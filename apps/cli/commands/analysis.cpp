@@ -775,7 +775,9 @@ std::optional<std::size_t> decode_ac4_as_coded(
 // The meter a decoded AC-4 presentation's channels are measured with, and the
 // decoded channel at each of its places: layout=bed's BS.1770 Annex 1 over the
 // 1/0, 2/0, 3/0 or 3/2 bed, a 7.X element's last pair left out of it, or
-// layout=rendered's Annex 3 over every channel by where it is (ac4_location()).
+// layout=rendered's Annex 3 over every channel by where it is (ac4_location()),
+// but for a channel that has no location there (22.2's bottom channels), which
+// is left out of the meter as a 7.X element's last pair is of the bed's.
 struct Ac4Meter {
     iclforge::ac3::meta::LoudnessMeter meter;
     std::vector<std::size_t> order;
@@ -789,16 +791,22 @@ Ac4Meter ac4_loudness_meter(const iclforge::ac4::DecodedFrame& pcm, bool rendere
                                                : iclforge::ac3::SampleRate::k48000;
     const std::span<const iclforge::ac4::Speaker> speakers{pcm.speakers};
     if (rendered) {
-        std::vector<std::size_t> order = ac4_order(
-            speakers, [](iclforge::ac4::Speaker s) { return static_cast<int>(ac4_location(s)); });
+        std::vector<std::size_t> order = ac4_order(speakers, [](iclforge::ac4::Speaker s) {
+            const auto location = ac4_location(s);
+            return location ? static_cast<int>(*location) : 99;
+        });
+        const auto located_end = std::ranges::find_if(
+            order, [&](std::size_t c) { return !ac4_location(speakers[c]).has_value(); });
+        const bool left_out = located_end != order.end();
+        order.erase(located_end, order.end());
         iclforge::ac3::eac3::chanmap::Layout layout{};
         for (const std::size_t c : order) {
-            layout.items[static_cast<std::size_t>(layout.count++)] = ac4_location(speakers[c]);
+            layout.items[static_cast<std::size_t>(layout.count++)] = *ac4_location(speakers[c]);
         }
         return Ac4Meter{.meter = iclforge::ac3::meta::LoudnessMeter{rate, layout},
                         .order = std::move(order),
                         .label = rendered_layout_label(layout),
-                        .pair_left_out = false};
+                        .pair_left_out = left_out};
     }
     std::vector<std::size_t> order = ac4_order(speakers, ac4_meter_rank);
     const auto bed_end = std::ranges::find_if(

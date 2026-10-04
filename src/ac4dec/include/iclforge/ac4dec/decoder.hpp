@@ -347,6 +347,18 @@ enum class Speaker : std::uint8_t {
     kTopSideLeft,    // Tsl, the top pair of the X.2 layouts: 5.X.2, the core layout
     kTopSideRight,   // Tsr
     kLfe2,           // the second LFE a bed can assign (Part 2 Tables 64 and 65)
+    // Part 2 Table A.27's other speakers, added after the ones above so that
+    // their values keep their meaning: the 9.X.4 layouts' screen pair, and the
+    // 22.2 layout's centre, top and bottom channels.
+    kLeftScreen,         // Lscr, the left screen edge speaker in 9.X.4
+    kRightScreen,        // Rscr
+    kTopFrontCentre,     // Tfc, in 22.2
+    kTopBackCentre,      // Tbc
+    kTopCentre,          // Tc
+    kBottomFrontLeft,    // Bfl
+    kBottomFrontRight,   // Bfr
+    kBottomFrontCentre,  // Bfc
+    kCentreBack,         // Cb
 };
 
 [[nodiscard]] ICLFORGE_AC4DEC_EXPORT std::string_view describe(Speaker speaker);
@@ -359,8 +371,8 @@ enum class Speaker : std::uint8_t {
 // renders them. The decoder renders only the intermediate spatial format
 // (Part 2 clause 5.10.3), into DecodedFrame::channels: 7.X.4 as coded, and
 // OutputConfig::downmix's layout otherwise, a two-channel target the
-// format's own stereo matrix, and none of the 9.X layouts, whose screen pair
-// Speaker does not name. An alternative presentation's alternative object
+// format's own stereo matrix, and none of the 9.X layouts, which no matrix
+// here renders to. An alternative presentation's alternative object
 // properties (Part 2 clause 6.3.9.4) are read and not applied.
 
 // ObjectProperties (ac4/ac4.hpp): Annex F.2 to F.10 and add_per_object_md()'s

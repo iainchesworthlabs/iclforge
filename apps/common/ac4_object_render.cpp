@@ -4,6 +4,7 @@
 #include <cmath>
 #include <optional>
 
+#include "ac4_channels.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/objects/oamd.hpp"
 
@@ -14,45 +15,11 @@ using Location = iclforge::ac3::eac3::chanmap::Location;
 using S = iclforge::ac4::Speaker;
 
 // Where each of AC-4's speakers sits among E-AC-3's locations (Table E2.5),
-// which the layout renderer places: the back pair at the rear surrounds, the
-// top front pair at the front heights, and the top back pair and an X.2
-// layout's top side pair at the top surrounds.
-[[nodiscard]] Location location_of(S speaker) {
-    switch (speaker) {
-        case S::kLeft:
-            return Location::kLeft;
-        case S::kRight:
-            return Location::kRight;
-        case S::kCentre:
-            return Location::kCentre;
-        case S::kLfe:
-            return Location::kLfe;
-        case S::kLeftSurround:
-            return Location::kLeftSurround;
-        case S::kRightSurround:
-            return Location::kRightSurround;
-        case S::kLeftBack:
-            return Location::kLrs;
-        case S::kRightBack:
-            return Location::kRrs;
-        case S::kLeftWide:
-            return Location::kLw;
-        case S::kRightWide:
-            return Location::kRw;
-        case S::kTopFrontLeft:
-            return Location::kVhl;
-        case S::kTopFrontRight:
-            return Location::kVhr;
-        case S::kTopBackLeft:
-        case S::kTopSideLeft:
-            return Location::kLts;
-        case S::kTopBackRight:
-        case S::kTopSideRight:
-            return Location::kRts;
-        case S::kLfe2:
-            return Location::kLfe2;
-    }
-    return Location::kCentre;
+// which the layout renderer places (ac4_location() in ac4_channels.hpp); none
+// for a speaker the table has no location for, which the renderer leaves
+// silent.
+[[nodiscard]] std::optional<Location> location_of(S speaker) {
+    return ac4_location(speaker);
 }
 
 [[nodiscard]] std::vector<S> speakers_for(iclforge::ac4::DownmixTarget target) {
@@ -92,7 +59,7 @@ using S = iclforge::ac4::Speaker;
     std::array<Location, render::OutputLayout::kMaxSlots> locations{};
     const std::size_t count = std::min(speakers.size(), locations.size());
     for (std::size_t i = 0; i < count; ++i) {
-        locations[i] = location_of(speakers[i]);
+        locations[i] = location_of(speakers[i]).value_or(Location::kCentre);
     }
     return render::OutputLayout::from_locations(std::span<const Location>(locations.data(), count))
         .value_or(render::OutputLayout::stereo());
@@ -119,11 +86,15 @@ void Ac4ObjectRenderer::reset() {
 Ac4ObjectRenderer::Gains Ac4ObjectRenderer::speaker_gains(iclforge::ac4::Speaker speaker) {
     // The bed as the one channel: the layout renderer's gain from it to each
     // slot, 1 to the slot of its own location where the layout has one.
+    Gains out{};
+    const std::optional<Location> location = location_of(speaker);
+    if (!location.has_value()) {
+        return out;
+    }
     iclforge::ac3::eac3::chanmap::Layout bed;
-    bed.items[0] = location_of(speaker);
+    bed.items[0] = *location;
     bed.count = 1;
     renderer_.set_bed(bed);
-    Gains out{};
     for (std::size_t slot = 0; slot < speakers_.size(); ++slot) {
         out[slot] = renderer_.bed_gain(0, slot);
     }

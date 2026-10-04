@@ -904,11 +904,20 @@ int transcode_from_ac4(std::string_view in_path, std::string_view out_path, std:
     }
 
     // The decoded channels at their Table E2.5 locations, in the WAV order a
-    // routing takes a source in.
+    // routing takes a source in. A channel with none (22.2's bottom channels)
+    // has no place in an AC-3 or E-AC-3 programme.
     std::vector<iclforge::ac3::eac3::chanmap::Location> locations;
     std::string names;
     for (const iclforge::ac4::Speaker speaker : source->speakers) {
-        locations.push_back(ac4_location(speaker));
+        const auto location = ac4_location(speaker);
+        if (!location.has_value()) {
+            fmt::println(stderr,
+                         "error: {}: the presentation's {} channel has no location in an AC-3 or "
+                         "E-AC-3 programme",
+                         in_path, iclforge::ac4::describe(speaker));
+            return kExitUsage;
+        }
+        locations.push_back(*location);
         names += (names.empty() ? "" : ",") +
                  std::string{iclforge::ac3::eac3::chanmap::name(locations.back())};
     }

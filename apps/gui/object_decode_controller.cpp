@@ -226,10 +226,14 @@ std::optional<RawResult> measure_ac4_objects(std::span<const std::byte> stream, 
             f.snap.push_back(p.snap);
             const bool bed = object.kind == iclforge::ac4::ObjectKind::kBed;
             beds += bed ? 1 : 0;
-            f.labels.push_back(bed && object.speaker
-                                   ? to_qstring(iclforge::ac3::eac3::chanmap::name(
-                                         iclforge::apps::ac4_location(*object.speaker)))
-                                   : QString());
+            // A bed speaker with no Table E2.5 location goes by AC-4's own name.
+            const auto location = bed && object.speaker
+                                      ? iclforge::apps::ac4_location(*object.speaker)
+                                      : std::nullopt;
+            f.labels.push_back(!bed || !object.speaker ? QString()
+                               : location
+                                   ? to_qstring(iclforge::ac3::eac3::chanmap::name(*location))
+                                   : to_qstring(iclforge::ac4::describe(*object.speaker)));
         }
         result.ac4_bed_objects = beds;
         result.ac4_dynamic_objects = static_cast<int>(pcm.objects.size()) - beds;

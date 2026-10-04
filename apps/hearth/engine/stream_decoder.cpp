@@ -42,11 +42,41 @@ ac3::eac3::chanmap::Layout ac4_bed(std::span<const iclforge::ac4::Speaker> speak
             case iclforge::ac4::Speaker::kTopBackRight:
             case iclforge::ac4::Speaker::kTopSideRight: location = Location::kRts; break;
             case iclforge::ac4::Speaker::kLfe2: location = Location::kLfe2; break;
+            // Table E2.5's vertical height centre, top surround and centre surround for 22.2's
+            // Tfc, Tc and Tbc, and Cb. The speakers with no location there (22.2's bottom
+            // channels, 9.X.4's screen pair) are refused by ac4_placeable() before a layout is
+            // made of them, so the default stands for none.
+            case iclforge::ac4::Speaker::kTopFrontCentre: location = Location::kVhc; break;
+            case iclforge::ac4::Speaker::kTopCentre:
+            case iclforge::ac4::Speaker::kTopBackCentre: location = Location::kTs; break;
+            case iclforge::ac4::Speaker::kCentreBack: location = Location::kCs; break;
+            case iclforge::ac4::Speaker::kLeftScreen:
+            case iclforge::ac4::Speaker::kRightScreen:
+            case iclforge::ac4::Speaker::kBottomFrontLeft:
+            case iclforge::ac4::Speaker::kBottomFrontRight:
+            case iclforge::ac4::Speaker::kBottomFrontCentre: break;
         }
         // clang-format on
         bed.items[static_cast<std::size_t>(bed.count++)] = location;
     }
     return bed;
+}
+
+bool ac4_placeable(std::span<const iclforge::ac4::Speaker> speakers) {
+    const auto unplaced = [](iclforge::ac4::Speaker speaker) {
+        switch (speaker) {
+            case iclforge::ac4::Speaker::kLeftScreen:
+            case iclforge::ac4::Speaker::kRightScreen:
+            case iclforge::ac4::Speaker::kBottomFrontLeft:
+            case iclforge::ac4::Speaker::kBottomFrontRight:
+            case iclforge::ac4::Speaker::kBottomFrontCentre:
+                return true;
+            default:
+                return false;
+        }
+    };
+    return speakers.size() <= render::LayoutRenderer::kMaxCoded &&
+           std::ranges::none_of(speakers, unplaced);
 }
 
 ac3::Acmod ac4_acmod(std::span<const iclforge::ac4::Speaker> speakers) {
@@ -446,6 +476,11 @@ std::expected<std::size_t, std::string> StreamDecoder::decode_ac4(std::span<cons
         return delivered_;
     }
     const iclforge::ac4::DecodedFrame& pcm = **decoded;
+    if (pcm.objects.empty() && !ac4_placeable(pcm.speakers)) {
+        flush_ac4(deliver);
+        return std::unexpected(std::string{
+            "An AC-4 frame's channels (22.2's) are more than the layout renderer places."});
+    }
     place_ac4_frame(pcm, deliver);
     report_ac4(pcm, unit.size(), reported);
     return delivered_;

@@ -42,8 +42,10 @@ namespace iclforge::ac4bridge {
 // applications place a decoded presentation by. Lb and Rb are the rear
 // surrounds, Lw and Rw the wides, the top front pair the vertical heights, the
 // top back and top side pairs the top surrounds (Table E2.5 has one pair for
-// both), and the second LFE LFE2.
-[[nodiscard]] inline iclforge::ac3::eac3::chanmap::Location location(
+// both), the second LFE LFE2, and 22.2's Tfc the vertical height centre, Tc and
+// Tbc the top surround and Cb the centre surround. 22.2's bottom channels and
+// 9.X.4's screen pair have no location there: nothing.
+[[nodiscard]] inline std::optional<iclforge::ac3::eac3::chanmap::Location> location(
     iclforge::ac4::Speaker speaker) {
     using L = iclforge::ac3::eac3::chanmap::Location;
     switch (speaker) {
@@ -79,8 +81,31 @@ namespace iclforge::ac4bridge {
             return L::kRts;
         case iclforge::ac4::Speaker::kLfe2:
             return L::kLfe2;
+        case iclforge::ac4::Speaker::kTopFrontCentre:
+            return L::kVhc;
+        case iclforge::ac4::Speaker::kTopCentre:
+        case iclforge::ac4::Speaker::kTopBackCentre:
+            return L::kTs;
+        case iclforge::ac4::Speaker::kCentreBack:
+            return L::kCs;
+        case iclforge::ac4::Speaker::kLeftScreen:
+        case iclforge::ac4::Speaker::kRightScreen:
+        case iclforge::ac4::Speaker::kBottomFrontLeft:
+        case iclforge::ac4::Speaker::kBottomFrontRight:
+        case iclforge::ac4::Speaker::kBottomFrontCentre:
+            return std::nullopt;
     }
-    return L::kCentre;
+    return std::nullopt;
+}
+
+// Whether every one of `speakers` has a location, which a bed made of them needs.
+[[nodiscard]] inline bool placeable(std::span<const iclforge::ac4::Speaker> speakers) {
+    for (const iclforge::ac4::Speaker speaker : speakers) {
+        if (!location(speaker).has_value()) {
+            return false;
+        }
+    }
+    return true;
 }
 
 // The coded layout a decoded block's channels are in, as the renderer takes it:
@@ -93,7 +118,8 @@ namespace iclforge::ac4bridge {
         if (layout.count >= iclforge::ac3::eac3::chanmap::kMaxChannels) {
             break;
         }
-        layout.items[static_cast<std::size_t>(layout.count)] = location(speaker);
+        layout.items[static_cast<std::size_t>(layout.count)] =
+            location(speaker).value_or(iclforge::ac3::eac3::chanmap::Location::kCentre);
         ++layout.count;
     }
     return layout;
