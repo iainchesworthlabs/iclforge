@@ -143,6 +143,18 @@ std::expected<Session, std::string> Session::open(
         if (chosen && *chosen < reading.presentations.size()) {
             session.facts_.channels =
                 static_cast<std::uint16_t>(reading.presentations[*chosen].speakers.size());
+            // A presentation with an HSF extension decodes at twice or four times the stream's
+            // base rate. The frame lengths read above, the layout renderer and the sink are
+            // sized by the table of contents' rate, so it is refused, not played at the wrong
+            // speed.
+            const int decoded_rate = reading.presentations[*chosen].sample_rate_hz;
+            if (decoded_rate > 0 && static_cast<std::uint32_t>(decoded_rate) != rate) {
+                return std::unexpected(
+                    fmt::format("\"{}\" is AC-4 at {} Hz, and this player plays AC-4 at the "
+                                "stream's base rate of "
+                                "{} Hz only.",
+                                path, decoded_rate, rate));
+            }
         }
         if (units->unread > 0) {
             note += fmt::format("{}{} of its frames did not read, and are concealed.",
