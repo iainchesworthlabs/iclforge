@@ -25,6 +25,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "ac4dec_units.hpp"
+
 #include "iclforge/ac4/ac4.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 #include "iclforge/ac4enc/encoder.hpp"
@@ -36,6 +38,7 @@ namespace {
 
 using iclforge::test::kSanitized;
 namespace detail = iclforge::ac4::detail;
+using QmfMatrix = iclforge::ac4::detail::QmfMatrix;
 using QmfValue = iclforge::ac4::detail::QmfValue;
 
 constexpr int kSlots = 32;  // num_qmf_timeslots at frame_rate_index 13
@@ -50,7 +53,7 @@ class ToneFrames {
     std::vector<QmfValue> next(double amplitude) {
         std::vector<detail::Real> pcm(kFrame);
         for (detail::Real& x : pcm) {
-            x = static_cast<detail::Real>(
+            x = ac4dec_units::time_real(
                 32768.0 * amplitude *
                 std::sin(2.0 * std::numbers::pi * hz_ * static_cast<double>(n_) / 48000.0));
             ++n_;
@@ -77,7 +80,7 @@ double amplitude_for(double relative, double dialnorm) {
 void run_frame(detail::DrcStage& stage, const iclforge::ac4::OutputConfig& output,
                const detail::DrcFrameValues& values, std::vector<QmfValue> left) {
     std::vector<QmfValue> right(left.size());
-    std::array<std::vector<QmfValue>*, 2> matrices = {&left, &right};
+    std::array<QmfMatrix, 2> matrices = {left, right};
     stage.process(output, values, matrices, matrices);
 }
 
@@ -369,10 +372,10 @@ TEST_CASE("transmitted DRC gains apply by channel group, band and subframe", "[a
     const iclforge::ac4::OutputConfig output{
         .output_level_dbfs = -24.0, .drc = iclforge::ac4::DrcMode::kDefault, .headphones = false};
     std::vector<std::vector<QmfValue>> channels(
-        speakers.size(), std::vector<QmfValue>(kSlots * 64, QmfValue{1.0, 0.0}));
-    std::vector<std::vector<QmfValue>*> matrices;
+        speakers.size(), std::vector<QmfValue>(kSlots * 64, ac4dec_units::qmf(1.0)));
+    std::vector<QmfMatrix> matrices;
     for (auto& channel : channels) {
-        matrices.push_back(&channel);
+        matrices.push_back(channel);
     }
     stage.process(output, {.dialnorm = -30.0, .curve = std::nullopt, .gains = set, .reset = false},
                   matrices, matrices);
@@ -386,13 +389,10 @@ TEST_CASE("transmitted DRC gains apply by channel group, band and subframe", "[a
                 const double gain =
                     2.0 * std::exp2(static_cast<double>(kGroup[c] * 10 + sf - band_of(k)) / 6.0);
                 const QmfValue got = channels[c][static_cast<std::size_t>(slot * 64 + k)];
-                if (std::abs(static_cast<double>(got.real()) - gain) >
-                    1e4 *
-                        static_cast<double>(
-                            std::numeric_limits<iclforge::ac4::detail::Real>::epsilon()) *
-                        gain) {
+                if (std::abs(ac4dec_units::qmf_units(got.real()) - gain) >
+                    1e4 * ac4dec_units::relative_epsilon() * gain) {
                     FAIL("channel " << c << " slot " << slot << " subband " << k << ": "
-                                    << got.real() << ", expected " << gain);
+                                    << ac4dec_units::qmf_units(got.real()) << ", expected " << gain);
                 }
             }
         }
@@ -434,10 +434,10 @@ TEST_CASE("transmitted DRC gains apply by Part 2 Table 69's groups to the immers
                                                  .drc = iclforge::ac4::DrcMode::kDefault,
                                                  .headphones = false};
         std::vector<std::vector<QmfValue>> channels(
-            speakers.size(), std::vector<QmfValue>(kSlots * 64, QmfValue{1.0, 0.0}));
-        std::vector<std::vector<QmfValue>*> matrices;
+            speakers.size(), std::vector<QmfValue>(kSlots * 64, ac4dec_units::qmf(1.0)));
+        std::vector<QmfMatrix> matrices;
         for (auto& channel : channels) {
-            matrices.push_back(&channel);
+            matrices.push_back(channel);
         }
         stage.process(output,
                       {.dialnorm = -30.0, .curve = std::nullopt, .gains = set, .reset = false},
@@ -446,7 +446,8 @@ TEST_CASE("transmitted DRC gains apply by Part 2 Table 69's groups to the immers
             CAPTURE(c);
             // -6 dB2 per group from the first: a half, a quarter, and so on.
             const double gain = std::exp2(-static_cast<double>(groups[c] + 1));
-            CHECK(std::abs(static_cast<double>(channels[c][100].real()) - gain) < 1e-12);
+            CHECK(std::abs(ac4dec_units::qmf_units(channels[c][100].real()) - gain) <
+                  1e4 * ac4dec_units::relative_epsilon() * gain + 1e-12);
         }
     }
 }

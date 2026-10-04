@@ -1076,11 +1076,15 @@ and the second restarts in a loop.
 ## AC-4
 
 `sdkconfig.ac4` builds the component's AC-4 decoder into the example (`CONFIG_ICLFORGE_AC4`,
-offered only on a part with a floating-point unit, and in practice one with PSRAM). A stream
-that opens with an AC-4 sync word then plays as an AC-3 or E-AC-3 one does, from any source.
+in practice on a part with PSRAM). A stream that opens with an AC-4 sync word then plays as an
+AC-3 or E-AC-3 one does, from any source.
 [The ESP32-P4 page](../../../../docs/platforms/bare-metal/esp32-p4.md#ac-4) has what a stream of
-each kind takes. Only the ESP32-P4 has run it: the S3 and C6 builds are phases D14c and D14d of
-`planning/ac4.md` and do not exist yet, and the Sendspin player advertises `ac3` and `eac3` as its
+each kind takes. Only the ESP32-P4 has played it on a board. On the ESP32-S3 it builds with
+`sdkconfig.psram` and `sdkconfig.ac4`, and an AC-4 play keeps its decoder's state in PSRAM
+(`CONFIG_ICLFORGE_AC4_INTERNAL_BELOW`, 512 bytes on that part: [ESP32-S3](../../../../docs/platforms/bare-metal/esp32-s3.md#ac-4));
+it has been checked under QEMU with the footprint probe and not played on a board (phase D14c of
+`planning/ac4.md`). On an ESP32-C6 the decoder builds in the fixed-point tier and does not fit beside WiFi
+([the C6 page](../../../../docs/platforms/bare-metal/esp32-c6.md#ac-4)). The Sendspin player advertises `ac3` and `eac3` as its
 data types and not `ac4` (`main/sendspin/player/sendspin.cpp`), so no AC-4 stream reaches a board
 from a Sendspin group (phase I6). The measurements were made with `POST /play` and a URL.
 

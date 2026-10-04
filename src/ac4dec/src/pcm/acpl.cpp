@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <memory>
 #include <numbers>
 
 #include "iclforge/ac4core/detail/profiling.hpp"
@@ -264,14 +265,13 @@ ParseResult acpl_values(const ChannelElement& element, AcplQuantHistory& history
     return {};
 }
 
-AcplStage::AcplStage()
-    : decorrelators_{acpl::Decorrelator<Real>(0), acpl::Decorrelator<Real>(1),
-                     acpl::Decorrelator<Real>(2), acpl::Decorrelator<Real>(0),
-                     acpl::Decorrelator<Real>(1)} {}
+AcplStage::AcplStage() = default;
 
 void AcplStage::reset() {
     for (auto& decorrelator : decorrelators_) {
-        decorrelator.reset();
+        if (decorrelator != nullptr) {
+            decorrelator->reset();
+        }
     }
     for (auto& ducker : duckers_) {
         ducker.reset();
@@ -283,7 +283,13 @@ void AcplStage::reset() {
 // Pseudocode 111, then Pseudocode 114 with the gains of Pseudocodes 112 and
 // 113 (src/ac4dec/ERRATA.md, "The transient ducker's energy").
 void AcplStage::decorrelate(int decorrelator, std::span<const QmfValue> in, std::span<QmfValue> out, int num_ts) {
-    decorrelators_[at(decorrelator)].process(in, out, num_ts);
+    // D0, D1 and D2, then the immersive element's second D0 and D1.
+    static constexpr std::array<int, kDecorrelatorSlots> kIndex = {0, 1, 2, 0, 1};
+    std::unique_ptr<acpl::Decorrelator<Real>>& slot = decorrelators_[at(decorrelator)];
+    if (slot == nullptr) {
+        slot = std::make_unique<acpl::Decorrelator<Real>>(kIndex[at(decorrelator)]);
+    }
+    slot->process(in, out, num_ts);
     duckers_[at(decorrelator)].process(out, num_ts);
 }
 
@@ -537,31 +543,31 @@ void AcplStage::apply(int ch_mode, bool add_ch_base, ElementKind kind, int codec
                       int num_ts, const AcplChannels& channels) {
     AC4_ZONE_SCOPED_N("ac4_acpl");
     const std::size_t n = at(num_ts) * kSubbands;
-    const auto matrix_of = [&](Speaker speaker) -> std::vector<QmfValue>* {
+    const auto matrix_of = [&](Speaker speaker) -> QmfMatrix {
         for (std::size_t c = 0; c < channels.speakers.size(); ++c) {
             if (channels.speakers[c] == speaker && c < channels.matrices.size()) {
                 return channels.matrices[c];
             }
         }
-        return nullptr;
+        return {};
     };
     // The inputs are copied first: every output overwrites a channel an
     // input came from.
     const auto input = [&](std::size_t slot, Speaker speaker) -> std::span<const QmfValue> {
-        const std::vector<QmfValue>* matrix = matrix_of(speaker);
+        const QmfMatrix matrix = matrix_of(speaker);
         std::vector<QmfValue>& copy = in_[slot];
         copy.assign(n, QmfValue{});
-        if (matrix != nullptr && matrix->size() >= n) {
-            std::copy_n(matrix->begin(), n, copy.begin());
+        if (matrix.size() >= n) {
+            std::copy_n(matrix.begin(), n, copy.begin());
         }
         return copy;
     };
     const auto output = [&](Speaker speaker) -> std::span<QmfValue> {
-        std::vector<QmfValue>* matrix = matrix_of(speaker);
-        if (matrix == nullptr || matrix->size() < n) {
+        const QmfMatrix matrix = matrix_of(speaker);
+        if (matrix.size() < n) {
             return {};
         }
-        return std::span<QmfValue>(*matrix).first(n);
+        return matrix.first(n);
     };
     const auto writable = [&](std::initializer_list<Speaker> speakers) {
         return std::ranges::all_of(speakers, [&](Speaker s) { return !output(s).empty(); });

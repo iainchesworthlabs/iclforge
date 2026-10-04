@@ -2065,6 +2065,22 @@ jobs:
           . "$IDF_PATH/export.sh"
           ./tools/checks/run_esp32s3_probe.sh --encoder
 
+      # The AC-4 decoder on this part (planning/ac4.md, D14c): the component's
+      # CONFIG_ICLFORGE_AC4 with the AC-4 probe, the decoder's state in the
+      # board's octal PSRAM, which QEMU emulates. Its own build directory
+      # (build-ac4/), so the two steps above keep theirs. It holds the six
+      # fixtures' PCM to the hashes the Cortex-M3 leg and the host are pinned to
+      # (decision 26), and the internal RAM each took at its worst to a ceiling,
+      # 2.0's the tightest (decision 29); the runner's AC-4 block has the
+      # figures. The run itself takes under a minute of QEMU.
+      - name: Build and run the AC-4 probe under QEMU
+        env:
+          ICLFORGE_ESP32S3_SUMMARY: apps/baremetal/platform/esp32s3/build/esp32s3-ac4-probe.txt
+        run: |
+          set -eu
+          . "$IDF_PATH/export.sh"
+          ./tools/checks/run_esp32s3_probe.sh --ac4
+
       # BUILD ONLY, and the reason is the peripheral rather than the code:
       # qemu-system-xtensa has no I2S, so there is nothing for the DMA to drain
       # into and the first i2s_channel_write would block until the job timed
@@ -3036,6 +3052,7 @@ jobs:
             apps/baremetal/platform/esp32s3/build/iclforge_probe_esp32s3.map
             apps/baremetal/platform/esp32s3/build/esp32s3-probe.txt
             apps/baremetal/platform/esp32s3/build/esp32s3-encode-probe.txt
+            apps/baremetal/platform/esp32s3/build/esp32s3-ac4-probe.txt
             esp-idf/iclforge/examples/hearth_sink/qemu-stream.txt
             esp-idf/iclforge/examples/hearth_sink/qemu-capture.txt
             esp-idf/iclforge/examples/hearth_sink/qemu-capture16.txt
@@ -3590,6 +3607,17 @@ jobs:
 
       - name: AC-4 instructions per frame under QEMU -icount
         run: ./tools/checks/run_baremetal_probe.sh --ac4 --icount | tee "build/config-arm-none-eabi-minimal/icount-ac4.txt"
+
+      # The AC-4 decoder's fixed-point tier on the same leg (planning/ac4.md, D14d):
+      # integer arithmetic, so its hashes are the same here, on the host and on
+      # RV32IMC, and are held to their own pins
+      # (tests/golden/ac4-fixed-probe-pcm-hashes.json). The -icount run gates the
+      # tier's own instruction ceilings (ICOUNT_CEILING_AC4_FIXED in the runner).
+      - name: Build and run the fixed-point AC-4 probe under QEMU -icount
+        run: ./tools/checks/run_baremetal_probe.sh --ac4 --scalar=fixed --icount | tee "build/config-arm-none-eabi-minimal/icount-ac4-fixed.txt"
+
+      - name: Fixed-point AC-4 hashes against the pinned ones
+        run: python3 tools/checks/check_probe_hashes.py --expected tests/golden/ac4-fixed-probe-pcm-hashes.json "build/config-arm-none-eabi-minimal/icount-ac4-fixed.txt"
 
       # The footprint table in docs/performance-trend.md is written by hand
       # from these numbers, so keep the run's own copy: a table nobody can

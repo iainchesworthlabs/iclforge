@@ -287,6 +287,18 @@ jobs:
         shell: bash
         run: python3 tools/checks/generate_support_matrices.py --check
 
+      # The AC-4 decoder's generated tables (planning/ac4.md, D14a and D14d): each generator can
+      # say whether the committed header is what it would write. Linux only:
+      # gen_ac4_transform_tables.py takes cos and sin from the host's C library, as the decoder
+      # does, and the header was written where those are glibc's.
+      - name: Generated AC-4 tables
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          python3 tools/generators/gen_ac4_qmf_twiddles.py --check
+          python3 tools/generators/gen_ac4_fixed_tables.py --check
+          python3 tools/generators/gen_ac4_transform_tables.py --check
+
       # `git ls-files` rather than a hard-coded list of directories: a shell
       # script added anywhere in the tree is then linted the day it lands,
       # instead of silently sitting outside the gate until someone remembers to

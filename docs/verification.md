@@ -1454,8 +1454,9 @@ under "Object audio syntax", "A-JOC" and "Object audio metadata and the ISF rend
 
 Phase D14a gives the decoder's arithmetic a scalar seam: `ICLFORGE_DECODE_SCALAR` builds the
 transforms, QMF banks and the A-SPX, A-CPL, A-JCC and A-JOC kernels of `src/ac4core` and
-`src/ac4dec/src/pcm` in `double`, the default, or `float`. The encoder is `double` in every build,
-and no fixed-point tier exists for AC-4 yet. What is checked:
+`src/ac4dec/src/pcm` in `double`, the default, or `float`, and phase D14d adds `fixed`
+(`Fixed32` with a block exponent per transform block and per QMF slot). The encoder is `double` in
+every build. What is checked:
 
 - **The float decode against the double one** (`tools/checks/check_ac4_decode_scalar_snr.py`, in
   FFmpeg Validate; the floors are in `tests/golden/ac4dec/scalar-agreement.json`): every committed
@@ -1491,6 +1492,13 @@ and no fixed-point tier exists for AC-4 yet. What is checked:
   (`tools/checks/check_probe_hashes.py`). The `linux-gcc` leg also runs the probe natively on
   x86-64 after a merge and in the nightly run, and holds its hashes to the same pins. The rows are
   in [Performance trend](performance-trend.md#the-ac-4-decoder).
+- **The fixed-point tier** (phase D14d): FFmpeg Validate builds a fixed CLI, runs both scorers with
+  it at their pins, and holds its decode to the double one as above, at the floors in
+  `tests/golden/ac4dec/scalar-agreement-fixed.json`. When they were pinned the two agreed to 105.7
+  to 132.1 dB below the crossover and 34.2 to 97.2 dB above it where a stream has A-SPX. The probe
+  runs at the tier on the Cortex-M3 leg with `--icount` and natively on the `linux-gcc` leg, and
+  both are held to `tests/golden/ac4-fixed-probe-pcm-hashes.json`; integer arithmetic, so the
+  hashes are the same on every architecture, RV32IMC included, where they were checked by hand.
 - **On the ESP32-P4** (phase D14b, `CONFIG_ICLFORGE_AC4`): no QEMU runs the P4, so CI builds
   `hearth_sink` with AC-4 in it and does not run it, and the checks are on a board. Twenty plays
   of DEE's streams (2.0, 5.1 and 5.1.4 in full decoding, the three 5.1.4 modes in core decoding and
@@ -1501,7 +1509,11 @@ and no fixed-point tier exists for AC-4 yet. What is checked:
   `std::pow` and `std::exp2` at `float` gave a different last bit in each C library, and D14a4 took
   those calls out of libm. [ESP32-P4](platforms/bare-metal/esp32-p4.md#ac-4) has the times: the P4
   decodes 2.0 in SIMPLE and in A-SPX mode, and through the frame-rate converter at 24 and 25 fps, in
-  real time and nothing wider. AC-4 on the S3 and on the C6 is not built.
+  real time and nothing wider. On the S3 the AC-4 probe's six fixtures decode under QEMU in CI to
+  the pinned hashes, with the decoder's state in PSRAM; no board has timed it
+  ([ESP32-S3](platforms/bare-metal/esp32-s3.md#ac-4)). The C6 builds the decoder in the fixed-point tier,
+  checked by the fixed-point gate above and the probe's hashes on the Cortex-M3 leg and RV32IMC
+  ([ESP32-C6](platforms/bare-metal/esp32-c6.md#ac-4)); no board has run it.
 
 ### The encoder
 

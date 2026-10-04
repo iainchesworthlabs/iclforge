@@ -4,8 +4,10 @@
 #include <cmath>
 #include <complex>
 #include <cstddef>
+#include <cstdint>
 #include <numbers>
 
+#include "iclforge/ac4core/dsp/scalar_traits.hpp"
 #include "iclforge/ac4core/tables/qmf_tables.hpp"
 
 namespace iclforge::ac4::detail {
@@ -13,8 +15,16 @@ namespace {
 
 constexpr int kSubbands = 64;
 // The QMF domain works at the inverse transform's scale, full scale 2^15
-// (substream_pcm.cpp, kFullScale).
-constexpr double kFullScalePower = 32768.0 * 32768.0;
+// (substream_pcm.cpp, kQmfFullScale), and at Fixed32 at 2^-3, below the double
+// decoder's by dsp::kQmfShift (dsp/scalar_traits.hpp).
+constexpr double kFullScalePower = [] {
+    if constexpr (dsp::kFixed<Real>) {
+        const double full_scale = 1.0 / static_cast<double>(std::int64_t{1} << -(15 + dsp::kQmfShift<Real>));
+        return full_scale * full_scale;
+    } else {
+        return 32768.0 * 32768.0;
+    }
+}();
 // BS.1770's offset from K-weighted mean square to LKFS.
 constexpr double kLkfsOffset = -0.691;
 // A floor for the level of silence, in the power's units.
@@ -356,21 +366,22 @@ void DrcStage::reset() noexcept {
     last_gain_ = 1.0;
 }
 
-double DrcStage::slot_level(std::span<std::vector<QmfValue>* const> side, int slot) const {
+double DrcStage::slot_level(std::span<const QmfMatrix> side, int slot) const {
     double power = 0.0;
     for (std::size_t c = 0; c < side.size() && c < loudness_weight_.size(); ++c) {
         const double weight = loudness_weight_[c];
         if (weight == 0.0) {
             continue;
         }
-        const QmfValue* row = side[c]->data() + static_cast<std::size_t>(slot) * kSubbands;
+        const QmfValue* row = side[c].data() + static_cast<std::size_t>(slot) * kSubbands;
         double channel = 0.0;
         for (std::size_t k = 0; k < kSubbands; ++k) {
             // The level detector's accumulation stays double regardless of
             // Real, for the same reason a downmix or DRC gain matrix does:
             // norm(row[k]) is Real, widened once here rather than summed at
-            // Real precision.
-            channel += k_weight_[k] * static_cast<double>(norm(row[k]));
+            // Real precision; at Fixed32 it is the exact energy as a mantissa
+            // and a power of two (dsp::energy_of).
+            channel += k_weight_[k] * static_cast<double>(dsp::energy_of(row[k]));
         }
         power += weight * channel;
     }
@@ -380,8 +391,8 @@ double DrcStage::slot_level(std::span<std::vector<QmfValue>* const> side, int sl
 }
 
 void DrcStage::process(const OutputConfig& output, const DrcFrameValues& values,
-                       std::span<std::vector<QmfValue>* const> matrices,
-                       std::span<std::vector<QmfValue>* const> side) {
+                       std::span<const QmfMatrix> matrices,
+                       std::span<const QmfMatrix> side) {
     if (values.dialnorm) {
         dialnorm_ = values.dialnorm;
     }
@@ -430,7 +441,7 @@ void DrcStage::process(const OutputConfig& output, const DrcFrameValues& values,
             gain = gain_smoothed_;
         }
         for (std::size_t c = 0; c < matrices.size(); ++c) {
-            QmfValue* row = matrices[c]->data() + static_cast<std::size_t>(n) * kSubbands;
+            QmfValue* row = matrices[c].data() + static_cast<std::size_t>(n) * kSubbands;
             if (values.gains) {
                 // Clause 5.7.9.3.2: the gain of the channel's group, its band
                 // and the slot's subframe, constant across each.

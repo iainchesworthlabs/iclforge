@@ -35,13 +35,16 @@ HOST=0
 DIRECTION=decoder
 # --ac4: the third profile, the AC-4 decoder (planning/ac4.md, D14a) in float, with its own
 # probe (apps/baremetal/ac4_probe.cpp) and its own presets, since AC-4 shares nothing with
-# iclforge::ac3 and an image carries one probe.
+# iclforge::ac3 and an image carries one probe. --ac4 --scalar=fixed is the same probe on the
+# decoder's fixed-point tier (D14d), with ceilings of its own.
 # --stage-timers: build the library with ICLFORGE_STAGE_TIMERS, so the probe
 # prints where each fixture's decode time goes stage by stage. On this leg
 # that is shape only - QEMU's clock describes the host, and the host shape's
 # describes a desktop - but it is the same build a board run uses, and this
 # is where it is proven to build and run. Passed to CMake in both states, so
-# a cached ON from an earlier run cannot leak into a plain one.
+# a cached ON from an earlier run cannot leak into a plain one. With --ac4 the
+# probe also names the stage open at each fixture's peak heap
+# (<fixture>.peak_stage), which a build without the timers prints as "-".
 STAGE_TIMERS=OFF
 # --icount: the one timing figure on this leg that means anything. The probe
 # is built with its clock on the mps2-an385's 25 MHz CMSDK timer
@@ -70,11 +73,6 @@ if [[ "$ICOUNT" == "1" && "$HOST" == "1" ]]; then
     echo "error: --icount is a QEMU mode; it cannot be combined with --host" >&2
     exit 2
 fi
-if [[ "$DIRECTION" == "ac4" && ( -n "${SCALAR:-}" || "$STAGE_TIMERS" == "ON" ) ]]; then
-    echo "error: the AC-4 probe is float and has no stage timers; --scalar and --stage-timers do not apply" >&2
-    exit 2
-fi
-
 # --- instruction ceilings (--icount) ---------------------------------------
 # Thumb-2 instructions per frame on the soft-float Cortex-M3 leg, measured
 # 2026-09-10 at the values docs/performance-trend.md's "Instructions per
@@ -143,36 +141,36 @@ declare -A ICOUNT_CEILING_ENCODE=(
 # change, and a change past one stops here to be explained in that table.
 #
 # Thumb-2 instructions per frame (--ac4 --icount), the generic seam's portable vector types
-# and all.
+# and all. Measured again 2026-10-03 with the decoder's memory work in (planning/ac4.md): 25.2 M,
+# 35.1 M, 87.2 M, 100.7 M, 161.8 M and 29.3 M, from 54.8 M, 57.3 M, 116.7 M, 122.9 M, 206.3 M and
+# 58.8 M. A figure is the average over a fixture's three or four frames, the first included, and
+# the first no longer builds the inverse transform's tables in software floating point: they
+# are in flash (dsp/transform_tables.hpp).
 declare -A ICOUNT_CEILING_AC4=(
-    [ac4_20_music]=60000000
-    [ac4_20_acpl]=64000000
-    [ac4_51_music]=130000000
-    [ac4_51_acpl]=137000000
-    [ac4_514_tones]=227000000
-    [ac4_20_companding]=64500000
+    [ac4_20_music]=28000000
+    [ac4_20_acpl]=39000000
+    [ac4_51_music]=96000000
+    [ac4_51_acpl]=111000000
+    [ac4_514_tones]=178000000
+    [ac4_20_companding]=32500000
 )
-# Steady-state allocations per frame. The decoder's syntax layer still builds its element
-# vectors afresh each frame (planning/ac4.md, D14a's memory audit); these hold the distance
-# from the frame's own zero from growing while that is open.
-declare -A CHURN_CEILING_AC4=(
-    [ac4_20_music]=58
-    [ac4_20_acpl]=56
-    [ac4_51_music]=168
-    [ac4_51_acpl]=99
-    [ac4_514_tones]=210
-    [ac4_20_companding]=82
+# The fixed-point tier's (--ac4 --scalar=fixed --icount), on the same leg with the same rule:
+# 6,700,000, 10,529,000, 24,041,000, 28,787,000, 42,962,000 and 8,308,000 in the order below
+# (2026-10-03; 38.2 M, 34.2 M, 55.6 M, 52.5 M, 90.4 M and 39.9 M at D14d, before the tables
+# went to flash). Integer arithmetic where the float tier's is software floating point.
+declare -A ICOUNT_CEILING_AC4_FIXED=(
+    [ac4_20_music]=7500000
+    [ac4_20_acpl]=11600000
+    [ac4_51_music]=26500000
+    [ac4_51_acpl]=31700000
+    [ac4_514_tones]=47500000
+    [ac4_20_companding]=9200000
 )
-# Each fixture's peak heap in bytes, on either leg: the host's 64-bit pointers put it a few
-# per cent above the Cortex-M3's, and one figure covers both.
-declare -A PEAK_CEILING_AC4=(
-    [ac4_20_music]=485000
-    [ac4_20_acpl]=690000
-    [ac4_51_music]=1100000
-    [ac4_51_acpl]=1330000
-    [ac4_514_tones]=2130000
-    [ac4_20_companding]=522000
-)
+# Each fixture's peak heap and steady-state allocations a frame, on either leg and at either
+# tier, are in tests/golden/ac4-probe-ceilings.json, which tools/checks/check_probe_ceilings.py
+# reads here and in run_esp32s3_probe.sh --ac4: a figure is stated once, with what it was measured
+# at, and a fixture with no entry fails.
+AC4_CEILINGS="$REPO/tests/golden/ac4-probe-ceilings.json"
 
 # --- ceilings --------------------------------------------------------------
 # Bytes. text+data+bss of the linked probe on the bare-metal target, and the
@@ -292,9 +290,24 @@ if [[ "$DIRECTION" == "ac4" ]]; then
     # retained; the stack a decode used, read by painting, 19,480 bytes on the Cortex-M3 and
     # 23,920 on the x86-64 host, whose frames are larger. Every ceiling a tenth or so over its
     # figure.
-    ICLFORGE_MAX_IMAGE_BYTES=${ICLFORGE_MAX_IMAGE_BYTES_AC4:-750000}
-    ICLFORGE_MAX_HEAP_BYTES=${ICLFORGE_MAX_HEAP_BYTES_AC4:-2130000}
-    ICLFORGE_MAX_STEADY_ALLOCS_PER_FRAME=${ICLFORGE_MAX_STEADY_ALLOCS_PER_FRAME_AC4:-210}
+    #
+    # Measured again 2026-10-03 with the decoder's memory work in: 750,276 bytes, 58,380 more,
+    # the inverse transform's float tables for the five block lengths of a 2048-sample frame in
+    # flash where they were built on the heap (dsp/transform_tables.hpp), and 2,400 bytes of
+    # .bss the probe's own stage-timer tables hold now that it names the stage at a peak.
+    ICLFORGE_MAX_IMAGE_BYTES=${ICLFORGE_MAX_IMAGE_BYTES_AC4:-825000}
+    # The fixed-point tier's image: 727,656 bytes at D14d (725,004 .text), 801,812 on
+    # 2026-10-03 with the transform tables (Q7.24, and the post-twiddles the tier has besides)
+    # in flash. Its converter tables are Q1.30 integers built by the compiler, the 1001/960 one
+    # 188,376 bytes and read in place, and the float tables are not linked. Peaks, churn, stack
+    # and retained bytes share the float tier's ceilings.
+    if [[ "${SCALAR:-}" == "fixed" ]]; then
+        ICLFORGE_MAX_IMAGE_BYTES=${ICLFORGE_MAX_IMAGE_BYTES_AC4:-880000}
+        for key in "${!ICOUNT_CEILING_AC4_FIXED[@]}"; do
+            ICOUNT_CEILING_AC4[$key]=${ICOUNT_CEILING_AC4_FIXED[$key]}
+        done
+    fi
+    ICLFORGE_MAX_HEAP_BYTES=${ICLFORGE_MAX_HEAP_BYTES_AC4:-1680000}
     ICLFORGE_MAX_RETAINED_BYTES=${ICLFORGE_MAX_RETAINED_BYTES_AC4:-1024}
     if [[ "$HOST" == "1" ]]; then
         ICLFORGE_MAX_STACK_BYTES=${ICLFORGE_MAX_STACK_BYTES_AC4:-28500}
@@ -405,20 +418,7 @@ if [[ "$DIRECTION" == "ac4" ]]; then
         echo "::error title=Footprint regression::a decode used $stack bytes of stack, ceiling is $ICLFORGE_MAX_STACK_BYTES" >&2
         exit 1
     fi
-    # The fixtures' own lines: heap.peak_bytes and stack.peak_bytes end the same way.
-    PEAKS=$(grep -o 'ac4_[a-z0-9_]*\.peak_bytes=[0-9]*' "$OUTPUT" | sed 's/\.peak_bytes=/ /')
-    while read -r codec peak; do
-        ceiling=${PEAK_CEILING_AC4[$codec]:-}
-        if [[ -z "$ceiling" ]]; then
-            echo "::error title=No peak ceiling::${codec} has no entry in run_baremetal_probe.sh's PEAK_CEILING_AC4 table - add one from a measured run" >&2
-            exit 1
-        fi
-        echo "peak heap: ${codec} = ${peak} bytes (ceiling ${ceiling})"
-        if (( peak > ceiling )); then
-            echo "::error title=Footprint regression::${codec} peaks at $peak bytes of heap, ceiling is $ceiling" >&2
-            exit 1
-        fi
-    done <<< "$PEAKS"
+    python3 "$REPO/tools/checks/check_probe_ceilings.py" --table "$AC4_CEILINGS" --metric peak_heap "$OUTPUT" || exit 1
 fi
 
 # Every fixture's steady-state churn, held to one ceiling: they are the same
@@ -448,18 +448,20 @@ if [[ -z "$CHURN" ]]; then
     echo "error: the probe reported no <fixture>.steady_allocs_per_frame line" >&2
     exit 1
 fi
-while read -r codec per_frame; do
-    ceiling=$ICLFORGE_MAX_STEADY_ALLOCS_PER_FRAME
-    # The AC-4 rows each have their own, from the table above.
-    if [[ "$DIRECTION" == "ac4" ]]; then
-        ceiling=${CHURN_CEILING_AC4[$codec]:-$ceiling}
-    fi
-    echo "churn: ${codec} = ${per_frame} allocations/frame (ceiling ${ceiling})"
-    if (( per_frame > ceiling )); then
-        echo "::error title=Footprint regression::${codec} steady-state allocations are $per_frame per frame, ceiling is $ceiling" >&2
-        exit 1
-    fi
-done <<< "$CHURN"
+if [[ "$DIRECTION" == "ac4" ]]; then
+    # The AC-4 rows each have their own.
+    python3 "$REPO/tools/checks/check_probe_ceilings.py" --table "$AC4_CEILINGS" \
+        --metric steady_allocs_per_frame "$OUTPUT" || exit 1
+else
+    while read -r codec per_frame; do
+        ceiling=$ICLFORGE_MAX_STEADY_ALLOCS_PER_FRAME
+        echo "churn: ${codec} = ${per_frame} allocations/frame (ceiling ${ceiling})"
+        if (( per_frame > ceiling )); then
+            echo "::error title=Footprint regression::${codec} steady-state allocations are $per_frame per frame, ceiling is $ceiling" >&2
+            exit 1
+        fi
+    done <<< "$CHURN"
+fi
 
 # --icount: every fixture's instructions per frame, from the probe's own
 # us_per_frame under the instruction-counting clock, held to the per-fixture

@@ -42,6 +42,7 @@
 
 #include "ac4_fixture.hpp"
 #include "probe.hpp"
+#include "stage_timers.hpp"
 
 namespace {
 
@@ -68,6 +69,15 @@ std::array<std::size_t, kBuckets> g_live_by_bucket{};
 std::array<std::size_t, kBuckets> g_peak_by_bucket{};
 std::array<std::size_t, kBuckets> g_live_count_by_bucket{};
 std::array<std::size_t, kBuckets> g_peak_count_by_bucket{};
+
+// The same snapshot at each fixture's own peak, with the frame being decoded and the innermost
+// stage open then (only a build with ICLFORGE_STAGE_TIMERS has stages): what the run's single
+// snapshot cannot say for the fixtures that are not the largest.
+std::array<std::size_t, kBuckets> g_fixture_peak_by_bucket{};
+std::array<std::size_t, kBuckets> g_fixture_peak_count_by_bucket{};
+int g_frame_index = -1;
+int g_fixture_peak_frame = -1;
+const char* g_fixture_peak_stage = nullptr;
 
 std::size_t size_bucket(std::size_t size) {
     std::size_t bucket = 0;
@@ -107,7 +117,13 @@ void* operator new(std::size_t size) {
         g_peak_by_bucket = g_live_by_bucket;
         g_peak_count_by_bucket = g_live_count_by_bucket;
     }
-    g_fixture_peak_bytes = std::max(g_fixture_peak_bytes, g_live_bytes);
+    if (g_live_bytes > g_fixture_peak_bytes) {
+        g_fixture_peak_bytes = g_live_bytes;
+        g_fixture_peak_by_bucket = g_live_by_bucket;
+        g_fixture_peak_count_by_bucket = g_live_count_by_bucket;
+        g_fixture_peak_frame = g_frame_index;
+        g_fixture_peak_stage = iclforge_probe::current_stage();
+    }
     return static_cast<std::byte*>(raw) + kHeaderBytes;
 }
 
@@ -224,9 +240,9 @@ struct LevelAccumulator {
 };
 
 // Every delivered sample's bit pattern, in delivery order, through FNV-1a, printed as
-// <fixture>.pcm_hash. The decode is float here, so the value is the same on every leg that
-// computes in IEEE single without fused multiply-add, and check_probe_hashes.py holds one
-// leg to another where that is the claim.
+// <fixture>.pcm_hash. In the float tier the value is the same on every leg that computes in
+// IEEE single without fused multiply-add; in the fixed-point tier it is the same on every leg.
+// check_probe_hashes.py holds one leg to another where that is the claim.
 struct PcmHash {
     std::uint64_t state = 14695981039346656037ULL;
 
@@ -255,7 +271,7 @@ void fail(const char* fixture, const char* what, long got, long expected) {
 // 5% of the expected value with a floor of 2 in the scaled unit (2e-6 of full scale): this
 // checks that the decode is RIGHT, not that two floating-point implementations agree bit for
 // bit, but the streams have levels down to 36 in that unit, so the floor is the smallest that
-// float's rounding stays inside.
+// float's rounding stays inside. The fixed-point tier's levels match the same expected values.
 bool level_matches(std::int32_t got, std::int32_t expected) {
     const std::int32_t slack = expected / 20 + 2;
     return got >= expected - slack && got <= expected + slack;
@@ -283,6 +299,9 @@ struct Measured {
     // Time inside decode_by_block() and flush() only: the level accumulation and the hash in
     // the sink are the probe's cost, not the decoder's, and are taken back out.
     std::uint64_t decode_us = 0;
+    // The first frame's share of decode_us: what a player waits before the first block,
+    // which includes everything a decoder makes when the first frame arrives.
+    std::uint64_t first_frame_us = 0;
     std::uint64_t sink_us = 0;
     StackUse stack;
 };
@@ -312,6 +331,11 @@ int decode_fixture(const Fixture& fixture) {
     std::size_t sink_channels = 0;
     bool frames_ok = true;
     g_fixture_peak_bytes = g_live_bytes;
+    g_fixture_peak_by_bucket = g_live_by_bucket;
+    g_fixture_peak_count_by_bucket = g_live_count_by_bucket;
+    g_frame_index = -1;
+    g_fixture_peak_frame = -1;
+    g_fixture_peak_stage = nullptr;
 
     {
         iclforge::ac4::Decoder decoder;
@@ -327,6 +351,7 @@ int decode_fixture(const Fixture& fixture) {
             measured.sink_us += iclforge_probe::now_us() - t0;
         };
 
+        iclforge_probe::heap_regions_begin();
         // Nothing that prints between here and read_stack() below.
         paint(0);
         int index = 0;
@@ -335,12 +360,15 @@ int decode_fixture(const Fixture& fixture) {
             const std::size_t bytes_before = g_alloc_bytes_total;
             const std::uint64_t sink_before = measured.sink_us;
             const std::uint64_t t0 = iclforge_probe::now_us();
+            g_frame_index = index;
             const auto decoded = decoder.decode_by_block(frame.raw_ac4_frame, sink);
             const std::uint64_t t1 = iclforge_probe::now_us();
-            measured.decode_us += (t1 - t0) - (measured.sink_us - sink_before);
+            const std::uint64_t frame_us = (t1 - t0) - (measured.sink_us - sink_before);
+            measured.decode_us += frame_us;
             const std::size_t allocs = g_alloc_calls - allocs_before;
             const std::size_t allocated = g_alloc_bytes_total - bytes_before;
             if (index == 0) {
+                measured.first_frame_us = frame_us;
                 measured.first_frame_allocs = allocs;
                 measured.first_frame_bytes = allocated;
             } else {
@@ -358,10 +386,12 @@ int decode_fixture(const Fixture& fixture) {
         }
         const std::uint64_t t0 = iclforge_probe::now_us();
         const std::uint64_t sink_before = measured.sink_us;
+        g_frame_index = index;
         (void)decoder.flush(sink);
         measured.decode_us += (iclforge_probe::now_us() - t0) - (measured.sink_us - sink_before);
         measured.stack = read_stack();
     }
+    iclforge_probe::heap_regions_end(fixture.name);
 
     if (!frames_ok) {
         fail(fixture.name, "frame", 0, 1);
@@ -401,6 +431,19 @@ int decode_fixture(const Fixture& fixture) {
     std::printf("%s.peak_bytes=%lu %s.stack_bytes=%lu\n", fixture.name,
                 static_cast<unsigned long>(g_fixture_peak_bytes), fixture.name,
                 static_cast<unsigned long>(measured.stack.bytes));
+    // The frame is the index of the decode_by_block call the peak fell in, the fixture's
+    // frame count for the flush; the stage is "-" outside every marker or without them.
+    std::printf("%s.peak_frame=%d %s.peak_stage=%s\n", fixture.name, g_fixture_peak_frame,
+                fixture.name, g_fixture_peak_stage != nullptr ? g_fixture_peak_stage : "-");
+    for (std::size_t bucket = 0; bucket < kBuckets; ++bucket) {
+        if (g_fixture_peak_by_bucket[bucket] == 0) {
+            continue;
+        }
+        std::printf("%s.peak_live[%lu]=%lu count=%lu\n", fixture.name,
+                    static_cast<unsigned long>(std::size_t{1} << bucket),
+                    static_cast<unsigned long>(g_fixture_peak_by_bucket[bucket]),
+                    static_cast<unsigned long>(g_fixture_peak_count_by_bucket[bucket]));
+    }
     const std::uint64_t per_frame_us =
         measured.decode_us / static_cast<std::uint64_t>(fixture.frames);
     const std::uint64_t permille = (measured.decode_us * 1000ULL) /
@@ -409,6 +452,8 @@ int decode_fixture(const Fixture& fixture) {
                 static_cast<unsigned long>(measured.decode_us), fixture.name,
                 static_cast<unsigned long>(per_frame_us), fixture.name,
                 static_cast<unsigned long>(permille));
+    std::printf("%s.first_frame_us=%lu\n", fixture.name,
+                static_cast<unsigned long>(measured.first_frame_us));
     for (std::size_t channel = 0; channel < fixture.rms.size(); ++channel) {
         const std::int32_t got = levels.rms_scaled(channel);
         std::printf("%s.rms[%u]=%ld expected=%ld\n", fixture.name, static_cast<unsigned>(channel),

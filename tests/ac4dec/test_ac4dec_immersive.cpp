@@ -22,6 +22,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "ac4dec_units.hpp"
+
 #include "iclforge/ac4dec/decoder.hpp"
 #include "iclforge/ac4core/acpl/acpl.hpp"
 #include "iclforge/ac4core/ajcc/ajcc.hpp"
@@ -38,6 +40,7 @@ namespace {
 
 using iclforge::ac4::DecodingMode;
 using iclforge::ac4::Speaker;
+using iclforge::ac4::detail::QmfMatrix;
 using iclforge::ac4::detail::QmfValue;
 using iclforge::ac4::detail::Real;
 namespace immersive = iclforge::ac4::detail::immersive_mode;
@@ -49,7 +52,7 @@ constexpr Real kSqrt2Real = static_cast<Real>(kSqrt2);
 // (S-CPL, A-CPL and A-JCC's hand-worked sums throughout this file) hold this
 // closely at whatever scalar the decoder runs at - a few ulps of Real, not
 // of double.
-const double kAbsoluteTolerance = 1e4 * static_cast<double>(std::numeric_limits<Real>::epsilon());
+const double kAbsoluteTolerance = 1e4 * ac4dec_units::relative_epsilon();
 constexpr int kSlots = 32;
 constexpr std::size_t kValues = static_cast<std::size_t>(kSlots) * 64;
 
@@ -138,7 +141,7 @@ TEST_CASE("S-CPL makes the channels of Tables 23 and 24", "[ac4dec][immersive]")
     // The tolerance a coupled pair's sum or difference can differ from its
     // exact double value by - a few ulps of Real, the same margin
     // test_ac4dec_multichannel.cpp's check_printed() gives a matrix entry.
-    const double tolerance = 1e4 * static_cast<double>(std::numeric_limits<Real>::epsilon());
+    const double tolerance = 1e4 * ac4dec_units::relative_epsilon();
     // Channel c holds the constant c + 1: A'' to K'' in the channels
     // pcm/routing.hpp gives them.
     const auto signals = [](std::size_t count) {
@@ -227,10 +230,10 @@ TEST_CASE("the immersive element's gains after A-SPX follow Tables 9 and 10 and 
     CHECK(gains(immersive::kScpl, kFull, S::kLeft) == std::array{1.0, 1.0});
 
     // apply_band_gains splits each slot at sbx.
-    std::vector<QmfValue> m(kValues, QmfValue{1.0, -1.0});
+    std::vector<QmfValue> m(kValues, QmfValue{Real{1}, Real{-1}});
     iclforge::ac4::detail::apply_band_gains(m, kSlots, 20, {.low = 2.0, .high = 3.0});
-    CHECK(m[5 * 64 + 19] == QmfValue{2.0, -2.0});
-    CHECK(m[5 * 64 + 20] == QmfValue{3.0, -3.0});
+    CHECK(m[5 * 64 + 19] == QmfValue{Real{2}, Real{-2}});
+    CHECK(m[5 * 64 + 20] == QmfValue{Real{3}, Real{-3}});
 }
 
 TEST_CASE("A-CPL's four immersive modules take Table 25's channels and Pseudocode 2's gains",
@@ -240,9 +243,9 @@ TEST_CASE("A-CPL's four immersive modules take Table 25's channels and Pseudocod
     const auto run = [&](int mode, const iclforge::ac4::detail::AcplFrameValues& values,
                          iclforge::ac4::detail::AcplStage& stage,
                          std::vector<std::vector<QmfValue>>& channels) {
-        std::vector<std::vector<QmfValue>*> matrices;
+        std::vector<QmfMatrix> matrices;
         for (auto& m : channels) {
-            matrices.push_back(&m);
+            matrices.push_back(m);
         }
         stage.apply(iclforge::ac4::detail::ch_mode::k7_0_4, false,
                     iclforge::ac4::detail::ElementKind::kImmersive, mode, values, kSlots,
@@ -481,9 +484,9 @@ void check_ajcc(DecodingMode decoding, int core_mode, std::array<Decorrelated, 6
                        0.13 + 0.07 * static_cast<double>(k) + 0.05 * frame);
         }
         const Channels in = channels;
-        std::vector<std::vector<QmfValue>*> matrices;
+        std::vector<QmfMatrix> matrices;
         for (auto& m : channels) {
-            matrices.push_back(&m);
+            matrices.push_back(m);
         }
         stage.apply(decoding, values, kSlots, {.speakers = speakers, .matrices = matrices});
 
@@ -657,7 +660,7 @@ TEST_CASE("A-JCC's pre-modification follows ajcc_core_mode (Pseudocode 9)",
     // g at slot ts of each frame: mode 0 from the first frame (1), then to 1
     // (falling), 1 again (0), back to 0 (rising).
     const std::array<int, 4> modes = {0, 1, 1, 0};
-    const double tolerance = 1e4 * static_cast<double>(std::numeric_limits<Real>::epsilon());
+    const double tolerance = 1e4 * ac4dec_units::relative_epsilon();
     for (std::size_t f = 0; f < modes.size(); ++f) {
         CAPTURE(f);
         pre.process(modes[f], kSlots, in1, in2, in3, in4, out1, out2);

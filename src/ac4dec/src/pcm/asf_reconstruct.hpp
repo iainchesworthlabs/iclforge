@@ -36,10 +36,14 @@ using ScaleFactorGains = std::array<Real, 256>;
 // 2^((sf - 100) / 4), then the noise fill when b_snf_data_exists. `noise` is
 // the generator Pseudocode 23 draws from, advanced by every line it fills.
 // Fails for a scale factor outside 0 to 255, which the note under Table A.1's
-// formula says is not a valid one. `sf_gain` is scale_factor_gains()'s.
+// formula says is not a valid one. `sf_gain` is scale_factor_gains()'s. The
+// lines are the values times 2^-exponent: at double and float the exponent is
+// 0, and at Fixed32 the track's own, which puts its largest line in [1/2, 1)
+// (planning/ac4.md, D14d); that tier forms its gains itself and its table is
+// empty.
 [[nodiscard]] ParseResult reconstruct_track(const SfInfo& info, const SfData& data,
                                             const ScaleFactorGains& sf_gain, RandGenState& noise,
-                                            std::vector<Real>& scaled);
+                                            std::vector<Real>& scaled, int& exponent);
 
 // The length in lines of each window of the frame, in order: one full block
 // for a long frame, otherwise num_windows blocks, each of its group's

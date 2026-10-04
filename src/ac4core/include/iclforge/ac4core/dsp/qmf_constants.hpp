@@ -60,16 +60,19 @@ struct Constants {
     std::array<Real, 32> post_cos{};
     std::array<Real, 32> post_sin{};
     // The synthesis's packing: e^(-i pi (2k + 1) 255 / 256) and
-    // e^(-i pi (2k + 1) 253 / 256), each over 128 (the 1 / 64 of Pseudocode 66 and
-    // the 1 / 2 of the unpacking), k = 0 to 31.
+    // e^(-i pi (2k + 1) 253 / 256), each over make_constants' pack_divisor (128: the
+    // 1 / 64 of Pseudocode 66 and the 1 / 2 of the unpacking), k = 0 to 31.
     std::array<Real, 32> pre_re{};
     std::array<Real, 32> pre_im{};
     std::array<Real, 32> prho_re{};
     std::array<Real, 32> prho_im{};
 };
 
+// pack_divisor is what the packing's factors are divided by before they are narrowed to Real: the
+// 128 the floating tiers fold into them, or 1 for a tier that takes the 1 / 128 elsewhere
+// (dsp/qmf_fixed.hpp, which keeps it in the delay line's shift).
 template <typename Real>
-[[nodiscard]] consteval Constants<Real> make_constants() {
+[[nodiscard]] consteval Constants<Real> make_constants(double pack_divisor = 128.0) {
     Constants<Real> c{};
     for (std::size_t p = 0; p < 16; ++p) {
         for (std::size_t k = 1; k <= 3; ++k) {
@@ -94,10 +97,10 @@ template <typename Real>
         const auto odd = static_cast<long long>(2 * k + 1);
         c.post_cos[k] = static_cast<Real>(cos_units(odd) / 2.0);
         c.post_sin[k] = static_cast<Real>(sin_units(odd) / 2.0);
-        c.pre_re[k] = static_cast<Real>(cos_units(-255 * odd) / 128.0);
-        c.pre_im[k] = static_cast<Real>(sin_units(-255 * odd) / 128.0);
-        c.prho_re[k] = static_cast<Real>(cos_units(-253 * odd) / 128.0);
-        c.prho_im[k] = static_cast<Real>(sin_units(-253 * odd) / 128.0);
+        c.pre_re[k] = static_cast<Real>(cos_units(-255 * odd) / pack_divisor);
+        c.pre_im[k] = static_cast<Real>(sin_units(-255 * odd) / pack_divisor);
+        c.prho_re[k] = static_cast<Real>(cos_units(-253 * odd) / pack_divisor);
+        c.prho_im[k] = static_cast<Real>(sin_units(-253 * odd) / pack_divisor);
     }
     return c;
 }
