@@ -1,10 +1,12 @@
 #include "iclforge/ac4core/dsp/synthesis.hpp"
 
 #include <algorithm>
+#include <type_traits>
 #include <utility>
 
 #include "iclforge/ac4core/detail/profiling.hpp"
 #include "iclforge/ac4core/dsp/kbd.hpp"
+#include "iclforge/ac4core/dsp/transform_tables.hpp"
 
 namespace iclforge::ac4::detail::dsp {
 namespace {
@@ -33,22 +35,36 @@ TransformSet<Real>::TransformSet(int full_length, int rate_multiplier) : full_le
             break;
         }
         imdct_.push_back(std::move(imdct));
-        // kbd_left() computes the window in double (the Kaiser-Bessel Bessel
-        // function series wants the precision); narrowed to Real explicitly,
-        // once, here - the vector<double>-to-vector<Real> range constructor
-        // narrows implicitly per element, which -Wdouble-promotion's sibling
-        // warning (MSVC's C4244) rightly flags as an error on the float build.
-        const std::vector<double> window = dsp::kbd_left(length, alpha);
-        std::vector<Real> narrowed(window.size());
-        std::ranges::transform(window, narrowed.begin(),
-                               [](double w) { return static_cast<Real>(w); });
-        windows_.push_back(std::move(narrowed));
+        // In flash at the float and fixed tiers for the lengths dsp/transform_tables.hpp
+        // builds in, at 44.1 and 48 kHz, where Table 186's alpha is the one it was built with.
+        const TransformTable<Real>* const table =
+            rate_multiplier == 1 ? transform_table<Real>(static_cast<std::size_t>(length)) : nullptr;
+        if (table != nullptr) {
+            window_tables_.push_back(table->kbd_left);
+            windows_.emplace_back();
+        } else {
+            window_tables_.emplace_back();
+            windows_.push_back(computed_kbd_left(length, rate_multiplier));
+        }
     }
     valid_ = !imdct_.empty();
     if (valid_) {
         block_.assign(2 * static_cast<std::size_t>(full_length), Real{});
         transform_.assign(static_cast<std::size_t>(full_length), Complex{});
     }
+}
+
+template <typename Real>
+std::vector<Real> TransformSet<Real>::computed_kbd_left(int length, int rate_multiplier) {
+    // kbd_left() computes the window in double (the Kaiser-Bessel Bessel
+    // function series wants the precision); narrowed to Real explicitly,
+    // once, here - the vector<double>-to-vector<Real> range constructor
+    // narrows implicitly per element, which -Wdouble-promotion's sibling
+    // warning (MSVC's C4244) rightly flags as an error on the float build.
+    const std::vector<double> window = dsp::kbd_left(length, kbd_alpha(length, rate_multiplier));
+    std::vector<Real> narrowed(window.size());
+    std::ranges::transform(window, narrowed.begin(), [](double w) { return static_cast<Real>(w); });
+    return narrowed;
 }
 
 template <typename Real>
@@ -70,7 +86,11 @@ Imdct<Real>* TransformSet<Real>::imdct(int length) noexcept {
 template <typename Real>
 std::span<const Real> TransformSet<Real>::kbd_left(int length) const noexcept {
     const int k = slot(length);
-    return k < 0 ? std::span<const Real>{} : std::span<const Real>(windows_[static_cast<std::size_t>(k)]);
+    if (k < 0) {
+        return {};
+    }
+    const auto index = static_cast<std::size_t>(k);
+    return window_tables_[index].empty() ? std::span<const Real>(windows_[index]) : window_tables_[index];
 }
 
 template <typename Real>
@@ -87,6 +107,12 @@ void ChannelSynthesis<Real>::reset() {
 template <typename Real>
 bool ChannelSynthesis<Real>::block(TransformSet<Real>& transforms, std::span<const Real> spectrum,
                                    std::span<Real> pcm) {
+    return block(transforms, spectrum, 0, pcm);
+}
+
+template <typename Real>
+bool ChannelSynthesis<Real>::block(TransformSet<Real>& transforms, std::span<const Real> spectrum,
+                                   int exponent, std::span<Real> pcm) {
     const std::size_t n = spectrum.size();
     const auto n_int = static_cast<int>(n);
     if (transforms.full_length() != full_length_ || pcm.size() < n) {
@@ -103,8 +129,9 @@ bool ChannelSynthesis<Real>::block(TransformSet<Real>& transforms, std::span<con
     const auto full = static_cast<std::size_t>(full_length_);
 
     // A full-length block after a full-length block has no skipped samples, and its transform,
-    // window and overlap-add are one pass over the samples (Imdct::inverse_overlap).
-    if (n == full && n_prev == full) {
+    // window and overlap-add are one pass over the samples (Imdct::inverse_overlap). At Fixed32
+    // every block takes the inverse that carries its exponent.
+    if (std::is_floating_point_v<Real> && n == full && n_prev == full) {
         imdct->inverse_overlap(spectrum, kbd, overlap_, pcm,
                                transforms.transform_scratch().first(n));
         previous_length_ = n_int;
@@ -113,7 +140,7 @@ bool ChannelSynthesis<Real>::block(TransformSet<Real>& transforms, std::span<con
 
     // Steps 1 to 4 and Pseudocode 63's unfolding, into the set's block scratch.
     const std::span<Real> x = transforms.block_scratch().first(2 * n);
-    imdct->inverse(spectrum, x, transforms.transform_scratch().first(n));
+    imdct->inverse(spectrum, exponent, x, transforms.transform_scratch().first(n));
 
     // Pseudocode 63's window over the first half.
     const std::size_t skip_left = (n - nw) / 2;

@@ -21,6 +21,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "ac4dec_units.hpp"
+
 #include "ac4dec_printed_matrices.hpp"
 #include "pcm/multichannel.hpp"
 #include "pcm/routing.hpp"
@@ -75,7 +77,7 @@ void check_printed(const iclforge::ac4::detail::Matrix<N>& m, std::string_view p
                    std::span<const ac4dec_test::Abcd> p) {
     const auto rows = rows_of(printed);
     REQUIRE(rows.size() == N);
-    const double tolerance = 1e4 * static_cast<double>(std::numeric_limits<Real>::epsilon());
+    const double tolerance = 1e4 * ac4dec_units::relative_epsilon();
     for (std::size_t o = 0; o < N; ++o) {
         REQUIRE(rows[o].size() == N);
         for (std::size_t i = 0; i < N; ++i) {
@@ -188,6 +190,7 @@ TEST_CASE("three_channel_data() takes its two parameter sets and reads no third"
     layout.sect_sfb_offset[0][2] = 8;
     std::vector<iclforge::ac4::detail::StereoParameters> sets(2);
     for (iclforge::ac4::detail::StereoParameters& set : sets) {
+        set.abcd.resize(1);
         set.abcd[0][0] = {Real{1}, Real{1}, Real{1}, Real{-1}};
         set.abcd[0][1] = {Real{1}, Real{1}, Real{1}, Real{-1}};
     }
