@@ -412,7 +412,10 @@ depends on the same reading.
   `asf_scalefac_data()` and `asf_snf_data()` (Tables 40 to 42) are unaffected: their own `get_max_sfb(g)`
   and `min(get_max_sfb(g), num_sfb_48(...))` calls keep the core-only reading, which is what makes a
   channel with no active extension unaffected byte for byte by touching the section loop at all.
-- **Evidence:** Text; no stream here uses the mode.
+- **Evidence:** The constructed streams under `tests/golden/ac4-hsf/` (`mono-96-long` and the rest,
+  built by `tests/ac4dec/ac4dec_hsf.cpp` from the text) read the extension's sections to `get_max_sfb_hsf(g)`
+  in both transcriptions, and their tones come back at 96 and 192 kHz only through that reading
+  (`tests/ac4dec/test_ac4dec_hsf.cpp`); no stream from another encoder uses the mode.
 
 ### ac4_hsf_ext_substream()'s max_sfb_ext_hsf and num_channels
 
@@ -432,7 +435,10 @@ depends on the same reading.
   read. A later track whose own `b_different_framing` calls for `max_sfb_ext_hsf[1]` where the first
   track's did not read one takes it as 0: no additional bands for that track's own second half, rather
   than a failure.
-- **Evidence:** Text; no stream here uses the mode.
+- **Evidence:** The same constructed streams: `mono-192-switched-snf` and `stereo-192-sap1-switched` carry
+  `b_different_framing` and so `max_sfb_ext_hsf[1]`, and `stereo-96-sap2` and `stereo-192-sap1-switched` are
+  pairs whose extension holds one `sf_hsf_data()` per track. The reading of a later track's differing
+  `b_different_framing` is Text only: the builder gives every track of an element the same framing.
 
 ## Channel elements
 
@@ -1640,6 +1646,145 @@ does what the readings say, not that they are what an encoder meant.
   at the sides; the top, bottom and centre-back channels are not in the ring.
 - **Evidence:** Text; as for 7.X, no stream mixes into a 22.2 substream.
 
+## 96 and 192 kHz
+
+Part 1 clause 5.4 and 6.2.5.2 are all the text says of decoding a substream at 96 or 192 kHz. The
+HSF extension substream holds "the scale factor and spectral data beyond 24 kHz" (4.2.4.3); a decoder
+capable of these rates "shall read the additional data up to either twice the original block length
+(for 96 kHz) or four times the original block length (for 192 kHz), and continue processing at twice or
+four times the block length and sampling rate"; "streams containing high sampling frequency data do not
+employ any of the QMF domain tools"; and decoding the extension needs the SAP tool and the IMDCT, and
+"no QMF domain processing". The readings below fill in what that leaves. No stream at these rates was
+available to read or to decode: the streams under `tests/golden/ac4-hsf/` and
+`tests/ac4dec/test_ac4dec_hsf.cpp`'s are built from the text alone (`tests/ac4dec/ac4dec_hsf.hpp` says
+how), the evidence for a reading is that the second transcription reads them alike and that the
+decoder's output is the tones they were made from.
+
+### The rate a 96 or 192 kHz substream decodes at
+
+- **Where:** Part 1 Table 89, p. 78, gives a substream's sampling frequency from `sf_multiplier`; 6.2.15,
+  p. 268, and Part 2 4.8.8, p. 53, say the decoder "may" (Part 1) or "shall" (Part 2) "be operated at
+  external sampling frequencies of 48 kHz, 96 kHz, or 192 kHz", with a converter by Table 83's ratio;
+  5.4, p. 184, that a capable decoder "may be configured to these higher rates", and one that is not "shall
+  ignore the additional coefficients". Nothing says what an external rate of 96 kHz does to a stream at
+  48 kHz, or to one at 96 kHz decoded at 192.
+- **Reading:** a substream with `sf_multiplier` decodes at its own sampling frequency, 96 000 or 192 000 Hz:
+  `DecodedFrame::sample_rate_hz` says so, and so do `PresentationInfo::sample_rate_hz` and the blocks of
+  `decode_by_block()`. A frame is Table 83's frame_length for the rate, twice or four times `frame_len_base`,
+  of blocks Tables 99 to 105 give, with the band tables of Annex B for the longer length (Tables B.2 and B.3
+  and the 96 and 192 kHz columns of B.4 to B.7). A stream at 48 kHz is not converted to a higher rate. This
+  decoder is capable of the higher rates, so it does not offer the core alone at 48 kHz.
+- **Evidence:** Text.
+
+### A 96 or 192 kHz substream with no HSF extension substream
+
+- **Where:** Part 1 4.2.4.3, p. 34 ("in case a substream is coded in 96/192 kHz, this additional substream holds
+  the scale factor and spectral data beyond 24 kHz"); 4.3.6.2.1, p. 87 ("if a high sampling frequency extension
+  is not present in the presentation, which is signalled by b_hsf_ext = 0, the transform length indicated in
+  table 106 shall be used"); 5.4, p. 184.
+- **Reading:** such a substream is refused (`DecodeError::kUnsupported`, "a 96 kHz or 192 kHz substream whose HSF
+  extension substream could not be read"). Table 106 for b_hsf_ext = 0 suggests the substream is then coded at the
+  base rate's block lengths, but Table 89 gives it the higher rate; the text does not say which holds, and
+  either would be a decode of something the text does not define. The same holds for an extension linked from a
+  substream with no `sf_multiplier`.
+- **Evidence:** Text.
+
+### The widths of max_sfb at 96 and 192 kHz
+
+- **Where:** Part 1 4.3.6.2.1, pp. 87 and 88: with `b_hsf_ext` the `n_msfb_bits` and `n_msfbl_bits` of the
+  high sampling frequency's transform length come from Table 107 or 108, where Table 106 gives the base
+  rate's.
+- **Reading:** `max_sfb` and the LFE's are read at the width Table 106 gives the base length, which is the width
+  Table 107 gives twice that length and Table 108 four times it, for every length of the three tables (held in
+  `tests/ac4dec/test_ac4dec_hsf.cpp`). `n_side_bits` has no HSF column and is not used at these rates.
+- **Evidence:** Text.
+
+### Scale factors and noise levels across an HSF extension
+
+- **Where:** Part 1 Tables 41 and 42 (p. 47), 42b and 42c (pp. 48 and 49), Pseudocodes 21 to 23 (pp. 142 to
+  145): each loops over the groups with `get_max_sfb(g)`, where the extension's own bands start at
+  `num_sfb_48` and run to `get_max_sfb_hsf(g)` (Pseudocode 18, p. 138). The text gives no Pseudocode 21, 22 or 23
+  for a track with an extension, and says only (5.1.3.1, 5.1.4.1) that `max_quant_idx` is derived from the
+  extension's spectral data as well.
+- **Reading:** the extension's bands are walked after every group's core bands, in the order the bitstream sends
+  them, with the walk's state carried over: the scale factor of the first extension band with lines is the
+  one before it plus its codeword's difference (the first of all, if the core had none, is
+  `reference_scale_factor`, as Table 42b's `first_scf_found` implies); the noise level of an extension band is the
+  level before it plus its codeword's step, the reference level (Pseudocode 22) the first band with energy of
+  the core's and then the extension's; and the noise generator draws in the same order, a track's core and then
+  its extension, track after track. Every band an extension's `dpcm_sf` and `dpcm_snf` are read for is walked
+  in that order, so a differently ordered walk (each group's core and extension together) would not read its
+  codewords in the order the extension substream holds them. With one window group the two orders are the
+  same.
+- **Evidence:** Text; `tests/ac4dec/test_ac4dec_noise_fill.cpp` holds the order, with one window group and two,
+  to the clauses' steps over a list of bands in this order.
+
+### Stereo processing of the HSF extension's bands
+
+- **Where:** Part 1 4.2.10 (Tables 47 and 48, pp. 51 and 52) and 5.3.2 (Pseudocode 59, p. 174): `chparam_info()`
+  and `sap_data()` give parameters for the bands below `get_max_sfb(g)` alone, which at 48 kHz are the only bands
+  with lines. Table 114, p. 95, gives `sap_mode` 2 as "M/S processing in all scale factor bands". At 96 and
+  192 kHz the bands from `get_max_sfb(g)` to `get_max_sfb_hsf(g)` hold lines too, and no syntax carries
+  parameters for them.
+- **Reading:** the lines of those bands are processed with the parameters Pseudocode 59 gives a band it has
+  none for, `a = d = 1`, `b = c = 0`, except in `sap_mode` 2 of a channel pair or of the matrices of three,
+  four and five channels, which is M/S in every band by Table 114 and so in these (`a = b = c = 1`, `d = -1`),
+  and the same for Table 183's two steps of a 7.X element. The matrices of Tables 178 and 179 and clause
+  5.3.3.4 are applied to those lines with those parameters, as chel_matsel permutes tracks whatever the
+  band. At 44.1 and 48 kHz the lines of these bands are zero and the choice is of no effect.
+- **Evidence:** Text; no `sap_mode` 1 or 3 reading is needed, their bands being outside `ms_used` and
+  `sap_coeff_used` either way. `tests/ac4dec/test_ac4dec_hsf.cpp` holds each of Tables 178 and 179's matrices,
+  and the 7.X steps, to the tones put through the inverse of the printed matrices.
+
+### Frame alignment at 96 and 192 kHz
+
+- **Where:** Part 1 5.6.2 and Table 188, p. 192: "a decoder shall apply a delay between the input and output PCM
+  samples" of `d_pcm` samples by frame rate, so that the control data's delays are whole frames. Part 2 H.3
+  says the decoded samples of tracks at different `sf_multiplier` in a switching set are to be time aligned
+  by the encoder.
+- **Reading:** `d_pcm` times the rate multiplier, the delay in seconds that Table 188 gives the base rate's
+  frame. A stream at 96 or 192 kHz has no QMF domain, hence no 577-sample banks, no history of
+  `ts_offset_hfgen` slots, and no control data to delay (`Decoder::latency_samples()` is `d_pcm` times the
+  multiplier, and the converter's).
+- **Evidence:** Text; the constructed streams' tones come out at the decoder's delay so read.
+
+### The sample rate converter at 96 and 192 kHz
+
+- **Where:** Part 1 6.2.15, p. 268, and Part 2 4.8.8: the converter uses Table 83's ratio at all three external
+  rates, and Table 47 (Part 2, p. 110) lists the sample counts at 48 kHz alone.
+- **Reading:** the converter of "The sample rate converter's filter and output grid", on the samples at the
+  substream's rate, with the same ratio and the same phase locked to `sequence_counter`. Its filter is
+  designed relative to the input rate, so the transition band is at the same fraction of the Nyquist
+  frequency. The counts per frame follow from its grid: twice and four times Table 47's over the five phases
+  at the 1000/1001 rates, and a constant count at the others.
+- **Evidence:** Text; the frame counts at every ratio of Table 83 and the frequency each tone comes out
+  at are held in `tests/ac4dec/test_ac4dec_hsf.cpp`.
+
+### The output stages at 96 and 192 kHz
+
+- **Where:** Part 1 5.7.8.1 (dialogue enhancement "operates in the QMF domain"), 5.7.9.1 ("DRC is operated in
+  the QMF domain"), 5.7.9.3.3 (the output level gain as a factor on each QMF sample), 6.2.16 and 6.2.17 (mixing
+  and rendering, equations on samples), 5.4 and 6.2.5.2 (no QMF domain).
+- **Reading:** of what a stream at 96 or 192 kHz leaves of them: the output level gain applies, by
+  2^((Lout - dialnorm) / 6) as a scalar on the samples, the last dialnorm the stream sent holding where it
+  sends none, and the downmix applies, as the matrix of 6.2.17 on the samples. Dialogue enhancement where the
+  stream sends parameters and the system asks for a gain, the compression curve and transmitted gains of
+  DRC (which are per QMF band and slot), the mixing of a presentation's substreams, and the audio spectral
+  frontend's alternatives (below) are refused with `DecodeError::kUnsupported` and a reason that names
+  them, per frame; `DrcMode::kOff` leaves the output level gain alone, and a stream that sends no DRC
+  configuration or no dialogue enhancement is unaffected by either.
+- **Evidence:** Text; the gain and the downmix are held to the matrices and the gain in
+  `tests/ac4dec/test_ac4dec_hsf.cpp`.
+
+### What a stream at 96 or 192 kHz may carry
+
+- **Where:** Part 1 5.4's NOTE, p. 184 (no QMF domain tool), and Table 36a, which sends the extension for the
+  audio spectral frontend's tracks alone.
+- **Reading:** mono, 3.0, 5.X and 7.X channel elements and the channel pair in SIMPLE codec mode, with the
+  ASF. The A-SPX and A-CPL codec modes, the speech spectral frontend, the immersive and 22.2 elements, and
+  object audio are refused by name. Part 2 gives no decoding text for them at these rates.
+- **Evidence:** Text.
+
 ## Output processing
 
 What the QMF domain's matrices go through before synthesis, dialogue enhancement (Part 1 5.7.8), the
@@ -2383,7 +2528,9 @@ enhancement methods 1 to 3 and alternative presentations among it. The construct
 transcriptions read them alike. To compare the two transcriptions on the rest, both read streams made for
 the purpose: DEE frames with one substream altered (a random tail from a random bit, a few flipped bits,
 or a random codec mode), and tables of contents built for the channel modes no encoder here writes, over
-random payloads, a quarter of them for a group of A-JOC and direct-coded object substreams. Wherever
+random payloads, a quarter of them for a group of A-JOC and direct-coded object substreams, and a third
+of the single-instance Part 1 modes at 96 or 192 kHz with an HSF extension substream; the constructed
+streams under `tests/golden/ac4-hsf/` are among those mutated. Wherever
 both read a substream to its end their traces must agree record for record, and where either stops they must agree up to that point. The two transcriptions still stop at different
 elements on some corrupt input, since each checks some values at a different point, which the check
 reports separately. The script is `tools/checks/ac4_syntax_differential.py`, which the nightly
