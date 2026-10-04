@@ -12,7 +12,7 @@
 // FFT's passes in Fft's order, Pseudocode 60's pre-twiddle, the fixed tier's post-twiddle and
 // KBD_LEFT(N). The values are what Fft, Imdct and TransformSet compute when they build their
 // own (tools/generators/gen_ac4_transform_tables.py computes the doubles the same way, and
-// src/dsp/transform_tables.cpp narrows them as those classes do), so a transform reads the same
+// src/ac4core/src/dsp/transform_tables.cpp narrows them as those classes do), so a transform reads the same
 // bits from either. Built in for the lengths of a 2048-sample frame at 44.1 and 48 kHz; any
 // other length, and every length at double, builds its tables when it is constructed.
 
