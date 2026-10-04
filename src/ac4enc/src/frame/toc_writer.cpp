@@ -131,9 +131,9 @@ void write_presentation_v1_info(BitWriter& w, const TocLayout& layout, const Toc
 
 // Table 56's channel_mode code: 0b0 mono, 0b10 stereo, 0b1100 to 0b1110 3.0,
 // 5.0 and 5.1, 0b1111000 to 0b1111101 the 7.X modes, 0b11111100 and
-// 0b11111101 7.0.4 and 7.1.4, which name the channels their source has, and
-// 0b111111110 22.2, which names none (clause 6.2.1.8 sends those fields for
-// 7.X.4 and 9.X.4 alone).
+// 0b11111101 7.0.4 and 7.1.4 and 0b111111100 and 0b111111101 9.0.4 and 9.1.4,
+// which name the channels their source has, and 0b111111110 22.2, which names
+// none (clause 6.2.1.8 sends those fields for 7.X.4 and 9.X.4 alone).
 void write_channel_mode(BitWriter& w, const TocSubstream& s) {
     const int ch_mode = s.ch_mode;
     if (ch_mode == 0) {
@@ -147,7 +147,11 @@ void write_channel_mode(BitWriter& w, const TocSubstream& s) {
     } else if (ch_mode == 15) {
         w.write(9, 0b111111110U, "channel_mode");
     } else {
-        w.write(8, 0b11111100U + static_cast<unsigned>(ch_mode - 11), "channel_mode");
+        if (ch_mode >= 13) {
+            w.write(9, 0b111111100U + static_cast<unsigned>(ch_mode - 13), "channel_mode");
+        } else {
+            w.write(8, 0b11111100U + static_cast<unsigned>(ch_mode - 11), "channel_mode");
+        }
         w.write(1, s.b_4_back_channels_present ? 1U : 0U, "b_4_back_channels_present");
         w.write(1, s.b_centre_present ? 1U : 0U, "b_centre_present");
         w.write(2, static_cast<std::uint64_t>(s.top_channels_present), "top_channels_present");
@@ -416,8 +420,8 @@ void write_substream_index_table(BitWriter& w, std::span<const std::size_t> size
             }
         }
         for (const TocSubstream& s : g.substreams) {
-            if (s.ch_mode < 0 || (s.ch_mode > 12 && s.ch_mode != 15) ||
-                s.top_channels_present < 0 || s.top_channels_present > 3 || s.substream_index < 0 ||
+            if (s.ch_mode < 0 || s.ch_mode > 15 || s.top_channels_present < 0 ||
+                s.top_channels_present > 3 || s.substream_index < 0 ||
                 static_cast<std::size_t>(s.substream_index) >= count) {
                 return false;
             }

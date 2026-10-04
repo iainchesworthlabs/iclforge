@@ -35,6 +35,10 @@ struct AudioSubstreamFields {
     const DeConfigCodes* de_config = nullptr;
     const DeFrameParameters* de = nullptr;
     const DeFrameParameters* de_previous = nullptr;
+    // 9.X.4 (ch_mode 13 and 14): the second de_data() for core decoding behind b_de_simulcast, and
+    // the last frame's of it.
+    const DeFrameParameters* de_core = nullptr;
+    const DeFrameParameters* de_core_previous = nullptr;
     const DialogueMixCodes* dialogue = nullptr;  // b_dialog
     std::span<const EmdfPayloadCodes> emdf;      // b_emdf_payloads_substream
 };
@@ -140,7 +144,8 @@ struct FrameFields {
     int fs_index = 1;           // Part 1 Table 82: 1 = 48 kHz, 0 = 44.1 kHz
     int frame_rate_index = 13;
     // Part 1 Table 88: 0 mono, 1 stereo, 2 3.0, 3 and 4 5.X, 5 to 10 7.X; and
-    // Part 2 Table 56's 11 and 12, 7.0.4 and 7.1.4, and 15, 22.2.
+    // Part 2 Table 56's 11 and 12, 7.0.4 and 7.1.4, 13 and 14, 9.0.4 and 9.1.4,
+    // and 15, 22.2.
     int ch_mode = 1;
     bool add_ch_base = false;   // for 7.X 5/2/0 and 3/2/2 (Part 2 clause 6.3.2.7)
     // The 7.X.4 modes' channels the source has (Part 2 clauses 6.3.2.7.3 to
@@ -159,6 +164,8 @@ struct FrameFields {
     const StreamMetadata* metadata = nullptr;
     const DeFrameParameters* de = nullptr;
     const DeFrameParameters* de_previous = nullptr;
+    const DeFrameParameters* de_core = nullptr;  // as AudioSubstreamFields::de_core
+    const DeFrameParameters* de_core_previous = nullptr;
     // DRC's gains for this frame, per mode in drc_config()'s order where the
     // mode sends them.
     std::span<const DrcModeGains> drc_gains;
