@@ -1,15 +1,18 @@
 // Parses the same Immersive Audio Bitstream (SMPTE ST 2098-2:2022) content two ways: once as a
-// bare elementary `.iab` file (iclforge::iab::parse_iabitstream, IAB reader phase 1) and once
-// wrapped in a synthetic MXF IAB Track File (iclforge::iab::parse_mxf_iab, IAB reader phase 2),
-// printing what each found to show the two agree - the point being that SMPTE ST 2067-201
-// clip-wraps the whole IABitstream as a single Generic Container KLV Value, so an MXF Track File's
-// essence really is the identical byte sequence an elementary `.iab` file already has (see
-// src/iab/src/mxf_reader.cpp's own header comment for the full citation trail).
+// bare elementary `.iab` file (iclforge::iab::parse_iabitstream) and once wrapped as an IMF IAB
+// Track File (iclforge::iab::write_mxf_iab, then iclforge::iab::parse_mxf_iab), printing what each
+// found to show the two agree - the point being that SMPTE ST 2067-201 clip-wraps the whole
+// IABitstream as a single Generic Container KLV Value, so a Track File's essence really is the
+// identical byte sequence an elementary `.iab` file already has (see src/iab/src/mxf_reader.cpp's
+// own header comment for the full citation trail).
 //
 // iclforge::iab is codec-blind - this program does not either, it only proves both parsed graphs
 // are navigable and agree. A real IAB Track File is a production Dolby Atmos cinema/IMF master
 // this project has no license to embed, so - like examples/read_adm.cpp for its own container -
-// this writes its own tiny-but-valid fixtures to temp files first.
+// this writes its own tiny-but-valid fixtures to temp files first. The elementary stream is
+// laid out byte by byte from the syntax tables; the Track File is written by write_mxf_iab()
+// from the frames that stream parses to, with the bit depth set to the 24 bits ST 2067-201 5.6.2
+// requires.
 
 #include <fmt/printf.h>
 #include <chrono>
@@ -23,6 +26,7 @@
 
 #include "iclforge/iab/ac3iab.hpp"
 #include "iclforge/iab/mxf.hpp"
+#include "iclforge/iab/writer.hpp"
 
 namespace {
 
@@ -36,10 +40,6 @@ std::string scratch_path(std::string_view name) {
 
 void put_u8(std::vector<std::byte>& out, std::uint8_t v) {
     out.push_back(static_cast<std::byte>(v));
-}
-
-void put_bytes(std::vector<std::byte>& out, const std::vector<std::byte>& more) {
-    out.insert(out.end(), more.begin(), more.end());
 }
 
 // SMPTE ST 2098-2:2022 §7 Table 2 / §8: a two-frame elementary IABitstream - each frame a
@@ -82,36 +82,6 @@ bool write_file(const std::string& path, const std::vector<std::byte>& bytes) {
     return static_cast<bool>(out);
 }
 
-// SMPTE ST 336:2017 §5.3 short-form BER length (every value here is well under 128).
-std::vector<std::byte> klv(const std::array<std::uint8_t, 16>& key,
-                           const std::vector<std::byte>& value) {
-    std::vector<std::byte> out;
-    for (auto b : key) {
-        put_u8(out, b);
-    }
-    put_u8(out, static_cast<std::uint8_t>(value.size()));
-    put_bytes(out, value);
-    return out;
-}
-
-// Wraps `iabitstream` as an IAB Track File: a Header Partition Pack (ST 377-1 Table 4/6, its
-// Value left empty - this reader only checks Keys, never Partition Pack fields, so an empty Value
-// is enough to prove that) followed by the one clip-wrapped Essence Element KLV (ST 2067-201 Table
-// 4.2) whose Value is `iabitstream` itself, byte for byte - see mxf.hpp's own header comment for
-// why that Value needs no reframing at all.
-std::vector<std::byte> wrap_as_mxf(const std::vector<std::byte>& iabitstream) {
-    constexpr std::array<std::uint8_t, 16> kHeaderPartitionKey = {
-        0x06, 0x0E, 0x2B, 0x34, 0x02, 0x05, 0x01, 0x01,
-        0x0D, 0x01, 0x02, 0x01, 0x01, 0x02, 0x04, 0x00};
-    constexpr std::array<std::uint8_t, 16> kIabEssenceKey = {0x06, 0x0E, 0x2B, 0x34, 0x01, 0x02,
-                                                             0x01, 0x01, 0x0D, 0x01, 0x03, 0x01,
-                                                             0x16, 0xCC, 0x0D, 0x01};
-    std::vector<std::byte> out;
-    put_bytes(out, klv(kHeaderPartitionKey, {}));
-    put_bytes(out, klv(kIabEssenceKey, iabitstream));
-    return out;
-}
-
 }  // namespace
 
 int main() {
@@ -119,23 +89,35 @@ int main() {
 
     const auto elementary_path = scratch_path("read_iab_elementary.iab");
     const auto mxf_path = scratch_path("read_iab_wrapped.mxf");
-    if (!write_file(elementary_path, iabitstream) ||
-        !write_file(mxf_path, wrap_as_mxf(iabitstream))) {
-        fmt::printf("could not write fixture files\n");
+    if (!write_file(elementary_path, iabitstream)) {
+        fmt::printf("could not write the elementary fixture\n");
         return 1;
     }
 
     const auto elementary = iclforge::iab::parse_iabitstream(elementary_path);
-    const auto mxf = iclforge::iab::parse_mxf_iab(mxf_path);
     std::filesystem::remove(elementary_path);
-    std::filesystem::remove(mxf_path);
-
     if (!elementary) {
         fmt::printf("parse_iabitstream failed: %.*s\n",
                     static_cast<int>(iclforge::iab::describe(elementary.error()).size()),
                     iclforge::iab::describe(elementary.error()).data());
         return 1;
     }
+
+    // The Track File carries the same frames at 24 bits (ST 2067-201 5.6.2). write_mxf_iab()
+    // refuses a bitstream the standard forbids, so this is checked, not assumed.
+    auto track_file_frames = *elementary;
+    for (auto& frame : track_file_frames) {
+        frame.frame.bit_depth = 24;
+    }
+    if (const auto written = iclforge::iab::write_mxf_iab(mxf_path, track_file_frames); !written) {
+        fmt::printf("write_mxf_iab failed: %.*s\n",
+                    static_cast<int>(iclforge::iab::describe(written.error()).size()),
+                    iclforge::iab::describe(written.error()).data());
+        return 1;
+    }
+    const auto mxf = iclforge::iab::parse_mxf_iab(mxf_path);
+    std::filesystem::remove(mxf_path);
+
     if (!mxf) {
         fmt::printf("parse_mxf_iab failed: %.*s\n",
                     static_cast<int>(iclforge::iab::describe(mxf.error()).size()),
@@ -155,7 +137,7 @@ int main() {
         const auto& b = (*mxf)[i].frame;
         fmt::printf("  frame %zu: elementary %u Hz/%u-bit, MXF %u Hz/%u-bit\n", i, a.sample_rate,
                     a.bit_depth, b.sample_rate, b.bit_depth);
-        if (a.sample_rate != b.sample_rate || a.bit_depth != b.bit_depth) {
+        if (a.sample_rate != b.sample_rate || b.bit_depth != 24) {
             fmt::printf("frame %zu disagrees between the two containers\n", i);
             return 1;
         }

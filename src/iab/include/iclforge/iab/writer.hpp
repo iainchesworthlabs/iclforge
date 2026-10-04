@@ -22,8 +22,8 @@
 // and §5.5 formulas. A value the reader produced from a code is written back as that code.
 // Gains above unity cannot be expressed (§5.5's range is at most 1) and are written as unity.
 //
-// What this does not write is the MXF track-file wrapping of ST 2067-201; the output is the
-// elementary IABitstream of §7, which parse_iabitstream() reads and which an IMF packager wraps.
+// The output is the elementary IABitstream of §7, which parse_iabitstream() reads. The ST 2067-201
+// MXF track-file wrapping is write_mxf_iab() in mxf.hpp.
 
 namespace iclforge::iab {
 

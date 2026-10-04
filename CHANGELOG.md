@@ -39,7 +39,14 @@ The sections below contain the complete change list and fixes.
   `kNoIabEssenceForChannel`. `fuzz_iab_parse` reaches the decoder.
 - **IAB writes.** `write_iaframe()`, `write_iabitstream()` and `encode_dlc()` write the element
   graph back as an elementary IABitstream, with a linear-predictive lossless encoder for the audio.
-  The MXF track-file wrapping is not written.
+- **IAB Track Files.** `write_mxf_iab()` wraps an IABitstream as the IMF IAB Track File of ST 2067-201,
+  laid out as ST 2067-5 lays out an Essence Component: header, index, essence and footer partitions,
+  a Random Index Pack, one Material and one File Package, the IAB Essence Descriptor with its Soundfield
+  and Channel SubDescriptors, and a one-entry-per-frame Index Table. It refuses what ST 2067-201
+  forbids (16-bit audio, `AudioDataDLC`, `BedRemap`, child elements, conditional elements).
+- **`parse_mxf_iab` accepts a real file's essence key.** It required the literal byte `CCh` where ST
+  2067-201 Table 2 has a placeholder and ST 379-1 puts the essence element count, so no real file
+  matched; byte 14 is now ignored.
 - **`build_iab()` carries spread and zone control.** `ObjectSpread` becomes the object's size and
   the nine-zone or 19-zone control becomes its zone constraint and elevation flag, where it matches
   one of TS 103 420 Table 20's presets; other patterns leave the object unconstrained.

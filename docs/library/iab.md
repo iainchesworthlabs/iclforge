@@ -1,4 +1,4 @@
-# IAB (SMPTE ST 2098-2) reading: `iclforge::iab`
+# IAB (SMPTE ST 2098-2) reading and writing: `iclforge::iab`
 
 `iclforge/iab/ac3iab.hpp`, `iclforge/iab/mxf.hpp`, library `iclforge::iab`. A standalone reader for the
 Immersive Audio Bitstream (IAB, SMPTE ST 2098-2:2022) — the format Dolby Atmos cinema masters
@@ -88,13 +88,50 @@ examples) consumes it.
   Preface/ContentStorage/Package object graph is never parsed at all (locating essence is a
   KLV-Key matter, not an object-graph one).
 
+## Writing an IMF Track File
+
+`write_mxf_iab(frames, options)` and `write_mxf_iab(path, frames, options)` wrap an IABitstream as the
+IMF IAB Track File of ST 2067-201, laid out as ST 2067-5 lays out an Essence Component: a header
+partition (Primer Pack, Header Metadata, 8 KiB of fill), a body partition holding the Index Table, a body
+partition holding the clip-wrapped essence, a footer partition, and a Random Index Pack. All partitions are
+closed and complete, KAG size 1, OP1a.
+
+The Header Metadata holds one Material Package and one File Package, each with a timecode track and the
+sound track; the IAB Essence Descriptor with its IAB Soundfield Label SubDescriptor and one IAB Channel
+SubDescriptor per bed channel (ST 2067-201 Annexes C and E); and the Preface's `ConformsToSpecifications`
+entry for IMF IAB Track File Level 0. The Edit Rate is the IAB frame rate and an Edit Unit is one Preamble
+and IAFrame pair, so the Index Table has one entry per frame; following 5.7.2 each entry's Stream Offset
+counts the essence key and length, so the first is at 25.
+
+ST 2067-201 narrows the bitstream, and the writer refuses what it forbids instead of writing a file that
+is not a Track File: 24-bit audio (`kBadBitDepth`), `AudioDataPCM` only (`kDlcNotAllowed`), no `BedRemap`
+(`kBedRemapNotAllowed`) or child elements (`kChildElement`), conditional elements only with UseCase `0xFF`
+(`kConditionalElement`), and a SampleRate, BitDepth, FrameRate and set of bed and object definitions that
+stay constant (`kInconsistentFrames`).
+
+```cpp
+iclforge::iab::MxfWriteOptions options;
+options.title = "Feature";                // IAB Soundfield Label SubDescriptor items
+options.spoken_language = "en-US";
+const auto written = iclforge::iab::write_mxf_iab("feature_iab.mxf", frames, options);
+```
+
+`MxfWriteOptions` also sets the Identification strings, the ST 2067-2 Annex E items (reference image edit
+rate and audio alignment level, which default to the frame rate and -20 dBFS), whether the Channel
+SubDescriptors are written, the timestamp, and a seed for the UUIDs and package identifier so the same
+input gives the same bytes. `src/iab/ERRATA.md` records the readings the writer takes. The writer's output
+parses in `parse_mxf_iab()`, and FFmpeg's MXF demuxer reads its partitions, Header Metadata, timecode and
+duration; FFmpeg does not know the IAB Essence Descriptor, so it reports the audio stream as unsupported.
+
 ## Consulted, never copied
 
 Every table and algorithm here is transcribed directly from the published standards, with the
 section/table/clause number cited at each call site, per CONTRIBUTING.md's clean-room rule.
 `DTSProAudio/iab-validator` (MIT) was consulted only as an external oracle to check this reader's
 bitstream output against a second, independent implementation — it has no MXF-related code or
-sample `.mxf` files at all, so it played no such role for `mxf.hpp`.
+sample `.mxf` files at all, so it played no such role for `mxf.hpp`. The Track File writer was checked
+against a reader written separately from ST 377-1 and the other standards it cites, and against the SMPTE
+Metadata Registers for the labels.
 
 ## API
 
@@ -114,6 +151,16 @@ std::expected<IaFrame, IabError> parse_iaframe(std::span<const std::byte> payloa
 
 std::expected<std::vector<IABitstreamFrame>, IabError> parse_mxf_iab(const std::string& path);
 std::expected<std::vector<IABitstreamFrame>, IabError> parse_mxf_iab(std::istream& in);
+
+enum class MxfWriteError : std::uint8_t {
+    kNoFrames, kInconsistentFrames, kBadBitDepth, kDlcNotAllowed, kBedRemapNotAllowed,
+    kChildElement, kConditionalElement, kBitstream, kTooLarge, kCannotOpen,
+};
+std::expected<std::vector<std::byte>, MxfWriteError> write_mxf_iab(std::span<const IABitstreamFrame> frames,
+                                                                   const MxfWriteOptions& options = {});
+std::expected<void, MxfWriteError> write_mxf_iab(const std::string& path,
+                                                 std::span<const IABitstreamFrame> frames,
+                                                 const MxfWriteOptions& options = {});
 ```
 
 ```cpp
@@ -139,8 +186,8 @@ inverses of `parse_iaframe()` and `parse_iabitstream()`, and `write_iabitstream(
 `.iab` file. The model holds resolved values, so the writer quantizes them with the inverse of the
 §5.4 and §5.5 formulas; a value the reader produced from a code is written back as that code, and
 writing what the reader returned reproduces the input bytes. A gain above unity cannot be coded and
-is written as unity. The output is the elementary IABitstream of §7. The ST 2067-201 MXF track-file
-wrapping is not written.
+is written as unity. The output is the elementary IABitstream of §7; `write_mxf_iab()` (below) wraps
+it as an IMF Track File.
 
 ```cpp
 std::expected<std::vector<std::byte>, WriteError> write_iaframe(const IaFrame& frame);

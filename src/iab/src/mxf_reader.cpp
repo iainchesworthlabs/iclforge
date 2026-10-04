@@ -99,10 +99,15 @@ struct Klv {
 // registered UL happens to use today, since neither byte is defined to be fixed - matching how
 // real MXF readers are expected to treat a registry-version byte, and erring toward accepting a
 // real file over a byte-for-byte guess at a value the standard itself does not fix.
+//
+// Byte 14 is wildcarded too. Table 4.2 writes it "cc", a placeholder like "nn", and ST 379-1 7.1
+// defines it as the Essence Element Count of the Item: 01h for the single Sound Element ST
+// 2067-201 5.5 requires. An earlier version of this reader required the literal value CCh there,
+// which no real file carries.
 constexpr std::array<std::uint8_t, kKeyLength> kIabEssenceKeyMask = {
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00};
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0x00};
 constexpr std::array<std::uint8_t, kKeyLength> kIabEssenceKey = {
-    0x06, 0x0E, 0x2B, 0x34, 0x01, 0x02, 0x01, 0x00, 0x0D, 0x01, 0x03, 0x01, 0x16, 0xCC, 0x0D, 0x00};
+    0x06, 0x0E, 0x2B, 0x34, 0x01, 0x02, 0x01, 0x00, 0x0D, 0x01, 0x03, 0x01, 0x16, 0x01, 0x0D, 0x00};
 
 [[nodiscard]] bool is_iab_essence_key(std::span<const std::byte> key) {
     if (key.size() != kKeyLength) {

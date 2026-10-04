@@ -204,7 +204,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | **Bridge** | IAB → Atmos encode (positions / gains) | 🟢 | High | Essential | `admbridge::build_iab`; `forge atmos-iab` |
 | | Spread + `ObjectZoneControl` → JOC | 🟡 | Medium | Important | Spread → object size; zone control → zone constraint when it matches one of the six presets; otherwise unconstrained |
 | **Writer** | IAB encode | 🟢 | Low | Nice-to-have | `write_iaframe`, `write_iabitstream`; `encode_dlc` for lossless essence |
-| | MXF Track File write (ST 2067-201) | 🔴 | Low | Nice-to-have | Elementary IABitstream only |
+| | MXF Track File write (ST 2067-201) | 🟢 | Low | Nice-to-have | `write_mxf_iab`; refuses what 2067-201 forbids (16-bit, DLC, `BedRemap`, child elements); checked by a separate reader and FFmpeg's demuxer, no IMF tool here has opened it |
 
 ---
 
@@ -332,7 +332,7 @@ this register is the checklist that those bounds appear here too.
 | Clause | Open item | Status |
 |---|---|---|
 | §5.5 / §10 zone control | A zone pattern that matches none of TS 103 420 Table 20's six presets is left unconstrained | 🟡 |
-| Writer | ST 2067-201 MXF Track File write | 🔴 |
+| Writer | ST 2067-201 Track File: no IMF validator or packager has opened a file | 🟡 |
 
 ### ITU-R BS.2076 / BS.2088 (ADM / BW64)
 

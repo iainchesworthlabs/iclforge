@@ -46,7 +46,8 @@ target_sources(iclforge_iab_objects
         src/iab_writer.cpp
         src/iab_reader.cpp
         src/iab.cpp
-        src/mxf_reader.cpp)
+        src/mxf_reader.cpp
+        src/mxf_writer.cpp)
 
 target_include_directories(iclforge_iab_objects
     PUBLIC

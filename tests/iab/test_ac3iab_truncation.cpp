@@ -566,7 +566,7 @@ std::vector<std::byte> mxf_key(bool iab) {
     std::vector<std::byte> key{std::byte{0x06}, std::byte{0x0E}, std::byte{0x2B}, std::byte{0x34},
                                std::byte{0x01}, std::byte{0x02}, std::byte{0x01}, std::byte{0x05},
                                std::byte{0x0D}, std::byte{0x01}, std::byte{0x03}, std::byte{0x01},
-                               std::byte{0x16}, std::byte{0xCC}, std::byte{0x0D}, std::byte{0x01}};
+                               std::byte{0x16}, std::byte{0x01}, std::byte{0x0D}, std::byte{0x01}};
     if (!iab) {
         key[12] = std::byte{0x15};
     }
