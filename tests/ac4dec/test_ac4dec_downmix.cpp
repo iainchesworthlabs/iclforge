@@ -23,6 +23,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "ac4dec_units.hpp"
+
 #include "iclforge/ac4/ac4.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 #include "pcm/downmix.hpp"
@@ -32,7 +34,9 @@ namespace {
 namespace detail = iclforge::ac4::detail;
 using S = iclforge::ac4::Speaker;
 using Row = std::vector<double>;
+using QmfMatrix = detail::QmfMatrix;
 using QmfValue = detail::QmfValue;
+using Real = detail::Real;
 
 double db(double decibels) {
     return std::pow(10.0, decibels / 20.0);
@@ -41,7 +45,7 @@ double db(double decibels) {
 // A gain in dB (db() above) is rarely an exact binary value, so a QmfValue
 // scaled by one holds it within a tolerance scaled to Real's own epsilon,
 // not to double's exactness.
-const double kTolerance = 1e4 * static_cast<double>(std::numeric_limits<detail::Real>::epsilon());
+const double kTolerance = 1e4 * ac4dec_units::relative_epsilon();
 
 constexpr std::array<S, 6> kFiveOne = {S::kLeft, S::kRight,        S::kCentre,
                                        S::kLfe,  S::kLeftSurround, S::kRightSurround};
@@ -67,9 +71,9 @@ std::vector<Row> matrix_for(std::span<const S> speakers, bool add_ch_base,
     detail::DownmixStage stage;
     stage.configure(speakers, add_ch_base, target, mix_lfe);
     std::vector<std::vector<QmfValue>> channels(speakers.size(), std::vector<QmfValue>(64));
-    std::vector<std::vector<QmfValue>*> in;
+    std::vector<QmfMatrix> in;
     for (auto& channel : channels) {
-        in.push_back(&channel);
+        in.push_back(channel);
     }
     std::vector<std::vector<QmfValue>> out;
     stage.process(values, in, out);
@@ -281,10 +285,10 @@ TEST_CASE("the downmix's gains hold from the frame that sends them until another
           "[ac4dec][downmix]") {
     detail::DownmixStage stage;
     stage.configure(kFiveOne, false, iclforge::ac4::DownmixTarget::kLoRo, true);
-    std::vector<std::vector<QmfValue>> channels(6, std::vector<QmfValue>(64, QmfValue{1.0, 0.0}));
-    std::vector<std::vector<QmfValue>*> in;
+    std::vector<std::vector<QmfValue>> channels(6, std::vector<QmfValue>(64, QmfValue{Real{1}, Real{0}}));
+    std::vector<QmfMatrix> in;
     for (auto& channel : channels) {
-        in.push_back(&channel);
+        in.push_back(channel);
     }
     std::vector<std::vector<QmfValue>> out;
     detail::DownmixValues sent;

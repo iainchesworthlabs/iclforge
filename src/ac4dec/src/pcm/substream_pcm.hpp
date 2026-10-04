@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <deque>
 #include <memory>
@@ -110,6 +111,10 @@ struct FrameInputs {
     // An object audio substream: decode() puts out its objects' PCM in
     // `channels`, in object order, and no speakers.
     bool objects = false;
+    // The substream's own tracks, where the caller holds them and needs them no more after the
+    // frame: decode() frees them once the reconstruction and the stereo and multichannel steps
+    // have read them, before the QMF stages (about 23 KB a channel pair at 2048 samples).
+    std::vector<Track>* release_tracks = nullptr;
 };
 
 class SubstreamPcm {
@@ -171,7 +176,13 @@ class SubstreamPcm {
             : synthesis(full_length),
               delay(delay_samples, Real{}),
               ext(ext_values),
-              out(out_values) {}
+              out_count(std::min(out_values, ext_values)) {}
+
+        // The QMF domain's matrix, which the output stages take: ext's first num_qmf_timeslots
+        // slots. A-SPX writes each of them from a slot of ext at or after it, and the next
+        // frame's history is ext's last slots, which it does not reach; the history moves to
+        // the front when the next frame's render() begins, after every stage has read it.
+        [[nodiscard]] QmfMatrix out() noexcept { return QmfMatrix(ext).first(out_count); }
 
         dsp::ChannelSynthesis<Real> synthesis;
         std::vector<Real> delay;  // the last d_pcm samples of the previous frame
@@ -179,7 +190,7 @@ class SubstreamPcm {
         // Q_low_ext (pcm/aspx.hpp): kTsOffsetHfadj + ts_offset_hfgen slots of
         // the previous frames' processed QMF matrix, then this frame's.
         std::vector<QmfValue> ext;
-        std::vector<QmfValue> out;  // the QMF domain's matrix, which the output stages take
+        std::size_t out_count = 0;  // out()'s values
         AspxChannelState aspx;
     };
 
@@ -330,11 +341,11 @@ class SubstreamPcm {
     // Every channel's matrix of this frame is the window of its `ext` (pass_through()), `out`
     // stale.
     bool out_in_ext_ = false;
-    std::vector<const std::vector<QmfValue>*> ajoc_inputs_;
-    std::vector<std::vector<QmfValue>*> ajoc_inputs_in_place_;
+    std::vector<QmfMatrix> ajoc_inputs_;
+    std::vector<QmfMatrix> ajoc_inputs_in_place_;
     // The objects' matrices in object order, and each object's synthesis bank
     // and converter.
-    std::vector<std::vector<QmfValue>*> object_matrices_;
+    std::vector<QmfMatrix> object_matrices_;
     std::vector<Output> object_outputs_;
     std::optional<int> decoded_mode_;
     std::optional<int> applied_mode_;
@@ -358,6 +369,7 @@ class SubstreamPcm {
     // The last good frame, which concealment repeats, and the frames lost
     // since it.
     std::vector<std::vector<Real>> last_spectra_;
+    std::vector<int> last_exponents_;
     std::vector<std::vector<int>> last_lengths_;
     ElementKind last_kind_ = ElementKind::kPair;
     DrcFrameValues last_drc_;
@@ -366,10 +378,10 @@ class SubstreamPcm {
     MixValues last_mix_;
     int losses_ = 0;
     std::vector<std::vector<QmfValue>> mixed_;  // the downmix's matrices
-    std::vector<std::vector<QmfValue>*> mixed_matrices_;
+    std::vector<QmfMatrix> mixed_matrices_;
     // The matrices before dialogue enhancement, DRC's side chain, where both act.
     std::vector<std::vector<QmfValue>> side_;
-    std::vector<std::vector<QmfValue>*> side_matrices_;
+    std::vector<QmfMatrix> side_matrices_;
     bool side_kept_ = false;  // whether the last frame's side chain is side_ rather than the matrices
 
     // Scratch, kept to save an allocation per frame.
@@ -382,6 +394,12 @@ class SubstreamPcm {
     ElementRoute route_;
     std::vector<StereoParameters> parameters_;  // one channel data element's, 16 or 32 KiB each
     std::vector<std::vector<Real>> scaled_;     // per track, in bitstream order
+    // Each track's lines are its values times 2^-exponent, and each channel's
+    // spectrum alike: 0 at double and float, the track's own at Fixed32
+    // (pcm/asf_reconstruct.hpp), and one exponent for tracks or channels that
+    // a matrix mixes.
+    std::vector<int> scaled_exponents_;
+    std::vector<int> spectra_exponents_;
     // reconstruct_track()'s 2^((sf - 100) / 4), made with the substream (1 KB at float).
     ScaleFactorGains sf_gain_ = scale_factor_gains();
     // The layouts align_tracks() gives a pair with b_dual_maxsfb, and per
@@ -391,11 +409,13 @@ class SubstreamPcm {
     std::vector<std::vector<Real>> spectra_;  // per channel, in window order
     std::vector<int> track_of_;               // per channel, the track its lines are in
     std::vector<Real> pcm_;
-    std::vector<std::vector<Real>> time_;  // per channel, the inverse transform's frame
+    // The inverse transform's frame: every channel's in a frame with S-CPL, else one channel's
+    // at a time (render()).
+    std::vector<std::vector<Real>> time_;
     std::vector<Real> converted_;
     std::vector<Real> aligned_;
     std::vector<std::vector<int>> lengths_;  // per channel, its blocks' lengths
-    std::vector<std::vector<QmfValue>*> matrices_;  // per channel, its `out`, for A-CPL
+    std::vector<QmfMatrix> matrices_;  // per channel, its `out`, for A-CPL
 };
 
 }  // namespace iclforge::ac4::detail

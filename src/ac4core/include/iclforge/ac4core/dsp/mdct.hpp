@@ -55,6 +55,16 @@ class Imdct {
     void inverse(std::span<const Real> spectrum, std::span<Real> out);
     void inverse(std::span<const Real> spectrum, std::span<Real> out, std::span<Complex> scratch);
 
+    // At Fixed32 (planning/ac4.md, D14d): `spectrum` holds the lines of the double decoder
+    // times 2^-exponent, and `out` receives the samples at the fixed tier's time-domain scale
+    // (dsp/scalar_traits.hpp, kTimeShift). The block takes an exponent of its own: its lines
+    // are shifted together until the largest is in [4, 8), the transform sheds bits only where
+    // a pass could reach the format's edge (Fft::inverse_scaled), and Pseudocode 62's 1/N is a
+    // power of two and a factor in [1/2, 1) folded into the post-twiddle. At double and float
+    // `exponent` is 0 and this is the form above.
+    void inverse(std::span<const Real> spectrum, int exponent, std::span<Real> out,
+                 std::span<Complex> scratch);
+
     // A block that follows another of its own length, with its window and overlap-add done as it
     // is unfolded (Pseudocode 64 with Nskip = 0, which dsp/synthesis.hpp describes): for i < N,
     //
@@ -67,16 +77,35 @@ class Imdct {
     void inverse_overlap(std::span<const Real> spectrum, std::span<const Real> kbd,
                          std::span<Real> overlap, std::span<Real> pcm, std::span<Complex> scratch);
 
+    // The pre-twiddle and, at Fixed32, the post-twiddle as the constructor computes them where no
+    // table is built in (dsp/transform_tables.hpp), which tests/ac4core/test_ac4core_transform_tables.cpp
+    // holds the built-in ones to.
+    [[nodiscard]] static std::vector<Complex> computed_pre_twiddles(std::size_t length);
+    [[nodiscard]] static std::vector<Complex> computed_post_twiddles(std::size_t length);
+
    private:
     // Pseudocodes 60 and 61: the pre-twiddle goes into the first pass of the plan's inverse
     // transform as it reads its input, so that no array of z[k] is made. Returns the half of
     // `scratch` that holds the N/2 values of the transform, or null for a plan with no passes.
     [[nodiscard]] Complex* transform(std::span<const Real> spectrum,
                                      std::span<Complex> scratch) const;
+    [[nodiscard]] static int post_shift_of(std::size_t length) noexcept;
+    [[nodiscard]] const Complex* pre() const noexcept {
+        return pre_table_ != nullptr ? pre_table_ : twiddle_.data();
+    }
+    [[nodiscard]] const Complex* post() const noexcept {
+        return post_table_ != nullptr ? post_table_ : post_twiddle_.data();
+    }
 
     std::size_t length_ = 0;
     Fft<Real> fft_;
-    std::vector<Complex> twiddle_;  // xcos1[k] + j xsin1[k], k < N/2
+    // xcos1[k] + j xsin1[k], k < N/2: the built-in table's where there is one, else twiddle_.
+    const Complex* pre_table_ = nullptr;
+    std::vector<Complex> twiddle_;
+    // At Fixed32 only: the pre-twiddle times 2^(post_shift_) / N, in [1/2, 1) in magnitude.
+    const Complex* post_table_ = nullptr;
+    std::vector<Complex> post_twiddle_;
+    int post_shift_ = 0;
     std::vector<Complex> scratch_;
 };
 

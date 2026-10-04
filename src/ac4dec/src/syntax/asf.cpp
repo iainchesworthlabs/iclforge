@@ -568,12 +568,12 @@ ParseResult parse_sf_data(BitReader& r, const SubstreamContext& ctx, const SfInf
                 // Stored line by line, a pair or a quad (dim is 2 or 4): as a loop of a count the
                 // compiler turns it into a call of memcpy, a call into ROM for 8 or 16 bytes at
                 // every codeword.
-                std::int32_t* const target = &out.quant_spec[at(k)];
-                target[0] = lines[0];
-                target[1] = lines[1];
+                std::int16_t* const target = &out.quant_spec[at(k)];
+                target[0] = static_cast<std::int16_t>(lines[0]);
+                target[1] = static_cast<std::int16_t>(lines[1]);
                 if (dim == 4) {
-                    target[2] = lines[2];
-                    target[3] = lines[3];
+                    target[2] = static_cast<std::int16_t>(lines[2]);
+                    target[3] = static_cast<std::int16_t>(lines[3]);
                 }
                 if (auto ok = check(r); !ok) {
                     return ok;
@@ -587,7 +587,7 @@ ParseResult parse_sf_data(BitReader& r, const SubstreamContext& ctx, const SfInf
         for (int sfb = 0; sfb < out.max_sfb[at(g)]; ++sfb) {
             std::int32_t peak = 0;
             for (int k = out.sect_sfb_offset[at(g)][at(sfb)]; k < out.sect_sfb_offset[at(g)][at(sfb + 1)]; ++k) {
-                peak = std::max(peak, std::abs(out.quant_spec[at(k)]));
+                peak = std::max<std::int32_t>(peak, std::abs(out.quant_spec[at(k)]));
             }
             out.max_quant_idx[at(g)][at(sfb)] =
                 static_cast<std::uint16_t>(std::min<std::int32_t>(peak, 65535));
@@ -700,7 +700,7 @@ ParseResult parse_sf_hsf_data(BitReader& r, int num_window_groups, const SfData&
                     return fail(DecodeError::kInvalidStream, "a codeword runs past its section");
                 }
                 for (int d = 0; d < dim; ++d) {
-                    hsf_out.quant_spec[at(k + d)] = lines[at(d)];
+                    hsf_out.quant_spec[at(k + d)] = static_cast<std::int16_t>(lines[at(d)]);
                 }
                 if (auto ok = check(r); !ok) {
                     return ok;
@@ -721,7 +721,7 @@ ParseResult parse_sf_hsf_data(BitReader& r, int num_window_groups, const SfData&
             std::int32_t peak = 0;
             for (int k = static_cast<int>(hsf_out.sect_sfb_offset[at(g)][at(i)]);
                  k < static_cast<int>(hsf_out.sect_sfb_offset[at(g)][at(i + 1)]); ++k) {
-                peak = std::max(peak, std::abs(hsf_out.quant_spec[at(k)]));
+                peak = std::max<std::int32_t>(peak, std::abs(hsf_out.quant_spec[at(k)]));
             }
             hsf_out.max_quant_idx[at(g)][at(i)] =
                 static_cast<std::uint16_t>(std::min<std::int32_t>(peak, 65535));
