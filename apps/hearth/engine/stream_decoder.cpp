@@ -479,7 +479,8 @@ std::expected<std::size_t, std::string> StreamDecoder::decode_ac4(std::span<cons
     if (pcm.objects.empty() && !ac4_placeable(pcm.speakers)) {
         flush_ac4(deliver);
         return std::unexpected(std::string{
-            "An AC-4 frame's channels (22.2's) are more than the layout renderer places."});
+            "An AC-4 frame's channels (22.2's, or the screen pair of a 9.X.4 mode) are not all "
+            "ones the layout renderer places."});
     }
     place_ac4_frame(pcm, deliver);
     report_ac4(pcm, unit.size(), reported);

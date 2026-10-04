@@ -98,7 +98,8 @@ namespace iclforge::hearth {
 
 // Whether the layout renderer can place `speakers` as a bed: it takes sixteen coded channels, and
 // Table E2.5 has no location for 22.2's bottom channels or 9.X.4's screen pair. A frame of a wider
-// layout, 22.2's, is refused rather than placed on some of its channels.
+// layout, 22.2's, or with one of those channels, a 9.X.4 mode's, is refused rather than placed on
+// some of its channels.
 [[nodiscard]] bool ac4_placeable(std::span<const iclforge::ac4::Speaker> speakers);
 
 // The A/52 audio coding mode with those speakers' front and surround channels,
