@@ -494,6 +494,12 @@ target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/fuzz")
 target_compile_definitions(iclforge-tests
     PRIVATE "ICLFORGE_GOLDEN_AUDIO_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden/audio\"")
 
+# The decode scalar the library under test was built with (ICLFORGE_DECODE_SCALAR: double, float or
+# fixed), for the few tolerances that are stated in terms of the arithmetic - the float decode
+# agrees with the double direct-form transform to float rounding, not to 1e-7.
+target_compile_definitions(iclforge-tests
+    PRIVATE "ICLFORGE_TEST_DECODE_SCALAR=\"${ICLFORGE_DECODE_SCALAR}\"")
+
 # The third-party Dolby fixture tests/ac3/oba/test_dee_joc_fixture.cpp reads, on the
 # same reasoning: a path, because ctest runs from the build tree.
 target_compile_definitions(iclforge-tests
