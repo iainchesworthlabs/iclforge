@@ -539,6 +539,35 @@ namespace {
     return kFactors[idx & 3u];
 }
 
+// §5.6.6.3.3 Table 41: object_div_table (object_div_mode 0) to
+// object_divergence.
+[[nodiscard]] double divergence_from_table(std::uint32_t index) {
+    constexpr std::array<double, 4> kDivergence = {0.500755, 0.608529, 0.704833, 1.0};
+    return kDivergence[index & 3u];
+}
+
+// §5.6.6.3.4 Table 42: object_div_code (object_div_mode 2) to
+// object_divergence. Code 0 is reserved, so the table starts at code 1 and is
+// indexed by code - 1.
+constexpr std::array<double, 63> kDivergenceFromCode = {
+    0.0,      0.004026, 0.00716,  0.012731, 0.020173, 0.028485, 0.04021,  0.050582, 0.063601,
+    0.079914, 0.100299, 0.125666, 0.140532, 0.157027, 0.175282, 0.195417, 0.217536, 0.241718,
+    0.268002, 0.296377, 0.326766, 0.359017, 0.392895, 0.428081, 0.464184, 0.500755, 0.537316,
+    0.573389, 0.608529, 0.642346, 0.674524, 0.704833, 0.733123, 0.75932,  0.783416, 0.805451,
+    0.825506, 0.843686, 0.860112, 0.874914, 0.888222, 0.900168, 0.910875, 0.920461, 0.929035,
+    0.936698, 0.943544, 0.949656, 0.955112, 0.95998,  0.964322, 0.968195, 0.974729, 0.979923,
+    0.98405,  0.98733,  0.989935, 0.992874, 0.994955, 0.996817, 0.99821,  0.998993, 1.0,
+};
+
+// Table 42's lookup. Code 0 is reserved and has no value, which is what the
+// empty optional says.
+[[nodiscard]] std::optional<double> divergence_from_code(std::uint32_t code) {
+    if (code == 0 || code > kDivergenceFromCode.size()) {
+        return std::nullopt;
+    }
+    return kDivergenceFromCode[code - 1];
+}
+
 // Everything one object_element() needs that lives outside it: how many
 // objects there are and which of them are speaker- or format-anchored.
 struct ObjectLayout {
@@ -840,6 +869,24 @@ void read_trim_element(BitReader& r, int object_count, TrimElement& trim) {
 // model has a home for (DynamicObject::divergence); ext_prec_pos_block is a
 // sub-quantization-step refinement of a position already decoded, and is
 // walked past rather than folded in.
+//
+// obj_div_block (§5.5.14, Table 40), per object and update block:
+//   - b_object_divergence 0: nothing is sent and the divergence stays 0.
+//   - object_div_mode 0: Table 41, indexed by object_div_table.
+//   - object_div_mode 1: "reuse object_divergence as transmitted in the
+//     previous obj_info_block", so the previous update block's value for the
+//     same object. The first block has no predecessor inside this payload and
+//     reads 0; carrying the last frame's value over would need decoder state
+//     that parse_payload does not have.
+//   - object_div_mode 2: Table 42, indexed by object_div_code.
+//   - object_div_mode 3: Table 40 reserves it, but §5.5.14 still reads an
+//     object_div_code for it, so the 6 bits are consumed to keep the rest of
+//     the element in step. Reserved gives no value, so the previous block's
+//     is kept, the same as mode 1.
+// A reserved object_div_code (0, Table 42) keeps the previous block's value
+// too. The pseudo-code's closing "else { object_divergence = 0 }" would zero
+// modes 0 and 1 after they have been read, which makes Table 41 and mode 1
+// pointless; it is read as belonging to the b_object_divergence test.
 [[nodiscard]] bool read_extended_object_element(BitReader& r, const ObjectLayout& layout,
                                                 int num_blocks, DecodedProgram& out) {
     if (num_blocks <= 0) {
@@ -855,16 +902,20 @@ void read_trim_element(BitReader& r, int object_count, TrimElement& trim) {
                     continue;
                 }
                 const auto mode = r.read(2);  // object_div_mode
-                double divergence = 0.0;
-                if (mode == 0) {
-                    // A 2-bit table index whose table TS 103 420 does not
-                    // print, so only its four steps even spacing is safe.
-                    divergence = static_cast<double>(r.read(2)) / 3.0;
-                } else if (mode == 2 || mode == 3) {
-                    divergence = static_cast<double>(r.read(6)) / 63.0;
-                }
                 auto& block = out.blocks[static_cast<std::size_t>(blk)];
                 const auto index = static_cast<std::size_t>(object - layout.anchored);
+                const double previous =
+                    blk > 0 && index < out.blocks[static_cast<std::size_t>(blk) - 1].objects.size()
+                        ? out.blocks[static_cast<std::size_t>(blk) - 1].objects[index].divergence
+                        : 0.0;
+                double divergence = previous;
+                if (mode == 0) {
+                    divergence = divergence_from_table(r.read(2));  // object_div_table
+                } else if (mode == 2) {
+                    divergence = divergence_from_code(r.read(6)).value_or(previous);
+                } else if (mode == 3) {
+                    r.skip(6);  // object_div_code, with no value to take from it
+                }
                 if (index < block.objects.size()) {
                     block.objects[index].divergence = divergence;
                 }

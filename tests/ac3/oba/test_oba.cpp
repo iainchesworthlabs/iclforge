@@ -1047,6 +1047,213 @@ TEST_CASE("OAMD skips an oa_element it does not recognise", "[oba][oamd]") {
     CHECK(decoded->objects[0].position.x == 31.0 / 62.0);
 }
 
+// --- extended_object_element: obj_div_block ---------------------------------
+
+namespace {
+
+// One object's obj_div_block entry for one update block (§5.5.14).
+struct DivEntry {
+    bool present = true;      // b_object_divergence
+    std::uint32_t mode = 0;   // object_div_mode
+    std::uint32_t value = 0;  // object_div_table (2 bits) or object_div_code (6 bits)
+};
+
+constexpr DivEntry kAbsent{.present = false};
+
+// Builds a payload with `entries.size()` dynamic objects and
+// `entries[0].size()` update blocks, splices an extended_object_element
+// (oa_element_id_idx 5) in behind its object_element, and returns every
+// block's decoded divergence as [object][block].
+std::vector<std::vector<double>> decode_divergence(
+    const std::vector<std::vector<DivEntry>>& entries) {
+    const int objects = static_cast<int>(entries.size());
+    const int blocks = static_cast<int>(entries.front().size());
+
+    const iclforge::oba::Program program{
+        .dynamic_only = true, .lfe = true, .dynamic_objects = objects};
+    const std::vector<iclforge::oba::DynamicObject> state(static_cast<std::size_t>(objects));
+    std::vector<iclforge::oba::ObjectUpdate> updates;
+    for (int blk = 0; blk < blocks; ++blk) {
+        updates.push_back({.block_offset_factor = blk * 4, .ramp_duration = 512, .objects = state});
+    }
+    const auto original = iclforge::oba::build_payload_updates(program, updates);
+
+    // The extended element's own contents, §5.5.13: b_obj_div_block, then
+    // each object's blocks in turn, then b_ext_prec_pos_block.
+    iclforge::BitWriter e;
+    e.put(0, 1);  // b_discard_unknown_element
+    e.put(1, 1);  // b_obj_div_block
+    for (const auto& per_object : entries) {
+        for (const auto& entry : per_object) {
+            e.put(entry.present ? 1 : 0, 1);  // b_object_divergence
+            if (!entry.present) {
+                continue;
+            }
+            e.put(entry.mode, 2);  // object_div_mode
+            if (entry.mode == 0) {
+                e.put(entry.value, 2);  // object_div_table
+            } else if (entry.mode >= 2) {
+                e.put(entry.value, 6);  // object_div_code
+            }
+        }
+    }
+    e.put(0, 1);  // b_ext_prec_pos_block
+    const std::size_t element_bits = e.bit_count();
+    const std::size_t element_bytes = (element_bits + 7) / 8;
+    REQUIRE(element_bytes <= 16);  // oa_element_size_bits below is a single group
+    e.byte_align();
+    const auto element = e.take();
+
+    // Re-emit the payload: header, the object_element as it was, the new
+    // element, then whatever followed.
+    iclforge::BitReader r{original};
+    iclforge::BitWriter w;
+    for (int bit = 0; bit < 2 + 5 + 1 + 1 + 1; ++bit) {  // through b_alternate_object_data_present
+        w.put(r.read_bit(), 1);
+    }
+    REQUIRE(r.read(4) == 1);  // oa_element_count_bits
+    w.put(2, 4);
+    const std::size_t object_element_begin = r.bit_position();
+    r.skip(4);  // oa_element_id_idx
+    const std::size_t object_element_bytes = read_variable_bits_max(r, 4, 4) + 1;
+    const std::size_t object_element_end = r.bit_position() + object_element_bytes * 8;
+    {
+        iclforge::BitReader copy{original};
+        copy.skip(object_element_begin);
+        for (std::size_t bit = object_element_begin; bit < object_element_end; ++bit) {
+            w.put(copy.read_bit(), 1);
+        }
+    }
+    r.skip(object_element_bytes * 8);
+
+    w.put(5, 4);  // oa_element_id_idx: extended_object_element
+    w.put(static_cast<std::uint32_t>(element_bytes - 1), 4);  // oa_element_size_bits
+    w.put(0, 1);                                              // read_more
+    {
+        iclforge::BitReader copy{element};
+        for (std::size_t bit = 0; bit < element_bytes * 8; ++bit) {
+            w.put(copy.read_bit(), 1);
+        }
+    }
+    const std::size_t remaining = original.size() * 8 - r.bit_position();
+    for (std::size_t bit = 0; bit < remaining; ++bit) {
+        w.put(r.read_bit(), 1);
+    }
+
+    const auto decoded = iclforge::oba::parse_payload(w.take());
+    REQUIRE(decoded.has_value());
+    REQUIRE(decoded->blocks.size() == static_cast<std::size_t>(blocks));
+    std::vector<std::vector<double>> out(static_cast<std::size_t>(objects));
+    for (int object = 0; object < objects; ++object) {
+        for (int blk = 0; blk < blocks; ++blk) {
+            out[static_cast<std::size_t>(object)].push_back(
+                decoded->blocks[static_cast<std::size_t>(blk)]
+                    .objects[static_cast<std::size_t>(object)]
+                    .divergence);
+        }
+        // `objects` is the first block's state, so it follows block 0.
+        CHECK(decoded->objects[static_cast<std::size_t>(object)].divergence ==
+              out[static_cast<std::size_t>(object)].front());
+    }
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("OAMD obj_div_block mode 0 reads TS 103 420 Table 41", "[oba][oamd]") {
+    // §5.6.6.3.3 Table 41, all four indices, one per update block.
+    const auto divergence = decode_divergence({{
+        {.mode = 0, .value = 0},
+        {.mode = 0, .value = 1},
+        {.mode = 0, .value = 2},
+        {.mode = 0, .value = 3},
+    }});
+    REQUIRE(divergence.size() == 1);
+    CHECK(divergence[0] == std::vector<double>{0.500755, 0.608529, 0.704833, 1.0});
+}
+
+TEST_CASE("OAMD obj_div_block mode 2 reads TS 103 420 Table 42", "[oba][oamd]") {
+    // The values the standard prints at the ends and at three interior codes.
+    // Codes 26, 29 and 32 hold the same values as Table 41's indices 0 to 2,
+    // which is a second check on the table against the standard itself.
+    const auto spot = decode_divergence({{
+        {.mode = 2, .value = 1},
+        {.mode = 2, .value = 2},
+        {.mode = 2, .value = 26},
+        {.mode = 2, .value = 29},
+        {.mode = 2, .value = 32},
+        {.mode = 2, .value = 63},
+    }});
+    CHECK(spot[0] == std::vector<double>{0.0, 0.004026, 0.500755, 0.608529, 0.704833, 1.0});
+
+    // Every code, eight update blocks at a time: each step is a larger
+    // divergence than the one before, from 0 to 1.
+    std::vector<double> all;
+    for (std::uint32_t first = 1; first <= 63; first += 8) {
+        std::vector<DivEntry> blocks;
+        for (std::uint32_t code = first; code < first + 8 && code <= 63; ++code) {
+            blocks.push_back({.mode = 2, .value = code});
+        }
+        const auto divergence = decode_divergence({blocks});
+        all.insert(all.end(), divergence[0].begin(), divergence[0].end());
+    }
+    REQUIRE(all.size() == 63);
+    CHECK(all.front() == 0.0);
+    CHECK(all.back() == 1.0);
+    for (std::size_t i = 1; i < all.size(); ++i) {
+        CHECK(all[i] > all[i - 1]);
+    }
+}
+
+TEST_CASE("OAMD obj_div_block mode 1 reuses the previous block's divergence", "[oba][oamd]") {
+    // Table 40: "reuse object_divergence as transmitted in the previous
+    // obj_info_block", kept per object. Entries run object by object on the
+    // wire, so the second object's differing history shows the two do not mix.
+    const auto divergence = decode_divergence({
+        {
+            {.mode = 1},               // no previous block in this payload: 0
+            {.mode = 0, .value = 1},   // 0.608529
+            {.mode = 1},               // reuse: 0.608529
+            {.mode = 1},               // reuse again, from the reused one
+            kAbsent,                   // nothing sent: 0
+            {.mode = 1},               // reuse of a block that sent nothing: 0
+            {.mode = 2, .value = 63},  // 1
+            {.mode = 1},               // 1
+        },
+        {
+            {.mode = 2, .value = 26},  // 0.500755
+            {.mode = 1},               // 0.500755
+            {.mode = 0, .value = 3},   // 1
+            {.mode = 1},               // 1
+            {.mode = 1},               // 1
+            kAbsent,                   // 0
+            {.mode = 0, .value = 0},   // 0.500755
+            {.mode = 1},               // 0.500755
+        },
+    });
+    REQUIRE(divergence.size() == 2);
+    CHECK(divergence[0] ==
+          std::vector<double>{0.0, 0.608529, 0.608529, 0.608529, 0.0, 0.0, 1.0, 1.0});
+    CHECK(divergence[1] ==
+          std::vector<double>{0.500755, 0.500755, 1.0, 1.0, 1.0, 0.0, 0.500755, 0.500755});
+}
+
+TEST_CASE("OAMD obj_div_block keeps the previous divergence for what Table 40 and 42 reserve",
+          "[oba][oamd]") {
+    // object_div_mode 3 (Table 40) and object_div_code 0 (Table 42) carry no
+    // value. Mode 3 still has its 6-bit code on the wire, so the entry after
+    // it decoding properly shows that those bits were consumed.
+    const auto divergence = decode_divergence({{
+        {.mode = 2, .value = 0},   // reserved code, nothing before it: 0
+        {.mode = 0, .value = 2},   // 0.704833
+        {.mode = 2, .value = 0},   // reserved code: 0.704833
+        {.mode = 3, .value = 63},  // reserved mode: 0.704833
+        {.mode = 2, .value = 63},  // 1
+        {.mode = 3, .value = 1},   // reserved mode: 1
+    }});
+    CHECK(divergence[0] == std::vector<double>{0.0, 0.704833, 0.704833, 0.704833, 1.0, 1.0});
+}
+
 // --- Encoder breadth: syntax build_payload used to hardcode away -----------
 
 TEST_CASE("OAMD writes b_object_not_active and nothing else for a silent object",
