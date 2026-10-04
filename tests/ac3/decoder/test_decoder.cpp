@@ -898,7 +898,14 @@ TEST_CASE("fast_imdct reconstructs the same PCM as the direct transform, long an
     // agree to well below one LSB of 16-bit audio. The bound is deliberately
     // far tighter than audibility and far looser than the ~1e-12 expectation,
     // so it fails on a real defect and never on rounding.
-    CHECK(max_diff < 1e-7f);
+    //
+    // A float build (ICLFORGE_DECODE_SCALAR=float) keeps the fast path in float and
+    // runs the direct form in double, narrowed to float, so the two differ by float
+    // rounding: measured 3.0e-7 on this stream, about five ULPs at the 0.9 peak. The
+    // bound there is 1e-6 - three times what was measured, and thirty times under one
+    // 16-bit LSB (3.05e-5). The fixed-point build has one form, so the two agree exactly.
+    constexpr bool kDouble = std::string_view{ICLFORGE_TEST_DECODE_SCALAR} == "double";
+    CHECK(max_diff < (kDouble ? 1e-7f : 1e-6f));
 }
 
 TEST_CASE("dual mono's output-stage dialnorm normalisation levels Ch2 by its own dialnorm2",

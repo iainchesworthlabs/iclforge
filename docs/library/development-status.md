@@ -212,12 +212,12 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | Category | Feature | Status | Priority | Criticality | Notes |
 |---|---|---|---|---|---|
 | **Reader** | BW64/RF64 container | 🟢 | High | Essential | Opt-in (`ICLFORGE_BUILD_ADM`); Boost |
-| | ADM XML — DirectSpeakers + Objects | 🟡 | High | Essential | Those two pack types only; the rest is refused (next row) |
-| | ADM Matrix / HOA / Binaural / `zoneExclusion` / `objectDivergence` / `screenRef` | 🔴 | Low | Nice-to-have | Refused `kUnsupportedType` |
+| | ADM XML — DirectSpeakers + Objects | 🟢 | High | Essential | Including `zoneExclusion`, `objectDivergence`, `screenRef`, `headLocked`; `zoneExclusion` is read from the axml text because libadm does not parse it |
+| | ADM XML — HOA / Binaural / Matrix blocks | 🟡 | Low | Nice-to-have | Parsed as blocks; a Matrix block's coefficients are not (libadm has no model); the bridge refuses all three |
 | | Common definitions (Annex A) | 🟢 | Medium | Important | Predefined formats merged |
-| **Writer** | BW64 write | 🟡 | Medium | Important | 24-bit PCM; shapes matching the bridge |
-| | Decode → ADM BWF (Atmos master profile) | 🟡 | Medium | Important | Dynamic-object-only programmes; cartesian |
-| **Bridge** | ADM → Atmos encode | 🟡 | High | Essential | Drops width / HOA / zoneLock and similar |
+| **Writer** | BW64 write | 🟡 | Medium | Important | 16/24/32-bit integer or 32/64-bit float; shapes matching the bridge; `zoneExclusion` written |
+| | Decode → ADM BWF (Atmos master profile) | 🟡 | Medium | Important | Dynamic-object-only programmes; cartesian; zone constraints, divergence value and `screenRef` written |
+| **Bridge** | ADM → Atmos encode | 🟡 | High | Essential | Position, gain, size, snap, zone constraints, divergence value and `screenRef` carried; `headLocked`, `diffuse`, a divergence range and a conditioned `channelLock` listed in `BridgeResult::unmapped` and warned; Matrix / HOA / Binaural refused |
 
 ---
 
@@ -340,8 +340,8 @@ this register is the checklist that those bounds appear here too.
 
 | Clause | Open item | Status |
 |---|---|---|
-| Pack types beyond DirectSpeakers + Objects | Matrix / HOA / Binaural / zoneExclusion / … | 🔴 |
-| Writer / bridge | Narrowed Atmos-master subset | 🟡 |
+| Pack types beyond DirectSpeakers + Objects | Matrix / HOA / Binaural: not representable in the Atmos bridge (refused by design); Matrix coefficients not parsed | 🟡 |
+| Writer / bridge | Narrowed Atmos-master subset; divergence and `screenRef` mapped by reading, since TS 103 420 Annex B has no row for them; no external decoder has rendered either | 🟡 |
 
 ### AOM IAMF v2.0.0
 

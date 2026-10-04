@@ -23,7 +23,11 @@ ObjectPlacement placement_of(const Keyframe& k) {
             .size = k.size,
             .snap = k.snap,
             .zone = k.zone,
-            .enable_elevation = k.enable_elevation};
+            .enable_elevation = k.enable_elevation,
+            .divergence = k.divergence,
+            .screen_reference = k.screen_reference,
+            .screen_factor = k.screen_factor,
+            .depth_factor = k.depth_factor};
 }
 
 ObjectPlacement interpolate(const Keyframe& a, const Keyframe& b, double time_s) {
@@ -41,7 +45,11 @@ ObjectPlacement interpolate(const Keyframe& a, const Keyframe& b, double time_s)
                      .height = lerp(a.size.height, b.size.height, f)},
             .snap = a.snap,
             .zone = a.zone,
-            .enable_elevation = a.enable_elevation};
+            .enable_elevation = a.enable_elevation,
+            .divergence = lerp(a.divergence, b.divergence, f),
+            .screen_reference = a.screen_reference,
+            .screen_factor = a.screen_factor,
+            .depth_factor = a.depth_factor};
 }
 
 }  // namespace

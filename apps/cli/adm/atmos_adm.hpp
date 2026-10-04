@@ -58,6 +58,8 @@ struct AdmAtmosSource {
         paths;                                // pass directly to iclforge::oba::evaluate_placements
     std::vector<std::span<const float>> pcm;  // one mono span per channel; see `handle` above
     std::shared_ptr<void> handle;             // opaque - owns the parsed document, if any
+    std::vector<std::string> warnings;        // one line per channel whose ADM metadata asks for
+                                              // something the Atmos encode does not carry
 
     [[nodiscard]] std::size_t channel_count() const { return paths.size(); }
 };

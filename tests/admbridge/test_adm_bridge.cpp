@@ -1,5 +1,6 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <cmath>
@@ -9,6 +10,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "iclforge/admbridge/bridge.hpp"
@@ -995,4 +997,320 @@ TEST_CASE("a real ADM BWF master's bed and moving object survive admbridge into 
             CHECK(energy_c > energy_sr);
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// zoneExclusion <-> ZoneConstraint (TS 103 420 Annex B.2.6, Tables B.18/B.19)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+using iclforge::adm::ExclusionZone;
+using iclforge::oba::ZoneConstraint;
+
+ExclusionZone zone_labelled(std::string label) {
+    return {.label = std::move(label)};
+}
+
+ExclusionZone zone_bounded(double min_x, double max_x, double min_y, double max_y, double min_z,
+                           double max_z) {
+    return {.label = {},
+            .has_bounds = true,
+            .min_x = min_x,
+            .max_x = max_x,
+            .min_y = min_y,
+            .max_y = max_y,
+            .min_z = min_z,
+            .max_z = max_z};
+}
+
+}  // namespace
+
+TEST_CASE("adm_zone_exclusion_to_constraint reads each Table B.18 preset by label", "[admbridge][zones]") {
+    using iclforge::admbridge::adm_zone_exclusion_to_constraint;
+    struct Case {
+        std::vector<std::string> labels;
+        ZoneConstraint zone;
+    };
+    const auto c = GENERATE(
+        Case{{"ZM1"}, ZoneConstraint::kBackExcluded},
+        Case{{"ZM2_Left", "ZM2_Right"}, ZoneConstraint::kSideExcluded},
+        Case{{"ZM3_ScreenLeft", "ZM3_SideLeft", "ZM3_ScreenRight", "ZM3_SideRight"},
+             ZoneConstraint::kCentreAndBackOnly},
+        Case{{"ZM4"}, ZoneConstraint::kScreenOnly},
+        Case{{"ZM5"}, ZoneConstraint::kSurroundOnly});
+    std::vector<ExclusionZone> zones;
+    for (const auto& label : c.labels) {
+        zones.push_back(zone_labelled(label));
+    }
+    const auto mapping = adm_zone_exclusion_to_constraint(zones);
+    CHECK(mapping.zone == c.zone);
+    CHECK(mapping.enable_elevation);
+    CHECK(mapping.exact);
+}
+
+TEST_CASE("adm_zone_exclusion_to_constraint reads a preset from its bounds when there is no label",
+          "[admbridge][zones]") {
+    using iclforge::admbridge::adm_zone_exclusion_to_constraint;
+    // Table B.19's ZM1 and the Top-Bottom pair, transcribed again here rather than taken from the
+    // implementation.
+    const auto back = adm_zone_exclusion_to_constraint(
+        std::vector{zone_bounded(-1, 1, -1, -0.41934, -0.49900, 0.49900)});
+    CHECK(back.zone == ZoneConstraint::kBackExcluded);
+    CHECK(back.exact);
+
+    const auto top_bottom = adm_zone_exclusion_to_constraint(
+        std::vector{zone_bounded(-1, 1, -1, 1, 0.49950, 1), zone_bounded(-1, 1, -1, 1, -1, -0.49950)});
+    CHECK(top_bottom.zone == ZoneConstraint::kNone);
+    CHECK_FALSE(top_bottom.enable_elevation);
+    CHECK(top_bottom.exact);
+
+    // Table B.19 prints ZM3_SideRight's minX as 0.5611; its mirror is 0.51611. Either reads.
+    for (const double min_x : {0.5611, 0.51611}) {
+        CAPTURE(min_x);
+        const auto centre_back = adm_zone_exclusion_to_constraint(std::vector{
+            zone_bounded(-1, -0.16129, 0.5, 1, -0.499, 0.499), zone_bounded(-1, -0.51611, -0.707, 0.49999, -0.499, 0.499),
+            zone_bounded(0.16129, 1, 0.5, 1, -0.499, 0.499), zone_bounded(min_x, 1, -0.707, 0.49999, -0.499, 0.499)});
+        CHECK(centre_back.zone == ZoneConstraint::kCentreAndBackOnly);
+        CHECK(centre_back.exact);
+    }
+}
+
+TEST_CASE("adm_zone_exclusion_to_constraint ignores label case and combines a horizontal preset with "
+          "the Top-Bottom pair",
+          "[admbridge][zones]") {
+    using iclforge::admbridge::adm_zone_exclusion_to_constraint;
+    const auto mapping = adm_zone_exclusion_to_constraint(
+        std::vector{zone_labelled("zm2_left"), zone_labelled("ZM2_RIGHT"), zone_labelled("zu"),
+                    zone_labelled("ZB")});
+    CHECK(mapping.zone == ZoneConstraint::kSideExcluded);
+    CHECK_FALSE(mapping.enable_elevation);
+    CHECK(mapping.exact);
+}
+
+TEST_CASE("adm_zone_exclusion_to_constraint with no zones is the default and exact", "[admbridge][zones]") {
+    const auto mapping = iclforge::admbridge::adm_zone_exclusion_to_constraint({});
+    CHECK(mapping.zone == ZoneConstraint::kNone);
+    CHECK(mapping.enable_elevation);
+    CHECK(mapping.exact);
+}
+
+TEST_CASE("adm_zone_exclusion_to_constraint flags what OAMD cannot say", "[admbridge][zones]") {
+    using iclforge::admbridge::adm_zone_exclusion_to_constraint;
+    SECTION("an unrecognised box") {
+        const auto mapping = adm_zone_exclusion_to_constraint(std::vector{zone_bounded(-0.2, 0.2, -0.2, 0.2, -0.2, 0.2)});
+        CHECK(mapping.zone == ZoneConstraint::kNone);
+        CHECK_FALSE(mapping.exact);
+    }
+    SECTION("a label that is not in Table B.18") {
+        CHECK_FALSE(adm_zone_exclusion_to_constraint(std::vector{zone_labelled("ZM9")}).exact);
+    }
+    SECTION("a zone with neither label nor bounds") {
+        CHECK_FALSE(adm_zone_exclusion_to_constraint(std::vector{ExclusionZone{}}).exact);
+    }
+    SECTION("only one of the two Top-Bottom zones") {
+        const auto mapping = adm_zone_exclusion_to_constraint(std::vector{zone_labelled("ZU")});
+        CHECK(mapping.enable_elevation);
+        CHECK_FALSE(mapping.exact);
+    }
+    SECTION("two horizontal presets at once") {
+        const auto mapping =
+            adm_zone_exclusion_to_constraint(std::vector{zone_labelled("ZM1"), zone_labelled("ZM4")});
+        CHECK(mapping.zone == ZoneConstraint::kNone);
+        CHECK_FALSE(mapping.exact);
+    }
+    SECTION("half of the side preset") {
+        CHECK_FALSE(adm_zone_exclusion_to_constraint(std::vector{zone_labelled("ZM2_Left")}).exact);
+    }
+    SECTION("the part that is recognised still maps") {
+        const auto mapping =
+            adm_zone_exclusion_to_constraint(std::vector{zone_labelled("ZM5"), zone_labelled("nonsense")});
+        CHECK(mapping.zone == ZoneConstraint::kSurroundOnly);
+        CHECK_FALSE(mapping.exact);
+    }
+}
+
+TEST_CASE("constraint_to_adm_zone_exclusion inverts adm_zone_exclusion_to_constraint", "[admbridge][zones]") {
+    const auto zone = GENERATE(ZoneConstraint::kNone, ZoneConstraint::kBackExcluded, ZoneConstraint::kSideExcluded,
+                               ZoneConstraint::kCentreAndBackOnly, ZoneConstraint::kScreenOnly,
+                               ZoneConstraint::kSurroundOnly);
+    const auto enable_elevation = GENERATE(true, false);
+    CAPTURE(static_cast<int>(zone), enable_elevation);
+
+    const auto zones = iclforge::admbridge::constraint_to_adm_zone_exclusion(zone, enable_elevation);
+    const auto mapping = iclforge::admbridge::adm_zone_exclusion_to_constraint(zones);
+    CHECK(mapping.zone == zone);
+    CHECK(mapping.enable_elevation == enable_elevation);
+    CHECK(mapping.exact);
+    // Written zones carry both a label and bounds, so a reader using either recognises them.
+    for (const auto& written : zones) {
+        CHECK_FALSE(written.label.empty());
+        CHECK(written.has_bounds);
+    }
+}
+
+TEST_CASE("constraint_to_adm_zone_exclusion lists Table B.18's zones", "[admbridge][zones]") {
+    using iclforge::admbridge::constraint_to_adm_zone_exclusion;
+    CHECK(constraint_to_adm_zone_exclusion(ZoneConstraint::kNone, true).empty());
+
+    const auto labels = [](const std::vector<ExclusionZone>& zones) {
+        std::vector<std::string> out;
+        for (const auto& zone : zones) {
+            out.push_back(zone.label);
+        }
+        return out;
+    };
+    CHECK(labels(constraint_to_adm_zone_exclusion(ZoneConstraint::kBackExcluded, true)) ==
+          std::vector<std::string>{"ZM1"});
+    CHECK(labels(constraint_to_adm_zone_exclusion(ZoneConstraint::kSideExcluded, true)) ==
+          std::vector<std::string>{"ZM2_Left", "ZM2_Right"});
+    CHECK(labels(constraint_to_adm_zone_exclusion(ZoneConstraint::kCentreAndBackOnly, true)) ==
+          std::vector<std::string>{"ZM3_ScreenLeft", "ZM3_SideLeft", "ZM3_ScreenRight", "ZM3_SideRight"});
+    CHECK(labels(constraint_to_adm_zone_exclusion(ZoneConstraint::kScreenOnly, true)) ==
+          std::vector<std::string>{"ZM4"});
+    CHECK(labels(constraint_to_adm_zone_exclusion(ZoneConstraint::kSurroundOnly, true)) ==
+          std::vector<std::string>{"ZM5"});
+    CHECK(labels(constraint_to_adm_zone_exclusion(ZoneConstraint::kNone, false)) ==
+          std::vector<std::string>{"ZU", "ZB"});
+    CHECK(labels(constraint_to_adm_zone_exclusion(ZoneConstraint::kBackExcluded, false)) ==
+          std::vector<std::string>{"ZM1", "ZU", "ZB"});
+}
+
+TEST_CASE("build_channel_path carries zoneExclusion into zone and enable_elevation", "[admbridge][zones]") {
+    auto first = block_at(0.0, 1.0, polar(0.0, 0.0));
+    first.zone_exclusion = {zone_labelled("ZM4")};
+    auto second = block_at(1.0, 1.0, polar(0.0, 0.0), 1.0, /*jump_position=*/true);
+    second.zone_exclusion = {zone_labelled("ZU"), zone_labelled("ZB")};
+    auto third = block_at(2.0, 1.0, polar(0.0, 0.0), 1.0, /*jump_position=*/true);
+
+    const auto path = iclforge::admbridge::build_channel_path(channel_with({first, second, third}), 0.0, false);
+    REQUIRE(path.has_value());
+
+    const auto in_first = path->evaluate(0.5);
+    CHECK(in_first.zone == ZoneConstraint::kScreenOnly);
+    CHECK(in_first.enable_elevation);
+
+    // Zone and elevation are discrete decisions: held until the next block's own keyframe.
+    const auto in_second = path->evaluate(1.5);
+    CHECK(in_second.zone == ZoneConstraint::kNone);
+    CHECK_FALSE(in_second.enable_elevation);
+
+    const auto in_third = path->evaluate(2.5);
+    CHECK(in_third.zone == ZoneConstraint::kNone);
+    CHECK(in_third.enable_elevation);
+}
+
+TEST_CASE("build_channel_path gives an LFE channel no zone constraint", "[admbridge][zones]") {
+    auto block = block_at(0.0, 1.0, polar(0.0, 0.0));
+    block.zone_exclusion = {zone_labelled("ZM1"), zone_labelled("ZU"), zone_labelled("ZB")};
+    const auto path = iclforge::admbridge::build_channel_path(channel_with({block}), 0.0, /*force_lfe=*/true);
+    REQUIRE(path.has_value());
+    const auto placement = path->evaluate(0.5);
+    CHECK(placement.zone == ZoneConstraint::kNone);
+    CHECK(placement.enable_elevation);
+}
+
+TEST_CASE("build() lists the ADM features it does not carry, per channel", "[admbridge][zones]") {
+    SECTION("a plain channel loses nothing") {
+        const auto result = iclforge::admbridge::build(minimal_document());
+        REQUIRE(result.has_value());
+        REQUIRE(result->unmapped.size() == 1);
+        CHECK(result->unmapped[0].empty());
+    }
+    SECTION("each unmapped feature is named once") {
+        auto doc = minimal_document();
+        auto& blocks = doc.model.channel_formats.front().block_formats;
+        blocks.front().has_object_divergence = true;
+        blocks.front().object_divergence.value = 0.5;
+        blocks.front().object_divergence.has_azimuth_range = true;
+        blocks.front().screen_ref = true;  // mapped: not listed
+        blocks.front().head_locked = true;
+        blocks.front().diffuse = 0.3;
+        blocks.front().has_channel_lock = true;
+        blocks.front().channel_lock = true;
+        blocks.front().has_channel_lock_max_distance = true;
+        blocks.front().zone_exclusion = {zone_bounded(-0.2, 0.2, -0.2, 0.2, -0.2, 0.2)};
+        blocks.push_back(blocks.front());  // a second block using the same features
+        blocks.back().rtime_s = 1.0;
+
+        const auto result = iclforge::admbridge::build(doc);
+        REQUIRE(result.has_value());
+        REQUIRE(result->unmapped.size() == 1);
+        CHECK(result->unmapped[0] ==
+              std::vector<std::string>{"objectDivergence range", "headLocked", "diffuse",
+                                       "channelLock maxDistance",
+                                       "zoneExclusion (not a TS 103 420 Table B.18 preset)"});
+    }
+    SECTION("a divergence value and screenRef are carried, not listed") {
+        auto doc = minimal_document();
+        auto& block = doc.model.channel_formats.front().block_formats.front();
+        block.has_object_divergence = true;
+        block.object_divergence.value = 0.5;
+        block.screen_ref = true;
+        const auto result = iclforge::admbridge::build(doc);
+        REQUIRE(result.has_value());
+        CHECK(result->unmapped[0].empty());
+    }
+    SECTION("a divergence of zero is not a loss") {
+        auto doc = minimal_document();
+        doc.model.channel_formats.front().block_formats.front().has_object_divergence = true;
+        const auto result = iclforge::admbridge::build(doc);
+        REQUIRE(result.has_value());
+        CHECK(result->unmapped[0].empty());
+    }
+    SECTION("a zone preset that maps is not a loss") {
+        auto doc = minimal_document();
+        doc.model.channel_formats.front().block_formats.front().zone_exclusion = {zone_labelled("ZM1")};
+        const auto result = iclforge::admbridge::build(doc);
+        REQUIRE(result.has_value());
+        CHECK(result->unmapped[0].empty());
+    }
+}
+
+// ---------------------------------------------------------------------------
+// objectDivergence and screenRef
+// ---------------------------------------------------------------------------
+
+TEST_CASE("build_channel_path carries objectDivergence and screenRef", "[admbridge][divergence]") {
+    auto first = block_at(0.0, 1.0, polar(0.0, 0.0));
+    first.has_object_divergence = true;
+    first.object_divergence.value = 0.4;
+    first.screen_ref = true;
+    auto second = block_at(1.0, 1.0, polar(0.0, 0.0), 1.0, /*jump_position=*/false);
+    second.has_object_divergence = true;
+    second.object_divergence.value = 0.8;
+    second.screen_ref = false;
+    auto third = block_at(2.0, 1.0, polar(0.0, 0.0), 1.0, /*jump_position=*/true);
+
+    const auto path = iclforge::admbridge::build_channel_path(channel_with({first, second, third}), 0.0, false);
+    REQUIRE(path.has_value());
+
+    const auto at_start = path->evaluate(0.5);
+    CHECK_THAT(at_start.divergence, Catch::Matchers::WithinAbs(0.4, 1e-12));
+    CHECK(at_start.screen_reference);
+    // ADM's screenRef is all or nothing: a full screen factor and unity depth.
+    CHECK(at_start.screen_factor == 1.0);
+    CHECK(at_start.depth_factor == 1.0);
+
+    // Divergence ramps across the block (jumpPosition 0); the flag holds the earlier block's value
+    // until the block's own keyframe at its end.
+    const auto ramping = path->evaluate(1.5);
+    CHECK_THAT(ramping.divergence, Catch::Matchers::WithinAbs(0.6, 1e-12));
+    CHECK(ramping.screen_reference);
+    CHECK_FALSE(path->evaluate(2.0).screen_reference);
+
+    const auto end = path->evaluate(2.5);
+    CHECK(end.divergence == 0.0);
+}
+
+TEST_CASE("build_channel_path gives an LFE channel no divergence or screen reference", "[admbridge][divergence]") {
+    auto block = block_at(0.0, 1.0, polar(0.0, 0.0));
+    block.has_object_divergence = true;
+    block.object_divergence.value = 1.0;
+    block.screen_ref = true;
+    const auto path = iclforge::admbridge::build_channel_path(channel_with({block}), 0.0, /*force_lfe=*/true);
+    REQUIRE(path.has_value());
+    const auto placement = path->evaluate(0.5);
+    CHECK(placement.divergence == 0.0);
+    CHECK_FALSE(placement.screen_reference);
 }

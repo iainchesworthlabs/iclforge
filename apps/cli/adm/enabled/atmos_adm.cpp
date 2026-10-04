@@ -40,6 +40,19 @@ std::expected<AdmAtmosSource, std::string> load_adm_atmos_source(std::string_vie
     out.is_bed = std::move(bridged->is_bed);
     out.paths = std::move(bridged->paths);
     out.pcm = std::move(bridged->pcm);
+    for (std::size_t i = 0; i < bridged->unmapped.size(); ++i) {
+        if (bridged->unmapped[i].empty()) {
+            continue;
+        }
+        std::string line = bridged->channel_ids[i] + ": not carried into the Atmos encode:";
+        for (const auto& feature : bridged->unmapped[i]) {
+            line += ' ';
+            line += feature;
+            line += ',';
+        }
+        line.pop_back();
+        out.warnings.push_back(std::move(line));
+    }
     out.handle = std::move(document);  // shared_ptr<AdmDocument> -> shared_ptr<void>
     return out;
 }

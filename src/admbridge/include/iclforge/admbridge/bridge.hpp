@@ -61,15 +61,14 @@
 //     hold-vs-glide state machine) is implemented in build_channel_path() below - see that
 //     function's own comment for the full walkthrough, verified against the standard's own
 //     Figs 7-10, not assumed from a paraphrase.
-//   - width/height/depth/diffuse/objectDivergence (parsed by ac3adm, per Clause 10.3 also
-//     nominally interpolatable) have no equivalent in iclforge::oba::Keyframe/ObjectPlacement at
-//     all - AtmosEncoder's object model is a pure point source. This bridge silently drops them;
-//     every channel it produces is a point source regardless of what the source ADM data's spread
-//     parameters said. Documented here and in docs/library/adm-bridge.md rather than left for a
-//     caller to discover by reading source.
-//   - channelLock/zoneExclusion (Clause 10.2/10.4) are parsed by ac3adm but have no AtmosEncoder
-//     equivalent either (no notion of "the nearest bed speaker" or "a masked zone" downstream of
-//     a fixed 5.1 VBAP ring) and are likewise dropped.
+//   - What an audioBlockFormat says beyond position and gain is mapped where TS 103 420 has a
+//     field for it, and listed in BridgeResult::unmapped where it does not. Carried: width/height/
+//     depth (object size), channelLock (snap), zoneExclusion (Annex B.2.6 zone constraints),
+//     objectDivergence's value (Tables 40-42) and screenRef (b_object_use_screen_ref). Not carried:
+//     diffuse, headLocked, a channelLock maxDistance, divergence's azimuthRange/positionRange, and a
+//     zoneExclusion that is not one of Table B.18's presets. AtmosEncoder transmits the carried
+//     items in the OAMD payload and stops there - its own bed render treats every object as a point
+//     source (see ObjectPlacement). docs/library/adm-bridge.md has the full account.
 namespace iclforge::admbridge {
 
 enum class BridgeError : std::uint8_t {
@@ -164,6 +163,11 @@ build_channel_path(const iclforge::adm::AudioChannelFormat& channel, double obje
 // not), it exists only so BridgeResult is deterministic and its diagnostics read sensibly.
 struct BridgeResult {
     std::vector<std::string> channel_ids;  // iclforge::adm::AudioChannelFormat::id, for diagnostics
+    std::vector<std::vector<std::string>>
+        unmapped;  // per channel: ADM features its blocks use that the Atmos encode does not carry
+                   // (diffuse, headLocked, a conditioned channelLock, a divergence range, a
+                   // zoneExclusion that is not a TS 103 420 Table B.18 preset). Empty for a
+                   // channel that loses nothing. For callers that want to warn.
     std::vector<bool> is_bed;                 // true: a DirectSpeakers bed channel
     std::vector<bool> is_lfe;                 // true only for a bed channel routed via lfe_send
                                                // (see this header's own top comment)
