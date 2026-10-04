@@ -23,10 +23,13 @@ Usage:
 
 from __future__ import annotations
 
-import argparse
 import math
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _header_gen import wrap, write_or_check  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 HEADER = (
@@ -117,20 +120,6 @@ def kbd_left(length: int, alpha: float) -> list[float]:
     return [math.sqrt(cumulative[n] / total) for n in range(length)]
 
 
-def wrap(items: list[str], indent: str = "    ", width: int = 100) -> list[str]:
-    lines: list[str] = []
-    line = indent
-    for item in items:
-        piece = item + ","
-        if len(line) + len(piece) + 1 > width and line.strip():
-            lines.append(line.rstrip())
-            line = indent
-        line += piece + " "
-    if line.strip():
-        lines.append(line.rstrip())
-    return lines
-
-
 def literal(value: float) -> str:
     return "0.0" if value == 0.0 and math.copysign(1.0, value) > 0 else float.hex(value)
 
@@ -167,25 +156,7 @@ def render() -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument(
-        "--check", action="store_true", help="fail when the header is not what this would write"
-    )
-    args = parser.parse_args()
-    text = render()
-    if args.check:
-        current = HEADER.read_text(encoding="utf-8") if HEADER.exists() else ""
-        if current != text:
-            print(
-                f"{HEADER.relative_to(REPO_ROOT)} is out of date; run "
-                "tools/generators/gen_ac4_transform_tables.py",
-                file=sys.stderr,
-            )
-            return 1
-        return 0
-    HEADER.write_text(text, encoding="utf-8", newline="\n")
-    print(f"wrote {HEADER.relative_to(REPO_ROOT)}")
-    return 0
+    return write_or_check(__doc__.split("\n\n")[0], render, HEADER, REPO_ROOT, "tools/generators/gen_ac4_transform_tables.py")
 
 
 if __name__ == "__main__":

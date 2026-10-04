@@ -912,7 +912,8 @@ line for each stage. The packer leaves the AC-4 sources out of the archive unles
 `--with-ac4`; with `--verify` it then builds a throwaway project against the archive for each of
 the manifest's parts, with the decoder switched on and constructed (in the fixed-point tier on the
 parts with no floating-point unit).
-CI narrows that to the ESP32-P4 with `--verify-targets esp32p4`. A `float` build evaluates the
+CI narrows that to the ESP32-P4, the ESP32-C3 and the ESP32-C6 with `--verify-targets esp32p4,esp32c3,esp32c6`:
+the `float` tier and the fixed-point tier on the two parts with no floating-point unit. A `float` build evaluates the
 converter's tables while it compiles `src/ac4core/src/dsp/resampler.cpp`, which takes ESP-IDF's
 RISC-V GCC 15.2 8.4 s where it took 1.5, and `src/ac4core/CMakeLists.txt` raises the compiler's limit
 on constant evaluation for that file (`-fconstexpr-ops-limit`).

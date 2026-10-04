@@ -219,14 +219,9 @@ if [[ "$DIRECTION" == "ac4" ]]; then
     ICLFORGE_ESP32S3_MAX_HEAP_BYTES=${ICLFORGE_ESP32S3_MAX_HEAP_BYTES_AC4:-1680000}
     ICLFORGE_ESP32S3_MAX_STEADY_ALLOCS_PER_FRAME=${ICLFORGE_ESP32S3_MAX_STEADY_ALLOCS_PER_FRAME_AC4:-210}
     ICLFORGE_ESP32S3_MAX_AC4_STACK_BYTES=${ICLFORGE_ESP32S3_MAX_AC4_STACK_BYTES:-24000}
-    declare -A INTERNAL_CEILING_AC4=(
-        [ac4_20_music]=6000
-        [ac4_20_acpl]=6000
-        [ac4_20_companding]=6000
-        [ac4_51_music]=14000
-        [ac4_51_acpl]=14000
-        [ac4_514_tones]=16000
-    )
+    # Each fixture's peak heap, steady-state allocations a frame and internal RAM ceilings are in
+    # tests/golden/ac4-probe-ceilings.json, which run_baremetal_probe.sh --ac4 reads as well.
+    AC4_CEILINGS="$REPO/tests/golden/ac4-probe-ceilings.json"
 fi
 
 OUTPUT="$(mktemp)"
@@ -436,25 +431,15 @@ if [[ "$DIRECTION" == "ac4" ]]; then
         exit 1
     fi
 
-    INTERNAL=$(grep -o 'ac4_[a-z0-9_]*\.esp32s3\.internal_peak_bytes=[0-9]*' "$OUTPUT" |
-               sed 's/\.esp32s3\.internal_peak_bytes=/ /')
-    if [[ -z "$INTERNAL" ]]; then
-        echo "error: the probe reported no <fixture>.esp32s3.internal_peak_bytes line" >&2
-        exit 1
-    fi
-    while read -r codec internal; do
-        ceiling=${INTERNAL_CEILING_AC4[$codec]:-}
-        if [[ -z "$ceiling" ]]; then
-            echo "::error title=No internal RAM ceiling::${codec} has no entry in run_esp32s3_probe.sh's INTERNAL_CEILING_AC4 table - add one from a measured run" >&2
-            exit 1
-        fi
-        psram=$(sed -n "s/.*${codec}\.esp32s3\.psram_peak_bytes=\([0-9]*\).*/\1/p" "$OUTPUT" | head -1)
-        echo "internal RAM: ${codec} = ${internal} bytes (ceiling ${ceiling}), PSRAM ${psram:-?} bytes"
-        if (( internal > ceiling )); then
-            echo "::error title=ESP32-S3 AC-4 internal RAM::${codec} took $internal bytes of internal RAM at its worst, ceiling is $ceiling - the decoder's state belongs in PSRAM (sdkconfig.ac4)" >&2
-            exit 1
-        fi
-    done <<< "$INTERNAL"
+    # Per fixture, from the table: the peak heap and the allocations a frame, which are the
+    # Cortex-M3 leg's to the byte, and the internal RAM each took at its worst.
+    python3 "$REPO/tools/checks/check_probe_ceilings.py" --table "$AC4_CEILINGS" \
+        --metric peak_heap --title "ESP32-S3 footprint regression" "$OUTPUT" || exit 1
+    python3 "$REPO/tools/checks/check_probe_ceilings.py" --table "$AC4_CEILINGS" \
+        --metric steady_allocs_per_frame --title "ESP32-S3 footprint regression" "$OUTPUT" || exit 1
+    python3 "$REPO/tools/checks/check_probe_ceilings.py" --table "$AC4_CEILINGS" \
+        --metric s3_internal_peak --title "ESP32-S3 AC-4 internal RAM" "$OUTPUT" || exit 1
+    grep -o 'ac4_[a-z0-9_]*\.esp32s3\.psram_peak_bytes=[0-9]*' "$OUTPUT" | sed 's/^/PSRAM: /' || true
 fi
 
 # --- what the ALLOCATOR has, as opposed to what the linker estimated -------

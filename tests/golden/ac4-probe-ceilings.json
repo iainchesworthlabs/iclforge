@@ -1,0 +1,35 @@
+{
+  "_comment": "The per-fixture ceilings the AC-4 footprint probe is held to (planning/ac4.md, D14), read by tools/checks/check_probe_ceilings.py for the Cortex-M3 and host legs (run_baremetal_probe.sh --ac4) and the ESP32-S3's QEMU leg (run_esp32s3_probe.sh --ac4), so a figure is stated once. peak_heap is the fixture's peak heap in bytes on either leg and at either tier: the host's 64-bit pointers put it a few per cent above the Cortex-M3's, and one figure covers both; measured 2026-10-03 at the fixed tier (the larger) on the host: 295,225, 435,486, 722,007, 886,336, 1,526,819 and 337,507; on the Cortex-M3 286,365, 426,918, 704,311, 868,424, 1,502,903 and 329,147. steady_allocs_per_frame is the steady-state allocations a frame: the decoder's syntax layer still builds its element vectors afresh each frame, and the ceiling holds the distance from zero from growing while that is open. s3_internal_peak is the internal RAM each fixture took at its worst on the ESP32-S3 with the decoder's state in PSRAM (planning/ac4.md, D14c), measured before D14f; 2.0's is the tightest. Each is a tenth or so over its measurement. Add a fixture here when the probe gains one.",
+  "fixtures": {
+    "ac4_20_music": {
+      "peak_heap": 325000,
+      "steady_allocs_per_frame": 58,
+      "s3_internal_peak": 6000
+    },
+    "ac4_20_acpl": {
+      "peak_heap": 480000,
+      "steady_allocs_per_frame": 56,
+      "s3_internal_peak": 6000
+    },
+    "ac4_20_companding": {
+      "peak_heap": 372000,
+      "steady_allocs_per_frame": 82,
+      "s3_internal_peak": 6000
+    },
+    "ac4_51_music": {
+      "peak_heap": 795000,
+      "steady_allocs_per_frame": 168,
+      "s3_internal_peak": 14000
+    },
+    "ac4_51_acpl": {
+      "peak_heap": 975000,
+      "steady_allocs_per_frame": 99,
+      "s3_internal_peak": 14000
+    },
+    "ac4_514_tones": {
+      "peak_heap": 1680000,
+      "steady_allocs_per_frame": 210,
+      "s3_internal_peak": 16000
+    }
+  }
+}

@@ -122,9 +122,9 @@ image 8,448 bytes larger):
 
 These are D14e's figures. D14f lowered the peaks and the instruction counts and raised the image
 ([the performance trend](../../performance-trend.md) has the table). The runner holds each column to
-a ceiling about a tenth above the figure (`ICOUNT_CEILING_AC4`, `PEAK_CEILING_AC4` and
-`CHURN_CEILING_AC4` in `tools/checks/run_baremetal_probe.sh`), and the image and the stack have ceilings
-of their own, set there. Nothing
+a ceiling about a tenth above the figure (`ICOUNT_CEILING_AC4` in `tools/checks/run_baremetal_probe.sh`;
+the peaks and the allocations a frame in `tests/golden/ac4-probe-ceilings.json`, which the ESP32-S3's
+QEMU leg reads as well), and the image and the stack have ceilings of their own, set in the runner. Nothing
 is retained after the decoders are destroyed. The stack is read by painting a window of it below
 the probe's frame before each fixture and finding how far the decode reached. The PCM of each
 fixture hashes to the value `tests/golden/ac4-probe-pcm-hashes.json` pins, on this leg and on the

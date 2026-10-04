@@ -166,30 +166,11 @@ declare -A ICOUNT_CEILING_AC4_FIXED=(
     [ac4_514_tones]=47500000
     [ac4_20_companding]=9200000
 )
-# Steady-state allocations per frame. The decoder's syntax layer still builds its element
-# vectors afresh each frame (planning/ac4.md, D14a's memory audit); these hold the distance
-# from the frame's own zero from growing while that is open.
-declare -A CHURN_CEILING_AC4=(
-    [ac4_20_music]=58
-    [ac4_20_acpl]=56
-    [ac4_51_music]=168
-    [ac4_51_acpl]=99
-    [ac4_514_tones]=210
-    [ac4_20_companding]=82
-)
-# Each fixture's peak heap in bytes, on either leg and at either tier: the host's 64-bit
-# pointers put it a few per cent above the Cortex-M3's, and one figure covers both. Measured
-# 2026-10-03 at the fixed tier (the larger) on the host: 295,225, 435,486, 722,007, 886,336,
-# 1,526,819 and 337,507; on the Cortex-M3 286,365, 426,918, 704,311, 868,424, 1,502,903 and
-# 329,147 (429,667, 626,368, 970,430, 1,172,502, 1,825,056 and 486,331 at D14d).
-declare -A PEAK_CEILING_AC4=(
-    [ac4_20_music]=325000
-    [ac4_20_acpl]=480000
-    [ac4_51_music]=795000
-    [ac4_51_acpl]=975000
-    [ac4_514_tones]=1680000
-    [ac4_20_companding]=372000
-)
+# Each fixture's peak heap and steady-state allocations a frame, on either leg and at either
+# tier, are in tests/golden/ac4-probe-ceilings.json, which tools/checks/check_probe_ceilings.py
+# reads here and in run_esp32s3_probe.sh --ac4: a figure is stated once, with what it was measured
+# at, and a fixture with no entry fails.
+AC4_CEILINGS="$REPO/tests/golden/ac4-probe-ceilings.json"
 
 # --- ceilings --------------------------------------------------------------
 # Bytes. text+data+bss of the linked probe on the bare-metal target, and the
@@ -327,7 +308,6 @@ if [[ "$DIRECTION" == "ac4" ]]; then
         done
     fi
     ICLFORGE_MAX_HEAP_BYTES=${ICLFORGE_MAX_HEAP_BYTES_AC4:-1680000}
-    ICLFORGE_MAX_STEADY_ALLOCS_PER_FRAME=${ICLFORGE_MAX_STEADY_ALLOCS_PER_FRAME_AC4:-210}
     ICLFORGE_MAX_RETAINED_BYTES=${ICLFORGE_MAX_RETAINED_BYTES_AC4:-1024}
     if [[ "$HOST" == "1" ]]; then
         ICLFORGE_MAX_STACK_BYTES=${ICLFORGE_MAX_STACK_BYTES_AC4:-28500}
@@ -438,20 +418,7 @@ if [[ "$DIRECTION" == "ac4" ]]; then
         echo "::error title=Footprint regression::a decode used $stack bytes of stack, ceiling is $ICLFORGE_MAX_STACK_BYTES" >&2
         exit 1
     fi
-    # The fixtures' own lines: heap.peak_bytes and stack.peak_bytes end the same way.
-    PEAKS=$(grep -o 'ac4_[a-z0-9_]*\.peak_bytes=[0-9]*' "$OUTPUT" | sed 's/\.peak_bytes=/ /')
-    while read -r codec peak; do
-        ceiling=${PEAK_CEILING_AC4[$codec]:-}
-        if [[ -z "$ceiling" ]]; then
-            echo "::error title=No peak ceiling::${codec} has no entry in run_baremetal_probe.sh's PEAK_CEILING_AC4 table - add one from a measured run" >&2
-            exit 1
-        fi
-        echo "peak heap: ${codec} = ${peak} bytes (ceiling ${ceiling})"
-        if (( peak > ceiling )); then
-            echo "::error title=Footprint regression::${codec} peaks at $peak bytes of heap, ceiling is $ceiling" >&2
-            exit 1
-        fi
-    done <<< "$PEAKS"
+    python3 "$REPO/tools/checks/check_probe_ceilings.py" --table "$AC4_CEILINGS" --metric peak_heap "$OUTPUT" || exit 1
 fi
 
 # Every fixture's steady-state churn, held to one ceiling: they are the same
@@ -481,18 +448,20 @@ if [[ -z "$CHURN" ]]; then
     echo "error: the probe reported no <fixture>.steady_allocs_per_frame line" >&2
     exit 1
 fi
-while read -r codec per_frame; do
-    ceiling=$ICLFORGE_MAX_STEADY_ALLOCS_PER_FRAME
-    # The AC-4 rows each have their own, from the table above.
-    if [[ "$DIRECTION" == "ac4" ]]; then
-        ceiling=${CHURN_CEILING_AC4[$codec]:-$ceiling}
-    fi
-    echo "churn: ${codec} = ${per_frame} allocations/frame (ceiling ${ceiling})"
-    if (( per_frame > ceiling )); then
-        echo "::error title=Footprint regression::${codec} steady-state allocations are $per_frame per frame, ceiling is $ceiling" >&2
-        exit 1
-    fi
-done <<< "$CHURN"
+if [[ "$DIRECTION" == "ac4" ]]; then
+    # The AC-4 rows each have their own.
+    python3 "$REPO/tools/checks/check_probe_ceilings.py" --table "$AC4_CEILINGS" \
+        --metric steady_allocs_per_frame "$OUTPUT" || exit 1
+else
+    while read -r codec per_frame; do
+        ceiling=$ICLFORGE_MAX_STEADY_ALLOCS_PER_FRAME
+        echo "churn: ${codec} = ${per_frame} allocations/frame (ceiling ${ceiling})"
+        if (( per_frame > ceiling )); then
+            echo "::error title=Footprint regression::${codec} steady-state allocations are $per_frame per frame, ceiling is $ceiling" >&2
+            exit 1
+        fi
+    done <<< "$CHURN"
+fi
 
 # --icount: every fixture's instructions per frame, from the probe's own
 # us_per_frame under the instruction-counting clock, held to the per-fixture

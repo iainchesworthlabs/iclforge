@@ -1207,7 +1207,8 @@ The image is 683,448 bytes (680,804 `.text`, 392 `.data`, 2,252 `.bss`; 198,416 
 before D14a5, 196,464 of them the converter's tables), the ceiling 750,000; the
 stack ceiling is 21,500 here and 28,500 on the host, whose frames are larger (24.7 to 26.0 KB read
 there); retained bytes after teardown 0, the ceiling 1,024. The ceilings are the runner's
-(`ICOUNT_CEILING_AC4`, `CHURN_CEILING_AC4`, `PEAK_CEILING_AC4`), each a tenth or so over its figure
+(`ICOUNT_CEILING_AC4` in `run_baremetal_probe.sh`, and the peaks and the allocations a frame in
+`tests/golden/ac4-probe-ceilings.json`), each a tenth or so over its figure
 with the same rule as the tables above. On the x86-64 host (GCC 16, 64-bit pointers) the peaks
 are 442,193, 634,088, 1,024,014, 1,235,048, 1,954,304 and, for the companding fixture, 474,083.
 The PCM of every fixture is bit-identical on the two legs, and the hashes are pinned in
