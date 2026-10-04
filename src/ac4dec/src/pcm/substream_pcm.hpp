@@ -273,6 +273,10 @@ class SubstreamPcm {
     // A-CPL (pcm/immersive.hpp), after A-SPX made `units`.
     void apply_immersive_gains(const Control& control, std::span<const UnitIo> units,
                                std::span<const aspx::SubbandGroups> groups);
+    // Core decoding's dialogue enhancement for the 9.X.4 modes' ASPX_AJCC and ASPX_ACPL_2 (clauses
+    // 5.8.2.1 and 5.8.2.2): the increment of the frame `control` holds, from the core's inputs and
+    // the A-JCC or A-CPL data's coefficients, into de_core_delta_.
+    void core_dialogue_enhancement(const Control& control);
     // Below the crossover and everywhere in SIMPLE mode a channel's `out` is its `ext` from
     // ts_offset_hfadj on. pass_through() for the whole frame does not copy it: it leaves
     // `out_in_ext_` set, and the output stages that only read the matrix read the window of `ext`.
@@ -356,6 +360,16 @@ class SubstreamPcm {
     std::shared_ptr<const dsp::BasicResamplerFilter<Real>> converter_filter_;
     std::optional<int> converter_phase_;
     DeStage de_;
+    // Core decoding of the 9.X.4 modes' ASPX_AJCC and ASPX_ACPL_2 takes dialogue enhancement from
+    // this tool instead (Part 2 clauses 5.8.2.1 and 5.8.2.2): apply() makes the increment of the
+    // frame it applies, which render() adds to the core's L, R and C where the frame's dialogue
+    // enhancement acts.
+    std::unique_ptr<DeCoreStage> de_core_;  // made by the first frame of a mode that uses it
+    std::array<std::vector<QmfValue>, kDeFront> de_core_inputs_;
+    std::array<std::vector<QmfValue>, kDeFront> de_core_delta_;
+    double de_gain_ = 0.0;          // G_DE of the frame being rendered
+    bool de_core_mode_ = false;     // the control applied this frame is such a mode's
+    bool de_core_pending_ = false;  // and its increment is to be added
     DrcStage drc_;
     DownmixStage downmix_;
     MixStage mix_;

@@ -57,7 +57,7 @@ std::array<double, kDeFront> de_rendering(int nr_channels, double coef1, double 
     }
 }
 
-DeFrameValues de_frame_values(const DialogEnhancement& de) {
+DeFrameValues de_frame_values(const DialogEnhancement& de, bool core) {
     DeFrameValues values;
     if (!de.b_de_data_present || de.de_nr_channels <= 0) {
         return values;
@@ -68,7 +68,9 @@ DeFrameValues de_frame_values(const DialogEnhancement& de) {
     const int config = de.config.de_channel_config;
     values.processed = {(config & 4) != 0, (config & 2) != 0, (config & 1) != 0};
     const bool cross = values.method == 1 || values.method == 3;
-    const DeData& data = de.data;
+    // Part 2 clause 4.8.3.15: "If b_de_simulcast is true, the decoder shall use the second
+    // de_data() in dialog_enhancement() for the core decoding mode."
+    const DeData& data = core && de.b_de_simulcast ? de.core_data : de.data;
     values.ms = data.de_ms_proc_flag;
     for (int i = 0; i < de.de_nr_channels && i < kDeFront; ++i) {
         for (int band = 0; band < kDeNrBands; ++band) {
@@ -84,8 +86,14 @@ DeFrameValues de_frame_values(const DialogEnhancement& de) {
 
 void DeStage::configure(int slots, std::span<const Speaker> speakers) {
     slots_ = slots;
-    constexpr std::array<Speaker, kDeFront> kFront = {Speaker::kLeft, Speaker::kRight,
-                                                      Speaker::kCentre};
+    // Part 2 Table 15: the dialogue enhancement channels of 9.X.4 are Lscr, Rscr and C, those of
+    // the other layouts L, R and C (src/ac4dec/ERRATA.md, "Dialogue enhancement's channels for
+    // 9.X.4"). A layout with the screen pair is a full decoding of a 9.X.4 mode; core decoding has
+    // none, and its core channels are L, R and C.
+    const bool screen = std::ranges::find(speakers, Speaker::kLeftScreen) != speakers.end();
+    const std::array<Speaker, kDeFront> kFront = {screen ? Speaker::kLeftScreen : Speaker::kLeft,
+                                                  screen ? Speaker::kRightScreen : Speaker::kRight,
+                                                  Speaker::kCentre};
     for (std::size_t f = 0; f < kFront.size(); ++f) {
         const auto it = std::ranges::find(speakers, kFront[f]);
         channel_[f] = it == speakers.end() ? -1 : static_cast<int>(it - speakers.begin());
@@ -108,7 +116,7 @@ DeStage::Matrix DeStage::identity() noexcept {
 }
 
 DeStage::Frame DeStage::frame_matrices(double gain_db, const DeFrameValues& values,
-                                       std::size_t waveform_channels) const {
+                                       std::size_t waveform_channels) {
     Frame out;
     out.h.fill(identity());
     if (!values.active || gain_db <= 0.0 || values.max_gain_db <= 0.0) {
@@ -165,6 +173,17 @@ DeStage::Frame DeStage::frame_matrices(double gain_db, const DeFrameValues& valu
                 h[front[i]][front[i]] = 1.0 + gp * values.p[i][band];
                 w[front[i]][i] = gs;
             }
+        }
+    }
+    return out;
+}
+
+std::array<DeMatrix, kDeNrBands> DeStage::parametric_increment(double gain_db,
+                                                               const DeFrameValues& values) {
+    std::array<DeMatrix, kDeNrBands> out = frame_matrices(gain_db, values, 0).h;
+    for (DeMatrix& h : out) {
+        for (std::size_t i = 0; i < kDeFront; ++i) {
+            h[i][i] -= 1.0;
         }
     }
     return out;
@@ -237,6 +256,136 @@ void DeStage::process(double gain_db, const DeFrameValues& values,
     }
     previous_ = current;
     previous_identity_ = current_identity;
+}
+
+void DeCoreStage::configure(int slots) {
+    slots_ = slots;
+    reset();
+}
+
+void DeCoreStage::reset() noexcept {
+    m_prev_ = {};
+    de_prev_ = {};
+    coeff_prev_ = {};
+    previous_zero_ = true;
+}
+
+bool DeCoreStage::active(double gain_db, const DeFrameValues& values) const noexcept {
+    return !previous_zero_ || (values.active && gain_db > 0.0 && values.max_gain_db > 0.0);
+}
+
+void DeCoreStage::process(double gain_db, const DeFrameValues& values,
+                          const DeCoreCoefficients& coefficients,
+                          std::span<const QmfMatrix, kDeFront> m,
+                          std::span<const std::span<QmfValue>, kDeFront> delta) {
+    const auto n = static_cast<std::size_t>(slots_);
+    for (const std::span<QmfValue>& d : delta) {
+        std::fill_n(d.begin(), std::min(d.size(), n * kSubbands), QmfValue{});
+    }
+    // de_param: the enhancement matrix less the identity, by band; all zero where the frame has no
+    // parameters or the gain is 0, which ramps the matrices down to 0.
+    const std::array<DeMatrix, kDeNrBands> increment =
+        DeStage::parametric_increment(gain_db, values);
+    // Pseudocode 20's three inputs: A'' with C_L, B'' with C_R, and C'' with the constant 1, one
+    // smooth parameter set (int_type[2] = 0, num_ps[2] = 1).
+    const std::array<acpl::Framing, kDeFront> framing = {coefficients.framing[0],
+                                                         coefficients.framing[1], acpl::Framing{}};
+    const double slots = static_cast<double>(slots_);
+    const double half = static_cast<double>(slots_ / 2);
+    bool all_zero = true;
+    std::vector<double> matrix(n);
+    for (int sb = 0; sb < kDeSubbands; ++sb) {
+        const auto sbi = static_cast<std::size_t>(sb);
+        const int ab = std::max(acpl::sb_to_pb(coefficients.num_bands, sb), 0);
+        std::size_t db = 0;
+        while (db + 1 < kDeNrBands && sb >= kBandStart[db + 1]) {
+            ++db;
+        }
+        for (std::size_t ch2 = 0; ch2 < kDeFront; ++ch2) {
+            const acpl::Framing& f = framing[ch2];
+            const int sets = ch2 == 2 ? 1 : std::clamp(f.num_param_sets, 1, acpl::kMaxParamSets);
+            const auto coeff = [&](int set) {
+                return ch2 == 2 ? 1.0
+                                : coefficients.values[ch2][static_cast<std::size_t>(set)]
+                                                     [static_cast<std::size_t>(ab)];
+            };
+            for (std::size_t ch1 = 0; ch1 < kDeFront; ++ch1) {
+                const double de_now = increment[db][ch1][ch2];
+                const double de_before = de_prev_[sbi][ch1][ch2];
+                const double m_before = m_prev_[sbi][ch1][ch2];
+                const double delta_de = (de_now - de_before) / slots;
+                // The enhancement matrix at slot t, interpolated across the frame (the value at the
+                // frame's last slot is the frame's own).
+                const auto de_at = [&](double t) { return de_before + (t + 1.0) * delta_de; };
+                const double target = de_now * coeff(sets - 1);  // Mtgt at the frame's end
+                if (!f.steep || ch2 == 2) {
+                    if (sets == 1) {
+                        // Linear from Mprev to Mtgt, reaching it at the last slot.
+                        for (std::size_t ts = 0; ts < n; ++ts) {
+                            matrix[ts] = m_before + (static_cast<double>(ts) + 1.0) *
+                                                        (target - m_before) / slots;
+                        }
+                    } else {
+                        // Two sets, smooth: to the first set's coefficient at the enhancement
+                        // matrix of the last slot of the first half, floor(N / 2) - 1, then on to
+                        // the frame's end.
+                        const double mid = de_at(half - 1.0) * coeff(0);
+                        for (std::size_t ts = 0; ts < n; ++ts) {
+                            const auto t = static_cast<double>(ts);
+                            matrix[ts] =
+                                t < half ? m_before + (t + 1.0) * (mid - m_before) / half
+                                         : mid + (t - half + 1.0) * (target - mid) / (slots - half);
+                        }
+                    }
+                } else {
+                    // Steep: the coefficient in force changes at each parameter timeslot, which
+                    // takes the new coefficient's matrix at the enhancement matrix it has there;
+                    // between them the matrix ramps, from the one before to the value the slot
+                    // before the next timeslot has (the frame's last slot for the last segment).
+                    double from = m_before;
+                    double in_force = coeff_prev_[ch2][sbi];
+                    double t = 0.0;
+                    const auto ramp = [&](double stop) {
+                        const double steps = stop - t;
+                        if (steps <= 0.0) {
+                            return;
+                        }
+                        const double end = de_at(stop - 1.0) * in_force;
+                        for (double s = t; s < stop; s += 1.0) {
+                            matrix[static_cast<std::size_t>(s)] =
+                                from + (s - t + 1.0) * (end - from) / steps;
+                        }
+                        from = end;
+                        t = stop;
+                    };
+                    for (int k = 0; k < sets; ++k) {
+                        const double timeslot = std::clamp(
+                            static_cast<double>(f.param_timeslot[static_cast<std::size_t>(k)]), t,
+                            slots - 1.0);
+                        ramp(timeslot);
+                        in_force = coeff(k);
+                        from = de_at(timeslot) * in_force;
+                        matrix[static_cast<std::size_t>(timeslot)] = from;
+                        t = timeslot + 1.0;
+                    }
+                    ramp(slots);
+                }
+                for (std::size_t ts = 0; ts < n; ++ts) {
+                    if (matrix[ts] == 0.0) {
+                        continue;
+                    }
+                    delta[ch1][ts * kSubbands + sbi] +=
+                        static_cast<Real>(matrix[ts]) * m[ch2][ts * kSubbands + sbi];
+                }
+                m_prev_[sbi][ch1][ch2] = target;
+                de_prev_[sbi][ch1][ch2] = de_now;
+                all_zero = all_zero && target == 0.0 && de_now == 0.0;
+            }
+            coeff_prev_[ch2][sbi] = coeff(sets - 1);
+        }
+    }
+    // Nothing to interpolate from next frame when this one ended on zero everywhere.
+    previous_zero_ = all_zero;
 }
 
 }  // namespace iclforge::ac4::detail

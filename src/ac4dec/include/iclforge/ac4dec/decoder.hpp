@@ -37,10 +37,12 @@
 // and at every frame_rate_index but 13 the sample rate converter from the
 // internal rate to 48 kHz (clause 6.2.15), its phase locked to
 // sequence_counter (Part 2 clause 5.11). It decodes the immersive element of
-// the 7.X.4 channel modes (Part 2 clause 6.2.4) in every codec mode, in full or
-// core decoding (DecodingMode), with Part 2's stereo and multichannel
-// processing, S-CPL, A-SPX, A-CPL and A-JCC (clauses 5.2 to 5.6), and renders
-// it by Part 2's channel renderer (clause 5.10.2, DownmixTarget). It decodes
+// the 7.X.4 and 9.X.4 channel modes (Part 2 clause 6.2.4, b_5fronts for the
+// 9.X.4 modes) in every codec mode, in full or core decoding (DecodingMode),
+// with Part 2's stereo and multichannel processing, S-CPL, A-SPX, A-CPL and
+// A-JCC (clauses 5.2 to 5.6), and renders it by Part 2's channel renderer
+// (clause 5.10.2, DownmixTarget; a 9.X layout is no target, Tables 35 to 37
+// being left out). It decodes
 // the 22.2 channel element (Part 2 clause 6.2.4.3) in full decoding, SIMPLE and
 // ASPX, to its 24 channels in the order of Part 2 Table A.27's speaker indices:
 // no renderer or downmix has a 22.2 input (Tables 35 to 43), so it is delivered
@@ -129,7 +131,8 @@ enum class DownmixTarget : std::uint8_t {
     kLoRo,
     kLtRt,  // in its Pro Logic II form where the stream prefers that
     kMono,  // L + R of the stereo downmix
-    // The immersive element's other layouts (Part 2 Tables 38 to 42; core
+    // The immersive element's other layouts (Part 2 Tables 38 to 43, with a
+    // 9.X.4 source's rows folding the screen pair; core
     // decoding has 5.X.2 and 5.X.0 alone, Table 44, and takes the one of those
     // with the target's top channels or without). The other elements come out
     // as coded.
@@ -450,7 +453,9 @@ struct DecodedFrame {
     // One per channel, in the order of `channels`: L, R, C, the LFE, Ls, Rs,
     // then a 7.X mode's last pair, or an immersive layout's Lb and Rb and then
     // Tfl, Tfr, Tbl and Tbr, or Tsl and Tsr, each where the layout has it. A
-    // 22.2 source has 24 channels in Part 2 Table A.27's order by speaker index:
+    // 9.X.4 source as coded has Table A.27's order by speaker index as 22.2
+    // does: L, R, C, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr, the LFE, Lscr, Rscr.
+    // A 22.2 source has 24 channels in Part 2 Table A.27's order by speaker index:
     // L, R, C, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr, LFE, Tsl, Tsr, Tfc, Tbc, Tc,
     // LFE2, Bfl, Bfr, Bfc, Cb, Lw, Rw, so its LFEs are the 12th and 18th.
     std::vector<Speaker> speakers;

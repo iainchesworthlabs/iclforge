@@ -234,7 +234,8 @@ ParseResult acpl_values(const ChannelElement& element, AcplQuantHistory& history
     if (element.kind == ElementKind::kPair) {
         expected = 1;
     } else if (element.kind == ElementKind::kImmersive) {
-        expected = kMaxAcplModules;
+        // Pseudocode 2: four modules, six with b_5fronts.
+        expected = element.b_5fronts ? kMaxAcplModules : kMaxAcplModules - 2;
     }
     if (element.acpl_1ch.size() != expected) {
         return fail(DecodeError::kInvalidStream, "an A-CPL element without its acpl_data_1ch()");
@@ -283,8 +284,8 @@ void AcplStage::reset() {
 // Pseudocode 111, then Pseudocode 114 with the gains of Pseudocodes 112 and
 // 113 (src/ac4dec/ERRATA.md, "The transient ducker's energy").
 void AcplStage::decorrelate(int decorrelator, std::span<const QmfValue> in, std::span<QmfValue> out, int num_ts) {
-    // D0, D1 and D2, then the immersive element's second D0 and D1.
-    static constexpr std::array<int, kDecorrelatorSlots> kIndex = {0, 1, 2, 0, 1};
+    // D0, D1 and D2, then the immersive element's second D0, D1 and D2.
+    static constexpr std::array<int, kDecorrelatorSlots> kIndex = {0, 1, 2, 0, 1, 2};
     std::unique_ptr<acpl::Decorrelator<Real>>& slot = decorrelators_[at(decorrelator)];
     if (slot == nullptr) {
         slot = std::make_unique<acpl::Decorrelator<Real>>(kIndex[at(decorrelator)]);
@@ -575,37 +576,48 @@ void AcplStage::apply(int ch_mode, bool add_ch_base, ElementKind kind, int codec
 
     using S = Speaker;
     if (kind == ElementKind::kImmersive) {
-        // Part 2 Pseudocode 2 with b_5fronts 0: modules 1 to 4 on (Ls, Lb),
-        // (Rs, Rb), (Tfl, Tbl) and (Tfr, Tbr) (Table 25's x5/x7, x6/x8, x9/x11
-        // and x10/x12), whose decorrelators are D0, D0, D1 and D1, each its own
-        // instance; x7, x8, x11 and x12 are the ASPX_ACPL_1 residuals and 0 in
-        // ASPX_ACPL_2. Then z0, z2 and z4 are twice L, R and C, and every
-        // module's outputs are scaled by the square root of 2.
+        // Part 2 Pseudocode 2: modules 1 to 4 on (Ls, Lb), (Rs, Rb), (Tfl, Tbl) and (Tfr, Tbr)
+        // (Table 25's x5/x7, x6/x8, x9/x11 and x10/x12), whose decorrelators are D0, D0, D1 and D1,
+        // each its own instance; x7, x8, x11 and x12 are the ASPX_ACPL_1 residuals and 0 in
+        // ASPX_ACPL_2. With b_5fronts modules 5 and 6 are on (L, Lscr) and (R, Rscr) (x0/x3 and
+        // x1/x4, outputs z0/z1 and z2/z3), both on D2, again each its own instance. Then z4 is
+        // twice C, and the outputs of modules 1 to 4 (z5 to z12) are scaled by the square root of
+        // 2; without b_5fronts z0 and z2 are twice L and R, and with it the modules' outputs z0 to
+        // z3 are not scaled.
         constexpr std::array<std::array<S, 2>, kMaxAcplModules> kPairs = {
             {{S::kLeftSurround, S::kLeftBack},
              {S::kRightSurround, S::kRightBack},
              {S::kTopFrontLeft, S::kTopBackLeft},
-             {S::kTopFrontRight, S::kTopBackRight}}};
-        constexpr std::array<int, kMaxAcplModules> kDecorrelator = {0, acpl::kDecorrelators, 1,
-                                                                    acpl::kDecorrelators + 1};
-        if (values.module_count != kMaxAcplModules ||
+             {S::kTopFrontRight, S::kTopBackRight},
+             {S::kLeft, S::kLeftScreen},
+             {S::kRight, S::kRightScreen}}};
+        constexpr std::array<int, kMaxAcplModules> kDecorrelator = {
+            0, acpl::kDecorrelators, 1, acpl::kDecorrelators + 1, 2, acpl::kDecorrelators + 2};
+        const bool fronts = values.module_count == kMaxAcplModules;
+        const std::size_t modules = fronts ? kMaxAcplModules : kMaxAcplModules - 2;
+        if (values.module_count != modules ||
             !writable({S::kLeft, S::kRight, S::kCentre, S::kLeftSurround, S::kLeftBack,
                        S::kRightSurround, S::kRightBack, S::kTopFrontLeft, S::kTopBackLeft,
-                       S::kTopFrontRight, S::kTopBackRight})) {
+                       S::kTopFrontRight, S::kTopBackRight}) ||
+            (fronts && !writable({S::kLeftScreen, S::kRightScreen}))) {
             return;
         }
         const bool residuals = codec_mode == immersive_mode::kAspxAcpl1;
-        for (std::size_t m = 0; m < kMaxAcplModules; ++m) {
+        for (std::size_t m = 0; m < modules; ++m) {
             const std::span<const QmfValue> x0 = input(0, kPairs[m][0]);
             const std::span<const QmfValue> x1 =
                 residuals ? input(1, kPairs[m][1]) : std::span<const QmfValue>{};
             module(values.modules[m], static_cast<int>(m), kDecorrelator[m], x0, x1,
                    output(kPairs[m][0]), output(kPairs[m][1]), num_ts);
-            scale(output(kPairs[m][0]), kSqrt2);
-            scale(output(kPairs[m][1]), kSqrt2);
+            if (m < kMaxAcplModules - 2) {
+                scale(output(kPairs[m][0]), kSqrt2);
+                scale(output(kPairs[m][1]), kSqrt2);
+            }
         }
-        for (const Speaker front : {S::kLeft, S::kRight, S::kCentre}) {
-            scale(output(front), 2.0);
+        scale(output(S::kCentre), 2.0);
+        if (!fronts) {
+            scale(output(S::kLeft), 2.0);
+            scale(output(S::kRight), 2.0);
         }
         return;
     }

@@ -10,10 +10,12 @@
 #include "iclforge/ac4core/dsp/complex.hpp"
 
 // Advanced joint channel coding's signal processing, ETSI TS 103 190-2 V1.3.1
-// clause 5.6, for the 7.X.4 channel modes (b_5fronts 0): differential decoding
-// and dequantisation (5.6.3.2, Pseudocodes 3 to 5), the pre-modification of two
-// decorrelator inputs (Pseudocode 9), and the coefficients of the full and core
-// decoding modules (Pseudocodes 11 and 14) with the sums they weight. The
+// clause 5.6: differential decoding and dequantisation (5.6.3.2, Pseudocodes 3
+// to 5), the pre-modification of two decorrelator inputs (Pseudocode 9), and the
+// coefficients of the modules with the sums they weight: the 7.X.4 channel
+// modes' (b_5fronts 0) full and core decoding modules (Pseudocodes 11 and 14),
+// and the 9.X.4 modes' (b_5fronts 1) ajcc_module_1() and ajcc_module_3()
+// (Pseudocodes 10 and 13). The
 // parameter bands, the interpolation, the decorrelators and the transient
 // ducker are A-CPL's (acpl/acpl.hpp): clauses 5.6.3.1, 5.6.3.3 and 5.6.3.4
 // define them by Part 1's, and Pseudocode 6 is Part 1's Pseudocode 109.
@@ -81,6 +83,26 @@ inline constexpr std::size_t kModule4Coefficients = 12;
 [[nodiscard]] std::array<double, kModule4Coefficients> module_4(int core_mode,
                                                                 const ModuleParams& p) noexcept;
 
+// Pseudocode 10, ajcc_module_1() of b_5fronts' full decoding: one input x and
+// the decorrelated y0 and y1 make three outputs, z0 = d0 x + p0 y0 + p1 y1, z1 =
+// d1 x + p2 y0 + p3 y1 and z2 = d2 x + p4 y0 + p5 y1. The coefficients are
+// d0 to d2, then y0's weights p0, p2 and p4 on z0 to z2, then y1's p1, p3 and
+// p5; ajcc_dry3 of the pseudocode is d2, 1 - dry1 - dry2. Only dry1, dry2 and
+// wet1 to wet3 of `p` are read.
+inline constexpr std::size_t kModule1Outputs = 3;
+inline constexpr std::size_t kModule1Coefficients = 9;
+[[nodiscard]] std::array<double, kModule1Coefficients> module_1(const ModuleParams& p) noexcept;
+
+// Pseudocode 13, ajcc_module_3() of b_5fronts' core decoding: the front
+// parameters `front` (dry2f and wet2f and wet3f of the pseudocode's arguments:
+// dry2, wet2 and wet3 of this module's side) and the back parameters `back`
+// (dry1b, dry2b, wet1b and wet3b: dry1, dry2, wet1 and wet3) make d0 to d5 and w0
+// to w5 laid out as ajcc_module_4()'s, output k of three being d_k x0 + d_(k+3)
+// x1 + w_k y0 + w_(k+3) y1 (module_term() with 3 outputs). The coefficients 0 to 2
+// and 6 to 8 follow the front framing, 3 to 5 and 9 to 11 the back.
+[[nodiscard]] std::array<double, kModule4Coefficients> module_3(const ModuleParams& front,
+                                                                const ModuleParams& back) noexcept;
+
 // Where a module's coefficient goes: the output it adds to, and whether it
 // weights an input x (d) or a decorrelated y (w), and which.
 struct Term {
@@ -89,6 +111,10 @@ struct Term {
     std::size_t input = 0;
 };
 [[nodiscard]] Term module_term(std::size_t coefficient, std::size_t outputs) noexcept;
+
+// Where module_1()'s coefficient goes: the output it adds to, and whether it
+// weights x (the first three) or y0 or y1 (input 0 or 1).
+[[nodiscard]] Term module_1_term(std::size_t coefficient) noexcept;
 
 // out += weight * in, value by value over `num_ts` slots: one term of
 // Pseudocodes 11 and 14's sums, `weight` the interpolated coefficient.

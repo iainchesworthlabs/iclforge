@@ -157,7 +157,7 @@ TEST_CASE("S-CPL makes the channels of Tables 23 and 24", "[ac4dec][immersive]")
         const Real m_gain = mode == immersive::kScpl ? static_cast<Real>(kSqrt2) : Real{1};
         std::vector<std::vector<Real>> time = signals(full.size());
         const std::vector<std::vector<Real>> in = time;
-        iclforge::ac4::detail::apply_scpl(mode, DecodingMode::kFull, full, time);
+        iclforge::ac4::detail::apply_scpl(mode, DecodingMode::kFull, false, full, time);
         const auto at = [&](const std::vector<std::vector<Real>>& t, Speaker s) {
             return t[index_of(full, s)][7];
         };
@@ -180,7 +180,7 @@ TEST_CASE("S-CPL makes the channels of Tables 23 and 24", "[ac4dec][immersive]")
 
         // Core decoding: c_gain on the seven core channels, the LFE as it is.
         std::vector<std::vector<Real>> core_time = signals(core.size());
-        iclforge::ac4::detail::apply_scpl(mode, DecodingMode::kCore, core, core_time);
+        iclforge::ac4::detail::apply_scpl(mode, DecodingMode::kCore, false, core, core_time);
         for (std::size_t c = 0; c < core.size(); ++c) {
             CAPTURE(c);
             const Real gain = core[c] == S::kLfe ? Real{1} : c_gain;
@@ -190,15 +190,101 @@ TEST_CASE("S-CPL makes the channels of Tables 23 and 24", "[ac4dec][immersive]")
     // Nothing in the modes without S-CPL.
     std::vector<std::vector<Real>> time = signals(full.size());
     const std::vector<std::vector<Real>> in = time;
-    iclforge::ac4::detail::apply_scpl(immersive::kAspxAcpl2, DecodingMode::kFull, full, time);
+    iclforge::ac4::detail::apply_scpl(immersive::kAspxAcpl2, DecodingMode::kFull, false, full,
+                                      time);
     CHECK(time == in);
+}
+
+TEST_CASE("S-CPL makes the 9.X.4 channels of Table 23's b_5fronts mapping and Table 24",
+          "[ac4dec][immersive][fronts]") {
+    using iclforge::ac4::detail::Real;
+    const auto full = iclforge::ac4::detail::speakers_of(iclforge::ac4::detail::ch_mode::k9_1_4);
+    const auto core = iclforge::ac4::detail::speakers_of(iclforge::ac4::detail::ch_mode::k9_1_4,
+                                                         DecodingMode::kCore);
+    REQUIRE(full.size() == 14);
+    const double tolerance = 1e4 * ac4dec_units::relative_epsilon();
+    const auto signals = [](std::size_t count) {
+        std::vector<std::vector<Real>> time(count);
+        for (std::size_t c = 0; c < count; ++c) {
+            time[c].assign(16, static_cast<Real>(c + 1));
+        }
+        return time;
+    };
+    for (const int mode : {immersive::kScpl, immersive::kAspxScpl}) {
+        CAPTURE(mode);
+        const Real c_gain = mode == immersive::kScpl ? Real{2} : Real{1};
+        const Real m_gain = mode == immersive::kScpl ? static_cast<Real>(kSqrt2) : Real{1};
+        std::vector<std::vector<Real>> time = signals(full.size());
+        const std::vector<std::vector<Real>> in = time;
+        iclforge::ac4::detail::apply_scpl(mode, DecodingMode::kFull, true, full, time);
+        const auto at = [&](const std::vector<std::vector<Real>>& t, Speaker s) {
+            return t[index_of(full, s)][7];
+        };
+        // C'' alone takes c_gain; the LFE passes.
+        CHECK(at(time, S::kCentre) == c_gain * at(in, S::kCentre));
+        CHECK(at(time, S::kLfe) == at(in, S::kLfe));
+        // L = A'' + L'' and Lscr = A'' - L'' (A'' and L'' arrive in the channels L and Lscr), and
+        // alike on the right: 2 x (1/2, 1/2; 1/2, -1/2) with no gain.
+        for (const auto& [x, y] : {std::pair{S::kLeft, S::kLeftScreen}, std::pair{S::kRight, S::kRightScreen}}) {
+            CHECK(std::abs(static_cast<double>(at(time, x) - (at(in, x) + at(in, y)))) < tolerance);
+            CHECK(std::abs(static_cast<double>(at(time, y) - (at(in, x) - at(in, y)))) < tolerance);
+        }
+        // The coupled pairs as for 7.X.4.
+        for (const auto& [x, y] : {std::pair{S::kLeftSurround, S::kLeftBack},
+                                   std::pair{S::kRightSurround, S::kRightBack},
+                                   std::pair{S::kTopFrontLeft, S::kTopBackLeft},
+                                   std::pair{S::kTopFrontRight, S::kTopBackRight}}) {
+            CHECK(std::abs(static_cast<double>(at(time, x) - m_gain * (at(in, x) + at(in, y)))) < tolerance);
+            CHECK(std::abs(static_cast<double>(at(time, y) - m_gain * (at(in, x) - at(in, y)))) < tolerance);
+        }
+        // Core decoding: Table 24's seven channels at c_gain, whatever b_5fronts.
+        std::vector<std::vector<Real>> core_time = signals(core.size());
+        iclforge::ac4::detail::apply_scpl(mode, DecodingMode::kCore, true, core, core_time);
+        for (std::size_t c = 0; c < core.size(); ++c) {
+            CAPTURE(c);
+            const Real gain = core[c] == S::kLfe ? Real{1} : c_gain;
+            CHECK(core_time[c][3] == gain * static_cast<Real>(c + 1));
+        }
+    }
+}
+
+TEST_CASE("the 9.X.4 element's A-SPX gains follow Table 11 and Table 9's b_5fronts row",
+          "[ac4dec][immersive][fronts]") {
+    using iclforge::ac4::detail::immersive_gains;
+    const auto gains = [](int mode, DecodingMode decoding, Speaker speaker) {
+        const auto g = immersive_gains(mode, decoding, true, speaker);
+        return std::array{g.low, g.high};
+    };
+    constexpr auto kFull = DecodingMode::kFull;
+    constexpr auto kCore = DecodingMode::kCore;
+    // Table 11: 2 for C, 1 for L, Lscr, R and Rscr, the square root of 2 for the coupled pairs.
+    CHECK(gains(immersive::kAspxScpl, kFull, S::kCentre) == std::array{2.0, 2.0});
+    for (const Speaker s : {S::kLeft, S::kLeftScreen, S::kRight, S::kRightScreen}) {
+        CHECK(gains(immersive::kAspxScpl, kFull, s) == std::array{1.0, 1.0});
+    }
+    for (const Speaker s : {S::kLeftSurround, S::kLeftBack, S::kRightSurround, S::kRightBack,
+                            S::kTopFrontLeft, S::kTopBackLeft, S::kTopFrontRight, S::kTopBackRight}) {
+        CHECK(gains(immersive::kAspxScpl, kFull, s) == std::array{kSqrt2, kSqrt2});
+    }
+    // Core decoding in ASPX_SCPL: 2, and Table 9's channels, L and R now among them, 0.841395 from
+    // sbx on.
+    for (const Speaker s : {S::kLeft, S::kRight, S::kLeftSurround, S::kRightSurround, S::kTopSideLeft,
+                            S::kTopSideRight}) {
+        CHECK(gains(immersive::kAspxScpl, kCore, s) == std::array{2.0, 2.0 * 0.841395});
+    }
+    CHECK(gains(immersive::kAspxScpl, kCore, S::kCentre) == std::array{2.0, 2.0});
+    // The A-CPL modes: 2 in core decoding in place of A-CPL, and none in full decoding.
+    for (const int mode : {immersive::kAspxAcpl1, immersive::kAspxAcpl2}) {
+        CHECK(gains(mode, kCore, S::kLeft) == std::array{2.0, 2.0});
+        CHECK(gains(mode, kFull, S::kLeftScreen) == std::array{1.0, 1.0});
+    }
 }
 
 TEST_CASE("the immersive element's gains after A-SPX follow Tables 9 and 10 and clause 4.8.3.14",
           "[ac4dec][immersive]") {
     using iclforge::ac4::detail::immersive_gains;
-    const auto gains = [](int mode, DecodingMode decoding, Speaker speaker) {
-        const auto g = immersive_gains(mode, decoding, speaker);
+    const auto gains = [](int mode, DecodingMode decoding, Speaker speaker, bool fronts = false) {
+        const auto g = immersive_gains(mode, decoding, fronts, speaker);
         return std::array{g.low, g.high};
     };
     constexpr auto kFull = DecodingMode::kFull;
@@ -757,5 +843,136 @@ TEST_CASE("A-JCC core decoding makes Pseudocode 12's seven channels from known Q
                 z[1] = sum({{1.0 - p.dry1, &x0}, {-v, &y0}});
                 z[2] = x1;
             });
+    }
+}
+
+TEST_CASE("A-CPL's six 9.X.4 modules add (L, Lscr) and (R, Rscr) on D2, without the square root of 2",
+          "[ac4dec][immersive][fronts]") {
+    const auto speakers =
+        iclforge::ac4::detail::speakers_of(iclforge::ac4::detail::ch_mode::k9_1_4);
+    const auto run = [&](int mode, const iclforge::ac4::detail::AcplFrameValues& values,
+                         iclforge::ac4::detail::AcplStage& stage,
+                         std::vector<std::vector<QmfValue>>& channels) {
+        std::vector<QmfMatrix> matrices;
+        for (auto& m : channels) {
+            matrices.push_back(m);
+        }
+        stage.apply(iclforge::ac4::detail::ch_mode::k9_1_4, false,
+                    iclforge::ac4::detail::ElementKind::kImmersive, mode, values, kSlots,
+                    {.speakers = speakers, .matrices = matrices});
+    };
+    const auto inputs = [&]() {
+        std::vector<std::vector<QmfValue>> channels;
+        for (std::size_t c = 0; c < speakers.size(); ++c) {
+            channels.push_back(
+                matrix(1.0 + 0.25 * static_cast<double>(c), 0.1 + 0.03 * static_cast<double>(c)));
+        }
+        return channels;
+    };
+    // Pseudocode 2 with b_5fronts: modules 1 to 4 on the 7.X.4 pairs, 5 and 6 on (L, Lscr) and
+    // (R, Rscr), Table 25's x0 / x3 to z0 / z1 and x1 / x4 to z2 / z3.
+    const std::array<std::array<Speaker, 2>, 6> pairs = {{{S::kLeftSurround, S::kLeftBack},
+                                                          {S::kRightSurround, S::kRightBack},
+                                                          {S::kTopFrontLeft, S::kTopBackLeft},
+                                                          {S::kTopFrontRight, S::kTopBackRight},
+                                                          {S::kLeft, S::kLeftScreen},
+                                                          {S::kRight, S::kRightScreen}}};
+    const auto value = [&](const std::vector<std::vector<QmfValue>>& t, Speaker s, std::size_t i) {
+        return t[index_of(speakers, s)][i];
+    };
+
+    SECTION("alpha 1 and -1, beta 0, and ASPX_ACPL_1's residuals") {
+        iclforge::ac4::detail::AcplFrameValues values;
+        values.module_count = 6;
+        for (std::size_t m = 0; m < 6; ++m) {
+            values.modules[m].num_bands = 15;
+            for (auto& band : values.modules[m].alpha[0]) {
+                band = m % 2 == 0 ? 1.0 : -1.0;
+            }
+        }
+        iclforge::ac4::detail::AcplStage stage;
+        std::vector<std::vector<QmfValue>> channels = inputs();
+        const std::vector<std::vector<QmfValue>> in = channels;
+        run(immersive::kAspxAcpl2, values, stage, channels);
+        channels = in;
+        run(immersive::kAspxAcpl2, values, stage, channels);
+        for (std::size_t i = 0; i < kValues; i += 131) {
+            CAPTURE(i);
+            // z4 is C doubled; the modules' outputs z5 to z12 are scaled by the square root of 2,
+            // z0 to z3 are not.
+            CHECK(static_cast<double>(abs(value(channels, S::kCentre, i) -
+                                          Real{2} * value(in, S::kCentre, i))) < kAbsoluteTolerance);
+            for (std::size_t m = 0; m < 6; ++m) {
+                const double scale = m < 4 ? 2.0 * kSqrt2 : 2.0;
+                const QmfValue full = static_cast<Real>(scale) * value(in, pairs[m][0], i);
+                const QmfValue first = m % 2 == 0 ? full : QmfValue{};
+                const QmfValue second = m % 2 == 0 ? QmfValue{} : full;
+                CAPTURE(m);
+                CHECK(static_cast<double>(abs(value(channels, pairs[m][0], i) - first)) < kAbsoluteTolerance);
+                CHECK(static_cast<double>(abs(value(channels, pairs[m][1], i) - second)) < kAbsoluteTolerance);
+            }
+        }
+        // ASPX_ACPL_1 below acpl_qmf_band: (x + r, x - r) with the residual r in Lscr and Rscr.
+        for (std::size_t m = 0; m < 6; ++m) {
+            values.modules[m].qmf_band = 64;
+        }
+        iclforge::ac4::detail::AcplStage residual;
+        channels = in;
+        run(immersive::kAspxAcpl1, values, residual, channels);
+        for (std::size_t i = 0; i < kValues; i += 131) {
+            CAPTURE(i);
+            for (std::size_t m = 0; m < 6; ++m) {
+                const auto& [x, r] = pairs[m];
+                const Real scale = m < 4 ? kSqrt2Real : Real{1};
+                CAPTURE(m);
+                CHECK(static_cast<double>(abs(value(channels, x, i) - scale * (value(in, x, i) + value(in, r, i)))) <
+                      kAbsoluteTolerance);
+                CHECK(static_cast<double>(abs(value(channels, r, i) - scale * (value(in, x, i) - value(in, r, i)))) <
+                      kAbsoluteTolerance);
+            }
+        }
+    }
+
+    SECTION("modules 5 and 6 decorrelate on D2, each with an instance of its own") {
+        // alpha 0 and beta 1: z0 - z1 = y, the decorrelated and ducked x_in. L and R carry the
+        // same signal: a shared instance would filter the second from the first's history, and a
+        // D0 or D1 in place of D2 would filter it differently.
+        iclforge::ac4::detail::AcplFrameValues values;
+        values.module_count = 6;
+        for (auto& module : values.modules) {
+            module.num_bands = 15;
+            for (auto& band : module.beta[0]) {
+                band = 1.0;
+            }
+        }
+        iclforge::ac4::detail::AcplStage stage;
+        iclforge::ac4::detail::acpl::Decorrelator<Real> reference(2);
+        iclforge::ac4::detail::acpl::TransientDucker<Real> ducker{};
+        for (int frame = 0; frame < 3; ++frame) {
+            CAPTURE(frame);
+            std::vector<std::vector<QmfValue>> channels = inputs();
+            const std::vector<QmfValue> front = matrix(0.8, 0.21 + 0.1 * frame);
+            for (const Speaker s : {S::kLeft, S::kRight}) {
+                channels[index_of(speakers, s)] = front;
+            }
+            run(immersive::kAspxAcpl2, values, stage, channels);
+            std::vector<QmfValue> x_in(kValues);
+            for (std::size_t i = 0; i < kValues; ++i) {
+                x_in[i] = Real{2} * front[i];
+            }
+            std::vector<QmfValue> y(kValues);
+            reference.process(x_in, y, kSlots);
+            ducker.process(y, kSlots);
+            if (frame == 0) {
+                continue;  // beta ramps from acpl_param_prev
+            }
+            for (std::size_t i = 0; i < kValues; i += 97) {
+                CAPTURE(i);
+                for (std::size_t m = 4; m < 6; ++m) {
+                    const QmfValue difference = value(channels, pairs[m][0], i) - value(channels, pairs[m][1], i);
+                    CHECK(static_cast<double>(abs(difference - y[i])) < kAbsoluteTolerance);
+                }
+            }
+        }
     }
 }

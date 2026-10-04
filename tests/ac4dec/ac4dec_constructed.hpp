@@ -91,6 +91,13 @@ struct ElementCase {
     // (ajcc_lines() in the source says which channels each route fills).
     int ajcc_core_mode = 0;
     int ajcc_route = 0;
+    // Dialogue enhancement (Part 1 Table 77 de_config(), the channel-independent method, 9 dB
+    // cap): its de_channel_config, 0 for none, and the index (Table 209) that every band of every
+    // channel is sent as. For ch_mode 13 and 14, de_core_par at or above 0 sends b_de_simulcast
+    // and a second de_data() (Part 2 clause 6.2.7.5) of that index.
+    int de_channel_config = 0;
+    int de_par = 0;
+    int de_core_par = -1;
 };
 
 struct BuiltStream {

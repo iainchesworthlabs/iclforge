@@ -45,8 +45,8 @@ void scale(std::vector<Real>& samples, Real gain) noexcept {
 
 }  // namespace
 
-void apply_scpl(int codec_mode, DecodingMode decoding, std::span<const Speaker> speakers,
-                std::span<std::vector<Real>> time) {
+void apply_scpl(int codec_mode, DecodingMode decoding, bool fronts,
+                std::span<const Speaker> speakers, std::span<std::vector<Real>> time) {
     if (codec_mode != immersive_mode::kScpl && codec_mode != immersive_mode::kAspxScpl) {
         return;
     }
@@ -60,30 +60,42 @@ void apply_scpl(int codec_mode, DecodingMode decoding, std::span<const Speaker> 
         }
         return;
     }
-    for (const Speaker front : {S::kLeft, S::kRight, S::kCentre}) {
-        if (std::vector<Real>* samples = channel(speakers, time, front)) {
+    // Table 23, b_5fronts 0: L and R are c_gain times A'' and B''; with b_5fronts only C is c_gain
+    // times its signal, and L, Lscr, R and Rscr come of the pairs (A'', L'') and (B'', M'')
+    // below, which carry no c_gain.
+    constexpr std::array<S, 3> kFronts = {S::kLeft, S::kRight, S::kCentre};
+    for (std::size_t k = fronts ? 2 : 0; k < kFronts.size(); ++k) {
+        if (std::vector<Real>* samples = channel(speakers, time, kFronts[k])) {
             scale(*samples, c_gain);
         }
     }
-    // m_gain x 2 x (1/2, 1/2; 1/2, -1/2).
-    const Real m_gain = scpl ? kSqrt2Real : Real{1};
-    for (const auto& [first, second] : kCoupled) {
+    // gain x 2 x (1/2, 1/2; 1/2, -1/2).
+    const auto couple = [&](Speaker first, Speaker second, Real gain) {
         std::vector<Real>* x = channel(speakers, time, first);
         std::vector<Real>* y = channel(speakers, time, second);
         if (x == nullptr || y == nullptr) {
-            continue;
+            return;
         }
         const std::size_t n = std::min(x->size(), y->size());
         for (std::size_t i = 0; i < n; ++i) {
             const Real sum = (*x)[i] + (*y)[i];
             const Real difference = (*x)[i] - (*y)[i];
-            (*x)[i] = m_gain * sum;
-            (*y)[i] = m_gain * difference;
+            (*x)[i] = gain * sum;
+            (*y)[i] = gain * difference;
         }
+    };
+    if (fronts) {
+        couple(S::kLeft, S::kLeftScreen, Real{1});
+        couple(S::kRight, S::kRightScreen, Real{1});
+    }
+    const Real m_gain = scpl ? kSqrt2Real : Real{1};
+    for (const auto& [first, second] : kCoupled) {
+        couple(first, second, m_gain);
     }
 }
 
-BandGains immersive_gains(int codec_mode, DecodingMode decoding, Speaker speaker) noexcept {
+BandGains immersive_gains(int codec_mode, DecodingMode decoding, bool fronts,
+                          Speaker speaker) noexcept {
     if (speaker == S::kLfe) {
         return {};
     }
@@ -91,13 +103,23 @@ BandGains immersive_gains(int codec_mode, DecodingMode decoding, Speaker speaker
     switch (codec_mode) {
         case immersive_mode::kAspxScpl: {
             if (core) {
+                // Table 9: Ls, Rs, Tfl and Tfr (here Tsl and Tsr), and with b_5fronts L and R.
                 const bool processed = speaker == S::kLeftSurround ||
                                        speaker == S::kRightSurround || speaker == S::kTopSideLeft ||
-                                       speaker == S::kTopSideRight;
+                                       speaker == S::kTopSideRight ||
+                                       (fronts && (speaker == S::kLeft || speaker == S::kRight));
                 return {.low = 2.0, .high = processed ? 2.0 * kPostProcessing : 2.0};
             }
-            const bool front = speaker == S::kLeft || speaker == S::kRight || speaker == S::kCentre;
-            const double g = front ? 2.0 : kSqrt2;
+            // Tables 10 and 11: 2 for C (and for L and R without b_5fronts), 1 for L, Lscr, R and
+            // Rscr with it, and the square root of 2 for the coupled pairs.
+            double g = kSqrt2;
+            if (speaker == S::kCentre) {
+                g = 2.0;
+            } else if (speaker == S::kLeft || speaker == S::kRight) {
+                g = fronts ? 1.0 : 2.0;
+            } else if (speaker == S::kLeftScreen || speaker == S::kRightScreen) {
+                g = 1.0;
+            }
             return {.low = g, .high = g};
         }
         case immersive_mode::kAspxAcpl1:
