@@ -1,5 +1,6 @@
 #include "iclforge/admbridge/iab_bridge.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <functional>
@@ -149,6 +150,26 @@ struct ChannelIdentity {
     return std::unexpected(BridgeError::kNoIabEssenceForChannel);
 }
 
+// The zone constraint in force at pan sub block `sb` of `object`. An ObjectZoneDefinition19 child
+// replaces the object's own nine-zone control (§10.6) and updates on its own cadence: the state at
+// `sb` is the latest sub block at or before it that carried zone information (sub block 0 always
+// does). Without that child, the sub block's own ObjectZoneControl gains apply, and without them
+// the object is unconstrained (§10.5.12: "zone control is not used").
+[[nodiscard]] IabZoneMapping zone_mapping_at(const iclforge::iab::ObjectDefinition& object, std::size_t sb) {
+    if (object.zone19.has_value() && !object.zone19->sub_blocks.empty()) {
+        const auto& blocks = object.zone19->sub_blocks;
+        std::size_t index = std::min(sb, blocks.size() - 1);
+        while (index > 0 && !blocks[index].has_zone_info) {
+            --index;
+        }
+        return iab_zones19_to_constraint(blocks[index].zone_gains);
+    }
+    if (object.sub_blocks[sb].zone_gains.has_value()) {
+        return iab_zones_to_constraint(*object.sub_blocks[sb].zone_gains);
+    }
+    return {};
+}
+
 // TS 103 420 §8.3.2.2's own 16-channel cap, the same constant and reasoning bridge.cpp's own
 // kMaxChannels documents for build() - reused by citation, not by symbol, since that one has
 // internal linkage in its own translation unit.
@@ -251,13 +272,17 @@ std::expected<IabBridgeResult, BridgeError> build_iab(std::span<const iclforge::
                         if (!block.has_pan_info) {
                             continue;
                         }
+                        const IabZoneMapping zones = zone_mapping_at(*object, sb);
                         keyframes[ch].push_back({
                             .time_s = time_s + (static_cast<double>(sb) + 1.0) /
                                                     static_cast<double>(*sub_block_count) * frame_duration_s,
                             .position = iab_position_to_room(block.position),
                             .gain = block.gain,
                             .lfe_send = 0.0,
+                            .size = iab_spread_to_size(block.spread),
                             .snap = block.snap,
+                            .zone = zones.zone,
+                            .enable_elevation = zones.enable_elevation,
                         });
                     }
                     auto essence = resolve_essence(*essence_in_frame, object->audio_data_id, *samples_per_frame);

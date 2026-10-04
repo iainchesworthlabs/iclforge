@@ -199,11 +199,12 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | **Reader** | Elementary `.iab` parse | 🟢 | High | Essential | vs DTS `iab-validator` |
 | | Bed / object definition tree | 🟢 | High | Essential | Positions, gains, spreads resolved on read |
 | | `AudioDataPCM` | 🟢 | High | Essential | Full PCM |
-| | `AudioDataDLC` (Annex B) | 🟡 | Medium | Important | Identity only — opaque bytes; lossless coder not decoded |
+| | `AudioDataDLC` (Annex B) | 🟢 | Medium | Important | 48 and 96 kHz, bit exact; `decode_dlc`, used by `build_iab` |
 | | MXF Track File extract (ST 2067-201) | 🟢 | High | Essential | Minimal KLV walk |
 | **Bridge** | IAB → Atmos encode (positions / gains) | 🟢 | High | Essential | `admbridge::build_iab`; `forge atmos-iab` |
-| | Spread + `ObjectZoneControl` → JOC | 🔴 | Medium | Important | Explicitly not bridged today |
-| **Writer** | IAB encode | 🔴 | Low | Nice-to-have | Read / ingest only |
+| | Spread + `ObjectZoneControl` → JOC | 🟡 | Medium | Important | Spread → object size; zone control → zone constraint when it matches one of the six presets; otherwise unconstrained |
+| **Writer** | IAB encode | 🟢 | Low | Nice-to-have | `write_iaframe`, `write_iabitstream`; `encode_dlc` for lossless essence |
+| | MXF Track File write (ST 2067-201) | 🔴 | Low | Nice-to-have | Elementary IABitstream only |
 
 ---
 
@@ -330,9 +331,8 @@ this register is the checklist that those bounds appear here too.
 
 | Clause | Open item | Status |
 |---|---|---|
-| Annex B | `AudioDataDLC` decode | 🟡 |
-| §5.5 / §10 zone control | Spread + `ObjectZoneControl` → JOC bridge | 🔴 |
-| Writer | IAB encode | 🔴 |
+| §5.5 / §10 zone control | A zone pattern that matches none of TS 103 420 Table 20's six presets is left unconstrained | 🟡 |
+| Writer | ST 2067-201 MXF Track File write | 🔴 |
 
 ### ITU-R BS.2076 / BS.2088 (ADM / BW64)
 

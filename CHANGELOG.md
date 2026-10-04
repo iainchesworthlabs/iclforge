@@ -29,6 +29,21 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**IAB (SMPTE ST 2098-2): lossless audio, a writer, and spread and zones in the bridge**
+
+- **`AudioDataDLC` decodes.** `iclforge::iab::decode_dlc()` implements Annex B: the lattice
+  predictors, Rice/Golomb and direct-PCM residuals, and the 96 kHz extension layer over an
+  upsampled 48 kHz base layer, in Annex B's integer arithmetic, so the output is bit exact.
+  `decode_audio()` returns a frame's PCM and DLC essence together, and `build_iab()` and
+  `forge atmos-iab` now accept DLC-coded masters, which used to fail with
+  `kNoIabEssenceForChannel`. `fuzz_iab_parse` reaches the decoder.
+- **IAB writes.** `write_iaframe()`, `write_iabitstream()` and `encode_dlc()` write the element
+  graph back as an elementary IABitstream, with a linear-predictive lossless encoder for the audio.
+  The MXF track-file wrapping is not written.
+- **`build_iab()` carries spread and zone control.** `ObjectSpread` becomes the object's size and
+  the nine-zone or 19-zone control becomes its zone constraint and elevation flag, where it matches
+  one of TS 103 420 Table 20's presets; other patterns leave the object unconstrained.
+
 **Associated-service identification, both directions**
 
 - **MPEG-TS's `mainid`/`asvc` now read back, not just write.** `mpegts::demux`/`Reader` decode

@@ -58,10 +58,15 @@ examples) consumes it.
   "plain aggregate, already-resolved" shape [`iclforge/adm/model.hpp`](adm.md) uses for ADM — see
   [`iclforge/iab/model.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/iab/include/iclforge/iab/model.hpp)
   for the full struct-by-struct citation trail.
-- **`AudioDataDLC`** (§9.6/§10.7, Annex B) is read only by identity — its forward-adaptive lattice
-  predictor plus entropy-coded residual is left as an opaque `std::vector<std::byte>` rather than
-  decoded. This is IM1's one deliberately unfinished piece; see that struct's own comment in
-  `model.hpp`.
+- **`AudioDataDLC`** (§9.6/§10.7, Annex B) is kept as its coded bytes by the reader and decoded by
+  `decode_dlc()` (`dlc.hpp`): the lattice predictor and its Rice/Golomb or direct-PCM residual,
+  at 48 kHz and at 96 kHz, where a 48 kHz base layer is upsampled and added to the extension
+  layer. The arithmetic is Annex B's integer arithmetic, so the output is bit exact: 32-bit samples
+  with the element's `ShiftBits` applied, or normalized floats through `DlcAudio::normalized()`. A
+  96 kHz element can be decoded to its base layer alone (`DlcDecodeOptions::base_layer_only`).
+  `decode_audio()` returns a frame's `AudioDataPCM` and `AudioDataDLC` essence together as
+  `AudioDataPcm`, which is what `build_iab()` uses. `src/iab/ERRATA.md` records the one reading
+  taken where Table 10's 96 kHz Rice branch is braced differently from its 48 kHz one.
 - **The MXF wrapping** (`mxf.hpp`) — SMPTE ST 2098-2 itself has no MXF content at all; the
   wrapping is a separate, much shorter standard, **SMPTE ST 2067-201:2021** ("IMF — Immersive Audio
   Bitstream Level 0 Plug-in"), which in turn references the base MXF standards (ST 377-1 file
@@ -97,7 +102,7 @@ sample `.mxf` files at all, so it played no such role for `mxf.hpp`.
 enum class IabError : std::uint8_t {
     kCannotOpen, kTruncated, kBadEscape, kBadPreambleTag, kBadFrameTag, kReservedVersion,
     kReservedSampleRate, kReservedBitDepth, kReservedFrameRate, kUnterminatedString,
-    kMxfBadKlv, kMxfNoIabEssence,
+    kBadDlc, kMxfBadKlv, kMxfNoIabEssence,
 };
 std::string_view describe(IabError error);
 
@@ -111,12 +116,53 @@ std::expected<std::vector<IABitstreamFrame>, IabError> parse_mxf_iab(const std::
 std::expected<std::vector<IABitstreamFrame>, IabError> parse_mxf_iab(std::istream& in);
 ```
 
+```cpp
+// dlc.hpp
+struct DlcAudio { std::uint32_t sample_rate; std::vector<std::int32_t> samples; std::vector<float> normalized() const; };
+struct DlcDecodeOptions { bool base_layer_only = false; };
+std::expected<DlcAudio, IabError> decode_dlc(const AudioDataDlc& element, std::uint8_t frame_rate_code,
+                                             const DlcDecodeOptions& options = {});
+std::expected<std::vector<AudioDataPcm>, IabError> decode_audio(const IaFrame& frame);
+```
+
 One error enum covers both entry points — `parse_mxf_iab` is still fundamentally "read an IAB
 frame sequence", just from a different container, so `kMxfBadKlv`/`kMxfNoIabEssence` join the
 bitstream-level codes rather than a second, parallel error type. `parse_iaframe` takes one
 already-extracted `IAElement(IA_FRAME)`'s payload directly (no header of its own — see its own doc
 comment) — the lower-level entry point both `parse_iabitstream` and `parse_mxf_iab` use internally
 once they have stripped their own respective framing away.
+
+## Writing
+
+`writer.hpp` writes the same graph back out. `write_iaframe()` and `write_iabitstream()` are the
+inverses of `parse_iaframe()` and `parse_iabitstream()`, and `write_iabitstream(path, frames)` writes a
+`.iab` file. The model holds resolved values, so the writer quantizes them with the inverse of the
+§5.4 and §5.5 formulas; a value the reader produced from a code is written back as that code, and
+writing what the reader returned reproduces the input bytes. A gain above unity cannot be coded and
+is written as unity. The output is the elementary IABitstream of §7. The ST 2067-201 MXF track-file
+wrapping is not written.
+
+```cpp
+std::expected<std::vector<std::byte>, WriteError> write_iaframe(const IaFrame& frame);
+std::expected<std::vector<std::byte>, WriteError> write_iabitstream(std::span<const IABitstreamFrame> frames);
+std::expected<void, WriteError> write_iabitstream(const std::string& path, std::span<const IABitstreamFrame> frames);
+
+struct DlcEncodeOptions {
+    std::uint32_t sample_rate = 48000;       // the IAFrame's SampleRate
+    std::uint32_t bit_depth = 24;            // 16 or 24
+    unsigned max_prediction_order = 8;       // 0 is Annex B.11's minimal encoder
+};
+std::expected<AudioDataDlc, WriteError> encode_dlc(std::uint32_t audio_data_id, std::span<const float> samples,
+                                                   std::uint8_t frame_rate_code, const DlcEncodeOptions& options = {});
+```
+
+`encode_dlc()` produces the `AudioDataDLC` elements a frame carries as lossless audio. It fits one
+linear predictor per layer (Levinson-Durbin on the layer's autocorrelation, quantized to the 10-bit
+lattice codes, with the residual computed in the integer arithmetic of B.7 and B.8) and codes each
+sub block as the smaller of direct PCM and Rice/Golomb. A 96 kHz frame is coded as a decimated
+48 kHz base layer plus the extension layer of B.3. Whatever the encoder chooses, `decode_dlc()`
+returns the quantized input integers exactly. Annex B's encoder is informative, so these are this
+encoder's own choices.
 
 ## Bridging to Atmos
 
@@ -125,7 +171,7 @@ input shape — one `iclforge::oba::ObjectPath` plus one mono PCM buffer per Bed
 to drive `encode_frame()` in a loop, the same destination shape `iclforge::admbridge::build()` produces
 for ADM. See [ADM → Atmos bridging](adm-bridge.md#bridging-iab) for what gets
 mapped (Table 19 → `iclforge::oba::BedLabel`, position conversion, MetaID-based cross-frame identity)
-and what does not (spread, the 9-zone `ObjectZoneControl`).
+and what is carried as metadata only (spread as object size, zone control as a zone constraint).
 [`examples/encode_iab.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/encode_iab.cpp)
 is the full read → bridge → encode pipeline; `forge atmos-iab` drives the identical pipeline from
 the command line.
