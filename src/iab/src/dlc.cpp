@@ -47,24 +47,35 @@ std::vector<std::int32_t> upsample_base_layer(std::span<const std::int32_t> pcm4
     return out;
 }
 
+// B.7: lattice (reflection) coefficients to direct form.
+void convert_lattice_to_direct(PredictorRegion& region) {
+    constexpr std::int32_t kOne = 1048576;  // 1.0 in Q20
+    std::array<std::int32_t, kMaxOrder + 1> temp{};
+    region.k_coeff[0] = kOne;
+    region.a_coeff[0] = kOne;
+    temp[0] = kOne;
+    for (unsigned j = 1; j <= region.order; ++j) {
+        region.k_coeff[j] = (region.k_coeff[j] - 512) * 2048;  // "-= 512; <<= 11"
+        region.a_coeff[j] = 0;
+        for (unsigned k = 1; k <= j; ++k) {
+            const std::int64_t accum = static_cast<std::int64_t>(region.k_coeff[j]) *
+                                       static_cast<std::int64_t>(region.a_coeff[j - k]);
+            temp[k] = wrap_add(region.a_coeff[k], static_cast<std::int32_t>(accum >> 20));
+        }
+        for (unsigned k = 1; k <= j; ++k) {
+            region.a_coeff[k] = temp[k];
+        }
+    }
+}
+
 }  // namespace detail
 
 namespace {
 
 using detail::BitReader;
-
-constexpr unsigned kMaxOrder = 31;  // Order48/96 is a 5-bit field, §10.7.7
-
-struct PredictorRegion {
-    unsigned length = 0;                                  // RegionLength, in sub blocks
-    unsigned order = 0;                                   // Order
-    std::array<std::int32_t, kMaxOrder + 1> k_coeff{};     // KCoeff[1..order], raw 10-bit codes
-    std::array<std::int32_t, kMaxOrder + 1> a_coeff{};     // ACoeff[0..order], Q20, from B.7
-};
-
-[[nodiscard]] std::int32_t wrap_add(std::int32_t a, std::int32_t b) {
-    return static_cast<std::int32_t>(static_cast<std::uint32_t>(a) + static_cast<std::uint32_t>(b));
-}
+using detail::kMaxOrder;
+using detail::PredictorRegion;
+using detail::wrap_add;
 
 // §9.6 Table 10, "Predictor information": NumPredRegions (2 bits), then per region RegionLength
 // (4), Order (5) and Order KCoeff values (10 each). §10.7.6: the RegionLengths sum to
@@ -101,27 +112,6 @@ struct PredictorRegion {
         return std::unexpected(IabError::kBadDlc);
     }
     return regions;
-}
-
-// B.7: lattice (reflection) coefficients to direct form.
-void convert_lattice_to_direct(PredictorRegion& region) {
-    constexpr std::int32_t kOne = 1048576;  // 1.0 in Q20
-    std::array<std::int32_t, kMaxOrder + 1> temp{};
-    region.k_coeff[0] = kOne;
-    region.a_coeff[0] = kOne;
-    temp[0] = kOne;
-    for (unsigned j = 1; j <= region.order; ++j) {
-        region.k_coeff[j] = (region.k_coeff[j] - 512) * 2048;  // "-= 512; <<= 11"
-        region.a_coeff[j] = 0;
-        for (unsigned k = 1; k <= j; ++k) {
-            const std::int64_t accum = static_cast<std::int64_t>(region.k_coeff[j]) *
-                                       static_cast<std::int64_t>(region.a_coeff[j - k]);
-            temp[k] = wrap_add(region.a_coeff[k], static_cast<std::int32_t>(accum >> 20));
-        }
-        for (unsigned k = 1; k <= j; ++k) {
-            region.a_coeff[k] = temp[k];
-        }
-    }
 }
 
 // §9.6 Table 10, "Coded residual", for one sub block: CodeType, then BitDepth or RiceRemBits and

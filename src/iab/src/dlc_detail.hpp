@@ -47,6 +47,26 @@ inline constexpr std::array<std::int32_t, 33> kInterp{
     0,     -138, 0, 305,  0, -618, 0, 1128, 0, -1952, 0, 3377, 0, -6450, 0, 20688, 32767,
     20688, 0,    -6450, 0, 3377, 0, -1952, 0, 1128,  0, -618, 0, 305,   0, -138,  0};
 
+// Annex B's 32-bit sums, wrapped rather than signed-overflowed.
+[[nodiscard]] inline std::int32_t wrap_add(std::int32_t a, std::int32_t b) {
+    return static_cast<std::int32_t>(static_cast<std::uint32_t>(a) + static_cast<std::uint32_t>(b));
+}
+
+constexpr unsigned kMaxOrder = 31;  // Order48/96 is a 5-bit field, §10.7.7
+
+// One predictor region of a layer (§9.6 Table 10).
+struct PredictorRegion {
+    unsigned length = 0;                                // RegionLength, in sub blocks
+    unsigned order = 0;                                 // Order
+    std::array<std::int32_t, kMaxOrder + 1> k_coeff{};  // KCoeff[1..order]: raw 10-bit codes, and
+                                                        // after the conversion the shifted values
+    std::array<std::int32_t, kMaxOrder + 1> a_coeff{};  // ACoeff[0..order], Q20, filled by
+                                                        // convert_lattice_to_direct()
+};
+
+// B.7: converts the region's lattice coefficients (raw codes in k_coeff) to direct form.
+void convert_lattice_to_direct(PredictorRegion& region);
+
 // B.9: upsamples a 48 kHz base layer to 96 kHz, `count96` output samples (twice the base layer
 // length). Integer arithmetic as specified, so the decoder and an encoder compute the same
 // approximation.
