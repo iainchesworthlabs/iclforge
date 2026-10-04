@@ -578,23 +578,29 @@ std::vector<std::byte> filters_v1() {
     return frame_of(w, 7);
 }
 
-// Presentations this decoder cannot decode: 22.2, and 5.1 at 96 kHz (its HSF
-// extension); then a stereo one.
+// A presentation this decoder cannot decode, 5.1 at 96 kHz (its HSF extension);
+// then a 9.0.4 one (the immersive element with b_5fronts), a 22.2 one and a
+// stereo one, which it decodes.
 std::vector<std::byte> capability_v1() {
     BitWriter w;
-    ac4_toc_test::toc_start(w, {.bitstream_version = 2, .sequence_counter = 1, .fs_index = 1,
-                                .frame_rate_index = 13, .b_iframe_global = true, .n_presentations = 3});
-    for (int i = 0; i < 3; ++i) {
+    ac4_toc_test::toc_start(w, {.bitstream_version = 2,
+                                .sequence_counter = 1,
+                                .fs_index = 1,
+                                .frame_rate_index = 13,
+                                .b_iframe_global = true,
+                                .n_presentations = 4});
+    for (int i = 0; i < 4; ++i) {
         ac4_toc_test::PresV1 pres;
         pres.groups = {i};
         pres.presentation_substream = i;
         pres.md_compat = 7;
         ac4_toc_test::presentation_v1(w, pres);
     }
-    ac4_toc_test::chan_group(w, {{.ch_mode = 15, .substream_index = 3}});
     ac4_toc_test::chan_group(w, {{.ch_mode = 4, .sf_multiplier = 0, .substream_index = 4}});
-    ac4_toc_test::chan_group(w, {{.ch_mode = 1, .substream_index = 5}});
-    return frame_of(w, 6);
+    ac4_toc_test::chan_group(w, {{.ch_mode = 13, .substream_index = 5}});
+    ac4_toc_test::chan_group(w, {{.ch_mode = 15, .substream_index = 6}});
+    ac4_toc_test::chan_group(w, {{.ch_mode = 1, .substream_index = 7}});
+    return frame_of(w, 8);
 }
 
 // presentation_config 5: roles by content_classifier (Part 2 Table 54).
@@ -710,7 +716,16 @@ std::vector<SelectionCase> selection_cases() {
         c.index = 0;
         add("v1 a disabled presentation asked for by position", filters, c, 3, 4);
     }
-    add("v1 presentations this decoder cannot decode", capability_v1(), {}, 7, 2);
+    add("v1 presentations this decoder cannot decode", capability_v1(), {}, 7, 1);
+    {
+        iclforge::ac4::PresentationChoice c;
+        c.index = 0;
+        add("v1 a 96 kHz presentation asked for by position", capability_v1(), c, 7, 1);
+        c.index = 1;
+        add("v1 a 9.X.4 presentation asked for by position", capability_v1(), c, 7, 1);
+        c.index = 3;
+        add("v1 a position past the 22.2 presentation", capability_v1(), c, 7, 3);
+    }
     const std::vector<std::byte> classified = by_classifier_v1();
     add("v1 configuration 5 without associated audio by default", classified, language("es"), 3, 1);
     add("v1 no preference passes over a first presentation with associated audio", classified, {}, 3, 1);
@@ -860,6 +875,42 @@ TEST_CASE("the pan law meets Table 216 at its three angles", "[ac4dec][presentat
     CHECK(std::abs(g[1] - 0.5) < 1e-12);
     CHECK(std::abs(g[5] - 0.5) < 1e-12);
     iclforge::ac4::detail::pan_gains(-30.0, five_one, g);
+    CHECK(g[0] == 1.0);
+}
+
+TEST_CASE("a pan into a 9.1.4 layout goes round the horizontal ring without the screen pair",
+          "[ac4dec][presentations][fronts]") {
+    // src/ac4dec/ERRATA.md, "Mixing into a 9.X.4 substream": Lscr and Rscr are no points of the
+    // ring, and the tops and the LFE are not either; the ring is the 7.X one, L, C, R, Rs, Rb, Lb,
+    // Ls (the surrounds at the sides, 90 and 270 degrees, as the layout has a back pair).
+    const std::array layout = {
+        Speaker::kLeft,         Speaker::kRight,         Speaker::kCentre,
+        Speaker::kLeftSurround, Speaker::kRightSurround, Speaker::kLeftBack,
+        Speaker::kRightBack,    Speaker::kTopFrontLeft,  Speaker::kTopFrontRight,
+        Speaker::kTopBackLeft,  Speaker::kTopBackRight,  Speaker::kLfe,
+        Speaker::kLeftScreen,   Speaker::kRightScreen};
+    std::array<double, 14> g{};
+    for (const double degrees : {0.0, 330.0, 30.0, 270.0, 180.0, 10.0}) {
+        iclforge::ac4::detail::pan_gains(degrees, layout, g);
+        CAPTURE(degrees);
+        CHECK(g[7] == 0.0);
+        CHECK(g[8] == 0.0);
+        CHECK(g[9] == 0.0);
+        CHECK(g[10] == 0.0);
+        CHECK(g[11] == 0.0);
+        CHECK(g[12] == 0.0);
+        CHECK(g[13] == 0.0);
+        double sum = 0.0;
+        for (const double v : g) {
+            sum += v;
+        }
+        CHECK(std::abs(sum - 1.0) < 1e-12);
+    }
+    iclforge::ac4::detail::pan_gains(0.0, layout, g);
+    CHECK(g[2] == 1.0);
+    iclforge::ac4::detail::pan_gains(270.0, layout, g);
+    CHECK(g[3] == 1.0);
+    iclforge::ac4::detail::pan_gains(330.0, layout, g);
     CHECK(g[0] == 1.0);
 }
 
@@ -1118,7 +1169,7 @@ TEST_CASE("version 0 presentations mix by their substreams' own metadata and dia
 }
 
 TEST_CASE("a stream with no presentation the decoder decodes names the substream it does not", "[ac4dec][presentations]") {
-    // One presentation of one 22.2 substream, whose channel element the
+    // One presentation of one 5.1 substream at 96 kHz, whose HSF extension the
     // decoder does not decode, and its presentation substream.
     BitWriter toc;
     ac4_toc_test::toc_start(toc, {.bitstream_version = 2, .sequence_counter = 1, .fs_index = 1,
@@ -1127,7 +1178,7 @@ TEST_CASE("a stream with no presentation the decoder decodes names the substream
     pres.presentation_substream = 1;
     pres.md_compat = 3;
     ac4_toc_test::presentation_v1(toc, pres);
-    ac4_toc_test::chan_group(toc, {{.ch_mode = 15, .substream_index = 0}});
+    ac4_toc_test::chan_group(toc, {{.ch_mode = 4, .sf_multiplier = 0, .substream_index = 0}});
     ac4_toc_test::index_table(toc, {4, 1});
     toc.align();
     const std::vector<std::byte> frame =

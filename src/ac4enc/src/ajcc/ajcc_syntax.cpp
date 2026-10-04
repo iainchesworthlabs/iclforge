@@ -144,13 +144,31 @@ int ajcc_num_param_bands(int num_param_bands_id) noexcept {
 void write_ajcc_data(BitWriter& w, const AjccDataFields& data) {
     w.write(1, data.no_dt ? 1U : 0U, "b_no_dt");
     w.write(2, static_cast<std::uint64_t>(data.num_param_bands_id), "ajcc_num_param_bands_id");
+    if (data.fronts) {
+        w.write(1, static_cast<std::uint64_t>(data.qm_f), "ajcc_qm_f");
+        w.write(1, static_cast<std::uint64_t>(data.qm_b), "ajcc_qm_b");
+        for (const AjccFramingFields& framing : data.framing) {
+            write_framing(w, framing);
+        }
+        // dry1f to dry4f, dry1b to dry4b, wet1f to wet6f, wet1b to wet6b: each at its front's or
+        // back's quantisation mode and its module's (lf, rf, lb, rb) number of parameter sets.
+        for (std::size_t p = 0; p < 20; ++p) {
+            const bool dry = p < 8;
+            const std::size_t k = dry ? p : p - 8;
+            const std::size_t module = dry ? (k / 4) * 2 + (k % 4) / 2 : (k / 6) * 2 + (k % 6) / 3;
+            const int quant = module < 2 ? data.qm_f : data.qm_b;
+            write_ajced(w, dry ? Kind::kDry : Kind::kWet, quant, data.no_dt,
+                        data.framing[module].num_param_sets, data.params[p]);
+        }
+        return;
+    }
     w.write(1, static_cast<std::uint64_t>(data.core_mode), "ajcc_core_mode");
     w.write(1, static_cast<std::uint64_t>(data.qm_ab), "ajcc_qm_ab");
     w.write(1, static_cast<std::uint64_t>(data.qm_dw), "ajcc_qm_dw");
-    for (const AjccFramingFields& framing : data.framing) {
-        write_framing(w, framing);
+    for (std::size_t k = 0; k < 2; ++k) {
+        write_framing(w, data.framing[k]);
     }
-    for (std::size_t p = 0; p < data.params.size(); ++p) {
+    for (std::size_t p = 0; p < 14; ++p) {
         const Kind kind = kind_of(p);
         const int quant = kind == Kind::kAlpha || kind == Kind::kBeta ? data.qm_ab : data.qm_dw;
         const int num_ps = data.framing[left(p) ? 0 : 1].num_param_sets;

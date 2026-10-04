@@ -289,8 +289,32 @@ std::optional<Speaker> speaker_of_index(int index) noexcept {
             return Speaker::kTopSideLeft;
         case 13:
             return Speaker::kTopSideRight;
+        // Table A.27's note 3: the deprecated group of indices 14 and 15 is read
+        // as the corresponding indices of group 7, Tsl and Tsr.
+        case 14:
+            return Speaker::kTopSideLeft;
+        case 15:
+            return Speaker::kTopSideRight;
+        case 16:
+            return Speaker::kTopFrontCentre;
+        case 17:
+            return Speaker::kTopBackCentre;
+        case 18:
+            return Speaker::kTopCentre;
         case 19:
             return Speaker::kLfe2;
+        case 20:
+            return Speaker::kBottomFrontLeft;
+        case 21:
+            return Speaker::kBottomFrontRight;
+        case 22:
+            return Speaker::kBottomFrontCentre;
+        case 23:
+            return Speaker::kCentreBack;
+        case 24:
+            return Speaker::kLeftScreen;
+        case 25:
+            return Speaker::kRightScreen;
         case 26:
             return Speaker::kLeftWide;
         case 27:

@@ -34,6 +34,10 @@ void stereo_parameters(const SubstreamContext& ctx, const SfInfo& info, const Ch
                        StereoParameters& out, StereoUse use) {
     const bool pair = use == StereoUse::kPair;
     const AsfPsyInfo& psy = info.psy;
+    // Where bands past max_sfb_g hold lines, as they do with an HSF extension, M/S in all bands
+    // reaches them; at 44.1 and 48 kHz those bands hold none and the matrix is of no effect.
+    const bool extension = ctx.sf_multiplier.has_value();
+    out.uncovered = extension && pair && chparam.sap_mode == 2 ? kMidSide : kIdentity;
     // alpha_q of a band sap_data() sent no coefficient for is never read by a
     // well-formed stream; it is 0 here rather than whatever it last held.
     std::array<std::array<int, kMaxSfb>, kMaxWindows> alpha_q{};
@@ -82,7 +86,7 @@ void stereo_parameters(const SubstreamContext& ctx, const SfInfo& info, const Ch
             }
         }
         for (int sfb = std::max(max_sfb_g, 0); sfb < kMaxSfb; ++sfb) {
-            out.abcd[gi][static_cast<std::size_t>(sfb)] = kIdentity;
+            out.abcd[gi][static_cast<std::size_t>(sfb)] = out.uncovered;
         }
         max_sfb_prev = max_sfb_g;
     }
@@ -104,6 +108,21 @@ void apply_stereo(const SfInfo& info, const SfData& layout, const StereoParamete
                 track1[k] = c * i0 + d * i1;
             }
         }
+    }
+}
+
+void apply_stereo_beyond_bands(const StereoParameters& parameters, std::span<Real> track0,
+                               std::span<Real> track1, std::size_t first_line) {
+    const auto [a, b, c, d] = parameters.uncovered;
+    if (a == Real{1} && b == Real{} && c == Real{} && d == Real{1}) {
+        return;
+    }
+    const std::size_t last = std::min(track0.size(), track1.size());
+    for (std::size_t k = first_line; k < last; ++k) {
+        const Real i0 = track0[k];
+        const Real i1 = track1[k];
+        track0[k] = a * i0 + b * i1;
+        track1[k] = c * i0 + d * i1;
     }
 }
 

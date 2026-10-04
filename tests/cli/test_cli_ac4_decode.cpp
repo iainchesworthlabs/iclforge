@@ -3,7 +3,8 @@
 // level, the presentation by position, associated service and level, the
 // associated mix, every downmix with and without the LFE, a 7.X stream folded
 // to 5.X, headphones, the syntax trace, and what decode says about options the
-// other format reads; and phase D10's objects, rendered to speakers.
+// other format reads; and phase D10's objects, rendered to speakers; and the constructed streams
+// at 96 and 192 kHz (tests/golden/ac4-hsf/), written at their own rate.
 // tests/cli/test_cli_containers.cpp has the first of them (output-level=, presentation-id=,
 // language=, dialogue-gain=, dialogue-enhancement=, channels=2 and 1, downmix=loro, conceal=).
 
@@ -353,4 +354,68 @@ TEST_CASE("decode renders AC-4's objects to the speakers the layout options name
         object_files += entry.path().extension() == ".wav" ? 1U : 0U;
     }
     CHECK(object_files > 0);
+}
+
+namespace {
+
+// The magnitude of `x`'s last 2048 samples at `hz`, by a single-bin DFT (Hann-windowed).
+double bin_magnitude(const std::vector<float>& x, double hz, double sample_rate) {
+    constexpr std::size_t kLength = 2048;
+    REQUIRE(x.size() >= kLength);
+    double re = 0.0;
+    double im = 0.0;
+    for (std::size_t i = 0; i < kLength; ++i) {
+        const auto n = static_cast<double>(i);
+        const double window =
+            0.5 - 0.5 * std::cos(2.0 * std::numbers::pi * n / static_cast<double>(kLength));
+        const double phase =
+            2.0 * std::numbers::pi * hz * static_cast<double>(x.size() - kLength + i) / sample_rate;
+        const double v = static_cast<double>(x[x.size() - kLength + i]) * window;
+        re += v * std::cos(phase);
+        im += v * std::sin(phase);
+    }
+    return std::hypot(re, im);
+}
+
+fs::path hsf_stream(const std::string& name) {
+    return fs::path{AC4DEC_GOLDEN_DIR} / ".." / "ac4-hsf" / (name + ".ac4");
+}
+
+}  // namespace
+
+TEST_CASE("decode writes AC-4 at 96 and 192 kHz at the rate it decodes at", "[cli][ac4][hsf]") {
+    const auto log = scratch_dir() / "ac4_hsf.log";
+    // tests/ac4dec/ac4dec_hsf.cpp's constructed streams: the tone of each channel is above 24 kHz
+    // (the right channel of the first, the only one of the second), so it is in the output only
+    // where the HSF extension was decoded into a transform of 2 or 4 times the base length.
+    struct Leg {
+        const char* name;
+        std::uint32_t rate;
+        std::size_t channel;
+        double hz;
+    };
+    for (const Leg& leg_case : {Leg{"stereo-96-sap2", 96000, 1, 37506.25},
+                                Leg{"mono-192-switched-snf", 192000, 0, 65010.0}}) {
+        CAPTURE(leg_case.name);
+        const auto decoded = decode(hsf_stream(leg_case.name), "", log);
+        CHECK(read_log(log).find(std::to_string(leg_case.rate) + " Hz") != std::string::npos);
+        CHECK(decoded.sample_rate == leg_case.rate);
+        REQUIRE(decoded.channels.size() > leg_case.channel);
+        const auto& x = decoded.channels[leg_case.channel];
+        const auto rate = static_cast<double>(leg_case.rate);
+        const double at_tone = bin_magnitude(x, leg_case.hz, rate);
+        CHECK(at_tone > 20.0);
+        // Three percent off the tone and an octave below it hold next to none of its energy.
+        CHECK(bin_magnitude(x, leg_case.hz * 0.97, rate) < at_tone * 0.05);
+        CHECK(bin_magnitude(x, leg_case.hz * 0.5, rate) < at_tone * 0.05);
+    }
+}
+
+TEST_CASE("qc refuses AC-4 at 96 kHz by name where its loudness meter is not made for the rate",
+          "[cli][ac4][hsf]") {
+    const auto log = scratch_dir() / "ac4_hsf_qc.log";
+    CHECK(run_cli("qc " + quoted(hsf_stream("mono-96-long")), log) != 0);
+    CHECK(read_log(log).find(
+              "decodes at 96000 Hz, and the loudness meter is made for 44.1 and 48 kHz only") !=
+          std::string::npos);
 }

@@ -194,7 +194,9 @@ ParseResult parse_sf_info(BitReader& r, const SubstreamContext& ctx, int spec_fr
     out = SfInfo{};
     out.spec_frontend = spec_frontend;
     if (spec_frontend != 0) {
-        return fail(DecodeError::kUnsupported, "the speech spectral frontend (SSF) is not decoded");
+        // Table 34: sf_info() has nothing for the speech spectral frontend; its block layout is
+        // in ssf_data() (syntax/ssf.hpp).
+        return {};
     }
     AsfPsyInfo& psy = out.psy;
 
@@ -367,7 +369,10 @@ void split_codeword(const Codebook& cb, int dim, int index, std::array<std::int3
 ParseResult parse_sf_data(BitReader& r, const SubstreamContext& ctx, const SfInfo& info, bool side_channel,
                           const HsfExtHeader* hsf, SfData& out, HsfSfData& hsf_out) {
     if (info.spec_frontend != 0) {
-        return fail(DecodeError::kUnsupported, "the speech spectral frontend (SSF) is not decoded");
+        // Table 36's ssf_data(), which needs the track's state: parse_ssf_data(), called by the
+        // element's parser in place of this.
+        return fail(DecodeError::kInvalidStream,
+                    "an SSF track read as an audio spectral frontend one");
     }
     const AsfPsyInfo& psy = info.psy;
     reset_in_place(out);

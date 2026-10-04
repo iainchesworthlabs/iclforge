@@ -28,10 +28,11 @@
 #include "ac4dec_units.hpp"
 
 #include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4core/dsp/qmf.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 #include "iclforge/ac4enc/encoder.hpp"
-#include "iclforge/ac4core/dsp/qmf.hpp"
 #include "pcm/drc.hpp"
+#include "pcm/routing.hpp"
 #include "sanitized.hpp"
 
 namespace {
@@ -450,6 +451,150 @@ TEST_CASE("transmitted DRC gains apply by Part 2 Table 69's groups to the immers
                   1e4 * ac4dec_units::relative_epsilon() * gain + 1e-12);
         }
     }
+}
+
+TEST_CASE("transmitted DRC gains apply by Part 2 Table 69's groups to the 9.X.4 element",
+          "[ac4dec][drc][fronts]") {
+    // Table 69's 9.X.4 row: L, R, the LFE, Lscr and Rscr; C; Ls, Rs, Lb and Rb; the four tops. The
+    // layout is Table A.27's order, the screen pair last.
+    using S = iclforge::ac4::Speaker;
+    const std::vector<S> speakers = {
+        S::kLeft,         S::kRight,     S::kCentre,       S::kLeftSurround,  S::kRightSurround,
+        S::kLeftBack,     S::kRightBack, S::kTopFrontLeft, S::kTopFrontRight, S::kTopBackLeft,
+        S::kTopBackRight, S::kLfe,       S::kLeftScreen,   S::kRightScreen};
+    const std::vector<int> groups = {0, 0, 1, 2, 2, 2, 2, 3, 3, 3, 3, 0, 0, 0};
+    detail::DrcGainset set;
+    set.drc_gains_config = 0;
+    set.nr_drc_channels = 4;
+    set.nr_drc_bands = 1;
+    set.nr_drc_subframes = 1;
+    set.gains_present = true;
+    for (int group = 0; group < 4; ++group) {
+        set.drc_gain[static_cast<std::size_t>(group * detail::kMaxDrcSubframes *
+                                              detail::kMaxDrcBands)] =
+            static_cast<std::int16_t>(-6 * (group + 1));
+    }
+    detail::DrcStage stage;
+    stage.configure(48000.0, kSlots, speakers, false, true);
+    const iclforge::ac4::OutputConfig output{
+        .output_level_dbfs = -30.0, .drc = iclforge::ac4::DrcMode::kDefault, .headphones = false};
+    std::vector<std::vector<QmfValue>> channels(
+        speakers.size(), std::vector<QmfValue>(kSlots * 64, ac4dec_units::qmf(1.0)));
+    std::vector<QmfMatrix> matrices;
+    for (auto& channel : channels) {
+        matrices.push_back(channel);
+    }
+    stage.process(output, {.dialnorm = -30.0, .curve = std::nullopt, .gains = set, .reset = false},
+                  matrices, matrices);
+    for (std::size_t c = 0; c < channels.size(); ++c) {
+        CAPTURE(c, iclforge::ac4::describe(speakers[c]));
+        const double gain = std::exp2(-static_cast<double>(groups[c] + 1));
+        CHECK(std::abs(ac4dec_units::qmf_units(channels[c][100].real()) - gain) <
+              1e4 * ac4dec_units::relative_epsilon() * gain + 1e-12);
+    }
+}
+
+TEST_CASE("transmitted DRC gains apply by Part 2 Table 69's groups to the 22.2 element",
+          "[ac4dec][drc]") {
+    // Table 69's 22.2 row: L, R, both LFEs, Lw and Rw; C; Ls, Rs, Lb, Rb, Bfl,
+    // Bfr, Bfc and Cb; and Tfl, Tfr, Tbl, Tbr, Tsl, Tsr, Tfc, Tbc and Tc. The
+    // speakers are in the order decode() writes them, Table A.27's.
+    using S = iclforge::ac4::Speaker;
+    const std::span<const S> speakers = detail::speakers_of(detail::ch_mode::k22_2);
+    const auto group_of = [](S s) {
+        switch (s) {
+            case S::kLeft:
+            case S::kRight:
+            case S::kLfe:
+            case S::kLfe2:
+            case S::kLeftWide:
+            case S::kRightWide:
+                return 0;
+            case S::kCentre:
+                return 1;
+            case S::kLeftSurround:
+            case S::kRightSurround:
+            case S::kLeftBack:
+            case S::kRightBack:
+            case S::kBottomFrontLeft:
+            case S::kBottomFrontRight:
+            case S::kBottomFrontCentre:
+            case S::kCentreBack:
+                return 2;
+            default:
+                return 3;  // the nine top channels
+        }
+    };
+    detail::DrcGainset set;
+    set.drc_gains_config = 0;
+    set.nr_drc_channels = 4;
+    set.nr_drc_bands = 1;
+    set.nr_drc_subframes = 1;
+    set.gains_present = true;
+    for (int group = 0; group < 4; ++group) {
+        set.drc_gain[static_cast<std::size_t>(group * detail::kMaxDrcSubframes *
+                                              detail::kMaxDrcBands)] =
+            static_cast<std::int16_t>(-6 * (group + 1));
+    }
+    detail::DrcStage stage;
+    stage.configure(48000.0, kSlots, speakers, false, true);
+    const iclforge::ac4::OutputConfig output{
+        .output_level_dbfs = -30.0, .drc = iclforge::ac4::DrcMode::kDefault, .headphones = false};
+    std::vector<std::vector<QmfValue>> channels(
+        speakers.size(), std::vector<QmfValue>(kSlots * 64, ac4dec_units::qmf(1.0)));
+    std::vector<QmfMatrix> matrices;
+    for (auto& channel : channels) {
+        matrices.push_back(channel);
+    }
+    stage.process(output, {.dialnorm = -30.0, .curve = std::nullopt, .gains = set, .reset = false},
+                  matrices, matrices);
+    REQUIRE(channels.size() == 24);
+    for (std::size_t c = 0; c < channels.size(); ++c) {
+        CAPTURE(c, iclforge::ac4::describe(speakers[c]));
+        const double gain = std::exp2(-static_cast<double>(group_of(speakers[c]) + 1));
+        CHECK(std::abs(ac4dec_units::qmf_units(channels[c][100].real()) - gain) <
+              1e4 * ac4dec_units::relative_epsilon() * gain + 1e-12);
+    }
+}
+
+TEST_CASE("the DRC level detector leaves out both of 22.2's LFEs", "[ac4dec][drc]") {
+    // A loud tone in an LFE adds nothing to the level the curve is read at, as
+    // BS.1770 weights the LFE: the stage's gain is the one for silence, which
+    // film standard's boost gives, while the same tone in L cuts.
+    using S = iclforge::ac4::Speaker;
+    const std::span<const S> speakers = detail::speakers_of(detail::ch_mode::k22_2);
+    constexpr double kDialnorm = -24.0;
+    const iclforge::ac4::OutputConfig output{.output_level_dbfs = kDialnorm,
+                                             .drc = iclforge::ac4::DrcMode::kDefault,
+                                             .headphones = false};
+    const detail::DrcCurve curve = *detail::drc_default_curve(1);
+    const auto gain_with_tone_in = [&](S loud) {
+        detail::DrcStage stage;
+        stage.configure(48000.0, kSlots, speakers, false, true);
+        ToneFrames tone(997.0);
+        for (int f = 0; f < 12; ++f) {
+            std::vector<std::vector<QmfValue>> channels(speakers.size(),
+                                                        std::vector<QmfValue>(kFrame));
+            const auto at = std::ranges::find(speakers, loud);
+            channels[static_cast<std::size_t>(at - speakers.begin())] =
+                tone.next(amplitude_for(20.0, kDialnorm));
+            std::vector<QmfMatrix> matrices;
+            for (auto& channel : channels) {
+                matrices.push_back(channel);
+            }
+            stage.process(
+                output,
+                {.dialnorm = kDialnorm, .curve = curve, .gains = std::nullopt, .reset = f == 0},
+                matrices, matrices);
+        }
+        return 6.0 * std::log2(stage.last_gain());
+    };
+    const double silent = curve.gain(-120.0);
+    CHECK(silent > 0.0);
+    CHECK(std::abs(gain_with_tone_in(S::kLfe) - silent) < 0.01);
+    CHECK(std::abs(gain_with_tone_in(S::kLfe2) - silent) < 0.01);
+    CHECK(gain_with_tone_in(S::kLeft) < 0.0);
+    CHECK(gain_with_tone_in(S::kBottomFrontCentre) < 0.0);
 }
 
 TEST_CASE(

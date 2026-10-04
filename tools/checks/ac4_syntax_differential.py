@@ -15,9 +15,12 @@ Streams:
              mode ("mode");
   synthetic  a table of contents for a channel mode no encoder here writes
              (mono, 3.0, 5.0 and the 7.X modes, with stereo and 5.1 among
-             them) over random substream payloads; a quarter of them instead
-             an object-coded substream group of A-JOC and direct-coded
-             substreams, with or without an OAMD substream.
+             them) over random substream payloads, a third of the Part 1
+             modes at 96 or 192 kHz with an HSF extension substream
+             (ac4_hsf_ext_substream(), Part 1 clause 4.2.4.3) beside the
+             audio; a quarter of them instead an object-coded substream group
+             of A-JOC and direct-coded substreams, with or without an OAMD
+             substream.
 
 Comparison, of each stream's last frame substream by substream: where both
 transcriptions read a substream to the end the records must be identical;
@@ -46,8 +49,8 @@ header). Run from the repo root:
       [--inputs DIR ...]
 
 --streams adds every *.ac4 under each directory (the local census, say) to the
-committed streams under tests/golden/external-baseline/. --inputs compares the
-files under each directory instead, every frame of each: a corpus
+committed streams under tests/golden/external-baseline/ and tests/golden/ac4-hsf/.
+--inputs compares the files under each directory instead, every frame of each: a corpus
 fuzz/run.sh grew for fuzz_ac4_decode reaches syntax random streams do not.
 """
 
@@ -145,14 +148,14 @@ class Bits:
         return bytes(out)
 
 
-# Part 2 Table 56 channel_mode codes as (code, width). The 7.X.4 modes are
-# listed twice, since only their immersive element is read (9.X.4's is refused
-# by both, which the two still have to agree on).
+# Part 2 Table 56 channel_mode codes as (code, width). The 7.X.4 and 9.X.4 modes
+# are listed twice, since only their immersive element is read (the 9.X.4 modes'
+# with b_5fronts); 22.2 (0b111111110) has the 22_2_channel_element().
 SYNTHETIC_MODES = [
     (0b0, 1), (0b10, 2), (0b1100, 4), (0b1101, 4), (0b1110, 4),
     (0b1111000, 7), (0b1111001, 7), (0b1111010, 7), (0b1111011, 7), (0b1111100, 7),
     (0b1111101, 7), (0b11111100, 8), (0b11111101, 8), (0b11111100, 8), (0b11111101, 8),
-    (0b111111100, 9), (0b111111101, 9),
+    (0b111111100, 9), (0b111111101, 9), (0b111111110, 9),
 ]
 # The immersive codes, which carry b_4_back_channels_present, b_centre_present
 # and top_channels_present (Part 2 6.2.1.8).
@@ -172,6 +175,14 @@ def synthetic(rng):
     # both factors; index 13 keeps the unmultiplied shape.
     factor = rng.choice((1, 1, 1, 2, 4))
     frame_rate_index = 13 if factor == 1 else 2
+    # An HSF extension (Part 1 Table 12 and 4.2.4.3): the substream is at 96 or
+    # 192 kHz and a substream beside it holds the lines beyond 24 kHz. Only for
+    # the Part 1 channel elements, and for a single instance: the committed
+    # constructed streams (tests/golden/ac4-hsf/) are the ones that read to
+    # their end, and mutations of them reach the extension's syntax; these
+    # reach its refusals and its first bits.
+    hsf = (factor == 1 and code not in IMMERSIVE_CODES and code != 0b111111110
+           and rng.randrange(3) == 0)
     w = Bits()
     w.put(2, 2)                         # bitstream_version
     w.put(rng.randrange(1, 1024), 10)   # sequence_counter, not 0: no splice
@@ -202,15 +213,17 @@ def synthetic(rng):
     w.put(1, 1)                         # b_pres_ndot
     # The audio element names substreams 0..factor-1, so the presentation
     # substream is the row after them.
-    w.put(factor, 2)                    # presentation substream_index
-    for value in (1, 0, 1, 1):          # b_substreams_present, b_hsf_ext,
+    w.put(factor + (1 if hsf else 0), 2)    # presentation substream_index
+    for value in (1, 1 if hsf else 0, 1, 1):    # b_substreams_present, b_hsf_ext,
         w.put(value, 1)                 # b_single_substream, b_channel_coded
     w.put(code, width)                  # channel_mode
     if code in IMMERSIVE_CODES:
         w.put(rng.randrange(2), 1)      # b_4_back_channels_present
         w.put(rng.randrange(2), 1)      # b_centre_present
         w.put(rng.randrange(4), 2)      # top_channels_present
-    w.put(0, 1)                         # b_sf_multiplier
+    w.put(1 if hsf else 0, 1)           # b_sf_multiplier
+    if hsf:
+        w.put(rng.randrange(2), 1)      # sf_multiplier: 96 or 192 kHz
     w.put(0, 1)                         # b_bitrate_info
     if code in (0b1111010, 0b1111011, 0b1111100, 0b1111101):
         w.put(rng.randrange(2), 1)      # add_ch_base
@@ -219,10 +232,13 @@ def synthetic(rng):
         # I-frame, the rest do not, which is the shape 4.3.3.2.7 describes.
         w.put(1 if i == 0 else 0, 1)
     w.put(0, 2)                         # substream_index 0
+    if hsf:
+        w.put(1, 2)                     # ac4_hsf_ext_substream_info(): substream_index 1
     w.put(0, 1)                         # b_content_type
     audio_lens = [rng.randint(16, 900) for _ in range(factor)]
+    ext_lens = [rng.randint(2, 300)] if hsf else []
     pres_len = rng.randint(4, 120)
-    sizes = [*audio_lens, pres_len]
+    sizes = [*audio_lens, *ext_lens, pres_len]
     if len(sizes) <= 3:
         w.put(len(sizes), 2)            # n_substreams
     else:
@@ -238,6 +254,8 @@ def synthetic(rng):
         audio[0] = audio_size >> 7                  # audio_size_value, then
         audio[1] = (audio_size << 1) & 0xFE         # b_more_bits 0
         payload += audio
+    for ext_len in ext_lens:
+        payload += bytes(rng.getrandbits(8) for _ in range(ext_len))
     payload += bytes(rng.getrandbits(8) for _ in range(pres_len))
     return w.to_bytes() + bytes(payload)
 
@@ -624,6 +642,8 @@ def main():
         print(f"{len(inputs)} inputs copied to {cases}")
     else:
         streams = sorted((REPO / "tests" / "golden" / "external-baseline").glob("ac4-*/*.ac4"))
+        # The constructed streams at 96 and 192 kHz, whose extension substreams the mutations reach.
+        streams += sorted((REPO / "tests" / "golden" / "ac4-hsf").glob("*.ac4"))
         for directory in args.streams:
             streams += sorted(directory.rglob("*.ac4"))
         count = generate(streams, cases, args.mutations, args.synthetic, args.seed)

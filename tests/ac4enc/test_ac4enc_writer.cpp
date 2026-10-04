@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include <catch2/catch_test_macros.hpp>
@@ -318,4 +319,70 @@ TEST_CASE(
     CHECK(without.bytes() == against_zeros.bytes());
     CHECK(without.bit_position() >
           3);  // b_de_data_present, b_de_config_flag, de_keep_data_flag, the codes
+}
+TEST_CASE("the table of contents writer codes the 9.X.4 and 22.2 channel modes of Part 2 Table 56",
+          "[ac4enc][writer][fronts]") {
+    // 9.0.4 and 9.1.4 are nine-bit codes 0b111111100 and 0b111111101 and name the channels their
+    // source has (clause 6.2.1.8); 22.2 is 0b111111110 and names none.
+    const std::array<std::pair<int, const char*>, 5> modes = {{{11, "7.0.4"}, {12, "7.1.4"}, {13, "9.0.4"},
+                                                               {14, "9.1.4"}, {15, "22.2"}}};
+    for (const auto& [mode, name] : modes) {
+        for (const int tops : {1, 2, 3}) {
+            CAPTURE(mode, name, tops);
+            iclforge::ac4::detail::FrameFields fields;
+            fields.ch_mode = mode;
+            fields.top_channels_present = tops;
+            fields.b_4_back_channels_present = tops != 2;
+            fields.b_centre_present = tops != 1;
+            BitWriter audio = BitWriter::buffered();
+            audio.write(8, 0, "padding");
+            const auto sink = [](const iclforge::ac4::SyntaxRecord&) {};
+            const auto frame = iclforge::ac4::detail::write_frame(fields, audio, 0, sink);
+            REQUIRE(frame.has_value());
+            const auto parsed = iclforge::ac4::parse_raw_frame(*frame);
+            REQUIRE(parsed.has_value());
+            const auto& chan = parsed->toc.substream_groups.at(0).substreams.at(0).chan;
+            REQUIRE(chan.has_value());
+            CHECK(chan->ch_mode == mode);
+            CHECK(chan->channel_mode_name == name);
+            CHECK(chan->channel_mode == (mode == 15 ? 0b111111110 : mode >= 13 ? 0b111111100 + (mode - 13) : 0b11111100 + (mode - 11)));
+            if (mode != 15) {
+                REQUIRE(chan->original_content.has_value());
+                CHECK(chan->original_content->top_channels_present == tops);
+                CHECK(chan->original_content->b_4_back_channels_present == (tops != 2));
+                CHECK(chan->original_content->b_centre_present == (tops != 1));
+            }
+        }
+    }
+}
+
+TEST_CASE("dialogue enhancement of the 9.X.4 modes sends b_de_simulcast and a second de_data()",
+          "[ac4enc][writer][fronts]") {
+    // Part 2 clause 6.2.7.5: after de_data(), ch_mode 13 and 14 send b_de_simulcast, and with it
+    // a second de_data() for core decoding; the other modes send neither.
+    using iclforge::ac4::detail::DeConfigCodes;
+    using iclforge::ac4::detail::DeFrameParameters;
+    const DeConfigCodes config{
+        .method = 0, .max_gain = 2, .channel_config = 1, .mid = false, .signal_contribution = 0};
+    DeFrameParameters frame;
+    frame.par[0] = {3, 2, 1, 0, 1, 2, 3, 2};
+    DeFrameParameters core;
+    core.par[0] = {5, 5, 4, 4, 3, 3, 2, 2};
+    const auto bits = [&](int ch_mode, const DeFrameParameters* second) {
+        BitWriter w = BitWriter::buffered();
+        iclforge::ac4::detail::write_dialog_enhancement(w, &config, &frame, nullptr, true, ch_mode, second);
+        return w.bit_position();
+    };
+    const std::size_t plain = bits(12, nullptr);
+    CHECK(bits(12, &core) == plain);                // 7.X.4 has no b_de_simulcast
+    CHECK(bits(13, nullptr) == plain + 1);          // 9.0.4: the flag alone
+    CHECK(bits(14, nullptr) == plain + 1);
+    CHECK(bits(13, &core) > plain + 1);             // and the second de_data()
+    // With no channel to enhance the flag is still sent.
+    const DeConfigCodes none{.method = 0, .max_gain = 2, .channel_config = 0};
+    BitWriter w = BitWriter::buffered();
+    iclforge::ac4::detail::write_dialog_enhancement(w, &none, &frame, nullptr, true, 14, nullptr);
+    BitWriter without = BitWriter::buffered();
+    iclforge::ac4::detail::write_dialog_enhancement(without, &none, &frame, nullptr, true, 12, nullptr);
+    CHECK(w.bit_position() == without.bit_position() + 1);
 }

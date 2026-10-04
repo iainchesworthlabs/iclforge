@@ -19,14 +19,17 @@
 namespace iclforge::ac4::detail {
 
 // Clause 5.3.3 on one frame of the IMDCT's output, in place, for an immersive
-// element in `codec_mode` (an immersive_mode value): time[c] is the channel
-// speakers[c] names. In full decoding (Table 23) L, R and C are c_gain times A'',
-// B'' and C'', and each coupled pair (Ls, Lb), (Rs, Rb), (Tfl, Tbl) and (Tfr,
-// Tbr) is m_gain (D'' + H'', D'' - H''); in core decoding (Table 24) every
-// channel but the LFE is c_gain times its signal. c_gain is 2 in SCPL and 1 in
-// ASPX_SCPL, m_gain the square root of 2 and 1. Nothing in the other modes.
-void apply_scpl(int codec_mode, DecodingMode decoding, std::span<const Speaker> speakers,
-                std::span<std::vector<Real>> time);
+// element in `codec_mode` (an immersive_mode value), with b_5fronts where
+// `fronts`: time[c] is the channel speakers[c] names. In full decoding (Table 23)
+// L, R and C are c_gain times A'', B'' and C'', and each coupled pair (Ls, Lb),
+// (Rs, Rb), (Tfl, Tbl) and (Tfr, Tbr) is m_gain (D'' + H'', D'' - H''); with
+// b_5fronts only C is c_gain times its signal, and (L, Lscr) and (R, Rscr) are
+// (A'' + L'', A'' - L'') and (B'' + M'', B'' - M''), L'' and M'' being held in
+// Lscr and Rscr. In core decoding (Table 24) every channel but the LFE is
+// c_gain times its signal. c_gain is 2 in SCPL and 1 in ASPX_SCPL, m_gain the
+// square root of 2 and 1. Nothing in the other modes.
+void apply_scpl(int codec_mode, DecodingMode decoding, bool fronts,
+                std::span<const Speaker> speakers, std::span<std::vector<Real>> time);
 
 // The gains the immersive element's QMF domain applies to one channel after
 // A-SPX, in its subbands below the sbx of the A-SPX data that carried it and
@@ -38,18 +41,21 @@ struct BandGains {
 
 // For a channel `speaker` of an immersive element in `codec_mode`:
 //
-//   full decoding, ASPX_SCPL     Table 10: 2 for L, R and C, the square root of
-//                                2 for the coupled pairs;
+//   full decoding, ASPX_SCPL     Tables 10 and 11: 2 for C, and for L and R but
+//                                with b_5fronts, 1 for those and for Lscr and
+//                                Rscr; the square root of 2 for the coupled
+//                                pairs;
 //   core decoding, ASPX_SCPL     clause 4.8.3.11.2: 2 for every channel A-SPX
 //                                makes, and in the subbands from sbx of Ls, Rs,
-//                                Tsl and Tsr (Table 9) the post-processing's
-//                                0.841395 (-1.5 dB) as well;
+//                                Tsl and Tsr, and with b_5fronts L and R (Table
+//                                9), the post-processing's 0.841395 (-1.5 dB)
+//                                as well;
 //   core decoding, ASPX_ACPL_1   clause 4.8.3.14: 2 for every channel but the
 //   and ASPX_ACPL_2              LFE, in place of A-CPL;
 //
 // and 1 elsewhere: full decoding's A-CPL (pcm/acpl.hpp) and A-JCC apply their
 // own.
-[[nodiscard]] BandGains immersive_gains(int codec_mode, DecodingMode decoding,
+[[nodiscard]] BandGains immersive_gains(int codec_mode, DecodingMode decoding, bool fronts,
                                         Speaker speaker) noexcept;
 
 // `gains` on `num_ts` slots of `matrix`, subbands below `sbx` and from it.

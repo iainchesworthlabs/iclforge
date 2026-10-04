@@ -1,0 +1,14 @@
+# ac4-syntax-digest/1 ../ac4-hsf/stereo-192-sap1-switched.ac4
+# frame	substream	kind	records	end_bit	crc32
+0	0	audio	548	1990	0x1d114b3d
+0	1	hsf_ext	885	4001	0xf665aca3
+0	2	presentation	7	17	0xc6b2acd5
+1	0	audio	546	2006	0x95b4da75
+1	1	hsf_ext	889	4036	0x97723ab0
+1	2	presentation	7	17	0xc6b2acd5
+2	0	audio	550	2022	0xda725a5b
+2	1	hsf_ext	885	4009	0x3180cbd2
+2	2	presentation	7	17	0xc6b2acd5
+3	0	audio	542	1982	0x93b84afd
+3	1	hsf_ext	885	4001	0x170d2bfd
+3	2	presentation	7	17	0xc6b2acd5

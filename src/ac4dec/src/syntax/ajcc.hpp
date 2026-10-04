@@ -9,8 +9,8 @@
 
 // Advanced joint channel coding (A-JCC) syntax: ETSI TS 103 190-2 V1.3.1
 // clause 6.2.6, semantics 6.3.7, for the immersive channel element of the
-// 7.X.4 channel modes. Those pass b_5fronts 0 (6.2.3.1); the 9.X.4 modes, which
-// pass 1, are refused before the element is read.
+// 7.X.4 channel modes, which pass b_5fronts 0 (6.2.3.1), and the 9.X.4 modes,
+// which pass 1.
 //
 // Nothing is dequantised: parameter values stay Huffman codebook indices,
 // before cb_off, with the diff_type that says how clause 5.6.3.2 decodes them,
@@ -20,6 +20,11 @@ namespace iclforge::ac4::detail {
 
 inline constexpr int kAjccMaxParamBands = 15;  // Part 2 Table 83
 inline constexpr int kAjccMaxParamSets = 2;    // Part 2 Table 90
+// The framings and parameters ajcc_data() sends at most, with b_5fronts: four
+// ajcc_framing_data() (lf, rf, lb, rb), eight dry and twelve wet parameters.
+inline constexpr std::size_t kAjccMaxFramings = 4;
+inline constexpr std::size_t kAjccMaxDry = 8;
+inline constexpr std::size_t kAjccMaxWet = 12;
 
 // The arguments of get_ajcc_hcb() (Part 2 Pseudocode 29).
 enum class AjccDataType : std::uint8_t { kAlpha, kBeta, kDry, kWet };
@@ -50,23 +55,38 @@ struct AjccParams {
     std::array<AjccParamSet, kAjccMaxParamSets> sets{};
 };
 
-// ajcc_data(0), 6.2.6.1.
+// ajcc_data(b_5fronts), 6.2.6.1.
+//
+// Without b_5fronts: ajcc_core_mode, ajcc_qm_ab and ajcc_qm_dw, the framing of
+// the left and right modules, and alpha1, alpha2, beta1, beta2, dry1 to dry4
+// and wet1 to wet6.
+// With it: ajcc_qm_f and ajcc_qm_b, the framing of the left front, right
+// front, left back and right back modules, and dry1f to dry4f, dry1b to dry4b,
+// wet1f to wet6f and wet1b to wet6b, which are no alpha or beta.
 struct AjccData {
+    bool b_5fronts = false;
     bool b_no_dt = false;
     std::uint8_t num_param_bands_id = 0;
     std::uint8_t num_bands = 15;  // Table 83
     std::uint8_t core_mode = 0;   // Table 84: 0 the core is L R C Ls Rs, 1 L R C Tfl Tfr
     std::uint8_t qm_ab = 0;       // Table 87
     std::uint8_t qm_dw = 0;       // Table 88
-    // ajcc_nps_l's and ajcc_nps_r's framing data, in that order.
-    std::array<AjccFraming, 2> framing{};
+    std::uint8_t qm_f = 0;        // Table 85, with b_5fronts
+    std::uint8_t qm_b = 0;        // Table 86, with b_5fronts
+    // ajcc_nps_l's and ajcc_nps_r's framing data, in that order; with b_5fronts
+    // ajcc_nps_lf's, _rf's, _lb's and _rb's.
+    std::array<AjccFraming, kAjccMaxFramings> framing{};
     std::array<AjccParams, 2> alpha{};  // ajcc_alpha1 (L), ajcc_alpha2 (R)
     std::array<AjccParams, 2> beta{};   // ajcc_beta1, ajcc_beta2
-    std::array<AjccParams, 4> dry{};    // ajcc_dry1 to ajcc_dry4: 1 and 2 L's, 3 and 4 R's
-    std::array<AjccParams, 6> wet{};    // ajcc_wet1 to ajcc_wet6: 1 to 3 L's, 4 to 6 R's
+    // ajcc_dry1 to ajcc_dry4: 1 and 2 L's, 3 and 4 R's; with b_5fronts dry1f to
+    // dry4f (1 and 2 lf's, 3 and 4 rf's), then dry1b to dry4b (lb's, rb's).
+    std::array<AjccParams, kAjccMaxDry> dry{};
+    // ajcc_wet1 to ajcc_wet6: 1 to 3 L's, 4 to 6 R's; with b_5fronts wet1f to
+    // wet6f (1 to 3 lf's, 4 to 6 rf's), then wet1b to wet6b (lb's, rb's).
+    std::array<AjccParams, kAjccMaxWet> wet{};
 };
 
-[[nodiscard]] ParseResult parse_ajcc_data(BitReader& r, AjccData& out);
+[[nodiscard]] ParseResult parse_ajcc_data(BitReader& r, bool b_5fronts, AjccData& out);
 
 // get_ajcc_hcb(), Pseudocode 29: alpha and beta take A-CPL's codebooks (Part 1
 // Annex A.3), dry and wet A-JCC's (Part 2 Annex A.1.2). quant_mode 0 is FINE,

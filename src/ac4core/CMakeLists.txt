@@ -45,7 +45,8 @@ target_sources(iclforge_ac4core
         src/tables/isf_tables.cpp
         src/tables/noise_tables.cpp
         src/tables/qmf_tables.cpp
-        src/tables/sfb_tables.cpp)
+        src/tables/sfb_tables.cpp
+        src/tables/ssf_tables.cpp)
 
 target_include_directories(iclforge_ac4core
     PUBLIC

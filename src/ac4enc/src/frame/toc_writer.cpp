@@ -91,8 +91,14 @@ void write_presentation_v1_info(BitWriter& w, const TocLayout& layout, const Toc
     if (index <= 4 || (index >= 7 && index <= 9)) {
         w.write(1, 0, "b_multiplier");
     }
+    // 6.2.1.4: indices 5 to 9 send b_frame_rate_fraction when frame_rate_factor is 1, as it is
+    // here; 10 to 12 send it, and b_frame_rate_fraction_is_4 after it when it is set.
     if (index >= 5 && index <= 12) {
-        w.write(1, 0, "b_frame_rate_fraction");
+        const bool fraction = layout.frame_rate_fraction > 1;
+        w.write(1, fraction ? 1U : 0U, "b_frame_rate_fraction");
+        if (fraction && index >= 10) {
+            w.write(1, layout.frame_rate_fraction == 4 ? 1U : 0U, "b_frame_rate_fraction_is_4");
+        }
     }
     write_emdf_info(w, p.emdf_substream);
     w.write(1, p.enable ? 1U : 0U, "b_presentation_filter");
@@ -124,8 +130,10 @@ void write_presentation_v1_info(BitWriter& w, const TocLayout& layout, const Toc
 }
 
 // Table 56's channel_mode code: 0b0 mono, 0b10 stereo, 0b1100 to 0b1110 3.0,
-// 5.0 and 5.1, 0b1111000 to 0b1111101 the 7.X modes, and 0b11111100 and
-// 0b11111101 7.0.4 and 7.1.4, which name the channels their source has.
+// 5.0 and 5.1, 0b1111000 to 0b1111101 the 7.X modes, 0b11111100 and
+// 0b11111101 7.0.4 and 7.1.4 and 0b111111100 and 0b111111101 9.0.4 and 9.1.4,
+// which name the channels their source has, and 0b111111110 22.2, which names
+// none (clause 6.2.1.8 sends those fields for 7.X.4 and 9.X.4 alone).
 void write_channel_mode(BitWriter& w, const TocSubstream& s) {
     const int ch_mode = s.ch_mode;
     if (ch_mode == 0) {
@@ -136,8 +144,14 @@ void write_channel_mode(BitWriter& w, const TocSubstream& s) {
         w.write(4, 0b1100U + static_cast<unsigned>(ch_mode - 2), "channel_mode");
     } else if (ch_mode <= 10) {
         w.write(7, 0b1111000U + static_cast<unsigned>(ch_mode - 5), "channel_mode");
+    } else if (ch_mode == 15) {
+        w.write(9, 0b111111110U, "channel_mode");
     } else {
-        w.write(8, 0b11111100U + static_cast<unsigned>(ch_mode - 11), "channel_mode");
+        if (ch_mode >= 13) {
+            w.write(9, 0b111111100U + static_cast<unsigned>(ch_mode - 13), "channel_mode");
+        } else {
+            w.write(8, 0b11111100U + static_cast<unsigned>(ch_mode - 11), "channel_mode");
+        }
         w.write(1, s.b_4_back_channels_present ? 1U : 0U, "b_4_back_channels_present");
         w.write(1, s.b_centre_present ? 1U : 0U, "b_centre_present");
         w.write(2, static_cast<std::uint64_t>(s.top_channels_present), "top_channels_present");
@@ -343,6 +357,13 @@ void write_substream_index_table(BitWriter& w, std::span<const std::size_t> size
     if (layout.presentations.empty() || layout.groups.empty()) {
         return false;
     }
+    // 6.2.1.4: a fraction of 2 is sent at frame_rate_index 5 to 12, one of 4 at 10 to 12.
+    const int fraction = layout.frame_rate_fraction;
+    if (fraction != 1 &&
+        !((fraction == 2 || fraction == 4) && layout.frame_rate_index >= 5 &&
+          layout.frame_rate_index <= 12 && (fraction == 2 || layout.frame_rate_index >= 10))) {
+        return false;
+    }
     std::vector<bool> named(layout.groups.size(), false);
     const auto names_substream = [count](int index) {
         return index >= 0 && static_cast<std::size_t>(index) < count;
@@ -399,7 +420,7 @@ void write_substream_index_table(BitWriter& w, std::span<const std::size_t> size
             }
         }
         for (const TocSubstream& s : g.substreams) {
-            if (s.ch_mode < 0 || s.ch_mode > 12 || s.top_channels_present < 0 ||
+            if (s.ch_mode < 0 || s.ch_mode > 15 || s.top_channels_present < 0 ||
                 s.top_channels_present > 3 || s.substream_index < 0 ||
                 static_cast<std::size_t>(s.substream_index) >= count) {
                 return false;

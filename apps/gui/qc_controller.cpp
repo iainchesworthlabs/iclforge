@@ -315,6 +315,15 @@ std::optional<RawResult> measure_ac4(std::span<const std::byte> stream,
         }
         const iclforge::ac4::DecodedFrame& pcm = **decoded;
         if (!meter) {
+            if (pcm.sample_rate_hz != 44100 && pcm.sample_rate_hz != 48000) {
+                // The loudness meter's K-weighting is derived for 32, 44.1 and 48 kHz only, and a
+                // stream with an HSF extension decodes at 96 or 192 kHz.
+                error = QStringLiteral(
+                            "This AC-4 stream decodes at %1 Hz, and the loudness meter is made for "
+                            "44.1 and 48 kHz only.")
+                            .arg(pcm.sample_rate_hz);
+                return std::nullopt;
+            }
             layout = pcm.speakers;
             result.sample_rate_hz = static_cast<std::uint32_t>(pcm.sample_rate_hz);
             result.presentation = pcm.presentation;

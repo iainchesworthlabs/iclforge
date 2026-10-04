@@ -57,10 +57,13 @@ constexpr double kPowerFloor = 1e-15;
 }
 
 // BS.1770's channel weights: 1.41 at the sides (60 to 120 degrees), none for
-// the LFE, 1 elsewhere.
+// the LFE, 1 elsewhere. 22.2's second LFE has none either; the one place
+// kLfe2 is a label for a fullband signal (a var_channel_element()'s sixteenth)
+// never reaches this tool, which object audio does not use.
 [[nodiscard]] double loudness_weight(Speaker speaker) noexcept {
     switch (speaker) {
         case Speaker::kLfe:
+        case Speaker::kLfe2:
             return 0.0;
         case Speaker::kLeftSurround:
         case Speaker::kRightSurround:
@@ -76,7 +79,9 @@ constexpr double kPowerFloor = 1e-15;
 // joins group 0 or 2 by add_ch_base, and the back pair is always group 2. The
 // immersive element's top channels are Part 2 Table 69's fourth group, and so
 // are core decoding's Tsl and Tsr, which carry them (src/ac4dec/ERRATA.md,
-// "DRC's groups in core decoding").
+// "DRC's groups in core decoding"). Part 2 Table 69's 22.2 row puts Bfl, Bfr,
+// Bfc and Cb in its third group and Tsl, Tsr, Tfc, Tbc and Tc in its fourth;
+// its first group's LFE, LFE2, Lw and Rw are what the default gives group 0.
 [[nodiscard]] int drc_group(Speaker speaker, bool add_ch_base, bool mono_or_stereo,
                             bool immersive) noexcept {
     if (mono_or_stereo) {
@@ -90,7 +95,15 @@ constexpr double kPowerFloor = 1e-15;
             case Speaker::kTopBackRight:
             case Speaker::kTopSideLeft:
             case Speaker::kTopSideRight:
+            case Speaker::kTopFrontCentre:
+            case Speaker::kTopBackCentre:
+            case Speaker::kTopCentre:
                 return 3;
+            case Speaker::kBottomFrontLeft:
+            case Speaker::kBottomFrontRight:
+            case Speaker::kBottomFrontCentre:
+            case Speaker::kCentreBack:
+                return 2;
             default:
                 break;
         }
