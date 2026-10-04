@@ -29,7 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _header_gen import wrap, write_or_check  # noqa: E402
+from _header_gen import wrap, write_or_check
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 SOURCE = REPO_ROOT / "src" / "ac4core" / "src" / "tables" / "qmf_tables.cpp"
@@ -113,7 +113,13 @@ def render() -> str:
 
 
 def main() -> int:
-    return write_or_check(__doc__.split("\n\n")[0], render, HEADER, REPO_ROOT, "tools/generators/gen_ac4_fixed_tables.py")
+    return write_or_check(
+        __doc__.split("\n\n")[0],
+        render,
+        HEADER,
+        REPO_ROOT,
+        "tools/generators/gen_ac4_fixed_tables.py",
+    )
 
 
 if __name__ == "__main__":

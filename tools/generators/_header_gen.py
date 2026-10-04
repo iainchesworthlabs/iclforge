@@ -26,7 +26,7 @@ def wrap(items: list[str], indent: str = "    ", width: int = 100) -> list[str]:
 
 def write_or_check(description: str, render: Callable[[], str], header: Path, repo_root: Path,
                    script: str) -> int:
-    """Write `render()` to `header`, or with --check fail when the header is not what it would write."""
+    """Write `render()` to `header`, or with --check fail when the header is not what it writes."""
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
         "--check", action="store_true", help="fail when the header is not what this would write"

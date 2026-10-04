@@ -12,7 +12,8 @@ Metrics, and the probe line each reads:
     s3_internal_peak          <fixture>.esp32s3.internal_peak_bytes
 
 Usage:
-    check_probe_ceilings.py --table <ceilings.json> --metric <metric> [--title <annotation title>] <run.txt>
+    check_probe_ceilings.py --table <ceilings.json> --metric <metric>
+                            [--title <annotation title>] <run.txt>
 
 Exits non-zero when a fixture is over its ceiling, when a fixture has no entry for the
 metric, or when the run printed none of the metric's lines.
@@ -26,19 +27,19 @@ import re
 import sys
 from pathlib import Path
 
-# metric -> (the key the probe prints after the fixture's name, what the line is called)
+# metric -> (the key the probe prints after the fixture's name, what the value is called, its unit)
 METRICS = {
-    "peak_heap": (r"\.peak_bytes", "peak heap", "bytes"),
-    "steady_allocs_per_frame": (r"\.steady_allocs_per_frame", "churn", "allocations/frame"),
-    "s3_internal_peak": (r"\.esp32s3\.internal_peak_bytes", "internal RAM", "bytes"),
+    "peak_heap": ("peak_bytes", "peak heap", "bytes"),
+    "steady_allocs_per_frame": ("steady_allocs_per_frame", "churn", "allocations/frame"),
+    "s3_internal_peak": ("esp32s3.internal_peak_bytes", "internal RAM", "bytes"),
 }
 
 
 def values_of_run(text: str, metric: str) -> dict[str, int]:
     """Each fixture's value of the metric, in the order the run printed them."""
-    key = METRICS[metric][0]
+    key = re.escape(METRICS[metric][0])
     found: dict[str, int] = {}
-    for fixture, value in re.findall(rf"\b(ac4_[a-z0-9_]+){key}=(\d+)", text):
+    for fixture, value in re.findall(rf"\b(ac4_[a-z0-9_]+)\.{key}=(\d+)", text):
         found[fixture] = int(value)
     return found
 
@@ -65,8 +66,11 @@ def check(values: dict[str, int], ceilings: dict[str, int], metric: str, title: 
             continue
         print(f"{label}: {fixture} = {value} {unit} (ceiling {ceiling})")
         if value > ceiling:
-            print(f"::error title={title}::{fixture}'s {label} is {value} {unit}, ceiling is {ceiling}",
-                  file=sys.stderr)
+            print(
+                f"::error title={title}::{fixture}'s {label} is {value} {unit}, "
+                f"ceiling is {ceiling}",
+                file=sys.stderr,
+            )
             ok = False
     return ok
 
@@ -81,8 +85,10 @@ def main(argv: list[str] | None = None) -> int:
 
     values = values_of_run(args.run.read_text(encoding="utf-8", errors="replace"), args.metric)
     if not values:
-        print(f"error: the probe reported no <fixture>{METRICS[args.metric][0].replace(chr(92), '')} "
-              f"line in {args.run}", file=sys.stderr)
+        print(
+            f"error: the probe reported no <fixture>.{METRICS[args.metric][0]} line in {args.run}",
+            file=sys.stderr,
+        )
         return 1
     ceilings = ceilings_of_table(args.table, args.metric)
     return 0 if check(values, ceilings, args.metric, args.title, args.table.name) else 1

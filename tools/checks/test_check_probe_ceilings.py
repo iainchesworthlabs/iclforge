@@ -21,8 +21,16 @@ import check_probe_ceilings as cpc
 
 TABLE = {
     "fixtures": {
-        "ac4_20_music": {"peak_heap": 325000, "steady_allocs_per_frame": 58, "s3_internal_peak": 6000},
-        "ac4_51_music": {"peak_heap": 795000, "steady_allocs_per_frame": 168, "s3_internal_peak": 14000},
+        "ac4_20_music": {
+            "peak_heap": 325000,
+            "steady_allocs_per_frame": 58,
+            "s3_internal_peak": 6000,
+        },
+        "ac4_51_music": {
+            "peak_heap": 795000,
+            "steady_allocs_per_frame": 168,
+            "s3_internal_peak": 14000,
+        },
     }
 }
 # A probe prints several key=value pairs on one line.
@@ -67,13 +75,15 @@ class ProbeCeilings(unittest.TestCase):
         self.assertNotIn("heap = ", out)
 
     def test_a_value_over_its_ceiling_fails(self):
-        rc, _, err = self.run_check("peak_heap", RUN.replace("ac4_20_music.peak_bytes=295225", "ac4_20_music.peak_bytes=325001"))
+        over = RUN.replace("ac4_20_music.peak_bytes=295225", "ac4_20_music.peak_bytes=325001")
+        rc, _, err = self.run_check("peak_heap", over)
         self.assertEqual(rc, 1)
         self.assertIn("ac4_20_music", err)
         self.assertIn("ceiling is 325000", err)
 
     def test_a_value_at_its_ceiling_passes(self):
-        rc, _, _ = self.run_check("steady_allocs_per_frame", RUN.replace("steady_allocs_per_frame=55", "steady_allocs_per_frame=58"))
+        at = RUN.replace("steady_allocs_per_frame=55", "steady_allocs_per_frame=58")
+        rc, _, _ = self.run_check("steady_allocs_per_frame", at)
         self.assertEqual(rc, 0)
 
     def test_a_fixture_without_an_entry_fails(self):
@@ -87,12 +97,20 @@ class ProbeCeilings(unittest.TestCase):
         self.assertIn("reported no", err)
 
     def test_the_title_is_the_callers(self):
-        rc, _, err = self.run_check("peak_heap", RUN.replace("704311 ac4_51_music.stack", "800000 ac4_51_music.stack"))
+        over = RUN.replace("704311 ac4_51_music.stack", "800000 ac4_51_music.stack")
+        rc, _, err = self.run_check("peak_heap", over)
         self.assertEqual(rc, 1)
         self.assertIn("title=Footprint regression", err)
         run = self.dir / "run.txt"
         with contextlib.redirect_stderr(io.StringIO()) as e:
-            cpc.main(["--table", str(self.table), "--metric", "peak_heap", "--title", "ESP32-S3 footprint regression", str(run)])
+            cpc.main(
+                [
+                    "--table", str(self.table),
+                    "--metric", "peak_heap",
+                    "--title", "ESP32-S3 footprint regression",
+                    str(run),
+                ]
+            )
         self.assertIn("title=ESP32-S3 footprint regression", e.getvalue())
 
     def test_the_committed_table_has_every_metric_for_every_fixture(self):
