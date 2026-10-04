@@ -122,13 +122,7 @@ template <typename Real>
     } else if (shift < 63) {
         raw = (product + (std::int64_t{1} << static_cast<unsigned>(shift - 1))) >> static_cast<unsigned>(shift);
     }
-    if (raw > std::numeric_limits<std::int32_t>::max()) {
-        return Fixed32::from_raw(std::numeric_limits<std::int32_t>::max());
-    }
-    if (raw < std::numeric_limits<std::int32_t>::min()) {
-        return Fixed32::from_raw(std::numeric_limits<std::int32_t>::min());
-    }
-    return Fixed32::from_raw(static_cast<std::int32_t>(raw));
+    return Fixed32::from_raw_saturated(raw);
 }
 
 template <typename Real>

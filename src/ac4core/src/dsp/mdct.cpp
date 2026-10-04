@@ -110,7 +110,7 @@ void Imdct<Real>::inverse(std::span<const Real> spectrum, int exponent, std::spa
             return;
         }
         // The largest line into [2^26, 2^27), [4, 8) in Q7.24: then |Z[k]| < 8 sqrt(2).
-        const int up = 27 - (32 - std::countl_zero(largest));
+        const int up = 27 - static_cast<int>(std::bit_width(largest));
         const auto line = [&](std::size_t k) { return spectrum[k].scaled_by_pow2(up); };
         for (std::size_t k = 0; k < half; ++k) {
             z[k] = Complex(line(n - 2 * k - 1), line(2 * k)) * pre()[k];

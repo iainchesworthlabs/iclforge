@@ -81,7 +81,7 @@ template <typename T, std::size_t N>
         const U magnitude = v < 0 ? U{0} - static_cast<U>(v) : static_cast<U>(v);
         largest = magnitude > largest ? magnitude : largest;
     }
-    return static_cast<int>(sizeof(U) * 8) - std::countl_zero(largest);
+    return static_cast<int>(std::bit_width(largest));
 }
 
 // One slot of the analysis from the delay line's ten blocks of 64 (head the newest) into 64
@@ -160,7 +160,7 @@ inline void synthesis_slot(const Complex<Fixed32>* in, Fixed32* filt, std::size_
                             : static_cast<std::uint64_t>(part);
         }
     }
-    const int bits = 64 - std::countl_zero(magnitudes);
+    const int bits = static_cast<int>(std::bit_width(magnitudes));
     if (bits == 0) {
         for (std::size_t n = 0; n < 128; ++n) {
             block_out[n] = Fixed32{};
@@ -215,11 +215,7 @@ inline void synthesis_slot(const Complex<Fixed32>* in, Fixed32* filt, std::size_
             sum += static_cast<std::int64_t>(block[2 * k + 1][64 + sb].raw) * qwin[128 * k + 64 + sb];
         }
         const std::int64_t rounded = (sum + (std::int64_t{1} << 29U)) >> 30U;
-        constexpr std::int64_t kMax = std::numeric_limits<std::int32_t>::max();
-        constexpr std::int64_t kMin = std::numeric_limits<std::int32_t>::min();
-        pcm[sb] = Fixed32::from_raw(static_cast<std::int32_t>(rounded > kMax   ? kMax
-                                                              : rounded < kMin ? kMin
-                                                                               : rounded));
+        pcm[sb] = Fixed32::from_raw_saturated(rounded);
     }
 }
 

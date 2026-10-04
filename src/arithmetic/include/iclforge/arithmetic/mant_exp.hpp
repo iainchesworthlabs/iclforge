@@ -58,7 +58,7 @@ struct MantExp {
         const bool negative = v < 0;
         std::uint64_t magnitude =
             negative ? 0U - static_cast<std::uint64_t>(v) : static_cast<std::uint64_t>(v);
-        const int bits = 64 - std::countl_zero(magnitude);
+        const int bits = static_cast<int>(std::bit_width(magnitude));
         int shift = bits - kMantissaBits;
         if (shift > 0) {
             magnitude = (magnitude + (std::uint64_t{1} << static_cast<unsigned>(shift - 1))) >>
@@ -110,14 +110,7 @@ struct MantExp {
                                            : std::numeric_limits<std::int32_t>::max());
         }
         if (shift >= 0) {
-            const std::int64_t raw = static_cast<std::int64_t>(m) << static_cast<unsigned>(shift);
-            if (raw > std::numeric_limits<std::int32_t>::max()) {
-                return Fixed32::from_raw(std::numeric_limits<std::int32_t>::max());
-            }
-            if (raw < std::numeric_limits<std::int32_t>::min()) {
-                return Fixed32::from_raw(std::numeric_limits<std::int32_t>::min());
-            }
-            return Fixed32::from_raw(static_cast<std::int32_t>(raw));
+            return Fixed32::from_raw_saturated(static_cast<std::int64_t>(m) << static_cast<unsigned>(shift));
         }
         if (shift <= -32) {
             return Fixed32{};

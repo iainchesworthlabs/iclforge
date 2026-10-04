@@ -85,6 +85,11 @@ struct Fixed32 {
         return f;
     }
 
+    // The raw value of a wider integer, saturated at the format's edges.
+    [[nodiscard]] static constexpr Fixed32 from_raw_saturated(std::int64_t r) {
+        return from_raw(saturate(r));
+    }
+
     // An integer times 2^power, exactly: what a dequantiser wants for a code
     // of up to sixteen bits that the format could not hold before the scale
     // (mantissas.hpp's asymmetric quantisers). Saturates past the format.

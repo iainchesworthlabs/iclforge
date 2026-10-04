@@ -142,7 +142,7 @@ int Fft<Real>::inverse_scaled(std::span<Complex> data, std::span<Complex> scratc
                     largest = magnitude > largest ? magnitude : largest;
                 }
             }
-            const int bits = 32 - std::countl_zero(largest);
+            const int bits = static_cast<int>(std::bit_width(largest));
             if (bits > kLimitBits) {
                 const int down = bits - kLimitBits;
                 for (std::size_t i = 0; i < length_; ++i) {
