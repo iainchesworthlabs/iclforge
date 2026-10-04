@@ -575,9 +575,11 @@ TEST_CASE("hearth ac4: the engine refuses the frames of a 22.2 presentation and 
     CHECK(played.frames == 0);
     // The renderer's own limit and the speakers it has no place for.
     using iclforge::ac4::Speaker;
-    const std::array<Speaker, 3> bottom = {Speaker::kLeft, Speaker::kRight, Speaker::kBottomFrontLeft};
+    const std::array<Speaker, 3> bottom = {Speaker::kLeft, Speaker::kRight,
+                                           Speaker::kBottomFrontLeft};
     CHECK_FALSE(iclforge::hearth::ac4_placeable(bottom));
-    const std::array<Speaker, 3> centre = {Speaker::kLeft, Speaker::kRight, Speaker::kTopFrontCentre};
+    const std::array<Speaker, 3> centre = {Speaker::kLeft, Speaker::kRight,
+                                           Speaker::kTopFrontCentre};
     CHECK(iclforge::hearth::ac4_placeable(centre));
     const std::vector<Speaker> seventeen(17, Speaker::kLeft);
     CHECK_FALSE(iclforge::hearth::ac4_placeable(seventeen));
