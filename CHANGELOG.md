@@ -29,6 +29,26 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**IAMF v2.0: object elements, Parameter Blocks, a reader, raw OBU streams and fragments**
+
+- **`iclforge::iamf` reads and writes IAMF v2.0.0.** The element graph (`model.hpp`) covers every
+  Descriptor and IA Data OBU: channel-based, scene-based and the new object-based Audio Elements,
+  Mix Presentations with rendering config, loudness and tags, Parameter Blocks of every type and
+  animation, Audio Frames with trimming, Temporal Delimiters and Metadata. `write_sequence()` and
+  `read_sequence()` are the standalone raw OBU stream; `write_isobmff()`, `read_isobmff()` and
+  `FragmentedWriter` the ISO-BMFF encapsulation as a file and as an initialization segment plus
+  movie fragments.
+- **`mux_objects()` writes object-based programs.** One or two objects per Audio Element, polar or
+  Cartesian positions animated by Parameter Blocks (a static object writes none), a Base-Advanced
+  profile Mix Presentation. `examples/iamf_objects.cpp` writes one as a file, a raw stream and
+  fragments and reads each back. `decode_pcm()` returns an element's `ipcm` audio with its trimming
+  applied.
+- **Trimming.** `AudioTrack::trim_start_samples` and `trim_end_samples` become Audio Frame trimming,
+  shorter IA Sample durations and an edit list; a program that is not a whole number of frames is
+  padded and trimmed.
+- **The Mix Presentation's rendering config follows v2.0.** `rendering_config_extension_size` now counts
+  the `num_parameters` field after it, as v2.0 defines; readers of the earlier syntax skip it.
+
 **Associated-service identification, both directions**
 
 - **MPEG-TS's `mainid`/`asvc` now read back, not just write.** `mpegts::demux`/`Reader` decode

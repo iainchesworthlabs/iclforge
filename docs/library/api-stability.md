@@ -187,7 +187,7 @@ The AC-4 inspector, decoder and encoder (`iclforge::ac4`, `iclforge::ac4dec`, `i
 [planning/ac4.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md) set, and
 the immersive layouts, core decoding and objects came as fields after the ones channel-based
 streams needed. The shared core, `iclforge::ac4core`, has no headers and so no tier. `iclforge::iamf`, the
-IAMF writer, is Experimental as a new module.
+IAMF reader and writer, is Experimental as a new module.
 
 `iclforge::adm` and `iclforge::admbridge` are a different case: also opt-in
 (`-DICLFORGE_BUILD_ADM=ON`), but consumed for real by the ADM→Atmos bridging path and stable in

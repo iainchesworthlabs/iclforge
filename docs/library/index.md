@@ -7,7 +7,7 @@ measurement. It links five libraries that know no codec: `iclforge::base`, `iclf
 `iclforge::objects`, `iclforge::render` and `iclforge::iec61937`. AC-4 has libraries of its own
 beside it, which share no code with it ([AC-4](ac4.md)).
 
-Other targets provide container writing, IAB and ADM/BW64 reading, IAMF writing, object signing,
+Other targets provide container writing, IAB and ADM/BW64 reading, IAMF reading and writing, object signing,
 platform audio, and AC-4 decoding and encoding. Build and linkage requirements differ by target.
 [Capabilities](capabilities.md) lists supported formats and limits;
 [Development status](development-status.md) is the compact done / partial / not-started companion.
@@ -33,7 +33,7 @@ main codec headers are under `src/ac3/include/iclforge/ac3/`, and the AC-4 heade
 | `iclforge::matroska`, `iclforge::mp4`, `iclforge::mpegts` | Container writers |
 | `iclforge::signing` | EMDF object signing; see [Object signing](signing.md) |
 | `iclforge::iab` | SMPTE ST 2098-2 IAB reading; see [IAB](iab.md) |
-| `iclforge::iamf` | IAMF OBU and ISOBMFF writing; see [IAMF](iamf.md) |
+| `iclforge::iamf` | IAMF reading and writing, as OBUs, ISO-BMFF and fragments; see [IAMF](iamf.md) |
 | `iclforge::adm` | ADM/BW64 reading and writing; opt-in with `ICLFORGE_BUILD_ADM=ON` |
 | `iclforge::admbridge` | Mapping between ADM objects and the Atmos encoder or decoder |
 | `iclforge::ac4dec` | AC-4 decoding; see [AC-4](ac4.md) |
@@ -251,9 +251,9 @@ re-synced by hand and can drift. Each page's "Full program" link is the canonica
   parser (opt-in, `-DICLFORGE_BUILD_ADM=ON`).
 - [ADM → Atmos bridging](adm-bridge.md) — `iclforge::admbridge`, mapping the parsed ADM graph onto
   `iclforge::ac3::oba::AtmosEncoder` (same opt-in flag).
-- [IAMF writing](iamf.md) — `iclforge::iamf`, a standalone writer re-wrapping a decoded 7.1.4
-  programme as a channel-based IAMF Audio Element in IAMF's own ISO-BMFF encapsulation (on by
-  default).
+- [IAMF](iamf.md) — `iclforge::iamf`, a standalone reader and writer: a decoded 7.1.4 programme
+  re-wrapped as a channel-based IAMF Audio Element, object-based Audio Elements with animated
+  positions, ISO-BMFF, raw OBU streams and fragments (on by default).
 - [AC-4](ac4.md) — `iclforge::ac4dec`, `iclforge::ac4enc` and the inspector both work through,
   `iclforge::ac4`: the decoder's controls, the choice of presentation and what the decoder reports; the
   encoder's configuration, substreams and presentations; and linking (on by default).

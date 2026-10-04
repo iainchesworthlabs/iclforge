@@ -24,7 +24,7 @@ carry a note about an oracle gap, an intentional `auto` exclusion, or an interop
 those details live in [Capabilities](capabilities.md) and [Validation](../verification.md).
 
 The tables below were cross-checked against the cited standards (A/52 / TS 102 366 including
-Annexes D–H and F, TS 103 420, TS 103 190-1/-2, ST 2098-2, BS.2076 / BS.2088, IAMF v1.1.0, and
+Annexes D–H and F, TS 103 420, TS 103 190-1/-2, ST 2098-2, BS.2076 / BS.2088, IAMF v2.0.0, and
 the carriage specs wired in-tree). Open gaps against those texts are collected again under
 [Standards cross-check](#standards-cross-check).
 
@@ -225,14 +225,16 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 
 | Category | Feature | Status | Priority | Criticality | Notes |
 |---|---|---|---|---|---|
-| **Writer** | Channel-based 7.1.4 LPCM (v1.1.0) | 🟢 | Medium | Important | ISO-BMFF encapsulation |
-| | IA Sequence / Codec Config / Audio Element / Mix Presentation | 🟢 | Medium | Important | Simple Profile |
+| **Writer** | Channel-based 7.1.4 LPCM | 🟢 | Medium | Important | ISO-BMFF encapsulation |
+| | IA Sequence / Codec Config / Audio Element / Mix Presentation | 🟢 | Medium | Important | All three element types, Opus / AAC-LC / FLAC as carried bytes; FFmpeg 7.0.2 reads the channel-based output |
 | | E-AC-3 decode → IAMF round trip | 🟢 | Medium | Important | `examples/mux_iamf.cpp` |
-| | Parameter Block / Temporal Delimiter / trimming OBUs | 🔴 | Low | Nice-to-have | Not required for static 7.1.4; not written |
-| | Object-based audio elements | 🔴 | Low | Nice-to-have | Waits on IAMF v2.0 final |
-| | OBU / file reader | 🔴 | Low | Nice-to-have | Nothing reads an IAMF file back |
-| | Raw OBU stream (§5) | 🔴 | Low | Nice-to-have | §6 ISO-BMFF only today |
-| | Fragmented / live writer | 🔴 | Low | Nice-to-have | Batch `iclforge::iamf::mux()` only |
+| | Parameter Block / Temporal Delimiter / trimming OBUs | 🟢 | Low | Nice-to-have | Every parameter type and animation; trimming also in the edit list |
+| | Object-based audio elements (v2.0) | 🟢 | Low | Nice-to-have | One or two objects per element, polar and Cartesian positions; no external oracle yet |
+| | Raw OBU stream (§5) | 🟢 | Low | Nice-to-have | `write_sequence()` |
+| | Fragmented / live writer | 🟢 | Low | Nice-to-have | `FragmentedWriter` |
+| **Reader** | OBU / file reader | 🟢 | Low | Nice-to-have | `read_sequence()`, `read_isobmff()` (files and fragments), `decode_pcm()` for `ipcm` |
+| | Opus / AAC-LC / FLAC encode | 🔴 | Low | Nice-to-have | Carried and parsed, not produced |
+| | Scalable channel layer reconstruction | 🔴 | Low | Nice-to-have | Demixing and recon gain are not applied by `decode_pcm()` |
 
 ---
 
@@ -341,13 +343,13 @@ this register is the checklist that those bounds appear here too.
 | Pack types beyond DirectSpeakers + Objects | Matrix / HOA / Binaural / zoneExclusion / … | 🔴 |
 | Writer / bridge | Narrowed Atmos-master subset | 🟡 |
 
-### AOM IAMF v1.1.0
+### AOM IAMF v2.0.0
 
 | Clause | Open item | Status |
 |---|---|---|
-| §3 Parameter / trim / delimiter OBUs | Not written | 🔴 |
-| Object elements | Waits on v2.0 | 🔴 |
-| §5 raw OBU; reader; fragmented writer | Not started | 🔴 |
+| Codec Specific | Encoding Opus, AAC-LC and FLAC | 🔴 |
+| Processing | Reconstruction of scalable channel layers and rendering | 🔴 |
+| ISO-BMFF | Common Encryption; more than one IA track | 🔴 |
 
 ### Carriage (Annex F, IEC 61937, MPEG-TS, HLS, DASH)
 
