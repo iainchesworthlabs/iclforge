@@ -109,9 +109,9 @@ void align_exponents(std::span<std::vector<R>* const> tracks, std::span<int* con
 
 constexpr std::size_t kSubbands = dsp::kQmfSubbands;
 
-// The most channels an element here has (7.1.4), and aspx_data elements (the
-// immersive element's six in ASPX_SCPL).
-constexpr std::size_t kMaxChannels = 12;
+// The most channels an element here has (22.2's 24), and aspx_data elements
+// (22.2's eleven).
+constexpr std::size_t kMaxChannels = 24;
 constexpr std::size_t kMaxUnits = kMaxAspxElements;
 
 [[nodiscard]] std::size_t at(int index) noexcept {
@@ -248,7 +248,8 @@ void SubstreamPcm::configure_outputs(const SubstreamContext& ctx, const OutputCo
     // DRC acts on the decoded channels before the downmix: a new target or
     // LFE choice leaves its dialnorm and smoothing where they were.
     if (!same_inputs) {
-        drc_.configure(internal_rate_, slots_, speakers_, add_ch_base_, layout_.has_value());
+        drc_.configure(internal_rate_, slots_, speakers_, add_ch_base_,
+                       layout_.has_value() || ch_mode_ == ch_mode::k22_2);
     }
     downmix_.configure(speakers_, add_ch_base_, downmix_target_, mix_lfe_, layout_);
     outputs_.clear();
@@ -864,6 +865,24 @@ ParseResult SubstreamPcm::decode(const SubstreamContext& ctx, const AudioSubstre
     }
     SubstreamContext pcm_ctx = ctx;
     pcm_ctx.ch_mode = *layout;
+    if (*layout == ch_mode::k22_2) {
+        // Part 2 Table 8 lists the 22_2_channel_element for "only full
+        // decoding supported", and no table of clause 5.10.2's renderer
+        // (Tables 35 to 43) has a 22.2 input: the element is delivered as
+        // coded, 24 channels, or not at all (src/ac4dec/ERRATA.md, "The 22.2
+        // element's output").
+        if (frame_inputs.decoding == DecodingMode::kCore) {
+            return fail(
+                DecodeError::kUnsupported,
+                "22_2_channel_element() has no core decoding (Part 2 Table 8: only full decoding)");
+        }
+        if (!frame_inputs.qmf_only && !frame_inputs.objects &&
+            frame_inputs.output.downmix != DownmixTarget::kAsCoded) {
+            return fail(DecodeError::kUnsupported,
+                        "a 22.2 source has no downmix or render target but as coded (Part 2 Tables "
+                        "35 to 43 have no 22.2 input)");
+        }
+    }
     if (auto ok = route_element(pcm_ctx, element, route_, frame_inputs.decoding); !ok) {
         return ok;
     }

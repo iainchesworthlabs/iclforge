@@ -10,14 +10,16 @@ explains the format.
 
 It decodes the mono, stereo, 3.0, 5.X and 7.X channel elements in each of Part 1's codec modes
 (SIMPLE, ASPX and the three A-CPL modes) at every frame rate; the immersive element of 7.0.4 and
-7.1.4 in full and core decoding, rendered by Part 2's channel renderer; object audio, A-JOC in
+7.1.4 in full and core decoding, rendered by Part 2's channel renderer; the 22.2 element in full
+decoding, as coded, to 24 channels ([22.2](#222-channel-element)); object audio, A-JOC in
 full and core decoding and direct-coded objects, with each object's metadata ([Objects](#objects));
 streams of several presentations, the one a system chooses decoded with all of its substreams
 mixed; the output level and dynamic range control, dialogue enhancement and the downmix; and it
 conceals a frame that does not decode when asked to. It refuses, per substream and per frame, with
-`DecodeError::kUnsupported` and a reason: the 9.X.4 and 22.2 channel elements, and output at
-96 or 192 kHz. It decodes the speech spectral frontend (Part 1 clause 5.2) for the tracks that
-select it, from the text alone: no stream here uses it. A presentation in the efficient high frame rate
+`DecodeError::kUnsupported` and a reason: the 9.X.4 channel elements, core decoding of the 22.2
+element and its rendering to any layout but as coded, and output at 96 or 192 kHz. It decodes the
+speech spectral frontend (Part 1 clause 5.2) for the tracks that select it, from the text alone: no
+stream here uses it. A presentation in the efficient high frame rate
 mode (`frame_rate_fraction` 2 or 4, Part 2 clause 5.1.3) spreads one codec frame over that many
 `raw_ac4_frame()`s: the decoder holds the fragments, `decode()` returns no frame until the unit's
 last transmission frame arrives, and the frame it then returns is at the audio frame rate of Part 2
@@ -103,10 +105,27 @@ to the next, and a new layout starts its channels' synthesis from silence.
 | `drc` | Which of Table 161's DRC decoder modes compresses: `kDefault` takes the one clause 5.7.9.2 gives the output level; `kHomeTheatre`, `kFlatPanelTv`, `kPortableSpeakers` and `kPortableHeadphones` name one; `kOff` applies the level alone | `kDefault` |
 | `headphones` | Whether `kDefault` takes portable headphones rather than portable speakers where the level falls in their range, −16 to 0 dBFS | `false` |
 | `dialogue_enhancement_db` | G_DE (clause 5.7.8): how far the dialogue is raised, up to the cap the stream sets, 3, 6, 9 or 12 dB | 0, the tool bypassed |
-| `downmix` | The layout (clause 6.2.17): `kAsCoded`, `k5X` (a 7.X element folded to 5.X), `kStereo` (the method the stream prefers), `kLoRo`, `kLtRt`, `kMono`; and for the immersive element and an intermediate spatial format, `k7X4`, `k7X2`, `k7X0`, `k5X4` and `k5X2` (Part 2 clauses 5.10.2 and 5.10.3) | `kAsCoded` |
+| `downmix` | The layout (clause 6.2.17): `kAsCoded`, `k5X` (a 7.X element folded to 5.X), `kStereo` (the method the stream prefers), `kLoRo`, `kLtRt`, `kMono`; and for the immersive element and an intermediate spatial format, `k7X4`, `k7X2`, `k7X0`, `k5X4` and `k5X2` (Part 2 clauses 5.10.2 and 5.10.3). A 22.2 source is delivered `kAsCoded` only | `kAsCoded` |
 | `mix_lfe` | Whether a two-channel or mono downmix takes the LFE at the stream's `lfe_mixgain`, as Part 1 does | `true` |
 | `dialogue_gain_db` | g_dialog (clause 6.2.16.1): a presentation's dialogue against its music and effects, up to the stream's `g_dialog_max` | 0 |
 | `associated_gain_db` | g_assoc (clause 6.2.16.2), 0 or less: a presentation's associated audio | 0 |
+
+### 22.2 channel element
+
+The 22.2 element (Part 2 clause 6.2.4.3) is two LFE tracks and eleven channel pairs, in the SIMPLE
+and ASPX codec modes, and decodes to 24 channels in the order of Part 2 Table A.27's speaker
+indices: L, R, C, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr, LFE, Tsl, Tsr, Tfc, Tbc, Tc, LFE2, Bfl, Bfr, Bfc,
+Cb, Lw, Rw (`DecodedFrame::speakers` names them). The LFEs are therefore not the fourth channel, as
+they are in the other layouts. `iclforge::ac4::Speaker` has an enumerator for each speaker of the
+table, the 9.X.4 screen pair included.
+
+Part 2 gives no renderer or downmix for a 22.2 input (Tables 35 to 43 have no row for one) and lists
+the element as full decoding only (Table 8). So the decoder delivers 22.2 as coded, refuses every
+`downmix` but `kAsCoded` and `decoding = kCore` with `kUnsupported` and a reason that names 22.2, and
+dialogue enhancement acts on L, R and C. DRC groups the channels by Part 2 Table 69. No stream of this
+element and no other decoder is available to check it against; the readings are in
+`src/ac4dec/ERRATA.md` under "The 22.2 element", and the streams its tests decode are built from the
+standard's tables ([Validation](../verification.md#the-decoders-222-element)).
 
 `DecoderConfig` holds the rest: `output`, `presentation` (below), `concealment`, `level` (the
 `md_compat` level the decoder claims, 3 by default; presentations above it are not chosen),

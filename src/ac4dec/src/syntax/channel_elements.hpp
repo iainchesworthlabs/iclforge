@@ -20,8 +20,9 @@
 // 3_0_channel_element, 5_X_channel_element and 7_X_channel_element (ETSI TS
 // 103 190-1 V1.4.1 clauses 4.2.5 and 4.2.6), and companding_control() (4.2.11);
 // and Part 2's immersive_channel_element (6.2.4.1, with immers_cfg() and
-// ajcc_data()) for the 7.X.4 channel modes, which pass it b_5fronts 0. The
-// 9.X.4 modes, which pass b_5fronts 1, and the 22.2 element are refused.
+// ajcc_data()) for the 7.X.4 channel modes, which pass it b_5fronts 0; and
+// Part 2's 22_2_channel_element (6.2.4.3). The 9.X.4 modes, which pass
+// b_5fronts 1, are refused.
 //
 // For object audio (Part 2 clause 6.2.3): audio_data_objs() (6.2.3.2), an
 // LFE's mono_data(1) and the Part 1 element objs_to_channel_mode() (6.2.3.3)
@@ -49,11 +50,11 @@ inline constexpr int kAspxAcpl2 = 3;
 inline constexpr int kAspxAjcc = 4;
 }  // namespace immersive_mode
 
-// The most aspx_data elements one channel element carries: var_channel_element()'s
-// nine, eight aspx_data_2ch() and an aspx_data_1ch() for its most signals,
-// sixteen (Part 2 clause 6.2.4.4); the immersive element has six in ASPX_SCPL
-// (Part 2 Table 8).
-inline constexpr std::size_t kMaxAspxElements = 9;
+// The most aspx_data elements one channel element carries: the 22.2 element's
+// eleven aspx_data_2ch() (Part 2 clause 6.2.4.3, Table 8); var_channel_element()
+// has nine, eight aspx_data_2ch() and an aspx_data_1ch() for its most signals,
+// sixteen (clause 6.2.4.4), and the immersive element six in ASPX_SCPL (Table 8).
+inline constexpr std::size_t kMaxAspxElements = 11;
 
 // 4.2.11 companding_control(num_chan).
 struct CompandingControl {
@@ -65,7 +66,7 @@ struct CompandingControl {
 
 // Which kind of channel element a substream's channel_mode selects; kVar is
 // the var_channel_element() of an A-JOC substream's downmix.
-enum class ElementKind : std::uint8_t { kSingle, kPair, k3_0, k5X, k7X, kImmersive, kVar };
+enum class ElementKind : std::uint8_t { kSingle, kPair, k3_0, k5X, k7X, kImmersive, kVar, k22_2 };
 
 // One sf_data() and the sf_info() that governs it, in syntax order.
 struct Track {

@@ -16,9 +16,10 @@ constexpr int kPresentationSubstream = 0;
 constexpr int kAudioSubstream = 1;
 
 // Part 1 Table 88's channel modes with an LFE: 5.1 and the three 7.1s; and
-// Part 2 Table 56's 7.1.4.
+// Part 2 Table 56's 7.1.4 and 22.2.
 [[nodiscard]] bool has_lfe(int ch_mode) noexcept {
-    return ch_mode == 4 || ch_mode == 6 || ch_mode == 8 || ch_mode == 10 || ch_mode == 12;
+    return ch_mode == 4 || ch_mode == 6 || ch_mode == 8 || ch_mode == 10 || ch_mode == 12 ||
+           ch_mode == 15;
 }
 
 // The presentation's channels for custom_dmx_data() and loud_corr(): one

@@ -42,8 +42,7 @@ struct BlockTiming {
 [[nodiscard]] BlockTiming block_timing(const OamdTimingData& timing, int block) noexcept;
 
 // Part 2 Table A.27's speaker index as a Speaker, for a bed object's
-// loudspeaker (Annex F.3); nothing for one the decoder does not name (the
-// screen edge pair, and the 22.2 layout's).
+// loudspeaker (Annex F.3); nothing for an index the table does not give.
 [[nodiscard]] std::optional<Speaker> speaker_of_index(int table_a27_index) noexcept;
 
 }  // namespace iclforge::ac4::detail

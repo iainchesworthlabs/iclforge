@@ -48,6 +48,8 @@ constexpr double kAmplitude = 0.1;  // -20 dBFS
 // immersive element's twelve tones reach 1.93 kHz, under 2.25 kHz.
 constexpr std::size_t kTopLine = 128;
 constexpr std::size_t kImmersiveTopLine = 192;
+// The 22.2 element's 24 tones reach 3.6 kHz, under 3.75 kHz.
+constexpr std::size_t k22_2TopLine = 320;
 // A-JCC's input gain, 2 + 1/sqrt(2) (Pseudocodes 8 and 12).
 constexpr double kAjccGain = 2.0 + 1.0 / std::numbers::sqrt2;
 // immersive_codec_mode (Part 2 Table 73).
@@ -118,17 +120,76 @@ constexpr double kGamma = 6552.0 / 16384.0;
     }
 }
 
+// The 22.2 element's: the immersive element's twelve, then twelve primes about
+// 150 Hz apart, and the second LFE's inside the LFE's band (to 328 Hz) clear of
+// the first's.
+[[nodiscard]] double tone_22_2_of(Speaker speaker) {
+    switch (speaker) {
+        case Speaker::kTopSideLeft:
+            return 2087.0;
+        case Speaker::kTopSideRight:
+            return 2243.0;
+        case Speaker::kTopFrontCentre:
+            return 2399.0;
+        case Speaker::kTopBackCentre:
+            return 2551.0;
+        case Speaker::kTopCentre:
+            return 2707.0;
+        case Speaker::kLfe2:
+            return 101.0;
+        case Speaker::kBottomFrontLeft:
+            return 2857.0;
+        case Speaker::kBottomFrontRight:
+            return 3011.0;
+        case Speaker::kBottomFrontCentre:
+            return 3167.0;
+        case Speaker::kCentreBack:
+            return 3319.0;
+        case Speaker::kLeftWide:
+            return 3469.0;
+        case Speaker::kRightWide:
+            return 3617.0;
+        default:
+            return immersive_tone_of(speaker);
+    }
+}
+
 [[nodiscard]] bool is_immersive(int ch_mode) {
     return ch_mode == 11 || ch_mode == 12;
 }
 
+[[nodiscard]] bool is_22_2(int ch_mode) {
+    return ch_mode == 15;
+}
+
 [[nodiscard]] double tone_for(int ch_mode, Speaker speaker) {
+    if (is_22_2(ch_mode)) {
+        return tone_22_2_of(speaker);
+    }
     return is_immersive(ch_mode) ? immersive_tone_of(speaker) : tone_of(speaker);
 }
 
 [[nodiscard]] bool has_lfe(int ch_mode) {
-    return ch_mode == 4 || ch_mode == 6 || ch_mode == 8 || ch_mode == 10 || ch_mode == 12;
+    return ch_mode == 4 || ch_mode == 6 || ch_mode == 8 || ch_mode == 10 || ch_mode == 12 ||
+           ch_mode == 15;
 }
+
+// Part 2 Table 21, as a table of this builder's own (the decoder's is in
+// src/ac4dec/src/pcm/routing.cpp): the two LFEs' mono_data(1), then each
+// two_channel_data()'s outputs, in syntax order.
+constexpr std::array<std::pair<Speaker, Speaker>, 11> k22_2Pairs = {{
+    {Speaker::kLeft, Speaker::kRight},
+    {Speaker::kCentre, Speaker::kTopCentre},
+    {Speaker::kLeftSurround, Speaker::kRightSurround},
+    {Speaker::kLeftBack, Speaker::kRightBack},
+    {Speaker::kTopFrontLeft, Speaker::kTopFrontRight},
+    {Speaker::kTopBackLeft, Speaker::kTopBackRight},
+    {Speaker::kTopSideLeft, Speaker::kTopSideRight},
+    {Speaker::kTopFrontCentre, Speaker::kTopBackCentre},
+    {Speaker::kBottomFrontLeft, Speaker::kBottomFrontRight},
+    {Speaker::kBottomFrontCentre, Speaker::kCentreBack},
+    {Speaker::kLeftWide, Speaker::kRightWide},
+}};
 
 // A 7.X mode's last pair (Table 88).
 [[nodiscard]] std::pair<Speaker, Speaker> last_pair(int ch_mode) {
@@ -144,6 +205,35 @@ constexpr double kGamma = 6552.0 / 16384.0;
 // The decoder's channels for a mode, in its order: L R C, the LFE, Ls Rs, the
 // last pair.
 [[nodiscard]] std::vector<Speaker> speakers_for(int ch_mode) {
+    if (is_22_2(ch_mode)) {
+        // Part 2 Table A.27's order, by speaker index (not Table 21's): L R C Ls
+        // Rs Lb Rb Tfl Tfr Tbl Tbr LFE Tsl Tsr Tfc Tbc Tc LFE2 Bfl Bfr Bfc Cb Lw Rw.
+        using S = Speaker;
+        return {S::kLeft,
+                S::kRight,
+                S::kCentre,
+                S::kLeftSurround,
+                S::kRightSurround,
+                S::kLeftBack,
+                S::kRightBack,
+                S::kTopFrontLeft,
+                S::kTopFrontRight,
+                S::kTopBackLeft,
+                S::kTopBackRight,
+                S::kLfe,
+                S::kTopSideLeft,
+                S::kTopSideRight,
+                S::kTopFrontCentre,
+                S::kTopBackCentre,
+                S::kTopCentre,
+                S::kLfe2,
+                S::kBottomFrontLeft,
+                S::kBottomFrontRight,
+                S::kBottomFrontCentre,
+                S::kCentreBack,
+                S::kLeftWide,
+                S::kRightWide};
+    }
     if (ch_mode == 1) {
         return {Speaker::kLeft, Speaker::kRight};
     }
@@ -251,9 +341,15 @@ constexpr double kGamma = 6552.0 / 16384.0;
 class ElementWriter {
    public:
     ElementWriter(BitWriter& w, const std::map<Speaker, Lines>& lines, const ElementCase& c)
-        : w_(w), lines_(lines), c_(c), layout_(iclforge::ac4::detail::long_layout(kFrameLength)) {
+        : w_(w),
+          lines_(lines),
+          c_(c),
+          layout_(iclforge::ac4::detail::long_layout(kFrameLength)),
+          proc_(c.stereo_proc) {
         const auto offsets = iclforge::ac4::detail::band_offsets(kFrameLength);
-        const std::size_t top = is_immersive(c.ch_mode) ? kImmersiveTopLine : kTopLine;
+        const std::size_t top = is_22_2(c.ch_mode)        ? k22_2TopLine
+                                : is_immersive(c.ch_mode) ? kImmersiveTopLine
+                                                          : kTopLine;
         while (max_sfb_ + 1 < static_cast<int>(offsets.size()) &&
                offsets[static_cast<std::size_t>(max_sfb_)] < top) {
             ++max_sfb_;
@@ -276,11 +372,15 @@ class ElementWriter {
         iclforge::ac4::detail::write_chparam_info(w_, choice);
     }
 
-    // mono_data(1): sf_info_lfe() is max_sfb alone.
-    void lfe() {
+    // mono_data(1): sf_info_lfe() is max_sfb alone. 22.2's second one is LFE2's.
+    void lfe(Speaker speaker = Speaker::kLfe) {
         w_.write(3, kLfeMaxSfb, "max_sfb");
-        iclforge::ac4::detail::write_sf_data(w_, code(lines_.at(Speaker::kLfe), layout_, kLfeMaxSfb), layout_);
+        iclforge::ac4::detail::write_sf_data(w_, code(lines_.at(speaker), layout_, kLfeMaxSfb),
+                                             layout_);
     }
+
+    // The next two_channel_data() and stereo_data() send b_enable_mdct_stereo_proc as `on`.
+    void set_stereo_proc(bool on) { proc_ = on; }
 
     // mono_data(0).
     void mono(Speaker speaker) {
@@ -292,8 +392,8 @@ class ElementWriter {
     // stereo_data(): the 3.0 element's pair, spec_frontend sent per track
     // when the tracks have their own sf_info().
     void stereo_data(Speaker a, Speaker b) {
-        w_.write(1, c_.stereo_proc ? 1U : 0U, "b_enable_mdct_stereo_proc");
-        if (c_.stereo_proc) {
+        w_.write(1, proc_ ? 1U : 0U, "b_enable_mdct_stereo_proc");
+        if (proc_) {
             sf_info();
             chparam(c_.sap_mode);
         } else {
@@ -306,9 +406,9 @@ class ElementWriter {
     }
 
     void two_channel_data(Speaker a, Speaker b) {
-        w_.write(1, c_.stereo_proc ? 1U : 0U, "b_enable_mdct_stereo_proc");
+        w_.write(1, proc_ ? 1U : 0U, "b_enable_mdct_stereo_proc");
         sf_info();
-        if (c_.stereo_proc) {
+        if (proc_) {
             chparam(c_.sap_mode);
         } else {
             sf_info();
@@ -359,8 +459,8 @@ class ElementWriter {
     // n_msfb_bits 6 and n_side_bits 5 (Table 106).
     void acpl_1_pair(Speaker a, Speaker b) {
         const auto max_sfb = static_cast<std::uint64_t>(max_sfb_);
-        w_.write(1, c_.stereo_proc ? 1U : 0U, "b_enable_mdct_stereo_proc");
-        if (!c_.stereo_proc) {
+        w_.write(1, proc_ ? 1U : 0U, "b_enable_mdct_stereo_proc");
+        if (!proc_) {
             w_.write(1, 0, "spec_frontend_m");
             sf_info();
             w_.write(1, 0, "spec_frontend_s");
@@ -397,7 +497,7 @@ class ElementWriter {
     void sf_data(const Lines& lines) { iclforge::ac4::detail::write_sf_data(w_, code(lines, layout_, max_sfb_), layout_); }
 
     void pair_tracks(Speaker a, Speaker b) {
-        if (c_.stereo_proc) {
+        if (proc_) {
             const std::array<Abcd, 1> p = {parameters_of(c_.sap_mode)};
             mixed(printed_matrix("a0 b0 | c0 d0", p), {a, b});
         } else {
@@ -421,6 +521,7 @@ class ElementWriter {
     const ElementCase& c_;
     FrameLayout layout_;
     int max_sfb_ = 0;
+    bool proc_ = true;
 };
 
 // One FIXFIX envelope over the frame: loud, with noise carrying its energy,
@@ -694,6 +795,25 @@ void write_pair_acpl(BitWriter& w, ElementWriter& e, bool iframe, const AspxSetu
     }
     write_aspx_data(w, iframe, setup, c);
     write_acpl_1ch_pair(w, c, iframe, 1);
+}
+
+// 22_2_channel_element() (Part 2 clause 6.2.4.3): the two LFEs, eleven
+// two_channel_data() by Table 21, and in ASPX eleven aspx_data_2ch().
+void write_22_2(BitWriter& w, ElementWriter& e, bool iframe, const AspxSetup& setup,
+                const ElementCase& c) {
+    w.write(1, c.aspx ? 1U : 0U, "22_2_codec_mode");
+    if (iframe && c.aspx) {
+        iclforge::ac4::detail::write_aspx_config(w, setup.config);
+    }
+    e.lfe(Speaker::kLfe);
+    e.lfe(Speaker::kLfe2);
+    for (std::size_t p = 0; p < k22_2Pairs.size(); ++p) {
+        e.set_stereo_proc(c.stereo_proc != (c.stereo_proc_alternates && p % 2 == 1));
+        e.two_channel_data(k22_2Pairs[p].first, k22_2Pairs[p].second);
+    }
+    if (c.aspx) {
+        write_aspx_data(w, iframe, setup, c);
+    }
 }
 
 // 5_X_channel_element() in the A-CPL modes (Table 25): Table 181's channel
@@ -1199,6 +1319,14 @@ void undo_additional_steps(std::map<Speaker, Lines>& lines, const ElementCase& c
 
 std::vector<std::vector<Speaker>> aspx_elements(int ch_mode, int codec_mode) {
     using S = Speaker;
+    if (is_22_2(ch_mode)) {
+        // Part 2 Table 8: the eleven pairs, in the order the syntax reads them.
+        std::vector<std::vector<Speaker>> pairs;
+        for (const auto& [first, second] : k22_2Pairs) {
+            pairs.push_back({first, second});
+        }
+        return pairs;
+    }
     if (is_immersive(ch_mode)) {
         // Part 2 Table 8, full decoding.
         switch (codec_mode) {
@@ -1286,12 +1414,14 @@ BuiltStream build_stream(const ElementCase& c, int frames) {
             if (c.acpl_beta_q > 0) {
                 out.tone_hz[1] = out.tone_hz[0];  // R carries L's tone, decorrelated
             }
-        } else if (c.ch_mode >= 5 && c.use_sap_add_ch) {
+        } else if (c.ch_mode >= 5 && c.ch_mode <= 10 && c.use_sap_add_ch) {
             undo_additional_steps(lines, c);
         }
         BitWriter audio = BitWriter::buffered();
         ElementWriter element(audio, lines, c);
-        if (is_immersive(c.ch_mode)) {
+        if (is_22_2(c.ch_mode)) {
+            write_22_2(audio, element, iframe, *setup, c);
+        } else if (is_immersive(c.ch_mode)) {
             write_immersive(audio, element, iframe, *setup, c);
         } else if (c.ch_mode == 1) {
             write_pair_acpl(audio, element, iframe, *setup, c);
@@ -1478,6 +1608,13 @@ std::vector<ElementCase> committed_cases() {
          .acpl_second = true,
          .acpl_quant = 1,
          .immersive = 3},
+        // The 22.2 element (Part 2 clause 6.2.4.3) in both codec modes, the
+        // pairs' stereo processing on and off by turns, and with M/S and L/R.
+        {.name = "22_2-simple-alternating",
+         .ch_mode = 15,
+         .sap_mode = 2,
+         .stereo_proc_alternates = true},
+        {.name = "22_2-aspx-unit7-lr", .ch_mode = 15, .aspx = true, .sap_mode = 0, .loud_unit = 7},
         {.name = "7_1_4-ajcc-grouping0-2ch1-mode1-route2",
          .ch_mode = 12,
          .coding_config = 0,

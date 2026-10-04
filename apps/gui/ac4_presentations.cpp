@@ -13,7 +13,10 @@ std::string ac4_speaker_names(std::span<const iclforge::ac4::Speaker> speakers) 
         if (!out.empty()) {
             out += ' ';
         }
-        out += iclforge::ac3::eac3::chanmap::name(iclforge::apps::ac4_location(speaker));
+        // A speaker with no Table E2.5 location (22.2's bottom channels) goes by AC-4's own name.
+        const auto location = iclforge::apps::ac4_location(speaker);
+        out += location ? iclforge::ac3::eac3::chanmap::name(*location)
+                        : iclforge::ac4::describe(speaker);
     }
     return out;
 }

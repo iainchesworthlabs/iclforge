@@ -96,6 +96,11 @@ namespace iclforge::hearth {
 // 103 190-1 clause D.1; A/52 Table E2.5).
 [[nodiscard]] ac3::eac3::chanmap::Layout ac4_bed(std::span<const iclforge::ac4::Speaker> speakers);
 
+// Whether the layout renderer can place `speakers` as a bed: it takes sixteen coded channels, and
+// Table E2.5 has no location for 22.2's bottom channels or 9.X.4's screen pair. A frame of a wider
+// layout, 22.2's, is refused rather than placed on some of its channels.
+[[nodiscard]] bool ac4_placeable(std::span<const iclforge::ac4::Speaker> speakers);
+
 // The A/52 audio coding mode with those speakers' front and surround channels,
 // which is how an AC-4 unit's layout reads where an acmod is asked for:
 // 1/0, 2/0, 3/0 or 3/2, any back, wide or height pair left out.

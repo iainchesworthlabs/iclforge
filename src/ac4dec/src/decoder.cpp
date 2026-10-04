@@ -87,6 +87,24 @@ std::string_view describe(Speaker speaker) {
             return "Tsr";
         case Speaker::kLfe2:
             return "LFE2";
+        case Speaker::kLeftScreen:
+            return "Lscr";
+        case Speaker::kRightScreen:
+            return "Rscr";
+        case Speaker::kTopFrontCentre:
+            return "Tfc";
+        case Speaker::kTopBackCentre:
+            return "Tbc";
+        case Speaker::kTopCentre:
+            return "Tc";
+        case Speaker::kBottomFrontLeft:
+            return "Bfl";
+        case Speaker::kBottomFrontRight:
+            return "Bfr";
+        case Speaker::kBottomFrontCentre:
+            return "Bfc";
+        case Speaker::kCentreBack:
+            return "Cb";
     }
     return "?";
 }

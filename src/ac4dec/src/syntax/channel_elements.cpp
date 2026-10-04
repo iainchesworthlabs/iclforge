@@ -14,6 +14,10 @@ namespace {
 
 using std::size_t;
 
+// 22_2_channel_element()'s two_channel_data() and aspx_data_2ch() count (Part
+// 2 clause 6.2.4.3, Table 21).
+constexpr int kPairs22_2 = 11;
+
 class ElementParser {
    public:
     ElementParser(BitReader& r, const SubstreamContext& ctx, ChannelElementState& state, ChannelElement& out,
@@ -26,6 +30,7 @@ class ElementParser {
     ParseResult element_5_x(bool b_has_lfe);
     ParseResult element_7_x();
     ParseResult immersive_element(bool b_lfe);
+    ParseResult element_22_2();
     ParseResult var_element(int n_dmx_signals, bool b_has_lfe);
     // audio_data_objs()'s mono_data(1), before its element.
     ParseResult objects_lfe() {
@@ -89,6 +94,9 @@ ParseResult ElementParser::begin(ElementKind kind, int mode, bool needs_aspx,
             break;
         case ElementKind::k7X:
             out_.tracks.reserve(8);
+            break;
+        case ElementKind::k22_2:
+            out_.tracks.reserve(24);
             break;
         case ElementKind::kImmersive:
         case ElementKind::kVar:
@@ -1055,6 +1063,36 @@ ParseResult ElementParser::immersive_element(bool b_lfe) {
     return check(r_);
 }
 
+// Part 2 6.2.4.3 22_2_channel_element(b_iframe): two LFE tracks, then eleven
+// two_channel_data() in Table 21's order, and in ASPX an aspx_data_2ch() for
+// each of the eleven pairs (Table 8). The syntax sends no companding_control()
+// and no A-CPL data: Part 2 clauses 4.8.3.10 and 4.8.3.14 apply neither to it.
+ParseResult ElementParser::element_22_2() {
+    const int mode = static_cast<int>(r_.read(1, "22_2_codec_mode"));
+    if (auto ok = begin(ElementKind::k22_2, mode, mode == codec_mode::kAspx, std::nullopt, false);
+        !ok) {
+        return ok;
+    }
+    for (int lfe = 0; lfe < 2; ++lfe) {
+        if (auto ok = mono_data(true); !ok) {
+            return ok;
+        }
+    }
+    for (int cp = 0; cp < kPairs22_2; ++cp) {
+        if (auto ok = two_channel_data(); !ok) {
+            return ok;
+        }
+    }
+    if (mode == codec_mode::kAspx) {
+        for (int cp = 0; cp < kPairs22_2; ++cp) {
+            if (auto ok = aspx_2ch(); !ok) {
+                return ok;
+            }
+        }
+    }
+    return check(r_);
+}
+
 // Part 2 6.2.4.4 var_channel_element(b_iframe, n_dmx_signals, b_has_lfe). Its
 // A-SPX data are an aspx_data_2ch() for each pair of the fullband tracks in
 // syntax order and an aspx_data_1ch() for an odd last one, and its
@@ -1216,7 +1254,7 @@ ParseResult parse_audio_data_chan(BitReader& r, const SubstreamContext& ctx, Cha
             return fail(DecodeError::kUnsupported,
                         "9.X.4, the immersive_channel_element() with b_5fronts, is not decoded");
         case ch_mode::k22_2:
-            return fail(DecodeError::kUnsupported, "22_2_channel_element() is not decoded");
+            return parser.element_22_2();
         default:
             return fail(DecodeError::kInvalidStream, "a reserved channel_mode");
     }

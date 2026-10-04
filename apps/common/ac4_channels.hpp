@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <numeric>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -19,7 +20,12 @@
 // So 5.1's surrounds take the fifth and sixth channels, as E-AC-3's do, and
 // 5.1.4 and 7.1.4 come out as DEE takes them in. The top side pair of an X.2
 // layout, which the order has no place for either, takes the top front pair's
-// places, which an X.2 layout leaves empty.
+// places, which an X.2 layout leaves empty. 22.2's other channels take the
+// order's places where it has one (Tc, Tfc, Tbc and Cb at TC, TFC, TBC and BC,
+// and the 9.X.4 screen pair at FLC and FRC), and its second LFE and bottom
+// channels go last with Lw and Rw, in the order the decoder writes them. A
+// layout with both top pairs, 22.2, has Tsl and Tsr share the top front pair's
+// ranks, so those four keep the decoder's order among themselves.
 
 namespace iclforge::apps {
 
@@ -51,6 +57,18 @@ namespace iclforge::apps {
             return 15;
         case iclforge::ac4::Speaker::kTopBackRight:
             return 17;
+        case iclforge::ac4::Speaker::kLeftScreen:
+            return 6;
+        case iclforge::ac4::Speaker::kRightScreen:
+            return 7;
+        case iclforge::ac4::Speaker::kCentreBack:
+            return 8;
+        case iclforge::ac4::Speaker::kTopCentre:
+            return 11;
+        case iclforge::ac4::Speaker::kTopFrontCentre:
+            return 13;
+        case iclforge::ac4::Speaker::kTopBackCentre:
+            return 16;
         default:
             return 99;
     }
@@ -108,8 +126,11 @@ template <typename Rank>
 // decoded presentation on an AC-3 or E-AC-3 layout: Lb and Rb are the rear
 // surrounds, Lw and Rw the wides, the top front pair the vertical heights, the
 // top back and top side pairs the top surrounds (Table E2.5 has one pair for
-// both, as the object renderer places them), and the second LFE LFE2.
-[[nodiscard]] inline iclforge::ac3::eac3::chanmap::Location ac4_location(
+// both, as the object renderer places them), and the second LFE LFE2. 22.2's
+// Tfc is the vertical height centre, Tc and Tbc the top surround, and Cb the
+// centre surround. Its bottom channels (Bfl, Bfr, Bfc) and 9.X.4's screen pair
+// (Lscr, Rscr) have no location in the table that the standard names: nothing.
+[[nodiscard]] inline std::optional<iclforge::ac3::eac3::chanmap::Location> ac4_location(
     iclforge::ac4::Speaker speaker) {
     using L = iclforge::ac3::eac3::chanmap::Location;
     switch (speaker) {
@@ -145,8 +166,21 @@ template <typename Rank>
             return L::kRts;
         case iclforge::ac4::Speaker::kLfe2:
             return L::kLfe2;
+        case iclforge::ac4::Speaker::kTopFrontCentre:
+            return L::kVhc;
+        case iclforge::ac4::Speaker::kTopCentre:
+        case iclforge::ac4::Speaker::kTopBackCentre:
+            return L::kTs;
+        case iclforge::ac4::Speaker::kCentreBack:
+            return L::kCs;
+        case iclforge::ac4::Speaker::kLeftScreen:
+        case iclforge::ac4::Speaker::kRightScreen:
+        case iclforge::ac4::Speaker::kBottomFrontLeft:
+        case iclforge::ac4::Speaker::kBottomFrontRight:
+        case iclforge::ac4::Speaker::kBottomFrontCentre:
+            return std::nullopt;
     }
-    return L::kCentre;
+    return std::nullopt;
 }
 
 }  // namespace iclforge::apps

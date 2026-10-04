@@ -10,15 +10,15 @@ In scope: ac4_presentation_substream() (Part 2 6.2.2.3), ac4_substream()
 (Part 2 6.2.2.2) with audio_data_chan() and the Part 1 channel elements
 (single, pair, 3_0, 5_X, 7_X) in every codec mode, the immersive channel
 element of the 7.X.4 channel modes (Part 2 6.2.4.1 and 6.2.4.2) with A-JCC's
-ajcc_data() (6.2.6), emdf_payloads_substream() (Part 1 4.2.4.4), and a
-channel-coded substream's HSF extension substream, ac4_hsf_ext_substream()
-(Part 1 4.2.4.3), where one is linked and its channel reports sf_multiplier.
+ajcc_data() (6.2.6), the 22_2_channel_element() (6.2.4.3),
+emdf_payloads_substream() (Part 1 4.2.4.4), and a channel-coded substream's HSF
+extension substream, ac4_hsf_ext_substream() (Part 1 4.2.4.3), where one is
+linked and its channel reports sf_multiplier.
 Refused (records read before the refusal are kept): object and A-JOC
 substreams, OAMD, the 9.X.4 channel modes (the immersive element with
-b_5fronts), 22_2_channel_element(), the speech spectral frontend, and an HSF
-extension substream that could not be resolved (a self-reference, no
-sf_multiplier, an object/A-JOC owner, or the extension substream itself being
-unreadable).
+b_5fronts), the speech spectral frontend, and an HSF extension substream that
+could not be resolved (a self-reference, no sf_multiplier, an object/A-JOC
+owner, or the extension substream itself being unreadable).
 
 Invariants checked (a failure is reported, the substream stops): audio_data
 ends inside audio_size (only fill and byte_align left), the tools metadata of
@@ -1732,6 +1732,23 @@ def immersive_channel_element(r, ctx, b_lfe):
             acpl_data_1ch(r, ctx)
 
 
+def twenty_two_two_channel_element(r, ctx):
+    """22_2_channel_element(b_iframe) (Part 2 6.2.4.3): the codec mode bit, aspx_config() in an
+    I-frame's ASPX, two mono_data(1) (the LFEs), eleven two_channel_data(), and in ASPX eleven
+    aspx_data_2ch(). The syntax has no companding_control() and no A-CPL data."""
+    mode = r.f(1, '22_2_codec_mode')
+    _configure(ctx, '22_2', mode, mode == 1)
+    if ctx.b_iframe and mode == 1:
+        aspx_config(r, ctx)
+    for _ in range(2):
+        mono_data(r, ctx, 1)
+    for _ in range(11):
+        two_channel_data(r, ctx)
+    if mode == 1:
+        for _ in range(11):
+            aspx_data_2ch(r, ctx)
+
+
 def audio_data_chan(r, ctx, ch_mode):
     """Part 2 6.2.3.1."""
     if ch_mode == 0:
@@ -1751,7 +1768,7 @@ def audio_data_chan(r, ctx, ch_mode):
     elif ch_mode in (13, 14):
         raise Refused('9.X.4: immersive_channel_element() with b_5fronts')
     elif ch_mode == 15:
-        raise Refused('22_2_channel_element()')
+        twenty_two_two_channel_element(r, ctx)
     # default: nothing
 
 

@@ -140,7 +140,7 @@ struct FrameFields {
     int fs_index = 1;           // Part 1 Table 82: 1 = 48 kHz, 0 = 44.1 kHz
     int frame_rate_index = 13;
     // Part 1 Table 88: 0 mono, 1 stereo, 2 3.0, 3 and 4 5.X, 5 to 10 7.X; and
-    // Part 2 Table 56's 11 and 12, 7.0.4 and 7.1.4.
+    // Part 2 Table 56's 11 and 12, 7.0.4 and 7.1.4, and 15, 22.2.
     int ch_mode = 1;
     bool add_ch_base = false;   // for 7.X 5/2/0 and 3/2/2 (Part 2 clause 6.3.2.7)
     // The 7.X.4 modes' channels the source has (Part 2 clauses 6.3.2.7.3 to

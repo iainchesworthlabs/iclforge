@@ -485,8 +485,8 @@ depends on the same reading.
 ## The immersive element
 
 Part 2's immersive_channel_element (6.2.4.1), which codes the 7.X.4 channel modes, and A-JCC's
-ajcc_data() (6.2.6). The 9.X.4 modes pass the element b_5fronts 1 (6.2.3.1) and are refused by name,
-as the 22.2 element is. DEE codes 5.1.4 as 7.1.4 with the back pair absent, in ASPX_ACPL_2 from 192
+ajcc_data() (6.2.6). The 9.X.4 modes pass the element b_5fronts 1 (6.2.3.1) and are refused by name.
+DEE codes 5.1.4 as 7.1.4 with the back pair absent, in ASPX_ACPL_2 from 192
 to 448 kbps, ASPX_SCPL at 512 and SCPL at 768, always with core_5ch_grouping 0, 2ch_mode 0 and
 b_use_sap_add_ch 0; the constructed streams of `tests/ac4dec/ac4dec_constructed.cpp` reach the rest.
 
@@ -1556,6 +1556,89 @@ reading below rests on it.
 - **Reading:** core decoding changes only the immersive element; the Part 1 elements decode as in full
   decoding, A-CPL included.
 - **Evidence:** Text.
+
+## The 22.2 element
+
+Part 2's 22_2_channel_element (6.2.4.3): two LFE tracks and eleven pairs, in the SIMPLE and ASPX codec
+modes. The decoder decodes it in full decoding to 24 channels. No stream of it exists here and no other
+decoder reads one, so every reading below rests on the text: the constructed streams of
+`tests/ac4dec/ac4dec_constructed.cpp` (`22_2-simple-alternating` and `22_2-aspx-unit7-lr`) carry a
+tone on each channel and are read by both transcriptions of the syntax, and they show that the decoder
+does what the readings say, not that they are what an encoder meant.
+
+### The 22.2 element's tracks
+
+- **Where:** Part 2 5.2.4 and Table 21, p. 62; 5.2.2.1, p. 58 (nSAP 22); 4.8.3.6, p. 45; 6.2.4.3, p. 130. Table 21 numbers the
+  inputs 0 to 23 and gives each its output: `mono_data[0]` is [LFE], `mono_data[1]` [LFE2],
+  `two_channel_data[0]` [L, R], then [C, Tc], [Ls, Rs], [Lb, Rb], [Tfl, Tfr], [Tbl, Tbr], [Tsl, Tsr],
+  [Tfc, Tbc], [Bfl, Bfr], [Bfc, Cb] and [Lw, Rw]. 4.8.3.6 sends the tracks of the first two `sf_data`
+  elements straight to the IMDCT stage, round the stereo and multichannel processing.
+- **Reading:** the tracks are those the syntax reads, in its order. Each pair is Part 1 5.3.3's
+  processing on its own `b_enable_mdct_stereo_proc` and `chparam_info()`, and nothing mixes tracks of
+  different pairs: no step in the text does. Unlike Tables 180 and 182 the table numbers the LFEs, so the
+  two `mono_data(1)` are tracks 0 and 1 and the pairs follow, and the Part 1 reading of the LFE's track
+  ("The LFE's track is not numbered in Tables 180 and 182") is not needed.
+- **Evidence:** Text.
+
+### The 22.2 element's output
+
+- **Where:** Part 2 Table A.27, p. 214, lists 22.2's speakers by speaker index, which skips 14 and 15
+  (reserved) and 24 and 25 (Lscr and Rscr, which 22.2 does not have); Part 2 5.10.2, Tables 35 to 43,
+  pp. 104 to 107, have no row for a 22.2 input; Table 8, p. 46, lists 22.2 as "Only full decoding
+  supported".
+- **Reading:** decode() writes the 24 channels in Table A.27's order by speaker index: L, R, C, Ls, Rs,
+  Lb, Rb, Tfl, Tfr, Tbl, Tbr, LFE, Tsl, Tsr, Tfc, Tbc, Tc, LFE2, Bfl, Bfr, Bfc, Cb, Lw, Rw. The LFE comes
+  after Tbr and LFE2 after Tc, where that table has them, not fourth as the Part 1 modes have it. The
+  output is delivered as coded. Every other `DownmixTarget` is refused, with `kUnsupported` and a reason
+  naming 22.2, since no table renders a 22.2 input and Part 1 Tables 217 to 219 take 5.X and 7.X inputs:
+  folding 22.2 by them would leave out most of its channels without saying so. The other elements come out
+  as coded for the immersive targets (as the header of `decoder.hpp` says); a 22.2 source is refused for
+  them too, since it is wider than any of those layouts rather than narrower. Core decoding of the
+  element is refused for Table 8's "only full decoding": the element has no core channel mode (Table 71).
+- **Evidence:** Text.
+
+### Dialogue enhancement's channels for 22.2
+
+- **Where:** Part 2 Table 15, p. 49, gives "9.X.4, 22.2" the channels "Lscr, Rscr, C". Table A.27 has
+  no Lscr or Rscr in its 22.2 column. Table 13, p. 48, sends 22.2 to Part 1 5.7.8, whose 5.7.8.2, p. 248,
+  calls the processed channels "the three front channels", and whose Table 171 names them L, R and C.
+- **Reading:** 22.2's dialogue enhancement channels are L, R and C, as for 5.X, 7.X and 7.X.4, and as the
+  tool's own `de_channel_config` names them. The printed row is 9.X.4's, which gives that layout's screen
+  pair; 22.2 has no such pair, and its L and R are its front pair (the wides Lw and Rw are channels of
+  their own). The reading for 9.X.4 is left to the work that decodes it.
+- **Evidence:** Text.
+
+### No companding, S-CPL or A-CPL for 22.2
+
+- **Where:** Part 2 4.8.3.10.2 and 4.8.3.10.3, p. 45, list the elements companding applies to, and
+  22.2 is not among them; 4.8.3.8, p. 45, bypasses S-CPL for every element but the immersive one;
+  4.8.3.14, p. 48: "For decoding of 22_2_channel_element, no A-CPL processing is required"; 6.2.4.3's
+  syntax has no `companding_control()` and no A-CPL data.
+- **Reading:** the element's QMF domain has A-SPX alone, and only in ASPX: eleven `aspx_data_2ch()` over the
+  pairs Table 8 gives, each pair's two channels together, as Part 1 6.2.10 processes a pair. The LFEs have no
+  A-SPX data and pass through. Nothing in the text gives the pairs a gain after A-SPX, as 4.8.3.11 gives
+  ASPX_SCPL's channels, so none is applied.
+- **Evidence:** Text.
+
+### DRC's groups and level for 22.2
+
+- **Where:** Part 2 Table 69, p. 170, gives 22.2 four groups: "L, R, [LFE, LFE2], Lw, Rw", C, "Ls, Rs, Lb, Rb,
+  Bfl, Bfr, Bfc, Cb" and "Tfl, Tfr, Tbl, Tbr, Tsl, Tsr, Tfc, Tbc, Tc", with the brackets meaning that
+  the LFEs are part of the group where the configuration has them; 4.8.3.16, p. 49, and 4.8.6, p. 53, take
+  the groups from that table. Part 1 5.7.9.3.1.1 leaves the level detector to the implementation.
+- **Reading:** the groups numbered 1 to 4 in the table are the gain sets 0 to 3 of `nr_drc_channels` 4; both
+  LFEs are in the first. The level detector takes neither LFE (BS.1770's weight for the LFE is none) and
+  the other channels at the weights it gives the 7.X modes' channels.
+- **Evidence:** Text.
+
+### Mixing into a 22.2 substream
+
+- **Where:** Part 1 4.3.12.4.9 and Table 216 pan a mixed substream over the horizontal speakers of the
+  main audio's layout; no table gives 22.2's.
+- **Reading:** a substream mixed into a 22.2 main substream is panned over the horizontal channels the
+  layout has, L, C, R, Lw, Rw, Ls, Rs, Lb and Rb at the azimuths a 7.X layout gives them, the Ls and Rs
+  at the sides; the top, bottom and centre-back channels are not in the ring.
+- **Evidence:** Text; as for 7.X, no stream mixes into a 22.2 substream.
 
 ## Output processing
 
