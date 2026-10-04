@@ -73,6 +73,29 @@ template <std::size_t N>
     return {};
 }
 
+template <std::size_t N>
+[[nodiscard]] ParseResult apply_beyond(int chel_matsel,
+                                       std::span<const StereoParameters> parameters,
+                                       std::span<std::vector<Real>* const> tracks,
+                                       std::size_t first_line) {
+    std::array<Abcd, kSets<N>> sets{};
+    for (std::size_t i = 0; i < kSets<N>; ++i) {
+        sets[i] = parameters[i].uncovered;
+    }
+    const auto m = matrix_of<N>(chel_matsel, sets);
+    if (!m) {
+        return fail(DecodeError::kInvalidStream, "a chel_matsel Tables 178 and 179 do not define");
+    }
+    std::size_t last = tracks[0]->size();
+    for (const auto* track : tracks) {
+        last = std::min(last, track->size());
+    }
+    if (first_line < last) {
+        multiply<N>(*m, tracks, first_line, last);
+    }
+    return {};
+}
+
 }  // namespace
 
 std::optional<Matrix<3>> three_channel_matrix(int chel_matsel, const Abcd& p0, const Abcd& p1) {
@@ -166,6 +189,32 @@ ParseResult apply_channel_data(const SfInfo& info, const SfData& layout, int che
     return fail(DecodeError::kInvalidStream, "a channel data element without its chparam_info()s");
 }
 
+ParseResult apply_channel_data_beyond_bands(int chel_matsel,
+                                            std::span<const StereoParameters> parameters,
+                                            std::span<std::vector<Real>* const> tracks,
+                                            std::size_t first_line) {
+    switch (tracks.size()) {
+        case 3:
+            if (parameters.size() == 2 && chel_matsel >= 0 && chel_matsel < kMatselCount) {
+                return apply_beyond<3>(chel_matsel, parameters, tracks, first_line);
+            }
+            break;
+        case 4:
+            if (parameters.size() == 4) {
+                return apply_beyond<4>(chel_matsel, parameters, tracks, first_line);
+            }
+            break;
+        case 5:
+            if (parameters.size() == 5 && chel_matsel >= 0 && chel_matsel < kMatselCount) {
+                return apply_beyond<5>(chel_matsel, parameters, tracks, first_line);
+            }
+            break;
+        default:
+            break;
+    }
+    return fail(DecodeError::kInvalidStream, "a channel data element without its chparam_info()s");
+}
+
 ParseResult apply_additional_pair(const SubstreamContext& ctx, const AsfPsyInfo& base,
                                   const StereoParameters& parameters, std::span<const int> base_lengths,
                                   std::span<const int> other_lengths, std::span<Real> base_lines,
@@ -198,6 +247,44 @@ ParseResult apply_additional_pair(const SubstreamContext& ctx, const AsfPsyInfo&
                 }
             }
             window_start += static_cast<std::size_t>(base_lengths[window]);
+        }
+    }
+    return {};
+}
+
+ParseResult apply_additional_pair_beyond_bands(const SubstreamContext& ctx, const AsfPsyInfo& base,
+                                               const StereoParameters& parameters,
+                                               std::span<const int> lengths,
+                                               std::span<Real> base_lines,
+                                               std::span<Real> other_lines) {
+    const auto [a, b, c, d] = parameters.uncovered;
+    if (a == Real{1} && b == Real{} && c == Real{} && d == Real{1}) {
+        return {};
+    }
+    std::size_t window_start = 0;
+    std::size_t window = 0;
+    for (int g = 0; g < base.num_window_groups; ++g) {
+        const auto gi = static_cast<std::size_t>(g);
+        const std::span<const std::uint16_t> offsets =
+            tables::sfb_offsets_48(transform_length_samples(ctx, get_transf_length(ctx, base, g)));
+        const int max_sfb = std::min(get_max_sfb(ctx, base, g, false), kMaxSfb);
+        const std::size_t covered =
+            max_sfb >= 0 && static_cast<std::size_t>(max_sfb) < offsets.size()
+                ? offsets[static_cast<std::size_t>(max_sfb)]
+                : 0;
+        for (std::size_t w = 0; w < base.num_win_in_group[gi]; ++w, ++window) {
+            if (window >= lengths.size()) {
+                return fail(DecodeError::kInvalidStream,
+                            "more windows in the groups than in the frame");
+            }
+            const std::size_t end = window_start + static_cast<std::size_t>(lengths[window]);
+            for (std::size_t k = window_start + covered; k < end; ++k) {
+                const Real i0 = base_lines[k];
+                const Real i1 = other_lines[k];
+                base_lines[k] = a * i0 + b * i1;
+                other_lines[k] = c * i0 + d * i1;
+            }
+            window_start = end;
         }
     }
     return {};

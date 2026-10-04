@@ -30,12 +30,22 @@ void language_of(const std::optional<ContentType>& content, std::string& out) {
     }
 }
 
-// Whether decode() turns a channel-coded substream into PCM: a channel mode
-// it renders, at 48 or 44.1 kHz (a 96 or 192 kHz substream's HSF extension is
-// refused).
-[[nodiscard]] bool decodable_substream(const ChannelSubstreamInfo& chan) noexcept {
-    return chan.ch_mode.has_value() && !speakers_of(*chan.ch_mode).empty() && !chan.sf_multiplier.has_value() &&
-           chan.substream_index.has_value();
+// Part 1 Table 89: 1, 2 or 4 for no sf_multiplier, 0 and 1.
+[[nodiscard]] int rate_multiplier_of(std::optional<int> sf_multiplier) noexcept {
+    return sf_multiplier ? 2 << *sf_multiplier : 1;
+}
+
+// Whether decode() takes a channel-coded substream: a channel mode it renders,
+// at 48 or 44.1 kHz, or at 96 or 192 kHz with the HSF extension substream its
+// group links (Part 1 Table 89, 4.2.3.9): the extension is the substream's own
+// scale factor and spectral data beyond 24 kHz, so a 96 or 192 kHz substream
+// without one, and an extension linked from a substream at the base rate, name
+// nothing to decode. What decode() then refuses for such a substream (a codec
+// mode but SIMPLE, mixing, and so on) it refuses by name, per frame.
+[[nodiscard]] bool decodable_substream(const ChannelSubstreamInfo& chan,
+                                       bool hsf_ext_linked) noexcept {
+    return chan.ch_mode.has_value() && !speakers_of(*chan.ch_mode).empty() &&
+           chan.sf_multiplier.has_value() == hsf_ext_linked && chan.substream_index.has_value();
 }
 
 // Appends a member to `plan`, reusing the storage a member at that place had.
@@ -65,6 +75,7 @@ void add_member(PresentationPlan& plan, std::size_t& count, const ChannelSubstre
     Member& m = add_member(plan, count, chan.substream_index, chan.b_iframe, role, group, gain_slot,
                            content);
     m.ch_mode = chan.ch_mode.value_or(-1);
+    m.rate_multiplier = rate_multiplier_of(chan.sf_multiplier);
 }
 
 // Whether decode() turns an object audio substream into PCM: at 48 or 44.1
@@ -140,8 +151,8 @@ void plan_v1(const Toc& toc, std::size_t index, PresentationPlan& plan) {
         const Role role = role_v1(p, position, group);
         for (const GroupSubstream& sub : group.substreams) {
             if (sub.kind == GroupSubstream::Kind::kChan && sub.chan) {
-                decodable =
-                    decodable && decodable_substream(*sub.chan) && !sub.hsf_ext_substream_index;
+                decodable = decodable &&
+                            decodable_substream(*sub.chan, sub.hsf_ext_substream_index.has_value());
                 add_member(plan, count, *sub.chan, role, group_index, gain_slot_v1(p, position),
                            group.content_type);
                 continue;
@@ -152,11 +163,13 @@ void plan_v1(const Toc& toc, std::size_t index, PresentationPlan& plan) {
                     add_member(plan, count, sub.ajoc->substream_index, sub.ajoc->b_iframe, role,
                                group_index, gain_slot_v1(p, position), group.content_type);
                 m.coding = Coding::kAjoc;
+                m.rate_multiplier = rate_multiplier_of(sub.ajoc->sf_multiplier);
             } else if (sub.kind == GroupSubstream::Kind::kObj && sub.obj) {
                 Member& m =
                     add_member(plan, count, sub.obj->substream_index, sub.obj->b_iframe, role,
                                group_index, gain_slot_v1(p, position), group.content_type);
                 m.coding = Coding::kObjects;
+                m.rate_multiplier = rate_multiplier_of(sub.obj->sf_multiplier);
             } else {
                 decodable = false;
             }
@@ -180,7 +193,8 @@ void plan_v0(const Toc& toc, std::size_t index, PresentationPlan& plan) {
     bool decodable = !p.substreams.empty();
     std::size_t count = 0;
     for (const auto& [name, chan] : p.substreams) {
-        decodable = decodable && decodable_substream(chan) && !chan.hsf_ext_substream_index;
+        decodable =
+            decodable && decodable_substream(chan, chan.hsf_ext_substream_index.has_value());
         add_member(plan, count, chan, role_v0(name), -1, std::nullopt, chan.content_type);
     }
     plan.members.resize(count);

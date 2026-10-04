@@ -1384,6 +1384,32 @@ The sections below contain the complete change list and fixes.
   the presentation and the gains from its input. librempeg decodes a presentation's first substream
   alone, and MediaInfo reads a second parameter set after `de_ms_proc_flag` that the text does not
   send; `src/ac4dec/ERRATA.md` records the readings.
+- **AC-4 decodes 96 and 192 kHz substreams in the SIMPLE codec mode.** A substream with
+  `sf_multiplier` and its HSF extension substream decodes to PCM at its own rate: the extension's scale
+  factors, noise levels and spectral lines in 2x and 4x transforms (Part 1 Tables 99 to 108 and Annex B),
+  stereo processing, windows, frame alignment, the sample rate converter, the output level gain and the
+  downmix. `DecodedFrame::sample_rate_hz` is 96000 or 192000, and `PresentationInfo` and
+  `PresentationMember` carry `sample_rate_hz` before a frame is decoded. A-SPX and A-CPL, the speech
+  spectral frontend, the immersive and 22.2 elements, objects, mixing, dialogue enhancement and DRC's
+  compression are refused by name at these rates. The loudness meter refuses a stream at a rate other
+  than 44.1 or 48 kHz, and Hearth refuses one whose decoded rate differs from its table of contents'.
+  No stream at these rates exists: streams built from the text carry tones above 24 kHz, and the second
+  transcription reads them alike (`src/ac4dec/ERRATA.md`, "96 and 192 kHz").
+- **AC-4 decodes the efficient high frame rate mode.** A presentation whose `frame_rate_fraction` is 2 or
+  4 (Part 2 5.1.3) spreads one codec frame over that many `raw_ac4_frame()`s; the decoder holds the
+  fragments in Figure 8's FIFO and decodes the unit when the last arrives, at the audio frame rate of
+  Table 18. `decode()` returns no frame for the others, and a unit that does not arrive whole is
+  concealed. DEE's immersive stereo cut into fragments decodes to the same PCM as the uncut stream. The
+  encoder's table of contents writer codes `frame_rate_fraction`; no stream uses the mode
+  (`src/ac4dec/ERRATA.md`, "The efficient high frame rate mode").
+- **AC-4 decodes the speech spectral frontend.** `ssf_data()` and its arithmetic coded granules
+  (Part 1 4.2.9 and 5.2, with Annex C's tables generated from the attachment) decode to spectral lines
+  in the mono, stereo and A-CPL stereo elements, SIMPLE or ASPX, in long and short stride. A second
+  transcription, `tools/references/ssf_ref.py`, agrees on random streams. No stream uses the tool, and
+  the text's defects and the readings taken for them are in `src/ac4dec/ERRATA.md`, "The speech
+  spectral frontend".
+- **AC-4 EMDF payload substreams are reported.** `SubstreamReport::emdf_payloads` carries the payload
+  id and bytes of each payload of an EMDF substream. Noise fill now has its own test.
 - **AC-4 decodes the 22.2 channel element, in full decoding and as coded.** Both transcriptions read
   `22_2_channel_element()` (Part 2 6.2.4.3) and `ac4::Decoder` decodes its two LFEs and eleven pairs,
   in SIMPLE and ASPX, to 24 channels in the order of Part 2 Table A.27's speaker indices (the LFEs
@@ -1420,7 +1446,7 @@ The sections below contain the complete change list and fixes.
   `OutputConfig::downmix` names, which gains 7.X.4, 7.X.2, 7.X.0, 5.X.4 and 5.X.2: Tables 38 to 43 in
   full decoding and 45 and 46 in core, with the custom downmix data the stream sends and the loudness
   correction of the output, and for two channels and mono Part 1's Table 218 after 5.X.0. DRC's
-  transmitted gains take Part 2 Table 69's groups. The 9.X.4 modes and 22.2 are refused by name.
+  transmitted gains take Part 2 Table 69's groups. The 9.X.4 modes and 22.2 were refused by name here and are decoded since (below).
   DEE's 5.1.4 legs, one per immersive codec mode it writes, decode with each of the ten tones on its
   own channel, to 0.02 dB where the tops are coded channel by channel, and in core decoding each on
   its core channel at the core gains; rendered to 5.1 and to two channels in both modes they equal

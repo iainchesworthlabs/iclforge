@@ -73,17 +73,23 @@
 // that select it, from the text alone: no stream here uses the tool, and
 // ERRATA.md gives the readings the text's defects needed.
 //
-// What it refuses, with DecodeError::kUnsupported and a reason: the 9.X.4
-// channel modes (Part 2's immersive element with b_5fronts), core decoding of
-// the 22.2 channel element (Table 8 supports full decoding alone) and its
+// What it refuses, with DecodeError::kUnsupported and a reason: core decoding
+// of the 22.2 channel element (Table 8 supports full decoding alone) and its
 // rendering to any DownmixTarget but kAsCoded, an intermediate spatial format
 // mixed into channels Annex A.2.1 has no matrix for, a 96/192 kHz substream
-// whose HSF extension substream could not be resolved and read alongside it,
-// and a substream no element of the table of contents this decoder reads names
-// (an HSF extension substream no ac4_hsf_ext_substream_info() names among
-// them). Refusing is per substream and per frame; the next frame is attempted
-// afresh. decode() refuses, the same way, what it reads and does not turn into
-// PCM: a substream at 96 or 192 kHz.
+// whose HSF extension substream could not be resolved and read alongside it
+// (it is refused rather than decoded at the base rate), and a substream no
+// element of the table of contents this decoder reads names (an HSF extension
+// substream no ac4_hsf_ext_substream_info() names among them). Refusing is per
+// substream and per frame; the next frame is attempted afresh.
+//
+// At 96 and 192 kHz decode() turns a SIMPLE-mode substream with its HSF
+// extension into PCM (Part 1 clauses 4.2.4.3, 5.4 and 6.2.5.2; ERRATA.md,
+// "96 and 192 kHz"). There it refuses, the same way, A-SPX and A-CPL, the
+// speech spectral frontend, the immersive and 22.2 elements, object audio, the
+// mixing of a presentation's substreams, dialogue enhancement where the stream
+// sends it and a gain is asked for, and DRC's compression curve and
+// transmitted gains.
 //
 // ERRATA.md beside this library records where the two standards are
 // ambiguous or defective and the reading taken for each.
@@ -441,6 +447,9 @@ struct DecodedObject {
 
 // One frame of output.
 struct DecodedFrame {
+    // 48000 or 44100 (frame_rate_index 13 only), or for a substream with an HSF extension its own
+    // sampling frequency, 96000 or 192000 (Part 1 clause 5.4, Table 89);
+    // PresentationInfo::sample_rate_hz says it before a frame decodes.
     int sample_rate_hz = 0;
     // Of the frame this came from; for a concealed frame whose table of
     // contents did not read, the counter the stream expected.
@@ -465,7 +474,9 @@ struct DecodedFrame {
     // or 1 602 at 29.97). The decoder's delay is applied: Part 1's frame
     // alignment (clause 5.6), the QMF banks and the QMF domain's history
     // (5.7.1), 1 313 samples at frame_rate_index 13 in every codec mode, and at
-    // the other indices the sample rate converter's too (latency_samples()).
+    // the other indices the sample rate converter's too (latency_samples()). At
+    // 96 and 192 kHz, which have no QMF domain, the alignment's delay alone,
+    // times 2 or 4 (352 x 2 at frame_rate_index 13, 96 kHz), and the converter's.
     std::vector<std::vector<float>> channels;
     std::size_t samples = 0;
     // Set only on a frame DecoderConfig::concealment made in place of one that
@@ -573,6 +584,10 @@ struct PresentationMember {
     // Its channel mode's channels; empty for a substream this decoder does
     // not turn into PCM.
     std::vector<Speaker> speakers;
+    // The sampling frequency of the substream (Part 1 Table 89): the stream's base rate, or two or
+    // four times it where the substream carries sf_multiplier, in which case decode() puts the
+    // presentation out at that rate.
+    int sample_rate_hz = 0;
 };
 
 struct PresentationInfo {
@@ -603,6 +618,10 @@ struct PresentationInfo {
     // The channels decode() puts out as coded: its main or music and effects
     // substream's, which the others are mixed into.
     std::vector<Speaker> speakers;
+    // The rate decode() puts the presentation out at, DecodedFrame::sample_rate_hz: that of the
+    // same substream, 48000 or 44100 or, with an HSF extension, 96000 or 192000 (Part 1 clause
+    // 5.4); 0 for a presentation with no channel-coded substream.
+    int sample_rate_hz = 0;
     std::vector<int> substream_groups;  // ac4_sgi_specifier()'s group_index values, version 1
     std::vector<PresentationMember> members;
     // Whether this decoder turns every substream of it into PCM, and whether
@@ -786,8 +805,9 @@ class ICLFORGE_AC4DEC_EXPORT Decoder {
     // The decoder's delay at the output rate for the stream as last decoded:
     // 1 313 samples at frame_rate_index 13, and at the other indices the same
     // at the internal rate and the converter's delay, to the nearest sample; 0
-    // before a frame has decoded. decode_by_block() holds back up to
-    // kBlockSamples - 1 samples more.
+    // before a frame has decoded. At 96 and 192 kHz the frame alignment's d_pcm
+    // times 2 or 4 (Part 1 clause 5.6), with the converter's where there is one.
+    // decode_by_block() holds back up to kBlockSamples - 1 samples more.
     [[nodiscard]] int latency_samples() const noexcept;
 
     // Forgets everything carried between frames, the samples decode_by_block()

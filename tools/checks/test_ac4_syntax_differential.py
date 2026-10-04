@@ -90,6 +90,25 @@ class Generators(unittest.TestCase):
             self.assertEqual(len(mutated), len(raw))
             self.assertEqual(d.python_layout(mutated), layout)
 
+    def test_synthetic_frames_include_an_hsf_extension_substream(self):
+        """A third of the single-instance Part 1 channel modes name an ac4_hsf_ext_substream()
+        beside the audio, at 96 or 192 kHz: the table of contents says so, and the extension is a
+        substream of its own in the frame (the audio's, the extension's, the presentation's)."""
+        rng = random.Random(3)
+        seen = set()
+        for _ in range(300):
+            raw = d.synthetic(rng)
+            toc = d.ac4_parse.parse_ac4_toc(d.ac4_parse.Reader(raw))
+            substream = toc["substream_groups"][0]["substreams"][0]
+            if not toc["substream_groups"][0]["b_hsf_ext"]:
+                self.assertIsNone(substream["hsf_ext_substream_index"])
+                continue
+            seen.add(substream["info"]["sf_multiplier"])
+            self.assertEqual(substream["hsf_ext_substream_index"], 1)
+            self.assertEqual(toc["n_substreams"], 3)
+            self.assertEqual(len(d.substream_spans(raw)), 3)
+        self.assertEqual(seen, {0, 1})
+
     def test_mutate_with_no_nonempty_substream(self):
         with mock.patch.object(d, "substream_spans", lambda raw: [(4, 0)]):
             self.assertEqual(d.mutate(random.Random(0), b"x"), (None, None))

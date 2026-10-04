@@ -42,9 +42,16 @@ using ScaleFactorGains = std::array<Real, 256>;
 // 0, and at Fixed32 the track's own, which puts its largest line in [1/2, 1)
 // (planning/ac4.md, D14d); that tier forms its gains itself and its table is
 // empty.
+//
+// `hsf` is the track's HSF extension (ETSI TS 103 190-1 clause 4.2.8.7 to 4.2.8.9) where it
+// has one: the vector then holds the core's lines and, after them, the extension's, one
+// exponent for both. Its scale factors and noise levels carry on from the core's, in the order
+// the bitstream sends them (src/ac4dec/ERRATA.md, "Scale factors and noise levels across an HSF
+// extension"); without it the result is what it was.
 [[nodiscard]] ParseResult reconstruct_track(const SfInfo& info, const SfData& data,
                                             const ScaleFactorGains& sf_gain, RandGenState& noise,
-                                            std::vector<Real>& scaled, int& exponent);
+                                            std::vector<Real>& scaled, int& exponent,
+                                            const HsfSfData* hsf = nullptr);
 
 // An SSF track's lines (clause 5.2) in the scalar, already in window order: at double and float
 // the lines themselves, at Fixed32 written at the exponent that keeps the largest below 1, as
@@ -54,14 +61,26 @@ void reconstruct_ssf_track(const SsfData& data, std::vector<Real>& scaled, int& 
 // The length in lines of each window of the frame, in order: one full block
 // for a long frame, otherwise num_windows blocks, each of its group's
 // transform length. Fails when they do not add up to the frame's length.
+// `multiplier` is 1 at 44.1 and 48 kHz, 2 at 96 kHz and 4 at 192 kHz: every block
+// is that many times as long (Tables 99 to 105), and the frame too.
 [[nodiscard]] ParseResult window_lengths(const SubstreamContext& ctx, const AsfPsyInfo& psy,
-                                         std::vector<int>& lengths);
+                                         std::vector<int>& lengths, int multiplier = 1);
 
 // Pseudocode 25: bitstream order to window order, each window's lines
 // ascending, zero above max_sfb. `lengths` is window_lengths()'s result and
 // `spec_reord` receives their sum.
 void ungroup(const SubstreamContext& ctx, const AsfPsyInfo& psy, const SfData& data, std::span<const int> lengths,
              std::span<const Real> scaled, std::vector<Real>& spec_reord);
+
+// Pseudocode 25 for the lines of a track's HSF extension, added to the spectrum ungroup() made
+// of its core's: window w of `lengths` (the blocks at 96 or 192 kHz, `multiplier` times the core's)
+// holds its core lines first and the extension's from line length / multiplier on, band after band
+// as the group has them. `scaled` is the track's vector of reconstruct_track(), whose extension
+// lines start at `core_lines`; `spec_reord` is ungroup()'s result for `lengths`, whose windows
+// have room for them.
+void ungroup_hsf(const SubstreamContext& ctx, const AsfPsyInfo& psy, const HsfSfData& hsf,
+                 int multiplier, std::span<const int> lengths, std::span<const Real> scaled,
+                 std::size_t core_lines, std::vector<Real>& spec_reord);
 
 // ungroup() for a frame of one long block, in one group of one window: the lines of `scaled` are in
 // window order already, so the spectrum is `scaled` with zeros after its last band, and the buffer

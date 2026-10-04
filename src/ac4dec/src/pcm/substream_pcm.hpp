@@ -70,6 +70,18 @@
 // dialogue enhancement substream's channels as its waveform. The output stages
 // then run once, on the mix.
 //
+// A substream at 96 or 192 kHz (Part 1 clause 5.4, sf_multiplier) takes another way: its spectral
+// frontend reads the core's lines and, from the HSF extension substream, the lines beyond
+// 24 kHz, into transforms two or four times as long (clause 5.5.3, Tables 99 to 108), and its
+// SIMPLE codec mode has none of the QMF domain tools, so the inverse transform's output is
+// delayed by clause 5.6 and goes to the sample rate converter of clause 6.2.15 with no
+// analysis or synthesis (decode_hsf(), render_hsf()). Of the output stages that clause 6.2.5.2
+// leaves it, the output level gain (clause 5.7.9.3.3, a scalar) and the downmix (clause 6.2.17,
+// a matrix on samples) apply; dialogue enhancement, the compression curve and gains of DRC,
+// the A-SPX and A-CPL codec modes, mixing a presentation's substreams, the speech spectral
+// frontend and the immersive, 22.2 and object elements are QMF-domain tools or have no HSF
+// text, and are refused by name.
+//
 // An object audio substream (Part 2 clause 6.2.3) decodes its element the same
 // way, in the layout pcm_layout() gives it (pcm/routing.hpp): an A-JOC
 // substream's downmix, whose objects A-JOC makes after A-SPX in full decoding
@@ -242,6 +254,26 @@ class SubstreamPcm {
         std::size_t count = 1;
     };
 
+    // A substream at 96 or 192 kHz (ctx.sf_multiplier): refused by name for what its text does not
+    // define, otherwise decoded to PCM at its own rate (decode()'s counterpart).
+    [[nodiscard]] ParseResult decode_hsf(const SubstreamContext& ctx,
+                                         const AudioSubstream& substream,
+                                         const FrameInputs& frame_inputs,
+                                         std::vector<std::vector<float>>& channels,
+                                         std::vector<Speaker>& speakers);
+    [[nodiscard]] ParseResult configure_hsf(const SubstreamContext& ctx, DecodingMode decoding);
+    void configure_hsf_outputs(const SubstreamContext& ctx, const OutputConfig& output);
+    // From the frame's spectra to its output, with no QMF domain: the inverse transform, frame
+    // alignment, the output level gain and downmix, and the sample rate converter.
+    [[nodiscard]] ParseResult render_hsf(const FrameInputs& frame_inputs,
+                                         const DownmixValues& downmix,
+                                         std::vector<std::vector<float>>& channels,
+                                         std::vector<Speaker>& speakers);
+    // Channel c's blocks through the inverse transform into `samples`, and the clause 5.6 delay
+    // of the result into `aligned`.
+    void transform_channel(std::size_t c, std::span<Real> samples);
+    void align_channel(std::size_t c, std::span<const Real> samples, std::span<Real> aligned);
+
     // From the frame's spectra (spectra_ and lengths_) to its output: the
     // inverse transform, frame alignment and QMF analysis, the QMF domain with
     // the frame's control data, which the caller has made at the back of held_
@@ -287,7 +319,11 @@ class SubstreamPcm {
     // The last slots of `ext` become the next frame's history.
     void shift_history();
 
-    int full_length_ = 0;
+    int full_length_ =
+        0;  // the frame's samples at the internal rate: 96 and 192 kHz's are 2 and 4 times
+    // 1 at 44.1 and 48 kHz, 2 at 96 kHz and 4 at 192 kHz: the substream's rate over the base rate
+    // (Table 89), with which every block, the frame and the alignment delay are as long.
+    int hsf_multiplier_ = 1;
     int ch_mode_ = -1;  // the element's layout: pcm_layout()'s
     // How the substream codes its audio, and an A-JOC substream's downmix.
     AudioCoding coding_ = AudioCoding::kChannel;
@@ -420,6 +456,14 @@ class SubstreamPcm {
     // track the one it takes, or -1 for its own.
     std::vector<SfData> dual_layouts_;
     std::vector<int> dual_layout_of_;
+    // At 96 and 192 kHz: each track's number of core lines, the extension's following them in
+    // scaled_[t]; the output level's last dialnorm (clause 5.7.9.3.3 holds it while the stream
+    // sends none); the alignment's output per channel, the downmix's, and each output's converter.
+    std::vector<std::size_t> core_lines_;
+    std::optional<double> hsf_dialnorm_;
+    std::vector<std::vector<Real>> hsf_aligned_;
+    std::vector<std::vector<Real>> hsf_mixed_;
+    std::vector<std::optional<dsp::Resampler<Real>>> hsf_converters_;
     std::vector<std::vector<Real>> spectra_;  // per channel, in window order
     std::vector<int> track_of_;               // per channel, the track its lines are in
     std::vector<Real> pcm_;

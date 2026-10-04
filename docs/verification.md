@@ -951,14 +951,12 @@ channel-coded audio substreams in the Part 1 channel elements (ASF spectral data
 companding, A-SPX and A-CPL data, and `metadata()` with its DRC and dialogue enhancement), a
 channel-coded substream's HSF extension substream where one resolves to a distinct, readable
 substream (the additional scale factor bands, spectral data and noise fill above 24 kHz a 96 kHz or
-192 kHz substream carries), the immersive element of the 7.X.4 channel modes, object substreams
+192 kHz substream carries, which it decodes to PCM at that rate in the SIMPLE codec mode), the immersive element of the 7.X.4 and 9.X.4 channel modes, object substreams
 (A-JOC and direct-coded objects, with their object audio metadata), and EMDF payload substreams.
 It decodes the speech spectral frontend (Part 1 clause 5.2) from the text alone, the syntax and
 the arithmetic coded data in one pass, checked against a second transcription
-(`tools/references/ssf_ref.py`) on random streams. It refuses, with a named reason, the 9.X.4
-channel modes, core decoding of the 22.2 channel element and its rendering to any layout but as coded (Part 2 has neither),
-an intermediate spatial format mixed into channels Annex A.2.1 has no
-matrix for, a 96/192 kHz substream whose HSF extension substream could not be resolved, and a
+(`tools/references/ssf_ref.py`) on random streams. The decode at 96 and 192 kHz is checked on streams built from the text alone (`tests/ac4dec/ac4dec_hsf.cpp`): tones above 24 kHz come back at their frequency and level through every transform length, grouping and channel element, the second transcription reads the committed streams alike, and no real stream at these rates exists. It refuses, with a named reason, core decoding of the 22.2 channel element and its rendering to any layout but as coded (Part 2 has neither), an intermediate spatial format mixed into channels Annex A.2.1 has no
+matrix for, a 96/192 kHz substream whose HSF extension substream could not be resolved, at 96 and 192 kHz A-SPX and A-CPL, the speech spectral frontend, the immersive and 22.2 elements, objects, mixing, dialogue enhancement and DRC's compression, and a
 substream no element of the table of contents names.
 
 With no reference output to compare against, the syntax is transcribed twice, separately, from the
@@ -1272,6 +1270,17 @@ reading is in `src/ac4dec/ERRATA.md`, under "Presentations".
   puts out silence for 15 and 16 presentations over 22 and 23 substreams, and refuses
   `bitstream_version` 1 ("not yet implemented"), which the version 0 stream is. Part 2 bounds none of
   these counts.
+
+### The decoder's 9.X.4 modes
+
+The 9.X.4 modes (Part 2 6.2.4.1 with `b_5fronts`) have no oracle outside the project. Five constructed
+streams (`tests/golden/ac4dec/constructed/9_*.ac4`) carry a distinct tone per channel; both transcriptions
+of the syntax read them to the same digests, and the decoder puts each tone on its channel in full and core
+decoding. The differential check compares the transcriptions on 600 streams. Unit tests hold S-CPL, A-SPX
+gains, A-CPL's six modules, the core dialogue enhancement interpolation, the renderer's 9.X rows (a second
+transcription, as printed) and DRC's groups, and each was mutation-checked. The float and fixed-point
+agreement floors are in `tests/golden/ac4dec/scalar-agreement*.json`. These show the decoder does what the
+readings in `src/ac4dec/ERRATA.md` ("The 9.X.4 element") say, not that they are what an encoder meant.
 
 ### The decoder's 22.2 element
 

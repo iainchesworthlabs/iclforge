@@ -18,7 +18,8 @@ streams of several presentations, the one a system chooses decoded with all of i
 mixed; the output level and dynamic range control, dialogue enhancement and the downmix; and it
 conceals a frame that does not decode when asked to. It refuses, per substream and per frame, with
 `DecodeError::kUnsupported` and a reason: core decoding of the 22.2
-element and its rendering to any layout but as coded, and output at 96 or 192 kHz. It decodes the
+element and its rendering to any layout but as coded, and, in a stream at 96 or 192 kHz, what the HSF
+text does not give it ([96 and 192 kHz](#96-and-192-khz)). It decodes the
 speech spectral frontend (Part 1 clause 5.2) for the tracks that select it, from the text alone: no
 stream here uses it. A presentation in the efficient high frame rate
 mode (`frame_rate_fraction` 2 or 4, Part 2 clause 5.1.3) spreads one codec frame over that many
@@ -161,6 +162,33 @@ reference has to outlive the decoder. The records are described under
 `associated-gain=`, `md-compat=`, `decoding=`, `conceal=`); see
 [Commands](../forge/cli/commands.md#the-output-stage-channels-downmix-drcmode).
 
+### 96 and 192 kHz
+
+A substream whose `ac4_substream_info()` carries `sf_multiplier` (Part 1 Table 89) is at 96 or 192 kHz, and
+its group's `ac4_hsf_ext_substream()` holds the lines beyond 24 kHz (clause 4.2.4.3). The decoder reads the
+core's lines and the extension's into transforms two or four times as long (Tables 99 to 105, with Annex B's
+Tables B.2 to B.7 for the bands), inverse transforms them with Table 186's windows, delays them by clause
+5.6, and passes them through the sample rate converter of clause 6.2.15 at the same ratio as at 48 kHz.
+`DecodedFrame::sample_rate_hz` is then 96000 or 192000, each frame holds twice or four times the samples
+Table 83 gives at 48 kHz, and `decode_by_block()` hands them over in the same blocks of 256 samples
+at that rate. `PresentationInfo::sample_rate_hz` gives the rate before a frame is decoded, so that a player
+can open its output at it.
+
+Clause 5.4 says a stream with high sampling frequency data uses none of the QMF domain tools, and 6.2.5.2
+that decoding it needs the SAP tool and the inverse transform alone. So only a SIMPLE codec mode of the
+mono, stereo, 3.0, 5.X and 7.X elements decodes at these rates, and of the output stages only the output
+level gain (a scalar on the samples) and the downmix (a matrix on them) apply. A stream at 96 or 192 kHz
+that needs more is refused per frame with `DecodeError::kUnsupported` and a reason that names it: the A-SPX
+and A-CPL codec modes, the speech spectral frontend, the immersive and 22.2 elements, object audio, the
+mixing of a presentation's substreams, dialogue enhancement where the stream sends it and `OutputConfig` asks
+for a gain, and the compression of DRC (`DrcMode::kOff` keeps the output level). A 96 or 192 kHz substream
+with no extension substream linked is refused too: the text does not say what rate it is at.
+
+No stream at these rates was available, and no other decoder: the tests decode streams built from the
+text (`tests/golden/ac4-hsf/` and `tests/ac4dec/ac4dec_hsf.hpp`), each channel a tone above 24 kHz where the
+base rate has none, and hold the output to its frequency, level and waveform. The readings the text left open
+are in `src/ac4dec/ERRATA.md` under "96 and 192 kHz".
+
 ## Choosing a presentation
 
 A stream can carry several presentations of its substreams: music and effects with dialogue in
@@ -191,8 +219,8 @@ reading taken. `forge decode` takes the choice as `presentation=` (the position)
   `iclforge::ac4::PresentationInfo`: its `presentation_id`, version, configuration and `md_compat`, whether
   it is enabled, an alternative or pre-virtualized, its name (Part 2 clause 6.3.3.1.4; a name sent
   in chunks over several frames once the decoder has all of it), its language, the channels it
-  decodes to, its substreams with the role each plays, and whether this decoder decodes it and may
-  choose it.
+  decodes to, the sampling frequency it decodes at (`sample_rate_hz`, also on each substream), its
+  substreams with the role each plays, and whether this decoder decodes it and may choose it.
 - `metadata()`: the metadata of the presentation decoded, as the frames read so far have sent it:
   the loudness values (dialnorm and Part 1 clause 4.3.12.3's further values), the DRC
   configuration with each decoder mode and the one applied, dialogue enhancement's method, channels

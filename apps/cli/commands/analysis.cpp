@@ -721,10 +721,13 @@ std::optional<QcProgrammeResult> measure_qc_eac3_objects(std::span<const std::by
 // and no downmix), handed to `on_frame` in order. The layout and the rate are
 // the first frame's, and a frame that changes them is refused. The frames it
 // decoded, with `decoder` holding the metadata the stream sent; nothing, the
-// reason printed, where a frame does not decode or none does.
+// reason printed, where a frame does not decode or none does. With `loudness`, a stream that
+// decodes at 96 or 192 kHz is refused by name: the BS.1770 meter's K-weighting is derived for
+// 44.1 and 48 kHz here, and would measure it at the wrong rate.
 std::optional<std::size_t> decode_ac4_as_coded(
     std::span<const std::byte> stream, std::string_view in_path, iclforge::ac4::Decoder& decoder,
-    const std::function<void(const iclforge::ac4::DecodedFrame&)>& on_frame) {
+    const std::function<void(const iclforge::ac4::DecodedFrame&)>& on_frame,
+    bool loudness = false) {
     const iclforge::ac4::ScanResult scan = iclforge::ac4::scan(stream);
     if (scan.frames.empty()) {
         fmt::println(stderr, "error: {} holds no AC-4 sync frame", in_path);
@@ -755,6 +758,13 @@ std::optional<std::size_t> decode_ac4_as_coded(
         if (decoded_frames == 0) {
             layout = pcm.speakers;
             rate = pcm.sample_rate_hz;
+            if (loudness && rate != 44100 && rate != 48000) {
+                fmt::println(stderr,
+                             "error: {}: this AC-4 stream decodes at {} Hz, and the loudness meter "
+                             "is made for 44.1 and 48 kHz only",
+                             in_path, rate);
+                return std::nullopt;
+            }
         } else if (pcm.speakers != layout || pcm.sample_rate_hz != rate) {
             fmt::println(stderr,
                          "error: {}: frame {}: the channel layout or sample rate changes "
@@ -770,6 +780,13 @@ std::optional<std::size_t> decode_ac4_as_coded(
         return std::nullopt;
     }
     return decoded_frames;
+}
+
+// decode_ac4_as_coded() for the commands that measure loudness.
+std::optional<std::size_t> decode_ac4_for_loudness(
+    std::span<const std::byte> stream, std::string_view in_path, iclforge::ac4::Decoder& decoder,
+    const std::function<void(const iclforge::ac4::DecodedFrame&)>& on_frame) {
+    return decode_ac4_as_coded(stream, in_path, decoder, on_frame, true);
 }
 
 // The meter a decoded AC-4 presentation's channels are measured with, and the
@@ -835,8 +852,8 @@ std::optional<QcResult> measure_qc_ac4(std::span<const std::byte> stream, std::s
     std::optional<Ac4Meter> meter;
     std::uint64_t samples = 0;
     std::vector<std::span<const float>> views;
-    const auto frames =
-        decode_ac4_as_coded(stream, in_path, decoder, [&](const iclforge::ac4::DecodedFrame& pcm) {
+    const auto frames = decode_ac4_for_loudness(
+        stream, in_path, decoder, [&](const iclforge::ac4::DecodedFrame& pcm) {
             if (!meter.has_value()) {
                 meter.emplace(ac4_loudness_meter(pcm, rendered));
                 result.sample_rate_hz = static_cast<std::uint32_t>(pcm.sample_rate_hz);
@@ -1201,8 +1218,8 @@ std::optional<StreamLoudness> measure_ac4_loudness(std::span<const std::byte> st
     iclforge::ac4::Decoder decoder(ac4_coded_config(meta));
     std::optional<Ac4Meter> meter;
     std::vector<std::span<const float>> views;
-    const auto frames =
-        decode_ac4_as_coded(stream, in_path, decoder, [&](const iclforge::ac4::DecodedFrame& pcm) {
+    const auto frames = decode_ac4_for_loudness(
+        stream, in_path, decoder, [&](const iclforge::ac4::DecodedFrame& pcm) {
             if (!meter.has_value()) {
                 meter.emplace(ac4_loudness_meter(pcm, false));
             }
@@ -1492,7 +1509,7 @@ int run_loudness(std::string_view in_path, const Options& meta) {
         std::vector<std::span<const float>> views;
         std::size_t presentation = 0;
         int rate = 0;
-        const auto frames = decode_ac4_as_coded(
+        const auto frames = decode_ac4_for_loudness(
             bytes, in_path, decoder, [&](const iclforge::ac4::DecodedFrame& pcm) {
                 if (!meter.has_value()) {
                     meter.emplace(ac4_loudness_meter(pcm, false));

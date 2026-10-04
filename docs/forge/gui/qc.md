@@ -79,7 +79,8 @@ it, with no output level and so no DRC, dialogue enhancement or downmix, metered
 2/0, 3/0 or 3/2 bed (a 7.X element's last pair left out). The card's dialnorm check reads AC-4's
 dialnorm, in quarter-dB steps (ETSI TS 103 190-1 clause 4.3.12.2.1), and adds the integrated
 loudness the stream states in its further loudness information where it sends one; AC-4 has no
-`compr`, so that line is left out.
+`compr`, so that line is left out. A stream that decodes at 96 or 192 kHz (an HSF extension, Part 1
+clause 4.2.4.3) is refused by name, for the meter's K-weighting is made for 44.1 and 48 kHz.
 
 A **Presentation** picker appears for an AC-4 file. Its first entry is the decoder's own choice
 with no preference, `forge qc`'s default; the others are the table of contents' presentations

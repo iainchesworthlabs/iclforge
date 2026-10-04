@@ -395,8 +395,7 @@ void DownmixStage::push_two(const Mix& lo, const Mix& ro) {
     matrix_.push_back(ro);
 }
 
-void DownmixStage::process(const DownmixValues& values, std::span<const QmfMatrix> in,
-                           std::vector<std::vector<QmfValue>>& out) {
+void DownmixStage::update(const DownmixValues& values) {
     bool changed = false;
     if (values.coeff) {
         coeff_ = values.coeff;
@@ -426,6 +425,11 @@ void DownmixStage::process(const DownmixValues& values, std::span<const QmfMatri
     if (changed) {
         rebuild();
     }
+}
+
+void DownmixStage::process(const DownmixValues& values, std::span<const QmfMatrix> in,
+                           std::vector<std::vector<QmfValue>>& out) {
+    update(values);
     const std::size_t length = in.empty() ? 0 : in.front().size();
     out.resize(matrix_.size());
     for (std::size_t o = 0; o < matrix_.size(); ++o) {
