@@ -743,31 +743,20 @@ void write_downmix(BitWriter& w, const PresentationChannels& p, const DownmixCod
     }
 }
 
-void write_dialog_enhancement(BitWriter& w, const DeConfigCodes* config,
-                              const DeFrameParameters* parameters,
-                              const DeFrameParameters* previous, bool iframe) {
-    w.write(1, config != nullptr ? 1U : 0U, "b_de_data_present");
-    if (config == nullptr) {
-        return;
-    }
-    if (iframe) {
-        w.write(2, static_cast<std::uint64_t>(config->method), "de_method");
-        w.write(2, static_cast<std::uint64_t>(config->max_gain), "de_max_gain");
-        w.write(3, static_cast<std::uint64_t>(config->channel_config), "de_channel_config");
-    } else {
-        w.write(1, 0, "b_de_config_flag");
-    }
-    // de_data(de_method, de_nr_channels, b_iframe), Part 1 Table 78: in the
-    // cross-channel method the panning, kept where it is the last frame's;
-    // then the parameters, of each channel or with de_ms_proc_flag of the
-    // Mid alone, kept where they are the last frame's.
-    const int nr_channels = de_channel_count(config->channel_config);
+namespace {
+
+// de_data(de_method, de_nr_channels, b_iframe, b_de_simulcast), Part 1 Table 78 and Part 2 clause
+// 6.2.7.6: in the cross-channel method the panning (the first set's alone: the simulcast set sends
+// none), kept where it is the last frame's; then the parameters, of each channel or with
+// de_ms_proc_flag of the Mid alone, kept where they are the last frame's.
+void write_de_data(BitWriter& w, const DeConfigCodes& config, const DeFrameParameters& frame,
+                   const DeFrameParameters* previous, bool iframe, bool simulcast) {
+    const int nr_channels = de_channel_count(config.channel_config);
     if (nr_channels == 0) {
         return;
     }
-    const DeFrameParameters& frame = *parameters;
-    const bool cross = config->method == 1 || config->method == 3;
-    if (cross && nr_channels > 1) {
+    const bool cross = config.method == 1 || config.method == 3;
+    if (cross && nr_channels > 1 && !simulcast) {
         bool keep_pos = false;
         if (!iframe) {
             keep_pos = previous != nullptr && frame.mix == previous->mix;
@@ -780,9 +769,9 @@ void write_dialog_enhancement(BitWriter& w, const DeConfigCodes* config,
             }
         }
     }
-    const bool ms = (config->method == 0 || config->method == 2) && nr_channels == 2 && config->mid;
+    const bool ms = (config.method == 0 || config.method == 2) && nr_channels == 2 && config.mid;
     const auto channels = static_cast<std::size_t>(nr_channels - (ms ? 1 : 0));
-    const bool hybrid = config->method >= 2;
+    const bool hybrid = config.method >= 2;
     bool keep = false;
     if (!iframe) {
         keep =
@@ -795,11 +784,11 @@ void write_dialog_enhancement(BitWriter& w, const DeConfigCodes* config,
     if (keep) {
         return;
     }
-    if ((config->method == 0 || config->method == 2) && nr_channels == 2) {
+    if ((config.method == 0 || config.method == 2) && nr_channels == 2) {
         w.write(1, ms ? 1U : 0U, "de_ms_proc_flag");
     }
     const std::array<std::array<int, kDeBands>, 3>& par = frame.par;
-    const bool second = config->method % 2 != 0;
+    const bool second = config.method % 2 != 0;
     const std::span<const HuffCode> abs_codes =
         second ? std::span<const HuffCode>(tables::kDeHcbAbs1Codes)
                : std::span<const HuffCode>(tables::kDeHcbAbs0Codes);
@@ -842,6 +831,35 @@ void write_dialog_enhancement(BitWriter& w, const DeConfigCodes* config,
     }
     if (hybrid) {
         w.write(5, static_cast<std::uint64_t>(frame.signal_contribution), "de_signal_contribution");
+    }
+}
+
+}  // namespace
+
+void write_dialog_enhancement(BitWriter& w, const DeConfigCodes* config,
+                              const DeFrameParameters* parameters,
+                              const DeFrameParameters* previous, bool iframe, int ch_mode,
+                              const DeFrameParameters* core,
+                              const DeFrameParameters* core_previous) {
+    w.write(1, config != nullptr ? 1U : 0U, "b_de_data_present");
+    if (config == nullptr) {
+        return;
+    }
+    if (iframe) {
+        w.write(2, static_cast<std::uint64_t>(config->method), "de_method");
+        w.write(2, static_cast<std::uint64_t>(config->max_gain), "de_max_gain");
+        w.write(3, static_cast<std::uint64_t>(config->channel_config), "de_channel_config");
+    } else {
+        w.write(1, 0, "b_de_config_flag");
+    }
+    write_de_data(w, *config, *parameters, previous, iframe, false);
+    // Part 2 clause 6.2.7.5: the 9.X.4 modes send b_de_simulcast, and with it a second de_data()
+    // for core decoding.
+    if (ch_mode == 13 || ch_mode == 14) {
+        w.write(1, core != nullptr ? 1U : 0U, "b_de_simulcast");
+        if (core != nullptr) {
+            write_de_data(w, *config, *core, core_previous, iframe, true);
+        }
     }
 }
 

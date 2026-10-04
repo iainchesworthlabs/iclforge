@@ -31,6 +31,12 @@ Reads, from --spec-dir (default spec/ in the repo root):
   ts_10319002v010301p.txt                Part 2 Annex A.1.1's and A.1.2's
                                          codebook tables.
 
+The speech spectral frontend's tables (Annex C, clause 5.2) come the same way: C.1's
+bandwidths from the text, and C.2 to C.14 and the 37 quantized prediction coefficient
+matrices from the attachment (ssf_tables.hpp and .cpp), their sizes held to the
+table_length the text prints, and the matrices' layout to the evidence in Pseudocode C.1's
+note below.
+
 Writes each header to src/ac4core/include/iclforge/ac4core/tables/ and each source to
 src/ac4core/src/tables/: huffman_tables.hpp and .cpp (every Annex A
 codebook, its entries sorted by length and then codeword, as
@@ -72,6 +78,13 @@ Checks, all of them before anything is written, every one failing the run:
            |QWIN[640 - n]| for every other n (the signs are the table's own);
            ASPX_NOISE holds 512 pairs, whose mean energy clause 5.7.6.4.3 says
            is 1, and is printed.
+  SSF      every Annex C table has the table_length the text prints; both CDF
+           look-up tables run from 0 to 32 768 and never decrease; CDF_TABLE
+           runs from 0 to 32 768 over 705 entries; STEP_SIZES_Q4_15 never
+           increases and AC_COEFF_MAX_INDEX never decreases; each prediction
+           coefficient matrix holds 33 (2 Rf + 1) Rt entries; and the layout of those
+           matrices is the one in which each (nu, k) row is smooth in eta: the printed
+           index formula (nu, k, eta) is not (see PRED_COEFF_LAYOUT).
   Annex B  Table B.1 lists the fifteen 44.1/48 kHz transform lengths, as
            Table 106 does; every row of Tables B.1 and B.4 to B.19 has
            exactly one reading (see read_row) with its sfb or max_sfb_master
@@ -188,6 +201,32 @@ C_DEFINE = re.compile(r"#define\s+(\w+)\s+(\d+)")
 # Tables A.25 and A.26 name, in the order kIsfMatrices holds them.
 ISF_CONFIGS = ["3100", "5300", "7300", "9500", "7530", "15951"]
 ISF_LAYOUTS = ["2", "5", "7", "9", "502", "504", "702", "704", "902", "904"]
+# Annex C of Part 1, the speech spectral frontend's tables. SSF_FLOAT_TABLES are the float
+# arrays (kept as the decimal text prints them, which is what Python and C++ both read as a
+# double); SSF_INT_TABLES the integer ones. Every entry names the Annex C clause and the
+# table_length the text prints for it.
+SSF_FLOAT_TABLES = {"POST_GAIN_LUT": (20, "C.2"), "PRED_GAIN_QUANT_TAB": (32, "C.3")}
+SSF_INT_TABLES = {
+    "PRED_RFS_TABLE": (37, "C.4"),
+    "PRED_RTS_TABLE": (37, "C.5"),
+    "CDF_TABLE": (705, "C.7"),
+    "PREDICTOR_GAIN_CDF_LUT": (33, "C.8"),
+    "ENVELOPE_CDF_LUT": (33, "C.9"),
+    "DITHER_TABLE": (256, "C.10"),
+    "STEP_SIZES_Q4_15": (21, "C.12"),
+    "AC_COEFF_MAX_INDEX": (21, "C.13"),
+    "SLOPES_DB_TO_LIN": (10, "C.14"),
+    "OFFSETS_DB_TO_LIN": (10, "C.14"),
+    "SLOPES_LIN_TO_DB": (50, "C.14"),
+    "OFFSETS_LIN_TO_DB": (50, "C.14"),
+}
+SSF_MATRICES = 37
+SSF_BLOCK_LENGTHS = [192, 240, 256, 384, 512, 768, 960, 1024]
+SSF_BANDS = 19
+# Pseudocode C.1 prints table_index = (nu + rfs) * rts * 33 + k * 33 + eta. Every one of the 37
+# arrays is smooth along eta only when eta is the middle index and k the fastest: see
+# check_ssf_layout(). The index used is ((nu + rfs) * 33 + eta) * rts + k.
+PRED_COEFF_LAYOUT = "((nu + rfs) * 33 + eta) * rts + k"
 ASPX_NOISE_PAIR = re.compile(r"\{\s*(" + D_NUMBER.pattern + r")\s*,\s*(" + D_NUMBER.pattern
                              + r")\s*\}")
 # A printed number: its first group of digits, then any groups of three after
@@ -1493,6 +1532,256 @@ def emit_isf_source(matrices):
     return out
 
 
+# ---------------------------------------------------------------------------
+# Annex C: the speech spectral frontend's tables
+# ---------------------------------------------------------------------------
+
+SSF_ARRAY = re.compile(
+    r"\b(?:const\s+)?(?:unsigned\s+)?(?:float|int32|int|char)\s+(\w+)\s*\[\s*(\d+)\s*\]\s*=\s*"
+    r"\{([^{}]*)\}\s*;")
+SSF_NUMBER = re.compile(r"-?\d+\.\d+f?|-?0[xX][0-9a-fA-F]+|-?\d+")
+
+
+@dataclass
+class SsfTables:
+    bandwidths: list  # per SSF_BLOCK_LENGTHS entry, SSF_BANDS widths
+    floats: dict      # name -> [decimal text, as printed, without the f suffix]
+    ints: dict        # name -> [int]
+    matrices: list    # SSF_MATRICES lists of ints (one byte each)
+
+
+def parse_ssf_bandwidths(numbered):
+    """Table C.1: SSF_BANDS rows of a band index and one width per block length."""
+    rows = []
+    for _, text in numbered:
+        fields = text.split()
+        # The heading row ("192 240 ... 960 1 024") also has digits only; a band row starts with
+        # the next band index.
+        if (len(fields) == 1 + len(SSF_BLOCK_LENGTHS) and all(f.isdigit() for f in fields)
+                and int(fields[0]) == len(rows)):
+            rows.append([int(f) for f in fields])
+    check(len(rows) == SSF_BANDS, f"Table C.1 has {len(rows)} rows, not {SSF_BANDS}")
+    check([row[0] for row in rows] == list(range(SSF_BANDS)), "Table C.1's band indices skip")
+    columns = [[row[1 + c] for row in rows] for c in range(len(SSF_BLOCK_LENGTHS))]
+    for length, widths in zip(SSF_BLOCK_LENGTHS, columns, strict=True):
+        check(all(a <= b for a, b in itertools.pairwise(widths)),
+              f"Table C.1: the widths at block length {length} shrink")
+    return columns
+
+
+def parse_ssf_table_lengths(numbered):
+    """{name: table_length} for every 'Table name X' / 'table_length N' pair of Annex C."""
+    lengths, name = {}, None
+    for _, text in numbered:
+        fields = text.split()
+        if len(fields) == 3 and fields[:2] == ["Table", "name"]:
+            name = fields[2]
+        elif len(fields) == 2 and fields[0] == "table_length" and name is not None:
+            lengths[name] = int(fields[1])
+            name = None
+    return lengths
+
+
+def parse_ssf(path, numbered_annex_c):
+    source = path.read_text(encoding="utf-8")
+    source = re.sub(r"/\*.*?\*/", " ", source, flags=re.S)
+    source = re.sub(r"//[^\n]*", " ", source)
+    wanted = (set(SSF_FLOAT_TABLES) | set(SSF_INT_TABLES)
+              | {f"ssf_pred_coeff_mat{i}" for i in range(SSF_MATRICES)})
+    arrays = {}
+    for name, size, body in SSF_ARRAY.findall(source):
+        if name not in wanted:
+            continue
+        numbers = SSF_NUMBER.findall(body)
+        leftover = re.sub(r"[\s,]", "", SSF_NUMBER.sub("", body))
+        check(not leftover, f"{name}: unexpected {leftover[:20]!r} among its values")
+        check(len(numbers) == int(size), f"{name}[{size}] holds {len(numbers)} values")
+        arrays[name] = numbers
+    text_lengths = parse_ssf_table_lengths(numbered_annex_c)
+    floats, ints = {}, {}
+    for name, (length, clause) in SSF_FLOAT_TABLES.items():
+        check(name in arrays, f"the attachment has no {name} (Annex {clause})")
+        check(len(arrays[name]) == length, f"{name} holds {len(arrays[name])}, not {length}")
+        check(text_lengths.get(name) == length,
+              f"Annex {clause} prints table_length {text_lengths.get(name)} for {name}, "
+              f"not {length}")
+        floats[name] = [n[:-1] if n.endswith("f") else n for n in arrays[name]]
+    for name, (length, clause) in SSF_INT_TABLES.items():
+        check(name in arrays, f"the attachment has no {name} (Annex {clause})")
+        check(len(arrays[name]) == length, f"{name} holds {len(arrays[name])}, not {length}")
+        check(text_lengths.get(name) == length,
+              f"Annex {clause} prints table_length {text_lengths.get(name)} for {name}, "
+              f"not {length}")
+        ints[name] = [int(n, 16) if n.lstrip("-")[:2].lower() == "0x" else int(n)
+                      for n in arrays[name]]
+    matrices = []
+    for index in range(SSF_MATRICES):
+        name = f"ssf_pred_coeff_mat{index}"
+        check(name in arrays, f"the attachment has no {name}")
+        matrices.append([int(n) for n in arrays[name]])
+    extra = sorted(set(re.findall(r"\bssf_pred_coeff_mat(\d+)\b", source))
+                   - {str(i) for i in range(SSF_MATRICES)})
+    check(not extra, f"unexpected prediction coefficient matrices {extra}")
+    return SsfTables(parse_ssf_bandwidths(numbered_annex_c), floats, ints, matrices)
+
+
+def check_ssf_layout(tables):
+    """Each matrix holds 33 (2 Rf + 1) Rt bytes, and the layout of Pseudocode C.1's printed index
+    formula (nu, k, eta) is the least smooth of the six: the one with eta in the middle and k
+    fastest has rows (fixed nu, k) whose second differences along eta are at least four times
+    smaller than any other layout's wherever Rt > 1."""
+    rfs, rts = tables.ints["PRED_RFS_TABLE"], tables.ints["PRED_RTS_TABLE"]
+    ratios = []
+    for index, matrix in enumerate(tables.matrices):
+        nu, k = 2 * rfs[index] + 1, rts[index]
+        check(len(matrix) == 33 * nu * k,
+              f"ssf_pred_coeff_mat{index} holds {len(matrix)}, not 33 * {nu} * {k}")
+        check(all(0 <= v <= 255 for v in matrix), f"ssf_pred_coeff_mat{index} is not bytes")
+        if k == 1:
+            continue
+        sizes = {"nu": nu, "k": k, "eta": 33}
+        scores = {}
+        for order in itertools.permutations(("nu", "k", "eta")):
+            # order is slowest to fastest; sum |second difference along eta| over every row.
+            strides, stride = {}, 1
+            for axis in reversed(order):
+                strides[axis] = stride
+                stride *= sizes[axis]
+            total = 0
+            for a in range(sizes["nu"]):
+                for b in range(sizes["k"]):
+                    line = [matrix[a * strides["nu"] + b * strides["k"] + e * strides["eta"]]
+                            for e in range(33)]
+                    total += sum(abs(line[e] - 2 * line[e + 1] + line[e + 2]) for e in range(31))
+            scores[order] = total
+        best = ("nu", "eta", "k")
+        others = min(v for o, v in scores.items() if o != best)
+        check(scores[best] * 4 <= others,
+              f"ssf_pred_coeff_mat{index}: layout {best} is not the smoothest by a factor of four "
+              f"({scores[best]} against {others})")
+        ratios.append(others / max(scores[best], 1))
+    return min(ratios)
+
+
+SSF_HEADER = [
+    "#pragma once",
+    "",
+    "#include <array>",
+    "#include <cstdint>",
+    "#include <span>",
+    "",
+    "// ETSI TS 103 190-1 V1.4.1 Annex C, the speech spectral frontend's tables (clause 5.2).",
+    "// GENERATED by tools/generators/gen_ac4_tables.py from the attachment",
+    "// ts_103190_tables.c and the text of Annex C; do not edit by hand.",
+    "",
+    "namespace iclforge::ac4::detail::tables {",
+    "",
+    "// Table C.1: the block lengths (n_mdct) it has columns for, and for each the width in",
+    f"// lines of each of the {SSF_BANDS} bands.",
+    f"inline constexpr std::array<int, {len(SSF_BLOCK_LENGTHS)}> kSsfBlockLengths = "
+    f"{{{', '.join(map(str, SSF_BLOCK_LENGTHS))}}};",
+    f"extern const std::array<std::array<std::uint8_t, {SSF_BANDS}>, "
+    f"{len(SSF_BLOCK_LENGTHS)}> kSsfBandWidths;",
+    "",
+    "// Tables C.2 and C.3, as the decimal text prints them, in double.",
+    "extern const std::array<double, 20> kSsfPostGainLut;",
+    "extern const std::array<double, 32> kSsfPredGainQuantTab;",
+    "",
+    "// Tables C.4 and C.5, indexed by tab_idx.",
+    "extern const std::array<std::int8_t, 37> kSsfPredRfsTable;",
+    "extern const std::array<std::int8_t, 37> kSsfPredRtsTable;",
+    "",
+    "// Annex C.6: ssf_pred_coeff_mat<tab_idx>, as the attachment lays them out. The layout",
+    "// is ((nu + Rf) * 33 + eta) * Rt + k, not the index of Pseudocode C.1",
+    "// (src/ac4dec/ERRATA.md, \"The layout of the SSF prediction coefficient tables\").",
+    "extern const std::array<std::span<const std::uint8_t>, 37> kSsfPredCoeffQuantMat;",
+    "",
+    "// Tables C.6 to C.9: CDF_TABLE (index -352 to 352 offset by 352), PREDICTOR_GAIN_CDF_LUT",
+    "// and ENVELOPE_CDF_LUT, in Q0.15.",
+    "extern const std::array<std::uint16_t, 705> kSsfCdfTable;",
+    "extern const std::array<std::uint16_t, 33> kSsfPredictorGainCdfLut;",
+    "extern const std::array<std::uint16_t, 33> kSsfEnvelopeCdfLut;",
+    "",
+    "// Table C.9: DITHER_TABLE in Q0.15.",
+    "extern const std::array<std::uint16_t, 256> kSsfDitherTable;",
+    "",
+    "// Tables C.11 and C.12: STEP_SIZES_Q4_15 and AC_COEFF_MAX_INDEX, by i_alloc.",
+    "extern const std::array<std::int32_t, 21> kSsfStepSizesQ4_15;",
+    "extern const std::array<std::uint8_t, 21> kSsfAcCoeffMaxIndex;",
+    "",
+    "// Tables C.13 to C.16, the dB conversions of Pseudocodes 29 and 30.",
+    "extern const std::array<std::int16_t, 10> kSsfSlopesDbToLin;",
+    "extern const std::array<std::int16_t, 10> kSsfOffsetsDbToLin;",
+    "extern const std::array<std::int16_t, 50> kSsfSlopesLinToDb;",
+    "extern const std::array<std::int16_t, 50> kSsfOffsetsLinToDb;",
+    "",
+    "}  // namespace iclforge::ac4::detail::tables",
+]
+
+
+def emit_ssf_source(tables):
+    def array(ctype, name, values):
+        return [f"const std::array<{ctype}, {len(values)}> {name} = {{",
+                *wrap([str(v) for v in values], "   "), "};", ""]
+
+    ints = tables.ints
+    check(all(0 <= v <= 65535 for v in ints["CDF_TABLE"]), "CDF_TABLE does not fit 16 bits")
+    check(all(-32768 <= v <= 32767 for n in ("SLOPES_DB_TO_LIN", "OFFSETS_DB_TO_LIN",
+                                              "SLOPES_LIN_TO_DB", "OFFSETS_LIN_TO_DB")
+              for v in ints[n]), "a dB table does not fit 16 bits")
+    out = ['#include "iclforge/ac4core/tables/ssf_tables.hpp"', "",
+           "namespace iclforge::ac4::detail::tables {", "namespace {", ""]
+    for index, matrix in enumerate(tables.matrices):
+        out.append(f"constexpr std::array<std::uint8_t, {len(matrix)}> kMat{index} = {{")
+        out.extend(wrap([str(v) for v in matrix], "   "))
+        out.extend(["};", ""])
+    out.extend(["}  // namespace", ""])
+    out.append(f"const std::array<std::array<std::uint8_t, {SSF_BANDS}>, "
+               f"{len(SSF_BLOCK_LENGTHS)}> kSsfBandWidths = {{{{")
+    for column in tables.bandwidths:
+        out.append(f"    {{{', '.join(map(str, column))}}},")
+    out.extend(["}};", ""])
+    out.extend(array("double", "kSsfPostGainLut", tables.floats["POST_GAIN_LUT"]))
+    out.extend(array("double", "kSsfPredGainQuantTab", tables.floats["PRED_GAIN_QUANT_TAB"]))
+    out.extend(array("std::int8_t", "kSsfPredRfsTable", ints["PRED_RFS_TABLE"]))
+    out.extend(array("std::int8_t", "kSsfPredRtsTable", ints["PRED_RTS_TABLE"]))
+    out.append("const std::array<std::span<const std::uint8_t>, 37> kSsfPredCoeffQuantMat = {{")
+    out.extend(wrap([f"kMat{i}" for i in range(SSF_MATRICES)], "   "))
+    out.extend(["}};", ""])
+    out.extend(array("std::uint16_t", "kSsfCdfTable", ints["CDF_TABLE"]))
+    out.extend(array("std::uint16_t", "kSsfPredictorGainCdfLut", ints["PREDICTOR_GAIN_CDF_LUT"]))
+    out.extend(array("std::uint16_t", "kSsfEnvelopeCdfLut", ints["ENVELOPE_CDF_LUT"]))
+    out.extend(array("std::uint16_t", "kSsfDitherTable", ints["DITHER_TABLE"]))
+    out.extend(array("std::int32_t", "kSsfStepSizesQ4_15", ints["STEP_SIZES_Q4_15"]))
+    out.extend(array("std::uint8_t", "kSsfAcCoeffMaxIndex", ints["AC_COEFF_MAX_INDEX"]))
+    out.extend(array("std::int16_t", "kSsfSlopesDbToLin", ints["SLOPES_DB_TO_LIN"]))
+    out.extend(array("std::int16_t", "kSsfOffsetsDbToLin", ints["OFFSETS_DB_TO_LIN"]))
+    out.extend(array("std::int16_t", "kSsfSlopesLinToDb", ints["SLOPES_LIN_TO_DB"]))
+    out.extend(array("std::int16_t", "kSsfOffsetsLinToDb", ints["OFFSETS_LIN_TO_DB"]))
+    out.append("}  // namespace iclforge::ac4::detail::tables")
+    return out
+
+
+def check_ssf_values(tables):
+    ints = tables.ints
+    for name in ("PREDICTOR_GAIN_CDF_LUT", "ENVELOPE_CDF_LUT", "CDF_TABLE"):
+        values = ints[name]
+        check(values[0] == 0 and values[-1] == 32768, f"{name} does not run from 0 to 32 768")
+        check(all(a <= b for a, b in itertools.pairwise(values)), f"{name} decreases")
+    check(all(0 <= v < 32768 for v in ints["DITHER_TABLE"]), "DITHER_TABLE leaves Q0.15 [0, 1)")
+    steps = ints["STEP_SIZES_Q4_15"]
+    check(steps[0] == 0 and all(a >= b for a, b in itertools.pairwise(steps[1:])),
+          "STEP_SIZES_Q4_15 is not [0, then non-increasing]")
+    check(all(a <= b for a, b in itertools.pairwise(ints["AC_COEFF_MAX_INDEX"])),
+          "AC_COEFF_MAX_INDEX decreases")
+    check(all(0 < r <= 6 and 0 < t <= 4 for r, t in zip(ints["PRED_RFS_TABLE"],
+                                                       ints["PRED_RTS_TABLE"], strict=True)),
+          "PRED_RFS_TABLE or PRED_RTS_TABLE leaves its range")
+    gains = [Fraction(n) for n in tables.floats["PRED_GAIN_QUANT_TAB"]]
+    check(all(a < b for a, b in itertools.pairwise(gains)), "PRED_GAIN_QUANT_TAB is not increasing")
+
+
+
 def report_codebooks(codebooks):
     print(f"{'codebook':<28} {'table':>6} {'entries':>7} {'bits':>6}  Kraft sum")
     for cb in codebooks:
@@ -1549,6 +1838,9 @@ def main():
     qwin = parse_qwin(tables_c)
     aspx_noise = parse_aspx_noise(tables_c)
     isf = parse_isf(tables2_c)
+    ssf = parse_ssf(tables_c, annex(lines, "C", "D"))
+    check_ssf_values(ssf)
+    ssf_ratio = check_ssf_layout(ssf)
 
     report_codebooks(codebooks)
     mean_square = sum(Fraction(text[:-1]) ** 2 for text in noise) / len(noise)
@@ -1558,6 +1850,9 @@ def main():
     print(f"ASPX_NOISE: {len(aspx_noise)} entries, mean energy {float(energy):.9f}")
     print(f"QWIN: {len(qwin)} entries, |QWIN[n]| == |QWIN[640 - n]|, "
           f"{sum(1 for text in qwin if text.startswith('-'))} negative")
+    print(f"SSF: {len(ssf.ints)} integer and {len(ssf.floats)} float tables, {SSF_MATRICES} "
+          f"prediction coefficient matrices in layout {PRED_COEFF_LAYOUT} (its rows are at "
+          f"least {ssf_ratio:.0f} times smoother along eta than any other layout's)")
     print(f"ISF: {len(isf)} rendering matrices, {len(ISF_CONFIGS)} formats to "
           f"{len(ISF_LAYOUTS)} layouts")
     print(f"\nAnnex B: num_sfb and offsets for {len(offsets)} transform lengths at 48 kHz, "
@@ -1577,6 +1872,8 @@ def main():
         "qmf_tables.cpp": emit_qmf_source(qwin, aspx_noise),
         "isf_tables.hpp": ISF_HEADER,
         "isf_tables.cpp": emit_isf_source(isf),
+        "ssf_tables.hpp": SSF_HEADER,
+        "ssf_tables.cpp": emit_ssf_source(ssf),
     }
     for name, out in outputs.items():
         for number, text in enumerate(out, start=1):

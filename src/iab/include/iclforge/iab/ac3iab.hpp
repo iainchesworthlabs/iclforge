@@ -18,8 +18,8 @@
 // standalone bitstream reader, the "codec-blind" shape iclforge::matroska, iclforge::mp4 and
 // iclforge::mpegts already use for their own containers (bare `include/ac3iab/` prefix, not
 // `ac3/ac3iab/` - see CONTRIBUTING.md's repository-layout section on what that prefix means).
-// AudioDataDLC's lossless coder (Annex B) is read only by identity in this phase, not decoded
-// - see model.hpp's AudioDataDlc comment. Phase 2 (MXF/KLV extraction for IAB track files - see
+// AudioDataDLC's lossless coder (Annex B) is kept as coded bytes by the reader and decoded by
+// decode_dlc() in dlc.hpp. Phase 2 (MXF/KLV extraction for IAB track files - see
 // mxf.hpp) is implemented alongside this header. Phase 3 (mapping onto iclforge::admbridge's
 // ObjectPath layer, the `atmos-iab` CLI command) is separate, later work.
 //
@@ -48,6 +48,11 @@ enum class IabError : std::uint8_t {
     kUnterminatedString,    // a NUL-terminated ASCII field (AudioDescriptionText,
                            // AuthoringToolURI) ran off the end of its element without a
                            // terminating 0x00 byte
+    kBadDlc,                // AudioDataDLC (Annex B) is structurally invalid: a reserved DLCSampleRate,
+                           // a non-integer IAFrame rate (§10.7), predictor region lengths that do
+                           // not sum to the sub block count (§10.7.6), a residual outside the
+                           // 32-bit range, or a DLCSampleRate that disagrees with the IAFrame's
+                           // SampleRate (§10.2.2)
     kMxfBadKlv,             // mxf.hpp: a KLV Length field violated SMPTE ST 336:2017's BER
                            // encoding rules (the reserved 0x80 "indefinite length" token, or a
                            // long form needing more than the 8 following bytes SMPTE ST 377-1's

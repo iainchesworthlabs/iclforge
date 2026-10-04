@@ -57,6 +57,11 @@ namespace iclforge::hearth::testsink {
 // pairs (ETSI TS 103 190-1 clause D.1; A/52 Table E2.5).
 [[nodiscard]] ac3::eac3::chanmap::Layout ac4_bed(std::span<const iclforge::ac4::Speaker> speakers);
 
+// Whether the layout renderer can place `speakers` as a bed: it takes sixteen coded channels, and
+// Table E2.5 has no location for 22.2's bottom channels or 9.X.4's screen pair. A frame of a wider
+// layout, 22.2's, is refused rather than placed on some of its channels.
+[[nodiscard]] bool ac4_placeable(std::span<const iclforge::ac4::Speaker> speakers);
+
 class BurstOutput {
    public:
     // `prefix` starts every file's name.

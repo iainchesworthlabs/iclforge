@@ -65,13 +65,16 @@
 //     guessed at without the external documents Table 19 itself defers to (SMPTE ST 428-12/
 //     ST 2098-5) for their exact geometry - see iab_bridge.cpp's own mapping table for the full,
 //     cited list of what IS mapped.
-//   - ObjectSpread (§10.5.15-17) and the 9-zone ObjectZoneControl (§10.5.11-14) are not mapped, for
-//     the identical reason spatial-and-atmos.md's own "extent and rendering constraints" section
-//     already gives ADM's own width/height/depth and zoneExclusion: spreading an object in the
-//     downmix would have the receiving renderer spread it a second time, and TS 103 420's own
-//     6-preset ZoneConstraint has no clean image for either IAB shape (a 9-independent-gain vector,
-//     or a 3-way spread). Applied consistently rather than inventing a different policy for this
-//     ingest path than the one ADM's own bridge already committed to.
+//   - ObjectSpread (§10.5.15-17) becomes the keyframe's ObjectSize (iab_spread_to_size()), and the
+//     object's zone control (the nine zones of §10.5.11-14, or the 19 of an ObjectZoneDefinition19
+//     child, which replaces them, §10.6) becomes its ZoneConstraint and b_enable_elevation
+//     (iab_zones_to_constraint(), iab_zones19_to_constraint()). Both are transmitted in OAMD and
+//     stop there, exactly as the ADM bridge's width, height and depth do: AtmosEncoder folds each
+//     object into its 5.1 bed as a point, because spreading it there would have the receiving
+//     renderer spread it a second time. A zone control maps only when its include/exclude pattern
+//     is exactly one of TS 103 420 Table 20's six presets; any other pattern leaves the object
+//     unconstrained. A zone19 update in a sub block with no pan information has no keyframe to
+//     ride on and takes effect at the next sub block that has one.
 //   - PCM is concatenated across many independently-parsed frames, so IabBridgeResult::pcm is
 //     OWNED (std::vector<std::vector<float>>), not borrowed the way BridgeResult::pcm is from a
 //     single caller-owned AdmDocument - there is no equivalent single upstream object here to

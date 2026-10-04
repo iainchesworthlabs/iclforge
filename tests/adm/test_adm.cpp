@@ -1312,3 +1312,281 @@ TEST_CASE("write_bw64 reports an audioTrackUID naming a track and a channel form
     CHECK(written.error() == iclforge::adm::AdmWriteError::kInvalidDocument);
     CHECK_FALSE(std::filesystem::exists(path));
 }
+
+// ---------------------------------------------------------------------------
+// zoneExclusion / objectDivergence / screenRef / headLocked (BS.2076-2 §10.4-10.6)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// zoneExclusion is the one element libadm does not parse, so this fixture is where the text scan
+// in src/adm/src/adm_xml_extras.cpp is exercised: a prefixed element name, a
+// comment and a CDATA section holding text that looks like a zone, an entity in a label, a zone
+// with bounds only, one with a label only, and a block without any zones in between two with.
+constexpr std::string_view kZoneAdmXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<audioFormatExtended version="ITU-R_BS.2076-2">
+  <audioChannelFormat audioChannelFormatID="AC_00031003" audioChannelFormatName="Zones" typeLabel="0003" typeDefinition="Objects">
+    <audioBlockFormat audioBlockFormatID="AB_00031003_00000001" rtime="00:00:00.00000" duration="00:00:01.00000">
+      <cartesian>1</cartesian>
+      <position coordinate="X">0.0</position>
+      <position coordinate="Y">1.0</position>
+      <!-- <zoneExclusion><zone>ZM5</zone></zoneExclusion> -->
+      <objectDivergence azimuthRange="30" positionRange="0.25">0.75</objectDivergence>
+      <screenRef>1</screenRef>
+      <headLocked>1</headLocked>
+      <zoneExclusion>
+        <zone minX="-1" maxX="1" minY="-1" maxY="-0.41934" minZ="-0.499" maxZ="0.499">ZM1</zone>
+        <zone minX="-1.0" maxX="-0.75806" minY="-0.41934" maxY="0.83871" minZ="-0.499" maxZ="0.499"/>
+        <zone>A&amp;B</zone>
+      </zoneExclusion>
+    </audioBlockFormat>
+    <audioBlockFormat audioBlockFormatID="AB_00031003_00000002" rtime="00:00:01.00000" duration="00:00:01.00000">
+      <cartesian>1</cartesian>
+      <position coordinate="X">0.0</position>
+      <position coordinate="Y">1.0</position>
+      <![CDATA[ <zoneExclusion><zone>ZM4</zone></zoneExclusion> ]]>
+    </audioBlockFormat>
+    <audioBlockFormat audioBlockFormatID="AB_00031003_00000003" rtime="00:00:02.00000" duration="00:00:01.00000">
+      <cartesian>1</cartesian>
+      <position coordinate="X">0.0</position>
+      <position coordinate="Y">1.0</position>
+      <adm:zoneExclusion xmlns:adm="urn:example"><adm:zone minX="-1" maxX="1" minY="-1" maxY="1" minZ="0.4995" maxZ="1" /></adm:zoneExclusion>
+    </audioBlockFormat>
+  </audioChannelFormat>
+</audioFormatExtended>
+)";
+
+}  // namespace
+
+TEST_CASE("parses zoneExclusion, objectDivergence, screenRef and headLocked on an Objects block",
+          "[adm][model]") {
+    std::istringstream stream(wrap_axml_only(kZoneAdmXml));
+    auto doc = iclforge::adm::parse_bw64(stream);
+    INFO("parse_bw64: " << (doc ? std::string{"ok"} : std::string(iclforge::adm::describe(doc.error()))));
+    REQUIRE(doc.has_value());
+    const auto& channel = find_by_id(doc->model.channel_formats, "AC_00031003");
+    REQUIRE(channel.block_formats.size() == 3);
+
+    const auto& first = channel.block_formats[0];
+    REQUIRE(first.zone_exclusion.size() == 3);
+    CHECK(first.zone_exclusion[0].label == "ZM1");
+    CHECK(first.zone_exclusion[0].has_bounds);
+    CHECK(first.zone_exclusion[0].max_y == Catch::Approx(-0.41934));
+    CHECK(first.zone_exclusion[0].max_z == Catch::Approx(0.499));
+    // Bounds only: no label.
+    CHECK(first.zone_exclusion[1].label.empty());
+    CHECK(first.zone_exclusion[1].has_bounds);
+    CHECK(first.zone_exclusion[1].max_x == Catch::Approx(-0.75806));
+    // Label only: no bounds, entity decoded.
+    CHECK(first.zone_exclusion[2].label == "A&B");
+    CHECK_FALSE(first.zone_exclusion[2].has_bounds);
+
+    REQUIRE(first.has_object_divergence);
+    CHECK(first.object_divergence.value == Catch::Approx(0.75));
+    REQUIRE(first.object_divergence.has_azimuth_range);
+    CHECK(first.object_divergence.azimuth_range_deg == Catch::Approx(30.0));
+    REQUIRE(first.object_divergence.has_position_range);
+    CHECK(first.object_divergence.position_range == Catch::Approx(0.25));
+    CHECK(first.screen_ref);
+    CHECK(first.head_locked);
+
+    // Zones named only inside a comment or a CDATA section are not zones.
+    CHECK(channel.block_formats[1].zone_exclusion.empty());
+    CHECK_FALSE(channel.block_formats[1].has_object_divergence);
+    CHECK_FALSE(channel.block_formats[1].screen_ref);
+    CHECK_FALSE(channel.block_formats[1].head_locked);
+
+    // A namespace prefix on the element names is ignored.
+    const auto& third = channel.block_formats[2];
+    REQUIRE(third.zone_exclusion.size() == 1);
+    CHECK(third.zone_exclusion[0].has_bounds);
+    CHECK(third.zone_exclusion[0].min_z == Catch::Approx(0.4995));
+}
+
+TEST_CASE("a block with no zoneExclusion reads back with none", "[adm][model]") {
+    std::istringstream stream(wrap_axml_only(kCartesianObjectAdmXml));
+    auto doc = iclforge::adm::parse_bw64(stream);
+    REQUIRE(doc.has_value());
+    const auto& block = find_by_id(doc->model.channel_formats, "AC_00031002").block_formats.at(0);
+    CHECK(block.zone_exclusion.empty());
+    CHECK_FALSE(block.has_object_divergence);
+    CHECK_FALSE(block.screen_ref);
+    CHECK_FALSE(block.head_locked);
+}
+
+TEST_CASE("write_bw64 writes zoneExclusion, objectDivergence, screenRef and headLocked",
+          "[adm][write]") {
+    auto document = objects_document({24U, 24U});
+    // Channel 0: three blocks, zones on the first and third only, so the writer has to put them
+    // on the right blocks. Channel 1 has zones on its only block.
+    auto& first_channel = document.model.channel_formats[0];
+    first_channel.block_formats.push_back(first_channel.block_formats.front());
+    first_channel.block_formats.push_back(first_channel.block_formats.front());
+    for (std::size_t i = 0; i < first_channel.block_formats.size(); ++i) {
+        first_channel.block_formats[i].rtime_s = static_cast<double>(i);
+        first_channel.block_formats[i].has_duration = true;
+        first_channel.block_formats[i].duration_s = 1.0;
+    }
+    first_channel.block_formats[0].zone_exclusion = {
+        {.label = "ZM1", .has_bounds = true, .min_x = -1, .max_x = 1, .min_y = -1, .max_y = -0.41934,
+         .min_z = -0.499, .max_z = 0.499}};
+    first_channel.block_formats[0].has_object_divergence = true;
+    first_channel.block_formats[0].object_divergence = {
+        .value = 0.5, .has_azimuth_range = true, .azimuth_range_deg = 20.0};
+    first_channel.block_formats[2].zone_exclusion = {{.label = "A<B"}};
+    first_channel.block_formats[2].screen_ref = true;
+    first_channel.block_formats[2].head_locked = true;
+    document.model.channel_formats[1].block_formats[0].zone_exclusion = {
+        {.label = "ZU", .has_bounds = true, .min_x = -1, .max_x = 1, .min_y = -1, .max_y = 1,
+         .min_z = 0.4995, .max_z = 1},
+        {.label = "ZB", .has_bounds = true, .min_x = -1, .max_x = 1, .min_y = -1, .max_y = 1,
+         .min_z = -1, .max_z = -0.4995}};
+
+    const auto path = (write_scratch_dir("adm_zone_write") / "zones.wav").string();
+    REQUIRE(iclforge::adm::write_bw64(path, document).has_value());
+
+    std::ifstream in(path, std::ios::binary);
+    REQUIRE(in);
+    const std::string file{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+    const auto axml = find_chunk(file, "axml");
+    REQUIRE(axml.has_value());
+    CHECK(axml->find("<zoneExclusion>") != std::string_view::npos);
+    CHECK(axml->find("A&lt;B") != std::string_view::npos);
+
+    const auto parsed = iclforge::adm::parse_bw64(path);
+    REQUIRE(parsed.has_value());
+    // The writer assigns its own IDs, so the channels are found by name.
+    const iclforge::adm::AudioChannelFormat* zero = nullptr;
+    const iclforge::adm::AudioChannelFormat* one = nullptr;
+    for (const auto& channel : parsed->model.channel_formats) {
+        if (channel.name == "Object 0") {
+            zero = &channel;
+        } else if (channel.name == "Object 1") {
+            one = &channel;
+        }
+    }
+    REQUIRE(zero != nullptr);
+    REQUIRE(one != nullptr);
+
+    REQUIRE(zero->block_formats.size() == 3);
+    REQUIRE(zero->block_formats[0].zone_exclusion.size() == 1);
+    CHECK(zero->block_formats[0].zone_exclusion[0].label == "ZM1");
+    CHECK(zero->block_formats[0].zone_exclusion[0].max_y == Catch::Approx(-0.41934));
+    CHECK(zero->block_formats[1].zone_exclusion.empty());
+    REQUIRE(zero->block_formats[2].zone_exclusion.size() == 1);
+    CHECK(zero->block_formats[2].zone_exclusion[0].label == "A<B");
+    CHECK_FALSE(zero->block_formats[2].zone_exclusion[0].has_bounds);
+
+    REQUIRE(zero->block_formats[0].has_object_divergence);
+    CHECK(zero->block_formats[0].object_divergence.value == Catch::Approx(0.5));
+    REQUIRE(zero->block_formats[0].object_divergence.has_azimuth_range);
+    CHECK(zero->block_formats[0].object_divergence.azimuth_range_deg == Catch::Approx(20.0));
+    CHECK_FALSE(zero->block_formats[0].screen_ref);
+    CHECK_FALSE(zero->block_formats[1].has_object_divergence);
+    CHECK(zero->block_formats[2].screen_ref);
+    CHECK(zero->block_formats[2].head_locked);
+
+    REQUIRE(one->block_formats.size() == 1);
+    REQUIRE(one->block_formats[0].zone_exclusion.size() == 2);
+    CHECK(one->block_formats[0].zone_exclusion[0].label == "ZU");
+    CHECK(one->block_formats[0].zone_exclusion[1].label == "ZB");
+}
+
+TEST_CASE("write_bw64 without any zones writes no zoneExclusion element", "[adm][write]") {
+    const auto document = objects_document({24U});
+    const auto path = (write_scratch_dir("adm_zone_none") / "none.wav").string();
+    REQUIRE(iclforge::adm::write_bw64(path, document).has_value());
+    std::ifstream in(path, std::ios::binary);
+    const std::string file{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+    const auto axml = find_chunk(file, "axml");
+    REQUIRE(axml.has_value());
+    CHECK(axml->find("zoneExclusion") == std::string_view::npos);
+}
+
+// ---------------------------------------------------------------------------
+// write_bw64 sample format
+// ---------------------------------------------------------------------------
+
+TEST_CASE("write_bw64 stores the sample format AdmWriteOptions names", "[adm][write]") {
+    struct Format {
+        std::uint16_t bit_depth;
+        bool is_float;
+        std::uint16_t format_tag;
+        double tolerance;
+    };
+    const auto format = GENERATE(Format{16, false, 1, 1.0 / 32768.0}, Format{24, false, 1, 1.0 / 8388608.0},
+                                 Format{32, false, 1, 1.0e-6}, Format{32, true, 3, 0.0},
+                                 Format{64, true, 3, 0.0});
+    CAPTURE(format.bit_depth, format.is_float);
+
+    auto document = objects_document({std::nullopt});
+    const auto path =
+        (write_scratch_dir("adm_write_format") /
+         ("format_" + std::to_string(format.bit_depth) + (format.is_float ? "f" : "i") + ".wav"))
+            .string();
+    REQUIRE(iclforge::adm::write_bw64(path, document,
+                                      {.bit_depth = format.bit_depth, .float_samples = format.is_float})
+                .has_value());
+
+    // The raw <fmt > chunk, then the same through the reader.
+    std::ifstream in(path, std::ios::binary);
+    const std::string file{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+    const auto fmt = find_chunk(file, "fmt ");
+    REQUIRE(fmt.has_value());
+    CHECK(get_u16le(*fmt, 0) == format.format_tag);
+    CHECK(get_u16le(*fmt, 14) == format.bit_depth);
+
+    const auto axml = find_chunk(file, "axml");
+    REQUIRE(axml.has_value());
+    const auto tags = track_uid_start_tags(*axml);
+    REQUIRE(tags.size() == 1);
+    CHECK(tags[0].find("bitDepth=\"" + std::to_string(format.bit_depth) + "\"") != std::string_view::npos);
+
+    const auto parsed = iclforge::adm::parse_bw64(path);
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->audio.bits_per_sample == format.bit_depth);
+    REQUIRE(parsed->audio.channels.size() == 1);
+    REQUIRE(parsed->audio.channels[0].size() == document.audio.channels[0].size());
+    for (std::size_t i = 0; i < document.audio.channels[0].size(); ++i) {
+        CHECK(static_cast<double>(parsed->audio.channels[0][i]) ==
+              Catch::Approx(static_cast<double>(document.audio.channels[0][i])).margin(format.tolerance + 1e-9));
+    }
+}
+
+TEST_CASE("write_bw64 rejects a sample format libbw64 cannot write and creates no file",
+          "[adm][write]") {
+    const auto document = objects_document({24U});
+    const auto dir = write_scratch_dir("adm_write_bad_format");
+    struct Bad {
+        std::uint16_t bit_depth;
+        bool is_float;
+    };
+    const auto bad = GENERATE(Bad{8, false}, Bad{20, false}, Bad{64, false}, Bad{16, true}, Bad{24, true},
+                              Bad{0, false});
+    CAPTURE(bad.bit_depth, bad.is_float);
+    const auto path = (dir / ("bad_" + std::to_string(bad.bit_depth) + (bad.is_float ? "f" : "i") + ".wav")).string();
+    const auto written =
+        iclforge::adm::write_bw64(path, document, {.bit_depth = bad.bit_depth, .float_samples = bad.is_float});
+    REQUIRE_FALSE(written.has_value());
+    CHECK(written.error() == iclforge::adm::AdmWriteError::kInvalidOptions);
+    CHECK_FALSE(std::filesystem::exists(path));
+}
+
+TEST_CASE("write_bw64 writes a sample rate above 16 bits unchanged", "[adm][write]") {
+    // bw64::writeFile() narrows the rate to 16 bits; 96 kHz is the case that shows it.
+    auto document = objects_document({24U});
+    document.audio.sample_rate = 96000;
+    const auto path = (write_scratch_dir("adm_write_rate") / "rate96k.wav").string();
+    REQUIRE(iclforge::adm::write_bw64(path, document).has_value());
+    const auto parsed = iclforge::adm::parse_bw64(path);
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->audio.sample_rate == 96000);
+}
+
+TEST_CASE("describe() returns a non-empty string for every AdmWriteError", "[adm][write]") {
+    using iclforge::adm::AdmWriteError;
+    for (const auto error : {AdmWriteError::kInvalidDocument, AdmWriteError::kCannotOpen,
+                             AdmWriteError::kOther, AdmWriteError::kInvalidOptions}) {
+        CHECK_FALSE(iclforge::adm::describe(error).empty());
+    }
+}

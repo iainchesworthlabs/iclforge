@@ -286,7 +286,17 @@ void register_ac4(py::module_& m) {
         .value("kTopSideLeft", iclforge::ac4::Speaker::kTopSideLeft,
                "Tsl, the top pair of the X.2 layouts")
         .value("kTopSideRight", iclforge::ac4::Speaker::kTopSideRight)
-        .value("kLfe2", iclforge::ac4::Speaker::kLfe2, "the second LFE a bed can assign");
+        .value("kLfe2", iclforge::ac4::Speaker::kLfe2, "the second LFE a bed can assign")
+        .value("kLeftScreen", iclforge::ac4::Speaker::kLeftScreen,
+               "Lscr, the screen edge pair of the 9.X.4 layouts")
+        .value("kRightScreen", iclforge::ac4::Speaker::kRightScreen)
+        .value("kTopFrontCentre", iclforge::ac4::Speaker::kTopFrontCentre, "Tfc, in 22.2")
+        .value("kTopBackCentre", iclforge::ac4::Speaker::kTopBackCentre, "Tbc, in 22.2")
+        .value("kTopCentre", iclforge::ac4::Speaker::kTopCentre, "Tc, in 22.2")
+        .value("kBottomFrontLeft", iclforge::ac4::Speaker::kBottomFrontLeft, "Bfl, in 22.2")
+        .value("kBottomFrontRight", iclforge::ac4::Speaker::kBottomFrontRight)
+        .value("kBottomFrontCentre", iclforge::ac4::Speaker::kBottomFrontCentre)
+        .value("kCentreBack", iclforge::ac4::Speaker::kCentreBack, "Cb, in 22.2");
 
     py::enum_<iclforge::ac4::ObjectKind>(ac4_module, "ObjectKind",
                                "bed_dyn_obj_assignment() (Part 2 clause 6.2.1.10).")

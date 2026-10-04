@@ -47,9 +47,17 @@
 // a channel until S-CPL, A-CPL or A-JCC makes one of it; each is held in the
 // channel it becomes, read from Tables 23, 8 and 25 together: A'' in L, B'' in
 // R, C'' in C, D'' in Ls, E'' in Rs, F'' in Tfl, G'' in Tfr, H'' in Lb, I'' in
-// Rb, J'' in Tbl and K'' in Tbr. Core decoding keeps A'' to G'' (Table 24), F''
-// and G'' in the core's Tsl and Tsr, and reads H to K without decoding them.
-// src/ac4dec/ERRATA.md, "The immersive element", records the readings.
+// Rb, J'' in Tbl and K'' in Tbr; with b_5fronts (the 9.X.4 modes) the 12th and
+// 13th signals, which Table 19 calls L and M and Tables 23 and 25 L'' and M'', in
+// Lscr and Rscr, where Table 25 has A-CPL's inputs x3 and x4. Core decoding keeps A''
+// to G'' (Table 24), F'' and G'' in the core's Tsl and Tsr, and reads H to M
+// without decoding them. src/ac4dec/ERRATA.md, "The immersive element" and "The
+// 9.X.4 element", records the readings.
+//
+// The 22.2 element (Part 2 clause 5.2.4, Table 21) is two LFE tracks and eleven
+// pairs, each pair's two tracks the channels Table 21 names; every pair is a
+// two_channel_data() with its own stereo processing, and there is no step
+// between the pairs.
 
 namespace iclforge::ac4::detail {
 
@@ -92,13 +100,23 @@ inline constexpr int kObjectsWithLfeBase = 96;
 // order: L, R, C, the LFE, Ls, Rs, then a 7.X mode's last pair, or the 7.X.4
 // modes' Lb, Rb, Tfl, Tfr, Tbl and Tbr in full decoding and their core's Tsl
 // and Tsr in core decoding (Part 2 clause 4.7). The Part 1 modes' are the same
-// in both. Empty for a mode no element here turns into PCM.
+// in both. 22.2's are Part 2 Table A.27's, by speaker index: L, R, C, Ls, Rs,
+// Lb, Rb, Tfl, Tfr, Tbl, Tbr, LFE, Tsl, Tsr, Tfc, Tbc, Tc, LFE2, Bfl, Bfr, Bfc,
+// Cb, Lw, Rw (src/ac4dec/ERRATA.md, "The 22.2 element's output"), and the 9.X.4
+// modes' in full decoding the same table's L, R, C, Ls, Rs, Lb, Rb, Tfl, Tfr,
+// Tbl, Tbr, LFE (9.1.4), Lscr, Rscr ("The 9.X.4 element's output"); their core
+// is the 7.X.4 modes'. Empty for a mode no element here turns into PCM.
 [[nodiscard]] std::span<const Speaker> speakers_of(
     int ch_mode, DecodingMode decoding = DecodingMode::kFull) noexcept;
 
-// Whether `ch_mode` is one of the 7.X.4 modes, whose element is the immersive
-// element.
+// Whether `ch_mode` is one of the 7.X.4 or 9.X.4 modes, whose element is the
+// immersive element.
 [[nodiscard]] bool is_immersive(int ch_mode) noexcept;
+
+// Whether `ch_mode` is one of the 9.X.4 modes, whose immersive element is read
+// with b_5fronts: 13 tracks, six A-CPL modules, A-JCC's four front and back
+// modules, and the screen pair Lscr and Rscr.
+[[nodiscard]] bool has_fronts(int ch_mode) noexcept;
 
 // One channel data element (or an LFE's mono_data), in syntax order.
 struct DataElementRoute {
@@ -147,10 +165,11 @@ struct ElementRoute {
                                         ElementRoute& out,
                                         DecodingMode decoding = DecodingMode::kFull);
 
-// The A-SPX data of an element, by Part 1 Table 213 and Part 2 Table 8: each
+// The A-SPX data of an element, by Part 1 Table 213 and Part 2 Table 8 (22.2's
+// eleven pairs and the 9.X.4 modes' seven in ASPX_SCPL included): each
 // aspx_data_1ch() or aspx_data_2ch() and the channels it carries, in syntax
 // order, for the channel mode's element in `codec_mode` (an immersive_mode
-// value for the 7.X.4 modes); empty where the mode sends none. `index` counts
+// value for the 7.X.4 and 9.X.4 modes); empty where the mode sends none. `index` counts
 // within aspx_1ch or aspx_2ch. With `first_only`, a pair of which decoding
 // takes the first channel alone (Table 8's square brackets, core decoding in
 // ASPX_SCPL); `speakers[1]` then names the channel full decoding gives the
@@ -168,6 +187,8 @@ struct AspxUnit {
 // channel mode's element in `codec_mode`. Empty where that mode sends none
 // (SIMPLE, and the 7.X element's ASPX); for the immersive element L, R, C, Ls
 // and Rs in ASPX_AJCC, the one mode that sends it (Part 2 clause 4.8.3.10.3).
+// The 22.2 element sends none in either codec mode (clause 4.8.3.10 does not
+// list it, and its syntax has no companding_control()).
 [[nodiscard]] std::vector<Speaker> companded_speakers(int ch_mode, int codec_mode);
 
 }  // namespace iclforge::ac4::detail

@@ -1234,15 +1234,36 @@ void reset_nested(std::array<std::vector<T>, N>& a) {
 
 // §3.5.5.1's spectrum in the coefficient store's scalar - a template for the
 // reason scalar_inverse.hpp's inverse_transform_into is one: the float form
-// of ecpl_channel_spectrum takes no `fast` (the direct form is double-only),
-// and only a template's `if constexpr` discards the call that would not
+// of ecpl_channel_spectrum takes no `fast` (the direct form is double-only, so
+// fast=false widens around it below), and only a template's `if constexpr` discards the call that would not
 // compile for the other scalar.
 template <typename Scalar>
 void ecpl_spectrum_into(const std::array<Scalar, 256>& prev, const std::array<Scalar, 256>& curr,
                         const std::array<Scalar, 256>& next, std::array<Scalar, 256>& zr,
                         std::array<Scalar, 256>& zi, bool fast) {
     if constexpr (std::is_same_v<Scalar, float>) {
-        (void)fast;
+        if constexpr (internal::kReferenceTransformAvailable) {
+            if (!fast) {
+                // The float form has no direct evaluation: widen, run the double
+                // form's, narrow (scalar_inverse.hpp's inverse_transform_into does the same).
+                std::array<double, 256> wide_prev{};
+                std::array<double, 256> wide_curr{};
+                std::array<double, 256> wide_next{};
+                std::array<double, 256> wide_zr{};
+                std::array<double, 256> wide_zi{};
+                std::ranges::copy(prev, wide_prev.begin());
+                std::ranges::copy(curr, wide_curr.begin());
+                std::ranges::copy(next, wide_next.begin());
+                eac3::ecpl_channel_spectrum(wide_prev, wide_curr, wide_next, wide_zr, wide_zi,
+                                            /*fast=*/false);
+                const auto narrow = [](double v) { return static_cast<float>(v); };
+                std::ranges::transform(wide_zr, zr.begin(), narrow);
+                std::ranges::transform(wide_zi, zi.begin(), narrow);
+                return;
+            }
+        } else {
+            (void)fast;
+        }
         eac3::ecpl_channel_spectrum(prev, curr, next, zr, zi);
     } else {
         eac3::ecpl_channel_spectrum(prev, curr, next, zr, zi, fast);
@@ -3881,11 +3902,10 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
             for (int ch = 0; ch < nchans; ++ch) {
                 const auto index = static_cast<std::size_t>(ch);
                 auto& x = impl_->imdct_scratch_;
-                // Two overloads, one call site. The float32 inverse takes no
-                // `fast` parameter - the direct form is double-only - and this
-                // profile has already refused fast_imdct=false with
-                // kNoReferenceTransform long before reaching here, so there is no
-                // choice being silently dropped.
+                // One call site for all three scalars (scalar_inverse.hpp). The float32
+                // inverse has no direct form of its own, so inverse_transform_into widens
+                // for fast_imdct=false; a build without the direct form has already
+                // refused it with kNoReferenceTransform long before reaching here.
                 const bool short_block = ch < nfchans && tail.blksw[static_cast<std::size_t>(ch)];
                 internal::inverse_transform_into(coeffs[index], x, short_block,
                                        impl_->config_.fast_imdct);

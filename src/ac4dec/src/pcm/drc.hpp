@@ -93,8 +93,8 @@ class DrcStage {
     // `rate_hz` is the rate the QMF banks run at, the internal rate; `slots`
     // num_qmf_timeslots; `speakers` the channels, in the order process() gets
     // their matrices; `add_ch_base` groups a 7.X element's channels for the
-    // transmitted gains (Table 168), and `immersive` an immersive element's
-    // by Part 2's Table 69.
+    // transmitted gains (Table 168), and `immersive` the immersive element's or
+    // the 22.2 element's by Part 2's Table 69.
     void configure(double rate_hz, int slots, std::span<const Speaker> speakers, bool add_ch_base,
                    bool immersive = false);
 

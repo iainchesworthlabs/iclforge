@@ -16,20 +16,21 @@ constexpr int kPresentationSubstream = 0;
 constexpr int kAudioSubstream = 1;
 
 // Part 1 Table 88's channel modes with an LFE: 5.1 and the three 7.1s; and
-// Part 2 Table 56's 7.1.4.
+// Part 2 Table 56's 7.1.4, 9.1.4 and 22.2.
 [[nodiscard]] bool has_lfe(int ch_mode) noexcept {
-    return ch_mode == 4 || ch_mode == 6 || ch_mode == 8 || ch_mode == 10 || ch_mode == 12;
+    return ch_mode == 4 || ch_mode == 6 || ch_mode == 8 || ch_mode == 10 || ch_mode == 12 ||
+           ch_mode == 14 || ch_mode == 15;
 }
 
 // The presentation's channels for custom_dmx_data() and loud_corr(): one
-// substream's, with Part 2 Table 71's core for the 7.X.4 modes and Table 72's
-// top pairs from top_channels_present.
+// substream's, with Part 2 Table 71's core for the 7.X.4 and 9.X.4 modes and
+// Table 72's top pairs from top_channels_present.
 [[nodiscard]] PresentationChannels presentation_channels(const FrameFields& f) noexcept {
     PresentationChannels p;
     p.ch_mode = f.ch_mode;
     p.lfe = has_lfe(f.ch_mode);
-    if (f.ch_mode == 11 || f.ch_mode == 12) {
-        p.ch_mode_core = f.ch_mode == 11 ? 5 : 6;
+    if (f.ch_mode >= 11 && f.ch_mode <= 14) {
+        p.ch_mode_core = f.ch_mode % 2 == 1 ? 5 : 6;
         p.back = f.b_4_back_channels_present;
         p.top_channel_pairs =
             f.top_channels_present == 3 ? 2 : (f.top_channels_present == 0 ? 0 : 1);
@@ -61,7 +62,8 @@ void write_metadata(BitWriter& w, const AudioSubstreamFields& f) {
     w.write(1, 0, "b_more_basic_metadata");
     write_extended_metadata(w, f.ch_mode, f.dialogue);
     BitWriter tools = BitWriter::buffered();
-    write_dialog_enhancement(tools, f.de_config, f.de, f.de_previous, f.iframe);
+    write_dialog_enhancement(tools, f.de_config, f.de, f.de_previous, f.iframe, f.ch_mode,
+                             f.de_core, f.de_core_previous);
     write_sized(w, tools, 7, "tools_metadata_size_value", "tools_metadata_size");
     w.write(1, f.emdf.empty() ? 0U : 1U, "b_emdf_payloads_substream");
     if (!f.emdf.empty()) {
@@ -279,6 +281,8 @@ AudioSubstreamFields audio_fields(const FrameFields& f) {
     out.de_config = f.metadata != nullptr && f.metadata->de ? &*f.metadata->de : nullptr;
     out.de = f.de;
     out.de_previous = f.de_previous;
+    out.de_core = f.de_core;
+    out.de_core_previous = f.de_core_previous;
     return out;
 }
 

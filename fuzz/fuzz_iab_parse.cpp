@@ -6,6 +6,7 @@
 #include <string>
 
 #include "iclforge/iab/ac3iab.hpp"
+#include "iclforge/iab/dlc.hpp"
 #include "iclforge/iab/mxf.hpp"
 
 // iclforge::iab::parse_iabitstream(std::istream&) and iclforge::iab::parse_mxf_iab(std::istream&)
@@ -24,6 +25,10 @@
 //   parse_iabitstream  §7's Preamble+IAFrame run, the elementary form
 //   parse_mxf_iab      the KLV walk that extracts that run from a track file
 //   parse_iaframe      §9.1 Table 5, one already-extracted frame's payload
+//
+// decode_dlc (Annex B) is reached two ways: on the AudioDataDLC elements parse_iaframe finds, and
+// directly on the input after its first byte, which picks the IAFrame rate. The DLC decoder reads
+// predictor orders, region lengths, Rice quotients and residual widths from the stream.
 //
 // parse_iaframe is reached directly as well as through the other two because
 // it is a public entry point in its own right (see ac3iab.hpp's own note on
@@ -46,8 +51,20 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         std::istringstream stream(bytes, std::ios::binary);
         (void)iclforge::iab::parse_mxf_iab(stream);
     }
-    (void)iclforge::iab::parse_iaframe(
+    const auto frame = iclforge::iab::parse_iaframe(
         std::span<const std::byte>(reinterpret_cast<const std::byte*>(data), size));
+    if (frame.has_value()) {
+        (void)iclforge::iab::decode_audio(*frame);
+    }
+
+    if (size > 1) {
+        iclforge::iab::AudioDataDlc element;
+        element.coded.assign(reinterpret_cast<const std::byte*>(data) + 1,
+                             reinterpret_cast<const std::byte*>(data) + size);
+        (void)iclforge::iab::decode_dlc(element, static_cast<std::uint8_t>(data[0] & 0x0F));
+        (void)iclforge::iab::decode_dlc(element, static_cast<std::uint8_t>(data[0] & 0x0F),
+                                        {.base_layer_only = true});
+    }
 
     return 0;
 }

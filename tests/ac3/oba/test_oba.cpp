@@ -2,10 +2,12 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <numbers>
 #include <span>
 #include <vector>
@@ -1238,20 +1240,21 @@ TEST_CASE("OAMD obj_div_block mode 1 reuses the previous block's divergence", "[
           std::vector<double>{0.500755, 0.500755, 1.0, 1.0, 1.0, 0.0, 0.500755, 0.500755});
 }
 
-TEST_CASE("OAMD obj_div_block keeps the previous divergence for what Table 40 and 42 reserve",
+TEST_CASE("OAMD obj_div_block reads the reserved mode 3 and code 0 as the decoder defines them",
           "[oba][oamd]") {
-    // object_div_mode 3 (Table 40) and object_div_code 0 (Table 42) carry no
-    // value. Mode 3 still has its 6-bit code on the wire, so the entry after
-    // it decoding properly shows that those bits were consumed.
+    // Table 40 reserves object_div_mode 3 and Table 42 reserves object_div_code 0, yet §5.5.14
+    // reads a 6-bit object_div_code for mode 3. The decoder takes code 0 as no divergence and
+    // reads mode 3's code like mode 2's. What matters most here is that the bits are consumed, so
+    // each entry after a reserved one is checked too.
     const auto divergence = decode_divergence({{
-        {.mode = 2, .value = 0},   // reserved code, nothing before it: 0
         {.mode = 0, .value = 2},   // 0.704833
-        {.mode = 2, .value = 0},   // reserved code: 0.704833
-        {.mode = 3, .value = 63},  // reserved mode: 0.704833
-        {.mode = 2, .value = 63},  // 1
-        {.mode = 3, .value = 1},   // reserved mode: 1
+        {.mode = 2, .value = 0},   // reserved code: no divergence
+        {.mode = 1},               // reuse of that: 0
+        {.mode = 3, .value = 63},  // reserved mode, code 63
+        {.mode = 1},               // reuse: 1
+        {.mode = 0, .value = 1},   // 0.608529
     }});
-    CHECK(divergence[0] == std::vector<double>{0.0, 0.704833, 0.704833, 0.704833, 1.0, 1.0});
+    CHECK(divergence[0] == std::vector<double>{0.704833, 0.0, 0.0, 1.0, 1.0, 0.608529});
 }
 
 // --- Encoder breadth: syntax build_payload used to hardcode away -----------
@@ -1645,4 +1648,226 @@ TEST_CASE("EMDF still refuses a reserved primary protection length", "[emdf]") {
     const auto result = iclforge::emdf::parse_container(data);
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error() == iclforge::emdf::ParseError::kUnsupportedConfig);
+}
+
+// --- Object divergence and screen reference (TS 103 420 §5.5.13-14, §5.6.6.3, §5.5.11) ----------
+
+namespace {
+
+// Table 42, as printed in ETSI TS 103 420 V1.2.1 §5.6.6.3.4 (generated from the text of the
+// standard; the encoder's own copy is typed separately and checked against this one here).
+constexpr std::array<double, 64> kTable42 = {
+    0.0, 0.0, 0.004026, 0.00716, 0.012731, 0.020173, 0.028485, 0.04021,
+    0.050582, 0.063601, 0.079914, 0.100299, 0.125666, 0.140532, 0.157027, 0.175282,
+    0.195417, 0.217536, 0.241718, 0.268002, 0.296377, 0.326766, 0.359017, 0.392895,
+    0.428081, 0.464184, 0.500755, 0.537316, 0.573389, 0.608529, 0.642346, 0.674524,
+    0.704833, 0.733123, 0.75932, 0.783416, 0.805451, 0.825506, 0.843686, 0.860112,
+    0.874914, 0.888222, 0.900168, 0.910875, 0.920461, 0.929035, 0.936698, 0.943544,
+    0.949656, 0.955112, 0.95998, 0.964322, 0.968195, 0.974729, 0.979923, 0.98405,
+    0.98733, 0.989935, 0.992874, 0.994955, 0.996817, 0.99821, 0.998993, 1.0,
+};
+
+iclforge::oba::DynamicObject with_divergence(double divergence) {
+    return {.position = {.x = 0.5, .y = 0.5, .z = 0.0}, .divergence = divergence};
+}
+
+}  // namespace
+
+TEST_CASE("OAMD round-trips every value of Table 42", "[oba][oamd][divergence]") {
+    const iclforge::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 1};
+    // Code 0 is reserved and code 1 is no divergence, so both read as 0; every other code comes
+    // back as the value the table prints, exactly.
+    for (std::size_t code = 2; code < kTable42.size(); ++code) {
+        CAPTURE(code);
+        const std::array<iclforge::oba::DynamicObject, 1> objects{with_divergence(kTable42[code])};
+        const auto decoded = iclforge::oba::parse_payload(iclforge::oba::build_payload(program, objects));
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->objects.size() == 1);
+        CHECK(decoded->objects[0].divergence == kTable42[code]);
+    }
+}
+
+TEST_CASE("OAMD quantizes divergence to the nearest Table 42 value", "[oba][oamd][divergence]") {
+    const iclforge::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 1};
+    const auto round_trip = [&](double divergence) {
+        const std::array<iclforge::oba::DynamicObject, 1> objects{with_divergence(divergence)};
+        const auto decoded = iclforge::oba::parse_payload(iclforge::oba::build_payload(program, objects));
+        REQUIRE(decoded.has_value());
+        return decoded->objects.at(0).divergence;
+    };
+    CHECK(round_trip(0.0) == 0.0);
+    CHECK(round_trip(0.0005) == 0.0);  // nearer 0 than Table 42's first non-zero entry
+    CHECK(round_trip(0.1) == kTable42[11]);  // 0.100299
+    CHECK(round_trip(0.6) == kTable42[29]);  // 0.608529
+    CHECK(round_trip(0.9999) == 1.0);
+    CHECK(round_trip(1.0) == 1.0);
+    CHECK(round_trip(7.0) == 1.0);   // clamped
+    CHECK(round_trip(-3.0) == 0.0);  // clamped
+}
+
+TEST_CASE("OAMD writes the extended_object_element only when an object diverges", "[oba][oamd][divergence]") {
+    const iclforge::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 2};
+    const std::array<iclforge::oba::DynamicObject, 2> none{{with_divergence(0.0), with_divergence(0.0)}};
+    const std::array<iclforge::oba::DynamicObject, 2> some{{with_divergence(0.0), with_divergence(0.5)}};
+    const auto plain = iclforge::oba::build_payload(program, none);
+    const auto extended = iclforge::oba::build_payload(program, some);
+    // oa_element_count_bits is the four bits after oa_md_version (2), object_count (5), the two
+    // program_assignment bits and b_alternate_object_data_present: bit 10.
+    const auto element_count = [](const std::vector<std::byte>& payload) {
+        iclforge::BitReader r(payload);
+        r.skip(2 + 5 + 2 + 1);
+        return r.read(4);
+    };
+    CHECK(element_count(plain) == 1);
+    CHECK(element_count(extended) == 2);
+    CHECK(extended.size() > plain.size());
+}
+
+TEST_CASE("OAMD codes divergence as Table 40 says: table, reuse or code", "[oba][oamd][divergence]") {
+    // The extended_object_element's bits, read back by hand from the payload: skip the
+    // object_element by its size, then walk §5.5.13 and §5.5.14 field by field.
+    const iclforge::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 1};
+
+    struct Elements {
+        std::uint32_t extended_id = 0;
+        std::vector<int> bits;  // the extended element's bits after b_discard_unknown_element
+    };
+    const auto walk = [&](std::span<const iclforge::oba::ObjectUpdate> updates, std::size_t extended_bits) {
+        const auto payload = iclforge::oba::build_payload_updates(program, updates);
+        iclforge::BitReader r(payload);
+        r.skip(2 + 5 + 2 + 1);
+        REQUIRE(r.read(4) == 2);
+        REQUIRE(r.read(4) == 1);  // object_element
+        const auto object_bytes = static_cast<std::size_t>(read_variable_bits_max(r, 4, 4)) + 1;
+        r.skip(object_bytes * 8);  // b_discard_unknown_element, the element, its padding
+        Elements out;
+        out.extended_id = r.read(4);
+        const auto extended_bytes = static_cast<std::size_t>(read_variable_bits_max(r, 4, 4)) + 1;
+        REQUIRE(extended_bytes * 8 >= extended_bits + 1);
+        r.skip(1);  // b_discard_unknown_element
+        for (std::size_t i = 0; i < extended_bits; ++i) {
+            out.bits.push_back(static_cast<int>(r.read_bit()));
+        }
+        return out;
+    };
+    const auto one_block = [&](double divergence) {
+        const std::array<iclforge::oba::DynamicObject, 1> objects{with_divergence(divergence)};
+        return std::array<iclforge::oba::ObjectUpdate, 1>{{{.objects = objects}}};
+    };
+
+    SECTION("a value Table 41 holds uses object_div_mode 0 and its 2-bit index") {
+        // b_obj_div_block 1; b_object_divergence 1, mode 00, table index 01 (0,608529); b_ext_prec_pos_block 0.
+        const auto objects = std::array{with_divergence(0.608529)};
+        const std::array<iclforge::oba::ObjectUpdate, 1> updates{{{.objects = objects}}};
+        const auto e = walk(updates, 7);
+        CHECK(e.extended_id == 5);
+        CHECK(e.bits == std::vector<int>{1, 1, 0, 0, 0, 1, 0});
+    }
+    SECTION("any other value uses object_div_mode 2 and its 6-bit code") {
+        // 0,100299 is code 11 = 001011.
+        const auto objects = std::array{with_divergence(0.1)};
+        const std::array<iclforge::oba::ObjectUpdate, 1> updates{{{.objects = objects}}};
+        const auto e = walk(updates, 11);
+        CHECK(e.bits == std::vector<int>{1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0});
+    }
+    SECTION("an unchanged value in the next block uses object_div_mode 1") {
+        const auto first = std::array{with_divergence(0.1)};
+        const auto second = std::array{with_divergence(0.1)};
+        const std::array<iclforge::oba::ObjectUpdate, 2> updates{
+            {{.block_offset_factor = 0, .objects = first}, {.block_offset_factor = 8, .objects = second}}};
+        // block 0: 1, 10, 001011; block 1: 1, 01; then b_ext_prec_pos_block 0.
+        const auto e = walk(updates, 1 + 9 + 3 + 1);
+        CHECK(e.bits == std::vector<int>{1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0});
+    }
+    SECTION("a block with no divergence sends only b_object_divergence 0") {
+        const auto first = std::array{with_divergence(0.1)};
+        const auto second = std::array{with_divergence(0.0)};
+        const std::array<iclforge::oba::ObjectUpdate, 2> updates{
+            {{.block_offset_factor = 0, .objects = first}, {.block_offset_factor = 8, .objects = second}}};
+        const auto e = walk(updates, 1 + 9 + 1 + 1);
+        CHECK(e.bits == std::vector<int>{1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0});
+    }
+    (void)one_block;
+}
+
+TEST_CASE("OAMD reads divergence modes and carries a repeated value across blocks", "[oba][oamd][divergence]") {
+    const iclforge::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 2};
+    const auto a0 = std::array{with_divergence(0.608529), with_divergence(0.0)};
+    const auto a1 = std::array{with_divergence(0.608529), with_divergence(0.3)};
+    const auto a2 = std::array{with_divergence(0.0), with_divergence(0.3)};
+    const std::array<iclforge::oba::ObjectUpdate, 3> updates{{{.block_offset_factor = 0, .objects = a0},
+                                                              {.block_offset_factor = 4, .objects = a1},
+                                                              {.block_offset_factor = 8, .objects = a2}}};
+    const auto decoded = iclforge::oba::parse_payload(iclforge::oba::build_payload_updates(program, updates));
+    REQUIRE(decoded.has_value());
+    REQUIRE(decoded->blocks.size() == 3);
+    CHECK(decoded->blocks[0].objects[0].divergence == 0.608529);
+    CHECK(decoded->blocks[1].objects[0].divergence == 0.608529);  // mode 1
+    CHECK(decoded->blocks[2].objects[0].divergence == 0.0);
+    CHECK(decoded->blocks[0].objects[1].divergence == 0.0);
+    CHECK(decoded->blocks[1].objects[1].divergence == kTable42[std::distance(
+              kTable42.begin(), std::ranges::min_element(kTable42, {}, [](double v) { return std::abs(v - 0.3); }))]);
+    CHECK(decoded->blocks[2].objects[1].divergence == decoded->blocks[1].objects[1].divergence);
+}
+
+TEST_CASE("OAMD sends no divergence for an inactive object", "[oba][oamd][divergence]") {
+    const iclforge::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 2};
+    iclforge::oba::DynamicObject silent = with_divergence(0.9);
+    silent.active = false;
+    const std::array<iclforge::oba::DynamicObject, 2> objects{{silent, with_divergence(0.5)}};
+    const auto decoded = iclforge::oba::parse_payload(iclforge::oba::build_payload(program, objects));
+    REQUIRE(decoded.has_value());
+    CHECK_FALSE(decoded->objects[0].active);
+    CHECK(decoded->objects[0].divergence == 0.0);
+    CHECK(decoded->objects[1].divergence == kTable42[std::distance(
+              kTable42.begin(), std::ranges::min_element(kTable42, {}, [](double v) { return std::abs(v - 0.5); }))]);
+}
+
+TEST_CASE("OAMD round-trips the screen reference and its two factors", "[oba][oamd][screen]") {
+    const iclforge::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 4};
+    const auto object = [](bool screen, double screen_factor, double depth_factor) {
+        iclforge::oba::DynamicObject o;
+        o.position = {.x = 0.5, .y = 0.0, .z = 0.0};
+        o.screen_reference = screen;
+        o.screen_factor = screen_factor;
+        o.depth_factor = depth_factor;
+        return o;
+    };
+    const std::array<iclforge::oba::DynamicObject, 4> objects{{
+        object(false, 0.0, 1.0),
+        object(true, 1.0, 1.0),
+        object(true, 3.0 / 8.0, 0.25),
+        object(true, 1.0 / 8.0, 2.0),
+    }};
+    const auto decoded = iclforge::oba::parse_payload(iclforge::oba::build_payload(program, objects));
+    REQUIRE(decoded.has_value());
+    REQUIRE(decoded->objects.size() == 4);
+    CHECK_FALSE(decoded->objects[0].screen_reference);
+    CHECK(decoded->objects[0].screen_factor == 0.0);
+    CHECK(decoded->objects[0].depth_factor == 1.0);
+    // §5.6.1.1.19: screen_factor = (screen_factor_bits + 1) / 8; Table 16 for the depth factor.
+    CHECK(decoded->objects[1].screen_reference);
+    CHECK(decoded->objects[1].screen_factor == 1.0);
+    CHECK(decoded->objects[1].depth_factor == 1.0);
+    CHECK(decoded->objects[2].screen_factor == 3.0 / 8.0);
+    CHECK(decoded->objects[2].depth_factor == 0.25);
+    CHECK(decoded->objects[3].screen_factor == 1.0 / 8.0);
+    CHECK(decoded->objects[3].depth_factor == 2.0);
+    // The position survives the extra bits.
+    for (const auto& o : decoded->objects) {
+        CHECK(o.position.x == 0.5);
+    }
+}
+
+TEST_CASE("OAMD quantizes the screen and depth factors to the nearest code", "[oba][oamd][screen]") {
+    const iclforge::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 1};
+    iclforge::oba::DynamicObject o;
+    o.screen_reference = true;
+    o.screen_factor = 0.52;  // nearer 4/8 than 5/8
+    o.depth_factor = 0.7;    // nearer 0.5 than 1
+    const std::array<iclforge::oba::DynamicObject, 1> objects{o};
+    const auto decoded = iclforge::oba::parse_payload(iclforge::oba::build_payload(program, objects));
+    REQUIRE(decoded.has_value());
+    CHECK(decoded->objects[0].screen_factor == 4.0 / 8.0);
+    CHECK(decoded->objects[0].depth_factor == 0.5);
 }

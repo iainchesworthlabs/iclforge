@@ -35,6 +35,16 @@ struct ObjectPlacement {
     // §5.6.1.6.2 Table 21: false excludes the Top-Bottom zone, holding the
     // object on the listener plane however high its z says it is.
     bool enable_elevation = true;
+    // §5.5.14 / Tables 40-42: how much of the object's energy is spread into two objects along X
+    // (§5.2.7), 0 for none to 1. Sent in the extended_object_element, which is only written when
+    // some object has a non-zero value; quantized to Table 42's 62 values.
+    double divergence = 0.0;
+    // §5.6.1.1.18-.20: the position is screen-anchored rather than room-anchored, and how far
+    // (screen_factor, 1/8 to 1) and with what depth (depth_factor, 1/4 to 2) the renderer follows
+    // the screen. Like the other rendering constraints these reach the OAMD payload and stop there.
+    bool screen_reference = false;
+    double screen_factor = 1.0;
+    double depth_factor = 1.0;
 };
 
 }  // namespace iclforge::oba

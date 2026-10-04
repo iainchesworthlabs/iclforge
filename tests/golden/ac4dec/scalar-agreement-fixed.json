@@ -6,6 +6,14 @@
       "below": 125.8,
       "above": 93.9
     },
+    "tests/golden/ac4dec/constructed/22_2-aspx-unit7-lr.ac4": {
+      "below": 112.7,
+      "above": 35.2
+    },
+    "tests/golden/ac4dec/constructed/22_2-simple-alternating.ac4": {
+      "below": 123.3,
+      "above": null
+    },
     "tests/golden/ac4dec/constructed/2_0-acpl1-stereoproc.ac4": {
       "below": 127.1,
       "above": 37.5
@@ -104,6 +112,26 @@
     },
     "tests/golden/ac4dec/constructed/7_1_4-scpl-grouping0-sap-prediction.ac4": {
       "below": 124.7,
+      "above": null
+    },
+    "tests/golden/ac4dec/constructed/9_0_4-acpl2-grouping2-second.ac4": {
+      "below": 122.7,
+      "above": 31.5
+    },
+    "tests/golden/ac4dec/constructed/9_0_4-aspx_scpl-grouping0-2ch1-unit3.ac4": {
+      "below": 108.7,
+      "above": 33.8
+    },
+    "tests/golden/ac4dec/constructed/9_1_4-acpl1-grouping3-matsel8-prediction.ac4": {
+      "below": 122.8,
+      "above": 34.6
+    },
+    "tests/golden/ac4dec/constructed/9_1_4-ajcc-grouping1-route2.ac4": {
+      "below": 118.1,
+      "above": 30.2
+    },
+    "tests/golden/ac4dec/constructed/9_1_4-scpl-grouping1-matsel2-prediction.ac4": {
+      "below": 124.2,
       "above": null
     },
     "tests/golden/ac4dec/objects/ajoc-2to4-coarse.ac4": {

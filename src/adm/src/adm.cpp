@@ -24,6 +24,7 @@
 #include <bw64/bw64.hpp>
 
 #include "adm_model.hpp"
+#include "adm_xml_extras.hpp"
 
 // Every `bw64::`/`::adm::` symbol below is a vendored third-party library
 // (libbw64/libadm respectively, see src/adm/CMakeLists.txt); every
@@ -229,7 +230,21 @@ std::expected<AdmModel, AdmError> parse_axml(const std::string& xml) {
         return std::unexpected(AdmError::kMalformedXml);
     }
 
-    return build_adm_model(document);
+    auto model = build_adm_model(document);
+    // libadm drops zoneExclusion (BS.2076-2 §10.4), so it is read from the same text here and
+    // attached to the blocks by ID.
+    const auto zones = scan_zone_exclusions(xml);
+    if (!zones.empty()) {
+        for (auto& channel : model.channel_formats) {
+            for (auto& block : channel.block_formats) {
+                const auto it = zones.find(block.id);
+                if (it != zones.end()) {
+                    block.zone_exclusion = it->second;
+                }
+            }
+        }
+    }
+    return model;
 }
 
 }  // namespace detail
@@ -488,6 +503,8 @@ std::string_view describe(AdmWriteError error) {
         case AdmWriteError::kInvalidDocument: return "AdmModel has an unresolved reference or an unsupported element type";
         case AdmWriteError::kCannotOpen: return "cannot open path for writing";
         case AdmWriteError::kOther: return "unexpected failure writing the BW64/ADM file";
+        case AdmWriteError::kInvalidOptions:
+            return "AdmWriteOptions: integer PCM must be 16, 24 or 32 bits and float must be 32 or 64";
     }
     return "unknown error";
 }
@@ -531,9 +548,22 @@ std::expected<bw64::AudioId, AdmWriteError> to_audio_id(
 }  // namespace
 
 std::expected<void, AdmWriteError> write_bw64(const std::string& path, const AdmDocument& document) {
-    // kWriteBitDepth goes to both halves of the file from here - every audioTrackUID's bitDepth
-    // and, below, the <fmt > chunk - so the two cannot drift apart.
-    auto built = detail::build_libadm_document(document.model, kWriteBitDepth);
+    return write_bw64(path, document, AdmWriteOptions{});
+}
+
+std::expected<void, AdmWriteError> write_bw64(const std::string& path, const AdmDocument& document,
+                                              const AdmWriteOptions& options) {
+    // libbw64 writes integer PCM at any whole-byte width it can encode (16/24/32 here) and
+    // IEEE float at 32 or 64.
+    const bool valid_options =
+        options.float_samples ? (options.bit_depth == 32 || options.bit_depth == 64)
+                              : (options.bit_depth == 16 || options.bit_depth == 24 || options.bit_depth == 32);
+    if (!valid_options) {
+        return std::unexpected(AdmWriteError::kInvalidOptions);
+    }
+    // options.bit_depth goes to both halves of the file from here - every audioTrackUID's
+    // bitDepth and, below, the <fmt > chunk - so the two cannot drift apart.
+    auto built = detail::build_libadm_document(document.model, options.bit_depth);
     if (!built) {
         return std::unexpected(built.error());
     }
@@ -571,7 +601,24 @@ std::expected<void, AdmWriteError> write_bw64(const std::string& path, const Adm
         if (!xml) {
             return std::unexpected(AdmWriteError::kOther);
         }
-        axml_chunk = std::make_shared<bw64::AxmlChunk>(xml.str());
+        std::string axml = xml.str();
+        if (!built->zone_blocks.empty()) {
+            // libadm cannot write zoneExclusion (BS.2076-2 §10.4). Its blocks now have their
+            // final IDs, so the element is added to the text by ID.
+            detail::ZonesByBlockId zones;
+            for (const auto& source : built->zone_blocks) {
+                std::size_t index = 0;
+                for (const auto& block : source.channel->getElements<::adm::AudioBlockFormatObjects>()) {
+                    if (index < source.zones_by_block.size() && !source.zones_by_block[index].empty()) {
+                        zones.emplace(::adm::formatId(block.get<::adm::AudioBlockFormatId>()),
+                                      source.zones_by_block[index]);
+                    }
+                    ++index;
+                }
+            }
+            axml = detail::inject_zone_exclusions(axml, zones);
+        }
+        axml_chunk = std::make_shared<bw64::AxmlChunk>(axml);
     } catch (const std::exception&) {
         return std::unexpected(AdmWriteError::kOther);
     }
@@ -580,14 +627,15 @@ std::expected<void, AdmWriteError> write_bw64(const std::string& path, const Adm
         return std::unexpected(AdmWriteError::kInvalidDocument);
     }
     try {
-        // bw64::Bw64Writer's own constructor takes sampleRate as uint16_t (writer.hpp) - a real
-        // limit of libbw64 0.10.0's API, harmless here since it still comfortably covers every
-        // AC-3/E-AC-3 rate this project ever decodes (max 48 kHz, well under 65536).
-        auto writer = bw64::writeFile(path, static_cast<std::uint16_t>(document.audio.channels.size()),
-                                      static_cast<std::uint16_t>(document.audio.sample_rate), kWriteBitDepth, chna_chunk,
-                                      axml_chunk);
+        // The Bw64Writer constructor rather than bw64::writeFile(): the helper writes integer PCM
+        // only and narrows the sample rate to 16 bits. The chunk order matches the helper's
+        // (<chna>, then <axml>).
+        std::vector<std::shared_ptr<bw64::Chunk>> pre_data_chunks{chna_chunk, axml_chunk};
+        bw64::Bw64Writer writer(path.c_str(), static_cast<std::uint16_t>(document.audio.channels.size()),
+                                document.audio.sample_rate, options.bit_depth, pre_data_chunks,
+                                /*useExtensible=*/false, options.float_samples);
         auto interleaved = interleave(document.audio);
-        writer->write(interleaved.data(), document.audio.frame_count());
+        writer.write(interleaved.data(), document.audio.frame_count());
         // ~Bw64Writer (writer's destructor, at scope exit) finalizes the file: writes the <axml>
         // chunk queued above, then patches the RIFF/data chunk sizes now that every sample has
         // gone out - the same "close on scope exit" shape iclforge::ac3::io::WavStreamWriter's own

@@ -12,8 +12,11 @@
 // subband group (aspx_start_freq 7, aspx_xover_subband_offset 5), and A-CPL
 // over 7 parameter bands.
 
+#include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
 #include <catch2/catch_test_macros.hpp>
@@ -562,8 +565,8 @@ TEST_CASE("a channel element that needs I-frame configuration refuses a frame wi
     }
 }
 
-TEST_CASE("channel elements refuse the speech frontend and the modes not decoded", "[ac4dec][channel_elements]") {
-    SECTION("spec_frontend SSF") {
+TEST_CASE("channel elements refuse the modes not decoded", "[ac4dec][channel_elements]") {
+    SECTION("spec_frontend SSF reads ssf_data(), whose zero bits are not a stream") {
         ElementWriter e;
         e.w.put(0, 1);
         e.w.flag(true);  // spec_frontend: SSF
@@ -572,22 +575,16 @@ TEST_CASE("channel elements refuse the speech frontend and the modes not decoded
         ChannelElement out;
         const auto result = read_element(e.w, context(ch_mode::kMono, true), state, out);
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error().error == DecodeError::kUnsupported);
+        CHECK(result.error().error == DecodeError::kInvalidStream);
     }
-    SECTION("9.X.4, 22.2 and reserved channel modes") {
+    SECTION("reserved channel modes") {
         BitWriter w;
         w.put(0, 32);
-        for (const int mode : {ch_mode::k9_0_4, ch_mode::k9_1_4, ch_mode::k22_2}) {
-            ChannelElementState state;
-            ChannelElement out;
-            const auto result = read_element(w, context(mode, true), state, out);
-            REQUIRE_FALSE(result.has_value());
-            CHECK(result.error().error == DecodeError::kUnsupported);
-            CHECK(result.error().reason.find(mode == ch_mode::k22_2 ? "22_2" : "9.X.4") != std::string_view::npos);
-        }
-        // The 7.X.4 modes read their immersive element, which 32 zero bits
-        // cannot hold: SCPL with its LFE, grouping 0 and the first sf_info()s.
-        for (const int mode : {ch_mode::k7_0_4, ch_mode::k7_1_4}) {
+        // The 7.X.4 and 9.X.4 modes read their immersive element, which 32 zero bits
+        // cannot hold: SCPL with its LFE, grouping 0 and the first sf_info()s. The
+        // 9.X.4 modes are read with b_5fronts (Part 2 clause 6.2.3.1).
+        for (const int mode :
+             {ch_mode::k7_0_4, ch_mode::k7_1_4, ch_mode::k9_0_4, ch_mode::k9_1_4}) {
             ChannelElementState state;
             ChannelElement out;
             const auto result = read_element(w, context(mode, true), state, out);
@@ -595,6 +592,7 @@ TEST_CASE("channel elements refuse the speech frontend and the modes not decoded
             CHECK(result.error().error == DecodeError::kTruncated);
             CHECK(out.kind == ElementKind::kImmersive);
             CHECK(out.codec_mode == immersive_mode::kScpl);
+            CHECK(out.b_5fronts == (mode >= ch_mode::k9_0_4));
         }
         ChannelElementState state;
         ChannelElement out;
@@ -602,6 +600,118 @@ TEST_CASE("channel elements refuse the speech frontend and the modes not decoded
         REQUIRE_FALSE(reserved.has_value());
         CHECK(reserved.error().error == DecodeError::kInvalidStream);
     }
+}
+
+// --- 22_2_channel_element() ------------------------------------------------
+
+namespace {
+
+// Part 2 clause 6.2.4.3, field by field: 22_2_codec_mode, aspx_config() in an
+// I-frame's ASPX, two mono_data(1), eleven two_channel_data() whose
+// b_enable_mdct_stereo_proc is `mdct[cp]`, and in ASPX eleven aspx_data_2ch().
+BitWriter element_22_2(int mode, const std::array<bool, 11>& mdct, bool iframe) {
+    ElementWriter e;
+    e.iframe = iframe;
+    e.w.put(static_cast<std::uint64_t>(mode), 1);
+    if (mode == codec_mode::kAspx && iframe) {
+        e.aspx_config();
+    }
+    e.mono(true);
+    e.mono(true);
+    for (const bool on : mdct) {
+        e.two_channel(on);
+    }
+    if (mode == codec_mode::kAspx) {
+        for (int cp = 0; cp < 11; ++cp) {
+            e.aspx_2ch();
+        }
+    }
+    return e.w;
+}
+
+}  // namespace
+
+TEST_CASE("22_2_channel_element reads two LFEs and eleven pairs, SIMPLE and ASPX",
+          "[ac4dec][channel_elements]") {
+    std::array<bool, 11> alternating{};
+    for (std::size_t cp = 0; cp < alternating.size(); ++cp) {
+        alternating[cp] = cp % 2 == 0;
+    }
+    std::array<bool, 11> all_on{};
+    all_on.fill(true);
+    const std::array<bool, 11> all_off{};
+    for (const int mode : {codec_mode::kSimple, codec_mode::kAspx}) {
+        for (const auto& mdct : {all_on, all_off, alternating}) {
+            const auto processed = static_cast<std::size_t>(std::ranges::count(mdct, true));
+            INFO("22_2_codec_mode " << mode << ", " << processed
+                                    << " pairs with stereo processing");
+            const BitWriter w = element_22_2(mode, mdct, true);
+            ChannelElementState state;
+            ChannelElement out;
+            Recorder rec;
+            REQUIRE(read_element(w, context(ch_mode::k22_2, true), state, out, &rec).has_value());
+            CHECK(out.kind == ElementKind::k22_2);
+            CHECK(out.codec_mode == mode);
+            // Two LFE tracks, then a pair's two for each of eleven pairs; a pair
+            // without stereo processing has an sf_info() for each track.
+            check_shape(out, {.tracks = 24,
+                              .infos = 2 + 11 * 2 - processed,
+                              .chparams = processed,
+                              .aspx_2ch = mode == codec_mode::kAspx ? 11U : 0U});
+            CHECK(out.b_enable_mdct_stereo_proc == std::vector<bool>(mdct.begin(), mdct.end()));
+            for (std::size_t t = 0; t < out.tracks.size(); ++t) {
+                CHECK(out.tracks[t].lfe == (t < 2));
+            }
+            // companding_control(), A-CPL and the 7.X elements' b_use_sap_add_ch
+            // are not in this element's syntax.
+            CHECK_FALSE(out.companding.has_value());
+            CHECK_FALSE(out.acpl_2ch.has_value());
+            CHECK_FALSE(out.b_use_sap_add_ch.has_value());
+            CHECK_FALSE(out.coding_config.has_value());
+            CHECK(out.aspx_config.has_value() == (mode == codec_mode::kAspx));
+            CHECK(rec.records.front().name == "22_2_codec_mode");
+            CHECK(rec.count("aspx_start_freq") == (mode == codec_mode::kAspx ? 1 : 0));
+            CHECK(rec.count("aspx_xover_subband_offset") == (mode == codec_mode::kAspx ? 11 : 0));
+            CHECK(rec.count("b_enable_mdct_stereo_proc") == 11);
+            CHECK(rec.end_bit() == w.size());
+        }
+    }
+}
+
+TEST_CASE("22_2_channel_element keeps its eleven A-SPX positions from the I-frame",
+          "[ac4dec][channel_elements]") {
+    const std::array<bool, 11> mdct{true, false, true, false, true, false,
+                                    true, false, true, false, true};
+    ChannelElementState state;
+    ChannelElement out;
+    REQUIRE(read_element(element_22_2(codec_mode::kAspx, mdct, true), context(ch_mode::k22_2, true),
+                         state, out)
+                .has_value());
+    for (std::size_t position = 0; position < 11; ++position) {
+        CHECK(state.aspx[position].have_xover_subband_offset);
+        CHECK(state.aspx[position].xover_subband_offset == 5);
+    }
+    // The next frame, not an I-frame, sends no aspx_config() and no
+    // aspx_xover_subband_offset: both come from the state, for every pair.
+    REQUIRE(read_element(element_22_2(codec_mode::kAspx, mdct, false),
+                         context(ch_mode::k22_2, false), state, out)
+                .has_value());
+    CHECK(out.aspx_2ch.size() == 11);
+    CHECK(out.aspx_config.has_value());
+    for (const AspxData2ch& pair : out.aspx_2ch) {
+        CHECK(pair.xover_subband_offset == 5);
+    }
+    // ASPX with no I-frame behind it has nothing to read the data with.
+    ChannelElementState fresh;
+    const auto result = read_element(element_22_2(codec_mode::kAspx, mdct, false),
+                                     context(ch_mode::k22_2, false), fresh, out);
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().error == DecodeError::kMissingIFrame);
+    // SIMPLE needs no configuration, I-frame or not.
+    ChannelElementState simple;
+    REQUIRE(read_element(element_22_2(codec_mode::kSimple, mdct, false),
+                         context(ch_mode::k22_2, false), simple, out)
+                .has_value());
 }
 
 // --- 3_0_channel_element() -------------------------------------------------

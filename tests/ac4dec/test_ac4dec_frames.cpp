@@ -46,6 +46,7 @@ struct MonoAudio {
     int frame_len_base = 2048;
     bool associated = false;
     bool dialog = false;
+    bool emdf_payload = false;  // metadata() carries one payload, id 7 with the byte 0xA5
 };
 
 std::vector<std::byte> mono_audio(const MonoAudio& m) {
@@ -91,7 +92,15 @@ std::vector<std::byte> mono_audio(const MonoAudio& m) {
         w.flag(false);  // b_drc_present
     }
     w.flag(false);     // b_de_data_present
-    w.flag(false);     // b_emdf_payloads_substream
+    w.flag(m.emdf_payload);  // b_emdf_payloads_substream
+    if (m.emdf_payload) {
+        w.put(7, 5);   // emdf_payload_id
+        w.put(0, 4);   // b_smpoffst, b_duration, b_groupid, b_codecdata
+        w.flag(true);  // b_discard_unknown_payload
+        w.variable_bits(1, 8);
+        w.put(0xA5, 8);
+        w.put(0, 5);  // end
+    }
     w.align();
     return w.bytes();
 }
@@ -131,6 +140,25 @@ std::vector<std::byte> emdf_payloads() {
     w.flag(true);    // b_discard_unknown_payload
     w.variable_bits(0, 8);
     w.put(0, 5);     // end
+    w.align();
+    return w.bytes();
+}
+
+// An emdf_payloads_substream() of two payloads that carry bytes: id 7 with two, id 3 with one.
+std::vector<std::byte> emdf_payloads_with_data() {
+    BitWriter w;
+    w.put(7, 5);   // emdf_payload_id
+    w.put(0, 4);   // b_smpoffst, b_duration, b_groupid, b_codecdata
+    w.flag(true);  // b_discard_unknown_payload
+    w.variable_bits(2, 8);
+    w.put(0xA5, 8);
+    w.put(0x5A, 8);
+    w.put(3, 5);  // emdf_payload_id
+    w.put(0, 4);
+    w.flag(true);
+    w.variable_bits(1, 8);
+    w.put(0xC3, 8);
+    w.put(0, 5);  // end
     w.align();
     return w.bytes();
 }
@@ -191,9 +219,12 @@ TEST_CASE("DecodeError describes every value", "[ac4dec][frames]") {
     CHECK(iclforge::ac4::describe(static_cast<DecodeError>(99)) == "unknown error");
 }
 
-TEST_CASE("a bitstream_version 0 presentation's audio and EMDF substreams are read", "[ac4dec][frames]") {
-    const auto audio = mono_audio({.sus_ver = 0});
-    const auto emdf = emdf_payloads();
+namespace {
+
+// A bitstream_version 0 presentation of one mono audio substream and the EMDF payloads substream
+// `emdf`, which its table of contents names.
+std::vector<std::byte> emdf_frame(const std::vector<std::byte>& audio,
+                                  const std::vector<std::byte>& emdf) {
     BitWriter toc;
     ac4_toc_test::toc_start(toc, {.bitstream_version = 0});
     // ac4_presentation_info(), a single substream.
@@ -213,11 +244,56 @@ TEST_CASE("a bitstream_version 0 presentation's audio and EMDF substreams are re
     toc.flag(false);  // b_add_emdf_substreams
     ac4_toc_test::index_table(toc, {audio.size(), emdf.size()});
     toc.align();
-    const auto report = decode(ac4_toc_test::assemble(toc, {audio, emdf}));
+    return ac4_toc_test::assemble(toc, {audio, emdf});
+}
+
+}  // namespace
+
+TEST_CASE("a bitstream_version 0 presentation's audio and EMDF substreams are read",
+          "[ac4dec][frames]") {
+    const auto audio = mono_audio({.sus_ver = 0});
+    const auto report = decode(emdf_frame(audio, emdf_payloads()));
     REQUIRE(report.substreams.size() == 2);
     check_read(find(report, 0), SubstreamReport::Kind::kAudio);
     check_read(find(report, 1), SubstreamReport::Kind::kEmdfPayloads);
     CHECK(find(report, 0).size_bits == 64);
+    // The one payload has no bytes; the audio substream sends none.
+    CHECK(find(report, 0).emdf_payloads.empty());
+    REQUIRE(find(report, 1).emdf_payloads.size() == 1);
+    CHECK(find(report, 1).emdf_payloads[0].id == 1U);
+    CHECK(find(report, 1).emdf_payloads[0].bytes.empty());
+}
+
+TEST_CASE("an EMDF payloads substream's payloads are reported by id, in order, with their bytes",
+          "[ac4dec][frames]") {
+    const auto report = decode(emdf_frame(mono_audio({.sus_ver = 0}), emdf_payloads_with_data()));
+    const SubstreamReport& emdf = find(report, 1);
+    check_read(emdf, SubstreamReport::Kind::kEmdfPayloads);
+    REQUIRE(emdf.emdf_payloads.size() == 2);
+    CHECK(emdf.emdf_payloads[0].id == 7U);
+    CHECK(emdf.emdf_payloads[0].bytes == std::vector<std::uint8_t>{0xA5, 0x5A});
+    CHECK(emdf.emdf_payloads[1].id == 3U);
+    CHECK(emdf.emdf_payloads[1].bytes == std::vector<std::uint8_t>{0xC3});
+}
+
+TEST_CASE("an audio substream's metadata() reports the EMDF payloads it carries",
+          "[ac4dec][frames]") {
+    const auto audio = mono_audio({.sus_ver = 0, .emdf_payload = true});
+    const auto report = decode(emdf_frame(audio, emdf_payloads()));
+    const SubstreamReport& substream = find(report, 0);
+    check_read(substream, SubstreamReport::Kind::kAudio);
+    REQUIRE(substream.emdf_payloads.size() == 1);
+    CHECK(substream.emdf_payloads[0].id == 7U);
+    CHECK(substream.emdf_payloads[0].bytes == std::vector<std::uint8_t>{0xA5});
+}
+
+TEST_CASE("an EMDF payloads substream cut short reports no payloads", "[ac4dec][frames]") {
+    std::vector<std::byte> cut = emdf_payloads_with_data();
+    cut.resize(cut.size() - 2);  // inside the second payload
+    const auto report = decode(emdf_frame(mono_audio({.sus_ver = 0}), cut));
+    const SubstreamReport& emdf = find(report, 1);
+    check_refused(emdf, DecodeError::kTruncated);
+    CHECK(emdf.emdf_payloads.empty());
 }
 
 TEST_CASE("a bitstream_version 1 Main + Associate presentation reads each role's metadata", "[ac4dec][frames]") {
@@ -282,17 +358,106 @@ TEST_CASE("each instance of a frame-rate-multiplied series is read at its share 
     check_read(find(report, 2), SubstreamReport::Kind::kPresentation);
 }
 
-TEST_CASE("a frame of the efficient high frame rate mode is refused by name", "[ac4dec][frames]") {
-    // frame_rate_index 10 with b_frame_rate_fraction set: every substream is
-    // a fragment.
-    const TocStart start{.frame_rate_index = 10};
+namespace {
+
+// The transmission frames of one unit of the efficient high frame rate mode (Part 2 clause 5.1.3)
+// at frame_rate_index 10, over one mono audio substream cut into `fraction` pieces and a
+// presentation substream held whole in the first frame and elided (length 0) in the others, as
+// Figure 7 has them. The first has `first_counter`, which a fraction divides.
+std::vector<std::vector<std::byte>> efficient_unit(int fraction, int first_counter,
+                                                   const std::vector<std::byte>& audio,
+                                                   std::optional<bool> enable = std::nullopt) {
     PresV1 p;
-    p.frame_rate_bits = {true, false};  // b_frame_rate_fraction, not 4
+    p.enable = enable;
+    p.frame_rate_bits = {true, fraction == 4};  // b_frame_rate_fraction, b_frame_rate_fraction_is_4
     ChanInfo info;
     info.ch_mode = 0;
-    const auto report = decode(single_group_frame(start, p, {info}, {mono_audio({}), presentation()}));
-    REQUIRE(report.substreams.size() == 2);
-    for (const SubstreamReport& s : report.substreams) {
+    std::vector<std::vector<std::byte>> frames;
+    const std::size_t piece = (audio.size() + static_cast<std::size_t>(fraction) - 1) /
+                              static_cast<std::size_t>(fraction);
+    for (int part = 0; part < fraction; ++part) {
+        const std::size_t begin = std::min(audio.size(), static_cast<std::size_t>(part) * piece);
+        const std::size_t end = std::min(audio.size(), begin + piece);
+        const TocStart start{.sequence_counter = first_counter + part,
+                             .frame_rate_index = 10,
+                             .b_iframe_global = part == 0};
+        frames.push_back(single_group_frame(
+            start, p, {info},
+            {std::vector<std::byte>(audio.begin() + static_cast<std::ptrdiff_t>(begin),
+                                    audio.begin() + static_cast<std::ptrdiff_t>(end)),
+             part == 0 ? presentation() : std::vector<std::byte>{}}));
+    }
+    return frames;
+}
+
+}  // namespace
+
+TEST_CASE("a unit of the efficient high frame rate mode is read when its last frame arrives",
+          "[ac4dec][frames][ehfr]") {
+    // frame_rate_index 10 is 100 fps, and a fraction of 2 makes the codec frames 50 fps: index 7,
+    // 1 024 samples (Part 2 Table 18).
+    const auto audio = mono_audio({.frame_len_base = 1024});
+    const auto frames = efficient_unit(2, 4, audio);
+    iclforge::ac4::Decoder decoder;
+    const auto first = decoder.parse(frames[0]);
+    REQUIRE(first.has_value());
+    CHECK(first->substreams.empty());  // a fragment: nothing to read yet
+    CHECK(first->sequence_counter == 4);
+    const auto unit = decoder.parse(frames[1]);
+    REQUIRE(unit.has_value());
+    REQUIRE(unit->substreams.size() == 2);
+    // The codec frame's number is its first frame's counter over the fraction.
+    CHECK(unit->sequence_counter == 2);
+    check_read(find(*unit, 0), SubstreamReport::Kind::kAudio);
+    check_read(find(*unit, 1), SubstreamReport::Kind::kPresentation);
+    CHECK(find(*unit, 0).size_bits == 8 * audio.size());
+}
+
+TEST_CASE("a fraction of 4 takes four transmission frames to a codec frame",
+          "[ac4dec][frames][ehfr]") {
+    // frame_rate_index 10 at a fraction of 4 is 25 fps: index 2, 2 048 samples.
+    const auto audio = mono_audio({.frame_len_base = 2048});
+    const auto frames = efficient_unit(4, 8, audio);
+    iclforge::ac4::Decoder decoder;
+    for (std::size_t frame = 0; frame < 3; ++frame) {
+        const auto held = decoder.parse(frames[frame]);
+        REQUIRE(held.has_value());
+        CHECK(held->substreams.empty());
+    }
+    const auto unit = decoder.parse(frames[3]);
+    REQUIRE(unit.has_value());
+    REQUIRE(unit->substreams.size() == 2);
+    CHECK(unit->sequence_counter == 2);
+    check_read(find(*unit, 0), SubstreamReport::Kind::kAudio);
+    CHECK(find(*unit, 0).size_bits == 8 * audio.size());
+}
+
+TEST_CASE("a unit whose first frame is missing is not assembled", "[ac4dec][frames][ehfr]") {
+    const auto audio = mono_audio({.frame_len_base = 1024});
+    const auto frames = efficient_unit(2, 4, audio);
+    iclforge::ac4::Decoder decoder;
+    // Joining at the second frame of a unit: the tail has nothing to join.
+    const auto tail = decoder.parse(frames[1]);
+    REQUIRE(tail.has_value());
+    CHECK(tail->substreams.empty());
+    // The next unit is whole.
+    const auto next = efficient_unit(2, 6, audio);
+    REQUIRE(decoder.parse(next[0]).has_value());
+    const auto unit = decoder.parse(next[1]);
+    REQUIRE(unit.has_value());
+    CHECK(unit->substreams.size() == 2);
+}
+
+TEST_CASE("a frame the efficient mode cannot select a presentation for is refused by name",
+          "[ac4dec][frames][ehfr]") {
+    // The stream's one presentation is disabled (b_enable_presentation 0): nothing is selected,
+    // so the substreams stay fragments.
+    iclforge::ac4::Decoder decoder;
+    const auto frames = efficient_unit(2, 4, mono_audio({.frame_len_base = 1024}), false);
+    const auto report = decoder.parse(frames[0]);
+    REQUIRE(report.has_value());
+    REQUIRE(report->substreams.size() == 2);
+    for (const SubstreamReport& s : report->substreams) {
         check_refused(s, DecodeError::kUnsupported);
         CHECK(s.kind == SubstreamReport::Kind::kOther);
     }
@@ -622,18 +787,21 @@ TEST_CASE("a presentation_config 5 presentation takes each group's role from its
     check_read(find(report, 3), SubstreamReport::Kind::kPresentation);
 }
 
-TEST_CASE("a 9.X.4 channel substream is refused as not decoded", "[ac4dec][frames]") {
+TEST_CASE("a 9.X.4 channel substream is read as the immersive element with b_5fronts",
+          "[ac4dec][frames]") {
     // 9.1.4 with four back channels and both top pairs: the presentation
     // substream reads bs_ch_config 0's b_cdmx_data_present, the stereo
-    // downmix flag and seven loudness correction flags, as 7.1.4's does.
+    // downmix flag and seven loudness correction flags, as 7.1.4's does. Four
+    // zero bytes are an SCPL element with its LFE and nothing after the
+    // first sf_info()s: the substream is read, not refused as not decoded, and
+    // runs out.
     PresV1 p;
     ChanInfo info;
     info.ch_mode = 14;
     const std::vector<std::byte> blank(4, std::byte{0});
     const auto report = decode(single_group_frame({}, p, {info}, {blank, presentation(1, false, 9)}));
     CHECK(find(report, 0).kind == SubstreamReport::Kind::kAudio);
-    check_refused(find(report, 0), DecodeError::kUnsupported);
-    CHECK(find(report, 0).refused_reason.find("9.X.4") != std::string_view::npos);
+    check_refused(find(report, 0), DecodeError::kTruncated);
     check_read(find(report, 1), SubstreamReport::Kind::kPresentation);
 }
 

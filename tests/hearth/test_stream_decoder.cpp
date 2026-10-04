@@ -603,6 +603,7 @@ TEST_CASE("stream decoder: fast inverse transform reaches the decoder, closely m
     }
     REQUIRE(squared_diff > 0.0);
     const double snr_db = 10.0 * std::log10(squared_signal / squared_diff);
+    CAPTURE(snr_db);
     CHECK(snr_db > 100.0);
 }
 

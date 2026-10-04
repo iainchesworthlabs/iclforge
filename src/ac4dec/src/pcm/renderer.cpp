@@ -24,7 +24,11 @@ constexpr std::size_t kTbr = 10;
 constexpr std::size_t kLfe = 11;
 constexpr std::size_t kTsl = 12;
 constexpr std::size_t kTsr = 13;
-constexpr std::size_t kIndices = 14;
+// The matrix's indices 14 to 21 are 22.2's channels, which no layout here renders; 22 and 23 are
+// the screen pair, and Table 33's 24 and 25 Lw and Rw.
+constexpr std::size_t kLscr = 22;
+constexpr std::size_t kRscr = 23;
+constexpr std::size_t kIndices = 24;
 
 constexpr std::size_t kNone = kIndices;
 
@@ -75,6 +79,10 @@ using Rows = std::array<std::array<double, kIndices>, kIndices>;  // [out][in]
             return kTsl;
         case S::kTopSideRight:
             return kTsr;
+        case S::kLeftScreen:
+            return kLscr;
+        case S::kRightScreen:
+            return kRscr;
         default:
             return kNone;
     }
@@ -85,7 +93,7 @@ using Rows = std::array<std::array<double, kIndices>, kIndices>;  // [out][in]
 // nowhere where the input configuration leaves it out.
 [[nodiscard]] std::size_t full_input(const ImmersiveLayout& layout, Speaker speaker) noexcept {
     const std::size_t i = index_of(speaker);
-    if ((i == kLb || i == kRb) && !layout.backs) {
+    if ((i == kLb || i == kRb) && !layout.backs && !layout.screen) {
         return kNone;
     }
     if (i >= kTfl && i <= kTbr) {
@@ -125,6 +133,21 @@ void pair(Rows& r, std::size_t out1, std::size_t in1, std::size_t out2, std::siz
     const auto& t2 = g.gain_t2;
     const bool in7 = in.width == 7;
     diagonal(r, {kL, kR, kC});
+    if (in.screen) {
+        // The screen pair: kept by a 9.X output (Tables 35 to 37, which no target here asks for but
+        // as coded), and in the others folded into the front pair. 7.X.4 takes r0,22 = r1,23 = 0 dB
+        // (Table 38) and so does every output from a 9.X.0 input; from 9.X.4 and 9.X.2 the other
+        // outputs take gain_f2 for L and R and gain_f1 for C, which the tables print the other way
+        // round ("The 9.X.4 element's rendering").
+        if (out.screen) {
+            diagonal(r, {kLscr, kRscr});
+        } else if ((out.width == 7 && out.tops == 4) || in.tops == 0) {
+            pair(r, kL, kLscr, kR, kRscr, 1.0);
+        } else {
+            pair(r, kL, kLscr, kR, kRscr, g.gain_f2);
+            pair(r, kC, kLscr, kC, kRscr, g.gain_f1);
+        }
+    }
     // The surround and back channels.
     if (out.width == 7) {
         diagonal(r, {kLs, kRs});
@@ -225,13 +248,15 @@ void pair(Rows& r, std::size_t out1, std::size_t in1, std::size_t out2, std::siz
 
 ChannelConfiguration input_configuration(const ImmersiveLayout& layout) noexcept {
     const int tops = layout.tops == 3 ? 4 : (layout.tops == 0 ? 0 : 2);
-    return {.width = layout.backs ? 7 : 5, .tops = tops};
+    return {.width = layout.backs || layout.screen ? 7 : 5, .tops = tops, .screen = layout.screen};
 }
 
 RenderGains render_gains(const CustomDmxData* cdmx, int out_ch_config) noexcept {
     // Table 130.
     const double m3 = from_db(-3.0);
     RenderGains g;
+    g.gain_f1 = 0.0;  // -inf dB
+    g.gain_f2 = 1.0;  // 0 dB
     g.gain_b = m3;
     g.gain_t1 = m3;
     g.gain_t2 = {0.0, m3, 0.0, 0.0, m3, 0.0};
@@ -255,6 +280,20 @@ RenderGains render_gains(const CustomDmxData* cdmx, int out_ch_config) noexcept 
         }
     };
     if (own != nullptr) {
+        // Table 128's gain_f1 (3.0 to -6.0 dB, then -inf) and Table 129's gain_f2.
+        constexpr std::array<double, 8> kGainF1Db = {3.0, 1.5, 0.0, -1.5, -3.0, -4.5, -6.0, 0.0};
+        // tool_scr_to_c_l() (6.2.9.4) sends the screen pair to C (b_put_screen_to_c 1, gain_f1) or
+        // to L and R (0, gain_f2): the one it does not name takes -inf dB (src/ac4dec/ERRATA.md,
+        // "The 9.X.4 element's rendering").
+        if (own->b_put_screen_to_c) {
+            (*own->b_put_screen_to_c ? g.gain_f2 : g.gain_f1) = 0.0;
+        }
+        if (own->gain_f1_code) {
+            const int code = *own->gain_f1_code;
+            g.gain_f1 =
+                code >= 0 && code < 7 ? from_db(kGainF1Db[static_cast<std::size_t>(code)]) : 0.0;
+        }
+        take(own->gain_f2_code, g.gain_f2);
         take(own->gain_b_code, g.gain_b);
         take(own->gain_t1_code, g.gain_t1);
         take(own->gain_t2a_code, g.gain_t2[0]);
@@ -309,6 +348,25 @@ RenderPlan render_plan(const ImmersiveLayout& layout, DownmixTarget target) {
         // Table 44: core decoding renders to 5.X.2 and 5.X.0 alone.
         plan.output = {.width = 5, .tops = plan.output.tops == 0 ? 0 : 2};
     }
+    if (plan.output.screen) {
+        // As coded from a 9.X layout (core decoding has no screen pair): Table A.27's order by
+        // speaker index, Tsl and Tsr (12 and 13) after the LFE (11), the screen pair (24 and 25)
+        // last.
+        plan.speakers = {S::kLeft,          S::kRight,    S::kCentre,   S::kLeftSurround,
+                         S::kRightSurround, S::kLeftBack, S::kRightBack};
+        if (plan.output.tops == 4) {
+            plan.speakers.insert(plan.speakers.end(), {S::kTopFrontLeft, S::kTopFrontRight,
+                                                       S::kTopBackLeft, S::kTopBackRight});
+        }
+        if (layout.lfe) {
+            plan.speakers.push_back(S::kLfe);
+        }
+        if (plan.output.tops == 2) {
+            plan.speakers.insert(plan.speakers.end(), {S::kTopSideLeft, S::kTopSideRight});
+        }
+        plan.speakers.insert(plan.speakers.end(), {S::kLeftScreen, S::kRightScreen});
+        return plan;
+    }
     plan.speakers = {S::kLeft, S::kRight, S::kCentre};
     if (layout.lfe) {
         plan.speakers.push_back(S::kLfe);
@@ -356,6 +414,9 @@ std::vector<std::vector<double>> render_matrix(const ImmersiveLayout& layout,
 }
 
 std::optional<int> out_ch_config(const ChannelConfiguration& output) noexcept {
+    if (output.screen) {
+        return std::nullopt;  // 9.X outputs take no custom downmix parameters (Table 127)
+    }
     if (output.width == 5) {
         return output.tops / 2;  // 5.X.0, 5.X.2 and 5.X.4: 0, 1 and 2
     }
@@ -368,7 +429,8 @@ std::optional<int> out_ch_config(const ChannelConfiguration& output) noexcept {
 LoudCorrOutput loud_corr_output(const ImmersiveLayout& layout,
                                 const ChannelConfiguration& output) noexcept {
     const ChannelConfiguration input = input_configuration(layout);
-    if (output.width >= input.width && output.tops >= input.tops) {
+    if (output.width >= input.width && output.tops >= input.tops &&
+        (output.screen || !input.screen)) {
         return LoudCorrOutput::kNone;  // nothing downmixed
     }
     if (layout.decoding == DecodingMode::kCore) {

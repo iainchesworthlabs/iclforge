@@ -131,6 +131,117 @@ void put_size(BitWriter& w, const ObjectSize& size) {
     w.put(code(size.height), 5);
 }
 
+// ETSI TS 103 420 §5.6.6.3.4 Table 42: object_divergence for each 6-bit object_div_code. Code 0 is
+// reserved and is read as no divergence, like code 1.
+constexpr std::array<double, 64> kDivergenceByCode = {
+    0.0,      0.0,      0.004026, 0.00716,  0.012731, 0.020173, 0.028485, 0.04021,
+    0.050582, 0.063601, 0.079914, 0.100299, 0.125666, 0.140532, 0.157027, 0.175282,
+    0.195417, 0.217536, 0.241718, 0.268002, 0.296377, 0.326766, 0.359017, 0.392895,
+    0.428081, 0.464184, 0.500755, 0.537316, 0.573389, 0.608529, 0.642346, 0.674524,
+    0.704833, 0.733123, 0.75932,  0.783416, 0.805451, 0.825506, 0.843686, 0.860112,
+    0.874914, 0.888222, 0.900168, 0.910875, 0.920461, 0.929035, 0.936698, 0.943544,
+    0.949656, 0.955112, 0.95998,  0.964322, 0.968195, 0.974729, 0.979923, 0.98405,
+    0.98733,  0.989935, 0.992874, 0.994955, 0.996817, 0.99821,  0.998993, 1.0};
+
+// §5.6.6.3.3 Table 41: object_div_table, the four values that need no more than a 2-bit index. Each
+// is also an entry of Table 42, so the writer can choose either by value.
+constexpr std::array<std::uint32_t, 4> kDivergenceTableCodes = {26, 29, 32, 63};
+
+// The Table 42 code nearest `divergence`, 0 when it is no divergence at all (the nearest value is
+// code 1's 0): such an object sends b_object_divergence = 0 instead.
+[[nodiscard]] std::uint32_t quantize_divergence(double divergence) {
+    const double clamped = std::clamp(divergence, 0.0, 1.0);
+    std::uint32_t best = 1;
+    double best_error = std::abs(kDivergenceByCode[1] - clamped);
+    for (std::uint32_t code = 2; code < kDivergenceByCode.size(); ++code) {
+        const double error = std::abs(kDivergenceByCode[code] - clamped);
+        if (error < best_error) {
+            best = code;
+            best_error = error;
+        }
+    }
+    return best == 1 ? 0 : best;
+}
+
+// §5.5.14 obj_div_block for one dynamic object in one block. `previous` is the Table 42 code the
+// object's previous block sent (0 for none), so a repeat can use object_div_mode 1.
+void put_obj_div_block(BitWriter& w, const DynamicObject& object, std::uint32_t code, std::uint32_t previous) {
+    if (!object.active) {
+        return;  // b_obj_not_active: object_divergence = 0, nothing is sent
+    }
+    if (code == 0) {
+        w.put(0, 1);  // b_object_divergence
+        return;
+    }
+    w.put(1, 1);
+    if (previous == code) {
+        w.put(1, 2);  // object_div_mode: reuse the previous block's value
+        return;
+    }
+    const auto in_table = std::ranges::find(kDivergenceTableCodes, code);
+    if (in_table != kDivergenceTableCodes.end()) {
+        w.put(0, 2);  // object_div_mode: object_div_table
+        w.put(static_cast<std::uint32_t>(in_table - kDivergenceTableCodes.begin()), 2);
+        return;
+    }
+    w.put(2, 2);  // object_div_mode: object_div_code
+    w.put(code, 6);
+}
+
+// §5.5.13 extended_object_element, with no extended precision positions. The Table 42 codes are
+// per update and per dynamic object; anchored objects send nothing (§5.5.14: obj_type != DYNAMIC).
+void put_extended_object_element(BitWriter& w, const Program& program, std::span<const ObjectUpdate> updates) {
+    const int dynamic_count = program.dynamic_objects;
+    std::vector<std::vector<std::uint32_t>> codes(static_cast<std::size_t>(dynamic_count));
+    bool any = false;
+    for (int object = 0; object < dynamic_count; ++object) {
+        for (const auto& update : updates) {
+            const auto& state = update.objects[static_cast<std::size_t>(object)];
+            const auto code = state.active ? quantize_divergence(state.divergence) : 0;
+            codes[static_cast<std::size_t>(object)].push_back(code);
+            any = any || code != 0;
+        }
+    }
+    w.put(any ? 1u : 0u, 1);  // b_obj_div_block
+    if (any) {
+        for (int object = 0; object < dynamic_count; ++object) {
+            std::uint32_t previous = 0;
+            for (std::size_t blk = 0; blk < updates.size(); ++blk) {
+                const auto code = codes[static_cast<std::size_t>(object)][blk];
+                put_obj_div_block(w, updates[blk].objects[static_cast<std::size_t>(object)], code, previous);
+                previous = code;
+            }
+        }
+    }
+    w.put(0, 1);  // b_ext_prec_pos_block
+}
+
+[[nodiscard]] bool needs_extended_object_element(std::span<const ObjectUpdate> updates) {
+    return std::ranges::any_of(updates, [](const ObjectUpdate& update) {
+        return std::ranges::any_of(update.objects, [](const DynamicObject& object) {
+            return object.active && quantize_divergence(object.divergence) != 0;
+        });
+    });
+}
+
+// §5.6.1.1.19 and §5.6.1.1.20's inverse: screen_factor = (screen_factor_bits + 1) / 8, and the
+// depth_factor of Table 16 nearest the one asked for.
+[[nodiscard]] std::uint32_t quantize_screen_factor(double factor) {
+    const long code = std::lround(std::clamp(factor, 0.125, 1.0) * 8.0) - 1;
+    return static_cast<std::uint32_t>(std::clamp(code, 0L, 7L));
+}
+
+[[nodiscard]] std::uint32_t quantize_depth_factor(double factor) {
+    constexpr std::array<double, 4> kFactors = {0.25, 0.5, 1.0, 2.0};
+    std::uint32_t best = 0;
+    for (std::uint32_t i = 1; i < kFactors.size(); ++i) {
+        if (std::abs(kFactors[i] - factor) < std::abs(kFactors[best] - factor)) {
+            best = i;
+        }
+    }
+    return best;
+}
+
 // §5.5.9 object_info_block. Everything that block 0 implies is implied here
 // too when blk == 0, so nothing the status indices would have carried is
 // written: §5.5.9 fixes both status_idx fields to 0b01 for blk == 0, and
@@ -183,7 +294,13 @@ void put_object_info_block(BitWriter& w, int blk, const DynamicObject* dynamic) 
 
         put_size(w, dynamic->size);
 
-        w.put(0, 1);  // b_object_use_screen_ref: room-anchored, not screen
+        // §5.5.11: b_object_use_screen_ref, and for a screen-anchored object screen_factor_bits and
+        // depth_factor_idx.
+        w.put(dynamic->screen_reference ? 1u : 0u, 1);
+        if (dynamic->screen_reference) {
+            w.put(quantize_screen_factor(dynamic->screen_factor), 3);
+            w.put(quantize_depth_factor(dynamic->depth_factor), 2);
+        }
         w.put(dynamic->snap ? 1u : 0u, 1);  // b_object_snap (ADM channelLock)
     }
 
@@ -425,13 +542,17 @@ std::vector<std::byte> build_payload_updates(const Program& program,
     // §5.6.4.3: oa_element_size counts b_discard_unknown_element, the element
     // and its padding, so the flag bit is inside the measurement and the
     // padding is whatever rounds the three of them up to whole bytes.
-    const std::size_t element_bits = [&] {
+    const bool extended = needs_extended_object_element(updates);
+    const auto measure = [&](const auto& put) {
         BitWriter probe;
-        put_object_element(probe, program, updates);
-        return probe.bit_count() + 1;
-    }();
-    const auto element_bytes = static_cast<std::uint32_t>((element_bits + 7) / 8);
-    const std::size_t element_padding = element_bytes * 8 - element_bits;
+        put(probe);
+        const std::size_t bits = probe.bit_count() + 1;
+        return std::pair{static_cast<std::uint32_t>((bits + 7) / 8), (bits + 7) / 8 * 8 - bits};
+    };
+    const auto put_object = [&](BitWriter& out) { put_object_element(out, program, updates); };
+    const auto put_extended = [&](BitWriter& out) { put_extended_object_element(out, program, updates); };
+    const auto [object_bytes, object_padding] = measure(put_object);
+    const auto [extended_bytes, extended_padding] = measure(put_extended);
 
     BitWriter w;
     // --- object_audio_metadata_payload (§5.5.2) ---
@@ -471,17 +592,26 @@ std::vector<std::byte> build_payload_updates(const Program& program,
     }
 
     w.put(0, 1);  // b_alternate_object_data_present
-    w.put(1, 4);  // oa_element_count_bits: one element, the object_element
+    w.put(extended ? 2u : 1u, 4);  // oa_element_count_bits: the object_element, then maybe the extended one
 
     // --- oa_element_md (§5.5.4) ---
     w.put(1, 4);  // oa_element_id_idx: object_element (Table 26)
-    put_variable_bits_max(w, element_bytes - 1, 4, 4);  // oa_element_size_bits
+    put_variable_bits_max(w, object_bytes - 1, 4, 4);  // oa_element_size_bits
     // A decoder that does not know this element can skip it by its size, so
     // there is no reason to make it throw the payload away.
     w.put(0, 1);  // b_discard_unknown_element
     put_object_element(w, program, updates);
-    for (std::size_t bit = 0; bit < element_padding; ++bit) {
+    for (std::size_t bit = 0; bit < object_padding; ++bit) {
         w.put(0, 1);  // §5.6.4.14 padding: zero bits, counted by the size
+    }
+    if (extended) {
+        w.put(5, 4);  // oa_element_id_idx: extended_object_element (Table 26)
+        put_variable_bits_max(w, extended_bytes - 1, 4, 4);
+        w.put(0, 1);  // b_discard_unknown_element
+        put_extended_object_element(w, program, updates);
+        for (std::size_t bit = 0; bit < extended_padding; ++bit) {
+            w.put(0, 1);
+        }
     }
 
     // §5.5.2's own trailing padding. It is NOT the same as the element's: the
@@ -537,35 +667,6 @@ namespace {
 [[nodiscard]] double depth_factor_from_idx(std::uint32_t idx) {
     constexpr std::array<double, 4> kFactors = {0.25, 0.5, 1.0, 2.0};
     return kFactors[idx & 3u];
-}
-
-// §5.6.6.3.3 Table 41: object_div_table (object_div_mode 0) to
-// object_divergence.
-[[nodiscard]] double divergence_from_table(std::uint32_t index) {
-    constexpr std::array<double, 4> kDivergence = {0.500755, 0.608529, 0.704833, 1.0};
-    return kDivergence[index & 3u];
-}
-
-// §5.6.6.3.4 Table 42: object_div_code (object_div_mode 2) to
-// object_divergence. Code 0 is reserved, so the table starts at code 1 and is
-// indexed by code - 1.
-constexpr std::array<double, 63> kDivergenceFromCode = {
-    0.0,      0.004026, 0.00716,  0.012731, 0.020173, 0.028485, 0.04021,  0.050582, 0.063601,
-    0.079914, 0.100299, 0.125666, 0.140532, 0.157027, 0.175282, 0.195417, 0.217536, 0.241718,
-    0.268002, 0.296377, 0.326766, 0.359017, 0.392895, 0.428081, 0.464184, 0.500755, 0.537316,
-    0.573389, 0.608529, 0.642346, 0.674524, 0.704833, 0.733123, 0.75932,  0.783416, 0.805451,
-    0.825506, 0.843686, 0.860112, 0.874914, 0.888222, 0.900168, 0.910875, 0.920461, 0.929035,
-    0.936698, 0.943544, 0.949656, 0.955112, 0.95998,  0.964322, 0.968195, 0.974729, 0.979923,
-    0.98405,  0.98733,  0.989935, 0.992874, 0.994955, 0.996817, 0.99821,  0.998993, 1.0,
-};
-
-// Table 42's lookup. Code 0 is reserved and has no value, which is what the
-// empty optional says.
-[[nodiscard]] std::optional<double> divergence_from_code(std::uint32_t code) {
-    if (code == 0 || code > kDivergenceFromCode.size()) {
-        return std::nullopt;
-    }
-    return kDivergenceFromCode[code - 1];
 }
 
 // Everything one object_element() needs that lives outside it: how many
@@ -869,24 +970,6 @@ void read_trim_element(BitReader& r, int object_count, TrimElement& trim) {
 // model has a home for (DynamicObject::divergence); ext_prec_pos_block is a
 // sub-quantization-step refinement of a position already decoded, and is
 // walked past rather than folded in.
-//
-// obj_div_block (§5.5.14, Table 40), per object and update block:
-//   - b_object_divergence 0: nothing is sent and the divergence stays 0.
-//   - object_div_mode 0: Table 41, indexed by object_div_table.
-//   - object_div_mode 1: "reuse object_divergence as transmitted in the
-//     previous obj_info_block", so the previous update block's value for the
-//     same object. The first block has no predecessor inside this payload and
-//     reads 0; carrying the last frame's value over would need decoder state
-//     that parse_payload does not have.
-//   - object_div_mode 2: Table 42, indexed by object_div_code.
-//   - object_div_mode 3: Table 40 reserves it, but §5.5.14 still reads an
-//     object_div_code for it, so the 6 bits are consumed to keep the rest of
-//     the element in step. Reserved gives no value, so the previous block's
-//     is kept, the same as mode 1.
-// A reserved object_div_code (0, Table 42) keeps the previous block's value
-// too. The pseudo-code's closing "else { object_divergence = 0 }" would zero
-// modes 0 and 1 after they have been read, which makes Table 41 and mode 1
-// pointless; it is read as belonging to the b_object_divergence test.
 [[nodiscard]] bool read_extended_object_element(BitReader& r, const ObjectLayout& layout,
                                                 int num_blocks, DecodedProgram& out) {
     if (num_blocks <= 0) {
@@ -897,28 +980,30 @@ void read_trim_element(BitReader& r, int object_count, TrimElement& trim) {
     }
     if (r.read(1) != 0) {  // b_obj_div_block
         for (int object = layout.anchored; object < layout.total; ++object) {
+            const auto index = static_cast<std::size_t>(object - layout.anchored);
+            double previous = 0.0;  // the previous block's object_divergence, for object_div_mode 1
             for (int blk = 0; blk < num_blocks; ++blk) {
-                if (r.read(1) == 0) {  // b_object_divergence
+                auto& block = out.blocks[static_cast<std::size_t>(blk)];
+                // §5.5.14: an object that is not active sends nothing, and its divergence is 0.
+                if (index >= block.objects.size() || !block.objects[index].active) {
+                    previous = 0.0;
                     continue;
                 }
-                const auto mode = r.read(2);  // object_div_mode
-                auto& block = out.blocks[static_cast<std::size_t>(blk)];
-                const auto index = static_cast<std::size_t>(object - layout.anchored);
-                const double previous =
-                    blk > 0 && index < out.blocks[static_cast<std::size_t>(blk) - 1].objects.size()
-                        ? out.blocks[static_cast<std::size_t>(blk) - 1].objects[index].divergence
-                        : 0.0;
-                double divergence = previous;
-                if (mode == 0) {
-                    divergence = divergence_from_table(r.read(2));  // object_div_table
-                } else if (mode == 2) {
-                    divergence = divergence_from_code(r.read(6)).value_or(previous);
-                } else if (mode == 3) {
-                    r.skip(6);  // object_div_code, with no value to take from it
+                double divergence = 0.0;
+                if (r.read(1) != 0) {  // b_object_divergence
+                    const auto mode = r.read(2);  // object_div_mode, Table 40
+                    if (mode == 0) {
+                        // Table 41: object_div_table, the four values Table 42 also holds.
+                        divergence = kDivergenceByCode[kDivergenceTableCodes[r.read(2)]];
+                    } else if (mode == 1) {
+                        divergence = previous;
+                    } else {
+                        // Modes 2 and 3 read the same 6-bit code (§5.5.14); 3 is reserved in Table 40.
+                        divergence = kDivergenceByCode[r.read(6)];
+                    }
                 }
-                if (index < block.objects.size()) {
-                    block.objects[index].divergence = divergence;
-                }
+                block.objects[index].divergence = divergence;
+                previous = divergence;
             }
         }
     }

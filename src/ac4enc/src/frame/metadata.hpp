@@ -290,10 +290,14 @@ void write_downmix(BitWriter& w, const PresentationChannels& p, const DownmixCod
 
 // dialog_enhancement(b_iframe): de_config() in I-frames and each frame's
 // parameters, differential in frequency in I-frames and in time against
-// `previous` in the others, or kept where they are the same.
+// `previous` in the others, or kept where they are the same. For ch_mode 13 and 14 (9.X.4), Part 2
+// clause 6.2.7.5 adds b_de_simulcast, with a second de_data() for core decoding, `core` and
+// `core_previous` as `parameters` and `previous`, where `core` is given.
 void write_dialog_enhancement(BitWriter& w, const DeConfigCodes* config,
                               const DeFrameParameters* parameters,
-                              const DeFrameParameters* previous, bool iframe);
+                              const DeFrameParameters* previous, bool iframe, int ch_mode = 0,
+                              const DeFrameParameters* core = nullptr,
+                              const DeFrameParameters* core_previous = nullptr);
 
 // The presentation substream's fields from b_substream_group_gains_present
 // (where n_substream_groups is above 1) to pan_associated; with nothing

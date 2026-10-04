@@ -96,6 +96,38 @@ iclforge::iab::AudioDataPcm make_pcm(std::uint32_t audio_data_id, std::size_t co
     return pcm;
 }
 
+// A minimal AudioDataDLC element (Annex B): 48 kHz, no predictor, every sub block direct PCM with
+// `magnitude` as the residual of each sample (BitDepth 8, positive), ShiftBits 16. At 24 fps
+// (Table 30) that is 10 sub blocks of 200 samples, so a frame of 2000 samples of 127 << 16.
+iclforge::iab::AudioDataDlc make_dlc(std::uint32_t audio_data_id, unsigned magnitude) {
+    std::vector<bool> bits;
+    const auto push = [&bits](std::uint64_t value, unsigned width) {
+        for (unsigned i = 0; i < width; ++i) {
+            bits.push_back(((value >> (width - 1 - i)) & 1U) != 0);
+        }
+    };
+    push(0, 2);   // DLCSampleRate: 48 kHz
+    push(16, 5);  // ShiftBits
+    push(0, 2);   // NumPredRegions48
+    for (unsigned n = 0; n < 10; ++n) {
+        push(0, 1);  // CodeType: direct PCM
+        push(8, 5);  // BitDepth
+        for (unsigned i = 0; i < 200; ++i) {
+            push(magnitude, 8);
+            push(0, 1);  // sign
+        }
+    }
+    iclforge::iab::AudioDataDlc element;
+    element.audio_data_id = audio_data_id;
+    element.coded.assign((bits.size() + 7) / 8, std::byte{0});
+    for (std::size_t i = 0; i < bits.size(); ++i) {
+        if (bits[i]) {
+            element.coded[i / 8] |= static_cast<std::byte>(0x80U >> (i % 8));
+        }
+    }
+    return element;
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -294,6 +326,184 @@ TEST_CASE("build_iab places each active Object sub block's keyframe at its own e
 }
 
 // ---------------------------------------------------------------------------
+// ObjectSpread and zone control
+// ---------------------------------------------------------------------------
+
+namespace {
+
+using iclforge::oba::ZoneConstraint;
+
+// Zone order of ST 2098-2 Table 24: screen left, screen centre, screen right, left wall, right
+// wall, rear left, rear right, overhead left, overhead right.
+std::array<double, iclforge::iab::kZoneCount> nine_zones(std::array<bool, 9> included) {
+    std::array<double, iclforge::iab::kZoneCount> gains{};
+    for (std::size_t i = 0; i < gains.size(); ++i) {
+        gains[i] = included[i] ? 1.0 : 0.0;
+    }
+    return gains;
+}
+
+}  // namespace
+
+TEST_CASE("iab_spread_to_size renames spread onto width, depth and height", "[admbridge][iab][spread]") {
+    using iclforge::iab::ObjectSpread;
+    using iclforge::iab::ObjectSpreadMode;
+
+    SECTION("a point source has no extent") {
+        const auto size = iclforge::admbridge::iab_spread_to_size({.mode = ObjectSpreadMode::kNone});
+        CHECK(size.is_point());
+    }
+    SECTION("an isotropic spread is the same on every axis") {
+        const auto size = iclforge::admbridge::iab_spread_to_size(
+            {.mode = ObjectSpreadMode::kOneD, .x = 0.25, .y = 0.25, .z = 0.25});
+        CHECK(size.width == 0.25);
+        CHECK(size.depth == 0.25);
+        CHECK(size.height == 0.25);
+        CHECK(size.is_isotropic());
+    }
+    SECTION("a 3-D spread keeps its axes: x is width, y depth, z height") {
+        const auto size = iclforge::admbridge::iab_spread_to_size(
+            {.mode = ObjectSpreadMode::kThreeD, .x = 0.1, .y = 0.5, .z = 1.0});
+        CHECK(size.width == 0.1);
+        CHECK(size.depth == 0.5);
+        CHECK(size.height == 1.0);
+    }
+}
+
+TEST_CASE("iab_zones_to_constraint maps Table 24's include patterns onto Table 20's presets",
+          "[admbridge][iab][zones]") {
+    struct Row {
+        std::array<bool, 9> included;
+        ZoneConstraint zone;
+        bool elevation;
+    };
+    const std::vector<Row> rows{
+        {{true, true, true, true, true, true, true, true, true}, ZoneConstraint::kNone, true},
+        {{true, true, true, true, true, false, false, true, true}, ZoneConstraint::kBackExcluded, true},
+        {{true, true, true, false, false, true, true, true, false}, ZoneConstraint::kSideExcluded, true},
+        {{false, true, false, false, false, true, true, false, false}, ZoneConstraint::kCentreAndBackOnly, false},
+        {{true, true, true, false, false, false, false, false, false}, ZoneConstraint::kScreenOnly, false},
+        {{false, false, false, true, true, true, true, true, true}, ZoneConstraint::kSurroundOnly, true},
+    };
+    for (const auto& row : rows) {
+        const auto mapping = iclforge::admbridge::iab_zones_to_constraint(nine_zones(row.included));
+        CHECK(mapping.exact);
+        CHECK(mapping.zone == row.zone);
+        CHECK(mapping.enable_elevation == row.elevation);
+    }
+}
+
+TEST_CASE("iab_zones_to_constraint leaves a pattern with no preset unconstrained", "[admbridge][iab][zones]") {
+    // Screen left only: no Table 20 preset excludes exactly the other six zones.
+    const auto mapping = iclforge::admbridge::iab_zones_to_constraint(
+        nine_zones({true, false, false, false, false, false, false, true, true}));
+    CHECK_FALSE(mapping.exact);
+    CHECK(mapping.zone == ZoneConstraint::kNone);
+    CHECK(mapping.enable_elevation);
+}
+
+TEST_CASE("iab_zones_to_constraint treats a zone gain as included from 0.5", "[admbridge][iab][zones]") {
+    auto gains = nine_zones({true, true, true, true, true, false, false, true, true});
+    gains[5] = 0.49;
+    gains[6] = 0.1;
+    CHECK(iclforge::admbridge::iab_zones_to_constraint(gains).zone == ZoneConstraint::kBackExcluded);
+    gains[5] = 0.5;
+    gains[6] = 0.5;
+    CHECK(iclforge::admbridge::iab_zones_to_constraint(gains).zone == ZoneConstraint::kNone);
+}
+
+TEST_CASE("iab_zones19_to_constraint reads the base layer for the horizontal zones", "[admbridge][iab][zones]") {
+    // Table 28: 0-2 base screen, 3-5 height screen, 6-8 base rear, 9-11 height rear, 12 base left
+    // wall, 13 height left wall, 14 base right wall, 15 height right wall, 16-18 ceiling.
+    std::array<double, iclforge::iab::kZone19Count> gains{};
+    gains.fill(1.0);
+
+    auto mapping = iclforge::admbridge::iab_zones19_to_constraint(gains);
+    CHECK(mapping.exact);
+    CHECK(mapping.zone == ZoneConstraint::kNone);
+    CHECK(mapping.enable_elevation);
+
+    // Screen only, no height or ceiling zones.
+    gains.fill(0.0);
+    gains[0] = gains[1] = gains[2] = 1.0;
+    mapping = iclforge::admbridge::iab_zones19_to_constraint(gains);
+    CHECK(mapping.zone == ZoneConstraint::kScreenOnly);
+    CHECK_FALSE(mapping.enable_elevation);
+
+    // Everything but the rear and the height rear: back excluded; a ceiling zone keeps elevation.
+    gains.fill(1.0);
+    gains[6] = gains[7] = gains[8] = 0.0;
+    gains[9] = gains[10] = gains[11] = 0.0;
+    mapping = iclforge::admbridge::iab_zones19_to_constraint(gains);
+    CHECK(mapping.zone == ZoneConstraint::kBackExcluded);
+    CHECK(mapping.enable_elevation);
+
+    // Only part of the rear included: no preset.
+    gains[7] = 1.0;
+    mapping = iclforge::admbridge::iab_zones19_to_constraint(gains);
+    CHECK_FALSE(mapping.exact);
+    CHECK(mapping.zone == ZoneConstraint::kNone);
+}
+
+TEST_CASE("build_iab carries spread and zone control onto the keyframe", "[admbridge][iab][spread][zones]") {
+    auto block = make_sub_block(0.5, 0.5, 0.25);
+    block.spread = {.mode = iclforge::iab::ObjectSpreadMode::kThreeD, .x = 0.2, .y = 0.4, .z = 0.6};
+    block.zone_gains = nine_zones({true, true, true, false, false, false, false, false, false});
+    block.snap = true;
+    auto frame = make_frame({}, {make_object(2, {block})});
+
+    const auto result = iclforge::admbridge::build_iab(std::span{&frame, 1});
+    REQUIRE(result.has_value());
+    const auto placement = result->paths[0].evaluate(0.0);
+    CHECK(placement.size.width == 0.2);
+    CHECK(placement.size.depth == 0.4);
+    CHECK(placement.size.height == 0.6);
+    CHECK(placement.zone == ZoneConstraint::kScreenOnly);
+    CHECK_FALSE(placement.enable_elevation);
+    CHECK(placement.snap);
+}
+
+TEST_CASE("build_iab without spread or zone control leaves the object a constraint-free point",
+          "[admbridge][iab][spread][zones]") {
+    auto frame = make_frame({}, {make_object(2, {make_sub_block(0.5, 0.5, 0.0)})});
+    const auto result = iclforge::admbridge::build_iab(std::span{&frame, 1});
+    REQUIRE(result.has_value());
+    const auto placement = result->paths[0].evaluate(0.0);
+    CHECK(placement.size.is_point());
+    CHECK(placement.zone == ZoneConstraint::kNone);
+    CHECK(placement.enable_elevation);
+}
+
+TEST_CASE("build_iab lets ObjectZoneDefinition19 replace the nine-zone control", "[admbridge][iab][zones]") {
+    // 120 fps has two pan sub blocks. The object's own control says screen only in both; the
+    // zone19 child says everything in sub block 0 and holds (no ZoneInfoExists) in sub block 1.
+    constexpr std::uint8_t kTwoSubBlockRate = 0x8;
+    auto first = make_sub_block(0.0, 0.5, 0.0);
+    first.zone_gains = nine_zones({true, true, true, false, false, false, false, false, false});
+    auto second = make_sub_block(1.0, 0.5, 0.0);
+    second.zone_gains = first.zone_gains;
+    auto object = make_object(2, {first, second});
+
+    iclforge::iab::ObjectZoneDefinition19 zone19;
+    zone19.sub_blocks.resize(2);
+    zone19.sub_blocks[0].zone_gains.fill(1.0);
+    zone19.sub_blocks[1].has_zone_info = false;
+    object.zone19 = zone19;
+
+    iclforge::iab::IABitstreamFrame frame;
+    frame.frame.sample_rate = 48000;
+    frame.frame.bit_depth = 16;
+    frame.frame.frame_rate_code = kTwoSubBlockRate;
+    frame.frame.objects = {object};
+
+    const auto result = iclforge::admbridge::build_iab(std::span{&frame, 1});
+    REQUIRE(result.has_value());
+    const auto duration = static_cast<double>(*iclforge::iab::sample_count(kTwoSubBlockRate, false)) / 48000.0;
+    CHECK(result->paths[0].evaluate(duration / 2.0).zone == ZoneConstraint::kNone);
+    CHECK(result->paths[0].evaluate(duration).zone == ZoneConstraint::kNone);
+}
+
+// ---------------------------------------------------------------------------
 // Error paths
 // ---------------------------------------------------------------------------
 
@@ -309,6 +519,30 @@ TEST_CASE("build_iab refuses a non-zero AudioDataID with no matching essence", "
     const auto result = iclforge::admbridge::build_iab(std::span{&frame, 1});
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error() == iclforge::admbridge::BridgeError::kNoIabEssenceForChannel);
+}
+
+TEST_CASE("build_iab decodes AudioDataDLC essence", "[admbridge][iab]") {
+    auto frame = make_frame({make_bed(1, {make_bed_channel(0x2, /*audio_data_id=*/9)})});
+    frame.frame.audio_dlc.push_back(make_dlc(9, 127));
+
+    const auto result = iclforge::admbridge::build_iab(std::span{&frame, 1});
+    REQUIRE(result.has_value());
+    REQUIRE(result->pcm.size() == 1);
+    REQUIRE(result->pcm[0].size() == 2000);
+    const float expected = static_cast<float>((127.0 * 65536.0) / 2147483648.0);
+    CHECK(result->pcm[0].front() == expected);
+    CHECK(result->pcm[0].back() == expected);
+}
+
+TEST_CASE("build_iab reports an AudioDataDLC element that fails to decode", "[admbridge][iab]") {
+    auto frame = make_frame({make_bed(1, {make_bed_channel(0x2, /*audio_data_id=*/9)})});
+    auto broken = make_dlc(9, 127);
+    broken.coded.resize(40);
+    frame.frame.audio_dlc.push_back(std::move(broken));
+
+    const auto result = iclforge::admbridge::build_iab(std::span{&frame, 1});
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error() == iclforge::admbridge::BridgeError::kBadIabAudio);
 }
 
 TEST_CASE("build_iab treats AudioDataID 0 as legitimate silence, not an error",

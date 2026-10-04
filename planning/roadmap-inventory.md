@@ -131,7 +131,7 @@ as active roadmap rows; the new roadmap may mention them only in a legacy index 
 | **AC-4 inspect** | IM4 Shipped | `src/ac4/include/iclforge/ac4/ac4.hpp`: "INSPECTOR, not a decoder"; `capabilities.md` AC-4 row | Shipped scope = parse/inspect + carriage in MP4/TS |
 | **AC-4 decode** | *(absent)* | `src/ac4dec/`: syntax only | **Partial** — separate row in section A |
 | **IAMF** | IM3 Shipped (phase 1) | `iamf/iamf.hpp`: "phase 1 of 3"; phases 2–3 wait on IAMF v2.0 final | Shipped = channel-based writer; object elements **blocked** |
-| **IAB reader** | IM1 Shipped | `ac3iab`: full header parse; **AudioDataDLC** opaque bytes only | Shipped = reader; Annex B DLC decode is **follow-on**, not ID'd |
+| **IAB** | IM1 Shipped | `iab`: reader, `dlc.hpp` decode, `writer.hpp` write and `encode_dlc` | Shipped = elementary IABitstream read and write, and `write_mxf_iab` for the ST 2067-201 Track File; an IMF validator run on it is the open follow-on |
 | **Multi-programme E-AC-3** | *(capabilities wording)* | `encode.cpp` generalizes `programme2=`..`programme8=`, each with its own `bsmod`/full `mixmdate` via `programmeN-<field>=`; `capabilities.md` L24 updated | **Shipped** — authoring complete for all eight §E2.3.1.2 substreams; receiver-side use of the metadata during mixdown remains a separate, open follow-on |
 | **E-AC-3 programme decode** | DC5 Shipped (structural) | `DecoderConfig::programme` selects one programme at a time | Shipped = structural; mixing metadata decode per DC4 |
 
@@ -198,7 +198,7 @@ Do **not** allocate new IDs. One old ID may map to **multiple** new names when s
 | IM3 | IAMF channel-based writer | Shipped |
 | *(IM3 tail)* | IAMF object elements + reader | Blocked on IAMF v2.0 |
 | IM1 | IAB reader | Shipped |
-| *(IM1 tail)* | IAB AudioDataDLC decode | Proposed follow-on |
+| *(IM1 tail)* | IAB MXF Track File write | Shipped (`write_mxf_iab`) |
 | UX12 | Crucible cross-platform product | Partial |
 | UX7 | macOS process tap | Partial |
 | AP1 | API freeze v1.0 | In progress |

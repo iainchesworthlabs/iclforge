@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "iclforge/adm/ac3adm.hpp"
 #include "iclforge/adm/model.hpp"
@@ -19,6 +20,7 @@
 namespace adm {
 class Document;
 class AudioTrackUid;
+class AudioChannelFormat;
 }  // namespace adm
 
 namespace iclforge::adm::detail {
@@ -40,8 +42,18 @@ namespace iclforge::adm::detail {
 // ac3adm.hpp's write_bw64 doc comment on why these are correlation keys, not real ADM IDs) - so
 // write_bw64 can resolve `AdmDocument::chna` entries (which name a track_uids[].uid) back to the
 // libadm element they describe, after reassignIds() has given it its real, final AudioTrackUidId.
+// One Objects audioChannelFormat whose blocks carry a zoneExclusion. libadm cannot write that
+// element, so write_bw64 adds it to the XML text afterwards, and needs the channel's final block
+// IDs (known only once reassignIds() has run) to say where. `zones_by_block[i]` belongs to the
+// channel's i-th block.
+struct ZoneBlockSource {
+    std::shared_ptr<::adm::AudioChannelFormat> channel;
+    std::vector<std::vector<ExclusionZone>> zones_by_block;
+};
+
 struct BuiltDocument {
     std::shared_ptr<::adm::Document> document;
+    std::vector<ZoneBlockSource> zone_blocks;
     std::unordered_map<std::string, std::shared_ptr<::adm::AudioTrackUid>> track_uids_by_key;
 };
 

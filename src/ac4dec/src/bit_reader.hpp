@@ -146,6 +146,11 @@ class BitReader {
         }
     }
 
+    // The bit at an absolute position, zero past the end of the data. For a decoder that reads
+    // ahead of what its syntax consumes (the speech spectral frontend's arithmetic decoder,
+    // which reads 30 bits before it knows how many it needs): reading does not move the reader.
+    [[nodiscard]] std::uint32_t bit(std::size_t index) const noexcept { return bit_at(index); }
+
     [[nodiscard]] std::size_t position() const noexcept { return pos_; }
     [[nodiscard]] std::size_t size_bits() const noexcept { return data_.size() * 8U; }
     [[nodiscard]] std::size_t remaining_bits() const noexcept {

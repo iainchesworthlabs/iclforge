@@ -396,11 +396,13 @@ std::string ac4_decoding(iclforge::ac4::DecodingMode decoding) {
 }
 
 // AC-4 objects into an ADM BWF master (planning/ac4.md, I5), reusing decode_adm.hpp's writer
-// (forge_cli::write_adm_atmos_master) rather than a second one: iclforge::ac4::Speaker and
-// iclforge::oba::BedLabel name the same seventeen loudspeaker positions in the same order (both TS
-// 103 190-2 Annex F.3 and this project's own bed labels descend from the same room layout), so a
-// bed object's speaker carries over by position.
-iclforge::oba::BedLabel to_oba_bed_label(iclforge::ac4::Speaker speaker) {
+// (forge_cli::write_adm_atmos_master) rather than a second one: the first seventeen of
+// iclforge::ac4::Speaker and iclforge::oba::BedLabel name the same loudspeaker positions in the
+// same order (both TS 103 190-2 Annex F.3 and this project's own bed labels descend from the same
+// room layout), so a bed object's speaker carries over by position. The speakers Table A.27 adds
+// (the 22.2 layout's centre, top and bottom channels, and 9.X.4's screen pair) have no bed label,
+// as before they had no Speaker: such a bed object is written with none.
+std::optional<iclforge::oba::BedLabel> to_oba_bed_label(iclforge::ac4::Speaker speaker) {
     switch (speaker) {
         case iclforge::ac4::Speaker::kLeft: return iclforge::oba::BedLabel::kL;
         case iclforge::ac4::Speaker::kRight: return iclforge::oba::BedLabel::kR;
@@ -419,8 +421,18 @@ iclforge::oba::BedLabel to_oba_bed_label(iclforge::ac4::Speaker speaker) {
         case iclforge::ac4::Speaker::kTopSideLeft: return iclforge::oba::BedLabel::kTsl;
         case iclforge::ac4::Speaker::kTopSideRight: return iclforge::oba::BedLabel::kTsr;
         case iclforge::ac4::Speaker::kLfe2: return iclforge::oba::BedLabel::kLfe2;
+        case iclforge::ac4::Speaker::kLeftScreen:
+        case iclforge::ac4::Speaker::kRightScreen:
+        case iclforge::ac4::Speaker::kTopFrontCentre:
+        case iclforge::ac4::Speaker::kTopBackCentre:
+        case iclforge::ac4::Speaker::kTopCentre:
+        case iclforge::ac4::Speaker::kBottomFrontLeft:
+        case iclforge::ac4::Speaker::kBottomFrontRight:
+        case iclforge::ac4::Speaker::kBottomFrontCentre:
+        case iclforge::ac4::Speaker::kCentreBack:
+            return std::nullopt;
     }
-    return iclforge::oba::BedLabel::kLfe;
+    return std::nullopt;
 }
 
 // iclforge::ac4::ObjectProperties (TS 103 190-2 Annex F) into iclforge::oba::DynamicObject (this

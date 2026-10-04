@@ -1,0 +1,14 @@
+# ac4-syntax-digest/1 ../ac4-hsf/mono-192-switched-snf.ac4
+# frame	substream	kind	records	end_bit	crc32
+0	0	audio	132	494	0x0afb0b0f
+0	1	hsf_ext	282	1056	0x0ac936e5
+0	2	presentation	7	17	0xc6b2acd5
+1	0	audio	132	494	0x69dc8c7d
+1	1	hsf_ext	288	1113	0x5645437b
+1	2	presentation	7	17	0xc6b2acd5
+2	0	audio	132	494	0x78ae2375
+2	1	hsf_ext	288	1092	0x4a0b3ccd
+2	2	presentation	7	17	0xc6b2acd5
+3	0	audio	132	494	0x69dc8c7d
+3	1	hsf_ext	290	1120	0x6a8e409e
+3	2	presentation	7	17	0xc6b2acd5

@@ -89,6 +89,11 @@ class DownmixStage {
     // loudness correction, Table 130's custom downmix parameters.
     void reset();
 
+    // Takes this frame's values, which then stay in force: the matrix() they give. process()
+    // does this first; a caller that applies the matrix to something other than QMF values (a
+    // substream at 96 or 192 kHz has none) calls this and reads matrix().
+    void update(const DownmixValues& values);
+
     // Takes this frame's values and writes out[o] = sum_c M[o][c] in[c] for
     // every QMF value, out resized to speakers().
     void process(const DownmixValues& values, std::span<const QmfMatrix> in,

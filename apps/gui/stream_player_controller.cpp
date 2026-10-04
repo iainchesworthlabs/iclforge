@@ -142,7 +142,18 @@ bool decode_ac4_to_memory(const QString& path, std::span<const std::byte> stream
                 std::ranges::find(pcm.speakers, iclforge::ac4::Speaker::kLfe) != pcm.speakers.end();
             result.layout_label = to_qstring(forge_gui::ac4_speaker_names(pcm.speakers));
             for (const std::size_t c : order) {
-                result.locations.push_back(iclforge::apps::ac4_location(pcm.speakers[c]));
+                const auto location = iclforge::apps::ac4_location(pcm.speakers[c]);
+                if (!location.has_value()) {
+                    // 22.2's bottom channels have no Table E2.5 location, which the player's
+                    // meters and layouts are made of.
+                    error = QStringLiteral(
+                                "%1: the presentation's %2 channel has no place in the player's "
+                                "layouts.")
+                                .arg(path)
+                                .arg(to_qstring(iclforge::ac4::describe(pcm.speakers[c])));
+                    return false;
+                }
+                result.locations.push_back(*location);
             }
         } else if (pcm.speakers != layout) {
             error = QStringLiteral("%1: frame %2: the channel layout changes mid-stream.")

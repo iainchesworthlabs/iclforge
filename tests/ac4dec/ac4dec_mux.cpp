@@ -102,8 +102,8 @@ void write_sized(BitWriter& w, const BitWriter& element, unsigned bits) {
         }
         BitWriter element = BitWriter::buffered();
         // At sus_ver 1 the tools are dialog_enhancement() alone.
-        iclforge::ac4::detail::write_dialog_enhancement(element, &group.de->config, &group.de->parameters, previous,
-                                              f.audio_iframe);
+        iclforge::ac4::detail::write_dialog_enhancement(
+            element, &group.de->config, &group.de->parameters, previous, f.audio_iframe, f.ch_mode);
         write_sized(w, element, 7);
         copy_bits(w, f.audio, emdf, end);
     } else {

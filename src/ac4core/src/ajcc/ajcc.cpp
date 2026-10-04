@@ -122,6 +122,59 @@ std::array<double, kModule4Coefficients> module_4(int core_mode, const ModulePar
     return c;
 }
 
+std::array<double, kModule1Coefficients> module_1(const ModuleParams& p) noexcept {
+    // Pseudocode 10: d0, d1 and d2 (ajcc_dry1, ajcc_dry2 and 1 - dry1 - dry2), then p0 to p5 in the
+    // order y0's three outputs, y1's three outputs.
+    std::array<double, kModule1Coefficients> c{};
+    c[0] = p.dry1;
+    c[1] = p.dry2;
+    c[2] = 1.0 - p.dry1 - p.dry2;
+    const double p0 = kRootHalf * (p.wet1 + p.wet3);
+    const double p1 = kRootHalf * (p.wet3 + p.wet2);
+    const double p2 = -kRootHalf * p.wet3;
+    const double p3 = -kRootHalf * p.wet2;
+    const double p4 = -kRootHalf * p.wet1;
+    const double p5 = -kRootHalf * p.wet3;
+    c[3] = p0;
+    c[4] = p2;
+    c[5] = p4;
+    c[6] = p1;
+    c[7] = p3;
+    c[8] = p5;
+    return c;
+}
+
+Term module_1_term(std::size_t coefficient) noexcept {
+    if (coefficient < kModule1Outputs) {
+        return {.output = coefficient, .decorrelated = false, .input = 0};
+    }
+    const std::size_t k = coefficient - kModule1Outputs;
+    return {.output = k % kModule1Outputs, .decorrelated = true, .input = k / kModule1Outputs};
+}
+
+std::array<double, kModule4Coefficients> module_3(const ModuleParams& front,
+                                                  const ModuleParams& back) noexcept {
+    // Pseudocode 13: the front arguments are dry2f, wet2f and wet3f (this side's dry2, wet2, wet3),
+    // the back ones dry1b, dry2b, wet1b and wet3b. d0 to d5, then w0 to w5.
+    std::array<double, kModule4Coefficients> c{};
+    c[0] = 1.0 - front.dry2;
+    c[1] = 0.0;
+    c[2] = front.dry2;
+    c[3] = 0.0;
+    c[4] = back.dry1 + back.dry2;
+    c[5] = 1.0 - back.dry1 - back.dry2;
+    const double wet_front =
+        std::sqrt(0.5 * front.wet3 * front.wet3 + 0.5 * front.wet2 * front.wet2);
+    const double wet_back = std::sqrt(0.5 * back.wet1 * back.wet1 + 0.5 * back.wet3 * back.wet3);
+    c[6] = -wet_front;
+    c[7] = 0.0;
+    c[8] = wet_front;
+    c[9] = 0.0;
+    c[10] = -wet_back;
+    c[11] = wet_back;
+    return c;
+}
+
 Term module_term(std::size_t coefficient, std::size_t outputs) noexcept {
     const std::size_t dry = 2 * outputs;
     if (coefficient < dry) {

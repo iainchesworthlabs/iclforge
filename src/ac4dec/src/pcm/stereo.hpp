@@ -30,6 +30,12 @@ struct StereoParameters {
     // One entry for each window group of the frame they were set for, 1 KB at the float
     // and fixed tiers, where the most a frame can have is 16.
     std::vector<std::array<std::array<Real, 4>, kMaxSfb>> abcd;
+    // a, b, c, d for every band at or past get_max_sfb(g) and so outside what chparam_info()
+    // covers: 1, 0, 0, 1, except in a substream at 96 or 192 kHz, whose HSF extension has bands
+    // there that hold lines, where sap_mode 2 (Table 114: M/S in all scale factor bands) makes
+    // it M/S for a pair. Used on the lines of those bands (src/ac4dec/ERRATA.md, "Stereo
+    // processing of the HSF extension's bands").
+    std::array<Real, 4> uncovered = {Real{1}, Real{0}, Real{0}, Real{1}};
 };
 
 // What a chparam_info() parameterises: a 2 x 2 step (Pseudocode 59), or one of
@@ -54,6 +60,12 @@ void stereo_parameters(const SubstreamContext& ctx, const SfInfo& info, const Ch
 // of either track and are left as they are.
 void apply_stereo(const SfInfo& info, const SfData& layout, const StereoParameters& parameters,
                   std::span<Real> track0, std::span<Real> track1);
+
+// The same 2 x 2 matrix, StereoParameters::uncovered, on every line from `first_line` on in the
+// two tracks: the HSF extension's lines of a substream at 96 or 192 kHz, which come after the
+// core's in each track's vector and which no band of chparam_info() reaches.
+void apply_stereo_beyond_bands(const StereoParameters& parameters, std::span<Real> track0,
+                               std::span<Real> track1, std::size_t first_line);
 
 // b_dual_maxsfb, which the channel pair's ASPX_ACPL_1 sends (Table 22): the
 // second track has max_sfb_side bands in a group where the first has max_sfb,

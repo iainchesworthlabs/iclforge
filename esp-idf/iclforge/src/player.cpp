@@ -200,6 +200,9 @@ struct Player::Impl {
     // The rate of a block the sink does not run at: the play is refused once
     // the frame that carried it returns.
     std::uint32_t ac4_refused_rate_hz = 0;
+    // Whether a block's channels are more than the renderer's bed holds, or have no
+    // location in it (22.2's): refused the same way.
+    bool ac4_refused_layout = false;
 #endif
 
     // The renderer's bed as last set. A block carries the bed it was decoded
@@ -704,6 +707,11 @@ struct Player::Impl {
             ac4_refused_rate_hz = static_cast<std::uint32_t>(block.sample_rate_hz);
             return;
         }
+        if (block.speakers.size() > LayoutRenderer::kMaxCoded ||
+            !ac4bridge::placeable(block.speakers)) {
+            ac4_refused_layout = true;
+            return;
+        }
         const std::size_t count = std::min(block.speakers.size(), ac4_speakers.size());
         if (count != ac4_speaker_count ||
             !std::equal(block.speakers.begin(),
@@ -876,6 +884,10 @@ struct Player::Impl {
             const auto elapsed = static_cast<std::uint64_t>(esp_timer_get_time() - started);
             if (ac4_refused_rate_hz != 0) {
                 finish("sample rate", true, static_cast<int>(ac4_refused_rate_hz));
+                break;
+            }
+            if (ac4_refused_layout) {
+                finish("channel layout", true, 0);
                 break;
             }
             if (!decoded) {

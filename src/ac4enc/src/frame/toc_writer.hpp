@@ -25,7 +25,9 @@ namespace iclforge::ac4::detail {
 // frame rate factor of 1.
 struct TocSubstream {
     // Part 1 Table 88: 0 mono to 10 (7.1 3/2/2); and Part 2 Table 56's 11 and
-    // 12, 7.0.4 and 7.1.4.
+    // 12, 7.0.4 and 7.1.4, 13 and 14, 9.0.4 and 9.1.4, and 15, 22.2 (layouts
+    // the encoder does not code; the decoder's tests build the streams of 9.X.4
+    // and 22.2 with this writer).
     int ch_mode = 1;
     bool add_ch_base = false;  // for 7.X 5/2/0 and 3/2/2 (clause 6.3.2.7)
     bool iframe = true;        // b_audio_ndot
@@ -135,6 +137,11 @@ struct TocLayout {
     int br_code = 0;
     int fs_index = 1;  // Part 1 Table 82
     int frame_rate_index = 13;
+    // frame_rate_fractions_info()'s frame_rate_fraction (Part 2 clause 6.2.1.4): 2 or 4 where
+    // the presentations are in the efficient high frame rate mode (clause 5.1.3), which only
+    // frame_rate_index 5 to 12 can carry (2 only at 5 to 9). Every presentation of the layout
+    // takes it.
+    int frame_rate_fraction = 1;
     bool iframe_global = true;
     std::vector<TocPresentation> presentations;
     // total_n_substream_groups of them, which is one more than the largest

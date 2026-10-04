@@ -9,16 +9,24 @@ encoder written from ETSI TS 103 190-1 V1.4.1 (channel-based coding) and TS 103 
 explains the format.
 
 It decodes the mono, stereo, 3.0, 5.X and 7.X channel elements in each of Part 1's codec modes
-(SIMPLE, ASPX and the three A-CPL modes) at every frame rate; the immersive element of 7.0.4 and
-7.1.4 in full and core decoding, rendered by Part 2's channel renderer; object audio, A-JOC in
+(SIMPLE, ASPX and the three A-CPL modes) at every frame rate; the immersive element of 7.0.4,
+7.1.4, 9.0.4 and 9.1.4 in full and core decoding, rendered by Part 2's channel renderer
+([9.X.4](#9x4-channel-elements)); the 22.2 element in full
+decoding, as coded, to 24 channels ([22.2](#222-channel-element)); object audio, A-JOC in
 full and core decoding and direct-coded objects, with each object's metadata ([Objects](#objects));
 streams of several presentations, the one a system chooses decoded with all of its substreams
 mixed; the output level and dynamic range control, dialogue enhancement and the downmix; and it
 conceals a frame that does not decode when asked to. It refuses, per substream and per frame, with
-`DecodeError::kUnsupported` and a reason: the speech spectral frontend, the 9.X.4 and 22.2
-channel elements, the efficient high frame rate mode (a presentation whose `frame_rate_fraction`
-is 2 or 4 spreads one frame over several `raw_ac4_frame()`s, and the decoder keeps no partial
-frames), and output at 96 or 192 kHz. [Development status](development-status.md)
+`DecodeError::kUnsupported` and a reason: core decoding of the 22.2
+element and its rendering to any layout but as coded, and, in a stream at 96 or 192 kHz, what the HSF
+text does not give it ([96 and 192 kHz](#96-and-192-khz)). It decodes the
+speech spectral frontend (Part 1 clause 5.2) for the tracks that select it, from the text alone: no
+stream here uses it. A presentation in the efficient high frame rate
+mode (`frame_rate_fraction` 2 or 4, Part 2 clause 5.1.3) spreads one codec frame over that many
+`raw_ac4_frame()`s: the decoder holds the fragments, `decode()` returns no frame until the unit's
+last transmission frame arrives, and the frame it then returns is at the audio frame rate of Part 2
+Table 18, with the unit's first `sequence_counter` divided by the fraction as its own. A unit that
+does not arrive whole is concealed as any frame that does not decode is. [Development status](development-status.md)
 has the detail, feature by feature, and [Validation](../verification.md#ac-4) says how each part
 is checked.
 
@@ -99,10 +107,46 @@ to the next, and a new layout starts its channels' synthesis from silence.
 | `drc` | Which of Table 161's DRC decoder modes compresses: `kDefault` takes the one clause 5.7.9.2 gives the output level; `kHomeTheatre`, `kFlatPanelTv`, `kPortableSpeakers` and `kPortableHeadphones` name one; `kOff` applies the level alone | `kDefault` |
 | `headphones` | Whether `kDefault` takes portable headphones rather than portable speakers where the level falls in their range, −16 to 0 dBFS | `false` |
 | `dialogue_enhancement_db` | G_DE (clause 5.7.8): how far the dialogue is raised, up to the cap the stream sets, 3, 6, 9 or 12 dB | 0, the tool bypassed |
-| `downmix` | The layout (clause 6.2.17): `kAsCoded`, `k5X` (a 7.X element folded to 5.X), `kStereo` (the method the stream prefers), `kLoRo`, `kLtRt`, `kMono`; and for the immersive element and an intermediate spatial format, `k7X4`, `k7X2`, `k7X0`, `k5X4` and `k5X2` (Part 2 clauses 5.10.2 and 5.10.3) | `kAsCoded` |
+| `downmix` | The layout (clause 6.2.17): `kAsCoded`, `k5X` (a 7.X element folded to 5.X), `kStereo` (the method the stream prefers), `kLoRo`, `kLtRt`, `kMono`; and for the immersive element and an intermediate spatial format, `k7X4`, `k7X2`, `k7X0`, `k5X4` and `k5X2` (Part 2 clauses 5.10.2 and 5.10.3), from a 9.X.4 source too. A 22.2 source is delivered `kAsCoded` only; no 9.X layout is a target | `kAsCoded` |
 | `mix_lfe` | Whether a two-channel or mono downmix takes the LFE at the stream's `lfe_mixgain`, as Part 1 does | `true` |
 | `dialogue_gain_db` | g_dialog (clause 6.2.16.1): a presentation's dialogue against its music and effects, up to the stream's `g_dialog_max` | 0 |
 | `associated_gain_db` | g_assoc (clause 6.2.16.2), 0 or less: a presentation's associated audio | 0 |
+
+### 22.2 channel element
+
+The 22.2 element (Part 2 clause 6.2.4.3) is two LFE tracks and eleven channel pairs, in the SIMPLE
+and ASPX codec modes, and decodes to 24 channels in the order of Part 2 Table A.27's speaker
+indices: L, R, C, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr, LFE, Tsl, Tsr, Tfc, Tbc, Tc, LFE2, Bfl, Bfr, Bfc,
+Cb, Lw, Rw (`DecodedFrame::speakers` names them). The LFEs are therefore not the fourth channel, as
+they are in the other layouts. `iclforge::ac4::Speaker` has an enumerator for each speaker of the
+table, the 9.X.4 screen pair included.
+
+Part 2 gives no renderer or downmix for a 22.2 input (Tables 35 to 43 have no row for one) and lists
+the element as full decoding only (Table 8). So the decoder delivers 22.2 as coded, refuses every
+`downmix` but `kAsCoded` and `decoding = kCore` with `kUnsupported` and a reason that names 22.2, and
+dialogue enhancement acts on L, R and C. DRC groups the channels by Part 2 Table 69. No stream of this
+element and no other decoder is available to check it against; the readings are in
+`src/ac4dec/ERRATA.md` under "The 22.2 element", and the streams its tests decode are built from the
+standard's tables ([Validation](../verification.md#the-decoders-222-element)).
+
+### 9.X.4 channel elements
+
+The 9.0.4 and 9.1.4 channel modes (`ch_mode` 13 and 14) are the immersive element with `b_5fronts`
+(Part 2 clause 6.2.4.1): the 7.X.4 channels and the screen pair, Lscr and Rscr, thirteen tracks in
+all, in SCPL, ASPX_SCPL, ASPX_ACPL_1, ASPX_ACPL_2 and ASPX_AJCC. They decode in full decoding to 13 or
+14 channels in the order of Part 2 Table A.27, the LFE after the tops and the screen pair last: L, R, C,
+Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr, LFE, Lscr, Rscr. Core decoding gives the same 5.X.2 as the
+7.X.4 modes' (L, R, C, LFE, Ls, Rs, Tsl, Tsr), without the screen pair.
+
+The renderer rows of Part 2 Tables 38 to 43 for a 9.X input fold the screen pair into L and R, or into
+C, at the custom downmix gains `gain_f1` and `gain_f2` (6.2.9.4), and the `downmix` targets `k7X4` to
+`k5X2` take them. Tables 35 to 37 render to a 9.X layout, which no `downmix` names, so a 9.X layout is
+never a target. Dialogue enhancement acts on Lscr, Rscr and C in full decoding (Table 15) and, for
+the A-JCC and A-CPL modes in core decoding, by the extension tools of clauses 5.8.2.1 and 5.8.2.2;
+`b_de_simulcast` selects the second `de_data()` for core decoding. DRC groups Lscr and Rscr with L and
+R (Table 69). No stream of these modes and no other decoder is available to check them against; the
+readings are in `src/ac4dec/ERRATA.md` under "The 9.X.4 element", and the streams their tests decode
+are built from the standard's tables.
 
 `DecoderConfig` holds the rest: `output`, `presentation` (below), `concealment`, `level` (the
 `md_compat` level the decoder claims, 3 by default; presentations above it are not chosen),
@@ -117,6 +161,33 @@ reference has to outlive the decoder. The records are described under
 `dialogue-enhancement=`, `channels=`, `downmix=`, `speakers=`, `mix-lfe=`, `dialogue-gain=`,
 `associated-gain=`, `md-compat=`, `decoding=`, `conceal=`); see
 [Commands](../forge/cli/commands.md#the-output-stage-channels-downmix-drcmode).
+
+### 96 and 192 kHz
+
+A substream whose `ac4_substream_info()` carries `sf_multiplier` (Part 1 Table 89) is at 96 or 192 kHz, and
+its group's `ac4_hsf_ext_substream()` holds the lines beyond 24 kHz (clause 4.2.4.3). The decoder reads the
+core's lines and the extension's into transforms two or four times as long (Tables 99 to 105, with Annex B's
+Tables B.2 to B.7 for the bands), inverse transforms them with Table 186's windows, delays them by clause
+5.6, and passes them through the sample rate converter of clause 6.2.15 at the same ratio as at 48 kHz.
+`DecodedFrame::sample_rate_hz` is then 96000 or 192000, each frame holds twice or four times the samples
+Table 83 gives at 48 kHz, and `decode_by_block()` hands them over in the same blocks of 256 samples
+at that rate. `PresentationInfo::sample_rate_hz` gives the rate before a frame is decoded, so that a player
+can open its output at it.
+
+Clause 5.4 says a stream with high sampling frequency data uses none of the QMF domain tools, and 6.2.5.2
+that decoding it needs the SAP tool and the inverse transform alone. So only a SIMPLE codec mode of the
+mono, stereo, 3.0, 5.X and 7.X elements decodes at these rates, and of the output stages only the output
+level gain (a scalar on the samples) and the downmix (a matrix on them) apply. A stream at 96 or 192 kHz
+that needs more is refused per frame with `DecodeError::kUnsupported` and a reason that names it: the A-SPX
+and A-CPL codec modes, the speech spectral frontend, the immersive and 22.2 elements, object audio, the
+mixing of a presentation's substreams, dialogue enhancement where the stream sends it and `OutputConfig` asks
+for a gain, and the compression of DRC (`DrcMode::kOff` keeps the output level). A 96 or 192 kHz substream
+with no extension substream linked is refused too: the text does not say what rate it is at.
+
+No stream at these rates was available, and no other decoder: the tests decode streams built from the
+text (`tests/golden/ac4-hsf/` and `tests/ac4dec/ac4dec_hsf.hpp`), each channel a tone above 24 kHz where the
+base rate has none, and hold the output to its frequency, level and waveform. The readings the text left open
+are in `src/ac4dec/ERRATA.md` under "96 and 192 kHz".
 
 ## Choosing a presentation
 
@@ -148,8 +219,8 @@ reading taken. `forge decode` takes the choice as `presentation=` (the position)
   `iclforge::ac4::PresentationInfo`: its `presentation_id`, version, configuration and `md_compat`, whether
   it is enabled, an alternative or pre-virtualized, its name (Part 2 clause 6.3.3.1.4; a name sent
   in chunks over several frames once the decoder has all of it), its language, the channels it
-  decodes to, its substreams with the role each plays, and whether this decoder decodes it and may
-  choose it.
+  decodes to, the sampling frequency it decodes at (`sample_rate_hz`, also on each substream), its
+  substreams with the role each plays, and whether this decoder decodes it and may choose it.
 - `metadata()`: the metadata of the presentation decoded, as the frames read so far have sent it:
   the loudness values (dialnorm and Part 1 clause 4.3.12.3's further values), the DRC
   configuration with each decoder mode and the one applied, dialogue enhancement's method, channels
@@ -160,7 +231,10 @@ reading taken. `forge decode` takes the choice as `presentation=` (the position)
   took of it, and, for one not read to its end, the error and the reason. A substream that no
   element of the table of contents this decoder reads names, an HSF extension substream that
   nothing claims among them, is reported as refused and unread. An OAMD substream that sends an
-  `oamd_common_data()` (Part 2 clause 6.2.8.1) reports it as `oamd_common_data`.
+  `oamd_common_data()` (Part 2 clause 6.2.8.1) reports it as `oamd_common_data`. An EMDF payloads
+  substream, and an audio substream whose `metadata()` carries an `emdf_payloads_substream()`,
+  report the payloads as `emdf_payloads`: each `emdf_payload_id` (Part 1 Table 174) and its
+  bytes, in the order read. The decoder does not interpret them.
 - `latency_samples()`: the decoder's delay at the output rate, 1 313 samples at
   `frame_rate_index` 13 and at the other indices the same at the internal rate plus the sample rate
   converter's delay. `decode_by_block()` holds back up to 255 samples more.
