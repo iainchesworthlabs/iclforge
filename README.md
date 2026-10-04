@@ -253,7 +253,7 @@ src/ac4core/    iclforge::ac4core — the tables and transforms the AC-4 decoder
 src/matroska/   iclforge::matroska — a standalone MKV muxer, no iclforge::ac3 dependency
 src/mp4/        iclforge::mp4 — a standalone MP4/ISOBMFF muxer plus fMP4/CMAF + HLS/DASH, no iclforge::ac3 dependency
 src/mpegts/     iclforge::mpegts — a standalone MPEG-2 Transport Stream muxer, no iclforge::ac3 dependency
-src/iamf/       iclforge::iamf — a standalone IAMF v1.1 OBU/ISOBMFF writer, fed from an E-AC-3 decode
+src/iamf/       iclforge::iamf — a standalone IAMF v2.0 OBU/ISOBMFF reader and writer, fed from an E-AC-3 decode
 src/iab/        iclforge::iab — a standalone SMPTE ST 2098-2 (IAB) bitstream reader, codec-blind
 src/adm/        iclforge::adm — BW64/RF64 + Audio Definition Model reader (opt-in, needs Boost)
 src/admbridge/  iclforge::admbridge — maps the ADM object graph src/adm parses onto the Atmos

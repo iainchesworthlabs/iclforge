@@ -452,7 +452,7 @@ ctest --preset test-windows-msvc-debug
 ```
 
 `examples/CMakeLists.txt` registers 22 example programs as their own `ctest` cases, plus
-`mux_iamf` and `read_iab` (their libraries build by default), `decode_ac4` (given a committed DEE
+`mux_iamf`, `iamf_objects` and `read_iab` (their libraries build by default), `decode_ac4` (given a committed DEE
 stream), `read_adm`, `encode_adm` and `encode_iab` under `ICLFORGE_BUILD_ADM` and the two C-API
 examples under `ICLFORGE_BUILD_CAPI`. The ones that touch the filesystem (`wav_roundtrip`,
 `read_adm`, `encode_adm`) write scratch files under a name unique to that run, not a fixed name

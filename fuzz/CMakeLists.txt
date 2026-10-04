@@ -84,8 +84,8 @@ foreach(container_target IN ITEMS iclforge_matroska_objects iclforge_mp4_objects
         -fsanitize=address,undefined,fuzzer-no-link)
 endforeach()
 
-# iclforge_ac4_objects and iclforge_iab_objects, for the same reason: fuzz_ac4_parse and
-# fuzz_iab_parse below mutate parsers that take their counts and lengths from
+# iclforge_ac4_objects, iclforge_iab_objects and iclforge_iamf_objects, for the same reason:
+# fuzz_ac4_parse, fuzz_iab_parse and fuzz_iamf_parse below mutate parsers that take their counts and lengths from
 # the file. Each is a library of its own rather than part of iclforge::ac3 (see
 # src/ac4/ and src/iab/), so nothing iclforge::ac3 carries reaches their
 # sources, and until these calls existed both harnesses ran against
@@ -119,6 +119,9 @@ if(ICLFORGE_BUILD_AC4)
 endif()
 if(ICLFORGE_BUILD_IAB)
     iclforge_instrument_for_fuzzing(iclforge_iab_objects)
+endif()
+if(ICLFORGE_BUILD_IAMF)
+    iclforge_instrument_for_fuzzing(iclforge_iamf_objects)
 endif()
 if(ICLFORGE_BUILD_ADM)
     iclforge_instrument_for_fuzzing(iclforge_adm_objects)
@@ -214,6 +217,13 @@ iclforge_add_container_fuzzer(fuzz_mpegts_demux iclforge::mpegts)
 # fuzz/regressions/fuzz_iab_parse/.
 if(ICLFORGE_BUILD_IAB)
     iclforge_add_fuzzer(fuzz_iab_parse iclforge::iab)
+endif()
+
+# iclforge::iamf::read_sequence + read_isobmff, and write_sequence, write_isobmff and decode_pcm on
+# what they return: the standalone OBU stream and the ISO-BMFF encapsulation, both read from numbers
+# the file chose (src/iamf/). One harness over both framings of the same bytes.
+if(ICLFORGE_BUILD_IAMF)
+    iclforge_add_fuzzer(fuzz_iamf_parse iclforge::iamf)
 endif()
 
 # iclforge::ac4::scan + iclforge::ac4::parse_raw_frame: sync search, then the TOC - a presentation
