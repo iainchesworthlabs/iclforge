@@ -485,7 +485,7 @@ depends on the same reading.
 ## The immersive element
 
 Part 2's immersive_channel_element (6.2.4.1), which codes the 7.X.4 channel modes, and A-JCC's
-ajcc_data() (6.2.6). The 9.X.4 modes pass the element b_5fronts 1 (6.2.3.1) and are refused by name.
+ajcc_data() (6.2.6). The 9.X.4 modes pass the element b_5fronts 1 (6.2.3.1); see "The 9.X.4 element".
 DEE codes 5.1.4 as 7.1.4 with the back pair absent, in ASPX_ACPL_2 from 192
 to 448 kbps, ASPX_SCPL at 512 and SCPL at 768, always with core_5ch_grouping 0, 2ch_mode 0 and
 b_use_sap_add_ch 0; the constructed streams of `tests/ac4dec/ac4dec_constructed.cpp` reach the rest.
@@ -1605,7 +1605,7 @@ does what the readings say, not that they are what an encoder meant.
 - **Reading:** 22.2's dialogue enhancement channels are L, R and C, as for 5.X, 7.X and 7.X.4, and as the
   tool's own `de_channel_config` names them. The printed row is 9.X.4's, which gives that layout's screen
   pair; 22.2 has no such pair, and its L and R are its front pair (the wides Lw and Rw are channels of
-  their own). The reading for 9.X.4 is left to the work that decodes it.
+  their own). The reading for 9.X.4 is "Dialogue enhancement's channels for 9.X.4".
 - **Evidence:** Text.
 
 ### No companding, S-CPL or A-CPL for 22.2
@@ -1639,6 +1639,200 @@ does what the readings say, not that they are what an encoder meant.
   layout has, L, C, R, Lw, Rw, Ls, Rs, Lb and Rb at the azimuths a 7.X layout gives them, the Ls and Rs
   at the sides; the top, bottom and centre-back channels are not in the ring.
 - **Evidence:** Text; as for 7.X, no stream mixes into a 22.2 substream.
+
+## The 9.X.4 element
+
+Part 2's immersive_channel_element (6.2.4.1) with `b_5fronts` 1, which codes the channel modes 13 and 14,
+9.0.4 and 9.1.4: the 7.X.4 modes' channels and the screen pair, Lscr and Rscr, in all five codec modes
+(SCPL, ASPX_SCPL, ASPX_ACPL_1, ASPX_ACPL_2, ASPX_AJCC). No stream of it exists here and no other decoder
+reads one, so every reading below rests on the text. The constructed streams of
+`tests/ac4dec/ac4dec_constructed.cpp` (`9_0_4-*` and `9_1_4-*`) carry a distinct tone on each channel and
+are read by both transcriptions of the syntax, and they show that the decoder does what the readings say,
+not that they are what an encoder meant.
+
+### The 9.X.4 element's tracks
+
+- **Where:** Part 2 6.2.4.1, pp. 128 and 129 (the third `two_channel_data()` and two further
+  `chparam_info()` that `b_5fronts` adds); 5.2.3.2 step 5, p. 60; Tables 19 and 20, pp. 60 and 61.
+  Step 5 prints "n_elem = 6 b_5fronts ≠ 0 and 0 ≤ j < n_elem" with the case split lost, and Table 20's
+  `b_5fronts` 1 matrix adds the rows L'' = L' + a'_4 A' and M'' = M' + a'_5 B'.
+- **Reading:** the element has 13 tracks, A'' to M'', and L'' and M'' are the last pair of Table 19,
+  after the tracks of the 7.X.4 element. a'_0 to a'_3 are the first four `chparam_info()` and a'_4 and a'_5
+  the last two, as the syntax orders them; the pair [L, M]'s own `chparam_info()` (its stereo
+  processing, Part 1 5.3.3) is read inside its `two_channel_data()`, which the syntax places between
+  the four and the two, and is not one of the six. The prediction, like the other four, is a'_j times the
+  track of the first pair (A' and B') added to the track, per band, with the sap_mode of the `chparam_info()`
+  it comes from; sap_mode 0 sets a' to 0.
+- **Evidence:** Text. The constructed streams `9_1_4-scpl-grouping1-matsel2-prediction` and
+  `9_1_4-acpl1-grouping3-matsel8-prediction` predict L and M at a non-zero alpha_q. A first reading took
+  a'_4 and a'_5 from the two `chparam_info()` that follow the pair's own in the decoder's list; the tones
+  of Lscr and Rscr came out on the wrong channels and the test caught it.
+
+### The 9.X.4 element's S-CPL channels
+
+- **Where:** Part 2 5.3.3.1, Table 23, p. 64: for `b_5fronts` 1 the table prints a second mapping, of
+  (A'', L'', B'', M'') to four outputs it labels "Lw, Lscr, Rw, Rscr" with the factor 2 x ½ and no
+  `c_gain` or `m_gain`; Table 24 for core decoding takes the first seven tracks. Table 8, p. 46, pairs the
+  channels A-SPX processes as (L, Lscr) and (R, Rscr), and 9.X.4 has no Lw or Rw (Table A.27).
+- **Reading:** the labels Lw and Rw of Table 23 are L and R: L = A'' + L'' and Lscr = A'' − L'', and R =
+  B'' + M'' and Rscr = B'' − M'' (½ ± ½ times 2), not scaled by `c_gain`, which only C takes (2 in SCPL, 1
+  in ASPX_SCPL); the printed 5.1-style rows for Ls to Tbr are the 7.X.4 element's. In core decoding Table
+  24 is the 7.X.4 core's, with L and R from A'' and B'' at `c_gain`.
+- **Evidence:** Text; the constructed SCPL and ASPX_SCPL streams put each of the 13 tones on its channel.
+
+### The 9.X.4 element's A-SPX
+
+- **Where:** Part 2 4.8.3.11, Tables 8 and 9, p. 46, and Table 11, p. 47; 6.2.4.1, p. 129. Table 8 lists
+  the channels of the ASPX_SCPL core mode as "[Ls], [Rs], C, (L, R), [Tfl], [Tfr]" for every `b_5fronts`
+  ("X"), and the syntax sends, with `b_5fronts` 1, two `aspx_data_2ch()` in the place of the one that
+  holds L and R, so that no unit holds both. Table 9 lists "L, R, Ls, Rs, Tfl, Tfr" for post-processing
+  with `b_5fronts` 1.
+- **Reading:** full decoding in ASPX_SCPL processes seven units in the order the syntax sends them:
+  (Ls, Lb), (Rs, Rb), C, (L, Lscr), (R, Rscr), (Tfl, Tbl), (Tfr, Tbr). Core decoding reads the same seven
+  and takes the first channel of each two-channel unit, as the square brackets of Table 8 say: L from the
+  fourth unit and R from the fifth, where Table 8 prints "(L, R)" as one pair. In the A-CPL
+  and A-JCC modes the units are Table 8's (A'', B''), (D'', E''), (F'', G'') and C'', and L'' and M''
+  have no A-SPX data of their own. The gains of ASPX_SCPL in full decoding are Table 11's: 2 for C, 1 for
+  L, Lscr, R and Rscr, and the square root of 2 for the others; the core's are g = 2 for the channels of
+  Table 9 and none for the rest.
+- **Evidence:** Text; `9_0_4-aspx_scpl-grouping0-2ch1-unit3` makes the fourth unit loud and finds its
+  high band on L and Lscr alone.
+
+### The 9.X.4 element's A-CPL
+
+- **Where:** Part 2 4.8.3.14 and Table 12, p. 48; 5.5.2 and Pseudocode 2, p. 67 (Table 25, p. 66);
+  6.2.4.1, p. 129 (`acpl_data_1ch()` six times with `b_5fronts`).
+- **Reading:** the six modules are Pseudocode 2's four, on (Ls, Lb), (Rs, Rb), (Tfl, Tbl) and (Tfr, Tbr),
+  then the fifth on (L, Lscr) and the sixth on (R, Rscr) with the fifth and sixth `acpl_data_1ch()`
+  (Table 25: x0 / x3 to z0 / z1 and x1 / x4 to z2 / z3); these two decorrelate with D2, each module
+  with a decorrelator of its own, as the first four use D0, D0, D1 and D1. In ASPX_ACPL_1 the residual
+  inputs x3 and x4 are the tracks L'' and M''; in ASPX_ACPL_2 they are 0. Pseudocode 2 prints
+  `u4 = inputSignalModification(x0in)` and `u5 = ... (x1in)` before the lines that assign `x0in = 2*x0`
+  and `x1in = 2*x1`; the assignments come first, as they do for x5in to x10in. With `b_5fronts` the
+  outputs of the fifth and sixth modules (z0 to z3) are not scaled by the square root of 2, C is twice
+  its input, and the outputs of the first four modules are scaled by it as before. Core decoding applies
+  g = 2 to each present channel instead and no A-CPL (4.8.3.14).
+- **Evidence:** Text; `9_0_4-acpl2-grouping2-second` and the ASPX_ACPL_1 stream route each module's
+  downmix to its first or second output and find the tone on the one channel.
+
+### The 9.X.4 element's A-JCC
+
+- **Where:** Part 2 6.2.6.1 (`ajcc_data(b_5fronts)`), p. 133; 5.6.3, Tables 26 and 27, pp. 68 and 71;
+  Pseudocodes 8, 10, 12 and 13, pp. 73 to 78.
+- **Reading:** with `b_5fronts` the data are `ajcc_qm_f` and `ajcc_qm_b` and four modules' framing, and
+  twenty parameters in the order dry1f to dry4f, dry1b to dry4b, wet1f to wet6f, wet1b to wet6b; the
+  modules lf, rf, lb and rb take dry1 and dry2, dry3 and dry4 and wet1 to wet3 or wet4 to wet6 of the front
+  or the back set. Full decoding is four `ajcc_module_1()` (Pseudocode 10) and core decoding two
+  `ajcc_module_3()` (Pseudocode 13); Pseudocode 10's coefficients d0 to d2 are dry1, dry2 and
+  1 − dry1 − dry2, followed by y0's p0, p2 and p4 and y1's p1, p3 and p5. Each coefficient is
+  interpolated with the framing of the half it comes from. Eight decorrelator instances, D0, D2, D1, D2 on
+  each side, serve the full modules and the core takes four.
+- **Evidence:** Text; `9_1_4-ajcc-grouping1-route2` and its siblings send each route (a module's input
+  whole to one output) and the tones come out on the channels the route names, in full and core decoding.
+
+### The 9.X.4 element's output
+
+- **Where:** Part 2 Table A.27, p. 214: the 9.X.4 column lists L, R, C, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr,
+  the LFE (index 11), and the screen pair at 24 and 25; Table 8, p. 46, and Table 71, p. 171, for the core.
+- **Reading:** decode() writes the thirteen or fourteen channels in Table A.27's order by speaker
+  index: L, R, C, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr, LFE, Lscr, Rscr (the LFE after the tops, as for 22.2).
+  Core decoding is the 7.X.4 core's 5.X.2 (L, R, C, [LFE], Ls, Rs, Tsl, Tsr): its channels are those of the
+  seven first tracks, and the screen pair is not in it.
+- **Evidence:** Text; the constructed streams.
+
+### The 9.X.4 element's rendering
+
+- **Where:** Part 2 5.10.2.4 and 5.10.2.5, Tables 34 to 43, pp. 104 to 107; Tables 128 to 130, pp. 207 and
+  208; Table 127, p. 206; 4.8.5.3, p. 52. Tables 38 to 43 have a 9.X.4, 9.X.2 and 9.X.0 row, with
+  r0,22 = r1,23 = gain_f1 and r2,22 = r2,23 = gain_f2 (Tables 39 to 43, from 9.X.4 and 9.X.2), or
+  r0,22 = r1,23 = 0 dB (Table 38, and every table from 9.X.0). Table 128 gives gain_f1 as 3.0 to −6.0 dB and
+  then −∞ (default −∞, Table 130), and Table 129 gives gain_f2 as 0 to −12 dB then −∞ (default 0 dB).
+  Tables 35 to 37 render to 9.X outputs.
+- **Reading:** the 9.X rows of Tables 38 to 43 are rendered as printed, with the two gain labels taken the
+  other way round: the coefficient the rows print gain_f1, on L and R (from Lscr and Rscr), is Table
+  129's gain_f2 (default 0 dB), and the one printed gain_f2, on C, is Table 128's gain_f1 (default
+  −∞). 6.2.9.4, p. 153, sends `b_put_screen_to_c` and then `gain_f1_code` if it is 1 and `gain_f2_code`
+  if not; 6.3.10.3.3, p. 207, says the flag says whether Lscr and Rscr "are mixed into the Centre
+  channel C"; and Table 130 defaults the flag to False, gain_f1 to −∞ and gain_f2 to 0 dB. So gain_f1 is the gain of the screen
+  pair into C and gain_f2 that into L and R, and printed the other way round the defaults would drop the
+  pair from L and R and put it into C, against Table 38's r0,22 = r1,23 = 0 dB. The flag chooses the
+  destination: with `b_put_screen_to_c` 1 the pair goes to C at gain_f1 and the gain into L and R is −∞,
+  with 0 it goes to L and R at gain_f2 and the gain into C is −∞ (the text says only "mixed into C").
+  A 9.X source's Lb and Rb are always in its input configuration, as the 9.X rows give them
+  coefficients and `bs_ch_config` 0 and 3 are the "back present" values of a 9.X mode (6.2.9.2);
+  `b_4_back_channels_present` does not narrow them. The 7.X.4 and 5.X targets are rendered; a 9.X
+  output (Tables 35 to 37) has no `out_ch_config` in Table 127 and is no `DownmixTarget`, so is refused.
+  Folding the screen pair is a downmix and takes the output's loudness correction; as coded does not
+  (4.8.5.3).
+- **Evidence:** Text: `tests/ac4dec/test_ac4dec_renderer.cpp` holds the 9.X rows a second time, as printed,
+  against the matrices for every output and every input; no stream sends `b_put_screen_to_c`, `gain_f1_code` or `gain_f2_code`.
+
+### Dialogue enhancement's channels for 9.X.4
+
+- **Where:** Part 2 Table 15, p. 49: "9.X.4, 22.2: Lscr, Rscr, C"; Table 13, p. 48: 9.X.4 in SCPL, ASPX_SCPL
+  and ASPX_ACPL_1 uses Part 1 5.7.8 in core and full decoding; in ASPX_ACPL_2 and ASPX_AJCC full
+  decoding uses Part 1 5.7.8 and core decoding clauses 5.8.2.2 and 5.8.2.1.
+- **Reading:** in full decoding the first, second and third channels of `de_channel_config` (Part 1 Table
+  171's bits 4, 2 and 1) are Lscr, Rscr and C, and L and R pass unchanged. In core decoding, which has no
+  screen pair, Part 1's tool for SCPL, ASPX_SCPL and ASPX_ACPL_1 processes the core's L, R and C, since
+  those carry the channels (A'' to C'') the screen pair is coded with. (The 22.2 reading, L, R and C, is
+  kept: see "Dialogue enhancement's channels for 22.2".)
+- **Evidence:** Text; `dialogue enhancement raises 9.X.4's Lscr, Rscr and C, not L and R` makes each tone 9 dB
+  louder on the channels asked and leaves the rest within 0.3 dB.
+
+### Core decoding's dialogue enhancement for 9.X.4
+
+- **Where:** Part 2 5.8.2.1 and 5.8.2.2, pp. 92 to 96, Pseudocodes 19 to 21, and 4.8.3.15, p. 49 ("If
+  b_de_simulcast is true, the decoder shall use the second de_data in dialog_enhancement for the core
+  decoding mode"). The tool computes y = (M_interp | I) (m, u): u is the core's L, R and C, m the three
+  inputs of the A-JCC (A'', B'', C'') or A-CPL (a, b, c) tool, M_interp the interpolation of the Part 1
+  matrix Ĥ_DE,MC less the identity, per input, times the coefficients C_L and C_R (1 for C).
+- **Reading:**
+  - 5.8.2.2 prints `y = H_DE,ACPL,Core x (...)` with H = (M_interp | I), a 3 x 6 matrix, and defines
+    the three A-CPL inputs `m` but no `u`; 5.8.2.1 has both. `u` is taken as 5.8.2.1 has
+    it, the core's L, R and C that Table 8's core decoding produces (A-CPL's replacement gain applied).
+    Ĥ_DE,Core is Ĥ_DE,MC (3 x 6, Part 1 5.7.8.6: the parametric 3 x 3 part and the waveform part) times
+    the 6 x 3 matrix [I; 0] less the 3 x 3 identity, that is, the parametric part less the identity,
+    the waveform part having no core counterpart (see "Dialogue enhancement without its waveform").
+  - The scale of m is not given. Qin_AJCC are the A-SPX outputs, and the core computes with them as
+    x0in = (2 + 1/√2) x0 (Pseudocode 12), so that u is at that scale. m is taken at the scale u is made
+    at: for A-JCC the A-SPX output times Pseudocode 12's input gain, for A-CPL the A-SPX output with the
+    replacement gain of 4.8.3.14 applied (g = 2, which core decoding gives instead of A-CPL). With that
+    scale a core channel that a module fills whole with its input (C = 1) is raised by 1 + g x p, the
+    factor full decoding raises Lscr by, and at the other scales it would be raised by a different
+    one for no reason the text gives.
+  - Pseudocode 20 is taken with its evident corrections. `ts++` inside the loops for the steep cases
+    would skip a timeslot; the value assigned at `ts == psts` is kept and the loop moves on. The ramps
+    divide by `psts`, which is 0 for a parameter set at the frame's first timeslot, and by
+    `num_qmf_timeslots − psts − 1`, which is 0 at the last: a zero denominator is a step to the target. The
+    interpolation reaches its target at the last timeslot, `(ts + 1) / N`, as Pseudocode 6 does for A-CPL.
+    `Mprev`, `de_param_prev` and `coeff_prev` start at 0, so the first frame fades in.
+  - C_L and C_R come from Pseudocodes 19 and 21 with the framing of the front modules (A-JCC) or of the
+    fifth and sixth `acpl_data_1ch()` (A-CPL); in A-CPL the coefficient is ½ (1 − alpha1), so a module that
+    sends the downmix to the second output (alpha −1) has C = 1 and one that sends it to the first
+    has 0. A-CPL's `acpl_num_param_bands` and A-JCC's `ajcc_num_param_bands` map the subbands (sb_to_pb).
+  - If `b_de_simulcast` is 1, core decoding takes the second `de_data()` (4.8.3.15), which sends no panning
+    of its own and takes the first's (6.2.7.6).
+- **Evidence:** Text; unit tests of the interpolation (smooth with one and two sets, steep) against
+  hand-worked values, and constructed streams (`dialogue enhancement ... core`) that find the core's L, R and C
+  louder by 1 + C g p on each route of A-JCC and of A-CPL, and unchanged where the second `de_data()` is 0.
+
+### DRC's groups for 9.X.4
+
+- **Where:** Part 2 Table 69, p. 170: 9.X.4 has four groups, "L, R, [LFE], Lscr, Rscr", C, "Ls, Rs, Lb, Rb"
+  and "Tfl, Tfr, Tbl, Tbr"; 4.8.3.16, p. 49.
+- **Reading:** Lscr and Rscr join the first group with L, R and the LFE; the level detector weighs them as
+  front channels (1) and the LFE not at all. Core decoding discards the gains of the channels it does not
+  have, as for 7.X.4.
+- **Evidence:** Text; `tests/ac4dec/test_ac4dec_drc.cpp`.
+
+### Mixing into a 9.X.4 substream
+
+- **Where:** Part 1 4.3.12.4.9 and Table 216 pan a mixed substream over the horizontal speakers of the main
+  audio's layout; no table gives 9.X.4's.
+- **Reading:** as for 22.2: the ring is the horizontal channels of the 7.X layout, L, C, R, Ls, Rs, Lb and Rb
+  with the surrounds at the sides; the screen pair, the tops and the LFE are not in it.
+- **Evidence:** Text; as for 7.X, no stream mixes into a 9.X.4 substream.
 
 ## Output processing
 
