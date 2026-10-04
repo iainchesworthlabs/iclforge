@@ -1,5 +1,6 @@
 #include "adm_model.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <expected>
 #include <functional>
@@ -204,6 +205,25 @@ AudioBlockFormat convert(const ::adm::AudioBlockFormatObjects& src) {
                 to_double(channel_lock.get<::adm::MaxDistance>().get());
         }
     }
+    // §10.5/§10.6: objectDivergence and screenRef/headLocked are DefaultParameters in libadm, so
+    // has<>() is always true; isDefault<>() is what says whether the file actually carried them.
+    if (!src.isDefault<::adm::ObjectDivergence>()) {
+        const auto divergence = src.get<::adm::ObjectDivergence>();
+        block.has_object_divergence = true;
+        block.object_divergence.value = to_double(divergence.get<::adm::Divergence>().get());
+        if (!divergence.isDefault<::adm::AzimuthRange>()) {
+            block.object_divergence.has_azimuth_range = true;
+            block.object_divergence.azimuth_range_deg =
+                to_double(divergence.get<::adm::AzimuthRange>().get());
+        }
+        if (!divergence.isDefault<::adm::PositionRange>()) {
+            block.object_divergence.has_position_range = true;
+            block.object_divergence.position_range =
+                to_double(divergence.get<::adm::PositionRange>().get());
+        }
+    }
+    block.screen_ref = src.get<::adm::ScreenRef>().get();
+    block.head_locked = src.get<::adm::HeadLocked>().get();
     if (src.has<::adm::JumpPosition>()) {
         const auto jump_position = src.get<::adm::JumpPosition>();
         block.has_jump_position = true;
@@ -399,6 +419,22 @@ namespace {
     if (block.has_channel_lock) {
         out.set(::adm::ChannelLock(::adm::ChannelLockFlag(block.channel_lock)));
     }
+    if (block.has_object_divergence) {
+        ::adm::ObjectDivergence divergence{::adm::Divergence(static_cast<float>(block.object_divergence.value))};
+        if (block.object_divergence.has_azimuth_range) {
+            divergence.set(::adm::AzimuthRange(static_cast<float>(block.object_divergence.azimuth_range_deg)));
+        }
+        if (block.object_divergence.has_position_range) {
+            divergence.set(::adm::PositionRange(static_cast<float>(block.object_divergence.position_range)));
+        }
+        out.set(divergence);
+    }
+    if (block.screen_ref) {
+        out.set(::adm::ScreenRef(true));
+    }
+    if (block.head_locked) {
+        out.set(::adm::HeadLocked(true));
+    }
     if (block.has_jump_position) {
         ::adm::JumpPosition jump{::adm::JumpPositionFlag(block.jump_position)};
         if (block.has_interpolation_length) {
@@ -450,6 +486,7 @@ std::expected<std::reference_wrapper<const std::shared_ptr<Value>>, AdmWriteErro
 std::expected<BuiltDocument, AdmWriteError> build_libadm_document(const AdmModel& model, std::uint16_t bit_depth) {
     auto document = ::adm::Document::create();
 
+    std::vector<ZoneBlockSource> zone_blocks;
     std::unordered_map<std::string, std::shared_ptr<::adm::AudioChannelFormat>> channel_formats_by_id;
     for (const auto& channel_format : model.channel_formats) {
         ::adm::TypeDescriptor type;
@@ -476,6 +513,15 @@ std::expected<BuiltDocument, AdmWriteError> build_libadm_document(const AdmModel
             } else {
                 libadm_channel->add(to_libadm_direct_speakers_block(block));
             }
+        }
+        if (channel_format.type == TypeDefinition::kObjects &&
+            std::ranges::any_of(channel_format.block_formats,
+                                [](const AudioBlockFormat& b) { return !b.zone_exclusion.empty(); })) {
+            ZoneBlockSource source{.channel = libadm_channel, .zones_by_block = {}};
+            for (const auto& block : channel_format.block_formats) {
+                source.zones_by_block.push_back(block.zone_exclusion);
+            }
+            zone_blocks.push_back(std::move(source));
         }
         document->add(libadm_channel);
         channel_formats_by_id.emplace(channel_format.id, std::move(libadm_channel));
@@ -640,7 +686,9 @@ std::expected<BuiltDocument, AdmWriteError> build_libadm_document(const AdmModel
         document->add(libadm_programme);
     }
 
-    return BuiltDocument{.document = std::move(document), .track_uids_by_key = std::move(track_uids_by_id)};
+    return BuiltDocument{.document = std::move(document),
+                         .zone_blocks = std::move(zone_blocks),
+                         .track_uids_by_key = std::move(track_uids_by_id)};
 }
 
 AdmModel build_adm_model(const std::shared_ptr<::adm::Document>& document) {

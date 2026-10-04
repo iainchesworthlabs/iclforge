@@ -257,10 +257,10 @@ constexpr std::string_view kAdmXml = R"(<?xml version="1.0" encoding="UTF-8"?>
 </audioFormatExtended>
 )";
 
-bool write_fixture(const fs::path& path) {
+bool write_fixture(const fs::path& path, std::string_view adm_xml = kAdmXml) {
     const auto fmt = build_fmt_chunk_3ch();
     const auto chna = build_chna_chunk_3();
-    const Bytes axml(kAdmXml);
+    const Bytes axml(adm_xml);
     const auto data = build_pcm16_3ch(kTotalFrames * kFrame);
 
     Bytes body;
@@ -429,4 +429,49 @@ TEST_CASE("forge atmos-adm reports a clear diagnosis for a file that is not a va
     // iclforge::adm::describe(AdmError::...) - never a silent crash or an unlabeled non-zero exit.
     CHECK(log.find("error:") != std::string::npos);
     CHECK_FALSE(fs::exists(out_path));
+}
+
+// A block that uses ADM features the Atmos encode has no field for is encoded anyway, with a
+// warning naming the channel and the features rather than silently dropping them.
+TEST_CASE("forge atmos-adm warns about ADM features it does not carry", "[cli][atmos-adm]") {
+    const auto dir = scratch_dir();
+
+    std::string xml(kAdmXml);
+    const std::string anchor = "<audioBlockFormat audioBlockFormatID=\"AB_00039001_00000001\"";
+    const auto at = xml.find(anchor);
+    REQUIRE(at != std::string::npos);
+    const auto close = xml.find("</audioBlockFormat>", at);
+    REQUIRE(close != std::string::npos);
+    // headLocked and a divergence range have no Atmos image; the divergence value, screenRef and ZM4
+    // (a Table B.18 preset) do, so they are not mentioned.
+    xml.insert(close,
+               "<objectDivergence azimuthRange=\"30\">0.5</objectDivergence><screenRef>1</screenRef>"
+               "<headLocked>1</headLocked><zoneExclusion><zone>ZM4</zone></zoneExclusion>");
+
+    const auto fixture_path = dir / "atmos_adm_unmapped.wav";
+    REQUIRE(write_fixture(fixture_path, xml));
+    const auto out_path = dir / "atmos_adm_unmapped.ec3";
+    const auto log_path = dir / "atmos_adm_unmapped.log";
+    const auto rc =
+        run_cli("atmos-adm \"" + fixture_path.string() + "\" \"" + out_path.string() + "\" 448",
+                log_path);
+    const auto log = read_log(log_path);
+    INFO(log);
+    CHECK(rc == 0);
+    CHECK(fs::exists(out_path));
+    CHECK(log.find("warning:") != std::string::npos);
+    CHECK(log.find("AC_00039001") != std::string::npos);
+    CHECK(log.find("objectDivergence range") != std::string::npos);
+    CHECK(log.find("headLocked") != std::string::npos);
+    CHECK(log.find("screenRef") == std::string::npos);
+    CHECK(log.find("zoneExclusion") == std::string::npos);
+
+    // The unmodified fixture says nothing.
+    const auto plain_path = dir / "atmos_adm_plain.wav";
+    REQUIRE(write_fixture(plain_path));
+    const auto plain_log = dir / "atmos_adm_plain.log";
+    CHECK(run_cli("atmos-adm \"" + plain_path.string() + "\" \"" + (dir / "atmos_adm_plain.ec3").string() +
+                      "\" 448",
+                  plain_log) == 0);
+    CHECK(read_log(plain_log).find("warning:") == std::string::npos);
 }

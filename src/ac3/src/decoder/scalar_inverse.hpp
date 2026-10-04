@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <type_traits>
 
@@ -22,10 +23,15 @@
 // ("the discarded branch of a non-template is still semantically checked and
 // its callees still ODR-used").
 //
-// The two arms differ only in the `fast` argument, which the float32 inverses
-// do not take: the direct form is the spec's own evaluation and stays double,
-// and a profile carrying float32 coefficients has already refused
-// fast_imdct=false with kNoReferenceTransform long before reaching here.
+// The float arm takes `fast` too. The float32 inverses have no direct form of
+// their own (the direct form is the spec's own evaluation and stays double), so
+// fast_imdct=false widens the block to double, runs the direct form and
+// narrows the result - the same shape oba/joc.cpp's inverse_512 uses. Without
+// it a full build configured ICLFORGE_DECODE_SCALAR=float served the fast
+// transform for a request of the direct one. A build without the direct form
+// (the minimum-footprint profile) has already refused fast_imdct=false with
+// kNoReferenceTransform long before reaching here, and compiles none of this.
+// The fixed-point tier has one form and ignores `fast`.
 
 namespace iclforge::ac3::internal {
 
@@ -45,7 +51,23 @@ void inverse_transform_into(const std::array<Scalar, 256>& coeffs, std::array<Sc
             imdct512_windowed_fixed(coeffs, x);
         }
     } else if constexpr (std::is_same_v<Scalar, float>) {
-        (void)fast;
+        if constexpr (kReferenceTransformAvailable) {
+            if (!fast) {
+                std::array<double, 256> wide_coeffs{};
+                std::array<double, 512> wide_x{};
+                std::ranges::copy(coeffs, wide_coeffs.begin());
+                if (short_block) {
+                    imdct256_pair_windowed(wide_coeffs, wide_x, /*fast=*/false);
+                } else {
+                    imdct512_windowed(wide_coeffs, wide_x, /*fast=*/false);
+                }
+                std::ranges::transform(wide_x, x.begin(),
+                                       [](double v) { return static_cast<float>(v); });
+                return;
+            }
+        } else {
+            (void)fast;
+        }
         if (short_block) {
             imdct256_pair_windowed(coeffs, x);
         } else {

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <array>
+#include <span>
+#include <vector>
 
 #include "iclforge/admbridge/export.hpp"
 #include "iclforge/objects/oamd.hpp"
@@ -154,5 +156,39 @@ inline constexpr double kIabZoneIncludeThreshold = 0.5;
 // b_enable_elevation.
 [[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT IabZoneMapping iab_zones19_to_constraint(
     const std::array<double, iclforge::iab::kZone19Count>& gains);
+
+// ETSI TS 103 420 V1.2.1 Annex B.2.6, Tables B.18 and B.19: OAMD's zone constraint (§5.6.1.6,
+// Tables 20 and 21) expressed as an ADM zoneExclusion, and back. ADM lists the zones that are
+// EXCLUDED; OAMD names the one horizontal zone group that is kept (or dropped) plus a separate
+// Top-Bottom switch. The two meet exactly only for the presets Table B.18 lists:
+//
+//   ZM1                                  back excluded            kBackExcluded
+//   ZM2_Left + ZM2_Right                 side excluded            kSideExcluded
+//   ZM3_ScreenLeft/_SideLeft/_ScreenRight/_SideRight
+//                                        all but centre-and-back  kCentreAndBackOnly
+//   ZM4                                  all but screen           kScreenOnly
+//   ZM5                                  all but surround         kSurroundOnly
+//   ZU + ZB                              Top-Bottom excluded      enable_elevation = false
+//
+// A zone is recognised by its label ("ZM1", "ZM2_Left", ...) or, failing that, by its six
+// Cartesian bounds matching Table B.19 within kZoneBoundTolerance. `exact` is false when any zone
+// was not recognised, or the recognised ones are not one of the combinations above (an arbitrary
+// box, only ZU without ZB, two different horizontal presets at once): what could be mapped is
+// still returned, the rest is dropped, and the caller decides whether to warn.
+struct ICLFORGE_ADMBRIDGE_EXPORT AdmZoneMapping {
+    iclforge::oba::ZoneConstraint zone = iclforge::oba::ZoneConstraint::kNone;
+    bool enable_elevation = true;
+    bool exact = true;
+};
+
+inline constexpr double kZoneBoundTolerance = 0.05;
+
+[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT AdmZoneMapping adm_zone_exclusion_to_constraint(
+    std::span<const iclforge::adm::ExclusionZone> zones);
+
+// The write direction: the zoneExclusion that says what `zone` and `enable_elevation` say. Empty
+// for kNone with elevation enabled, which is the ADM default (no zoneExclusion element).
+[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT std::vector<iclforge::adm::ExclusionZone>
+constraint_to_adm_zone_exclusion(iclforge::oba::ZoneConstraint zone, bool enable_elevation);
 
 }  // namespace iclforge::admbridge

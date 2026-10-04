@@ -676,6 +676,10 @@ std::expected<eac3::AccessUnit, FrameError> AtmosEncoder::encode_frame(
         described[object].snap = placement[object].snap;
         described[object].zone = placement[object].zone;
         described[object].enable_elevation = placement[object].enable_elevation;
+        described[object].divergence = placement[object].divergence;
+        described[object].screen_reference = placement[object].screen_reference;
+        described[object].screen_factor = placement[object].screen_factor;
+        described[object].depth_factor = placement[object].depth_factor;
         described[object].active = impl_->object_active_[object];
     }
     // §6.3.3.3: 0 marks the first frame, after which the counter runs 1..1023

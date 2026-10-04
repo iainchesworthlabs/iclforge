@@ -93,6 +93,17 @@ placement[obj] = {
     // and whether the Top-Bottom zone is in play at all.
     .zone = iclforge::oba::ZoneConstraint::kScreenOnly,
     .enable_elevation = true,
+    // §5.5.14 / Tables 40-42: the share of the object's energy spread into two
+    // objects along X (§5.2.7), 0 to 1. Quantized to Table 42's values and sent
+    // in the extended_object_element, which is written only when an object
+    // diverges.
+    .divergence = 0.0,
+    // §5.6.1.1.18-.20: the position is screen-anchored rather than room-anchored,
+    // with screen_factor (1/8 to 1) and depth_factor (1/4 to 2) saying how far
+    // the renderer follows the screen.
+    .screen_reference = false,
+    .screen_factor = 1.0,
+    .depth_factor = 1.0,
 };
 ```
 

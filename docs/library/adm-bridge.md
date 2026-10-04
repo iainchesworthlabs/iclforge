@@ -132,16 +132,67 @@ an object in the downmix would have the receiving renderer spread it a second ti
 - **`diffuse`** (§10.1) is parsed by `iclforge::adm` and dropped. It is a direct-versus-diffuse balance,
   not an extent; OAMD has no field for it, and folding it into `object_size` would misreport a
   decorrelation instruction as a physical size.
-- **`zoneExclusion`** (§10.4) and **`objectDivergence`** (§10.5) are not parsed by `iclforge::adm` at all
-  — `iclforge::adm::AudioBlockFormat` has no field for either, so nothing is dropped so much as never
-  read. Both have a partial image in OAMD (`zone_constraints_idx`, and `obj_div_block` in the
-  `extended_object_element`), but neither is a clean mapping: BS.2076-2 excludes arbitrary
-  axis-aligned cuboids, while TS 103 420 Table 20 offers six named presets and no way to express
-  anything else, and `obj_div_block` rides in an element `oba::build_payload` does not write. The
-  decode side reads both (`DynamicObject::zone`, `DynamicObject::divergence`); the ADM-to-OAMD
-  direction is left unmapped rather than approximated.
-- **`screenRef`** and the Matrix/Binaural-specific sub-elements are likewise unparsed, per
-  `iclforge::adm::model.hpp`'s own scope note.
+- **`objectDivergence`'s range** (§10.5): `azimuthRange` and `positionRange` say where the two
+  objects go; OAMD has no field for them (§5.2.7 spreads the energy along X by its own rule). The
+  divergence **value** is carried, see below.
+- **`headLocked`** has no OAMD field.
+- **A conditioned `channelLock`**: `maxDistance` is dropped and the lock applies unconditionally,
+  since `b_object_snap` is one bit.
+- **A `zoneExclusion` that is not a Table B.18 preset** (see below).
+- **Matrix, HOA, Binaural and User Custom packs** are refused with `BridgeError::kUnsupportedType`, by
+  design rather than as a gap: `AtmosEncoder` takes mono objects with a position, and a Matrix pack
+  is a coefficient mix, HOA has no position, and Binaural is already rendered. libadm also has no
+  model for a Matrix block's coefficients, so they are not read.
+
+`build()` does not drop these silently. `BridgeResult::unmapped[i]` lists, for channel `i`, each feature
+above that its blocks use, and `forge atmos-adm` prints one `warning:` line per such channel.
+
+### Divergence and screen reference
+
+Both reach the bitstream through `ObjectPlacement` and the OAMD writer, which now writes
+`b_object_use_screen_ref` with its `screen_factor_bits` and `depth_factor_idx` (§5.5.11) and the
+`extended_object_element` with its `obj_div_block` (§5.5.13, §5.5.14). The encoder's own bed render does
+not act on either, as for size and zones.
+
+- **`objectDivergence`'s value** (0 to 1) becomes `ObjectPlacement::divergence`, and the writer sends the
+  nearest value of Table 42: a 2-bit index (`object_div_mode` 0) when the nearest is one of Table 41's four
+  values, `object_div_mode` 1 when it repeats the previous block's, and the 6-bit code
+  (`object_div_mode` 2) otherwise. A value that rounds to no divergence sends `b_object_divergence` 0.
+  TS 103 420 Annex B has no row for it, so the correspondence is a reading: ADM's value and OAMD's
+  `object_divergence` are both the share of the energy moved into two spread objects (§5.2.7).
+  `src/admbridge/ERRATA.md` records it.
+- **`screenRef`** becomes `screen_reference` with `screen_factor` 1 and `depth_factor` 1, since ADM's flag is
+  all or nothing. The reference screen of Annex B.2.1.3 (`audioProgrammeReferenceScreen`, sized by a
+  `ref_screen_ratio` the OAMD syntax does not carry) is not read or written; the renderer's screen applies.
+- The write direction maps back: a divergence above zero becomes `objectDivergence`, and a screen reference
+  with `screen_factor` of one half or more becomes `screenRef`. A smaller factor reads as room-anchored,
+  because ADM cannot say how far.
+
+### Zone constraints
+
+`zoneExclusion` maps both ways through TS 103 420 Annex B.2.6 (Tables B.18 and B.19), since OAMD's
+`zone_constraints_idx` and `b_enable_elevation` are exactly the presets that table lists:
+
+| ADM `zone` elements (excluded) | `ZoneConstraint` |
+|---|---|
+| `ZM1` | `kBackExcluded` |
+| `ZM2_Left`, `ZM2_Right` | `kSideExcluded` |
+| `ZM3_ScreenLeft`, `ZM3_SideLeft`, `ZM3_ScreenRight`, `ZM3_SideRight` | `kCentreAndBackOnly` |
+| `ZM4` | `kScreenOnly` |
+| `ZM5` | `kSurroundOnly` |
+| `ZU` and `ZB` together | `enable_elevation = false` |
+
+A zone is recognised by its label, or by its six Cartesian bounds matching Table B.19 within
+`kZoneBoundTolerance` (0.05). Anything else — an arbitrary cuboid, only one of `ZU` and `ZB`, two
+horizontal presets at once — keeps whatever part did map, and is reported in `unmapped`.
+`adm_zone_exclusion_to_constraint()` and `constraint_to_adm_zone_exclusion()` in `coordinates.hpp` are
+the two directions. `write()` emits the zone of every OAMD update as a `zoneExclusion`, with both
+label and bounds, so a reader using either recognises it. Table B.19 prints `ZM3_SideRight`'s `minX` as
+`0.5611`; the mirrored `ZM3_SideLeft` has `-0.51611` and every other pair is symmetric, so `0.51611` is
+written (see `src/admbridge/ERRATA.md`).
+
+Zone and elevation are discrete decisions, so a path holds the earlier block's value until the next
+block's keyframe, as it does for `snap`.
 
 `ObjectPlacement::zone` and `ObjectPlacement::enable_elevation` exist and are transmitted — a
 caller constructing paths directly can set them; it is only the ADM-derived route that leaves them
@@ -294,6 +345,7 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
 
 struct BridgeResult {
     std::vector<std::string> channel_ids;
+    std::vector<std::vector<std::string>> unmapped;  // per channel: ADM features not carried
     std::vector<bool> is_bed;
     std::vector<bool> is_lfe;
     std::vector<iclforge::oba::ObjectPath> paths;   // pass directly to evaluate_placements
@@ -307,6 +359,9 @@ iclforge::adm::CartesianPosition polar_to_adm_cartesian(const iclforge::adm::Pol
 iclforge::oba::Position adm_cartesian_to_room(const iclforge::adm::CartesianPosition& cartesian);
 iclforge::oba::Position adm_position_to_room(const iclforge::adm::Position& position);
 iclforge::adm::CartesianPosition room_to_adm_cartesian(const iclforge::oba::Position& room);
+AdmZoneMapping adm_zone_exclusion_to_constraint(std::span<const iclforge::adm::ExclusionZone> zones);
+std::vector<iclforge::adm::ExclusionZone> constraint_to_adm_zone_exclusion(
+    iclforge::oba::ZoneConstraint zone, bool enable_elevation);
 iclforge::oba::Position iab_position_to_room(const iclforge::iab::Position& position);  // direct passthrough
 
 struct IabBridgeResult {
