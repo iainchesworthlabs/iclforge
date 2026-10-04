@@ -1129,7 +1129,9 @@ without the factor of two its informative example mentions, decodes DEE's stream
 full scale at 2^15. Phase D3 settled two more: A-SPX's envelopes read at that scale, and companding
 measures its levels against full scale 1.0. Those and the other readings reconstruction takes are in
 `src/ac4dec/ERRATA.md`, under "Reconstruction" and "The QMF domain". None of the streams here, from DEE
-or anyone else, sets `b_snf_data_exists`, so the noise fill is decoded from the text alone.
+or anyone else, sets `b_snf_data_exists`, so the noise fill is decoded from the text alone. A unit
+test (`tests/ac4dec/test_ac4dec_noise_fill.cpp`) holds its levels, escape and draw order to
+Pseudocodes 22 and 23 on a hand-built track.
 
 **Locally, over the census.** With `AC4DEC_GOLDEN_DIR` and `AC4DEC_STREAM_DIR` set, the same test
 compares the decoder with the Python parser's digests of any other set of streams. Over the 107 DEE

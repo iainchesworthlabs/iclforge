@@ -160,7 +160,10 @@ reading taken. `forge decode` takes the choice as `presentation=` (the position)
   took of it, and, for one not read to its end, the error and the reason. A substream that no
   element of the table of contents this decoder reads names, an HSF extension substream that
   nothing claims among them, is reported as refused and unread. An OAMD substream that sends an
-  `oamd_common_data()` (Part 2 clause 6.2.8.1) reports it as `oamd_common_data`.
+  `oamd_common_data()` (Part 2 clause 6.2.8.1) reports it as `oamd_common_data`. An EMDF payloads
+  substream, and an audio substream whose `metadata()` carries an `emdf_payloads_substream()`,
+  report the payloads as `emdf_payloads`: each `emdf_payload_id` (Part 1 Table 174) and its
+  bytes, in the order read. The decoder does not interpret them.
 - `latency_samples()`: the decoder's delay at the output rate, 1 313 samples at
   `frame_rate_index` 13 and at the other indices the same at the internal rate plus the sample rate
   converter's delay. `decode_by_block()` holds back up to 255 samples more.

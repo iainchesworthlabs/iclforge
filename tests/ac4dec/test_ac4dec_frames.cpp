@@ -46,6 +46,7 @@ struct MonoAudio {
     int frame_len_base = 2048;
     bool associated = false;
     bool dialog = false;
+    bool emdf_payload = false;  // metadata() carries one payload, id 7 with the byte 0xA5
 };
 
 std::vector<std::byte> mono_audio(const MonoAudio& m) {
@@ -91,7 +92,15 @@ std::vector<std::byte> mono_audio(const MonoAudio& m) {
         w.flag(false);  // b_drc_present
     }
     w.flag(false);     // b_de_data_present
-    w.flag(false);     // b_emdf_payloads_substream
+    w.flag(m.emdf_payload);  // b_emdf_payloads_substream
+    if (m.emdf_payload) {
+        w.put(7, 5);   // emdf_payload_id
+        w.put(0, 4);   // b_smpoffst, b_duration, b_groupid, b_codecdata
+        w.flag(true);  // b_discard_unknown_payload
+        w.variable_bits(1, 8);
+        w.put(0xA5, 8);
+        w.put(0, 5);  // end
+    }
     w.align();
     return w.bytes();
 }
@@ -131,6 +140,25 @@ std::vector<std::byte> emdf_payloads() {
     w.flag(true);    // b_discard_unknown_payload
     w.variable_bits(0, 8);
     w.put(0, 5);     // end
+    w.align();
+    return w.bytes();
+}
+
+// An emdf_payloads_substream() of two payloads that carry bytes: id 7 with two, id 3 with one.
+std::vector<std::byte> emdf_payloads_with_data() {
+    BitWriter w;
+    w.put(7, 5);   // emdf_payload_id
+    w.put(0, 4);   // b_smpoffst, b_duration, b_groupid, b_codecdata
+    w.flag(true);  // b_discard_unknown_payload
+    w.variable_bits(2, 8);
+    w.put(0xA5, 8);
+    w.put(0x5A, 8);
+    w.put(3, 5);  // emdf_payload_id
+    w.put(0, 4);
+    w.flag(true);
+    w.variable_bits(1, 8);
+    w.put(0xC3, 8);
+    w.put(0, 5);  // end
     w.align();
     return w.bytes();
 }
@@ -191,9 +219,12 @@ TEST_CASE("DecodeError describes every value", "[ac4dec][frames]") {
     CHECK(iclforge::ac4::describe(static_cast<DecodeError>(99)) == "unknown error");
 }
 
-TEST_CASE("a bitstream_version 0 presentation's audio and EMDF substreams are read", "[ac4dec][frames]") {
-    const auto audio = mono_audio({.sus_ver = 0});
-    const auto emdf = emdf_payloads();
+namespace {
+
+// A bitstream_version 0 presentation of one mono audio substream and the EMDF payloads substream
+// `emdf`, which its table of contents names.
+std::vector<std::byte> emdf_frame(const std::vector<std::byte>& audio,
+                                  const std::vector<std::byte>& emdf) {
     BitWriter toc;
     ac4_toc_test::toc_start(toc, {.bitstream_version = 0});
     // ac4_presentation_info(), a single substream.
@@ -213,11 +244,56 @@ TEST_CASE("a bitstream_version 0 presentation's audio and EMDF substreams are re
     toc.flag(false);  // b_add_emdf_substreams
     ac4_toc_test::index_table(toc, {audio.size(), emdf.size()});
     toc.align();
-    const auto report = decode(ac4_toc_test::assemble(toc, {audio, emdf}));
+    return ac4_toc_test::assemble(toc, {audio, emdf});
+}
+
+}  // namespace
+
+TEST_CASE("a bitstream_version 0 presentation's audio and EMDF substreams are read",
+          "[ac4dec][frames]") {
+    const auto audio = mono_audio({.sus_ver = 0});
+    const auto report = decode(emdf_frame(audio, emdf_payloads()));
     REQUIRE(report.substreams.size() == 2);
     check_read(find(report, 0), SubstreamReport::Kind::kAudio);
     check_read(find(report, 1), SubstreamReport::Kind::kEmdfPayloads);
     CHECK(find(report, 0).size_bits == 64);
+    // The one payload has no bytes; the audio substream sends none.
+    CHECK(find(report, 0).emdf_payloads.empty());
+    REQUIRE(find(report, 1).emdf_payloads.size() == 1);
+    CHECK(find(report, 1).emdf_payloads[0].id == 1U);
+    CHECK(find(report, 1).emdf_payloads[0].bytes.empty());
+}
+
+TEST_CASE("an EMDF payloads substream's payloads are reported by id, in order, with their bytes",
+          "[ac4dec][frames]") {
+    const auto report = decode(emdf_frame(mono_audio({.sus_ver = 0}), emdf_payloads_with_data()));
+    const SubstreamReport& emdf = find(report, 1);
+    check_read(emdf, SubstreamReport::Kind::kEmdfPayloads);
+    REQUIRE(emdf.emdf_payloads.size() == 2);
+    CHECK(emdf.emdf_payloads[0].id == 7U);
+    CHECK(emdf.emdf_payloads[0].bytes == std::vector<std::uint8_t>{0xA5, 0x5A});
+    CHECK(emdf.emdf_payloads[1].id == 3U);
+    CHECK(emdf.emdf_payloads[1].bytes == std::vector<std::uint8_t>{0xC3});
+}
+
+TEST_CASE("an audio substream's metadata() reports the EMDF payloads it carries",
+          "[ac4dec][frames]") {
+    const auto audio = mono_audio({.sus_ver = 0, .emdf_payload = true});
+    const auto report = decode(emdf_frame(audio, emdf_payloads()));
+    const SubstreamReport& substream = find(report, 0);
+    check_read(substream, SubstreamReport::Kind::kAudio);
+    REQUIRE(substream.emdf_payloads.size() == 1);
+    CHECK(substream.emdf_payloads[0].id == 7U);
+    CHECK(substream.emdf_payloads[0].bytes == std::vector<std::uint8_t>{0xA5});
+}
+
+TEST_CASE("an EMDF payloads substream cut short reports no payloads", "[ac4dec][frames]") {
+    std::vector<std::byte> cut = emdf_payloads_with_data();
+    cut.resize(cut.size() - 2);  // inside the second payload
+    const auto report = decode(emdf_frame(mono_audio({.sus_ver = 0}), cut));
+    const SubstreamReport& emdf = find(report, 1);
+    check_refused(emdf, DecodeError::kTruncated);
+    CHECK(emdf.emdf_payloads.empty());
 }
 
 TEST_CASE("a bitstream_version 1 Main + Associate presentation reads each role's metadata", "[ac4dec][frames]") {

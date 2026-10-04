@@ -298,6 +298,16 @@ struct DecoderConfig {
     DecodingMode decoding = DecodingMode::kFull;
 };
 
+// One EMDF payload as an emdf_payloads_substream() carries it (Part 1 clauses 4.2.4.4 and
+// 4.2.14.14), or as an audio substream's metadata() does through its own
+// emdf_payloads_substream() (Part 2 clause 6.2.7.1): Table 174's emdf_payload_id and the
+// emdf_payload_size bytes after it. The decoder does not interpret them; an application reads
+// the ones it knows by id.
+struct EmdfPayloadReport {
+    std::uint64_t id = 0;
+    std::vector<std::uint8_t> bytes;
+};
+
 // What one substream of a frame turned out to be.
 struct SubstreamReport {
     // kAudio covers channel-coded, A-JOC coded and direct-coded object
@@ -315,6 +325,10 @@ struct SubstreamReport {
     // A-JOC substream's, in the table of contents, is
     // AjocSubstreamInfo::oamd_common_data.
     std::optional<OamdCommonData> oamd_common_data;
+    // The payloads a kEmdfPayloads substream carries, and those of an audio substream's
+    // metadata(), in the order they were read; empty for every other kind of substream, and for
+    // a substream that was refused before its payloads were read to their end.
+    std::vector<EmdfPayloadReport> emdf_payloads;
 };
 
 // Every substream of the frame's substream_index_table(), in index order.

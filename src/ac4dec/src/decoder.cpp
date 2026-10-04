@@ -907,6 +907,17 @@ void forget_content(CapturedAudio* captured) {
     }
 }
 
+// The payloads of a parsed emdf_payloads_substream(), as the report carries them.
+[[nodiscard]] std::vector<EmdfPayloadReport> emdf_payload_reports(
+    const detail::EmdfPayloads& parsed) {
+    std::vector<EmdfPayloadReport> reports;
+    reports.reserve(parsed.payloads.size());
+    for (const detail::EmdfPayload& payload : parsed.payloads) {
+        reports.push_back({.id = payload.emdf_payload_id, .bytes = payload.bytes});
+    }
+    return reports;
+}
+
 // Mixing values a stream need not send in every frame, which a decoder keeps
 // until new ones come or the stream is spliced (Part 1 clause 6.2.16.0),
 // field by field: the associated audio's gains on the main audio and its pan,
@@ -2379,6 +2390,9 @@ std::expected<FrameReport, DecodeError> Decoder::Impl::read(
         const ParseResult owner_result =
             detail::parse_audio_substream(owner_reader, assignment.audio, state, parsed, &ext_reader);
         owner_report.bits_read = owner_reader.position();
+        if (owner_result && parsed.metadata.b_emdf_payloads_substream) {
+            owner_report.emdf_payloads = emdf_payload_reports(parsed.metadata.emdf_payloads);
+        }
         if (!owner_result) {
             owner_report.refused = owner_result.error().error;
             owner_report.refused_reason = owner_result.error().reason;
@@ -2483,6 +2497,9 @@ std::expected<FrameReport, DecodeError> Decoder::Impl::read(
                                                            nullptr, objects ? &*objects : nullptr);
                     if (!result) {
                         forget_content(wanted);
+                    } else if (parsed.metadata.b_emdf_payloads_substream) {
+                        substream.emdf_payloads =
+                            emdf_payload_reports(parsed.metadata.emdf_payloads);
                     }
                     if (CapturedAudio* const captured = result ? wanted : nullptr) {
                         captured->state_key = assignment.state_key;
@@ -2544,6 +2561,9 @@ std::expected<FrameReport, DecodeError> Decoder::Impl::read(
                 case SubstreamReport::Kind::kEmdfPayloads: {
                     detail::EmdfPayloads parsed;
                     result = detail::parse_emdf_payloads_substream(reader, parsed);
+                    if (result) {
+                        substream.emdf_payloads = emdf_payload_reports(parsed);
+                    }
                     break;
                 }
                 case SubstreamReport::Kind::kHsfExt:
