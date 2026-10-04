@@ -322,14 +322,17 @@ TEST_CASE("sf_info at the shorter frame lengths reads one transform length", "[a
         CHECK(result.error().error == DecodeError::kInvalidStream);
     }
     SECTION("the speech frontend") {
-        BitWriter w;
-        w.put(0, 16);
+        // sf_info() has no fields for it (Table 34); its data is ssf_data(), which a track
+        // read as an ASF one refuses.
+        BitWriter none;
         SfInfo info;
-        const auto result = read(w, [&](BitReader& r) {
+        const auto result = read(none, [&](BitReader& r) {
             return iclforge::ac4::detail::parse_sf_info(r, context(2048), 1, false, false, info);
         });
-        REQUIRE_FALSE(result.has_value());
-        CHECK(result.error().error == DecodeError::kUnsupported);
+        REQUIRE(result.has_value());  // and it read no bit
+        CHECK(info.spec_frontend == 1);
+        BitWriter w;
+        w.put(0, 16);
         SfData data;
         HsfSfData hsf;
         const auto refused = read(w, [&](BitReader& r) {
@@ -337,7 +340,7 @@ TEST_CASE("sf_info at the shorter frame lengths reads one transform length", "[a
                                                         data, hsf);
         });
         REQUIRE_FALSE(refused.has_value());
-        CHECK(refused.error().error == DecodeError::kUnsupported);
+        CHECK(refused.error().error == DecodeError::kInvalidStream);
     }
 }
 

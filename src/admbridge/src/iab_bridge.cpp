@@ -1,5 +1,6 @@
 #include "iclforge/admbridge/iab_bridge.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <functional>
@@ -10,6 +11,7 @@
 
 #include "iclforge/admbridge/coordinates.hpp"
 #include "iclforge/objects/oamd.hpp"
+#include "iclforge/iab/dlc.hpp"
 #include "iclforge/iab/model.hpp"
 
 // See iab_bridge.hpp's own top comment for the overall two-pass design and what is and is not
@@ -131,21 +133,41 @@ struct ChannelIdentity {
 
 // §10.3.6/Table 8's own AudioDataID convention, shared by Bed channels and Objects: 0 means
 // legitimate silence (zero-filled, not an error); a non-zero value must resolve to an
-// AudioDataPCM element in THIS frame or the channel has no audio to place -
-// BridgeError::kNoIabEssenceForChannel (an AudioDataDLC-only reference is exactly this case, since
-// phase 1 does not decode that element - see model.hpp's own AudioDataDlc comment).
+// AudioDataPCM or AudioDataDLC element in THIS frame, already decoded to PCM by
+// iclforge::iab::decode_audio(), or the channel has no audio to place -
+// BridgeError::kNoIabEssenceForChannel.
 [[nodiscard]] std::expected<std::vector<float>, BridgeError> resolve_essence(
-    const iclforge::iab::IaFrame& frame, std::uint32_t audio_data_id,
+    const std::vector<iclforge::iab::AudioDataPcm>& essence, std::uint32_t audio_data_id,
     std::uint32_t samples_per_frame) {
     if (audio_data_id == 0) {
         return std::vector<float>(samples_per_frame, 0.0f);
     }
-    for (const auto& pcm : frame.audio_pcm) {
+    for (const auto& pcm : essence) {
         if (pcm.audio_data_id == audio_data_id) {
             return pcm.samples;
         }
     }
     return std::unexpected(BridgeError::kNoIabEssenceForChannel);
+}
+
+// The zone constraint in force at pan sub block `sb` of `object`. An ObjectZoneDefinition19 child
+// replaces the object's own nine-zone control (§10.6) and updates on its own cadence: the state at
+// `sb` is the latest sub block at or before it that carried zone information (sub block 0 always
+// does). Without that child, the sub block's own ObjectZoneControl gains apply, and without them
+// the object is unconstrained (§10.5.12: "zone control is not used").
+[[nodiscard]] IabZoneMapping zone_mapping_at(const iclforge::iab::ObjectDefinition& object, std::size_t sb) {
+    if (object.zone19.has_value() && !object.zone19->sub_blocks.empty()) {
+        const auto& blocks = object.zone19->sub_blocks;
+        std::size_t index = std::min(sb, blocks.size() - 1);
+        while (index > 0 && !blocks[index].has_zone_info) {
+            --index;
+        }
+        return iab_zones19_to_constraint(blocks[index].zone_gains);
+    }
+    if (object.sub_blocks[sb].zone_gains.has_value()) {
+        return iab_zones_to_constraint(*object.sub_blocks[sb].zone_gains);
+    }
+    return {};
 }
 
 // TS 103 420 §8.3.2.2's own 16-channel cap, the same constant and reasoning bridge.cpp's own
@@ -193,6 +215,11 @@ std::expected<IabBridgeResult, BridgeError> build_iab(std::span<const iclforge::
         const double frame_duration_s =
             static_cast<double>(*samples_per_frame) / static_cast<double>(frame.sample_rate);
 
+        auto essence_in_frame = iclforge::iab::decode_audio(frame);
+        if (!essence_in_frame) {
+            return std::unexpected(BridgeError::kBadIabAudio);
+        }
+
         for (std::size_t ch = 0; ch < identities->size(); ++ch) {
             const auto& identity = (*identities)[ch];
 
@@ -222,7 +249,7 @@ std::expected<IabBridgeResult, BridgeError> build_iab(std::span<const iclforge::
                         .gain = is_lfe ? 0.0 : channel->gain,
                         .lfe_send = is_lfe ? 1.0 : 0.0,
                     });
-                    auto essence = resolve_essence(frame, channel->audio_data_id, *samples_per_frame);
+                    auto essence = resolve_essence(*essence_in_frame, channel->audio_data_id, *samples_per_frame);
                     if (!essence) {
                         return std::unexpected(essence.error());
                     }
@@ -245,16 +272,20 @@ std::expected<IabBridgeResult, BridgeError> build_iab(std::span<const iclforge::
                         if (!block.has_pan_info) {
                             continue;
                         }
+                        const IabZoneMapping zones = zone_mapping_at(*object, sb);
                         keyframes[ch].push_back({
                             .time_s = time_s + (static_cast<double>(sb) + 1.0) /
                                                     static_cast<double>(*sub_block_count) * frame_duration_s,
                             .position = iab_position_to_room(block.position),
                             .gain = block.gain,
                             .lfe_send = 0.0,
+                            .size = iab_spread_to_size(block.spread),
                             .snap = block.snap,
+                            .zone = zones.zone,
+                            .enable_elevation = zones.enable_elevation,
                         });
                     }
-                    auto essence = resolve_essence(frame, object->audio_data_id, *samples_per_frame);
+                    auto essence = resolve_essence(*essence_in_frame, object->audio_data_id, *samples_per_frame);
                     if (!essence) {
                         return std::unexpected(essence.error());
                     }

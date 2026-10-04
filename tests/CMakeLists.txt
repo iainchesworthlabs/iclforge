@@ -273,6 +273,7 @@ target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac4de
 if(NOT BUILD_SHARED_LIBS)
     target_sources(iclforge-tests PRIVATE
         ac4dec/ac4dec_constructed.cpp
+        ac4dec/ac4dec_hsf.cpp
         ac4dec/ac4dec_mux.cpp
         ac4dec/ac4dec_objects.cpp
         ac4dec/test_ac4dec_acpl.cpp
@@ -284,9 +285,12 @@ if(NOT BUILD_SHARED_LIBS)
         ac4dec/test_ac4dec_de.cpp
         ac4dec/test_ac4dec_downmix.cpp
         ac4dec/test_ac4dec_drc.cpp
+        ac4dec/test_ac4dec_ehfr.cpp
+        ac4dec/test_ac4dec_hsf.cpp
         ac4dec/test_ac4dec_immersive.cpp
         ac4dec/test_ac4dec_metadata.cpp
         ac4dec/test_ac4dec_multichannel.cpp
+        ac4dec/test_ac4dec_noise_fill.cpp
         ac4dec/test_ac4dec_object_render.cpp
         ac4dec/test_ac4dec_objects.cpp
         ac4dec/test_ac4dec_pcm.cpp
@@ -294,6 +298,7 @@ if(NOT BUILD_SHARED_LIBS)
         ac4dec/test_ac4dec_presentations.cpp
         ac4dec/test_ac4dec_reconstruct_exact.cpp
         ac4dec/test_ac4dec_renderer.cpp
+        ac4dec/test_ac4dec_ssf.cpp
         ac4enc/test_ac4enc_acpl.cpp
         ac4enc/test_ac4enc_aspx.cpp
         ac4enc/test_ac4enc_multichannel.cpp
@@ -408,7 +413,7 @@ endif()
 # ac3/core/test_simd_kernels.cpp's own AVX2_REQUIRE knob reads std::getenv too -
 # same C4996 reasoning as cpu_features.cpp above - and so do
 # ac4dec/test_ac4dec_syntax.cpp, for its trace and census directories,
-# ac4dec/test_ac4dec_constructed.cpp, test_ac4dec_objects.cpp and
+# ac4dec/test_ac4dec_constructed.cpp, test_ac4dec_hsf.cpp, test_ac4dec_objects.cpp and
 # test_ac4dec_presentations.cpp, for where to write their streams (and
 # test_ac4dec_objects.cpp for Chromium's A-JOC stream, and
 # test_ac4dec_object_render.cpp for where to write the streams to listen to),
@@ -420,7 +425,7 @@ endif()
 if(ICLFORGE_IS_MSVC_LIKE)
     set_source_files_properties(ac3/core/test_simd_kernels.cpp ac4dec/test_ac4dec_syntax.cpp
         ac4dec/test_ac4dec_constructed.cpp ac4dec/test_ac4dec_objects.cpp ac4dec/test_ac4dec_presentations.cpp
-        ac4dec/test_ac4dec_api.cpp ac4dec/test_ac4dec_object_render.cpp
+        ac4dec/test_ac4dec_api.cpp ac4dec/test_ac4dec_object_render.cpp ac4dec/test_ac4dec_hsf.cpp
         ac4enc/test_ac4enc_objects.cpp ac4enc/test_ac4enc_presentations.cpp
         ac4enc/test_ac4enc_presentations_race.cpp iec61937/test_iec61937_ac4.cpp
         PROPERTIES COMPILE_OPTIONS "/wd4996")
@@ -971,7 +976,7 @@ endif()
 # only linked, when ICLFORGE_BUILD_IAB actually turned the target on. Same conditional shape
 # as the ICLFORGE_BUILD_ADM block above.
 if(ICLFORGE_BUILD_IAB)
-    target_sources(iclforge-tests PRIVATE iab/test_ac3iab.cpp iab/test_ac3iab_truncation.cpp iab/test_mxf_reader.cpp)
+    target_sources(iclforge-tests PRIVATE iab/test_ac3iab.cpp iab/test_ac3iab_truncation.cpp iab/test_dlc.cpp iab/test_iab_writer.cpp iab/test_mxf_reader.cpp iab/test_mxf_writer.cpp)
     target_link_libraries(iclforge-tests PRIVATE iclforge::iab)
 endif()
 

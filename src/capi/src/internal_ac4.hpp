@@ -55,6 +55,24 @@ static_assert(static_cast<int>(iclforge::ac4::Speaker::kTopSideLeft) ==
 static_assert(static_cast<int>(iclforge::ac4::Speaker::kTopSideRight) ==
               ICLFORGE_AC4_SPEAKER_TOP_SIDE_RIGHT);
 static_assert(static_cast<int>(iclforge::ac4::Speaker::kLfe2) == ICLFORGE_AC4_SPEAKER_LFE2);
+static_assert(static_cast<int>(iclforge::ac4::Speaker::kLeftScreen) ==
+              ICLFORGE_AC4_SPEAKER_LEFT_SCREEN);
+static_assert(static_cast<int>(iclforge::ac4::Speaker::kRightScreen) ==
+              ICLFORGE_AC4_SPEAKER_RIGHT_SCREEN);
+static_assert(static_cast<int>(iclforge::ac4::Speaker::kTopFrontCentre) ==
+              ICLFORGE_AC4_SPEAKER_TOP_FRONT_CENTRE);
+static_assert(static_cast<int>(iclforge::ac4::Speaker::kTopBackCentre) ==
+              ICLFORGE_AC4_SPEAKER_TOP_BACK_CENTRE);
+static_assert(static_cast<int>(iclforge::ac4::Speaker::kTopCentre) ==
+              ICLFORGE_AC4_SPEAKER_TOP_CENTRE);
+static_assert(static_cast<int>(iclforge::ac4::Speaker::kBottomFrontLeft) ==
+              ICLFORGE_AC4_SPEAKER_BOTTOM_FRONT_LEFT);
+static_assert(static_cast<int>(iclforge::ac4::Speaker::kBottomFrontRight) ==
+              ICLFORGE_AC4_SPEAKER_BOTTOM_FRONT_RIGHT);
+static_assert(static_cast<int>(iclforge::ac4::Speaker::kBottomFrontCentre) ==
+              ICLFORGE_AC4_SPEAKER_BOTTOM_FRONT_CENTRE);
+static_assert(static_cast<int>(iclforge::ac4::Speaker::kCentreBack) ==
+              ICLFORGE_AC4_SPEAKER_CENTRE_BACK);
 
 static_assert(static_cast<int>(iclforge::ac4::ObjectKind::kBed) == ICLFORGE_AC4_OBJECT_BED);
 static_assert(static_cast<int>(iclforge::ac4::ObjectKind::kDyn) == ICLFORGE_AC4_OBJECT_DYN);

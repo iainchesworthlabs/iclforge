@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <span>
 #include <vector>
 
@@ -108,10 +109,53 @@ namespace iclforge::admbridge {
 // (no clause equates the two specs' height references directly) - the same status
 // coordinates.hpp's own "one genuine, documented judgement call" above has for ADM, stated
 // plainly rather than asserted as spec fact. See iab_bridge.cpp's own top comment for where this
-// is used and what is deliberately not carried across (ObjectSpread, the 9-zone
-// ObjectZoneControl).
+// is used; the spread and zone mappings follow below.
 [[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT iclforge::oba::Position iab_position_to_room(
     const iclforge::iab::Position& position);
+
+// SMPTE ST 2098-2:2022 §10.5.16-17: ObjectSpread is the extent of the object on each axis, as a
+// fraction of the unit cube ("+/- 0.5 * ObjectSpread from the object's position"), 0 for a point
+// source. ETSI TS 103 420 §5.6.1.2 codes object_width, object_depth and object_height as the same
+// normalized [0, 1] extent on the room's x, y and z axes, so IAB's spread on x, y and z is
+// width, depth and height. The same rename the ADM bridge makes for BS.2076-2's width, depth and
+// height. This is this bridge's own reading; neither clause equates the two scales.
+[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT iclforge::oba::ObjectSize iab_spread_to_size(
+    const iclforge::iab::ObjectSpread& spread);
+
+// A zone control mapped onto TS 103 420's zone constraints.
+struct IabZoneMapping {
+    iclforge::oba::ZoneConstraint zone = iclforge::oba::ZoneConstraint::kNone;
+    bool enable_elevation = true;
+    // False when the gains matched none of Table 20's six presets, so `zone` is kNone: the object
+    // is left unconstrained rather than approximated by a preset that excludes the wrong zones.
+    bool exact = true;
+};
+
+// A zone gain at or above this counts as the zone being included. TS 103 420 Table 20 only
+// includes or excludes a zone; ST 2098-2 gives each zone a gain from 0 to 1.
+inline constexpr double kIabZoneIncludeThreshold = 0.5;
+
+// ST 2098-2 §10.5.11-14 Table 24's nine zones (screen left/centre/right, left wall, right wall,
+// rear left, rear right, overhead left, overhead right) onto TS 103 420 §5.6.1.6 Table 20 and
+// Table 21. The horizontal zones map to a preset only when their include/exclude pattern is
+// exactly that preset's:
+//   none               every horizontal zone
+//   back excluded      all but the two rear zones
+//   side excluded      all but the two wall zones
+//   centre and back    screen centre and the two rear zones
+//   screen only        the three screen zones
+//   surround only      the two wall zones and the two rear zones
+// The overhead zones set b_enable_elevation: on when either is included.
+[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT IabZoneMapping iab_zones_to_constraint(
+    const std::array<double, iclforge::iab::kZoneCount>& gains);
+
+// The same mapping for ObjectZoneDefinition19's 19 zones (§10.6 Table 28), which replace the nine
+// zones when present. The base layer zones carry the horizontal pattern - screen from zones 0-2,
+// the left and right walls from 12 and 14, the rear from 6-8, a rear or screen group counting as
+// included only when all its zones are - and every height layer or ceiling zone feeds
+// b_enable_elevation.
+[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT IabZoneMapping iab_zones19_to_constraint(
+    const std::array<double, iclforge::iab::kZone19Count>& gains);
 
 // ETSI TS 103 420 V1.2.1 Annex B.2.6, Tables B.18 and B.19: OAMD's zone constraint (§5.6.1.6,
 // Tables 20 and 21) expressed as an ADM zoneExclusion, and back. ADM lists the zones that are

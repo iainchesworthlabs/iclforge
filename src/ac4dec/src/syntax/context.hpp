@@ -56,6 +56,24 @@ using ParseResult = std::expected<void, SyntaxError>;
     return kForExternal48[static_cast<std::size_t>(frame_rate_index)];
 }
 
+// Part 2 Table 18: the frame_rate_index a codec frame has in the efficient high frame rate
+// mode, from the stream's frame_rate_index and frame_rate_fraction; -1 where the table has no
+// row (a fraction of 4 below index 10, or an index below 5).
+[[nodiscard]] inline int audio_frame_rate_index(int frame_rate_index,
+                                                int frame_rate_fraction) noexcept {
+    if (frame_rate_index < 5 || frame_rate_index > 12) {
+        return -1;
+    }
+    if (frame_rate_fraction == 2) {
+        // 5 to 9 map onto 0 to 4, and 10 to 12 onto 7 to 9.
+        return frame_rate_index <= 9 ? frame_rate_index - 5 : frame_rate_index - 3;
+    }
+    if (frame_rate_fraction == 4 && frame_rate_index >= 10) {
+        return frame_rate_index - 8;  // 10 to 12 onto 2 to 4
+    }
+    return -1;
+}
+
 // Part 1 Table 83's decoder resampling ratio, up / down: 1001/1000 x 25/24 =
 // 1001/960 at the 1000/1001 rates, 25/24, 15/16, and 1/1 at index 13 (and for
 // an index the table reserves).

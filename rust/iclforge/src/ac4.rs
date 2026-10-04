@@ -48,6 +48,15 @@ pub enum Speaker {
     TopSideLeft,
     TopSideRight,
     Lfe2,
+    LeftScreen,
+    RightScreen,
+    TopFrontCentre,
+    TopBackCentre,
+    TopCentre,
+    BottomFrontLeft,
+    BottomFrontRight,
+    BottomFrontCentre,
+    CentreBack,
 }
 
 impl Speaker {
@@ -73,6 +82,25 @@ impl Speaker {
             sys::iclforge_ac4_speaker_ICLFORGE_AC4_SPEAKER_TOP_SIDE_LEFT => Speaker::TopSideLeft,
             sys::iclforge_ac4_speaker_ICLFORGE_AC4_SPEAKER_TOP_SIDE_RIGHT => Speaker::TopSideRight,
             sys::iclforge_ac4_speaker_ICLFORGE_AC4_SPEAKER_LFE2 => Speaker::Lfe2,
+            sys::iclforge_ac4_speaker_ICLFORGE_AC4_SPEAKER_LEFT_SCREEN => Speaker::LeftScreen,
+            sys::iclforge_ac4_speaker_ICLFORGE_AC4_SPEAKER_RIGHT_SCREEN => Speaker::RightScreen,
+            sys::iclforge_ac4_speaker_ICLFORGE_AC4_SPEAKER_TOP_FRONT_CENTRE => {
+                Speaker::TopFrontCentre
+            }
+            sys::iclforge_ac4_speaker_ICLFORGE_AC4_SPEAKER_TOP_BACK_CENTRE => {
+                Speaker::TopBackCentre
+            }
+            sys::iclforge_ac4_speaker_ICLFORGE_AC4_SPEAKER_TOP_CENTRE => Speaker::TopCentre,
+            sys::iclforge_ac4_speaker_ICLFORGE_AC4_SPEAKER_BOTTOM_FRONT_LEFT => {
+                Speaker::BottomFrontLeft
+            }
+            sys::iclforge_ac4_speaker_ICLFORGE_AC4_SPEAKER_BOTTOM_FRONT_RIGHT => {
+                Speaker::BottomFrontRight
+            }
+            sys::iclforge_ac4_speaker_ICLFORGE_AC4_SPEAKER_BOTTOM_FRONT_CENTRE => {
+                Speaker::BottomFrontCentre
+            }
+            sys::iclforge_ac4_speaker_ICLFORGE_AC4_SPEAKER_CENTRE_BACK => Speaker::CentreBack,
             // An unrecognized ordinal cannot happen from this crate's own calls (every
             // accessor's C side clamps out-of-range indices to ICLFORGE_AC4_SPEAKER_LEFT
             // rather than an unmapped value) - Left is the same fallback iclforge.h's own

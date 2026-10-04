@@ -35,7 +35,9 @@ std::string_view describe(BridgeError error) {
         case BridgeError::kUnsupportedIabChannel:
             return "a Bed ChannelID has no iclforge::oba::BedLabel equivalent";
         case BridgeError::kNoIabEssenceForChannel:
-            return "a channel's non-zero AudioDataID never resolved to AudioDataPCM essence";
+            return "a channel's non-zero AudioDataID never resolved to AudioDataPCM or AudioDataDLC essence";
+        case BridgeError::kBadIabAudio:
+            return "an AudioDataDLC element in an IAB frame failed to decode";
     }
     return "unknown iclforge::admbridge::BridgeError";
 }

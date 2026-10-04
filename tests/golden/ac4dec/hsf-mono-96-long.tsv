@@ -1,0 +1,14 @@
+# ac4-syntax-digest/1 ../ac4-hsf/mono-96-long.ac4
+# frame	substream	kind	records	end_bit	crc32
+0	0	audio	22	78	0x67ac8145
+0	1	hsf_ext	143	460	0xa9afccdc
+0	2	presentation	7	17	0xc6b2acd5
+1	0	audio	22	78	0x5110ef50
+1	1	hsf_ext	147	481	0x1900fe70
+1	2	presentation	7	17	0xc6b2acd5
+2	0	audio	22	78	0x9dbe7653
+2	1	hsf_ext	145	468	0x9313620a
+2	2	presentation	7	17	0xc6b2acd5
+3	0	audio	22	78	0x8456f02b
+3	1	hsf_ext	144	470	0xd19cadf4
+3	2	presentation	7	17	0xc6b2acd5

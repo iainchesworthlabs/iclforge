@@ -94,16 +94,109 @@ depends on the same reading.
   place, which is what keeps the audio and presentation substreams of a frame on the same value.
 - **Evidence:** Text; every stream here is 48 kHz.
 
-### The efficient high frame rate mode is refused
+### The efficient high frame rate mode
 
-- **Where:** Part 2 5.1.3, p. 56, and Table 18: above 30 fps a presentation may transmit
-  `frame_rate_fraction` 2 or 4, spreading one coded frame over that many `raw_ac4_frame()`s, each
-  carrying fragments of the substreams; a decoder holds the partial frames and concatenates them.
-- **Reading:** the decoder reads no fragments, so a frame whose presentation carries a fraction above 1
-  has every substream refused as unsupported, naming the mode. Reading a fragment as a whole substream
-  reports a legal stream as a damaged one, which is what the decoder did before the fraction was carried
-  out of the table of contents at all.
-- **Evidence:** Text; no stream here uses the mode.
+- **Where:** Part 2 5.1.3, pp. 56 and 57, Figures 7 and 8, Table 18, and 5.11, p. 111. Above 30 fps a
+  presentation may transmit `frame_rate_fraction` 2 or 4: the codec frame is that many transmission frames
+  long, each `raw_ac4_frame()` carries a fragment of each substream, the presentation substream whole in
+  the first and elided in the others. A decoder keeps a FIFO and "reassembles the frame by concatenating all
+  the `ac4_substream_data` fragments that are referenced in the selected presentation".
+- **Reading:**
+  - The fraction is the selected presentation's. The presentation is selected on the table of contents of
+    the first frame of a unit as if every fraction were 1, which is how the unit will read; a presentation of
+    another fraction in the same frame stays a set of fragments and is refused as before.
+  - A unit is the frames from one whose `sequence_counter` is a multiple of the fraction to the one before
+    the next (Figure 8). Its table of contents is the first frame's, with Table 18's `frame_rate_index` and a
+    fraction of 1. The text does not say which counter the codec frame has, and 5.11 locks the sample rate
+    converter's phase to "the sequence_counter"; the codec frame's is the first frame's counter divided by the
+    fraction, which steps by one from unit to unit, as the counter of a stream of that audio frame rate does,
+    and keeps a first frame of 0 (the splice mark) at 0. Read as the first frame's own counter, the phase
+    would step by the fraction and the 1 601 and 1 602 sample frames of 29.97 fps would come in another
+    order.
+  - Every substream of the frame is concatenated, not only those of the selected presentation, since the
+    others cost nothing to join; all frames of a unit must have the first's `n_substreams`.
+  - Continuity (Part 1 4.3.3.2.2) is checked on the transmission counters, one frame at a time, so a lost
+    frame is a change of source, which drops the unit being assembled. A frame that cannot be read inside a
+    unit counts as a fragment lost: the unit ends as lost at its last frame, and `decode()` conceals it
+    (Figure 8's "conceal and dequeue"). A frame that is not the first of a unit, with no first frame held (the
+    decoder joined part way through a unit), is dropped without concealment.
+  - `decode()` returns no frame for a fragment other than the unit's last. `parse()` gives a report with no
+    substreams for it, and the unit's for the last.
+- **Evidence:** Text; no stream here uses the mode. `tests/ac4dec/test_ac4dec_ehfr.cpp` cuts DEE's immersive
+  stereo streams at 24, 25 and 29.97 fps into fragments at each fraction Table 18 gives them, and the decoder's
+  PCM for each unit equals the uncut stream's for its frame, sample for sample. That holds the framing and the
+  counter reading; it cannot say how an encoder splits a substream. Fragments are cut by the test at equal
+  lengths; the text allows zero-length ones and any other split, which the concatenation does not depend on.
+
+### The speech spectral frontend
+
+- **Where:** Part 1 4.2.9 (Tables 43 to 46), 4.3.7 (Tables 111 to 113, Pseudocode 7), 5.2
+  (Pseudocodes 4a to 58) and Annex C, whose tables are in the attachment ts_103190_tables.c except
+  Table C.1. The decoder reads and decodes it in one pass (`src/ac4dec/src/syntax/ssf.cpp`), since
+  `ssf_ac_data()` has no length, and the allocation its arithmetic decoder needs comes from values the
+  decoding builds. `tools/references/ssf_ref.py` is a second transcription, written from the text without
+  reading the first; they agree on random streams (below). The text is defective in the places that follow.
+- **Readings:**
+  1. Pseudocode 50 calls `AcDecodeSymbolExtCdf(..., 0, i_max_idx)`, a search that "cannot return a
+     negative value" for signed indices. A coefficient's symbols run from `-i_max_idx` to `i_max_idx`,
+     ascending, the first whose interval holds the target; any larger range gives the same symbol, since
+     the intervals that hold nothing are empty. For the envelope and predictor gain tables, of 33 entries
+     (32 symbols), the call's upper bound of 32 would read `table[33]`: the symbols are 0 to 31.
+  2. Pseudocode 51 clamps `iLeft` from below and `iRight` from above only, so a symbol wholly beyond
+     +-10 makes `CdfEst()` index outside CDF_TABLE. Both ends are clamped to +-327680; such a symbol's
+     interval is empty. The table's tails (47 and 46 in 32 768 beyond +-10) are therefore never
+     decoded: no valid stream puts a symbol there.
+  3. Pseudocode 27 gives `HeuristicScaling()` f_rfu "in Qx.10" and never converts it. It is rounded:
+     `floor(f_rfu * 1024 + 0.5)`. Truncation would change a band's weight in about 4 % of random sets
+     of an envelope and a predictor gain (measured), and with it the allocation, so which bits of the
+     arithmetic coded data are read; no stream here settles it.
+  4. Pseudocode 28 does not reset `band` before the reverse water-filling, which it enters with
+     `num_bands`, so the loop would not run. It is reset to 0.
+  5. Pseudocodes 56 and 57 write `x = x++`: an increment, as in "x = x++ in Pseudocode 57" above.
+  6. Pseudocode C.1's index `(nu + rfs) * rts * 33 + k * 33 + eta` does not match the arrays, which
+     are smooth along eta only with eta as the middle index and k the fastest, the index being
+     `((nu + rfs) * 33 + eta) * rts + k` (for each of the 37 arrays with Rt > 1 the second differences
+     along eta are at least 6 times smaller than in any other order; `tools/generators/gen_ac4_tables.py`
+     checks it).
+  7. Pseudocode 36's sign (`s`, never initialised, toggling inside the loops) is replaced by the displayed
+     equation of 5.2.6, `(-1)^((k + 1) p)`, and `round()` by `floor(x + 1/2)` as the equations have it.
+     The two differ only for a negative exact half, which one coefficient at predictor lag index 509 and a
+     block length of 960 reaches.
+  8. Pseudocode 4e's `(i_pred_lag_idx - 509) / 170` is a real division.
+  9. Pseudocode 41 names the large threshold `SSF_SSF_THRESHOLD_LARGE` and uses `SSF_THRESHOLD_LARGE`:
+     1 << 29, the initial range of Pseudocode 43.
+  10. `FLOAT()` in Pseudocode 27 is a division by 1024.
+  11. `AcDecodeFinish()` (Pseudocode 47) counts the bits the arithmetic decoder has read since its
+      initialisation, less the 30 it reads ahead, plus the termination length it finds: that is where
+      the next granule starts. The decoder's own reads beyond the substream are zeros; a count that
+      ends beyond it is a truncated substream.
+  12. An SSF-I-frame (`b_iframe`, or `b_ssf_iframe` for the first granule) starts both random generators
+      (Pseudocode 55), `i_prev_pred_lag_idx` and the predictor's buffers afresh. The second granule of a
+      frame is never an I granule. The dither of a granule is drawn up front (Pseudocode 58), the noise
+      as the lines are dequantised, in block, band and bin order. A stream that fails to decode needs the
+      next I-frame.
+  13. The predictor's spectra buffers keep the lines of the length they were written at; when the block
+      length changes between granules they are cut or zero extended to the new `num_bins`. The text
+      says nothing on a change of stride.
+  14. A subband predictor with a gain of 0 produces zeros without being run; with a gain, a lag that
+      reaches an envelope buffer entry no block has filled (the first blocks after an I-frame), or past
+      the four entries, is an invalid stream rather than a division by zero.
+  15. The fixed point arithmetic of Pseudocodes 4b and 27 to 30 and 40 to 53 is held in 64 bits and a
+      result outside int32 is an invalid stream (the macros would wrap). The state of the arithmetic
+      decoder is uint32 and wraps, as the unsigned types do: a random stream breaks `offset < range`
+      half the time, and both transcriptions then run on with wrapped arithmetic.
+  16. A stream is invalid where an envelope leaves -64 to 63 (the NOTE of 5.2.3.0a), a predictor lag index
+      leaves 0 to 509 (the NOTE of 5.2.4.0a), a short stride is sent where Table 112 allows none
+      (frame lengths of 512 and 384), or a symbol's interval holds nothing the arithmetic decoder asks for.
+  17. The lines are the inverse MDCT's input in the scale of the audio spectral frontend's, and a granule's
+      blocks (768, or 4 of 192, and so on) are the transform blocks Table 187 lists.
+- **Evidence:** Text. No stream here uses the tool: not DEE's, not the census's, not the third-party ones.
+  `tests/golden/ac4dec/ssf/ssf-vectors.txt` is 128 frames of random bytes through the reference
+  (`python tools/references/ssf_ref.py vectors --seed 1 --cases 32 --frames 4`), which the decoder matches
+  on the bits ssf_data() took, every granule's stride and band count, and every line to 1e-9; five
+  deliberate changes (the rounding of f_rfu, the predictor's sign, a dB table's shift, the termination
+  count, an integer division) each fail it. Random bits are not a stream a codec wrote, so the readings
+  above that depend on one (3, 11, 13) are not tested by it.
 
 ### A substream named by several elements
 
@@ -319,7 +412,10 @@ depends on the same reading.
   `asf_scalefac_data()` and `asf_snf_data()` (Tables 40 to 42) are unaffected: their own `get_max_sfb(g)`
   and `min(get_max_sfb(g), num_sfb_48(...))` calls keep the core-only reading, which is what makes a
   channel with no active extension unaffected byte for byte by touching the section loop at all.
-- **Evidence:** Text; no stream here uses the mode.
+- **Evidence:** The constructed streams under `tests/golden/ac4-hsf/` (`mono-96-long` and the rest,
+  built by `tests/ac4dec/ac4dec_hsf.cpp` from the text) read the extension's sections to `get_max_sfb_hsf(g)`
+  in both transcriptions, and their tones come back at 96 and 192 kHz only through that reading
+  (`tests/ac4dec/test_ac4dec_hsf.cpp`); no stream from another encoder uses the mode.
 
 ### ac4_hsf_ext_substream()'s max_sfb_ext_hsf and num_channels
 
@@ -339,7 +435,10 @@ depends on the same reading.
   read. A later track whose own `b_different_framing` calls for `max_sfb_ext_hsf[1]` where the first
   track's did not read one takes it as 0: no additional bands for that track's own second half, rather
   than a failure.
-- **Evidence:** Text; no stream here uses the mode.
+- **Evidence:** The same constructed streams: `mono-192-switched-snf` and `stereo-192-sap1-switched` carry
+  `b_different_framing` and so `max_sfb_ext_hsf[1]`, and `stereo-96-sap2` and `stereo-192-sap1-switched` are
+  pairs whose extension holds one `sf_hsf_data()` per track. The reading of a later track's differing
+  `b_different_framing` is Text only: the builder gives every track of an element the same framing.
 
 ## Channel elements
 
@@ -392,8 +491,8 @@ depends on the same reading.
 ## The immersive element
 
 Part 2's immersive_channel_element (6.2.4.1), which codes the 7.X.4 channel modes, and A-JCC's
-ajcc_data() (6.2.6). The 9.X.4 modes pass the element b_5fronts 1 (6.2.3.1) and are refused by name,
-as the 22.2 element is. DEE codes 5.1.4 as 7.1.4 with the back pair absent, in ASPX_ACPL_2 from 192
+ajcc_data() (6.2.6). The 9.X.4 modes pass the element b_5fronts 1 (6.2.3.1); see "The 9.X.4 element".
+DEE codes 5.1.4 as 7.1.4 with the back pair absent, in ASPX_ACPL_2 from 192
 to 448 kbps, ASPX_SCPL at 512 and SCPL at 768, always with core_5ch_grouping 0, 2ch_mode 0 and
 b_use_sap_add_ch 0; the constructed streams of `tests/ac4dec/ac4dec_constructed.cpp` reach the rest.
 
@@ -1464,6 +1563,422 @@ reading below rests on it.
   decoding, A-CPL included.
 - **Evidence:** Text.
 
+## The 22.2 element
+
+Part 2's 22_2_channel_element (6.2.4.3): two LFE tracks and eleven pairs, in the SIMPLE and ASPX codec
+modes. The decoder decodes it in full decoding to 24 channels. No stream of it exists here and no other
+decoder reads one, so every reading below rests on the text: the constructed streams of
+`tests/ac4dec/ac4dec_constructed.cpp` (`22_2-simple-alternating` and `22_2-aspx-unit7-lr`) carry a
+tone on each channel and are read by both transcriptions of the syntax, and they show that the decoder
+does what the readings say, not that they are what an encoder meant.
+
+### The 22.2 element's tracks
+
+- **Where:** Part 2 5.2.4 and Table 21, p. 62; 5.2.2.1, p. 58 (nSAP 22); 4.8.3.6, p. 45; 6.2.4.3, p. 130. Table 21 numbers the
+  inputs 0 to 23 and gives each its output: `mono_data[0]` is [LFE], `mono_data[1]` [LFE2],
+  `two_channel_data[0]` [L, R], then [C, Tc], [Ls, Rs], [Lb, Rb], [Tfl, Tfr], [Tbl, Tbr], [Tsl, Tsr],
+  [Tfc, Tbc], [Bfl, Bfr], [Bfc, Cb] and [Lw, Rw]. 4.8.3.6 sends the tracks of the first two `sf_data`
+  elements straight to the IMDCT stage, round the stereo and multichannel processing.
+- **Reading:** the tracks are those the syntax reads, in its order. Each pair is Part 1 5.3.3's
+  processing on its own `b_enable_mdct_stereo_proc` and `chparam_info()`, and nothing mixes tracks of
+  different pairs: no step in the text does. Unlike Tables 180 and 182 the table numbers the LFEs, so the
+  two `mono_data(1)` are tracks 0 and 1 and the pairs follow, and the Part 1 reading of the LFE's track
+  ("The LFE's track is not numbered in Tables 180 and 182") is not needed.
+- **Evidence:** Text.
+
+### The 22.2 element's output
+
+- **Where:** Part 2 Table A.27, p. 214, lists 22.2's speakers by speaker index, which skips 14 and 15
+  (reserved) and 24 and 25 (Lscr and Rscr, which 22.2 does not have); Part 2 5.10.2, Tables 35 to 43,
+  pp. 104 to 107, have no row for a 22.2 input; Table 8, p. 46, lists 22.2 as "Only full decoding
+  supported".
+- **Reading:** decode() writes the 24 channels in Table A.27's order by speaker index: L, R, C, Ls, Rs,
+  Lb, Rb, Tfl, Tfr, Tbl, Tbr, LFE, Tsl, Tsr, Tfc, Tbc, Tc, LFE2, Bfl, Bfr, Bfc, Cb, Lw, Rw. The LFE comes
+  after Tbr and LFE2 after Tc, where that table has them, not fourth as the Part 1 modes have it. The
+  output is delivered as coded. Every other `DownmixTarget` is refused, with `kUnsupported` and a reason
+  naming 22.2, since no table renders a 22.2 input and Part 1 Tables 217 to 219 take 5.X and 7.X inputs:
+  folding 22.2 by them would leave out most of its channels without saying so. The other elements come out
+  as coded for the immersive targets (as the header of `decoder.hpp` says); a 22.2 source is refused for
+  them too, since it is wider than any of those layouts rather than narrower. Core decoding of the
+  element is refused for Table 8's "only full decoding": the element has no core channel mode (Table 71).
+- **Evidence:** Text.
+
+### Dialogue enhancement's channels for 22.2
+
+- **Where:** Part 2 Table 15, p. 49, gives "9.X.4, 22.2" the channels "Lscr, Rscr, C". Table A.27 has
+  no Lscr or Rscr in its 22.2 column. Table 13, p. 48, sends 22.2 to Part 1 5.7.8, whose 5.7.8.2, p. 248,
+  calls the processed channels "the three front channels", and whose Table 171 names them L, R and C.
+- **Reading:** 22.2's dialogue enhancement channels are L, R and C, as for 5.X, 7.X and 7.X.4, and as the
+  tool's own `de_channel_config` names them. The printed row is 9.X.4's, which gives that layout's screen
+  pair; 22.2 has no such pair, and its L and R are its front pair (the wides Lw and Rw are channels of
+  their own). The reading for 9.X.4 is "Dialogue enhancement's channels for 9.X.4".
+- **Evidence:** Text.
+
+### No companding, S-CPL or A-CPL for 22.2
+
+- **Where:** Part 2 4.8.3.10.2 and 4.8.3.10.3, p. 45, list the elements companding applies to, and
+  22.2 is not among them; 4.8.3.8, p. 45, bypasses S-CPL for every element but the immersive one;
+  4.8.3.14, p. 48: "For decoding of 22_2_channel_element, no A-CPL processing is required"; 6.2.4.3's
+  syntax has no `companding_control()` and no A-CPL data.
+- **Reading:** the element's QMF domain has A-SPX alone, and only in ASPX: eleven `aspx_data_2ch()` over the
+  pairs Table 8 gives, each pair's two channels together, as Part 1 6.2.10 processes a pair. The LFEs have no
+  A-SPX data and pass through. Nothing in the text gives the pairs a gain after A-SPX, as 4.8.3.11 gives
+  ASPX_SCPL's channels, so none is applied.
+- **Evidence:** Text.
+
+### DRC's groups and level for 22.2
+
+- **Where:** Part 2 Table 69, p. 170, gives 22.2 four groups: "L, R, [LFE, LFE2], Lw, Rw", C, "Ls, Rs, Lb, Rb,
+  Bfl, Bfr, Bfc, Cb" and "Tfl, Tfr, Tbl, Tbr, Tsl, Tsr, Tfc, Tbc, Tc", with the brackets meaning that
+  the LFEs are part of the group where the configuration has them; 4.8.3.16, p. 49, and 4.8.6, p. 53, take
+  the groups from that table. Part 1 5.7.9.3.1.1 leaves the level detector to the implementation.
+- **Reading:** the groups numbered 1 to 4 in the table are the gain sets 0 to 3 of `nr_drc_channels` 4; both
+  LFEs are in the first. The level detector takes neither LFE (BS.1770's weight for the LFE is none) and
+  the other channels at the weights it gives the 7.X modes' channels.
+- **Evidence:** Text.
+
+### Mixing into a 22.2 substream
+
+- **Where:** Part 1 4.3.12.4.9 and Table 216 pan a mixed substream over the horizontal speakers of the
+  main audio's layout; no table gives 22.2's.
+- **Reading:** a substream mixed into a 22.2 main substream is panned over the horizontal channels the
+  layout has, L, C, R, Lw, Rw, Ls, Rs, Lb and Rb at the azimuths a 7.X layout gives them, the Ls and Rs
+  at the sides; the top, bottom and centre-back channels are not in the ring.
+- **Evidence:** Text; as for 7.X, no stream mixes into a 22.2 substream.
+
+## The 9.X.4 element
+
+Part 2's immersive_channel_element (6.2.4.1) with `b_5fronts` 1, which codes the channel modes 13 and 14,
+9.0.4 and 9.1.4: the 7.X.4 modes' channels and the screen pair, Lscr and Rscr, in all five codec modes
+(SCPL, ASPX_SCPL, ASPX_ACPL_1, ASPX_ACPL_2, ASPX_AJCC). No stream of it exists here and no other decoder
+reads one, so every reading below rests on the text. The constructed streams of
+`tests/ac4dec/ac4dec_constructed.cpp` (`9_0_4-*` and `9_1_4-*`) carry a distinct tone on each channel and
+are read by both transcriptions of the syntax, and they show that the decoder does what the readings say,
+not that they are what an encoder meant.
+
+### The 9.X.4 element's tracks
+
+- **Where:** Part 2 6.2.4.1, pp. 128 and 129 (the third `two_channel_data()` and two further
+  `chparam_info()` that `b_5fronts` adds); 5.2.3.2 step 5, p. 60; Tables 19 and 20, pp. 60 and 61.
+  Step 5 prints "n_elem = 6 b_5fronts ≠ 0 and 0 ≤ j < n_elem" with the case split lost, and Table 20's
+  `b_5fronts` 1 matrix adds the rows L'' = L' + a'_4 A' and M'' = M' + a'_5 B'.
+- **Reading:** the element has 13 tracks, A'' to M'', and L'' and M'' are the last pair of Table 19,
+  after the tracks of the 7.X.4 element. a'_0 to a'_3 are the first four `chparam_info()` and a'_4 and a'_5
+  the last two, as the syntax orders them; the pair [L, M]'s own `chparam_info()` (its stereo
+  processing, Part 1 5.3.3) is read inside its `two_channel_data()`, which the syntax places between
+  the four and the two, and is not one of the six. The prediction, like the other four, is a'_j times the
+  track of the first pair (A' and B') added to the track, per band, with the sap_mode of the `chparam_info()`
+  it comes from; sap_mode 0 sets a' to 0.
+- **Evidence:** Text. The constructed streams `9_1_4-scpl-grouping1-matsel2-prediction` and
+  `9_1_4-acpl1-grouping3-matsel8-prediction` predict L and M at a non-zero alpha_q. A first reading took
+  a'_4 and a'_5 from the two `chparam_info()` that follow the pair's own in the decoder's list; the tones
+  of Lscr and Rscr came out on the wrong channels and the test caught it.
+
+### The 9.X.4 element's S-CPL channels
+
+- **Where:** Part 2 5.3.3.1, Table 23, p. 64: for `b_5fronts` 1 the table prints a second mapping, of
+  (A'', L'', B'', M'') to four outputs it labels "Lw, Lscr, Rw, Rscr" with the factor 2 x ½ and no
+  `c_gain` or `m_gain`; Table 24 for core decoding takes the first seven tracks. Table 8, p. 46, pairs the
+  channels A-SPX processes as (L, Lscr) and (R, Rscr), and 9.X.4 has no Lw or Rw (Table A.27).
+- **Reading:** the labels Lw and Rw of Table 23 are L and R: L = A'' + L'' and Lscr = A'' − L'', and R =
+  B'' + M'' and Rscr = B'' − M'' (½ ± ½ times 2), not scaled by `c_gain`, which only C takes (2 in SCPL, 1
+  in ASPX_SCPL); the printed 5.1-style rows for Ls to Tbr are the 7.X.4 element's. In core decoding Table
+  24 is the 7.X.4 core's, with L and R from A'' and B'' at `c_gain`.
+- **Evidence:** Text; the constructed SCPL and ASPX_SCPL streams put each of the 13 tones on its channel.
+
+### The 9.X.4 element's A-SPX
+
+- **Where:** Part 2 4.8.3.11, Tables 8 and 9, p. 46, and Table 11, p. 47; 6.2.4.1, p. 129. Table 8 lists
+  the channels of the ASPX_SCPL core mode as "[Ls], [Rs], C, (L, R), [Tfl], [Tfr]" for every `b_5fronts`
+  ("X"), and the syntax sends, with `b_5fronts` 1, two `aspx_data_2ch()` in the place of the one that
+  holds L and R, so that no unit holds both. Table 9 lists "L, R, Ls, Rs, Tfl, Tfr" for post-processing
+  with `b_5fronts` 1.
+- **Reading:** full decoding in ASPX_SCPL processes seven units in the order the syntax sends them:
+  (Ls, Lb), (Rs, Rb), C, (L, Lscr), (R, Rscr), (Tfl, Tbl), (Tfr, Tbr). Core decoding reads the same seven
+  and takes the first channel of each two-channel unit, as the square brackets of Table 8 say: L from the
+  fourth unit and R from the fifth, where Table 8 prints "(L, R)" as one pair. In the A-CPL
+  and A-JCC modes the units are Table 8's (A'', B''), (D'', E''), (F'', G'') and C'', and L'' and M''
+  have no A-SPX data of their own. The gains of ASPX_SCPL in full decoding are Table 11's: 2 for C, 1 for
+  L, Lscr, R and Rscr, and the square root of 2 for the others; the core's are g = 2 for the channels of
+  Table 9 and none for the rest.
+- **Evidence:** Text; `9_0_4-aspx_scpl-grouping0-2ch1-unit3` makes the fourth unit loud and finds its
+  high band on L and Lscr alone.
+
+### The 9.X.4 element's A-CPL
+
+- **Where:** Part 2 4.8.3.14 and Table 12, p. 48; 5.5.2 and Pseudocode 2, p. 67 (Table 25, p. 66);
+  6.2.4.1, p. 129 (`acpl_data_1ch()` six times with `b_5fronts`).
+- **Reading:** the six modules are Pseudocode 2's four, on (Ls, Lb), (Rs, Rb), (Tfl, Tbl) and (Tfr, Tbr),
+  then the fifth on (L, Lscr) and the sixth on (R, Rscr) with the fifth and sixth `acpl_data_1ch()`
+  (Table 25: x0 / x3 to z0 / z1 and x1 / x4 to z2 / z3); these two decorrelate with D2, each module
+  with a decorrelator of its own, as the first four use D0, D0, D1 and D1. In ASPX_ACPL_1 the residual
+  inputs x3 and x4 are the tracks L'' and M''; in ASPX_ACPL_2 they are 0. Pseudocode 2 prints
+  `u4 = inputSignalModification(x0in)` and `u5 = ... (x1in)` before the lines that assign `x0in = 2*x0`
+  and `x1in = 2*x1`; the assignments come first, as they do for x5in to x10in. With `b_5fronts` the
+  outputs of the fifth and sixth modules (z0 to z3) are not scaled by the square root of 2, C is twice
+  its input, and the outputs of the first four modules are scaled by it as before. Core decoding applies
+  g = 2 to each present channel instead and no A-CPL (4.8.3.14).
+- **Evidence:** Text; `9_0_4-acpl2-grouping2-second` and the ASPX_ACPL_1 stream route each module's
+  downmix to its first or second output and find the tone on the one channel.
+
+### The 9.X.4 element's A-JCC
+
+- **Where:** Part 2 6.2.6.1 (`ajcc_data(b_5fronts)`), p. 133; 5.6.3, Tables 26 and 27, pp. 68 and 71;
+  Pseudocodes 8, 10, 12 and 13, pp. 73 to 78.
+- **Reading:** with `b_5fronts` the data are `ajcc_qm_f` and `ajcc_qm_b` and four modules' framing, and
+  twenty parameters in the order dry1f to dry4f, dry1b to dry4b, wet1f to wet6f, wet1b to wet6b; the
+  modules lf, rf, lb and rb take dry1 and dry2, dry3 and dry4 and wet1 to wet3 or wet4 to wet6 of the front
+  or the back set. Full decoding is four `ajcc_module_1()` (Pseudocode 10) and core decoding two
+  `ajcc_module_3()` (Pseudocode 13); Pseudocode 10's coefficients d0 to d2 are dry1, dry2 and
+  1 − dry1 − dry2, followed by y0's p0, p2 and p4 and y1's p1, p3 and p5. Each coefficient is
+  interpolated with the framing of the half it comes from. Eight decorrelator instances, D0, D2, D1, D2 on
+  each side, serve the full modules and the core takes four.
+- **Evidence:** Text; `9_1_4-ajcc-grouping1-route2` and its siblings send each route (a module's input
+  whole to one output) and the tones come out on the channels the route names, in full and core decoding.
+
+### The 9.X.4 element's output
+
+- **Where:** Part 2 Table A.27, p. 214: the 9.X.4 column lists L, R, C, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr,
+  the LFE (index 11), and the screen pair at 24 and 25; Table 8, p. 46, and Table 71, p. 171, for the core.
+- **Reading:** decode() writes the thirteen or fourteen channels in Table A.27's order by speaker
+  index: L, R, C, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr, LFE, Lscr, Rscr (the LFE after the tops, as for 22.2).
+  Core decoding is the 7.X.4 core's 5.X.2 (L, R, C, [LFE], Ls, Rs, Tsl, Tsr): its channels are those of the
+  seven first tracks, and the screen pair is not in it.
+- **Evidence:** Text; the constructed streams.
+
+### The 9.X.4 element's rendering
+
+- **Where:** Part 2 5.10.2.4 and 5.10.2.5, Tables 34 to 43, pp. 104 to 107; Tables 128 to 130, pp. 207 and
+  208; Table 127, p. 206; 4.8.5.3, p. 52. Tables 38 to 43 have a 9.X.4, 9.X.2 and 9.X.0 row, with
+  r0,22 = r1,23 = gain_f1 and r2,22 = r2,23 = gain_f2 (Tables 39 to 43, from 9.X.4 and 9.X.2), or
+  r0,22 = r1,23 = 0 dB (Table 38, and every table from 9.X.0). Table 128 gives gain_f1 as 3.0 to −6.0 dB and
+  then −∞ (default −∞, Table 130), and Table 129 gives gain_f2 as 0 to −12 dB then −∞ (default 0 dB).
+  Tables 35 to 37 render to 9.X outputs.
+- **Reading:** the 9.X rows of Tables 38 to 43 are rendered as printed, with the two gain labels taken the
+  other way round: the coefficient the rows print gain_f1, on L and R (from Lscr and Rscr), is Table
+  129's gain_f2 (default 0 dB), and the one printed gain_f2, on C, is Table 128's gain_f1 (default
+  −∞). 6.2.9.4, p. 153, sends `b_put_screen_to_c` and then `gain_f1_code` if it is 1 and `gain_f2_code`
+  if not; 6.3.10.3.3, p. 207, says the flag says whether Lscr and Rscr "are mixed into the Centre
+  channel C"; and Table 130 defaults the flag to False, gain_f1 to −∞ and gain_f2 to 0 dB. So gain_f1 is the gain of the screen
+  pair into C and gain_f2 that into L and R, and printed the other way round the defaults would drop the
+  pair from L and R and put it into C, against Table 38's r0,22 = r1,23 = 0 dB. The flag chooses the
+  destination: with `b_put_screen_to_c` 1 the pair goes to C at gain_f1 and the gain into L and R is −∞,
+  with 0 it goes to L and R at gain_f2 and the gain into C is −∞ (the text says only "mixed into C").
+  A 9.X source's Lb and Rb are always in its input configuration, as the 9.X rows give them
+  coefficients and `bs_ch_config` 0 and 3 are the "back present" values of a 9.X mode (6.2.9.2);
+  `b_4_back_channels_present` does not narrow them. The 7.X.4 and 5.X targets are rendered; a 9.X
+  output (Tables 35 to 37) has no `out_ch_config` in Table 127 and is no `DownmixTarget`, so is refused.
+  Folding the screen pair is a downmix and takes the output's loudness correction; as coded does not
+  (4.8.5.3).
+- **Evidence:** Text: `tests/ac4dec/test_ac4dec_renderer.cpp` holds the 9.X rows a second time, as printed,
+  against the matrices for every output and every input; no stream sends `b_put_screen_to_c`, `gain_f1_code` or `gain_f2_code`.
+
+### Dialogue enhancement's channels for 9.X.4
+
+- **Where:** Part 2 Table 15, p. 49: "9.X.4, 22.2: Lscr, Rscr, C"; Table 13, p. 48: 9.X.4 in SCPL, ASPX_SCPL
+  and ASPX_ACPL_1 uses Part 1 5.7.8 in core and full decoding; in ASPX_ACPL_2 and ASPX_AJCC full
+  decoding uses Part 1 5.7.8 and core decoding clauses 5.8.2.2 and 5.8.2.1.
+- **Reading:** in full decoding the first, second and third channels of `de_channel_config` (Part 1 Table
+  171's bits 4, 2 and 1) are Lscr, Rscr and C, and L and R pass unchanged. In core decoding, which has no
+  screen pair, Part 1's tool for SCPL, ASPX_SCPL and ASPX_ACPL_1 processes the core's L, R and C, since
+  those carry the channels (A'' to C'') the screen pair is coded with. (The 22.2 reading, L, R and C, is
+  kept: see "Dialogue enhancement's channels for 22.2".)
+- **Evidence:** Text; `dialogue enhancement raises 9.X.4's Lscr, Rscr and C, not L and R` makes each tone 9 dB
+  louder on the channels asked and leaves the rest within 0.3 dB.
+
+### Core decoding's dialogue enhancement for 9.X.4
+
+- **Where:** Part 2 5.8.2.1 and 5.8.2.2, pp. 92 to 96, Pseudocodes 19 to 21, and 4.8.3.15, p. 49 ("If
+  b_de_simulcast is true, the decoder shall use the second de_data in dialog_enhancement for the core
+  decoding mode"). The tool computes y = (M_interp | I) (m, u): u is the core's L, R and C, m the three
+  inputs of the A-JCC (A'', B'', C'') or A-CPL (a, b, c) tool, M_interp the interpolation of the Part 1
+  matrix Ĥ_DE,MC less the identity, per input, times the coefficients C_L and C_R (1 for C).
+- **Reading:**
+  - 5.8.2.2 prints `y = H_DE,ACPL,Core x (...)` with H = (M_interp | I), a 3 x 6 matrix, and defines
+    the three A-CPL inputs `m` but no `u`; 5.8.2.1 has both. `u` is taken as 5.8.2.1 has
+    it, the core's L, R and C that Table 8's core decoding produces (A-CPL's replacement gain applied).
+    Ĥ_DE,Core is Ĥ_DE,MC (3 x 6, Part 1 5.7.8.6: the parametric 3 x 3 part and the waveform part) times
+    the 6 x 3 matrix [I; 0] less the 3 x 3 identity, that is, the parametric part less the identity,
+    the waveform part having no core counterpart (see "Dialogue enhancement without its waveform").
+  - The scale of m is not given. Qin_AJCC are the A-SPX outputs, and the core computes with them as
+    x0in = (2 + 1/√2) x0 (Pseudocode 12), so that u is at that scale. m is taken at the scale u is made
+    at: for A-JCC the A-SPX output times Pseudocode 12's input gain, for A-CPL the A-SPX output with the
+    replacement gain of 4.8.3.14 applied (g = 2, which core decoding gives instead of A-CPL). With that
+    scale a core channel that a module fills whole with its input (C = 1) is raised by 1 + g x p, the
+    factor full decoding raises Lscr by, and at the other scales it would be raised by a different
+    one for no reason the text gives.
+  - Pseudocode 20 is taken with its evident corrections. `ts++` inside the loops for the steep cases
+    would skip a timeslot; the value assigned at `ts == psts` is kept and the loop moves on. The ramps
+    divide by `psts`, which is 0 for a parameter set at the frame's first timeslot, and by
+    `num_qmf_timeslots − psts − 1`, which is 0 at the last: a zero denominator is a step to the target. The
+    interpolation reaches its target at the last timeslot, `(ts + 1) / N`, as Pseudocode 6 does for A-CPL.
+    `Mprev`, `de_param_prev` and `coeff_prev` start at 0, so the first frame fades in.
+  - C_L and C_R come from Pseudocodes 19 and 21 with the framing of the front modules (A-JCC) or of the
+    fifth and sixth `acpl_data_1ch()` (A-CPL); in A-CPL the coefficient is ½ (1 − alpha1), so a module that
+    sends the downmix to the second output (alpha −1) has C = 1 and one that sends it to the first
+    has 0. A-CPL's `acpl_num_param_bands` and A-JCC's `ajcc_num_param_bands` map the subbands (sb_to_pb).
+  - If `b_de_simulcast` is 1, core decoding takes the second `de_data()` (4.8.3.15), which sends no panning
+    of its own and takes the first's (6.2.7.6).
+- **Evidence:** Text; unit tests of the interpolation (smooth with one and two sets, steep) against
+  hand-worked values, and constructed streams (`dialogue enhancement ... core`) that find the core's L, R and C
+  louder by 1 + C g p on each route of A-JCC and of A-CPL, and unchanged where the second `de_data()` is 0.
+
+### DRC's groups for 9.X.4
+
+- **Where:** Part 2 Table 69, p. 170: 9.X.4 has four groups, "L, R, [LFE], Lscr, Rscr", C, "Ls, Rs, Lb, Rb"
+  and "Tfl, Tfr, Tbl, Tbr"; 4.8.3.16, p. 49.
+- **Reading:** Lscr and Rscr join the first group with L, R and the LFE; the level detector weighs them as
+  front channels (1) and the LFE not at all. Core decoding discards the gains of the channels it does not
+  have, as for 7.X.4.
+- **Evidence:** Text; `tests/ac4dec/test_ac4dec_drc.cpp`.
+
+### Mixing into a 9.X.4 substream
+
+- **Where:** Part 1 4.3.12.4.9 and Table 216 pan a mixed substream over the horizontal speakers of the main
+  audio's layout; no table gives 9.X.4's.
+- **Reading:** as for 22.2: the ring is the horizontal channels of the 7.X layout, L, C, R, Ls, Rs, Lb and Rb
+  with the surrounds at the sides; the screen pair, the tops and the LFE are not in it.
+- **Evidence:** Text; as for 7.X, no stream mixes into a 9.X.4 substream.
+
+## 96 and 192 kHz
+
+Part 1 clause 5.4 and 6.2.5.2 are all the text says of decoding a substream at 96 or 192 kHz. The
+HSF extension substream holds "the scale factor and spectral data beyond 24 kHz" (4.2.4.3); a decoder
+capable of these rates "shall read the additional data up to either twice the original block length
+(for 96 kHz) or four times the original block length (for 192 kHz), and continue processing at twice or
+four times the block length and sampling rate"; "streams containing high sampling frequency data do not
+employ any of the QMF domain tools"; and decoding the extension needs the SAP tool and the IMDCT, and
+"no QMF domain processing". The readings below fill in what that leaves. No stream at these rates was
+available to read or to decode: the streams under `tests/golden/ac4-hsf/` and
+`tests/ac4dec/test_ac4dec_hsf.cpp`'s are built from the text alone (`tests/ac4dec/ac4dec_hsf.hpp` says
+how), the evidence for a reading is that the second transcription reads them alike and that the
+decoder's output is the tones they were made from.
+
+### The rate a 96 or 192 kHz substream decodes at
+
+- **Where:** Part 1 Table 89, p. 78, gives a substream's sampling frequency from `sf_multiplier`; 6.2.15,
+  p. 268, and Part 2 4.8.8, p. 53, say the decoder "may" (Part 1) or "shall" (Part 2) "be operated at
+  external sampling frequencies of 48 kHz, 96 kHz, or 192 kHz", with a converter by Table 83's ratio;
+  5.4, p. 184, that a capable decoder "may be configured to these higher rates", and one that is not "shall
+  ignore the additional coefficients". Nothing says what an external rate of 96 kHz does to a stream at
+  48 kHz, or to one at 96 kHz decoded at 192.
+- **Reading:** a substream with `sf_multiplier` decodes at its own sampling frequency, 96 000 or 192 000 Hz:
+  `DecodedFrame::sample_rate_hz` says so, and so do `PresentationInfo::sample_rate_hz` and the blocks of
+  `decode_by_block()`. A frame is Table 83's frame_length for the rate, twice or four times `frame_len_base`,
+  of blocks Tables 99 to 105 give, with the band tables of Annex B for the longer length (Tables B.2 and B.3
+  and the 96 and 192 kHz columns of B.4 to B.7). A stream at 48 kHz is not converted to a higher rate. This
+  decoder is capable of the higher rates, so it does not offer the core alone at 48 kHz.
+- **Evidence:** Text.
+
+### A 96 or 192 kHz substream with no HSF extension substream
+
+- **Where:** Part 1 4.2.4.3, p. 34 ("in case a substream is coded in 96/192 kHz, this additional substream holds
+  the scale factor and spectral data beyond 24 kHz"); 4.3.6.2.1, p. 87 ("if a high sampling frequency extension
+  is not present in the presentation, which is signalled by b_hsf_ext = 0, the transform length indicated in
+  table 106 shall be used"); 5.4, p. 184.
+- **Reading:** such a substream is refused (`DecodeError::kUnsupported`, "a 96 kHz or 192 kHz substream whose HSF
+  extension substream could not be read"). Table 106 for b_hsf_ext = 0 suggests the substream is then coded at the
+  base rate's block lengths, but Table 89 gives it the higher rate; the text does not say which holds, and
+  either would be a decode of something the text does not define. The same holds for an extension linked from a
+  substream with no `sf_multiplier`.
+- **Evidence:** Text.
+
+### The widths of max_sfb at 96 and 192 kHz
+
+- **Where:** Part 1 4.3.6.2.1, pp. 87 and 88: with `b_hsf_ext` the `n_msfb_bits` and `n_msfbl_bits` of the
+  high sampling frequency's transform length come from Table 107 or 108, where Table 106 gives the base
+  rate's.
+- **Reading:** `max_sfb` and the LFE's are read at the width Table 106 gives the base length, which is the width
+  Table 107 gives twice that length and Table 108 four times it, for every length of the three tables (held in
+  `tests/ac4dec/test_ac4dec_hsf.cpp`). `n_side_bits` has no HSF column and is not used at these rates.
+- **Evidence:** Text.
+
+### Scale factors and noise levels across an HSF extension
+
+- **Where:** Part 1 Tables 41 and 42 (p. 47), 42b and 42c (pp. 48 and 49), Pseudocodes 21 to 23 (pp. 142 to
+  145): each loops over the groups with `get_max_sfb(g)`, where the extension's own bands start at
+  `num_sfb_48` and run to `get_max_sfb_hsf(g)` (Pseudocode 18, p. 138). The text gives no Pseudocode 21, 22 or 23
+  for a track with an extension, and says only (5.1.3.1, 5.1.4.1) that `max_quant_idx` is derived from the
+  extension's spectral data as well.
+- **Reading:** the extension's bands are walked after every group's core bands, in the order the bitstream sends
+  them, with the walk's state carried over: the scale factor of the first extension band with lines is the
+  one before it plus its codeword's difference (the first of all, if the core had none, is
+  `reference_scale_factor`, as Table 42b's `first_scf_found` implies); the noise level of an extension band is the
+  level before it plus its codeword's step, the reference level (Pseudocode 22) the first band with energy of
+  the core's and then the extension's; and the noise generator draws in the same order, a track's core and then
+  its extension, track after track. Every band an extension's `dpcm_sf` and `dpcm_snf` are read for is walked
+  in that order, so a differently ordered walk (each group's core and extension together) would not read its
+  codewords in the order the extension substream holds them. With one window group the two orders are the
+  same.
+- **Evidence:** Text; `tests/ac4dec/test_ac4dec_noise_fill.cpp` holds the order, with one window group and two,
+  to the clauses' steps over a list of bands in this order.
+
+### Stereo processing of the HSF extension's bands
+
+- **Where:** Part 1 4.2.10 (Tables 47 and 48, pp. 51 and 52) and 5.3.2 (Pseudocode 59, p. 174): `chparam_info()`
+  and `sap_data()` give parameters for the bands below `get_max_sfb(g)` alone, which at 48 kHz are the only bands
+  with lines. Table 114, p. 95, gives `sap_mode` 2 as "M/S processing in all scale factor bands". At 96 and
+  192 kHz the bands from `get_max_sfb(g)` to `get_max_sfb_hsf(g)` hold lines too, and no syntax carries
+  parameters for them.
+- **Reading:** the lines of those bands are processed with the parameters Pseudocode 59 gives a band it has
+  none for, `a = d = 1`, `b = c = 0`, except in `sap_mode` 2 of a channel pair or of the matrices of three,
+  four and five channels, which is M/S in every band by Table 114 and so in these (`a = b = c = 1`, `d = -1`),
+  and the same for Table 183's two steps of a 7.X element. The matrices of Tables 178 and 179 and clause
+  5.3.3.4 are applied to those lines with those parameters, as chel_matsel permutes tracks whatever the
+  band. At 44.1 and 48 kHz the lines of these bands are zero and the choice is of no effect.
+- **Evidence:** Text; no `sap_mode` 1 or 3 reading is needed, their bands being outside `ms_used` and
+  `sap_coeff_used` either way. `tests/ac4dec/test_ac4dec_hsf.cpp` holds each of Tables 178 and 179's matrices,
+  and the 7.X steps, to the tones put through the inverse of the printed matrices.
+
+### Frame alignment at 96 and 192 kHz
+
+- **Where:** Part 1 5.6.2 and Table 188, p. 192: "a decoder shall apply a delay between the input and output PCM
+  samples" of `d_pcm` samples by frame rate, so that the control data's delays are whole frames. Part 2 H.3
+  says the decoded samples of tracks at different `sf_multiplier` in a switching set are to be time aligned
+  by the encoder.
+- **Reading:** `d_pcm` times the rate multiplier, the delay in seconds that Table 188 gives the base rate's
+  frame. A stream at 96 or 192 kHz has no QMF domain, hence no 577-sample banks, no history of
+  `ts_offset_hfgen` slots, and no control data to delay (`Decoder::latency_samples()` is `d_pcm` times the
+  multiplier, and the converter's).
+- **Evidence:** Text; the constructed streams' tones come out at the decoder's delay so read.
+
+### The sample rate converter at 96 and 192 kHz
+
+- **Where:** Part 1 6.2.15, p. 268, and Part 2 4.8.8: the converter uses Table 83's ratio at all three external
+  rates, and Table 47 (Part 2, p. 110) lists the sample counts at 48 kHz alone.
+- **Reading:** the converter of "The sample rate converter's filter and output grid", on the samples at the
+  substream's rate, with the same ratio and the same phase locked to `sequence_counter`. Its filter is
+  designed relative to the input rate, so the transition band is at the same fraction of the Nyquist
+  frequency. The counts per frame follow from its grid: twice and four times Table 47's over the five phases
+  at the 1000/1001 rates, and a constant count at the others.
+- **Evidence:** Text; the frame counts at every ratio of Table 83 and the frequency each tone comes out
+  at are held in `tests/ac4dec/test_ac4dec_hsf.cpp`.
+
+### The output stages at 96 and 192 kHz
+
+- **Where:** Part 1 5.7.8.1 (dialogue enhancement "operates in the QMF domain"), 5.7.9.1 ("DRC is operated in
+  the QMF domain"), 5.7.9.3.3 (the output level gain as a factor on each QMF sample), 6.2.16 and 6.2.17 (mixing
+  and rendering, equations on samples), 5.4 and 6.2.5.2 (no QMF domain).
+- **Reading:** of what a stream at 96 or 192 kHz leaves of them: the output level gain applies, by
+  2^((Lout - dialnorm) / 6) as a scalar on the samples, the last dialnorm the stream sent holding where it
+  sends none, and the downmix applies, as the matrix of 6.2.17 on the samples. Dialogue enhancement where the
+  stream sends parameters and the system asks for a gain, the compression curve and transmitted gains of
+  DRC (which are per QMF band and slot), the mixing of a presentation's substreams, and the audio spectral
+  frontend's alternatives (below) are refused with `DecodeError::kUnsupported` and a reason that names
+  them, per frame; `DrcMode::kOff` leaves the output level gain alone, and a stream that sends no DRC
+  configuration or no dialogue enhancement is unaffected by either.
+- **Evidence:** Text; the gain and the downmix are held to the matrices and the gain in
+  `tests/ac4dec/test_ac4dec_hsf.cpp`.
+
+### What a stream at 96 or 192 kHz may carry
+
+- **Where:** Part 1 5.4's NOTE, p. 184 (no QMF domain tool), and Table 36a, which sends the extension for the
+  audio spectral frontend's tracks alone.
+- **Reading:** mono, 3.0, 5.X and 7.X channel elements and the channel pair in SIMPLE codec mode, with the
+  ASF. The A-SPX and A-CPL codec modes, the speech spectral frontend, the immersive and 22.2 elements, and
+  object audio are refused by name. Part 2 gives no decoding text for them at these rates.
+- **Evidence:** Text.
+
 ## Output processing
 
 What the QMF domain's matrices go through before synthesis, dialogue enhancement (Part 1 5.7.8), the
@@ -1676,7 +2191,8 @@ it, whose substreams carry a tone each (`tests/ac4dec/test_ac4dec_presentations.
   one its table defines (Table 55: 0 to 3 and 7; Table 86: 0 to 4 and 7) and no more than the decoder's
   level, the stream has not disabled it, it carries audio (a single substream or group, or
   presentation_config 0 to 5), and the decoder decodes all of it: every substream channel-coded, in a
-  channel mode it renders, at 48 or 44.1 kHz, and none a fragment of the efficient high frame rate mode.
+  channel mode it renders, at 48 or 44.1 kHz, and none a fragment of the efficient high frame rate mode that
+  was not assembled (a presentation of another fraction than the selected one's).
   md_compat 7 is above every level Table 55 defines, so it is selected only by a decoder told its level
   is 7. The default level is 3.
 - **Evidence:** Text; the selection table's cases, which both transcriptions take.
@@ -2206,7 +2722,9 @@ enhancement methods 1 to 3 and alternative presentations among it. The construct
 transcriptions read them alike. To compare the two transcriptions on the rest, both read streams made for
 the purpose: DEE frames with one substream altered (a random tail from a random bit, a few flipped bits,
 or a random codec mode), and tables of contents built for the channel modes no encoder here writes, over
-random payloads, a quarter of them for a group of A-JOC and direct-coded object substreams. Wherever
+random payloads, a quarter of them for a group of A-JOC and direct-coded object substreams, and a third
+of the single-instance Part 1 modes at 96 or 192 kHz with an HSF extension substream; the constructed
+streams under `tests/golden/ac4-hsf/` are among those mutated. Wherever
 both read a substream to its end their traces must agree record for record, and where either stops they must agree up to that point. The two transcriptions still stop at different
 elements on some corrupt input, since each checks some values at a different point, which the check
 reports separately. The script is `tools/checks/ac4_syntax_differential.py`, which the nightly

@@ -200,7 +200,8 @@ and A-CPL data, `metadata()` with DRC and dialogue enhancement, EMDF payload sub
 channel-coded substream's HSF extension (#786). It refused, by name, the speech frontend, the
 immersive and 22.2 elements, object substreams, and the efficient high frame rate mode. Since then
 D2 to D10 made it decode all of them but the speech frontend, the 9.X.4 and 22.2 layouts and the
-efficient high frame rate mode, which it still refuses; the header
+efficient high frame rate mode; 22.2 has been decoded since (in full decoding, as coded), and so
+have the 9.X.4 modes (in full and core decoding), and the rest it still refuses; the header
 `src/ac4dec/include/iclforge/ac4dec/decoder.hpp` says what it decodes and what it refuses.
 `src/ac4dec/ERRATA.md` records every reading taken where the text is ambiguous or defective, with
 its evidence.
@@ -1784,7 +1785,8 @@ and core decoding.
   others.
 - 7.1.4 with every channel present, which DEE cannot write: the same element with the back channels
   present, tested on constructed streams and then on E8's.
-- 22.2 and 9.X.4 are refused.
+- 22.2 and 9.X.4 are refused. (22.2 is decoded since: the 22.2 element in full decoding, as coded;
+  and the 9.X.4 modes, in full and core decoding, on constructed streams alone.)
 - D9 found the element's text at odds with itself in three places, each read by the rest of the
   text: Table 19's track numbers are names, not the order the syntax reads the elements in; the
   EXAMPLE after it assigns the first pair of grouping 1 against the table; step 4's NOTE 2 names F'
@@ -4392,7 +4394,8 @@ outright, with no compatibility shim.
 - 96 and 192 kHz, the HSF extension, beyond its syntax: the decoder reads it (D1) and refuses to
   decode such a substream, so its output is 48 kHz, or 44.1 kHz at index 13 (a 48 kHz decoder may
   ignore the extension, Part 1 4.2.4.3 and 5.4), and the encoder takes 48 and 44.1 kHz input alone.
-- 22.2 and 9.X.4, until a stream exists.
+- 9.X.4's own streams: the modes are decoded, as 22.2 is, without one, and checked on constructed
+  streams alone.
 - Presentations spread over several elementary streams (Part 2 5.1.2), and the efficient high frame
   rate mode (Part 2 5.1.3), in either direction, until a stream uses them.
 - The speech spectral frontend: in the decoder until a stream uses it (decision 2); in the encoder

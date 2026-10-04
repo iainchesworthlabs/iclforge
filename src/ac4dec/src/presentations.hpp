@@ -56,6 +56,9 @@ struct Member {
     int ch_mode = -1;             // -1 for a reserved channel mode, and for object audio
     bool iframe = false;          // b_iframe or b_audio_ndot of the substream (the first instance)
     Coding coding = Coding::kChannel;
+    // 1 at 44.1 and 48 kHz, 2 at 96 kHz and 4 at 192 kHz (Part 1 Table 89's sf_multiplier): the
+    // factor the substream's sampling frequency is of the stream's base rate.
+    int rate_multiplier = 1;
 };
 
 // What decode() needs of a presentation.

@@ -32,7 +32,9 @@
 //   the immersive element       four modules, on (Ls, Lb), (Rs, Rb), (Tfl,
 //                               Tbl) and (Tfr, Tbr), in full decoding (ETSI
 //                               TS 103 190-2 V1.3.1 clause 5.5.2, Table 25
-//                               and Pseudocode 2).
+//                               and Pseudocode 2), and with b_5fronts (the
+//                               9.X.4 modes) two more, on (L, Lscr) and (R,
+//                               Rscr).
 //
 // The core (acpl/acpl.hpp) holds the decorrelators, the transient ducker and
 // interpolation. src/ac4dec/ERRATA.md records the readings taken, under
@@ -40,8 +42,9 @@
 
 namespace iclforge::ac4::detail {
 
-// The most acpl_data_1ch() one element carries: the immersive element's four.
-inline constexpr std::size_t kMaxAcplModules = 4;
+// The most acpl_data_1ch() one element carries: the immersive element's four, six
+// with b_5fronts.
+inline constexpr std::size_t kMaxAcplModules = 6;
 
 // One acpl_data_1ch(), dequantised: the parameters of one module.
 struct AcplModuleValues {
@@ -136,8 +139,9 @@ class AcplStage {
     void decorrelate(int decorrelator, std::span<const QmfValue> in, std::span<QmfValue> out, int num_ts);
 
     // D0, D1 and D2, then the second instances of D0 and D1 the immersive
-    // element's four modules take (Pseudocode 2): kDecorrelatorSlots.
-    static constexpr std::size_t kDecorrelatorSlots = acpl::kDecorrelators + 2;
+    // element's four modules take and of D2 its two more take with b_5fronts
+    // (Pseudocode 2): kDecorrelatorSlots.
+    static constexpr std::size_t kDecorrelatorSlots = acpl::kDecorrelators + 3;
     // Each made when a module first takes it, 11 KB at the float and fixed tiers: a channel
     // pair takes one of the five. A new one is in reset()'s state.
     std::array<std::unique_ptr<acpl::Decorrelator<Real>>, kDecorrelatorSlots> decorrelators_;

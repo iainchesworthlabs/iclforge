@@ -951,11 +951,12 @@ channel-coded audio substreams in the Part 1 channel elements (ASF spectral data
 companding, A-SPX and A-CPL data, and `metadata()` with its DRC and dialogue enhancement), a
 channel-coded substream's HSF extension substream where one resolves to a distinct, readable
 substream (the additional scale factor bands, spectral data and noise fill above 24 kHz a 96 kHz or
-192 kHz substream carries), the immersive element of the 7.X.4 channel modes, object substreams
+192 kHz substream carries, which it decodes to PCM at that rate in the SIMPLE codec mode), the immersive element of the 7.X.4 and 9.X.4 channel modes, object substreams
 (A-JOC and direct-coded objects, with their object audio metadata), and EMDF payload substreams.
-It refuses, with a named reason, the speech spectral frontend, the 9.X.4 channel modes and the
-22.2 channel element, an intermediate spatial format mixed into channels Annex A.2.1 has no
-matrix for, a 96/192 kHz substream whose HSF extension substream could not be resolved, and a
+It decodes the speech spectral frontend (Part 1 clause 5.2) from the text alone, the syntax and
+the arithmetic coded data in one pass, checked against a second transcription
+(`tools/references/ssf_ref.py`) on random streams. The decode at 96 and 192 kHz is checked on streams built from the text alone (`tests/ac4dec/ac4dec_hsf.cpp`): tones above 24 kHz come back at their frequency and level through every transform length, grouping and channel element, the second transcription reads the committed streams alike, and no real stream at these rates exists. It refuses, with a named reason, core decoding of the 22.2 channel element and its rendering to any layout but as coded (Part 2 has neither), an intermediate spatial format mixed into channels Annex A.2.1 has no
+matrix for, a 96/192 kHz substream whose HSF extension substream could not be resolved, at 96 and 192 kHz A-SPX and A-CPL, the speech spectral frontend, the immersive and 22.2 elements, objects, mixing, dialogue enhancement and DRC's compression, and a
 substream no element of the table of contents names.
 
 With no reference output to compare against, the syntax is transcribed twice, separately, from the
@@ -1129,7 +1130,9 @@ without the factor of two its informative example mentions, decodes DEE's stream
 full scale at 2^15. Phase D3 settled two more: A-SPX's envelopes read at that scale, and companding
 measures its levels against full scale 1.0. Those and the other readings reconstruction takes are in
 `src/ac4dec/ERRATA.md`, under "Reconstruction" and "The QMF domain". None of the streams here, from DEE
-or anyone else, sets `b_snf_data_exists`, so the noise fill is decoded from the text alone.
+or anyone else, sets `b_snf_data_exists`, so the noise fill is decoded from the text alone. A unit
+test (`tests/ac4dec/test_ac4dec_noise_fill.cpp`) holds its levels, escape and draw order to
+Pseudocodes 22 and 23 on a hand-built track.
 
 **Locally, over the census.** With `AC4DEC_GOLDEN_DIR` and `AC4DEC_STREAM_DIR` set, the same test
 compares the decoder with the Python parser's digests of any other set of streams. Over the 107 DEE
@@ -1267,6 +1270,39 @@ reading is in `src/ac4dec/ERRATA.md`, under "Presentations".
   puts out silence for 15 and 16 presentations over 22 and 23 substreams, and refuses
   `bitstream_version` 1 ("not yet implemented"), which the version 0 stream is. Part 2 bounds none of
   these counts.
+
+### The decoder's 9.X.4 modes
+
+The 9.X.4 modes (Part 2 6.2.4.1 with `b_5fronts`) have no oracle outside the project. Five constructed
+streams (`tests/golden/ac4dec/constructed/9_*.ac4`) carry a distinct tone per channel; both transcriptions
+of the syntax read them to the same digests, and the decoder puts each tone on its channel in full and core
+decoding. The differential check compares the transcriptions on 600 streams. Unit tests hold S-CPL, A-SPX
+gains, A-CPL's six modules, the core dialogue enhancement interpolation, the renderer's 9.X rows (a second
+transcription, as printed) and DRC's groups, and each was mutation-checked. The float and fixed-point
+agreement floors are in `tests/golden/ac4dec/scalar-agreement*.json`. These show the decoder does what the
+readings in `src/ac4dec/ERRATA.md` ("The 9.X.4 element") say, not that they are what an encoder meant.
+
+### The decoder's 22.2 element
+
+The 22.2 element (Part 2 6.2.4.3, Tables 8 and 21 and Annex A.3) has no oracle outside the project: DEE
+does not write it (planning/ac4.md, "What DEE writes"), no stream of it is public, and librempeg does not
+decode it. What checks it is the standard's own tables and the project's two transcriptions:
+
+- **The syntax, in both transcriptions** (`tests/ac4dec/test_ac4dec_channel_elements.cpp`,
+  `test_ac4dec_syntax.cpp`): the element in SIMPLE and ASPX, with 24 tracks, eleven `aspx_data_2ch()` and
+  the stereo flags of each pair, and two constructed streams (`22_2-simple-alternating`,
+  `22_2-aspx-unit7-lr`) whose digests `tools/references/ac4_syntax.py` wrote and the decoder reproduces.
+  `ac4_syntax_differential.py` includes the channel mode among its synthetic tables of contents.
+- **Each tone on its channel** (`tests/ac4dec/test_ac4dec_constructed.cpp`): the 24 tones are coded by
+  the test's own transcription of Table 21, with every pair's stereo processing on, off and alternating,
+  and each decodes on its own channel in Table A.27's order, the LFEs included, 60 dB over the others.
+  A-SPX fills the two channels of the `aspx_data_2ch()` that asks for it and no other, by Table 8's pairs.
+  The refusals (core decoding and every `DownmixTarget` but as coded) are tested by name.
+- **DRC and levels** (`tests/ac4dec/test_ac4dec_drc.cpp`): transmitted gains apply by Table 69's four
+  groups to the 24 channels, and neither LFE moves the level detector.
+
+These show that the decoder does what the readings in `src/ac4dec/ERRATA.md` ("The 22.2 element") say,
+not that they are what an encoder meant.
 
 ### The decoder's immersive element
 

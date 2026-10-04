@@ -97,33 +97,69 @@ constexpr std::array<CodebookSet, 4> kCoarseCodebooks = {{
 
 }  // namespace
 
-ParseResult parse_ajcc_data(BitReader& r, AjccData& out) {
+ParseResult parse_ajcc_data(BitReader& r, bool b_5fronts, AjccData& out) {
     out = AjccData{};
+    out.b_5fronts = b_5fronts;
     out.b_no_dt = r.read_flag("b_no_dt");
     out.num_param_bands_id = u8(r.read(2, "ajcc_num_param_bands_id"));
     out.num_bands = kNumParamBands[out.num_param_bands_id];
-    // b_5fronts is 0: ajcc_core_mode, ajcc_qm_ab and ajcc_qm_dw, then the
-    // framing of the left and right modules.
-    out.core_mode = u8(r.read(1, "ajcc_core_mode"));
-    out.qm_ab = u8(r.read(1, "ajcc_qm_ab"));
-    out.qm_dw = u8(r.read(1, "ajcc_qm_dw"));
-    for (AjccFraming& framing : out.framing) {
-        if (auto result = parse_framing(r, framing); !result) {
-            return result;
-        }
-    }
-    const std::uint8_t nps_l = out.framing[0].num_param_sets;
-    const std::uint8_t nps_r = out.framing[1].num_param_sets;
     const std::size_t bands = out.num_bands;
-    // 6.2.6.1's order: alpha1 (L), alpha2 (R), beta1 (L), beta2 (R) at
-    // ajcc_qm_ab; dry1 and dry2 (L), dry3 and dry4 (R), wet1 to wet3 (L) and
-    // wet4 to wet6 (R) at ajcc_qm_dw.
     struct Step {
         AjccParams* params;
         AjccDataType type;
         std::uint8_t quant;
         std::uint8_t num_ps;
     };
+    if (b_5fronts) {
+        // ajcc_qm_f and ajcc_qm_b, then the four modules' framing data, then
+        // the dry and wet parameters of the front modules (at ajcc_qm_f) and the
+        // back modules (at ajcc_qm_b): 6.2.6.1's order.
+        out.qm_f = u8(r.read(1, "ajcc_qm_f"));
+        out.qm_b = u8(r.read(1, "ajcc_qm_b"));
+        for (std::size_t k = 0; k < kAjccMaxFramings; ++k) {
+            if (auto result = parse_framing(r, out.framing[k]); !result) {
+                return result;
+            }
+        }
+        const auto nps = [&out](std::size_t module) { return out.framing[module].num_param_sets; };
+        // The module a parameter belongs to: dry1 and dry2 are the left module's, dry3 and dry4
+        // the right's, wet1 to wet3 the left's and wet4 to wet6 the right's; front, then back.
+        std::array<Step, kAjccMaxDry + kAjccMaxWet> steps{};
+        std::size_t n = 0;
+        for (std::size_t k = 0; k < kAjccMaxDry; ++k) {
+            const std::size_t module = (k / 4) * 2 + (k % 4) / 2;  // lf, rf, lb, rb
+            steps[n++] = {&out.dry[k], AjccDataType::kDry, k < 4 ? out.qm_f : out.qm_b,
+                          nps(module)};
+        }
+        for (std::size_t k = 0; k < kAjccMaxWet; ++k) {
+            const std::size_t module = (k / 6) * 2 + (k % 6) / 3;
+            steps[n++] = {&out.wet[k], AjccDataType::kWet, k < 6 ? out.qm_f : out.qm_b,
+                          nps(module)};
+        }
+        for (const Step& step : steps) {
+            if (auto result = parse_ajced(r, step.type, bands, step.quant, out.b_no_dt, step.num_ps,
+                                          *step.params);
+                !result) {
+                return result;
+            }
+        }
+        return check(r);
+    }
+    // b_5fronts is 0: ajcc_core_mode, ajcc_qm_ab and ajcc_qm_dw, then the
+    // framing of the left and right modules.
+    out.core_mode = u8(r.read(1, "ajcc_core_mode"));
+    out.qm_ab = u8(r.read(1, "ajcc_qm_ab"));
+    out.qm_dw = u8(r.read(1, "ajcc_qm_dw"));
+    for (std::size_t k = 0; k < 2; ++k) {
+        if (auto result = parse_framing(r, out.framing[k]); !result) {
+            return result;
+        }
+    }
+    const std::uint8_t nps_l = out.framing[0].num_param_sets;
+    const std::uint8_t nps_r = out.framing[1].num_param_sets;
+    // 6.2.6.1's order: alpha1 (L), alpha2 (R), beta1 (L), beta2 (R) at
+    // ajcc_qm_ab; dry1 and dry2 (L), dry3 and dry4 (R), wet1 to wet3 (L) and
+    // wet4 to wet6 (R) at ajcc_qm_dw.
     const std::array<Step, 14> steps = {{
         {&out.alpha[0], AjccDataType::kAlpha, out.qm_ab, nps_l},
         {&out.alpha[1], AjccDataType::kAlpha, out.qm_ab, nps_r},

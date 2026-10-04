@@ -11,8 +11,9 @@
 // and 4.2.8, semantics 4.3.6) and stereo audio processing's (4.2.10, 4.3.8):
 // sf_info, sf_info_lfe, sf_data, chparam_info and sap_data.
 //
-// The speech spectral frontend is refused where sf_info or sf_data would
-// select it (DecodeError::kUnsupported); see ac4dec/decoder.hpp.
+// The speech spectral frontend has no sf_info() fields and is read by
+// parse_ssf_data() (syntax/ssf.hpp), which the channel elements call in place
+// of parse_sf_data() for a track that selects it.
 
 namespace iclforge::ac4::detail {
 
@@ -47,7 +48,7 @@ struct AsfPsyInfo {
 
 struct SfInfo {
     bool is_lfe = false;       // read by sf_info_lfe()
-    int spec_frontend = 0;     // 0 = ASF; SSF is refused before an SfInfo is kept
+    int spec_frontend = 0;     // 0 = ASF, 1 = SSF (Table 94)
     AsfPsyInfo psy{};
 };
 

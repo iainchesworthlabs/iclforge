@@ -1,0 +1,14 @@
+# ac4-syntax-digest/1 ../ac4-hsf/stereo-96-sap2.ac4
+# frame	substream	kind	records	end_bit	crc32
+0	0	audio	335	1598	0x34718546
+0	1	hsf_ext	289	956	0xe66977b3
+0	2	presentation	7	17	0xc6b2acd5
+1	0	audio	315	1518	0xead3e929
+1	1	hsf_ext	291	946	0xa892ee97
+1	2	presentation	7	17	0xc6b2acd5
+2	0	audio	307	1478	0x85f8cfd5
+2	1	hsf_ext	295	980	0x44f3b4d8
+2	2	presentation	7	17	0xc6b2acd5
+3	0	audio	335	1598	0x667b6eb1
+3	1	hsf_ext	287	928	0xdd80ce35
+3	2	presentation	7	17	0xc6b2acd5

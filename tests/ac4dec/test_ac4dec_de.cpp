@@ -339,3 +339,188 @@ TEST_CASE("DEE's dialogue enhancement leaves the output alone at 0 dB and raises
     };
     CHECK(10.0 * std::log10(energy(enhanced[0]) / energy(plain[0])) > 1.0);
 }
+
+// --- 9.X.4: Table 15's channels and the core tools of clauses 5.8.2.1 and 5.8.2.2 ------------
+
+namespace {
+
+constexpr std::array<iclforge::ac4::Speaker, 5> kScreenFront = {
+    iclforge::ac4::Speaker::kLeft, iclforge::ac4::Speaker::kRight, iclforge::ac4::Speaker::kCentre,
+    iclforge::ac4::Speaker::kLeftScreen, iclforge::ac4::Speaker::kRightScreen};
+
+detail::DeCoreCoefficients core_coefficients(double c_left, double c_right, int bands = 15) {
+    detail::DeCoreCoefficients out;
+    out.num_bands = bands;
+    for (auto& set : out.values[0]) {
+        set.fill(c_left);
+    }
+    for (auto& set : out.values[1]) {
+        set.fill(c_right);
+    }
+    return out;
+}
+
+struct CoreRun {
+    std::array<std::vector<QmfValue>, 3> m;
+    std::array<std::vector<QmfValue>, 3> delta;
+    std::array<QmfMatrix, 3> m_views;
+    std::array<std::span<QmfValue>, 3> delta_views;
+
+    explicit CoreRun(unsigned seed) {
+        for (std::size_t c = 0; c < 3; ++c) {
+            m[c] = random_matrix(seed + static_cast<unsigned>(c));
+            delta[c].assign(kValues, QmfValue{});
+            m_views[c] = m[c];
+            delta_views[c] = delta[c];
+        }
+    }
+    CoreRun(const CoreRun&) = delete;
+    CoreRun& operator=(const CoreRun&) = delete;
+};
+
+double ratio_at(const CoreRun& run, std::size_t out, std::size_t in, int slot, int subband) {
+    const auto at = static_cast<std::size_t>(slot * 64 + subband);
+    return static_cast<double>(run.delta[out][at].real()) /
+           static_cast<double>(run.m[in][at].real());
+}
+
+}  // namespace
+
+TEST_CASE("9.X.4's dialogue enhancement channels are Lscr, Rscr and C", "[ac4dec][de]") {
+    // Part 2 Table 15: with the screen pair present, L and R are not the dialogue's channels.
+    detail::DeStage stage;
+    stage.configure(kSlots, kScreenFront);
+    const detail::DeFrameValues values = channel_independent({true, true, true}, 9.0);
+    const double g = std::pow(10.0, 9.0 / 20.0) - 1.0;
+    Channels first(kScreenFront.size(), 3);
+    stage.process(12.0, values, first.pointers);
+    Channels channels(kScreenFront.size(), 5);
+    const auto before = channels.data;
+    stage.process(12.0, values, channels.pointers);
+    // L and R (channels 0, 1) pass; C (2) takes the third parameter set, Lscr (3) the first, Rscr
+    // (4) the second.
+    const std::array<int, 5> parameter = {-1, -1, 2, 0, 1};
+    for (std::size_t c = 0; c < kScreenFront.size(); ++c) {
+        for (int slot = 0; slot < kSlots; slot += 7) {
+            const auto at = static_cast<std::size_t>(slot * 64 + 5);  // band 3
+            const double got = static_cast<double>(abs(channels.data[c][at]) / abs(before[c][at]));
+            const double expected =
+                parameter[c] < 0 ? 1.0
+                                 : 1.0 + g * values.p[static_cast<std::size_t>(parameter[c])][3];
+            INFO("channel " << c);
+            CHECK(std::abs(got - expected) < kTolerance);
+        }
+    }
+}
+
+TEST_CASE("core decoding takes the second de_data() when b_de_simulcast says so", "[ac4dec][de]") {
+    // Part 2 clause 4.8.3.15.
+    detail::DialogEnhancement de;
+    de.b_de_data_present = true;
+    de.de_nr_channels = 1;
+    de.config.de_channel_config = 1;
+    de.config.de_max_gain = 2;
+    de.data.de_par[0].fill(10);       // 1.0
+    de.core_data.de_par[0].fill(20);  // 3.0 (Table 209)
+    CHECK(detail::de_frame_values(de, false).p[0][0] == 1.0);
+    CHECK(detail::de_frame_values(de, true).p[0][0] == 1.0);  // no simulcast: the one set
+    de.b_de_simulcast = true;
+    CHECK(detail::de_frame_values(de, false).p[0][0] == 1.0);
+    CHECK(detail::de_frame_values(de, true).p[0][0] == detail::de_parameter(20, false));
+    CHECK(detail::de_frame_values(de, true).p[0][0] != 1.0);
+}
+
+TEST_CASE("the core tool's C input ramps one smooth set by (ts + 1) / N from nothing, then holds",
+          "[ac4dec][de]") {
+    // Pseudocode 20, ch2 = 2 (the constant 1): no A-CPL or A-JCC set in the way.
+    detail::DeCoreStage stage;
+    stage.configure(kSlots);
+    const detail::DeFrameValues values = channel_independent({false, false, true}, 9.0);
+    const double g = std::pow(10.0, 9.0 / 20.0) - 1.0;
+    const detail::DeCoreCoefficients coefficients = core_coefficients(0.5, 0.25);
+    CHECK(stage.active(9.0, values));
+    CoreRun first(21);
+    stage.process(9.0, values, coefficients, first.m_views, first.delta_views);
+    for (int slot = 0; slot < kSlots; ++slot) {
+        const double expected = (slot + 1.0) / kSlots * g * values.p[0][3];
+        CHECK(std::abs(ratio_at(first, 2, 2, slot, 5) - expected) < kTolerance);  // band 3
+        // L and R get nothing: they are not enhanced, and C's input does not feed them.
+        CHECK(first.delta[0][static_cast<std::size_t>(slot * 64 + 5)] == QmfValue{});
+        CHECK(first.delta[1][static_cast<std::size_t>(slot * 64 + 5)] == QmfValue{});
+    }
+    // Subbands above the 41st have no parameters.
+    CHECK(first.delta[2][static_cast<std::size_t>(5 * 64 + 50)] == QmfValue{});
+    CoreRun second(31);
+    stage.process(9.0, values, coefficients, second.m_views, second.delta_views);
+    for (int slot = 0; slot < kSlots; ++slot) {
+        CHECK(std::abs(ratio_at(second, 2, 2, slot, 5) - g * values.p[0][3]) < kTolerance);
+    }
+    // Gain 0 ramps back down to nothing and then the stage is idle.
+    CoreRun third(41);
+    stage.process(0.0, values, coefficients, third.m_views, third.delta_views);
+    CHECK(std::abs(ratio_at(third, 2, 2, kSlots - 1, 5)) < kTolerance);
+    CHECK(std::abs(ratio_at(third, 2, 2, 0, 5) - (1.0 - 1.0 / kSlots) * g * values.p[0][3]) <
+          kTolerance);
+    CHECK_FALSE(stage.active(0.0, values));
+}
+
+TEST_CASE("the core tool's A'' and B'' inputs carry C_L and C_R, smooth over two sets",
+          "[ac4dec][de]") {
+    // Pseudocode 20, two smooth sets: to the first set's matrix at the first half's end, then on to
+    // the frame's.
+    detail::DeCoreStage stage;
+    stage.configure(kSlots);
+    const detail::DeFrameValues values = channel_independent({true, true, false}, 9.0);
+    const double g = std::pow(10.0, 9.0 / 20.0) - 1.0;
+    detail::DeCoreCoefficients coefficients = core_coefficients(0.0, 0.0);
+    coefficients.framing[0].num_param_sets = 2;
+    coefficients.framing[1].num_param_sets = 1;
+    for (std::size_t b = 0; b < 15; ++b) {
+        coefficients.values[0][0][b] = 0.5;
+        coefficients.values[0][1][b] = 1.0;
+        coefficients.values[1][0][b] = 0.25;  // one set: only [0] is read
+    }
+    CoreRun run(51);
+    stage.process(9.0, values, coefficients, run.m_views, run.delta_views);
+    const double de_l = g * values.p[0][3];
+    const double de_r = g * values.p[1][3];
+    // A'' feeds L; slot 15 ends the first half, where the enhancement has reached 16 / 32 of the
+    // frame's, times the first set's 0.5; slot 31 the frame's end, times the second set's 1.
+    CHECK(std::abs(ratio_at(run, 0, 0, 15, 5) - 16.0 / 32.0 * de_l * 0.5) < kTolerance);
+    CHECK(std::abs(ratio_at(run, 0, 0, 31, 5) - de_l) < kTolerance);
+    CHECK(std::abs(ratio_at(run, 0, 0, 7, 5) - 8.0 / 16.0 * (16.0 / 32.0 * de_l * 0.5)) <
+          kTolerance);
+    CHECK(std::abs(ratio_at(run, 0, 0, 23, 5) -
+                   (16.0 / 32.0 * de_l * 0.5 + 8.0 / 16.0 * (de_l - 16.0 / 32.0 * de_l * 0.5))) <
+          kTolerance);
+    // B'' feeds R with its own framing: the one set, end to end.
+    CHECK(std::abs(ratio_at(run, 1, 1, 31, 5) - de_r * 0.25) < kTolerance);
+    CHECK(std::abs(ratio_at(run, 1, 1, 15, 5) - 16.0 / 32.0 * de_r * 0.25) < kTolerance);
+}
+
+TEST_CASE("the core tool's steep interpolation switches coefficient at its parameter timeslots",
+          "[ac4dec][de]") {
+    detail::DeCoreStage stage;
+    stage.configure(kSlots);
+    const detail::DeFrameValues values = channel_independent({true, false, false}, 9.0);
+    const double g = std::pow(10.0, 9.0 / 20.0) - 1.0;
+    detail::DeCoreCoefficients coefficients = core_coefficients(0.0, 0.0);
+    coefficients.framing[0] = {.steep = true, .num_param_sets = 2, .param_timeslot = {8, 20}};
+    for (std::size_t b = 0; b < 15; ++b) {
+        coefficients.values[0][0][b] = 0.5;
+        coefficients.values[0][1][b] = 1.0;
+    }
+    CoreRun run(61);
+    stage.process(9.0, values, coefficients, run.m_views, run.delta_views);
+    const double de = g * values.p[0][3];
+    // Before the first timeslot the coefficient of the frame before, 0, holds; at the timeslot the
+    // new coefficient takes the enhancement the slot has; the last slot has the frame's.
+    for (int slot = 0; slot < 8; ++slot) {
+        CHECK(std::abs(ratio_at(run, 0, 0, slot, 5)) < kTolerance);
+    }
+    CHECK(std::abs(ratio_at(run, 0, 0, 8, 5) - 9.0 / 32.0 * de * 0.5) < kTolerance);
+    CHECK(std::abs(ratio_at(run, 0, 0, 20, 5) - 21.0 / 32.0 * de * 1.0) < kTolerance);
+    CHECK(std::abs(ratio_at(run, 0, 0, 31, 5) - de) < kTolerance);
+    // The last slot before the second timeslot is on its way to the first set's value there.
+    CHECK(std::abs(ratio_at(run, 0, 0, 19, 5) - 20.0 / 32.0 * de * 0.5) < kTolerance);
+}

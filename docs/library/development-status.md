@@ -142,15 +142,16 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | Audio PCM decode (inspector) | 🔴 | High | Essential | By design — content is byte ranges only; see **Decoder** below for `iclforge::ac4dec` PCM output |
 | **Decoder (`iclforge::ac4dec`)** | Presentation + channel-coded syntax | 🟢 | High | Essential | Every syntax element of the presentation substream, the channel elements and the EMDF substreams, in two transcriptions (C++ and `tools/references/ac4_syntax.py`) whose traces agree record for record on every committed stream, in CI |
 | | ASF / ASPX / A-CPL / metadata() | 🟢 | High | Essential | DEE's digests pinned in CI; the same dual transcription against Python |
-| | Channel-coded paths without fixtures | 🟡 | Medium | Optional | Noise fill, VARVAR ASPX, time-interleaved ASPX, the mono element, alt presentations, transmitted DRC gains — transcribed, oracle-poor; 3.0, 7.X and every A-CPL mode read on constructed streams |
-| | EMDF payload substreams (syntax) | 🟡 | Medium | Important | Syntax only |
+| | Channel-coded paths without fixtures | 🟡 | Medium | Optional | Noise fill, VARVAR ASPX, time-interleaved ASPX, the mono element, alt presentations, transmitted DRC gains — transcribed, oracle-poor; 3.0, 7.X and every A-CPL mode read on constructed streams. The noise fill's band levels, escape and draw order are held to Pseudocodes 22 and 23 on a hand-built track; no stream sets `b_snf_data_exists`, so no reference decode exists |
+| | EMDF payload substreams | 🟢 | Medium | Important | Read, and each payload's id and bytes handed to the caller in the substream's report (`SubstreamReport::emdf_payloads`), from an EMDF payloads substream and from an audio substream's `metadata()`; the decoder does not interpret a payload |
 | | Dialogue enhancement PCM apply | 🟢 | Medium | Important | Part 1 5.7.8's four methods in the QMF domain, from 0 dB to the stream's cap; 0 dB is the tool bypassed, sample for sample, and the parsed gains apply to 0.01 dB; the channel-independent method on DEE's streams, the others on constructed data; the hybrid methods take their waveform from the presentation's dialogue enhancement substream; `forge decode dialogue-enhancement=` |
-| | Speech spectral frontend (SSF) | 🔴 | Low | Nice-to-have | Refused `kUnsupported` |
+| | Speech spectral frontend (SSF) | 🟡 | Low | Nice-to-have | Part 1 4.2.9 and 5.2 in the mono, stereo and A-CPL stereo elements, SIMPLE or ASPX, long and short stride, the predictor and the arithmetic decoder, with Annex C's tables generated from the attachment. Decoded from the text alone, in two transcriptions that agree on random streams (the bits each frame takes, every stride, and every line to 1e-9); the text's defects and the readings taken for them are in `src/ac4dec/ERRATA.md`. No stream uses the tool, so no real stream and no other decoder has checked a reading, and PCM from one is unverified; the encoder does not write it |
 | | Immersive channel element (7.0.4, 7.1.4) | 🟢 | High | Essential | Part 2 6.2.4 to 6.2.6 in both transcriptions; SCPL, ASPX_SCPL, ASPX_ACPL_1, ASPX_ACPL_2 and ASPX_AJCC: 5.2's track assignment, S-CPL, A-SPX's pairing and gains, A-CPL's four modules and A-JCC, in full and core decoding (`iclforge::ac4::DecoderConfig::decoding`); DEE's 5.1.4 in its three modes with each tone on its own channel, the rest on constructed streams; `forge decode decoding=` |
-| | 9.X.4 and 22.2 channel elements | 🔴 | Low | Nice-to-have | Refused `kUnsupported` by name |
-| | Efficient high frame rate mode | 🔴 | Low | Nice-to-have | A frame whose presentation has a `frame_rate_fraction` above 1 has every substream refused `kUnsupported`, naming the mode; the decoder keeps no partial frames (Part 2 5.1.3), and no stream here uses the mode |
+| | 22.2 channel element | 🟡 | Low | Nice-to-have | Part 2 6.2.4.3 in both transcriptions and decoded in full decoding, SIMPLE and ASPX, to 24 channels in Table A.27's order (Table 21's tracks, eleven pairs' stereo processing, A-SPX over the pairs of Table 8, DRC by Table 69), as coded only: core decoding and every other `DownmixTarget` are refused `kUnsupported`. No stream of it and no other decoder exist: constructed streams with a tone on each channel, read by both transcriptions, and the standard's tables are all that check it |
+| | 9.X.4 channel elements | 🟡 | Low | Nice-to-have | Part 2 6.2.4.1 with `b_5fronts` in both transcriptions; SCPL, ASPX_SCPL, ASPX_ACPL_1, ASPX_ACPL_2 and ASPX_AJCC in full and core decoding: 13 tracks with Table 20's six parameters, S-CPL, A-SPX over (L, Lscr) and (R, Rscr), six A-CPL modules, A-JCC's four modules (two in core); Table A.27's order, rendered to 7.X.4 and 5.X by Tables 38 to 43's 9.X rows (no 9.X layout is a target); dialogue enhancement on Lscr, Rscr and C with the core tools of 5.8.2.1 and 5.8.2.2; DRC by Table 69. No stream and no other decoder: five constructed streams with a tone on each channel, read by both transcriptions, are all that check it. Hearth and the ESP32 player refuse a 9.X.4 presentation |
+| | Efficient high frame rate mode | 🟡 | Low | Nice-to-have | Part 2 5.1.3: the decoder holds the fragments of a presentation whose `frame_rate_fraction` is 2 or 4 in the FIFO of Figure 8 and decodes the concatenated unit at Table 18's audio frame rate; `decode()` returns no frame until a unit's last transmission frame. DEE's immersive stereo at 24, 25 and 29.97 fps, cut into fragments by a test helper, decodes to the same PCM, sample for sample, as the uncut stream, at fractions of 2 and 4. No stream from an encoder uses the mode, so how an encoder fills a fragment is read from the text alone; the encoder does not write it |
 | | Object audio: A-JOC and direct-coded objects | 🟢 | Medium | Important | Part 2 6.2.3 to 6.2.8 in both transcriptions, the OAMD substream included; A-JOC's reconstruction (5.7) in full decoding and its downmix or static bed in core decoding, dialogue enhancement for objects (5.8.2.3 to 5.8.2.5), each object's Annex F properties at its update sample, and the ISF renderer (5.10.3); Chromium's `ac4-ajoc.ac4` in both modes, eight constructed streams scored tone by tone. No reference decode to compare with: librempeg refuses object coding, and DEE writes no A-JOC from this project's masters |
-| | HSF / 96–192 kHz | 🟡 | Low | Nice-to-have | The extension substream's content is read when it resolves to its owning channel substream (an unresolved link is refused `kUnsupported`), on synthetic frames only, no real HSF stream being available; `decode()` refuses a 96 or 192 kHz substream, so there is no PCM at those rates |
+| | HSF / 96–192 kHz | 🟡 | Low | Nice-to-have | SIMPLE-mode channel elements (mono, stereo, 3.0, 5.X, 7.X) decode to PCM at 96 and 192 kHz: the extension's scale factors, noise levels and lines in 2x and 4x transforms, SAP, windows, alignment, the converter, the output level gain and the downmix. Checked on streams built from the text only, no real HSF stream being available. A-SPX and A-CPL, SSF, immersive and 22.2, objects, mixing, dialogue enhancement and DRC compression are refused by name at these rates |
 | | PCM: SIMPLE mono and stereo | 🟢 | High | Essential | ASF, stereo processing, block switching, frame alignment and the QMF banks at `frame_rate_index` 13; DEE's 2.0 streams at unity gain and pinned SNR floors in CI; librempeg agrees to 83 dB or better |
 | | PCM: ASPX mono and stereo | 🟢 | High | Essential | Companding and A-SPX in the QMF domain; DEE's 2.0 streams from 48 to 144 kbps at unity gain and its immersive stereo against Lo/Ro, with SNR below the crossover, A-SPX tile energies, LSD and ViSQOL pinned; interleaved waveform coding, balance and VARVAR tested on constructed data |
 | | PCM: 3.0, 5.X and 7.X | 🟢 | High | Essential | SIMPLE and ASPX: the LFE, Tables 178 to 183's matrices and routing, A-SPX pairing and companding over Tables 212 and 213; DEE's 5.1 streams from 192 to 768 kbps with every channel scored and pinned, each tone on its own channel, librempeg agreeing to 83 dB; every coding_config, 2ch_mode, chel_matsel, the 3.0 element and the three 7.X modes on constructed streams |
@@ -199,11 +200,12 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | **Reader** | Elementary `.iab` parse | 🟢 | High | Essential | vs DTS `iab-validator` |
 | | Bed / object definition tree | 🟢 | High | Essential | Positions, gains, spreads resolved on read |
 | | `AudioDataPCM` | 🟢 | High | Essential | Full PCM |
-| | `AudioDataDLC` (Annex B) | 🟡 | Medium | Important | Identity only — opaque bytes; lossless coder not decoded |
+| | `AudioDataDLC` (Annex B) | 🟢 | Medium | Important | 48 and 96 kHz, bit exact; `decode_dlc`, used by `build_iab` |
 | | MXF Track File extract (ST 2067-201) | 🟢 | High | Essential | Minimal KLV walk |
 | **Bridge** | IAB → Atmos encode (positions / gains) | 🟢 | High | Essential | `admbridge::build_iab`; `forge atmos-iab` |
-| | Spread + `ObjectZoneControl` → JOC | 🔴 | Medium | Important | Explicitly not bridged today |
-| **Writer** | IAB encode | 🔴 | Low | Nice-to-have | Read / ingest only |
+| | Spread + `ObjectZoneControl` → JOC | 🟡 | Medium | Important | Spread → object size; zone control → zone constraint when it matches one of the six presets; otherwise unconstrained |
+| **Writer** | IAB encode | 🟢 | Low | Nice-to-have | `write_iaframe`, `write_iabitstream`; `encode_dlc` for lossless essence |
+| | MXF Track File write (ST 2067-201) | 🟢 | Low | Nice-to-have | `write_mxf_iab`; refuses what 2067-201 forbids (16-bit, DLC, `BedRemap`, child elements); checked by a separate reader and FFmpeg's demuxer, no IMF tool here has opened it |
 
 ---
 
@@ -320,10 +322,10 @@ this register is the checklist that those bounds appear here too.
 |---|---|---|
 | Part 1 / 2 TOC legacy | `bitstream_version` 0/1 | 🟡 |
 | Channel-coded syntax without fixtures | Noise fill, VARVAR, … | 🟡 |
-| SSF | Decode | 🔴 |
-| Part 2 5.1.3 | Efficient high frame rate mode (`frame_rate_fraction` 2 or 4): refused | 🔴 |
-| §4.2.4.3 | HSF extension substream content: syntax read on synthetic frames, PCM at 96 and 192 kHz refused | 🟡 |
-| Whole codec | PCM reconstruction of the 9.X.4 and 22.2 elements | 🔴 |
+| SSF | Decode: from the text alone, see ERRATA.md | 🟡 |
+| Part 2 5.1.3 | Efficient high frame rate mode (`frame_rate_fraction` 2 or 4): decoded from the text; no encoder's stream | 🟡 |
+| §4.2.4.3 | HSF extension substream: syntax and PCM at 96 and 192 kHz in the SIMPLE mode, on constructed streams only | 🟡 |
+| Whole codec | 22.2 and 9.X.4: no stream and no other decoder, so their decode is checked against constructed streams alone; 22.2 has no renderer or core decoding (Part 2 gives none) | 🟡 |
 | Whole codec | Encoding the speech frontend, the 9.X.4 and 22.2 elements and 96 or 192 kHz | 🔴 |
 | Whole codec | Encoder options no reader outside the project has checked: the `experimental=` tools, the 7.X layouts, 7.X.4 with the back pair, ASPX_AJCC, objects | 🟡 |
 | §5.1.4 | Spectral noise fill: decoded, but no stream here sets it | 🟡 |
@@ -332,9 +334,8 @@ this register is the checklist that those bounds appear here too.
 
 | Clause | Open item | Status |
 |---|---|---|
-| Annex B | `AudioDataDLC` decode | 🟡 |
-| §5.5 / §10 zone control | Spread + `ObjectZoneControl` → JOC bridge | 🔴 |
-| Writer | IAB encode | 🔴 |
+| §5.5 / §10 zone control | A zone pattern that matches none of TS 103 420 Table 20's six presets is left unconstrained | 🟡 |
+| Writer | ST 2067-201 Track File: no IMF validator or packager has opened a file | 🟡 |
 
 ### ITU-R BS.2076 / BS.2088 (ADM / BW64)
 

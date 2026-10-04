@@ -169,8 +169,8 @@ already covers the same case without it.
 Not every installed, default-on module is part of the `v1.0.0` freeze. `iclforge::iab` (the
 SMPTE ST 2098-2 IAB reader) is real, tested, and default-built (`ICLFORGE_BUILD_IAB`).
 `forge atmos-iab` consumes it through the opt-in `iclforge::admbridge` module, while the GUI does
-not. Its own model is still being built out (`AudioDataDLC`'s Annex B coder is read by identity
-only, not decoded — see [Header map](header-map.md)). It is **Experimental**: installed,
+not. Its own model is still being built out (the MXF track-file wrapping is read but not written —
+see [Header map](header-map.md)). It is **Experimental**: installed,
 versioned, and functional, but explicitly outside the compatibility promise `v1.0.0` makes for
 the Public tier above until this page deliberately promotes it. The same designation applies to
 `iclforge::mlp` when the TrueHD/MLP branch lands (itself already
