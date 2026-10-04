@@ -404,17 +404,20 @@ jobs:
       # stream decoder's fast-inverse-transform case) failed on all four
       # compilers at float, on main, with no leg building and running it.
       # iclforge-tests joins the build directory the float32 decoder is already
-      # in, so the libraries are not rebuilt. -E _NOT_BUILT leaves out the
-      # placeholders ctest registers for test programs this directory did not
-      # build (the throughput guards, the Qt suites); -j runs the cases at
-      # once, where the suite takes about a minute in a single process.
+      # in, so the libraries are not rebuilt. The program is run itself, from the
+      # directory ctest runs its cases in, and not through ctest: this
+      # directory is configured for everything and builds only forge and the
+      # tests, so ctest would also list the Qt suites and the examples as "Not
+      # Run" and fail on them. One process takes a couple of minutes; Catch2
+      # exits non-zero on any failed case.
       - name: Whole test suite (float32 decode)
         if: matrix.scalar_variants
         shell: bash
         run: |
           set -euo pipefail
           cmake --build build/decode-scalar-float --target iclforge-tests
-          ctest --test-dir build/decode-scalar-float -E _NOT_BUILT -j "$(nproc)" --no-tests=error --output-on-failure
+          cd build/decode-scalar-float/tests
+          ../bin/iclforge-tests
 
       # The third scalar (planning/arithmetic-tiers.md): the fixed-point
       # decoder, Q7.24 in an int32, for parts with no FPU. The same two

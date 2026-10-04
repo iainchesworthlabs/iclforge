@@ -57,7 +57,8 @@
       // The float32 decoder and encoder and the fixed-point decoder, each built as its
       // own binary with the numeric type changed, and their gold-reference gates and
       // comparisons against the double build, and the whole test suite at float: eleven steps and
-      // about fourteen minutes (the suite adds an estimated five).
+      // about sixteen minutes (the suite adds about seven: its build, measured at six, and a
+      // two-minute run).
       // Nightly only. The variants change when their own code does, which the nightly
       // run finds within a day.
       "scalar_variants": true,
