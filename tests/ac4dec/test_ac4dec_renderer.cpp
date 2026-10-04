@@ -64,7 +64,14 @@ constexpr double kGainB = 0.11;
 constexpr double kGainT1 = 0.22;
 constexpr std::array<double, 6> kGainT2 = {0.31, 0.32, 0.33, 0.34, 0.35, 0.36};
 
-enum class G { k0, kM3, kB, kT1, kT2a, kT2b, kT2c, kT2d, kT2e, kT2f };
+// The gains the 9.X rows print as gain_f1 and gain_f2, with a value of their own each. The tables'
+// labels are taken the other way round (src/ac4dec/ERRATA.md, "The 9.X.4 element's rendering"):
+// the coefficient printed gain_f1, on L and R, is the one Table 129's gain_f2 sets (default 0 dB),
+// and the one printed gain_f2, on C, Table 128's gain_f1 (default -inf).
+constexpr double kGainF1 = 0.41;  // RenderGains::gain_f1, Table 128
+constexpr double kGainF2 = 0.52;  // RenderGains::gain_f2, Table 129
+
+enum class G { k0, kM3, kB, kT1, kT2a, kT2b, kT2c, kT2d, kT2e, kT2f, kPrintedF1, kPrintedF2 };
 
 double value_of(G g) {
     switch (g) {
@@ -88,6 +95,10 @@ double value_of(G g) {
             return kGainT2[4];
         case G::kT2f:
             return kGainT2[5];
+        case G::kPrintedF1:
+            return kGainF2;
+        case G::kPrintedF2:
+            return kGainF1;
     }
     return 0.0;
 }
@@ -334,7 +345,81 @@ detail::ImmersiveLayout layout_of(Config input, int two, bool lfe) {
 }
 
 detail::RenderGains test_gains() {
-    return {.gain_b = kGainB, .gain_t1 = kGainT1, .gain_t2 = kGainT2};
+    return {.gain_f1 = kGainF1,
+            .gain_f2 = kGainF2,
+            .gain_b = kGainB,
+            .gain_t1 = kGainT1,
+            .gain_t2 = kGainT2};
+}
+
+// The generalized matrix's index for the screen pair (Table 33: 22 and 23).
+constexpr int kLscrIndex = 22;
+constexpr int kRscrIndex = 23;
+
+// Tables 38 to 43's rows for the 9.X inputs, as printed, with Lscr and Rscr as indices 22 and 23.
+Entries printed_9x(Config output, int tops) {
+    const Entries f = {{0, kLscrIndex, G::kPrintedF1},
+                       {1, kRscrIndex, G::kPrintedF1},
+                       {2, kLscrIndex, G::kPrintedF2},
+                       {2, kRscrIndex, G::kPrintedF2}};
+    const Entries zero = {{0, kLscrIndex, G::k0}, {1, kRscrIndex, G::k0}};
+    const Entries top_m3 = {{7, 12, G::kM3}, {9, 12, G::kM3}, {8, 13, G::kM3}, {10, 13, G::kM3}};
+    const Entries t1 = {{12, 7, G::kT1}, {12, 9, G::kT1}, {13, 8, G::kT1}, {13, 10, G::kT1}};
+    const Entries back_b = {{3, 3, G::kB}, {3, 5, G::kB}, {4, 4, G::kB}, {4, 6, G::kB}};
+    const Entries back_m3 = {{3, 3, G::kM3}, {3, 5, G::kM3}, {4, 4, G::kM3}, {4, 6, G::kM3}};
+    // tops: 3 is .4, 1 or 2 is .2 (the pair carried in index 12 and 13), 0 is .0.
+    switch (output) {
+        case Config::k7X4:  // Table 38
+            if (tops == 3) {
+                return diag({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}) + zero;
+            }
+            return tops == 0 ? diag({0, 1, 2, 3, 4, 5, 6}) + zero
+                             : diag({0, 1, 2, 3, 4, 5, 6}) + zero + top_m3;
+        case Config::k7X2:  // Table 39
+            if (tops == 3) {
+                return diag({0, 1, 2, 3, 4, 5, 6}) + f + t1;
+            }
+            return tops == 0 ? diag({0, 1, 2, 3, 4, 5, 6}) + zero
+                             : diag({0, 1, 2, 3, 4, 5, 6, 12, 13}) + f;
+        case Config::k7X0:  // Table 40
+            if (tops == 3) {
+                return diag({0, 1, 2, 3, 4, 5, 6}) + f +
+                       Entries{{0, 7, G::kT2a},  {1, 8, G::kT2a},  {3, 7, G::kT2b},
+                               {4, 8, G::kT2b},  {5, 7, G::kT2c},  {6, 8, G::kT2c},
+                               {0, 9, G::kT2d},  {1, 10, G::kT2d}, {3, 9, G::kT2e},
+                               {4, 10, G::kT2e}, {5, 9, G::kT2f},  {6, 10, G::kT2f}};
+            }
+            return tops == 0 ? diag({0, 1, 2, 3, 4, 5, 6}) + zero
+                             : diag({0, 1, 2, 3, 4, 5, 6}) + f +
+                                   Entries{{0, 12, G::kT2a}, {1, 13, G::kT2a}, {3, 12, G::kT2b},
+                                           {4, 13, G::kT2b}, {5, 12, G::kT2c}, {6, 13, G::kT2c}};
+        case Config::k5X4:  // Table 41
+            if (tops == 3) {
+                return diag({0, 1, 2, 7, 8, 9, 10}) + f + back_b;
+            }
+            return tops == 0 ? diag({0, 1, 2}) + zero + back_m3
+                             : diag({0, 1, 2}) + f + back_b + top_m3;
+        case Config::k5X2:  // Table 42
+            if (tops == 3) {
+                return diag({0, 1, 2}) + f + back_b + t1;
+            }
+            return tops == 0 ? diag({0, 1, 2}) + zero + back_m3
+                             : diag({0, 1, 2, 12, 13}) + f + back_b;
+        case Config::k5X0:  // Table 43
+            if (tops == 3) {
+                return diag({0, 1, 2}) + f + back_b + Entries{{0, 7, G::kT2a}, {1, 8, G::kT2a},
+                                                              {3, 7, G::kT2b}, {4, 8, G::kT2b},
+                                                              {0, 9, G::kT2d}, {1, 10, G::kT2d},
+                                                              {3, 9, G::kT2e}, {4, 10, G::kT2e}};
+            }
+            return tops == 0 ? diag({0, 1, 2}) + zero + back_m3
+                             : diag({0, 1, 2}) + f + back_b +
+                                   Entries{{0, 12, G::kT2a},
+                                           {1, 13, G::kT2a},
+                                           {3, 12, G::kT2b},
+                                           {4, 13, G::kT2b}};
+    }
+    return {};
 }
 
 }  // namespace
@@ -391,6 +476,139 @@ TEST_CASE("the renderer's full decoding matrices are Tables 38 to 43 as printed"
             }
         }
     }
+}
+
+TEST_CASE(
+    "the renderer's full decoding matrices for 9.X inputs are Tables 38 to 43's 9.X rows as "
+    "printed",
+    "[ac4dec][renderer][fronts]") {
+    // 9.X.4, 9.X.2 (the top pair carried in Tfl, Tfr or Tbl, Tbr) and 9.X.0, every output of
+    // Tables 38 to 43. 9.X outputs (Tables 35 to 37) are no DownmixTarget.
+    for (const bool lfe : {true, false}) {
+        std::vector<S> decoded = decoded_714(lfe);
+        decoded.insert(decoded.end(), {S::kLeftScreen, S::kRightScreen});
+        for (const int tops : {3, 1, 2, 0}) {
+            detail::ImmersiveLayout layout;
+            layout.backs = true;
+            layout.screen = true;
+            layout.tops = tops;
+            layout.lfe = lfe;
+            const auto input_of = [&](S speaker) {
+                if (speaker == S::kLeftScreen) {
+                    return kLscrIndex;
+                }
+                if (speaker == S::kRightScreen) {
+                    return kRscrIndex;
+                }
+                return full_input(layout, speaker);
+            };
+            for (const Config output : kConfigs) {
+                CAPTURE(lfe, tops, name_of(output));
+                const detail::RenderPlan plan = detail::render_plan(layout, target_of(output));
+                const auto m = detail::render_matrix(layout, decoded, plan, test_gains());
+                std::array<std::array<double, 24>, 24> table{};
+                for (const Entry& e : printed_9x(output, tops)) {
+                    table[static_cast<std::size_t>(e.out)][static_cast<std::size_t>(e.in)] =
+                        value_of(e.gain);
+                }
+                if (lfe) {
+                    table[11][11] = 1.0;
+                }
+                REQUIRE(m.size() == plan.speakers.size());
+                for (std::size_t o = 0; o < plan.speakers.size(); ++o) {
+                    const int out = index_of(plan.speakers[o]);
+                    REQUIRE(m[o].size() == decoded.size());
+                    for (std::size_t d = 0; d < decoded.size(); ++d) {
+                        const int in = input_of(decoded[d]);
+                        const double expected = in < 0 ? 0.0
+                                                       : table[static_cast<std::size_t>(out)]
+                                                              [static_cast<std::size_t>(in)];
+                        CAPTURE(iclforge::ac4::describe(plan.speakers[o]),
+                                iclforge::ac4::describe(decoded[d]));
+                        CHECK(std::abs(m[o][d] - expected) < 1e-12);
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE(
+    "the custom downmix gains gain_f1 and gain_f2 default to -inf dB and 0 dB and read Tables 128 "
+    "and 129",
+    "[ac4dec][renderer][fronts]") {
+    const detail::RenderGains defaults = detail::render_gains(nullptr, 0);
+    CHECK(defaults.gain_f1 == 0.0);
+    CHECK(defaults.gain_f2 == 1.0);
+    detail::CustomDmxData cdmx;
+    cdmx.bs_ch_config = 0;
+    cdmx.b_cdmx_data_present = true;
+    cdmx.n_cdmx_configs = 1;
+    cdmx.cdmx[0].out_ch_config = 1;
+    // b_put_screen_to_c 1: the screen pair goes to C at gain_f1, and not to L and R.
+    cdmx.cdmx[0].b_put_screen_to_c = true;
+    cdmx.cdmx[0].gain_f1_code = 6;  // -6 dB
+    const detail::RenderGains to_centre = detail::render_gains(&cdmx, 1);
+    CHECK(std::abs(to_centre.gain_f1 - db(-6.0)) < 1e-12);
+    CHECK(to_centre.gain_f2 == 0.0);
+    cdmx.cdmx[0].gain_f1_code = 0;  // 3 dB
+    CHECK(std::abs(detail::render_gains(&cdmx, 1).gain_f1 - db(3.0)) < 1e-12);
+    cdmx.cdmx[0].gain_f1_code = 7;  // -inf
+    CHECK(detail::render_gains(&cdmx, 1).gain_f1 == 0.0);
+    // b_put_screen_to_c 0: to L and R at gain_f2, and not to C.
+    cdmx.cdmx[0].b_put_screen_to_c = false;
+    cdmx.cdmx[0].gain_f1_code.reset();
+    cdmx.cdmx[0].gain_f2_code = 5;  // -9 dB
+    const detail::RenderGains to_front = detail::render_gains(&cdmx, 1);
+    CHECK(std::abs(to_front.gain_f2 - db(-9.0)) < 1e-12);
+    CHECK(to_front.gain_f1 == 0.0);
+    cdmx.cdmx[0].gain_f2_code = 7;  // -inf
+    CHECK(detail::render_gains(&cdmx, 1).gain_f2 == 0.0);
+    // Another output configuration takes the defaults.
+    CHECK(detail::render_gains(&cdmx, 2).gain_f2 == 1.0);
+}
+
+TEST_CASE(
+    "decode()'s layouts for a 9.X.4 element: as coded in Table A.27's order, core as the 7.X.4 "
+    "core",
+    "[ac4dec][renderer][fronts]") {
+    using T = iclforge::ac4::DownmixTarget;
+    detail::ImmersiveLayout full;
+    full.screen = true;
+    full.tops = 3;
+    full.lfe = true;
+    CHECK(detail::render_plan(full, T::kAsCoded).speakers ==
+          std::vector<S>{S::kLeft, S::kRight, S::kCentre, S::kLeftSurround, S::kRightSurround,
+                         S::kLeftBack, S::kRightBack, S::kTopFrontLeft, S::kTopFrontRight,
+                         S::kTopBackLeft, S::kTopBackRight, S::kLfe, S::kLeftScreen,
+                         S::kRightScreen});
+    // 9.X.0 as coded has no tops, and a source's .2 has Tsl and Tsr after the LFE.
+    full.tops = 2;
+    full.lfe = false;
+    CHECK(detail::render_plan(full, T::kAsCoded).speakers ==
+          std::vector<S>{S::kLeft, S::kRight, S::kCentre, S::kLeftSurround, S::kRightSurround,
+                         S::kLeftBack, S::kRightBack, S::kTopSideLeft, S::kTopSideRight,
+                         S::kLeftScreen, S::kRightScreen});
+    // The 7.X.4 and 5.X targets fold the screen pair away.
+    full.tops = 3;
+    full.lfe = true;
+    CHECK(detail::render_plan(full, T::k7X4).speakers == decoded_714(true));
+    for (const T target : {T::kStereo, T::kLoRo, T::kLtRt, T::kMono}) {
+        CHECK(detail::render_plan(full, target).output ==
+              detail::ChannelConfiguration{.width = 5, .tops = 0});
+    }
+    // Core decoding is 5.X.2 at most, as for 7.X.4, and the screen pair is not in it.
+    detail::ImmersiveLayout core = full;
+    core.decoding = iclforge::ac4::DecodingMode::kCore;
+    CHECK(detail::render_plan(core, T::kAsCoded).output ==
+          detail::ChannelConfiguration{.width = 5, .tops = 2});
+    CHECK_FALSE(detail::render_plan(core, T::kAsCoded).output.screen);
+    // 9.X sources have no out_ch_config of their own (Table 127): no 9.X output is asked for.
+    CHECK_FALSE(detail::out_ch_config({.width = 7, .tops = 4, .screen = true}).has_value());
+    // Folding the screen pair is a downmix, so the output's correction applies.
+    using L = detail::LoudCorrOutput;
+    CHECK(detail::loud_corr_output(full, {.width = 7, .tops = 4}) == L::k7X4);
+    CHECK(detail::loud_corr_output(full, {.width = 7, .tops = 4, .screen = true}) == L::kNone);
 }
 
 TEST_CASE("the renderer's core decoding matrices are Tables 45 and 46 as printed",

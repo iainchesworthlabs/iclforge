@@ -506,10 +506,15 @@ TEST_CASE(
     for (const fs::path& path : to_play) {
         INFO("stream " << path.string());
         // 22.2's 24 channels are more than the layout renderer's bed holds, and its bottom
-        // channels have no Table E2.5 location: the engine refuses its frames (the test below),
-        // so there is no decode to hold to a reference.
+        // channels have no Table E2.5 location, nor have the 9.X.4 modes' screen pair: the engine
+        // refuses their frames (the tests below), so there is no decode to hold to a reference.
         if (path.filename().string().starts_with("22_2-")) {
             ++refused["a 22.2 presentation, whose channels the layout renderer cannot place"];
+            continue;
+        }
+        if (path.filename().string().starts_with("9_0_4-") ||
+            path.filename().string().starts_with("9_1_4-")) {
+            ++refused["a 9.X.4 presentation, whose screen pair the layout renderer cannot place"];
             continue;
         }
         std::vector<std::byte> bytes = read_file(path);
@@ -583,6 +588,27 @@ TEST_CASE("hearth ac4: the engine refuses the frames of a 22.2 presentation and 
     CHECK(iclforge::hearth::ac4_placeable(centre));
     const std::vector<Speaker> seventeen(17, Speaker::kLeft);
     CHECK_FALSE(iclforge::hearth::ac4_placeable(seventeen));
+}
+
+TEST_CASE("hearth ac4: the engine refuses the frames of a 9.X.4 presentation and says why",
+          "[hearth][ac4]") {
+    // The decoder decodes the 9.X.4 modes, whose Lscr and Rscr Table E2.5 has no location for: the
+    // layout renderer cannot place them, so the frame is refused and nothing is played.
+    for (const char* name :
+         {"9_1_4-scpl-grouping1-matsel2-prediction.ac4", "9_0_4-acpl2-grouping2-second.ac4"}) {
+        INFO(name);
+        const std::vector<std::byte> bytes =
+            read_file(fs::path{AC4DEC_GOLDEN_DIR} / "constructed" / name);
+        const Played played = play_item(bytes, layout_of(kEverySpeaker), as_coded());
+        REQUIRE_FALSE(played.errors.empty());
+        for (const std::string& error : played.errors) {
+            CHECK(error.find("9.X.4") != std::string::npos);
+        }
+        CHECK(played.frames == 0);
+    }
+    using iclforge::ac4::Speaker;
+    const std::array<Speaker, 3> screen = {Speaker::kLeft, Speaker::kRight, Speaker::kLeftScreen};
+    CHECK_FALSE(iclforge::hearth::ac4_placeable(screen));
 }
 
 TEST_CASE("hearth ac4: the engine plays the streams of AC4DEC_API_STREAM_DIR", "[hearth][ac4]") {

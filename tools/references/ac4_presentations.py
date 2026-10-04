@@ -8,7 +8,7 @@ builds and holds the decoder to.
 
 A presentation can be selected when the decoder can decode it: every substream it names is a
 channel-coded substream in this elementary stream, in one of the channel modes the decoder renders
-(Part 1's, 0 to 10), at 48 or 44.1 kHz; its presentation_version is 0, 1 or 2 (Part 2 clause
+(Table 56's 0 to 15), at 48 or 44.1 kHz; its presentation_version is 0, 1 or 2 (Part 2 clause
 6.3.2.3.1); it carries audio (presentation_config 0 to 5, or a single substream or group); its
 md_compat is one the tables define (Part 1 Table 86: 0 to 4 and 7; Part 2 Table 55: 0 to 3 and 7)
 and within the decoder's level; and the stream has not disabled it (b_enable_presentation).
@@ -41,10 +41,10 @@ ROLES_V0 = {'M+E': 'music_effects', 'Dialog': 'dialogue', 'DE': 'dialogue_enhanc
 TABLE_92 = {'audio-description': ('qad', 'qax'), 'audio-description-subtitles': ('qas', 'qtx'),
             'spoken-subtitles': ('qss', 'qsx'), 'emergency-information': ('qei', 'qex')}
 
-# The channel modes the decoder renders: Part 1's (mono to 7.1), Part 2's 7.0.4 and 7.1.4
-# (Table 56's 11 and 12), whose immersive element phase D9 decodes, and 22.2 (15). 9.0.4 and
-# 9.1.4 (13 and 14) are refused.
-DECODED_CH_MODES = (*range(0, 13), 15)
+# The channel modes the decoder renders: Part 1's (mono to 7.1), and Part 2's 7.0.4 and 7.1.4
+# (Table 56's 11 and 12), whose immersive element phase D9 decodes, 9.0.4 and 9.1.4 (13 and 14),
+# whose element is the same one read with b_5fronts, and 22.2 (15): every channel mode.
+DECODED_CH_MODES = range(0, 16)
 
 
 def _language(content_type):

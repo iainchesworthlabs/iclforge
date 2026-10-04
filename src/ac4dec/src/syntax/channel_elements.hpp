@@ -20,9 +20,8 @@
 // 3_0_channel_element, 5_X_channel_element and 7_X_channel_element (ETSI TS
 // 103 190-1 V1.4.1 clauses 4.2.5 and 4.2.6), and companding_control() (4.2.11);
 // and Part 2's immersive_channel_element (6.2.4.1, with immers_cfg() and
-// ajcc_data()) for the 7.X.4 channel modes, which pass it b_5fronts 0; and
-// Part 2's 22_2_channel_element (6.2.4.3). The 9.X.4 modes, which pass
-// b_5fronts 1, are refused.
+// ajcc_data()) for the 7.X.4 channel modes, which pass it b_5fronts 0, and the
+// 9.X.4 modes, which pass it 1; and Part 2's 22_2_channel_element (6.2.4.3).
 //
 // For object audio (Part 2 clause 6.2.3): audio_data_objs() (6.2.3.2), an
 // LFE's mono_data(1) and the Part 1 element objs_to_channel_mode() (6.2.3.3)
@@ -53,7 +52,8 @@ inline constexpr int kAspxAjcc = 4;
 // The most aspx_data elements one channel element carries: the 22.2 element's
 // eleven aspx_data_2ch() (Part 2 clause 6.2.4.3, Table 8); var_channel_element()
 // has nine, eight aspx_data_2ch() and an aspx_data_1ch() for its most signals,
-// sixteen (clause 6.2.4.4), and the immersive element six in ASPX_SCPL (Table 8).
+// sixteen (clause 6.2.4.4), and the immersive element six in ASPX_SCPL, seven with
+// b_5fronts (Table 8).
 inline constexpr std::size_t kMaxAspxElements = 11;
 
 // 4.2.11 companding_control(num_chan).
@@ -90,6 +90,7 @@ struct ChannelElement {
     int codec_mode = codec_mode::kSimple;
     std::optional<int> coding_config;         // 3_0_coding_config or coding_config, when read
     std::optional<int> core_5ch_grouping;     // the immersive element's (Part 2 Table 75)
+    bool b_5fronts = false;                   // the immersive element's: a 9.X.4 mode (13 tracks)
     std::optional<bool> two_ch_mode;          // 2ch_mode
     std::optional<bool> b_use_sap_add_ch;     // 7_X, and the immersive element's 7CH_STATIC modes
     std::vector<bool> b_enable_mdct_stereo_proc;  // one per stereo_data / two_channel_data / ACPL_1 pair, in order
@@ -133,7 +134,7 @@ struct ChannelElementState {
     std::optional<AcplConfig1ch> acpl_config_1ch;
     std::optional<AcplConfig2ch> acpl_config_2ch;
     // One per aspx_data_1ch()/aspx_data_2ch() position in the element, in
-    // syntax order: the immersive element in ASPX_SCPL has the most, six.
+    // syntax order: the immersive element in ASPX_SCPL has the most, seven with b_5fronts.
     std::array<AspxElementState, kMaxAspxElements> aspx{};
     // The speech spectral frontend's state, by the track's place in the element, made when a
     // track first selects it: it holds the predictor's buffers, 40 KB at the longest block.

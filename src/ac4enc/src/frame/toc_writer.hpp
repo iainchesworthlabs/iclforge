@@ -25,8 +25,9 @@ namespace iclforge::ac4::detail {
 // frame rate factor of 1.
 struct TocSubstream {
     // Part 1 Table 88: 0 mono to 10 (7.1 3/2/2); and Part 2 Table 56's 11 and
-    // 12, 7.0.4 and 7.1.4, and 15, 22.2 (a layout the encoder does not code;
-    // the decoder's tests build its streams with this writer).
+    // 12, 7.0.4 and 7.1.4, 13 and 14, 9.0.4 and 9.1.4, and 15, 22.2 (layouts
+    // the encoder does not code; the decoder's tests build the streams of 9.X.4
+    // and 22.2 with this writer).
     int ch_mode = 1;
     bool add_ch_base = false;  // for 7.X 5/2/0 and 3/2/2 (clause 6.3.2.7)
     bool iframe = true;        // b_audio_ndot

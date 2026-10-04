@@ -1396,6 +1396,18 @@ The sections below contain the complete change list and fixes.
   Forge's meters leave them out and Hearth and the ESP32 player refuse a 22.2 presentation. No stream
   of the element and no other decoder exist: constructed streams with a tone on each channel check it
   (`src/ac4dec/ERRATA.md`, "The 22.2 element").
+- **AC-4 decodes the 9.X.4 channel modes, 9.0.4 and 9.1.4, in full and core decoding.** Both
+  transcriptions read the immersive element with `b_5fronts` (Part 2 6.2.4.1): thirteen tracks with
+  Table 20's six prediction parameters, S-CPL (Table 23), A-SPX over (L, Lscr) and (R, Rscr), six A-CPL
+  modules, and A-JCC's four modules (full) and two (core). `ac4::Decoder` writes the channels in the
+  order of Part 2 Table A.27's speaker indices (the LFE after the tops, then Lscr and Rscr), renders
+  them to the 7.X.4 and 5.X targets by the 9.X rows of Tables 38 to 43 (a 9.X layout is no target), and
+  enhances dialogue on Lscr, Rscr and C, with the core tools of 5.8.2.1 and 5.8.2.2 for the A-JCC and
+  A-CPL modes and the second `de_data()` of `b_de_simulcast`; DRC groups Lscr and Rscr with L and R.
+  The encoder's table of contents writer codes the two channel modes so that tests build the streams;
+  no stream of them and no other decoder exist, and constructed streams with a tone on each channel
+  check them (`src/ac4dec/ERRATA.md`, "The 9.X.4 element"). Hearth and the ESP32 player refuse a 9.X.4
+  presentation, whose screen pair the layout renderer cannot place.
 - **AC-4 decodes the immersive element of 7.0.4 and 7.1.4, in full and core decoding, and renders
   it by Part 2's channel renderer** (phase D9 of `planning/ac4.md`). Both transcriptions read
   `immersive_channel_element()` with `immers_cfg` and A-JCC's `ajcc_data()` (Part 2 6.2.4 to 6.2.6),

@@ -2407,7 +2407,8 @@ std::expected<bool, DecodeError> Decoder::Impl::decode_into(
         std::erase_if(d.pcm, [&d](const auto& entry) { return !d.keeps(entry.first); });
         return true;
     }
-    inputs.de = detail::de_frame_values(main.content.metadata.dialog_enhancement);
+    inputs.de = detail::de_frame_values(main.content.metadata.dialog_enhancement,
+                                        d.config.decoding == DecodingMode::kCore);
     inputs.downmix =
         detail::downmix_values(capture.presentation_read ? &capture.presentation : nullptr, main.content.metadata);
     inputs.mix = d.mix_values(plan, anchor, dialnorm);
@@ -2426,7 +2427,8 @@ std::expected<bool, DecodeError> Decoder::Impl::decode_into(
                                           .new_source = d.new_source,
                                           .output = d.config.output,
                                           .drc = {}};
-        member_inputs.de = detail::de_frame_values(member.content.metadata.dialog_enhancement);
+        member_inputs.de = detail::de_frame_values(member.content.metadata.dialog_enhancement,
+                                                   d.config.decoding == DecodingMode::kCore);
         member_inputs.decoding = d.config.decoding;
         member_inputs.qmf_only = true;
         // The capture is this frame's alone (read() clears it), and nothing after decode()

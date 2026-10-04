@@ -29,7 +29,7 @@ class ElementParser {
     ParseResult element_3_0();
     ParseResult element_5_x(bool b_has_lfe);
     ParseResult element_7_x();
-    ParseResult immersive_element(bool b_lfe);
+    ParseResult immersive_element(bool b_lfe, bool b_5fronts);
     ParseResult element_22_2();
     ParseResult var_element(int n_dmx_signals, bool b_has_lfe);
     // audio_data_objs()'s mono_data(1), before its element.
@@ -899,9 +899,9 @@ ParseResult ElementParser::element_7_x() {
 }
 
 // Part 2 6.2.4.1 immersive_channel_element(b_lfe, b_5fronts, b_iframe) with
-// b_5fronts 0, the 7.X.4 channel modes, and immers_cfg() (6.2.4.2).
-// core_channel_config is 7CH_STATIC in every codec mode but ASPX_AJCC's
-// 5CH_DYNAMIC (Table 74).
+// immers_cfg() (6.2.4.2): the 7.X.4 channel modes pass b_5fronts 0 (11 tracks
+// without the LFE) and the 9.X.4 modes 1 (13). core_channel_config is
+// 7CH_STATIC in every codec mode but ASPX_AJCC's 5CH_DYNAMIC (Table 74).
 //
 // The syntax names no framing for its chparam_info() elements, which need one
 // (Part 1 Table 47). The reading taken, recorded in the errata register: each
@@ -909,8 +909,10 @@ ParseResult ElementParser::element_7_x() {
 // against, as the 7_X element's do. The two b_use_sap_add_ch sends are Part 2
 // 5.2.3.2 step 4's, which codes F and G against D and E; the four after the
 // tracks H to K are Table 20's a'_0 to a'_3, which predict H, I, J and K from
-// D, E, F and G.
-ParseResult ElementParser::immersive_element(bool b_lfe) {
+// D, E, F and G, and with b_5fronts the two after the tracks L and M are a'_4
+// and a'_5, which predict L from A and M from B.
+ParseResult ElementParser::immersive_element(bool b_lfe, bool b_5fronts) {
+    out_.b_5fronts = b_5fronts;
     // immersive_codec_mode_code (6.3.5.1, Table 73): a 1 is ASPX_AJCC, and
     // after a 0 two more bits give SCPL to ASPX_ACPL_2. One record, of one or
     // three bits, valued at the bits read.
@@ -985,8 +987,14 @@ ParseResult ElementParser::immersive_element(bool b_lfe) {
     // two_channel_data(), the fifth and sixth.
     int pos_d = 2;
     int pos_e = 3;
+    // A is the first track of the core in every grouping; B is the second, but
+    // for 2ch_mode 1, whose first two_channel_data() holds A and D and whose
+    // second holds B and E.
+    constexpr int kPosA = 0;
+    int pos_b = 1;
     if (grouping == 0 && out_.two_ch_mode.value_or(false)) {
         pos_d = 1;
+        pos_b = 2;
     } else if (grouping == 1 || grouping == 3) {
         pos_d = 3;
         pos_e = 4;
@@ -1019,9 +1027,20 @@ ParseResult ElementParser::immersive_element(bool b_lfe) {
         }
     }
     if (mode == immersive_mode::kAspxScpl) {
-        // Table 8: (Ls, Lb), (Rs, Rb), C, (L, R), (Tfl, Tbl) and (Tfr, Tbr).
-        for (const bool pair : {true, true, false, true, true, true}) {
-            if (auto next = pair ? aspx_2ch() : aspx_1ch(); !next) {
+        // Table 8: (Ls, Lb), (Rs, Rb), C, (L, R), (Tfl, Tbl) and (Tfr, Tbr), and with
+        // b_5fronts (L, Lscr) and (R, Rscr) in place of (L, R): 6.2.4.1 sends
+        // aspx_data_2ch() twice where it sends it once.
+        const int fronts = b_5fronts ? 2 : 1;
+        for (int k = 0; k < 2; ++k) {
+            if (auto next = aspx_2ch(); !next) {
+                return next;
+            }
+        }
+        if (auto next = aspx_1ch(); !next) {
+            return next;
+        }
+        for (int k = 0; k < fronts + 2; ++k) {
+            if (auto next = aspx_2ch(); !next) {
                 return next;
             }
         }
@@ -1038,7 +1057,7 @@ ParseResult ElementParser::immersive_element(bool b_lfe) {
     }
     if (mode == immersive_mode::kAspxAjcc) {
         AjccData data;
-        if (auto next = parse_ajcc_data(r_, data); !next) {
+        if (auto next = parse_ajcc_data(r_, b_5fronts, data); !next) {
             return next;
         }
         out_.ajcc = data;
@@ -1052,9 +1071,18 @@ ParseResult ElementParser::immersive_element(bool b_lfe) {
         if (auto next = chparams_after({pos_d, pos_e, kPosF, kPosG}); !next) {
             return next;
         }
+        if (b_5fronts) {
+            // The tracks L and M, and Table 20's a'_4 and a'_5.
+            if (auto next = two_channel_data(); !next) {
+                return next;
+            }
+            if (auto next = chparams_after({kPosA, pos_b}); !next) {
+                return next;
+            }
+        }
     }
     if (mode == immersive_mode::kAspxAcpl1 || mode == immersive_mode::kAspxAcpl2) {
-        for (int k = 0; k < 4; ++k) {
+        for (int k = 0; k < (b_5fronts ? 6 : 4); ++k) {
             if (auto next = acpl_1ch(); !next) {
                 return next;
             }
@@ -1246,13 +1274,13 @@ ParseResult parse_audio_data_chan(BitReader& r, const SubstreamContext& ctx, Cha
         case ch_mode::k7_1_322:
             return parser.element_7_x();
         case ch_mode::k7_0_4:
-            return parser.immersive_element(false);
+            return parser.immersive_element(false, false);
         case ch_mode::k7_1_4:
-            return parser.immersive_element(true);
+            return parser.immersive_element(true, false);
         case ch_mode::k9_0_4:
+            return parser.immersive_element(false, true);
         case ch_mode::k9_1_4:
-            return fail(DecodeError::kUnsupported,
-                        "9.X.4, the immersive_channel_element() with b_5fronts, is not decoded");
+            return parser.immersive_element(true, true);
         case ch_mode::k22_2:
             return parser.element_22_2();
         default:

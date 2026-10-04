@@ -40,6 +40,20 @@ constexpr std::array k714_core = {S::kLeft,        S::kRight,        S::kCentre,
                                   S::kLfe,         S::kLeftSurround, S::kRightSurround,
                                   S::kTopSideLeft, S::kTopSideRight};
 
+// The 9.X.4 modes in full decoding, in Part 2 Table A.27's order by speaker
+// index as the 22.2 layout is: L, R, C, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr, the
+// LFE (index 11), then Lscr and Rscr (24 and 25). Core decoding makes the same
+// 5.X.2 the 7.X.4 modes' core is (src/ac4dec/ERRATA.md, "The 9.X.4 element's
+// output").
+constexpr std::array k904 = {S::kLeft,          S::kRight,       S::kCentre,       S::kLeftSurround,
+                             S::kRightSurround, S::kLeftBack,    S::kRightBack,    S::kTopFrontLeft,
+                             S::kTopFrontRight, S::kTopBackLeft, S::kTopBackRight, S::kLeftScreen,
+                             S::kRightScreen};
+constexpr std::array k914 = {S::kLeft,          S::kRight,       S::kCentre,       S::kLeftSurround,
+                             S::kRightSurround, S::kLeftBack,    S::kRightBack,    S::kTopFrontLeft,
+                             S::kTopFrontRight, S::kTopBackLeft, S::kTopBackRight, S::kLfe,
+                             S::kLeftScreen,    S::kRightScreen};
+
 // The 22.2 layout in Part 2 Table A.27's order, its speaker indices 0 to 13 and
 // 16 to 23 and 26 and 27 (14 and 15 are reserved, 24 and 25 are 9.X.4's screen
 // pair): so the LFE comes after Tbr and LFE2 after Tc, where that table has
@@ -241,10 +255,12 @@ ParseResult route_immersive(const SubstreamContext& ctx, const ChannelElement& e
     Walker walk(element, out);
     const bool core = decoding == DecodingMode::kCore;
     const int mode = element.codec_mode;
+    const bool fronts = has_fronts(ctx.ch_mode);  // b_5fronts
     const bool lfe = !element.tracks.empty() && element.tracks.front().lfe;
     const bool two_ch_mode = element.two_ch_mode.value_or(false);
     const int grouping = element.core_5ch_grouping.value_or(-1);
-    // A'' to G''. H'' to K'' are Lb, Rb, Tbl and Tbr.
+    // A'' to G''. H'' to K'' are Lb, Rb, Tbl and Tbr, and with b_5fronts L'' and M'' are
+    // Lscr and Rscr.
     const Speaker a = S::kLeft;
     const Speaker b = S::kRight;
     const Speaker c = S::kCentre;
@@ -286,10 +302,16 @@ ParseResult route_immersive(const SubstreamContext& ctx, const ChannelElement& e
     const bool coupled = mode == immersive_mode::kScpl || mode == immersive_mode::kAspxScpl ||
                          mode == immersive_mode::kAspxAcpl1;
     int prediction_first = 0;
+    int prediction_fronts_first = 0;
     if (coupled) {
         walk.pair(S::kLeftBack, S::kRightBack, core);
         walk.pair(S::kTopBackLeft, S::kTopBackRight, core);
         prediction_first = walk.take_chparams(4);
+        if (fronts) {
+            // L'' and M'', and Table 20's a'_4 and a'_5.
+            walk.pair(S::kLeftScreen, S::kRightScreen, core);
+            prediction_fronts_first = walk.take_chparams(2);
+        }
     }
     // Step 4, in every 7CH_STATIC mode, ASPX_ACPL_2's included (ERRATA.md,
     // "ASPX_ACPL_2 and step 4").
@@ -301,8 +323,9 @@ ParseResult route_immersive(const SubstreamContext& ctx, const ChannelElement& e
     }
     // Table 20: H'' = H' + a'0 D', I'' = I' + a'1 E', J'' = J' + a'2 F' and
     // K'' = K' + a'3 G', which core decoding has no use for.
+    // With b_5fronts, L'' = L' + a'4 A' and M'' = M' + a'5 B' as well.
     if (coupled && !core) {
-        const std::array<std::array<Speaker, 2>, 4> predicted = {
+        std::vector<std::array<Speaker, 2>> predicted = {
             {{d, S::kLeftBack}, {e, S::kRightBack}, {f, S::kTopBackLeft}, {g, S::kTopBackRight}}};
         for (std::size_t j = 0; j < predicted.size(); ++j) {
             out.steps.push_back({.first = predicted[j][0],
@@ -310,6 +333,18 @@ ParseResult route_immersive(const SubstreamContext& ctx, const ChannelElement& e
                                  .chparam = prediction_first + static_cast<int>(j),
                                  .framing = predicted[j][0],
                                  .prediction = true});
+        }
+        if (fronts) {
+            // a'_4 and a'_5 follow the tracks L and M, and so their own chparam_info(), if any.
+            const std::array<std::array<Speaker, 2>, 2> screens = {
+                {{a, S::kLeftScreen}, {b, S::kRightScreen}}};
+            for (std::size_t j = 0; j < screens.size(); ++j) {
+                out.steps.push_back({.first = screens[j][0],
+                                     .second = screens[j][1],
+                                     .chparam = prediction_fronts_first + static_cast<int>(j),
+                                     .framing = screens[j][0],
+                                     .prediction = true});
+            }
         }
     }
     // 5.2.3.3 and 5.2.3.4: what the mode leaves silent until A-CPL or A-JCC
@@ -321,6 +356,10 @@ ParseResult route_immersive(const SubstreamContext& ctx, const ChannelElement& e
                                         S::kTopFrontRight, S::kTopBackLeft, S::kTopBackRight};
     } else if (mode == immersive_mode::kAspxAcpl2 && !core) {
         out.silent = {S::kLeftBack, S::kRightBack, S::kTopBackLeft, S::kTopBackRight};
+    }
+    if (fronts && !core &&
+        (mode == immersive_mode::kAspxAjcc || mode == immersive_mode::kAspxAcpl2)) {
+        out.silent.insert(out.silent.end(), {S::kLeftScreen, S::kRightScreen});
     }
     if (grouping < 0 || (grouping == 0 && !element.two_ch_mode.has_value()) ||
         lfe != ctx.has_lfe() || seven != element.b_use_sap_add_ch.has_value() || !walk.complete()) {
@@ -461,7 +500,11 @@ int ajoc_input_channel(int i, int n_fb, bool lfe) noexcept {
 }
 
 bool is_immersive(int ch_mode) noexcept {
-    return ch_mode == ch_mode::k7_0_4 || ch_mode == ch_mode::k7_1_4;
+    return ch_mode == ch_mode::k7_0_4 || ch_mode == ch_mode::k7_1_4 || has_fronts(ch_mode);
+}
+
+bool has_fronts(int ch_mode) noexcept {
+    return ch_mode == ch_mode::k9_0_4 || ch_mode == ch_mode::k9_1_4;
 }
 
 std::span<const Speaker> speakers_of(int ch_mode, DecodingMode decoding) noexcept {
@@ -493,6 +536,10 @@ std::span<const Speaker> speakers_of(int ch_mode, DecodingMode decoding) noexcep
             return core ? std::span<const Speaker>(k704_core) : std::span<const Speaker>(k704);
         case ch_mode::k7_1_4:
             return core ? std::span<const Speaker>(k714_core) : std::span<const Speaker>(k714);
+        case ch_mode::k9_0_4:
+            return core ? std::span<const Speaker>(k704_core) : std::span<const Speaker>(k904);
+        case ch_mode::k9_1_4:
+            return core ? std::span<const Speaker>(k714_core) : std::span<const Speaker>(k914);
         case ch_mode::k22_2:
             return k222;
         case object_layout::objects_with_lfe(0):
@@ -726,30 +773,49 @@ std::vector<AspxUnit> aspx_units(int ch_mode, int codec_mode, DecodingMode decod
         const AspxUnit centre = {
             .pair = false, .index = 0, .speakers = {S::kCentre, S::kCentre}, .first_only = false};
         switch (codec_mode) {
-            case immersive_mode::kAspxScpl:
+            case immersive_mode::kAspxScpl: {
                 // (Ls, Lb), (Rs, Rb), C, (L, R), (Tfl, Tbl), (Tfr, Tbr); in core
-                // decoding the first channel of each coupled pair alone.
-                return {{.pair = true,
-                         .index = 0,
-                         .speakers = {S::kLeftSurround, S::kLeftBack},
-                         .first_only = core},
-                        {.pair = true,
-                         .index = 1,
-                         .speakers = {S::kRightSurround, S::kRightBack},
-                         .first_only = core},
-                        centre,
-                        {.pair = true,
-                         .index = 2,
-                         .speakers = {S::kLeft, S::kRight},
-                         .first_only = false},
-                        {.pair = true,
-                         .index = 3,
-                         .speakers = {tl, S::kTopBackLeft},
-                         .first_only = core},
-                        {.pair = true,
-                         .index = 4,
-                         .speakers = {tr, S::kTopBackRight},
-                         .first_only = core}};
+                // decoding the first channel of each coupled pair alone. With
+                // b_5fronts (L, Lscr) and (R, Rscr) stand in place of (L, R):
+                // two aspx_data_2ch() the syntax sends, and in core decoding
+                // the first channel of each, as Table 9 lists L and R for the
+                // post-processing then (src/ac4dec/ERRATA.md, "The 9.X.4
+                // element's A-SPX in core decoding").
+                std::vector<AspxUnit> units = {{.pair = true,
+                                                .index = 0,
+                                                .speakers = {S::kLeftSurround, S::kLeftBack},
+                                                .first_only = core},
+                                               {.pair = true,
+                                                .index = 1,
+                                                .speakers = {S::kRightSurround, S::kRightBack},
+                                                .first_only = core},
+                                               centre};
+                int index = 2;
+                if (has_fronts(ch_mode)) {
+                    units.push_back({.pair = true,
+                                     .index = index++,
+                                     .speakers = {S::kLeft, S::kLeftScreen},
+                                     .first_only = core});
+                    units.push_back({.pair = true,
+                                     .index = index++,
+                                     .speakers = {S::kRight, S::kRightScreen},
+                                     .first_only = core});
+                } else {
+                    units.push_back({.pair = true,
+                                     .index = index++,
+                                     .speakers = {S::kLeft, S::kRight},
+                                     .first_only = false});
+                }
+                units.push_back({.pair = true,
+                                 .index = index++,
+                                 .speakers = {tl, S::kTopBackLeft},
+                                 .first_only = core});
+                units.push_back({.pair = true,
+                                 .index = index,
+                                 .speakers = {tr, S::kTopBackRight},
+                                 .first_only = core});
+                return units;
+            }
             case immersive_mode::kAspxAcpl1:
             case immersive_mode::kAspxAcpl2:
                 // (A'', B''), (D'', E''), (F'', G''), C''.

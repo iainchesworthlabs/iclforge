@@ -4,13 +4,15 @@
 #include <span>
 #include <vector>
 
+#include "iclforge/ac4core/acpl/acpl.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 #include "pcm/aspx.hpp"
 #include "syntax/metadata.hpp"
 
 // The dialogue enhancement tool of ETSI TS 103 190-1 V1.4.1 clause 5.7.8: in
 // the QMF domain, before DRC, the dialogue in the front channels (L, R and C,
-// Table 215) is raised by the gain the system asks for, capped by the stream's
+// Table 215; Lscr, Rscr and C for the 9.X.4 modes, ETSI TS 103 190-2 V1.3.1
+// Table 15) is raised by the gain the system asks for, capped by the stream's
 // G_max, through a matrix per parameter band (Table 173) that clause 5.7.8.6
 // interpolates slot by slot from the previous frame's.
 //
@@ -28,10 +30,18 @@
 //
 // Subbands above Table 173's last band, 40, have no parameters and pass
 // unchanged (ERRATA, "The subbands above dialogue enhancement's bands").
+//
+// Core decoding of the 9.X.4 modes' ASPX_AJCC and ASPX_ACPL_2 has a tool of its own
+// (ETSI TS 103 190-2 V1.3.1 clauses 5.8.2.1 and 5.8.2.2, DeCoreStage): the core's L, R and
+// C come of the A-JCC core or the A-CPL replacement gain, and the dialogue is in the screen
+// pair and C of the layout the core leaves out, so the tool adds to them the part of the
+// enhancement that the screen pair's share of the inputs would have had.
 
 namespace iclforge::ac4::detail {
 
 inline constexpr int kDeFront = 3;  // L, R and C, the order clause 5.7.8.6 gives the 3x6 matrix
+// The subbands Table 173's bands cover: the first 41, a subband above them has no parameters.
+inline constexpr int kDeSubbands = 41;
 
 // One frame's dialogue enhancement, dequantised.
 struct DeFrameValues {
@@ -58,11 +68,22 @@ struct DeFrameValues {
 [[nodiscard]] std::array<double, kDeFront> de_rendering(int nr_channels, double coef1,
                                                         double coef2) noexcept;
 
-// What a frame's dialog_enhancement() gives the tool.
-[[nodiscard]] DeFrameValues de_frame_values(const DialogEnhancement& de);
+// What a frame's dialog_enhancement() gives the tool: in core decoding the second de_data()
+// where there is one (b_de_simulcast, Part 2 clause 4.8.3.15), the first otherwise.
+[[nodiscard]] DeFrameValues de_frame_values(const DialogEnhancement& de, bool core = false);
+
+// A 3 x 3 matrix over the processed channels, in the order clause 5.7.8.6 gives them.
+using DeMatrix = std::array<std::array<double, kDeFront>, kDeFront>;
 
 class DeStage {
    public:
+    // Clauses 5.7.8.7 and 5.7.8.8's parametric matrix H of one frame at G_DE `gain_db`, less the
+    // identity, band by band: what the core tools of 5.8.2.1 and 5.8.2.2 take as the dialogue
+    // enhancement matrix's parametric part, (H_hat_DE,MC x [I; 0]) - I, with no waveform. All
+    // zero where `values` carries nothing or `gain_db` is 0.
+    [[nodiscard]] static std::array<DeMatrix, kDeNrBands> parametric_increment(
+        double gain_db, const DeFrameValues& values);
+
     // `speakers` names the channels in the order process() gets their
     // matrices; `slots` is num_qmf_timeslots.
     void configure(int slots, std::span<const Speaker> speakers);
@@ -82,7 +103,7 @@ class DeStage {
                  std::span<const QmfMatrix> waveform = {});
 
    private:
-    using Matrix = std::array<std::array<double, kDeFront>, kDeFront>;
+    using Matrix = DeMatrix;
 
     // Clause 5.7.8.6's 3x6 matrix per band: the parametric part, over L, R and
     // C, and the waveform part, over the waveform's channels.
@@ -92,13 +113,55 @@ class DeStage {
     };
 
     [[nodiscard]] static Matrix identity() noexcept;
-    [[nodiscard]] Frame frame_matrices(double gain_db, const DeFrameValues& values,
-                                       std::size_t waveform_channels) const;
+    [[nodiscard]] static Frame frame_matrices(double gain_db, const DeFrameValues& values,
+                                              std::size_t waveform_channels);
 
     int slots_ = 32;
     std::array<int, kDeFront> channel_{-1, -1, -1};  // each of L, R and C's matrix, -1 where absent
     Frame previous_{};
     bool previous_identity_ = true;
+};
+
+// The two coefficients C_L and C_R of Pseudocodes 19 and 21: the share of A'' and B'' that full
+// decoding sends to Lscr and Rscr, per parameter band and set, with each its own framing.
+struct DeCoreCoefficients {
+    std::array<acpl::Framing, 2> framing{};
+    int num_bands = acpl::kMaxParamBands;  // the parameter bands of the A-JCC or A-CPL data
+    std::array<acpl::ParamSets, 2> values{};
+};
+
+// ETSI TS 103 190-2 V1.3.1 clauses 5.8.2.1 and 5.8.2.2: y = (M_interp | I) (m, u), the core's L,
+// R and C (u) with M_interp m added, m being A'', B'' and C'' as the A-JCC core takes them, or
+// the A-CPL replacement gain gives them (src/ac4dec/ERRATA.md, "Core decoding's dialogue
+// enhancement for 9.X.4"). M_interp is Pseudocode 20's interpolation, per subband and input, of
+// the enhancement matrix (H - I) times the coefficient of the input (C_L, C_R, and 1 for C), from
+// the matrix the last frame ended on to this frame's.
+class DeCoreStage {
+   public:
+    // `slots` is num_qmf_timeslots.
+    void configure(int slots);
+
+    // Nothing enhanced before the first frame: every matrix the interpolation starts from is 0.
+    void reset() noexcept;
+
+    // Whether process() would give a non-zero increment: parameters now, or a matrix left from
+    // the last frame to interpolate from.
+    [[nodiscard]] bool active(double gain_db, const DeFrameValues& values) const noexcept;
+
+    // Writes M_interp m to `delta`, one matrix of `slots` x 64 values for each of L, R and C, from
+    // the inputs `m`, at G_DE `gain_db`; and moves the interpolation on a frame.
+    void process(double gain_db, const DeFrameValues& values,
+                 const DeCoreCoefficients& coefficients, std::span<const QmfMatrix, kDeFront> m,
+                 std::span<const std::span<QmfValue>, kDeFront> delta);
+
+   private:
+    int slots_ = 32;
+    // Pseudocode 20's state per subband: Mprev[sb][ch1][ch2], de_param_prev and
+    // coeff_prev[ch2][sb].
+    std::array<DeMatrix, kDeSubbands> m_prev_{};
+    std::array<DeMatrix, kDeSubbands> de_prev_{};
+    std::array<std::array<double, kDeSubbands>, kDeFront> coeff_prev_{};
+    bool previous_zero_ = true;
 };
 
 }  // namespace iclforge::ac4::detail

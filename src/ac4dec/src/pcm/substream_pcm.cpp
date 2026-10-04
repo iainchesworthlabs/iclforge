@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <numbers>
 #include <span>
 
 #include "iclforge/ac4core/aspx/hf_generator.hpp"
@@ -135,6 +136,51 @@ constexpr std::size_t kMaxUnits = kMaxAspxElements;
                                            : mode != codec_mode::kSimple;
 }
 
+// Whether core decoding of an element of `kind` in `mode`, a 9.X.4 mode's, takes its dialogue
+// enhancement from Part 2's tool for A-JCC and A-CPL (clauses 5.8.2.1 and 5.8.2.2) rather than
+// Part 1's.
+[[nodiscard]] bool uses_core_de(ElementKind kind, int mode, DecodingMode decoding,
+                                int ch_mode) noexcept {
+    return kind == ElementKind::kImmersive && decoding == DecodingMode::kCore &&
+           has_fronts(ch_mode) &&
+           (mode == immersive_mode::kAspxAcpl2 || mode == immersive_mode::kAspxAjcc);
+}
+
+// Pseudocode 19: C_L = 1 - ajcc_dry1f_dq - ajcc_dry2f_dq and C_R = 1 - ajcc_dry3f_dq -
+// ajcc_dry4f_dq, which are the left and right front modules' dry1 and dry2, with the modules'
+// framing (ajcc_it_lf, ajcc_nps_lf, ajcc_psts_lf and the right's).
+[[nodiscard]] DeCoreCoefficients de_coefficients(const AjccFrameValues& values) {
+    DeCoreCoefficients out;
+    out.num_bands = values.num_bands;
+    for (std::size_t module = 0; module < 2; ++module) {
+        out.framing[module] = values.framing[module];
+        for (std::size_t ps = 0; ps < acpl::kMaxParamSets; ++ps) {
+            for (std::size_t pb = 0; pb < static_cast<std::size_t>(values.num_bands); ++pb) {
+                const ajcc::ModuleParams p = values.module_params_5fronts(module, ps, pb);
+                out.values[module][ps][pb] = 1.0 - p.dry1 - p.dry2;
+            }
+        }
+    }
+    return out;
+}
+
+// Pseudocode 21: C_L = 0.5 (1 - acpl_alpha5_dq) and C_R = 0.5 (1 - acpl_alpha6_dq), the alpha1 of
+// the fifth and sixth acpl_data_1ch(), with their framing.
+[[nodiscard]] DeCoreCoefficients de_coefficients(const AcplFrameValues& values) {
+    DeCoreCoefficients out;
+    for (std::size_t module = 0; module < 2; ++module) {
+        const AcplModuleValues& m = values.modules[4 + module];
+        out.framing[module] = m.framing;
+        out.num_bands = m.num_bands;
+        for (std::size_t ps = 0; ps < acpl::kMaxParamSets; ++ps) {
+            for (std::size_t pb = 0; pb < acpl::kMaxParamBands; ++pb) {
+                out.values[module][ps][pb] = 0.5 * (1.0 - m.alpha[ps][pb]);
+            }
+        }
+    }
+    return out;
+}
+
 // The chparam_info()s a processed channel data element of `count` tracks
 // holds: one for a pair, two for three tracks, four and five for the others.
 [[nodiscard]] std::size_t chparams_of(int count) noexcept {
@@ -211,6 +257,9 @@ void SubstreamPcm::reset() {
     applied_mode_.reset();
     converter_phase_.reset();
     de_.reset();
+    if (de_core_) {
+        de_core_->reset();
+    }
     drc_.reset();
     downmix_.reset();
     last_spectra_.clear();
@@ -234,7 +283,8 @@ void SubstreamPcm::configure_outputs(const SubstreamContext& ctx, const OutputCo
     if (is_immersive(ch_mode_)) {
         layout = ImmersiveLayout{.backs = ctx.b_4_back_channels_present,
                                  .tops = ctx.top_channels_present,
-                                 .lfe = ch_mode_ == ch_mode::k7_1_4,
+                                 .lfe = ch_mode_ == ch_mode::k7_1_4 || ch_mode_ == ch_mode::k9_1_4,
+                                 .screen = has_fronts(ch_mode_),
                                  .decoding = decoding_};
     }
     const bool same_inputs = outputs_valid_ && add_ch_base_ == ctx.add_ch_base && layout_ == layout;
@@ -341,6 +391,9 @@ ParseResult SubstreamPcm::configure(const SubstreamContext& ctx, DecodingMode de
     applied_mode_.reset();
     converter_phase_.reset();
     de_.configure(slots_, speakers_);
+    if (de_core_) {
+        de_core_->configure(slots_);
+    }
     // The QMF banks run at the internal rate.
     const double base_rate = ctx.fs_index == 0 ? 44100.0 : 48000.0;
     internal_rate_ = base_rate * static_cast<double>(ratio.down) / static_cast<double>(ratio.up);
@@ -473,6 +526,8 @@ SubstreamPcm::UnitIo SubstreamPcm::unit_io(const AspxUnit& unit, const Control& 
 
 void SubstreamPcm::apply(const Control& control) {
     out_in_ext_ = false;
+    de_core_mode_ = false;
+    de_core_pending_ = false;
     if (control.new_source) {
         // The new source's first frame takes none of the old one's envelopes
         // as the base of its differences along time (ERRATA.md, "A change of
@@ -578,6 +633,11 @@ void SubstreamPcm::apply(const Control& control) {
     if (control.kind == ElementKind::kImmersive) {
         apply_immersive_gains(control, std::span<const UnitIo>(units).first(units_.size()),
                               std::span<const aspx::SubbandGroups>(groups).first(units_.size()));
+    }
+    // Core decoding's A-JCC and A-CPL replacement have taken nothing yet: the dialogue
+    // enhancement tool of clauses 5.8.2.1 and 5.8.2.2 reads their inputs.
+    if (uses_core_de(control.kind, control.codec_mode, decoding_, ch_mode_)) {
+        core_dialogue_enhancement(control);
     }
 
     // A-CPL on what A-SPX made (Figure 6, Table 214; Part 2 Table 12).
@@ -720,6 +780,49 @@ void SubstreamPcm::synthesise_objects(const FrameInputs& frame_inputs, const Drc
     converter_phase_ = converter_phase;
 }
 
+void SubstreamPcm::core_dialogue_enhancement(const Control& control) {
+    de_core_mode_ = true;
+    const bool ajcc = control.codec_mode == immersive_mode::kAspxAjcc;
+    if (ajcc ? !control.ajcc.has_value() : !control.acpl.has_value()) {
+        return;
+    }
+    if (!de_core_) {
+        de_core_ = std::make_unique<DeCoreStage>();
+        de_core_->configure(slots_);
+    }
+    if (!de_core_->active(de_gain_, control.de)) {
+        return;
+    }
+    const DeCoreCoefficients coefficients =
+        ajcc ? de_coefficients(*control.ajcc) : de_coefficients(*control.acpl);
+    // m: A'', B'' and C'' at the scale of u, the outputs they are added to: A-JCC's input gain
+    // (Pseudocode 12), or the replacement gain A-SPX's gains have already applied
+    // (clause 4.8.3.14).
+    constexpr double kAjccInputGain = 2.0 + 1.0 / std::numbers::sqrt2;
+    const auto gain = static_cast<Real>(ajcc ? kAjccInputGain : 1.0);
+    const std::size_t n = at(slots_) * kSubbands;
+    std::array<QmfMatrix, kDeFront> inputs{};
+    std::array<std::span<QmfValue>, kDeFront> delta{};
+    constexpr std::array<Speaker, kDeFront> kFront = {Speaker::kLeft, Speaker::kRight,
+                                                      Speaker::kCentre};
+    for (std::size_t k = 0; k < kFront.size(); ++k) {
+        const int channel = channel_of(kFront[k]);
+        if (channel < 0) {
+            return;
+        }
+        const QmfMatrix source = channels_[at(channel)].out();
+        de_core_inputs_[k].resize(n);
+        for (std::size_t i = 0; i < n; ++i) {
+            de_core_inputs_[k][i] = gain * source[i];
+        }
+        de_core_delta_[k].assign(n, QmfValue{});
+        inputs[k] = de_core_inputs_[k];
+        delta[k] = de_core_delta_[k];
+    }
+    de_core_->process(de_gain_, control.de, coefficients, inputs, delta);
+    de_core_pending_ = true;
+}
+
 void SubstreamPcm::apply_immersive_gains(const Control& control, std::span<const UnitIo> units,
                                          std::span<const aspx::SubbandGroups> groups) {
     // Every channel but the LFE comes out of A-SPX in the modes that apply a
@@ -730,8 +833,8 @@ void SubstreamPcm::apply_immersive_gains(const Control& control, std::span<const
             if (index < 0) {
                 continue;
             }
-            const BandGains gains =
-                immersive_gains(control.codec_mode, decoding_, speakers_[at(index)]);
+            const BandGains gains = immersive_gains(control.codec_mode, decoding_,
+                                                    has_fronts(ch_mode_), speakers_[at(index)]);
             if (gains.low != 1.0 || gains.high != 1.0) {
                 apply_band_gains(channels_[at(index)].out(), slots_, groups[u].sbx, gains);
             }
@@ -937,7 +1040,12 @@ ParseResult SubstreamPcm::decode(const SubstreamContext& ctx, const AudioSubstre
     }
     // Clause 5.7.7.7 now, so that a value outside its table refuses the
     // frame; the history DIFF_TIME refers to moves on once the frame is kept.
-    const bool acpl_used = uses_acpl(element.kind, element.codec_mode, decoding_);
+    // Core decoding's dialogue enhancement for the 9.X.4 modes' ASPX_ACPL_2 reads the fifth and
+    // sixth acpl_data_1ch() (clause 5.8.2.2), whose differential decoding runs as full decoding's.
+    const bool acpl_used =
+        uses_acpl(element.kind, element.codec_mode, decoding_) ||
+        (uses_core_de(element.kind, element.codec_mode, decoding_, ctx.ch_mode) &&
+         element.codec_mode == immersive_mode::kAspxAcpl2);
     const bool fresh = frame_inputs.new_source || decoded_mode_ != element.codec_mode;
     AcplQuantHistory acpl_history = fresh ? AcplQuantHistory{} : acpl_history_;
     if (acpl_used) {
@@ -1135,7 +1243,7 @@ ParseResult SubstreamPcm::render(const FrameInputs& frame_inputs,
         }
         // S-CPL on the inverse transform's output, the frame's own, before the frame alignment
         // and the analysis.
-        apply_scpl(*scpl_mode_, decoding_, speakers_, time_);
+        apply_scpl(*scpl_mode_, decoding_, has_fronts(ch_mode_), speakers_, time_);
     }
     for (std::size_t c = 0; c < channel_count; ++c) {
         if (!across_channels) {
@@ -1178,6 +1286,9 @@ ParseResult SubstreamPcm::render(const FrameInputs& frame_inputs,
     DownmixValues downmix;
     MixValues mix;
     ajoc_applied_ = false;
+    de_gain_ = frame_inputs.output.dialogue_enhancement_db;
+    de_core_mode_ = false;
+    de_core_pending_ = false;
     if (held_.size() > static_cast<std::size_t>(control_delay_)) {
         apply(held_.front());
         drc = held_.front().drc;
@@ -1197,7 +1308,7 @@ ParseResult SubstreamPcm::render(const FrameInputs& frame_inputs,
         matrices_.push_back(channel.out());
     }
     const double de_gain = frame_inputs.output.dialogue_enhancement_db;
-    const bool enhance = de_.active(de_gain, de);
+    const bool enhance = de_core_mode_ ? de_core_pending_ : de_.active(de_gain, de);
     // In a presentation of several substreams the others are mixed in ahead
     // of DRC (clause 6.2.16; ERRATA, "Where the substreams are mixed").
     const bool mixing = !frame_inputs.qmf_only && mix.active;
@@ -1228,7 +1339,18 @@ ParseResult SubstreamPcm::render(const FrameInputs& frame_inputs,
         }
         side = side_matrices_;
     }
-    if (enhance) {
+    if (enhance && de_core_mode_) {
+        // Clauses 5.8.2.1 and 5.8.2.2: y = (M_interp | I) (m, u): u, the core's L, R and C, is in
+        // the matrices, and M_interp m was made when the frame's control data were applied.
+        constexpr std::array<Speaker, kDeFront> kFront = {Speaker::kLeft, Speaker::kRight,
+                                                          Speaker::kCentre};
+        for (std::size_t k = 0; k < kFront.size(); ++k) {
+            const QmfMatrix target = matrices_[at(channel_of(kFront[k]))];
+            for (std::size_t i = 0; i < de_core_delta_[k].size() && i < target.size(); ++i) {
+                target[i] += de_core_delta_[k][i];
+            }
+        }
+    } else if (enhance) {
         de_.process(de_gain, de, matrices_,
                     frame_inputs.dialogue ? frame_inputs.dialogue->matrices
                                           : std::span<const QmfMatrix>{});

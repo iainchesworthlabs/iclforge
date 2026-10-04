@@ -787,18 +787,21 @@ TEST_CASE("a presentation_config 5 presentation takes each group's role from its
     check_read(find(report, 3), SubstreamReport::Kind::kPresentation);
 }
 
-TEST_CASE("a 9.X.4 channel substream is refused as not decoded", "[ac4dec][frames]") {
+TEST_CASE("a 9.X.4 channel substream is read as the immersive element with b_5fronts",
+          "[ac4dec][frames]") {
     // 9.1.4 with four back channels and both top pairs: the presentation
     // substream reads bs_ch_config 0's b_cdmx_data_present, the stereo
-    // downmix flag and seven loudness correction flags, as 7.1.4's does.
+    // downmix flag and seven loudness correction flags, as 7.1.4's does. Four
+    // zero bytes are an SCPL element with its LFE and nothing after the
+    // first sf_info()s: the substream is read, not refused as not decoded, and
+    // runs out.
     PresV1 p;
     ChanInfo info;
     info.ch_mode = 14;
     const std::vector<std::byte> blank(4, std::byte{0});
     const auto report = decode(single_group_frame({}, p, {info}, {blank, presentation(1, false, 9)}));
     CHECK(find(report, 0).kind == SubstreamReport::Kind::kAudio);
-    check_refused(find(report, 0), DecodeError::kUnsupported);
-    CHECK(find(report, 0).refused_reason.find("9.X.4") != std::string_view::npos);
+    check_refused(find(report, 0), DecodeError::kTruncated);
     check_read(find(report, 1), SubstreamReport::Kind::kPresentation);
 }
 

@@ -261,7 +261,18 @@ TEST_CASE("the channel modes' speakers, in the order decode() writes them", "[ac
                                             Speaker::kTopSideLeft, Speaker::kTopSideRight});
     CHECK(core(mode::k7_1_4).size() == 8);
     CHECK(core(mode::k7_1_322) == list(mode::k7_1_322));
-    CHECK(list(mode::k9_1_4).empty());
+    // Part 2 Table A.27's 9.X.4 column, by speaker index, in full decoding: the LFE (index 11)
+    // after Tbr, then Lscr and Rscr (24 and 25); the core is the 7.X.4 modes'.
+    CHECK(list(mode::k9_1_4) ==
+          std::vector{Speaker::kLeft, Speaker::kRight, Speaker::kCentre, Speaker::kLeftSurround,
+                      Speaker::kRightSurround, Speaker::kLeftBack, Speaker::kRightBack,
+                      Speaker::kTopFrontLeft, Speaker::kTopFrontRight, Speaker::kTopBackLeft,
+                      Speaker::kTopBackRight, Speaker::kLfe, Speaker::kLeftScreen,
+                      Speaker::kRightScreen});
+    CHECK(list(mode::k9_0_4).size() == 13);
+    CHECK(list(mode::k9_0_4).back() == Speaker::kRightScreen);
+    CHECK(core(mode::k9_0_4) == core(mode::k7_0_4));
+    CHECK(core(mode::k9_1_4) == core(mode::k7_1_4));
     // Part 2 Table A.27's 22.2 column, by speaker index: the LFE after Tbr, LFE2
     // after Tc, and the same 24 in core decoding.
     using S = Speaker;
@@ -677,6 +688,168 @@ TEST_CASE("Part 2 Table 19 routes the immersive element's tracks, with step 4 an
             iclforge::ac4::detail::ch_mode::k7_0_4;  // an LFE track where the mode has none
         CHECK_FALSE(iclforge::ac4::detail::route_element(ctx, element, route));
     }
+}
+
+TEST_CASE(
+    "Part 2 Table 19 routes the 9.X.4 element's thirteen tracks, with Table 20's six parameters",
+    "[ac4dec][multichannel]") {
+    namespace immersive = iclforge::ac4::detail::immersive_mode;
+    using S = Speaker;
+    SubstreamContext ctx;
+    ctx.ch_mode = iclforge::ac4::detail::ch_mode::k9_1_4;
+    ElementRoute route;
+    const auto immersive_element = [](int mode, int tracks, int pairs, bool lfe) {
+        ChannelElement element = element_of(ElementKind::kImmersive, tracks, lfe);
+        element.codec_mode = mode;
+        element.b_5fronts = true;
+        element.b_enable_mdct_stereo_proc.assign(static_cast<std::size_t>(pairs), false);
+        return element;
+    };
+    SECTION("SCPL: the tracks L and M are Lscr and Rscr, and a'_4 and a'_5 follow them") {
+        // LFE, [A,B], [D,E], C, [F,G], [H,I], [J,K], [L,M]; step 4's two chparam_info(), Table
+        // 20's four after [J,K], then [L,M]'s own (it is processed) and a'_4 and a'_5.
+        ChannelElement element = immersive_element(immersive::kScpl, 14, 6, true);
+        element.core_5ch_grouping = 0;
+        element.two_ch_mode = false;
+        element.b_use_sap_add_ch = true;
+        element.b_enable_mdct_stereo_proc[5] = true;  // [L,M]
+        element.chparams.resize(2 + 4 + 1 + 2);
+        REQUIRE(iclforge::ac4::detail::route_element(ctx, element, route));
+        CHECK(destinations(route) == std::vector{S::kLfe, S::kLeft, S::kRight, S::kLeftSurround,
+                                                 S::kRightSurround, S::kCentre, S::kTopFrontLeft,
+                                                 S::kTopFrontRight, S::kLeftBack, S::kRightBack,
+                                                 S::kTopBackLeft, S::kTopBackRight, S::kLeftScreen,
+                                                 S::kRightScreen});
+        CHECK(route.silent.empty());
+        REQUIRE(route.steps.size() == 2 + 4 + 2);
+        // a'_4 and a'_5 predict L from A and M from B, framed as A and B; their chparam_info()
+        // come after the pair's own, which is the one at index 2 + 4.
+        const auto& l = route.steps[6];
+        const auto& m = route.steps[7];
+        CHECK((l.prediction && l.first == S::kLeft && l.second == S::kLeftScreen &&
+               l.framing == S::kLeft));
+        CHECK((m.prediction && m.first == S::kRight && m.second == S::kRightScreen &&
+               m.framing == S::kRight));
+        CHECK(l.chparam == 2 + 4 + 1);
+        CHECK(m.chparam == 2 + 4 + 2);
+        CHECK(route.data.back().first_chparam == 2 + 4);
+
+        // Core decoding: L and M are read and not decoded, with H to K.
+        REQUIRE(iclforge::ac4::detail::route_element(ctx, element, route,
+                                                     iclforge::ac4::DecodingMode::kCore));
+        REQUIRE(route.data.size() == 8);
+        CHECK(route.data[5].discarded);
+        CHECK(route.data[6].discarded);
+        CHECK(route.data[7].discarded);
+        CHECK(route.steps.size() == 2);
+    }
+    SECTION("2ch_mode 1 frames a'_5 by B's track, which is the third of the core") {
+        // [A,D], [B,E]: the track B is at position 2, in the second two_channel_data().
+        ChannelElement element = immersive_element(immersive::kAspxAcpl1, 14, 6, true);
+        element.core_5ch_grouping = 0;
+        element.two_ch_mode = true;
+        element.b_use_sap_add_ch = false;
+        element.chparams.resize(4 + 2);
+        REQUIRE(iclforge::ac4::detail::route_element(ctx, element, route));
+        CHECK(destinations(route)[1] == S::kLeft);
+        CHECK(destinations(route)[2] == S::kLeftSurround);
+        CHECK(destinations(route)[3] == S::kRight);
+        REQUIRE(route.steps.size() == 6);
+        CHECK(route.steps[4].chparam == 4);
+        CHECK(route.steps[5].chparam == 5);
+    }
+    SECTION(
+        "ASPX_ACPL_2 and ASPX_AJCC leave Lscr and Rscr silent with the rest of A-CPL's and "
+        "A-JCC's") {
+        ChannelElement acpl = immersive_element(immersive::kAspxAcpl2, 8, 3, true);
+        acpl.core_5ch_grouping = 0;
+        acpl.two_ch_mode = false;
+        acpl.b_use_sap_add_ch = false;
+        REQUIRE(iclforge::ac4::detail::route_element(ctx, acpl, route));
+        CHECK(route.silent == std::vector{S::kLeftBack, S::kRightBack, S::kTopBackLeft,
+                                          S::kTopBackRight, S::kLeftScreen, S::kRightScreen});
+        REQUIRE(iclforge::ac4::detail::route_element(ctx, acpl, route,
+                                                     iclforge::ac4::DecodingMode::kCore));
+        CHECK(route.silent.empty());
+
+        ChannelElement ajcc = immersive_element(immersive::kAspxAjcc, 6, 2, true);
+        ajcc.core_5ch_grouping = 0;
+        ajcc.two_ch_mode = false;
+        REQUIRE(iclforge::ac4::detail::route_element(ctx, ajcc, route));
+        CHECK(route.silent == std::vector{S::kLeftBack, S::kRightBack, S::kTopFrontLeft,
+                                          S::kTopFrontRight, S::kTopBackLeft, S::kTopBackRight,
+                                          S::kLeftScreen, S::kRightScreen});
+        REQUIRE(iclforge::ac4::detail::route_element(ctx, ajcc, route,
+                                                     iclforge::ac4::DecodingMode::kCore));
+        CHECK(route.silent == std::vector{S::kTopSideLeft, S::kTopSideRight});
+    }
+    SECTION("an element that sends only 7.X.4's tracks is refused") {
+        ChannelElement element = immersive_element(immersive::kScpl, 12, 5, true);
+        element.core_5ch_grouping = 0;
+        element.two_ch_mode = false;
+        element.b_use_sap_add_ch = false;
+        element.chparams.resize(4);
+        CHECK_FALSE(iclforge::ac4::detail::route_element(ctx, element, route));
+    }
+}
+
+TEST_CASE("Part 2 Table 8 names the channels A-SPX processes in the 9.X.4 element",
+          "[ac4dec][multichannel]") {
+    namespace mode = iclforge::ac4::detail::ch_mode;
+    namespace immersive = iclforge::ac4::detail::immersive_mode;
+    using iclforge::ac4::detail::aspx_units;
+    using iclforge::ac4::detail::companded_speakers;
+    using S = Speaker;
+    constexpr auto kCore = iclforge::ac4::DecodingMode::kCore;
+    CHECK(aspx_units(mode::k9_1_4, immersive::kScpl).empty());
+    CHECK(companded_speakers(mode::k9_1_4, immersive::kAspxScpl).empty());
+    CHECK(companded_speakers(mode::k9_0_4, immersive::kAspxAjcc) ==
+          std::vector{S::kLeft, S::kRight, S::kCentre, S::kLeftSurround, S::kRightSurround});
+
+    // ASPX_SCPL with b_5fronts: (Ls, Lb), (Rs, Rb), C, (L, Lscr), (R, Rscr), (Tfl, Tbl), (Tfr,
+    // Tbr).
+    const auto full = aspx_units(mode::k9_1_4, immersive::kAspxScpl);
+    REQUIRE(full.size() == 7);
+    const std::array<std::array<S, 2>, 7> kFull = {{{S::kLeftSurround, S::kLeftBack},
+                                                    {S::kRightSurround, S::kRightBack},
+                                                    {S::kCentre, S::kCentre},
+                                                    {S::kLeft, S::kLeftScreen},
+                                                    {S::kRight, S::kRightScreen},
+                                                    {S::kTopFrontLeft, S::kTopBackLeft},
+                                                    {S::kTopFrontRight, S::kTopBackRight}}};
+    const std::array<int, 7> kIndex = {0, 1, 0, 2, 3, 4, 5};
+    for (std::size_t u = 0; u < full.size(); ++u) {
+        CAPTURE(u);
+        CHECK(full[u].speakers[0] == kFull[u][0]);
+        CHECK(full[u].pair == (u != 2));
+        if (full[u].pair) {
+            CHECK(full[u].speakers[1] == kFull[u][1]);
+        }
+        CHECK(full[u].index == kIndex[u]);
+        CHECK_FALSE(full[u].first_only);
+    }
+    // Core decoding: the first channel of every pair alone, L and R too (Table 9 lists them with
+    // b_5fronts), since the stream has no aspx_data_2ch() for the pair (L, R) Table 8's core row
+    // names.
+    const auto core = aspx_units(mode::k9_1_4, immersive::kAspxScpl, kCore);
+    REQUIRE(core.size() == 7);
+    CHECK((core[0].first_only && core[1].first_only && !core[2].first_only && core[3].first_only &&
+           core[4].first_only && core[5].first_only && core[6].first_only));
+    CHECK(core[3].speakers[0] == S::kLeft);
+    CHECK(core[4].speakers[0] == S::kRight);
+    CHECK(core[5].speakers[0] == S::kTopSideLeft);
+    CHECK(core[6].speakers[0] == S::kTopSideRight);
+
+    // ASPX_ACPL_1 and 2, and ASPX_AJCC, as without b_5fronts.
+    for (const int codec : {immersive::kAspxAcpl1, immersive::kAspxAcpl2}) {
+        const auto acpl = aspx_units(mode::k9_0_4, codec);
+        REQUIRE(acpl.size() == 4);
+        CHECK(acpl[0].speakers == std::array{S::kLeft, S::kRight});
+        CHECK(acpl[2].speakers == std::array{S::kTopFrontLeft, S::kTopFrontRight});
+    }
+    const auto ajcc = aspx_units(mode::k9_0_4, immersive::kAspxAjcc);
+    REQUIRE(ajcc.size() == 3);
+    CHECK(ajcc[1].speakers == std::array{S::kLeftSurround, S::kRightSurround});
 }
 
 TEST_CASE("Tables 212 and 213 name the channels companding and A-SPX process", "[ac4dec][multichannel]") {

@@ -16,12 +16,14 @@
 // comparing them, to commit after a change to the builder.
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <complex>
 #include <cstddef>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <numbers>
 #include <span>
@@ -58,7 +60,8 @@ struct Decoded {
 // Every frame decoded, with the decoder's records the writer's: the same
 // substreams, offsets, widths and values, in the same order.
 Decoded decode_checked(const BuiltStream& stream,
-                       iclforge::ac4::DecodingMode decoding = iclforge::ac4::DecodingMode::kFull) {
+                       iclforge::ac4::DecodingMode decoding = iclforge::ac4::DecodingMode::kFull,
+                       double dialogue_enhancement_db = 0.0) {
     std::vector<iclforge::ac4::SyntaxRecord> read;
     const auto keep = [&read](const iclforge::ac4::SyntaxRecord& record) {
         read.push_back(record);
@@ -66,6 +69,7 @@ Decoded decode_checked(const BuiltStream& stream,
     iclforge::ac4::DecoderConfig config;
     config.syntax = keep;
     config.decoding = decoding;
+    config.output.dialogue_enhancement_db = dialogue_enhancement_db;
     iclforge::ac4::Decoder decoder(config);
     Decoded out;
     for (std::size_t f = 0; f < stream.frames.size(); ++f) {
@@ -214,6 +218,112 @@ void check_core_routing(const BuiltStream& stream, const Decoded& decoded) {
     }
 }
 
+// Core decoding of the 9.X.4 modes' immersive element (Part 2 clauses 4.7 and 5.3.3.2): the core
+// is 5.X.2, whose L, R, C, Ls, Rs, Tsl and Tsr come, by codec mode, as follows. Each entry is a
+// core channel, the tone that is on it and that tone's amplitude as a multiple of the source's
+// -20 dBFS; every other tone must be 60 dB under -20 dBFS there.
+//
+//   SCPL, ASPX_SCPL and ASPX_ACPL_1: A'' to G'' at c_gain (Table 24), or with A-SPX at 2 and
+//   with A-CPL's replacement gain of 2 (clause 4.8.3.14): L is (L + Lscr), R (R + Rscr), C C, Ls
+//   (Ls + Lb) / sqrt 2, Rs (Rs + Rb) / sqrt 2, Tsl (Tfl + Tbl) / sqrt 2, Tsr (Tfr + Tbr) / sqrt 2;
+//   ASPX_ACPL_2: each core channel the one of its pair that the module sends the downmix to, L
+//   the L or, with acpl_second, the Lscr tone at 1, Ls the Ls or Lb tone at 1 / sqrt 2, and alike;
+//   ASPX_AJCC: Pseudocode 13's modules by the route (below).
+struct CoreTone {
+    Speaker core;
+    Speaker source;
+    double gain;
+};
+
+std::vector<CoreTone> core_tones_of_fronts(const ElementCase& c) {
+    using S = Speaker;
+    const double down = std::sqrt(0.5);
+    std::vector<CoreTone> out = {{S::kCentre, S::kCentre, 1.0}};
+    const auto sides = [&](auto&& side) {
+        side(true, S::kLeft, S::kLeftScreen, S::kLeftSurround, S::kLeftBack, S::kTopFrontLeft,
+             S::kTopBackLeft, S::kTopSideLeft);
+        side(false, S::kRight, S::kRightScreen, S::kRightSurround, S::kRightBack, S::kTopFrontRight,
+             S::kTopBackRight, S::kTopSideRight);
+    };
+    if (c.immersive == 4) {
+        // Pseudocode 13 at wet 0: dry1f = dry1b = 1 on route 0, dry2f = dry2b = 1 on route 1,
+        // neither on route 2. L = (1 - dry2f) x0in, Ls = (dry1b + dry2b) x1in, Tsl = dry2f x0in +
+        // (1 - dry1b - dry2b) x1in, where x0in is the tone of the front's output by the route
+        // (L, Tfl or Lscr; Tfl, which Pseudocode 8 scales, at 1 / sqrt 2) and x1in that of the
+        // back's (Ls, Lb or Tbl, at 1 / sqrt 2).
+        sides([&](bool, S l, S scr, S ls, S lb, S tfl, S tbl, S tsl) {
+            switch (c.ajcc_route) {
+                case 0:
+                    out.push_back({l, l, 1.0});
+                    out.push_back({ls, ls, down});
+                    break;
+                case 1:
+                    out.push_back({ls, lb, down});
+                    out.push_back({tsl, tfl, down});
+                    break;
+                default:
+                    out.push_back({l, scr, 1.0});
+                    out.push_back({tsl, tbl, down});
+                    break;
+            }
+        });
+        return out;
+    }
+    sides([&](bool, S l, S scr, S ls, S lb, S tfl, S tbl, S tsl) {
+        if (c.immersive == 3) {
+            out.push_back({l, c.acpl_second ? scr : l, 1.0});
+            out.push_back({ls, c.acpl_second ? lb : ls, down});
+            out.push_back({tsl, c.acpl_second ? tbl : tfl, down});
+            return;
+        }
+        out.push_back({l, l, 1.0});
+        out.push_back({l, scr, 1.0});
+        out.push_back({ls, ls, down});
+        out.push_back({ls, lb, down});
+        out.push_back({tsl, tfl, down});
+        out.push_back({tsl, tbl, down});
+    });
+    return out;
+}
+
+void check_core_routing_fronts(const ElementCase& c, const BuiltStream& stream,
+                               const Decoded& decoded) {
+    using S = Speaker;
+    const std::vector<S> core =
+        stream.speakers.size() == 14
+            ? std::vector<S>{S::kLeft,         S::kRight,         S::kCentre,      S::kLfe,
+                             S::kLeftSurround, S::kRightSurround, S::kTopSideLeft, S::kTopSideRight}
+            : std::vector<S>{S::kLeft,          S::kRight,       S::kCentre,      S::kLeftSurround,
+                             S::kRightSurround, S::kTopSideLeft, S::kTopSideRight};
+    REQUIRE(decoded.speakers == core);
+    const std::vector<CoreTone> tones = core_tones_of_fronts(c);
+    for (std::size_t ch = 0; ch < decoded.channels.size(); ++ch) {
+        CAPTURE(ch, iclforge::ac4::describe(decoded.speakers[ch]));
+        for (std::size_t s = 0; s < stream.speakers.size(); ++s) {
+            if (stream.tone_hz[s] <= 0.0 || stream.speakers[s] == S::kLfe) {
+                continue;
+            }
+            CAPTURE(iclforge::ac4::describe(stream.speakers[s]));
+            const double level = tone_amplitude(steady(decoded, ch), stream.tone_hz[s]);
+            const auto wanted = std::ranges::find_if(tones, [&](const CoreTone& t) {
+                return t.core == decoded.speakers[ch] && t.source == stream.speakers[s];
+            });
+            if (wanted == tones.end()) {
+                CHECK(level < kAmplitude * 1e-3);
+            } else {
+                CHECK(std::abs(20.0 * std::log10(level / (kAmplitude * wanted->gain))) < 0.3);
+            }
+        }
+    }
+    // The LFE is its own, untouched.
+    if (stream.speakers.size() == 14) {
+        const auto lfe = std::ranges::find(decoded.speakers, S::kLfe) - decoded.speakers.begin();
+        const auto at = static_cast<std::size_t>(lfe);
+        CHECK(std::abs(20.0 * std::log10(tone_amplitude(steady(decoded, at), 47.0) / kAmplitude)) <
+              0.3);
+    }
+}
+
 void check_case(const ElementCase& c) {
     INFO(name_of(c) << (c.aspx ? " ASPX" : " SIMPLE") << ", chel_matsel " << c.chel_matsel
                     << ", sap_mode " << c.sap_mode << ", 2ch_mode " << c.two_ch_mode
@@ -224,7 +334,10 @@ void check_case(const ElementCase& c) {
                     << c.ajcc_core_mode << " route " << c.ajcc_route);
     const BuiltStream stream = ac4dec_test::build_stream(c, kFrames);
     check_routing(stream, decode_checked(stream));
-    if (c.immersive >= 0) {
+    if (c.immersive >= 0 && c.ch_mode >= 13 && c.ch_mode <= 14) {
+        check_core_routing_fronts(c, stream,
+                                  decode_checked(stream, iclforge::ac4::DecodingMode::kCore));
+    } else if (c.immersive >= 0) {
         check_core_routing(stream, decode_checked(stream, iclforge::ac4::DecodingMode::kCore));
     }
 }
@@ -500,7 +613,9 @@ TEST_CASE("A-SPX fills the immersive element's channels by Part 2 Table 8, full 
     // and A-JCC's first route leave each channel A-SPX made where it was, and
     // what they make of it silent. Core decoding in ASPX_SCPL takes the first
     // channel of a coupled pair alone (Table 8's square brackets): the
-    // second, Lb, Rb, Tbl or Tbr, core decoding does not have.
+    // second, Lb, Rb, Tbl or Tbr, or with b_5fronts (the 9.X.4 modes, where
+    // the pairs are (L, Lscr) and (R, Rscr)) Lscr or Rscr, core decoding does
+    // not have.
     using S = Speaker;
     const auto core_of = [](S s) {
         switch (s) {
@@ -514,50 +629,280 @@ TEST_CASE("A-SPX fills the immersive element's channels by Part 2 Table 8, full 
     };
     // Under the sanitizers every other element, from the first in ASPX_SCPL
     // and A-JCC and from the second in ASPX_ACPL_2.
-    for (const int mode : {1, 3, 4}) {
-        const auto elements = ac4dec_test::aspx_elements(12, mode);
-        for (std::size_t loud = 0; loud < elements.size(); ++loud) {
-            if (kSanitized && (loud + (mode == 3 ? 1U : 0U)) % 2 != 0) {
-                continue;
-            }
-            CAPTURE(mode, loud);
-            ElementCase c;
-            c.ch_mode = 12;
-            c.immersive = mode;
-            c.sap_mode = 2;
-            c.loud_unit = static_cast<int>(loud);
-            const BuiltStream stream = ac4dec_test::build_stream(c, kFrames);
-            for (const iclforge::ac4::DecodingMode decoding :
-                 {iclforge::ac4::DecodingMode::kFull, iclforge::ac4::DecodingMode::kCore}) {
-                const bool core = decoding == iclforge::ac4::DecodingMode::kCore;
-                CAPTURE(core);
-                const Decoded decoded = decode_checked(stream, decoding);
-                std::vector<S> filled;
-                for (const S s : elements[loud]) {
-                    const bool second = s == S::kLeftBack || s == S::kRightBack ||
-                                        s == S::kTopBackLeft || s == S::kTopBackRight;
-                    if (!core || !second) {
-                        filled.push_back(core ? core_of(s) : s);
-                    }
+    for (const int ch_mode : {12, 14}) {
+        for (const int mode : {1, 3, 4}) {
+            const auto elements = ac4dec_test::aspx_elements(ch_mode, mode);
+            for (std::size_t loud = 0; loud < elements.size(); ++loud) {
+                if (kSanitized && (loud + (mode == 3 ? 1U : 0U)) % 2 != 0) {
+                    continue;
                 }
-                double quietest_loud = 1e300;
-                double loudest_other = 0.0;
-                std::string levels;
-                for (std::size_t ch = 0; ch < decoded.channels.size(); ++ch) {
-                    const double high = band_energy(steady(decoded, ch), 32, 48);
-                    levels += std::string{iclforge::ac4::describe(decoded.speakers[ch])} + " " +
-                              std::to_string(10.0 * std::log10(high)) + "; ";
-                    if (std::ranges::find(filled, decoded.speakers[ch]) != filled.end()) {
-                        quietest_loud = std::min(quietest_loud, high);
-                    } else {
-                        loudest_other = std::max(loudest_other, high);
+                CAPTURE(ch_mode, mode, loud);
+                ElementCase c;
+                c.ch_mode = ch_mode;
+                c.immersive = mode;
+                c.sap_mode = 2;
+                c.loud_unit = static_cast<int>(loud);
+                const BuiltStream stream = ac4dec_test::build_stream(c, kFrames);
+                for (const iclforge::ac4::DecodingMode decoding :
+                     {iclforge::ac4::DecodingMode::kFull, iclforge::ac4::DecodingMode::kCore}) {
+                    const bool core = decoding == iclforge::ac4::DecodingMode::kCore;
+                    CAPTURE(core);
+                    const Decoded decoded = decode_checked(stream, decoding);
+                    std::vector<S> filled;
+                    for (const S s : elements[loud]) {
+                        const bool second = s == S::kLeftBack || s == S::kRightBack ||
+                                            s == S::kTopBackLeft || s == S::kTopBackRight ||
+                                            s == S::kLeftScreen || s == S::kRightScreen;
+                        if (!core || !second) {
+                            filled.push_back(core ? core_of(s) : s);
+                        }
                     }
+                    double quietest_loud = 1e300;
+                    double loudest_other = 0.0;
+                    std::string levels;
+                    for (std::size_t ch = 0; ch < decoded.channels.size(); ++ch) {
+                        const double high = band_energy(steady(decoded, ch), 32, 48);
+                        levels += std::string{iclforge::ac4::describe(decoded.speakers[ch])} + " " +
+                                  std::to_string(10.0 * std::log10(high)) + "; ";
+                        if (std::ranges::find(filled, decoded.speakers[ch]) != filled.end()) {
+                            quietest_loud = std::min(quietest_loud, high);
+                        } else {
+                            loudest_other = std::max(loudest_other, high);
+                        }
+                    }
+                    CAPTURE(levels);
+                    CAPTURE(10.0 * std::log10(quietest_loud),
+                            10.0 * std::log10(loudest_other + 1e-30));
+                    CHECK(quietest_loud > 1e3 * loudest_other);
                 }
-                CAPTURE(levels);
-                CAPTURE(10.0 * std::log10(quietest_loud), 10.0 * std::log10(loudest_other + 1e-30));
-                CHECK(quietest_loud > 1e3 * loudest_other);
             }
         }
+    }
+}
+
+TEST_CASE(
+    "Part 2 Table 19 with b_5fronts, Tables 20, 23 and 25 put each 9.X.4 tone on its channel, full "
+    "and core",
+    "[ac4dec][constructed][immersive][fronts]") {
+    // SCPL, ASPX_SCPL and ASPX_ACPL_1, which code all thirteen signals: every core_5ch_grouping and
+    // 2ch_mode, step 4 at identity, M/S or absent, and Table 20's six parameters predicting or not.
+    // Under the sanitizers three cases, one of each mode.
+    for (const int mode : {0, 1, 2}) {
+        for (int grouping = 0; grouping < 4; ++grouping) {
+            for (const bool sap : {false, true}) {
+                if (kSanitized && (sap != (mode == 1) || grouping != mode + 1)) {
+                    continue;
+                }
+                ElementCase c;
+                c.ch_mode = grouping % 2 == 0 ? 14 : 13;
+                c.immersive = mode;
+                c.coding_config = grouping;
+                c.two_ch_mode = (grouping + mode) % 2 == 1;
+                c.chel_matsel = (4 * mode + grouping) % 12;
+                c.sap_mode = 2;
+                c.stereo_proc = mode != 1;
+                c.use_sap_add_ch = sap;
+                c.sap_add_mode = grouping % 2 == 0 ? 2 : 0;
+                c.prediction_alpha_q = sap ? 5 : (mode == 2 ? -3 : 0);
+                c.acpl_bands_id = grouping;
+                c.loud_unit = mode == 1 ? grouping : -1;
+                check_case(c);
+            }
+        }
+    }
+}
+
+TEST_CASE("the 9.X.4 modes' ASPX_ACPL_2 makes each coupled pair and each front pair by A-CPL",
+          "[ac4dec][constructed][immersive][fronts]") {
+    // Pseudocode 2 with b_5fronts: six modules, the last two on (L, Lscr) and (R, Rscr), sending
+    // the downmix to the first output (alpha 1) or the second (alpha -1). Under the sanitizers the
+    // first case and the last, which differ in every field.
+    Stride stride(3, 0);
+    for (const bool second : {false, true}) {
+        for (const bool sap : {false, true}) {
+            ElementCase c;
+            c.ch_mode = second ? 13 : 14;
+            c.immersive = 3;
+            c.coding_config = sap ? 3 : 0;
+            c.chel_matsel = 2;
+            c.sap_mode = 2;
+            c.use_sap_add_ch = sap;
+            c.acpl_second = second;
+            c.acpl_quant = second ? 1 : 0;
+            c.acpl_bands_id = sap ? 1 : 3;
+            check_case(c, stride);
+        }
+    }
+}
+
+TEST_CASE(
+    "A-JCC makes the 9.X.4 channels of its five by its four modules, full and core, by each route",
+    "[ac4dec][constructed][immersive][ajcc][fronts]") {
+    // Each route sends a module's input whole to one of its three outputs (the front modules' to
+    // L, Tfl or Lscr, the back modules' to Ls, Lb or Tbl, and alike on the right). Under the
+    // sanitizers every other case.
+    Stride stride(2, 0);
+    for (int route = 0; route < 3; ++route) {
+        for (const bool steep : {false}) {
+            ElementCase c;
+            c.ch_mode = route == 1 ? 13 : 14;
+            c.immersive = 4;
+            c.coding_config = (route + 1) % 4;
+            c.two_ch_mode = route == 2;
+            c.chel_matsel = 6 + route;
+            c.sap_mode = 2;
+            c.ajcc_route = route;
+            c.acpl_quant = route % 2;
+            c.acpl_bands_id = route;
+            (void)steep;
+            check_case(c, stride);
+        }
+    }
+}
+
+// The amplitude of source tone `s` of `stream` on the decoded channel `ch`.
+double tone_level(const BuiltStream& stream, const Decoded& decoded, std::size_t ch,
+                  std::size_t s) {
+    return tone_amplitude(steady(decoded, ch), stream.tone_hz[s]);
+}
+
+// Dialogue enhancement at its 9 dB cap, with every band's parameter 10 (Table 209's 1.0), raises a
+// channel it applies to by 1 + (10^(9/20) - 1) x 1.0, 9 dB, and by 1 + C x that where the core tool
+// of Part 2 clauses 5.8.2.1 and 5.8.2.2 weighs the channel's input by C.
+const double kDeGain = 9.0;
+
+// Returns how many of the (channel, tone) pairs it checked `weight` raised.
+std::size_t check_de_levels(const ElementCase& c, const BuiltStream& stream, const Decoded& plain,
+                            const Decoded& enhanced,
+                            const std::function<double(Speaker, Speaker)>& weight) {
+    // `weight` is the share of the 9 dB each (decoded channel, source tone) pair gets, 0 to 1.
+    REQUIRE(plain.speakers == enhanced.speakers);
+    const double g = std::pow(10.0, kDeGain / 20.0) - 1.0;
+    std::size_t checked = 0;
+    std::size_t raised = 0;
+    for (std::size_t ch = 0; ch < plain.channels.size(); ++ch) {
+        for (std::size_t s = 0; s < stream.speakers.size(); ++s) {
+            if (stream.tone_hz[s] <= 0.0 || stream.speakers[s] == Speaker::kLfe) {
+                continue;
+            }
+            const double before = tone_level(stream, plain, ch, s);
+            if (before < kAmplitude * 0.1) {
+                continue;  // not a tone this channel carries
+            }
+            CAPTURE(iclforge::ac4::describe(plain.speakers[ch]),
+                    iclforge::ac4::describe(stream.speakers[s]), c.de_channel_config, c.ajcc_route,
+                    c.acpl_second);
+            const double expected = 1.0 + weight(plain.speakers[ch], stream.speakers[s]) * g;
+            CHECK(std::abs(20.0 * std::log10(tone_level(stream, enhanced, ch, s) / before /
+                                             expected)) < 0.3);
+            ++checked;
+            raised += weight(plain.speakers[ch], stream.speakers[s]) > 0.0 ? 1U : 0U;
+        }
+    }
+    CHECK(checked >= 5);
+    return raised;
+}
+
+TEST_CASE("dialogue enhancement raises 9.X.4's Lscr, Rscr and C, not L and R (Part 2 Table 15)",
+          "[ac4dec][constructed][immersive][fronts][de]") {
+    using S = Speaker;
+    // de_channel_config's bits are the first, second and third channels of Table 15: 7 is all
+    // three, 4 the first alone and 3 the second and the third.
+    for (const int config : {7, 4, 3}) {
+        for (const int ch_mode : {13, 14}) {
+            ElementCase c;
+            c.ch_mode = ch_mode;
+            c.immersive = 0;
+            c.coding_config = config % 4;
+            c.sap_mode = 2;
+            c.de_channel_config = config;
+            c.de_par = 10;
+            const BuiltStream stream = ac4dec_test::build_stream(c, kFrames);
+            ElementCase off = c;
+            off.de_channel_config = 0;
+            const BuiltStream plain_stream = ac4dec_test::build_stream(off, kFrames);
+            const Decoded plain = decode_checked(plain_stream);
+            const Decoded enhanced =
+                decode_checked(stream, iclforge::ac4::DecodingMode::kFull, kDeGain);
+            const std::size_t raised =
+                check_de_levels(c, stream, plain, enhanced, [&](Speaker out, Speaker source) {
+                    if (out != source) {
+                        return 0.0;
+                    }
+                    const bool first = out == S::kLeftScreen;
+                    const bool second = out == S::kRightScreen;
+                    const bool third = out == S::kCentre;
+                    return ((first && (config & 4) != 0) || (second && (config & 2) != 0) ||
+                            (third && (config & 1) != 0))
+                               ? 1.0
+                               : 0.0;
+                });
+            CHECK(raised == static_cast<std::size_t>(std::popcount(static_cast<unsigned>(config))));
+            // Asked for 0 dB, nothing changes.
+            const Decoded bypass = decode_checked(stream, iclforge::ac4::DecodingMode::kFull, 0.0);
+            check_de_levels(c, stream, plain, bypass, [](Speaker, Speaker) { return 0.0; });
+        }
+    }
+}
+
+TEST_CASE(
+    "core decoding's dialogue enhancement weighs Lscr and Rscr by the coefficient the A-JCC or "
+    "A-CPL data gives",
+    "[ac4dec][constructed][immersive][fronts][de]") {
+    using S = Speaker;
+    // Clauses 5.8.2.1 and 5.8.2.2: C is enhanced whole; the core's L and R by C_L and C_R, 1 where
+    // the module sent the input to Lscr (A-CPL's second output, A-JCC's route 2), 0 where it sent
+    // it to L (or, route 1, Tfl).
+    struct Mode {
+        int immersive;
+        int route;
+        bool second;
+        double front;  // C_L and C_R
+    };
+    for (const Mode mode : {Mode{3, 0, false, 0.0}, Mode{3, 0, true, 1.0}, Mode{4, 0, false, 0.0},
+                            Mode{4, 1, false, 0.0}, Mode{4, 2, false, 1.0}}) {
+        ElementCase c;
+        c.ch_mode = mode.immersive == 4 && mode.route == 1 ? 13 : 14;
+        c.immersive = mode.immersive;
+        c.coding_config = 1;
+        c.chel_matsel = 2;
+        c.sap_mode = 2;
+        c.acpl_second = mode.second;
+        c.ajcc_route = mode.route;
+        c.de_channel_config = 7;
+        c.de_par = 10;
+        const BuiltStream stream = ac4dec_test::build_stream(c, kFrames);
+        ElementCase off = c;
+        off.de_channel_config = 0;
+        const BuiltStream plain_stream = ac4dec_test::build_stream(off, kFrames);
+        const Decoded plain = decode_checked(plain_stream, iclforge::ac4::DecodingMode::kCore);
+        const Decoded enhanced =
+            decode_checked(stream, iclforge::ac4::DecodingMode::kCore, kDeGain);
+        const std::size_t raised =
+            check_de_levels(c, stream, plain, enhanced, [&](Speaker out, Speaker) {
+                if (out == S::kCentre) {
+                    return 1.0;
+                }
+                return out == S::kLeft || out == S::kRight ? mode.front : 0.0;
+            });
+        CHECK(raised == (mode.front > 0.0 ? 3U : 1U));
+        // The core takes b_de_simulcast's second set where there is one: 0 there leaves the core
+        // alone while the full decoding is enhanced as before.
+        ElementCase simulcast = c;
+        simulcast.de_core_par = 0;
+        const BuiltStream simulcast_stream = ac4dec_test::build_stream(simulcast, kFrames);
+        const Decoded core_zero =
+            decode_checked(simulcast_stream, iclforge::ac4::DecodingMode::kCore, kDeGain);
+        check_de_levels(c, stream, plain, core_zero, [](Speaker, Speaker) { return 0.0; });
+        const Decoded full_plain = decode_checked(plain_stream);
+        const Decoded full_simulcast =
+            decode_checked(simulcast_stream, iclforge::ac4::DecodingMode::kFull, kDeGain);
+        check_de_levels(c, stream, full_plain, full_simulcast, [](Speaker out, Speaker source) {
+            return out == source &&
+                           (out == S::kLeftScreen || out == S::kRightScreen || out == S::kCentre)
+                       ? 1.0
+                       : 0.0;
+        });
     }
 }
 
