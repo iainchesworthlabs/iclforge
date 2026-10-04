@@ -99,84 +99,95 @@ constexpr void design_phase(const ResamplerDesign& d, int p, double* row) noexce
     }
 }
 
-// Phases 0 to up / 2 of the design, each rounded to float once, in phase order, into `out`: the
-// half of the table that a converter at float keeps. `row` is `taps` doubles of scratch.
-template <typename Math>
-constexpr void design_half_phases(const ResamplerDesign& d, float* out, double* row) noexcept {
+// How a coefficient of the double design is stored: rounded to float once, for the converter at
+// float, or as Q1.30, for the fixed-point tier (planning/ac4.md, D14d), each coefficient times 2^30
+// rounded half away from zero.
+struct FloatCoefficient {
+    using Type = float;
+    [[nodiscard]] static constexpr float from_design(double value) noexcept {
+        return static_cast<float>(value);
+    }
+};
+
+struct Q30Coefficient {
+    using Type = std::int32_t;
+    [[nodiscard]] static constexpr std::int32_t from_design(double value) noexcept {
+        const double scaled = value * 1073741824.0;
+        return static_cast<std::int32_t>(scaled < 0.0 ? scaled - 0.5 : scaled + 0.5);
+    }
+};
+
+// Phases 0 to up / 2 of the design, each coefficient stored as `Coefficient` says, in phase order,
+// into `out`: the half of the table that a converter keeps. `row` is `taps` doubles of scratch.
+template <typename Math, typename Coefficient>
+constexpr void design_half_phases_as(const ResamplerDesign& d, typename Coefficient::Type* out,
+                                     double* row) noexcept {
     const int phases = d.up / 2 + 1;
     for (int p = 0; p < phases; ++p) {
         design_phase<Math>(d, p, row);
-        float* phase_out = out + static_cast<std::size_t>(p) * static_cast<std::size_t>(d.taps);
+        auto* phase_out = out + static_cast<std::size_t>(p) * static_cast<std::size_t>(d.taps);
         for (int k = 0; k < d.taps; ++k) {
-            phase_out[k] = static_cast<float>(row[k]);
+            phase_out[k] = Coefficient::from_design(row[k]);
         }
     }
 }
 
-// The same phases in Q1.30, for the fixed-point tier (planning/ac4.md, D14d): each coefficient
-// of the double design times 2^30, rounded half away from zero.
+// The half a converter at float keeps, and the half the fixed-point tier keeps in Q1.30.
+template <typename Math>
+constexpr void design_half_phases(const ResamplerDesign& d, float* out, double* row) noexcept {
+    design_half_phases_as<Math, FloatCoefficient>(d, out, row);
+}
+
 template <typename Math>
 constexpr void design_half_phases_q30(const ResamplerDesign& d, std::int32_t* out, double* row) noexcept {
-    const int phases = d.up / 2 + 1;
-    for (int p = 0; p < phases; ++p) {
-        design_phase<Math>(d, p, row);
-        std::int32_t* phase_out = out + static_cast<std::size_t>(p) * static_cast<std::size_t>(d.taps);
-        for (int k = 0; k < d.taps; ++k) {
-            const double scaled = row[k] * 1073741824.0;
-            phase_out[k] = static_cast<std::int32_t>(scaled < 0.0 ? scaled - 0.5 : scaled + 0.5);
-        }
-    }
+    design_half_phases_as<Math, Q30Coefficient>(d, out, row);
 }
 
 // The half table of the ratio Up / Down, for the compiler's constant evaluator.
-template <int Up, int Down>
-struct HalfTable {
+template <typename Coefficient, int Up, int Down>
+struct BasicHalfTable {
     static constexpr ResamplerDesign kDesign = design_resampler<PortableMath>(Up, Down);
     static constexpr int kTaps = kDesign.taps;
     static constexpr int kPhases = Up / 2 + 1;
-    std::array<float, static_cast<std::size_t>(kPhases) * static_cast<std::size_t>(kTaps)>
+    std::array<typename Coefficient::Type,
+               static_cast<std::size_t>(kPhases) * static_cast<std::size_t>(kTaps)>
         coefficients{};
 };
+
+template <int Up, int Down>
+using HalfTable = BasicHalfTable<FloatCoefficient, Up, Down>;
+template <int Up, int Down>
+using HalfTableQ30 = BasicHalfTable<Q30Coefficient, Up, Down>;
 
 // consteval: the table is built by the compiler and at no other time, so no call that reaches run
 // time can be written. The functions it calls stay constexpr, since a ratio outside the three is
 // designed at run time with them (dsp/resampler.cpp).
-template <int Up, int Down>
-[[nodiscard]] consteval HalfTable<Up, Down> design_half_table() {
-    HalfTable<Up, Down> table;
-    std::array<double, static_cast<std::size_t>(HalfTable<Up, Down>::kTaps)> row{};
-    design_half_phases<PortableMath>(HalfTable<Up, Down>::kDesign, table.coefficients.data(),
-                                     row.data());
+template <typename Coefficient, int Up, int Down>
+[[nodiscard]] consteval BasicHalfTable<Coefficient, Up, Down> design_half_table_as() {
+    BasicHalfTable<Coefficient, Up, Down> table;
+    std::array<double, static_cast<std::size_t>(BasicHalfTable<Coefficient, Up, Down>::kTaps)> row{};
+    design_half_phases_as<PortableMath, Coefficient>(BasicHalfTable<Coefficient, Up, Down>::kDesign,
+                                                     table.coefficients.data(), row.data());
     return table;
 }
 
-// The table, evaluated by the compiler: a variable template, so that only a build that uses a
-// ratio's table pays for evaluating it (the decoder's at float: dsp/resampler.cpp), and constexpr,
-// so that the table is data in the program's read-only memory (flash, on a part that executes from
-// it) and nothing the program computes.
 template <int Up, int Down>
-inline constexpr HalfTable<Up, Down> kHalfTable = design_half_table<Up, Down>();
-
-// The fixed-point tier's half table of the ratio Up / Down, in Q1.30: built by the compiler as the
-// float one is, and named only by a build whose scalar is Fixed32, so neither build evaluates or
-// links the other's.
-template <int Up, int Down>
-struct HalfTableQ30 {
-    static constexpr ResamplerDesign kDesign = design_resampler<PortableMath>(Up, Down);
-    static constexpr int kTaps = kDesign.taps;
-    static constexpr int kPhases = Up / 2 + 1;
-    std::array<std::int32_t, static_cast<std::size_t>(kPhases) * static_cast<std::size_t>(kTaps)>
-        coefficients{};
-};
+[[nodiscard]] consteval HalfTable<Up, Down> design_half_table() {
+    return design_half_table_as<FloatCoefficient, Up, Down>();
+}
 
 template <int Up, int Down>
 [[nodiscard]] consteval HalfTableQ30<Up, Down> design_half_table_q30() {
-    HalfTableQ30<Up, Down> table;
-    std::array<double, static_cast<std::size_t>(HalfTableQ30<Up, Down>::kTaps)> row{};
-    design_half_phases_q30<PortableMath>(HalfTableQ30<Up, Down>::kDesign, table.coefficients.data(),
-                                         row.data());
-    return table;
+    return design_half_table_as<Q30Coefficient, Up, Down>();
 }
+
+// The tables, evaluated by the compiler: variable templates, so that only a build that uses a
+// ratio's table pays for evaluating it (the decoder's at float: dsp/resampler.cpp; at Fixed32, the
+// Q1.30 one, so neither build evaluates or links the other's), and constexpr, so that the table is
+// data in the program's read-only memory (flash, on a part that executes from it) and nothing the
+// program computes.
+template <int Up, int Down>
+inline constexpr HalfTable<Up, Down> kHalfTable = design_half_table<Up, Down>();
 
 template <int Up, int Down>
 inline constexpr HalfTableQ30<Up, Down> kHalfTableQ30 = design_half_table_q30<Up, Down>();
