@@ -1257,8 +1257,10 @@ the x86-64 host the fixed tier's peaks are 295,225 to 1,526,819 bytes.
 The first frame allocates 279 KB, 261 KB, 661 KB, 639 KB, 1.47 MB and 270 KB (D14f; 510 KB, 490 KB, 987 KB, 998 KB, 1.86 MB
 and 498 KB at D14e, 550 KB, 531 KB, 1.21 MB, 1.22 MB, 2.06 MB and 541 KB at D14a), the decoder's state built as the stream's
 layout is first seen; the steady state allocates 48 to 143 allocations a frame at 2.0 and 5.1 and 202 at 5.1.4, the syntax
-layer's element vectors built afresh each frame (`vector<Track>` the largest). That is the gap to zero here, as it is for the
-AC-3 and E-AC-3 decoders above, and the peak is what D14c has to bring under the S3's 245,000 bytes for 2.0.
+layer's element vectors built afresh each frame (`vector<Track>` the largest). That is the gap to zero here, as it is for the AC-3 and E-AC-3 decoders above. D14c did not bring the peak under the S3's
+internal RAM: the S3 puts the decoder's state in PSRAM, and its QEMU row holds what is left in internal RAM, 3 to 5 KB at 2.0
+and 9 to 14 KB at 5.1 and 5.1.4 when D14c measured it, before D14f ([ESP32-S3](platforms/bare-metal/esp32-s3.md#ac-4)); the
+peaks are this leg's to the byte there.
 
 <style>
 #memory-trend-app { margin: 1.5em 0; }
