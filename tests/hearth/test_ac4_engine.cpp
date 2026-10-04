@@ -505,6 +505,13 @@ TEST_CASE(
     std::map<std::string, int> refused;
     for (const fs::path& path : to_play) {
         INFO("stream " << path.string());
+        // 22.2's 24 channels are more than the layout renderer's bed holds, and its bottom
+        // channels have no Table E2.5 location: the engine refuses its frames (the test below),
+        // so there is no decode to hold to a reference.
+        if (path.filename().string().starts_with("22_2-")) {
+            ++refused["a 22.2 presentation, whose channels the layout renderer cannot place"];
+            continue;
+        }
         std::vector<std::byte> bytes = read_file(path);
         if (kSanitized) {
             bytes.resize(
@@ -551,6 +558,29 @@ TEST_CASE(
     // The 42 D8 decoded through the API, and any stream since that the
     // decoder decodes; under the sanitizers the 40 kinds or more there are.
     CHECK(played_whole >= (kSanitized ? 40 : 42));
+}
+
+TEST_CASE("hearth ac4: the engine refuses the frames of a 22.2 presentation and says why",
+          "[hearth][ac4]") {
+    // The layout renderer takes sixteen coded channels, and Table E2.5 has no location for 22.2's
+    // bottom channels, so a layout of 24 is not placed on some of its channels: the frame is
+    // refused, and nothing is played.
+    const std::vector<std::byte> bytes =
+        read_file(fs::path{AC4DEC_GOLDEN_DIR} / "constructed" / "22_2-simple-alternating.ac4");
+    const Played played = play_item(bytes, layout_of(kEverySpeaker), as_coded());
+    REQUIRE_FALSE(played.errors.empty());
+    for (const std::string& error : played.errors) {
+        CHECK(error.find("22.2") != std::string::npos);
+    }
+    CHECK(played.frames == 0);
+    // The renderer's own limit and the speakers it has no place for.
+    using iclforge::ac4::Speaker;
+    const std::array<Speaker, 3> bottom = {Speaker::kLeft, Speaker::kRight, Speaker::kBottomFrontLeft};
+    CHECK_FALSE(iclforge::hearth::ac4_placeable(bottom));
+    const std::array<Speaker, 3> centre = {Speaker::kLeft, Speaker::kRight, Speaker::kTopFrontCentre};
+    CHECK(iclforge::hearth::ac4_placeable(centre));
+    const std::vector<Speaker> seventeen(17, Speaker::kLeft);
+    CHECK_FALSE(iclforge::hearth::ac4_placeable(seventeen));
 }
 
 TEST_CASE("hearth ac4: the engine plays the streams of AC4DEC_API_STREAM_DIR", "[hearth][ac4]") {

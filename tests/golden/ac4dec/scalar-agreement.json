@@ -6,6 +6,14 @@
       "below": 132.7,
       "above": 98.5
     },
+    "tests/golden/ac4dec/constructed/22_2-aspx-unit7-lr.ac4": {
+      "below": 124.0,
+      "above": 37.3
+    },
+    "tests/golden/ac4dec/constructed/22_2-simple-alternating.ac4": {
+      "below": 128.7,
+      "above": null
+    },
     "tests/golden/ac4dec/constructed/2_0-acpl1-stereoproc.ac4": {
       "below": 131.1,
       "above": 41.1

@@ -561,6 +561,116 @@ TEST_CASE("A-SPX fills the immersive element's channels by Part 2 Table 8, full 
     }
 }
 
+TEST_CASE("Table 21 puts each 22.2 tone on its channel, in Table A.27's order",
+          "[ac4dec][constructed][22_2]") {
+    // 24 tones, one on each channel, the two LFEs' among them: every pair
+    // processed (M/S and L/R), none, and the pairs alternating, in SIMPLE and
+    // ASPX. A pair coded in another's place, or an LFE in a pair's, puts a tone
+    // on a channel whose own is another.
+    Stride stride(2, 0);
+    for (const bool aspx : {false, true}) {
+        check_case({.ch_mode = 15, .aspx = aspx, .sap_mode = 2}, stride);
+        check_case({.ch_mode = 15, .aspx = aspx, .sap_mode = 0, .stereo_proc = false}, stride);
+        check_case({.ch_mode = 15, .aspx = aspx, .sap_mode = 2, .stereo_proc_alternates = true},
+                   stride);
+    }
+    // The output is 24 channels in Table A.27's order: L R C Ls Rs Lb Rb Tfl
+    // Tfr Tbl Tbr LFE Tsl Tsr Tfc Tbc Tc LFE2 Bfl Bfr Bfc Cb Lw Rw.
+    const BuiltStream stream = ac4dec_test::build_stream({.ch_mode = 15, .sap_mode = 2}, 6);
+    REQUIRE(stream.speakers.size() == 24);
+    const Decoded decoded = decode_checked(stream);
+    std::string names;
+    for (const Speaker speaker : decoded.speakers) {
+        names += std::string{iclforge::ac4::describe(speaker)} + " ";
+    }
+    CHECK(names ==
+          "L R C Ls Rs Lb Rb Tfl Tfr Tbl Tbr LFE Tsl Tsr Tfc Tbc Tc LFE2 Bfl Bfr Bfc Cb Lw Rw ");
+}
+
+TEST_CASE("A-SPX fills the 22.2 element's channels by the pair of Part 2 Table 8 that asks for it",
+          "[ac4dec][constructed][22_2]") {
+    // Crossover at QMF subband 28 (10.5 kHz): the tones are below it, and only
+    // the loud aspx_data_2ch()'s two channels have anything from 12 to 18 kHz;
+    // the LFEs, which have no aspx_data, and every other pair have nothing.
+    const auto elements = ac4dec_test::aspx_elements(15);
+    REQUIRE(elements.size() == 11);
+    Stride stride(2, 0);
+    for (std::size_t loud = 0; loud < elements.size(); ++loud) {
+        if (!stride.take()) {
+            continue;
+        }
+        CAPTURE(loud);
+        const BuiltStream stream = ac4dec_test::build_stream(
+            {.ch_mode = 15, .aspx = true, .sap_mode = 2, .loud_unit = static_cast<int>(loud)},
+            kFrames);
+        const Decoded decoded = decode_checked(stream);
+        double quietest_loud = 1e300;
+        double loudest_other = 0.0;
+        for (std::size_t c = 0; c < decoded.channels.size(); ++c) {
+            const double high = band_energy(steady(decoded, c), 32, 48);
+            const bool carried =
+                std::ranges::find(elements[loud], decoded.speakers[c]) != elements[loud].end();
+            if (carried) {
+                quietest_loud = std::min(quietest_loud, high);
+            } else {
+                loudest_other = std::max(loudest_other, high);
+            }
+        }
+        CAPTURE(10.0 * std::log10(quietest_loud), 10.0 * std::log10(loudest_other + 1e-30));
+        CHECK(quietest_loud > 1e3 * loudest_other);
+    }
+}
+
+TEST_CASE("a 22.2 stream decodes as coded, 24 channels, and nothing else",
+          "[ac4dec][constructed][22_2]") {
+    // Part 2 Table 8: only full decoding. Tables 35 to 43 have no 22.2 input, so
+    // every target but as coded is refused, by name, and so is core decoding.
+    for (const bool aspx : {false, true}) {
+        const BuiltStream stream =
+            ac4dec_test::build_stream({.ch_mode = 15, .aspx = aspx, .sap_mode = 2}, 3);
+        CAPTURE(aspx);
+        {
+            iclforge::ac4::Decoder decoder;
+            for (const std::vector<std::byte>& frame : stream.frames) {
+                const auto decoded = decoder.decode(frame);
+                REQUIRE(decoded.has_value());
+                REQUIRE(decoded->has_value());
+                CHECK((**decoded).channels.size() == 24);
+                CHECK((**decoded).speakers == stream.speakers);
+            }
+            REQUIRE(decoder.presentations().size() == 1);
+            const iclforge::ac4::PresentationInfo& presentation = decoder.presentations().front();
+            CHECK(presentation.decodable);
+            CHECK(presentation.selectable);
+            CHECK(presentation.speakers == stream.speakers);
+        }
+        {
+            iclforge::ac4::Decoder decoder(
+                iclforge::ac4::DecoderConfig{.decoding = iclforge::ac4::DecodingMode::kCore});
+            const auto decoded = decoder.decode(stream.frames.front());
+            REQUIRE_FALSE(decoded.has_value());
+            CHECK(decoded.error() == iclforge::ac4::DecodeError::kUnsupported);
+            CHECK(decoder.refusal_reason().find("22_2_channel_element()") !=
+                  std::string_view::npos);
+            CHECK(decoder.refusal_reason().find("core decoding") != std::string_view::npos);
+        }
+        using iclforge::ac4::DownmixTarget;
+        for (const DownmixTarget target :
+             {DownmixTarget::k5X, DownmixTarget::kStereo, DownmixTarget::kLoRo,
+              DownmixTarget::kLtRt, DownmixTarget::kMono, DownmixTarget::k7X4, DownmixTarget::k7X2,
+              DownmixTarget::k7X0, DownmixTarget::k5X4, DownmixTarget::k5X2}) {
+            CAPTURE(iclforge::ac4::describe(target));
+            iclforge::ac4::DecoderConfig config;
+            config.output.downmix = target;
+            iclforge::ac4::Decoder decoder(config);
+            const auto decoded = decoder.decode(stream.frames.front());
+            REQUIRE_FALSE(decoded.has_value());
+            CHECK(decoded.error() == iclforge::ac4::DecodeError::kUnsupported);
+            CHECK(decoder.refusal_reason().find("22.2") != std::string_view::npos);
+        }
+    }
+}
+
 TEST_CASE("A-CPL's decorrelated part cancels in the sum of its two outputs", "[ac4dec][constructed][acpl]") {
     // The channel pair in ASPX_ACPL_2 with alpha 0 and beta_q 4 (1.4 at ibeta
     // 0, Table 204): L = x0 + 0.7 y and R = x0 - 0.7 y, with y the ducked

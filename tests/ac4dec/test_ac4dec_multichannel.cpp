@@ -262,7 +262,35 @@ TEST_CASE("the channel modes' speakers, in the order decode() writes them", "[ac
     CHECK(core(mode::k7_1_4).size() == 8);
     CHECK(core(mode::k7_1_322) == list(mode::k7_1_322));
     CHECK(list(mode::k9_1_4).empty());
-    CHECK(list(mode::k22_2).empty());
+    // Part 2 Table A.27's 22.2 column, by speaker index: the LFE after Tbr, LFE2
+    // after Tc, and the same 24 in core decoding.
+    using S = Speaker;
+    const std::vector<Speaker> a27 = {S::kLeft,
+                                      S::kRight,
+                                      S::kCentre,
+                                      S::kLeftSurround,
+                                      S::kRightSurround,
+                                      S::kLeftBack,
+                                      S::kRightBack,
+                                      S::kTopFrontLeft,
+                                      S::kTopFrontRight,
+                                      S::kTopBackLeft,
+                                      S::kTopBackRight,
+                                      S::kLfe,
+                                      S::kTopSideLeft,
+                                      S::kTopSideRight,
+                                      S::kTopFrontCentre,
+                                      S::kTopBackCentre,
+                                      S::kTopCentre,
+                                      S::kLfe2,
+                                      S::kBottomFrontLeft,
+                                      S::kBottomFrontRight,
+                                      S::kBottomFrontCentre,
+                                      S::kCentreBack,
+                                      S::kLeftWide,
+                                      S::kRightWide};
+    CHECK(list(mode::k22_2) == a27);
+    CHECK(core(mode::k22_2) == a27);
 }
 
 TEST_CASE("Table 180 routes the 5.X element's tracks", "[ac4dec][multichannel]") {
@@ -382,6 +410,101 @@ TEST_CASE("Table 182 routes the 7.X element's tracks, and Table 183 pairs its la
                                                  Speaker::kTopFrontRight, Speaker::kCentre});
         CHECK(route.steps.empty());
     }
+}
+
+TEST_CASE("Part 2 Table 21 routes the 22.2 element's two LFEs and eleven pairs",
+          "[ac4dec][multichannel]") {
+    using S = Speaker;
+    SubstreamContext ctx;
+    ctx.ch_mode = iclforge::ac4::detail::ch_mode::k22_2;
+    ElementRoute route;
+    ChannelElement element = element_of(ElementKind::k22_2, 24, false);
+    element.tracks[0].lfe = true;
+    element.tracks[1].lfe = true;
+    element.b_enable_mdct_stereo_proc = {true, false, true, false, true, false,
+                                         true, false, true, false, true};
+    element.chparams.resize(6);
+    REQUIRE(iclforge::ac4::detail::route_element(ctx, element, route));
+    // The tracks in syntax order and where Table 21 sends them.
+    CHECK(destinations(route) == std::vector{S::kLfe,
+                                             S::kLfe2,
+                                             S::kLeft,
+                                             S::kRight,
+                                             S::kCentre,
+                                             S::kTopCentre,
+                                             S::kLeftSurround,
+                                             S::kRightSurround,
+                                             S::kLeftBack,
+                                             S::kRightBack,
+                                             S::kTopFrontLeft,
+                                             S::kTopFrontRight,
+                                             S::kTopBackLeft,
+                                             S::kTopBackRight,
+                                             S::kTopSideLeft,
+                                             S::kTopSideRight,
+                                             S::kTopFrontCentre,
+                                             S::kTopBackCentre,
+                                             S::kBottomFrontLeft,
+                                             S::kBottomFrontRight,
+                                             S::kBottomFrontCentre,
+                                             S::kCentreBack,
+                                             S::kLeftWide,
+                                             S::kRightWide});
+    REQUIRE(route.data.size() == 13);
+    CHECK((route.data[0].count == 1 && route.data[1].count == 1));
+    // Each pair applies stereo processing on its own flag, and takes its own
+    // chparam_info().
+    for (std::size_t pair = 0; pair < 11; ++pair) {
+        CAPTURE(pair);
+        const auto& part = route.data[2 + pair];
+        CHECK(part.count == 2);
+        CHECK(part.first_track == 2 + 2 * static_cast<int>(pair));
+        CHECK(part.processed == (pair % 2 == 0));
+        if (part.processed) {
+            CHECK(part.first_chparam == static_cast<int>(pair / 2));
+        }
+    }
+    CHECK(route.steps.empty());
+    CHECK(route.silent.empty());
+    // Each LFE is a track of its own with no stereo processing, and the
+    // element is refused when a pair's LFE flag or the track count is wrong.
+    element.tracks[1].lfe = false;
+    CHECK_FALSE(iclforge::ac4::detail::route_element(ctx, element, route));
+    element.tracks[1].lfe = true;
+    element.tracks.pop_back();
+    CHECK_FALSE(iclforge::ac4::detail::route_element(ctx, element, route));
+}
+
+TEST_CASE("Part 2 Table 8 gives the 22.2 element eleven aspx_data_2ch and no companding",
+          "[ac4dec][multichannel]") {
+    using S = Speaker;
+    namespace codec = iclforge::ac4::detail::codec_mode;
+    const int ch = iclforge::ac4::detail::ch_mode::k22_2;
+    CHECK(iclforge::ac4::detail::aspx_units(ch, codec::kSimple).empty());
+    const auto units = iclforge::ac4::detail::aspx_units(ch, codec::kAspx);
+    // (L, R), (C, Tc), (Ls, Rs), (Lb, Rb), (Tfl, Tfr), (Tbl, Tbr), (Tsl, Tsr),
+    // (Tfc, Tbc), (Bfl, Bfr), (Bfc, Cb), (Lw, Rw).
+    const std::array<std::array<S, 2>, 11> expected = {{{S::kLeft, S::kRight},
+                                                        {S::kCentre, S::kTopCentre},
+                                                        {S::kLeftSurround, S::kRightSurround},
+                                                        {S::kLeftBack, S::kRightBack},
+                                                        {S::kTopFrontLeft, S::kTopFrontRight},
+                                                        {S::kTopBackLeft, S::kTopBackRight},
+                                                        {S::kTopSideLeft, S::kTopSideRight},
+                                                        {S::kTopFrontCentre, S::kTopBackCentre},
+                                                        {S::kBottomFrontLeft, S::kBottomFrontRight},
+                                                        {S::kBottomFrontCentre, S::kCentreBack},
+                                                        {S::kLeftWide, S::kRightWide}}};
+    REQUIRE(units.size() == expected.size());
+    for (std::size_t u = 0; u < units.size(); ++u) {
+        CAPTURE(u);
+        CHECK(units[u].pair);
+        CHECK(units[u].index == static_cast<int>(u));
+        CHECK(units[u].speakers == expected[u]);
+        CHECK_FALSE(units[u].first_only);
+    }
+    CHECK(iclforge::ac4::detail::companded_speakers(ch, codec::kSimple).empty());
+    CHECK(iclforge::ac4::detail::companded_speakers(ch, codec::kAspx).empty());
 }
 
 TEST_CASE("Part 2 Table 19 routes the immersive element's tracks, with step 4 and Table 20",

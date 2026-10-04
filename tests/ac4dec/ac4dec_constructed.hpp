@@ -4,11 +4,12 @@
 // decoder's tests: the 3.0 element, the 5.X element in every coding_config
 // and 2ch_mode, and the 7.X element in its three channel modes, in the SIMPLE
 // and ASPX codec modes (ETSI TS 103 190-1 V1.4.1 clause 4.2.6); the channel
-// pair, 5.X and 7.X elements in the A-CPL modes; and the immersive element of
+// pair, 5.X and 7.X elements in the A-CPL modes; the immersive element of
 // the 7.X.4 modes (ETSI TS 103 190-2 V1.3.1 clause 6.2.4) in its five codec
 // modes, every core_5ch_grouping and 2ch_mode, with step 4's and Table 20's
-// parameters. Each output channel carries a tone of its own, so a channel
-// coded in the wrong place shows as its tone in the wrong channel.
+// parameters; and the 22.2 element (clause 6.2.4.3) in SIMPLE and ASPX. Each
+// output channel carries a tone of its own, so a channel coded in the wrong
+// place shows as its tone in the wrong channel.
 //
 // The immersive element's tracks are the tones worked back through what full
 // decoding does to them, by the text: S-CPL's Table 23, A-CPL's Pseudocode 2 or
@@ -50,13 +51,16 @@ namespace ac4dec_test {
 
 struct ElementCase {
     std::string name{};
-    int ch_mode = 4;               // Part 1 Table 88: 2 (3.0) to 10
+    int ch_mode = 4;               // Part 1 Table 88: 2 (3.0) to 10; 15 is 22.2 (Part 2 Table 56)
     bool aspx = false;             // the ASPX codec mode, else SIMPLE
     int coding_config = 0;         // 3_0_coding_config (0 or 1), or coding_config (0 to 3)
     bool two_ch_mode = false;      // 2ch_mode, in coding_config 0 of the 5.X and 7.X elements
     int chel_matsel = 0;           // of three_channel_data() and five_channel_data()
     int sap_mode = 0;              // every chparam_info()'s: 0, left and right, or 2, M/S
     bool stereo_proc = true;       // every pair's b_enable_mdct_stereo_proc
+    // 22.2: the odd-numbered pairs (Table 21's two_channel_data[1], [3], ...) send
+    // the opposite of stereo_proc, so that each pair's own flag decides its tracks.
+    bool stereo_proc_alternates = false;
     bool use_sap_add_ch = false;   // the 7.X element's b_use_sap_add_ch
     int sap_add_mode = 2;          // the sap_mode of the two chparam_info() it sends
     int loud_unit = -1;            // ASPX: the aspx_data element, in syntax order, sent loud
@@ -107,7 +111,7 @@ struct BuiltStream {
 // The builder's reading of Table 213, and of Part 2 Table 8 in full decoding:
 // the aspx_data elements of an element in ASPX (codec mode 1) or an A-CPL mode
 // in syntax order, each the channels it carries; for ch_mode 11 and 12,
-// `codec_mode` is the immersive element's.
+// `codec_mode` is the immersive element's; for ch_mode 15, 22.2's eleven pairs.
 [[nodiscard]] std::vector<std::vector<iclforge::ac4::Speaker>> aspx_elements(int ch_mode,
                                                                              int codec_mode = 1);
 

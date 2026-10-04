@@ -147,12 +147,13 @@ class Bits:
 
 # Part 2 Table 56 channel_mode codes as (code, width). The 7.X.4 modes are
 # listed twice, since only their immersive element is read (9.X.4's is refused
-# by both, which the two still have to agree on).
+# by both, which the two still have to agree on); 22.2 (0b111111110) has the
+# 22_2_channel_element().
 SYNTHETIC_MODES = [
     (0b0, 1), (0b10, 2), (0b1100, 4), (0b1101, 4), (0b1110, 4),
     (0b1111000, 7), (0b1111001, 7), (0b1111010, 7), (0b1111011, 7), (0b1111100, 7),
     (0b1111101, 7), (0b11111100, 8), (0b11111101, 8), (0b11111100, 8), (0b11111101, 8),
-    (0b111111100, 9), (0b111111101, 9),
+    (0b111111100, 9), (0b111111101, 9), (0b111111110, 9),
 ]
 # The immersive codes, which carry b_4_back_channels_present, b_centre_present
 # and top_channels_present (Part 2 6.2.1.8).
