@@ -81,6 +81,8 @@ std::string_view describe(IabError error) {
             return "FrameRate code was Reserved (0xA-0xF)";
         case IabError::kUnterminatedString:
             return "a NUL-terminated ASCII field ran off the end of its element without a terminator";
+        case IabError::kBadDlc:
+            return "an AudioDataDLC element is structurally invalid (Annex B)";
         case IabError::kMxfBadKlv:
             return "a KLV Length field violated SMPTE ST 336's BER encoding rules";
         case IabError::kMxfNoIabEssence:

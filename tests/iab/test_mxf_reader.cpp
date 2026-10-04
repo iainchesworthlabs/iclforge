@@ -66,7 +66,7 @@ constexpr std::array<std::uint8_t, 16> kFillItemKey = {
 // concrete here - 0x01 is a real, valid value for each, matching this project's synthetic fixture
 // convention elsewhere of using the spec's own worked values where one is given).
 constexpr std::array<std::uint8_t, 16> kIabEssenceKey = {
-    0x06, 0x0E, 0x2B, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0D, 0x01, 0x03, 0x01, 0x16, 0xCC, 0x0D, 0x01};
+    0x06, 0x0E, 0x2B, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0D, 0x01, 0x03, 0x01, 0x16, 0x01, 0x0D, 0x01};
 
 // A Key sharing the IAB essence key's Item-Type byte (0x16, "GC Sound" - ST 379-1 Table 2) but a
 // different Essence Element Type (byte 15), the way a real file's BWF/AES3/Dolby E sound essence

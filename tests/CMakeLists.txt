@@ -976,7 +976,7 @@ endif()
 # only linked, when ICLFORGE_BUILD_IAB actually turned the target on. Same conditional shape
 # as the ICLFORGE_BUILD_ADM block above.
 if(ICLFORGE_BUILD_IAB)
-    target_sources(iclforge-tests PRIVATE iab/test_ac3iab.cpp iab/test_ac3iab_truncation.cpp iab/test_mxf_reader.cpp)
+    target_sources(iclforge-tests PRIVATE iab/test_ac3iab.cpp iab/test_ac3iab_truncation.cpp iab/test_dlc.cpp iab/test_iab_writer.cpp iab/test_mxf_reader.cpp iab/test_mxf_writer.cpp)
     target_link_libraries(iclforge-tests PRIVATE iclforge::iab)
 endif()
 

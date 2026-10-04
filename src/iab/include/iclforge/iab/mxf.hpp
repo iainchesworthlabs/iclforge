@@ -1,7 +1,14 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <expected>
 #include <iosfwd>
+#include <optional>
+#include <span>
 #include <string>
+#include <utility>
+#include <string_view>
 #include <vector>
 
 #include "iclforge/iab/ac3iab.hpp"
@@ -61,5 +68,86 @@ namespace iclforge::iab {
 parse_mxf_iab(const std::string& path);
 [[nodiscard]] ICLFORGE_IAB_EXPORT std::expected<std::vector<IABitstreamFrame>, IabError>
 parse_mxf_iab(std::istream& in);
+
+// --- Writing ---------------------------------------------------------------------------------
+//
+// write_mxf_iab() wraps a parsed or constructed IABitstream sequence as an IMF IAB Track File: the
+// structure ST 2067-5 gives an Essence Component and ST 2067-201 gives IAB. It writes
+//
+//   header partition   Primer Pack, Header Metadata, 8 KiB of KLV fill  (closed and complete)
+//   body partition     the Index Table Segments                          (IndexSID 2)
+//   body partition     the clip-wrapped essence, one KLV                  (BodySID 1)
+//   footer partition   no repeated metadata
+//   Random Index Pack
+//
+// KAG size 1, OP1a (single item, single package, uni-track, stream, internal essence). The
+// Header Metadata holds one Material Package and one File Package, each with a timecode track and
+// the sound track; the IAB Essence Descriptor with an IAB Soundfield Label SubDescriptor and one
+// IAB Channel SubDescriptor per bed channel (ST 2067-201 Annexes C and E); and the Preface's
+// ConformsToSpecifications entry for IMF IAB Track File Level 0.
+//
+// Edit Rate is the IAB frame rate and an Edit Unit is one Preamble + IAFrame segment pair, so the
+// Index Table has one entry per frame. Following ST 2067-201 5.7.2 (a deliberate deviation from
+// ST 377-1 11.1.4) each entry's Stream Offset includes the essence KLV's key and length, so the
+// first Edit Unit is at offset 25.
+//
+// ST 2067-201 constrains the bitstream more tightly than ST 2098-2 does, and the writer refuses
+// what it forbids rather than writing a non-conformant file: 24-bit audio, AudioDataPCM only (no
+// AudioDataDLC), no BedRemap and no child elements of a BedDefinition or ObjectDefinition, no
+// conditional elements unless their UseCase is 0xFF, and a SampleRate, BitDepth and FrameRate that
+// do not change.
+enum class MxfWriteError : std::uint8_t {
+    kNoFrames,             // there are no frames to wrap
+    kInconsistentFrames,   // SampleRate, BitDepth or FrameRate differs between frames (5.6.1), or a
+                           // BedDefinition / ObjectDefinition does not keep its constant fields (5.6.3)
+    kBadBitDepth,          // the bit depth is not 24 (5.6.2)
+    kDlcNotAllowed,        // a frame carries AudioDataDLC (5.6.2)
+    kBedRemapNotAllowed,   // a BedRemap element (5.6.3.3)
+    kChildElement,         // a child of a BedDefinition or ObjectDefinition (5.6.3.2)
+    kConditionalElement,   // a conditional element whose UseCase is not 0xFF (5.6.3.4)
+    kBitstream,            // write_iabitstream() refused a frame; see its own WriteError
+    kTooLarge,             // a value does not fit the field that holds it
+    kCannotOpen,           // the output path could not be opened
+};
+
+[[nodiscard]] ICLFORGE_IAB_EXPORT std::string_view describe(MxfWriteError error);
+
+struct MxfWriteOptions {
+    // Identification Set: who wrote the file.
+    std::string company_name = "iclforge";
+    std::string product_name = "iclforge IAB track file writer";
+    std::string version_string = "ST 2067-201";
+
+    // IAB Soundfield Label SubDescriptor (Annex C, Table 7). The strings are written as given; MCA
+    // Content and MCA Use Class take the values of ST 377-41 Subclauses 5.4 and 5.5, which are not
+    // checked here. A spoken language is an RFC 5646 tag and is left out when empty.
+    std::optional<std::string> title;
+    std::optional<std::string> title_version;
+    std::optional<std::string> spoken_language;
+    std::optional<std::string> content;
+    std::optional<std::string> use_class;
+
+    // ST 2067-2 Annex E items, both "should be present". When the edit rate is not set it defaults
+    // to the IAB frame rate for the rates that are also picture rates (24, 25, 30 and 24000/1001)
+    // and is left out for the others. The alignment level is in dBFS.
+    std::optional<std::pair<std::int32_t, std::int32_t>> reference_image_edit_rate;
+    std::optional<std::int8_t> reference_audio_alignment_level = -20;
+
+    // false leaves out the IAB Channel SubDescriptors (Annex E; "should").
+    bool channel_sub_descriptors = true;
+
+    // Times written to the Preface, Identification and both Packages. Now when unset.
+    std::optional<std::chrono::sys_seconds> timestamp;
+
+    // Seeds the UUIDs and the package identifier. The same seed and timestamp give the same
+    // bytes; unset draws one from std::random_device.
+    std::optional<std::uint64_t> uid_seed;
+};
+
+[[nodiscard]] ICLFORGE_IAB_EXPORT std::expected<std::vector<std::byte>, MxfWriteError> write_mxf_iab(
+    std::span<const IABitstreamFrame> frames, const MxfWriteOptions& options = {});
+
+[[nodiscard]] ICLFORGE_IAB_EXPORT std::expected<void, MxfWriteError> write_mxf_iab(
+    const std::string& path, std::span<const IABitstreamFrame> frames, const MxfWriteOptions& options = {});
 
 }  // namespace iclforge::iab

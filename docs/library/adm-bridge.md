@@ -254,10 +254,36 @@ expressing anything below it (IAB's `[0, 1]` is the upper half of `oba::Position
 two specs share a reference height — the same status the ADM conversion's own one undocumented gap
 has above.
 
-`ObjectSpread` (§10.5.15-17) and the 9-zone `ObjectZoneControl` (§10.5.11-14) are not mapped, for
-the identical reason ADM's own `width`/`height`/`depth`/`zoneExclusion` are not (see "What does not
-get mapped" above): spreading an object in the downmix would have the receiving renderer spread it
-a second time, and `ZoneConstraint`'s six named presets have no clean image for either IAB shape.
+**Spread** (§10.5.15-17) becomes `ObjectSize`: `iab_spread_to_size()` takes the spread on x, y and z as
+width, depth and height. ST 2098-2 defines the spread as the extent of the object, in fractions of
+the unit cube, and TS 103 420 §5.6.1.2 codes `object_width`, `object_depth` and `object_height` as
+normalized `[0, 1]` extents on the same axes. No clause states that the two scales are the same;
+this is the same rename the ADM bridge makes. A point source (`OBJECT_SPREAD_NONE`) is size zero.
+
+**Zone control** becomes `ZoneConstraint` and `b_enable_elevation`. `iab_zones_to_constraint()` takes
+the nine gains of §10.5.11-14 Table 24 and `iab_zones19_to_constraint()` the nineteen of an
+`ObjectZoneDefinition19` child (§10.6 Table 28), which replaces the nine when present. A gain of 0.5
+or more counts as the zone being included, because TS 103 420 Table 20 includes or excludes a zone
+and has no gain. The horizontal zones map to a preset only when their pattern is exactly that
+preset's:
+
+| Preset | Included horizontal zones |
+|---|---|
+| none | all |
+| back excluded | all but the two rear zones |
+| side excluded | all but the two wall zones |
+| centre and back | screen centre and the two rear zones |
+| screen only | the three screen zones |
+| surround only | the two wall zones and the two rear zones |
+
+Any other pattern leaves the object unconstrained (`IabZoneMapping::exact` is false) rather than
+picking a preset that would exclude the wrong zones. The overhead zones set `b_enable_elevation`:
+on when either is included, or, for the 19-zone form, when any height-layer or ceiling zone is. A
+`zone19` update in a sub block with no pan information has no keyframe to ride on and takes effect
+at the next sub block that has one.
+
+Both reach the bitstream and stop there, as ADM's width and zone do: `AtmosEncoder` folds each
+object into the bed as a point.
 
 `IabBridgeResult` is a **new** struct, not a reuse of `BridgeResult`: PCM is concatenated across
 many independently-parsed frames, so `IabBridgeResult::pcm` is **owned**
@@ -309,7 +335,8 @@ enum class BridgeError : std::uint8_t {
     kNoProgramme, kProgrammeNotFound, kUnresolvedReference, kObjectReferenceCycle,
     kUnsupportedType, kChannelTrackMismatch, kNoAudioForTrack, kEmptyBlockSequence,
     kTooManyChannels, kEmptyInput,
-    kEmptyIabStream, kUnsupportedIabChannel, kNoIabEssenceForChannel,  // build_iab() only
+    kEmptyIabStream, kUnsupportedIabChannel, kNoIabEssenceForChannel,
+    kBadIabAudio,  // build_iab() only
 };
 std::string_view describe(BridgeError error);
 
