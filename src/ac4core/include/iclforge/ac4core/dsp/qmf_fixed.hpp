@@ -44,60 +44,8 @@ namespace iclforge::ac4::detail::dsp::qmf::fixed {
 
 using iclforge::internal::Fixed32;
 
-[[nodiscard]] constexpr Fixed32 q(double value) noexcept {
-    return Fixed32{value};
-}
-
 // The factors of qmf_constants.hpp at Fixed32, the packing's without its 1/128.
-struct FixedConstants {
-    std::array<Fixed32, 48> fft1_re{};
-    std::array<Fixed32, 48> fft1_im{};
-    std::array<Fixed32, 12> fft2_re{};
-    std::array<Fixed32, 12> fft2_im{};
-    std::array<Fixed32, 64> rot_re{};
-    std::array<Fixed32, 64> rot_im{};
-    std::array<Fixed32, 32> post_cos{};
-    std::array<Fixed32, 32> post_sin{};
-    std::array<Fixed32, 32> pre_re{};
-    std::array<Fixed32, 32> pre_im{};
-    std::array<Fixed32, 32> prho_re{};
-    std::array<Fixed32, 32> prho_im{};
-};
-
-[[nodiscard]] consteval FixedConstants make_fixed_constants() {
-    FixedConstants c{};
-    for (std::size_t p = 0; p < 16; ++p) {
-        for (std::size_t k = 1; k <= 3; ++k) {
-            const auto units = static_cast<long long>(8 * p * k);
-            c.fft1_re[(k - 1) * 16 + p] = q(cos_units(units));
-            c.fft1_im[(k - 1) * 16 + p] = q(sin_units(units));
-        }
-    }
-    for (std::size_t p = 0; p < 4; ++p) {
-        for (std::size_t k = 1; k <= 3; ++k) {
-            const auto units = static_cast<long long>(32 * p * k);
-            c.fft2_re[(k - 1) * 4 + p] = q(cos_units(units));
-            c.fft2_im[(k - 1) * 4 + p] = q(sin_units(units));
-        }
-    }
-    for (std::size_t m = 0; m < 64; ++m) {
-        const auto units = static_cast<long long>(4 * m);
-        c.rot_re[m] = q(cos_units(units));
-        c.rot_im[m] = q(sin_units(units));
-    }
-    for (std::size_t k = 0; k < 32; ++k) {
-        const auto odd = static_cast<long long>(2 * k + 1);
-        c.post_cos[k] = q(cos_units(odd) / 2.0);
-        c.post_sin[k] = q(sin_units(odd) / 2.0);
-        c.pre_re[k] = q(cos_units(-255 * odd));
-        c.pre_im[k] = q(sin_units(-255 * odd));
-        c.prho_re[k] = q(cos_units(-253 * odd));
-        c.prho_im[k] = q(sin_units(-253 * odd));
-    }
-    return c;
-}
-
-inline constexpr FixedConstants kFixedConstants = make_fixed_constants();
+inline constexpr Constants<Fixed32> kFixedConstants = make_constants<Fixed32>(1.0);
 
 // A product the bounds above keep below the format's edge.
 [[nodiscard]] inline Fixed32 mul(Fixed32 a, Fixed32 b) noexcept {
@@ -106,53 +54,12 @@ inline constexpr FixedConstants kFixedConstants = make_fixed_constants();
 
 // fft64() of qmf_kernels.hpp, every twiddle product unsaturated.
 inline void fft64(Fixed32* xr, Fixed32* xi, Fixed32* yr, Fixed32* yi) noexcept {
-    const FixedConstants& c = kFixedConstants;
-    Complex<Fixed32> a[4];
-    Complex<Fixed32> b[4];
-    const auto turn = [](Complex<Fixed32> v, Fixed32 wr, Fixed32 wi) {
-        return Complex<Fixed32>{mul(v.re, wr) - mul(v.im, wi), mul(v.re, wi) + mul(v.im, wr)};
-    };
-    for (std::size_t p = 0; p < 16; ++p) {
-        for (std::size_t i = 0; i < 4; ++i) {
-            a[i] = Complex<Fixed32>{xr[p + 16 * i], xi[p + 16 * i]};
-        }
-        butterfly4(a, b);
-        yr[4 * p] = b[0].re;
-        yi[4 * p] = b[0].im;
-        for (std::size_t k = 1; k < 4; ++k) {
-            const std::size_t t = (k - 1) * 16 + p;
-            const Complex<Fixed32> v = turn(b[k], c.fft1_re[t], c.fft1_im[t]);
-            yr[4 * p + k] = v.re;
-            yi[4 * p + k] = v.im;
-        }
-    }
-    for (std::size_t p = 0; p < 4; ++p) {
-        for (std::size_t r = 0; r < 4; ++r) {
-            for (std::size_t i = 0; i < 4; ++i) {
-                a[i] = Complex<Fixed32>{yr[r + 4 * p + 16 * i], yi[r + 4 * p + 16 * i]};
-            }
-            butterfly4(a, b);
-            for (std::size_t k = 0; k < 4; ++k) {
-                Complex<Fixed32> v = b[k];
-                if (p != 0 && k != 0) {
-                    const std::size_t t = (k - 1) * 4 + p;
-                    v = turn(v, c.fft2_re[t], c.fft2_im[t]);
-                }
-                xr[r + 16 * p + 4 * k] = v.re;
-                xi[r + 16 * p + 4 * k] = v.im;
-            }
-        }
-    }
-    for (std::size_t r = 0; r < 16; ++r) {
-        for (std::size_t i = 0; i < 4; ++i) {
-            a[i] = Complex<Fixed32>{xr[r + 16 * i], xi[r + 16 * i]};
-        }
-        butterfly4(a, b);
-        for (std::size_t k = 0; k < 4; ++k) {
-            yr[r + 16 * k] = b[k].re;
-            yi[r + 16 * k] = b[k].im;
-        }
-    }
+    qmf::fft64_turned<Fixed32>(
+        kFixedConstants,
+        [](Complex<Fixed32> v, Fixed32 wr, Fixed32 wi) {
+            return Complex<Fixed32>{mul(v.re, wr) - mul(v.im, wi), mul(v.re, wi) + mul(v.im, wr)};
+        },
+        xr, xi, yr, yi);
 }
 
 // v rounded half up by 2^shift, a right shift for shift > 0 and an exact left one otherwise,
@@ -210,7 +117,7 @@ inline void analysis_slot(const Fixed32* filt, std::size_t head, Complex<Fixed32
     for (std::size_t n = 0; n < 128; ++n) {
         u[n] = Fixed32::from_raw(shift_rounded(sums[n], shift));
     }
-    const FixedConstants& c = kFixedConstants;
+    const Constants<Fixed32>& c = kFixedConstants;
     for (std::size_t m = 0; m < 64; ++m) {
         const Fixed32 even = u[2 * m];
         const Fixed32 odd = u[2 * m + 1];
@@ -266,7 +173,7 @@ inline void synthesis_slot(const Complex<Fixed32>* in, Fixed32* filt, std::size_
             norm[k] = Complex<Fixed32>{Fixed32::from_raw(shift_rounded(in[k].re.raw, shift)),
                                        Fixed32::from_raw(shift_rounded(in[k].im.raw, shift))};
         }
-        const FixedConstants& c = kFixedConstants;
+        const Constants<Fixed32>& c = kFixedConstants;
         for (std::size_t k = 0; k < 32; ++k) {
             const Fixed32 q0r = norm[k].re;
             const Fixed32 q0i = norm[k].im;

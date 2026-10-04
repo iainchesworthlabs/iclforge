@@ -81,9 +81,13 @@ inline void butterfly4(const Complex<Real>* a, Complex<Real>* b) noexcept {
 // A pass with n the length it splits, s the number of transforms side by side and
 // m = n / 4, takes a[i] = x[q + s (p + i m)] and writes b[k] w^(p k) to
 // y[q + s (4 p + k)], with w = e^(+2 pi i / n).
-template <typename Real>
-inline void fft64(Real* xr, Real* xi, Real* yr, Real* yi) noexcept {
-    const auto& c = kConstants<Real>;
+//
+// `c` holds the factors (Constants<Real>) and `turn(v, wr, wi)` the product of v and w, so that a
+// tier whose products must not saturate (dsp/qmf_fixed.hpp) takes its own and every other step
+// stays this one's.
+template <typename Real, typename Turn>
+inline void fft64_turned(const Constants<Real>& c, Turn turn, Real* xr, Real* xi, Real* yr,
+                         Real* yi) noexcept {
     Complex<Real> a[4];
     Complex<Real> b[4];
     // n = 64, s = 1: x to y.
@@ -96,7 +100,7 @@ inline void fft64(Real* xr, Real* xi, Real* yr, Real* yi) noexcept {
         yi[4 * p] = b[0].im;
         for (std::size_t k = 1; k < 4; ++k) {
             const std::size_t t = (k - 1) * 16 + p;
-            const Complex<Real> v = b[k] * Complex<Real>{c.fft1_re[t], c.fft1_im[t]};
+            const Complex<Real> v = turn(b[k], c.fft1_re[t], c.fft1_im[t]);
             yr[4 * p + k] = v.re;
             yi[4 * p + k] = v.im;
         }
@@ -112,7 +116,7 @@ inline void fft64(Real* xr, Real* xi, Real* yr, Real* yi) noexcept {
                 Complex<Real> v = b[k];
                 if (p != 0 && k != 0) {
                     const std::size_t t = (k - 1) * 4 + p;
-                    v = v * Complex<Real>{c.fft2_re[t], c.fft2_im[t]};
+                    v = turn(v, c.fft2_re[t], c.fft2_im[t]);
                 }
                 xr[q + 16 * p + 4 * k] = v.re;
                 xi[q + 16 * p + 4 * k] = v.im;
@@ -130,6 +134,13 @@ inline void fft64(Real* xr, Real* xi, Real* yr, Real* yi) noexcept {
             yi[q + 16 * k] = b[k].im;
         }
     }
+}
+
+template <typename Real>
+inline void fft64(Real* xr, Real* xi, Real* yr, Real* yi) noexcept {
+    fft64_turned<Real>(
+        kConstants<Real>,
+        [](Complex<Real> v, Real wr, Real wi) { return v * Complex<Real>{wr, wi}; }, xr, xi, yr, yi);
 }
 
 // Q[k] and Q[63 - k] from Z[k] and Z[63 - k], k < 32 (see dsp/qmf.hpp).
