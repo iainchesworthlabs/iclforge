@@ -442,10 +442,11 @@ TEST_CASE("forge atmos-adm warns about ADM features it does not carry", "[cli][a
     REQUIRE(at != std::string::npos);
     const auto close = xml.find("</audioBlockFormat>", at);
     REQUIRE(close != std::string::npos);
-    // divergence and screenRef have no Atmos image; ZM4 is a Table B.18 preset and does.
+    // headLocked and a divergence range have no Atmos image; the divergence value, screenRef and ZM4
+    // (a Table B.18 preset) do, so they are not mentioned.
     xml.insert(close,
-               "<objectDivergence>0.5</objectDivergence><screenRef>1</screenRef>"
-               "<zoneExclusion><zone>ZM4</zone></zoneExclusion>");
+               "<objectDivergence azimuthRange=\"30\">0.5</objectDivergence><screenRef>1</screenRef>"
+               "<headLocked>1</headLocked><zoneExclusion><zone>ZM4</zone></zoneExclusion>");
 
     const auto fixture_path = dir / "atmos_adm_unmapped.wav";
     REQUIRE(write_fixture(fixture_path, xml));
@@ -460,8 +461,9 @@ TEST_CASE("forge atmos-adm warns about ADM features it does not carry", "[cli][a
     CHECK(fs::exists(out_path));
     CHECK(log.find("warning:") != std::string::npos);
     CHECK(log.find("AC_00039001") != std::string::npos);
-    CHECK(log.find("objectDivergence") != std::string::npos);
-    CHECK(log.find("screenRef") != std::string::npos);
+    CHECK(log.find("objectDivergence range") != std::string::npos);
+    CHECK(log.find("headLocked") != std::string::npos);
+    CHECK(log.find("screenRef") == std::string::npos);
     CHECK(log.find("zoneExclusion") == std::string::npos);
 
     // The unmodified fixture says nothing.

@@ -216,8 +216,8 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | ADM XML — HOA / Binaural / Matrix blocks | 🟡 | Low | Nice-to-have | Parsed as blocks; a Matrix block's coefficients are not (libadm has no model); the bridge refuses all three |
 | | Common definitions (Annex A) | 🟢 | Medium | Important | Predefined formats merged |
 | **Writer** | BW64 write | 🟡 | Medium | Important | 16/24/32-bit integer or 32/64-bit float; shapes matching the bridge; `zoneExclusion` written |
-| | Decode → ADM BWF (Atmos master profile) | 🟡 | Medium | Important | Dynamic-object-only programmes; cartesian; zone constraints written, `screenRef` and divergence not |
-| **Bridge** | ADM → Atmos encode | 🟡 | High | Essential | Position, gain, size, snap and zone constraints carried; divergence, `screenRef`, `headLocked`, `diffuse` listed in `BridgeResult::unmapped` and warned; Matrix / HOA / Binaural refused |
+| | Decode → ADM BWF (Atmos master profile) | 🟡 | Medium | Important | Dynamic-object-only programmes; cartesian; zone constraints, divergence value and `screenRef` written |
+| **Bridge** | ADM → Atmos encode | 🟡 | High | Essential | Position, gain, size, snap, zone constraints, divergence value and `screenRef` carried; `headLocked`, `diffuse`, a divergence range and a conditioned `channelLock` listed in `BridgeResult::unmapped` and warned; Matrix / HOA / Binaural refused |
 
 ---
 
@@ -339,7 +339,7 @@ this register is the checklist that those bounds appear here too.
 | Clause | Open item | Status |
 |---|---|---|
 | Pack types beyond DirectSpeakers + Objects | Matrix / HOA / Binaural: not representable in the Atmos bridge (refused by design); Matrix coefficients not parsed | 🟡 |
-| Writer / bridge | Narrowed Atmos-master subset; divergence and `screenRef` not mapped (TS 103 420 Annex B gives no mapping) | 🟡 |
+| Writer / bridge | Narrowed Atmos-master subset; divergence and `screenRef` mapped by reading, since TS 103 420 Annex B has no row for them; no external decoder has rendered either | 🟡 |
 
 ### AOM IAMF v1.1.0
 

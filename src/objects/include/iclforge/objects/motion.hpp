@@ -39,6 +39,12 @@ struct Keyframe {
     bool snap = false;
     ZoneConstraint zone = ZoneConstraint::kNone;
     bool enable_elevation = true;
+    // Divergence interpolates like size; the screen reference and its two factors hold the earlier
+    // keyframe's value, like the other rendering flags.
+    double divergence = 0.0;
+    bool screen_reference = false;
+    double screen_factor = 1.0;
+    double depth_factor = 1.0;
 };
 
 enum class PathError : std::uint8_t { kNoKeyframes, kDuplicateTimestamp };

@@ -63,6 +63,8 @@ struct Rendering {
     bool snap = false;
     iclforge::oba::ZoneConstraint zone = iclforge::oba::ZoneConstraint::kNone;
     bool enable_elevation = true;
+    double divergence = 0.0;
+    bool screen_reference = false;
 };
 
 }  // namespace
@@ -98,6 +100,12 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
     //
     // zoneExclusion (§10.4) maps through TS 103 420 Annex B.2.6 (see coordinates.hpp); a zone list
     // that is not one of Table B.18's presets keeps whatever part of it did map.
+    //
+    // objectDivergence (§10.5) value maps to OAMD's object_divergence (§5.2.7, Tables 40 to 42): both
+    // are the share of the object's energy moved into two objects spread along X, 0 to 1. Annex B
+    // does not print the correspondence; src/admbridge/ERRATA.md has the reading. screenRef (§10.6)
+    // maps to b_object_use_screen_ref with a full screen_factor and depth_factor (see
+    // Keyframe), since ADM's flag is all or nothing.
     const auto rendering_of = [&](const iclforge::adm::AudioBlockFormat& block) -> Rendering {
         if (force_lfe) {
             return {};
@@ -108,7 +116,9 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
                          .height = std::clamp(block.height, 0.0, 1.0)},
                 .snap = block.has_channel_lock && block.channel_lock,
                 .zone = zones.zone,
-                .enable_elevation = zones.enable_elevation};
+                .enable_elevation = zones.enable_elevation,
+                .divergence = block.has_object_divergence ? std::clamp(block.object_divergence.value, 0.0, 1.0) : 0.0,
+                .screen_reference = block.screen_ref};
     };
     const double lfe_send = force_lfe ? 1.0 : 0.0;
 
@@ -133,7 +143,9 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
                              .size = rendering.size,
                              .snap = rendering.snap,
                              .zone = rendering.zone,
-                             .enable_elevation = rendering.enable_elevation});
+                             .enable_elevation = rendering.enable_elevation,
+                             .divergence = rendering.divergence,
+                             .screen_reference = rendering.screen_reference});
     };
 
     if (channel.block_formats.size() == 1) {
@@ -243,14 +255,13 @@ std::vector<std::string> unmapped_features(const iclforge::adm::AudioChannelForm
             out.emplace_back(name);
         }
     };
-    // §10.5 objectDivergence: OAMD's own divergence (TS 103 420 §5.2.7) is a spread along X into
-    // two objects, defined by its own tables, and Annex B gives no correspondence with ADM's
-    // value-plus-range form, so none is invented.
-    note(any_block([](const auto& b) { return b.has_object_divergence && b.object_divergence.value > 0.0; }),
-         "objectDivergence");
-    // §10.6 screenRef: needs the programme's reference screen (Annex B Tables B.5/B.6), which
-    // this model does not carry.
-    note(any_block([](const auto& b) { return b.screen_ref; }), "screenRef");
+    // §10.5 objectDivergence's value maps (see rendering_of); its azimuthRange and positionRange,
+    // which say where the two objects go, have no OAMD field.
+    note(any_block([](const auto& b) {
+             return b.has_object_divergence && b.object_divergence.value > 0.0 &&
+                    (b.object_divergence.has_azimuth_range || b.object_divergence.has_position_range);
+         }),
+         "objectDivergence range");
     note(any_block([](const auto& b) { return b.head_locked; }), "headLocked");
     note(any_block([](const auto& b) { return b.diffuse > 0.0; }), "diffuse");
     note(any_block([](const auto& b) { return b.has_channel_lock_max_distance; }),
@@ -480,6 +491,13 @@ std::vector<iclforge::adm::AudioBlockFormat> build_block_formats(std::span<const
         }
         // TS 103 420 Annex B.2.6: zone constraints go out as a zoneExclusion.
         block.zone_exclusion = constraint_to_adm_zone_exclusion(state.zone, state.enable_elevation);
+        // The divergence value (Table 42) and the screen reference. ADM's screenRef is all or nothing, so
+        // a screen_factor below one half reads as room-anchored.
+        if (state.divergence > 0.0) {
+            block.has_object_divergence = true;
+            block.object_divergence.value = std::clamp(state.divergence, 0.0, 1.0);
+        }
+        block.screen_ref = state.screen_reference && state.screen_factor >= 0.5;
     };
 
     std::vector<iclforge::adm::AudioBlockFormat> blocks;

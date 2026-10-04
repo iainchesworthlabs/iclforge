@@ -34,8 +34,23 @@ matches a preset and reports the rest as inexact (`AdmZoneMapping::exact`), whic
 
 ## ADM `objectDivergence` and `screenRef`
 
-TS 103 420 Annex B (the OAMD-to-ADM conversion) lists no mapping for either. OAMD's divergence
-(§5.2.7, Tables 40 to 42) splits an object in two along X; ADM's is a value with an azimuth or position
-range. `screenRef` is mapped in B.2.1.3 only together with an `audioProgrammeReferenceScreen` built from
-`ref_screen_ratio`, which the decoded program model does not carry. The bridge reads both from ADM and
-does not carry either into the Atmos encode, and `write()` does not emit them.
+TS 103 420 Annex B (the OAMD-to-ADM conversion) has no row for either.
+
+**Divergence.** OAMD's `object_divergence` (§5.2.7, Tables 40 to 42) "converts one object into two
+objects, where the energy is spread along the X-axis"; ADM's `objectDivergence` value (BS.2076-2 §10.5) is
+the balance between the original and two objects spread either side of it, 0 to 1. The bridge reads the two
+values as the same quantity and copies one into the other, quantized to Table 42. ADM also says where the two
+objects go (`azimuthRange` for polar positions, `positionRange` for Cartesian ones); OAMD has no field for
+that, so a block that sets either is listed in `BridgeResult::unmapped` as "objectDivergence range".
+
+Evidence: **text** for each side. Nothing here has rendered a stream with divergence to compare the two
+renderers' spreading.
+
+**Screen reference.** ADM's `screenRef` is a flag; OAMD's `b_object_use_screen_ref` is followed by a
+`screen_factor` (1/8 to 1) and `depth_factor` (1/4 to 2) that blend between room and screen anchoring
+(§5.2.1.3). `screenRef` 1 becomes a factor of 1 and a depth factor of 1, the fully screen-anchored case. Back
+the other way, a factor of one half or more becomes `screenRef` 1. Annex B.2.1.3 also writes an
+`audioProgrammeReferenceScreen` whose width is `2 x ref_screen_ratio`, a quantity the OAMD syntax does not
+carry (it is in no clause of the standard but that row), so the bridge reads and writes no reference screen.
+
+Evidence: **text** (§5.5.11, §5.6.1.1.18 to .20, §5.2.1.3, Annex B.2.1.3).

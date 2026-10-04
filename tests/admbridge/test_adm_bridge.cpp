@@ -1222,7 +1222,8 @@ TEST_CASE("build() lists the ADM features it does not carry, per channel", "[adm
         auto& blocks = doc.model.channel_formats.front().block_formats;
         blocks.front().has_object_divergence = true;
         blocks.front().object_divergence.value = 0.5;
-        blocks.front().screen_ref = true;
+        blocks.front().object_divergence.has_azimuth_range = true;
+        blocks.front().screen_ref = true;  // mapped: not listed
         blocks.front().head_locked = true;
         blocks.front().diffuse = 0.3;
         blocks.front().has_channel_lock = true;
@@ -1236,9 +1237,19 @@ TEST_CASE("build() lists the ADM features it does not carry, per channel", "[adm
         REQUIRE(result.has_value());
         REQUIRE(result->unmapped.size() == 1);
         CHECK(result->unmapped[0] ==
-              std::vector<std::string>{"objectDivergence", "screenRef", "headLocked", "diffuse",
+              std::vector<std::string>{"objectDivergence range", "headLocked", "diffuse",
                                        "channelLock maxDistance",
                                        "zoneExclusion (not a TS 103 420 Table B.18 preset)"});
+    }
+    SECTION("a divergence value and screenRef are carried, not listed") {
+        auto doc = minimal_document();
+        auto& block = doc.model.channel_formats.front().block_formats.front();
+        block.has_object_divergence = true;
+        block.object_divergence.value = 0.5;
+        block.screen_ref = true;
+        const auto result = iclforge::admbridge::build(doc);
+        REQUIRE(result.has_value());
+        CHECK(result->unmapped[0].empty());
     }
     SECTION("a divergence of zero is not a loss") {
         auto doc = minimal_document();
@@ -1254,4 +1265,52 @@ TEST_CASE("build() lists the ADM features it does not carry, per channel", "[adm
         REQUIRE(result.has_value());
         CHECK(result->unmapped[0].empty());
     }
+}
+
+// ---------------------------------------------------------------------------
+// objectDivergence and screenRef
+// ---------------------------------------------------------------------------
+
+TEST_CASE("build_channel_path carries objectDivergence and screenRef", "[admbridge][divergence]") {
+    auto first = block_at(0.0, 1.0, polar(0.0, 0.0));
+    first.has_object_divergence = true;
+    first.object_divergence.value = 0.4;
+    first.screen_ref = true;
+    auto second = block_at(1.0, 1.0, polar(0.0, 0.0), 1.0, /*jump_position=*/false);
+    second.has_object_divergence = true;
+    second.object_divergence.value = 0.8;
+    second.screen_ref = false;
+    auto third = block_at(2.0, 1.0, polar(0.0, 0.0), 1.0, /*jump_position=*/true);
+
+    const auto path = iclforge::admbridge::build_channel_path(channel_with({first, second, third}), 0.0, false);
+    REQUIRE(path.has_value());
+
+    const auto at_start = path->evaluate(0.5);
+    CHECK_THAT(at_start.divergence, Catch::Matchers::WithinAbs(0.4, 1e-12));
+    CHECK(at_start.screen_reference);
+    // ADM's screenRef is all or nothing: a full screen factor and unity depth.
+    CHECK(at_start.screen_factor == 1.0);
+    CHECK(at_start.depth_factor == 1.0);
+
+    // Divergence ramps across the block (jumpPosition 0); the flag holds the earlier block's value
+    // until the block's own keyframe at its end.
+    const auto ramping = path->evaluate(1.5);
+    CHECK_THAT(ramping.divergence, Catch::Matchers::WithinAbs(0.6, 1e-12));
+    CHECK(ramping.screen_reference);
+    CHECK_FALSE(path->evaluate(2.0).screen_reference);
+
+    const auto end = path->evaluate(2.5);
+    CHECK(end.divergence == 0.0);
+}
+
+TEST_CASE("build_channel_path gives an LFE channel no divergence or screen reference", "[admbridge][divergence]") {
+    auto block = block_at(0.0, 1.0, polar(0.0, 0.0));
+    block.has_object_divergence = true;
+    block.object_divergence.value = 1.0;
+    block.screen_ref = true;
+    const auto path = iclforge::admbridge::build_channel_path(channel_with({block}), 0.0, /*force_lfe=*/true);
+    REQUIRE(path.has_value());
+    const auto placement = path->evaluate(0.5);
+    CHECK(placement.divergence == 0.0);
+    CHECK_FALSE(placement.screen_reference);
 }

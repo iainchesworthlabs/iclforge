@@ -132,13 +132,10 @@ an object in the downmix would have the receiving renderer spread it a second ti
 - **`diffuse`** (§10.1) is parsed by `iclforge::adm` and dropped. It is a direct-versus-diffuse balance,
   not an extent; OAMD has no field for it, and folding it into `object_size` would misreport a
   decorrelation instruction as a physical size.
-- **`objectDivergence`** (§10.5) is parsed and not carried. OAMD's divergence (TS 103 420 §5.2.7) turns
-  one object into two with the energy spread along X, through its own value tables, and Annex B
-  gives no correspondence with ADM's value-plus-range form; none is invented here.
-- **`screenRef`** (§10.6) is parsed and not carried. Annex B.2.1.3 expresses a screen-referenced
-  object with `screenRef` plus an `audioProgrammeReferenceScreen` sized from `ref_screen_ratio`, and
-  the model carries neither the programme's reference screen nor the ratio. **`headLocked`** has no
-  OAMD field.
+- **`objectDivergence`'s range** (§10.5): `azimuthRange` and `positionRange` say where the two
+  objects go; OAMD has no field for them (§5.2.7 spreads the energy along X by its own rule). The
+  divergence **value** is carried, see below.
+- **`headLocked`** has no OAMD field.
 - **A conditioned `channelLock`**: `maxDistance` is dropped and the lock applies unconditionally,
   since `b_object_snap` is one bit.
 - **A `zoneExclusion` that is not a Table B.18 preset** (see below).
@@ -149,6 +146,27 @@ an object in the downmix would have the receiving renderer spread it a second ti
 
 `build()` does not drop these silently. `BridgeResult::unmapped[i]` lists, for channel `i`, each feature
 above that its blocks use, and `forge atmos-adm` prints one `warning:` line per such channel.
+
+### Divergence and screen reference
+
+Both reach the bitstream through `ObjectPlacement` and the OAMD writer, which now writes
+`b_object_use_screen_ref` with its `screen_factor_bits` and `depth_factor_idx` (§5.5.11) and the
+`extended_object_element` with its `obj_div_block` (§5.5.13, §5.5.14). The encoder's own bed render does
+not act on either, as for size and zones.
+
+- **`objectDivergence`'s value** (0 to 1) becomes `ObjectPlacement::divergence`, and the writer sends the
+  nearest value of Table 42: a 2-bit index (`object_div_mode` 0) when the nearest is one of Table 41's four
+  values, `object_div_mode` 1 when it repeats the previous block's, and the 6-bit code
+  (`object_div_mode` 2) otherwise. A value that rounds to no divergence sends `b_object_divergence` 0.
+  TS 103 420 Annex B has no row for it, so the correspondence is a reading: ADM's value and OAMD's
+  `object_divergence` are both the share of the energy moved into two spread objects (§5.2.7).
+  `src/admbridge/ERRATA.md` records it.
+- **`screenRef`** becomes `screen_reference` with `screen_factor` 1 and `depth_factor` 1, since ADM's flag is
+  all or nothing. The reference screen of Annex B.2.1.3 (`audioProgrammeReferenceScreen`, sized by a
+  `ref_screen_ratio` the OAMD syntax does not carry) is not read or written; the renderer's screen applies.
+- The write direction maps back: a divergence above zero becomes `objectDivergence`, and a screen reference
+  with `screen_factor` of one half or more becomes `screenRef`. A smaller factor reads as room-anchored,
+  because ADM cannot say how far.
 
 ### Zone constraints
 

@@ -394,3 +394,48 @@ TEST_CASE("AtmosEncoder transmits an object's size, snap and zone", "[atmos][mot
     CHECK(objects[0].zone == iclforge::oba::ZoneConstraint::kCentreAndBackOnly);
     CHECK_FALSE(objects[0].enable_elevation);
 }
+
+TEST_CASE("keyframe paths ramp divergence but hold the screen reference", "[atmos][motion]") {
+    const auto path = iclforge::oba::KeyframePath::create({
+        {.time_s = 0.0, .divergence = 0.0, .screen_reference = false, .screen_factor = 1.0, .depth_factor = 1.0},
+        {.time_s = 2.0, .divergence = 1.0, .screen_reference = true, .screen_factor = 0.5, .depth_factor = 2.0},
+    });
+    REQUIRE(path.has_value());
+    const auto mid = path->evaluate(1.0);
+    CHECK_THAT(mid.divergence, Catch::Matchers::WithinAbs(0.5, 1e-12));
+    CHECK_FALSE(mid.screen_reference);
+    CHECK(mid.screen_factor == 1.0);
+    const auto end = path->evaluate(2.0);
+    CHECK(end.divergence == 1.0);
+    CHECK(end.screen_reference);
+    CHECK(end.screen_factor == 0.5);
+    CHECK(end.depth_factor == 2.0);
+}
+
+TEST_CASE("AtmosEncoder transmits an object's divergence and screen reference", "[atmos][motion]") {
+    iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, 1};
+    const auto source = tone(440.0, 0.4, 0.0, 0);
+    const std::array<std::span<const float>, 1> audio{std::span<const float>{source}};
+    const std::array<iclforge::oba::ObjectPlacement, 1> placement{
+        {{.position = {.x = 0.25, .y = 0.5, .z = 0.0},
+          .gain = 1.0,
+          .divergence = 0.608529,  // Table 41 index 1
+          .screen_reference = true,
+          .screen_factor = 0.75,
+          .depth_factor = 0.5}}};
+
+    const auto unit = encoder.encode_frame(audio, placement);
+    REQUIRE(unit.has_value());
+
+    iclforge::ac3::Eac3Decoder decoder;
+    const auto decoded = decoder.decode_substream(unit->substream(0));
+    REQUIRE(decoded.has_value());
+    REQUIRE(decoded->has_value());
+    REQUIRE((*decoded)->object_metadata.has_value());
+    const auto& objects = (*decoded)->object_metadata->objects;
+    REQUIRE(objects.size() == 1);
+    CHECK(objects[0].divergence == 0.608529);
+    CHECK(objects[0].screen_reference);
+    CHECK(objects[0].screen_factor == 0.75);
+    CHECK(objects[0].depth_factor == 0.5);
+}

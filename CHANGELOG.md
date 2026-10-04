@@ -46,6 +46,13 @@ The sections below contain the complete change list and fixes.
 - **`write_bw64` takes `AdmWriteOptions`.** 16, 24 or 32-bit integer or 32 or 64-bit float; the
   default stays 24-bit integer. The sample rate is no longer narrowed to 16 bits, so 96 kHz masters
   write correctly.
+- **Object divergence and screen reference are transmitted.** The OAMD writer sends
+  `b_object_use_screen_ref` with its screen and depth factors, and the `extended_object_element` with
+  `obj_div_block` (Tables 40 to 42), through new `ObjectPlacement` and `Keyframe` fields. The ADM bridge
+  maps `objectDivergence`'s value and `screenRef` onto them, and back when writing.
+- **The OAMD decoder reads divergence from the standard's tables.** It guessed an evenly spaced 2-bit
+  table and a linear 6-bit code, though Tables 41 and 42 are printed; `object_div_mode` 1 (reuse) now
+  repeats the previous block's value, and an inactive object no longer has divergence bits read for it.
 - Matrix, HOA and Binaural packs stay refused by the bridge; the documentation now says why.
 
 **Associated-service identification, both directions**
