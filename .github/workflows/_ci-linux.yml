@@ -354,9 +354,9 @@ jobs:
       # forge only - the rest of the tree is untouched by the option and
       # building it again would buy nothing.
       #
-      # This and the nine steps after it test `matrix.scalar_variants`, a flag
+      # This and the ten steps after it test `matrix.scalar_variants`, a flag
       # legs.jsonc marks nightly-only for linux-gcc, so the run after a merge
-      # skips all ten and the nightly run keeps them.
+      # skips all eleven and the nightly run keeps them.
       - name: Build a float32 decoder
         if: matrix.scalar_variants
         shell: bash
@@ -396,6 +396,25 @@ jobs:
           python3 tools/checks/check_decode_scalar_snr.py               --double-cli "build/config-${MATRIX_PRESET}/bin/forge"               --float-cli build/decode-scalar-float/bin/forge               --workdir "$workdir"
         env:
           MATRIX_PRESET: ${{ matrix.preset }}
+
+      # The whole test suite against the float32 decoder. The three steps above
+      # build forge only, so the decoder's float path was held to the gold
+      # references and to the double decode's SNR but not to the tests: the
+      # suite's expectations are written for double, and one of them (the
+      # stream decoder's fast-inverse-transform case) failed on all four
+      # compilers at float, on main, with no leg building and running it.
+      # iclforge-tests joins the build directory the float32 decoder is already
+      # in, so the libraries are not rebuilt. -E _NOT_BUILT leaves out the
+      # placeholders ctest registers for test programs this directory did not
+      # build (the throughput guards, the Qt suites); -j runs the cases at
+      # once, where the suite takes about a minute in a single process.
+      - name: Whole test suite (float32 decode)
+        if: matrix.scalar_variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --build build/decode-scalar-float --target iclforge-tests
+          ctest --test-dir build/decode-scalar-float -E _NOT_BUILT -j "$(nproc)" --no-tests=error --output-on-failure
 
       # The third scalar (planning/arithmetic-tiers.md): the fixed-point
       # decoder, Q7.24 in an int32, for parts with no FPU. The same two

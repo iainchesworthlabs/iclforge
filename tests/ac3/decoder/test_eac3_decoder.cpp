@@ -156,7 +156,7 @@ struct RoundTrip {
 // Encode per-channel tones, then feed the elementary stream back through
 // split_access_units and the decoder - so the framing is exercised too, not
 // just the frames the encoder happened to hand over.
-RoundTrip round_trip(const LayoutCase& layout, int frames) {
+RoundTrip round_trip(const LayoutCase& layout, int frames, bool fast_imdct = true) {
     iclforge::ac3::eac3::AccessUnitEncoder encoder{layout.config};
     const auto nchans = static_cast<std::size_t>(encoder.channel_count());
     REQUIRE(layout.tones.size() == nchans);
@@ -189,7 +189,7 @@ RoundTrip round_trip(const LayoutCase& layout, int frames) {
     REQUIRE(units.has_value());
     REQUIRE(units->size() == static_cast<std::size_t>(frames));
 
-    iclforge::ac3::Eac3Decoder decoder;
+    iclforge::ac3::Eac3Decoder decoder{{.fast_imdct = fast_imdct}};
     for (const auto& unit : *units) {
         const auto decoded = decoder.decode_access_unit(unit);
         REQUIRE(decoded.has_value());
@@ -1223,6 +1223,49 @@ TEST_CASE("E-AC-3 enhanced coupling round-trips are near-transparent",
             CHECK(snr_db(rt.source[ch], rt.rendered[ch]) > 20.0);
         }
     }
+}
+
+TEST_CASE("E-AC-3 enhanced coupling honours fast_imdct = false, closely matching the fast path",
+          "[eac3][decoder][enhanced_coupling][fast-imdct]") {
+    // ecpl_channel_spectrum runs three inverse transforms of its own, and
+    // DecoderConfig::fast_imdct reaches them. A build that carries the
+    // coefficients in float must still run the direct form for `false`
+    // (ICLFORGE_DECODE_SCALAR=float used to hand back the fast result for both).
+    auto cpl_bed = bed(192);
+    cpl_bed.coupling = true;
+    cpl_bed.enhanced = true;
+    const LayoutCase layout{
+        .name = "5.1 ecpl",
+        .config = {.independent = cpl_bed},
+        .tones = {1000.0, 800.0, 1200.0, 600.0, 1400.0, 60.0},
+        .speakers = {{Location::kLeft, 1000.0},
+                     {Location::kCentre, 800.0},
+                     {Location::kRight, 1200.0},
+                     {Location::kLeftSurround, 600.0},
+                     {Location::kRightSurround, 1400.0},
+                     {Location::kLfe, 60.0}}};
+    const auto fast = round_trip(layout, 5, /*fast_imdct=*/true);
+    const auto direct = round_trip(layout, 5, /*fast_imdct=*/false);
+    REQUIRE(fast.rendered.size() == direct.rendered.size());
+
+    double squared_diff = 0.0;
+    double squared_signal = 0.0;
+    for (std::size_t ch = 0; ch < fast.rendered.size(); ++ch) {
+        REQUIRE(fast.rendered[ch].size() == direct.rendered[ch].size());
+        for (std::size_t n = 0; n < fast.rendered[ch].size(); ++n) {
+            const double diff = static_cast<double>(fast.rendered[ch][n]) -
+                                static_cast<double>(direct.rendered[ch][n]);
+            squared_diff += diff * diff;
+            squared_signal += static_cast<double>(direct.rendered[ch][n]) *
+                              static_cast<double>(direct.rendered[ch][n]);
+        }
+    }
+    // The setting has to change something, or both runs took the same path.
+    REQUIRE(squared_diff > 0.0);
+    const double snr_db = 10.0 * std::log10(squared_signal / squared_diff);
+    CAPTURE(snr_db);
+    // Measured 140.2 dB at float; a 1% error in the coupled spectrum alone gives 100.1 dB.
+    CHECK(snr_db > 120.0);
 }
 
 TEST_CASE("E-AC-3 enhanced coupling degrades gracefully when two channels share "
