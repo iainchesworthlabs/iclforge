@@ -78,9 +78,12 @@ iab::IaFrame make_frame(unsigned index, std::uint8_t frame_rate_code = kFrameRat
     for (std::uint32_t id = 1; id <= 4; ++id) {
         iab::AudioDataPcm pcm;
         pcm.audio_data_id = id;
-        pcm.samples.assign(samples, 0.0F);
         // Distinct per frame and per asset, and exactly representable at 24 bits.
-        pcm.samples[0] = static_cast<float>(index + id) / 1024.0F;
+        const float first_sample = static_cast<float>(index + id) / 1024.0F;
+        pcm.samples.assign(samples, 0.0F);
+        if (!pcm.samples.empty()) {
+            pcm.samples.front() = first_sample;
+        }
         frame.audio_pcm.push_back(std::move(pcm));
     }
     return frame;
