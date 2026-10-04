@@ -973,7 +973,7 @@ endif()
 # see the root CMakeLists.txt's own option()), same conditional shape as the ICLFORGE_BUILD_IAB
 # block immediately above.
 if(ICLFORGE_BUILD_IAMF)
-    target_sources(iclforge-tests PRIVATE iamf/test_iamf.cpp)
+    target_sources(iclforge-tests PRIVATE iamf/test_iamf.cpp iamf/test_iamf_container.cpp iamf/test_iamf_objects.cpp iamf/test_iamf_sequence.cpp)
     target_link_libraries(iclforge-tests PRIVATE iclforge::iamf)
 endif()
 

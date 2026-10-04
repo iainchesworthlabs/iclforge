@@ -183,7 +183,7 @@ option(ICLFORGE_BUILD_IAB "Build the standalone Immersive Audio Bitstream reader
 # also like iclforge::iab, nothing in apps/cli, apps/gui or examples/ links it unconditionally yet (only
 # examples/mux_iamf.cpp does, guarded on this option) - see src/iamf/CMakeLists.txt's own header
 # comment.
-option(ICLFORGE_BUILD_IAMF "Build the standalone IAMF OBU/ISOBMFF writer (src/iamf)" ON)
+option(ICLFORGE_BUILD_IAMF "Build the standalone IAMF OBU/ISOBMFF reader and writer (src/iamf)" ON)
 
 # The minimum-footprint decoder profile. Not a "build X too"
 # option like the ones above - it REPLACES what src/ac3 builds with a single

@@ -375,9 +375,12 @@ TEST_CASE("Mix Presentation OBU carries the mandatory Stereo layout plus the 7.1
     CHECK(leb128_at(entry.config_obus, pos, consumed) == 0);  // audio_element_id
     pos += consumed;
 
-    CHECK(byte_at(entry.config_obus, pos) == 0);  // RenderingConfig: headphones_rendering_mode
+    CHECK(byte_at(entry.config_obus, pos) == 0);  // RenderingConfig: mode, gain offset flag, filter profile
     pos += 1;
-    CHECK(leb128_at(entry.config_obus, pos, consumed) == 0);  // rendering_config_extension_size
+    // rendering_config_extension_size counts everything after it: here num_parameters alone.
+    CHECK(leb128_at(entry.config_obus, pos, consumed) == 1);
+    pos += consumed;
+    CHECK(leb128_at(entry.config_obus, pos, consumed) == 0);  // num_parameters: no position definition
     pos += consumed;
 
     // element_mix_gain: MixGainParamDefinition (§3.7.2 extends ParamDefinition, §3.6.1)

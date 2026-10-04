@@ -1,12 +1,13 @@
 # ---------------------------------------------------------------------------
-# iclforge::iamf - a standalone writer for AOM's IAMF (Immersive Audio Model and
-# Formats) v1.1.0, phase 1 of 3: an
-# `ipcm`-substream OBU/ISOBMFF writer for a channel-based 7.1.4 element,
-# fed from an E-AC-3 decode. E-AC-3 is not in IAMF's codec list (Opus,
-# AAC-LC, FLAC, LPCM only) and never can be, so this is a decode-then-rewrap
-# bridge, not a new encoder output - see include/iamf/iamf.hpp's own header
-# comment for the full picture. Phase 2 (object elements) waits on IAMF
-# v2.0; phase 3 (an OBU reader) is separate later work.
+# iclforge::iamf - a standalone reader and writer for AOM's IAMF (Immersive Audio
+# Model and Formats) v2.0.0: the OBU syntax (IA Sequence Header, Codec Config,
+# Audio Element, Mix Presentation, Parameter Block, Audio Frame, Temporal
+# Delimiter and Metadata OBUs), the standalone raw OBU stream, and the ISO-BMFF
+# encapsulation as a whole file or as movie fragments. It writes `ipcm`
+# substreams for channel-based and object-based Audio Elements; E-AC-3 is not in
+# IAMF's codec list (Opus, AAC-LC, FLAC, LPCM) and never can be, so the
+# channel-based route from E-AC-3 is a decode-then-rewrap bridge. See
+# include/iclforge/iamf/iamf.hpp for the full picture.
 #
 # Codec-blind by design, the same shape iclforge::matroska, iclforge::mp4,
 # iclforge::mpegts and iclforge::iab already use for their own formats: it
@@ -47,7 +48,11 @@ endif()
 
 target_sources(iclforge_iamf_objects
     PRIVATE
-        src/iamf.cpp)
+        src/container.cpp
+        src/iamf.cpp
+        src/sequence_common.cpp
+        src/sequence_read.cpp
+        src/sequence_write.cpp)
 
 target_include_directories(iclforge_iamf_objects
     PUBLIC

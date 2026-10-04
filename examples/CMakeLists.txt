@@ -58,6 +58,9 @@ endif()
 # (default ON, see the root CMakeLists.txt's own option()) turned iclforge::iamf on.
 if(ICLFORGE_BUILD_IAMF)
     list(APPEND ICLFORGE_EXAMPLES mux_iamf)
+    # iamf_objects writes object-based IAMF (v2.0) as ISO-BMFF, a raw OBU stream and fragments, and
+    # reads each back; it links iclforge::iamf alone.
+    list(APPEND ICLFORGE_EXAMPLES iamf_objects)
 endif()
 
 # read_iab demonstrates iclforge::iab (src/iab), IAB reader phases 1-2 - "standalone" meaning
@@ -82,6 +85,8 @@ foreach(example IN LISTS ICLFORGE_EXAMPLES)
                                                   iclforge::warnings iclforge::fmt)
     elseif(example STREQUAL "mux_iamf")
         target_link_libraries(${example} PRIVATE iclforge::ac3 iclforge::iamf iclforge::warnings iclforge::fmt)
+    elseif(example STREQUAL "iamf_objects")
+        target_link_libraries(${example} PRIVATE iclforge::iamf iclforge::warnings iclforge::fmt)
     elseif(example STREQUAL "read_iab")
         # No iclforge::ac3 here either - src/iab is deliberately independent of it (see
         # src/iab/CMakeLists.txt's header comment), the same reason read_adm above needs none.
