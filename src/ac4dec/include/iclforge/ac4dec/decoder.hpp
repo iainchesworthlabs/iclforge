@@ -41,31 +41,36 @@
 // core decoding (DecodingMode), with Part 2's stereo and multichannel
 // processing, S-CPL, A-SPX, A-CPL and A-JCC (clauses 5.2 to 5.6), and renders
 // it by Part 2's channel renderer (clause 5.10.2, DownmixTarget). It decodes
-// the presentation a system chooses (Part 2 clause 4.8.2) with all its
-// substreams: music and effects with dialogue, main audio with associated
-// audio, both, and a main substream with the dialogue enhancement substream
-// the hybrid dialogue enhancement methods take (Part 1 clauses 5.7.8.9 and
-// 6.2.16, Part 2 clauses 4.8.3.17 to 4.8.4). It decodes object audio (Part 2
-// clauses 4.8.3.4, 4.8.3.13 and 4.8.3.19): A-JOC substreams in full and core
-// decoding (clause 5.7), with A-JOC's dialogue enhancement (5.8.2.3 and
-// 5.8.2.4), and direct-coded object substreams with theirs (5.8.2.5), to each
-// object's PCM and the properties its object audio metadata sets (clause
-// 6.3.9, Annex F), for the application to render (DecodedFrame::objects); it
-// renders an intermediate spatial format itself (clause 5.10.3). The table of
-// contents and the substream framing come from iclforge::ac4::parse_raw_frame (the
-// inspector, src/ac4); this library starts where the inspector stops.
+// the 22.2 channel element (Part 2 clause 6.2.4.3) in full decoding, SIMPLE and
+// ASPX, to its 24 channels in the order of Part 2 Table A.27's speaker indices:
+// no renderer or downmix has a 22.2 input (Tables 35 to 43), so it is delivered
+// as coded alone. It decodes the presentation a system chooses (Part 2 clause
+// 4.8.2) with all its substreams: music and effects with dialogue, main audio
+// with associated audio, both, and a main substream with the dialogue
+// enhancement substream the hybrid dialogue enhancement methods take (Part 1
+// clauses 5.7.8.9 and 6.2.16, Part 2 clauses 4.8.3.17 to 4.8.4). It decodes
+// object audio (Part 2 clauses 4.8.3.4, 4.8.3.13 and 4.8.3.19): A-JOC
+// substreams in full and core decoding (clause 5.7), with A-JOC's dialogue
+// enhancement (5.8.2.3 and 5.8.2.4), and direct-coded object substreams with
+// theirs (5.8.2.5), to each object's PCM and the properties its object audio
+// metadata sets (clause 6.3.9, Annex F), for the application to render
+// (DecodedFrame::objects); it renders an intermediate spatial format itself
+// (clause 5.10.3). The table of contents and the substream framing come from
+// iclforge::ac4::parse_raw_frame (the inspector, src/ac4); this library starts
+// where the inspector stops.
 //
 // What it refuses, with DecodeError::kUnsupported and a reason: the speech
 // spectral frontend (Part 1 clause 5.2), the 9.X.4 channel modes (Part 2's
-// immersive element with b_5fronts) and the 22.2 channel element, an
-// intermediate spatial format mixed into channels Annex A.2.1 has no matrix
-// for, a 96/192 kHz substream whose HSF extension substream could not be
-// resolved and read alongside it, and a substream no element of the table of
-// contents this decoder reads names (an HSF extension substream no
-// ac4_hsf_ext_substream_info() names among them). Refusing is per substream
-// and per frame; the next frame is attempted afresh. decode() refuses, the
-// same way, what it reads and does not turn into PCM: a substream at 96 or
-// 192 kHz.
+// immersive element with b_5fronts), core decoding of the 22.2 channel element
+// (Table 8 supports full decoding alone) and its rendering to any
+// DownmixTarget but kAsCoded, an intermediate spatial format mixed into
+// channels Annex A.2.1 has no matrix for, a 96/192 kHz substream whose HSF
+// extension substream could not be resolved and read alongside it, and a
+// substream no element of the table of contents this decoder reads names (an
+// HSF extension substream no ac4_hsf_ext_substream_info() names among them).
+// Refusing is per substream and per frame; the next frame is attempted afresh.
+// decode() refuses, the same way, what it reads and does not turn into PCM: a
+// substream at 96 or 192 kHz.
 //
 // ERRATA.md beside this library records where the two standards are
 // ambiguous or defective and the reading taken for each.
@@ -102,7 +107,9 @@ enum class DecodeError : std::uint8_t {
 enum class DownmixTarget : std::uint8_t {
     // The channels as coded: for the immersive element, the layout its source
     // had (b_4_back_channels_present and top_channels_present), and in core
-    // decoding its 5.X.2 core, 5.X.0 where the source has no top channels.
+    // decoding its 5.X.2 core, 5.X.0 where the source has no top channels. The
+    // only target a 22.2 source has: Part 2 Tables 35 to 43 have no 22.2 input,
+    // and every other target is refused for it.
     kAsCoded,
     k5X,  // a 7.X element's channels folded to 5.X (Table 219); 5.X.0 for the immersive element
     // Two channels, Lo/Ro or Lt/Rt as the stream's preferred_dmx_method says,
@@ -158,7 +165,8 @@ struct OutputConfig {
     double dialogue_enhancement_db = 0.0;
     // The layout the channels come out in; a stream narrower than the target
     // comes out as coded, except mono, which a two-channel target takes to
-    // both channels.
+    // both channels. A 22.2 source is refused (kUnsupported) for any target
+    // but kAsCoded.
     DownmixTarget downmix = DownmixTarget::kAsCoded;
     // Whether a two-channel or mono downmix takes the LFE, at the stream's
     // lfe_mixgain, as Part 1 does; off drops it, outside the text.
@@ -416,7 +424,10 @@ struct DecodedFrame {
     std::optional<int> presentation_id;
     // One per channel, in the order of `channels`: L, R, C, the LFE, Ls, Rs,
     // then a 7.X mode's last pair, or an immersive layout's Lb and Rb and then
-    // Tfl, Tfr, Tbl and Tbr, or Tsl and Tsr, each where the layout has it.
+    // Tfl, Tfr, Tbl and Tbr, or Tsl and Tsr, each where the layout has it. A
+    // 22.2 source has 24 channels in Part 2 Table A.27's order by speaker index:
+    // L, R, C, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr, LFE, Tsl, Tsr, Tfc, Tbc, Tc,
+    // LFE2, Bfl, Bfr, Bfc, Cb, Lw, Rw, so its LFEs are the 12th and 18th.
     std::vector<Speaker> speakers;
     // Planar PCM, one vector per channel, all `samples` long, at full scale
     // 1.0: a frame's worth, which at 29.97, 59.94 and 119.88 fps alternates by

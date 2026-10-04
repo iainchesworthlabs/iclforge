@@ -50,6 +50,11 @@
 // Rb, J'' in Tbl and K'' in Tbr. Core decoding keeps A'' to G'' (Table 24), F''
 // and G'' in the core's Tsl and Tsr, and reads H to K without decoding them.
 // src/ac4dec/ERRATA.md, "The immersive element", records the readings.
+//
+// The 22.2 element (Part 2 clause 5.2.4, Table 21) is two LFE tracks and eleven
+// pairs, each pair's two tracks the channels Table 21 names; every pair is a
+// two_channel_data() with its own stereo processing, and there is no step
+// between the pairs.
 
 namespace iclforge::ac4::detail {
 
@@ -92,7 +97,10 @@ inline constexpr int kObjectsWithLfeBase = 96;
 // order: L, R, C, the LFE, Ls, Rs, then a 7.X mode's last pair, or the 7.X.4
 // modes' Lb, Rb, Tfl, Tfr, Tbl and Tbr in full decoding and their core's Tsl
 // and Tsr in core decoding (Part 2 clause 4.7). The Part 1 modes' are the same
-// in both. Empty for a mode no element here turns into PCM.
+// in both. 22.2's are Part 2 Table A.27's, by speaker index: L, R, C, Ls, Rs,
+// Lb, Rb, Tfl, Tfr, Tbl, Tbr, LFE, Tsl, Tsr, Tfc, Tbc, Tc, LFE2, Bfl, Bfr, Bfc,
+// Cb, Lw, Rw (src/ac4dec/ERRATA.md, "The 22.2 element's output"). Empty for a
+// mode no element here turns into PCM.
 [[nodiscard]] std::span<const Speaker> speakers_of(
     int ch_mode, DecodingMode decoding = DecodingMode::kFull) noexcept;
 
@@ -147,7 +155,8 @@ struct ElementRoute {
                                         ElementRoute& out,
                                         DecodingMode decoding = DecodingMode::kFull);
 
-// The A-SPX data of an element, by Part 1 Table 213 and Part 2 Table 8: each
+// The A-SPX data of an element, by Part 1 Table 213 and Part 2 Table 8 (22.2's
+// eleven pairs included): each
 // aspx_data_1ch() or aspx_data_2ch() and the channels it carries, in syntax
 // order, for the channel mode's element in `codec_mode` (an immersive_mode
 // value for the 7.X.4 modes); empty where the mode sends none. `index` counts
@@ -168,6 +177,8 @@ struct AspxUnit {
 // channel mode's element in `codec_mode`. Empty where that mode sends none
 // (SIMPLE, and the 7.X element's ASPX); for the immersive element L, R, C, Ls
 // and Rs in ASPX_AJCC, the one mode that sends it (Part 2 clause 4.8.3.10.3).
+// The 22.2 element sends none in either codec mode (clause 4.8.3.10 does not
+// list it, and its syntax has no companding_control()).
 [[nodiscard]] std::vector<Speaker> companded_speakers(int ch_mode, int codec_mode);
 
 }  // namespace iclforge::ac4::detail

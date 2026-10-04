@@ -40,6 +40,35 @@ constexpr std::array k714_core = {S::kLeft,        S::kRight,        S::kCentre,
                                   S::kLfe,         S::kLeftSurround, S::kRightSurround,
                                   S::kTopSideLeft, S::kTopSideRight};
 
+// The 22.2 layout in Part 2 Table A.27's order, its speaker indices 0 to 13 and
+// 16 to 23 and 26 and 27 (14 and 15 are reserved, 24 and 25 are 9.X.4's screen
+// pair): so the LFE comes after Tbr and LFE2 after Tc, where that table has
+// them, not fourth as the Part 1 modes' do.
+constexpr std::array k222 = {S::kLeft,
+                             S::kRight,
+                             S::kCentre,
+                             S::kLeftSurround,
+                             S::kRightSurround,
+                             S::kLeftBack,
+                             S::kRightBack,
+                             S::kTopFrontLeft,
+                             S::kTopFrontRight,
+                             S::kTopBackLeft,
+                             S::kTopBackRight,
+                             S::kLfe,
+                             S::kTopSideLeft,
+                             S::kTopSideRight,
+                             S::kTopFrontCentre,
+                             S::kTopBackCentre,
+                             S::kTopCentre,
+                             S::kLfe2,
+                             S::kBottomFrontLeft,
+                             S::kBottomFrontRight,
+                             S::kBottomFrontCentre,
+                             S::kCentreBack,
+                             S::kLeftWide,
+                             S::kRightWide};
+
 // The labels a var_channel_element()'s fullband outputs are held under, in
 // order; they name no loudspeaker (object_layout's comment).
 constexpr std::array<Speaker, 16> kVarSlots = {
@@ -115,6 +144,7 @@ class Walker {
     Walker(const ChannelElement& element, ElementRoute& out) : element_(element), out_(out) {}
 
     void lfe() { add(1, {S::kLfe}, false, 0, 0); }
+    void lfe2() { add(1, {S::kLfe2}, false, 0, 0); }
     void mono(Speaker speaker) { add(1, {speaker}, false, 0, 0); }
 
     // `discarded`: tracks read and not decoded (DataElementRoute::discarded).
@@ -300,6 +330,38 @@ ParseResult route_immersive(const SubstreamContext& ctx, const ChannelElement& e
     return {};
 }
 
+// Part 2 clause 5.2.4, Table 21: the 22.2 element's two LFE tracks and eleven
+// pairs, each pair's outputs where the table puts them. Every pair is a
+// two_channel_data(), so each applies Part 1 clause 5.3.3's stereo processing
+// on its own b_enable_mdct_stereo_proc.
+ParseResult route_22_2(const ChannelElement& element, ElementRoute& out) {
+    Walker walk(element, out);
+    walk.lfe();
+    walk.lfe2();
+    walk.pair(S::kLeft, S::kRight);
+    walk.pair(S::kCentre, S::kTopCentre);
+    walk.pair(S::kLeftSurround, S::kRightSurround);
+    walk.pair(S::kLeftBack, S::kRightBack);
+    walk.pair(S::kTopFrontLeft, S::kTopFrontRight);
+    walk.pair(S::kTopBackLeft, S::kTopBackRight);
+    walk.pair(S::kTopSideLeft, S::kTopSideRight);
+    walk.pair(S::kTopFrontCentre, S::kTopBackCentre);
+    walk.pair(S::kBottomFrontLeft, S::kBottomFrontRight);
+    walk.pair(S::kBottomFrontCentre, S::kCentreBack);
+    walk.pair(S::kLeftWide, S::kRightWide);
+    // The first two tracks are the LFEs' (mono_data(1)) and no other is.
+    bool lfes_first = element.tracks.size() >= 2;
+    for (std::size_t t = 0; t < element.tracks.size(); ++t) {
+        lfes_first = lfes_first && element.tracks[t].lfe == (t < 2);
+    }
+    if (!lfes_first || !walk.complete() ||
+        (element.codec_mode != codec_mode::kSimple && element.codec_mode != codec_mode::kAspx)) {
+        return fail(DecodeError::kInvalidStream,
+                    "a 22_2_channel_element() whose parts do not match its syntax");
+    }
+    return {};
+}
+
 // Part 2 clause 6.2.4.4: a var_channel_element()'s data elements in syntax
 // order, the LFE's first; each fullband output goes to the next slot.
 ParseResult route_var(const ChannelElement& element, ElementRoute& out) {
@@ -431,6 +493,8 @@ std::span<const Speaker> speakers_of(int ch_mode, DecodingMode decoding) noexcep
             return core ? std::span<const Speaker>(k704_core) : std::span<const Speaker>(k704);
         case ch_mode::k7_1_4:
             return core ? std::span<const Speaker>(k714_core) : std::span<const Speaker>(k714);
+        case ch_mode::k22_2:
+            return k222;
         case object_layout::objects_with_lfe(0):
             return kLfeOnly;
         case object_layout::objects_with_lfe(1):
@@ -458,6 +522,9 @@ ParseResult route_element(const SubstreamContext& ctx, const ChannelElement& ele
     }
     if (element.kind == ElementKind::kVar) {
         return route_var(element, out);
+    }
+    if (element.kind == ElementKind::k22_2) {
+        return route_22_2(element, out);
     }
     Walker walk(element, out);
     const bool lfe = !element.tracks.empty() && element.tracks.front().lfe;
@@ -591,7 +658,8 @@ ParseResult route_element(const SubstreamContext& ctx, const ChannelElement& ele
         }
         case ElementKind::kImmersive:
         case ElementKind::kVar:
-            break;  // route_immersive() and route_var()
+        case ElementKind::k22_2:
+            break;  // route_immersive(), route_var() and route_22_2()
     }
     const bool five_x_acpl = element.kind == ElementKind::k5X && acpl;
     // ASPX_ACPL_3 sends no coding_config: its channel data is stereo_data().
@@ -697,6 +765,28 @@ std::vector<AspxUnit> aspx_units(int ch_mode, int codec_mode, DecodingMode decod
     }
     if (codec_mode == codec_mode::kSimple) {
         return {};
+    }
+    if (ch_mode == ch_mode::k22_2) {
+        // Part 2 Table 8: eleven aspx_data_2ch() in the order the syntax reads
+        // them, which Table 21's pairs follow but for the LFEs, which have none.
+        constexpr std::array<std::array<Speaker, 2>, 11> kPairs = {{
+            {S::kLeft, S::kRight},
+            {S::kCentre, S::kTopCentre},
+            {S::kLeftSurround, S::kRightSurround},
+            {S::kLeftBack, S::kRightBack},
+            {S::kTopFrontLeft, S::kTopFrontRight},
+            {S::kTopBackLeft, S::kTopBackRight},
+            {S::kTopSideLeft, S::kTopSideRight},
+            {S::kTopFrontCentre, S::kTopBackCentre},
+            {S::kBottomFrontLeft, S::kBottomFrontRight},
+            {S::kBottomFrontCentre, S::kCentreBack},
+            {S::kLeftWide, S::kRightWide},
+        }};
+        std::vector<AspxUnit> units;
+        for (std::size_t p = 0; p < kPairs.size(); ++p) {
+            units.push_back({.pair = true, .index = static_cast<int>(p), .speakers = kPairs[p]});
+        }
+        return units;
     }
     const AspxUnit front_pair = {.pair = true, .index = 0, .speakers = {S::kLeft, S::kRight}};
     const AspxUnit centre_single = {.pair = false, .index = 0, .speakers = {S::kCentre, S::kCentre}};
