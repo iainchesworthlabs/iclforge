@@ -426,5 +426,9 @@ WebAssembly bindings wrap the decoder and the encoder, the object encoder includ
 API](c-api.md#ac-4), [Python API](python-api.md#ac-4), [Rust API](rust-api.md#ac-4) and
 [WebAssembly](../platforms/wasm.md#ac-4-module)). Android's CMake build compiles the libraries and
 links them into nothing in the app. The ESP-IDF component builds the inspector, core and decoder
-behind `CONFIG_ICLFORGE_AC4`, off by default and offered on parts with a floating-point unit, in
-single precision, and never the encoder ([ESP32-P4](../platforms/bare-metal/esp32-p4.md#ac-4)).
+behind `CONFIG_ICLFORGE_AC4`, off by default, in single precision on parts with a floating-point
+unit and in the fixed-point tier on the ESP32-C3 and ESP32-C6, and never the encoder
+([ESP32-P4](../platforms/bare-metal/esp32-p4.md#ac-4), [ESP32-S3](../platforms/bare-metal/esp32-s3.md#ac-4),
+[ESP32-C6](../platforms/bare-metal/esp32-c6.md#ac-4)). A decode peaks at 0.29 MB at 2.0 and 1.50 MB
+at 5.1.4 on the footprint probe's streams, so the S3 and P4 keep its state in PSRAM; on the C6 it
+does not fit beside WiFi.

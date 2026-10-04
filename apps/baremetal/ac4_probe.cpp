@@ -299,6 +299,9 @@ struct Measured {
     // Time inside decode_by_block() and flush() only: the level accumulation and the hash in
     // the sink are the probe's cost, not the decoder's, and are taken back out.
     std::uint64_t decode_us = 0;
+    // The first frame's share of decode_us: what a player waits before the first block,
+    // which includes everything a decoder makes when the first frame arrives.
+    std::uint64_t first_frame_us = 0;
     std::uint64_t sink_us = 0;
     StackUse stack;
 };
@@ -348,6 +351,7 @@ int decode_fixture(const Fixture& fixture) {
             measured.sink_us += iclforge_probe::now_us() - t0;
         };
 
+        iclforge_probe::heap_regions_begin();
         // Nothing that prints between here and read_stack() below.
         paint(0);
         int index = 0;
@@ -359,10 +363,12 @@ int decode_fixture(const Fixture& fixture) {
             g_frame_index = index;
             const auto decoded = decoder.decode_by_block(frame.raw_ac4_frame, sink);
             const std::uint64_t t1 = iclforge_probe::now_us();
-            measured.decode_us += (t1 - t0) - (measured.sink_us - sink_before);
+            const std::uint64_t frame_us = (t1 - t0) - (measured.sink_us - sink_before);
+            measured.decode_us += frame_us;
             const std::size_t allocs = g_alloc_calls - allocs_before;
             const std::size_t allocated = g_alloc_bytes_total - bytes_before;
             if (index == 0) {
+                measured.first_frame_us = frame_us;
                 measured.first_frame_allocs = allocs;
                 measured.first_frame_bytes = allocated;
             } else {
@@ -385,6 +391,7 @@ int decode_fixture(const Fixture& fixture) {
         measured.decode_us += (iclforge_probe::now_us() - t0) - (measured.sink_us - sink_before);
         measured.stack = read_stack();
     }
+    iclforge_probe::heap_regions_end(fixture.name);
 
     if (!frames_ok) {
         fail(fixture.name, "frame", 0, 1);
@@ -445,6 +452,8 @@ int decode_fixture(const Fixture& fixture) {
                 static_cast<unsigned long>(measured.decode_us), fixture.name,
                 static_cast<unsigned long>(per_frame_us), fixture.name,
                 static_cast<unsigned long>(permille));
+    std::printf("%s.first_frame_us=%lu\n", fixture.name,
+                static_cast<unsigned long>(measured.first_frame_us));
     for (std::size_t channel = 0; channel < fixture.rms.size(); ++channel) {
         const std::int32_t got = levels.rms_scaled(channel);
         std::printf("%s.rms[%u]=%ld expected=%ld\n", fixture.name, static_cast<unsigned>(channel),

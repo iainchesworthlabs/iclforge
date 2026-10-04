@@ -1509,7 +1509,11 @@ every build. What is checked:
   `std::pow` and `std::exp2` at `float` gave a different last bit in each C library, and D14a4 took
   those calls out of libm. [ESP32-P4](platforms/bare-metal/esp32-p4.md#ac-4) has the times: the P4
   decodes 2.0 in SIMPLE and in A-SPX mode, and through the frame-rate converter at 24 and 25 fps, in
-  real time and nothing wider. AC-4 on the S3 and on the C6 is not built.
+  real time and nothing wider. On the S3 the AC-4 probe's six fixtures decode under QEMU in CI to
+  the pinned hashes, with the decoder's state in PSRAM; no board has timed it
+  ([ESP32-S3](platforms/bare-metal/esp32-s3.md#ac-4)). The C6 builds the decoder in the fixed-point tier,
+  checked by the fixed-point gate above and the probe's hashes on the Cortex-M3 leg and RV32IMC
+  ([ESP32-C6](platforms/bare-metal/esp32-c6.md#ac-4)); no board has run it.
 
 ### The encoder
 
