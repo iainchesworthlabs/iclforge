@@ -1,3 +1,4 @@
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -5,6 +6,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <numbers>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -240,4 +242,114 @@ TEST_CASE("a real decoded Atmos programme survives write_bw64 -> parse_bw64 -> b
             CHECK(energy_l > energy_r);
         }
     }
+}
+
+// Zone constraints ride the OAMD updates of a decoded programme (§5.6.1.6) and go out as an ADM
+// zoneExclusion (TS 103 420 Annex B.2.6). The same file read back through build() has to give the
+// zone and the elevation switch of each update, in the block it came from.
+TEST_CASE("zone constraints survive write() -> write_bw64 -> parse_bw64 -> build", "[admbridge][write][zones]") {
+    using iclforge::oba::ZoneConstraint;
+    constexpr std::uint32_t kRate = 48000;
+    std::vector<float> pcm(static_cast<std::size_t>(kRate) * 3, 0.1F);
+
+    const auto update = [](std::uint64_t at, ZoneConstraint zone, bool elevation) {
+        iclforge::admbridge::WriteObjectUpdate u;
+        u.sample_offset = at;
+        u.state.position = {.x = 0.5, .y = 0.5, .z = 0.0};
+        u.state.zone = zone;
+        u.state.enable_elevation = elevation;
+        return u;
+    };
+    const std::vector<iclforge::admbridge::WriteObjectUpdate> updates{
+        update(0, ZoneConstraint::kScreenOnly, true),
+        update(kRate, ZoneConstraint::kSideExcluded, false),
+        update(2ULL * kRate, ZoneConstraint::kNone, true),
+    };
+
+    iclforge::admbridge::WriteInput input;
+    input.sample_rate = kRate;
+    input.channels.push_back({.name = "Object 1", .pcm = pcm, .bed_label = std::nullopt, .updates = updates});
+    const auto built = iclforge::admbridge::write(input);
+    REQUIRE(built.has_value());
+
+    const auto scratch = fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("admbridge_zones_" + scratch_pid_suffix());
+    fs::create_directories(scratch);
+    const auto path = (scratch / "zones.wav").string();
+    REQUIRE(iclforge::adm::write_bw64(path, *built).has_value());
+
+    const auto parsed = iclforge::adm::parse_bw64(path);
+    REQUIRE(parsed.has_value());
+    const auto bridged = iclforge::admbridge::build(*parsed);
+    REQUIRE(bridged.has_value());
+    REQUIRE(bridged->channel_count() == 1);
+    CHECK(bridged->unmapped[0].empty());
+
+    const auto first = bridged->paths[0].evaluate(0.5);
+    CHECK(first.zone == ZoneConstraint::kScreenOnly);
+    CHECK(first.enable_elevation);
+    const auto second = bridged->paths[0].evaluate(1.5);
+    CHECK(second.zone == ZoneConstraint::kSideExcluded);
+    CHECK_FALSE(second.enable_elevation);
+    const auto third = bridged->paths[0].evaluate(2.5);
+    CHECK(third.zone == ZoneConstraint::kNone);
+    CHECK(third.enable_elevation);
+}
+
+// The OAMD divergence and screen reference of each update go out as ADM objectDivergence and screenRef,
+// and read back into the same OAMD fields.
+TEST_CASE("divergence and screen reference survive write() -> write_bw64 -> parse_bw64 -> build",
+          "[admbridge][write][divergence]") {
+    constexpr std::uint32_t kRate = 48000;
+    std::vector<float> pcm(static_cast<std::size_t>(kRate) * 3, 0.1F);
+
+    const auto update = [](std::uint64_t at, double divergence, bool screen, double screen_factor) {
+        iclforge::admbridge::WriteObjectUpdate u;
+        u.sample_offset = at;
+        u.state.position = {.x = 0.5, .y = 0.5, .z = 0.0};
+        u.state.divergence = divergence;
+        u.state.screen_reference = screen;
+        u.state.screen_factor = screen_factor;
+        return u;
+    };
+    const std::vector<iclforge::admbridge::WriteObjectUpdate> updates{
+        update(0, 0.0, false, 0.0),
+        update(kRate, 0.608529, true, 1.0),
+        update(2ULL * kRate, 0.2, true, 0.25),  // a quarter screen factor reads as room-anchored
+    };
+
+    iclforge::admbridge::WriteInput input;
+    input.sample_rate = kRate;
+    input.channels.push_back({.name = "Object 1", .pcm = pcm, .bed_label = std::nullopt, .updates = updates});
+    const auto built = iclforge::admbridge::write(input);
+    REQUIRE(built.has_value());
+
+    const auto scratch = fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("admbridge_divergence_" + scratch_pid_suffix());
+    fs::create_directories(scratch);
+    const auto path = (scratch / "divergence.wav").string();
+    REQUIRE(iclforge::adm::write_bw64(path, *built).has_value());
+
+    const auto parsed = iclforge::adm::parse_bw64(path);
+    REQUIRE(parsed.has_value());
+    const iclforge::adm::AudioChannelFormat* object = nullptr;
+    for (const auto& channel : parsed->model.channel_formats) {
+        if (channel.name == "Object 1") object = &channel;
+    }
+    REQUIRE(object != nullptr);
+    REQUIRE(object->block_formats.size() == 3);
+    CHECK_FALSE(object->block_formats[0].has_object_divergence);
+    CHECK_FALSE(object->block_formats[0].screen_ref);
+    REQUIRE(object->block_formats[1].has_object_divergence);
+    CHECK(object->block_formats[1].object_divergence.value == Catch::Approx(0.608529));
+    CHECK(object->block_formats[1].screen_ref);
+    REQUIRE(object->block_formats[2].has_object_divergence);
+    CHECK(object->block_formats[2].object_divergence.value == Catch::Approx(0.2));
+    CHECK_FALSE(object->block_formats[2].screen_ref);
+
+    const auto bridged = iclforge::admbridge::build(*parsed);
+    REQUIRE(bridged.has_value());
+    CHECK(bridged->unmapped[0].empty());
+    CHECK(bridged->paths[0].evaluate(0.5).divergence == 0.0);
+    CHECK_FALSE(bridged->paths[0].evaluate(0.5).screen_reference);
+    CHECK(bridged->paths[0].evaluate(1.5).divergence == Catch::Approx(0.608529));
+    CHECK(bridged->paths[0].evaluate(1.5).screen_reference);
 }

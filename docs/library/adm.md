@@ -62,11 +62,20 @@ back and prints what it found.
 - **The ADM object graph** (Recommendation ITU-R BS.2076-2, Annex 1): `audioProgramme` →
   `audioContent` → `audioObject` → `audioPackFormat`/`audioChannelFormat` (with its
   `audioBlockFormat` time-divisions — position, gain, width/height/depth, `channelLock`,
-  `jumpPosition`, HOA order/degree/normalization) → `audioStreamFormat`/`audioTrackFormat` →
+  `jumpPosition`, `zoneExclusion`, `objectDivergence`, `screenRef`, `headLocked`, HOA
+  order/degree/normalization) → `audioStreamFormat`/`audioTrackFormat` →
   `audioTrackUID`. See [`iclforge/adm/model.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/adm/include/iclforge/adm/model.hpp) for exactly which sub-elements are carried and which
-  are deliberately out of scope (`zoneExclusion`, `objectDivergence`, `screenRef`, the
-  Matrix/Binaural-specific sub-elements, and loudness metadata — `iclforge::ac3::meta::loudness` already
-  measures loudness independently).
+  are deliberately out of scope (the Matrix block's coefficients, which libadm has no model for,
+  the Binaural-specific sub-elements, and loudness metadata — `iclforge::ac3::meta::loudness`
+  already measures loudness independently).
+
+**`zoneExclusion` is read by this module, not by libadm.** libadm's parser and writer both leave a
+`TODO: zoneExclusion` where it would go, and its XML tokenizer is private. `parse_bw64` therefore
+scans the same `<axml>` text a second time for `<zoneExclusion>` elements and attaches each
+block's `zone` children (`label`, and the six Cartesian bounds when given) to
+`AudioBlockFormat::zone_exclusion`; `write_bw64` adds the element to libadm's output the same way.
+The scan runs only after libadm has accepted the document, so it does not validate anything. The
+other three elements are libadm's own.
 
 **`model` always includes BS.2076-2 Annex A's "common definitions".** libadm's own `parseXml()`
 starts every document from a copy already populated with the standard's ~940 predefined
@@ -97,9 +106,11 @@ plain-data graph `parse_bw64` produces) into a libadm `adm::Document` (a new tra
 `build_libadm_document()` in `src/adm/src/adm_model.cpp`, alongside the existing read-side
 `build_adm_model()`), serializes it with `adm::writeXml()`, and writes the BW64 container
 (`<fmt >`/`<chna>`/`<axml>`/`<data>`) with libbw64's `Bw64Writer` (`bw64::writeFile()`) — the same
-two vendored libraries as the read side, in the other direction. Always 24-bit integer PCM
-(`iclforge::adm::kWriteBitDepth`; `EBU Tech 3306`'s own framing). The pinned libbw64 can write IEEE
-float, but `write_bw64` has no option that asks for it.
+two vendored libraries as the read side, in the other direction. 24-bit integer PCM by default
+(`iclforge::adm::kWriteBitDepth`; `EBU Tech 3306`'s own framing); a third argument,
+`AdmWriteOptions{.bit_depth, .float_samples}`, selects 16/24/32-bit integer or 32/64-bit IEEE float
+(anything else is `AdmWriteError::kInvalidOptions`, and no file is created). The sample rate is
+written at its full 32-bit width.
 
 ```cpp
 iclforge::adm::AdmDocument document;
@@ -123,7 +134,7 @@ the real `trackRef`/`packRef` strings itself, so a caller building a document pu
 may leave both empty.
 
 `AudioTrackUid::has_bit_depth`/`bit_depth` are not read on write either. Every `audioTrackUID` is
-written with `bitDepth` equal to the `<fmt >` chunk's bits per sample (`kWriteBitDepth`), whatever
+written with `bitDepth` equal to the `<fmt >` chunk's bits per sample (`AdmWriteOptions::bit_depth`), whatever
 the model says, because a value carried over from another file (a 16-bit master the model was
 parsed from, say) would contradict the `<fmt >` chunk written beside it. The Dolby Atmos Master ADM
 Profile expects the two to agree: Dolby Encoding Engine refuses a master whose `audioTrackUID`s

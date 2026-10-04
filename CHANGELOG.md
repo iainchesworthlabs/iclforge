@@ -29,6 +29,32 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**ADM / BW64: rendering constraints, a sample-format option, and what the bridge drops**
+
+- **`zoneExclusion`, `objectDivergence`, `screenRef` and `headLocked` are read and written.**
+  `iclforge::adm::AudioBlockFormat` carries them. libadm does not parse or write `zoneExclusion`, so
+  `parse_bw64` and `write_bw64` handle that one element on the `<axml>` text themselves.
+- **Zone constraints map both ways through TS 103 420 Annex B.2.6.** `build()` turns a Table B.18
+  `zoneExclusion` into `ZoneConstraint` and `enable_elevation`, and `write()` emits the zones of each
+  OAMD update. `adm_zone_exclusion_to_constraint()` and `constraint_to_adm_zone_exclusion()` are the
+  two directions. The table's `ZM3_SideRight` `minX` is read either as printed or as the mirror of
+  `ZM3_SideLeft` (`src/admbridge/ERRATA.md`).
+- **The bridge reports what it does not carry.** `BridgeResult::unmapped` lists, per channel, the ADM
+  features it dropped (`objectDivergence`, `screenRef`, `headLocked`, `diffuse`, a conditioned
+  `channelLock`, a `zoneExclusion` outside the presets), and `forge atmos-adm` prints a warning for each
+  such channel.
+- **`write_bw64` takes `AdmWriteOptions`.** 16, 24 or 32-bit integer or 32 or 64-bit float; the
+  default stays 24-bit integer. The sample rate is no longer narrowed to 16 bits, so 96 kHz masters
+  write correctly.
+- **Object divergence and screen reference are transmitted.** The OAMD writer sends
+  `b_object_use_screen_ref` with its screen and depth factors, and the `extended_object_element` with
+  `obj_div_block` (Tables 40 to 42), through new `ObjectPlacement` and `Keyframe` fields. The ADM bridge
+  maps `objectDivergence`'s value and `screenRef` onto them, and back when writing.
+- **The OAMD decoder reads divergence from the standard's tables.** It guessed an evenly spaced 2-bit
+  table and a linear 6-bit code, though Tables 41 and 42 are printed; `object_div_mode` 1 (reuse) now
+  repeats the previous block's value, and an inactive object no longer has divergence bits read for it.
+- Matrix, HOA and Binaural packs stay refused by the bridge; the documentation now says why.
+
 **Associated-service identification, both directions**
 
 - **MPEG-TS's `mainid`/`asvc` now read back, not just write.** `mpegts::demux`/`Reader` decode

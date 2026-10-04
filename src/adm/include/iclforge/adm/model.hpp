@@ -76,6 +76,32 @@ enum class TypeDefinition : std::uint8_t {
     kUserCustom = 6,
 };
 
+// BS.2076-2 §10.4 zoneExclusion: one `zone` child. The six Cartesian bounds are attributes of
+// the element; the text content, when present, is a label (TS 103 420 Table B.18 uses "ZM1",
+// "ZM2_Left", "ZU" and so on). A zone given in polar bounds only carries its label and has
+// has_bounds = false.
+struct ExclusionZone {
+    std::string label;
+    bool has_bounds = false;
+    double min_x = 0.0;
+    double max_x = 0.0;
+    double min_y = 0.0;
+    double max_y = 0.0;
+    double min_z = 0.0;
+    double max_z = 0.0;
+};
+
+// BS.2076-2 §10.5 objectDivergence. Divergence is in [0, 1]; the two range values apply to the
+// position-based and azimuth-based forms respectively and keep the schema's own defaults when
+// absent.
+struct ObjectDivergenceInfo {
+    double value = 0.0;
+    bool has_azimuth_range = false;
+    double azimuth_range_deg = 45.0;
+    bool has_position_range = false;
+    double position_range = 0.0;
+};
+
 // BS.2076-2 §5.4: one audioBlockFormat, the unit that divides an
 // audioChannelFormat along the time axis (§5.4.1: a channel with a single
 // block is static; more than one means it is dynamic over time and both
@@ -88,12 +114,13 @@ enum class TypeDefinition : std::uint8_t {
 // DirectSpeakers and Objects (§§5.4.3.1, 5.4.3.3), plus HOA's order/degree/
 // normalization (§5.4.3.4). channelLock, jumpPosition/interpolationLength
 // (§10.2, §10.3) are carried too since they directly affect how a phase-2
-// mapper should read the position sequence. zoneExclusion, objectDivergence,
-// screenRef and the Matrix/Binaural-specific sub-elements (§§5.4.3.2, 5.4.3.5,
-// §10.4-10.6) are deliberately NOT parsed here - none of them are needed to
-// place an object in space, which is this graph's only reason for existing
-// before phase 2 exists to consume it. A file that uses them still parses;
-// those fields are simply absent from the result.
+// mapper should read the position sequence. For Objects blocks it also carries
+// the rendering constraints of §10.4-10.6 - zoneExclusion, objectDivergence,
+// screenRef and headLocked - since a consumer that drops them changes how the
+// object is rendered. libadm does not parse zoneExclusion at all (its parser
+// and writer both leave a TODO for it), so that one element is read from the
+// axml text by src/adm/src/adm_xml_extras.cpp instead. Matrix blocks carry no
+// coefficients here: libadm has no model for them either.
 struct AudioBlockFormat {
     std::string id;  // audioBlockFormatID, e.g. "AB_00031001_00000001"
 
@@ -138,6 +165,15 @@ struct AudioBlockFormat {
     bool jump_position = false;
     bool has_interpolation_length = false;
     double interpolation_length_s = 0.0;
+
+    // Objects only (§10.4-10.6). zone_exclusion is empty when the element is absent;
+    // object_divergence is only meaningful when has_object_divergence is set; screen_ref and
+    // head_locked default to false, as in the schema.
+    std::vector<ExclusionZone> zone_exclusion;
+    bool has_object_divergence = false;
+    ObjectDivergenceInfo object_divergence;
+    bool screen_ref = false;
+    bool head_locked = false;
 
     // HOA only (§5.4.3.4, Table 18): order/degree are required by the spec
     // when typeDefinition is HOA, so has_* tracks whether they were actually

@@ -200,6 +200,7 @@ endif()
 target_sources(iclforge_adm_objects
     PRIVATE
         src/adm_model.cpp
+        src/adm_xml_extras.cpp
         src/adm.cpp)
 
 target_include_directories(iclforge_adm_objects
