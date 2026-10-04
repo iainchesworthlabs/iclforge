@@ -25,7 +25,7 @@
 // these three bits move. An energy, a gain or a scale factor is
 // a MantExp (iclforge/arithmetic/mant_exp.hpp), a mantissa and a power of two, since they span
 // a range no absolute format holds; a value the double decoder states in its own units enters
-// this tier's through qmf_amplitude() or qmf_energy(), which move its exponent.
+// this tier's through qmf_energy(), which moves its exponent.
 
 namespace iclforge::ac4::detail::dsp {
 
@@ -55,15 +55,7 @@ inline constexpr int kTimeShift = kFixed<Real> ? -12 : 0;
 template <typename Real>
 inline constexpr int kQmfShift = kFixed<Real> ? -16 : 0;
 
-// An amplitude or an energy given in the double decoder's QMF units, in this tier's.
-template <typename Real>
-[[nodiscard]] constexpr Energy<Real> qmf_amplitude(Energy<Real> value) noexcept {
-    if constexpr (kFixed<Real>) {
-        return value.scaled_by_pow2(kQmfShift<Real>);
-    } else {
-        return value;
-    }
-}
+// An energy given in the double decoder's QMF units, in this tier's.
 template <typename Real>
 [[nodiscard]] constexpr Energy<Real> qmf_energy(Energy<Real> value) noexcept {
     if constexpr (kFixed<Real>) {
@@ -98,15 +90,7 @@ template <typename Real>
     }
 }
 
-// The scalar's value as an energy, and an energy as the scalar: identities but at Fixed32.
-template <typename Real>
-[[nodiscard]] constexpr Energy<Real> to_energy(Real x) noexcept {
-    if constexpr (kFixed<Real>) {
-        return MantExp{x};
-    } else {
-        return x;
-    }
-}
+// An energy as the scalar: an identity but at Fixed32.
 template <typename Real>
 [[nodiscard]] constexpr Real from_energy(Energy<Real> x) noexcept {
     if constexpr (kFixed<Real>) {
