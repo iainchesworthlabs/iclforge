@@ -953,8 +953,9 @@ channel-coded substream's HSF extension substream where one resolves to a distin
 substream (the additional scale factor bands, spectral data and noise fill above 24 kHz a 96 kHz or
 192 kHz substream carries), the immersive element of the 7.X.4 channel modes, object substreams
 (A-JOC and direct-coded objects, with their object audio metadata), and EMDF payload substreams.
-It refuses, with a named reason, the speech spectral frontend, the 9.X.4 channel modes and the
-22.2 channel element, an intermediate spatial format mixed into channels Annex A.2.1 has no
+It refuses, with a named reason, the speech spectral frontend, the 9.X.4 channel modes, core
+decoding of the 22.2 channel element and its rendering to any layout but as coded (Part 2 has neither),
+an intermediate spatial format mixed into channels Annex A.2.1 has no
 matrix for, a 96/192 kHz substream whose HSF extension substream could not be resolved, and a
 substream no element of the table of contents names.
 
@@ -1267,6 +1268,28 @@ reading is in `src/ac4dec/ERRATA.md`, under "Presentations".
   puts out silence for 15 and 16 presentations over 22 and 23 substreams, and refuses
   `bitstream_version` 1 ("not yet implemented"), which the version 0 stream is. Part 2 bounds none of
   these counts.
+
+### The decoder's 22.2 element
+
+The 22.2 element (Part 2 6.2.4.3, Tables 8 and 21 and Annex A.3) has no oracle outside the project: DEE
+does not write it (planning/ac4.md, "What DEE writes"), no stream of it is public, and librempeg does not
+decode it. What checks it is the standard's own tables and the project's two transcriptions:
+
+- **The syntax, in both transcriptions** (`tests/ac4dec/test_ac4dec_channel_elements.cpp`,
+  `test_ac4dec_syntax.cpp`): the element in SIMPLE and ASPX, with 24 tracks, eleven `aspx_data_2ch()` and
+  the stereo flags of each pair, and two constructed streams (`22_2-simple-alternating`,
+  `22_2-aspx-unit7-lr`) whose digests `tools/references/ac4_syntax.py` wrote and the decoder reproduces.
+  `ac4_syntax_differential.py` includes the channel mode among its synthetic tables of contents.
+- **Each tone on its channel** (`tests/ac4dec/test_ac4dec_constructed.cpp`): the 24 tones are coded by
+  the test's own transcription of Table 21, with every pair's stereo processing on, off and alternating,
+  and each decodes on its own channel in Table A.27's order, the LFEs included, 60 dB over the others.
+  A-SPX fills the two channels of the `aspx_data_2ch()` that asks for it and no other, by Table 8's pairs.
+  The refusals (core decoding and every `DownmixTarget` but as coded) are tested by name.
+- **DRC and levels** (`tests/ac4dec/test_ac4dec_drc.cpp`): transmitted gains apply by Table 69's four
+  groups to the 24 channels, and neither LFE moves the level detector.
+
+These show that the decoder does what the readings in `src/ac4dec/ERRATA.md` ("The 22.2 element") say,
+not that they are what an encoder meant.
 
 ### The decoder's immersive element
 

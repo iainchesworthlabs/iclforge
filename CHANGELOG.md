@@ -1384,6 +1384,18 @@ The sections below contain the complete change list and fixes.
   the presentation and the gains from its input. librempeg decodes a presentation's first substream
   alone, and MediaInfo reads a second parameter set after `de_ms_proc_flag` that the text does not
   send; `src/ac4dec/ERRATA.md` records the readings.
+- **AC-4 decodes the 22.2 channel element, in full decoding and as coded.** Both transcriptions read
+  `22_2_channel_element()` (Part 2 6.2.4.3) and `ac4::Decoder` decodes its two LFEs and eleven pairs,
+  in SIMPLE and ASPX, to 24 channels in the order of Part 2 Table A.27's speaker indices (the LFEs
+  are the 12th and 18th). Part 2 gives 22.2 no renderer or downmix and lists it as full decoding
+  only, so every `OutputConfig::downmix` but `kAsCoded` and core decoding are refused by name, and
+  dialogue enhancement acts on L, R and C. `ac4::Speaker` gains `kLeftScreen`, `kRightScreen`,
+  `kTopFrontCentre`, `kTopBackCentre`, `kTopCentre`, `kBottomFrontLeft`, `kBottomFrontRight`,
+  `kBottomFrontCentre` and `kCentreBack` after its last value, and the C API, Python and Rust
+  enums the same; the layout renderer's E-AC-3 locations have no place for the bottom channels, so
+  Forge's meters leave them out and Hearth and the ESP32 player refuse a 22.2 presentation. No stream
+  of the element and no other decoder exist: constructed streams with a tone on each channel check it
+  (`src/ac4dec/ERRATA.md`, "The 22.2 element").
 - **AC-4 decodes the immersive element of 7.0.4 and 7.1.4, in full and core decoding, and renders
   it by Part 2's channel renderer** (phase D9 of `planning/ac4.md`). Both transcriptions read
   `immersive_channel_element()` with `immers_cfg` and A-JCC's `ajcc_data()` (Part 2 6.2.4 to 6.2.6),
