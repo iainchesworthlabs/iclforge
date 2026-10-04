@@ -199,8 +199,9 @@ fi
 #
 #   - the image: 51,469 bytes of DIRAM, half the AC-3 and E-AC-3 decode image's, since
 #     iclforge::ac3's decoders are not linked;
-#   - heap.peak_bytes counts both regions and is the Cortex-M3 leg's to the byte (1,800,312,
-#     the 5.1.4 fixture), so it takes that leg's ceiling, and the churn and retained bytes too;
+#   - heap.peak_bytes counts both regions and is the Cortex-M3 leg's to the byte (1,494,319
+#     at the 5.1.4 fixture since D14f; 1,800,312 before it), so it takes that leg's ceiling for
+#     that fixture, 1,680,000, and the churn and retained bytes too;
 #   - the internal RAM each fixture took at its worst (<fixture>.esp32s3.internal_peak_bytes):
 #     3,188 to 5,032 bytes at 2.0, 8,612 and 12,012 at 5.1, 14,140 at 5.1.4. Under ESP-IDF's
 #     default limit of 16 KB the same fixtures took 247,608 to 263,756 at 2.0 and left 1.3 to
@@ -215,7 +216,7 @@ fi
 # starts keeping its state in internal RAM shows here before a board's Wi-Fi does.
 if [[ "$DIRECTION" == "ac4" ]]; then
     ICLFORGE_ESP32S3_MAX_DIRAM_BYTES=${ICLFORGE_ESP32S3_MAX_DIRAM_BYTES_AC4:-57000}
-    ICLFORGE_ESP32S3_MAX_HEAP_BYTES=${ICLFORGE_ESP32S3_MAX_HEAP_BYTES_AC4:-2130000}
+    ICLFORGE_ESP32S3_MAX_HEAP_BYTES=${ICLFORGE_ESP32S3_MAX_HEAP_BYTES_AC4:-1680000}
     ICLFORGE_ESP32S3_MAX_STEADY_ALLOCS_PER_FRAME=${ICLFORGE_ESP32S3_MAX_STEADY_ALLOCS_PER_FRAME_AC4:-210}
     ICLFORGE_ESP32S3_MAX_AC4_STACK_BYTES=${ICLFORGE_ESP32S3_MAX_AC4_STACK_BYTES:-24000}
     declare -A INTERNAL_CEILING_AC4=(

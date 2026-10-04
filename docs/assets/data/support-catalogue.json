@@ -1688,9 +1688,9 @@
             "six streams in float and in fixed point; PCM hashes pinned"
           ],
           [
-            "unavailable",
-            "not-applicable",
-            "not built yet"
+            "limited",
+            "emulated",
+            "behind CONFIG_ICLFORGE_AC4, state in PSRAM; six streams under QEMU, not run on a board"
           ],
           [
             "limited",

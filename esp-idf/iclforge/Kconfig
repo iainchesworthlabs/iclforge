@@ -43,8 +43,9 @@ config ICLFORGE_AC4
         tier on one without (ESP32-C3, ESP32-C6; planning/ac4.md, D14d).
 
         The decoder holds 286 KB at 2.0, 0.7 MB at 5.1 and 1.5 MB at 5.1.4
-        on a 32-bit core in either tier (planning/ac4.md, D14f): more than
-        the ESP32-S3 has free in internal RAM, about 277 KB, and more than
+        on a 32-bit core in either tier (planning/ac4.md, D14f): about what
+        the ESP32-S3 has free in internal RAM (277,400 bytes in the AC-3
+        probe's configuration, 347,051 in the AC-4 probe's) and more than
         the ESP32-P4's internal RAM from 5.1 up, so a build that turns it
         on hands its heap to PSRAM (CONFIG_SPIRAM_USE_MALLOC). On an
         ESP32-C6, which has no PSRAM, 2.0 is level with the 285 KB free

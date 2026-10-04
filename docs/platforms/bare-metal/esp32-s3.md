@@ -1332,7 +1332,7 @@ holds less. The CI row's ceilings (6,000 bytes of internal RAM at 2.0, 14,000 at
 | | ESP32-S3 (QEMU, 512-byte limit for AC-4) | [ESP32-P4](esp32-p4.md#ac-4) (board, ESP-IDF's default) |
 |---|---|---|
 | PCM | the six fixtures' pinned hashes | the six fixtures' pinned hashes, and the host's on 52 plays |
-| Peak heap | 0.41 to 0.60 MB at 2.0, 0.95 to 1.15 MB at 5.1, 1.80 MB at 5.1.4 (the probe) | 0.58 MB at 2.0 to 2.2 MB at 5.1.4 (`hearth_sink`) |
+| Peak heap | 0.29 to 0.42 MB at 2.0, 0.70 to 0.86 MB at 5.1, 1.49 MB at 5.1.4 since D14f (the probe; 0.41 to 0.60, 0.95 to 1.15 and 1.80 MB when D14c measured it) | 0.58 MB at 2.0 to 2.2 MB at 5.1.4 (`hearth_sink`) |
 | Internal RAM at the worst moment | 3 to 14 KB used, 333 to 344 KB of 347 KB left | used up: 1 to 8 KB left of 344 to 350 KB |
 | Decode stack | 18 to 22 KB | 19 to 30 KB |
 | Real time | not measured | 2.0 at 0.28 and 0.37; 5.1 at 0.64, 0.83 and 0.90; 5.1.4 at 1.55 to 1.89 |

@@ -120,9 +120,11 @@ image 8,448 bytes larger):
 | `ac4_514_tones`, 5.1.4 | 2 | 206,264,000 | 1,800,312 | 203 | 19,480 |
 | `ac4_20_companding`, 2.0 with companding | 3 | 58,818,000 | 462,435 | 73 | 19,480 |
 
-The runner holds each column to a ceiling about a tenth above the figure (`ICOUNT_CEILING_AC4`,
-`PEAK_CEILING_AC4` and `CHURN_CEILING_AC4` in `tools/checks/run_baremetal_probe.sh`), and the image
-(691,896 bytes, ceiling 750,000) and the stack (ceiling 21,500) have ceilings of their own. Nothing
+These are D14e's figures. D14f lowered the peaks and the instruction counts and raised the image
+([the performance trend](../../performance-trend.md) has the table). The runner holds each column to
+a ceiling about a tenth above the figure (`ICOUNT_CEILING_AC4`, `PEAK_CEILING_AC4` and
+`CHURN_CEILING_AC4` in `tools/checks/run_baremetal_probe.sh`), and the image and the stack have ceilings
+of their own, set there. Nothing
 is retained after the decoders are destroyed. The stack is read by painting a window of it below
 the probe's frame before each fixture and finding how far the decode reached. The PCM of each
 fixture hashes to the value `tests/golden/ac4-probe-pcm-hashes.json` pins, on this leg and on the

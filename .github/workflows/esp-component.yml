@@ -107,8 +107,9 @@ jobs:
       # ESP32-P4 with CONFIG_ICLFORGE_AC4 on and an application that constructs an AC-4
       # decoder and calls it (planning/ac4.md, D14b). The archive above is what it always
       # was, without them; this asks that the flag does what it says. One part rather than
-      # all four: the others are the step above's, and only the parts with a floating-point
-      # unit offer the option. Nothing is uploaded from it.
+      # all four: the others are the step above's. The option is offered on every part now
+      # (single precision with a floating-point unit, the fixed-point tier without: D14d),
+      # and the ESP32-C3 and ESP32-C6 builds of it are not run here. Nothing is uploaded from it.
       - name: Pack with the AC-4 decoder and build against the archive for the ESP32-P4
         run: |
           set -eu
