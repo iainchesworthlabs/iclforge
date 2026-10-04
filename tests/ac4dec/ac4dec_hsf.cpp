@@ -438,7 +438,7 @@ FramePlan make_plan(const HsfCase& c, int base, int multiplier) {
                 members.push_back(w);
             }
         }
-        const int h = members.front() < count[0] ? 0 : 1;
+        const int h = members.at(0) < count[0] ? 0 : 1;
         // Where the framing is the same a group may span the halves; its length is then the one.
         plan.groups.push_back(make_group(members, length[static_cast<std::size_t>(h)],
                                          plan.different ? h : 0,
@@ -706,7 +706,7 @@ HsfStream build_hsf_stream(const HsfCase& c, int frames) {
     const std::size_t blocks = per_frame * static_cast<std::size_t>(frames);
     const auto block_length = [&](std::size_t j) { return plan.block_lengths[j % per_frame]; };
     std::vector<long> window_start(blocks + 1);
-    window_start[0] = -block_length(0);
+    window_start.at(0) = -block_length(0);
     for (std::size_t j = 0; j < blocks; ++j) {
         window_start[j + 1] = window_start[j] + (3L * block_length(j) - block_length(j + 1)) / 2;
     }
