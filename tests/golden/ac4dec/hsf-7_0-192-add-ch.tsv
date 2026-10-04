@@ -1,0 +1,14 @@
+# ac4-syntax-digest/1 ../ac4-hsf/7_0-192-add-ch.ac4
+# frame	substream	kind	records	end_bit	crc32
+0	0	audio	633	2582	0x9d7d9677
+0	1	hsf_ext	674	2305	0xf63064c8
+0	2	presentation	12	22	0x2a23540f
+1	0	audio	635	2574	0x417d3967
+1	1	hsf_ext	654	2238	0xce6000e2
+1	2	presentation	12	22	0x2a23540f
+2	0	audio	635	2582	0x318d1483
+2	1	hsf_ext	681	2349	0x34df69d6
+2	2	presentation	12	22	0x2a23540f
+3	0	audio	631	2590	0x2b7f7996
+3	1	hsf_ext	660	2241	0x35bfe50d
+3	2	presentation	12	22	0x2a23540f

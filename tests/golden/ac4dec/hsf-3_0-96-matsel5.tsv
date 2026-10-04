@@ -1,0 +1,14 @@
+# ac4-syntax-digest/1 ../ac4-hsf/3_0-96-matsel5.ac4
+# frame	substream	kind	records	end_bit	crc32
+0	0	audio	393	1694	0xdcda7caf
+0	1	hsf_ext	153	518	0x533a601f
+0	2	presentation	9	19	0x46d5a9c6
+1	0	audio	503	2262	0xf26f65e6
+1	1	hsf_ext	153	522	0xf5520415
+1	2	presentation	9	19	0x46d5a9c6
+2	0	audio	398	1710	0x3e06a319
+2	1	hsf_ext	149	506	0x706dacf2
+2	2	presentation	9	19	0x46d5a9c6
+3	0	audio	402	1718	0xa913d503
+3	1	hsf_ext	149	502	0x5f2d686d
+3	2	presentation	9	19	0x46d5a9c6

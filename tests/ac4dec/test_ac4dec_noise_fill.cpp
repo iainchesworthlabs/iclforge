@@ -224,3 +224,247 @@ TEST_CASE("noise fill draws continue across tracks of a frame rather than restar
     }
     CHECK(differ);
 }
+
+// --- a track with an HSF extension (ETSI TS 103 190-1 clauses 4.2.8.7 to 4.2.8.9)
+// -----------------
+//
+// The extension's scale factors and noise levels are each a difference from the one transmitted
+// before (Tables 42b and 42c carry on from asf_scalefac_data() and asf_snf_data()), so the walk of
+// Pseudocodes 21 to 23 takes every group's core bands and then every group's extension bands
+// (src/ac4dec/ERRATA.md, "Scale factors and noise levels across an HSF extension"). The
+// reference here is that order written out over a flat list of bands.
+
+namespace hsf_test {
+
+struct BandSpec {
+    std::array<int, kBandWidth> quant{};
+    int dpcm_sf = 60;  // the codeword index of a coded band's scale factor delta
+    int snf = -1;      // the noise codeword's delta (+17 for its index), or -1 for none
+};
+
+[[nodiscard]] bool silent(const BandSpec& band) {
+    return std::all_of(band.quant.begin(), band.quant.end(), [](int q) { return q == 0; });
+}
+
+struct Built {
+    detail::SfInfo info;
+    std::unique_ptr<detail::SfData> core = std::make_unique<detail::SfData>();
+    detail::HsfSfData hsf;
+    std::vector<BandSpec> order;  // the reference's flat list
+};
+
+// `groups` groups of one window each: group g's core bands core[g] and extension bands
+// extension[g].
+[[nodiscard]] Built build(const std::vector<std::vector<BandSpec>>& core,
+                          const std::vector<std::vector<BandSpec>>& extension,
+                          int reference_scale_factor) {
+    Built b;
+    const std::size_t groups = core.size();
+    b.info.psy.num_window_groups = static_cast<int>(groups);
+    for (std::size_t g = 0; g < groups; ++g) {
+        b.info.psy.num_win_in_group[g] = 1;
+    }
+    detail::SfData& data = *b.core;
+    data.reference_scale_factor = reference_scale_factor;
+    data.b_snf_data_exists = true;
+    std::size_t core_offset = 0;
+    std::size_t hsf_offset = 0;
+    for (std::size_t g = 0; g < groups; ++g) {
+        data.max_sfb[g] = static_cast<int>(core[g].size());
+        for (std::size_t i = 0; i < core[g].size(); ++i) {
+            const BandSpec& band = core[g][i];
+            data.sect_sfb_offset[g][i] = static_cast<std::uint16_t>(core_offset);
+            for (const int q : band.quant) {
+                data.quant_spec.push_back(static_cast<std::int16_t>(q));
+            }
+            core_offset += kBandWidth;
+            data.scale_factor_present[g][i] = !silent(band);
+            data.dpcm_sf[g][i] = static_cast<std::int16_t>(band.dpcm_sf);
+            data.snf_present[g][i] = band.snf >= 0;
+            data.dpcm_snf[g][i] = static_cast<std::int16_t>(std::max(band.snf + kNoDelta, 0));
+        }
+        data.sect_sfb_offset[g][core[g].size()] = static_cast<std::uint16_t>(core_offset);
+        // The extension's bands are numbered from the core's last, start_sfb.
+        b.hsf.start_sfb[g] = static_cast<int>(core[g].size());
+        b.hsf.max_sfb_hsf[g] = static_cast<int>(core[g].size() + extension[g].size());
+        b.hsf.sect_sfb_offset[g].resize(extension[g].size() + 1);
+        b.hsf.scale_factor_present[g].resize(extension[g].size());
+        b.hsf.dpcm_sf[g].resize(extension[g].size());
+        b.hsf.snf_present[g].resize(extension[g].size());
+        b.hsf.dpcm_snf[g].resize(extension[g].size());
+        for (std::size_t i = 0; i < extension[g].size(); ++i) {
+            const BandSpec& band = extension[g][i];
+            b.hsf.sect_sfb_offset[g][i] = static_cast<std::uint32_t>(hsf_offset);
+            for (const int q : band.quant) {
+                b.hsf.quant_spec.push_back(static_cast<std::int16_t>(q));
+            }
+            hsf_offset += kBandWidth;
+            b.hsf.scale_factor_present[g][i] = !silent(band);
+            b.hsf.dpcm_sf[g][i] = static_cast<std::int16_t>(band.dpcm_sf);
+            b.hsf.snf_present[g][i] = band.snf >= 0;
+            b.hsf.dpcm_snf[g][i] = static_cast<std::int16_t>(std::max(band.snf + kNoDelta, 0));
+        }
+        b.hsf.sect_sfb_offset[g][extension[g].size()] = static_cast<std::uint32_t>(hsf_offset);
+    }
+    for (const auto& group : core) {
+        b.order.insert(b.order.end(), group.begin(), group.end());
+    }
+    for (const auto& group : extension) {
+        b.order.insert(b.order.end(), group.begin(), group.end());
+    }
+    return b;
+}
+
+}  // namespace hsf_test
+
+namespace {
+
+using hsf_test::BandSpec;
+
+// Pseudocodes 21, 22 and 23 over the flat list, as the clauses print them: scale factors by the
+// difference from the one transmitted before, the first coded band taking reference_scale_factor;
+// the reference noise level that of the first band with energy; each noise codeword a step from
+// the level before, and each coded band setting the level.
+std::vector<double> reference_lines(const std::vector<BandSpec>& order, int reference_scale_factor,
+                                    int counter) {
+    std::vector<double> lines(order.size() * kBandWidth, 0.0);
+    int scale_factor = reference_scale_factor;
+    bool first = false;
+    std::vector<bool> coded(order.size(), false);
+    for (std::size_t b = 0; b < order.size(); ++b) {
+        if (hsf_test::silent(order[b])) {
+            continue;
+        }
+        if (first) {
+            scale_factor += order[b].dpcm_sf - 60;
+        } else {
+            first = true;
+        }
+        coded[b] = true;
+        const double gain = std::pow(2.0, 0.25 * (scale_factor - 100));
+        for (std::size_t k = 0; k < kBandWidth; ++k) {
+            lines[b * kBandWidth + k] = gain * coded_value(order[b].quant[k]);
+        }
+    }
+    const auto level_of = [&](std::size_t b) {
+        double sum = 0.0;
+        for (std::size_t k = 0; k < kBandWidth; ++k) {
+            sum += lines[b * kBandWidth + k] * lines[b * kBandWidth + k];
+        }
+        return 1.44269504 * std::log(sum / static_cast<double>(kBandWidth));
+    };
+    double previous = -1000.0;
+    for (std::size_t b = 0; b < order.size(); ++b) {
+        if (coded[b]) {
+            previous = level_of(b);
+            break;
+        }
+    }
+    detail::RandGenState noise = detail::reset_rand_gen_state_snf(counter);
+    for (std::size_t b = 0; b < order.size(); ++b) {
+        if (coded[b]) {
+            previous = level_of(b);
+        } else if (order[b].snf >= 0 && order[b].snf != -kNoDelta) {
+            previous += order[b].snf;
+            const double amplitude = std::pow(2.0, 0.5 * previous);
+            for (std::size_t k = 0; k < kBandWidth; ++k) {
+                lines[b * kBandWidth + k] =
+                    static_cast<double>(detail::get_random_noise_value(noise)) * amplitude;
+            }
+        }
+    }
+    return lines;
+}
+
+void check_extension(const std::vector<std::vector<BandSpec>>& core,
+                     const std::vector<std::vector<BandSpec>>& extension,
+                     int reference_scale_factor) {
+    constexpr int kCounter = 31;
+    hsf_test::Built built = hsf_test::build(core, extension, reference_scale_factor);
+    detail::RandGenState noise = detail::reset_rand_gen_state_snf(kCounter);
+    std::vector<Real> scaled;
+    int exponent = 0;
+    REQUIRE(detail::reconstruct_track(built.info, *built.core, detail::scale_factor_gains(), noise,
+                                      scaled, exponent, &built.hsf));
+    const std::vector<double> expected =
+        reference_lines(built.order, reference_scale_factor, kCounter);
+    REQUIRE(scaled.size() == expected.size());
+    // Fixed32 holds a track's lines to its largest line's 2^-24 and float to a part in 10^6.
+    const double tolerance = detail::dsp::kFixed<Real> ? 2e-3 : 2e-5;
+    double largest = 0.0;
+    for (const double v : expected) {
+        largest = std::max(largest, std::abs(v));
+    }
+    for (std::size_t k = 0; k < expected.size(); ++k) {
+        CAPTURE(k);
+        CHECK(std::ldexp(static_cast<double>(scaled[k]), exponent) ==
+              Catch::Approx(expected[k]).epsilon(tolerance).margin(tolerance * largest));
+    }
+}
+
+}  // namespace
+
+TEST_CASE("an HSF extension's scale factors and noise levels carry on from the core's",
+          "[ac4dec][asf][noise][hsf]") {
+    SECTION("one window group") {
+        BandSpec silent_zero;
+        silent_zero.snf = 0;
+        BandSpec core_coded;
+        core_coded.quant = {4, -3, 2, 1};
+        BandSpec core_silent_up;
+        core_silent_up.snf = +3;
+        BandSpec ext_up;
+        ext_up.quant = {1, 0, 0, 0};
+        ext_up.dpcm_sf = 68;  // +8 on the core's scale factor: a gain of 4
+        BandSpec ext_silent_down;
+        ext_silent_down.snf = -5;
+        BandSpec ext_down;
+        ext_down.quant = {2, 2, 2, 2};
+        ext_down.dpcm_sf = 52;  // -8
+        BandSpec ext_silent_escape;
+        ext_silent_escape.snf = -kNoDelta;
+        BandSpec ext_silent_up;
+        ext_silent_up.snf = +2;
+        check_extension({{silent_zero, core_coded, core_silent_up}},
+                        {{ext_up, ext_silent_down, ext_down, ext_silent_escape, ext_silent_up}},
+                        100);
+    }
+    SECTION("two window groups: every group's core, then every group's extension") {
+        BandSpec a;
+        a.quant = {5, 5, 5, 5};
+        BandSpec b;
+        b.quant = {1, 2, 3, 0};
+        b.dpcm_sf = 62;  // +2
+        BandSpec c;
+        c.quant = {2, 0, 2, 0};
+        c.dpcm_sf = 70;  // +10: after b in the stream, not after a
+        BandSpec d;
+        d.quant = {0, 7, 0, 0};
+        d.dpcm_sf = 50;  // -10
+        BandSpec fill;
+        fill.snf = +1;
+        BandSpec fill_down;
+        fill_down.snf = -2;
+        check_extension({{a, fill}, {b, fill_down}}, {{c, fill}, {d, fill_down}}, 90);
+    }
+    SECTION("a core with no coded band: the extension's first takes reference_scale_factor") {
+        BandSpec silent_a;
+        silent_a.snf = +2;
+        BandSpec silent_b;
+        silent_b.snf = -1;
+        BandSpec first;
+        first.quant = {3, -1, 0, 2};
+        first.dpcm_sf = 99;  // never read: the first scale factor found is the reference itself
+        BandSpec next;
+        next.quant = {1, 1, 1, 1};
+        next.dpcm_sf = 64;
+        check_extension({{silent_a, silent_b}}, {{first, next}}, 104);
+    }
+    SECTION("no extension bands at all") {
+        BandSpec a;
+        a.quant = {2, 2, 0, 1};
+        BandSpec fill;
+        fill.snf = 0;
+        check_extension({{a, fill}}, {{}}, 100);
+    }
+}
