@@ -2689,6 +2689,13 @@ The sections below contain the complete change list and fixes.
 
 **Codec correctness**
 
+- **A float decode ignored `DecoderConfig::fast_imdct = false`.** A full build configured with
+  `ICLFORGE_DECODE_SCALAR=float` ran the fast inverse transform whatever the setting, so the
+  reference form (`mode=reference`) was not the one that ran. It now widens the block to double,
+  runs the direct form and narrows the result, as the object reconstruction already did. The
+  default (`fast_imdct = true`), the double build and the minimum-footprint profile, which refuses
+  the setting, are unchanged. The test suite now builds and runs at float in the nightly run.
+
 - **The AC-4 decoder dropped the stream's downmix gains when the listener changed the downmix or
   the LFE choice.** `Decoder::set_output()` with a new `downmix` or `mix_lfe` reset the gains,
   the custom downmix data and the loudness corrections the stream had sent, and a stream may send

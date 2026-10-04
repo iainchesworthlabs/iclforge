@@ -3881,11 +3881,10 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
             for (int ch = 0; ch < nchans; ++ch) {
                 const auto index = static_cast<std::size_t>(ch);
                 auto& x = impl_->imdct_scratch_;
-                // Two overloads, one call site. The float32 inverse takes no
-                // `fast` parameter - the direct form is double-only - and this
-                // profile has already refused fast_imdct=false with
-                // kNoReferenceTransform long before reaching here, so there is no
-                // choice being silently dropped.
+                // One call site for all three scalars (scalar_inverse.hpp). The float32
+                // inverse has no direct form of its own, so inverse_transform_into widens
+                // for fast_imdct=false; a build without the direct form has already
+                // refused it with kNoReferenceTransform long before reaching here.
                 const bool short_block = ch < nfchans && tail.blksw[static_cast<std::size_t>(ch)];
                 internal::inverse_transform_into(coeffs[index], x, short_block,
                                        impl_->config_.fast_imdct);
