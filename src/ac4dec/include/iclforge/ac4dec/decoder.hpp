@@ -63,8 +63,11 @@
 // the audio frame rate of Table 18, with the unit's first sequence_counter
 // divided by the fraction as its own (ERRATA.md).
 //
-// What it refuses, with DecodeError::kUnsupported and a reason: the speech
-// spectral frontend (Part 1 clause 5.2), the 9.X.4 channel modes (Part 2's
+// It decodes the speech spectral frontend (Part 1 clause 5.2) for the tracks
+// that select it, from the text alone: no stream here uses the tool, and
+// ERRATA.md gives the readings the text's defects needed.
+//
+// What it refuses, with DecodeError::kUnsupported and a reason: the 9.X.4 channel modes (Part 2's
 // immersive element with b_5fronts) and the 22.2 channel element, an
 // intermediate spatial format mixed into channels Annex A.2.1 has no matrix
 // for, a 96/192 kHz substream whose HSF extension substream could not be

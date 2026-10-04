@@ -128,6 +128,76 @@ depends on the same reading.
   counter reading; it cannot say how an encoder splits a substream. Fragments are cut by the test at equal
   lengths; the text allows zero-length ones and any other split, which the concatenation does not depend on.
 
+### The speech spectral frontend
+
+- **Where:** Part 1 4.2.9 (Tables 43 to 46), 4.3.7 (Tables 111 to 113, Pseudocode 7), 5.2
+  (Pseudocodes 4a to 58) and Annex C, whose tables are in the attachment ts_103190_tables.c except
+  Table C.1. The decoder reads and decodes it in one pass (`src/ac4dec/src/syntax/ssf.cpp`), since
+  `ssf_ac_data()` has no length, and the allocation its arithmetic decoder needs comes from values the
+  decoding builds. `tools/references/ssf_ref.py` is a second transcription, written from the text without
+  reading the first; they agree on random streams (below). The text is defective in the places that follow.
+- **Readings:**
+  1. Pseudocode 50 calls `AcDecodeSymbolExtCdf(..., 0, i_max_idx)`, a search that "cannot return a
+     negative value" for signed indices. A coefficient's symbols run from `-i_max_idx` to `i_max_idx`,
+     ascending, the first whose interval holds the target; any larger range gives the same symbol, since
+     the intervals that hold nothing are empty. For the envelope and predictor gain tables, of 33 entries
+     (32 symbols), the call's upper bound of 32 would read `table[33]`: the symbols are 0 to 31.
+  2. Pseudocode 51 clamps `iLeft` from below and `iRight` from above only, so a symbol wholly beyond
+     +-10 makes `CdfEst()` index outside CDF_TABLE. Both ends are clamped to +-327680; such a symbol's
+     interval is empty. The table's tails (47 and 46 in 32 768 beyond +-10) are therefore never
+     decoded: no valid stream puts a symbol there.
+  3. Pseudocode 27 gives `HeuristicScaling()` f_rfu "in Qx.10" and never converts it. It is rounded:
+     `floor(f_rfu * 1024 + 0.5)`. Truncation would change a band's weight in about 4 % of random sets
+     of an envelope and a predictor gain (measured), and with it the allocation, so which bits of the
+     arithmetic coded data are read; no stream here settles it.
+  4. Pseudocode 28 does not reset `band` before the reverse water-filling, which it enters with
+     `num_bands`, so the loop would not run. It is reset to 0.
+  5. Pseudocodes 56 and 57 write `x = x++`: an increment, as in "x = x++ in Pseudocode 57" above.
+  6. Pseudocode C.1's index `(nu + rfs) * rts * 33 + k * 33 + eta` does not match the arrays, which
+     are smooth along eta only with eta as the middle index and k the fastest, the index being
+     `((nu + rfs) * 33 + eta) * rts + k` (for each of the 37 arrays with Rt > 1 the second differences
+     along eta are at least 6 times smaller than in any other order; `tools/generators/gen_ac4_tables.py`
+     checks it).
+  7. Pseudocode 36's sign (`s`, never initialised, toggling inside the loops) is replaced by the displayed
+     equation of 5.2.6, `(-1)^((k + 1) p)`, and `round()` by `floor(x + 1/2)` as the equations have it.
+     The two differ only for a negative exact half, which one coefficient at predictor lag index 509 and a
+     block length of 960 reaches.
+  8. Pseudocode 4e's `(i_pred_lag_idx - 509) / 170` is a real division.
+  9. Pseudocode 41 names the large threshold `SSF_SSF_THRESHOLD_LARGE` and uses `SSF_THRESHOLD_LARGE`:
+     1 << 29, the initial range of Pseudocode 43.
+  10. `FLOAT()` in Pseudocode 27 is a division by 1024.
+  11. `AcDecodeFinish()` (Pseudocode 47) counts the bits the arithmetic decoder has read since its
+      initialisation, less the 30 it reads ahead, plus the termination length it finds: that is where
+      the next granule starts. The decoder's own reads beyond the substream are zeros; a count that
+      ends beyond it is a truncated substream.
+  12. An SSF-I-frame (`b_iframe`, or `b_ssf_iframe` for the first granule) starts both random generators
+      (Pseudocode 55), `i_prev_pred_lag_idx` and the predictor's buffers afresh. The second granule of a
+      frame is never an I granule. The dither of a granule is drawn up front (Pseudocode 58), the noise
+      as the lines are dequantised, in block, band and bin order. A stream that fails to decode needs the
+      next I-frame.
+  13. The predictor's spectra buffers keep the lines of the length they were written at; when the block
+      length changes between granules they are cut or zero extended to the new `num_bins`. The text
+      says nothing on a change of stride.
+  14. A subband predictor with a gain of 0 produces zeros without being run; with a gain, a lag that
+      reaches an envelope buffer entry no block has filled (the first blocks after an I-frame), or past
+      the four entries, is an invalid stream rather than a division by zero.
+  15. The fixed point arithmetic of Pseudocodes 4b and 27 to 30 and 40 to 53 is held in 64 bits and a
+      result outside int32 is an invalid stream (the macros would wrap). The state of the arithmetic
+      decoder is uint32 and wraps, as the unsigned types do: a random stream breaks `offset < range`
+      half the time, and both transcriptions then run on with wrapped arithmetic.
+  16. A stream is invalid where an envelope leaves -64 to 63 (the NOTE of 5.2.3.0a), a predictor lag index
+      leaves 0 to 509 (the NOTE of 5.2.4.0a), a short stride is sent where Table 112 allows none
+      (frame lengths of 512 and 384), or a symbol's interval holds nothing the arithmetic decoder asks for.
+  17. The lines are the inverse MDCT's input in the scale of the audio spectral frontend's, and a granule's
+      blocks (768, or 4 of 192, and so on) are the transform blocks Table 187 lists.
+- **Evidence:** Text. No stream here uses the tool: not DEE's, not the census's, not the third-party ones.
+  `tests/golden/ac4dec/ssf/ssf-vectors.txt` is 128 frames of random bytes through the reference
+  (`python tools/references/ssf_ref.py vectors --seed 1 --cases 32 --frames 4`), which the decoder matches
+  on the bits ssf_data() took, every granule's stride and band count, and every line to 1e-9; five
+  deliberate changes (the rounding of f_rfu, the predictor's sign, a dB table's shift, the termination
+  count, an integer division) each fail it. Random bits are not a stream a codec wrote, so the readings
+  above that depend on one (3, 11, 13) are not tested by it.
+
 ### A substream named by several elements
 
 - **Where:** Part 1 Table 15, p. 33, and Part 2 Table 50, p. 123: the element that names a substream's

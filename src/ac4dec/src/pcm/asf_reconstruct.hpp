@@ -8,6 +8,7 @@
 #include "pcm/snf_random.hpp"
 #include "syntax/asf.hpp"
 #include "syntax/context.hpp"
+#include "syntax/ssf.hpp"
 
 // The audio spectral frontend's reconstruction, ETSI TS 103 190-1 V1.4.1
 // clause 5.1, from what D1's sf_data() reading kept (syntax/asf.hpp):
@@ -44,6 +45,11 @@ using ScaleFactorGains = std::array<Real, 256>;
 [[nodiscard]] ParseResult reconstruct_track(const SfInfo& info, const SfData& data,
                                             const ScaleFactorGains& sf_gain, RandGenState& noise,
                                             std::vector<Real>& scaled, int& exponent);
+
+// An SSF track's lines (clause 5.2) in the scalar, already in window order: at double and float
+// the lines themselves, at Fixed32 written at the exponent that keeps the largest below 1, as
+// reconstruct_track()'s are.
+void reconstruct_ssf_track(const SsfData& data, std::vector<Real>& scaled, int& exponent);
 
 // The length in lines of each window of the frame, in order: one full block
 // for a long frame, otherwise num_windows blocks, each of its group's

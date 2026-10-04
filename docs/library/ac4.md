@@ -15,8 +15,9 @@ full and core decoding and direct-coded objects, with each object's metadata ([O
 streams of several presentations, the one a system chooses decoded with all of its substreams
 mixed; the output level and dynamic range control, dialogue enhancement and the downmix; and it
 conceals a frame that does not decode when asked to. It refuses, per substream and per frame, with
-`DecodeError::kUnsupported` and a reason: the speech spectral frontend, the 9.X.4 and 22.2
-channel elements, and output at 96 or 192 kHz. A presentation in the efficient high frame rate
+`DecodeError::kUnsupported` and a reason: the 9.X.4 and 22.2 channel elements, and output at
+96 or 192 kHz. It decodes the speech spectral frontend (Part 1 clause 5.2) for the tracks that
+select it, from the text alone: no stream here uses it. A presentation in the efficient high frame rate
 mode (`frame_rate_fraction` 2 or 4, Part 2 clause 5.1.3) spreads one codec frame over that many
 `raw_ac4_frame()`s: the decoder holds the fragments, `decode()` returns no frame until the unit's
 last transmission frame arrives, and the frame it then returns is at the audio frame rate of Part 2

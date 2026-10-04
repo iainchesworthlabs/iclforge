@@ -95,6 +95,7 @@ target_sources(iclforge_ac4dec_objects
         src/syntax/metadata.cpp
         src/syntax/oamd.cpp
         src/syntax/presentation.cpp
+        src/syntax/ssf.cpp
         src/syntax/substream.cpp)
 
 target_include_directories(iclforge_ac4dec_objects

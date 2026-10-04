@@ -392,4 +392,24 @@ bool ungroup_in_place(const SubstreamContext& ctx, const AsfPsyInfo& psy, const 
     return true;
 }
 
+void reconstruct_ssf_track(const SsfData& data, std::vector<Real>& scaled, int& exponent) {
+    scaled.resize(data.lines.size());
+    exponent = 0;
+    double factor = 1.0;
+    if constexpr (dsp::kFixed<Real>) {
+        double largest = 0.0;
+        for (const double value : data.lines) {
+            largest = std::max(largest, std::abs(value));
+        }
+        if (largest > 0.0) {
+            // largest is in [2^(e - 1), 2^e): every line below 1 at 2^-e.
+            (void)std::frexp(largest, &exponent);
+            factor = std::ldexp(1.0, -exponent);
+        }
+    }
+    for (std::size_t k = 0; k < data.lines.size(); ++k) {
+        scaled[k] = static_cast<Real>(data.lines[k] * factor);
+    }
+}
+
 }  // namespace iclforge::ac4::detail

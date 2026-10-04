@@ -953,8 +953,10 @@ channel-coded substream's HSF extension substream where one resolves to a distin
 substream (the additional scale factor bands, spectral data and noise fill above 24 kHz a 96 kHz or
 192 kHz substream carries), the immersive element of the 7.X.4 channel modes, object substreams
 (A-JOC and direct-coded objects, with their object audio metadata), and EMDF payload substreams.
-It refuses, with a named reason, the speech spectral frontend, the 9.X.4 channel modes and the
-22.2 channel element, an intermediate spatial format mixed into channels Annex A.2.1 has no
+It decodes the speech spectral frontend (Part 1 clause 5.2) from the text alone, the syntax and
+the arithmetic coded data in one pass, checked against a second transcription
+(`tools/references/ssf_ref.py`) on random streams. It refuses, with a named reason, the 9.X.4
+channel modes and the 22.2 channel element, an intermediate spatial format mixed into channels Annex A.2.1 has no
 matrix for, a 96/192 kHz substream whose HSF extension substream could not be resolved, and a
 substream no element of the table of contents names.
 

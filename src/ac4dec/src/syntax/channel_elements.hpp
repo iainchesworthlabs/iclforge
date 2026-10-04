@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -12,6 +13,7 @@
 #include "syntax/asf.hpp"
 #include "syntax/aspx.hpp"
 #include "syntax/context.hpp"
+#include "syntax/ssf.hpp"
 
 // audio_data_chan() (ETSI TS 103 190-2 V1.3.1 clause 6.2.3.1) for the Part 1
 // channel elements: single_channel_element, channel_pair_element,
@@ -71,6 +73,8 @@ struct Track {
     bool side_channel = false;  // Pseudocode 5's b_side_channel
     bool lfe = false;
     SfData data;
+    // The track's lines where it is an SSF one (SfInfo::spec_frontend 1), in place of `data`'s.
+    SsfData ssf;
     // Populated alongside `data` only where this substream's HSF extension
     // is active (see parse_audio_data_chan's `hsf_reader` parameter); a
     // default-constructed HsfSfData otherwise.
@@ -130,6 +134,10 @@ struct ChannelElementState {
     // One per aspx_data_1ch()/aspx_data_2ch() position in the element, in
     // syntax order: the immersive element in ASPX_SCPL has the most, six.
     std::array<AspxElementState, kMaxAspxElements> aspx{};
+    // The speech spectral frontend's state, by the track's place in the element, made when a
+    // track first selects it: it holds the predictor's buffers, 40 KB at the longest block.
+    static constexpr std::size_t kMaxSsfTracks = 8;
+    std::array<std::unique_ptr<SsfState>, kMaxSsfTracks> ssf;
 };
 
 // `hsf_reader` is the owning substream's HSF extension reader, positioned at

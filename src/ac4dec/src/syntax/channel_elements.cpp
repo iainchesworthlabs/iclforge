@@ -189,6 +189,24 @@ ParseResult ElementParser::add_track(int info, bool side_channel, bool lfe) {
         hsf_peeked_ = true;
     }
     const HsfExtHeader* hsf = hsf_reader_ != nullptr ? &hsf_header_ : nullptr;
+    if (out_.infos[static_cast<size_t>(info)].spec_frontend != 0) {
+        // Table 36: ssf_data(b_iframe), with the state this place in the element has kept.
+        const size_t place = out_.tracks.size() - 1;
+        if (place >= ChannelElementState::kMaxSsfTracks) {
+            out_.tracks.pop_back();
+            return fail(DecodeError::kUnsupported,
+                        "more speech spectral frontend tracks than the decoder keeps state for");
+        }
+        std::unique_ptr<SsfState>& ssf_state = state_.ssf[place];
+        if (!ssf_state) {
+            ssf_state = std::make_unique<SsfState>();
+        }
+        if (auto ok = parse_ssf_data(r_, ctx_, *ssf_state, track.ssf); !ok) {
+            out_.tracks.pop_back();
+            return ok;
+        }
+        return {};
+    }
     if (auto ok = parse_sf_data(r_, ctx_, out_.infos[static_cast<size_t>(info)], side_channel, hsf, track.data,
                                 track.hsf);
         !ok) {

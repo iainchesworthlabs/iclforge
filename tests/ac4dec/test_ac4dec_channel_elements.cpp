@@ -562,8 +562,8 @@ TEST_CASE("a channel element that needs I-frame configuration refuses a frame wi
     }
 }
 
-TEST_CASE("channel elements refuse the speech frontend and the modes not decoded", "[ac4dec][channel_elements]") {
-    SECTION("spec_frontend SSF") {
+TEST_CASE("channel elements refuse the modes not decoded", "[ac4dec][channel_elements]") {
+    SECTION("spec_frontend SSF reads ssf_data(), whose zero bits are not a stream") {
         ElementWriter e;
         e.w.put(0, 1);
         e.w.flag(true);  // spec_frontend: SSF
@@ -572,7 +572,7 @@ TEST_CASE("channel elements refuse the speech frontend and the modes not decoded
         ChannelElement out;
         const auto result = read_element(e.w, context(ch_mode::kMono, true), state, out);
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error().error == DecodeError::kUnsupported);
+        CHECK(result.error().error == DecodeError::kInvalidStream);
     }
     SECTION("9.X.4, 22.2 and reserved channel modes") {
         BitWriter w;

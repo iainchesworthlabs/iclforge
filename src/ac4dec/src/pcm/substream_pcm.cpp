@@ -813,6 +813,12 @@ ParseResult SubstreamPcm::matrix(const SubstreamContext& ctx, const ChannelEleme
         spectra_exponents_[c] = scaled_exponents_[at(track_of_[c])];
         const Track& track = element.tracks[at(track_of_[c])];
         const SfInfo& info = element.infos[at(track.info)];
+        if (info.spec_frontend != 0) {
+            // An SSF track's lines are in window order already (clause 5.2): there are no
+            // scale factor bands to ungroup, and no stereo processing reaches such a track.
+            spectra_[c] = scaled_[at(track_of_[c])];
+            continue;
+        }
         const int dual = dual_layout_of_[at(track_of_[c])];
         const SfData& layout = dual >= 0 ? dual_layouts_[at(dual)] : track.data;
         if (!ungroup_in_place(ctx, info.psy, layout, lengths_[c], scaled_[at(track_of_[c])],
@@ -895,7 +901,14 @@ ParseResult SubstreamPcm::decode(const SubstreamContext& ctx, const AudioSubstre
             lengths_[c].assign(1, full_length_);
             continue;
         }
-        const SfInfo& info = element.infos[at(element.tracks[at(track_of_[c])].info)];
+        const Track& track = element.tracks[at(track_of_[c])];
+        const SfInfo& info = element.infos[at(track.info)];
+        if (info.spec_frontend != 0) {
+            // The speech spectral frontend's blocks are the granules' (Table 187's 768|768,
+            // 4*192|768, ...); they cover the frame by construction.
+            ssf_window_lengths(track.ssf, lengths_[c]);
+            continue;
+        }
         if (auto ok = window_lengths(pcm_ctx, info.psy, lengths_[c]); !ok) {
             return ok;
         }
@@ -954,12 +967,17 @@ ParseResult SubstreamPcm::decode(const SubstreamContext& ctx, const AudioSubstre
     for (std::size_t t = 0; t < element.tracks.size(); ++t) {
         const Track& track = element.tracks[t];
         const SfInfo& info = element.infos[static_cast<std::size_t>(track.info)];
-        if (auto ok = reconstruct_track(info, track.data, sf_gain_, noise, scaled_[t], scaled_exponents_[t]); !ok) {
+        if (info.spec_frontend != 0) {
+            reconstruct_ssf_track(track.ssf, scaled_[t], scaled_exponents_[t]);
+        } else if (auto ok = reconstruct_track(info, track.data, sf_gain_, noise, scaled_[t],
+                                               scaled_exponents_[t]);
+                   !ok) {
             return ok;
         }
         // The track's lines are scaled_[t] now; what follows reads only its band layout.
         if (frame_inputs.release_tracks != nullptr) {
             (*frame_inputs.release_tracks)[t].data.quant_spec = {};
+            (*frame_inputs.release_tracks)[t].ssf.lines = {};
         }
     }
     if (auto ok = matrix(pcm_ctx, element); !ok) {
