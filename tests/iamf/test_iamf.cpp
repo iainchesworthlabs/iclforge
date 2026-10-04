@@ -240,6 +240,7 @@ TEST_CASE("IAMF file parses as well-formed ISOBMFF boxes carrying the iamf brand
     REQUIRE(find(elements, "dinf") != nullptr);
 
     const auto* ftyp = find(elements, "ftyp");
+    REQUIRE(ftyp != nullptr);
     CHECK(fourcc_at(*file, ftyp->payload) == "iamf");  // major_brand, IAMF §6.1
     CHECK((fourcc_at(*file, ftyp->payload + 8) == "iamf" ||
           fourcc_at(*file, ftyp->payload + 12) == "iamf"));  // 'iamf' in compatible_brands

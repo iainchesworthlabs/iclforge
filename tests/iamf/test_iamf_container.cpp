@@ -355,9 +355,15 @@ TEST_CASE("IAMF FragmentedWriter writes an initialization segment and movie frag
     // The second fragment continues the numbering and the clock.
     const auto second_top = boxes_in(*second, 0, second->size());
     const auto second_moof = boxes_in(*second, second_top[0].body, second_top[0].end);
-    CHECK(u32_at(*second, find(second_moof, "mfhd")->body + 4) == 2);
-    const auto second_traf = boxes_in(*second, find(second_moof, "traf")->body, find(second_moof, "traf")->end);
-    CHECK(u32_at(*second, find(second_traf, "tfdt")->body + 8) == 960);
+    const auto* second_mfhd = find(second_moof, "mfhd");
+    const auto* second_traf_box = find(second_moof, "traf");
+    REQUIRE(second_mfhd != nullptr);
+    REQUIRE(second_traf_box != nullptr);
+    CHECK(u32_at(*second, second_mfhd->body + 4) == 2);
+    const auto second_traf = boxes_in(*second, second_traf_box->body, second_traf_box->end);
+    const auto* second_tfdt = find(second_traf, "tfdt");
+    REQUIRE(second_tfdt != nullptr);
+    CHECK(u32_at(*second, second_tfdt->body + 8) == 960);
 
     // Concatenated, the pieces are one file that reads like the batch file.
     Bytes fragmented = init;
