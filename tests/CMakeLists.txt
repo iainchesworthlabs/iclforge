@@ -284,6 +284,7 @@ if(NOT BUILD_SHARED_LIBS)
         ac4dec/test_ac4dec_de.cpp
         ac4dec/test_ac4dec_downmix.cpp
         ac4dec/test_ac4dec_drc.cpp
+        ac4dec/test_ac4dec_ehfr.cpp
         ac4dec/test_ac4dec_immersive.cpp
         ac4dec/test_ac4dec_metadata.cpp
         ac4dec/test_ac4dec_multichannel.cpp

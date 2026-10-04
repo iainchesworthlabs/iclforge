@@ -55,6 +55,14 @@
 // contents and the substream framing come from iclforge::ac4::parse_raw_frame (the
 // inspector, src/ac4); this library starts where the inspector stops.
 //
+// A presentation in the efficient high frame rate mode (Part 2 clause 5.1.3)
+// spreads one codec frame over frame_rate_fraction (2 or 4) transmission
+// frames. The decoder holds their fragments (Figure 8's FIFO) and decodes the
+// unit when its last frame arrives: decode() returns no frame for the others,
+// parse() a report without substreams, and the frame decode() returns is at
+// the audio frame rate of Table 18, with the unit's first sequence_counter
+// divided by the fraction as its own (ERRATA.md).
+//
 // What it refuses, with DecodeError::kUnsupported and a reason: the speech
 // spectral frontend (Part 1 clause 5.2), the 9.X.4 channel modes (Part 2's
 // immersive element with b_5fronts) and the 22.2 channel element, an

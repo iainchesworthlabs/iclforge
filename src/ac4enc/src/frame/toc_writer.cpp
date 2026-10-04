@@ -91,8 +91,14 @@ void write_presentation_v1_info(BitWriter& w, const TocLayout& layout, const Toc
     if (index <= 4 || (index >= 7 && index <= 9)) {
         w.write(1, 0, "b_multiplier");
     }
+    // 6.2.1.4: indices 5 to 9 send b_frame_rate_fraction when frame_rate_factor is 1, as it is
+    // here; 10 to 12 send it, and b_frame_rate_fraction_is_4 after it when it is set.
     if (index >= 5 && index <= 12) {
-        w.write(1, 0, "b_frame_rate_fraction");
+        const bool fraction = layout.frame_rate_fraction > 1;
+        w.write(1, fraction ? 1U : 0U, "b_frame_rate_fraction");
+        if (fraction && index >= 10) {
+            w.write(1, layout.frame_rate_fraction == 4 ? 1U : 0U, "b_frame_rate_fraction_is_4");
+        }
     }
     write_emdf_info(w, p.emdf_substream);
     w.write(1, p.enable ? 1U : 0U, "b_presentation_filter");
@@ -341,6 +347,13 @@ void write_substream_index_table(BitWriter& w, std::span<const std::size_t> size
 // audio substreams among `count`.
 [[nodiscard]] bool valid(const TocLayout& layout, std::size_t count) {
     if (layout.presentations.empty() || layout.groups.empty()) {
+        return false;
+    }
+    // 6.2.1.4: a fraction of 2 is sent at frame_rate_index 5 to 12, one of 4 at 10 to 12.
+    const int fraction = layout.frame_rate_fraction;
+    if (fraction != 1 &&
+        !((fraction == 2 || fraction == 4) && layout.frame_rate_index >= 5 &&
+          layout.frame_rate_index <= 12 && (fraction == 2 || layout.frame_rate_index >= 10))) {
         return false;
     }
     std::vector<bool> named(layout.groups.size(), false);

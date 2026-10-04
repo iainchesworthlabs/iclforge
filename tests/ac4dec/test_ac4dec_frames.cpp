@@ -358,17 +358,106 @@ TEST_CASE("each instance of a frame-rate-multiplied series is read at its share 
     check_read(find(report, 2), SubstreamReport::Kind::kPresentation);
 }
 
-TEST_CASE("a frame of the efficient high frame rate mode is refused by name", "[ac4dec][frames]") {
-    // frame_rate_index 10 with b_frame_rate_fraction set: every substream is
-    // a fragment.
-    const TocStart start{.frame_rate_index = 10};
+namespace {
+
+// The transmission frames of one unit of the efficient high frame rate mode (Part 2 clause 5.1.3)
+// at frame_rate_index 10, over one mono audio substream cut into `fraction` pieces and a
+// presentation substream held whole in the first frame and elided (length 0) in the others, as
+// Figure 7 has them. The first has `first_counter`, which a fraction divides.
+std::vector<std::vector<std::byte>> efficient_unit(int fraction, int first_counter,
+                                                   const std::vector<std::byte>& audio,
+                                                   std::optional<bool> enable = std::nullopt) {
     PresV1 p;
-    p.frame_rate_bits = {true, false};  // b_frame_rate_fraction, not 4
+    p.enable = enable;
+    p.frame_rate_bits = {true, fraction == 4};  // b_frame_rate_fraction, b_frame_rate_fraction_is_4
     ChanInfo info;
     info.ch_mode = 0;
-    const auto report = decode(single_group_frame(start, p, {info}, {mono_audio({}), presentation()}));
-    REQUIRE(report.substreams.size() == 2);
-    for (const SubstreamReport& s : report.substreams) {
+    std::vector<std::vector<std::byte>> frames;
+    const std::size_t piece = (audio.size() + static_cast<std::size_t>(fraction) - 1) /
+                              static_cast<std::size_t>(fraction);
+    for (int part = 0; part < fraction; ++part) {
+        const std::size_t begin = std::min(audio.size(), static_cast<std::size_t>(part) * piece);
+        const std::size_t end = std::min(audio.size(), begin + piece);
+        const TocStart start{.sequence_counter = first_counter + part,
+                             .frame_rate_index = 10,
+                             .b_iframe_global = part == 0};
+        frames.push_back(single_group_frame(
+            start, p, {info},
+            {std::vector<std::byte>(audio.begin() + static_cast<std::ptrdiff_t>(begin),
+                                    audio.begin() + static_cast<std::ptrdiff_t>(end)),
+             part == 0 ? presentation() : std::vector<std::byte>{}}));
+    }
+    return frames;
+}
+
+}  // namespace
+
+TEST_CASE("a unit of the efficient high frame rate mode is read when its last frame arrives",
+          "[ac4dec][frames][ehfr]") {
+    // frame_rate_index 10 is 100 fps, and a fraction of 2 makes the codec frames 50 fps: index 7,
+    // 1 024 samples (Part 2 Table 18).
+    const auto audio = mono_audio({.frame_len_base = 1024});
+    const auto frames = efficient_unit(2, 4, audio);
+    iclforge::ac4::Decoder decoder;
+    const auto first = decoder.parse(frames[0]);
+    REQUIRE(first.has_value());
+    CHECK(first->substreams.empty());  // a fragment: nothing to read yet
+    CHECK(first->sequence_counter == 4);
+    const auto unit = decoder.parse(frames[1]);
+    REQUIRE(unit.has_value());
+    REQUIRE(unit->substreams.size() == 2);
+    // The codec frame's number is its first frame's counter over the fraction.
+    CHECK(unit->sequence_counter == 2);
+    check_read(find(*unit, 0), SubstreamReport::Kind::kAudio);
+    check_read(find(*unit, 1), SubstreamReport::Kind::kPresentation);
+    CHECK(find(*unit, 0).size_bits == 8 * audio.size());
+}
+
+TEST_CASE("a fraction of 4 takes four transmission frames to a codec frame",
+          "[ac4dec][frames][ehfr]") {
+    // frame_rate_index 10 at a fraction of 4 is 25 fps: index 2, 2 048 samples.
+    const auto audio = mono_audio({.frame_len_base = 2048});
+    const auto frames = efficient_unit(4, 8, audio);
+    iclforge::ac4::Decoder decoder;
+    for (std::size_t frame = 0; frame < 3; ++frame) {
+        const auto held = decoder.parse(frames[frame]);
+        REQUIRE(held.has_value());
+        CHECK(held->substreams.empty());
+    }
+    const auto unit = decoder.parse(frames[3]);
+    REQUIRE(unit.has_value());
+    REQUIRE(unit->substreams.size() == 2);
+    CHECK(unit->sequence_counter == 2);
+    check_read(find(*unit, 0), SubstreamReport::Kind::kAudio);
+    CHECK(find(*unit, 0).size_bits == 8 * audio.size());
+}
+
+TEST_CASE("a unit whose first frame is missing is not assembled", "[ac4dec][frames][ehfr]") {
+    const auto audio = mono_audio({.frame_len_base = 1024});
+    const auto frames = efficient_unit(2, 4, audio);
+    iclforge::ac4::Decoder decoder;
+    // Joining at the second frame of a unit: the tail has nothing to join.
+    const auto tail = decoder.parse(frames[1]);
+    REQUIRE(tail.has_value());
+    CHECK(tail->substreams.empty());
+    // The next unit is whole.
+    const auto next = efficient_unit(2, 6, audio);
+    REQUIRE(decoder.parse(next[0]).has_value());
+    const auto unit = decoder.parse(next[1]);
+    REQUIRE(unit.has_value());
+    CHECK(unit->substreams.size() == 2);
+}
+
+TEST_CASE("a frame the efficient mode cannot select a presentation for is refused by name",
+          "[ac4dec][frames][ehfr]") {
+    // The stream's one presentation is disabled (b_enable_presentation 0): nothing is selected,
+    // so the substreams stay fragments.
+    iclforge::ac4::Decoder decoder;
+    const auto frames = efficient_unit(2, 4, mono_audio({.frame_len_base = 1024}), false);
+    const auto report = decoder.parse(frames[0]);
+    REQUIRE(report.has_value());
+    REQUIRE(report->substreams.size() == 2);
+    for (const SubstreamReport& s : report->substreams) {
         check_refused(s, DecodeError::kUnsupported);
         CHECK(s.kind == SubstreamReport::Kind::kOther);
     }

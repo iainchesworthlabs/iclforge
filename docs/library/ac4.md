@@ -16,9 +16,12 @@ streams of several presentations, the one a system chooses decoded with all of i
 mixed; the output level and dynamic range control, dialogue enhancement and the downmix; and it
 conceals a frame that does not decode when asked to. It refuses, per substream and per frame, with
 `DecodeError::kUnsupported` and a reason: the speech spectral frontend, the 9.X.4 and 22.2
-channel elements, the efficient high frame rate mode (a presentation whose `frame_rate_fraction`
-is 2 or 4 spreads one frame over several `raw_ac4_frame()`s, and the decoder keeps no partial
-frames), and output at 96 or 192 kHz. [Development status](development-status.md)
+channel elements, and output at 96 or 192 kHz. A presentation in the efficient high frame rate
+mode (`frame_rate_fraction` 2 or 4, Part 2 clause 5.1.3) spreads one codec frame over that many
+`raw_ac4_frame()`s: the decoder holds the fragments, `decode()` returns no frame until the unit's
+last transmission frame arrives, and the frame it then returns is at the audio frame rate of Part 2
+Table 18, with the unit's first `sequence_counter` divided by the fraction as its own. A unit that
+does not arrive whole is concealed as any frame that does not decode is. [Development status](development-status.md)
 has the detail, feature by feature, and [Validation](../verification.md#ac-4) says how each part
 is checked.
 

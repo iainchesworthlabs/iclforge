@@ -94,16 +94,39 @@ depends on the same reading.
   place, which is what keeps the audio and presentation substreams of a frame on the same value.
 - **Evidence:** Text; every stream here is 48 kHz.
 
-### The efficient high frame rate mode is refused
+### The efficient high frame rate mode
 
-- **Where:** Part 2 5.1.3, p. 56, and Table 18: above 30 fps a presentation may transmit
-  `frame_rate_fraction` 2 or 4, spreading one coded frame over that many `raw_ac4_frame()`s, each
-  carrying fragments of the substreams; a decoder holds the partial frames and concatenates them.
-- **Reading:** the decoder reads no fragments, so a frame whose presentation carries a fraction above 1
-  has every substream refused as unsupported, naming the mode. Reading a fragment as a whole substream
-  reports a legal stream as a damaged one, which is what the decoder did before the fraction was carried
-  out of the table of contents at all.
-- **Evidence:** Text; no stream here uses the mode.
+- **Where:** Part 2 5.1.3, pp. 56 and 57, Figures 7 and 8, Table 18, and 5.11, p. 111. Above 30 fps a
+  presentation may transmit `frame_rate_fraction` 2 or 4: the codec frame is that many transmission frames
+  long, each `raw_ac4_frame()` carries a fragment of each substream, the presentation substream whole in
+  the first and elided in the others. A decoder keeps a FIFO and "reassembles the frame by concatenating all
+  the `ac4_substream_data` fragments that are referenced in the selected presentation".
+- **Reading:**
+  - The fraction is the selected presentation's. The presentation is selected on the table of contents of
+    the first frame of a unit as if every fraction were 1, which is how the unit will read; a presentation of
+    another fraction in the same frame stays a set of fragments and is refused as before.
+  - A unit is the frames from one whose `sequence_counter` is a multiple of the fraction to the one before
+    the next (Figure 8). Its table of contents is the first frame's, with Table 18's `frame_rate_index` and a
+    fraction of 1. The text does not say which counter the codec frame has, and 5.11 locks the sample rate
+    converter's phase to "the sequence_counter"; the codec frame's is the first frame's counter divided by the
+    fraction, which steps by one from unit to unit, as the counter of a stream of that audio frame rate does,
+    and keeps a first frame of 0 (the splice mark) at 0. Read as the first frame's own counter, the phase
+    would step by the fraction and the 1 601 and 1 602 sample frames of 29.97 fps would come in another
+    order.
+  - Every substream of the frame is concatenated, not only those of the selected presentation, since the
+    others cost nothing to join; all frames of a unit must have the first's `n_substreams`.
+  - Continuity (Part 1 4.3.3.2.2) is checked on the transmission counters, one frame at a time, so a lost
+    frame is a change of source, which drops the unit being assembled. A frame that cannot be read inside a
+    unit counts as a fragment lost: the unit ends as lost at its last frame, and `decode()` conceals it
+    (Figure 8's "conceal and dequeue"). A frame that is not the first of a unit, with no first frame held (the
+    decoder joined part way through a unit), is dropped without concealment.
+  - `decode()` returns no frame for a fragment other than the unit's last. `parse()` gives a report with no
+    substreams for it, and the unit's for the last.
+- **Evidence:** Text; no stream here uses the mode. `tests/ac4dec/test_ac4dec_ehfr.cpp` cuts DEE's immersive
+  stereo streams at 24, 25 and 29.97 fps into fragments at each fraction Table 18 gives them, and the decoder's
+  PCM for each unit equals the uncut stream's for its frame, sample for sample. That holds the framing and the
+  counter reading; it cannot say how an encoder splits a substream. Fragments are cut by the test at equal
+  lengths; the text allows zero-length ones and any other split, which the concatenation does not depend on.
 
 ### A substream named by several elements
 
@@ -1676,7 +1699,8 @@ it, whose substreams carry a tone each (`tests/ac4dec/test_ac4dec_presentations.
   one its table defines (Table 55: 0 to 3 and 7; Table 86: 0 to 4 and 7) and no more than the decoder's
   level, the stream has not disabled it, it carries audio (a single substream or group, or
   presentation_config 0 to 5), and the decoder decodes all of it: every substream channel-coded, in a
-  channel mode it renders, at 48 or 44.1 kHz, and none a fragment of the efficient high frame rate mode.
+  channel mode it renders, at 48 or 44.1 kHz, and none a fragment of the efficient high frame rate mode that
+  was not assembled (a presentation of another fraction than the selected one's).
   md_compat 7 is above every level Table 55 defines, so it is selected only by a decoder told its level
   is 7. The default level is 3.
 - **Evidence:** Text; the selection table's cases, which both transcriptions take.

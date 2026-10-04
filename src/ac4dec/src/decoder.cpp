@@ -1252,6 +1252,24 @@ struct Decoder::Impl {
         new_source = true;
     }
 
+    // Part 1 4.3.3.2.2: a frame continues the stream when its sequence_counter is the previous
+    // one plus 1, wraps from 1020 to 1, or follows a 0 (the splice mark). Anything else is a
+    // change of source, and nothing read from before it may be used; frames that need
+    // configuration wait for the next I-frame. Returns whether the frame continues.
+    bool note_sequence_counter(int counter) {
+        bool continues = true;
+        if (previous_sequence_counter) {
+            const int previous = *previous_sequence_counter;
+            continues = counter == previous + 1 || (counter == 1 && previous == 1020) ||
+                        (counter != 0 && previous == 0);
+            if (!continues) {
+                forget_stream();
+            }
+        }
+        previous_sequence_counter = counter;
+        return continues;
+    }
+
     // Drops the signal too, so that the next frame decoded starts from
     // silence.
     void forget_signal() {
@@ -1289,8 +1307,44 @@ struct Decoder::Impl {
     // Reads every substream of the frame, keeping the content of the
     // presentation decode() selects in frame_capture, and updates what
     // presentations() and metadata() report.
+    // `frame` is parse_raw_frame()'s reading of `raw_ac4_frame`, or for a unit the efficient
+    // high frame rate mode assembled (`assembled`), the unit's table of contents and its
+    // substreams over `raw_ac4_frame`, the concatenated fragments. An assembled unit's
+    // sequence_counter is its codec frame's, so its continuity is not checked here: collect()
+    // checked each transmission frame's.
     [[nodiscard]] ICLFORGE_AC4DEC_NO_EXPORT std::expected<FrameReport, DecodeError> read(
-        std::span<const std::byte> raw_ac4_frame);
+        std::span<const std::byte> raw_ac4_frame,
+        std::expected<iclforge::ac4::RawFrame, iclforge::ac4::Error> frame, bool assembled = false);
+
+    // Part 2 clause 5.1.3: what a transmission frame turns into. A frame of no presentation in
+    // the efficient high frame rate mode is read as it stands (kFrame); the first f - 1 frames of
+    // a unit are held (kPending) and the last gives the assembled unit (kFrame, `assembled`); a
+    // unit that cannot be completed gives kLost.
+    struct Collected {
+        enum class Kind : std::uint8_t { kFrame, kPending, kLost };
+        Kind kind = Kind::kFrame;
+        std::span<const std::byte> bytes;
+        std::expected<iclforge::ac4::RawFrame, iclforge::ac4::Error> frame;
+        bool assembled = false;
+    };
+    [[nodiscard]] ICLFORGE_AC4DEC_NO_EXPORT Collected
+    collect(std::span<const std::byte> raw_ac4_frame);
+
+    // The FIFO of Figure 8 (Part 2 clause 5.1.3): the frames of the unit being assembled, each
+    // kept whole, with the unit once assembled. The storage stays from unit to unit.
+    struct Fragment {
+        std::vector<std::byte> bytes;
+        iclforge::ac4::RawFrame frame;
+        int counter = 0;
+    };
+    std::vector<Fragment> fragments;
+    std::size_t fragments_used = 0;
+    std::size_t fragments_missing = 0;  // frames of the unit that arrived damaged
+    int fragment_fraction = 1;          // the fraction of the unit in progress
+    std::vector<std::byte> unit_bytes;
+    // Joins the fragments of the unit; false where they do not describe one.
+    [[nodiscard]] ICLFORGE_AC4DEC_NO_EXPORT bool assemble_unit(int fraction,
+                                                               iclforge::ac4::RawFrame& unit);
 
     // decode()'s work, into `frame`, whose storage it reuses: true for a frame
     // of output, false for a frame that has none.
@@ -1681,6 +1735,8 @@ void Decoder::reset() {
     impl_->new_source = false;
     impl_->converter_phase.reset();
     impl_->previous_sequence_counter.reset();
+    impl_->fragments_used = 0;
+    impl_->fragments_missing = 0;
     impl_->last_rate = 0;
     impl_->last_presentation = 0;
     impl_->last_presentation_id.reset();
@@ -1693,7 +1749,17 @@ void Decoder::reset() {
 }
 
 std::expected<FrameReport, DecodeError> Decoder::parse(std::span<const std::byte> raw_ac4_frame) {
-    return impl_->read(raw_ac4_frame);
+    Impl::Collected collected = impl_->collect(raw_ac4_frame);
+    if (collected.kind != Impl::Collected::Kind::kFrame) {
+        // A fragment of a unit not yet whole, or of one that was lost: nothing to read yet.
+        FrameReport report;
+        if (const auto frame = iclforge::ac4::parse_raw_frame(raw_ac4_frame)) {
+            report.sequence_counter = frame->toc.sequence_counter;
+            report.b_iframe_global = frame->toc.b_iframe_global;
+        }
+        return report;
+    }
+    return impl_->read(collected.bytes, std::move(collected.frame), collected.assembled);
 }
 
 std::string_view Decoder::refusal_reason() const noexcept {
@@ -2027,11 +2093,169 @@ void Decoder::Impl::report_metadata() {
     }
 }
 
+bool Decoder::Impl::assemble_unit(int fraction, iclforge::ac4::RawFrame& unit) {
+    // Every frame of the unit has the first's number of substreams: Part 2 clause 5.1.3 gives
+    // each successive raw_ac4_frame() "the same number n_substreams of substream fragments".
+    const iclforge::ac4::RawFrame& first = fragments.front().frame;
+    const std::size_t count = first.substreams.size();
+    unit_bytes.clear();
+    unit.substreams.assign(count, {});
+    for (std::size_t index = 0; index < count; ++index) {
+        iclforge::ac4::Substream& joined = unit.substreams[index];
+        joined.offset = unit_bytes.size();
+        joined.is_audio = first.substreams[index].is_audio;
+        for (std::size_t member = 0; member < fragments_used; ++member) {
+            const Fragment& fragment = fragments[member];
+            if (fragment.frame.substreams.size() != count) {
+                return false;
+            }
+            const iclforge::ac4::Substream& part = fragment.frame.substreams[index];
+            const std::span<const std::byte> bytes(fragment.bytes);
+            unit_bytes.insert(unit_bytes.end(),
+                              bytes.begin() + static_cast<std::ptrdiff_t>(part.offset),
+                              bytes.begin() + static_cast<std::ptrdiff_t>(part.offset + part.size));
+        }
+        joined.size = unit_bytes.size() - joined.offset;
+    }
+    // The unit is a frame of the codec's own rate (Table 18), numbered by its codec frame: its
+    // first transmission frame's counter over the fraction. Those counters step by `fraction`
+    // from one unit to the next, so this steps by one; the 0 a splicer writes stays 0
+    // (src/ac4dec/ERRATA.md, "The efficient high frame rate mode").
+    unit.toc = first.toc;
+    unit.toc.frame_rate_index =
+        detail::audio_frame_rate_index(first.toc.frame_rate_index, fraction);
+    unit.toc.sequence_counter = fragments.front().counter / fraction;
+    for (PresentationInfoV1& info : unit.toc.presentations_v1) {
+        if (info.frame_rate_fraction == fraction) {
+            info.frame_rate_fraction = 1;
+        }
+    }
+    unit.toc.substream_sizes.clear();
+    for (const iclforge::ac4::Substream& joined : unit.substreams) {
+        unit.toc.substream_sizes.push_back(static_cast<int>(joined.size));
+    }
+    return unit.toc.frame_rate_index >= 0;
+}
+
+Decoder::Impl::Collected Decoder::Impl::collect(std::span<const std::byte> raw_ac4_frame) {
+    Collected out;
+    out.bytes = raw_ac4_frame;
+    out.frame = iclforge::ac4::parse_raw_frame(raw_ac4_frame);
+    int counter = 0;
+    int fraction = 1;
+    bool damaged = false;
+    if (!out.frame) {
+        // A frame that cannot be read, inside a unit being assembled, is one of its fragments
+        // lost: the unit is lost when its last frame comes, and the damaged frame is taken to
+        // have the next counter, as read() takes it for any other frame.
+        if (fragments_used == 0 || !previous_sequence_counter) {
+            return out;
+        }
+        counter = *previous_sequence_counter == 1020 ? 1 : *previous_sequence_counter + 1;
+        fraction = fragment_fraction;
+        damaged = true;
+    } else {
+        const Toc& toc = out.frame->toc;
+        if (std::ranges::none_of(toc.presentations_v1, [](const PresentationInfoV1& info) {
+                return info.frame_rate_fraction != 1;
+            })) {
+            fragments_used = 0;
+            fragments_missing = 0;
+            return out;  // the usual frame
+        }
+        // The presentation the decoder takes decides the fraction. select() takes only
+        // presentations it can decode, so it is asked on the table of contents as the unit will
+        // have it, and the presentation it chooses is looked up in the one sent.
+        Toc normalised = toc;
+        for (PresentationInfoV1& info : normalised.presentations_v1) {
+            info.frame_rate_fraction = 1;
+        }
+        const std::optional<std::size_t> selected =
+            detail::select(normalised, config.presentation, config.level, plans);
+        fraction = selected && *selected < toc.presentations_v1.size()
+                       ? toc.presentations_v1[*selected].frame_rate_fraction
+                       : 1;
+        if (fraction == 1) {
+            fragments_used = 0;
+            fragments_missing = 0;
+            return out;  // read() refuses what it cannot select, naming the mode
+        }
+        counter = toc.sequence_counter;
+    }
+
+    // Part 2 Figure 8, on the transmission frame's sequence_counter c and the fraction f.
+    if (!note_sequence_counter(counter)) {
+        fragments_used = 0;  // a change of source ends the unit being assembled
+        fragments_missing = 0;
+    }
+    fragment_fraction = fraction;
+    out.assembled = true;
+    out.kind = Collected::Kind::kPending;
+    bool lost = false;
+    const bool first_frame = counter % fraction == 0;
+    if (first_frame && fragments_used != 0) {
+        lost = true;  // the unit before this one did not end
+        fragments_used = 0;
+        fragments_missing = 0;
+    }
+    // A frame that is not the first of a unit, with no first frame held, is the tail of a unit
+    // the decoder joined part way through, or one a change of source cut: there is nothing to
+    // assemble it with, and nothing to conceal.
+    const bool orphan = !first_frame && fragments_used == 0;
+    if (!damaged && !orphan) {
+        if (fragments.size() <= fragments_used) {
+            fragments.emplace_back();
+        }
+        Fragment& slot = fragments[fragments_used++];
+        slot.bytes.assign(raw_ac4_frame.begin(), raw_ac4_frame.end());
+        slot.frame = std::move(*out.frame);
+        slot.counter = counter;
+    } else if (damaged) {
+        ++fragments_missing;
+    }
+    const bool last_frame = (counter + 1) % fraction == 0;
+    if (last_frame) {
+        iclforge::ac4::RawFrame unit;
+        const bool had_first = fragments_used != 0;
+        const bool whole = fragments_missing == 0 &&
+                           fragments_used == static_cast<std::size_t>(fraction) &&
+                           assemble_unit(fraction, unit);
+        fragments_used = 0;
+        fragments_missing = 0;
+        if (whole) {
+            out.kind = Collected::Kind::kFrame;
+            out.bytes = unit_bytes;
+            out.frame = std::move(unit);
+            return out;
+        }
+        lost = lost || had_first || damaged;
+    } else if (fragments_used + fragments_missing >= static_cast<std::size_t>(fraction)) {
+        lost = true;  // the FIFO is full and the unit has not ended
+        fragments_used = 0;
+        fragments_missing = 0;
+    }
+    if (lost) {
+        out.kind = Collected::Kind::kLost;
+    }
+    return out;
+}
+
 std::expected<bool, DecodeError> Decoder::Impl::decode_into(
     std::span<const std::byte> raw_ac4_frame, DecodedFrame& frame) {
     Impl& d = *this;
     d.refusal = {};
-    auto report = d.read(raw_ac4_frame);
+    Collected collected = d.collect(raw_ac4_frame);
+    if (collected.kind == Collected::Kind::kPending) {
+        return false;  // a fragment: the unit is not whole yet
+    }
+    if (collected.kind == Collected::Kind::kLost) {
+        d.refusal = "a unit of the efficient high frame rate mode that did not arrive whole";
+        if (d.converter_phase) {
+            d.converter_phase = (*d.converter_phase + 1) % 5;
+        }
+        return d.conceal_or(DecodeError::kInvalidStream, frame);
+    }
+    auto report = d.read(collected.bytes, std::move(collected.frame), collected.assembled);
     if (!report) {
         d.refusal = describe(report.error());
         // read() took the frame to be the one the stream expected; its phase
@@ -2239,10 +2463,10 @@ std::expected<bool, DecodeError> Decoder::Impl::decode_into(
 }
 
 std::expected<FrameReport, DecodeError> Decoder::Impl::read(
-    std::span<const std::byte> raw_ac4_frame) {
+    std::span<const std::byte> raw_ac4_frame,
+    std::expected<iclforge::ac4::RawFrame, iclforge::ac4::Error> frame, bool assembled) {
     AC4_ZONE_SCOPED_N("ac4_parse");
     Capture* const capture = &frame_capture;
-    auto frame = iclforge::ac4::parse_raw_frame(raw_ac4_frame);
     if (!frame) {
         // The frame is taken to be the one the stream expected next, so that
         // one damaged frame is not a change of source. After a splice mark
@@ -2267,34 +2491,20 @@ std::expected<FrameReport, DecodeError> Decoder::Impl::read(
         }
     }
 
-    // Part 1 4.3.3.2.2: a frame continues the stream when its sequence_counter
-    // is the previous one plus 1, wraps from 1020 to 1, or follows a 0 (the
-    // splice mark). Anything else is a change of source, and nothing read
-    // from before it may be used; frames that need configuration wait for
-    // the next I-frame.
-    if (previous_sequence_counter) {
-        const int previous = *previous_sequence_counter;
-        const int counter = toc.sequence_counter;
-        const bool continues = counter == previous + 1 || (counter == 1 && previous == 1020) ||
-                               (counter != 0 && previous == 0);
-        if (!continues) {
-            forget_stream();
-        }
+    if (!assembled) {
+        note_sequence_counter(toc.sequence_counter);
     }
-    previous_sequence_counter = toc.sequence_counter;
 
     FrameReport report;
     report.sequence_counter = toc.sequence_counter;
     report.b_iframe_global = toc.b_iframe_global;
 
     std::map<int, Assignment> assignments;
-    // Part 2 clause 5.1.3: above a frame rate of 30 fps a presentation can
-    // spread one coded frame over 2 or 4 transmission frames, each carrying
-    // fragments of its substreams rather than whole ones. Assembling them
-    // needs a queue of partial frames this phase does not keep, so every
-    // substream of such a frame is refused by name, before anything claims it
-    // - reading a fragment as a whole substream reports a legal stream as a
-    // damaged one.
+    // Part 2 clause 5.1.3: collect() assembled the fragments of a presentation in the efficient
+    // high frame rate mode into a unit whose presentations have a fraction of 1. A frame that
+    // still has a presentation above 1 here is one collect() found no presentation to select in:
+    // its substreams are fragments, and reading a fragment as a whole substream would report a
+    // legal stream as a damaged one, so each is refused by name before anything claims it.
     const bool fragmented =
         std::ranges::any_of(toc.presentations_v1, [](const PresentationInfoV1& info) {
             return info.frame_rate_fraction != 1;

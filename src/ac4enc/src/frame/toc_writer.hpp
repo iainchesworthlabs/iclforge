@@ -135,6 +135,11 @@ struct TocLayout {
     int br_code = 0;
     int fs_index = 1;  // Part 1 Table 82
     int frame_rate_index = 13;
+    // frame_rate_fractions_info()'s frame_rate_fraction (Part 2 clause 6.2.1.4): 2 or 4 where
+    // the presentations are in the efficient high frame rate mode (clause 5.1.3), which only
+    // frame_rate_index 5 to 12 can carry (2 only at 5 to 9). Every presentation of the layout
+    // takes it.
+    int frame_rate_fraction = 1;
     bool iframe_global = true;
     std::vector<TocPresentation> presentations;
     // total_n_substream_groups of them, which is one more than the largest
