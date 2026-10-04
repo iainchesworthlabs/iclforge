@@ -9,14 +9,13 @@ trace contract (docs/verification.md); the TOC is parsed but not recorded.
 In scope: ac4_presentation_substream() (Part 2 6.2.2.3), ac4_substream()
 (Part 2 6.2.2.2) with audio_data_chan() and the Part 1 channel elements
 (single, pair, 3_0, 5_X, 7_X) in every codec mode, the immersive channel
-element of the 7.X.4 channel modes (Part 2 6.2.4.1 and 6.2.4.2) with A-JCC's
-ajcc_data() (6.2.6), the 22_2_channel_element() (6.2.4.3),
+element of the 7.X.4 and 9.X.4 channel modes (Part 2 6.2.4.1 and 6.2.4.2, with
+b_5fronts 0 and 1) with A-JCC's ajcc_data() (6.2.6), the 22_2_channel_element() (6.2.4.3),
 emdf_payloads_substream() (Part 1 4.2.4.4), and a channel-coded substream's HSF
 extension substream, ac4_hsf_ext_substream() (Part 1 4.2.4.3), where one is
 linked and its channel reports sf_multiplier.
 Refused (records read before the refusal are kept): object and A-JOC
-substreams, OAMD, the 9.X.4 channel modes (the immersive element with
-b_5fronts), the speech spectral frontend, and an HSF extension substream that
+substreams, OAMD, the speech spectral frontend, and an HSF extension substream that
 could not be resolved (a self-reference, no sf_multiplier, an object/A-JOC
 owner, or the extension substream itself being unreadable).
 
@@ -1594,6 +1593,9 @@ SCPL, ASPX_SCPL, ASPX_ACPL_1, ASPX_ACPL_2, ASPX_AJCC = 0, 1, 2, 3, 4
 # the 7CH_STATIC two_channel_data()'s, then H, I, J and K.
 _CORE_D_E = {(0, 0): (2, 3), (0, 1): (1, 3), (1, 0): (3, 4), (2, 0): (2, 3), (3, 0): (3, 4)}
 _F, _G = 5, 6
+# Where A and B sit among them: A is the core's first track, B its second but for 2ch_mode 1,
+# whose first two_channel_data() is [A, D] and second [B, E].
+_CORE_A_B = {(0, 0): (0, 1), (0, 1): (0, 2), (1, 0): (0, 1), (2, 0): (0, 1), (3, 0): (0, 1)}
 
 
 def _immersive_codec_mode(r):
@@ -1638,11 +1640,33 @@ def _ajced(r, data_type, bands, quant_mode, b_no_dt, num_ps):
                 dt.decode(r, 'ajcc_hcw')
 
 
-def ajcc_data(r):
-    """ajcc_data(b_5fronts) (Part 2 6.2.6.1) for b_5fronts 0, the only case the
-    7.X.4 channel modes reach (6.2.3.1); 9.X.4 is refused before it."""
+def ajcc_data(r, b_5fronts):
+    """ajcc_data(b_5fronts) (Part 2 6.2.6.1). Without b_5fronts (the 7.X.4 channel modes): the
+    core mode and the two quantisation modes, the framing of the left and right modules, then alpha,
+    beta, dry and wet. With it (the 9.X.4 modes): ajcc_qm_f and ajcc_qm_b, the framing of the left
+    front, right front, left back and right back modules, then the dry parameters (front, then
+    back) and the wet ones, each at the front's or the back's quantisation mode and with its own
+    module's number of parameter sets."""
     b_no_dt = r.f(1, 'b_no_dt')
     bands = T.AJCC_NUM_BANDS[r.f(2, 'ajcc_num_param_bands_id')]
+    if b_5fronts:
+        qm_f = r.f(1, 'ajcc_qm_f')
+        qm_b = r.f(1, 'ajcc_qm_b')
+        nps_lf = _ajcc_framing(r)
+        nps_rf = _ajcc_framing(r)
+        nps_lb = _ajcc_framing(r)
+        nps_rb = _ajcc_framing(r)
+        for data_type, quant_mode, num_ps in (
+                ('DRY', qm_f, nps_lf), ('DRY', qm_f, nps_lf),
+                ('DRY', qm_f, nps_rf), ('DRY', qm_f, nps_rf),
+                ('DRY', qm_b, nps_lb), ('DRY', qm_b, nps_lb),
+                ('DRY', qm_b, nps_rb), ('DRY', qm_b, nps_rb),
+                ('WET', qm_f, nps_lf), ('WET', qm_f, nps_lf), ('WET', qm_f, nps_lf),
+                ('WET', qm_f, nps_rf), ('WET', qm_f, nps_rf), ('WET', qm_f, nps_rf),
+                ('WET', qm_b, nps_lb), ('WET', qm_b, nps_lb), ('WET', qm_b, nps_lb),
+                ('WET', qm_b, nps_rb), ('WET', qm_b, nps_rb), ('WET', qm_b, nps_rb)):
+            _ajced(r, data_type, bands, quant_mode, b_no_dt, num_ps)
+        return
     r.f(1, 'ajcc_core_mode')
     qm_ab = r.f(1, 'ajcc_qm_ab')
     qm_dw = r.f(1, 'ajcc_qm_dw')
@@ -1658,10 +1682,10 @@ def ajcc_data(r):
         _ajced(r, data_type, bands, quant_mode, b_no_dt, num_ps)
 
 
-def immersive_channel_element(r, ctx, b_lfe):
-    """immersive_channel_element(b_lfe, 0, b_iframe) (Part 2 6.2.4.1) with
-    immers_cfg() (6.2.4.2): the 7.X.4 channel modes. core_channel_config is
-    7CH_STATIC in every mode but ASPX_AJCC (Table 74).
+def immersive_channel_element(r, ctx, b_lfe, b_5fronts):
+    """immersive_channel_element(b_lfe, b_5fronts, b_iframe) (Part 2 6.2.4.1) with
+    immers_cfg() (6.2.4.2): the 7.X.4 channel modes pass b_5fronts 0, the 9.X.4 modes 1.
+    core_channel_config is 7CH_STATIC in every mode but ASPX_AJCC (Table 74).
 
     The chparam_info() elements need a framing (Part 1 Table 47), which the
     syntax does not name (src/ac4dec/ERRATA.md): each takes the framing of the
@@ -1669,7 +1693,8 @@ def immersive_channel_element(r, ctx, b_lfe):
     element's take the tracks Table 183 names. The two b_use_sap_add_ch sends
     are 5.2.3.2 step 4's, which codes F and G against D and E; the four after
     H to K are Table 20's a'_0 to a'_3, which predict H, I, J and K from D, E,
-    F and G."""
+    F and G, and with b_5fronts the two after L and M are a'_4 and a'_5, which
+    predict L from A and M from B."""
     mode = _immersive_codec_mode(r)
     _configure(ctx, 'immersive', mode, mode != SCPL)
     if ctx.b_iframe:
@@ -1700,6 +1725,7 @@ def immersive_channel_element(r, ctx, b_lfe):
     else:
         five_channel_data(r, ctx)
     d, e = _CORE_D_E[(grouping, two_ch_mode)]
+    a, b = _CORE_A_B[(grouping, two_ch_mode)]
     static = mode != ASPX_AJCC
     if static:
         if r.f(1, 'b_use_sap_add_ch'):
@@ -1707,11 +1733,16 @@ def immersive_channel_element(r, ctx, b_lfe):
                 chparam_info(r, s)
         two_channel_data(r, ctx)
     if mode == ASPX_SCPL:
-        # (Ls, Lb), (Rs, Rb), C, (L, R), (Tfl, Tbl), (Tfr, Tbr): Table 8.
+        # (Ls, Lb), (Rs, Rb), C, (L, R), (Tfl, Tbl), (Tfr, Tbr): Table 8; with b_5fronts the
+        # syntax sends two aspx_data_2ch() where it sends one for (L, R): (L, Lscr), (R, Rscr).
         aspx_data_2ch(r, ctx)
         aspx_data_2ch(r, ctx)
         aspx_data_1ch(r, ctx)
-        aspx_data_2ch(r, ctx)
+        if b_5fronts:
+            aspx_data_2ch(r, ctx)
+            aspx_data_2ch(r, ctx)
+        else:
+            aspx_data_2ch(r, ctx)
         aspx_data_2ch(r, ctx)
         aspx_data_2ch(r, ctx)
     elif mode != SCPL:
@@ -1721,14 +1752,18 @@ def immersive_channel_element(r, ctx, b_lfe):
             aspx_data_2ch(r, ctx)
         aspx_data_1ch(r, ctx)
     if mode == ASPX_AJCC:
-        ajcc_data(r)
+        ajcc_data(r, b_5fronts)
     if mode in (SCPL, ASPX_SCPL, ASPX_ACPL_1):
         two_channel_data(r, ctx)
         two_channel_data(r, ctx)
         for s in _tracks_at(ctx, mark, (d, e, _F, _G)):
             chparam_info(r, s)
+        if b_5fronts:
+            two_channel_data(r, ctx)
+            for s in _tracks_at(ctx, mark, (a, b)):
+                chparam_info(r, s)
     if mode in (ASPX_ACPL_1, ASPX_ACPL_2):
-        for _ in range(4):
+        for _ in range(6 if b_5fronts else 4):
             acpl_data_1ch(r, ctx)
 
 
@@ -1764,9 +1799,9 @@ def audio_data_chan(r, ctx, ch_mode):
     elif 5 <= ch_mode <= 10:
         seven_x_channel_element(r, ctx, ch_mode)
     elif ch_mode in (11, 12):
-        immersive_channel_element(r, ctx, 1 if ch_mode == 12 else 0)
+        immersive_channel_element(r, ctx, 1 if ch_mode == 12 else 0, 0)
     elif ch_mode in (13, 14):
-        raise Refused('9.X.4: immersive_channel_element() with b_5fronts')
+        immersive_channel_element(r, ctx, 1 if ch_mode == 14 else 0, 1)
     elif ch_mode == 15:
         twenty_two_two_channel_element(r, ctx)
     # default: nothing

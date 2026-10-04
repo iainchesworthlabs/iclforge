@@ -577,20 +577,14 @@ TEST_CASE("channel elements refuse the modes not decoded", "[ac4dec][channel_ele
         REQUIRE_FALSE(result.has_value());
         CHECK(result.error().error == DecodeError::kInvalidStream);
     }
-    SECTION("9.X.4 and reserved channel modes") {
+    SECTION("reserved channel modes") {
         BitWriter w;
         w.put(0, 32);
-        for (const int mode : {ch_mode::k9_0_4, ch_mode::k9_1_4}) {
-            ChannelElementState state;
-            ChannelElement out;
-            const auto result = read_element(w, context(mode, true), state, out);
-            REQUIRE_FALSE(result.has_value());
-            CHECK(result.error().error == DecodeError::kUnsupported);
-            CHECK(result.error().reason.find("9.X.4") != std::string_view::npos);
-        }
-        // The 7.X.4 modes read their immersive element, which 32 zero bits
-        // cannot hold: SCPL with its LFE, grouping 0 and the first sf_info()s.
-        for (const int mode : {ch_mode::k7_0_4, ch_mode::k7_1_4}) {
+        // The 7.X.4 and 9.X.4 modes read their immersive element, which 32 zero bits
+        // cannot hold: SCPL with its LFE, grouping 0 and the first sf_info()s. The
+        // 9.X.4 modes are read with b_5fronts (Part 2 clause 6.2.3.1).
+        for (const int mode :
+             {ch_mode::k7_0_4, ch_mode::k7_1_4, ch_mode::k9_0_4, ch_mode::k9_1_4}) {
             ChannelElementState state;
             ChannelElement out;
             const auto result = read_element(w, context(mode, true), state, out);
@@ -598,6 +592,7 @@ TEST_CASE("channel elements refuse the modes not decoded", "[ac4dec][channel_ele
             CHECK(result.error().error == DecodeError::kTruncated);
             CHECK(out.kind == ElementKind::kImmersive);
             CHECK(out.codec_mode == immersive_mode::kScpl);
+            CHECK(out.b_5fronts == (mode >= ch_mode::k9_0_4));
         }
         ChannelElementState state;
         ChannelElement out;
