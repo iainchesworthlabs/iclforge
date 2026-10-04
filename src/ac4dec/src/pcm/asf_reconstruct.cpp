@@ -40,16 +40,13 @@ template <typename R>
     return sum;
 }
 
-// Pseudocodes 21 to 23 at double and float.
-template <typename R>
-ParseResult reconstruct_track_floating(const SfInfo& info, const SfData& data,
-                                       const std::array<R, 256>& sf_gain_table, RandGenState& noise,
-                                       std::vector<R>& scaled) {
-    const AsfPsyInfo& psy = info.psy;
-    scaled.assign(data.quant_spec.size(), R{});
-
-    // Pseudocode 21: the first band with a scale factor takes
-    // reference_scale_factor; each later one adds its codeword's index less 60.
+// Pseudocode 21's walk, for either arithmetic: the first band with a scale factor takes
+// reference_scale_factor, each later one adds its codeword's index less 60, and a scale factor
+// outside 0 to 255 is an invalid stream. on_band(group, band, begin, end, scale_factor) is called
+// for each band that has one, in order.
+template <typename OnBand>
+[[nodiscard]] ParseResult for_each_scale_factor_band(const AsfPsyInfo& psy, const SfData& data,
+                                                     OnBand&& on_band) {
     int scale_factor = data.reference_scale_factor;
     bool first_scf_found = false;
     for (int g = 0; g < psy.num_window_groups; ++g) {
@@ -67,54 +64,47 @@ ParseResult reconstruct_track_floating(const SfInfo& info, const SfData& data,
             if (scale_factor < 0 || scale_factor > 255) {
                 return fail(DecodeError::kInvalidStream, "a scale factor outside 0 to 255");
             }
-            const R sf_gain = sf_gain_table[static_cast<std::size_t>(scale_factor)];
-            const std::size_t begin = data.sect_sfb_offset[gi][si];
-            const std::size_t end = data.sect_sfb_offset[gi][si + 1];
-            for (std::size_t k = begin; k < end; ++k) {
-                scaled[k] = sf_gain * reconstruct_line<R>(data.quant_spec[k]);
-            }
+            on_band(gi, si, static_cast<std::size_t>(data.sect_sfb_offset[gi][si]),
+                    static_cast<std::size_t>(data.sect_sfb_offset[gi][si + 1]), scale_factor);
         }
     }
+    return {};
+}
 
-    if (!data.b_snf_data_exists) {
-        return {};
-    }
-    // Pseudocode 22: the reference level is that of the first band with any
-    // energy. 1.44269504 is the text's own rounding of 1/ln 2.
-    // The noise floor's tracking (previous_rms, band_rms and amplitude) stays
-    // double regardless of R: it is a once-per-band control value, not a
-    // per-sample one, in the same "computed in double, narrowed once" shape
-    // as a downmix or DRC gain (band_energy's own sum of squares is R, the
-    // actual per-sample precision, then widened once for std::log).
-    constexpr double kLog2E = 1.44269504;
-    double previous_rms = -1000.0;
-    for (int g = 0; g < psy.num_window_groups && previous_rms == -1000.0; ++g) {
+// Pseudocodes 22 and 23's control flow, for either arithmetic. `Level` is what the noise floor's
+// tracking is held in. band_level(group, band, begin, end, level) sets `level` to the band's level
+// and returns true when the band has any energy, and leaves it alone otherwise; offset(level, delta)
+// is the level plus a codeword's delta; fill(begin, end, level) writes a band's noise.
+// Pseudocode 22: the reference level is that of the first band with any energy, `initial` when
+// none has. Pseudocode 23: a band with energy sets the level; a band without it that
+// asf_snf_data() read a codeword for (sfb_cb 0 or max_quant_idx 0; the two conditions coincide)
+// moves the level by the codeword's delta and is filled, except for the escape, which fills
+// nothing and does not update the level.
+template <typename Level, typename BandLevel, typename Offset, typename Fill>
+void for_each_noise_fill_band(const AsfPsyInfo& psy, const SfData& data, Level initial,
+                              BandLevel band_level, Offset offset, Fill fill) {
+    Level previous = initial;
+    bool have_previous = false;
+    for (int g = 0; g < psy.num_window_groups && !have_previous; ++g) {
         const auto gi = static_cast<std::size_t>(g);
         for (int sfb = 0; sfb < data.max_sfb[gi]; ++sfb) {
             const auto si = static_cast<std::size_t>(sfb);
-            const std::size_t begin = data.sect_sfb_offset[gi][si];
-            const std::size_t end = data.sect_sfb_offset[gi][si + 1];
-            const auto band_rms = static_cast<double>(band_energy<R>(scaled, begin, end));
-            if (band_rms > 0.0) {
-                previous_rms = kLog2E * std::log(band_rms / static_cast<double>(end - begin));
+            if (band_level(gi, si, static_cast<std::size_t>(data.sect_sfb_offset[gi][si]),
+                           static_cast<std::size_t>(data.sect_sfb_offset[gi][si + 1]), previous)) {
+                have_previous = true;
                 break;
             }
         }
     }
-    // Pseudocode 23.
     for (int g = 0; g < psy.num_window_groups; ++g) {
         const auto gi = static_cast<std::size_t>(g);
         for (int sfb = 0; sfb < data.max_sfb[gi]; ++sfb) {
             const auto si = static_cast<std::size_t>(sfb);
-            const std::size_t begin = data.sect_sfb_offset[gi][si];
-            const std::size_t end = data.sect_sfb_offset[gi][si + 1];
-            const auto band_rms = static_cast<double>(band_energy<R>(scaled, begin, end));
-            if (band_rms > 0.0) {
-                previous_rms = kLog2E * std::log(band_rms / static_cast<double>(end - begin));
+            const auto begin = static_cast<std::size_t>(data.sect_sfb_offset[gi][si]);
+            const auto end = static_cast<std::size_t>(data.sect_sfb_offset[gi][si + 1]);
+            if (band_level(gi, si, begin, end, previous)) {
                 continue;
             }
-            // A band with no energy is one asf_snf_data() read a codeword for
-            // (sfb_cb 0 or max_quant_idx 0); the two conditions coincide.
             if (!data.snf_present[gi][si]) {
                 continue;
             }
@@ -122,14 +112,60 @@ ParseResult reconstruct_track_floating(const SfInfo& info, const SfData& data,
             if (delta == -17) {
                 continue;  // the escape: no noise, and the level is not updated
             }
-            const double noise_rms = previous_rms + static_cast<double>(delta);
-            previous_rms = noise_rms;
+            previous = offset(previous, delta);
+            fill(begin, end, previous);
+        }
+    }
+}
+
+// Pseudocodes 21 to 23 at double and float.
+template <typename R>
+ParseResult reconstruct_track_floating(const SfInfo& info, const SfData& data,
+                                       const std::array<R, 256>& sf_gain_table, RandGenState& noise,
+                                       std::vector<R>& scaled) {
+    const AsfPsyInfo& psy = info.psy;
+    scaled.assign(data.quant_spec.size(), R{});
+
+    // Pseudocode 21.
+    if (auto ok = for_each_scale_factor_band(
+            psy, data,
+            [&](std::size_t, std::size_t, std::size_t begin, std::size_t end, int scale_factor) {
+                const R sf_gain = sf_gain_table[static_cast<std::size_t>(scale_factor)];
+                for (std::size_t k = begin; k < end; ++k) {
+                    scaled[k] = sf_gain * reconstruct_line<R>(data.quant_spec[k]);
+                }
+            });
+        !ok) {
+        return ok;
+    }
+
+    if (!data.b_snf_data_exists) {
+        return {};
+    }
+    // Pseudocodes 22 and 23. 1.44269504 is the text's own rounding of 1/ln 2.
+    // The noise floor's tracking (previous_rms, band_rms and amplitude) stays
+    // double regardless of R: it is a once-per-band control value, not a
+    // per-sample one, in the same "computed in double, narrowed once" shape
+    // as a downmix or DRC gain (band_energy's own sum of squares is R, the
+    // actual per-sample precision, then widened once for std::log).
+    constexpr double kLog2E = 1.44269504;
+    for_each_noise_fill_band<double>(
+        psy, data, -1000.0,
+        [&](std::size_t, std::size_t, std::size_t begin, std::size_t end, double& level) {
+            const auto band_rms = static_cast<double>(band_energy<R>(scaled, begin, end));
+            if (band_rms > 0.0) {
+                level = kLog2E * std::log(band_rms / static_cast<double>(end - begin));
+                return true;
+            }
+            return false;
+        },
+        [](double previous, int delta) { return previous + static_cast<double>(delta); },
+        [&](std::size_t begin, std::size_t end, double noise_rms) {
             const double amplitude = std::pow(2.0, 0.5 * noise_rms);
             for (std::size_t k = begin; k < end; ++k) {
                 scaled[k] = static_cast<R>(static_cast<double>(get_random_noise_value(noise)) * amplitude);
             }
-        }
-    }
+        });
     return {};
 }
 
@@ -197,90 +233,47 @@ class FixedTrack {
         };
         // Pseudocode 21, with each coded band's energy kept for Pseudocodes 22 and 23.
         std::array<std::array<MantExp, kMaxSfb>, kMaxWindows> energy{};
-        int scale_factor = data_.reference_scale_factor;
-        bool first_scf_found = false;
-        for (int g = 0; g < psy_.num_window_groups; ++g) {
-            const auto gi = static_cast<std::size_t>(g);
-            for (int sfb = 0; sfb < data_.max_sfb[gi]; ++sfb) {
-                const auto si = static_cast<std::size_t>(sfb);
-                if (!data_.scale_factor_present[gi][si]) {
-                    continue;
-                }
-                if (first_scf_found) {
-                    scale_factor += data_.dpcm_sf[gi][si] - 60;
-                } else {
-                    first_scf_found = true;
-                }
-                if (scale_factor < 0 || scale_factor > 255) {
-                    return fail(DecodeError::kInvalidStream, "a scale factor outside 0 to 255");
-                }
-                const MantExp sf_gain = gain(scale_factor);
-                const std::size_t begin = data_.sect_sfb_offset[gi][si];
-                const std::size_t end = data_.sect_sfb_offset[gi][si + 1];
-                MantExp sum{};
-                std::size_t largest_q = 0;
-                for (std::size_t k = begin; k < end; ++k) {
-                    const std::size_t m = magnitude(data_.quant_spec[k]);
-                    largest_q = std::max(largest_q, m);
-                    const MantExp value = sf_gain * pow43[m];
-                    sum += value * value;
-                    if (write) {
-                        scaled[k] = stored(data_.quant_spec[k] < 0 ? -value : value);
+        if (auto ok = for_each_scale_factor_band(
+                psy_, data_,
+                [&](std::size_t gi, std::size_t si, std::size_t begin, std::size_t end, int scale_factor) {
+                    const MantExp sf_gain = gain(scale_factor);
+                    MantExp sum{};
+                    std::size_t largest_q = 0;
+                    for (std::size_t k = begin; k < end; ++k) {
+                        const std::size_t m = magnitude(data_.quant_spec[k]);
+                        largest_q = std::max(largest_q, m);
+                        const MantExp value = sf_gain * pow43[m];
+                        sum += value * value;
+                        if (write) {
+                            scaled[k] = stored(data_.quant_spec[k] < 0 ? -value : value);
+                        }
                     }
-                }
-                energy[gi][si] = sum;
-                note(sf_gain * pow43[largest_q]);
-            }
+                    energy[gi][si] = sum;
+                    note(sf_gain * pow43[largest_q]);
+                });
+            !ok) {
+            return ok;
         }
         if (!data_.b_snf_data_exists) {
             return {};
         }
-        const auto band_energy = [&](std::size_t gi, std::size_t si) {
-            // Only a band with a scale factor has lines Pseudocode 21 set.
-            return data_.scale_factor_present[gi][si] ? energy[gi][si] : MantExp{};
-        };
         const auto level = [&](MantExp band_rms, std::size_t lines) {
             return scalar_log2(band_rms / MantExp{static_cast<int>(lines)}) * kLog2EOnLog2;
         };
-        // Pseudocode 22.
-        bool have_previous = false;
-        MantExp previous_rms{};
-        for (int g = 0; g < psy_.num_window_groups && !have_previous; ++g) {
-            const auto gi = static_cast<std::size_t>(g);
-            for (int sfb = 0; sfb < data_.max_sfb[gi]; ++sfb) {
-                const auto si = static_cast<std::size_t>(sfb);
-                const MantExp band_rms = band_energy(gi, si);
+        // Pseudocodes 22 and 23.
+        for_each_noise_fill_band<MantExp>(
+            psy_, data_, MantExp{-1000},
+            [&](std::size_t gi, std::size_t si, std::size_t begin, std::size_t end, MantExp& out) {
+                // Only a band with a scale factor has lines Pseudocode 21 set.
+                const MantExp band_rms = data_.scale_factor_present[gi][si] ? energy[gi][si] : MantExp{};
                 if (band_rms > MantExp{}) {
-                    previous_rms = level(band_rms, data_.sect_sfb_offset[gi][si + 1] - data_.sect_sfb_offset[gi][si]);
-                    have_previous = true;
-                    break;
+                    out = level(band_rms, end - begin);
+                    return true;
                 }
-            }
-        }
-        if (!have_previous) {
-            previous_rms = MantExp{-1000};
-        }
-        // Pseudocode 23.
-        for (int g = 0; g < psy_.num_window_groups; ++g) {
-            const auto gi = static_cast<std::size_t>(g);
-            for (int sfb = 0; sfb < data_.max_sfb[gi]; ++sfb) {
-                const auto si = static_cast<std::size_t>(sfb);
-                const std::size_t begin = data_.sect_sfb_offset[gi][si];
-                const std::size_t end = data_.sect_sfb_offset[gi][si + 1];
-                const MantExp band_rms = band_energy(gi, si);
-                if (band_rms > MantExp{}) {
-                    previous_rms = level(band_rms, end - begin);
-                    continue;
-                }
-                if (!data_.snf_present[gi][si]) {
-                    continue;
-                }
-                const int delta = data_.dpcm_snf[gi][si] - 17;
-                if (delta == -17) {
-                    continue;
-                }
-                const MantExp noise_rms = previous_rms + MantExp{delta};
-                previous_rms = noise_rms;
+                return false;
+            },
+            [](MantExp previous, int delta) { return previous + MantExp{delta}; },
+            [&](std::size_t begin, std::size_t end, MantExp noise_rms) {
                 const MantExp amplitude = scalar_exp2(noise_rms.scaled_by_pow2(-1));
                 note(amplitude.scaled_by_pow2(kNoiseBits));
                 if (write) {
@@ -288,8 +281,7 @@ class FixedTrack {
                         scaled[k] = stored(MantExp{static_cast<double>(get_random_noise_value(noise))} * amplitude);
                     }
                 }
-            }
-        }
+            });
         return {};
     }
 
