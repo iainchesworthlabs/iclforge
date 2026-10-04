@@ -75,6 +75,14 @@ set_target_properties(iclforge_iamf_objects PROPERTIES
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON)
 
+# MSVC's C4251 ("class X needs to have dll-interface...") fires for the PRIVATE
+# STL-typed members of iclforge::iamf::FragmentedWriter, the one
+# ICLFORGE_IAMF_EXPORT class here (its descriptors, its initialization segment
+# buffer): implementation detail a caller reaches only through the class's own
+# exported methods. Suppressed here, PUBLIC, for the reasons given in
+# src/mp4/CMakeLists.txt's identical iclforge_mp4_objects treatment.
+target_compile_options(iclforge_iamf_objects PUBLIC "$<$<CXX_COMPILER_ID:MSVC>:/wd4251>")
+
 include(GenerateExportHeader)
 set_target_properties(iclforge_iamf_shared PROPERTIES DEFINE_SYMBOL "ICLFORGE_IAMF_BUILDING_SHARED")
 generate_export_header(iclforge_iamf_shared
