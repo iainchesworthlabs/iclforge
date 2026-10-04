@@ -164,6 +164,11 @@ build_channel_path(const iclforge::adm::AudioChannelFormat& channel, double obje
 // not), it exists only so BridgeResult is deterministic and its diagnostics read sensibly.
 struct BridgeResult {
     std::vector<std::string> channel_ids;  // iclforge::adm::AudioChannelFormat::id, for diagnostics
+    std::vector<std::vector<std::string>>
+        unmapped;  // per channel: ADM features its blocks use that the Atmos encode does not carry
+                   // (objectDivergence, screenRef, headLocked, diffuse, a conditioned channelLock,
+                   // a zoneExclusion that is not a TS 103 420 Table B.18 preset). Empty for a
+                   // channel that loses nothing. For callers that want to warn.
     std::vector<bool> is_bed;                 // true: a DirectSpeakers bed channel
     std::vector<bool> is_lfe;                 // true only for a bed channel routed via lfe_send
                                                // (see this header's own top comment)

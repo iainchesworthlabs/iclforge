@@ -57,6 +57,14 @@ namespace {
 // i.e. this parameter is meant for short but audible crossfades, not zero).
 constexpr double kInstantJumpEpsilon = 1.0e-6;
 
+// The non-positional, non-gain part of a Keyframe that comes from one audioBlockFormat.
+struct Rendering {
+    iclforge::oba::ObjectSize size{};
+    bool snap = false;
+    iclforge::oba::ZoneConstraint zone = iclforge::oba::ZoneConstraint::kNone;
+    bool enable_elevation = true;
+};
+
 }  // namespace
 
 std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
@@ -77,26 +85,30 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
         }
         return {adm_position_to_room(block.position), block.gain};
     };
-    // BS.2076-2 Table 15/16/17 width/height/depth are the same normalized
-    // [0, 1] extents TS 103 420 §5.6.1.2 codes, on the same three axes, so
-    // this is a rename and not a conversion. An LFE bed channel gets none of
-    // it: it has no direction, so it has no extent around one either.
-    const auto extent_of =
-        [&](const iclforge::adm::AudioBlockFormat& block) -> iclforge::oba::ObjectSize {
+    // Everything but position and gain that a block says about HOW the object is rendered, in the
+    // form Keyframe carries it. An LFE bed channel has no direction, so it gets none of it.
+    //
+    // Width/height/depth (BS.2076-2 Tables 15-17) are the same normalized [0, 1] extents TS 103 420
+    // §5.6.1.2 codes, on the same three axes: a rename, not a conversion.
+    //
+    // channelLock (§10.2) and b_object_snap (§5.6.1.5.1) are the same idea under two names: render
+    // to the nearest speaker instead of panning. maxDistance has no image - OAMD b_object_snap is
+    // one bit, with no distance to condition it on - so a conditioned channelLock maps to an
+    // unconditioned snap, the closest thing the syntax can say.
+    //
+    // zoneExclusion (§10.4) maps through TS 103 420 Annex B.2.6 (see coordinates.hpp); a zone list
+    // that is not one of Table B.18's presets keeps whatever part of it did map.
+    const auto rendering_of = [&](const iclforge::adm::AudioBlockFormat& block) -> Rendering {
         if (force_lfe) {
             return {};
         }
-        return {.width = std::clamp(block.width, 0.0, 1.0),
-                .depth = std::clamp(block.depth, 0.0, 1.0),
-                .height = std::clamp(block.height, 0.0, 1.0)};
-    };
-    // BS.2076-2 §10.2 channelLock and TS 103 420 §5.6.1.5.1 b_object_snap are
-    // the same idea under two names: render to the nearest speaker instead of
-    // panning. maxDistance has no image - OAMD b_object_snap is one bit, with
-    // no distance to condition it on - so a conditioned channelLock maps to an
-    // unconditioned snap, which is the closest thing the syntax can say.
-    const auto snap_of = [&](const iclforge::adm::AudioBlockFormat& block) {
-        return !force_lfe && block.has_channel_lock && block.channel_lock;
+        const auto zones = adm_zone_exclusion_to_constraint(block.zone_exclusion);
+        return {.size = {.width = std::clamp(block.width, 0.0, 1.0),
+                         .depth = std::clamp(block.depth, 0.0, 1.0),
+                         .height = std::clamp(block.height, 0.0, 1.0)},
+                .snap = block.has_channel_lock && block.channel_lock,
+                .zone = zones.zone,
+                .enable_elevation = zones.enable_elevation};
     };
     const double lfe_send = force_lfe ? 1.0 : 0.0;
 
@@ -110,7 +122,7 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
     // separate branch for each. See kInstantJumpEpsilon's own comment for why this is inaudible
     // at the resolution that reaches the bitstream.
     const auto push_keyframe = [&](double time_s, iclforge::oba::Position position, double gain,
-                                   iclforge::oba::ObjectSize size, bool snap) {
+                                   const Rendering& rendering) {
         if (!keyframes.empty() && time_s <= keyframes.back().time_s) {
             time_s = keyframes.back().time_s + kInstantJumpEpsilon;
         }
@@ -118,8 +130,10 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
                              .position = position,
                              .gain = gain,
                              .lfe_send = lfe_send,
-                             .size = size,
-                             .snap = snap});
+                             .size = rendering.size,
+                             .snap = rendering.snap,
+                             .zone = rendering.zone,
+                             .enable_elevation = rendering.enable_elevation});
     };
 
     if (channel.block_formats.size() == 1) {
@@ -128,8 +142,7 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
         // time" - one keyframe, which iclforge::oba::KeyframePath already holds everywhere.
         const auto& block = channel.block_formats.front();
         const auto [position, gain] = placement_of(block);
-        push_keyframe(object_start_s + block.rtime_s, position, gain, extent_of(block),
-                      snap_of(block));
+        push_keyframe(object_start_s + block.rtime_s, position, gain, rendering_of(block));
     } else {
         for (std::size_t i = 0; i < channel.block_formats.size(); ++i) {
             const auto& block = channel.block_formats[i];
@@ -137,13 +150,12 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
             const bool has_end = block.has_duration;
             const double t_end = t_start + block.duration_s;
             const auto [position, gain] = placement_of(block);
-            const auto extent = extent_of(block);
-            const bool snap = snap_of(block);
+            const auto rendering = rendering_of(block);
 
             if (i == 0) {
                 // §10.3: "the position specified in the first block covers the entire length of
                 // the block (regardless of the jumpPosition and interpolationLength properties)".
-                push_keyframe(t_start, position, gain, extent, snap);
+                push_keyframe(t_start, position, gain, rendering);
                 // A non-final block omitting duration is legal (§5.4.1 only "should" - not
                 // "must" - pair rtime with duration once a channel has more than one block) but
                 // discouraged, and its true end is the NEXT block's own start, not "forever":
@@ -155,7 +167,7 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
                 const double effective_end =
                     has_end ? t_end : object_start_s + channel.block_formats[1].rtime_s;
                 if (effective_end > t_start) {
-                    push_keyframe(effective_end, position, gain, extent, snap);
+                    push_keyframe(effective_end, position, gain, rendering);
                 }
                 continue;
             }
@@ -163,7 +175,7 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
             if (!block.jump_position) {
                 // Ramp across the FULL block duration, continuous from whatever the previous
                 // block's own last keyframe already pinned at this same t_start.
-                push_keyframe(has_end ? t_end : t_start, position, gain, extent, snap);
+                push_keyframe(has_end ? t_end : t_start, position, gain, rendering);
                 continue;
             }
 
@@ -172,9 +184,9 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
             const double length =
                 block.has_interpolation_length ? std::max(block.interpolation_length_s, 0.0) : 0.0;
             const double ramp_end = has_end ? std::min(t_start + length, t_end) : t_start + length;
-            push_keyframe(ramp_end, position, gain, extent, snap);
+            push_keyframe(ramp_end, position, gain, rendering);
             if (has_end && t_end > ramp_end) {
-                push_keyframe(t_end, position, gain, extent, snap);
+                push_keyframe(t_end, position, gain, rendering);
             }
         }
     }
@@ -213,6 +225,39 @@ bool channel_is_lfe(const iclforge::adm::AudioChannelFormat& channel) {
         }
     }
     return false;
+}
+
+// What a channel's blocks ask for that this bridge does not carry into the Atmos encode. Each
+// name appears once however many blocks use it. An LFE bed channel is routed by lfe_send alone,
+// so nothing it carries is lost.
+std::vector<std::string> unmapped_features(const iclforge::adm::AudioChannelFormat& channel, bool force_lfe) {
+    std::vector<std::string> out;
+    if (force_lfe) {
+        return out;
+    }
+    const auto any_block = [&](auto&& predicate) {
+        return std::ranges::any_of(channel.block_formats, predicate);
+    };
+    const auto note = [&](bool present, std::string_view name) {
+        if (present) {
+            out.emplace_back(name);
+        }
+    };
+    // §10.5 objectDivergence: OAMD's own divergence (TS 103 420 §5.2.7) is a spread along X into
+    // two objects, defined by its own tables, and Annex B gives no correspondence with ADM's
+    // value-plus-range form, so none is invented.
+    note(any_block([](const auto& b) { return b.has_object_divergence && b.object_divergence.value > 0.0; }),
+         "objectDivergence");
+    // §10.6 screenRef: needs the programme's reference screen (Annex B Tables B.5/B.6), which
+    // this model does not carry.
+    note(any_block([](const auto& b) { return b.screen_ref; }), "screenRef");
+    note(any_block([](const auto& b) { return b.head_locked; }), "headLocked");
+    note(any_block([](const auto& b) { return b.diffuse > 0.0; }), "diffuse");
+    note(any_block([](const auto& b) { return b.has_channel_lock_max_distance; }),
+         "channelLock maxDistance");
+    note(any_block([](const auto& b) { return !adm_zone_exclusion_to_constraint(b.zone_exclusion).exact; }),
+         "zoneExclusion (not a TS 103 420 Table B.18 preset)");
+    return out;
 }
 
 struct ClassifiedObject {
@@ -375,6 +420,7 @@ std::expected<BridgeResult, BridgeError> build(const iclforge::adm::AdmDocument&
             }
 
             out.channel_ids.push_back(channel->id);
+            out.unmapped.push_back(unmapped_features(*channel, is_lfe));
             out.is_bed.push_back(classified->is_bed);
             out.is_lfe.push_back(is_lfe);
             out.paths.push_back(std::move(*path));
@@ -432,6 +478,8 @@ std::vector<iclforge::adm::AudioBlockFormat> build_block_formats(std::span<const
             block.has_channel_lock = true;
             block.channel_lock = true;
         }
+        // TS 103 420 Annex B.2.6: zone constraints go out as a zoneExclusion.
+        block.zone_exclusion = constraint_to_adm_zone_exclusion(state.zone, state.enable_elevation);
     };
 
     std::vector<iclforge::adm::AudioBlockFormat> blocks;
