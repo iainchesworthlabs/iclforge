@@ -2006,9 +2006,12 @@ void Decoder::Impl::report_presentations(const Toc& toc) {
                                         : std::nullopt;
             to.language = from.language;
             speakers_into(from.ch_mode, to.speakers);
+            to.sample_rate_hz = toc.sample_rate_hz * from.rate_multiplier;
         }
         const std::optional<std::size_t> anchor = detail::anchor_member(plan);
         speakers_into(anchor ? plan.members[*anchor].ch_mode : -1, info.speakers);
+        info.sample_rate_hz =
+            anchor ? toc.sample_rate_hz * plan.members[*anchor].rate_multiplier : 0;
         info.decodable = plan.decodable;
         info.selectable = detail::selectable(plan, config.level);
     }
@@ -2331,7 +2334,9 @@ std::expected<bool, DecodeError> Decoder::Impl::decode_into(
     }
     const CapturedAudio& main = capture.audio[anchor];
     frame.concealed.reset();
-    frame.sample_rate_hz = main.context.fs_index == 0 ? 44100 : 48000;
+    // Part 1 Table 89: a substream at 96 or 192 kHz is decoded at its own rate.
+    frame.sample_rate_hz = (main.context.fs_index == 0 ? 44100 : 48000) *
+                           (main.context.sf_multiplier ? 2 << *main.context.sf_multiplier : 1);
     const auto is_object = [&plan](std::size_t m) {
         return plan.members[m].coding != detail::Coding::kChannel;
     };

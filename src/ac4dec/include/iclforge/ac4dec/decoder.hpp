@@ -438,6 +438,9 @@ struct DecodedObject {
 
 // One frame of output.
 struct DecodedFrame {
+    // 48000 or 44100 (frame_rate_index 13 only), or for a substream with an HSF extension its own
+    // sampling frequency, 96000 or 192000 (Part 1 clause 5.4, Table 89);
+    // PresentationInfo::sample_rate_hz says it before a frame decodes.
     int sample_rate_hz = 0;
     // Of the frame this came from; for a concealed frame whose table of
     // contents did not read, the counter the stream expected.
@@ -460,7 +463,9 @@ struct DecodedFrame {
     // or 1 602 at 29.97). The decoder's delay is applied: Part 1's frame
     // alignment (clause 5.6), the QMF banks and the QMF domain's history
     // (5.7.1), 1 313 samples at frame_rate_index 13 in every codec mode, and at
-    // the other indices the sample rate converter's too (latency_samples()).
+    // the other indices the sample rate converter's too (latency_samples()). At
+    // 96 and 192 kHz, which have no QMF domain, the alignment's delay alone,
+    // times 2 or 4 (352 x 2 at frame_rate_index 13, 96 kHz), and the converter's.
     std::vector<std::vector<float>> channels;
     std::size_t samples = 0;
     // Set only on a frame DecoderConfig::concealment made in place of one that
@@ -568,6 +573,10 @@ struct PresentationMember {
     // Its channel mode's channels; empty for a substream this decoder does
     // not turn into PCM.
     std::vector<Speaker> speakers;
+    // The sampling frequency of the substream (Part 1 Table 89): the stream's base rate, or two or
+    // four times it where the substream carries sf_multiplier, in which case decode() puts the
+    // presentation out at that rate.
+    int sample_rate_hz = 0;
 };
 
 struct PresentationInfo {
@@ -598,6 +607,10 @@ struct PresentationInfo {
     // The channels decode() puts out as coded: its main or music and effects
     // substream's, which the others are mixed into.
     std::vector<Speaker> speakers;
+    // The rate decode() puts the presentation out at, DecodedFrame::sample_rate_hz: that of the
+    // same substream, 48000 or 44100 or, with an HSF extension, 96000 or 192000 (Part 1 clause
+    // 5.4); 0 for a presentation with no channel-coded substream.
+    int sample_rate_hz = 0;
     std::vector<int> substream_groups;  // ac4_sgi_specifier()'s group_index values, version 1
     std::vector<PresentationMember> members;
     // Whether this decoder turns every substream of it into PCM, and whether
@@ -781,8 +794,9 @@ class ICLFORGE_AC4DEC_EXPORT Decoder {
     // The decoder's delay at the output rate for the stream as last decoded:
     // 1 313 samples at frame_rate_index 13, and at the other indices the same
     // at the internal rate and the converter's delay, to the nearest sample; 0
-    // before a frame has decoded. decode_by_block() holds back up to
-    // kBlockSamples - 1 samples more.
+    // before a frame has decoded. At 96 and 192 kHz the frame alignment's d_pcm
+    // times 2 or 4 (Part 1 clause 5.6), with the converter's where there is one.
+    // decode_by_block() holds back up to kBlockSamples - 1 samples more.
     [[nodiscard]] int latency_samples() const noexcept;
 
     // Forgets everything carried between frames, the samples decode_by_block()

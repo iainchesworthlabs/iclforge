@@ -151,6 +151,9 @@ constexpr std::size_t kMaxUnits = kMaxAspxElements;
 }  // namespace
 
 int SubstreamPcm::delay_samples() const noexcept {
+    if (hsf_multiplier_ > 1) {
+        return delay_;  // no QMF banks, and no history of QMF slots
+    }
     return delay_ + kQmfPairDelay + hfgen_ * dsp::kQmfSubbands;
 }
 
@@ -213,6 +216,12 @@ void SubstreamPcm::reset() {
     de_.reset();
     drc_.reset();
     downmix_.reset();
+    for (std::optional<dsp::Resampler<Real>>& converter : hsf_converters_) {
+        if (converter) {
+            converter->reset();
+        }
+    }
+    hsf_dialnorm_.reset();
     last_spectra_.clear();
     last_lengths_.clear();
     losses_ = 0;
@@ -270,12 +279,16 @@ ParseResult SubstreamPcm::configure(const SubstreamContext& ctx, DecodingMode de
     if (speakers.empty()) {
         return fail(DecodeError::kUnsupported, "this channel mode is not decoded to PCM yet");
     }
-    if (full_length_ == ctx.frame_len_base && ch_mode_ == ctx.ch_mode &&
+    if (hsf_multiplier_ == 1 && full_length_ == ctx.frame_len_base && ch_mode_ == ctx.ch_mode &&
         frame_rate_index_ == ctx.frame_rate_index && fs_index_ == ctx.fs_index &&
         decoding_ == decoding && coding_ == ctx.coding && static_dmx_ == ctx.b_static_dmx &&
         transforms_.has_value()) {
         return {};
     }
+    hsf_multiplier_ = 1;
+    hsf_converters_.clear();
+    hsf_aligned_.clear();
+    hsf_mixed_.clear();
     coding_ = ctx.coding;
     static_dmx_ = ctx.b_static_dmx;
     dmx_signals_ = ctx.b_static_dmx ? 5 : ctx.n_fullband_dmx;
@@ -761,6 +774,11 @@ ParseResult SubstreamPcm::matrix(const SubstreamContext& ctx, const ChannelEleme
             if (element.tracks[at(part.first_track + k)].info != first.info) {
                 return fail(DecodeError::kInvalidStream, "stereo processing over tracks of different sf_info()s");
             }
+            if (hsf_multiplier_ > 1 &&
+                core_lines_[at(part.first_track + k)] != core_lines_[at(part.first_track)]) {
+                return fail(DecodeError::kInvalidStream,
+                            "stereo processing over tracks of different band layouts");
+            }
         }
         const std::size_t needed = chparams_of(part.count);
         if (parameters_.size() < needed) {
@@ -786,6 +804,10 @@ ParseResult SubstreamPcm::matrix(const SubstreamContext& ctx, const ChannelEleme
             const std::array<int*, 2> pair_exponents = {&scaled_exponents_[t0], &scaled_exponents_[t0 + 1]};
             align_exponents<Real>(pair, pair_exponents);
             apply_stereo(info, layout, parameters_[0], scaled_[t0], scaled_[t0 + 1]);
+            if (hsf_multiplier_ > 1) {
+                apply_stereo_beyond_bands(parameters_[0], scaled_[t0], scaled_[t0 + 1],
+                                          core_lines_[t0]);
+            }
             continue;
         }
         std::array<std::vector<Real>*, 5> tracks{};
@@ -801,6 +823,15 @@ ParseResult SubstreamPcm::matrix(const SubstreamContext& ctx, const ChannelEleme
                                          std::span<std::vector<Real>* const>(tracks).first(at(part.count)));
             !ok) {
             return ok;
+        }
+        if (hsf_multiplier_ > 1) {
+            if (auto ok = apply_channel_data_beyond_bands(
+                    part.chel_matsel, std::span<const StereoParameters>(parameters_).first(needed),
+                    std::span<std::vector<Real>* const>(tracks).first(at(part.count)),
+                    core_lines_[at(part.first_track)]);
+                !ok) {
+                return ok;
+            }
         }
     }
 
@@ -822,9 +853,20 @@ ParseResult SubstreamPcm::matrix(const SubstreamContext& ctx, const ChannelEleme
         }
         const int dual = dual_layout_of_[at(track_of_[c])];
         const SfData& layout = dual >= 0 ? dual_layouts_[at(dual)] : track.data;
-        if (!ungroup_in_place(ctx, info.psy, layout, lengths_[c], scaled_[at(track_of_[c])],
-                              spectra_[c])) {
-            ungroup(ctx, info.psy, layout, lengths_[c], scaled_[at(track_of_[c])], spectra_[c]);
+        const std::size_t t = at(track_of_[c]);
+        const std::size_t extension_lines =
+            hsf_multiplier_ > 1 && scaled_[t].size() > core_lines_[t]
+                ? scaled_[t].size() - core_lines_[t]
+                : 0;
+        if (extension_lines == 0 &&
+            ungroup_in_place(ctx, info.psy, layout, lengths_[c], scaled_[t], spectra_[c])) {
+            continue;
+        }
+        ungroup(ctx, info.psy, layout, lengths_[c], scaled_[t], spectra_[c]);
+        if (extension_lines != 0) {
+            // The lines of the HSF extension join the core's in each window.
+            ungroup_hsf(ctx, info.psy, track.hsf, hsf_multiplier_, lengths_[c], scaled_[t],
+                        core_lines_[t], spectra_[c]);
         }
     }
 
@@ -843,6 +885,14 @@ ParseResult SubstreamPcm::matrix(const SubstreamContext& ctx, const ChannelEleme
             !ok) {
             return ok;
         }
+        if (hsf_multiplier_ > 1) {
+            if (auto ok = apply_additional_pair_beyond_bands(ctx, info.psy, parameters_[0],
+                                                             lengths_[first], spectra_[first],
+                                                             spectra_[second]);
+                !ok) {
+                return ok;
+            }
+        }
     }
     return {};
 }
@@ -854,7 +904,7 @@ ParseResult SubstreamPcm::decode(const SubstreamContext& ctx, const AudioSubstre
     const int sequence_counter = frame_inputs.sequence_counter;
     const ChannelElement& element = substream.element;
     if (ctx.sf_multiplier.has_value()) {
-        return fail(DecodeError::kUnsupported, "96 and 192 kHz decoding (the HSF extension) is not decoded yet");
+        return decode_hsf(ctx, substream, frame_inputs, channels, speakers);
     }
     // The element's layout: the channel mode, or object audio's
     // (pcm/routing.hpp), from here on the context's channel mode.
@@ -1082,6 +1132,10 @@ ParseResult SubstreamPcm::conceal(ConcealmentPolicy policy, const FrameInputs& f
         }
     }
     lengths_ = last_lengths_;
+    if (hsf_multiplier_ > 1) {
+        // At 96 and 192 kHz there is no QMF domain to hold control data in.
+        return render_hsf(frame_inputs, last_downmix_, channels, speakers);
+    }
     // No control data came with the frame: the QMF domain passes it through,
     // the d_ctrl queue keeps its place, and the output stages hold the last
     // good frame's values.
@@ -1094,6 +1148,44 @@ ParseResult SubstreamPcm::conceal(ConcealmentPolicy policy, const FrameInputs& f
     control.downmix = last_downmix_;
     control.mix = last_mix_;
     return render(frame_inputs, channels, speakers);
+}
+
+void SubstreamPcm::transform_channel(std::size_t c, std::span<Real> samples) {
+    std::size_t offset = 0;
+    for (const int length : lengths_[c]) {
+        const auto n = static_cast<std::size_t>(length);
+        // window_lengths() allows only lengths the transform set has.
+        (void)channels_[c].synthesis.block(*transforms_,
+                                           std::span<const Real>(spectra_[c]).subspan(offset, n),
+                                           spectra_exponents_[c], samples.subspan(offset, n));
+        offset += n;
+    }
+}
+
+void SubstreamPcm::align_channel(std::size_t c, std::span<const Real> samples,
+                                 std::span<Real> aligned) {
+    const auto frame = static_cast<std::size_t>(full_length_);
+    // Clause 5.6.2: out[n] = in[n - d_pcm]. d_pcm exceeds the frame at
+    // some rates (1 312 at 100 fps, whose frame is 512), so the held
+    // samples and the new ones are one queue.
+    std::vector<Real>& held = channels_[c].delay;
+    if (samples.size() == frame && held.size() <= frame) {
+        // The queue's delay is the shorter of the two, as at every frame length in Table 188
+        // but 512 at 100 fps: this frame's alignment is the held samples and the frame's first,
+        // and the queue the frame's last. The same samples that appending the frame to the
+        // queue, taking the first `frame` and erasing them leave, moved once each rather than
+        // twice.
+        const std::size_t delay = held.size();
+        std::copy(held.begin(), held.end(), aligned.begin());
+        std::copy_n(samples.begin(), frame - delay,
+                    aligned.begin() + static_cast<std::ptrdiff_t>(delay));
+        std::copy_n(samples.begin() + static_cast<std::ptrdiff_t>(frame - delay), delay,
+                    held.begin());
+    } else {
+        held.insert(held.end(), samples.begin(), samples.end());
+        std::copy_n(held.begin(), frame, aligned.begin());
+        held.erase(held.begin(), held.begin() + static_cast<std::ptrdiff_t>(frame));
+    }
 }
 
 ParseResult SubstreamPcm::render(const FrameInputs& frame_inputs,
@@ -1119,15 +1211,7 @@ ParseResult SubstreamPcm::render(const FrameInputs& frame_inputs,
         samples.resize(frame);
     }
     const auto transform = [&](std::size_t c, std::vector<Real>& samples) {
-        std::size_t offset = 0;
-        for (const int length : lengths_[c]) {
-            const auto n = static_cast<std::size_t>(length);
-            // window_lengths() allows only lengths the transform set has.
-            (void)channels_[c].synthesis.block(
-                *transforms_, std::span<const Real>(spectra_[c]).subspan(offset, n),
-                spectra_exponents_[c], std::span<Real>(samples).subspan(offset, n));
-            offset += n;
-        }
+        transform_channel(c, samples);
     };
     if (across_channels) {
         for (std::size_t c = 0; c < channel_count; ++c) {
@@ -1142,27 +1226,7 @@ ParseResult SubstreamPcm::render(const FrameInputs& frame_inputs,
             transform(c, time_[0]);
         }
         const std::vector<Real>& samples = time_[across_channels ? c : 0];
-        // Clause 5.6.2: out[n] = in[n - d_pcm]. d_pcm exceeds the frame at
-        // some rates (1 312 at 100 fps, whose frame is 512), so the held
-        // samples and the new ones are one queue.
-        std::vector<Real>& held = channels_[c].delay;
-        if (samples.size() == frame && held.size() <= frame) {
-            // The queue's delay is the shorter of the two, as at every frame length in Table 188
-            // but 512 at 100 fps: this frame's alignment is the held samples and the frame's first,
-            // and the queue the frame's last. The same samples that appending the frame to the
-            // queue, taking the first `frame` and erasing them leave, moved once each rather than
-            // twice.
-            const std::size_t delay = held.size();
-            std::copy(held.begin(), held.end(), aligned_.begin());
-            std::copy_n(samples.begin(), frame - delay,
-                        aligned_.begin() + static_cast<std::ptrdiff_t>(delay));
-            std::copy_n(samples.begin() + static_cast<std::ptrdiff_t>(frame - delay), delay,
-                        held.begin());
-        } else {
-            held.insert(held.end(), samples.begin(), samples.end());
-            std::copy_n(held.begin(), frame, aligned_.begin());
-            held.erase(held.begin(), held.begin() + static_cast<std::ptrdiff_t>(frame));
-        }
+        align_channel(c, samples, aligned_);
         // Clause 5.7.3: this frame's slots after the history.
         channels_[c].analysis.process(
             aligned_, std::span<QmfValue>(channels_[c].ext).subspan(history), qmf_scratch_);
@@ -1298,6 +1362,322 @@ ParseResult SubstreamPcm::render(const FrameInputs& frame_inputs,
     }
     converter_phase_ = converter_phase;
     const std::span<const Speaker> out_speakers = downmix_.speakers();
+    speakers.assign(out_speakers.begin(), out_speakers.end());
+    return {};
+}
+
+ParseResult SubstreamPcm::configure_hsf(const SubstreamContext& ctx, DecodingMode decoding) {
+    const std::span<const Speaker> speakers = speakers_of(ctx.ch_mode, decoding);
+    if (speakers.empty() || !ctx.sf_multiplier.has_value()) {
+        return fail(DecodeError::kUnsupported, "this channel mode is not decoded to PCM yet");
+    }
+    // Table 89: sf_multiplier 0 is 96 kHz and 1 is 192 kHz, 2 and 4 times the base rate and
+    // blocks (Tables 99 to 105).
+    const int multiplier = 2 << *ctx.sf_multiplier;
+    const int full = ctx.frame_len_base * multiplier;
+    if (hsf_multiplier_ == multiplier && full_length_ == full && ch_mode_ == ctx.ch_mode &&
+        frame_rate_index_ == ctx.frame_rate_index && fs_index_ == ctx.fs_index &&
+        decoding_ == decoding && transforms_.has_value()) {
+        return {};
+    }
+    transforms_.emplace(full, multiplier);
+    if (!transforms_->valid()) {
+        transforms_.reset();
+        return fail(DecodeError::kInvalidStream, "a frame length with no transform");
+    }
+    hsf_multiplier_ = multiplier;
+    full_length_ = full;
+    ch_mode_ = ctx.ch_mode;
+    frame_rate_index_ = ctx.frame_rate_index;
+    fs_index_ = ctx.fs_index;
+    decoding_ = decoding;
+    coding_ = AudioCoding::kChannel;
+    static_dmx_ = false;
+    speakers_ = speakers;
+    // Clause 5.6's delay in samples at the substream's rate: Table 188's d_pcm for the base
+    // rate's frame, as many times over as the frame is (ERRATA.md, "Frame alignment at 96 and 192
+    // kHz").
+    delay_ = kAlignmentDelay[static_cast<std::size_t>(ctx.frame_rate_index)] * multiplier;
+    control_delay_ = 1;
+    slots_ = 0;
+    ts_in_ats_ = 1;
+    hfgen_ = 0;
+    // Clause 6.2.15: the converter takes the internal rate to the external one with the ratio of
+    // Table 83, whose column is the same at 96 and 192 kHz.
+    const ResamplingRatio ratio = resampling_ratio(ctx.frame_rate_index);
+    converter_filter_.reset();
+    if (ratio.up != ratio.down) {
+        converter_filter_ =
+            std::make_shared<const dsp::BasicResamplerFilter<Real>>(ratio.up, ratio.down);
+    }
+    channels_.clear();
+    for (std::size_t c = 0; c < speakers_.size(); ++c) {
+        // No QMF domain: a channel is its overlap buffer and its alignment delay.
+        channels_.emplace_back(full_length_, static_cast<std::size_t>(delay_), 0, 0);
+    }
+    time_.clear();
+    ghosts_.clear();
+    objects_.clear();
+    object_outputs_.clear();
+    outputs_.clear();
+    held_.clear();
+    master_.reset();
+    acpl_.reset();
+    ajcc_.reset();
+    ajoc_.reset();
+    scpl_mode_.reset();
+    decoded_mode_.reset();
+    applied_mode_.reset();
+    converter_phase_.reset();
+    const double base_rate = ctx.fs_index == 0 ? 44100.0 : 48000.0;
+    internal_rate_ = base_rate * static_cast<double>(multiplier) * static_cast<double>(ratio.down) /
+                     static_cast<double>(ratio.up);
+    outputs_valid_ = false;
+    hsf_converters_.clear();
+    hsf_aligned_.clear();
+    hsf_mixed_.clear();
+    last_spectra_.clear();
+    last_lengths_.clear();
+    losses_ = 0;
+    return {};
+}
+
+void SubstreamPcm::configure_hsf_outputs(const SubstreamContext& ctx, const OutputConfig& output) {
+    if (outputs_valid_ && add_ch_base_ == ctx.add_ch_base && downmix_target_ == output.downmix &&
+        mix_lfe_ == output.mix_lfe) {
+        return;
+    }
+    add_ch_base_ = ctx.add_ch_base;
+    downmix_target_ = output.downmix;
+    mix_lfe_ = output.mix_lfe;
+    layout_.reset();
+    downmix_.configure(speakers_, add_ch_base_, downmix_target_, mix_lfe_, std::nullopt);
+    hsf_converters_.clear();
+    for (std::size_t o = 0; o < downmix_.speakers().size(); ++o) {
+        if (converter_filter_) {
+            hsf_converters_.emplace_back(std::in_place, converter_filter_);
+        } else {
+            hsf_converters_.emplace_back();
+        }
+    }
+    // New converters start their grid at the next frame's phase.
+    converter_phase_.reset();
+    outputs_valid_ = true;
+}
+
+ParseResult SubstreamPcm::decode_hsf(const SubstreamContext& ctx, const AudioSubstream& substream,
+                                     const FrameInputs& frame_inputs,
+                                     std::vector<std::vector<float>>& channels,
+                                     std::vector<Speaker>& speakers) {
+    const ChannelElement& element = substream.element;
+    // Part 1 clause 5.4: a stream with HSF data employs none of the QMF domain tools, and clause
+    // 6.2.5.2 leaves it the SAP tool and the inverse transform. What follows from that is decoded;
+    // what it takes away, and what the HSF text does not reach, is refused by name, before
+    // anything moves on.
+    if (ctx.coding != AudioCoding::kChannel) {
+        return fail(DecodeError::kUnsupported,
+                    "object audio at 96 or 192 kHz (no HSF text covers it)");
+    }
+    switch (element.kind) {
+        case ElementKind::kSingle:
+        case ElementKind::kPair:
+        case ElementKind::k3_0:
+        case ElementKind::k5X:
+        case ElementKind::k7X:
+            break;
+        default:
+            return fail(DecodeError::kUnsupported,
+                        "the immersive and 22.2 channel elements at 96 or 192 kHz (no HSF text "
+                        "covers them)");
+    }
+    if (element.codec_mode != codec_mode::kSimple) {
+        return fail(DecodeError::kUnsupported,
+                    "A-SPX and A-CPL at 96 or 192 kHz (Part 1 clause 5.4: HSF streams use no QMF "
+                    "domain tool)");
+    }
+    for (const Track& track : element.tracks) {
+        if (element.infos[at(track.info)].spec_frontend != 0) {
+            return fail(DecodeError::kUnsupported,
+                        "the speech spectral frontend at 96 or 192 kHz (the HSF extension carries "
+                        "ASF data)");
+        }
+    }
+    if (frame_inputs.qmf_only || frame_inputs.objects || !frame_inputs.sources.empty() ||
+        frame_inputs.dialogue.has_value() || frame_inputs.mix.active) {
+        return fail(
+            DecodeError::kUnsupported,
+            "mixing a presentation's substreams at 96 or 192 kHz (clause 6.2.16 has no HSF text)");
+    }
+    if (frame_inputs.output.dialogue_enhancement_db > 0.0 && frame_inputs.de.active &&
+        frame_inputs.de.max_gain_db > 0.0) {
+        return fail(DecodeError::kUnsupported,
+                    "dialogue enhancement at 96 or 192 kHz (a QMF domain tool, clause 5.7.8.1)");
+    }
+    if (frame_inputs.drc.curve.has_value() || frame_inputs.drc.gains.has_value()) {
+        return fail(
+            DecodeError::kUnsupported,
+            "dynamic range compression at 96 or 192 kHz (a QMF domain tool, clause 5.7.9.1); "
+            "DrcMode::kOff leaves the output level gain");
+    }
+
+    SubstreamContext pcm_ctx = ctx;
+    if (auto ok = route_element(pcm_ctx, element, route_, frame_inputs.decoding); !ok) {
+        return ok;
+    }
+    if (auto ok = configure_hsf(pcm_ctx, frame_inputs.decoding); !ok) {
+        return ok;
+    }
+    configure_hsf_outputs(pcm_ctx, frame_inputs.output);
+    const std::size_t channel_count = channels_.size();
+
+    // Everything that can fail is checked before any channel's overlap buffer moves on.
+    track_of_.assign(channel_count, -1);
+    for (const DataElementRoute& part : route_.data) {
+        if (part.discarded) {
+            continue;
+        }
+        for (int k = 0; k < part.count; ++k) {
+            const int channel = channel_of(part.outputs[at(k)]);
+            if (channel < 0 || track_of_[at(channel)] >= 0) {
+                return fail(DecodeError::kInvalidStream,
+                            "a channel element that codes one channel twice");
+            }
+            track_of_[at(channel)] = part.first_track + k;
+        }
+    }
+    lengths_.resize(channel_count);
+    for (std::size_t c = 0; c < channel_count; ++c) {
+        if (track_of_[c] < 0) {
+            if (std::ranges::find(route_.silent, speakers_[c]) == route_.silent.end()) {
+                return fail(DecodeError::kInvalidStream,
+                            "a channel element that leaves a channel uncoded");
+            }
+            lengths_[c].assign(1, full_length_);
+            continue;
+        }
+        const SfInfo& info = element.infos[at(element.tracks[at(track_of_[c])].info)];
+        if (auto ok = window_lengths(pcm_ctx, info.psy, lengths_[c], hsf_multiplier_); !ok) {
+            return ok;
+        }
+    }
+
+    // Clause 5.1.4.2: the noise fill's generator starts each frame from sequence_counter and runs
+    // through the tracks in syntax order, each track's core and then its extension.
+    RandGenState noise = reset_rand_gen_state_snf(frame_inputs.sequence_counter);
+    scaled_.resize(element.tracks.size());
+    scaled_exponents_.assign(element.tracks.size(), 0);
+    core_lines_.assign(element.tracks.size(), 0);
+    for (std::size_t t = 0; t < element.tracks.size(); ++t) {
+        const Track& track = element.tracks[t];
+        const SfInfo& info = element.infos[at(track.info)];
+        core_lines_[t] = track.data.quant_spec.size();
+        if (auto ok = reconstruct_track(info, track.data, sf_gain_, noise, scaled_[t],
+                                        scaled_exponents_[t], &track.hsf);
+            !ok) {
+            return ok;
+        }
+        if (frame_inputs.release_tracks != nullptr) {
+            (*frame_inputs.release_tracks)[t].data.quant_spec = {};
+            (*frame_inputs.release_tracks)[t].hsf.quant_spec = {};
+        }
+    }
+    if (auto ok = matrix(pcm_ctx, element); !ok) {
+        return ok;
+    }
+    if (frame_inputs.release_tracks != nullptr) {
+        *frame_inputs.release_tracks = {};
+    }
+    decoded_mode_ = element.codec_mode;
+    last_lengths_ = lengths_;
+    last_kind_ = element.kind;
+    last_drc_ = frame_inputs.drc;
+    last_drc_.reset = false;
+    last_de_ = frame_inputs.de;
+    last_downmix_ = frame_inputs.downmix;
+    last_mix_ = frame_inputs.mix;
+    losses_ = 0;
+    if (frame_inputs.drc.dialnorm) {
+        hsf_dialnorm_ = frame_inputs.drc.dialnorm;
+    }
+    ParseResult rendered = render_hsf(frame_inputs, frame_inputs.downmix, channels, speakers);
+    std::swap(last_spectra_, spectra_);
+    last_exponents_ = spectra_exponents_;
+    return rendered;
+}
+
+ParseResult SubstreamPcm::render_hsf(const FrameInputs& frame_inputs, const DownmixValues& downmix,
+                                     std::vector<std::vector<float>>& channels,
+                                     std::vector<Speaker>& speakers) {
+    const int converter_phase = frame_inputs.converter_phase;
+    const std::size_t channel_count = channels_.size();
+    const auto frame = static_cast<std::size_t>(full_length_);
+    time_.resize(1);
+    time_[0].resize(frame);
+    hsf_aligned_.resize(channel_count);
+    for (std::size_t c = 0; c < channel_count; ++c) {
+        hsf_aligned_[c].resize(frame);
+        // Clauses 5.5 and 5.6, at the substream's rate; clause 6.2.5.2: no QMF domain follows.
+        transform_channel(c, time_[0]);
+        align_channel(c, time_[0], hsf_aligned_[c]);
+    }
+
+    // Clause 5.7.9.3.3's output level gain, 2^((Lout - dialnorm) / 6), the part of the DRC tool
+    // that is a scalar: a stream that has sent no dialnorm yet is at the output level.
+    double level_gain = 1.0;
+    if (frame_inputs.output.output_level_dbfs) {
+        const double lin = hsf_dialnorm_.value_or(*frame_inputs.output.output_level_dbfs);
+        level_gain = std::exp2((*frame_inputs.output.output_level_dbfs - lin) / 6.0);
+    }
+    const auto gain = static_cast<Real>(level_gain);
+
+    // Clause 6.2.17's downmix is a matrix on the channels' samples, whatever domain they are in.
+    downmix_.update(downmix);
+    const bool through = downmix_.passes_through();
+    if (!through) {
+        const std::vector<std::vector<double>>& matrix = downmix_.matrix();
+        hsf_mixed_.resize(matrix.size());
+        for (std::size_t o = 0; o < matrix.size(); ++o) {
+            hsf_mixed_[o].assign(frame, Real{});
+            for (std::size_t c = 0; c < channel_count && c < matrix[o].size(); ++c) {
+                const double w = matrix[o][c];
+                if (w == 0.0) {
+                    continue;
+                }
+                const auto weight = static_cast<Real>(w);
+                for (std::size_t i = 0; i < frame; ++i) {
+                    hsf_mixed_[o][i] += weight * hsf_aligned_[c][i];
+                }
+            }
+        }
+    }
+    const std::span<const Speaker> out_speakers = downmix_.speakers();
+    const std::size_t outputs = out_speakers.size();
+    channels.resize(outputs);
+    // Part 2 clause 5.11: the converter's grid starts at the frame's phase, and moves where the
+    // phase jumps.
+    const auto grid = static_cast<std::int64_t>(converter_phase) * full_length_;
+    const bool jumped = converter_phase_ && converter_phase != (*converter_phase_ + 1) % 5;
+    for (std::size_t o = 0; o < outputs; ++o) {
+        const std::vector<Real>& source = through ? hsf_aligned_[o] : hsf_mixed_[o];
+        std::span<const Real> produced = source;
+        if (o < hsf_converters_.size() && hsf_converters_[o]) {
+            dsp::Resampler<Real>& converter = *hsf_converters_[o];
+            if (!converter_phase_) {
+                converter.reset(grid);
+            } else if (jumped) {
+                converter.rephase(grid);
+            }
+            converted_.clear();
+            converter.process(source, converted_);
+            produced = converted_;
+        }
+        std::vector<float>& out = channels[o];
+        out.resize(produced.size());
+        for (std::size_t n = 0; n < produced.size(); ++n) {
+            out[n] = output_sample(gain, produced[n]);
+        }
+    }
+    converter_phase_ = converter_phase;
     speakers.assign(out_speakers.begin(), out_speakers.end());
     return {};
 }

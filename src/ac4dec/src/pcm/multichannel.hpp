@@ -59,6 +59,16 @@ using Matrix = std::array<std::array<Real, N>, N>;
                                              std::span<const StereoParameters> parameters,
                                              std::span<std::vector<Real>* const> tracks);
 
+// The same on the lines from `first_line` on in each track, every one of them with the parameters
+// that stand outside chparam_info()'s bands (StereoParameters::uncovered): what a substream at 96
+// or 192 kHz does to the lines of its HSF extension, which `parameters`' bands do not reach and
+// which all lie at the end of the tracks (pcm/asf_reconstruct.hpp's vector holds them after the
+// core's). Nothing changes for parameters that are the identity, which are those of every mode
+// but sap_mode 2.
+[[nodiscard]] ParseResult apply_channel_data_beyond_bands(
+    int chel_matsel, std::span<const StereoParameters> parameters,
+    std::span<std::vector<Real>* const> tracks, std::size_t first_line);
+
 // One of Table 183's two 2 x 2 steps, which make the 7.X element's last two
 // channels of the tracks of two different channel data elements: O0 = a I0 +
 // b I1, O1 = c I0 + d I1, on the tracks' lines in window order (after
@@ -73,5 +83,13 @@ using Matrix = std::array<std::array<Real, N>, N>;
                                                 std::span<const int> base_lengths,
                                                 std::span<const int> other_lengths, std::span<Real> base_lines,
                                                 std::span<Real> other_lines);
+
+// apply_additional_pair() for the lines of each window that the bands of chparam_info() do not
+// reach, from the end of the band max_sfb(g) of the window's group on, with
+// StereoParameters::uncovered: the lines of the HSF extension, and of the bands between the
+// core's max_sfb and the extension. `lengths` are the windows' of the substream's own rate.
+[[nodiscard]] ParseResult apply_additional_pair_beyond_bands(
+    const SubstreamContext& ctx, const AsfPsyInfo& base, const StereoParameters& parameters,
+    std::span<const int> lengths, std::span<Real> base_lines, std::span<Real> other_lines);
 
 }  // namespace iclforge::ac4::detail
