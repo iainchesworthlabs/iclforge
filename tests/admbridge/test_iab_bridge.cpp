@@ -96,6 +96,38 @@ iclforge::iab::AudioDataPcm make_pcm(std::uint32_t audio_data_id, std::size_t co
     return pcm;
 }
 
+// A minimal AudioDataDLC element (Annex B): 48 kHz, no predictor, every sub block direct PCM with
+// `magnitude` as the residual of each sample (BitDepth 8, positive), ShiftBits 16. At 24 fps
+// (Table 30) that is 10 sub blocks of 200 samples, so a frame of 2000 samples of 127 << 16.
+iclforge::iab::AudioDataDlc make_dlc(std::uint32_t audio_data_id, unsigned magnitude) {
+    std::vector<bool> bits;
+    const auto push = [&bits](std::uint64_t value, unsigned width) {
+        for (unsigned i = 0; i < width; ++i) {
+            bits.push_back(((value >> (width - 1 - i)) & 1U) != 0);
+        }
+    };
+    push(0, 2);   // DLCSampleRate: 48 kHz
+    push(16, 5);  // ShiftBits
+    push(0, 2);   // NumPredRegions48
+    for (unsigned n = 0; n < 10; ++n) {
+        push(0, 1);  // CodeType: direct PCM
+        push(8, 5);  // BitDepth
+        for (unsigned i = 0; i < 200; ++i) {
+            push(magnitude, 8);
+            push(0, 1);  // sign
+        }
+    }
+    iclforge::iab::AudioDataDlc element;
+    element.audio_data_id = audio_data_id;
+    element.coded.assign((bits.size() + 7) / 8, std::byte{0});
+    for (std::size_t i = 0; i < bits.size(); ++i) {
+        if (bits[i]) {
+            element.coded[i / 8] |= static_cast<std::byte>(0x80U >> (i % 8));
+        }
+    }
+    return element;
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -309,6 +341,30 @@ TEST_CASE("build_iab refuses a non-zero AudioDataID with no matching essence", "
     const auto result = iclforge::admbridge::build_iab(std::span{&frame, 1});
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error() == iclforge::admbridge::BridgeError::kNoIabEssenceForChannel);
+}
+
+TEST_CASE("build_iab decodes AudioDataDLC essence", "[admbridge][iab]") {
+    auto frame = make_frame({make_bed(1, {make_bed_channel(0x2, /*audio_data_id=*/9)})});
+    frame.frame.audio_dlc.push_back(make_dlc(9, 127));
+
+    const auto result = iclforge::admbridge::build_iab(std::span{&frame, 1});
+    REQUIRE(result.has_value());
+    REQUIRE(result->pcm.size() == 1);
+    REQUIRE(result->pcm[0].size() == 2000);
+    const float expected = static_cast<float>((127.0 * 65536.0) / 2147483648.0);
+    CHECK(result->pcm[0].front() == expected);
+    CHECK(result->pcm[0].back() == expected);
+}
+
+TEST_CASE("build_iab reports an AudioDataDLC element that fails to decode", "[admbridge][iab]") {
+    auto frame = make_frame({make_bed(1, {make_bed_channel(0x2, /*audio_data_id=*/9)})});
+    auto broken = make_dlc(9, 127);
+    broken.coded.resize(40);
+    frame.frame.audio_dlc.push_back(std::move(broken));
+
+    const auto result = iclforge::admbridge::build_iab(std::span{&frame, 1});
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error() == iclforge::admbridge::BridgeError::kBadIabAudio);
 }
 
 TEST_CASE("build_iab treats AudioDataID 0 as legitimate silence, not an error",

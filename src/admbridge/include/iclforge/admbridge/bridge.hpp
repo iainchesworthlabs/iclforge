@@ -103,10 +103,12 @@ enum class BridgeError : std::uint8_t {
                              // iclforge::oba::BedLabel equivalent - see iab_bridge.cpp's own
                              // comment on exactly which codes map and which are refused
     kNoIabEssenceForChannel,  // build_iab() only: a channel's non-zero AudioDataID (§10.3.6/Table
-                              // 8's own field) never resolved to an AudioDataPCM element in any
-                              // frame it was active in - missing, or only ever present as an
-                              // (undecoded) AudioDataDLC asset. AudioDataID == 0 is legitimate
-                              // silence (§10.3.6) and is not this error.
+                              // 8's own field) never resolved to an AudioDataPCM or AudioDataDLC
+                              // element in any frame it was active in. AudioDataID == 0 is
+                              // legitimate silence (§10.3.6) and is not this error.
+    kBadIabAudio,             // build_iab() only: an AudioDataDLC element in a frame failed to
+                              // decode (iclforge::iab::decode_audio) - see
+                              // iclforge::iab::IabError::kBadDlc
 };
 
 [[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT std::string_view describe(BridgeError error);

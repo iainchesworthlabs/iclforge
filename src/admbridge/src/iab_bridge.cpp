@@ -10,6 +10,7 @@
 
 #include "iclforge/admbridge/coordinates.hpp"
 #include "iclforge/objects/oamd.hpp"
+#include "iclforge/iab/dlc.hpp"
 #include "iclforge/iab/model.hpp"
 
 // See iab_bridge.hpp's own top comment for the overall two-pass design and what is and is not
@@ -131,16 +132,16 @@ struct ChannelIdentity {
 
 // §10.3.6/Table 8's own AudioDataID convention, shared by Bed channels and Objects: 0 means
 // legitimate silence (zero-filled, not an error); a non-zero value must resolve to an
-// AudioDataPCM element in THIS frame or the channel has no audio to place -
-// BridgeError::kNoIabEssenceForChannel (an AudioDataDLC-only reference is exactly this case, since
-// phase 1 does not decode that element - see model.hpp's own AudioDataDlc comment).
+// AudioDataPCM or AudioDataDLC element in THIS frame, already decoded to PCM by
+// iclforge::iab::decode_audio(), or the channel has no audio to place -
+// BridgeError::kNoIabEssenceForChannel.
 [[nodiscard]] std::expected<std::vector<float>, BridgeError> resolve_essence(
-    const iclforge::iab::IaFrame& frame, std::uint32_t audio_data_id,
+    const std::vector<iclforge::iab::AudioDataPcm>& essence, std::uint32_t audio_data_id,
     std::uint32_t samples_per_frame) {
     if (audio_data_id == 0) {
         return std::vector<float>(samples_per_frame, 0.0f);
     }
-    for (const auto& pcm : frame.audio_pcm) {
+    for (const auto& pcm : essence) {
         if (pcm.audio_data_id == audio_data_id) {
             return pcm.samples;
         }
@@ -193,6 +194,11 @@ std::expected<IabBridgeResult, BridgeError> build_iab(std::span<const iclforge::
         const double frame_duration_s =
             static_cast<double>(*samples_per_frame) / static_cast<double>(frame.sample_rate);
 
+        auto essence_in_frame = iclforge::iab::decode_audio(frame);
+        if (!essence_in_frame) {
+            return std::unexpected(BridgeError::kBadIabAudio);
+        }
+
         for (std::size_t ch = 0; ch < identities->size(); ++ch) {
             const auto& identity = (*identities)[ch];
 
@@ -222,7 +228,7 @@ std::expected<IabBridgeResult, BridgeError> build_iab(std::span<const iclforge::
                         .gain = is_lfe ? 0.0 : channel->gain,
                         .lfe_send = is_lfe ? 1.0 : 0.0,
                     });
-                    auto essence = resolve_essence(frame, channel->audio_data_id, *samples_per_frame);
+                    auto essence = resolve_essence(*essence_in_frame, channel->audio_data_id, *samples_per_frame);
                     if (!essence) {
                         return std::unexpected(essence.error());
                     }
@@ -254,7 +260,7 @@ std::expected<IabBridgeResult, BridgeError> build_iab(std::span<const iclforge::
                             .snap = block.snap,
                         });
                     }
-                    auto essence = resolve_essence(frame, object->audio_data_id, *samples_per_frame);
+                    auto essence = resolve_essence(*essence_in_frame, object->audio_data_id, *samples_per_frame);
                     if (!essence) {
                         return std::unexpected(essence.error());
                     }

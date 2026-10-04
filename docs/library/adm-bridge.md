@@ -258,7 +258,8 @@ enum class BridgeError : std::uint8_t {
     kNoProgramme, kProgrammeNotFound, kUnresolvedReference, kObjectReferenceCycle,
     kUnsupportedType, kChannelTrackMismatch, kNoAudioForTrack, kEmptyBlockSequence,
     kTooManyChannels, kEmptyInput,
-    kEmptyIabStream, kUnsupportedIabChannel, kNoIabEssenceForChannel,  // build_iab() only
+    kEmptyIabStream, kUnsupportedIabChannel, kNoIabEssenceForChannel,
+    kBadIabAudio,  // build_iab() only
 };
 std::string_view describe(BridgeError error);
 

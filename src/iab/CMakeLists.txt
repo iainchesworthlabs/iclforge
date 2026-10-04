@@ -41,6 +41,7 @@ endif()
 target_sources(iclforge_iab_objects
     PRIVATE
         src/bitreader.cpp
+        src/dlc.cpp
         src/iab_reader.cpp
         src/iab.cpp
         src/mxf_reader.cpp)
