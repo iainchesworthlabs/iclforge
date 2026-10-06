@@ -361,6 +361,16 @@ LATER_SPELLINGS: dict[str, str] = {
     "iclforge/ac4core/detail/real.hpp": "iclforge/ac4/detail/real.hpp",
     "iclforge/ac4dec/decoder.hpp": "iclforge/ac4/decoder/decoder.hpp",
     "iclforge/ac4enc/encoder.hpp": "iclforge/ac4/encoder/encoder.hpp",
+    # C2: arithmetic in base, admbridge in adm, the key in base's crypto and the signer in ac3
+    "iclforge/admbridge/bridge.hpp": "iclforge/adm/bridge.hpp",
+    "iclforge/admbridge/coordinates.hpp": "iclforge/adm/coordinates.hpp",
+    "iclforge/admbridge/iab_bridge.hpp": "iclforge/adm/iab_bridge.hpp",
+    "iclforge/arithmetic/detail/simd.hpp": "iclforge/base/detail/simd.hpp",
+    "iclforge/arithmetic/fixed32.hpp": "iclforge/base/arithmetic/fixed32.hpp",
+    "iclforge/arithmetic/mant_exp.hpp": "iclforge/base/arithmetic/mant_exp.hpp",
+    "iclforge/arithmetic/scalar_math.hpp": "iclforge/base/arithmetic/scalar_math.hpp",
+    "iclforge/signing/emdf_atmos_signer.hpp": "iclforge/ac3/signing/emdf_atmos_signer.hpp",
+    "iclforge/signing/signing_key.hpp": "iclforge/base/crypto/signing_key.hpp",
 }
 
 

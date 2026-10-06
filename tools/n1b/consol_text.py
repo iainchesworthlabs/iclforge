@@ -55,6 +55,10 @@ class Rule:
     plans: bool = False
     # the files the rule alone reads, by prefix, KEEP's among them (empty: every file of its kinds)
     files: tuple[str, ...] = ()
+    # in a C or C++ source, whether the rule reads its string literals and its comments: a name in a
+    # string is what a program prints, which C0 to C3 do not change
+    strings: bool = True
+    comments: bool = True
     compiled: re.Pattern = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -259,7 +263,142 @@ C1_PROSE = [
         files=("tests/golden/ac4/",),
     ),
 ]
-STAGES: dict[str, list[Rule]] = {"c0": C0, "c1": C1 + C1_PROSE}
+# --- C2 ---------------------------------------------------------------------------------------
+# arithmetic joins base, admbridge joins adm, and signing is divided: the operator's key, SHA-256
+# and HMAC-SHA-256 to iclforge::base::crypto, the EMDF Atmos signer to iclforge::ac3::signing. A
+# qualified name follows its declaration; a string literal keeps what it prints (the CLI's messages
+# when ADM is not built name iclforge::admbridge); the Catch2 tags and the environment variables
+# (ICLFORGE_SIGNING_KEY) keep their names.
+C2_CRYPTO = (
+    "SigningKey",
+    "KeyErrorKind",
+    "KeyLoadError",
+    "load_signing_key",
+    "decode_signing_key",
+    "hmac_sha256",
+    "sha256",
+    "Sha256",
+)
+C2_SIGNER = (
+    "sign_atmos_stream",
+    "sign_atmos_frame",
+    "has_authenticity_tag",
+    "VerifyResult",
+    "VerifySummary",
+    "verify_atmos_stream",
+    "verify_atmos_frame",
+)
+_CRYPTO = "|".join(C2_CRYPTO)
+_SIGNER = "|".join(C2_SIGNER)
+_SIGNER_FILES = ("src/ac3/include/iclforge/ac3/signing/", "src/ac3/src/signing/")
+_CRYPTO_FILES = ("src/base/include/iclforge/base/crypto/", "src/base/src/crypto/")
+C2 = [
+    Rule(
+        "crypto-name",
+        rf"\biclforge::signing::({_CRYPTO})\b",
+        r"iclforge::base::crypto::\1",
+        _TEXT,
+        strings=False,
+    ),
+    Rule(
+        "signer-name",
+        rf"\biclforge::signing::({_SIGNER})\b",
+        r"iclforge::ac3::signing::\1",
+        _TEXT,
+        strings=False,
+    ),
+    Rule(
+        "signer-relative",
+        rf"(?<![\w:])signing::({_SIGNER})\b",
+        r"ac3::signing::\1",
+        strings=False,
+    ),
+    Rule(
+        "crypto-namespace",
+        r"\bnamespace iclforge::signing\b",
+        "namespace iclforge::base::crypto",
+        files=_CRYPTO_FILES,
+    ),
+    Rule(
+        "signer-namespace",
+        r"\bnamespace iclforge::signing\b",
+        "namespace iclforge::ac3::signing",
+        files=_SIGNER_FILES,
+    ),
+    # the signer, in iclforge::ac3::signing now, names the key and the MAC by base's namespace
+    Rule(
+        "signer-crypto",
+        r"(?<![\w:.>/])(SigningKey|hmac_sha256)\b",
+        r"base::crypto::\1",
+        files=_SIGNER_FILES,
+        strings=False,
+        comments=False,
+    ),
+    Rule("bridge-name", r"\biclforge::admbridge::", "iclforge::adm::", _TEXT, strings=False),
+    Rule("bridge-relative", r"(?<![\w:])admbridge::(?=\w)", "adm::", _TEXT, strings=False),
+    Rule("bridge-namespace", r"\bnamespace iclforge::admbridge\b", "namespace iclforge::adm"),
+    # what names a library that goes, in a build file, a script or a page
+    Rule(
+        "alias-variant",
+        r"\biclforge::(signing|admbridge)_(static|shared|objects)\b",
+        lambda m: f"iclforge::{C2_INTO[m.group(1)]}_{m.group(2)}",
+        _TEXT,
+        strings=False,
+    ),
+    Rule(
+        "raw-target",
+        r"\biclforge_(signing|admbridge)_(static|shared|objects)\b",
+        lambda m: f"iclforge_{C2_INTO[m.group(1)]}_{m.group(2)}",
+        _TEXT,
+        strings=False,
+    ),
+    Rule(
+        "alias",
+        r"\biclforge::(signing|admbridge)\b(?![_:])",
+        lambda m: f"iclforge::{C2_INTO[m.group(1)]}",
+        ("cmake",),
+    ),
+    Rule(
+        "file",
+        r"\blibiclforge_(signing|admbridge)(_static\.a|\.so|\.a|\.dylib|\.dll|\.lib)",
+        lambda m: f"libiclforge_{C2_INTO[m.group(1)]}{m.group(2)}",
+        _TEXT,
+        strings=False,
+    ),
+    Rule(
+        "pkg-config",
+        r"\biclforge-(signing|admbridge)\b(?![-\w])",
+        lambda m: f"iclforge-{C2_INTO[m.group(1)]}",
+        _TEXT,
+        strings=False,
+    ),
+    Rule(
+        "macro",
+        r"\bICLFORGE_ADMBRIDGE_((?:DEPRECATED_)?(?:NO_)?EXPORT|DEPRECATED|STATIC_DEFINE"
+        r"|BUILDING_SHARED)\b",
+        r"ICLFORGE_ADM_\1",
+        _TEXT,
+    ),
+    Rule(
+        "collapse",
+        r"(`?\biclforge::(?:ac3|adm|base)(?:_static|_shared)?\b`?)"
+        r"(?:(?:,? and |, | or |/)\1(?![\w:]))+",
+        r"\1",
+        _TEXT,
+    ),
+    Rule(
+        "dedupe",
+        r"(\biclforge::(?:ac3|adm|base)(?:_static|_shared)?)"
+        r"(?:[ \t]*\n[ \t]*\1(?![\w:])|[ \t]+\1(?![\w:]))+",
+        r"\1",
+        ("cmake",),
+    ),
+]
+# A library that goes, and the one a link to it becomes: the signer's users link the codec, which
+# links base. arithmetic's links are include paths, and are base's by hand.
+C2_INTO = {"signing": "ac3", "admbridge": "adm"}
+
+STAGES: dict[str, list[Rule]] = {"c0": C0, "c1": C1 + C1_PROSE, "c2": C2}
 
 
 def kind_of(path: str) -> set[str]:
@@ -272,6 +411,58 @@ def kind_of(path: str) -> set[str]:
 
 
 HELD_PLANS = KEEP[1:4]
+
+_RAW_OPEN = re.compile(r'(?:u8|[uUL])?R"([^ ()\\\t\n]{0,16})\(')
+
+
+def cpp_segments(text: str) -> list[tuple[str, str]]:
+    """A C or C++ source as runs of code, comments and string or character literals (raw strings
+    too), so that a rule can leave a literal or a comment alone. A digit separator (`1'000`) is
+    code."""
+    out: list[tuple[str, str]] = []
+    i, start, n = 0, 0, len(text)
+
+    def flush(upto: int) -> None:
+        if upto > start:
+            out.append(("code", text[start:upto]))
+
+    while i < n:
+        c = text[i]
+        if c == "/" and text.startswith("//", i):
+            flush(i)
+            j = text.find("\n", i)
+            j = n if j == -1 else j
+            out.append(("comment", text[i:j]))
+            i = start = j
+        elif c == "/" and text.startswith("/*", i):
+            flush(i)
+            j = text.find("*/", i + 2)
+            j = n if j == -1 else j + 2
+            out.append(("comment", text[i:j]))
+            i = start = j
+        elif (
+            c in "uULR"
+            and (m := _RAW_OPEN.match(text, i))
+            and (i == 0 or not text[i - 1].isalnum())
+        ):
+            flush(i)
+            close = ")" + m.group(1) + '"'
+            j = text.find(close, m.end())
+            j = n if j == -1 else j + len(close)
+            out.append(("string", text[i:j]))
+            i = start = j
+        elif c == '"' or (c == "'" and not (i > 0 and text[i - 1].isalnum())):
+            flush(i)
+            j = i + 1
+            while j < n and text[j] != c and text[j] != "\n":
+                j += 2 if text[j] == "\\" else 1
+            j = min(j + 1, n)
+            out.append(("string", text[i:j]))
+            i = start = j
+        else:
+            i += 1
+    flush(n)
+    return out
 
 
 def rewrite(
@@ -286,6 +477,17 @@ def rewrite(
         if not kinds.intersection(rule.kinds) or (plan_page and not rule.plans):
             continue
         if rule.files and not path.startswith(rule.files):
+            continue
+        if "cpp" in kinds and not (rule.strings and rule.comments):
+            out = []
+            for kind, chunk in cpp_segments(text):
+                if kind == "code" or (kind == "string" and rule.strings) or (
+                    kind == "comment" and rule.comments
+                ):
+                    chunk, n = rule.compiled.subn(rule.replacement, chunk)
+                    counts[rule.name] += n
+                out.append(chunk)
+            text = "".join(out)
             continue
         text, n = rule.compiled.subn(rule.replacement, text)
         counts[rule.name] += n
