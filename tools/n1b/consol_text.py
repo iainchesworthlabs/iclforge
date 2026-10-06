@@ -20,6 +20,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import consol_apply
+import n1b_docs
 from n1b_lib import CPP_EXT, DEFAULT_ROOT, Repo
 
 KEEP = (
@@ -199,6 +201,36 @@ C1_PROSE = [
         _TEXT,
         plans=True,
     ),
+    # The streams and digests under tests/golden/ac4dec moved with the library's tests (decision 10).
+    Rule(
+        "golden-dir",
+        r"\btests/golden/ac4dec\b(?![\w-])",
+        "tests/golden/ac4",
+        _TEXT,
+        plans=True,
+    ),
+    # check_ac4_decode_scalar_snr.py keys its floors by each stream's path from the repository's root
+    Rule(
+        "golden-dir-pins",
+        r"\btests/golden/ac4dec/",
+        "tests/golden/ac4/",
+        _TEXT,
+        files=("tests/golden/ac4/scalar-agreement",),
+    ),
+    # A comment that still spells an AC-4 header as it was before N1B (`ac4enc/encoder.hpp`): N1B's
+    # header map, followed to the spelling of today (n1b_docs.new_header).
+    Rule(
+        "n1b-header",
+        r"(?<![A-Za-z0-9_./-])("
+        + "|".join(
+            re.escape(k)
+            for k in sorted(n1b_docs.HEADER_MAP, key=len, reverse=True)
+            if k.startswith(("ac4core/", "ac4dec/", "ac4enc/"))
+        )
+        + r")(?![A-Za-z0-9_])",
+        lambda m: n1b_docs.new_header(m.group(1)),
+        _TEXT,
+    ),
     # The encoder's errata, folded into the decoder's page, link the decoder's entries on the page
     # they are on.
     Rule(
@@ -255,20 +287,22 @@ def rewrite(
 def spelling_rules(plan: Path) -> list[Rule]:
     """The include spellings a stage changed (its plan's map, and the cut's), wherever a page or a
     comment names one: n1b_docs.py's `header` rule for the consolidation."""
-    spellings = dict(json.loads(plan.read_text(encoding="utf-8")).get("spellings", {}))
-    spellings.update(CUT_SPELLINGS.get(json.loads(plan.read_text(encoding="utf-8"))["stage"], {}))
-    rules = []
-    for old in sorted(spellings, key=len, reverse=True):
-        rules.append(
-            Rule(
-                "header",
-                r"(?<![\w/])" + re.escape(old) + r"(?![\w/])",
-                spellings[old].replace("\\", "\\\\"),
-                _TEXT,
-                plans=True,
-            )
+    made = json.loads(plan.read_text(encoding="utf-8"))
+    spellings = dict(made.get("spellings", {}))
+    spellings.update(consol_apply.spellings_of(made.get("moves", {})))
+    spellings.update(CUT_SPELLINGS.get(made["stage"], {}))
+    if not spellings:
+        return []
+    alternation = "|".join(re.escape(old) for old in sorted(spellings, key=len, reverse=True))
+    return [
+        Rule(
+            "header",
+            r"(?<![\w/])(" + alternation + r")(?![\w/])",
+            lambda m: spellings[m.group(1)],
+            _TEXT,
+            plans=True,
         )
-    return rules
+    ]
 
 
 def run(

@@ -64,6 +64,18 @@ def new_spelling(path: str) -> str | None:
     return layoutdef.spelling_of(path) or private_spelling(path)
 
 
+def spellings_of(moves: dict[str, str]) -> dict[str, str]:
+    """The include spelling of every public header a stage moves, and its spelling after: a public
+    one's, or its library's private root's where the header is a private one now (the AC-4 core's
+    headers in C1)."""
+    out = {}
+    for old, new in moves.items():
+        so, sn = layoutdef.spelling_of(old), new_spelling(new)
+        if so and sn and so != sn:
+            out[so] = sn
+    return out
+
+
 def export_target(stage: str, old_lib: str, file_new: str) -> str:
     """The library whose export header and macro a file uses after the stage, for `old_lib`'s."""
     lib = library_of(file_new)
@@ -81,11 +93,7 @@ def plan(repo: Repo, stage: str, index) -> dict:
     macros: dict[str, dict[str, str]] = defaultdict(dict)
     stats: Counter = Counter()
     problems = []
-    global_map: dict[str, str] = {}
-    for old, new in moves.items():
-        so, sn = layoutdef.spelling_of(old), layoutdef.spelling_of(new)
-        if so and sn and so != sn:
-            global_map[so] = sn
+    global_map = spellings_of(moves)
     for f in repo.files:
         if repo.ext(f) not in CPP_EXT and not f.endswith((".hpp.in", ".h.in")):
             continue
@@ -190,8 +198,10 @@ def run(root: Path, stage: str, phase: str, json_path: str | None) -> dict:
     made = plan(repo, stage, index)
     by_area = Counter(old.split("/")[0] for old in made["moves"])
     print(
-        f"{stage}: {len(made['moves'])} moves ({', '.join(f'{k} {v}' for k, v in sorted(by_area.items()))}); "
-        f"{sum(len(v) for v in made['edits'].values())} include rewrites in {len(made['edits'])} files, "
+        f"{stage}: {len(made['moves'])} moves "
+        f"({', '.join(f'{k} {v}' for k, v in sorted(by_area.items()))}); "
+        f"{sum(len(v) for v in made['edits'].values())} include rewrites in "
+        f"{len(made['edits'])} files, "
         f"export macros in {len(made['macros'])}; kinds {made['stats']}; "
         f"{len(made['problems'])} includes of a moved private header from outside its library"
     )
