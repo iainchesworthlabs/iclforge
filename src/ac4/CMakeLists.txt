@@ -28,14 +28,15 @@
 # built for no ESP32 part (decision 34).
 # ---------------------------------------------------------------------------
 
-# The decoder: syntax/ reads the substreams, pcm/ reconstructs them.
+# The decoder: syntax/ reads the substreams, pcm/ reconstructs them, and oba/
+# gives object audio metadata its meaning and renders the objects and the
+# intermediate spatial format.
 set(_ac4_decoder_sources
     src/decoder/decoder.cpp
     src/decoder/huffman.cpp
     src/decoder/pcm/acpl.cpp
     src/decoder/pcm/ajcc.cpp
     src/decoder/pcm/ajoc.cpp
-    src/decoder/pcm/isf.cpp
     src/decoder/pcm/asf_reconstruct.cpp
     src/decoder/pcm/aspx.cpp
     src/decoder/pcm/companding.cpp
@@ -45,7 +46,6 @@ set(_ac4_decoder_sources
     src/decoder/pcm/immersive.cpp
     src/decoder/pcm/mixer.cpp
     src/decoder/pcm/multichannel.cpp
-    src/decoder/pcm/objects.cpp
     src/decoder/pcm/renderer.cpp
     src/decoder/pcm/routing.cpp
     src/decoder/pcm/snf_random.cpp
@@ -62,7 +62,9 @@ set(_ac4_decoder_sources
     src/decoder/syntax/oamd.cpp
     src/decoder/syntax/presentation.cpp
     src/decoder/syntax/ssf.cpp
-    src/decoder/syntax/substream.cpp)
+    src/decoder/syntax/substream.cpp
+    src/oba/isf.cpp
+    src/oba/objects.cpp)
 
 # The encoder, and the bit writer its syntax writes through.
 set(_ac4_encoder_sources

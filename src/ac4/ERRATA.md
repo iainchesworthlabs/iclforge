@@ -3141,7 +3141,7 @@ output level's gain and no DRC, so an object presentation refuses DRC gains.
   `object_depth_factor` (2 bits) together, the factor is printed `object_screen_factor_code+1/8`, and "If the
   object_screen_factor_code element is not present, object_screen_factor shall be 0".
 - **Reading:** the factor is (code + 1) / 8, from 1/8 to 1, as the decoder reads it (`apply_other()` in
-  `src/ac4/src/decoder/pcm/objects.cpp`), so the group has no code for a factor of 0: a factor of 0 is the group's
+  `src/ac4/src/oba/objects.cpp`), so the group has no code for a factor of 0: a factor of 0 is the group's
   absence, which also leaves the depth exponent at 1 ([the decoder's reading](#object-audio-metadata)).
   The encoder sends the group for an object whose factor is above 0 or whose exponent is not 1. An exponent
   other than 1 with a factor of 0 has no code. The encoder refuses such an object at configuration, naming the
