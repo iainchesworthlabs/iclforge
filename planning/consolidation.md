@@ -1,17 +1,17 @@
 # One shape for every codec, and fewer libraries (a proposal)
 
-!!! note "Status as of 2026-10-06: C0 and C1 run and proved; C2 and C3 under way; decisions 1 to 5, 7, 10 and 11 taken"
+!!! note "Status as of 2026-10-06: C0, C1 and C2 run and proved; C3 under way; decisions 1 to 7, 10 and 11 taken"
     Asked for by the user on 2026-10-06: "the AC3 codec and the AC4 codec structures are completely
     different. There's also duplication from inside codecs to common stuff", "the ac3 approach is the
     preferred approach", and "should there be 25 libraries? Is it worth consolidating some?". This page
     reads the tree as it stood on `main` that day. It follows [layout.md](layout.md) (N1B), which put the
     codecs side by side and left the duplicated DSP, the codec-blind vocabulary and the shape of AC-4 for
     later ([layout.md (j)](layout.md#j-what-stays-out-and-follow-on-ideas)). The user took decisions 1 to 5
-    below on 2026-10-06, and 7 and 10 before C1; 6, 8 and 9 are open. C0 and C1 ran on the local
-    branches `chore/src-consolidation-c0` and `-c1` and changed nothing a build outputs; C1's cut moves
-    the instruction counts of the bare-metal AC-4 probe by up to 68 parts per million, which the user
-    accepted (decision 11) ([what the runs found](#what-the-runs-found-that-the-plan-did-not)); nothing
-    is pushed.
+    below on 2026-10-06, 7 and 10 before C1, and 6 before C3; 8 and 9 are open. C0, C1 and C2 ran on
+    the local branches `chore/src-consolidation-c0`, `-c1` and `-c2` and changed nothing a build
+    outputs; C1's cut moves the instruction counts of the bare-metal AC-4 probe by up to 68 parts per
+    million, which the user accepted (decision 11) ([what the runs
+    found](#what-the-runs-found-that-the-plan-did-not)); nothing is pushed.
 
 ## In brief
 
@@ -569,6 +569,88 @@ Hazards the plan did not name:
 Not run here: as for C0, and the coverage run (`gcovr` is not installed), so the floor of `src/ac4` is
 the lowest of the three it replaces rather than a measurement.
 
+### C2, 2026-10-06 (`chore/src-consolidation-c2`)
+
+The commits, after C1: the cut's script and the cut (`tests/signing/test_signing.cpp`'s nine cases
+into the signer's five and the primitives' four, `tests/signing/test_crypto.cpp`, with the helpers
+and the includes each uses); the moves alone (26 renames, every one `R100`); the include spellings
+(75 files); the build files and the paths in text (22 files); four passes of `consol_text.py`, each
+after the commit of its rules (88, 36, 66 and 13 files: the namespaces and the names of the
+libraries that go, the directories of `arithmetic` and `admbridge`, the libraries named in prose,
+the SIMD directories); the hand-written commit (40 files, +319 −509); the ABI allowlists. 22 commits,
+11 of them the scripts'.
+
+| | the plan | the run |
+|---|---|---|
+| `arithmetic` into `base` | headers to `iclforge/base/arithmetic/`, the SIMD resolution to `src/base/CMakeLists.txt` | so; the headers keep their `iclforge::internal` namespace and stay out of the install (`iclforge_install_library(... EXCLUDE arithmetic)`); their include path is the header-only `iclforge::base_arithmetic`, since `ac4` and the minimum-footprint archives include them and link no `iclforge::base` |
+| `admbridge` into `adm` | namespace `iclforge::admbridge` to `iclforge::adm` | so; `iclforge::adm` links `iclforge::objects` and `iclforge::iab` publicly, as the bridge did, and stays shared-only; no name collides (`describe` is overloaded on another error type) |
+| signing divided | the key, SHA-256 and HMAC to `iclforge::base::crypto`, the signer to `iclforge::ac3::signing` | so; `sha256.hpp` and `hmac_sha256.hpp`, private before, are installed public headers of `base` now (tiered "internal" in `api-stability.md`); the signer's unqualified uses of the key and the MAC say `base::crypto::` |
+| the tests | `tests/signing/` to `tests/ac3/signing/` and `tests/base/` | so, by the cut; the Catch2 tags (`[signing]`, `[admbridge]`) are kept, as C1 kept AC-4's |
+| text | a pass, as S3 | `consol_text.py` reads a C++ source's code and comments and never its strings: the CLI's message when ADM is not built (`"iclforge::adm/iclforge::admbridge were not linked in"`) and `describe()`'s fallback (`"unknown iclforge::admbridge::BridgeError"`) print what they printed; `ICLFORGE_SIGNING_KEY` and `ICLFORGE_SIGNING_KEY_FILE` keep their names |
+| libraries | 19 to 16 | 16 (`check_layering.py`: 150 edges); public headers 165 in 15 libraries; the install 247 files to 236; the ABI allowlists 14 to 13 |
+
+**The proof.** Against C1's tree, on GCC 16, Clang 22 and the shared tree:
+
+- **Identical:** the pinned hashes and the 44 commands of the CLI corpus on both compilers; the five
+  bare-metal probes, every line (PCM, instructions, heap, stack, image); the exports
+  (`export_diff.py --map c2 --rewrite c2`: `ac3`, `base` and `signing` as one group, 1,544 names before
+  and after, `adm` and `admbridge` 339, every other library −0 +0, 3,268 names in all); the allowlists
+  (`abi_compare.py --map c2 --rewrite c2`: 470 names in `ac3`'s and `base`'s, −0 +0); the public
+  headers (`check-moves --pure`: 165, none lost or edited).
+- **The whole ctest:** 3,452 tests on GCC and on Clang, all pass but the five that skip themselves. The
+  shared tree builds every library; its `iclforge-tests` fails to link as on `main`.
+- **The IR** (`ir_compare.py --plan --names c2`, 540 units): 527 identical, among them the signer, the
+  key and the MAC under their new names; the bridge's two units the same but for local lambdas'
+  mangled names, which no demangler reads and whose encoding follows the namespace; the rest are what
+  a build writes (the commit and the branch in `version.cpp`, the Qt resources' time stamps).
+- **How each unit compiles** (`flags_diff.py --moves`): what changes is what the merges say. The
+  consumers lose the three libraries' `STATIC_DEFINE`s and include directories; the arithmetic
+  include path is `base`'s; the crypto, the signer and the bridge take their library's flags; AC-4's
+  units gain `src/base/include`, which holds no header AC-4 includes by another path.
+- `check_layering.py`, `check_namespaces.py`, `check_pages.py`, `check_doc_paths.py` (6,196 paths), the
+  unit tests and `precheck.py` (but for the patch attribution) pass. The ESP-IDF packer stages the
+  moved files where they went (483 files become 490: the signer and the crypto are in the trees it
+  stages, though the archive the component builds lists none of them).
+
+Hazards the plan did not name:
+
+- **Strings that print a name.** The CLI's disabled-ADM message and the bridge's `describe()` fallback
+  name `iclforge::admbridge`; a namespace pass that read strings would have changed what the programs
+  print. `consol_text.py` gained a C++ segmenter (code, comments, string and raw string literals) so a
+  rule can leave strings alone, and `ir_compare.py` renames only what the compiler writes into a
+  string (`__PRETTY_FUNCTION__`), recomputing its length.
+- **A library divided.** `export_diff.py` and `abi_compare.py` compared one old library with its new
+  files, or several with one; signing went to two. A stage's merges and splits are now one graph
+  (`consoldef.SPLITS`), and each connected group is compared as a union. `libiclforge_signing.so`
+  exported 45 names: 12 are `base`'s now, 13 `ac3`'s, and 20 were the copy of the codec it carried
+  (C0's finding), which `ac3` exports anyway.
+- **Names no tool reads.** Local lambdas' mangled names (clang's `$_0`) stop `llvm-cxxfilt`, and a
+  `construct_at` with a requires-clause stops `nm -C`: `ir_compare.py` demangles a lambda with its `$`
+  read as a letter, compares what is left without the encoding, and says so; the exports read
+  `8iclforge9admbridge` as `8iclforge3adm`, the same depth.
+- **Rename rules in comments.** The CMake rule that made `iclforge::signing` `iclforge::ac3` in a link
+  also made comments say "the signer (iclforge::ac3)" and "iclforge::adm share iclforge::adm's flag";
+  a list rewritten to two equal names (`iclforge::ac3 iclforge::audio iclforge::ac3`) is a duplicate
+  link that the dedupe rule, which reads adjacent names only, left. Both by hand. C1's collapse rule
+  had missed `if(TARGET iclforge::ac4 AND TARGET iclforge::ac4 AND TARGET iclforge::ac4)` in
+  `python/CMakeLists.txt`, fixed here.
+- **Instrumentation that moved.** The HMAC fuzz_signing_verify drives was instrumented as part of
+  `iclforge_signing_objects`; it is `base`'s now, so the fuzz tree instruments `iclforge_base_objects`
+  too.
+- **A shared library with private copies.** In a static build `libiclforge_adm.so` (shared-only)
+  links the archives of `objects`, `dsp`, `base` and `iab`, as `libiclforge_admbridge.so` did, and
+  `adm`'s `--exclude-libs,ALL` now keeps their names out of its exports where the bridge's library
+  exported them. The shared tree, which the export proof reads, links them dynamically.
+- **What the move leaves possible.** `io::probe` asks whether a frame carries an authenticity tag
+  through a callback (`ProbeOptions::authenticity`) because `ac3` could not link the signer; it can
+  now. A simplification for C4, not made in a stage that changes nothing.
+- **The stash.** Running a text pass on the committed tree with the hand edits stashed, while a build
+  ran in the same worktree, let the build read the build files without the hand edits for a moment;
+  the tree was built again afterwards.
+
+Not run here: as for C1. The coverage floors of `src/adm` take the lower of `adm`'s and `admbridge`'s
+(82/75); `src/base` and `src/ac3` keep theirs, which are under signing's.
+
 ## (g) Decisions
 
 ### Taken on 2026-10-06
@@ -582,6 +664,10 @@ the lowest of the three it replaces rather than a measurement.
    the algorithm differ ("signing should probably be in ac3 with ac4 having its own signing"). AC-3's
    signer goes into `ac3` now and AC-4's into `ac4` when it is built; the key, SHA-256 and HMAC, which
    both use, go to `base` (d).
+6. **The containers' namespace.** (a) `iclforge::containers::mp4` and so on, one rule for path, target
+   and namespace, as `iclforge::ac3::io` is (headers `iclforge/containers/mp4/mp4.hpp`); (b) keep
+   `iclforge::mp4` and its kin inside the one library, a recorded exception to the lock. **Taken,
+   before C3: (a)**, every use rewritten by a pass, as C2's renames were.
 7. **AC-4's public headers.** **Taken: (a)**, split in C1.
 10. **The golden directories.** **Taken, on the user's words:** "tests structure should ideally map
     directly to src structure so move/consolidate/rename as necessary". `tests/golden/ac4dec/` becomes
@@ -593,11 +679,6 @@ the lowest of the three it replaces rather than a measurement.
 
 ### Open
 
-6. **The containers' namespace.** (a) **`iclforge::containers::mp4` and so on** (recommended: one rule for
-   path, target and namespace, as `iclforge::ac3::io` is; headers `iclforge/containers/mp4/mp4.hpp`);
-   (b) keep `iclforge::mp4` and its kin inside the one library, a recorded exception to the lock. Cost of
-   (a): every use of the five namespaces in the programs, the tests and the bindings, done by a pass as
-   N1B's S3 was.
 8. **The order.** (a) **C0, C1, C2, C3 as one freeze, then C4, C5, C6 as they are ready** (recommended:
    the mechanical stages are disruptive in the same files and are cheapest together); (b) each stage
    alone; (c) C1 first, before C0.
