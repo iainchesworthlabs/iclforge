@@ -484,7 +484,7 @@ void check(ElementKind kind, int codec, unsigned seed) {
 }  // namespace
 
 TEST_CASE("the A-CPL stage gives the bits of the old stage: a channel pair in ASPX_ACPL_2",
-          "[ac4dec][acpl][exact]") {
+          "[ac4][decoder][acpl][exact]") {
     for (unsigned seed = 1; seed <= 8; ++seed) {
         CAPTURE(seed);
         check(ElementKind::kPair, codec_mode::kAspxAcpl2, seed);
@@ -493,7 +493,7 @@ TEST_CASE("the A-CPL stage gives the bits of the old stage: a channel pair in AS
 
 TEST_CASE(
     "the A-CPL stage gives the bits of the old stage: a channel pair with residuals in ASPX_ACPL_1",
-    "[ac4dec][acpl][exact]") {
+    "[ac4][decoder][acpl][exact]") {
     for (unsigned seed = 11; seed <= 18; ++seed) {
         CAPTURE(seed);
         check(ElementKind::kPair, codec_mode::kAspxAcpl1, seed);
@@ -501,7 +501,7 @@ TEST_CASE(
 }
 
 TEST_CASE("the A-CPL stage gives the bits of the old stage: the 5.X element's two modules",
-          "[ac4dec][acpl][exact]") {
+          "[ac4][decoder][acpl][exact]") {
     for (unsigned seed = 21; seed <= 28; ++seed) {
         CAPTURE(seed);
         check(ElementKind::k5X, codec_mode::kAspxAcpl2, seed);
@@ -511,7 +511,7 @@ TEST_CASE("the A-CPL stage gives the bits of the old stage: the 5.X element's tw
 
 TEST_CASE(
     "the A-CPL stage gives the bits of the old stage: the 5.X element's coupling in ASPX_ACPL_3",
-    "[ac4dec][acpl][exact]") {
+    "[ac4][decoder][acpl][exact]") {
     for (unsigned seed = 31; seed <= 46; ++seed) {
         CAPTURE(seed);
         check(ElementKind::k5X, codec_mode::kAspxAcpl3, seed);

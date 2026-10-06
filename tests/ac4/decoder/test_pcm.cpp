@@ -148,7 +148,7 @@ std::vector<double> subband_energy(std::span<const float> samples) {
 
 }  // namespace
 
-TEST_CASE("Pseudocode 24's reset lands where stepping Pseudocode 57's increments lands", "[ac4dec][pcm]") {
+TEST_CASE("Pseudocode 24's reset lands where stepping Pseudocode 57's increments lands", "[ac4][decoder][pcm]") {
     // Pseudocode 55's state, stepped 255 * (sequence_counter % 256) times
     // with `x = x++` read as an increment, is Pseudocode 24's closed form for
     // every counter; ERRATA.md, "x = x++ in Pseudocode 57".
@@ -174,7 +174,7 @@ TEST_CASE("Pseudocode 24's reset lands where stepping Pseudocode 57's increments
     }
 }
 
-TEST_CASE("GetRandomNoiseValue adds two table entries and then steps", "[ac4dec][pcm]") {
+TEST_CASE("GetRandomNoiseValue adds two table entries and then steps", "[ac4][decoder][pcm]") {
     iclforge::ac4::detail::RandGenState state = iclforge::ac4::detail::reset_rand_gen_state_snf(0);
     // Pseudocode 55's state: current 0, state 1.
     CHECK(iclforge::ac4::detail::get_random_noise_value(state) ==
@@ -190,7 +190,7 @@ TEST_CASE("GetRandomNoiseValue adds two table entries and then steps", "[ac4dec]
 }
 
 TEST_CASE("a pair with b_dual_maxsfb is laid out alike before its stereo processing",
-          "[ac4dec][pcm]") {
+          "[ac4][decoder][pcm]") {
     // Two windows of 1 024 lines in groups of their own; the first track
     // sends 10 and 8 bands, the second 4 and 6. Each line holds its group,
     // band and place: 1000 (track) + 100 g + the line's index in its band's
@@ -270,7 +270,7 @@ TEST_CASE("a pair with b_dual_maxsfb is laid out alike before its stereo process
                    ((1100.0 + 0.01 * 2) - (2100.0 + 0.01 * 2))) < kTolerance);
 }
 
-TEST_CASE("a SIMPLE stereo stream decodes each tone to its own channel", "[ac4dec][pcm]") {
+TEST_CASE("a SIMPLE stereo stream decodes each tone to its own channel", "[ac4][decoder][pcm]") {
     const Decoded decoded = decode_all("ac4-20-tones-192");
     REQUIRE(decoded.speakers == std::vector<iclforge::ac4::Speaker>{iclforge::ac4::Speaker::kLeft, iclforge::ac4::Speaker::kRight});
     CHECK(decoded.sample_rate_hz == 48000);
@@ -298,7 +298,7 @@ TEST_CASE("a SIMPLE stereo stream decodes each tone to its own channel", "[ac4de
     CHECK(std::abs(level_db(right_457)) < 0.2);
 }
 
-TEST_CASE("a SIMPLE stereo music stream decodes every frame", "[ac4dec][pcm]") {
+TEST_CASE("a SIMPLE stereo music stream decodes every frame", "[ac4][decoder][pcm]") {
     const Decoded decoded = decode_all("ac4-20-music-192");
     REQUIRE(decoded.channels.size() == 2);
     float peak = 0.0F;
@@ -313,7 +313,7 @@ TEST_CASE("a SIMPLE stereo music stream decodes every frame", "[ac4dec][pcm]") {
     CHECK(peak < 0.3F);
 }
 
-TEST_CASE("an ASPX stereo stream decodes every frame with its high band rebuilt", "[ac4dec][pcm]") {
+TEST_CASE("an ASPX stereo stream decodes every frame with its high band rebuilt", "[ac4][decoder][pcm]") {
     // DEE's 2.0 speech at 128 kbps: A-SPX recreates QMF subbands 36 (13.5
     // kHz) to 55 from the waveform-coded band below. Its source speech has
     // content up to 16 kHz, 10 to 25 dB under the 7.5 to 11 kHz band.
@@ -337,7 +337,7 @@ TEST_CASE("an ASPX stereo stream decodes every frame with its high band rebuilt"
     }
 }
 
-TEST_CASE("a SIMPLE 5.1 stream decodes each tone to its own channel, the LFE's included", "[ac4dec][pcm]") {
+TEST_CASE("a SIMPLE 5.1 stream decodes each tone to its own channel, the LFE's included", "[ac4][decoder][pcm]") {
     // tones_51: L R C LFE Ls Rs at 331, 457, 613, 47, 787 and 953 Hz, each at
     // -20 dBFS (gen_ac4_baseline.py's TONE_HZ).
     const Decoded decoded = decode_all("ac4-51-tones-384", iclforge::ac4::DecodingMode::kFull,
@@ -413,7 +413,7 @@ std::size_t channel_of(const Decoded& decoded, iclforge::ac4::Speaker speaker) {
 }  // namespace
 
 TEST_CASE("the immersive element's SCPL and ASPX_SCPL streams decode each tone to its own channel",
-          "[ac4dec][pcm][immersive]") {
+          "[ac4][decoder][pcm][immersive]") {
     using S = iclforge::ac4::Speaker;
     for (const char* leg : {"ac4-514-tones-768", "ac4-514-tones-512"}) {
         CAPTURE(leg);
@@ -454,7 +454,7 @@ TEST_CASE("the immersive element's SCPL and ASPX_SCPL streams decode each tone t
 }
 
 TEST_CASE("the immersive element's ASPX_ACPL_2 stream makes its top pairs by A-CPL",
-          "[ac4dec][pcm][immersive]") {
+          "[ac4][decoder][pcm][immersive]") {
     // At 256 kbps DEE codes F'' and G'', each top pair's sum, and A-CPL makes
     // Tfl and Tbl, Tfr and Tbr of them with its parameters: each top tone
     // keeps its level across its pair and is loudest in its own channel, and
@@ -491,7 +491,7 @@ TEST_CASE("the immersive element's ASPX_ACPL_2 stream makes its top pairs by A-C
 }
 
 TEST_CASE("core decoding gives the immersive element's 5.X.2 core at the core gains",
-          "[ac4dec][pcm][immersive]") {
+          "[ac4][decoder][pcm][immersive]") {
     // Table 24 and clauses 4.8.3.11.2 and 4.8.3.14: L, R and C as coded; Ls,
     // Rs, Tsl and Tsr each the sum of the pair full decoding makes, over the
     // square root of 2, so every tone of those pairs 3 dB down, in every mode.
@@ -574,7 +574,7 @@ using Mixes = std::vector<std::pair<iclforge::ac4::Speaker, std::vector<Term>>>;
 
 TEST_CASE(
     "the immersive element's renders to 5.1 and 2.0 are the renderer's matrices, in both modes",
-    "[ac4dec][pcm][immersive]") {
+    "[ac4][decoder][pcm][immersive]") {
     // Rendered to 5.X.0 and to Lo/Ro, each tone's phasor in each channel is
     // the matrix's mix of its phasors decoded as coded (the source's 5.1.4 in
     // full decoding, the core's 5.1.2 in core decoding), to 0.01 dB where it
@@ -688,7 +688,7 @@ TEST_CASE(
     }
 }
 
-TEST_CASE("an ASPX 5.1 stream rebuilds the high band of every channel but the LFE", "[ac4dec][pcm]") {
+TEST_CASE("an ASPX 5.1 stream rebuilds the high band of every channel but the LFE", "[ac4][decoder][pcm]") {
     // DEE's 5.1 music at 192 kbps: A-SPX from QMF subband 32 (12 kHz) in the
     // pairs (L, R) and (Ls, Rs) and in C (Part 1 Table 213). The source music
     // is 25 to 40 dB quieter from 12 to 16 kHz than from 7.5 to 11.25 kHz; its
@@ -721,7 +721,7 @@ TEST_CASE("an ASPX 5.1 stream rebuilds the high band of every channel but the LF
 }
 
 TEST_CASE("decode takes the IMS streams' frame rates through the sample rate converter to 48 kHz",
-          "[ac4dec][pcm][src]") {
+          "[ac4][decoder][pcm][src]") {
     struct Leg {
         const char* name;
         int frame_rate_index;
@@ -767,7 +767,7 @@ TEST_CASE("decode takes the IMS streams' frame rates through the sample rate con
     }
 }
 
-TEST_CASE("decode reports a table of contents it cannot read", "[ac4dec][pcm]") {
+TEST_CASE("decode reports a table of contents it cannot read", "[ac4][decoder][pcm]") {
     iclforge::ac4::Decoder decoder;
     const std::array<std::byte, 3> garbage{std::byte{0xFF}, std::byte{0xFF}, std::byte{0xFF}};
     const auto decoded = decoder.decode(garbage);
@@ -776,7 +776,7 @@ TEST_CASE("decode reports a table of contents it cannot read", "[ac4dec][pcm]") 
     CHECK_FALSE(decoder.refusal_reason().empty());
 }
 
-TEST_CASE("the |q|^(4/3) table holds the double nearest every power", "[ac4dec][pcm]") {
+TEST_CASE("the |q|^(4/3) table holds the double nearest every power", "[ac4][decoder][pcm]") {
     namespace pd = iclforge::ac4::detail::pow43_detail;
     const auto& table = iclforge::ac4::detail::kPow43<double>;
     const auto& narrow = iclforge::ac4::detail::kPow43<float>;
@@ -809,7 +809,7 @@ TEST_CASE("the |q|^(4/3) table holds the double nearest every power", "[ac4dec][
 
 TEST_CASE(
     "a substream's decoder state holds no A-CPL, A-JCC or A-JOC stage its stream does not use",
-    "[ac4dec][pcm]") {
+    "[ac4][decoder][pcm]") {
     // The three stages hold their decorrelators' history, 100 to 170 KiB each at double;
     // the first frame that applies one makes it, so SubstreamPcm itself is a few KiB.
     CHECK(sizeof(iclforge::ac4::detail::SubstreamPcm) <= 16 * 1024);

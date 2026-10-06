@@ -56,7 +56,7 @@ bool increasing(std::span<const int> values) {
 }  // namespace
 
 TEST_CASE("the subband groups, patches and limiter of DEE's 128 kbps stereo configuration",
-          "[ac4core][aspx]") {
+          "[ac4][core][aspx]") {
     // aspx_master_freq_scale 1, aspx_start_freq 6, aspx_stop_freq 1,
     // aspx_noise_sbg 3, aspx_xover_subband_offset 0, worked through
     // Pseudocodes 67 to 74 by hand.
@@ -95,7 +95,7 @@ TEST_CASE("the subband groups, patches and limiter of DEE's 128 kbps stereo conf
 }
 
 TEST_CASE("the subband groups, patches and limiter of DEE's 48 kbps stereo configuration",
-          "[ac4core][aspx]") {
+          "[ac4][core][aspx]") {
     const aspx::SubbandGroups g = groups_for({.master_freq_scale = 0,
                                               .start_freq = 5,
                                               .stop_freq = 0,
@@ -120,7 +120,7 @@ TEST_CASE("the subband groups, patches and limiter of DEE's 48 kbps stereo confi
 }
 
 TEST_CASE("every configuration a stream can select gives tables that hold together",
-          "[ac4core][aspx]") {
+          "[ac4][core][aspx]") {
     int configurations = 0;
     int noise_refusals = 0;
     int patches_short = 0;
@@ -199,7 +199,7 @@ TEST_CASE("every configuration a stream can select gives tables that hold togeth
 }
 
 TEST_CASE("the linear prediction of Pseudocodes 86 and 87 finds a two-slot recursion",
-          "[ac4core][aspx]") {
+          "[ac4][core][aspx]") {
     // One subband following x[n] = -a0 x[n-2] - a1 x[n-4] exactly: the
     // whitening filter 1 + a0 z^-2 + a1 z^-4 leaves nothing, so the
     // covariance method returns (a0, a1), up to Pseudocode 87's 2^-20, which
@@ -226,7 +226,7 @@ TEST_CASE("the linear prediction of Pseudocodes 86 and 87 finds a two-slot recur
     CHECK(alpha1[3] == Complex{});
 }
 
-TEST_CASE("pre-flattening flattens an envelope that is a cubic in dB exactly", "[ac4core][aspx]") {
+TEST_CASE("pre-flattening flattens an envelope that is a cubic in dB exactly", "[ac4][core][aspx]") {
     // |Q[sb]|^2 = 10^(p(sb)/10) - 1 on every slot, so Pseudocode 85's
     // 10 log10(energy + 1) is p(sb), which the cubic fit returns unchanged.
     constexpr int kSbx = 20;
@@ -254,7 +254,7 @@ TEST_CASE("pre-flattening flattens an envelope that is a cubic in dB exactly", "
 }
 
 TEST_CASE("with no tonal adjustment the generator copies each patch's source subbands up",
-          "[ac4core][aspx]") {
+          "[ac4][core][aspx]") {
     const aspx::SubbandGroups g = groups_for({.master_freq_scale = 1,
                                               .start_freq = 6,
                                               .stop_freq = 1,
@@ -294,7 +294,7 @@ TEST_CASE("with no tonal adjustment the generator copies each patch's source sub
     CHECK(q_high[32 * 64 + 40] == Complex(7.0, 7.0));
 }
 
-TEST_CASE("pre-flattening patches a low band whose envelope is a cubic in dB flat", "[ac4core][aspx]") {
+TEST_CASE("pre-flattening patches a low band whose envelope is a cubic in dB flat", "[ac4][core][aspx]") {
     // Pseudocode 85 fits the cubic exactly, and every subband the patches
     // fill comes out at the fit's mean: the patch is flattened, the reading
     // src/ac4/ERRATA.md takes under "Pre-flattening's direction". Applied
@@ -338,7 +338,7 @@ TEST_CASE("pre-flattening patches a low band whose envelope is a cubic in dB fla
     }
 }
 
-TEST_CASE("the chirp factors follow Table 195 and Pseudocode 88's smoothing", "[ac4core][aspx]") {
+TEST_CASE("the chirp factors follow Table 195 and Pseudocode 88's smoothing", "[ac4][core][aspx]") {
     const aspx::SubbandGroups g = groups_for({.master_freq_scale = 1,
                                               .start_freq = 6,
                                               .stop_freq = 1,

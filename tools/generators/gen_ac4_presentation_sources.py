@@ -21,7 +21,7 @@ tests/golden/ac4/presentations/sources/, and tests/ac4/decoder/test_presentation
 multiplexes them, byte for byte, into the streams committed beside them; the encoder's bytes are
 not promised across toolchains, so the test takes the committed sources rather than encoding
 them again. Run this after a change to the encoder that should reach them, then the test with
-AC4DEC_WRITE_PRESENTATIONS set to rewrite the multiplexed streams, then
+AC4_DECODER_WRITE_PRESENTATIONS set to rewrite the multiplexed streams, then
 tools/references/ac4_syntax.py for their digests.
 
 Usage:

@@ -192,7 +192,7 @@ what that forge's probe and decode made of the stream. G0's streams get their MP
 DIR/mp4/<leg>/. With --cli, the objects group builds its ADM BWF masters with that forge
 (DIR/masters/<name>/, atmos-encode then decode's adm_out) and checks them with atmos_info.
 Every AC-4 leg's syntax digest goes to <scratch>/census/, for the census comparison:
-AC4DEC_GOLDEN_DIR=<scratch>/census AC4DEC_STREAM_DIR=DIR/streams iclforge-tests "[ac4dec][syntax]".
+AC4_GOLDEN_DIR=<scratch>/census AC4_STREAM_DIR=DIR/streams iclforge-tests "[ac4][decoder][syntax]".
 
 What DEE 6.5.4 could not be made to write (G1's audit, recorded in the manifest's g1_dee_cannot):
 7.1 AC-4 (eight channels in come out as 5.1), 7.1.4 or 9.1.6 AC-4, any frame rate but index 13
@@ -2100,8 +2100,8 @@ def gold_run(args, version):
     for label, names in (("failed", failed), ("leveled", leveled), ("walk failures", walk_failed)):
         if names:
             print(f"  {label}: {names}")
-    print(f"census digests in {census}: AC4DEC_GOLDEN_DIR={census} "
-          f"AC4DEC_STREAM_DIR={streams} iclforge-tests \"[ac4dec][syntax]\"")
+    print(f"census digests in {census}: AC4_GOLDEN_DIR={census} "
+          f"AC4_STREAM_DIR={streams} iclforge-tests \"[ac4][decoder][syntax]\"")
     if failed:
         raise SystemExit(1)
 

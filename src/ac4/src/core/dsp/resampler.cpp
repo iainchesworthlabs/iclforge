@@ -277,8 +277,8 @@ template class BasicResamplerFilter<Real>;
 template class Resampler<Real>;
 // The encoder's own sample rate handling (src/ac4/src/encoder/encoder.cpp) calls
 // this at double regardless of the decoder's scalar (see this target's
-// CMakeLists.txt, AC4CORE_ALSO_AT_DOUBLE), with the double filter.
-AC4CORE_ALSO_AT_DOUBLE(template class BasicResamplerFilter<double>;)
-AC4CORE_ALSO_AT_DOUBLE(template class Resampler<double>;)
+// CMakeLists.txt, ICLFORGE_AC4_ALSO_AT_DOUBLE), with the double filter.
+ICLFORGE_AC4_ALSO_AT_DOUBLE(template class BasicResamplerFilter<double>;)
+ICLFORGE_AC4_ALSO_AT_DOUBLE(template class Resampler<double>;)
 
 }  // namespace iclforge::ac4::detail::dsp

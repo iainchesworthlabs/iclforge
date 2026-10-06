@@ -128,7 +128,7 @@ void expect_noise(const Reconstruction& got, std::size_t band, double level,
 }  // namespace
 
 TEST_CASE("noise fill levels follow the coded band's and each codeword's delta",
-          "[ac4dec][asf][noise]") {
+          "[ac4][decoder][asf][noise]") {
     Track t;
     t.quant[1] = {4, -3, 2, 1};  // the first band with energy: the reference level
     t.quant[5] = {1, 0, 0, 0};   // a coded band later on sets the level again
@@ -174,7 +174,7 @@ TEST_CASE("noise fill levels follow the coded band's and each codeword's delta",
 }
 
 TEST_CASE("noise fill is off unless b_snf_data_exists, whatever the bands carry",
-          "[ac4dec][asf][noise]") {
+          "[ac4][decoder][asf][noise]") {
     Track t;
     t.quant[0] = {2, 2, 2, 2};
     t.fill(1, 0);
@@ -198,7 +198,7 @@ TEST_CASE("noise fill is off unless b_snf_data_exists, whatever the bands carry"
 }
 
 TEST_CASE("noise fill draws continue across tracks of a frame rather than restarting",
-          "[ac4dec][asf][noise]") {
+          "[ac4][decoder][asf][noise]") {
     // ERRATA: the generator starts once per substream per frame and each track draws on from where
     // the one before stopped, so two channels of a pair do not get the same noise.
     Track a;
@@ -405,7 +405,7 @@ void check_extension(const std::vector<std::vector<BandSpec>>& core,
 }  // namespace
 
 TEST_CASE("an HSF extension's scale factors and noise levels carry on from the core's",
-          "[ac4dec][asf][noise][hsf]") {
+          "[ac4][decoder][asf][noise][hsf]") {
     SECTION("one window group") {
         BandSpec silent_zero;
         silent_zero.snf = 0;

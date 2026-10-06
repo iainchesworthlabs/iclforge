@@ -11,7 +11,7 @@
 // against the formulas of Part 1 clauses 5.7.8.9 and 6.2.16 and Part 2 clauses
 // 4.8.3.17 to 4.8.4, to 0.01 dB, each against the substream decoded alone
 // through a presentation of its own. The rules a presentation keeps are held
-// by refusals. With AC4ENC_WRITE_PRESENTATIONS set to a directory, the
+// by refusals. With AC4_ENCODER_WRITE_PRESENTATIONS set to a directory, the
 // broadcast and hybrid streams are written there, each with the configuration
 // it was made from as JSON, to commit under tests/golden/ac4/presentations/,
 // where tools/checks/mix_ac4_decode.py holds their mixes to the formulas and
@@ -610,7 +610,7 @@ std::vector<std::byte> sync_framed(const Encoded& encoded) {
 }
 
 fs::path committed(std::string_view name) {
-    return fs::path{AC4DEC_GOLDEN_DIR} / "presentations" / (std::string{name} + ".ac4");
+    return fs::path{AC4_GOLDEN_DIR} / "presentations" / (std::string{name} + ".ac4");
 }
 
 iclforge::ac4::Toc toc_of(std::span<const std::byte> frame) {
@@ -628,7 +628,7 @@ bool accepted(const iclforge::ac4::EncoderConfig& config) {
 }  // namespace
 
 TEST_CASE("the default stream has a presentation_id and the level its layout needs",
-          "[ac4enc][presentations]") {
+          "[ac4][encoder][presentations]") {
     for (const auto& [channels, level] :
          {std::pair{1, 0}, std::pair{2, 0}, std::pair{5, 1}, std::pair{6, 1}}) {
         CAPTURE(channels);
@@ -674,7 +674,7 @@ TEST_CASE("the default stream has a presentation_id and the level its layout nee
 }
 
 TEST_CASE("the table of contents holds the presentations and substreams as configured",
-          "[ac4enc][presentations]") {
+          "[ac4][encoder][presentations]") {
     const Stream s = broadcast();
     const Encoded& encoded = encoded_broadcast();
     REQUIRE_FALSE(encoded.frames.empty());
@@ -739,13 +739,13 @@ TEST_CASE("the table of contents holds the presentations and substreams as confi
     }
 }
 
-TEST_CASE("the encoder's presentations read back with its own trace", "[ac4enc][presentations]") {
+TEST_CASE("the encoder's presentations read back with its own trace", "[ac4][encoder][presentations]") {
     read_back(encoded_broadcast());
     read_back(encoded_hybrid());
     read_back(encoded_emdf());
 }
 
-TEST_CASE("names and EMDF payloads read back as configured", "[ac4enc][presentations]") {
+TEST_CASE("names and EMDF payloads read back as configured", "[ac4][encoder][presentations]") {
     const Encoded& encoded = encoded_broadcast();
     // The records of the first frame, an I-frame, by substream.
     std::vector<iclforge::ac4::SyntaxRecord> read;
@@ -806,7 +806,7 @@ TEST_CASE("names and EMDF payloads read back as configured", "[ac4enc][presentat
 }
 
 TEST_CASE("the decoder selects the encoder's presentations as configured",
-          "[ac4enc][presentations]") {
+          "[ac4][encoder][presentations]") {
     const iclforge::ac4::Toc toc = toc_of(encoded_broadcast().frames.front());
     const auto selected_id = [&toc](const iclforge::ac4::PresentationChoice& choice,
                                     int level = 3) -> std::optional<int> {
@@ -842,7 +842,7 @@ TEST_CASE("the decoder selects the encoder's presentations as configured",
     CHECK(selected_id({}, 0) == 21);
 }
 
-TEST_CASE("music and effects with dialogue mix as configured", "[ac4enc][presentations]") {
+TEST_CASE("music and effects with dialogue mix as configured", "[ac4][encoder][presentations]") {
     const Encoded& e = encoded_broadcast();
     const Decoded me = decode_id(e, 20);
     const Decoded english = decode_id(e, 21);
@@ -871,7 +871,7 @@ TEST_CASE("music and effects with dialogue mix as configured", "[ac4enc][present
     check_tone(fr, french, Speaker::kRight, kToneFrench[1], {{Speaker::kRight, 3.0}});
 }
 
-TEST_CASE("associated audio mixes as configured", "[ac4enc][presentations]") {
+TEST_CASE("associated audio mixes as configured", "[ac4][encoder][presentations]") {
     const Encoded& e = encoded_broadcast();
     const Decoded main = decode_id(e, 20);
     const Decoded english = decode_id(e, 21);
@@ -914,7 +914,7 @@ TEST_CASE("associated audio mixes as configured", "[ac4enc][presentations]") {
 }
 
 TEST_CASE("the hybrid methods add the dialogue enhancement substream's waveform",
-          "[ac4enc][presentations]") {
+          "[ac4][encoder][presentations]") {
     const Encoded& e = encoded_hybrid();
     const Decoded main51 = decode_id(e, 10);
     const Decoded waveform51 = decode_id(e, 11);
@@ -980,7 +980,7 @@ TEST_CASE("the hybrid methods add the dialogue enhancement substream's waveform"
 }
 
 TEST_CASE("the cross-channel hybrid method renders its waveform by the dialogue's panning",
-          "[ac4enc][presentations]") {
+          "[ac4][encoder][presentations]") {
     // A stereo main whose dialogue, a stem apart from the programme, is panned
     // (0.448, 0.894), which Table 172 carries exactly: the waveform is its
     // projection on that panning, and the decoder renders it back by it.
@@ -1024,7 +1024,7 @@ TEST_CASE("the cross-channel hybrid method renders its waveform by the dialogue'
 }
 
 TEST_CASE("3.0 carries the dialogue of a music and effects presentation and a waveform",
-          "[ac4enc][presentations]") {
+          "[ac4][encoder][presentations]") {
     const Encoded& e = encoded_three_zero();
     read_back(e);
     const iclforge::ac4::Toc toc = toc_of(e.frames.front());
@@ -1059,7 +1059,7 @@ TEST_CASE("3.0 carries the dialogue of a music and effects presentation and a wa
     CHECK_FALSE(accepted(config));
 }
 
-TEST_CASE("the 7.X pair is the 7.X substream's beside mono dialogue", "[ac4enc][presentations]") {
+TEST_CASE("the 7.X pair is the 7.X substream's beside mono dialogue", "[ac4][encoder][presentations]") {
     // 7.1 music and effects (L R C LFE Ls Rs and the back pair) with mono
     // English dialogue: experimental.seven_x names the 7.1 substream's pair,
     // and the dialogue codes as it would alone.
@@ -1096,7 +1096,7 @@ TEST_CASE("the 7.X pair is the 7.X substream's beside mono dialogue", "[ac4enc][
           "experimental.seven_x's additional pair without seven or eight channels");
 }
 
-TEST_CASE("presentations that break the rules are refused", "[ac4enc][presentations]") {
+TEST_CASE("presentations that break the rules are refused", "[ac4][encoder][presentations]") {
     const auto base = [] {
         iclforge::ac4::EncoderConfig c;
         c.bitrate_kbps = 256;
@@ -1248,8 +1248,8 @@ TEST_CASE("presentations that break the rules are refused", "[ac4enc][presentati
 }
 
 TEST_CASE("the committed encoder presentation streams are the configurations'",
-          "[ac4enc][presentations]") {
-    const char* write_to = std::getenv("AC4ENC_WRITE_PRESENTATIONS");
+          "[ac4][encoder][presentations]") {
+    const char* write_to = std::getenv("AC4_ENCODER_WRITE_PRESENTATIONS");
     const std::array<std::pair<std::string_view, Stream>, 4> streams = {
         std::pair{"encoder-broadcast", broadcast()}, std::pair{"encoder-hybrid", hybrid()},
         std::pair{"encoder-emdf", emdf()}, std::pair{"encoder-three-zero", three_zero()}};
@@ -1291,7 +1291,7 @@ TEST_CASE("the committed encoder presentation streams are the configurations'",
                   toc.substream_groups[g].substreams.front().chan->ch_mode);
         }
         std::ifstream in(
-            fs::path{AC4DEC_GOLDEN_DIR} / "presentations" / (std::string{name} + ".json"),
+            fs::path{AC4_GOLDEN_DIR} / "presentations" / (std::string{name} + ".json"),
             std::ios::binary);
         std::string json((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
         std::erase(json, '\r');

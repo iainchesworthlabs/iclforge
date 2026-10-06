@@ -216,7 +216,7 @@ constexpr std::array<int, 8> kSlotCounts = {1, 2, 7, 16, 24, 30, 31, 32};
 }  // namespace
 
 TEST_CASE("interpolate gives the bits of Pseudocode 109 evaluated at every subband",
-          "[ac4core][acpl][exact]") {
+          "[ac4][core][acpl][exact]") {
     Source source(20261002U);
     for (const bool steep : {false, true}) {
         for (const int sets : {1, 2}) {
@@ -258,7 +258,7 @@ TEST_CASE("interpolate gives the bits of Pseudocode 109 evaluated at every subba
 }
 
 TEST_CASE("interpolate follows a band count that changes between frames",
-          "[ac4core][acpl][exact]") {
+          "[ac4][core][acpl][exact]") {
     // acpl_param_prev is per subband and a frame can change the band count: the previous frame's 15
     // bands' values stand in a new frame's 7, so a band's subbands start from different values.
     Source source(7U);
@@ -313,7 +313,7 @@ void check_decorrelators() {
 TEST_CASE(
     "a decorrelator gives the bits of its coefficients narrowed at every tap at the decoder's "
     "scalar",
-    "[ac4core][acpl][exact]") {
+    "[ac4][core][acpl][exact]") {
     // At Fixed32 the decorrelators sum their taps in 64 bits with Q1.30 coefficients. A generic lambda, so that a fixed build
     // does not instantiate the floating comparison.
     []<typename R>() {
@@ -324,6 +324,6 @@ TEST_CASE(
 }
 
 TEST_CASE("a decorrelator gives the bits of its coefficients narrowed at every tap at double",
-          "[ac4core][acpl][exact]") {
+          "[ac4][core][acpl][exact]") {
     check_decorrelators<double>();
 }

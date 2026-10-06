@@ -30,7 +30,7 @@ bool same_bits(std::span<const Real> a, std::span<const Real> b) {
 }  // namespace
 
 TEST_CASE("ungrouping a long block in place gives the lines ungroup() puts out",
-          "[ac4dec][exact]") {
+          "[ac4][decoder][exact]") {
     namespace detail = iclforge::ac4::detail;
     detail::SubstreamContext ctx;  // a 2 048 sample frame
     detail::AsfPsyInfo psy;        // one long block, one group of one window
@@ -77,7 +77,7 @@ TEST_CASE("ungrouping a long block in place gives the lines ungroup() puts out",
 }
 
 TEST_CASE("the scale factor gains are the std::pow the reconstruction made for each band",
-          "[ac4dec][exact]") {
+          "[ac4][decoder][exact]") {
     const iclforge::ac4::detail::ScaleFactorGains gains =
         iclforge::ac4::detail::scale_factor_gains();
     // At Fixed32 the table is empty: that tier forms each gain as a MantExp (pcm/asf_reconstruct.cpp).

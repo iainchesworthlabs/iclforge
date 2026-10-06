@@ -28,7 +28,7 @@
 # API target is linked and run, static and shared; install_consumer/CMakeLists.txt says how. So is
 # every exported AC-4 decoder target, in a C++ program that decodes a committed stream
 # (install_consumer/consumer_ac4.cpp), and every exported AC-4 encoder target, in one that encodes
-# a tone and reads it back with the inspector (install_consumer/consumer_ac4enc.cpp); a tree built
+# a tone and reads it back with the inspector (install_consumer/consumer_ac4_encoder.cpp); a tree built
 # with ICLFORGE_BUILD_AC4=ON whose package exports none of either fails.
 #
 # The same prefix is then used the way a Makefile, Meson or autotools build uses it, through its
@@ -172,7 +172,7 @@ pkg_config_check() {
         esac
         libdir="$(pc --variable=libdir iclforge-ac4)"
         read -r -a flags <<< "$(pc ${iclforge_ac4_static[@]+"${iclforge_ac4_static[@]}"} --cflags --libs iclforge-ac4)"
-        for program in consumer_ac4 consumer_ac4enc; do
+        for program in consumer_ac4 consumer_ac4_encoder; do
             echo "--- $cxx $program.cpp, flags from: pkg-config ${iclforge_ac4_static[*]:+${iclforge_ac4_static[*]} }--cflags --libs iclforge-ac4"
             echo "    ${flags[*]}"
             if ! "$cxx" -std=c++23 "$root/tools/checks/install_consumer/$program.cpp" \
@@ -182,7 +182,7 @@ pkg_config_check() {
             fi
         done
         "$work/pc_consumer_ac4" "$root/tests/golden/external-baseline/ac4-51-film-96/dee.ac4"
-        "$work/pc_consumer_ac4enc"
+        "$work/pc_consumer_ac4_encoder"
     fi
 
     # One .pc at a time, every archive it names linked whole into a program that calls nothing.

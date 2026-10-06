@@ -207,7 +207,7 @@ std::vector<std::byte> single_group_frame(const TocStart& start, const PresV1& p
 
 }  // namespace
 
-TEST_CASE("DecodeError describes every value", "[ac4dec][frames]") {
+TEST_CASE("DecodeError describes every value", "[ac4][decoder][frames]") {
     std::set<std::string_view> seen;
     for (const DecodeError error : {DecodeError::kTruncated, DecodeError::kInvalidToc, DecodeError::kInvalidStream,
                                     DecodeError::kUnsupported, DecodeError::kMissingIFrame}) {
@@ -250,7 +250,7 @@ std::vector<std::byte> emdf_frame(const std::vector<std::byte>& audio,
 }  // namespace
 
 TEST_CASE("a bitstream_version 0 presentation's audio and EMDF substreams are read",
-          "[ac4dec][frames]") {
+          "[ac4][decoder][frames]") {
     const auto audio = mono_audio({.sus_ver = 0});
     const auto report = decode(emdf_frame(audio, emdf_payloads()));
     REQUIRE(report.substreams.size() == 2);
@@ -265,7 +265,7 @@ TEST_CASE("a bitstream_version 0 presentation's audio and EMDF substreams are re
 }
 
 TEST_CASE("an EMDF payloads substream's payloads are reported by id, in order, with their bytes",
-          "[ac4dec][frames]") {
+          "[ac4][decoder][frames]") {
     const auto report = decode(emdf_frame(mono_audio({.sus_ver = 0}), emdf_payloads_with_data()));
     const SubstreamReport& emdf = find(report, 1);
     check_read(emdf, SubstreamReport::Kind::kEmdfPayloads);
@@ -277,7 +277,7 @@ TEST_CASE("an EMDF payloads substream's payloads are reported by id, in order, w
 }
 
 TEST_CASE("an audio substream's metadata() reports the EMDF payloads it carries",
-          "[ac4dec][frames]") {
+          "[ac4][decoder][frames]") {
     const auto audio = mono_audio({.sus_ver = 0, .emdf_payload = true});
     const auto report = decode(emdf_frame(audio, emdf_payloads()));
     const SubstreamReport& substream = find(report, 0);
@@ -287,7 +287,7 @@ TEST_CASE("an audio substream's metadata() reports the EMDF payloads it carries"
     CHECK(substream.emdf_payloads[0].bytes == std::vector<std::uint8_t>{0xA5});
 }
 
-TEST_CASE("an EMDF payloads substream cut short reports no payloads", "[ac4dec][frames]") {
+TEST_CASE("an EMDF payloads substream cut short reports no payloads", "[ac4][decoder][frames]") {
     std::vector<std::byte> cut = emdf_payloads_with_data();
     cut.resize(cut.size() - 2);  // inside the second payload
     const auto report = decode(emdf_frame(mono_audio({.sus_ver = 0}), cut));
@@ -296,7 +296,7 @@ TEST_CASE("an EMDF payloads substream cut short reports no payloads", "[ac4dec][
     CHECK(emdf.emdf_payloads.empty());
 }
 
-TEST_CASE("a bitstream_version 1 Main + Associate presentation reads each role's metadata", "[ac4dec][frames]") {
+TEST_CASE("a bitstream_version 1 Main + Associate presentation reads each role's metadata", "[ac4][decoder][frames]") {
     // Main is a dialogue substream by its content classifier and carries an
     // HSF extension link to substream 2; at 48 kHz without sf_multiplier the
     // link names nothing to read, so the extension is refused.
@@ -340,7 +340,7 @@ TEST_CASE("a bitstream_version 1 Main + Associate presentation reads each role's
 }
 
 TEST_CASE("each instance of a frame-rate-multiplied series is read at its share of the frame",
-          "[ac4dec][frames]") {
+          "[ac4][decoder][frames]") {
     // frame_rate_index 2 (2048 samples) with frame_rate_factor 2: two
     // consecutive substreams of 1024 samples, the first an I-frame.
     const TocStart start{.frame_rate_index = 2};
@@ -393,7 +393,7 @@ std::vector<std::vector<std::byte>> efficient_unit(int fraction, int first_count
 }  // namespace
 
 TEST_CASE("a unit of the efficient high frame rate mode is read when its last frame arrives",
-          "[ac4dec][frames][ehfr]") {
+          "[ac4][decoder][frames][ehfr]") {
     // frame_rate_index 10 is 100 fps, and a fraction of 2 makes the codec frames 50 fps: index 7,
     // 1 024 samples (Part 2 Table 18).
     const auto audio = mono_audio({.frame_len_base = 1024});
@@ -414,7 +414,7 @@ TEST_CASE("a unit of the efficient high frame rate mode is read when its last fr
 }
 
 TEST_CASE("a fraction of 4 takes four transmission frames to a codec frame",
-          "[ac4dec][frames][ehfr]") {
+          "[ac4][decoder][frames][ehfr]") {
     // frame_rate_index 10 at a fraction of 4 is 25 fps: index 2, 2 048 samples.
     const auto audio = mono_audio({.frame_len_base = 2048});
     const auto frames = efficient_unit(4, 8, audio);
@@ -432,7 +432,7 @@ TEST_CASE("a fraction of 4 takes four transmission frames to a codec frame",
     CHECK(find(*unit, 0).size_bits == 8 * audio.size());
 }
 
-TEST_CASE("a unit whose first frame is missing is not assembled", "[ac4dec][frames][ehfr]") {
+TEST_CASE("a unit whose first frame is missing is not assembled", "[ac4][decoder][frames][ehfr]") {
     const auto audio = mono_audio({.frame_len_base = 1024});
     const auto frames = efficient_unit(2, 4, audio);
     iclforge::ac4::Decoder decoder;
@@ -449,7 +449,7 @@ TEST_CASE("a unit whose first frame is missing is not assembled", "[ac4dec][fram
 }
 
 TEST_CASE("a frame the efficient mode cannot select a presentation for is refused by name",
-          "[ac4dec][frames][ehfr]") {
+          "[ac4][decoder][frames][ehfr]") {
     // The stream's one presentation is disabled (b_enable_presentation 0): nothing is selected,
     // so the substreams stay fragments.
     iclforge::ac4::Decoder decoder;
@@ -463,7 +463,7 @@ TEST_CASE("a frame the efficient mode cannot select a presentation for is refuse
     }
 }
 
-TEST_CASE("a frame rate index 44.1 kHz does not define refuses audio and presentation alike", "[ac4dec][frames]") {
+TEST_CASE("a frame rate index 44.1 kHz does not define refuses audio and presentation alike", "[ac4][decoder][frames]") {
     const TocStart start{.fs_index = 0, .frame_rate_index = 3};
     PresV1 p;
     p.frame_rate_bits = {false};  // b_multiplier
@@ -475,7 +475,7 @@ TEST_CASE("a frame rate index 44.1 kHz does not define refuses audio and present
     check_refused(find(report, 1), DecodeError::kInvalidStream);
 }
 
-TEST_CASE("the decoder refuses a reserved channel mode and an index past the table", "[ac4dec][frames]") {
+TEST_CASE("the decoder refuses a reserved channel mode and an index past the table", "[ac4][decoder][frames]") {
     // Two presentations: group 0's substream has the reserved 9-bit
     // channel_mode escape; group 1's names substream 5 of three.
     BitWriter toc;
@@ -521,7 +521,7 @@ TEST_CASE("the decoder refuses a reserved channel mode and an index past the tab
 }
 
 TEST_CASE("object, A-JOC and object metadata substreams are read by their own syntax",
-          "[ac4dec][frames]") {
+          "[ac4][decoder][frames]") {
     BitWriter toc;
     ac4_toc_test::toc_start(toc, {});
     PresV1 p;
@@ -577,7 +577,7 @@ TEST_CASE("object, A-JOC and object metadata substreams are read by their own sy
 }
 
 TEST_CASE("a presentation of three groups reads each and a group without substreams reads none",
-          "[ac4dec][frames]") {
+          "[ac4][decoder][frames]") {
     // presentation_config 3 (M+E, dialogue, associated) over groups 0 to 2,
     // then a second presentation naming group 3, which has no substreams
     // in this elementary stream.
@@ -636,7 +636,7 @@ TEST_CASE("a presentation of three groups reads each and a group without substre
     check_read(find(report, 4), SubstreamReport::Kind::kPresentation);
 }
 
-TEST_CASE("an HSF extension whose owner cannot be read is refused with it", "[ac4dec][frames]") {
+TEST_CASE("an HSF extension whose owner cannot be read is refused with it", "[ac4][decoder][frames]") {
     // A 96 kHz stereo substream in ASPX mode, not an I-frame: with no
     // configuration its element fails, and the extension it links is
     // refused as unreadable alongside it.
@@ -700,7 +700,7 @@ std::vector<std::byte> hsf_owner(int max_sfb) {
 
 }  // namespace
 
-TEST_CASE("an HSF extension is refused alone when its own data is malformed", "[ac4dec][frames]") {
+TEST_CASE("an HSF extension is refused alone when its own data is malformed", "[ac4][decoder][frames]") {
     PresV1 p;
     p.presentation_substream = 2;
     ChanInfo info;
@@ -734,7 +734,7 @@ TEST_CASE("an HSF extension is refused alone when its own data is malformed", "[
     }
 }
 
-TEST_CASE("iclforge::ac4::Decoder keeps its carried state when moved", "[ac4dec][frames]") {
+TEST_CASE("iclforge::ac4::Decoder keeps its carried state when moved", "[ac4][decoder][frames]") {
     // A moved-to or moved-assigned decoder is the same decoder: the frame
     // after the last one it read continues the stream (sequence_counter 2
     // after 1) and is read as such.
@@ -758,7 +758,7 @@ TEST_CASE("iclforge::ac4::Decoder keeps its carried state when moved", "[ac4dec]
 }
 
 TEST_CASE("a presentation_config 5 presentation takes each group's role from its content type",
-          "[ac4dec][frames]") {
+          "[ac4][decoder][frames]") {
     // Four references to three groups - associated, dialogue and
     // unclassified - the first repeated: a group named twice is read once.
     BitWriter toc;
@@ -788,7 +788,7 @@ TEST_CASE("a presentation_config 5 presentation takes each group's role from its
 }
 
 TEST_CASE("a 9.X.4 channel substream is read as the immersive element with b_5fronts",
-          "[ac4dec][frames]") {
+          "[ac4][decoder][frames]") {
     // 9.1.4 with four back channels and both top pairs: the presentation
     // substream reads bs_ch_config 0's b_cdmx_data_present, the stereo
     // downmix flag and seven loudness correction flags, as 7.1.4's does. Four
@@ -805,7 +805,7 @@ TEST_CASE("a 9.X.4 channel substream is read as the immersive element with b_5fr
     check_read(find(report, 1), SubstreamReport::Kind::kPresentation);
 }
 
-TEST_CASE("two channels linking one HSF extension: the second is read without it", "[ac4dec][frames]") {
+TEST_CASE("two channels linking one HSF extension: the second is read without it", "[ac4][decoder][frames]") {
     PresV1 p;
     p.presentation_substream = 3;
     ChanInfo first;
@@ -826,7 +826,7 @@ TEST_CASE("two channels linking one HSF extension: the second is read without it
     check_refused(find(report, 1), DecodeError::kUnsupported);
 }
 
-TEST_CASE("an HSF-linked channel outside the index table is refused with its extension", "[ac4dec][frames]") {
+TEST_CASE("an HSF-linked channel outside the index table is refused with its extension", "[ac4][decoder][frames]") {
     PresV1 p;
     ChanInfo info;
     info.ch_mode = 0;
@@ -841,7 +841,7 @@ TEST_CASE("an HSF-linked channel outside the index table is refused with its ext
     check_read(find(report, 1), SubstreamReport::Kind::kPresentation);
 }
 
-TEST_CASE("a series whose first substream index is INT_MAX names nothing past it", "[ac4dec][frames]") {
+TEST_CASE("a series whose first substream index is INT_MAX names nothing past it", "[ac4][decoder][frames]") {
     // Two instances from substream_index 2^31 - 1: the first is outside the
     // table, and the second, which would be 2^31, is not named at all.
     const TocStart start{.frame_rate_index = 2};
@@ -1049,7 +1049,7 @@ std::vector<std::byte> oamd_substream() {
 }  // namespace
 
 TEST_CASE("an object group of A-JOC and direct-coded substreams and OAMD reads each to its end",
-          "[ac4dec][frames]") {
+          "[ac4][decoder][frames]") {
     BitWriter toc;
     ac4_toc_test::toc_start(toc, {});
     PresV1 p;
@@ -1149,7 +1149,7 @@ TEST_CASE("an object group of A-JOC and direct-coded substreams and OAMD reads e
 }
 
 TEST_CASE("a substream named by two object elements is read as the first names it",
-          "[ac4dec][frames]") {
+          "[ac4][decoder][frames]") {
     BitWriter toc;
     ac4_toc_test::toc_start(toc, {});
     PresV1 p;
@@ -1239,7 +1239,7 @@ std::vector<std::byte> ajoc_upmix_signals_frame(std::uint32_t upmix_signals, boo
 // stopped on malloc(3221225472) as the list grew. The substream is refused as
 // unsupported without one, as it is at any count over the limit.
 TEST_CASE("an A-JOC substream of more upmix signals than the decoder describes is refused unread",
-          "[ac4dec][frames]") {
+          "[ac4][decoder][frames]") {
     struct Case {
         std::uint32_t signals;
         bool b_lfe;

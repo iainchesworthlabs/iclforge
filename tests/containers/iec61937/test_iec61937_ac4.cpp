@@ -28,7 +28,7 @@
 // comes back unchanged with the repetition period, sequence and Pc fields the
 // tables give: constructed frames, whose table of contents is written here,
 // the Dolby Encoding Engine's streams at 23.44, 24, 25 and 29.97 fps, and
-// every DEE leg of a directory, the committed ones unless AC4DEC_STREAM_DIR
+// every DEE leg of a directory, the committed ones unless AC4_STREAM_DIR
 // names another.
 
 namespace {
@@ -923,10 +923,10 @@ TEST_CASE("Ac4BurstPacker: DEE's streams at four frame rates pack and read back 
 
 TEST_CASE("Ac4BurstPacker: every DEE leg of a directory packs and reads back unchanged",
           "[iec61937][ac4]") {
-    // The committed legs; AC4DEC_STREAM_DIR points it at another directory of DEE legs, such as
+    // The committed legs; AC4_STREAM_DIR points it at another directory of DEE legs, such as
     // the whole gold set, as it does the decoder's syntax test. Each stream goes in the smallest
     // burst type its largest frame fits, at the rate its first frame states.
-    const char* const elsewhere = std::getenv("AC4DEC_STREAM_DIR");
+    const char* const elsewhere = std::getenv("AC4_STREAM_DIR");
     const std::filesystem::path root =
         elsewhere != nullptr ? std::filesystem::path{elsewhere}
                              : std::filesystem::path{ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR};

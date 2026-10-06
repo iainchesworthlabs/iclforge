@@ -124,7 +124,7 @@ SfInfo long_info(int max_sfb) {
 
 // --- sf_info() ---------------------------------------------------------------
 
-TEST_CASE("sf_info groups the windows of a differently framed short frame", "[ac4dec][asf]") {
+TEST_CASE("sf_info groups the windows of a differently framed short frame", "[ac4][decoder][asf]") {
     // transf_length 2 then 3 at 2048: two 512-sample windows and one of 1024,
     // with one grouping bit (Table 109) that joins the first two.
     BitWriter w;
@@ -207,7 +207,7 @@ TEST_CASE("sf_info groups the windows of a differently framed short frame", "[ac
     }
 }
 
-TEST_CASE("chparam_info reads SAP coefficients for all bands", "[ac4dec][asf]") {
+TEST_CASE("chparam_info reads SAP coefficients for all bands", "[ac4][decoder][asf]") {
     const SfInfo info = long_info(3);
     BitWriter c;
     c.put(3, 2);                          // sap_mode 3
@@ -224,7 +224,7 @@ TEST_CASE("chparam_info reads SAP coefficients for all bands", "[ac4dec][asf]") 
     CHECK(out.dpcm_alpha_q[0][2] == 61);
 }
 
-TEST_CASE("sf_info reads side-limited and dual max_sfb for both halves of a split frame", "[ac4dec][asf]") {
+TEST_CASE("sf_info reads side-limited and dual max_sfb for both halves of a split frame", "[ac4][decoder][asf]") {
     const SubstreamContext ctx = context(2048);
     SECTION("side-limited: n_side_bits wide") {
         BitWriter w;
@@ -282,7 +282,7 @@ TEST_CASE("sf_info reads side-limited and dual max_sfb for both halves of a spli
     }
 }
 
-TEST_CASE("sf_info at the shorter frame lengths reads one transform length", "[ac4dec][asf]") {
+TEST_CASE("sf_info at the shorter frame lengths reads one transform length", "[ac4][decoder][asf]") {
     struct Case {
         int frame_len_base;
         int transf_length;
@@ -344,7 +344,7 @@ TEST_CASE("sf_info at the shorter frame lengths reads one transform length", "[a
     }
 }
 
-TEST_CASE("sf_info_lfe takes the whole frame's transform", "[ac4dec][asf]") {
+TEST_CASE("sf_info_lfe takes the whole frame's transform", "[ac4][decoder][asf]") {
     SECTION("at 1024, two bits of max_sfb and the whole-frame index") {
         BitWriter w;
         w.put(3, 2);
@@ -375,7 +375,7 @@ TEST_CASE("sf_info_lfe takes the whole frame's transform", "[ac4dec][asf]") {
     }
 }
 
-TEST_CASE("transform lengths and widths follow Tables 103 and 106", "[ac4dec][asf]") {
+TEST_CASE("transform lengths and widths follow Tables 103 and 106", "[ac4][decoder][asf]") {
     using iclforge::ac4::detail::n_side_bits;
     using iclforge::ac4::detail::transform_length_samples;
     CHECK(transform_length_samples(context(2048), 0) == 128);
@@ -395,7 +395,7 @@ TEST_CASE("transform lengths and widths follow Tables 103 and 106", "[ac4dec][as
 
 // --- sf_data() ---------------------------------------------------------------
 
-TEST_CASE("sf_data decodes the lines of every spectral codebook", "[ac4dec][asf]") {
+TEST_CASE("sf_data decodes the lines of every spectral codebook", "[ac4][decoder][asf]") {
     // Two bands of one codebook, a band of none; scale factors for the two
     // coded bands (the first taken as the reference, the second sent) and
     // noise fill for the silent one.
@@ -466,7 +466,7 @@ TEST_CASE("sf_data decodes the lines of every spectral codebook", "[ac4dec][asf]
     }
 }
 
-TEST_CASE("sf_data escapes a long section and refuses malformed ones", "[ac4dec][asf]") {
+TEST_CASE("sf_data escapes a long section and refuses malformed ones", "[ac4][decoder][asf]") {
     SECTION("sect_len_incr's escape") {
         const SfInfo info = long_info(40);
         BitWriter w;
@@ -560,7 +560,7 @@ SfInfo short_info_512(int max_sfb) {
 
 }  // namespace
 
-TEST_CASE("sf_data and sf_hsf_data share a section straddling the 48 kHz bands", "[ac4dec][asf]") {
+TEST_CASE("sf_data and sf_hsf_data share a section straddling the 48 kHz bands", "[ac4][decoder][asf]") {
     // max_sfb 13 and max_sfb_ext_hsf 3 at 96 kHz: bands 0 to 15, of which 14
     // and 15 are the extension's. Sections: none for 0-12, codebook 1 for
     // 13-14 (split at 14), none for 15. Each band is 16 lines of four windows.
@@ -633,7 +633,7 @@ TEST_CASE("sf_data and sf_hsf_data share a section straddling the 48 kHz bands",
     CHECK(hsf.dpcm_snf[0][1] == 7);
 }
 
-TEST_CASE("the HSF extension at 192 kHz and its limits", "[ac4dec][asf]") {
+TEST_CASE("the HSF extension at 192 kHz and its limits", "[ac4][decoder][asf]") {
     const SfInfo info = short_info_512(2);
     SECTION("192 kHz: four times the transform, and no extension bands") {
         SubstreamContext ctx = context(512);
@@ -682,7 +682,7 @@ TEST_CASE("the HSF extension at 192 kHz and its limits", "[ac4dec][asf]") {
 
 // --- the scale factor band tables --------------------------------------------
 
-TEST_CASE("the scale factor band tables answer only for the lengths they list", "[ac4dec][asf]") {
+TEST_CASE("the scale factor band tables answer only for the lengths they list", "[ac4][decoder][asf]") {
     CHECK(tables::num_sfb_48(128) == 14);
     CHECK(tables::num_sfb_48(2048) == 63);
     CHECK(tables::num_sfb_48(100) == 0);
@@ -698,7 +698,7 @@ TEST_CASE("the scale factor band tables answer only for the lengths they list", 
     CHECK(tables::sfb_offsets_192(512).back() == 512);
 }
 
-TEST_CASE("max_sfb_from_master maps a master max_sfb to shorter transforms", "[ac4dec][asf]") {
+TEST_CASE("max_sfb_from_master maps a master max_sfb to shorter transforms", "[ac4][decoder][asf]") {
     using tables::max_sfb_from_master;
     CHECK(max_sfb_from_master(2048, 10, 2048) == 10);
     CHECK(max_sfb_from_master(2048, 64, 2048) == -1);
@@ -751,7 +751,7 @@ ParseResult read_cut(const std::vector<std::byte>& bytes, F&& parse) {
 }  // namespace
 
 TEST_CASE("an ASF codeword the substream ends inside fails as truncated as in every tool",
-          "[ac4dec][asf]") {
+          "[ac4][decoder][asf]") {
     // Each element's longest codeword, placed so that a byte boundary falls
     // inside it; the substream ends there. The
     // A-SPX, A-CPL and dialogue enhancement codewords always reported this
@@ -829,7 +829,7 @@ TEST_CASE("an ASF codeword the substream ends inside fails as truncated as in ev
 }
 
 TEST_CASE("huff_codeword reports a codeword cut short as truncated in every codebook",
-          "[ac4dec][asf]") {
+          "[ac4][decoder][asf]") {
     // Every tool reads its codewords through huff_codeword(): each codebook's
     // longest codeword with its last bit cut off by the end of the substream
     // is a miss the syntax reports as truncated, consuming nothing.
@@ -948,7 +948,7 @@ std::vector<std::byte> random_bytes(std::size_t count, unsigned seed) {
 
 }  // namespace
 
-TEST_CASE("the bit reader's cache gives what reading bit by bit gives", "[ac4dec][asf][reader]") {
+TEST_CASE("the bit reader's cache gives what reading bit by bit gives", "[ac4][decoder][asf][reader]") {
     // Data of every length from nothing to a few words, so that the cache is loaded
     // whole, near the end and past it; then a long run of reads, peeks, skips,
     // alignments and seeks, some past the end.
@@ -1027,7 +1027,7 @@ std::pair<int, int> search_decode(std::span<const std::byte> data, std::size_t p
 
 }  // namespace
 
-TEST_CASE("every codebook's shortcut table names only real codewords", "[ac4dec][asf][huffman]") {
+TEST_CASE("every codebook's shortcut table names only real codewords", "[ac4][decoder][asf][huffman]") {
     for (const Codebook* book : tables::kAllCodebooks) {
         CAPTURE(book->name);
         REQUIRE(book->fast.size() == iclforge::ac4::detail::kHuffFastSize);
@@ -1065,7 +1065,7 @@ TEST_CASE("every codebook's shortcut table names only real codewords", "[ac4dec]
 }
 
 TEST_CASE("huff_decode with its shortcut reads every codeword of every codebook",
-          "[ac4dec][asf][huffman]") {
+          "[ac4][decoder][asf][huffman]") {
     std::mt19937_64 rng(929);
     for (const Codebook* book : tables::kAllCodebooks) {
         CAPTURE(book->name);
@@ -1101,7 +1101,7 @@ TEST_CASE("huff_decode with its shortcut reads every codeword of every codebook"
 TEST_CASE(
     "huff_decode with its shortcut agrees with the search on random bits and on the end of the "
     "data",
-    "[ac4dec][asf][huffman]") {
+    "[ac4][decoder][asf][huffman]") {
     std::mt19937 rng(930);
     for (const Codebook* book : tables::kAllCodebooks) {
         CAPTURE(book->name);

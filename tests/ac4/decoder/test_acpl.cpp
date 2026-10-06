@@ -85,7 +85,7 @@ std::vector<QmfValue> matrix(double scale) {
 }  // namespace
 
 TEST_CASE("acpl_values decodes alpha and beta along frequency, then along time from the frame before",
-          "[ac4dec][acpl]") {
+          "[ac4][decoder][acpl]") {
     // Fine alpha: F0 has cb_off 0, DF and DT 32; fine beta: F0 0, DF and DT 8.
     AcplData1ch data;
     data.framing.num_param_sets = 1;
@@ -116,7 +116,7 @@ TEST_CASE("acpl_values decodes alpha and beta along frequency, then along time f
     CHECK(refused.error().error == iclforge::ac4::DecodeError::kInvalidStream);
 }
 
-TEST_CASE("acpl_values leaves the bands below acpl_param_band at 0", "[ac4dec][acpl]") {
+TEST_CASE("acpl_values leaves the bands below acpl_param_band at 0", "[ac4][decoder][acpl]") {
     AcplData1ch data;
     data.framing.num_param_sets = 1;
     data.num_bands = 15;
@@ -141,7 +141,7 @@ TEST_CASE("acpl_values leaves the bands below acpl_param_band at 0", "[ac4dec][a
     CHECK(values.modules[0].alpha[0][14] == -1.0);
 }
 
-TEST_CASE("acpl_values dequantises acpl_data_2ch()'s beta3 and gammas by their steps", "[ac4dec][acpl]") {
+TEST_CASE("acpl_values dequantises acpl_data_2ch()'s beta3 and gammas by their steps", "[ac4][decoder][acpl]") {
     iclforge::ac4::detail::AcplData2ch data;
     data.framing.num_param_sets = 1;
     data.num_bands = 9;
@@ -170,7 +170,7 @@ TEST_CASE("acpl_values dequantises acpl_data_2ch()'s beta3 and gammas by their s
     }
 }
 
-TEST_CASE("steep interpolation switches a pair between its outputs at each set's time slot", "[ac4dec][acpl]") {
+TEST_CASE("steep interpolation switches a pair between its outputs at each set's time slot", "[ac4][decoder][acpl]") {
     // ASPX_ACPL_2 with two parameter sets: alpha 1 from slot 8 and -1 from
     // slot 20, beta 0; acpl_param_prev 0 (alpha 0) before slot 8.
     iclforge::ac4::detail::AcplModuleValues module;
@@ -209,7 +209,7 @@ TEST_CASE("steep interpolation switches a pair between its outputs at each set's
     }
 }
 
-TEST_CASE("ASPX_ACPL_3 makes the centre of gamma5 and gamma6", "[ac4dec][acpl]") {
+TEST_CASE("ASPX_ACPL_3 makes the centre of gamma5 and gamma6", "[ac4][decoder][acpl]") {
     // Only gamma5 and gamma6 set, at 0.5: C = sqrt 2 (1 + sqrt 2) (x0 + x1) / 2
     // (Pseudocode 118's ACplModule2() on (z4, z5) and its sqrt 2), and the
     // other four channels 0. Two frames, so that the second has no ramp from

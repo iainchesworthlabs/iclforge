@@ -62,7 +62,7 @@ fs::path leg(const std::string& name, const std::string& file = "dee.ac4") {
 }
 
 fs::path multiplexed() {
-    return fs::path{AC4DEC_GOLDEN_DIR} / "presentations" / "presentations-5_1.ac4";
+    return fs::path{AC4_GOLDEN_DIR} / "presentations" / "presentations-5_1.ac4";
 }
 
 // The frames of a stream that a decode takes under the sanitizers, in place of
@@ -256,7 +256,7 @@ TEST_CASE("decode folds AC-4 by each downmix with the LFE and without it", "[cli
 TEST_CASE("decode folds an AC-4 7.X stream to 5.X with channels=5.1", "[cli][ac4]") {
     const auto log = scratch_dir() / "ac4_fold_5x.log";
     const fs::path seven_one =
-        fs::path{AC4DEC_GOLDEN_DIR} / "constructed" / "7_1-340-simple-config0-2ch1-sap.ac4";
+        fs::path{AC4_GOLDEN_DIR} / "constructed" / "7_1-340-simple-config0-2ch1-sap.ac4";
     const auto coded = decode(seven_one, "", log);
     CHECK(coded.channels.size() == 8);
     const auto folded = decode(seven_one, "channels=5.1", log);
@@ -264,7 +264,7 @@ TEST_CASE("decode folds an AC-4 7.X stream to 5.X with channels=5.1", "[cli][ac4
     CHECK(read_log(log).find("(L R C LFE Ls Rs, 48000 Hz)") != std::string::npos);
     CHECK(read_log(log).find("downmixed to 5.X") != std::string::npos);
     const fs::path seven_zero =
-        fs::path{AC4DEC_GOLDEN_DIR} / "constructed" / "7_0-322-aspx-config0.ac4";
+        fs::path{AC4_GOLDEN_DIR} / "constructed" / "7_0-322-aspx-config0.ac4";
     CHECK(decode(seven_zero, "channels=5.1", log).channels.size() == 5);
 }
 
@@ -325,7 +325,7 @@ TEST_CASE("decode renders AC-4's objects to the speakers the layout options name
     // channels the decoder rendered it to.
     const auto dir = scratch_dir();
     const auto log = dir / "ac4_objects.log";
-    const fs::path objects = fs::path{AC4DEC_GOLDEN_DIR} / "objects";
+    const fs::path objects = fs::path{AC4_GOLDEN_DIR} / "objects";
     const auto rendered = decode(objects / "direct-dynamic.ac4", "", log);
     CHECK(rendered.channels.size() == 12);
     CHECK(read_log(log).find("(L R C LFE Lb Rb Ls Rs Tfl Tfr Tbl Tbr, 48000 Hz)") !=
@@ -378,7 +378,7 @@ double bin_magnitude(const std::vector<float>& x, double hz, double sample_rate)
 }
 
 fs::path hsf_stream(const std::string& name) {
-    return fs::path{AC4DEC_GOLDEN_DIR} / ".." / "ac4-hsf" / (name + ".ac4");
+    return fs::path{AC4_GOLDEN_DIR} / ".." / "ac4-hsf" / (name + ".ac4");
 }
 
 }  // namespace

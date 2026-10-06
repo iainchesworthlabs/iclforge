@@ -6,7 +6,7 @@
 // position at that moment: tone by tone, the speaker's component is the sum
 // of the objects' components at their gains.
 //
-// With AC4DEC_WRITE_LISTENING set to a directory, this writes the moving
+// With AC4_DECODER_WRITE_LISTENING set to a directory, this writes the moving
 // cases ten seconds long there, to decode with forge and listen to.
 
 #include <algorithm>
@@ -91,7 +91,7 @@ std::vector<double> tones_of(const BuiltObjectStream& stream) {
 
 TEST_CASE(
     "rendered AC-4 objects reach each speaker at the layout renderer's gain for their position",
-    "[ac4dec][objects]") {
+    "[ac4][decoder][objects]") {
     struct Leg {
         std::string name;
         iclforge::ac4::DecodingMode mode;
@@ -214,13 +214,13 @@ TEST_CASE(
     }
 }
 
-TEST_CASE("the moving object streams for listening are written where AC4DEC_WRITE_LISTENING says",
-          "[ac4dec][objects]") {
+TEST_CASE("the moving object streams for listening are written where AC4_DECODER_WRITE_LISTENING says",
+          "[ac4][decoder][objects]") {
     // Ten seconds of each moving case, for forge decode and the ear: object
     // 0's tone crosses the front from the left wall to the right one.
-    const char* dir = std::getenv("AC4DEC_WRITE_LISTENING");
+    const char* dir = std::getenv("AC4_DECODER_WRITE_LISTENING");
     if (dir == nullptr) {
-        SKIP("AC4DEC_WRITE_LISTENING does not name a directory");
+        SKIP("AC4_DECODER_WRITE_LISTENING does not name a directory");
     }
     fs::create_directories(dir);
     for (const char* name :

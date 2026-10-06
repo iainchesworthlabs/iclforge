@@ -87,7 +87,7 @@ iclforge::ac4::SubstreamGroupInfo group_of(std::vector<iclforge::ac4::GroupSubst
 
 // --- superset() and presentation_context_v1() ----------------------------
 
-TEST_CASE("superset_ch_mode gives the lowest mode holding both", "[ac4dec][presentation]") {
+TEST_CASE("superset_ch_mode gives the lowest mode holding both", "[ac4][decoder][presentation]") {
     using iclforge::ac4::detail::superset_ch_mode;
     using iclforge::ac4::detail::superset_ch_mode_core;
     CHECK(superset_ch_mode(-1, 4) == 4);
@@ -106,7 +106,7 @@ TEST_CASE("superset_ch_mode gives the lowest mode holding both", "[ac4dec][prese
     CHECK(superset_ch_mode_core(7, 3) == -1);
 }
 
-TEST_CASE("presentation_context_v1 counts substream groups by presentation_config", "[ac4dec][presentation]") {
+TEST_CASE("presentation_context_v1 counts substream groups by presentation_config", "[ac4][decoder][presentation]") {
     iclforge::ac4::Toc toc;
     toc.frame_rate_index = 13;
     toc.substream_groups = {group_of({chan_substream(ch_mode::kStereo)}),
@@ -132,7 +132,7 @@ TEST_CASE("presentation_context_v1 counts substream groups by presentation_confi
     }
 }
 
-TEST_CASE("presentation_context_v1 derives the channel helpers of Part 2 6.3.3.1", "[ac4dec][presentation]") {
+TEST_CASE("presentation_context_v1 derives the channel helpers of Part 2 6.3.3.1", "[ac4][decoder][presentation]") {
     iclforge::ac4::Toc toc;
     toc.frame_rate_index = 3;  // 1536 at 48 kHz
 
@@ -216,7 +216,7 @@ TEST_CASE("presentation_context_v1 derives the channel helpers of Part 2 6.3.3.1
 
 // --- ac4_presentation_substream() -----------------------------------------
 
-TEST_CASE("a stereo presentation substream with nothing optional reads 17 bits", "[ac4dec][presentation]") {
+TEST_CASE("a stereo presentation substream with nothing optional reads 17 bits", "[ac4][decoder][presentation]") {
     BitWriter w;
     w.flag(false);  // b_additional_data
     put_loudness_and_no_drc(w, 31);
@@ -232,7 +232,7 @@ TEST_CASE("a stereo presentation substream with nothing optional reads 17 bits",
     CHECK(rec.end_bit() == 17);
 }
 
-TEST_CASE("an alternative presentation substream reads its name and targets", "[ac4dec][presentation]") {
+TEST_CASE("an alternative presentation substream reads its name and targets", "[ac4][decoder][presentation]") {
     PresentationContext ctx = stereo_context();
     ctx.b_alternative = true;
     ctx.n_substreams_in_presentation = 3;
@@ -294,7 +294,7 @@ TEST_CASE("an alternative presentation substream reads its name and targets", "[
 }
 
 TEST_CASE("an alternative presentation's default-length name and a target count no data backs",
-          "[ac4dec][presentation]") {
+          "[ac4][decoder][presentation]") {
     PresentationContext ctx = stereo_context();
     ctx.b_alternative = true;
 
@@ -341,7 +341,7 @@ TEST_CASE("an alternative presentation's default-length name and a target count 
 }
 
 TEST_CASE("the presentation substream's additional data carries advanced dialogue enhancement",
-          "[ac4dec][presentation]") {
+          "[ac4][decoder][presentation]") {
     // add_data_bytes_minus1 then the byte-aligned fields inside it: the
     // add_data run fills what they leave.
     const auto additional = [](BitWriter& w, bool object_mode, bool advanced, bool config, int thresh) {
@@ -522,7 +522,7 @@ TEST_CASE("the presentation substream's additional data carries advanced dialogu
 }
 
 TEST_CASE("the presentation substream reads its further loudness info and a DRC frame of its own",
-          "[ac4dec][presentation]") {
+          "[ac4][decoder][presentation]") {
     PresentationContext ctx = stereo_context();
     ctx.b_pres_ndot = true;
     // A drc_frame() of one compression-curve mode, long enough (34 bits) that
@@ -613,7 +613,7 @@ TEST_CASE("the presentation substream reads its further loudness info and a DRC 
     }
 }
 
-TEST_CASE("the presentation substream reads substream group gains and keeps them", "[ac4dec][presentation]") {
+TEST_CASE("the presentation substream reads substream group gains and keeps them", "[ac4][decoder][presentation]") {
     PresentationContext ctx = stereo_context();
     ctx.n_substream_groups = 3;
     PresentationSubstreamState state;
@@ -678,7 +678,7 @@ TEST_CASE("the presentation substream reads substream group gains and keeps them
     }
 }
 
-TEST_CASE("the presentation substream reads an associated presentation's scaling", "[ac4dec][presentation]") {
+TEST_CASE("the presentation substream reads an associated presentation's scaling", "[ac4][decoder][presentation]") {
     BitWriter w;
     w.flag(false);
     put_loudness_and_no_drc(w);
@@ -743,7 +743,7 @@ PresentationSubstream read_ok(const BitWriter& w, const PresentationContext& ctx
 
 }  // namespace
 
-TEST_CASE("custom_dmx_data derives bs_ch_config from the presentation's channels", "[ac4dec][presentation]") {
+TEST_CASE("custom_dmx_data derives bs_ch_config from the presentation's channels", "[ac4][decoder][presentation]") {
     struct Case {
         int mode;
         int top_pairs;
@@ -771,7 +771,7 @@ TEST_CASE("custom_dmx_data derives bs_ch_config from the presentation's channels
 }
 
 TEST_CASE("cdmx_parameters reads the tools of bs_ch_config 0 for each output configuration",
-          "[ac4dec][presentation]") {
+          "[ac4][decoder][presentation]") {
     BitWriter w;
     put_head(w);
     w.flag(true);    // b_cdmx_data_present
@@ -826,7 +826,7 @@ TEST_CASE("cdmx_parameters reads the tools of bs_ch_config 0 for each output con
 }
 
 TEST_CASE("cdmx_parameters reads tool_t4_to_f_s_b and the output configurations needing one tool",
-          "[ac4dec][presentation]") {
+          "[ac4][decoder][presentation]") {
     BitWriter w;
     put_head(w);
     w.flag(true);    // b_cdmx_data_present
@@ -884,7 +884,7 @@ TEST_CASE("cdmx_parameters reads tool_t4_to_f_s_b and the output configurations 
     }
 }
 
-TEST_CASE("cdmx_parameters reads the two-top and one-bit configurations", "[ac4dec][presentation]") {
+TEST_CASE("cdmx_parameters reads the two-top and one-bit configurations", "[ac4][decoder][presentation]") {
     SECTION("bs_ch_config 2: a one-bit out_ch_config") {
         BitWriter w;
         put_head(w);
@@ -982,7 +982,7 @@ TEST_CASE("cdmx_parameters reads the two-top and one-bit configurations", "[ac4d
     }
 }
 
-TEST_CASE("custom_dmx_data reads the stereo downmix coefficients", "[ac4dec][presentation]") {
+TEST_CASE("custom_dmx_data reads the stereo downmix coefficients", "[ac4][decoder][presentation]") {
     PresentationContext ctx = stereo_context();
     ctx.pres_ch_mode = ch_mode::k5_1;
     ctx.b_pres_has_lfe = true;
@@ -1019,7 +1019,7 @@ TEST_CASE("custom_dmx_data reads the stereo downmix coefficients", "[ac4dec][pre
     CHECK(rec.count("b_corr_for_immersive_out") == 0);
 }
 
-TEST_CASE("loud_corr reads every correction an immersive presentation can carry", "[ac4dec][presentation]") {
+TEST_CASE("loud_corr reads every correction an immersive presentation can carry", "[ac4][decoder][presentation]") {
     PresentationContext ctx = immersive_context(ch_mode::k7_0_4, 0, false);
     ctx.pres_ch_mode_core = 5;
     BitWriter w;
@@ -1059,7 +1059,7 @@ TEST_CASE("loud_corr reads every correction an immersive presentation can carry"
     CHECK_FALSE(corr.loud_corr_9_X_4.has_value());
 }
 
-TEST_CASE("loud_corr reads an object presentation's corrections", "[ac4dec][presentation]") {
+TEST_CASE("loud_corr reads an object presentation's corrections", "[ac4][decoder][presentation]") {
     PresentationContext ctx = stereo_context();
     ctx.pres_ch_mode = -1;
     ctx.pres_ch_mode_core = 4;  // a static A-JOC core: 5.1

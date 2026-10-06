@@ -150,11 +150,11 @@ fs::path metadata_ac4() {
 }
 
 fs::path constructed(const std::string& name) {
-    return fs::path{AC4DEC_GOLDEN_DIR} / "constructed" / name;
+    return fs::path{AC4_GOLDEN_DIR} / "constructed" / name;
 }
 
 fs::path multiplexed() {
-    return fs::path{AC4DEC_GOLDEN_DIR} / "presentations" / "presentations-5_1.ac4";
+    return fs::path{AC4_GOLDEN_DIR} / "presentations" / "presentations-5_1.ac4";
 }
 
 // The first syncframe's metadata of an AC-3 or E-AC-3 file.

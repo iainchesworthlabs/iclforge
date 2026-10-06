@@ -20,4 +20,4 @@ using Real = iclforge::internal::Fixed32;
 
 // Real is Fixed32 here, so the encoder's double instantiations are extra, as in the
 // float variant, and this passes them through.
-#define AC4CORE_ALSO_AT_DOUBLE(...) __VA_ARGS__
+#define ICLFORGE_AC4_ALSO_AT_DOUBLE(...) __VA_ARGS__

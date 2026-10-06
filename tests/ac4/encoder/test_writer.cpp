@@ -58,7 +58,7 @@ void require_same(std::span<const iclforge::ac4::SyntaxRecord> written, std::spa
 
 }  // namespace
 
-TEST_CASE("variable_bits written by the encoder reads back through the decoder's reader", "[ac4enc][writer]") {
+TEST_CASE("variable_bits written by the encoder reads back through the decoder's reader", "[ac4][encoder][writer]") {
     for (const unsigned n : {2U, 3U, 5U, 7U}) {
         for (std::uint64_t value = 0; value < 3000; value += (value < 300 ? 1 : 37)) {
             CAPTURE(n, value);
@@ -75,7 +75,7 @@ TEST_CASE("variable_bits written by the encoder reads back through the decoder's
 }
 
 TEST_CASE("every codeword of every spectral and scale factor codebook reads back as its index",
-          "[ac4enc][writer]") {
+          "[ac4][encoder][writer]") {
     const auto check_book = [](const iclforge::ac4::detail::Codebook& book, std::span<const iclforge::ac4::detail::HuffCode> codes) {
         CAPTURE(book.name);
         REQUIRE(codes.size() == book.codebook_length);
@@ -95,7 +95,7 @@ TEST_CASE("every codeword of every spectral and scale factor codebook reads back
                iclforge::ac4::detail::tables::kAsfHcbScalefacCodes);
 }
 
-TEST_CASE("a buffered writer's records land where its bits do", "[ac4enc][writer]") {
+TEST_CASE("a buffered writer's records land where its bits do", "[ac4][encoder][writer]") {
     std::vector<iclforge::ac4::SyntaxRecord> records;
     const auto sink = [&](const iclforge::ac4::SyntaxRecord& r) { records.push_back(r); };
     BitWriter inner = BitWriter::buffered();
@@ -116,7 +116,7 @@ TEST_CASE("a buffered writer's records land where its bits do", "[ac4enc][writer
     CHECK(r.read(7, "") == 100U);
 }
 
-TEST_CASE("sync frames carry the raw frame and, with 0xAC41, a CRC the inspector accepts", "[ac4enc][writer]") {
+TEST_CASE("sync frames carry the raw frame and, with 0xAC41, a CRC the inspector accepts", "[ac4][encoder][writer]") {
     std::vector<std::byte> raw(300);
     for (std::size_t i = 0; i < raw.size(); ++i) {
         raw[i] = static_cast<std::byte>(i * 37 + 11);
@@ -150,7 +150,7 @@ TEST_CASE("sync frames carry the raw frame and, with 0xAC41, a CRC the inspector
 }
 
 TEST_CASE("a frame of the writer's reads to the end of every substream, with the writer's trace",
-          "[ac4enc][writer]") {
+          "[ac4][encoder][writer]") {
     for (const bool stereo : {true, false}) {
         for (const std::size_t frame_bytes : {std::size_t{0}, std::size_t{400}, std::size_t{1029}}) {
             CAPTURE(stereo, frame_bytes);
@@ -217,7 +217,7 @@ TEST_CASE("a frame of the writer's reads to the end of every substream, with the
     }
 }
 
-TEST_CASE("Table 109's grouping bit counts are what the layouts write", "[ac4enc][writer]") {
+TEST_CASE("Table 109's grouping bit counts are what the layouts write", "[ac4][encoder][writer]") {
     for (int a = 0; a < 4; ++a) {
         for (int b = 0; b < 4; ++b) {
             CAPTURE(a, b);
@@ -233,7 +233,7 @@ TEST_CASE("Table 109's grouping bit counts are what the layouts write", "[ac4enc
 }
 
 TEST_CASE("a DRC profile sent as a curve is the profile the decoder's Table 162 gives",
-          "[ac4enc][writer][drc]") {
+          "[ac4][encoder][writer][drc]") {
     // The writer's Table 162 in Table 166's terms, read back through the
     // decoder's Table 166, against the decoder's own Table 162: two
     // transcriptions of each table meeting.
@@ -299,7 +299,7 @@ TEST_CASE("a DRC profile sent as a curve is the profile the decoder's Table 162 
 
 TEST_CASE(
     "dialogue enhancement data of a later frame with no frame before it is coded against zeros",
-    "[ac4enc][writer]") {
+    "[ac4][encoder][writer]") {
     // Before any parameters were sent a stream starts from 0 in every band (the encoder's
     // least_parameters() reads it so). Writing a frame that is not an I-frame with no previous
     // frame must give the bits that writing it against zeros gives, and not read through a null
@@ -322,7 +322,7 @@ TEST_CASE(
           3);  // b_de_data_present, b_de_config_flag, de_keep_data_flag, the codes
 }
 TEST_CASE("the table of contents writer codes the 9.X.4 and 22.2 channel modes of Part 2 Table 56",
-          "[ac4enc][writer][fronts]") {
+          "[ac4][encoder][writer][fronts]") {
     // 9.0.4 and 9.1.4 are nine-bit codes 0b111111100 and 0b111111101 and name the channels their
     // source has (clause 6.2.1.8); 22.2 is 0b111111110 and names none.
     const std::array<std::pair<int, const char*>, 5> modes = {{{11, "7.0.4"}, {12, "7.1.4"}, {13, "9.0.4"},
@@ -358,7 +358,7 @@ TEST_CASE("the table of contents writer codes the 9.X.4 and 22.2 channel modes o
 }
 
 TEST_CASE("dialogue enhancement of the 9.X.4 modes sends b_de_simulcast and a second de_data()",
-          "[ac4enc][writer][fronts]") {
+          "[ac4][encoder][writer][fronts]") {
     // Part 2 clause 6.2.7.5: after de_data(), ch_mode 13 and 14 send b_de_simulcast, and with it
     // a second de_data() for core decoding; the other modes send neither.
     using iclforge::ac4::detail::DeConfigCodes;

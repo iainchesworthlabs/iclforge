@@ -264,7 +264,7 @@ void check_core(const std::vector<Channel>& channels, const Decoded& core) {
 
 TEST_CASE(
     "5.1.4 in each codec mode DEE writes decodes to each channel's tone, in full and core decoding",
-    "[ac4enc][encoder][immersive]") {
+    "[ac4][encoder][immersive]") {
     // kAuto takes DEE's modes by the rate: SCPL at 768 kbps, ASPX_SCPL at 512
     // and ASPX_ACPL_2 at 256 (Table 73's codes 0, 1 and 3). In ASPX_ACPL_2 the
     // top pairs are rebuilt from their sums band by band, which parts two tones
@@ -330,7 +330,7 @@ TEST_CASE(
 }
 
 TEST_CASE("5.0.4, and 7.1.4 with the back pair, put each channel's tone on its own channel",
-          "[ac4enc][encoder][immersive]") {
+          "[ac4][encoder][immersive]") {
     SECTION("5.0.4 in ASPX_SCPL") {
         const std::vector<Channel> channels = layout(false, false);
         const Encoded encoded = encode({.channels = 9, .bitrate_kbps = 512}, tones(channels));
@@ -364,7 +364,7 @@ TEST_CASE("5.0.4, and 7.1.4 with the back pair, put each channel's tone on its o
 }
 
 TEST_CASE("A-JCC puts each channel's tone on its own channel, in full and core decoding",
-          "[ac4enc][encoder][immersive]") {
+          "[ac4][encoder][immersive]") {
     // ASPX_AJCC (experimental, Part 2 clause 5.6): the core carries each
     // side's front (L with Tfl) and back (Ls with Lb and Tbl) as one channel,
     // and A-JCC's modules part them band by band, so each tone sits
@@ -462,7 +462,7 @@ TEST_CASE("A-JCC puts each channel's tone on its own channel, in full and core d
 }
 
 TEST_CASE("the immersive layouts' table of contents, levels and MP4 description",
-          "[ac4enc][encoder][immersive]") {
+          "[ac4][encoder][immersive]") {
     struct Case {
         int channels;
         int kbps;
@@ -504,7 +504,7 @@ TEST_CASE("the immersive layouts' table of contents, levels and MP4 description"
 }
 
 TEST_CASE("the height downmix sends DEE's custom downmix data, which the renderer applies",
-          "[ac4enc][encoder][immersive]") {
+          "[ac4][encoder][immersive]") {
     // Tfl's and Tbl's tones alone; rendered to 5.1 the top pairs go where the
     // configuration sends them, at its gain (Part 2 clause 6.2.9.8,
     // tool_t4_to_f_s()): kFront both to L, kSurround both to Ls, and
@@ -556,7 +556,7 @@ TEST_CASE("the height downmix sends DEE's custom downmix data, which the rendere
 }
 
 TEST_CASE("the encoder refuses the immersive configurations it does not write",
-          "[ac4enc][encoder][immersive]") {
+          "[ac4][encoder][immersive]") {
     struct Case {
         const char* name;
         iclforge::ac4::EncoderConfig config;

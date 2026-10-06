@@ -141,7 +141,7 @@ void decode_one(const AspxFrame& frame, const AspxChannel& data, Channel& channe
 
 TEST_CASE(
     "frequency interleaving adds the waveform-coded groups, time interleaving replaces its slots",
-    "[ac4dec][aspx]") {
+    "[ac4][decoder][aspx]") {
     // A silent low band leaves the patches nothing, and the lowest noise floor
     // Table A.28 can send (qscf 29) leaves the extension near silence: what
     // reaches the output above the crossover is then the waveform-coded input.
@@ -174,7 +174,7 @@ TEST_CASE(
 }
 
 TEST_CASE("a sinusoid sits in its group's middle subband, a quarter turn further each slot",
-          "[ac4dec][aspx]") {
+          "[ac4][decoder][aspx]") {
     const AspxConfig config = dee_128k_config();
     AspxChannel data = flat_channel(20, 29);
     data.add_harmonic[3] = true;  // group [42, 44): (6 + 8) / 2 = 7 above sbx, subband 43
@@ -199,7 +199,7 @@ TEST_CASE("a sinusoid sits in its group's middle subband, a quarter turn further
     CHECK(abs(channel.at(0, 43) / level - unit[1]) < Real(1e-3));
 }
 
-TEST_CASE("the noise generator's index runs on from one interval into the next", "[ac4dec][aspx]") {
+TEST_CASE("the noise generator's index runs on from one interval into the next", "[ac4][decoder][aspx]") {
     // With nothing to patch and no sinusoid, the extension is noise only:
     // one level times NoiseTable at index (base + 20 ts + sb + 1) % 512,
     // base 0 after master_reset and then the previous interval's last.
@@ -226,7 +226,7 @@ TEST_CASE("the noise generator's index runs on from one interval into the next",
 }
 
 TEST_CASE("an interval past its frame's end reaches the output in the next frame",
-          "[ac4dec][aspx]") {
+          "[ac4][decoder][aspx]") {
     const AspxConfig config = dee_128k_config();
     // FIXVAR to A-SPX slot 18 (QMF slot 36), then VARFIX from slot 2.
     AspxChannel fixvar = flat_channel(10, 0, 0, 18);
@@ -249,7 +249,7 @@ TEST_CASE("an interval past its frame's end reaches the output in the next frame
           static_cast<Real>(kRelativeTolerance) * abs(level));
 }
 
-TEST_CASE("a balanced pair shares the sum's scale factors as the balance says", "[ac4dec][aspx]") {
+TEST_CASE("a balanced pair shares the sum's scale factors as the balance says", "[ac4][decoder][aspx]") {
     // Pseudocode 84: with qmode 0, a balance of 32 (16 per step of the
     // balance codebook) puts channel 0 2^(32/2 - 12) = 16 times above channel 1.
     AspxConfig config = dee_128k_config();
@@ -286,7 +286,7 @@ TEST_CASE("a balanced pair shares the sum's scale factors as the balance says", 
                    10.0 * std::log10(16.0)) < 0.5);
 }
 
-TEST_CASE("companding scales each slot by its level against full scale 1.0", "[ac4dec][aspx]") {
+TEST_CASE("companding scales each slot by its level against full scale 1.0", "[ac4][decoder][aspx]") {
     // 5.7.5.2 with alpha 0.65: g = (L / full scale)^(0.35 / 0.65), G = 2^(1 / 0.65).
     constexpr double kFullScale = 32768.0;
     std::vector<QmfValue> ext(static_cast<std::size_t>(kExtSlots) * 64);
@@ -336,7 +336,7 @@ TEST_CASE("companding scales each slot by its level against full scale 1.0", "[a
 }
 
 TEST_CASE("companding's gains are libm's at double and the project's own functions at float",
-          "[ac4dec][aspx]") {
+          "[ac4][decoder][aspx]") {
     // The same slots as above, whose level is exact in Real (a sum of 36 equal integers), so that
     // the gain is the only inexact step. At double the gain is std::pow and G is std::exp2, as
     // they always were; at float they are 2^(e log2 L) and 2^(1 / alpha) through

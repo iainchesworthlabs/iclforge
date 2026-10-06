@@ -519,7 +519,7 @@ target_compile_definitions(iclforge-tests
 # tests/ac4/decoder/test_syntax.cpp holds the AC-4 decoder's syntax trace to
 # the digests tools/references/ac4_syntax.py wrote for the same streams.
 target_compile_definitions(iclforge-tests
-    PRIVATE "AC4DEC_GOLDEN_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden/ac4\"")
+    PRIVATE "AC4_GOLDEN_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden/ac4\"")
 
 # crucible/test_translations.cpp reads the Crucible's six Qt Linguist
 # catalogues as files (no Qt in this target), on the same reasoning: a

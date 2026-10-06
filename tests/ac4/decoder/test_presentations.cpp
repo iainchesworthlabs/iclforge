@@ -21,7 +21,7 @@
 // and as a waveform against the same formula applied to the substreams
 // decoded alone.
 // tools/references/ac4_syntax.py's digests of them are beside the others in
-// tests/golden/ac4/. With AC4DEC_WRITE_PRESENTATIONS set to a directory,
+// tests/golden/ac4/. With AC4_DECODER_WRITE_PRESENTATIONS set to a directory,
 // the streams and the selection table are written there instead of compared,
 // to commit after a change to the multiplexer.
 
@@ -87,7 +87,7 @@ void write_file(const fs::path& path, std::span<const std::byte> bytes) {
 }
 
 fs::path golden() {
-    return fs::path{AC4DEC_GOLDEN_DIR};
+    return fs::path{AC4_GOLDEN_DIR};
 }
 
 MuxSource source(const fs::path& path) {
@@ -796,7 +796,7 @@ std::string selection_table() {
 
 }  // namespace
 
-TEST_CASE("a table of tables of contents selects as Part 2 clause 4.8.2 requires", "[ac4dec][presentations]") {
+TEST_CASE("a table of tables of contents selects as Part 2 clause 4.8.2 requires", "[ac4][decoder][presentations]") {
     for (const SelectionCase& c : selection_cases()) {
         CAPTURE(c.name);
         const auto parsed = iclforge::ac4::parse_raw_frame(c.frame);
@@ -805,8 +805,8 @@ TEST_CASE("a table of tables of contents selects as Part 2 clause 4.8.2 requires
     }
 }
 
-TEST_CASE("the committed presentation streams and selection table are the builders'", "[ac4dec][presentations]") {
-    const char* write_to = std::getenv("AC4DEC_WRITE_PRESENTATIONS");
+TEST_CASE("the committed presentation streams and selection table are the builders'", "[ac4][decoder][presentations]") {
+    const char* write_to = std::getenv("AC4_DECODER_WRITE_PRESENTATIONS");
     const std::string table = selection_table();
     const std::vector<std::byte> five_one = build(stream_5_1());
     const std::vector<std::byte> hybrid = build(stream_hybrid());
@@ -829,7 +829,7 @@ TEST_CASE("the committed presentation streams and selection table are the builde
     CHECK(on_disk == table);
 }
 
-TEST_CASE("every presentation of the multiplexed streams reads to its end", "[ac4dec][presentations]") {
+TEST_CASE("every presentation of the multiplexed streams reads to its end", "[ac4][decoder][presentations]") {
     for (const char* name : {"5_1", "hybrid", "v0"}) {
         CAPTURE(name);
         iclforge::ac4::Decoder decoder;
@@ -848,7 +848,7 @@ TEST_CASE("every presentation of the multiplexed streams reads to its end", "[ac
     }
 }
 
-TEST_CASE("the pan law meets Table 216 at its three angles", "[ac4dec][presentations]") {
+TEST_CASE("the pan law meets Table 216 at its three angles", "[ac4][decoder][presentations]") {
     const std::array five_one = {Speaker::kLeft, Speaker::kRight, Speaker::kCentre,
                                  Speaker::kLfe,  Speaker::kLeftSurround, Speaker::kRightSurround};
     const std::array stereo = {Speaker::kLeft, Speaker::kRight};
@@ -880,7 +880,7 @@ TEST_CASE("the pan law meets Table 216 at its three angles", "[ac4dec][presentat
 }
 
 TEST_CASE("a pan into a 9.1.4 layout goes round the horizontal ring without the screen pair",
-          "[ac4dec][presentations][fronts]") {
+          "[ac4][decoder][presentations][fronts]") {
     // src/ac4/ERRATA.md, "Mixing into a 9.X.4 substream": Lscr and Rscr are no points of the
     // ring, and the tops and the LFE are not either; the ring is the 7.X one, L, C, R, Rs, Rb, Lb,
     // Ls (the surrounds at the sides, 90 and 270 degrees, as the layout has a back pair).
@@ -915,7 +915,7 @@ TEST_CASE("a pan into a 9.1.4 layout goes round the horizontal ring without the 
     CHECK(g[0] == 1.0);
 }
 
-TEST_CASE("music and effects with dialogue mixes as Part 1 clause 6.2.16.1 gives", "[ac4dec][presentations]") {
+TEST_CASE("music and effects with dialogue mixes as Part 1 clause 6.2.16.1 gives", "[ac4][decoder][presentations]") {
     const std::span<const std::byte> file = mixing("5_1");
     const Decoded me = decode_id(file, 20);
     const Decoded english = decode_id(file, 21);
@@ -946,7 +946,7 @@ TEST_CASE("music and effects with dialogue mixes as Part 1 clause 6.2.16.1 gives
     check_tone(fr, french, Speaker::kRight, kToneDialogueFr[1], {{Speaker::kRight, 3.0}});
 }
 
-TEST_CASE("main with associated audio mixes as Part 1 clause 6.2.16.2 gives", "[ac4dec][presentations]") {
+TEST_CASE("main with associated audio mixes as Part 1 clause 6.2.16.2 gives", "[ac4][decoder][presentations]") {
     const std::span<const std::byte> file = mixing("5_1");
     const Decoded main = decode_id(file, 20);
     const Decoded ad = decode_id(file, 23);
@@ -978,7 +978,7 @@ TEST_CASE("main with associated audio mixes as Part 1 clause 6.2.16.2 gives", "[
 }
 
 TEST_CASE("music and effects, dialogue and associated audio mix as Part 1 clause 6.2.16.3 gives",
-          "[ac4dec][presentations]") {
+          "[ac4][decoder][presentations]") {
     const std::span<const std::byte> file = mixing("5_1");
     const Decoded me = decode_id(file, 20);
     const Decoded english = decode_id(file, 21);
@@ -1014,7 +1014,7 @@ TEST_CASE("music and effects, dialogue and associated audio mix as Part 1 clause
 }
 
 TEST_CASE("a hybrid dialogue enhancement method takes its waveform from the dialogue enhancement substream",
-          "[ac4dec][presentations]") {
+          "[ac4][decoder][presentations]") {
     const std::vector<std::byte>& file = committed("hybrid");
     const Decoded main51 = decode_id(file, 10);
     const Decoded waveform = decode_id(file, 11);
@@ -1093,7 +1093,7 @@ TEST_CASE("a hybrid dialogue enhancement method takes its waveform from the dial
     }
 }
 
-TEST_CASE("version 0 presentations mix by their substreams' own metadata and dialnorms", "[ac4dec][presentations]") {
+TEST_CASE("version 0 presentations mix by their substreams' own metadata and dialnorms", "[ac4][decoder][presentations]") {
     const std::span<const std::byte> file = mixing("v0");
     const Decoded me = decode_id(file, 10);
     const Decoded english = decode_id(file, 11);
@@ -1169,7 +1169,7 @@ TEST_CASE("version 0 presentations mix by their substreams' own metadata and dia
     check_tone(decode_id(file, 2, 0.0, 0.0, 0.0, kLevel), ad_at, Speaker::kCentre, kToneAd, {{Speaker::kRight, 0.0}});
 }
 
-TEST_CASE("a stream with no presentation the decoder decodes names the substream it does not", "[ac4dec][presentations]") {
+TEST_CASE("a stream with no presentation the decoder decodes names the substream it does not", "[ac4][decoder][presentations]") {
     // One presentation of one 5.1 substream at 96 kHz, whose HSF extension the
     // decoder does not decode, and its presentation substream.
     BitWriter toc;
@@ -1201,7 +1201,7 @@ TEST_CASE("a stream with no presentation the decoder decodes names the substream
     CHECK(decoder.refusal_reason() == audio->refused_reason);
 }
 
-TEST_CASE("the decoder selects by its configuration and reports what it decoded", "[ac4dec][presentations]") {
+TEST_CASE("the decoder selects by its configuration and reports what it decoded", "[ac4][decoder][presentations]") {
     const std::span<const std::byte> file = mixing("5_1");
     iclforge::ac4::DecoderConfig config;
     config.presentation.language = "de";
@@ -1214,7 +1214,7 @@ TEST_CASE("the decoder selects by its configuration and reports what it decoded"
     CHECK(decode(file, iclforge::ac4::DecoderConfig{}).presentation_ids.front() == 1);
 }
 
-TEST_CASE("a mixed presentation conceals a lost frame with all its substreams", "[ac4dec][presentations]") {
+TEST_CASE("a mixed presentation conceals a lost frame with all its substreams", "[ac4][decoder][presentations]") {
     const std::vector<std::byte>& file = committed("5_1");
     iclforge::ac4::DecoderConfig config;
     config.presentation.presentation_id = 1;

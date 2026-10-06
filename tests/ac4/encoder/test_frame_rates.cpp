@@ -69,7 +69,7 @@ struct Leg {
 
 TEST_CASE(
     "every frame rate reads back and decodes to its sample count with the tones at their levels",
-    "[ac4enc][frame-rate]") {
+    "[ac4][encoder][frame-rate]") {
     // SIMPLE, ASPX with companding and without, ASPX_ACPL_2. At 120 fps a
     // frame's table of contents, presentation substream, metadata and A-SPX
     // data take much of a low rate: mono at 32 kbps, 33 bytes a frame there,
@@ -193,7 +193,7 @@ TEST_CASE(
 }
 
 TEST_CASE("every frame rate frames attacks within its block and A-SPX limits",
-          "[ac4enc][frame-rate]") {
+          "[ac4][encoder][frame-rate]") {
     // Bursts of noise after near silence, which split the transform (a
     // frame's shortest blocks below 1 536 samples) and give A-SPX its
     // attacks, whose borders at 8 A-SPX slots a frame or fewer take one
@@ -297,7 +297,7 @@ TEST_CASE("every frame rate frames attacks within its block and A-SPX limits",
 }
 
 TEST_CASE("I-frames fall where the caller names them and a decoder can start at each",
-          "[ac4enc][frame-rate]") {
+          "[ac4][encoder][frame-rate]") {
     // At 29.97 fps, whose frames decode to 1 601 or 1 602 samples: frames 5
     // and 7 named, and fragments from output samples 16 016 (frame 10's first)
     // and 20 000 (inside frame 12, so frame 13).
@@ -352,7 +352,7 @@ TEST_CASE("I-frames fall where the caller names them and a decoder can start at 
 }
 
 TEST_CASE("the decoded output lags the input by the encoder's and the decoder's delays",
-          "[ac4enc][frame-rate]") {
+          "[ac4][encoder][frame-rate]") {
     // Noise through SIMPLE at a high rate: the lag at which the decoded
     // signal best matches the input is the sum of the two delays, to within
     // a sample, at index 13 and at frame rates with each converter ratio.
@@ -410,7 +410,7 @@ TEST_CASE("the decoded output lags the input by the encoder's and the decoder's 
     }
 }
 
-TEST_CASE("frame rates the sample rate does not have are refused", "[ac4enc][frame-rate]") {
+TEST_CASE("frame rates the sample rate does not have are refused", "[ac4][encoder][frame-rate]") {
     iclforge::ac4::EncoderConfig config;
     config.sample_rate_hz = 44100;
     for (int index = 0; index <= 15; ++index) {
@@ -427,7 +427,7 @@ TEST_CASE("frame rates the sample rate does not have are refused", "[ac4enc][fra
 
 TEST_CASE(
     "over 100 000 frames at each frame rate every frame decodes to the samples counted for it",
-    "[ac4enc][frame-rate][.long]") {
+    "[ac4][encoder][frame-rate][.long]") {
     // Hidden, run on demand (planning/ac4.md, phase E5's exit): 98 wraps of
     // sequence_counter, from 1 020 to 1, each keeping the phase Part 2 clause
     // 5.11 locks the frame lengths to. Mono silence in pieces, each frame

@@ -149,7 +149,7 @@ std::array<int, 2> max_sfb_of(const iclforge::ac4::detail::FrameLayout& layout) 
 
 }  // namespace
 
-TEST_CASE("every chel_matsel's cascade undone comes back through Table 178 as printed", "[ac4enc][multichannel]") {
+TEST_CASE("every chel_matsel's cascade undone comes back through Table 178 as printed", "[ac4][encoder][multichannel]") {
     Lcg rng;
     for (const auto& layout : kLayouts) {
         for (int matsel = 0; matsel < 12; ++matsel) {
@@ -176,7 +176,7 @@ TEST_CASE("every chel_matsel's cascade undone comes back through Table 178 as pr
     }
 }
 
-TEST_CASE("four_channel_data()'s steps undone come back through clause 5.3.3.4's matrix", "[ac4enc][multichannel]") {
+TEST_CASE("four_channel_data()'s steps undone come back through clause 5.3.3.4's matrix", "[ac4][encoder][multichannel]") {
     Lcg rng;
     for (const auto& layout : kLayouts) {
         for (const bool chosen : {false, true}) {
@@ -203,7 +203,7 @@ TEST_CASE("four_channel_data()'s steps undone come back through clause 5.3.3.4's
 }
 
 TEST_CASE("every chel_matsel's five channel matrix undone comes back through Table 179 as printed",
-          "[ac4enc][multichannel]") {
+          "[ac4][encoder][multichannel]") {
     Lcg rng;
     for (const auto& layout : kLayouts) {
         for (int matsel = 0; matsel < 12; ++matsel) {
@@ -231,7 +231,7 @@ TEST_CASE("every chel_matsel's five channel matrix undone comes back through Tab
     }
 }
 
-TEST_CASE("a pair undone comes back through its chparam_info()'s matrix", "[ac4enc][multichannel]") {
+TEST_CASE("a pair undone comes back through its chparam_info()'s matrix", "[ac4][encoder][multichannel]") {
     Lcg rng;
     for (const auto& layout : kLayouts) {
         for (const bool chosen : {false, true}) {
@@ -259,7 +259,7 @@ TEST_CASE("a pair undone comes back through its chparam_info()'s matrix", "[ac4e
     }
 }
 
-TEST_CASE("perceptual entropy prefers the matrix that takes out what the channels share", "[ac4enc][multichannel]") {
+TEST_CASE("perceptual entropy prefers the matrix that takes out what the channels share", "[ac4][encoder][multichannel]") {
     // Three channels of one content at 1, 0.9 and 0.8: some chel_matsel must
     // cost fewer bits than every step left and right, which is what the
     // experimental coding configurations weigh.

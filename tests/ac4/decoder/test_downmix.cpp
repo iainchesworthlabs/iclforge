@@ -147,7 +147,7 @@ double amplitude(const std::vector<float>& x, double hz) {
 
 }  // namespace
 
-TEST_CASE("Tables 149 and 149a give the downmix's mix gains", "[ac4dec][downmix]") {
+TEST_CASE("Tables 149 and 149a give the downmix's mix gains", "[ac4][decoder][downmix]") {
     constexpr std::array<double, 7> kCentre = {3.0, 1.5, 0.0, -1.5, -3.0, -4.5, -6.0};
     for (int code = 0; code < 7; ++code) {
         CHECK(std::abs(detail::centre_mix_gain(code) -
@@ -167,7 +167,7 @@ TEST_CASE("Tables 149 and 149a give the downmix's mix gains", "[ac4dec][downmix]
 }
 
 TEST_CASE("5.1's downmixes are Table 218's with the stream's gains, LFE and loudness corrections",
-          "[ac4dec][downmix]") {
+          "[ac4][decoder][downmix]") {
     // Lo/Ro: C at 0 dB and the surrounds at -6; Lt/Rt: C at -6 and the
     // surrounds at -4.5; the LFE at 5.5 - 10 = -4.5 dB; Lo/Ro's loudness
     // correction (15 - 21) / 2 = -3 dB2 and Lt/Rt's (15 - 13) / 2 = 1 dB2.
@@ -225,7 +225,7 @@ TEST_CASE("5.1's downmixes are Table 218's with the stream's gains, LFE and loud
 }
 
 TEST_CASE("7.X folds to 5.X by Table 219 for each additional pair and add_ch_base",
-          "[ac4dec][downmix]") {
+          "[ac4][decoder][downmix]") {
     constexpr double k = 0.707;
     detail::DownmixValues values;
     // Columns L R C LFE Ls Rs and the pair.
@@ -267,7 +267,7 @@ TEST_CASE("7.X folds to 5.X by Table 219 for each additional pair and add_ch_bas
     CHECK(matrix_for(kFiveOne, false, iclforge::ac4::DownmixTarget::k5X, values).size() == 6);
 }
 
-TEST_CASE("3.0, stereo and mono take Table 217, the sum and the 0.707 upmix", "[ac4dec][downmix]") {
+TEST_CASE("3.0, stereo and mono take Table 217, the sum and the 0.707 upmix", "[ac4][decoder][downmix]") {
     detail::DownmixValues values;
     values.coeff = coefficients(5, 4, 3, 4, std::nullopt, 1);
     const std::array<S, 3> three = {S::kLeft, S::kRight, S::kCentre};
@@ -283,7 +283,7 @@ TEST_CASE("3.0, stereo and mono take Table 217, the sum and the 0.707 upmix", "[
 }
 
 TEST_CASE("the downmix's gains hold from the frame that sends them until another does",
-          "[ac4dec][downmix]") {
+          "[ac4][decoder][downmix]") {
     detail::DownmixStage stage;
     stage.configure(kFiveOne, false, iclforge::ac4::DownmixTarget::kLoRo, true);
     std::vector<std::vector<QmfValue>> channels(6, std::vector<QmfValue>(64, QmfValue{Real{1}, Real{0}}));
@@ -307,7 +307,7 @@ TEST_CASE("the downmix's gains hold from the frame that sends them until another
 }
 
 TEST_CASE("DEE's 5.1 tones come out of each downmix at the stream's gains, to 0.01 dB",
-          "[ac4dec][downmix]") {
+          "[ac4][decoder][downmix]") {
     // L R C LFE Ls Rs at 331, 457, 613, 47, 787 and 953 Hz; DEE's stream sends
     // -3 dB centre and surround gains and no LFE mix gain.
     constexpr std::array<double, 6> kHz = {331.0, 457.0, 613.0, 47.0, 787.0, 953.0};

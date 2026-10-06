@@ -70,7 +70,7 @@ constexpr std::size_t kLengths[] = {2048, 1024, 512, 256, 128};
 }  // namespace
 
 TEST_CASE("The built-in transform tables are the bits the decoder computes",
-          "[ac4][ac4core][dsp][transform_tables]") {
+          "[ac4][core][dsp][transform_tables]") {
     for (const std::size_t n : kLengths) {
         CAPTURE(n);
         const dsp::TransformTable<Real>* const table = dsp::transform_table<Real>(n);
@@ -95,7 +95,7 @@ TEST_CASE("The built-in transform tables are the bits the decoder computes",
     }
 }
 
-TEST_CASE("A length with no built-in table has none", "[ac4][ac4core][dsp][transform_tables]") {
+TEST_CASE("A length with no built-in table has none", "[ac4][core][dsp][transform_tables]") {
     for (const std::size_t n : {std::size_t{1920}, std::size_t{1536}, std::size_t{96}, std::size_t{4096}}) {
         CAPTURE(n);
         CHECK(dsp::transform_table<Real>(n) == nullptr);

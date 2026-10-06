@@ -94,7 +94,7 @@ void put_empty_basic_and_extended_sus1(BitWriter& w) {
 // --- basic_metadata() -------------------------------------------------------
 
 TEST_CASE("metadata reads a sus_ver 0 5.1 substream's dialnorm, loudness and stereo downmix block",
-          "[ac4dec][metadata]") {
+          "[ac4][decoder][metadata]") {
     BitWriter w;
     w.put(27, 7);       // dialnorm_bits
     w.flag(true);       // b_more_basic_metadata
@@ -176,7 +176,7 @@ TEST_CASE("metadata reads a sus_ver 0 5.1 substream's dialnorm, loudness and ste
 }
 
 TEST_CASE("metadata reads a sus_ver 1 stereo substream's loudness and previous downmix info",
-          "[ac4dec][metadata]") {
+          "[ac4][decoder][metadata]") {
     BitWriter w;
     w.flag(true);    // b_more_basic_metadata
     w.flag(true);    // b_substream_loudness_info
@@ -254,7 +254,7 @@ TEST_CASE("metadata reads a sus_ver 1 stereo substream's loudness and previous d
     CHECK_FALSE(out.drc.has_value());  // at sus_ver 1 the presentation substream has DRC
 }
 
-TEST_CASE("metadata reads the upmix type of each 7.X layout", "[ac4dec][metadata]") {
+TEST_CASE("metadata reads the upmix type of each 7.X layout", "[ac4][decoder][metadata]") {
     struct Case {
         int mode;
         int upmix_bits;  // 2 for 3/4/0, 1 for 3/2/2, 0 for 5/2/0
@@ -296,7 +296,7 @@ TEST_CASE("metadata reads the upmix type of each 7.X layout", "[ac4dec][metadata
 
 // --- extended_metadata() ----------------------------------------------------
 
-TEST_CASE("metadata reads a sus_ver 0 associated mono substream's scaling and pan", "[ac4dec][metadata]") {
+TEST_CASE("metadata reads a sus_ver 0 associated mono substream's scaling and pan", "[ac4][decoder][metadata]") {
     SubstreamContext ctx = context(ch_mode::kMono, 0, true);
     ctx.b_associated = true;
     ctx.b_dialog = true;
@@ -341,7 +341,7 @@ TEST_CASE("metadata reads a sus_ver 0 associated mono substream's scaling and pa
     CHECK(rec.count("b_dialog") == 0);  // a parameter at sus_ver 0, not a field
 }
 
-TEST_CASE("extended_metadata classifies every channel its channel mode holds", "[ac4dec][metadata]") {
+TEST_CASE("extended_metadata classifies every channel its channel mode holds", "[ac4][decoder][metadata]") {
     // Which classifier flags each mode reads, all written as 1 so that each
     // b_*_active is followed by its b_*_has_dialog where the syntax has one.
     struct Case {
@@ -398,7 +398,7 @@ TEST_CASE("extended_metadata classifies every channel its channel mode holds", "
     }
 }
 
-TEST_CASE("metadata fails when tools_metadata_size disagrees with the tools read", "[ac4dec][metadata]") {
+TEST_CASE("metadata fails when tools_metadata_size disagrees with the tools read", "[ac4][decoder][metadata]") {
     BitWriter w;
     put_empty_basic_and_extended_sus1(w);
     w.put(5, 7);     // tools_metadata_size_value: 5, but dialog_enhancement() takes 1
@@ -417,7 +417,7 @@ TEST_CASE("metadata fails when tools_metadata_size disagrees with the tools read
     CHECK(result.error().error == DecodeError::kInvalidStream);
 }
 
-TEST_CASE("metadata reads an inline emdf_payloads_substream()", "[ac4dec][metadata]") {
+TEST_CASE("metadata reads an inline emdf_payloads_substream()", "[ac4][decoder][metadata]") {
     BitWriter w;
     put_empty_basic_and_extended_sus1(w);
     w.put(1, 7);     // tools_metadata_size_value
@@ -451,7 +451,7 @@ TEST_CASE("metadata reads an inline emdf_payloads_substream()", "[ac4dec][metada
     CHECK(out.emdf_payloads.payloads[0].bytes == std::vector<std::uint8_t>{0xA5});
 }
 
-TEST_CASE("metadata stops with kTruncated when the substream ends inside it", "[ac4dec][metadata]") {
+TEST_CASE("metadata stops with kTruncated when the substream ends inside it", "[ac4][decoder][metadata]") {
     BitWriter w;
     w.flag(true);   // b_more_basic_metadata
     w.flag(true);   // b_substream_loudness_info, then nothing
@@ -470,7 +470,7 @@ TEST_CASE("metadata stops with kTruncated when the substream ends inside it", "[
 
 // --- further_loudness_info() ------------------------------------------------
 
-TEST_CASE("further_loudness_info reads every optional field of the full form", "[ac4dec][metadata]") {
+TEST_CASE("further_loudness_info reads every optional field of the full form", "[ac4][decoder][metadata]") {
     BitWriter w;
     w.put(3, 2);       // loudness_version 3: extended follows
     w.put(2, 4);       // extended_loudness_version
@@ -545,7 +545,7 @@ TEST_CASE("further_loudness_info reads every optional field of the full form", "
 }
 
 TEST_CASE("further_loudness_info refuses malformed extensions and unterminated boundaries",
-          "[ac4dec][metadata]") {
+          "[ac4][decoder][metadata]") {
     // Everything up to the extension, at the presentation form.
     const auto head = [](BitWriter& w) {
         w.put(0, 2);    // loudness_version
@@ -615,7 +615,7 @@ TEST_CASE("further_loudness_info refuses malformed extensions and unterminated b
 
 // --- drc_frame() ------------------------------------------------------------
 
-TEST_CASE("DRC helper tables give each channel mode and frame length its count", "[ac4dec][metadata]") {
+TEST_CASE("DRC helper tables give each channel mode and frame length its count", "[ac4][decoder][metadata]") {
     using iclforge::ac4::detail::nr_drc_channels;
     using iclforge::ac4::detail::nr_drc_subframes;
     const auto channels = [](int mode) { return nr_drc_channels(DrcContext{.ch_mode = mode}); };
@@ -664,7 +664,7 @@ int drc_code_bits(int diff) {
 
 }  // namespace
 
-TEST_CASE("drc_frame reads a configuration of three modes and their gains", "[ac4dec][metadata]") {
+TEST_CASE("drc_frame reads a configuration of three modes and their gains", "[ac4][decoder][metadata]") {
     // 5.1 at frame_len_base 512: three DRC channels and two subframes; mode 0
     // has drc_gains_config 2, two bands, so twelve gains, the first
     // drc_gain_val and eleven drc_gain_code differences of +1.
@@ -796,7 +796,7 @@ TEST_CASE("drc_frame reads a configuration of three modes and their gains", "[ac
     }
 }
 
-TEST_CASE("drc_frame reads a full compression curve", "[ac4dec][metadata]") {
+TEST_CASE("drc_frame reads a full compression curve", "[ac4][decoder][metadata]") {
     BitWriter w;
     w.flag(true);    // b_drc_present
     w.put(0, 3);     // one mode
@@ -858,7 +858,7 @@ TEST_CASE("drc_frame reads a full compression curve", "[ac4dec][metadata]") {
     CHECK(out.drc_reserved == 1);
 }
 
-TEST_CASE("drc_frame refuses what its syntax cannot follow", "[ac4dec][metadata]") {
+TEST_CASE("drc_frame refuses what its syntax cannot follow", "[ac4][decoder][metadata]") {
     // One mode, id 0, with the given drc_gains_config, then drc_eac3_profile.
     const auto one_mode = [](BitWriter& w, int gains_config) {
         w.flag(true);
@@ -947,7 +947,7 @@ TEST_CASE("drc_frame refuses what its syntax cannot follow", "[ac4dec][metadata]
 }
 
 TEST_CASE("a sus_ver 0 substream's metadata carries a long drc_frame behind escaped sizes",
-          "[ac4dec][metadata]") {
+          "[ac4][decoder][metadata]") {
     // drc_version 1 with 150 bits of drc2_bits: drc_gainset_size 159 needs
     // its b_more_bits, and tools_metadata_size (the whole drc_frame() plus
     // dialog_enhancement()) goes past 127 and needs its own.
@@ -1026,7 +1026,7 @@ void put_de_config(BitWriter& w, int method, int max_gain, int channel_config) {
 
 }  // namespace
 
-TEST_CASE("de_nr_channels follows Table 171", "[ac4dec][metadata]") {
+TEST_CASE("de_nr_channels follows Table 171", "[ac4][decoder][metadata]") {
     using iclforge::ac4::detail::de_nr_channels;
     CHECK(de_nr_channels(0b000) == 0);
     CHECK(de_nr_channels(0b001) == 1);
@@ -1039,7 +1039,7 @@ TEST_CASE("de_nr_channels follows Table 171", "[ac4dec][metadata]") {
 }
 
 TEST_CASE("dialog_enhancement decodes three channels' parameters and carries them between frames",
-          "[ac4dec][metadata]") {
+          "[ac4][decoder][metadata]") {
     const auto& abs1 = tables::kDeHcbAbs1;
     const auto& diff1 = tables::kDeHcbDiff1;
     MetadataState state;
@@ -1110,7 +1110,7 @@ TEST_CASE("dialog_enhancement decodes three channels' parameters and carries the
     CHECK(rec3.count("de_par_code") == 0);
 }
 
-TEST_CASE("dialog_enhancement reads M/S processing and the signal contribution", "[ac4dec][metadata]") {
+TEST_CASE("dialog_enhancement reads M/S processing and the signal contribution", "[ac4][decoder][metadata]") {
     const auto& abs0 = tables::kDeHcbAbs0;
     const auto& diff0 = tables::kDeHcbDiff0;
 
@@ -1183,7 +1183,7 @@ TEST_CASE("dialog_enhancement reads M/S processing and the signal contribution",
     }
 }
 
-TEST_CASE("dialog_enhancement's configuration follows the I-frame rule", "[ac4dec][metadata]") {
+TEST_CASE("dialog_enhancement's configuration follows the I-frame rule", "[ac4][decoder][metadata]") {
     const auto& abs0 = tables::kDeHcbAbs0;
     const auto& diff0 = tables::kDeHcbDiff0;
     // One centre channel, de_method 0.
@@ -1243,7 +1243,7 @@ TEST_CASE("dialog_enhancement's configuration follows the I-frame rule", "[ac4de
     }
 }
 
-TEST_CASE("a 9.X.4 substream's dialog_enhancement carries a simulcast core set", "[ac4dec][metadata]") {
+TEST_CASE("a 9.X.4 substream's dialog_enhancement carries a simulcast core set", "[ac4][decoder][metadata]") {
     const auto& abs0 = tables::kDeHcbAbs0;
     const auto& diff0 = tables::kDeHcbDiff0;
     BitWriter de;
@@ -1295,7 +1295,7 @@ TEST_CASE("a 9.X.4 substream's dialog_enhancement carries a simulcast core set",
 }
 
 TEST_CASE("dialog_enhancement fails on a codeword cut short by the end of the substream",
-          "[ac4dec][metadata]") {
+          "[ac4][decoder][metadata]") {
     // de_config() then one bit of a DE_HCB_ABS_0 codeword whose shortest
     // codeword is longer: the substream ends inside it.
     BitWriter w;
@@ -1318,7 +1318,7 @@ TEST_CASE("dialog_enhancement fails on a codeword cut short by the end of the su
 
 // --- emdf_payloads_substream() ----------------------------------------------
 
-TEST_CASE("emdf_payloads_substream reads each payload configuration", "[ac4dec][metadata]") {
+TEST_CASE("emdf_payloads_substream reads each payload configuration", "[ac4][decoder][metadata]") {
     BitWriter w;
     // Payload 1: the escaped id, a sample offset and every optional field.
     w.put(31, 5);
@@ -1388,7 +1388,7 @@ TEST_CASE("emdf_payloads_substream reads each payload configuration", "[ac4dec][
     CHECK_FALSE(third.config.smpoffst.has_value());
 }
 
-TEST_CASE("emdf_payloads_substream refuses a payload size past the end", "[ac4dec][metadata]") {
+TEST_CASE("emdf_payloads_substream refuses a payload size past the end", "[ac4][decoder][metadata]") {
     BitWriter w;
     w.put(2, 5);
     w.put(0, 4);

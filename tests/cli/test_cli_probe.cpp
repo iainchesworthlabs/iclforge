@@ -791,7 +791,7 @@ TEST_CASE("probe writes an AC-4 stream's presentations and metadata", "[cli][pro
     // The test multiplexer's stream: 17 version 1 presentations, their
     // languages and their substreams' roles.
     const auto multiplexed =
-        fs::path{AC4DEC_GOLDEN_DIR} / "presentations" / "presentations-5_1.ac4";
+        fs::path{AC4_GOLDEN_DIR} / "presentations" / "presentations-5_1.ac4";
     REQUIRE(run_cli("probe \"" + multiplexed.string() + "\" json=1", log) == 0);
     const auto many = read_log(log);
     std::size_t presentations = 0;
@@ -903,7 +903,7 @@ TEST_CASE("probe reports the common data of a group's own OAMD substream", "[cli
     // b_default_screen_size_ratio, master_screen_size_ratio_code,
     // b_bed_object_chan_distribute and the optional trim(), bed_render_info() and
     // headphone() of add_data.
-    const fs::path objects = fs::path{AC4DEC_GOLDEN_DIR} / "objects";
+    const fs::path objects = fs::path{AC4_GOLDEN_DIR} / "objects";
     const auto oamd_of = [&objects](const std::string& stream) {
         const auto log = scratch_dir() / (stream + ".json");
         REQUIRE(run_cli("probe \"" + (objects / (stream + ".ac4")).string() + "\" json=1", log) ==

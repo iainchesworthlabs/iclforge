@@ -1134,7 +1134,7 @@ or anyone else, sets `b_snf_data_exists`, so the noise fill is decoded from the 
 test (`tests/ac4/decoder/test_noise_fill.cpp`) holds its levels, escape and draw order to
 Pseudocodes 22 and 23 on a hand-built track.
 
-**Locally, over the census.** With `AC4DEC_GOLDEN_DIR` and `AC4DEC_STREAM_DIR` set, the same test
+**Locally, over the census.** With `AC4_GOLDEN_DIR` and `AC4_STREAM_DIR` set, the same test
 compares the decoder with the Python parser's digests of any other set of streams. Over the 107 DEE
 streams of the local census (50,728 frames of 2.0, 5.1, 5.1.4 and immersive stereo) every digest
 agrees, and every substream is read to its exact end or, for 5.1.4's audio, refused at the immersive
@@ -1145,7 +1145,7 @@ encoders wrote: DASH-IF's Dolby
 test vectors (2.0 and 5.1 at 25 and 29.97 fps), CTA WAVE's `ca4s` sets (2.0 at 30 fps) and Chromium's
 channel-based and immersive-stereo test files, 6,670 frames in all, taken out of their MP4 and CMAF
 segments with `forge demux` and kept out of the tree. Chromium's A-JOC file is refused at the same
-table of contents by both. `AC4DEC_TRACE_DIR` writes the decoder's full trace, one record per line as
+table of contents by both. `AC4_TRACE_DIR` writes the decoder's full trace, one record per line as
 `frame substream bit_offset width value name`, the shape `ac4_syntax.py trace` prints.
 
 **Where no stream reaches.** No stream of DEE's reaches most of the syntax: noise fill, VARVAR framing,
@@ -1375,7 +1375,7 @@ named otherwise.
   speakers and changing the output level and dialogue enhancement half way through. No frame is
   refused, only a frame before a stream's first I-frame comes out empty, a stream ends in one short
   block at most, and the output equals `decode()`'s configured the same way, sample for sample.
-  Pointed at a directory of local streams with `AC4DEC_API_STREAM_DIR`, the same test reports how
+  Pointed at a directory of local streams with `AC4_API_STREAM_DIR`, the same test reports how
   many decode and counts the refusals by reason. When phase D8 wrote it, before the immersive
   element and the objects were decoded, it decoded 406 of DEE's 533 local streams and refused the
   127 5.1.4 ones by name, and of 13 third-party streams it decoded 12 and refused the A-JOC one;
@@ -1470,7 +1470,7 @@ under "Object audio syntax", "A-JOC" and "Object audio metadata and the ISF rend
 - **The intermediate spatial format**: rendered to 7.X.4, 7.X.2, 7.X.0, 5.X.4, 5.X.2, 5.X, two
   channels and mono, each object's tone reaches each speaker at its coefficient in the attachment's
   matrix, and 5 dB up where its metadata sets that gain.
-- **Chromium's `ac4-ajoc.ac4`** (a local test, `AC4DEC_AJOC_STREAM`): every frame decodes in both
+- **Chromium's `ac4-ajoc.ac4`** (a local test, `AC4_AJOC_STREAM`): every frame decodes in both
   modes, seventeen objects in full decoding and ten in core, the kinds and speakers its table of
   contents lists, each a frame long and finite, its updates inside the frame and in order. Its
   metadata puts every object at the front of the room on the floor (X 0.5, Y 0, Z −1) in every
@@ -1480,7 +1480,7 @@ under "Object audio syntax", "A-JOC" and "Object audio metadata and the ISF rend
   of the objects' components at the gains the layout renderer gives their positions, frame by frame,
   in full and core decoding, as object 0 crosses the front from the left wall to the right. Whether
   it sounds right is for a listener to judge, on ten-second versions the test writes with
-  `AC4DEC_WRITE_LISTENING`.
+  `AC4_DECODER_WRITE_LISTENING`.
 - **No second decoder.** librempeg (git 2026-09-24) refuses every object substream ("object coding
   is not implemented"), Chromium's and the eight constructed ones alike, and DEE's A-JOC encoder
   takes no master this project writes, so no reading here rests on another decoder.
@@ -1825,7 +1825,7 @@ committed streams (`tests/golden/ac4/objects/encoder-*.ac4`, with their digests)
 encoder-space harness's object draws. MediaInfo's reading of the object count and the bed
 (`tools/checks/check_ac4_encode_readers.py --only objects`) needs DEE's install. Whether the objects
 move as their metadata says is the listener's to hear, from the streams the test writes with
-`AC4ENC_WRITE_LISTENING` set.
+`AC4_ENCODER_WRITE_LISTENING` set.
 
 ### IEC 61937
 

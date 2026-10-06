@@ -205,7 +205,7 @@ std::vector<std::size_t> some_indices(std::size_t count) {
 
 }  // namespace
 
-TEST_CASE("the FFT equals the DFT at every 2, 3 and 5 smooth length it is given", "[ac4core][dsp]") {
+TEST_CASE("the FFT equals the DFT at every 2, 3 and 5 smooth length it is given", "[ac4][core][dsp]") {
     for (const std::size_t n : {1U, 2U, 3U, 4U, 5U, 6U, 8U, 9U, 10U, 12U, 15U, 16U, 25U, 27U, 30U, 45U, 48U, 60U,
                                 64U, 96U, 120U, 125U, 240U, 384U, 480U, 512U, 960U, 1024U}) {
         CAPTURE(n);
@@ -236,7 +236,7 @@ TEST_CASE("the FFT equals the DFT at every 2, 3 and 5 smooth length it is given"
     }
 }
 
-TEST_CASE("the FFT refuses a length with a prime factor above 5", "[ac4core][dsp]") {
+TEST_CASE("the FFT refuses a length with a prime factor above 5", "[ac4][core][dsp]") {
     for (const std::size_t n : {0U, 7U, 14U, 22U, 2048U * 7U}) {
         CAPTURE(n);
         dsp::Fft<double> fft(n);
@@ -244,7 +244,7 @@ TEST_CASE("the FFT refuses a length with a prime factor above 5", "[ac4core][dsp
     }
 }
 
-TEST_CASE("the inverse MDCT equals Pseudocodes 60 to 63 and their cosine sum at every length", "[ac4core][dsp]") {
+TEST_CASE("the inverse MDCT equals Pseudocodes 60 to 63 and their cosine sum at every length", "[ac4][core][dsp]") {
     for (const int length : kLengths48) {
         CAPTURE(length);
         const auto n = static_cast<std::size_t>(length);
@@ -276,7 +276,7 @@ TEST_CASE("the inverse MDCT equals Pseudocodes 60 to 63 and their cosine sum at 
     }
 }
 
-TEST_CASE("the forward MDCT equals its cosine sum at every length", "[ac4core][dsp]") {
+TEST_CASE("the forward MDCT equals its cosine sum at every length", "[ac4][core][dsp]") {
     for (const int length : kLengths48) {
         CAPTURE(length);
         const auto n = static_cast<std::size_t>(length);
@@ -306,7 +306,7 @@ TEST_CASE("the forward MDCT equals its cosine sum at every length", "[ac4core][d
     }
 }
 
-TEST_CASE("Table 186 gives each transform length its KBD alpha", "[ac4core][dsp]") {
+TEST_CASE("Table 186 gives each transform length its KBD alpha", "[ac4][core][dsp]") {
     CHECK(dsp::kbd_alpha(2048, 1) == 3.0);
     CHECK(dsp::kbd_alpha(1920, 1) == 3.0);
     CHECK(dsp::kbd_alpha(1536, 1) == 3.0);
@@ -327,7 +327,7 @@ TEST_CASE("Table 186 gives each transform length its KBD alpha", "[ac4core][dsp]
     CHECK(dsp::kbd_alpha(2048, 3) == 0.0);
 }
 
-TEST_CASE("the KBD windows match an independent Kaiser window and meet Princen-Bradley", "[ac4core][dsp]") {
+TEST_CASE("the KBD windows match an independent Kaiser window and meet Princen-Bradley", "[ac4][core][dsp]") {
     struct Reference {
         int length;
         double alpha;
@@ -369,7 +369,7 @@ TEST_CASE("the KBD windows match an independent Kaiser window and meet Princen-B
     }
 }
 
-TEST_CASE("the I0 series converges to the Bessel function", "[ac4core][dsp]") {
+TEST_CASE("the I0 series converges to the Bessel function", "[ac4][core][dsp]") {
     // I0(0) = 1; the others from the series in closed-form tables
     // (Abramowitz and Stegun Table 9.8 gives e^-x I0(x)).
     CHECK(dsp::bessel_i0(0.0) == 1.0);
@@ -447,7 +447,7 @@ std::vector<std::vector<int>> table_187(int full) {
 
 }  // namespace
 
-TEST_CASE("windowed blocks reconstruct their input across every Table 187 transition", "[ac4core][dsp]") {
+TEST_CASE("windowed blocks reconstruct their input across every Table 187 transition", "[ac4][core][dsp]") {
     for (const int full : {2048, 1920, 1536}) {
         CAPTURE(full);
         dsp::TransformSet<double> set(full, 1);
@@ -506,7 +506,7 @@ TEST_CASE("windowed blocks reconstruct their input across every Table 187 transi
     }
 }
 
-TEST_CASE("the transforms leave their output alone when given the wrong sizes", "[ac4core][dsp]") {
+TEST_CASE("the transforms leave their output alone when given the wrong sizes", "[ac4][core][dsp]") {
     dsp::Fft<double> fft(8);
     std::vector<Complex> short_data(4, Complex(1.0, 0.0));
     fft.forward(short_data);
@@ -536,7 +536,7 @@ TEST_CASE("the transforms leave their output alone when given the wrong sizes", 
     CHECK(dsp::kbd_alpha(-96, 1) == 0.0);
 }
 
-TEST_CASE("the synthesis refuses a block length its transform set does not have", "[ac4core][dsp]") {
+TEST_CASE("the synthesis refuses a block length its transform set does not have", "[ac4][core][dsp]") {
     dsp::TransformSet<double> set(2048, 1);
     REQUIRE(set.valid());
     dsp::ChannelSynthesis<double> synthesis(2048);
@@ -637,7 +637,7 @@ double max_abs(std::span<const Complex> values) {
 
 }  // namespace
 
-TEST_CASE("the QMF analysis equals Pseudocode 65 as printed", "[ac4core][dsp][qmf]") {
+TEST_CASE("the QMF analysis equals Pseudocode 65 as printed", "[ac4][core][dsp][qmf]") {
     const std::vector<double> pcm = random_values(64 * 24, 65);
     // Two calls, to carry qmf_filt across them as a frame boundary does.
     dsp::QmfAnalysis<double> analysis;
@@ -654,7 +654,7 @@ TEST_CASE("the QMF analysis equals Pseudocode 65 as printed", "[ac4core][dsp][qm
     CHECK(error <= 1e-12 * max_abs(printed));
 }
 
-TEST_CASE("the QMF synthesis equals Pseudocode 66 as printed", "[ac4core][dsp][qmf]") {
+TEST_CASE("the QMF synthesis equals Pseudocode 66 as printed", "[ac4][core][dsp][qmf]") {
     const std::vector<double> re = random_values(64 * 24, 66);
     const std::vector<double> im = random_values(64 * 24, 67);
     std::vector<Complex> q(re.size());
@@ -671,7 +671,7 @@ TEST_CASE("the QMF synthesis equals Pseudocode 66 as printed", "[ac4core][dsp][q
     CHECK(max_abs_difference(fast, printed) <= 1e-12 * max_abs(std::span<const double>(printed)));
 }
 
-TEST_CASE("the QMF pair gives back its input 577 samples later, to 78 dB", "[ac4core][dsp][qmf]") {
+TEST_CASE("the QMF pair gives back its input 577 samples later, to 78 dB", "[ac4][core][dsp][qmf]") {
     const std::vector<double> x = random_values(64 * 400, 577);
     dsp::QmfAnalysis<double> analysis;
     dsp::QmfSynthesis<double> synthesis;
@@ -707,7 +707,7 @@ TEST_CASE("the QMF pair gives back its input 577 samples later, to 78 dB", "[ac4
 }
 
 TEST_CASE("the QMF banks leave their output alone when given the wrong sizes, and reset",
-          "[ac4core][dsp][qmf]") {
+          "[ac4][core][dsp][qmf]") {
     dsp::QmfAnalysis<double> analysis;
     const std::vector<double> ragged(100, 1.0);
     std::vector<Complex> q(128, Complex(-1.0, 0.0));
@@ -743,7 +743,7 @@ TEST_CASE("the QMF banks leave their output alone when given the wrong sizes, an
 }
 
 TEST_CASE("the QMF banks give the same output however the slots are split across calls",
-          "[ac4core][dsp][qmf]") {
+          "[ac4][core][dsp][qmf]") {
     // 47 slots is more than four laps of the ten blocks of each delay line, and
     // calls of 1, 2, 3, 5, 7 and 11 slots start the laps at every block.
     constexpr std::size_t kSlots = 47;
@@ -782,7 +782,7 @@ TEST_CASE("the QMF banks give the same output however the slots are split across
 }
 
 TEST_CASE("the QMF banks at the decoder's scalar agree with the banks at double",
-          "[ac4core][dsp][qmf]") {
+          "[ac4][core][dsp][qmf]") {
     using Scalar = iclforge::ac4::detail::Real;
     using ScalarComplex = dsp::Complex<Scalar>;
     // Where the decoder's scalar is double these are one type and the difference
@@ -849,7 +849,7 @@ TEST_CASE("the QMF banks at the decoder's scalar agree with the banks at double"
 }
 
 TEST_CASE("the QMF twiddle factors are cosines and sines of whole units of pi over 256",
-          "[ac4core][dsp][qmf]") {
+          "[ac4][core][dsp][qmf]") {
     namespace q = dsp::qmf;
     for (long long j = -1100; j <= 1100; ++j) {
         const double c = q::cos_units(j);
@@ -891,7 +891,7 @@ TEST_CASE("the QMF twiddle factors are cosines and sines of whole units of pi ov
     }
 }
 
-TEST_CASE("the QMF's 64-point transform equals the DFT", "[ac4core][dsp][qmf]") {
+TEST_CASE("the QMF's 64-point transform equals the DFT", "[ac4][core][dsp][qmf]") {
     const std::vector<double> re = random_values(64, 641);
     const std::vector<double> im = random_values(64, 642);
     std::vector<Complex> expected(64);
@@ -930,7 +930,7 @@ TEST_CASE("the QMF's 64-point transform equals the DFT", "[ac4core][dsp][qmf]") 
 }
 
 TEST_CASE("each QMF vector kernel gives the bits of the scalar loop it replaces",
-          "[ac4core][dsp][qmf][simd]") {
+          "[ac4][core][dsp][qmf][simd]") {
     namespace k = dsp::qmf;
     namespace v = dsp::qmf::vec;
     const auto run = [](auto tag, unsigned seed) {
@@ -1020,7 +1020,7 @@ TEST_CASE("each QMF vector kernel gives the bits of the scalar loop it replaces"
 }
 
 TEST_CASE("the QMF banks give the bits of the scalar kernels run one after another",
-          "[ac4core][dsp][qmf][simd]") {
+          "[ac4][core][dsp][qmf][simd]") {
     namespace k = dsp::qmf;
     const auto run = [](auto tag, unsigned seed) {
         using R = decltype(tag);
@@ -1082,7 +1082,7 @@ TEST_CASE("the QMF banks give the bits of the scalar kernels run one after anoth
         CHECK(std::memcmp(got_pcm.data(), expected_pcm.data(), got_pcm.size() * sizeof(R)) == 0);
     };
     // The banks are instantiated at the decoder's scalar and at double, whichever
-    // that is (AC4CORE_ALSO_AT_DOUBLE), and at nothing else. At Fixed32 the banks
+    // that is (ICLFORGE_AC4_ALSO_AT_DOUBLE), and at nothing else. At Fixed32 the banks
     // have kernels of their own, with a block exponent per slot (dsp/qmf_fixed.hpp),
     // which the test above holds to the banks at double.
     run(double{}, 8100);
@@ -1092,7 +1092,7 @@ TEST_CASE("the QMF banks give the bits of the scalar kernels run one after anoth
 }
 
 TEST_CASE("the transforms take a scratch of the caller's and give the same values",
-          "[ac4core][dsp]") {
+          "[ac4][core][dsp]") {
     // The FFT and the inverse MDCT work in buffers of their own, made by the first
     // call, or in one the caller lends; the values do not depend on which.
     for (const std::size_t n :
@@ -1139,7 +1139,7 @@ TEST_CASE("the transforms take a scratch of the caller's and give the same value
 }
 
 TEST_CASE("channels that share one transform set give what channels with their own give",
-          "[ac4core][dsp]") {
+          "[ac4][core][dsp]") {
     // A substream's channels inverse transform one block after another in the set's
     // scratch, at block lengths that change from one block to the next.
     constexpr int kFull = 2048;

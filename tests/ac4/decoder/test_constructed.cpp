@@ -11,7 +11,7 @@
 // The streams under tests/golden/ac4/constructed/ are the committed cases,
 // byte for byte, and tests/golden/ac4/ holds
 // tools/references/ac4_syntax.py's digests of them, which
-// test_ac4dec_syntax.cpp holds the decoder to. With AC4DEC_WRITE_CONSTRUCTED
+// test_ac4dec_syntax.cpp holds the decoder to. With AC4_DECODER_WRITE_CONSTRUCTED
 // set to a directory, this writes the committed cases there instead of
 // comparing them, to commit after a change to the builder.
 
@@ -379,7 +379,7 @@ std::vector<std::byte> read_file(const fs::path& path) {
 
 }  // namespace
 
-TEST_CASE("the 3.0 element's two coding_configs put each tone on its channel", "[ac4dec][constructed]") {
+TEST_CASE("the 3.0 element's two coding_configs put each tone on its channel", "[ac4][decoder][constructed]") {
     // Under the sanitizers every fifth case: each coding_config in SIMPLE and
     // ASPX, stereo processing on and off, and four of the matrices.
     Stride stride(5, 0);
@@ -395,7 +395,7 @@ TEST_CASE("the 3.0 element's two coding_configs put each tone on its channel", "
     }
 }
 
-TEST_CASE("Table 180's coding_configs and 2ch_modes put each 5.X tone on its channel", "[ac4dec][constructed]") {
+TEST_CASE("Table 180's coding_configs and 2ch_modes put each 5.X tone on its channel", "[ac4][decoder][constructed]") {
     // Under the sanitizers each 2ch_mode with stereo processing one way, and
     // every fifth matrix, in SIMPLE and ASPX for coding_config 3.
     for (const int ch_mode : {3, 4}) {
@@ -421,7 +421,7 @@ TEST_CASE("Table 180's coding_configs and 2ch_modes put each 5.X tone on its cha
     }
 }
 
-TEST_CASE("Tables 182 and 183 put each 7.X tone on its channel in the three modes", "[ac4dec][constructed]") {
+TEST_CASE("Tables 182 and 183 put each 7.X tone on its channel in the three modes", "[ac4][decoder][constructed]") {
     // Under the sanitizers every seventh case: each ch_mode and
     // coding_config, SIMPLE and ASPX, both 2ch_modes and b_use_sap_add_ch.
     Stride stride(7, 0);
@@ -437,7 +437,7 @@ TEST_CASE("Tables 182 and 183 put each 7.X tone on its channel in the three mode
     }
 }
 
-TEST_CASE("the channel pair's A-CPL modes put each tone on its channel", "[ac4dec][constructed][acpl]") {
+TEST_CASE("the channel pair's A-CPL modes put each tone on its channel", "[ac4][decoder][constructed][acpl]") {
     // ASPX_ACPL_1: mid and side below acpl_qmf_band, with and without stereo
     // processing; ASPX_ACPL_2: one track, sent to L or to R.
     for (const bool proc : {false, true}) {
@@ -456,7 +456,7 @@ TEST_CASE("the channel pair's A-CPL modes put each tone on its channel", "[ac4de
     }
 }
 
-TEST_CASE("the 5.X element's A-CPL modes put each tone on its channel", "[ac4dec][constructed][acpl]") {
+TEST_CASE("the 5.X element's A-CPL modes put each tone on its channel", "[ac4][decoder][constructed][acpl]") {
     // Under the sanitizers each ch_mode takes one coding_config, 3/2/0 the
     // first and 3/2/0 with the LFE the second, and a case of each A-CPL mode,
     // with sap_add_mode, acpl_second, acpl_quant and stereo processing each
@@ -493,7 +493,7 @@ TEST_CASE("the 5.X element's A-CPL modes put each tone on its channel", "[ac4dec
     }
 }
 
-TEST_CASE("the 7.X element's A-CPL modes put each tone on its channel by Table 202", "[ac4dec][constructed][acpl]") {
+TEST_CASE("the 7.X element's A-CPL modes put each tone on its channel by Table 202", "[ac4][decoder][constructed][acpl]") {
     // Under the sanitizers every twentieth case from the second: each
     // ch_mode, coding_config and 2ch_mode, add_ch_base both ways, and each
     // A-CPL mode and acpl_second.
@@ -528,7 +528,7 @@ TEST_CASE("the 7.X element's A-CPL modes put each tone on its channel by Table 2
 }
 
 TEST_CASE("Part 2 Table 19, step 4 and Table 20 put each 7.X.4 tone on its channel, full and core",
-          "[ac4dec][constructed][immersive]") {
+          "[ac4][decoder][constructed][immersive]") {
     // SCPL, ASPX_SCPL and ASPX_ACPL_1, which code all eleven signals: every
     // core_5ch_grouping and 2ch_mode, step 4 at identity, M/S or absent, and
     // Table 20 predicting at 0.5 or not at all. Under the sanitizers four
@@ -562,7 +562,7 @@ TEST_CASE("Part 2 Table 19, step 4 and Table 20 put each 7.X.4 tone on its chann
 }
 
 TEST_CASE("the immersive element's ASPX_ACPL_2 makes each coupled pair by A-CPL",
-          "[ac4dec][constructed][immersive]") {
+          "[ac4][decoder][constructed][immersive]") {
     // Under the sanitizers the first case and the last, which differ in
     // every field.
     Stride stride(3, 0);
@@ -584,7 +584,7 @@ TEST_CASE("the immersive element's ASPX_ACPL_2 makes each coupled pair by A-CPL"
 }
 
 TEST_CASE("A-JCC makes the 7.X.4 channels of its five, full and core, by each core mode",
-          "[ac4dec][constructed][immersive][ajcc]") {
+          "[ac4][decoder][constructed][immersive][ajcc]") {
     // Each route sends a module's A'' and D'' whole to two of its five
     // outputs; the other three stay silent. Under the sanitizers every other
     // case: each route, and each core mode.
@@ -608,7 +608,7 @@ TEST_CASE("A-JCC makes the 7.X.4 channels of its five, full and core, by each co
 }
 
 TEST_CASE("A-SPX fills the immersive element's channels by Part 2 Table 8, full and core",
-          "[ac4dec][constructed][immersive]") {
+          "[ac4][decoder][constructed][immersive]") {
     // The loud aspx_data element's channels, and no other. A-CPL at alpha 1
     // and A-JCC's first route leave each channel A-SPX made where it was, and
     // what they make of it silent. Core decoding in ASPX_SCPL takes the first
@@ -683,7 +683,7 @@ TEST_CASE("A-SPX fills the immersive element's channels by Part 2 Table 8, full 
 TEST_CASE(
     "Part 2 Table 19 with b_5fronts, Tables 20, 23 and 25 put each 9.X.4 tone on its channel, full "
     "and core",
-    "[ac4dec][constructed][immersive][fronts]") {
+    "[ac4][decoder][constructed][immersive][fronts]") {
     // SCPL, ASPX_SCPL and ASPX_ACPL_1, which code all thirteen signals: every core_5ch_grouping and
     // 2ch_mode, step 4 at identity, M/S or absent, and Table 20's six parameters predicting or not.
     // Under the sanitizers three cases, one of each mode.
@@ -713,7 +713,7 @@ TEST_CASE(
 }
 
 TEST_CASE("the 9.X.4 modes' ASPX_ACPL_2 makes each coupled pair and each front pair by A-CPL",
-          "[ac4dec][constructed][immersive][fronts]") {
+          "[ac4][decoder][constructed][immersive][fronts]") {
     // Pseudocode 2 with b_5fronts: six modules, the last two on (L, Lscr) and (R, Rscr), sending
     // the downmix to the first output (alpha 1) or the second (alpha -1). Under the sanitizers the
     // first case and the last, which differ in every field.
@@ -737,7 +737,7 @@ TEST_CASE("the 9.X.4 modes' ASPX_ACPL_2 makes each coupled pair and each front p
 
 TEST_CASE(
     "A-JCC makes the 9.X.4 channels of its five by its four modules, full and core, by each route",
-    "[ac4dec][constructed][immersive][ajcc][fronts]") {
+    "[ac4][decoder][constructed][immersive][ajcc][fronts]") {
     // Each route sends a module's input whole to one of its three outputs (the front modules' to
     // L, Tfl or Lscr, the back modules' to Ls, Lb or Tbl, and alike on the right). Under the
     // sanitizers every other case.
@@ -804,7 +804,7 @@ std::size_t check_de_levels(const ElementCase& c, const BuiltStream& stream, con
 }
 
 TEST_CASE("dialogue enhancement raises 9.X.4's Lscr, Rscr and C, not L and R (Part 2 Table 15)",
-          "[ac4dec][constructed][immersive][fronts][de]") {
+          "[ac4][decoder][constructed][immersive][fronts][de]") {
     using S = Speaker;
     // de_channel_config's bits are the first, second and third channels of Table 15: 7 is all
     // three, 4 the first alone and 3 the second and the third.
@@ -848,7 +848,7 @@ TEST_CASE("dialogue enhancement raises 9.X.4's Lscr, Rscr and C, not L and R (Pa
 TEST_CASE(
     "core decoding's dialogue enhancement weighs Lscr and Rscr by the coefficient the A-JCC or "
     "A-CPL data gives",
-    "[ac4dec][constructed][immersive][fronts][de]") {
+    "[ac4][decoder][constructed][immersive][fronts][de]") {
     using S = Speaker;
     // Clauses 5.8.2.1 and 5.8.2.2: C is enhanced whole; the core's L and R by C_L and C_R, 1 where
     // the module sent the input to Lscr (A-CPL's second output, A-JCC's route 2), 0 where it sent
@@ -907,7 +907,7 @@ TEST_CASE(
 }
 
 TEST_CASE("Table 21 puts each 22.2 tone on its channel, in Table A.27's order",
-          "[ac4dec][constructed][22_2]") {
+          "[ac4][decoder][constructed][22_2]") {
     // 24 tones, one on each channel, the two LFEs' among them: every pair
     // processed (M/S and L/R), none, and the pairs alternating, in SIMPLE and
     // ASPX. A pair coded in another's place, or an LFE in a pair's, puts a tone
@@ -933,7 +933,7 @@ TEST_CASE("Table 21 puts each 22.2 tone on its channel, in Table A.27's order",
 }
 
 TEST_CASE("A-SPX fills the 22.2 element's channels by the pair of Part 2 Table 8 that asks for it",
-          "[ac4dec][constructed][22_2]") {
+          "[ac4][decoder][constructed][22_2]") {
     // Crossover at QMF subband 28 (10.5 kHz): the tones are below it, and only
     // the loud aspx_data_2ch()'s two channels have anything from 12 to 18 kHz;
     // the LFEs, which have no aspx_data, and every other pair have nothing.
@@ -967,7 +967,7 @@ TEST_CASE("A-SPX fills the 22.2 element's channels by the pair of Part 2 Table 8
 }
 
 TEST_CASE("a 22.2 stream decodes as coded, 24 channels, and nothing else",
-          "[ac4dec][constructed][22_2]") {
+          "[ac4][decoder][constructed][22_2]") {
     // Part 2 Table 8: only full decoding. Tables 35 to 43 have no 22.2 input, so
     // every target but as coded is refused, by name, and so is core decoding.
     for (const bool aspx : {false, true}) {
@@ -1016,7 +1016,7 @@ TEST_CASE("a 22.2 stream decodes as coded, 24 channels, and nothing else",
     }
 }
 
-TEST_CASE("A-CPL's decorrelated part cancels in the sum of its two outputs", "[ac4dec][constructed][acpl]") {
+TEST_CASE("A-CPL's decorrelated part cancels in the sum of its two outputs", "[ac4][decoder][constructed][acpl]") {
     // The channel pair in ASPX_ACPL_2 with alpha 0 and beta_q 4 (1.4 at ibeta
     // 0, Table 204): L = x0 + 0.7 y and R = x0 - 0.7 y, with y the ducked
     // decorrelator output of 2 x0. A steady tone passes the all-pass filters
@@ -1037,7 +1037,7 @@ TEST_CASE("A-CPL's decorrelated part cancels in the sum of its two outputs", "[a
     CHECK(std::abs(20.0 * std::log10(tone_amplitude(difference, hz) / (1.4 * kAmplitude))) < 0.3);
 }
 
-TEST_CASE("A-SPX fills the channels of the aspx_data element Table 213 gives them", "[ac4dec][constructed]") {
+TEST_CASE("A-SPX fills the channels of the aspx_data element Table 213 gives them", "[ac4][decoder][constructed]") {
     // Crossover at QMF subband 28 (10.5 kHz): the tones are below it, and
     // only the loud element's channels have anything from 12 to 18 kHz. Under
     // the sanitizers every other element, from the first and the second by
@@ -1073,7 +1073,7 @@ TEST_CASE("A-SPX fills the channels of the aspx_data element Table 213 gives the
     }
 }
 
-TEST_CASE("companding changes only the channel companding_control() names", "[ac4dec][constructed]") {
+TEST_CASE("companding changes only the channel companding_control() names", "[ac4][decoder][constructed]") {
     // Table 212: L, R and C for 3.0; L, R, C, Ls and Rs for 5.X. With
     // b_compand_on, the expander scales that channel's low band by its level
     // over full scale to the 0.54th power times 2^(1/0.65), which moves each
@@ -1111,9 +1111,9 @@ TEST_CASE("companding changes only the channel companding_control() names", "[ac
     }
 }
 
-TEST_CASE("the committed constructed streams are the builder's", "[ac4dec][constructed]") {
-    const fs::path committed = fs::path{AC4DEC_GOLDEN_DIR} / "constructed";
-    const char* write_to = std::getenv("AC4DEC_WRITE_CONSTRUCTED");
+TEST_CASE("the committed constructed streams are the builder's", "[ac4][decoder][constructed]") {
+    const fs::path committed = fs::path{AC4_GOLDEN_DIR} / "constructed";
+    const char* write_to = std::getenv("AC4_DECODER_WRITE_CONSTRUCTED");
     for (const ElementCase& c : ac4dec_test::committed_cases()) {
         CAPTURE(c.name);
         const BuiltStream stream = ac4dec_test::build_stream(c, ac4dec_test::kCommittedFrames);

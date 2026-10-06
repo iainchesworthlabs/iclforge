@@ -92,7 +92,7 @@ struct Run {
 
 }  // namespace
 
-TEST_CASE("A-JOC Table 28 maps the 64 QMF subbands to each band count", "[ac4core][ajoc]") {
+TEST_CASE("A-JOC Table 28 maps the 64 QMF subbands to each band count", "[ac4][core][ajoc]") {
     constexpr std::array<int, 8> kCounts = {23, 15, 12, 9, 7, 5, 3, 1};
     for (int code = 0; code < 8; ++code) {
         CHECK(ajoc::num_bands(code) == kCounts[at(code)]);
@@ -120,7 +120,7 @@ TEST_CASE("A-JOC Table 28 maps the 64 QMF subbands to each band count", "[ac4cor
     }
 }
 
-TEST_CASE("A-JOC Tables 29 to 32 dequantise about their centres", "[ac4core][ajoc]") {
+TEST_CASE("A-JOC Tables 29 to 32 dequantise about their centres", "[ac4][core][ajoc]") {
     CHECK(ajoc::dequantise(false, 1, 0) == -5.0048828125);
     CHECK(ajoc::dequantise(false, 1, 25) == 0.0);
     CHECK(ajoc::dequantise(false, 1, 9) == -3.203125);
@@ -132,7 +132,7 @@ TEST_CASE("A-JOC Tables 29 to 32 dequantise about their centres", "[ac4core][ajo
     CHECK(ajoc::dequantise(true, 0, 20) == 0.0);
 }
 
-TEST_CASE("A-JOC Pseudocode 16 wraps along frequency and adds along time", "[ac4core][ajoc]") {
+TEST_CASE("A-JOC Pseudocode 16 wraps along frequency and adds along time", "[ac4][core][ajoc]") {
     std::array<int, ajoc::kMaxBands> previous{};
     std::array<int, ajoc::kMaxBands> out{};
     // DIFF_FREQ: the first value as it is, then each next one added modulo
@@ -157,14 +157,14 @@ TEST_CASE("A-JOC Pseudocode 16 wraps along frequency and adds along time", "[ac4
     CHECK_FALSE(ajoc::differential_decode(false, 51, 1, first, previous, out));
 }
 
-TEST_CASE("A-JOC decorrelators are D0 D2 D1 in turn", "[ac4core][ajoc]") {
+TEST_CASE("A-JOC decorrelators are D0 D2 D1 in turn", "[ac4][core][ajoc]") {
     const std::array<int, 7> expected = {0, 2, 1, 0, 2, 1, 0};
     for (int de = 0; de < 7; ++de) {
         CHECK(ajoc::decorrelator_of(de) == expected[at(de)]);
     }
 }
 
-TEST_CASE("A-JOC's dry matrix gives C_dry x once its ramp has run", "[ac4core][ajoc]") {
+TEST_CASE("A-JOC's dry matrix gives C_dry x once its ramp has run", "[ac4][core][ajoc]") {
     const std::vector<std::vector<double>> dry = {{0.5, 0.0}, {0.0, 1.0}, {0.25, -0.5}};
     const ajoc::FrameParameters p = parameters(dry, 1, 0, 1);
     auto r = std::make_unique<ajoc::Reconstruction<double>>();
@@ -186,7 +186,7 @@ TEST_CASE("A-JOC's dry matrix gives C_dry x once its ramp has run", "[ac4core][a
     }
 }
 
-TEST_CASE("A-JOC's ramp reaches its target in ajoc_ramp_len slots and holds", "[ac4core][ajoc]") {
+TEST_CASE("A-JOC's ramp reaches its target in ajoc_ramp_len slots and holds", "[ac4][core][ajoc]") {
     // Pseudocodes 17 and 18: the value moves by (target - prev) / ramp_len a
     // slot from the slot after ajoc_start_pos, so it arrives after ramp_len
     // slots and stays (src/ac4/ERRATA.md, "A-JOC's ramp").
@@ -216,7 +216,7 @@ TEST_CASE("A-JOC's ramp reaches its target in ajoc_ramp_len slots and holds", "[
     }
 }
 
-TEST_CASE("A-JOC's coefficients follow Table 28 subband by subband", "[ac4core][ajoc]") {
+TEST_CASE("A-JOC's coefficients follow Table 28 subband by subband", "[ac4][core][ajoc]") {
     // 23 bands, each band's coefficient its index / 10.
     ajoc::FrameParameters p = parameters({{0.0}}, 23, 0, 1);
     for (int pb = 0; pb < 23; ++pb) {
@@ -233,7 +233,7 @@ TEST_CASE("A-JOC's coefficients follow Table 28 subband by subband", "[ac4core][
 }
 
 TEST_CASE("A-JOC's wet path is the ducked decorrelator of D x, D = |C_wet| C_dry",
-          "[ac4core][ajoc]") {
+          "[ac4][core][ajoc]") {
     // One input, one object of dry 0.6 and wet 0.4 on decorrelator 0: the
     // decorrelator's input is 0.24 x, ramped as the coefficients are.
     ajoc::FrameParameters p = parameters({{0.6}}, 1, 0, 1);
@@ -278,7 +278,7 @@ TEST_CASE("A-JOC's wet path is the ducked decorrelator of D x, D = |C_wet| C_dry
 }
 
 TEST_CASE("A-JOC's decorrelation input matrix takes each object at its own bands",
-          "[ac4core][ajoc]") {
+          "[ac4][core][ajoc]") {
     // Two objects of 23 bands and of 1 on one decorrelator (src/ac4/
     // ERRATA.md, "The decorrelation input matrix"): in subband sb, D is
     // |wet_0| dry_0 at object 0's band of sb plus |wet_1| dry_1, object 1's
@@ -327,7 +327,7 @@ TEST_CASE("A-JOC's decorrelation input matrix takes each object at its own bands
 }
 
 TEST_CASE("A-JOC dialogue enhancement scales the dialogue objects after D is taken",
-          "[ac4core][ajoc]") {
+          "[ac4][core][ajoc]") {
     // Pseudocode 22 in full decoding: the dialogue object's dry and wet times
     // de_gain; the decorrelation input matrix is Pseudocode 18's, taken before.
     ajoc::FrameParameters p = parameters({{0.6}}, 1, 0, 1);
@@ -363,7 +363,7 @@ TEST_CASE("A-JOC dialogue enhancement scales the dialogue objects after D is tak
     }
 }
 
-TEST_CASE("A-JOC core decoding's dialogue enhancement adds H_M H_A x", "[ac4core][ajoc]") {
+TEST_CASE("A-JOC core decoding's dialogue enhancement adds H_M H_A x", "[ac4][core][ajoc]") {
     // Clause 5.8.2.4: two downmix signals, object 0 the dialogue at dry (0.5,
     // 0.25), object 1 not; its downmix coefficients (1, 0.5); de_gain 1
     // (10^(G/20) - 1 at G of 6.02 dB). H_M ramps from 0 over the first frame.

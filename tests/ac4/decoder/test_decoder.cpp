@@ -428,7 +428,7 @@ constexpr std::size_t kQmfSpread = 640;
 }  // namespace
 
 TEST_CASE("iclforge::ac4::Decoder fails a frame whose table of contents does not parse",
-          "[ac4dec]") {
+          "[ac4][decoder]") {
     iclforge::ac4::Decoder decoder;
     const std::vector<std::byte> nothing;
     const auto empty = decoder.parse(nothing);
@@ -444,7 +444,7 @@ TEST_CASE("iclforge::ac4::Decoder fails a frame whose table of contents does not
     CHECK_FALSE(iclforge::ac4::describe(iclforge::ac4::DecodeError::kInvalidToc).empty());
 }
 
-TEST_CASE("iclforge::ac4::Decoder carries I-frame configuration while sequence_counter continues", "[ac4dec]") {
+TEST_CASE("iclforge::ac4::Decoder carries I-frame configuration while sequence_counter continues", "[ac4][decoder]") {
     // ASPX stereo: a frame that is not an I-frame needs the aspx_config() of
     // the last I-frame.
     const auto frames = raw_frames(read_stream("ac4-20-speech-128"));
@@ -478,7 +478,7 @@ TEST_CASE("iclforge::ac4::Decoder carries I-frame configuration while sequence_c
 }
 
 TEST_CASE("iclforge::ac4::Decoder forgets I-frame configuration at a change of source",
-          "[ac4dec]") {
+          "[ac4][decoder]") {
     const auto frames = raw_frames(read_stream("ac4-20-speech-128"));
     REQUIRE(frames.size() > 2);
     REQUIRE(is_iframe(frames[0]));
@@ -505,7 +505,7 @@ TEST_CASE("iclforge::ac4::Decoder forgets I-frame configuration at a change of s
 }
 
 TEST_CASE("a substream that is both a channel and its own HSF extension resolves to audio",
-          "[ac4dec]") {
+          "[ac4][decoder]") {
     iclforge::ac4::Decoder decoder;
     const auto report = decoder.parse(self_referencing_hsf_ext_frame());
     REQUIRE(report.has_value());
@@ -517,7 +517,7 @@ TEST_CASE("a substream that is both a channel and its own HSF extension resolves
 }
 
 TEST_CASE("iclforge::ac4::Decoder reads a channel's HSF extension substream alongside it",
-          "[ac4dec]") {
+          "[ac4][decoder]") {
     bool ext_index_lower = false;
     SECTION("the extension's substream index is higher than its owner's") { ext_index_lower = false; }
     SECTION("the extension's substream index is lower than its owner's") { ext_index_lower = true; }
@@ -550,7 +550,7 @@ TEST_CASE("iclforge::ac4::Decoder reads a channel's HSF extension substream alon
 }
 
 TEST_CASE("an HSF extension substream nothing names is reported as refused and unread",
-          "[ac4dec]") {
+          "[ac4][decoder]") {
     // The review of #700: the header said an HSF substream was refused, yet
     // a substream no ac4_hsf_ext_substream_info() named got no report at all.
     // Every substream of the index table now has one.
@@ -581,7 +581,7 @@ TEST_CASE("an HSF extension substream nothing names is reported as refused and u
 }
 
 TEST_CASE("a decode begun at an I-frame gives the whole stream's output from the frame after it",
-          "[ac4dec][pcm]") {
+          "[ac4][decoder][pcm]") {
     // The I-frame's own audio needs the frame before it to overlap with; from
     // the next frame's audio the two decodes agree, as closely as each codec
     // mode's state allows.
@@ -640,7 +640,7 @@ TEST_CASE("a decode begun at an I-frame gives the whole stream's output from the
     }
 }
 
-TEST_CASE("a splice at an I-frame joins the two streams' audio without a gap", "[ac4dec][pcm]") {
+TEST_CASE("a splice at an I-frame joins the two streams' audio without a gap", "[ac4][decoder][pcm]") {
     // Part 1 clause 6.2.19: a switch at an I-frame decodes without a flaw,
     // and the first frame after a splice is read without what the frames
     // before it sent. The signal carries on: the first stream's audio comes out
@@ -714,7 +714,7 @@ TEST_CASE("a splice at an I-frame joins the two streams' audio without a gap", "
 
 TEST_CASE(
     "after a change of source between I-frames the output resumes as the new stream decoded alone",
-    "[ac4dec][pcm]") {
+    "[ac4][decoder][pcm]") {
     // Without a concealment policy the frames that wait for an I-frame return
     // nothing, and the signal before them goes with them.
     const auto first_stream = raw_frames(read_stream("ac4-20-music-192"));
@@ -735,7 +735,7 @@ TEST_CASE(
 }
 
 TEST_CASE("the converter's output counts stay locked to sequence_counter across a splice",
-          "[ac4dec][pcm][src]") {
+          "[ac4][decoder][pcm][src]") {
     // Part 2 Table 47 at 29.97 fps, by phi_t.
     constexpr std::array<std::size_t, 5> kCounts{1601, 1602, 1601, 1602, 1602};
     const auto frames = raw_frames(read_stream("ac4-ims-music-64-2997"));
@@ -769,7 +769,7 @@ TEST_CASE("the converter's output counts stay locked to sequence_counter across 
 }
 
 TEST_CASE("without a concealment policy a frame that does not decode fails and the next goes on",
-          "[ac4dec][pcm]") {
+          "[ac4][decoder][pcm]") {
     const auto frames = raw_frames(read_stream("ac4-20-tones-192"));
     constexpr std::size_t kLost = 10;
     REQUIRE_FALSE(is_iframe(frames[kLost + 1]));
@@ -797,7 +797,7 @@ TEST_CASE("without a concealment policy a frame that does not decode fails and t
 }
 
 TEST_CASE("a concealment policy puts a frame in place of each one that does not decode",
-          "[ac4dec][pcm]") {
+          "[ac4][decoder][pcm]") {
     // SIMPLE stereo tones, at -20 dBFS: three frames lost in a row. Under the
     // sanitizers the stream's first 20 frames, six of them past the losses.
     auto frames = raw_frames(read_stream("ac4-20-tones-192"));
@@ -876,7 +876,7 @@ TEST_CASE("a concealment policy puts a frame in place of each one that does not 
 }
 
 TEST_CASE("a concealment policy has nothing to conceal from before a frame has decoded",
-          "[ac4dec][pcm]") {
+          "[ac4][decoder][pcm]") {
     auto frames = raw_frames(read_stream("ac4-20-tones-192"));
     damage_audio(frames[0]);
     iclforge::ac4::Decoder decoder(iclforge::ac4::DecoderConfig{
@@ -892,7 +892,7 @@ TEST_CASE("a concealment policy has nothing to conceal from before a frame has d
 }
 
 TEST_CASE("a concealed frame whose table of contents did not read keeps the converter's counts",
-          "[ac4dec][pcm][src]") {
+          "[ac4][decoder][pcm][src]") {
     // Part 2 Table 47 at 29.97 fps, by phi_t.
     constexpr std::array<std::size_t, 5> kCounts{1601, 1602, 1601, 1602, 1602};
     auto frames = raw_frames(read_stream("ac4-ims-music-64-2997"));
@@ -921,7 +921,7 @@ TEST_CASE("a concealed frame whose table of contents did not read keeps the conv
 }
 
 TEST_CASE("a concealment policy fills the frames that wait for an I-frame after a change of source",
-          "[ac4dec][pcm]") {
+          "[ac4][decoder][pcm]") {
     // Frames 0 to 19 of one stream, then 50 on: the counter jumps, and 50 to
     // 70 wait for the I-frame at 71.
     const auto frames = raw_frames(read_stream("ac4-20-tones-192"));

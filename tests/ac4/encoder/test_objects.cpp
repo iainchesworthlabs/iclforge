@@ -10,9 +10,9 @@
 // does. Every object carries a tone of its own at the middle of a QMF subband,
 // each in a parameter band of its own.
 //
-// With AC4ENC_WRITE_OBJECTS set to a directory, the committed object streams
+// With AC4_ENCODER_WRITE_OBJECTS set to a directory, the committed object streams
 // (tests/golden/ac4/objects/encoder-*.ac4) are written there; with
-// AC4ENC_WRITE_LISTENING, ten-second streams for listening.
+// AC4_ENCODER_WRITE_LISTENING, ten-second streams for listening.
 
 #include <algorithm>
 #include <array>
@@ -343,7 +343,7 @@ void write_file(const fs::path& path, std::span<const std::byte> bytes) {
 }  // namespace
 
 TEST_CASE("an A-JOC substream's objects decode as the encoder was given them",
-          "[ac4enc][objects]") {
+          "[ac4][encoder][objects]") {
     // Floors at the first measurement (2026-09-27) less 0.02 in correlation
     // and 1 dB in SNR, by object in the encoder's order, the LFE's among
     // them. Every measured correlation was above 0.99999.
@@ -394,7 +394,7 @@ TEST_CASE("an A-JOC substream's objects decode as the encoder was given them",
     }
 }
 
-TEST_CASE("direct-coded objects decode as the encoder was given them", "[ac4enc][objects]") {
+TEST_CASE("direct-coded objects decode as the encoder was given them", "[ac4][encoder][objects]") {
     const Case c = direct();
     const Encoded encoded = encode(config_of(c), input_of(c, kSamples));
     check_frames_read_back(encoded);
@@ -407,7 +407,7 @@ TEST_CASE("direct-coded objects decode as the encoder was given them", "[ac4enc]
 }
 
 TEST_CASE("core decoding of an A-JOC substream gives its downmix with its metadata",
-          "[ac4enc][objects]") {
+          "[ac4][encoder][objects]") {
     const Case c = computed();
     const std::vector<std::vector<float>> input = input_of(c, kSamples);
     const Encoded encoded = encode(config_of(c), input);
@@ -439,7 +439,7 @@ TEST_CASE("core decoding of an A-JOC substream gives its downmix with its metada
 }
 
 TEST_CASE("an object's metadata updates come out where their input samples do",
-          "[ac4enc][objects]") {
+          "[ac4][encoder][objects]") {
     for (const iclforge::ac4::ObjectCoding coding :
          {iclforge::ac4::ObjectCoding::kAjoc, iclforge::ac4::ObjectCoding::kDirect}) {
         CAPTURE(coding == iclforge::ac4::ObjectCoding::kAjoc);
@@ -471,7 +471,7 @@ TEST_CASE("an object's metadata updates come out where their input samples do",
     }
 }
 
-TEST_CASE("the object encoder's streams are the same from the same input", "[ac4enc][objects]") {
+TEST_CASE("the object encoder's streams are the same from the same input", "[ac4][encoder][objects]") {
     for (const Case& c : {computed(), static_bed(), beds_and_decorrelation(), direct()}) {
         CAPTURE(c.name);
         const std::vector<std::vector<float>> input = input_of(c, 4 * kFrame);
@@ -484,8 +484,8 @@ TEST_CASE("the object encoder's streams are the same from the same input", "[ac4
     }
 }
 
-TEST_CASE("the committed encoder object streams are the configurations'", "[ac4enc][objects]") {
-    const char* write_to = std::getenv("AC4ENC_WRITE_OBJECTS");
+TEST_CASE("the committed encoder object streams are the configurations'", "[ac4][encoder][objects]") {
+    const char* write_to = std::getenv("AC4_ENCODER_WRITE_OBJECTS");
     for (const Case& c : {computed(), static_bed(), beds_and_decorrelation(), direct()}) {
         CAPTURE(c.name);
         const Encoded encoded = encode(config_of(c), input_of(c, 6 * kFrame));
@@ -496,7 +496,7 @@ TEST_CASE("the committed encoder object streams are the configurations'", "[ac4e
         // The bytes are not promised across toolchains: the committed stream
         // is held to the configuration's table of contents, and its digests
         // to both readers (tests/golden/ac4/objects-encoder-*.tsv).
-        const fs::path path = fs::path{AC4DEC_GOLDEN_DIR} / "objects" / (c.name + ".ac4");
+        const fs::path path = fs::path{AC4_GOLDEN_DIR} / "objects" / (c.name + ".ac4");
         std::ifstream in(path, std::ios::binary);
         REQUIRE(in.good());
         const std::vector<char> chars((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
@@ -518,7 +518,7 @@ TEST_CASE("the committed encoder object streams are the configurations'", "[ac4e
     }
 }
 
-TEST_CASE("the encoder refuses the object configurations it does not write", "[ac4enc][objects]") {
+TEST_CASE("the encoder refuses the object configurations it does not write", "[ac4][encoder][objects]") {
     const auto reason = [](const std::function<void(iclforge::ac4::EncoderConfig&)>& change) {
         iclforge::ac4::EncoderConfig config = config_of(computed());
         change(config);
@@ -589,7 +589,7 @@ TEST_CASE("the encoder refuses the object configurations it does not write", "[a
 
 TEST_CASE(
     "an object's depth exponent goes with a screen factor and the encoder refuses one without",
-    "[ac4enc][objects]") {
+    "[ac4][encoder][objects]") {
     // Part 2 clause 6.2.8.7 sends object_screen_factor_code and object_depth_factor as one group of
     // fields, and the factor, (code + 1) / 8, has no code for 0 (src/ac4/ERRATA.md, "The screen
     // factor and the depth exponent"). An exponent other than 1 with a factor of 0 used to be
@@ -661,16 +661,16 @@ TEST_CASE(
     CHECK(encoder->encode(views, std::span(&update, 1)).has_value());
 }
 
-TEST_CASE("the object streams for listening are written where AC4ENC_WRITE_LISTENING says",
-          "[ac4enc][objects]") {
+TEST_CASE("the object streams for listening are written where AC4_ENCODER_WRITE_LISTENING says",
+          "[ac4][encoder][objects]") {
     // Ten seconds each: a tone crossing the front from the left wall to the
     // right one over eight seconds, a quiet static bed of five tones on L, R,
     // C, Ls and Rs, and the LFE, in A-JOC over a computed downmix and over a
     // static 5.1 bed, and direct-coded with the bed as dynamic objects at the
     // loudspeakers.
-    const char* dir = std::getenv("AC4ENC_WRITE_LISTENING");
+    const char* dir = std::getenv("AC4_ENCODER_WRITE_LISTENING");
     if (dir == nullptr) {
-        SKIP("AC4ENC_WRITE_LISTENING does not name a directory");
+        SKIP("AC4_ENCODER_WRITE_LISTENING does not name a directory");
     }
     constexpr std::size_t kLength = 480000;
     const std::array<std::array<double, 2>, 5> speakers = {

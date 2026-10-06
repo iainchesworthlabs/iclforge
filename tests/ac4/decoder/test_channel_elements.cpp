@@ -324,7 +324,7 @@ void check_shape(const ChannelElement& out, const Shape& shape) {
 
 // --- single_channel_element() and channel_pair_element() ------------------
 
-TEST_CASE("single_channel_element reads SIMPLE and ASPX mono", "[ac4dec][channel_elements]") {
+TEST_CASE("single_channel_element reads SIMPLE and ASPX mono", "[ac4][decoder][channel_elements]") {
     SECTION("SIMPLE") {
         ElementWriter e;
         e.w.put(0, 1);  // mono_codec_mode
@@ -383,7 +383,7 @@ TEST_CASE("single_channel_element reads SIMPLE and ASPX mono", "[ac4dec][channel
     }
 }
 
-TEST_CASE("channel_pair_element reads every stereo codec mode", "[ac4dec][channel_elements]") {
+TEST_CASE("channel_pair_element reads every stereo codec mode", "[ac4][decoder][channel_elements]") {
     SECTION("SIMPLE, with and without MDCT stereo processing") {
         for (const bool mdct : {true, false}) {
             ElementWriter e;
@@ -488,7 +488,7 @@ TEST_CASE("channel_pair_element reads every stereo codec mode", "[ac4dec][channe
 }
 
 TEST_CASE("a channel element that needs I-frame configuration refuses a frame without it",
-          "[ac4dec][channel_elements]") {
+          "[ac4][decoder][channel_elements]") {
     SECTION("no I-frame at all") {
         ElementWriter e;
         e.iframe = false;
@@ -565,7 +565,7 @@ TEST_CASE("a channel element that needs I-frame configuration refuses a frame wi
     }
 }
 
-TEST_CASE("channel elements refuse the modes not decoded", "[ac4dec][channel_elements]") {
+TEST_CASE("channel elements refuse the modes not decoded", "[ac4][decoder][channel_elements]") {
     SECTION("spec_frontend SSF reads ssf_data(), whose zero bits are not a stream") {
         ElementWriter e;
         e.w.put(0, 1);
@@ -632,7 +632,7 @@ BitWriter element_22_2(int mode, const std::array<bool, 11>& mdct, bool iframe) 
 }  // namespace
 
 TEST_CASE("22_2_channel_element reads two LFEs and eleven pairs, SIMPLE and ASPX",
-          "[ac4dec][channel_elements]") {
+          "[ac4][decoder][channel_elements]") {
     std::array<bool, 11> alternating{};
     for (std::size_t cp = 0; cp < alternating.size(); ++cp) {
         alternating[cp] = cp % 2 == 0;
@@ -679,7 +679,7 @@ TEST_CASE("22_2_channel_element reads two LFEs and eleven pairs, SIMPLE and ASPX
 }
 
 TEST_CASE("22_2_channel_element keeps its eleven A-SPX positions from the I-frame",
-          "[ac4dec][channel_elements]") {
+          "[ac4][decoder][channel_elements]") {
     const std::array<bool, 11> mdct{true, false, true, false, true, false,
                                     true, false, true, false, true};
     ChannelElementState state;
@@ -716,7 +716,7 @@ TEST_CASE("22_2_channel_element keeps its eleven A-SPX positions from the I-fram
 
 // --- 3_0_channel_element() -------------------------------------------------
 
-TEST_CASE("3_0_channel_element reads both coding configurations, SIMPLE and ASPX", "[ac4dec][channel_elements]") {
+TEST_CASE("3_0_channel_element reads both coding configurations, SIMPLE and ASPX", "[ac4][decoder][channel_elements]") {
     for (const int mode : {codec_mode::kSimple, codec_mode::kAspx}) {
         for (const int config : {0, 1}) {
             INFO("3_0_codec_mode " << mode << ", 3_0_coding_config " << config);
@@ -766,7 +766,7 @@ TEST_CASE("3_0_channel_element reads both coding configurations, SIMPLE and ASPX
 
 // --- 5_X_channel_element() -------------------------------------------------
 
-TEST_CASE("5_X_channel_element reads the four SIMPLE and ASPX coding configurations", "[ac4dec][channel_elements]") {
+TEST_CASE("5_X_channel_element reads the four SIMPLE and ASPX coding configurations", "[ac4][decoder][channel_elements]") {
     for (const int mode : {codec_mode::kSimple, codec_mode::kAspx}) {
         for (const int config : {0, 1, 2, 3}) {
             for (const bool lfe : {false, true}) {
@@ -834,7 +834,7 @@ TEST_CASE("5_X_channel_element reads the four SIMPLE and ASPX coding configurati
     }
 }
 
-TEST_CASE("5_X_channel_element reads the three A-CPL codec modes", "[ac4dec][channel_elements]") {
+TEST_CASE("5_X_channel_element reads the three A-CPL codec modes", "[ac4][decoder][channel_elements]") {
     SECTION("ASPX_ACPL_1 and ASPX_ACPL_2, both coding configurations") {
         for (const int mode : {codec_mode::kAspxAcpl1, codec_mode::kAspxAcpl2}) {
             for (const int config : {0, 1}) {
@@ -911,7 +911,7 @@ TEST_CASE("5_X_channel_element reads the three A-CPL codec modes", "[ac4dec][cha
 // --- 7_X_channel_element() -------------------------------------------------
 
 TEST_CASE("7_X_channel_element reads SIMPLE and ASPX with and without SAP for the additional channels",
-          "[ac4dec][channel_elements]") {
+          "[ac4][decoder][channel_elements]") {
     for (const int mode : {codec_mode::kSimple, codec_mode::kAspx}) {
         for (const int config : {0, 1, 2, 3}) {
             for (const int ch : {ch_mode::k7_1_340, ch_mode::k7_0_520, ch_mode::k7_1_322}) {
@@ -976,7 +976,7 @@ TEST_CASE("7_X_channel_element reads SIMPLE and ASPX with and without SAP for th
     }
 }
 
-TEST_CASE("7_X_channel_element reads the A-CPL codec modes", "[ac4dec][channel_elements]") {
+TEST_CASE("7_X_channel_element reads the A-CPL codec modes", "[ac4][decoder][channel_elements]") {
     for (const int mode : {codec_mode::kAspxAcpl1, codec_mode::kAspxAcpl2}) {
         for (const int config : {0, 3}) {
             for (const bool add_ch_base : {false, true}) {
@@ -1065,7 +1065,7 @@ void put_envelopes(BitWriter& w, int sig, int sig_bands, int noise, int qmode, A
 
 }  // namespace
 
-TEST_CASE("aspx_data_1ch reads each interval class", "[ac4dec][channel_elements]") {
+TEST_CASE("aspx_data_1ch reads each interval class", "[ac4][decoder][channel_elements]") {
     // aspx_start_freq 7 and crossover 3: three high-resolution signal groups,
     // two low-resolution ones, one noise group; 16 time slots, so the
     // relative borders and counts take 2 bits.
@@ -1241,7 +1241,7 @@ TEST_CASE("aspx_data_1ch reads each interval class", "[ac4dec][channel_elements]
     }
 }
 
-TEST_CASE("aspx_data_1ch refuses what its syntax cannot follow", "[ac4dec][channel_elements]") {
+TEST_CASE("aspx_data_1ch refuses what its syntax cannot follow", "[ac4][decoder][channel_elements]") {
     const auto refused = [](const BitWriter& w, const SubstreamContext& ctx, const AspxConfig& config,
                             AspxElementState& state) {
         AspxData1ch out;
@@ -1315,7 +1315,7 @@ TEST_CASE("aspx_data_1ch refuses what its syntax cannot follow", "[ac4dec][chann
     }
 }
 
-TEST_CASE("derive_aspx_subband_groups counts the noise groups and the timeslots", "[ac4dec][channel_elements]") {
+TEST_CASE("derive_aspx_subband_groups counts the noise groups and the timeslots", "[ac4][decoder][channel_elements]") {
     AspxConfig config = aspx_config(0);
     config.start_freq = 0;
     config.master_freq_scale = 1;
@@ -1351,7 +1351,7 @@ TEST_CASE("derive_aspx_subband_groups counts the noise groups and the timeslots"
     CHECK(aspx_num_timeslots(100) == 0);
 }
 
-TEST_CASE("aspx_data_2ch reads the interleaved-waveform flags of both channels", "[ac4dec][channel_elements]") {
+TEST_CASE("aspx_data_2ch reads the interleaved-waveform flags of both channels", "[ac4][decoder][channel_elements]") {
     const AspxConfig config = aspx_config(0, 0);
     for (const int variant : {0, 1, 2}) {
         INFO("variant " << variant);
@@ -1418,7 +1418,7 @@ TEST_CASE("aspx_data_2ch reads the interleaved-waveform flags of both channels",
 
 // --- acpl_data_1ch() and acpl_data_2ch() ---------------------------------
 
-TEST_CASE("acpl_data_1ch reads steep interpolation with two parameter sets", "[ac4dec][channel_elements]") {
+TEST_CASE("acpl_data_1ch reads steep interpolation with two parameter sets", "[ac4][decoder][channel_elements]") {
     BitWriter cw;
     cw.put(0, 2);    // 15 bands
     cw.put(1, 1);    // coarse
@@ -1461,7 +1461,7 @@ TEST_CASE("acpl_data_1ch reads steep interpolation with two parameter sets", "[a
                                                   AcplDataType::kBeta, 1, AcplHcbType::kDt)));
 }
 
-TEST_CASE("A-CPL data refuses a missing configuration and a truncated codeword", "[ac4dec][channel_elements]") {
+TEST_CASE("A-CPL data refuses a missing configuration and a truncated codeword", "[ac4][decoder][channel_elements]") {
     BitWriter zeros;
     zeros.put(0, 16);
     const std::vector<std::byte> bytes = zeros.bytes();
@@ -1497,7 +1497,7 @@ TEST_CASE("A-CPL data refuses a missing configuration and a truncated codeword",
 
 // --- ac4_substream() ---------------------------------------------------------
 
-TEST_CASE("ac4_substream checks audio_size against the substream and the element", "[ac4dec][channel_elements]") {
+TEST_CASE("ac4_substream checks audio_size against the substream and the element", "[ac4][decoder][channel_elements]") {
     const auto run = [](const BitWriter& w, const SubstreamContext& ctx) {
         const std::vector<std::byte> bytes = w.bytes();
         Recorder rec;

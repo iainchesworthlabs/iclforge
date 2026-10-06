@@ -524,7 +524,7 @@ TEST_CASE("decode takes AC-4's presentation by presentation-id= and language=, m
     // 1 is 5.1 music and effects with English dialogue, 2 the same with
     // German, 21 the English dialogue alone (tests/ac4/decoder/
     // test_ac4dec_presentations.cpp).
-    const fs::path stream = fs::path{AC4DEC_GOLDEN_DIR} / "presentations" / "presentations-5_1.ac4";
+    const fs::path stream = fs::path{AC4_GOLDEN_DIR} / "presentations" / "presentations-5_1.ac4";
     const auto mixed_wav = dir / "ac4_mixed.wav";
     REQUIRE(run_cli("decode " + quoted(stream) + " " + quoted(mixed_wav) + " presentation-id=1", log) == 0);
     CHECK(read_log(log).find("presentation 0 (presentation_id 1)") != std::string::npos);

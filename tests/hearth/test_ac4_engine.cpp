@@ -104,7 +104,7 @@ fs::path baseline(std::string_view leg) {
 std::vector<fs::path> committed_streams() {
     std::vector<fs::path> paths;
     for (const fs::path& root :
-         {fs::path{ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR}, fs::path{AC4DEC_GOLDEN_DIR}}) {
+         {fs::path{ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR}, fs::path{AC4_GOLDEN_DIR}}) {
         for (const auto& entry : fs::recursive_directory_iterator(root)) {
             if (entry.is_regular_file() && entry.path().extension() == ".ac4") {
                 paths.push_back(entry.path());
@@ -571,7 +571,7 @@ TEST_CASE("hearth ac4: the engine refuses the frames of a 22.2 presentation and 
     // bottom channels, so a layout of 24 is not placed on some of its channels: the frame is
     // refused, and nothing is played.
     const std::vector<std::byte> bytes =
-        read_file(fs::path{AC4DEC_GOLDEN_DIR} / "constructed" / "22_2-simple-alternating.ac4");
+        read_file(fs::path{AC4_GOLDEN_DIR} / "constructed" / "22_2-simple-alternating.ac4");
     const Played played = play_item(bytes, layout_of(kEverySpeaker), as_coded());
     REQUIRE_FALSE(played.errors.empty());
     for (const std::string& error : played.errors) {
@@ -598,7 +598,7 @@ TEST_CASE("hearth ac4: the engine refuses the frames of a 9.X.4 presentation and
          {"9_1_4-scpl-grouping1-matsel2-prediction.ac4", "9_0_4-acpl2-grouping2-second.ac4"}) {
         INFO(name);
         const std::vector<std::byte> bytes =
-            read_file(fs::path{AC4DEC_GOLDEN_DIR} / "constructed" / name);
+            read_file(fs::path{AC4_GOLDEN_DIR} / "constructed" / name);
         const Played played = play_item(bytes, layout_of(kEverySpeaker), as_coded());
         REQUIRE_FALSE(played.errors.empty());
         for (const std::string& error : played.errors) {
@@ -611,10 +611,10 @@ TEST_CASE("hearth ac4: the engine refuses the frames of a 9.X.4 presentation and
     CHECK_FALSE(iclforge::hearth::ac4_placeable(screen));
 }
 
-TEST_CASE("hearth ac4: the engine plays the streams of AC4DEC_API_STREAM_DIR", "[hearth][ac4]") {
-    const char* dir = std::getenv("AC4DEC_API_STREAM_DIR");
+TEST_CASE("hearth ac4: the engine plays the streams of AC4_API_STREAM_DIR", "[hearth][ac4]") {
+    const char* dir = std::getenv("AC4_API_STREAM_DIR");
     if (dir == nullptr) {
-        SKIP("AC4DEC_API_STREAM_DIR is not set");
+        SKIP("AC4_API_STREAM_DIR is not set");
     }
     std::vector<fs::path> streams;
     for (const auto& entry : fs::recursive_directory_iterator(fs::path{dir})) {
@@ -793,7 +793,7 @@ constexpr std::size_t kBroadcastTo = 21 * kFrame;
 
 const std::vector<std::byte>& broadcast() {
     static const std::vector<std::byte> stream =
-        read_file(fs::path{AC4DEC_GOLDEN_DIR} / "presentations" / "encoder-broadcast.ac4");
+        read_file(fs::path{AC4_GOLDEN_DIR} / "presentations" / "encoder-broadcast.ac4");
     return stream;
 }
 

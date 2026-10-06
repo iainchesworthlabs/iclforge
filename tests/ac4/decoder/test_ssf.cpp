@@ -70,7 +70,7 @@ struct VectorCase {
 };
 
 std::vector<VectorCase> read_vectors() {
-    std::ifstream in(std::filesystem::path{AC4DEC_GOLDEN_DIR} / "ssf" / "ssf-vectors.txt");
+    std::ifstream in(std::filesystem::path{AC4_GOLDEN_DIR} / "ssf" / "ssf-vectors.txt");
     REQUIRE(in.good());
     std::vector<VectorCase> cases;
     std::string line;
@@ -117,7 +117,7 @@ std::vector<VectorCase> read_vectors() {
 
 }  // namespace
 
-TEST_CASE("ssf_data decodes random streams as the reference transcription does", "[ac4dec][ssf]") {
+TEST_CASE("ssf_data decodes random streams as the reference transcription does", "[ac4][decoder][ssf]") {
     const std::vector<VectorCase> cases = read_vectors();
     REQUIRE_FALSE(cases.empty());
     std::size_t frames_ok = 0;
@@ -179,7 +179,7 @@ TEST_CASE("ssf_data decodes random streams as the reference transcription does",
 }
 
 TEST_CASE("the dB and linear maps of Pseudocodes 29 and 30 track the functions they approximate",
-          "[ac4dec][ssf]") {
+          "[ac4][decoder][ssf]") {
     // Map_dB_to_Lin takes Q.10 dB and gives Q.10 10^(dB / 20) by a table of chords; its slopes are
     // coarse integers, so it is held to 10 % rather than to a float's accuracy.
     for (int db = 0; db < 40 * 1024; db += 97) {
@@ -278,7 +278,7 @@ std::vector<std::byte> presentation_substream() {
 }  // namespace
 
 TEST_CASE("a speech spectral frontend track decodes to PCM through the public API",
-          "[ac4dec][ssf]") {
+          "[ac4][decoder][ssf]") {
     const std::vector<VectorCase> cases = read_vectors();
     std::size_t decoded_frames = 0;
     for (const VectorCase& c : cases) {

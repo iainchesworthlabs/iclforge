@@ -68,7 +68,7 @@ static_assert(iclforge::ac4::detail::dsp::bessel_i0(0.0) == 1.0);
 
 }  // namespace
 
-TEST_CASE("the portable ceil rounds up to a whole number", "[ac4core][dsp][portable]") {
+TEST_CASE("the portable ceil rounds up to a whole number", "[ac4][core][dsp][portable]") {
     CHECK(portable::ceil(0.5) == 1.0);
     CHECK(portable::ceil(1.0) == 1.0);
     CHECK(portable::ceil(1.0000000000000002) == 2.0);
@@ -84,7 +84,7 @@ TEST_CASE("the portable ceil rounds up to a whole number", "[ac4core][dsp][porta
     }
 }
 
-TEST_CASE("the portable square root is the double nearest the root", "[ac4core][dsp][portable]") {
+TEST_CASE("the portable square root is the double nearest the root", "[ac4][core][dsp][portable]") {
     // Exact roots.
     for (std::int64_t n = 1; n <= 100000; ++n) {
         const auto root = static_cast<double>(n);
@@ -130,7 +130,7 @@ TEST_CASE("the portable square root is the double nearest the root", "[ac4core][
 
 TEST_CASE(
     "the portable sin and cos keep to the C library's values to a few units in the last place",
-    "[ac4core][dsp][portable]") {
+    "[ac4][core][dsp][portable]") {
     // The classics: the reduction of the double nearest pi and pi / 2 leaves what is left of them.
     CHECK(portable::sin(std::numbers::pi) == 1.2246467991473532e-16);
     CHECK(portable::cos(std::numbers::pi / 2.0) == 6.123233995736766e-17);
@@ -170,7 +170,7 @@ TEST_CASE(
 }
 
 TEST_CASE("the portable sin and cos give no number outside the range of their reduction",
-          "[ac4core][dsp][portable]") {
+          "[ac4][core][dsp][portable]") {
     constexpr double kInfinity = std::numeric_limits<double>::infinity();
     CHECK(std::isnan(portable::sin(2097152.0)));
     CHECK(std::isnan(portable::cos(-2097152.0)));
@@ -182,7 +182,7 @@ TEST_CASE("the portable sin and cos give no number outside the range of their re
 }
 
 TEST_CASE("the portable functions give at run time the bits they give at compile time",
-          "[ac4core][dsp][portable]") {
+          "[ac4][core][dsp][portable]") {
     // A table of values the compiler's constant evaluator computes, and the same values computed
     // here by the machine the test runs on, each from an argument the optimiser cannot see.
     constexpr std::size_t kCount = 48;

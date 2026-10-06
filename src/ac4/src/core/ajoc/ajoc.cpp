@@ -443,7 +443,7 @@ template class Reconstruction<Real>;
 // The A-JOC encoder (src/ac4/src/encoder/ajoc/ajoc_encoder.cpp) drives this at
 // double regardless of the decoder's scalar, to measure its candidate
 // parameters as a decoder will reconstruct them (see this target's
-// CMakeLists.txt, AC4CORE_ALSO_AT_DOUBLE).
-AC4CORE_ALSO_AT_DOUBLE(template class Reconstruction<double>;)
+// CMakeLists.txt, ICLFORGE_AC4_ALSO_AT_DOUBLE).
+ICLFORGE_AC4_ALSO_AT_DOUBLE(template class Reconstruction<double>;)
 
 }  // namespace iclforge::ac4::detail::ajoc

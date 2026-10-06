@@ -86,7 +86,7 @@ struct AdmAccumulator {
 
 TEST_CASE("a real decoded Atmos programme survives write_bw64 -> parse_bw64 -> build -> a fresh "
          "AtmosEncoder/Eac3Decoder round trip",
-         "[admbridge][atmos][write]") {
+         "[adm][bridge][atmos][write]") {
     constexpr int kFrame = iclforge::ac3::kSamplesPerFrame;
     constexpr int kTotalFrames = 6;  // 3 frames holding right, 3 frames holding left
     constexpr double kSampleRate = 48000.0;
@@ -160,7 +160,7 @@ TEST_CASE("a real decoded Atmos programme survives write_bw64 -> parse_bw64 -> b
         CHECK(track_uid.bit_depth == built->audio.bits_per_sample);
     }
 
-    const auto scratch = fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("admbridge_write_" + scratch_pid_suffix());
+    const auto scratch = fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("adm_bridge_write_" + scratch_pid_suffix());
     fs::create_directories(scratch);
     const auto master_path = (scratch / "write_roundtrip.wav").string();
     const auto written = iclforge::adm::write_bw64(master_path, *built);
@@ -247,7 +247,7 @@ TEST_CASE("a real decoded Atmos programme survives write_bw64 -> parse_bw64 -> b
 // Zone constraints ride the OAMD updates of a decoded programme (§5.6.1.6) and go out as an ADM
 // zoneExclusion (TS 103 420 Annex B.2.6). The same file read back through build() has to give the
 // zone and the elevation switch of each update, in the block it came from.
-TEST_CASE("zone constraints survive write() -> write_bw64 -> parse_bw64 -> build", "[admbridge][write][zones]") {
+TEST_CASE("zone constraints survive write() -> write_bw64 -> parse_bw64 -> build", "[adm][bridge][write][zones]") {
     using iclforge::oba::ZoneConstraint;
     constexpr std::uint32_t kRate = 48000;
     std::vector<float> pcm(static_cast<std::size_t>(kRate) * 3, 0.1F);
@@ -272,7 +272,7 @@ TEST_CASE("zone constraints survive write() -> write_bw64 -> parse_bw64 -> build
     const auto built = iclforge::adm::write(input);
     REQUIRE(built.has_value());
 
-    const auto scratch = fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("admbridge_zones_" + scratch_pid_suffix());
+    const auto scratch = fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("adm_bridge_zones_" + scratch_pid_suffix());
     fs::create_directories(scratch);
     const auto path = (scratch / "zones.wav").string();
     REQUIRE(iclforge::adm::write_bw64(path, *built).has_value());
@@ -298,7 +298,7 @@ TEST_CASE("zone constraints survive write() -> write_bw64 -> parse_bw64 -> build
 // The OAMD divergence and screen reference of each update go out as ADM objectDivergence and screenRef,
 // and read back into the same OAMD fields.
 TEST_CASE("divergence and screen reference survive write() -> write_bw64 -> parse_bw64 -> build",
-          "[admbridge][write][divergence]") {
+          "[adm][bridge][write][divergence]") {
     constexpr std::uint32_t kRate = 48000;
     std::vector<float> pcm(static_cast<std::size_t>(kRate) * 3, 0.1F);
 
@@ -323,7 +323,7 @@ TEST_CASE("divergence and screen reference survive write() -> write_bw64 -> pars
     const auto built = iclforge::adm::write(input);
     REQUIRE(built.has_value());
 
-    const auto scratch = fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("admbridge_divergence_" + scratch_pid_suffix());
+    const auto scratch = fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("adm_bridge_divergence_" + scratch_pid_suffix());
     fs::create_directories(scratch);
     const auto path = (scratch / "divergence.wav").string();
     REQUIRE(iclforge::adm::write_bw64(path, *built).has_value());

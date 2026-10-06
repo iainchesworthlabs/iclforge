@@ -91,7 +91,7 @@ AcplFramingFields framing(Lcg& rng) {
 
 }  // namespace
 
-TEST_CASE("acpl_config_1ch() and acpl_data_1ch() read back as written", "[ac4enc][acpl]") {
+TEST_CASE("acpl_config_1ch() and acpl_data_1ch() read back as written", "[ac4][encoder][acpl]") {
     Lcg rng;
     for (int id = 0; id < 4; ++id) {
         for (const bool partial : {false, true}) {
@@ -131,7 +131,7 @@ TEST_CASE("acpl_config_1ch() and acpl_data_1ch() read back as written", "[ac4enc
     }
 }
 
-TEST_CASE("acpl_config_2ch() and acpl_data_2ch() read back as written", "[ac4enc][acpl]") {
+TEST_CASE("acpl_config_2ch() and acpl_data_2ch() read back as written", "[ac4][encoder][acpl]") {
     Lcg rng;
     for (int id = 0; id < 4; ++id) {
         for (int quant_0 = 0; quant_0 < 2; ++quant_0) {
@@ -171,7 +171,7 @@ TEST_CASE("acpl_config_2ch() and acpl_data_2ch() read back as written", "[ac4enc
     }
 }
 
-TEST_CASE("the A-CPL writer takes the values each codebook holds and no others", "[ac4enc][acpl]") {
+TEST_CASE("the A-CPL writer takes the values each codebook holds and no others", "[ac4][encoder][acpl]") {
     for (const AcplKind kind : {AcplKind::kAlpha, AcplKind::kBeta, AcplKind::kBeta3, AcplKind::kGamma}) {
         for (int quant = 0; quant < 2; ++quant) {
             for (int diff_type = 0; diff_type < 2; ++diff_type) {

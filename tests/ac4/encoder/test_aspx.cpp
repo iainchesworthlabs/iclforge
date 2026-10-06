@@ -230,7 +230,7 @@ AspxConfigFields dee_config(int start, int stop, int scale) {
 
 }  // namespace
 
-TEST_CASE("A-SPX FIXFIX intervals of one, two and four envelopes read back as written", "[ac4enc][aspx]") {
+TEST_CASE("A-SPX FIXFIX intervals of one, two and four envelopes read back as written", "[ac4][encoder][aspx]") {
     Lcg rng;
     for (const AspxConfigFields& base : {dee_config(5, 0, 0), dee_config(4, 1, 1), dee_config(6, 1, 1)}) {
         for (const int freq_res_mode : {0, 1, 2, 3}) {
@@ -254,7 +254,7 @@ TEST_CASE("A-SPX FIXFIX intervals of one, two and four envelopes read back as wr
     }
 }
 
-TEST_CASE("A-SPX variable borders, sinusoids and interleaving read back as written", "[ac4enc][aspx]") {
+TEST_CASE("A-SPX variable borders, sinusoids and interleaving read back as written", "[ac4][encoder][aspx]") {
     Lcg rng;
     for (const int freq_res_mode : {0, 1, 3}) {
         for (const bool iframe : {true, false}) {
@@ -315,7 +315,7 @@ TEST_CASE("A-SPX variable borders, sinusoids and interleaving read back as writt
     }
 }
 
-TEST_CASE("the encoder's interval borders, resolutions and noise borders are the parser's", "[ac4enc][aspx]") {
+TEST_CASE("the encoder's interval borders, resolutions and noise borders are the parser's", "[ac4][encoder][aspx]") {
     // Every framing the encoder chooses from, and more: written, parsed, and
     // held to the parser's Pseudocode 76 and 77 and Table 193.
     Lcg rng;
@@ -400,7 +400,7 @@ TEST_CASE("the encoder's interval borders, resolutions and noise borders are the
 }
 
 TEST_CASE("the A-SPX data a frame falls back to cost more where its interval starts a slot in",
-          "[ac4enc][aspx]") {
+          "[ac4][encoder][aspx]") {
     // AspxChannelEncoder::fallback() takes one envelope from where the last
     // interval stopped: FIXFIX from the frame's start, VARFIX from a slot
     // in, as after a FIXVAR interval run on to an attack's parity, which in
@@ -429,7 +429,7 @@ TEST_CASE("the A-SPX data a frame falls back to cost more where its interval sta
     CHECK(bits(varied, 1) > bits(fixed, 1));
     CHECK(bits(varied, 2) > bits(fixed, 2));
 }
-TEST_CASE("companding_control() in its three forms reads back through the channel element", "[ac4enc][aspx]") {
+TEST_CASE("companding_control() in its three forms reads back through the channel element", "[ac4][encoder][aspx]") {
     const std::optional<iclforge::ac4::detail::AspxSetup> setup =
         iclforge::ac4::detail::aspx_setup_for(32.0, 48000);
     REQUIRE(setup.has_value());
@@ -493,7 +493,7 @@ TEST_CASE("companding_control() in its three forms reads back through the channe
     }
 }
 
-TEST_CASE("the encoder's A-SPX configurations are DEE's", "[ac4enc][aspx]") {
+TEST_CASE("the encoder's A-SPX configurations are DEE's", "[ac4][encoder][aspx]") {
     // Crossover subband, companding, by kbps a channel.
     struct Row {
         double kbps;
@@ -536,7 +536,7 @@ TEST_CASE("the encoder's A-SPX configurations are DEE's", "[ac4enc][aspx]") {
 }
 
 TEST_CASE("the QMF front end's compressed low band is the signal again after the decoder's expansion",
-          "[ac4enc][aspx]") {
+          "[ac4][encoder][aspx]") {
     // A tone below the crossover whose level steps by 30 dB: compressed, the
     // steps shrink to alpha of their size in dB, and expanded as the decoder
     // expands they come back.

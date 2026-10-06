@@ -155,7 +155,7 @@ double rms_db(std::span<const float> x) {
 
 }  // namespace
 
-TEST_CASE("Table 162's profiles are the compression curves the text defines", "[ac4dec][drc]") {
+TEST_CASE("Table 162's profiles are the compression curves the text defines", "[ac4][decoder][drc]") {
     struct Point {
         int profile;
         double level;
@@ -191,7 +191,7 @@ TEST_CASE("Table 162's profiles are the compression curves the text defines", "[
 }
 
 TEST_CASE("DEE's transmitted curves take Table 166's points to the profiles it names",
-          "[ac4dec][drc]") {
+          "[ac4][decoder][drc]") {
     struct Mode {
         detail::DrcCompressionCurve sent;
         int profile;
@@ -220,7 +220,7 @@ TEST_CASE("DEE's transmitted curves take Table 166's points to the profiles it n
     }
 }
 
-TEST_CASE("Table 161 chooses the DRC decoder mode for the output level", "[ac4dec][drc]") {
+TEST_CASE("Table 161 chooses the DRC decoder mode for the output level", "[ac4][decoder][drc]") {
     detail::DrcConfig config;
     for (std::size_t id = 0; id < 4; ++id) {
         config.mode[id].configured = true;
@@ -265,7 +265,7 @@ TEST_CASE("Table 161 chooses the DRC decoder mode for the output level", "[ac4de
 TEST_CASE(
     "the DRC stage's static curve, measured with stepped tones at steady state, is each profile's "
     "within 0.5 dB",
-    "[ac4dec][drc]") {
+    "[ac4][decoder][drc]") {
     const std::array<iclforge::ac4::Speaker, 2> speakers = {iclforge::ac4::Speaker::kLeft,
                                                             iclforge::ac4::Speaker::kRight};
     constexpr double kDialnorm = -24.0;
@@ -295,7 +295,7 @@ TEST_CASE(
 }
 
 TEST_CASE("the DRC stage moves to a new gain with the attack and release time constants",
-          "[ac4dec][drc]") {
+          "[ac4][decoder][drc]") {
     const std::array<iclforge::ac4::Speaker, 2> speakers = {iclforge::ac4::Speaker::kLeft,
                                                             iclforge::ac4::Speaker::kRight};
     constexpr double kDialnorm = -24.0;
@@ -347,7 +347,7 @@ TEST_CASE("the DRC stage moves to a new gain with the attack and release time co
     }
 }
 
-TEST_CASE("transmitted DRC gains apply by channel group, band and subframe", "[ac4dec][drc]") {
+TEST_CASE("transmitted DRC gains apply by channel group, band and subframe", "[ac4][decoder][drc]") {
     const std::array<iclforge::ac4::Speaker, 6> speakers = {
         iclforge::ac4::Speaker::kLeft,         iclforge::ac4::Speaker::kRight,
         iclforge::ac4::Speaker::kCentre,       iclforge::ac4::Speaker::kLfe,
@@ -401,7 +401,7 @@ TEST_CASE("transmitted DRC gains apply by channel group, band and subframe", "[a
 }
 
 TEST_CASE("transmitted DRC gains apply by Part 2 Table 69's groups to the immersive element",
-          "[ac4dec][drc]") {
+          "[ac4][decoder][drc]") {
     // Table 69 for 7.X.4: L, R and the LFE; C; Ls, Rs, Lb and Rb; the four
     // tops. Core decoding's Tsl and Tsr carry the tops and take their group
     // (src/ac4/ERRATA.md, "DRC's groups in core decoding").
@@ -454,7 +454,7 @@ TEST_CASE("transmitted DRC gains apply by Part 2 Table 69's groups to the immers
 }
 
 TEST_CASE("transmitted DRC gains apply by Part 2 Table 69's groups to the 9.X.4 element",
-          "[ac4dec][drc][fronts]") {
+          "[ac4][decoder][drc][fronts]") {
     // Table 69's 9.X.4 row: L, R, the LFE, Lscr and Rscr; C; Ls, Rs, Lb and Rb; the four tops. The
     // layout is Table A.27's order, the screen pair last.
     using S = iclforge::ac4::Speaker;
@@ -495,7 +495,7 @@ TEST_CASE("transmitted DRC gains apply by Part 2 Table 69's groups to the 9.X.4 
 }
 
 TEST_CASE("transmitted DRC gains apply by Part 2 Table 69's groups to the 22.2 element",
-          "[ac4dec][drc]") {
+          "[ac4][decoder][drc]") {
     // Table 69's 22.2 row: L, R, both LFEs, Lw and Rw; C; Ls, Rs, Lb, Rb, Bfl,
     // Bfr, Bfc and Cb; and Tfl, Tfr, Tbl, Tbr, Tsl, Tsr, Tfc, Tbc and Tc. The
     // speakers are in the order decode() writes them, Table A.27's.
@@ -557,7 +557,7 @@ TEST_CASE("transmitted DRC gains apply by Part 2 Table 69's groups to the 22.2 e
     }
 }
 
-TEST_CASE("the DRC level detector leaves out both of 22.2's LFEs", "[ac4dec][drc]") {
+TEST_CASE("the DRC level detector leaves out both of 22.2's LFEs", "[ac4][decoder][drc]") {
     // A loud tone in an LFE adds nothing to the level the curve is read at, as
     // BS.1770 weights the LFE: the stage's gain is the one for silence, which
     // film standard's boost gives, while the same tone in L cuts.
@@ -599,7 +599,7 @@ TEST_CASE("the DRC level detector leaves out both of 22.2's LFEs", "[ac4dec][drc
 
 TEST_CASE(
     "decode takes dialnorm to the output level by 2^((Lout - dialnorm) / 6), dialnorms -31 to -17",
-    "[ac4dec][drc]") {
+    "[ac4][decoder][drc]") {
     // Two seconds of a 997 Hz tone at -20 dBFS in both channels.
     constexpr std::size_t kLength = 96000;
     std::vector<std::vector<float>> input(2, std::vector<float>(kLength));
@@ -652,7 +652,7 @@ TEST_CASE(
 }
 
 TEST_CASE("DEE's 5.1 stream compresses in the modes it configures, within its curves",
-          "[ac4dec][drc]") {
+          "[ac4][decoder][drc]") {
     // Made with the home theatre mode as Music light and portable headphones
     // as Speech (gen_ac4_baseline.py, ac4-51-drc-ltrt-192).
     const std::vector<std::byte> stream = read_stream("ac4-51-drc-ltrt-192");

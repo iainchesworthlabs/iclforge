@@ -152,7 +152,7 @@ HsfCase mono_case(int sf_multiplier, double hz) {
 
 }  // namespace
 
-TEST_CASE("a tone above 24 kHz decodes at 96 kHz at its frequency and level", "[ac4dec][hsf]") {
+TEST_CASE("a tone above 24 kHz decodes at 96 kHz at its frequency and level", "[ac4][decoder][hsf]") {
     // 30 006.25 Hz is the centre of line 2 400 of the 4 096-line transform (12.5 Hz a line), past
     // the 2 048 lines the base rate has: only the HSF extension carries it.
     const HsfCase c = mono_case(0, 30006.25);
@@ -172,7 +172,7 @@ TEST_CASE("a tone above 24 kHz decodes at 96 kHz at its frequency and level", "[
     CHECK(waveform_error(c, stream, d, 0) < 0.02);
 }
 
-TEST_CASE("a tone above 48 kHz decodes at 192 kHz at its frequency and level", "[ac4dec][hsf]") {
+TEST_CASE("a tone above 48 kHz decodes at 192 kHz at its frequency and level", "[ac4][decoder][hsf]") {
     // Line 5 600 of the 8 192-line transform (11.72 Hz a line) is at 65 625 Hz, past the 4 096
     // lines of 96 kHz as well.
     const double hz = 65625.0 + 0.5 * 24000.0 / 2048.0;
@@ -234,7 +234,7 @@ void check_tones(const HsfCase& c, const HsfStream& stream, const Decoded& d,
 
 TEST_CASE(
     "a pair's tones, one in the core's bands and one in the extension's, stay in their channels",
-    "[ac4dec][hsf]") {
+    "[ac4][decoder][hsf]") {
     for (const int sf_multiplier : {0, 1}) {
         CAPTURE(sf_multiplier);
         const double rate = 96000.0 * (sf_multiplier + 1);
@@ -254,7 +254,7 @@ TEST_CASE(
 
 TEST_CASE(
     "a pair's stereo processing reaches the extension's bands as clause 5.3 and Table 114 say",
-    "[ac4dec][hsf]") {
+    "[ac4][decoder][hsf]") {
     // sap_mode 0: left and right. 1: M/S where ms_used says, which covers the core's bands, so the
     // extension's are left and right. 2: M/S in all scale factor bands, the extension's included.
     for (const int sap_mode : {0, 1, 2}) {
@@ -273,7 +273,7 @@ TEST_CASE(
     check_tones(c, stream, decode_stream(stream));
 }
 
-TEST_CASE("noise fill's escape codes in a stream at 96 kHz leave the tone alone", "[ac4dec][hsf]") {
+TEST_CASE("noise fill's escape codes in a stream at 96 kHz leave the tone alone", "[ac4][decoder][hsf]") {
     HsfCase c = mono_case(0, 30006.25);
     c.noise_fill = true;
     const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
@@ -285,7 +285,7 @@ TEST_CASE("noise fill's escape codes in a stream at 96 kHz leave the tone alone"
     CHECK(d.channels[0] == plain.channels[0]);
 }
 
-TEST_CASE("an extension with no band of lines and one with all of them decode", "[ac4dec][hsf]") {
+TEST_CASE("an extension with no band of lines and one with all of them decode", "[ac4][decoder][hsf]") {
     // No tone past the core's bands: the extension is empty, but its header is read and the
     // frame is 96 kHz, with the core's tone alone.
     HsfCase c = mono_case(0, 5000.5);
@@ -300,7 +300,7 @@ TEST_CASE("an extension with no band of lines and one with all of them decode", 
     check_tones(c, stream, decode_stream(stream));
 }
 
-TEST_CASE("a stream at 96 kHz at another frame rate converts as Table 83 says", "[ac4dec][hsf]") {
+TEST_CASE("a stream at 96 kHz at another frame rate converts as Table 83 says", "[ac4][decoder][hsf]") {
     struct Leg {
         int frame_rate_index;
         int base;  // frame_len_base
@@ -335,7 +335,7 @@ TEST_CASE("a stream at 96 kHz at another frame rate converts as Table 83 says", 
 }
 
 TEST_CASE("block switching at 96 and 192 kHz: groups of windows of every transform length",
-          "[ac4dec][hsf]") {
+          "[ac4][decoder][hsf]") {
     struct Leg {
         int t0;
         int t1;
@@ -393,7 +393,7 @@ HsfCase multichannel_case(int ch_mode, int sf_multiplier) {
 }  // namespace
 
 TEST_CASE("the 3.0 element's channels at 96 and 192 kHz, by coding_config and chel_matsel",
-          "[ac4dec][hsf]") {
+          "[ac4][decoder][hsf]") {
     for (const int sf_multiplier : {0, 1}) {
         for (const int sap_mode : {0, 2}) {
             // Table 178's twelve matrices: each puts the tracks on L, R and C another way, which
@@ -418,7 +418,7 @@ TEST_CASE("the 3.0 element's channels at 96 and 192 kHz, by coding_config and ch
 }
 
 TEST_CASE("the 5.X element's channels at 96 and 192 kHz, with and without an LFE",
-          "[ac4dec][hsf]") {
+          "[ac4][decoder][hsf]") {
     for (const int ch_mode : {3, 4}) {
         for (const int sf_multiplier : {0, 1}) {
             for (const int sap_mode : {0, 2}) {
@@ -447,7 +447,7 @@ TEST_CASE("the 5.X element's channels at 96 and 192 kHz, with and without an LFE
     }
 }
 
-TEST_CASE("the 7.X element's additional channels at 96 and 192 kHz", "[ac4dec][hsf]") {
+TEST_CASE("the 7.X element's additional channels at 96 and 192 kHz", "[ac4][decoder][hsf]") {
     for (const int sf_multiplier : {0, 1}) {
         // Without b_use_sap_add_ch, and with Table 183's two steps in each sap_mode.
         for (const int step : {-1, 0, 1, 2}) {
@@ -480,16 +480,16 @@ std::vector<std::byte> read_file(const std::filesystem::path& path) {
 
 }  // namespace
 
-TEST_CASE("the committed streams at 96 and 192 kHz are the builder's", "[ac4dec][hsf]") {
+TEST_CASE("the committed streams at 96 and 192 kHz are the builder's", "[ac4][decoder][hsf]") {
     // tests/golden/ac4-hsf/*.ac4 are these cases' streams byte for byte, and
     // tools/references/ac4_syntax.py's digests of them, tests/golden/ac4/hsf-*.tsv, are what
     // test_ac4dec_syntax.cpp holds the decoder's trace to. They are not under tests/golden/ac4/
     // with the other constructed streams, which the tests and checks that play every committed
-    // stream at 48 kHz take in. With AC4DEC_WRITE_HSF set to a directory the streams are written
+    // stream at 48 kHz take in. With AC4_DECODER_WRITE_HSF set to a directory the streams are written
     // there instead of compared, to commit after a change to the builder.
     const std::filesystem::path committed =
-        std::filesystem::path{AC4DEC_GOLDEN_DIR} / ".." / "ac4-hsf";
-    const char* write_to = std::getenv("AC4DEC_WRITE_HSF");
+        std::filesystem::path{AC4_GOLDEN_DIR} / ".." / "ac4-hsf";
+    const char* write_to = std::getenv("AC4_DECODER_WRITE_HSF");
     for (const HsfCase& c : ac4dec_test::committed_hsf_cases()) {
         CAPTURE(c.name);
         const HsfStream stream = ac4dec_test::build_hsf_stream(c, ac4dec_test::kHsfCommittedFrames);
@@ -507,7 +507,7 @@ TEST_CASE("the committed streams at 96 and 192 kHz are the builder's", "[ac4dec]
     }
 }
 
-TEST_CASE("the output level gain applies at 96 kHz as clause 5.7.9.3.3 gives it", "[ac4dec][hsf]") {
+TEST_CASE("the output level gain applies at 96 kHz as clause 5.7.9.3.3 gives it", "[ac4][decoder][hsf]") {
     // dialnorm_bits 20 is -5 dBFS; to -23 dBFS is 2^((-23 + 5) / 6) = 1/8, by DrcMode::kOff or by
     // the default mode of a stream with no compression to apply.
     const HsfCase c = mono_case(0, 30006.25);
@@ -529,7 +529,7 @@ TEST_CASE("the output level gain applies at 96 kHz as clause 5.7.9.3.3 gives it"
           0.15);
 }
 
-TEST_CASE("the downmix is the matrix of clause 6.2.17 on the samples at 96 kHz", "[ac4dec][hsf]") {
+TEST_CASE("the downmix is the matrix of clause 6.2.17 on the samples at 96 kHz", "[ac4][decoder][hsf]") {
     // Decoded as coded and then downmixed, a stream's channels are what the downmix's matrix
     // makes of them: the same DownmixStage matrix, applied to the samples.
     namespace detail = iclforge::ac4::detail;
@@ -573,7 +573,7 @@ TEST_CASE("the downmix is the matrix of clause 6.2.17 on the samples at 96 kHz",
     }
 }
 
-TEST_CASE("a lost frame is concealed at 96 kHz as it is at 48", "[ac4dec][hsf]") {
+TEST_CASE("a lost frame is concealed at 96 kHz as it is at 48", "[ac4][decoder][hsf]") {
     const HsfCase c = mono_case(0, 30006.25);
     const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
     DecoderConfig config;
@@ -605,7 +605,7 @@ TEST_CASE("a lost frame is concealed at 96 kHz as it is at 48", "[ac4dec][hsf]")
     CHECK(level(6) > 0.01);
 }
 
-TEST_CASE("decode_by_block hands a stream at 96 and 192 kHz over at its rate", "[ac4dec][hsf]") {
+TEST_CASE("decode_by_block hands a stream at 96 and 192 kHz over at its rate", "[ac4][decoder][hsf]") {
     for (const int sf_multiplier : {0, 1}) {
         const HsfCase c = mono_case(sf_multiplier, sf_multiplier == 0 ? 30006.25 : 65625.0);
         const HsfStream stream = ac4dec_test::build_hsf_stream(c, 6);
@@ -631,7 +631,7 @@ TEST_CASE("decode_by_block hands a stream at 96 and 192 kHz over at its rate", "
     }
 }
 
-TEST_CASE("a presentation reports the rate it decodes at", "[ac4dec][hsf]") {
+TEST_CASE("a presentation reports the rate it decodes at", "[ac4][decoder][hsf]") {
     for (const int sf_multiplier : {0, 1}) {
         const HsfCase c = mono_case(sf_multiplier, 30006.25);
         const HsfStream stream = ac4dec_test::build_hsf_stream(c, 2);
@@ -655,7 +655,7 @@ TEST_CASE("a presentation reports the rate it decodes at", "[ac4dec][hsf]") {
 
 TEST_CASE(
     "what Part 1 clause 5.4 and 6.2.5.2 do not give a stream at 96 or 192 kHz is refused by name",
-    "[ac4dec][hsf]") {
+    "[ac4][decoder][hsf]") {
     namespace detail = iclforge::ac4::detail;
     detail::SubstreamContext ctx;
     ctx.sf_multiplier = 0;
@@ -731,7 +731,7 @@ TEST_CASE(
 }
 
 TEST_CASE("Table 106 for the base length is Tables 107 and 108 for the longer one",
-          "[ac4dec][hsf]") {
+          "[ac4][decoder][hsf]") {
     // Clause 4.3.6.2.1: with b_hsf_ext the n_msfb_bits and n_msfbl_bits of the high sampling
     // frequency's transform length are taken from Table 107 (96 kHz) or 108 (192 kHz). The decoder
     // reads them by the base length's, Table 106: the same widths, for every length

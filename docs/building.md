@@ -304,9 +304,9 @@ entry per test case, and `catch_discover_tests(... ADD_TAGS_AS_LABELS)` turns ev
 case into a ctest label, so a tag selects a subset in two ways:
 
 ```bash
-ctest --preset test-linux-gcc-debug -L ac4dec           # the cases tagged [ac4dec], through ctest
+ctest --preset test-linux-gcc-debug -L ac4dec           # the cases tagged [ac4][decoder], through ctest
 ctest --preset test-linux-gcc-debug -N -L ac4           # list what a label selects, run nothing
-build/config-linux-gcc-debug/bin/iclforge-tests "[ac4dec]"    # the same cases, through the Catch2 binary
+build/config-linux-gcc-debug/bin/iclforge-tests "[ac4][decoder]"    # the same cases, through the Catch2 binary
 build/config-linux-gcc-debug/bin/iclforge-tests --list-tags   # every tag and how many cases carry it
 ```
 

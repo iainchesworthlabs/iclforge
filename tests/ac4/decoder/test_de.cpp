@@ -139,7 +139,7 @@ std::vector<std::vector<float>> decode_all(std::span<const std::byte> stream,
 
 }  // namespace
 
-TEST_CASE("Tables 209, 210 and 172 dequantise dialogue enhancement's parameters", "[ac4dec][de]") {
+TEST_CASE("Tables 209, 210 and 172 dequantise dialogue enhancement's parameters", "[ac4][decoder][de]") {
     CHECK(detail::de_parameter(0, false) == 0.0);
     CHECK(std::abs(detail::de_parameter(10, false) - 1.0) < 1e-12);
     CHECK(std::abs(detail::de_parameter(15, false) - 1.5) < 1e-12);
@@ -163,7 +163,7 @@ TEST_CASE("Tables 209, 210 and 172 dequantise dialogue enhancement's parameters"
 }
 
 TEST_CASE("dialogue enhancement at 0 dB leaves the matrices as the tool bypassed would",
-          "[ac4dec][de]") {
+          "[ac4][decoder][de]") {
     detail::DeStage stage;
     stage.configure(kSlots, kFiveOne);
     const detail::DeFrameValues values = channel_independent({true, true, true}, 9.0);
@@ -177,7 +177,7 @@ TEST_CASE("dialogue enhancement at 0 dB leaves the matrices as the tool bypassed
 }
 
 TEST_CASE("at its cap, dialogue enhancement applies the gains its parameters give, to 0.01 dB",
-          "[ac4dec][de]") {
+          "[ac4][decoder][de]") {
     detail::DeStage stage;
     stage.configure(kSlots, kFiveOne);
     // L and C, capped at 9 dB and asked for 12: g = 10^(9/20) - 1.
@@ -212,7 +212,7 @@ TEST_CASE("at its cap, dialogue enhancement applies the gains its parameters giv
 }
 
 TEST_CASE("with de_ms_proc_flag, dialogue enhancement raises the Mid and leaves the Side",
-          "[ac4dec][de]") {
+          "[ac4][decoder][de]") {
     const std::array<iclforge::ac4::Speaker, 2> stereo = {iclforge::ac4::Speaker::kLeft,
                                                           iclforge::ac4::Speaker::kRight};
     detail::DeStage stage;
@@ -248,7 +248,7 @@ TEST_CASE("with de_ms_proc_flag, dialogue enhancement raises the Mid and leaves 
 }
 
 TEST_CASE("cross-channel dialogue enhancement adds g r p^T m to the processed channels",
-          "[ac4dec][de]") {
+          "[ac4][decoder][de]") {
     detail::DeStage stage;
     stage.configure(kSlots, kFiveOne);
     detail::DeFrameValues values;
@@ -291,7 +291,7 @@ TEST_CASE("cross-channel dialogue enhancement adds g r p^T m to the processed ch
 }
 
 TEST_CASE("dialogue enhancement moves from one frame's matrix to the next slot by slot",
-          "[ac4dec][de]") {
+          "[ac4][decoder][de]") {
     const std::array<iclforge::ac4::Speaker, 1> mono = {iclforge::ac4::Speaker::kCentre};
     detail::DeStage stage;
     stage.configure(kSlots, mono);
@@ -310,7 +310,7 @@ TEST_CASE("dialogue enhancement moves from one frame's matrix to the next slot b
 }
 
 TEST_CASE("DEE's dialogue enhancement leaves the output alone at 0 dB and raises it at its cap",
-          "[ac4dec][de]") {
+          "[ac4][decoder][de]") {
     // Speech: DEE sends channel-independent parameters for the pair it
     // detects dialogue in, capped at 9 dB.
     const std::vector<std::byte> stream = read_stream("ac4-20-speech-128");
@@ -386,7 +386,7 @@ double ratio_at(const CoreRun& run, std::size_t out, std::size_t in, int slot, i
 
 }  // namespace
 
-TEST_CASE("9.X.4's dialogue enhancement channels are Lscr, Rscr and C", "[ac4dec][de]") {
+TEST_CASE("9.X.4's dialogue enhancement channels are Lscr, Rscr and C", "[ac4][decoder][de]") {
     // Part 2 Table 15: with the screen pair present, L and R are not the dialogue's channels.
     detail::DeStage stage;
     stage.configure(kSlots, kScreenFront);
@@ -413,7 +413,7 @@ TEST_CASE("9.X.4's dialogue enhancement channels are Lscr, Rscr and C", "[ac4dec
     }
 }
 
-TEST_CASE("core decoding takes the second de_data() when b_de_simulcast says so", "[ac4dec][de]") {
+TEST_CASE("core decoding takes the second de_data() when b_de_simulcast says so", "[ac4][decoder][de]") {
     // Part 2 clause 4.8.3.15.
     detail::DialogEnhancement de;
     de.b_de_data_present = true;
@@ -431,7 +431,7 @@ TEST_CASE("core decoding takes the second de_data() when b_de_simulcast says so"
 }
 
 TEST_CASE("the core tool's C input ramps one smooth set by (ts + 1) / N from nothing, then holds",
-          "[ac4dec][de]") {
+          "[ac4][decoder][de]") {
     // Pseudocode 20, ch2 = 2 (the constant 1): no A-CPL or A-JCC set in the way.
     detail::DeCoreStage stage;
     stage.configure(kSlots);
@@ -465,7 +465,7 @@ TEST_CASE("the core tool's C input ramps one smooth set by (ts + 1) / N from not
 }
 
 TEST_CASE("the core tool's A'' and B'' inputs carry C_L and C_R, smooth over two sets",
-          "[ac4dec][de]") {
+          "[ac4][decoder][de]") {
     // Pseudocode 20, two smooth sets: to the first set's matrix at the first half's end, then on to
     // the frame's.
     detail::DeCoreStage stage;
@@ -499,7 +499,7 @@ TEST_CASE("the core tool's A'' and B'' inputs carry C_L and C_R, smooth over two
 }
 
 TEST_CASE("the core tool's steep interpolation switches coefficient at its parameter timeslots",
-          "[ac4dec][de]") {
+          "[ac4][decoder][de]") {
     detail::DeCoreStage stage;
     stage.configure(kSlots);
     const detail::DeFrameValues values = channel_independent({true, false, false}, 9.0);

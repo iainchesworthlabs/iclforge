@@ -7,7 +7,7 @@
 // The streams under tests/golden/ac4/objects/ are the committed cases, byte
 // for byte, and tests/golden/ac4/ holds tools/references/ac4_syntax.py's
 // digests of them, which test_ac4dec_syntax.cpp holds the decoder to. With
-// AC4DEC_WRITE_OBJECTS set to a directory, this writes the committed cases
+// AC4_DECODER_WRITE_OBJECTS set to a directory, this writes the committed cases
 // there instead of comparing them, to commit after a change to the builder.
 
 #include <algorithm>
@@ -206,14 +206,14 @@ std::vector<std::byte> read_file(const fs::path& path) {
 
 }  // namespace
 
-TEST_CASE("object audio streams read as the encoder's writer wrote them", "[ac4dec][objects]") {
+TEST_CASE("object audio streams read as the encoder's writer wrote them", "[ac4][decoder][objects]") {
     for (const ObjectCase& c : ac4dec_test::committed_object_cases()) {
         CAPTURE(c.name);
         parse_checked(ac4dec_test::build_objects(c, kFrames));
     }
 }
 
-TEST_CASE("A-JOC downmixes of one to seven signals read in both codec modes", "[ac4dec][objects]") {
+TEST_CASE("A-JOC downmixes of one to seven signals read in both codec modes", "[ac4][decoder][objects]") {
     // Every var_channel_element() shape: one signal, pairs, and an odd count
     // over each var_coding_config, SIMPLE and ASPX (companding_control() up
     // to five signals), with and without the LFE.
@@ -237,9 +237,9 @@ TEST_CASE("A-JOC downmixes of one to seven signals read in both codec modes", "[
     }
 }
 
-TEST_CASE("the committed object streams are the builder's", "[ac4dec][objects]") {
-    const fs::path committed = fs::path{AC4DEC_GOLDEN_DIR} / "objects";
-    const char* write_to = std::getenv("AC4DEC_WRITE_OBJECTS");
+TEST_CASE("the committed object streams are the builder's", "[ac4][decoder][objects]") {
+    const fs::path committed = fs::path{AC4_GOLDEN_DIR} / "objects";
+    const char* write_to = std::getenv("AC4_DECODER_WRITE_OBJECTS");
     for (const ObjectCase& c : ac4dec_test::committed_object_cases()) {
         CAPTURE(c.name);
         const BuiltObjectStream stream =
@@ -258,7 +258,7 @@ TEST_CASE("the committed object streams are the builder's", "[ac4dec][objects]")
 }
 
 TEST_CASE("A-JOC objects carry their dry coefficients' share of each downmix signal",
-          "[ac4dec][objects]") {
+          "[ac4][decoder][objects]") {
     // Pseudocode 18 end to end: each object the sum of its coefficients times
     // the downmix's tones, in QinAJOC's order (Pseudocode 14a), with Table 28's
     // band of each tone; and in core decoding the downmix itself.
@@ -277,7 +277,7 @@ TEST_CASE("A-JOC objects carry their dry coefficients' share of each downmix sig
 }
 
 TEST_CASE("a static downmix's core objects are its LFE and its bed at L R C Ls and Rs",
-          "[ac4dec][objects]") {
+          "[ac4][decoder][objects]") {
     // src/ac4/ERRATA.md, "A static downmix's inputs": in core decoding the
     // objects of an A-JOC substream over a static 5.1 downmix are its bed.
     ObjectCase c;
@@ -301,7 +301,7 @@ TEST_CASE("a static downmix's core objects are its LFE and its bed at L R C Ls a
     }
 }
 
-TEST_CASE("direct-coded objects and a bed carry their own tones", "[ac4dec][objects]") {
+TEST_CASE("direct-coded objects and a bed carry their own tones", "[ac4][decoder][objects]") {
     for (const ObjectCase& c : ac4dec_test::committed_object_cases()) {
         if (c.kind != ObjectCase::Kind::kDynamic && c.kind != ObjectCase::Kind::kBed) {
             continue;
@@ -317,7 +317,7 @@ TEST_CASE("direct-coded objects and a bed carry their own tones", "[ac4dec][obje
 }
 
 TEST_CASE("A-JOC dialogue enhancement raises the dialogue object and its share of the core",
-          "[ac4dec][objects]") {
+          "[ac4][decoder][objects]") {
     // Part 2 clause 5.8.2.3: in full decoding the dialogue object's dry and
     // wet coefficients times de_gain = 10^(min(G_DE, Gmax) / 20), Gmax (1 +
     // de_max_gain) x 3 dB, 9 dB for the builder's 2. Clause 5.8.2.4: in core
@@ -362,7 +362,7 @@ TEST_CASE("A-JOC dialogue enhancement raises the dialogue object and its share o
 }
 
 TEST_CASE("a direct-coded dialogue substream's objects take dialogue enhancement up to its cap",
-          "[ac4dec][objects]") {
+          "[ac4][decoder][objects]") {
     // Part 2 clause 5.8.2.5: de_gain = 10^(min(G_DE, Gmax) / 20) on every
     // object of a dialogue substream, Gmax 3 x (1 + dialog_max_gain) dB, 9 dB
     // for the builder's dialog_max_gain of 2.
@@ -391,7 +391,7 @@ TEST_CASE("a direct-coded dialogue substream's objects take dialogue enhancement
 }
 
 TEST_CASE("object metadata takes effect at its update sample and moves object 0",
-          "[ac4dec][objects]") {
+          "[ac4][decoder][objects]") {
     // Clause 5.9.2: block n of a frame's metadata takes effect sample_offset +
     // 32 x block_offset_factor into its codec frame, which comes out the
     // decoder's delay later, 1 313 samples at frame_rate_index 13; each block's
@@ -450,7 +450,7 @@ TEST_CASE("object metadata takes effect at its update sample and moves object 0"
 }
 
 TEST_CASE("an intermediate spatial format renders to the output layout by Annex A.2.1",
-          "[ac4dec][objects]") {
+          "[ac4][decoder][objects]") {
     // Clause 5.10.3.4: y = M x t, t the SR3.1.0.0 objects (M1 M2 M3 U1) in
     // order, over the two substreams that carry them, and M the attachment's
     // SR3100_to_<layout>, a row per object and a column per speaker in Table
@@ -551,7 +551,7 @@ TEST_CASE("an intermediate spatial format renders to the output layout by Annex 
     CHECK(iclforge::ac4::detail::tables::kIsfMatrices[5][9].size() == 30 * 13);
 }
 
-TEST_CASE("an ISF object's gain ramps linearly from its update sample", "[ac4dec][objects]") {
+TEST_CASE("an ISF object's gain ramps linearly from its update sample", "[ac4][decoder][objects]") {
     // Annex F.11: an update takes effect at its sample, reached over its
     // ramp_duration from the gain in force there; the ramp carries on into
     // the next frame.
@@ -582,16 +582,16 @@ TEST_CASE("an ISF object's gain ramps linearly from its update sample", "[ac4dec
     CHECK(last[4] == 0.0F);
 }
 
-TEST_CASE("Chromium's A-JOC stream decodes in full and core decoding", "[ac4dec][objects]") {
-    // A local check: AC4DEC_AJOC_STREAM names Chromium's ac4-ajoc.ac4, which
+TEST_CASE("Chromium's A-JOC stream decodes in full and core decoding", "[ac4][decoder][objects]") {
+    // A local check: AC4_AJOC_STREAM names Chromium's ac4-ajoc.ac4, which
     // is not committed. Every frame from the first I-frame decodes, with the
     // objects its table of contents lists - the upmix's in full decoding and
     // the downmix's in core decoding, the LFE first and each bed object at its
     // speaker - each a frame long and finite, with its metadata's updates
     // inside the frame and in order.
-    const char* path = std::getenv("AC4DEC_AJOC_STREAM");
+    const char* path = std::getenv("AC4_AJOC_STREAM");
     if (path == nullptr) {
-        SKIP("AC4DEC_AJOC_STREAM does not name Chromium's ac4-ajoc.ac4");
+        SKIP("AC4_AJOC_STREAM does not name Chromium's ac4-ajoc.ac4");
     }
     const std::vector<std::byte> bytes = read_file(fs::path{path});
     const iclforge::ac4::ScanResult scan = iclforge::ac4::scan(bytes);

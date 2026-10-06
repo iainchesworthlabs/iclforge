@@ -27,7 +27,7 @@ and an MP4 file, and:
 
 Phase E6's presentations: the encoder's streams of several substreams and presentations under
 tests/golden/ac4/presentations/ (encoder-*.ac4, which tests/ac4/encoder/test_presentations.cpp
-writes with AC4ENC_WRITE_PRESENTATIONS, beside the configuration each was made from as JSON), whose
+writes with AC4_ENCODER_WRITE_PRESENTATIONS, beside the configuration each was made from as JSON), whose
 MediaInfo reading (`--Output=JSON`) lists every presentation with the configured
 presentation_config, presentation_id, md_compat (MediaInfo's "PresentationLevel"), groups,
 dialnorm and language (its dialogue substream's, else its main substream's; MediaInfo names a Part 1
@@ -40,7 +40,7 @@ MediaInfo reads no substream after a presentation_config 6 (EMDF-only) presentat
 encoder's streams list that presentation last.
 
 Phase E9's objects: the encoder's object streams under tests/golden/ac4/objects/ (encoder-*.ac4,
-which tests/ac4/encoder/test_objects.cpp writes with AC4ENC_WRITE_OBJECTS), whose MediaInfo
+which tests/ac4/encoder/test_objects.cpp writes with AC4_ENCODER_WRITE_OBJECTS), whose MediaInfo
 reading (`--Output=JSON`) gives the count of the objects the stream was configured with, in the
 substreams' `ChannelMode` strings under the audio track's `extra`: an A-JOC substream reads
 `A-JOC <objects>.<LFE> (<core>)`, the core `<n>.<m> object core` for a computed downmix and

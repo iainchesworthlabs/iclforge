@@ -19,7 +19,7 @@
 #
 # Two C++ consumers per AC-4 target the package exports, in the same way: iclforge::ac4_shared and
 # iclforge::ac4_static, or the bare iclforge::ac4 of a single-linkage package. consumer_ac4.cpp
-# decodes a committed stream through the installed inspector and decoder, and consumer_ac4enc.cpp
+# decodes a committed stream through the installed inspector and decoder, and consumer_ac4_encoder.cpp
 # encodes a tone through the installed encoder and reads the stream back with the inspector. A package built with ICLFORGE_BUILD_AC4=OFF has neither;
 # check_install_consumer.sh passes ICLFORGE_EXPECT_AC4 from the tree's own cache, so that a package
 # that should have them and does not fails here.
@@ -88,28 +88,28 @@ if(ac4_consumers)
     message(STATUS "AC-4 consumers of the installed package, each linked and run: ${ac4_consumers}")
 endif()
 
-set(ac4enc_consumers)
+set(ac4_encoder_consumers)
 foreach(target IN ITEMS iclforge::ac4_shared iclforge::ac4_static iclforge::ac4)
     if(NOT TARGET ${target})
         continue()
     endif()
     string(REPLACE "::" "_" name "consumer_encoder_${target}")
-    add_executable(${name} consumer_ac4enc.cpp)
+    add_executable(${name} consumer_ac4_encoder.cpp)
     add_test(NAME ${name} COMMAND ${name})
     target_link_libraries(${name} PRIVATE ${target})
     set_target_properties(${name} PROPERTIES
         CXX_STANDARD 23
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS OFF)
-    list(APPEND ac4enc_consumers ${target})
+    list(APPEND ac4_encoder_consumers ${target})
 endforeach()
 
-if(ICLFORGE_EXPECT_AC4 AND NOT ac4enc_consumers)
+if(ICLFORGE_EXPECT_AC4 AND NOT ac4_encoder_consumers)
     message(FATAL_ERROR
         "the package was built with ICLFORGE_BUILD_AC4=ON and exports none of "
         "iclforge::ac4_shared, iclforge::ac4_static or iclforge::ac4 - see cmake/InstallLibrary.cmake")
 endif()
-if(ac4enc_consumers)
+if(ac4_encoder_consumers)
     message(STATUS
-        "AC-4 encoder consumers of the installed package, each linked and run: ${ac4enc_consumers}")
+        "AC-4 encoder consumers of the installed package, each linked and run: ${ac4_encoder_consumers}")
 endif()

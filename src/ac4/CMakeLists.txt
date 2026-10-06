@@ -129,7 +129,7 @@ set(_ac4_kernel_sources
 # by its tier. "fixed" is iclforge::internal::Fixed32, the ESP32-C6's and -C3's
 # (planning/ac4.md, D14d).
 #
-# AC4CORE_ALSO_AT_DOUBLE: the encoder calls straight into a handful of these
+# ICLFORGE_AC4_ALSO_AT_DOUBLE: the encoder calls straight into a handful of these
 # same kernels (Mdct, QmfAnalysis, QmfSynthesis, Resampler,
 # ajoc::Reconstruction, aspx::generate_high_band) always at double - decision
 # 34 (planning/ac4.md), the encoder never runs on an ESP32 and has no float or

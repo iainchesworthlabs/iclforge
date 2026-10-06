@@ -623,7 +623,7 @@ void preflattening_matches_reference() {
 }  // namespace
 
 TEST_CASE("the FFT passes give the bits of the generic radix loop at the decoder's scalar",
-          "[ac4core][dsp][exact]") {
+          "[ac4][core][dsp][exact]") {
     // These rewrites are identities of IEEE rounding; Fixed32 rounds a product half up,
     // so a negated product and the product of a negation differ by a raw unit there, and the
     // fixed decoder runs Fft::inverse_scaled. A generic lambda, so that a fixed build
@@ -636,12 +636,12 @@ TEST_CASE("the FFT passes give the bits of the generic radix loop at the decoder
 }
 
 TEST_CASE("the FFT passes give the bits of the generic radix loop at double",
-          "[ac4core][dsp][exact]") {
+          "[ac4][core][dsp][exact]") {
     fft_matches_reference<double>();
 }
 
 TEST_CASE("the inverse MDCT gives the bits of the old inverse transform at the decoder's scalar",
-          "[ac4core][dsp][exact]") {
+          "[ac4][core][dsp][exact]") {
     // As the FFT's: the fixed decoder runs the inverse that carries a block's exponent. A generic lambda, so that a fixed build
     // does not instantiate the floating comparison.
     []<typename R>() {
@@ -652,13 +652,13 @@ TEST_CASE("the inverse MDCT gives the bits of the old inverse transform at the d
 }
 
 TEST_CASE("the inverse MDCT gives the bits of the old inverse transform at double",
-          "[ac4core][dsp][exact]") {
+          "[ac4][core][dsp][exact]") {
     imdct_matches_reference<double>();
 }
 
 TEST_CASE(
     "the windowed overlap-add gives the bits of the old block synthesis at the decoder's scalar",
-    "[ac4core][dsp][exact]") {
+    "[ac4][core][dsp][exact]") {
     for (const auto& [full, multiplier] :
          {std::pair{2048, 1}, std::pair{1920, 1}, std::pair{1536, 1}, std::pair{1024, 1},
           std::pair{960, 1}, std::pair{4096, 2}, std::pair{3840, 2}, std::pair{8192, 4}}) {
@@ -677,7 +677,7 @@ TEST_CASE(
 }
 
 TEST_CASE("the windowed overlap-add gives the bits of the old block synthesis at double",
-          "[ac4core][dsp][exact]") {
+          "[ac4][core][dsp][exact]") {
     for (const auto& [full, multiplier] :
          {std::pair{2048, 1}, std::pair{1920, 1}, std::pair{1536, 1}, std::pair{4096, 2}}) {
         CAPTURE(full);
@@ -689,7 +689,7 @@ TEST_CASE("the windowed overlap-add gives the bits of the old block synthesis at
 TEST_CASE(
     "pre-flattening's gains keep the bits of the fit made afresh each frame at the decoder's "
     "scalar",
-    "[ac4core][aspx][exact]") {
+    "[ac4][core][aspx][exact]") {
     // At Fixed32 the gains are MantExp values, which this floating reference does not form.
     []<typename R>() {
         if constexpr (std::is_floating_point_v<R>) {
@@ -699,6 +699,6 @@ TEST_CASE(
 }
 
 TEST_CASE("pre-flattening's gains keep the bits of the fit made afresh each frame at double",
-          "[ac4core][aspx][exact]") {
+          "[ac4][core][aspx][exact]") {
     preflattening_matches_reference<double>();
 }

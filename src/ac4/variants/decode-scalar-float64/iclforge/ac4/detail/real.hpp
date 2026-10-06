@@ -37,4 +37,4 @@ using Real = double;
 // instantiation and a second one is ill-formed: this expands to nothing. It
 // takes the instantiation as its argument, rather than a preprocessor
 // conditional around it, for tools/checks/check_platform_macros.ps1's rule.
-#define AC4CORE_ALSO_AT_DOUBLE(...)
+#define ICLFORGE_AC4_ALSO_AT_DOUBLE(...)

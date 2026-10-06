@@ -117,7 +117,7 @@ std::vector<Speaker> destinations(const ElementRoute& route) {
 
 }  // namespace
 
-TEST_CASE("Table 178's matrices equal the table's printed entries", "[ac4dec][multichannel]") {
+TEST_CASE("Table 178's matrices equal the table's printed entries", "[ac4][decoder][multichannel]") {
     std::mt19937 rng(178);
     for (int trial = 0; trial < 20; ++trial) {
         const RandomParams p = random_parameters(rng, 2);
@@ -131,7 +131,7 @@ TEST_CASE("Table 178's matrices equal the table's printed entries", "[ac4dec][mu
     }
 }
 
-TEST_CASE("Table 179's matrices equal the table's printed entries", "[ac4dec][multichannel]") {
+TEST_CASE("Table 179's matrices equal the table's printed entries", "[ac4][decoder][multichannel]") {
     std::mt19937 rng(179);
     for (int trial = 0; trial < 20; ++trial) {
         const RandomParams p = random_parameters(rng, 5);
@@ -145,7 +145,7 @@ TEST_CASE("Table 179's matrices equal the table's printed entries", "[ac4dec][mu
     }
 }
 
-TEST_CASE("clause 5.3.3.4's matrix equals its printed entries", "[ac4dec][multichannel]") {
+TEST_CASE("clause 5.3.3.4's matrix equals its printed entries", "[ac4][decoder][multichannel]") {
     std::mt19937 rng(334);
     for (int trial = 0; trial < 20; ++trial) {
         const RandomParams p = random_parameters(rng, 4);
@@ -155,7 +155,7 @@ TEST_CASE("clause 5.3.3.4's matrix equals its printed entries", "[ac4dec][multic
     }
 }
 
-TEST_CASE("every chel_matsel's matrix is the identity when its parameters are", "[ac4dec][multichannel]") {
+TEST_CASE("every chel_matsel's matrix is the identity when its parameters are", "[ac4][decoder][multichannel]") {
     // sap_mode 0 sets a = d = 1 and b = c = 0 (Pseudocode 59): the tracks are
     // the channels, whatever chel_matsel says.
     const iclforge::ac4::detail::Abcd one = {Real{1}, Real{}, Real{}, Real{1}};
@@ -178,7 +178,7 @@ TEST_CASE("every chel_matsel's matrix is the identity when its parameters are", 
     }
 }
 
-TEST_CASE("three_channel_data() takes its two parameter sets and reads no third", "[ac4dec][multichannel]") {
+TEST_CASE("three_channel_data() takes its two parameter sets and reads no third", "[ac4][decoder][multichannel]") {
     // One long group of two bands, M/S in both sets, and the sets in a vector
     // of exactly two: a read of a third set leaves it, which a sanitised or
     // bounds-checked build stops at.
@@ -217,7 +217,7 @@ TEST_CASE("three_channel_data() takes its two parameter sets and reads no third"
     }
 }
 
-TEST_CASE("chel_matsel 12 to 15, which the tables leave out, make no matrix", "[ac4dec][multichannel]") {
+TEST_CASE("chel_matsel 12 to 15, which the tables leave out, make no matrix", "[ac4][decoder][multichannel]") {
     const iclforge::ac4::detail::Abcd one = {Real{1}, Real{}, Real{}, Real{1}};
     const std::array<iclforge::ac4::detail::Abcd, 5> ones = {one, one, one, one, one};
     for (int matsel = 12; matsel < 16; ++matsel) {
@@ -226,7 +226,7 @@ TEST_CASE("chel_matsel 12 to 15, which the tables leave out, make no matrix", "[
     }
 }
 
-TEST_CASE("the channel modes' speakers, in the order decode() writes them", "[ac4dec][multichannel]") {
+TEST_CASE("the channel modes' speakers, in the order decode() writes them", "[ac4][decoder][multichannel]") {
     using iclforge::ac4::detail::speakers_of;
     namespace mode = iclforge::ac4::detail::ch_mode;
     const auto list = [](int ch_mode) {
@@ -304,7 +304,7 @@ TEST_CASE("the channel modes' speakers, in the order decode() writes them", "[ac
     CHECK(core(mode::k22_2) == a27);
 }
 
-TEST_CASE("Table 180 routes the 5.X element's tracks", "[ac4dec][multichannel]") {
+TEST_CASE("Table 180 routes the 5.X element's tracks", "[ac4][decoder][multichannel]") {
     SubstreamContext ctx;
     ctx.ch_mode = iclforge::ac4::detail::ch_mode::k5_1;
     ElementRoute route;
@@ -367,7 +367,7 @@ TEST_CASE("Table 180 routes the 5.X element's tracks", "[ac4dec][multichannel]")
     }
 }
 
-TEST_CASE("Table 182 routes the 7.X element's tracks, and Table 183 pairs its last two", "[ac4dec][multichannel]") {
+TEST_CASE("Table 182 routes the 7.X element's tracks, and Table 183 pairs its last two", "[ac4][decoder][multichannel]") {
     SubstreamContext ctx;
     ElementRoute route;
     SECTION("3/4/0.1, coding_config 0, 2ch_mode 1") {
@@ -424,7 +424,7 @@ TEST_CASE("Table 182 routes the 7.X element's tracks, and Table 183 pairs its la
 }
 
 TEST_CASE("Part 2 Table 21 routes the 22.2 element's two LFEs and eleven pairs",
-          "[ac4dec][multichannel]") {
+          "[ac4][decoder][multichannel]") {
     using S = Speaker;
     SubstreamContext ctx;
     ctx.ch_mode = iclforge::ac4::detail::ch_mode::k22_2;
@@ -487,7 +487,7 @@ TEST_CASE("Part 2 Table 21 routes the 22.2 element's two LFEs and eleven pairs",
 }
 
 TEST_CASE("Part 2 Table 8 gives the 22.2 element eleven aspx_data_2ch and no companding",
-          "[ac4dec][multichannel]") {
+          "[ac4][decoder][multichannel]") {
     using S = Speaker;
     namespace codec = iclforge::ac4::detail::codec_mode;
     const int ch = iclforge::ac4::detail::ch_mode::k22_2;
@@ -519,7 +519,7 @@ TEST_CASE("Part 2 Table 8 gives the 22.2 element eleven aspx_data_2ch and no com
 }
 
 TEST_CASE("Part 2 Table 19 routes the immersive element's tracks, with step 4 and Table 20",
-          "[ac4dec][multichannel]") {
+          "[ac4][decoder][multichannel]") {
     namespace immersive = iclforge::ac4::detail::immersive_mode;
     using S = Speaker;
     SubstreamContext ctx;
@@ -692,7 +692,7 @@ TEST_CASE("Part 2 Table 19 routes the immersive element's tracks, with step 4 an
 
 TEST_CASE(
     "Part 2 Table 19 routes the 9.X.4 element's thirteen tracks, with Table 20's six parameters",
-    "[ac4dec][multichannel]") {
+    "[ac4][decoder][multichannel]") {
     namespace immersive = iclforge::ac4::detail::immersive_mode;
     using S = Speaker;
     SubstreamContext ctx;
@@ -794,7 +794,7 @@ TEST_CASE(
 }
 
 TEST_CASE("Part 2 Table 8 names the channels A-SPX processes in the 9.X.4 element",
-          "[ac4dec][multichannel]") {
+          "[ac4][decoder][multichannel]") {
     namespace mode = iclforge::ac4::detail::ch_mode;
     namespace immersive = iclforge::ac4::detail::immersive_mode;
     using iclforge::ac4::detail::aspx_units;
@@ -852,7 +852,7 @@ TEST_CASE("Part 2 Table 8 names the channels A-SPX processes in the 9.X.4 elemen
     CHECK(ajcc[1].speakers == std::array{S::kLeftSurround, S::kRightSurround});
 }
 
-TEST_CASE("Tables 212 and 213 name the channels companding and A-SPX process", "[ac4dec][multichannel]") {
+TEST_CASE("Tables 212 and 213 name the channels companding and A-SPX process", "[ac4][decoder][multichannel]") {
     namespace mode = iclforge::ac4::detail::ch_mode;
     using iclforge::ac4::detail::aspx_units;
     using iclforge::ac4::detail::companded_speakers;
@@ -910,7 +910,7 @@ TEST_CASE("Tables 212 and 213 name the channels companding and A-SPX process", "
 }
 
 TEST_CASE("Part 2 Table 8 names the channels A-SPX processes in the immersive element",
-          "[ac4dec][multichannel]") {
+          "[ac4][decoder][multichannel]") {
     namespace mode = iclforge::ac4::detail::ch_mode;
     namespace immersive = iclforge::ac4::detail::immersive_mode;
     using iclforge::ac4::detail::aspx_units;

@@ -263,7 +263,7 @@ iclforge::ac4::EncoderConfig config_51() {
 }  // namespace
 
 TEST_CASE("the encoder's metadata reads back as configured, with the encoder's trace",
-          "[ac4enc][metadata]") {
+          "[ac4][encoder][metadata]") {
     const Encoded encoded = encode(config_51(), tones_51());
     std::vector<std::size_t> starts;
     const std::vector<iclforge::ac4::SyntaxRecord> read = read_back(encoded, starts);
@@ -339,7 +339,7 @@ TEST_CASE("the encoder's metadata reads back as configured, with the encoder's t
 }
 
 TEST_CASE("loudness values without a practice read back, with no correction flags",
-          "[ac4enc][metadata]") {
+          "[ac4][encoder][metadata]") {
     iclforge::ac4::EncoderConfig config;
     config.channels = 2;
     config.bitrate_kbps = 128;
@@ -357,7 +357,7 @@ TEST_CASE("loudness values without a practice read back, with no correction flag
 }
 
 TEST_CASE("the decoder applies the encoder's metadata with the gains its formulas give",
-          "[ac4enc][metadata]") {
+          "[ac4][encoder][metadata]") {
     const Encoded encoded = encode(config_51(), tones_51());
     const std::vector<std::vector<float>> coded = decode(encoded.frames, {});
     REQUIRE(coded.size() == 6);
@@ -426,7 +426,7 @@ TEST_CASE("the decoder applies the encoder's metadata with the gains its formula
 }
 
 TEST_CASE("dialogue enhancement from a stem raises the dialogue and leaves the rest",
-          "[ac4enc][metadata]") {
+          "[ac4][encoder][metadata]") {
     // Stereo: a 1 kHz tone, the dialogue, in L and R under noise-like music
     // of three far tones; the stem is the dialogue alone. Centred for the
     // channel-independent method and the Mid, and panned for the
@@ -525,7 +525,7 @@ TEST_CASE("dialogue enhancement from a stem raises the dialogue and leaves the r
 }
 
 TEST_CASE("DRC gains sent from a profile read back and compress as the profile's curve does",
-          "[ac4enc][metadata]") {
+          "[ac4][encoder][metadata]") {
     // Two seconds at -40 dBFS, which the profile boosts, then two at -12,
     // which it cuts, and back: 1 kHz in every channel but the LFE. Under the
     // sanitizers half a second, a second and a second and three quarters, and
@@ -644,7 +644,7 @@ TEST_CASE("DRC gains sent from a profile read back and compress as the profile's
     CHECK_FALSE(iclforge::ac4::Encoder::create(config).has_value());
 }
 
-TEST_CASE("the encoder refuses metadata the syntax cannot send", "[ac4enc][metadata]") {
+TEST_CASE("the encoder refuses metadata the syntax cannot send", "[ac4][encoder][metadata]") {
     const auto refused = [](const iclforge::ac4::EncoderConfig& config) {
         const auto encoder = iclforge::ac4::Encoder::create(config);
         return !encoder.has_value() &&

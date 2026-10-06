@@ -141,7 +141,7 @@ BufferCheck check_buffer(const std::vector<std::size_t>& sizes, const std::vecto
 
 }  // namespace
 
-TEST_CASE("an average rate stream never needs more than the buffer it signals", "[ac4enc][rate]") {
+TEST_CASE("an average rate stream never needs more than the buffer it signals", "[ac4][encoder][rate]") {
     struct Leg {
         int frame_rate_index;
         double frames_per_second;
@@ -216,7 +216,7 @@ TEST_CASE("an average rate stream never needs more than the buffer it signals", 
 }
 
 TEST_CASE("an average rate keeps each of several substreams at its least frame or above",
-          "[ac4enc][rate]") {
+          "[ac4][encoder][rate]") {
     // Mono and two stereo substreams, the stereo ones' channels equal, which
     // A-SPX's balance coding makes cheap: at an average rate each substream
     // is sized by what it needs, and one that needs less than its least frame
@@ -247,7 +247,7 @@ TEST_CASE("an average rate keeps each of several substreams at its least frame o
 }
 
 TEST_CASE("a variable rate stream sends no wait and keeps its rate over seconds",
-          "[ac4enc][rate]") {
+          "[ac4][encoder][rate]") {
     iclforge::ac4::EncoderConfig config;
     config.channels = 2;
     config.bitrate_kbps = 96;
@@ -275,7 +275,7 @@ TEST_CASE("a variable rate stream sends no wait and keeps its rate over seconds"
           2.0 * 48000.0 / 2048.0 * share);
 }
 
-TEST_CASE("a constant rate stream sends wait_frames 0 and no br_code", "[ac4enc][rate]") {
+TEST_CASE("a constant rate stream sends wait_frames 0 and no br_code", "[ac4][encoder][rate]") {
     iclforge::ac4::EncoderConfig config;
     config.channels = 2;
     config.bitrate_kbps = 96;

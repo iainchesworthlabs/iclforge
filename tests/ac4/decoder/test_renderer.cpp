@@ -425,7 +425,7 @@ Entries printed_9x(Config output, int tops) {
 }  // namespace
 
 TEST_CASE("the renderer's full decoding matrices are Tables 38 to 43 as printed",
-          "[ac4dec][renderer]") {
+          "[ac4][decoder][renderer]") {
     for (const bool lfe : {true, false}) {
         const std::vector<S> decoded = decoded_714(lfe);
         for (const Config input : kConfigs) {
@@ -481,7 +481,7 @@ TEST_CASE("the renderer's full decoding matrices are Tables 38 to 43 as printed"
 TEST_CASE(
     "the renderer's full decoding matrices for 9.X inputs are Tables 38 to 43's 9.X rows as "
     "printed",
-    "[ac4dec][renderer][fronts]") {
+    "[ac4][decoder][renderer][fronts]") {
     // 9.X.4, 9.X.2 (the top pair carried in Tfl, Tfr or Tbl, Tbr) and 9.X.0, every output of
     // Tables 38 to 43. 9.X outputs (Tables 35 to 37) are no DownmixTarget.
     for (const bool lfe : {true, false}) {
@@ -536,7 +536,7 @@ TEST_CASE(
 TEST_CASE(
     "the custom downmix gains gain_f1 and gain_f2 default to -inf dB and 0 dB and read Tables 128 "
     "and 129",
-    "[ac4dec][renderer][fronts]") {
+    "[ac4][decoder][renderer][fronts]") {
     const detail::RenderGains defaults = detail::render_gains(nullptr, 0);
     CHECK(defaults.gain_f1 == 0.0);
     CHECK(defaults.gain_f2 == 1.0);
@@ -571,7 +571,7 @@ TEST_CASE(
 TEST_CASE(
     "decode()'s layouts for a 9.X.4 element: as coded in Table A.27's order, core as the 7.X.4 "
     "core",
-    "[ac4dec][renderer][fronts]") {
+    "[ac4][decoder][renderer][fronts]") {
     using T = iclforge::ac4::DownmixTarget;
     detail::ImmersiveLayout full;
     full.screen = true;
@@ -612,7 +612,7 @@ TEST_CASE(
 }
 
 TEST_CASE("the renderer's core decoding matrices are Tables 45 and 46 as printed",
-          "[ac4dec][renderer]") {
+          "[ac4][decoder][renderer]") {
     const std::vector<S> decoded = {S::kLeft,        S::kRight,        S::kCentre,
                                     S::kLfe,         S::kLeftSurround, S::kRightSurround,
                                     S::kTopSideLeft, S::kTopSideRight};
@@ -671,7 +671,7 @@ TEST_CASE("the renderer's core decoding matrices are Tables 45 and 46 as printed
 }
 
 TEST_CASE("decode()'s layouts for an immersive element, in full and core decoding",
-          "[ac4dec][renderer]") {
+          "[ac4][decoder][renderer]") {
     using T = iclforge::ac4::DownmixTarget;
     const detail::ImmersiveLayout full_514{.backs = false, .tops = 3, .lfe = true};
     CHECK(detail::render_plan(full_514, T::kAsCoded).speakers ==
@@ -717,7 +717,7 @@ TEST_CASE("decode()'s layouts for an immersive element, in full and core decodin
 }
 
 TEST_CASE("the custom downmix gains take Table 130's defaults and clause 6.3.10.3.10's exception",
-          "[ac4dec][renderer]") {
+          "[ac4][decoder][renderer]") {
     const double m3 = db(-3.0);
     // Table 130, where no custom downmix data came.
     const detail::RenderGains defaults = detail::render_gains(nullptr, 0);
@@ -773,7 +773,7 @@ TEST_CASE("the custom downmix gains take Table 130's defaults and clause 6.3.10.
 }
 
 TEST_CASE("each output takes the loudness correction clause 4.8.5.3 gives it",
-          "[ac4dec][renderer]") {
+          "[ac4][decoder][renderer]") {
     using L = detail::LoudCorrOutput;
     const detail::ImmersiveLayout full_714{.backs = true, .tops = 3, .lfe = true};
     CHECK(detail::loud_corr_output(full_714, {.width = 7, .tops = 4}) == L::kNone);
@@ -837,7 +837,7 @@ std::vector<double> through(detail::DownmixStage& stage, const detail::DownmixVa
 
 TEST_CASE(
     "the downmix stage renders an immersive element with what the stream sent, until it sends more",
-    "[ac4dec][renderer]") {
+    "[ac4][decoder][renderer]") {
     const std::vector<S> decoded = decoded_714(true);
     // Each decoded channel a value of its own.
     std::vector<double> in(decoded.size());
@@ -898,7 +898,7 @@ TEST_CASE(
 }
 
 TEST_CASE("an immersive element's two channels and one follow the renderer's 5.X.0 by Table 218",
-          "[ac4dec][renderer]") {
+          "[ac4][decoder][renderer]") {
     const std::vector<S> decoded = decoded_714(true);
     std::vector<double> in(decoded.size());
     for (std::size_t c = 0; c < in.size(); ++c) {
@@ -958,7 +958,7 @@ TEST_CASE("an immersive element's two channels and one follow the renderer's 5.X
 }
 
 TEST_CASE("core decoding's renderer never passes the core through: Table 45 takes the custom gains",
-          "[ac4dec][renderer]") {
+          "[ac4][decoder][renderer]") {
     const std::vector<S> core = {S::kLeft,        S::kRight,        S::kCentre,
                                  S::kLfe,         S::kLeftSurround, S::kRightSurround,
                                  S::kTopSideLeft, S::kTopSideRight};
@@ -996,7 +996,7 @@ TEST_CASE("core decoding's renderer never passes the core through: Table 45 take
 
 TEST_CASE(
     "downmix_values takes the immersive corrections and custom downmix data a presentation sends",
-    "[ac4dec][renderer]") {
+    "[ac4][decoder][renderer]") {
     detail::PresentationSubstream p;
     p.loud_corr.loud_corr_5_X = 1;
     p.loud_corr.loud_corr_5_X_2 = 2;

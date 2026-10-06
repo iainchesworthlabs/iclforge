@@ -47,7 +47,7 @@ iclforge::adm::PolarPosition polar(double azimuth_deg, double elevation_deg,
 }  // namespace
 
 TEST_CASE("polar_to_adm_cartesian converts BS.2076-2 Clause 8 cardinal points correctly",
-         "[admbridge][coordinates]") {
+         "[adm][bridge][coordinates]") {
     // Clause 8: azimuth 0 = straight ahead = +Y (front-positive); X is right-positive so
     // positive (left) azimuth is negative X; elevation 0 = level, positive = up = +Z.
     SECTION("straight ahead") {
@@ -82,7 +82,7 @@ TEST_CASE("polar_to_adm_cartesian converts BS.2076-2 Clause 8 cardinal points co
 }
 
 TEST_CASE("adm_cartesian_to_room maps the unit cube onto iclforge::oba::Position's room convention",
-         "[admbridge][coordinates]") {
+         "[adm][bridge][coordinates]") {
     // Table 16 + Clause 8: X right-positive, Y front-positive, Z top-positive, [-1, 1] cube.
     // oamd.hpp: x 0=left..1=right, y 0=front..1=back, z -1=floor..+1=ceiling.
     SECTION("left wall (X=-1) is room x=0") {
@@ -115,7 +115,7 @@ TEST_CASE("adm_cartesian_to_room maps the unit cube onto iclforge::oba::Position
 }
 
 TEST_CASE("polar positions at the 5.1 ring reproduce this project's own known room coordinates",
-         "[admbridge][coordinates]") {
+         "[adm][bridge][coordinates]") {
     // Cross-check against tests/ac3/oba/test_atmos_motion.cpp's own kL/kR/kSR constants (that file's own
     // comment: "the 5.1 ring's L, SR and R azimuths... L +30 degrees, SR -110 degrees, R -30
     // degrees"), which are also exactly BS.2076-2 Annex A's own M+030/M-030/M-110 speaker-label
@@ -142,7 +142,7 @@ TEST_CASE("polar positions at the 5.1 ring reproduce this project's own known ro
     }
 }
 
-TEST_CASE("adm_position_to_room dispatches on the Position variant", "[admbridge][coordinates]") {
+TEST_CASE("adm_position_to_room dispatches on the Position variant", "[adm][bridge][coordinates]") {
     SECTION("Cartesian alternative goes straight through adm_cartesian_to_room") {
         const iclforge::adm::Position position{
             iclforge::adm::CartesianPosition{.x = 0.4, .y = -0.2, .z = 0.1}};
@@ -199,7 +199,7 @@ iclforge::adm::AudioChannelFormat channel_with(
 
 }  // namespace
 
-TEST_CASE("build_channel_path holds a single static block everywhere", "[admbridge]") {
+TEST_CASE("build_channel_path holds a single static block everywhere", "[adm][bridge]") {
     const auto channel = channel_with({block_at(0.5, std::nullopt, polar(45.0, 0.0), 0.8)});
     const auto path =
         iclforge::adm::build_channel_path(channel, /*object_start_s=*/2.0, false);
@@ -215,7 +215,7 @@ TEST_CASE("build_channel_path holds a single static block everywhere", "[admbrid
 }
 
 TEST_CASE("build_channel_path with jumpPosition=0 ramps continuously across the whole block",
-         "[admbridge]") {
+         "[adm][bridge]") {
     // Block 0 holds at azimuth 30 for [0, 1); block 1 (jumpPosition=0) ramps to azimuth -30 over
     // [1, 3) - BS.2076-2 §10.3: "the renderer will interpolate a moving object between positions
     // over the full duration of the block."
@@ -243,7 +243,7 @@ TEST_CASE("build_channel_path with jumpPosition=0 ramps continuously across the 
 }
 
 TEST_CASE("build_channel_path with jumpPosition=1 and no interpolationLength "
-         "jumps near-instantly and holds", "[admbridge]") {
+         "jumps near-instantly and holds", "[adm][bridge]") {
     const auto channel = channel_with({
         block_at(0.0, 1.0, polar(30.0, 0.0)),
         block_at(1.0, 2.0, polar(-30.0, 0.0), 1.0, /*jump_position=*/true),
@@ -267,7 +267,7 @@ TEST_CASE("build_channel_path with jumpPosition=1 and no interpolationLength "
 }
 
 TEST_CASE("build_channel_path with jumpPosition=1 and an interpolationLength "
-         "ramps briefly then holds", "[admbridge]") {
+         "ramps briefly then holds", "[adm][bridge]") {
     const auto channel = channel_with({
         block_at(0.0, 1.0, polar(30.0, 0.0)),
         block_at(1.0, 2.0, polar(-30.0, 0.0), 1.0, /*jump_position=*/true,
@@ -295,7 +295,7 @@ TEST_CASE("build_channel_path with jumpPosition=1 and an interpolationLength "
 }
 
 TEST_CASE("build_channel_path's first block always holds regardless of its own jumpPosition",
-         "[admbridge]") {
+         "[adm][bridge]") {
     // §10.3: "the position specified in the first block covers the entire length of the block
     // (regardless of the jumpPosition and interpolationLength properties)." Even with
     // jumpPosition=0 declared on block 0 itself, it must still hold across [0, 1) rather than
@@ -314,7 +314,7 @@ TEST_CASE("build_channel_path's first block always holds regardless of its own j
 
 TEST_CASE("build_channel_path's first block, when it omits duration itself, still holds only "
          "until the second block's own start - not indefinitely, and not stretching the second "
-         "block's ramp back to time zero", "[admbridge]") {
+         "block's ramp back to time zero", "[adm][bridge]") {
     // §5.4.1 only "should" (not "must") pair rtime with duration once a channel is dynamic (more
     // than one block), so a first block with no duration at all is legal, if discouraged. Its
     // true end is the second block's own start (here rtime=1.0), not "forever" - block 1 below
@@ -345,7 +345,7 @@ TEST_CASE("build_channel_path's first block, when it omits duration itself, stil
 }
 
 TEST_CASE("build_channel_path with force_lfe discards the block's own position and gain",
-         "[admbridge]") {
+         "[adm][bridge]") {
     const auto channel = channel_with({block_at(0.0, std::nullopt, polar(123.0, 45.0), 0.5)});
     const auto path = iclforge::adm::build_channel_path(channel, 0.0, /*force_lfe=*/true);
     REQUIRE(path.has_value());
@@ -354,7 +354,7 @@ TEST_CASE("build_channel_path with force_lfe discards the block's own position a
     CHECK(placement.lfe_send == 1.0);
 }
 
-TEST_CASE("build_channel_path maps width/height/depth and channelLock", "[admbridge]") {
+TEST_CASE("build_channel_path maps width/height/depth and channelLock", "[adm][bridge]") {
     // BS.2076-2 Table 15/16/17's extents and TS 103 420 §5.6.1.2's are the
     // same normalized quantity on the same three axes, so this is a rename
     // rather than a conversion - and §10.3 interpolates them, which is what
@@ -397,7 +397,7 @@ TEST_CASE("build_channel_path maps width/height/depth and channelLock", "[admbri
     CHECK_FALSE(path->evaluate(3.0).snap);
 }
 
-TEST_CASE("build_channel_path gives an LFE channel no extent and no snap", "[admbridge]") {
+TEST_CASE("build_channel_path gives an LFE channel no extent and no snap", "[adm][bridge]") {
     // force_lfe already discards position and gain; extent and channel lock
     // follow for the same reason - an LFE has no direction, so it has no
     // extent around one and nothing to snap to.
@@ -417,7 +417,7 @@ TEST_CASE("build_channel_path gives an LFE channel no extent and no snap", "[adm
     CHECK(placement.lfe_send == 1.0);
 }
 
-TEST_CASE("build_channel_path rejects an empty block sequence", "[admbridge]") {
+TEST_CASE("build_channel_path rejects an empty block sequence", "[adm][bridge]") {
     iclforge::adm::AudioChannelFormat channel;
     channel.id = "AC_EMPTY";
     const auto path = iclforge::adm::build_channel_path(channel, 0.0, false);
@@ -465,21 +465,21 @@ iclforge::adm::AdmDocument minimal_document() {
 
 }  // namespace
 
-TEST_CASE("build() rejects a document with no audioProgramme", "[admbridge]") {
+TEST_CASE("build() rejects a document with no audioProgramme", "[adm][bridge]") {
     iclforge::adm::AdmDocument doc;
     const auto result = iclforge::adm::build(doc);
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error() == iclforge::adm::BridgeError::kNoProgramme);
 }
 
-TEST_CASE("build() rejects an explicit programme_id that does not exist", "[admbridge]") {
+TEST_CASE("build() rejects an explicit programme_id that does not exist", "[adm][bridge]") {
     const auto doc = minimal_document();
     const auto result = iclforge::adm::build(doc, "APR_9999");
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error() == iclforge::adm::BridgeError::kProgrammeNotFound);
 }
 
-TEST_CASE("build() rejects an unresolved audioContent reference", "[admbridge]") {
+TEST_CASE("build() rejects an unresolved audioContent reference", "[adm][bridge]") {
     auto doc = minimal_document();
     doc.model.programmes[0].content_refs = {"ACO_MISSING"};
     const auto result = iclforge::adm::build(doc);
@@ -487,7 +487,7 @@ TEST_CASE("build() rejects an unresolved audioContent reference", "[admbridge]")
     CHECK(result.error() == iclforge::adm::BridgeError::kUnresolvedReference);
 }
 
-TEST_CASE("build() rejects an unresolved audioObject reference", "[admbridge]") {
+TEST_CASE("build() rejects an unresolved audioObject reference", "[adm][bridge]") {
     auto doc = minimal_document();
     doc.model.contents[0].object_refs = {"AO_MISSING"};
     const auto result = iclforge::adm::build(doc);
@@ -495,7 +495,7 @@ TEST_CASE("build() rejects an unresolved audioObject reference", "[admbridge]") 
     CHECK(result.error() == iclforge::adm::BridgeError::kUnresolvedReference);
 }
 
-TEST_CASE("build() rejects an unresolved audioPackFormat reference", "[admbridge]") {
+TEST_CASE("build() rejects an unresolved audioPackFormat reference", "[adm][bridge]") {
     auto doc = minimal_document();
     doc.model.objects[0].pack_format_refs = {"AP_MISSING"};
     const auto result = iclforge::adm::build(doc);
@@ -503,7 +503,7 @@ TEST_CASE("build() rejects an unresolved audioPackFormat reference", "[admbridge
     CHECK(result.error() == iclforge::adm::BridgeError::kUnresolvedReference);
 }
 
-TEST_CASE("build() rejects a HOA pack (unsupported TypeDefinition)", "[admbridge]") {
+TEST_CASE("build() rejects a HOA pack (unsupported TypeDefinition)", "[adm][bridge]") {
     auto doc = minimal_document();
     doc.model.pack_formats[0].type = iclforge::adm::TypeDefinition::kHoa;
     const auto result = iclforge::adm::build(doc);
@@ -511,7 +511,7 @@ TEST_CASE("build() rejects a HOA pack (unsupported TypeDefinition)", "[admbridge
     CHECK(result.error() == iclforge::adm::BridgeError::kUnsupportedType);
 }
 
-TEST_CASE("build() rejects a nested audioPackFormat", "[admbridge]") {
+TEST_CASE("build() rejects a nested audioPackFormat", "[adm][bridge]") {
     auto doc = minimal_document();
     doc.model.pack_formats[0].pack_format_refs = {"AP_NESTED"};
     const auto result = iclforge::adm::build(doc);
@@ -520,7 +520,7 @@ TEST_CASE("build() rejects a nested audioPackFormat", "[admbridge]") {
 }
 
 TEST_CASE("build() rejects a track_uid_refs count that does not match the channel count",
-         "[admbridge]") {
+         "[adm][bridge]") {
     auto doc = minimal_document();
     doc.model.objects[0].track_uid_refs.push_back("ATU_00000002");
     const auto result = iclforge::adm::build(doc);
@@ -528,7 +528,7 @@ TEST_CASE("build() rejects a track_uid_refs count that does not match the channe
     CHECK(result.error() == iclforge::adm::BridgeError::kChannelTrackMismatch);
 }
 
-TEST_CASE("build() rejects a track UID with no matching chna row", "[admbridge]") {
+TEST_CASE("build() rejects a track UID with no matching chna row", "[adm][bridge]") {
     auto doc = minimal_document();
     doc.chna.clear();
     const auto result = iclforge::adm::build(doc);
@@ -536,7 +536,7 @@ TEST_CASE("build() rejects a track UID with no matching chna row", "[admbridge]"
     CHECK(result.error() == iclforge::adm::BridgeError::kUnresolvedReference);
 }
 
-TEST_CASE("build() rejects a chna track_index with no corresponding PCM channel", "[admbridge]") {
+TEST_CASE("build() rejects a chna track_index with no corresponding PCM channel", "[adm][bridge]") {
     auto doc = minimal_document();
     doc.chna[0].track_index = 5;  // only one PCM channel exists (index 1)
     const auto result = iclforge::adm::build(doc);
@@ -544,7 +544,7 @@ TEST_CASE("build() rejects a chna track_index with no corresponding PCM channel"
     CHECK(result.error() == iclforge::adm::BridgeError::kNoAudioForTrack);
 }
 
-TEST_CASE("build() rejects a chna track_index of 0 (the unused-row marker)", "[admbridge]") {
+TEST_CASE("build() rejects a chna track_index of 0 (the unused-row marker)", "[adm][bridge]") {
     auto doc = minimal_document();
     doc.chna[0].track_index = 0;
     const auto result = iclforge::adm::build(doc);
@@ -552,7 +552,7 @@ TEST_CASE("build() rejects a chna track_index of 0 (the unused-row marker)", "[a
     CHECK(result.error() == iclforge::adm::BridgeError::kNoAudioForTrack);
 }
 
-TEST_CASE("build() detects a cycle in nested audioObject references", "[admbridge]") {
+TEST_CASE("build() detects a cycle in nested audioObject references", "[adm][bridge]") {
     auto doc = minimal_document();
     // AO_0001 -> AO_0001 (self-reference, the simplest illegal loop §5.6.7 names explicitly).
     doc.model.objects[0].object_refs = {"AO_0001"};
@@ -561,7 +561,7 @@ TEST_CASE("build() detects a cycle in nested audioObject references", "[admbridg
     CHECK(result.error() == iclforge::adm::BridgeError::kObjectReferenceCycle);
 }
 
-TEST_CASE("build() rejects more than 15 channels", "[admbridge]") {
+TEST_CASE("build() rejects more than 15 channels", "[adm][bridge]") {
     iclforge::adm::AdmDocument doc;
     doc.model.programmes.push_back({.id = "APR_0001", .name = "P", .content_refs = {"ACO_0001"}});
     iclforge::adm::AudioContent content{.id = "ACO_0001", .name = "C", .object_refs = {}};
@@ -600,7 +600,7 @@ TEST_CASE("build() rejects more than 15 channels", "[admbridge]") {
     CHECK(result.error() == iclforge::adm::BridgeError::kTooManyChannels);
 }
 
-TEST_CASE("build() picks the lowest-ID audioProgramme by default", "[admbridge]") {
+TEST_CASE("build() picks the lowest-ID audioProgramme by default", "[adm][bridge]") {
     auto doc = minimal_document();
     // A second programme/content/object graph, deliberately using a HIGHER id, pointing at
     // channel "AC_HIGH" instead of the first document's "AC_0001" - if the wrong programme is
@@ -632,7 +632,7 @@ TEST_CASE("build() picks the lowest-ID audioProgramme by default", "[admbridge]"
 }
 
 TEST_CASE("build() classifies DirectSpeakers as a bed and detects an LFE speakerLabel",
-         "[admbridge]") {
+         "[adm][bridge]") {
     auto doc = minimal_document();
     doc.model.pack_formats[0].type = iclforge::adm::TypeDefinition::kDirectSpeakers;
     auto& channel = doc.model.channel_formats[0];
@@ -653,7 +653,7 @@ TEST_CASE("build() classifies DirectSpeakers as a bed and detects an LFE speaker
     CHECK(placement.lfe_send == 1.0);
 }
 
-TEST_CASE("build() classifies Objects channels as dynamic, not a bed", "[admbridge]") {
+TEST_CASE("build() classifies Objects channels as dynamic, not a bed", "[adm][bridge]") {
     const auto doc = minimal_document();  // pack type is already kObjects
     const auto result = iclforge::adm::build(doc);
     REQUIRE(result.has_value());
@@ -662,7 +662,7 @@ TEST_CASE("build() classifies Objects channels as dynamic, not a bed", "[admbrid
     CHECK_FALSE(result->is_lfe[0]);
 }
 
-TEST_CASE("build() applies absolute time as object.start_s + block.rtime_s", "[admbridge]") {
+TEST_CASE("build() applies absolute time as object.start_s + block.rtime_s", "[adm][bridge]") {
     // BS.2076-2 Table 24 + §5.6.7: audioObject.start is relative to the programme directly, and
     // stays that way through any nesting - no third, programme-level term is added. A nonzero
     // object start_s combined with a block rtime_s should land at exactly their sum.
@@ -909,7 +909,7 @@ double channel_energy(std::span<const float> samples) {
 }  // namespace
 
 TEST_CASE("a real ADM BWF master's bed and moving object survive admbridge into a real "
-         "AtmosEncoder bitstream", "[admbridge][atmos]") {
+         "AtmosEncoder bitstream", "[adm][bridge][atmos]") {
     constexpr int kTotalFrames = 6;  // 3 frames holding SR, 3 frames holding centre
     const auto fmt = build_fmt_chunk(3, 48000, 16);
     const auto chna = build_chna_chunk_3();
@@ -1026,7 +1026,7 @@ ExclusionZone zone_bounded(double min_x, double max_x, double min_y, double max_
 
 }  // namespace
 
-TEST_CASE("adm_zone_exclusion_to_constraint reads each Table B.18 preset by label", "[admbridge][zones]") {
+TEST_CASE("adm_zone_exclusion_to_constraint reads each Table B.18 preset by label", "[adm][bridge][zones]") {
     using iclforge::adm::adm_zone_exclusion_to_constraint;
     struct Case {
         std::vector<std::string> labels;
@@ -1050,7 +1050,7 @@ TEST_CASE("adm_zone_exclusion_to_constraint reads each Table B.18 preset by labe
 }
 
 TEST_CASE("adm_zone_exclusion_to_constraint reads a preset from its bounds when there is no label",
-          "[admbridge][zones]") {
+          "[adm][bridge][zones]") {
     using iclforge::adm::adm_zone_exclusion_to_constraint;
     // Table B.19's ZM1 and the Top-Bottom pair, transcribed again here rather than taken from the
     // implementation.
@@ -1078,7 +1078,7 @@ TEST_CASE("adm_zone_exclusion_to_constraint reads a preset from its bounds when 
 
 TEST_CASE("adm_zone_exclusion_to_constraint ignores label case and combines a horizontal preset with "
           "the Top-Bottom pair",
-          "[admbridge][zones]") {
+          "[adm][bridge][zones]") {
     using iclforge::adm::adm_zone_exclusion_to_constraint;
     const auto mapping = adm_zone_exclusion_to_constraint(
         std::vector{zone_labelled("zm2_left"), zone_labelled("ZM2_RIGHT"), zone_labelled("zu"),
@@ -1088,14 +1088,14 @@ TEST_CASE("adm_zone_exclusion_to_constraint ignores label case and combines a ho
     CHECK(mapping.exact);
 }
 
-TEST_CASE("adm_zone_exclusion_to_constraint with no zones is the default and exact", "[admbridge][zones]") {
+TEST_CASE("adm_zone_exclusion_to_constraint with no zones is the default and exact", "[adm][bridge][zones]") {
     const auto mapping = iclforge::adm::adm_zone_exclusion_to_constraint({});
     CHECK(mapping.zone == ZoneConstraint::kNone);
     CHECK(mapping.enable_elevation);
     CHECK(mapping.exact);
 }
 
-TEST_CASE("adm_zone_exclusion_to_constraint flags what OAMD cannot say", "[admbridge][zones]") {
+TEST_CASE("adm_zone_exclusion_to_constraint flags what OAMD cannot say", "[adm][bridge][zones]") {
     using iclforge::adm::adm_zone_exclusion_to_constraint;
     SECTION("an unrecognised box") {
         const auto mapping = adm_zone_exclusion_to_constraint(std::vector{zone_bounded(-0.2, 0.2, -0.2, 0.2, -0.2, 0.2)});
@@ -1130,7 +1130,7 @@ TEST_CASE("adm_zone_exclusion_to_constraint flags what OAMD cannot say", "[admbr
     }
 }
 
-TEST_CASE("constraint_to_adm_zone_exclusion inverts adm_zone_exclusion_to_constraint", "[admbridge][zones]") {
+TEST_CASE("constraint_to_adm_zone_exclusion inverts adm_zone_exclusion_to_constraint", "[adm][bridge][zones]") {
     const auto zone = GENERATE(ZoneConstraint::kNone, ZoneConstraint::kBackExcluded, ZoneConstraint::kSideExcluded,
                                ZoneConstraint::kCentreAndBackOnly, ZoneConstraint::kScreenOnly,
                                ZoneConstraint::kSurroundOnly);
@@ -1149,7 +1149,7 @@ TEST_CASE("constraint_to_adm_zone_exclusion inverts adm_zone_exclusion_to_constr
     }
 }
 
-TEST_CASE("constraint_to_adm_zone_exclusion lists Table B.18's zones", "[admbridge][zones]") {
+TEST_CASE("constraint_to_adm_zone_exclusion lists Table B.18's zones", "[adm][bridge][zones]") {
     using iclforge::adm::constraint_to_adm_zone_exclusion;
     CHECK(constraint_to_adm_zone_exclusion(ZoneConstraint::kNone, true).empty());
 
@@ -1176,7 +1176,7 @@ TEST_CASE("constraint_to_adm_zone_exclusion lists Table B.18's zones", "[admbrid
           std::vector<std::string>{"ZM1", "ZU", "ZB"});
 }
 
-TEST_CASE("build_channel_path carries zoneExclusion into zone and enable_elevation", "[admbridge][zones]") {
+TEST_CASE("build_channel_path carries zoneExclusion into zone and enable_elevation", "[adm][bridge][zones]") {
     auto first = block_at(0.0, 1.0, polar(0.0, 0.0));
     first.zone_exclusion = {zone_labelled("ZM4")};
     auto second = block_at(1.0, 1.0, polar(0.0, 0.0), 1.0, /*jump_position=*/true);
@@ -1200,7 +1200,7 @@ TEST_CASE("build_channel_path carries zoneExclusion into zone and enable_elevati
     CHECK(in_third.enable_elevation);
 }
 
-TEST_CASE("build_channel_path gives an LFE channel no zone constraint", "[admbridge][zones]") {
+TEST_CASE("build_channel_path gives an LFE channel no zone constraint", "[adm][bridge][zones]") {
     auto block = block_at(0.0, 1.0, polar(0.0, 0.0));
     block.zone_exclusion = {zone_labelled("ZM1"), zone_labelled("ZU"), zone_labelled("ZB")};
     const auto path = iclforge::adm::build_channel_path(channel_with({block}), 0.0, /*force_lfe=*/true);
@@ -1210,7 +1210,7 @@ TEST_CASE("build_channel_path gives an LFE channel no zone constraint", "[admbri
     CHECK(placement.enable_elevation);
 }
 
-TEST_CASE("build() lists the ADM features it does not carry, per channel", "[admbridge][zones]") {
+TEST_CASE("build() lists the ADM features it does not carry, per channel", "[adm][bridge][zones]") {
     SECTION("a plain channel loses nothing") {
         const auto result = iclforge::adm::build(minimal_document());
         REQUIRE(result.has_value());
@@ -1271,7 +1271,7 @@ TEST_CASE("build() lists the ADM features it does not carry, per channel", "[adm
 // objectDivergence and screenRef
 // ---------------------------------------------------------------------------
 
-TEST_CASE("build_channel_path carries objectDivergence and screenRef", "[admbridge][divergence]") {
+TEST_CASE("build_channel_path carries objectDivergence and screenRef", "[adm][bridge][divergence]") {
     auto first = block_at(0.0, 1.0, polar(0.0, 0.0));
     first.has_object_divergence = true;
     first.object_divergence.value = 0.4;
@@ -1303,7 +1303,7 @@ TEST_CASE("build_channel_path carries objectDivergence and screenRef", "[admbrid
     CHECK(end.divergence == 0.0);
 }
 
-TEST_CASE("build_channel_path gives an LFE channel no divergence or screen reference", "[admbridge][divergence]") {
+TEST_CASE("build_channel_path gives an LFE channel no divergence or screen reference", "[adm][bridge][divergence]") {
     auto block = block_at(0.0, 1.0, polar(0.0, 0.0));
     block.has_object_divergence = true;
     block.object_divergence.value = 1.0;

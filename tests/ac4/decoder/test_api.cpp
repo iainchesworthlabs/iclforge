@@ -8,7 +8,7 @@
 // (apps/hearth/engine/stream_decoder.hpp) standing in for it, which decodes
 // every committed AC-4 stream by block.
 //
-// AC4DEC_API_STREAM_DIR, when set, names a directory whose .ac4 files the
+// AC4_API_STREAM_DIR, when set, names a directory whose .ac4 files the
 // engine decodes as well, the local gold set or the third-party streams; a
 // stream in syntax this version refuses by name is counted, not failed.
 //
@@ -92,7 +92,7 @@ fs::path baseline(std::string_view leg) {
 std::vector<fs::path> committed_streams() {
     std::vector<fs::path> paths;
     for (const fs::path& root :
-         {fs::path{ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR}, fs::path{AC4DEC_GOLDEN_DIR}}) {
+         {fs::path{ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR}, fs::path{AC4_GOLDEN_DIR}}) {
         for (const auto& entry : fs::recursive_directory_iterator(root)) {
             if (entry.is_regular_file() && entry.path().extension() == ".ac4") {
                 paths.push_back(entry.path());
@@ -168,7 +168,7 @@ static_assert(std::is_constructible_v<iclforge::ac4::SyntaxTrace, RecordFunctor>
 // --- The syntax trace's lifetime ---------------------------------------------
 
 TEST_CASE("a decoder keeps its own copy of the syntax callable it is configured with",
-          "[ac4dec][api]") {
+          "[ac4][decoder][api]") {
     // The review of #700 and D7: DecoderConfig::syntax held only its
     // callable's address, so one written in place was gone by the next
     // statement, which one platform's heap hid and MSVC's Release build did
@@ -202,7 +202,7 @@ TEST_CASE("a decoder keeps its own copy of the syntax callable it is configured 
 }
 
 TEST_CASE("an encoder keeps its own copy of the syntax callable it is configured with",
-          "[ac4enc][api]") {
+          "[ac4][encoder][api]") {
     int alive = 0;
     std::vector<iclforge::ac4::SyntaxRecord> records;
     std::optional<iclforge::ac4::Encoder> encoder;
@@ -228,7 +228,7 @@ TEST_CASE("an encoder keeps its own copy of the syntax callable it is configured
 // --- Changing the output and the presentation while a stream plays ------------
 
 TEST_CASE("set_output changes the output level from the next frame without waiting for an I-frame",
-          "[ac4dec][api]") {
+          "[ac4][decoder][api]") {
     const auto frames = frames_of(baseline("ac4-20-music-192"));
     REQUIRE(frames.size() > 40);
     const iclforge::ac4::OutputConfig before{};
@@ -401,7 +401,7 @@ void require_change_lands_whole(const std::vector<std::vector<std::byte>>& frame
 // the downmix would take a stream without gains' -3 dB, and no LFE, for up to
 // a second (Hearth's DecoderAc4::test_downmixIsHeardWithTheStreamsGains).
 TEST_CASE("set_output changes the downmix from the next frame, keeping the stream's own gains",
-          "[ac4dec][api]") {
+          "[ac4][decoder][api]") {
     const auto frames = tones_with_their_own_gains(60);
     REQUIRE(frames.size() >= 60);
     // Frame 30 is between the I-frames 24 and 48, the only frames that carry
@@ -419,7 +419,7 @@ TEST_CASE("set_output changes the downmix from the next frame, keeping the strea
     }
 }
 
-TEST_CASE("set_output changes the downmix without starting the DRC again", "[ac4dec][api]") {
+TEST_CASE("set_output changes the downmix without starting the DRC again", "[ac4][decoder][api]") {
     auto frames = frames_of(baseline("ac4-51-drc-ltrt-192"));
     REQUIRE(frames.size() > 60);
     frames.resize(60);
@@ -437,9 +437,9 @@ TEST_CASE("set_output changes the downmix without starting the DRC again", "[ac4
     require_change_lands_whole(frames, 30, loro, ltrt);
 }
 
-TEST_CASE("set_presentation switches presentations from the next frame", "[ac4dec][api]") {
+TEST_CASE("set_presentation switches presentations from the next frame", "[ac4][decoder][api]") {
     const auto frames =
-        frames_of(fs::path{AC4DEC_GOLDEN_DIR} / "presentations" / "presentations-5_1.ac4");
+        frames_of(fs::path{AC4_GOLDEN_DIR} / "presentations" / "presentations-5_1.ac4");
     REQUIRE(frames.size() >= 12);
     iclforge::ac4::Decoder decoder;
     iclforge::ac4::PresentationChoice second;
@@ -489,7 +489,7 @@ TEST_CASE("set_presentation switches presentations from the next frame", "[ac4de
 
 TEST_CASE(
     "decode_by_block hands the output over in blocks of 256 samples whatever the frame length",
-    "[ac4dec][api]") {
+    "[ac4][decoder][api]") {
     // Index 13's 2 048-sample frames, and 24 fps IMS, whose frames come to 2 000
     // samples at 48 kHz: seven blocks and 208 held for the next.
     for (const std::string_view leg :
@@ -539,7 +539,7 @@ TEST_CASE(
     }
 }
 
-TEST_CASE("decode_by_block hands over what it holds before a change of layout", "[ac4dec][api]") {
+TEST_CASE("decode_by_block hands over what it holds before a change of layout", "[ac4][decoder][api]") {
     const auto frames = frames_of(baseline("ac4-51-music-384"));
     iclforge::ac4::Decoder decoder;
     std::vector<std::size_t> widths;
@@ -678,13 +678,13 @@ std::vector<std::uint8_t> hex_bytes(std::string_view hex) {
 }  // namespace
 
 TEST_CASE("presentations() names an alternative presentation as its chunks arrive",
-          "[ac4dec][api]") {
+          "[ac4][decoder][api]") {
     // tests/golden/ac4/presentations/presentation-names.tsv: each case a sequence of
     // frames' presentation_name bytes, or "-" for a frame without one, and the
     // name after the last. tools/checks/test_ac4_presentation_names.py holds
     // the Python reference to the same table (src/ac4/ERRATA.md, "A
     // presentation name in chunks").
-    std::ifstream in(fs::path{AC4DEC_GOLDEN_DIR} / "presentations" / "presentation-names.tsv");
+    std::ifstream in(fs::path{AC4_GOLDEN_DIR} / "presentations" / "presentation-names.tsv");
     REQUIRE(in.good());
     std::string line;
     int cases = 0;
@@ -722,7 +722,7 @@ TEST_CASE("presentations() names an alternative presentation as its chunks arriv
     CHECK(cases >= 10);
 }
 
-TEST_CASE("describe names every substream role", "[ac4dec][api]") {
+TEST_CASE("describe names every substream role", "[ac4][decoder][api]") {
     std::set<std::string_view> seen;
     for (const iclforge::ac4::SubstreamRole role :
          {iclforge::ac4::SubstreamRole::kMain, iclforge::ac4::SubstreamRole::kMusicAndEffects,
@@ -737,7 +737,7 @@ TEST_CASE("describe names every substream role", "[ac4dec][api]") {
     CHECK(iclforge::ac4::describe(static_cast<iclforge::ac4::SubstreamRole>(99)) == "?");
 }
 
-TEST_CASE("presentations() lists each presentation of the table of contents", "[ac4dec][api]") {
+TEST_CASE("presentations() lists each presentation of the table of contents", "[ac4][decoder][api]") {
     SECTION("a DEE stream's one presentation") {
         const auto frames = frames_of(baseline("ac4-51-music-192"));
         iclforge::ac4::Decoder decoder;
@@ -762,7 +762,7 @@ TEST_CASE("presentations() lists each presentation of the table of contents", "[
     }
     SECTION("the multiplexer's presentations of several substreams") {
         const auto frames =
-            frames_of(fs::path{AC4DEC_GOLDEN_DIR} / "presentations" / "presentations-5_1.ac4");
+            frames_of(fs::path{AC4_GOLDEN_DIR} / "presentations" / "presentations-5_1.ac4");
         iclforge::ac4::Decoder decoder;
         REQUIRE(decoder.parse(frames.front()).has_value());
         const std::span<const iclforge::ac4::PresentationInfo> all = decoder.presentations();
@@ -795,7 +795,7 @@ TEST_CASE("presentations() lists each presentation of the table of contents", "[
 }
 
 TEST_CASE("metadata() reports the values the selected presentation's frames sent",
-          "[ac4dec][api]") {
+          "[ac4][decoder][api]") {
     // Each DEE leg's frames traced: the last value of each element the trace
     // shows, which is what metadata() holds after the last frame.
     for (const std::string_view leg : {"ac4-20-music-192", "ac4-20-speech-128", "ac4-51-music-128",
@@ -852,7 +852,7 @@ TEST_CASE("metadata() reports the values the selected presentation's frames sent
 }
 
 TEST_CASE("latency_samples() is the decoder delay the encoder counts on at every frame rate",
-          "[ac4dec][api]") {
+          "[ac4][decoder][api]") {
     // Encoder::decoder_delay_samples() gives the delay a decoder adds at each
     // rate from the encoder's own timing; the decoder measures its own.
     const std::vector<float> silence(12000, 0.0F);
@@ -1031,7 +1031,7 @@ Played play(const fs::path& path, std::size_t limit = kAllFrames) {
 
 TEST_CASE(
     "an engine in the shape of Hearth's decodes every committed AC-4 stream through the public API",
-    "[ac4dec][api]") {
+    "[ac4][decoder][api]") {
     const std::vector<fs::path> streams = committed_streams();
     REQUIRE(streams.size() >= 42);
     for (const fs::path& path : streams_to_play(streams)) {
@@ -1041,11 +1041,11 @@ TEST_CASE(
     }
 }
 
-TEST_CASE("an engine in the shape of Hearth's decodes the streams of AC4DEC_API_STREAM_DIR",
-          "[ac4dec][api]") {
-    const char* dir = std::getenv("AC4DEC_API_STREAM_DIR");
+TEST_CASE("an engine in the shape of Hearth's decodes the streams of AC4_API_STREAM_DIR",
+          "[ac4][decoder][api]") {
+    const char* dir = std::getenv("AC4_API_STREAM_DIR");
     if (dir == nullptr) {
-        SKIP("AC4DEC_API_STREAM_DIR is not set");
+        SKIP("AC4_API_STREAM_DIR is not set");
     }
     std::vector<fs::path> streams;
     for (const auto& entry : fs::recursive_directory_iterator(fs::path{dir})) {

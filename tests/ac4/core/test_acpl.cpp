@@ -88,7 +88,7 @@ std::vector<Complex> run_decorrelator(int decorrelator, int subband, const std::
 
 }  // namespace
 
-TEST_CASE("sb_to_pb maps QMF subbands to parameter bands by Table 197", "[ac4core][acpl]") {
+TEST_CASE("sb_to_pb maps QMF subbands to parameter bands by Table 197", "[ac4][core][acpl]") {
     CHECK(acpl::sb_to_pb(15, 0) == 0);
     CHECK(acpl::sb_to_pb(15, 10) == 9);
     CHECK(acpl::sb_to_pb(15, 63) == 14);
@@ -109,7 +109,7 @@ TEST_CASE("sb_to_pb maps QMF subbands to parameter bands by Table 197", "[ac4cor
     }
 }
 
-TEST_CASE("Tables 203 to 206 dequantise alpha and beta", "[ac4core][acpl]") {
+TEST_CASE("Tables 203 to 206 dequantise alpha and beta", "[ac4][core][acpl]") {
     using acpl::Quant;
     // Table 203's ends, centre and a row in each half, with their ibeta.
     CHECK(acpl::dequantise_alpha(0, Quant::kFine).alpha == -2.0);
@@ -164,7 +164,7 @@ TEST_CASE("Tables 203 to 206 dequantise alpha and beta", "[ac4core][acpl]") {
     }
 }
 
-TEST_CASE("Tables 207 and 208 give beta3's and gamma's steps", "[ac4core][acpl]") {
+TEST_CASE("Tables 207 and 208 give beta3's and gamma's steps", "[ac4][core][acpl]") {
     CHECK(acpl::beta3_step(acpl::Quant::kFine) == 0.125);
     CHECK(acpl::beta3_step(acpl::Quant::kCoarse) == 0.25);
     CHECK(acpl::gamma_step(acpl::Quant::kFine) == 1638.0 / 16384.0);
@@ -178,7 +178,7 @@ TEST_CASE("Tables 207 and 208 give beta3's and gamma's steps", "[ac4core][acpl]"
     }
 }
 
-TEST_CASE("Pseudocode 121 decodes along frequency and along time", "[ac4core][acpl]") {
+TEST_CASE("Pseudocode 121 decodes along frequency and along time", "[ac4][core][acpl]") {
     using acpl::Kind;
     using acpl::Quant;
     std::array<int, 15> coded{};
@@ -223,7 +223,7 @@ TEST_CASE("Pseudocode 121 decodes along frequency and along time", "[ac4core][ac
     }
 }
 
-TEST_CASE("Pseudocodes 109 and 110 interpolate a frame's parameters", "[ac4core][acpl]") {
+TEST_CASE("Pseudocodes 109 and 110 interpolate a frame's parameters", "[ac4][core][acpl]") {
     constexpr int kSlots = 32;
     acpl::ParamSets values{};
     acpl::ParamPrev prev{};
@@ -266,7 +266,7 @@ TEST_CASE("Pseudocodes 109 and 110 interpolate a frame's parameters", "[ac4core]
     }
 }
 
-TEST_CASE("Each decorrelator's impulse response is its difference equation", "[ac4core][acpl]") {
+TEST_CASE("Each decorrelator's impulse response is its difference equation", "[ac4][core][acpl]") {
     // Two thousand slots take every filter's tail below 1e-30 (its largest
     // pole is 0.959), run through the class 32 and 6 slots at a time.
     constexpr std::size_t kLength = 2048;
@@ -300,7 +300,7 @@ TEST_CASE("Each decorrelator's impulse response is its difference equation", "[a
     CHECK(std::ranges::all_of(out, [](Complex v) { return v == Complex{7.0, 0.0}; }));
 }
 
-TEST_CASE("Each decorrelator is all-pass: its magnitude response is flat to 1e-9", "[ac4core][acpl]") {
+TEST_CASE("Each decorrelator is all-pass: its magnitude response is flat to 1e-9", "[ac4][core][acpl]") {
     constexpr std::size_t kLength = 2048;
     std::vector<Complex> impulse(kLength);
     impulse[0] = Complex{1.0, 0.0};
@@ -323,7 +323,7 @@ TEST_CASE("Each decorrelator is all-pass: its magnitude response is flat to 1e-9
     }
 }
 
-TEST_CASE("The transient ducker leaves steady signals and ducks a decaying one", "[ac4core][acpl]") {
+TEST_CASE("The transient ducker leaves steady signals and ducks a decaying one", "[ac4][core][acpl]") {
     constexpr int kSlots = 32;
     std::vector<Complex> signal(at(kSlots) * kSubbands);
     SECTION("steady energy: every gain 1") {

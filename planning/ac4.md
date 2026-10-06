@@ -804,7 +804,7 @@ object over 4 KiB, or a heap allocation each frame where a member buffer would d
 
 The encoder runs on computers only. It is built at `double`, on the same scalar type as the core it
 shares, with no `float` or fixed-point tier and no place in the ESP32 builds; the core's kernels it
-calls are also instantiated at `double` in a `float` build (`AC4CORE_ALSO_AT_DOUBLE`). Its output is
+calls are also instantiated at `double` in a `float` build (`ICLFORGE_AC4_ALSO_AT_DOUBLE`). Its output is
 deterministic for one toolchain, as `ac3::forge`'s encoders' is, and is not promised byte-identical
 across toolchains.
 
@@ -1984,7 +1984,7 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   encoder has no `float` tier of its own ([decision 34](#decisions-of-2026-09-25)) and `ac4core` is
   one shared library rather than `ac3::forge`'s separately-compiled encoder and decoder DSP; those
   kernels, and a few others `ac4core`'s own tests exercise directly at `double`, now also explicitly
-  instantiate `<double>` when `Real` is not already `double` (`AC4CORE_ALSO_AT_DOUBLE`, defined by
+  instantiate `<double>` when `Real` is not already `double` (`ICLFORGE_AC4_ALSO_AT_DOUBLE`, defined by
   the per-scalar `real.hpp`), adding nothing to a `double`-configured build - the encoder's own tests, part of the unmoved whole suite above,
   hold on that path unchanged.
 

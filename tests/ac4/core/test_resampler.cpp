@@ -127,7 +127,7 @@ double to_db(double ratio) {
 }  // namespace
 
 TEST_CASE("the sample rate converter gives every frame rate its exact output count, from any frame",
-          "[ac4core][dsp][src]") {
+          "[ac4][core][dsp][src]") {
     constexpr std::int64_t kFrames = 100'000;
     for (const Rate& rate : kRates) {
         CAPTURE(rate.index);
@@ -152,7 +152,7 @@ TEST_CASE("the sample rate converter gives every frame rate its exact output cou
 }
 
 TEST_CASE("the converter runs through frames in Table 47's sequence of output counts",
-          "[ac4core][dsp][src]") {
+          "[ac4][core][dsp][src]") {
     struct Sequence {
         int frame;
         std::array<std::size_t, 5> counts;  // phi_t = 0 .. 4
@@ -189,7 +189,7 @@ TEST_CASE("the converter runs through frames in Table 47's sequence of output co
 }
 
 TEST_CASE("a converter whose phase jumps gives the new phase's counts and keeps converting",
-          "[ac4core][dsp][src]") {
+          "[ac4][core][dsp][src]") {
     const auto filter = std::make_shared<const dsp::ResamplerFilter>(1001, 960);
     constexpr std::int64_t kFrame = 1536;
     constexpr std::array<std::size_t, 5> kCounts = {1601, 1602, 1601, 1602, 1602};
@@ -216,7 +216,7 @@ TEST_CASE("a converter whose phase jumps gives the new phase's counts and keeps 
 }
 
 TEST_CASE("a converter started at a later frame puts its samples where one run from the start does",
-          "[ac4core][dsp][src]") {
+          "[ac4][core][dsp][src]") {
     const auto filter = std::make_shared<const dsp::ResamplerFilter>(1001, 960);
     constexpr std::size_t kFrame = 1536;
     std::vector<double> signal(12 * kFrame);
@@ -243,7 +243,7 @@ TEST_CASE("a converter started at a later frame puts its samples where one run f
 }
 
 TEST_CASE("the converter's passband is flat to 0.001 dB and its stopband 100 dB down, both ways",
-          "[ac4core][dsp][src]") {
+          "[ac4][core][dsp][src]") {
     struct Ratio {
         int up;
         int down;
@@ -292,7 +292,7 @@ TEST_CASE("the converter's passband is flat to 0.001 dB and its stopband 100 dB 
     }
 }
 
-TEST_CASE("the converter delays by the delay() it states", "[ac4core][dsp][src]") {
+TEST_CASE("the converter delays by the delay() it states", "[ac4][core][dsp][src]") {
     for (const Rate& rate : {kRates[0], kRates[1], kRates[2]}) {
         CAPTURE(rate.index);
         const auto filter = std::make_shared<const dsp::ResamplerFilter>(rate.up, rate.down);
@@ -360,7 +360,7 @@ std::uint64_t fnv_float_image(const std::vector<float>& coefficients) {
 }  // namespace
 
 TEST_CASE("the converter's table is the double design rounded once to the scalar it runs at",
-          "[ac4core][dsp][src]") {
+          "[ac4][core][dsp][src]") {
     const double epsilon = dsp::kFixed<Real> ? 0x1p-30 : static_cast<double>(std::numeric_limits<Real>::epsilon());
     for (const Rate& rate : {kRates[1], kRates[2], kRates[0]}) {
         CAPTURE(rate.index);
@@ -410,7 +410,7 @@ TEST_CASE("the converter's table is the double design rounded once to the scalar
 }
 
 TEST_CASE("the converter's table rounded to float is the same on every platform",
-          "[ac4core][dsp][src]") {
+          "[ac4][core][dsp][src]") {
     // FNV-1a over the bit pattern of every coefficient of every phase as a float. The table is
     // pinned three ways: the double design's entries rounded once (the design calls sin and sqrt at
     // double, whose last bit the C libraries do not all agree on), the same design with the
@@ -456,7 +456,7 @@ TEST_CASE("the converter's table rounded to float is the same on every platform"
 
 TEST_CASE(
     "the converter's float table built by the compiler is what the design makes at run time",
-    "[ac4core][dsp][src]") {
+    "[ac4][core][dsp][src]") {
     // The compiler evaluates the design with no library, and this machine runs it: the same
     // function in IEEE double arithmetic, so the same bits. The ratios here are small, for the
     // compiler's step limit in a test; the decoder's own three are in the test above.
@@ -488,7 +488,7 @@ TEST_CASE(
 }
 
 TEST_CASE("phase up - p of the design is phase p read from its last coefficient to its first",
-          "[ac4core][dsp][src]") {
+          "[ac4][core][dsp][src]") {
     // The window and the sinc are even, so tap k of one is, in the other, tap taps - 1 - k, and a
     // table can keep half its phases. The double design, whose phases are all computed, shows it to
     // the rounding of their arguments.
@@ -611,12 +611,12 @@ void check_how_the_filter_keeps_its_phases() {
 }  // namespace
 
 TEST_CASE("a filter at float keeps half its phases and reads the others backwards",
-          "[ac4core][dsp][src]") {
+          "[ac4][core][dsp][src]") {
     check_how_the_filter_keeps_its_phases<Real>();
 }
 
 TEST_CASE("the converter's float dot product is the sum of four lanes added in the order it states",
-          "[ac4core][dsp][src]") {
+          "[ac4][core][dsp][src]") {
     std::uint32_t state = 7U;
     const auto next = [&state] {
         state = state * 1664525U + 1013904223U;
@@ -650,7 +650,7 @@ TEST_CASE("the converter's float dot product is the sum of four lanes added in t
 }
 
 TEST_CASE("the reversed dot product is the four lane sum of the phase written out backwards",
-          "[ac4core][dsp][src]") {
+          "[ac4][core][dsp][src]") {
     std::uint32_t state = 11U;
     const auto next = [&state] {
         state = state * 1664525U + 1013904223U;
@@ -674,7 +674,7 @@ TEST_CASE("the reversed dot product is the four lane sum of the phase written ou
 }
 
 TEST_CASE("the converter at the decoder's scalar follows the double converter to that scalar",
-          "[ac4core][dsp][src]") {
+          "[ac4][core][dsp][src]") {
     // At Fixed32 the converter runs in the time domain, kTimeShift below the double decoder's
     // (dsp/scalar_traits.hpp), where a raw unit is 2^-24: the signal goes in and comes out
     // through `scale`, and the bound is that unit against the peak.
@@ -721,7 +721,7 @@ TEST_CASE("the converter at the decoder's scalar follows the double converter to
     }
 }
 
-TEST_CASE("a converter at a ratio of 1 copies its input without delay", "[ac4core][dsp][src]") {
+TEST_CASE("a converter at a ratio of 1 copies its input without delay", "[ac4][core][dsp][src]") {
     const auto filter = std::make_shared<const dsp::ResamplerFilter>(48000, 48000);
     CHECK(filter->up() == 1);
     CHECK(filter->down() == 1);

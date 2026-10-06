@@ -502,7 +502,7 @@ TEST_CASE("engine: an AC-4 presentation a sink would not choose reaches a group 
     // E6's broadcast stream: presentation 2 is music and effects with the
     // German dialogue, not the one a decoder with no preferences selects.
     const std::vector<std::byte> programme =
-        read_bytes(fs::path{AC4DEC_GOLDEN_DIR} / "presentations" / "encoder-broadcast.ac4");
+        read_bytes(fs::path{AC4_GOLDEN_DIR} / "presentations" / "encoder-broadcast.ac4");
     TwoSinkGroup sinks(scratch);
     iclforge::hearth::DecoderSettings settings;
     settings.ac4.presentation_id = 2;

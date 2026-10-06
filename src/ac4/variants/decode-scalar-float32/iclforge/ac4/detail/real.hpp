@@ -17,7 +17,7 @@ using Real = float;
 
 }  // namespace iclforge::ac4::detail
 
-// The float variant of AC4CORE_ALSO_AT_DOUBLE (see the double variant under
+// The float variant of ICLFORGE_AC4_ALSO_AT_DOUBLE (see the double variant under
 // src/internal/scalar/double/): Real is float here, so the encoder's double
 // instantiations are extra, and this passes them through.
-#define AC4CORE_ALSO_AT_DOUBLE(...) __VA_ARGS__
+#define ICLFORGE_AC4_ALSO_AT_DOUBLE(...) __VA_ARGS__

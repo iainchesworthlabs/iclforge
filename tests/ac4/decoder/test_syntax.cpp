@@ -11,13 +11,13 @@
 // tools/checks/test_ac4_syntax_digests.py holds the Python parser to the same
 // files.
 //
-// With AC4DEC_TRACE_DIR set, every record is also written there, one file per
+// With AC4_TRACE_DIR set, every record is also written there, one file per
 // stream, in the same shape the Python parser's `trace` command writes, so a
 // disagreement can be found by comparing the two files line by line.
 //
-// AC4DEC_GOLDEN_DIR and AC4DEC_STREAM_DIR, when both are set, replace the
+// AC4_GOLDEN_DIR and AC4_STREAM_DIR, when both are set, replace the
 // committed digests and streams with another set, such as the whole local
-// census, whose header lines name streams relative to AC4DEC_STREAM_DIR.
+// census, whose header lines name streams relative to AC4_STREAM_DIR.
 // Such a set may hold streams with syntax this phase refuses, so refusals
 // are then compared through the digests alone.
 
@@ -43,7 +43,7 @@ namespace {
 
 namespace fs = std::filesystem;
 
-constexpr const char* kGoldenDir = AC4DEC_GOLDEN_DIR;
+constexpr const char* kGoldenDir = AC4_GOLDEN_DIR;
 constexpr const char* kStreamDir = ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR;
 
 struct Directories {
@@ -53,8 +53,8 @@ struct Directories {
 };
 
 Directories directories() {
-    const char* golden = std::getenv("AC4DEC_GOLDEN_DIR");
-    const char* streams = std::getenv("AC4DEC_STREAM_DIR");
+    const char* golden = std::getenv("AC4_GOLDEN_DIR");
+    const char* streams = std::getenv("AC4_STREAM_DIR");
     if (golden != nullptr && streams != nullptr) {
         return {fs::path{golden}, fs::path{streams}, false};
     }
@@ -283,7 +283,7 @@ void check_stream(const Directories& dirs, const fs::path& golden_path, const ch
 
 }  // namespace
 
-TEST_CASE("ac4dec syntax digests match the independent Python transcription", "[ac4dec][syntax]") {
+TEST_CASE("ac4dec syntax digests match the independent Python transcription", "[ac4][decoder][syntax]") {
     const Directories dirs = directories();
     std::vector<fs::path> goldens;
     for (const auto& entry : fs::directory_iterator(dirs.golden)) {
@@ -294,7 +294,7 @@ TEST_CASE("ac4dec syntax digests match the independent Python transcription", "[
     std::sort(goldens.begin(), goldens.end());
     REQUIRE_FALSE(goldens.empty());
 
-    const char* trace_dir = std::getenv("AC4DEC_TRACE_DIR");
+    const char* trace_dir = std::getenv("AC4_TRACE_DIR");
     for (const fs::path& golden_path : goldens) {
         DYNAMIC_SECTION(golden_path.filename().string()) {
             check_stream(dirs, golden_path, trace_dir);

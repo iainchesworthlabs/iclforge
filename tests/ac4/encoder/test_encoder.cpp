@@ -154,7 +154,7 @@ void check_frames_read_back(const Encoded& encoded) {
 
 }  // namespace
 
-TEST_CASE("the encoder refuses what it does not write", "[ac4enc][encoder]") {
+TEST_CASE("the encoder refuses what it does not write", "[ac4][encoder]") {
     iclforge::ac4::EncoderConfig config;
     for (const int channels : {0, 3, 4, 7, 8, 11, 12, 13}) {
         CAPTURE(channels);
@@ -193,7 +193,7 @@ TEST_CASE("the encoder refuses what it does not write", "[ac4enc][encoder]") {
 }
 
 TEST_CASE("Encoder::refusal_reason names the rule a refused configuration breaks",
-          "[ac4enc][encoder]") {
+          "[ac4][encoder]") {
     CHECK(iclforge::ac4::Encoder::refusal_reason(iclforge::ac4::EncoderConfig{}).empty());
     const auto two = [](std::string_view language) {
         return iclforge::ac4::SubstreamConfig{.channels = 2,
@@ -246,7 +246,7 @@ TEST_CASE("Encoder::refusal_reason names the rule a refused configuration breaks
 }
 
 TEST_CASE("the configuration takes designated initializers naming some fields",
-          "[ac4enc][encoder]") {
+          "[ac4][encoder]") {
     // Every field of the configuration's structures has a default, so these
     // name only what they set, and GCC's and Clang's missing initializer
     // warnings, errors here, have nothing to say.
@@ -281,7 +281,7 @@ TEST_CASE("the configuration takes designated initializers naming some fields",
     CHECK_FALSE(iclforge::ac4::build_dac4(toc).empty());
 }
 
-TEST_CASE("samples far past full scale still encode, to frames that read back and decode", "[ac4enc][encoder]") {
+TEST_CASE("samples far past full scale still encode, to frames that read back and decode", "[ac4][encoder]") {
     // A finite float can stand 10^38 over full scale, more than the coarsest
     // step codes in a frame at a low rate: such a frame goes out with no bands.
     // 9 kbps is the least stereo takes at 48 kHz in the ASPX mode.
@@ -304,7 +304,7 @@ TEST_CASE("samples far past full scale still encode, to frames that read back an
     }
 }
 
-TEST_CASE("the encoder's table of contents describes one stereo substream at index 13", "[ac4enc][encoder]") {
+TEST_CASE("the encoder's table of contents describes one stereo substream at index 13", "[ac4][encoder]") {
     auto encoder = iclforge::ac4::Encoder::create(iclforge::ac4::EncoderConfig{});
     REQUIRE(encoder.has_value());
     const iclforge::ac4::Toc& toc = encoder->toc();
@@ -321,7 +321,7 @@ TEST_CASE("the encoder's table of contents describes one stereo substream at ind
 }
 
 TEST_CASE("stereo tones encode at 192 kbps and decode on their own channels at unity gain",
-          "[ac4enc][encoder]") {
+          "[ac4][encoder]") {
     const std::size_t count = seconds(3.0, 1.5);
     const std::vector<std::vector<float>> input{tone(331.0, 0.1, count, 48000), tone(457.0, 0.1, count, 48000)};
     iclforge::ac4::EncoderConfig config;
@@ -350,7 +350,7 @@ TEST_CASE("stereo tones encode at 192 kbps and decode on their own channels at u
     }
 }
 
-TEST_CASE("a panned source is predicted from M and keeps its balance", "[ac4enc][encoder]") {
+TEST_CASE("a panned source is predicted from M and keeps its balance", "[ac4][encoder]") {
     // Twelve tones across the band, the same in both channels but for a gain:
     // S is then a multiple of M in every band, which sap_mode 3 predicts whole.
     const std::size_t count = seconds(2.0, 1.0);
@@ -392,7 +392,7 @@ TEST_CASE("a panned source is predicted from M and keeps its balance", "[ac4enc]
     }
 }
 
-TEST_CASE("mono encodes and decodes at 64 kbps", "[ac4enc][encoder]") {
+TEST_CASE("mono encodes and decodes at 64 kbps", "[ac4][encoder]") {
     const std::size_t count = 48000 * 2;
     const std::vector<std::vector<float>> input{tone(1000.0, 0.25, count, 48000)};
     iclforge::ac4::EncoderConfig config;
@@ -407,7 +407,7 @@ TEST_CASE("mono encodes and decodes at 64 kbps", "[ac4enc][encoder]") {
     CHECK(s.snr_db > 30.0);
 }
 
-TEST_CASE("transients split frames into short blocks, and still decode cleanly", "[ac4enc][encoder]") {
+TEST_CASE("transients split frames into short blocks, and still decode cleanly", "[ac4][encoder]") {
     const std::size_t count = 48000 * 2;
     std::vector<float> clicks(count, 0.0F);
     for (std::size_t n = 6000; n < count; n += 9000) {
@@ -434,7 +434,7 @@ TEST_CASE("transients split frames into short blocks, and still decode cleanly",
     CHECK(s.snr_db > 20.0);
 }
 
-TEST_CASE("at 44.1 kHz frames alternate sizes to keep the bit rate", "[ac4enc][encoder]") {
+TEST_CASE("at 44.1 kHz frames alternate sizes to keep the bit rate", "[ac4][encoder]") {
     const std::size_t count = 44100;
     const std::vector<std::vector<float>> input{tone(440.0, 0.1, count, 44100), tone(660.0, 0.1, count, 44100)};
     iclforge::ac4::EncoderConfig config;
@@ -561,7 +561,7 @@ std::vector<std::vector<float>> mixed(std::size_t count, int rate, int channels)
 }  // namespace
 
 TEST_CASE("ASPX streams read back with the encoder's trace at every rate, channel count and tool",
-          "[ac4enc][encoder][aspx]") {
+          "[ac4][encoder][aspx]") {
     struct Config {
         int channels;
         int rate;
@@ -601,7 +601,7 @@ TEST_CASE("ASPX streams read back with the encoder's trace at every rate, channe
     }
 }
 
-TEST_CASE("ASPX recreates the band above the crossover at its energy", "[ac4enc][encoder][aspx]") {
+TEST_CASE("ASPX recreates the band above the crossover at its energy", "[ac4][encoder][aspx]") {
     // Noise over 11 to 20 kHz on a tone: the crossover is 7.5 kHz at 48 kbps
     // and 13.5 kHz at 96, and A-SPX recreates the band over it at the
     // source's energy, give or take its envelopes' steps and the limiter.
@@ -638,7 +638,7 @@ TEST_CASE("ASPX recreates the band above the crossover at its energy", "[ac4enc]
 }
 
 TEST_CASE("a sweep above the crossover keeps the source's energy in every band above 16.5 kHz",
-          "[ac4enc][encoder][aspx]") {
+          "[ac4][encoder][aspx]") {
     // A logarithmic sweep from 11 to 21 kHz in the first channel, silence in the rest: while it is
     // above the crossover (13.5 kHz in stereo at 96 kbps, 12.75 in 5.1 at 256, 10.5 in 5.1.4 at
     // 256) the low band holds nothing for the patch to copy, and a patch without energy delivers
@@ -679,7 +679,7 @@ TEST_CASE("a sweep above the crossover keeps the source's energy in every band a
     }
 }
 
-TEST_CASE("the experimental A-SPX tools do what they are for", "[ac4enc][encoder][aspx]") {
+TEST_CASE("the experimental A-SPX tools do what they are for", "[ac4][encoder][aspx]") {
     const std::size_t count = seconds(2.0, 1.0);
     SECTION("balance codes equal channels as a sum and a centred balance") {
         const std::vector<float> x = mixed(count, 48000, 1).front();
@@ -742,7 +742,7 @@ TEST_CASE("the experimental A-SPX tools do what they are for", "[ac4enc][encoder
     }
 }
 
-TEST_CASE("sequence_counter starts at 0 and I-frames come at the configured interval", "[ac4enc][encoder]") {
+TEST_CASE("sequence_counter starts at 0 and I-frames come at the configured interval", "[ac4][encoder]") {
     const std::vector<std::vector<float>> input{std::vector<float>(48000, 0.0F), std::vector<float>(48000, 0.0F)};
     iclforge::ac4::EncoderConfig config;
     config.iframe_interval = 5;
@@ -841,7 +841,7 @@ std::vector<float> high_noise(std::size_t count) {
 }  // namespace
 
 TEST_CASE("5.0 and 5.1 put each channel's tone on its own channel in SIMPLE and ASPX, the LFE's included",
-          "[ac4enc][encoder][multichannel]") {
+          "[ac4][encoder][multichannel]") {
     // Under the sanitizers half a second: check_routing()'s window, a third of
     // a second, holds each tone 100 dB over another 126 Hz away.
     const std::size_t count = seconds(2.0, 0.5);
@@ -872,7 +872,7 @@ TEST_CASE("5.0 and 5.1 put each channel's tone on its own channel in SIMPLE and 
     }
 }
 
-TEST_CASE("the encoder's 5.1 table of contents and MP4 description", "[ac4enc][encoder][multichannel]") {
+TEST_CASE("the encoder's 5.1 table of contents and MP4 description", "[ac4][encoder][multichannel]") {
     iclforge::ac4::EncoderConfig config;
     config.channels = 6;
     config.bitrate_kbps = 384;
@@ -886,7 +886,7 @@ TEST_CASE("the encoder's 5.1 table of contents and MP4 description", "[ac4enc][e
 }
 
 TEST_CASE("each aspx_data element fills the high band of the channels Table 213 gives it",
-          "[ac4enc][encoder][multichannel][aspx]") {
+          "[ac4][encoder][multichannel][aspx]") {
     // Noise above the crossover in one channel: after decoding only that
     // channel carries it, so the encoder's pairing of A-SPX channels is the
     // decoder's, element by element. Under the sanitizers 24 576 samples,
@@ -945,7 +945,7 @@ TEST_CASE("each aspx_data element fills the high band of the channels Table 213 
     }
 }
 
-TEST_CASE("the 7.X element's three layouts put each tone on its own channel", "[ac4enc][encoder][multichannel]") {
+TEST_CASE("the 7.X element's three layouts put each tone on its own channel", "[ac4][encoder][multichannel]") {
     const std::size_t count = seconds(2.0, 1.0);
     // Under the sanitizers every fifth run: each layout, with the LFE and
     // without, in ASPX and SIMPLE.
@@ -980,7 +980,7 @@ TEST_CASE("the 7.X element's three layouts put each tone on its own channel", "[
 }
 
 TEST_CASE("the experimental coding configurations choose frame by frame and decode where they should",
-          "[ac4enc][encoder][multichannel]") {
+          "[ac4][encoder][multichannel]") {
     // A second of each: independent tones; one signal in L, R and C at three
     // levels; and L again in Ls and R in Rs. Frames choose among the coding
     // configurations, and every channel comes back as its input. Under the
@@ -1110,7 +1110,7 @@ iclforge::ac4::CodecMode mode_of(const iclforge::ac4::EncoderConfig& config) {
 
 }  // namespace
 
-TEST_CASE("kAuto codes 5.X in ASPX_ACPL_3 and ASPX_ACPL_2 at the rates DEE does", "[ac4enc][encoder][acpl]") {
+TEST_CASE("kAuto codes 5.X in ASPX_ACPL_3 and ASPX_ACPL_2 at the rates DEE does", "[ac4][encoder][acpl]") {
     // 5.1: ASPX_ACPL_3 below 22.4 kbps a channel, ASPX_ACPL_2 below 33.6.
     struct Rate {
         int channels;
@@ -1135,7 +1135,7 @@ TEST_CASE("kAuto codes 5.X in ASPX_ACPL_3 and ASPX_ACPL_2 at the rates DEE does"
     CHECK(mode_of(config) == iclforge::ac4::CodecMode::kAspx);
 }
 
-TEST_CASE("the A-CPL modes the encoder does not write are refused", "[ac4enc][encoder][acpl]") {
+TEST_CASE("the A-CPL modes the encoder does not write are refused", "[ac4][encoder][acpl]") {
     struct Refused {
         int channels;
         iclforge::ac4::CodecMode mode;
@@ -1170,7 +1170,7 @@ TEST_CASE("the A-CPL modes the encoder does not write are refused", "[ac4enc][en
           iclforge::ac4::EncodeError::kInvalidConfig);
 }
 
-TEST_CASE("the 5.X element's A-CPL modes put each channel's tone on its own channel", "[ac4enc][encoder][acpl]") {
+TEST_CASE("the 5.X element's A-CPL modes put each channel's tone on its own channel", "[ac4][encoder][acpl]") {
     struct Leg {
         int kbps;
         iclforge::ac4::CodecMode mode;
@@ -1206,7 +1206,7 @@ TEST_CASE("the 5.X element's A-CPL modes put each channel's tone on its own chan
     }
 }
 
-TEST_CASE("A-CPL in stereo, experimental, puts each channel's tone on its own channel", "[ac4enc][encoder][acpl]") {
+TEST_CASE("A-CPL in stereo, experimental, puts each channel's tone on its own channel", "[ac4][encoder][acpl]") {
     // L's tone below ASPX_ACPL_1's residual top, 3 kHz, and R's above it, in
     // parameter band 10.
     const std::vector<double> hz = {subband_centre(1), subband_centre(12)};
@@ -1227,7 +1227,7 @@ TEST_CASE("A-CPL in stereo, experimental, puts each channel's tone on its own ch
     }
 }
 
-TEST_CASE("A-CPL keeps a pair's level difference and correlation", "[ac4enc][encoder][acpl]") {
+TEST_CASE("A-CPL keeps a pair's level difference and correlation", "[ac4][encoder][acpl]") {
     // L and Ls: a second of one noise at a 6 dB level difference, then a
     // second of two independent noises at one level; the other channels
     // quieter noises of their own. Under the sanitizers half a second of
@@ -1273,7 +1273,7 @@ TEST_CASE("A-CPL keeps a pair's level difference and correlation", "[ac4enc][enc
 }
 
 TEST_CASE("at the least rate a configuration takes every frame still goes out",
-          "[ac4enc][encoder]") {
+          "[ac4][encoder]") {
     // create() checks that the rate holds a silent I-frame as a stream
     // starts. A later I-frame can cost more: it codes A-CPL's values whole,
     // which a changing mix makes dearer than those a stream starts from; its
@@ -1403,7 +1403,7 @@ TEST_CASE("at the least rate a configuration takes every frame still goes out",
 }
 
 TEST_CASE("at the least rate a frame between I-frames keeps a stem's last parameters",
-          "[ac4enc][encoder]") {
+          "[ac4][encoder]") {
     // Between I-frames a stem's dialogue parameters are coded against the
     // last frame's, and a stem whose share of the channel jumps from frame to
     // frame makes that dearer than the least frame create() checks: the frame

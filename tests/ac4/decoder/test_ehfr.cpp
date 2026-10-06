@@ -168,7 +168,7 @@ constexpr std::array<Leg, 5> kLegs{{
 
 }  // namespace
 
-TEST_CASE("an assembled unit decodes to the frame it was cut from", "[ac4dec][ehfr][pcm]") {
+TEST_CASE("an assembled unit decodes to the frame it was cut from", "[ac4][decoder][ehfr][pcm]") {
     for (const Leg& leg : kLegs) {
         CAPTURE(leg.name, leg.stream_frame_rate_index, leg.fraction);
         const std::vector<MuxSource> sources = {dee(leg.name)};
@@ -199,7 +199,7 @@ TEST_CASE("an assembled unit decodes to the frame it was cut from", "[ac4dec][eh
     }
 }
 
-TEST_CASE("a unit with a transmission frame missing gives no frame", "[ac4dec][ehfr][pcm]") {
+TEST_CASE("a unit with a transmission frame missing gives no frame", "[ac4][decoder][ehfr][pcm]") {
     const std::vector<MuxSource> sources = {dee("ac4-ims-music-128-25")};
     auto cut = reframe(sources[0], kUnits, 2, 7);
     // The second frame of the fifth unit never arrives: the counters then jump, which Part 1
@@ -223,7 +223,7 @@ TEST_CASE("a unit with a transmission frame missing gives no frame", "[ac4dec][e
 }
 
 TEST_CASE("a damaged fragment loses its unit, which a concealment policy fills",
-          "[ac4dec][ehfr][pcm]") {
+          "[ac4][decoder][ehfr][pcm]") {
     const std::vector<MuxSource> sources = {dee("ac4-ims-music-128-25")};
     auto cut = reframe(sources[0], kUnits, 2, 7);
     // The last frame of the fifth unit is damaged beyond its table of contents.

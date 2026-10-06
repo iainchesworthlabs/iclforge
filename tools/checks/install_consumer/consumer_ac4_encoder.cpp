@@ -28,7 +28,7 @@
 namespace {
 
 int fail(const char* what) {
-    std::fprintf(stderr, "consumer_ac4enc: %s\n", what);
+    std::fprintf(stderr, "consumer_ac4_encoder: %s\n", what);
     return 1;
 }
 
@@ -89,7 +89,7 @@ int main() {
     }
 
     const std::string codecs = iclforge::ac4::rfc6381_codec_string(encoder->toc());
-    std::printf("consumer_ac4enc: %zu frames, %zu bytes, codecs %s, delay %d samples\n",
+    std::printf("consumer_ac4_encoder: %zu frames, %zu bytes, codecs %s, delay %d samples\n",
                 frames->size(), stream.size(), codecs.c_str(), encoder->delay_samples());
     return 0;
 }

@@ -81,7 +81,7 @@ std::vector<QmfValue> matrix(double scale, double step) {
 }  // namespace
 
 TEST_CASE("Table 20's prediction gains are sap_gain in full SAP's coded bands and 0 elsewhere",
-          "[ac4dec][immersive]") {
+          "[ac4][decoder][immersive]") {
     iclforge::ac4::detail::SubstreamContext ctx;
     iclforge::ac4::detail::SfInfo info;
     info.psy.max_sfb = {8, 0};
@@ -133,7 +133,7 @@ TEST_CASE("Table 20's prediction gains are sap_gain in full SAP's coded bands an
     }
 }
 
-TEST_CASE("S-CPL makes the channels of Tables 23 and 24", "[ac4dec][immersive]") {
+TEST_CASE("S-CPL makes the channels of Tables 23 and 24", "[ac4][decoder][immersive]") {
     using iclforge::ac4::detail::Real;
     const auto full = iclforge::ac4::detail::speakers_of(iclforge::ac4::detail::ch_mode::k7_1_4);
     const auto core = iclforge::ac4::detail::speakers_of(iclforge::ac4::detail::ch_mode::k7_1_4,
@@ -196,7 +196,7 @@ TEST_CASE("S-CPL makes the channels of Tables 23 and 24", "[ac4dec][immersive]")
 }
 
 TEST_CASE("S-CPL makes the 9.X.4 channels of Table 23's b_5fronts mapping and Table 24",
-          "[ac4dec][immersive][fronts]") {
+          "[ac4][decoder][immersive][fronts]") {
     using iclforge::ac4::detail::Real;
     const auto full = iclforge::ac4::detail::speakers_of(iclforge::ac4::detail::ch_mode::k9_1_4);
     const auto core = iclforge::ac4::detail::speakers_of(iclforge::ac4::detail::ch_mode::k9_1_4,
@@ -249,7 +249,7 @@ TEST_CASE("S-CPL makes the 9.X.4 channels of Table 23's b_5fronts mapping and Ta
 }
 
 TEST_CASE("the 9.X.4 element's A-SPX gains follow Table 11 and Table 9's b_5fronts row",
-          "[ac4dec][immersive][fronts]") {
+          "[ac4][decoder][immersive][fronts]") {
     using iclforge::ac4::detail::immersive_gains;
     const auto gains = [](int mode, DecodingMode decoding, Speaker speaker) {
         const auto g = immersive_gains(mode, decoding, true, speaker);
@@ -281,7 +281,7 @@ TEST_CASE("the 9.X.4 element's A-SPX gains follow Table 11 and Table 9's b_5fron
 }
 
 TEST_CASE("the immersive element's gains after A-SPX follow Tables 9 and 10 and clause 4.8.3.14",
-          "[ac4dec][immersive]") {
+          "[ac4][decoder][immersive]") {
     using iclforge::ac4::detail::immersive_gains;
     const auto gains = [](int mode, DecodingMode decoding, Speaker speaker, bool fronts = false) {
         const auto g = immersive_gains(mode, decoding, fronts, speaker);
@@ -323,7 +323,7 @@ TEST_CASE("the immersive element's gains after A-SPX follow Tables 9 and 10 and 
 }
 
 TEST_CASE("A-CPL's four immersive modules take Table 25's channels and Pseudocode 2's gains",
-          "[ac4dec][immersive]") {
+          "[ac4][decoder][immersive]") {
     const auto speakers =
         iclforge::ac4::detail::speakers_of(iclforge::ac4::detail::ch_mode::k7_0_4);
     const auto run = [&](int mode, const iclforge::ac4::detail::AcplFrameValues& values,
@@ -646,7 +646,7 @@ std::array<Decorrelated, 6> core_decorrelators() {
 }  // namespace
 
 TEST_CASE("A-JCC's values decode and dequantise by Pseudocodes 3 to 5",
-          "[ac4dec][immersive][ajcc]") {
+          "[ac4][decoder][immersive][ajcc]") {
     using ajcc::Kind;
     CHECK(ajcc::dequantise(Kind::kDry, 9, acpl::Quant::kFine) == 9 * 0.1 - 0.6);
     CHECK(ajcc::dequantise(Kind::kDry, 4, acpl::Quant::kCoarse) == 4 * 0.2 - 0.6);
@@ -735,7 +735,7 @@ TEST_CASE("A-JCC's values decode and dequantise by Pseudocodes 3 to 5",
 }
 
 TEST_CASE("A-JCC's pre-modification follows ajcc_core_mode (Pseudocode 9)",
-          "[ac4dec][immersive][ajcc]") {
+          "[ac4][decoder][immersive][ajcc]") {
     ajcc::PreModification<Real> pre;
     const std::vector<QmfValue> in1 = matrix(1.0, 0.3);
     const std::vector<QmfValue> in2 = matrix(2.0, 0.5);
@@ -765,7 +765,7 @@ TEST_CASE("A-JCC's pre-modification follows ajcc_core_mode (Pseudocode 9)",
 }
 
 TEST_CASE("A-JCC full decoding makes Pseudocode 8's eleven channels from known QMF input",
-          "[ac4dec][immersive][ajcc]") {
+          "[ac4][decoder][immersive][ajcc]") {
     const double r = 1.0 / std::numbers::sqrt2;
     SECTION("ajcc_core_mode 0: the core is L, R, C, Ls and Rs") {
         auto reference = full_decorrelators();
@@ -808,7 +808,7 @@ TEST_CASE("A-JCC full decoding makes Pseudocode 8's eleven channels from known Q
 }
 
 TEST_CASE("A-JCC core decoding makes Pseudocode 12's seven channels from known QMF input",
-          "[ac4dec][immersive][ajcc]") {
+          "[ac4][decoder][immersive][ajcc]") {
     SECTION("ajcc_core_mode 0") {
         auto reference = core_decorrelators();
         check_ajcc(
@@ -847,7 +847,7 @@ TEST_CASE("A-JCC core decoding makes Pseudocode 12's seven channels from known Q
 }
 
 TEST_CASE("A-CPL's six 9.X.4 modules add (L, Lscr) and (R, Rscr) on D2, without the square root of 2",
-          "[ac4dec][immersive][fronts]") {
+          "[ac4][decoder][immersive][fronts]") {
     const auto speakers =
         iclforge::ac4::detail::speakers_of(iclforge::ac4::detail::ch_mode::k9_1_4);
     const auto run = [&](int mode, const iclforge::ac4::detail::AcplFrameValues& values,
