@@ -285,7 +285,7 @@ HEADER_MAP: dict[str, str] = {
     "ac3iab/model.hpp": "iclforge/iab/model.hpp",
     "ac3iab/mxf.hpp": "iclforge/iab/mxf.hpp",
     "ac4/ac4.hpp": "iclforge/ac4/ac4.hpp",
-    "ac4/detail/profiling.hpp": "iclforge/base/detail/profiling.hpp",
+    "ac4/detail/profiling.hpp": "iclforge/ac4core/detail/profiling.hpp",
     "ac4/detail/real.hpp": "iclforge/ac4core/detail/real.hpp",
     "ac4/syntax.hpp": "iclforge/ac4/syntax.hpp",
     "ac4dec/decoder.hpp": "iclforge/ac4dec/decoder.hpp",
@@ -348,8 +348,18 @@ _HEADER_RX = re.compile(
 )
 
 
+# Where a header the map names has gone since S2: planning/consolidation.md's stages move headers
+# that N1B put in place. The map stays what L2 derives (test_docs holds it to that); a page the
+# header rule rewrites takes the header's spelling of today.
+LATER_SPELLINGS: dict[str, str] = {
+    # C0: the AC-4 core's profiling variant is iclforge::base's
+    "iclforge/ac4core/detail/profiling.hpp": "iclforge/base/detail/profiling.hpp",
+}
+
+
 def new_header(path: str) -> str:
-    return HEADER_MAP.get(path, path)
+    new = HEADER_MAP.get(path, path)
+    return LATER_SPELLINGS.get(new, new)
 
 
 # --- the decisions --------------------------------------------------------------------------------

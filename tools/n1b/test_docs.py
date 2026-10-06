@@ -451,7 +451,11 @@ class Former(unittest.TestCase):
 class Tables(unittest.TestCase):
     def test_the_header_map_names_a_header_of_the_tree(self) -> None:
         spellings = {layoutdef.spelling_of(f) for f in Repo(DEFAULT_ROOT).files}
-        missing = sorted(new for new in D.HEADER_MAP.values() if new not in spellings)
+        missing = sorted(
+            D.LATER_SPELLINGS.get(new, new)
+            for new in D.HEADER_MAP.values()
+            if D.LATER_SPELLINGS.get(new, new) not in spellings
+        )
         self.assertEqual(missing, [])
 
     def test_the_header_map_is_what_the_layout_gives(self) -> None:
