@@ -22,7 +22,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "ac4dec_mux.hpp"
+#include "mux.hpp"
 #include "encoder/frame/toc_writer.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"

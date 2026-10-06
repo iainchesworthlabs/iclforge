@@ -25,7 +25,7 @@
 
 #include "ac4_object_render.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
-#include "ac4dec_objects.hpp"
+#include "objects.hpp"
 
 namespace {
 

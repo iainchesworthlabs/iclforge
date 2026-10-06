@@ -1,4 +1,4 @@
-#include "ac4dec_constructed.hpp"
+#include "constructed.hpp"
 
 #include <algorithm>
 #include <array>
@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <utility>
 
-#include "ac4dec_printed_matrices.hpp"
+#include "printed_matrices.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "encoder/acpl/acpl_syntax.hpp"
 #include "encoder/ajcc/ajcc_syntax.hpp"

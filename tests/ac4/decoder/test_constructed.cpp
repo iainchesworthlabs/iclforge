@@ -33,7 +33,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "iclforge/ac4/decoder/decoder.hpp"
-#include "ac4dec_constructed.hpp"
+#include "constructed.hpp"
 #include "core/dsp/qmf.hpp"
 #include "sanitized.hpp"
 

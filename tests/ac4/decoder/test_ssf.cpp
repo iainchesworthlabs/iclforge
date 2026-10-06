@@ -21,8 +21,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "ac4/core/ac4_toc_writer.hpp"
-#include "ac4/decoder/ac4dec_bits.hpp"
+#include "ac4/core/toc_writer.hpp"
+#include "ac4/decoder/bits.hpp"
 #include "core/bit_reader.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "decoder/syntax/context.hpp"

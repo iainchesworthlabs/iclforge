@@ -21,9 +21,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "ac4dec_units.hpp"
+#include "units.hpp"
 
-#include "ac4dec_printed_matrices.hpp"
+#include "printed_matrices.hpp"
 #include "decoder/pcm/multichannel.hpp"
 #include "decoder/pcm/routing.hpp"
 

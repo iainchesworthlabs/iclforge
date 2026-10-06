@@ -1,4 +1,4 @@
-#include "ac4dec_hsf.hpp"
+#include "hsf.hpp"
 
 #include <algorithm>
 #include <array>
@@ -9,9 +9,9 @@
 #include <span>
 #include <stdexcept>
 
-#include "ac4/core/ac4_toc_writer.hpp"
-#include "ac4dec_bits.hpp"
-#include "ac4dec_printed_matrices.hpp"
+#include "ac4/core/toc_writer.hpp"
+#include "bits.hpp"
+#include "printed_matrices.hpp"
 #include "core/dsp/kbd.hpp"
 #include "core/dsp/mdct.hpp"
 #include "core/tables/huffman_tables.hpp"

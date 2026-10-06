@@ -22,7 +22,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "ac4dec_units.hpp"
+#include "units.hpp"
 
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "core/acpl/acpl.hpp"

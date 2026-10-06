@@ -26,7 +26,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "../decoder/ac4dec_mux.hpp"
+#include "../decoder/mux.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"

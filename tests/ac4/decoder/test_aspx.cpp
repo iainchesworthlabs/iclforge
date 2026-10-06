@@ -25,7 +25,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "ac4dec_units.hpp"
+#include "units.hpp"
 #include "iclforge/base/arithmetic/scalar_math.hpp"
 #include "decoder/pcm/aspx.hpp"
 #include "decoder/pcm/companding.hpp"

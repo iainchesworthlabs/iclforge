@@ -21,7 +21,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "ac4dec_bits.hpp"
+#include "bits.hpp"
 #include "core/bit_reader.hpp"
 #include "decoder/syntax/acpl.hpp"
 #include "decoder/syntax/aspx.hpp"

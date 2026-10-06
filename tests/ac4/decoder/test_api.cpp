@@ -49,7 +49,7 @@
 #include "iclforge/ac4/core/syntax.hpp"
 #include "ac4_stream_kinds.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
-#include "ac4dec_bits.hpp"
+#include "bits.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "sanitized.hpp"
 

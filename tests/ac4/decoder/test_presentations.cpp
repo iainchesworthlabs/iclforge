@@ -47,9 +47,9 @@
 
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/ac4/core/toc.hpp"
-#include "ac4/core/ac4_toc_writer.hpp"
+#include "ac4/core/toc_writer.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
-#include "ac4dec_mux.hpp"
+#include "mux.hpp"
 #include "decoder/pcm/mixer.hpp"
 #include "sanitized.hpp"
 

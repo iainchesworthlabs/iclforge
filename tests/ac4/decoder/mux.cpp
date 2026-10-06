@@ -1,4 +1,4 @@
-#include "ac4dec_mux.hpp"
+#include "mux.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -9,7 +9,7 @@
 
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/ac4/core/toc.hpp"
-#include "ac4/core/ac4_toc_writer.hpp"
+#include "ac4/core/toc_writer.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "core/bit_writer.hpp"

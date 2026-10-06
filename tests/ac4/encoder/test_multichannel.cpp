@@ -16,7 +16,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "../decoder/ac4dec_printed_matrices.hpp"
+#include "../decoder/printed_matrices.hpp"
 #include "encoder/asf/coder.hpp"
 #include "encoder/asf/layout.hpp"
 #include "encoder/asf/multichannel.hpp"

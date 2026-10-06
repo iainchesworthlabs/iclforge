@@ -30,7 +30,7 @@
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
-#include "ac4dec_objects.hpp"
+#include "objects.hpp"
 #include "decoder/pcm/isf.hpp"
 #include "core/tables/isf_tables.hpp"
 

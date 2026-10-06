@@ -23,7 +23,7 @@
 #include "iclforge/ac4/io/carriage.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/ac4/core/toc.hpp"
-#include "ac4/core/ac4_toc_writer.hpp"
+#include "ac4/core/toc_writer.hpp"
 
 namespace {
 

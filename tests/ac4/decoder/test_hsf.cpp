@@ -19,7 +19,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "ac4dec_hsf.hpp"
+#include "hsf.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "decoder/pcm/downmix.hpp"
 #include "decoder/pcm/drc.hpp"
