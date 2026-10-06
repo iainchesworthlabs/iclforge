@@ -45,6 +45,7 @@ the `AC3FORGE_` variables. The family is ICL Forge now, and its programs are `fo
 | [topology.md](topology.md) | Source, transport, sink roles; HLS/CMAF transport | Hearth sinks use Sendspin instead ([SUPERSEDED.md](SUPERSEDED.md)); none of the HLS/CMAF transport is built, and its frame still applies elsewhere |
 | [host-plugin.md](host-plugin.md) | DAW/NLE metering/QC plugin feasibility | [Proposed — DAW/NLE host plugin](../ROADMAP.md#proposed) |
 | [qc-report.md](qc-report.md) | Delivery-shaped QC report file | [Proposed — QC delivery report file](../ROADMAP.md#proposed) |
+| [consolidation.md](consolidation.md) | One shape for every codec (AC-3's), AC-4's four libraries as one, the copies of codec-blind code removed, and `src/` from 22 libraries to 12, in stages C0 to C6 | Proposed 2026-10-06; decisions 1 to 5 taken, 6 to 10 open; nothing built |
 | [layout.md](layout.md) | The layout and names of `src/` (N1B): codecs as peers over a codec-blind base, three layouts, the migration stages and a prototype, with an [inventory](layout-inventory.md); built as L2 in the stages S0 to S6 and N1A (see [what the runs found](layout.md#what-the-runs-found-that-the-plan-did-not)) | [N1 in the AC-4 plan](ac4.md#n1-the-names) |
 
 ---
