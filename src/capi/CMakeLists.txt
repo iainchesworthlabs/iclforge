@@ -69,7 +69,7 @@
 # dependencies to its own consumers as link-only, so naming the decoder and
 # encoder archives is enough to pull in the inspector and the DSP core
 # transitively - apps/cli/CMakeLists.txt relies on the same transitive closure
-# for iclforge::ac4/iclforge::ac4.
+# for iclforge::ac4.
 set(_capi_sources
     src/atmos.cpp
     src/common.cpp

@@ -25,7 +25,7 @@
 // fixed names both of forge probe's forms use, and the AC-4 walk.
 //
 // Compiled into each application that uses it, like the rest of apps/common:
-// it needs iclforge::ac3, iclforge::ac4 and iclforge::ac4, which both applications
+// it needs iclforge::ac3, iclforge::ac4, which both applications
 // link.
 
 namespace iclforge::apps::probe_json {

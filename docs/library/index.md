@@ -140,7 +140,7 @@ cover behaviors, not additional public APIs/targets/binaries, and each of these 
 | `mp4` | `iclforge::mp4` |
 | `mpegts` | `iclforge::mpegts` |
 | `capi` | `iclforge::c`, the C API (see [C API](c-api.md)) |
-| `ac4` | `iclforge::ac4`, `iclforge::ac4` and `iclforge::ac4` (see [AC-4](ac4.md)) |
+| `ac4` | `iclforge::ac4` (see [AC-4](ac4.md)) |
 | `iab` | `iclforge::iab` (see [IAB](iab.md)) |
 | `iamf` | `iclforge::iamf` (see [IAMF](iamf.md)) |
 
@@ -254,7 +254,7 @@ re-synced by hand and can drift. Each page's "Full program" link is the canonica
 - [IAMF](iamf.md) — `iclforge::iamf`, a standalone reader and writer: a decoded 7.1.4 programme
   re-wrapped as a channel-based IAMF Audio Element, object-based Audio Elements with animated
   positions, ISO-BMFF, raw OBU streams and fragments (on by default).
-- [AC-4](ac4.md) — `iclforge::ac4`, `iclforge::ac4` and the inspector both work through,
+- [AC-4](ac4.md) — `iclforge::ac4` and the inspector both work through,
   `iclforge::ac4`: the decoder's controls, the choice of presentation and what the decoder reports; the
   encoder's configuration, substreams and presentations; and linking (on by default).
 - [Measuring quality](quality.md) — `iclforge::ac3::quality`, the decoded-domain distortion measure and the

@@ -18,7 +18,7 @@
 #include <utility>
 #include <vector>
 
-// The variant of the `ac3.ac4` submodule compiled when iclforge::ac4/iclforge::ac4/
+// The variant of the `ac3.ac4` submodule compiled when iclforge::ac4/
 // iclforge::ac4 are in this build.
 //
 // pybind11-direct on iclforge::ac4::Decoder/iclforge::ac4::Encoder, the same policy as the rest of

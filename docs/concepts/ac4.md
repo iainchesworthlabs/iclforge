@@ -10,7 +10,7 @@ personalized audio. It shares no bitstream syntax with AC-3 or E-AC-3, so it doe
 them the way E-AC-3 builds on AC-3. A decoder for AC-3 and E-AC-3 cannot read an AC-4 stream, and
 an AC-4 stream carries no AC-3 or E-AC-3 stream inside it for such a decoder to fall back to.
 
-ICL Forge's AC-4 libraries, `iclforge::ac4` and `iclforge::ac4`, were written from the two parts and
+ICL Forge's AC-4 libraries, `iclforge::ac4`, were written from the two parts and
 link nothing from `iclforge::ac3`. [AC-4 decoding and encoding](../library/ac4.md) is their API
 reference.
 

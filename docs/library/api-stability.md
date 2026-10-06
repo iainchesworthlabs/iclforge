@@ -182,7 +182,7 @@ decision on this page, the same way `iclforge::iab` will. `iclforge::render` is 
 the ESP32 player and serves the desktop player as well, it has been a library of its own since the
 re-layout, and its speaker management is new with it.
 
-The AC-4 inspector, decoder and encoder (`iclforge::ac4`, `iclforge::ac4`, `iclforge::ac4`,
+The AC-4 inspector, decoder and encoder (`iclforge::ac4`,
 [AC-4](ac4.md)) are Experimental too. Their API has the form
 [planning/ac4.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md) set, and
 the immersive layouts, core decoding and objects came as fields after the ones channel-based

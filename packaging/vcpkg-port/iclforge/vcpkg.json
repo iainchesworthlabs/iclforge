@@ -30,7 +30,7 @@
       "description": "Stable, minimal C11 API over the AC-3 and E-AC-3 encode/decode core, and over AC-4 when the ac4 feature is also on (iclforge::c) - for bindings and embedding by callers that cannot or do not want to link C++23"
     },
     "ac4": {
-      "description": "AC-4 (ETSI TS 103 190) sync frame and table of contents reader, decoder and encoder (iclforge::ac4, iclforge::ac4, iclforge::ac4) - depends on nothing in iclforge::ac3"
+      "description": "AC-4 (ETSI TS 103 190) sync frame and table of contents reader, decoder and encoder (iclforge::ac4) - depends on nothing in iclforge::ac3"
     },
     "iab": {
       "description": "Standalone SMPTE ST 2098-2 Immersive Audio Bitstream reader (iclforge::iab) - depends on nothing in iclforge::ac3"

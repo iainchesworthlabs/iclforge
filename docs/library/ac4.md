@@ -1,4 +1,4 @@
-# AC-4 (ETSI TS 103 190): `iclforge::ac4` and `iclforge::ac4`
+# AC-4 (ETSI TS 103 190): `iclforge::ac4`
 
 `iclforge/ac4dec/decoder.hpp`, library `iclforge::ac4`, and `iclforge/ac4enc/encoder.hpp`, library `iclforge::ac4`,
 with the inspector both work through, `iclforge/ac4/ac4.hpp` in library `iclforge::ac4`. An AC-4 decoder and
@@ -482,7 +482,7 @@ target_link_libraries(your_target PRIVATE iclforge::ac4_static)   # or iclforge:
 
 Each decoder and encoder library links the inspector of its own kind, `iclforge::ac4_static` or
 `iclforge::ac4_shared`. A package installed with one linkage, as a vcpkg or Conan one is, also defines
-the bare `iclforge::ac4`, `iclforge::ac4` and `iclforge::ac4`. The static decoder and encoder call into
+the bare `iclforge::ac4`. The static decoder and encoder call into
 `iclforge::ac4`, a static archive of the tables and transforms the two share (`libac4core_static.a`,
 no headers), which their exported targets name as a link-only dependency; each shared library
 carries the part of it that it uses. Through pkg-config the decoder is `ac4dec` and the encoder

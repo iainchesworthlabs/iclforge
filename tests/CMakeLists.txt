@@ -261,7 +261,7 @@ target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/s
 # iclforge_ac4_objects under CXX_VISIBILITY_PRESET hidden. With BUILD_SHARED_LIBS=ON,
 # iclforge::ac4 is libac4dec.so and iclforge::ac4 libac4enc.so, which export none
 # of them, so these tests link only against the static libraries and are built
-# only when that is what iclforge::ac4 and iclforge::ac4 name. They test the
+# only when that is what iclforge::ac4 name. They test the
 # syntax and the arithmetic, not the linkage: every static leg runs them, and
 # the shared-libs pass (config-linux-llvm-shared) still runs the tests of the
 # public API, test_ac4dec_{decoder,frames,syntax}.cpp and test_ac4enc_encoder.cpp,

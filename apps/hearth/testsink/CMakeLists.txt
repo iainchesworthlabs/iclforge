@@ -4,7 +4,7 @@
 add_library(hearth_testsink STATIC burst_output.cpp sink.cpp store.cpp wav_output.cpp)
 target_include_directories(hearth_testsink PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_features(hearth_testsink PUBLIC cxx_std_23)
-# iclforge::ac4 and iclforge::ac4 for the extension role's AC-4 bursts (planning/ac4.md, D11): the
+# iclforge::ac4 for the extension role's AC-4 bursts (planning/ac4.md, D11): the
 # decoder, and the inspector's sync-frame scan in front of it.
 target_link_libraries(hearth_testsink PUBLIC iclforge::sendspin iclforge::ac3 iclforge::ac4 iclforge::ac4)
 # iclforge::coverage: this library's sources are also linked straight into iclforge-tests (tests/CMakeLists.txt),
