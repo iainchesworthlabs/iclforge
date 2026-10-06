@@ -10,7 +10,7 @@
 #include "core/tables/qmf_tables.hpp"
 
 // The QMF steps of dsp/qmf_kernels.hpp on the seam's 128-bit vector types
-// (src/arithmetic/arch: f64x2 at double, f32x4 at float), one step for one step.
+// (src/base/variants: f64x2 at double, f32x4 at float), one step for one step.
 // Each is written to perform, in every lane, the operations its scalar
 // counterpart performs, in the same order: one IEEE add, subtract or multiply at a
 // time, no fused multiply-add (the build pins -ffp-contract=off, and the seam's

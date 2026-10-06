@@ -93,7 +93,7 @@ add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 #  - It is invisible. Nothing in the source says a contraction happened, so
 #    the difference cannot be reviewed, only measured after the fact.
 #  - It would break the SIMD seam's correctness argument outright.
-#    src/arithmetic/arch/*/ac3/internal/arch/simd.hpp maps every
+#    src/base/variants/arch-*/iclforge/base/detail/simd.hpp maps every
 #    operation to exactly one IEEE-754 add/subtract/multiply so that a
 #    vectorised kernel is bit-identical to the scalar loop it replaced. That
 #    holds only if the scalar loop is not silently getting a fused form the
@@ -734,7 +734,7 @@ message(STATUS "  Audio backend  : ${ICLFORGE_AUDIO_BACKEND}")
 if(ICLFORGE_BUILD_CRUCIBLE AND LINUX)
     message(STATUS "  Crucible X11   : ${ICLFORGE_CRUCIBLE_X11_BACKEND}")
 endif()
-# Which src/arithmetic/arch/ directory the codec's vector kernels
+# Which src/base/variants/ directory the codec's vector kernels
 # were compiled from (SIMD kernels). 'generic' is the portable scalar
 # reference; -DICLFORGE_SIMD=generic forces it anywhere.
 message(STATUS "  SIMD kernels   : ${ICLFORGE_SIMD_RESOLVED}")

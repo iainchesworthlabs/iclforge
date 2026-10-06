@@ -5,7 +5,7 @@
 #include "iclforge/base/detail/simd.hpp"
 
 // The sample rate converter's dot product at float (dsp/resampler.cpp), on the seam's
-// 128-bit f32x4 (src/arithmetic/arch).
+// 128-bit f32x4 (src/base/variants).
 //
 // A sequential sum of 94 to 100 products is a chain of dependent adds, and on the ESP32-P4's
 // single-precision FPU each add waits for the last. The sum is therefore split over four

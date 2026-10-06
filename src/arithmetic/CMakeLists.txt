@@ -134,8 +134,8 @@ set(ICLFORGE_ARCH_INCLUDE_DIR
 if(NOT IS_DIRECTORY "${ICLFORGE_ARCH_INCLUDE_DIR}")
     message(FATAL_ERROR
         "ICLFORGE_SIMD=${ICLFORGE_SIMD} resolved to '${ICLFORGE_SIMD_RESOLVED}', which has no "
-        "directory under src/arithmetic/variants/. Add "
-        "src/arithmetic/variants/arch-<name>/iclforge/arithmetic/detail/simd.hpp - the arch-generic "
+        "directory under src/base/variants/. Add "
+        "src/base/variants/arch-<name>/iclforge/arithmetic/detail/simd.hpp - the arch-generic "
         "copy is the portable implementation and is a working starting point.")
 endif()
 
