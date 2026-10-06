@@ -31,7 +31,7 @@
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "objects.hpp"
-#include "decoder/pcm/isf.hpp"
+#include "oba/isf.hpp"
 #include "core/tables/isf_tables.hpp"
 
 namespace {
