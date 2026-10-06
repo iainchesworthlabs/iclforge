@@ -35,7 +35,7 @@ using iclforge::ac4::detail::AcplData2chFields;
 using iclforge::ac4::detail::AcplParamFields;
 using iclforge::ac4::detail::AspxChannelFields;
 using iclforge::ac4::detail::AspxSetup;
-using iclforge::ac4::detail::BitWriter;
+using iclforge::BitWriter;
 using iclforge::ac4::detail::CodedTrack;
 using iclforge::ac4::detail::FrameLayout;
 using Lines = std::vector<double>;

@@ -29,8 +29,8 @@ using iclforge::ac4::detail::AcplConfig2chFields;
 using iclforge::ac4::detail::AcplFramingFields;
 using iclforge::ac4::detail::AcplKind;
 using iclforge::ac4::detail::AcplParamFields;
-using iclforge::ac4::detail::BitReader;
-using iclforge::ac4::detail::BitWriter;
+using iclforge::BitReader;
+using iclforge::BitWriter;
 
 // A trace kept here; iclforge::ac4::SyntaxSink refers to its callable without owning it.
 struct Recording {

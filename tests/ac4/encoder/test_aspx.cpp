@@ -37,8 +37,8 @@ using iclforge::ac4::detail::AspxConfigFields;
 using iclforge::ac4::detail::AspxCounts;
 using iclforge::ac4::detail::AspxEnvelopeFields;
 using iclforge::ac4::detail::AspxIntervalClass;
-using iclforge::ac4::detail::BitReader;
-using iclforge::ac4::detail::BitWriter;
+using iclforge::BitReader;
+using iclforge::BitWriter;
 
 // A trace kept here. iclforge::ac4::SyntaxSink refers to its callable without owning
 // it, so the callable is a member, alive as long as the recording.

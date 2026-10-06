@@ -47,7 +47,7 @@ using iclforge::ac4::detail::AspxElementState;
 using iclforge::ac4::detail::AspxHcbType;
 using iclforge::ac4::detail::AspxIntClass;
 using iclforge::ac4::detail::AspxStereoMode;
-using iclforge::ac4::detail::BitReader;
+using iclforge::BitReader;
 using iclforge::ac4::detail::ChannelElement;
 using iclforge::ac4::detail::ChannelElementState;
 using iclforge::ac4::detail::Codebook;

@@ -185,7 +185,7 @@ namespace {
 
 using detail::AudioSubstream;
 using detail::AudioSubstreamState;
-using detail::BitReader;
+using iclforge::BitReader;
 using detail::ParseResult;
 using detail::PresentationContext;
 using detail::PresentationSubstream;

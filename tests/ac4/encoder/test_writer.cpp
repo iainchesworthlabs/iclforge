@@ -32,8 +32,8 @@
 
 namespace {
 
-using iclforge::ac4::detail::BitReader;
-using iclforge::ac4::detail::BitWriter;
+using iclforge::BitReader;
+using iclforge::BitWriter;
 
 std::vector<iclforge::ac4::SyntaxRecord> records_of(
     std::span<const iclforge::ac4::SyntaxRecord> all, int substream) {
@@ -65,7 +65,7 @@ TEST_CASE("variable_bits written by the encoder reads back through the decoder's
             BitWriter w;
             w.write_variable_bits(n, value, "v");
             w.write(3, 5, "tail");
-            CHECK(w.bit_count() == iclforge::ac4::detail::variable_bits_width(n, value) + 3);
+            CHECK(w.bit_count() == iclforge::variable_bits_width(n, value) + 3);
             BitReader r(w.bytes(), 0, {});
             CHECK(r.variable_bits(static_cast<int>(n), "v") == value);
             CHECK(r.read(3, "tail") == 5U);

@@ -28,7 +28,7 @@ namespace {
 using iclforge::ac4::detail::AjocFields;
 using iclforge::ac4::detail::AjocObjectFields;
 using iclforge::ac4::detail::AjocSetFields;
-using iclforge::ac4::detail::BitWriter;
+using iclforge::BitWriter;
 using iclforge::ac4::detail::FrameLayout;
 using iclforge::ac4::detail::OamdObject;
 using iclforge::ac4::detail::OamdObjectKind;

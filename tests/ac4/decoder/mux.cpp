@@ -19,7 +19,7 @@ namespace ac4dec_test {
 namespace {
 
 using iclforge::ac4::SyntaxRecord;
-using iclforge::ac4::detail::BitWriter;
+using iclforge::BitWriter;
 
 // One frame of a source, taken apart: each substream's bytes and the records
 // the decoder read from it, and what the table of contents says of them.

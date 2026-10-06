@@ -49,7 +49,7 @@ std::string_view describe(EncodeError error) {
 
 namespace {
 
-using detail::BitWriter;
+using iclforge::BitWriter;
 using detail::FrameLayout;
 
 // Why a configuration is refused: a string literal naming the rule it breaks,

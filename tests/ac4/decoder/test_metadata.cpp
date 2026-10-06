@@ -22,7 +22,7 @@
 namespace {
 
 using iclforge::ac4::DecodeError;
-using iclforge::ac4::detail::BitReader;
+using iclforge::BitReader;
 using iclforge::ac4::detail::DrcContext;
 using iclforge::ac4::detail::DrcFrame;
 using iclforge::ac4::detail::DrcState;

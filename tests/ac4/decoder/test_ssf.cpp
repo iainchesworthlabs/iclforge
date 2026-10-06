@@ -30,7 +30,7 @@
 
 namespace {
 
-using iclforge::ac4::detail::BitReader;
+using iclforge::BitReader;
 using iclforge::ac4::detail::SsfData;
 using iclforge::ac4::detail::SsfState;
 using iclforge::ac4::detail::SubstreamContext;

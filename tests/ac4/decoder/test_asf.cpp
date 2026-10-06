@@ -31,7 +31,7 @@
 namespace {
 
 using iclforge::ac4::DecodeError;
-using iclforge::ac4::detail::BitReader;
+using iclforge::BitReader;
 using iclforge::ac4::detail::ChparamInfo;
 using iclforge::ac4::detail::Codebook;
 using iclforge::ac4::detail::HsfExtHeader;
