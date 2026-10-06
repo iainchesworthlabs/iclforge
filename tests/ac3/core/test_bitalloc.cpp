@@ -171,7 +171,7 @@ TEST_CASE("monotonicity: more snr offset never allocates fewer bits", "[bitalloc
 }
 
 // Found by fuzz/fuzz_signing_verify (signing-verify fuzz walk), through
-// iclforge::signing's own frame walk: a frame whose fields make an allocation
+// iclforge::ac3::signing's own frame walk: a frame whose fields make an allocation
 // region empty reached the §7.2.2.4 band walk, whose upper bound is
 // kMaskTab[end - 1] - and `end - 1` on end == 0 indexes that 256-entry table
 // at SIZE_MAX. UBSan reported the pointer overflow; the shipped NDEBUG build

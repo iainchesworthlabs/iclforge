@@ -12,7 +12,7 @@
 #include "iclforge/audio/audio_backend.hpp"
 
 // The ADM BWF reader, phase 3 of 3 (feeding the JOC encoder) - the narrow
-// seam between main.cpp's 'atmos-adm' command and iclforge::adm/iclforge::admbridge, this project's
+// seam between main.cpp's 'atmos-adm' command and iclforge::adm, this project's
 // one opt-in, non-default library (ICLFORGE_BUILD_ADM, default OFF - see root CMakeLists.txt's
 // own option() for why: libadm's Boost dependency).
 //
@@ -21,7 +21,7 @@
 // see .github/workflows/ci.yml's own "Check for preprocessor conditionals in src/" job) refuses ANY
 // #if/#ifdef/#ifndef under src/ - deliberately stricter than "no OS macros"; that script's own
 // header comment says a feature-flag #ifdef is "just as unwelcome as a platform one". So whether
-// iclforge::adm/iclforge::admbridge exist in this particular build has to be a build-time FILE
+// iclforge::adm exist in this particular build has to be a build-time FILE
 // choice, the same "exactly one implementation, selected by CMake" shape
 // apps/cli/platform/{windows,posix}/ stdio_binary.cpp and src/audio's own src/backend/<os>/
 // directory already use for an OS difference - here for a library-linked-or-not difference instead.

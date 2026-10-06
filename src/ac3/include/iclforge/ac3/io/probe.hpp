@@ -247,7 +247,7 @@ struct ProbeOptions {
     ProbeAccessUnitSink on_access_unit;
     // Whether a syncframe carries an authenticity tag. Supplied by the caller
     // rather than called directly because signing lives in its own library
-    // (iclforge::signing, which this one does not and should not link) - pass
+    // (iclforge::ac3::signing, which this one does not and should not link) - pass
     // iclforge::ac3::signing::has_authenticity_tag here. Unset means the question is
     // not asked and every frame reports untagged.
     std::function<bool(std::span<const std::byte>)> authenticity;

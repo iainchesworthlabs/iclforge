@@ -339,7 +339,7 @@ forge ac4-encode me_51.wav out.mp4 448 substream1-content=music-and-effects \
 row as `UNAVAILABLE HERE` instead of the description below, and running it prints a clear reason
 (`forge atmos-adm ...` → `error: 'atmos-adm' is unavailable on this platform: this build was not
 configured with -DICLFORGE_BUILD_ADM=ON ...`) rather than "unknown command". Three things in the
-tool need `iclforge::adm`/`iclforge::admbridge`, this project's sole opt-in, Boost-requiring module
+tool need `iclforge::adm`, this project's sole opt-in, Boost-requiring module
 (default **off** — see [ADM / BW64 reading](../../library/adm.md#why-opt-in)): this command,
 `atmos-iab` below, and `decode`'s optional `adm_out` argument. Everything else builds and works
 identically whether that flag is on or off. What the row looks like in a build configured
@@ -433,7 +433,7 @@ for the same pipeline as a minimal, standalone, self-fixturing program.
 **Only *runnable* in a build with `-DICLFORGE_BUILD_ADM=ON`** — the identical gate and the same
 `UNAVAILABLE HERE`/clear-error treatment `atmos-adm` above gets, and for the same underlying
 reason even though `iclforge::iab` itself is on by default: this command needs
-[`iclforge::admbridge`'s own IAB mapping](../../library/adm-bridge.md#bridging-iab)
+[`iclforge::adm`'s own IAB mapping](../../library/adm-bridge.md#bridging-iab)
 (`build_iab()`), and that whole module rides `ICLFORGE_BUILD_ADM` (see
 [ADM / BW64 reading](../../library/adm.md#why-opt-in)) since it PUBLIC-links `iclforge::adm`
 alongside `iclforge::iab`. What the row looks like in a build configured with the flag on (the

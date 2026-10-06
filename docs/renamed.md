@@ -78,7 +78,7 @@ header that moved changed with it (`ac3/core/layout.hpp` is `iclforge/base/layou
 | `ac3::forge`, `ac3::forge_static`, `ac3::forge_shared` | `iclforge::ac3`, `iclforge::ac3_static`, `iclforge::ac3_shared` |
 | `ac3::forge_minimal` | `iclforge::ac3_minimal` |
 | `ac3::forge_c` (`_static`, `_shared`) | `iclforge::c` (`iclforge::c_static`, `iclforge::c_shared`) |
-| `ac3::audio`, `ac3::sendspin`, `ac3::signing`, `ac3::admbridge`, `ac3::arithmetic` | `iclforge::audio`, `iclforge::sendspin`, `iclforge::signing`, `iclforge::admbridge`, `iclforge::base_arithmetic` |
+| `ac3::audio`, `ac3::sendspin`, `ac3::signing`, `ac3::admbridge`, `ac3::arithmetic` | `iclforge::audio`, `iclforge::sendspin`, `iclforge::ac3::signing`, `iclforge::adm`, `iclforge::base_arithmetic` |
 | `matroska::matroska`, `mp4::mp4`, `mpegts::mpegts`, `iamf::iamf` | `iclforge::matroska`, `iclforge::mp4`, `iclforge::mpegts`, `iclforge::iamf` |
 | `ac3iab::ac3iab`, `ac3adm::ac3adm` | `iclforge::iab`, `iclforge::adm` |
 | `ac4::ac4`, `ac4::decoder`, `ac4::encoder`, `ac4::core` | `iclforge::ac4` |

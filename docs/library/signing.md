@@ -1,6 +1,6 @@
-# Object signing: `iclforge::signing`
+# Object signing: `iclforge::ac3::signing`
 
-`iclforge/ac3/signing/emdf_atmos_signer.hpp`, `signing_key.hpp` — a separate library, `iclforge::signing`, not
+`iclforge/ac3/signing/emdf_atmos_signer.hpp`, `signing_key.hpp` — a separate library, `iclforge::ac3::signing`, not
 part of `iclforge::ac3`: signing is an optional step a front end applies to already-encoded frames, so
 the codec itself has no dependency on it. See [Object signing](../concepts/object-signing.md) for
 what this is *for* — a licensed decoder treats the EMDF container's `emdf_protection` field as a

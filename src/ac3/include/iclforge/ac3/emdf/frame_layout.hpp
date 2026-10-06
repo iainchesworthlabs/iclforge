@@ -15,7 +15,7 @@
 // Two very different jobs need the same map, which is why it lives here
 // rather than inside either of them:
 //
-//   - iclforge::signing (src/signing) authenticates a frame by hashing everything
+//   - iclforge::ac3::signing (src/signing) authenticates a frame by hashing everything
 //     EXCEPT the regions a licensed decoder is allowed to rewrite - the
 //     framing words, the metadata flags, the skip fields and the CRC tail.
 //     It needs those regions ("holes") and the container's own position.
@@ -98,7 +98,7 @@ struct FrameLayout {
     // else, which is not this project's to interpret or remove.
     std::optional<BitRange> addbsi = std::nullopt;
 
-    // Every region iclforge::signing excludes from the authenticated message,
+    // Every region iclforge::ac3::signing excludes from the authenticated message,
     // ascending, non-overlapping: the framing words, the infomdate flag, the
     // addbsi element, the skipflde flag, every skip field, and the auxdata +
     // CRC tail.

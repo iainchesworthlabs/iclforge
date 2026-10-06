@@ -33,7 +33,7 @@
 // a stream carries objects or omits the container entirely, never an empty
 // one (docs/concepts/atmos-joc.md), and that is what this implements.
 //
-// This is the inverse of iclforge::signing's in-place EMDF rewrite and, like it,
+// This is the inverse of iclforge::ac3::signing's in-place EMDF rewrite and, like it,
 // needs no key: taking a container out is not authenticating one. A stripped
 // frame simply has nothing left for a decoder's authenticity gate to check.
 //

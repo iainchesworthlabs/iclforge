@@ -1925,6 +1925,6 @@ covered where it's most relevant rather than repeated here:
   boards; those pages give the boards, the figures and what only QEMU covers, and QEMU runs no P4
   or C6.
 - [Atmos & JOC](concepts/atmos-joc.md#two-limitations) — Dolby's own decoder gates object
-  decoding on a keyed authenticity tag; the signer ships in-tree (`iclforge::signing`) but this
+  decoding on a keyed authenticity tag; the signer ships in-tree (`iclforge::ac3::signing`) but this
   project ships no key for it, so its streams are unsigned unless an operator supplies one.
   Objects sharing a direction also can't be perfectly separated. Neither is a conformance gap.

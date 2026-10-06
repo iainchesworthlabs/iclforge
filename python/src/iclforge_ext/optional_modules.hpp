@@ -7,7 +7,7 @@
 // anything to register.
 //
 // `ac3.signing`, `ac3.containers` and `ac3.ac4` exist only when the configure
-// that built this extension also built the libraries behind them - iclforge::signing,
+// that built this extension also built the libraries behind them - iclforge::ac3::signing,
 // the matroska/mp4/mpegts trio, and iclforge::ac4 (see
 // python/CMakeLists.txt, and the options' comments in the root CMakeLists.txt).
 // A trimmed developer build - codec only - still produces a working extension
@@ -30,7 +30,7 @@
 namespace iclforge::python {
 
 // Adds the `signing` submodule to `m`, or does nothing in a build with no
-// iclforge::signing behind it.
+// iclforge::ac3::signing behind it.
 void register_signing(pybind11::module_& m);
 
 // Adds the `containers` submodule to `m`, or does nothing in a build with no

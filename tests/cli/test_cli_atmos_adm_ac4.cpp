@@ -48,7 +48,7 @@
 // channel's ObjectPath at the same two times (well inside each hold, clear of the encode's own
 // frame-boundary quantization around the 0.096s jump - see kBeforeJumpS/kAfterJumpS below) and
 // comparing position/gain - not by asserting a specific numeric azimuth-to-room-cube mapping, which
-// belongs to iclforge::admbridge's own tests.
+// belongs to iclforge::adm's own tests.
 
 namespace fs = std::filesystem;
 

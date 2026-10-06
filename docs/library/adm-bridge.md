@@ -1,6 +1,6 @@
-# ADM ↔ Atmos bridging: `iclforge::admbridge`
+# ADM ↔ Atmos bridging: `iclforge::adm`
 
-`iclforge/adm/bridge.hpp`, `iclforge/adm/coordinates.hpp`, library `iclforge::admbridge`. Two
+`iclforge/adm/bridge.hpp`, `iclforge/adm/coordinates.hpp`, library `iclforge::adm`. Two
 directions live here:
 
 - **Read**: maps the ADM object graph [`iclforge::adm`](adm.md) parses from a BW64/ADM master onto
@@ -19,7 +19,7 @@ directions live here:
 Both directions are the same "one place `iclforge::adm` and `iclforge::ac3`/`iclforge::oba` are allowed to meet"
 seam this module has always been, see [Commands](../forge/cli/commands.md) for both commands.
 
-**Opt-in, gated by the same flag as `iclforge::adm`.** `iclforge::admbridge` depends on both
+**Opt-in, gated by the same flag as `iclforge::adm`.** `iclforge::adm` depends on both
 `iclforge::adm` and `iclforge::ac3`, so it is meaningless without `ICLFORGE_BUILD_ADM=ON` and is
 built as part of the same `add_subdirectory` block — no separate `ICLFORGE_BUILD_ADMBRIDGE` option
 exists. See [ADM / BW64 reading](adm.md) for the exact CMake invocation.
@@ -51,10 +51,10 @@ Two hard constraints rule out folding this into either side it bridges:
   configuration of this project. It cannot gain a dependency on the opt-in, Boost-requiring
   `iclforge::adm` without breaking every default build.
 
-`iclforge::admbridge` is therefore its own module (`src/adm/`), PUBLIC-linking both — the same
-shape `iclforge::signing` uses for its own `iclforge::ac3` dependency. Like `iclforge::adm` itself
+`iclforge::adm` is therefore its own module (`src/adm/`), PUBLIC-linking both — the same
+shape `iclforge::ac3::signing` uses for its own `iclforge::ac3` dependency. Like `iclforge::adm` itself
 (see [ADM / BW64 reading](adm.md)), it IS part of the installed `find_package(iclforge)` package,
-but shared-only: `iclforge::adm_shared`/the bare `iclforge::admbridge` alias, no `_static` variant.
+but shared-only: `iclforge::adm_shared`/the bare `iclforge::adm` alias, no `_static` variant.
 `build_iab()` (`iclforge/adm/iab_bridge.hpp`) maps a whole parsed `iclforge::iab::IABitstreamFrame`
 sequence — from either of `iclforge::iab`'s two readers (`src/iab`: a bare elementary `.iab`
 file or a real MXF Track File) — onto this same `ObjectPath` layer, driven end to end by `forge

@@ -94,7 +94,7 @@ TEST_CASE("AC-4 object slots list the dynamic objects, then the speakers, then t
 }
 
 TEST_CASE("a channel pinned to a speaker sits where ADM puts the speaker", "[gui][ac4]") {
-    // tests/ac3/oba/test_atmos_motion.cpp's ring constants, which iclforge::admbridge's polar
+    // tests/ac3/oba/test_atmos_motion.cpp's ring constants, which iclforge::adm's polar
     // conversion is checked against: L at +30 degrees, SR at -110.
     const auto left = iclforge::apps::ac4_pin_position(30.0);
     CHECK(left.x == Catch::Approx(0.25).margin(1e-6));

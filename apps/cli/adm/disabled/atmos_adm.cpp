@@ -4,10 +4,10 @@
 #include <string>
 #include <string_view>
 
-// Compiled only when ICLFORGE_BUILD_ADM did NOT turn iclforge::adm/iclforge::admbridge on (see
+// Compiled only when ICLFORGE_BUILD_ADM did NOT turn iclforge::adm on (see
 // apps/cli/CMakeLists.txt) - see ../atmos_adm.hpp's own top comment for why this file, rather than
 // a preprocessor conditional inside main.cpp, is the mechanism. This translation unit links
-// neither iclforge::adm nor iclforge::admbridge and includes neither of their headers - it cannot,
+// neither iclforge::adm nor iclforge::adm and includes neither of their headers - it cannot,
 // since in this build neither target was ever add_subdirectory()'d at all.
 
 namespace forge_cli {

@@ -5,7 +5,7 @@
 
 #include "binding_support.hpp"
 
-// The variant of the `ac3.signing` submodule compiled when iclforge::signing is in this build.
+// The variant of the `ac3.signing` submodule compiled when iclforge::ac3::signing is in this build.
 //
 // This is the body that used to sit inside bindings.cpp's PYBIND11_MODULE
 // behind `#ifdef ICLFORGE_PY_HAVE_SIGNING`, moved verbatim. See

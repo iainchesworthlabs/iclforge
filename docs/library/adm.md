@@ -7,7 +7,7 @@ from `iclforge::ac3` — it has no idea AC-3, E-AC-3 or the JOC/Atmos object lay
 
 Mapping the graph this module parses onto `iclforge::ac3::oba::AtmosEncoder` (ADM → encode) or building it
 from a decoded `iclforge::ac3::Eac3Decoder` programme (decode → ADM) is a separate module,
-[`iclforge::admbridge`](adm-bridge.md); driving the read direction end to end — a real ADM BWF master
+[`iclforge::adm`](adm-bridge.md); driving the read direction end to end — a real ADM BWF master
 straight to a DD+ JOC E-AC-3 stream — is `forge atmos-adm`, and the write direction is
 `forge decode ... adm_out` (see [Commands](../forge/cli/commands.md)) and
 [`examples/encode_adm.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/encode_adm.cpp). This page and
@@ -83,7 +83,7 @@ pack/channel/stream/track/block formats (one set per standard loudspeaker layout
 third-order HOA component) and merges the file's own content into it, so that a file referencing
 a common-definition ID (e.g. a stereo bed's pack format `AP_00010002`) without locally
 re-declaring it still resolves. This module keeps that merge rather than filtering it back out:
-[`iclforge::admbridge`](adm-bridge.md) needs exactly this, a pack/channel/stream/track format reference that resolves regardless
+[`iclforge::adm`](adm-bridge.md) needs exactly this, a pack/channel/stream/track format reference that resolves regardless
 of whether the file re-declared it — so `model.pack_formats`/`channel_formats`/`stream_formats`/
 `track_formats` are never just "what this one file defined". `model.programmes`/`contents`/
 `objects`/`track_uids` are unaffected (the common set defines none of those four).
@@ -252,6 +252,6 @@ PCM-only framing). Float ones exist too.
 
 See also: [File I/O](file-io.md) — the plain-WAV reader this module's container-parsing
 deliberately does not share an implementation with, despite the family resemblance;
-[ADM → Atmos bridging](adm-bridge.md) — `iclforge::admbridge`, which maps this graph onto
+[ADM → Atmos bridging](adm-bridge.md) — `iclforge::adm`, which maps this graph onto
 `iclforge::ac3::oba::AtmosEncoder`; [Spatial & Atmos objects](spatial-and-atmos.md) — the
 `iclforge::ac3::oba::AtmosEncoder`/`iclforge::oba::motion` surface that bridge drives.

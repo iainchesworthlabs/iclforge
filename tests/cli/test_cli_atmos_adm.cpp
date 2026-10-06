@@ -26,7 +26,7 @@
 // comment).
 //
 // A separate file rather than folded into test_cli.cpp: this file's own tests only make sense
-// when ICLFORGE_BUILD_ADM turned on iclforge::adm/iclforge::admbridge AND forge was actually built
+// when ICLFORGE_BUILD_ADM turned on iclforge::adm AND forge was actually built
 // (so its own binary has the 'atmos-adm' command at all) - a narrower, two-part condition
 // test_cli.cpp's single TARGET-forge gate does not express. See tests/CMakeLists.txt's own
 // gating comment for exactly how both conditions are checked before this file is even compiled.

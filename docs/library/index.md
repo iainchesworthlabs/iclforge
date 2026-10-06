@@ -31,14 +31,14 @@ main codec headers are under `src/ac3/include/iclforge/ac3/`, and the AC-4 heade
 | `iclforge::objects`, `iclforge::render` | The object-audio model and the Object Audio Metadata payload; layouts, routing and the renderer |
 | `iclforge::iec61937` | IEC 61937 burst packing and detection, for AC-3, E-AC-3 and AC-4 |
 | `iclforge::matroska`, `iclforge::mp4`, `iclforge::mpegts` | Container writers |
-| `iclforge::signing` | EMDF object signing; see [Object signing](signing.md) |
+| `iclforge::ac3::signing` | EMDF object signing; see [Object signing](signing.md) |
 | `iclforge::iab` | SMPTE ST 2098-2 IAB reading; see [IAB](iab.md) |
 | `iclforge::iamf` | IAMF reading and writing, as OBUs, ISO-BMFF and fragments; see [IAMF](iamf.md) |
 | `iclforge::adm` | ADM/BW64 reading and writing; opt-in with `ICLFORGE_BUILD_ADM=ON` |
-| `iclforge::admbridge` | Mapping between ADM objects and the Atmos encoder or decoder |
+| `iclforge::adm` | Mapping between ADM objects and the Atmos encoder or decoder |
 | `iclforge::ac4` | AC-4 decoding and encoding, and the sync frames, table of contents and presentations both work through; see [AC-4](ac4.md) |
 
-`iclforge::adm` and `iclforge::admbridge` need the root dependency manifest's `adm` feature
+`iclforge::adm` need the root dependency manifest's `adm` feature
 (`-DVCPKG_MANIFEST_FEATURES=adm`) when building this repository with vcpkg, and are installed as
 shared libraries. The packaged `iclforge` port has no `adm` feature and does not package either
 target. Their [ADM](adm.md) and [ADM bridge](adm-bridge.md) pages explain the dependency and
@@ -93,20 +93,20 @@ objects (`IMPORTED_LINK_INTERFACE_LANGUAGES`). A build outside CMake gets them f
 files (see pkg-config below), or adds them to the link line itself (`-lstdc++ -lm` with libstdc++,
 `-lc++ -lm` with libc++).
 
-`iclforge::adm`/`iclforge::admbridge` are the exception: they PRIVATE-embed the third-party
+`iclforge::adm` are the exception: they PRIVATE-embed the third-party
 libbw64/libadm (Apache-2.0, FetchContent'd — see [ADM / BW64 reading](adm.md)), neither of which
 this project installs or exports in its own right, so the installed package only ever exports
 their **shared** variant (`iclforge::adm_shared`, plus the bare
-`iclforge::adm`/`iclforge::admbridge` alias — there is no `_static` counterpart here, unlike every
+`iclforge::adm` alias — there is no `_static` counterpart here, unlike every
 other module on this page) regardless of `ICLFORGE_INSTALL_BOTH_LINKAGES`. A self-contained
 `.so` absorbs libbw64/libadm at its own build step; a static archive would leave a downstream
 consumer with unresolved symbols into a library this package doesn't ship. `iclforge::adm`
 still needs Boost at build time (see the note above) — that requirement doesn't go away just
 because the *installed* artifact is self-contained.
 
-`iclforge::signing` follows this exact same shape — mandatory, not gated by an
+`iclforge::ac3::signing` follows this exact same shape — mandatory, not gated by an
 `ICLFORGE_BUILD_<NAME>` switch, same as `iclforge::ac3` itself — so it resolves the identical way in
-both cases: the bare `iclforge::signing` alias in-tree, and explicit `iclforge::ac3_static`/
+both cases: the bare `iclforge::ac3::signing` alias in-tree, and explicit `iclforge::ac3_static`/
 `iclforge::ac3_shared` from an installed package.
 
 **vcpkg.** A port lives in this repo at
@@ -126,7 +126,7 @@ target_link_libraries(your_target PRIVATE iclforge::ac3)
 ```
 
 `iclforge::ac3` and the libraries it links (`base`, `dsp`, `objects`, `render`, `iec61937`), with
-`iclforge::signing`, are what the port installs by default. Every other library is one of the
+`iclforge::ac3::signing`, are what the port installs by default. Every other library is one of the
 port's features, and none is on by default (a curated-registry port's `default-features` may only
 cover behaviors, not additional public APIs/targets/binaries, and each of these is exactly that):
 
@@ -141,7 +141,7 @@ cover behaviors, not additional public APIs/targets/binaries, and each of these 
 | `iamf` | `iclforge::iamf` (see [IAMF](iamf.md)) |
 
 Opt in with `vcpkg install iclforge[matroska,mp4,mpegts]` for the three container writers, or any
-subset, such as `iclforge[ac4]` for AC-4 alone. `iclforge::adm`/`iclforge::admbridge` have no vcpkg
+subset, such as `iclforge[ac4]` for AC-4 alone. `iclforge::adm` have no vcpkg
 feature — out of scope for this port, even though upstream installs and exports both
 (shared-only, see the note above). Once merged into `microsoft/vcpkg`, the same two snippets work
 with a plain `vcpkg install iclforge` — no `--overlay-ports` needed.
@@ -240,7 +240,7 @@ re-synced by hand and can drift. Each page's "Full program" link is the canonica
   Bitstream reader, elementary `.iab` files and MXF Track Files alike (on by default).
 - [ADM / BW64 reading](adm.md) — `iclforge::adm`, a standalone BW64/RF64 + Audio Definition Model
   parser (opt-in, `-DICLFORGE_BUILD_ADM=ON`).
-- [ADM → Atmos bridging](adm-bridge.md) — `iclforge::admbridge`, mapping the parsed ADM graph onto
+- [ADM → Atmos bridging](adm-bridge.md) — `iclforge::adm`, mapping the parsed ADM graph onto
   `iclforge::ac3::oba::AtmosEncoder` (same opt-in flag).
 - [IAMF](iamf.md) — `iclforge::iamf`, a standalone reader and writer: a decoded 7.1.4 programme
   re-wrapped as a channel-based IAMF Audio Element, object-based Audio Elements with animated
@@ -250,7 +250,7 @@ re-synced by hand and can drift. Each page's "Full program" link is the canonica
   encoder's configuration, substreams and presentations; and linking (on by default).
 - [Measuring quality](quality.md) — `iclforge::ac3::quality`, the decoded-domain distortion measure and the
   tonality/masking model the encoder's decision search is judged on.
-- [Object signing](signing.md) — `iclforge::signing`, the EMDF protection tag.
+- [Object signing](signing.md) — `iclforge::ac3::signing`, the EMDF protection tag.
 - [Header map](header-map.md) — the headers a caller normally reaches for, and what lives in each.
 - [API stability](api-stability.md) — the v1.0 freeze plan: header tiers, SemVer and deprecation
   policy, and what's decided versus still deliberately deferred.

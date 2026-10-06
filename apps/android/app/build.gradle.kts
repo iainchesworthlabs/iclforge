@@ -2,7 +2,7 @@ plugins {
     id("com.android.application")
 }
 
-// Object signing is no longer a build-variant toggle. The signer (iclforge::signing)
+// Object signing is no longer a build-variant toggle. The signer (iclforge::ac3::signing)
 // is committed and always compiled; whether the app actually signs is decided
 // at runtime by whether a `signing.key` asset is present (see
 // shield_signing_hook.hpp). That asset is written into src/main/assets/ from a

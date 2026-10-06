@@ -187,7 +187,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | Category | Feature | Status | Priority | Criticality | Notes |
 |---|---|---|---|---|---|
 | **Codec** | Experimental TrueHD/MLP module | 🟡 | Medium | Important | Substantial work on `feature/truehd-atmos-support`; not on `main` (roadmap IM5) |
-| | Evolution frame HMAC (authenticity) | 🔴 | Medium | Important | Distinct from DD+ EMDF `iclforge::signing`; truncated HMAC-SHA-256 on Evolution frames (cf. truehdd `--evo-key`). Note on IM5 / [Object signing](../concepts/object-signing.md#sibling-truehd-evolution) |
+| | Evolution frame HMAC (authenticity) | 🔴 | Medium | Important | Distinct from DD+ EMDF `iclforge::ac3::signing`; truncated HMAC-SHA-256 on Evolution frames (cf. truehdd `--evo-key`). Note on IM5 / [Object signing](../concepts/object-signing.md#sibling-truehd-evolution) |
 | | Shipping TrueHD interop | 🔴 | Low | Out-of-scope | Blocked on DVD Forum reference material and clean-room ruling (IM6) |
 | | Passthrough device lists | 🟡 | Low | Nice-to-have | ELD / capability enums mention TrueHD; no codec on `main` |
 
@@ -368,7 +368,7 @@ this register is the checklist that those bounds appear here too.
 | Source | Open item | Status |
 |---|---|---|
 | Branch `feature/truehd-atmos-support` | Land as experimental module (IM5) | 🟡 |
-| Evolution frame HMAC | Authenticity policy on MLP (parallel to EMDF; not `iclforge::signing`) | 🔴 |
+| Evolution frame HMAC | Authenticity policy on MLP (parallel to EMDF; not `iclforge::ac3::signing`) | 🔴 |
 | DVD Forum MLP reference | Shipping interop (IM6) | 🔴 |
 
 ---

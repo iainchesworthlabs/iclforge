@@ -6,13 +6,13 @@ does one extra thing before it will reconstruct the objects — it checks a keye
 carried in the stream's EMDF *protection* field. Without a valid tag it plays the plain 5.1 bed
 instead of the height-rendered objects (see [Atmos & JOC](atmos-joc.md#two-limitations)).
 
-`iclforge::signing` computes that tag.
+`iclforge::ac3::signing` computes that tag.
 
 ## The library has no key — you provide it
 
 This is the one thing to take away from this page:
 
-> **`iclforge::signing` contains no key, and never will. Every user of the library supplies their own
+> **`iclforge::ac3::signing` contains no key, and never will. Every user of the library supplies their own
 > key at runtime — this project's own tools included, and any consumer outside this project
 > equally.** The library cannot sign anything until *you* hand it a key.
 
@@ -29,7 +29,7 @@ key, reads none from the build, and has no way to obtain or derive one. What it 
 A stream signed with a key that does not match a given decoder's simply fails that decoder's check,
 exactly as an unsigned one does. Providing a key that a particular licensed decoder accepts — and
 being entitled to use it — is entirely the library user's responsibility, whether that user is this
-project or someone building on `iclforge::signing` elsewhere.
+project or someone building on `iclforge::ac3::signing` elsewhere.
 
 !!! note "The tag construction, precisely"
     `tag = HMAC-SHA-256(key, A ‖ B)`, truncated to the primary protection field's width.
@@ -40,7 +40,7 @@ project or someone building on `iclforge::signing` elsewhere.
 
 ## Verifying a tag this signer wrote
 
-`iclforge::signing` also checks its own tag: `verify_atmos_frame`/`verify_atmos_stream` recompute the
+`iclforge::ac3::signing` also checks its own tag: `verify_atmos_frame`/`verify_atmos_stream` recompute the
 same HMAC over the same frame regions and compare it against what a frame's
 `protection_bits_primary` already holds, without modifying anything. That is useful for round-trip
 testing, catching tampering or corruption of this project's own signed test assets, and CI/delivery
@@ -64,7 +64,7 @@ return, rather than a per-frame vector callers would otherwise have to reduce th
 
 ## Using the library (any consumer)
 
-Any code that links `iclforge::signing` gets a key-less signer and must construct a key to use it. The
+Any code that links `iclforge::ac3::signing` gets a key-less signer and must construct a key to use it. The
 whole API surface is the key type plus the sign/verify calls:
 
 ```cpp
@@ -146,7 +146,7 @@ forge decode signed.ec3 out.wav verify-objects signing-key=/path/to/atmos.key
 - Checking is **just as opt-in as signing**: `verify-objects` is off by default, and a `decode` or
   `monitor` invocation with no `verify-objects` plays a signed stream exactly like an unsigned one —
   it never routes through the checker at all. `Eac3Decoder` itself never gains any knowledge of
-  `iclforge::signing`; the check runs separately, over the same raw stream bytes, and only when the
+  `iclforge::ac3::signing`; the check runs separately, over the same raw stream bytes, and only when the
   operator asks for it.
 - With `verify-objects` and a key, every frame's tag is checked and a summary is reported
   (`N valid, M mismatched, K unsigned`). Any mismatch is a hard failure — the command refuses,
@@ -185,7 +185,7 @@ the app streams the unsigned `bed51`-equivalent, always safe on any receiver.
 This page is **E-AC-3 / EMDF** object signing only. TrueHD uses a different keyed check —
 **Evolution frame protection** (truncated HMAC-SHA-256 over the access unit and the Evolution
 frame). That seam belongs on the TrueHD/MLP branch (`feature/truehd-atmos-support`, roadmap IM5),
-not in `iclforge::signing`. Open tools such as truehdd expose it as an optional `--evo-key`; decode
+not in `iclforge::ac3::signing`. Open tools such as truehdd expose it as an optional `--evo-key`; decode
 without a key stays unchecked. Any future multi-key verify / licensed soft-gate for MLP should
 target Evolution HMAC, parallel to but separate from the EMDF policy on this page.
 

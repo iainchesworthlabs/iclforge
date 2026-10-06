@@ -300,7 +300,7 @@ library only (`iclforge::ac3`, plus `iclforge::matroska`/`iclforge::mp4`/
 `capi` (see the note below), the AC-4 library behind `ac4`, `iclforge::iab` behind `iab` and
 `iclforge::iamf` behind `iamf` - see `cmake/InstallLibrary.cmake`'s `ICLFORGE_BUILD_<NAME>` and
 `ICLFORGE_INSTALL_BOTH_LINKAGES` options), never the CLI/GUI/Hearth/tests/examples/fuzzers.
-`iclforge::adm` (the ADM/BW64 reader) and `iclforge::admbridge` have no vcpkg feature
+`iclforge::adm` (the ADM/BW64 reader) and `iclforge::adm` have no vcpkg feature
 either - they do install/export via `find_package(iclforge)` now (shared-only), but embed
 third-party libbw64/libadm and so deliberately carry no vcpkg/Conan feature of their own for
 now - see the recipe note further down and [docs/library/index.md](library/index.md).
@@ -349,7 +349,7 @@ feature to `packaging/vcpkg-port/iclforge/vcpkg.json` and one line to `portfile.
 `packaging/conan/conanfile.py` with its `tc.variables` line (the parity check above fails the
 recipes until both have it), and the component to `tools/checks/check_install_consumer.sh`'s
 list - unless the component pulls in a real third-party link dependency
-of its own, the way `iclforge::adm`/`iclforge::admbridge` do (see
+of its own, the way `iclforge::adm` do (see
 [ADM / BW64 reading](library/adm.md#why-opt-in)): those still install/export (shared-only, to
 stay self-contained without re-exporting the third party), but deliberately have no vcpkg/Conan
 feature of their own for now.

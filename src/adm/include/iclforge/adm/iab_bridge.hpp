@@ -17,7 +17,7 @@
 // object, the same destination shape build() (bridge.hpp) already produces for ADM. This is still
 // the one place iclforge::iab and iclforge::ac3/iclforge::oba are allowed to meet - see
 // bridge.hpp's own top comment on why that boundary exists - just a second source feeding it. Gated
-// by the same ICLFORGE_BUILD_ADM flag as the rest of iclforge::admbridge (this module's own
+// by the same ICLFORGE_BUILD_ADM flag as the rest of iclforge::adm (this module's own
 // CMakeLists.txt has the full reasoning); ICLFORGE_BUILD_IAB (default ON) is a separate,
 // always-satisfied prerequisite this module's own CMakeLists.txt now enforces with a FATAL_ERROR
 // guard.

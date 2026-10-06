@@ -209,7 +209,7 @@ rather than passed through, because passing it through would hand back a stream 
 the objects this function promises to remove. An AC-3 stream is refused outright
 (`kNotEac3`): Annex E is where substreams and skip fields live.
 
-This is the inverse of `iclforge::signing`'s in-place EMDF rewrite and, like it, needs no key —
+This is the inverse of `iclforge::ac3::signing`'s in-place EMDF rewrite and, like it, needs no key —
 taking a container out is not authenticating one. Both share one bit-accurate frame walk
 (`iclforge::ac3::emdf::walk_frame`) so the two cannot drift apart.
 

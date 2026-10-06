@@ -135,7 +135,7 @@ struct Args {
 // kPassthrough.
 //
 // kAdm ('atmos-adm', ADM BWF reader phase 3): unlike the three audio ones, this is not a hardware
-// question - it is whether iclforge::adm/iclforge::admbridge were linked into this build at all
+// question - it is whether iclforge::adm were linked into this build at all
 // (ICLFORGE_BUILD_ADM, default OFF - see the root CMakeLists.txt's own option()). Answered the
 // same way regardless: adm/atmos_adm.hpp's forge_cli::adm_capability(), backed by exactly one of
 // adm/enabled/atmos_adm.cpp or adm/disabled/atmos_adm.cpp (see run_atmos_adm's own comment for
@@ -194,7 +194,7 @@ int run_man();
 int run_completions(std::string_view shell);
 
 // 44 commands, always - including atmos-adm and atmos-iab, whether or not ICLFORGE_BUILD_ADM
-// linked iclforge::adm/iclforge::admbridge into this particular build (see Needs::kAdm/unmet()
+// linked iclforge::adm into this particular build (see Needs::kAdm/unmet()
 // above and run_atmos_adm's own comment): a command this build cannot run is listed with Needs
 // gating it, never sized out of the table entirely - the identical "listed, not hidden" treatment
 // kCapture/kPassthrough/kMonitor commands already get (see print_usage()'s own comment below on

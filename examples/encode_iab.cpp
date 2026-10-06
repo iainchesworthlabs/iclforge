@@ -317,7 +317,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Step 2: iclforge::admbridge (phase 3) - Bed/Object identity, coordinate conversion, and the
+    // Step 2: iclforge::adm (phase 3) - Bed/Object identity, coordinate conversion, and the
     // per-IAFrame position/gain timeline, mapped onto AtmosEncoder's flat object-list input shape.
     const auto bridged = iclforge::adm::build_iab(*frames);
     if (!bridged) {

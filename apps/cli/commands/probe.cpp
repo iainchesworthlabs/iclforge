@@ -741,7 +741,7 @@ int run_probe(std::string_view in_path, const Options& meta) {
 
     io::ProbeOptions options;
     options.detail = detail != Detail::kNone;
-    // iclforge::signing lives in its own library and iclforge::ac3 neither links nor
+    // iclforge::ac3::signing lives in its own library and iclforge::ac3 neither links nor
     // should link it, so the question is passed in rather than asked there -
     // see ProbeOptions::authenticity. No key is involved: whether a frame
     // carries a tag is answerable without one, and only whether that tag is

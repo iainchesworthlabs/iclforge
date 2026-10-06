@@ -20,7 +20,7 @@
 // `ac3/ac3iab/` - see CONTRIBUTING.md's repository-layout section on what that prefix means).
 // AudioDataDLC's lossless coder (Annex B) is kept as coded bytes by the reader and decoded by
 // decode_dlc() in dlc.hpp. Phase 2 (MXF/KLV extraction for IAB track files - see
-// mxf.hpp) is implemented alongside this header. Phase 3 (mapping onto iclforge::admbridge's
+// mxf.hpp) is implemented alongside this header. Phase 3 (mapping onto iclforge::adm's
 // ObjectPath layer, the `atmos-iab` CLI command) is separate, later work.
 //
 // Every table and algorithm this module implements is transcribed directly from the published

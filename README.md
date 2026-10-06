@@ -253,9 +253,9 @@ src/mpegts/     iclforge::mpegts — a standalone MPEG-2 Transport Stream muxer,
 src/iamf/       iclforge::iamf — a standalone IAMF v2.0 OBU/ISOBMFF reader and writer, fed from an E-AC-3 decode
 src/iab/        iclforge::iab — a standalone SMPTE ST 2098-2 (IAB) bitstream reader, codec-blind
 src/adm/        iclforge::adm — BW64/RF64 + Audio Definition Model reader (opt-in, needs Boost)
-src/adm/  iclforge::admbridge — maps the ADM object graph src/adm parses onto the Atmos
+src/adm/  iclforge::adm — maps the ADM object graph src/adm parses onto the Atmos
                 encoder's input
-src/signing/    iclforge::signing — EMDF object signing, key supplied at runtime
+src/signing/    iclforge::ac3::signing — EMDF object signing, key supplied at runtime
 src/capi/       iclforge_c — a plain-C11 surface over the AC-3, E-AC-3 and AC-4 encode/decode
                 cores, for bindings and callers that do not link C++23
 src/sendspin/   iclforge::sendspin — Sendspin player and server for Hearth (desktop tools and the

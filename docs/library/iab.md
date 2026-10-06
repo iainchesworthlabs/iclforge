@@ -8,7 +8,7 @@ carry, and that Netflix's IMF pipeline (SMPTE ST 2067-201) delivers inside MXF t
 
 The bitstream reader is `ac3iab.hpp` and the MXF Track File extraction is `mxf.hpp`, both covered
 here. Mapping the parsed bed/object graph onto `iclforge::ac3::oba::AtmosEncoder` is a separate module,
-`iclforge::admbridge`'s `build_iab()` — see [ADM → Atmos bridging](adm-bridge.md#bridging-iab) — driven
+`iclforge::adm`'s `build_iab()` — see [ADM → Atmos bridging](adm-bridge.md#bridging-iab) — driven
 end to end by `forge atmos-iab` (see [Commands](../forge/cli/commands.md)).
 
 ```cpp
@@ -43,7 +43,7 @@ The vcpkg port and the Conan recipe install it where asked for, off by default:
 `vcpkg install iclforge[iab]`, or `-o "iclforge/*:iab=True"` (see
 [Using the libraries](index.md)).
 
-`forge atmos-iab` (needs `-DICLFORGE_BUILD_ADM=ON` — the same flag `iclforge::admbridge` itself rides,
+`forge atmos-iab` (needs `-DICLFORGE_BUILD_ADM=ON` — the same flag `iclforge::adm` itself rides,
 since that is the module with a consumer for this graph) is this module's own real-world driver,
 writing E-AC-3 or, with `codec=ac4`, AC-4 objects; nothing else in this build (`forge-gui`, the other
 examples) consumes it.
@@ -213,7 +213,7 @@ encoder's own choices.
 
 ## Bridging to Atmos
 
-`iclforge::admbridge`'s `build_iab()` maps this module's parsed graph onto `iclforge::ac3::oba::AtmosEncoder`'s
+`iclforge::adm`'s `build_iab()` maps this module's parsed graph onto `iclforge::ac3::oba::AtmosEncoder`'s
 input shape — one `iclforge::oba::ObjectPath` plus one mono PCM buffer per Bed channel or Object, ready
 to drive `encode_frame()` in a loop, the same destination shape `iclforge::adm::build()` produces
 for ADM. See [ADM → Atmos bridging](adm-bridge.md#bridging-iab) for what gets
@@ -225,6 +225,6 @@ the command line.
 
 ---
 
-See also: [ADM → Atmos bridging](adm-bridge.md) — `iclforge::admbridge`, which maps this graph onto
+See also: [ADM → Atmos bridging](adm-bridge.md) — `iclforge::adm`, which maps this graph onto
 `iclforge::ac3::oba::AtmosEncoder`; [ADM / BW64 reading](adm.md) — the sibling codec-blind reader this
 module's shape and documentation follow.

@@ -1,6 +1,6 @@
 // Sign an Atmos stream's EMDF object container.
 //
-// iclforge::signing computes the keyed EMDF-protection tag a licensed decoder
+// iclforge::ac3::signing computes the keyed EMDF-protection tag a licensed decoder
 // checks before it will decode a stream's OAMD/JOC container - see
 // docs/concepts/object-signing.md. The key is always the operator's own to
 // provision at runtime (an environment variable or a signing-key=<path> file

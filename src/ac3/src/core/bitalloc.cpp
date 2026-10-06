@@ -190,7 +190,7 @@ namespace {
 //
 // No encode path produces either, and the assert in the callers still says
 // so for a caller's benefit. But `exps` reaches here, through both the
-// decoder and iclforge::signing's own frame walk, sized by a field value a hostile
+// decoder and iclforge::ac3::signing's own frame walk, sized by a field value a hostile
 // stream picks - and this project has been here before (8386c8f: a decoder
 // shifting by an unvalidated exponent). A contract that only a debug assert
 // enforces is not enforced in the builds that ship.

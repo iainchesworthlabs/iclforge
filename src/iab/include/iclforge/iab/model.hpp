@@ -19,7 +19,7 @@
 // raw bitstream code - matching how iclforge::adm::AudioBlockFormat::gain is always linear
 // regardless of the source's own gainUnit. Roadmap item IM1 phase 1 (): a standalone
 // `iclforge::iab::` reader in the `iclforge::adm::` mould - it knows nothing about AC-3, E-AC-3 or
-// JOC, and a later phase 3 (mapping onto iclforge::admbridge's ObjectPath layer) is what will
+// JOC, and a later phase 3 (mapping onto iclforge::adm's ObjectPath layer) is what will
 // finally make this module's output useful to the codec.
 //
 // AudioDataDLC (§9.6/§10.7, Annex B) is the one element this phase reads only the identity of:

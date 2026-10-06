@@ -52,7 +52,7 @@ it directly. Four tiers, assigned per header below:
 | `iclforge/ac3/oba/atmos.hpp`, `joc.hpp`, `oamd.hpp`, `motion.hpp`, `scene.hpp`, `scene_osc.hpp` | Public — `iclforge::oba::joc` included, now that AP2 folded it into `iclforge::oba` proper. |
 | `iclforge/objects/joc_domain.hpp` | Public — `joc::Domain` is selected through `AtmosConfig` and `reconstruct()`, as it was in `joc.hpp`. |
 | `iclforge/objects/emdf.hpp` | Public. |
-| `iclforge/ac3/emdf/frame_layout.hpp` | Internal — the bit-accurate frame walk `strip_objects` and `iclforge::signing` share; a caller uses them, not it. |
+| `iclforge/ac3/emdf/frame_layout.hpp` | Internal — the bit-accurate frame walk `strip_objects` and `iclforge::ac3::signing` share; a caller uses them, not it. |
 | `iclforge/objects/placement.hpp` | Public — `ObjectPlacement` is what `AtmosEncoder::encode_frame` takes, as it was when `atmos.hpp` declared it. |
 | `iclforge/iec61937/iec61937.hpp` | Public. |
 | `iclforge/dsp/qmf.hpp` | Public — `oba::joc::Domain::kQmf` is selected through public `AtmosConfig`. |
@@ -168,7 +168,7 @@ already covers the same case without it.
 
 Not every installed, default-on module is part of the `v1.0.0` freeze. `iclforge::iab` (the
 SMPTE ST 2098-2 IAB reader) is real, tested, and default-built (`ICLFORGE_BUILD_IAB`).
-`forge atmos-iab` consumes it through the opt-in `iclforge::admbridge` module, while the GUI does
+`forge atmos-iab` consumes it through the opt-in `iclforge::adm` module, while the GUI does
 not. Its own model is still being built out (the MXF track-file wrapping is read but not written —
 see [Header map](header-map.md)). It is **Experimental**: installed,
 versioned, and functional, but explicitly outside the compatibility promise `v1.0.0` makes for
@@ -189,7 +189,7 @@ the immersive layouts, core decoding and objects came as fields after the ones c
 streams needed. The core its decoder and encoder share has private headers and so no tier. `iclforge::iamf`, the
 IAMF reader and writer, is Experimental as a new module.
 
-`iclforge::adm` and `iclforge::admbridge` are a different case: also opt-in
+`iclforge::adm` are a different case: also opt-in
 (`-DICLFORGE_BUILD_ADM=ON`), but consumed for real by the ADM→Atmos bridging path and stable in
 shape since the ADM writer and the scene timeline landed. They're Public, not Experimental — opt-in build gating and API maturity
 are independent axes, and conflating "off by default" with "not yet stable" would understate how

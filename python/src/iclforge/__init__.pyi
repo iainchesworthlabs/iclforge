@@ -1147,7 +1147,7 @@ class ac4:
     @staticmethod
     def sync_frame(raw_ac4_frame: bytes, crc: bool) -> bytes: ...
 
-# iclforge::signing - EMDF object-layer signing. Same submodule-as-class convention.
+# iclforge::ac3::signing - EMDF object-layer signing. Same submodule-as-class convention.
 class signing:
     class SigningKey:
         def __init__(self, content: bytes) -> None: ...

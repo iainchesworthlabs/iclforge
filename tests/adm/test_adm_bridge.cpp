@@ -20,7 +20,7 @@
 #include "iclforge/objects/motion.hpp"
 #include "iclforge/adm/ac3adm.hpp"
 
-// iclforge::admbridge - ADM BWF → JOC bridge, phase 2 ("ADM BWF reader feeding the JOC encoder",
+// iclforge::adm - ADM BWF → JOC bridge, phase 2 ("ADM BWF reader feeding the JOC encoder",
 // see ROADMAP.md). Most cases here construct iclforge::adm::AdmDocument/AdmModel values directly
 // (they are plain aggregates, per ac3adm/model.hpp's own design - no parser needed to build one)
 // rather than a byte-level BW64 file, which keeps the error-path and coordinate/timeline unit tests

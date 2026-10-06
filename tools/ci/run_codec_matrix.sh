@@ -731,7 +731,7 @@ run decode atmos_path.ec3 atmos_path.wav
 run_ffmpeg_check atmos_path.ec3
 
 # atmos-adm (ADM BWF reader): only exercised for real when THIS build actually has it.
-# iclforge::adm/iclforge::admbridge are this project's one opt-in, non-default library
+# iclforge::adm are this project's one opt-in, non-default library
 # (ICLFORGE_BUILD_ADM, default off - see the root CMakeLists.txt's own option()), and it needs
 # Boost plus a dedicated vcpkg feature neither of this script's two CI callers (the ASan+UBSan
 # leg, the FFmpeg-oracle leg this file's own header describes) pulls in - both build the plain
@@ -773,7 +773,7 @@ else
 fi
 
 # atmos-iab (IAB reader phase 3): the identical conditional-command shape atmos-adm above uses,
-# and for the same reason - it needs iclforge::admbridge's own IAB mapping, gated by the same
+# and for the same reason - it needs iclforge::adm's own IAB mapping, gated by the same
 # ICLFORGE_BUILD_ADM flag (see apps/cli/adm/atmos_iab.hpp's own header comment: iclforge::iab
 # itself is on by default, but build_iab() only exists once admbridge is). Detected the same
 # "ask the real usage listing" way, not guessed from a preset name. examples/encode_iab's own

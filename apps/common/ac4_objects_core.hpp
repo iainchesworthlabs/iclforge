@@ -110,7 +110,7 @@ struct Ac4ObjectSlot {
 
 // Where a channel pinned to a speaker sits: on the ring of radius 0.5 about the
 // room's centre, at the speaker's azimuth, the place ADM's polar coordinates
-// give a bed channel (iclforge::admbridge), so that a pinned channel and an ADM bed
+// give a bed channel (iclforge::adm), so that a pinned channel and an ADM bed
 // channel come out at one position.
 [[nodiscard]] iclforge::oba::Position ac4_pin_position(double azimuth_deg);
 

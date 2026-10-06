@@ -144,7 +144,7 @@ reports, each surfacing once the one before it was fixed:
   sized to wrote one element past the end of it. (ASan
   `stack-buffer-overflow`: a 4-byte write at offset 1076 of a 1012-byte frame
   object.)
-- `iclforge::signing`'s own per-channel tally took `subspan(0, endmant)` of the
+- `iclforge::ac3::signing`'s own per-channel tally took `subspan(0, endmant)` of the
   exponent array the walk had actually recovered, without checking that
   `endmant` fits in it. That is a precondition, not a clamp: on an empty
   span it manufactures one with a null data pointer and a non-zero size,

@@ -1,6 +1,6 @@
 #pragma once
 
-// SHA-256 (FIPS 180-4), self-contained. Internal to iclforge::signing - not on the
+// SHA-256 (FIPS 180-4), self-contained. Internal to iclforge::ac3::signing - not on the
 // target's public include path, since callers want hmac_sha256 (and the EMDF
 // signer above that), never the raw hash. No third-party dependency by design:
 // the codec's only third-party library is {fmt}, for formatting (see the top
@@ -39,9 +39,9 @@ private:
 // Convenience one-shot over a whole buffer. Exported (unlike Sha256 itself) purely so
 // tests/ac3/signing/test_signing.cpp - which reaches this private header directly to run the
 // FIPS/RFC known-answer vectors, see tests/CMakeLists.txt's own comment - can resolve it when
-// iclforge::signing builds as a shared library (signing_objects' default-hidden visibility would
+// iclforge::ac3::signing builds as a shared library (signing_objects' default-hidden visibility would
 // otherwise drop it from the .so's export table). The header itself stays uninstalled and off
-// the target's public include path, so this does not change what iclforge::signing's own advertised
+// the target's public include path, so this does not change what iclforge::ac3::signing's own advertised
 // public API is.
 ICLFORGE_BASE_EXPORT std::array<std::byte, 32> sha256(std::span<const std::byte> data);
 

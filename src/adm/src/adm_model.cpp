@@ -399,7 +399,7 @@ namespace {
 }
 
 ::adm::AudioBlockFormatObjects to_libadm_block(const AudioBlockFormat& block) {
-    // The Dolby Atmos Master ADM Profile - and this writer's only caller, iclforge::admbridge's
+    // The Dolby Atmos Master ADM Profile - and this writer's only caller, iclforge::adm's
     // write-side (bridge.cpp) - always produces cartesian blocks; a caller handing this writer a
     // polar one is a bug in that caller, which build_libadm_document() reports as
     // AdmWriteError::kInvalidDocument before calling this, so `position` is cartesian here.
@@ -496,7 +496,7 @@ std::expected<BuiltDocument, AdmWriteError> build_libadm_document(const AdmModel
             type = ::adm::TypeDefinition::DIRECT_SPEAKERS;
         } else {
             // Matrix/HOA/Binaural/User Custom/Unknown - out of this writer's scope, same
-            // boundary iclforge::admbridge's own read-side classify_object() draws (bridge.cpp).
+            // boundary iclforge::adm's own read-side classify_object() draws (bridge.cpp).
             return std::unexpected(AdmWriteError::kInvalidDocument);
         }
         auto libadm_channel = ::adm::AudioChannelFormat::create(::adm::AudioChannelFormatName(channel_format.name), type);
@@ -634,7 +634,7 @@ std::expected<BuiltDocument, AdmWriteError> build_libadm_document(const AdmModel
     std::unordered_map<std::string, std::shared_ptr<::adm::AudioObject>> objects_by_id;
     for (const auto& object : model.objects) {
         if (!object.object_refs.empty()) {
-            // Nested audioObject references - out of scope, same as iclforge::admbridge's own
+            // Nested audioObject references - out of scope, same as iclforge::adm's own
             // read-side collect_leaf_objects() only ever WALKS these, never expects to write them.
             return std::unexpected(AdmWriteError::kInvalidDocument);
         }

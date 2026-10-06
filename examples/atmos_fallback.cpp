@@ -2,7 +2,7 @@
 //
 // A decoder that VALIDATES the EMDF container's protection field treats its
 // sync word as a commitment to object decoding and refuses the whole stream
-// if the tag does not check out (see iclforge::signing and
+// if the tag does not check out (see iclforge::ac3::signing and
 // docs/concepts/object-signing.md for how a licensed decoder is satisfied).
 // With the container left out entirely there is no sync word for such a
 // decoder to find, so it falls back to the 5.1 bed underneath exactly as it

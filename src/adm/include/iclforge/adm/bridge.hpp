@@ -19,7 +19,7 @@
 // span per channel, ready to drive encode_frame() in a loop. Phase 3 (a CLI/GUI-facing end-to-end
 // command) is a separate, later task; this module is the mapping/bridge library only.
 //
-// iclforge::admbridge sits between two modules that otherwise know nothing about each other:
+// iclforge::adm sits between two modules that otherwise know nothing about each other:
 // iclforge::adm (src/adm, codec-blind by design - see its own header comments) and
 // iclforge::ac3/iclforge::oba (src/ac3, always built, no dependency on the opt-in, Boost-requiring
 // ac3adm). This module is the one place both are allowed to meet, and - like iclforge::adm

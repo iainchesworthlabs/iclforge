@@ -205,7 +205,7 @@ against independent tooling and the bed decodes correctly — but unless that ta
 valid, the licensed decoder falls back to playing just the plain 5.1 bed rather than
 reconstructing the objects. This is an authenticity gate, not a correctness or conformance problem.
 
-The signer that produces the tag ships in the tree (`iclforge::signing`): the HMAC construction and the
+The signer that produces the tag ships in the tree (`iclforge::ac3::signing`): the HMAC construction and the
 layout of what gets signed are clean-room and committed, and the **only** thing you supply is the
 key — provisioned at runtime, never embedded, the same way a licensed tool receives its own. With a
 matching key, a validating decoder reconstructs the objects; without one, the stream stays a valid

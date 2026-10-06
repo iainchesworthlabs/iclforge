@@ -61,7 +61,7 @@ int run_strip_objects(std::string_view in_path, std::string_view out_path,
 // BW64/RF64 container) straight to DD+ JOC E-AC-3, no WAV plus a hand-authored keyframe file the
 // way atmos-encode above needs, because the master already carries every bed speaker feed's and
 // dynamic object's own position/gain automation (§10.3). See adm/atmos_adm.hpp's own header
-// comment for why this function is unconditional (iclforge::adm/iclforge::admbridge
+// comment for why this function is unconditional (iclforge::adm
 // linked-or-not is a build-time FILE choice, never a preprocessor conditional).
 int run_atmos_adm(std::string_view in_path, std::string_view out_path, std::uint32_t bitrate,
                   const forge_cli::Options& meta, std::string_view programme_id);
@@ -71,7 +71,7 @@ int run_atmos_adm(std::string_view in_path, std::string_view out_path, std::uint
 // E-AC-3, the identical shape run_atmos_adm above has for ADM: every Bed channel/Object the file
 // names becomes an AtmosEncoder object, driven by the file's own authored panning, no scene file
 // needed. See adm/atmos_iab.hpp's own header comment for why this function is unconditional
-// (iclforge::iab/iclforge::admbridge linked-or-not is a build-time FILE choice, never a
+// (iclforge::iab/iclforge::adm linked-or-not is a build-time FILE choice, never a
 // preprocessor conditional) and why it rides run_atmos_adm's own ICLFORGE_BUILD_ADM gate rather
 // than a new one.
 int run_atmos_iab(std::string_view in_path, std::string_view out_path, std::uint32_t bitrate,

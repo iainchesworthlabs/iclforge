@@ -101,7 +101,7 @@ object signing — **Evolution frame protection**, a truncated HMAC-SHA-256 over
 and the Evolution frame. Open decoders (e.g. truehdd `--evo-key`) optionally verify it with an
 operator-supplied key; without a key they decode unchecked. When authenticity policy lands for
 MLP (multi-key verify / unchecked / licensed soft-gate), wire it to Evolution HMAC, not to
-`iclforge::signing`'s EMDF path. See [Object signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md#sibling-truehd-evolution).
+`iclforge::ac3::signing`'s EMDF path. See [Object signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md#sibling-truehd-evolution).
 
 ### Crucible — cross-platform product (was UX12, Partial)
 
@@ -143,7 +143,7 @@ These shipped but have an open follow-on. They do not belong in "In progress" as
 |---|---|---|
 | **IAMF** (was IM3) | `src/iamf`: v2.0 reader and writer — channel-based and object-based `ipcm` elements, Parameter Blocks, trimming, raw OBU streams, ISO-BMFF and fragments | Encoding Opus, AAC-LC and FLAC; scalable layer reconstruction |
 | **IAB** (was IM1) | Reader, `AudioDataDLC` decode, writer and DLC encoder, spread and zone control into the Atmos bridge, ST 2067-201 MXF Track File write | A Track File checked by an IMF packager or validator |
-| **Object authenticity modes** | `iclforge::signing` HMAC tag; `sign-objects`; single-key `verify-objects` (hard fail); default decode reconstructs objects **unchecked** (FOSS-style) | **Multi-key** verify (keyring / repeated `signing-key=`); **licensed** soft-gate (e.g. `gate-objects`: tag mismatch / unsigned → bed-only, decode continues); CLI + docs naming the three modes — [Object signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md#planned-decode-modes). TrueHD Evolution HMAC is the parallel on IM5, not EMDF |
+| **Object authenticity modes** | `iclforge::ac3::signing` HMAC tag; `sign-objects`; single-key `verify-objects` (hard fail); default decode reconstructs objects **unchecked** (FOSS-style) | **Multi-key** verify (keyring / repeated `signing-key=`); **licensed** soft-gate (e.g. `gate-objects`: tag mismatch / unsigned → bed-only, decode continues); CLI + docs naming the three modes — [Object signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md#planned-decode-modes). TrueHD Evolution HMAC is the parallel on IM5, not EMDF |
 | **Multi-programme E-AC-3 encode** | `programme2=`..`programme8=` authoring via CLI (all eight §E2.3.1.2 substreams, full per-programme `mixmdate`/`bsmod` metadata) | Receiver-side use of that metadata — actually combining an associated service with the main programme during mixdown, rather than just carrying it — see [capabilities](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/library/capabilities.md) |
 | **Encoder reproducibility** (was VX12) | Audit done; `ilogb` fix landed | Re-validate FP-gated bit-cost thresholds; fixed-point transient port optional |
 | **Listening test** (was VX9) | Apparatus in `tools/listening/` | **No session run yet** — see [`tools/listening/responses/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/listening/responses/README.md) |
