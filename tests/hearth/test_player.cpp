@@ -31,6 +31,7 @@
 #include "iclforge/mp4/mp4.hpp"
 #include "pcm_sink.hpp"
 #include "player.hpp"
+#include "iclforge/ac4/elementary.hpp"
 
 // iclforge::hearth::Player (apps/hearth/engine/player.cpp) against a fake device.
 //

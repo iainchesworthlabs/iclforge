@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/elementary.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 
 // What the AC-4 pages show of a stream's presentations, Qt-free so iclforge-tests

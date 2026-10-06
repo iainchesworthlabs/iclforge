@@ -22,7 +22,7 @@
 #include "iclforge/render/render.hpp"
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sendspin/chunks.hpp"
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/elementary.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 
 namespace iclforge::hearth::testsink {

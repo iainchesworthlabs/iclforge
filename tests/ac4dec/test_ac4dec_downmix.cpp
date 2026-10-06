@@ -25,7 +25,8 @@
 
 #include "ac4dec_units.hpp"
 
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/elementary.hpp"
+#include "iclforge/ac4/toc.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 #include "pcm/downmix.hpp"
 

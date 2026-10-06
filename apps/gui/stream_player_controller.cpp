@@ -16,7 +16,7 @@
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/encoder/plan.hpp"
 #include "iclforge/ac3/io/wav.hpp"
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/elementary.hpp"
 #include "ac4_channels.hpp"
 #include "ac4_presentations.hpp"
 #include "ac4_sync_word.hpp"

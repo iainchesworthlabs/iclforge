@@ -45,7 +45,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/elementary.hpp"
+#include "iclforge/ac4/toc.hpp"
 #include "ac4/ac4_toc_writer.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 #include "ac4dec_mux.hpp"

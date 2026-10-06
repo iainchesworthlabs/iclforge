@@ -27,7 +27,7 @@
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/render/layout.hpp"
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/toc.hpp"
 #include "ac4_stream.hpp"
 #include "ac4_stream_kinds.hpp"
 #include "iclforge/ac4dec/decoder.hpp"

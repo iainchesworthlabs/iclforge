@@ -1,4 +1,5 @@
 #include "encoder_controller.hpp"
+#include "iclforge/ac4/elementary.hpp"
 
 #include "iclforge/base/detail/profiling.hpp"
 

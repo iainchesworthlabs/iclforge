@@ -19,7 +19,7 @@
 #include "../exit_codes.hpp"
 #include "../support.hpp"
 #include "iclforge/ac3/io/wav.hpp"
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/toc.hpp"
 #include "ac4_encode_core.hpp"
 #include "iclforge/ac4/syntax.hpp"
 #include "iclforge/ac4dec/decoder.hpp"

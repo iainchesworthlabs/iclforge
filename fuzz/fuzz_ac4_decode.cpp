@@ -4,7 +4,7 @@
 #include <optional>
 #include <span>
 
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/elementary.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 
 // iclforge::ac4::Decoder::parse and iclforge::ac4::Decoder::decode (src/ac4dec) - the AC-4

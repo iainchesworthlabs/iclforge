@@ -17,7 +17,7 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/toc.hpp"
 #include "iclforge/base/detail/profiling.hpp"
 #include "bit_reader.hpp"
 #include "pcm/downmix.hpp"

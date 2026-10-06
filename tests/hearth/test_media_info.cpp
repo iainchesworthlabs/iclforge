@@ -31,6 +31,7 @@
 #include "container_input.hpp"
 #include "iclforge/matroska/matroska.hpp"
 #include "media_info.hpp"
+#include "iclforge/ac4/elementary.hpp"
 #include "media_inspector.hpp"
 #include "iclforge/mp4/mp4.hpp"
 #include "iclforge/mpegts/mpegts.hpp"

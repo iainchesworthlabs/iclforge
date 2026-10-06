@@ -26,7 +26,7 @@
 #include "sanitized.hpp"
 
 #include "iclforge/ac3/io/wav.hpp"
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/elementary.hpp"
 
 namespace fs = std::filesystem;
 using iclforge::test::kSanitized;

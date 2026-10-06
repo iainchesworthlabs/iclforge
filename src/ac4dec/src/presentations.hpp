@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/toc.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 
 // The presentations of a table of contents as decode() takes them (ETSI TS 103

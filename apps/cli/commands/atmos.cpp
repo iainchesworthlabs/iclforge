@@ -1,4 +1,5 @@
 #include "atmos.hpp"
+#include "iclforge/ac4/elementary.hpp"
 
 #include <algorithm>
 #include <array>

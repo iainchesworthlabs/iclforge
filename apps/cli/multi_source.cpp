@@ -18,6 +18,7 @@
 #include "iclforge/ac3/encoder/plan.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 #include "support.hpp"
+#include "iclforge/ac4/carriage.hpp"
 
 namespace forge_cli {
 

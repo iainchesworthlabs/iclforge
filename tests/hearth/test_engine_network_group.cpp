@@ -31,7 +31,7 @@
 #include "iclforge/sendspin/pairing_messages.hpp"
 #include "iclforge/sendspin/server_host.hpp"
 #include "iclforge/sendspin/server_store.hpp"
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/elementary.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 #include "burst_output.hpp"
 #include "engine_thread.hpp"

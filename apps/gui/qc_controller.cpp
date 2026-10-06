@@ -20,7 +20,7 @@
 #include "iclforge/ac3/meta/drc.hpp"
 #include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/ac3/meta/qc.hpp"
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/elementary.hpp"
 #include "ac4_channels.hpp"
 #include "ac4_presentations.hpp"
 #include "ac4_sync_word.hpp"

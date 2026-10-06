@@ -18,7 +18,7 @@
 #include "iclforge/ac3/encoder/assignment.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/objects/scene.hpp"
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/elementary.hpp"
 #include "ac4_encode_core.hpp"
 #include "ac4_objects_core.hpp"
 #include "iclforge/ac4dec/decoder.hpp"

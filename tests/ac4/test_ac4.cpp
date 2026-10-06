@@ -16,7 +16,9 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/carriage.hpp"
+#include "iclforge/ac4/elementary.hpp"
+#include "iclforge/ac4/toc.hpp"
 
 namespace {
 

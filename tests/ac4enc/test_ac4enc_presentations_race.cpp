@@ -28,7 +28,7 @@
 
 #include "../ac4dec/ac4dec_mux.hpp"
 #include "iclforge/ac3/io/wav.hpp"
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/toc.hpp"
 #include "iclforge/ac4enc/encoder.hpp"
 
 namespace {

@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "iclforge/ac3/io/elementary.hpp"
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/toc.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 #include "container_input.hpp"
 #include "queue.hpp"

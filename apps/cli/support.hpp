@@ -34,6 +34,7 @@
 #include "iclforge/signing/emdf_atmos_signer.hpp"
 #include "iclforge/signing/signing_key.hpp"
 #include "ac4_objects_core.hpp"
+#include "iclforge/ac4/elementary.hpp"
 #include "ac4_sync_word.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 #include "iclforge/ac4enc/encoder.hpp"

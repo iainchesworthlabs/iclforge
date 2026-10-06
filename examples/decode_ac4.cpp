@@ -19,7 +19,7 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/elementary.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 
 int main(int argc, char** argv) {

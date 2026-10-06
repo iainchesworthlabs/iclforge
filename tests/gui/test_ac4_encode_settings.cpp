@@ -6,7 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/carriage.hpp"
+#include "iclforge/ac4/elementary.hpp"
 #include "ac4_encode_core.hpp"
 #include "ac4_encode_settings.hpp"
 #include "ac4_presentations.hpp"

@@ -19,4 +19,6 @@
 # ---------------------------------------------------------------------------
 iclforge_add_library(ac4
     SOURCES
-        src/ac4.cpp)
+        src/ac4.cpp
+        src/carriage.cpp
+        src/elementary.cpp)

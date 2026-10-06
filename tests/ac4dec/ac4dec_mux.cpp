@@ -7,7 +7,8 @@
 #include <string_view>
 #include <utility>
 
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/elementary.hpp"
+#include "iclforge/ac4/toc.hpp"
 #include "ac4/ac4_toc_writer.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 #include "iclforge/ac4enc/encoder.hpp"

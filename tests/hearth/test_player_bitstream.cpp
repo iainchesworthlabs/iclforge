@@ -25,6 +25,7 @@
 #include "iclforge/ac3/io/metadata_edit.hpp"
 #include "iclforge/render/layout.hpp"
 #include "ac3_transcoder.hpp"
+#include "iclforge/ac4/carriage.hpp"
 #include "bitstream_sink.hpp"
 #include "decoder_settings.hpp"
 #include "diagnostic_log.hpp"

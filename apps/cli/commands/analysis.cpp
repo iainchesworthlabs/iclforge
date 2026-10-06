@@ -38,7 +38,7 @@
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/iec61937/iec61937.hpp"
 #include "iclforge/render/spatial.hpp"
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/elementary.hpp"
 #include "ac4_channels.hpp"
 #include "iclforge/ac4dec/decoder.hpp"
 

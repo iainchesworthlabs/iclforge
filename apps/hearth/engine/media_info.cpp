@@ -11,7 +11,9 @@
 #include "iclforge/sendspin/json.hpp"
 #include "iclforge/signing/emdf_atmos_signer.hpp"
 #include "iclforge/ac3/version.hpp"
-#include "iclforge/ac4/ac4.hpp"
+#include "iclforge/ac4/carriage.hpp"
+#include "iclforge/ac4/elementary.hpp"
+#include "iclforge/ac4/toc.hpp"
 
 // See media_info.hpp.
 
