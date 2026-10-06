@@ -1121,8 +1121,8 @@ ICLFORGE_C_EXPORT int iclforge_scanned_stream_access_unit_at_sample(
 ICLFORGE_C_EXPORT int iclforge_scanned_stream_access_unit_at_seconds(
     const iclforge_scanned_stream_t* stream, double seconds, size_t* out_index);
 /* The one length every access unit shares - returns 0 (out_samples
- * untouched) when they differ, 1 otherwise. iclforge::mp4::AudioTrack/iclforge::mpegts::
- * AudioTrack/iclforge::matroska::AudioTrack each need exactly this before a stream can
+ * untouched) when they differ, 1 otherwise. iclforge::containers::mp4::AudioTrack/iclforge::containers::mpegts::
+ * AudioTrack/iclforge::containers::matroska::AudioTrack each need exactly this before a stream can
  * be muxed into a fixed-duration track. */
 ICLFORGE_C_EXPORT int iclforge_scanned_stream_uniform_access_unit_samples(
     const iclforge_scanned_stream_t* stream, uint32_t* out_samples);

@@ -19,7 +19,7 @@
 // packets and takes each access unit as opaque bytes. It has NO dependency
 // on iclforge::ac3 beyond the caller telling it AC-3 vs. E-AC-3 (AudioCodec,
 // below) - which is the point of keeping it a separate library, the same
-// shape as iclforge::matroska (src/matroska/). A caller muxing E-AC-3 hands
+// shape as iclforge::containers::matroska (src/containers/src/matroska/). A caller muxing E-AC-3 hands
 // over whole access units; the module knows nothing about what is inside
 // them.
 //
@@ -71,7 +71,7 @@
 // values off the bitstream is iclforge::ac3::io::scan's, which is why ServiceInfo is
 // plain integers and this module still has no dependency on iclforge::ac3.
 
-namespace iclforge::mpegts {
+namespace iclforge::containers::mpegts {
 
 enum class AudioCodec : std::uint8_t {
     kAc3,
@@ -277,7 +277,7 @@ struct MuxOptions {
 
 // Mux access units into a complete .ts, returned as bytes. No file I/O here,
 // so this stays testable without touching a disk. Access units arrive as
-// views (iclforge::matroska::mux's own reasoning); the vector-list overload below
+// views (iclforge::containers::matroska::mux's own reasoning); the vector-list overload below
 // forwards for owned lists.
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<std::vector<std::byte>, MuxError> mux(
     const AudioTrack& track, std::span<const std::span<const std::byte>> frames,
@@ -288,14 +288,14 @@ struct MuxOptions {
     const MuxOptions& options = {});
 
 // Incrementally muxes access units into a transport stream as they arrive -
-// iclforge::matroska::Writer's sibling, for a session whose length is not known up
+// iclforge::containers::matroska::Writer's sibling, for a session whose length is not known up
 // front. A transport stream is the born-streamable container: the only
 // state that crosses access units is three continuity counters and the
 // index the 90 kHz clock derives from, so the bytes push() hands back,
 // written in order, are IDENTICAL to what mux() produces for the same
 // frames - that equality is this class's contract and its test.
 //
-// No file I/O, matching iclforge::matroska::Writer: push() hands back bytes for the
+// No file I/O, matching iclforge::containers::matroska::Writer: push() hands back bytes for the
 // caller to write. Two shape differences from the Matroska sibling, both
 // forced by the format itself: there is no header() (PSI - PAT and PMT -
 // repeats every options.psi_repeat_every_au access units and rides inside
@@ -333,4 +333,4 @@ class ICLFORGE_CONTAINERS_EXPORT Writer {
     std::uint8_t audio_cc_ = 0;
 };
 
-}  // namespace iclforge::mpegts
+}  // namespace iclforge::containers::mpegts

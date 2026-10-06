@@ -224,7 +224,7 @@ struct PassthroughSink::Impl {
     coreaudio::HogGuard hog;
     coreaudio::MixingGuard mixing;
     std::unique_ptr<ByteRingBuffer> queue;
-    std::size_t burst_bytes = iec61937::kBurstBytes;
+    std::size_t burst_bytes = containers::iec61937::kBurstBytes;
     // Which of the IOProc's buffers is the chosen stream's: a device's output
     // streams arrive as its buffers, in the order the device lists them.
     std::size_t buffer_index = 0;

@@ -1,5 +1,5 @@
-# vcpkg port for iclforge - installs the library only (iclforge::ac3, plus iclforge::matroska,
-# iclforge::mp4, iclforge::mpegts, iclforge::c, the AC-4 library, iclforge::iab and iclforge::iamf as
+# vcpkg port for iclforge - installs the library only (iclforge::ac3, plus iclforge::containers,
+# iclforge::containers, iclforge::c, the AC-4 library, iclforge::iab and iclforge::containers as
 # opt-in features, off unless asked for, since each adds public targets), never the CLI, GUI,
 # Hearth, tests, examples or fuzz harnesses - upstream's own ICLFORGE_BUILD_CLI/GUI/HEARTH/TESTS/
 # EXAMPLES/FUZZERS options make that a plain OFF each, no patching needed. iclforge::adm (the

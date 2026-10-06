@@ -153,7 +153,7 @@ bool play_file(const std::string& path) {
                         "streaming %zu access units from %s (%u Hz, carrier 4x that)",
                         units.size(), path.c_str(), content_rate);
 
-    iclforge::iec61937::Eac3BurstPacker eac3_packer;
+    iclforge::containers::iec61937::Eac3BurstPacker eac3_packer;
     for (const auto& unit : units) {
         auto result = eac3_packer.push(unit);
         if (!result) {

@@ -23,7 +23,7 @@
 // computed by Windows Sonic/Dolby Atmos's HRTF renderer, not by anything in
 // this repository - the whole reason it is worth building.
 //
-// This header is deliberately codec-blind, the same way iclforge::iec61937's
+// This header is deliberately codec-blind, the same way iclforge::containers::iec61937's
 // framing is the only iclforge::ac3-adjacent thing iclforge::audio depends on: it
 // knows nothing about OAMD, JOC, or which of a programme's objects are bed
 // vs dynamic. That interpretation (see apps/cli/commands/live_audio.cpp's

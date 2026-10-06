@@ -25,7 +25,7 @@
 // PCM; see examples/mux_iamf.cpp. mux_objects() writes object-based Audio Elements, the v2.0
 // addition, with positions animated by Parameter Block OBUs.
 //
-// Standalone and codec-blind in the sense iclforge::matroska, iclforge::mp4 and iclforge::iab
+// Standalone and codec-blind in the sense iclforge::containers::matroska, iclforge::containers::mp4 and iclforge::iab
 // are: it links nothing from iclforge::ac3. Every OBU and box field is transcribed from the
 // published specification, with the structure named at each call site, per CONTRIBUTING.md's
 // clean-room rule. AOM's `libiamf` and Open Audio Renderer are oracles only.
@@ -34,7 +34,7 @@
 // file (write_isobmff()), as a raw OBU stream (write_sequence()), or fragment by fragment
 // (FragmentedWriter). mux() and mux_objects() are the ISO-BMFF shortcut.
 
-namespace iclforge::iamf {
+namespace iclforge::containers::iamf {
 
 enum class MuxError : std::uint8_t {
     kNoFrames,             // frames is empty
@@ -180,4 +180,4 @@ struct DecodedElement {
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<DecodedElement, Error> decode_pcm(const Sequence& sequence,
                                                                                     std::uint32_t audio_element_id);
 
-}  // namespace iclforge::iamf
+}  // namespace iclforge::containers::iamf

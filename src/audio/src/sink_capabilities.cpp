@@ -2,7 +2,7 @@
 
 // The one platform-independent piece of iclforge::audio::sink_capabilities - see
 // the header for the shape this is describing errors for. Compiled on every
-// platform, the same way iclforge::iec61937's byte framing is platform-independent
+// platform, the same way iclforge::containers::iec61937's byte framing is platform-independent
 // while PassthroughSink's delivery of it is not; read_sink_capabilities()
 // itself is implemented once per backend/<platform>/sink_capabilities.cpp.
 

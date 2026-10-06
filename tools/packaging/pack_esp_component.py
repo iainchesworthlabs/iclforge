@@ -66,7 +66,7 @@ STAGED_TREES = (
     "src/dsp",
     "src/objects",
     "src/render",
-    "src/iec61937",
+    "src/containers/src/iec61937",
     "cmake",
 )
 

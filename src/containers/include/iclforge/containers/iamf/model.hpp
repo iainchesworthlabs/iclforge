@@ -23,7 +23,7 @@
 // their coded integers. The helper functions at the end convert the ones a caller usually wants as
 // decibels or normalized coordinates.
 
-namespace iclforge::iamf {
+namespace iclforge::containers::iamf {
 
 using Bytes = std::vector<std::byte>;
 
@@ -349,4 +349,4 @@ struct Sequence {
 [[nodiscard]] constexpr double normalized_cart8(std::int32_t coded) { return static_cast<double>(coded) / 127.0; }
 [[nodiscard]] constexpr double normalized_cart16(std::int32_t coded) { return static_cast<double>(coded) / 32767.0; }
 
-}  // namespace iclforge::iamf
+}  // namespace iclforge::containers::iamf

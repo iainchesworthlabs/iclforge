@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::iec61937 - IEC 61937 burst packing and unpacking: an access unit of AC-3, E-AC-3 or AC-4
+# iclforge::containers - IEC 61937 burst packing and unpacking: an access unit of AC-3, E-AC-3 or AC-4
 # disguised as PCM for an S/PDIF or HDMI sink, and the detector that finds one in a capture. The
 # packers take the frame's facts as arguments; the library links no codec.
 # ---------------------------------------------------------------------------
@@ -11,7 +11,7 @@ endif()
 
 iclforge_add_library(iec61937
     SOURCES
-        src/iec61937.cpp
+        src/containers/src/iec61937.cpp
     DEPENDS base
     PRIVATE_INCLUDES
         "${CMAKE_CURRENT_SOURCE_DIR}/src"

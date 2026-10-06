@@ -33,7 +33,7 @@
 
 namespace {
 
-namespace iec = iclforge::iec61937;
+namespace iec = iclforge::containers::iec61937;
 using iec::BurstDataType;
 
 std::uint8_t u8(std::span<const std::byte> bytes, std::size_t index) {

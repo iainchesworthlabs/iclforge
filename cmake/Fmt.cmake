@@ -21,7 +21,7 @@
 # Android triplet chainloading on for this one dependency.
 #
 # A second target, iclforge::fmt_private, is defined at the end of this file. The
-# libraries installed as static archives (iclforge::ac3, iclforge::mp4) link it in place
+# libraries installed as static archives (iclforge::ac3, iclforge::containers) link it in place
 # of iclforge::fmt.
 # ---------------------------------------------------------------------------
 
@@ -143,8 +143,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 endif()
 
 # iclforge::fmt_private - a private copy of {fmt}, compiled into the object files of a library that is
-# installed as a static archive: iclforge::ac3 (src/ac3/CMakeLists.txt) and iclforge::mp4
-# (src/mp4/CMakeLists.txt).
+# installed as a static archive: iclforge::ac3 (src/ac3/CMakeLists.txt) and iclforge::containers
+# (src/containers/CMakeLists.txt).
 #
 # An archive is not linked. Each function its objects call without defining stays an undefined
 # reference until a consumer's own link, and the installed package names no {fmt} for that link to

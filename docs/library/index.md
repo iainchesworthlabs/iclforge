@@ -4,7 +4,7 @@
 decodes AC-3 and E-AC-3, including E-AC-3 streams with Dolby Atmos objects represented through
 Joint Object Coding (JOC). It also provides loudness metering, level analysis, and quality
 measurement. It links five libraries that know no codec: `iclforge::base`, `iclforge::dsp`,
-`iclforge::objects`, `iclforge::render` and `iclforge::iec61937`. AC-4 has libraries of its own
+`iclforge::objects`, `iclforge::render` and `iclforge::containers::iec61937`. AC-4 has libraries of its own
 beside it, which share no code with it ([AC-4](ac4.md)).
 
 Other targets provide container writing, IAB and ADM/BW64 reading, IAMF reading and writing, object signing,
@@ -29,10 +29,10 @@ main codec headers are under `src/ac3/include/iclforge/ac3/`, and the AC-4 heade
 | `iclforge::ac3` | AC-3 and E-AC-3 encoding and decoding, and EMDF object signing (see [Object signing](signing.md)); links the five libraries below it |
 | `iclforge::base`, `iclforge::dsp` | Bit I/O, the speaker vocabulary, the CPU probe, and the signing key with SHA-256 and HMAC-SHA-256; the FFT, the QMF bank and the sample-rate converter |
 | `iclforge::objects`, `iclforge::render` | The object-audio model and the Object Audio Metadata payload; layouts, routing and the renderer |
-| `iclforge::iec61937` | IEC 61937 burst packing and detection, for AC-3, E-AC-3 and AC-4 |
-| `iclforge::matroska`, `iclforge::mp4`, `iclforge::mpegts` | Container writers |
+| `iclforge::containers::iec61937` | IEC 61937 burst packing and detection, for AC-3, E-AC-3 and AC-4 |
+| `iclforge::containers::matroska`, `iclforge::containers::mp4`, `iclforge::containers::mpegts` | Container writers |
 | `iclforge::iab` | SMPTE ST 2098-2 IAB reading; see [IAB](iab.md) |
-| `iclforge::iamf` | IAMF reading and writing, as OBUs, ISO-BMFF and fragments; see [IAMF](iamf.md) |
+| `iclforge::containers::iamf` | IAMF reading and writing, as OBUs, ISO-BMFF and fragments; see [IAMF](iamf.md) |
 | `iclforge::adm` | ADM/BW64 reading and writing, and the mapping between ADM objects and the Atmos encoder or decoder; opt-in with `ICLFORGE_BUILD_ADM=ON` |
 | `iclforge::ac4` | AC-4 decoding and encoding, and the sync frames, table of contents and presentations both work through; see [AC-4](ac4.md) |
 
@@ -69,7 +69,7 @@ An installed package has no ambient `BUILD_SHARED_LIBS` default to resolve again
 exports both variants explicitly rather than a bare `iclforge::ac3` — pick the one you want.
 The package has nothing for a consumer to find: no `find_dependency()` calls, no system or
 third-party library to resolve, static or shared. The codec is not dependency-free, though —
-`iclforge::ac3` and `iclforge::mp4` use {fmt} for formatting (`cmake/Fmt.cmake`, and this repo's own
+`iclforge::ac3` and `iclforge::containers::mp4` use {fmt} for formatting (`cmake/Fmt.cmake`, and this repo's own
 `vcpkg.json`; it stands in for `<format>`, which NDK r26's libc++ does not implement). Both
 compile a private copy of it into their own object files (`FMT_HEADER_ONLY`, in its own inline
 namespace `fmt::ac3_private`, through the `iclforge::fmt_private` target wrapped in
@@ -124,13 +124,13 @@ cover behaviors, not additional public APIs/targets/binaries, and each of these 
 
 | Feature | Targets |
 |---|---|
-| `matroska` | `iclforge::matroska` |
-| `mp4` | `iclforge::mp4` |
-| `mpegts` | `iclforge::mpegts` |
+| `matroska` | `iclforge::containers::matroska` |
+| `mp4` | `iclforge::containers::mp4` |
+| `mpegts` | `iclforge::containers::mpegts` |
 | `capi` | `iclforge::c`, the C API (see [C API](c-api.md)) |
 | `ac4` | `iclforge::ac4` (see [AC-4](ac4.md)) |
 | `iab` | `iclforge::iab` (see [IAB](iab.md)) |
-| `iamf` | `iclforge::iamf` (see [IAMF](iamf.md)) |
+| `iamf` | `iclforge::containers::iamf` (see [IAMF](iamf.md)) |
 
 Opt in with `vcpkg install iclforge[matroska,mp4,mpegts]` for the three container writers, or any
 subset, such as `iclforge[ac4]` for AC-4 alone. `iclforge::adm` have no vcpkg
@@ -183,7 +183,7 @@ cc consumer.c $(pkg-config --static --cflags --libs iclforge-c)
 
 `iclforge-c.pc` requires `iclforge-ac3` privately, because `libiclforge_c_static.a` calls into
 `libiclforge_ac3_static.a` (and `iclforge-ac4` where the C API carries AC-4). `iclforge-ac3.pc`,
-`iclforge-matroska.pc`, `iclforge-mp4.pc`, `iclforge-mpegts.pc`, `iclforge-iamf.pc`,
+`iclforge-containers.pc`, `iclforge-containers.pc`, `iclforge-containers.pc`, `iclforge-containers.pc`,
 `iclforge-iab.pc` and `iclforge-ac4.pc` list the C++ runtime and libm in
 `Libs.private`. A C compiler does not link them by itself, and a C++ compiler does. The names are
 the ones CMake recorded for the compiler that built the archives: `-lstdc++ -lm` with libstdc++
@@ -194,7 +194,7 @@ An install with both linkages, such as the `iclforge-dev-*` packages, names the 
 and `--static` does not switch to the archives, so name them yourself: `-liclforge_c_static`,
 then the `_static` archive of each library its `Requires` chain names, a library before the ones
 it uses (`iclforge_ac3_static`, `iclforge_render_static`, `iclforge_objects_static`,
-`iclforge_dsp_static`, `iclforge_base_static` and `iclforge_iec61937_static`; a build with
+`iclforge_dsp_static`, `iclforge_base_static` and `iclforge_containers_static`; a build with
 AC-4 adds `iclforge_ac4_static`), and `-lstdc++ -lm` at the end.
 
 Live audio — capture, monitor playback, IEC 61937 passthrough — is `iclforge::audio`
@@ -224,8 +224,8 @@ re-synced by hand and can drift. Each page's "Full program" link is the canonica
 - [A worked scene — station broadcast](station-broadcast.md) — a complete 115-second authored Atmos scene built on the object APIs.
 - [Channel plans & routing](channel-plans-and-routing.md) — custom channel selections and multi-source assignment.
 - [Metadata](metadata.md) — loudness, DRC and downmix metadata.
-- [Muxing & sinks](muxing-and-sinks.md) — `iclforge::matroska::mux`, `iclforge::mp4::mux`, fMP4/CMAF + HLS/DASH
-  (`iclforge::mp4::fragment`, `iclforge/mp4/hls.hpp`, `iclforge/mp4/dash.hpp`), metering, the IEC 61937/passthrough/monitor
+- [Muxing & sinks](muxing-and-sinks.md) — `iclforge::containers::matroska::mux`, `iclforge::containers::mp4::mux`, fMP4/CMAF + HLS/DASH
+  (`iclforge::containers::mp4::fragment`, `iclforge/containers/mp4/hls.hpp`, `iclforge/containers/mp4/dash.hpp`), metering, the IEC 61937/passthrough/monitor
   sinks, and capture.
 - [File I/O](file-io.md) — reading and writing WAV.
 - [IAB (SMPTE ST 2098-2) reading](iab.md) — `iclforge::iab`, a standalone Immersive Audio
@@ -234,7 +234,7 @@ re-synced by hand and can drift. Each page's "Full program" link is the canonica
   parser (opt-in, `-DICLFORGE_BUILD_ADM=ON`).
 - [ADM → Atmos bridging](adm-bridge.md) — `iclforge::adm`, mapping the parsed ADM graph onto
   `iclforge::ac3::oba::AtmosEncoder` (same opt-in flag).
-- [IAMF](iamf.md) — `iclforge::iamf`, a standalone reader and writer: a decoded 7.1.4 programme
+- [IAMF](iamf.md) — `iclforge::containers::iamf`, a standalone reader and writer: a decoded 7.1.4 programme
   re-wrapped as a channel-based IAMF Audio Element, object-based Audio Elements with animated
   positions, ISO-BMFF, raw OBU streams and fragments (on by default).
 - [AC-4](ac4.md) — `iclforge::ac4`, the decoder, the encoder and the inspector both work through:
@@ -271,14 +271,14 @@ libraries do the same with `iclforge::ac4::Error`, `iclforge::ac4::DecodeError` 
 
 **Namespaces follow the libraries.** Everything is under `iclforge::`, and a library's public
 headers declare into the namespace named for it: `iclforge::ac3` for the AC-3, E-AC-3 and Atmos
-codec, `iclforge::ac4` for the AC-4 codec, and `iclforge::mp4`, `iclforge::matroska`,
-`iclforge::mpegts`, `iclforge::iamf`, `iclforge::iab` and `iclforge::adm` for the containers and
+codec, `iclforge::ac4` for the AC-4 codec, and `iclforge::containers::mp4`, `iclforge::containers::matroska`,
+`iclforge::containers::mpegts`, `iclforge::containers::iamf`, `iclforge::iab` and `iclforge::adm` for the containers and
 the readers, which know nothing about AC-3, E-AC-3 or Atmos: they take frames as opaque bytes. The
 codec's sub-namespaces keep their names under its own: `iclforge::ac3::eac3`, `iclforge::ac3::oba`,
 `iclforge::ac3::io`, `iclforge::ac3::meta`, `iclforge::ac3::plan`, `iclforge::ac3::verify`,
 `iclforge::ac3::quality` and `iclforge::ac3::analysis`. The libraries split from it have a
 namespace of their own, `iclforge::base`, `iclforge::render`, `iclforge::dsp` and
-`iclforge::iec61937`, and the objects library declares `iclforge::oba` and `iclforge::emdf`.
+`iclforge::containers::iec61937`, and the objects library declares `iclforge::oba` and `iclforge::emdf`.
 Five names are declared both by another library under `iclforge::` and by the codec under
 `iclforge::ac3::`: `oba`, `emdf`, `render`, `internal` and `detail`. Inside `iclforge::ac3` an
 unqualified `oba::` is the codec's, so the objects library's `Position` is written

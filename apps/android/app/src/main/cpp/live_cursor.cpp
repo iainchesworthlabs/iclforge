@@ -1023,7 +1023,7 @@ void run_loop() {
     std::vector<std::span<const float>> bed_views;
     bed_views.reserve(6);
 
-    iclforge::iec61937::Eac3BurstPacker packer;
+    iclforge::containers::iec61937::Eac3BurstPacker packer;
     std::array<std::vector<float>, kObjects> tones;
     for (auto& tone : tones) {
         tone.resize(iclforge::ac3::kSamplesPerFrame);
@@ -1353,7 +1353,7 @@ void run_loop() {
             if (frames == 0) {
                 __android_log_print(ANDROID_LOG_INFO, kLogTag,
                                     "first burst ready: %zu bytes (expect %zu)",
-                                    (*push_result)->size(), iclforge::iec61937::kEac3BurstBytes);
+                                    (*push_result)->size(), iclforge::containers::iec61937::kEac3BurstBytes);
             }
             int retry_count = 0;
             bool submitted = false;

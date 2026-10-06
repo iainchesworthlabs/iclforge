@@ -12,7 +12,7 @@
 // Object-based audio elements (IAMF v2.0.0): the Audio Element and Mix Presentation a program of
 // objects produces, the Parameter Blocks that animate positions, and the audio read back.
 
-namespace iamf = iclforge::iamf;
+namespace iamf = iclforge::containers::iamf;
 
 namespace {
 

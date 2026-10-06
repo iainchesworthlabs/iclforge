@@ -112,7 +112,7 @@ struct OutputStage::Impl {
     std::unique_ptr<ObjectSink> spatial;
     bool spatial_started = false;
 
-    std::unique_ptr<iclforge::iec61937::Eac3BurstPacker> packer;  // Atmos / DD+
+    std::unique_ptr<iclforge::containers::iec61937::Eac3BurstPacker> packer;  // Atmos / DD+
     std::unique_ptr<iclforge::ac3::FrameEncoder> ac3_encoder;           // DD 5.1
     // DD 5.1 only: the bed gathered until a whole AC-3 frame's worth is in
     // hand, one vector per coded channel. AC-3 has no short frames - every
@@ -273,7 +273,7 @@ const OutputStatus& OutputStage::apply(std::vector<EndpointFacts> facts, bool si
             if (!started.has_value()) {
                 return refuse(started.error());
             }
-            impl_->packer = std::make_unique<iclforge::iec61937::Eac3BurstPacker>();
+            impl_->packer = std::make_unique<iclforge::containers::iec61937::Eac3BurstPacker>();
             break;
         }
         case OutputMode::kDd51: {
@@ -453,7 +453,7 @@ void OutputStage::submit(std::span<const std::byte> unit, const RawFrame& raw) {
                 if (!frame.has_value()) {
                     continue;
                 }
-                if (const auto wrapped = iclforge::iec61937::wrap_frame(*frame)) {
+                if (const auto wrapped = iclforge::containers::iec61937::wrap_frame(*frame)) {
                     submit_with_patience(*impl.passthrough, status_.underruns,
                                          std::span<const std::byte>(*wrapped));
                 }

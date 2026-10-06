@@ -1,8 +1,8 @@
-# IAMF reading and writing: `iclforge::iamf`
+# IAMF reading and writing: `iclforge::containers::iamf`
 
-`iclforge/iamf/`, library `iclforge::iamf`. A standalone reader and writer for AOM's IAMF (Immersive Audio
-Model and Formats) v2.0.0 — the bitstream format behind Eclipsa Audio. Like `iclforge::matroska`,
-`iclforge::mp4` and `iclforge::iab`, it links nothing from `iclforge::ac3`: it knows nothing about
+`iclforge/iamf/`, library `iclforge::containers::iamf`. A standalone reader and writer for AOM's IAMF (Immersive Audio
+Model and Formats) v2.0.0 — the bitstream format behind Eclipsa Audio. Like `iclforge::containers::matroska`,
+`iclforge::containers::mp4` and `iclforge::iab`, it links nothing from `iclforge::ac3`: it knows nothing about
 AC-3, E-AC-3 or the JOC/Atmos object layer, and takes already-rendered PCM in.
 
 **Why a writer exists at all.** IAMF's codec list is Opus, AAC-LC, FLAC and LPCM — E-AC-3 can
@@ -15,7 +15,7 @@ order and handed over as PCM. The object-based path (v2.0) takes mono PCM per ob
 **Two routes to the same ecosystem.** [ADM / BW64 writing](adm.md)'s `write_bw64()` already opens
 an *indirect* one: AOM's own `iamf-tools` encoder accepts ADM-BWF input, so a decoded programme
 written as an ADM master already reaches IAMF via a second, external encoder — but
-only for the ADM writer's own scope (dynamic-object-only programmes, cartesian positions). `iclforge::iamf`
+only for the ADM writer's own scope (dynamic-object-only programmes, cartesian positions). `iclforge::containers::iamf`
 writes the IAMF bitstream directly, with nothing else in the chain.
 
 Default-on (`ICLFORGE_BUILD_IAMF`), installed/exported the same way as the container writers —
@@ -33,14 +33,14 @@ the Conan recipe install it where asked for, off by default: `vcpkg install iclf
 | `container.hpp` | ISO-BMFF: `write_isobmff()`, `read_isobmff()` and `FragmentedWriter`. |
 
 ```cpp
-iclforge::iamf::AudioTrack track{.samples_per_frame = iclforge::ac3::kSamplesPerFrame};
-std::vector<iclforge::iamf::Frame> frames;
+iclforge::containers::iamf::AudioTrack track{.samples_per_frame = iclforge::ac3::kSamplesPerFrame};
+std::vector<iclforge::containers::iamf::Frame> frames;
 // ... frames.push_back(...) for each temporal unit ...
 
-const auto file = iclforge::iamf::mux(track, frames);
+const auto file = iclforge::containers::iamf::mux(track, frames);
 if (!file) {
-    fmt::printf("iclforge::iamf::mux failed: %.*s\n", static_cast<int>(iclforge::iamf::describe(file.error()).size()),
-                iclforge::iamf::describe(file.error()).data());
+    fmt::printf("iclforge::containers::iamf::mux failed: %.*s\n", static_cast<int>(iclforge::containers::iamf::describe(file.error()).size()),
+                iclforge::containers::iamf::describe(file.error()).data());
     return 1;
 }
 ```
@@ -53,7 +53,7 @@ an object-based program as a file, a raw OBU stream and fragments, and reads eac
 
 ## The permutation a caller does (7.1.4)
 
-`iclforge::iamf::Frame::channels` is planar, ordered exactly as this module's Audio Element OBU declares
+`iclforge::containers::iamf::Frame::channels` is planar, ordered exactly as this module's Audio Element OBU declares
 (IAMF §3.6.2, `loudspeaker_layout` = 7, "7.1.4ch"): **L, C, R, Lss, Rss, Lrs, Rrs, Ltf, Rtf, Ltb,
 Rtb, LFE**. A decoded `iclforge::ac3::DecodedAccessUnit::channels` is ordered by Table E2.5 *bit* order
 instead (`DecodedAccessUnit::layout`), which is neither this order nor WAV's — so
@@ -71,16 +71,16 @@ constexpr std::array<Location, 12> kIamf714Order{
 };
 ```
 
-This permutation is not part of `iclforge::iamf` itself — the module stays codec-blind, the same
-reason `iclforge::mp4::AudioTrack::codec_config`'s ETSI TS 102 366 payload is built by the *caller*
-(`iclforge::ac3::io::build_codec_config_box`), not by `iclforge::mp4` — so it lives in the example, not a bridge
+This permutation is not part of `iclforge::containers::iamf` itself — the module stays codec-blind, the same
+reason `iclforge::containers::mp4::AudioTrack::codec_config`'s ETSI TS 102 366 payload is built by the *caller*
+(`iclforge::ac3::io::build_codec_config_box`), not by `iclforge::containers::mp4` — so it lives in the example, not a bridge
 library. There is no IAMF counterpart of `iclforge::adm`'s bridge; the mapping is small,
 one-directional, and this is what it looks like.
 
 ## What gets written
 
 Every OBU and box field is transcribed from the published IAMF v2.0.0 specification (the structure is
-named at each call site in `src/containers/src/iamf/`), per this project's clean-room rule — `libiamf`, FFmpeg and
+named at each call site in `src/containers/src/containers/src/iamf/`), per this project's clean-room rule — `libiamf`, FFmpeg and
 AOM's Open Audio Renderer are oracles used to validate the output, never sources this code was
 transcribed from.
 
@@ -167,6 +167,6 @@ uses every structure.
 ---
 
 See also: [ADM / BW64 reading and writing](adm.md) — the indirect route to the same ecosystem;
-[Muxing & sinks](muxing-and-sinks.md) — `iclforge::mp4`/`iclforge::matroska`, the container modules
+[Muxing & sinks](muxing-and-sinks.md) — `iclforge::containers::mp4`/`iclforge::containers::matroska`, the container modules
 this one's shape is modeled on; [Decoding](decoding.md) — `iclforge::ac3::Eac3Decoder`, this module's own
 source of PCM.

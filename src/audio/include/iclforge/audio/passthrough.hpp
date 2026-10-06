@@ -35,7 +35,7 @@
 // any of those corrupts the bit pattern and the receiver hears static or
 // loses lock. Exclusive mode hands the endpoint our bytes untouched.
 //
-// The burst packing itself lives in iclforge::iec61937 (byte-exact against
+// The burst packing itself lives in iclforge::containers::iec61937 (byte-exact against
 // FFmpeg's spdif muxer, and for E-AC-3 also cross-checked against Microsoft's
 // own IEC 61937 documentation); this is only delivery.
 
@@ -60,14 +60,14 @@ enum class PassthroughError : std::uint8_t {
 // WASAPI subformats and different carrier (link) sample rates - Dolby Digital
 // Plus runs the carrier at 4x the content rate (Microsoft's "Representing
 // Formats for IEC 61937 Transmissions") - and different burst sizes
-// (iclforge::iec61937::kBurstBytes vs kEac3BurstBytes).
+// (iclforge::containers::iec61937::kBurstBytes vs kEac3BurstBytes).
 //
 // The AC-4 formats are its links rather than its data types: kAc4 carries
 // IEC 61937-14's AC-4 and AC-4 LD data-bursts on a link at the content rate,
 // kAc4Hbr4 its HBR4 ones at four times it, as E-AC-3's, and kAc4Hbr16 its
 // HBR16 ones at sixteen times it. An AC-4 burst is as long as its own
 // repetition period, which follows the stream's frame rate
-// (iclforge::iec61937::Ac4BurstPacker).
+// (iclforge::containers::iec61937::Ac4BurstPacker).
 enum class BitstreamFormat : std::uint8_t { kAc3, kEac3, kAc4, kAc4Hbr4, kAc4Hbr16 };
 
 [[nodiscard]] constexpr bool is_ac4(BitstreamFormat format) {
@@ -110,21 +110,21 @@ enum class BitstreamFormat : std::uint8_t { kAc3, kEac3, kAc4, kAc4Hbr4, kAc4Hbr
 
 // The longest burst `format` has, in bytes: every AC-3 and E-AC-3 burst is
 // this long, and an AC-4 one is as long as its own repetition period, the
-// longest of which this is (iclforge::iec61937::repetition_period()).
+// longest of which this is (iclforge::containers::iec61937::repetition_period()).
 [[nodiscard]] inline std::size_t max_burst_bytes(BitstreamFormat format) {
     switch (format) {
         case BitstreamFormat::kAc3:
-            return iec61937::kBurstBytes;
+            return containers::iec61937::kBurstBytes;
         case BitstreamFormat::kEac3:
-            return iec61937::kEac3BurstBytes;
+            return containers::iec61937::kEac3BurstBytes;
         case BitstreamFormat::kAc4:
-            return iec61937::repetition_period(iec61937::BurstDataType::kAc4);
+            return containers::iec61937::repetition_period(containers::iec61937::BurstDataType::kAc4);
         case BitstreamFormat::kAc4Hbr4:
-            return iec61937::repetition_period(iec61937::BurstDataType::kAc4Hbr4);
+            return containers::iec61937::repetition_period(containers::iec61937::BurstDataType::kAc4Hbr4);
         case BitstreamFormat::kAc4Hbr16:
-            return iec61937::repetition_period(iec61937::BurstDataType::kAc4Hbr16);
+            return containers::iec61937::repetition_period(containers::iec61937::BurstDataType::kAc4Hbr16);
     }
-    return iec61937::kBurstBytes;
+    return containers::iec61937::kBurstBytes;
 }
 
 // Whether a burst of `bytes` is one `format`'s submit() takes: exactly
@@ -224,8 +224,8 @@ public:
         const std::string& device_id, std::uint32_t sample_rate = 48000,
         BitstreamFormat format = BitstreamFormat::kAc3);
 
-    // Queues one complete burst (iclforge::iec61937::kBurstBytes for AC-3,
-    // kEac3BurstBytes for E-AC-3 - see iclforge::iec61937::wrap_frame /
+    // Queues one complete burst (iclforge::containers::iec61937::kBurstBytes for AC-3,
+    // kEac3BurstBytes for E-AC-3 - see iclforge::containers::iec61937::wrap_frame /
     // Eac3BurstPacker). Returns false if the queue is full - the caller is
     // running ahead of real time and should wait rather than spin - and
     // whenever the sink is not running(), which no wait will change: a caller

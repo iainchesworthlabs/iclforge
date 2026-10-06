@@ -10,7 +10,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/renderTargets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/iec61937Targets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ac3Targets.cmake")
 
-# iclforge::matroska, iclforge::mp4 and iclforge::mpegts are all optional components
+# iclforge::containers are all optional components
 # (ICLFORGE_BUILD_MATROSKA/ICLFORGE_BUILD_MP4/ICLFORGE_BUILD_MPEGTS) - each Targets file only
 # exists when that component was actually installed, e.g. a vcpkg install() built without a
 # given feature (see cmake/InstallLibrary.cmake's header comment; each of the three maps onto
@@ -52,8 +52,8 @@ endif()
 # explicitly (see docs/library/index.md). A package built with that option OFF (a vcpkg install,
 # which only ever installs one linkage per triplet - see cmake/InstallLibrary.cmake) has no such
 # ambiguity: recreate the same bare-name convenience the in-tree build gets, for whichever one
-# variant is actually present. Same treatment for iclforge::matroska, iclforge::mp4 and
-# iclforge::mpegts - each guarded on its own TARGET check, since any of the three may be
+# variant is actually present. Same treatment for iclforge::containers and
+# iclforge::containers - each guarded on its own TARGET check, since any of the three may be
 # entirely absent (its *Targets.cmake never included above) rather than merely single-linkage.
 if(TARGET iclforge::ac3_shared AND NOT TARGET iclforge::ac3_static)
     add_library(iclforge::ac3 ALIAS iclforge::ac3_shared)
@@ -65,30 +65,30 @@ if(TARGET iclforge::ac3_shared AND NOT TARGET iclforge::ac3_static)
 elseif(TARGET iclforge::ac3_static AND NOT TARGET iclforge::ac3_shared)
     add_library(iclforge::ac3 ALIAS iclforge::ac3_static)
 endif()
-if(TARGET iclforge::matroska_shared AND NOT TARGET iclforge::matroska_static)
-    add_library(iclforge::matroska ALIAS iclforge::matroska_shared)
-elseif(TARGET iclforge::matroska_static AND NOT TARGET iclforge::matroska_shared)
-    add_library(iclforge::matroska ALIAS iclforge::matroska_static)
+if(TARGET iclforge::containers_shared AND NOT TARGET iclforge::containers_static)
+    add_library(iclforge::containers ALIAS iclforge::containers_shared)
+elseif(TARGET iclforge::containers_static AND NOT TARGET iclforge::containers_shared)
+    add_library(iclforge::containers ALIAS iclforge::containers_static)
 endif()
-if(TARGET iclforge::mp4_shared AND NOT TARGET iclforge::mp4_static)
-    add_library(iclforge::mp4 ALIAS iclforge::mp4_shared)
-elseif(TARGET iclforge::mp4_static AND NOT TARGET iclforge::mp4_shared)
-    add_library(iclforge::mp4 ALIAS iclforge::mp4_static)
+if(TARGET iclforge::containers_shared AND NOT TARGET iclforge::containers_static)
+    add_library(iclforge::containers ALIAS iclforge::containers_shared)
+elseif(TARGET iclforge::containers_static AND NOT TARGET iclforge::containers_shared)
+    add_library(iclforge::containers ALIAS iclforge::containers_static)
 endif()
-if(TARGET iclforge::mpegts_shared AND NOT TARGET iclforge::mpegts_static)
-    add_library(iclforge::mpegts ALIAS iclforge::mpegts_shared)
-elseif(TARGET iclforge::mpegts_static AND NOT TARGET iclforge::mpegts_shared)
-    add_library(iclforge::mpegts ALIAS iclforge::mpegts_static)
+if(TARGET iclforge::containers_shared AND NOT TARGET iclforge::containers_static)
+    add_library(iclforge::containers ALIAS iclforge::containers_shared)
+elseif(TARGET iclforge::containers_static AND NOT TARGET iclforge::containers_shared)
+    add_library(iclforge::containers ALIAS iclforge::containers_static)
 endif()
 if(TARGET iclforge::iab_shared AND NOT TARGET iclforge::iab_static)
     add_library(iclforge::iab ALIAS iclforge::iab_shared)
 elseif(TARGET iclforge::iab_static AND NOT TARGET iclforge::iab_shared)
     add_library(iclforge::iab ALIAS iclforge::iab_static)
 endif()
-if(TARGET iclforge::iamf_shared AND NOT TARGET iclforge::iamf_static)
-    add_library(iclforge::iamf ALIAS iclforge::iamf_shared)
-elseif(TARGET iclforge::iamf_static AND NOT TARGET iclforge::iamf_shared)
-    add_library(iclforge::iamf ALIAS iclforge::iamf_static)
+if(TARGET iclforge::containers_shared AND NOT TARGET iclforge::containers_static)
+    add_library(iclforge::containers ALIAS iclforge::containers_shared)
+elseif(TARGET iclforge::containers_static AND NOT TARGET iclforge::containers_shared)
+    add_library(iclforge::containers ALIAS iclforge::containers_static)
 endif()
 if(TARGET iclforge::ac4_shared AND NOT TARGET iclforge::ac4_static)
     add_library(iclforge::ac4 ALIAS iclforge::ac4_shared)

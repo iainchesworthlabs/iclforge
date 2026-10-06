@@ -19,7 +19,7 @@
 // values, bytes past the syntax they know) and strict about anything that would make it read past
 // an OBU or allocate from an unchecked count.
 
-namespace iclforge::iamf {
+namespace iclforge::containers::iamf {
 
 namespace {
 
@@ -785,4 +785,4 @@ std::expected<Sequence, Error> read_sequence(std::span<const std::byte> data) {
     return sequence;
 }
 
-}  // namespace iclforge::iamf
+}  // namespace iclforge::containers::iamf

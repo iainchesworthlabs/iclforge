@@ -295,10 +295,10 @@ A vcpkg port for `iclforge` is staged in-tree at
 as pull request #53470 under the name `ac3forge`, which is a draft with changes requested (last
 updated 2026-08-19) - see
 [docs/library/index.md](library/index.md) for how a consumer uses it either way. It installs the
-library only (`iclforge::ac3`, plus `iclforge::matroska`/`iclforge::mp4`/
-`iclforge::mpegts` behind their own `matroska`/`mp4`/`mpegts` features, `iclforge::c` behind
+library only (`iclforge::ac3`, plus `iclforge::containers::matroska`/`iclforge::containers::mp4`/
+`iclforge::containers::mpegts` behind their own `matroska`/`mp4`/`mpegts` features, `iclforge::c` behind
 `capi` (see the note below), the AC-4 library behind `ac4`, `iclforge::iab` behind `iab` and
-`iclforge::iamf` behind `iamf` - see `cmake/InstallLibrary.cmake`'s `ICLFORGE_BUILD_<NAME>` and
+`iclforge::containers::iamf` behind `iamf` - see `cmake/InstallLibrary.cmake`'s `ICLFORGE_BUILD_<NAME>` and
 `ICLFORGE_INSTALL_BOTH_LINKAGES` options), never the CLI/GUI/Hearth/tests/examples/fuzzers.
 `iclforge::adm` (the ADM/BW64 reader and its bridge) has no vcpkg feature
 either - it does install/export via `find_package(iclforge)` now (shared-only), but embeds
@@ -384,8 +384,8 @@ vcpkg install iclforge[matroska,mp4,mpegts,capi,ac4,iab,iamf] --classic --overla
 `--classic` is required from inside this repo - the root `vcpkg.json` (manifest mode, for this
 project's *own* build-time dependencies) would otherwise shadow the package-name argument.
 Check for a clean post-build lint (no "not used"/"missing usage" warnings) and that the bare
-`iclforge` install excludes every feature's library (`iclforge::matroska`/`iclforge::mp4`/
-`iclforge::mpegts`/`iclforge::c`, the AC-4 library, `iclforge::iab`, `iclforge::iamf`) - not just
+`iclforge` install excludes every feature's library (`iclforge::containers::matroska`/`iclforge::containers::mp4`/
+`iclforge::containers::mpegts`/`iclforge::c`, the AC-4 library, `iclforge::iab`, `iclforge::containers::iamf`) - not just
 unlinked, no matching files anywhere in the install tree - while
 `iclforge[matroska,mp4,mpegts,capi,ac4,iab,iamf]` installs all seven.
 `tools/checks/check_install_consumer.sh` makes the same check of any build tree it installs: a
@@ -641,9 +641,9 @@ A Conan (2.x) recipe for `iclforge` is staged in-tree at
 [`packaging/conan/`](https://github.com/iainchesworthlabs/iclforge/tree/main/packaging/conan)
 (`conanfile.py`, `conandata.yml`, `test_package/`) and has not been submitted to ConanCenter
 (`conan-center-index`), where no pull request names it. Scoped the same as the vcpkg port - the library only (`iclforge::ac3`,
-plus `iclforge::matroska`/`iclforge::mp4`/`iclforge::mpegts` behind their own default-on `matroska`/
+plus `iclforge::containers::matroska`/`iclforge::containers::mp4`/`iclforge::containers::mpegts` behind their own default-on `matroska`/
 `mp4`/`mpegts` options, and `iclforge::c`, the AC-4 library, `iclforge::iab` and
-`iclforge::iamf` behind default-off `capi`/`ac4`/`iab`/`iamf` options), never the
+`iclforge::containers::iamf` behind default-off `capi`/`ac4`/`iab`/`iamf` options), never the
 CLI/GUI/Hearth/tests/examples/fuzzers - with one Conan option per `ICLFORGE_BUILD_<NAME>` CMake option,
 the same pattern the vcpkg port's `vcpkg_check_features()` call already establishes, and the same
 options as the port's features, which `tools/checks/check_packaging_versions.sh` checks. The
@@ -808,7 +808,7 @@ exists and how it's built.
 
 The end-user packages are `forge`/`forge-gui` (CPack's `runtime` component) on desktop, or the
 Shield app's `.apk` on Android. The library packages are a second, independent download for a
-third party consuming `iclforge::ac3`/`iclforge::matroska` via `find_package(iclforge)` (see
+third party consuming `iclforge::ac3`/`iclforge::containers::matroska` via `find_package(iclforge)` (see
 [docs/library/index.md](library/index.md)) - headers, static and shared libraries, and the
 CMake package config, but neither `forge`/`forge-gui` nor `iclforge::audio` (live capture/monitor/
 passthrough stays a CLI/GUI-internal detail, not part of what's installed here).

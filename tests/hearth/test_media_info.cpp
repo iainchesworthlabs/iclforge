@@ -114,17 +114,17 @@ LoadedItem load(std::span<const std::byte> file) {
 }
 
 std::vector<std::byte> in_mp4(const std::vector<std::byte>& stream,
-                              std::optional<iclforge::mp4::MuxOptions::Edit> edit = std::nullopt) {
+                              std::optional<iclforge::containers::mp4::MuxOptions::Edit> edit = std::nullopt) {
     const auto scanned = iclforge::ac3::io::scan(stream);
     REQUIRE(scanned.has_value());
-    iclforge::mp4::AudioTrack track;
-    track.codec_id = std::string{iclforge::mp4::kCodecEac3};
+    iclforge::containers::mp4::AudioTrack track;
+    track.codec_id = std::string{iclforge::containers::mp4::kCodecEac3};
     track.sample_rate = iclforge::ac3::sample_rate_hz(scanned->sample_rate);
     track.channels = scanned->channels;
     track.codec_config = iclforge::ac3::io::build_codec_config_box(*scanned);
-    iclforge::mp4::MuxOptions options;
+    iclforge::containers::mp4::MuxOptions options;
     options.edit = edit;
-    const auto muxed = iclforge::mp4::mux(
+    const auto muxed = iclforge::containers::mp4::mux(
         track, std::span<const std::span<const std::byte>>(scanned->access_units), options);
     REQUIRE(muxed.has_value());
     return *muxed;
@@ -307,7 +307,7 @@ TEST_CASE("media info: an E-AC-3 stream in MP4, with its container and edit list
     config.mixing = mix;
     const auto stream = joined(eac3_frames(20, config));
     const std::uint64_t total = 20 * 1536;
-    const auto file = in_mp4(stream, iclforge::mp4::MuxOptions::Edit{.start_samples = 256,
+    const auto file = in_mp4(stream, iclforge::containers::mp4::MuxOptions::Edit{.start_samples = 256,
                                                            .duration_samples = total - 256 - 500});
 
     const MediaInfo info = describe_media("movie.mp4", load(file));
@@ -373,12 +373,12 @@ TEST_CASE("media info: Matroska and MPEG-TS name their tracks", "[hearth][media-
     }
 
     SECTION("Matroska") {
-        iclforge::matroska::AudioTrack track;
-        track.codec_id = std::string{iclforge::matroska::kCodecEac3};
+        iclforge::containers::matroska::AudioTrack track;
+        track.codec_id = std::string{iclforge::containers::matroska::kCodecEac3};
         track.sample_rate = 48000;
         track.channels = 6;
         const auto file =
-            iclforge::matroska::mux(track, std::span<const std::span<const std::byte>>(views));
+            iclforge::containers::matroska::mux(track, std::span<const std::span<const std::byte>>(views));
         REQUIRE(file.has_value());
         const MediaInfo info = describe_media("show.mkv", load(*file));
         CHECK(info.error.empty());
@@ -392,12 +392,12 @@ TEST_CASE("media info: Matroska and MPEG-TS name their tracks", "[hearth][media-
         CHECK(parsed.root()["container"]["mp4"].is_null());
     }
     SECTION("MPEG-TS") {
-        iclforge::mpegts::AudioTrack track;
+        iclforge::containers::mpegts::AudioTrack track;
         track.channels = 6;
-        iclforge::mpegts::MuxOptions options;
+        iclforge::containers::mpegts::MuxOptions options;
         options.program_number = 7;
         options.audio_pid = 0x0123;
-        const auto file = iclforge::mpegts::mux(
+        const auto file = iclforge::containers::mpegts::mux(
             track, std::span<const std::span<const std::byte>>(views), options);
         REQUIRE(file.has_value());
         const MediaInfo info = describe_media("broadcast.ts", load(*file));

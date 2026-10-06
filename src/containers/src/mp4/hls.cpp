@@ -12,7 +12,7 @@
 #include "manifest_detail.hpp"
 #include "iclforge/containers/mp4/mp4.hpp"
 
-namespace iclforge::mp4 {
+namespace iclforge::containers::mp4 {
 
 namespace {
 
@@ -163,4 +163,4 @@ std::string build_hls_master_playlist(const AudioTrack& track,
     return build_hls_master_playlist(track, segment_infos(segments), media_playlist_uri, options);
 }
 
-}  // namespace iclforge::mp4
+}  // namespace iclforge::containers::mp4

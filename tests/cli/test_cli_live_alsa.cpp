@@ -182,7 +182,7 @@ std::vector<std::vector<std::byte>> tone_frames(int count) {
 // An IEC 61937 pause burst (data type 3) the size of an AC-3 one: a burst
 // the recorder must step over rather than record.
 std::vector<std::byte> pause_burst() {
-    std::vector<std::byte> burst(iclforge::iec61937::kBurstBytes, std::byte{0});
+    std::vector<std::byte> burst(iclforge::containers::iec61937::kBurstBytes, std::byte{0});
     // Pa, Pb, Pc (data type 3), Pd (payload length in bits), little-endian.
     const std::uint16_t header[4] = {0xF872, 0x4E1F, 0x0003, 0x0020};
     for (std::size_t w = 0; w < 4; ++w) {
@@ -209,7 +209,7 @@ void write_float_carrier(const fs::path& path, const std::vector<std::vector<std
         }
     };
     for (std::size_t f = 0; f < frames.size(); ++f) {
-        const auto burst = iclforge::iec61937::wrap_frame(frames[f]);
+        const auto burst = iclforge::containers::iec61937::wrap_frame(frames[f]);
         REQUIRE(burst.has_value());
         emit(*burst);
         if (pause_after && *pause_after == f + 1) {

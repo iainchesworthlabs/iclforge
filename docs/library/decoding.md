@@ -103,7 +103,7 @@ Three lookups go with it:
 | `uniform_access_unit_samples` | The one length every unit shares, or nothing when they differ |
 
 That last one is exactly the question a fixed-duration container track can answer and a variable
-one cannot: `iclforge::mp4::AudioTrack`, `iclforge::mpegts::AudioTrack` and `iclforge::matroska::AudioTrack` each hold a single
+one cannot: `iclforge::containers::mp4::AudioTrack`, `iclforge::containers::mpegts::AudioTrack` and `iclforge::containers::matroska::AudioTrack` each hold a single
 `samples_per_frame`, so a stream it returns nothing for cannot be described to them without
 per-sample durations they do not model. `forge`'s `mkv`/`mp4`/`fmp4`/`ts` take the figure from
 here and refuse such a stream rather than muxing it to a silently wrong timeline.
@@ -872,6 +872,6 @@ manifest of what each exercises, for checking an independent implementation.
 
 See also: [Encoding AC-3](encoding-ac3.md) and [Encoding E-AC-3](encoding-eac3.md) — what
 `decode_frame`/`decode_access_unit` are undoing, and the full latency budget;
-[Muxing & sinks](muxing-and-sinks.md) — pairing `iclforge::ac3::io::scan` with `iclforge::matroska::mux` is what
+[Muxing & sinks](muxing-and-sinks.md) — pairing `iclforge::ac3::io::scan` with `iclforge::containers::matroska::mux` is what
 keeps a container's track header accurate; [Building](../building.md) — the minimum-footprint
 decoder profile for set-top and DSP targets.

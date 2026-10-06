@@ -14,7 +14,7 @@
 // The OBU writer. Each function below writes one syntax structure of AOM IAMF v2.0.0 in the
 // field order the specification lists, named after the class it implements.
 
-namespace iclforge::iamf {
+namespace iclforge::containers::iamf {
 
 namespace {
 
@@ -692,4 +692,4 @@ std::expected<Bytes, Error> write_sequence(const Sequence& sequence) {
     return out;
 }
 
-}  // namespace iclforge::iamf
+}  // namespace iclforge::containers::iamf

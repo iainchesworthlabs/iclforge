@@ -41,8 +41,8 @@ target_include_directories(_iclforge PRIVATE src/iclforge_ext)
 # src/internal/avx2/none/, tests/ac3/core/avx2/{present,absent}/) and the one
 # tools/checks/check_platform_macros.ps1 exists to keep. See
 # src/iclforge_ext/optional_modules.hpp for the seam itself.
-if(TARGET iclforge::matroska AND TARGET iclforge::mp4 AND TARGET iclforge::mpegts)
-    target_link_libraries(_iclforge PRIVATE iclforge::matroska iclforge::mp4 iclforge::mpegts)
+if(TARGET iclforge::containers AND TARGET iclforge::containers AND TARGET iclforge::containers)
+    target_link_libraries(_iclforge PRIVATE iclforge::containers)
     target_sources(_iclforge PRIVATE src/iclforge_ext/containers/present/containers_module.cpp)
 else()
     target_sources(_iclforge PRIVATE src/iclforge_ext/containers/absent/containers_module.cpp)

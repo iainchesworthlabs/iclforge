@@ -17,7 +17,7 @@
 //
 // The PCM sink's counterpart for the other kind of payload: IEC 61937
 // bursts, each one AC-3 frame or six E-AC-3 blocks' worth of access units,
-// already packed. The engine packs them (iclforge::iec61937::wrap_frame and
+// already packed. The engine packs them (iclforge::containers::iec61937::wrap_frame and
 // Eac3BurstPacker) and talks to this, never to a platform API. One
 // implementation drives iclforge::audio::PassthroughSink; iclforge-tests has a fake with
 // a clock of its own, as it has for the PCM sink.

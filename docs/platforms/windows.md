@@ -45,7 +45,7 @@ for the mechanics.
 On Windows, the five pieces that touch sound hardware are all implemented over **WASAPI**:
 
 - **`iclforge::audio`** — live input/loopback capture through a lock-free SPSC ring.
-- **`iclforge::iec61937::PassthroughDetector`** — recognising, from that same capture, that the
+- **`iclforge::containers::iec61937::PassthroughDetector`** — recognising, from that same capture, that the
   endpoint is handing over IEC 61937 bursts (AC-3, E-AC-3 or AC-4) rather than PCM.
 - **`iclforge::audio::PassthroughSink`** — exclusive-mode/direct bitstream output, for both AC-3 and
   E-AC-3 burst framing (IEC 61937). AC-4 (IEC 61937-14) is refused here with
@@ -273,7 +273,7 @@ playing into it is bitstreaming — is the same framing read backwards, and the 
 it. The bursts arrive as ordinary PCM16 samples: `IAudioClient` has no way to say "this is
 Dolby Digital", and `Capture` converts them to float by dividing by 32768, which loses nothing.
 
-`iclforge::iec61937::PassthroughDetector` recognises the framing from those floats — a `Pa`/`Pb`
+`iclforge::containers::iec61937::PassthroughDetector` recognises the framing from those floats — a `Pa`/`Pb`
 preamble at a repetition period with a syncframe behind it (`0x0B77` for AC-3 and E-AC-3, the
 AC-4 sync word for AC-4) — and `forge record`
 switches to writing the elementary stream instead of encoding the bursts as audio; `forge

@@ -7,7 +7,7 @@
 #
 # What the codec uses and does not own is in the libraries it links: iclforge::base (bit I/O, the
 # speaker vocabulary, the kernels' build variants), iclforge::dsp, iclforge::objects (the object
-# model and the OAMD payload), iclforge::render (PcmBlock and the panner) and iclforge::iec61937.
+# model and the OAMD payload), iclforge::render (PcmBlock and the panner) and iclforge::containers.
 # None of them links this one. AC-4 is a peer, in src/ac4*, and links none of this.
 #
 # Built and installed as a static library, a shared library and the OBJECT library both wrap;

@@ -247,11 +247,11 @@ struct PackedBurst {
     std::int64_t frame = 0;
 };
 
-// The bursts iclforge::iec61937::Eac3BurstPacker makes of `stream`'s access units, `passes` times over as
+// The bursts iclforge::containers::iec61937::Eac3BurstPacker makes of `stream`'s access units, `passes` times over as
 // one programme: each with the Pc and Pd the packer writes, the access units it holds, and the
 // programme frame of its first sample.
 std::vector<PackedBurst> pack_bursts(const iclforge::ac3::io::ScannedStream& stream, int passes) {
-    iclforge::iec61937::Eac3BurstPacker packer;
+    iclforge::containers::iec61937::Eac3BurstPacker packer;
     std::vector<PackedBurst> bursts;
     const std::uint64_t pass_samples = iclforge::ac3::io::stream_duration_samples(stream);
     PackedBurst pending;
@@ -1107,7 +1107,7 @@ TEST_CASE("group: ten minutes of E-AC-3 JOC in step on two test sinks", "[.][hea
 
 // D11 (planning/ac4.md): the Dolby Encoding Engine's 2.0 AC-4 stream at 48 kHz and frame_rate_index
 // 13, the rate the decoder on main decodes, sent to a paired test sink over _iclforge_player@v1:
-// each frame in its own AC-4 data-burst, with the Pc and Pd iclforge::iec61937::Ac4BurstPacker
+// each frame in its own AC-4 data-burst, with the Pc and Pd iclforge::containers::iec61937::Ac4BurstPacker
 // writes and the frame's 2 048 samples on the group's timeline. The sink's WAV must be the local
 // decode of the same frames rendered to its layout as its BurstOutput renders them, sample for
 // sample; what its decoder found must reach the host; and every burst's logged play time must put
@@ -1129,7 +1129,7 @@ TEST_CASE("group: a paired test sink decodes AC-4 sent over the extension role",
     REQUIRE_FALSE(scanned.stopped_at.has_value());
     constexpr std::int64_t kFrameSamples = 2048;
     std::vector<PackedBurst> bursts;
-    iclforge::iec61937::Ac4BurstPacker packer;
+    iclforge::containers::iec61937::Ac4BurstPacker packer;
     for (std::size_t i = 0; i < scanned.frames.size(); ++i) {
         const std::size_t begin = scanned.frames[i].offset;
         const std::size_t end =
@@ -1137,7 +1137,7 @@ TEST_CASE("group: a paired test sink decodes AC-4 sent over the extension role",
         const std::span<const std::byte> sync_frame =
             std::span<const std::byte>(file).subspan(begin, end - begin);
         REQUIRE(packer.push(sync_frame).has_value());
-        const iclforge::iec61937::Ac4BurstPacker::Packed& packed = *packer.last();
+        const iclforge::containers::iec61937::Ac4BurstPacker::Packed& packed = *packer.last();
         // IEC 61937-14 Tables 5 and 7: 2 048 IEC 60958 frames, code 13, at 48 kHz.
         REQUIRE(packed.period == 2048);
         REQUIRE(((packed.pc >> 8U) & 0x0FU) == 13U);

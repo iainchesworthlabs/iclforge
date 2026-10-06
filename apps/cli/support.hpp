@@ -373,7 +373,7 @@ struct Options {
     // registry's descriptor can read off the bitstream because they describe
     // how services in a multiplex RELATE, not what one elementary stream
     // contains. Unset omits the field rather than inventing a number - see
-    // iclforge::mpegts::ServiceInfo::mainid.
+    // iclforge::containers::mpegts::ServiceInfo::mainid.
     std::optional<int> mainid = std::nullopt;
     std::optional<int> asvc = std::nullopt;
     // 'eac3-encode' only: run iclforge::ac3::verify's E-AC-3 encoder/decoder mirror
@@ -404,7 +404,7 @@ struct Options {
     RecordingSink::Container container = RecordingSink::Container::kElementary;
     // container=fmp4 only: how many of the most recent media segments the
     // HLS playlist and DASH MPD list - a rolling live window
-    // (iclforge::mp4::FragmentOptions::playlist_window_segments). 0, the default,
+    // (iclforge::containers::mp4::FragmentOptions::playlist_window_segments). 0, the default,
     // lists every segment, which is what a session whose directory will be
     // served whole afterwards wants; a real origin deleting segments behind
     // itself sets its own depth here.

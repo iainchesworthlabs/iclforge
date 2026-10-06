@@ -11,9 +11,9 @@
 #include "obu_io.hpp"
 
 // Shared by the OBU writer (sequence_write.cpp) and reader (sequence_read.cpp): the OBU header
-// fields, parameter definition coding and the parameter index. Internal to src/containers/src/iamf.
+// fields, parameter definition coding and the parameter index. Internal to src/containers/src/containers/src/iamf.
 
-namespace iclforge::iamf::detail {
+namespace iclforge::containers::iamf::detail {
 
 // OBU Header: obu_type(5) obu_redundant_copy(1) <type dependent flag>(1) obu_extension_flag(1).
 // The type dependent flag is optional_fields_flag for a Mix Presentation, is_not_key_frame for a
@@ -59,4 +59,4 @@ void put_animated(Out& out, std::uint32_t animation_type, const AnimatedValue& v
                                                                 unsigned width, bool is_signed);
 [[nodiscard]] bool known_animation(std::uint32_t animation_type);
 
-}  // namespace iclforge::iamf::detail
+}  // namespace iclforge::containers::iamf::detail

@@ -24,10 +24,10 @@ namespace {
 using Bytes = std::vector<std::byte>;
 
 // A 48 kHz track as the MP4 reader reports one, with `edits`.
-iclforge::mp4::ReadTrack track_with(std::vector<iclforge::mp4::EditListEntry> edits,
+iclforge::containers::mp4::ReadTrack track_with(std::vector<iclforge::containers::mp4::EditListEntry> edits,
                                     std::uint32_t timescale = 48000,
                                     std::uint32_t movie_timescale = 48000) {
-    iclforge::mp4::ReadTrack track;
+    iclforge::containers::mp4::ReadTrack track;
     track.sample_rate = 48000;
     track.timescale = timescale;
     track.movie_timescale = movie_timescale;
@@ -164,12 +164,12 @@ TEST_CASE("elementary_stream_from_bytes reports what each container says about i
     const std::span<const std::span<const std::byte>> units(scanned->access_units);
 
     SECTION("MP4, with its codec configuration box") {
-        iclforge::mp4::AudioTrack track;
-        track.codec_id = std::string{iclforge::mp4::kCodecAc3};
+        iclforge::containers::mp4::AudioTrack track;
+        track.codec_id = std::string{iclforge::containers::mp4::kCodecAc3};
         track.sample_rate = 48000;
         track.channels = 2;
         track.codec_config = iclforge::ac3::io::build_codec_config_box(*scanned);
-        const auto file = iclforge::mp4::mux(track, units);
+        const auto file = iclforge::containers::mp4::mux(track, units);
         REQUIRE(file.has_value());
         const auto result = iclforge::apps::elementary_stream_from_bytes(*file);
         REQUIRE(result.error.empty());
@@ -195,11 +195,11 @@ TEST_CASE("elementary_stream_from_bytes reports what each container says about i
         CHECK(facts.codec_box->bytes > 0);
     }
     SECTION("Matroska") {
-        iclforge::matroska::AudioTrack track;
-        track.codec_id = std::string{iclforge::matroska::kCodecAc3};
+        iclforge::containers::matroska::AudioTrack track;
+        track.codec_id = std::string{iclforge::containers::matroska::kCodecAc3};
         track.sample_rate = 48000;
         track.channels = 2;
-        const auto file = iclforge::matroska::mux(track, units);
+        const auto file = iclforge::containers::matroska::mux(track, units);
         REQUIRE(file.has_value());
         const auto result = iclforge::apps::elementary_stream_from_bytes(*file);
         REQUIRE(result.error.empty());
@@ -213,14 +213,14 @@ TEST_CASE("elementary_stream_from_bytes reports what each container says about i
         CHECK_FALSE(facts.codec_box.has_value());
     }
     SECTION("MPEG-TS") {
-        iclforge::mpegts::AudioTrack track;
-        track.codec = iclforge::mpegts::AudioCodec::kAc3;
-        iclforge::mpegts::MuxOptions options;
-        options.profile = iclforge::mpegts::BroadcastProfile::kAtsc;
+        iclforge::containers::mpegts::AudioTrack track;
+        track.codec = iclforge::containers::mpegts::AudioCodec::kAc3;
+        iclforge::containers::mpegts::MuxOptions options;
+        options.profile = iclforge::containers::mpegts::BroadcastProfile::kAtsc;
         options.program_number = 3;
         options.pmt_pid = 0x0200;
         options.audio_pid = 0x0210;
-        const auto file = iclforge::mpegts::mux(track, units, options);
+        const auto file = iclforge::containers::mpegts::mux(track, units, options);
         REQUIRE(file.has_value());
         const auto result = iclforge::apps::elementary_stream_from_bytes(*file);
         REQUIRE(result.error.empty());
@@ -360,17 +360,17 @@ TEST_CASE("elementary_stream_from_bytes reports an MP4's edit list as a trim",
     REQUIRE(scanned.has_value());
     REQUIRE(scanned->access_units.size() == 3);
 
-    iclforge::mp4::AudioTrack track;
-    track.codec_id = std::string{iclforge::mp4::kCodecAc3};
+    iclforge::containers::mp4::AudioTrack track;
+    track.codec_id = std::string{iclforge::containers::mp4::kCodecAc3};
     track.sample_rate = 48000;
     track.channels = 2;
     track.codec_config = iclforge::ac3::io::build_codec_config_box(*scanned);
     const std::span<const std::span<const std::byte>> units(scanned->access_units);
 
-    iclforge::mp4::MuxOptions edited;
+    iclforge::containers::mp4::MuxOptions edited;
     edited.edit =
-        iclforge::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = (3 * 1536) - 356};
-    const auto with_edit = iclforge::mp4::mux(track, units, edited);
+        iclforge::containers::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = (3 * 1536) - 356};
+    const auto with_edit = iclforge::containers::mp4::mux(track, units, edited);
     REQUIRE(with_edit.has_value());
     const auto trimmed = iclforge::apps::elementary_stream_from_bytes(*with_edit);
     CHECK(trimmed.error.empty());
@@ -380,7 +380,7 @@ TEST_CASE("elementary_stream_from_bytes reports an MP4's edit list as a trim",
     CHECK(*trimmed.trim.length == (3 * 1536) - 356);
     CHECK(trimmed.trim_note.empty());
 
-    const auto without_edit = iclforge::mp4::mux(track, units);
+    const auto without_edit = iclforge::containers::mp4::mux(track, units);
     REQUIRE(without_edit.has_value());
     const auto whole = iclforge::apps::elementary_stream_from_bytes(*without_edit);
     CHECK(whole.bytes == stream);

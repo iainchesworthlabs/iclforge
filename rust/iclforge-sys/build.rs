@@ -20,7 +20,7 @@ fn main() {
         "src/dsp",
         "src/objects",
         "src/render",
-        "src/iec61937",
+        "src/containers/src/iec61937",
         "CMakeLists.txt",
     ] {
         println!("cargo:rerun-if-changed={}", repo_root.join(rel).display());

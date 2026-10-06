@@ -19,7 +19,7 @@
 // API surface - confirmed against Kodi's own PipeWire passthrough
 // implementation (xbmc PR #22560), which negotiates exactly this way and
 // still hands PipeWire pre-packed IEC 61937 burst bytes as opaque S16
-// carrier data, the same shape iclforge::iec61937 already produces for the ALSA
+// carrier data, the same shape iclforge::containers::iec61937 already produces for the ALSA
 // backend.
 //
 // ---------------------------------------------------------------------------
@@ -410,7 +410,7 @@ struct PassthroughSink::Impl {
     ThreadLoop loop;
     Stream stream;
     std::unique_ptr<ByteRingBuffer> queue;
-    std::size_t burst_bytes = iec61937::kBurstBytes;
+    std::size_t burst_bytes = containers::iec61937::kBurstBytes;
     // Raised by start(). Lowered by stop(), or by state_changed() when the
     // stream ends on its own.
     std::atomic_bool running{false};

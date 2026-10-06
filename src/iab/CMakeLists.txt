@@ -1,10 +1,10 @@
 # ---------------------------------------------------------------------------
 # iclforge::iab - a standalone reader for SMPTE ST 2098-2:2022's Immersive
 # Audio Bitstream (IAB), phase 1 of 3 - a
-# codec-blind bitstream parser, the same shape iclforge::matroska, iclforge::mp4
-# and iclforge::mpegts already use for their own containers: it links nothing
+# codec-blind bitstream parser, the same shape iclforge::containers
+# and iclforge::containers already use for their own containers: it links nothing
 # from iclforge::ac3 and knows nothing about AC-3, E-AC-3 or JOC, so it can be
-# reasoned about, tested and reused on its own (see src/mpegts/CMakeLists.txt's
+# reasoned about, tested and reused on its own (see src/containers/CMakeLists.txt's
 # own header, which this file mirrors structurally).
 #
 # Unlike iclforge::adm (src/adm), this module has no third-party dependency at

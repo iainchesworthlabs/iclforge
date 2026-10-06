@@ -25,7 +25,7 @@
 // type and timing mode), so the functions that handle Temporal Units take the Sequence whose
 // Descriptors define them as `context`.
 
-namespace iclforge::iamf {
+namespace iclforge::containers::iamf {
 
 enum class Error : std::uint8_t {
     kTruncated,           // the data ended inside an OBU, box or field
@@ -106,4 +106,4 @@ struct LayoutInfo {
 };
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::optional<LayoutInfo> layout_info(std::uint8_t loudspeaker_layout);
 
-}  // namespace iclforge::iamf
+}  // namespace iclforge::containers::iamf

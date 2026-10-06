@@ -15,7 +15,7 @@
 // through write_sequence() and read_sequence(), and the reader's handling of what a parser is told
 // to ignore or cannot trust.
 
-namespace iamf = iclforge::iamf;
+namespace iamf = iclforge::containers::iamf;
 
 namespace {
 

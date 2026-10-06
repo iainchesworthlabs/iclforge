@@ -18,7 +18,7 @@ namespace forge_cli::commands {
 
 int run_mkv(std::string_view in_path, std::string_view out_path);
 
-// Same shape as run_mkv, wrapping iclforge::mp4::mux() instead: iclforge::ac3::io::scan() still
+// Same shape as run_mkv, wrapping iclforge::containers::mp4::mux() instead: iclforge::ac3::io::scan() still
 // supplies everything the container needs to declare, and additionally - via
 // iclforge::ac3::io::build_codec_config_box() - the exact dac3/dec3 sample-entry payload straight
 // off the bitstream.

@@ -1029,7 +1029,7 @@ jobs:
           echo "aarch64 Crucible package: ${debs[0]}"
 
       # Proves BUILD_SHARED_LIBS=ON actually works before it ships in a real
-      # release: iclforge::ac3_shared/iclforge::matroska_shared existing and
+      # release: iclforge::ac3_shared/iclforge::containers_shared existing and
       # configuring cleanly (already exercised by every leg's normal
       # config-<preset> build, since both variants are always built
       # regardless of BUILD_SHARED_LIBS - see src/ac3/CMakeLists.txt) is not
@@ -1082,7 +1082,7 @@ jobs:
             build/config-linux-llvm-shared/src/dsp/libiclforge_dsp.so \
             build/config-linux-llvm-shared/src/objects/libiclforge_objects.so \
             build/config-linux-llvm-shared/src/render/libiclforge_render.so \
-            build/config-linux-llvm-shared/src/iec61937/libiclforge_iec61937.so
+            build/config-linux-llvm-shared/src/iec61937/libiclforge_containers.so
 
       # A build tree is not an installed package. tests/capi and the C examples compile against
       # the build tree, where every generated header is already on the include path whether or

@@ -104,9 +104,7 @@ else()
         # information this application's loader hands to describe_media() needs
         # a container's own facts (container_input.hpp, "whose functions the
         # engine does not compile" - apps/hearth/engine/session.hpp's comment).
-        iclforge::matroska
-        iclforge::mp4
-        iclforge::mpegts
+        iclforge::containers
         Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2)
 
     set(ICLFORGE_HEARTH_QML_FILES

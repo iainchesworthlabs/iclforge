@@ -231,7 +231,7 @@ when nearly all of the binding surface is C++.
 **Shared libraries.** `config-linux-llvm-shared` / `build-linux-llvm-shared` /
 `test-linux-llvm-shared`, same shape again: an instrumented variant of `linux-llvm`, Debug-only.
 It inherits a `shared-libs` fragment setting `BUILD_SHARED_LIBS=ON`, proving
-`iclforge::ac3_shared`/`iclforge::matroska_shared` actually work — not just that the CMake topology
+`iclforge::ac3_shared`/`iclforge::containers_shared` actually work — not just that the CMake topology
 configures, but that every in-tree consumer (`forge`, `forge-gui`, `iclforge-tests`, `examples/`) links
 and runs against the real `.so`. `.github/workflows/_ci-linux.yml` runs it as an extra step inside
 the existing `linux-llvm` leg rather than a new matrix entry (in the nightly run only), the same
@@ -334,11 +334,11 @@ the failures of the last run; add `--output-on-failure` to any run to see a fail
 | `ICLFORGE_BUILD_TESTS` | `ON` | Build the Catch2 suite. Requires Catch2. |
 | `ICLFORGE_FETCH_CATCH2` | `ON` | When no local Catch2 3 is found (vcpkg, a distro package, an explicit `CMAKE_PREFIX_PATH`), fetch and build v3.15.3 from source via `FetchContent` instead of failing. Turn off to insist on a package-manager copy — see `tests/CMakeLists.txt`. Irrelevant when `ICLFORGE_BUILD_TESTS` is off. |
 | `ICLFORGE_BUILD_EXAMPLES` | `ON` | Build `examples/`, and register them as tests. |
-| `ICLFORGE_BUILD_MATROSKA` | `ON` | Build `iclforge::matroska` (`src/matroska`), the standalone Matroska container writer. `OFF` only makes sense with the CLI, GUI, tests and examples all `OFF` too — they link it unconditionally, and configure fails with a clear message otherwise (see the root `CMakeLists.txt` guard). |
-| `ICLFORGE_BUILD_MP4` | `ON` | Build `iclforge::mp4` (`src/mp4`), the standalone MP4/ISOBMFF container writer. Same all-off constraint as `ICLFORGE_BUILD_MATROSKA`. |
-| `ICLFORGE_BUILD_MPEGTS` | `ON` | Build `iclforge::mpegts` (`src/mpegts`), the standalone MPEG-TS container writer. Same all-off constraint as `ICLFORGE_BUILD_MATROSKA`. |
+| `ICLFORGE_BUILD_MATROSKA` | `ON` | Build `iclforge::containers::matroska` (`src/containers/src/matroska`), the standalone Matroska container writer. `OFF` only makes sense with the CLI, GUI, tests and examples all `OFF` too — they link it unconditionally, and configure fails with a clear message otherwise (see the root `CMakeLists.txt` guard). |
+| `ICLFORGE_BUILD_MP4` | `ON` | Build `iclforge::containers::mp4` (`src/containers/src/mp4`), the standalone MP4/ISOBMFF container writer. Same all-off constraint as `ICLFORGE_BUILD_MATROSKA`. |
+| `ICLFORGE_BUILD_MPEGTS` | `ON` | Build `iclforge::containers::mpegts` (`src/containers/src/mpegts`), the standalone MPEG-TS container writer. Same all-off constraint as `ICLFORGE_BUILD_MATROSKA`. |
 | `ICLFORGE_BUILD_IAB` | `ON` | Build `iclforge::iab` (`src/iab`), the standalone SMPTE ST 2098-2 Immersive Audio Bitstream reader. Like the three container writers above it needs no opt-in third-party library, so it defaults on the same way; unlike them nothing in `apps/` or `examples/` links it yet, so there is no all-off guard — `tests/CMakeLists.txt` simply adds its test file when this is on. |
-| `ICLFORGE_BUILD_IAMF` | `ON` | Build `iclforge::iamf` (`src/iamf`), the standalone IAMF v1.1 OBU and ISOBMFF writer. Same zero-third-party-dependency shape as `iclforge::iab`, and like it linked by nothing in `apps/` (`examples/mux_iamf.cpp` builds when this is on). The vcpkg port's `iamf` feature and the Conan recipe's `iamf` option install it, off by default. |
+| `ICLFORGE_BUILD_IAMF` | `ON` | Build `iclforge::containers::iamf` (`src/containers/src/iamf`), the standalone IAMF v1.1 OBU and ISOBMFF writer. Same zero-third-party-dependency shape as `iclforge::iab`, and like it linked by nothing in `apps/` (`examples/mux_iamf.cpp` builds when this is on). The vcpkg port's `iamf` feature and the Conan recipe's `iamf` option install it, off by default. |
 | `ICLFORGE_BUILD_AC4` | `ON` | Build the AC-4 codec `iclforge::ac4` (`src/ac4`): the inspector, the decoder and the encoder, one library, with the tables and transforms the decoder and the encoder share inside it (`src/ac4/src/core`) — see [AC-4](library/ac4.md). It is installed and exported as `iclforge::ac4_static` and `iclforge::ac4_shared`. `OFF` needs the CLI, the GUI and the tests off too, and Hearth unless it is the ESP-IDF player half (the root `CMakeLists.txt` guards), since they link them. The Python wheel binds them (`iclforge.ac4`), the WebAssembly preset builds them for the `iclforge_wasm_ac4` module, and the Android app builds them without linking them yet; the ESP-IDF component and the minimum-footprint presets turn the option off and take the decoder alone through `ICLFORGE_MINIMAL_AC4`. The vcpkg port's `ac4` feature and the Conan recipe's `ac4` option install them, off by default. |
 | `ICLFORGE_BUILD_CAPI` | `ON` | Build `iclforge::c` (`src/capi`), the C API over the encode/decode core — see [C API](library/c-api.md). Depends on nothing but `iclforge::ac3_static`, so unlike `ICLFORGE_BUILD_ADM` there is no extra dependency footprint to opt out of. |
 | `ICLFORGE_BUILD_PYTHON` | `OFF` | Build the pybind11 extension module (`python/`). Off by default for the same reason as `ICLFORGE_BUILD_ADM`: nothing under `src/`, `apps/`, `tests/` or `examples/` links it, so a normal C++ build is unaffected either way. `python/pyproject.toml` turns it on itself via scikit-build-core when `pip install`/cibuildwheel drives the configure. |
@@ -1024,7 +1024,7 @@ see [Raspberry Pi](platforms/raspberry-pi.md#verified-configuration). Packages l
 `cmake --build --preset build-windows-msvc --target pack-iclforge` runs the same thing from
 inside an IDE's target list instead of the command line.
 
-`forge`/`forge-gui` and `iclforge::ac3`/`iclforge::matroska` are both installed and packaged, as
+`forge`/`forge-gui` and `iclforge::ac3`/`iclforge::containers::matroska` are both installed and packaged, as
 independent CPack components (`runtime`, plus `library`/`libruntime` for the codec itself) - a
 second `iclforge-dev-*` archive alongside the usual end-user one, for a third party consuming the
 codec via `find_package(iclforge)` rather than running it as a program; on Linux, `library`/

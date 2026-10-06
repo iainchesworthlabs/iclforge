@@ -536,8 +536,8 @@ TEST_CASE("alsa passthrough: AC-3 bursts reach a software device, burst for burs
     CHECK(sink.running());
     CHECK(sink.can_submit());
 
-    const std::vector<std::byte> burst(iclforge::iec61937::kBurstBytes);
-    const std::vector<std::byte> wrong(iclforge::iec61937::kEac3BurstBytes);
+    const std::vector<std::byte> burst(iclforge::containers::iec61937::kBurstBytes);
+    const std::vector<std::byte> wrong(iclforge::containers::iec61937::kEac3BurstBytes);
     CHECK_FALSE(sink.submit(wrong));
     for (int i = 0; i < 8; ++i) {
         REQUIRE(eventually([&] { return sink.submit(burst); }));
@@ -564,8 +564,8 @@ TEST_CASE("alsa passthrough: E-AC-3 runs its link at 4x and takes only E-AC-3-si
     const NullDevices devices;
     iclforge::audio::PassthroughSink sink;
     REQUIRE(sink.start("null", 48000, iclforge::audio::BitstreamFormat::kEac3).has_value());
-    const std::vector<std::byte> ac3_sized(iclforge::iec61937::kBurstBytes);
-    const std::vector<std::byte> burst(iclforge::iec61937::kEac3BurstBytes);
+    const std::vector<std::byte> ac3_sized(iclforge::containers::iec61937::kBurstBytes);
+    const std::vector<std::byte> burst(iclforge::containers::iec61937::kEac3BurstBytes);
     CHECK_FALSE(sink.submit(ac3_sized));
     REQUIRE(sink.submit(burst));
     CHECK(eventually([&] { return sink.stats().bursts_rendered >= 1; }));
@@ -574,7 +574,7 @@ TEST_CASE("alsa passthrough: E-AC-3 runs its link at 4x and takes only E-AC-3-si
 TEST_CASE("alsa passthrough: pause, flush and resume take effect before and after the link starts",
           "[audio][alsa-null][concurrency]") {
     const NullDevices devices;
-    const std::vector<std::byte> burst(iclforge::iec61937::kBurstBytes);
+    const std::vector<std::byte> burst(iclforge::containers::iec61937::kBurstBytes);
     SECTION("paused while still PREPARED: dropped and prepared again") {
         iclforge::audio::PassthroughSink sink;
         REQUIRE(sink.start("null", 48000, iclforge::audio::BitstreamFormat::kAc3).has_value());
@@ -704,7 +704,7 @@ TEST_CASE("alsa passthrough: a link that under-runs is recovered and keeps carry
     const NullDevices devices;
     iclforge::audio::PassthroughSink sink;
     REQUIRE(sink.start("stereo_xrun", 48000, iclforge::audio::BitstreamFormat::kAc3).has_value());
-    const std::vector<std::byte> burst(iclforge::iec61937::kBurstBytes);
+    const std::vector<std::byte> burst(iclforge::containers::iec61937::kBurstBytes);
     for (int i = 0; i < 12; ++i) {
         REQUIRE(eventually([&] { return sink.submit(burst); }));
     }
@@ -725,7 +725,7 @@ TEST_CASE("alsa passthrough: a device whose writes fail for good stops the sink 
     const NullDevices devices;
     iclforge::audio::PassthroughSink sink;
     REQUIRE(sink.start("full", 48000, iclforge::audio::BitstreamFormat::kAc3).has_value());
-    const std::vector<std::byte> burst(iclforge::iec61937::kBurstBytes);
+    const std::vector<std::byte> burst(iclforge::containers::iec61937::kBurstBytes);
     CHECK(eventually([&] {
         std::ignore = sink.submit(burst);
         return !sink.running();

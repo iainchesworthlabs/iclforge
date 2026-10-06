@@ -11,7 +11,7 @@
 
 #include "iclforge/containers/iamf/iamf.hpp"
 
-// These tests read iclforge::iamf::mux()'s output back with an independent OBU/ISOBMFF walker
+// These tests read iclforge::containers::iamf::mux()'s output back with an independent OBU/ISOBMFF walker
 // rather than comparing against bytes this same code produced - the same reasoning as
 // test_mp4.cpp's own header comment: a muxer checked only against itself proves nothing about
 // whether a real IAMF parser can open the file. The walker below re-derives field offsets straight
@@ -212,8 +212,8 @@ std::vector<std::uint32_t> read_stsz(std::span<const std::byte> file, const Elem
     return static_cast<std::int32_t>(std::clamp(scaled, -full_scale - 1.0, full_scale));
 }
 
-iclforge::iamf::Frame make_frame(std::uint32_t samples_per_frame, float value_per_sample) {
-    iclforge::iamf::Frame frame;
+iclforge::containers::iamf::Frame make_frame(std::uint32_t samples_per_frame, float value_per_sample) {
+    iclforge::containers::iamf::Frame frame;
     for (auto& channel : frame.channels) {
         channel.assign(samples_per_frame, value_per_sample);
     }
@@ -223,10 +223,10 @@ iclforge::iamf::Frame make_frame(std::uint32_t samples_per_frame, float value_pe
 }  // namespace
 
 TEST_CASE("IAMF file parses as well-formed ISOBMFF boxes carrying the iamf brand", "[iamf]") {
-    const iclforge::iamf::AudioTrack track{.samples_per_frame = 960};
-    const std::vector<iclforge::iamf::Frame> frames{make_frame(960, 0.1F), make_frame(960, -0.2F),
+    const iclforge::containers::iamf::AudioTrack track{.samples_per_frame = 960};
+    const std::vector<iclforge::containers::iamf::Frame> frames{make_frame(960, 0.1F), make_frame(960, -0.2F),
                                           make_frame(960, 0.3F)};
-    const auto file = iclforge::iamf::mux(track, frames);
+    const auto file = iclforge::containers::iamf::mux(track, frames);
     REQUIRE(file.has_value());
 
     const auto elements = parse(*file);
@@ -247,9 +247,9 @@ TEST_CASE("IAMF file parses as well-formed ISOBMFF boxes carrying the iamf brand
 }
 
 TEST_CASE("IAMF sample entry carries the four Descriptor OBUs in the required order", "[iamf]") {
-    const iclforge::iamf::AudioTrack track{.samples_per_frame = 512};
-    const std::vector<iclforge::iamf::Frame> frames{make_frame(512, 0.0F)};
-    const auto file = iclforge::iamf::mux(track, frames);
+    const iclforge::containers::iamf::AudioTrack track{.samples_per_frame = 512};
+    const std::vector<iclforge::containers::iamf::Frame> frames{make_frame(512, 0.0F)};
+    const auto file = iclforge::containers::iamf::mux(track, frames);
     REQUIRE(file.has_value());
     const auto elements = parse(*file);
 
@@ -268,9 +268,9 @@ TEST_CASE("IAMF sample entry carries the four Descriptor OBUs in the required or
 }
 
 TEST_CASE("IA Sequence Header OBU declares the iamf code and Simple Profile", "[iamf]") {
-    const iclforge::iamf::AudioTrack track{};
-    const std::vector<iclforge::iamf::Frame> frames{make_frame(track.samples_per_frame, 0.0F)};
-    const auto file = iclforge::iamf::mux(track, frames);
+    const iclforge::containers::iamf::AudioTrack track{};
+    const std::vector<iclforge::containers::iamf::Frame> frames{make_frame(track.samples_per_frame, 0.0F)};
+    const auto file = iclforge::containers::iamf::mux(track, frames);
     REQUIRE(file.has_value());
     const auto entry = read_sample_entry(*file, *find(parse(*file), "stsd"));
     const auto obus = parse_obus(entry.config_obus);
@@ -282,10 +282,10 @@ TEST_CASE("IA Sequence Header OBU declares the iamf code and Simple Profile", "[
 }
 
 TEST_CASE("Codec Config OBU declares ipcm at the track's own sample rate and bit depth", "[iamf]") {
-    const iclforge::iamf::AudioTrack track{
+    const iclforge::containers::iamf::AudioTrack track{
         .sample_rate = 96000, .bit_depth = 32, .samples_per_frame = 480};
-    const std::vector<iclforge::iamf::Frame> frames{make_frame(480, 0.0F)};
-    const auto file = iclforge::iamf::mux(track, frames);
+    const std::vector<iclforge::containers::iamf::Frame> frames{make_frame(480, 0.0F)};
+    const auto file = iclforge::containers::iamf::mux(track, frames);
     REQUIRE(file.has_value());
     const auto entry = read_sample_entry(*file, *find(parse(*file), "stsd"));
     const auto obus = parse_obus(entry.config_obus);
@@ -311,9 +311,9 @@ TEST_CASE("Codec Config OBU declares ipcm at the track's own sample rate and bit
 
 TEST_CASE("Audio Element OBU declares a channel-based 7.1.4 layer with 5 coupled substreams",
          "[iamf]") {
-    const iclforge::iamf::AudioTrack track{};
-    const std::vector<iclforge::iamf::Frame> frames{make_frame(track.samples_per_frame, 0.0F)};
-    const auto file = iclforge::iamf::mux(track, frames);
+    const iclforge::containers::iamf::AudioTrack track{};
+    const std::vector<iclforge::containers::iamf::Frame> frames{make_frame(track.samples_per_frame, 0.0F)};
+    const auto file = iclforge::containers::iamf::mux(track, frames);
     REQUIRE(file.has_value());
     const auto entry = read_sample_entry(*file, *find(parse(*file), "stsd"));
     const auto obus = parse_obus(entry.config_obus);
@@ -353,11 +353,11 @@ TEST_CASE("Audio Element OBU declares a channel-based 7.1.4 layer with 5 coupled
 
 TEST_CASE("Mix Presentation OBU carries the mandatory Stereo layout plus the 7.1.4 layout",
          "[iamf]") {
-    iclforge::iamf::AudioTrack track{};
+    iclforge::containers::iamf::AudioTrack track{};
     track.stereo_loudness = {.integrated_loudness_lkfs = -23.0F, .digital_peak_dbfs = -1.5F};
     track.layout_714_loudness = {.integrated_loudness_lkfs = -18.25F, .digital_peak_dbfs = -0.3F};
-    const std::vector<iclforge::iamf::Frame> frames{make_frame(track.samples_per_frame, 0.0F)};
-    const auto file = iclforge::iamf::mux(track, frames);
+    const std::vector<iclforge::containers::iamf::Frame> frames{make_frame(track.samples_per_frame, 0.0F)};
+    const auto file = iclforge::containers::iamf::mux(track, frames);
     REQUIRE(file.has_value());
     const auto entry = read_sample_entry(*file, *find(parse(*file), "stsd"));
     const auto obus = parse_obus(entry.config_obus);
@@ -440,21 +440,21 @@ TEST_CASE("Mix Presentation OBU carries the mandatory Stereo layout plus the 7.1
 
 TEST_CASE("Audio Frame OBUs carry byte-exact PCM in the spec's substream order", "[iamf]") {
     // A distinct value per channel (§3.6.2's L,C,R,Lss,Rss,Lrs,Rrs,Ltf,Rtf,Ltb,Rtb,LFE order,
-    // matching iclforge::iamf::Frame::channels) - if the substream/channel-pairing table in
+    // matching iclforge::containers::iamf::Frame::channels) - if the substream/channel-pairing table in
     // obu_detail.hpp ever swapped two entries (e.g. Lss/Rss with Lrs/Rrs), the quantized bytes
     // checked below would land in the wrong substream and this test would fail.
     constexpr int kBitDepth = 16;
     constexpr std::uint32_t kSamplesPerFrame = 4;
-    const iclforge::iamf::AudioTrack track{.bit_depth = kBitDepth,
+    const iclforge::containers::iamf::AudioTrack track{.bit_depth = kBitDepth,
                                            .samples_per_frame = kSamplesPerFrame};
 
-    iclforge::iamf::Frame frame;
+    iclforge::containers::iamf::Frame frame;
     for (std::size_t ch = 0; ch < frame.channels.size(); ++ch) {
         const float value = -0.9F + static_cast<float>(ch) * 0.15F;  // 12 distinct, non-colliding
         frame.channels[ch].assign(kSamplesPerFrame, value);
     }
-    const std::vector<iclforge::iamf::Frame> frames{frame};
-    const auto file = iclforge::iamf::mux(track, frames);
+    const std::vector<iclforge::containers::iamf::Frame> frames{frame};
+    const auto file = iclforge::containers::iamf::mux(track, frames);
     REQUIRE(file.has_value());
 
     const auto elements = parse(*file);
@@ -498,10 +498,10 @@ TEST_CASE("Audio Frame OBUs carry byte-exact PCM in the spec's substream order",
 }
 
 TEST_CASE("IAMF chunk offsets and stsz sizes index mdat exactly", "[iamf]") {
-    const iclforge::iamf::AudioTrack track{.samples_per_frame = 32};
-    const std::vector<iclforge::iamf::Frame> frames{make_frame(32, 0.1F), make_frame(32, -0.4F),
+    const iclforge::containers::iamf::AudioTrack track{.samples_per_frame = 32};
+    const std::vector<iclforge::containers::iamf::Frame> frames{make_frame(32, 0.1F), make_frame(32, -0.4F),
                                           make_frame(32, 0.7F)};
-    const auto file = iclforge::iamf::mux(track, frames);
+    const auto file = iclforge::containers::iamf::mux(track, frames);
     REQUIRE(file.has_value());
     const auto elements = parse(*file);
 
@@ -531,47 +531,47 @@ TEST_CASE("IAMF chunk offsets and stsz sizes index mdat exactly", "[iamf]") {
 }
 
 TEST_CASE("iclforge::iamf::mux validates the track and every frame", "[iamf]") {
-    const iclforge::iamf::AudioTrack track{};
+    const iclforge::containers::iamf::AudioTrack track{};
 
     SECTION("no frames") {
-        const auto result = iclforge::iamf::mux(track, {});
+        const auto result = iclforge::containers::iamf::mux(track, {});
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error() == iclforge::iamf::MuxError::kNoFrames);
+        CHECK(result.error() == iclforge::containers::iamf::MuxError::kNoFrames);
     }
 
     SECTION("unsupported sample rate") {
-        iclforge::iamf::AudioTrack bad = track;
+        iclforge::containers::iamf::AudioTrack bad = track;
         bad.sample_rate = 44099;  // not in IAMF §3.11.4's {44100,16000,32000,48000,96000}
-        const std::vector<iclforge::iamf::Frame> frames{make_frame(bad.samples_per_frame, 0.0F)};
-        const auto result = iclforge::iamf::mux(bad, frames);
+        const std::vector<iclforge::containers::iamf::Frame> frames{make_frame(bad.samples_per_frame, 0.0F)};
+        const auto result = iclforge::containers::iamf::mux(bad, frames);
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error() == iclforge::iamf::MuxError::kInvalidTrack);
+        CHECK(result.error() == iclforge::containers::iamf::MuxError::kInvalidTrack);
     }
 
     SECTION("unsupported bit depth") {
-        iclforge::iamf::AudioTrack bad = track;
+        iclforge::containers::iamf::AudioTrack bad = track;
         bad.bit_depth = 20;  // not in IAMF §3.11.4's {16,24,32}
-        const std::vector<iclforge::iamf::Frame> frames{make_frame(bad.samples_per_frame, 0.0F)};
-        const auto result = iclforge::iamf::mux(bad, frames);
+        const std::vector<iclforge::containers::iamf::Frame> frames{make_frame(bad.samples_per_frame, 0.0F)};
+        const auto result = iclforge::containers::iamf::mux(bad, frames);
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error() == iclforge::iamf::MuxError::kInvalidTrack);
+        CHECK(result.error() == iclforge::containers::iamf::MuxError::kInvalidTrack);
     }
 
     SECTION("zero samples_per_frame") {
-        iclforge::iamf::AudioTrack bad = track;
+        iclforge::containers::iamf::AudioTrack bad = track;
         bad.samples_per_frame = 0;
-        const std::vector<iclforge::iamf::Frame> frames{iclforge::iamf::Frame{}};
-        const auto result = iclforge::iamf::mux(bad, frames);
+        const std::vector<iclforge::containers::iamf::Frame> frames{iclforge::containers::iamf::Frame{}};
+        const auto result = iclforge::containers::iamf::mux(bad, frames);
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error() == iclforge::iamf::MuxError::kInvalidTrack);
+        CHECK(result.error() == iclforge::containers::iamf::MuxError::kInvalidTrack);
     }
 
     SECTION("a channel does not carry samples_per_frame samples") {
         auto frame = make_frame(track.samples_per_frame, 0.0F);
         frame.channels[3].pop_back();  // one sample short
-        const std::vector<iclforge::iamf::Frame> frames{frame};
-        const auto result = iclforge::iamf::mux(track, frames);
+        const std::vector<iclforge::containers::iamf::Frame> frames{frame};
+        const auto result = iclforge::containers::iamf::mux(track, frames);
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error() == iclforge::iamf::MuxError::kFrameSizeMismatch);
+        CHECK(result.error() == iclforge::containers::iamf::MuxError::kFrameSizeMismatch);
     }
 }

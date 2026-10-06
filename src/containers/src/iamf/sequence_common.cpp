@@ -11,7 +11,7 @@
 #include "iclforge/containers/iamf/sequence.hpp"
 #include "sequence_detail.hpp"
 
-namespace iclforge::iamf {
+namespace iclforge::containers::iamf {
 
 std::string_view describe(Error error) {
     switch (error) {
@@ -107,9 +107,9 @@ std::optional<LayoutInfo> layout_info(std::uint8_t loudspeaker_layout) {
     }
 }
 
-}  // namespace iclforge::iamf
+}  // namespace iclforge::containers::iamf
 
-namespace iclforge::iamf::detail {
+namespace iclforge::containers::iamf::detail {
 
 std::map<std::uint32_t, ParamInfo> index_parameters(const Sequence& sequence) {
     std::map<std::uint32_t, ParamInfo> index;
@@ -353,4 +353,4 @@ std::expected<AnimatedValue, Error> read_animated(Cursor& in, std::uint32_t anim
     return value;
 }
 
-}  // namespace iclforge::iamf::detail
+}  // namespace iclforge::containers::iamf::detail

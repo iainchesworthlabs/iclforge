@@ -31,13 +31,13 @@ constexpr std::size_t kInitialPendingBlocks = 32;
     return audio::format_name(format);
 }
 
-[[nodiscard]] std::string_view describe(iec61937::WrapError error) {
+[[nodiscard]] std::string_view describe(containers::iec61937::WrapError error) {
     // clang-format off
     switch (error) {
-        case iec61937::WrapError::kNotAFrame: return "it is not a whole frame";
-        case iec61937::WrapError::kFrameTooLarge: return "it is too large for a burst";
-        case iec61937::WrapError::kUnsupportedRate: return "no burst carries its frame rate";
-        case iec61937::WrapError::kRateChanged: return "its sampling frequency changed mid-stream";
+        case containers::iec61937::WrapError::kNotAFrame: return "it is not a whole frame";
+        case containers::iec61937::WrapError::kFrameTooLarge: return "it is too large for a burst";
+        case containers::iec61937::WrapError::kUnsupportedRate: return "no burst carries its frame rate";
+        case containers::iec61937::WrapError::kRateChanged: return "its sampling frequency changed mid-stream";
     }
     // clang-format on
     return "it could not be packed";
@@ -299,14 +299,14 @@ void Player::send_unit(std::span<const std::byte> unit, std::uint32_t samples,
     // AC-3 is a burst a frame. E-AC-3's units are packed until they make six
     // blocks, which for a stream of shorter frames spans several units - and
     // at a join, units of both items.
-    std::expected<std::optional<std::vector<std::byte>>, iec61937::WrapError> packed;
+    std::expected<std::optional<std::vector<std::byte>>, containers::iec61937::WrapError> packed;
     if (transport_.open_format().stream == audio::BitstreamFormat::kEac3) {
         if (!packer_) {
             packer_.emplace();
         }
         packed = packer_->push(unit);
     } else {
-        auto wrapped = iec61937::wrap_frame(unit);
+        auto wrapped = containers::iec61937::wrap_frame(unit);
         if (wrapped) {
             packed = std::optional<std::vector<std::byte>>{std::move(*wrapped)};
         } else {
@@ -318,7 +318,7 @@ void Player::send_unit(std::span<const std::byte> unit, std::uint32_t samples,
         // held, so none of that is on its way either. Everything after it
         // on the link comes that much sooner.
         std::uint64_t lost = samples;
-        if (packed.error() == iec61937::WrapError::kFrameTooLarge) {
+        if (packed.error() == containers::iec61937::WrapError::kFrameTooLarge) {
             lost += packed_frames_;
             packed_frames_ = 0;
             packed_spans_.clear();
@@ -357,9 +357,9 @@ void Player::send_unit_to_group(std::span<const std::byte> unit, std::uint32_t s
         // blocks run short of by what it holds back.
         if (!ac4_packer_) {
             ac4_packer_.emplace(
-                *stream == audio::BitstreamFormat::kAc4Hbr16  ? iec61937::BurstDataType::kAc4Hbr16
-                : *stream == audio::BitstreamFormat::kAc4Hbr4 ? iec61937::BurstDataType::kAc4Hbr4
-                                                              : iec61937::BurstDataType::kAc4);
+                *stream == audio::BitstreamFormat::kAc4Hbr16  ? containers::iec61937::BurstDataType::kAc4Hbr16
+                : *stream == audio::BitstreamFormat::kAc4Hbr4 ? containers::iec61937::BurstDataType::kAc4Hbr4
+                                                              : containers::iec61937::BurstDataType::kAc4);
         }
         const auto packed = ac4_packer_->push(unit);
         if (!packed) {
@@ -367,7 +367,7 @@ void Player::send_unit_to_group(std::span<const std::byte> unit, std::uint32_t s
                                         describe(packed.error())));
             return;
         }
-        const iec61937::Ac4BurstPacker::Packed& last = *ac4_packer_->last();
+        const containers::iec61937::Ac4BurstPacker::Packed& last = *ac4_packer_->last();
         const Segment& segment = segments_.back();
         const std::uint64_t at =
             segment.output_start + (start > segment.item_start ? start - segment.item_start : 0);
@@ -400,14 +400,14 @@ void Player::send_unit_to_group(std::span<const std::byte> unit, std::uint32_t s
     // (network_group_sink.hpp's own comment on submit_burst() says why: a
     // group's members are not S/PDIF, so there is nothing here to
     // word-swizzle or zero-pad).
-    std::expected<std::optional<std::vector<std::byte>>, iec61937::WrapError> packed;
+    std::expected<std::optional<std::vector<std::byte>>, containers::iec61937::WrapError> packed;
     if (transport_.open_format().stream == audio::BitstreamFormat::kEac3) {
         if (!packer_) {
             packer_.emplace();
         }
         packed = packer_->push(unit);
     } else {
-        auto wrapped = iec61937::wrap_frame(unit);
+        auto wrapped = containers::iec61937::wrap_frame(unit);
         if (wrapped) {
             packed = std::optional<std::vector<std::byte>>{std::move(*wrapped)};
         } else {
@@ -458,7 +458,7 @@ void Player::encode_transcoded(bool last) {
         for (const Ac3Transcoder::Span& span : spans) {
             samples += span.frames;
         }
-        auto wrapped = iec61937::wrap_frame(frame);
+        auto wrapped = containers::iec61937::wrap_frame(frame);
         if (!wrapped) {
             // The frame's samples are not on the link, and what follows them
             // is that much sooner.

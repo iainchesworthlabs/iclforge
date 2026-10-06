@@ -20,7 +20,7 @@
 // what makes the file IAMF is the `iamf` brand, the `iamf` sample entry holding an `iacb` box of
 // configOBUs, and one IA Sample per Temporal Unit.
 
-namespace iclforge::iamf {
+namespace iclforge::containers::iamf {
 
 namespace {
 
@@ -1106,4 +1106,4 @@ std::expected<IsobmffFile, Error> read_isobmff(std::span<const std::byte> file) 
     return result;
 }
 
-}  // namespace iclforge::iamf
+}  // namespace iclforge::containers::iamf

@@ -42,7 +42,7 @@
 // so the period follows the stream's frame rate instead of being fixed; see
 // the AC-4 section below.
 
-namespace iclforge::iec61937 {
+namespace iclforge::containers::iec61937 {
 
 inline constexpr std::size_t kBurstBytes = 6144;
 inline constexpr std::size_t kEac3BurstBytes = 24576;
@@ -481,4 +481,4 @@ class ICLFORGE_CONTAINERS_EXPORT PassthroughDetector {
     std::optional<WordOrder> order_;
 };
 
-}  // namespace iclforge::iec61937
+}  // namespace iclforge::containers::iec61937

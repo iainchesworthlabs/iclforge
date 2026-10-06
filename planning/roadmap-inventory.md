@@ -179,7 +179,7 @@ passthrough tests for A2/A3; TDM DAC boards for sinks; Music Assistant compatibi
 | `AC3FORGE_BUILD_AC4` | `src/ac4` | ON | AC-4 inspect + syntax decoder |
 | `AC3FORGE_BUILD_HEARTH` | `src/sendspin`, `apps/hearth` | OFF | Hearth engine/tests when ON |
 | `AC3FORGE_BUILD_CRUCIBLE` | `apps/crucible` | OFF | UX12; CI sets ON on selected legs |
-| `AC3FORGE_BUILD_IAMF` | `src/iamf` | ON | IM3 phase 1 |
+| `AC3FORGE_BUILD_IAMF` | `src/containers/src/iamf` | ON | IM3 phase 1 |
 | `AC3FORGE_BUILD_IAB` | `src/iab` | ON | IM1 |
 | `AC3FORGE_BUILD_ADM` | `src/adm`, `src/adm` | OFF | ADM/JOC bridge optional |
 | `hearth-esp32s3` CI job | `.github/workflows/_build.yml` | — | B-chip sink verification |

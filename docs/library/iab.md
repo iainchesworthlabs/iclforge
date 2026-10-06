@@ -3,7 +3,7 @@
 `iclforge/iab/ac3iab.hpp`, `iclforge/iab/mxf.hpp`, library `iclforge::iab`. A standalone reader for the
 Immersive Audio Bitstream (IAB, SMPTE ST 2098-2:2022) — the format Dolby Atmos cinema masters
 carry, and that Netflix's IMF pipeline (SMPTE ST 2067-201) delivers inside MXF track files. Like
-`iclforge::adm`, `iclforge::matroska`, `iclforge::mp4` and `iclforge::mpegts`, it links nothing from
+`iclforge::adm`, `iclforge::containers::matroska`, `iclforge::containers::mp4` and `iclforge::containers::mpegts`, it links nothing from
 `iclforge::ac3` — it has no idea AC-3, E-AC-3 or the JOC/Atmos object layer exist.
 
 The bitstream reader is `ac3iab.hpp` and the MXF Track File extraction is `mxf.hpp`, both covered

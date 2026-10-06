@@ -1181,7 +1181,7 @@ int run_live(std::string_view out_path, int capture_device, std::uint32_t second
     if (ac4) {
         ac4_monitor_decoder.emplace();
     }
-    iclforge::iec61937::Eac3BurstPacker eac3_packer;
+    iclforge::containers::iec61937::Eac3BurstPacker eac3_packer;
 
     // Object mode meters the 5.1 bed (matching encodeObjects/run_atmos_encode
     // - what a legacy decoder hears); channel mode meters the routed coded
@@ -1254,7 +1254,7 @@ int run_live(std::string_view out_path, int capture_device, std::uint32_t second
     // detects and stops rather than switching modes - the alternative is a
     // whole session's output that is noise, discovered at the end of it.
     // Costs nothing after the first quarter-second.
-    iclforge::iec61937::PassthroughDetector passthrough_probe;
+    iclforge::containers::iec61937::PassthroughDetector passthrough_probe;
 
     std::uint64_t n0 = 0;
     std::uint64_t frames_written = 0;
@@ -1297,9 +1297,9 @@ int run_live(std::string_view out_path, int capture_device, std::uint32_t second
                              "error: \"{}\" is bitstreaming {} over IEC 61937, not delivering "
                              "PCM - a live encode of it would be noise",
                              device.name,
-                             *type == iclforge::iec61937::BurstDataType::kEac3
+                             *type == iclforge::containers::iec61937::BurstDataType::kEac3
                                  ? "Dolby Digital Plus"
-                             : *type == iclforge::iec61937::BurstDataType::kAc3 ? "Dolby Digital"
+                             : *type == iclforge::containers::iec61937::BurstDataType::kAc3 ? "Dolby Digital"
                                                                                 : "AC-4");
                 fmt::println(stderr,
                              "  'forge record <out.ec3> <seconds> 0 {}' records the elementary "
@@ -1516,7 +1516,7 @@ int run_live(std::string_view out_path, int capture_device, std::uint32_t second
                 // the monitor and the file exactly as it always has.
                 const auto leg_frame = downmix_encoder->encode_frame(bed_views);
                 if (leg_frame.has_value()) {
-                    if (const auto wrapped = iclforge::iec61937::wrap_frame(*leg_frame)) {
+                    if (const auto wrapped = iclforge::containers::iec61937::wrap_frame(*leg_frame)) {
                         bursts.push_back(*wrapped);
                     }
                 }
@@ -1527,7 +1527,7 @@ int run_live(std::string_view out_path, int capture_device, std::uint32_t second
                         if (packed && *packed) {
                             bursts.push_back(std::move(**packed));
                         }
-                    } else if (const auto wrapped = iclforge::iec61937::wrap_frame(unit.bytes)) {
+                    } else if (const auto wrapped = iclforge::containers::iec61937::wrap_frame(unit.bytes)) {
                         bursts.push_back(*wrapped);
                     }
                 }

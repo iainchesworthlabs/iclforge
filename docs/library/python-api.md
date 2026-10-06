@@ -360,7 +360,7 @@ wraps, and a context manager:
   `ac4.Encoder.toc.build_dac4()`; `demux_mp4` and `demux_mpegts` read AC-4 tracks back. `Mp4Track`
   has no `timescale` and `mux_mp4` no sync-sample list, so every sample is marked a sync sample and
   a frame rate whose frames alternate in length (29.97, 59.94 and 119.88 fps) has no
-  `samples_per_frame` to give; `forge` or the C++ `iclforge::mp4::mux` writes those. The incremental
+  `samples_per_frame` to give; `forge` or the C++ `iclforge::containers::mp4::mux` writes those. The incremental
   `Reader`/`Writer` classes and the fragmented-MP4/HLS/DASH surface are C++-only, by design.
 - **`iclforge.meta`** — `LoudnessMeter` (BS.1770; every gated measurement is `None` until it
   can mean anything), the cited `qc_preset()` table, and `evaluate_qc_gate()` — `forge qc`'s

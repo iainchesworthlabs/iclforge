@@ -4,7 +4,7 @@
 // substream. The program writes no files; it checks that what comes back is what went in and exits
 // non-zero when it is not.
 //
-// iclforge::iamf is codec-blind and does not link iclforge::ac3: the objects are plain PCM.
+// iclforge::containers::iamf is codec-blind and does not link iclforge::ac3: the objects are plain PCM.
 
 #include <fmt/printf.h>
 #include <cmath>
@@ -33,7 +33,7 @@ std::vector<float> tone(double hz) {
 }  // namespace
 
 int main() {
-    namespace iamf = iclforge::iamf;
+    namespace iamf = iclforge::containers::iamf;
 
     // A fixed object in front, an object circling the listener at ear height, and two objects coded as one pair.
     iamf::ObjectSource fixed;

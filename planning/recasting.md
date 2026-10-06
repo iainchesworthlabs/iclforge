@@ -96,7 +96,7 @@ live demos, with the npm package listed among the library's bindings.
 
 | | The library | Forge | Crucible |
 |---|---|---|---|
-| Source | `src/ac3`, `src/signing`, `src/capi`, `src/matroska`, `src/mp4`, `src/mpegts`, `src/iab`, `src/iamf`, `src/adm`, `src/adm`, `src/ac4` (built, never exported); `python/`, `js/`, `rust/`; `examples/`, `fuzz/`, `apps/baremetal` | `apps/cli`, `apps/gui`, `apps/common` | `apps/crucible`; by purpose `apps/windows/driver` and `driver-vm` |
+| Source | `src/ac3`, `src/signing`, `src/capi`, `src/containers/src/matroska`, `src/containers/src/mp4`, `src/containers/src/mpegts`, `src/iab`, `src/containers/src/iamf`, `src/adm`, `src/adm`, `src/ac4` (built, never exported); `python/`, `js/`, `rust/`; `examples/`, `fuzz/`, `apps/baremetal` | `apps/cli`, `apps/gui`, `apps/common` | `apps/crucible`; by purpose `apps/windows/driver` and `driver-vm` |
 | Build identity | `ac3::forge`, `ac3::forge_c`, `ac3::signing`, `matroska::matroska`, `mp4::mp4`, `mpegts::mpegts`, `ac3iab::ac3iab`, `iamf::iamf`, `ac3adm::ac3adm`, `ac3::admbridge`; ten export sets and ten `.pc` files | targets `ac3cli`, `ac3gui`; QML URI `Ac3Forge`; options `AC3FORGE_BUILD_CLI`, `AC3FORGE_BUILD_GUI` | targets `ac3crucible`, `ac3crucible-run`, `ac3::crucible_engine`; QML URI `Ac3ForgeCrucible`; option `AC3FORGE_BUILD_CRUCIBLE`; root guard `WIN32 OR (UNIX AND NOT APPLE)` (`CMakeLists.txt:450`) |
 | Tests and checks | most of `ac3tests`; `tests/capi`, `python/tests`, `apps/wasm/tests`; coverage floors `src/*` (`tools/checks/coverage_report.sh:108-116`); abi-gate; fuzz.yml; interop.yml | `tests/cli`, `tests/gui`, `ac3gui_qmltests` (label `gui`); floor `apps/cli` (:117); `.clang-tidy:95` | `tests/crucible` (compiled into `ac3tests`, `tests/CMakeLists.txt:436-456`), `ac3crucible_qmltests`; labels `crucible`, `crucible-ui`; `tools/ci/check_crucible_package.py`; `tools/checks/coverage_crucible.ps1`, `crucible_platform_probe.cpp` |
 | Docs | Library (22 pages), Concepts (4), Validation, Threat model, Conformance vectors, Performance & quality (6), `platforms/wasm.md`, the two WASM demo pages | CLI reference (3), GUI guide (12) | Crucible guide (5), `platforms/windows-demo.md` (the record), `platforms/windows-driver-acx.md` |
@@ -191,7 +191,7 @@ its decisions are with the user.
 | `docs/` | 73 pages | 73 pages plus `docs/forge/index.md`, `docs/family/recasting.md` (this page), and, under [decision 8](#decisions), `docs/library/capabilities.md` and a `docs/security.md` wrapper | see [The docs](#the-docs) |
 
 What does change on disk is small: the README's layout block gains member headings and the rows
-it is missing today (`src/capi`, `src/ac4`, `src/iab`, `src/iamf`, `src/adm`,
+it is missing today (`src/capi`, `src/ac4`, `src/iab`, `src/containers/src/iamf`, `src/adm`,
 `apps/wasm`, `apps/common`, `apps/baremetal`, `apps/windows`, `python/`, `js/`, `rust/`), and
 `CONTRIBUTING.md:50-51`'s consumer list `apps/{cli,gui,wasm,android}` names the tree as it is.
 

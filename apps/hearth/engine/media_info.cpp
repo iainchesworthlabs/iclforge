@@ -229,7 +229,7 @@ void write_container(JsonSink& json, const apps::ContainerFacts& facts) {
             // over vs. karaoke), and channel_flags() - the only acmod-shaped
             // thing this descriptor carries - is a many-to-one summary that
             // cannot be read back into an exact acmod (see
-            // iclforge::mpegts::parse_service_descriptor's own comment). Showing one
+            // iclforge::containers::mpegts::parse_service_descriptor's own comment). Showing one
             // label anyway would sometimes just be wrong; a caller that has
             // the elementary stream can label service_bsmod itself with the
             // acmod iclforge::ac3::io::scan() actually read.

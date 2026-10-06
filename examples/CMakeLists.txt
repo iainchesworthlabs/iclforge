@@ -53,13 +53,13 @@ endif()
 
 # mux_iamf demonstrates IAMF writer phase 1's decode -> IAMF bridge: it encodes a synthetic
 # 7.1.4 E-AC-3 stream, decodes it back with iclforge::ac3::Eac3Decoder, permutes the result into iamf::'s
-# own channel order and calls iclforge::iamf::mux() - so, like encode_adm above, it needs BOTH iclforge::ac3
+# own channel order and calls iclforge::containers::iamf::mux() - so, like encode_adm above, it needs BOTH iclforge::ac3
 # and the standalone writer module together, and only exists to build when ICLFORGE_BUILD_IAMF
-# (default ON, see the root CMakeLists.txt's own option()) turned iclforge::iamf on.
+# (default ON, see the root CMakeLists.txt's own option()) turned iclforge::containers on.
 if(ICLFORGE_BUILD_IAMF)
     list(APPEND ICLFORGE_EXAMPLES mux_iamf)
     # iamf_objects writes object-based IAMF (v2.0) as ISO-BMFF, a raw OBU stream and fragments, and
-    # reads each back; it links iclforge::iamf alone.
+    # reads each back; it links iclforge::containers alone.
     list(APPEND ICLFORGE_EXAMPLES iamf_objects)
 endif()
 
@@ -84,9 +84,9 @@ foreach(example IN LISTS ICLFORGE_EXAMPLES)
         target_link_libraries(${example} PRIVATE iclforge::ac3 iclforge::adm
                                                   iclforge::warnings iclforge::fmt)
     elseif(example STREQUAL "mux_iamf")
-        target_link_libraries(${example} PRIVATE iclforge::ac3 iclforge::iamf iclforge::warnings iclforge::fmt)
+        target_link_libraries(${example} PRIVATE iclforge::ac3 iclforge::containers iclforge::warnings iclforge::fmt)
     elseif(example STREQUAL "iamf_objects")
-        target_link_libraries(${example} PRIVATE iclforge::iamf iclforge::warnings iclforge::fmt)
+        target_link_libraries(${example} PRIVATE iclforge::containers iclforge::warnings iclforge::fmt)
     elseif(example STREQUAL "read_iab")
         # No iclforge::ac3 here either - src/iab is deliberately independent of it (see
         # src/iab/CMakeLists.txt's header comment), the same reason read_adm above needs none.
@@ -103,11 +103,11 @@ foreach(example IN LISTS ICLFORGE_EXAMPLES)
     set_target_properties(${example} PROPERTIES FOLDER examples)
 endforeach()
 
-# Only these need a container writer; mux_fmp4 reuses iclforge::mp4 the same way mux_mp4 does.
-target_link_libraries(mux_mkv PRIVATE iclforge::matroska)
-target_link_libraries(mux_mp4 PRIVATE iclforge::mp4)
-target_link_libraries(mux_fmp4 PRIVATE iclforge::mp4)
-target_link_libraries(mux_ts PRIVATE iclforge::mpegts)
+# Only these need a container writer; mux_fmp4 reuses iclforge::containers the same way mux_mp4 does.
+target_link_libraries(mux_mkv PRIVATE iclforge::containers)
+target_link_libraries(mux_mp4 PRIVATE iclforge::containers)
+target_link_libraries(mux_fmp4 PRIVATE iclforge::containers)
+target_link_libraries(mux_ts PRIVATE iclforge::containers)
 
 # Only this one needs the object signer.
 target_link_libraries(object_signing PRIVATE iclforge::ac3)

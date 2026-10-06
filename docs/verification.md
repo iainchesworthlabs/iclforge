@@ -759,7 +759,7 @@ position, without the series: librempeg refuses object coding, and DEE writes no
 this project's masters ([The decoder's objects](#the-decoders-objects)).
 
 **Containers and manifests are checked externally where a reader exists, and only there.**
-`iclforge::mp4::fragment`'s and `iclforge::mp4::FragmentWriter`'s CMAF output both pass FFmpeg 8.0.1's strict decode
+`iclforge::containers::mp4::fragment`'s and `iclforge::containers::mp4::FragmentWriter`'s CMAF output both pass FFmpeg 8.0.1's strict decode
 (`ffmpeg -v error -xerror -err_detect crccheck+bitstream+buffer+explode`) over the init segment
 concatenated with every media segment, and both the HLS media playlist and the DASH MPD read back
 through FFmpeg's own `hls` and `dash` demuxers at the exact original access-unit count —
@@ -778,10 +778,10 @@ JOC-aware player would read the right complexity index from it. No MPD schema va
 real DASH player has been run against these manifests. The same gap applies to the HLS
 `CHANNELS="<N>/JOC"` attribute, which predates this work.
 
-The incremental writers are held to a stronger in-repo standard instead: `iclforge::mp4::FragmentWriter`'s
-media segments are asserted byte-identical to `iclforge::mp4::fragment`'s over the same frames, and its
+The incremental writers are held to a stronger in-repo standard instead: `iclforge::containers::mp4::FragmentWriter`'s
+media segments are asserted byte-identical to `iclforge::containers::mp4::fragment`'s over the same frames, and its
 initialization segment byte-identical once the three duration fields a live session cannot know
-are patched back — the same equality contract `iclforge::mpegts::Writer` has against `iclforge::mpegts::mux`. That
+are patched back — the same equality contract `iclforge::containers::mpegts::Writer` has against `iclforge::containers::mpegts::mux`. That
 makes the batch form's own external validation carry over to the streamed one by construction
 rather than by re-measuring it.
 

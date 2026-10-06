@@ -28,20 +28,20 @@ namespace {
         largest = std::max(largest, frame.size());
     }
     const iclforge::ac4::Toc& toc = units.first.toc;
-    const std::optional<iec61937::BurstDataType> type = iec61937::ac4_burst_type_for(
+    const std::optional<containers::iec61937::BurstDataType> type = containers::iec61937::ac4_burst_type_for(
         largest, toc.sample_rate_hz == 44100 ? 0 : 1, toc.frame_rate_index);
     if (!type) {
         return std::nullopt;
     }
     switch (*type) {
-        case iec61937::BurstDataType::kAc4Hbr4:
+        case containers::iec61937::BurstDataType::kAc4Hbr4:
             return audio::BitstreamFormat::kAc4Hbr4;
-        case iec61937::BurstDataType::kAc4Hbr16:
+        case containers::iec61937::BurstDataType::kAc4Hbr16:
             return audio::BitstreamFormat::kAc4Hbr16;
-        case iec61937::BurstDataType::kAc4:
-        case iec61937::BurstDataType::kAc4Ld:
-        case iec61937::BurstDataType::kAc3:
-        case iec61937::BurstDataType::kEac3:
+        case containers::iec61937::BurstDataType::kAc4:
+        case containers::iec61937::BurstDataType::kAc4Ld:
+        case containers::iec61937::BurstDataType::kAc3:
+        case containers::iec61937::BurstDataType::kEac3:
             break;
     }
     return audio::BitstreamFormat::kAc4;

@@ -65,7 +65,7 @@ which is legal and expected, if unusual for a plain PCM16 file.
 
 Of the four containers above, only **fragmented MP4/CMAF** carries over to a **live session** the
 way Matroska does: `EncoderController::openLiveOutputWriters` wires exactly two incremental
-writers, `iclforge::matroska::Writer` and `iclforge::mp4::FragmentWriter`, and **MP4**, **S/PDIF** and **MPEG-TS** all
+writers, `iclforge::containers::matroska::Writer` and `iclforge::containers::mp4::FragmentWriter`, and **MP4**, **S/PDIF** and **MPEG-TS** all
 fall through to writing the plain elementary stream when a live session starts — the same file
 Elementary stream itself would produce live. That is a limit of the live path, not of the
 containers: a **recording** (the Record button's capture-to-file take) goes through

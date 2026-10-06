@@ -15,8 +15,8 @@
 // Bitstream into an IaFrame per frame (see model.hpp for the full element graph).
 //
 // Roadmap item IM1 phase 1 of 3 ('s "IAB (SMPTE ST 2098-2) reader" entry): a
-// standalone bitstream reader, the "codec-blind" shape iclforge::matroska, iclforge::mp4 and
-// iclforge::mpegts already use for their own containers (bare `include/ac3iab/` prefix, not
+// standalone bitstream reader, the "codec-blind" shape iclforge::containers::matroska, iclforge::containers::mp4 and
+// iclforge::containers::mpegts already use for their own containers (bare `include/ac3iab/` prefix, not
 // `ac3/ac3iab/` - see CONTRIBUTING.md's repository-layout section on what that prefix means).
 // AudioDataDLC's lossless coder (Annex B) is kept as coded bytes by the reader and decoded by
 // decode_dlc() in dlc.hpp. Phase 2 (MXF/KLV extraction for IAB track files - see

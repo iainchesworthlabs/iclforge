@@ -235,7 +235,7 @@ TEST_CASE("network group sink: PCM and a burst reach real sinks through the wrap
     // (player.cpp's own comment on iec61937's stable, documented preamble
     // layout explains why that read-back is safe rather than a guess).
     const std::vector<std::byte> unit = ac3_unit();
-    const auto wrapped = iclforge::iec61937::wrap_frame(unit);
+    const auto wrapped = iclforge::containers::iec61937::wrap_frame(unit);
     REQUIRE(wrapped.has_value());
     REQUIRE(wrapped->size() >= 8);
     const auto byte_at = [&](std::size_t i) { return std::to_integer<unsigned>((*wrapped)[i]); };

@@ -1133,7 +1133,7 @@ bool wrap_ac3_stream(std::span<const std::byte> stream, std::uint32_t& rate_out,
     rate_out = sample_rate_hz(static_cast<iclforge::ac3::SampleRate>(fscod));
 
     for (const auto& frame : *frames) {
-        const auto burst = iclforge::iec61937::wrap_frame(frame);
+        const auto burst = iclforge::containers::iec61937::wrap_frame(frame);
         if (!burst) {
             return false;
         }
@@ -1153,7 +1153,7 @@ bool wrap_eac3_stream(std::span<const std::byte> stream, std::uint32_t& rate_out
     const auto byte4 = std::to_integer<std::uint32_t>((*units)[0][4]);
     rate_out = sample_rate_hz(static_cast<iclforge::ac3::SampleRate>(byte4 >> 6));
 
-    iclforge::iec61937::Eac3BurstPacker packer;
+    iclforge::containers::iec61937::Eac3BurstPacker packer;
     for (const auto& unit : *units) {
         const auto burst = packer.push(unit);
         if (!burst) {
@@ -1623,15 +1623,15 @@ int run_spdif_ac4(std::span<const std::byte> stream, std::string_view in_path,
         frames.push_back(stream.subspan(scan.frames[i].offset, end - scan.frames[i].offset));
         largest = std::max(largest, frames.back().size());
     }
-    const auto head = iclforge::iec61937::read_ac4_sync_frame(frames.front());
+    const auto head = iclforge::containers::iec61937::read_ac4_sync_frame(frames.front());
     if (!head.has_value()) {
         fmt::println(stderr, "error: {}: the first sync frame's table of contents does not read",
                      in_path);
         return kExitInput;
     }
     const auto type =
-        iclforge::iec61937::ac4_burst_type_for(largest, head->fs_index, head->frame_rate_index);
-    const auto timing = type.has_value() ? iclforge::iec61937::ac4_burst_timing(
+        iclforge::containers::iec61937::ac4_burst_type_for(largest, head->fs_index, head->frame_rate_index);
+    const auto timing = type.has_value() ? iclforge::containers::iec61937::ac4_burst_timing(
                                                *type, head->fs_index, head->frame_rate_index)
                                          : std::nullopt;
     if (!type.has_value() || !timing.has_value()) {
@@ -1641,20 +1641,20 @@ int run_spdif_ac4(std::span<const std::byte> stream, std::string_view in_path,
                      in_path, largest, head->frame_rate_index);
         return kExitInput;
     }
-    const bool hbr16 = *type == iclforge::iec61937::BurstDataType::kAc4Hbr16;
+    const bool hbr16 = *type == iclforge::containers::iec61937::BurstDataType::kAc4Hbr16;
     const std::uint32_t carrier_rate = hbr16 ? timing->link_rate_hz / 4 : timing->link_rate_hz;
     const std::uint16_t carrier_channels = hbr16 ? 8 : 2;
     Pcm16RawWavSink sink;
     if (!sink.open(out_path, carrier_rate, carrier_channels)) {
         return kExitOutput;
     }
-    iclforge::iec61937::Ac4BurstPacker packer{*type};
+    iclforge::containers::iec61937::Ac4BurstPacker packer{*type};
     for (const std::span<const std::byte> frame : frames) {
         const auto burst = packer.push(frame);
         if (!burst.has_value()) {
             sink.abort();
             fmt::println(stderr, "error: {}: a sync frame will not pack into {} bursts", in_path,
-                         iclforge::iec61937::data_type_name(*type));
+                         iclforge::containers::iec61937::data_type_name(*type));
             return kExitInput;
         }
         if (!sink.push(*burst)) {
@@ -1668,7 +1668,7 @@ int run_spdif_ac4(std::span<const std::byte> stream, std::string_view in_path,
     const auto status = status_stream();
     status_println(status,
                    "wrapped {} AC-4 sync frames into IEC 61937-14 {} bursts -> {} ({} Hz{})",
-                   frames.size(), iclforge::iec61937::data_type_name(*type), out_path, carrier_rate,
+                   frames.size(), iclforge::containers::iec61937::data_type_name(*type), out_path, carrier_rate,
                    hbr16 ? ", eight channels" : " carrier");
     status_println(status,
                    "no receiver found takes AC-4 over IEC 61937 yet; 'unspdif' reads the frames "
@@ -1879,7 +1879,7 @@ int run_unspdif(std::string_view in_path, std::string_view out_path, bool keep_p
     if (!sink.open(out_path, keep_partial)) {
         return kExitOutput;
     }
-    iclforge::iec61937::BurstReader reader;
+    iclforge::containers::iec61937::BurstReader reader;
     std::vector<std::byte> carrier(kCarrierChunkBytes);
     std::vector<std::byte> payload;
     std::uint64_t elementary_bytes = 0;
@@ -1898,7 +1898,7 @@ int run_unspdif(std::string_view in_path, std::string_view out_path, bool keep_p
         if (!pushed.has_value()) {
             sink.abort();
             fmt::println(stderr, "error: {}: {}", in_path,
-                         iclforge::iec61937::describe(pushed.error()));
+                         iclforge::containers::iec61937::describe(pushed.error()));
             return kExitInput;
         }
         if (!payload.empty()) {
@@ -1930,8 +1930,8 @@ int run_unspdif(std::string_view in_path, std::string_view out_path, bool keep_p
     // than something visible here. An AC-4 carrier names its own link (IEC
     // 61937-14's four burst types); its bursts hold AC-4 sync frames, the
     // .ac4 form.
-    const std::string_view kind = iclforge::iec61937::data_type_name(
-        reader.data_type().value_or(iclforge::iec61937::BurstDataType::kAc3));
+    const std::string_view kind = iclforge::containers::iec61937::data_type_name(
+        reader.data_type().value_or(iclforge::containers::iec61937::BurstDataType::kAc3));
     // stderr when the elementary stream itself is going to stdout, the same
     // convention encode/decode follow (see status_stream's own comment):
     // this report must never land in the middle of the bytes a pipeline is
@@ -1944,7 +1944,7 @@ int run_unspdif(std::string_view in_path, std::string_view out_path, bool keep_p
         // 4x, so 192000 here means a 48 kHz programme.
         status_println(status, "carrier: {} Hz, {} ch, {} words", chunk->sample_rate,
                        chunk->channels,
-                       reader.word_order() == iclforge::iec61937::WordOrder::kBigEndian
+                       reader.word_order() == iclforge::containers::iec61937::WordOrder::kBigEndian
                            ? "big-endian"
                            : "little-endian");
     }
@@ -1962,7 +1962,7 @@ int run_unspdif(std::string_view in_path, std::string_view out_path, bool keep_p
         // something, but the reader's own contract (a whole final burst) was
         // not met, which the exit code alone does not distinguish from a
         // clean stop.
-        fmt::println(stderr, "warning: {}", iclforge::iec61937::describe(finished.error()));
+        fmt::println(stderr, "warning: {}", iclforge::containers::iec61937::describe(finished.error()));
     }
     return kExitOk;
 }

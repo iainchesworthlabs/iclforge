@@ -10,17 +10,17 @@
 #include "iclforge/containers/mp4/mp4.hpp"
 
 // HLS signaling (RFC 8216, "HTTP Live Streaming") for the CMAF segments
-// iclforge::mp4::fragment() produces.
+// iclforge::containers::mp4::fragment() produces.
 //
-// Deliberately as codec-blind as the rest of iclforge::mp4:: allows: WHICH codec
+// Deliberately as codec-blind as the rest of iclforge::containers::mp4:: allows: WHICH codec
 // string and CHANNELS value to use is either derived straight from
 // AudioTrack (already opaque-by-design - see mp4.hpp) or supplied by the
 // caller through HlsOptions::channels_attribute. This module only knows HLS
 // *syntax* - #EXTM3U/#EXT-X-STREAM-INF/#EXT-X-MEDIA/#EXT-X-MAP/#EXTINF - not
-// AC-3/E-AC-3 semantics, the same boundary iclforge::mp4::mux() itself draws around
+// AC-3/E-AC-3 semantics, the same boundary iclforge::containers::mp4::mux() itself draws around
 // 'dec3'/'dac3' (see AudioTrack::codec_config).
 
-namespace iclforge::mp4 {
+namespace iclforge::containers::mp4 {
 
 struct HlsOptions {
     std::string init_segment_uri{"init.mp4"};
@@ -43,7 +43,7 @@ struct HlsOptions {
     // and shown verbatim in a real manifest
     // (CODECS="avc1.64001f,ec-3" / CHANNELS="12/JOC") by AWS MediaLive's own
     // HLS+Atmos documentation. Empty means "just the track's channel count",
-    // correct for plain (non-Atmos) AC-3/E-AC-3 - iclforge::mp4:: itself has no
+    // correct for plain (non-Atmos) AC-3/E-AC-3 - iclforge::containers::mp4:: itself has no
     // opinion on JOC, since that is TS 103 420 object-layer syntax this
     // module never reads; the caller (which already read
     // oba_complexity_index off the bitstream to build the dec3 box, see
@@ -55,19 +55,19 @@ struct HlsOptions {
     std::uint32_t version = 7;
     // Whether this is the whole, final asset (RFC 8216 §4.3.3.5's VOD
     // #EXT-X-PLAYLIST-TYPE plus a closing #EXT-X-ENDLIST) rather than a live,
-    // still-growing playlist. True is right for iclforge::mp4::fragment()'s batch
+    // still-growing playlist. True is right for iclforge::containers::mp4::fragment()'s batch
     // output, where every fragment is already known. False is the live shape
     // (RFC 8216 §6.2.2): both tags are omitted, and #EXT-X-MEDIA-SEQUENCE -
     // written from the FIRST listed segment's own sequence number either way -
     // is what tells a player that segments have rolled off the front of the
     // playlist since it last reloaded. Rewrite the playlist from
-    // iclforge::mp4::FragmentWriter::window() each time a segment closes, then rewrite it
+    // iclforge::containers::mp4::FragmentWriter::window() each time a segment closes, then rewrite it
     // once more with vod = true when the session ends.
     bool vod = true;
 };
 
 // The RFC 6381 'Codecs' parameter value for one AudioTrack: just the
-// ISOBMFF sample entry's own four-character code (iclforge::mp4::kCodecAc3/kCodecEac3,
+// ISOBMFF sample entry's own four-character code (iclforge::containers::mp4::kCodecAc3/kCodecEac3,
 // ISO/IEC 14496-15 §5.5's registration), since neither AC-3 nor E-AC-3
 // registers any of the dot-separated profile/level fields RFC 6381 §3 makes
 // room for (unlike e.g. "avc1.640028") - confirmed against every real HLS
@@ -95,7 +95,7 @@ struct HlsRendition {
     // A manifest only ever reads a segment's bookkeeping, never its bytes
     // (mp4.hpp's SegmentInfo) - the same reason build_hls_master_playlist's
     // single-rendition form and build_hls_media_playlist both settled on it.
-    // iclforge::mp4::segment_info()/segment_infos() convert from a caller's own
+    // iclforge::containers::mp4::segment_info()/segment_infos() convert from a caller's own
     // FragmentedOutput::media_segments or FragmentWriter::window().
     std::span<const SegmentInfo> segments{};
     // Relative to the master playlist.
@@ -134,9 +134,9 @@ struct HlsRendition {
     const AudioTrack& track, std::span<const SegmentInfo> segments,
     std::string_view media_playlist_uri, const HlsOptions& options = {});
 
-// Convenience overload for a caller holding iclforge::mp4::fragment()'s batch output
-// (iclforge::mp4::segment_infos() is what it forwards through). The SegmentInfo form
-// above is the one a live caller wants: iclforge::mp4::FragmentWriter::window() hands
+// Convenience overload for a caller holding iclforge::containers::mp4::fragment()'s batch output
+// (iclforge::containers::mp4::segment_infos() is what it forwards through). The SegmentInfo form
+// above is the one a live caller wants: iclforge::containers::mp4::FragmentWriter::window() hands
 // back exactly that, without keeping the windowed segments' bytes alive
 // purely to name them.
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string build_hls_master_playlist(
@@ -154,4 +154,4 @@ struct HlsRendition {
     const AudioTrack& track, std::span<const MediaSegment> segments,
     const HlsOptions& options = {});
 
-}  // namespace iclforge::mp4
+}  // namespace iclforge::containers::mp4

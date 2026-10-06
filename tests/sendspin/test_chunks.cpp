@@ -198,7 +198,7 @@ TEST_CASE("chunks: an AC-3 burst chunk carries wrap_frame's Pc, Pd and frame",
     const auto frame = iclforge::ac3::build_silent_stereo_frame(
         {.sample_rate = iclforge::ac3::SampleRate::k48000, .bitrate_kbps = 192, .dialnorm = 31, .pad441 = false});
     REQUIRE(frame.has_value());
-    const auto burst = iclforge::iec61937::wrap_frame(*frame);
+    const auto burst = iclforge::containers::iec61937::wrap_frame(*frame);
     REQUIRE(burst.has_value());
     const std::uint16_t pc = le16(*burst, 4);
     const std::uint16_t pd = le16(*burst, 6);
@@ -235,7 +235,7 @@ TEST_CASE("chunks: an E-AC-3 burst chunk carries Eac3BurstPacker's six blocks",
         frame[5] = static_cast<std::byte>((16 << 3) | 0x7);
         return frame;
     };
-    iclforge::iec61937::Eac3BurstPacker packer;
+    iclforge::containers::iec61937::Eac3BurstPacker packer;
     std::vector<std::byte> payload;
     std::vector<std::byte> burst;
     for (int i = 0; i < 6; ++i) {
@@ -247,7 +247,7 @@ TEST_CASE("chunks: an E-AC-3 burst chunk carries Eac3BurstPacker's six blocks",
             burst = **pushed;
         }
     }
-    REQUIRE(burst.size() == iclforge::iec61937::kEac3BurstBytes);
+    REQUIRE(burst.size() == iclforge::containers::iec61937::kEac3BurstBytes);
     const std::uint16_t pc = le16(burst, 4);
     const std::uint16_t pd = le16(burst, 6);
     CHECK(pc == 0x15);
@@ -270,9 +270,9 @@ TEST_CASE("chunks: a burst chunk for the first syncframe of tests/golden's AC-3 
     REQUIRE_FALSE(frames->empty());
     const std::span<const std::byte> frame = frames->front();
     REQUIRE(frame.size() == 1792);
-    const auto burst = iclforge::iec61937::wrap_frame(frame);
+    const auto burst = iclforge::containers::iec61937::wrap_frame(frame);
     REQUIRE(burst.has_value());
-    REQUIRE(burst->size() == iclforge::iec61937::kBurstBytes);
+    REQUIRE(burst->size() == iclforge::containers::iec61937::kBurstBytes);
     const std::uint16_t pc = le16(*burst, 4);
     const std::uint16_t pd = le16(*burst, 6);
     // Data type 1 and the frame's bsmod in bits 8 to 10; the frame's length in bits.
@@ -293,7 +293,7 @@ TEST_CASE("chunks: a burst chunk for the encoder's E-AC-3 syncframes of two bloc
     iclforge::ac3::eac3::FrameConfig config{.bitrate_kbps = 192, .numblkscod = 1};
     const auto frame = iclforge::ac3::eac3::build_silent_frame(config);
     REQUIRE(frame.has_value());
-    iclforge::iec61937::Eac3BurstPacker packer;
+    iclforge::containers::iec61937::Eac3BurstPacker packer;
     std::vector<std::byte> payload;
     std::optional<std::vector<std::byte>> burst;
     int pushed = 0;
@@ -307,7 +307,7 @@ TEST_CASE("chunks: a burst chunk for the encoder's E-AC-3 syncframes of two bloc
     // Two blocks each, so three syncframes make the burst's six.
     CHECK(pushed == 3);
     REQUIRE(burst.has_value());
-    REQUIRE(burst->size() == iclforge::iec61937::kEac3BurstBytes);
+    REQUIRE(burst->size() == iclforge::containers::iec61937::kEac3BurstBytes);
     const std::uint16_t pc = le16(*burst, 4);
     const std::uint16_t pd = le16(*burst, 6);
     CHECK(pc == 21);
@@ -403,7 +403,7 @@ TEST_CASE("chunks: an AC-4 burst chunk carries Ac4BurstPacker's Pc and Pd and it
     for (const auto& [raw, crc] : {Case{600, false}, Case{601, false}, Case{321, true}}) {
         CAPTURE(raw, crc);
         const std::vector<std::byte> frame = ac4_sync_frame(raw, crc);
-        iclforge::iec61937::Ac4BurstPacker packer;
+        iclforge::containers::iec61937::Ac4BurstPacker packer;
         const auto burst = packer.push(frame);
         REQUIRE(burst.has_value());
         const std::uint16_t pc = le16(*burst, 4);
@@ -434,7 +434,7 @@ TEST_CASE("chunks: AC-4 HBR4 counts in bytes and HBR16 in 8-byte units with the 
     const std::vector<std::byte> frame = ac4_sync_frame(9001);
     REQUIRE(frame.size() == 9005);
 
-    iclforge::iec61937::Ac4BurstPacker hbr4(iclforge::iec61937::BurstDataType::kAc4Hbr4);
+    iclforge::containers::iec61937::Ac4BurstPacker hbr4(iclforge::containers::iec61937::BurstDataType::kAc4Hbr4);
     REQUIRE(hbr4.push(frame).has_value());
     CHECK(hbr4.last()->pc == 0x0D38);
     CHECK(hbr4.last()->pd == 9005);
@@ -443,7 +443,7 @@ TEST_CASE("chunks: AC-4 HBR4 counts in bytes and HBR16 in 8-byte units with the 
     CHECK(four->data_type() == BurstDataType::kAc4Hbr4);
 
     // HBR16's payload is the frame and three zeros: 1 126 units of 8 bytes.
-    iclforge::iec61937::Ac4BurstPacker hbr16(iclforge::iec61937::BurstDataType::kAc4Hbr16);
+    iclforge::containers::iec61937::Ac4BurstPacker hbr16(iclforge::containers::iec61937::BurstDataType::kAc4Hbr16);
     REQUIRE(hbr16.push(frame).has_value());
     CHECK(hbr16.last()->pc == 0x0D58);
     CHECK(hbr16.last()->pd == 1126);

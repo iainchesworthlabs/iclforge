@@ -309,11 +309,10 @@ target_link_libraries(forge-gui
         iclforge::audio
         # The GUI can save straight to .mkv, so it needs the muxer the CLI's
         # 'mkv' command uses. It links nothing from iclforge::ac3 itself.
-        iclforge::matroska
-        # Same reasoning as iclforge::matroska above, for the CLI's 'mp4'/
+        iclforge::containers
+        # Same reasoning as iclforge::containers above, for the CLI's 'mp4'/
         # 'fmp4'/'ts' commands - see EncoderController::writeOutput().
-        iclforge::mp4
-        iclforge::mpegts
+        iclforge::containers
         # AC-4 in the codec list, the QC, the player and the object page, through
         # the decoder's and the encoder's public APIs.
         iclforge::ac4

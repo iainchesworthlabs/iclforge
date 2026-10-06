@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::mp4 - a minimal MP4 (ISOBMFF) container writer, plus fragmented
+# iclforge::containers - a minimal MP4 (ISOBMFF) container writer, plus fragmented
 # MP4/CMAF segmenting and HLS/DASH signaling helpers.
 #
 # Deliberately standalone: it links nothing from iclforge::ac3 and knows nothing
@@ -8,7 +8,7 @@
 # opaque bytes, so it can be reasoned about, tested and reused on its own.
 # The dependency runs one way only - front ends may use both this and
 # iclforge::ac3, but the codec library never reaches for the container and vice
-# versa. Made, as src/matroska is, by iclforge_add_library()
+# versa. Made, as src/containers/src/matroska is, by iclforge_add_library()
 # (cmake/IclforgeLibrary.cmake).
 #
 # mp4.cpp (mux()) and fragment.cpp (fragment()) share their ISOBMFF
@@ -20,12 +20,12 @@
 # ---------------------------------------------------------------------------
 iclforge_add_library(mp4
     SOURCES
-        src/mp4.cpp
+        src/containers/src/mp4.cpp
         src/reader.cpp
         src/fragment.cpp
         src/hls.cpp
         src/dash.cpp
     # iclforge::fmt_private compiles {fmt} into hls.cpp and dash.cpp instead of linking it, so
-    # iclforge_mp4_static carries no undefined {fmt} reference into a consumer's link - see
+    # iclforge_containers_static carries no undefined {fmt} reference into a consumer's link - see
     # cmake/Fmt.cmake.
     LINK_PRIVATE "$<BUILD_INTERFACE:iclforge::fmt_private>")

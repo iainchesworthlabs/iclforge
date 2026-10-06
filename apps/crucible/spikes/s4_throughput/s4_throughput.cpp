@@ -84,7 +84,7 @@ Result run(int numblkscod, unsigned bitrate_kbps, int seconds) {
     std::vector<double> times;
     times.reserve(static_cast<std::size_t>(total_frames));
     std::size_t bytes = 0;
-    iclforge::iec61937::Eac3BurstPacker packer;
+    iclforge::containers::iec61937::Eac3BurstPacker packer;
     double t = 0.0;
 
     for (int f = 0; f < total_frames; ++f) {

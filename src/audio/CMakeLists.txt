@@ -20,19 +20,19 @@
 # its own public interface (LivePositionSource::drain_into), so forge is a
 # genuine usage requirement for anything that includes this library's
 # headers, not merely something the .cpp files reach for privately the way
-# the passthrough backends reuse iclforge::iec61937's burst-size constants and
+# the passthrough backends reuse iclforge::containers's burst-size constants and
 # framer to size and pack S/PDIF bursts. Free to widen from the PRIVATE this
 # used to be: this target is never installed or exported (see above), so
 # there is no install(EXPORT) graph for the wider dependency to leak into.
 #
 # Always STATIC, deliberately, regardless of the ambient BUILD_SHARED_LIBS a
-# whole-project configure might set for iclforge::ac3/iclforge::matroska's own
+# whole-project configure might set for iclforge::ac3/iclforge::containers's own
 # benefit (see src/ac3/CMakeLists.txt): this target carries no export
 # annotations at all, so building it SHARED produces a DLL with nothing
 # exported and no usable import library - a link failure for every in-tree
 # consumer, not a working shared iclforge_audio. It isn't part of the distributed
 # package (see the header comment above), so there is no packaging reason to
-# give it the same static+shared treatment iclforge::ac3/iclforge::matroska get.
+# give it the same static+shared treatment iclforge::ac3/iclforge::containers get.
 # ---------------------------------------------------------------------------
 add_library(iclforge_audio STATIC)
 add_library(iclforge::audio ALIAS iclforge_audio)
@@ -44,7 +44,7 @@ target_include_directories(iclforge_audio
 
 # The one platform-independent piece of the backend tree below: describe()
 # for iclforge::audio::EdidError. Compiled unconditionally, the same reasoning as
-# iclforge::iec61937 staying platform-independent while PassthroughSink is not -
+# iclforge::containers staying platform-independent while PassthroughSink is not -
 # see sink_capabilities.hpp's own header comment. Each platform's own
 # read_sink_capabilities() is added alongside that platform's other four
 # backend files, below.
@@ -74,7 +74,7 @@ target_compile_features(iclforge_audio PUBLIC cxx_std_23)
 # cmake/Coverage.cmake). Plain, not $<BUILD_INTERFACE:...>-wrapped: this
 # target is never installed (see the header comment above), so it has no
 # install(EXPORT) graph to keep the dependency out of.
-target_link_libraries(iclforge_audio PUBLIC iclforge::render iclforge::iec61937 iclforge::objects)
+target_link_libraries(iclforge_audio PUBLIC iclforge::render iclforge::containers iclforge::objects)
 target_link_libraries(iclforge_audio PRIVATE iclforge::warnings iclforge::coverage iclforge::fmt)
 
 # live_positions.cpp: platform-independent by construction (it names

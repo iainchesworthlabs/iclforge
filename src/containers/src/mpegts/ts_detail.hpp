@@ -7,7 +7,7 @@
 
 // The transport-stream constants and the PSI section CRC shared between
 // mpegts.cpp (the writer: mux() and Writer) and reader.cpp (the reader:
-// demux() and Reader). Internal to src/containers/src/mpegts/ on purpose - plumbing
+// demux() and Reader). Internal to src/containers/src/containers/src/mpegts/ on purpose - plumbing
 // between translation units of the same library, not public API; see
 // src/containers/src/mp4/isobmff_detail.hpp and src/containers/src/matroska/ebml_detail.hpp for
 // the same pattern in the sibling container modules.
@@ -17,7 +17,7 @@
 // writer's, and the round-trip test would be the only thing that noticed -
 // and only for the cases it happens to cover.
 
-namespace iclforge::mpegts::detail {
+namespace iclforge::containers::mpegts::detail {
 
 inline constexpr std::size_t kTsPacketSize = 188;
 inline constexpr std::uint8_t kSyncByte = 0x47;
@@ -91,4 +91,4 @@ static_assert(crc32_mpeg2(kCrc32CheckVector) == 0x0376'E6E7U,
               "a wrong polynomial or bit order here corrupts every PAT/PMT section silently, "
               "since nothing but a real demuxer's CRC check would ever notice.");
 
-}  // namespace iclforge::mpegts::detail
+}  // namespace iclforge::containers::mpegts::detail

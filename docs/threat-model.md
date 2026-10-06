@@ -29,12 +29,12 @@ this repository that must not crash, read out of bounds, or loop unboundedly on 
 | JOC payloads (TS 103 420 §6) | `iclforge::ac3::oba::joc::parse_payload` | yes — `fuzz_joc_parse`, plus indirectly through the E-AC-3 harnesses |
 | WAV / RIFF headers and PCM | `iclforge::ac3::io::read_wav`, `iclforge::ac3::io::WavStreamReader` | yes |
 | IAB (SMPTE ST 2098-2) elementary streams and MXF track files | `iclforge::iab::parse_iabitstream`, `iclforge::iab::parse_mxf_iab`, `iclforge::iab::parse_iaframe` | yes — `fuzz_iab_parse` |
-| IEC 61937 bursts off an S/PDIF or HDMI capture, AC-4's included, and the AC-4 sync frames the AC-4 packer reads | `iclforge::iec61937::BurstReader`, `iclforge::iec61937::read_ac4_sync_frame` | yes — `fuzz_iec61937_unwrap` |
+| IEC 61937 bursts off an S/PDIF or HDMI capture, AC-4's included, and the AC-4 sync frames the AC-4 packer reads | `iclforge::containers::iec61937::BurstReader`, `iclforge::containers::iec61937::read_ac4_sync_frame` | yes — `fuzz_iec61937_unwrap` |
 | ADM XML + BW64/RF64 (opt-in build) | `iclforge::adm::parse_bw64`, via vendored libadm/libbw64 | **opt-in only** — `fuzz_adm_parse` exists but is built only under `ICLFORGE_BUILD_ADM`; see [ADM](#adm-xml-and-bw64) |
 | Object authenticity tags | `iclforge::ac3::signing::verify_atmos_frame` | yes — `fuzz_signing_verify` (the key is part of the fuzzed input) |
-| Matroska/WebM containers | `iclforge::matroska::demux`, `iclforge::matroska::Reader` | yes |
-| MP4/ISOBMFF containers | `iclforge::mp4::demux`, `iclforge::mp4::Reader` | yes |
-| MPEG-TS containers | `iclforge::mpegts::demux`, `iclforge::mpegts::Reader` | yes |
+| Matroska/WebM containers | `iclforge::containers::matroska::demux`, `iclforge::containers::matroska::Reader` | yes |
+| MP4/ISOBMFF containers | `iclforge::containers::mp4::demux`, `iclforge::containers::mp4::Reader` | yes |
+| MPEG-TS containers | `iclforge::containers::mpegts::demux`, `iclforge::containers::mpegts::Reader` | yes |
 | OSC control packets (UDP), a live object-position source | `iclforge::oba::parse_osc_packet` | yes — `fuzz_osc_parse`, part of `fuzz/run.sh`'s default target list alongside the other object/metadata-layer harnesses |
 | Sendspin's handshake messages from a network peer (Hearth build) | `iclforge::sendspin::handshake` | yes — `fuzz_sendspin_handshake` |
 | Sendspin's messages after the handshake, JSON included (Hearth build) | `iclforge::sendspin::json::Document::parse`, the readers in `iclforge::sendspin::messages`, `pairing_messages`, `iclforge` and the other roles' namespaces | yes — `fuzz_sendspin_json`, `fuzz_sendspin_messages` |

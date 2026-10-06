@@ -13,7 +13,7 @@
 
 #include "iclforge/containers/export.hpp"
 
-// The read side of iclforge::mp4::mux()/iclforge::mp4::fragment(): pulling one audio track's
+// The read side of iclforge::containers::mp4::mux()/iclforge::containers::mp4::fragment(): pulling one audio track's
 // samples back out of an MP4, plain or fragmented.
 //
 // A container reader and nothing more, in the sense mp4/mp4.hpp's writer is a
@@ -46,7 +46,7 @@
 // range is checked against the data actually present rather than trusted.
 // fuzz/fuzz_mp4_demux.cpp drives the walker with arbitrary bytes.
 
-namespace iclforge::mp4 {
+namespace iclforge::containers::mp4 {
 
 namespace detail {
 // Reader's parse state, defined in src/containers/src/mp4/reader.cpp - a namespace-scope
@@ -231,4 +231,4 @@ class ICLFORGE_CONTAINERS_EXPORT Reader {
     std::unique_ptr<detail::ReaderState> state_;
 };
 
-}  // namespace iclforge::mp4
+}  // namespace iclforge::containers::mp4

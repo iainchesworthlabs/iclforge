@@ -4003,11 +4003,11 @@ RecordingSink::Config take_sink_config(const Options& meta, const TakePlan& take
     // none does.
     ac4.carrier_rate_hz = 0;
     const int fs_index = toc->sample_rate_hz == 44100 ? 0 : 1;
-    if (const auto type = iclforge::iec61937::ac4_burst_type_for(encoder->ac4_max_frame_bytes(),
+    if (const auto type = iclforge::containers::iec61937::ac4_burst_type_for(encoder->ac4_max_frame_bytes(),
                                                             fs_index, toc->frame_rate_index)) {
         if (const auto timing =
-                iclforge::iec61937::ac4_burst_timing(*type, fs_index, toc->frame_rate_index)) {
-            const bool hbr16 = *type == iclforge::iec61937::BurstDataType::kAc4Hbr16;
+                iclforge::containers::iec61937::ac4_burst_timing(*type, fs_index, toc->frame_rate_index)) {
+            const bool hbr16 = *type == iclforge::containers::iec61937::BurstDataType::kAc4Hbr16;
             ac4.burst_type = *type;
             ac4.carrier_rate_hz = hbr16 ? timing->link_rate_hz / 4 : timing->link_rate_hz;
             ac4.carrier_channels = hbr16 ? 8 : 2;
@@ -4018,7 +4018,7 @@ RecordingSink::Config take_sink_config(const Options& meta, const TakePlan& take
     // presentation with the widest compatibility, as fmp4 writes them.
     if (const auto timing = iclforge::ac4::media_timing(*toc)) {
         ac4.fmp4.audio =
-            iclforge::mp4::AudioTrack{.codec_id = std::string{iclforge::mp4::kCodecAc4},
+            iclforge::containers::mp4::AudioTrack{.codec_id = std::string{iclforge::containers::mp4::kCodecAc4},
                             .sample_rate = static_cast<std::uint32_t>(toc->sample_rate_hz),
                             .channels = 2,  // TS 103 190-2 E.4.5
                             .samples_per_frame = timing->sample_delta,
@@ -4031,12 +4031,12 @@ RecordingSink::Config take_sink_config(const Options& meta, const TakePlan& take
         ac4.fmp4.hls.channels_attribute = fmt::format("{}", *channels);
     }
     if (const auto configuration = iclforge::ac4::dash_channel_configuration(*toc)) {
-        ac4.fmp4.dash.channel_configuration = iclforge::mp4::Descriptor{
+        ac4.fmp4.dash.channel_configuration = iclforge::containers::mp4::Descriptor{
             .scheme_id_uri = configuration->scheme_id_uri, .value = configuration->value};
     }
     for (const iclforge::ac4::ManifestDescriptor& property :
          iclforge::ac4::dash_supplemental_properties(*toc)) {
-        ac4.fmp4.dash.supplemental_properties.push_back(iclforge::mp4::Descriptor{
+        ac4.fmp4.dash.supplemental_properties.push_back(iclforge::containers::mp4::Descriptor{
             .scheme_id_uri = property.scheme_id_uri, .value = property.value});
     }
     config.channels = 2;

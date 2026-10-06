@@ -161,9 +161,7 @@ target_link_libraries(forge_gui_qmltests
     PRIVATE
         iclforge::ac3
         iclforge::audio
-        iclforge::matroska
-        iclforge::mp4
-        iclforge::mpegts
+        iclforge::containers
         iclforge::ac4
         iclforge::warnings
         iclforge::fmt

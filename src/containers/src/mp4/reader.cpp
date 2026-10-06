@@ -14,7 +14,7 @@
 #include "isobmff_detail.hpp"
 #include "iclforge/containers/mp4/mp4.hpp"
 
-namespace iclforge::mp4 {
+namespace iclforge::containers::mp4 {
 
 namespace {
 
@@ -147,7 +147,7 @@ CodecConfig parse_codec_config(std::uint32_t box_type, std::span<const std::byte
     }
 
     // §F.6: data_rate(13) num_ind_sub(3), then one independent-substream
-    // record. Only the first is read: iclforge::mp4::AudioTrack describes exactly one
+    // record. Only the first is read: iclforge::containers::mp4::AudioTrack describes exactly one
     // track, and iclforge::ac3::io::scan groups an access unit as one independent
     // substream plus its dependents, so a second record has nowhere to go
     // in ReadTrack - and num_ind_sub is reported verbatim so a caller can
@@ -1098,4 +1098,4 @@ std::expected<void, DemuxError> Reader::finish() {
     return finish_verdict(s);
 }
 
-}  // namespace iclforge::mp4
+}  // namespace iclforge::containers::mp4

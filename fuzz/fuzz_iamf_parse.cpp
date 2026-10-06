@@ -6,7 +6,7 @@
 #include "iclforge/containers/iamf/iamf.hpp"
 #include "iclforge/containers/iamf/sequence.hpp"
 
-// iclforge::iamf::read_sequence (the standalone raw OBU stream) and read_isobmff (the ISO-BMFF
+// iclforge::containers::iamf::read_sequence (the standalone raw OBU stream) and read_isobmff (the ISO-BMFF
 // encapsulation, whole files and movie fragments) on the same bytes, then the paths that consume
 // what they return: writing the Sequence back out and decoding an Audio Element's PCM
 // (src/containers/src/iamf/sequence_read.cpp, container.cpp, iamf.cpp).
@@ -19,7 +19,7 @@
 // Writing a Sequence back checks what the reader produced is something the writer accepts or
 // refuses cleanly, and decode_pcm reaches the sample reader with sizes and trims the file chose.
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
-    namespace iamf = iclforge::iamf;
+    namespace iamf = iclforge::containers::iamf;
     const std::span<const std::byte> bytes(reinterpret_cast<const std::byte*>(data), size);
 
     if (auto sequence = iamf::read_sequence(bytes); sequence.has_value()) {

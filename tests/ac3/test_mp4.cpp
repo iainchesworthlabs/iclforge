@@ -194,8 +194,8 @@ std::vector<std::uint32_t> read_stco(std::span<const std::byte> file, const Elem
     return offsets;
 }
 
-iclforge::mp4::AudioTrack sample_track(int channels = 6) {
-    return iclforge::mp4::AudioTrack{.codec_id = std::string{iclforge::mp4::kCodecEac3},
+iclforge::containers::mp4::AudioTrack sample_track(int channels = 6) {
+    return iclforge::containers::mp4::AudioTrack{.codec_id = std::string{iclforge::containers::mp4::kCodecEac3},
                            .sample_rate = 48000,
                            .channels = channels,
                            .samples_per_frame = 1536,
@@ -210,7 +210,7 @@ TEST_CASE("MP4 file parses as well-formed ISOBMFF boxes", "[mp4]") {
     // question for a muxer that computes offsets ahead of the data itself.
     const std::vector<Bytes> frames{frame_of(1792, 0x11), frame_of(1792, 0x22),
                                     frame_of(1792, 0x33)};
-    const auto file = iclforge::mp4::mux(sample_track(), frames);
+    const auto file = iclforge::containers::mp4::mux(sample_track(), frames);
     REQUIRE(file.has_value());
 
     const auto elements = parse(*file);
@@ -236,7 +236,7 @@ TEST_CASE("MP4 file parses as well-formed ISOBMFF boxes", "[mp4]") {
 TEST_CASE("MP4 sample entry and mdhd describe the audio", "[mp4]") {
     const std::vector<Bytes> frames(63, frame_of(896, 0xAB));
     const auto track = sample_track(10);
-    const auto file = iclforge::mp4::mux(track, frames);
+    const auto file = iclforge::containers::mp4::mux(track, frames);
     REQUIRE(file.has_value());
     const auto elements = parse(*file);
 
@@ -274,7 +274,7 @@ TEST_CASE("MP4 chunk offsets index mdat exactly", "[mp4]") {
         frames.push_back(frame_of(100 + static_cast<std::size_t>(i) * 37,
                                   static_cast<std::uint8_t>(i + 1)));
     }
-    const auto file = iclforge::mp4::mux(sample_track(2), frames);
+    const auto file = iclforge::containers::mp4::mux(sample_track(2), frames);
     REQUIRE(file.has_value());
     const auto elements = parse(*file);
 
@@ -308,31 +308,31 @@ TEST_CASE("MP4 muxer rejects what it cannot describe", "[mp4]") {
 
     // Explicit empty span: bare {} became ambiguous when the span-of-views
     // mux overload arrived alongside the owned-list one.
-    CHECK(iclforge::mp4::mux(track, std::span<const Bytes>{}).error() ==
-          iclforge::mp4::MuxError::kNoFrames);
+    CHECK(iclforge::containers::mp4::mux(track, std::span<const Bytes>{}).error() ==
+          iclforge::containers::mp4::MuxError::kNoFrames);
 
     auto bad_channels = track;
     bad_channels.channels = 0;
-    CHECK(iclforge::mp4::mux(bad_channels, one).error() == iclforge::mp4::MuxError::kInvalidTrack);
+    CHECK(iclforge::containers::mp4::mux(bad_channels, one).error() == iclforge::containers::mp4::MuxError::kInvalidTrack);
 
     auto bad_rate = track;
     bad_rate.sample_rate = 0;
-    CHECK(iclforge::mp4::mux(bad_rate, one).error() == iclforge::mp4::MuxError::kInvalidTrack);
+    CHECK(iclforge::containers::mp4::mux(bad_rate, one).error() == iclforge::containers::mp4::MuxError::kInvalidTrack);
 
     auto bad_codec = track;
     bad_codec.codec_id = "mp4a";  // this module only knows ac-3/ec-3
-    CHECK(iclforge::mp4::mux(bad_codec, one).error() == iclforge::mp4::MuxError::kInvalidTrack);
+    CHECK(iclforge::containers::mp4::mux(bad_codec, one).error() == iclforge::containers::mp4::MuxError::kInvalidTrack);
 
     auto no_config = track;
     no_config.codec_config.clear();
-    CHECK(iclforge::mp4::mux(no_config, one).error() == iclforge::mp4::MuxError::kInvalidTrack);
+    CHECK(iclforge::containers::mp4::mux(no_config, one).error() == iclforge::containers::mp4::MuxError::kInvalidTrack);
 }
 
 TEST_CASE("MP4 muxer writes one edit, and presents the edit's duration", "[mp4]") {
     const std::vector<Bytes> frames(4, frame_of(512, 0x5A));
-    iclforge::mp4::MuxOptions options;
-    options.edit = iclforge::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = 5000};
-    const auto file = iclforge::mp4::mux(sample_track(), frames, options);
+    iclforge::containers::mp4::MuxOptions options;
+    options.edit = iclforge::containers::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = 5000};
+    const auto file = iclforge::containers::mp4::mux(sample_track(), frames, options);
     REQUIRE(file.has_value());
     const auto elements = parse(*file);
 
@@ -372,7 +372,7 @@ TEST_CASE("MP4 muxer writes one edit, and presents the edit's duration", "[mp4]"
 
     // Without the option there is no edit list, and every duration is the
     // media's.
-    const auto plain = iclforge::mp4::mux(sample_track(), frames);
+    const auto plain = iclforge::containers::mp4::mux(sample_track(), frames);
     REQUIRE(plain.has_value());
     const auto plain_elements = parse(*plain);
     CHECK(find(plain_elements, "edts") == nullptr);
@@ -384,17 +384,17 @@ TEST_CASE("MP4 muxer writes one edit, and presents the edit's duration", "[mp4]"
 TEST_CASE("MP4 muxer refuses an edit outside the frames", "[mp4]") {
     const std::vector<Bytes> two(2, frame_of(64, 0));  // 3,072 samples
     const auto with = [&two](std::uint64_t start, std::uint64_t duration) {
-        iclforge::mp4::MuxOptions options;
+        iclforge::containers::mp4::MuxOptions options;
         options.edit =
-            iclforge::mp4::MuxOptions::Edit{.start_samples = start, .duration_samples = duration};
-        return iclforge::mp4::mux(sample_track(), two, options);
+            iclforge::containers::mp4::MuxOptions::Edit{.start_samples = start, .duration_samples = duration};
+        return iclforge::containers::mp4::mux(sample_track(), two, options);
     };
     CHECK(with(0, 3072).has_value());
     CHECK(with(3071, 1).has_value());
-    CHECK(with(0, 3073).error() == iclforge::mp4::MuxError::kInvalidOptions);
-    CHECK(with(1, 3072).error() == iclforge::mp4::MuxError::kInvalidOptions);
-    CHECK(with(3072, 1).error() == iclforge::mp4::MuxError::kInvalidOptions);
-    CHECK(with(100, 0).error() == iclforge::mp4::MuxError::kInvalidOptions);
+    CHECK(with(0, 3073).error() == iclforge::containers::mp4::MuxError::kInvalidOptions);
+    CHECK(with(1, 3072).error() == iclforge::containers::mp4::MuxError::kInvalidOptions);
+    CHECK(with(3072, 1).error() == iclforge::containers::mp4::MuxError::kInvalidOptions);
+    CHECK(with(100, 0).error() == iclforge::containers::mp4::MuxError::kInvalidOptions);
 }
 
 TEST_CASE("MP4 muxer names the sync samples, and counts in the track's own timescale", "[mp4]") {
@@ -402,12 +402,12 @@ TEST_CASE("MP4 muxer names the sync samples, and counts in the track's own times
     // and 8 008 a frame (ETSI TS 103 190-2 Table E.1), I-frames first, fourth
     // and sixth.
     const std::vector<Bytes> frames(6, frame_of(64, 0x3C));
-    iclforge::mp4::AudioTrack track = sample_track(2);
+    iclforge::containers::mp4::AudioTrack track = sample_track(2);
     track.timescale = 240000;
     track.samples_per_frame = 8008;
-    iclforge::mp4::MuxOptions options;
+    iclforge::containers::mp4::MuxOptions options;
     options.sync_samples = {true, false, false, true, false, true};
-    const auto file = iclforge::mp4::mux(track, frames, options);
+    const auto file = iclforge::containers::mp4::mux(track, frames, options);
     REQUIRE(file.has_value());
     const auto elements = parse(*file);
 
@@ -438,17 +438,17 @@ TEST_CASE("MP4 muxer names the sync samples, and counts in the track's own times
     // Every frame a sync sample needs no box; a list of another length is
     // refused.
     options.sync_samples.assign(6, true);
-    const auto all = iclforge::mp4::mux(track, frames, options);
+    const auto all = iclforge::containers::mp4::mux(track, frames, options);
     REQUIRE(all.has_value());
     CHECK(find(parse(*all), "stss") == nullptr);
     options.sync_samples.assign(5, true);
-    CHECK(iclforge::mp4::mux(track, frames, options).error() ==
-          iclforge::mp4::MuxError::kInvalidOptions);
+    CHECK(iclforge::containers::mp4::mux(track, frames, options).error() ==
+          iclforge::containers::mp4::MuxError::kInvalidOptions);
 }
 
 // --- iclforge::ac3::io::build_codec_config_box: the dec3/dac3 payload itself ---------
 //
-// These read the box's raw bytes directly rather than through iclforge::mp4::mux(), so
+// These read the box's raw bytes directly rather than through iclforge::containers::mp4::mux(), so
 // a bug specific to the box-payload builder (ac3/io/dec3.hpp) cannot hide
 // behind the muxer's own wrapping. Real, multi-frame encoded audio throughout
 // - never silence, never frame 0 alone - per CONTRIBUTING.md's validation
@@ -691,8 +691,8 @@ TEST_CASE("dec3 box signals Dolby Atmos objects", "[dec3]") {
 // are proven with.
 
 TEST_CASE("MP4 carries an 'ac-4' sample entry with a 'dac4' box", "[mp4][ac4]") {
-    iclforge::mp4::AudioTrack track;
-    track.codec_id = std::string{iclforge::mp4::kCodecAc4};
+    iclforge::containers::mp4::AudioTrack track;
+    track.codec_id = std::string{iclforge::containers::mp4::kCodecAc4};
     track.sample_rate = 48000;
     track.channels = 2;  // E.4.5: "should be set to 2"
     track.samples_per_frame = 2048;
@@ -700,7 +700,7 @@ TEST_CASE("MP4 carries an 'ac-4' sample entry with a 'dac4' box", "[mp4][ac4]") 
     track.rfc6381 = "ac-4.02.01.00";
 
     const std::vector<Bytes> frames{frame_of(320, 0x5A), frame_of(320, 0x5B)};
-    const auto file = iclforge::mp4::mux(track, frames);
+    const auto file = iclforge::containers::mp4::mux(track, frames);
     REQUIRE(file.has_value());
 
     // The sample entry is stsd's child, which parse()'s flat walk does not
@@ -718,7 +718,7 @@ TEST_CASE("MP4 carries an 'ac-4' sample entry with a 'dac4' box", "[mp4][ac4]") 
     CHECK(entry.config_payload == track.codec_config);
 
     // The manifest string is the override, not the fourcc, for this codec.
-    CHECK(iclforge::mp4::hls_codec_string(track) == "ac-4.02.01.00");
+    CHECK(iclforge::containers::mp4::hls_codec_string(track) == "ac-4.02.01.00");
     track.rfc6381.clear();
-    CHECK(iclforge::mp4::hls_codec_string(track) == "ac-4");
+    CHECK(iclforge::containers::mp4::hls_codec_string(track) == "ac-4");
 }

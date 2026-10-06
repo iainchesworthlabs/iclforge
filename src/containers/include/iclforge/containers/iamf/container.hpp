@@ -20,7 +20,7 @@
 // an initialization segment followed by movie fragments, one call per group of Temporal Units, for
 // output that is produced as it is encoded. read_isobmff() reads both forms.
 
-namespace iclforge::iamf {
+namespace iclforge::containers::iamf {
 
 struct IsobmffOptions {
     // Written into the handler box's name field.
@@ -92,4 +92,4 @@ private:
     std::uint64_t decode_time_ = 0;
 };
 
-}  // namespace iclforge::iamf
+}  // namespace iclforge::containers::iamf

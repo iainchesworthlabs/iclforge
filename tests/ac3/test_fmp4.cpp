@@ -191,9 +191,9 @@ TrunInfo read_trun(std::span<const std::byte> file, const Element& trun) {
     return out;
 }
 
-iclforge::mp4::AudioTrack sample_track(int channels = 6) {
-    return iclforge::mp4::AudioTrack{
-        .codec_id = std::string{iclforge::mp4::kCodecEac3},
+iclforge::containers::mp4::AudioTrack sample_track(int channels = 6) {
+    return iclforge::containers::mp4::AudioTrack{
+        .codec_id = std::string{iclforge::containers::mp4::kCodecEac3},
         .sample_rate = 48000,
         .channels = channels,
         .samples_per_frame = 1536,
@@ -239,9 +239,9 @@ std::vector<Bytes> encode_real_eac3_frames() {
 }
 
 struct RealFixture {
-    iclforge::mp4::AudioTrack track;
+    iclforge::containers::mp4::AudioTrack track;
     std::vector<Bytes> frames;
-    iclforge::mp4::FragmentedOutput fragmented;
+    iclforge::containers::mp4::FragmentedOutput fragmented;
 };
 
 RealFixture make_real_fixture() {
@@ -254,16 +254,16 @@ RealFixture make_real_fixture() {
     REQUIRE(scanned.has_value());
     REQUIRE(scanned->kind == iclforge::ac3::io::StreamKind::kEac3);
 
-    const iclforge::mp4::AudioTrack track{
-        .codec_id = std::string{iclforge::mp4::kCodecEac3},
+    const iclforge::containers::mp4::AudioTrack track{
+        .codec_id = std::string{iclforge::containers::mp4::kCodecEac3},
         .sample_rate = iclforge::ac3::sample_rate_hz(scanned->sample_rate),
         .channels = scanned->channels,
         .samples_per_frame = iclforge::ac3::kSamplesPerFrame,
         .codec_config = iclforge::ac3::io::build_codec_config_box(*scanned),
     };
 
-    const auto result = iclforge::mp4::fragment(
-        track, frames, iclforge::mp4::FragmentOptions{.frames_per_fragment = kFramesPerFragment});
+    const auto result = iclforge::containers::mp4::fragment(
+        track, frames, iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = kFramesPerFragment});
     REQUIRE(result.has_value());
     return RealFixture{.track = track, .frames = frames, .fragmented = *result};
 }
@@ -406,39 +406,39 @@ TEST_CASE("fragment() rejects what it cannot describe", "[fmp4]") {
 
     // Explicit empty span: bare {} became ambiguous when the span-of-views
     // fragment overload arrived alongside the owned-list one.
-    CHECK(iclforge::mp4::fragment(track, std::span<const Bytes>{}).error() ==
-          iclforge::mp4::MuxError::kNoFrames);
+    CHECK(iclforge::containers::mp4::fragment(track, std::span<const Bytes>{}).error() ==
+          iclforge::containers::mp4::MuxError::kNoFrames);
 
     auto bad_channels = track;
     bad_channels.channels = 0;
-    CHECK(iclforge::mp4::fragment(bad_channels, one).error() ==
-          iclforge::mp4::MuxError::kInvalidTrack);
+    CHECK(iclforge::containers::mp4::fragment(bad_channels, one).error() ==
+          iclforge::containers::mp4::MuxError::kInvalidTrack);
 
     auto bad_codec = track;
     bad_codec.codec_id = "mp4a";
-    CHECK(iclforge::mp4::fragment(bad_codec, one).error() ==
-          iclforge::mp4::MuxError::kInvalidTrack);
+    CHECK(iclforge::containers::mp4::fragment(bad_codec, one).error() ==
+          iclforge::containers::mp4::MuxError::kInvalidTrack);
 
-    CHECK(iclforge::mp4::fragment(track, one,
-                                  iclforge::mp4::FragmentOptions{.frames_per_fragment = 0})
-              .error() == iclforge::mp4::MuxError::kInvalidOptions);
+    CHECK(iclforge::containers::mp4::fragment(track, one,
+                                  iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = 0})
+              .error() == iclforge::containers::mp4::MuxError::kInvalidOptions);
 }
 
 // --- HLS ---------------------------------------------------------------
 
 TEST_CASE("hls_codec_string is RFC 6381's bare sample-entry fourcc for both codecs", "[hls]") {
     auto track = sample_track();
-    track.codec_id = std::string{iclforge::mp4::kCodecEac3};
-    CHECK(iclforge::mp4::hls_codec_string(track) == "ec-3");
-    track.codec_id = std::string{iclforge::mp4::kCodecAc3};
-    CHECK(iclforge::mp4::hls_codec_string(track) == "ac-3");
+    track.codec_id = std::string{iclforge::containers::mp4::kCodecEac3};
+    CHECK(iclforge::containers::mp4::hls_codec_string(track) == "ec-3");
+    track.codec_id = std::string{iclforge::containers::mp4::kCodecAc3};
+    CHECK(iclforge::containers::mp4::hls_codec_string(track) == "ac-3");
 }
 
 TEST_CASE("HLS media playlist lists every fragment in order with EXT-X-MAP and correct timing",
           "[hls]") {
     const auto fixture = make_real_fixture();
-    const auto playlist = iclforge::mp4::build_hls_media_playlist(
-        fixture.track, fixture.fragmented.media_segments, iclforge::mp4::HlsOptions{});
+    const auto playlist = iclforge::containers::mp4::build_hls_media_playlist(
+        fixture.track, fixture.fragmented.media_segments, iclforge::containers::mp4::HlsOptions{});
 
     CHECK(playlist.starts_with("#EXTM3U\n"));
     CHECK(playlist.find("#EXT-X-VERSION:7\n") != std::string::npos);
@@ -465,9 +465,9 @@ TEST_CASE("HLS master playlist signals CODECS and CHANNELS correctly", "[hls]") 
     const auto fixture = make_real_fixture();
 
     SECTION("plain E-AC-3: CHANNELS defaults to the track's channel count") {
-        const auto master = iclforge::mp4::build_hls_master_playlist(
+        const auto master = iclforge::containers::mp4::build_hls_master_playlist(
             fixture.track, fixture.fragmented.media_segments, "audio.m3u8",
-            iclforge::mp4::HlsOptions{});
+            iclforge::containers::mp4::HlsOptions{});
         CHECK(master.find("CODECS=\"ec-3\"") != std::string::npos);
         CHECK(master.find(fmt::format("CHANNELS=\"{}\"", fixture.track.channels)) !=
               std::string::npos);
@@ -484,12 +484,12 @@ TEST_CASE("HLS master playlist signals CODECS and CHANNELS correctly", "[hls]") 
     }
 
     SECTION("Dolby Atmos: CHANNELS carries the caller-supplied </JOC> form") {
-        // iclforge::mp4:: never reads TS 103 420 object-layer syntax itself (see
+        // iclforge::containers::mp4:: never reads TS 103 420 object-layer syntax itself (see
         // hls.hpp's own comment) - the caller (which DOES know
         // oba_complexity_index) supplies the exact string.
-        const auto master = iclforge::mp4::build_hls_master_playlist(
+        const auto master = iclforge::containers::mp4::build_hls_master_playlist(
             fixture.track, fixture.fragmented.media_segments, "audio.m3u8",
-            iclforge::mp4::HlsOptions{.channels_attribute = "12/JOC"});
+            iclforge::containers::mp4::HlsOptions{.channels_attribute = "12/JOC"});
         CHECK(master.find("CODECS=\"ec-3\"") != std::string::npos);
         CHECK(master.find("CHANNELS=\"12/JOC\"") != std::string::npos);
     }
@@ -509,26 +509,26 @@ TEST_CASE("HLS master playlist lists several renditions in one group", "[hls]") 
     // ever reads a segment's bookkeeping, never its bytes (see hls.hpp's own
     // comment) - so the fixture's MediaSegment list is converted once and
     // shared by both renditions below, which point at the same segments.
-    std::vector<iclforge::mp4::SegmentInfo> segments;
+    std::vector<iclforge::containers::mp4::SegmentInfo> segments;
     segments.reserve(fixture.fragmented.media_segments.size());
     for (const auto& segment : fixture.fragmented.media_segments) {
-        segments.push_back(iclforge::mp4::segment_info(segment));
+        segments.push_back(iclforge::containers::mp4::segment_info(segment));
     }
 
-    const std::array<iclforge::mp4::HlsRendition, 2> renditions{
-        iclforge::mp4::HlsRendition{.track = fixture.track,
+    const std::array<iclforge::containers::mp4::HlsRendition, 2> renditions{
+        iclforge::containers::mp4::HlsRendition{.track = fixture.track,
                           .segments = segments,
                           .media_playlist_uri = "audio.m3u8",
                           .name = "Dolby Atmos",
                           .channels_attribute = "12/JOC",
                           .is_default = true},
-        iclforge::mp4::HlsRendition{.track = bed_track,
+        iclforge::containers::mp4::HlsRendition{.track = bed_track,
                           .segments = segments,
                           .media_playlist_uri = "bed51/audio.m3u8",
                           .name = "5.1",
                           .channels_attribute = {},
                           .is_default = false}};
-    const auto master = iclforge::mp4::build_hls_master_playlist(renditions);
+    const auto master = iclforge::containers::mp4::build_hls_master_playlist(renditions);
 
     // Both renditions, one group, exactly one DEFAULT=YES between them.
     CHECK(master.find("NAME=\"Dolby Atmos\",DEFAULT=YES,AUTOSELECT=YES,CHANNELS=\"12/JOC\"") !=
@@ -554,22 +554,22 @@ TEST_CASE("HLS master playlist lists several renditions in one group", "[hls]") 
 
 TEST_CASE("the single-rendition master playlist is the one-element multi form", "[hls]") {
     const auto fixture = make_real_fixture();
-    const iclforge::mp4::HlsOptions options{.channels_attribute = "12/JOC"};
-    const auto one = iclforge::mp4::build_hls_master_playlist(
+    const iclforge::containers::mp4::HlsOptions options{.channels_attribute = "12/JOC"};
+    const auto one = iclforge::containers::mp4::build_hls_master_playlist(
         fixture.track, fixture.fragmented.media_segments, "audio.m3u8", options);
-    std::vector<iclforge::mp4::SegmentInfo> segments;
+    std::vector<iclforge::containers::mp4::SegmentInfo> segments;
     segments.reserve(fixture.fragmented.media_segments.size());
     for (const auto& segment : fixture.fragmented.media_segments) {
-        segments.push_back(iclforge::mp4::segment_info(segment));
+        segments.push_back(iclforge::containers::mp4::segment_info(segment));
     }
-    const std::array<iclforge::mp4::HlsRendition, 1> renditions{
-        iclforge::mp4::HlsRendition{.track = fixture.track,
+    const std::array<iclforge::containers::mp4::HlsRendition, 1> renditions{
+        iclforge::containers::mp4::HlsRendition{.track = fixture.track,
                           .segments = segments,
                           .media_playlist_uri = "audio.m3u8",
                           .name = "Audio",
                           .channels_attribute = "12/JOC",
                           .is_default = true}};
-    CHECK(one == iclforge::mp4::build_hls_master_playlist(renditions, options));
+    CHECK(one == iclforge::containers::mp4::build_hls_master_playlist(renditions, options));
 }
 
 // --- DASH ----------------------------------------------------------------
@@ -577,8 +577,8 @@ TEST_CASE("the single-rendition master playlist is the one-element multi form", 
 TEST_CASE("DASH adaptation set snippet carries the correct codecs, timescale and segment template",
           "[dash]") {
     const auto fixture = make_real_fixture();
-    const auto snippet = iclforge::mp4::build_dash_adaptation_set(
-        fixture.track, fixture.fragmented.media_segments, iclforge::mp4::DashOptions{});
+    const auto snippet = iclforge::containers::mp4::build_dash_adaptation_set(
+        fixture.track, fixture.fragmented.media_segments, iclforge::containers::mp4::DashOptions{});
 
     CHECK(snippet.find("<AdaptationSet") != std::string::npos);
     CHECK(snippet.find("</AdaptationSet>") != std::string::npos);
@@ -648,23 +648,23 @@ TEST_CASE("DASH adaptation set's SegmentTimeline exactly reproduces varied segme
     // A more demanding duration pattern than the shared fixture's
     // "uniform-except-last" one: run-length encoding must not assume only
     // two runs ever occur.
-    const iclforge::mp4::AudioTrack track = sample_track();
-    const std::vector<iclforge::mp4::MediaSegment> segments{
-        iclforge::mp4::MediaSegment{
+    const iclforge::containers::mp4::AudioTrack track = sample_track();
+    const std::vector<iclforge::containers::mp4::MediaSegment> segments{
+        iclforge::containers::mp4::MediaSegment{
             .bytes = {}, .sequence_number = 1, .sample_count = 2, .duration_samples = 3072},
-        iclforge::mp4::MediaSegment{
+        iclforge::containers::mp4::MediaSegment{
             .bytes = {}, .sequence_number = 2, .sample_count = 2, .duration_samples = 3072},
-        iclforge::mp4::MediaSegment{
+        iclforge::containers::mp4::MediaSegment{
             .bytes = {}, .sequence_number = 3, .sample_count = 1, .duration_samples = 1536},
-        iclforge::mp4::MediaSegment{
+        iclforge::containers::mp4::MediaSegment{
             .bytes = {}, .sequence_number = 4, .sample_count = 3, .duration_samples = 4608},
-        iclforge::mp4::MediaSegment{
+        iclforge::containers::mp4::MediaSegment{
             .bytes = {}, .sequence_number = 5, .sample_count = 3, .duration_samples = 4608},
-        iclforge::mp4::MediaSegment{
+        iclforge::containers::mp4::MediaSegment{
             .bytes = {}, .sequence_number = 6, .sample_count = 3, .duration_samples = 4608},
     };
     const auto snippet =
-        iclforge::mp4::build_dash_adaptation_set(track, segments, iclforge::mp4::DashOptions{});
+        iclforge::containers::mp4::build_dash_adaptation_set(track, segments, iclforge::containers::mp4::DashOptions{});
     CHECK(snippet.find("<S t=\"0\" d=\"3072\" r=\"1\"/>") != std::string::npos);
     CHECK(snippet.find("<S d=\"1536\"/>") != std::string::npos);
     CHECK(snippet.find("<S d=\"4608\" r=\"2\"/>") != std::string::npos);
@@ -711,11 +711,11 @@ TEST_CASE("FragmentWriter's pushed segments are fragment()'s bytes exactly", "[f
     // fixture is deliberately 10 frames at 3 per fragment, so this spans
     // three full fragments and one short trailing one.
     const auto fixture = make_real_fixture();
-    auto writer = iclforge::mp4::FragmentWriter::create(
-        fixture.track, iclforge::mp4::FragmentOptions{.frames_per_fragment = kFramesPerFragment});
+    auto writer = iclforge::containers::mp4::FragmentWriter::create(
+        fixture.track, iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = kFramesPerFragment});
     REQUIRE(writer.has_value());
 
-    std::vector<iclforge::mp4::MediaSegment> streamed;
+    std::vector<iclforge::containers::mp4::MediaSegment> streamed;
     for (const auto& frame : fixture.frames) {
         auto closed = writer->push(frame);
         REQUIRE(closed.has_value());
@@ -765,8 +765,8 @@ TEST_CASE("FragmentWriter's init segment is fragment()'s but for the unknown dur
     // dec3 payload, mvex/trex, the empty sample table, the ftyp brands) fails
     // here rather than passing a weaker structural check.
     const auto fixture = make_real_fixture();
-    auto writer = iclforge::mp4::FragmentWriter::create(
-        fixture.track, iclforge::mp4::FragmentOptions{.frames_per_fragment = kFramesPerFragment});
+    auto writer = iclforge::containers::mp4::FragmentWriter::create(
+        fixture.track, iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = kFramesPerFragment});
     REQUIRE(writer.has_value());
 
     Bytes patched = writer->init_segment();
@@ -803,22 +803,22 @@ TEST_CASE("FragmentWriter's init segment is fragment()'s but for the unknown dur
 
 TEST_CASE("FragmentWriter refuses what fragment() refuses", "[fmp4]") {
     const auto track = sample_track();
-    CHECK(iclforge::mp4::FragmentWriter::create({.channels = 0, .codec_config = {std::byte{0}}})
-              .error() == iclforge::mp4::MuxError::kInvalidTrack);
-    CHECK(iclforge::mp4::FragmentWriter::create(
-              iclforge::mp4::AudioTrack{.codec_id = "mp4a", .codec_config = {std::byte{0}}})
-              .error() == iclforge::mp4::MuxError::kInvalidTrack);
+    CHECK(iclforge::containers::mp4::FragmentWriter::create({.channels = 0, .codec_config = {std::byte{0}}})
+              .error() == iclforge::containers::mp4::MuxError::kInvalidTrack);
+    CHECK(iclforge::containers::mp4::FragmentWriter::create(
+              iclforge::containers::mp4::AudioTrack{.codec_id = "mp4a", .codec_config = {std::byte{0}}})
+              .error() == iclforge::containers::mp4::MuxError::kInvalidTrack);
     // No codec_config payload at all: the sample entry would have no
     // dac3/dec3 child to describe the codec with.
-    CHECK(iclforge::mp4::FragmentWriter::create(
-              iclforge::mp4::AudioTrack{.sample_rate = 48000, .channels = 2, .codec_config = {}})
-              .error() == iclforge::mp4::MuxError::kInvalidTrack);
-    CHECK(iclforge::mp4::FragmentWriter::create(track, {.frames_per_fragment = 0}).error() ==
-          iclforge::mp4::MuxError::kInvalidOptions);
+    CHECK(iclforge::containers::mp4::FragmentWriter::create(
+              iclforge::containers::mp4::AudioTrack{.sample_rate = 48000, .channels = 2, .codec_config = {}})
+              .error() == iclforge::containers::mp4::MuxError::kInvalidTrack);
+    CHECK(iclforge::containers::mp4::FragmentWriter::create(track, {.frames_per_fragment = 0}).error() ==
+          iclforge::containers::mp4::MuxError::kInvalidOptions);
     // Unlike fragment(), an empty session is not an error - kNoFrames is a
     // statement about a batch call's arguments, and a live writer that is
     // stopped before its first frame simply has nothing to flush.
-    auto writer = iclforge::mp4::FragmentWriter::create(track);
+    auto writer = iclforge::containers::mp4::FragmentWriter::create(track);
     REQUIRE(writer.has_value());
     auto tail = writer->finalize();
     REQUIRE(tail.has_value());
@@ -834,8 +834,8 @@ TEST_CASE("FragmentWriter's playlist window rolls, and the live manifests roll w
     // amount to describe - so the manifests must state where the window now
     // STARTS, not assume it starts at the beginning of the track.
     const auto fixture = make_real_fixture();
-    auto writer = iclforge::mp4::FragmentWriter::create(
-        fixture.track, iclforge::mp4::FragmentOptions{.frames_per_fragment = kFramesPerFragment,
+    auto writer = iclforge::containers::mp4::FragmentWriter::create(
+        fixture.track, iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = kFramesPerFragment,
                                             .playlist_window_segments = 2});
     REQUIRE(writer.has_value());
     for (const auto& frame : fixture.frames) {
@@ -852,14 +852,14 @@ TEST_CASE("FragmentWriter's playlist window rolls, and the live manifests roll w
     const auto& batch = fixture.fragmented.media_segments;
     CHECK(window.front().base_media_decode_time == batch[2].base_media_decode_time);
     CHECK(window.front().byte_size == batch[2].bytes.size());
-    CHECK(iclforge::mp4::segment_info(batch[3]).duration_samples == window.back().duration_samples);
+    CHECK(iclforge::containers::mp4::segment_info(batch[3]).duration_samples == window.back().duration_samples);
 
     // RFC 8216 §6.2.2's live Media Playlist: #EXT-X-MEDIA-SEQUENCE is the
     // FIRST listed segment's number (3, not 1), and neither
     // #EXT-X-PLAYLIST-TYPE:VOD nor #EXT-X-ENDLIST appears while the
     // presentation is still growing.
-    const auto live = iclforge::mp4::build_hls_media_playlist(
-        fixture.track, window, iclforge::mp4::HlsOptions{.vod = false});
+    const auto live = iclforge::containers::mp4::build_hls_media_playlist(
+        fixture.track, window, iclforge::containers::mp4::HlsOptions{.vod = false});
     CHECK(live.find("#EXT-X-MEDIA-SEQUENCE:3\n") != std::string::npos);
     CHECK(live.find("#EXT-X-ENDLIST") == std::string::npos);
     CHECK(live.find("#EXT-X-PLAYLIST-TYPE") == std::string::npos);
@@ -870,18 +870,18 @@ TEST_CASE("FragmentWriter's playlist window rolls, and the live manifests roll w
     // Before the first segment closes there is nothing to list, and a
     // manifest builder handed an empty window has to say so rather than
     // reach past the end of it - @startNumber falls back to its own default.
-    const std::span<const iclforge::mp4::SegmentInfo> nothing_yet;
-    const auto empty = iclforge::mp4::build_dash_adaptation_set(fixture.track, nothing_yet);
+    const std::span<const iclforge::containers::mp4::SegmentInfo> nothing_yet;
+    const auto empty = iclforge::containers::mp4::build_dash_adaptation_set(fixture.track, nothing_yet);
     CHECK(empty.find("startNumber=\"1\"") != std::string::npos);
     CHECK(empty.find("<S ") == std::string::npos);
-    CHECK(iclforge::mp4::build_hls_media_playlist(fixture.track, nothing_yet)
+    CHECK(iclforge::containers::mp4::build_hls_media_playlist(fixture.track, nothing_yet)
               .find("#EXT-X-MEDIA-SEQUENCE") == std::string::npos);
 
     // The DASH half of the same fact: @startNumber is the window's first
     // segment and the timeline's first <S> states its decode time, so a
     // player joining now lands where the audio actually is rather than at
     // zero.
-    const auto snippet = iclforge::mp4::build_dash_adaptation_set(fixture.track, window);
+    const auto snippet = iclforge::containers::mp4::build_dash_adaptation_set(fixture.track, window);
     CHECK(snippet.find("startNumber=\"3\"") != std::string::npos);
     CHECK(snippet.find(fmt::format("<S t=\"{}\" d=\"{}\"/>", window.front().base_media_decode_time,
                                    window.front().duration_samples)) != std::string::npos);
@@ -900,8 +900,8 @@ TEST_CASE("fragment() adds the 'ceao' brand only for an object-audio track", "[f
     CHECK_FALSE(has_brand(read_brand_box(fixture.fragmented.init_segment, *plain_ftyp), "ceao"));
 
     const auto object_audio =
-        iclforge::mp4::fragment(fixture.track, fixture.frames,
-                      iclforge::mp4::FragmentOptions{.frames_per_fragment = kFramesPerFragment,
+        iclforge::containers::mp4::fragment(fixture.track, fixture.frames,
+                      iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = kFramesPerFragment,
                                            .object_audio_brand = true});
     REQUIRE(object_audio.has_value());
     const auto init = parse(object_audio->init_segment);
@@ -921,8 +921,8 @@ TEST_CASE("fragment() adds the 'ceao' brand only for an object-audio track", "[f
         CHECK(has_brand(read_brand_box(segment.bytes, *styp), "ceao"));
     }
     // FragmentWriter honours the same option, since it shares the builder.
-    auto writer = iclforge::mp4::FragmentWriter::create(
-        fixture.track, iclforge::mp4::FragmentOptions{.frames_per_fragment = kFramesPerFragment,
+    auto writer = iclforge::containers::mp4::FragmentWriter::create(
+        fixture.track, iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = kFramesPerFragment,
                                             .object_audio_brand = true});
     REQUIRE(writer.has_value());
     const auto streamed_init = parse(writer->init_segment());
@@ -939,9 +939,9 @@ TEST_CASE("DASH signals JOC and the channel configuration the way TS 103 420 D.2
     // complexity_index_type_a in the EC3SpecificBox". Both are named by
     // DASH-IF IOP Part 8 v5.0.0 §5.3.2 as the E-AC-3-with-JOC signalling.
     const auto fixture = make_real_fixture();
-    const iclforge::mp4::DashOptions options{.joc_complexity_index = 12,
+    const iclforge::containers::mp4::DashOptions options{.joc_complexity_index = 12,
                                    .dolby_channel_configuration = "F801"};
-    const auto snippet = iclforge::mp4::build_dash_adaptation_set(
+    const auto snippet = iclforge::containers::mp4::build_dash_adaptation_set(
         fixture.track, fixture.fragmented.media_segments, options);
     CHECK(snippet.find("<SupplementalProperty "
                        "schemeIdUri=\"tag:dolby.com,2018:dash:EC3_ExtensionType:2018\" "
@@ -976,11 +976,11 @@ TEST_CASE("DASH signals JOC and the channel configuration the way TS 103 420 D.2
 TEST_CASE("build_dash_mpd wraps a Period, static or dynamic", "[dash]") {
     const auto fixture = make_real_fixture();
     const auto& segments = fixture.fragmented.media_segments;
-    const auto snippet = iclforge::mp4::build_dash_adaptation_set(fixture.track, segments);
+    const auto snippet = iclforge::containers::mp4::build_dash_adaptation_set(fixture.track, segments);
 
     // Static: the whole asset exists, so it states its own total - 10 frames
     // of 1536 samples at 48 kHz, recomputed here rather than read back.
-    const auto vod = iclforge::mp4::build_dash_mpd(fixture.track, segments, snippet);
+    const auto vod = iclforge::containers::mp4::build_dash_mpd(fixture.track, segments, snippet);
     CHECK(vod.find("type=\"static\"") != std::string::npos);
     CHECK(vod.find(fmt::format(
               "mediaPresentationDuration=\"PT{:.3f}S\"",
@@ -994,9 +994,9 @@ TEST_CASE("build_dash_mpd wraps a Period, static or dynamic", "[dash]") {
     // stating one would tell a player the stream stops there - and
     // @availabilityStartTime anchors the timeline to wall-clock time. The
     // same attribute set TS 103 420 §D.2.3's own example MPD carries.
-    const auto live = iclforge::mp4::build_dash_mpd(
+    const auto live = iclforge::containers::mp4::build_dash_mpd(
         fixture.track, segments, snippet,
-        iclforge::mp4::MpdOptions{.is_static = false,
+        iclforge::containers::mp4::MpdOptions{.is_static = false,
                         .availability_start_time = "2026-08-23T12:30:00Z",
                         .publish_time = "2026-08-23T12:31:00Z",
                         .minimum_update_period_seconds = 1.5,
@@ -1011,9 +1011,9 @@ TEST_CASE("build_dash_mpd wraps a Period, static or dynamic", "[dash]") {
 
     // publishTime is optional; an empty one omits the attribute rather than
     // writing an empty string a validator would reject.
-    const auto no_publish = iclforge::mp4::build_dash_mpd(
+    const auto no_publish = iclforge::containers::mp4::build_dash_mpd(
         fixture.track, segments, snippet,
-        iclforge::mp4::MpdOptions{.is_static = false,
+        iclforge::containers::mp4::MpdOptions{.is_static = false,
                                   .availability_start_time = "2026-08-23T12:30:00Z"});
     CHECK(no_publish.find("publishTime") == std::string::npos);
 }
@@ -1025,8 +1025,8 @@ namespace {
 
 // An AC-4 track as forge describes one: the 'ac-4' sample entry, its dac4 as
 // opaque bytes, and a frame of 2 048 samples.
-iclforge::mp4::AudioTrack ac4_track() {
-    return iclforge::mp4::AudioTrack{.codec_id = std::string{iclforge::mp4::kCodecAc4},
+iclforge::containers::mp4::AudioTrack ac4_track() {
+    return iclforge::containers::mp4::AudioTrack{.codec_id = std::string{iclforge::containers::mp4::kCodecAc4},
                            .sample_rate = 48000,
                            .channels = 2,
                            .samples_per_frame = 2048,
@@ -1070,7 +1070,7 @@ TrunSamples read_trun_samples(std::span<const std::byte> file, const Element& tr
 }
 
 // mdhd's timescale: version+flags(4), creation(4), modification(4), then the
-// timescale (version 0, as iclforge::mp4:: writes it).
+// timescale (version 0, as iclforge::containers::mp4:: writes it).
 std::uint32_t read_mdhd_timescale(std::span<const std::byte> file, const Element& mdhd) {
     return u32_at(file, mdhd.payload + 12);
 }
@@ -1084,16 +1084,16 @@ TEST_CASE("fragment() starts every fragment at a sync sample and lists each samp
     // run to the next I-frame after two: [0, 3), [3, 7) and [7, 10).
     const std::vector<bool> sync = {true,  false, false, true,  false,
                                     false, false, true,  false, false};
-    const auto out = iclforge::mp4::fragment(
+    const auto out = iclforge::containers::mp4::fragment(
         ac4_track(), frames,
-        iclforge::mp4::FragmentOptions{.frames_per_fragment = 2, .sync_samples = sync});
+        iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = 2, .sync_samples = sync});
     REQUIRE(out.has_value());
     REQUIRE(out->media_segments.size() == 3);
     const std::array<std::size_t, 3> starts{0, 3, 7};
     const std::array<std::uint32_t, 3> counts{3, 4, 3};
     for (std::size_t s = 0; s < 3; ++s) {
         CAPTURE(s);
-        const iclforge::mp4::MediaSegment& segment = out->media_segments[s];
+        const iclforge::containers::mp4::MediaSegment& segment = out->media_segments[s];
         CHECK(segment.sample_count == counts[s]);
         CHECK(segment.base_media_decode_time == starts[s] * 2048U);
         const auto elements = parse(segment.bytes);
@@ -1119,11 +1119,11 @@ TEST_CASE("fragment() starts every fragment at a sync sample and lists each samp
 TEST_CASE("fragment() with every frame a sync sample writes what it writes without flags",
           "[fmp4][ac4]") {
     const auto frames = opaque_frames(7);
-    const auto plain = iclforge::mp4::fragment(
-        ac4_track(), frames, iclforge::mp4::FragmentOptions{.frames_per_fragment = 3});
-    const auto flagged = iclforge::mp4::fragment(
+    const auto plain = iclforge::containers::mp4::fragment(
+        ac4_track(), frames, iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = 3});
+    const auto flagged = iclforge::containers::mp4::fragment(
         ac4_track(), frames,
-        iclforge::mp4::FragmentOptions{.frames_per_fragment = 3,
+        iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = 3,
                                        .sync_samples = std::vector<bool>(7, true)});
     REQUIRE(plain.has_value());
     REQUIRE(flagged.has_value());
@@ -1144,10 +1144,10 @@ TEST_CASE("fragment() refuses sync flags of another length or a first frame that
     const auto frames = opaque_frames(4);
     const auto refused = [&](std::vector<bool> sync) {
         const auto out =
-            iclforge::mp4::fragment(ac4_track(), frames,
-                                    iclforge::mp4::FragmentOptions{
+            iclforge::containers::mp4::fragment(ac4_track(), frames,
+                                    iclforge::containers::mp4::FragmentOptions{
                                         .frames_per_fragment = 2, .sync_samples = std::move(sync)});
-        return !out.has_value() && out.error() == iclforge::mp4::MuxError::kInvalidOptions;
+        return !out.has_value() && out.error() == iclforge::containers::mp4::MuxError::kInvalidOptions;
     };
     CHECK(refused({true, false, true}));
     CHECK(refused({false, true, false, true}));
@@ -1162,8 +1162,8 @@ TEST_CASE("a track's timescale reaches its init segment and its decode times and
     track.samples_per_frame = 8008;
     track.timescale = 240000;
     const auto frames = opaque_frames(5);
-    const auto out = iclforge::mp4::fragment(
-        track, frames, iclforge::mp4::FragmentOptions{.frames_per_fragment = 2});
+    const auto out = iclforge::containers::mp4::fragment(
+        track, frames, iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = 2});
     REQUIRE(out.has_value());
     const auto init = parse(out->init_segment);
     const auto* mdhd = find(init, "mdhd");
@@ -1181,12 +1181,12 @@ TEST_CASE("a track's timescale reaches its init segment and its decode times and
     CHECK(read_tfdt(out->media_segments[2].bytes, *tfdt) == 4U * 8008U);
 
     // Two frames are 16 016 / 240 000 s, not 16 016 samples at 48 kHz.
-    const auto media = iclforge::mp4::build_hls_media_playlist(track, out->media_segments);
+    const auto media = iclforge::containers::mp4::build_hls_media_playlist(track, out->media_segments);
     CHECK(media.find(fmt::format("#EXTINF:{:.5f},", 16016.0 / 240000.0)) != std::string::npos);
-    const auto snippet = iclforge::mp4::build_dash_adaptation_set(track, out->media_segments);
+    const auto snippet = iclforge::containers::mp4::build_dash_adaptation_set(track, out->media_segments);
     CHECK(snippet.find("timescale=\"240000\"") != std::string::npos);
     CHECK(snippet.find("audioSamplingRate=\"48000\"") != std::string::npos);
-    const auto mpd = iclforge::mp4::build_dash_mpd(track, out->media_segments, snippet);
+    const auto mpd = iclforge::containers::mp4::build_dash_mpd(track, out->media_segments, snippet);
     CHECK(mpd.find(fmt::format("mediaPresentationDuration=\"PT{:.3f}S\"",
                                5.0 * 8008.0 / 240000.0)) != std::string::npos);
 }
@@ -1195,15 +1195,15 @@ TEST_CASE("FragmentWriter pushed with sync flags writes fragment()'s segments", 
     const auto frames = opaque_frames(10);
     const std::vector<bool> sync = {true,  false, false, true,  false,
                                     false, false, true,  false, false};
-    const iclforge::mp4::FragmentOptions options{.frames_per_fragment = 2};
+    const iclforge::containers::mp4::FragmentOptions options{.frames_per_fragment = 2};
     auto batch_options = options;
     batch_options.sync_samples = sync;
-    const auto batch = iclforge::mp4::fragment(ac4_track(), frames, batch_options);
+    const auto batch = iclforge::containers::mp4::fragment(ac4_track(), frames, batch_options);
     REQUIRE(batch.has_value());
 
-    auto writer = iclforge::mp4::FragmentWriter::create(ac4_track(), options);
+    auto writer = iclforge::containers::mp4::FragmentWriter::create(ac4_track(), options);
     REQUIRE(writer.has_value());
-    std::vector<iclforge::mp4::MediaSegment> written;
+    std::vector<iclforge::containers::mp4::MediaSegment> written;
     for (std::size_t i = 0; i < frames.size(); ++i) {
         CAPTURE(i);
         auto closed = writer->push(frames[i], sync[i]);
@@ -1225,18 +1225,18 @@ TEST_CASE("FragmentWriter pushed with sync flags writes fragment()'s segments", 
     }
 
     // The first frame of a track starts its first fragment.
-    auto refusing = iclforge::mp4::FragmentWriter::create(ac4_track(), options);
+    auto refusing = iclforge::containers::mp4::FragmentWriter::create(ac4_track(), options);
     REQUIRE(refusing.has_value());
     const auto not_sync = refusing->push(frames[0], false);
     REQUIRE_FALSE(not_sync.has_value());
-    CHECK(not_sync.error() == iclforge::mp4::MuxError::kInvalidOptions);
+    CHECK(not_sync.error() == iclforge::containers::mp4::MuxError::kInvalidOptions);
 }
 
 TEST_CASE("fragment() lists a caller's brands after the structural ones", "[fmp4][ac4]") {
     const auto frames = opaque_frames(3);
-    const auto out = iclforge::mp4::fragment(
+    const auto out = iclforge::containers::mp4::fragment(
         ac4_track(), frames,
-        iclforge::mp4::FragmentOptions{.frames_per_fragment = 3, .brands = {"ca4m", "ca4s"}});
+        iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = 3, .brands = {"ca4m", "ca4s"}});
     REQUIRE(out.has_value());
     const auto init = parse(out->init_segment);
     const auto* ftyp = find(init, "ftyp");
@@ -1249,14 +1249,14 @@ TEST_CASE("fragment() lists a caller's brands after the structural ones", "[fmp4
     CHECK(read_brand_box(out->media_segments.front().bytes, *styp).compatible_brands ==
           brands.compatible_brands);
 
-    const auto short_brand = iclforge::mp4::fragment(
-        ac4_track(), frames, iclforge::mp4::FragmentOptions{.brands = {"ca4"}});
+    const auto short_brand = iclforge::containers::mp4::fragment(
+        ac4_track(), frames, iclforge::containers::mp4::FragmentOptions{.brands = {"ca4"}});
     REQUIRE_FALSE(short_brand.has_value());
-    CHECK(short_brand.error() == iclforge::mp4::MuxError::kInvalidOptions);
-    const auto long_brand = iclforge::mp4::FragmentWriter::create(
-        ac4_track(), iclforge::mp4::FragmentOptions{.brands = {"toolong"}});
+    CHECK(short_brand.error() == iclforge::containers::mp4::MuxError::kInvalidOptions);
+    const auto long_brand = iclforge::containers::mp4::FragmentWriter::create(
+        ac4_track(), iclforge::containers::mp4::FragmentOptions{.brands = {"toolong"}});
     REQUIRE_FALSE(long_brand.has_value());
-    CHECK(long_brand.error() == iclforge::mp4::MuxError::kInvalidOptions);
+    CHECK(long_brand.error() == iclforge::containers::mp4::MuxError::kInvalidOptions);
 }
 
 TEST_CASE("DASH writes a caller's channel configuration and supplemental properties",
@@ -1264,18 +1264,18 @@ TEST_CASE("DASH writes a caller's channel configuration and supplemental propert
     const auto frames = opaque_frames(4);
     auto track = ac4_track();
     track.rfc6381 = "ac-4.02.01.00";
-    const auto out = iclforge::mp4::fragment(
-        track, frames, iclforge::mp4::FragmentOptions{.frames_per_fragment = 2});
+    const auto out = iclforge::containers::mp4::fragment(
+        track, frames, iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = 2});
     REQUIRE(out.has_value());
-    const iclforge::mp4::DashOptions options{
+    const iclforge::containers::mp4::DashOptions options{
         .channel_configuration =
-            iclforge::mp4::Descriptor{.scheme_id_uri = "urn:mpeg:mpegB:cicp:ChannelConfiguration",
+            iclforge::containers::mp4::Descriptor{.scheme_id_uri = "urn:mpeg:mpegB:cicp:ChannelConfiguration",
                             .value = "6"},
         .supplemental_properties = {
             {.scheme_id_uri = "tag:dolby.com,2017:dash:audio_frame_rate:2017", .value = "375/16"},
             {.scheme_id_uri = "urn:example:a&b", .value = "<\"x\">"}}};
     const auto snippet =
-        iclforge::mp4::build_dash_adaptation_set(track, out->media_segments, options);
+        iclforge::containers::mp4::build_dash_adaptation_set(track, out->media_segments, options);
     CHECK(snippet.find("codecs=\"ac-4.02.01.00\"") != std::string::npos);
     CHECK(snippet.find("<AudioChannelConfiguration "
                        "schemeIdUri=\"urn:mpeg:mpegB:cicp:ChannelConfiguration\" value=\"6\"/>") !=

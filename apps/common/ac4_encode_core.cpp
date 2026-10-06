@@ -232,7 +232,7 @@ std::expected<Ac4Packaged, Ac4PackageError> package_ac4(
     // Part 2 Annex E: each frame a sample, the I-frames its sync samples,
     // timed as Table E.1 says.
     std::vector<std::span<const std::byte>> samples;
-    iclforge::mp4::MuxOptions options;
+    iclforge::containers::mp4::MuxOptions options;
     samples.reserve(frames.size());
     // Sized, not reserved: GCC 16's -Wnull-dereference flags vector<bool>::reserve on an
     // empty vector.
@@ -256,7 +256,7 @@ std::expected<Ac4Packaged, Ac4PackageError> package_ac4(
                 iclforge::ac4::dac4_refusal(toc)),
             .usage = true});
     }
-    const iclforge::mp4::AudioTrack track{.codec_id = std::string{iclforge::mp4::kCodecAc4},
+    const iclforge::containers::mp4::AudioTrack track{.codec_id = std::string{iclforge::containers::mp4::kCodecAc4},
                                 .sample_rate = static_cast<std::uint32_t>(toc.sample_rate_hz),
                                 .channels = 2,  // TS 103 190-2 E.4.5: "should be set to 2"
                                 .samples_per_frame = timing->sample_delta,
@@ -264,10 +264,10 @@ std::expected<Ac4Packaged, Ac4PackageError> package_ac4(
                                 .rfc6381 = iclforge::ac4::rfc6381_codec_string(toc),
                                 .timescale = timing->timescale};
     out.rfc6381 = track.rfc6381;
-    auto muxed = iclforge::mp4::mux(track, samples, options);
+    auto muxed = iclforge::containers::mp4::mux(track, samples, options);
     if (!muxed.has_value()) {
         return std::unexpected(Ac4PackageError{
-            .message = std::string{iclforge::mp4::describe(muxed.error())}, .usage = false});
+            .message = std::string{iclforge::containers::mp4::describe(muxed.error())}, .usage = false});
     }
     out.chunks.push_back(std::move(*muxed));
     return out;

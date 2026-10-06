@@ -2,7 +2,7 @@
 
 `iclforge/adm/ac3adm.hpp`, library `iclforge::adm`. A standalone BW64/RF64 + Audio Definition Model
 (ADM) parser and writer: the professional delivery format Netflix's and Apple's own Atmos ingest
-pipelines require. Like `iclforge::matroska`, `iclforge::mp4` and `iclforge::mpegts`, it links nothing
+pipelines require. Like `iclforge::containers::matroska`, `iclforge::containers::mp4` and `iclforge::containers::mpegts`, it links nothing
 from `iclforge::ac3` — it has no idea AC-3, E-AC-3 or the JOC/Atmos object layer exist.
 
 Mapping the graph this module parses onto `iclforge::ac3::oba::AtmosEncoder` (ADM → encode) or building it

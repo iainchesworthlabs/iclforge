@@ -503,7 +503,7 @@ endif()
 # ---------------------------------------------------------------------------
 # Library component(s): a second, separate download alongside the existing
 # forge/forge-gui package - headers + .lib/.dll/.a/.so + CMake package config
-# for a third party consuming iclforge::ac3/iclforge::matroska via
+# for a third party consuming iclforge::ac3/iclforge::containers via
 # find_package(iclforge) (see cmake/InstallLibrary.cmake). Everything
 # install()'d without an explicit COMPONENT falls into CPack's own
 # "Unspecified" component, which is why forge/forge-gui and every

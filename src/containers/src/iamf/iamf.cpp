@@ -16,7 +16,7 @@
 #include "iclforge/containers/iamf/model.hpp"
 #include "iclforge/containers/iamf/sequence.hpp"
 
-namespace iclforge::iamf {
+namespace iclforge::containers::iamf {
 
 namespace {
 
@@ -607,4 +607,4 @@ std::expected<DecodedElement, Error> decode_pcm(const Sequence& sequence, std::u
     return decoded;
 }
 
-}  // namespace iclforge::iamf
+}  // namespace iclforge::containers::iamf

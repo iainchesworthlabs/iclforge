@@ -13,7 +13,7 @@
 #include "iclforge/containers/export.hpp"
 #include "iclforge/containers/mpegts/mpegts.hpp"
 
-// The read side of iclforge::mpegts::mux()/iclforge::mpegts::Writer: pulling one programme's
+// The read side of iclforge::containers::mpegts::mux()/iclforge::containers::mpegts::Writer: pulling one programme's
 // audio back out of a transport stream.
 //
 // A container reader and nothing more, the same way the writer beside it is
@@ -54,7 +54,7 @@
 // and ReadOptions bounds what may be buffered. fuzz/fuzz_mpegts_demux.cpp
 // drives both entry points with arbitrary bytes.
 
-namespace iclforge::mpegts {
+namespace iclforge::containers::mpegts {
 
 namespace detail {
 // Reader's parse state, defined in src/containers/src/mpegts/reader.cpp - a
@@ -99,7 +99,7 @@ struct ReadStream {
     // The detected grid: 188 (TS), 192 (M2TS) or 204 (TS with RS parity).
     std::size_t packet_size = 188;
     // The PMT's own AC-3/E-AC-3 audio descriptor, decoded back into the same
-    // ServiceInfo shape iclforge::mpegts::mux()'s caller supplies - see mpegts.hpp's
+    // ServiceInfo shape iclforge::containers::mpegts::mux()'s caller supplies - see mpegts.hpp's
     // own header comment on why this module's job stops at descriptor
     // syntax. std::nullopt when signalling carries no such
     // descriptor to read (kAtscStreamType's own stream_type IDs the codec
@@ -107,7 +107,7 @@ struct ReadStream {
     // descriptor at all, and ac4 never does either) or when this codec's
     // descriptor is malformed - never a guessed value. Some ServiceInfo
     // fields cannot be recovered exactly from these bytes (see
-    // iclforge::mpegts::parse_service_descriptor's own comment) and are left at their
+    // iclforge::containers::mpegts::parse_service_descriptor's own comment) and are left at their
     // ServiceInfo default rather than approximated; acmod/channels/lfe/
     // dsurmod in particular are better read from iclforge::ac3::io::scan() on the
     // elementary stream itself, the same source mux()'s caller used to fill
@@ -157,7 +157,7 @@ struct Demuxed {
     std::span<const std::byte> file, const ReadOptions& options = {});
 
 // Incrementally reads payloads out of a transport stream as its bytes
-// arrive - iclforge::mpegts::Writer's mirror image, and the natural shape for the one
+// arrive - iclforge::containers::mpegts::Writer's mirror image, and the natural shape for the one
 // container here that was designed to be read as a stream in the first
 // place.
 //
@@ -190,4 +190,4 @@ class ICLFORGE_CONTAINERS_EXPORT Reader {
     std::unique_ptr<detail::ReaderState> state_;
 };
 
-}  // namespace iclforge::mpegts
+}  // namespace iclforge::containers::mpegts

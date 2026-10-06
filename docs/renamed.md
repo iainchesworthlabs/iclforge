@@ -58,13 +58,13 @@ before it, or call `forge` by its full path, when a shell answers with the wrong
 
 | Old | New |
 |---|---|
-| C++ namespaces `ac3::`, `ac4::`, `mp4::`, `matroska::`, `mpegts::`, `iamf::`, `ac3iab::`, `ac3adm::` | `iclforge::ac3::` (the codec's own names, and its sub-namespaces `iclforge::ac3::eac3::`, `iclforge::ac3::io::`, `iclforge::ac3::meta::` and the rest), `iclforge::ac4::`, `iclforge::mp4::`, `iclforge::matroska::`, `iclforge::mpegts::`, `iclforge::iamf::`, `iclforge::iab::`, `iclforge::adm::` |
+| C++ namespaces `ac3::`, `ac4::`, `mp4::`, `matroska::`, `mpegts::`, `iamf::`, `ac3iab::`, `ac3adm::` | `iclforge::ac3::` (the codec's own names, and its sub-namespaces `iclforge::ac3::eac3::`, `iclforge::ac3::io::`, `iclforge::ac3::meta::` and the rest), `iclforge::ac4::`, `iclforge::containers::mp4::`, `iclforge::containers::matroska::`, `iclforge::containers::mpegts::`, `iclforge::containers::iamf::`, `iclforge::iab::`, `iclforge::adm::` |
 | Header roots `ac3/`, `ac4/`, `mp4/`, `matroska/`, `mpegts/`, `iamf/`, `ac3iab/`, `ac3adm/`, `ac4dec/`, `ac4enc/` | `iclforge/<library>/`: `iclforge/ac3/`, `iclforge/ac4/`, `iclforge/mp4/` and so on; the [header map](library/header-map.md) lists them |
 | The C API: `ac3forge_c/ac3forge.h`, `ac3forge_*`, `AC3FORGE_*`, `libac3forge_c` | `iclforge_c/iclforge.h`, `iclforge_*`, `ICLFORGE_*`, `libiclforge_c` |
 | CMake package `find_package(ac3forge)` | `find_package(iclforge)` |
 | CMake options and cache variables `AC3FORGE_*` (`AC3FORGE_BUILD_ADM`, `AC3FORGE_SIMD`, ...) | `ICLFORGE_*` |
 | Kconfig symbols `CONFIG_AC3FORGE_*` | `CONFIG_ICLFORGE_*` |
-| pkg-config `ac3forge`, `ac3signing`, `matroska`, `mp4`, `mpegts`, `iamf`, `ac3iab`, `ac3adm`, `admbridge`, `ac3forge_c`, `ac4`, `ac4dec`, `ac4enc`, `ac4core` | `iclforge-<library>`: `iclforge-ac3`, `iclforge-ac3`, `iclforge-matroska`, ..., `iclforge-c`; the four AC-4 names are one, `iclforge-ac4` |
+| pkg-config `ac3forge`, `ac3signing`, `matroska`, `mp4`, `mpegts`, `iamf`, `ac3iab`, `ac3adm`, `admbridge`, `ac3forge_c`, `ac4`, `ac4dec`, `ac4enc`, `ac4core` | `iclforge-<library>`: `iclforge-ac3`, `iclforge-ac3`, `iclforge-containers`, ..., `iclforge-c`; the four AC-4 names are one, `iclforge-ac4` |
 | Library files `libac3forge`, `libac3forge_c`, `libmp4`, ... | `libiclforge_<library>`, with `_static` for the archive |
 
 The codec library `ac3::forge` became one of the libraries under `src/`, and five of its parts
@@ -79,7 +79,7 @@ header that moved changed with it (`ac3/core/layout.hpp` is `iclforge/base/layou
 | `ac3::forge_minimal` | `iclforge::ac3_minimal` |
 | `ac3::forge_c` (`_static`, `_shared`) | `iclforge::c` (`iclforge::c_static`, `iclforge::c_shared`) |
 | `ac3::audio`, `ac3::sendspin`, `ac3::signing`, `ac3::admbridge`, `ac3::arithmetic` | `iclforge::audio`, `iclforge::sendspin`, `iclforge::ac3::signing`, `iclforge::adm`, `iclforge::base_arithmetic` |
-| `matroska::matroska`, `mp4::mp4`, `mpegts::mpegts`, `iamf::iamf` | `iclforge::matroska`, `iclforge::mp4`, `iclforge::mpegts`, `iclforge::iamf` |
+| `matroska::matroska`, `mp4::mp4`, `mpegts::mpegts`, `iamf::iamf` | `iclforge::containers::matroska`, `iclforge::containers::mp4`, `iclforge::containers::mpegts`, `iclforge::containers::iamf` |
 | `ac3iab::ac3iab`, `ac3adm::ac3adm` | `iclforge::iab`, `iclforge::adm` |
 | `ac4::ac4`, `ac4::decoder`, `ac4::encoder`, `ac4::core` | `iclforge::ac4` |
 

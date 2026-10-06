@@ -4082,7 +4082,7 @@ TEST_CASE("remux converts one container straight to another", "[cli][remux]") {
     // from the re-scanned bitstream (iclforge::ac3::io::build_codec_config_box), never
     // from what the source container could or could not declare. If that
     // ever regressed to reading a source-side box instead, this MP4 would
-    // have nothing to build one from and iclforge::mp4::mux would refuse it outright -
+    // have nothing to build one from and iclforge::containers::mp4::mux would refuse it outright -
     // the round trip through demux below is what proves it wrote a coherent
     // one rather than merely that it wrote *something*.
     SECTION("Matroska to MP4 round-trips through demux") {

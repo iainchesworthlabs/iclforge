@@ -67,8 +67,8 @@ iclforge_instrument_for_fuzzing(iclforge_base_objects)
 #
 # Same PUBLIC-on-the-OBJECT-library reasoning as iclforge_ac3_objects above: the
 # usage requirements propagate through the static/shared wrappers to
-# whatever finally links iclforge::matroska - here, each harness.
-foreach(container_target IN ITEMS iclforge_matroska_objects iclforge_mp4_objects iclforge_mpegts_objects)
+# whatever finally links iclforge::containers - here, each harness.
+foreach(container_target IN ITEMS iclforge_containers_objects iclforge_containers_objects iclforge_containers_objects)
     target_compile_options(${container_target} PUBLIC
         -fsanitize=address,undefined,fuzzer-no-link
         -fno-sanitize-recover=undefined
@@ -78,7 +78,7 @@ foreach(container_target IN ITEMS iclforge_matroska_objects iclforge_mp4_objects
         -fsanitize=address,undefined,fuzzer-no-link)
 endforeach()
 
-# iclforge_ac4_objects, iclforge_iab_objects and iclforge_iamf_objects, for the same reason:
+# iclforge_ac4_objects, iclforge_iab_objects and iclforge_containers_objects, for the same reason:
 # fuzz_ac4_parse, fuzz_iab_parse and fuzz_iamf_parse below mutate parsers that take their counts and lengths from
 # the file. Each is a library of its own rather than part of iclforge::ac3 (see
 # src/ac4/ and src/iab/), so nothing iclforge::ac3 carries reaches their
@@ -115,7 +115,7 @@ if(ICLFORGE_BUILD_IAB)
     iclforge_instrument_for_fuzzing(iclforge_iab_objects)
 endif()
 if(ICLFORGE_BUILD_IAMF)
-    iclforge_instrument_for_fuzzing(iclforge_iamf_objects)
+    iclforge_instrument_for_fuzzing(iclforge_containers_objects)
 endif()
 if(ICLFORGE_BUILD_ADM)
     iclforge_instrument_for_fuzzing(iclforge_adm_objects)
@@ -172,22 +172,22 @@ endfunction()
 # decoder commits to a layout (src/ac3/src/io/elementary.cpp).
 iclforge_add_fuzzer(fuzz_scan)
 
-# iclforge::matroska::demux + iclforge::matroska::Reader: the EBML walk over a container that came
+# iclforge::containers::matroska::demux + iclforge::containers::matroska::Reader: the EBML walk over a container that came
 # from a disc rip, a broadcast capture or a download - every length in it
 # self-declared (src/containers/src/matroska/reader.cpp).
-iclforge_add_container_fuzzer(fuzz_matroska_demux iclforge::matroska)
+iclforge_add_container_fuzzer(fuzz_matroska_demux iclforge::containers)
 
-# iclforge::mp4::demux + iclforge::mp4::Reader: the box walk, and the sample table it resolves
+# iclforge::containers::mp4::demux + iclforge::containers::mp4::Reader: the box walk, and the sample table it resolves
 # against the file - an INDEX of self-declared offsets and sizes, which is a
 # wider attack surface than Matroska's in-line framing
 # (src/containers/src/mp4/reader.cpp).
-iclforge_add_container_fuzzer(fuzz_mp4_demux iclforge::mp4)
+iclforge_add_container_fuzzer(fuzz_mp4_demux iclforge::containers)
 
-# iclforge::mpegts::demux + iclforge::mpegts::Reader: sync search, PSI section reassembly and PES
+# iclforge::containers::mpegts::demux + iclforge::containers::mpegts::Reader: sync search, PSI section reassembly and PES
 # reassembly, all loops driven by self-declared lengths over a format that is
 # EXPECTED to arrive damaged - the harness most likely to find a hang rather
 # than a crash (src/containers/src/mpegts/reader.cpp).
-iclforge_add_container_fuzzer(fuzz_mpegts_demux iclforge::mpegts)
+iclforge_add_container_fuzzer(fuzz_mpegts_demux iclforge::containers)
 
 # --- The other two Dolby bitstreams this repo reads --------------------------
 #
@@ -212,11 +212,11 @@ if(ICLFORGE_BUILD_IAB)
     iclforge_add_fuzzer(fuzz_iab_parse iclforge::iab)
 endif()
 
-# iclforge::iamf::read_sequence + read_isobmff, and write_sequence, write_isobmff and decode_pcm on
+# iclforge::containers::iamf::read_sequence + read_isobmff, and write_sequence, write_isobmff and decode_pcm on
 # what they return: the standalone OBU stream and the ISO-BMFF encapsulation, both read from numbers
-# the file chose (src/iamf/). One harness over both framings of the same bytes.
+# the file chose (src/containers/src/iamf/). One harness over both framings of the same bytes.
 if(ICLFORGE_BUILD_IAMF)
-    iclforge_add_fuzzer(fuzz_iamf_parse iclforge::iamf)
+    iclforge_add_fuzzer(fuzz_iamf_parse iclforge::containers)
 endif()
 
 # iclforge::ac4::scan + iclforge::ac4::parse_raw_frame: sync search, then the TOC - a presentation
@@ -254,7 +254,7 @@ iclforge_add_fuzzer(fuzz_eac3_decode)
 # (src/ac3/src/io/wav.cpp).
 iclforge_add_fuzzer(fuzz_wav_read)
 
-# iclforge::iec61937::BurstReader: IEC 61937 burst de-framing, driven the way
+# iclforge::containers::iec61937::BurstReader: IEC 61937 burst de-framing, driven the way
 # forge's 'unspdif' drives it (src/containers/src/iec61937/iec61937.cpp). The one
 # entry point here whose input is by definition off a wire - an S/PDIF or
 # HDMI capture - and whose Pd word is an attacker-chosen length.

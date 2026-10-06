@@ -19,7 +19,7 @@
 // documents ENCODING_IEC61937 data as "already IEC 61937-formatted from
 // upstream"). This project's PassthroughSink::submit() contract is fixed
 // across every platform - it receives a complete, already-wrapped
-// iclforge::iec61937::wrap_frame()/Eac3BurstPacker::push() burst - so
+// iclforge::containers::iec61937::wrap_frame()/Eac3BurstPacker::push() burst - so
 // ENCODING_E_AC3 would double-wrap that burst inside another layer of
 // Android's own framing and produce noise; ENCODING_IEC61937 is the only
 // encoding whose input shape matches what this backend actually has.
@@ -315,7 +315,7 @@ struct PassthroughSink::Impl {
     std::atomic<std::uint64_t> underruns{0};
     // Which bursts submit() takes (audio::burst_size_fits()), and the longest.
     BitstreamFormat format = BitstreamFormat::kAc3;
-    std::size_t burst_bytes = iec61937::kBurstBytes;
+    std::size_t burst_bytes = containers::iec61937::kBurstBytes;
 
     // For position(), all under g_bridge_mutex. The bytes the track has
     // accepted since it was opened or flushed, and its head position, which

@@ -1,6 +1,6 @@
 // Wrap an elementary stream in Matroska.
 //
-// iclforge::matroska links nothing from iclforge::ac3 — it takes frames as opaque
+// iclforge::containers::matroska links nothing from iclforge::ac3 — it takes frames as opaque
 // bytes. Pairing it with iclforge::ac3::io::scan is what keeps the track header honest:
 // the channel count and packet boundaries come off the bitstream rather than
 // from the caller.
@@ -58,20 +58,20 @@ int main() {
         frames.emplace_back(unit.begin(), unit.end());
     }
 
-    const iclforge::matroska::AudioTrack track{
+    const iclforge::containers::matroska::AudioTrack track{
         .codec_id = std::string{scanned->kind == iclforge::ac3::io::StreamKind::kAc3
-                                    ? iclforge::matroska::kCodecAc3
-                                    : iclforge::matroska::kCodecEac3},
+                                    ? iclforge::containers::matroska::kCodecAc3
+                                    : iclforge::containers::matroska::kCodecEac3},
         .sample_rate = iclforge::ac3::sample_rate_hz(scanned->sample_rate),
         .channels = scanned->channels,
         .samples_per_frame = iclforge::ac3::kSamplesPerFrame,
     };
 
-    const auto file = iclforge::matroska::mux(track, frames);
+    const auto file = iclforge::containers::matroska::mux(track, frames);
     if (!file) {
         fmt::printf("mux failed: %.*s\n",
-                    static_cast<int>(iclforge::matroska::describe(file.error()).size()),
-                    iclforge::matroska::describe(file.error()).data());
+                    static_cast<int>(iclforge::containers::matroska::describe(file.error()).size()),
+                    iclforge::containers::matroska::describe(file.error()).data());
         return 1;
     }
 

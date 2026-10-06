@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-namespace iclforge::iec61937 {
+namespace iclforge::containers::iec61937 {
 
 namespace {
 
@@ -1019,4 +1019,4 @@ void PassthroughDetector::push(std::span<const float> interleaved, std::uint16_t
     }
 }
 
-}  // namespace iclforge::iec61937
+}  // namespace iclforge::containers::iec61937

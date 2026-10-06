@@ -12,7 +12,7 @@
 
 #include "iclforge/containers/export.hpp"
 
-// The read side of iclforge::matroska::mux()/iclforge::matroska::Writer: pulling one audio
+// The read side of iclforge::containers::matroska::mux()/iclforge::containers::matroska::Writer: pulling one audio
 // track's frames back out of a Matroska file.
 //
 // This is a container reader and nothing more, in exactly the sense the
@@ -33,7 +33,7 @@
 //   Reader   - incremental, for a file too big to hold: push() chunks in,
 //              frames come back through a callback. Peak memory is one
 //              frame plus one chunk, never the file - the same bound
-//              iclforge::matroska::Writer offers on the way out.
+//              iclforge::containers::matroska::Writer offers on the way out.
 //
 // Both run the same EBML walker (src/containers/src/matroska/reader.cpp); the only
 // difference is where the bytes come from and where the frames point.
@@ -47,7 +47,7 @@
 // the third, and fuzz/fuzz_matroska_demux.cpp drives the whole walker with
 // arbitrary bytes.
 
-namespace iclforge::matroska {
+namespace iclforge::containers::matroska {
 
 namespace detail {
 // Reader's parse state, defined in src/containers/src/matroska/reader.cpp. A
@@ -119,7 +119,7 @@ struct Demuxed {
 // Reads a complete Matroska file held in one buffer. Frames come back as
 // views into `file` - no audio is copied.
 //
-// A file whose Segment uses EBML's "unknown size" (what iclforge::matroska::Writer
+// A file whose Segment uses EBML's "unknown size" (what iclforge::containers::matroska::Writer
 // emits for a live recording) reads back exactly like a sized one, and so
 // does one truncated mid-cluster: every whole frame before the cut is
 // returned rather than an error, because a truncated capture is the normal
@@ -129,7 +129,7 @@ struct Demuxed {
     std::span<const std::byte> file, const ReadOptions& options = {});
 
 // Incrementally reads frames out of a Matroska file as its bytes arrive -
-// iclforge::matroska::Writer's mirror image, and the shape `forge demux` uses so a
+// iclforge::containers::matroska::Writer's mirror image, and the shape `forge demux` uses so a
 // multi-gigabyte rip never lands in memory.
 //
 // Frames are delivered to a callback rather than returned, so nothing
@@ -181,4 +181,4 @@ class ICLFORGE_CONTAINERS_EXPORT Reader {
     std::unique_ptr<detail::ReaderState> state_;
 };
 
-}  // namespace iclforge::matroska
+}  // namespace iclforge::containers::matroska

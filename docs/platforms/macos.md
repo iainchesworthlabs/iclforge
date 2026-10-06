@@ -107,7 +107,7 @@ with `kUnsupportedFormat`, and `supports_ac4_passthrough` is false on every devi
 
 Passthrough **capture** — an input carrying somebody else's bitstream — needs none of that
 machinery, on macOS or anywhere else: IEC 61937 bursts arrive as ordinary PCM samples, and
-recognising them is `iclforge::iec61937::PassthroughDetector`, which works off whatever interleaved
+recognising them is `iclforge::containers::iec61937::PassthroughDetector`, which works off whatever interleaved
 floats the backend delivers rather than off any HAL property. `forge record` uses it to write
 the elementary stream instead of encoding the bursts as audio, `forge live` to stop rather than
 encode a session of noise, and `forge unspdif` does the same job on a capture already saved to

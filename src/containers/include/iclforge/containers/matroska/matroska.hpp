@@ -27,7 +27,7 @@
 // No SeekHead, no Cues, no chapters, no tags. Those matter for seeking in
 // large files, not for playing back what this project produces.
 
-namespace iclforge::matroska {
+namespace iclforge::containers::matroska {
 
 // Matroska CodecID strings (the Matroska codec mappings registry).
 inline constexpr std::string_view kCodecEac3 = "A_EAC3";
@@ -137,4 +137,4 @@ private:
     bool cluster_open_ = false;
 };
 
-}  // namespace iclforge::matroska
+}  // namespace iclforge::containers::matroska

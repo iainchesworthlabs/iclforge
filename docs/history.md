@@ -75,7 +75,7 @@ energy-normalized 2D VBAP with per-block gain ramps and explicit LFE sends. `ac3
 renders a tone circling the listener into 5.1 AC-3. An end-to-end test parks the object at
 each speaker in turn and asserts the decoded energy follows it: C → L → SL → SR → R.
 
-The IEC 61937 packer (`src/containers/src/iec61937/`) wraps frames into S/PDIF bursts byte-exact against
+The IEC 61937 packer (`src/containers/src/containers/src/iec61937/`) wraps frames into S/PDIF bursts byte-exact against
 FFmpeg's `spdif` muxer. `ac3cli spdif` emits them as a PCM16 WAV; played bit-exactly through a
 passthrough output, a receiver locks on and lights its Dolby Digital indicator.
 
@@ -319,7 +319,7 @@ than a separate system — `ac3::plan::channel_plan_for(id)` is a one-line looku
 
 ## Since
 
-- The Matroska muxer (`src/matroska/`), deliberately independent of `ac3::forge`.
+- The Matroska muxer (`src/containers/src/matroska/`), deliberately independent of `ac3::forge`.
 - `ac3::io::scan`, so a muxer derives format, packet boundaries, sample rate and channel count
   from the bitstream rather than being told.
 - `ac3cli` dispatch moved to a single command table, so an argv index cannot be quietly wrong.

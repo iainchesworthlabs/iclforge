@@ -153,14 +153,14 @@ option(ICLFORGE_BUILD_EXAMPLES "Build the documented library examples" ON)
 # directly - it configures a dedicated build/fuzz directory with the right
 # compiler.
 option(ICLFORGE_BUILD_FUZZERS "Build libFuzzer harnesses (Clang only; see fuzz/)" OFF)
-# Every other library component (iclforge::matroska, iclforge::mp4, iclforge::mpegts, and the AC-4,
+# Every other library component (iclforge::containers, and the AC-4,
 # IAB and IAMF libraries below) gets its own ICLFORGE_BUILD_<NAME> option, defaulting ON so
 # nothing changes for today's direct/CPack builds. This is what lets the vcpkg port and the Conan
 # recipe (packaging/) expose each as an opt-in feature or option, off unless asked for - see
 # cmake/InstallLibrary.cmake's matching install()/export() gate.
-option(ICLFORGE_BUILD_MATROSKA "Build the standalone Matroska container writer (src/matroska)" ON)
-option(ICLFORGE_BUILD_MP4 "Build the standalone MP4/ISOBMFF container writer (src/mp4)" ON)
-option(ICLFORGE_BUILD_MPEGTS "Build the standalone MPEG-TS container writer (src/mpegts)" ON)
+option(ICLFORGE_BUILD_MATROSKA "Build the standalone Matroska container writer (src/containers/src/matroska)" ON)
+option(ICLFORGE_BUILD_MP4 "Build the standalone MP4/ISOBMFF container writer (src/containers/src/mp4)" ON)
+option(ICLFORGE_BUILD_MPEGTS "Build the standalone MPEG-TS container writer (src/containers/src/mpegts)" ON)
 # The AC-4 codec (src/ac4): the sync-frame/TOC/presentation/substream-group
 # inspector, the decoder and the encoder, one library. Same "own option,
 # defaults ON" treatment as the three above - apps/cli's `probe` command links
@@ -177,14 +177,14 @@ option(ICLFORGE_BUILD_AC4 "Build the AC-4 codec: the bitstream inspector, the de
 # ICLFORGE_BUILD_ADM.
 option(ICLFORGE_BUILD_IAB "Build the standalone Immersive Audio Bitstream reader (src/iab)" ON)
 
-# iclforge::iamf (src/iamf) - IAMF writer, phase 1: a standalone OBU/ISOBMFF writer for AOM's
+# iclforge::containers (src/containers/src/iamf) - IAMF writer, phase 1: a standalone OBU/ISOBMFF writer for AOM's
 # IAMF (Immersive Audio Model and Formats) v1.1.0, emitting `ipcm` substreams for a channel-based
 # 7.1.4 element. Same zero-third-party-dependency shape as iclforge::iab immediately above (unlike
 # iclforge::adm, see its own option() below), so it defaults ON the same way and for the same reason;
 # also like iclforge::iab, nothing in apps/cli, apps/gui or examples/ links it unconditionally yet (only
-# examples/mux_iamf.cpp does, guarded on this option) - see src/iamf/CMakeLists.txt's own header
+# examples/mux_iamf.cpp does, guarded on this option) - see src/containers/CMakeLists.txt's own header
 # comment.
-option(ICLFORGE_BUILD_IAMF "Build the standalone IAMF OBU/ISOBMFF reader and writer (src/iamf)" ON)
+option(ICLFORGE_BUILD_IAMF "Build the standalone IAMF OBU/ISOBMFF reader and writer (src/containers/src/iamf)" ON)
 
 # The minimum-footprint decoder profile. Not a "build X too"
 # option like the ones above - it REPLACES what src/ac3 builds with a single
@@ -284,8 +284,8 @@ else()
         "ICLFORGE_DECODE_SCALAR is 'double', 'float' or 'fixed' (got '${ICLFORGE_DECODE_SCALAR}')")
 endif()
 
-# apps/cli, apps/gui, tests/ and examples/ all link iclforge::matroska, iclforge::mp4 and
-# iclforge::mpegts unconditionally - none of them are written to cope with any of the three being
+# apps/cli, apps/gui, tests/ and examples/ all link iclforge::containers and
+# iclforge::containers unconditionally - none of them are written to cope with any of the three being
 # absent. ICLFORGE_BUILD_MATROSKA=OFF, ICLFORGE_BUILD_MP4=OFF or ICLFORGE_BUILD_MPEGTS=OFF only
 # make sense with all four also OFF (this is the shape a vcpkg or Conan build without the
 # matching feature or option actually uses, see cmake/InstallLibrary.cmake and packaging/);
@@ -295,18 +295,18 @@ endif()
 if(NOT ICLFORGE_BUILD_MATROSKA AND (ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR ICLFORGE_BUILD_TESTS OR ICLFORGE_BUILD_EXAMPLES))
     message(FATAL_ERROR "ICLFORGE_BUILD_MATROSKA=OFF requires ICLFORGE_BUILD_CLI, "
         "ICLFORGE_BUILD_GUI, ICLFORGE_BUILD_TESTS and ICLFORGE_BUILD_EXAMPLES to all be OFF too - "
-        "they all link iclforge::matroska unconditionally.")
+        "they all link iclforge::containers unconditionally.")
 endif()
 if(NOT ICLFORGE_BUILD_MP4 AND (ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR ICLFORGE_BUILD_TESTS OR ICLFORGE_BUILD_EXAMPLES))
     message(FATAL_ERROR "ICLFORGE_BUILD_MP4=OFF requires ICLFORGE_BUILD_CLI, "
         "ICLFORGE_BUILD_GUI, ICLFORGE_BUILD_TESTS and ICLFORGE_BUILD_EXAMPLES to all be OFF too - "
-        "they all link iclforge::mp4 unconditionally.")
+        "they all link iclforge::containers unconditionally.")
 endif()
 if(NOT ICLFORGE_BUILD_MPEGTS AND (ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR
                                   ICLFORGE_BUILD_TESTS OR ICLFORGE_BUILD_EXAMPLES))
     message(FATAL_ERROR "ICLFORGE_BUILD_MPEGTS=OFF requires ICLFORGE_BUILD_CLI, "
         "ICLFORGE_BUILD_GUI, ICLFORGE_BUILD_TESTS and ICLFORGE_BUILD_EXAMPLES to all be OFF too - "
-        "they all link iclforge::mpegts unconditionally.")
+        "they all link iclforge::containers unconditionally.")
 endif()
 if(NOT ICLFORGE_BUILD_AC4 AND (ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR ICLFORGE_BUILD_TESTS))
     message(FATAL_ERROR "ICLFORGE_BUILD_AC4=OFF requires ICLFORGE_BUILD_CLI, "
@@ -464,7 +464,7 @@ add_subdirectory(src/base)
 add_subdirectory(src/dsp)
 add_subdirectory(src/objects)
 add_subdirectory(src/render)
-add_subdirectory(src/iec61937)
+add_subdirectory(src/containers/src/iec61937)
 add_subdirectory(src/ac3)
 
 # Live capture, monitor playback and IEC 61937 passthrough - the only
@@ -493,22 +493,22 @@ endif()
 # ICLFORGE_BUILD_MATROSKA (default ON) so it can be opted out of - a vcpkg
 # port maps this straight to its own "matroska" feature.
 if(ICLFORGE_BUILD_MATROSKA)
-    add_subdirectory(src/matroska)
+    add_subdirectory(src/containers/src/matroska)
 endif()
 
 # A second standalone container writer, same shape and same reasoning as
-# src/matroska above - see src/mp4/CMakeLists.txt's own header. Gated by
+# src/containers/src/matroska above - see src/containers/CMakeLists.txt's own header. Gated by
 # ICLFORGE_BUILD_MP4 (default ON, see the FATAL_ERROR guard above).
 if(ICLFORGE_BUILD_MP4)
-    add_subdirectory(src/mp4)
+    add_subdirectory(src/containers/src/mp4)
 endif()
 
-# A third standalone container writer, same shape as src/matroska above but
+# A third standalone container writer, same shape as src/containers/src/matroska above but
 # for MPEG-2 Transport Stream rather than Matroska. Gated by ICLFORGE_BUILD_MPEGTS
 # (default ON, see the option() and its FATAL_ERROR guard above) so it can be
 # opted out of the same way matroska is expected to become opt-out-able too.
 if(ICLFORGE_BUILD_MPEGTS)
-    add_subdirectory(src/mpegts)
+    add_subdirectory(src/containers/src/mpegts)
 endif()
 
 # The AC-4 codec, a peer of iclforge::ac3 that links nothing of it: the
@@ -531,7 +531,7 @@ endif()
 # OBU/ISOBMFF writer). Gated by ICLFORGE_BUILD_IAMF (default ON, see the option()
 # above).
 if(ICLFORGE_BUILD_IAMF)
-    add_subdirectory(src/iamf)
+    add_subdirectory(src/containers/src/iamf)
 endif()
 
 # A standalone BW64/RF64 + Audio Definition Model parser - reader, not writer, but the same
@@ -565,8 +565,8 @@ if(ICLFORGE_BUILD_HEARTH)
     add_subdirectory(src/sendspin)
 endif()
 
-# install()/find_package(iclforge) support for iclforge::ac3, iclforge::matroska,
-# iclforge::mp4 and iclforge::mpegts - after every add_subdirectory() call above (needs their targets to
+# install()/find_package(iclforge) support for iclforge::ac3, iclforge::containers,
+# iclforge::containers - after every add_subdirectory() call above (needs their targets to
 # exist), before include(Packaging) (CPack's library component packages exactly what gets
 # install()'d here). Deliberately not iclforge::audio - see cmake/InstallLibrary.cmake's own header
 # comment for why. iclforge::adm ARE installed/exported here (ICLFORGE_BUILD_ADM

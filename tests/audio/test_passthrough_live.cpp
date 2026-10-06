@@ -45,7 +45,7 @@ std::vector<std::byte> silent_burst() {
     const std::vector<std::span<const float>> views(2, silence);
     const auto frame = encoder.encode_frame(views);
     REQUIRE(frame.has_value());
-    auto burst = iclforge::iec61937::wrap_frame(*frame);
+    auto burst = iclforge::containers::iec61937::wrap_frame(*frame);
     REQUIRE(burst.has_value());
     return std::move(*burst);
 }

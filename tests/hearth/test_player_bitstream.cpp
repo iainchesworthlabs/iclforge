@@ -151,8 +151,8 @@ public:
             return false;
         }
         const std::size_t expected = log_->format == BitstreamFormat::kEac3
-                                         ? iclforge::iec61937::kEac3BurstBytes
-                                         : iclforge::iec61937::kBurstBytes;
+                                         ? iclforge::containers::iec61937::kEac3BurstBytes
+                                         : iclforge::containers::iec61937::kBurstBytes;
         if (burst.size() != expected) {
             // Failed once, and refused: a REQUIRE would throw through the
             // player, and the player offers the same burst at every pump.
@@ -383,10 +383,10 @@ Bytes joined(const Units& units) {
 // What the link should carry for these units, one after another.
 std::vector<Bytes> expected_bursts(const Units& units, BitstreamFormat format) {
     std::vector<Bytes> out;
-    iclforge::iec61937::Eac3BurstPacker packer;
+    iclforge::containers::iec61937::Eac3BurstPacker packer;
     for (const Bytes& unit : units) {
         if (format == BitstreamFormat::kAc3) {
-            auto burst = iclforge::iec61937::wrap_frame(unit);
+            auto burst = iclforge::containers::iec61937::wrap_frame(unit);
             REQUIRE(burst.has_value());
             out.push_back(std::move(*burst));
         } else {
@@ -499,7 +499,7 @@ Transcoded reference_transcode(const std::vector<ItemPart>& items) {
 std::vector<Bytes> wrapped(const std::vector<Bytes>& frames) {
     std::vector<Bytes> out;
     for (const Bytes& frame : frames) {
-        auto burst = iclforge::iec61937::wrap_frame(frame);
+        auto burst = iclforge::containers::iec61937::wrap_frame(frame);
         REQUIRE(burst.has_value());
         out.push_back(std::move(*burst));
     }
@@ -508,7 +508,7 @@ std::vector<Bytes> wrapped(const std::vector<Bytes>& frames) {
 
 // What a receiver with no settings of its own hears from `bursts`.
 Slots link_audio(const std::vector<Bytes>& bursts) {
-    const auto stream = iclforge::iec61937::unwrap_stream(joined(bursts));
+    const auto stream = iclforge::containers::iec61937::unwrap_stream(joined(bursts));
     REQUIRE(stream.has_value());
     const auto frames = iclforge::ac3::split_frames(*stream);
     REQUIRE(frames.has_value());
@@ -1489,7 +1489,7 @@ TEST_CASE("transcode: the position, the meters and the reports run the encoder's
     CHECK(std::string{rig.player->settings_note()}.find("transcoded") != std::string::npos);
     // Each frame carries its own unit's dialnorm.
     REQUIRE(rig.link->bursts.size() >= 3);
-    const auto stream = iclforge::iec61937::unwrap_stream(joined(
+    const auto stream = iclforge::containers::iec61937::unwrap_stream(joined(
         std::vector<Bytes>(rig.link->bursts.begin(), std::next(rig.link->bursts.begin(), 3))));
     REQUIRE(stream.has_value());
     const auto frames = iclforge::ac3::split_frames(*stream);
@@ -1877,7 +1877,7 @@ TEST_CASE("transcode: an item that folds at other levels reopens, other dialnorm
         rig.link->bursts.begin(),
         std::next(rig.link->bursts.begin(),
                   static_cast<std::ptrdiff_t>(rig.link->bursts_at_open[1])));
-    const auto stream = iclforge::iec61937::unwrap_stream(joined(first));
+    const auto stream = iclforge::containers::iec61937::unwrap_stream(joined(first));
     REQUIRE(stream.has_value());
     const auto frames = iclforge::ac3::split_frames(*stream);
     REQUIRE(frames.has_value());
@@ -1920,7 +1920,7 @@ TEST_CASE("transcode: dual mono heard as its second channel is sent levelled as 
     rig.player->play();
     REQUIRE(rig.play_out());
 
-    const auto stream = iclforge::iec61937::unwrap_stream(joined(rig.link->bursts));
+    const auto stream = iclforge::containers::iec61937::unwrap_stream(joined(rig.link->bursts));
     REQUIRE(stream.has_value());
     const auto frames = iclforge::ac3::split_frames(*stream);
     REQUIRE(frames.has_value());

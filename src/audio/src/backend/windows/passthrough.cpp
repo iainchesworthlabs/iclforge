@@ -405,7 +405,7 @@ struct PassthroughSink::Impl {
     std::atomic<std::uint64_t> underruns{0};
     // Set by start(); submit()/can_submit() validate against whichever burst
     // size the chosen BitstreamFormat uses.
-    std::size_t burst_bytes = iec61937::kBurstBytes;
+    std::size_t burst_bytes = containers::iec61937::kBurstBytes;
     // The link's frames: four bytes each, and carrier_ratio() of them to a
     // content frame. Set by start() before the render thread runs.
     std::size_t frame_bytes = kCarrierChannels * (kCarrierBits / 8);

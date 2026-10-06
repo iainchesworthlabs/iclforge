@@ -33,7 +33,7 @@ private const val BUFFER_BURSTS = 8
  *
  * Opened with [AudioFormat.ENCODING_IEC61937], not `ENCODING_E_AC3`: the
  * native side already hands this class complete, pre-wrapped IEC 61937
- * bursts (`iclforge::iec61937::wrap_frame`/`Eac3BurstPacker::push`'s output), and
+ * bursts (`iclforge::containers::iec61937::wrap_frame`/`Eac3BurstPacker::push`'s output), and
  * `ENCODING_E_AC3` would tell Android to wrap them AGAIN, corrupting the
  * stream. `carrierRateHz` in every method below is already the physical
  * carrier rate (content rate for AC-3, 4x it for E-AC-3), computed once in

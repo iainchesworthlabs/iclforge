@@ -26,7 +26,7 @@ namespace iclforge::ac4 {
 // bytes, so a caller pays for exactly one parse however many it needs.
 
 // The 'dac4' box payload - ac4_dsi_v1 (Annex E.6), box header excluded, the
-// same contract as iclforge::mp4::AudioTrack::codec_config ("payload only").
+// same contract as iclforge::containers::mp4::AudioTrack::codec_config ("payload only").
 //
 // TOC-level fields are carried in full: ac4_dsi_version 1, the stream's own
 // bitstream_version / fs_index / frame_rate_index, n_presentations, and for
@@ -67,7 +67,7 @@ namespace iclforge::ac4 {
 [[nodiscard]] ICLFORGE_AC4_EXPORT std::string_view cmaf_refusal(const Toc& toc);
 
 // Samples per AC-4 frame at the stream's own sample rate - what
-// iclforge::mp4::AudioTrack::samples_per_frame and an MPEG-TS PTS cadence need.
+// iclforge::containers::mp4::AudioTrack::samples_per_frame and an MPEG-TS PTS cadence need.
 // Table 84: most frame rates divide the sample rate exactly; the
 // 1000/1001-family entries whose frame length alternates between two values
 // (29.97/59.94/119.88 fps) have no single answer and return nullopt;

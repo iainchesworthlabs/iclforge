@@ -81,11 +81,11 @@ cache_value() {
 # .cmake), the stem of its .pc files, the stem of its library files and its include directory
 # below include/.
 components=(
-    "ICLFORGE_BUILD_MATROSKA matroskaTargets iclforge-matroska iclforge_matroska iclforge/matroska"
-    "ICLFORGE_BUILD_MP4 mp4Targets iclforge-mp4 iclforge_mp4 iclforge/mp4"
-    "ICLFORGE_BUILD_MPEGTS mpegtsTargets iclforge-mpegts iclforge_mpegts iclforge/mpegts"
+    "ICLFORGE_BUILD_MATROSKA matroskaTargets iclforge-containers iclforge_matroska iclforge/matroska"
+    "ICLFORGE_BUILD_MP4 mp4Targets iclforge-containers iclforge_mp4 iclforge/mp4"
+    "ICLFORGE_BUILD_MPEGTS mpegtsTargets iclforge-containers iclforge_mpegts iclforge/mpegts"
     "ICLFORGE_BUILD_IAB iabTargets iclforge-iab iclforge_iab iclforge/iab"
-    "ICLFORGE_BUILD_IAMF iamfTargets iclforge-iamf iclforge_iamf iclforge/iamf"
+    "ICLFORGE_BUILD_IAMF iamfTargets iclforge-containers iclforge_iamf iclforge/iamf"
     "ICLFORGE_BUILD_AC4 ac4Targets iclforge-ac4 iclforge_ac4 iclforge/ac4"
 )
 

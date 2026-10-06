@@ -4,7 +4,7 @@
 
 #include "iclforge/containers/mp4/reader.hpp"
 
-// iclforge::mp4::demux and iclforge::mp4::Reader over bytes nobody has vetted. An MP4 is a
+// iclforge::containers::mp4::demux and iclforge::containers::mp4::Reader over bytes nobody has vetted. An MP4 is a
 // harder target than the Matroska sibling for one reason: its sample table
 // is an INDEX rather than an in-line framing. stsc names chunks, stco names
 // absolute file offsets and stsz names sizes, all self-declared and all
@@ -22,7 +22,7 @@
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
     const std::span<const std::byte> bytes{reinterpret_cast<const std::byte*>(data), size};
 
-    if (const auto out = iclforge::mp4::demux(bytes)) {
+    if (const auto out = iclforge::containers::mp4::demux(bytes)) {
         for (const auto& sample : out->samples) {
             // Touch every byte: a span that escaped its buffer is only a bug
             // if something reads it, and ASan only reports it then.
@@ -38,7 +38,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     }
 
     const std::size_t chunk = size == 0 ? 1 : (static_cast<std::size_t>(data[0]) % 64) + 1;
-    iclforge::mp4::Reader reader{};
+    iclforge::containers::mp4::Reader reader{};
     const auto sink = [](std::span<const std::byte> sample) {
         volatile std::byte last{};
         for (const auto b : sample) {

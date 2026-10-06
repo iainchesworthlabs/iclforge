@@ -23,7 +23,7 @@ namespace {
 // 48/44.1/32 kHz, each with its reduced-rate half), and fscod_family() is
 // exactly that mapping (tables.hpp), so this reports the family and leaves
 // the exact rate to the sample entry's own samplerate field
-// (iclforge::mp4::AudioTrack::sample_rate, set from the same ScannedStream) - the box
+// (iclforge::containers::mp4::AudioTrack::sample_rate, set from the same ScannedStream) - the box
 // exists for capability signalling (E-AC-3? how many channels? Atmos?), not
 // as the sample rate's source of truth.
 [[nodiscard]] std::uint32_t box_fscod(SampleRate sr) {
@@ -141,7 +141,7 @@ std::vector<std::byte> build_codec_config_box(const ScannedStream& stream) {
         // locations (eac3::chanmap), and deliberately not translated into it
         // in this first cut (see this file's own PR description). No audio
         // is misdescribed by leaving it 0: the sample entry's channelcount
-        // (iclforge::mp4::AudioTrack::channels, Table E2.5-derived and exact) is what a
+        // (iclforge::containers::mp4::AudioTrack::channels, Table E2.5-derived and exact) is what a
         // player actually opens the file with, and the elementary stream in
         // mdat is unaffected either way - only this one informational field
         // undercounts which extra positions the dependent(s) add.

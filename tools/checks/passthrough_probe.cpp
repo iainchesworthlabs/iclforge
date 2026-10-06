@@ -131,7 +131,7 @@ int main(int argc, char** argv) {
         return 3;
     }
 
-    iclforge::iec61937::Eac3BurstPacker packer;
+    iclforge::containers::iec61937::Eac3BurstPacker packer;
     const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
     std::size_t bursts = 0;
     std::size_t loops = 0;
@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
                 }
                 taking = submit_paced(sink, **burst, until);
             } else {
-                const auto burst = iclforge::iec61937::wrap_frame(unit);
+                const auto burst = iclforge::containers::iec61937::wrap_frame(unit);
                 if (!burst) {
                     std::printf("wrap_frame refused a syncframe\n");
                     sink.stop();

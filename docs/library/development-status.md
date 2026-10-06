@@ -69,7 +69,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | **Encoder** | Independent + dependent substreams | 🟢 | High | Essential | `AccessUnitEncoder` for wide layouts |
 | | Layouts through 7.1.4 (`chanmap`) | 🟢 | High | Essential | 7.1.4 = two dependents |
 | | Multi-programme authoring (I0–I7) | 🟢 | Medium | Important | All eight programmes; each with own layout, dialnorm and full `mixmdate`/`bsmod` metadata — sample rate and block count shared across the stream (§E2.3.1.2 requires it) |
-| | Associated-service `bsmod` / `mainid` labelling | 🟢 | Medium | Important | Written, read back and validated against the stream's own `bsmod` (`iclforge::mpegts::parse_service_descriptor`); `forge probe json=1` reports the PMT's service descriptor (`bsmod`, `mainid`, `asvc`) and a `dec3` box's `asvc` bit, and Hearth's container facts show them |
+| | Associated-service `bsmod` / `mainid` labelling | 🟢 | Medium | Important | Written, read back and validated against the stream's own `bsmod` (`iclforge::containers::mpegts::parse_service_descriptor`); `forge probe json=1` reports the PMT's service descriptor (`bsmod`, `mainid`, `asvc`) and a `dec3` box's `asvc` bit, and Hearth's container facts show them |
 | | Sample rates + `fscod2` half rates | 🟢 | Medium | Important | Enc/dec complete; no external PCM oracle for half rates |
 | | CBR and VBR (per substream) | 🟢 | High | Essential | VBR E-AC-3 only; ABR mode shipped |
 | | Short syncframes (`numblkscod` 0–2) + `convsync` | 🟢 | Medium | Important | Including object layer scaling; `eac3_latency()` follows the syncframe length |

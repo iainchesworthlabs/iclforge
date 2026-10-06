@@ -51,7 +51,7 @@ target_sources(forge PRIVATE ../common/probe_json.cpp)
 # main.cpp's 'atmos-adm' command (ADM BWF reader phase 3) needs iclforge::adm - this
 # project's one optional, non-default library dependency (ICLFORGE_BUILD_ADM, default OFF - see
 # the root CMakeLists.txt's own option() for why: libadm's Boost dependency). Unlike
-# iclforge::matroska/iclforge::mp4/iclforge::mpegts below (default ON, and a FATAL_ERROR guard in the
+# iclforge::containers below (default ON, and a FATAL_ERROR guard in the
 # root CMakeLists.txt refuses to build this target at all without them), forge builds and works
 # perfectly well with this flag off - it just lacks the one command, refused with a clear reason at
 # dispatch time (main.cpp's Needs::kAdm/unmet()) rather than missing from the binary's usage
@@ -97,15 +97,13 @@ target_link_libraries(forge
     PRIVATE
         iclforge::ac3
         iclforge::audio
-        iclforge::matroska
-        iclforge::mp4
-        iclforge::mpegts
+        iclforge::containers
         iclforge::ac4
         iclforge::warnings
         iclforge::fmt
         iclforge::coverage)
 
-# iclforge::ac3, iclforge::matroska, iclforge::mp4 and iclforge::mpegts are link-only here, but
+# iclforge::ac3, iclforge::containers are link-only here, but
 # installed and packaged in their own right elsewhere - see
 # cmake/InstallLibrary.cmake and cmake/Packaging.cmake's `library` CPack
 # component, and docs/library/index.md for how a third party consumes them
@@ -113,7 +111,7 @@ target_link_libraries(forge
 # always - a CLI/GUI implementation detail, not part of the distributed
 # library.
 #
-# iclforge::mp4/iclforge::mpegts are only ever unavailable when ICLFORGE_BUILD_MP4=OFF/
+# iclforge::containers are only ever unavailable when ICLFORGE_BUILD_MP4=OFF/
 # ICLFORGE_BUILD_MPEGTS=OFF, which the root CMakeLists.txt's own FATAL_ERROR guards
 # already refuse to combine with ICLFORGE_BUILD_CLI=ON - so unlike iclforge::audio's
 # Needs::kCapture/kPassthrough/kMonitor runtime-availability checks (main.cpp), the

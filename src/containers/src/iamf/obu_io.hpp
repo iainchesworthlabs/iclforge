@@ -13,9 +13,9 @@
 
 // Byte and bit level reading and writing for the OBU syntax (AOM IAMF v2.0.0, "Convention"):
 // leb128() values, null-terminated UTF-8 strings, and the MSB-first packed fields the position
-// parameters use. Internal to src/containers/src/iamf.
+// parameters use. Internal to src/containers/src/containers/src/iamf.
 
-namespace iclforge::iamf::detail {
+namespace iclforge::containers::iamf::detail {
 
 // Appends fields to a byte vector. bits() packs MSB first; every byte-oriented call requires the
 // bit position to be byte aligned, which the syntax guarantees at those points.
@@ -210,4 +210,4 @@ private:
     return static_cast<std::int32_t>(static_cast<std::int64_t>((value ^ sign) - sign));
 }
 
-}  // namespace iclforge::iamf::detail
+}  // namespace iclforge::containers::iamf::detail

@@ -7,7 +7,7 @@
 # gate pass per component off the shared JSON trace. Line and branch coverage
 # are gated PER COMPONENT rather than as one blended number: src/ac3 is an
 # order of magnitude larger than any container writer, so a blend would let a
-# real regression in src/mpegts or src/capi hide inside ordinary drift in
+# real regression in src/containers/src/mpegts or src/capi hide inside ordinary drift in
 # src/ac3 - and "which module is thin" is exactly the question a
 # per-component table exists to answer.
 #
@@ -161,17 +161,17 @@ src/base              80 56
 src/dsp               82 88
 src/objects           88 80
 src/render            91 83
-src/iec61937          91 83
+src/containers/src/iec61937          91 83
 src/audio             72 58
-src/matroska          88 85
-src/mp4               90 85
-src/mpegts            92 85
+src/containers/src/matroska          88 85
+src/containers/src/mp4               90 85
+src/containers/src/mpegts            92 85
 src/capi              84 74
 src/adm               82 75
 src/sendspin          85 74
 src/ac4               88 80
 src/iab            90 87
-src/iamf              91 90
+src/containers/src/iamf              91 90
 apps/cli              80 71
 apps/common           78 66
 apps/crucible/engine  90 82

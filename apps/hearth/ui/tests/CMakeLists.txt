@@ -89,7 +89,7 @@ target_link_libraries(hearth_qmltests PRIVATE
     # The AC-4 encoder, for TestServices.writeAc4Stream(): the AC-4 decoder
     # page's suite plays tones it writes (planning/ac4.md, I2).
     iclforge::ac4
-    iclforge::matroska iclforge::mp4 iclforge::mpegts
+    iclforge::containers
     iclforge::warnings iclforge::fmt
     Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::QuickTest
     # QTest::keyClick() on a QWindow, for TestServices.keyClick() (see

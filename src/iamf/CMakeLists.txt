@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::iamf - a standalone reader and writer for AOM's IAMF (Immersive Audio
+# iclforge::containers - a standalone reader and writer for AOM's IAMF (Immersive Audio
 # Model and Formats) v2.0.0: the OBU syntax (IA Sequence Header, Codec Config,
 # Audio Element, Mix Presentation, Parameter Block, Audio Frame, Temporal
 # Delimiter and Metadata OBUs), the standalone raw OBU stream, and the ISO-BMFF
@@ -9,8 +9,8 @@
 # channel-based route from E-AC-3 is a decode-then-rewrap bridge. See
 # include/iclforge/iamf/iamf.hpp for the full picture.
 #
-# Codec-blind by design, the same shape iclforge::matroska, iclforge::mp4,
-# iclforge::mpegts and iclforge::iab already use for their own formats: it
+# Codec-blind by design, the same shape iclforge::containers,
+# iclforge::containers and iclforge::iab already use for their own formats: it
 # links nothing from iclforge::ac3 and knows nothing about AC-3, E-AC-3 or JOC
 # (see CONTRIBUTING.md's repository-layout section on what a bare
 # `include/iamf/` prefix, with no `ac3/`, means).
@@ -32,7 +32,7 @@
 iclforge_add_library(iamf
     SOURCES
         src/container.cpp
-        src/iamf.cpp
+        src/containers/src/iamf.cpp
         src/sequence_common.cpp
         src/sequence_read.cpp
         src/sequence_write.cpp)

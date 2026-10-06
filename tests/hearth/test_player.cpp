@@ -278,19 +278,19 @@ std::vector<std::byte> ac3_stream(
 // A stream wrapped the way the container writers wrap one, with an edit list
 // when `edit` is given.
 std::vector<std::byte> in_mp4(const std::vector<std::byte>& stream,
-                              std::optional<iclforge::mp4::MuxOptions::Edit> edit = std::nullopt) {
+                              std::optional<iclforge::containers::mp4::MuxOptions::Edit> edit = std::nullopt) {
     const auto scanned = iclforge::ac3::io::scan(stream);
     REQUIRE(scanned.has_value());
-    iclforge::mp4::AudioTrack track;
+    iclforge::containers::mp4::AudioTrack track;
     track.codec_id =
-        std::string{scanned->kind == iclforge::ac3::io::StreamKind::kAc3 ? iclforge::mp4::kCodecAc3
-                                                                    : iclforge::mp4::kCodecEac3};
+        std::string{scanned->kind == iclforge::ac3::io::StreamKind::kAc3 ? iclforge::containers::mp4::kCodecAc3
+                                                                    : iclforge::containers::mp4::kCodecEac3};
     track.sample_rate = iclforge::ac3::sample_rate_hz(scanned->sample_rate);
     track.channels = scanned->channels;
     track.codec_config = iclforge::ac3::io::build_codec_config_box(*scanned);
-    iclforge::mp4::MuxOptions options;
+    iclforge::containers::mp4::MuxOptions options;
     options.edit = edit;
-    const auto muxed = iclforge::mp4::mux(
+    const auto muxed = iclforge::containers::mp4::mux(
         track, std::span<const std::span<const std::byte>>(scanned->access_units), options);
     REQUIRE(muxed.has_value());
     return *muxed;
@@ -299,13 +299,13 @@ std::vector<std::byte> in_mp4(const std::vector<std::byte>& stream,
 std::vector<std::byte> in_mkv(const std::vector<std::byte>& stream) {
     const auto scanned = iclforge::ac3::io::scan(stream);
     REQUIRE(scanned.has_value());
-    iclforge::matroska::AudioTrack track;
+    iclforge::containers::matroska::AudioTrack track;
     track.codec_id = std::string{scanned->kind == iclforge::ac3::io::StreamKind::kAc3
-                                     ? iclforge::matroska::kCodecAc3
-                                     : iclforge::matroska::kCodecEac3};
+                                     ? iclforge::containers::matroska::kCodecAc3
+                                     : iclforge::containers::matroska::kCodecEac3};
     track.sample_rate = iclforge::ac3::sample_rate_hz(scanned->sample_rate);
     track.channels = scanned->channels;
-    const auto muxed = iclforge::matroska::mux(
+    const auto muxed = iclforge::containers::matroska::mux(
         track, std::span<const std::span<const std::byte>>(scanned->access_units));
     REQUIRE(muxed.has_value());
     return *muxed;
@@ -861,7 +861,7 @@ TEST_CASE("player: an MP4 edit list's priming and padding are decoded but not pl
     Library library;
     library.files["raw.ec3"] = stream;
     library.files["edited.mp4"] = in_mp4(
-        stream, iclforge::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = kept});
+        stream, iclforge::containers::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = kept});
 
     const Slots whole = played_alone(library, "raw.ec3");
 
@@ -892,10 +892,10 @@ TEST_CASE("player: two edited items join with nothing of either encoder's betwee
     library.files["second.ac3"] = second;
     library.files["first.mp4"] = in_mp4(
         first,
-        iclforge::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = first_kept});
+        iclforge::containers::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = first_kept});
     library.files["second.mp4"] = in_mp4(
         second,
-        iclforge::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = second_kept});
+        iclforge::containers::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = second_kept});
 
     const Slots expected =
         joined(part(played_alone(library, "first.ec3"), 256, first_kept),
@@ -924,7 +924,7 @@ TEST_CASE("player: a seek in an edited item counts from what the item plays", "[
     Library library;
     library.files["raw.ec3"] = stream;
     library.files["edited.mp4"] = in_mp4(
-        stream, iclforge::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = kept});
+        stream, iclforge::containers::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = kept});
     const Slots whole = played_alone(library, "raw.ec3");
 
     auto log = std::make_shared<FakeDevice::Log>();

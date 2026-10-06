@@ -86,7 +86,7 @@
 // _iclforge_player@v1 - network_group_sink.hpp's own comment has the shape.
 // An AC-4 item (planning/ac4.md, I2) is decoded for every output and reaches
 // a member as a bitstream only this way: a sync frame to a burst, packed by
-// iclforge::iec61937::Ac4BurstPacker in the burst type the item's largest frame
+// iclforge::containers::iec61937::Ac4BurstPacker in the burst type the item's largest frame
 // needs, each burst placed at its frame's own start on the item's timeline.
 // A member decodes the presentation it would choose with no preferences, so
 // an item whose listener has chosen another is sent as PCM alone, as another
@@ -612,10 +612,10 @@ private:
     // code, and `packed_spans_` whose they are - a bitstream's own; a
     // network group's burst carries no span (send_unit_to_group()'s own
     // comment says why it does not need one).
-    std::optional<iec61937::Eac3BurstPacker> packer_;
+    std::optional<containers::iec61937::Eac3BurstPacker> packer_;
     // An AC-4 item's, for a network group: one per stream, which follows its
     // frames' phase (iec61937.hpp).
-    std::optional<iec61937::Ac4BurstPacker> ac4_packer_;
+    std::optional<containers::iec61937::Ac4BurstPacker> ac4_packer_;
     std::uint64_t packed_frames_ = 0;
     std::vector<Span> packed_spans_;
     // A network group's own burst-in-progress: the raw (unwrapped)

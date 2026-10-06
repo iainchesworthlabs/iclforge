@@ -236,7 +236,7 @@ class SinkLog final : public testsink::SinkLog {
 }
 
 // The programme's bursts, made as they are needed: `passes` times through the file's access units
-// on one timeline, each burst with the Pc and Pd iclforge::iec61937 writes, the units it carries, and the
+// on one timeline, each burst with the Pc and Pd iclforge::containers::iec61937 writes, the units it carries, and the
 // programme frame of its first sample.
 class BurstSource {
    public:
@@ -266,7 +266,7 @@ class BurstSource {
             std::transform(unit.begin(), unit.end(), std::back_inserter(payload_),
                            [](std::byte b) { return std::to_integer<std::uint8_t>(b); });
             if (!eac3) {
-                const auto burst = iclforge::iec61937::wrap_frame(unit);
+                const auto burst = iclforge::containers::iec61937::wrap_frame(unit);
                 if (!burst) {
                     error = "an AC-3 frame could not be wrapped";
                     return std::nullopt;
@@ -291,7 +291,7 @@ class BurstSource {
     std::uint64_t pass_samples_;
     int pass_ = 0;
     std::size_t unit_ = 0;
-    iclforge::iec61937::Eac3BurstPacker packer_;
+    iclforge::containers::iec61937::Eac3BurstPacker packer_;
     std::vector<std::uint8_t> payload_;
 };
 

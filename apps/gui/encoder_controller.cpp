@@ -415,7 +415,7 @@ std::optional<RecordingSink::Container> recording_sink_container(int container_i
 // function returns; oba_complexity_index is a plain value, so it is the one
 // field worth carrying out.
 struct Mp4Scan {
-    iclforge::mp4::AudioTrack track;
+    iclforge::containers::mp4::AudioTrack track;
     std::optional<int> oba_complexity_index;
     // The DASH AudioChannelConfiguration @value for this stream on the Dolby
     // scheme (iclforge::ac3::io::dash_channel_configuration) - a plain string for the
@@ -424,7 +424,7 @@ struct Mp4Scan {
     std::string dolby_channel_configuration;
 };
 
-// iclforge::mp4::AudioTrack::codec_config (the dec3/dac3 box, including the Atmos
+// iclforge::containers::mp4::AudioTrack::codec_config (the dec3/dac3 box, including the Atmos
 // flag_ec3_extension_type_a/complexity_index_type_a extension) can only be
 // built from a real iclforge::ac3::io::ScannedStream - bsid/bsmod/the Atmos marker are
 // bitstream syntax this controller does not otherwise track. So MP4 and
@@ -442,8 +442,8 @@ std::expected<Mp4Scan, QString> scan_for_mp4(const std::vector<std::vector<std::
         return std::unexpected(to_qstring(iclforge::ac3::io::describe(scanned.error())));
     }
     const bool eac3 = scanned->kind == iclforge::ac3::io::StreamKind::kEac3;
-    iclforge::mp4::AudioTrack track{
-        .codec_id = std::string{eac3 ? iclforge::mp4::kCodecEac3 : iclforge::mp4::kCodecAc3},
+    iclforge::containers::mp4::AudioTrack track{
+        .codec_id = std::string{eac3 ? iclforge::containers::mp4::kCodecEac3 : iclforge::containers::mp4::kCodecAc3},
         .sample_rate = iclforge::ac3::sample_rate_hz(scanned->sample_rate),
         .channels = scanned->channels,
         .samples_per_frame = iclforge::ac3::kSamplesPerFrame,
@@ -717,7 +717,7 @@ struct EncoderController::Source {
 // EncoderController::openLiveOutputWriters. `stream` is always the take's own
 // final destination now, byte for byte: an elementary-stream container writes
 // every unit straight into it (every byte written here already is the take),
-// and Matroska writes iclforge::matroska::Writer's own header/cluster bytes into the
+// and Matroska writes iclforge::containers::matroska::Writer's own header/cluster bytes into the
 // SAME file as they are produced - see `writer`'s own comment. There is no
 // separate spool for either container any more, and so nothing to fold
 // together at the end: finalize() below is the whole of what a clean stop
@@ -744,7 +744,7 @@ struct EncoderController::LiveOutputWriters {
     // written to `stream` as the frame loop runs, and finalize()'s tail
     // bytes at the end - see the "failure story" comment further down for
     // exactly where.
-    std::optional<iclforge::matroska::Writer> writer;
+    std::optional<iclforge::containers::matroska::Writer> writer;
     std::unique_ptr<iclforge::ac3::io::WavStreamWriter> wav_safety;  // null when not requested
 };
 
@@ -4648,7 +4648,7 @@ void EncoderController::playFileToReceiver(const QString& path, int deviceIndex)
                         const auto why = iclforge::audio::describe(started.error());
                         message = QString::fromUtf8(why.data(), static_cast<qsizetype>(why.size()));
                     } else {
-                        iclforge::iec61937::Eac3BurstPacker eac3_packer;
+                        iclforge::containers::iec61937::Eac3BurstPacker eac3_packer;
                         for (const auto& unit : *units) {
                             // Only ~EncoderController() sets this: the window
                             // has no way to stop a file once it is streaming,
@@ -4667,7 +4667,7 @@ void EncoderController::playFileToReceiver(const QString& path, int deviceIndex)
                                 }
                                 burst = std::move(**result);
                             } else {
-                                const auto wrapped = iclforge::iec61937::wrap_frame(unit);
+                                const auto wrapped = iclforge::containers::iec61937::wrap_frame(unit);
                                 if (!wrapped) {
                                     break;
                                 }
@@ -4881,8 +4881,8 @@ std::unique_ptr<EncoderController::LiveOutputWriters> EncoderController::openLiv
     writers->matroska = container_index_ == kContainerMatroska;
     // Two containers are special-cased for a live session, and they are
     // exactly the two with an INCREMENTAL writer behind them:
-    // iclforge::matroska::Writer and iclforge::mp4::FragmentWriter. iclforge::mp4::mux and
-    // iclforge::mpegts::mux are batch APIs - every frame has to be known up front (see
+    // iclforge::containers::matroska::Writer and iclforge::containers::mp4::FragmentWriter. iclforge::containers::mp4::mux and
+    // iclforge::containers::mpegts::mux are batch APIs - every frame has to be known up front (see
     // mp4.hpp/mpegts.hpp's own header comments) - so MP4, S/PDIF and MPEG-TS
     // still fall through to the same plain elementary-stream write, rather
     // than gaining a new failure mode.
@@ -5375,9 +5375,9 @@ void EncoderController::runLiveSession(iclforge::audio::DeviceInfo device,
     // open already gives the destination path.
     if (writers && writers->matroska) {
         const int channels_for_track = renderedChannelCount();
-        auto created = iclforge::matroska::Writer::create(
+        auto created = iclforge::containers::matroska::Writer::create(
             {.codec_id =
-                 std::string{eac3 ? iclforge::matroska::kCodecEac3 : iclforge::matroska::kCodecAc3},
+                 std::string{eac3 ? iclforge::containers::matroska::kCodecEac3 : iclforge::containers::matroska::kCodecAc3},
              .sample_rate = device.sample_rate,
              .channels = channels_for_track,
              .samples_per_frame = iclforge::ac3::kSamplesPerFrame});
@@ -5388,7 +5388,7 @@ void EncoderController::runLiveSession(iclforge::audio::DeviceInfo device,
             live_active_ = false;
             setBusy(false);
             emit liveActiveChanged();
-            setStatus(to_qstring(iclforge::matroska::describe(created.error())));
+            setStatus(to_qstring(iclforge::containers::matroska::describe(created.error())));
             emit encodeFinished(false, status());
             return;
         }
@@ -5473,7 +5473,7 @@ void EncoderController::runLiveSession(iclforge::audio::DeviceInfo device,
         // the threshold, same as the encoders/decoder just above - same
         // pattern as examples/atmos_objects.cpp (PR #295).
         auto eac3_monitor_decoder = std::make_unique<iclforge::ac3::Eac3Decoder>();
-        iclforge::iec61937::Eac3BurstPacker eac3_packer;
+        iclforge::containers::iec61937::Eac3BurstPacker eac3_packer;
         // The parallel receiver leg: an independent AC-3 5.1 encoder fed the
         // main plan's already-computed bed channels (chan_views[0..5] for a
         // channel session, atmos_encoder->bed() for an object one - both are
@@ -5581,13 +5581,13 @@ void EncoderController::runLiveSession(iclforge::audio::DeviceInfo device,
         // message is set there too so it can say which leg it was.
         bool output_lost = false;
         QString output_lost_message;
-        // Set if iclforge::matroska::Writer::push() ever refuses a frame - see the
+        // Set if iclforge::containers::matroska::Writer::push() ever refuses a frame - see the
         // write_to_disk block below. In practice unreachable (a SimpleBlock's
         // own limit is 2^40 bytes; no real AC-3/E-AC-3 access unit comes
         // close), but the muxer reports it as std::expected rather than
         // asserting, per this project's "no exceptions for stream-level
         // failure" rule, so this loop honours that instead of ignoring it.
-        std::optional<iclforge::matroska::MuxError> mux_error;
+        std::optional<iclforge::containers::matroska::MuxError> mux_error;
         // The same for the fragmented-MP4 folder, which reports its failures
         // as user-facing strings rather than an enum (Fmp4FolderWriter) -
         // reachable here in a way mux_error is not, since every segment and
@@ -5921,7 +5921,7 @@ void EncoderController::runLiveSession(iclforge::audio::DeviceInfo device,
                     const auto& bed_source = atmos ? bed_views : std::span{chan_views}.first(6);
                     const auto leg_frame = downmix_encoder->encode_frame(bed_source);
                     if (leg_frame) {
-                        const auto wrapped = iclforge::iec61937::wrap_frame(*leg_frame);
+                        const auto wrapped = iclforge::containers::iec61937::wrap_frame(*leg_frame);
                         if (wrapped) {
                             burst = *wrapped;
                         }
@@ -5932,7 +5932,7 @@ void EncoderController::runLiveSession(iclforge::audio::DeviceInfo device,
                         burst = std::move(**packed);
                     }
                 } else {
-                    const auto wrapped = iclforge::iec61937::wrap_frame(unit_bytes);
+                    const auto wrapped = iclforge::containers::iec61937::wrap_frame(unit_bytes);
                     if (wrapped) {
                         burst = *wrapped;
                     }
@@ -5964,7 +5964,7 @@ void EncoderController::runLiveSession(iclforge::audio::DeviceInfo device,
                     // fragment closes (about 1.5 s), with the HLS playlists
                     // and the MPD rewritten beside it - live-shaped until the
                     // stop below closes them. Nothing here holds the take in
-                    // RAM: iclforge::mp4::FragmentWriter buffers one fragment's frames
+                    // RAM: iclforge::containers::mp4::FragmentWriter buffers one fragment's frames
                     // and the segment window's bookkeeping, and no more, so
                     // memory stays bounded for a session of any length -
                     // exactly the property the Matroska path below gives.
@@ -6083,7 +6083,7 @@ void EncoderController::runLiveSession(iclforge::audio::DeviceInfo device,
             problem = output_lost_message;
         }
         if (problem.isEmpty() && mux_error) {
-            const auto why = iclforge::matroska::describe(*mux_error);
+            const auto why = iclforge::containers::matroska::describe(*mux_error);
             problem = QStringLiteral("Matroska muxing failed: %1")
                           .arg(QString::fromUtf8(why.data(), static_cast<qsizetype>(why.size())));
         }
@@ -6106,7 +6106,7 @@ void EncoderController::runLiveSession(iclforge::audio::DeviceInfo device,
                 // The trailing partial cluster - whatever the loop above
                 // never reached the time budget to close on its own. Nothing
                 // else needs closing: Segment's size was written unknown by
-                // design (see iclforge::matroska::Writer's own comment), so there is
+                // design (see iclforge::containers::matroska::Writer's own comment), so there is
                 // no length field left to go back and patch, the way the old
                 // spool-and-remux design needed a clean stop to even attempt.
                 // A device-lost or otherwise interrupted session still
@@ -7074,15 +7074,15 @@ QString EncoderController::writeOutput(const QString& path,
     }
     if (container_index_ == kContainerMatroska) {
         const bool eac3 = atmos_enabled_ || codec_ == plan::Codec::kEac3;
-        const iclforge::matroska::AudioTrack track{
+        const iclforge::containers::matroska::AudioTrack track{
             .codec_id =
-                std::string{eac3 ? iclforge::matroska::kCodecEac3 : iclforge::matroska::kCodecAc3},
+                std::string{eac3 ? iclforge::containers::matroska::kCodecEac3 : iclforge::containers::matroska::kCodecAc3},
             .sample_rate = sample_rate,
             .channels = channels,
             .samples_per_frame = iclforge::ac3::kSamplesPerFrame};
-        const auto file = iclforge::matroska::mux(track, frames);
+        const auto file = iclforge::containers::matroska::mux(track, frames);
         if (!file) {
-            return to_qstring(iclforge::matroska::describe(file.error()));
+            return to_qstring(iclforge::containers::matroska::describe(file.error()));
         }
         std::ofstream out{path.toStdString(), std::ios::binary};
         if (!out) {
@@ -7107,7 +7107,7 @@ QString EncoderController::writeOutput(const QString& path,
         for (const auto& frame : frames) {
             units.emplace_back(frame);
         }
-        const auto payload = iclforge::iec61937::wrap_stream(units, eac3);
+        const auto payload = iclforge::containers::iec61937::wrap_stream(units, eac3);
         if (!payload) {
             return QStringLiteral("Could not wrap the stream into IEC 61937 bursts.");
         }
@@ -7119,20 +7119,20 @@ QString EncoderController::writeOutput(const QString& path,
         return written ? QString() : to_qstring(iclforge::ac3::io::describe(written.error()));
     }
     if (container_index_ == kContainerMpegts) {
-        // Same shape as the Matroska branch above: iclforge::mpegts::AudioTrack needs
+        // Same shape as the Matroska branch above: iclforge::containers::mpegts::AudioTrack needs
         // no codec-config box (DVB's AC3_descriptor/Enhanced_AC3_descriptor
         // is built entirely from track.codec), so no bitstream scan is
         // needed here, matching forge's own run_ts (main.cpp).
         const bool eac3 = atmos_enabled_ || codec_ == plan::Codec::kEac3;
-        const iclforge::mpegts::AudioTrack track{
+        const iclforge::containers::mpegts::AudioTrack track{
             .codec =
-                eac3 ? iclforge::mpegts::AudioCodec::kEac3 : iclforge::mpegts::AudioCodec::kAc3,
+                eac3 ? iclforge::containers::mpegts::AudioCodec::kEac3 : iclforge::containers::mpegts::AudioCodec::kAc3,
             .sample_rate = sample_rate,
             .channels = channels,
             .samples_per_frame = iclforge::ac3::kSamplesPerFrame};
-        const auto file = iclforge::mpegts::mux(track, frames);
+        const auto file = iclforge::containers::mpegts::mux(track, frames);
         if (!file) {
-            return to_qstring(iclforge::mpegts::describe(file.error()));
+            return to_qstring(iclforge::containers::mpegts::describe(file.error()));
         }
         std::ofstream out{path.toStdString(), std::ios::binary};
         if (!out) {
@@ -7147,9 +7147,9 @@ QString EncoderController::writeOutput(const QString& path,
         if (!built) {
             return built.error();
         }
-        const auto file = iclforge::mp4::mux(built->track, frames);
+        const auto file = iclforge::containers::mp4::mux(built->track, frames);
         if (!file) {
-            return to_qstring(iclforge::mp4::describe(file.error()));
+            return to_qstring(iclforge::containers::mp4::describe(file.error()));
         }
         std::ofstream out{path.toStdString(), std::ios::binary};
         if (!out) {
@@ -7174,12 +7174,12 @@ QString EncoderController::writeOutput(const QString& path,
         // object-audio track, which DASH-IF IOP Part 8 v5.0.0 §5.3.3 asks
         // for - the same construction forge's own run_fmp4 makes from the
         // same scanned complexity index.
-        const auto fragmented = iclforge::mp4::fragment(
+        const auto fragmented = iclforge::containers::mp4::fragment(
             built->track, frames,
-            iclforge::mp4::FragmentOptions{.object_audio_brand =
+            iclforge::containers::mp4::FragmentOptions{.object_audio_brand =
                                                built->oba_complexity_index.has_value()});
         if (!fragmented) {
-            return to_qstring(iclforge::mp4::describe(fragmented.error()));
+            return to_qstring(iclforge::containers::mp4::describe(fragmented.error()));
         }
         std::error_code ec;
         const std::filesystem::path dir{path.toStdString()};
@@ -7202,13 +7202,13 @@ QString EncoderController::writeOutput(const QString& path,
         // instead of a plain channel count - see mp4/hls.hpp's own
         // citations, and run_fmp4 (apps/cli/main.cpp) for the CLI's
         // identical construction.
-        const iclforge::mp4::HlsOptions hls_options{
+        const iclforge::containers::mp4::HlsOptions hls_options{
             .channels_attribute = built->oba_complexity_index
                                       ? fmt::format("{}/JOC", *built->oba_complexity_index)
                                       : std::string{}};
-        const auto media_playlist = iclforge::mp4::build_hls_media_playlist(
+        const auto media_playlist = iclforge::containers::mp4::build_hls_media_playlist(
             built->track, fragmented->media_segments, hls_options);
-        const auto master_playlist = iclforge::mp4::build_hls_master_playlist(
+        const auto master_playlist = iclforge::containers::mp4::build_hls_master_playlist(
             built->track, fragmented->media_segments, "audio.m3u8", hls_options);
         if (!write_text_to_path(dir / "audio.m3u8", media_playlist) ||
             !write_text_to_path(dir / "master.m3u8", master_playlist)) {
@@ -7218,13 +7218,13 @@ QString EncoderController::writeOutput(const QString& path,
         // complexity index (DASH-IF IOP Part 8 §5.3.2), plus the
         // AudioChannelConfiguration @value TS 102 366 clause I.1.2.1
         // defines - again the same pair forge's run_fmp4 writes.
-        const iclforge::mp4::DashOptions dash_options{
+        const iclforge::containers::mp4::DashOptions dash_options{
             .joc_complexity_index = built->oba_complexity_index,
             .dolby_channel_configuration = built->dolby_channel_configuration};
-        const auto adaptation_set = iclforge::mp4::build_dash_adaptation_set(
+        const auto adaptation_set = iclforge::containers::mp4::build_dash_adaptation_set(
             built->track, fragmented->media_segments, dash_options);
         const auto mpd =
-            iclforge::mp4::build_dash_mpd(built->track, fragmented->media_segments, adaptation_set);
+            iclforge::containers::mp4::build_dash_mpd(built->track, fragmented->media_segments, adaptation_set);
         if (!write_text_to_path(dir / "manifest.mpd", mpd)) {
             return QStringLiteral("Could not write manifest.mpd to \"%1\".").arg(path);
         }

@@ -54,7 +54,7 @@ it directly. Four tiers, assigned per header below:
 | `iclforge/objects/emdf.hpp` | Public. |
 | `iclforge/ac3/emdf/frame_layout.hpp` | Internal — the bit-accurate frame walk `strip_objects` and `iclforge::ac3::signing` share; a caller uses them, not it. |
 | `iclforge/objects/placement.hpp` | Public — `ObjectPlacement` is what `AtmosEncoder::encode_frame` takes, as it was when `atmos.hpp` declared it. |
-| `iclforge/iec61937/iec61937.hpp` | Public. |
+| `iclforge/containers/iec61937/iec61937.hpp` | Public. |
 | `iclforge/dsp/qmf.hpp` | Public — `oba::joc::Domain::kQmf` is selected through public `AtmosConfig`. |
 | `iclforge/dsp/biquad.hpp`, `resampler.hpp` | Public — `dsp::resample`/`resample_planar` is a documented multi-source-rate-conversion utility, not purely an implementation detail (see `header-map.md`). |
 | `iclforge/ac3/analysis/levels.hpp` | Public. |
@@ -66,7 +66,7 @@ it directly. Four tiers, assigned per header below:
 | `iclforge/adm/ac3adm.hpp`, `model.hpp` | Public within its own opt-in module (`-DICLFORGE_BUILD_ADM=ON`); see [Experimental modules](#experimental-modules) for why this is not the same as "frozen." |
 | `iclforge/adm/bridge.hpp`, `iab_bridge.hpp`, `coordinates.hpp` | Public, same opt-in caveat. |
 | `iclforge/iab/ac3iab.hpp`, `model.hpp`, `mxf.hpp` | **Experimental** — see below; not part of the `v1.0.0` freeze despite being installed and default-on today. |
-| `iclforge/iamf/iamf.hpp` | **Experimental** — a new module, which starts there (see below); installed and default-on. |
+| `iclforge/containers/iamf/iamf.hpp` | **Experimental** — a new module, which starts there (see below); installed and default-on. |
 | `iclforge/ac4/core/toc.hpp`, `iclforge/ac4/decoder/decoder.hpp`, `iclforge/ac4/encoder/encoder.hpp` | **Experimental** — the AC-4 inspector, decoder and encoder, installed and default-on; see below. |
 | `iclforge/ac4/core/syntax.hpp` | Diagnostic — the AC-4 syntax trace the decoder and encoder write, as `iclforge/ac3/decoder/syntax_trace.hpp` is for AC-3 and E-AC-3. |
 | `iclforge_c/iclforge.h` | Public — its own narrower promise, see [C API](c-api.md). |
@@ -89,7 +89,7 @@ permitted, and per-header ABI compatibility only holds within a major version (s
 anything, and has (this is what "all releases are prereleases" means to the vcpkg registry
 reviewer's maturity rule).
 
-`ICLFORGE_DEPRECATED` (and each module's own equivalent — `ICLFORGE_MATROSKA_DEPRECATED`,
+`ICLFORGE_DEPRECATED` (and each module's own equivalent — `ICLFORGE_CONTAINERS_DEPRECATED`,
 `ICLFORGE_ADM_DEPRECATED`, and so on, all `generate_export_header()` output) exists in every generated
 export header already, but `DEFINE_NO_DEPRECATED` is passed everywhere it's generated, which
 disables it unconditionally. That's correct for right now: there is no stable symbol yet for
@@ -187,7 +187,7 @@ The AC-4 codec, its inspector, decoder and encoder (`iclforge::ac4`,
 [AC-4](ac4.md)), is Experimental too. Their API has the form
 [planning/ac4.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md) set, and
 the immersive layouts, core decoding and objects came as fields after the ones channel-based
-streams needed. The core its decoder and encoder share has private headers and so no tier. `iclforge::iamf`, the
+streams needed. The core its decoder and encoder share has private headers and so no tier. `iclforge::containers::iamf`, the
 IAMF reader and writer, is Experimental as a new module.
 
 `iclforge::adm` are a different case: also opt-in

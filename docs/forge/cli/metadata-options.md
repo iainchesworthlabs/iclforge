@@ -560,7 +560,7 @@ playable file rather than nothing.
 | Value | What it writes | Byte-identical to |
 |---|---|---|
 | `raw` (default) | The bare `.ac3`/`.ec3` elementary stream, or an `.ac4` one's sync frames with their CRC | the frames, concatenated |
-| `mkv` (alias `matroska`) | Matroska, via `iclforge::matroska::Writer`'s unknown-size Segment | `mkv` over the same frames, modulo the streaming Segment header |
+| `mkv` (alias `matroska`) | Matroska, via `iclforge::containers::matroska::Writer`'s unknown-size Segment | `mkv` over the same frames, modulo the streaming Segment header |
 | `ts` (alias `mpegts`) | MPEG-2 Transport Stream, DVB profile | `ts` over the same frames |
 | `spdif` | IEC 61937 bursts inside a PCM16 WAV carrier | `spdif` over the same frames |
 | `fmp4` (alias `cmaf`) | A directory of fragmented MP4/CMAF segments plus HLS/DASH manifests, via `Fmp4FolderWriter` (`apps/common/fmp4_folder_writer.hpp`) | see below |

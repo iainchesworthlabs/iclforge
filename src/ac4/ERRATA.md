@@ -3298,7 +3298,7 @@ every configuration's substream groups as written.
 Annex H) with an HLS playlist and a DASH MPD (Annex G). `src/ac4` reads what the manifests say off the
 table of contents (`iclforge::ac4::signalled_presentation()`, `iclforge::ac4::rfc6381_codec_string()`,
 `iclforge::ac4::dash_channel_configuration()`, `iclforge::ac4::dash_supplemental_properties()`,
-`iclforge::ac4::presentation_channel_count()`), and `src/mp4` writes the track, each fragment starting at a sync
+`iclforge::ac4::presentation_channel_count()`), and `src/containers/src/mp4` writes the track, each fragment starting at a sync
 sample (E.3) and listing each sample's flags where a fragment holds a frame that is not an I-frame
 (E.2). These are the readings.
 

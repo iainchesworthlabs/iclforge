@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::matroska - a minimal MKV container writer and reader.
+# iclforge::containers - a minimal MKV container writer and reader.
 #
 # Deliberately standalone: it links nothing from iclforge::ac3 and knows nothing
 # about AC-3. It nests EBML elements and lays out clusters, taking every frame
@@ -12,5 +12,5 @@
 # ---------------------------------------------------------------------------
 iclforge_add_library(matroska
     SOURCES
-        src/matroska.cpp
+        src/containers/src/matroska.cpp
         src/reader.cpp)

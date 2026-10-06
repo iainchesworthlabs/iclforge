@@ -3,14 +3,14 @@
 // not a new encoder output. This encodes a synthetic 7.1.4 E-AC-3 stream (an independent 3/2+LFE
 // bed plus two dependent substreams, exactly examples/encode_eac3.cpp's own encode_714()), decodes
 // each access unit back with iclforge::ac3::Eac3Decoder, permutes the result from Table E2.5's bit
-// order into iclforge::iamf::'s own L,C,R,Lss,Rss,Lrs,Rrs,Ltf,Rtf,Ltb,Rtb,LFE order (IAMF v1.1.0
+// order into iclforge::containers::iamf::'s own L,C,R,Lss,Rss,Lrs,Rrs,Ltf,Rtf,Ltb,Rtb,LFE order (IAMF v1.1.0
 // §3.6.2, loudspeaker_layout = 7), and writes it out as an IAMF ISOBMFF file with
-// iclforge::iamf::mux().
+// iclforge::containers::iamf::mux().
 //
-// iclforge::iamf itself is codec-blind (see iamf/iamf.hpp) - the permutation below is what a caller
+// iclforge::containers::iamf itself is codec-blind (see iamf/iamf.hpp) - the permutation below is what a caller
 // bridging a real decode into it looks like, kept here rather than inside the module for the same
-// reason iclforge::mp4::AudioTrack::codec_config's ETSI TS 102 366 payload is built by the CALLER
-// (iclforge::ac3::io::build_codec_config_box) rather than by iclforge::mp4:: itself.
+// reason iclforge::containers::mp4::AudioTrack::codec_config's ETSI TS 102 366 payload is built by the CALLER
+// (iclforge::ac3::io::build_codec_config_box) rather than by iclforge::containers::mp4:: itself.
 
 #include <array>
 #include <cmath>
@@ -52,7 +52,7 @@ std::vector<std::span<const float>> views_of(const std::vector<std::vector<float
     return views;
 }
 
-// The 12 locations a 7.1.4 access unit renders, in the order iclforge::iamf::Frame::channels
+// The 12 locations a 7.1.4 access unit renders, in the order iclforge::containers::iamf::Frame::channels
 // declares (IAMF §3.6.2 loudspeaker_layout = 7's own "L/C/R/Lss/Rss/Lrs/Rrs/Ltf/Rtf/Ltb/Rtb/LFE"):
 // Vhl/Vhr are Table E2.5's front-height pair (IAMF's Ltf/Rtf) and Lts/Rts its rear-height pair
 // (Ltb/Rtb).
@@ -65,8 +65,8 @@ constexpr std::array<Location, 12> kIamf714Order{
     Location::kLfe,
 };
 
-iclforge::iamf::Frame to_iamf_frame(const iclforge::ac3::DecodedAccessUnit& decoded) {
-    iclforge::iamf::Frame frame;
+iclforge::containers::iamf::Frame to_iamf_frame(const iclforge::ac3::DecodedAccessUnit& decoded) {
+    iclforge::containers::iamf::Frame frame;
     for (std::size_t i = 0; i < kIamf714Order.size(); ++i) {
         const int index = decoded.layout.index_of(kIamf714Order[i]);
         frame.channels[i] = decoded.channels[static_cast<std::size_t>(index)];
@@ -99,9 +99,9 @@ int main() {
                                     2800.0, 3200.0};
 
     iclforge::ac3::Eac3Decoder decoder;
-    iclforge::iamf::AudioTrack track{
+    iclforge::containers::iamf::AudioTrack track{
         .samples_per_frame = static_cast<std::uint32_t>(iclforge::ac3::kSamplesPerFrame)};
-    std::vector<iclforge::iamf::Frame> frames;
+    std::vector<iclforge::containers::iamf::Frame> frames;
 
     constexpr int kFrameCount = 8;  // several frames of real content, not silence - see
                                     // CONTRIBUTING.md's "test with real audio" section
@@ -124,10 +124,10 @@ int main() {
         frames.push_back(to_iamf_frame(**decoded));
     }
 
-    const auto file = iclforge::iamf::mux(track, frames);
+    const auto file = iclforge::containers::iamf::mux(track, frames);
     if (!file) {
-        fmt::printf("iclforge::iamf::mux failed: %.*s\n", static_cast<int>(iclforge::iamf::describe(file.error()).size()),
-                    iclforge::iamf::describe(file.error()).data());
+        fmt::printf("iclforge::iamf::mux failed: %.*s\n", static_cast<int>(iclforge::containers::iamf::describe(file.error()).size()),
+                    iclforge::containers::iamf::describe(file.error()).data());
         return 1;
     }
     fmt::printf("iamf: %d frames, %zu channels, %zu bytes\n", kFrameCount, channel_count,

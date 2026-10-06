@@ -433,7 +433,7 @@ struct PassthroughSink::Impl {
     // length. An AC-4 burst is any whole number of link frames up to the
     // longest (burst_size_fits()).
     BitstreamFormat format = BitstreamFormat::kAc3;
-    std::size_t burst_bytes = iec61937::kBurstBytes;
+    std::size_t burst_bytes = containers::iec61937::kBurstBytes;
     // Link frames to a content frame (carrier_ratio()), for position().
     std::uint32_t ratio = 1;
     // Raised by start(). Lowered by stop(), or by the render thread itself

@@ -50,7 +50,7 @@ struct ChannelStatus {
 //
 // The same for AC-3 and different for E-AC-3, which is the detail that catches
 // people: a Dolby Digital Plus burst is four times the size of an AC-3 one
-// (iclforge::iec61937::kEac3BurstBytes) and covers the same span of time, so the
+// (iclforge::containers::iec61937::kEac3BurstBytes) and covers the same span of time, so the
 // link has to clock four times as fast to deliver it. Microsoft's
 // "Representing Formats for IEC 61937 Transmissions" states it as a
 // requirement; the Windows backend applies it by building a 4x

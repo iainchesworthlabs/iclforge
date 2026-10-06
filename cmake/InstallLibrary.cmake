@@ -1,21 +1,21 @@
 # ---------------------------------------------------------------------------
 # InstallLibrary.cmake
 #
-# install() rules + package config for distributing iclforge::ac3, iclforge::matroska, iclforge::mp4 and
+# install() rules + package config for distributing iclforge::ac3, iclforge::containers and
 # the other libraries below independently, consumable via find_package(iclforge). iclforge::audio
 # (src/audio/) is deliberately NOT installed/exported here - it is a CLI/GUI implementation
 # detail, not part of the distributed package; see docs/library/index.md.
 #
 # include()'d from the root CMakeLists.txt after add_subdirectory(src/ac3) and, for each
-# optional component, its own guarded add_subdirectory(src/matroska|mp4|mpegts), before
+# optional component, its own guarded add_subdirectory(src/containers/src/matroska|mp4|mpegts), before
 # include(Packaging) - CPack's own library component (cmake/Packaging.cmake) packages exactly
 # what gets install()'d here.
 #
-# iclforge::matroska, iclforge::mp4 and iclforge::mpegts are all optional components, off-able via
+# iclforge::containers are all optional components, off-able via
 # their own ICLFORGE_BUILD_MATROSKA/ICLFORGE_BUILD_MP4/ICLFORGE_BUILD_MPEGTS option (root
 # CMakeLists.txt) - each its own ICLFORGE_BUILD_<NAME> option, its own guarded
 # add_subdirectory(), and its own guarded block below, as are iclforge::c, the AC-4 library,
-# iclforge::iab and iclforge::iamf. Each maps 1:1 onto its own vcpkg feature
+# iclforge::iab and iclforge::containers. Each maps 1:1 onto its own vcpkg feature
 # (packaging/vcpkg-port/iclforge/vcpkg.json's "matroska"/"mp4"/"mpegts"/"capi"/"ac4"/"iab"/
 # "iamf", wired through portfile.cmake's vcpkg_check_features()) and its own Conan option
 # (packaging/conan/conanfile.py), so a vcpkg or Conan install only gets the ones its feature
@@ -100,8 +100,8 @@ endif()
 # Two separate EXPORT sets, not the one combined set an earlier draft of this
 # plan sketched: install(EXPORT ... NAMESPACE X) applies X uniformly to
 # every target in that export set, and iclforge::ac3_static/iclforge::ac3_shared
-# need a different namespace from iclforge::matroska_static/
-# iclforge::matroska_shared. Both still land in the one iclforgeConfig.cmake
+# need a different namespace from iclforge::containers_static/
+# iclforge::containers_shared. Both still land in the one iclforgeConfig.cmake
 # a consumer's find_package(iclforge) resolves - see iclforgeConfig.cmake.in,
 # which include()s both generated *Targets.cmake files.
 #
@@ -147,7 +147,7 @@ iclforge_install_pkgconfig(
     NAME iclforge-ac3
     DESCRIPTION "Clean-room AC-3 (ATSC A/52) and E-AC-3 encoder and decoder with a spatial object layer"
     LIBNAME "${_iclforge_forge_pc_libname}"
-    REQUIRES iclforge-base iclforge-dsp iclforge-objects iclforge-render iclforge-iec61937)
+    REQUIRES iclforge-base iclforge-dsp iclforge-objects iclforge-render iclforge-containers)
 
 # The codec-blind libraries iclforge::ac3 links (src/base, dsp, objects, render, iec61937): each is a
 # mandatory component, installed and exported like the codec.
@@ -165,7 +165,7 @@ iclforge_install_library(render
 iclforge_install_library(iec61937
     DESCRIPTION "IEC 61937 burst packing and unpacking for AC-3, E-AC-3 and AC-4")
 
-# The optional components below (iclforge::matroska, mp4, mpegts, iab, iamf, the AC-4 library,
+# The optional components below (iclforge::containers, mp4, mpegts, iab, iamf, the AC-4 library,
 # adm, and iclforge::c) each have their own ICLFORGE_BUILD_<NAME> option (root
 # CMakeLists.txt) and their own guarded block here, and the vcpkg port's and the Conan recipe's
 # features of the same names switch them (packaging/). Their targets, headers and export sets only
@@ -255,7 +255,7 @@ endif()
 # The config file find_package(iclforge) actually loads. No find_dependency()
 # calls needed in iclforgeConfig.cmake.in: the platform-audio code is
 # physically in a separate, non-exported target (iclforge::audio), and {fmt}, the
-# one third-party library iclforge::ac3 and iclforge::mp4 use, is compiled into their
+# one third-party library iclforge::ac3 and iclforge::containers use, is compiled into their
 # object files as a private copy (iclforge::fmt_private, cmake/Fmt.cmake) instead of linked. A
 # shared library absorbs a linked {fmt} at its own link step; a static archive
 # cannot, so a linked {fmt} would leave its consumers an undefined fmt:: symbol

@@ -46,7 +46,7 @@ adb -s <shield-ip>:5555 shell am start -n com.iclforge.shield/.MainActivity
 ## What's reused, what's new
 
 `iclforge::ac3` (`src/ac3/`) — the codec and `AtmosEncoder` — and the libraries it links, among them
-`iclforge::iec61937` for the IEC 61937 framing, are fully platform-independent and are linked into the app **unmodified**, via a thin wrapper
+`iclforge::containers::iec61937` for the IEC 61937 framing, are fully platform-independent and are linked into the app **unmodified**, via a thin wrapper
 `CMakeLists.txt` (`apps/android/app/src/main/cpp/CMakeLists.txt`) that `add_subdirectory()`s
 the real repo root rather than duplicating its target definitions. `iclforge::audio` (`src/audio/`)
 gains its own backend, `src/audio/src/backend/android/`, alongside `windows`/`alsa`/`pipewire`/
@@ -75,7 +75,7 @@ this project's Android build passes. Rather than avoiding formatted output file 
 around that, the whole project uses [{fmt}](https://github.com/fmtlib/fmt) — `fmt::format`/
 `fmt::print` in place of `std::format`/`std::print` everywhere — since {fmt} has no
 such gap (see `cmake/Fmt.cmake` and `CONTRIBUTING.md`'s code-conventions section). That single
-choice is also what lets `iclforge::mp4`'s HLS/DASH signaling helpers build for Android at all; see the
+choice is also what lets `iclforge::containers::mp4`'s HLS/DASH signaling helpers build for Android at all; see the
 note in `apps/android/app/src/main/cpp/CMakeLists.txt` for why this app still doesn't link them
 regardless (it never muxes a file).
 

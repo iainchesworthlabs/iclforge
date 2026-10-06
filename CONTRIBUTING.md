@@ -91,7 +91,7 @@ The two codecs stand on libraries that know no codec: `src/base` (bit I/O, the s
 the CPU probe, the signing key, SHA-256 and HMAC-SHA-256, and, header-only and not installed,
 `Fixed32`, the project's own float functions and the SIMD seam), `src/dsp` (the transforms more
 than one library uses), `src/objects` (the object-audio model and the Object Audio Metadata
-payload), `src/render` (layouts, routing and the renderer) and `src/iec61937` (burst packing).
+payload), `src/render` (layouts, routing and the renderer) and `src/containers/src/iec61937` (burst packing).
 `apps/{cli,gui,crucible,hearth,android,wasm,baremetal}` consume them (Crucible and the Shield app
 use the AC-3, E-AC-3 and Atmos codec only), and `apps/common` is shared application code,
 compiled directly into its consumers. `apps/windows` holds Crucible's separately licensed

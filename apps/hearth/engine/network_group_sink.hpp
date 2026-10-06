@@ -81,7 +81,7 @@ public:
     // retries what was not taken.
     [[nodiscard]] virtual std::size_t submit_pcm(std::span<const std::span<const float>> slots,
                                                  std::size_t frames) = 0;
-    // One burst: `pc`/`pd` as iclforge::iec61937 writes them, `payload` the
+    // One burst: `pc`/`pd` as iclforge::containers::iec61937 writes them, `payload` the
     // elementary-stream bytes they describe (not the IEC 61937 carrier
     // bytes - a group's members are not S/PDIF, so there is nothing to
     // word-swizzle or zero-pad here), `frame` the programme frame that is

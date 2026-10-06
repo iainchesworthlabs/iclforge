@@ -84,15 +84,15 @@ namespace {
 // starts at the first burst rather than a quarter-second into it.
 int record_passthrough(std::string_view out_path, std::uint32_t seconds,
                        iclforge::audio::Capture& capture,
-                       iclforge::iec61937::PassthroughDetector& detector, const Options& meta) {
+                       iclforge::containers::iec61937::PassthroughDetector& detector, const Options& meta) {
     const auto channels = capture.channels();
-    const auto type = detector.detected().value_or(iclforge::iec61937::BurstDataType::kAc3);
+    const auto type = detector.detected().value_or(iclforge::containers::iec61937::BurstDataType::kAc3);
     const auto status = status_stream(out_path);
     status_println(status, "");
     status_println(
         status, "capture is bitstreaming {}, not PCM: recording the elementary stream",
-        type == iclforge::iec61937::BurstDataType::kEac3  ? "Dolby Digital Plus (data type 0x15)"
-        : type == iclforge::iec61937::BurstDataType::kAc3 ? "Dolby Digital (data type 0x01)"
+        type == iclforge::containers::iec61937::BurstDataType::kEac3  ? "Dolby Digital Plus (data type 0x15)"
+        : type == iclforge::containers::iec61937::BurstDataType::kAc3 ? "Dolby Digital (data type 0x01)"
                                                      : "AC-4 (IEC 61937-14, data type 24)");
     if (meta.container != RecordingSink::Container::kElementary) {
         // Said rather than silently ignored: mkv/ts/spdif/fmp4 all need the
@@ -120,14 +120,14 @@ int record_passthrough(std::string_view out_path, std::uint32_t seconds,
     if (!sink.open(out_path, meta.keep_partial)) {
         return kExitOutput;
     }
-    iclforge::iec61937::BurstReader reader;
+    iclforge::containers::iec61937::BurstReader reader;
     std::vector<std::byte> payload;
     std::uint64_t elementary_bytes = 0;
     const auto drain = [&](std::span<const std::byte> carrier) {
         payload.clear();
         const auto pushed = reader.push(carrier, payload);
         if (!pushed.has_value()) {
-            fmt::println(stderr, "error: {}", iclforge::iec61937::describe(pushed.error()));
+            fmt::println(stderr, "error: {}", iclforge::containers::iec61937::describe(pushed.error()));
             return false;
         }
         if (payload.empty()) {
@@ -179,7 +179,7 @@ int record_passthrough(std::string_view out_path, std::uint32_t seconds,
         }
         captured += static_cast<std::uint64_t>(iclforge::ac3::kSamplesPerFrame);
         carrier.clear();
-        iclforge::iec61937::carrier_from_capture(interleaved, channels, carrier);
+        iclforge::containers::iec61937::carrier_from_capture(interleaved, channels, carrier);
         if (!drain(carrier)) {
             sink.abort();
             return kExitInput;
@@ -211,7 +211,7 @@ int record_passthrough(std::string_view out_path, std::uint32_t seconds,
     }
     const auto stats = capture.stats();
     status_println(status, "wrote {} {} bursts ({} bytes) to {}", reader.bursts(),
-                   iclforge::iec61937::data_type_name(type), elementary_bytes, out_path);
+                   iclforge::containers::iec61937::data_type_name(type), elementary_bytes, out_path);
     status_println(status, "captured {} frames, {} silence-filled, {} dropped",
                    stats.frames_captured, stats.frames_silence_filled, stats.frames_dropped);
     if (reader.skipped_bursts() > 0 || reader.false_syncs() > 0) {
@@ -322,7 +322,7 @@ int run_record(std::string_view out_path, std::uint32_t seconds, std::uint32_t b
     // real PCM until the header bytes are parsed - see the encode loop below
     // for how that briefer, opportunistic check works.
     if (!encodable_rate) {
-        iclforge::iec61937::PassthroughDetector detector;
+        iclforge::containers::iec61937::PassthroughDetector detector;
         std::vector<float> probe(static_cast<std::size_t>(iclforge::ac3::kSamplesPerFrame) *
                                  channels);
         while (!detector.decided() && !device_lost) {
@@ -437,7 +437,7 @@ int run_record(std::string_view out_path, std::uint32_t seconds, std::uint32_t b
     // flushed into the sink once opened (see below). Bounded to a fraction of
     // a second's worth of frames, not the whole session, so the
     // bounded-memory property still holds for everything after this window.
-    iclforge::iec61937::PassthroughDetector detector;
+    iclforge::containers::iec61937::PassthroughDetector detector;
     std::uint64_t frames_written = 0;
 
     while (frames_written < target_frames && !device_lost) {
@@ -850,7 +850,7 @@ struct SplitStream {
 int submit_units_to_sink(iclforge::audio::PassthroughSink& sink,
                          std::span<const std::span<const std::byte>> units, bool eac3,
                          std::string_view device_name) {
-    iclforge::iec61937::Eac3BurstPacker eac3_packer;
+    iclforge::containers::iec61937::Eac3BurstPacker eac3_packer;
     for (const auto& unit : units) {
         std::vector<std::byte> burst;
         if (eac3) {
@@ -864,7 +864,7 @@ int submit_units_to_sink(iclforge::audio::PassthroughSink& sink,
             }
             burst = std::move(**result);
         } else {
-            const auto wrapped = iclforge::iec61937::wrap_frame(unit);
+            const auto wrapped = iclforge::containers::iec61937::wrap_frame(unit);
             if (!wrapped.has_value()) {
                 fmt::println(stderr, "error: burst wrap failed");
                 return kExitRuntime;
