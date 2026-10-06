@@ -2,8 +2,8 @@
 # iclforge::dsp - the signal-processing pieces more than one library uses: the radix-2 FFT kernel, the
 # 64-band complex QMF bank, the offline sample-rate converter and the second-order filter sections.
 # It knows no codec. The transforms that belong to one codec (AC-3's 512-sample MDCT, AC-4's KBD
-# windows) stay with that codec; folding the duplicated FFTs and QMF banks of ac3 and iclforge_ac4core into this
-# library is a later phase (planning/layout.md, "What stays out").
+# windows) stay with that codec; folding the duplicated FFTs and QMF banks of ac3 and the AC-4 core
+# into this library is a later phase (planning/layout.md, "What stays out").
 # ---------------------------------------------------------------------------
 # The minimum-footprint profile compiles what it needs into one archive (src/ac3/minimal.cmake),
 # so no library is built here for it.

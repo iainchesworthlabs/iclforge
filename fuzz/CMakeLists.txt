@@ -335,10 +335,9 @@ endif()
 # contents fuzz_ac4_parse presses (src/ac4/src/decoder) - section lengths, Huffman
 # codewords, A-SPX envelope counts, DRC gain sets and EMDF payloads, each
 # counted by the stream - and, from D2, the reconstruction of what they
-# decode to. iclforge_ac4_objects is a library of its own, so it needs its own
-# instrumentation call, as fuzz_ac4_parse's parser does, and so does the
-# shared core it links (src/ac4/src/core: the tables and transforms). Its seeds
-# are fuzz_ac4_parse's (fuzz/run.sh's seed_source_for).
+# decode to. The decoder, the shared core (src/ac4/src/core: the tables and
+# transforms) and the parser are all iclforge_ac4_objects, which the call above
+# instruments. Its seeds are fuzz_ac4_parse's (fuzz/run.sh's seed_source_for).
 #
 # Its first run from short seeds (one to three frames of the committed DEE
 # streams) stopped 2,690 executions in: ext_code's escape, whose leading ones
@@ -346,18 +345,15 @@ endif()
 # the escape to 21 bits, which the decoder now enforces; the input is under
 # fuzz/regressions/fuzz_ac4_decode/.
 if(ICLFORGE_BUILD_AC4)
-    iclforge_instrument_for_fuzzing(iclforge_ac4core)
-    iclforge_instrument_for_fuzzing(iclforge_ac4_objects)
     iclforge_add_fuzzer(fuzz_ac4_decode iclforge::ac4)
 endif()
 
 # iclforge::ac4::Encoder (src/ac4/src/encoder): configurations and samples from the input, each
 # frame read back by the decoder, whose trace must be the encoder's, decoded
 # to finite PCM, and written again byte for byte by a second encoder
-# (planning/ac4.md, the encoder's ladder, items 1 and 8). The core and the
-# decoder are instrumented by the block above.
+# (planning/ac4.md, the encoder's ladder, items 1 and 8). The encoder is
+# iclforge_ac4_objects too.
 if(ICLFORGE_BUILD_AC4)
-    iclforge_instrument_for_fuzzing(iclforge_ac4_objects)
     iclforge_add_fuzzer(fuzz_ac4_encode iclforge::ac4)
 endif()
 
