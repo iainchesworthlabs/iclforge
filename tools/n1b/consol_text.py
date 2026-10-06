@@ -718,6 +718,13 @@ ONCE = {"c4": "src/ac4/src/core/bit_reader.hpp"}
 # now, beside the arithmetic: what it is is base's headers.
 C4B = [
     Rule("base-headers", r"\biclforge(::|_)base_arithmetic\b", r"iclforge\1base_headers", _TEXT),
+    # what AC-4's code and tests named in its own namespace is iclforge's
+    Rule(
+        "qualified",
+        r"\b(?:iclforge::ac4::)?detail::(BitReader|BitWriter|variable_bits_width)\b",
+        r"iclforge::\1",
+        files=_C4_AC4,
+    ),
 ]
 
 STAGES: dict[str, list[Rule]] = {
