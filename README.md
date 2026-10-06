@@ -245,9 +245,9 @@ src/render/     iclforge::render — the room's layout, routing, the bed and obj
 src/iec61937/   iclforge::iec61937 — IEC 61937 burst packing and detection for AC-3, E-AC-3 and AC-4
 src/ac3/        iclforge::ac3 — the AC-3, E-AC-3 and Atmos codec, GUI-free
 src/ac4/        iclforge::ac4 — a standalone AC-4 sync frame/TOC/presentation/substream inspector
-src/ac4dec/     iclforge::ac4 — an AC-4 decoder, from ETSI TS 103 190-1 and -2; no iclforge::ac3
+src/ac4/src/decoder/     iclforge::ac4 — an AC-4 decoder, from ETSI TS 103 190-1 and -2; no iclforge::ac3
                 dependency
-src/ac4enc/     iclforge::ac4 — an AC-4 encoder, from the same standards; no iclforge::ac3 dependency
+src/ac4/src/encoder/     iclforge::ac4 — an AC-4 encoder, from the same standards; no iclforge::ac3 dependency
 src/ac4/src/core/    iclforge::ac4 — the tables and transforms the AC-4 decoder and encoder share, a static
                 library with no headers of its own
 src/matroska/   iclforge::matroska — a standalone MKV muxer, no iclforge::ac3 dependency

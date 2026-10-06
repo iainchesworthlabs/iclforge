@@ -697,10 +697,10 @@ and a second decoder.
 Three libraries beside the inspector, none linking `ac3::forge`
 ([decision 15](#decisions-for-the-encoder-and-the-applications)):
 
-- **The decoder**, `src/ac4dec/` (`ac4::decoder`), as D1 built it: an OBJECT library with static
+- **The decoder**, `src/ac4/src/decoder/` (`ac4::decoder`), as D1 built it: an OBJECT library with static
   and shared wrappers, headers under `include/ac4dec/`, types in namespace `ac4`, linking `ac4::ac4`
   for the table of contents and presentation types.
-- **The encoder**, `src/ac4enc/` (`ac4::encoder`), in the same pattern, with headers under
+- **The encoder**, `src/ac4/src/encoder/` (`ac4::encoder`), in the same pattern, with headers under
   `include/ac4enc/`. It links `ac4::ac4`, whose `Toc` describes what it writes and whose
   `build_dac4()` and `rfc6381_codec_string()` it reuses.
 - **The shared core**, `src/ac4/src/core/` (`ac4::core`): what both directions compute, built and tested
@@ -1482,7 +1482,7 @@ same install. G2 (#1054, 2026-09-26) made the last for AC-3, E-AC-3, E-AC-3 JOC 
 **Status:** merged as #700 on 2026-09-16, with the readings of #712 and #715; the HSF extension's
 content followed in #786. Exit met: every criterion below, the third-party streams included.
 
-- `src/ac4dec/` with its CMake, tests and an instrumented fuzz target, and the inspector additions
+- `src/ac4/src/decoder/` with its CMake, tests and an instrumented fuzz target, and the inspector additions
   under [What the inspector grows](#what-the-inspector-grows).
 - The whole syntax of channel-coded substreams in the Part 1 channel elements, from Part 1 clause 4
   and Part 2 clause 6: ASF section, spectral, scale factor and noise fill data decoded to quantised
@@ -2481,7 +2481,7 @@ and a power of two; the decorrelators and the converter's taps on 64-bit accumul
 equal on x86, the Cortex-M3 and the C3; the `double` output and the `float` pins unchanged; the fixed tier's agreement with
 `double` stated and pinned; the C6 and C3 images sized; and on the C6, with WiFi up, core decoding first.
 
-- **The tier.** `ICLFORGE_DECODE_SCALAR=fixed` selects `src/ac4/src/core/variants/scalar-fixed/`, whose `Real` is `Fixed32` (Q7.24 in
+- **The tier.** `ICLFORGE_DECODE_SCALAR=fixed` selects `src/ac4/variants/decode-scalar-fixed32/`, whose `Real` is `Fixed32` (Q7.24 in
   an `int32_t`, `src/arithmetic`). The code that differs by tier is chosen by `if constexpr` on `dsp::kFixed<Real>`
   (`dsp/scalar_traits.hpp`), so a `double` or `float` build compiles what it compiled before. In `src/ac4/src/decoder`'s files that are not
   templates the fixed branches are templates on the scalar or generic lambdas, for the same reason.
@@ -2629,7 +2629,7 @@ decode with the invariants holding and MediaInfo's and librempeg's readings reco
 
 **Status:** merged as #1011 on 2026-09-25. Exit met.
 
-- `src/ac4enc/`, with its CMake, tests, an instrumented fuzz target over its configuration and
+- `src/ac4/src/encoder/`, with its CMake, tests, an instrumented fuzz target over its configuration and
   input, the write trace, and `src/ac4/ERRATA.md`.
 - The frame writer: `ac4_toc()` at bitstream version 2 with one version 1 presentation, one
   substream group and the substream index table; the presentation substream with dialnorm; the audio
