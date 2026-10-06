@@ -9,42 +9,7 @@ namespace {
 
 constexpr int kSubbands = 64;
 
-// Table 173: the first QMF subband of each parameter band, and one past the
-// last band's.
-constexpr std::array<int, kDeNrBands + 1> kBandStart = {0, 1, 2, 4, 7, 11, 17, 27, 41};
-
-// Table 172.
-constexpr std::array<double, 32> kMixCoefficients = {
-    0.0,   6.32e-3, 1e-2,   1.79e-2, 3.16e-2, 5.65e-2, 7.87e-2, 0.111,   0.156,   0.218, 0.303,
-    0.37,  0.448,   0.533,  0.577,   0.622,   0.7071,  0.783,   0.846,   0.894,   0.929, 0.953,
-    0.976, 0.9877,  0.9938, 0.9969,  0.9984,  0.9995,  0.99984, 0.99995, 0.99998, 1.0,
-};
-
 }  // namespace
-
-double de_parameter(int index, bool cross_channel) noexcept {
-    if (cross_channel) {
-        // Table 210: -3.0 to 3.0 in steps of 0.1.
-        return 0.1 * static_cast<double>(std::clamp(index, -30, 30));
-    }
-    // Table 209: 0 to 1.5 in steps of 0.1, then 1.75, 2.0, and 2.5 to 9.0 in
-    // steps of 0.5.
-    const int i = std::clamp(index, 0, 31);
-    if (i <= 15) {
-        return 0.1 * static_cast<double>(i);
-    }
-    if (i == 16) {
-        return 1.75;
-    }
-    if (i == 17) {
-        return 2.0;
-    }
-    return 2.5 + 0.5 * static_cast<double>(i - 18);
-}
-
-double de_mix_coefficient(int index) noexcept {
-    return kMixCoefficients[static_cast<std::size_t>(std::clamp(index, 0, 31))];
-}
 
 std::array<double, kDeFront> de_rendering(int nr_channels, double coef1, double coef2) noexcept {
     switch (nr_channels) {
@@ -225,7 +190,7 @@ void DeStage::process(double gain_db, const DeFrameValues& values,
                     hw[i][j] = (1.0 - w) * previous_.w[band][i][j] + w * current.w[band][i][j];
                 }
             }
-            for (int k = kBandStart[band]; k < kBandStart[band + 1]; ++k) {
+            for (int k = kDeBandStart[band]; k < kDeBandStart[band + 1]; ++k) {
                 std::array<QmfValue, kDeFront> m{};
                 std::array<QmfValue, kDeFront> d{};
                 std::array<QmfValue*, kDeFront> where{};
@@ -298,7 +263,7 @@ void DeCoreStage::process(double gain_db, const DeFrameValues& values,
         const auto sbi = static_cast<std::size_t>(sb);
         const int ab = std::max(acpl::sb_to_pb(coefficients.num_bands, sb), 0);
         std::size_t db = 0;
-        while (db + 1 < kDeNrBands && sb >= kBandStart[db + 1]) {
+        while (db + 1 < kDeNrBands && sb >= kDeBandStart[db + 1]) {
             ++db;
         }
         for (std::size_t ch2 = 0; ch2 < kDeFront; ++ch2) {

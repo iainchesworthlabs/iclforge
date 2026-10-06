@@ -282,7 +282,7 @@ TEST_CASE("a DRC profile sent as a curve is the profile the decoder's Table 162 
 
         // The encoder's own reading of Table 166, which its transmitted gains
         // are computed with, gives the same curve.
-        const iclforge::ac4::detail::DrcGainCurve own = iclforge::ac4::detail::drc_gain_curve(c);
+        const iclforge::ac4::detail::DrcCurve own = iclforge::ac4::detail::drc_gain_curve(c);
         for (int level = -60; level <= 50; ++level) {
             CAPTURE(level);
             CHECK(own.gain(level) == table->gain(level));

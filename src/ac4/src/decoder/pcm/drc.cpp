@@ -2,13 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <complex>
 #include <cstddef>
 #include <cstdint>
-#include <numbers>
 
 #include "core/dsp/scalar_traits.hpp"
-#include "core/tables/qmf_tables.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {
@@ -25,35 +22,9 @@ constexpr double kFullScalePower = [] {
         return 32768.0 * 32768.0;
     }
 }();
-// BS.1770's offset from K-weighted mean square to LKFS.
-constexpr double kLkfsOffset = -0.691;
-// A floor for the level of silence, in the power's units.
-constexpr double kPowerFloor = 1e-15;
 
 [[nodiscard]] double db2_to_linear(double gain) noexcept {
     return std::exp2(gain / 6.0);
-}
-
-// |H(f)|^2 of a biquad at 48 kHz.
-[[nodiscard]] double biquad_power(const std::array<double, 3>& b, const std::array<double, 3>& a,
-                                  double hz) {
-    const double w = 2.0 * std::numbers::pi * hz / 48000.0;
-    const std::complex<double> z1 = std::polar(1.0, -w);
-    const std::complex<double> z2 = z1 * z1;
-    const std::complex<double> h = (b[0] + b[1] * z1 + b[2] * z2) / (a[0] + a[1] * z1 + a[2] * z2);
-    return std::norm(h);
-}
-
-// ITU-R BS.1770's K-weighting at 48 kHz, the shelf and the high-pass, as power
-// at `hz` (read at 23.5 kHz above it: the shelf is flat there).
-[[nodiscard]] double k_weight(double hz) {
-    constexpr std::array<double, 3> kShelfB = {1.53512485958697, -2.69169618940638,
-                                               1.19839281085285};
-    constexpr std::array<double, 3> kShelfA = {1.0, -1.69065929318241, 0.73248077421585};
-    constexpr std::array<double, 3> kHighPassB = {1.0, -2.0, 1.0};
-    constexpr std::array<double, 3> kHighPassA = {1.0, -1.99004745483398, 0.99007225036621};
-    const double f = std::min(hz, 23500.0);
-    return biquad_power(kShelfB, kShelfA, f) * biquad_power(kHighPassB, kHighPassA, f);
 }
 
 // BS.1770's channel weights: 1.41 at the sides (60 to 120 degrees), none for
@@ -69,7 +40,7 @@ constexpr double kPowerFloor = 1e-15;
         case Speaker::kRightSurround:
         case Speaker::kLeftWide:
         case Speaker::kRightWide:
-            return 1.41;
+            return kDrcSideWeight;
         default:
             return 1.0;
     }
@@ -146,39 +117,6 @@ constexpr double kPowerFloor = 1e-15;
 }
 
 }  // namespace
-
-double DrcCurve::gain(double level) const noexcept {
-    const auto between = [](double from_gain, double to_gain, double t) {
-        return from_gain + (to_gain - from_gain) * t;
-    };
-    if (level < max_boost_level) {
-        return max_boost_gain;
-    }
-    if (level <= section_boost_level) {
-        const double span = section_boost_level - max_boost_level;
-        return span > 0.0 ? between(section_boost_gain, max_boost_gain,
-                                    (section_boost_level - level) / span)
-                          : section_boost_gain;
-    }
-    if (level <= null_low) {
-        const double span = null_low - section_boost_level;
-        return span > 0.0 ? section_boost_gain * (null_low - level) / span : 0.0;
-    }
-    if (level <= null_high) {
-        return 0.0;
-    }
-    if (level <= section_cut_level) {
-        const double span = section_cut_level - null_high;
-        return span > 0.0 ? section_cut_gain * (level - null_high) / span : 0.0;
-    }
-    if (level <= max_cut_level) {
-        const double span = max_cut_level - section_cut_level;
-        return span > 0.0
-                   ? between(section_cut_gain, max_cut_gain, (level - section_cut_level) / span)
-                   : section_cut_gain;
-    }
-    return max_cut_gain;
-}
 
 DrcCurve drc_curve(const DrcCompressionCurve& t) noexcept {
     DrcCurve c;
@@ -360,22 +298,14 @@ void DrcStage::configure(double rate_hz, int slots, std::span<const Speaker> spe
         loudness_weight_.push_back(loudness_weight(speaker));
         group_.push_back(drc_group(speaker, add_ch_base, small, immersive));
     }
-    for (int k = 0; k < kSubbands; ++k) {
-        k_weight_[static_cast<std::size_t>(k)] =
-            k_weight((static_cast<double>(k) + 0.5) * rate_hz / (2.0 * kSubbands));
-    }
-    qmf_gain_ = 0.0;
-    for (const float w : tables::kQwin) {
-        qmf_gain_ += static_cast<double>(w) * static_cast<double>(w);
-    }
+    k_weight_ = k_weights(rate_hz);
+    qmf_gain_ = qmf_energy_gain();
     reset();
 }
 
 void DrcStage::reset() noexcept {
     dialnorm_.reset();
-    primed_ = false;
-    level_smoothed_ = 0.0;
-    gain_smoothed_ = 1.0;
+    smoothing_ = {};
     last_gain_ = 1.0;
 }
 
@@ -419,39 +349,13 @@ void DrcStage::process(const OutputConfig& output, const DrcFrameValues& values,
     const double level_gain = db2_to_linear(*output.output_level_dbfs - lin);
     const double slot_ms = static_cast<double>(kSubbands) * 1000.0 / rate_hz_;
     if (values.reset) {
-        primed_ = false;
+        smoothing_.primed = false;
     }
     for (int n = 0; n < slots_; ++n) {
         double gain = 1.0;
         if (values.curve) {
-            const DrcCurve& curve = *values.curve;
-            const double power = std::max(slot_level(side, n), kPowerFloor);
-            const double level = 10.0 * std::log10(power) + kLkfsOffset - lin;
-            const double target = db2_to_linear(curve.gain(level));
-            if (!primed_) {
-                level_smoothed_ = power;
-                gain_smoothed_ = target;
-                primed_ = true;
-            } else {
-                double tau = level_smoothed_ < power ? curve.attack_ms : curve.release_ms;
-                if (curve.adaptive) {
-                    const double change =
-                        10.0 * std::log10(power / std::max(level_smoothed_, kPowerFloor));
-                    if (change > curve.attack_threshold) {
-                        tau = curve.attack_fast_ms;
-                    } else if (change > 0.0) {
-                        tau = curve.attack_ms;
-                    } else if (-change <= curve.release_threshold) {
-                        tau = curve.release_ms;
-                    } else {
-                        tau = curve.release_fast_ms;
-                    }
-                }
-                const double alpha = tau > 0.0 ? std::exp2(-slot_ms / tau) : 0.0;
-                level_smoothed_ = alpha * level_smoothed_ + (1.0 - alpha) * power;
-                gain_smoothed_ = alpha * gain_smoothed_ + (1.0 - alpha) * target;
-            }
-            gain = gain_smoothed_;
+            const double power = std::max(slot_level(side, n), kDrcPowerFloor);
+            gain = smoothing_.step(*values.curve, power, lin, slot_ms);
         }
         for (std::size_t c = 0; c < matrices.size(); ++c) {
             QmfValue* row = matrices[c].data() + static_cast<std::size_t>(n) * kSubbands;

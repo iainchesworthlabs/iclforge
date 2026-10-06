@@ -9,6 +9,7 @@
 #include "core/dsp/qmf.hpp"
 #include "encoder/frame/metadata.hpp"
 #include "encoder/frame/timing.hpp"
+#include "meta/drc.hpp"
 
 // Transmitted DRC gains (ETSI TS 103 190-1 V1.4.1 clause 5.7.9.3.2), computed
 // from a compression curve as a decoder applying the curve would (5.7.9.3.1):
@@ -18,11 +19,10 @@
 // dB2 (6 dB2 a factor of 2, src/ac4/ERRATA.md "DRC's units").
 //
 // The level is the one the decoder's detector reads, which the text leaves to
-// the implementation (5.7.9.3.1.1): ITU-R BS.1770's K-weighted power of the
-// channels with its channel weights (1.41 at the sides, none for the LFE),
-// the K-weighting read at each QMF subband's centre, in LKFS. A profile's
-// curve is defined on the programme's level against dialnorm, so every
-// channel group (Table 168) and band (Table 164) takes the programme's gain:
+// the implementation (5.7.9.3.1.1), and the curve, its smoothing and the
+// K-weighting are the decoder's (meta/drc.hpp). A profile's curve is defined
+// on the programme's level against dialnorm, so every channel group
+// (Table 168) and band (Table 164) takes the programme's gain:
 // a group or a band measured alone reads quieter, and the curve would cut it
 // less, or boost it. What drc_gains_config 1 to 3 add here is the subframes'
 // time resolution over config 0's one gain a frame.
@@ -33,34 +33,9 @@
 
 namespace iclforge::ac4::detail {
 
-// A compression curve's control points (dB2) and time constants (ms), from
-// drc_compression_curve()'s fields as Table 166 and clauses 4.3.13.4.15 to
-// 4.3.13.4.21 give them, or Table 167's defaults.
-struct DrcGainCurve {
-    double max_boost_gain = 0.0;
-    double max_boost_level = 0.0;
-    double section_boost_gain = 0.0;
-    double section_boost_level = 0.0;
-    double null_low = 0.0;
-    double null_high = 0.0;
-    double section_cut_gain = 0.0;
-    double section_cut_level = 0.0;
-    double max_cut_gain = 0.0;
-    double max_cut_level = 0.0;
-    double attack_ms = 100.0;
-    double release_ms = 3000.0;
-    double attack_fast_ms = 10.0;
-    double release_fast_ms = 1000.0;
-    bool adaptive = false;
-    double attack_threshold = 15.0;
-    double release_threshold = 20.0;
-
-    // Clause 5.7.9.3.1.2's piecewise linear gain for a level relative to
-    // dialnorm.
-    [[nodiscard]] double gain(double level) const noexcept;
-};
-
-[[nodiscard]] DrcGainCurve drc_gain_curve(const CurveCodes& codes) noexcept;
+// The compression curve drc_compression_curve()'s fields give, as Table 166
+// and clauses 4.3.13.4.15 to 4.3.13.4.21 give them, or Table 167's defaults.
+[[nodiscard]] DrcCurve drc_gain_curve(const CurveCodes& codes) noexcept;
 
 // Table 169: DRC subframes a frame.
 [[nodiscard]] int drc_subframes(int frame_length) noexcept;
@@ -75,7 +50,7 @@ class DrcGainEncoder {
    public:
     // `channels` names the input's channels in order; `mono_or_stereo`
     // puts them in one group, as Table 168 does.
-    DrcGainEncoder(const DrcGainCurve& curve, int gains_config,
+    DrcGainEncoder(const DrcCurve& curve, int gains_config,
                    std::span<const DrcChannel> channels, bool mono_or_stereo,
                    const FrameTiming& timing, int rate_hz, double dialnorm_db);
 
@@ -91,13 +66,7 @@ class DrcGainEncoder {
     [[nodiscard]] DrcModeGains gains(long long frame);
 
    private:
-    struct Smoothing {
-        bool primed = false;
-        double level = 0.0;  // L~, as a power
-        double gain = 1.0;   // g~, linear
-    };
-
-    DrcGainCurve curve_;
+    DrcCurve curve_;
     int gains_config_ = 0;
     FrameTiming timing_;
     double slot_ms_ = 64.0 * 1000.0 / 48000.0;
@@ -108,7 +77,7 @@ class DrcGainEncoder {
     std::array<double, dsp::kQmfSubbands> k_weight_{};
     double qmf_gain_ = 1.0;  // sum of QWIN^2
     std::vector<dsp::QmfAnalysis<double>> analyses_;
-    Smoothing smoothing_;
+    DrcSmoothing smoothing_;
     // The smoothed gain of each slot analysed and not yet sent, from slot
     // `first_`.
     std::vector<double> pending_;

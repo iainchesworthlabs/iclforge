@@ -8,6 +8,7 @@
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "decoder/pcm/aspx.hpp"
 #include "decoder/syntax/metadata.hpp"
+#include "meta/dialogue.hpp"
 
 // The dialogue enhancement tool of ETSI TS 103 190-1 V1.4.1 clause 5.7.8: in
 // the QMF domain, before DRC, the dialogue in the front channels (L, R and C,
@@ -56,13 +57,6 @@ struct DeFrameValues {
     bool ms = false;                   // de_ms_proc_flag
     double alpha_c = 0.0;              // de_signal_contribution / 31
 };
-
-// Tables 209 and 210: a parameter index's value, channel independent or
-// cross-channel.
-[[nodiscard]] double de_parameter(int index, bool cross_channel) noexcept;
-
-// Table 172: a mixing coefficient index's value.
-[[nodiscard]] double de_mix_coefficient(int index) noexcept;
 
 // Clause 5.7.8.5: the rendering vector for one to three processed channels.
 [[nodiscard]] std::array<double, kDeFront> de_rendering(int nr_channels, double coef1,

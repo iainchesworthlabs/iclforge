@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "encoder/frame/metadata.hpp"
+#include "meta/dialogue.hpp"
 
 // Dialogue enhancement's parameters (ETSI TS 103 190-1 V1.4.1 clause 5.7.8).
 // The channel-independent method (5.7.8.7) raises channel m by g p m in each
@@ -15,12 +16,9 @@
 
 namespace iclforge::ac4::detail {
 
-// Table 209's channel-independent value nearest `p`, as its index: 0 to 1.5
+// Table 209's channel-independent value nearest `p`, as its index (meta/dialogue.hpp): 0 to 1.5
 // in steps of 0.1, 1.75, 2, then 2.5 to 9 in steps of 0.5.
 [[nodiscard]] int de_parameter_index(double p) noexcept;
-
-// Table 209's value of an index.
-[[nodiscard]] double de_parameter_value(int index) noexcept;
 
 // One channel's parameters for a frame, from the long-block spectra of the
 // channel and of the dialogue in it (Analysis::transform's lines,

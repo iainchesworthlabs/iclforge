@@ -2,81 +2,21 @@
 
 #include <algorithm>
 #include <cmath>
-#include <complex>
-#include <numbers>
 
 #include "core/dsp/complex.hpp"
-#include "core/tables/qmf_tables.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {
 
 constexpr std::size_t kSubbands = dsp::kQmfSubbands;
-// BS.1770's offset from K-weighted mean square to LKFS.
-constexpr double kLkfsOffset = -0.691;
-// The power of silence, which no level is taken below.
-constexpr double kPowerFloor = 1e-15;
-
-// |H(f)|^2 of a biquad at 48 kHz.
-[[nodiscard]] double biquad_power(const std::array<double, 3>& b, const std::array<double, 3>& a,
-                                  double hz) {
-    const double w = 2.0 * std::numbers::pi * hz / 48000.0;
-    const std::complex<double> z1 = std::polar(1.0, -w);
-    const std::complex<double> z2 = z1 * z1;
-    return std::norm((b[0] + b[1] * z1 + b[2] * z2) / (a[0] + a[1] * z1 + a[2] * z2));
-}
-
-// ITU-R BS.1770's K-weighting, its two filters at 48 kHz, as power at `hz`,
-// read at 23.5 kHz above that, where the shelf is flat.
-[[nodiscard]] double k_weight(double hz) {
-    constexpr std::array<double, 3> kShelfB = {1.53512485958697, -2.69169618940638,
-                                               1.19839281085285};
-    constexpr std::array<double, 3> kShelfA = {1.0, -1.69065929318241, 0.73248077421585};
-    constexpr std::array<double, 3> kHighPassB = {1.0, -2.0, 1.0};
-    constexpr std::array<double, 3> kHighPassA = {1.0, -1.99004745483398, 0.99007225036621};
-    const double f = std::min(hz, 23500.0);
-    return biquad_power(kShelfB, kShelfA, f) * biquad_power(kHighPassB, kHighPassA, f);
-}
 
 }  // namespace
 
-double DrcGainCurve::gain(double level) const noexcept {
-    // G1 to G4 of clause 5.7.9.3.1.2, each a line between two control points.
-    const auto along = [](double from, double to, double t) { return from + (to - from) * t; };
-    if (level < max_boost_level) {
-        return max_boost_gain;
-    }
-    if (level <= section_boost_level) {
-        const double span = section_boost_level - max_boost_level;
-        return span > 0.0
-                   ? along(section_boost_gain, max_boost_gain, (section_boost_level - level) / span)
-                   : section_boost_gain;
-    }
-    if (level <= null_low) {
-        const double span = null_low - section_boost_level;
-        return span > 0.0 ? section_boost_gain * (null_low - level) / span : 0.0;
-    }
-    if (level <= null_high) {
-        return 0.0;
-    }
-    if (level <= section_cut_level) {
-        const double span = section_cut_level - null_high;
-        return span > 0.0 ? section_cut_gain * (level - null_high) / span : 0.0;
-    }
-    if (level <= max_cut_level) {
-        const double span = max_cut_level - section_cut_level;
-        return span > 0.0
-                   ? along(section_cut_gain, max_cut_gain, (level - section_cut_level) / span)
-                   : section_cut_gain;
-    }
-    return max_cut_gain;
-}
-
-DrcGainCurve drc_gain_curve(const CurveCodes& codes) noexcept {
+DrcCurve drc_gain_curve(const CurveCodes& codes) noexcept {
     // Table 166: the null band, then each side's section, if it has one, a
     // step of 1 + its level code from the band, and its maximum a step of 1
     // + its code from the section, or from the band without one.
-    DrcGainCurve c;
+    DrcCurve c;
     c.null_low = -static_cast<double>(codes.lev_nullband_low);
     c.null_high = static_cast<double>(codes.lev_nullband_high);
     c.max_boost_gain = static_cast<double>(codes.gain_max_boost);
@@ -131,7 +71,7 @@ int drc_subframes(int frame_length) noexcept {
     }
 }
 
-DrcGainEncoder::DrcGainEncoder(const DrcGainCurve& curve, int gains_config,
+DrcGainEncoder::DrcGainEncoder(const DrcCurve& curve, int gains_config,
                                std::span<const DrcChannel> channels, bool mono_or_stereo,
                                const FrameTiming& timing, int rate_hz, double dialnorm_db)
     : curve_(curve),
@@ -147,15 +87,11 @@ DrcGainEncoder::DrcGainEncoder(const DrcGainCurve& curve, int gains_config,
         weight_.push_back(
             channel == DrcChannel::kLfe
                 ? 0.0
-                : (channel == DrcChannel::kSide || channel == DrcChannel::kWide ? 1.41 : 1.0));
+                : (channel == DrcChannel::kSide || channel == DrcChannel::kWide ? kDrcSideWeight
+                                                                                  : 1.0));
     }
-    for (std::size_t k = 0; k < kSubbands; ++k) {
-        k_weight_[k] = k_weight((static_cast<double>(k) + 0.5) * rate_hz / (2.0 * kSubbands));
-    }
-    qmf_gain_ = 0.0;
-    for (const float w : tables::kQwin) {
-        qmf_gain_ += static_cast<double>(w) * static_cast<double>(w);
-    }
+    k_weight_ = k_weights(static_cast<double>(rate_hz));
+    qmf_gain_ = qmf_energy_gain();
 }
 
 long long DrcGainEncoder::slots_needed(long long frame) const noexcept {
@@ -178,31 +114,8 @@ void DrcGainEncoder::push_slot(std::span<const std::array<double, dsp::kQmfSubba
             power += weight_[c] * k_weight_[k] * norm(slot[k]);
         }
     }
-    const double p = std::max(power / (static_cast<double>(kSubbands) * qmf_gain_), kPowerFloor);
-    const double level = 10.0 * std::log10(p) + kLkfsOffset - dialnorm_db_;
-    const double target = std::exp2(curve_.gain(level) / 6.0);
-    Smoothing& s = smoothing_;
-    if (!s.primed) {
-        s = Smoothing{.primed = true, .level = p, .gain = target};
-    } else {
-        double tau = s.level < p ? curve_.attack_ms : curve_.release_ms;
-        if (curve_.adaptive) {
-            const double change = 10.0 * std::log10(p / std::max(s.level, kPowerFloor));
-            if (change > curve_.attack_threshold) {
-                tau = curve_.attack_fast_ms;
-            } else if (change > 0.0) {
-                tau = curve_.attack_ms;
-            } else if (-change <= curve_.release_threshold) {
-                tau = curve_.release_ms;
-            } else {
-                tau = curve_.release_fast_ms;
-            }
-        }
-        const double alpha = tau > 0.0 ? std::exp2(-slot_ms_ / tau) : 0.0;
-        s.level = alpha * s.level + (1.0 - alpha) * p;
-        s.gain = alpha * s.gain + (1.0 - alpha) * target;
-    }
-    pending_.push_back(s.gain);
+    const double p = std::max(power / (static_cast<double>(kSubbands) * qmf_gain_), kDrcPowerFloor);
+    pending_.push_back(smoothing_.step(curve_, p, dialnorm_db_, slot_ms_));
     ++slots_;
 }
 

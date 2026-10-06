@@ -8,6 +8,7 @@
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "decoder/pcm/aspx.hpp"
 #include "decoder/syntax/metadata.hpp"
+#include "meta/drc.hpp"
 
 // The dynamic range control tool of ETSI TS 103 190-1 V1.4.1 clause 5.7.9, with
 // the output level gain it applies (5.7.9.3.3): in the QMF domain, before
@@ -21,42 +22,13 @@
 // as 10^(G/20) is taken as 2^(G/6) with them (src/ac4/ERRATA.md, "DRC's
 // units").
 //
-// The level detector, which clause 5.7.9.3.1.1 leaves to the implementation:
-// ITU-R BS.1770's K-weighted power of the channels, summed with its channel
-// weights (1 for the front channels, 1.41 for those at the sides, none for the
-// LFE), one wideband value per QMF time slot, in LKFS relative to dialnorm.
-// The K-weighting is BS.1770's two filters at 48 kHz, read at each subband's
-// centre frequency; the QMF analysis's energy gain, the sum of QWIN's squared
-// coefficients, is taken out, so a steady 997 Hz sine at full scale in one
-// channel reads -3.01 LKFS, as BS.1770 has it. That level and the gain are
-// smoothed as clause 5.7.9.3.1.2 gives, with the time constants of the mode.
+// The level detector, which clause 5.7.9.3.1.1 leaves to the implementation,
+// is meta/drc.hpp's: one wideband value per QMF time slot, so a steady 997 Hz
+// sine at full scale in one channel reads -3.01 LKFS, as BS.1770 has it. That
+// level and the gain are smoothed as clause 5.7.9.3.1.2 gives, with the time
+// constants of the mode (meta/drc.hpp's DrcSmoothing).
 
 namespace iclforge::ac4::detail {
-
-// A compression curve and its time constants, in dB2 and ms (Table 166, or
-// Table 162 for a default profile).
-struct DrcCurve {
-    double max_boost_gain = 0.0;
-    double max_boost_level = 0.0;
-    double section_boost_gain = 0.0;
-    double section_boost_level = 0.0;
-    double null_low = 0.0;
-    double null_high = 0.0;
-    double section_cut_gain = 0.0;
-    double section_cut_level = 0.0;
-    double max_cut_gain = 0.0;
-    double max_cut_level = 0.0;
-    double attack_ms = 100.0;
-    double release_ms = 3000.0;
-    double attack_fast_ms = 10.0;
-    double release_fast_ms = 1000.0;
-    bool adaptive = false;
-    double attack_threshold = 15.0;
-    double release_threshold = 20.0;
-
-    // The curve's gain for a level relative to dialnorm (clause 5.7.9.3.1.2).
-    [[nodiscard]] double gain(double level) const noexcept;
-};
 
 // Table 166: a transmitted curve's control points and time constants.
 [[nodiscard]] DrcCurve drc_curve(const DrcCompressionCurve& transmitted) noexcept;
@@ -126,10 +98,7 @@ class DrcStage {
     std::array<double, 64> k_weight_{};    // |K(f)|^2 at each subband's centre
     double qmf_gain_ = 1.0;                // sum of QWIN^2
     std::optional<double> dialnorm_;       // the last one carried
-    // The smoothing's state: L~ as a power, g~ as a linear gain.
-    bool primed_ = false;
-    double level_smoothed_ = 0.0;
-    double gain_smoothed_ = 1.0;
+    DrcSmoothing smoothing_;
     double last_gain_ = 1.0;
 };
 
