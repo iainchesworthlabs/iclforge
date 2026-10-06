@@ -1,15 +1,17 @@
 # One shape for every codec, and fewer libraries (a proposal)
 
-!!! note "Status as of 2026-10-06: C0 run and proved; C1 to C3 under way; decisions 1 to 5, 7 and 10 taken"
+!!! note "Status as of 2026-10-06: C0 and C1 run and proved; C2 and C3 wait on the user; decisions 1 to 5, 7 and 10 taken"
     Asked for by the user on 2026-10-06: "the AC3 codec and the AC4 codec structures are completely
     different. There's also duplication from inside codecs to common stuff", "the ac3 approach is the
     preferred approach", and "should there be 25 libraries? Is it worth consolidating some?". This page
     reads the tree as it stood on `main` that day. It follows [layout.md](layout.md) (N1B), which put the
     codecs side by side and left the duplicated DSP, the codec-blind vocabulary and the shape of AC-4 for
     later ([layout.md (j)](layout.md#j-what-stays-out-and-follow-on-ideas)). The user took decisions 1 to 5
-    below on 2026-10-06, and 7 and 10 before C1; 6, 8 and 9 are open. C0 ran on the local branch
-    `chore/src-consolidation-c0` and changed nothing a build outputs ([what the runs
-    found](#what-the-runs-found-that-the-plan-did-not)); nothing is pushed.
+    below on 2026-10-06, and 7 and 10 before C1; 6, 8 and 9 are open. C0 and C1 ran on the local
+    branches `chore/src-consolidation-c0` and `-c1` and changed nothing a build outputs; C1's cut moves
+    the instruction counts of the bare-metal AC-4 probe by up to 68 parts per million, which the user is
+    asked about before C2 ([what the runs found](#what-the-runs-found-that-the-plan-did-not)); nothing
+    is pushed.
 
 ## In brief
 
@@ -473,6 +475,99 @@ Not run here: MSVC and clang-cl, macOS, the ESP-IDF pack (`compote` and `idf.py`
 the packer's `stage()` was run instead, and stages the same files but the two variant headers C0
 removes), the CI dispatch, `ruff` (the sandbox will not install it) and the platform-macro check
 (`pwsh`).
+
+### C1, 2026-10-06 (`chore/src-consolidation-c1`)
+
+The commits, after C0 merged: the cuts' script (four commits) and the cut (106 files, +3,005 −2,817);
+the passes' scripts; the moves alone (393 renames, every one `R100`); the include spellings (296 files);
+the build files and the paths in text (245 files), then nine smaller passes of `consol_text.py`, each
+after the commit of its rule; the hand-written commit (74 files, +1,698 −1,844); the ABI allowlist; and
+the fixes the proof found (below). 45 commits in all, with this page's and `tools/n1b/README.md`'s; 24 of them are the scripts'.
+
+| | the plan | the run |
+|---|---|---|
+| AC-4's libraries | four become `iclforge::ac4` | one: `src/ac4/CMakeLists.txt` builds the inspector, the decoder, the encoder and the core as `iclforge::ac4`, and `src/ac4/minimal.cmake` its decode-only archive; the three build files are gone |
+| public headers (decision 7) | split in C1 | `ac4.hpp` into `core/toc.hpp`, `io/elementary.hpp` and `io/carriage.hpp`; the decoder's header into `decoder/{config,frame,presentation,decoder}.hpp`, the encoder's into `encoder/{config,encoder}.hpp`; `syntax.hpp` to `core/`; the core's 34 headers private (`src/ac4/src/core/`) |
+| `ac4.cpp` | not named | divided as its header was: `src/core/toc.cpp`, `src/io/elementary.cpp`, `src/io/carriage.cpp` |
+| the golden directory (decision 10) | `tests/golden/ac4dec` to `tests/golden/ac4` | moved, and the tests under `tests/ac4/{core,decoder,encoder,io}`; the test files keep their names (`test_ac4dec_*.cpp`) and their Catch2 tags (`[ac4dec]`, which `ctest -L` and the pages select by) |
+| the encoder's errata | not named | folded into `src/ac4/ERRATA.md` under "The encoder"; its 67 links to the decoder's entries are links within the page |
+| install | not named | 253 files become 247: two shared libraries (and their versioned names), three archives, three `.pc` files and two export headers fewer, and ten headers by area in place of four; the package config makes no `iclforge::ac4dec` or `iclforge::ac4enc` |
+| ABI allowlists | 16 to 9 over C1 to C3 | 16 to 14 |
+| coverage floor | not named | `src/ac4` at 88/80, the lowest of the three it replaces (93/88, 88/80, 88/80); not measured (below) |
+
+**The proof.** Against C0's tree, on GCC 16, Clang 22 and the shared tree, each with ADM on:
+
+- **Identical:** the pinned hashes (both modes, both compilers); the 44 commands of the CLI corpus but
+  five, whose output names the stream they read (`probe json=1` prints `"file":
+  "tests/golden/ac4/constructed/..."`), and which are identical once the path is read as the old one;
+  the exports (`export_diff.py --map c1`: `libiclforge_ac4.so` exports 1,154 names, exactly the union of
+  the three, and every other library −0 +0, 3,268 names in all); the allowlists (`abi_compare.py --map
+  c1`: the one AC-4 file holds the 60 names the three held); the public headers (`check-moves --pure` on
+  the move commit: 199 headers, none lost or edited; after the stage 192 of C0's 193 are where the plan
+  sends them, the other the header the cut divided).
+- **The whole ctest:** 3,452 tests on GCC and on Clang, all pass but the five that skip themselves, as
+  on C0. The shared tree builds every library, and its `iclforge-tests` fails to link as on `main`.
+- **The IR** (`ir_compare.py --plan --names none`, 538 units of the Clang tree, compiled at `-O0`): 524
+  identical, one the same but for an assertion's white space, eleven that differ only in what a build
+  writes (the commit, the branch and the "dirty" line of `version.cpp`, a Qt resource's time stamp, the
+  vcpkg path the two trees share), and `ac4.cpp` against `toc.cpp`. The three units the cut made define
+  the 1,258 functions `ac4.cpp` did; 179 of its 182 own functions have the same IR, and the other three
+  the same source and the same IR but for the order of their stack slots.
+- **How each unit compiles and links** (`flags_diff.py --moves`): 822 units become 824 (the cut's two),
+  and what changes is what the merge says: the two `STATIC_DEFINE`s and generated directories of the
+  libraries that went leave their consumers, the core's units take the library's define and its scalar
+  directory, and the programs link the one archive. `libiclforge_ac4.so` is linked from the objects the
+  three were.
+- **The bare-metal probes** (QEMU, `-icount`): the AC-3 decoder and the encoder print the same PCM hash,
+  instruction count, heap, stack and image size for every fixture. The three AC-4 probes print the same
+  PCM hash, heap, stack and allocations for all six fixtures, and two things that are not output bytes
+  move: the image is 80 to 112 bytes smaller, and the instructions per frame of three or four fixtures
+  move by 1,000 or 2,000 (at most 68 parts per million, at the probe's resolution of 1,000). Of the 87
+  objects of the AC-4 tree, 85 disassemble the same; `decoder.cpp`'s sections come in another order, and
+  the rest is the cut: GCC optimises `parse_raw_frame`, which the decoder calls every frame, in a unit
+  of 17,959 bytes in place of one of 30,965, and inlines and clones other helpers than it did. The
+  fixed-point probe fails its stack ceiling at 22,712 bytes, as on `main`.
+- `check_layering.py` (19 libraries, 152 edges), `check_namespaces.py` (163 public headers in 18
+  libraries), `check_pages.py`, `check_doc_paths.py` (6,201 paths) and the unit tests of `tools/n1b`,
+  `tools/checks` and `tools/ci` pass; `precheck.py` fails only the patch attribution, as on C0. The
+  fuzz tree configures, instruments all 80 AC-4 units and builds the three AC-4 harnesses, which run
+  their seeds clean. The ESP-IDF packer's `stage()` stages the same files outside AC-4 and AC-4's
+  decoder without the encoder (477 files become 483: the headers by area, the cut's units).
+
+The bare-metal difference is the one the user is asked about before C2: the plan said C1 changes no
+output byte, and it does not, but its cut changes the code GCC makes of the inspector's unit, which
+the instruction counts and the image size see.
+
+Hazards the plan did not name:
+
+- **Paths that are data.** `consol_text.py` leaves `tests/golden/` alone, as N1B's passes did, and three
+  kinds of path inside it moved with the directory: the stream a syntax digest names (51 files; the test
+  failed on each), the keys of the scalar-agreement floors (`check_ac4_decode_scalar_snr.py` keys them by
+  path from the root; 114 keys), and two tests that build the path from parts (`".." / "ac4dec" /
+  "presentations"`). Each is a rule of its own, scoped to the files it is for.
+- **Proof tools that read the tree.** `cli_bytes.py` globbed `tests/golden/ac4dec/constructed`, so on
+  C1's tree the corpus had no AC-4 commands at all; the comparison lists a missing command, which is how
+  it showed. It reads either directory now.
+- **Spellings that are not includes.** `tools/generators/gen_ac4_tables.py` writes the tables' includes
+  as strings; the core's headers became private, and their public spellings are in no include the
+  spelling pass reads. The text pass follows every moved public header to its private spelling now.
+  The comments that spelt an AC-4 header as it was before N1B (`ac4enc/encoder.hpp`) follow N1B's map.
+- **A configuration no preset builds.** `fuzz/CMakeLists.txt` instrumented `iclforge_ac4core`, a
+  target that no longer exists; no tree here configures the fuzzers, so only a configure of one found
+  it.
+- **N1B's own header map.** `n1b_docs.py`'s map is held to what N1B's layout gives and to the headers of
+  the tree, which a later stage makes disagree. The map stays as derived; `LATER_SPELLINGS` follows a
+  header a later stage moved (C0's profiling header, C1's five).
+- **Names that stay.** The macro `AC4CORE_ALSO_AT_DOUBLE`, the test files' prefixes and the Catch2 tags
+  name the core, the decoder and the encoder, which are areas of one library now; renaming them changes
+  no output but the tags are what `ctest -L ac4dec` and the pages select by, so they are left for a
+  decision of their own.
+- **The machine.** The check scripts' tests make git repositories under `TMPDIR`, which must not be
+  inside the worktree (`build/tmp` is); they run with `TMPDIR=/tmp`. A fuzzer writes what it finds into
+  the first corpus directory it is given, which is the committed seeds.
+
+Not run here: as for C0, and the coverage run (`gcovr` is not installed), so the floor of `src/ac4` is
+the lowest of the three it replaces rather than a measurement.
 
 ## (g) Decisions
 
