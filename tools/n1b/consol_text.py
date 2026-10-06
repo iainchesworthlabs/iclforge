@@ -652,7 +652,59 @@ def _c4n_tags(m: re.Match[str]) -> str:
 
 
 _C4N_OLD_TAG = "|".join(C4N_TAGS)
+
+
+def _c4n_basenames() -> dict[str, str]:
+    """The file names C4's names stage gave, old -> new, from consoldef.py's moves: a page or a
+    comment that names a test file without its directory, which the path pass does not read."""
+    import consoldef
+
+    olds = [*consoldef.C4N_EXACT, *_C4N_EXAMPLES]
+    return {Path(o).name: Path(consoldef.c4n_new(o) or o).name for o in olds}
+
+
+# Names of each shape, for _c4n_basenames(): the rules map the rest the same way.
+_C4N_EXAMPLES = (
+    "tests/ac4/decoder/ac4dec_bits.hpp",
+    "tests/ac4/decoder/ac4dec_constructed.hpp",
+    "tests/ac4/decoder/ac4dec_constructed.cpp",
+    "tests/ac4/decoder/ac4dec_hsf.hpp",
+    "tests/ac4/decoder/ac4dec_hsf.cpp",
+    "tests/ac4/decoder/ac4dec_mux.hpp",
+    "tests/ac4/decoder/ac4dec_mux.cpp",
+    "tests/ac4/decoder/ac4dec_objects.hpp",
+    "tests/ac4/decoder/ac4dec_objects.cpp",
+    "tests/ac4/decoder/ac4dec_printed_matrices.hpp",
+    "tests/ac4/decoder/ac4dec_units.hpp",
+    "tests/ac4/core/test_ac4_presentation_configs.cpp",
+    "tests/ac4/core/test_ac4_toc_syntax.cpp",
+    "tests/ac4/io/test_ac4_splitter.cpp",
+)
+
+
+def _c4n_bare(m: re.Match[str]) -> str:
+    name = m.group(0)
+    known = _c4n_basenames()
+    if name in known:
+        return known[name]
+    return re.sub(r"^test_ac4(?:dec|enc|core)_", "test_", name)
+
+
 C4N = [
+    # a test file or a helper named without its directory
+    Rule(
+        "bare-name",
+        r"(?<![\w/.-])(?:test_ac4(?:dec|enc|core)_\w+\.cpp|test_ac4(?:_\w+)?\.cpp"
+        r"|ac4dec_(?:bits|constructed|hsf|mux|objects|printed_matrices|units)\.[ch]pp"
+        r"|ac4_toc_writer\.hpp|consumer_ac4enc\.cpp)",
+        _c4n_bare,
+        _TEXT,
+        plans=True,
+    ),
+    Rule("bare-brace", r"(?<![\w/.-])test_ac4(?:dec|enc|core)_\{", "test_{", _TEXT, plans=True),
+    # the tests' own namespaces
+    Rule("test-namespace", r"\bac4dec_test\b", "ac4_decoder_test", ("cpp",)),
+    Rule("units-namespace", r"\bac4dec_units\b", "ac4_units", ("cpp",)),
     Rule(
         "tags",
         rf"(?:\[[\w.!-]+\])*\[(?:{_C4N_OLD_TAG})\](?:\[[\w.!-]+\])*",
