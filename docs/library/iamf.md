@@ -80,7 +80,7 @@ one-directional, and this is what it looks like.
 ## What gets written
 
 Every OBU and box field is transcribed from the published IAMF v2.0.0 specification (the structure is
-named at each call site in `src/containers/src/containers/src/iamf/`), per this project's clean-room rule — `libiamf`, FFmpeg and
+named at each call site in `src/containers/src/iamf/`), per this project's clean-room rule — `libiamf`, FFmpeg and
 AOM's Open Audio Renderer are oracles used to validate the output, never sources this code was
 transcribed from.
 

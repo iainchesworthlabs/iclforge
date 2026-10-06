@@ -20,7 +20,7 @@
 // tables stts/stsc/stsz/stco - a fragmented track's init segment writes
 // those last four EMPTY, but empty is just what these already do when
 // called with a zero count / empty span, so no separate "empty" variant is
-// needed). Internal to src/containers/src/containers/src/mp4/ on purpose - this is plumbing between
+// needed). Internal to src/containers/src/mp4/ on purpose - this is plumbing between
 // translation units of the same library, not public API; see
 // src/ac3/src/encoder/snr_search.hpp for the identical pattern elsewhere in
 // this codebase.

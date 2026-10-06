@@ -4,7 +4,7 @@
 
 // The EBML element ids and reserved values shared between matroska.cpp (the
 // writer: mux() and Writer) and reader.cpp (the reader: demux() and Reader).
-// Internal to src/containers/src/containers/src/matroska/ on purpose - this is plumbing between
+// Internal to src/containers/src/matroska/ on purpose - this is plumbing between
 // translation units of the same library, not public API; see
 // src/containers/src/mp4/isobmff_detail.hpp for the identical pattern in the sibling
 // container module.

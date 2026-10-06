@@ -70,7 +70,7 @@ set(ICLFORGE_BUILD_CAPI OFF CACHE BOOL "" FORCE)
 # condition the root CMakeLists.txt's own FATAL_ERROR guards require before
 # these three may also be OFF ("this is the shape a vcpkg build without the
 # matching feature actually uses"). Turning them off here is purely an
-# unused-code trim now: iclforge::containers's HLS/DASH signaling helpers (src/containers/src/containers/src/mp4/
+# unused-code trim now: iclforge::containers's HLS/DASH signaling helpers (src/containers/src/mp4/
 # hls.cpp, dash.cpp) used to fail to compile for Android outright - NDK r26's
 # bundled libc++ (LLVM 17) ships <format> gated behind
 # __has_feature(experimental_library), undefined unless the compiler is

@@ -28,7 +28,7 @@ namespace {
 
 using Bytes = std::vector<std::byte>;
 
-// --- a hand EBML writer, independent of src/containers/src/containers/src/matroska -------------------
+// --- a hand EBML writer, independent of src/containers/src/matroska -------------------
 // Deliberately NOT matroska.cpp's put_* helpers: a test that builds its
 // input with the same code the reader was written against tests the pair
 // against itself. These are transcribed from the EBML element layout.
