@@ -360,7 +360,7 @@ void split_codeword(const Codebook& cb, int dim, int index, std::array<std::int3
     const std::uint32_t ext_val = r.peek(n_ext + 4);
     r.consume(n_ext + 4);
     const auto magnitude = static_cast<std::int32_t>((std::uint32_t{1} << static_cast<unsigned>(n_ext + 4)) + ext_val);
-    r.emit(start, static_cast<int>(r.bit_position() - start), static_cast<std::uint64_t>(magnitude), "ext_code");
+    r.record(start, static_cast<int>(r.bit_position() - start), static_cast<std::uint64_t>(magnitude), "ext_code");
     return magnitude;
 }
 

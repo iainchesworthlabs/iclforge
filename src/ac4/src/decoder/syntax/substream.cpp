@@ -50,7 +50,7 @@ namespace {
                 mask = (mask << 1U) | r.peek(1);
                 r.consume(1);
             }
-            r.emit(start, n_fb_dmx, mask, "dmx_active_signals_mask");
+            r.record(start, n_fb_dmx, mask, "dmx_active_signals_mask");
             ajoc.dmx_active_signals_mask = mask;
         }
         if (auto ok =

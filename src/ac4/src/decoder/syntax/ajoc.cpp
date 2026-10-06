@@ -76,7 +76,7 @@ constexpr std::array<CodebookSet, 2> kCoarse = {{
         value = (value << 1U) | r.peek(1);
         r.consume(1);
     }
-    r.emit(start, bits, value, name);
+    r.record(start, bits, value, name);
     return value;
 }
 
@@ -87,17 +87,17 @@ constexpr std::array<CodebookSet, 2> kCoarse = {{
     const std::size_t start = r.bit_position();
     if (r.peek(1) == 0) {
         r.consume(1);
-        r.emit(start, 1, 0, "de_dlg_dmx_coeff_idx");
+        r.record(start, 1, 0, "de_dlg_dmx_coeff_idx");
         return 0;
     }
     if (r.peek(4) == 0b1111) {
         r.consume(4);
-        r.emit(start, 4, 0b1111, "de_dlg_dmx_coeff_idx");
+        r.record(start, 4, 0b1111, "de_dlg_dmx_coeff_idx");
         return 15;
     }
     const std::uint32_t code = r.peek(5);
     r.consume(5);
-    r.emit(start, 5, code, "de_dlg_dmx_coeff_idx");
+    r.record(start, 5, code, "de_dlg_dmx_coeff_idx");
     return static_cast<std::uint8_t>((code & 0b1111U) + 1U);
 }
 

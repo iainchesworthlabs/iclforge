@@ -18,7 +18,7 @@ int huff_decode(BitReader& reader, const Codebook& codebook, std::string_view el
         if (length != 0 && static_cast<std::size_t>(length) <= reader.remaining_bits()) {
             const auto index = static_cast<std::uint16_t>(entry >> 4U);
             reader.consume(length);
-            reader.emit(start, length, index, element);
+            reader.record(start, length, index, element);
             return index;
         }
     }
@@ -42,7 +42,7 @@ int huff_decode(BitReader& reader, const Codebook& codebook, std::string_view el
             begin, end, code, [](const HuffEntry& entry, std::uint32_t value) { return entry.code < value; });
         if (found != end && found->code == code) {
             reader.consume(length);
-            reader.emit(start, length, found->index, element);
+            reader.record(start, length, found->index, element);
             return found->index;
         }
     }

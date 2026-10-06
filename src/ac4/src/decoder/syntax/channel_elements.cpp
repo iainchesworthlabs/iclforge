@@ -920,11 +920,11 @@ ParseResult ElementParser::immersive_element(bool b_lfe, bool b_5fronts) {
     int mode = immersive_mode::kAspxAjcc;
     if (r_.peek(1) != 0) {
         r_.consume(1);
-        r_.emit(start, 1, 1, "immersive_codec_mode_code");
+        r_.record(start, 1, 1, "immersive_codec_mode_code");
     } else {
         mode = static_cast<int>(r_.peek(3));
         r_.consume(3);
-        r_.emit(start, 3, static_cast<std::uint64_t>(mode), "immersive_codec_mode_code");
+        r_.record(start, 3, static_cast<std::uint64_t>(mode), "immersive_codec_mode_code");
     }
     if (auto ok = check(r_); !ok) {
         return ok;

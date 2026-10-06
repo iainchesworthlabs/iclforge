@@ -933,7 +933,7 @@ ParseResult GranuleDecoder::run() {
     for (std::size_t bit = first; bit < ac_start + ac_bits; ++bit) {
         tail = (tail << 1U) | r.bit(bit);
     }
-    r.emit(ac_start, static_cast<int>(ac_bits), tail, "ssf_ac_data");
+    r.record(ac_start, static_cast<int>(ac_bits), tail, "ssf_ac_data");
     r.seek(ac_start + ac_bits);
 
     // What the next granule starts from.

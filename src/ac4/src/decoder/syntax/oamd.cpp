@@ -23,12 +23,12 @@ namespace {
     const std::size_t start = r.bit_position();
     if (r.peek(1) == 0) {
         r.consume(1);
-        r.emit(start, 1, 0, name);
+        r.record(start, 1, 0, name);
         return 0;
     }
     const auto code = static_cast<int>(r.peek(2));
     r.consume(2);
-    r.emit(start, 2, static_cast<std::uint64_t>(code), name);
+    r.record(start, 2, static_cast<std::uint64_t>(code), name);
     return code;
 }
 
