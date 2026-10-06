@@ -9,7 +9,7 @@ IR once the names are read alike. What is left of a difference is another consta
 another overload, or a string that prints a qualified name.
 
     ir_compare.py compile <build dir> <out dir> [--jobs N] [--tests] [--only <substring>]
-                  [--asserts]
+                  [--asserts] [--source <src dir>]
     ir_compare.py compare <old dir> <new dir> --old-root <src dir> --new-root <src dir>
                   [--diffs <dir>] [--jobs N] [--plan <plan.json>]
 
@@ -143,10 +143,16 @@ def run_one(entry: dict, out: Path, asserts: bool) -> tuple[str, int, str]:
 
 
 def compile_tree(
-    build: Path, out_dir: Path, jobs: int, tests: bool, only: str | None, asserts: bool = False
+    build: Path,
+    out_dir: Path,
+    jobs: int,
+    tests: bool,
+    only: str | None,
+    asserts: bool = False,
+    source: Path | None = None,
 ) -> int:
     build = build.resolve()
-    src = (build.parent / "src").resolve()
+    src = (source or build.parent / "src").resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     db = json.loads((build / "compile_commands.json").read_text(encoding="utf-8"))
     work: list[tuple[dict, Path]] = []
@@ -394,6 +400,9 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--tests", action="store_true")
     c.add_argument("--asserts", action="store_true")
     c.add_argument("--only", default=None)
+    c.add_argument(
+        "--source", type=Path, default=None, help="the source tree, if not <build>/../src"
+    )
     k = sub.add_parser("compare")
     k.add_argument("old")
     k.add_argument("new")
@@ -406,7 +415,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     a = ap.parse_args(argv)
     if a.mode == "compile":
-        return compile_tree(Path(a.build), Path(a.out), a.jobs, a.tests, a.only, a.asserts)
+        return compile_tree(
+            Path(a.build), Path(a.out), a.jobs, a.tests, a.only, a.asserts, a.source
+        )
     moves = json.loads(a.plan.read_text(encoding="utf-8"))["moves"] if a.plan else None
     return compare_dirs(Path(a.old), Path(a.new), a.old_root, a.new_root, a.diffs, a.jobs, moves)
 
