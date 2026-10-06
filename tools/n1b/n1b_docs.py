@@ -354,6 +354,13 @@ _HEADER_RX = re.compile(
 LATER_SPELLINGS: dict[str, str] = {
     # C0: the AC-4 core's profiling variant is iclforge::base's
     "iclforge/ac4core/detail/profiling.hpp": "iclforge/base/detail/profiling.hpp",
+    # C1: AC-4 one library, its headers by area; the header the cut divided names the table of
+    # contents', and the core's scalar variant is the library's
+    "iclforge/ac4/ac4.hpp": "iclforge/ac4/core/toc.hpp",
+    "iclforge/ac4/syntax.hpp": "iclforge/ac4/core/syntax.hpp",
+    "iclforge/ac4core/detail/real.hpp": "iclforge/ac4/detail/real.hpp",
+    "iclforge/ac4dec/decoder.hpp": "iclforge/ac4/decoder/decoder.hpp",
+    "iclforge/ac4enc/encoder.hpp": "iclforge/ac4/encoder/encoder.hpp",
 }
 
 

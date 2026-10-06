@@ -51,6 +51,8 @@ class Rule:
     # layout study's two, which name the paths before and after on purpose): a path or a header a
     # plan names follows the tree, as N1B's path pass had it do
     plans: bool = False
+    # the files the rule alone reads, by prefix, KEEP's among them (empty: every file of its kinds)
+    files: tuple[str, ...] = ()
     compiled: re.Pattern = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -99,7 +101,8 @@ C1 = [
     Rule("pkg-config", r"\biclforge-ac4(?:dec|enc)\b(?![-\w])", "iclforge-ac4", _TEXT),
     Rule(
         "macro",
-        r"\bICLFORGE_AC4(?:DEC|ENC)_((?:DEPRECATED_)?(?:NO_)?EXPORT|DEPRECATED|STATIC_DEFINE|BUILDING_SHARED)\b",
+        r"\bICLFORGE_AC4(?:DEC|ENC)_"
+        r"((?:DEPRECATED_)?(?:NO_)?EXPORT|DEPRECATED|STATIC_DEFINE|BUILDING_SHARED)\b",
         r"ICLFORGE_AC4_\1",
         _TEXT,
     ),
@@ -196,6 +199,25 @@ C1_PROSE = [
         _TEXT,
         plans=True,
     ),
+    # The encoder's errata, folded into the decoder's page, link the decoder's entries on the page
+    # they are on.
+    Rule(
+        "errata-self",
+        r"\.\./ac4dec/ERRATA\.md#",
+        "#",
+        _TEXT,
+        files=("src/ac4/ERRATA.md",),
+    ),
+    # A syntax digest names its stream by the path from tests/golden/ (ac4_syntax.stream_label), and
+    # the constructed streams moved with tests/golden/ac4dec: the generator writes the new path.
+    Rule(
+        "digest-stream",
+        r"^(# ac4-syntax-digest/1 )\.\./ac4dec/",
+        r"\1../ac4/",
+        _TEXT,
+        re.MULTILINE,
+        files=("tests/golden/ac4/",),
+    ),
 ]
 STAGES: dict[str, list[Rule]] = {"c0": C0, "c1": C1 + C1_PROSE}
 
@@ -213,10 +235,17 @@ HELD_PLANS = KEEP[1:4]
 
 
 def rewrite(
-    text: str, rules: list[Rule], kinds: set[str], counts: Counter, plan_page: bool = False
+    text: str,
+    rules: list[Rule],
+    kinds: set[str],
+    counts: Counter,
+    plan_page: bool = False,
+    path: str = "",
 ) -> str:
     for rule in rules:
         if not kinds.intersection(rule.kinds) or (plan_page and not rule.plans):
+            continue
+        if rule.files and not path.startswith(rule.files):
             continue
         text, n = rule.compiled.subn(rule.replacement, text)
         counts[rule.name] += n
@@ -251,14 +280,16 @@ def run(
     changed: list[str] = []
     for f in repo.files:
         plan_page = f.startswith("planning/")
-        if f.startswith(KEEP) and not (plan_page and not f.startswith(HELD_PLANS)):
+        kept = f.startswith(KEEP) and not (plan_page and not f.startswith(HELD_PLANS))
+        file_rules = [r for r in rules if r.files and f.startswith(r.files)] if kept else rules
+        if not file_rules:
             continue
         path = root / f
         try:
             text = path.read_bytes().decode("utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        out = rewrite(text, rules, kind_of(f), counts, plan_page)
+        out = rewrite(text, file_rules, kind_of(f), counts, plan_page, f)
         if out != text:
             changed.append(f)
             if not dry_run:

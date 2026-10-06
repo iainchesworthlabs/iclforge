@@ -197,7 +197,7 @@ class Code(Case):
         )
         self.renamed(
             "`mp4/hls.hpp`, `ac4dec/decoder.hpp`",
-            "`iclforge/mp4/hls.hpp`, `iclforge/ac4dec/decoder.hpp`",
+            "`iclforge/mp4/hls.hpp`, `iclforge/ac4/decoder/decoder.hpp`",
         )
         self.renamed(
             "`ac3::forge` and `ac3::forge_static`, `ac4::decoder`",
