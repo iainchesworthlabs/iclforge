@@ -195,7 +195,7 @@ if(ICLFORGE_BUILD_IAB)
 endif()
 
 # iclforge::adm share iclforge::adm's ICLFORGE_BUILD_ADM (see
-# src/admbridge/CMakeLists.txt's header comment), and unlike every other component in this file
+# src/adm/CMakeLists.txt's header comment), and unlike every other component in this file
 # each installs and exports its SHARED variant only, regardless of ICLFORGE_INSTALL_BOTH_LINKAGES
 # and BUILD_SHARED_LIBS: iclforge::adm embeds the third-party libbw64 and libadm (never installed or
 # exported by this project in their own right), which only a self-contained shared library can

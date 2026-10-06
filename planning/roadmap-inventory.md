@@ -181,7 +181,7 @@ passthrough tests for A2/A3; TDM DAC boards for sinks; Music Assistant compatibi
 | `AC3FORGE_BUILD_CRUCIBLE` | `apps/crucible` | OFF | UX12; CI sets ON on selected legs |
 | `AC3FORGE_BUILD_IAMF` | `src/iamf` | ON | IM3 phase 1 |
 | `AC3FORGE_BUILD_IAB` | `src/iab` | ON | IM1 |
-| `AC3FORGE_BUILD_ADM` | `src/adm`, `src/admbridge` | OFF | ADM/JOC bridge optional |
+| `AC3FORGE_BUILD_ADM` | `src/adm`, `src/adm` | OFF | ADM/JOC bridge optional |
 | `hearth-esp32s3` CI job | `.github/workflows/_build.yml` | — | B-chip sink verification |
 | `ABI_ENFORCE` | `_ci-core.yml` | `false` | AP1 deferred gate |
 

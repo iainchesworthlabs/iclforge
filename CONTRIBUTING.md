@@ -88,7 +88,7 @@ into another library's namespace, or into `iclforge` itself.
 AC-4 codec, in namespace `iclforge::ac4`, laid out by the same areas (`core`, `io`, `decoder`,
 `encoder`), and links nothing from `src/ac3`.
 The two codecs stand on libraries that know no codec: `src/base` (bit I/O, the speaker
-vocabulary, the CPU probe), `src/arithmetic` (header-only: `Fixed32`, the project's own float
+vocabulary, the CPU probe), `src/base` (header-only: `Fixed32`, the project's own float
 functions and the SIMD seam; it is not installed), `src/dsp` (the transforms more than one
 library uses), `src/objects` (the object-audio model and the Object Audio Metadata payload),
 `src/render` (layouts, routing and the renderer) and `src/iec61937` (burst packing).

@@ -44,7 +44,7 @@ set(ICLFORGE_EXAMPLES
 if(ICLFORGE_BUILD_ADM)
     list(APPEND ICLFORGE_EXAMPLES read_adm encode_adm)
     # encode_iab (IAB reader phase 3) needs iclforge::adm's own IAB mapping (build_iab), gated
-    # the same way encode_adm needs the ADM one - see src/admbridge/CMakeLists.txt's own header
+    # the same way encode_adm needs the ADM one - see src/adm/CMakeLists.txt's own header
     # comment for why that whole module rides ICLFORGE_BUILD_ADM. Unlike encode_adm it does NOT
     # need iclforge::adm directly (iclforge::iab, its own container reader, is always available -
     # ICLFORGE_BUILD_IAB defaults ON).

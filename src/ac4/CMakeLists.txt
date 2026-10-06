@@ -152,14 +152,14 @@ set(_ac4_kernel_sources
 # application supplies. The profile builds no iclforge::base, so the directory
 # comes from src/base by variable (ICLFORGE_PROFILING_INCLUDE_DIR).
 #
-# iclforge::arithmetic (src/arithmetic): Fixed32, MantExp and the project's own
+# iclforge::base_arithmetic (src/base): Fixed32, MantExp and the project's own
 # float transcendentals, decision 31's "no copies", the same on every platform.
 set(_ac4_private_includes
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}"
     "${ICLFORGE_PROFILING_INCLUDE_DIR}")
 set(_ac4_link_private
-    "$<BUILD_INTERFACE:iclforge::arithmetic>"
+    "$<BUILD_INTERFACE:iclforge::base_arithmetic>"
     "$<BUILD_INTERFACE:iclforge::tracy>")
 
 # tests/CMakeLists.txt compiles the kernels a second time into iclforge-tests in a shared build, where

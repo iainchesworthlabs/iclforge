@@ -165,7 +165,7 @@ src/mp4               90 85
 src/mpegts            92 85
 src/capi              84 74
 src/adm            82 75
-src/admbridge         88 78
+src/adm         88 78
 src/sendspin          85 74
 src/ac4               88 80
 src/iab            90 87

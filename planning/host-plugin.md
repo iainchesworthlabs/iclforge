@@ -103,7 +103,7 @@ elementary stream, and no format below has a way to do that.
 
 **Object panner.** The library has the machinery — `src/adm` for BW64/ADM,
 `src/objects/include/iclforge/objects/oamd.hpp`, `scene.hpp` and `motion.hpp` for object metadata and
-trajectories, `src/admbridge` for coordinate conversion. The wall is the formats, and it is the
+trajectories, `src/adm` for coordinate conversion. The wall is the formats, and it is the
 next section.
 
 ### The formats, and what they can express

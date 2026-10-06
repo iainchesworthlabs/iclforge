@@ -1,7 +1,7 @@
 // A real ADM BWF master, all the way to a Dolby Atmos E-AC-3 (DD+ JOC) elementary stream.
 //
 // Roadmap item B1 phase 3 of 3 (the last piece - phase 1 is iclforge::adm, src/adm; phase 2 is
-// iclforge::admbridge, src/admbridge). This is a minimal, standalone illustration of the same
+// iclforge::admbridge, src/adm). This is a minimal, standalone illustration of the same
 // pipeline forge's 'atmos-adm' command drives for real: iclforge::adm::parse_bw64() reads the
 // container + ADM XML graph, iclforge::adm::build() maps it onto
 // iclforge::ac3::oba::AtmosEncoder's flat object-list input shape (one bed speaker feed pinned in

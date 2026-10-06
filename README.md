@@ -234,7 +234,7 @@ and where the raw-pointer boundaries are, the per-access-unit resource limits, a
 # tools/checks/layering.json says which library may include which
 src/base/       iclforge::base — bit I/O, the speaker vocabulary, the CPU probe and the profiling
                 hooks every library shares; it knows no codec
-src/arithmetic/ iclforge::arithmetic — header-only: Fixed32, the project's own float functions and the
+src/base/ iclforge::base_arithmetic — header-only: Fixed32, the project's own float functions and the
                 SIMD seam that iclforge::ac3 and iclforge::ac4 share; built in-tree, not installed
 src/dsp/        iclforge::dsp — the FFT kernel, the 64-band QMF bank, the sample-rate converter and
                 the filter sections more than one library uses
@@ -253,7 +253,7 @@ src/mpegts/     iclforge::mpegts — a standalone MPEG-2 Transport Stream muxer,
 src/iamf/       iclforge::iamf — a standalone IAMF v2.0 OBU/ISOBMFF reader and writer, fed from an E-AC-3 decode
 src/iab/        iclforge::iab — a standalone SMPTE ST 2098-2 (IAB) bitstream reader, codec-blind
 src/adm/        iclforge::adm — BW64/RF64 + Audio Definition Model reader (opt-in, needs Boost)
-src/admbridge/  iclforge::admbridge — maps the ADM object graph src/adm parses onto the Atmos
+src/adm/  iclforge::admbridge — maps the ADM object graph src/adm parses onto the Atmos
                 encoder's input
 src/signing/    iclforge::signing — EMDF object signing, key supplied at runtime
 src/capi/       iclforge_c — a plain-C11 surface over the AC-3, E-AC-3 and AC-4 encode/decode

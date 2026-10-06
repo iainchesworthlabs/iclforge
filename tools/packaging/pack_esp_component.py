@@ -69,9 +69,9 @@ STAGED_TREES = (
     # The header-only Fixed32 / scalar-function target src/ac3 and src/ac4
     # both link (planning/ac4.md decision 31); the root CMakeLists.txt adds it
     # with add_subdirectory before it reaches src/ac3, so a staged tree
-    # without it stops the configure with "source src/arithmetic ... is not an
+    # without it stops the configure with "source src/base ... is not an
     # existing directory" - the failure this list produced when D14a added it.
-    "src/arithmetic",
+    "src/base",
     "cmake",
 )
 

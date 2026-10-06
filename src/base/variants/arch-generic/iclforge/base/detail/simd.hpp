@@ -7,7 +7,7 @@
 // The portable (no-SIMD) member of the arch seam.
 //
 // One of src/arithmetic/arch/{generic,x86_64,aarch64}/ is put on
-// the include path by src/arithmetic/CMakeLists.txt (iclforge::arithmetic's INTERFACE), so every
+// the include path by src/base/CMakeLists.txt (iclforge::base_arithmetic's INTERFACE), so every
 // `#include "ac3/internal/arch/simd.hpp"` in the codec core resolves to
 // exactly one of these three identically-pathed headers - the mechanism
 // src/internal/profiling/tracy_{enabled,disabled}/ already uses for the

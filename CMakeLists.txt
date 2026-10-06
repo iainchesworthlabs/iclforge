@@ -457,7 +457,7 @@ endif()
 # (planning/ac4.md, decision 31). Header-only and dependency-free, so it goes
 # first; both consumers link it PRIVATE.
 include(IclforgeLibrary)
-add_subdirectory(src/arithmetic)
+add_subdirectory(src/base)
 
 # The codec-blind libraries the AC-3 codec builds on, each linking only the ones above it:
 # base (bit I/O, the speaker vocabulary, the kernels' build variants), dsp, objects (the object model
@@ -571,9 +571,9 @@ if(ICLFORGE_BUILD_ADM)
     # iclforge::ac3::oba::AtmosEncoder. Depends on iclforge::ac3 (added above), iclforge::adm (just added) and
     # (IAB reader phase 3) iclforge::iab (added earlier, guarded above), so it is meaningless
     # without ICLFORGE_BUILD_ADM - gated by the same flag rather than a new option of its own; see
-    # src/admbridge/CMakeLists.txt's own header comment for the full reasoning, including why this
+    # src/adm/CMakeLists.txt's own header comment for the full reasoning, including why this
     # is a separate module from every side it bridges.
-    add_subdirectory(src/admbridge)
+    add_subdirectory(src/adm)
 endif()
 
 # iclforge_c (C API) - after src/ac3 so iclforge::ac3_static exists to embed, gated by its own

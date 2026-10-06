@@ -9,7 +9,7 @@
 # The variant directories are chosen here, by CMake, and put on the include path of everything that
 # links this library: a translation unit includes iclforge/base/detail/profiling.hpp and never asks
 # what it is being compiled for, which is the rule tools/checks/check_platform_macros.ps1 enforces.
-# The SIMD architecture is chosen the same way in src/arithmetic, which this directory reads the answer
+# The SIMD architecture is chosen the same way in src/base, which this directory reads the answer
 # of (ICLFORGE_SIMD_RESOLVED) from the root scope.
 # ---------------------------------------------------------------------------
 

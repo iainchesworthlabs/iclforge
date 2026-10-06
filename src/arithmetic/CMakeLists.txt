@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::arithmetic - the scalar building blocks the decoder's arithmetic tiers
+# iclforge::base_arithmetic - the scalar building blocks the decoder's arithmetic tiers
 # share: Fixed32 (iclforge/base/arithmetic/fixed32.hpp, the Q7.24 fixed-point tier's
 # type) and the project's own cross-platform-identical float transcendentals
 # (iclforge/base/arithmetic/scalar_math.hpp). Header-only, so there is nothing to
@@ -23,7 +23,7 @@
 # installed package needs to reach.
 # ---------------------------------------------------------------------------
 add_library(iclforge_arithmetic INTERFACE)
-add_library(iclforge::arithmetic ALIAS iclforge_arithmetic)
+add_library(iclforge::base_arithmetic ALIAS iclforge_arithmetic)
 
 target_include_directories(iclforge_arithmetic INTERFACE
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
@@ -95,7 +95,7 @@ endif()
 # The directories were src/forge/src/internal/arch/ until src/ac4/src/core's QMF
 # banks took vector kernels of their own (planning/ac4.md, D14a, and decision 31's
 # "the vector types" in a header-only target both consumers link): this target
-# carries the include path, so linking iclforge::arithmetic is all a consumer does.
+# carries the include path, so linking iclforge::base_arithmetic is all a consumer does.
 #
 # ICLFORGE_SIMD forces a directory. `generic` in particular is what a
 # reproducibility comparison wants (is a difference between two machines the
@@ -139,7 +139,7 @@ if(NOT IS_DIRECTORY "${ICLFORGE_ARCH_INCLUDE_DIR}")
         "copy is the portable implementation and is a working starting point.")
 endif()
 
-# Every consumer of iclforge::arithmetic (iclforge::ac3, iclforge_ac3_minimal, src/ac4/src/core) gets the
+# Every consumer of iclforge::base_arithmetic (iclforge::ac3, iclforge_ac3_minimal, src/ac4/src/core) gets the
 # one directory through the target.
 target_include_directories(iclforge_arithmetic INTERFACE "$<BUILD_INTERFACE:${ICLFORGE_ARCH_INCLUDE_DIR}>")
 

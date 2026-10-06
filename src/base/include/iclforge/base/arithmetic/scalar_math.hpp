@@ -8,7 +8,7 @@
 // The transcendentals the encoders' content analyses call, in the scalar of
 // the coefficient store (ac3/internal/encode_scalar.hpp), as one overload set.
 //
-// Header-only, in its own target (src/arithmetic) so that iclforge::ac3 and
+// Header-only, in its own target (src/base) so that iclforge::ac3 and
 // src/ac4/src/core both use this one copy rather than each carrying their own
 // (planning/ac4.md, decision 31). It lived at src/forge/src/core/scalar_math.hpp
 // until AC-4's D14a moved it here; nothing about the functions changed in the

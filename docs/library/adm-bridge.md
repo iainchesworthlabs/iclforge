@@ -51,7 +51,7 @@ Two hard constraints rule out folding this into either side it bridges:
   configuration of this project. It cannot gain a dependency on the opt-in, Boost-requiring
   `iclforge::adm` without breaking every default build.
 
-`iclforge::admbridge` is therefore its own module (`src/admbridge/`), PUBLIC-linking both — the same
+`iclforge::admbridge` is therefore its own module (`src/adm/`), PUBLIC-linking both — the same
 shape `iclforge::signing` uses for its own `iclforge::ac3` dependency. Like `iclforge::adm` itself
 (see [ADM / BW64 reading](adm.md)), it IS part of the installed `find_package(iclforge)` package,
 but shared-only: `iclforge::adm_shared`/the bare `iclforge::admbridge` alias, no `_static` variant.

@@ -12,13 +12,13 @@
 //
 // At Real = double they are libm's own calls, exactly as the tools made them (`std::pow`, and
 // `iclforge::internal::scalar_exp2`, which is `std::exp2` there), so the double build's output is
-// the bytes it was. At Real = float they are the project's own functions (src/arithmetic's
+// the bytes it was. At Real = float they are the project's own functions (src/base's
 // `scalar_exp2` and `scalar_log2`): plain float multiplies and adds, the same float on the x86-64
 // host, the Cortex-M3 leg and the ESP32s, where the C libraries' `powf` and `exp2f` differ in the
 // last bit on some inputs. In the fixed-point tier they take a MantExp, a mantissa and a power of
 // two (dsp/scalar_traits.hpp's Energy), and are that type's integer log2 and exp2. They live in
 // this target, and not in the decoder's, because src/ac4/src/decoder includes from src/ac4/src/core and
-// src/ac4/src/core from src/arithmetic (tools/checks/layering.json).
+// src/ac4/src/core from src/base (tools/checks/layering.json).
 
 namespace iclforge::ac4::detail::dsp {
 

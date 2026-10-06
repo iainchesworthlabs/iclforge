@@ -190,7 +190,7 @@ iclforge_add_library(ac3
     LINK_PRIVATE
         "$<BUILD_INTERFACE:iclforge::tracy>"
         "$<BUILD_INTERFACE:iclforge::fmt_private>"
-        "$<BUILD_INTERFACE:iclforge::arithmetic>")
+        "$<BUILD_INTERFACE:iclforge::base_arithmetic>")
 add_dependencies(iclforge_ac3_objects iclforge_version)
 target_include_directories(iclforge_ac3_objects PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>")

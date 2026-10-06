@@ -1952,7 +1952,7 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   - Vector kernels on the host (`f32x4`, `f64x2`) on the split planes, each identical bit for bit
     to the loop it replaces.
 
-  **Built in D14a.** Decision 31's header-only target (`src/arithmetic`) moved `Fixed32`
+  **Built in D14a.** Decision 31's header-only target (`src/base`) moved `Fixed32`
   and the float scalar functions out of `ac3::forge`'s own tree with no copy; both `ac3::forge` and
   `src/ac4/src/core` link it. `src/ac4/src/core`'s own QMF-domain kernels - the analysis/synthesis pair, the
   FFT and MDCT, A-SPX's high-frequency generator, A-CPL's decorrelators and ducker, A-JOC's
@@ -1978,7 +1978,7 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   own coefficients from `acpl::interpolate()`, deliberately left untouched - keep `double`, narrowed
   once where they multiply a `Real` or `QmfValue`, in the shape the QMF banks' own twiddle factors
   already used. `hf_generator.cpp`'s dB gains, which called `std::log10`/`std::pow` directly at
-  every scalar, now go through a new `scalar_exp2` (`src/arithmetic`, beside the existing
+  every scalar, now go through a new `scalar_exp2` (`src/base`, beside the existing
   `scalar_log2`/`scalar_exp`) at `float` only; the `double` path still calls them directly,
   unchanged. `src/ac4/src/encoder` calls several of `src/ac4/src/core`'s kernels at a literal `double`, since the
   encoder has no `float` tier of its own ([decision 34](#decisions-of-2026-09-25)) and `ac4core` is
@@ -2002,7 +2002,7 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   sum, at both scalars. A slot takes 0.77 us in analysis and 0.83 us in synthesis at `double`, from
   3.15 and 3.3. The vector kernels (`qmf_vector.hpp`) put the seven steps of a slot on `f32x4` and
   `f64x2`, each tested equal bit for bit to the scalar loop it replaces, at both scalars, and the
-  banks to those loops composed. The SIMD seam moved from `src/ac3` to `src/arithmetic` for them
+  banks to those loops composed. The SIMD seam moved from `src/ac3` to `src/base` for them
   (`ac3::arithmetic` now carries the architecture directory): on the x86-64 seam a slot is 2.2 to
   3.9 times faster at `float` and 0.9 to 1.6 times at `double`. On the Cortex-M3 leg the seam is the
   generic directory, and the same kernels run 0.2 to 0.3% fewer instructions and add 4.2 KB to the image
@@ -2482,7 +2482,7 @@ equal on x86, the Cortex-M3 and the C3; the `double` output and the `float` pins
 `double` stated and pinned; the C6 and C3 images sized; and on the C6, with WiFi up, core decoding first.
 
 - **The tier.** `ICLFORGE_DECODE_SCALAR=fixed` selects `src/ac4/variants/decode-scalar-fixed32/`, whose `Real` is `Fixed32` (Q7.24 in
-  an `int32_t`, `src/arithmetic`). The code that differs by tier is chosen by `if constexpr` on `dsp::kFixed<Real>`
+  an `int32_t`, `src/base`). The code that differs by tier is chosen by `if constexpr` on `dsp::kFixed<Real>`
   (`dsp/scalar_traits.hpp`), so a `double` or `float` build compiles what it compiled before. In `src/ac4/src/decoder`'s files that are not
   templates the fixed branches are templates on the scalar or generic lambdas, for the same reason.
 - **Where the values sit.** A sample of PCM has full scale at 8.0 and a QMF sample sits at 2^-16 of the `double` decoder's, two
@@ -2504,7 +2504,7 @@ equal on x86, the Cortex-M3 and the C3; the `double` output and the `float` pins
   from flash, so the 1001/960 table costs no RAM: a C6 has no PSRAM, and 188 KB is most of what it has free with WiFi up. A fixed
   image links these three tables and no `float` one.
 
-**Built in D14d.** In `src/arithmetic`, `mant_exp.hpp`; in `src/ac4/src/core`, the `scalar-fixed` variant, `dsp/scalar_traits.hpp`,
+**Built in D14d.** In `src/base`, `mant_exp.hpp`; in `src/ac4/src/core`, the `scalar-fixed` variant, `dsp/scalar_traits.hpp`,
 `dsp/qmf_fixed.hpp` and the generated `tables/qmf_tables_fixed.hpp` (`tools/generators/gen_ac4_fixed_tables.py`, with `--check`),
 `Fft::inverse_scaled()`, the IMDCT's and the synthesis's overloads that carry a block's exponent, and the fixed branches of
 `aspx/hf_generator.cpp`, `acpl/acpl.cpp` and `dsp/resampler.cpp`; in `src/ac4/src/decoder`, the per-track exponent of
@@ -4378,7 +4378,7 @@ outright, with no compatibility shim.
 - `tools/ci/classify_changes.py` has no lane of its own for AC-4 (`src/ac4*` is in the core lane),
   and `tools/generators/` and `tools/references/` match no lane, so every lane runs when they
   change. No phase gave AC-4 a lane. The ESP32 lane lights after a merge for `src/ac3/`,
-  `src/arithmetic/` and `cmake/` (#1131) and leaves the AC-4 trees, which the component's pack stages
+  `src/base/` and `cmake/` (#1131) and leaves the AC-4 trees, which the component's pack stages
   only for `--with-ac4`, to the nightly run.
 - librempeg's binary is named `ffmpeg`; nothing puts it on `PATH` ([The oracles](#the-oracles)).
 - D11's change sits in `ac3::iec61937`, inside `ac3::forge`, beside the passthrough work of

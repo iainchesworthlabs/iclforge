@@ -96,7 +96,7 @@ live demos, with the npm package listed among the library's bindings.
 
 | | The library | Forge | Crucible |
 |---|---|---|---|
-| Source | `src/ac3`, `src/signing`, `src/capi`, `src/matroska`, `src/mp4`, `src/mpegts`, `src/iab`, `src/iamf`, `src/adm`, `src/admbridge`, `src/ac4` (built, never exported); `python/`, `js/`, `rust/`; `examples/`, `fuzz/`, `apps/baremetal` | `apps/cli`, `apps/gui`, `apps/common` | `apps/crucible`; by purpose `apps/windows/driver` and `driver-vm` |
+| Source | `src/ac3`, `src/signing`, `src/capi`, `src/matroska`, `src/mp4`, `src/mpegts`, `src/iab`, `src/iamf`, `src/adm`, `src/adm`, `src/ac4` (built, never exported); `python/`, `js/`, `rust/`; `examples/`, `fuzz/`, `apps/baremetal` | `apps/cli`, `apps/gui`, `apps/common` | `apps/crucible`; by purpose `apps/windows/driver` and `driver-vm` |
 | Build identity | `ac3::forge`, `ac3::forge_c`, `ac3::signing`, `matroska::matroska`, `mp4::mp4`, `mpegts::mpegts`, `ac3iab::ac3iab`, `iamf::iamf`, `ac3adm::ac3adm`, `ac3::admbridge`; ten export sets and ten `.pc` files | targets `ac3cli`, `ac3gui`; QML URI `Ac3Forge`; options `AC3FORGE_BUILD_CLI`, `AC3FORGE_BUILD_GUI` | targets `ac3crucible`, `ac3crucible-run`, `ac3::crucible_engine`; QML URI `Ac3ForgeCrucible`; option `AC3FORGE_BUILD_CRUCIBLE`; root guard `WIN32 OR (UNIX AND NOT APPLE)` (`CMakeLists.txt:450`) |
 | Tests and checks | most of `ac3tests`; `tests/capi`, `python/tests`, `apps/wasm/tests`; coverage floors `src/*` (`tools/checks/coverage_report.sh:108-116`); abi-gate; fuzz.yml; interop.yml | `tests/cli`, `tests/gui`, `ac3gui_qmltests` (label `gui`); floor `apps/cli` (:117); `.clang-tidy:95` | `tests/crucible` (compiled into `ac3tests`, `tests/CMakeLists.txt:436-456`), `ac3crucible_qmltests`; labels `crucible`, `crucible-ui`; `tools/ci/check_crucible_package.py`; `tools/checks/coverage_crucible.ps1`, `crucible_platform_probe.cpp` |
 | Docs | Library (22 pages), Concepts (4), Validation, Threat model, Conformance vectors, Performance & quality (6), `platforms/wasm.md`, the two WASM demo pages | CLI reference (3), GUI guide (12) | Crucible guide (5), `platforms/windows-demo.md` (the record), `platforms/windows-driver-acx.md` |
@@ -172,7 +172,7 @@ summary.
 `docs/`: on 2026-09-14 the CLI reference and the GUI guide went to `docs/forge/cli/` and
 `docs/forge/gui/`, Crucible's promotion record to `docs/crucible/design/`, and the flat
 bare-metal page was split into `docs/platforms/bare-metal/` (#674). The tree also gained
-`apps/hearth`, `src/sendspin`, `src/arithmetic` and the four AC-4 libraries, `src/ac4`,
+`apps/hearth`, `src/sendspin`, `src/base` and the four AC-4 libraries, `src/ac4`,
 `src/ac4`. N1B ([layout.md](layout.md)) reopens the source
 layout: its recommended L2 renames `src/ac3` to `src/ac3` and takes five libraries that know
 no codec out of it, so that AC-4 sits beside AC-3 and E-AC-3. That study is a proposal, and
@@ -191,7 +191,7 @@ its decisions are with the user.
 | `docs/` | 73 pages | 73 pages plus `docs/forge/index.md`, `docs/family/recasting.md` (this page), and, under [decision 8](#decisions), `docs/library/capabilities.md` and a `docs/security.md` wrapper | see [The docs](#the-docs) |
 
 What does change on disk is small: the README's layout block gains member headings and the rows
-it is missing today (`src/capi`, `src/ac4`, `src/iab`, `src/iamf`, `src/admbridge`,
+it is missing today (`src/capi`, `src/ac4`, `src/iab`, `src/iamf`, `src/adm`,
 `apps/wasm`, `apps/common`, `apps/baremetal`, `apps/windows`, `python/`, `js/`, `rust/`), and
 `CONTRIBUTING.md:50-51`'s consumer list `apps/{cli,gui,wasm,android}` names the tree as it is.
 

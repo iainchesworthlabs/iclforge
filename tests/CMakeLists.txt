@@ -242,11 +242,11 @@ target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/s
 
 # test_scalar_math.cpp includes iclforge/base/arithmetic/scalar_math.hpp and
 # test_fixed32*.cpp/test_mdct_fixed.cpp include iclforge/base/arithmetic/fixed32.hpp - the
-# shared arithmetic target (src/arithmetic) both iclforge::ac3 and iclforge::ac4
+# shared arithmetic target (src/base) both iclforge::ac3 and iclforge::ac4
 # use (planning/ac4.md, decision 31), worth holding to their own accuracy/
 # correctness bounds rather than only through the fixture hashes that depend
 # on them.
-target_link_libraries(iclforge-tests PRIVATE iclforge::arithmetic)
+target_link_libraries(iclforge-tests PRIVATE iclforge::base_arithmetic)
 target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/src/core")
 # test_block_norm.cpp includes src/ac3/src/decoder/block_norm.hpp, the
 # fixed-point tier's block exponent, which both decoders share and which is not
@@ -318,7 +318,7 @@ if(NOT BUILD_SHARED_LIBS)
 endif()
 
 # test_simd_kernels.cpp (SIMD kernels) needs the ONE architecture directory
-# CMake selected in src/arithmetic/CMakeLists.txt, so the test exercises the
+# CMake selected in src/base/CMakeLists.txt, so the test exercises the
 # f64x2/i32x4 the library was actually built with rather than a different
 # one - same white-box arrangement as src/signing/src just above and the ALSA
 # backend's internal header below.
@@ -950,8 +950,8 @@ endif()
 # inside src/adm/CMakeLists.txt's own add_subdirectory(), which never runs unless
 # ICLFORGE_BUILD_ADM is already ON - so the option itself is what's checked here instead.
 #
-# test_adm_bridge.cpp (iclforge::adm, ADM BWF reader phase 2, src/admbridge) rides the same gate:
-# it depends on iclforge::adm too, and src/admbridge is only add_subdirectory()'d from inside
+# test_adm_bridge.cpp (iclforge::adm, ADM BWF reader phase 2, src/adm) rides the same gate:
+# it depends on iclforge::adm too, and src/adm is only add_subdirectory()'d from inside
 # the same if(ICLFORGE_BUILD_ADM) block in the root CMakeLists.txt.
 if(ICLFORGE_BUILD_ADM)
     target_sources(iclforge-tests PRIVATE adm/test_adm.cpp adm/test_adm_bridge.cpp

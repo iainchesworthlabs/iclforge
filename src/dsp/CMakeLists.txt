@@ -22,4 +22,4 @@ iclforge_add_library(dsp
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
     LINK_PRIVATE
         "$<BUILD_INTERFACE:iclforge::tracy>"
-        "$<BUILD_INTERFACE:iclforge::arithmetic>")
+        "$<BUILD_INTERFACE:iclforge::base_arithmetic>")

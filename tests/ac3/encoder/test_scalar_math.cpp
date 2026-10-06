@@ -1,4 +1,4 @@
-// The float encode path's own log2 / log / exp / exp2 (src/arithmetic's
+// The float encode path's own log2 / log / exp / exp2 (src/base's
 // ac3/internal/scalar_math.hpp) against libm's double forms: accuracy bounds
 // sized to what the callers quantise to, exactness at the powers of two the
 // analyses lean on, and the double overloads being libm itself.
