@@ -1,6 +1,6 @@
-#include "iclforge/mp4/dash.hpp"
+#include "iclforge/containers/mp4/dash.hpp"
 
-#include "iclforge/mp4/hls.hpp"  // hls_codec_string: DASH's @codecs is the same RFC 6381 string
+#include "iclforge/containers/mp4/hls.hpp"  // hls_codec_string: DASH's @codecs is the same RFC 6381 string
 
 #include <cstddef>
 #include <cstdint>
@@ -10,7 +10,7 @@
 #include <string_view>
 
 #include "manifest_detail.hpp"
-#include "iclforge/mp4/mp4.hpp"
+#include "iclforge/containers/mp4/mp4.hpp"
 
 namespace iclforge::mp4 {
 

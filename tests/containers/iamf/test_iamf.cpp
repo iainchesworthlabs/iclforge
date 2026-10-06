@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "iclforge/iamf/iamf.hpp"
+#include "iclforge/containers/iamf/iamf.hpp"
 
 // These tests read iclforge::iamf::mux()'s output back with an independent OBU/ISOBMFF walker
 // rather than comparing against bytes this same code produced - the same reasoning as

@@ -8,9 +8,9 @@
 #include <string>
 #include <vector>
 
-#include "iclforge/mp4/dash.hpp"
-#include "iclforge/mp4/hls.hpp"
-#include "iclforge/mp4/mp4.hpp"
+#include "iclforge/containers/mp4/dash.hpp"
+#include "iclforge/containers/mp4/hls.hpp"
+#include "iclforge/containers/mp4/mp4.hpp"
 
 // Writes a fragmented MP4/CMAF FOLDER as encoded access units arrive, through
 // iclforge::mp4::FragmentWriter: init.mp4, one segment<N>.m4s each time a fragment

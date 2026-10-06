@@ -67,7 +67,7 @@
 
 #include "iclforge/audio/ring_buffer.hpp"
 #include "iclforge/audio/speakers.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "pipewire_support.hpp"
 
 namespace iclforge::audio {

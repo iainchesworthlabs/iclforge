@@ -20,7 +20,7 @@
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/encoder/plan.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/io/metadata_edit.hpp"
 #include "iclforge/render/layout.hpp"

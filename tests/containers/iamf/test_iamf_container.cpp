@@ -8,8 +8,8 @@
 #include <string>
 #include <vector>
 
-#include "iclforge/iamf/container.hpp"
-#include "iclforge/iamf/iamf.hpp"
+#include "iclforge/containers/iamf/container.hpp"
+#include "iclforge/containers/iamf/iamf.hpp"
 
 // ISO-BMFF tests for iclforge::iamf: a file written by write_isobmff() read back by read_isobmff(),
 // trimming and the edit list, non-sync samples, and the fragmented writer, whose output is also

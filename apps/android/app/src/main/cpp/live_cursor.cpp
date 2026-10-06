@@ -66,7 +66,7 @@
 #include "iclforge/ac3/latency.hpp"
 #include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/audio/passthrough.hpp"
 #include "shield_signing_hook.hpp"
 

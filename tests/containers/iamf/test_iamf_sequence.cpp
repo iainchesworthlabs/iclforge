@@ -6,9 +6,9 @@
 #include <string>
 #include <vector>
 
-#include "iclforge/iamf/iamf.hpp"
-#include "iclforge/iamf/model.hpp"
-#include "iclforge/iamf/sequence.hpp"
+#include "iclforge/containers/iamf/iamf.hpp"
+#include "iclforge/containers/iamf/model.hpp"
+#include "iclforge/containers/iamf/sequence.hpp"
 
 // OBU level tests for iclforge::iamf: the bytes of individual OBUs against hand-assembled
 // expectations from the IAMF v2.0.0 syntax, a Sequence that uses every structure round-tripped

@@ -14,7 +14,7 @@
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/ac3/encoder/silent_frame.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/sendspin/chunks.hpp"
 #include "iclforge/sendspin/frames.hpp"
 

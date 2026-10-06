@@ -28,7 +28,7 @@
 #include "iclforge/audio/playback_counter.hpp"
 #include "iclforge/audio/ring_buffer.hpp"
 #include "iclforge/audio/speakers.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "windows_support.hpp"
 
 namespace iclforge::audio {

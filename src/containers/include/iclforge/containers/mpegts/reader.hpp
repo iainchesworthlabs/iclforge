@@ -10,8 +10,8 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/mpegts/export.hpp"
-#include "iclforge/mpegts/mpegts.hpp"
+#include "iclforge/containers/export.hpp"
+#include "iclforge/containers/mpegts/mpegts.hpp"
 
 // The read side of iclforge::mpegts::mux()/iclforge::mpegts::Writer: pulling one programme's
 // audio back out of a transport stream.
@@ -71,7 +71,7 @@ enum class DemuxError : std::uint8_t {
     kLimitExceeded,       // a PES or section beyond ReadOptions
 };
 
-[[nodiscard]] ICLFORGE_MPEGTS_EXPORT std::string_view describe(DemuxError error);
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string_view describe(DemuxError error);
 
 // How the PMT named the codec. Reported rather than resolved because the
 // three are not interchangeable claims: an ATSC stream_type is a statement
@@ -153,7 +153,7 @@ struct Demuxed {
 };
 
 // Reads a complete transport stream held in one buffer.
-[[nodiscard]] ICLFORGE_MPEGTS_EXPORT std::expected<Demuxed, DemuxError> demux(
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<Demuxed, DemuxError> demux(
     std::span<const std::byte> file, const ReadOptions& options = {});
 
 // Incrementally reads payloads out of a transport stream as its bytes
@@ -162,7 +162,7 @@ struct Demuxed {
 // place.
 //
 // Move-only: the parse state lives behind a pointer.
-class ICLFORGE_MPEGTS_EXPORT Reader {
+class ICLFORGE_CONTAINERS_EXPORT Reader {
    public:
     using PayloadFn = std::function<void(std::span<const std::byte>)>;
 

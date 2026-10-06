@@ -30,7 +30,7 @@
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/decoder/serving.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/render/layout.hpp"

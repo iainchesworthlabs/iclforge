@@ -48,7 +48,7 @@
 
 #include "iclforge/audio/passthrough.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 
 namespace {
 

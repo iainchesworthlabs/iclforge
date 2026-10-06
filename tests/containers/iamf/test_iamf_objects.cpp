@@ -6,8 +6,8 @@
 #include <numbers>
 #include <vector>
 
-#include "iclforge/iamf/container.hpp"
-#include "iclforge/iamf/iamf.hpp"
+#include "iclforge/containers/iamf/container.hpp"
+#include "iclforge/containers/iamf/iamf.hpp"
 
 // Object-based audio elements (IAMF v2.0.0): the Audio Element and Mix Presentation a program of
 // objects produces, the Parameter Blocks that animate positions, and the audio read back.

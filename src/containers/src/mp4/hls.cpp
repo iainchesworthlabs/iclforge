@@ -1,4 +1,4 @@
-#include "iclforge/mp4/hls.hpp"
+#include "iclforge/containers/mp4/hls.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -10,7 +10,7 @@
 #include <string_view>
 
 #include "manifest_detail.hpp"
-#include "iclforge/mp4/mp4.hpp"
+#include "iclforge/containers/mp4/mp4.hpp"
 
 namespace iclforge::mp4 {
 

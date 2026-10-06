@@ -15,7 +15,7 @@
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/encoder/silent_frame.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 
 // The de-framing side of iclforge::iec61937 (IEC 61937 de-framing). Its whole reason to
 // exist is that nothing read a burst back before, so the wrap side - byte-

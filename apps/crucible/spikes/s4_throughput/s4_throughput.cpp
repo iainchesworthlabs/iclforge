@@ -21,7 +21,7 @@
 
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/encoder/silent_frame.hpp"  // describe(FrameError)
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
 
 namespace {

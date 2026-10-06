@@ -8,8 +8,8 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/iamf/export.hpp"
-#include "iclforge/iamf/model.hpp"
+#include "iclforge/containers/export.hpp"
+#include "iclforge/containers/iamf/model.hpp"
 
 // Reading and writing an IA Sequence as OBUs (AOM IAMF v2.0.0, "Open Bitstream Unit (OBU) Syntax
 // and Semantics" and "Standalone IAMF Representation").
@@ -43,25 +43,25 @@ enum class Error : std::uint8_t {
     kUnsupported,         // a construct this module does not read or write
 };
 
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::string_view describe(Error error);
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string_view describe(Error error);
 
 // --- Writing ------------------------------------------------------------------------------------
 
 // The Descriptor OBUs, in the order the specification requires: IA Sequence Header, all Codec
 // Config OBUs, any Metadata OBUs, all Audio Element OBUs, all Mix Presentation OBUs. Set
 // `redundant_copy` to write them as a repeat of an earlier set (obu_redundant_copy = 1).
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::expected<Bytes, Error> write_descriptors(const Sequence& sequence,
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<Bytes, Error> write_descriptors(const Sequence& sequence,
                                                                                   bool redundant_copy = false);
 
 // One Temporal Unit: a Temporal Delimiter OBU when `unit.has_temporal_delimiter` is set (carrying
 // is_not_key_frame), then Parameter Block and Metadata OBUs, then the Audio Frame OBUs. Audio
 // Frames of the first 18 substreams use the compact OBU_IA_Audio_Frame_ID0..17 types; others
 // carry an explicit substream id. `context` supplies the parameter definitions.
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::expected<Bytes, Error> write_temporal_unit(const Sequence& context,
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<Bytes, Error> write_temporal_unit(const Sequence& context,
                                                                                     const TemporalUnit& unit);
 
 // The standalone IA Sequence: write_descriptors() followed by every Temporal Unit.
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::expected<Bytes, Error> write_sequence(const Sequence& sequence);
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<Bytes, Error> write_sequence(const Sequence& sequence);
 
 // --- Reading ------------------------------------------------------------------------------------
 
@@ -69,24 +69,24 @@ enum class Error : std::uint8_t {
 // Sequence with no Temporal Units. Redundant copies of an OBU already read are skipped; Reserved
 // OBUs and OBU types this module does not know are ignored. `consumed`, if given, receives the
 // number of bytes read: the first OBU that is not a Descriptor ends the Descriptors.
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::expected<Sequence, Error> read_descriptors(
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<Sequence, Error> read_descriptors(
     std::span<const std::byte> data, std::size_t* consumed = nullptr);
 
 // Reads the OBUs of one Temporal Unit (an IA Sample's bytes, or the OBUs between two Temporal
 // Delimiters) using the parameter definitions in `context`. Parameter Blocks of a parameter_id
 // no definition declares are dropped, as the specification says parsers should.
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::expected<TemporalUnit, Error> read_temporal_unit(
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<TemporalUnit, Error> read_temporal_unit(
     const Sequence& context, std::span<const std::byte> data);
 
 // Reads a standalone IA Sequence. Temporal Units are split at Temporal Delimiter OBUs; a stream
 // without them is split where the next Parameter Block, Metadata or Audio Frame OBU would repeat
 // an Audio Substream already in the unit, or follow an Audio Frame.
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::expected<Sequence, Error> read_sequence(std::span<const std::byte> data);
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<Sequence, Error> read_sequence(std::span<const std::byte> data);
 
 // --- Helpers ------------------------------------------------------------------------------------
 
 // The ParamType of a parameter_id declared in `sequence`'s Audio Elements and Mix Presentations.
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::optional<ParamType> parameter_type(const Sequence& sequence,
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::optional<ParamType> parameter_type(const Sequence& sequence,
                                                                             std::uint32_t parameter_id);
 
 // The channel layout a loudspeaker_layout value names, as the substreams of a single layer in
@@ -104,6 +104,6 @@ struct LayoutInfo {
     std::uint8_t channel_count = 0;
     std::uint8_t sound_system = 0;  // the Layout() sound_system value for the same layout
 };
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::optional<LayoutInfo> layout_info(std::uint8_t loudspeaker_layout);
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::optional<LayoutInfo> layout_info(std::uint8_t loudspeaker_layout);
 
 }  // namespace iclforge::iamf

@@ -7,7 +7,7 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/iamf/sequence.hpp"
+#include "iclforge/containers/iamf/sequence.hpp"
 #include "obu_io.hpp"
 
 // Shared by the OBU writer (sequence_write.cpp) and reader (sequence_read.cpp): the OBU header

@@ -7,8 +7,8 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/iamf/model.hpp"
-#include "iclforge/iamf/sequence.hpp"
+#include "iclforge/containers/iamf/model.hpp"
+#include "iclforge/containers/iamf/sequence.hpp"
 #include "sequence_detail.hpp"
 
 // The OBU writer. Each function below writes one syntax structure of AOM IAMF v2.0.0 in the

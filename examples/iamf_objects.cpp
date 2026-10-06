@@ -13,8 +13,8 @@
 #include <numbers>
 #include <vector>
 
-#include "iclforge/iamf/container.hpp"
-#include "iclforge/iamf/iamf.hpp"
+#include "iclforge/containers/iamf/container.hpp"
+#include "iclforge/containers/iamf/iamf.hpp"
 
 namespace {
 

@@ -38,10 +38,10 @@
 #include "ac4_sync_word.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
-#include "iclforge/matroska/matroska.hpp"
-#include "iclforge/mp4/dash.hpp"
-#include "iclforge/mp4/hls.hpp"
-#include "iclforge/mp4/mp4.hpp"
+#include "iclforge/containers/matroska/matroska.hpp"
+#include "iclforge/containers/mp4/dash.hpp"
+#include "iclforge/containers/mp4/hls.hpp"
+#include "iclforge/containers/mp4/mp4.hpp"
 #include "recording_sink.hpp"
 
 // The CLI-wide support layer: option/metadata parsing, path/stdio conventions, frame and WAV I/O,

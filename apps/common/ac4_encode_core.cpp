@@ -12,7 +12,7 @@
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac3/meta/loudness.hpp"
 #include "ac4_channels.hpp"
-#include "iclforge/mp4/mp4.hpp"
+#include "iclforge/containers/mp4/mp4.hpp"
 
 namespace iclforge::apps {
 

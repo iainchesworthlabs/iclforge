@@ -26,7 +26,7 @@
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
-#include "iclforge/iamf/iamf.hpp"
+#include "iclforge/containers/iamf/iamf.hpp"
 
 namespace {
 

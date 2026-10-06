@@ -20,7 +20,7 @@
 #include "platform/process.hpp"
 
 #include "iclforge/ac3/encoder/encoder.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/sendspin/messages.hpp"

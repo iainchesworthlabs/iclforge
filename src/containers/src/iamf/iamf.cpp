@@ -1,4 +1,4 @@
-#include "iclforge/iamf/iamf.hpp"
+#include "iclforge/containers/iamf/iamf.hpp"
 
 #include <algorithm>
 #include <array>
@@ -12,9 +12,9 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/iamf/container.hpp"
-#include "iclforge/iamf/model.hpp"
-#include "iclforge/iamf/sequence.hpp"
+#include "iclforge/containers/iamf/container.hpp"
+#include "iclforge/containers/iamf/model.hpp"
+#include "iclforge/containers/iamf/sequence.hpp"
 
 namespace iclforge::iamf {
 

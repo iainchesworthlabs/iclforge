@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/iamf/export.hpp"
+#include "iclforge/containers/export.hpp"
 
 // The IAMF element graph, per the AOM Immersive Audio Model and Formats specification v2.0.0
 // (https://aomediacodec.github.io/iamf/, the version that adds object-based audio elements).
@@ -341,7 +341,7 @@ struct Sequence {
 
 // Q7.8 fixed point to and from decibels or a plain ratio.
 [[nodiscard]] constexpr double q7_8_to_double(std::int16_t value) { return static_cast<double>(value) / 256.0; }
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::int16_t double_to_q7_8(double value);
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::int16_t double_to_q7_8(double value);
 
 // Position codings to normalized coordinates: polar azimuth and elevation in degrees and
 // distance as value / 127; Cartesian axes as value / 127 (8 bit) or value / 32767 (16 bit).

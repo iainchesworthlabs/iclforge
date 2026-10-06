@@ -8,9 +8,9 @@
 #include <string>
 #include <vector>
 
-#include "iclforge/iamf/export.hpp"
-#include "iclforge/iamf/model.hpp"
-#include "iclforge/iamf/sequence.hpp"
+#include "iclforge/containers/export.hpp"
+#include "iclforge/containers/iamf/model.hpp"
+#include "iclforge/containers/iamf/sequence.hpp"
 
 // IAMF in ISO-BMFF (AOM IAMF v2.0.0, "ISO-BMFF IAMF Encapsulation"): an `iamf`-branded file whose
 // one track holds the IA Sequence. The Descriptors are the configOBUs of the `iacb` box in the
@@ -53,18 +53,18 @@ struct IsobmffFile {
 // trimmed from its start and not those trimmed from its end. When any Audio Frame carries
 // trimming, an edts/elst box records the trim at the start and end of the sequence. Temporal
 // Units marked is_not_key_frame are listed as non-sync samples in an stss box.
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::expected<Bytes, Error> write_isobmff(const Sequence& sequence,
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<Bytes, Error> write_isobmff(const Sequence& sequence,
                                                                               const IsobmffOptions& options = {});
 
 // Reads a file written by write_isobmff(), by FragmentedWriter, or by another IAMF muxer that
 // follows the same encapsulation. Only the first IA track is read.
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::expected<IsobmffFile, Error> read_isobmff(std::span<const std::byte> file);
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<IsobmffFile, Error> read_isobmff(std::span<const std::byte> file);
 
 // A fragmented writer. initialization_segment() holds the ftyp and a moov with an empty sample
 // table and an mvex box; each fragment() call returns one moof and mdat for the Temporal Units
 // passed, which continue where the last call stopped. The pieces concatenate into a valid file,
 // and each fragment can be sent as soon as it is returned.
-class ICLFORGE_IAMF_EXPORT FragmentedWriter {
+class ICLFORGE_CONTAINERS_EXPORT FragmentedWriter {
 public:
     // `descriptors` supplies the Descriptor OBUs and the parameter definitions; its Temporal Units
     // are not written.

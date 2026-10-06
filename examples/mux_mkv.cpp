@@ -16,7 +16,7 @@
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
-#include "iclforge/matroska/matroska.hpp"
+#include "iclforge/containers/matroska/matroska.hpp"
 
 int main() {
     // Some AC-3 to wrap.

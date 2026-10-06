@@ -20,7 +20,7 @@
 #include "iclforge/audio/pcm_output.hpp"
 #include "iclforge/audio/sink_capabilities.hpp"
 #include "iclforge/audio/spatial.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/render/layout.hpp"
 #include "audio/alsa_null_device.hpp"
 

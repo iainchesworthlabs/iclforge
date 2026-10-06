@@ -9,7 +9,7 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/iamf/sequence.hpp"
+#include "iclforge/containers/iamf/sequence.hpp"
 
 // Byte and bit level reading and writing for the OBU syntax (AOM IAMF v2.0.0, "Convention"):
 // leb128() values, null-terminated UTF-8 strings, and the MSB-first packed fields the position

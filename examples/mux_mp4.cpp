@@ -19,7 +19,7 @@
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/io/dec3.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
-#include "iclforge/mp4/mp4.hpp"
+#include "iclforge/containers/mp4/mp4.hpp"
 
 int main() {
     // Some AC-3 to wrap.

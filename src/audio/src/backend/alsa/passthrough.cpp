@@ -75,7 +75,7 @@
 #include "iclforge/audio/playback_counter.hpp"
 #include "iclforge/audio/ring_buffer.hpp"
 #include "iclforge/audio/speakers.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "alsa_support.hpp"
 #include "candidates.hpp"
 #include "device_names.hpp"

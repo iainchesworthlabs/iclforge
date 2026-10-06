@@ -1,4 +1,4 @@
-#include "iclforge/matroska/reader.hpp"
+#include "iclforge/containers/matroska/reader.hpp"
 
 #include <bit>
 #include <cstddef>
@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "ebml_detail.hpp"
-#include "iclforge/matroska/matroska.hpp"
+#include "iclforge/containers/matroska/matroska.hpp"
 
 namespace iclforge::matroska {
 

@@ -20,7 +20,7 @@
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/encoder/silent_frame.hpp"
 #include "iclforge/ac3/io/wav.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 
 // Byte-level regression for the IEC 61937 packers. AC-3's wrap_frame had no
 // dedicated test file at all before this one - the CLI/GUI exercised it, but

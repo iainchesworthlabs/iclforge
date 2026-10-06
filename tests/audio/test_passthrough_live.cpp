@@ -11,7 +11,7 @@
 #include "iclforge/audio/passthrough.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 
 // PassthroughSink's playback position, pause and flush against a real
 // receiver (src/audio/src/backend/*/passthrough.cpp).

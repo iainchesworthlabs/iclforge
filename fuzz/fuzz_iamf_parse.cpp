@@ -2,9 +2,9 @@
 #include <cstdint>
 #include <span>
 
-#include "iclforge/iamf/container.hpp"
-#include "iclforge/iamf/iamf.hpp"
-#include "iclforge/iamf/sequence.hpp"
+#include "iclforge/containers/iamf/container.hpp"
+#include "iclforge/containers/iamf/iamf.hpp"
+#include "iclforge/containers/iamf/sequence.hpp"
 
 // iclforge::iamf::read_sequence (the standalone raw OBU stream) and read_isobmff (the ISO-BMFF
 // encapsulation, whole files and movie fragments) on the same bytes, then the paths that consume

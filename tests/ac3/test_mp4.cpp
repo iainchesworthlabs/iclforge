@@ -17,8 +17,8 @@
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
-#include "iclforge/mp4/hls.hpp"
-#include "iclforge/mp4/mp4.hpp"
+#include "iclforge/containers/mp4/hls.hpp"
+#include "iclforge/containers/mp4/mp4.hpp"
 
 // These tests read the muxer's output back with an independent ISOBMFF box
 // walker rather than comparing against bytes this same code produced - the

@@ -10,8 +10,8 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/iamf/model.hpp"
-#include "iclforge/iamf/sequence.hpp"
+#include "iclforge/containers/iamf/model.hpp"
+#include "iclforge/containers/iamf/sequence.hpp"
 #include "sequence_detail.hpp"
 
 // The OBU reader: the inverse of sequence_write.cpp, structure by structure. Lenient where the

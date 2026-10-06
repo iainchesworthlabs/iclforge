@@ -9,7 +9,7 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/mp4/export.hpp"
+#include "iclforge/containers/export.hpp"
 
 // A minimal MP4 (ISOBMFF) muxer, per ISO/IEC 14496-12 (the ISO Base Media
 // File Format).
@@ -70,7 +70,7 @@ enum class MuxError : std::uint8_t {
                       // that runs past the frames
 };
 
-[[nodiscard]] ICLFORGE_MP4_EXPORT std::string_view describe(MuxError error);
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string_view describe(MuxError error);
 
 struct AudioTrack {
     // Selects the sample entry box ('ac-3' or 'ec-3') and, through it, which
@@ -138,11 +138,11 @@ struct MuxOptions {
 // this stays testable without touching a disk - iclforge::matroska::mux()'s own reason
 // applies unchanged. Frames arrive as views (iclforge::matroska::mux's own reasoning
 // there too); the vector-list overload below forwards for owned lists.
-[[nodiscard]] ICLFORGE_MP4_EXPORT std::expected<std::vector<std::byte>, MuxError> mux(
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<std::vector<std::byte>, MuxError> mux(
     const AudioTrack& track, std::span<const std::span<const std::byte>> frames,
     const MuxOptions& options = {});
 
-[[nodiscard]] ICLFORGE_MP4_EXPORT std::expected<std::vector<std::byte>, MuxError> mux(
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<std::vector<std::byte>, MuxError> mux(
     const AudioTrack& track, std::span<const std::vector<std::byte>> frames,
     const MuxOptions& options = {});
 
@@ -269,7 +269,7 @@ struct SegmentInfo {
 // The SegmentInfo describing one MediaSegment, for a caller holding
 // fragment()'s batch output that wants the manifest builders' SegmentInfo
 // overloads (mp4/hls.hpp, mp4/dash.hpp).
-[[nodiscard]] ICLFORGE_MP4_EXPORT SegmentInfo segment_info(const MediaSegment& segment);
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT SegmentInfo segment_info(const MediaSegment& segment);
 
 struct FragmentedOutput {
     std::vector<std::byte> init_segment;       // ftyp + moov (mvex/trex, zero samples)
@@ -280,11 +280,11 @@ struct FragmentedOutput {
 // file I/O, same as mux(); the caller decides file names (or byte-range
 // offsets, for a single concatenated CMAF track file) for init_segment and
 // each media_segments[i].
-[[nodiscard]] ICLFORGE_MP4_EXPORT std::expected<FragmentedOutput, MuxError> fragment(
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<FragmentedOutput, MuxError> fragment(
     const AudioTrack& track, std::span<const std::span<const std::byte>> frames,
     const FragmentOptions& options = {});
 
-[[nodiscard]] ICLFORGE_MP4_EXPORT std::expected<FragmentedOutput, MuxError> fragment(
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<FragmentedOutput, MuxError> fragment(
     const AudioTrack& track, std::span<const std::vector<std::byte>> frames,
     const FragmentOptions& options = {});
 
@@ -319,7 +319,7 @@ struct FragmentedOutput {
 // push() and finalize() hand back bytes for the caller to write. Memory stays
 // bounded at one fragment's frames plus the playlist window
 // (FragmentOptions::playlist_window_segments) however long the session runs.
-class ICLFORGE_MP4_EXPORT FragmentWriter {
+class ICLFORGE_CONTAINERS_EXPORT FragmentWriter {
    public:
     // Validates the track and options exactly the way fragment() does. On
     // success init_segment() already holds the initialization segment.

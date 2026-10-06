@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/audio/passthrough.hpp"
 
 // The Android backend's pure half, split out for the same reason

@@ -46,7 +46,7 @@
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/encoder/assignment.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "ac4_channels.hpp"
 #include "recording_sink.hpp"
 #include "sink_wait.hpp"

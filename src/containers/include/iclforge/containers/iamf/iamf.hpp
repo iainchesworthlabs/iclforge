@@ -9,9 +9,9 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/iamf/export.hpp"
-#include "iclforge/iamf/model.hpp"
-#include "iclforge/iamf/sequence.hpp"
+#include "iclforge/containers/export.hpp"
+#include "iclforge/containers/iamf/model.hpp"
+#include "iclforge/containers/iamf/sequence.hpp"
 
 // High level writing and reading of IAMF (Immersive Audio Model and Formats), per the AOM IAMF
 // v2.0.0 specification (https://aomediacodec.github.io/iamf/). This header is the convenient end
@@ -51,7 +51,7 @@ enum class MuxError : std::uint8_t {
     kWriteFailed,          // the Sequence built could not be written; see the Error it came from
 };
 
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::string_view describe(MuxError error);
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string_view describe(MuxError error);
 
 // One Temporal Unit's worth of PCM: samples_per_frame samples of each of the 12 channels of a
 // 7.1.4ch Audio Element (loudspeaker_layout = 7), ordered L, C, R, Lss, Rss, Lrs, Rrs, Ltf, Rtf,
@@ -93,11 +93,11 @@ struct AudioTrack {
 // The IA Sequence for a 7.1.4ch LPCM programme: one channel-based Audio Element (one layer, seven
 // Audio Substreams: five coupled pairs, the centre and the LFE) and one Mix Presentation with the
 // mandatory Stereo loudness layout and the 7.1.4 one.
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::expected<Sequence, MuxError> build_sequence(
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<Sequence, MuxError> build_sequence(
     const AudioTrack& track, std::span<const Frame> frames);
 
 // build_sequence() written as an ISO-BMFF file.
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::expected<std::vector<std::byte>, MuxError> mux(
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<std::vector<std::byte>, MuxError> mux(
     const AudioTrack& track, std::span<const Frame> frames);
 
 // --- Object-based audio -------------------------------------------------------------------------
@@ -156,10 +156,10 @@ struct ObjectTrack {
 // The IA Sequence for a program of object-based Audio Elements: one Audio Element per
 // ObjectElement, one Mix Presentation referencing all of them, Base-Advanced profile (at most 18
 // channels in all).
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::expected<Sequence, MuxError> build_object_sequence(
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<Sequence, MuxError> build_object_sequence(
     const ObjectTrack& track, std::span<const ObjectElement> elements);
 
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::expected<std::vector<std::byte>, MuxError> mux_objects(
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<std::vector<std::byte>, MuxError> mux_objects(
     const ObjectTrack& track, std::span<const ObjectElement> elements);
 
 // --- Reading PCM back ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ struct DecodedElement {
 // channel-based elements with one layer in a layout layout_info() knows, object-based elements, and
 // scene-based elements in mono mode; any other element, and any codec but ipcm, is kUnsupported.
 // The Sequence is as read_sequence() or read_isobmff() returns it, or as build_sequence() does.
-[[nodiscard]] ICLFORGE_IAMF_EXPORT std::expected<DecodedElement, Error> decode_pcm(const Sequence& sequence,
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<DecodedElement, Error> decode_pcm(const Sequence& sequence,
                                                                                     std::uint32_t audio_element_id);
 
 }  // namespace iclforge::iamf

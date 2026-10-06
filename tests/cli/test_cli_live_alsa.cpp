@@ -23,7 +23,7 @@
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "audio/alsa_null_device.hpp"
 
 // The device-facing forge commands against software ALSA devices

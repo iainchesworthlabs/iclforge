@@ -29,12 +29,12 @@
 #include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
 #include "iclforge/base/crypto/signing_key.hpp"
 #include "container_input.hpp"
-#include "iclforge/matroska/matroska.hpp"
+#include "iclforge/containers/matroska/matroska.hpp"
 #include "media_info.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
 #include "media_inspector.hpp"
-#include "iclforge/mp4/mp4.hpp"
-#include "iclforge/mpegts/mpegts.hpp"
+#include "iclforge/containers/mp4/mp4.hpp"
+#include "iclforge/containers/mpegts/mpegts.hpp"
 
 // iclforge::hearth's media information (apps/hearth/engine/media_info.cpp and
 // media_inspector.cpp): what a queue item's file says about itself, read on a

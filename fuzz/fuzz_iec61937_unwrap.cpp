@@ -5,7 +5,7 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 
 // iclforge::iec61937::BurstReader, driven the way forge's 'unspdif' drives it
 // (src/iec61937/src/iec61937.cpp).

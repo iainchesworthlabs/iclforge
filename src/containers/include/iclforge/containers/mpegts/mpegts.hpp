@@ -9,7 +9,7 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/mpegts/export.hpp"
+#include "iclforge/containers/export.hpp"
 
 // A minimal MPEG-2 Transport Stream (TS) muxer, per ISO/IEC 13818-1 (MPEG-2
 // Systems), with the AC-3/Enhanced AC-3 identification DVB defines in ETSI
@@ -231,7 +231,7 @@ struct ServiceInfo {
 //     would invent a channel layout the descriptor never actually claimed.
 //     A caller that has the elementary stream already has the exact values
 //     from iclforge::ac3::io::scan() - the same source mux()'s own caller used.
-[[nodiscard]] ICLFORGE_MPEGTS_EXPORT std::optional<ServiceInfo> parse_service_descriptor(
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::optional<ServiceInfo> parse_service_descriptor(
     std::uint8_t tag, std::span<const std::byte> body);
 
 enum class MuxError : std::uint8_t {
@@ -241,7 +241,7 @@ enum class MuxError : std::uint8_t {
     kFrameTooLarge,   // a single access unit too large for one PES packet's 16-bit length field
 };
 
-[[nodiscard]] ICLFORGE_MPEGTS_EXPORT std::string_view describe(MuxError error);
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string_view describe(MuxError error);
 
 struct AudioTrack {
     AudioCodec codec = AudioCodec::kEac3;
@@ -279,11 +279,11 @@ struct MuxOptions {
 // so this stays testable without touching a disk. Access units arrive as
 // views (iclforge::matroska::mux's own reasoning); the vector-list overload below
 // forwards for owned lists.
-[[nodiscard]] ICLFORGE_MPEGTS_EXPORT std::expected<std::vector<std::byte>, MuxError> mux(
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<std::vector<std::byte>, MuxError> mux(
     const AudioTrack& track, std::span<const std::span<const std::byte>> frames,
     const MuxOptions& options = {});
 
-[[nodiscard]] ICLFORGE_MPEGTS_EXPORT std::expected<std::vector<std::byte>, MuxError> mux(
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<std::vector<std::byte>, MuxError> mux(
     const AudioTrack& track, std::span<const std::vector<std::byte>> frames,
     const MuxOptions& options = {});
 
@@ -302,7 +302,7 @@ struct MuxOptions {
 // push()'s own bytes, exactly where mux() puts it), and finalize() always
 // returns empty (a transport stream has no trailer and no length field to
 // patch) - it exists so a caller can treat the two writers uniformly.
-class ICLFORGE_MPEGTS_EXPORT Writer {
+class ICLFORGE_CONTAINERS_EXPORT Writer {
    public:
     // Validates the track and options the same way mux() does.
     [[nodiscard]] static std::expected<Writer, MuxError> create(const AudioTrack& track,
