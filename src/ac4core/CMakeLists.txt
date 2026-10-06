@@ -55,22 +55,15 @@ target_include_directories(iclforge_ac4core
 target_compile_features(iclforge_ac4core PUBLIC cxx_std_23)
 
 # The scalar ac4core's kernels are explicitly instantiated at (planning/ac4.md,
-# D14a: "AC-4 joins ICLFORGE_DECODE_SCALAR"). The same cache variable
-# src/ac3/CMakeLists.txt declares and resolves its own decode_scalar_t from -
-# declared again here with the identical default/STRINGS (CMake's set(...
-# CACHE ...) only takes effect the first time it runs in a configure, so
-# whichever of the two subdirectories add_subdirectory() reaches first is the
-# one that actually sets it) so that src/ac4core configures correctly even in
-# a tree that builds AC-4 without iclforge::ac3.
-#
-# "fixed" is iclforge::internal::Fixed32, the ESP32-C6's and -C3's (planning/ac4.md,
-# D14d).
-set(ICLFORGE_DECODE_SCALAR "double" CACHE STRING
-    "Scalar the decoder carries coefficients in: double (default), float, or fixed (Q7.24 in an int32, for parts with no FPU)")
-set_property(CACHE ICLFORGE_DECODE_SCALAR PROPERTY STRINGS double float fixed)
-if(ICLFORGE_DECODE_SCALAR STREQUAL "float")
+# D14a: "AC-4 joins ICLFORGE_DECODE_SCALAR"): the root's one option for every
+# codec, by its tier. "fixed" is iclforge::internal::Fixed32, the ESP32-C6's and
+# -C3's (planning/ac4.md, D14d). The variant directories keep their names
+# (scalar-double, scalar-float, scalar-fixed) until the library's files move
+# into src/ac4 (planning/consolidation.md, appendix A), where they take the
+# tier's.
+if(ICLFORGE_DECODE_SCALAR_TIER STREQUAL "float32")
     set(_ac4core_scalar_dir "float")
-elseif(ICLFORGE_DECODE_SCALAR STREQUAL "fixed")
+elseif(ICLFORGE_DECODE_SCALAR_TIER STREQUAL "fixed32")
     set(_ac4core_scalar_dir "fixed")
 else()
     set(_ac4core_scalar_dir "double")
@@ -106,22 +99,17 @@ endif()
 target_include_directories(iclforge_ac4core PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/variants/scalar-${_ac4core_scalar_dir}>")
 
-# Which "iclforge/ac4core/detail/profiling.hpp" the kernels' AC4_ZONE_SCOPED_N() markers see
-# (planning/ac4.md, D14b): none/, where they expand to nothing, or stage_timers/,
-# where they call the two functions the application supplies, as iclforge::ac3's
-# own zone markers do under ICLFORGE_STAGE_TIMERS - which the root allows only in
-# the minimum-footprint profile, so no other build ever takes the second. A
-# directory choice, the way the scalar just above is, for the platform-tree rule
-# (tools/checks/check_platform_macros.ps1). PUBLIC for the same reason as the
+# The kernels' ICLFORGE_ZONE_SCOPED_N() markers are iclforge::base's
+# ("iclforge/base/detail/profiling.hpp", planning/ac4.md, D14b): nothing in an
+# ordinary build, a Tracy zone under ICLFORGE_ENABLE_TRACY, and in the
+# minimum-footprint profile under ICLFORGE_STAGE_TIMERS the two functions the
+# application supplies, as iclforge::ac3's markers do. The profile builds no
+# iclforge::base, so the directory comes from src/base by variable rather than
+# from that library's usage requirements. PUBLIC for the same reason as the
 # scalar's: the decoder's own translation units carry markers too, and compile
 # against this target without linking it.
-if(ICLFORGE_STAGE_TIMERS)
-    set(_ac4core_profiling_dir "stage_timers")
-else()
-    set(_ac4core_profiling_dir "none")
-endif()
 target_include_directories(iclforge_ac4core PUBLIC
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/variants/profiling-${_ac4core_profiling_dir}>")
+    "$<BUILD_INTERFACE:${ICLFORGE_PROFILING_INCLUDE_DIR}>")
 
 # -Wdouble-promotion as an error on the float build (planning/ac4.md, D14a):
 # an implicit float-to-double promotion anywhere in these kernels is exactly
@@ -151,7 +139,8 @@ target_link_libraries(iclforge_ac4core
         "$<BUILD_INTERFACE:iclforge::warnings>"
         "$<BUILD_INTERFACE:iclforge::coverage>"
     PUBLIC
-        "$<BUILD_INTERFACE:iclforge::arithmetic>")
+        "$<BUILD_INTERFACE:iclforge::arithmetic>"
+        "$<BUILD_INTERFACE:iclforge::tracy>")
 
 # The kernels of a frame's transform and filter work at -O3 under the profile's
 # ICLFORGE_MINIMAL_HOT_O2 (named for the AC-3 and E-AC-3 decoders' -O2 in

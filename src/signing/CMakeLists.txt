@@ -15,90 +15,28 @@
 # by default, unlike the old gitignored quarantine overlay it replaces - there
 # is no secret in it to keep out of the tree.
 #
-# Built and installed as BOTH a static and a shared library, the same OBJECT-
-# library-plus-two-thin-wrappers shape iclforge::ac3 itself uses (see
-# src/ac3/CMakeLists.txt's header comment for the full reasoning) - unlike
-# iclforge::c (src/capi/CMakeLists.txt), this is an ordinary C++ dependent
-# rather than a self-contained C ABI, so iclforge_signing_static links iclforge::ac3_static
-# and iclforge_signing_shared links iclforge::ac3_shared, exactly mirroring how
-# iclforge_ac3_static/iclforge_ac3_shared each wrap iclforge_ac3_objects, rather than always
+# Built and installed as both a static and a shared library by
+# iclforge_add_library() (cmake/IclforgeLibrary.cmake). An ordinary C++
+# dependent rather than a self-contained C ABI like iclforge::c
+# (src/capi/CMakeLists.txt): iclforge_signing_static and iclforge_signing_shared
+# link iclforge::ac3_static and iclforge::ac3_shared, rather than always
 # embedding one specific variant regardless of BUILD_SHARED_LIBS the way capi
-# does. The raw targets are iclforge_signing_objects, iclforge_signing_static and
-# iclforge_signing_shared; a consumer names the aliases iclforge::signing_static,
-# iclforge::signing_shared and iclforge::signing (the shared one when BUILD_SHARED_LIBS is ON),
-# as it does for iclforge::ac3.
+# does.
 # ---------------------------------------------------------------------------
-add_library(iclforge_signing_objects OBJECT)
-add_library(iclforge_signing_static STATIC)
-add_library(iclforge_signing_shared SHARED)
-
-target_link_libraries(iclforge_signing_static PUBLIC iclforge_signing_objects iclforge::ac3_static)
-target_link_libraries(iclforge_signing_shared PUBLIC iclforge_signing_objects iclforge::ac3_shared)
-
-add_library(iclforge::signing_static ALIAS iclforge_signing_static)
-add_library(iclforge::signing_shared ALIAS iclforge_signing_shared)
-if(BUILD_SHARED_LIBS)
-    add_library(iclforge::signing ALIAS iclforge_signing_shared)
-else()
-    add_library(iclforge::signing ALIAS iclforge_signing_static)
-endif()
-
-target_sources(iclforge_signing_objects
-    PRIVATE
+iclforge_add_library(signing
+    SOURCES
         src/sha256.cpp
         src/hmac_sha256.cpp
         src/signing_key.cpp
-        src/emdf_atmos_signer.cpp)
-
-target_include_directories(iclforge_signing_objects
-    PUBLIC
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>"
-        "$<INSTALL_INTERFACE:include>"
-    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
-
-target_compile_features(iclforge_signing_objects PUBLIC cxx_std_23)
-
-# iclforge::ac3 (bare, BUILD_SHARED_LIBS-selected) for the parsing primitives, PRIVATE and compile-time
-# only - iclforge_signing_static/signing_shared above each PUBLICLY link their own matching iclforge_ac3_static/
-# iclforge_ac3_shared variant instead, the same "propagation lives on the wrapper, not the shared object
-# library" split iclforge_ac3_objects/capi_objects's own PRIVATE deps already use. iclforge::warnings/
-# iclforge::coverage wrapped in $<BUILD_INTERFACE:...> for the same dev-only, never-exported reason
-# iclforge_ac3_objects's identical treatment documents.
-target_link_libraries(iclforge_signing_objects
-    PRIVATE
-        iclforge::ac3
-        "$<BUILD_INTERFACE:iclforge::warnings>"
-        "$<BUILD_INTERFACE:iclforge::coverage>")
-
-# --- Static+shared plumbing -------------------------------------------------
-# Same PIC/hidden-visibility/ICLFORGE_SIGNING_EXPORT shape as iclforge_ac3_objects's own
-# identical block - see its header comment for the full reasoning.
-set_target_properties(iclforge_signing_objects PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    CXX_VISIBILITY_PRESET hidden
-    VISIBILITY_INLINES_HIDDEN ON)
-
-target_compile_options(iclforge_signing_objects PUBLIC "$<$<CXX_COMPILER_ID:MSVC>:/wd4251>")
-
-include(GenerateExportHeader)
-set_target_properties(iclforge_signing_shared PROPERTIES DEFINE_SYMBOL "ICLFORGE_SIGNING_BUILDING_SHARED")
-generate_export_header(iclforge_signing_shared
-    BASE_NAME ICLFORGE_SIGNING
-    EXPORT_MACRO_NAME ICLFORGE_SIGNING_EXPORT
-    EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/generated/iclforge/signing/export.hpp"
-    DEFINE_NO_DEPRECATED
-    STATIC_DEFINE ICLFORGE_SIGNING_STATIC_DEFINE)
-target_compile_definitions(iclforge_signing_objects PRIVATE ICLFORGE_SIGNING_BUILDING_SHARED)
-target_compile_definitions(iclforge_signing_static PUBLIC ICLFORGE_SIGNING_STATIC_DEFINE)
-
-set_target_properties(iclforge_signing_shared PROPERTIES
-    VERSION "${PROJECT_VERSION}"
-    SOVERSION "${PROJECT_VERSION}")
-
-# Same Windows same-directory-clash avoidance as iclforge_ac3_shared/iclforge_ac3_static's own OUTPUT_NAME split.
-set_target_properties(iclforge_signing_shared PROPERTIES OUTPUT_NAME "iclforge_signing")
-set_target_properties(iclforge_signing_static PROPERTIES OUTPUT_NAME "iclforge_signing_static")
+        src/emdf_atmos_signer.cpp
+    PRIVATE_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    # An ordinary link, not the compile-only one DEPENDS would make: the bare alias is the static
+    # codec in a static build, so libiclforge_signing.so carries a copy of what the signer calls of
+    # it beside its link to libiclforge_ac3.so. Kept as it was until the signer moves into
+    # iclforge::ac3 (planning/consolidation.md, C2).
+    LINK_PRIVATE_FIRST iclforge::ac3)
+target_link_libraries(iclforge_signing_static PUBLIC iclforge::ac3_static)
+target_link_libraries(iclforge_signing_shared PUBLIC iclforge::ac3_shared)
 
 # MSVC flags plain getenv() (signing_key.cpp's env-var fallbacks) as C4996
 # "unsafe". The call is POSIX and portable - GCC/Clang raise nothing for it

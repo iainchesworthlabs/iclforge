@@ -108,23 +108,10 @@ add_custom_target(iclforge_version ALL
 # scalar are each chosen by directory, the same mechanism iclforge::base uses for the SIMD tier: CMake
 # picks the directory that holds iclforge/ac3/detail/<x>.hpp and no source picks with an #ifdef.
 #
-# double is the default and stays it for every ordinary build: the gold references, the quality trend
-# and the cross-platform bitstream hashes are all stated in terms of that arithmetic.
-# iclforge_ac3_minimal picks float32 unconditionally - see minimal.cmake.
-set(ICLFORGE_DECODE_SCALAR "double" CACHE STRING
-    "Scalar the decoder carries coefficients in: double (default), float, or fixed (Q7.24 in an int32, for parts with no FPU)")
-set_property(CACHE ICLFORGE_DECODE_SCALAR PROPERTY STRINGS double float fixed)
-if(ICLFORGE_DECODE_SCALAR STREQUAL "float")
-    set(_ac3_scalar_dir "float32")
-elseif(ICLFORGE_DECODE_SCALAR STREQUAL "double")
-    set(_ac3_scalar_dir "float64")
-elseif(ICLFORGE_DECODE_SCALAR STREQUAL "fixed")
-    # iclforge::arithmetic's Fixed32 - the third tier (planning/arithmetic-tiers.md).
-    set(_ac3_scalar_dir "fixed32")
-else()
-    message(FATAL_ERROR
-        "ICLFORGE_DECODE_SCALAR is 'double', 'float' or 'fixed' (got '${ICLFORGE_DECODE_SCALAR}')")
-endif()
+# The decode scalar is the root's ICLFORGE_DECODE_SCALAR, one option for every codec, and its tier
+# (float64, float32, fixed32) names the directory. iclforge_ac3_minimal picks float32 unless the
+# tier is fixed32 - see minimal.cmake.
+set(_ac3_scalar_dir "${ICLFORGE_DECODE_SCALAR_TIER}")
 
 set(ICLFORGE_ENCODE_SCALAR "double" CACHE STRING
     "Scalar the encoders' analysis front end runs in: double (default) or float")

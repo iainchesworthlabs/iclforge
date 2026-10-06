@@ -178,42 +178,10 @@ unset(_ac3adm_saved_build_shared_libs)
 
 # ---------------------------------------------------------------------------
 # iclforge::adm's own targets - built and installed as both a static and a shared
-# library, same OBJECT-library-plus-two-thin-wrappers shape as every other
-# component here; see src/ac3/CMakeLists.txt's iclforge::ac3 for the full
-# explanation of why.
+# library by iclforge_add_library() (cmake/IclforgeLibrary.cmake); only the
+# shared one is installed (cmake/InstallLibrary.cmake).
 # ---------------------------------------------------------------------------
-add_library(iclforge_adm_objects OBJECT)
-add_library(iclforge_adm_static STATIC)
-add_library(iclforge_adm_shared SHARED)
-
-target_link_libraries(iclforge_adm_static PUBLIC iclforge_adm_objects)
-target_link_libraries(iclforge_adm_shared PUBLIC iclforge_adm_objects)
-
-add_library(iclforge::adm_static ALIAS iclforge_adm_static)
-add_library(iclforge::adm_shared ALIAS iclforge_adm_shared)
-if(BUILD_SHARED_LIBS)
-    add_library(iclforge::adm ALIAS iclforge_adm_shared)
-else()
-    add_library(iclforge::adm ALIAS iclforge_adm_static)
-endif()
-
-target_sources(iclforge_adm_objects
-    PRIVATE
-        src/adm_model.cpp
-        src/adm_xml_extras.cpp
-        src/adm.cpp)
-
-target_include_directories(iclforge_adm_objects
-    PUBLIC
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>"
-        "$<INSTALL_INTERFACE:include>")
-
-target_compile_features(iclforge_adm_objects PUBLIC cxx_std_23)
-
-# $<BUILD_INTERFACE:...> wrapping iclforge::warnings - see src/ac3/CMakeLists.txt's identical
-# iclforge_ac3_objects treatment for why a plain PRIVATE link isn't enough for an OBJECT
-# library that's part of an install(EXPORT) set. bw64/adm are PRIVATE too: neither
+# bw64/adm are PRIVATE links of the objects: neither
 # library's types cross iclforge::adm's own public API (see this file's header comment), so
 # nothing downstream needs to link them transitively.
 # -Wnull-dereference false positive, GNU only: adm.cpp's read_pcm() calls into libbw64's inlined
@@ -255,36 +223,16 @@ target_compile_options(ac3adm_suppress_gcc15_null_deref INTERFACE
 # admTargets.cmake - which is safe here specifically because the only installed variant,
 # iclforge_adm_shared, already has adm's (forced-STATIC, see above) object code embedded by the time
 # it's built; a downstream consumer never needs bw64/adm on their own link line.
-target_link_libraries(iclforge_adm_objects
-    PRIVATE
-        "$<BUILD_INTERFACE:iclforge::warnings>"
-        "$<BUILD_INTERFACE:iclforge::coverage>"
+iclforge_add_library(adm
+    NO_C4251_SUPPRESSION
+    SOURCES
+        src/adm_model.cpp
+        src/adm_xml_extras.cpp
+        src/adm.cpp
+    LINK_PRIVATE
         "$<BUILD_INTERFACE:bw64>"
         "$<BUILD_INTERFACE:adm>"
         "$<BUILD_INTERFACE:ac3adm_suppress_gcc15_null_deref>")
-
-set_target_properties(iclforge_adm_objects PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    CXX_VISIBILITY_PRESET hidden
-    VISIBILITY_INLINES_HIDDEN ON)
-
-include(GenerateExportHeader)
-set_target_properties(iclforge_adm_shared PROPERTIES DEFINE_SYMBOL "ICLFORGE_ADM_BUILDING_SHARED")
-generate_export_header(iclforge_adm_shared
-    BASE_NAME ICLFORGE_ADM
-    EXPORT_MACRO_NAME ICLFORGE_ADM_EXPORT
-    EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/generated/iclforge/adm/export.hpp"
-    DEFINE_NO_DEPRECATED
-    STATIC_DEFINE ICLFORGE_ADM_STATIC_DEFINE)
-target_compile_definitions(iclforge_adm_objects PRIVATE ICLFORGE_ADM_BUILDING_SHARED)
-target_compile_definitions(iclforge_adm_static PUBLIC ICLFORGE_ADM_STATIC_DEFINE)
-
-set_target_properties(iclforge_adm_shared PROPERTIES
-    VERSION "${PROJECT_VERSION}"
-    SOVERSION "${PROJECT_VERSION}")
-
-set_target_properties(iclforge_adm_shared PROPERTIES OUTPUT_NAME "iclforge_adm")
-set_target_properties(iclforge_adm_static PROPERTIES OUTPUT_NAME "iclforge_adm_static")
 
 # --exclude-libs,ALL: confirmed empirically necessary, not a defensive guess - without this,
 # iclforge_adm_shared's dynamic symbol table carries ~16,800 exported symbols (a real linux-llvm-shared

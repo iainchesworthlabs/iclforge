@@ -262,6 +262,27 @@ if(ICLFORGE_STAGE_TIMERS AND NOT (ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_E
         "this, and nothing in it defines the two functions the stage-timer backend calls.")
 endif()
 
+# The scalar the decoders carry their coefficients in, for every codec: double is the default and
+# stays it for every ordinary build (the gold references, the quality trend and the cross-platform
+# bitstream hashes are all stated in that arithmetic); float is the single-precision-FPU parts';
+# fixed is iclforge::internal::Fixed32, Q7.24 in an int32, for parts with no FPU
+# (planning/arithmetic-tiers.md). Each codec takes its decode-scalar-<tier>/ variant directory from
+# ICLFORGE_DECODE_SCALAR_TIER, so the three spellings are float64, float32 and fixed32 everywhere.
+# A CACHE variable, so an ESP-IDF project or a preset that set it first keeps its value.
+set(ICLFORGE_DECODE_SCALAR "double" CACHE STRING
+    "Scalar the decoder carries coefficients in: double (default), float, or fixed (Q7.24 in an int32, for parts with no FPU)")
+set_property(CACHE ICLFORGE_DECODE_SCALAR PROPERTY STRINGS double float fixed)
+if(ICLFORGE_DECODE_SCALAR STREQUAL "double")
+    set(ICLFORGE_DECODE_SCALAR_TIER "float64")
+elseif(ICLFORGE_DECODE_SCALAR STREQUAL "float")
+    set(ICLFORGE_DECODE_SCALAR_TIER "float32")
+elseif(ICLFORGE_DECODE_SCALAR STREQUAL "fixed")
+    set(ICLFORGE_DECODE_SCALAR_TIER "fixed32")
+else()
+    message(FATAL_ERROR
+        "ICLFORGE_DECODE_SCALAR is 'double', 'float' or 'fixed' (got '${ICLFORGE_DECODE_SCALAR}')")
+endif()
+
 # apps/cli, apps/gui, tests/ and examples/ all link iclforge::matroska, iclforge::mp4 and
 # iclforge::mpegts unconditionally - none of them are written to cope with any of the three being
 # absent. ICLFORGE_BUILD_MATROSKA=OFF, ICLFORGE_BUILD_MP4=OFF or ICLFORGE_BUILD_MPEGTS=OFF only

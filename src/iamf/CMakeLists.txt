@@ -26,77 +26,13 @@
 # this PR, nothing downstream (CLI, GUI, examples beyond mux_iamf.cpp)
 # consumes it yet.
 #
-# Built and installed as both a static and a shared library - see
-# src/ac3/CMakeLists.txt's iclforge::ac3 for the full explanation of why an
-# OBJECT library plus two thin wrapper targets, rather than one
-# add_library().
+# Built and installed as both a static and a shared library, by
+# iclforge_add_library() (cmake/IclforgeLibrary.cmake).
 # ---------------------------------------------------------------------------
-add_library(iclforge_iamf_objects OBJECT)
-add_library(iclforge_iamf_static STATIC)
-add_library(iclforge_iamf_shared SHARED)
-
-target_link_libraries(iclforge_iamf_static PUBLIC iclforge_iamf_objects)
-target_link_libraries(iclforge_iamf_shared PUBLIC iclforge_iamf_objects)
-
-add_library(iclforge::iamf_static ALIAS iclforge_iamf_static)
-add_library(iclforge::iamf_shared ALIAS iclforge_iamf_shared)
-if(BUILD_SHARED_LIBS)
-    add_library(iclforge::iamf ALIAS iclforge_iamf_shared)
-else()
-    add_library(iclforge::iamf ALIAS iclforge_iamf_static)
-endif()
-
-target_sources(iclforge_iamf_objects
-    PRIVATE
+iclforge_add_library(iamf
+    SOURCES
         src/container.cpp
         src/iamf.cpp
         src/sequence_common.cpp
         src/sequence_read.cpp
         src/sequence_write.cpp)
-
-target_include_directories(iclforge_iamf_objects
-    PUBLIC
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>"
-        "$<INSTALL_INTERFACE:include>")
-
-target_compile_features(iclforge_iamf_objects PUBLIC cxx_std_23)
-
-# $<BUILD_INTERFACE:...> wrapping iclforge::warnings/iclforge::coverage - see
-# src/ac3/CMakeLists.txt's identical iclforge_ac3_objects treatment for why a
-# plain PRIVATE link isn't enough for an OBJECT library that's part of an
-# install(EXPORT) set.
-target_link_libraries(iclforge_iamf_objects PRIVATE
-    "$<BUILD_INTERFACE:iclforge::warnings>"
-    "$<BUILD_INTERFACE:iclforge::coverage>")
-
-set_target_properties(iclforge_iamf_objects PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    CXX_VISIBILITY_PRESET hidden
-    VISIBILITY_INLINES_HIDDEN ON)
-
-# MSVC's C4251 ("class X needs to have dll-interface...") fires for the PRIVATE
-# STL-typed members of iclforge::iamf::FragmentedWriter, the one
-# ICLFORGE_IAMF_EXPORT class here (its descriptors, its initialization segment
-# buffer): implementation detail a caller reaches only through the class's own
-# exported methods. Suppressed here, PUBLIC, for the reasons given in
-# src/mp4/CMakeLists.txt's identical iclforge_mp4_objects treatment.
-target_compile_options(iclforge_iamf_objects PUBLIC "$<$<CXX_COMPILER_ID:MSVC>:/wd4251>")
-
-include(GenerateExportHeader)
-set_target_properties(iclforge_iamf_shared PROPERTIES DEFINE_SYMBOL "ICLFORGE_IAMF_BUILDING_SHARED")
-generate_export_header(iclforge_iamf_shared
-    BASE_NAME ICLFORGE_IAMF
-    EXPORT_MACRO_NAME ICLFORGE_IAMF_EXPORT
-    EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/generated/iclforge/iamf/export.hpp"
-    DEFINE_NO_DEPRECATED
-    STATIC_DEFINE ICLFORGE_IAMF_STATIC_DEFINE)
-target_compile_definitions(iclforge_iamf_objects PRIVATE ICLFORGE_IAMF_BUILDING_SHARED)
-target_compile_definitions(iclforge_iamf_static PUBLIC ICLFORGE_IAMF_STATIC_DEFINE)
-
-set_target_properties(iclforge_iamf_shared PROPERTIES
-    VERSION "${PROJECT_VERSION}"
-    SOVERSION "${PROJECT_VERSION}")
-
-set_target_properties(iclforge_iamf_shared PROPERTIES OUTPUT_NAME "iclforge_iamf")
-set_target_properties(iclforge_iamf_static PROPERTIES OUTPUT_NAME "iclforge_iamf_static")

@@ -56,6 +56,16 @@ else()
     set(_iclforge_profiling_dir "${CMAKE_CURRENT_SOURCE_DIR}/variants/profiling-tracy_disabled")
 endif()
 set(ICLFORGE_PROFILING_STAGE_TIMERS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/variants/profiling-stage_timers" PARENT_SCOPE)
+# The directory a library outside this one compiles its markers against when it cannot take it from
+# this library's usage requirements, because the minimum-footprint profile builds no iclforge::base
+# (the AC-4 core, src/ac4core): the stage timers in that profile when they are asked for, else what
+# this library's own users see.
+if(ICLFORGE_STAGE_TIMERS)
+    set(ICLFORGE_PROFILING_INCLUDE_DIR
+        "${CMAKE_CURRENT_SOURCE_DIR}/variants/profiling-stage_timers" PARENT_SCOPE)
+else()
+    set(ICLFORGE_PROFILING_INCLUDE_DIR "${_iclforge_profiling_dir}" PARENT_SCOPE)
+endif()
 
 # The minimum-footprint profile compiles the sources it needs itself (src/ac3/minimal.cmake), so no
 # library is built here for it.
