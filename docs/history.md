@@ -509,8 +509,8 @@ changed the output: the QMF synthesis modulation offset, where only Pseudocode 6
 as the inverse of the gain it needs and which left the top of DEE's 5.1 film centre 4.6 dB under the
 source at 256 kbps.
 
-The encoder (`src/ac4enc`) followed each decoder phase that reads what it writes, sharing
-`src/ac4core`'s transforms, and was raced against DEE's streams of the same sources. In stereo in
+The encoder (`src/ac4/src/encoder`) followed each decoder phase that reads what it writes, sharing
+`src/ac4/src/core`'s transforms, and was raced against DEE's streams of the same sources. In stereo in
 the SIMPLE mode at 192 kbps its SNR was 5.6 dB above DEE's on music and 14.9 dB on speech, with
 ViSQOL within 0.02. The races also found that a tone sweeping above A-SPX's crossover left the band
 empty in the encoder's streams, which phase E10 fixed by measuring the share of each noise group's

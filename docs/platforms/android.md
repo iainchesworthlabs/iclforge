@@ -147,8 +147,8 @@ So the backend is split, unlike the other three:
 ### AC-4
 
 **The app does nothing with AC-4.** Its native library, `iclforge_jni`, links `iclforge::ac3`,
-`iclforge::audio` and `iclforge::signing` and none of the AC-4 libraries (`src/ac4`, `src/ac4core`,
-`src/ac4dec`, `src/ac4enc`). The wrapper `CMakeLists.txt` leaves `ICLFORGE_BUILD_AC4` at its
+`iclforge::audio` and `iclforge::signing` and none of the AC-4 libraries (`src/ac4`,
+`src/ac4`). The wrapper `CMakeLists.txt` leaves `ICLFORGE_BUILD_AC4` at its
 default, on, so the NDK build compiles those libraries and holds their sources to building under
 NDK r26 (`tools/checks/test_ac4_build_configurations.py` holds it to that default), and nothing
 calls them. The live encode loop makes E-AC-3 only. The `play_file` diagnostic (below) replays

@@ -218,12 +218,12 @@ if(ICLFORGE_BUILD_IAMF)
         DESCRIPTION "IAMF v1.1.0 OBU / ISO-BMFF writer")
 endif()
 
-# The AC-4 inspector (src/ac4, iclforge::ac4), the AC-4 decoder (src/ac4dec, iclforge::ac4) and the
-# AC-4 encoder (src/ac4enc, iclforge::ac4) are optional components under one switch,
+# The AC-4 inspector (src/ac4, iclforge::ac4), the AC-4 decoder (src/ac4/src/decoder, iclforge::ac4) and the
+# AC-4 encoder (src/ac4/src/encoder, iclforge::ac4) are optional components under one switch,
 # ICLFORGE_BUILD_AC4 (see the root CMakeLists.txt), with the core the decoder and the encoder link
-# (src/ac4core, iclforge::ac4). The four share one export set, ac4Targets, installed below, each
+# (src/ac4/src/core, iclforge::ac4). The four share one export set, ac4Targets, installed below, each
 # with its own install() and its own .pc file - the pairing tools/checks/check_packaging_versions.sh
-# counts. The core is exported as core (src/ac4core/CMakeLists.txt).
+# counts. The core is exported as core (src/ac4/CMakeLists.txt).
 #
 # The core is a static archive of hidden symbols with no headers and no ABI of its own. The
 # static decoder's and encoder's archives call into it without containing it, so it is installed

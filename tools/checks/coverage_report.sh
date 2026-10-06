@@ -164,8 +164,8 @@ src/adm            82 75
 src/admbridge         88 78
 src/sendspin          85 74
 src/ac4               93 88
-src/ac4dec            88 80
-src/ac4core           88 80
+src/ac4/src/decoder            88 80
+src/ac4/src/core           88 80
 src/iab            90 87
 src/iamf              91 90
 apps/cli              80 71

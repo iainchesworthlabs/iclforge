@@ -27,7 +27,7 @@ namespace iclforge::ac4::detail {
 // Why `p` cannot be sent, or an empty view where it can: a value off the range
 // encoder.hpp gives it, or a depth exponent other than 1 with a screen factor
 // of 0. The two are one group of fields (Part 2 clause 6.2.8.7's
-// group_other_mask 0b0010), and the factor has no code for 0 (src/ac4enc/
+// group_other_mask 0b0010), and the factor has no code for 0 (src/ac4/
 // ERRATA.md, "The screen factor and the depth exponent").
 [[nodiscard]] std::string_view properties_refusal(const ObjectProperties& p) noexcept;
 

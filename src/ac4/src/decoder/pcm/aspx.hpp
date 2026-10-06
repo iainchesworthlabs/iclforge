@@ -30,13 +30,13 @@ namespace iclforge::ac4::detail {
 
 // ac4core's own complex type (in place of std::complex<double>): the
 // decoder's QMF-domain reconstruction (this file and its neighbours in
-// pcm/) calls straight into src/ac4core's A-SPX, A-CPL and A-JOC kernels,
+// pcm/) calls straight into src/ac4/src/core's A-SPX, A-CPL and A-JOC kernels,
 // which take this type since D14a (planning/ac4.md), and a std::complex
 // buffer cannot be passed where one of those is asked for even at the same
 // underlying double representation - the two are unrelated types.
 //
 // `Real` (ac4/detail/real.hpp) is the same CMake-selected scalar
-// src/ac4core's kernels are explicitly instantiated at, resolved by
+// src/ac4/src/core's kernels are explicitly instantiated at, resolved by
 // ICLFORGE_DECODE_SCALAR (double or float): one concrete type per build,
 // used directly here rather than as a template parameter, the way
 // iclforge::ac3's own decode path uses iclforge::ac3::internal::decode_scalar_t (that

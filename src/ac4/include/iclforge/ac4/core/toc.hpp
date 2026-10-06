@@ -40,7 +40,7 @@
 // (oamd_substream(), §6.2.2.4 - which embeds a second, independent
 // oamd_common_data() of its own) was never in scope of this inspector either
 // way - like every non-audio substream, it is reported as a byte range only.
-// iclforge::ac4::Decoder (src/ac4dec) reads it.
+// iclforge::ac4::Decoder (src/ac4/src/decoder) reads it.
 //
 // The bitstream_version >= 2 path (TS 103 190-2 clause 6, presentation_v1
 // and substream-group framing) is cross-checked against real Dolby

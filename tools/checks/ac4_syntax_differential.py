@@ -1,7 +1,7 @@
 """Compare the two AC-4 syntax transcriptions where no encoded stream reaches.
 
 The committed DEE streams, and the local census, exercise only part of the
-syntax the decoder in src/ac4dec and tools/references/ac4_syntax.py read. This
+syntax the decoder in src/ac4/src/decoder and tools/references/ac4_syntax.py read. This
 script makes streams that reach the rest, reads each through both
 transcriptions and compares their traces.
 

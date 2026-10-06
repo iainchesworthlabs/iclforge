@@ -1,4 +1,4 @@
-// Multichannel processing (src/ac4dec/src/pcm/multichannel.*) against the
+// Multichannel processing (src/ac4/src/decoder/pcm/multichannel.*) against the
 // entries ETSI TS 103 190-1 V1.4.1 prints for it, and the routing of a
 // channel element's tracks to channels (pcm/routing.*) against Tables 180,
 // 182, 183, 212 and 213, and the immersive element's against ETSI TS 103

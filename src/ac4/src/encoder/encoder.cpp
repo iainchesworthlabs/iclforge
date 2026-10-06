@@ -4753,7 +4753,7 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
             continue;
         }
         if (objects) {
-            // Objects take the output level's gain and no DRC (src/ac4dec/
+            // Objects take the output level's gain and no DRC (src/ac4/
             // ERRATA.md, "Object audio metadata and the ISF renderer").
             return invalid("DRC gains for a presentation of objects");
         }

@@ -1,10 +1,10 @@
 #pragma once
 
-// The type src/ac4core's kernels are explicitly instantiated at (the
+// The type src/ac4/src/core's kernels are explicitly instantiated at (the
 // `template class Foo<Real>;` lines in dsp/qmf.hpp, dsp/mdct.hpp, dsp/fft.hpp,
 // aspx/hf_generator.hpp, acpl/acpl.hpp, ajcc/ajcc.hpp and ajoc/ajoc.hpp) - the
 // DOUBLE variant. The float variant is the identically-pathed header under
-// src/internal/scalar/float/; src/ac4core/CMakeLists.txt picks the directory
+// src/internal/scalar/float/; src/ac4/CMakeLists.txt picks the directory
 // from ICLFORGE_DECODE_SCALAR, the same cache variable src/ac3/CMakeLists.txt
 // resolves its own decode_scalar_t from (planning/ac4.md, "AC-4 joins
 // ICLFORGE_DECODE_SCALAR"), so no source file asks which it is with a
@@ -30,7 +30,7 @@ using Real = double;
 }  // namespace iclforge::ac4::detail
 
 // Explicit instantiations a translation unit adds at double beside its
-// `template class Foo<Real>;` when Real is not double: the encoder (src/ac4enc)
+// `template class Foo<Real>;` when Real is not double: the encoder (src/ac4/src/encoder)
 // always runs at double, decision 34 (planning/ac4.md), and ac4core is one
 // archive both ac4dec and ac4enc link, so each kernel the encoder calls is
 // instantiated at both. Here Real is double, so the line above is already that

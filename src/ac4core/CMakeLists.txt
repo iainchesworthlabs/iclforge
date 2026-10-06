@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::ac4 - what the AC-4 decoder (src/ac4dec) and the AC-4 encoder compute
+# iclforge::ac4 - what the AC-4 decoder (src/ac4/src/decoder) and the AC-4 encoder compute
 # alike, built and tested once (planning/ac4.md, "Where the libraries live"):
 # the tables generated from the ETSI attachments, and the transforms.
 #
@@ -69,7 +69,7 @@ else()
     set(_ac4core_scalar_dir "double")
 endif()
 
-# AC4CORE_ALSO_AT_DOUBLE: the encoder (src/ac4enc) calls straight into a handful
+# AC4CORE_ALSO_AT_DOUBLE: the encoder (src/ac4/src/encoder) calls straight into a handful
 # of these same kernels (Mdct, QmfAnalysis, QmfSynthesis, Resampler,
 # ajoc::Reconstruction, aspx::generate_high_band) always at double - decision
 # 34 (planning/ac4.md), the encoder never runs on an ESP32 and has no float
@@ -90,7 +90,7 @@ endif()
 # PUBLIC, not PRIVATE: ac4core's own PUBLIC headers (aspx/hf_generator.hpp,
 # acpl/acpl.hpp, ajcc/ajcc.hpp, ajoc/ajoc.hpp, dsp/qmf.hpp, dsp/mdct.hpp,
 # dsp/fft.hpp, dsp/resampler.hpp, dsp/synthesis.hpp) #include
-# "iclforge/ac4core/detail/real.hpp" themselves, and src/ac4dec and src/ac4enc compile
+# "iclforge/ac4core/detail/real.hpp" themselves, and src/ac4 compile
 # against those headers through iclforge::ac4 as a COMPILE_ONLY dependency (their
 # own CMakeLists.txt) - a consumer that only ever compiles against a target,
 # never links it, still needs that target's PUBLIC usage requirements, this
@@ -152,7 +152,7 @@ target_link_libraries(iclforge_ac4core
 # core's floating-point unit that a rolled loop exposes) for 9 KB of flash; the
 # arithmetic is the same operation for operation, which the board's PCM hashes
 # checked (docs/platforms/bare-metal/esp32-p4.md, planning/ac4.md D14e). The
-# decoder's own files (src/ac4dec) are at -O2 in its CMakeLists.txt: -O3 gained
+# decoder's own files (src/ac4/src/decoder) are at -O2 in its CMakeLists.txt: -O3 gained
 # nothing there and cost 73 KB.
 if(ICLFORGE_MINIMAL_DECODER AND ICLFORGE_MINIMAL_HOT_O2)
     set_source_files_properties(

@@ -340,7 +340,7 @@ reading of each of these, and the tests hold the three traces equal on every imm
 
 The writer takes the decoder's readings of [A-JOC](../ac4dec/ERRATA.md#a-joc) and of [object audio
 metadata and the ISF renderer](../ac4dec/ERRATA.md#object-audio-metadata-and-the-isf-renderer) by
-running the decoder's own reconstruction (`src/ac4core`'s `ajoc::Reconstruction`) on the parameters it
+running the decoder's own reconstruction (`src/ac4/src/core`'s `ajoc::Reconstruction`) on the parameters it
 weighs: the ramp's counter, the decorrelation input matrix by subband, H'_M by object. Objects take the
 output level's gain and no DRC, so an object presentation refuses DRC gains.
 

@@ -2,7 +2,7 @@
 
 tools/references/ac4_syntax.py reads the syntax of every AC-4 substream a
 frame holds, transcribed from ETSI TS 103 190-1 and -2 separately from the
-decoder in src/ac4dec, and summarises what it read as one digest line per
+decoder in src/ac4/src/decoder, and summarises what it read as one digest line per
 frame and substream: how many syntax elements, where the last one ended, and a
 CRC-32 over every element's (bit offset, width, value). The digests of the
 committed DEE streams are under tests/golden/ac4/, and

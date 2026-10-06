@@ -241,7 +241,7 @@ target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/s
 
 # test_scalar_math.cpp includes iclforge/arithmetic/scalar_math.hpp and
 # test_fixed32*.cpp/test_mdct_fixed.cpp include iclforge/arithmetic/fixed32.hpp - the
-# shared arithmetic target (src/arithmetic) both iclforge::ac3 and src/ac4core
+# shared arithmetic target (src/arithmetic) both iclforge::ac3 and src/ac4/src/core
 # use (planning/ac4.md, decision 31), worth holding to their own accuracy/
 # correctness bounds rather than only through the fixture hashes that depend
 # on them.
@@ -255,7 +255,7 @@ target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/s
 # AC-4 decoder's syntax functions (src/ac4/src/decoder/syntax/) to hold each branch of
 # the syntax to a hand-built bitstream - the committed streams reach only the
 # branches DEE writes - and the other tests in the block below reach its PCM
-# functions (src/ac4/src/decoder/pcm/) and the encoder's writer (src/ac4enc/src/).
+# functions (src/ac4/src/decoder/pcm/) and the encoder's writer (src/ac4/src/encoder/).
 # Same pattern as the forge headers above, with one difference: those headers
 # are inline, and these functions are compiled into iclforge_ac4_objects and
 # iclforge_ac4_objects under CXX_VISIBILITY_PRESET hidden. With BUILD_SHARED_LIBS=ON,
@@ -306,10 +306,10 @@ if(NOT BUILD_SHARED_LIBS)
         ac4/encoder/test_ac4enc_writer.cpp
         "${CMAKE_SOURCE_DIR}/apps/common/ac4_object_render.cpp")
 endif()
-# tests/ac4/encoder/ reach the encoder's writer (src/ac4enc/src/) the same way; the
+# tests/ac4/encoder/ reach the encoder's writer (src/ac4/src/encoder/) the same way; the
 # two libraries' internal headers keep distinct names (bit_reader.hpp and
 # syntax/ against bit_writer.hpp, asf/ and frame/).
-target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac4enc/src")
+target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac4/src/encoder")
 
 # test_simd_kernels.cpp (SIMD kernels) needs the ONE architecture directory
 # CMake selected in src/arithmetic/CMakeLists.txt, so the test exercises the

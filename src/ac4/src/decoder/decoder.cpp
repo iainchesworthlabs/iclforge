@@ -835,7 +835,7 @@ void assign_v1(const Toc& toc, std::map<int, Assignment>& out) {
             if (oamd_claimed) {
                 // 6.3.9.5: oamd_dyndata_multi() lists "all object essences
                 // present over all audio substreams of the according substream
-                // group in the order of bitstream presence" (src/ac4dec/
+                // group in the order of bitstream presence" (src/ac4/
                 // ERRATA.md, "The objects oamd_dyndata_multi() lists").
                 out.at(*oamd_key).oamd->objects = group_objects;
             }
@@ -1142,7 +1142,7 @@ struct Decoder::Impl {
     std::map<int, AudioSubstreamState> audio;
     std::map<int, PresentationSubstreamState> presentation;
     // What a substream group's OAMD substream sent last, keyed by its index:
-    // the timing its substreams take where they send none (src/ac4dec/
+    // the timing its substreams take where they send none (src/ac4/
     // ERRATA.md, "Which oamd_timing_data() applies"), and the common data.
     struct OamdGroupState {
         std::optional<detail::OamdTimingData> timing;
@@ -1582,7 +1582,7 @@ detail::ParseResult Decoder::Impl::decode_objects(const CapturedAudio& member,
     // downmix's in core decoding; a direct-coded substream's in its group's
     // OAMD substream, or in its own metadata() in an alternative
     // presentation. A portion that sends no timing takes the downmix's
-    // (b_derive_timing_from_dmx), the group's, or its own last (src/ac4dec/
+    // (b_derive_timing_from_dmx), the group's, or its own last (src/ac4/
     // ERRATA.md, "Which oamd_timing_data() applies").
     // The common data: an A-JOC substream's own in the table of contents,
     // else its group's OAMD substream's.

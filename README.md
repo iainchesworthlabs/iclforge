@@ -248,7 +248,7 @@ src/ac4/        iclforge::ac4 — a standalone AC-4 sync frame/TOC/presentation/
 src/ac4dec/     iclforge::ac4 — an AC-4 decoder, from ETSI TS 103 190-1 and -2; no iclforge::ac3
                 dependency
 src/ac4enc/     iclforge::ac4 — an AC-4 encoder, from the same standards; no iclforge::ac3 dependency
-src/ac4core/    iclforge::ac4 — the tables and transforms the AC-4 decoder and encoder share, a static
+src/ac4/src/core/    iclforge::ac4 — the tables and transforms the AC-4 decoder and encoder share, a static
                 library with no headers of its own
 src/matroska/   iclforge::matroska — a standalone MKV muxer, no iclforge::ac3 dependency
 src/mp4/        iclforge::mp4 — a standalone MP4/ISOBMFF muxer plus fMP4/CMAF + HLS/DASH, no iclforge::ac3 dependency

@@ -103,7 +103,7 @@ jobs:
           python tools/packaging/pack_esp_component.py --version 0.0.0-ci --verify
 
       # The archive the AC-4 decoder needs, and one part of each tier built against it: packed
-      # with --with-ac4, which also stages src/ac4, src/ac4core and src/ac4dec, and built with
+      # with --with-ac4, which also stages src/ac4, and built with
       # CONFIG_ICLFORGE_AC4 on and an application that constructs an AC-4 decoder and calls it,
       # for the ESP32-P4 in single precision (planning/ac4.md, D14b) and for the ESP32-C3 and
       # ESP32-C6 in the fixed-point tier (D14d). The archive above is what it always was, without

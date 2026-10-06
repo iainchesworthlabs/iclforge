@@ -1,5 +1,5 @@
 // Embind wrapper around iclforge::ac3's AC-4 decode and encode paths (src/ac4,
-// src/ac4dec, src/ac4enc), for the roadmap plan phase I4 bindings sweep. One
+// src/ac4), for the roadmap plan phase I4 bindings sweep. One
 // combined module, unlike the AC-3 side's separate decode_bindings.cpp/
 // encoder_bindings.cpp executables (apps/wasm/CMakeLists.txt's own comment on
 // why AC-3 split them): the task this file was written for calls for "an
@@ -11,7 +11,7 @@
 // Three JS-visible things:
 //   - Ac4Decoder: wraps iclforge::ac4::Decoder (src/ac4/include/iclforge/ac4/decoder/decoder.hpp).
 //   - Ac4Encoder: wraps iclforge::ac4::Encoder (src/ac4/include/iclforge/ac4/encoder/encoder.hpp).
-//   - syncFrame: wraps iclforge::ac4::sync_frame() (src/ac4enc, declared beside Encoder).
+//   - syncFrame: wraps iclforge::ac4::sync_frame() (src/ac4/src/encoder, declared beside Encoder).
 //
 // Scope cut (the same "reasonable cost" cut used for every other binding in
 // this task): what is left out is the deep, rarely-touched-from-a-UI

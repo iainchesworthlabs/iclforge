@@ -49,7 +49,7 @@ qmf_tables.hpp and .cpp (Annex D.3, the QMF banks' window of clauses 5.7.3 and
 5.7.4, and Annex D.2, A-SPX's noise generator table of clause 5.7.6.4.3) and
 isf_tables.hpp and .cpp (Part 2 Annex A.2.1, the intermediate spatial format's
 rendering matrices of Part 2 clause 5.10.3).
-src/ac4core is what the AC-4 decoder and encoder share.
+src/ac4/src/core is what the AC-4 decoder and encoder share.
 
 Checks, all of them before anything is written, every one failing the run:
   Huffman  Annex A names the same codebooks as the attachment, with the

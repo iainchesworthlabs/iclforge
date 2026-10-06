@@ -164,7 +164,7 @@ option(ICLFORGE_BUILD_MPEGTS "Build the standalone MPEG-TS container writer (src
 # AC-4 bitstream inspector: the AC-4 sync-frame/TOC/presentation/substream-group bitstream
 # inspector (src/ac4). Same "own option, defaults ON" treatment as the three
 # above - apps/cli's `probe` command links it unconditionally.
-option(ICLFORGE_BUILD_AC4 "Build the standalone AC-4 bitstream inspector, decoder and encoder (src/ac4, src/ac4core, src/ac4dec, src/ac4enc)" ON)
+option(ICLFORGE_BUILD_AC4 "Build the standalone AC-4 bitstream inspector, decoder and encoder (src/ac4)" ON)
 
 # iclforge::iab (src/iab) - IAB reader, phase 1: a standalone reader for SMPTE
 # ST 2098-2's Immersive Audio Bitstream. Like the three container writers above, it needs no
@@ -226,11 +226,11 @@ if(ICLFORGE_MINIMAL_DECODER AND ICLFORGE_MINIMAL_ENCODER)
 endif()
 
 # The AC-4 decoder inside the same profile (planning/ac4.md, D14b): the
-# inspector (src/ac4), the core (src/ac4core) and the decoder (src/ac4dec) as
+# inspector (src/ac4), the core (src/ac4/src/core) and the decoder (src/ac4/src/decoder) as
 # static archives built with the profile's own compile options, and no encoder -
 # the encoder is built for no ESP32 part (decision 34). It is an option of its
 # own rather than a use of ICLFORGE_BUILD_AC4, which the guard below refuses in
-# the profile because it also builds src/ac4enc, the applications and the
+# the profile because it also builds src/ac4/src/encoder, the applications and the
 # tests. Off by default, and when off the profile builds exactly what it did
 # before: esp-idf/iclforge/CMakeLists.txt sets it from CONFIG_ICLFORGE_AC4.
 option(ICLFORGE_MINIMAL_AC4
@@ -451,7 +451,7 @@ endif()
 # ---------------------------------------------------------------------------
 # Targets
 # ---------------------------------------------------------------------------
-# The scalar building blocks iclforge::ac3 and src/ac4core (below) both use -
+# The scalar building blocks iclforge::ac3 and src/ac4/src/core (below) both use -
 # Fixed32 and the cross-platform-identical float transcendentals
 # (planning/ac4.md, decision 31). Header-only and dependency-free, so it goes
 # first; both consumers link it PRIVATE.
@@ -529,16 +529,16 @@ endif()
 # A fourth standalone module, same "depends on nothing of iclforge::ac3" shape
 # as the three container writers above - the AC-4 bitstream inspector, and the
 # AC-4 decoder beside it, which links the inspector and
-# nothing of iclforge::ac3 either, and the AC-4 encoder (src/ac4enc). src/ac4core
+# nothing of iclforge::ac3 either, and the AC-4 encoder (src/ac4/src/encoder). src/ac4/src/core
 # is what the decoder and the encoder compute alike (tables and transforms),
 # linked privately by both.
 # Gated together by ICLFORGE_BUILD_AC4 (default ON, see the option() and its
 # FATAL_ERROR guard above).
 if(ICLFORGE_BUILD_AC4)
     add_subdirectory(src/ac4)
-    add_subdirectory(src/ac4core)
-    add_subdirectory(src/ac4dec)
-    add_subdirectory(src/ac4enc)
+    add_subdirectory(src/ac4/src/core)
+    add_subdirectory(src/ac4/src/decoder)
+    add_subdirectory(src/ac4/src/encoder)
 elseif(ICLFORGE_MINIMAL_AC4)
     # The minimum-footprint profile's share of the above: what a decode reads
     # and no encoder (ICLFORGE_MINIMAL_AC4, beside the profile's options). The
@@ -546,8 +546,8 @@ elseif(ICLFORGE_MINIMAL_AC4)
     # bare-metal archive cannot have: a shared library, position-independent
     # code, and exceptions.
     add_subdirectory(src/ac4)
-    add_subdirectory(src/ac4core)
-    add_subdirectory(src/ac4dec)
+    add_subdirectory(src/ac4/src/core)
+    add_subdirectory(src/ac4/src/decoder)
     # -Wno-psabi: GCC's arm-none-eabi says, once a translation unit and for every
     # std::span passed by value, that its passing changed in GCC 7.1. A note about an
     # ABI nothing here links against, hundreds of them in the log of a leg whose

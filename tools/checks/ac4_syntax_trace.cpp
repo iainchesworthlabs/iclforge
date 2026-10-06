@@ -18,7 +18,7 @@
 //   X  scan stopped                                  the sync frames stopped
 //
 // Not a CMake target: a development tool, built by hand against a build of
-// the static libraries: the decoder, the shared core it links (src/ac4core)
+// the static libraries: the decoder, the shared core it links (src/ac4/src/core)
 // and the inspector. With MSVC, from a developer prompt at the repo root,
 // against a build tree in <b>:
 //
@@ -27,7 +27,7 @@
 //      /I<b>/src/ac4/generated /I<b>/src/ac4dec/generated
 //      tools/checks/ac4_syntax_trace.cpp
 //      /link <b>/src/ac4dec/iclforge_ac4_static.lib
-//      <b>/src/ac4core/iclforge_ac4core_static.lib <b>/src/ac4/iclforge_ac4_static.lib
+//      <b>/src/ac4/src/core/iclforge_ac4core_static.lib <b>/src/ac4/iclforge_ac4_static.lib
 //
 // With GCC or Clang:
 //
@@ -35,7 +35,7 @@
 //      -DICLFORGE_AC4_STATIC_DEFINE -DICLFORGE_AC4DEC_STATIC_DEFINE -Isrc/ac4/include
 //      -Isrc/ac4dec/include -I<b>/src/ac4/generated -I<b>/src/ac4dec/generated
 //      <b>/src/ac4dec/libiclforge_ac4_static.a
-//      <b>/src/ac4core/libiclforge_ac4core_static.a <b>/src/ac4/libiclforge_ac4_static.a
+//      <b>/src/ac4/src/core/libiclforge_ac4core_static.a <b>/src/ac4/libiclforge_ac4_static.a
 
 #include <cstddef>
 #include <cstdio>

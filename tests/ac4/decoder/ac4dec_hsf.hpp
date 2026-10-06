@@ -2,7 +2,7 @@
 
 // Streams at 96 and 192 kHz for the decoder's tests: ETSI TS 103 190-1 V1.4.1's
 // HSF extension (clauses 4.2.3.9, 4.2.4.3, 4.2.7.4 and 4.2.8.7 to 4.2.8.9, with 5.4),
-// which the encoder (src/ac4enc) cannot write. A mono or stereo SIMPLE substream, one long
+// which the encoder (src/ac4/src/encoder) cannot write. A mono or stereo SIMPLE substream, one long
 // block a frame, whose channels each carry one steady tone, and the extension substream
 // that the table of contents links to it.
 //

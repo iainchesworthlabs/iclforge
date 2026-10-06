@@ -1,4 +1,4 @@
-"""AC-4 substream syntax transcription (the Python reference for src/ac4dec).
+"""AC-4 substream syntax transcription (the Python reference for src/ac4/src/decoder).
 
 Written from ETSI TS 103 190-1 V1.4.1 (Part 1) and ETSI TS 103 190-2 V1.3.1
 (Part 2) alone. Part 2 clause 6 amends Part 1 clause 4 (Part 2 tables 48/49);

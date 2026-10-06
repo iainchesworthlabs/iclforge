@@ -944,7 +944,7 @@ in `tools/references/ac4_parse.py`.
 
 ### The decoder's syntax
 
-`src/ac4dec` is an AC-4 decoder written from the same two standards. It reads every
+`src/ac4/src/decoder` is an AC-4 decoder written from the same two standards. It reads every
 syntax element of a frame's substreams and decodes their audio (see "The decoder's
 output" below): the presentation substream,
 channel-coded audio substreams in the Part 1 channel elements (ASF spectral data, stereo processing,
@@ -1023,7 +1023,7 @@ mode passes through the QMF banks, SIMPLE included, as Part 1 Figure 9 draws the
 has one delay, 1,313 samples at index 13: `d_pcm`'s 352, the banks' 577 and six QMF slots of history.
 The LFE passes through the banks with the other channels and nothing else touches it there. The
 transforms, the QMF banks, A-SPX's tables and high frequency generator, and A-CPL's decorrelators,
-transient ducker, interpolation and dequantisation tables are in `src/ac4core`, the core the decoder
+transient ducker, interpolation and dequantisation tables are in `src/ac4/src/core`, the core the decoder
 shares with the encoder. Six checks stand in for the reference output neither part defines:
 
 - **Each transform against its formula** (`tests/ac4/core/test_ac4core_dsp.cpp`): the FFT against the
@@ -1489,7 +1489,7 @@ under "Object audio syntax", "A-JOC" and "Object audio metadata and the ISF rend
 ### The decoder in float, and on small targets
 
 Phase D14a gives the decoder's arithmetic a scalar seam: `ICLFORGE_DECODE_SCALAR` builds the
-transforms, QMF banks and the A-SPX, A-CPL, A-JCC and A-JOC kernels of `src/ac4core` and
+transforms, QMF banks and the A-SPX, A-CPL, A-JCC and A-JOC kernels of `src/ac4/src/core` and
 `src/ac4/src/decoder/pcm` in `double`, the default, or `float`, and phase D14d adds `fixed`
 (`Fixed32` with a block exponent per transform block and per QMF slot). The encoder is `double` in
 every build. What is checked:
@@ -1553,7 +1553,7 @@ every build. What is checked:
 
 ### The encoder
 
-`src/ac4enc` writes AC-4 from the same two standards: mono, stereo, 5.0 or 5.1, and 5.0.4 or 5.1.4
+`src/ac4/src/encoder` writes AC-4 from the same two standards: mono, stereo, 5.0 or 5.1, and 5.0.4 or 5.1.4
 in the immersive element (phase E8), at 48 kHz at every
 frame rate of Part 1 Table 83 or at 44.1 kHz at `frame_rate_index` 13, at a constant, average or
 variable rate, with I-frames where a caller asks for them, the loudness values, DRC's decoder modes,
@@ -1569,7 +1569,7 @@ configurations, chosen frame by frame by the bits they save, 7.0 and 7.1 in the 
 ASPX_ACPL_1 and A-CPL in stereo, and 7.0.4 and 7.1.4 with the back pair, ASPX_ACPL_1 and A-JCC in
 the immersive element are experimental options. Objects, as an A-JOC substream or direct-coded, are
 an experimental option too (phase E9). It shares
-`src/ac4core`'s transforms, windows, codebooks, QMF banks and A-SPX tables and high frequency
+`src/ac4/src/core`'s transforms, windows, codebooks, QMF banks and A-SPX tables and high frequency
 generator with the decoder, and writes the syntax through a transcription of the tables of its own.
 `forge ac4-encode` writes it raw or in MP4, with an option for each setting. Ten checks stand
 behind it (`planning/ac4.md`, the encoder's ladder, and phases E5's to E8's exits), and a

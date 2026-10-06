@@ -6,12 +6,12 @@
 # compile here - just a target that carries the include path.
 #
 # Why this is its own target rather than living inside iclforge::ac3, where both
-# files used to be (src/ac3/src/core/{fixed32,scalar_math}.hpp): src/ac4core
+# files used to be (src/ac3/src/core/{fixed32,scalar_math}.hpp): src/ac4/src/core
 # needs Fixed32 too, for the same reason iclforge::ac3 does (a fixed-point tier
 # with no floating-point unit, planning/ac4.md's D14), and a decoder that
 # linked iclforge::ac3 to get it would bring the whole AC-3/E-AC-3 codec into
-# every AC-4 build (src/ac4dec/CMakeLists.txt's own header explains why AC-4
-# links none of it). Copying the two files into src/ac4core instead was the
+# every AC-4 build (src/ac4/CMakeLists.txt's own header explains why AC-4
+# links none of it). Copying the two files into src/ac4/src/core instead was the
 # other option and was rejected: planning/ac4.md's decision 31 is explicit
 # that a copied Fixed32 would drift from the original. So both consumers
 # depend on this one small target instead - "no copies" made structural
@@ -88,11 +88,11 @@ endif()
 #
 # The kernels themselves are NOT duplicated per directory. They live once,
 # in shared code (iclforge::ac3's src/core/mdct.cpp, bitalloc.cpp and exponents.cpp,
-# src/ac4core's src/dsp/qmf_vector.hpp), written against the 128-bit vector types
+# src/ac4/src/core's src/dsp/qmf_vector.hpp), written against the 128-bit vector types
 # the header defines; the directories carry the types and their operations. See
 # the generic header for why that is what makes the bit-exactness claim testable.
 #
-# The directories were src/forge/src/internal/arch/ until src/ac4core's QMF
+# The directories were src/forge/src/internal/arch/ until src/ac4/src/core's QMF
 # banks took vector kernels of their own (planning/ac4.md, D14a, and decision 31's
 # "the vector types" in a header-only target both consumers link): this target
 # carries the include path, so linking iclforge::arithmetic is all a consumer does.
@@ -139,7 +139,7 @@ if(NOT IS_DIRECTORY "${ICLFORGE_ARCH_INCLUDE_DIR}")
         "copy is the portable implementation and is a working starting point.")
 endif()
 
-# Every consumer of iclforge::arithmetic (iclforge::ac3, iclforge_ac3_minimal, src/ac4core) gets the
+# Every consumer of iclforge::arithmetic (iclforge::ac3, iclforge_ac3_minimal, src/ac4/src/core) gets the
 # one directory through the target.
 target_include_directories(iclforge_arithmetic INTERFACE "$<BUILD_INTERFACE:${ICLFORGE_ARCH_INCLUDE_DIR}>")
 

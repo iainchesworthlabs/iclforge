@@ -1,4 +1,4 @@
-// The AC-4 encoder's syntax writer (src/ac4enc/src), each piece read back by
+// The AC-4 encoder's syntax writer (src/ac4/src/encoder), each piece read back by
 // what reads AC-4 here: variable_bits() and every Huffman codeword by the
 // decoder's bit reader, the sync frame and its CRC by the inspector's scan,
 // and a whole frame by the inspector and the decoder, whose trace must equal

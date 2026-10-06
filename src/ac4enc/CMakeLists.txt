@@ -2,11 +2,11 @@
 # iclforge::ac4 - an AC-4 encoder, ETSI TS 103 190-1 V1.4.1 and TS 103 190-2
 # V1.3.1, written from the published texts (planning/ac4.md, phase E1 on).
 #
-# A peer of src/ac4dec, made the same way by iclforge_add_library()
+# A peer of src/ac4/src/decoder, made the same way by iclforge_add_library()
 # (cmake/IclforgeLibrary.cmake). It links iclforge::ac4, since its own header
 # describes what it writes with the inspector's Toc and syntax trace, and embeds
 # the shared core iclforge::ac4core: the forward transform, the windows and the
-# codebooks; both as src/ac4dec does, for the reasons it gives. Its syntax
+# codebooks; both as src/ac4/src/decoder does, for the reasons it gives. Its syntax
 # writer is a transcription of the tables of its own, separate from the
 # decoder's reader. Installed and exported with the inspector, the decoder and
 # the core as iclforge::ac4_static and iclforge::ac4_shared

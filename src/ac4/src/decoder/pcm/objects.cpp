@@ -86,7 +86,7 @@ void apply_position(const ObjectRenderInfo& r, const std::optional<ExtPrecPos>& 
         p.position[2] = clip3(-1.0, 1.0,
                               clip3(-15, 15, prev[2]) / 15.0 + clip3(-4, 3, r.diff_pos3d_z) / 15.0 +
                                   clip3(-2, 2, ez) / (15.0 * 5.0));
-        // The standard precision the next difference refers to (src/ac4dec/
+        // The standard precision the next difference refers to (src/ac4/
         // ERRATA.md, "Object audio metadata").
         s.standard = {clip3(0, 62, prev[0] + r.diff_pos3d_x),
                       clip3(0, 62, prev[1] + r.diff_pos3d_y),

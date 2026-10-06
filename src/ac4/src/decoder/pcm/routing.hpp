@@ -26,7 +26,7 @@
 // against the channels their A-CPL modules pair them with: 5.3.4.3.2's matrix
 // in the 5.X element, (L, Ls) = P0 (A, s3) and (R, Rs) = P1 (B, s4), and the
 // same step on Table 202's pairs in the 7.X element, each residual's
-// chparam_info() read under the residual's own sf_info() (src/ac4dec/
+// chparam_info() read under the residual's own sf_info() (src/ac4/
 // ERRATA.md, "ASPX_ACPL_1: the framing of the residuals").
 //
 // Table 182 names the 7.X element's outputs A to G before Table 183 makes

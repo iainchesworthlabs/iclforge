@@ -240,7 +240,7 @@ void Reconstruction<Real>::reconstruct(const FrameParameters& p, int num_ts,
 
     // The decorrelation input matrix's parameters, D = |C_wet^T| C_dry per data
     // point, from the coefficients before dialogue enhancement; subband by
-    // subband, each object's coefficients at its own band (src/ac4dec/
+    // subband, each object's coefficients at its own band (src/ac4/
     // ERRATA.md, "The decorrelation input matrix").
     pre_param_.assign(at(p.num_dpoints) * at(kSubbands) * kMaxDecorrelators * at(m), 0.0);
     for (int dp = 0; dp < p.num_dpoints; ++dp) {

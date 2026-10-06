@@ -4,7 +4,7 @@
 // experimental 7.1.4 with the back pair and ASPX_ACPL_1. Each stream reads back
 // with the trace the encoder recorded and decodes, in full decoding, with each
 // channel's tone on its own channel, and in core decoding with each on the
-// core layout's speaker at the core gain, as src/ac4dec's tests hold DEE's
+// core layout's speaker at the core gain, as src/ac4/src/decoder's tests hold DEE's
 // 5.1.4 streams to. The signals are half a second long, and a third of a
 // second under the sanitizers (tests/sanitized.hpp), where the height downmix
 // takes its one route that sends both of the syntax's branches.

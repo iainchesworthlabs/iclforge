@@ -15,7 +15,7 @@
 // subroutine and a 5.1 E-AC-3 frame is 12.9 M soft-float instructions.
 //
 // Header-only, in its own target (src/arithmetic) so that iclforge::ac3 and
-// src/ac4core both use this one copy rather than each carrying their own
+// src/ac4/src/core both use this one copy rather than each carrying their own
 // (planning/ac4.md, decision 31: "a copied Fixed32 would drift"). It lived at
 // src/forge/src/core/fixed32.hpp until AC-4's D14a moved it here; nothing
 // about the type changed in the move.

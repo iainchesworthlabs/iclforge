@@ -25,7 +25,7 @@ config ICLFORGE_SENDSPIN
         rest: X25519, SHA-256, SHA-512 and AES-256-GCM are on in ESP-IDF's
         default configuration.
 
-# THE AC-4 DECODER - src/ac4, src/ac4core and src/ac4dec, and the player's
+# THE AC-4 DECODER - src/ac4, and the player's
 # reading of AC-4 streams (src/ac4_bridge.hpp; planning/ac4.md, D14b). Off by
 # default: a firmware that plays AC-3 and E-AC-3 carries none of it, and its
 # build is what it was without this option.

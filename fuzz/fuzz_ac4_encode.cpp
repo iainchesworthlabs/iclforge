@@ -16,7 +16,7 @@
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 
-// iclforge::ac4::Encoder (src/ac4enc) over the configurations and input it takes, read
+// iclforge::ac4::Encoder (src/ac4/src/encoder) over the configurations and input it takes, read
 // back by the decoder (planning/ac4.md, the encoder's ladder, items 1 and 8).
 //
 // The first bytes choose the configuration - the channel layout, mono to

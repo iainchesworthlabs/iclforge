@@ -155,7 +155,7 @@ if(ICLFORGE_BUILD_CAPI)
     endif()
 endif()
 
-# decode_ac4 demonstrates the AC-4 inspector and decoder (src/ac4, src/ac4dec), which link nothing
+# decode_ac4 demonstrates the AC-4 inspector and decoder (src/ac4), which link nothing
 # of iclforge::ac3, as read_iab links nothing of it. It decodes the stream it is given, so it keeps out
 # of the list above, whose programs ctest runs with no arguments, and ctest hands it a committed DEE
 # stream. ICLFORGE_BUILD_AC4 defaults ON, and with it off there is no decoder to link.

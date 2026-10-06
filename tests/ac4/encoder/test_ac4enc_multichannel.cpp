@@ -1,4 +1,4 @@
-// The encoder's channel data matrices undone (src/ac4enc/src/asf/multichannel.
+// The encoder's channel data matrices undone (src/ac4/src/encoder/asf/multichannel.
 // hpp) held to ETSI TS 103 190-1 V1.4.1 as printed: Tables 178 and 179 and
 // clause 5.3.3.4's matrix, in the transcription the decoder's tests keep
 // (tests/ac4/decoder/ac4dec_printed_matrices.hpp). A unit's output channels,

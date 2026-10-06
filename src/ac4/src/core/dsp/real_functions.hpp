@@ -6,7 +6,7 @@
 #include "iclforge/arithmetic/mant_exp.hpp"
 #include "iclforge/arithmetic/scalar_math.hpp"
 
-// The transcendentals the QMF-domain tools of src/ac4dec call at the decoder's scalar, where the
+// The transcendentals the QMF-domain tools of src/ac4/src/decoder call at the decoder's scalar, where the
 // answer reaches the output and a C library's last bit would be heard on a platform that had
 // another one (planning/ac4.md, D14a4).
 //
@@ -17,8 +17,8 @@
 // host, the Cortex-M3 leg and the ESP32s, where the C libraries' `powf` and `exp2f` differ in the
 // last bit on some inputs. In the fixed-point tier they take a MantExp, a mantissa and a power of
 // two (dsp/scalar_traits.hpp's Energy), and are that type's integer log2 and exp2. They live in
-// this target, and not in the decoder's, because src/ac4dec includes from src/ac4core and
-// src/ac4core from src/arithmetic (tools/checks/layering.json).
+// this target, and not in the decoder's, because src/ac4/src/decoder includes from src/ac4/src/core and
+// src/ac4/src/core from src/arithmetic (tools/checks/layering.json).
 
 namespace iclforge::ac4::detail::dsp {
 

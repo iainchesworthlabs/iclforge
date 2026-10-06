@@ -1,7 +1,7 @@
 """AC-4 opt-in by build configuration (planning/ac4.md, phases D8 and I4).
 
-ICLFORGE_BUILD_AC4 is on by default, and the AC-4 libraries (src/ac4, src/ac4core,
-src/ac4dec, src/ac4enc) are part of the default target. D8 found three builds that
+ICLFORGE_BUILD_AC4 is on by default, and the AC-4 libraries (src/ac4,
+src/ac4) are part of the default target. D8 found three builds that
 linked none of them and turned the option off there instead of compiling all four
 for nothing: the Android app's CMake wrapper, the WebAssembly preset and the Python
 wheel. Phase I4 binds AC-4 into the C API, Python, Rust and WebAssembly:
@@ -130,9 +130,9 @@ class Ac4BuildConfigurations(unittest.TestCase):
         self.assertIn("if(ICLFORGE_MINIMAL_AC4 AND NOT ICLFORGE_MINIMAL_DECODER)", text)
         # The profile's branch builds the inspector, the core and the decoder, and no encoder.
         branch = text.split("elseif(ICLFORGE_MINIMAL_AC4)", 1)[1].split("\nendif()", 1)[0]
-        for directory in ("src/ac4", "src/ac4core", "src/ac4dec"):
+        for directory in ("src/ac4", "src/ac4/src/core", "src/ac4/src/decoder"):
             self.assertIn(f"add_subdirectory({directory})", branch)
-        self.assertNotIn("src/ac4enc", branch)
+        self.assertNotIn("src/ac4/src/encoder", branch)
 
     def test_baremetal_ac4_probe_links_the_decoder_and_nothing_of_the_encoder(self):
         text = BAREMETAL_CMAKE.read_text(encoding="utf-8")

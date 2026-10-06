@@ -522,7 +522,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    // --- AC-4's shared transforms (src/ac4core) ------------------------------
+    // --- AC-4's shared transforms (src/ac4/src/core) ------------------------------
     // The transforms the AC-4 decoder and encoder share, at 512 bins, one of
     // the transform lengths the 2 048-sample frame divides into, and one
     // 64-subband slot of the QMF analysis bank (Pseudocode 65) behind A-SPX and

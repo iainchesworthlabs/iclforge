@@ -28,7 +28,7 @@
 // element, so the decoder must read those as printed for the tones to come
 // back where they started.
 //
-// They are written with the encoder's writer (src/ac4enc/src): its audio
+// They are written with the encoder's writer (src/ac4/src/encoder): its audio
 // spectral frontend coder, chparam_info(), companding_control() and A-SPX
 // writers, and its frame writer. The element syntax around those, and where
 // each channel goes (Tables 180, 182 and 183), are written here, a

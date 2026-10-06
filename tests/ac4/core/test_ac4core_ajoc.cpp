@@ -279,7 +279,7 @@ TEST_CASE("A-JOC's wet path is the ducked decorrelator of D x, D = |C_wet| C_dry
 
 TEST_CASE("A-JOC's decorrelation input matrix takes each object at its own bands",
           "[ac4core][ajoc]") {
-    // Two objects of 23 bands and of 1 on one decorrelator (src/ac4dec/
+    // Two objects of 23 bands and of 1 on one decorrelator (src/ac4/
     // ERRATA.md, "The decorrelation input matrix"): in subband sb, D is
     // |wet_0| dry_0 at object 0's band of sb plus |wet_1| dry_1, object 1's
     // one band covering every subband.

@@ -2,7 +2,7 @@
 
 #include "iclforge/arithmetic/fixed32.hpp"
 
-// The FIXED-POINT variant of src/ac4core's explicit-instantiation scalar. See the
+// The FIXED-POINT variant of src/ac4/src/core's explicit-instantiation scalar. See the
 // double variant under variants/scalar-double/ for what this seam is and why it is
 // not iclforge::ac3::internal::decode_scalar_t's mechanism.
 //

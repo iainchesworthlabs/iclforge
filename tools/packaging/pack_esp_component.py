@@ -66,7 +66,7 @@ STAGED_TREES = (
     "src/objects",
     "src/render",
     "src/iec61937",
-    # The header-only Fixed32 / scalar-function target src/ac3 and src/ac4core
+    # The header-only Fixed32 / scalar-function target src/ac3 and src/ac4/src/core
     # both link (planning/ac4.md decision 31); the root CMakeLists.txt adds it
     # with add_subdirectory before it reaches src/ac3, so a staged tree
     # without it stops the configure with "source src/arithmetic ... is not an
@@ -76,14 +76,14 @@ STAGED_TREES = (
 )
 
 # What --with-ac4 adds: the AC-4 inspector, the core both AC-4 libraries link and
-# the decoder, whole, as the trees above are. Not src/ac4enc, which no ESP32 part
+# the decoder, whole, as the trees above are. Not src/ac4/src/encoder, which no ESP32 part
 # builds (planning/ac4.md, decision 34); the root adds it only under
 # ICLFORGE_BUILD_AC4, which the component keeps off. Off by default, so an
 # archive packed without the flag holds exactly the trees it always did.
 STAGED_AC4_TREES = (
     "src/ac4",
-    "src/ac4core",
-    "src/ac4dec",
+    "src/ac4/src/core",
+    "src/ac4/src/decoder",
 )
 
 # Individual files the root build needs before it reaches src/ac3.

@@ -17,7 +17,7 @@
 // says which tones at which amplitudes each object should carry, in full
 // decoding and in core decoding, and where its metadata puts it in each frame.
 //
-// They are written with the encoder's writers (src/ac4enc/src): the audio
+// They are written with the encoder's writers (src/ac4/src/encoder): the audio
 // spectral frontend coder, A-SPX and companding, the A-JOC and object audio
 // metadata syntax (ajoc/, oamd/) and the table of contents (frame/
 // toc_writer.hpp). The element syntax around those, the metadata() of each

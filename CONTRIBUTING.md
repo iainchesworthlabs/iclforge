@@ -85,7 +85,7 @@ library's public headers declare into the namespace named for it under the famil
 `check_namespaces.py` (its table is `tools/checks/namespaces.json`) fails a header that declares
 into another library's namespace, or into `iclforge` itself.
 `src/ac3` is the AC-3, E-AC-3 and Atmos codec, in namespace `iclforge::ac3`. `src/ac4`,
-`src/ac4core`, `src/ac4dec` and `src/ac4enc` are the AC-4 codec, in namespace `iclforge::ac4`,
+`src/ac4` are the AC-4 codec, in namespace `iclforge::ac4`,
 and link nothing from `src/ac3`.
 The two codecs stand on libraries that know no codec: `src/base` (bit I/O, the speaker
 vocabulary, the CPU probe), `src/arithmetic` (header-only: `Fixed32`, the project's own float

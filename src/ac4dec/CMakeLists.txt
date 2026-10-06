@@ -22,10 +22,10 @@
 # on nothing. The OBJECT library takes both for compiling only.
 #
 # iclforge::arithmetic is the header-only target that carries
-# iclforge/arithmetic/scalar_math.hpp, which src/ac4core's dsp/real_functions.hpp
+# iclforge/arithmetic/scalar_math.hpp, which src/ac4/src/core's dsp/real_functions.hpp
 # includes: the float transcendentals that give the same float on every
 # platform, called by pcm/aspx.cpp and pcm/companding.cpp through that header
-# (src/ac4dec includes from src/ac4core and not from src/arithmetic,
+# (src/ac4/src/decoder includes from src/ac4/src/core and not from src/arithmetic,
 # tools/checks/layering.json; planning/ac4.md, D14a4).
 iclforge_add_library(ac4dec
     SOURCES
@@ -70,7 +70,7 @@ iclforge_add_library(ac4dec
 
 # The translation units a frame's time goes to (the syntax's Huffman and scale factor reading, the
 # reconstruction around the transforms, the stereo and downmix passes) at -O2 under the profile's
-# ICLFORGE_MINIMAL_HOT_O2, as src/ac4core/CMakeLists.txt does for the kernels (at -O3 there); flash
+# ICLFORGE_MINIMAL_HOT_O2, as src/ac4/CMakeLists.txt does for the kernels (at -O3 there); flash
 # and not SRAM. planning/ac4.md, D14e has what it bought on the ESP32-P4 and what it cost.
 if(ICLFORGE_MINIMAL_DECODER AND ICLFORGE_MINIMAL_HOT_O2)
     set_source_files_properties(

@@ -20,7 +20,7 @@
 //
 // The fields are the syntax's codes. A prefix code (oa_sample_offset_type and
 // oa_sample_offset_code, basic_info_md, object_gain_code) is one record of the
-// bits written, valued at them, as the decoder records it (src/ac4dec/
+// bits written, valued at them, as the decoder records it (src/ac4/
 // ERRATA.md, "Prefix codes in the trace"); a flag array (group_zone_flag[],
 // trim_balance_presence[], ext_prec_pos_presence[]) is one field, its highest
 // index first.
