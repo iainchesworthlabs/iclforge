@@ -672,12 +672,49 @@ C4N = [
     Rule("adm-scratch", r"\badmbridge_(write|zones|divergence)_", r"adm_bridge_\1_", ("cpp",)),
 ]
 
+# --- C4 ---------------------------------------------------------------------------------------
+# One bit reader and one writer, iclforge::BitReader and iclforge::BitWriter (src/base), for AC-4's
+# and base's: AC-4's code includes base's headers and calls the one name each operation has. The
+# reader's position and overflow flag are base's names (bit_position(), overflowed()), its peek is
+# peek(); the writer's count is base's bit_count(), which AC-3's bit counters share, and both
+# align with align(). The inspector's reader and the DSI writer, which are not these classes, are
+# rewritten by hand (their files are left alone), and so are the copies of the old classes that
+# tests/base/test_bit_io.cpp holds the new ones to.
+_C4_AC4 = ("src/ac4/", "tests/ac4/", "fuzz/")
+_C4_HAND = r"class (?:Reader|DsiWriter) \{|namespace old_base \{"
+C4 = [
+    Rule(
+        "reader-include",
+        r'(#\s*include\s*")core/bit_reader\.hpp(")',
+        r"\1iclforge/base/bitreader.hpp\2",
+    ),
+    Rule(
+        "writer-include",
+        r'(#\s*include\s*")core/bit_writer\.hpp(")',
+        r"\1iclforge/base/bitwriter.hpp\2",
+    ),
+    # AC-4's writer counted with bit_position(), its reader with position(): the first is the
+    # writer's bit_count(), and only then does the second take bit_position()
+    Rule("writer-count", r"\.bit_position\(\)", ".bit_count()", files=_C4_AC4, unless=_C4_HAND,
+         strings=False, comments=False),
+    Rule("reader-position", r"\.position\(\)", ".bit_position()", files=_C4_AC4,
+         unless=_C4_HAND, strings=False, comments=False),
+    Rule("reader-overflow", r"\.overflow\(\)", ".overflowed()", files=_C4_AC4, unless=_C4_HAND,
+         strings=False, comments=False),
+    Rule("reader-peek", r"\.peek_raw\(", ".peek(", files=_C4_AC4, strings=False, comments=False),
+    Rule("writer-codeword", r"\b(\w+)\.write_codeword\(", r"write_codeword(\1, ", files=_C4_AC4,
+         strings=False, comments=False),
+    Rule("writer-align", r"\.byte_align\(\)", ".align()", unless=_C4_HAND, strings=False,
+         comments=False),
+]
+
 STAGES: dict[str, list[Rule]] = {
     "c0": C0,
     "c1": C1 + C1_PROSE,
     "c2": C2 + C2_PROSE,
     "c3": C3 + C3_PROSE,
     "c4n": C4N,
+    "c4": C4,
 }
 
 
