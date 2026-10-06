@@ -423,6 +423,28 @@ C2_PROSE = [
         _TEXT,
         strings=False,
     ),
+    # A page or a comment that names the bridge's library names adm's, and one that names the
+    # signer's names the namespace it is in now; what a sentence says of linking it is a person's.
+    Rule(
+        "bridge-library",
+        r"\biclforge::admbridge\b(?![_:])",
+        "iclforge::adm",
+        _TEXT,
+        strings=False,
+    ),
+    Rule(
+        "signer-library",
+        r"\biclforge::signing\b(?![_:])",
+        "iclforge::ac3::signing",
+        _TEXT,
+        strings=False,
+    ),
+    Rule(
+        "collapse-again",
+        r"(`?\biclforge::adm\b`?)(?:(?:,? and |, | or |/)\1(?![\w:]))+",
+        r"\1",
+        _TEXT,
+    ),
 ]
 
 STAGES: dict[str, list[Rule]] = {"c0": C0, "c1": C1 + C1_PROSE, "c2": C2 + C2_PROSE}
