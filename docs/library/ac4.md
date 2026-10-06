@@ -420,7 +420,7 @@ a CMAF track carries.
 MPEG-TS carries AC-4 under the DVB profile only, and Matroska registers no codec ID for it, so
 `forge mkv` refuses an AC-4 stream. `forge ac4-encode` spells each setting as an option, raw or
 MP4 by the output's name: see [Commands](../forge/cli/commands.md#ac4-encode); `forge mp4`, `ts`
-and `fmp4` package a stream that already exists, and [Muxing & sinks](muxing-and-sinks.md#muxing-iclforgemp4mux)
+and `fmp4` package a stream that already exists, and [Muxing & sinks](muxing-and-sinks.md#muxing-iclforgecontainersmp4mux)
 has the library's side.
 
 ## The inspector

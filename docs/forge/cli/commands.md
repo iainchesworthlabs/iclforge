@@ -1323,7 +1323,7 @@ forge ts commentary.ac3 commentary.ts atsc asvc=0,2
 ```
 
 Reading a `.ts` back out (`iclforge::containers::mpegts::demux`/`Reader`) decodes the same descriptor into
-`ReadStream::service` — see [muxing-and-sinks.md](../../library/muxing-and-sinks.md#demuxing-iclforgempegtsdemux-iclforgempegtsreader)
+`ReadStream::service` — see [muxing-and-sinks.md](../../library/muxing-and-sinks.md#demuxing-iclforgecontainersmpegtsdemux-iclforgecontainersmpegtsreader)
 for what does and does not survive the round trip.
 
 ### Live & hardware

@@ -158,7 +158,7 @@ re-derive: `bsid`, `bsmod` (with `bsmod_present`, since Annex E carries it only 
 `infomdate`), `bit_rate_code`, `dsurmod`, `mix_metadata`, `oba_complexity_index`, and — for
 E-AC-3 — `independent_substreams` plus a `SubstreamService` for substreams 1–3. Those feed
 `iclforge::ac3::io::build_codec_config_box`'s `dac3`/`dec3` payload and the MPEG-TS PMT descriptors of
-both broadcast profiles (see [Muxing & sinks](muxing-and-sinks.md#muxing-iclforgempegtsmux)).
+both broadcast profiles (see [Muxing & sinks](muxing-and-sinks.md#muxing-iclforgecontainersmpegtsmux)).
 `independent_substreams` is an *observation* of which substream ids appear; it deliberately does
 not change how `scan` groups access units, which stays one-programme.
 

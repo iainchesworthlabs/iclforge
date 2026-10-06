@@ -197,7 +197,7 @@ file for "faststart"; `mux()` and `fragment()` both write `moov` first, as does 
 file.
 
 **The `dec3`/`dac3` box comes back parsed.** `ReadTrack::codec_config` is a `CodecConfig`, the read
-twin of [`iclforge::ac3::io::build_codec_config_box`](#muxing-iclforgemp4mux): `fscod`, `bsid`, `bsmod`, `acmod`,
+twin of [`iclforge::ac3::io::build_codec_config_box`](#muxing-iclforgecontainersmp4mux): `fscod`, `bsid`, `bsmod`, `acmod`,
 `lfeon`, `bit_rate_code` or `data_rate_kbps`, `num_ind_sub`/`num_dep_sub`/`chan_loc`, and —
 crucially — TS 103 420's `flag_ec3_extension_type_a`/`complexity_index_type_a` as an
 `optional<int>`. That last field is the Atmos/JOC marker an FFmpeg remux is known to drop, and
@@ -415,7 +415,7 @@ later: `iclforge::containers::mp4::fragment` lays out the same track and frames 
 describes zero samples) plus one or more media segments (`styp`+`moof`+`mdat`, one per fragment).
 Same batch shape as `mux`: every frame is known up front, so real durations/timestamps are
 filled in throughout, including the track's total duration in `mvhd`/`tkhd`/`mdhd`.
-[`iclforge::containers::mp4::FragmentWriter`](#incremental-fragmenting-iclforgemp4fragmentwriter) below is the incremental form
+[`iclforge::containers::mp4::FragmentWriter`](#incremental-fragmenting-iclforgecontainersmp4fragmentwriter) below is the incremental form
 for a live session, and that total duration is the one thing the two disagree about.
 
 ```cpp
