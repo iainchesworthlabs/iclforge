@@ -113,7 +113,33 @@ C1 = [
     ),
 ]
 
-STAGES: dict[str, list[Rule]] = {"c0": C0, "c1": C1}
+# The directories of the three libraries that went, named bare in a comment or a page, where the
+# path pass (consol_paths.py) reads whole paths of files a line at a time. A list of them is the one
+# library's directory; a path a comment broke at a slash follows its file; each directory alone is
+# where its files went (the core's to src/ac4/src/core, the decoder's and the encoder's to their
+# areas), and its build file is the library's.
+C1_PROSE = [
+    # `src/ac4, src/ac4core, src/ac4dec and src/ac4enc`, written with code spans or not
+    Rule(
+        "dir-list",
+        r"(`?)src/ac4(?:core|dec|enc)?\1(?:(?:,? and |, )\1src/ac4(?:core|dec|enc)?\b\1)+",
+        r"\1src/ac4\1",
+        _TEXT,
+    ),
+    Rule(
+        "errata-broken",
+        r"src/ac4(?:dec|enc)/(\n[ \t]*(?://|#)[ \t]*)ERRATA\.md",
+        r"src/ac4/\1ERRATA.md",
+        _TEXT,
+    ),
+    Rule("build-file", r"\bsrc/ac4(?:core|dec|enc)/CMakeLists\.txt\b", "src/ac4/CMakeLists.txt", _TEXT),
+    Rule("dir-core", r"\bsrc/ac4core(?:/include/iclforge/ac4core)?\b(?![\w-])", "src/ac4/src/core", _TEXT),
+    Rule("dir-dec-src", r"\bsrc/ac4dec/src\b", "src/ac4/src/decoder", _TEXT),
+    Rule("dir-enc-src", r"\bsrc/ac4enc/src\b", "src/ac4/src/encoder", _TEXT),
+    Rule("dir-dec", r"\bsrc/ac4dec\b(?![\w-])(?!/)", "src/ac4/src/decoder", _TEXT),
+    Rule("dir-enc", r"\bsrc/ac4enc\b(?![\w-])(?!/)", "src/ac4/src/encoder", _TEXT),
+]
+STAGES: dict[str, list[Rule]] = {"c0": C0, "c1": C1 + C1_PROSE}
 
 
 def kind_of(path: str) -> set[str]:
