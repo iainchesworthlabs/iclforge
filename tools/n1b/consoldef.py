@@ -178,6 +178,14 @@ def c3_new(path: str) -> str | None:
     return None
 
 
+# Files that are not moved but folded into another by hand, which the pages and comments that name
+# them follow as they follow a move (consol_paths.py).
+FOLDED = {
+    "c1": {"src/ac4enc/ERRATA.md": "src/ac4/ERRATA.md"},
+    "c2": {},
+    "c3": {},
+}
+
 STAGES = {"c1": c1_new, "c2": c2_new, "c3": c3_new}
 REMOVED = {"c1": C1_REMOVED, "c2": C2_REMOVED, "c3": C3_REMOVED}
 

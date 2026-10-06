@@ -5,7 +5,8 @@
 n1b_paths.py with two changes: the consolidation's own plan (planning/consolidation.md), which names
 the paths before and after every stage on purpose, is left alone as the layout study was; and the
 renames no move plan lists are the stage's ABI allowlists (the libraries that merge take the name of
-the one that replaces them), not S2's. A directory the stage keeps is not renamed
+the one that replaces them) and the files folded into another (consoldef.FOLDED: the AC-4 encoder's
+errata are a section of src/ac4/ERRATA.md), not S2's. A directory the stage keeps is not renamed
 (consol_cmake.kept_dirs_out).
 """
 
@@ -38,7 +39,7 @@ def main() -> None:
     stage = argv[i + 1]
     del argv[i : i + 2]
     n1b_paths.KEEP_OLD_PATHS = (*n1b_paths.KEEP_OLD_PATHS, "planning/consolidation.md")
-    n1b_paths.HAND_RENAMES = allowlist_renames(stage)
+    n1b_paths.HAND_RENAMES = {**allowlist_renames(stage), **consoldef.FOLDED[stage]}
     root = argv[argv.index("--root") + 1] if "--root" in argv else DEFAULT_ROOT
     known = path_index(Repo(root).files)
     derive = n1b_paths.dir_rules
