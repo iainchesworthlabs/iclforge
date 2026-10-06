@@ -114,6 +114,8 @@ C2_EXACT = {
     ),
     "src/signing/src/emdf_atmos_signer.cpp": "src/ac3/src/signing/emdf_atmos_signer.cpp",
     "src/admbridge/ERRATA.md": "src/adm/ERRATA.md",
+    # the primitives' and the key's tests, cut from tests/signing/test_signing.cpp (c2_cuts.py)
+    "tests/signing/test_crypto.cpp": "tests/base/test_crypto.cpp",
 }
 
 C2_RULES: list[tuple[re.Pattern, str]] = [
