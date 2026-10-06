@@ -775,7 +775,7 @@ fi
 # atmos-iab (IAB reader phase 3): the identical conditional-command shape atmos-adm above uses,
 # and for the same reason - it needs iclforge::adm's own IAB mapping, gated by the same
 # ICLFORGE_BUILD_ADM flag (see apps/cli/adm/atmos_iab.hpp's own header comment: iclforge::iab
-# itself is on by default, but build_iab() only exists once admbridge is). Detected the same
+# itself is on by default, but build_iab() only exists once iclforge::adm is). Detected the same
 # "ask the real usage listing" way, not guessed from a preset name. examples/encode_iab's own
 # --write-fixture mode produces a real elementary IAB file on disk, so this is driven through a
 # real file the same way every other command in this matrix is. Same flat bin/ directory as $CLI

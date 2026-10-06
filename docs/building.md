@@ -304,17 +304,17 @@ entry per test case, and `catch_discover_tests(... ADD_TAGS_AS_LABELS)` turns ev
 case into a ctest label, so a tag selects a subset in two ways:
 
 ```bash
-ctest --preset test-linux-gcc-debug -L ac4dec           # the cases tagged [ac4][decoder], through ctest
+ctest --preset test-linux-gcc-debug -L ac4 -L decoder  # the cases tagged [ac4] and [decoder], through ctest
 ctest --preset test-linux-gcc-debug -N -L ac4           # list what a label selects, run nothing
 build/config-linux-gcc-debug/bin/iclforge-tests "[ac4][decoder]"    # the same cases, through the Catch2 binary
 build/config-linux-gcc-debug/bin/iclforge-tests --list-tags   # every tag and how many cases carry it
 ```
 
 A case carries several tags, one for the component under test and others for what it checks. The
-codecs have `eac3`, `ac4`, `ac4core`, `ac4dec` and `ac4enc`; the libraries and applications
-`cli`, `capi`, `hearth`, `sendspin` and `crucible`; and there are `oba` (Atmos objects), `dsp`,
-`iec61937`, `fixed32`, `simd` and `avx2`, and `concurrency` for the cases ThreadSanitizer runs.
-`iclforge-tests --list-tags` has the full list.
+codecs have `eac3` and `ac4`, with an area beside the codec's (`[ac4][decoder]`, `[ac4][core]`); the
+libraries and applications `cli`, `capi`, `hearth`, `sendspin` and `crucible`; and there are `oba`
+(Atmos objects), `dsp`, `iec61937`, `fixed32`, `simd` and `avx2`, and `concurrency` for the cases
+ThreadSanitizer runs. `iclforge-tests --list-tags` has the full list.
 
 Three things register their own ctest entries beside `iclforge-tests`. `iclforge-perf`, the real-time
 throughput guards, is a separate binary whose cases carry the `Performance` label, so

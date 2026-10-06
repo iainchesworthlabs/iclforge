@@ -7,8 +7,8 @@
 # turns it on, so normal dev/CI builds pay no instrumentation cost.
 #
 # Link it PRIVATE into every first-party target whose coverage should be
-# measured - today that is every library component (forge, audio, signing,
-# matroska, mp4, mpegts, the C API, iclforge::adm, admbridge) plus forge and
+# measured - today that is every library component (ac3, ac4, audio, the
+# containers, the C API, iclforge::adm with its bridge) plus forge and
 # iclforge-tests.
 #
 # The distinction that matters, and that cost a measurement run to notice:

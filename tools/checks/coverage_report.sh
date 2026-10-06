@@ -218,7 +218,7 @@ html="$build_dir/coverage.html"
 # but it made the DSP-heavy cases 2-6x slower (the ten-minute playout case
 # 4.9 s -> 30.8 s), so the flag stays.
 gcovr --root . \
-    --filter 'src/(ac3|base|dsp|objects|render|iec61937|audio|signing|matroska|mp4|mpegts|capi|adm|admbridge|sendspin|ac4|iab|iamf)/.*' \
+    --filter 'src/(ac3|base|dsp|objects|render|containers|audio|capi|adm|sendspin|ac4|iab)/.*' \
     --filter 'apps/cli/.*' \
     --filter 'apps/common/.*' \
     --filter 'apps/crucible/engine/.*' \

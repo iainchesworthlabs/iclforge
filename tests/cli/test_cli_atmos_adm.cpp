@@ -40,7 +40,7 @@
 // project's own established per-file test-helper convention (see that file's own comment on this)
 // rather than shared, and deliberately kept byte-identical to that fixture rather than inventing a
 // new one: this file's own job is checking that the real forge binary wires parse_bw64 ->
-// adm::build -> AtmosEncoder together correctly end to end, not re-proving admbridge's own
+// adm::build -> AtmosEncoder together correctly end to end, not re-proving the ADM bridge's own
 // BS.2076-2 §10.3 state machine or coordinate conversion, which tests/adm/test_adm_bridge.cpp
 // already does directly against the library API.
 

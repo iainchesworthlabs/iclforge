@@ -21,7 +21,7 @@
 // src/adm/CMakeLists.txt's own header comment) - NOT ICLFORGE_BUILD_IAB alone, which
 // defaults ON and is not the gating question here: iclforge::iab by itself has nothing that can
 // drive AtmosEncoder, only iclforge::adm's build_iab() does that, and that function only
-// exists when ICLFORGE_BUILD_ADM turned admbridge on. So this command reuses adm/atmos_adm.hpp's
+// exists when ICLFORGE_BUILD_ADM turned iclforge::adm on. So this command reuses adm/atmos_adm.hpp's
 // own Needs::kAdm/adm_capability() gate rather than asking a new question - the availability test
 // is identical either way.
 //
@@ -37,7 +37,7 @@ namespace forge_cli {
 // iclforge::adm::BridgeError, only text to print. `handle` owns whatever `pcm`'s spans
 // actually borrow from - for IAB this is the IabBridgeResult itself
 // (iclforge::adm::build_iab), since its own `pcm` is OWNED storage rather than a borrow from
-// a separate document object (see ac3/admbridge/iab_bridge.hpp's own top comment on why); keep an
+// a separate document object (see iclforge/adm/iab_bridge.hpp's own top comment on why); keep an
 // IabAtmosSource alive for exactly as long as its `pcm` spans are read.
 struct IabAtmosSource {
     std::uint32_t sample_rate = 0;

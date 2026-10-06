@@ -64,7 +64,7 @@ std::expected<IabAtmosSource, std::string> load_iab_atmos_source(std::string_vie
 
     // Placed on the heap (not a stack local) before the caller reads IabAtmosSource::pcm - those
     // spans borrow straight out of this IabBridgeResult's own OWNED storage (see
-    // ac3/admbridge/iab_bridge.hpp's own top comment on why, unlike ADM's BridgeResult), and
+    // iclforge/adm/iab_bridge.hpp's own top comment on why, unlike ADM's BridgeResult), and
     // IabAtmosSource::handle has to keep this exact object alive for as long as the caller keeps
     // reading them.
     auto bridged = std::make_shared<iclforge::adm::IabBridgeResult>();

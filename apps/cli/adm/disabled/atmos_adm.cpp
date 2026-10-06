@@ -16,7 +16,7 @@ const iclforge::audio::Capability& adm_capability() {
     static constexpr iclforge::audio::Capability kUnavailable{
         .available = false,
         .reason = "this build was not configured with -DICLFORGE_BUILD_ADM=ON "
-                  "(iclforge::adm/iclforge::admbridge were not linked in)"};
+                  "(iclforge::adm was not linked in)"};
     return kUnavailable;
 }
 

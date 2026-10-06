@@ -287,7 +287,7 @@ int main(int argc, char** argv) {
     const auto bridged = iclforge::adm::build(*document);
     std::filesystem::remove(fixture_path);
     if (!bridged) {
-        fmt::printf("admbridge::build failed: %.*s\n",
+        fmt::printf("adm::build failed: %.*s\n",
                     static_cast<int>(iclforge::adm::describe(bridged.error()).size()),
                     iclforge::adm::describe(bridged.error()).data());
         return 1;

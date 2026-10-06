@@ -274,8 +274,8 @@ escape through `variable_bits()` could overflow.
 
 `fuzz_ac4_decode` and `fuzz_ac4_encode` are in `fuzz/run.sh`'s default list, so
 `fuzz-regress`, `fuzz-short` and `fuzz-nightly` run them with the others.
-`fuzz/CMakeLists.txt` instruments `ac4core`, `ac4dec_objects` and
-`ac4enc_objects` for them, as it does `iclforge_ac4_objects` for `fuzz_ac4_parse`.
+`fuzz/CMakeLists.txt` instruments `iclforge_ac4_objects` for them, as it does for
+`fuzz_ac4_parse`.
 `fuzz_ac4_decode` starts from `fuzz_ac4_parse`'s seeds and keeps regressions of
 its own, four so far:
 

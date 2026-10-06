@@ -767,7 +767,7 @@ std::vector<std::byte> build_iaframe(unsigned index) {
 }  // namespace
 
 TEST_CASE(
-    "a real IAB fixture's bed and moving object survive admbridge into a real "
+    "a real IAB fixture's bed and moving object survive the ADM bridge into a real "
     "AtmosEncoder bitstream",
     "[adm][bridge][iab][atmos]") {
     std::vector<std::byte> file;

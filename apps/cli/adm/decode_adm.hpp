@@ -11,7 +11,7 @@
 
 // The JOC -> ADM BWF writer - the write-direction sibling of atmos_adm.hpp's
 // AdmAtmosSource/load_adm_atmos_source. Same reason for existing: decode.cpp cannot
-// #include "ac3adm/ac3adm.hpp" or "ac3/admbridge/bridge.hpp" itself, not even behind a
+// #include "iclforge/adm/adm.hpp" or "iclforge/adm/bridge.hpp" itself, not even behind a
 // preprocessor guard (tools/checks/check_platform_macros.ps1 refuses ANY #if/#ifdef/#ifndef
 // under src/ or apps/cli/commands - see atmos_adm.hpp's own top comment for the full reasoning),
 // so this header is declared entirely in terms of iclforge::oba's own types (always available) and

@@ -18,7 +18,7 @@
 // half of the clip and then jumps hard left for the second half - the same "visibly tracks the
 // authored automation" shape encode_adm.cpp's own fixture uses, adapted to what IAB's per-frame
 // (not whole-file audioBlockFormat) automation model can actually express - see
-// ac3/admbridge/iab_bridge.hpp's own top comment on why a Bed/Object's position is one value per
+// iclforge/adm/iab_bridge.hpp's own top comment on why a Bed/Object's position is one value per
 // IAFrame here, not a file-length keyframe sequence.
 //
 // Run with `--write-fixture <path>` to just write that same fixture to a real file and exit,

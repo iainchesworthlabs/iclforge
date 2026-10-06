@@ -908,7 +908,7 @@ double channel_energy(std::span<const float> samples) {
 
 }  // namespace
 
-TEST_CASE("a real ADM BWF master's bed and moving object survive admbridge into a real "
+TEST_CASE("a real ADM BWF master's bed and moving object survive the ADM bridge into a real "
          "AtmosEncoder bitstream", "[adm][bridge][atmos]") {
     constexpr int kTotalFrames = 6;  // 3 frames holding SR, 3 frames holding centre
     const auto fmt = build_fmt_chunk(3, 48000, 16);
@@ -977,7 +977,7 @@ TEST_CASE("a real ADM BWF master's bed and moving object survive admbridge into 
         CHECK(energy_r > 1.0);
 
         // Neither bed channel is ever panned toward C or SR - whatever energy shows up in those
-        // two comes entirely from the moving object, revealing exactly where admbridge placed
+        // two comes entirely from the moving object, revealing exactly where the bridge placed
         // it. A dominance comparison (rather than an absolute near-zero threshold on the "wrong"
         // channel) is what's checked: the encoder's own MDCT block overlap smears a little real
         // energy from a hard pan change into the neighbouring channel even once the object's own

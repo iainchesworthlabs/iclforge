@@ -7,7 +7,7 @@
 
 // The Atmos/object-layer commands: two synthetic generators (a built-in orbit, and one driven by
 // a hand-authored keyframe file), one real-material encoder (every source channel becomes an
-// object), one ADM BWF reader (ADM BWF reader phase 3, the ac3adm/admbridge integration), and the
+// object), one ADM BWF reader (ADM BWF reader phase 3, the iclforge::adm integration), and the
 // one that goes the other way - taking an object layer back out of a finished stream. Split
 // out of main.cpp as part of the repo-structure review's H4 monolith split.
 namespace forge_cli::commands {

@@ -20,7 +20,7 @@ std::expected<IabAtmosSource, std::string> load_iab_atmos_source(std::string_vie
     // standard this project's other refusal paths hold themselves to.
     return std::unexpected(std::string(
         "this build was not configured with -DICLFORGE_BUILD_ADM=ON "
-        "(iclforge::iab's IAB mapping / iclforge::admbridge were not linked in)"));
+        "(iclforge::iab's IAB mapping / iclforge::adm were not linked in)"));
 }
 
 }  // namespace forge_cli

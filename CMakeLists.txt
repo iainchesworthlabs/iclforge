@@ -552,7 +552,7 @@ endif()
 # libbw64/libadm (FetchContent'd, never installed/exported by this project in their own right,
 # see src/adm/CMakeLists.txt's header comment), which only a self-contained SHARED library can
 # absorb without either re-exporting them or shipping a STATIC archive with genuinely unresolved
-# symbols. admbridge follows suit since it transitively depends on iclforge::adm_shared.
+# symbols. The ADM bridge, a part of it, follows suit.
 # Not under ICLFORGE_MINIMAL_DECODER: the exported package describes
 # iclforge::ac3_static/iclforge::ac3_shared, neither of which exists in that
 # profile, and an embedded integrator consumes iclforge::ac3_minimal from an

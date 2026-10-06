@@ -33,7 +33,7 @@
 // duplicated per this project's own established per-file test-helper convention (see that file's
 // own comment) rather than shared: this file's own job is checking that the real forge binary
 // wires parse_iabitstream -> adm::build_iab -> AtmosEncoder together correctly end to end,
-// not re-proving admbridge's own Table 19 mapping or coordinate conversion, which
+// not re-proving the ADM bridge's own Table 19 mapping or coordinate conversion, which
 // tests/adm/test_iab_bridge.cpp already does directly against the library API.
 
 namespace fs = std::filesystem;

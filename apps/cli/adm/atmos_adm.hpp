@@ -16,7 +16,7 @@
 // one opt-in, non-default library (ICLFORGE_BUILD_ADM, default OFF - see root CMakeLists.txt's
 // own option() for why: libadm's Boost dependency).
 //
-// main.cpp cannot #include "ac3adm/ac3adm.hpp" or "ac3/admbridge/bridge.hpp" itself, not even
+// main.cpp cannot #include "iclforge/adm/adm.hpp" or "iclforge/adm/bridge.hpp" itself, not even
 // behind a preprocessor guard: this project's tools/checks/check_platform_macros.ps1 (CI-enforced,
 // see .github/workflows/ci.yml's own "Check for preprocessor conditionals in src/" job) refuses ANY
 // #if/#ifdef/#ifndef under src/ - deliberately stricter than "no OS macros"; that script's own

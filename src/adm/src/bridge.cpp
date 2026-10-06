@@ -39,7 +39,7 @@ std::string_view describe(BridgeError error) {
         case BridgeError::kBadIabAudio:
             return "an AudioDataDLC element in an IAB frame failed to decode";
     }
-    return "unknown iclforge::admbridge::BridgeError";
+    return "unknown iclforge::adm::BridgeError";
 }
 
 namespace {
