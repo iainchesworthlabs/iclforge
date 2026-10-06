@@ -9,10 +9,14 @@
 iclforge_add_library(ac4
     SOURCES
         ${_ac4_decoder_sources}
+        ${_ac4_meta_sources}
         ${_ac4_inspector_sources}
         ${_ac4_kernel_sources}
     PRIVATE_INCLUDES ${_ac4_private_includes}
-    LINK_PRIVATE ${_ac4_link_private})
+    LINK_PRIVATE ${_ac4_link_private}
+    # The profile builds no iclforge::base; the public headers name its syntax trace and its
+    # speakers, which are header-only.
+    LINK_PUBLIC "$<BUILD_INTERFACE:iclforge::base_headers>")
 
 # -Wno-psabi: GCC's arm-none-eabi says, once a translation unit and for every
 # std::span passed by value, that its passing changed in GCC 7.1. A note about an

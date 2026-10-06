@@ -82,7 +82,6 @@ set(_ac4_encoder_sources
     src/encoder/asf/stereo.cpp
     src/encoder/aspx/aspx_encoder.cpp
     src/encoder/aspx/aspx_syntax.cpp
-    src/core/bit_writer.cpp
     src/encoder/encoder.cpp
     src/encoder/frame/dialogue.cpp
     src/encoder/frame/drc_gains.cpp
@@ -93,6 +92,13 @@ set(_ac4_encoder_sources
     src/encoder/frame/toc_writer.cpp
     src/encoder/oamd/object_metadata.cpp
     src/encoder/oamd/oamd_syntax.cpp)
+
+# What the decoder applies and the encoder sends alike: DRC's curve, its
+# smoothing and its level detector's weighting, and dialogue enhancement's
+# tables.
+set(_ac4_meta_sources
+    src/meta/dialogue.cpp
+    src/meta/drc.cpp)
 
 # The table of contents, the elementary stream and the carriage: what was the
 # inspector, which the decoder reads the table of contents through
@@ -173,10 +179,13 @@ set(ICLFORGE_AC4_KERNEL_SOURCES "${ICLFORGE_AC4_KERNEL_SOURCES}" PARENT_SCOPE)
 if(ICLFORGE_MINIMAL_DECODER)
     include("${CMAKE_CURRENT_SOURCE_DIR}/minimal.cmake")
 else()
+    # base: the public headers name its syntax trace and its speakers.
     iclforge_add_library(ac4
+        DEPENDS base
         SOURCES
             ${_ac4_decoder_sources}
             ${_ac4_encoder_sources}
+            ${_ac4_meta_sources}
             ${_ac4_inspector_sources}
             ${_ac4_kernel_sources}
         PRIVATE_INCLUDES ${_ac4_private_includes}

@@ -199,7 +199,8 @@ endif()
 # headers, so nothing else is installed for them.
 if(ICLFORGE_BUILD_AC4)
     iclforge_install_library(ac4
-        DESCRIPTION "AC-4 (ETSI TS 103 190-1 and TS 103 190-2) inspector, decoder and encoder")
+        DESCRIPTION "AC-4 (ETSI TS 103 190-1 and TS 103 190-2) inspector, decoder and encoder"
+        REQUIRES iclforge-base)
 endif()
 
 # iclforge::c is an optional component (ICLFORGE_BUILD_CAPI, see the root CMakeLists.txt). Roadmap

@@ -676,7 +676,7 @@ void write_metadata(BitWriter& w, bool dialog) {
         w.write_variable_bits(7, bytes >> 15U, "audio_size_value");
     }
     w.append(audio);
-    w.write_unrecorded(static_cast<unsigned>(bytes * 8 - audio.bit_count()), 0);  // fill_bits
+    w.put(0, static_cast<int>(bytes * 8 - audio.bit_count()));  // fill_bits
     write_metadata(w, dialog);
     w.align();
     return w.bytes();
