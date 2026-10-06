@@ -125,7 +125,8 @@ struct ProbeSyncframe {
     // Set where the parse tier declined the frame; every field below it is
     // then whatever was reached before the refusal.
     std::optional<DecodeError> parse_error = std::nullopt;
-    // Whether an authenticity tag is present - see ProbeOptions::authenticity.
+    // Whether an authenticity tag is present (iclforge::ac3::signing::has_authenticity_tag:
+    // answerable without a key; whether the tag is VALID is not).
     bool authenticity_tag = false;
     FrameSyntax syntax{};
     // §7.7.1.2's effective word per block, persistence already resolved.
@@ -221,8 +222,7 @@ struct ProbeReport {
     // dynamic object count. std::nullopt where no OAMD parsed.
     std::optional<iclforge::oba::Program> program = std::nullopt;
     std::uint64_t object_frames = 0;
-    // Frames carrying a non-zero authenticity tag - see
-    // ProbeOptions::authenticity. Always 0 when no probe was supplied.
+    // Frames carrying a non-zero authenticity tag (ProbeSyncframe::authenticity_tag).
     std::uint64_t authenticity_tagged_frames = 0;
 
     // --- integrity ---------------------------------------------------------
@@ -245,12 +245,6 @@ struct ProbeOptions {
     // neither, and a dump of a long file is a lot of output nobody asked for.
     bool detail = false;
     ProbeAccessUnitSink on_access_unit;
-    // Whether a syncframe carries an authenticity tag. Supplied by the caller
-    // rather than called directly because signing lives in its own library
-    // (iclforge::ac3::signing, which this one does not and should not link) - pass
-    // iclforge::ac3::signing::has_authenticity_tag here. Unset means the question is
-    // not asked and every frame reports untagged.
-    std::function<bool(std::span<const std::byte>)> authenticity;
 };
 
 // The walk, fed one access unit at a time.

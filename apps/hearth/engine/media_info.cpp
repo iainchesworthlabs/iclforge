@@ -9,7 +9,6 @@
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/sendspin/json.hpp"
-#include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
 #include "iclforge/ac3/version.hpp"
 #include "iclforge/ac4/io/carriage.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
@@ -774,9 +773,6 @@ MediaInfo describe_media(const std::string& path, const LoadedItem& loaded) {
                 return;
             }
         }
-    };
-    options.authenticity = [](std::span<const std::byte> frame) {
-        return ac3::signing::has_authenticity_tag(frame);
     };
     ac3::io::Prober prober{std::move(options)};
     for (std::size_t index = 0; index < scanned->access_units.size(); ++index) {

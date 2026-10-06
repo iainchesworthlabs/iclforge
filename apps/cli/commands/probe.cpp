@@ -30,7 +30,6 @@
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/objects/oamd.hpp"
-#include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
 #include "iclforge/ac3/version.hpp"
 #include "iclforge/ac4/io/carriage.hpp"
 #include "container_input.hpp"
@@ -741,13 +740,6 @@ int run_probe(std::string_view in_path, const Options& meta) {
 
     io::ProbeOptions options;
     options.detail = detail != Detail::kNone;
-    // io::probe takes the question as a callback (ProbeOptions::authenticity) rather than asking
-    // the signer itself. No key is involved: whether a frame
-    // carries a tag is answerable without one, and only whether that tag is
-    // VALID is not (that is 'decode verify-objects').
-    options.authenticity = [](std::span<const std::byte> frame) {
-        return iclforge::ac3::signing::has_authenticity_tag(frame);
-    };
     if (detail != Detail::kNone) {
         options.on_access_unit = [&meta, &json, &detail](const io::ProbeAccessUnit& unit) {
             if (meta.json) {

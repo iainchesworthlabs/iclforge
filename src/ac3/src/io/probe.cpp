@@ -22,6 +22,7 @@
 #include "iclforge/objects/emdf.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/meta/drc.hpp"
+#include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
 #include "iclforge/objects/oamd.hpp"
 
 namespace iclforge::ac3::io {
@@ -285,10 +286,8 @@ std::expected<void, ScanError> Prober::push(std::span<const std::byte> unit) {
         if (!reported.crc_valid) {
             ++impl.report.crc_failures;
         }
-        if (impl.options.authenticity) {
-            reported.authenticity_tag = impl.options.authenticity(frame);
-            impl.report.authenticity_tagged_frames += reported.authenticity_tag ? 1 : 0;
-        }
+        reported.authenticity_tag = signing::has_authenticity_tag(frame);
+        impl.report.authenticity_tagged_frames += reported.authenticity_tag ? 1 : 0;
 
         // The parse tier. A refusal is recorded against the frame and the
         // walk continues: the decoders are strict by design (they refuse
