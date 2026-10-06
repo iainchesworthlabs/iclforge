@@ -628,11 +628,56 @@ C3_PROSE = [
     ),
 ]
 
+# --- C4's names -------------------------------------------------------------------------------
+# Decision 12: what still says a library that merged. A Catch2 tag names the codec and the area, as
+# the directory does ([ac4dec] is [ac4][decoder]; a run of tags that has [ac4] already keeps one);
+# the tests' environment variables and compile definitions name the codec, with the direction where
+# the decoder's and the encoder's are the same variable; the scalar tier's macro takes the project's
+# prefix; the install check's encoder program its file's new name.
+C4N_TAGS = {
+    "ac4dec": ("ac4", "decoder"),
+    "ac4enc": ("ac4", "encoder"),
+    "ac4core": ("ac4", "core"),
+    "admbridge": ("adm", "bridge"),
+}
+
+
+def _c4n_tags(m: re.Match[str]) -> str:
+    out: list[str] = []
+    for tag in re.findall(r"\[([^\]]*)\]", m.group(0)):
+        for t in C4N_TAGS.get(tag, (tag,)):
+            if t not in out:
+                out.append(t)
+    return "".join(f"[{t}]" for t in out)
+
+
+_C4N_OLD_TAG = "|".join(C4N_TAGS)
+C4N = [
+    Rule(
+        "tags",
+        rf"(?:\[[\w.!-]+\])*\[(?:{_C4N_OLD_TAG})\](?:\[[\w.!-]+\])*",
+        _c4n_tags,
+        _TEXT,
+        plans=True,
+    ),
+    Rule("write-env", r"\bAC4(DEC|ENC)_WRITE_(\w+)", lambda m: "AC4_"
+         + ("DECODER" if m.group(1) == "DEC" else "ENCODER") + "_WRITE_" + m.group(2), _TEXT,
+         plans=True),
+    Rule("env", r"\bAC4DEC_(GOLDEN_DIR|STREAM_DIR|API_STREAM_DIR|AJOC_STREAM|TRACE_DIR)\b",
+         r"AC4_\1", _TEXT, plans=True),
+    Rule("double-macro", r"\bAC4CORE_ALSO_AT_DOUBLE\b", "ICLFORGE_AC4_ALSO_AT_DOUBLE", _TEXT,
+         plans=True),
+    Rule("consumer", r"\b(pc_)?consumer_ac4enc\b", r"\1consumer_ac4_encoder", _TEXT),
+    Rule("consumer-list", r"\bac4enc_consumers\b", "ac4_encoder_consumers", _TEXT),
+    Rule("adm-scratch", r"\badmbridge_(write|zones|divergence)_", r"adm_bridge_\1_", ("cpp",)),
+]
+
 STAGES: dict[str, list[Rule]] = {
     "c0": C0,
     "c1": C1 + C1_PROSE,
     "c2": C2 + C2_PROSE,
     "c3": C3 + C3_PROSE,
+    "c4n": C4N,
 }
 
 
