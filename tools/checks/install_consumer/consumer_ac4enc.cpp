@@ -22,6 +22,8 @@
 
 #include <iclforge/ac4/core/toc.hpp>
 #include <iclforge/ac4/encoder/encoder.hpp>
+#include <iclforge/ac4/io/carriage.hpp>
+#include <iclforge/ac4/io/elementary.hpp>
 
 namespace {
 

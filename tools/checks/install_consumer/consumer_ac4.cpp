@@ -20,8 +20,8 @@
 #include <string_view>
 #include <vector>
 
-#include <iclforge/ac4/core/toc.hpp>
 #include <iclforge/ac4/decoder/decoder.hpp>
+#include <iclforge/ac4/io/elementary.hpp>
 
 namespace {
 
