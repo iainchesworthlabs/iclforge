@@ -219,6 +219,9 @@ def renamed_namespace(stage: str, name: str, unit: str = "") -> str:
     import consol_text
 
     name = re.sub(r"\biclforge::admbridge::", "iclforge::adm::", name)
+    # a mangled name no demangler reads (a requires-clause, a local lambda): admbridge -> adm keeps
+    # the namespace's depth, so the substitutions after it are unchanged
+    name = name.replace("8iclforge9admbridge", "8iclforge3adm")
     unit_namespace = (
         "iclforge::base::crypto::" if unit.startswith("src/base/") else "iclforge::ac3::signing::"
     )
