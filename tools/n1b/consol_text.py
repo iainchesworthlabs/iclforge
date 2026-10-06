@@ -402,6 +402,30 @@ C2_INTO = {"signing": "ac3", "admbridge": "adm"}
 # adm's; arithmetic's header-only target is base's (iclforge::base_arithmetic). signing's went two
 # ways, and a sentence that names it is a person's.
 C2_PROSE = [
+    # the SIMD directories, as today's tree has them and as comments from before N1B spell them
+    Rule(
+        "arch-header",
+        r"\bsrc/arithmetic/arch/(\*|<arch>|\w+)/ac3/internal/arch/simd\.hpp\b",
+        r"src/base/variants/arch-\1/iclforge/base/detail/simd.hpp",
+        _TEXT,
+        plans=True,
+    ),
+    Rule(
+        "arch-dirs",
+        r"\bsrc/arithmetic/arch/\{([\w,]+)\}/",
+        lambda m: "src/base/variants/{"
+        + ",".join("arch-" + x for x in m.group(1).split(","))
+        + "}/",
+        _TEXT,
+        plans=True,
+    ),
+    Rule(
+        "arch-root",
+        r"\bsrc/arithmetic/(?:arch|variants)\b/?",
+        lambda m: "src/base/variants" + ("/" if m.group(0).endswith("/") else ""),
+        _TEXT,
+        plans=True,
+    ),
     Rule(
         "build-file",
         r"\bsrc/(arithmetic|admbridge)/CMakeLists\.txt\b",
