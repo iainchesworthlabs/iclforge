@@ -708,6 +708,18 @@ C4 = [
          comments=False),
 ]
 
+# C4's rules above translate one API into another (AC-4's reader's bit_position() is the writer's
+# bit_count(), and the reader's position() becomes bit_position()), so a second run would rename
+# what the first wrote. They run once, on a tree that still has AC-4's own reader, which C4's hand
+# commit deletes; on any other tree the stage changes nothing.
+ONCE = {"c4": "src/ac4/src/core/bit_reader.hpp"}
+
+# base's header-only target carries the bit reader and writer, the CRC, the trace and the speakers
+# now, beside the arithmetic: what it is is base's headers.
+C4B = [
+    Rule("base-headers", r"\biclforge(::|_)base_arithmetic\b", r"iclforge\1base_headers", _TEXT),
+]
+
 STAGES: dict[str, list[Rule]] = {
     "c0": C0,
     "c1": C1 + C1_PROSE,
@@ -715,6 +727,7 @@ STAGES: dict[str, list[Rule]] = {
     "c3": C3 + C3_PROSE,
     "c4n": C4N,
     "c4": C4,
+    "c4b": C4B,
 }
 
 
@@ -837,9 +850,12 @@ def spelling_rules(plan: Path) -> list[Rule]:
 def run(
     root: Path, stage: str, dry_run: bool, report: Path | None, plan: Path | None = None
 ) -> Counter:
+    counts: Counter = Counter()
+    if stage in ONCE and not (root / ONCE[stage]).exists():
+        print(f"{stage}: already applied ({ONCE[stage]} is gone); nothing to do")
+        return counts
     repo = Repo(str(root))
     rules = STAGES[stage] + (spelling_rules(plan) if plan else [])
-    counts: Counter = Counter()
     changed: list[str] = []
     for f in repo.files:
         plan_page = f.startswith("planning/")
