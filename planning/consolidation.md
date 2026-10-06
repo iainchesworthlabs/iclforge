@@ -640,6 +640,12 @@ Hazards the plan did not name:
   link that the dedupe rule, which reads adjacent names only, left. Both by hand. C1's collapse rule
   had missed `if(TARGET iclforge::ac4 AND TARGET iclforge::ac4 AND TARGET iclforge::ac4)` in
   `python/CMakeLists.txt`, fixed here.
+- **The package config.** The same rule turned signing's alias block in `iclforgeConfig.cmake.in`
+  into a second `add_library(iclforge::ac3 ALIAS ...)`, which stops a consumer's
+  `find_package(iclforge)`; the install record compares the file's bytes, which change in any case, so
+  only a consumer finds it. Found during C3 by `check_install_consumer.sh`, which C0 to C2 had not run,
+  and fixed on this branch; the check passes on C2's tree and its programs print what they printed
+  on C0.
 - **Instrumentation that moved.** The HMAC fuzz_signing_verify drives was instrumented as part of
   `iclforge_signing_objects`; it is `base`'s now, so the fuzz tree instruments `iclforge_base_objects`
   too.
