@@ -630,6 +630,27 @@ The vocabulary of `wav`, `loudness` and `analysis` (decision 5(a): recorded, not
 lists; the ESP-IDF component's 173 names, which declare into the root; and the version names of the generated `version.hpp`
 (`iclforge::ac3::version_details()`), the family's build identity declared by the AC-3 library.
 
+## The consolidation, C0 to C3
+
+[planning/consolidation.md](../../planning/consolidation.md) merges libraries with the same scripts,
+pointed at a plan of its own. `consoldef.py` holds the moves of each stage (`c1_new`, `c2_new`,
+`c3_new`), the libraries it merges (`LIBRARY_MAP`) and the files it folds into another (`FOLDED`).
+A stage runs, each pass committed alone after the commit of its script:
+
+| step | what runs |
+|---|---|
+| C1's cuts | `python tools/n1b/ac4_cuts.py --root <worktree>`: AC-4's public headers divided by what each declares, the inspector's unit into three, and each consumer including what it uses. |
+| moves and include spellings | `python tools/n1b/consol_apply.py --root <worktree> --stage c1 --phase all --json <plan.json>`: the renames alone (`git mv`, every one `R100`), then the includes, the export headers and every macro of a merged library's export header. |
+| build files and paths | `consol_cmake.py --plan <plan.json>` and `consol_paths.py --stage c1 --plan <plan.json>`: `n1b_cmake.py` and `n1b_paths.py` for the stage's moves, renaming no directory the stage keeps. |
+| names in text | `python tools/n1b/consol_text.py --root <worktree> --stage c1 --plan <plan.json>`: the targets, files, pkg-config names and macros of the libraries that go, the directories a sentence names bare, the include spellings a page or a comment names (public and, where a header became private, its private spelling), and the paths a golden file keys by. |
+
+The merged library's CMake, the install rules, the bindings, the pages and the plans are by hand. The
+proof adds to N1B's: `export_diff.py` and `abi_compare.py` take `--map c1|c2|c3`, which compares the
+union of the libraries a stage merges with the one they become; `ir_compare.py compare --plan` pairs a
+moved unit with the one it became (and `--names none` reads no namespace as another); `flags_diff.py`
+compares how each unit compiles and links in two configured trees; `baseline.py` records an `install`
+kind.
+
 ## Proof
 
 `tools/n1b/baseline.py` records and compares what a stage must not change, against a build tree:
