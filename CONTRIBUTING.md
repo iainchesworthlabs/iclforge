@@ -77,7 +77,7 @@ If you cannot cite where something came from, it does not go in.
 
 ## Repository layout
 
-**`src/` is the installable library; `apps/` consumes it, never the reverse.** `src/` holds 16
+**`src/` is the installable library; `apps/` consumes it, never the reverse.** `src/` holds 12
 libraries. Each is a directory with its own CMake target (`iclforge::<name>`), its own public
 headers (`iclforge/<name>/`) and its own row in `tools/checks/layering.json`, which lists the
 libraries it may include from; `check_layering.py` fails an include its row does not list. A
@@ -91,7 +91,8 @@ The two codecs stand on libraries that know no codec: `src/base` (bit I/O, the s
 the CPU probe, the signing key, SHA-256 and HMAC-SHA-256, and, header-only and not installed,
 `Fixed32`, the project's own float functions and the SIMD seam), `src/dsp` (the transforms more
 than one library uses), `src/objects` (the object-audio model and the Object Audio Metadata
-payload), `src/render` (layouts, routing and the renderer) and `src/containers/src/iec61937` (burst packing).
+payload), `src/render` (layouts, routing and the renderer) and `src/containers` (IEC 61937 burst
+packing, and the Matroska, MP4, MPEG-TS and IAMF writers and readers, each in a part of its own).
 `apps/{cli,gui,crucible,hearth,android,wasm,baremetal}` consume them (Crucible and the Shield app
 use the AC-3, E-AC-3 and Atmos codec only), and `apps/common` is shared application code,
 compiled directly into its consumers. `apps/windows` holds Crucible's separately licensed
@@ -125,8 +126,8 @@ the Homebrew formula's test asserts it.
 component of an include path says which library a header belongs to: `iclforge/ac3/decoder/decoder.hpp`
 is in `src/ac3/include/iclforge/ac3/decoder/`, `iclforge/render/layout.hpp` in
 `src/render/include/iclforge/render/`. A library includes headers only of the libraries its row of
-`layering.json` lists. `base`, `dsp`, `objects`, `render` and `iec61937` list no codec, nor do the
-containers (`matroska`, `mp4`, `mpegts`, `iamf`) and the readers (`adm`, `iab`): none of them knows
+`layering.json` lists. `base`, `dsp`, `objects`, `render` and `containers` list no codec, nor do the
+readers (`adm`, `iab`): none of them knows
 AC-3, E-AC-3 or Atmos exist, and they should stay that way. The AC-4 library lists none of
 `ac3`'s: a separate codec that shares no bitstream syntax with it. Its core (`src/ac4/src/core`) is
 what the decoder and the encoder share, and has no public headers.

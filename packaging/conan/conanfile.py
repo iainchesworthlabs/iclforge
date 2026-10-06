@@ -1,6 +1,6 @@
 # Conan (2.x) recipe for iclforge - installs the library only (iclforge::ac3,
-# iclforge::containers::matroska/iclforge::containers::mp4/iclforge::containers::mpegts behind their own default-on options, and
-# iclforge::c, the AC-4 library, iclforge::iab and iclforge::containers::iamf behind default-off "capi",
+# the Matroska, MP4 and MPEG-TS parts of iclforge::containers behind their own default-on options,
+# and iclforge::c, the AC-4 library, iclforge::iab and the IAMF part behind default-off "capi",
 # "ac4", "iab" and "iamf" options), never the CLI, GUI, Hearth, tests, examples or fuzz
 # harnesses. Same scope as the vcpkg port (packaging/vcpkg-port/iclforge/) - one Conan option
 # <-> one ICLFORGE_BUILD_<NAME> CMake option, same pattern that port's vcpkg_check_features()
@@ -167,8 +167,7 @@ class IclforgeConan(ConanFile):
         # of the way; builddirs puts the package's own installed config on
         # CMAKE_PREFIX_PATH so a consumer's plain
         # find_package(iclforge CONFIG REQUIRED) resolves it directly -
-        # same find_package() call and iclforge::ac3/iclforge::containers::matroska/
-        # iclforge::containers::mp4/iclforge::containers::mpegts targets as any other consumer in
-        # docs/library/index.md, Conan or not.
+        # same find_package() call and iclforge::ac3/iclforge::containers targets as any other
+        # consumer in docs/library/index.md, Conan or not.
         self.cpp_info.set_property("cmake_find_mode", "none")
         self.cpp_info.builddirs = [os.path.join("lib", "cmake", "iclforge")]

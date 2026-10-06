@@ -2,7 +2,7 @@
 
 ## Muxing: `iclforge::containers::matroska::mux`
 
-`iclforge/containers/matroska/matroska.hpp`, library `iclforge::containers::matroska`. It links nothing from `iclforge::ac3` and
+`iclforge/containers/matroska/matroska.hpp`, `iclforge::containers::matroska`, a part of `iclforge::containers`. It links nothing from `iclforge::ac3` and
 takes frames as opaque bytes. Pairing it with `iclforge::ac3::io::scan` is what keeps the track header
 accurate.
 
@@ -104,7 +104,7 @@ points with arbitrary bytes under ASan/UBSan.
 
 ## Muxing: `iclforge::containers::mp4::mux`
 
-`iclforge/containers/mp4/mp4.hpp`, library `iclforge::containers::mp4`. Same shape as `iclforge::containers::matroska`: it links nothing from
+`iclforge/containers/mp4/mp4.hpp`, `iclforge::containers::mp4`, a part of `iclforge::containers`. Same shape as `iclforge::containers::matroska`: it links nothing from
 `iclforge::ac3` and takes frames as opaque bytes. The one place MP4 needs codec-specific bytes that
 Matroska's plain CodecID string does not is the sample entry's `dac3`/`dec3` configuration box
 (ETSI TS 102 366 Annex F) — so `iclforge::containers::mp4::AudioTrack::codec_config` carries that box's payload as
@@ -233,7 +233,7 @@ real. `fuzz/fuzz_mp4_demux.cpp` drives both entry points with arbitrary bytes.
 
 ## Muxing: `iclforge::containers::mpegts::mux`
 
-`iclforge/containers/mpegts/mpegts.hpp`, library `iclforge::containers::mpegts`. Same shape as `iclforge::containers::matroska::mux` above — it links
+`iclforge/containers/mpegts/mpegts.hpp`, `iclforge::containers::mpegts`, a part of `iclforge::containers`. Same shape as `iclforge::containers::matroska::mux` above — it links
 nothing from `iclforge::ac3` beyond the AC-3, E-AC-3 or AC-4 choice it is told, and takes access
 units as opaque bytes.
 

@@ -307,11 +307,8 @@ target_link_libraries(forge-gui
         # EncoderController's live-capture/monitor/passthrough panel is a
         # real, load-bearing consumer of this - not incidental.
         iclforge::audio
-        # The GUI can save straight to .mkv, so it needs the muxer the CLI's
-        # 'mkv' command uses. It links nothing from iclforge::ac3 itself.
-        iclforge::containers
-        # Same reasoning as iclforge::containers above, for the CLI's 'mp4'/
-        # 'fmp4'/'ts' commands - see EncoderController::writeOutput().
+        # The GUI can save straight to .mkv, .mp4 and .ts, so it needs the muxers the CLI's 'mkv',
+        # 'mp4', 'fmp4' and 'ts' commands use - see EncoderController::writeOutput().
         iclforge::containers
         # AC-4 in the codec list, the QC, the player and the object page, through
         # the decoder's and the encoder's public APIs.

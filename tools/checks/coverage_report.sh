@@ -153,6 +153,10 @@ fi
 # under signing's 90/76 and stay as they were, and admbridge into src/adm, which takes the lower of
 # the two floors (82/75 and 88/78) until a coverage run measures it.
 #
+# C3 merged mp4 (90/85), mpegts (92/85), matroska (88/85), iamf (91/90) and iec61937 (91/83) into
+# src/containers, which takes the lowest line and branch floors of the five until a coverage run
+# measures it.
+#
 # apps/crucible/engine is the platform-free engine core iclforge-tests compiles in;
 # the rest of apps/crucible keeps its own floors in coverage_crucible.ps1.
 components="
@@ -161,17 +165,13 @@ src/base              80 56
 src/dsp               82 88
 src/objects           88 80
 src/render            91 83
-src/containers/src/iec61937          91 83
+src/containers        88 83
 src/audio             72 58
-src/containers/src/matroska          88 85
-src/containers/src/mp4               90 85
-src/containers/src/mpegts            92 85
 src/capi              84 74
 src/adm               82 75
 src/sendspin          85 74
 src/ac4               88 80
-src/iab            90 87
-src/containers/src/iamf              91 90
+src/iab               90 87
 apps/cli              80 71
 apps/common           78 66
 apps/crucible/engine  90 82

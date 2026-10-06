@@ -58,15 +58,14 @@ COMPONENT = REPO / "esp-idf" / "iclforge"
 # language binding, and none of the container muxers. A component archive should
 # carry the part that builds for this chip.
 STAGED_TREES = (
-    # The AC-3 codec and the five libraries it is built from: the minimum-footprint profile is
-    # one archive of files from all six (src/ac3/minimal.cmake). src/base also holds the header-only
+    # The AC-3 codec and the four libraries it is built from: the minimum-footprint profile is
+    # one archive of files from all five (src/ac3/minimal.cmake). src/base also holds the header-only
     # Fixed32 and scalar functions src/ac3 and src/ac4 both include (planning/ac4.md decision 31).
     "src/ac3",
     "src/base",
     "src/dsp",
     "src/objects",
     "src/render",
-    "src/containers/src/iec61937",
     "cmake",
 )
 

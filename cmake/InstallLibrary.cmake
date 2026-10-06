@@ -6,20 +6,18 @@
 # (src/audio/) is deliberately NOT installed/exported here - it is a CLI/GUI implementation
 # detail, not part of the distributed package; see docs/library/index.md.
 #
-# include()'d from the root CMakeLists.txt after add_subdirectory(src/ac3) and, for each
-# optional component, its own guarded add_subdirectory(src/containers/src/matroska|mp4|mpegts), before
-# include(Packaging) - CPack's own library component (cmake/Packaging.cmake) packages exactly
-# what gets install()'d here.
+# include()'d from the root CMakeLists.txt after add_subdirectory(src/ac3), src/containers and each
+# optional component's own guarded add_subdirectory(), before include(Packaging) - CPack's own
+# library component (cmake/Packaging.cmake) packages exactly what gets install()'d here.
 #
-# iclforge::containers are all optional components, off-able via
-# their own ICLFORGE_BUILD_MATROSKA/ICLFORGE_BUILD_MP4/ICLFORGE_BUILD_MPEGTS option (root
-# CMakeLists.txt) - each its own ICLFORGE_BUILD_<NAME> option, its own guarded
-# add_subdirectory(), and its own guarded block below, as are iclforge::c, the AC-4 library,
-# iclforge::iab and iclforge::containers. Each maps 1:1 onto its own vcpkg feature
-# (packaging/vcpkg-port/iclforge/vcpkg.json's "matroska"/"mp4"/"mpegts"/"capi"/"ac4"/"iab"/
-# "iamf", wired through portfile.cmake's vcpkg_check_features()) and its own Conan option
-# (packaging/conan/conanfile.py), so a vcpkg or Conan install only gets the ones its feature
-# selection actually asked for.
+# iclforge::containers is installed always, with the parts its options selected
+# (ICLFORGE_BUILD_MATROSKA, ICLFORGE_BUILD_MP4, ICLFORGE_BUILD_MPEGTS, ICLFORGE_BUILD_IAMF): a part
+# that is off installs no headers. iclforge::c, the AC-4 library and iclforge::iab have their own
+# ICLFORGE_BUILD_<NAME> option, guarded add_subdirectory() and guarded block below. Each option maps
+# 1:1 onto its own vcpkg feature (packaging/vcpkg-port/iclforge/vcpkg.json's
+# "matroska"/"mp4"/"mpegts"/"capi"/"ac4"/"iab"/"iamf", wired through portfile.cmake's
+# vcpkg_check_features()) and its own Conan option (packaging/conan/conanfile.py), so a vcpkg or
+# Conan install only gets the ones its feature selection actually asked for.
 #
 # Every install() rule below carries COMPONENT library: without one, CPack
 # files it under its own "Unspecified" component, inconsistent once
@@ -147,10 +145,10 @@ iclforge_install_pkgconfig(
     NAME iclforge-ac3
     DESCRIPTION "Clean-room AC-3 (ATSC A/52) and E-AC-3 encoder and decoder with a spatial object layer"
     LIBNAME "${_iclforge_forge_pc_libname}"
-    REQUIRES iclforge-base iclforge-dsp iclforge-objects iclforge-render iclforge-containers)
+    REQUIRES iclforge-base iclforge-dsp iclforge-objects iclforge-render)
 
-# The codec-blind libraries iclforge::ac3 links (src/base, dsp, objects, render, iec61937): each is a
-# mandatory component, installed and exported like the codec.
+# The codec-blind libraries iclforge::ac3 links (src/base, dsp, objects, render), and the
+# containers: each is a mandatory component, installed and exported like the codec.
 # Fixed32 and the scalar arithmetic (iclforge/base/arithmetic/) are in-tree build plumbing, never
 # installed: iclforge::base_arithmetic (src/base/CMakeLists.txt).
 iclforge_install_library(base
@@ -162,27 +160,16 @@ iclforge_install_library(objects
     DESCRIPTION "The object-audio model, its scene readers and the Object Audio Metadata payload of ETSI TS 103 420")
 iclforge_install_library(render
     DESCRIPTION "Speaker layouts, routing, the bed and object renderer and the panner")
-iclforge_install_library(iec61937
-    DESCRIPTION "IEC 61937 burst packing and unpacking for AC-3, E-AC-3 and AC-4")
+iclforge_install_library(containers
+    DESCRIPTION "IEC 61937 burst packing, and the Matroska, MP4/ISOBMFF (with fMP4/CMAF, HLS and DASH), MPEG-2 TS and IAMF writers and readers this build selected"
+    EXCLUDE ${ICLFORGE_CONTAINERS_NOT_BUILT})
 
-# The optional components below (iclforge::containers, mp4, mpegts, iab, iamf, the AC-4 library,
-# adm, and iclforge::c) each have their own ICLFORGE_BUILD_<NAME> option (root
+# The optional components below (iclforge::iab, the AC-4 library, adm, and iclforge::c) each
+# have their own ICLFORGE_BUILD_<NAME> option (root
 # CMakeLists.txt) and their own guarded block here, and the vcpkg port's and the Conan recipe's
 # features of the same names switch them (packaging/). Their targets, headers and export sets only
 # exist to install when the component was actually built; iclforgeConfig.cmake.in includes each
 # *Targets.cmake only if(EXISTS).
-if(ICLFORGE_BUILD_MATROSKA)
-    iclforge_install_library(matroska
-        DESCRIPTION "Standalone Matroska (.mkv) container writer")
-endif()
-if(ICLFORGE_BUILD_MP4)
-    iclforge_install_library(mp4
-        DESCRIPTION "Standalone MP4/ISOBMFF container writer, plus fMP4/CMAF and HLS/DASH signaling")
-endif()
-if(ICLFORGE_BUILD_MPEGTS)
-    iclforge_install_library(mpegts
-        DESCRIPTION "Standalone MPEG-2 Transport Stream container writer")
-endif()
 # A reader rather than a writer; the vcpkg port's "iab" feature and the Conan recipe's "iab"
 # option switch it, off unless asked for (packaging/).
 if(ICLFORGE_BUILD_IAB)
@@ -202,13 +189,6 @@ if(ICLFORGE_BUILD_ADM)
     iclforge_install_library(adm SHARED_ONLY
         DESCRIPTION "Standalone BW64/RF64 + Audio Definition Model (ADM) parser, and its bridge onto the object model iclforge::ac3's Atmos encoder takes"
         REQUIRES iclforge-objects iclforge-iab)
-endif()
-
-# A writer rather than a reader like iab above; the vcpkg port's "iamf" feature and the Conan
-# recipe's "iamf" option switch it, off unless asked for (packaging/).
-if(ICLFORGE_BUILD_IAMF)
-    iclforge_install_library(iamf
-        DESCRIPTION "IAMF v1.1.0 OBU / ISO-BMFF writer")
 endif()
 
 # The AC-4 codec (src/ac4, iclforge::ac4: the inspector, the decoder and the encoder, one library)

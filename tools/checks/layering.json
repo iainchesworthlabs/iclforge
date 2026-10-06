@@ -5,16 +5,12 @@
     "dsp": ["base"],
     "objects": ["base", "dsp"],
     "render": ["base", "objects"],
-    "iec61937": [],
+    "containers": ["base"],
     "ac3": ["base", "dsp", "objects", "render"],
     "ac4": ["base", "dsp", "objects", "render"],
-    "mp4": [],
-    "mpegts": [],
-    "matroska": [],
-    "iamf": [],
     "iab": [],
     "adm": ["iab", "objects"],
-    "audio": ["base", "render", "iec61937", "objects"],
+    "audio": ["base", "render", "containers", "objects"],
     "sendspin": [],
     "capi": ["ac3", "ac4"]
   }

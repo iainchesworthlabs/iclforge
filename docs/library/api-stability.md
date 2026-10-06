@@ -99,8 +99,8 @@ anything to deprecate *from*. The policy going forward:
   in `CHANGELOG.md` like any other change — a deprecation cycle promises a grace period this
   project isn't promising yet.
 - **At and after `v1.0.0`:** drop `DEFINE_NO_DEPRECATED` from every `generate_export_header()`
-  call (fourteen libraries — `base`, `dsp`, `objects`, `render`, `iec61937`, `ac3`, `capi`,
-  `matroska`, `mp4`, `mpegts`, `adm`, `iab`, `iamf` and `ac4`;
+  call (ten libraries — `base`, `dsp`, `objects`, `render`, `containers`, `ac3`, `capi`, `adm`,
+  `iab` and `ac4`;
   `iclforge::ac3_minimal` has no `SOVERSION` promise to protect and can keep it).
   A symbol scheduled for removal gets `ICLFORGE_DEPRECATED` (or its module's equivalent) in the
   same minor release its replacement ships, stays for at least one further minor release, and is

@@ -177,7 +177,7 @@ iclforge_add_library(ac3
         src/verify/selfcheck.cpp
         src/verify/trace_export.cpp
         src/version.cpp
-    DEPENDS base dsp objects render iec61937
+    DEPENDS base dsp objects render
     EXPORT_CUSTOM_CONTENT_VAR _ac3_export_custom_content
     PRIVATE_INCLUDES
         "${CMAKE_CURRENT_SOURCE_DIR}/variants/decode-scalar-${_ac3_scalar_dir}"

@@ -456,20 +456,28 @@ include(IclforgeLibrary)
 
 # The codec-blind libraries the AC-3 codec builds on, each linking only the ones above it:
 # base (bit I/O, the speaker vocabulary, the scalar arithmetic, the signing key and its hash and MAC,
-# the kernels' build variants), dsp, objects (the object model and the OAMD payload), render and
-# iec61937. Then the codec, which links all of them and holds the EMDF Atmos signer. None of the
-# five links a codec; AC-4 (src/ac4) takes base's profiling directory and its arithmetic headers and
-# links none of them yet.
+# the kernels' build variants), dsp, objects (the object model and the OAMD payload) and render.
+# Then the codec, which links all four and holds the EMDF Atmos signer. None of them links a codec;
+# AC-4 (src/ac4) takes base's profiling directory and its arithmetic headers and links none of them
+# yet.
 add_subdirectory(src/base)
 add_subdirectory(src/dsp)
 add_subdirectory(src/objects)
 add_subdirectory(src/render)
-add_subdirectory(src/containers/src/iec61937)
 add_subdirectory(src/ac3)
 
+# The containers, codec-blind and one library: IEC 61937 burst packing, always, and the Matroska,
+# MP4/ISOBMFF, MPEG-2 TS and IAMF writers and readers, each selected by its own option
+# (ICLFORGE_BUILD_MATROSKA, _MP4, _MPEGTS and _IAMF, default ON), which a vcpkg feature or a Conan
+# option of the same name switches - see src/containers/CMakeLists.txt. The minimum-footprint
+# profile carries no container.
+if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
+    add_subdirectory(src/containers)
+endif()
+
 # Live capture, monitor playback and IEC 61937 passthrough - the only
-# platform-specific code in the project. After src/ac3 (PRIVATE-links
-# iclforge::ac3 for the IEC 61937 framer); before apps/cli/apps/gui/tests, which
+# platform-specific code in the project. After src/ac3 and src/containers (it links
+# the codec, and the containers' IEC 61937 framer); before apps/cli/apps/gui/tests, which
 # link it alongside iclforge::ac3 for their live-audio commands/features. Not
 # linked by examples/ - none of them touch live audio.
 #
@@ -488,29 +496,6 @@ if(NOT EMSCRIPTEN AND NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCO
     add_subdirectory(src/audio)
 endif()
 
-# A standalone container writer, kept apart from the codec on purpose: it
-# depends on nothing of iclforge::ac3 and knows nothing about AC-3. Gated by
-# ICLFORGE_BUILD_MATROSKA (default ON) so it can be opted out of - a vcpkg
-# port maps this straight to its own "matroska" feature.
-if(ICLFORGE_BUILD_MATROSKA)
-    add_subdirectory(src/containers/src/matroska)
-endif()
-
-# A second standalone container writer, same shape and same reasoning as
-# src/containers/src/matroska above - see src/containers/CMakeLists.txt's own header. Gated by
-# ICLFORGE_BUILD_MP4 (default ON, see the FATAL_ERROR guard above).
-if(ICLFORGE_BUILD_MP4)
-    add_subdirectory(src/containers/src/mp4)
-endif()
-
-# A third standalone container writer, same shape as src/containers/src/matroska above but
-# for MPEG-2 Transport Stream rather than Matroska. Gated by ICLFORGE_BUILD_MPEGTS
-# (default ON, see the option() and its FATAL_ERROR guard above) so it can be
-# opted out of the same way matroska is expected to become opt-out-able too.
-if(ICLFORGE_BUILD_MPEGTS)
-    add_subdirectory(src/containers/src/mpegts)
-endif()
-
 # The AC-4 codec, a peer of iclforge::ac3 that links nothing of it: the
 # inspector, the decoder and the encoder, one library (src/ac4). Gated by
 # ICLFORGE_BUILD_AC4 (default ON, see the option() and its FATAL_ERROR guard
@@ -520,22 +505,15 @@ if(ICLFORGE_BUILD_AC4 OR ICLFORGE_MINIMAL_AC4)
     add_subdirectory(src/ac4)
 endif()
 
-# A standalone reader, not a writer like the three container modules above - roadmap item IM1
+# A standalone reader - roadmap item IM1
 # phase 1 ("IAB (SMPTE ST 2098-2) reader"). Gated by ICLFORGE_BUILD_IAB
 # (default ON, see the option() above).
 if(ICLFORGE_BUILD_IAB)
     add_subdirectory(src/iab)
 endif()
 
-# A standalone writer, not a reader like iab above - IAMF writer, phase 1 (an IAMF
-# OBU/ISOBMFF writer). Gated by ICLFORGE_BUILD_IAMF (default ON, see the option()
-# above).
-if(ICLFORGE_BUILD_IAMF)
-    add_subdirectory(src/containers/src/iamf)
-endif()
-
 # A standalone BW64/RF64 + Audio Definition Model parser - reader, not writer, but the same
-# "depends on nothing of iclforge::ac3" shape as the three container writers above. Gated by
+# "depends on nothing of iclforge::ac3" shape as the containers above. Gated by
 # ICLFORGE_BUILD_ADM (default OFF, unlike the three above - see the option() itself for why).
 if(ICLFORGE_BUILD_ADM)
     # IAB reader bridge, phase 3: iclforge::adm's own IAB mapping (src/adm/src/iab_bridge.cpp)

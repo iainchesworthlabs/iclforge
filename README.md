@@ -242,16 +242,16 @@ src/objects/    iclforge::objects — the object-audio model: object paths and s
                 Metadata payload and the EMDF container it travels in; codec-blind
 src/render/     iclforge::render — the room's layout, routing, the bed and object renderer and the
                 panner; links no codec
-src/containers/src/iec61937/   iclforge::containers::iec61937 — IEC 61937 burst packing and detection for AC-3, E-AC-3 and AC-4
 src/ac3/        iclforge::ac3 — the AC-3, E-AC-3 and Atmos codec, and the EMDF object signer (key
                 supplied at runtime), GUI-free
 src/ac4/        iclforge::ac4 — the AC-4 codec, from ETSI TS 103 190-1 and -2: the sync frame, TOC and
                 presentation inspector, the decoder and the encoder, laid out as src/ac3 is (core/,
                 io/, decoder/, encoder/); no iclforge::ac3 dependency
-src/containers/src/matroska/   iclforge::containers::matroska — a standalone MKV muxer, no iclforge::ac3 dependency
-src/containers/src/mp4/        iclforge::containers::mp4 — a standalone MP4/ISOBMFF muxer plus fMP4/CMAF + HLS/DASH, no iclforge::ac3 dependency
-src/containers/src/mpegts/     iclforge::containers::mpegts — a standalone MPEG-2 Transport Stream muxer, no iclforge::ac3 dependency
-src/containers/src/iamf/       iclforge::containers::iamf — a standalone IAMF v2.0 OBU/ISOBMFF reader and writer, fed from an E-AC-3 decode
+src/containers/ iclforge::containers — codec-blind carriage, no iclforge::ac3 dependency, in parts
+                (iclforge::containers::<part>): iec61937 (burst packing and detection for AC-3,
+                E-AC-3 and AC-4), matroska (MKV), mp4 (MP4/ISOBMFF plus fMP4/CMAF + HLS/DASH),
+                mpegts (MPEG-2 Transport Stream) and iamf (IAMF v2.0 OBU/ISOBMFF, fed from an
+                E-AC-3 decode), each a writer and a reader
 src/iab/        iclforge::iab — a standalone SMPTE ST 2098-2 (IAB) bitstream reader, codec-blind
 src/adm/        iclforge::adm — BW64/RF64 + Audio Definition Model reader, and the bridge from the
                 object graph it parses to the Atmos encoder's input (opt-in, needs Boost)

@@ -7,24 +7,12 @@ include("${CMAKE_CURRENT_LIST_DIR}/baseTargets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/dspTargets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/objectsTargets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/renderTargets.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/iec61937Targets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ac3Targets.cmake")
+# The containers: IEC 61937 always, and each of Matroska, MP4, MPEG-TS and IAMF when its option
+# (ICLFORGE_BUILD_MATROSKA and the rest, a vcpkg feature or a Conan option) was on.
+include("${CMAKE_CURRENT_LIST_DIR}/containersTargets.cmake")
 
-# iclforge::containers are all optional components
-# (ICLFORGE_BUILD_MATROSKA/ICLFORGE_BUILD_MP4/ICLFORGE_BUILD_MPEGTS) - each Targets file only
-# exists when that component was actually installed, e.g. a vcpkg install() built without a
-# given feature (see cmake/InstallLibrary.cmake's header comment; each of the three maps onto
-# its own vcpkg feature). Same shape applies to any future optional component's own
-# *Targets.cmake.
-if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/matroskaTargets.cmake")
-    include("${CMAKE_CURRENT_LIST_DIR}/matroskaTargets.cmake")
-endif()
-if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/mp4Targets.cmake")
-    include("${CMAKE_CURRENT_LIST_DIR}/mp4Targets.cmake")
-endif()
-if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/mpegtsTargets.cmake")
-    include("${CMAKE_CURRENT_LIST_DIR}/mpegtsTargets.cmake")
-endif()
+# The optional components below each have a Targets file only when that component was installed.
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/iabTargets.cmake")
     include("${CMAKE_CURRENT_LIST_DIR}/iabTargets.cmake")
 endif()
@@ -33,9 +21,6 @@ endif()
 # for why iclforge::adm is shared-only, unlike every other component here.
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/admTargets.cmake")
     include("${CMAKE_CURRENT_LIST_DIR}/admTargets.cmake")
-endif()
-if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/iamfTargets.cmake")
-    include("${CMAKE_CURRENT_LIST_DIR}/iamfTargets.cmake")
 endif()
 # The AC-4 codec (ICLFORGE_BUILD_AC4): the inspector, the decoder and the encoder, one library - see
 # cmake/InstallLibrary.cmake's ICLFORGE_BUILD_AC4 block.
@@ -65,25 +50,10 @@ if(TARGET iclforge::containers_shared AND NOT TARGET iclforge::containers_static
 elseif(TARGET iclforge::containers_static AND NOT TARGET iclforge::containers_shared)
     add_library(iclforge::containers ALIAS iclforge::containers_static)
 endif()
-if(TARGET iclforge::containers_shared AND NOT TARGET iclforge::containers_static)
-    add_library(iclforge::containers ALIAS iclforge::containers_shared)
-elseif(TARGET iclforge::containers_static AND NOT TARGET iclforge::containers_shared)
-    add_library(iclforge::containers ALIAS iclforge::containers_static)
-endif()
-if(TARGET iclforge::containers_shared AND NOT TARGET iclforge::containers_static)
-    add_library(iclforge::containers ALIAS iclforge::containers_shared)
-elseif(TARGET iclforge::containers_static AND NOT TARGET iclforge::containers_shared)
-    add_library(iclforge::containers ALIAS iclforge::containers_static)
-endif()
 if(TARGET iclforge::iab_shared AND NOT TARGET iclforge::iab_static)
     add_library(iclforge::iab ALIAS iclforge::iab_shared)
 elseif(TARGET iclforge::iab_static AND NOT TARGET iclforge::iab_shared)
     add_library(iclforge::iab ALIAS iclforge::iab_static)
-endif()
-if(TARGET iclforge::containers_shared AND NOT TARGET iclforge::containers_static)
-    add_library(iclforge::containers ALIAS iclforge::containers_shared)
-elseif(TARGET iclforge::containers_static AND NOT TARGET iclforge::containers_shared)
-    add_library(iclforge::containers ALIAS iclforge::containers_static)
 endif()
 if(TARGET iclforge::ac4_shared AND NOT TARGET iclforge::ac4_static)
     add_library(iclforge::ac4 ALIAS iclforge::ac4_shared)

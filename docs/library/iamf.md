@@ -1,6 +1,6 @@
 # IAMF reading and writing: `iclforge::containers::iamf`
 
-`iclforge/iamf/`, library `iclforge::containers::iamf`. A standalone reader and writer for AOM's IAMF (Immersive Audio
+`iclforge/containers/iamf/`, `iclforge::containers::iamf`, a part of `iclforge::containers`. A standalone reader and writer for AOM's IAMF (Immersive Audio
 Model and Formats) v2.0.0 — the bitstream format behind Eclipsa Audio. Like `iclforge::containers::matroska`,
 `iclforge::containers::mp4` and `iclforge::iab`, it links nothing from `iclforge::ac3`: it knows nothing about
 AC-3, E-AC-3 or the JOC/Atmos object layer, and takes already-rendered PCM in.

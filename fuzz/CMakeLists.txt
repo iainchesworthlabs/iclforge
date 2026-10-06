@@ -67,19 +67,12 @@ iclforge_instrument_for_fuzzing(iclforge_base_objects)
 #
 # Same PUBLIC-on-the-OBJECT-library reasoning as iclforge_ac3_objects above: the
 # usage requirements propagate through the static/shared wrappers to
-# whatever finally links iclforge::containers - here, each harness.
-foreach(container_target IN ITEMS iclforge_containers_objects iclforge_containers_objects iclforge_containers_objects)
-    target_compile_options(${container_target} PUBLIC
-        -fsanitize=address,undefined,fuzzer-no-link
-        -fno-sanitize-recover=undefined
-        -fno-omit-frame-pointer
-        -g)
-    target_link_options(${container_target} PUBLIC
-        -fsanitize=address,undefined,fuzzer-no-link)
-endforeach()
+# whatever finally links iclforge::containers - here, each harness. The IAMF parser
+# fuzz_iamf_parse mutates is a part of it too.
+iclforge_instrument_for_fuzzing(iclforge_containers_objects)
 
-# iclforge_ac4_objects, iclforge_iab_objects and iclforge_containers_objects, for the same reason:
-# fuzz_ac4_parse, fuzz_iab_parse and fuzz_iamf_parse below mutate parsers that take their counts and lengths from
+# iclforge_ac4_objects and iclforge_iab_objects, for the same reason: fuzz_ac4_parse and
+# fuzz_iab_parse below mutate parsers that take their counts and lengths from
 # the file. Each is a library of its own rather than part of iclforge::ac3 (see
 # src/ac4/ and src/iab/), so nothing iclforge::ac3 carries reaches their
 # sources, and until these calls existed both harnesses ran against
@@ -113,9 +106,6 @@ if(ICLFORGE_BUILD_AC4)
 endif()
 if(ICLFORGE_BUILD_IAB)
     iclforge_instrument_for_fuzzing(iclforge_iab_objects)
-endif()
-if(ICLFORGE_BUILD_IAMF)
-    iclforge_instrument_for_fuzzing(iclforge_containers_objects)
 endif()
 if(ICLFORGE_BUILD_ADM)
     iclforge_instrument_for_fuzzing(iclforge_adm_objects)

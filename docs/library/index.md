@@ -26,13 +26,11 @@ main codec headers are under `src/ac3/include/iclforge/ac3/`, and the AC-4 heade
 
 | CMake target | Purpose |
 |---|---|
-| `iclforge::ac3` | AC-3 and E-AC-3 encoding and decoding, and EMDF object signing (see [Object signing](signing.md)); links the five libraries below it |
+| `iclforge::ac3` | AC-3 and E-AC-3 encoding and decoding, and EMDF object signing (see [Object signing](signing.md)); links the four libraries below it |
 | `iclforge::base`, `iclforge::dsp` | Bit I/O, the speaker vocabulary, the CPU probe, and the signing key with SHA-256 and HMAC-SHA-256; the FFT, the QMF bank and the sample-rate converter |
 | `iclforge::objects`, `iclforge::render` | The object-audio model and the Object Audio Metadata payload; layouts, routing and the renderer |
-| `iclforge::containers::iec61937` | IEC 61937 burst packing and detection, for AC-3, E-AC-3 and AC-4 |
-| `iclforge::containers::matroska`, `iclforge::containers::mp4`, `iclforge::containers::mpegts` | Container writers |
+| `iclforge::containers` | The codec-blind carriage, in parts: IEC 61937 burst packing and detection for AC-3, E-AC-3 and AC-4 (`iclforge::containers::iec61937`, always built); the Matroska, MP4 and MPEG-TS writers and readers (`::matroska`, `::mp4`, `::mpegts`); IAMF reading and writing, as OBUs, ISO-BMFF and fragments (`::iamf`, see [IAMF](iamf.md)) |
 | `iclforge::iab` | SMPTE ST 2098-2 IAB reading; see [IAB](iab.md) |
-| `iclforge::containers::iamf` | IAMF reading and writing, as OBUs, ISO-BMFF and fragments; see [IAMF](iamf.md) |
 | `iclforge::adm` | ADM/BW64 reading and writing, and the mapping between ADM objects and the Atmos encoder or decoder; opt-in with `ICLFORGE_BUILD_ADM=ON` |
 | `iclforge::ac4` | AC-4 decoding and encoding, and the sync frames, table of contents and presentations both work through; see [AC-4](ac4.md) |
 
@@ -117,23 +115,24 @@ find_package(iclforge CONFIG REQUIRED)
 target_link_libraries(your_target PRIVATE iclforge::ac3)
 ```
 
-`iclforge::ac3` (with the object signer) and the libraries it links (`base`, `dsp`, `objects`,
-`render`, `iec61937`) are what the port installs by default. Every other library is one of the
-port's features, and none is on by default (a curated-registry port's `default-features` may only
+`iclforge::ac3` (with the object signer), the libraries it links (`base`, `dsp`, `objects`,
+`render`) and `iclforge::containers` with its IEC 61937 part are what the port installs by default.
+The containers' other parts and every other library are the port's features, and none is on by
+default (a curated-registry port's `default-features` may only
 cover behaviors, not additional public APIs/targets/binaries, and each of these is exactly that):
 
 | Feature | Targets |
 |---|---|
-| `matroska` | `iclforge::containers::matroska` |
-| `mp4` | `iclforge::containers::mp4` |
-| `mpegts` | `iclforge::containers::mpegts` |
+| `matroska` | `iclforge::containers`'s Matroska part (`iclforge::containers::matroska`) |
+| `mp4` | `iclforge::containers`'s MP4 part (`iclforge::containers::mp4`) |
+| `mpegts` | `iclforge::containers`'s MPEG-TS part (`iclforge::containers::mpegts`) |
 | `capi` | `iclforge::c`, the C API (see [C API](c-api.md)) |
 | `ac4` | `iclforge::ac4` (see [AC-4](ac4.md)) |
 | `iab` | `iclforge::iab` (see [IAB](iab.md)) |
-| `iamf` | `iclforge::containers::iamf` (see [IAMF](iamf.md)) |
+| `iamf` | `iclforge::containers`'s IAMF part (`iclforge::containers::iamf`, see [IAMF](iamf.md)) |
 
 Opt in with `vcpkg install iclforge[matroska,mp4,mpegts]` for the three container writers, or any
-subset, such as `iclforge[ac4]` for AC-4 alone. `iclforge::adm` have no vcpkg
+subset, such as `iclforge[ac4]` for AC-4 alone. `iclforge::adm` has no vcpkg
 feature — out of scope for this port, even though upstream installs and exports both
 (shared-only, see the note above). Once merged into `microsoft/vcpkg`, the same two snippets work
 with a plain `vcpkg install iclforge` — no `--overlay-ports` needed.
@@ -156,8 +155,7 @@ one.
 
 **pkg-config.** Every installed library also gets its own `.pc` file,
 `${libdir}/pkgconfig/iclforge-<name>.pc` (`iclforge-base`, `-dsp`, `-objects`, `-render`,
-`-iec61937`, `-ac3`, `-matroska`, `-mp4`, `-mpegts`, `-iamf`, `-iab`, `-adm`, `-ac4` and
-`-c`), for a non-CMake consumer:
+`-containers`, `-ac3`, `-iab`, `-adm`, `-ac4` and `-c`), for a non-CMake consumer:
 
 ```bash
 pkg-config --cflags --libs iclforge-ac3
