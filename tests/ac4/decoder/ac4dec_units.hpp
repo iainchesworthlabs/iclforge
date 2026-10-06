@@ -11,7 +11,7 @@
 // tests that state theirs in the double decoder's: full scale 2^15 (src/ac4/src/decoder/pcm/
 // substream_pcm.cpp). At double and float the two are the same and these are identities; at
 // Fixed32 the QMF domain is 2^kQmfShift and the time domain 2^kTimeShift below them
-// (iclforge/ac4core/dsp/scalar_traits.hpp, planning/ac4.md, D14d).
+// (core/dsp/scalar_traits.hpp, planning/ac4.md, D14d).
 
 namespace ac4dec_units {
 

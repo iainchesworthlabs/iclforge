@@ -2980,7 +2980,7 @@ its tracks direct-coded, through E6's presentation machinery. Decoded in full, e
 committed cases comes back at 40 to 75 dB SNR against its source, the tones each in a parameter band of
 their own (pinned in `tests/ac4/encoder/test_ac4enc_objects.cpp`), and core decoding gives the downmix at its
 metadata; the encoder's trace, the decoder's and the Python parser's agree on the committed streams
-(`tests/golden/ac4dec/objects/encoder-*.ac4`) and on the encoder-space harness's object draws.
+(`tests/golden/ac4/objects/encoder-*.ac4`) and on the encoder-space harness's object draws.
 `ac3cli ac4-encode objects=` takes a scene file of the library's terms for the harness and the listening
 streams; the applications' scene readers are I5's. DEE writes no A-JOC from this project's masters, so
 there is no race, and librempeg refuses object coding, so there is no second decode; MediaInfo's reading

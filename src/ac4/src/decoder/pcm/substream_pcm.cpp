@@ -36,7 +36,7 @@ constexpr std::array<int, 14> kControlDelay = {1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 4, 
 // QMF domain works at that scale, and the output is scaled to full scale 1.0.
 // See src/ac4/ERRATA.md, "Full scale, and the overlap-add's factor of two".
 // At Fixed32 the time and QMF domains are below the double decoder's by
-// dsp::kTimeShift and dsp::kQmfShift (iclforge/ac4core/dsp/scalar_traits.hpp),
+// dsp::kTimeShift and dsp::kQmfShift (core/dsp/scalar_traits.hpp),
 // where full scale is 2^(15 + the shift).
 template <typename R>
 [[nodiscard]] constexpr R qmf_full_scale() noexcept {

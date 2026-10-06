@@ -32,7 +32,7 @@
 
 namespace iclforge::hearth {
 
-// AC-4's own controls, each a field of iclforge::ac4::DecoderConfig (ac4dec/decoder.hpp)
+// AC-4's own controls, each a field of iclforge::ac4::DecoderConfig (iclforge/ac4/decoder/decoder.hpp)
 // once decoder_setup() has made one of them.
 struct Ac4Settings {
     // The presentation to play: the one that carries this presentation_id,

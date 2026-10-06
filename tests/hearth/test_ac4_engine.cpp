@@ -1074,7 +1074,7 @@ TEST_CASE("hearth ac4: an AC-4 item joins an E-AC-3 one in the same output", "[h
 TEST_CASE("hearth ac4: a presentation with objects is rendered through Ac4ObjectRenderer",
           "[hearth][ac4]") {
     // frame_rate_index 13 is the only rate an object substream takes
-    // (ac4enc/encoder.hpp), which kFrame (2 048 samples) already assumes.
+    // (iclforge/ac4/encoder/encoder.hpp), which kFrame (2 048 samples) already assumes.
     iclforge::ac4::EncoderConfig config;
     config.sample_rate_hz = kRate;
     config.frame_rate_index = 13;

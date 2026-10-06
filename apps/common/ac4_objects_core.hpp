@@ -69,7 +69,7 @@ struct ObjectSlot {
 
 // --- AC-4 objects -----------------------------------------------------------
 
-// The object substream is frame_rate_index 13 only (ac4enc/encoder.hpp,
+// The object substream is frame_rate_index 13 only (iclforge/ac4/encoder/encoder.hpp,
 // SubstreamConfig::objects): 2 048 samples a frame, one metadata update a
 // frame.
 inline constexpr int kAc4ObjectFrameRateIndex = 13;

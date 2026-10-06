@@ -200,7 +200,7 @@ constexpr std::array<CbiLayout, 3> kCbiLayouts{{
 // branches beside this function give a bed channel (panned by position, no speaker-anchored
 // iclforge::ac4::BedChannel assigned) - is_bed is reported in the summary line and nothing else,
 // exactly as it already is for E-AC-3 above. AC-4's object substream is frame_rate_index 13 only
-// (ac4enc/encoder.hpp, SubstreamConfig::objects), so metadata updates land on that fixed
+// (iclforge/ac4/encoder/encoder.hpp, SubstreamConfig::objects), so metadata updates land on that fixed
 // 2048-sample grid: one update per object per frame, ramped over the whole frame from the previous
 // one, evaluated at the frame's END time - the convention every Atmos-encode command in this file
 // uses. The steps themselves are apps/common/ac4_objects_core.cpp's, which forge-gui's AC-4 objects

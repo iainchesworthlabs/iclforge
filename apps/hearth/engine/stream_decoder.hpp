@@ -68,7 +68,7 @@
 //
 // AC-4 (planning/ac4.md, I2; objects and the immersive layout control, I5): a
 // unit that starts with an AC-4 sync word is one sync frame, which goes to
-// iclforge::ac4::Decoder through its public API alone (ac4dec/decoder.hpp): decode()
+// iclforge::ac4::Decoder through its public API alone (iclforge/ac4/decoder/decoder.hpp): decode()
 // reads the whole frame at once - channels, and, where a presentation carries
 // them, objects with their Annex F properties - and place_ac4_frame() places
 // it on the layout a kBlockSamples chunk at a time, by the channels' (or, with

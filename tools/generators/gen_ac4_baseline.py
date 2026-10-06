@@ -3,7 +3,7 @@
 Two sets, from the same legs and sources:
 
 - The committed set: tests/golden/external-baseline/ac4-*/dee.ac4, ac4-manifest.json beside
-  them, and each stream's syntax digest under tests/golden/ac4dec/. Short streams that CI reads.
+  them, and each stream's syntax digest under tests/golden/ac4/. Short streams that CI reads.
 - The gold set (--gold-set DIR): every stream the phases of planning/ac4.md need, kept on a
   local disk and never committed. Phase G0 of that plan made it and phase G1 added to it, both
   while the local DEE licence ran (it ends on 2026-11-06 and is not renewed, so no DEE stream

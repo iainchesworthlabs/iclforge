@@ -21,7 +21,7 @@
 // and as a waveform against the same formula applied to the substreams
 // decoded alone.
 // tools/references/ac4_syntax.py's digests of them are beside the others in
-// tests/golden/ac4dec/. With AC4DEC_WRITE_PRESENTATIONS set to a directory,
+// tests/golden/ac4/. With AC4DEC_WRITE_PRESENTATIONS set to a directory,
 // the streams and the selection table are written there instead of compared,
 // to commit after a change to the multiplexer.
 

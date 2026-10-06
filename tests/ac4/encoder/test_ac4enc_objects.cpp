@@ -11,7 +11,7 @@
 // each in a parameter band of its own.
 //
 // With AC4ENC_WRITE_OBJECTS set to a directory, the committed object streams
-// (tests/golden/ac4dec/objects/encoder-*.ac4) are written there; with
+// (tests/golden/ac4/objects/encoder-*.ac4) are written there; with
 // AC4ENC_WRITE_LISTENING, ten-second streams for listening.
 
 #include <algorithm>
@@ -495,7 +495,7 @@ TEST_CASE("the committed encoder object streams are the configurations'", "[ac4e
         }
         // The bytes are not promised across toolchains: the committed stream
         // is held to the configuration's table of contents, and its digests
-        // to both readers (tests/golden/ac4dec/objects-encoder-*.tsv).
+        // to both readers (tests/golden/ac4/objects-encoder-*.tsv).
         const fs::path path = fs::path{AC4DEC_GOLDEN_DIR} / "objects" / (c.name + ".ac4");
         std::ifstream in(path, std::ios::binary);
         REQUIRE(in.good());

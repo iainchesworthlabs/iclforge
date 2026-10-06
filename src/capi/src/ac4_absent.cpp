@@ -20,7 +20,7 @@
 // --- config initializers -----------------------------------------------
 // Pure C structs; the defaults below are iclforge::ac4::OutputConfig{}'s,
 // iclforge::ac4::DecoderConfig{}'s and iclforge::ac4::EncoderConfig{}'s (src/ac4dec/include/
-// ac4dec/decoder.hpp, src/ac4/include/iclforge/ac4/encoder/encoder.hpp) spelled as C
+// iclforge/ac4/decoder/decoder.hpp, src/ac4/include/iclforge/ac4/encoder/encoder.hpp) spelled as C
 // literals, so a config built by this library is the same whichever way
 // ICLFORGE_BUILD_AC4 was set - naming no iclforge::ac4:: type does not have to mean
 // guessing at its defaults.

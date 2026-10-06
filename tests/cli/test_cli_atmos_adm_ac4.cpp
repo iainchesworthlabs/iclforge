@@ -110,7 +110,7 @@ constexpr int kTotalFrames = 6;  // 3 frames holding SR, 3 frames holding centre
 // for staying clear of a boundary rather than landing on one.
 constexpr double kBeforeJumpS = 0.05;
 constexpr double kAfterJumpS = 0.13;
-// Position: AC-4's own quantization (ac4enc/encoder.hpp: X/Y in steps of 1/62, Z in 1/15) plus this
+// Position: AC-4's own quantization (iclforge/ac4/encoder/encoder.hpp: X/Y in steps of 1/62, Z in 1/15) plus this
 // command's one-update-a-frame (2048 samples, 42.67 ms) sampling of the continuous ADM automation.
 // Gain: AC-4's own whole-dB steps.
 constexpr double kPositionTolerance = 0.06;

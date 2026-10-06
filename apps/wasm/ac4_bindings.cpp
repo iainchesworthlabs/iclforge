@@ -100,7 +100,7 @@ emscripten::val make_number_array(const std::array<double, 3>& values) {
 std::string_view object_kind_name(iclforge::ac4::ObjectKind kind) {
     // ac4/ac4.hpp declares ObjectKind with no describe() of its own (unlike
     // DecodeError/DownmixTarget/DrcMode/DecodingMode/Speaker/SubstreamRole,
-    // which ac4dec/decoder.hpp all give one) - a small local mapping, the
+    // which iclforge/ac4/decoder/decoder.hpp all give one) - a small local mapping, the
     // same "the library gives no describe() for this one" situation encoder_
     // bindings.cpp's own WasmLayout/acmod_for_layout helpers are already in.
     switch (kind) {
