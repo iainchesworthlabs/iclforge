@@ -10,11 +10,13 @@
 #include <vector>
 
 #include "iclforge/containers/mp4/mp4.hpp"
+#include "isobmff_writer.hpp"
 
 // Shared ISOBMFF box plumbing between mp4.cpp (mux(), the non-fragmented
 // file), fragment.cpp (fragment(), the CMAF path) and reader.cpp (demux()
 // and Reader, which walk back in what the other two lay out): the low-level
-// box/FullBox primitives in both directions, and every box builder whose
+// box/FullBox primitives in both directions (the writing ones the
+// containers' own, src/containers/src/isobmff_writer.hpp), and every box builder whose
 // shape does not differ between the two writers (ftyp/styp's shared format, mvhd/tkhd/mdhd/
 // hdlr/smhd/dinf, the 'ac-3'/'ec-3' sample entry + stsd, and the sample
 // tables stts/stsc/stsz/stco - a fragmented track's init segment writes
@@ -30,67 +32,16 @@
 
 namespace iclforge::containers::mp4::detail {
 
-using Bytes = std::vector<std::byte>;
-
-inline void put_u8(Bytes& out, std::uint8_t value) {
-    out.push_back(static_cast<std::byte>(value));
-}
-
-inline void put_u16(Bytes& out, std::uint16_t value) {
-    put_u8(out, static_cast<std::uint8_t>(value >> 8));
-    put_u8(out, static_cast<std::uint8_t>(value & 0xFF));
-}
-
-inline void put_u32(Bytes& out, std::uint32_t value) {
-    put_u8(out, static_cast<std::uint8_t>(value >> 24));
-    put_u8(out, static_cast<std::uint8_t>((value >> 16) & 0xFF));
-    put_u8(out, static_cast<std::uint8_t>((value >> 8) & 0xFF));
-    put_u8(out, static_cast<std::uint8_t>(value & 0xFF));
-}
-
-// ISO/IEC 14496-12 §8.8.12's tfdt needs a 64-bit baseMediaDecodeTime once a
-// track runs long enough to overflow 32 bits - unused outside fragment.cpp,
-// but it belongs beside put_u32 rather than duplicated there alone.
-inline void put_u64(Bytes& out, std::uint64_t value) {
-    put_u32(out, static_cast<std::uint32_t>(value >> 32));
-    put_u32(out, static_cast<std::uint32_t>(value & 0xFFFFFFFFU));
-}
-
-// ISO/IEC 14496-12 §4.2: a box type is 4 printable-ASCII bytes.
-inline void put_fourcc(Bytes& out, std::string_view fourcc) {
-    assert(fourcc.size() == 4);
-    for (const char c : fourcc) {
-        put_u8(out, static_cast<std::uint8_t>(c));
-    }
-}
-
-inline void put_bytes(Bytes& out, std::span<const std::byte> bytes) {
-    out.insert(out.end(), bytes.begin(), bytes.end());
-}
-
-// ISO/IEC 14496-12 §4.2's Box: a 32-bit size (the WHOLE box, header
-// included), then the 4-byte type, then the body. Every box this module
-// builds stays well under 4 GiB (mux()/fragment() themselves refuse
-// anything that would not), so the 64-bit largesize escape (size field == 1)
-// is never needed.
-inline void put_box(Bytes& out, std::string_view fourcc, const Bytes& body) {
-    put_u32(out, static_cast<std::uint32_t>(8 + body.size()));
-    put_fourcc(out, fourcc);
-    put_bytes(out, body);
-}
-
-// ISO/IEC 14496-12 §4.2's FullBox: a Box with a 1-byte version and 3-byte
-// flags prepended to the body.
-inline void put_fullbox(Bytes& out, std::string_view fourcc, std::uint8_t version,
-                        std::uint32_t flags, const Bytes& body) {
-    Bytes full;
-    put_u8(full, version);
-    put_u8(full, static_cast<std::uint8_t>(flags >> 16));
-    put_u8(full, static_cast<std::uint8_t>((flags >> 8) & 0xFF));
-    put_u8(full, static_cast<std::uint8_t>(flags & 0xFF));
-    put_bytes(full, body);
-    put_box(out, fourcc, full);
-}
+// The box primitives are the containers' (isobmff_writer.hpp).
+using containers::detail::Bytes;
+using containers::detail::put_box;
+using containers::detail::put_bytes;
+using containers::detail::put_fourcc;
+using containers::detail::put_fullbox;
+using containers::detail::put_u16;
+using containers::detail::put_u32;
+using containers::detail::put_u64;
+using containers::detail::put_u8;
 
 // ISO/IEC 14496-12 §8.16.2: the Segment Type Box (styp) "has the same format
 // as a File Type Box" (§4.3's ftyp) - major_brand/minor_version/

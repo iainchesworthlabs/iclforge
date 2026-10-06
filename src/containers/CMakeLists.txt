@@ -51,10 +51,12 @@ else()
     list(APPEND _containers_not_built iamf)
 endif()
 
-# fmt_private: the MP4 part's HLS and DASH writers format their manifests with {fmt}.
+# fmt_private: the MP4 part's HLS and DASH writers format their manifests with {fmt}. src/ is
+# where the parts' shared private headers are (isobmff_writer.hpp).
 iclforge_add_library(containers
     SOURCES ${_containers_sources}
     DEPENDS base
+    PRIVATE_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/src"
     LINK_PRIVATE
         "$<BUILD_INTERFACE:iclforge::tracy>"
         "$<BUILD_INTERFACE:iclforge::fmt_private>")

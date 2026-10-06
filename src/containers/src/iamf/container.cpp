@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "isobmff_writer.hpp"
 #include "obu_io.hpp"
 #include "sequence_detail.hpp"
 
@@ -29,24 +30,19 @@ using detail::Out;
 
 // --- Writing -----------------------------------------------------------------------------------
 
-// A Box: size (the whole box), type, body. Files stay below 4 GiB, so no largesize is needed.
+// A Box and a FullBox, by the containers' box writer (isobmff_writer.hpp). Files stay below
+// 4 GiB, so no largesize is needed.
 [[nodiscard]] Bytes box(std::string_view type, std::span<const std::byte> body) {
-    Out out;
-    out.u32(static_cast<std::uint32_t>(8 + body.size()));
-    out.fourcc(type);
-    out.bytes(body);
-    return out.take();
+    Bytes out;
+    containers::detail::put_box(out, type, body);
+    return out;
 }
 
 [[nodiscard]] Bytes full_box(std::string_view type, std::uint8_t version, std::uint32_t flags,
                              std::span<const std::byte> body) {
-    Out out;
-    out.u8(version);
-    out.u8(flags >> 16);
-    out.u8((flags >> 8) & 0xFFU);
-    out.u8(flags & 0xFFU);
-    out.bytes(body);
-    return box(type, out.data());
+    Bytes out;
+    containers::detail::put_fullbox(out, type, version, flags, body);
+    return out;
 }
 
 void append(Bytes& out, const Bytes& more) { out.insert(out.end(), more.begin(), more.end()); }
