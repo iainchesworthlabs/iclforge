@@ -371,6 +371,20 @@ LATER_SPELLINGS: dict[str, str] = {
     "iclforge/arithmetic/scalar_math.hpp": "iclforge/base/arithmetic/scalar_math.hpp",
     "iclforge/signing/emdf_atmos_signer.hpp": "iclforge/ac3/signing/emdf_atmos_signer.hpp",
     "iclforge/signing/signing_key.hpp": "iclforge/base/crypto/signing_key.hpp",
+    # C3: the containers, one library
+    "iclforge/iamf/container.hpp": "iclforge/containers/iamf/container.hpp",
+    "iclforge/iamf/iamf.hpp": "iclforge/containers/iamf/iamf.hpp",
+    "iclforge/iamf/model.hpp": "iclforge/containers/iamf/model.hpp",
+    "iclforge/iamf/sequence.hpp": "iclforge/containers/iamf/sequence.hpp",
+    "iclforge/iec61937/iec61937.hpp": "iclforge/containers/iec61937/iec61937.hpp",
+    "iclforge/matroska/matroska.hpp": "iclforge/containers/matroska/matroska.hpp",
+    "iclforge/matroska/reader.hpp": "iclforge/containers/matroska/reader.hpp",
+    "iclforge/mp4/dash.hpp": "iclforge/containers/mp4/dash.hpp",
+    "iclforge/mp4/hls.hpp": "iclforge/containers/mp4/hls.hpp",
+    "iclforge/mp4/mp4.hpp": "iclforge/containers/mp4/mp4.hpp",
+    "iclforge/mp4/reader.hpp": "iclforge/containers/mp4/reader.hpp",
+    "iclforge/mpegts/mpegts.hpp": "iclforge/containers/mpegts/mpegts.hpp",
+    "iclforge/mpegts/reader.hpp": "iclforge/containers/mpegts/reader.hpp",
 }
 
 

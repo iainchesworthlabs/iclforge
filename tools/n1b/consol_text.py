@@ -59,6 +59,8 @@ class Rule:
     # string is what a program prints, which C0 to C3 do not change
     strings: bool = True
     comments: bool = True
+    # a file this matches is left alone by the rule (a namespace alias that keeps a relative name)
+    unless: str = ""
     compiled: re.Pattern = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -471,7 +473,138 @@ C2_PROSE = [
     ),
 ]
 
-STAGES: dict[str, list[Rule]] = {"c0": C0, "c1": C1 + C1_PROSE, "c2": C2 + C2_PROSE}
+# --- C3 ---------------------------------------------------------------------------------------
+# mp4, mpegts, matroska, iamf and iec61937 are one library, iclforge::containers, and their
+# namespaces nest under it (decision 6): iclforge::mp4 is iclforge::containers::mp4. A name in a
+# C++ string keeps what it prints; the options ICLFORGE_BUILD_MP4 and the rest, and the vcpkg and
+# Conan features, keep their names.
+C3_PARTS = ("mp4", "mpegts", "matroska", "iamf", "iec61937")
+_C3_PART = "|".join(C3_PARTS)
+C3 = [
+    Rule(
+        "namespace-qualified",
+        rf"\biclforge::({_C3_PART})::",
+        r"iclforge::containers::\1::",
+        _TEXT,
+        strings=False,
+    ),
+    Rule(
+        "namespace-declared",
+        rf"\bnamespace iclforge::({_C3_PART})\b",
+        r"namespace iclforge::containers::\1",
+    ),
+    # `using namespace iclforge::mp4;`, `namespace iamf = iclforge::iamf;`, a namespace's closing
+    # comment, and a page that names the part
+    Rule(
+        "namespace-bare",
+        rf"\biclforge::({_C3_PART})\b(?![_:])",
+        r"iclforge::containers::\1",
+        ("cpp",),
+        strings=False,
+    ),
+]
+# A name written from inside another iclforge namespace (`iec61937::kBurstBytes` in iclforge::audio)
+# nests too, unless the file declares an alias of that name.
+C3 += [
+    Rule(
+        f"relative-{part}",
+        rf"(?<![\w:]){part}::(?=\w)",
+        f"containers::{part}::",
+        strings=False,
+        unless=rf"\bnamespace\s+{part}\s*=",
+    )
+    for part in C3_PARTS
+]
+C3 += [
+    Rule(
+        "alias-variant",
+        rf"\biclforge::({_C3_PART})_(static|shared|objects)\b",
+        r"iclforge::containers_\2",
+        _TEXT,
+        strings=False,
+    ),
+    Rule(
+        "raw-target",
+        rf"\biclforge_({_C3_PART})_(static|shared|objects)\b",
+        r"iclforge_containers_\2",
+        _TEXT,
+        strings=False,
+    ),
+    Rule("alias", rf"\biclforge::({_C3_PART})\b(?![_:])", "iclforge::containers", ("cmake",)),
+    Rule(
+        "file",
+        rf"\blibiclforge_({_C3_PART})(_static\.a|\.so|\.a|\.dylib|\.dll|\.lib)",
+        r"libiclforge_containers\2",
+        _TEXT,
+        strings=False,
+    ),
+    Rule(
+        "pkg-config",
+        rf"\biclforge-({_C3_PART})\b(?![-\w])",
+        "iclforge-containers",
+        _TEXT,
+        strings=False,
+    ),
+    Rule(
+        "macro",
+        r"\bICLFORGE_(?:MP4|MPEGTS|MATROSKA|IAMF|IEC61937)_"
+        r"((?:DEPRECATED_)?(?:NO_)?EXPORT|DEPRECATED|STATIC_DEFINE|BUILDING_SHARED)\b",
+        r"ICLFORGE_CONTAINERS_\1",
+        _TEXT,
+    ),
+    Rule(
+        "collapse",
+        r"(`?\biclforge::containers(?:_static|_shared)?\b`?)(?:(?:,? and |, | or |/)\1(?![\w:]))+",
+        r"\1",
+        _TEXT,
+    ),
+    Rule(
+        "dedupe",
+        r"(\biclforge::containers(?:_static|_shared)?)"
+        r"(?:[ \t]*\n[ \t]*\1(?![\w:])|[ \t]+\1(?![\w:]))+",
+        r"\1",
+        ("cmake",),
+    ),
+]
+# A page or a comment that names one of the five as a library names its part of the one; their
+# directories, named bare, are where their files went.
+C3_PROSE = [
+    Rule(
+        "part-library",
+        rf"\biclforge::({_C3_PART})\b(?![_:])",
+        r"iclforge::containers::\1",
+        _TEXT,
+        strings=False,
+    ),
+    Rule(
+        "build-file",
+        rf"\bsrc/({_C3_PART})/CMakeLists\.txt\b",
+        "src/containers/CMakeLists.txt",
+        _TEXT,
+        plans=True,
+    ),
+    Rule(
+        "dir",
+        rf"\bsrc/({_C3_PART})\b(?![\w-])(?!/[\w.*{{])",
+        r"src/containers/src/\1",
+        _TEXT,
+        plans=True,
+    ),
+    Rule(
+        "test-dir",
+        rf"\btests/({_C3_PART})\b(?![\w-])(?!/[\w.*{{])",
+        r"tests/containers/\1",
+        _TEXT,
+        plans=True,
+    ),
+]
+
+STAGES: dict[str, list[Rule]] = {
+    "c0": C0,
+    "c1": C1 + C1_PROSE,
+    "c2": C2 + C2_PROSE,
+    "c3": C3 + C3_PROSE,
+}
 
 
 def kind_of(path: str) -> set[str]:
@@ -550,6 +683,8 @@ def rewrite(
         if not kinds.intersection(rule.kinds) or (plan_page and not rule.plans):
             continue
         if rule.files and not path.startswith(rule.files):
+            continue
+        if rule.unless and re.search(rule.unless, text):
             continue
         if "cpp" in kinds and not (rule.strings and rule.comments):
             out = []
