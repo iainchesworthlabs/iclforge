@@ -27,8 +27,8 @@ using iclforge::ac4::detail::ParseResult;
 using iclforge::ac4::detail::PresentationContext;
 using iclforge::ac4::detail::PresentationSubstream;
 using iclforge::ac4::detail::PresentationSubstreamState;
-using ac4dec_test::BitWriter;
-using ac4dec_test::Recorder;
+using ac4_decoder_test::BitWriter;
+using ac4_decoder_test::Recorder;
 namespace ch_mode = iclforge::ac4::detail::ch_mode;
 
 // Reads `w` as a presentation substream. On success the reader must stop at

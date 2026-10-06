@@ -22,7 +22,7 @@
 #include "encoder/frame/toc_writer.hpp"
 #include "encoder/oamd/oamd_syntax.hpp"
 
-namespace ac4dec_test {
+namespace ac4_decoder_test {
 namespace {
 
 using iclforge::ac4::detail::AjocFields;
@@ -1274,4 +1274,4 @@ std::vector<ObjectCase> committed_object_cases() {
     };
 }
 
-}  // namespace ac4dec_test
+}  // namespace ac4_decoder_test

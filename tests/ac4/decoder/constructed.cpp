@@ -24,7 +24,7 @@
 #include "iclforge/base/bitwriter.hpp"
 #include "encoder/frame/frame_writer.hpp"
 
-namespace ac4dec_test {
+namespace ac4_decoder_test {
 namespace {
 
 using iclforge::ac4::Speaker;
@@ -1818,4 +1818,4 @@ std::vector<ElementCase> committed_cases() {
     };
 }
 
-}  // namespace ac4dec_test
+}  // namespace ac4_decoder_test

@@ -41,9 +41,9 @@ using iclforge::ac4::detail::AspxFrame;
 using iclforge::ac4::detail::QmfValue;
 using iclforge::ac4::detail::Real;
 namespace aspx = iclforge::ac4::detail::aspx;
-using ac4dec_units::qmf;
-using ac4dec_units::qmf_real;
-using ac4dec_units::qmf_units;
+using ac4_units::qmf;
+using ac4_units::qmf_real;
+using ac4_units::qmf_units;
 
 constexpr int kSlots = 32;                                    // num_qmf_timeslots at 2 048
 constexpr int kExtSlots = aspx::kTsOffsetHfadj + 6 + kSlots;  // Q_low_ext
@@ -53,7 +53,7 @@ constexpr int kNoiseGroups = 2;
 // A relative-tolerance scale, in place of a fixed 1e-9: this file's own hand
 // assembly of a level times a table entry holds to a handful of ulps of Real
 // (possibly float, or Fixed32's raw unit), not of double.
-const double kRelativeTolerance = 1e4 * ac4dec_units::relative_epsilon();
+const double kRelativeTolerance = 1e4 * ac4_units::relative_epsilon();
 
 AspxConfig dee_128k_config() {
     AspxConfig config;

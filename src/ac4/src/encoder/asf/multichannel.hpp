@@ -22,7 +22,7 @@
 // it stands; step 2, with set 1, takes the other with the third track r, as
 // (X, Ir) where Y is the output and as (Ir, Y) where X is, and its two rows are
 // the other two outputs. Each printed matrix is one such cascade, read here
-// off the table's entries; test_ac4enc_multichannel.cpp holds all twelve to
+// off the table's entries; test_multichannel.cpp holds all twelve to
 // the printed table.
 //
 // Clause 5.3.3.4: set 0 turns (I0, I1) into (P0, P1) and set 1 (I2, I3) into

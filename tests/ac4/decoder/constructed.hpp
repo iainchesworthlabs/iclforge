@@ -47,7 +47,7 @@
 #include "iclforge/ac4/core/syntax.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 
-namespace ac4dec_test {
+namespace ac4_decoder_test {
 
 struct ElementCase {
     std::string name{};
@@ -128,4 +128,4 @@ struct BuiltStream {
 inline constexpr int kCommittedFrames = 4;
 [[nodiscard]] std::vector<ElementCase> committed_cases();
 
-}  // namespace ac4dec_test
+}  // namespace ac4_decoder_test

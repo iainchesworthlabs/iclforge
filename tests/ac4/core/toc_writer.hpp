@@ -16,7 +16,7 @@
 
 namespace ac4_toc_test {
 
-using ac4dec_test::BitWriter;
+using ac4_decoder_test::BitWriter;
 
 // Part 1 Table 3's substream_index: 2 bits, 3 escaping to variable_bits(2).
 inline void substream_index(BitWriter& w, int index) {

@@ -1053,7 +1053,7 @@ shares with the encoder. Six checks stand in for the reference output neither pa
   across frames, and a value outside its table refuses the frame; interpolation is worked smooth and
   steep, with one and two parameter sets; ASPX_ACPL_3 makes its centre of gamma5 and gamma6.
 - **The multichannel matrices against the printed tables, and the elements DEE does not write**
-  (`tests/ac4/decoder/test_multichannel.cpp`, `test_ac4dec_constructed.cpp`): the matrices of Part 1
+  (`tests/ac4/decoder/test_multichannel.cpp`, `test_constructed.cpp`): the matrices of Part 1
   Tables 178 and 179 and clause 5.3.3.4 equal the tables' printed entries, 300 of them for Table 179
   alone, held in the test as a transcription of their own. DEE's 5.1 streams use one form of the 5.X
   element, `coding_config` 0 with `2ch_mode` 0. The others, the 3.0 element and the 7.X element in its
@@ -1289,7 +1289,7 @@ does not write it (planning/ac4.md, "What DEE writes"), no stream of it is publi
 decode it. What checks it is the standard's own tables and the project's two transcriptions:
 
 - **The syntax, in both transcriptions** (`tests/ac4/decoder/test_channel_elements.cpp`,
-  `test_ac4dec_syntax.cpp`): the element in SIMPLE and ASPX, with 24 tracks, eleven `aspx_data_2ch()` and
+  `test_syntax.cpp`): the element in SIMPLE and ASPX, with 24 tracks, eleven `aspx_data_2ch()` and
   the stereo flags of each pair, and two constructed streams (`22_2-simple-alternating`,
   `22_2-aspx-unit7-lr`) whose digests `tools/references/ac4_syntax.py` wrote and the decoder reproduces.
   `ac4_syntax_differential.py` includes the channel mode among its synthetic tables of contents.
@@ -1345,7 +1345,7 @@ which takes it to the layout a system asks for. Where the text leaves a choice o
   each custom downmix gain a distinct value, so that one in the wrong place shows; Table 130's defaults,
   6.3.10.3.10's exception, the persistence of the custom downmix data and the loudness corrections, and
   the steps to two channels and one after 5.X.0 hold on their own. DRC's transmitted gains take Part 2
-  Table 69's groups (`test_ac4dec_drc.cpp`).
+  Table 69's groups (`test_drc.cpp`).
 - **The renders on DEE's streams** (`tests/ac4/decoder/test_pcm.cpp`, `gain_ac4_decode.py`): each
   render's tones equal the renderer's matrix applied to the as-coded decode, to 0.01 dB, in full
   decoding to 5.1 and to Lo/Ro in the tests, and in the gain script to every layout the renderer
@@ -1603,11 +1603,11 @@ paragraph on the objects follows them:
   interleaving back through the decoder's parser, and hold the encoder's reading of the interval
   borders, envelope resolutions and noise borders to the parser's. The encoder undoes the three, four
   and five channel matrices as the 2 x 2 steps they cascade, in a transcription of Tables 178 and 179
-  and clause 5.3.3.4 of its own, which `test_ac4enc_multichannel.cpp` holds to every printed matrix
+  and clause 5.3.3.4 of its own, which `test_multichannel.cpp` holds to every printed matrix
   for every `chel_matsel`, with the steps' parameters chosen or drawn at random.
 - **One tone per channel.** Encoded and decoded, each channel's tone comes back at unity gain on its
   own channel, 60 dB or more over every other tone there, the LFE's 47 Hz included: 5.0 and 5.1 in
-  SIMPLE and ASPX, and 7.0 and 7.1 in each of the three 7.X layouts (`test_ac4enc_encoder.cpp`, and
+  SIMPLE and ASPX, and 7.0 and 7.1 in each of the three 7.X layouts (`test_encoder.cpp`, and
   through `forge` in the WAV order `decode` writes). Noise above the crossover in one channel comes
   back in that channel alone, so each `aspx_data` element carries the channels Part 1 Table 213 gives
   it. In the A-CPL modes, whose parameters rebuild the channels band by band, a tone at the centre of
@@ -1662,7 +1662,7 @@ paragraph on the objects follows them:
   output, as waveforms below the crossover, each parameter band's level difference and correlation
   against the source's, and on the tones the routing margin.
 - **Frame rates, rates and metadata** (phase E5). At every frame rate each frame decodes to the
-  samples Part 2 clause 5.11 gives it, over a second in `test_ac4enc_frame_rates.cpp`, and over
+  samples Part 2 clause 5.11 gives it, over a second in `test_frame_rates.cpp`, and over
   100 000 frames at every rate, across 98 wraps of `sequence_counter`, in a test run on demand; the
   decoded output lags the input by `delay_samples()` and `decoder_delay_samples()`, found by
   correlation, to within a sample. `score_ac4_encode.py`'s frame-rate legs hold music and speech in
@@ -1670,7 +1670,7 @@ paragraph on the objects follows them:
   index 13 on the log-spectral distance and ViSQOL: to 60 fps within 0.17 dB and 0.012, and at 100 to
   120 fps music at 128 kbps 0.63 to 0.87 dB over and 0.09 to 0.18 under, where the frames' fixed side
   information takes five times its share of the rate. An average-rate stream never needs more than
-  the input buffer it signals: `test_ac4enc_rates.cpp` starts a decoder at every frame and runs its
+  the input buffer it signals: `test_rates.cpp` starts a decoder at every frame and runs its
   buffer. Through the decoder's output processing (`gain_ac4_decode.py --encoder`, in FFmpeg
   Validate) the output
   level, each downmix and dialogue enhancement's gains on the encoder's streams equal their formulas
@@ -1723,7 +1723,7 @@ paragraph on the objects follows them:
   the music and effects alone of either stream's mixes.
 - **The API, the command and the package** (phase E7). `Encoder::refusal_reason()` names the rule a
   refused configuration breaks, and a table of refusals holds each reason to its rule
-  (`test_ac4enc_encoder.cpp`), as the configuration's designated initializers hold its defaults;
+  (`test_encoder.cpp`), as the configuration's designated initializers hold its defaults;
   `fuzz_ac4_encode` holds it to `create()` on every configuration it draws, and `fuzz_ac4_parse`
   holds `dac4_refusal()` to `build_dac4()` on every table of contents that reads.
   Every option of `forge ac4-encode` has a test: `tests/cli/test_cli_ac4_encode.cpp` reads what

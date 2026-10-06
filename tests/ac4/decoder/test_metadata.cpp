@@ -32,8 +32,8 @@ using iclforge::ac4::detail::Metadata;
 using iclforge::ac4::detail::MetadataState;
 using iclforge::ac4::detail::ParseResult;
 using iclforge::ac4::detail::SubstreamContext;
-using ac4dec_test::BitWriter;
-using ac4dec_test::Recorder;
+using ac4_decoder_test::BitWriter;
+using ac4_decoder_test::Recorder;
 namespace ch_mode = iclforge::ac4::detail::ch_mode;
 namespace tables = iclforge::ac4::detail::tables;
 

@@ -59,7 +59,7 @@ namespace fs = std::filesystem;
 using iclforge::test::kSanitized;
 using iclforge::test::kSanitizedFrames;
 using iclforge::test::streams_to_play;
-using ac4dec_test::BitWriter;
+using ac4_decoder_test::BitWriter;
 
 std::vector<std::byte> read_file(const fs::path& path) {
     std::ifstream in(path, std::ios::binary);

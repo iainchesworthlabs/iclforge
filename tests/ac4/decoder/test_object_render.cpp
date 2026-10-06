@@ -1,6 +1,6 @@
 // The AC-4 object renderer of apps/common/ac4_object_render.hpp - forge's,
 // through the layout renderer Hearth plays E-AC-3's objects with - on the
-// constructed object streams of ac4dec_objects.hpp, whose object 0 moves from
+// constructed object streams of objects.hpp, whose object 0 moves from
 // the left wall to the right one over the stream. Each speaker's output is
 // each object's essence at the gain the layout renderer gives the object's
 // position at that moment: tone by tone, the speaker's component is the sum
@@ -30,8 +30,8 @@
 namespace {
 
 namespace fs = std::filesystem;
-using ac4dec_test::BuiltObjectStream;
-using ac4dec_test::ObjectCase;
+using ac4_decoder_test::BuiltObjectStream;
+using ac4_decoder_test::ObjectCase;
 using S = iclforge::ac4::Speaker;
 
 // The component of `samples` at `hz`, through a Hann window, scaled so that a
@@ -53,7 +53,7 @@ std::complex<double> tone_component(std::span<const float> samples, double hz) {
 
 ObjectCase committed(const std::string& name) {
     ObjectCase found;
-    for (const ObjectCase& c : ac4dec_test::committed_object_cases()) {
+    for (const ObjectCase& c : ac4_decoder_test::committed_object_cases()) {
         if (c.name == name) {
             found = c;
         }
@@ -76,7 +76,7 @@ iclforge::ac4::ObjectProperties at_middle(const iclforge::ac4::DecodedObject& ob
 std::vector<double> tones_of(const BuiltObjectStream& stream) {
     std::vector<double> tones;
     for (const auto& list : {stream.full, stream.core}) {
-        for (const ac4dec_test::ExpectedObject& object : list) {
+        for (const ac4_decoder_test::ExpectedObject& object : list) {
             for (const auto& tone : object.tones) {
                 if (std::ranges::find(tones, tone[0]) == tones.end()) {
                     tones.push_back(tone[0]);
@@ -102,7 +102,7 @@ TEST_CASE(
     for (const Leg& leg : legs) {
         CAPTURE(leg.name, iclforge::ac4::describe(leg.mode));
         // Four seconds, so that object 0 moves little within a frame.
-        const BuiltObjectStream stream = ac4dec_test::build_objects(committed(leg.name), 96);
+        const BuiltObjectStream stream = ac4_decoder_test::build_objects(committed(leg.name), 96);
         const std::vector<double> tones = tones_of(stream);
         iclforge::ac4::DecoderConfig config;
         config.decoding = leg.mode;
@@ -225,8 +225,8 @@ TEST_CASE("the moving object streams for listening are written where AC4_DECODER
     fs::create_directories(dir);
     for (const char* name :
          {"direct-dynamic", "ajoc-2to4-coarse", "ajoc-5lfe-aspx-decorr-sparse"}) {
-        const BuiltObjectStream stream = ac4dec_test::build_objects(committed(name), 240);
-        const std::vector<std::byte> bytes = ac4dec_test::sync_framed(stream);
+        const BuiltObjectStream stream = ac4_decoder_test::build_objects(committed(name), 240);
+        const std::vector<std::byte> bytes = ac4_decoder_test::sync_framed(stream);
         std::ofstream out(fs::path{dir} / ("listen-" + std::string{name} + ".ac4"),
                           std::ios::binary);
         out.write(reinterpret_cast<const char*>(bytes.data()),

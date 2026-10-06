@@ -13,7 +13,7 @@
 // Fixed32 the QMF domain is 2^kQmfShift and the time domain 2^kTimeShift below them
 // (core/dsp/scalar_traits.hpp, planning/ac4.md, D14d).
 
-namespace ac4dec_units {
+namespace ac4_units {
 
 using Real = iclforge::ac4::detail::Real;
 using QmfValue = iclforge::ac4::detail::dsp::Complex<Real>;
@@ -64,4 +64,4 @@ inline constexpr int kLineExponent = iclforge::ac4::detail::dsp::kFixed<Real> ? 
     return std::ldexp(static_cast<double>(value), -kTimeShift);
 }
 
-}  // namespace ac4dec_units
+}  // namespace ac4_units

@@ -17,7 +17,7 @@
 // operations per lane), which is the seam's contract for its three directories: the x86-64
 // seam's SSE and the generic seam's four scalars, on the Cortex-M3 and the ESP32s, give the
 // same float, and the aarch64 seam's NEON is held to the same. tests/ac4/core/
-// test_ac4core_resampler.cpp holds the kernel to a loop of that description, written out, bit
+// test_resampler.cpp holds the kernel to a loop of that description, written out, bit
 // for bit.
 //
 // At double the converter's sum stays a sequential loop, as it always was: the encoder's

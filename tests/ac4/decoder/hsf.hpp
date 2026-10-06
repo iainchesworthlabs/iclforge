@@ -22,7 +22,7 @@
 #include <string>
 #include <vector>
 
-namespace ac4dec_test {
+namespace ac4_decoder_test {
 
 struct HsfChannel {
     double hz = 0.0;         // the tone's frequency; 0 for a silent channel
@@ -49,7 +49,7 @@ struct HsfCase {
     std::vector<HsfChannel> channels{};
     // A pair's b_enable_mdct_stereo_proc, and the sap_mode (0 to 2) of every chparam_info() of the
     // element: the tracks are the channels through the inverse of the matrix the decoder reads for
-    // each band, Tables 178 and 179 and clause 5.3.3.4 as printed (ac4dec_printed_matrices.hpp),
+    // each band, Tables 178 and 179 and clause 5.3.3.4 as printed (printed_matrices.hpp),
     // with a = b = c = 1, d = -1 where M/S applies: 1 in the bands ms_used covers, which are the
     // core's, 2 in every band.
     bool stereo_proc = false;
@@ -102,4 +102,4 @@ struct HsfStream {
 inline constexpr int kHsfCommittedFrames = 4;
 [[nodiscard]] std::vector<HsfCase> committed_hsf_cases();
 
-}  // namespace ac4dec_test
+}  // namespace ac4_decoder_test

@@ -18,7 +18,7 @@
 #include "core/tables/sfb_tables.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 
-namespace ac4dec_test {
+namespace ac4_decoder_test {
 namespace {
 
 namespace tables = iclforge::ac4::detail::tables;
@@ -464,7 +464,7 @@ FramePlan make_plan(const HsfCase& c, int base, int multiplier) {
 }
 
 using Windows = std::vector<std::vector<double>>;  // [window][line]
-using Abcd = ac4dec_test::Abcd;
+using Abcd = ac4_decoder_test::Abcd;
 
 constexpr Abcd kIdentity = {1.0, 0.0, 0.0, 1.0};
 constexpr Abcd kMidSide = {1.0, 1.0, 1.0, -1.0};
@@ -602,17 +602,17 @@ std::vector<std::vector<double>> element_matrix(const Element& e, int chel_matse
     switch (e.kind) {
         case Kind::kThree: {
             const std::array<Abcd, 2> sets = {p, p};
-            return ac4dec_test::printed_matrix(
-                ac4dec_test::kTable178[static_cast<std::size_t>(chel_matsel)], sets);
+            return ac4_decoder_test::printed_matrix(
+                ac4_decoder_test::kTable178[static_cast<std::size_t>(chel_matsel)], sets);
         }
         case Kind::kFive: {
             const std::array<Abcd, 5> sets = {p, p, p, p, p};
-            return ac4dec_test::printed_matrix(
-                ac4dec_test::kTable179[static_cast<std::size_t>(chel_matsel)], sets);
+            return ac4_decoder_test::printed_matrix(
+                ac4_decoder_test::kTable179[static_cast<std::size_t>(chel_matsel)], sets);
         }
         case Kind::kFour: {
             const std::array<Abcd, 4> sets = {p, p, p, p};
-            return ac4dec_test::printed_matrix(ac4dec_test::kFourChannel, sets);
+            return ac4_decoder_test::printed_matrix(ac4_decoder_test::kFourChannel, sets);
         }
         case Kind::kStereoData:
         case Kind::kTwoChannelData:
@@ -1165,4 +1165,4 @@ std::vector<float> hsf_tone(const HsfCase& c, const HsfStream& stream, std::size
     return out;
 }
 
-}  // namespace ac4dec_test
+}  // namespace ac4_decoder_test

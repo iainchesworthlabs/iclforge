@@ -5,7 +5,7 @@
 // 190-2 V1.3.1 Tables 19, 20 and 8.
 //
 // Tables 178 and 179 are held as printed, entry by entry, in
-// ac4dec_printed_matrices.hpp, a transcription separate from the
+// printed_matrices.hpp, a transcription separate from the
 // implementation's: Table 178 is written there entry by entry too, and Table
 // 179 as the cascade its entries share.
 
@@ -35,21 +35,21 @@ using iclforge::ac4::detail::ElementKind;
 using iclforge::ac4::detail::ElementRoute;
 using iclforge::ac4::detail::Real;
 using iclforge::ac4::detail::SubstreamContext;
-using ac4dec_test::entry;
-using ac4dec_test::kFourChannel;
-using ac4dec_test::kTable178;
-using ac4dec_test::kTable179;
-using ac4dec_test::rows_of;
+using ac4_decoder_test::entry;
+using ac4_decoder_test::kFourChannel;
+using ac4_decoder_test::kTable178;
+using ac4_decoder_test::kTable179;
+using ac4_decoder_test::rows_of;
 
 // Random parameter sets in both forms this file needs: `real`, fed to the
 // production matrix functions (iclforge::ac4::detail::Abcd, Real - possibly float),
 // and `reference`, fed to entry()'s exact double formula
-// (ac4dec_test::Abcd, always double - a table transcription independent of
+// (ac4_decoder_test::Abcd, always double - a table transcription independent of
 // the decoder's own scalar). The two hold the same values, `real`'s narrowed
 // once from `reference`'s.
 struct RandomParams {
     std::vector<iclforge::ac4::detail::Abcd> real;
-    std::vector<ac4dec_test::Abcd> reference;
+    std::vector<ac4_decoder_test::Abcd> reference;
 };
 
 RandomParams random_parameters(std::mt19937& rng, std::size_t count) {
@@ -74,10 +74,10 @@ RandomParams random_parameters(std::mt19937& rng, std::size_t count) {
 // the formula, not the scalar.
 template <std::size_t N>
 void check_printed(const iclforge::ac4::detail::Matrix<N>& m, std::string_view printed,
-                   std::span<const ac4dec_test::Abcd> p) {
+                   std::span<const ac4_decoder_test::Abcd> p) {
     const auto rows = rows_of(printed);
     REQUIRE(rows.size() == N);
-    const double tolerance = 1e4 * ac4dec_units::relative_epsilon();
+    const double tolerance = 1e4 * ac4_units::relative_epsilon();
     for (std::size_t o = 0; o < N; ++o) {
         REQUIRE(rows[o].size() == N);
         for (std::size_t i = 0; i < N; ++i) {

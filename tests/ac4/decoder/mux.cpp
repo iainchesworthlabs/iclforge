@@ -15,7 +15,7 @@
 #include "iclforge/base/bitwriter.hpp"
 #include "encoder/frame/toc_writer.hpp"
 
-namespace ac4dec_test {
+namespace ac4_decoder_test {
 namespace {
 
 using iclforge::ac4::SyntaxRecord;
@@ -475,4 +475,4 @@ std::vector<std::byte> mux_sync_framed(std::span<const std::vector<std::byte>> f
     return out;
 }
 
-}  // namespace ac4dec_test
+}  // namespace ac4_decoder_test

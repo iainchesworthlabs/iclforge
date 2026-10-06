@@ -43,7 +43,7 @@ All skip the first three frames, where the stream's values have not yet reached 
 and stop three frames before the first frame whose values differ from the first frame's: DEE's
 immersive stereo at 24 and 25 fps sends a dialnorm of -24 dBFS in its last frame. DRC's curves and
 dialogue enhancement's gains are held on known input by tests/ac4/decoder/test_drc.cpp and
-test_ac4dec_de.cpp; this script reads the gains from the stream, as those tests cannot.
+test_de.cpp; this script reads the gains from the stream, as those tests cannot.
 
 The committed legs (tests/golden/external-baseline/) are checked by default. --gold DIR checks
 phase G0's local gold set in DIR (DIR/streams/<leg>/dee.ac4, DIR/gold-manifest.json), which never

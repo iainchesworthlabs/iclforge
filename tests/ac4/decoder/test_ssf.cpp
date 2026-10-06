@@ -201,7 +201,7 @@ TEST_CASE("the dB and linear maps of Pseudocodes 29 and 30 track the functions t
 
 namespace {
 
-using ac4dec_test::BitWriter;
+using ac4_decoder_test::BitWriter;
 
 // Part 1 Table 83's frame_rate_index for a frame length at 48 kHz.
 int frame_rate_index_of(int frame_len_base) {

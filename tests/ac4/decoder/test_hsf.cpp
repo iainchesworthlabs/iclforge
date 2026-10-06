@@ -1,4 +1,4 @@
-// The decoder on streams at 96 and 192 kHz (ac4dec_hsf.hpp): ETSI TS 103 190-1 V1.4.1 clause 5.4,
+// The decoder on streams at 96 and 192 kHz (hsf.hpp): ETSI TS 103 190-1 V1.4.1 clause 5.4,
 // the HSF extension substream's lines in transforms twice and four times as long (Tables 99 to
 // 108), their band tables (Annex B, Tables B.2 to B.7) and what clause 6.2.5.2 leaves them
 // of the output stages. No real stream at these rates exists to hold the decoder to; the streams
@@ -28,9 +28,9 @@
 
 namespace {
 
-using ac4dec_test::HsfCase;
-using ac4dec_test::HsfChannel;
-using ac4dec_test::HsfStream;
+using ac4_decoder_test::HsfCase;
+using ac4_decoder_test::HsfChannel;
+using ac4_decoder_test::HsfStream;
 using iclforge::ac4::DecodedFrame;
 using iclforge::ac4::DecodeError;
 using iclforge::ac4::Decoder;
@@ -131,7 +131,7 @@ double waveform_error(const HsfCase& c, const HsfStream& stream, const Decoded& 
         static_cast<long>(352 * stream.multiplier);  // Table 188's d_pcm at frame_rate_index 13
     const std::size_t first = kSkipped * static_cast<std::size_t>(stream.frame_length);
     const std::size_t count = 8192;
-    const std::vector<float> expected = ac4dec_test::hsf_tone(
+    const std::vector<float> expected = ac4_decoder_test::hsf_tone(
         c, stream, channel, stream.origin + static_cast<long>(first) - delay, count);
     double worst = 0.0;
     for (std::size_t i = 0; i < count; ++i) {
@@ -156,7 +156,7 @@ TEST_CASE("a tone above 24 kHz decodes at 96 kHz at its frequency and level", "[
     // 30 006.25 Hz is the centre of line 2 400 of the 4 096-line transform (12.5 Hz a line), past
     // the 2 048 lines the base rate has: only the HSF extension carries it.
     const HsfCase c = mono_case(0, 30006.25);
-    const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+    const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
     CHECK(stream.sample_rate_hz == 96000.0);
     const Decoded d = decode_stream(stream);
     REQUIRE(d.channels.size() == 1);
@@ -177,7 +177,7 @@ TEST_CASE("a tone above 48 kHz decodes at 192 kHz at its frequency and level", "
     // lines of 96 kHz as well.
     const double hz = 65625.0 + 0.5 * 24000.0 / 2048.0;
     const HsfCase c = mono_case(1, hz);
-    const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+    const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
     CHECK(stream.sample_rate_hz == 192000.0);
     const Decoded d = decode_stream(stream);
     for (const std::size_t length : d.lengths) {
@@ -242,7 +242,7 @@ TEST_CASE(
         // above it.
         const HsfCase c =
             stereo_case(sf_multiplier, 9812.5, sf_multiplier == 0 ? 37506.25 : 71881.0);
-        const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+        const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
         CHECK(stream.sample_rate_hz == rate);
         const Decoded d = decode_stream(stream);
         REQUIRE(d.channels.size() == 2);
@@ -262,26 +262,26 @@ TEST_CASE(
         HsfCase c = stereo_case(0, 9812.5, 37506.25);
         c.stereo_proc = true;
         c.sap_mode = sap_mode;
-        const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+        const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
         check_tones(c, stream, decode_stream(stream));
     }
     // Both channels in the extension at once, M/S coding them into two tracks.
     HsfCase c = stereo_case(0, 33006.25, 41506.25);
     c.stereo_proc = true;
     c.sap_mode = 2;
-    const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+    const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
     check_tones(c, stream, decode_stream(stream));
 }
 
 TEST_CASE("noise fill's escape codes in a stream at 96 kHz leave the tone alone", "[ac4][decoder][hsf]") {
     HsfCase c = mono_case(0, 30006.25);
     c.noise_fill = true;
-    const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+    const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
     const Decoded d = decode_stream(stream);
     CHECK(waveform_error(c, stream, d, 0) < 0.02);
     // The same stream without the flag decodes to the same samples.
     c.noise_fill = false;
-    const Decoded plain = decode_stream(ac4dec_test::build_hsf_stream(c, kFrames));
+    const Decoded plain = decode_stream(ac4_decoder_test::build_hsf_stream(c, kFrames));
     CHECK(d.channels[0] == plain.channels[0]);
 }
 
@@ -290,13 +290,13 @@ TEST_CASE("an extension with no band of lines and one with all of them decode", 
     // frame is 96 kHz, with the core's tone alone.
     HsfCase c = mono_case(0, 5000.5);
     c.ext_bands = 0;
-    HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+    HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
     check_tones(c, stream, decode_stream(stream));
     // The most bands max_sfb_ext_hsf can name, 16 (96 kHz at 4 096 lines has 79 bands, 63 the base
     // rate's).
     c = mono_case(0, 30006.25);
     c.ext_bands = 16;
-    stream = ac4dec_test::build_hsf_stream(c, kFrames);
+    stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
     check_tones(c, stream, decode_stream(stream));
 }
 
@@ -316,7 +316,7 @@ TEST_CASE("a stream at 96 kHz at another frame rate converts as Table 83 says", 
         c.frame_rate_index = leg.frame_rate_index;
         // Enough frames for the steady part to be 16 384 samples after the first few.
         const int frames = static_cast<int>(kSkipped) + 16384 / (leg.base * leg.up / leg.down) + 3;
-        const HsfStream stream = ac4dec_test::build_hsf_stream(c, frames);
+        const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, frames);
         CHECK(stream.frame_length == 2 * leg.base);
         const Decoded d = decode_stream(stream);
         for (std::size_t f = 0; f < d.lengths.size(); ++f) {
@@ -353,7 +353,7 @@ TEST_CASE("block switching at 96 and 192 kHz: groups of windows of every transfo
             c.transf_length0 = leg.t0;
             c.transf_length1 = leg.t1;
             c.group_size = leg.group_size;
-            const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+            const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
             const Decoded d = decode_stream(stream);
             const auto samples =
                 steady(d.channels[0], static_cast<std::size_t>(stream.frame_length));
@@ -404,7 +404,7 @@ TEST_CASE("the 3.0 element's channels at 96 and 192 kHz, by coding_config and ch
                 c.coding_config = 1;
                 c.chel_matsel = matsel;
                 c.sap_mode = sap_mode;
-                const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+                const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
                 check_tones(c, stream, decode_stream(stream));
             }
         }
@@ -412,7 +412,7 @@ TEST_CASE("the 3.0 element's channels at 96 and 192 kHz, by coding_config and ch
         c.coding_config = 0;
         c.stereo_proc = true;
         c.sap_mode = 2;
-        const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+        const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
         check_tones(c, stream, decode_stream(stream));
     }
 }
@@ -429,7 +429,7 @@ TEST_CASE("the 5.X element's channels at 96 and 192 kHz, with and without an LFE
                     c.coding_config = 3;
                     c.chel_matsel = matsel;
                     c.sap_mode = sap_mode;
-                    const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+                    const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
                     check_tones(c, stream, decode_stream(stream));
                 }
             }
@@ -440,7 +440,7 @@ TEST_CASE("the 5.X element's channels at 96 and 192 kHz, with and without an LFE
                 c.coding_config = 0;
                 c.stereo_proc = proc;
                 c.sap_mode = 2;
-                const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+                const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
                 check_tones(c, stream, decode_stream(stream));
             }
         }
@@ -458,7 +458,7 @@ TEST_CASE("the 7.X element's additional channels at 96 and 192 kHz", "[ac4][deco
                 c.sap_add_mode = std::max(step, 0);
                 c.stereo_proc = proc;
                 c.sap_mode = 2;
-                const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+                const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
                 check_tones(c, stream, decode_stream(stream));
             }
         }
@@ -483,17 +483,17 @@ std::vector<std::byte> read_file(const std::filesystem::path& path) {
 TEST_CASE("the committed streams at 96 and 192 kHz are the builder's", "[ac4][decoder][hsf]") {
     // tests/golden/ac4-hsf/*.ac4 are these cases' streams byte for byte, and
     // tools/references/ac4_syntax.py's digests of them, tests/golden/ac4/hsf-*.tsv, are what
-    // test_ac4dec_syntax.cpp holds the decoder's trace to. They are not under tests/golden/ac4/
+    // test_syntax.cpp holds the decoder's trace to. They are not under tests/golden/ac4/
     // with the other constructed streams, which the tests and checks that play every committed
     // stream at 48 kHz take in. With AC4_DECODER_WRITE_HSF set to a directory the streams are written
     // there instead of compared, to commit after a change to the builder.
     const std::filesystem::path committed =
         std::filesystem::path{AC4_GOLDEN_DIR} / ".." / "ac4-hsf";
     const char* write_to = std::getenv("AC4_DECODER_WRITE_HSF");
-    for (const HsfCase& c : ac4dec_test::committed_hsf_cases()) {
+    for (const HsfCase& c : ac4_decoder_test::committed_hsf_cases()) {
         CAPTURE(c.name);
-        const HsfStream stream = ac4dec_test::build_hsf_stream(c, ac4dec_test::kHsfCommittedFrames);
-        const std::vector<std::byte> bytes = ac4dec_test::hsf_sync_framed(stream);
+        const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, ac4_decoder_test::kHsfCommittedFrames);
+        const std::vector<std::byte> bytes = ac4_decoder_test::hsf_sync_framed(stream);
         if (write_to != nullptr) {
             std::filesystem::create_directories(write_to);
             std::ofstream out(std::filesystem::path{write_to} / (c.name + ".ac4"),
@@ -511,7 +511,7 @@ TEST_CASE("the output level gain applies at 96 kHz as clause 5.7.9.3.3 gives it"
     // dialnorm_bits 20 is -5 dBFS; to -23 dBFS is 2^((-23 + 5) / 6) = 1/8, by DrcMode::kOff or by
     // the default mode of a stream with no compression to apply.
     const HsfCase c = mono_case(0, 30006.25);
-    const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+    const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
     for (const iclforge::ac4::DrcMode mode :
          {iclforge::ac4::DrcMode::kOff, iclforge::ac4::DrcMode::kDefault}) {
         DecoderConfig config;
@@ -546,7 +546,7 @@ TEST_CASE("the downmix is the matrix of clause 6.2.17 on the samples at 96 kHz",
         CAPTURE(leg.ch_mode, static_cast<int>(leg.target));
         HsfCase c = multichannel_case(leg.ch_mode, 0);
         c.coding_config = 3;
-        const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+        const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
         const Decoded coded = decode_stream(stream);
         DecoderConfig config;
         config.output.downmix = leg.target;
@@ -575,7 +575,7 @@ TEST_CASE("the downmix is the matrix of clause 6.2.17 on the samples at 96 kHz",
 
 TEST_CASE("a lost frame is concealed at 96 kHz as it is at 48", "[ac4][decoder][hsf]") {
     const HsfCase c = mono_case(0, 30006.25);
-    const HsfStream stream = ac4dec_test::build_hsf_stream(c, kFrames);
+    const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, kFrames);
     DecoderConfig config;
     config.concealment = iclforge::ac4::ConcealmentPolicy::kRepeatFade;
     Decoder decoder(config);
@@ -608,7 +608,7 @@ TEST_CASE("a lost frame is concealed at 96 kHz as it is at 48", "[ac4][decoder][
 TEST_CASE("decode_by_block hands a stream at 96 and 192 kHz over at its rate", "[ac4][decoder][hsf]") {
     for (const int sf_multiplier : {0, 1}) {
         const HsfCase c = mono_case(sf_multiplier, sf_multiplier == 0 ? 30006.25 : 65625.0);
-        const HsfStream stream = ac4dec_test::build_hsf_stream(c, 6);
+        const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, 6);
         Decoder decoder;
         std::size_t blocks = 0;
         for (const auto& frame : stream.frames) {
@@ -634,7 +634,7 @@ TEST_CASE("decode_by_block hands a stream at 96 and 192 kHz over at its rate", "
 TEST_CASE("a presentation reports the rate it decodes at", "[ac4][decoder][hsf]") {
     for (const int sf_multiplier : {0, 1}) {
         const HsfCase c = mono_case(sf_multiplier, 30006.25);
-        const HsfStream stream = ac4dec_test::build_hsf_stream(c, 2);
+        const HsfStream stream = ac4_decoder_test::build_hsf_stream(c, 2);
         Decoder decoder;
         const auto report = decoder.parse(stream.frames[0]);
         REQUIRE(report.has_value());

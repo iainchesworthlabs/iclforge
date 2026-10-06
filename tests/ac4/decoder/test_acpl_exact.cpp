@@ -6,10 +6,10 @@
 // over frames that carry the decorrelators', the ducker's and acpl_param_prev's state, with every
 // framing, band count and qmf_band.
 //
-// test_ac4dec_acpl.cpp holds the stage to the answers that can be worked by hand; this file holds
+// test_acpl.cpp holds the stage to the answers that can be worked by hand; this file holds
 // it to what it did before the speed-up, so that a decoder's output moves by no bit. The
 // decorrelators and the interpolation the copy calls are the core's own, which
-// test_ac4core_acpl_exact.cpp holds to their old selves.
+// test_acpl_exact.cpp holds to their old selves.
 
 #include <algorithm>
 #include <array>

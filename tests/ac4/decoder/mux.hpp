@@ -35,7 +35,7 @@
 
 #include "encoder/frame/metadata.hpp"
 
-namespace ac4dec_test {
+namespace ac4_decoder_test {
 
 // A hybrid dialogue enhancement method to write into a group's substream in
 // place of what the source sends: its de_config() and every frame's
@@ -125,4 +125,4 @@ struct MuxSource {
 // The frames sync-framed with a CRC (Part 1 Annex G), as a file holds them.
 [[nodiscard]] std::vector<std::byte> mux_sync_framed(std::span<const std::vector<std::byte>> frames);
 
-}  // namespace ac4dec_test
+}  // namespace ac4_decoder_test

@@ -259,8 +259,8 @@ target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/s
 # only against the static library and are built only when that is what iclforge::ac4
 # names. They test the syntax and the arithmetic, not the linkage: every static leg
 # runs them, and the shared-libs pass (config-linux-llvm-shared) still runs the tests
-# of the public API, test_ac4dec_{decoder,frames,syntax}.cpp and
-# test_ac4enc_encoder.cpp, against the real .so file. Linking the static library here
+# of the public API, test_{decoder,frames,syntax}.cpp and
+# test_encoder.cpp, against the real .so file. Linking the static library here
 # instead would let those bind to a static copy too, and stop testing the .so at all.
 #
 # The library's private headers are spelled from src/ac4/src (core/, decoder/,
@@ -414,10 +414,10 @@ endif()
 # ac3/core/test_simd_kernels.cpp's own AVX2_REQUIRE knob reads std::getenv too -
 # same C4996 reasoning as cpu_features.cpp above - and so do
 # ac4/decoder/test_syntax.cpp, for its trace and census directories,
-# ac4/decoder/test_constructed.cpp, test_ac4dec_hsf.cpp, test_ac4dec_objects.cpp and
-# test_ac4dec_presentations.cpp, for where to write their streams (and
-# test_ac4dec_objects.cpp for Chromium's A-JOC stream, and
-# test_ac4dec_object_render.cpp for where to write the streams to listen to),
+# ac4/decoder/test_constructed.cpp, test_hsf.cpp, test_objects.cpp and
+# test_presentations.cpp, for where to write their streams (and
+# test_objects.cpp for Chromium's A-JOC stream, and
+# test_object_render.cpp for where to write the streams to listen to),
 # ac4/decoder/test_api.cpp, for a directory of further streams to decode,
 # ac4/encoder/test_presentations.cpp, for where to write its streams,
 # ac4/encoder/test_objects.cpp, for where to write its streams and those to

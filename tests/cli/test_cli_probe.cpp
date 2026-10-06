@@ -735,7 +735,7 @@ TEST_CASE("probe reads a real AC-4 stream, in table and JSON form", "[cli][probe
     CHECK(json_field(ac4, "bitstream_version") == "2");
     CHECK(json_field(ac4, "sample_rate_hz") == "48000");
     CHECK(json_field(ac4, "n_presentations") == "1");
-    // The real fixture's one presentation is v1 (test_ac4.cpp's own frame-0
+    // The real fixture's one presentation is v1 (test_toc.cpp's own frame-0
     // check: presentations_v1.size() == 1), so the older presentations_v0
     // array this schema also always carries stays empty rather than absent.
     CHECK(json_array(ac4, "presentations_v0").empty());
@@ -756,7 +756,7 @@ TEST_CASE("probe reads a real AC-4 stream, in table and JSON form", "[cli][probe
 TEST_CASE("probe writes an AC-4 stream's presentations and metadata", "[cli][probe][ac4]") {
     // DEE's 5.1 film leg: one version 1 presentation, and the metadata its
     // presentation substream and I-frames send (tests/ac4/decoder/
-    // test_ac4dec_api.cpp holds the decoder's report of them to the trace).
+    // test_api.cpp holds the decoder's report of them to the trace).
     const auto input = baseline("ac4-51-film-96", "dee.ac4");
     const auto log = scratch_dir() / "ac4_media.json";
     REQUIRE(run_cli("probe \"" + input.string() + "\" json=1", log) == 0);

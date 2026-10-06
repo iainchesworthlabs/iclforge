@@ -484,7 +484,7 @@ template class TransientDucker<Real>;
 // ajoc::Reconstruction<double> (ajoc/ajoc.cpp, itself needed at double for
 // the A-JOC encoder and the core's own tests) holds these at its own Real,
 // double in that instantiation; the core's tests
-// (tests/ac4/core/test_acpl.cpp, test_ac4core_ajoc.cpp) also exercise
+// (tests/ac4/core/test_acpl.cpp, test_ajoc.cpp) also exercise
 // both directly (see this target's CMakeLists.txt, ICLFORGE_AC4_ALSO_AT_DOUBLE).
 ICLFORGE_AC4_ALSO_AT_DOUBLE(template class Decorrelator<double>; template class TransientDucker<double>;)
 

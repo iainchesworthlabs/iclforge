@@ -52,7 +52,7 @@ constexpr Real kSqrt2Real = static_cast<Real>(kSqrt2);
 // (S-CPL, A-CPL and A-JCC's hand-worked sums throughout this file) hold this
 // closely at whatever scalar the decoder runs at - a few ulps of Real, not
 // of double.
-const double kAbsoluteTolerance = 1e4 * ac4dec_units::relative_epsilon();
+const double kAbsoluteTolerance = 1e4 * ac4_units::relative_epsilon();
 constexpr int kSlots = 32;
 constexpr std::size_t kValues = static_cast<std::size_t>(kSlots) * 64;
 
@@ -140,8 +140,8 @@ TEST_CASE("S-CPL makes the channels of Tables 23 and 24", "[ac4][decoder][immers
                                                          DecodingMode::kCore);
     // The tolerance a coupled pair's sum or difference can differ from its
     // exact double value by - a few ulps of Real, the same margin
-    // test_ac4dec_multichannel.cpp's check_printed() gives a matrix entry.
-    const double tolerance = 1e4 * ac4dec_units::relative_epsilon();
+    // test_multichannel.cpp's check_printed() gives a matrix entry.
+    const double tolerance = 1e4 * ac4_units::relative_epsilon();
     // Channel c holds the constant c + 1: A'' to K'' in the channels
     // pcm/routing.hpp gives them.
     const auto signals = [](std::size_t count) {
@@ -202,7 +202,7 @@ TEST_CASE("S-CPL makes the 9.X.4 channels of Table 23's b_5fronts mapping and Ta
     const auto core = iclforge::ac4::detail::speakers_of(iclforge::ac4::detail::ch_mode::k9_1_4,
                                                          DecodingMode::kCore);
     REQUIRE(full.size() == 14);
-    const double tolerance = 1e4 * ac4dec_units::relative_epsilon();
+    const double tolerance = 1e4 * ac4_units::relative_epsilon();
     const auto signals = [](std::size_t count) {
         std::vector<std::vector<Real>> time(count);
         for (std::size_t c = 0; c < count; ++c) {
@@ -746,7 +746,7 @@ TEST_CASE("A-JCC's pre-modification follows ajcc_core_mode (Pseudocode 9)",
     // g at slot ts of each frame: mode 0 from the first frame (1), then to 1
     // (falling), 1 again (0), back to 0 (rising).
     const std::array<int, 4> modes = {0, 1, 1, 0};
-    const double tolerance = 1e4 * ac4dec_units::relative_epsilon();
+    const double tolerance = 1e4 * ac4_units::relative_epsilon();
     for (std::size_t f = 0; f < modes.size(); ++f) {
         CAPTURE(f);
         pre.process(modes[f], kSlots, in1, in2, in3, in4, out1, out2);

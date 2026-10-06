@@ -4,7 +4,7 @@
 // gave, at the decoder's scalar and at double, on parameters of every framing and band count and on
 // signals with zeros of either sign, because a stream's PCM hash moves by one bit of either.
 //
-// test_ac4core_acpl.cpp holds the same code to the formulas it computes; this file holds the
+// test_acpl.cpp holds the same code to the formulas it computes; this file holds the
 // speed-ups to what the code did before them.
 
 #include <algorithm>

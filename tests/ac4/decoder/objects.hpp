@@ -34,7 +34,7 @@
 
 #include "iclforge/ac4/core/syntax.hpp"
 
-namespace ac4dec_test {
+namespace ac4_decoder_test {
 
 struct ObjectCase {
     std::string name{};
@@ -128,4 +128,4 @@ inline constexpr int kCommittedObjectFrames = 8;
 [[nodiscard]] double object_tone_hz(int k);
 inline constexpr double kLfeToneHz = 47.0;
 
-}  // namespace ac4dec_test
+}  // namespace ac4_decoder_test

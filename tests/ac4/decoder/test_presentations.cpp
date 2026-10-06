@@ -10,7 +10,7 @@
 // parser's selection to.
 //
 // Mixing: the streams under tests/golden/ac4/presentations/ are the test
-// multiplexer's (ac4dec_mux.hpp) over DEE's tone legs and the encoder's
+// multiplexer's (mux.hpp) over DEE's tone legs and the encoder's
 // sources beside them, byte for byte, and hold presentations of several
 // substreams: music and effects with dialogue, main with associated audio,
 // both, by content classifier, and main with a dialogue enhancement substream
@@ -58,10 +58,10 @@ namespace {
 namespace fs = std::filesystem;
 using iclforge::test::kSanitized;
 using iclforge::ac4::Speaker;
-using ac4dec_test::MuxGroup;
-using ac4dec_test::MuxLayout;
-using ac4dec_test::MuxPresentation;
-using ac4dec_test::MuxSource;
+using ac4_decoder_test::MuxGroup;
+using ac4_decoder_test::MuxLayout;
+using ac4_decoder_test::MuxPresentation;
+using ac4_decoder_test::MuxSource;
 
 constexpr std::size_t kFrames = 24;
 // The frames before the steady state: the decoder's delay, and the first
@@ -93,7 +93,7 @@ fs::path golden() {
 MuxSource source(const fs::path& path) {
     const std::vector<std::byte> file = read_file(path);
     REQUIRE_FALSE(file.empty());
-    return ac4dec_test::mux_source(file);
+    return ac4_decoder_test::mux_source(file);
 }
 
 MuxSource dee(const char* leg) {
@@ -228,8 +228,8 @@ constexpr int kAlphaCross = 10;
 constexpr int kAlphaMid = 8;
 constexpr int kMixCoef1 = 12;  // Table 172: 0.448
 
-ac4dec_test::MuxDe hybrid(int method, int channel_config, bool mid, std::array<int, 2> parameters, int alpha) {
-    ac4dec_test::MuxDe de;
+ac4_decoder_test::MuxDe hybrid(int method, int channel_config, bool mid, std::array<int, 2> parameters, int alpha) {
+    ac4_decoder_test::MuxDe de;
     de.config.method = method;
     de.config.max_gain = 3;  // 12 dB
     de.config.channel_config = channel_config;
@@ -282,12 +282,12 @@ constexpr int kDialnormStereoMain = 96;
 
 struct BuiltV0 {
     std::vector<MuxSource> sources;
-    ac4dec_test::MuxLayoutV0 layout;
+    ac4_decoder_test::MuxLayoutV0 layout;
 };
 
-ac4dec_test::MuxSubstreamV0 substream_v0(std::size_t from, int dialnorm_bits, std::optional<int> classifier = std::nullopt,
+ac4_decoder_test::MuxSubstreamV0 substream_v0(std::size_t from, int dialnorm_bits, std::optional<int> classifier = std::nullopt,
                                          std::string language = {}) {
-    ac4dec_test::MuxSubstreamV0 s;
+    ac4_decoder_test::MuxSubstreamV0 s;
     s.source = from;
     s.dialnorm_bits = dialnorm_bits;
     s.content_classifier = classifier;
@@ -295,8 +295,8 @@ ac4dec_test::MuxSubstreamV0 substream_v0(std::size_t from, int dialnorm_bits, st
     return s;
 }
 
-ac4dec_test::MuxPresentationV0 presentation_v0(std::optional<int> config, std::vector<int> substreams, int id) {
-    ac4dec_test::MuxPresentationV0 p;
+ac4_decoder_test::MuxPresentationV0 presentation_v0(std::optional<int> config, std::vector<int> substreams, int id) {
+    ac4_decoder_test::MuxPresentationV0 p;
     p.presentation_config = config;
     p.substreams = std::move(substreams);
     p.presentation_id = id;
@@ -307,15 +307,15 @@ BuiltV0 stream_v0() {
     BuiltV0 b;
     b.sources = {dee("ac4-51-tones-384"), dee("ac4-20-tones-192"), encoded("dialogue-en-mono"), encoded("ad-mono"),
                  encoded("dialogue-fr-stereo")};
-    ac4dec_test::MuxSubstreamV0 english = substream_v0(2, kDialnormEn, 0b100, "en");
+    ac4_decoder_test::MuxSubstreamV0 english = substream_v0(2, kDialnormEn, 0b100, "en");
     english.dialogue =
         iclforge::ac4::detail::DialogueMixCodes{1, std::array{kPan330, 0}, 0};  // 6 dB, 330
-    ac4dec_test::MuxSubstreamV0 ad = substream_v0(3, kDialnormAd, 0b010, "qad");
+    ac4_decoder_test::MuxSubstreamV0 ad = substream_v0(3, kDialnormAd, 0b010, "qad");
     ad.associated = iclforge::ac4::detail::AssociatedMixCodes{.scale_main = 20,         // -6 dB
                                                     .scale_main_centre = 10,  // -3 dB
                                                     .scale_main_front = 5,    // -1.5 dB
                                                     .pan_associated = kPan30};
-    ac4dec_test::MuxSubstreamV0 french = substream_v0(4, kDialnormMe, 0b100, "fr");
+    ac4_decoder_test::MuxSubstreamV0 french = substream_v0(4, kDialnormMe, 0b100, "fr");
     french.dialogue =
         iclforge::ac4::detail::DialogueMixCodes{0, std::array{kPan0, kPan30}, 0};  // 3 dB
     b.layout.substreams = {substream_v0(0, kDialnormMe), english, ad, substream_v0(1, kDialnormStereoMain), french};
@@ -335,13 +335,13 @@ BuiltV0 stream_v0() {
 }
 
 std::vector<std::byte> build(const Built& b) {
-    const std::vector<std::vector<std::byte>> frames = ac4dec_test::multiplex(b.sources, b.layout, kFrames);
-    return ac4dec_test::mux_sync_framed(frames);
+    const std::vector<std::vector<std::byte>> frames = ac4_decoder_test::multiplex(b.sources, b.layout, kFrames);
+    return ac4_decoder_test::mux_sync_framed(frames);
 }
 
 std::vector<std::byte> build(const BuiltV0& b) {
-    const std::vector<std::vector<std::byte>> frames = ac4dec_test::multiplex_v0(b.sources, b.layout, kFrames);
-    return ac4dec_test::mux_sync_framed(frames);
+    const std::vector<std::vector<std::byte>> frames = ac4_decoder_test::multiplex_v0(b.sources, b.layout, kFrames);
+    return ac4_decoder_test::mux_sync_framed(frames);
 }
 
 const std::vector<std::byte>& committed(std::string_view name) {

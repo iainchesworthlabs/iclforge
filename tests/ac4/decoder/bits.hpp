@@ -15,7 +15,7 @@
 
 #include "iclforge/ac4/decoder/decoder.hpp"
 
-namespace ac4dec_test {
+namespace ac4_decoder_test {
 
 class BitWriter {
    public:
@@ -118,4 +118,4 @@ struct Recorder {
     }
 };
 
-}  // namespace ac4dec_test
+}  // namespace ac4_decoder_test

@@ -1392,7 +1392,7 @@ beside the eleven made with DEE's default loudness correction; changed streams t
 read each one to the end of every substream (5.1.4's audio refused, as now), and MediaInfo's trace
 is saved beside each.
 
-**Verified by:** the generator's own checks; the census comparison in `test_ac4dec_syntax.cpp` over
+**Verified by:** the generator's own checks; the census comparison in `test_syntax.cpp` over
 the set.
 
 **G1, the golden masters (merged as #1051 on 2026-09-25; exit met under G0's criterion).** On
@@ -1827,7 +1827,7 @@ and core decoding.
 
 **Status:** merged as #1060 on 2026-09-26. Exit met, with two exceptions. The DEE criterion did not
 apply (G0 and G1 found no master DEE's A-JOC encoder accepts), and the listening, that the objects
-move as their metadata says, is the user's to do; the numbers hold in `test_ac4dec_object_render.cpp`.
+move as their metadata says, is the user's to do; the numbers hold in `test_object_render.cpp`.
 
 - `audio_data_ajoc`, `var_channel_element`, A-JOC in full decoding, object audio metadata (common,
   timing and dynamic data), dialogue enhancement for A-JOC (Part 2 5.8.2.3), and the ISF renderer.
@@ -2453,9 +2453,9 @@ the same tree with the parts added, one image each, flashed with its own bootloa
 **Built in D14e.** `src/ac4/src/core`'s `dsp/fft_kernels.hpp`, `Imdct::inverse_overlap()`, `CubicBasis`, `acpl::Interpolator` and the decorrelator's narrowed tables; in `src/ac4/src/decoder`
 `SubstreamPcm`'s lazy pass-through (`materialize_out()` and `shift_history()`), `ungroup_in_place()`, `scale_factor_gains()` and the cheaper `parse_sf_data()` store
 and `ElementParser::begin()`; the compiler options of both libraries' `CMakeLists.txt`; `sdkconfig.p4`'s QIO line; the page's tables and its Flash mode and What D14e
-changed sections. Four test files hold the changes to the old code, to the bit: `test_ac4core_dsp_exact.cpp` (the passes, the transform and the synthesis against
-verbatim copies, at the decoder's scalar and at `double`, on dense data and on spectra with runs of zeros of either sign), `test_ac4core_acpl_exact.cpp`,
-`test_ac4dec_acpl_exact.cpp` (the stage against a copy of the old one, over several frames that carry state) and `test_ac4dec_reconstruct_exact.cpp`.
+changed sections. Four test files hold the changes to the old code, to the bit: `test_dsp_exact.cpp` (the passes, the transform and the synthesis against
+verbatim copies, at the decoder's scalar and at `double`, on dense data and on spectra with runs of zeros of either sign), `test_acpl_exact.cpp`,
+`test_acpl_exact.cpp` (the stage against a copy of the old one, over several frames that carry state) and `test_reconstruct_exact.cpp`.
 
 **Exit, as measured.** On the board with the network up and the default allocation policy, the decoder's microseconds a frame and times a frame's duration, D14a6's and then D14e's
 (`ICLFORGE_EXAMPLE_AC4_PCM_HASH` on, a null sink): 5.1 SIMPLE 49,913 (1.17) and 27,400 (0.64), A-SPX 64,836 (1.52) and 35,589 (0.83), A-SPX with A-CPL mode 2 82,568 (1.94) and 38,823

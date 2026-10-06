@@ -4,8 +4,8 @@
 // printed: each entry the product of the parameters it names, "a0a1a3" for
 // a0 * a1 * a3, and "0". A transcription of their own, separate from the
 // decoder's (src/ac4/src/decoder/pcm/multichannel.cpp), which
-// test_ac4dec_multichannel.cpp holds to these, and which the constructed
-// streams of ac4dec_constructed.cpp invert to code their tracks.
+// test_multichannel.cpp holds to these, and which the constructed
+// streams of constructed.cpp invert to code their tracks.
 
 #include <array>
 #include <cstddef>
@@ -14,7 +14,7 @@
 #include <string_view>
 #include <vector>
 
-namespace ac4dec_test {
+namespace ac4_decoder_test {
 
 using Abcd = std::array<double, 4>;
 
@@ -117,4 +117,4 @@ inline std::vector<std::vector<double>> printed_matrix(std::string_view printed,
     return m;
 }
 
-}  // namespace ac4dec_test
+}  // namespace ac4_decoder_test

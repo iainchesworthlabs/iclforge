@@ -290,7 +290,7 @@ depends on the same reading.
   element either; `audio_data_objs()` codes the LFE outside the element, so the element's count excludes
   it.
 - **Evidence:** Text. The inspector (`src/ac4`) and `ac4_parse.py` had followed the syntax's count;
-  `tests/ac4/core/test_toc.cpp` and `test_ac4_toc_syntax.cpp` hold the table's.
+  `tests/ac4/core/test_toc.cpp` and `test_toc_syntax.cpp` hold the table's.
 
 #### bits_used from trim()/bed_render_info()/headphone() is measured, not returned
 

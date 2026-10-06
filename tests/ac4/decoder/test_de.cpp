@@ -43,7 +43,7 @@ constexpr std::array<int, 9> kBandStart = {0, 1, 2, 4, 7, 11, 17, 27, 41};
 // holds this closely to the matrix Pseudocode 111 and this file's own hand
 // worked sums print; double-only comparisons (de_parameter, de_rendering,
 // both fixed at double regardless of the decoder's scalar) keep 1e-12.
-const double kTolerance = 1e4 * ac4dec_units::relative_epsilon();
+const double kTolerance = 1e4 * ac4_units::relative_epsilon();
 
 int band_of(int subband) {
     for (int band = 0; band < 8; ++band) {
@@ -282,7 +282,7 @@ TEST_CASE("cross-channel dialogue enhancement adds g r p^T m to the processed ch
                 expected += g * static_cast<iclforge::ac4::detail::Real>(values.r[i]) * dialogue;
             }
             CHECK(std::abs(static_cast<double>(abs(channels.data[i][at] - expected))) <
-                  1e4 * ac4dec_units::relative_epsilon());
+                  1e4 * ac4_units::relative_epsilon());
         }
         // The LFE and the surrounds take no part.
         CHECK(channels.data[3][at] == m[3][at]);

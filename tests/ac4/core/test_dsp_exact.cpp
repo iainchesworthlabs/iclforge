@@ -5,7 +5,7 @@
 // and on spectra with runs of zeros of either sign. A sign of zero is a bit, and a stream whose
 // output is silent for a while shows it in its PCM hash.
 //
-// test_ac4core_dsp.cpp holds the same code to the formulas it computes; this file holds the
+// test_dsp.cpp holds the same code to the formulas it computes; this file holds the
 // speed-ups to what the code did before them, so that a decoder's output moves by no bit.
 
 #include <algorithm>

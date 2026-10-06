@@ -46,7 +46,7 @@ constexpr std::size_t kValues = static_cast<std::size_t>(kSlots) * 64;
 // tones (matrix() below); this holds by hand-worked pseudocode at whatever
 // scalar the decoder runs at - a few ulps of Real, not of double.
 const Real kTolerance =
-    static_cast<Real>(1e4 * ac4dec_units::relative_epsilon());
+    static_cast<Real>(1e4 * ac4_units::relative_epsilon());
 
 // One parameter set of `bands` bands: along frequency, the first band's F0
 // index and DF indices at cb_off (no change) after it; along time, DT

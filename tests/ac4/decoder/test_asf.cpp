@@ -40,8 +40,8 @@ using iclforge::ac4::detail::ParseResult;
 using iclforge::ac4::detail::SfData;
 using iclforge::ac4::detail::SfInfo;
 using iclforge::ac4::detail::SubstreamContext;
-using ac4dec_test::BitWriter;
-using ac4dec_test::Recorder;
+using ac4_decoder_test::BitWriter;
+using ac4_decoder_test::Recorder;
 namespace tables = iclforge::ac4::detail::tables;
 
 SubstreamContext context(int frame_len_base) {

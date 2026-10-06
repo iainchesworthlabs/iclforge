@@ -2,7 +2,7 @@
 // and 23) in reconstruct_track(), held to the clause's own steps on a hand-built SfData. No stream
 // available here sets b_snf_data_exists (src/ac4/ERRATA.md, "x = x++ in Pseudocode 57"), so
 // the committed streams never reach this code; the generator under it is held by
-// test_ac4dec_pcm.cpp, and these hold what draws from it: the level each filled band takes, which
+// test_pcm.cpp, and these hold what draws from it: the level each filled band takes, which
 // bands are filled, and the order and count of the draws.
 
 #include <algorithm>

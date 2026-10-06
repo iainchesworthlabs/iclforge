@@ -46,7 +46,7 @@ double db(double decibels) {
 // A gain in dB (db() above) is rarely an exact binary value, so a QmfValue
 // scaled by one holds it within a tolerance scaled to Real's own epsilon,
 // not to double's exactness.
-const double kTolerance = 1e4 * ac4dec_units::relative_epsilon();
+const double kTolerance = 1e4 * ac4_units::relative_epsilon();
 
 constexpr std::array<S, 6> kFiveOne = {S::kLeft, S::kRight,        S::kCentre,
                                        S::kLfe,  S::kLeftSurround, S::kRightSurround};

@@ -26,7 +26,7 @@ namespace {
 
 using iclforge::ac4::detail::Channel;
 using iclforge::ac4::detail::StereoChoice;
-using ac4dec_test::Abcd;
+using ac4_decoder_test::Abcd;
 
 // A small linear congruential generator: the same draws everywhere.
 struct Lcg {
@@ -118,7 +118,7 @@ void check_printed(std::string_view printed, std::span<const StereoChoice> sets,
             for (const StereoChoice& set : sets) {
                 p.push_back(parameters(set, g, b));
             }
-            const auto m = ac4dec_test::printed_matrix(printed, p);
+            const auto m = ac4_decoder_test::printed_matrix(printed, p);
             for (std::size_t k = first.offset[g][b]; k < first.offset[g][b + 1]; ++k) {
                 for (std::size_t o = 0; o < outputs.size(); ++o) {
                     double sum = 0.0;
@@ -169,7 +169,7 @@ TEST_CASE("every chel_matsel's cascade undone comes back through Table 178 as pr
                 REQUIRE(choice.sets.size() == 2);
                 CHECK(choice.chel_matsel == matsel);
                 CHECK(std::isfinite(choice.bits));
-                check_printed(ac4dec_test::kTable178[static_cast<std::size_t>(matsel)], choice.sets, outputs,
+                check_printed(ac4_decoder_test::kTable178[static_cast<std::size_t>(matsel)], choice.sets, outputs,
                               {&unit[0], &unit[1], &unit[2]});
             }
         }
@@ -196,7 +196,7 @@ TEST_CASE("four_channel_data()'s steps undone come back through clause 5.3.3.4's
                 const iclforge::ac4::detail::UnitChoice choice = iclforge::ac4::detail::undo_four(
                     {&unit[0], &unit[1], &unit[2], &unit[3]}, forced);
                 REQUIRE(choice.sets.size() == 4);
-                check_printed(ac4dec_test::kFourChannel, choice.sets, outputs, {&unit[0], &unit[1], &unit[2], &unit[3]});
+                check_printed(ac4_decoder_test::kFourChannel, choice.sets, outputs, {&unit[0], &unit[1], &unit[2], &unit[3]});
             }
         }
     }
@@ -224,7 +224,7 @@ TEST_CASE("every chel_matsel's five channel matrix undone comes back through Tab
                     iclforge::ac4::detail::undo_five(matsel, {&unit[0], &unit[1], &unit[2], &unit[3], &unit[4]}, forced);
                 REQUIRE(choice.sets.size() == 5);
                 CHECK(choice.chel_matsel == matsel);
-                check_printed(ac4dec_test::kTable179[static_cast<std::size_t>(matsel)], choice.sets, outputs,
+                check_printed(ac4_decoder_test::kTable179[static_cast<std::size_t>(matsel)], choice.sets, outputs,
                               {&unit[0], &unit[1], &unit[2], &unit[3], &unit[4]});
             }
         }

@@ -1,5 +1,5 @@
 // The decoder on streams of the channel elements DEE's streams do not reach
-// (ac4dec_constructed.hpp): the 3.0 element, the 5.X element's
+// (constructed.hpp): the 3.0 element, the 5.X element's
 // coding_configs, 2ch_modes and matrices, and the 7.X element in its three
 // channel modes, in the SIMPLE and ASPX codec modes; and the channel pair,
 // 5.X and 7.X elements in the A-CPL modes. Each stream reads with the
@@ -11,7 +11,7 @@
 // The streams under tests/golden/ac4/constructed/ are the committed cases,
 // byte for byte, and tests/golden/ac4/ holds
 // tools/references/ac4_syntax.py's digests of them, which
-// test_ac4dec_syntax.cpp holds the decoder to. With AC4_DECODER_WRITE_CONSTRUCTED
+// test_syntax.cpp holds the decoder to. With AC4_DECODER_WRITE_CONSTRUCTED
 // set to a directory, this writes the committed cases there instead of
 // comparing them, to commit after a change to the builder.
 
@@ -42,8 +42,8 @@ namespace {
 namespace fs = std::filesystem;
 using iclforge::test::kSanitized;
 using iclforge::ac4::Speaker;
-using ac4dec_test::BuiltStream;
-using ac4dec_test::ElementCase;
+using ac4_decoder_test::BuiltStream;
+using ac4_decoder_test::ElementCase;
 
 // Under the sanitizers ten frames, six of them steady: over those,
 // tone_amplitude()'s window still holds a tone 126 Hz away 90 dB down.
@@ -332,7 +332,7 @@ void check_case(const ElementCase& c) {
                     << ", add_ch_base " << c.add_ch_base << ", immersive mode " << c.immersive
                     << ", a' alpha_q " << c.prediction_alpha_q << ", A-JCC core mode "
                     << c.ajcc_core_mode << " route " << c.ajcc_route);
-    const BuiltStream stream = ac4dec_test::build_stream(c, kFrames);
+    const BuiltStream stream = ac4_decoder_test::build_stream(c, kFrames);
     check_routing(stream, decode_checked(stream));
     if (c.immersive >= 0 && c.ch_mode >= 13 && c.ch_mode <= 14) {
         check_core_routing_fronts(c, stream,
@@ -631,7 +631,7 @@ TEST_CASE("A-SPX fills the immersive element's channels by Part 2 Table 8, full 
     // and A-JCC and from the second in ASPX_ACPL_2.
     for (const int ch_mode : {12, 14}) {
         for (const int mode : {1, 3, 4}) {
-            const auto elements = ac4dec_test::aspx_elements(ch_mode, mode);
+            const auto elements = ac4_decoder_test::aspx_elements(ch_mode, mode);
             for (std::size_t loud = 0; loud < elements.size(); ++loud) {
                 if (kSanitized && (loud + (mode == 3 ? 1U : 0U)) % 2 != 0) {
                     continue;
@@ -642,7 +642,7 @@ TEST_CASE("A-SPX fills the immersive element's channels by Part 2 Table 8, full 
                 c.immersive = mode;
                 c.sap_mode = 2;
                 c.loud_unit = static_cast<int>(loud);
-                const BuiltStream stream = ac4dec_test::build_stream(c, kFrames);
+                const BuiltStream stream = ac4_decoder_test::build_stream(c, kFrames);
                 for (const iclforge::ac4::DecodingMode decoding :
                      {iclforge::ac4::DecodingMode::kFull, iclforge::ac4::DecodingMode::kCore}) {
                     const bool core = decoding == iclforge::ac4::DecodingMode::kCore;
@@ -817,10 +817,10 @@ TEST_CASE("dialogue enhancement raises 9.X.4's Lscr, Rscr and C, not L and R (Pa
             c.sap_mode = 2;
             c.de_channel_config = config;
             c.de_par = 10;
-            const BuiltStream stream = ac4dec_test::build_stream(c, kFrames);
+            const BuiltStream stream = ac4_decoder_test::build_stream(c, kFrames);
             ElementCase off = c;
             off.de_channel_config = 0;
-            const BuiltStream plain_stream = ac4dec_test::build_stream(off, kFrames);
+            const BuiltStream plain_stream = ac4_decoder_test::build_stream(off, kFrames);
             const Decoded plain = decode_checked(plain_stream);
             const Decoded enhanced =
                 decode_checked(stream, iclforge::ac4::DecodingMode::kFull, kDeGain);
@@ -871,10 +871,10 @@ TEST_CASE(
         c.ajcc_route = mode.route;
         c.de_channel_config = 7;
         c.de_par = 10;
-        const BuiltStream stream = ac4dec_test::build_stream(c, kFrames);
+        const BuiltStream stream = ac4_decoder_test::build_stream(c, kFrames);
         ElementCase off = c;
         off.de_channel_config = 0;
-        const BuiltStream plain_stream = ac4dec_test::build_stream(off, kFrames);
+        const BuiltStream plain_stream = ac4_decoder_test::build_stream(off, kFrames);
         const Decoded plain = decode_checked(plain_stream, iclforge::ac4::DecodingMode::kCore);
         const Decoded enhanced =
             decode_checked(stream, iclforge::ac4::DecodingMode::kCore, kDeGain);
@@ -890,7 +890,7 @@ TEST_CASE(
         // alone while the full decoding is enhanced as before.
         ElementCase simulcast = c;
         simulcast.de_core_par = 0;
-        const BuiltStream simulcast_stream = ac4dec_test::build_stream(simulcast, kFrames);
+        const BuiltStream simulcast_stream = ac4_decoder_test::build_stream(simulcast, kFrames);
         const Decoded core_zero =
             decode_checked(simulcast_stream, iclforge::ac4::DecodingMode::kCore, kDeGain);
         check_de_levels(c, stream, plain, core_zero, [](Speaker, Speaker) { return 0.0; });
@@ -921,7 +921,7 @@ TEST_CASE("Table 21 puts each 22.2 tone on its channel, in Table A.27's order",
     }
     // The output is 24 channels in Table A.27's order: L R C Ls Rs Lb Rb Tfl
     // Tfr Tbl Tbr LFE Tsl Tsr Tfc Tbc Tc LFE2 Bfl Bfr Bfc Cb Lw Rw.
-    const BuiltStream stream = ac4dec_test::build_stream({.ch_mode = 15, .sap_mode = 2}, 6);
+    const BuiltStream stream = ac4_decoder_test::build_stream({.ch_mode = 15, .sap_mode = 2}, 6);
     REQUIRE(stream.speakers.size() == 24);
     const Decoded decoded = decode_checked(stream);
     std::string names;
@@ -937,7 +937,7 @@ TEST_CASE("A-SPX fills the 22.2 element's channels by the pair of Part 2 Table 8
     // Crossover at QMF subband 28 (10.5 kHz): the tones are below it, and only
     // the loud aspx_data_2ch()'s two channels have anything from 12 to 18 kHz;
     // the LFEs, which have no aspx_data, and every other pair have nothing.
-    const auto elements = ac4dec_test::aspx_elements(15);
+    const auto elements = ac4_decoder_test::aspx_elements(15);
     REQUIRE(elements.size() == 11);
     Stride stride(2, 0);
     for (std::size_t loud = 0; loud < elements.size(); ++loud) {
@@ -945,7 +945,7 @@ TEST_CASE("A-SPX fills the 22.2 element's channels by the pair of Part 2 Table 8
             continue;
         }
         CAPTURE(loud);
-        const BuiltStream stream = ac4dec_test::build_stream(
+        const BuiltStream stream = ac4_decoder_test::build_stream(
             {.ch_mode = 15, .aspx = true, .sap_mode = 2, .loud_unit = static_cast<int>(loud)},
             kFrames);
         const Decoded decoded = decode_checked(stream);
@@ -972,7 +972,7 @@ TEST_CASE("a 22.2 stream decodes as coded, 24 channels, and nothing else",
     // every target but as coded is refused, by name, and so is core decoding.
     for (const bool aspx : {false, true}) {
         const BuiltStream stream =
-            ac4dec_test::build_stream({.ch_mode = 15, .aspx = aspx, .sap_mode = 2}, 3);
+            ac4_decoder_test::build_stream({.ch_mode = 15, .aspx = aspx, .sap_mode = 2}, 3);
         CAPTURE(aspx);
         {
             iclforge::ac4::Decoder decoder;
@@ -1022,7 +1022,7 @@ TEST_CASE("A-CPL's decorrelated part cancels in the sum of its two outputs", "[a
     // decorrelator output of 2 x0. A steady tone passes the all-pass filters
     // and the ducker whole, so (L + R) / 2 is the coded tone and (L - R) / 2
     // the tone 1.4 times over, phase-shifted.
-    const BuiltStream stream = ac4dec_test::build_stream({.ch_mode = 1, .acpl = 3, .acpl_beta_q = 4}, kFrames);
+    const BuiltStream stream = ac4_decoder_test::build_stream({.ch_mode = 1, .acpl = 3, .acpl_beta_q = 4}, kFrames);
     const Decoded decoded = decode_checked(stream);
     const std::span<const float> l = steady(decoded, 0);
     const std::span<const float> r = steady(decoded, 1);
@@ -1044,14 +1044,14 @@ TEST_CASE("A-SPX fills the channels of the aspx_data element Table 213 gives the
     // turns.
     std::size_t turn = 0;
     for (const int ch_mode : {2, 4, 5, 7, 9}) {
-        const auto elements = ac4dec_test::aspx_elements(ch_mode);
+        const auto elements = ac4_decoder_test::aspx_elements(ch_mode);
         const std::size_t first = turn++ % 2;
         for (std::size_t loud = 0; loud < elements.size(); ++loud) {
             if (kSanitized && (loud + first) % 2 != 0) {
                 continue;
             }
             CAPTURE(ch_mode, loud);
-            const BuiltStream stream = ac4dec_test::build_stream(
+            const BuiltStream stream = ac4_decoder_test::build_stream(
                 {.ch_mode = ch_mode, .aspx = true, .coding_config = 0, .sap_mode = 2,
                  .loud_unit = static_cast<int>(loud)},
                 kFrames);
@@ -1088,11 +1088,11 @@ TEST_CASE("companding changes only the channel companding_control() names", "[ac
     };
     for (const Mode& mode : modes) {
         const BuiltStream plain_stream =
-            ac4dec_test::build_stream({.ch_mode = mode.ch_mode, .aspx = true, .coding_config = 0}, kFrames);
+            ac4_decoder_test::build_stream({.ch_mode = mode.ch_mode, .aspx = true, .coding_config = 0}, kFrames);
         const Decoded plain = decode_checked(plain_stream);
         for (std::size_t k = 0; k < mode.order.size(); ++k) {
             CAPTURE(mode.ch_mode, k);
-            const BuiltStream stream = ac4dec_test::build_stream(
+            const BuiltStream stream = ac4_decoder_test::build_stream(
                 {.ch_mode = mode.ch_mode, .aspx = true, .coding_config = 0, .companded = static_cast<int>(k)},
                 kFrames);
             const Decoded decoded = decode_checked(stream);
@@ -1114,11 +1114,11 @@ TEST_CASE("companding changes only the channel companding_control() names", "[ac
 TEST_CASE("the committed constructed streams are the builder's", "[ac4][decoder][constructed]") {
     const fs::path committed = fs::path{AC4_GOLDEN_DIR} / "constructed";
     const char* write_to = std::getenv("AC4_DECODER_WRITE_CONSTRUCTED");
-    for (const ElementCase& c : ac4dec_test::committed_cases()) {
+    for (const ElementCase& c : ac4_decoder_test::committed_cases()) {
         CAPTURE(c.name);
-        const BuiltStream stream = ac4dec_test::build_stream(c, ac4dec_test::kCommittedFrames);
+        const BuiltStream stream = ac4_decoder_test::build_stream(c, ac4_decoder_test::kCommittedFrames);
         (void)decode_checked(stream);
-        const std::vector<std::byte> bytes = ac4dec_test::sync_framed(stream);
+        const std::vector<std::byte> bytes = ac4_decoder_test::sync_framed(stream);
         if (write_to != nullptr) {
             fs::create_directories(write_to);
             std::ofstream out(fs::path{write_to} / (c.name + ".ac4"), std::ios::binary);

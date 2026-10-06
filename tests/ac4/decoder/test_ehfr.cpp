@@ -1,7 +1,7 @@
 // The efficient high frame rate mode (ETSI TS 103 190-2 V1.3.1 clause 5.1.3), decoded.
 //
 // No stream here uses the mode, so the streams under test are DEE's immersive stereo streams at
-// 24, 25 and 29.97 fps cut into fragments by the test multiplexer (ac4dec_mux.hpp): each frame
+// 24, 25 and 29.97 fps cut into fragments by the test multiplexer (mux.hpp): each frame
 // becomes 2 or 4 transmission frames at the stream frame rate Part 2 Table 18 pairs with its own,
 // the audio substream in pieces and the presentation substream whole in the first. The unit the
 // decoder assembles is the frame the source had, so its PCM must equal the source stream's
@@ -30,7 +30,7 @@
 namespace {
 
 namespace fs = std::filesystem;
-using ac4dec_test::MuxSource;
+using ac4_decoder_test::MuxSource;
 using iclforge::ac4::DecodedFrame;
 
 constexpr std::size_t kUnits = 12;
@@ -45,7 +45,7 @@ MuxSource dee(const char* leg) {
     for (std::size_t i = 0; i < raw.size(); ++i) {
         bytes[i] = static_cast<std::byte>(raw[i]);
     }
-    return ac4dec_test::mux_source(bytes);
+    return ac4_decoder_test::mux_source(bytes);
 }
 
 // One presentation of one channel-coded substream, as the source has them, in `frames` frames

@@ -1,6 +1,6 @@
 // The race of the encoder's presentations against DEE's substreams
 // (planning/ac4.md, phase E6). DEE writes one presentation of one substream,
-// so its side of the race is phase D7's test multiplexer (ac4dec_mux.hpp) over
+// so its side of the race is phase D7's test multiplexer (mux.hpp) over
 // the gold set's legs of the same sources: music and effects, dialogue and
 // associated audio, each a DEE encode at its own rate, made into presentations
 // of music and effects with dialogue (presentation_config 0), with associated
@@ -102,34 +102,34 @@ TEST_CASE("the encoder's presentations and DEE's substreams, made for the race",
     for (const Race& race : kRaces) {
         CAPTURE(race.name);
         // DEE's side: each leg's audio substream, multiplexed.
-        std::vector<ac4dec_test::MuxSource> sources;
+        std::vector<ac4_decoder_test::MuxSource> sources;
         std::size_t frames = SIZE_MAX;
         for (const char* leg : {race.music_leg, race.dialogue_leg, race.associated_leg}) {
             const std::vector<std::byte> file = read_file(gold / "streams" / leg / "dee.ac4");
             REQUIRE_FALSE(file.empty());
-            sources.push_back(ac4dec_test::mux_source(file));
+            sources.push_back(ac4_decoder_test::mux_source(file));
             frames = std::min(frames, sources.back().frames.size());
         }
-        ac4dec_test::MuxLayout layout;
-        layout.groups.push_back(ac4dec_test::MuxGroup{.source = 0,
+        ac4_decoder_test::MuxLayout layout;
+        layout.groups.push_back(ac4_decoder_test::MuxGroup{.source = 0,
                                                       .content_classifier = 1,
                                                       .language = {},
                                                       .dialogue = std::nullopt,
                                                       .de = std::nullopt});
         layout.groups.push_back(
-            ac4dec_test::MuxGroup{.source = 1,
+            ac4_decoder_test::MuxGroup{.source = 1,
                                   .content_classifier = 4,
                                   .language = "en",
                                   .dialogue = iclforge::ac4::detail::DialogueMixCodes{},
                                   .de = std::nullopt});
-        layout.groups.push_back(ac4dec_test::MuxGroup{.source = 2,
+        layout.groups.push_back(ac4_decoder_test::MuxGroup{.source = 2,
                                                       .content_classifier = 2,
                                                       .language = "qad",
                                                       .dialogue = std::nullopt,
                                                       .de = std::nullopt});
         const auto mux_presentation = [](std::optional<int> config, std::vector<int> groups, int id,
                                          int md_compat) {
-            ac4dec_test::MuxPresentation p;
+            ac4_decoder_test::MuxPresentation p;
             p.presentation_config = config;
             p.groups = std::move(groups);
             p.presentation_id = id;
@@ -142,7 +142,7 @@ TEST_CASE("the encoder's presentations and DEE's substreams, made for the race",
                                 mux_presentation(std::nullopt, {0}, 10, 0),
                                 mux_presentation(std::nullopt, {1}, 11, 0),
                                 mux_presentation(std::nullopt, {2}, 12, 0)};
-        const std::vector<std::vector<std::byte>> dee = ac4dec_test::multiplex(sources, layout, frames);
+        const std::vector<std::vector<std::byte>> dee = ac4_decoder_test::multiplex(sources, layout, frames);
         write_file(out / (std::string{race.name} + ".dee.ac4"), sync_framed(dee));
 
         // The encoder's side: the same sources and presentations, each

@@ -1,4 +1,4 @@
-// The decoder on the object audio streams of ac4dec_objects.hpp: A-JOC
+// The decoder on the object audio streams of objects.hpp: A-JOC
 // substreams over a var_channel_element() or a static 5.X downmix, and
 // direct-coded dynamic objects, a bed and an intermediate spatial format, with
 // their object audio metadata. Each stream reads with the writer's trace,
@@ -6,7 +6,7 @@
 //
 // The streams under tests/golden/ac4/objects/ are the committed cases, byte
 // for byte, and tests/golden/ac4/ holds tools/references/ac4_syntax.py's
-// digests of them, which test_ac4dec_syntax.cpp holds the decoder to. With
+// digests of them, which test_syntax.cpp holds the decoder to. With
 // AC4_DECODER_WRITE_OBJECTS set to a directory, this writes the committed cases
 // there instead of comparing them, to commit after a change to the builder.
 
@@ -37,8 +37,8 @@
 namespace {
 
 namespace fs = std::filesystem;
-using ac4dec_test::BuiltObjectStream;
-using ac4dec_test::ObjectCase;
+using ac4_decoder_test::BuiltObjectStream;
+using ac4_decoder_test::ObjectCase;
 
 constexpr int kFrames = 8;
 
@@ -153,7 +153,7 @@ std::span<const float> steady(const std::vector<float>& samples, std::size_t ski
 // `tolerance_db`), and none of the other downmix or object tones; an object
 // that takes a decorrelator's output carries its tones, at a level the check
 // leaves alone.
-void check_objects(const std::vector<ac4dec_test::ExpectedObject>& expected, const Decoded& decoded,
+void check_objects(const std::vector<ac4_decoder_test::ExpectedObject>& expected, const Decoded& decoded,
                    const std::vector<double>& all_tones, double tolerance_db) {
     REQUIRE(decoded.samples.size() == expected.size());
     for (std::size_t o = 0; o < expected.size(); ++o) {
@@ -182,7 +182,7 @@ void check_objects(const std::vector<ac4dec_test::ExpectedObject>& expected, con
 std::vector<double> tones_of(const BuiltObjectStream& stream) {
     std::vector<double> tones;
     for (const auto& list : {stream.full, stream.core}) {
-        for (const ac4dec_test::ExpectedObject& object : list) {
+        for (const ac4_decoder_test::ExpectedObject& object : list) {
             for (const auto& tone : object.tones) {
                 if (std::ranges::find(tones, tone[0]) == tones.end()) {
                     tones.push_back(tone[0]);
@@ -207,9 +207,9 @@ std::vector<std::byte> read_file(const fs::path& path) {
 }  // namespace
 
 TEST_CASE("object audio streams read as the encoder's writer wrote them", "[ac4][decoder][objects]") {
-    for (const ObjectCase& c : ac4dec_test::committed_object_cases()) {
+    for (const ObjectCase& c : ac4_decoder_test::committed_object_cases()) {
         CAPTURE(c.name);
-        parse_checked(ac4dec_test::build_objects(c, kFrames));
+        parse_checked(ac4_decoder_test::build_objects(c, kFrames));
     }
 }
 
@@ -231,7 +231,7 @@ TEST_CASE("A-JOC downmixes of one to seven signals read in both codec modes", "[
                 c.lfe = dmx % 2 == 0;
                 c.var_coding_config = config;
                 CAPTURE(dmx, aspx, config);
-                parse_checked(ac4dec_test::build_objects(c, 5));
+                parse_checked(ac4_decoder_test::build_objects(c, 5));
             }
         }
     }
@@ -240,11 +240,11 @@ TEST_CASE("A-JOC downmixes of one to seven signals read in both codec modes", "[
 TEST_CASE("the committed object streams are the builder's", "[ac4][decoder][objects]") {
     const fs::path committed = fs::path{AC4_GOLDEN_DIR} / "objects";
     const char* write_to = std::getenv("AC4_DECODER_WRITE_OBJECTS");
-    for (const ObjectCase& c : ac4dec_test::committed_object_cases()) {
+    for (const ObjectCase& c : ac4_decoder_test::committed_object_cases()) {
         CAPTURE(c.name);
         const BuiltObjectStream stream =
-            ac4dec_test::build_objects(c, ac4dec_test::kCommittedObjectFrames);
-        const std::vector<std::byte> bytes = ac4dec_test::sync_framed(stream);
+            ac4_decoder_test::build_objects(c, ac4_decoder_test::kCommittedObjectFrames);
+        const std::vector<std::byte> bytes = ac4_decoder_test::sync_framed(stream);
         if (write_to != nullptr) {
             fs::create_directories(write_to);
             std::ofstream out(fs::path{write_to} / (c.name + ".ac4"), std::ios::binary);
@@ -262,12 +262,12 @@ TEST_CASE("A-JOC objects carry their dry coefficients' share of each downmix sig
     // Pseudocode 18 end to end: each object the sum of its coefficients times
     // the downmix's tones, in QinAJOC's order (Pseudocode 14a), with Table 28's
     // band of each tone; and in core decoding the downmix itself.
-    for (const ObjectCase& c : ac4dec_test::committed_object_cases()) {
+    for (const ObjectCase& c : ac4_decoder_test::committed_object_cases()) {
         if (c.kind != ObjectCase::Kind::kAjoc && c.kind != ObjectCase::Kind::kAjocStatic) {
             continue;
         }
         CAPTURE(c.name);
-        const BuiltObjectStream stream = ac4dec_test::build_objects(c, 12);
+        const BuiltObjectStream stream = ac4_decoder_test::build_objects(c, 12);
         const std::vector<double> tones = tones_of(stream);
         check_objects(stream.full, decode_all(stream, iclforge::ac4::DecodingMode::kFull), tones,
                       0.1);
@@ -281,13 +281,13 @@ TEST_CASE("a static downmix's core objects are its LFE and its bed at L R C Ls a
     // src/ac4/ERRATA.md, "A static downmix's inputs": in core decoding the
     // objects of an A-JOC substream over a static 5.1 downmix are its bed.
     ObjectCase c;
-    for (const ObjectCase& committed : ac4dec_test::committed_object_cases()) {
+    for (const ObjectCase& committed : ac4_decoder_test::committed_object_cases()) {
         if (committed.kind == ObjectCase::Kind::kAjocStatic) {
             c = committed;
         }
     }
     REQUIRE(c.kind == ObjectCase::Kind::kAjocStatic);
-    const BuiltObjectStream stream = ac4dec_test::build_objects(c, 4);
+    const BuiltObjectStream stream = ac4_decoder_test::build_objects(c, 4);
     const Decoded decoded = decode_all(stream, iclforge::ac4::DecodingMode::kCore);
     using S = iclforge::ac4::Speaker;
     const std::array<S, 6> speakers = {S::kLfe,    S::kLeft,         S::kRight,
@@ -302,12 +302,12 @@ TEST_CASE("a static downmix's core objects are its LFE and its bed at L R C Ls a
 }
 
 TEST_CASE("direct-coded objects and a bed carry their own tones", "[ac4][decoder][objects]") {
-    for (const ObjectCase& c : ac4dec_test::committed_object_cases()) {
+    for (const ObjectCase& c : ac4_decoder_test::committed_object_cases()) {
         if (c.kind != ObjectCase::Kind::kDynamic && c.kind != ObjectCase::Kind::kBed) {
             continue;
         }
         CAPTURE(c.name);
-        const BuiltObjectStream stream = ac4dec_test::build_objects(c, 12);
+        const BuiltObjectStream stream = ac4_decoder_test::build_objects(c, 12);
         const std::vector<double> tones = tones_of(stream);
         for (const iclforge::ac4::DecodingMode mode :
              {iclforge::ac4::DecodingMode::kFull, iclforge::ac4::DecodingMode::kCore}) {
@@ -330,29 +330,29 @@ TEST_CASE("A-JOC dialogue enhancement raises the dialogue object and its share o
     c.dmx = 2;
     c.umx = 4;
     c.dialogue = true;
-    const BuiltObjectStream stream = ac4dec_test::build_objects(c, 12);
+    const BuiltObjectStream stream = ac4_decoder_test::build_objects(c, 12);
     const std::vector<double> tones = tones_of(stream);
     REQUIRE(stream.core.size() == 2);
     const double amplitude = stream.core.front().tones.front()[1];
     for (const auto& [asked, applied] : {std::pair{6.0, 6.0}, std::pair{12.0, 9.0}}) {
         CAPTURE(asked);
         const double de_gain = std::pow(10.0, applied / 20.0);
-        std::vector<ac4dec_test::ExpectedObject> full = stream.full;
+        std::vector<ac4_decoder_test::ExpectedObject> full = stream.full;
         for (auto& tone : full.front().tones) {
             tone[1] *= de_gain;
         }
         check_objects(full, decode_all(stream, iclforge::ac4::DecodingMode::kFull, asked), tones,
                       0.1);
-        std::vector<ac4dec_test::ExpectedObject> core(stream.core.size());
+        std::vector<ac4_decoder_test::ExpectedObject> core(stream.core.size());
         for (int ch = 0; ch < 2; ++ch) {
             for (int in = 0; in < 2; ++in) {
                 const double a =
                     (ch == in ? 1.0 : 0.0) + (de_gain - 1.0) *
-                                                 ac4dec_test::ajoc_dialogue_dmx_coefficient(c, ch) *
-                                                 ac4dec_test::ajoc_dry_coefficient(c, 0, in);
+                                                 ac4_decoder_test::ajoc_dialogue_dmx_coefficient(c, ch) *
+                                                 ac4_decoder_test::ajoc_dry_coefficient(c, 0, in);
                 if (std::abs(a) > 1e-9) {
                     core[static_cast<std::size_t>(ch)].tones.push_back(
-                        {ac4dec_test::ajoc_input_tone_hz(c, in), std::abs(a) * amplitude});
+                        {ac4_decoder_test::ajoc_input_tone_hz(c, in), std::abs(a) * amplitude});
                 }
             }
         }
@@ -367,20 +367,20 @@ TEST_CASE("a direct-coded dialogue substream's objects take dialogue enhancement
     // object of a dialogue substream, Gmax 3 x (1 + dialog_max_gain) dB, 9 dB
     // for the builder's dialog_max_gain of 2.
     ObjectCase c;
-    for (const ObjectCase& committed : ac4dec_test::committed_object_cases()) {
+    for (const ObjectCase& committed : ac4_decoder_test::committed_object_cases()) {
         if (committed.kind == ObjectCase::Kind::kDynamic) {
             c = committed;
         }
     }
     REQUIRE(c.kind == ObjectCase::Kind::kDynamic);
     c.dialogue = true;
-    const BuiltObjectStream stream = ac4dec_test::build_objects(c, 12);
+    const BuiltObjectStream stream = ac4_decoder_test::build_objects(c, 12);
     const std::vector<double> tones = tones_of(stream);
     for (const auto& [asked, applied] :
          {std::pair{0.0, 0.0}, std::pair{6.0, 6.0}, std::pair{12.0, 9.0}}) {
         CAPTURE(asked);
-        std::vector<ac4dec_test::ExpectedObject> expected = stream.full;
-        for (ac4dec_test::ExpectedObject& object : expected) {
+        std::vector<ac4_decoder_test::ExpectedObject> expected = stream.full;
+        for (ac4_decoder_test::ExpectedObject& object : expected) {
             for (auto& tone : object.tones) {
                 tone[1] *= std::pow(10.0, applied / 20.0);
             }
@@ -397,17 +397,17 @@ TEST_CASE("object metadata takes effect at its update sample and moves object 0"
     // decoder's delay later, 1 313 samples at frame_rate_index 13; each block's
     // position is 6.3.9.8.4's, explicit or as a difference from the last.
     constexpr std::size_t kDelay = 1313;
-    for (const ObjectCase& c : ac4dec_test::committed_object_cases()) {
+    for (const ObjectCase& c : ac4_decoder_test::committed_object_cases()) {
         if (c.kind == ObjectCase::Kind::kBed || c.kind == ObjectCase::Kind::kIsf) {
             continue;
         }
         CAPTURE(c.name);
-        const BuiltObjectStream stream = ac4dec_test::build_objects(c, 12);
+        const BuiltObjectStream stream = ac4_decoder_test::build_objects(c, 12);
         const Decoded decoded = decode_all(stream, iclforge::ac4::DecodingMode::kFull);
         std::size_t moving = 0;
         int dynamic = -1;
         for (std::size_t o = 0; o < stream.full.size(); ++o) {
-            const ac4dec_test::ExpectedObject& expected = stream.full[o];
+            const ac4_decoder_test::ExpectedObject& expected = stream.full[o];
             if (expected.positions.empty()) {
                 continue;
             }
@@ -489,7 +489,7 @@ TEST_CASE("an intermediate spatial format renders to the output layout by Annex 
           S::kRightBack, S::kTopSideLeft, S::kTopSideRight}},
     };
     ObjectCase isf;
-    for (const ObjectCase& c : ac4dec_test::committed_object_cases()) {
+    for (const ObjectCase& c : ac4_decoder_test::committed_object_cases()) {
         if (c.kind == ObjectCase::Kind::kIsf) {
             isf = c;
         }
@@ -498,7 +498,7 @@ TEST_CASE("an intermediate spatial format renders to the output layout by Annex 
     for (const bool gained : {false, true}) {
         ObjectCase c = isf;
         c.extras = gained;  // object_gain 15 - 10 = 5 dB for every object (Table 102)
-        const BuiltObjectStream stream = ac4dec_test::build_objects(c, 12);
+        const BuiltObjectStream stream = ac4_decoder_test::build_objects(c, 12);
         REQUIRE(stream.full.size() == 4);
         const double gain = gained ? std::pow(10.0, 5.0 / 20.0) : 1.0;
         for (const Target& t : targets) {
