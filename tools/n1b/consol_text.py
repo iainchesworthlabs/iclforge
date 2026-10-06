@@ -590,14 +590,14 @@ C3_PROSE = [
     # not a path inside another (`src/containers/src/mp4`, which holds `src/mp4`)
     Rule(
         "dir",
-        rf"(?<![\w/.-])src/({_C3_PART})\b(?![\w-])(?!/[\w.*{{])",
+        rf"(?<![\w/.-])src/({_C3_PART})\b(?![\w-])(?!/[\w.*{{])(?!\.\w)",
         r"src/containers/src/\1",
         _TEXT,
         plans=True,
     ),
     Rule(
         "test-dir",
-        rf"(?<![\w/.-])tests/({_C3_PART})\b(?![\w-])(?!/[\w.*{{])",
+        rf"(?<![\w/.-])tests/({_C3_PART})\b(?![\w-])(?!/[\w.*{{])(?!\.\w)",
         r"tests/containers/\1",
         _TEXT,
         plans=True,
