@@ -181,7 +181,11 @@ def c3_new(path: str) -> str | None:
 # Files that are not moved but folded into another by hand, which the pages and comments that name
 # them follow as they follow a move (consol_paths.py).
 FOLDED = {
-    "c1": {"src/ac4enc/ERRATA.md": "src/ac4/ERRATA.md"},
+    "c1": {
+        "src/ac4enc/ERRATA.md": "src/ac4/ERRATA.md",
+        # the header the cut divided: the table of contents' keeps its file comment
+        "src/ac4/include/iclforge/ac4/ac4.hpp": "src/ac4/include/iclforge/ac4/core/toc.hpp",
+    },
     "c2": {},
     "c3": {},
 }

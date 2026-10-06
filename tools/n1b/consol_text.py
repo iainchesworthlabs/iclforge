@@ -14,6 +14,7 @@ a second run changes nothing.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -23,6 +24,9 @@ from n1b_lib import CPP_EXT, DEFAULT_ROOT, Repo
 
 KEEP = (
     "CHANGELOG.md",
+    "planning/consolidation.md",
+    "planning/layout.md",
+    "planning/layout-inventory.md",
     "planning/",
     "tools/n1b/",
     "tools/checks/layering_debt/",
@@ -43,6 +47,10 @@ class Rule:
     # which files: "cpp" (C and C++ sources), "cmake", or "text" (every tracked text file)
     kinds: tuple[str, ...] = ("cpp",)
     flags: int = 0
+    # whether the plans under planning/ are read too (not this consolidation's own page nor the
+    # layout study's two, which name the paths before and after on purpose): a path or a header a
+    # plan names follows the tree, as N1B's path pass had it do
+    plans: bool = False
     compiled: re.Pattern = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -118,6 +126,10 @@ C1 = [
 # library's directory; a path a comment broke at a slash follows its file; each directory alone is
 # where its files went (the core's to src/ac4/src/core, the decoder's and the encoder's to their
 # areas), and its build file is the library's.
+# The header the cut removed: a page that names it is pointed at the table of contents' header, the
+# one that keeps its file comment; what it says of the declarations is a person's.
+CUT_SPELLINGS = {"c1": {"iclforge/ac4/ac4.hpp": "iclforge/ac4/core/toc.hpp"}}
+
 C1_PROSE = [
     # `src/ac4, src/ac4core, src/ac4dec and src/ac4enc`, written with code spans or not
     Rule(
@@ -125,19 +137,57 @@ C1_PROSE = [
         r"(`?)src/ac4(?:core|dec|enc)?\1(?:(?:,? and |, )\1src/ac4(?:core|dec|enc)?\b\1)+",
         r"\1src/ac4\1",
         _TEXT,
+        plans=True,
     ),
     Rule(
         "errata-broken",
         r"src/ac4(?:dec|enc)/(\n[ \t]*(?://|#)[ \t]*)ERRATA\.md",
         r"src/ac4/\1ERRATA.md",
         _TEXT,
+        plans=True,
     ),
-    Rule("build-file", r"\bsrc/ac4(?:core|dec|enc)/CMakeLists\.txt\b", "src/ac4/CMakeLists.txt", _TEXT),
-    Rule("dir-core", r"\bsrc/ac4core(?:/include/iclforge/ac4core)?\b(?![\w-])", "src/ac4/src/core", _TEXT),
-    Rule("dir-dec-src", r"\bsrc/ac4dec/src\b", "src/ac4/src/decoder", _TEXT),
-    Rule("dir-enc-src", r"\bsrc/ac4enc/src\b", "src/ac4/src/encoder", _TEXT),
-    Rule("dir-dec", r"\bsrc/ac4dec\b(?![\w-])(?!/)", "src/ac4/src/decoder", _TEXT),
-    Rule("dir-enc", r"\bsrc/ac4enc\b(?![\w-])(?!/)", "src/ac4/src/encoder", _TEXT),
+    Rule(
+        "build-file",
+        r"\bsrc/ac4(?:core|dec|enc)/CMakeLists\.txt\b",
+        "src/ac4/CMakeLists.txt",
+        _TEXT,
+        plans=True,
+    ),
+    Rule(
+        "dir-core",
+        r"\bsrc/ac4core(?:/include/iclforge/ac4core)?\b(?![\w-])",
+        "src/ac4/src/core",
+        _TEXT,
+        plans=True,
+    ),
+    Rule(
+        "dir-dec-src",
+        r"\bsrc/ac4dec/src\b",
+        "src/ac4/src/decoder",
+        _TEXT,
+        plans=True,
+    ),
+    Rule(
+        "dir-enc-src",
+        r"\bsrc/ac4enc/src\b",
+        "src/ac4/src/encoder",
+        _TEXT,
+        plans=True,
+    ),
+    Rule(
+        "dir-dec",
+        r"\bsrc/ac4dec\b(?![\w-])(?!/)",
+        "src/ac4/src/decoder",
+        _TEXT,
+        plans=True,
+    ),
+    Rule(
+        "dir-enc",
+        r"\bsrc/ac4enc\b(?![\w-])(?!/)",
+        "src/ac4/src/encoder",
+        _TEXT,
+        plans=True,
+    ),
 ]
 STAGES: dict[str, list[Rule]] = {"c0": C0, "c1": C1 + C1_PROSE}
 
@@ -151,29 +201,56 @@ def kind_of(path: str) -> set[str]:
     return kinds
 
 
-def rewrite(text: str, rules: list[Rule], kinds: set[str], counts: Counter) -> str:
+HELD_PLANS = KEEP[1:4]
+
+
+def rewrite(
+    text: str, rules: list[Rule], kinds: set[str], counts: Counter, plan_page: bool = False
+) -> str:
     for rule in rules:
-        if not kinds.intersection(rule.kinds):
+        if not kinds.intersection(rule.kinds) or (plan_page and not rule.plans):
             continue
         text, n = rule.compiled.subn(rule.replacement, text)
         counts[rule.name] += n
     return text
 
 
-def run(root: Path, stage: str, dry_run: bool, report: Path | None) -> Counter:
+def spelling_rules(plan: Path) -> list[Rule]:
+    """The include spellings a stage changed (its plan's map, and the cut's), wherever a page or a
+    comment names one: n1b_docs.py's `header` rule for the consolidation."""
+    spellings = dict(json.loads(plan.read_text(encoding="utf-8")).get("spellings", {}))
+    spellings.update(CUT_SPELLINGS.get(json.loads(plan.read_text(encoding="utf-8"))["stage"], {}))
+    rules = []
+    for old in sorted(spellings, key=len, reverse=True):
+        rules.append(
+            Rule(
+                "header",
+                r"(?<![\w/])" + re.escape(old) + r"(?![\w/])",
+                spellings[old].replace("\\", "\\\\"),
+                _TEXT,
+                plans=True,
+            )
+        )
+    return rules
+
+
+def run(
+    root: Path, stage: str, dry_run: bool, report: Path | None, plan: Path | None = None
+) -> Counter:
     repo = Repo(str(root))
-    rules = STAGES[stage]
+    rules = STAGES[stage] + (spelling_rules(plan) if plan else [])
     counts: Counter = Counter()
     changed: list[str] = []
     for f in repo.files:
-        if f.startswith(KEEP):
+        plan_page = f.startswith("planning/")
+        if f.startswith(KEEP) and not (plan_page and not f.startswith(HELD_PLANS)):
             continue
         path = root / f
         try:
             text = path.read_bytes().decode("utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        out = rewrite(text, rules, kind_of(f), counts)
+        out = rewrite(text, rules, kind_of(f), counts, plan_page)
         if out != text:
             changed.append(f)
             if not dry_run:
@@ -195,8 +272,11 @@ def main() -> None:
     ap.add_argument("--stage", required=True, choices=sorted(STAGES))
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--report", type=Path, default=None)
+    ap.add_argument(
+        "--plan", type=Path, default=None, help="the stage's plan: its include spellings follow too"
+    )
     a = ap.parse_args()
-    run(Path(a.root), a.stage, a.dry_run, a.report)
+    run(Path(a.root), a.stage, a.dry_run, a.report, a.plan)
 
 
 if __name__ == "__main__":
