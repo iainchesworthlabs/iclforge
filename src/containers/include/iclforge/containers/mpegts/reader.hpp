@@ -57,7 +57,7 @@
 namespace iclforge::mpegts {
 
 namespace detail {
-// Reader's parse state, defined in src/mpegts/src/reader.cpp - a
+// Reader's parse state, defined in src/containers/src/mpegts/reader.cpp - a
 // namespace-scope type rather than a private nested one so the walker's own
 // free functions there can name it.
 struct ReaderState;

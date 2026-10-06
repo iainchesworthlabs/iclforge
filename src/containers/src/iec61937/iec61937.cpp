@@ -159,7 +159,7 @@ std::expected<std::vector<std::byte>, WrapError> wrap_stream(
 // AC-4 (IEC 61937-14:2017).
 //
 // The tables below are transcribed from Part 14 and checked against renders
-// of its pages; tests/iec61937/test_iec61937_ac4.cpp holds a second
+// of its pages; tests/containers/iec61937/test_iec61937_ac4.cpp holds a second
 // transcription of their cases, made separately, and checks the two against
 // each other and against what the standard's own arithmetic implies.
 //

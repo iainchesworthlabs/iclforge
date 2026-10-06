@@ -134,25 +134,25 @@ add_executable(iclforge-tests
     dsp/test_fft.cpp
     ac3/test_fmp4.cpp
     ac3/core/test_frame.cpp
-    iec61937/test_iec61937.cpp
-    iec61937/test_iec61937_ac4.cpp
+    containers/iec61937/test_iec61937.cpp
+    containers/iec61937/test_iec61937_ac4.cpp
     ac3/decoder/test_latency.cpp
-    iec61937/test_iec61937_unwrap.cpp
+    containers/iec61937/test_iec61937_unwrap.cpp
     ac3/decoder/test_live_downmix.cpp
     ac3/decoder/test_output_stage.cpp
     ac3/meta/test_loudness.cpp
     ac3/core/test_mantissas.cpp
     ac3/test_container_input.cpp
-    matroska/test_matroska.cpp
-    matroska/test_matroska_reader.cpp
+    containers/matroska/test_matroska.cpp
+    containers/matroska/test_matroska_reader.cpp
     ac3/core/test_mdct.cpp
     ac3/core/test_mdct_fast.cpp
     ac3/meta/test_meta_qc.cpp
     ac3/meta/test_mixing.cpp
     ac3/test_mp4.cpp
-    mp4/test_mp4_reader.cpp
+    containers/mp4/test_mp4_reader.cpp
     ac3/test_mpegts.cpp
-    mpegts/test_mpegts_reader.cpp
+    containers/mpegts/test_mpegts_reader.cpp
     ac3/io/test_object_strip.cpp
     ac3/quality/test_distortion.cpp
     ac3/quality/test_perceptual.cpp
@@ -421,13 +421,13 @@ endif()
 # ac4/encoder/test_ac4enc_presentations.cpp, for where to write its streams,
 # ac4/encoder/test_ac4enc_objects.cpp, for where to write its streams and those to
 # listen to, and ac4/encoder/test_ac4enc_presentations_race.cpp, for the gold set's.
-# iec61937/test_iec61937_ac4.cpp reads one too, for the census directory it packs.
+# containers/iec61937/test_iec61937_ac4.cpp reads one too, for the census directory it packs.
 if(ICLFORGE_IS_MSVC_LIKE)
     set_source_files_properties(ac3/core/test_simd_kernels.cpp ac4/decoder/test_ac4dec_syntax.cpp
         ac4/decoder/test_ac4dec_constructed.cpp ac4/decoder/test_ac4dec_objects.cpp ac4/decoder/test_ac4dec_presentations.cpp
         ac4/decoder/test_ac4dec_api.cpp ac4/decoder/test_ac4dec_object_render.cpp ac4/decoder/test_ac4dec_hsf.cpp
         ac4/encoder/test_ac4enc_objects.cpp ac4/encoder/test_ac4enc_presentations.cpp
-        ac4/encoder/test_ac4enc_presentations_race.cpp iec61937/test_iec61937_ac4.cpp
+        ac4/encoder/test_ac4enc_presentations_race.cpp containers/iec61937/test_iec61937_ac4.cpp
         PROPERTIES COMPILE_OPTIONS "/wd4996")
 endif()
 
@@ -984,7 +984,7 @@ endif()
 # see the root CMakeLists.txt's own option()), same conditional shape as the ICLFORGE_BUILD_IAB
 # block immediately above.
 if(ICLFORGE_BUILD_IAMF)
-    target_sources(iclforge-tests PRIVATE iamf/test_iamf.cpp iamf/test_iamf_container.cpp iamf/test_iamf_objects.cpp iamf/test_iamf_sequence.cpp)
+    target_sources(iclforge-tests PRIVATE containers/iamf/test_iamf.cpp containers/iamf/test_iamf_container.cpp containers/iamf/test_iamf_objects.cpp containers/iamf/test_iamf_sequence.cpp)
     target_link_libraries(iclforge-tests PRIVATE iclforge::iamf)
 endif()
 

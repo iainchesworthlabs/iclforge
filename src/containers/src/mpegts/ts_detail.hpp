@@ -7,9 +7,9 @@
 
 // The transport-stream constants and the PSI section CRC shared between
 // mpegts.cpp (the writer: mux() and Writer) and reader.cpp (the reader:
-// demux() and Reader). Internal to src/mpegts/src/ on purpose - plumbing
+// demux() and Reader). Internal to src/containers/src/mpegts/ on purpose - plumbing
 // between translation units of the same library, not public API; see
-// src/mp4/src/isobmff_detail.hpp and src/matroska/src/ebml_detail.hpp for
+// src/containers/src/mp4/isobmff_detail.hpp and src/containers/src/matroska/ebml_detail.hpp for
 // the same pattern in the sibling container modules.
 //
 // One list, not two. A reader that transcribed its own copy of the packet

@@ -35,7 +35,7 @@
 //              frame plus one chunk, never the file - the same bound
 //              iclforge::matroska::Writer offers on the way out.
 //
-// Both run the same EBML walker (src/matroska/src/reader.cpp); the only
+// Both run the same EBML walker (src/containers/src/matroska/reader.cpp); the only
 // difference is where the bytes come from and where the frames point.
 //
 // UNTRUSTED INPUT. A container arrives from a disc rip, a broadcast capture
@@ -50,7 +50,7 @@
 namespace iclforge::matroska {
 
 namespace detail {
-// Reader's parse state, defined in src/matroska/src/reader.cpp. A
+// Reader's parse state, defined in src/containers/src/matroska/reader.cpp. A
 // namespace-scope type rather than a nested one so the walker's own
 // free functions there can name it - a private nested struct would be
 // unreachable from them.

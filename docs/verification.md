@@ -1831,7 +1831,7 @@ move as their metadata says is the listener's to hear, from the streams the test
 
 AC-4's burst types (IEC 61937-14, phase D11) have no oracle: nothing else here writes or reads
 them, and no receiver found accepts AC-4. They are checked against the standard's text.
-`tests/iec61937/test_iec61937_ac4.cpp` transcribes Part 14's repetition periods, burst sequences,
+`tests/containers/iec61937/test_iec61937_ac4.cpp` transcribes Part 14's repetition periods, burst sequences,
 `Pc` codes and maximum lengths a second time, row by row as printed, and holds the library's
 tables to that transcription and both to the arithmetic the standard implies: five bursts of a
 sequence span five frames exactly, each burst starts at the IEC 60958 frame nearest its frame's
@@ -1843,7 +1843,7 @@ at four frame rates do the same. For the extension role, a loopback test
 (`tests/hearth/test_group.cpp`) sends DEE's 2.0 stream at 48 kHz through `_iclforge_player@v1`
 to a test sink, whose output equals the local decode, rendered the same way, sample for sample.
 The two readings Part 14 leaves open, which frame starts a burst sequence and whether `Pd` counts
-bits or bytes, are given in `src/iec61937/src/iec61937.cpp`.
+bits or bytes, are given in `src/containers/src/iec61937/iec61937.cpp`.
 
 ### Hearth's engine
 

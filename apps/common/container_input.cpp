@@ -20,7 +20,7 @@ namespace {
 
 // EBML's own magic: the four bytes of the EBML header id every Matroska and
 // WebM file opens with - the same kEbmlHeader constant
-// src/matroska/src/ebml_detail.hpp holds, written out big-endian.
+// src/containers/src/matroska/ebml_detail.hpp holds, written out big-endian.
 constexpr std::array<std::byte, 4> kEbmlMagic{std::byte{0x1A}, std::byte{0x45}, std::byte{0xDF},
                                               std::byte{0xA3}};
 

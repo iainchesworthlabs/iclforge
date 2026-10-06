@@ -51,7 +51,7 @@
 | `sendspin` command-line player | 7.5.0, 2026-06-16, on aiosendspin 6.0.1 | Not used: it has no Noise and no CPace, so a conformant server cannot connect to it ([Decisions](#decisions), 2) |
 | Sendspin time filter, `github.com/Sendspin/time-filter` | `39dd3f4a`, C++, Apache-2.0 | Vendored into `src/sendspin` for the player half |
 | CPace, draft-irtf-cfrg-cpace-21 | Expires 2026-10-25 | The code-based pairing flows |
-| IEC 61937 bursts | `ac3::iec61937::wrap_frame`, `Eac3BurstPacker` and `Ac4BurstPacker` (`src/iec61937/include/iclforge/iec61937/iec61937.hpp`); IEC 61937-14:2017 for AC-4 | What a burst chunk carries |
+| IEC 61937 bursts | `ac3::iec61937::wrap_frame`, `Eac3BurstPacker` and `Ac4BurstPacker` (`src/containers/include/iclforge/containers/iec61937/iec61937.hpp`); IEC 61937-14:2017 for AC-4 | What a burst chunk carries |
 
 ## Conformance
 

@@ -97,13 +97,13 @@ already shipped and nobody had connected it to this problem.
 **What exists.** Roadmap IO4 built the streaming fMP4/CMAF fragmenter and IO5 added the DASH JOC
 signalling:
 
-- `src/mp4/include/iclforge/mp4/mp4.hpp` — `FragmentWriter`, `MediaSegment`, `SegmentInfo`,
+- `src/containers/include/iclforge/containers/mp4/mp4.hpp` — `FragmentWriter`, `MediaSegment`, `SegmentInfo`,
   `FragmentOptions`.
-- `src/mp4/include/iclforge/mp4/hls.hpp` — `build_hls_master_playlist`, `build_hls_media_playlist`,
+- `src/containers/include/iclforge/containers/mp4/hls.hpp` — `build_hls_master_playlist`, `build_hls_media_playlist`,
   `hls_codec_string`.
-- `src/mp4/include/iclforge/mp4/dash.hpp` — the dynamic MPD, with TS 103 420 D.2's supplemental
+- `src/containers/include/iclforge/containers/mp4/dash.hpp` — the dynamic MPD, with TS 103 420 D.2's supplemental
   properties and the `ceao` compatibility brand.
-- `src/mp4/include/iclforge/mp4/reader.hpp` — **the read direction**, so a sink can pull an access unit
+- `src/containers/include/iclforge/containers/mp4/reader.hpp` — **the read direction**, so a sink can pull an access unit
   back out of a segment without new demuxing code.
 - `apps/common/fmp4_folder_writer.hpp` — and this is the piece that matters most. It writes
   `init.mp4`, one `segment<N>.m4s` per closed fragment, and `audio.m3u8`, `master.m3u8` and
@@ -131,7 +131,7 @@ signalling:
 fragment is 1.536 s segments; a player holding three of them is roughly 5 s behind live. That is
 fine for music in another room and wrong for anything watched. Low-Latency HLS is **not**
 implemented — `#EXT-X-PART` appears nowhere, and the only tag beyond the basics is
-`#EXT-X-INDEPENDENT-SEGMENTS` (in `src/mp4/src/hls.cpp`).
+`#EXT-X-INDEPENDENT-SEGMENTS` (in `src/containers/src/mp4/hls.cpp`).
 
 It may not be needed. `FragmentOptions`' own comment records the property that makes segment
 length free: *"Every AC-3/E-AC-3 access unit this project produces is independently decodable
@@ -367,7 +367,7 @@ two-machine run. Latency measured, not assumed, at 48, 16, 8 and 4 frames per fr
 
 **Status: not built.** No segment-length measurement exists, `frames_per_fragment` still defaults to
 48 and `playlist_window_segments` to 0, and Low-Latency HLS is still absent (`#EXT-X-PART` appears
-nowhere in `src/mp4/src/hls.cpp`). One constraint the phase would meet has changed: an AC-4
+nowhere in `src/containers/src/mp4/hls.cpp`). One constraint the phase would meet has changed: an AC-4
 frame is decodable alone only where its table of contents sets `b_iframe_global`, so an AC-4
 fragment holds at least `frames_per_fragment` frames and closes on the next sync sample, and
 cannot be shorter than the interval between the stream's I-frames (`FragmentOptions` in

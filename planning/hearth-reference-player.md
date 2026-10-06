@@ -461,7 +461,7 @@ package.*
 - Between queue items with the same sample rate and output layout, the output stays open and no
   silence is inserted. In a group, the Sendspin stream continues and its timestamps run on.
 - No container field about encoder delay or padding is read today. `mp4.hpp` says "No edit lists,
-  no multiple tracks" (`src/mp4/include/iclforge/mp4/mp4.hpp:35`) and nothing reads `iTunSMPB`. A3 adds
+  no multiple tracks" (`src/containers/include/iclforge/containers/mp4/mp4.hpp:35`) and nothing reads `iTunSMPB`. A3 adds
   `elst` reading to `mp4::Reader` and trims what it states. A raw elementary stream carries no
   such field, so at each join up to a frame of padding remains, plus the transform delay, which
   is 256 samples for this project's encoder (`src/ac3/include/iclforge/ac3/latency.hpp:29-37`).

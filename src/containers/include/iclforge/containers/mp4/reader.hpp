@@ -49,7 +49,7 @@
 namespace iclforge::mp4 {
 
 namespace detail {
-// Reader's parse state, defined in src/mp4/src/reader.cpp - a namespace-scope
+// Reader's parse state, defined in src/containers/src/mp4/reader.cpp - a namespace-scope
 // type rather than a private nested one so the walker's own free functions
 // there can name it.
 struct ReaderState;

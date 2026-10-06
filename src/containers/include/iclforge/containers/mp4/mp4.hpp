@@ -262,7 +262,7 @@ struct SegmentInfo {
     std::uint64_t duration_samples = 0;
     std::uint64_t base_media_decode_time = 0;
     // MediaSegment::bytes.size() - what the HLS BANDWIDTH and DASH @bandwidth
-    // averages are computed from (see src/mp4/src/manifest_detail.hpp).
+    // averages are computed from (see src/containers/src/mp4/manifest_detail.hpp).
     std::uint64_t byte_size = 0;
 };
 

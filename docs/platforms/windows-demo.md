@@ -92,7 +92,7 @@ inventory the plan is built on, with the header each item lives in.
 | E-AC-3 JOC encoder, 5.1 bed plus up to 15 dynamic objects, count fixed at construction | exists | `ac3::oba::AtmosEncoder`, `src/ac3/include/iclforge/ac3/oba/atmos.hpp` |
 | Live per-object placement surface the UI pushes into once per frame | exists | `ac3::oba::SceneCursor`, `src/objects/include/iclforge/objects/scene.hpp`; the three-call pattern is `examples/osc_object_control.cpp` |
 | 5.1 bed panner for the AC-3-only receiver case | exists | `ac3::spatial::BedRenderer`, shown in `examples/spatial_objects.cpp` |
-| IEC 61937 burst framing for AC-3 and E-AC-3 | exists | `ac3::iec61937`, `src/iec61937/include/iclforge/iec61937/iec61937.hpp` |
+| IEC 61937 burst framing for AC-3 and E-AC-3 | exists | `ac3::iec61937`, `src/containers/include/iclforge/containers/iec61937/iec61937.hpp` |
 | Exclusive-mode HDMI/S/PDIF bitstream sink, with a per-device format probe | exists, confirmed against a real receiver on Windows (via `ac3cli`, not this demo's own app yet) | `ac3::audio::PassthroughSink`, `enumerate_render_devices()`, `src/audio/include/iclforge/audio/passthrough.hpp` |
 | Shared-mode multichannel PCM sink | exists | `ac3::audio::MonitorSink`, `monitor.hpp` |
 | Windows Spatial Sound object sink (headphones) | exists, confirmed against a real spatial endpoint | `ac3::audio::SpatialObjectSink`, `spatial.hpp` |
