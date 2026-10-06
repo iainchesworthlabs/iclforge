@@ -175,6 +175,7 @@ add_executable(iclforge-tests
     ac3/verify/test_eac3_selfcheck.cpp
     ac3/verify/test_selfcheck.cpp
     ac3/verify/test_trace_export.cpp
+    signing/test_crypto.cpp
     signing/test_signing.cpp
     render/test_spatial.cpp
     ac3/core/test_simd_kernels.cpp
