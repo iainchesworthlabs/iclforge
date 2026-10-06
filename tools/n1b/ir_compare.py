@@ -11,7 +11,8 @@ another overload, or a string that prints a qualified name.
     ir_compare.py compile <build dir> <out dir> [--jobs N] [--tests] [--only <substring>]
                   [--asserts] [--source <src dir>]
     ir_compare.py compare <old dir> <new dir> --old-root <src dir> --new-root <src dir>
-                  [--diffs <dir>] [--jobs N] [--plan <plan.json>] [--names ac3ns|none]
+                  [--diffs <dir>] [--jobs N] [--plan <plan.json>]
+                  [--names ac3ns|none|c2|c3]
 
 `compile` takes the compile_commands.json of a tree configured with a Clang preset (a source archive
 of the parent and one of the new commit, each configured and not built: the IR of a unit needs only
@@ -310,12 +311,16 @@ def _moves_rx(olds: tuple[str, ...]) -> re.Pattern[str]:
 
 
 def compare_pair(
-    args: tuple[str, str, str, str, str | None, dict[str, str] | None, bool],
+    args: tuple[str, str, str, str, str | None, dict[str, str] | None, str],
 ) -> tuple[str, str, int]:
-    old_file, new_file, old_root, new_root, diffs, moves, ac3ns = args
+    old_file, new_file, old_root, new_root, diffs, moves, names = args
     old_text = Path(old_file).read_text(errors="replace").replace(old_root, "<T>")
     a = normalise(moved_paths(old_text, moves), old_root, False)
-    b = normalise(Path(new_file).read_text(errors="replace"), new_root, ac3ns)
+    if names in ("c2", "c3"):
+        import consoldef
+
+        a = [consoldef.renamed_namespace(names, line) for line in a]
+    b = normalise(Path(new_file).read_text(errors="replace"), new_root, names == "ac3ns")
     name = Path(new_file).name
     v = verdict(a, b)
     if v == "identical":
@@ -364,7 +369,7 @@ def compare_dirs(
     diffs: str | None,
     jobs: int,
     moves: dict[str, str] | None = None,
-    ac3ns: bool = True,
+    names: str = "ac3ns",
 ) -> int:
     olds = {p.name: p for p in old.glob("*.ll")}
     news = {p.name: p for p in new.glob("*.ll")}
@@ -376,7 +381,7 @@ def compare_dirs(
     print(f"{len(both)} units in both ({len(olds)} old, {len(news)} new)")
     for name in sorted(set(olds) ^ set(news)):
         print("only in one tree:", name)
-    work = [(str(olds[n]), str(news[n]), old_root, new_root, diffs, moves, ac3ns) for n in both]
+    work = [(str(olds[n]), str(news[n]), old_root, new_root, diffs, moves, names) for n in both]
     counts = {"identical": 0, "order": 0, "text": 0, "differs": 0}
     with concurrent.futures.ProcessPoolExecutor(jobs) as ex:
         for name, v, changed in ex.map(compare_pair, work, chunksize=1):
@@ -416,9 +421,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     k.add_argument(
         "--names",
-        choices=["ac3ns", "none"],
+        choices=["ac3ns", "none", "c2", "c3"],
         default="ac3ns",
-        help="ac3ns: the new tree's iclforge::ac3:: reads as iclforge:: (S6); none: as it is",
+        help="ac3ns: the new tree's iclforge::ac3:: reads as iclforge:: (S6); none: as it is;"
+        " c2, c3: the old tree's names read in the namespaces the stage moved them to",
     )
     a = ap.parse_args(argv)
     if a.mode == "compile":
@@ -427,7 +433,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     moves = json.loads(a.plan.read_text(encoding="utf-8"))["moves"] if a.plan else None
     return compare_dirs(
-        Path(a.old), Path(a.new), a.old_root, a.new_root, a.diffs, a.jobs, moves, a.names == "ac3ns"
+        Path(a.old), Path(a.new), a.old_root, a.new_root, a.diffs, a.jobs, moves, a.names
     )
 
 
