@@ -28,7 +28,9 @@ header includes the standard headers its declarations name, the export header wh
 and the other headers whose names it uses (comments are not read for that), so that it compiles
 alone. A consumer that included ac4.hpp includes the headers whose names it uses instead (the table
 of contents' where it uses none); a consumer of the decoder's or the encoder's header keeps it, as
-that header includes the others, and gains the inspector's headers it used through it.
+that header includes the others. A file that reached ac4.hpp through another header before the cut
+(the decoder's, or one of its own) and uses a name of the inspector that it reaches no longer gains
+the header that declares it, beside the include it reached it through.
 
 Idempotent: a split whose first new file exists is skipped. Loud: a declaration the table does not
 place, or a marker of the unit's cut that is not found, stops the run. The pages are not touched
@@ -43,6 +45,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from cuts import Source, include_line, new_file
+from include_graph import build_index, resolve
 from n1b_lib import CPP_EXT, Repo, base_parser
 
 AC4_INC = "src/ac4/include/iclforge/ac4"
@@ -391,17 +394,6 @@ def includes_of(text: str) -> list[str]:
     return re.findall(r'^#include "([^"]+)"', text, flags=re.M)
 
 
-def closure(start: str, edges: dict[str, list[str]]) -> set[str]:
-    seen, todo = set(), [start]
-    while todo:
-        s = todo.pop()
-        if s in seen:
-            continue
-        seen.add(s)
-        todo.extend(edges.get(s, ()))
-    return seen
-
-
 def replace_include(text: str, old: str, news: list[str]) -> str:
     """`#include "old"` replaced, in its place, by `news` in sorted order, those not there yet."""
     lines = text.split("\n")
@@ -498,39 +490,103 @@ def add_units_to_build(root: Path) -> None:
 # --- consumers ------------------------------------------------------------------------------------
 
 
-def rewrite_consumers(root: Path, pieces: dict[str, set[str]], edges: dict[str, list[str]]) -> int:
+class Reach:
+    """What a file reaches through its includes, read from the tree as it stands."""
+
+    def __init__(self, root: Path, repo: Repo, index, extra: dict[str, Path]):
+        self.root, self.repo, self.index, self.extra = root, repo, index, extra
+        self.memo: dict[str, frozenset[str]] = {}
+
+    def target(self, frm: str, spelling: str) -> str | None:
+        if spelling in self.extra:
+            return self.extra[spelling].as_posix()
+        _owner, target, _public = resolve(self.repo, self.index, frm, spelling, "")
+        return target
+
+    def spellings(self, f: str, stack: frozenset[str] = frozenset()) -> frozenset[str]:
+        """Every quoted include spelling the file reaches, itself included."""
+        if f in self.memo:
+            return self.memo[f]
+        path = self.root / f
+        if f in stack or not path.exists():
+            return frozenset()
+        out: set[str] = set()
+        for sp in includes_of(path.read_bytes().decode("utf-8", errors="replace")):
+            out.add(sp)
+            t = self.target(f, sp)
+            if t:
+                out |= self.spellings(t, stack | {f})
+        self.memo[f] = frozenset(out)
+        return self.memo[f]
+
+
+def old_reach(root: Path) -> dict[str, frozenset[str]]:
+    """For every C and C++ file, the AC-4 headers it reaches before the cut."""
     repo = Repo(str(root))
+    index, _ = build_index(repo)
+    reach = Reach(root, repo, index, {})
+    watched = {s.spelling for s in SPLITS}
+    out = {}
+    for f in repo.files:
+        if Path(f).suffix in CPP_EXT:
+            out[f] = reach.spellings(f) & watched
+    return out
+
+
+def rewrite_consumers(root: Path, pieces: dict[str, set[str]], before: dict) -> int:
+    repo = Repo(str(root))
+    index, _ = build_index(repo)
+    piece_paths = {
+        sp: Path(s.source).parent / Path(sp).name for s in SPLITS for sp in s.pieces.values()
+    }
+    piece_files = {p.as_posix() for p in piece_paths.values()}
     inspector_pieces = list(INSPECTOR.pieces.values())
     changed = 0
+    # first the direct includes of ac4.hpp, then what a file reached through another header
     for f in repo.files:
-        if Path(f).suffix not in CPP_EXT or f.startswith("tools/n1b/") or not (root / f).exists():
+        if Path(f).suffix not in CPP_EXT or f.startswith("tools/n1b/") or f in piece_files:
             continue
-        if f in {
-            (Path(s.source).parent / Path(p).name).as_posix()
-            for s in SPLITS
-            for p in s.pieces.values()
-        }:
+        if not (root / f).exists():
             continue
         src = Source(root, f)
-        text = src.text
-        incs = includes_of(text)
-        used = names_used(text)
-        if INSPECTOR.spelling in incs:
+        used = names_used(src.text)
+        if INSPECTOR.spelling in includes_of(src.text):
             want = [s for s in inspector_pieces if used & pieces[s]] or [INSPECTOR.pieces["toc"]]
-            text = replace_include(text, INSPECTOR.spelling, want)
-        for split in (DECODER, ENCODER):
-            if split.spelling in includes_of(text):
-                reach = set()
-                for inc in includes_of(text):
-                    reach |= closure(inc, edges)
-                missing = [s for s in inspector_pieces if used & pieces[s] and s not in reach]
-                if missing:
-                    text = add_includes(text, split.spelling, missing)
-        if text != src.text:
-            src.text = text
+            src.text = replace_include(src.text, INSPECTOR.spelling, want)
             src.save()
             changed += 1
+    reach = Reach(root, Repo(str(root)), index, piece_paths)
+    for f in repo.files:
+        if Path(f).suffix not in CPP_EXT or f.startswith("tools/n1b/") or f in piece_files:
+            continue
+        if not (root / f).exists() or not before.get(f):
+            continue
+        src = Source(root, f)
+        used = names_used(src.text)
+        reached = reach.spellings(f)
+        missing = [s for s in inspector_pieces if used & pieces[s] and s not in reached]
+        if not missing:
+            continue
+        # beside the include it reached the inspector through before the cut
+        anchor = next(
+            (
+                sp
+                for sp in includes_of(src.text)
+                if sp in {s.spelling for s in SPLITS} or old_route(sp, f, reach, before)
+            ),
+            includes_of(src.text)[0],
+        )
+        src.text = add_includes(src.text, anchor, missing)
+        src.save()
+        reach.memo.pop(f, None)
+        changed += 1
     return changed
+
+
+def old_route(spelling: str, frm: str, reach: Reach, before: dict) -> bool:
+    """Whether `spelling`, included by `frm`, is the header it reached AC-4's headers through."""
+    t = reach.target(frm, spelling)
+    return bool(t and before.get(t))
 
 
 def run(root: Path, dry_run: bool) -> None:
@@ -546,19 +602,15 @@ def run(root: Path, dry_run: bool) -> None:
         print(s.source, {p: len(d) for p, d in plans[s.source].items()})
     if dry_run:
         return
+    before = old_reach(root)
     pieces: dict[str, set[str]] = {k: set(v) for k, v in FIXED.items()}
     for s in SPLITS:
         pieces.update(write_pieces(root, s, headers[s.source], plans[s.source], pieces))
     # the inspector's header is gone; its pieces replace it
     (root / INSPECTOR.source).unlink()
-    edges = {}
-    for s in SPLITS:
-        for spelling in s.pieces.values():
-            path = root / (Path(s.source).parent / Path(spelling).name)
-            edges[spelling] = includes_of(path.read_text(encoding="utf-8"))
     cut_unit(root)
     add_units_to_build(root)
-    n = rewrite_consumers(root, pieces, edges)
+    n = rewrite_consumers(root, pieces, before)
     print(f"ac4_cuts: wrote {sum(len(s.pieces) for s in SPLITS)} headers, 3 units; {n} consumers")
 
 
