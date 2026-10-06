@@ -76,7 +76,7 @@ endif()
 #
 # The directories were src/forge/src/internal/arch/ until src/ac4/src/core's QMF
 # banks took vector kernels of their own (planning/ac4.md, D14a, and decision 31's
-# "the vector types" in a header-only target both consumers link): iclforge::base_arithmetic below
+# "the vector types" in a header-only target both consumers link): iclforge::base_headers below
 # carries the include path, so linking it is all a consumer does.
 #
 # ICLFORGE_SIMD forces a directory. `generic` in particular is what a
@@ -129,12 +129,12 @@ endif()
 # 31 of planning/ac4.md asks for, without AC-4 linking the AC-3 codec to reach it. Not installed and
 # not exported, as iclforge::warnings is not: in-tree build plumbing, which the library's install
 # leaves out (cmake/InstallLibrary.cmake).
-add_library(iclforge_base_arithmetic INTERFACE)
-add_library(iclforge::base_arithmetic ALIAS iclforge_base_arithmetic)
-target_include_directories(iclforge_base_arithmetic INTERFACE
+add_library(iclforge_base_headers INTERFACE)
+add_library(iclforge::base_headers ALIAS iclforge_base_headers)
+target_include_directories(iclforge_base_headers INTERFACE
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<BUILD_INTERFACE:${ICLFORGE_ARCH_INCLUDE_DIR}>")
-target_compile_features(iclforge_base_arithmetic INTERFACE cxx_std_23)
+target_compile_features(iclforge_base_headers INTERFACE cxx_std_23)
 
 # tests/CMakeLists.txt reads this so test_simd_kernels.cpp sees the same simd.hpp the library was
 # built with, the same white-box arrangement ICLFORGE_AUDIO_BACKEND_DIR has there.

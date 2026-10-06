@@ -209,7 +209,7 @@ target_include_directories(iclforge_ac3_minimal
         # clock and the table, the library only calls in.
         "${_ac3_minimal_profiling_dir}"
         # The SIMD arch seam is resolved by src/base/CMakeLists.txt and comes
-        # with iclforge::base_arithmetic, linked below: mdct.cpp/bitalloc.cpp/exponents.cpp
+        # with iclforge::base_headers, linked below: mdct.cpp/bitalloc.cpp/exponents.cpp
         # include iclforge/base/detail/simd.hpp unconditionally, so this profile needs
         # a directory the same way the ordinary build does.
         #
@@ -270,7 +270,7 @@ endif()
 
 target_link_libraries(iclforge_ac3_minimal
     PUBLIC iclforge::minimal_profile
-    PRIVATE "$<BUILD_INTERFACE:iclforge::warnings>" "$<BUILD_INTERFACE:iclforge::base_arithmetic>")
+    PRIVATE "$<BUILD_INTERFACE:iclforge::warnings>" "$<BUILD_INTERFACE:iclforge::base_headers>")
 
 # iclforge/<library>/export.hpp is generated for each of the six libraries the archive holds, and
 # every annotated header includes its own. This profile is static-only, so each is asked for the

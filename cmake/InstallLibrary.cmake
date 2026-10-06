@@ -150,7 +150,7 @@ iclforge_install_pkgconfig(
 # The codec-blind libraries iclforge::ac3 links (src/base, dsp, objects, render), and the
 # containers: each is a mandatory component, installed and exported like the codec.
 # Fixed32 and the scalar arithmetic (iclforge/base/arithmetic/) are in-tree build plumbing, never
-# installed: iclforge::base_arithmetic (src/base/CMakeLists.txt).
+# installed: iclforge::base_headers (src/base/CMakeLists.txt).
 iclforge_install_library(base
     DESCRIPTION "The bit reader and writer, the speaker vocabulary, the CPU feature probe and the signing key, SHA-256 and HMAC-SHA-256 the iclforge libraries build on"
     EXCLUDE arithmetic)

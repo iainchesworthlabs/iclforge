@@ -43,7 +43,7 @@ The AC-4 library is installed and exported as `iclforge::ac4_static` and `iclfor
 the tables and transforms its decoder and encoder share are inside it, with no headers of their own
 ([AC-4](ac4.md#linking) has the detail).
 
-`iclforge::base_arithmetic` (header-only) is built in-tree and not installed; `iclforge::audio` and
+`iclforge::base_headers` (header-only) is built in-tree and not installed; `iclforge::audio` and
 `iclforge::sendspin` are not installed either (see the end of this page).
 
 **In-tree** (this repo `add_subdirectory`'d into a larger build, or as a git submodule):

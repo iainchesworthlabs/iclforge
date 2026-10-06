@@ -241,7 +241,7 @@ target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/s
 # use (planning/ac4.md, decision 31), worth holding to their own accuracy/
 # correctness bounds rather than only through the fixture hashes that depend
 # on them.
-target_link_libraries(iclforge-tests PRIVATE iclforge::base_arithmetic)
+target_link_libraries(iclforge-tests PRIVATE iclforge::base_headers)
 target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/src/core")
 # test_block_norm.cpp includes src/ac3/src/decoder/block_norm.hpp, the
 # fixed-point tier's block exponent, which both decoders share and which is not
