@@ -95,6 +95,14 @@ C1 = [
         r"ICLFORGE_AC4_\1",
         _TEXT,
     ),
+    # A list that named the libraries one by one names the one library once: `iclforge::ac4,
+    # iclforge::ac4 and iclforge::ac4`, `iclforge::ac4/iclforge::ac4`.
+    Rule(
+        "collapse",
+        r"(`?\biclforge::ac4(?:_static|_shared)?\b`?)(?:(?:,? and |, | or |/)\1(?![\w:]))+",
+        r"\1",
+        _TEXT,
+    ),
 ]
 
 STAGES: dict[str, list[Rule]] = {"c0": C0, "c1": C1}
