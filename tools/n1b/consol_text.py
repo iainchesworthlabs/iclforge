@@ -201,7 +201,8 @@ C1_PROSE = [
         _TEXT,
         plans=True,
     ),
-    # The streams and digests under tests/golden/ac4dec moved with the library's tests (decision 10).
+    # The streams and digests under tests/golden/ac4dec moved with the library's tests (decision
+    # 10).
     Rule(
         "golden-dir",
         r"\btests/golden/ac4dec\b(?![\w-])",
@@ -209,7 +210,8 @@ C1_PROSE = [
         _TEXT,
         plans=True,
     ),
-    # check_ac4_decode_scalar_snr.py keys its floors by each stream's path from the repository's root
+    # check_ac4_decode_scalar_snr.py keys its floors by each stream's path from the repository's
+    # root
     Rule(
         "golden-dir-pins",
         r"\btests/golden/ac4dec/",
