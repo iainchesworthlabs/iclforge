@@ -1134,7 +1134,7 @@ struct BlockQueue {
 
 // Nested in an exported class, Impl takes its visibility, so each member
 // function defined out of line below would be exported from libac4dec.so with
-// it. ICLFORGE_AC4DEC_NO_EXPORT on each keeps them to the library, and the exported set
+// it. ICLFORGE_AC4_NO_EXPORT on each keeps them to the library, and the exported set
 // to the header's (tools/ci/abi-allowlist/libiclforge_ac4.so.txt). Hiding Impl
 // itself would make GCC warn that Decoder is more visible than its impl_.
 struct Decoder::Impl {
@@ -1224,7 +1224,7 @@ struct Decoder::Impl {
 
     // Renders the frame's intermediate spatial format objects into `frame`'s
     // channels (clause 5.10.3), or where it has none into the output layout's.
-    [[nodiscard]] ICLFORGE_AC4DEC_NO_EXPORT detail::ParseResult render_isf(DecodedFrame& frame);
+    [[nodiscard]] ICLFORGE_AC4_NO_EXPORT detail::ParseResult render_isf(DecodedFrame& frame);
     // What presentations() and metadata() report: the presentations of the
     // last frame read, their names by presentation substream, and the
     // selected presentation's metadata as the frames have sent it.
@@ -1246,7 +1246,7 @@ struct Decoder::Impl {
 
     // The objects of one object audio member of the presentation, decoded,
     // their metadata applied, into `frame`.
-    [[nodiscard]] ICLFORGE_AC4DEC_NO_EXPORT detail::ParseResult decode_objects(
+    [[nodiscard]] ICLFORGE_AC4_NO_EXPORT detail::ParseResult decode_objects(
         const CapturedAudio& member, const detail::FrameInputs& base, DecodedFrame& frame);
 
     // A change of source (Part 1 clause 4.3.3.2.2): what was read from the
@@ -1303,7 +1303,7 @@ struct Decoder::Impl {
     // the captured frame and the values in force; `dialnorm` is the one the
     // DRC takes, which a version 0 presentation levels its associated audio
     // to.
-    [[nodiscard]] ICLFORGE_AC4DEC_NO_EXPORT detail::MixValues mix_values(
+    [[nodiscard]] ICLFORGE_AC4_NO_EXPORT detail::MixValues mix_values(
         const detail::PresentationPlan& plan, std::size_t anchor, std::optional<double> dialnorm);
 
     // The substream a concealed frame comes from, the one that output last;
@@ -1319,7 +1319,7 @@ struct Decoder::Impl {
     // A frame of concealed output in `frame` in place of the frame that failed
     // with `error`, at the sequence_counter and phase decode() took it to
     // have; the error where there is no concealment source.
-    [[nodiscard]] ICLFORGE_AC4DEC_NO_EXPORT std::expected<bool, DecodeError> conceal_or(
+    [[nodiscard]] ICLFORGE_AC4_NO_EXPORT std::expected<bool, DecodeError> conceal_or(
         DecodeError error, DecodedFrame& frame);
 
     // Reads every substream of the frame, keeping the content of the
@@ -1330,7 +1330,7 @@ struct Decoder::Impl {
     // substreams over `raw_ac4_frame`, the concatenated fragments. An assembled unit's
     // sequence_counter is its codec frame's, so its continuity is not checked here: collect()
     // checked each transmission frame's.
-    [[nodiscard]] ICLFORGE_AC4DEC_NO_EXPORT std::expected<FrameReport, DecodeError> read(
+    [[nodiscard]] ICLFORGE_AC4_NO_EXPORT std::expected<FrameReport, DecodeError> read(
         std::span<const std::byte> raw_ac4_frame,
         std::expected<iclforge::ac4::RawFrame, iclforge::ac4::Error> frame, bool assembled = false);
 
@@ -1345,7 +1345,7 @@ struct Decoder::Impl {
         std::expected<iclforge::ac4::RawFrame, iclforge::ac4::Error> frame;
         bool assembled = false;
     };
-    [[nodiscard]] ICLFORGE_AC4DEC_NO_EXPORT Collected
+    [[nodiscard]] ICLFORGE_AC4_NO_EXPORT Collected
     collect(std::span<const std::byte> raw_ac4_frame);
 
     // The FIFO of Figure 8 (Part 2 clause 5.1.3): the frames of the unit being assembled, each
@@ -1361,26 +1361,26 @@ struct Decoder::Impl {
     int fragment_fraction = 1;          // the fraction of the unit in progress
     std::vector<std::byte> unit_bytes;
     // Joins the fragments of the unit; false where they do not describe one.
-    [[nodiscard]] ICLFORGE_AC4DEC_NO_EXPORT bool assemble_unit(int fraction,
+    [[nodiscard]] ICLFORGE_AC4_NO_EXPORT bool assemble_unit(int fraction,
                                                                iclforge::ac4::RawFrame& unit);
 
     // decode()'s work, into `frame`, whose storage it reuses: true for a frame
     // of output, false for a frame that has none.
-    [[nodiscard]] ICLFORGE_AC4DEC_NO_EXPORT std::expected<bool, DecodeError> decode_into(
+    [[nodiscard]] ICLFORGE_AC4_NO_EXPORT std::expected<bool, DecodeError> decode_into(
         std::span<const std::byte> raw_ac4_frame, DecodedFrame& frame);
 
     // The presentations of `toc` as presentations() reports them, from the
     // plans select() left.
-    ICLFORGE_AC4DEC_NO_EXPORT void report_presentations(const Toc& toc);
+    ICLFORGE_AC4_NO_EXPORT void report_presentations(const Toc& toc);
     // The selected presentation's metadata, from the frame just read.
-    ICLFORGE_AC4DEC_NO_EXPORT void report_metadata();
+    ICLFORGE_AC4_NO_EXPORT void report_metadata();
 
     // decode_by_block()'s queue: hands `frame` to `sink` in blocks, holding
     // what is left over; returns the blocks handed over.
-    ICLFORGE_AC4DEC_NO_EXPORT std::size_t queue(const DecodedFrame& frame, const BlockSink& sink);
+    ICLFORGE_AC4_NO_EXPORT std::size_t queue(const DecodedFrame& frame, const BlockSink& sink);
     // Hands over what the queue holds as one shorter block; returns its
     // samples.
-    ICLFORGE_AC4DEC_NO_EXPORT std::size_t drain(const BlockSink& sink);
+    ICLFORGE_AC4_NO_EXPORT std::size_t drain(const BlockSink& sink);
 };
 
 std::expected<bool, DecodeError> Decoder::Impl::conceal_or(DecodeError error, DecodedFrame& frame) {
