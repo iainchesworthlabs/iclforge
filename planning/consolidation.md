@@ -1,13 +1,15 @@
 # One shape for every codec, and fewer libraries (a proposal)
 
-!!! note "Status as of 2026-10-06: proposed; five decisions taken, the rest open, nothing built"
+!!! note "Status as of 2026-10-06: C0 run and proved; C1 to C3 under way; decisions 1 to 5, 7 and 10 taken"
     Asked for by the user on 2026-10-06: "the AC3 codec and the AC4 codec structures are completely
     different. There's also duplication from inside codecs to common stuff", "the ac3 approach is the
     preferred approach", and "should there be 25 libraries? Is it worth consolidating some?". This page
     reads the tree as it stood on `main` that day. It follows [layout.md](layout.md) (N1B), which put the
     codecs side by side and left the duplicated DSP, the codec-blind vocabulary and the shape of AC-4 for
     later ([layout.md (j)](layout.md#j-what-stays-out-and-follow-on-ideas)). The user took decisions 1 to 5
-    below on 2026-10-06; 6 to 10 are open.
+    below on 2026-10-06, and 7 and 10 before C1; 6, 8 and 9 are open. C0 ran on the local branch
+    `chore/src-consolidation-c0` and changed nothing a build outputs ([what the runs
+    found](#what-the-runs-found-that-the-plan-did-not)); nothing is pushed.
 
 ## In brief
 
@@ -363,6 +365,115 @@ the passes pointed at it.
 
 When a stage lands, `ac4.md` and `layout.md` say so in their status blocks, and `ROADMAP.md` carries a row.
 
+## How C0 to C3 are run
+
+The stages run as N1B's did ([tools/n1b/README.md](../tools/n1b/README.md)), one local branch each, each
+made from the one before: `chore/src-consolidation-c0` from the branch this page was written on, then
+`-c1`, `-c2`, `-c3`. Within a stage the commits come in N1B's order, each script in a commit of its own
+before the commit it makes: the cuts (C1 only), the moves alone (`git mv`, every rename `R100`), the
+include spellings, the build files and the paths in text, then what is done by hand.
+
+**The passes.** N1B's scripts are pointed at a plan of their own:
+
+| script | what it does here |
+|---|---|
+| `consoldef.py` (new) | the moves of appendices A and B as data, one function per stage (`c1_new`, `c2_new`, `c3_new`), as `layoutdef.py` holds L2; the libraries each stage merges (`LIBRARY_MAP`) |
+| `ac4_cuts.py` (new) | C1's cuts in today's layout: `ac4.hpp` into `toc.hpp`, `elementary.hpp` and `carriage.hpp`, the decoder's header into four and the encoder's into two, by a table of where each declaration goes; `ac4.cpp` into three units; each consumer includes what it uses |
+| `consol_apply.py` (new) | `n1b_apply.py`'s planner and include rewrite with a stage's moves: `git mv`, the include spellings, the export headers and macros of the libraries that merge |
+| `consol_text.py` (new) | the rewrites a table can say: C0's profiling markers; a stage's export macros, namespaces and CMake target names |
+| `n1b_cmake.py`, `n1b_paths.py` | the moved paths in the build files and in every other text, from the stage's plan |
+| `baseline.py` | the record of a tree before and after; it gains an ELF reader for the exports (`nm -D`) and an `install` kind, every file `cmake --install` lays down and the bytes of the text a consumer reads |
+| `flags_diff.py` (new) | the flags each unit compiles with, and each archive and link step, of two configured trees (`compile_commands.json`, `ninja -t commands`): a C0 that changes nothing a compiler sees shows nothing, minutes before a build |
+| `export_diff.py`, `abi_compare.py` | the exports per library, with a stage's library map (C1, C2, C3) and namespace rewrites (C2, C3) |
+| `ir_compare.py` | the moved units' IR, old tree against new (C1 to C3) |
+
+The CMake of a merged library (`src/ac4/CMakeLists.txt` and `minimal.cmake`, `src/containers/CMakeLists.txt`),
+the install rules, the package config, the ports, the bindings, the pages and the status of the plans are
+by hand, in the stage's last commits.
+
+**The proof, on this machine.** Linux (WSL2), GCC 16 and Clang 22, the presets `config-linux-gcc` and
+`config-linux-llvm` (Release, `-Werror`) and `config-linux-llvm-shared` (Debug, `BUILD_SHARED_LIBS=ON`),
+each with `ICLFORGE_BUILD_ADM=ON` and the `adm` and `hearth` features, so that every library is built.
+Before a stage, its parent is built in a worktree of its own (`build/wt/<stage>-before`) and recorded
+(`baseline.py record`); after it, the stage's tree is built, the whole ctest runs, and the two records are
+compared: the pinned hashes and the CLI corpus per compiler, the exports of every shared library with the
+stage's map, the installed tree. Then `check_layering.py`, `check_namespaces.py`, `check_pages.py`,
+`check_doc_paths.py` and `tools/ci/precheck.py`, and the bare-metal probes under QEMU (`arm-none-eabi-gcc`
+and `qemu-system-arm` are on this machine): the AC-3 decoder, the encoder, and AC-4 in float, with the stage
+timers, and in fixed point, each with `--icount`, so that the instruction count of every fixture is
+compared as well as its PCM. What cannot run here is recorded with each stage: MSVC and clang-cl, macOS,
+ESP-IDF (`pack_esp_component.py --verify` needs `idf.py`), and the CI dispatch.
+
+A stage that shows a difference stops, and the user is told before the next begins.
+
+## What the runs found that the plan did not
+
+### C0, 2026-10-06 (`chore/src-consolidation-c0`)
+
+The commits, after the plan's own: two fixes to `main` the baseline needed (below); the scripts
+(`baseline.py`'s ELF and install records, `flags_diff.py`, `consol_text.py`); the scripted commit
+(`consol_text.py --stage c0`: 6 files, 6 includes and 8 markers); the build files by hand (21 files,
++485 −1,599: the twelve libraries' `CMakeLists.txt`, `cmake/IclforgeLibrary.cmake`,
+`cmake/InstallLibrary.cmake`, the root, `src/ac3`, `src/base`, `src/ac4core`, the two removed variant
+headers and the layering table).
+
+| | the plan | the run |
+|---|---|---|
+| libraries made by hand | 12 | 12, now `iclforge_add_library()`; `ac4core` stays a plain archive until C1 removes it |
+| `iclforge_add_library()` gains | a minimal profile, a source list per option, `COMPILE_ONLY` | the minimal profile, `EMBEDS`, `LINK_PUBLIC`, `STEM`, `EXPORT_HEADER`, and three options that keep the old exports exactly (`LINK_PRIVATE_FIRST`, `BUILD_TREE_DEPENDS`, `NO_C4251_SUPPRESSION`); a source list per option is a list the caller builds (`src/capi`) |
+| install blocks | not named | `InstallLibrary.cmake`'s twelve blocks become `iclforge_install_library()` calls, which gains `SHARED_ONLY`, `EXPORT_SET`, `REQUIRES`, `STATIC_REQUIRES`, `GENERATED_HEADERS` |
+| `ICLFORGE_DECODE_SCALAR` | at the root, one spelling of its directories | at the root, with `ICLFORGE_DECODE_SCALAR_TIER` (`float64`, `float32`, `fixed32`); `ac4core`'s directories keep their names until C1 moves them (a move in C0 would not be "no file moves") |
+| `ac4core`'s profiling variants | removed, `base`'s header | removed; the core takes `base`'s directory by variable (`ICLFORGE_PROFILING_INCLUDE_DIR`), since the minimal profile builds no `iclforge::base`; `layering.json` lets `ac4core` and `ac4dec` include `base` |
+
+**The proof.** Identical, in every kind, on GCC 16 (`config-linux-gcc`), Clang 22 (`config-linux-llvm`)
+and the shared tree (`config-linux-llvm-shared`), each with ADM on: the pinned hashes (both modes, the
+gate passing), the 44 commands of the CLI corpus per compiler, the exports of all 18 shared libraries
+(`abi_compare.py --map identity`: every library −0 +0), the public headers, and the installed tree
+(253 files: the package config, 17 export sets and 18 `.pc` files byte for byte). `flags_diff.py`
+found every unit compiled with the same flags (822, 822 and 789 units) and every archive and link step
+the same (87, 62 and 60), and the same of the bare-metal AC-4 tree (`config-arm-none-eabi-minimal-ac4`,
+87 and 5), once AC-4's profiling directory, which C0 changes on purpose, is set aside. The five
+bare-metal probes under QEMU with `-icount` (the AC-3 and E-AC-3 decoder, the encoder, and AC-4 in
+float, with the stage timers and in fixed point) print the same PCM hash, instruction count, heap,
+stack and image size for every fixture. The whole ctest of the GCC and the Clang trees, 3,452 tests
+each: all pass but five that skip themselves (streams named by environment variables), as on the
+parent.
+`check_layering.py` (240 edges), `check_namespaces.py` (191 headers), `check_pages.py` and
+`check_doc_paths.py` (6,230 paths) pass; so does `precheck.py` but for the patch attribution
+(below).
+
+**What `main` needed first.** The parent did not build with Clang 22 `-Werror`: `src/iamf/src/iamf.cpp`
+promoted two floats to double implicitly (#1188) and `tests/iab/test_mxf_writer.cpp` had an unused
+item UL (#1187). Each is a commit at the start of the branch, before the baseline, and changes no
+output. Three more things of `main`'s are recorded and left: the shared tree's `iclforge-tests` does
+not link (`iclforge::iab::DlcAudio::normalized()` is not exported; `shared_libs` is a nightly leg), the
+fixed-point AC-4 probe's decode takes 22,712 bytes of stack against a ceiling of 21,500, and the ABI
+allowlists of `adm` and `admbridge` are 36 names behind the libraries (CI's shared leg builds no ADM).
+
+Hazards the plan did not name:
+
+- **What a hand-written library exported.** The helper's first draft compiled and linked everything
+  the same, and the installed export sets still differed in six files: the AC-4 decoder and encoder
+  took the inspector's compile requirements in the build tree only, four libraries set no C4251
+  suppression, and `iclforge::signing` linked the codec first and as an ordinary link. Only the
+  `install` record, which the plan's four kinds do not include, showed it; three options keep them.
+- **`libiclforge_signing.so` carries a copy of the codec.** Its objects link the bare `iclforge::ac3`,
+  which is the static archive in a static build, so the shared signer embeds what it calls of the
+  codec beside its link to `libiclforge_ac3.so`. Kept as it was; C2 moves the signer into `ac3`.
+- **Tracy and AC-4.** Under `ICLFORGE_ENABLE_TRACY` the AC-4 core's markers now make Tracy zones,
+  where its own variant made nothing. No Tracy build was run.
+- **The machine.** vcpkg wants to write `~/vcpkg`, outside the sandbox: its buildtrees, downloads and
+  packages go under `build/vcpkg`, and the trees share one `vcpkg_installed` (`VCPKG_INSTALLED_DIR`).
+  Catch2's test discovery writes into `XDG_RUNTIME_DIR` and three tests write under `HOME`; both point
+  into `build/tmp` for the builds and the ctest. A fresh build directory clones libadm and libbw64,
+  which makes a configure take six to seven minutes. The commits carry the machine's identity, not the
+  one `precheck.py`'s attribution check expects, so a push needs them re-attributed first.
+
+Not run here: MSVC and clang-cl, macOS, the ESP-IDF pack (`compote` and `idf.py` are not installed;
+the packer's `stage()` was run instead, and stages the same files but the two variant headers C0
+removes), the CI dispatch, `ruff` (the sandbox will not install it) and the platform-macro check
+(`pwsh`).
+
 ## (g) Decisions
 
 ### Taken on 2026-10-06
@@ -376,6 +487,11 @@ When a stage lands, `ac4.md` and `layout.md` say so in their status blocks, and 
    the algorithm differ ("signing should probably be in ac3 with ac4 having its own signing"). AC-3's
    signer goes into `ac3` now and AC-4's into `ac4` when it is built; the key, SHA-256 and HMAC, which
    both use, go to `base` (d).
+7. **AC-4's public headers.** **Taken: (a)**, split in C1.
+10. **The golden directories.** **Taken, on the user's words:** "tests structure should ideally map
+    directly to src structure so move/consolidate/rename as necessary". `tests/golden/ac4dec/` becomes
+    `tests/golden/ac4/` in C1, and a golden directory named for a library that merges follows it in C2
+    and C3.
 
 ### Open
 
@@ -384,15 +500,11 @@ When a stage lands, `ac4.md` and `layout.md` say so in their status blocks, and 
    (b) keep `iclforge::mp4` and its kin inside the one library, a recorded exception to the lock. Cost of
    (a): every use of the five namespaces in the programs, the tests and the bindings, done by a pass as
    N1B's S3 was.
-7. **AC-4's public headers.** (a) **split in C1** (recommended: the include spellings change in C1
-   anyway, so a consumer changes once); (b) move whole in C1 and split in C6.
 8. **The order.** (a) **C0, C1, C2, C3 as one freeze, then C4, C5, C6 as they are ready** (recommended:
    the mechanical stages are disruptive in the same files and are cheapest together); (b) each stage
    alone; (c) C1 first, before C0.
 9. **C5 at all.** (a) **proceed, kernel by kernel, with re-scoring** (recommended); (b) stop after C4 and
    keep two QMF banks and two FFTs, recorded as accepted, as decision 25(b) priced it.
-10. **The golden directories.** `tests/golden/ac4dec/` is data that fixtures, generators and pages name by
-    path. (a) **leave it where it is** (recommended); (b) rename it to `tests/golden/ac4/` in C1.
 
 ## Appendix A: the moves of C1
 
