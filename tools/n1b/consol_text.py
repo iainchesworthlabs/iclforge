@@ -36,6 +36,10 @@ KEEP = (
     "fuzz/seeds/",
     "fuzz/regressions/",
     "packaging/winget/manifests/",
+    # what a build exported, which check_abi_symbols.py --update writes again after a stage
+    "tools/ci/abi-allowlist/",
+    # the namespace checker's own fixtures, which name libraries of their own (`mp4`)
+    "tools/checks/test_check_namespaces.py",
 )
 
 CMAKE = ("CMakeLists.txt", ".cmake", ".cmake.in")
