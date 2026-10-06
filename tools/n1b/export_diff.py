@@ -11,6 +11,8 @@ options and nothing else passes.
   --map l2         the libraries of S2: ac3forge.dll is compared with the union of the six it was
                    split into, and every other library with the file its output name becomes
                    (n1b_cmake.OUTPUT)
+  --map c1|c2|c3   a consolidation stage's merges (planning/consolidation.md): the union of the
+                   libraries merged into one is compared with the one
   --rewrite cuts   the types the seven cuts of S1 moved appear under their new qualified names
   --rewrite names  the namespace root is rewritten the way n1b_names.py rewrites it (S3)
   --rewrite idents the brand in a name is rewritten the way n1b_idents.py rewrites an identifier
@@ -92,11 +94,42 @@ def l2_map(old_libraries: list[str]) -> dict[str, list[str]]:
     return {old: out.get(old, [old]) for old in old_libraries}
 
 
+def consolidation_map(stage: str, old_libraries: list[str]) -> dict[str, list[str]]:
+    """The libraries a stage of planning/consolidation.md merges, as groups: the old files a group
+    of new ones exports between them (consoldef.LIBRARY_MAP, a library that goes to the one it is
+    merged into, and the merged one to itself), every other library itself. Keyed by the group's
+    old files joined with `+`."""
+    import consoldef
+
+    def file_of(lib: str, like: str) -> str:
+        return like.replace(like[like.index("iclforge_") + 9 : like.rindex(".")], lib)
+
+    like = old_libraries[0]
+    groups: dict[str, set[str]] = {}
+    for old, target in consoldef.LIBRARY_MAP[stage].items():
+        groups.setdefault(file_of(target, like), {file_of(target, like)}).add(file_of(old, like))
+    grouped = {o for olds in groups.values() for o in olds}
+    out = {
+        "+".join(sorted(o for o in olds if o in old_libraries)): [new]
+        for new, olds in groups.items()
+    }
+    out.update({old: [old] for old in old_libraries if old not in grouped})
+    return out
+
+
 def compare(
     old: dict, new: dict, mapping: str, kinds: set[str], limit: int, copies: bool = False
 ) -> int:
-    old_libs, new_libs = old["libraries"], new["libraries"]
-    grouping = l2_map(sorted(old_libs)) if mapping == "l2" else {name: [name] for name in old_libs}
+    old_libs, new_libs = dict(old["libraries"]), new["libraries"]
+    if mapping == "l2":
+        grouping = l2_map(sorted(old_libs))
+    elif mapping in ("c1", "c2", "c3"):
+        grouping = consolidation_map(mapping, sorted(old_libs))
+        for key in grouping:
+            if "+" in key:
+                old_libs[key] = [n for part in key.split("+") for n in old_libs[part]]
+    else:
+        grouping = {name: [name] for name in old_libs}
     everywhere = {n for names in new_libs.values() for n in names}
     bad = 0
     used: set[str] = set()
@@ -122,7 +155,7 @@ def compare(
         names = len(new_libs[extra])
         print(f"{extra}: a library the old record has no counterpart for ({names} names)")
         bad += 1
-    union_old = {rewrite(n, kinds) for names in old_libs.values() for n in names}
+    union_old = {rewrite(n, kinds) for names in old["libraries"].values() for n in names}
     lost, gained = sorted(union_old - everywhere), sorted(everywhere - union_old)
     print(
         f"all libraries together: {len(union_old)} names before, {len(everywhere)} after; "
@@ -140,7 +173,7 @@ def main() -> int:
     )
     ap.add_argument("--old", required=True, type=Path)
     ap.add_argument("--new", required=True, type=Path)
-    ap.add_argument("--map", choices=["identity", "l2"], default="identity")
+    ap.add_argument("--map", choices=["identity", "l2", "c1", "c2", "c3"], default="identity")
     ap.add_argument("--rewrite", default="", help="comma-separated: cuts, names, idents, ac3ns")
     ap.add_argument("--copies", action="store_true", help="a name another library exports is kept")
     ap.add_argument("--limit", type=int, default=30)
