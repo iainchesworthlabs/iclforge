@@ -3030,7 +3030,7 @@ struct StreamPresentation {
 
 // Part 2 Table 55 reads md_compat 3 as holding 17 A-JOC objects and an LFE;
 // the writer takes an A-JOC substream to need that level, and 7 above 17
-// objects (src/ac4enc/ERRATA.md, "md_compat for objects").
+// objects (src/ac4/ERRATA.md, "md_compat for objects").
 constexpr int kAjocObjectsAtLevel3 = 17;
 // The most objects the decoder keeps in one portion (src/ac4/ERRATA.md,
 // "The objects oamd_dyndata_multi() lists").
@@ -3702,7 +3702,7 @@ detail::TocGroup Encoder::Impl::object_group(const Impl& impl, const ObjectLayou
         // ac4_substream_info_ajoc(): the downmix's signals, dynamic objects
         // only; the upmix's, its bed objects listed by
         // nonstd_bed_channel_assignment where it has any and the dynamic
-        // objects after them (src/ac4enc/ERRATA.md, "An A-JOC substream's
+        // objects after them (src/ac4/ERRATA.md, "An A-JOC substream's
         // objects"); the common data where it is configured.
         TocObjectSubstream info;
         info.ajoc = true;
@@ -4382,7 +4382,7 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
             }
             // Part 1 clause 4.3.3.7.1: 3.0 codes a dialogue enhancement signal,
             // or the dialogue of a music and effects presentation, alone; the
-            // dialogue may also play by itself (src/ac4enc/ERRATA.md, "3.0
+            // dialogue may also play by itself (src/ac4/ERRATA.md, "3.0
             // substreams").
             const bool three_dialogue = roles[m] == Role::kDialogue && music_and_effects;
             if (mode == 2 && !subs[i].enhances && !three_dialogue && pc.config) {

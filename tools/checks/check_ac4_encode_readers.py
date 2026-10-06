@@ -23,7 +23,7 @@ and an MP4 file, and:
              - de_ms_proc_flag, twice the codes the encoder and the decoder read for L and R's Mid;
   DEE's muxer  dee_mp4muxer takes the raw stream and writes an MP4 file whose 'dac4' box is the one
              the encoder's MP4 file carries; for the 3/2/2 layout, but for channel group 4, which
-             the muxer leaves out (src/ac4enc/ERRATA.md, "The 3/2/2 layout's top front pair").
+             the muxer leaves out (src/ac4/ERRATA.md, "The 3/2/2 layout's top front pair").
 
 Phase E6's presentations: the encoder's streams of several substreams and presentations under
 tests/golden/ac4/presentations/ (encoder-*.ac4, which tests/ac4/encoder/test_ac4enc_presentations.cpp
@@ -266,7 +266,7 @@ FRAME = re.compile(r"^([0-9A-F]{4,}) ac4_syncframe - (\d+) ")
 
 
 def run(command, timeout=600):
-    # A timeout for every tool: DEE's muxer can hang on a stream (src/ac4enc/ERRATA.md, "An
+    # A timeout for every tool: DEE's muxer can hang on a stream (src/ac4/ERRATA.md, "An
     # alternative presentation's dac4").
     try:
         result = subprocess.run(

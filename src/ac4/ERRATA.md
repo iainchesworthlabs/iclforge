@@ -21,7 +21,7 @@ reading. The evidence for a reading is one of:
 - **Observation**: the text says nothing; the encoded streams decide.
 
 Phases D2 to D10 added the readings their processing needs, under their own headings below. A
-reading only a writer needs is in `src/ac4enc/ERRATA.md`, which points back here wherever the decoder
+reading only a writer needs is in `src/ac4/ERRATA.md`, which points back here wherever the decoder
 depends on the same reading.
 
 ## Table of contents and presentations
@@ -1460,7 +1460,7 @@ reading below rests on it.
   3 in nearly every frame and `sap_mode` 2 in the rest (the 237 frames of G0's `514-music-768`: 236 for
   each surround pair, 216 and 220 for the top pairs), and the ten tones of its 5.1.4 legs decode with this
   reading each on its own channel (`tools/checks/score_ac4_decode.py`).
-  Phase E8's encoder writes them the same way (`src/ac4enc/ERRATA.md`, "Table 20's prediction").
+  Phase E8's encoder writes them the same way (`src/ac4/ERRATA.md`, "Table 20's prediction").
 
 ### ASPX_ACPL_2 and step 4
 

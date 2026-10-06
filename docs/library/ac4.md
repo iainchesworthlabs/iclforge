@@ -358,7 +358,7 @@ config.presentations = {
 presentation gets the least `md_compat` its tracks need and a `presentation_id` of its own unless it
 sets them, and its own dialnorm, loudness, DRC and downmix where it sets them. The substreams take
 shares of the rate in proportion to their full-band channels unless they set their own. What the
-encoder refuses there, and why, is in the header and `src/ac4enc/ERRATA.md`.
+encoder refuses there, and why, is in the header and `src/ac4/ERRATA.md`.
 
 ### Encoding objects
 
@@ -450,7 +450,7 @@ probe:
   G.1, or the Dolby 2015 scheme's word); and `iclforge::ac4::dash_supplemental_properties(toc)` the frame
   rate and a pre-virtualized presentation's descriptors (G.3). `iclforge::ac4::configuration_difference(a,
   b)` names the Annex H.1.2.4 parameter in which two tables of contents differ, empty where every
-  sample of a CMAF track may carry both. `src/ac4enc/ERRATA.md` ("Manifests and CMAF tracks") has
+  sample of a CMAF track may carry both. `src/ac4/ERRATA.md` ("Manifests and CMAF tracks") has
   the readings these take.
 
 ## Errors

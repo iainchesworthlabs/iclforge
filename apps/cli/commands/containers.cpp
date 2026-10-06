@@ -533,7 +533,7 @@ std::vector<iclforge::mp4::SegmentInfo> segment_infos_of(const RenditionFiles& r
 // H.1.2.4's equivalent configurations. Each fragment starts at an I-frame
 // (E.3), the first once it holds frames_per_fragment frames, and the track
 // counts in Table E.1's timescale. Its brands are Table H.1's 'ca4m' and
-// 'ca4s' (src/ac4enc/ERRATA.md, "A single-stream track's brands"); its codecs
+// 'ca4s' (src/ac4/ERRATA.md, "A single-stream track's brands"); its codecs
 // parameter, channel configuration, frame rate and channel count describe the
 // presentation with the widest compatibility (G.2.3, iclforge::ac4::signalled_presentation()).
 int fmp4_ac4(Ac4Input& input, std::string_view in_path, std::string_view out_dir,

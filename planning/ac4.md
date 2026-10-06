@@ -302,7 +302,7 @@ literally:
 - A-JOC's differential decoding, which writes the wrong wet-matrix index (Part 2 5.7.3.2).
 
 The implementation keeps a register of them: for each, the clause, the reading taken, and the
-evidence for that reading. `src/ac4/ERRATA.md` has 165 entries today and `src/ac4enc/ERRATA.md`,
+evidence for that reading. `src/ac4/ERRATA.md` has 165 entries today and `src/ac4/ERRATA.md`,
 for the readings only the writer needs, 48.
 
 ### Material
@@ -1343,7 +1343,7 @@ How each phase is run:
   encoder phase's pull request records the race against DEE.
 - Every reading taken where the text is ambiguous goes into `src/ac4/ERRATA.md`, and both
   transcriptions take it. A reading only the writer needs, such as the value of a field decoders
-  ignore or an order the text leaves open, goes into `src/ac4enc/ERRATA.md`, which points at the
+  ignore or an order the text leaves open, goes into `src/ac4/ERRATA.md`, which points at the
   decoder's entry wherever both depend on one reading.
 - Each phase updates what it changes of the support catalogue, the status table, the capabilities
   and validation pages, CHANGELOG and ROADMAP.
@@ -2630,7 +2630,7 @@ decode with the invariants holding and MediaInfo's and librempeg's readings reco
 **Status:** merged as #1011 on 2026-09-25. Exit met.
 
 - `src/ac4enc/`, with its CMake, tests, an instrumented fuzz target over its configuration and
-  input, the write trace, and `src/ac4enc/ERRATA.md`.
+  input, the write trace, and `src/ac4/ERRATA.md`.
 - The frame writer: `ac4_toc()` at bitstream version 2 with one version 1 presentation, one
   substream group and the substream index table; the presentation substream with dialnorm; the audio
   substream's `metadata()`; the sync frame, with Annex G's CRC on request; and raw frames for MP4
@@ -2708,7 +2708,7 @@ pinned tolerance; log-spectral distance and ViSQOL pinned. The race at 2.0 and 4
   its matrices of three to five channels and the 3.0 element's pair come out 6 to 19 dB down, it
   refuses the 5/2/0 and 3/2/2 layouts, and it writes a 3/4/0 stream's L on every channel. DEE's
   muxer leaves 3/2/2's top front pair out of the `dac4` channel groups Part 2 Table A.27 and
-  Pseudocode E.3 both give it (`src/ac4enc/ERRATA.md`).
+  Pseudocode E.3 both give it (`src/ac4/ERRATA.md`).
 - In the race, this encoder's SNR below the crossover trails DEE's by 7.3 to 11.6 dB at 192 kbps,
   where DEE keeps the bass clean and lets the band from 8 kHz go, with ViSQOL at or above DEE's
   there; above 288 kbps its SNR leads and its ViSQOL is up to 0.05 under DEE's on film. DEE splits a
@@ -2736,7 +2736,7 @@ and E2's checks; the race at 5.1 from 192 to 768 kbps.
   I-frames, no companding, and A-SPX
   from subband 32 to 23.25 kHz with a 12.75 kHz crossover in ASPX_ACPL_2, to 18.75 kHz from 12 kHz in
   ASPX_ACPL_3. The encoder writes that. Its ASPX_ACPL_3 gammas follow DEE's four relations, which
-  DEE's streams hold in all but 37 of 7,110 bands (`src/ac4enc/ERRATA.md`, "ASPX_ACPL_3's gammas").
+  DEE's streams hold in all but 37 of 7,110 bands (`src/ac4/ERRATA.md`, "ASPX_ACPL_3's gammas").
 - Each band's parameters are estimated over 48 QMF slots centred on the frame's last, where smooth
   interpolation reaches them, from a DFT of each subband's slots, reading the bins of its own band. A
   subband's own band lies in half of its spectrum; its neighbours reach the other half through the
@@ -2814,7 +2814,7 @@ meet E1's and E2's checks; the race at 5.1 and 96, 128 and 144 kbps.
   lacks, except mono; 3.0 carries only a dialogue enhancement signal or the dialogue of a music and
   effects presentation; and CMAF's limits hold: 64 presentations at most, a `presentation_id` in
   every sample and one table of contents configuration throughout.
-- E6 found the text leaving a writer these choices (`src/ac4enc/ERRATA.md`, "Presentations"): the
+- E6 found the text leaving a writer these choices (`src/ac4/ERRATA.md`, "Presentations"): the
   tracks `md_compat` counts, every channel but the LFE of every substream a presentation names, the
   dialogue enhancement substream's included, which DEE's levels agree with (0 in stereo, 1 in 5.1, 2
   in 5.1.4, and `presentation_id` 0 on their one presentation, which E1 to E5 left out); a name sent
@@ -2879,7 +2879,7 @@ languages and levels as configured.
   of more than one presentation and does not finish one of an alternative presentation, so the box
   is held to the text and to MediaInfo's trace, and to the muxer's box byte for byte for Chromium's
   A-JOC stream and DASH-IF's 5.1 test vectors. MediaInfo reads `n_targets` as `n_targets_minus1`.
-  `src/ac4enc/ERRATA.md` records the readings, among them where Pseudocode E.3 leaves channel groups
+  `src/ac4/ERRATA.md` records the readings, among them where Pseudocode E.3 leaves channel groups
   out and when `b_presentation_core_differs` is set.
 - A configuration 6 presentation has no field for the `presentation_id` Annex H.1.2.1 asks of every
   presentation of a CMAF track. `ac4::cmaf_refusal()` names the rule a table of contents breaks, and
@@ -3051,7 +3051,7 @@ raises by 0.2 to 0.9 dB on sweeps, to 0.55, 0.79 and 1.14 dB over DEE's at 2.0 a
 and 0.55 to 2.7 dB under it everywhere else. The pins moved for that reason alone: the 5.1.4 sweeps' LSD
 ceilings up 0.4 to 0.7 dB, their ViSQOL floors up 0.17 to 0.63, their tile ceilings down by 7 to 19 dB, and
 their SNR floors unchanged but for 0.1 dB in a channel or two at 256 to 320 kbps; the 2.0 and 5.1 sweeps
-and the three A-CPL ones are pinned for the first time. `src/ac4enc/ERRATA.md` records the reading. Not
+and the three A-CPL ones are pinned for the first time. `src/ac4/ERRATA.md` records the reading. Not
 done: `choose_sinusoids` holds a group's tone to twice the group's mean energy, which no group of two
 subbands can show, so sinusoids reach only the three-subband groups above 16.5 kHz and the single
 subbands; changing it would change music's streams, and E10 leaves it.
@@ -3103,7 +3103,7 @@ against a real device (the software-ALSA tests run on Linux CI).
   has an ID and a mapping. `record` no longer writes the frames of its bitstream check after the
   rest of the take. `play` decodes AC-4 to PCM, since no receiver found takes it over IEC 61937, and
   `live` sends a receiver the 5.1 AC-3 leg. `fmp4`'s CMAF track takes the readings
-  `src/ac4enc/ERRATA.md` records under "Manifests and CMAF tracks".
+  `src/ac4/ERRATA.md` records under "Manifests and CMAF tracks".
 
 **Exit:** every new option has a test; the codec matrix covers every AC-4 command, as
 `tools/checks/check_matrix_coverage.py` requires; the man page and completions list them.
@@ -3335,7 +3335,7 @@ metadata, so the decoder reports it with gain -infinity and priority 0. E9's `ob
 wrote the screen factor and the depth exponent as one group of fields whose factor has no code for
 0, so an object with a depth exponent other than 1 and a screen factor of 0 decoded with a factor of
 1/8; the tests gave such an object a factor, and the encoder now refuses it, naming the reason
-(`src/ac4enc/ERRATA.md`, "The screen factor and the depth exponent"). Python binds the C++
+(`src/ac4/ERRATA.md`, "The screen factor and the depth exponent"). Python binds the C++
 structs, so its streams are the C++ encoder's by construction: its test holds two ways of
 configuring the same scene to the same bytes, and the decoder's read-back holds each field. A C
 caller can store any int in an enumeration-typed field, and reading a value the enumeration does not

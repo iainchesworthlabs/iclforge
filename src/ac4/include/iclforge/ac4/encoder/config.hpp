@@ -351,7 +351,7 @@ struct EmdfPayload {
 // gives a renderer, which the encoder writes as object audio metadata (clause
 // 6.2.8). The applications convert the scene descriptions they read into
 // these. Behind experimental.objects (planning/ac4.md, "What the encoder
-// writes by default"). src/ac4enc/ERRATA.md records the readings the writer
+// writes by default"). src/ac4/ERRATA.md records the readings the writer
 // takes: the downmix, the metadata's timing and the md_compat objects need.
 
 // The loudspeaker a bed object plays from: Part 2 Table 66's

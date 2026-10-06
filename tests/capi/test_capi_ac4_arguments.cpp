@@ -981,7 +981,7 @@ TEST_CASE("the AC-4 encoder configuration's optional object fields reach the enc
 TEST_CASE("the AC-4 encoder refuses an object with a depth exponent and no screen factor",
           "[capi][ac4]") {
     // The screen factor and the depth exponent are one group of fields whose factor has no code for
-    // 0 (src/ac4enc/ERRATA.md): an exponent other than 1 needs a factor of 1/8 or more. A
+    // 0 (src/ac4/ERRATA.md): an exponent other than 1 needs a factor of 1/8 or more. A
     // configuration without one answers ICLFORGE_ERROR_AC4_ENCODE_INVALID_CONFIG and names the
     // reason, and an update ICLFORGE_ERROR_AC4_ENCODE_INVALID_INPUT.
     std::array<iclforge_ac4_object_config_t, 2> objects{};

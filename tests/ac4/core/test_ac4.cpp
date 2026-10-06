@@ -2488,7 +2488,7 @@ TEST_CASE("build_dac4 writes the dac4 DEE's muxer writes for an A-JOC stream", "
 
     // Objects are no channel mode, and an adaptive downmix no core: neither
     // is sent, where Table E.11's text would set b_presentation_core_differs
-    // for any A-JOC group (src/ac4enc/ERRATA.md).
+    // for any A-JOC group (src/ac4/ERRATA.md).
     PresentationDsi p = presentation_of(toc);
     CHECK_FALSE(p.ch_mode.has_value());
     CHECK_FALSE(p.core.has_value());

@@ -71,7 +71,7 @@ This is the constraint the whole project rests on. Breaking it makes the code un
   and the A-JOC and A-JCC codebooks the same way. Those files are the standard, not an
   implementation of it.
 - Where a standard is ambiguous or contradicts itself, the reading taken and its evidence go in
-  an `ERRATA.md` beside the code (`src/ac4/ERRATA.md`, `src/ac4enc/ERRATA.md`).
+  an `ERRATA.md` beside the code (`src/ac4/ERRATA.md`, `src/ac4/ERRATA.md`).
 
 If you cannot cite where something came from, it does not go in.
 

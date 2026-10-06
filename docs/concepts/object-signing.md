@@ -192,7 +192,7 @@ target Evolution HMAC, parallel to but separate from the EMDF policy on this pag
 ## Sibling: AC-4
 
 AC-4 objects carry no such tag in this project. The AC-4 encoder writes its EMDF containers with no
-protection bytes (`src/ac4enc/ERRATA.md`), and the decoder reconstructs objects without a key. See
+protection bytes (`src/ac4/ERRATA.md`), and the decoder reconstructs objects without a key. See
 [AC-4](ac4.md).
 
 ## Planned decode modes

@@ -597,7 +597,7 @@ void write_drc_frame(BitWriter& w, const DrcCodes* codes, bool iframe,
         }
         // drc_gains() (Table 75), under the reading src/ac4/ERRATA.md
         // "drc_gains() is a brace short" takes; drc_gainset_size counts
-        // drc_version, as bits_left's formula does (src/ac4enc/ERRATA.md,
+        // drc_version, as bits_left's formula does (src/ac4/ERRATA.md,
         // "drc_gainset_size counts drc_version").
         const DrcModeGains& set = gains[m];
         BitWriter body = BitWriter::buffered();
@@ -988,7 +988,7 @@ void write_alternative(BitWriter& w, const AlternativeCodes& codes) {
         w.write(8, 0, "presentation_name");
     }
     // One target: the presentation's level, every device category, and every
-    // substream active with no alternative data set (src/ac4enc/ERRATA.md,
+    // substream active with no alternative data set (src/ac4/ERRATA.md,
     // "An alternative presentation's target").
     w.write(2, 0, "n_targets_minus1");
     w.write(3, static_cast<std::uint64_t>(codes.target_level), "target_level");

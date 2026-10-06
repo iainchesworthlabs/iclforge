@@ -7,7 +7,7 @@
 // A-JOC's downmix from the encoder's side, which ETSI TS 103 190-2 V1.3.1
 // leaves to it (p. 161): the groups of objects a computed downmix sums, the
 // gains a static 5.X bed pans an object with, and the var_channel_element()
-// track each downmix signal takes. src/ac4enc/ERRATA.md, "A-JOC's downmix",
+// track each downmix signal takes. src/ac4/ERRATA.md, "A-JOC's downmix",
 // records the readings.
 
 namespace iclforge::ac4::detail {

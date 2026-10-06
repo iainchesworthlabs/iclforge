@@ -598,7 +598,7 @@ IMMERSIVE_EXTRA = {
 # of the envelope whatever the patch holds (Part 1 Pseudocodes 94 and 95): the band came back 30
 # to 68 dB under the sweep's energy where DEE's floors, 2^-1 to 2^-11, bring it to 15 to 17 dB
 # under, the tiles landed 4 to 14 dB further from the source's energy than DEE's, and ViSQOL 0.03
-# to 0.18 under DEE's from 256 to 512 kbps. With the floors of src/ac4enc/ERRATA.md's "A noise
+# to 0.18 under DEE's from 256 to 512 kbps. With the floors of src/ac4/ERRATA.md's "A noise
 # floor for a group whose patch holds nothing" the tiles land 3.5 to 5.7 dB nearer than DEE's,
 # ViSQOL is 0.13 to 0.66 over DEE's in full decoding and 0.05 to 0.65 in core decoding at every
 # A-SPX rate, and the log-spectral distance, still 0.8 to 1.3 dB under DEE's, is 0.4 to 0.7 dB

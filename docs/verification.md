@@ -1624,7 +1624,7 @@ paragraph on the objects follows them:
   the experimental coding configurations and the 7.X layouts 3/4/0 and 5/2/0, and every substream
   field MediaInfo shows holds the value the encoder's syntax trace wrote. For 3/2/2 the muxer
   leaves out channel group 4, which Part 2 Table A.27 and Pseudocode E.3 both give its top front
-  pair, and MediaInfo's summary names that pair Tfc (`src/ac4enc/ERRATA.md`). MediaInfo and the
+  pair, and MediaInfo's summary names that pair Tfc (`src/ac4/ERRATA.md`). MediaInfo and the
   muxer read the A-CPL streams as configured as well, ASPX_ACPL_1 and A-CPL in stereo included.
   The muxer refuses a stream of several presentations, and does not finish one of an alternative
   presentation; for those the `dac4` (Part 2 Annex E.10) is held to the text and to MediaInfo's
@@ -1809,7 +1809,7 @@ transition band, and the centre's prediction there came out 0.5 and 0.2 where C 
 subband's own band lies in half of its spectrum, so the estimate now takes a DFT of each subband's
 slots and reads the bins of its own band, all of them where its neighbours' components carry the
 band; the prediction is 1 and 0 there (DEE's 0.9 and 0), and the routing 9.7 dB. The readings the
-writer takes, and those it shares with the decoder, are in `src/ac4enc/ERRATA.md`.
+writer takes, and those it shares with the decoder, are in `src/ac4/ERRATA.md`.
 
 The encoder's objects (phase E9, behind `experimental.objects`) are checked against the decoder
 alone, since no reader outside the project decodes them: DEE writes no A-JOC from this project's

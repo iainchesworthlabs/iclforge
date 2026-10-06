@@ -40,7 +40,7 @@ namespace iclforge::ac4 {
 // configurations of Table 53 (0 to 5, and 6's EMDF payloads alone), channel
 // coded, A-JOC or direct coded objects, and its channel mode, core and
 // channel groups by Pseudocodes 25, 26 and E.3 over every substream of those
-// groups. src/ac4enc/ERRATA.md records the readings it takes. Its closing
+// groups. src/ac4/ERRATA.md records the readings it takes. Its closing
 // de_indicator and immersive_audio_indicator are written where the Toc
 // carries them (see PresentationInfoV1), and left out otherwise, which the
 // syntax allows; an alternative presentation's name and targets, which the
@@ -119,7 +119,7 @@ struct FrameRate {
 // The presentation a manifest describes a track by: Annex G.2.3's "AC-4
 // presentation with the widest compatibility", read as the lowest md_compat
 // among the presentations that carry audio and that the stream does not
-// disable, the first of them where several share it (src/ac4enc/ERRATA.md,
+// disable, the first of them where several share it (src/ac4/ERRATA.md,
 // "Manifests"). The first presentation where none carries audio; nothing for
 // a table of contents without presentations.
 [[nodiscard]] ICLFORGE_AC4_EXPORT std::optional<std::size_t> signalled_presentation(const Toc& toc);
@@ -136,7 +136,7 @@ struct ManifestDescriptor {
 // as build_dac4() writes them) map to one, which G.3.3.1 prefers, and the
 // "Dolby:2015" scheme tag:dolby.com,2015:dash:audio_channel_configuration:2015
 // otherwise, six hexadecimal digits with group g at bit g and bit 23 set for
-// object audio (src/ac4enc/ERRATA.md, "Manifests", on G.3.3.2's bit order).
+// object audio (src/ac4/ERRATA.md, "Manifests", on G.3.3.2's bit order).
 // Nothing for a bitstream_version below 2, or a presentation whose substreams
 // the table of contents does not describe whole.
 [[nodiscard]] ICLFORGE_AC4_EXPORT std::optional<ManifestDescriptor> dash_channel_configuration(

@@ -16,7 +16,7 @@
 // (the inverse of the decoder's clause 6.3.9 tables), each object's changes
 // kept in time, and each frame's object_info_block()s built from them.
 //
-// Timing (src/ac4enc/ERRATA.md, "When an object's metadata changes"): an
+// Timing (src/ac4/ERRATA.md, "When an object's metadata changes"): an
 // update at sample s of the encoder's delayed signal lands in the frame that
 // codes s, at block_offset_factor (s - the frame's first sample) / 32 with
 // oa_sample_offset 0, where the decoder places it at the sample the input
