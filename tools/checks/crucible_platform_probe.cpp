@@ -28,7 +28,7 @@
 //       -DICLFORGE_AC3_STATIC_DEFINE -DICLFORGE_SIGNING_STATIC_DEFINE
 //       build-pw/apps/crucible/libcrucible_engine.a
 //       build-pw/src/audio/libiclforge_audio.a build-pw/src/ac3/libiclforge_ac3_static.a
-//       build-pw/src/signing/libiclforge_signing_static.a
+//       build-pw/src/signing/libiclforge_ac3_static.a
 //       $(pkg-config --libs libpipewire-0.3) $(pkg-config --libs xcb) -lpthread
 //
 //   ($(pkg-config --libs xcb) is for an engine built with libxcb, the X11

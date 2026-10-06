@@ -14,7 +14,7 @@
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/adm/ac3adm.hpp"
 
-namespace iclforge::admbridge {
+namespace iclforge::adm {
 
 std::string_view describe(BridgeError error) {
     switch (error) {
@@ -663,4 +663,4 @@ std::expected<iclforge::adm::AdmDocument, BridgeError> write(const WriteInput& i
     return document;
 }
 
-}  // namespace iclforge::admbridge
+}  // namespace iclforge::adm

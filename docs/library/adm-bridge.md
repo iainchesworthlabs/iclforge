@@ -1,6 +1,6 @@
 # ADM ↔ Atmos bridging: `iclforge::admbridge`
 
-`iclforge/admbridge/bridge.hpp`, `iclforge/admbridge/coordinates.hpp`, library `iclforge::admbridge`. Two
+`iclforge/adm/bridge.hpp`, `iclforge/adm/coordinates.hpp`, library `iclforge::admbridge`. Two
 directions live here:
 
 - **Read**: maps the ADM object graph [`iclforge::adm`](adm.md) parses from a BW64/ADM master onto
@@ -28,11 +28,11 @@ exists. See [ADM / BW64 reading](adm.md) for the exact CMake invocation.
 const auto document = iclforge::adm::parse_bw64(path);
 if (!document) { /* ... */ }
 
-const auto bridged = iclforge::admbridge::build(*document);
+const auto bridged = iclforge::adm::build(*document);
 if (!bridged) {
     fmt::printf("build failed: %.*s\n",
-                static_cast<int>(iclforge::admbridge::describe(bridged.error()).size()),
-                iclforge::admbridge::describe(bridged.error()).data());
+                static_cast<int>(iclforge::adm::describe(bridged.error()).size()),
+                iclforge::adm::describe(bridged.error()).data());
     return 1;
 }
 
@@ -54,8 +54,8 @@ Two hard constraints rule out folding this into either side it bridges:
 `iclforge::admbridge` is therefore its own module (`src/admbridge/`), PUBLIC-linking both — the same
 shape `iclforge::signing` uses for its own `iclforge::ac3` dependency. Like `iclforge::adm` itself
 (see [ADM / BW64 reading](adm.md)), it IS part of the installed `find_package(iclforge)` package,
-but shared-only: `iclforge::admbridge_shared`/the bare `iclforge::admbridge` alias, no `_static` variant.
-`build_iab()` (`iclforge/admbridge/iab_bridge.hpp`) maps a whole parsed `iclforge::iab::IABitstreamFrame`
+but shared-only: `iclforge::adm_shared`/the bare `iclforge::admbridge` alias, no `_static` variant.
+`build_iab()` (`iclforge/adm/iab_bridge.hpp`) maps a whole parsed `iclforge::iab::IABitstreamFrame`
 sequence — from either of `iclforge::iab`'s two readers (`src/iab`: a bare elementary `.iab`
 file or a real MXF Track File) — onto this same `ObjectPath` layer, driven end to end by `forge
 atmos-iab` (see [Commands](../forge/cli/commands.md)). `iclforge::adm::AdmDocument` and `iclforge::iab::
@@ -203,7 +203,7 @@ at their defaults.
 `build_iab(std::span<const iclforge::iab::IABitstreamFrame> frames)` maps a whole parsed Immersive Audio
 Bitstream sequence — `iclforge::iab::parse_iabitstream()` or `iclforge::iab::parse_mxf_iab()`'s own return value,
 unmodified — onto the identical destination shape `build()` produces for ADM, in a new header,
-`iclforge/admbridge/iab_bridge.hpp`.
+`iclforge/adm/iab_bridge.hpp`.
 
 IAB has no whole-file object graph the way ADM's `audioProgramme → audioContent → audioObject` tree
 does — it is a flat sequence of self-contained `IaFrame`s, each carrying its own Bed/Object metadata

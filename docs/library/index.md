@@ -96,7 +96,7 @@ files (see pkg-config below), or adds them to the link line itself (`-lstdc++ -l
 `iclforge::adm`/`iclforge::admbridge` are the exception: they PRIVATE-embed the third-party
 libbw64/libadm (Apache-2.0, FetchContent'd — see [ADM / BW64 reading](adm.md)), neither of which
 this project installs or exports in its own right, so the installed package only ever exports
-their **shared** variant (`iclforge::adm_shared`/`iclforge::admbridge_shared`, plus the bare
+their **shared** variant (`iclforge::adm_shared`, plus the bare
 `iclforge::adm`/`iclforge::admbridge` alias — there is no `_static` counterpart here, unlike every
 other module on this page) regardless of `ICLFORGE_INSTALL_BOTH_LINKAGES`. A self-contained
 `.so` absorbs libbw64/libadm at its own build step; a static archive would leave a downstream
@@ -106,8 +106,8 @@ because the *installed* artifact is self-contained.
 
 `iclforge::signing` follows this exact same shape — mandatory, not gated by an
 `ICLFORGE_BUILD_<NAME>` switch, same as `iclforge::ac3` itself — so it resolves the identical way in
-both cases: the bare `iclforge::signing` alias in-tree, and explicit `iclforge::signing_static`/
-`iclforge::signing_shared` from an installed package.
+both cases: the bare `iclforge::signing` alias in-tree, and explicit `iclforge::ac3_static`/
+`iclforge::ac3_shared` from an installed package.
 
 **vcpkg.** A port lives in this repo at
 [`packaging/vcpkg-port/iclforge/`](https://github.com/iainchesworthlabs/iclforge/tree/main/packaging/vcpkg-port/iclforge) and is pending
@@ -175,7 +175,7 @@ Picks whichever linkage was actually installed (the shared name when
 `ICLFORGE_INSTALL_BOTH_LINKAGES`/`BUILD_SHARED_LIBS` selected it, else the `_static`-suffixed
 one — matching what is actually on disk), and chains `Requires:` for a library that PUBLIC-
 links another (`iclforge-ac3` requires `iclforge-base`, `-dsp`, `-objects`, `-render` and
-`-iec61937`; `iclforge-signing` requires `iclforge-ac3`; `iclforge-admbridge` requires
+`-iec61937`; `iclforge-ac3` requires `iclforge-ac3`; `iclforge-adm` requires
 `iclforge-ac3` and `iclforge-adm`). The `prefix=` line resolves relative to wherever the `.pc` file itself ends up
 (`pkg-config`'s own `${pcfiledir}`), so it works the same whether that's a real system install or
 an unpacked `iclforge-dev-*` archive.
@@ -195,7 +195,7 @@ cc consumer.c $(pkg-config --static --cflags --libs iclforge-c)
 `iclforge-iab.pc` and `iclforge-ac4.pc` list the C++ runtime and libm in
 `Libs.private`. A C compiler does not link them by itself, and a C++ compiler does. The names are
 the ones CMake recorded for the compiler that built the archives: `-lstdc++ -lm` with libstdc++
-and `-lc++ -lm` with libc++ on Linux. `iclforge-signing.pc` gets them through `iclforge-ac3`. A
+and `-lc++ -lm` with libc++ on Linux. `iclforge-ac3.pc` gets them through `iclforge-ac3`. A
 `.pc` that names a shared library has neither field: the library records what it needs, and
 `libiclforge_c.so` holds its own copy of the codec, so it does not pull in `libiclforge_ac3.so`.
 An install with both linkages, such as the `iclforge-dev-*` packages, names the shared libraries,

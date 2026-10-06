@@ -8,7 +8,7 @@
 namespace iclforge::crucible {
 
 struct SigningHook::Impl {
-    iclforge::signing::SigningKey key;
+    iclforge::base::crypto::SigningKey key;
 };
 
 SigningHook::SigningHook() : impl_(std::make_unique<Impl>()) {}
@@ -16,12 +16,12 @@ SigningHook::SigningHook() : impl_(std::make_unique<Impl>()) {}
 SigningHook::~SigningHook() = default;
 
 std::string SigningHook::load(std::string_view explicit_path) {
-    auto loaded = iclforge::signing::load_signing_key(explicit_path);
+    auto loaded = iclforge::base::crypto::load_signing_key(explicit_path);
     if (!loaded) {
         clear();
         failure_ = loaded.error().kind;
         switch (loaded.error().kind) {
-            case iclforge::signing::KeyErrorKind::kAbsent:
+            case iclforge::base::crypto::KeyErrorKind::kAbsent:
                 source_.clear();
                 return "no signing key: objects off, streaming the 5.1 bed only";
             default:
@@ -38,7 +38,7 @@ std::string SigningHook::load(std::string_view explicit_path) {
 }
 
 void SigningHook::clear() {
-    impl_->key = iclforge::signing::SigningKey{};
+    impl_->key = iclforge::base::crypto::SigningKey{};
     source_.clear();
     kind_ = Source::kNone;
     failure_.reset();
@@ -52,7 +52,7 @@ bool SigningHook::sign(std::span<std::byte> access_unit) const {
     if (impl_->key.empty()) {
         return false;
     }
-    return iclforge::signing::sign_atmos_frame(access_unit, impl_->key);
+    return iclforge::ac3::signing::sign_atmos_frame(access_unit, impl_->key);
 }
 
 }  // namespace iclforge::crucible

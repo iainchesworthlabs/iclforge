@@ -64,13 +64,13 @@ it directly. Four tiers, assigned per header below:
 | `ac3/audio/*` | In-tree only (unchanged). |
 | `matroska/`, `mp4/`, `mpegts/` mux + demux headers | Public — each is its own installed target with its own `SOVERSION`. |
 | `iclforge/adm/ac3adm.hpp`, `model.hpp` | Public within its own opt-in module (`-DICLFORGE_BUILD_ADM=ON`); see [Experimental modules](#experimental-modules) for why this is not the same as "frozen." |
-| `iclforge/admbridge/bridge.hpp`, `iab_bridge.hpp`, `coordinates.hpp` | Public, same opt-in caveat. |
+| `iclforge/adm/bridge.hpp`, `iab_bridge.hpp`, `coordinates.hpp` | Public, same opt-in caveat. |
 | `iclforge/iab/ac3iab.hpp`, `model.hpp`, `mxf.hpp` | **Experimental** — see below; not part of the `v1.0.0` freeze despite being installed and default-on today. |
 | `iclforge/iamf/iamf.hpp` | **Experimental** — a new module, which starts there (see below); installed and default-on. |
 | `iclforge/ac4/core/toc.hpp`, `iclforge/ac4/decoder/decoder.hpp`, `iclforge/ac4/encoder/encoder.hpp` | **Experimental** — the AC-4 inspector, decoder and encoder, installed and default-on; see below. |
 | `iclforge/ac4/core/syntax.hpp` | Diagnostic — the AC-4 syntax trace the decoder and encoder write, as `iclforge/ac3/decoder/syntax_trace.hpp` is for AC-3 and E-AC-3. |
 | `iclforge_c/iclforge.h` | Public — its own narrower promise, see [C API](c-api.md). |
-| `iclforge/signing/signing_key.hpp`, `emdf_atmos_signer.hpp` | Public. |
+| `iclforge/base/crypto/signing_key.hpp`, `emdf_atmos_signer.hpp` | Public. |
 
 **The `detail` namespace convention is unaffected by a header's tier.** Five public headers
 (`silent_frame.hpp`, `meta/drc.hpp`, `core/tables.hpp`, `core/window.hpp`, `core/crc16.hpp`)

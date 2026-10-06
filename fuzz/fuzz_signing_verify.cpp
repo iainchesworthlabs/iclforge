@@ -7,7 +7,7 @@
 #include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
 #include "iclforge/base/crypto/signing_key.hpp"
 
-// iclforge::signing::verify_atmos_stream / verify_atmos_frame (src/signing/src/
+// iclforge::ac3::signing::verify_atmos_stream / verify_atmos_frame (src/signing/src/
 // emdf_atmos_signer.cpp).
 //
 // Verification is the one signing operation that runs on input the operator
@@ -40,14 +40,14 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     }
     const auto* bytes = reinterpret_cast<const std::byte*>(data);
     std::vector<std::byte> key_bytes(bytes + 1, bytes + 1 + key_len);
-    const iclforge::signing::SigningKey key{std::move(key_bytes)};
+    const iclforge::base::crypto::SigningKey key{std::move(key_bytes)};
     const std::span<const std::byte> stream{bytes + 1 + key_len, size - 1 - key_len};
 
-    (void)iclforge::signing::verify_atmos_stream(stream, key);
+    (void)iclforge::ac3::signing::verify_atmos_stream(stream, key);
     // ... and the single-frame entry directly, not only through the stream
     // walk above: verify_atmos_frame is public, so a caller that has already
     // split the stream itself reaches it with a span the stream walk's own
     // frmsiz arithmetic never would have produced.
-    (void)iclforge::signing::verify_atmos_frame(stream, key);
+    (void)iclforge::ac3::signing::verify_atmos_frame(stream, key);
     return 0;
 }

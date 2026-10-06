@@ -498,8 +498,8 @@ TEST_CASE("media info: objects, and whether they are signed", "[hearth][media-in
     CHECK(displayed[0].position.z == Catch::Approx(0.0));
     CHECK(displayed[0].gain_db == Catch::Approx(0.0));
 
-    const iclforge::signing::SigningKey key{std::vector<std::byte>(32, std::byte{0x5A})};
-    REQUIRE(iclforge::signing::sign_atmos_stream(stream, key) == 4);
+    const iclforge::base::crypto::SigningKey key{std::vector<std::byte>(32, std::byte{0x5A})};
+    REQUIRE(iclforge::ac3::signing::sign_atmos_stream(stream, key) == 4);
     const MediaInfo signed_info = describe_media("signed.ec3", load(stream));
     REQUIRE(signed_info.probe.has_value());
     CHECK(signed_info.probe->authenticity_tagged_frames == 4);

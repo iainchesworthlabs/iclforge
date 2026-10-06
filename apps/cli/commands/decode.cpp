@@ -938,7 +938,7 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     // update block's absolute-sample-timestamped position/gain) and is written once, after the
     // decode loop below finishes - unlike the streaming per-object WAVs objects_dir writes above,
     // the ADM master's own <axml> chunk needs every dynamic object's own final duration known
-    // before it can be built at all (iclforge::admbridge::write() computes each audioBlockFormat's
+    // before it can be built at all (iclforge::adm::write() computes each audioBlockFormat's
     // duration from it - see bridge.cpp's own build_block_formats).
     //
     // The LFE channel this lambda appends below is NOT yet delayed to match the objects beside
@@ -966,7 +966,7 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         if (!program.dynamic_only) {
             // A genuine bed program (third-party channel-based-immersive content, oamd.hpp's
             // own Program comment) is out of this writer's current scope - see
-            // iclforge::admbridge::WriteInput's own doc comment. Warned once; the WAV/objects_dir
+            // iclforge::adm::WriteInput's own doc comment. Warned once; the WAV/objects_dir
             // outputs this decode already produces are unaffected.
             if (!adm_bed_warned) {
                 fmt::println(stderr,
@@ -1007,7 +1007,7 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         // §5.6.2.1: sample_offset is already in samples from THIS access unit's own first
         // sample - adm_samples_emitted (bumped at the bottom of this lambda by exactly the
         // number of samples object_audio just contributed) turns it into an absolute offset
-        // from the start of the whole decode, which is what iclforge::admbridge::WriteObjectUpdate
+        // from the start of the whole decode, which is what iclforge::adm::WriteObjectUpdate
         // wants (bridge.hpp's own doc comment).
         for (const auto& block : object_metadata->blocks) {
             const auto sample_offset =

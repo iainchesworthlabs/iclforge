@@ -17,7 +17,7 @@
 // See iab_bridge.hpp's own top comment for the overall two-pass design and what is and is not
 // mapped. This file is the implementation of that design.
 
-namespace iclforge::admbridge {
+namespace iclforge::adm {
 
 namespace {
 
@@ -323,4 +323,4 @@ std::expected<IabBridgeResult, BridgeError> build_iab(std::span<const iclforge::
     return out;
 }
 
-}  // namespace iclforge::admbridge
+}  // namespace iclforge::adm

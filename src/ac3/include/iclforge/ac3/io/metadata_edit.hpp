@@ -148,7 +148,7 @@ struct MetadataEdit {
 // Re-stamps crc1 (AC-3 only) and crc2 for one syncframe, for a caller that
 // changed bsi bits itself. edit_frame_metadata already does this; this is
 // exposed because the CRCs are the non-obvious half of any in-place rewrite
-// and a caller doing its own (iclforge::signing::sign_atmos_frame is the
+// and a caller doing its own (iclforge::ac3::signing::sign_atmos_frame is the
 // in-project precedent) should not have to reimplement crc1's solve.
 [[nodiscard]] ICLFORGE_AC3_EXPORT std::expected<void, EditError> restamp_crc(
     std::span<std::byte> frame);

@@ -69,7 +69,7 @@
 //     zoneExclusion that is not one of Table B.18's presets. AtmosEncoder transmits the carried
 //     items in the OAMD payload and stops there - its own bed render treats every object as a point
 //     source (see ObjectPlacement). docs/library/adm-bridge.md has the full account.
-namespace iclforge::admbridge {
+namespace iclforge::adm {
 
 enum class BridgeError : std::uint8_t {
     kNoProgramme,            // the document's ADM model has no audioProgramme at all
@@ -276,4 +276,4 @@ struct ICLFORGE_ADM_EXPORT WriteInput {
 [[nodiscard]] ICLFORGE_ADM_EXPORT std::expected<iclforge::adm::AdmDocument, BridgeError>
 write(const WriteInput& input);
 
-}  // namespace iclforge::admbridge
+}  // namespace iclforge::adm

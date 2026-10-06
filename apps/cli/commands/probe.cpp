@@ -747,7 +747,7 @@ int run_probe(std::string_view in_path, const Options& meta) {
     // carries a tag is answerable without one, and only whether that tag is
     // VALID is not (that is 'decode verify-objects').
     options.authenticity = [](std::span<const std::byte> frame) {
-        return iclforge::signing::has_authenticity_tag(frame);
+        return iclforge::ac3::signing::has_authenticity_tag(frame);
     };
     if (detail != Detail::kNone) {
         options.on_access_unit = [&meta, &json, &detail](const io::ProbeAccessUnit& unit) {

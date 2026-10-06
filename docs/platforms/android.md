@@ -693,7 +693,7 @@ env var, but this app signs on-device, so the key has to travel in the APK as an
 CI writes the base64 `ATMOS_SIGNING_KEY` secret verbatim into it (`.github/workflows/_build.yml`),
 or you drop one in by hand for a local signed build. `init_signing()` loads it once through the same
 `AAssetManager` the lead-voice asset uses and decodes it (base64 or raw) via the same
-`iclforge::signing::decode_signing_key()` the CLI applies.
+`iclforge::base::crypto::decode_signing_key()` the CLI applies.
 
 **Unsigned builds omit the object container entirely.** An unsigned
 but *present* EMDF container is not a safe degraded mode — per `AtmosConfig::emit_object_metadata`'s

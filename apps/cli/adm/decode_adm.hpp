@@ -27,7 +27,7 @@ namespace forge_cli {
 // own object_metadata->blocks in file order and adding each block's own sample_offset to a
 // running total of samples already emitted (object_audio's own length each access unit, since
 // that is the count actually written, not numblkscod*256 - see decode.cpp's own accumulation for
-// why). Mirrors iclforge::admbridge::WriteObjectUpdate field for field; kept as its own type rather
+// why). Mirrors iclforge::adm::WriteObjectUpdate field for field; kept as its own type rather
 // than reused directly for the same reason AdmAtmosSource mirrors BridgeResult rather than
 // including bridge.hpp - see this header's own top comment.
 struct AdmObjectUpdate {
@@ -38,7 +38,7 @@ struct AdmObjectUpdate {
 
 // One channel of the master being written - a bed channel (`bed_label` set, pinned at its own
 // room position, `updates` unused) or a JOC-reconstructed dynamic object (`bed_label` empty,
-// positioned by `updates`). Mirrors iclforge::admbridge::WriteChannel.
+// positioned by `updates`). Mirrors iclforge::adm::WriteChannel.
 struct AdmMasterChannel {
     std::string name;
     std::vector<float> pcm;
@@ -52,7 +52,7 @@ struct AdmMasterInput {
 };
 
 // Writes `input` to `path` as a Dolby Atmos Master ADM Profile BW64 file
-// (iclforge::admbridge::write() builds the iclforge::adm::AdmDocument, iclforge::adm::write_bw64()
+// (iclforge::adm::write() builds the iclforge::adm::AdmDocument, iclforge::adm::write_bw64()
 // writes it) - or a single diagnostic string already run through both BridgeError's and
 // AdmWriteError's own describe(), the same "main.cpp/decode.cpp never needs either error enum's
 // type" convention load_adm_atmos_source's own doc comment states for the read direction. Caller

@@ -34,7 +34,7 @@
 #include "iclforge/ac3/export.hpp"
 #include "iclforge/base/crypto/signing_key.hpp"
 
-namespace iclforge::signing {
+namespace iclforge::ac3::signing {
 
 // Signs, in place, every syncframe in `stream` that carries an EMDF object
 // container (OAMD payload), using `key`. Frames without a container are left
@@ -47,11 +47,11 @@ namespace iclforge::signing {
 // recognise, not a caller error - iclforge::ac3::emdf::walk_frame's own `supported`
 // field (ac3/emdf/frame_layout.hpp) is what draws that scope.
 [[nodiscard]] ICLFORGE_AC3_EXPORT int sign_atmos_stream(std::span<std::byte> stream,
-                                                       const SigningKey& key);
+                                                       const base::crypto::SigningKey& key);
 
 // One syncframe. Returns true if it carried a container and was signed.
 [[nodiscard]] ICLFORGE_AC3_EXPORT bool sign_atmos_frame(std::span<std::byte> frame,
-                                                       const SigningKey& key);
+                                                       const base::crypto::SigningKey& key);
 
 // Whether this syncframe carries a non-zero authenticity tag - that is,
 // whether anyone has signed it - answered WITHOUT a key.
@@ -97,7 +97,7 @@ struct VerifySummary {
 // caller error - see sign_atmos_stream's own comment above for where that
 // tolerance actually lives.
 [[nodiscard]] ICLFORGE_AC3_EXPORT VerifySummary
-verify_atmos_stream(std::span<const std::byte> stream, const SigningKey& key);
+verify_atmos_stream(std::span<const std::byte> stream, const base::crypto::SigningKey& key);
 
 // One syncframe. Mirrors sign_atmos_frame's exact construction (excise the
 // framing/metadata/skip/CRC holes into message A, zero the tag bits in the
@@ -105,6 +105,6 @@ verify_atmos_stream(std::span<const std::byte> stream, const SigningKey& key);
 // protection field's width) but reads the existing protection_bits_primary
 // bits instead of writing computed ones, and compares.
 [[nodiscard]] ICLFORGE_AC3_EXPORT VerifyResult
-verify_atmos_frame(std::span<const std::byte> frame, const SigningKey& key);
+verify_atmos_frame(std::span<const std::byte> frame, const base::crypto::SigningKey& key);
 
-}  // namespace iclforge::signing
+}  // namespace iclforge::ac3::signing

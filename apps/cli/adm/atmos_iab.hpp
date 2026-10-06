@@ -34,9 +34,9 @@ namespace forge_cli {
 // Everything run_atmos_iab (apps/cli/commands/atmos.cpp) needs from one parsed-and-bridged IAB
 // source, expressed purely in iclforge::oba terms - the same shape AdmAtmosSource (atmos_adm.hpp)
 // already uses for ADM, for the identical reason: main.cpp never needs iclforge::iab::IabError or
-// iclforge::admbridge::BridgeError, only text to print. `handle` owns whatever `pcm`'s spans
+// iclforge::adm::BridgeError, only text to print. `handle` owns whatever `pcm`'s spans
 // actually borrow from - for IAB this is the IabBridgeResult itself
-// (iclforge::admbridge::build_iab), since its own `pcm` is OWNED storage rather than a borrow from
+// (iclforge::adm::build_iab), since its own `pcm` is OWNED storage rather than a borrow from
 // a separate document object (see ac3/admbridge/iab_bridge.hpp's own top comment on why); keep an
 // IabAtmosSource alive for exactly as long as its `pcm` spans are read.
 struct IabAtmosSource {
@@ -53,7 +53,7 @@ struct IabAtmosSource {
 // Reads `path` - a bare elementary `.iab` file or a real MXF IAB Track File, sniffed by its first
 // byte (an MXF Partition Pack Key starts 06h; an elementary IABitstream's own PreambleTag is 01h -
 // see the enabled implementation's own comment) - and bridges it onto AtmosEncoder's input shape
-// (iclforge::admbridge::build_iab), or a single diagnostic string already run through both
+// (iclforge::adm::build_iab), or a single diagnostic string already run through both
 // IabError's and BridgeError's own describe() - so main.cpp never needs either error enum's type.
 [[nodiscard]] std::expected<IabAtmosSource, std::string> load_iab_atmos_source(std::string_view path);
 

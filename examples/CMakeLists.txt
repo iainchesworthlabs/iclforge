@@ -36,14 +36,14 @@ set(ICLFORGE_EXAMPLES
 # read_adm demonstrates iclforge::adm (src/adm), the standalone BW64/RF64 + ADM
 # parser - "standalone" meaning zero dependency on iclforge::ac3, unlike every other
 # example in the list above. encode_adm (ADM BWF reader phase 3) is the end-to-end
-# counterpart: iclforge::adm::parse_bw64 -> iclforge::admbridge::build -> iclforge::ac3::oba::AtmosEncoder, so unlike
+# counterpart: iclforge::adm::parse_bw64 -> iclforge::adm::build -> iclforge::ac3::oba::AtmosEncoder, so unlike
 # every other entry here (including read_adm) it needs BOTH iclforge::ac3 and the opt-in ADM modules
 # together. Both are only added when ICLFORGE_BUILD_ADM turned those modules on (default OFF - see
 # root CMakeLists.txt's own option() for why), so the foreach below cannot assume either is always
 # present the way it can for e.g. mux_mkv.
 if(ICLFORGE_BUILD_ADM)
     list(APPEND ICLFORGE_EXAMPLES read_adm encode_adm)
-    # encode_iab (IAB reader phase 3) needs iclforge::admbridge's own IAB mapping (build_iab), gated
+    # encode_iab (IAB reader phase 3) needs iclforge::adm's own IAB mapping (build_iab), gated
     # the same way encode_adm needs the ADM one - see src/admbridge/CMakeLists.txt's own header
     # comment for why that whole module rides ICLFORGE_BUILD_ADM. Unlike encode_adm it does NOT
     # need iclforge::adm directly (iclforge::iab, its own container reader, is always available -
@@ -81,7 +81,7 @@ foreach(example IN LISTS ICLFORGE_EXAMPLES)
     elseif(example STREQUAL "encode_adm")
         # The one example (and ADM BWF reader's own phase-3 deliverable) needing iclforge::ac3
         # (AtmosEncoder) and the ADM modules (parse/bridge) at the same time.
-        target_link_libraries(${example} PRIVATE iclforge::ac3 iclforge::adm iclforge::admbridge
+        target_link_libraries(${example} PRIVATE iclforge::ac3 iclforge::adm
                                                   iclforge::warnings iclforge::fmt)
     elseif(example STREQUAL "mux_iamf")
         target_link_libraries(${example} PRIVATE iclforge::ac3 iclforge::iamf iclforge::warnings iclforge::fmt)
@@ -93,9 +93,9 @@ foreach(example IN LISTS ICLFORGE_EXAMPLES)
         target_link_libraries(${example} PRIVATE iclforge::iab iclforge::warnings iclforge::fmt)
     elseif(example STREQUAL "encode_iab")
         # The one example (and IAB reader's own phase-3 deliverable) needing iclforge::ac3
-        # (AtmosEncoder), iclforge::iab (its own container reader) and iclforge::admbridge (build_iab)
+        # (AtmosEncoder), iclforge::iab (its own container reader) and iclforge::adm (build_iab)
         # at the same time - the IAB mirror of encode_adm above.
-        target_link_libraries(${example} PRIVATE iclforge::ac3 iclforge::iab iclforge::admbridge
+        target_link_libraries(${example} PRIVATE iclforge::ac3 iclforge::iab iclforge::adm
                                                   iclforge::warnings iclforge::fmt)
     else()
         target_link_libraries(${example} PRIVATE iclforge::ac3 iclforge::warnings iclforge::fmt)
@@ -110,7 +110,7 @@ target_link_libraries(mux_fmp4 PRIVATE iclforge::mp4)
 target_link_libraries(mux_ts PRIVATE iclforge::mpegts)
 
 # Only this one needs the object signer.
-target_link_libraries(object_signing PRIVATE iclforge::signing)
+target_link_libraries(object_signing PRIVATE iclforge::ac3)
 
 # capi_encode_decode (C API) is a plain C source, not C++ - the .c extension is what actually
 # proves iclforge_c/iclforge.h compiles under a C toolchain rather than merely under a C++ one

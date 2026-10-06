@@ -80,7 +80,7 @@
 //     single caller-owned AdmDocument - there is no equivalent single upstream object here to
 //     borrow spans from once this function returns. This is the one reason IabBridgeResult is a
 //     new struct rather than a reuse of BridgeResult, even though every other field lines up.
-namespace iclforge::admbridge {
+namespace iclforge::adm {
 
 // The result of bridging a whole parsed IAB frame sequence - everything needed to construct and
 // drive an iclforge::ac3::oba::AtmosEncoder, one entry per channel, all vectors indexed
@@ -109,4 +109,4 @@ struct IabBridgeResult {
 [[nodiscard]] ICLFORGE_ADM_EXPORT std::expected<IabBridgeResult, BridgeError> build_iab(
     std::span<const iclforge::iab::IABitstreamFrame> frames);
 
-}  // namespace iclforge::admbridge
+}  // namespace iclforge::adm

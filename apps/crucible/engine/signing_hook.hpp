@@ -29,7 +29,7 @@ public:
     enum class Source : std::uint8_t { kNone, kFile, kEnvironment };
 
     // Loads from `explicit_path` if non-empty, else $ICLFORGE_SIGNING_KEY_FILE,
-    // else $ICLFORGE_SIGNING_KEY (iclforge::signing::load_signing_key's own order).
+    // else $ICLFORGE_SIGNING_KEY (iclforge::base::crypto::load_signing_key's own order).
     // Returns a one-line status for the UI either way.
     std::string load(std::string_view explicit_path);
     void clear();
@@ -39,7 +39,7 @@ public:
     [[nodiscard]] Source source_kind() const { return kind_; }
     // Why the last load failed, when it did; nullopt after a success or a
     // clear.
-    [[nodiscard]] std::optional<iclforge::signing::KeyErrorKind> failure() const {
+    [[nodiscard]] std::optional<iclforge::base::crypto::KeyErrorKind> failure() const {
         return failure_;
     }
 
@@ -57,7 +57,7 @@ private:
     std::unique_ptr<Impl> impl_;  // the key, zeroised on clear() and destruction
     std::string source_;
     Source kind_ = Source::kNone;
-    std::optional<iclforge::signing::KeyErrorKind> failure_;
+    std::optional<iclforge::base::crypto::KeyErrorKind> failure_;
 };
 
 }  // namespace iclforge::crucible

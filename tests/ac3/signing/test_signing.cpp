@@ -45,8 +45,8 @@ std::vector<std::byte> encode_atmos_stream(int frames, bool emit_objects) {
     return stream;
 }
 
-iclforge::signing::SigningKey make_key(std::uint8_t fill) {
-    return iclforge::signing::SigningKey{std::vector<std::byte>(32, std::byte{fill})};
+iclforge::base::crypto::SigningKey make_key(std::uint8_t fill) {
+    return iclforge::base::crypto::SigningKey{std::vector<std::byte>(32, std::byte{fill})};
 }
 
 }  // namespace
@@ -56,10 +56,10 @@ TEST_CASE("sign_atmos_stream signs object frames deterministically", "[signing][
     const std::vector<std::byte> original = encode_atmos_stream(4, /*emit_objects=*/true);
     REQUIRE_FALSE(original.empty());
 
-    const iclforge::signing::SigningKey key_a = make_key(0x11);
+    const iclforge::base::crypto::SigningKey key_a = make_key(0x11);
 
     std::vector<std::byte> signed_a = original;
-    const int n = iclforge::signing::sign_atmos_stream(signed_a, key_a);
+    const int n = iclforge::ac3::signing::sign_atmos_stream(signed_a, key_a);
 
     SECTION("every object frame is signed and the bytes actually change") {
         CHECK(n == 4);
@@ -68,13 +68,13 @@ TEST_CASE("sign_atmos_stream signs object frames deterministically", "[signing][
 
     SECTION("signing is deterministic for a given key") {
         std::vector<std::byte> signed_again = original;
-        CHECK(iclforge::signing::sign_atmos_stream(signed_again, key_a) == n);
+        CHECK(iclforge::ac3::signing::sign_atmos_stream(signed_again, key_a) == n);
         CHECK(signed_again == signed_a);
     }
 
     SECTION("a different key produces a different tag") {
         std::vector<std::byte> signed_b = original;
-        CHECK(iclforge::signing::sign_atmos_stream(signed_b, make_key(0x22)) == n);
+        CHECK(iclforge::ac3::signing::sign_atmos_stream(signed_b, make_key(0x22)) == n);
         CHECK(signed_b != signed_a);
     }
 }
@@ -83,14 +83,14 @@ TEST_CASE("sign_atmos_stream is a no-op without a key or a container", "[signing
     SECTION("an empty key signs nothing and leaves the stream untouched") {
         std::vector<std::byte> stream = encode_atmos_stream(2, /*emit_objects=*/true);
         const std::vector<std::byte> before = stream;
-        CHECK(iclforge::signing::sign_atmos_stream(stream, iclforge::signing::SigningKey{}) == 0);
+        CHECK(iclforge::ac3::signing::sign_atmos_stream(stream, iclforge::base::crypto::SigningKey{}) == 0);
         CHECK(stream == before);
     }
 
     SECTION("a bed51 stream has no container to sign") {
         std::vector<std::byte> stream = encode_atmos_stream(2, /*emit_objects=*/false);
         const std::vector<std::byte> before = stream;
-        CHECK(iclforge::signing::sign_atmos_stream(stream, make_key(0x11)) == 0);
+        CHECK(iclforge::ac3::signing::sign_atmos_stream(stream, make_key(0x11)) == 0);
         CHECK(stream == before);
     }
 }
@@ -112,7 +112,7 @@ TEST_CASE("sign_atmos_stream is a no-op without a key or a container", "[signing
 // every caller: verification over arbitrary bytes returns, and returns an
 // answer, rather than reading out of bounds.
 TEST_CASE("verify_atmos_stream survives arbitrary bytes", "[signing][verify]") {
-    const iclforge::signing::SigningKey key = make_key(0x33);
+    const iclforge::base::crypto::SigningKey key = make_key(0x33);
 
     SECTION("a truncated real stream") {
         const std::vector<std::byte> original = encode_atmos_stream(2, /*emit_objects=*/true);
@@ -121,7 +121,7 @@ TEST_CASE("verify_atmos_stream survives arbitrary bytes", "[signing][verify]") {
             CAPTURE(keep);
             const std::vector<std::byte> cut(original.begin(),
                                              original.begin() + static_cast<std::ptrdiff_t>(keep));
-            const auto summary = iclforge::signing::verify_atmos_stream(cut, key);
+            const auto summary = iclforge::ac3::signing::verify_atmos_stream(cut, key);
             CHECK(summary.valid + summary.mismatch + summary.no_container >= 0);
         }
     }
@@ -133,16 +133,16 @@ TEST_CASE("verify_atmos_stream survives arbitrary bytes", "[signing][verify]") {
         std::vector<std::byte> fake(96, std::byte{0xA5});
         fake[0] = std::byte{0x0B};
         fake[1] = std::byte{0x77};
-        const auto summary = iclforge::signing::verify_atmos_stream(fake, key);
+        const auto summary = iclforge::ac3::signing::verify_atmos_stream(fake, key);
         CHECK(summary.valid == 0);
     }
 
     SECTION("an empty stream and a stream shorter than a header") {
-        CHECK(iclforge::signing::verify_atmos_stream({}, key).no_container == 0);
+        CHECK(iclforge::ac3::signing::verify_atmos_stream({}, key).no_container == 0);
         const std::vector<std::byte> tiny(3, std::byte{0x0B});
-        CHECK(iclforge::signing::verify_atmos_stream(tiny, key).no_container == 0);
-        CHECK(iclforge::signing::verify_atmos_frame(tiny, key) ==
-              iclforge::signing::VerifyResult::kNoContainer);
+        CHECK(iclforge::ac3::signing::verify_atmos_stream(tiny, key).no_container == 0);
+        CHECK(iclforge::ac3::signing::verify_atmos_frame(tiny, key) ==
+              iclforge::ac3::signing::VerifyResult::kNoContainer);
     }
 }
 
@@ -155,22 +155,22 @@ TEST_CASE("verify_atmos_stream checks the signer's own tag", "[signing][emdf][ve
     const std::vector<std::byte> original = encode_atmos_stream(4, /*emit_objects=*/true);
     REQUIRE_FALSE(original.empty());
 
-    const iclforge::signing::SigningKey key_a = make_key(0x11);
-    const iclforge::signing::SigningKey key_b = make_key(0x22);
+    const iclforge::base::crypto::SigningKey key_a = make_key(0x11);
+    const iclforge::base::crypto::SigningKey key_b = make_key(0x22);
 
     std::vector<std::byte> signed_a = original;
-    const int n = iclforge::signing::sign_atmos_stream(signed_a, key_a);
+    const int n = iclforge::ac3::signing::sign_atmos_stream(signed_a, key_a);
     REQUIRE(n == 4);
 
     SECTION("the same key verifies every signed frame") {
-        const auto summary = iclforge::signing::verify_atmos_stream(signed_a, key_a);
+        const auto summary = iclforge::ac3::signing::verify_atmos_stream(signed_a, key_a);
         CHECK(summary.valid == 4);
         CHECK(summary.mismatch == 0);
         CHECK(summary.no_container == 0);
     }
 
     SECTION("a different key mismatches every signed frame") {
-        const auto summary = iclforge::signing::verify_atmos_stream(signed_a, key_b);
+        const auto summary = iclforge::ac3::signing::verify_atmos_stream(signed_a, key_b);
         CHECK(summary.valid == 0);
         CHECK(summary.mismatch == 4);
         CHECK(summary.no_container == 0);
@@ -178,35 +178,35 @@ TEST_CASE("verify_atmos_stream checks the signer's own tag", "[signing][emdf][ve
 
     SECTION("a bed51 stream (no container) reports kNoContainer, not a mismatch") {
         const std::vector<std::byte> bed51 = encode_atmos_stream(3, /*emit_objects=*/false);
-        const auto summary = iclforge::signing::verify_atmos_stream(bed51, key_a);
+        const auto summary = iclforge::ac3::signing::verify_atmos_stream(bed51, key_a);
         CHECK(summary.no_container == 3);
         CHECK(summary.valid == 0);
         CHECK(summary.mismatch == 0);
 
         REQUIRE_FALSE(bed51.empty());
-        CHECK(iclforge::signing::verify_atmos_frame(bed51, key_a) ==
-              iclforge::signing::VerifyResult::kNoContainer);
+        CHECK(iclforge::ac3::signing::verify_atmos_frame(bed51, key_a) ==
+              iclforge::ac3::signing::VerifyResult::kNoContainer);
     }
 
     SECTION("verifying is deterministic - the same stream and key give the same result "
            "every time") {
-        const auto first = iclforge::signing::verify_atmos_stream(signed_a, key_a);
-        const auto second = iclforge::signing::verify_atmos_stream(signed_a, key_a);
+        const auto first = iclforge::ac3::signing::verify_atmos_stream(signed_a, key_a);
+        const auto second = iclforge::ac3::signing::verify_atmos_stream(signed_a, key_a);
         CHECK(first.valid == second.valid);
         CHECK(first.mismatch == second.mismatch);
         CHECK(first.no_container == second.no_container);
 
         // Repeated verification never mutates the stream (unlike signing).
         std::vector<std::byte> before = signed_a;
-        (void)iclforge::signing::verify_atmos_stream(signed_a, key_a);
+        (void)iclforge::ac3::signing::verify_atmos_stream(signed_a, key_a);
         CHECK(signed_a == before);
     }
 
     SECTION("verify_atmos_frame agrees with verify_atmos_stream, frame by frame") {
-        CHECK(iclforge::signing::verify_atmos_frame(signed_a, key_a) ==
-              iclforge::signing::VerifyResult::kValid);
-        CHECK(iclforge::signing::verify_atmos_frame(signed_a, key_b) ==
-              iclforge::signing::VerifyResult::kMismatch);
+        CHECK(iclforge::ac3::signing::verify_atmos_frame(signed_a, key_a) ==
+              iclforge::ac3::signing::VerifyResult::kValid);
+        CHECK(iclforge::ac3::signing::verify_atmos_frame(signed_a, key_b) ==
+              iclforge::ac3::signing::VerifyResult::kMismatch);
     }
 }
 
@@ -224,12 +224,12 @@ TEST_CASE("verify_atmos_frame detects tampering anywhere in the authenticated re
           "[signing][emdf][verify]") {
     const std::vector<std::byte> original = encode_atmos_stream(1, /*emit_objects=*/true);
     REQUIRE_FALSE(original.empty());
-    const iclforge::signing::SigningKey key = make_key(0x33);
+    const iclforge::base::crypto::SigningKey key = make_key(0x33);
 
     std::vector<std::byte> signed_frame = original;
-    REQUIRE(iclforge::signing::sign_atmos_frame(signed_frame, key));
-    REQUIRE(iclforge::signing::verify_atmos_frame(signed_frame, key) ==
-            iclforge::signing::VerifyResult::kValid);
+    REQUIRE(iclforge::ac3::signing::sign_atmos_frame(signed_frame, key));
+    REQUIRE(iclforge::ac3::signing::verify_atmos_frame(signed_frame, key) ==
+            iclforge::ac3::signing::VerifyResult::kValid);
     REQUIRE(signed_frame.size() > 40);
 
     bool any_mismatch = false;
@@ -240,8 +240,8 @@ TEST_CASE("verify_atmos_frame detects tampering anywhere in the authenticated re
         if (at >= signed_frame.size()) continue;
         std::vector<std::byte> tampered = signed_frame;
         tampered[at] ^= std::byte{0x01};
-        if (iclforge::signing::verify_atmos_frame(tampered, key) ==
-            iclforge::signing::VerifyResult::kMismatch) {
+        if (iclforge::ac3::signing::verify_atmos_frame(tampered, key) ==
+            iclforge::ac3::signing::VerifyResult::kMismatch) {
             any_mismatch = true;
         }
     }

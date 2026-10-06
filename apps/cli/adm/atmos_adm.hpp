@@ -31,7 +31,7 @@
 //
 // The functions below are declared entirely in terms of iclforge::oba's own types (always available
 // - iclforge::oba is part of iclforge::ac3, unconditionally built) and plain strings, never
-// iclforge::adm::AdmDocument/AdmError or iclforge::admbridge::BridgeResult/BridgeError - so this
+// iclforge::adm::AdmDocument/AdmError or iclforge::adm::BridgeResult/BridgeError - so this
 // header itself never needs those two modules' own headers, and main.cpp (which includes this one)
 // never gains a hard dependency on them either. adm/enabled/atmos_adm.cpp is the one place both
 // meet.
@@ -50,7 +50,7 @@ namespace forge_cli {
 // purely in iclforge::oba terms. `handle` owns whatever `pcm`'s spans actually borrow from (an
 // iclforge::adm::AdmDocument, in the real implementation) - keep an AdmAtmosSource alive for
 // exactly as long as its `pcm` spans are read, the same lifetime contract
-// iclforge::admbridge::BridgeResult itself documents for its own `pcm` field.
+// iclforge::adm::BridgeResult itself documents for its own `pcm` field.
 struct AdmAtmosSource {
     std::uint32_t sample_rate = 0;
     std::vector<bool> is_bed;                 // parallel to paths/pcm; true = bed speaker feed
@@ -65,10 +65,10 @@ struct AdmAtmosSource {
 };
 
 // Parses `path` (iclforge::adm::parse_bw64) and bridges it onto AtmosEncoder's input shape
-// (iclforge::admbridge::build), or a single diagnostic string already run through both AdmError's
+// (iclforge::adm::build), or a single diagnostic string already run through both AdmError's
 // and BridgeError's own describe() - so main.cpp never needs either error enum's type, only text to
 // print. Empty `programme_id` means "the file's own default (lowest-ID) audioProgramme", the same
-// default iclforge::admbridge::build itself documents.
+// default iclforge::adm::build itself documents.
 [[nodiscard]] std::expected<AdmAtmosSource, std::string> load_adm_atmos_source(
     std::string_view path, std::string_view programme_id);
 

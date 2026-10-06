@@ -27,7 +27,7 @@
 // byte-level ADM fixture and ends at a decoded bitstream, this one starts from a decoded
 // bitstream (exactly what apps/cli/commands/decode.cpp's own accumulate_adm lambda consumes)
 // and ends at a real file on disk, read back through the identical iclforge::adm::parse_bw64 ->
-// iclforge::admbridge::build -> AtmosEncoder/Eac3Decoder chain that file's own flagship test
+// iclforge::adm::build -> AtmosEncoder/Eac3Decoder chain that file's own flagship test
 // already proves correct - so if THIS test's second half passes, the whole write -> read round trip
 // really works, not just "write_bw64 didn't throw".
 
@@ -58,7 +58,7 @@ double channel_energy(std::span<const float> samples) {
 struct AdmAccumulator {
     std::uint64_t samples_emitted = 0;
     std::vector<float> object_pcm;
-    std::vector<iclforge::admbridge::WriteObjectUpdate> object_updates;
+    std::vector<iclforge::adm::WriteObjectUpdate> object_updates;
     std::vector<float> lfe_pcm;
 
     void add(const iclforge::ac3::DecodedAccessUnit& unit) {
@@ -134,7 +134,7 @@ TEST_CASE("a real decoded Atmos programme survives write_bw64 -> parse_bw64 -> b
     }
 
     // --- Phase 2: write a real ADM BWF master from what was decoded. ---
-    iclforge::admbridge::WriteInput write_input;
+    iclforge::adm::WriteInput write_input;
     write_input.sample_rate = 48000;
     write_input.channels.push_back({.name = "Object 1",
                                     .pcm = accumulator.object_pcm,
@@ -145,7 +145,7 @@ TEST_CASE("a real decoded Atmos programme survives write_bw64 -> parse_bw64 -> b
                                     .bed_label = iclforge::oba::BedLabel::kLfe,
                                     .updates = {}});
 
-    const auto built = iclforge::admbridge::write(write_input);
+    const auto built = iclforge::adm::write(write_input);
     REQUIRE(built.has_value());
     CHECK(built->model.objects.size() == 2);
     CHECK(built->audio.channels.size() == 2);
@@ -187,7 +187,7 @@ TEST_CASE("a real decoded Atmos programme survives write_bw64 -> parse_bw64 -> b
         CHECK(track_uid.bit_depth == parsed->audio.bits_per_sample);
     }
 
-    const auto bridged = iclforge::admbridge::build(*parsed);
+    const auto bridged = iclforge::adm::build(*parsed);
     REQUIRE(bridged.has_value());
     REQUIRE(bridged->channel_count() == 2);
     // Order matches model.objects' own insertion order (write()'s own doc comment): object,
@@ -253,23 +253,23 @@ TEST_CASE("zone constraints survive write() -> write_bw64 -> parse_bw64 -> build
     std::vector<float> pcm(static_cast<std::size_t>(kRate) * 3, 0.1F);
 
     const auto update = [](std::uint64_t at, ZoneConstraint zone, bool elevation) {
-        iclforge::admbridge::WriteObjectUpdate u;
+        iclforge::adm::WriteObjectUpdate u;
         u.sample_offset = at;
         u.state.position = {.x = 0.5, .y = 0.5, .z = 0.0};
         u.state.zone = zone;
         u.state.enable_elevation = elevation;
         return u;
     };
-    const std::vector<iclforge::admbridge::WriteObjectUpdate> updates{
+    const std::vector<iclforge::adm::WriteObjectUpdate> updates{
         update(0, ZoneConstraint::kScreenOnly, true),
         update(kRate, ZoneConstraint::kSideExcluded, false),
         update(2ULL * kRate, ZoneConstraint::kNone, true),
     };
 
-    iclforge::admbridge::WriteInput input;
+    iclforge::adm::WriteInput input;
     input.sample_rate = kRate;
     input.channels.push_back({.name = "Object 1", .pcm = pcm, .bed_label = std::nullopt, .updates = updates});
-    const auto built = iclforge::admbridge::write(input);
+    const auto built = iclforge::adm::write(input);
     REQUIRE(built.has_value());
 
     const auto scratch = fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("admbridge_zones_" + scratch_pid_suffix());
@@ -279,7 +279,7 @@ TEST_CASE("zone constraints survive write() -> write_bw64 -> parse_bw64 -> build
 
     const auto parsed = iclforge::adm::parse_bw64(path);
     REQUIRE(parsed.has_value());
-    const auto bridged = iclforge::admbridge::build(*parsed);
+    const auto bridged = iclforge::adm::build(*parsed);
     REQUIRE(bridged.has_value());
     REQUIRE(bridged->channel_count() == 1);
     CHECK(bridged->unmapped[0].empty());
@@ -303,7 +303,7 @@ TEST_CASE("divergence and screen reference survive write() -> write_bw64 -> pars
     std::vector<float> pcm(static_cast<std::size_t>(kRate) * 3, 0.1F);
 
     const auto update = [](std::uint64_t at, double divergence, bool screen, double screen_factor) {
-        iclforge::admbridge::WriteObjectUpdate u;
+        iclforge::adm::WriteObjectUpdate u;
         u.sample_offset = at;
         u.state.position = {.x = 0.5, .y = 0.5, .z = 0.0};
         u.state.divergence = divergence;
@@ -311,16 +311,16 @@ TEST_CASE("divergence and screen reference survive write() -> write_bw64 -> pars
         u.state.screen_factor = screen_factor;
         return u;
     };
-    const std::vector<iclforge::admbridge::WriteObjectUpdate> updates{
+    const std::vector<iclforge::adm::WriteObjectUpdate> updates{
         update(0, 0.0, false, 0.0),
         update(kRate, 0.608529, true, 1.0),
         update(2ULL * kRate, 0.2, true, 0.25),  // a quarter screen factor reads as room-anchored
     };
 
-    iclforge::admbridge::WriteInput input;
+    iclforge::adm::WriteInput input;
     input.sample_rate = kRate;
     input.channels.push_back({.name = "Object 1", .pcm = pcm, .bed_label = std::nullopt, .updates = updates});
-    const auto built = iclforge::admbridge::write(input);
+    const auto built = iclforge::adm::write(input);
     REQUIRE(built.has_value());
 
     const auto scratch = fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("admbridge_divergence_" + scratch_pid_suffix());
@@ -345,7 +345,7 @@ TEST_CASE("divergence and screen reference survive write() -> write_bw64 -> pars
     CHECK(object->block_formats[2].object_divergence.value == Catch::Approx(0.2));
     CHECK_FALSE(object->block_formats[2].screen_ref);
 
-    const auto bridged = iclforge::admbridge::build(*parsed);
+    const auto bridged = iclforge::adm::build(*parsed);
     REQUIRE(bridged.has_value());
     CHECK(bridged->unmapped[0].empty());
     CHECK(bridged->paths[0].evaluate(0.5).divergence == 0.0);

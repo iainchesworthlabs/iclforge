@@ -13,14 +13,14 @@
 namespace forge_cli {
 
 std::expected<void, std::string> write_adm_atmos_master(std::string_view path, const AdmMasterInput& input) {
-    iclforge::admbridge::WriteInput bridged;
+    iclforge::adm::WriteInput bridged;
     bridged.sample_rate = input.sample_rate;
     bridged.channels.reserve(input.channels.size());
 
-    // `updates` holds iclforge::admbridge::WriteObjectUpdate by value for as long as `bridged` is
+    // `updates` holds iclforge::adm::WriteObjectUpdate by value for as long as `bridged` is
     // alive - WriteChannel::updates is only a span, so the vectors it borrows from have to
-    // outlive the iclforge::admbridge::write() call below.
-    std::vector<std::vector<iclforge::admbridge::WriteObjectUpdate>> updates_storage;
+    // outlive the iclforge::adm::write() call below.
+    std::vector<std::vector<iclforge::adm::WriteObjectUpdate>> updates_storage;
     updates_storage.reserve(input.channels.size());
 
     for (const auto& channel : input.channels) {
@@ -37,9 +37,9 @@ std::expected<void, std::string> write_adm_atmos_master(std::string_view path, c
                                     .updates = stored_updates});
     }
 
-    auto document = iclforge::admbridge::write(bridged);
+    auto document = iclforge::adm::write(bridged);
     if (!document) {
-        return std::unexpected(std::string(iclforge::admbridge::describe(document.error())));
+        return std::unexpected(std::string(iclforge::adm::describe(document.error())));
     }
 
     auto written = iclforge::adm::write_bw64(std::string{path}, *document);

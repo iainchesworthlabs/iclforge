@@ -4,7 +4,7 @@
 
 #include "iclforge/base/crypto/sha256.hpp"
 
-namespace iclforge::signing {
+namespace iclforge::base::crypto {
 
 std::array<std::byte, 32> hmac_sha256(std::span<const std::byte> key,
                                       std::span<const std::byte> message) {
@@ -43,4 +43,4 @@ std::array<std::byte, 32> hmac_sha256(std::span<const std::byte> key,
     return out;
 }
 
-}  // namespace iclforge::signing
+}  // namespace iclforge::base::crypto

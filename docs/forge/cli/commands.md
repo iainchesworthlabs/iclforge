@@ -352,7 +352,7 @@ this row instead reads `UNAVAILABLE HERE`):
 
 | Command | What it does |
 |---|---|
-| `atmos-adm` | A real ADM BWF master (professional delivery format Netflix's and Apple's own Atmos ingest pipelines require) straight to DD+ JOC E-AC-3 — no WAV, no hand-authored keyframe file: [`iclforge::admbridge::build`](../../library/adm-bridge.md) classifies every channel as a bed speaker feed or a dynamic object and builds its own `iclforge::oba::ObjectPath` straight from the file's authored BS.2076-2 §10.3 position/gain automation, driven frame by frame the same way `atmos-encode` drives an authored `[paths.txt]`. With `codec=ac4` (planning/ac4.md, I5), every bed/object channel becomes an AC-4 dynamic object instead (A-JOC by default, `coding=direct` for direct-coded object substreams), its position sampled once a frame (frame_rate_index 13 is the object substream's only rate) |
+| `atmos-adm` | A real ADM BWF master (professional delivery format Netflix's and Apple's own Atmos ingest pipelines require) straight to DD+ JOC E-AC-3 — no WAV, no hand-authored keyframe file: [`iclforge::adm::build`](../../library/adm-bridge.md) classifies every channel as a bed speaker feed or a dynamic object and builds its own `iclforge::oba::ObjectPath` straight from the file's authored BS.2076-2 §10.3 position/gain automation, driven frame by frame the same way `atmos-encode` drives an authored `[paths.txt]`. With `codec=ac4` (planning/ac4.md, I5), every bed/object channel becomes an AC-4 dynamic object instead (A-JOC by default, `coding=direct` for direct-coded object substreams), its position sampled once a frame (frame_rate_index 13 is the object substream's only rate) |
 
 ```bash
 forge atmos-adm master.wav out.ec3 448
@@ -419,7 +419,7 @@ channels have no single fixed layout to measure loudness against the way `atmos-
 input does, so `atmos-adm` refuses it with a clear error rather than silently keeping the default.
 
 Every failure — a container/XML parse error (`iclforge::adm::AdmError`) or a graph-resolution error
-(`iclforge::admbridge::BridgeError`, e.g. no `audioProgramme`, an unresolved reference, an unsupported
+(`iclforge::adm::BridgeError`, e.g. no `audioProgramme`, an unresolved reference, an unsupported
 pack type) — prints a real diagnosis via that error's own `describe()`, never an opaque crash or a
 bare non-zero exit.
 
@@ -446,7 +446,7 @@ usage block at the top of this page is from a *default* build, where this row in
 
 | Command | What it does |
 |---|---|
-| `atmos-iab` | A real Immersive Audio Bitstream (SMPTE ST 2098-2) master — a bare elementary `.iab` file or a real MXF Track File alike, sniffed automatically by its first byte — straight to DD+ JOC E-AC-3: [`iclforge::admbridge::build_iab`](../../library/adm-bridge.md#bridging-iab) classifies every Bed channel/Object and builds its own `iclforge::oba::ObjectPath` from the file's own per-frame panning, driven frame by frame the same way `atmos-adm` drives an ADM master. `codec=ac4`/`coding=` work exactly as `atmos-adm`'s own do (planning/ac4.md, I5) |
+| `atmos-iab` | A real Immersive Audio Bitstream (SMPTE ST 2098-2) master — a bare elementary `.iab` file or a real MXF Track File alike, sniffed automatically by its first byte — straight to DD+ JOC E-AC-3: [`iclforge::adm::build_iab`](../../library/adm-bridge.md#bridging-iab) classifies every Bed channel/Object and builds its own `iclforge::oba::ObjectPath` from the file's own per-frame panning, driven frame by frame the same way `atmos-adm` drives an ADM master. `codec=ac4`/`coding=` work exactly as `atmos-adm`'s own do (planning/ac4.md, I5) |
 
 ```bash
 forge atmos-iab master.iab out.ec3 448
@@ -468,7 +468,7 @@ channels have no single fixed layout to measure loudness against the way `atmos-
 input does, so `atmos-iab` refuses it with a clear error rather than silently keeping the default.
 
 Every failure — a bitstream/MXF parse error (`iclforge::iab::IabError`) or a graph-resolution error
-(`iclforge::admbridge::BridgeError`, e.g. a Table 19 `ChannelID` with no `BedLabel` equivalent, or
+(`iclforge::adm::BridgeError`, e.g. a Table 19 `ChannelID` with no `BedLabel` equivalent, or
 essence that never resolved) — prints a real diagnosis via that error's own `describe()`, never an
 opaque crash or a bare non-zero exit.
 

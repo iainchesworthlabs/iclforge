@@ -210,7 +210,7 @@ target_include_directories(iclforge_ac3_minimal
         "${_ac3_minimal_profiling_dir}"
         # The SIMD arch seam is resolved by src/arithmetic/CMakeLists.txt and comes
         # with iclforge::arithmetic, linked below: mdct.cpp/bitalloc.cpp/exponents.cpp
-        # include iclforge/arithmetic/detail/simd.hpp unconditionally, so this profile needs
+        # include iclforge/base/detail/simd.hpp unconditionally, so this profile needs
         # a directory the same way the ordinary build does.
         #
         # Both of the profile's bare-metal targets resolve to generic/ - an

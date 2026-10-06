@@ -144,10 +144,10 @@ from the model wherever `has_sample_rate` is set. On the read side both attribut
 `has_bit_depth`.
 
 `write_bw64`'s own translator supports exactly the element shapes [ADM → Atmos bridging](adm-bridge.md)'s
-write direction (`iclforge::admbridge::write()`) produces: `audioProgramme` → `audioContent` →
+write direction (`iclforge::adm::write()`) produces: `audioProgramme` → `audioContent` →
 `audioObject` (no nesting) → `audioPackFormat` (`Objects` or `DirectSpeakers`, no nesting) →
 `audioChannelFormat` (cartesian `audioBlockFormat`s only) → `audioStreamFormat` → `audioTrackFormat`
-→ `audioTrackUID`. `iclforge::admbridge::write()` always populates the full `audioStreamFormat`/
+→ `audioTrackUID`. `iclforge::adm::write()` always populates the full `audioStreamFormat`/
 `audioTrackFormat` chain rather than BS.2076-2's plain-PCM shortcut (`audioTrackUID` referencing
 `audioPackFormat`/`audioChannelFormat` directly, with no stream/track format at all) — libadm's own
 `adm::reassignIds()` zeroes out any `audioChannelFormat` no `audioStreamFormat` references ("get an

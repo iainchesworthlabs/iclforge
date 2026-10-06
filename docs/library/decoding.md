@@ -131,7 +131,7 @@ A/52 §7.10.1 puts it **before** the region it protects and requires the registe
 once the first 5/8 of the syncframe has been shifted through, so it has to be *solved* rather
 than computed — `iclforge::ac3::solve_leading_crc` (`iclforge/ac3/core/crc16.hpp`) does that with a GF(2)
 polynomial inverse, and is the same function the encoder itself uses. `restamp_crc` is public
-for a caller doing its own bsi surgery (`iclforge::signing::sign_atmos_frame` is the in-project
+for a caller doing its own bsi surgery (`iclforge::ac3::signing::sign_atmos_frame` is the in-project
 precedent) so nobody has to reimplement that solve.
 
 Stated as limits rather than left to be discovered:

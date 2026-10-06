@@ -414,7 +414,7 @@ std::vector<std::string_view> track_uid_start_tags(std::string_view xml) {
 // own track, with that entry as its AudioTrackUid's bit depth (nullopt: has_bit_depth false). Each
 // object's audioPackFormat and audioChannelFormat are `type` - kObjects, or kDirectSpeakers, the
 // writer's other supported typeDefinition - and each channel carries one cartesian block. Built
-// with the full audioStreamFormat -> audioTrackFormat chain iclforge::admbridge::write() uses
+// with the full audioStreamFormat -> audioTrackFormat chain iclforge::adm::write() uses
 // rather than BS.2076-2's plain-PCM shortcut: libadm's reassignIds() gives any audioChannelFormat
 // no audioStreamFormat references the id zero (bridge.cpp's own comment on it), and several
 // channels collapsed onto one id read back as a duplicate-ID failure, not as anything a test using

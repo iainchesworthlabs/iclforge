@@ -84,7 +84,7 @@ target_include_directories(hearth_engine PUBLIC "${PROJECT_SOURCE_DIR}/apps/comm
 # for the JSON writer the media information is written with, the key ring the
 # pairing records implement (pairing_store.hpp), discovery and pairing
 # themselves (network_sinks.hpp), and Group, the burst/PCM streaming path a
-# network output plays through (network_group_sink.hpp). iclforge::signing asks
+# network output plays through (network_group_sink.hpp). iclforge::ac3 asks
 # whether frames carry an authenticity tag.
 target_link_libraries(hearth_engine PUBLIC iclforge::audio iclforge::ac3 iclforge::ac4 iclforge::sendspin)
 # iclforge::coverage (coverage floors, tools/checks/coverage_report.sh's "apps/hearth" row) instruments
@@ -92,7 +92,7 @@ target_link_libraries(hearth_engine PUBLIC iclforge::audio iclforge::ac3 iclforg
 # instrumented EXECUTABLE that eventually links this library is not enough on its own: --coverage
 # is a compile-time flag, so without this a coverage build's .cpp files here would produce no
 # .gcno at all and read as no data rather than as low coverage.
-target_link_libraries(hearth_engine PRIVATE iclforge::warnings iclforge::fmt iclforge::signing iclforge::coverage)
+target_link_libraries(hearth_engine PRIVATE iclforge::warnings iclforge::fmt iclforge::ac3 iclforge::coverage)
 # The engine thread (engine_thread.cpp).
 find_package(Threads REQUIRED)
 target_link_libraries(hearth_engine PUBLIC Threads::Threads)

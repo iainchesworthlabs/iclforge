@@ -72,14 +72,14 @@ whole API surface is the key type plus the sign/verify calls:
 #include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
 
 // You own the bytes. There is no default, no built-in, no fallback key.
-iclforge::signing::SigningKey key{ my_32_key_bytes };          // or:
-auto loaded = iclforge::signing::load_signing_key("/path/key"); // file/env resolver
+iclforge::base::crypto::SigningKey key{ my_32_key_bytes };          // or:
+auto loaded = iclforge::base::crypto::load_signing_key("/path/key"); // file/env resolver
 
 // Sign a whole E-AC-3 elementary stream in place; returns the frames signed.
-int n = iclforge::signing::sign_atmos_stream(stream, key);
+int n = iclforge::ac3::signing::sign_atmos_stream(stream, key);
 
 // Check it back, without modifying the stream.
-iclforge::signing::VerifySummary v = iclforge::signing::verify_atmos_stream(stream, key);
+iclforge::ac3::signing::VerifySummary v = iclforge::ac3::signing::verify_atmos_stream(stream, key);
 // v.valid == n, v.mismatch == 0, assuming `stream` and `key` are unchanged.
 ```
 

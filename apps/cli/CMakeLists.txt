@@ -48,7 +48,7 @@ endif()
 # in the same way as the apps/common files above.
 target_sources(forge PRIVATE ../common/probe_json.cpp)
 
-# main.cpp's 'atmos-adm' command (ADM BWF reader phase 3) needs iclforge::adm/iclforge::admbridge - this
+# main.cpp's 'atmos-adm' command (ADM BWF reader phase 3) needs iclforge::adm - this
 # project's one optional, non-default library dependency (ICLFORGE_BUILD_ADM, default OFF - see
 # the root CMakeLists.txt's own option() for why: libadm's Boost dependency). Unlike
 # iclforge::matroska/iclforge::mp4/iclforge::mpegts below (default ON, and a FATAL_ERROR guard in the
@@ -57,7 +57,7 @@ target_sources(forge PRIVATE ../common/probe_json.cpp)
 # dispatch time (main.cpp's Needs::kAdm/unmet()) rather than missing from the binary's usage
 # listing entirely.
 #
-# main.cpp itself never names iclforge::adm/iclforge::admbridge or includes either of their headers -
+# main.cpp itself never names iclforge::adm or includes either of their headers -
 # not even behind a preprocessor guard, since tools/checks/check_platform_macros.ps1 (CI-enforced)
 # refuses ANY #if/#ifdef/#ifndef anywhere under src/, feature flags included, not just platform
 # ones (that script's own header comment). So the same platform-tree shape the WIN32/else split
@@ -72,7 +72,7 @@ target_sources(forge PRIVATE ../common/probe_json.cpp)
 # 'atmos-iab' (IAB reader phase 3) rides the exact same ICLFORGE_BUILD_ADM gate as 'atmos-adm'
 # above, for the reason adm/atmos_iab.hpp's own top comment gives: iclforge::iab by itself
 # (ICLFORGE_BUILD_IAB, default ON) has nothing that can drive AtmosEncoder - only
-# iclforge::admbridge's own build_iab() does that, and admbridge only exists when ICLFORGE_BUILD_ADM
+# iclforge::adm's own build_iab() does that, and admbridge only exists when ICLFORGE_BUILD_ADM
 # turned it on. adm/enabled/atmos_iab.cpp additionally needs iclforge::iab directly (to sniff and
 # parse the input container), already linked unconditionally elsewhere in this target - see the
 # root CMakeLists.txt's own ICLFORGE_BUILD_ADM-requires-ICLFORGE_BUILD_IAB guard for why that
@@ -80,7 +80,7 @@ target_sources(forge PRIVATE ../common/probe_json.cpp)
 if(ICLFORGE_BUILD_ADM)
     target_sources(forge PRIVATE adm/enabled/atmos_adm.cpp adm/enabled/decode_adm.cpp
                                   adm/enabled/atmos_iab.cpp)
-    target_link_libraries(forge PRIVATE iclforge::adm iclforge::admbridge)
+    target_link_libraries(forge PRIVATE iclforge::adm)
 else()
     target_sources(forge PRIVATE adm/disabled/atmos_adm.cpp adm/disabled/decode_adm.cpp
                                   adm/disabled/atmos_iab.cpp)
@@ -97,7 +97,7 @@ target_link_libraries(forge
     PRIVATE
         iclforge::ac3
         iclforge::audio
-        iclforge::signing
+        iclforge::ac3
         iclforge::matroska
         iclforge::mp4
         iclforge::mpegts

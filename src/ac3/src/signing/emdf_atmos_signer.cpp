@@ -12,7 +12,7 @@
 #include "iclforge/ac3/emdf/frame_layout.hpp"
 #include "iclforge/base/crypto/hmac_sha256.hpp"
 
-namespace iclforge::signing {
+namespace iclforge::ac3::signing {
 namespace {
 
 // Where the frame's fields are is iclforge::ac3::emdf::walk_frame's job (see
@@ -62,7 +62,7 @@ struct TagContext {
 };
 
 std::optional<TagContext> compute_tag_context(std::span<const std::byte> frame,
-                                               const SigningKey& key) {
+                                               const base::crypto::SigningKey& key) {
     const FrameLayout p = ac3::emdf::walk_frame(frame);
     // A frame outside the walker's scope, or one whose fields stopped making
     // sense part-way through, reports no container - so it is left unsigned
@@ -114,7 +114,7 @@ std::optional<TagContext> compute_tag_context(std::span<const std::byte> frame,
     for (std::uint8_t x : b_bytes) msg.push_back(std::byte{x});
 
     const std::size_t prim_off = p.container_start + pb - std::size_t(np) - std::size_t(ms);
-    return TagContext{.digest = hmac_sha256(key.bytes(), msg), .np = np, .prim_off = prim_off};
+    return TagContext{.digest = base::crypto::hmac_sha256(key.bytes(), msg), .np = np, .prim_off = prim_off};
 }
 
 }  // namespace
@@ -158,7 +158,7 @@ bool has_authenticity_tag(std::span<const std::byte> frame) {
     return false;
 }
 
-bool sign_atmos_frame(std::span<std::byte> frame, const SigningKey& key) {
+bool sign_atmos_frame(std::span<std::byte> frame, const base::crypto::SigningKey& key) {
     if (key.empty()) return false;
     const auto ctx = compute_tag_context(frame, key);
     if (!ctx) return false;
@@ -188,7 +188,7 @@ bool sign_atmos_frame(std::span<std::byte> frame, const SigningKey& key) {
     return true;
 }
 
-int sign_atmos_stream(std::span<std::byte> stream, const SigningKey& key) {
+int sign_atmos_stream(std::span<std::byte> stream, const base::crypto::SigningKey& key) {
     if (key.empty()) return 0;
     int signed_count = 0;
     std::size_t off = 0;
@@ -201,7 +201,7 @@ int sign_atmos_stream(std::span<std::byte> stream, const SigningKey& key) {
     return signed_count;
 }
 
-VerifyResult verify_atmos_frame(std::span<const std::byte> frame, const SigningKey& key) {
+VerifyResult verify_atmos_frame(std::span<const std::byte> frame, const base::crypto::SigningKey& key) {
     const auto ctx = compute_tag_context(frame, key);
     if (!ctx) return VerifyResult::kNoContainer;
 
@@ -219,7 +219,7 @@ VerifyResult verify_atmos_frame(std::span<const std::byte> frame, const SigningK
     return VerifyResult::kValid;
 }
 
-VerifySummary verify_atmos_stream(std::span<const std::byte> stream, const SigningKey& key) {
+VerifySummary verify_atmos_stream(std::span<const std::byte> stream, const base::crypto::SigningKey& key) {
     VerifySummary summary;
     std::size_t off = 0;
     while (off + 6 <= stream.size()) {
@@ -235,4 +235,4 @@ VerifySummary verify_atmos_stream(std::span<const std::byte> stream, const Signi
     return summary;
 }
 
-}  // namespace iclforge::signing
+}  // namespace iclforge::ac3::signing

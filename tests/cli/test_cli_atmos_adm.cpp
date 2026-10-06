@@ -40,7 +40,7 @@
 // project's own established per-file test-helper convention (see that file's own comment on this)
 // rather than shared, and deliberately kept byte-identical to that fixture rather than inventing a
 // new one: this file's own job is checking that the real forge binary wires parse_bw64 ->
-// admbridge::build -> AtmosEncoder together correctly end to end, not re-proving admbridge's own
+// adm::build -> AtmosEncoder together correctly end to end, not re-proving admbridge's own
 // BS.2076-2 §10.3 state machine or coordinate conversion, which tests/adm/test_adm_bridge.cpp
 // already does directly against the library API.
 
@@ -312,7 +312,7 @@ TEST_CASE("forge atmos-adm parses, bridges and encodes a real ADM BWF master end
 
     // Decode what the CLI actually wrote - not a re-run through the library API - so this test
     // proves the real binary's argument parsing, iclforge::adm::parse_bw64 call,
-    // iclforge::admbridge::build call and per-frame AtmosEncoder loop are all wired together
+    // iclforge::adm::build call and per-frame AtmosEncoder loop are all wired together
     // correctly, not just that each piece works in isolation (tests/adm/test_adm_bridge.cpp's
     // own flagship test already covers that).
     std::ifstream stream_in{out_path, std::ios::binary};
@@ -375,7 +375,7 @@ TEST_CASE("forge atmos-adm reports a clear diagnosis for a file with no ADM prog
     const auto dir = scratch_dir();
     // Same container, empty <axml> chunk: parse_bw64 succeeds (a document with no ADM metadata
     // is valid per BS.2088-1 - see iclforge::adm::AdmDocument's own comment on this), but
-    // admbridge::build then has no audioProgramme to resolve at all - BridgeError::kNoProgramme,
+    // adm::build then has no audioProgramme to resolve at all - BridgeError::kNoProgramme,
     // the error path this test exercises.
     const auto fixture_path = dir / "atmos_adm_no_programme.wav";
     {

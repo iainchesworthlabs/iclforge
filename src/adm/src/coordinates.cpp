@@ -12,7 +12,7 @@
 #include <variant>
 #include <vector>
 
-namespace iclforge::admbridge {
+namespace iclforge::adm {
 
 iclforge::adm::CartesianPosition polar_to_adm_cartesian(const iclforge::adm::PolarPosition& polar) {
     const double azimuth_rad = polar.azimuth_deg * std::numbers::pi / 180.0;
@@ -304,4 +304,4 @@ std::vector<iclforge::adm::ExclusionZone> constraint_to_adm_zone_exclusion(
     return out;
 }
 
-}  // namespace iclforge::admbridge
+}  // namespace iclforge::adm

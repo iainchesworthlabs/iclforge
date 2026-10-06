@@ -32,7 +32,7 @@
 // fixture (same Bed Center channel + hard-right-then-hard-left Object, same 300/800 Hz tones) -
 // duplicated per this project's own established per-file test-helper convention (see that file's
 // own comment) rather than shared: this file's own job is checking that the real forge binary
-// wires parse_iabitstream -> admbridge::build_iab -> AtmosEncoder together correctly end to end,
+// wires parse_iabitstream -> adm::build_iab -> AtmosEncoder together correctly end to end,
 // not re-proving admbridge's own Table 19 mapping or coordinate conversion, which
 // tests/adm/test_iab_bridge.cpp already does directly against the library API.
 
@@ -277,7 +277,7 @@ TEST_CASE("forge atmos-iab parses, bridges and encodes a real IAB fixture end to
     CHECK(fs::file_size(out_path) > 0);
 
     // Decode what the CLI actually wrote - proves the real binary's argument parsing, the MXF/
-    // elementary sniff, iclforge::admbridge::build_iab call and per-frame AtmosEncoder loop are all
+    // elementary sniff, iclforge::adm::build_iab call and per-frame AtmosEncoder loop are all
     // wired together correctly, not just that each piece works in isolation
     // (tests/adm/test_iab_bridge.cpp's own flagship test already covers that).
     std::ifstream stream_in{out_path, std::ios::binary};

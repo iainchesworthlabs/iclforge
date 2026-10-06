@@ -31,7 +31,7 @@ this repository that must not crash, read out of bounds, or loop unboundedly on 
 | IAB (SMPTE ST 2098-2) elementary streams and MXF track files | `iclforge::iab::parse_iabitstream`, `iclforge::iab::parse_mxf_iab`, `iclforge::iab::parse_iaframe` | yes — `fuzz_iab_parse` |
 | IEC 61937 bursts off an S/PDIF or HDMI capture, AC-4's included, and the AC-4 sync frames the AC-4 packer reads | `iclforge::iec61937::BurstReader`, `iclforge::iec61937::read_ac4_sync_frame` | yes — `fuzz_iec61937_unwrap` |
 | ADM XML + BW64/RF64 (opt-in build) | `iclforge::adm::parse_bw64`, via vendored libadm/libbw64 | **opt-in only** — `fuzz_adm_parse` exists but is built only under `ICLFORGE_BUILD_ADM`; see [ADM](#adm-xml-and-bw64) |
-| Object authenticity tags | `iclforge::signing::verify_atmos_frame` | yes — `fuzz_signing_verify` (the key is part of the fuzzed input) |
+| Object authenticity tags | `iclforge::ac3::signing::verify_atmos_frame` | yes — `fuzz_signing_verify` (the key is part of the fuzzed input) |
 | Matroska/WebM containers | `iclforge::matroska::demux`, `iclforge::matroska::Reader` | yes |
 | MP4/ISOBMFF containers | `iclforge::mp4::demux`, `iclforge::mp4::Reader` | yes |
 | MPEG-TS containers | `iclforge::mpegts::demux`, `iclforge::mpegts::Reader` | yes |
@@ -52,7 +52,7 @@ caller, not an attack:
 - PCM handed to the encoder. Any float is legal audio; nothing about it can reach a decision the
   bitstream syntax does not already bound.
 - The signing key, if an operator supplies one. It is never generated, logged or written to disk
-  by this code (`iclforge::signing::SigningKey` zeroizes on destruction).
+  by this code (`iclforge::base::crypto::SigningKey` zeroizes on destruction).
 - File paths, output destinations, and the caller-owned spans the `_into` decode forms write
   through — see [Raw-pointer boundaries](#raw-pointer-boundaries).
 
@@ -367,7 +367,7 @@ libadm and libbw64, plus Boost headers. That means:
 - The whole `axml` chunk is materialised as a string and re-parsed from an `istringstream`, so
   memory is O(document).
 - Parse and graph-resolution failures do surface as real diagnostics (`iclforge::adm::AdmError`,
-  `iclforge::admbridge::BridgeError`, each with its own `describe()`) rather than a crash or a bare
+  `iclforge::adm::BridgeError`, each with its own `describe()`) rather than a crash or a bare
   non-zero exit.
 
 **Do not enable the ADM build for untrusted input.** It exists to ingest professional master
@@ -377,7 +377,7 @@ advisory job, and deciding a document-size policy; neither has been done.
 
 ### Object signing is authentication, not integrity of the stream
 
-`iclforge::signing::verify_atmos_frame`/`verify_atmos_stream` check an HMAC tag over the EMDF object
+`iclforge::ac3::signing::verify_atmos_frame`/`verify_atmos_stream` check an HMAC tag over the EMDF object
 container. This tells you the object metadata came from someone holding the key. It does **not**
 authenticate the audio, the bed, or anything outside the container, and a stream with no
 container at all has nothing to verify — see

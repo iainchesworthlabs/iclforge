@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::admbridge - ADM BWF → JOC bridge, phase 2: maps the ADM object graph
+# iclforge::adm - ADM BWF → JOC bridge, phase 2: maps the ADM object graph
 # iclforge::adm (src/adm) parses onto iclforge::ac3::oba::AtmosEncoder's input shape.
 #
 # A NEW standalone module, not folded into either side it bridges, for two
@@ -28,8 +28,8 @@
 # need.
 #
 # Installed/exported via find_package(iclforge) (cmake/InstallLibrary.cmake's ICLFORGE_BUILD_ADM
-# block) as iclforge::admbridge_shared ONLY - same shared-only deviation as iclforge::adm itself (see
-# src/adm/CMakeLists.txt's header comment), and for a related reason: iclforge_admbridge_objects PUBLIC-
+# block) as iclforge::adm_shared ONLY - same shared-only deviation as iclforge::adm itself (see
+# src/adm/CMakeLists.txt's header comment), and for a related reason: iclforge_adm_objects PUBLIC-
 # links iclforge::adm below, a genuine usage requirement (this module's own public headers name
 # iclforge::adm types), so admTargets must resolve it - and since only iclforge_adm_shared is ever exported,
 # admbridge has to resolve to that specific variant too, not the ambient iclforge::adm alias
@@ -40,7 +40,7 @@
 # LINK_PUBLIC: this module's own public headers (bridge.hpp, coordinates.hpp, iab_bridge.hpp) name
 # types from iclforge::oba (iclforge::ac3), iclforge::adm AND (IAB reader phase 3) iclforge::iab in
 # their signatures (iclforge::oba::ObjectPath, iclforge::adm::AdmDocument, iclforge::iab::IABitstreamFrame, ...), so
-# anything linking iclforge::admbridge needs all three transitively.
+# anything linking iclforge::adm needs all three transitively.
 #
 # iclforge::adm_shared explicitly, not the ambient iclforge::adm alias: this file's header
 # comment explains why - the alias tracks BUILD_SHARED_LIBS and would resolve to iclforge_adm_static

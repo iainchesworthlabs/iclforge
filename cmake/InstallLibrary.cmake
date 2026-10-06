@@ -162,7 +162,7 @@ iclforge_install_library(render
 iclforge_install_library(iec61937
     DESCRIPTION "IEC 61937 burst packing and unpacking for AC-3, E-AC-3 and AC-4")
 
-# iclforge::signing is mandatory, not an ICLFORGE_BUILD_<NAME>-gated optional component (same as
+# iclforge::ac3 is mandatory, not an ICLFORGE_BUILD_<NAME>-gated optional component (same as
 # iclforge::ac3 itself, unconditionally add_subdirectory()'d in the root CMakeLists.txt) - so unlike
 # the optional components below, it carries no if(ICLFORGE_BUILD_...) guard.
 iclforge_install_library(signing
@@ -194,7 +194,7 @@ if(ICLFORGE_BUILD_IAB)
         DESCRIPTION "Standalone SMPTE ST 2098-2 Immersive Audio Bitstream reader")
 endif()
 
-# iclforge::adm and iclforge::admbridge share iclforge::adm's ICLFORGE_BUILD_ADM (see
+# iclforge::adm share iclforge::adm's ICLFORGE_BUILD_ADM (see
 # src/admbridge/CMakeLists.txt's header comment), and unlike every other component in this file
 # each installs and exports its SHARED variant only, regardless of ICLFORGE_INSTALL_BOTH_LINKAGES
 # and BUILD_SHARED_LIBS: iclforge::adm embeds the third-party libbw64 and libadm (never installed or

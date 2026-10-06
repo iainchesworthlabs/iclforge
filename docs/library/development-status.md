@@ -202,7 +202,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | `AudioDataPCM` | 🟢 | High | Essential | Full PCM |
 | | `AudioDataDLC` (Annex B) | 🟢 | Medium | Important | 48 and 96 kHz, bit exact; `decode_dlc`, used by `build_iab` |
 | | MXF Track File extract (ST 2067-201) | 🟢 | High | Essential | Minimal KLV walk |
-| **Bridge** | IAB → Atmos encode (positions / gains) | 🟢 | High | Essential | `admbridge::build_iab`; `forge atmos-iab` |
+| **Bridge** | IAB → Atmos encode (positions / gains) | 🟢 | High | Essential | `adm::build_iab`; `forge atmos-iab` |
 | | Spread + `ObjectZoneControl` → JOC | 🟡 | Medium | Important | Spread → object size; zone control → zone constraint when it matches one of the six presets; otherwise unconstrained |
 | **Writer** | IAB encode | 🟢 | Low | Nice-to-have | `write_iaframe`, `write_iabitstream`; `encode_dlc` for lossless essence |
 | | MXF Track File write (ST 2067-201) | 🟢 | Low | Nice-to-have | `write_mxf_iab`; refuses what 2067-201 forbids (16-bit, DLC, `BedRemap`, child elements); checked by a separate reader and FFmpeg's demuxer, no IMF tool here has opened it |

@@ -64,7 +64,7 @@ before it, or call `forge` by its full path, when a shell answers with the wrong
 | CMake package `find_package(ac3forge)` | `find_package(iclforge)` |
 | CMake options and cache variables `AC3FORGE_*` (`AC3FORGE_BUILD_ADM`, `AC3FORGE_SIMD`, ...) | `ICLFORGE_*` |
 | Kconfig symbols `CONFIG_AC3FORGE_*` | `CONFIG_ICLFORGE_*` |
-| pkg-config `ac3forge`, `ac3signing`, `matroska`, `mp4`, `mpegts`, `iamf`, `ac3iab`, `ac3adm`, `admbridge`, `ac3forge_c`, `ac4`, `ac4dec`, `ac4enc`, `ac4core` | `iclforge-<library>`: `iclforge-ac3`, `iclforge-signing`, `iclforge-matroska`, ..., `iclforge-c`; the four AC-4 names are one, `iclforge-ac4` |
+| pkg-config `ac3forge`, `ac3signing`, `matroska`, `mp4`, `mpegts`, `iamf`, `ac3iab`, `ac3adm`, `admbridge`, `ac3forge_c`, `ac4`, `ac4dec`, `ac4enc`, `ac4core` | `iclforge-<library>`: `iclforge-ac3`, `iclforge-ac3`, `iclforge-matroska`, ..., `iclforge-c`; the four AC-4 names are one, `iclforge-ac4` |
 | Library files `libac3forge`, `libac3forge_c`, `libmp4`, ... | `libiclforge_<library>`, with `_static` for the archive |
 
 The codec library `ac3::forge` became one of the libraries under `src/`, and five of its parts

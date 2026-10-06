@@ -44,7 +44,7 @@
 #
 # LINK_PRIVATE_FIRST, BUILD_TREE_DEPENDS and NO_C4251_SUPPRESSION reproduce what the libraries made
 # by hand before planning/consolidation.md's C0 exported, so that the stage changed nothing installed:
-# iclforge::signing linked the codec first and as an ordinary link, the AC-4 decoder and encoder took
+# iclforge::ac3 linked the codec first and as an ordinary link, the AC-4 decoder and encoder took
 # the inspector's compile requirements in the build tree only, and iclforge::adm, admbridge, iab and
 # c set no C4251 suppression.
 #

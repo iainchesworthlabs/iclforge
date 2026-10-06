@@ -67,10 +67,10 @@ std::expected<IabAtmosSource, std::string> load_iab_atmos_source(std::string_vie
     // ac3/admbridge/iab_bridge.hpp's own top comment on why, unlike ADM's BridgeResult), and
     // IabAtmosSource::handle has to keep this exact object alive for as long as the caller keeps
     // reading them.
-    auto bridged = std::make_shared<iclforge::admbridge::IabBridgeResult>();
-    auto built = iclforge::admbridge::build_iab(*frames);
+    auto bridged = std::make_shared<iclforge::adm::IabBridgeResult>();
+    auto built = iclforge::adm::build_iab(*frames);
     if (!built) {
-        return std::unexpected(std::string(iclforge::admbridge::describe(built.error())));
+        return std::unexpected(std::string(iclforge::adm::describe(built.error())));
     }
     *bridged = std::move(*built);
 

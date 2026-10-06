@@ -235,13 +235,13 @@ struct Engine::Impl {
         }
         if (const auto failure = signing.failure()) {
             switch (*failure) {
-                case iclforge::signing::KeyErrorKind::kUnreadable:
+                case iclforge::base::crypto::KeyErrorKind::kUnreadable:
                     return "signing: key not loaded (unreadable), 5.1 bed only";
-                case iclforge::signing::KeyErrorKind::kMalformed:
+                case iclforge::base::crypto::KeyErrorKind::kMalformed:
                     return "signing: key not loaded (malformed), 5.1 bed only";
-                case iclforge::signing::KeyErrorKind::kEmpty:
+                case iclforge::base::crypto::KeyErrorKind::kEmpty:
                     return "signing: key not loaded (empty), 5.1 bed only";
-                case iclforge::signing::KeyErrorKind::kAbsent: break;
+                case iclforge::base::crypto::KeyErrorKind::kAbsent: break;
             }
         }
         return "signing: no key, 5.1 bed only";

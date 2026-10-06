@@ -66,7 +66,7 @@
 // on-axis azimuths, which is the case that matters for real DirectSpeakers content (every
 // standard loudspeaker position BS.2076-2's own Annex A common definitions use is on-axis: pure
 // left/right, pure front/back, or pure up/down combinations).
-namespace iclforge::admbridge {
+namespace iclforge::adm {
 
 // BS.2076-2 Clause 8's polar convention to the same right/front/top-positive point its own
 // Cartesian axes describe. See this header's own top comment for the full derivation and the
@@ -191,4 +191,4 @@ inline constexpr double kZoneBoundTolerance = 0.05;
 [[nodiscard]] ICLFORGE_ADM_EXPORT std::vector<iclforge::adm::ExclusionZone>
 constraint_to_adm_zone_exclusion(iclforge::oba::ZoneConstraint zone, bool enable_elevation);
 
-}  // namespace iclforge::admbridge
+}  // namespace iclforge::adm

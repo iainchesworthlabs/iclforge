@@ -1271,7 +1271,7 @@ Pi OS, and so on).
 The codec's hot kernels are vectorised, and the vector types they are written against come from
 a directory CMake chooses — never from an `#ifdef`. `src/arithmetic/variants/` holds
 `arch-generic/`, `arch-x86_64/` and `arch-aarch64/`, each carrying one identically-pathed
-`iclforge/arithmetic/detail/simd.hpp`; `src/arithmetic/CMakeLists.txt` puts exactly one of them on
+`iclforge/base/detail/simd.hpp`; `src/arithmetic/CMakeLists.txt` puts exactly one of them on
 `iclforge::arithmetic`'s include path, which `iclforge_ac3_objects` and `src/ac4/src/core` link, so every `#include "iclforge/base/detail/simd.hpp"` in the
 core resolves to it and no translation unit ever asks what it is being compiled for. This is the
 same mechanism `src/base/variants/profiling-tracy_{enabled,disabled}/` uses for the

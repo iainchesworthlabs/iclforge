@@ -30,9 +30,9 @@ std::expected<AdmAtmosSource, std::string> load_adm_atmos_source(std::string_vie
     // dangling the moment this function returns.
     auto document = std::make_shared<iclforge::adm::AdmDocument>(std::move(*parsed));
 
-    auto bridged = iclforge::admbridge::build(*document, programme_id);
+    auto bridged = iclforge::adm::build(*document, programme_id);
     if (!bridged) {
-        return std::unexpected(std::string(iclforge::admbridge::describe(bridged.error())));
+        return std::unexpected(std::string(iclforge::adm::describe(bridged.error())));
     }
 
     AdmAtmosSource out;

@@ -4469,14 +4469,14 @@ iclforge::ac4::DecoderConfig ac4_coded_config(const Options& meta) {
     return config;
 }
 
-std::optional<iclforge::signing::VerifySummary> apply_object_verification(
+std::optional<iclforge::ac3::signing::VerifySummary> apply_object_verification(
     std::span<const std::byte> stream, const Options& meta, FILE* status) {
     if (!meta.verify_objects) {
-        return iclforge::signing::VerifySummary{};
+        return iclforge::ac3::signing::VerifySummary{};
     }
-    const auto key = iclforge::signing::load_signing_key(meta.signing_key.value_or(""));
+    const auto key = iclforge::base::crypto::load_signing_key(meta.signing_key.value_or(""));
     if (!key.has_value()) {
-        if (key.error().kind == iclforge::signing::KeyErrorKind::kAbsent) {
+        if (key.error().kind == iclforge::base::crypto::KeyErrorKind::kAbsent) {
             fmt::println(stderr,
                          "error: verify-objects needs a key — pass signing-key=<path>, or set "
                          "ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY");
@@ -4485,7 +4485,7 @@ std::optional<iclforge::signing::VerifySummary> apply_object_verification(
         }
         return std::nullopt;
     }
-    const auto summary = iclforge::signing::verify_atmos_stream(stream, *key);
+    const auto summary = iclforge::ac3::signing::verify_atmos_stream(stream, *key);
     status_println(status, "  object signature: {} valid, {} mismatched, {} unsigned frame(s)",
                    summary.valid, summary.mismatch, summary.no_container);
     if (summary.mismatch > 0) {

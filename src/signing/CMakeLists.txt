@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::signing - the EMDF Atmos object signer.
+# iclforge::ac3 - the EMDF Atmos object signer.
 #
 # Clean-room and dependency-free (SHA-256/HMAC are implemented from FIPS 180-4/
 # RFC 2104, not pulled from OpenSSL - the same "no third-party codec deps" rule
@@ -18,7 +18,7 @@
 # Built and installed as both a static and a shared library by
 # iclforge_add_library() (cmake/IclforgeLibrary.cmake). An ordinary C++
 # dependent rather than a self-contained C ABI like iclforge::c
-# (src/capi/CMakeLists.txt): iclforge_signing_static and iclforge_signing_shared
+# (src/capi/CMakeLists.txt): iclforge_ac3_static and iclforge_ac3_shared
 # link iclforge::ac3_static and iclforge::ac3_shared, rather than always
 # embedding one specific variant regardless of BUILD_SHARED_LIBS the way capi
 # does.
@@ -31,12 +31,12 @@ iclforge_add_library(signing
         src/emdf_atmos_signer.cpp
     PRIVATE_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/src"
     # An ordinary link, not the compile-only one DEPENDS would make: the bare alias is the static
-    # codec in a static build, so libiclforge_signing.so carries a copy of what the signer calls of
+    # codec in a static build, so libiclforge_ac3.so carries a copy of what the signer calls of
     # it beside its link to libiclforge_ac3.so. Kept as it was until the signer moves into
     # iclforge::ac3 (planning/consolidation.md, C2).
     LINK_PRIVATE_FIRST iclforge::ac3)
-target_link_libraries(iclforge_signing_static PUBLIC iclforge::ac3_static)
-target_link_libraries(iclforge_signing_shared PUBLIC iclforge::ac3_shared)
+target_link_libraries(iclforge_ac3_static PUBLIC iclforge::ac3_static)
+target_link_libraries(iclforge_ac3_shared PUBLIC iclforge::ac3_shared)
 
 # MSVC flags plain getenv() (signing_key.cpp's env-var fallbacks) as C4996
 # "unsafe". The call is POSIX and portable - GCC/Clang raise nothing for it
@@ -46,5 +46,5 @@ target_link_libraries(iclforge_signing_shared PUBLIC iclforge::ac3_shared)
 # standard C function, the same way src/ac3 handles its own MSVC-only
 # suppressions (see cmake/CompilerWarnings.cmake).
 if(MSVC)
-    target_compile_options(iclforge_signing_objects PRIVATE /wd4996)
+    target_compile_options(iclforge_ac3_objects PRIVATE /wd4996)
 endif()

@@ -4,7 +4,7 @@
 // Roadmap item IM1 phase 3 of 3 (the last piece - phase 1 is iclforge::iab, src/iab; phase 2
 // is iclforge::iab::parse_mxf_iab, src/iab/src/mxf_reader.cpp). This is a minimal, standalone
 // illustration of the same pipeline forge's 'atmos-iab' command drives for real:
-// iclforge::iab::parse_iabitstream() reads the frame sequence, iclforge::admbridge::build_iab()
+// iclforge::iab::parse_iabitstream() reads the frame sequence, iclforge::adm::build_iab()
 // maps it onto iclforge::ac3::oba::AtmosEncoder's flat object-list input shape (one bed channel
 // pinned in place, one dynamic object panned by its own authored motion), and a plain per-frame
 // loop calls iclforge::oba::evaluate_placements() plus AtmosEncoder::encode_frame() the same way
@@ -319,11 +319,11 @@ int main(int argc, char** argv) {
 
     // Step 2: iclforge::admbridge (phase 3) - Bed/Object identity, coordinate conversion, and the
     // per-IAFrame position/gain timeline, mapped onto AtmosEncoder's flat object-list input shape.
-    const auto bridged = iclforge::admbridge::build_iab(*frames);
+    const auto bridged = iclforge::adm::build_iab(*frames);
     if (!bridged) {
         fmt::printf("build_iab failed: %.*s\n",
-                    static_cast<int>(iclforge::admbridge::describe(bridged.error()).size()),
-                    iclforge::admbridge::describe(bridged.error()).data());
+                    static_cast<int>(iclforge::adm::describe(bridged.error()).size()),
+                    iclforge::adm::describe(bridged.error()).data());
         return 1;
     }
 

@@ -63,9 +63,9 @@ std::optional<int> apply_object_signing(std::vector<std::vector<std::byte>>& uni
     if (!meta.sign_objects) {
         return 0;
     }
-    const auto key = iclforge::signing::load_signing_key(meta.signing_key.value_or(""));
+    const auto key = iclforge::base::crypto::load_signing_key(meta.signing_key.value_or(""));
     if (!key.has_value()) {
-        if (key.error().kind == iclforge::signing::KeyErrorKind::kAbsent) {
+        if (key.error().kind == iclforge::base::crypto::KeyErrorKind::kAbsent) {
             fmt::println(stderr,
                          "error: sign-objects needs a key — pass signing-key=<path>, or set "
                          "ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY");
@@ -76,7 +76,7 @@ std::optional<int> apply_object_signing(std::vector<std::vector<std::byte>>& uni
     }
     int signed_count = 0;
     for (auto& unit : units) {
-        signed_count += iclforge::signing::sign_atmos_stream(unit, *key);
+        signed_count += iclforge::ac3::signing::sign_atmos_stream(unit, *key);
     }
     return signed_count;
 }

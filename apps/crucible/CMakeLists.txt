@@ -14,7 +14,7 @@
 # the modules under engine/platform/<os>/ talk to that platform's session
 # enumeration, default device and silent device, and exactly one directory of
 # them is ever compiled. The rest of engine/ (taps, output stage, signing
-# hook, the frame loop) is written against iclforge::audio and iclforge::signing and
+# hook, the frame loop) is written against iclforge::audio and iclforge::ac3 and
 # would compile anywhere, but only makes sense here, so it rides the same
 # option.
 
@@ -36,7 +36,7 @@ target_compile_features(crucible_engine PUBLIC cxx_std_23)
 # (config-windows-llvm-coverage); then this library, the window and its
 # tests are the instrumented set tools/checks/coverage_crucible.ps1 reports.
 target_link_libraries(crucible_engine
-    PUBLIC iclforge::ac3 iclforge::audio iclforge::signing iclforge::tracy
+    PUBLIC iclforge::ac3 iclforge::audio iclforge::ac3 iclforge::tracy
     PRIVATE iclforge::warnings iclforge::coverage)
 
 # The platform half, selected the way apps/cli/CMakeLists.txt selects its

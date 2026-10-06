@@ -222,7 +222,7 @@ set_source_files_properties(ac3/io/test_metadata_edit.cpp
 set_source_files_properties(hearth/test_queue.cpp hearth/test_transport.cpp
     PROPERTIES COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:GNU>:-Wno-null-dereference>")
 
-# test_signing.cpp reaches iclforge::signing's internal crypto headers (sha256.hpp/
+# test_signing.cpp reaches iclforge::ac3's internal crypto headers (sha256.hpp/
 # hmac_sha256.hpp) to run the FIPS/RFC known-answer vectors directly - they are
 # not part of the target's public API, so put its private src/ dir on this
 # target's include path only, the same pattern the alsa backend's internal
@@ -240,8 +240,8 @@ target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/signi
 # through a whole encode. Same pattern as the signing headers above.
 target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/src/encoder")
 
-# test_scalar_math.cpp includes iclforge/arithmetic/scalar_math.hpp and
-# test_fixed32*.cpp/test_mdct_fixed.cpp include iclforge/arithmetic/fixed32.hpp - the
+# test_scalar_math.cpp includes iclforge/base/arithmetic/scalar_math.hpp and
+# test_fixed32*.cpp/test_mdct_fixed.cpp include iclforge/base/arithmetic/fixed32.hpp - the
 # shared arithmetic target (src/arithmetic) both iclforge::ac3 and iclforge::ac4
 # use (planning/ac4.md, decision 31), worth holding to their own accuracy/
 # correctness bounds rather than only through the fixture hashes that depend
@@ -950,14 +950,14 @@ endif()
 # inside src/adm/CMakeLists.txt's own add_subdirectory(), which never runs unless
 # ICLFORGE_BUILD_ADM is already ON - so the option itself is what's checked here instead.
 #
-# test_adm_bridge.cpp (iclforge::admbridge, ADM BWF reader phase 2, src/admbridge) rides the same gate:
+# test_adm_bridge.cpp (iclforge::adm, ADM BWF reader phase 2, src/admbridge) rides the same gate:
 # it depends on iclforge::adm too, and src/admbridge is only add_subdirectory()'d from inside
 # the same if(ICLFORGE_BUILD_ADM) block in the root CMakeLists.txt.
 if(ICLFORGE_BUILD_ADM)
     target_sources(iclforge-tests PRIVATE adm/test_adm.cpp adm/test_adm_bridge.cpp
                                     adm/test_adm_bridge_write.cpp
                                     adm/test_iab_bridge.cpp)
-    target_link_libraries(iclforge-tests PRIVATE iclforge::adm iclforge::admbridge)
+    target_link_libraries(iclforge-tests PRIVATE iclforge::adm)
 endif()
 
 # test_cli_atmos_adm.cpp (ADM BWF reader phase 3, forge's 'atmos-adm' command) needs BOTH conditions
@@ -1228,7 +1228,7 @@ target_link_libraries(iclforge-tests
     PRIVATE
         iclforge::ac3
         iclforge::audio
-        iclforge::signing
+        iclforge::ac3
         iclforge::matroska
         iclforge::mp4
         iclforge::mpegts

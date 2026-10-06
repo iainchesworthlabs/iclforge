@@ -13,7 +13,7 @@
 # writers, it defaults ON rather than OFF, and (also unlike iclforge::adm) has no
 # opt-in vcpkg feature of its own yet: it is new in this PR and nothing
 # downstream (CLI, GUI, examples) consumes it yet - IAB reader's phase 3
-# (`atmos-iab`, mapping onto iclforge::admbridge) is what will eventually give it
+# (`atmos-iab`, mapping onto iclforge::adm) is what will eventually give it
 # a consumer. Following iclforge::c's own precedent (see
 # packaging/vcpkg-port/iclforge/portfile.cmake's header comment), it is left
 # out of the vcpkg port until it has one.

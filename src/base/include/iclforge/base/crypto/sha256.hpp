@@ -14,7 +14,7 @@
 
 #include "iclforge/base/export.hpp"
 
-namespace iclforge::signing {
+namespace iclforge::base::crypto {
 
 // Incremental so HMAC can feed it ipad/opad and the message in separate
 // updates without first concatenating them into one buffer.
@@ -45,4 +45,4 @@ private:
 // public API is.
 ICLFORGE_BASE_EXPORT std::array<std::byte, 32> sha256(std::span<const std::byte> data);
 
-}  // namespace iclforge::signing
+}  // namespace iclforge::base::crypto

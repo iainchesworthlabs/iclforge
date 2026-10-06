@@ -3,7 +3,7 @@
 // Roadmap item B1 phase 3 of 3 (the last piece - phase 1 is iclforge::adm, src/adm; phase 2 is
 // iclforge::admbridge, src/admbridge). This is a minimal, standalone illustration of the same
 // pipeline forge's 'atmos-adm' command drives for real: iclforge::adm::parse_bw64() reads the
-// container + ADM XML graph, iclforge::admbridge::build() maps it onto
+// container + ADM XML graph, iclforge::adm::build() maps it onto
 // iclforge::ac3::oba::AtmosEncoder's flat object-list input shape (one bed speaker feed pinned in
 // place, one dynamic object panned by its own authored motion), and a plain per-frame loop calls
 // iclforge::oba::evaluate_placements() plus AtmosEncoder::encode_frame() the same way every other
@@ -16,7 +16,7 @@
 // DirectSpeakers bed channel pinned at the front-centre speaker, and one Objects channel that
 // holds hard right (azimuth -90 - BS.2076-2 Clause 8: positive azimuth is left, so negative is
 // right) for half the clip and then jumps hard left (azimuth +90) for the rest (§10.3's
-// jumpPosition=1 state machine - see iclforge::admbridge::build_channel_path's own comment for the
+// jumpPosition=1 state machine - see iclforge::adm::build_channel_path's own comment for the
 // full walkthrough), so the encoded stream's own channel balance visibly tracks the authored ADM
 // automation rather than staying static throughout.
 //
@@ -284,12 +284,12 @@ int main(int argc, char** argv) {
 
     // Step 2: iclforge::admbridge (phase 2) - bed/object classification, coordinate conversion, and
     // §10.3 position/gain automation, mapped onto AtmosEncoder's flat object-list input shape.
-    const auto bridged = iclforge::admbridge::build(*document);
+    const auto bridged = iclforge::adm::build(*document);
     std::filesystem::remove(fixture_path);
     if (!bridged) {
         fmt::printf("admbridge::build failed: %.*s\n",
-                    static_cast<int>(iclforge::admbridge::describe(bridged.error()).size()),
-                    iclforge::admbridge::describe(bridged.error()).data());
+                    static_cast<int>(iclforge::adm::describe(bridged.error()).size()),
+                    iclforge::adm::describe(bridged.error()).data());
         return 1;
     }
 

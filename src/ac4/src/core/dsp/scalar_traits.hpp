@@ -23,7 +23,7 @@
 // full scale; at 2^-15, with full scale 1.0, the decode's agreement with double fell 20 dB with
 // every 20 dB of level below full scale, from 123 dB on noise at a third of full scale, which
 // these three bits move. An energy, a gain or a scale factor is
-// a MantExp (iclforge/arithmetic/mant_exp.hpp), a mantissa and a power of two, since they span
+// a MantExp (iclforge/base/arithmetic/mant_exp.hpp), a mantissa and a power of two, since they span
 // a range no absolute format holds; a value the double decoder states in its own units enters
 // this tier's through qmf_energy(), which moves its exponent.
 

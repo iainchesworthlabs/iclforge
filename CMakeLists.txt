@@ -491,7 +491,7 @@ if(NOT EMSCRIPTEN AND NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCO
     add_subdirectory(src/audio)
 endif()
 
-# The EMDF Atmos object signer (iclforge::signing). Clean-room and dependency-free:
+# The EMDF Atmos object signer (iclforge::ac3). Clean-room and dependency-free:
 # the HMAC construction and authenticated-region layout are in-tree, and the
 # only secret - the key - is supplied by the operator at runtime, never
 # embedded, so unlike the old quarantine overlay this is committed and built by
@@ -554,7 +554,7 @@ endif()
 # "depends on nothing of iclforge::ac3" shape as the three container writers above. Gated by
 # ICLFORGE_BUILD_ADM (default OFF, unlike the three above - see the option() itself for why).
 if(ICLFORGE_BUILD_ADM)
-    # IAB reader bridge, phase 3: iclforge::admbridge's own IAB mapping (src/adm/src/iab_bridge.cpp)
+    # IAB reader bridge, phase 3: iclforge::adm's own IAB mapping (src/adm/src/iab_bridge.cpp)
     # names iclforge::iab::IABitstreamFrame in a public header, so it needs the src/iab add_subdirectory()
     # above to have actually run. ICLFORGE_BUILD_IAB defaults ON, unlike ICLFORGE_BUILD_ADM, so this
     # is the one combination that can silently fail to configure without an explicit guard - every
@@ -562,12 +562,12 @@ if(ICLFORGE_BUILD_ADM)
     # unconditionally true (iclforge::ac3) or already checked by this same if() (iclforge::adm).
     if(NOT ICLFORGE_BUILD_IAB)
         message(FATAL_ERROR "ICLFORGE_BUILD_ADM=ON requires ICLFORGE_BUILD_IAB=ON (default ON) - "
-                             "iclforge::admbridge's IAB mapping (IAB reader phase 3) depends on iclforge::iab")
+                             "iclforge::adm's IAB mapping (IAB reader phase 3) depends on iclforge::iab")
     endif()
 
     add_subdirectory(src/adm)
 
-    # iclforge::admbridge - ADM BWF → JOC bridge, phase 2: maps iclforge::adm's parsed ADM graph onto
+    # iclforge::adm - ADM BWF → JOC bridge, phase 2: maps iclforge::adm's parsed ADM graph onto
     # iclforge::ac3::oba::AtmosEncoder. Depends on iclforge::ac3 (added above), iclforge::adm (just added) and
     # (IAB reader phase 3) iclforge::iab (added earlier, guarded above), so it is meaningless
     # without ICLFORGE_BUILD_ADM - gated by the same flag rather than a new option of its own; see
@@ -593,7 +593,7 @@ endif()
 # iclforge::mp4 and iclforge::mpegts - after every add_subdirectory() call above (needs their targets to
 # exist), before include(Packaging) (CPack's library component packages exactly what gets
 # install()'d here). Deliberately not iclforge::audio - see cmake/InstallLibrary.cmake's own header
-# comment for why. iclforge::adm and iclforge::admbridge ARE installed/exported here (ICLFORGE_BUILD_ADM
+# comment for why. iclforge::adm ARE installed/exported here (ICLFORGE_BUILD_ADM
 # block) but SHARED ONLY, unlike every other component - iclforge::adm PRIVATE-embeds the third-party
 # libbw64/libadm (FetchContent'd, never installed/exported by this project in their own right,
 # see src/adm/CMakeLists.txt's header comment), which only a self-contained SHARED library can

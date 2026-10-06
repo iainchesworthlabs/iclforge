@@ -1287,7 +1287,7 @@ using iclforge::apps::is_ac4_stream;
 // either/or" stance - never a silent partial pass. The summary line goes to
 // `status`, the caller's status stream: nowhere under quiet, and stderr when
 // a "-" output owns stdout (see status_stream above).
-std::optional<iclforge::signing::VerifySummary> apply_object_verification(
+std::optional<iclforge::ac3::signing::VerifySummary> apply_object_verification(
     std::span<const std::byte> stream, const Options& meta, FILE* status);
 
 // The object layer (TS 103 420's OAMD) an E-AC-3 decode found, reported the

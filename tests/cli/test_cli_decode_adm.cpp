@@ -213,7 +213,7 @@ TEST_CASE("decode's ADM master lines the bed's LFE up with the object it was pul
 
     const auto parsed = iclforge::adm::parse_bw64(adm_out.string());
     REQUIRE(parsed.has_value());
-    const auto bridged = iclforge::admbridge::build(*parsed);
+    const auto bridged = iclforge::adm::build(*parsed);
     REQUIRE(bridged.has_value());
     REQUIRE(bridged->channel_count() == 2);
 

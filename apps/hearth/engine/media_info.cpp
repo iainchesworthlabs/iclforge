@@ -776,7 +776,7 @@ MediaInfo describe_media(const std::string& path, const LoadedItem& loaded) {
         }
     };
     options.authenticity = [](std::span<const std::byte> frame) {
-        return signing::has_authenticity_tag(frame);
+        return ac3::signing::has_authenticity_tag(frame);
     };
     ac3::io::Prober prober{std::move(options)};
     for (std::size_t index = 0; index < scanned->access_units.size(); ++index) {

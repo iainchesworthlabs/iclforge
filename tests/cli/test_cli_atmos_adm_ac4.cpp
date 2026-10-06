@@ -44,7 +44,7 @@
 // bridged onto iclforge::oba::DynamicObject - apps/cli/commands/decode.cpp's
 // to_oba_dynamic_object). "Match the master" is checked by parsing BOTH the original fixture and
 // the round-tripped adm_out back through the same
-// iclforge::adm::parse_bw64/iclforge::admbridge::build the read side already uses, evaluating each
+// iclforge::adm::parse_bw64/iclforge::adm::build the read side already uses, evaluating each
 // channel's ObjectPath at the same two times (well inside each hold, clear of the encode's own
 // frame-boundary quantization around the 0.096s jump - see kBeforeJumpS/kAfterJumpS below) and
 // comparing position/gain - not by asserting a specific numeric azimuth-to-room-cube mapping, which
@@ -401,18 +401,18 @@ TEST_CASE(
     CHECK(object_files == 3);
 
     // "Match the master": the original fixture and the round-tripped adm_out, both read back
-    // through iclforge::adm::parse_bw64/iclforge::admbridge::build (the same pipeline
+    // through iclforge::adm::parse_bw64/iclforge::adm::build (the same pipeline
     // load_adm_atmos_source itself uses), evaluated at the same two times and compared object for
     // object (matched by tone, not by index - this function's own top comment).
     const auto before_doc = iclforge::adm::parse_bw64(fixture_path.string());
     REQUIRE(before_doc.has_value());
-    const auto before = iclforge::admbridge::build(*before_doc);
+    const auto before = iclforge::adm::build(*before_doc);
     REQUIRE(before.has_value());
     REQUIRE(before->channel_count() == 3);
 
     const auto after_doc = iclforge::adm::parse_bw64(adm_out.string());
     REQUIRE(after_doc.has_value());
-    const auto after = iclforge::admbridge::build(*after_doc);
+    const auto after = iclforge::adm::build(*after_doc);
     REQUIRE(after.has_value());
     REQUIRE(after->channel_count() == 3);
 
