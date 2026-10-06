@@ -718,6 +718,9 @@ ONCE = {"c4": "src/ac4/src/core/bit_reader.hpp"}
 # now, beside the arithmetic: what it is is base's headers.
 C4B = [
     Rule("base-headers", r"\biclforge(::|_)base_arithmetic\b", r"iclforge\1base_headers", _TEXT),
+    # the reader's records are record() and record_element(): Qt defines `emit` as a macro
+    Rule("reader-record", r"\.emit(_element)?\(", r".record\1(", files=_C4_AC4, strings=False,
+         comments=False),
     # what AC-4's code and tests named in its own namespace is iclforge's
     Rule(
         "qualified",
