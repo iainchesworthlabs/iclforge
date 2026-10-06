@@ -3,7 +3,7 @@
 tests/golden/ac4/presentations/presentation-names.tsv lists sequences of frames'
 presentation_name bytes and the name each leaves (ETSI TS 103 190-2 clause 6.3.3.1.4, read as
 src/ac4/ERRATA.md's "A presentation name in chunks" reads it).
-tests/ac4/decoder/test_ac4dec_api.cpp decodes each sequence through the decoder in hand-built frames;
+tests/ac4/decoder/test_api.cpp decodes each sequence through the decoder in hand-built frames;
 this test holds tools/references/ac4_presentations.py's PresentationName, written separately, to
 the same table.
 

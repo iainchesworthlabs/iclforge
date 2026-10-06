@@ -20,7 +20,7 @@ use iclforge_sys as sys;
 const RATE: f64 = 48_000.0;
 const FRAME: usize = 2048;
 // Each object's tone sits at the middle of a QMF subband of its own (a parameter band of its own
-// in A-JOC's matrices), the LFE's at 47 Hz, as tests/ac4/encoder/test_ac4enc_objects.cpp has them.
+// in A-JOC's matrices), the LFE's at 47 Hz, as tests/ac4/encoder/test_objects.cpp has them.
 const SUBBANDS: [usize; 8] = [1, 3, 5, 7, 9, 12, 16, 22];
 const LFE_HZ: f64 = 47.0;
 // Six frames of input; the update sits at sample 5000, in the third.

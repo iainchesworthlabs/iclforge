@@ -3307,7 +3307,7 @@ constexpr double kObjectRate = 48000.0;
 constexpr int kObjectFrame = 2048;
 // Each object's tone sits at the middle of a QMF subband of its own, each in a
 // parameter band of its own in A-JOC's matrices, and the LFE's at 47 Hz, as
-// tests/ac4/encoder/test_ac4enc_objects.cpp has them.
+// tests/ac4/encoder/test_objects.cpp has them.
 constexpr std::array<int, 8> kObjectSubbands = {1, 3, 5, 7, 9, 12, 16, 22};
 constexpr double kObjectLfeHz = 47.0;
 // Six frames of input; the metadata update sits at sample 5000, in the third.

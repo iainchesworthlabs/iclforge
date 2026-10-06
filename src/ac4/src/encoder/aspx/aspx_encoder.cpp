@@ -285,7 +285,7 @@ std::optional<AspxSetup> aspx_setup_for(double kbps_per_channel, int sample_rate
     setup.xover_subband_offset = 0;
     // DEE's aspx_config() in G0's 2.0 legs at 48, 64 and 96 to 144 kbps: the
     // low resolution table from subband 20, the high resolution one from 28,
-    // and from 36 (tests/ac4/core/test_ac4core_aspx.cpp works two of them
+    // and from 36 (tests/ac4/core/test_aspx.cpp works two of them
     // through Pseudocodes 67 to 74). In its 5.1 legs from 192 to 320 kbps, the
     // high resolution table from subband 32, and from 256 kbps with
     // aspx_stop_freq 0 and aspx_xover_subband_offset 1.

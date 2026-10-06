@@ -185,7 +185,7 @@ for a gain, and the compression of DRC (`DrcMode::kOff` keeps the output level).
 with no extension substream linked is refused too: the text does not say what rate it is at.
 
 No stream at these rates was available, and no other decoder: the tests decode streams built from the
-text (`tests/golden/ac4-hsf/` and `tests/ac4/decoder/ac4dec_hsf.hpp`), each channel a tone above 24 kHz where the
+text (`tests/golden/ac4-hsf/` and `tests/ac4/decoder/hsf.hpp`), each channel a tone above 24 kHz where the
 base rate has none, and hold the output to its frequency, level and waveform. The readings the text left open
 are in `src/ac4/ERRATA.md` under "96 and 192 kHz".
 

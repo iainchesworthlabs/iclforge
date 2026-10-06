@@ -772,7 +772,7 @@ std::vector<ObjectEntry> parse_bed_dyn_obj_assignment(Reader& r, int n_signals) 
         // monolithic MSB-first r.bits(17) - position 16 is the LAST bit
         // transmitted, the LSB (bit 0). flag[j] therefore sits at bit
         // (16-j), i.e. flag[16-i] sits at bit i. Cross-checked against
-        // §6.3.2.10.8 EXAMPLE 2's worked value in tests/ac4/core/test_ac4.cpp.
+        // §6.3.2.10.8 EXAMPLE 2's worked value in tests/ac4/core/test_toc.cpp.
         const std::uint32_t flags = r.bits(17);
         for (int i = 0; i < 17; ++i) {
             if ((flags >> i) & 1) {  // flag[16-i]

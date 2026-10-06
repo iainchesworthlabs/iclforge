@@ -72,13 +72,13 @@ class Imdct {
     //
     // x being what inverse() gives, each product rounded and then the two added, so pcm and the
     // new overlap hold the bits that inverse() followed by the three loops of ChannelSynthesis
-    // gives (tests/ac4/core/test_ac4core_dsp_exact.cpp) with no 2N-sample block in between. `kbd`
+    // gives (tests/ac4/core/test_dsp_exact.cpp) with no 2N-sample block in between. `kbd`
     // holds the N values of KBD_LEFT(N), `overlap` and `pcm` N and `scratch` N, as above.
     void inverse_overlap(std::span<const Real> spectrum, std::span<const Real> kbd,
                          std::span<Real> overlap, std::span<Real> pcm, std::span<Complex> scratch);
 
     // The pre-twiddle and, at Fixed32, the post-twiddle as the constructor computes them where no
-    // table is built in (dsp/transform_tables.hpp), which tests/ac4/core/test_ac4core_transform_tables.cpp
+    // table is built in (dsp/transform_tables.hpp), which tests/ac4/core/test_transform_tables.cpp
     // holds the built-in ones to.
     [[nodiscard]] static std::vector<Complex> computed_pre_twiddles(std::size_t length);
     [[nodiscard]] static std::vector<Complex> computed_post_twiddles(std::size_t length);

@@ -12,7 +12,7 @@ kbd.cpp and synthesis.cpp), in the order it stores them:
 Each is computed here with the same double operations in the same order as the C++, and the
 same C library's cos, sin and sqrt, and written as an exact hexadecimal literal.
 src/ac4/src/core/dsp/transform_tables.cpp narrows them to the tier's scalar at compile time, as
-the runtime code narrows its own, and tests/ac4/core/test_ac4core_transform_tables.cpp holds
+the runtime code narrows its own, and tests/ac4/core/test_transform_tables.cpp holds
 every narrowed value equal to what the runtime code computes on the compiler that runs it.
 
 Usage:

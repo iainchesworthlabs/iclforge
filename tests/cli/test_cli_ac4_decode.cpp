@@ -179,7 +179,7 @@ TEST_CASE("decode compresses AC-4 alike on one DRC profile and differently on a 
 TEST_CASE("decode chooses AC-4's presentation by position associated service and level",
           "[cli][ac4]") {
     const auto log = scratch_dir() / "ac4_presentation_choice.log";
-    // tests/ac4/decoder/test_ac4dec_presentations.cpp's presentations-5_1: index 2
+    // tests/ac4/decoder/test_presentations.cpp's presentations-5_1: index 2
     // is music and effects with English dialogue and audio description (id 3),
     // 4 main with audio description at 0 degrees (id 5), 10 the music and
     // effects alone (id 20, md_compat 1); the rest before 10 have md_compat 2.
@@ -385,7 +385,7 @@ fs::path hsf_stream(const std::string& name) {
 
 TEST_CASE("decode writes AC-4 at 96 and 192 kHz at the rate it decodes at", "[cli][ac4][hsf]") {
     const auto log = scratch_dir() / "ac4_hsf.log";
-    // tests/ac4/decoder/ac4dec_hsf.cpp's constructed streams: the tone of each channel is above 24 kHz
+    // tests/ac4/decoder/hsf.cpp's constructed streams: the tone of each channel is above 24 kHz
     // (the right channel of the first, the only one of the second), so it is in the output only
     // where the HSF extension was decoded into a transform of 2 or 4 times the base length.
     struct Leg {

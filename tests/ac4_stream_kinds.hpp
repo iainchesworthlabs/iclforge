@@ -10,7 +10,7 @@
 // still played.
 //
 // The tests that play the committed streams share it:
-// tests/ac4/decoder/test_ac4dec_api.cpp and tests/hearth/test_ac4_engine.cpp.
+// tests/ac4/decoder/test_api.cpp and tests/hearth/test_ac4_engine.cpp.
 
 #include <algorithm>
 #include <cstddef>

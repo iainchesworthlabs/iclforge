@@ -63,7 +63,7 @@ class Fft {
     }
 
     // Every pass's roots, in the plan's order, as the constructor computes them where no table
-    // is built in (dsp/transform_tables.hpp), which tests/ac4/core/test_ac4core_transform_tables.cpp
+    // is built in (dsp/transform_tables.hpp), which tests/ac4/core/test_transform_tables.cpp
     // holds the built-in ones to.
     [[nodiscard]] static std::vector<Complex> computed_roots(std::size_t length);
 

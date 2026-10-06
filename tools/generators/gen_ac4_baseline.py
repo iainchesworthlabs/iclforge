@@ -11,7 +11,7 @@ Two sets, from the same legs and sources:
 
 What the streams are for. The decoder in src/ac4/src/decoder is checked against them: first its syntax,
 read by two transcriptions whose traces must agree (tools/references/ac4_syntax.py writes the
-committed digests; tests/ac4/decoder/test_ac4dec_syntax.cpp holds the decoder to them), then, from
+committed digests; tests/ac4/decoder/test_syntax.cpp holds the decoder to them), then, from
 phase D2 on, its PCM, scored against each stream's source. The encoder phases race against the
 same streams. So every leg except ac4-stereo-64 is made with loudness measured and not
 corrected: DEE's default (measure_and_correct) normalises to -24 LKFS and runs a -2 dBFS
@@ -331,7 +331,7 @@ _DRC_AND_LTRT = ("drc_profile=film_standard:drc_profile_portable_hp=speech:"
 # The committed legs. "expect" holds what the layout, the rate and the options must give; a
 # walk that disagrees stops main() before anything in the tree changes.
 LEGS = [
-    # tests/ac4/core/test_ac4.cpp pins this stream's frame count and its MediaInfo-checked TOC
+    # tests/ac4/core/test_toc.cpp pins this stream's frame count and its MediaInfo-checked TOC
     # fields; tests/cli and fuzz/generate-seeds.sh read it too. "pinned": main() refuses to
     # replace it with different bytes, so it keeps DEE's defaults.
     {"name": "ac4-stereo-64", "encoder": AC4, "source": "reference_stereo", "layout": "stereo",

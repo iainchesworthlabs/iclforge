@@ -24,7 +24,7 @@
 // presentation substream: each substream's metadata() is rewritten at sus_ver
 // 0, carrying its own dialnorm and, where the table of contents makes it
 // associated audio or dialogue, the mixing fields; its table of contents is
-// written with the tests' own writer (tests/ac4/core/ac4_toc_writer.hpp), the
+// written with the tests' own writer (tests/ac4/core/toc_writer.hpp), the
 // encoder writing no version 0 presentations.
 
 #include <cstddef>

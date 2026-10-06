@@ -6,7 +6,7 @@ decoder in src/ac4/src/decoder, and summarises what it read as one digest line p
 frame and substream: how many syntax elements, where the last one ended, and a
 CRC-32 over every element's (bit offset, width, value). The digests of the
 committed DEE streams are under tests/golden/ac4/, and
-tests/ac4/decoder/test_ac4dec_syntax.cpp requires the decoder to produce the same
+tests/ac4/decoder/test_syntax.cpp requires the decoder to produce the same
 lines. This test is the other half: it requires the reference parser still to
 produce them, so neither transcription can change alone.
 

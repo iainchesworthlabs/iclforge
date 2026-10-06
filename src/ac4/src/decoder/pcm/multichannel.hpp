@@ -30,7 +30,7 @@
 //   O0 = a3 T0 + b3 U0,   O3 = c3 T0 + d3 U0,
 //   O1 = a4 T1 + b4 U1,   O4 = c4 T1 + d4 U1,   O2 = T2.
 //
-// tests/ac4/decoder/test_ac4dec_multichannel.cpp holds the table's 300 printed
+// tests/ac4/decoder/test_multichannel.cpp holds the table's 300 printed
 // entries and checks every one against this.
 
 namespace iclforge::ac4::detail {

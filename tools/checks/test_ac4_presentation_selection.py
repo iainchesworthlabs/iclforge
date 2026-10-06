@@ -1,6 +1,6 @@
 """The AC-4 reference parser's presentation selection against the committed selection table.
 
-tests/ac4/decoder/test_ac4dec_presentations.cpp builds a table of tables of contents, each with a
+tests/ac4/decoder/test_presentations.cpp builds a table of tables of contents, each with a
 choice (presentation_id, position, language, associated audio, headphones), a decoder level and
 the presentation ETSI TS 103 190-2 clause 4.8.2 and src/ac4/ERRATA.md's readings select, and
 holds the decoder to it; the table is committed as

@@ -187,7 +187,7 @@ decoder phases added to it, and what the decoder and the encoder meet in it now:
   list on both table-of-contents paths, checked by frames built in both languages.
 
 The Python reference parser `tools/references/ac4_parse.py` reads the same framing, transcribed
-independently; CI runs it through `ac4_syntax.py`'s digest test. `tests/ac4/core/test_ac4.cpp` checks one
+independently; CI runs it through `ac4_syntax.py`'s digest test. `tests/ac4/core/test_toc.cpp` checks one
 committed DEE stream, `tests/golden/external-baseline/ac4-stereo-64/dee.ac4`, against MediaInfo's
 reading of it; fifteen more committed DEE streams sit beside it (G0 and G1 added the later ones).
 
@@ -208,7 +208,7 @@ its evidence.
 
 The syntax is transcribed twice, in C++ and in `tools/references/ac4_syntax.py`, and the two traces
 must agree record for record: `tests/golden/ac4/*.tsv` holds the Python parser's digests of the
-committed streams, `tests/ac4/decoder/test_ac4dec_syntax.cpp` holds the decoder to them in `ac3tests`,
+committed streams, `tests/ac4/decoder/test_syntax.cpp` holds the decoder to them in `ac3tests`,
 which every build leg runs, and `tools/checks/test_ac4_syntax_digests.py` holds the Python parser
 to the same files. Over the local census (107 DEE streams, 50,728 frames) and 6,670 frames of
 public streams from other Dolby encoders, every digest agreed when D1 merged.
@@ -1212,7 +1212,7 @@ the ones it uses.
 6. **Constructed streams reach what no encoder here writes.** A test multiplexer builds
    presentations of several substreams from the substreams of separate DEE encodes, rewriting their
    `extended_metadata`. The encoder's writer, driven directly by the tests
-   (`tests/ac4/decoder/ac4dec_constructed.cpp`), builds syntax no encoder here writes by default: A-CPL
+   (`tests/ac4/decoder/constructed.cpp`), builds syntax no encoder here writes by default: A-CPL
    mode 1, A-JCC, transmitted DRC gains, and dialogue enhancement methods 1 to 3. The encoder's own
    streams reach it too. These check parsing, the invariants, and gains on known input; the writer,
    the encoder and the decoder can share a misreading.
@@ -2296,7 +2296,7 @@ compile time, with C++23 `constexpr` and `consteval`, "idiomatic". One pull requ
 
 **Built in D14a5.** `dsp/portable_math.hpp` and `dsp/resampler_design.hpp` in `src/ac4/src/core`, `bessel_i0` in
 `dsp/kbd.hpp`, the filter and kernel in `dsp/resampler.{hpp,cpp}` and `dsp/resampler_vector.hpp`, the compile limits,
-and `tests/ac4/core/test_ac4core_portable_math.cpp` with the converter's tests (the table's FNV-1a image three ways, the
+and `tests/ac4/core/test_portable_math.cpp` with the converter's tests (the table's FNV-1a image three ways, the
 compiler's evaluation against the machine's, the mirrored phases, the reversed kernel). The three tables equal the C
 library's design rounded to `float` in every coefficient, so no `float` PCM hash moved; the tests pin the FNV-1a image
 of each table, which is new here. The Cortex-M3 probe's image is 683,448 bytes from 485,032, which its ceiling follows (750,000).
@@ -2509,8 +2509,8 @@ equal on x86, the Cortex-M3 and the C3; the `double` output and the `float` pins
 `Fft::inverse_scaled()`, the IMDCT's and the synthesis's overloads that carry a block's exponent, and the fixed branches of
 `aspx/hf_generator.cpp`, `acpl/acpl.cpp` and `dsp/resampler.cpp`; in `src/ac4/src/decoder`, the per-track exponent of
 `pcm/asf_reconstruct.cpp` and `pcm/substream_pcm.cpp`, and the `Energy` types of `pcm/aspx.cpp`, `pcm/companding.cpp` and
-`pcm/drc.cpp`. `tests/ac4/core/test_ac4core_mant_exp.cpp` is new; the AC-4 tests take their units from
-`tests/ac4/decoder/ac4dec_units.hpp` and pass at every scalar, and D14e's exact tests, which hold the floating paths to their verbatim
+`pcm/drc.cpp`. `tests/ac4/core/test_mant_exp.cpp` is new; the AC-4 tests take their units from
+`tests/ac4/decoder/units.hpp` and pass at every scalar, and D14e's exact tests, which hold the floating paths to their verbatim
 copies, run where the scalar is floating. `check_ac4_decode_scalar_snr.py --fixed-cli` measures the tier against `double`;
 `run_baremetal_probe.sh --ac4 --scalar=fixed` builds the probe at the tier, with its own instruction and image ceilings. CI runs
 both, the scorers with a fixed CLI and the probe's hashes on the Linux host and the Cortex-M3 leg. `CONFIG_ICLFORGE_AC4` no longer
@@ -2558,7 +2558,7 @@ probe, and the larger redesigns decided once the smaller ones had shown where th
   48 kHz, the FFT's roots, the IMDCT's pre-twiddles, the fixed tier's post-twiddles and the KBD windows are narrowed to the
   tier's scalar while `src/ac4/src/core/dsp/transform_tables.cpp` compiles, from doubles `tools/generators/gen_ac4_transform_tables.py`
   computes as the runtime code does (the same operations in the same order and the same C library's `cos`, `sin` and `sqrt`,
-  written as exact hexadecimal literals). `tests/ac4/core/test_ac4core_transform_tables.cpp` holds every narrowed value to the
+  written as exact hexadecimal literals). `tests/ac4/core/test_transform_tables.cpp` holds every narrowed value to the
   runtime computation's bits on the compiler that runs it. `double`, and every other length, builds its tables as before.
 - **A-SPX's high band assembled in place.** Pseudocode 106 reads each value of the high band only where it writes Y, so one
   buffer for an element's channels replaces the two each channel allocated.
@@ -2978,7 +2978,7 @@ dynamic objects in mono, stereo, 3.0 and 5.0 elements with the LFE's `mono_data(
 and the group's OAMD substream. One presentation of the substream alone, at md_compat 3 for A-JOC and by
 its tracks direct-coded, through E6's presentation machinery. Decoded in full, each object of the
 committed cases comes back at 40 to 75 dB SNR against its source, the tones each in a parameter band of
-their own (pinned in `tests/ac4/encoder/test_ac4enc_objects.cpp`), and core decoding gives the downmix at its
+their own (pinned in `tests/ac4/encoder/test_objects.cpp`), and core decoding gives the downmix at its
 metadata; the encoder's trace, the decoder's and the Python parser's agree on the committed streams
 (`tests/golden/ac4/objects/encoder-*.ac4`) and on the encoder-space harness's object draws.
 `ac3cli ac4-encode objects=` takes a scene file of the library's terms for the harness and the listening
@@ -3041,7 +3041,7 @@ sends the floor at which (share + Q) / (1 + Q) reaches three quarters, when it i
 the tonality rule chose: `qscf_noise` 4 for an empty patch. Music, film, speech, noise, transients and
 tones at 2.0 from 48 to 144 kbps, 5.1 from 96 to 320 and 5.1.4 from 192 to 512 encode to the same bytes
 as before (91 streams); only the sweeps change, and the SIMPLE and SCPL rates have no A-SPX. The test
-(`tests/ac4/encoder/test_ac4enc_encoder.cpp`) encodes a sweep from 11 to 21 kHz in one channel of a stereo and
+(`tests/ac4/encoder/test_encoder.cpp`) encodes a sweep from 11 to 21 kHz in one channel of a stereo and
 a 5.1.4 stream and holds the energy of each band from 16.5 to 20.5 kHz to 6 dB of the source's: before,
 seven of the eight came back 8 to 13 dB under it, and after all eight 2 to 4 dB under. Against DEE's
 streams ViSQOL is now over DEE's on every sweep leg: 0.15 to 0.28 at 2.0, 0.05 to 0.48 at 5.1 and 0.13 to

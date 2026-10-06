@@ -869,7 +869,7 @@ ordering CONTRIBUTING.md's Oracles list uses:
    (`sync_word`, `frame_size`, `crc_word`) is read correctly.
 2. **MediaInfo**, bundled with the same DEE install, reads the committed fixtures through its own
    `dlb_ac4lib`-based AC-4 support (channel count, channel layout, bitstream_version, presentation
-   and substream-group counts). `tests/ac4/core/test_ac4.cpp` asserts `iclforge::ac4::parse_raw_frame`'s fields
+   and substream-group counts). `tests/ac4/core/test_toc.cpp` asserts `iclforge::ac4::parse_raw_frame`'s fields
    against exactly what MediaInfo reports for the same file — an independent second reader, not
    just a self-consistent round trip.
 3. **`tools/references/ac4_parse.py`**, an independent Python transcription of the same clauses,
@@ -900,7 +900,7 @@ this project has no tooling that produces one DEE accepts (the same "gates on co
 not syntax" limit this page already states for the AC-3/E-AC-3 JOC side); `dee_ac4ims_encoder.exe`
 — the other locally available object-adjacent encoder, despite its "immersive stereo" name — was
 confirmed to stay channel-coded regardless of input. What stands in for a DEE fixture is a set of
-**synthetic, hand-built bitstreams** (`tests/ac4/core/test_ac4.cpp`), each assembled by a from-scratch
+**synthetic, hand-built bitstreams** (`tests/ac4/core/test_toc.cpp`), each assembled by a from-scratch
 `BitWriter` sharing no code with either `iclforge::ac4` or `tools/references/ac4_parse.py`, field-traced
 against the spec text (including Table 64/65's array-position-to-bit-index mapping, cross-checked
 against §6.3.2.10.8's own worked EXAMPLE 2/3 values) rather than against an external reader. Two
@@ -938,7 +938,7 @@ loop that TS 103 190-1 §4.2.3.2 and TS 103 190-2 §6.2.1.3 place after the conf
 TOC paths. `tools/references/ac4_parse.py` did the same on the `bitstream_version` 2 path. Every
 later presentation, the substream groups and `substream_index_table()` were then read from the
 wrong bit, and on that path the two transcriptions agreed: the shared-misreading case described
-above. `tests/ac4/core/test_ac4.cpp` now builds an EMDF-only presentation ahead of an ordinary one on
+above. `tests/ac4/core/test_toc.cpp` now builds an EMDF-only presentation ahead of an ordinary one on
 both paths, and the same frames, built again with a separate Python bit writer, parse the same way
 in `tools/references/ac4_parse.py`.
 
@@ -955,7 +955,7 @@ substream (the additional scale factor bands, spectral data and noise fill above
 (A-JOC and direct-coded objects, with their object audio metadata), and EMDF payload substreams.
 It decodes the speech spectral frontend (Part 1 clause 5.2) from the text alone, the syntax and
 the arithmetic coded data in one pass, checked against a second transcription
-(`tools/references/ssf_ref.py`) on random streams. The decode at 96 and 192 kHz is checked on streams built from the text alone (`tests/ac4/decoder/ac4dec_hsf.cpp`): tones above 24 kHz come back at their frequency and level through every transform length, grouping and channel element, the second transcription reads the committed streams alike, and no real stream at these rates exists. It refuses, with a named reason, core decoding of the 22.2 channel element and its rendering to any layout but as coded (Part 2 has neither), an intermediate spatial format mixed into channels Annex A.2.1 has no
+(`tools/references/ssf_ref.py`) on random streams. The decode at 96 and 192 kHz is checked on streams built from the text alone (`tests/ac4/decoder/hsf.cpp`): tones above 24 kHz come back at their frequency and level through every transform length, grouping and channel element, the second transcription reads the committed streams alike, and no real stream at these rates exists. It refuses, with a named reason, core decoding of the 22.2 channel element and its rendering to any layout but as coded (Part 2 has neither), an intermediate spatial format mixed into channels Annex A.2.1 has no
 matrix for, a 96/192 kHz substream whose HSF extension substream could not be resolved, at 96 and 192 kHz A-SPX and A-CPL, the speech spectral frontend, the immersive and 22.2 elements, objects, mixing, dialogue enhancement and DRC's compression, and a
 substream no element of the table of contents names.
 
@@ -990,7 +990,7 @@ zlib's CRC-32 over the records packed as `struct.pack('<IHQ', offset, width, val
 `tests/golden/ac4/` holds the Python parser's digests of the committed DEE streams: SIMPLE, ASPX,
 ASPX_ACPL_2 and ASPX_ACPL_3 at 2.0 and 5.1, one tone per channel at 2.0 and 5.1, DRC curves with an
 Lt/Rt downmix, immersive stereo at three frame rates, and 5.1.4, one tone per channel in each
-immersive codec mode DEE writes. `tests/ac4/decoder/test_ac4dec_syntax.cpp` requires
+immersive codec mode DEE writes. `tests/ac4/decoder/test_syntax.cpp` requires
 the decoder to produce the same lines, to read every substream to its exact end and to refuse nothing,
 and `tools/checks/test_ac4_syntax_digests.py` requires the Python parser to reproduce the same files, so
 neither transcription can change alone.
@@ -1026,7 +1026,7 @@ transforms, the QMF banks, A-SPX's tables and high frequency generator, and A-CP
 transient ducker, interpolation and dequantisation tables are in `src/ac4/src/core`, the core the decoder
 shares with the encoder. Six checks stand in for the reference output neither part defines:
 
-- **Each transform against its formula** (`tests/ac4/core/test_ac4core_dsp.cpp`): the FFT against the
+- **Each transform against its formula** (`tests/ac4/core/test_dsp.cpp`): the FFT against the
   DFT; the inverse MDCT against a verbatim transcription of Pseudocodes 60 to 63 and against the cosine
   sum they come to, at every transform length of clause 5.5.3; the forward MDCT against its own sum; the
   KBD windows against numpy's Kaiser window, cumulated; the QMF analysis and synthesis banks against
@@ -1034,16 +1034,16 @@ shares with the encoder. Six checks stand in for the reference output neither pa
   in the test from the same windows reconstruct their input to 1e-12 across every block transition Part
   1 Table 187 allows, within a frame and across frames, and the QMF pair gives back its input 577
   samples later to 78 dB, a property of its window, `QWIN`.
-- **A-SPX's parts on known input** (`tests/ac4/core/test_ac4core_aspx.cpp`,
-  `tests/ac4/decoder/test_ac4dec_aspx.cpp`): the subband group, patch and limiter tables of DEE's two 2.0
+- **A-SPX's parts on known input** (`tests/ac4/core/test_aspx.cpp`,
+  `tests/ac4/decoder/test_aspx.cpp`): the subband group, patch and limiter tables of DEE's two 2.0
   configurations, worked through Pseudocodes 67 to 74 by hand, and their invariants over all 2,811
   configurations a stream can select; the linear prediction finding a two-slot recursion; pre-flattening
   an envelope that is a cubic in dB; Table 195's chirp factors; and, on hand-built A-SPX data, the paths
   DEE's streams do not take: frequency and time interleaved waveform coding, a balanced pair, the tone
   generator's phase, the noise generator's index across intervals, an interval running past its frame,
   and companding's gains.
-- **A-CPL's parts on known input** (`tests/ac4/core/test_ac4core_acpl.cpp`,
-  `tests/ac4/decoder/test_ac4dec_acpl.cpp`): each of the three decorrelators, in each of Table 198's regions,
+- **A-CPL's parts on known input** (`tests/ac4/core/test_acpl.cpp`,
+  `tests/ac4/decoder/test_acpl.cpp`): each of the three decorrelators, in each of Table 198's regions,
   has the impulse response of its difference equation to 1e-12, run through 32 or 16 slots at a time,
   and a magnitude response flat to 1e-9; the transient ducker leaves a steady signal alone and ducks a
   decaying one by the gain Pseudocode 112 gives, worked by hand. The dequantisation tables hold their
@@ -1053,7 +1053,7 @@ shares with the encoder. Six checks stand in for the reference output neither pa
   across frames, and a value outside its table refuses the frame; interpolation is worked smooth and
   steep, with one and two parameter sets; ASPX_ACPL_3 makes its centre of gamma5 and gamma6.
 - **The multichannel matrices against the printed tables, and the elements DEE does not write**
-  (`tests/ac4/decoder/test_ac4dec_multichannel.cpp`, `test_ac4dec_constructed.cpp`): the matrices of Part 1
+  (`tests/ac4/decoder/test_multichannel.cpp`, `test_ac4dec_constructed.cpp`): the matrices of Part 1
   Tables 178 and 179 and clause 5.3.3.4 equal the tables' printed entries, 300 of them for Table 179
   alone, held in the test as a transcription of their own. DEE's 5.1 streams use one form of the 5.X
   element, `coding_config` 0 with `2ch_mode` 0. The others, the 3.0 element and the 7.X element in its
@@ -1131,7 +1131,7 @@ full scale at 2^15. Phase D3 settled two more: A-SPX's envelopes read at that sc
 measures its levels against full scale 1.0. Those and the other readings reconstruction takes are in
 `src/ac4/ERRATA.md`, under "Reconstruction" and "The QMF domain". None of the streams here, from DEE
 or anyone else, sets `b_snf_data_exists`, so the noise fill is decoded from the text alone. A unit
-test (`tests/ac4/decoder/test_ac4dec_noise_fill.cpp`) holds its levels, escape and draw order to
+test (`tests/ac4/decoder/test_noise_fill.cpp`) holds its levels, escape and draw order to
 Pseudocodes 22 and 23 on a hand-built track.
 
 **Locally, over the census.** With `AC4DEC_GOLDEN_DIR` and `AC4DEC_STREAM_DIR` set, the same test
@@ -1173,7 +1173,7 @@ downmix), and what the decoder does at I-frames, at a change of source and with 
 decode. Where the text leaves a choice open, the reading is in `src/ac4/ERRATA.md`, under "Output
 processing" and in "A change of source" and "What an I-frame does not restore".
 
-- **The sample rate converter** (`tests/ac4/core/test_ac4core_resampler.cpp`): over 100,000 frames at
+- **The sample rate converter** (`tests/ac4/core/test_resampler.cpp`): over 100,000 frames at
   each of the decoder's three ratios and the encoder's inverses the output count is exact, frame by
   frame in Part 2 Table 47's sequence at the 1000/1001 rates and from any starting frame, and a
   converter whose phase jumps goes on converting at the new phase's counts. Tones in the passband come
@@ -1186,22 +1186,22 @@ processing" and in "A change of source" and "What an I-frame does not restore".
   coefficient of it; the phases the table keeps and the ones it reads backwards agree with each other
   and with a copy written out; the compiler's evaluation equals the same function run on the machine,
   bit for bit; and the dot product that reads a phase backwards equals the four-lane sum of that phase
-  written out. `tests/ac4/core/test_ac4core_portable_math.cpp` holds the functions the design calls
+  written out. `tests/ac4/core/test_portable_math.cpp` holds the functions the design calls
   without a library (sin, cos, sqrt, ceil and the Kaiser window's I0) to their definitions, to the C
   library's values and to their own values at compile time.
-- **The output level and DRC** (`tests/ac4/decoder/test_ac4dec_drc.cpp`): Table 162's profiles and the
+- **The output level and DRC** (`tests/ac4/decoder/test_drc.cpp`): Table 162's profiles and the
   curves DEE transmits are the compression curves the text defines; stepped tones at steady state
   follow each profile's static curve within 0.5 dB, and a step in level moves the gain at the attack and
   release time constants. Table 161 chooses the mode for the output level. The output level gain
   equals 2^((Lout - dialnorm) / 6) to 0.01 dB on streams the encoder writes at dialnorms from -31 to
   -17. Transmitted gains apply by channel group, band and subframe on constructed data, and DEE's 5.1
   stream compresses within its own curves in each mode it configures.
-- **Dialogue enhancement** (`tests/ac4/decoder/test_ac4dec_de.cpp`): at 0 dB the output is the output with
+- **Dialogue enhancement** (`tests/ac4/decoder/test_de.cpp`): at 0 dB the output is the output with
   the tool bypassed, sample for sample; at the stream's cap the channel-independent method, its mid and
   side form and the cross-channel method apply the gains their parameters give to 0.01 dB on known
   input, and a frame's matrix moves to the next slot by slot. DEE's speech comes out raised at its cap
   and unchanged at 0 dB.
-- **The downmix** (`tests/ac4/decoder/test_ac4dec_downmix.cpp`): Tables 149 and 149a give the mix gains,
+- **The downmix** (`tests/ac4/decoder/test_downmix.cpp`): Tables 149 and 149a give the mix gains,
   5.1's downmixes are Table 218's with the stream's gains, the LFE and the loudness corrections, 7.X
   folds to 5.X by Table 219 for each additional pair, and 3.0, stereo and mono take Table 217, the sum
   and the 0.707 upmix; the gains hold from the frame that sends them until another does. DEE's 5.1 tones
@@ -1215,7 +1215,7 @@ processing" and in "A change of source" and "What an I-frame does not restore".
   gold set, dialnorms from -24 (the ATSC A/85 preset) to -16, with DEE's own Lo/Ro and Lt/Rt gains,
   each preferred downmix method and Lt/Rt's Pro Logic II form. DEE's immersive stereo at 24 and 25 fps
   sends a dialnorm of -24 dBFS in its last frame, so the checks stop before it.
-- **Start-up, splices and damaged frames** (`tests/ac4/decoder/test_ac4dec_decoder.cpp`): decoded from each
+- **Start-up, splices and damaged frames** (`tests/ac4/decoder/test_decoder.cpp`): decoded from each
   of their I-frames, the committed streams give the whole stream's output from the frame after the
   I-frame, whose own audio overlaps a frame the decoder never had: to under -100 dBFS in SIMPLE, to -50
   dBFS in ASPX, whose noise and tone generators run at another phase, and in A-CPL within -54 dBFS by
@@ -1233,13 +1233,13 @@ processing" and in "A change of source" and "What an I-frame does not restore".
 
 Phase D7 adds the choice among a stream's presentations (Part 2 4.8.2) and the mixing of a
 presentation's substreams (Part 1 6.2.16, Part 2 4.8.3.15 to 4.8.5). DEE writes no stream of several
-presentations or substreams, so a test multiplexer (`tests/ac4/decoder/ac4dec_mux.hpp`) builds them from
+presentations or substreams, so a test multiplexer (`tests/ac4/decoder/mux.hpp`) builds them from
 DEE's 5.1 and 2.0 tone legs and the encoder's mono and stereo tone streams
 (`tools/generators/gen_ac4_presentation_sources.py`), each substream carrying tones of its own, and
 writes their tables of contents with the encoder's writer. Where the text leaves a choice open, the
 reading is in `src/ac4/ERRATA.md`, under "Presentations".
 
-- **The selection** (`tests/ac4/decoder/test_ac4dec_presentations.cpp`,
+- **The selection** (`tests/ac4/decoder/test_presentations.cpp`,
   `tools/checks/test_ac4_presentation_selection.py`): a table of 30 cases, each a constructed table of
   contents of version 0 or version 1 presentations, a system's choice and a level, committed as
   `tests/golden/ac4/presentations/presentation-selection.tsv`; the decoder and the Python reference
@@ -1288,17 +1288,17 @@ The 22.2 element (Part 2 6.2.4.3, Tables 8 and 21 and Annex A.3) has no oracle o
 does not write it (planning/ac4.md, "What DEE writes"), no stream of it is public, and librempeg does not
 decode it. What checks it is the standard's own tables and the project's two transcriptions:
 
-- **The syntax, in both transcriptions** (`tests/ac4/decoder/test_ac4dec_channel_elements.cpp`,
+- **The syntax, in both transcriptions** (`tests/ac4/decoder/test_channel_elements.cpp`,
   `test_ac4dec_syntax.cpp`): the element in SIMPLE and ASPX, with 24 tracks, eleven `aspx_data_2ch()` and
   the stereo flags of each pair, and two constructed streams (`22_2-simple-alternating`,
   `22_2-aspx-unit7-lr`) whose digests `tools/references/ac4_syntax.py` wrote and the decoder reproduces.
   `ac4_syntax_differential.py` includes the channel mode among its synthetic tables of contents.
-- **Each tone on its channel** (`tests/ac4/decoder/test_ac4dec_constructed.cpp`): the 24 tones are coded by
+- **Each tone on its channel** (`tests/ac4/decoder/test_constructed.cpp`): the 24 tones are coded by
   the test's own transcription of Table 21, with every pair's stereo processing on, off and alternating,
   and each decodes on its own channel in Table A.27's order, the LFEs included, 60 dB over the others.
   A-SPX fills the two channels of the `aspx_data_2ch()` that asks for it and no other, by Table 8's pairs.
   The refusals (core decoding and every `DownmixTarget` but as coded) are tested by name.
-- **DRC and levels** (`tests/ac4/decoder/test_ac4dec_drc.cpp`): transmitted gains apply by Table 69's four
+- **DRC and levels** (`tests/ac4/decoder/test_drc.cpp`): transmitted gains apply by Table 69's four
   groups to the 24 channels, and neither LFE moves the level detector.
 
 These show that the decoder does what the readings in `src/ac4/ERRATA.md` ("The 22.2 element") say,
@@ -1315,7 +1315,7 @@ which takes it to the layout a system asks for. Where the text leaves a choice o
   Annex A's codebooks, in the decoder and in `ac4_syntax.py`. DEE's three 5.1.4 legs (G1's, one per
   immersive codec mode DEE writes) and five constructed streams carry the Python parser's digests,
   which the decoder reproduces, and 3,000 mutations of them find the two transcriptions agreeing.
-- **DEE's 5.1.4 legs, as coded** (`tests/ac4/decoder/test_ac4dec_pcm.cpp`, `score_ac4_decode.py`): DEE's
+- **DEE's 5.1.4 legs, as coded** (`tests/ac4/decoder/test_pcm.cpp`, `score_ac4_decode.py`): DEE's
   5.1.4 is 7.1.4 with its back channels silent, which the decoder gives as 5.1.4. SCPL at 768 kbps and
   ASPX_SCPL at 512 put each of the ten tones on its own channel to 0.02 dB (the LFE 0.26 dB down, DEE's
   low-pass), 50 dB over every other channel. ASPX_ACPL_2, at 192 to 448 kbps, codes each top pair's
@@ -1332,7 +1332,7 @@ which takes it to the layout a system asks for. Where the text leaves a choice o
   tone leg's tones are 64 dB over the others in their channels. G1's noise legs are left out: white
   noise codes at 7 to 13 dB SNR, and its level falls 0.3 to 0.7 dB with the bands the encoder leaves
   empty, at every rate.
-- **The constructed streams** (`tests/ac4/decoder/test_ac4dec_immersive.cpp`): the element in its five codec
+- **The constructed streams** (`tests/ac4/decoder/test_immersive.cpp`): the element in its five codec
   modes, every `core_5ch_grouping` and `2ch_mode`, step 4's and Table 20's parameters and 7.1.4 with
   its back channels, built with the encoder's writer from tones worked back through S-CPL, A-CPL or
   A-JCC by the text; each decodes with every tone on its own channel, and in core decoding on its core
@@ -1340,13 +1340,13 @@ which takes it to the layout a system asks for. Where the text leaves a choice o
   pair alone in core decoding.
 - **A-JCC on known input**: its full and core reconstructions (Part 2 Pseudocodes 8 and 12) equal
   the printed sums on known QMF input, in both core modes, to 1e-9.
-- **The renderer** (`tests/ac4/decoder/test_ac4dec_renderer.cpp`): Tables 38 to 43, 45 and 46, transcribed
+- **The renderer** (`tests/ac4/decoder/test_renderer.cpp`): Tables 38 to 43, 45 and 46, transcribed
   again in the test, hold against the renderer's matrices for every input and output configuration,
   each custom downmix gain a distinct value, so that one in the wrong place shows; Table 130's defaults,
   6.3.10.3.10's exception, the persistence of the custom downmix data and the loudness corrections, and
   the steps to two channels and one after 5.X.0 hold on their own. DRC's transmitted gains take Part 2
   Table 69's groups (`test_ac4dec_drc.cpp`).
-- **The renders on DEE's streams** (`tests/ac4/decoder/test_ac4dec_pcm.cpp`, `gain_ac4_decode.py`): each
+- **The renders on DEE's streams** (`tests/ac4/decoder/test_pcm.cpp`, `gain_ac4_decode.py`): each
   render's tones equal the renderer's matrix applied to the as-coded decode, to 0.01 dB, in full
   decoding to 5.1 and to Lo/Ro in the tests, and in the gain script to every layout the renderer
   gives, in full and core decoding, with the stream's custom downmix data, its stereo coefficients and
@@ -1366,7 +1366,7 @@ which takes it to the layout a system asks for. Where the text leaves a choice o
 
 Phase D8 gives the decoder's API the form planning/ac4.md sets for channel-based streams, reports
 what a stream carries through it, and installs the inspector, the decoder and the core
-([AC-4 decoding](library/ac4.md)). The tests are in `tests/ac4/decoder/test_ac4dec_api.cpp` unless
+([AC-4 decoding](library/ac4.md)). The tests are in `tests/ac4/decoder/test_api.cpp` unless
 named otherwise.
 
 - **Through the public API alone**: a test standing in for Hearth's engine decodes every committed
@@ -1399,7 +1399,7 @@ named otherwise.
   which the decoder and `tools/references/ac4_presentations.py` both reproduce
   (`tools/checks/test_ac4_presentation_names.py`); the reading is in `src/ac4/ERRATA.md`, "A
   presentation name in chunks".
-- **The splitter** (`tests/ac4/io/test_ac4_splitter.cpp`): `iclforge::ac4::SyncFrameSplitter` hands over the
+- **The splitter** (`tests/ac4/io/test_splitter.cpp`): `iclforge::ac4::SyncFrameSplitter` hands over the
   frames `iclforge::ac4::scan` finds in three committed streams fed in pieces from 1 byte to 64 KiB, skips
   and counts what is not a frame before and between frames, drops a partial last frame, reports
   storage too small, and reads an escaped frame size. `fuzz_ac4_parse` holds it to `iclforge::ac4::scan` on
@@ -1424,12 +1424,12 @@ Four items of the review of #700 have a test each, and each test failed before i
 - **One error for a Huffman miss.** A codeword the substream ends inside was `kTruncated` in A-SPX,
   A-CPL and dialogue enhancement and `kInvalidStream` in the audio spectral frontend. Every tool
   now reads its codewords through one function, and a codeword cut short is `kTruncated` whichever
-  tool reads it (`tests/ac4/decoder/test_ac4dec_asf.cpp`, each ASF codeword and each codebook's longest
+  tool reads it (`tests/ac4/decoder/test_asf.cpp`, each ASF codeword and each codebook's longest
   codeword).
 - **An HSF extension substream nothing claims** used to go unreported. Every substream of
   `substream_index_table()` is in the frame's report now, and one that no element of the table of
-  contents names is refused as unread (`tests/ac4/decoder/test_ac4dec_decoder.cpp`,
-  `tests/ac4/decoder/test_ac4dec_frames.cpp`).
+  contents names is refused as unread (`tests/ac4/decoder/test_decoder.cpp`,
+  `tests/ac4/decoder/test_frames.cpp`).
 - **Android, WebAssembly and the Python wheel** compiled the AC-4 library and linked nothing of
   them. Each turned `ICLFORGE_BUILD_AC4` off until phase I4 bound them, and
   `tools/checks/test_ac4_build_configurations.py` reads the configurations: the wheel and the
@@ -1451,12 +1451,12 @@ under "Object audio syntax", "A-JOC" and "Object audio metadata and the ISF rend
   each `var_coding_config`, with and without the LFE). Eight of them are committed with the Python
   parser's digests, and the differential check mutates them. Chromium's `ac4-ajoc.ac4`, the one
   encoded A-JOC stream here, reads to the end of every substream of its 64 frames in both.
-- **A-JOC on known input** (`tests/ac4/core/test_ac4core_ajoc.cpp`): Table 28's bands, Tables 29 to
+- **A-JOC on known input** (`tests/ac4/core/test_ajoc.cpp`): Table 28's bands, Tables 29 to
   32's dequantisation, Pseudocode 16's differential decoding, the ramp of Pseudocodes 17 and 18 over
   one and two data points and across frames, the decorrelation input matrix of objects of different
   band counts, the wet path against the decorrelators and duckers run by hand, and dialogue
   enhancement in both modes, each against its formula.
-- **The constructed streams** (`tests/ac4/decoder/test_ac4dec_objects.cpp`): each object's coefficients
+- **The constructed streams** (`tests/ac4/decoder/test_objects.cpp`): each object's coefficients
   are whole quantisation steps, so each object is a known sum of the downmix's tones; in full
   decoding every object carries its tones to 0.1 dB and no other, through Pseudocode 14a's order,
   several bands, two data points, differential decoding in time and an object not present, and in
@@ -1475,7 +1475,7 @@ under "Object audio syntax", "A-JOC" and "Object audio metadata and the ISF rend
   contents lists, each a frame long and finite, its updates inside the frame and in order. Its
   metadata puts every object at the front of the room on the floor (X 0.5, Y 0, Z −1) in every
   frame. The public API's engine test decodes it and the other 15 third-party streams, 16 of 16.
-- **Rendered** (`tests/ac4/decoder/test_ac4dec_object_render.cpp`): `forge decode`'s rendering, through
+- **Rendered** (`tests/ac4/decoder/test_object_render.cpp`): `forge decode`'s rendering, through
   the layout renderer Hearth plays E-AC-3's objects with, puts each tone at each speaker at the sum
   of the objects' components at the gains the layout renderer gives their positions, frame by frame,
   in full and core decoding, as object 0 crosses the front from the left wall to the right. Whether
@@ -1627,7 +1627,7 @@ paragraph on the objects follows them:
   muxer read the A-CPL streams as configured as well, ASPX_ACPL_1 and A-CPL in stereo included.
   The muxer refuses a stream of several presentations, and does not finish one of an alternative
   presentation; for those the `dac4` (Part 2 Annex E.10) is held to the text and to MediaInfo's
-  trace, which reads every configuration's substream groups as written, and `tests/ac4/core/test_ac4.cpp`
+  trace, which reads every configuration's substream groups as written, and `tests/ac4/core/test_toc.cpp`
   holds `build_dac4()` to the muxer's box byte for byte for Chromium's A-JOC stream and DASH-IF's
   5.1 test vectors, whose program identifier it copies.
   librempeg decodes the 5.X element's ASPX_ACPL_2 and ASPX_ACPL_3 streams' coded channels to within
@@ -1682,7 +1682,7 @@ paragraph on the objects follows them:
   interval and per-frame metadata cost more than the frame `create()` checked. A frame that holds
   nothing more now sends each as a stream starts it, and `create()` sizes it with the costlier
   interval, which takes stereo at 48 kHz in the ASPX mode from 8 kbps to 9.
-- **Presentations and several substreams** (phase E6, `tests/ac4/encoder/test_ac4enc_presentations.cpp`).
+- **Presentations and several substreams** (phase E6, `tests/ac4/encoder/test_presentations.cpp`).
   Four committed streams, each with its configuration beside it as JSON
   (`tests/golden/ac4/presentations/encoder-*.ac4`): a broadcast of 5.1 music and effects, English
   and German mono dialogue, a mono audio description, a stereo commentary and stereo French dialogue,
@@ -1736,7 +1736,7 @@ paragraph on the objects follows them:
   reading every sync frame and its CRC back with the installed inspector; the ABI gate compares
   `libiclforge_ac4.so`'s exports with the headers' API (`tools/ci/abi-allowlist/libiclforge_ac4.so.txt`), and
   is advisory until the API freeze. Both run nightly.
-- **The immersive element** (phase E8, `tests/ac4/encoder/test_ac4enc_immersive.cpp`). 5.0.4 and 5.1.4
+- **The immersive element** (phase E8, `tests/ac4/encoder/test_immersive.cpp`). 5.0.4 and 5.1.4
   are written in the immersive element as DEE writes it: SCPL from 640 kbps, ASPX_SCPL from 480
   and ASPX_ACPL_2 below, each coupled pair coded as its sum and difference; 7.0.4 and 7.1.4 with
   the back pair, ASPX_ACPL_1 and A-JCC are experimental options. Each stream reads back with the
@@ -1812,7 +1812,7 @@ writer takes, and those it shares with the decoder, are in `src/ac4/ERRATA.md`.
 
 The encoder's objects (phase E9, behind `experimental.objects`) are checked against the decoder
 alone, since no reader outside the project decodes them: DEE writes no A-JOC from this project's
-masters and librempeg refuses object coding. `tests/ac4/encoder/test_ac4enc_objects.cpp` codes an A-JOC
+masters and librempeg refuses object coding. `tests/ac4/encoder/test_objects.cpp` codes an A-JOC
 substream over a computed downmix of four signals for eight objects, over a static 5.1 bed for six
 objects and the LFE, and with bed objects, the LFE and decorrelators, and direct-coded dynamic objects
 with the LFE, each object a tone at the middle of a QMF subband of a parameter band of its own. Decoded

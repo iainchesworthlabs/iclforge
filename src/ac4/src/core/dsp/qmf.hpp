@@ -21,7 +21,7 @@
 //
 //   qsyn[n] = Re sum_{k<64} c[k] e((2k + 1)(2n - 255) / 256).
 //
-// tests/ac4/core/test_ac4core_dsp.cpp holds both to the pseudocode as printed. The
+// tests/ac4/core/test_dsp.cpp holds both to the pseudocode as printed. The
 // pair delays by 577 samples and reconstructs to about 78 dB, a property of QWIN.
 //
 // Each is one 64-point complex transform. u is real, so its even and odd

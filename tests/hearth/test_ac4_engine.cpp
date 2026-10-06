@@ -100,7 +100,7 @@ fs::path baseline(std::string_view leg) {
 
 // Every committed AC-4 stream: DEE's, the constructed ones and the
 // multiplexed presentations with their sources - the set
-// tests/ac4/decoder/test_ac4dec_api.cpp decodes through the API.
+// tests/ac4/decoder/test_api.cpp decodes through the API.
 std::vector<fs::path> committed_streams() {
     std::vector<fs::path> paths;
     for (const fs::path& root :
@@ -777,7 +777,7 @@ TEST_CASE("hearth ac4: a stereo or mono layout takes the downmix Part 1 clause 6
 
 namespace {
 
-// E6's committed broadcast stream (tests/ac4/encoder/test_ac4enc_presentations.cpp,
+// E6's committed broadcast stream (tests/ac4/encoder/test_presentations.cpp,
 // broadcast()): a tone in each substream. Music and effects 5.1 (L 331, R 457,
 // C 613, LFE 47, Ls 787, Rs 953 Hz), English dialogue at 1 117 Hz, whose
 // dialogue may be raised 6 dB, German at 1 373, and audio description at 1

@@ -100,7 +100,7 @@ using ParamPrev = std::array<double, kSubbands>;
 // multiplication by its reciprocal, which gives the bits of the division because the reciprocal is
 // exact and both are correctly rounded (a frame of 2 048 samples has 32 slots, its halves 16). The
 // other divisors, 24 and 30 slots and their halves, divide.
-// tests/ac4/core/test_ac4core_acpl_exact.cpp holds it to the expression as written.
+// tests/ac4/core/test_acpl_exact.cpp holds it to the expression as written.
 class Interpolator {
    public:
     // One band's values for a frame, and the two differences the ramps multiply.

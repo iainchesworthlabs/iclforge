@@ -46,31 +46,31 @@ if(NOT Catch2_FOUND)
 endif()
 
 add_executable(iclforge-tests
-    ac4/core/test_ac4.cpp
-    ac4/core/test_ac4_presentation_configs.cpp
-    ac4/io/test_ac4_splitter.cpp
-    ac4/core/test_ac4_toc_syntax.cpp
-    ac4/core/test_ac4core_acpl.cpp
-    ac4/core/test_ac4core_acpl_exact.cpp
-    ac4/core/test_ac4core_ajoc.cpp
-    ac4/core/test_ac4core_aspx.cpp
-    ac4/core/test_ac4core_dsp.cpp
-    ac4/core/test_ac4core_dsp_exact.cpp
-    ac4/core/test_ac4core_mant_exp.cpp
-    ac4/core/test_ac4core_transform_tables.cpp
-    ac4/core/test_ac4core_portable_math.cpp
-    ac4/core/test_ac4core_resampler.cpp
-    ac4/decoder/test_ac4dec_api.cpp
-    ac4/decoder/test_ac4dec_decoder.cpp
-    ac4/decoder/test_ac4dec_frames.cpp
-    ac4/decoder/test_ac4dec_syntax.cpp
-    ac4/encoder/test_ac4enc_encoder.cpp
-    ac4/encoder/test_ac4enc_frame_rates.cpp
-    ac4/encoder/test_ac4enc_immersive.cpp
-    ac4/encoder/test_ac4enc_metadata.cpp
-    ac4/encoder/test_ac4enc_objects.cpp
-    ac4/encoder/test_ac4enc_presentations.cpp
-    ac4/encoder/test_ac4enc_rates.cpp
+    ac4/core/test_toc.cpp
+    ac4/core/test_presentation_configs.cpp
+    ac4/io/test_splitter.cpp
+    ac4/core/test_toc_syntax.cpp
+    ac4/core/test_acpl.cpp
+    ac4/core/test_acpl_exact.cpp
+    ac4/core/test_ajoc.cpp
+    ac4/core/test_aspx.cpp
+    ac4/core/test_dsp.cpp
+    ac4/core/test_dsp_exact.cpp
+    ac4/core/test_mant_exp.cpp
+    ac4/core/test_transform_tables.cpp
+    ac4/core/test_portable_math.cpp
+    ac4/core/test_resampler.cpp
+    ac4/decoder/test_api.cpp
+    ac4/decoder/test_decoder.cpp
+    ac4/decoder/test_frames.cpp
+    ac4/decoder/test_syntax.cpp
+    ac4/encoder/test_encoder.cpp
+    ac4/encoder/test_frame_rates.cpp
+    ac4/encoder/test_immersive.cpp
+    ac4/encoder/test_metadata.cpp
+    ac4/encoder/test_objects.cpp
+    ac4/encoder/test_presentations.cpp
+    ac4/encoder/test_rates.cpp
     ac3/analysis/test_analysis.cpp
     ac3/encoder/test_assignment.cpp
     ac3/encoder/test_bandwidth.cpp
@@ -276,38 +276,38 @@ if(BUILD_SHARED_LIBS AND ICLFORGE_BUILD_AC4)
 endif()
 if(NOT BUILD_SHARED_LIBS)
     target_sources(iclforge-tests PRIVATE
-        ac4/decoder/ac4dec_constructed.cpp
-        ac4/decoder/ac4dec_hsf.cpp
-        ac4/decoder/ac4dec_mux.cpp
-        ac4/decoder/ac4dec_objects.cpp
-        ac4/decoder/test_ac4dec_acpl.cpp
-        ac4/decoder/test_ac4dec_acpl_exact.cpp
-        ac4/decoder/test_ac4dec_asf.cpp
-        ac4/decoder/test_ac4dec_aspx.cpp
-        ac4/decoder/test_ac4dec_channel_elements.cpp
-        ac4/decoder/test_ac4dec_constructed.cpp
-        ac4/decoder/test_ac4dec_de.cpp
-        ac4/decoder/test_ac4dec_downmix.cpp
-        ac4/decoder/test_ac4dec_drc.cpp
-        ac4/decoder/test_ac4dec_ehfr.cpp
-        ac4/decoder/test_ac4dec_hsf.cpp
-        ac4/decoder/test_ac4dec_immersive.cpp
-        ac4/decoder/test_ac4dec_metadata.cpp
-        ac4/decoder/test_ac4dec_multichannel.cpp
-        ac4/decoder/test_ac4dec_noise_fill.cpp
-        ac4/decoder/test_ac4dec_object_render.cpp
-        ac4/decoder/test_ac4dec_objects.cpp
-        ac4/decoder/test_ac4dec_pcm.cpp
-        ac4/decoder/test_ac4dec_presentation.cpp
-        ac4/decoder/test_ac4dec_presentations.cpp
-        ac4/decoder/test_ac4dec_reconstruct_exact.cpp
-        ac4/decoder/test_ac4dec_renderer.cpp
-        ac4/decoder/test_ac4dec_ssf.cpp
-        ac4/encoder/test_ac4enc_acpl.cpp
-        ac4/encoder/test_ac4enc_aspx.cpp
-        ac4/encoder/test_ac4enc_multichannel.cpp
-        ac4/encoder/test_ac4enc_presentations_race.cpp
-        ac4/encoder/test_ac4enc_writer.cpp
+        ac4/decoder/constructed.cpp
+        ac4/decoder/hsf.cpp
+        ac4/decoder/mux.cpp
+        ac4/decoder/objects.cpp
+        ac4/decoder/test_acpl.cpp
+        ac4/decoder/test_acpl_exact.cpp
+        ac4/decoder/test_asf.cpp
+        ac4/decoder/test_aspx.cpp
+        ac4/decoder/test_channel_elements.cpp
+        ac4/decoder/test_constructed.cpp
+        ac4/decoder/test_de.cpp
+        ac4/decoder/test_downmix.cpp
+        ac4/decoder/test_drc.cpp
+        ac4/decoder/test_ehfr.cpp
+        ac4/decoder/test_hsf.cpp
+        ac4/decoder/test_immersive.cpp
+        ac4/decoder/test_metadata.cpp
+        ac4/decoder/test_multichannel.cpp
+        ac4/decoder/test_noise_fill.cpp
+        ac4/decoder/test_object_render.cpp
+        ac4/decoder/test_objects.cpp
+        ac4/decoder/test_pcm.cpp
+        ac4/decoder/test_presentation.cpp
+        ac4/decoder/test_presentations.cpp
+        ac4/decoder/test_reconstruct_exact.cpp
+        ac4/decoder/test_renderer.cpp
+        ac4/decoder/test_ssf.cpp
+        ac4/encoder/test_acpl.cpp
+        ac4/encoder/test_aspx.cpp
+        ac4/encoder/test_multichannel.cpp
+        ac4/encoder/test_presentations_race.cpp
+        ac4/encoder/test_writer.cpp
         "${CMAKE_SOURCE_DIR}/apps/common/ac4_object_render.cpp")
 endif()
 
@@ -412,22 +412,22 @@ endif()
 
 # ac3/core/test_simd_kernels.cpp's own AVX2_REQUIRE knob reads std::getenv too -
 # same C4996 reasoning as cpu_features.cpp above - and so do
-# ac4/decoder/test_ac4dec_syntax.cpp, for its trace and census directories,
-# ac4/decoder/test_ac4dec_constructed.cpp, test_ac4dec_hsf.cpp, test_ac4dec_objects.cpp and
+# ac4/decoder/test_syntax.cpp, for its trace and census directories,
+# ac4/decoder/test_constructed.cpp, test_ac4dec_hsf.cpp, test_ac4dec_objects.cpp and
 # test_ac4dec_presentations.cpp, for where to write their streams (and
 # test_ac4dec_objects.cpp for Chromium's A-JOC stream, and
 # test_ac4dec_object_render.cpp for where to write the streams to listen to),
-# ac4/decoder/test_ac4dec_api.cpp, for a directory of further streams to decode,
-# ac4/encoder/test_ac4enc_presentations.cpp, for where to write its streams,
-# ac4/encoder/test_ac4enc_objects.cpp, for where to write its streams and those to
-# listen to, and ac4/encoder/test_ac4enc_presentations_race.cpp, for the gold set's.
+# ac4/decoder/test_api.cpp, for a directory of further streams to decode,
+# ac4/encoder/test_presentations.cpp, for where to write its streams,
+# ac4/encoder/test_objects.cpp, for where to write its streams and those to
+# listen to, and ac4/encoder/test_presentations_race.cpp, for the gold set's.
 # containers/iec61937/test_iec61937_ac4.cpp reads one too, for the census directory it packs.
 if(ICLFORGE_IS_MSVC_LIKE)
-    set_source_files_properties(ac3/core/test_simd_kernels.cpp ac4/decoder/test_ac4dec_syntax.cpp
-        ac4/decoder/test_ac4dec_constructed.cpp ac4/decoder/test_ac4dec_objects.cpp ac4/decoder/test_ac4dec_presentations.cpp
-        ac4/decoder/test_ac4dec_api.cpp ac4/decoder/test_ac4dec_object_render.cpp ac4/decoder/test_ac4dec_hsf.cpp
-        ac4/encoder/test_ac4enc_objects.cpp ac4/encoder/test_ac4enc_presentations.cpp
-        ac4/encoder/test_ac4enc_presentations_race.cpp containers/iec61937/test_iec61937_ac4.cpp
+    set_source_files_properties(ac3/core/test_simd_kernels.cpp ac4/decoder/test_syntax.cpp
+        ac4/decoder/test_constructed.cpp ac4/decoder/test_objects.cpp ac4/decoder/test_presentations.cpp
+        ac4/decoder/test_api.cpp ac4/decoder/test_object_render.cpp ac4/decoder/test_hsf.cpp
+        ac4/encoder/test_objects.cpp ac4/encoder/test_presentations.cpp
+        ac4/encoder/test_presentations_race.cpp containers/iec61937/test_iec61937_ac4.cpp
         PROPERTIES COMPILE_OPTIONS "/wd4996")
 endif()
 
@@ -510,13 +510,13 @@ target_compile_definitions(iclforge-tests
 target_compile_definitions(iclforge-tests
     PRIVATE "ICLFORGE_GOLDEN_OBJECT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden/object-fixture\"")
 
-# tests/ac4/core/test_ac4.cpp reads the real DEE-produced AC-4 fixtures under
+# tests/ac4/core/test_toc.cpp reads the real DEE-produced AC-4 fixtures under
 # here (tools/generators/gen_ac4_baseline.py) - same reasoning as the two
 # defines above.
 target_compile_definitions(iclforge-tests
     PRIVATE "ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden/external-baseline\"")
 
-# tests/ac4/decoder/test_ac4dec_syntax.cpp holds the AC-4 decoder's syntax trace to
+# tests/ac4/decoder/test_syntax.cpp holds the AC-4 decoder's syntax trace to
 # the digests tools/references/ac4_syntax.py wrote for the same streams.
 target_compile_definitions(iclforge-tests
     PRIVATE "AC4DEC_GOLDEN_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden/ac4\"")
@@ -1025,7 +1025,7 @@ if(ICLFORGE_BUILD_HEARTH)
         hearth/test_transport.cpp)
     target_link_libraries(iclforge-tests PRIVATE hearth_engine)
     # test_ac4_engine.cpp takes a directory of further AC-4 streams from std::getenv, as
-    # ac4/decoder/test_ac4dec_api.cpp does - the same C4996 reasoning as that file's.
+    # ac4/decoder/test_api.cpp does - the same C4996 reasoning as that file's.
     if(ICLFORGE_IS_MSVC_LIKE)
         set_source_files_properties(hearth/test_ac4_engine.cpp PROPERTIES COMPILE_OPTIONS "/wd4996")
     endif()

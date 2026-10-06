@@ -59,7 +59,7 @@
 //
 // A-JOC/direct-coded-object/OAMD framing has a narrower verification story
 // still: the one encoded A-JOC stream this project has is Chromium's
-// ac4-ajoc.ac4, kept out of the tree (tests/ac4/core/test_ac4.cpp holds its table
+// ac4-ajoc.ac4, kept out of the tree (tests/ac4/core/test_toc.cpp holds its table
 // of contents), and `dee_ac4ajoc_encoder.exe` accepts only an Atmos ADM BWF
 // mezzanine, which this project's own tooling cannot produce one DEE accepts
 // (the same "gates on content provenance, not syntax" limit
@@ -69,7 +69,7 @@
 // regardless. What stands in for more streams is a set of synthetic,
 // hand-built bitstreams cross-checked between this parser and
 // tools/references/ac4_parse.py, each built by an independent bit writer
-// in neither module - see tests/ac4/core/test_ac4.cpp. See docs/verification.md.
+// in neither module - see tests/ac4/core/test_toc.cpp. See docs/verification.md.
 
 namespace iclforge::ac4 {
 

@@ -23,7 +23,7 @@
 // rate's Nyquist frequency (19.8 kHz at 46 080 Hz, 20.6 kHz at 48 kHz), the
 // stopband starts at that Nyquist frequency, and the stopband is 100 dB down,
 // which puts the passband ripple near 0.0001 dB. Each phase sums to 1, so a
-// constant passes unchanged. tests/ac4/core/test_ac4core_resampler.cpp
+// constant passes unchanged. tests/ac4/core/test_resampler.cpp
 // measures the ripple, the attenuation and the sample counts.
 //
 // The output grid. Output sample m (from 0) is complete once (m + 1) * down /
