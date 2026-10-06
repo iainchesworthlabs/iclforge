@@ -42,7 +42,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from cuts import Source, include_line, new_file, quoted_run, sorted_position
+from cuts import Source, include_line, new_file
 from n1b_lib import CPP_EXT, Repo, base_parser
 
 AC4_INC = "src/ac4/include/iclforge/ac4"
@@ -403,32 +403,20 @@ def closure(start: str, edges: dict[str, list[str]]) -> set[str]:
 
 
 def replace_include(text: str, old: str, news: list[str]) -> str:
+    """`#include "old"` replaced, in its place, by `news` in sorted order, those not there yet."""
     lines = text.split("\n")
-    old_line = include_line(old)
-    index = lines.index(old_line)
-    first, last = quoted_run(lines, index)
-    del lines[index]
-    last -= 1
-    for spelling in news:
-        line = include_line(spelling)
-        if line in lines:
-            continue
-        pos = sorted_position(lines, first, last, line)
-        lines.insert(pos, line)
-        last += 1
+    index = lines.index(include_line(old))
+    fresh = [include_line(s) for s in sorted(news) if include_line(s) not in lines]
+    lines[index : index + 1] = fresh
     return "\n".join(lines)
 
 
 def add_includes(text: str, anchor: str, news: list[str]) -> str:
+    """`news` in sorted order, those not there yet, on the lines after `#include "anchor"`."""
     lines = text.split("\n")
     index = lines.index(include_line(anchor))
-    first, last = quoted_run(lines, index)
-    for spelling in news:
-        line = include_line(spelling)
-        if line in lines:
-            continue
-        lines.insert(sorted_position(lines, first, last, line), line)
-        last += 1
+    fresh = [include_line(s) for s in sorted(news) if include_line(s) not in lines]
+    lines[index + 1 : index + 1] = fresh
     return "\n".join(lines)
 
 
