@@ -285,7 +285,7 @@ HEADER_MAP: dict[str, str] = {
     "ac3iab/model.hpp": "iclforge/iab/model.hpp",
     "ac3iab/mxf.hpp": "iclforge/iab/mxf.hpp",
     "ac4/ac4.hpp": "iclforge/ac4/ac4.hpp",
-    "ac4/detail/profiling.hpp": "iclforge/ac4core/detail/profiling.hpp",
+    "ac4/detail/profiling.hpp": "iclforge/base/detail/profiling.hpp",
     "ac4/detail/real.hpp": "iclforge/ac4core/detail/real.hpp",
     "ac4/syntax.hpp": "iclforge/ac4/syntax.hpp",
     "ac4dec/decoder.hpp": "iclforge/ac4dec/decoder.hpp",
