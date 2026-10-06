@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "encoder/asf/coder.hpp"
-#include "core/bit_writer.hpp"
+#include "iclforge/base/bitwriter.hpp"
 
 // Stereo processing for a channel pair coded with one sf_info() (ETSI TS 103
 // 190-1 V1.4.1 stereo_data() with b_enable_mdct_stereo_proc, Table 23, and

@@ -8,7 +8,7 @@
 #include <string_view>
 
 #include "iclforge/ac4/decoder/decoder.hpp"
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 
 // What a substream's syntax needs from outside the substream, and the result
 // type every syntax function returns.
@@ -31,7 +31,7 @@ using ParseResult = std::expected<void, SyntaxError>;
 // After a read that could have run off the end: the substream was shorter
 // than its syntax.
 [[nodiscard]] inline ParseResult check(const BitReader& reader) {
-    if (reader.overflow()) {
+    if (reader.overflowed()) {
         return fail(DecodeError::kTruncated, "a syntax element runs past the end of the substream");
     }
     return {};

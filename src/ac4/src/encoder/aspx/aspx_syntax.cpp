@@ -80,7 +80,7 @@ void write_huff_data(BitWriter& w, bool signal, int quant_mode, bool balance,
                      const AspxEnvelopeFields& envelope) {
     for (std::size_t i = 0; i < envelope.values.size(); ++i) {
         const CodebookRef cb = value_codebook(signal, quant_mode, balance, envelope.delta_dir, i);
-        w.write_codeword(cb.codes, static_cast<std::size_t>(envelope.values[i] + cb.cb_off),
+        write_codeword(w, cb.codes, static_cast<std::size_t>(envelope.values[i] + cb.cb_off),
                          "aspx_hcw");
     }
 }

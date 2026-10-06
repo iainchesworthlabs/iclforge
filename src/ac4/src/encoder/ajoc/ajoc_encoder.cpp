@@ -5,7 +5,7 @@
 #include <limits>
 #include <memory>
 
-#include "core/bit_writer.hpp"
+#include "iclforge/base/bitwriter.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {
@@ -391,7 +391,7 @@ AjocFields AjocEncoder::propose(long long frame, bool iframe, std::size_t max_bi
     const auto bits_of = [&](const Values& v) {
         BitWriter w = BitWriter::buffered();
         write_ajoc(w, setup_.num_dmx, fields_of(v, iframe));
-        return w.bit_position();
+        return w.bit_count();
     };
     // A fit whose values take more than the frame allows keeps its larger
     // coefficients alone: those under each threshold in turn go to 0 until it

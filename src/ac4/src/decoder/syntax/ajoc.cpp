@@ -70,10 +70,10 @@ constexpr std::array<CodebookSet, 2> kCoarse = {{
 
 // Up to 64 bits read as one field, one record valued at them.
 [[nodiscard]] std::uint64_t read_field(BitReader& r, int bits, std::string_view name) {
-    const std::size_t start = r.position();
+    const std::size_t start = r.bit_position();
     std::uint64_t value = 0;
     for (int i = 0; i < bits; ++i) {
-        value = (value << 1U) | r.peek_raw(1);
+        value = (value << 1U) | r.peek(1);
         r.consume(1);
     }
     r.emit(start, bits, value, name);
@@ -84,18 +84,18 @@ constexpr std::array<CodebookSet, 2> kCoarse = {{
 // (xxxx + 1)/15 from 0b10000 to 0b11101. One record of the bits read, valued
 // at them. Returns the coefficient in fifteenths.
 [[nodiscard]] std::uint8_t read_dlg_dmx_coeff(BitReader& r) {
-    const std::size_t start = r.position();
-    if (r.peek_raw(1) == 0) {
+    const std::size_t start = r.bit_position();
+    if (r.peek(1) == 0) {
         r.consume(1);
         r.emit(start, 1, 0, "de_dlg_dmx_coeff_idx");
         return 0;
     }
-    if (r.peek_raw(4) == 0b1111) {
+    if (r.peek(4) == 0b1111) {
         r.consume(4);
         r.emit(start, 4, 0b1111, "de_dlg_dmx_coeff_idx");
         return 15;
     }
-    const std::uint32_t code = r.peek_raw(5);
+    const std::uint32_t code = r.peek(5);
     r.consume(5);
     r.emit(start, 5, code, "de_dlg_dmx_coeff_idx");
     return static_cast<std::uint8_t>((code & 0b1111U) + 1U);

@@ -44,10 +44,10 @@ namespace {
         if (ajoc.b_some_signals_inactive) {
             // dmx_active_signals_mask[] is one field, [0] its first bit
             // (src/ac4/ERRATA.md, "Arrays read as one field").
-            const std::size_t start = r.position();
+            const std::size_t start = r.bit_position();
             std::uint64_t mask = 0;
             for (int s = 0; s < n_fb_dmx; ++s) {
-                mask = (mask << 1U) | r.peek_raw(1);
+                mask = (mask << 1U) | r.peek(1);
                 r.consume(1);
             }
             r.emit(start, n_fb_dmx, mask, "dmx_active_signals_mask");
@@ -90,12 +90,12 @@ namespace {
                 return fail(DecodeError::kTruncated, "skip_bits run past the end of the substream");
             }
             const std::uint64_t budget = bytes * 8U;
-            const std::size_t before = r.position();
+            const std::size_t before = r.bit_position();
             AjocBedInfo bed_info;
             if (auto ok = parse_ajoc_bed_info(r, bed_info); !ok) {
                 return ok;
             }
-            const std::uint64_t used = r.position() - before;
+            const std::uint64_t used = r.bit_position() - before;
             if (used > budget) {
                 return fail(DecodeError::kInvalidStream,
                             "an element reads past the byte budget of the data that holds it");
@@ -175,7 +175,7 @@ ParseResult parse_audio_substream(BitReader& r, const SubstreamContext& ctx,
         return fail(DecodeError::kUnsupported,
                     "a 96 kHz or 192 kHz substream whose HSF extension substream could not be read");
     }
-    const std::size_t audio_start = r.position();
+    const std::size_t audio_start = r.bit_position();
     const std::size_t metadata_start = audio_start + static_cast<std::size_t>(audio_size) * 8U;
     if (metadata_start > r.size_bits()) {
         return fail(DecodeError::kInvalidStream, "audio_size runs past the end of the substream");
@@ -205,7 +205,7 @@ ParseResult parse_audio_substream(BitReader& r, const SubstreamContext& ctx,
             }
             break;
     }
-    if (r.position() > metadata_start) {
+    if (r.bit_position() > metadata_start) {
         return fail(DecodeError::kInvalidStream, "audio_data() runs past audio_size");
     }
 

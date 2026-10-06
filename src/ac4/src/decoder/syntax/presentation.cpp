@@ -593,7 +593,7 @@ ParseResult parse_presentation_substream(BitReader& r, const PresentationContext
                 } else {
                     target.alt_data_set_index.emplace_back(std::nullopt);
                 }
-                if (r.overflow()) {
+                if (r.overflowed()) {
                     break;
                 }
             }
@@ -620,7 +620,7 @@ ParseResult parse_presentation_substream(BitReader& r, const PresentationContext
         // Everything down to add_data fills the add_data_bytes that start at
         // this byte boundary.
         const std::uint64_t add_data_bits = add_data_bytes * 8U;
-        const std::size_t start = r.position();
+        const std::size_t start = r.bit_position();
         out.immersive_audio_indicator = r.read_flag("immersive_audio_indicator");
         if (ctx.pres_ch_mode == -1) {
             out.b_oamd_common_timing = r.read_flag("b_oamd_common_timing");
@@ -638,7 +638,7 @@ ParseResult parse_presentation_substream(BitReader& r, const PresentationContext
         if (const ParseResult result = check(r); !result) {
             return result;
         }
-        const std::uint64_t used = r.position() - start;
+        const std::uint64_t used = r.bit_position() - start;
         if (used > add_data_bits) {
             return fail(DecodeError::kInvalidStream,
                         "add_data_bytes is too small for the fields read inside it");
@@ -671,7 +671,7 @@ ParseResult parse_presentation_substream(BitReader& r, const PresentationContext
     if (const ParseResult result = check(r); !result) {
         return result;
     }
-    const std::size_t drc_start = r.position();
+    const std::size_t drc_start = r.bit_position();
     const DrcContext drc_ctx{
         .b_iframe = ctx.b_pres_ndot,
         .ch_mode = ctx.pres_ch_mode,
@@ -681,7 +681,7 @@ ParseResult parse_presentation_substream(BitReader& r, const PresentationContext
         return result;
     }
     // Part 2 clause 6.3.3.1.19: "the size of the drc_frame() element, in bits".
-    if (r.position() - drc_start != drc_metadata_size) {
+    if (r.bit_position() - drc_start != drc_metadata_size) {
         return fail(DecodeError::kInvalidStream,
                     "drc_metadata_size does not match the drc_frame() read");
     }
@@ -695,7 +695,7 @@ ParseResult parse_presentation_substream(BitReader& r, const PresentationContext
                 state.sg_gain.assign(groups, 0);
                 for (std::size_t sg = 0; sg < groups; ++sg) {
                     state.sg_gain[sg] = read_int(r, 6, "sg_gain");
-                    if (r.overflow()) {
+                    if (r.overflowed()) {
                         break;
                     }
                 }

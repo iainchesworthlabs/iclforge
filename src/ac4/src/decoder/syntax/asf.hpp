@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "decoder/syntax/context.hpp"
 
 // The audio spectral frontend's syntax (ETSI TS 103 190-1 V1.4.1 clauses 4.2.7

@@ -363,7 +363,7 @@ void write_chparam_info(BitWriter& w, const StereoChoice& choice) {
                     continue;
                 }
                 const int alpha_q = choice.alpha_q[g][p];
-                w.write_codeword(tables::kAsfHcbScalefacCodes, static_cast<std::size_t>(alpha_q - below + 60),
+                write_codeword(w, tables::kAsfHcbScalefacCodes, static_cast<std::size_t>(alpha_q - below + 60),
                                  "sap_hcw");
                 below = alpha_q;
             }
@@ -374,7 +374,7 @@ void write_chparam_info(BitWriter& w, const StereoChoice& choice) {
 std::size_t chparam_info_bits(const StereoChoice& choice) {
     BitWriter w;
     write_chparam_info(w, choice);
-    return w.bit_position();
+    return w.bit_count();
 }
 
 }  // namespace iclforge::ac4::detail

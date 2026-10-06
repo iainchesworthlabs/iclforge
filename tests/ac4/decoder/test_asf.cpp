@@ -21,7 +21,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "bits.hpp"
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "decoder/huffman.hpp"
 #include "decoder/syntax/asf.hpp"
 #include "decoder/syntax/context.hpp"
@@ -60,7 +60,7 @@ ParseResult read(const BitWriter& w, F&& parse, bool exact = true) {
     BitReader reader(bytes, 0, rec);
     const ParseResult result = parse(reader);
     if (result && exact) {
-        CHECK(reader.position() == w.size());
+        CHECK(reader.bit_position() == w.size());
     }
     return result;
 }
@@ -608,7 +608,7 @@ TEST_CASE("sf_data and sf_hsf_data share a section straddling the 48 kHz bands",
     SfData out;
     HsfSfData hsf;
     REQUIRE(iclforge::ac4::detail::parse_sf_data(core_reader, ctx, info, false, &header, out, hsf).has_value());
-    CHECK(core_reader.position() == core.size());
+    CHECK(core_reader.bit_position() == core.size());
     CHECK(out.max_sfb[0] == 14);
     CHECK(out.num_sec_lsf[0] == 2);
     REQUIRE(out.sections[0].size() == 2);
@@ -623,7 +623,7 @@ TEST_CASE("sf_data and sf_hsf_data share a section straddling the 48 kHz bands",
     CHECK(hsf.sections[0][1].start == 15);
 
     REQUIRE(iclforge::ac4::detail::parse_sf_hsf_data(ext_reader, info.psy.num_window_groups, out, hsf).has_value());
-    CHECK(ext_reader.position() == ext.size());
+    CHECK(ext_reader.bit_position() == ext.size());
     CHECK(hsf.quant_spec[1] == -1);
     CHECK(hsf.max_quant_idx[0][0] == 1);
     CHECK(hsf.max_quant_idx[0][1] == 0);
@@ -876,7 +876,7 @@ TEST_CASE("huff_codeword reports a codeword cut short as truncated in every code
         REQUIRE_FALSE(result.has_value());
         CHECK(result.error().error == DecodeError::kTruncated);
         CHECK(result.error().reason == "cut");
-        CHECK(reader.position() == static_cast<std::size_t>(pad));
+        CHECK(reader.bit_position() == static_cast<std::size_t>(pad));
     }
 }
 
@@ -963,7 +963,7 @@ TEST_CASE("the bit reader's cache gives what reading bit by bit gives", "[ac4][d
             switch (rng() % 7U) {
                 case 0:
                 case 1:
-                    REQUIRE(fast.peek_raw(bits) == slow.peek(bits));
+                    REQUIRE(fast.peek(bits) == slow.peek(bits));
                     break;
                 case 2:
                 case 3:
@@ -989,14 +989,14 @@ TEST_CASE("the bit reader's cache gives what reading bit by bit gives", "[ac4][d
                     break;
                 }
             }
-            REQUIRE(fast.position() == slow.position());
-            REQUIRE(fast.overflow() == slow.overflow());
+            REQUIRE(fast.bit_position() == slow.bit_position());
+            REQUIRE(fast.overflowed() == slow.overflowed());
             REQUIRE(fast.remaining_bits() == slow.remaining_bits());
             // Wherever it stands, a peek of every width agrees.
             for (const int width : {1, 7, 8, 9, 16, 25, 31, 32}) {
-                REQUIRE(fast.peek_raw(width) == slow.peek(width));
+                REQUIRE(fast.peek(width) == slow.peek(width));
             }
-            if (slow.overflow() && rng() % 4U == 0U) {
+            if (slow.overflowed() && rng() % 4U == 0U) {
                 break;  // past the end there is nothing more to compare, and a new run starts
             }
         }
@@ -1081,11 +1081,11 @@ TEST_CASE("huff_decode with its shortcut reads every codeword of every codebook"
             }
             BitReader whole(full, 0, {});
             REQUIRE(iclforge::ac4::detail::huff_decode(whole, *book, "hcw") == entry.index);
-            REQUIRE(whole.position() == entry.bits);
+            REQUIRE(whole.bit_position() == entry.bits);
             const std::vector<std::byte> cut(full.begin(), full.begin() + (entry.bits + 7) / 8);
             BitReader exact(cut, 0, {});
             REQUIRE(iclforge::ac4::detail::huff_decode(exact, *book, "hcw") == entry.index);
-            REQUIRE(exact.position() == entry.bits);
+            REQUIRE(exact.bit_position() == entry.bits);
             // One bit less than the codeword needs: none found, nothing consumed.
             if (entry.bits % 8 != 0) {
                 continue;  // the padding bits are still data; only a whole-byte cut ends inside
@@ -1093,7 +1093,7 @@ TEST_CASE("huff_decode with its shortcut reads every codeword of every codebook"
             const std::vector<std::byte> shorter(full.begin(), full.begin() + entry.bits / 8 - 1);
             BitReader short_reader(shorter, 0, {});
             REQUIRE(iclforge::ac4::detail::huff_decode(short_reader, *book, "hcw") == -1);
-            REQUIRE(short_reader.position() == 0);
+            REQUIRE(short_reader.bit_position() == 0);
         }
     }
 }
@@ -1113,11 +1113,11 @@ TEST_CASE(
             const std::size_t pos = rng() % (data.size() * 8U + 8U);
             BitReader reader(data, 0, {});
             reader.seek(pos);
-            const std::size_t start = reader.position();
+            const std::size_t start = reader.bit_position();
             const auto [index, length] = search_decode(data, start, *book);
             const int got = iclforge::ac4::detail::huff_decode(reader, *book, "hcw");
             REQUIRE(got == index);
-            REQUIRE(reader.position() == start + static_cast<std::size_t>(length));
+            REQUIRE(reader.bit_position() == start + static_cast<std::size_t>(length));
         }
     }
 }

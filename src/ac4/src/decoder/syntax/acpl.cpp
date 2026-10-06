@@ -113,7 +113,7 @@ ParseResult parse_acpl_config_1ch(BitReader& r, AcplConfigKind kind, AcplConfig1
         config.param_band = static_cast<std::uint8_t>(
             acpl::sb_to_pb(config.num_param_bands, config.qmf_band));
     }
-    config.valid = !r.overflow();
+    config.valid = !r.overflowed();
     out = config;
     return check(r);
 }
@@ -124,7 +124,7 @@ ParseResult parse_acpl_config_2ch(BitReader& r, AcplConfig2ch& out) {
     config.num_param_bands = kNumParamBands[config.num_param_bands_id];
     config.quant_mode_0 = u8(r.read(1, "acpl_quant_mode_0"));
     config.quant_mode_1 = u8(r.read(1, "acpl_quant_mode_1"));
-    config.valid = !r.overflow();
+    config.valid = !r.overflowed();
     out = config;
     return check(r);
 }

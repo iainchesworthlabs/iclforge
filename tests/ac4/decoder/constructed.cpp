@@ -21,7 +21,7 @@
 #include "encoder/asf/stereo.hpp"
 #include "encoder/aspx/aspx_encoder.hpp"
 #include "encoder/aspx/aspx_syntax.hpp"
-#include "core/bit_writer.hpp"
+#include "iclforge/base/bitwriter.hpp"
 #include "encoder/frame/frame_writer.hpp"
 
 namespace ac4dec_test {

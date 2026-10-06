@@ -7,7 +7,7 @@
 #include <optional>
 #include <vector>
 
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "decoder/syntax/acpl.hpp"
 #include "decoder/syntax/ajcc.hpp"
 #include "decoder/syntax/asf.hpp"

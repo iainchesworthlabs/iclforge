@@ -18,7 +18,7 @@
 #include "encoder/asf/stereo.hpp"
 #include "encoder/aspx/aspx_encoder.hpp"
 #include "encoder/aspx/aspx_syntax.hpp"
-#include "core/bit_writer.hpp"
+#include "iclforge/base/bitwriter.hpp"
 #include "encoder/frame/toc_writer.hpp"
 #include "encoder/oamd/oamd_syntax.hpp"
 
@@ -669,14 +669,14 @@ void write_metadata(BitWriter& w, bool dialog) {
         trace.push_back(record);
     };
     BitWriter w(index, keep);
-    const std::size_t bytes = (audio.bit_position() + 7) / 8;
+    const std::size_t bytes = (audio.bit_count() + 7) / 8;
     w.write(15, bytes & 0x7FFFU, "audio_size_value");
     w.write(1, bytes >= 0x8000U ? 1U : 0U, "b_more_bits");
     if (bytes >= 0x8000U) {
         w.write_variable_bits(7, bytes >> 15U, "audio_size_value");
     }
     w.append(audio);
-    w.write_unrecorded(static_cast<unsigned>(bytes * 8 - audio.bit_position()), 0);  // fill_bits
+    w.write_unrecorded(static_cast<unsigned>(bytes * 8 - audio.bit_count()), 0);  // fill_bits
     write_metadata(w, dialog);
     w.align();
     return w.bytes();
@@ -833,7 +833,7 @@ void build_ajoc_frame(const ObjectCase& c, int frame, int frames, bool iframe,
             BitWriter info = BitWriter::buffered();
             iclforge::ac4::detail::write_ajoc_bed_info(info, 3);
             audio.append(info);
-            audio.write_zero_run(8 - info.bit_position(), "skip_data");
+            audio.write_zero_run(8 - info.bit_count(), "skip_data");
         }
     }
     iclforge::ac4::detail::write_ajoc(audio, m, ajoc_fields(c, iframe));

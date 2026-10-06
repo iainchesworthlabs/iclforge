@@ -91,7 +91,7 @@ void write_ec_data(BitWriter& w, AcplKind kind, int quant_mode, const AcplFramin
         w.write(1, static_cast<std::uint64_t>(set.diff_type), "diff_type");
         for (std::size_t i = 0; i < set.values.size(); ++i) {
             const CodebookRef cb = codebook(kind, quant_mode, type_of(set.diff_type, i == 0));
-            w.write_codeword(cb.codes, static_cast<std::size_t>(set.values[i] + cb.cb_off), "acpl_hcw");
+            write_codeword(w, cb.codes, static_cast<std::size_t>(set.values[i] + cb.cb_off), "acpl_hcw");
         }
     }
 }

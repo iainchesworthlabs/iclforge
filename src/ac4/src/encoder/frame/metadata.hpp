@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "iclforge/ac4/encoder/encoder.hpp"
-#include "core/bit_writer.hpp"
+#include "iclforge/base/bitwriter.hpp"
 
 // The metadata a frame carries beside the audio, as the codes the syntax
 // sends, and the writers for it: further_loudness_info() (ETSI TS 103 190-2

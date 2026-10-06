@@ -1103,7 +1103,7 @@ std::vector<std::vector<double>> decode_divergence(
     const std::size_t element_bits = e.bit_count();
     const std::size_t element_bytes = (element_bits + 7) / 8;
     REQUIRE(element_bytes <= 16);  // oa_element_size_bits below is a single group
-    e.byte_align();
+    e.align();
     const auto element = e.take();
 
     // Re-emit the payload: header, the object_element as it was, the new

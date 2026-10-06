@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "iclforge/ac4/core/toc.hpp"
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "decoder/syntax/context.hpp"
 #include "decoder/syntax/metadata.hpp"
 

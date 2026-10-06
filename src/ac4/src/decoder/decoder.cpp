@@ -19,7 +19,7 @@
 
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/base/detail/profiling.hpp"
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "pcm/downmix.hpp"
 #include "pcm/drc.hpp"
 #include "oba/isf.hpp"
@@ -2624,7 +2624,7 @@ std::expected<FrameReport, DecodeError> Decoder::Impl::read(
         AudioSubstream& parsed = wanted != nullptr ? wanted->content : *parsed_storage;
         const ParseResult owner_result =
             detail::parse_audio_substream(owner_reader, assignment.audio, state, parsed, &ext_reader);
-        owner_report.bits_read = owner_reader.position();
+        owner_report.bits_read = owner_reader.bit_position();
         if (owner_result && parsed.metadata.b_emdf_payloads_substream) {
             owner_report.emdf_payloads = emdf_payload_reports(parsed.metadata.emdf_payloads);
         }
@@ -2633,7 +2633,7 @@ std::expected<FrameReport, DecodeError> Decoder::Impl::read(
             owner_report.refused_reason = owner_result.error().reason;
             ext_report.refused = DecodeError::kUnsupported;
             ext_report.refused_reason = "its owning channel substream could not be read";
-            ext_report.bits_read = ext_reader.position();
+            ext_report.bits_read = ext_reader.bit_position();
             forget_content(wanted);
         } else {
             ParseResult ext_result;
@@ -2649,7 +2649,7 @@ std::expected<FrameReport, DecodeError> Decoder::Impl::read(
                 ext_reader.align();
                 ext_result = detail::check(ext_reader);
             }
-            ext_report.bits_read = ext_reader.position();
+            ext_report.bits_read = ext_reader.bit_position();
             if (!ext_result) {
                 ext_report.refused = ext_result.error().error;
                 ext_report.refused_reason = ext_result.error().reason;
@@ -2813,7 +2813,7 @@ std::expected<FrameReport, DecodeError> Decoder::Impl::read(
                 default:
                     break;
             }
-            substream.bits_read = reader.position();
+            substream.bits_read = reader.bit_position();
             if (!result) {
                 substream.refused = result.error().error;
                 substream.refused_reason = result.error().reason;

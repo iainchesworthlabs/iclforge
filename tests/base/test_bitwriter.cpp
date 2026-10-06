@@ -46,7 +46,7 @@ TEST_CASE("single-bit writes accumulate to bytes", "[bitwriter]") {
 TEST_CASE("byte_align zero-pads a partial byte", "[bitwriter]") {
     iclforge::BitWriter w;
     w.put(0b101, 3);
-    w.byte_align();
+    w.align();
     CHECK(w.bit_count() == 8);
     CHECK(to_u8(w.take()) == std::vector<std::uint8_t>{0b10100000});
 }

@@ -42,7 +42,7 @@ constexpr int kAudioSubstream = 1;
 // (drc_metadata_size, tools_metadata_size), then the element it sizes.
 void write_sized(BitWriter& w, const BitWriter& element, unsigned bits, std::string_view value_name,
                  std::string_view extension_name) {
-    const std::size_t size = element.bit_position();
+    const std::size_t size = element.bit_count();
     const std::uint64_t low = size & ((1U << bits) - 1U);
     const std::uint64_t high = size >> bits;
     w.write(bits, low, value_name);
@@ -122,7 +122,7 @@ bool audio_substream_size_possible(const AudioSubstreamFields& fields,
 std::optional<BitWriter> write_audio_substream(const AudioSubstreamFields& fields,
                                                const BitWriter& audio,
                                                std::size_t substream_bytes) {
-    const std::size_t needed = (audio.bit_position() + 7) / 8;
+    const std::size_t needed = (audio.bit_count() + 7) / 8;
     std::size_t audio_size = needed;
     if (substream_bytes > 0) {
         const std::optional<std::size_t> fitted =
@@ -139,10 +139,10 @@ std::optional<BitWriter> write_audio_substream(const AudioSubstreamFields& field
     if (more) {
         w.write_variable_bits(7, audio_size >> 15U, "audio_size_value");
     }
-    const std::size_t start = w.bit_position();
+    const std::size_t start = w.bit_count();
     w.append(audio);
     // fill_bits and byte_align, to audio_size bytes after audio_data() began.
-    while (w.bit_position() < start + 8 * audio_size) {
+    while (w.bit_count() < start + 8 * audio_size) {
         w.write_unrecorded(1, 0);
     }
     write_metadata(w, fields);

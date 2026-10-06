@@ -74,11 +74,11 @@ constexpr CodebookSet kNoiseBalance = {&tables::kAspxHcbNoiseBalanceF0,
 // 53 lists as one element of 1...3 bits: peek to find the code's length, then
 // read the whole code as that element.
 [[nodiscard]] AspxIntClass read_int_class(BitReader& r) {
-    if (r.peek_raw(1) == 0) {
+    if (r.peek(1) == 0) {
         r.read(1, "aspx_int_class");
         return AspxIntClass::kFixFix;
     }
-    if (r.peek_raw(2) == 0b10U) {
+    if (r.peek(2) == 0b10U) {
         r.read(2, "aspx_int_class");
         return AspxIntClass::kFixVar;
     }
@@ -495,7 +495,7 @@ ParseResult parse_aspx_config(BitReader& r, AspxConfig& out) {
     config.noise_sbg = u8(r.read(2, "aspx_noise_sbg"));
     config.num_env_bits_fixfix = u8(r.read(1, "aspx_num_env_bits_fixfix"));
     config.freq_res_mode = u8(r.read(2, "aspx_freq_res_mode"));
-    config.valid = !r.overflow();
+    config.valid = !r.overflowed();
     out = config;
     return check(r);
 }

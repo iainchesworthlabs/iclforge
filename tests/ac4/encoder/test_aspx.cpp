@@ -22,8 +22,8 @@
 #include "iclforge/ac4/core/syntax.hpp"
 #include "encoder/aspx/aspx_encoder.hpp"
 #include "encoder/aspx/aspx_syntax.hpp"
-#include "core/bit_reader.hpp"
-#include "core/bit_writer.hpp"
+#include "iclforge/base/bitreader.hpp"
+#include "iclforge/base/bitwriter.hpp"
 #include "decoder/syntax/aspx.hpp"
 #include "decoder/syntax/channel_elements.hpp"
 #include "decoder/syntax/context.hpp"
@@ -215,8 +215,8 @@ void round_trip(const AspxConfigFields& config, bool iframe, int xover, bool bal
         REQUIRE(ok);
         CHECK(data.balance == balance);
     }
-    CHECK_FALSE(r.overflow());
-    CHECK(r.position() == w.bit_position());
+    CHECK_FALSE(r.overflowed());
+    CHECK(r.bit_position() == w.bit_count());
     require_same(written.records, read.records);
 }
 
@@ -424,7 +424,7 @@ TEST_CASE("the A-SPX data a frame falls back to cost more where its interval sta
             iclforge::ac4::detail::write_aspx_data_2ch(w, true, 0, setup->config, setup->counts,
                                                        false, {f, f});
         }
-        return w.bit_position();
+        return w.bit_count();
     };
     CHECK(bits(varied, 1) > bits(fixed, 1));
     CHECK(bits(varied, 2) > bits(fixed, 2));
@@ -485,7 +485,7 @@ TEST_CASE("companding_control() in its three forms reads back through the channe
                     REQUIRE(parsed.companding.has_value());
                     CHECK(parsed.companding->sync_flag == sync);
                     CHECK(parsed.companding->b_compand_on[0] == ((on & 1) != 0));
-                    CHECK(r.position() == w.bit_position());
+                    CHECK(r.bit_position() == w.bit_count());
                     require_same(written.records, read.records);
                 }
             }

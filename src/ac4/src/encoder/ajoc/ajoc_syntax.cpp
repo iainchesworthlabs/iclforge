@@ -76,7 +76,7 @@ void write_huff_data(BitWriter& w, bool wet, int bands, int quant_select, bool d
         const CodebookRef cb = codebook(wet, quant_select, type_of(diff_type, first));
         const int value = set.values.at(static_cast<std::size_t>(i));
         const int index = diff_type == 0 && first ? value : value + cb.cb_off;
-        w.write_codeword(cb.codes, static_cast<std::size_t>(index), "ajoc_hcw");
+        write_codeword(w, cb.codes, static_cast<std::size_t>(index), "ajoc_hcw");
     }
 }
 

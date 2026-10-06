@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "decoder/pcm/snf_random.hpp"
 #include "decoder/syntax/context.hpp"
 

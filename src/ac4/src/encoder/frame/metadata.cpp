@@ -608,7 +608,7 @@ void write_drc_frame(BitWriter& w, const DrcCodes* codes, bool iframe,
                 for (int band = 0; band < set.bands; ++band) {
                     for (int sf = 0; sf < set.subframes; ++sf) {
                         if (sf != 0 || band != 0 || ch != 0) {
-                            body.write_codeword(
+                            write_codeword(body, 
                                 tables::kDrcHcbCodes,
                                 static_cast<std::size_t>(set.at(ch, sf, band) - ref +
                                                          tables::kDrcHcb.cb_off),
@@ -621,7 +621,7 @@ void write_drc_frame(BitWriter& w, const DrcCodes* codes, bool iframe,
                 ref = set.at(ch, 0, 0);
             }
         }
-        const std::size_t size = 2 + body.bit_position();
+        const std::size_t size = 2 + body.bit_count();
         w.write(6, size & 63U, "drc_gainset_size_value");
         w.write(1, size > 63 ? 1U : 0U, "b_more_bits");
         if (size > 63) {
@@ -798,7 +798,7 @@ void write_de_data(BitWriter& w, const DeConfigCodes& config, const DeFrameParam
     const int abs_off = second ? tables::kDeHcbAbs1.cb_off : tables::kDeHcbAbs0.cb_off;
     const int diff_off = second ? tables::kDeHcbDiff1.cb_off : tables::kDeHcbDiff0.cb_off;
     const auto code = [&](std::span<const HuffCode> codes, int value) {
-        w.write_codeword(codes, static_cast<std::size_t>(value), "de_par_code");
+        write_codeword(w, codes, static_cast<std::size_t>(value), "de_par_code");
     };
     // A frame that is not an I-frame is coded against the last frame sent. Before any was sent that
     // is the state a stream starts from, 0 in every band (the encoder's least_parameters() takes it

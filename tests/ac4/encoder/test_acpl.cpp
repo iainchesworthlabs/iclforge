@@ -16,8 +16,8 @@
 
 #include "iclforge/ac4/core/syntax.hpp"
 #include "encoder/acpl/acpl_syntax.hpp"
-#include "core/bit_reader.hpp"
-#include "core/bit_writer.hpp"
+#include "iclforge/base/bitreader.hpp"
+#include "iclforge/base/bitwriter.hpp"
 #include "decoder/syntax/acpl.hpp"
 #include "decoder/syntax/context.hpp"
 
@@ -122,8 +122,8 @@ TEST_CASE("acpl_config_1ch() and acpl_data_1ch() read back as written", "[ac4][e
                     CHECK(parsed.qmf_band == (partial ? qmf_band : 0));
                     iclforge::ac4::detail::AcplData1ch out;
                     REQUIRE(iclforge::ac4::detail::parse_acpl_data_1ch(r, {}, parsed, out));
-                    CHECK_FALSE(r.overflow());
-                    CHECK(r.position() == w.bit_position());
+                    CHECK_FALSE(r.overflowed());
+                    CHECK(r.bit_position() == w.bit_count());
                     require_same(written.records, read.records);
                 }
             }
@@ -163,8 +163,8 @@ TEST_CASE("acpl_config_2ch() and acpl_data_2ch() read back as written", "[ac4][e
                 REQUIRE(iclforge::ac4::detail::parse_acpl_config_2ch(r, parsed));
                 iclforge::ac4::detail::AcplData2ch out;
                 REQUIRE(iclforge::ac4::detail::parse_acpl_data_2ch(r, {}, parsed, out));
-                CHECK_FALSE(r.overflow());
-                CHECK(r.position() == w.bit_position());
+                CHECK_FALSE(r.overflowed());
+                CHECK(r.bit_position() == w.bit_count());
                 require_same(written.records, read.records);
             }
         }

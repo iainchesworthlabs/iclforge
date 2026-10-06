@@ -442,11 +442,11 @@ namespace {
         gainset.drc_version = read_int(r, 2, "drc_version");
         std::uint64_t used_bits = 0;
         if (gainset.drc_version <= 1) {
-            const std::size_t start = r.position();
+            const std::size_t start = r.bit_position();
             if (const ParseResult result = parse_drc_gains(r, ctx, mode, gainset); !result) {
                 return result;
             }
-            used_bits = r.position() - start;
+            used_bits = r.bit_position() - start;
         }
         if (const ParseResult result = check(r); !result) {
             return result;
@@ -742,7 +742,7 @@ ParseResult parse_further_loudness_info(BitReader& r, int sus_ver, bool b_presen
             while (!bit) {
                 bit = r.read_flag("prgmbndy_bit");
                 ++reads;
-                if (r.overflow()) {
+                if (r.overflowed()) {
                     return check(r);
                 }
             }
@@ -981,7 +981,7 @@ ParseResult parse_metadata(BitReader& r, const SubstreamContext& ctx, MetadataSt
     if (const ParseResult result = check(r); !result) {
         return result;
     }
-    const std::size_t tools_start = r.position();
+    const std::size_t tools_start = r.bit_position();
     if (ctx.sus_ver == 0) {
         const DrcContext drc_ctx{
             .b_iframe = ctx.b_iframe,
@@ -1002,7 +1002,7 @@ ParseResult parse_metadata(BitReader& r, const SubstreamContext& ctx, MetadataSt
     // Part 1 clause 4.3.12.1.1: the size in bits of the DRC and dialogue
     // enhancement metadata, which is exactly what lies between here and the
     // size field.
-    if (r.position() - tools_start != tools_metadata_size) {
+    if (r.bit_position() - tools_start != tools_metadata_size) {
         return fail(DecodeError::kInvalidStream,
                     "tools_metadata_size does not match the drc_frame() and dialog_enhancement() "
                     "read");

@@ -23,7 +23,7 @@
 
 #include "ac4/core/toc_writer.hpp"
 #include "ac4/decoder/bits.hpp"
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "decoder/syntax/context.hpp"
 #include "decoder/syntax/ssf.hpp"
@@ -141,7 +141,7 @@ TEST_CASE("ssf_data decodes random streams as the reference transcription does",
             }
             REQUIRE(result.has_value());
             ++frames_ok;
-            CHECK(reader.position() == want.bits);
+            CHECK(reader.bit_position() == want.bits);
             REQUIRE(got.granule_count == static_cast<int>(want.granules.size()));
             std::size_t offset = 0;
             for (std::size_t g = 0; g < want.granules.size(); ++g) {

@@ -1181,7 +1181,7 @@ std::optional<std::array<AspxChannelFields, 2>> AspxChannelEncoder::balanced_wit
     write_aspx_data_2ch(apart, iframe, setup_->xover_subband_offset, setup_->config, setup_->counts, false, proposed);
     BitWriter together = BitWriter::buffered();
     write_aspx_data_2ch(together, iframe, setup_->xover_subband_offset, setup_->config, setup_->counts, true, out);
-    if (together.bit_position() >= apart.bit_position()) {
+    if (together.bit_count() >= apart.bit_count()) {
         return std::nullopt;
     }
     return out;

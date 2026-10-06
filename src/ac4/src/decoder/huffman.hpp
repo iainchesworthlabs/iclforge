@@ -3,7 +3,7 @@
 #include <expected>
 #include <string_view>
 
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "core/huffman_codebook.hpp"
 #include "syntax/context.hpp"
 

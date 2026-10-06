@@ -7,7 +7,7 @@
 #include <string_view>
 #include <vector>
 
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "decoder/syntax/context.hpp"
 #include "decoder/syntax/oamd.hpp"
 

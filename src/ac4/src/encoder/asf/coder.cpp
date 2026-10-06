@@ -336,7 +336,7 @@ CodedTrack code_track(const Grouped& grouped, const std::vector<std::vector<int>
 std::size_t sf_info_bits(const FrameLayout& layout, std::array<int, 2> max_sfb) {
     BitWriter w;
     write_sf_info(w, layout, max_sfb);
-    return w.bit_position();
+    return w.bit_count();
 }
 
 namespace {
@@ -413,7 +413,7 @@ void write_sf_data(BitWriter& w, const CodedTrack& track, const FrameLayout& lay
             const std::size_t end = track.offset[g][static_cast<std::size_t>(section.end)];
             for (std::size_t k = begin; k < end; k += dim) {
                 const std::span<const std::int32_t> values = std::span<const std::int32_t>(track.q).subspan(k, dim);
-                w.write_codeword(codes, codeword_index(s, section.cb, values), "asf_qspec_hcw");
+                write_codeword(w, codes, codeword_index(s, section.cb, values), "asf_qspec_hcw");
                 if (!s.is_unsigned) {
                     continue;
                 }
@@ -463,7 +463,7 @@ void write_sf_data(BitWriter& w, const CodedTrack& track, const FrameLayout& lay
             }
             if (!first) {
                 const auto index = static_cast<std::size_t>(track.sf[g][b] - last + kMaxDelta);
-                w.write_codeword(tables::kAsfHcbScalefacCodes, index, "asf_sf_hcw");
+                write_codeword(w, tables::kAsfHcbScalefacCodes, index, "asf_sf_hcw");
             }
             first = false;
             last = track.sf[g][b];

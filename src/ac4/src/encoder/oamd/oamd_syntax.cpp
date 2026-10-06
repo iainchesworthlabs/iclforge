@@ -323,12 +323,12 @@ void write_oamd_common_data(BitWriter& w, const OamdCommonFields& f) {
     write_bed_render_info(bed, f.bed_render);
     BitWriter hp = BitWriter::buffered();
     write_headphone(hp, f.headphone);
-    std::size_t needed = trim.bit_position();
+    std::size_t needed = trim.bit_count();
     if (f.bed_render || f.headphone) {
-        needed += bed.bit_position();
+        needed += bed.bit_count();
     }
     if (f.headphone) {
-        needed += hp.bit_position();
+        needed += hp.bit_count();
     }
     const std::uint64_t bytes = std::max(bytes_for(needed), u(std::max(f.add_data_bytes, 1)));
     w.write(1, bytes >= 2 ? 1U : 0U, "add_data_bytes_minus1");
@@ -338,14 +338,14 @@ void write_oamd_common_data(BitWriter& w, const OamdCommonFields& f) {
     // Each element the decoder reads while bits of the budget are left.
     std::uint64_t left = bytes * 8;
     w.append(trim);
-    left -= trim.bit_position();
+    left -= trim.bit_count();
     if (left > 0) {
         w.append(bed);
-        left -= bed.bit_position();
+        left -= bed.bit_count();
     }
     if (left > 0) {
         w.append(hp);
-        left -= hp.bit_position();
+        left -= hp.bit_count();
     }
     w.write_zero_run(left, "add_data");
 }
@@ -404,10 +404,10 @@ void write_object_info_block(BitWriter& w, bool no_delta, bool dynamic,
         BitWriter md = BitWriter::buffered();
         write_add_per_object_md(md, b.not_active, dynamic, *b.add_table);
         const std::uint64_t bytes = std::min<std::uint64_t>(
-            16, std::max(bytes_for(md.bit_position()), u(b.add_table->size_bytes)));
+            16, std::max(bytes_for(md.bit_count()), u(b.add_table->size_bytes)));
         w.write(4, bytes - 1, "add_table_data_size_minus1");
         w.append(md);
-        w.write_zero_run(bytes * 8 - md.bit_position(), "add_table_data");
+        w.write_zero_run(bytes * 8 - md.bit_count(), "add_table_data");
     }
 }
 
@@ -490,10 +490,10 @@ void write_oamd_dyndata(BitWriter& w, std::span<const OamdObject> objects, int n
                     }
                 }
             }
-            const std::uint64_t bytes = bytes_for(ext.bit_position());
+            const std::uint64_t bytes = bytes_for(ext.bit_count());
             w.write_variable_bits(2, bytes - 1, "skip_bits");
             w.append(ext);
-            w.write_zero_run(bytes * 8 - ext.bit_position(), "skip_data");
+            w.write_zero_run(bytes * 8 - ext.bit_count(), "skip_data");
         }
     }
 }

@@ -6,7 +6,7 @@
 #include <optional>
 #include <vector>
 
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "core/huffman_codebook.hpp"
 #include "decoder/syntax/context.hpp"
 

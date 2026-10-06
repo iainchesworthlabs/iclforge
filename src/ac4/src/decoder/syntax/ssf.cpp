@@ -570,7 +570,7 @@ ParseResult GranuleDecoder::run() {
     };
 
     // Table 46: the arithmetic coded data starts here.
-    const std::size_t ac_start = r.position();
+    const std::size_t ac_start = r.bit_position();
     AcDecoder ac(r, ac_start);
     Fx fx;
     const auto bands = static_cast<std::size_t>(num_bands);

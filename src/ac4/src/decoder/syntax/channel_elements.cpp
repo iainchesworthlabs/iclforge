@@ -916,13 +916,13 @@ ParseResult ElementParser::immersive_element(bool b_lfe, bool b_5fronts) {
     // immersive_codec_mode_code (6.3.5.1, Table 73): a 1 is ASPX_AJCC, and
     // after a 0 two more bits give SCPL to ASPX_ACPL_2. One record, of one or
     // three bits, valued at the bits read.
-    const std::size_t start = r_.position();
+    const std::size_t start = r_.bit_position();
     int mode = immersive_mode::kAspxAjcc;
-    if (r_.peek_raw(1) != 0) {
+    if (r_.peek(1) != 0) {
         r_.consume(1);
         r_.emit(start, 1, 1, "immersive_codec_mode_code");
     } else {
-        mode = static_cast<int>(r_.peek_raw(3));
+        mode = static_cast<int>(r_.peek(3));
         r_.consume(3);
         r_.emit(start, 3, static_cast<std::uint64_t>(mode), "immersive_codec_mode_code");
     }

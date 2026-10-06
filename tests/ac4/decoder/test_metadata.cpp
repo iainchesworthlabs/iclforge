@@ -14,7 +14,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "bits.hpp"
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "decoder/syntax/context.hpp"
 #include "decoder/syntax/metadata.hpp"
 #include "core/tables/huffman_tables.hpp"
@@ -44,7 +44,7 @@ ParseResult read_with(const BitWriter& w, Recorder& rec, std::size_t& position, 
     const std::vector<std::byte> bytes = w.bytes();
     BitReader reader(bytes, 0, rec);
     const ParseResult result = parse(reader);
-    position = reader.position();
+    position = reader.bit_position();
     return result;
 }
 

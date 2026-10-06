@@ -3,7 +3,7 @@
 #include <array>
 #include <cstdint>
 
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "decoder/huffman.hpp"
 #include "decoder/syntax/context.hpp"
 

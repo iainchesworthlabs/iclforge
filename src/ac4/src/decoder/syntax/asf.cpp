@@ -348,19 +348,19 @@ void split_codeword(const Codebook& cb, int dim, int index, std::array<std::int3
 // for a ninth leading one, with nothing recorded.
 [[nodiscard]] std::int32_t read_ext_code(BitReader& r) {
     static constexpr int kMaxNExt = 8;
-    const size_t start = r.position();
+    const size_t start = r.bit_position();
     int n_ext = 0;
-    while (r.peek_raw(1) != 0 && !r.overflow()) {
+    while (r.peek(1) != 0 && !r.overflowed()) {
         r.consume(1);
         if (++n_ext > kMaxNExt) {
             return -1;
         }
     }
     r.consume(1);
-    const std::uint32_t ext_val = r.peek_raw(n_ext + 4);
+    const std::uint32_t ext_val = r.peek(n_ext + 4);
     r.consume(n_ext + 4);
     const auto magnitude = static_cast<std::int32_t>((std::uint32_t{1} << static_cast<unsigned>(n_ext + 4)) + ext_val);
-    r.emit(start, static_cast<int>(r.position() - start), static_cast<std::uint64_t>(magnitude), "ext_code");
+    r.emit(start, static_cast<int>(r.bit_position() - start), static_cast<std::uint64_t>(magnitude), "ext_code");
     return magnitude;
 }
 
@@ -466,7 +466,7 @@ ParseResult parse_sf_data(BitReader& r, const SubstreamContext& ctx, const SfInf
             while (incr == sect_esc_val) {
                 sect_len += sect_esc_val;
                 incr = static_cast<int>(r.read(n_sect_bits, "sect_len_incr"));
-                if (r.overflow()) {
+                if (r.overflowed()) {
                     return check(r);
                 }
             }

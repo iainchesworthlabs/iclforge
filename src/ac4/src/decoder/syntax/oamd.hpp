@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "iclforge/ac4/core/toc.hpp"
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "decoder/syntax/context.hpp"
 
 // Object audio metadata, ETSI TS 103 190-2 V1.3.1 clause 6.2.8:

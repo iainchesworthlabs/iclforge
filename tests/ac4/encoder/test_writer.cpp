@@ -20,8 +20,8 @@
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "encoder/asf/layout.hpp"
-#include "core/bit_reader.hpp"
-#include "core/bit_writer.hpp"
+#include "iclforge/base/bitreader.hpp"
+#include "iclforge/base/bitwriter.hpp"
 #include "encoder/frame/drc_gains.hpp"
 #include "encoder/frame/frame_writer.hpp"
 #include "encoder/frame/metadata.hpp"
@@ -65,11 +65,11 @@ TEST_CASE("variable_bits written by the encoder reads back through the decoder's
             BitWriter w;
             w.write_variable_bits(n, value, "v");
             w.write(3, 5, "tail");
-            CHECK(w.bit_position() == iclforge::ac4::detail::variable_bits_width(n, value) + 3);
+            CHECK(w.bit_count() == iclforge::ac4::detail::variable_bits_width(n, value) + 3);
             BitReader r(w.bytes(), 0, {});
             CHECK(r.variable_bits(static_cast<int>(n), "v") == value);
             CHECK(r.read(3, "tail") == 5U);
-            CHECK_FALSE(r.overflow());
+            CHECK_FALSE(r.overflowed());
         }
     }
 }
@@ -81,7 +81,7 @@ TEST_CASE("every codeword of every spectral and scale factor codebook reads back
         REQUIRE(codes.size() == book.codebook_length);
         BitWriter w;
         for (std::size_t index = 0; index < codes.size(); ++index) {
-            w.write_codeword(codes, index, "cw");
+            write_codeword(w, codes, index, "cw");
         }
         BitReader r(w.bytes(), 0, {});
         for (std::size_t index = 0; index < codes.size(); ++index) {
@@ -316,9 +316,9 @@ TEST_CASE(
     iclforge::ac4::detail::write_dialog_enhancement(without, &config, &frame, nullptr, false);
     BitWriter against_zeros = BitWriter::buffered();
     iclforge::ac4::detail::write_dialog_enhancement(against_zeros, &config, &frame, &zeros, false);
-    CHECK(without.bit_position() == against_zeros.bit_position());
+    CHECK(without.bit_count() == against_zeros.bit_count());
     CHECK(without.bytes() == against_zeros.bytes());
-    CHECK(without.bit_position() >
+    CHECK(without.bit_count() >
           3);  // b_de_data_present, b_de_config_flag, de_keep_data_flag, the codes
 }
 TEST_CASE("the table of contents writer codes the 9.X.4 and 22.2 channel modes of Part 2 Table 56",
@@ -372,7 +372,7 @@ TEST_CASE("dialogue enhancement of the 9.X.4 modes sends b_de_simulcast and a se
     const auto bits = [&](int ch_mode, const DeFrameParameters* second) {
         BitWriter w = BitWriter::buffered();
         iclforge::ac4::detail::write_dialog_enhancement(w, &config, &frame, nullptr, true, ch_mode, second);
-        return w.bit_position();
+        return w.bit_count();
     };
     const std::size_t plain = bits(12, nullptr);
     CHECK(bits(12, &core) == plain);                // 7.X.4 has no b_de_simulcast
@@ -385,5 +385,5 @@ TEST_CASE("dialogue enhancement of the 9.X.4 modes sends b_de_simulcast and a se
     iclforge::ac4::detail::write_dialog_enhancement(w, &none, &frame, nullptr, true, 14, nullptr);
     BitWriter without = BitWriter::buffered();
     iclforge::ac4::detail::write_dialog_enhancement(without, &none, &frame, nullptr, true, 12, nullptr);
-    CHECK(w.bit_position() == without.bit_position() + 1);
+    CHECK(w.bit_count() == without.bit_count() + 1);
 }

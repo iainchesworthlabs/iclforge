@@ -22,7 +22,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "bits.hpp"
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "decoder/syntax/acpl.hpp"
 #include "decoder/syntax/aspx.hpp"
 #include "decoder/syntax/channel_elements.hpp"
@@ -295,7 +295,7 @@ ParseResult read_element(const BitWriter& w, const SubstreamContext& ctx, Channe
     const ParseResult result =
         iclforge::ac4::detail::parse_audio_data_chan(reader, ctx, state, out);
     if (result) {
-        CHECK(reader.position() == w.size());
+        CHECK(reader.bit_position() == w.size());
     }
     return result;
 }
@@ -1044,7 +1044,7 @@ ParseResult read_aspx_1ch(const BitWriter& w, const SubstreamContext& ctx, const
     const ParseResult result =
         iclforge::ac4::detail::parse_aspx_data_1ch(reader, ctx, config, state, out);
     if (result && exact) {
-        CHECK(reader.position() == w.size());
+        CHECK(reader.bit_position() == w.size());
     }
     return result;
 }
@@ -1404,7 +1404,7 @@ TEST_CASE("aspx_data_2ch reads the interleaved-waveform flags of both channels",
         AspxData2ch out;
         REQUIRE(iclforge::ac4::detail::parse_aspx_data_2ch(reader, context(ch_mode::kStereo, true), config, state, out)
                     .has_value());
-        CHECK(reader.position() == w.size());
+        CHECK(reader.bit_position() == w.size());
         CHECK(out.channels[1].tna_mode[0] == 3);
         CHECK(out.channels[0].add_harmonic[0]);
         CHECK_FALSE(out.channels[1].add_harmonic[0]);
@@ -1451,7 +1451,7 @@ TEST_CASE("acpl_data_1ch reads steep interpolation with two parameter sets", "[a
     BitReader reader(bytes, 0, rec);
     AcplData1ch out;
     REQUIRE(iclforge::ac4::detail::parse_acpl_data_1ch(reader, context(ch_mode::kStereo, true), config, out).has_value());
-    CHECK(reader.position() == w.size());
+    CHECK(reader.bit_position() == w.size());
     CHECK(out.framing.interpolation_type == 1);
     CHECK(out.framing.num_param_sets == 2);
     CHECK(out.framing.param_timeslot[0] == 3);

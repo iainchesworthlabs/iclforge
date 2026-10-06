@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "encoder/asf/layout.hpp"
-#include "core/bit_writer.hpp"
+#include "iclforge/base/bitwriter.hpp"
 
 // The audio spectral frontend's coding of one track, ETSI TS 103 190-1 V1.4.1
 // clauses 4.2.7 and 4.2.8 written in reverse, with the reconstruction of

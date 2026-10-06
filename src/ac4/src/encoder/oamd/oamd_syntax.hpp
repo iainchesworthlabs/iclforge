@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "core/bit_writer.hpp"
+#include "iclforge/base/bitwriter.hpp"
 
 // Object audio metadata, written: ETSI TS 103 190-2 V1.3.1 clause 6.2.8 -
 // oamd_common_data() with trim(), bed_render_info() and headphone(),

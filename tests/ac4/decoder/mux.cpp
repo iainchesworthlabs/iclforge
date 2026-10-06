@@ -12,7 +12,7 @@
 #include "ac4/core/toc_writer.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
-#include "core/bit_writer.hpp"
+#include "iclforge/base/bitwriter.hpp"
 #include "encoder/frame/toc_writer.hpp"
 
 namespace ac4dec_test {
@@ -70,7 +70,7 @@ void copy_bits(BitWriter& w, std::span<const std::byte> bytes, std::size_t from,
 // A size field of `bits` bits and variable_bits(3) above it, then the
 // element (tools_metadata_size, Part 2 clause 6.2.7.1).
 void write_sized(BitWriter& w, const BitWriter& element, unsigned bits) {
-    const std::size_t size = element.bit_position();
+    const std::size_t size = element.bit_count();
     const std::uint64_t low = size & ((1U << bits) - 1U);
     const std::uint64_t high = size >> bits;
     w.write(bits, low, "tools_metadata_size_value");

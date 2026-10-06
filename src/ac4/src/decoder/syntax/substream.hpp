@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <optional>
 
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "decoder/syntax/ajoc.hpp"
 #include "decoder/syntax/channel_elements.hpp"
 #include "decoder/syntax/context.hpp"

@@ -15,7 +15,7 @@
 
 #include "iclforge/ac4/core/toc.hpp"
 #include "bits.hpp"
-#include "core/bit_reader.hpp"
+#include "iclforge/base/bitreader.hpp"
 #include "decoder/syntax/context.hpp"
 #include "decoder/syntax/presentation.hpp"
 
@@ -40,7 +40,7 @@ ParseResult read_presentation(const BitWriter& w, const PresentationContext& ctx
     const ParseResult result =
         iclforge::ac4::detail::parse_presentation_substream(reader, ctx, state, out);
     if (result) {
-        CHECK(reader.position() == w.size());
+        CHECK(reader.bit_position() == w.size());
     }
     return result;
 }

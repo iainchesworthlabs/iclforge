@@ -128,7 +128,7 @@ void write_ajced(BitWriter& w, Kind kind, int quant_mode, bool no_dt, int num_ps
         }
         for (std::size_t i = 0; i < set.values.size(); ++i) {
             const CodebookRef cb = codebook(kind, quant_mode, type_of(set.diff_type, i == 0));
-            w.write_codeword(cb.codes, static_cast<std::size_t>(set.values[i] + cb.cb_off),
+            write_codeword(w, cb.codes, static_cast<std::size_t>(set.values[i] + cb.cb_off),
                              "ajcc_hcw");
         }
     }

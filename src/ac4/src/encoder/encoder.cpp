@@ -24,7 +24,7 @@
 #include "asf/psycho.hpp"
 #include "asf/stereo.hpp"
 #include "aspx/aspx_encoder.hpp"
-#include "core/bit_writer.hpp"
+#include "iclforge/base/bitwriter.hpp"
 #include "core/dsp/resampler.hpp"
 #include "frame/dialogue.hpp"
 #include "frame/drc_gains.hpp"
@@ -2179,7 +2179,7 @@ struct SubstreamCoder {
         f.tracks.resize(channels);
         BitWriter side = BitWriter::buffered();
         write_element(side, f, false);
-        p.side_bits = side.bit_position();
+        p.side_bits = side.bit_count();
 
         // The rate loop's level of noise per line is measured from the
         // highest allowance per line, and its cap from each band's energy.
@@ -2502,7 +2502,7 @@ struct SubstreamCoder {
         std::size_t most = 0;
         each_least([&](const detail::AudioSubstreamFields& fields, const BitWriter& audio) {
             most = std::max(most,
-                            detail::audio_substream_bytes(fields, (audio.bit_position() + 7) / 8));
+                            detail::audio_substream_bytes(fields, (audio.bit_count() + 7) / 8));
             return true;
         });
         return most;

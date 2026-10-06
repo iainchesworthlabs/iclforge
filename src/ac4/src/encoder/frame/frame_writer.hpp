@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "iclforge/ac4/core/syntax.hpp"
-#include "core/bit_writer.hpp"
+#include "iclforge/base/bitwriter.hpp"
 #include "encoder/frame/metadata.hpp"
 #include "encoder/frame/toc_writer.hpp"
 

@@ -20,13 +20,13 @@ namespace {
 // 101): one record of the bits read, valued at them, as
 // immersive_codec_mode_code is recorded.
 [[nodiscard]] int read_prefix_1_2(BitReader& r, std::string_view name) {
-    const std::size_t start = r.position();
-    if (r.peek_raw(1) == 0) {
+    const std::size_t start = r.bit_position();
+    if (r.peek(1) == 0) {
         r.consume(1);
         r.emit(start, 1, 0, name);
         return 0;
     }
-    const auto code = static_cast<int>(r.peek_raw(2));
+    const auto code = static_cast<int>(r.peek(2));
     r.consume(2);
     r.emit(start, 2, static_cast<std::uint64_t>(code), name);
     return code;
@@ -385,14 +385,14 @@ void parse_object_render_info(BitReader& r, InfoStatus status, bool b_no_delta,
     if (out.b_add_table_data) {
         out.add_table_data_size = read_int(r, 4, "add_table_data_size_minus1") + 1;
         Budget budget(8U * static_cast<std::uint64_t>(out.add_table_data_size));
-        const std::size_t before = r.position();
+        const std::size_t before = r.bit_position();
         AddPerObjectMd per_object;
         if (auto ok =
                 parse_add_per_object_md(r, out.b_object_not_active, b_dynamic_object, per_object);
             !ok) {
             return ok;
         }
-        if (auto ok = budget.spend(before, r.position()); !ok) {
+        if (auto ok = budget.spend(before, r.bit_position()); !ok) {
             return ok;
         }
         out.per_object = per_object;
@@ -524,11 +524,11 @@ void parse_object_render_info(BitReader& r, InfoStatus status, bool b_no_delta,
                 return fail(DecodeError::kTruncated, "skip_bits run past the end of the substream");
             }
             Budget budget(bytes * 8U);
-            const std::size_t before = r.position();
+            const std::size_t before = r.bit_position();
             if (auto ok = parse_ext_prec_alt_pos(r, objects, set.b_keep, set); !ok) {
                 return ok;
             }
-            if (auto ok = budget.spend(before, r.position()); !ok) {
+            if (auto ok = budget.spend(before, r.bit_position()); !ok) {
                 return ok;
             }
             set.skip_bits = budget.left();
@@ -638,22 +638,22 @@ ParseResult parse_oamd_common_data(BitReader& r, OamdCommonData& out) {
         return fail(DecodeError::kTruncated, "add_data_bytes run past the end of the substream");
     }
     Budget budget(add_data_bytes * 8U);
-    std::size_t before = r.position();
+    std::size_t before = r.bit_position();
     data.trim = parse_trim(r);
-    if (auto ok = budget.spend(before, r.position()); !ok) {
+    if (auto ok = budget.spend(before, r.bit_position()); !ok) {
         return ok;
     }
     if (budget.left() != 0) {
-        before = r.position();
+        before = r.bit_position();
         data.bed_render_info = parse_bed_render_info(r);
-        if (auto ok = budget.spend(before, r.position()); !ok) {
+        if (auto ok = budget.spend(before, r.bit_position()); !ok) {
             return ok;
         }
     }
     if (budget.left() != 0) {
-        before = r.position();
+        before = r.bit_position();
         data.headphone = parse_headphone(r);
-        if (auto ok = budget.spend(before, r.position()); !ok) {
+        if (auto ok = budget.spend(before, r.bit_position()); !ok) {
             return ok;
         }
     }
