@@ -84,6 +84,7 @@ add_executable(iclforge-tests
     ac3/core/test_fixed32.cpp
     ac3/core/test_mdct_fixed.cpp
     ac3/decoder/test_block_norm.cpp
+    base/test_bit_io.cpp
     base/test_bitwriter.cpp
     ac3/meta/test_bsi.cpp
     ac3/encoder/test_bit_reservoir.cpp
