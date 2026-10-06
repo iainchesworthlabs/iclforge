@@ -79,13 +79,14 @@ cache_value() {
 
 # Each optional library: its ICLFORGE_BUILD_<NAME> option, its CMake export file (without
 # .cmake), the stem of its .pc files, the stem of its library files and its include directory
-# below include/.
+# below include/. A part of iclforge::containers, which is installed whatever its options say, has
+# `-` for the stem of its library files: its option decides its headers alone.
 components=(
-    "ICLFORGE_BUILD_MATROSKA matroskaTargets iclforge-containers iclforge_matroska iclforge/matroska"
-    "ICLFORGE_BUILD_MP4 mp4Targets iclforge-containers iclforge_mp4 iclforge/mp4"
-    "ICLFORGE_BUILD_MPEGTS mpegtsTargets iclforge-containers iclforge_mpegts iclforge/mpegts"
+    "ICLFORGE_BUILD_MATROSKA containersTargets iclforge-containers - iclforge/containers/matroska"
+    "ICLFORGE_BUILD_MP4 containersTargets iclforge-containers - iclforge/containers/mp4"
+    "ICLFORGE_BUILD_MPEGTS containersTargets iclforge-containers - iclforge/containers/mpegts"
     "ICLFORGE_BUILD_IAB iabTargets iclforge-iab iclforge_iab iclforge/iab"
-    "ICLFORGE_BUILD_IAMF iamfTargets iclforge-containers iclforge_iamf iclforge/iamf"
+    "ICLFORGE_BUILD_IAMF containersTargets iclforge-containers - iclforge/containers/iamf"
     "ICLFORGE_BUILD_AC4 ac4Targets iclforge-ac4 iclforge_ac4 iclforge/ac4"
 )
 
@@ -100,15 +101,20 @@ check_components() {
         case "${value^^}" in
             ON|TRUE|1|YES|Y)
                 if [[ -z "$(find "$prefix" -name "$targets.cmake" -print -quit)" ]] ||
-                        [[ -z "$(find "$prefix" -name "$stem.pc" -print -quit)" ]]; then
-                    echo "::error::$build has $option=ON and installed no $targets.cmake or $stem.pc - see cmake/InstallLibrary.cmake" >&2
+                        [[ -z "$(find "$prefix" -name "$stem.pc" -print -quit)" ]] ||
+                        [[ ! -d "$prefix/include/$incdir" ]]; then
+                    echo "::error::$build has $option=ON and installed no $targets.cmake, $stem.pc or include/$incdir - see cmake/InstallLibrary.cmake" >&2
                     return 1
                 fi
-                echo "--- $option=ON: $targets.cmake and $stem.pc installed"
+                echo "--- $option=ON: $targets.cmake, $stem.pc and include/$incdir installed"
                 ;;
             *)
-                found="$(find "$prefix" \( -name "$targets*.cmake" -o -name "lib$libstem*" -o -name "$stem*.pc" \
-                    -o -path "$prefix/include/$incdir*" \) -print -quit)"
+                if [[ "$libstem" == "-" ]]; then
+                    found="$(find "$prefix" -path "$prefix/include/$incdir*" -print -quit)"
+                else
+                    found="$(find "$prefix" \( -name "$targets*.cmake" -o -name "lib$libstem*" -o -name "$stem*.pc" \
+                        -o -path "$prefix/include/$incdir*" \) -print -quit)"
+                fi
                 if [[ -n "$found" ]]; then
                     echo "::error::$build has $option=${value:-unset} and installed a file of it anyway: $found - see cmake/InstallLibrary.cmake" >&2
                     return 1
