@@ -381,5 +381,17 @@ class Moves(unittest.TestCase):
             self.assertEqual(ir.compare_dirs(*args), 1)
 
 
+class Mangled(unittest.TestCase):
+    def test_a_name_no_demangler_reads_is_compared_without_its_encoding(self) -> None:
+        a = ['  call void @"_ZZN8iclforge9admbridge1fEvENK3$_0clEv"(ptr %0)', "  ret void"]
+        b = ['  call void @"_ZZN8iclforge3adm1fEvENK3$_0clEv"(ptr %0)', "  ret void"]
+        self.assertEqual(ir.verdict(a, b), "mangled")
+        self.assertEqual(ir.verdict(a, ["  call void @f(ptr %1)", "  ret void"]), "differs")
+
+    def test_a_local_lambda_is_demangled_with_its_dollar_read_as_a_letter(self) -> None:
+        got = ir.demangle(["_ZZ1fvENK3$_0clEv"])
+        self.assertIn("X_0", got["_ZZ1fvENK3$_0clEv"])
+
+
 if __name__ == "__main__":
     unittest.main()

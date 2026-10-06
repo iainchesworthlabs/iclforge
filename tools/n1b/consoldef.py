@@ -211,23 +211,27 @@ SPLITS = {"c1": {}, "c2": {"signing": ("ac3", "base")}, "c3": {}}
 
 # The names a stage moves to another namespace, as the exports spell them: the old namespace and,
 # for each name declared in it, the new one (consol_text.py's tables).
-def renamed_namespace(stage: str, name: str) -> str:
-    """`name`, an exported symbol as the old tree spelled it, as the stage spells it."""
+def renamed_namespace(stage: str, name: str, unit: str = "") -> str:
+    """`name`, a symbol or a line of IR as the old tree spelled it, as the stage spells it. A name
+    no table holds (one in an anonymous namespace) goes where the unit it is defined in went."""
     if stage != "c2":
         return name
     import consol_text
 
     name = re.sub(r"\biclforge::admbridge::", "iclforge::adm::", name)
-    return re.sub(
-        r"\biclforge::signing::(\w+)",
-        lambda m: (
-            "iclforge::base::crypto::"
-            if m.group(1) in consol_text.C2_CRYPTO
-            else "iclforge::ac3::signing::"
-        )
-        + m.group(1),
-        name,
+    unit_namespace = (
+        "iclforge::base::crypto::" if unit.startswith("src/base/") else "iclforge::ac3::signing::"
     )
+
+    def where(m: re.Match[str]) -> str:
+        n = m.group(1)
+        if n in consol_text.C2_CRYPTO:
+            return "iclforge::base::crypto::" + n
+        if n in consol_text.C2_SIGNER:
+            return "iclforge::ac3::signing::" + n
+        return unit_namespace + n
+
+    return re.sub(r"\biclforge::signing::(\w+|\(anonymous namespace\))", where, name)
 
 
 def moves(stage: str, files: list[str]) -> dict[str, str]:

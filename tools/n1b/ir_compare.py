@@ -68,6 +68,9 @@ NEW_NAMESPACE = "iclforge::ac3::"
 OLD_NAMESPACE = "iclforge::"
 
 MANGLED = re.compile(r"_Z[A-Za-z0-9_$.]+")
+# a mangled name left as it was because no demangler reads it (a local lambda's, clang's `$_0`
+# among its components): its encoding follows the namespace around it, which a stage moves
+RAW_MANGLED = re.compile(r'"?_Z[A-Za-z0-9_$.]+"?')
 SUBSTITUTION = re.compile(r"S[0-9A-Z]*_")
 STRING_DEF = re.compile(
     r'^(?P<head>@[^=\n]*= [^\n]*?constant \[)(?P<n>\d+)(?P<mid> x i8\] c")(?P<body>.*)'
@@ -189,12 +192,16 @@ def compile_tree(
 
 
 def demangle(names: list[str]) -> dict[str, str]:
+    """The demangled names, a local lambda's `$_0` read as `X_0`: llvm-cxxfilt stops at the `$`
+    clang writes, and both trees are read alike."""
     if not names:
         return {}
+    readable = [n.replace("$", "X") for n in names]
     p = subprocess.run(
-        [CXXFILT], input="\n".join(names) + "\n", capture_output=True, text=True, check=True
+        [CXXFILT], input="\n".join(readable) + "\n", capture_output=True, text=True, check=True
     )
-    return dict(zip(names, p.stdout.split("\n"), strict=False))
+    out = dict(zip(names, p.stdout.split("\n"), strict=False))
+    return {n: (n if out[n] == r else out[n]) for n, r in zip(names, readable, strict=False)}
 
 
 def string_length(body: str) -> int:
@@ -284,13 +291,17 @@ def squash_text(line: str) -> str:
 
 def verdict(a: list[str], b: list[str]) -> str:
     """identical, order (the same blocks in another order), text (and the white space of the
-    strings), or differs."""
+    strings), mangled (and the encoding of names no demangler reads), or differs."""
     if a == b:
         return "identical"
     if by_chunks(a) == by_chunks(b):
         return "order"
     if by_chunks([squash_text(x) for x in a]) == by_chunks([squash_text(x) for x in b]):
         return "text"
+    if by_chunks([RAW_MANGLED.sub("<mangled>", x) for x in a]) == by_chunks(
+        [RAW_MANGLED.sub("<mangled>", x) for x in b]
+    ):
+        return "mangled"
     return "differs"
 
 
@@ -310,6 +321,24 @@ def _moves_rx(olds: tuple[str, ...]) -> re.Pattern[str]:
     )
 
 
+def renamed_line(stage: str, line: str, unit: str) -> str:
+    """A line of the old tree's IR with its names in the namespaces the stage moved them to: a
+    name the compiler writes into a string (__PRETTY_FUNCTION__, __func__) too, with the string's
+    length, but not a string the source wrote, which the stage leaves as it was."""
+    import consoldef
+
+    def rename(text: str) -> str:
+        return consoldef.renamed_namespace(stage, text, unit)
+
+    m = STRING_DEF.match(line)
+    if not m:
+        return rename(line)
+    if not m.group("head").startswith(("@__PRETTY_FUNCTION__", "@__func__")):
+        return line
+    head, body = rename(m.group("head")), rename(m.group("body"))
+    return f"{head}{string_length(body)}{m.group('mid')}{body}{m.group('tail')}"
+
+
 def compare_pair(
     args: tuple[str, str, str, str, str | None, dict[str, str] | None, str],
 ) -> tuple[str, str, int]:
@@ -317,9 +346,7 @@ def compare_pair(
     old_text = Path(old_file).read_text(errors="replace").replace(old_root, "<T>")
     a = normalise(moved_paths(old_text, moves), old_root, False)
     if names in ("c2", "c3"):
-        import consoldef
-
-        a = [consoldef.renamed_namespace(names, line) for line in a]
+        a = [renamed_line(names, line, source_of(Path(new_file).name)) for line in a]
     b = normalise(Path(new_file).read_text(errors="replace"), new_root, names == "ac3ns")
     name = Path(new_file).name
     v = verdict(a, b)
@@ -382,15 +409,16 @@ def compare_dirs(
     for name in sorted(set(olds) ^ set(news)):
         print("only in one tree:", name)
     work = [(str(olds[n]), str(news[n]), old_root, new_root, diffs, moves, names) for n in both]
-    counts = {"identical": 0, "order": 0, "text": 0, "differs": 0}
+    counts = {"identical": 0, "order": 0, "text": 0, "mangled": 0, "differs": 0}
     with concurrent.futures.ProcessPoolExecutor(jobs) as ex:
         for name, v, changed in ex.map(compare_pair, work, chunksize=1):
             counts[v] += 1
-            if v == "differs":
-                print(f"differs: {name}: {changed} changed lines")
+            if v in ("differs", "mangled"):
+                print(f"{v}: {name}: {changed} changed lines")
     print(
         f"{counts['identical']} identical, {counts['order']} the same blocks in another order, "
         f"{counts['text']} the same but for the white space of an assertion's text, "
+        f"{counts['mangled']} the same but for names no demangler reads, "
         f"{counts['differs']} differ"
     )
     return 0 if counts["differs"] == 0 and set(olds) == set(news) else 1
