@@ -587,17 +587,33 @@ C3_PROSE = [
         _TEXT,
         plans=True,
     ),
+    # not a path inside another (`src/containers/src/mp4`, which holds `src/mp4`)
     Rule(
         "dir",
-        rf"\bsrc/({_C3_PART})\b(?![\w-])(?!/[\w.*{{])",
+        rf"(?<![\w/.-])src/({_C3_PART})\b(?![\w-])(?!/[\w.*{{])",
         r"src/containers/src/\1",
         _TEXT,
         plans=True,
     ),
     Rule(
         "test-dir",
-        rf"\btests/({_C3_PART})\b(?![\w-])(?!/[\w.*{{])",
+        rf"(?<![\w/.-])tests/({_C3_PART})\b(?![\w-])(?!/[\w.*{{])",
         r"tests/containers/\1",
+        _TEXT,
+        plans=True,
+    ),
+    # what the first run of the two rules above made of a path already inside src/containers
+    Rule(
+        "nested-dir",
+        r"\bsrc/containers/src/containers/src/",
+        "src/containers/src/",
+        _TEXT,
+        plans=True,
+    ),
+    Rule(
+        "nested-test-dir",
+        r"\btests/containers/containers/",
+        "tests/containers/",
         _TEXT,
         plans=True,
     ),
