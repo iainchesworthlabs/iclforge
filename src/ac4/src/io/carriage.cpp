@@ -6,47 +6,16 @@
 #include <numeric>
 #include <string>
 
+#include "iclforge/base/bitwriter.hpp"
+
 namespace iclforge::ac4 {
 
 // --- Carriage (AC-4 bitstream inspector's separable slice) -------------------------------
 
 namespace {
 
-// Annex E's DSI fields are written MSB-first into whole bytes, the same
-// bit-packing discipline the parser reads with - small enough here that a
-// local accumulator beats pulling a writer dependency into a module whose
-// whole identity is depending on nothing.
-class DsiWriter {
-   public:
-    void put(std::uint32_t value, int bits) {
-        for (int bit = bits - 1; bit >= 0; --bit) {
-            accumulator_ = static_cast<std::uint8_t>(
-                (static_cast<std::uint32_t>(accumulator_) << 1) | ((value >> bit) & 1u));
-            if (++filled_ == 8) {
-                bytes_.push_back(static_cast<std::byte>(accumulator_));
-                accumulator_ = 0;
-                filled_ = 0;
-            }
-        }
-    }
-    void byte_align() {
-        while (filled_ != 0) {
-            put(0, 1);
-        }
-    }
-    [[nodiscard]] std::vector<std::byte> take() {
-        byte_align();
-        return std::move(bytes_);
-    }
-
-   private:
-    std::vector<std::byte> bytes_;
-    std::uint8_t accumulator_ = 0;
-    int filled_ = 0;
-};
-
 // Annex E.7's ac4_bitrate_dsi(): the mode wait_frames implies, the rate unknown.
-void put_bitrate_dsi(DsiWriter& w, const Toc& toc) {
+void put_bitrate_dsi(BitWriter& w, const Toc& toc) {
     std::uint32_t mode = 3;
     if (toc.wait_frames == 0) {
         mode = 1;
@@ -258,7 +227,7 @@ std::expected<PresentationShape, Refusal> shape_of(const Toc& toc, const Present
 }
 
 // ac4_substream_group_dsi() (Annex E.11).
-std::optional<Refusal> put_group_dsi(DsiWriter& w, const SubstreamGroupInfo& group) {
+std::optional<Refusal> put_group_dsi(BitWriter& w, const SubstreamGroupInfo& group) {
     if (group.substreams.size() > 255) {
         return "a substream group of more substreams than n_substreams' eight bits count";
     }
@@ -358,7 +327,7 @@ std::optional<Refusal> put_group_dsi(DsiWriter& w, const SubstreamGroupInfo& gro
 
 // The DSI's closing byte (E.10.1): de_indicator, immersive_audio_indicator and
 // an extended presentation_id, written where the Toc carries the indicators.
-void put_indicators(DsiWriter& w, const PresentationInfoV1& pres) {
+void put_indicators(BitWriter& w, const PresentationInfoV1& pres) {
     const int id = pres.presentation_id.value_or(0);
     w.put(pres.de_indicator.value_or(false) ? 1U : 0U, 1);
     w.put(pres.immersive_audio_indicator.value_or(false) ? 1U : 0U, 1);
@@ -371,7 +340,7 @@ void put_indicators(DsiWriter& w, const PresentationInfoV1& pres) {
     return pres.de_indicator.has_value() || pres.immersive_audio_indicator.has_value();
 }
 
-std::optional<Refusal> put_add_emdf(DsiWriter& w, const std::vector<EmdfVersionKey>& add_emdf) {
+std::optional<Refusal> put_add_emdf(BitWriter& w, const std::vector<EmdfVersionKey>& add_emdf) {
     if (add_emdf.size() > 127) {
         return "more additional EMDF substreams than n_add_emdf_substreams' seven bits count";
     }
@@ -391,7 +360,7 @@ std::optional<Refusal> put_add_emdf(DsiWriter& w, const std::vector<EmdfVersionK
 // contents.
 std::expected<std::vector<std::byte>, Refusal> presentation_v1_dsi(const Toc& toc,
                                                                    const PresentationInfoV1& pres) {
-    DsiWriter w;
+    BitWriter w;
     if (pres.presentation_config == 6) {
         // EMDF payloads alone: presentation_config_v1 6 implies
         // b_add_emdf_substreams, and there is no substream to describe.
@@ -401,7 +370,7 @@ std::expected<std::vector<std::byte>, Refusal> presentation_v1_dsi(const Toc& to
         }
         w.put(0, 1);  // b_presentation_bitrate_info: nothing contributes
         w.put(0, 1);  // b_alternative
-        w.byte_align();
+        w.align();
         if (has_indicators(pres)) {
             put_indicators(w, pres);
         }
@@ -536,7 +505,7 @@ std::expected<std::vector<std::byte>, Refusal> presentation_v1_dsi(const Toc& to
             return std::unexpected(
                 "an alternative presentation's name or targets past alternative_info()'s fields");
         }
-        w.byte_align();
+        w.align();
         w.put(static_cast<std::uint32_t>(alternative.name.size()), 16);
         for (const char c : alternative.name) {
             w.put(static_cast<std::uint32_t>(static_cast<unsigned char>(c)), 8);
@@ -551,7 +520,7 @@ std::expected<std::vector<std::byte>, Refusal> presentation_v1_dsi(const Toc& to
             w.put(static_cast<std::uint32_t>(target.device_category) << 4U, 8);
         }
     }
-    w.byte_align();
+    w.align();
     if (has_indicators(pres)) {
         put_indicators(w, pres);
     }
@@ -570,7 +539,7 @@ std::expected<std::vector<std::byte>, Refusal> dac4_of(const Toc& toc) {
     if (static_cast<std::size_t>(toc.n_presentations) != toc.presentations_v1.size()) {
         return std::unexpected("a table of contents whose presentations did not all read");
     }
-    DsiWriter w;
+    BitWriter w;
     // ac4_dsi_v1 (Annex E.6).
     w.put(1, 3);  // ac4_dsi_version
     w.put(static_cast<std::uint32_t>(toc.bitstream_version), 7);
@@ -589,7 +558,7 @@ std::expected<std::vector<std::byte>, Refusal> dac4_of(const Toc& toc) {
         }
     }
     put_bitrate_dsi(w, toc);
-    w.byte_align();
+    w.align();
 
     for (const PresentationInfoV1& pres : toc.presentations_v1) {
         // A version 2 presentation's DSI is a skip area to this annex; DEE's

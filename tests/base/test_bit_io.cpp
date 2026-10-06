@@ -984,7 +984,7 @@ TEST_CASE("the bit reader reads and records as AC-4's reader did before C4", "[b
                     const auto start = before.position();
                     const int bits = pick(rng, 0, 20);
                     before.emit(start, bits, 7, name);
-                    after.emit(start, bits, 7, name);
+                    after.record(start, bits, 7, name);
                     break;
                 }
             }

@@ -17,26 +17,6 @@ namespace iclforge::emdf {
 
 namespace {
 
-// The group count and the offset that goes with it, per Table H.2.1. Values
-// below 2^n take one group; the next 2^2n values take two, and so on.
-struct VarBitsShape {
-    int groups = 1;
-    std::uint64_t offset = 0;
-};
-
-[[nodiscard]] VarBitsShape variable_bits_shape(std::uint32_t value, int group_bits) {
-    assert(group_bits > 0 && group_bits <= 11);
-    VarBitsShape shape;
-    while (true) {
-        const std::uint64_t capacity = std::uint64_t{1} << (shape.groups * group_bits);
-        if (value < shape.offset + capacity) {
-            return shape;
-        }
-        shape.offset += capacity;
-        ++shape.groups;
-    }
-}
-
 // §H.2.2.3, restricted to TS 103 420 Table 56. Every field there is fixed, so
 // the only degree of freedom is groupid.
 //
@@ -65,40 +45,25 @@ void put_payload_config(BitWriter& w, int groupid) {
 
 }  // namespace
 
+// Table H.2.1's variable_bits, which BitWriter writes (src/base): values below 2^n take one
+// group, the next 2^2n two, and so on.
 void put_variable_bits(BitWriter& w, std::uint32_t value, int group_bits) {
-    const auto [groups, offset] = variable_bits_shape(value, group_bits);
-    const auto encoded = static_cast<std::uint64_t>(value) - offset;
-    for (int group = groups - 1; group >= 0; --group) {
-        const auto shift = group * group_bits;
-        w.put(static_cast<std::uint32_t>((encoded >> shift) &
-                                         ((std::uint64_t{1} << group_bits) - 1)),
-              group_bits);
-        w.put(group == 0 ? 0u : 1u, 1);  // read_more
-    }
+    assert(group_bits > 0 && group_bits <= 11);
+    w.write_variable_bits(static_cast<unsigned>(group_bits), value);
 }
 
 int variable_bits_size(std::uint32_t value, int group_bits) {
-    return variable_bits_shape(value, group_bits).groups * (group_bits + 1);
+    assert(group_bits > 0 && group_bits <= 11);
+    return static_cast<int>(variable_bits_width(static_cast<unsigned>(group_bits), value));
 }
 
 namespace {
 
-// Decode-side inverse of put_variable_bits: groups of `group_bits`, MSB
-// group first, each followed by a read_more bit, accumulating the same
-// per-group offset the writer folds in. BitReader's sticky overflow makes
-// this safe against a stream that never sends a 0 read_more bit - once past
-// the end, read_bit() returns 0 forever, so read_more reads false and the
-// loop terminates instead of running away.
+// Decode-side inverse of put_variable_bits, as BitReader reads it: its sticky overflow makes
+// this safe against a stream that never sends a 0 read_more bit - once past the end, the reads
+// return 0 forever, so read_more reads false and the loop terminates instead of running away.
 std::uint32_t read_variable_bits(BitReader& r, int group_bits) {
-    std::uint32_t value = 0;
-    while (true) {
-        value += r.read(static_cast<int>(group_bits));
-        if (r.read_bit() == 0) {
-            return value;
-        }
-        value <<= group_bits;
-        value += 1u << group_bits;
-    }
+    return static_cast<std::uint32_t>(r.variable_bits(group_bits));
 }
 
 // §H.2.2.1.1: the container's position depends on how many bits the audio

@@ -24,11 +24,12 @@
 iclforge_add_library(iab
     NO_C4251_SUPPRESSION
     SOURCES
-        src/bitreader.cpp
         src/dlc.cpp
         src/dlc_encoder.cpp
         src/iab_writer.cpp
         src/iab_reader.cpp
         src/iab.cpp
         src/mxf_reader.cpp
-        src/mxf_writer.cpp)
+        src/mxf_writer.cpp
+    # the bit reader and writer, header-only, which the library's private headers adapt
+    LINK_PRIVATE "$<BUILD_INTERFACE:iclforge::base_headers>")

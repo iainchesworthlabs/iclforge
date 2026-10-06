@@ -8,7 +8,7 @@
     "containers": ["base"],
     "ac3": ["base", "dsp", "objects", "render"],
     "ac4": ["base", "dsp", "objects", "render"],
-    "iab": [],
+    "iab": ["base"],
     "adm": ["iab", "objects"],
     "audio": ["base", "render", "containers", "objects"],
     "sendspin": [],

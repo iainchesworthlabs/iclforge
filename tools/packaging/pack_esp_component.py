@@ -83,8 +83,6 @@ STAGED_AC4_TREES = ("src/ac4",)
 AC4_PRUNE = (
     "src/ac4/include/iclforge/ac4/encoder",
     "src/ac4/src/encoder",
-    "src/ac4/src/core/bit_writer.cpp",
-    "src/ac4/src/core/bit_writer.hpp",
 )
 
 # Individual files the root build needs before it reaches src/ac3.

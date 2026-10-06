@@ -25,7 +25,7 @@ namespace iclforge {
 //
 // A read given a name is a syntax element: with a base::SyntaxSink attached, the reader emits one
 // base::SyntaxRecord for it (iclforge/base/syntax_trace.hpp). A read without one, skip() and align()
-// emit nothing, and cost nothing for the sink.
+// record nothing, and cost nothing for the sink.
 class BitReader {
    public:
     explicit BitReader(std::span<const std::byte> data) noexcept : data_(data) {}
@@ -46,7 +46,7 @@ class BitReader {
         const std::size_t start = pos_;
         const std::uint32_t value = peek(bits);
         advance(bits);
-        emit(start, bits, value, name);
+        record(start, bits, value, name);
         return value;
     }
 
@@ -72,7 +72,7 @@ class BitReader {
             value <<= n_bits;
             value += std::uint64_t{1} << n_bits;
         }
-        emit_element(start, pos_, value, name);
+        record_element(start, pos_, value, name);
         return value;
     }
 
@@ -88,7 +88,7 @@ class BitReader {
                 value = (value << 1U) | bit_at(pos_ + static_cast<std::size_t>(i));
             }
             advance_bits(static_cast<std::size_t>(width));
-            emit(start, static_cast<int>(width), value, name);
+            record(start, static_cast<int>(width), value, name);
             bits -= width;
         }
     }
@@ -112,10 +112,11 @@ class BitReader {
 
     void consume(int bits) noexcept { advance(bits); }
 
-    // A zero-width element is not a record: it occupies no bits. Nor is an element that runs past
+    // A zero-width element is not a record: it occupies no bits. (Not called emit(): Qt defines
+    // `emit` as a macro, and a Qt program includes this header.) Nor is an element that runs past
     // the end of the data: the reader hands back zeros for it and the caller fails at its next
     // check, so the trace ends with the last element the data holds.
-    void emit(std::size_t start, int bits, std::uint64_t value, std::string_view name) const {
+    void record(std::size_t start, int bits, std::uint64_t value, std::string_view name) const {
         if (sink_ && bits > 0 && start + static_cast<std::size_t>(bits) <= size_bits()) {
             sink_(base::SyntaxRecord{substream_, static_cast<std::uint32_t>(start),
                                      static_cast<std::uint16_t>(bits), value, name});
@@ -125,11 +126,11 @@ class BitReader {
     // One element, whatever its width. An element wider than 65535 bits is recorded as
     // consecutive 65535-bit records, the last shorter, each valued at its own last 64 bits - the
     // shape read_run() uses.
-    void emit_element(std::size_t start, std::size_t end, std::uint64_t value,
+    void record_element(std::size_t start, std::size_t end, std::uint64_t value,
                       std::string_view name) const {
         const std::size_t total = end - start;
         if (total <= kMaxRecordBits) {
-            emit(start, static_cast<int>(total), value, name);
+            record(start, static_cast<int>(total), value, name);
             return;
         }
         for (std::size_t at = start; at < end;) {
@@ -138,7 +139,7 @@ class BitReader {
             for (std::size_t i = 0; i < width; ++i) {
                 chunk = (chunk << 1U) | bit_at(at + i);
             }
-            emit(at, static_cast<int>(width), chunk, name);
+            record(at, static_cast<int>(width), chunk, name);
             at += width;
         }
     }

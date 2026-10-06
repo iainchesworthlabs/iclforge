@@ -44,7 +44,7 @@ struct SourceFrame {
 void copy_bits(BitWriter& w, std::span<const std::byte> bytes, std::size_t from, std::size_t to) {
     for (std::size_t bit = from; bit < to; ++bit) {
         const auto byte = std::to_integer<unsigned>(bytes[bit / 8]);
-        w.write_unrecorded(1, (byte >> (7 - (bit % 8))) & 1U);
+        w.put((byte >> (7 - (bit % 8))) & 1U, 1);
     }
 }
 

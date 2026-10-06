@@ -19,29 +19,11 @@ namespace iclforge::oba {
 
 namespace {
 
-// §5.5.1 variable_bits_max(n, max_num_groups). Same construction as EMDF's
-// variable_bits - groups of n bits, each followed by read_more, with the
-// group offset folded in - but the group count is capped, so the last group
-// carries no read_more of any consequence and the field cannot run away.
-void put_variable_bits_max(BitWriter& w, std::uint32_t value, int group_bits,
-                           int max_groups) {
-    int groups = 1;
-    std::uint64_t offset = 0;
-    while (groups < max_groups) {
-        const std::uint64_t capacity = std::uint64_t{1} << (groups * group_bits);
-        if (value < offset + capacity) {
-            break;
-        }
-        offset += capacity;
-        ++groups;
-    }
-    const auto encoded = static_cast<std::uint64_t>(value) - offset;
-    for (int group = groups - 1; group >= 0; --group) {
-        w.put(static_cast<std::uint32_t>((encoded >> (group * group_bits)) &
-                                         ((std::uint64_t{1} << group_bits) - 1)),
-              group_bits);
-        w.put(group == 0 ? 0u : 1u, 1);  // read_more
-    }
+// §5.5.1 variable_bits_max(n, max_num_groups), which BitWriter writes (src/base): EMDF's
+// variable_bits with the group count capped, so the last group carries no read_more of any
+// consequence and the field cannot run away.
+void put_variable_bits_max(BitWriter& w, std::uint32_t value, int group_bits, int max_groups) {
+    w.write_variable_bits(static_cast<unsigned>(group_bits), value, {}, max_groups);
 }
 
 // The flag arrays in §5.6 are transmitted with array index 0 FIRST, so element
@@ -395,20 +377,10 @@ void put_object_element(BitWriter& w, const Program& program,
     }
 }
 
-// Decode-side inverse of put_variable_bits_max: same shape as the encoder's,
-// with the same group-count ceiling so a stream that never sends a 0
-// read_more bit still terminates.
+// Decode-side inverse of put_variable_bits_max, with the same group-count ceiling, so a stream
+// that never sends a 0 read_more bit still terminates.
 [[nodiscard]] std::uint32_t read_variable_bits_max(BitReader& r, int group_bits, int max_groups) {
-    std::uint32_t value = 0;
-    for (int group = 1;; ++group) {
-        value += r.read(group_bits);
-        const bool read_more = r.read_bit() != 0;
-        if (!read_more || group >= max_groups) {
-            return value;
-        }
-        value <<= group_bits;
-        value += 1u << group_bits;
-    }
+    return static_cast<std::uint32_t>(r.variable_bits(group_bits, {}, max_groups));
 }
 
 }  // namespace

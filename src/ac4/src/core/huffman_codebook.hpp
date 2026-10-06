@@ -6,6 +6,8 @@
 #include <span>
 #include <string_view>
 
+#include "iclforge/base/bitwriter.hpp"
+
 // The shape of every Huffman codebook of both parts' Annex A, shared by the
 // decoder, which reads codewords (src/ac4/src/decoder/huffman.hpp), and the encoder,
 // which writes them.
@@ -41,6 +43,14 @@ struct HuffCode {
     std::uint32_t code = 0;  // right-aligned in `bits` bits, MSB first
     std::uint8_t bits = 0;
 };
+
+// The codeword of `index` in a codebook, recorded with its length and the index (not the
+// codeword), as the decoder records the codeword it reads.
+inline void write_codeword(BitWriter& w, std::span<const HuffCode> codebook, std::size_t index,
+                           std::string_view name) {
+    const HuffCode& code = codebook[index];
+    w.write_as(code.bits, code.code, index, name);
+}
 
 inline constexpr int kMaxHuffBits = 32;
 

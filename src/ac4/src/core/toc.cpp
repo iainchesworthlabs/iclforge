@@ -9,6 +9,8 @@
 #include <numeric>
 #include <string>
 
+#include "iclforge/base/bitreader.hpp"
+
 namespace iclforge::ac4 {
 
 std::string_view describe(Error error) {
@@ -25,64 +27,41 @@ std::string_view describe(Error error) {
 
 namespace {
 
-// MSB-first bit reader with a sticky failure state - the same shape
-// iclforge::core::BitReader uses for overflow, extended here to also carry the
-// explicit refusal condition (kUnsupportedBitstreamVersion) so every parse_*
-// helper below can bail out with a plain early return instead of threading
-// std::expected through the whole call tree. Only parse_raw_frame(), at the
-// boundary, converts the final state to std::expected.
+// The bit reader (iclforge::BitReader, src/base) with a sticky failure state:
+// the explicit refusal condition (kUnsupportedBitstreamVersion) beside its
+// overflow, so every parse_* helper below can bail out with a plain early
+// return instead of threading std::expected through the whole call tree. Only
+// parse_raw_frame(), at the boundary, converts the final state to
+// std::expected.
 class Reader {
    public:
-    explicit Reader(std::span<const std::byte> data) : data_(data) {}
+    explicit Reader(std::span<const std::byte> data) : bits_(data) {}
 
-    [[nodiscard]] std::uint32_t bits(int n) {
-        std::uint32_t value = 0;
-        for (int i = 0; i < n; ++i) {
-            value = (value << 1) | read_bit();
-        }
-        return value;
-    }
+    [[nodiscard]] std::uint32_t bits(int n) { return bits_.read(n); }
 
-    void byte_align() { position_ = (position_ + 7) & ~std::size_t{7}; }
+    void byte_align() { bits_.align(); }
 
     // Reads and discards n bits - every call site below that consumes a
     // reserved/unused field rather than a value it goes on to use.
-    void skip(int n) { (void)bits(n); }
+    void skip(int n) { bits_.skip(static_cast<std::size_t>(n)); }
 
     // Discards n bytes by moving the read position, for a byte count the
     // stream chose: presentation_config_ext_info's n_skip_bytes, which
-    // variable_bits() lets reach 2^32. skip(8 * n) overflowed int on such a
-    // count, and would then have walked the phantom bits past the end of the
-    // data one at a time. A count past the end marks the reader overflowed,
-    // as reading those bits would have.
-    void skip_bytes(std::uint32_t n) {
-        const std::uint64_t end = std::uint64_t{data_.size()} * 8;
-        const std::uint64_t target = std::uint64_t{position_} + std::uint64_t{n} * 8;
-        if (target <= end) {
-            position_ = static_cast<std::size_t>(target);
-            return;
-        }
-        overflowed_ = true;
-        if (position_ < end) {
-            position_ = static_cast<std::size_t>(end);
-        }
-    }
+    // variable_bits() lets reach 2^32, so the count is widened before it is
+    // made bits. A count past the end marks the reader overflowed, as reading
+    // those bits would have.
+    void skip_bytes(std::uint32_t n) { bits_.skip(static_cast<std::size_t>(std::uint64_t{n} * 8)); }
 
     // Bit-granular twin of skip_bytes(), for a bit count the stream chose
     // (oamd_common_data()'s add_data, after trim()/bed_render_info()/
     // headphone() spend some of add_data_bytes*8) rather than a whole byte
-    // count - same 64-bit-safe arithmetic, same reasoning.
-    void skip_bits(std::uint64_t n) {
-        const std::uint64_t end = std::uint64_t{data_.size()} * 8;
-        const std::uint64_t target = std::uint64_t{position_} + n;
-        if (target <= end) {
-            position_ = static_cast<std::size_t>(target);
-            return;
-        }
-        overflowed_ = true;
-        if (position_ < end) {
-            position_ = static_cast<std::size_t>(end);
-        }
+    // count.
+    void skip_bits(std::uint64_t n) { bits_.skip(static_cast<std::size_t>(n)); }
+
+    // Table 3 (§4.2.2): a value sent as groups of n_bits, MSB group first,
+    // each followed by a continuation bit; 32 bits of it.
+    [[nodiscard]] std::uint32_t variable_bits(int n_bits) {
+        return static_cast<std::uint32_t>(bits_.variable_bits(n_bits));
     }
 
     void fail(Error error) {
@@ -98,7 +77,7 @@ class Reader {
         // one of those phantom bits (e.g. a b_channel_coded that reads as 0
         // only because it ran off the end) is itself meaningless and would
         // misreport the actual cause as something more specific than it is.
-        if (overflowed_) {
+        if (bits_.overflowed()) {
             return Error::kTruncated;
         }
         if (error_) {
@@ -107,41 +86,14 @@ class Reader {
         return std::nullopt;
     }
 
-    [[nodiscard]] std::size_t bit_position() const { return position_; }
+    [[nodiscard]] std::size_t bit_position() const { return bits_.bit_position(); }
 
    private:
-    [[nodiscard]] std::uint32_t read_bit() {
-        const std::size_t byte_index = position_ >> 3;
-        if (byte_index >= data_.size()) {
-            overflowed_ = true;
-            ++position_;
-            return 0;
-        }
-        const auto bit =
-            (std::to_integer<std::uint32_t>(data_[byte_index]) >> (7 - (position_ & 7))) & 1u;
-        ++position_;
-        return bit;
-    }
-
-    std::span<const std::byte> data_;
-    std::size_t position_ = 0;
-    bool overflowed_ = false;
+    iclforge::BitReader bits_;
     std::optional<Error> error_;
 };
 
-// Table 3 (§4.2.2): a value sent as groups of n_bits, MSB group first, each
-// followed by a continuation bit.
-std::uint32_t variable_bits(Reader& r, int n_bits) {
-    std::uint32_t value = 0;
-    while (true) {
-        value += r.bits(n_bits);
-        if (!r.bits(1)) {
-            return value;
-        }
-        value <<= n_bits;
-        value += (1u << n_bits);
-    }
-}
+std::uint32_t variable_bits(Reader& r, int n_bits) { return r.variable_bits(n_bits); }
 
 // The `substream_index; ...2; if (==3) += variable_bits(2)` shape repeated
 // by every *_substream_info element (§4.3.3.7.9 and its Part 2

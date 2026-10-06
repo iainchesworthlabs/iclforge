@@ -11,6 +11,7 @@
 #include <string_view>
 #include <vector>
 
+#include "iclforge/base/bitreader.hpp"
 #include "isobmff_detail.hpp"
 #include "iclforge/containers/mp4/mp4.hpp"
 
@@ -82,42 +83,12 @@ constexpr std::uint32_t kDac4 = fourcc("dac4");
 //
 // The read twin of iclforge::ac3::io::build_codec_config_box (ac3/io/dec3.hpp), field
 // for field: ETSI TS 102 366 Annex F §F.4 (AC3SpecificBox) and §F.6
-// (EC3SpecificBox), plus TS 103 420 §8.3.1/§8.3.2.2's Atmos extension. A
-// tiny MSB-first bit reader rather than iclforge::BitReader, because this module
-// links nothing from iclforge::ac3 - the same boundary that keeps
-// AudioTrack::codec_config opaque to the writer.
-class BitCursor {
-   public:
-    explicit BitCursor(std::span<const std::byte> data) : data_(data) {}
-
-    // Zero-extends past the end rather than failing: every field below is
-    // optional-by-truncation in some real file, and a short box means "this
-    // muxer stopped here", not "corrupt". The caller checks `left()` where
-    // the difference matters - see the Atmos extension below.
-    [[nodiscard]] std::uint32_t get(int bits) {
-        std::uint32_t value = 0;
-        for (int i = 0; i < bits; ++i) {
-            const std::size_t index = pos_ >> 3U;
-            const std::uint32_t bit =
-                index < data_.size()
-                    ? (static_cast<std::uint32_t>(get_u8(data_, index)) >> (7U - (pos_ & 7U))) & 1U
-                    : 0U;
-            value = (value << 1U) | bit;
-            ++pos_;
-        }
-        return value;
-    }
-
-    [[nodiscard]] std::size_t left() const {
-        const std::size_t total = data_.size() * 8;
-        return pos_ >= total ? 0 : total - pos_;
-    }
-
-   private:
-    std::span<const std::byte> data_;
-    std::size_t pos_ = 0;
-};
-
+// (EC3SpecificBox), plus TS 103 420 §8.3.1/§8.3.2.2's Atmos extension, read
+// through iclforge::BitReader (src/base), which zero-extends past the end rather
+// than failing: every field below is optional-by-truncation in some real file,
+// and a short box means "this muxer stopped here", not "corrupt". The caller
+// checks remaining_bits() where the difference matters - see the Atmos
+// extension below.
 CodecConfig parse_codec_config(std::uint32_t box_type, std::span<const std::byte> payload) {
     CodecConfig out;
     out.eac3 = box_type == kDec3;
@@ -132,17 +103,17 @@ CodecConfig parse_codec_config(std::uint32_t box_type, std::span<const std::byte
         out.ac4 = true;
         return out;
     }
-    BitCursor bits{payload};
+    BitReader bits{payload};
 
     if (!out.eac3) {
         // §F.4: fscod(2) bsid(5) bsmod(3) acmod(3) lfeon(1) bit_rate_code(5)
         // reserved(5).
-        out.fscod = static_cast<int>(bits.get(2));
-        out.bsid = static_cast<int>(bits.get(5));
-        out.bsmod = static_cast<int>(bits.get(3));
-        out.acmod = static_cast<int>(bits.get(3));
-        out.lfeon = bits.get(1) != 0;
-        out.bit_rate_code = static_cast<int>(bits.get(5));
+        out.fscod = static_cast<int>(bits.read(2));
+        out.bsid = static_cast<int>(bits.read(5));
+        out.bsmod = static_cast<int>(bits.read(3));
+        out.acmod = static_cast<int>(bits.read(3));
+        out.lfeon = bits.read(1) != 0;
+        out.bit_rate_code = static_cast<int>(bits.read(5));
         return out;
     }
 
@@ -152,33 +123,33 @@ CodecConfig parse_codec_config(std::uint32_t box_type, std::span<const std::byte
     // substream plus its dependents, so a second record has nowhere to go
     // in ReadTrack - and num_ind_sub is reported verbatim so a caller can
     // see that the file claimed more.
-    out.data_rate_kbps = static_cast<int>(bits.get(13));
-    out.num_ind_sub = static_cast<int>(bits.get(3));
-    out.fscod = static_cast<int>(bits.get(2));
-    out.bsid = static_cast<int>(bits.get(5));
-    (void)bits.get(1);  // reserved
-    out.asvc = bits.get(1) != 0;
-    out.bsmod = static_cast<int>(bits.get(3));
-    out.acmod = static_cast<int>(bits.get(3));
-    out.lfeon = bits.get(1) != 0;
-    (void)bits.get(3);  // reserved
-    out.num_dep_sub = static_cast<int>(bits.get(4));
+    out.data_rate_kbps = static_cast<int>(bits.read(13));
+    out.num_ind_sub = static_cast<int>(bits.read(3));
+    out.fscod = static_cast<int>(bits.read(2));
+    out.bsid = static_cast<int>(bits.read(5));
+    (void)bits.read(1);  // reserved
+    out.asvc = bits.read(1) != 0;
+    out.bsmod = static_cast<int>(bits.read(3));
+    out.acmod = static_cast<int>(bits.read(3));
+    out.lfeon = bits.read(1) != 0;
+    (void)bits.read(3);  // reserved
+    out.num_dep_sub = static_cast<int>(bits.read(4));
     if (out.num_dep_sub > 0) {
-        out.chan_loc = static_cast<int>(bits.get(9));
+        out.chan_loc = static_cast<int>(bits.read(9));
     } else {
-        (void)bits.get(1);  // reserved
+        (void)bits.read(1);  // reserved
     }
 
     // The Atmos extension is a TRAILING addition: a box written before TS
     // 103 420 simply ends here, which is not an error and not "no Atmos" -
     // it is "this box has nothing to say". Only a box that actually carries
     // the byte gets read, hence the explicit length check rather than
-    // letting BitCursor zero-extend and reporting a confident false.
-    if (bits.left() >= 8) {
-        (void)bits.get(7);  // reserved
-        const bool flag_type_a = bits.get(1) != 0;
-        if (flag_type_a && bits.left() >= 8) {
-            out.oba_complexity_index = static_cast<int>(bits.get(8));
+    // letting the reader zero-extend and reporting a confident false.
+    if (bits.remaining_bits() >= 8) {
+        (void)bits.read(7);  // reserved
+        const bool flag_type_a = bits.read(1) != 0;
+        if (flag_type_a && bits.remaining_bits() >= 8) {
+            out.oba_complexity_index = static_cast<int>(bits.read(8));
         }
     }
     return out;

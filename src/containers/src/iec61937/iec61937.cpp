@@ -13,6 +13,8 @@
 #include <utility>
 #include <vector>
 
+#include "iclforge/base/bitreader.hpp"
+
 namespace iclforge::containers::iec61937 {
 
 namespace {
@@ -387,48 +389,38 @@ enum class HeadRead : std::uint8_t { kHead, kNotAFrame, kNeedMore };
     return HeadRead::kHead;
 }
 
-// MSB-first bits over a span, for the few fields of a table of contents the
-// packer reads; nothing once the span runs out.
+// The few fields of a table of contents the packer reads, through
+// iclforge::BitReader (src/base); nothing once the span runs out.
 class TocBits {
    public:
-    explicit TocBits(std::span<const std::byte> bytes) : bytes_(bytes) {}
+    explicit TocBits(std::span<const std::byte> bytes) : bits_(bytes) {}
 
     [[nodiscard]] std::optional<std::uint32_t> read(int count) {
-        std::uint32_t value = 0;
-        for (int i = 0; i < count; ++i) {
-            if (bit_ >= bytes_.size() * 8) {
-                return std::nullopt;
-            }
-            const auto byte = std::to_integer<std::uint32_t>(bytes_[bit_ / 8]);
-            value = (value << 1U) | ((byte >> (7U - (bit_ % 8))) & 1U);
-            ++bit_;
+        if (static_cast<std::size_t>(count) > bits_.remaining_bits()) {
+            return std::nullopt;
         }
-        return value;
+        return bits_.read(count);
     }
 
-    // variable_bits(n) (ETSI TS 103 190-1 4.2.2, Table 3). Eight rounds are
+    // variable_bits(n) (ETSI TS 103 190-1 4.2.2, Table 3). Eight groups are
     // far more than any value a table of contents holds, and keep the sum well
-    // inside 32 bits.
+    // inside 32 bits: a ninth is refused.
     [[nodiscard]] std::optional<std::uint32_t> variable_bits(int count) {
-        std::uint32_t value = 0;
-        for (int round = 0; round < 8; ++round) {
-            const std::optional<std::uint32_t> part = read(count);
-            const std::optional<std::uint32_t> more = part ? read(1) : std::nullopt;
-            if (!more) {
-                return std::nullopt;
-            }
-            value += *part;
-            if (*more == 0) {
-                return value;
-            }
-            value = (value << static_cast<unsigned>(count)) + (1U << static_cast<unsigned>(count));
+        constexpr int kMaxGroups = 8;
+        const std::size_t start = bits_.bit_position();
+        const std::uint64_t value = bits_.variable_bits(count, {}, kMaxGroups);
+        const std::size_t groups =
+            (bits_.bit_position() - start) / static_cast<std::size_t>(count + 1);
+        if (bits_.overflowed() ||
+            (groups == static_cast<std::size_t>(kMaxGroups) &&
+             bits_.bit(bits_.bit_position() - 1) != 0)) {
+            return std::nullopt;
         }
-        return std::nullopt;
+        return static_cast<std::uint32_t>(value);
     }
 
    private:
-    std::span<const std::byte> bytes_;
-    std::size_t bit_ = 0;
+    BitReader bits_;
 };
 
 }  // namespace

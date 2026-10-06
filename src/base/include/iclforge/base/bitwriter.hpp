@@ -183,7 +183,7 @@ class BitWriter {
         for (base::SyntaxRecord kept : other.kept_) {
             kept.substream = substream_;
             kept.bit_offset += static_cast<std::uint32_t>(start);
-            emit(kept);
+            send(kept);
         }
     }
 
@@ -224,12 +224,12 @@ class BitWriter {
    private:
     void record(std::size_t offset, unsigned bits, std::uint64_t value, std::string_view name) {
         if (buffering_ || sink_) {
-            emit(base::SyntaxRecord{substream_, static_cast<std::uint32_t>(offset),
+            send(base::SyntaxRecord{substream_, static_cast<std::uint32_t>(offset),
                                     static_cast<std::uint16_t>(bits), value, name});
         }
     }
 
-    void emit(const base::SyntaxRecord& record) {
+    void send(const base::SyntaxRecord& record) {
         if (buffering_) {
             kept_.push_back(record);
         } else if (sink_) {

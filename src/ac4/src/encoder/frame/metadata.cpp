@@ -608,8 +608,8 @@ void write_drc_frame(BitWriter& w, const DrcCodes* codes, bool iframe,
                 for (int band = 0; band < set.bands; ++band) {
                     for (int sf = 0; sf < set.subframes; ++sf) {
                         if (sf != 0 || band != 0 || ch != 0) {
-                            write_codeword(body, 
-                                tables::kDrcHcbCodes,
+                            write_codeword(
+                                body, tables::kDrcHcbCodes,
                                 static_cast<std::size_t>(set.at(ch, sf, band) - ref +
                                                          tables::kDrcHcb.cb_off),
                                 "drc_gain_code");

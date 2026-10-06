@@ -143,7 +143,7 @@ std::optional<BitWriter> write_audio_substream(const AudioSubstreamFields& field
     w.append(audio);
     // fill_bits and byte_align, to audio_size bytes after audio_data() began.
     while (w.bit_count() < start + 8 * audio_size) {
-        w.write_unrecorded(1, 0);
+        w.put(0, 1);
     }
     write_metadata(w, fields);
     if (substream_bytes > 0 && w.byte_size() != substream_bytes) {

@@ -818,13 +818,8 @@ FrameLayout walk_frame(std::span<const std::byte> frame) {
             // payload config (fixed shape TS 103 420 Table 56, iclforge)
             (void)cr.read(1);  // smploffste=0
             (void)cr.read(1);  // duratione=0
-            if (cr.read(1)) {  // groupide, variable_bits(2)
-                while (!cr.overflowed()) {
-                    (void)cr.read(2);
-                    if (!cr.read(1)) {
-                        break;
-                    }
-                }
+            if (cr.read(1) && !cr.overflowed()) {  // groupide, variable_bits(2)
+                (void)cr.variable_bits(2);
             }
             if (cr.read(1)) {
                 (void)cr.read(8);  // codecdatae
@@ -839,15 +834,8 @@ FrameLayout walk_frame(std::span<const std::byte> frame) {
                 (void)cr.read(2);
             }
             // payload size (variable_bits 8)
-            std::uint32_t size = 0;
-            while (!cr.overflowed()) {
-                size += cr.read(8);
-                if (!cr.read(1)) {
-                    break;
-                }
-                size <<= 8;
-                size += 256;
-            }
+            const std::uint32_t size =
+                cr.overflowed() ? 0U : static_cast<std::uint32_t>(cr.variable_bits(8));
             for (std::uint32_t i = 0; i < size && !cr.overflowed(); ++i) {
                 (void)cr.read(8);
             }

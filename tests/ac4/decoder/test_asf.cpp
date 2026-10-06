@@ -916,12 +916,12 @@ class BitByBitReader {
             pos_ = bit_position;
         }
     }
-    [[nodiscard]] std::size_t position() const { return pos_; }
+    [[nodiscard]] std::size_t bit_position() const { return pos_; }
     [[nodiscard]] std::size_t size_bits() const { return data_.size() * 8U; }
     [[nodiscard]] std::size_t remaining_bits() const {
         return pos_ >= size_bits() ? 0 : size_bits() - pos_;
     }
-    [[nodiscard]] bool overflow() const { return overflow_; }
+    [[nodiscard]] bool overflowed() const { return overflow_; }
 
    private:
     [[nodiscard]] std::uint32_t bit_at(std::size_t bit) const {
