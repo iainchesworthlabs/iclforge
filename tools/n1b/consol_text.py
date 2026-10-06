@@ -43,7 +43,7 @@ CMAKE = ("CMakeLists.txt", ".cmake", ".cmake.in")
 class Rule:
     name: str
     pattern: str
-    replacement: str
+    replacement: object  # a string with group references, or a function of the match
     # which files: "cpp" (C and C++ sources), "cmake", or "text" (every tracked text file)
     kinds: tuple[str, ...] = ("cpp",)
     flags: int = 0
@@ -147,6 +147,14 @@ C1_PROSE = [
         plans=True,
     ),
     Rule(
+        "scalar-dir",
+        r"\bsrc/ac4(?:core|/src/core)/variants/scalar-(double|float|fixed)\b",
+        lambda m: "src/ac4/variants/decode-scalar-"
+        + {"double": "float64", "float": "float32", "fixed": "fixed32"}[m.group(1)],
+        _TEXT,
+        plans=True,
+    ),
+    Rule(
         "build-file",
         r"\bsrc/ac4(?:core|dec|enc)/CMakeLists\.txt\b",
         "src/ac4/CMakeLists.txt",
@@ -176,14 +184,14 @@ C1_PROSE = [
     ),
     Rule(
         "dir-dec",
-        r"\bsrc/ac4dec\b(?![\w-])(?!/)",
+        r"\bsrc/ac4dec\b(?![\w-])(?!/[\w.*{])",
         "src/ac4/src/decoder",
         _TEXT,
         plans=True,
     ),
     Rule(
         "dir-enc",
-        r"\bsrc/ac4enc\b(?![\w-])(?!/)",
+        r"\bsrc/ac4enc\b(?![\w-])(?!/[\w.*{])",
         "src/ac4/src/encoder",
         _TEXT,
         plans=True,
