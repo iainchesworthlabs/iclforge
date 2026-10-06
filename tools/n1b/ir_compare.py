@@ -11,7 +11,7 @@ another overload, or a string that prints a qualified name.
     ir_compare.py compile <build dir> <out dir> [--jobs N] [--tests] [--only <substring>]
                   [--asserts]
     ir_compare.py compare <old dir> <new dir> --old-root <src dir> --new-root <src dir>
-                  [--diffs <dir>] [--jobs N]
+                  [--diffs <dir>] [--jobs N] [--plan <plan.json>]
 
 `compile` takes the compile_commands.json of a tree configured with a Clang preset (a source archive
 of the parent and one of the new commit, each configured and not built: the IR of a unit needs only
@@ -50,6 +50,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import difflib
+import functools
 import hashlib
 import json
 import os
@@ -286,11 +287,30 @@ def verdict(a: list[str], b: list[str]) -> str:
     return "differs"
 
 
-def compare_pair(args: tuple[str, str, str, str, str | None]) -> tuple[str, str, int]:
-    old_file, new_file, old_root, new_root, diffs = args
-    a = normalise(Path(old_file).read_text(errors="replace"), old_root, False)
+def moved_paths(text: str, moves: dict[str, str] | None) -> str:
+    """The old tree's paths in a unit's IR (its source_filename, a __FILE__) as the stage moved
+    them, under the `<T>` normalise() writes."""
+    if not moves or "<T>/" not in text:
+        return text
+    rx = _moves_rx(tuple(sorted(moves)))
+    return rx.sub(lambda m: "<T>/" + moves[m.group(1)], text)
+
+
+@functools.lru_cache(maxsize=2)
+def _moves_rx(olds: tuple[str, ...]) -> re.Pattern[str]:
+    return re.compile(
+        r"<T>/(" + "|".join(re.escape(o) for o in sorted(olds, key=len, reverse=True)) + r")\b"
+    )
+
+
+def compare_pair(
+    args: tuple[str, str, str, str, str | None, dict[str, str] | None],
+) -> tuple[str, str, int]:
+    old_file, new_file, old_root, new_root, diffs, moves = args
+    old_text = Path(old_file).read_text(errors="replace").replace(old_root, "<T>")
+    a = normalise(moved_paths(old_text, moves), old_root, False)
     b = normalise(Path(new_file).read_text(errors="replace"), new_root, True)
-    name = Path(old_file).name
+    name = Path(new_file).name
     v = verdict(a, b)
     if v == "identical":
         return name, v, 0
@@ -301,18 +321,55 @@ def compare_pair(args: tuple[str, str, str, str, str | None]) -> tuple[str, str,
     return name, v, changed
 
 
+def source_of(name: str) -> str:
+    """The source path a unit's IR file is named for (unit_name), without its object's tag."""
+    return name.rsplit(".", 2)[0].replace("__", "/")
+
+
+def paired(olds: dict[str, Path], news: dict[str, Path], moves: dict[str, str]) -> dict[str, Path]:
+    """The old units under the names of the new ones they are, a stage's moves applied: a source
+    the stage moved, and so whose object moved too, is paired by its path when each tree compiles
+    it once; a unit that moved and is compiled more than once keeps its name, and is listed."""
+    by_source: dict[str, list[str]] = {}
+    for name in news:
+        by_source.setdefault(source_of(name), []).append(name)
+    out: dict[str, Path] = {}
+    seen: dict[str, int] = {}
+    for name in olds:
+        seen[source_of(name)] = seen.get(source_of(name), 0) + 1
+    for name, path in olds.items():
+        src = source_of(name)
+        target = moves.get(src, src)
+        candidates = by_source.get(target, [])
+        if name in news:
+            out[name] = path
+        elif len(candidates) == 1 and seen[src] == 1:
+            out[candidates[0]] = path
+        else:
+            out[name] = path
+    return out
+
+
 def compare_dirs(
-    old: Path, new: Path, old_root: str, new_root: str, diffs: str | None, jobs: int
+    old: Path,
+    new: Path,
+    old_root: str,
+    new_root: str,
+    diffs: str | None,
+    jobs: int,
+    moves: dict[str, str] | None = None,
 ) -> int:
     olds = {p.name: p for p in old.glob("*.ll")}
     news = {p.name: p for p in new.glob("*.ll")}
+    if moves is not None:
+        olds = paired(olds, news, moves)
     both = sorted(set(olds) & set(news))
     if diffs:
         Path(diffs).mkdir(parents=True, exist_ok=True)
     print(f"{len(both)} units in both ({len(olds)} old, {len(news)} new)")
     for name in sorted(set(olds) ^ set(news)):
         print("only in one tree:", name)
-    work = [(str(olds[n]), str(news[n]), old_root, new_root, diffs) for n in both]
+    work = [(str(olds[n]), str(news[n]), old_root, new_root, diffs, moves) for n in both]
     counts = {"identical": 0, "order": 0, "text": 0, "differs": 0}
     with concurrent.futures.ProcessPoolExecutor(jobs) as ex:
         for name, v, changed in ex.map(compare_pair, work, chunksize=1):
@@ -344,10 +401,14 @@ def main(argv: list[str] | None = None) -> int:
     k.add_argument("--new-root", required=True)
     k.add_argument("--diffs", default=None)
     k.add_argument("--jobs", type=int, default=8)
+    k.add_argument(
+        "--plan", type=Path, default=None, help="a stage's plan: its moves pair the units it moved"
+    )
     a = ap.parse_args(argv)
     if a.mode == "compile":
         return compile_tree(Path(a.build), Path(a.out), a.jobs, a.tests, a.only, a.asserts)
-    return compare_dirs(Path(a.old), Path(a.new), a.old_root, a.new_root, a.diffs, a.jobs)
+    moves = json.loads(a.plan.read_text(encoding="utf-8"))["moves"] if a.plan else None
+    return compare_dirs(Path(a.old), Path(a.new), a.old_root, a.new_root, a.diffs, a.jobs, moves)
 
 
 if __name__ == "__main__":

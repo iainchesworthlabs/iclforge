@@ -343,5 +343,43 @@ class Directories(unittest.TestCase):
             self.assertEqual(ir.compare_dirs(old, new, OLD_ROOT, NEW_ROOT, None, 1), 1)
 
 
+class Moves(unittest.TestCase):
+    MOVES = {"src/ac4dec/src/decoder.cpp": "src/ac4/src/decoder/decoder.cpp"}
+
+    def test_a_moved_unit_is_paired_with_the_one_it_became(self) -> None:
+        olds = {"src__ac4dec__src__decoder.cpp.aaaaaa.ll": Path("o")}
+        news = {"src__ac4__src__decoder__decoder.cpp.bbbbbb.ll": Path("n")}
+        self.assertEqual(ir.paired(olds, news, self.MOVES), {next(iter(news)): Path("o")})
+
+    def test_a_unit_compiled_twice_is_not_paired_by_its_path(self) -> None:
+        olds = {
+            "src__ac4dec__src__decoder.cpp.aaaaaa.ll": Path("o1"),
+            "src__ac4dec__src__decoder.cpp.cccccc.ll": Path("o2"),
+        }
+        news = {"src__ac4__src__decoder__decoder.cpp.bbbbbb.ll": Path("n")}
+        self.assertEqual(set(ir.paired(olds, news, self.MOVES)), set(olds))
+
+    def test_the_old_paths_in_the_ir_are_the_moved_ones(self) -> None:
+        text = 'source_filename = "<T>/src/ac4dec/src/decoder.cpp"'
+        want = 'source_filename = "<T>/src/ac4/src/decoder/decoder.cpp"'
+        self.assertEqual(ir.moved_paths(text, self.MOVES), want)
+
+    def test_a_moved_unit_with_the_same_ir_is_identical(self) -> None:
+        body = 'source_filename = "{root}/{path}"\n\ndefine void @f() {{\n  ret void\n}}\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            old, new = Path(tmp, "old"), Path(tmp, "new")
+            old.mkdir()
+            new.mkdir()
+            (old / "src__ac4dec__src__decoder.cpp.aaaaaa.ll").write_text(
+                body.format(root=OLD_ROOT, path="src/ac4dec/src/decoder.cpp")
+            )
+            (new / "src__ac4__src__decoder__decoder.cpp.bbbbbb.ll").write_text(
+                body.format(root=NEW_ROOT, path="src/ac4/src/decoder/decoder.cpp")
+            )
+            args = (old, new, OLD_ROOT, NEW_ROOT, None, 1)
+            self.assertEqual(ir.compare_dirs(*args, self.MOVES), 0)
+            self.assertEqual(ir.compare_dirs(*args), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
