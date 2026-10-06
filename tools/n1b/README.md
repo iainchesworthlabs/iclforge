@@ -639,17 +639,18 @@ A stage runs, each pass committed alone after the commit of its script:
 
 | step | what runs |
 |---|---|
-| C1's cuts | `python tools/n1b/ac4_cuts.py --root <worktree>`: AC-4's public headers divided by what each declares, the inspector's unit into three, and each consumer including what it uses. |
-| moves and include spellings | `python tools/n1b/consol_apply.py --root <worktree> --stage c1 --phase all --json <plan.json>`: the renames alone (`git mv`, every one `R100`), then the includes, the export headers and every macro of a merged library's export header. |
+| the cuts | `python tools/n1b/ac4_cuts.py --root <worktree>` (C1): AC-4's public headers divided by what each declares, the inspector's unit into three, and each consumer including what it uses. `python tools/n1b/c2_cuts.py --root <worktree>` (C2): the signing tests divided into the primitives' and the signer's. |
+| moves and include spellings | `python tools/n1b/consol_apply.py --root <worktree> --stage c1 --phase all --json <plan.json>` (and `c2`, `c3`): the renames alone (`git mv`, every one `R100`), then the includes, the export headers and every macro of a merged library's export header. |
 | build files and paths | `consol_cmake.py --plan <plan.json>` and `consol_paths.py --stage c1 --plan <plan.json>`: `n1b_cmake.py` and `n1b_paths.py` for the stage's moves, renaming no directory the stage keeps. |
-| names in text | `python tools/n1b/consol_text.py --root <worktree> --stage c1 --plan <plan.json>`: the targets, files, pkg-config names and macros of the libraries that go, the directories a sentence names bare, the include spellings a page or a comment names (public and, where a header became private, its private spelling), and the paths a golden file keys by. |
+| names in text | `python tools/n1b/consol_text.py --root <worktree> --stage c1 --plan <plan.json>` (and `c2`): the targets, files, pkg-config names and macros of the libraries that go, C2's namespaces (in a C++ source's code and comments, never its strings), the directories a sentence names bare, the include spellings a page or a comment names (public and, where a header became private, its private spelling), and the paths a golden file keys by. |
 
 The merged library's CMake, the install rules, the bindings, the pages and the plans are by hand. The
 proof adds to N1B's: `export_diff.py` and `abi_compare.py` take `--map c1|c2|c3`, which compares the
-union of the libraries a stage merges with the one they become; `ir_compare.py compare --plan` pairs a
-moved unit with the one it became (and `--names none` reads no namespace as another); `flags_diff.py`
-compares how each unit compiles and links in two configured trees; `baseline.py` records an `install`
-kind.
+union of the libraries a stage merges, or divides, with what they become, and `--rewrite c2` reads the
+old names in their new namespaces; `ir_compare.py compare --plan` pairs a moved unit with the one it
+became (`--names none` reads no namespace as another, `--names c2` the old names in C2's namespaces);
+`flags_diff.py` compares how each unit compiles and links in two configured trees; `baseline.py`
+records an `install` kind.
 
 ## Proof
 
