@@ -62,5 +62,29 @@ class Consolidation(unittest.TestCase):
         self.assertIn("only in old: iclforge::ac4::Decoder::Decoder()", out)
 
 
+class Split(unittest.TestCase):
+    def test_a_library_divided_between_two_is_one_group_with_both(self) -> None:
+        libs = ["libiclforge_ac3.so", "libiclforge_base.so", "libiclforge_signing.so"]
+        groups = export_diff.consolidation_map("c2", libs)
+        self.assertEqual(
+            groups["libiclforge_ac3.so+libiclforge_base.so+libiclforge_signing.so"],
+            ["libiclforge_ac3.so", "libiclforge_base.so"],
+        )
+
+    def test_the_signers_names_follow_their_declarations(self) -> None:
+        old = (
+            "iclforge::signing::verify_atmos_frame(std::span<std::byte const>, "
+            "iclforge::signing::SigningKey const&)"
+        )
+        self.assertEqual(
+            export_diff.rewrite(old, {"c2"}),
+            "iclforge::ac3::signing::verify_atmos_frame(std::span<std::byte const>, "
+            "iclforge::base::crypto::SigningKey const&)",
+        )
+        self.assertEqual(
+            export_diff.rewrite("iclforge::admbridge::build(x)", {"c2"}), "iclforge::adm::build(x)"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -204,6 +204,31 @@ LIBRARY_MAP = {
     "c3": {c: "containers" for c in CONTAINERS},
 }
 
+# The libraries a stage divides, old -> every library its files went to: signing's key, hash and
+# MAC are base's and its signer ac3's, so the exports of signing, ac3 and base are compared as one
+# group (export_diff.py, abi_compare.py).
+SPLITS = {"c1": {}, "c2": {"signing": ("ac3", "base")}, "c3": {}}
+
+# The names a stage moves to another namespace, as the exports spell them: the old namespace and,
+# for each name declared in it, the new one (consol_text.py's tables).
+def renamed_namespace(stage: str, name: str) -> str:
+    """`name`, an exported symbol as the old tree spelled it, as the stage spells it."""
+    if stage != "c2":
+        return name
+    import consol_text
+
+    name = re.sub(r"\biclforge::admbridge::", "iclforge::adm::", name)
+    return re.sub(
+        r"\biclforge::signing::(\w+)",
+        lambda m: (
+            "iclforge::base::crypto::"
+            if m.group(1) in consol_text.C2_CRYPTO
+            else "iclforge::ac3::signing::"
+        )
+        + m.group(1),
+        name,
+    )
+
 
 def moves(stage: str, files: list[str]) -> dict[str, str]:
     """Old path -> new path for every tracked file the stage moves."""
