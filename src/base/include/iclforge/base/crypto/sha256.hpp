@@ -1,8 +1,8 @@
 #pragma once
 
-// SHA-256 (FIPS 180-4), self-contained. Internal to iclforge::ac3::signing - not on the
-// target's public include path, since callers want hmac_sha256 (and the EMDF
-// signer above that), never the raw hash. No third-party dependency by design:
+// SHA-256 (FIPS 180-4), self-contained: the hash under hmac_sha256.hpp, which the EMDF Atmos
+// signer (iclforge::ac3::signing) computes its tag with. A caller wants the MAC or the signer
+// above it, not the raw hash. No third-party dependency by design:
 // the codec's only third-party library is {fmt}, for formatting (see the top
 // of vcpkg.json), so this is a from-the-standard implementation rather than a
 // pull of OpenSSL/mbedTLS for one primitive.
@@ -36,13 +36,9 @@ private:
     std::size_t buffered_ = 0;
 };
 
-// Convenience one-shot over a whole buffer. Exported (unlike Sha256 itself) purely so
-// tests/ac3/signing/test_signing.cpp - which reaches this private header directly to run the
-// FIPS/RFC known-answer vectors, see tests/CMakeLists.txt's own comment - can resolve it when
-// iclforge::ac3::signing builds as a shared library (signing_objects' default-hidden visibility would
-// otherwise drop it from the .so's export table). The header itself stays uninstalled and off
-// the target's public include path, so this does not change what iclforge::ac3::signing's own advertised
-// public API is.
+// Convenience one-shot over a whole buffer. Exported (unlike Sha256 itself) so that
+// tests/base/test_crypto.cpp can run FIPS 180-4's known-answer vectors against a shared
+// libiclforge_base.
 ICLFORGE_BASE_EXPORT std::array<std::byte, 32> sha256(std::span<const std::byte> data);
 
 }  // namespace iclforge::base::crypto

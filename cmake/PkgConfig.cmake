@@ -50,8 +50,8 @@ unset(_iclforge_pc_lib)
 # iclforge_pkgconfig_libname() below for how callers derive this correctly for whichever
 # linkage(s) got installed.
 # REQUIRES: other .pc names this one's Requires: line should chain to (space-separated), for a
-# genuine PUBLIC/usage-requirement dependency - e.g. iclforge::ac3 requires iclforge because
-# iclforge_ac3_static/signing_shared PUBLIC-link iclforge::ac3_static/iclforge::ac3_shared.
+# genuine PUBLIC/usage-requirement dependency - e.g. iclforge-adm requires iclforge-iab because
+# iclforge_adm_shared PUBLIC-links iclforge::iab, whose types the bridge's headers name.
 # STATIC_REQUIRES: .pc names a static archive of this component calls into, for a dependency that
 # is PRIVATE in CMake - iclforge_c, whose libiclforge_c_static.a holds calls into
 # libiclforge_ac3_static.a. An archive is not linked when it is built, so nothing in it records that

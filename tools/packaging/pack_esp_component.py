@@ -59,19 +59,14 @@ COMPONENT = REPO / "esp-idf" / "iclforge"
 # carry the part that builds for this chip.
 STAGED_TREES = (
     # The AC-3 codec and the five libraries it is built from: the minimum-footprint profile is
-    # one archive of files from all six (src/ac3/minimal.cmake).
+    # one archive of files from all six (src/ac3/minimal.cmake). src/base also holds the header-only
+    # Fixed32 and scalar functions src/ac3 and src/ac4 both include (planning/ac4.md decision 31).
     "src/ac3",
     "src/base",
     "src/dsp",
     "src/objects",
     "src/render",
     "src/iec61937",
-    # The header-only Fixed32 / scalar-function target src/ac3 and src/ac4
-    # both link (planning/ac4.md decision 31); the root CMakeLists.txt adds it
-    # with add_subdirectory before it reaches src/ac3, so a staged tree
-    # without it stops the configure with "source src/base ... is not an
-    # existing directory" - the failure this list produced when D14a added it.
-    "src/base",
     "cmake",
 )
 

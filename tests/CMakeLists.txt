@@ -222,13 +222,6 @@ set_source_files_properties(ac3/io/test_metadata_edit.cpp
 set_source_files_properties(hearth/test_queue.cpp hearth/test_transport.cpp
     PROPERTIES COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:GNU>:-Wno-null-dereference>")
 
-# test_signing.cpp reaches iclforge::ac3's internal crypto headers (sha256.hpp/
-# hmac_sha256.hpp) to run the FIPS/RFC known-answer vectors directly - they are
-# not part of the target's public API, so put its private src/ dir on this
-# target's include path only, the same pattern the alsa backend's internal
-# header uses below.
-target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/signing/src")
-
 # test_bit_reservoir.cpp reaches the encoder's own internal bit_reservoir.hpp
 # (ABR's sliding-window accounting), which is plumbing between the encoder's
 # translation units rather than library surface - same pattern, same reason.
@@ -237,7 +230,8 @@ target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/signi
 # nothing outside src/ac3/src/encoder/ has any business planning exponent
 # runs - but what it decides is a cost judgement, and that is worth holding to
 # account on inputs chosen to make the right answer obvious rather than only
-# through a whole encode. Same pattern as the signing headers above.
+# through a whole encode: a library's src/ dir on this target's include path only, the pattern the
+# ALSA backend's internal header uses below.
 target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/src/encoder")
 
 # test_scalar_math.cpp includes iclforge/base/arithmetic/scalar_math.hpp and
@@ -320,8 +314,8 @@ endif()
 # test_simd_kernels.cpp (SIMD kernels) needs the ONE architecture directory
 # CMake selected in src/base/CMakeLists.txt, so the test exercises the
 # f64x2/i32x4 the library was actually built with rather than a different
-# one - same white-box arrangement as src/signing/src just above and the ALSA
-# backend's internal header below.
+# one - same white-box arrangement as src/ac3/src/encoder just above and the
+# ALSA backend's internal header below.
 target_include_directories(iclforge-tests PRIVATE "${ICLFORGE_ARCH_INCLUDE_DIR}")
 
 # The interleave and the DMA queue model from the ESP-IDF component
@@ -352,7 +346,7 @@ target_include_directories(iclforge-tests PRIVATE
 # into iclforge_ac3_objects's own copy of has_avx2(), which would need
 # dllexport/dllimport treatment that would otherwise only matter for the
 # config-linux-llvm-shared (BUILD_SHARED_LIBS=ON) leg. Same white-box
-# arrangement as src/signing/src above, and unconditional: has_avx2()
+# arrangement as src/ac3/src/encoder above, and unconditional: has_avx2()
 # correctly answering "false" on a build with no AVX2 tier is exactly as
 # worth testing as it answering "true" where one exists.
 target_sources(iclforge-tests PRIVATE "${ICLFORGE_CPU_FEATURES_SOURCE}")
@@ -408,7 +402,7 @@ else()
     # iclforge_ac3_objects in exactly this configuration, so the absent variant reuses
     # those rather than defining a second set (which is a duplicate-symbol link
     # error, not a harmless overlap). Reaching into src/ by path is the same
-    # white-box arrangement this file already uses for src/signing/src and
+    # white-box arrangement this file already uses for
     # src/ac3/src/{encoder,core,decoder} above.
     target_include_directories(iclforge-tests PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/ac3/core/avx2/absent"
@@ -489,8 +483,8 @@ endif()
 # restamp_syncframe_crcs is ordinary portable C++ over iclforge::ac3::crc16 and the
 # frame-size tables, and whether it produces a crc1 the decoder accepts is
 # exactly the kind of thing that should be checked on every platform rather
-# than inferred from a coverage number on one. Same shape as the signing/src
-# include just above: a directory outside the public include tree, on this
+# than inferred from a coverage number on one. Same shape as the src/ac3/src
+# includes above: a directory outside the public include tree, on this
 # target's path only.
 target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/fuzz")
 
@@ -888,7 +882,7 @@ target_sources(iclforge-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/apps/crucible/ui/desktop_entries.cpp")
 # test_engine_commands.cpp saves the signing key's env-var fallbacks with
 # std::getenv before clearing them for its own case - same C4996 reasoning as
-# src/base/src/crypto/signing_key.cpp (src/signing/CMakeLists.txt) and
+# src/base/src/crypto/signing_key.cpp (src/base/CMakeLists.txt) and
 # ac3/core/test_simd_kernels.cpp above.
 if(ICLFORGE_IS_MSVC_LIKE)
     set_source_files_properties(crucible/test_engine_commands.cpp
@@ -1228,7 +1222,6 @@ target_link_libraries(iclforge-tests
     PRIVATE
         iclforge::ac3
         iclforge::audio
-        iclforge::ac3
         iclforge::matroska
         iclforge::mp4
         iclforge::mpegts

@@ -169,6 +169,7 @@ iclforge_add_library(ac3
         src/oba/joc.cpp
         src/quality/distortion.cpp
         src/quality/perceptual.cpp
+        src/signing/emdf_atmos_signer.cpp
         src/verify/bap_census.cpp
         src/verify/eac3_mirror.cpp
         src/verify/eac3_selfcheck.cpp
@@ -196,7 +197,7 @@ target_include_directories(iclforge_ac3_objects PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>")
 
 # tests/CMakeLists.txt compiles src/internal/avx2/avx2_probe.cpp a SECOND time, directly into iclforge-tests
-# (the same white-box arrangement src/signing/src has there).
+# (the same white-box arrangement ICLFORGE_AUDIO_BACKEND_DIR has there).
 # The one target in the whole build that ever sees an AVX2 compiler flag: an AVX2 flag applied to the
 # codec's other files would compile them for a feature the deployment machine might not have, which
 # iclforge/base/detail/cpu_features.hpp's has_avx2() exists to let this project avoid.

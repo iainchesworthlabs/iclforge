@@ -77,7 +77,7 @@ If you cannot cite where something came from, it does not go in.
 
 ## Repository layout
 
-**`src/` is the installable library; `apps/` consumes it, never the reverse.** `src/` holds 19
+**`src/` is the installable library; `apps/` consumes it, never the reverse.** `src/` holds 16
 libraries. Each is a directory with its own CMake target (`iclforge::<name>`), its own public
 headers (`iclforge/<name>/`) and its own row in `tools/checks/layering.json`, which lists the
 libraries it may include from; `check_layering.py` fails an include its row does not list. A
@@ -87,11 +87,11 @@ into another library's namespace, or into `iclforge` itself.
 `src/ac3` is the AC-3, E-AC-3 and Atmos codec, in namespace `iclforge::ac3`. `src/ac4` is the
 AC-4 codec, in namespace `iclforge::ac4`, laid out by the same areas (`core`, `io`, `decoder`,
 `encoder`), and links nothing from `src/ac3`.
-The two codecs stand on libraries that know no codec: `src/base` (bit I/O, the speaker
-vocabulary, the CPU probe), `src/base` (header-only: `Fixed32`, the project's own float
-functions and the SIMD seam; it is not installed), `src/dsp` (the transforms more than one
-library uses), `src/objects` (the object-audio model and the Object Audio Metadata payload),
-`src/render` (layouts, routing and the renderer) and `src/iec61937` (burst packing).
+The two codecs stand on libraries that know no codec: `src/base` (bit I/O, the speaker vocabulary,
+the CPU probe, the signing key, SHA-256 and HMAC-SHA-256, and, header-only and not installed,
+`Fixed32`, the project's own float functions and the SIMD seam), `src/dsp` (the transforms more
+than one library uses), `src/objects` (the object-audio model and the Object Audio Metadata
+payload), `src/render` (layouts, routing and the renderer) and `src/iec61937` (burst packing).
 `apps/{cli,gui,crucible,hearth,android,wasm,baremetal}` consume them (Crucible and the Shield app
 use the AC-3, E-AC-3 and Atmos codec only), and `apps/common` is shared application code,
 compiled directly into its consumers. `apps/windows` holds Crucible's separately licensed

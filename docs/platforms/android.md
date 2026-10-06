@@ -146,8 +146,8 @@ So the backend is split, unlike the other three:
 
 ### AC-4
 
-**The app does nothing with AC-4.** Its native library, `iclforge_jni`, links `iclforge::ac3`,
-`iclforge::audio` and `iclforge::ac3::signing` and not the AC-4 library
+**The app does nothing with AC-4.** Its native library, `iclforge_jni`, links `iclforge::ac3` (with
+its object signer) and `iclforge::audio` and not the AC-4 library
 (`src/ac4`). The wrapper `CMakeLists.txt` leaves `ICLFORGE_BUILD_AC4` at its
 default, on, so the NDK build compiles the library and holds its sources to building under
 NDK r26 (`tools/checks/test_ac4_build_configurations.py` holds it to that default), and nothing
@@ -679,7 +679,7 @@ receiver into an on-screen accusation.
     audio: a real Dolby-licensed decoder gates JOC object decode on a keyed HMAC over the EMDF
     protection field. The algorithm that produces that tag is in-tree; the key it needs is not.
 
-The signer is `iclforge::ac3::signing` (`src/signing/`) — committed, clean-room and dependency-free, the
+The signer is `iclforge::ac3::signing` (`src/ac3/src/signing/`) — committed, clean-room and dependency-free, the
 same library `forge` uses. Its full design (what's signed, why the algorithm is committable but
 the key isn't) is in [Object signing](../concepts/object-signing.md); this section covers only what
 is specific to the app. The app's seam is `shield_signing_hook.{hpp,cpp}`, one committed

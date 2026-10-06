@@ -233,9 +233,9 @@ and where the raw-pointer boundaries are, the per-access-unit resource limits, a
 # the CMake target iclforge::<name>, the headers iclforge/<name>/ and the library iclforge_<name>;
 # tools/checks/layering.json says which library may include which
 src/base/       iclforge::base — bit I/O, the speaker vocabulary, the CPU probe and the profiling
-                hooks every library shares; it knows no codec
-src/base/ iclforge::base_arithmetic — header-only: Fixed32, the project's own float functions and the
-                SIMD seam that iclforge::ac3 and iclforge::ac4 share; built in-tree, not installed
+                hooks every library shares, the signing key with SHA-256 and HMAC-SHA-256, and,
+                header-only and not installed, Fixed32, the project's own float functions and the
+                SIMD seam iclforge::ac3 and iclforge::ac4 share; it knows no codec
 src/dsp/        iclforge::dsp — the FFT kernel, the 64-band QMF bank, the sample-rate converter and
                 the filter sections more than one library uses
 src/objects/    iclforge::objects — the object-audio model: object paths and scenes, the Object Audio
@@ -243,7 +243,8 @@ src/objects/    iclforge::objects — the object-audio model: object paths and s
 src/render/     iclforge::render — the room's layout, routing, the bed and object renderer and the
                 panner; links no codec
 src/iec61937/   iclforge::iec61937 — IEC 61937 burst packing and detection for AC-3, E-AC-3 and AC-4
-src/ac3/        iclforge::ac3 — the AC-3, E-AC-3 and Atmos codec, GUI-free
+src/ac3/        iclforge::ac3 — the AC-3, E-AC-3 and Atmos codec, and the EMDF object signer (key
+                supplied at runtime), GUI-free
 src/ac4/        iclforge::ac4 — the AC-4 codec, from ETSI TS 103 190-1 and -2: the sync frame, TOC and
                 presentation inspector, the decoder and the encoder, laid out as src/ac3 is (core/,
                 io/, decoder/, encoder/); no iclforge::ac3 dependency
@@ -252,16 +253,14 @@ src/mp4/        iclforge::mp4 — a standalone MP4/ISOBMFF muxer plus fMP4/CMAF 
 src/mpegts/     iclforge::mpegts — a standalone MPEG-2 Transport Stream muxer, no iclforge::ac3 dependency
 src/iamf/       iclforge::iamf — a standalone IAMF v2.0 OBU/ISOBMFF reader and writer, fed from an E-AC-3 decode
 src/iab/        iclforge::iab — a standalone SMPTE ST 2098-2 (IAB) bitstream reader, codec-blind
-src/adm/        iclforge::adm — BW64/RF64 + Audio Definition Model reader (opt-in, needs Boost)
-src/adm/  iclforge::adm — maps the ADM object graph src/adm parses onto the Atmos
-                encoder's input
-src/signing/    iclforge::ac3::signing — EMDF object signing, key supplied at runtime
+src/adm/        iclforge::adm — BW64/RF64 + Audio Definition Model reader, and the bridge from the
+                object graph it parses to the Atmos encoder's input (opt-in, needs Boost)
 src/capi/       iclforge_c — a plain-C11 surface over the AC-3, E-AC-3 and AC-4 encode/decode
                 cores, for bindings and callers that do not link C++23
 src/sendspin/   iclforge::sendspin — Sendspin player and server for Hearth (desktop tools and the
                 ESP32 sink); built with the hearth feature, not as part of the codec library
 python/         the iclforge Python package — pybind11 bindings straight onto iclforge::ac3 and the
-                AC-4 libraries
+                AC-4 library
 js/             iclforge-wasm-decoder — the npm streaming decoder package (AudioWorklet + Worker),
                 with a typed wrapper for the AC-4 WebAssembly module
 rust/           iclforge-sys and iclforge — Rust crates over the C API in src/capi

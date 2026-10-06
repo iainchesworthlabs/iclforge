@@ -22,7 +22,7 @@ key, reads none from the build, and has no way to obtain or derive one. What it 
 
 | Part | Where it comes from | In the library? |
 |---|---|---|
-| **HMAC-SHA-256** | FIPS 180-4 / RFC 2104, public standards | Yes — `src/signing/`, dependency-free |
+| **HMAC-SHA-256** | FIPS 180-4 / RFC 2104, public standards | Yes — `src/base/src/crypto/`, dependency-free |
 | **What gets authenticated** — which frame regions feed the HMAC, and where the tag is written | The public container layout this codec already emits (`src/objects/src/emdf.cpp`, the E-AC-3 syntax, TS 103 420) | Yes — `src/ac3/src/signing/emdf_atmos_signer.cpp` |
 | **The key** | You provision it — exactly as a licensed tool (DEE) receives its own via iLok | **No — never** |
 
@@ -64,7 +64,7 @@ return, rather than a per-frame vector callers would otherwise have to reduce th
 
 ## Using the library (any consumer)
 
-Any code that links `iclforge::ac3::signing` gets a key-less signer and must construct a key to use it. The
+Any code that links `iclforge::ac3` gets a key-less signer and must construct a key to use it. The
 whole API surface is the key type plus the sign/verify calls:
 
 ```cpp

@@ -42,16 +42,10 @@ endif()
 # targets: the actual codec sources compile there (see src/ac3/CMakeLists.txt),
 # and PUBLIC on an OBJECT library's usage requirements still propagates
 # through PUBLIC target_link_libraries(iclforge_ac3_static PUBLIC iclforge_ac3_objects)
-# to whatever finally links iclforge::ac3 - here, each fuzz harness below.
-#
-# iclforge_ac3_objects gets the identical treatment, for the identical reason:
-# fuzz_signing_verify drives iclforge::ac3's own frame walk and HMAC
-# construction (src/ac3/src/signing/emdf_atmos_signer.cpp), which is a separate
-# target from iclforge::ac3 (see src/signing/CMakeLists.txt) and would otherwise
-# be the one library in this build linked into a fuzzer without coverage
-# counters or sanitizer instrumentation of its own - so a report would only
-# fire on the ASan runtime's own interceptors, and the mutation engine would
-# be blind to every branch inside it.
+# to whatever finally links iclforge::ac3 - here, each fuzz harness below. That
+# includes the EMDF Atmos signer fuzz_signing_verify drives (its frame walk,
+# src/ac3/src/signing/emdf_atmos_signer.cpp), which is a part of iclforge::ac3. The HMAC-SHA-256 it
+# computes is iclforge::base's (src/base/src/crypto), so iclforge_base_objects is instrumented too.
 function(iclforge_instrument_for_fuzzing target)
     target_compile_options(${target} PUBLIC
         -fsanitize=address,undefined,fuzzer-no-link
@@ -62,7 +56,7 @@ function(iclforge_instrument_for_fuzzing target)
 endfunction()
 
 iclforge_instrument_for_fuzzing(iclforge_ac3_objects)
-iclforge_instrument_for_fuzzing(iclforge_ac3_objects)
+iclforge_instrument_for_fuzzing(iclforge_base_objects)
 
 # The container libraries need the identical treatment: they parse
 # self-declared lengths straight off untrusted input, which is exactly the
@@ -142,9 +136,8 @@ add_custom_target(iclforge_fuzzers)
 # reshape the input a fuzzer thinks it is passing in.
 #
 # Anything after `name` is an extra library that harness needs beyond
-# iclforge::ac3 - iclforge::ac3 for fuzz_signing_verify, iclforge::iab for
-# fuzz_iab_parse, iclforge::ac4 for fuzz_ac4_parse, iclforge::adm for
-# fuzz_adm_parse. Each is a separate target rather than part of iclforge::ac3
+# iclforge::ac3 - iclforge::iab for fuzz_iab_parse, iclforge::ac4 for
+# fuzz_ac4_parse, iclforge::adm for fuzz_adm_parse. Each is a separate target rather than part of iclforge::ac3
 # (see its own CMakeLists.txt for why), and none is needed by the harnesses
 # that only call into the codec. Naming a library here does not instrument
 # it: its OBJECT library needs its own iclforge_instrument_for_fuzzing() call
@@ -317,7 +310,7 @@ iclforge_add_fuzzer(fuzz_osc_parse)
 # (src/ac3/src/signing/emdf_atmos_signer.cpp). Links iclforge::ac3 on top of
 # iclforge::ac3; the key is part of the fuzzed input, and nothing here needs or
 # derives a real one - see the harness's own header comment.
-iclforge_add_fuzzer(fuzz_signing_verify iclforge::ac3)
+iclforge_add_fuzzer(fuzz_signing_verify)
 
 # iclforge::adm::parse_bw64: BW64/RF64 chunks plus an arbitrary ADM XML document
 # (src/adm/src/adm.cpp). Gated on the same ICLFORGE_BUILD_ADM the library

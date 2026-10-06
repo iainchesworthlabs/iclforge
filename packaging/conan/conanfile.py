@@ -5,9 +5,9 @@
 # harnesses. Same scope as the vcpkg port (packaging/vcpkg-port/iclforge/) - one Conan option
 # <-> one ICLFORGE_BUILD_<NAME> CMake option, same pattern that port's vcpkg_check_features()
 # call already establishes, and tools/checks/check_packaging_versions.sh holds the two recipes to
-# the same components and options. iclforge::adm (the ADM/BW64
-# reader and its Atmos bridge) are deliberately NOT options here even though upstream now
-# installs/exports both (shared-only - see cmake/InstallLibrary.cmake's ICLFORGE_BUILD_ADM
+# the same components and options. iclforge::adm (the ADM/BW64 reader and its Atmos
+# bridge) is deliberately NOT an option here even though upstream now installs/exports
+# it (shared-only - see cmake/InstallLibrary.cmake's ICLFORGE_BUILD_ADM
 # block): iclforge::adm needs Boost, and out-of-scope-for-now applies here the same way it does
 # for the vcpkg port's own missing "adm" feature.
 #

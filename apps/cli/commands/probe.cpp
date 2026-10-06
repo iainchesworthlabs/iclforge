@@ -741,9 +741,8 @@ int run_probe(std::string_view in_path, const Options& meta) {
 
     io::ProbeOptions options;
     options.detail = detail != Detail::kNone;
-    // iclforge::ac3::signing lives in its own library and iclforge::ac3 neither links nor
-    // should link it, so the question is passed in rather than asked there -
-    // see ProbeOptions::authenticity. No key is involved: whether a frame
+    // io::probe takes the question as a callback (ProbeOptions::authenticity) rather than asking
+    // the signer itself. No key is involved: whether a frame
     // carries a tag is answerable without one, and only whether that tag is
     // VALID is not (that is 'decode verify-objects').
     options.authenticity = [](std::span<const std::byte> frame) {

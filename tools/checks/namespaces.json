@@ -4,8 +4,6 @@
     "ac3": ["ac3"],
     "ac4": ["ac4"],
     "adm": ["adm"],
-    "admbridge": ["admbridge"],
-    "arithmetic": ["internal"],
     "audio": ["audio"],
     "base": ["base", "internal"],
     "dsp": ["dsp", "internal"],
@@ -17,8 +15,7 @@
     "mpegts": ["mpegts"],
     "objects": ["emdf", "oba"],
     "render": ["render", "spatial"],
-    "sendspin": ["sendspin"],
-    "signing": ["signing"]
+    "sendspin": ["sendspin"]
   },
   "debts": [
     {

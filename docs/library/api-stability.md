@@ -70,7 +70,8 @@ it directly. Four tiers, assigned per header below:
 | `iclforge/ac4/core/toc.hpp`, `iclforge/ac4/decoder/decoder.hpp`, `iclforge/ac4/encoder/encoder.hpp` | **Experimental** — the AC-4 inspector, decoder and encoder, installed and default-on; see below. |
 | `iclforge/ac4/core/syntax.hpp` | Diagnostic — the AC-4 syntax trace the decoder and encoder write, as `iclforge/ac3/decoder/syntax_trace.hpp` is for AC-3 and E-AC-3. |
 | `iclforge_c/iclforge.h` | Public — its own narrower promise, see [C API](c-api.md). |
-| `iclforge/base/crypto/signing_key.hpp`, `emdf_atmos_signer.hpp` | Public. |
+| `iclforge/base/crypto/signing_key.hpp`, `iclforge/ac3/signing/emdf_atmos_signer.hpp` | Public. |
+| `iclforge/base/crypto/sha256.hpp`, `hmac_sha256.hpp` | Internal — the hash and the MAC the signer computes its tag with, installed with `iclforge::base`; a caller signs and verifies through `emdf_atmos_signer.hpp`. |
 
 **The `detail` namespace convention is unaffected by a header's tier.** Five public headers
 (`silent_frame.hpp`, `meta/drc.hpp`, `core/tables.hpp`, `core/window.hpp`, `core/crc16.hpp`)
@@ -98,8 +99,8 @@ anything to deprecate *from*. The policy going forward:
   in `CHANGELOG.md` like any other change — a deprecation cycle promises a grace period this
   project isn't promising yet.
 - **At and after `v1.0.0`:** drop `DEFINE_NO_DEPRECATED` from every `generate_export_header()`
-  call (sixteen libraries — `base`, `dsp`, `objects`, `render`, `iec61937`, `ac3`, `capi`,
-  `matroska`, `mp4`, `mpegts`, `adm`, `iab`, `admbridge`, `signing`, `iamf` and `ac4`;
+  call (fourteen libraries — `base`, `dsp`, `objects`, `render`, `iec61937`, `ac3`, `capi`,
+  `matroska`, `mp4`, `mpegts`, `adm`, `iab`, `iamf` and `ac4`;
   `iclforge::ac3_minimal` has no `SOVERSION` promise to protect and can keep it).
   A symbol scheduled for removal gets `ICLFORGE_DEPRECATED` (or its module's equivalent) in the
   same minor release its replacement ships, stays for at least one further minor release, and is

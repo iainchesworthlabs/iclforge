@@ -1,10 +1,10 @@
 #pragma once
 
-// HMAC-SHA-256 (RFC 2104) over the SHA-256 in sha256.hpp. Internal to
-// iclforge::ac3::signing. The key is passed in by the caller every time - this holds no
-// key of its own, which is the whole point of the restructure that moved the
-// signer into the clean-room tree: the algorithm is public (RFC 2104 / FIPS
-// 180-4), only the key is secret, and the key is supplied at runtime.
+// HMAC-SHA-256 (RFC 2104) over the SHA-256 in sha256.hpp, which the EMDF Atmos signer
+// (iclforge::ac3::signing) computes its tag with. The key is passed in by the caller every time
+// - this holds no key of its own, which is the whole point of the restructure that moved the
+// signer into the clean-room tree: the algorithm is public (RFC 2104 / FIPS 180-4), only the key
+// is secret, and the key is supplied at runtime.
 
 #include <array>
 #include <cstddef>
@@ -14,7 +14,8 @@
 
 namespace iclforge::base::crypto {
 
-// Exported for the same reason sha256.hpp's own one-shot function is - see its comment.
+// Exported: iclforge::ac3's signer calls it, and tests/base/test_crypto.cpp runs RFC 4231's
+// vectors against it.
 ICLFORGE_BASE_EXPORT std::array<std::byte, 32> hmac_sha256(std::span<const std::byte> key,
                                                          std::span<const std::byte> message);
 

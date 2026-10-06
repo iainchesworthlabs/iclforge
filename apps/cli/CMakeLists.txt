@@ -97,7 +97,6 @@ target_link_libraries(forge
     PRIVATE
         iclforge::ac3
         iclforge::audio
-        iclforge::ac3
         iclforge::matroska
         iclforge::mp4
         iclforge::mpegts

@@ -36,7 +36,7 @@ target_compile_features(crucible_engine PUBLIC cxx_std_23)
 # (config-windows-llvm-coverage); then this library, the window and its
 # tests are the instrumented set tools/checks/coverage_crucible.ps1 reports.
 target_link_libraries(crucible_engine
-    PUBLIC iclforge::ac3 iclforge::audio iclforge::ac3 iclforge::tracy
+    PUBLIC iclforge::ac3 iclforge::audio iclforge::tracy
     PRIVATE iclforge::warnings iclforge::coverage)
 
 # The platform half, selected the way apps/cli/CMakeLists.txt selects its

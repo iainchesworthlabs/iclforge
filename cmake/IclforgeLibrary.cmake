@@ -217,7 +217,8 @@ endfunction()
 #       [REQUIRES <pc>...]             # the .pc file's Requires (default: iclforge-<dep> for each of
 #                                      # DEPENDS)
 #       [STATIC_REQUIRES <pc>...]      # its Requires.private, for what a static archive calls into
-#       [GENERATED_HEADERS <path>...]) # more generated headers to install, below generated/
+#       [GENERATED_HEADERS <path>...]  # more generated headers to install, below generated/
+#       [EXCLUDE <dir>...])            # directories of include/ that are not installed
 #
 # `ICLFORGE_INSTALL_BOTH_LINKAGES` and BUILD_SHARED_LIBS choose which variants are installed, as
 # cmake/InstallLibrary.cmake always did. The export set is under the iclforge:: namespace, in the
@@ -228,7 +229,7 @@ endfunction()
 # directory's include/ tree and the generated export header.
 function(iclforge_install_library name)
     cmake_parse_arguments(PARSE_ARGV 1 ARG "SHARED_ONLY" "DESCRIPTION;EXPORT_SET"
-        "REQUIRES;STATIC_REQUIRES;GENERATED_HEADERS")
+        "REQUIRES;STATIC_REQUIRES;GENERATED_HEADERS;EXCLUDE")
     set(objects iclforge_${name}_objects)
     get_target_property(stem ${objects} ICLFORGE_STEM)
     get_target_property(export_header ${objects} ICLFORGE_EXPORT_HEADER)
@@ -253,9 +254,14 @@ function(iclforge_install_library name)
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT library
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT libruntime NAMELINK_COMPONENT library
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT library)
+    set(excluded "")
+    foreach(dir IN LISTS ARG_EXCLUDE)
+        list(APPEND excluded PATTERN "${dir}" EXCLUDE)
+    endforeach()
     install(DIRECTORY "${source_dir}/include/"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-        COMPONENT library)
+        COMPONENT library
+        ${excluded})
     foreach(header IN ITEMS "${export_header}" ${ARG_GENERATED_HEADERS})
         get_filename_component(header_dir "${header}" DIRECTORY)
         install(FILES "${binary_dir}/generated/${header}"

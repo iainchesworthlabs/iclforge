@@ -47,7 +47,7 @@ set(ICLFORGE_BUILD_FUZZERS OFF CACHE BOOL "" FORCE)
 # Same gap python/pyproject.toml and rust/iclforge-sys/build.rs had for the same reason.
 set(ICLFORGE_BUILD_HEARTH OFF CACHE BOOL "" FORCE)
 
-# iclforge_jni's own target_link_libraries below is iclforge::ac3/iclforge::audio/iclforge::ac3 only
+# iclforge_jni's own target_link_libraries below is iclforge::ac3/iclforge::audio only
 # (see the comment above the MATROSKA/MP4/MPEGTS block just below) - this app never links
 # iclforge::c, so there is no reason to compile src/capi at all here. Off explicitly rather
 # than relying on the root CMakeLists.txt's default ON: leaving it on would silently compile
@@ -104,9 +104,9 @@ target_compile_features(iclforge_jni PRIVATE cxx_std_23)
 # android: android/asset_manager_jni.h (AAssetManager_fromJava), used by
 # live_cursor.cpp to load the bundled lead-object voice sample and by
 # shield_signing_hook.cpp to load the bundled signing key.
-# iclforge::signing: the committed clean-room EMDF object signer (built by the repo
-# root add_subdirectory above, dependency-free). Always linked now - the signer
+# iclforge::ac3 carries the committed clean-room EMDF object signer (src/ac3/src/signing,
+# dependency-free) with the codec. Always linked now - the signer
 # has no embedded secret to keep out of the tree; whether it actually signs
 # depends on the runtime key asset, not on a build variant. See
 # shield_signing_hook.hpp.
-target_link_libraries(iclforge_jni PRIVATE iclforge::ac3 iclforge::audio iclforge::ac3 log android)
+target_link_libraries(iclforge_jni PRIVATE iclforge::ac3 iclforge::audio log android)

@@ -196,8 +196,8 @@ iclforge_atmos_encoder_destroy(encoder);
 
 Positions use the room-anchored coordinates described under
 [Spatial & Atmos objects](spatial-and-atmos.md): `x` and `y` are in `[0,1]`, and `z` is in
-`[-1,1]`. The C API emits unsigned object containers. Object signing remains the separate
-`iclforge::ac3::signing` C++ library or the CLI workflow documented under [Object signing](signing.md).
+`[-1,1]`. The C API emits unsigned object containers. Object signing remains the C++ API of
+`iclforge::ac3::signing` or the CLI workflow documented under [Object signing](signing.md).
 
 ## Decoding
 

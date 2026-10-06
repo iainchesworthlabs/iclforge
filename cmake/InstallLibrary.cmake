@@ -151,8 +151,11 @@ iclforge_install_pkgconfig(
 
 # The codec-blind libraries iclforge::ac3 links (src/base, dsp, objects, render, iec61937): each is a
 # mandatory component, installed and exported like the codec.
+# Fixed32 and the scalar arithmetic (iclforge/base/arithmetic/) are in-tree build plumbing, never
+# installed: iclforge::base_arithmetic (src/base/CMakeLists.txt).
 iclforge_install_library(base
-    DESCRIPTION "The bit reader and writer, the speaker vocabulary and the CPU feature probe the iclforge libraries build on")
+    DESCRIPTION "The bit reader and writer, the speaker vocabulary, the CPU feature probe and the signing key, SHA-256 and HMAC-SHA-256 the iclforge libraries build on"
+    EXCLUDE arithmetic)
 iclforge_install_library(dsp
     DESCRIPTION "The FFT, the QMF bank, the sample-rate converter and the biquad sections the iclforge codecs share")
 iclforge_install_library(objects
@@ -162,15 +165,8 @@ iclforge_install_library(render
 iclforge_install_library(iec61937
     DESCRIPTION "IEC 61937 burst packing and unpacking for AC-3, E-AC-3 and AC-4")
 
-# iclforge::ac3 is mandatory, not an ICLFORGE_BUILD_<NAME>-gated optional component (same as
-# iclforge::ac3 itself, unconditionally add_subdirectory()'d in the root CMakeLists.txt) - so unlike
-# the optional components below, it carries no if(ICLFORGE_BUILD_...) guard.
-iclforge_install_library(signing
-    DESCRIPTION "EMDF Atmos object-signing tag for iclforge"
-    REQUIRES iclforge-ac3)
-
 # The optional components below (iclforge::matroska, mp4, mpegts, iab, iamf, the AC-4 library,
-# adm and admbridge, and iclforge::c) each have their own ICLFORGE_BUILD_<NAME> option (root
+# adm, and iclforge::c) each have their own ICLFORGE_BUILD_<NAME> option (root
 # CMakeLists.txt) and their own guarded block here, and the vcpkg port's and the Conan recipe's
 # features of the same names switch them (packaging/). Their targets, headers and export sets only
 # exist to install when the component was actually built; iclforgeConfig.cmake.in includes each
@@ -194,21 +190,18 @@ if(ICLFORGE_BUILD_IAB)
         DESCRIPTION "Standalone SMPTE ST 2098-2 Immersive Audio Bitstream reader")
 endif()
 
-# iclforge::adm share iclforge::adm's ICLFORGE_BUILD_ADM (see
-# src/adm/CMakeLists.txt's header comment), and unlike every other component in this file
-# each installs and exports its SHARED variant only, regardless of ICLFORGE_INSTALL_BOTH_LINKAGES
-# and BUILD_SHARED_LIBS: iclforge::adm embeds the third-party libbw64 and libadm (never installed or
-# exported by this project in their own right), which only a self-contained shared library can
-# absorb without either re-exporting them or leaving a static archive with unresolved symbols
-# (src/adm/CMakeLists.txt's header comment); admbridge follows because it PUBLIC-links
-# iclforge::adm_shared. No vcpkg or Conan feature: iclforge::adm needs Boost
-# (docs/library/index.md). admbridge's .pc names iclforge-ac3, as it always has.
+# iclforge::adm (the parser and the bridge, ICLFORGE_BUILD_ADM), unlike every other component in
+# this file, installs and exports its SHARED variant only, regardless of
+# ICLFORGE_INSTALL_BOTH_LINKAGES and BUILD_SHARED_LIBS: it embeds the third-party libbw64 and libadm
+# (never installed or exported by this project in their own right), which only a self-contained
+# shared library can absorb without either re-exporting them or leaving a static archive with
+# unresolved symbols (src/adm/CMakeLists.txt's header comment). Its .pc names the object model and
+# the IAB reader, which the bridge's headers name. No vcpkg or Conan feature: iclforge::adm needs
+# Boost (docs/library/index.md).
 if(ICLFORGE_BUILD_ADM)
     iclforge_install_library(adm SHARED_ONLY
-        DESCRIPTION "Standalone BW64/RF64 + Audio Definition Model (ADM) parser")
-    iclforge_install_library(admbridge SHARED_ONLY
-        DESCRIPTION "Maps a parsed ADM object graph onto/from iclforge::oba::AtmosEncoder"
-        REQUIRES iclforge-ac3 iclforge-adm)
+        DESCRIPTION "Standalone BW64/RF64 + Audio Definition Model (ADM) parser, and its bridge onto the object model iclforge::ac3's Atmos encoder takes"
+        REQUIRES iclforge-objects iclforge-iab)
 endif()
 
 # A writer rather than a reader like iab above; the vcpkg port's "iamf" feature and the Conan

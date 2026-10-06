@@ -26,23 +26,20 @@ main codec headers are under `src/ac3/include/iclforge/ac3/`, and the AC-4 heade
 
 | CMake target | Purpose |
 |---|---|
-| `iclforge::ac3` | AC-3 and E-AC-3 encoding and decoding; links the five libraries below it |
-| `iclforge::base`, `iclforge::dsp` | Bit I/O, the speaker vocabulary and the CPU probe; the FFT, the QMF bank and the sample-rate converter |
+| `iclforge::ac3` | AC-3 and E-AC-3 encoding and decoding, and EMDF object signing (see [Object signing](signing.md)); links the five libraries below it |
+| `iclforge::base`, `iclforge::dsp` | Bit I/O, the speaker vocabulary, the CPU probe, and the signing key with SHA-256 and HMAC-SHA-256; the FFT, the QMF bank and the sample-rate converter |
 | `iclforge::objects`, `iclforge::render` | The object-audio model and the Object Audio Metadata payload; layouts, routing and the renderer |
 | `iclforge::iec61937` | IEC 61937 burst packing and detection, for AC-3, E-AC-3 and AC-4 |
 | `iclforge::matroska`, `iclforge::mp4`, `iclforge::mpegts` | Container writers |
-| `iclforge::ac3::signing` | EMDF object signing; see [Object signing](signing.md) |
 | `iclforge::iab` | SMPTE ST 2098-2 IAB reading; see [IAB](iab.md) |
 | `iclforge::iamf` | IAMF reading and writing, as OBUs, ISO-BMFF and fragments; see [IAMF](iamf.md) |
-| `iclforge::adm` | ADM/BW64 reading and writing; opt-in with `ICLFORGE_BUILD_ADM=ON` |
-| `iclforge::adm` | Mapping between ADM objects and the Atmos encoder or decoder |
+| `iclforge::adm` | ADM/BW64 reading and writing, and the mapping between ADM objects and the Atmos encoder or decoder; opt-in with `ICLFORGE_BUILD_ADM=ON` |
 | `iclforge::ac4` | AC-4 decoding and encoding, and the sync frames, table of contents and presentations both work through; see [AC-4](ac4.md) |
 
-`iclforge::adm` need the root dependency manifest's `adm` feature
-(`-DVCPKG_MANIFEST_FEATURES=adm`) when building this repository with vcpkg, and are installed as
-shared libraries. The packaged `iclforge` port has no `adm` feature and does not package either
-target. Their [ADM](adm.md) and [ADM bridge](adm-bridge.md) pages explain the dependency and
-linkage details.
+`iclforge::adm` needs the root dependency manifest's `adm` feature
+(`-DVCPKG_MANIFEST_FEATURES=adm`) when building this repository with vcpkg, and is installed as a
+shared library. The packaged `iclforge` port has no `adm` feature and does not package it. The
+[ADM](adm.md) and [ADM bridge](adm-bridge.md) pages explain the dependency and linkage details.
 
 The AC-4 library is installed and exported as `iclforge::ac4_static` and `iclforge::ac4_shared`;
 the tables and transforms its decoder and encoder share are inside it, with no headers of their own
@@ -93,21 +90,16 @@ objects (`IMPORTED_LINK_INTERFACE_LANGUAGES`). A build outside CMake gets them f
 files (see pkg-config below), or adds them to the link line itself (`-lstdc++ -lm` with libstdc++,
 `-lc++ -lm` with libc++).
 
-`iclforge::adm` are the exception: they PRIVATE-embed the third-party
+`iclforge::adm` is the exception: it PRIVATE-embeds the third-party
 libbw64/libadm (Apache-2.0, FetchContent'd — see [ADM / BW64 reading](adm.md)), neither of which
 this project installs or exports in its own right, so the installed package only ever exports
-their **shared** variant (`iclforge::adm_shared`, plus the bare
+its **shared** variant (`iclforge::adm_shared`, plus the bare
 `iclforge::adm` alias — there is no `_static` counterpart here, unlike every
 other module on this page) regardless of `ICLFORGE_INSTALL_BOTH_LINKAGES`. A self-contained
 `.so` absorbs libbw64/libadm at its own build step; a static archive would leave a downstream
 consumer with unresolved symbols into a library this package doesn't ship. `iclforge::adm`
 still needs Boost at build time (see the note above) — that requirement doesn't go away just
 because the *installed* artifact is self-contained.
-
-`iclforge::ac3::signing` follows this exact same shape — mandatory, not gated by an
-`ICLFORGE_BUILD_<NAME>` switch, same as `iclforge::ac3` itself — so it resolves the identical way in
-both cases: the bare `iclforge::ac3::signing` alias in-tree, and explicit `iclforge::ac3_static`/
-`iclforge::ac3_shared` from an installed package.
 
 **vcpkg.** A port lives in this repo at
 [`packaging/vcpkg-port/iclforge/`](https://github.com/iainchesworthlabs/iclforge/tree/main/packaging/vcpkg-port/iclforge) and is pending
@@ -125,8 +117,8 @@ find_package(iclforge CONFIG REQUIRED)
 target_link_libraries(your_target PRIVATE iclforge::ac3)
 ```
 
-`iclforge::ac3` and the libraries it links (`base`, `dsp`, `objects`, `render`, `iec61937`), with
-`iclforge::ac3::signing`, are what the port installs by default. Every other library is one of the
+`iclforge::ac3` (with the object signer) and the libraries it links (`base`, `dsp`, `objects`,
+`render`, `iec61937`) are what the port installs by default. Every other library is one of the
 port's features, and none is on by default (a curated-registry port's `default-features` may only
 cover behaviors, not additional public APIs/targets/binaries, and each of these is exactly that):
 
@@ -164,8 +156,8 @@ one.
 
 **pkg-config.** Every installed library also gets its own `.pc` file,
 `${libdir}/pkgconfig/iclforge-<name>.pc` (`iclforge-base`, `-dsp`, `-objects`, `-render`,
-`-iec61937`, `-ac3`, `-signing`, `-matroska`, `-mp4`, `-mpegts`, `-iamf`, `-iab`, `-adm`,
-`-admbridge`, `-ac4` and `-c`), for a non-CMake consumer:
+`-iec61937`, `-ac3`, `-matroska`, `-mp4`, `-mpegts`, `-iamf`, `-iab`, `-adm`, `-ac4` and
+`-c`), for a non-CMake consumer:
 
 ```bash
 pkg-config --cflags --libs iclforge-ac3

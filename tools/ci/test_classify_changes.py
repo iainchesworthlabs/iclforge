@@ -218,7 +218,7 @@ class SatellitesDirectTest(unittest.TestCase):
         for path in (
             "src/ac3/coder/eac3_encoder.cpp",
             "src/base/detail/cpu_features.cpp",
-            "src/arithmetic/fixed32.hpp",
+            "src/base/include/iclforge/base/arithmetic/fixed32.hpp",
             "cmake/Compiler.cmake",
             "CMakeLists.txt",
         ):

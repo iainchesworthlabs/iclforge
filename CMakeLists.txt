@@ -452,17 +452,14 @@ endif()
 # ---------------------------------------------------------------------------
 # Targets
 # ---------------------------------------------------------------------------
-# The scalar building blocks iclforge::ac3 and iclforge::ac4 (below) both use -
-# Fixed32 and the cross-platform-identical float transcendentals
-# (planning/ac4.md, decision 31). Header-only and dependency-free, so it goes
-# first; both consumers link it PRIVATE.
 include(IclforgeLibrary)
-add_subdirectory(src/base)
 
 # The codec-blind libraries the AC-3 codec builds on, each linking only the ones above it:
-# base (bit I/O, the speaker vocabulary, the kernels' build variants), dsp, objects (the object model
-# and the OAMD payload), render and iec61937. Then the codec, which links all of them. None of the
-# five links a codec; AC-4 (src/ac4) takes base's profiling directory and links none of them yet.
+# base (bit I/O, the speaker vocabulary, the scalar arithmetic, the signing key and its hash and MAC,
+# the kernels' build variants), dsp, objects (the object model and the OAMD payload), render and
+# iec61937. Then the codec, which links all of them and holds the EMDF Atmos signer. None of the
+# five links a codec; AC-4 (src/ac4) takes base's profiling directory and its arithmetic headers and
+# links none of them yet.
 add_subdirectory(src/base)
 add_subdirectory(src/dsp)
 add_subdirectory(src/objects)
@@ -489,19 +486,6 @@ add_subdirectory(src/ac3)
 # is that nothing outside the decode path is compiled.
 if(NOT EMSCRIPTEN AND NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
     add_subdirectory(src/audio)
-endif()
-
-# The EMDF Atmos object signer (iclforge::ac3). Clean-room and dependency-free:
-# the HMAC construction and authenticated-region layout are in-tree, and the
-# only secret - the key - is supplied by the operator at runtime, never
-# embedded, so unlike the old quarantine overlay this is committed and built by
-# default. After src/ac3 so it can reuse the codec's parsing primitives; before
-# apps/cli so forge can link it.
-# Not under ICLFORGE_MINIMAL_DECODER: object SIGNING is a production-side
-# concern, and verification is opt-in even in a full build - neither is on a
-# decode path a set-top box has to run.
-if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
-    add_subdirectory(src/signing)
 endif()
 
 # A standalone container writer, kept apart from the codec on purpose: it
@@ -565,14 +549,6 @@ if(ICLFORGE_BUILD_ADM)
                              "iclforge::adm's IAB mapping (IAB reader phase 3) depends on iclforge::iab")
     endif()
 
-    add_subdirectory(src/adm)
-
-    # iclforge::adm - ADM BWF → JOC bridge, phase 2: maps iclforge::adm's parsed ADM graph onto
-    # iclforge::ac3::oba::AtmosEncoder. Depends on iclforge::ac3 (added above), iclforge::adm (just added) and
-    # (IAB reader phase 3) iclforge::iab (added earlier, guarded above), so it is meaningless
-    # without ICLFORGE_BUILD_ADM - gated by the same flag rather than a new option of its own; see
-    # src/adm/CMakeLists.txt's own header comment for the full reasoning, including why this
-    # is a separate module from every side it bridges.
     add_subdirectory(src/adm)
 endif()
 

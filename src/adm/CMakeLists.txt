@@ -223,12 +223,26 @@ target_compile_options(ac3adm_suppress_gcc15_null_deref INTERFACE
 # admTargets.cmake - which is safe here specifically because the only installed variant,
 # iclforge_adm_shared, already has adm's (forced-STATIC, see above) object code embedded by the time
 # it's built; a downstream consumer never needs bw64/adm on their own link line.
+# The bridge (bridge.hpp, coordinates.hpp, iab_bridge.hpp; iclforge::adm's build, write and build_iab)
+# maps the parsed ADM graph, and an IAB master's frames, onto the object model iclforge::ac3's Atmos
+# encoder takes, and back. It was a library of its own, iclforge::admbridge, until
+# planning/consolidation.md's C2 merged it here: it is meaningless without the parser and gated by
+# the same ICLFORGE_BUILD_ADM. Its public headers name iclforge::oba's and iclforge::iab's types in
+# their signatures (iclforge::oba::ObjectPath, iclforge::iab::IABitstreamFrame), so anything linking
+# iclforge::adm needs both: LINK_PUBLIC. The parser stays codec-blind; the object model is not a
+# codec's (src/objects).
 iclforge_add_library(adm
     NO_C4251_SUPPRESSION
     SOURCES
         src/adm_model.cpp
         src/adm_xml_extras.cpp
         src/adm.cpp
+        src/coordinates.cpp
+        src/bridge.cpp
+        src/iab_bridge.cpp
+    LINK_PUBLIC
+        iclforge::objects
+        iclforge::iab
     LINK_PRIVATE
         "$<BUILD_INTERFACE:bw64>"
         "$<BUILD_INTERFACE:adm>"
