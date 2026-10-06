@@ -6,7 +6,8 @@
     baseline.py compare <recorded dir> <recorded dir> [--only <kinds>]
     baseline.py check-moves --plan <plan.json> [--baseline <dir>] [--root <worktree>] [--pure]
 
-<kinds> is a comma-separated list of headers, hashes, symbols and cli (the default is all four).
+<kinds> is a comma-separated list of headers, hashes, symbols, cli and install (the default is all
+five).
 
 A stage that changes names and paths must change nothing else. Four things stand for "nothing else":
 
@@ -17,13 +18,18 @@ A stage that changes names and paths must change nothing else. Four things stand
   hashes   the three streams the pinned-hash gate encodes from tests/golden/audio/reference_51.wav,
            in fast and reference mode, and what tools/checks/check_cross_platform_hash.py says of
            them against tests/golden/bitstream-hashes.json, which S1 to S6 leave unchanged.
-  symbols  the names each shared library exports, undecorated (MSVC: dumpbin /exports and undname),
+  symbols  the names each shared library exports, undecorated (MSVC: dumpbin /exports and undname;
+           an ELF tree: nm -D --defined-only -C, keyed by the unversioned file name),
            so that the union of the libraries a library was split into can be compared with what
            it exported (export_diff.py).
   cli      the bytes the CLI writes (`forge`; `ac3cli` in a tree built before N1A) over a fixed
            corpus of commands (cli_bytes.py): exit code, SHA-256 of every output file and of
            stdout. Recorded per compiler, since the float code of the AC-4 codec is only bit-exact
            within one.
+  install  what `cmake --install` lays down: every file's path, and the bytes of the text a
+           consumer reads (the package config, the export sets, the pkg-config files, the
+           headers), with the prefix and the trees' paths written as tokens. The consolidation's
+           stage C0 changes how the libraries are made and must not change what is installed.
 
 `record` measures a built tree and writes one JSON file per kind, `<kind>-<label>.json` (headers
 carry no label). The record names the commit it was measured at, which `compare` and `verify`
@@ -39,6 +45,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import posixpath
 import re
 import shutil
@@ -52,7 +59,7 @@ from n1b_lib import DEFAULT_ROOT
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_BASELINE = HERE / "baselines"
-KINDS = ("headers", "hashes", "symbols", "cli")
+KINDS = ("headers", "hashes", "symbols", "cli", "install")
 SCHEMA = 1
 IGNORED_KEYS = ("measured_at", "tools")
 GOLD_WAV = "tests/golden/audio/reference_51.wav"
@@ -234,7 +241,57 @@ def undecorate(undname: Path, names: list[str]) -> dict[str, str]:
     return result
 
 
+def so_targets(build: Path) -> list[str]:
+    """The ELF shared libraries this tree links (`lib<name>.so.<version>`), from its ninja file."""
+    text = (build / "build.ninja").read_text(encoding="utf-8", errors="replace")
+    return sorted(
+        {
+            m.group(1)
+            for m in re.finditer(
+                r"^build ((?:[^\s:|$]+/)?lib[^\s:|$/]+\.so(?:\.[0-9][^\s:|$/]*)?)[\s:]",
+                text,
+                re.MULTILINE,
+            )
+        }
+    )
+
+
+def nm_exports(so: Path) -> list[str]:
+    """The names an ELF shared library defines in its dynamic symbol table, demangled."""
+    out = subprocess.run(
+        ["nm", "-D", "--defined-only", "-C", str(so)], capture_output=True, text=True, check=True
+    ).stdout
+    names = set()
+    for line in out.splitlines():
+        m = re.match(r"^[0-9a-fA-F]*\s+([A-Za-z])\s+(.+)$", line)
+        if m and m.group(1) not in "Uw":
+            names.add(m.group(2))
+    return sorted(names)
+
+
 def record_symbols(build: Path) -> dict:
+    """Per shared library, the names it exports: dumpbin on Windows, nm on an ELF tree.
+
+    An ELF library is keyed by its unversioned file name (`libiclforge_ac3.so`), so that a record
+    of one version compares with another's; the name in the ninja file carries the version.
+    """
+    if (build / "build.ninja").is_file() and not dll_targets(build):
+        libraries: dict[str, list[str]] = {}
+        # the ninja file names each library by its real file, its symlinks and a phony alias; the
+        # real file is the one that is neither a link nor a bare name
+        for rel in so_targets(build):
+            so = build / rel
+            if "/" not in rel or so.is_symlink():
+                continue
+            if not so.is_file():
+                raise SystemExit(
+                    f"baseline: {rel} is a target of {build} but is not built; build every target"
+                )
+            key = re.sub(r"\.so(\.[0-9].*)?$", ".so", posixpath.basename(rel))
+            libraries[key] = nm_exports(so)
+        if not libraries:
+            raise SystemExit(f"baseline: {build} links no shared library (BUILD_SHARED_LIBS=ON?)")
+        return {"libraries": libraries}
     dumpbin, undname = msvc_tools(build)
     libraries: dict[str, list[str]] = {}
     for name in dll_targets(build):
@@ -247,6 +304,58 @@ def record_symbols(build: Path) -> dict:
         undone = undecorate(undname, raw)
         libraries[name] = sorted({undone.get(r, r) for r in raw})
     return {"libraries": libraries}
+
+
+# --- install --------------------------------------------------------------------------------------
+
+# What an install lays down that is text a consumer reads: the package config and its export sets,
+# the pkg-config files, the headers. Their bytes are recorded (with the prefix and the trees' own
+# paths written as tokens). A library, an archive or a program is recorded by name and kind only:
+# its bytes carry the build's paths and the order the linker met its objects in, and what it
+# exports is the symbols record's business.
+INSTALL_TEXT_EXT = {".cmake", ".pc", ".hpp", ".h", ".in", ".inl", ".ipp", ".txt", ".md", ".json"}
+GIT_STAMP = re.compile(
+    r"^(inline constexpr [\w:]+ git_(?:commit|commit_full|describe|branch|dirty|commits_since_tag) = ).*$",
+    re.MULTILINE,
+)
+
+
+def record_install(build: Path, work: Path) -> dict:
+    prefix = work / "install"
+    shutil.rmtree(prefix, ignore_errors=True)
+    done = subprocess.run(
+        ["cmake", "--install", str(build), "--prefix", str(prefix)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if done.returncode != 0:
+        raise SystemExit(f"baseline: cmake --install failed:\n{done.stderr[-2000:]}")
+    tokens = [
+        (str(prefix), "<prefix>"),
+        (str(build.resolve()), "<build>"),
+        (str(source_root(build)), "<source>"),
+    ]
+    files: dict[str, str] = {}
+    for path in sorted(prefix.rglob("*")):
+        rel = path.relative_to(prefix).as_posix()
+        if path.is_symlink():
+            files[rel] = "symlink -> " + re.sub(r"\.so\.[0-9][^/]*$", ".so.<v>", os.readlink(path))
+        elif path.is_dir():
+            continue
+        elif path.suffix in INSTALL_TEXT_EXT:
+            text = path.read_text(encoding="utf-8", errors="replace")
+            for real, token in tokens:
+                text = text.replace(real, token)
+            # the build's own commit, branch and state, which a stage changes by being one
+            text = GIT_STAMP.sub(r"\1<git>", text)
+            files[rel] = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        else:
+            files[rel] = "binary"
+    # the version is in the file names of a shared library; keep the record free of it
+    return {
+        "files": {re.sub(r"\.so\.[0-9][^/]*$", ".so.<v>", k): v for k, v in sorted(files.items())}
+    }
 
 
 # --- cli ------------------------------------------------------------------------------------------
@@ -299,6 +408,8 @@ def record(
             body = record_symbols(build)
         elif kind == "cli":
             body = record_cli(root, executable(build, *CLI_NAMES), work)
+        elif kind == "install":
+            body = record_install(build, work)
         else:
             raise SystemExit(f"baseline: unknown kind {kind!r}")
         made[kind] = {
