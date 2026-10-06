@@ -398,7 +398,34 @@ C2 = [
 # links base. arithmetic's links are include paths, and are base's by hand.
 C2_INTO = {"signing": "ac3", "admbridge": "adm"}
 
-STAGES: dict[str, list[Rule]] = {"c0": C0, "c1": C1 + C1_PROSE, "c2": C2}
+# The directories of arithmetic and admbridge, named bare in a comment or a page, are base's and
+# adm's; arithmetic's header-only target is base's (iclforge::base_arithmetic). signing's went two
+# ways, and a sentence that names it is a person's.
+C2_PROSE = [
+    Rule(
+        "build-file",
+        r"\bsrc/(arithmetic|admbridge)/CMakeLists\.txt\b",
+        lambda m: f"src/{ {'arithmetic': 'base', 'admbridge': 'adm'}[m.group(1)] }/CMakeLists.txt",
+        _TEXT,
+        plans=True,
+    ),
+    Rule(
+        "dir",
+        r"\bsrc/(arithmetic|admbridge)\b(?![\w-])(?!/[\w.*{])",
+        lambda m: f"src/{ {'arithmetic': 'base', 'admbridge': 'adm'}[m.group(1)] }",
+        _TEXT,
+        plans=True,
+    ),
+    Rule(
+        "arithmetic-target",
+        r"\biclforge::arithmetic\b",
+        "iclforge::base_arithmetic",
+        _TEXT,
+        strings=False,
+    ),
+]
+
+STAGES: dict[str, list[Rule]] = {"c0": C0, "c1": C1 + C1_PROSE, "c2": C2 + C2_PROSE}
 
 
 def kind_of(path: str) -> set[str]:
