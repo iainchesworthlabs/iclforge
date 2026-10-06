@@ -555,6 +555,12 @@ Hazards the plan did not name:
 - **A configuration no preset builds.** `fuzz/CMakeLists.txt` instrumented `iclforge_ac4core`, a
   target that no longer exists; no tree here configures the fuzzers, so only a configure of one found
   it.
+- **A check the proof did not run.** `tools/checks/check_install_consumer.sh` builds two programs
+  against the installed package. The cut gave `install_consumer/consumer_ac4.cpp` and
+  `consumer_ac4enc.cpp` the table of contents' header in place of `ac4.hpp`, and they use the
+  splitter, the scanner and the carriage, which the cut put in `io/`: `ac4_cuts.py` read the tree's
+  consumers but not `tools/checks/`. Found during C3 and fixed on this branch; the check passes and the
+  two programs print what they printed on C0.
 - **N1B's own header map.** `n1b_docs.py`'s map is held to what N1B's layout gives and to the headers of
   the tree, which a later stage makes disagree. The map stays as derived; `LATER_SPELLINGS` follows a
   header a later stage moved (C0's profiling header, C1's five).
@@ -634,6 +640,12 @@ Hazards the plan did not name:
   link that the dedupe rule, which reads adjacent names only, left. Both by hand. C1's collapse rule
   had missed `if(TARGET iclforge::ac4 AND TARGET iclforge::ac4 AND TARGET iclforge::ac4)` in
   `python/CMakeLists.txt`, fixed here.
+- **The package config.** The same rule turned signing's alias block in `iclforgeConfig.cmake.in`
+  into a second `add_library(iclforge::ac3 ALIAS ...)`, which stops a consumer's
+  `find_package(iclforge)`; the install record compares the file's bytes, which change in any case, so
+  only a consumer finds it. Found during C3 by `check_install_consumer.sh`, which C0 to C2 had not run,
+  and fixed on this branch; the check passes on C2's tree and its programs print what they printed
+  on C0.
 - **Instrumentation that moved.** The HMAC fuzz_signing_verify drives was instrumented as part of
   `iclforge_signing_objects`; it is `base`'s now, so the fuzz tree instruments `iclforge_base_objects`
   too.
