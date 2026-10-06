@@ -1125,7 +1125,7 @@ ParseResult ElementParser::element_22_2() {
 // A-SPX data are an aspx_data_2ch() for each pair of the fullband tracks in
 // syntax order and an aspx_data_1ch() for an odd last one, and its
 // companding_control() lists the fullband tracks in syntax order
-// (src/ac4dec/ERRATA.md, "var_channel_element()'s A-SPX and companding"):
+// (src/ac4/ERRATA.md, "var_channel_element()'s A-SPX and companding"):
 // what that means is the reconstruction's, the syntax reads the same either
 // way.
 ParseResult ElementParser::var_element(int n_dmx_signals, bool b_has_lfe) {

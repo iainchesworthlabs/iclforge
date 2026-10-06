@@ -23,7 +23,7 @@
 // rate's Nyquist frequency (19.8 kHz at 46 080 Hz, 20.6 kHz at 48 kHz), the
 // stopband starts at that Nyquist frequency, and the stopband is 100 dB down,
 // which puts the passband ripple near 0.0001 dB. Each phase sums to 1, so a
-// constant passes unchanged. tests/ac4core/test_ac4core_resampler.cpp
+// constant passes unchanged. tests/ac4/core/test_ac4core_resampler.cpp
 // measures the ripple, the attenuation and the sample counts.
 //
 // The output grid. Output sample m (from 0) is complete once (m + 1) * down /
@@ -59,7 +59,7 @@
 // double) and the same coefficients are on every platform. The copy is for a
 // part that executes from flash behind a cache, where reading a table the
 // cache cannot hold from the constants is several times slower than reading it
-// from the heap (src/ac4core/src/dsp/resampler.cpp has the figures). The tables
+// from the heap (src/ac4/src/core/dsp/resampler.cpp has the figures). The tables
 // hold phases 0 to up / 2: phase up - p is phase p read from its last coefficient
 // to its first, so that is half of each, 188 KB at 1001/960, and phase() says
 // which way to read (planning/ac4.md, D14a5). Any other ratio at float is

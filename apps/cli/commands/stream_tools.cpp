@@ -684,7 +684,7 @@ std::optional<iclforge::ac3::meta::ProfileId> eac3_profile_of(int drc_eac3_profi
 // What an AC-4 source's presentation sends that AC-3 or E-AC-3 has a field
 // for, into `p` where the options leave it to the source, a line for each
 // into `notes`: dialnorm, to the dB; drc_eac3_profile, the DRC profile Part 1
-// clause 5.7.9.4 has a transcoder compress with (src/ac4dec/ERRATA.md, "The
+// clause 5.7.9.4 has a transcoder compress with (src/ac4/ERRATA.md, "The
 // profile a transcoder to AC-3 or E-AC-3 takes"); and the downmix values, as
 // E-AC-3's mixing metadata or as AC-3's two bsi levels.
 void carry_ac4_metadata(const iclforge::ac4::PresentationMetadata& source, plan::Codec target,

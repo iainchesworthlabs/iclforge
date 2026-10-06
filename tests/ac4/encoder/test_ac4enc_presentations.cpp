@@ -13,7 +13,7 @@
 // through a presentation of its own. The rules a presentation keeps are held
 // by refusals. With AC4ENC_WRITE_PRESENTATIONS set to a directory, the
 // broadcast and hybrid streams are written there, each with the configuration
-// it was made from as JSON, to commit under tests/golden/ac4dec/presentations/,
+// it was made from as JSON, to commit under tests/golden/ac4/presentations/,
 // where tools/checks/mix_ac4_decode.py holds their mixes to the formulas and
 // tools/checks/check_ac4_encode_readers.py holds MediaInfo's reading of them to
 // the configuration.

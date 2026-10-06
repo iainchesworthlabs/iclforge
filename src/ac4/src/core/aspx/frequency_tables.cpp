@@ -172,7 +172,7 @@ bool derive_patch_tables(const SubbandGroups& groups, int master_freq_scale, boo
     }
 
     // Pseudocode 72, the loop that copies the patch borders taken as its body
-    // (src/ac4dec/ERRATA.md, "Stray semicolon in the limiter's patch
+    // (src/ac4/ERRATA.md, "Stray semicolon in the limiter's patch
     // borders"), with Pseudocodes 73 and 74.
     const int num_low = groups.num_sbg_sig_lowres;
     std::array<int, kMaxSbgLim + 1> lim{};

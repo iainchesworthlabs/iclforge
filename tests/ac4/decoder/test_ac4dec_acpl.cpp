@@ -1,4 +1,4 @@
-// The decoder's A-CPL stage (src/ac4dec/src/pcm/acpl.hpp): differential
+// The decoder's A-CPL stage (src/ac4/src/decoder/pcm/acpl.hpp): differential
 // decoding and dequantisation of parsed acpl_data_1ch() and acpl_data_2ch()
 // across frames (ETSI TS 103 190-1 V1.4.1 clause 5.7.7.7), and the modules of
 // Pseudocodes 115 to 119 on QMF matrices where the answer can be worked by

@@ -59,7 +59,7 @@ enum class GroupsError : std::uint8_t {
 // falls, the master table follows from aspx_master_freq_scale,
 // aspx_start_freq and aspx_stop_freq, so it is built from them each time.
 // num_sbg_noise, max(1, floor(aspx_noise_sbg * log2(sbz / sbx) + 0.5)), is
-// decided in integers (src/ac4dec/ERRATA.md, "Counts computed exactly").
+// decided in integers (src/ac4/ERRATA.md, "Counts computed exactly").
 [[nodiscard]] GroupsError derive_subband_groups(const FrequencyConfig& config, SubbandGroups& out);
 
 // Pseudocodes 71 to 74.

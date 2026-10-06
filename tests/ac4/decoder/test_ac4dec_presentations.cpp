@@ -3,13 +3,13 @@
 // Selection: a table of tables of contents built for it, of version 1 and
 // version 0 presentations, each case a table of contents, a PresentationChoice
 // and a level, and the presentation Part 2 clause 4.8.2 and the readings of
-// src/ac4dec/ERRATA.md ("Which presentations can be selected", "The order of
+// src/ac4/ERRATA.md ("Which presentations can be selected", "The order of
 // the preferences") select. The table is
-// committed as tests/golden/ac4dec/presentations/presentation-selection.tsv, which
+// committed as tests/golden/ac4/presentations/presentation-selection.tsv, which
 // tools/checks/test_ac4_presentation_selection.py holds the Python reference
 // parser's selection to.
 //
-// Mixing: the streams under tests/golden/ac4dec/presentations/ are the test
+// Mixing: the streams under tests/golden/ac4/presentations/ are the test
 // multiplexer's (ac4dec_mux.hpp) over DEE's tone legs and the encoder's
 // sources beside them, byte for byte, and hold presentations of several
 // substreams: music and effects with dialogue, main with associated audio,
@@ -881,7 +881,7 @@ TEST_CASE("the pan law meets Table 216 at its three angles", "[ac4dec][presentat
 
 TEST_CASE("a pan into a 9.1.4 layout goes round the horizontal ring without the screen pair",
           "[ac4dec][presentations][fronts]") {
-    // src/ac4dec/ERRATA.md, "Mixing into a 9.X.4 substream": Lscr and Rscr are no points of the
+    // src/ac4/ERRATA.md, "Mixing into a 9.X.4 substream": Lscr and Rscr are no points of the
     // ring, and the tops and the LFE are not either; the ring is the 7.X one, L, C, R, Rs, Rb, Lb,
     // Ls (the surrounds at the sides, 90 and 270 degrees, as the layout has a back pair).
     const std::array layout = {

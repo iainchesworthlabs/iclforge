@@ -5,8 +5,8 @@ frame holds, transcribed from ETSI TS 103 190-1 and -2 separately from the
 decoder in src/ac4dec, and summarises what it read as one digest line per
 frame and substream: how many syntax elements, where the last one ended, and a
 CRC-32 over every element's (bit offset, width, value). The digests of the
-committed DEE streams are under tests/golden/ac4dec/, and
-tests/ac4dec/test_ac4dec_syntax.cpp requires the decoder to produce the same
+committed DEE streams are under tests/golden/ac4/, and
+tests/ac4/decoder/test_ac4dec_syntax.cpp requires the decoder to produce the same
 lines. This test is the other half: it requires the reference parser still to
 produce them, so neither transcription can change alone.
 
@@ -21,7 +21,7 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-GOLDEN = REPO / "tests" / "golden" / "ac4dec"
+GOLDEN = REPO / "tests" / "golden" / "ac4"
 STREAMS = REPO / "tests" / "golden" / "external-baseline"
 
 sys.path.insert(0, str(REPO / "tools" / "references"))

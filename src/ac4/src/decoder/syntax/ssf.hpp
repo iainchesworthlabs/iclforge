@@ -20,7 +20,7 @@
 // granule is read, dequantised, predicted and scaled in one pass, block by block, and the
 // frame's lines are what the sf_data() element holds (SsfData), already in window order.
 //
-// The text is defective in several places, whose readings src/ac4dec/ERRATA.md gives under
+// The text is defective in several places, whose readings src/ac4/ERRATA.md gives under
 // "The speech spectral frontend". No stream here uses the tool.
 
 namespace iclforge::ac4::detail {

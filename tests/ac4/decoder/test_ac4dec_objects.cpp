@@ -4,8 +4,8 @@
 // their object audio metadata. Each stream reads with the writer's trace,
 // record for record, every substream to its end.
 //
-// The streams under tests/golden/ac4dec/objects/ are the committed cases, byte
-// for byte, and tests/golden/ac4dec/ holds tools/references/ac4_syntax.py's
+// The streams under tests/golden/ac4/objects/ are the committed cases, byte
+// for byte, and tests/golden/ac4/ holds tools/references/ac4_syntax.py's
 // digests of them, which test_ac4dec_syntax.cpp holds the decoder to. With
 // AC4DEC_WRITE_OBJECTS set to a directory, this writes the committed cases
 // there instead of comparing them, to commit after a change to the builder.
@@ -278,7 +278,7 @@ TEST_CASE("A-JOC objects carry their dry coefficients' share of each downmix sig
 
 TEST_CASE("a static downmix's core objects are its LFE and its bed at L R C Ls and Rs",
           "[ac4dec][objects]") {
-    // src/ac4dec/ERRATA.md, "A static downmix's inputs": in core decoding the
+    // src/ac4/ERRATA.md, "A static downmix's inputs": in core decoding the
     // objects of an A-JOC substream over a static 5.1 downmix are its bed.
     ObjectCase c;
     for (const ObjectCase& committed : ac4dec_test::committed_object_cases()) {

@@ -19,7 +19,7 @@
 // factor of three or more (planning/ac4.md, D14e).
 //
 // Every statement performs the operations of the loop it replaces, in the same order, so
-// the outputs are the same bits at every scalar (tests/ac4core/test_ac4core_dsp_exact.cpp
+// the outputs are the same bits at every scalar (tests/ac4/core/test_ac4core_dsp_exact.cpp
 // holds each to a verbatim copy of that loop). Two rewrites are not a copy of the old
 // text, and each is an identity of IEEE 754 arithmetic rather than a reassociation:
 //

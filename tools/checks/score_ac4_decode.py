@@ -3,13 +3,13 @@
 For each leg the decoder turns into PCM - SIMPLE and ASPX mono, stereo and 5.1, 5.1 in ASPX_ACPL_2
 and ASPX_ACPL_3, and DEE's immersive stereo (IMS), at frame_rate_index 13, and IMS at 23.976, 24,
 25 and 29.97 fps through the sample rate converter (see
-src/ac4dec/include/iclforge/ac4dec/decoder.hpp) - this decodes the stream with `forge decode`,
+src/ac4/include/iclforge/ac4/decoder/decoder.hpp) - this decodes the stream with `forge decode`,
 aligns the output with its reference by cross-correlation, fits a least-squares gain per channel,
 and checks (planning/ac4.md, the decoder's ladder, item 3):
 
   lag      the output lags the source by the leg's LAG: DEE's encoder delay plus this decoder's,
            1 313 samples at index 13 (Part 1 Table 188's d_pcm, the QMF banks' 577 samples and six
-           QMF slots of history, for every codec mode: src/ac4dec/ERRATA.md, "Every codec mode
+           QMF slots of history, for every codec mode: src/ac4/ERRATA.md, "Every codec mode
            passes through the QMF banks"). DEE's IMS encoder runs a frame shorter than its AC-4
            encoder. At the other frame rates, the lag first measured (LAG_AT_RATE); the A-SPX
            subbands there are the internal rate's.
@@ -107,7 +107,7 @@ RESAMPLING = {0: (1001, 960), 1: (25, 24), 2: (15, 16), 3: (1001, 960), 4: (25, 
 # At the other frame rates DEE's IMS encoder writes, the lag by frame_rate_index, as first
 # measured. DEE's IMS encoder delays by half a frame at 48 kHz, as at index 13 (1 024); this
 # decoder by its d_pcm, the QMF banks' 577 samples and 384 of history at the internal rate, and
-# its converter's delay() (src/ac4core/include/iclforge/ac4core/dsp/resampler.hpp), taken to 48 kHz.
+# its converter's delay() (src/ac4/src/core/dsp/resampler.hpp), taken to 48 kHz.
 # Their sum comes within 1.3 samples of each lag: 1 000 + 1 301.0 + 49.0 at 24 fps,
 # 1 001 + 1 302.4 + 49.1 at 23.976, 960 + 1 230.9 + 46.8 at 25, 800.8 + 1 102.1 + 49.1 at 29.97.
 LAG_AT_RATE = {(baseline.IMS, 0): 2353, (baseline.IMS, 1): 2351, (baseline.IMS, 2): 2239,
@@ -180,7 +180,7 @@ G1_LEGS = tuple(f"514-{content}-{kbps}"
 # margins above. The committed legs by their directory under tests/golden/external-baseline/, the
 # gold legs by their name in gold-manifest.json. Measured 2026-09-25: the SIMPLE legs with the
 # decoder of phase D3, the ASPX and 5.1 legs with phase D4's, whose reading of pre-flattening
-# (src/ac4dec/ERRATA.md, "Pre-flattening's direction") moved the ASPX legs' tiles, LSD and MOS.
+# (src/ac4/ERRATA.md, "Pre-flattening's direction") moved the ASPX legs' tiles, LSD and MOS.
 PINS = {
     "ac4-20-music-192": ((33.9, 34.5), 1.82, None, 4.62),
     "ac4-20-speech-128": ((37.1, 37.1), 0.81, 3.40, 4.29),

@@ -129,7 +129,7 @@ using Refusal = std::string_view;
 // each mode holds in full: its channel groups with the centre, the four back
 // channels and both top pairs present. The lowest mode holding every channel
 // of both; -1 identity, superset(0, 1) is 1 as the clause says, and -1 where no
-// mode holds both, as src/ac4dec/ERRATA.md ("The presentation substream") reads
+// mode holds both, as src/ac4/ERRATA.md ("The presentation substream") reads
 // the six pairs the clause leaves without one.
 [[nodiscard]] int superset(int a, int b) {
     if (a < 0) {
@@ -167,7 +167,7 @@ using Refusal = std::string_view;
 
 // What Pseudocodes 25 and 26 and clauses 6.3.3.1.29 to 6.3.3.1.30 derive from
 // every substream of the substream groups a presentation's specifiers name,
-// each group once, as the decoder takes them (src/ac4dec/ERRATA.md,
+// each group once, as the decoder takes them (src/ac4/ERRATA.md,
 // "presentation_config 1 and 4 read more specifiers than n_substream_groups").
 struct PresentationShape {
     int ch_mode = -1;  // pres_ch_mode

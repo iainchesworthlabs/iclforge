@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::ac4enc - an AC-4 encoder, ETSI TS 103 190-1 V1.4.1 and TS 103 190-2
+# iclforge::ac4 - an AC-4 encoder, ETSI TS 103 190-1 V1.4.1 and TS 103 190-2
 # V1.3.1, written from the published texts (planning/ac4.md, phase E1 on).
 #
 # A peer of src/ac4dec, made the same way by iclforge_add_library()
@@ -9,7 +9,7 @@
 # codebooks; both as src/ac4dec does, for the reasons it gives. Its syntax
 # writer is a transcription of the tables of its own, separate from the
 # decoder's reader. Installed and exported with the inspector, the decoder and
-# the core as iclforge::ac4enc_static and iclforge::ac4enc_shared
+# the core as iclforge::ac4_static and iclforge::ac4_shared
 # (cmake/InstallLibrary.cmake).
 # ---------------------------------------------------------------------------
 iclforge_add_library(ac4enc
@@ -41,7 +41,7 @@ iclforge_add_library(ac4enc
         src/oamd/oamd_syntax.cpp
     DEPENDS ac4
     BUILD_TREE_DEPENDS
-    EMBEDS iclforge::ac4core
+    EMBEDS iclforge::ac4
     PRIVATE_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 # -Wnull-dereference false positive, GNU only: GCC 16 at -O3 (Release) flags

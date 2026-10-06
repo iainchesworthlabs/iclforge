@@ -483,7 +483,7 @@ std::vector<std::byte> read_file(const std::filesystem::path& path) {
 TEST_CASE("the committed streams at 96 and 192 kHz are the builder's", "[ac4dec][hsf]") {
     // tests/golden/ac4-hsf/*.ac4 are these cases' streams byte for byte, and
     // tools/references/ac4_syntax.py's digests of them, tests/golden/ac4dec/hsf-*.tsv, are what
-    // test_ac4dec_syntax.cpp holds the decoder's trace to. They are not under tests/golden/ac4dec/
+    // test_ac4dec_syntax.cpp holds the decoder's trace to. They are not under tests/golden/ac4/
     // with the other constructed streams, which the tests and checks that play every committed
     // stream at 48 kHz take in. With AC4DEC_WRITE_HSF set to a directory the streams are written
     // there instead of compared, to commit after a change to the builder.
@@ -735,7 +735,7 @@ TEST_CASE("Table 106 for the base length is Tables 107 and 108 for the longer on
     // Clause 4.3.6.2.1: with b_hsf_ext the n_msfb_bits and n_msfbl_bits of the high sampling
     // frequency's transform length are taken from Table 107 (96 kHz) or 108 (192 kHz). The decoder
     // reads them by the base length's, Table 106: the same widths, for every length
-    // (src/ac4dec/ERRATA.md, "The widths of max_sfb at 96 and 192 kHz"). Tables 106 to 108 as
+    // (src/ac4/ERRATA.md, "The widths of max_sfb at 96 and 192 kHz"). Tables 106 to 108 as
     // printed (n_msfb_bits, then n_msfbl_bits where there is one, 0 where the table says N/A):
     struct Row {
         int length;

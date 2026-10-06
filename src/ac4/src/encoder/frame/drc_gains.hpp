@@ -15,7 +15,7 @@
 // a level per QMF slot relative to dialnorm, the curve's gain for it, and the
 // smoothing of 5.7.9.3.1.2, with its time constants; then each gain the
 // stream sends is the smoothed gain over its subframe (Table 169), in whole
-// dB2 (6 dB2 a factor of 2, src/ac4dec/ERRATA.md "DRC's units").
+// dB2 (6 dB2 a factor of 2, src/ac4/ERRATA.md "DRC's units").
 //
 // The level is the one the decoder's detector reads, which the text leaves to
 // the implementation (5.7.9.3.1.1): ITU-R BS.1770's K-weighted power of the

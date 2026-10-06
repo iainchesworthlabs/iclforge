@@ -233,7 +233,7 @@ void check_routing(const std::vector<Channel>& channels, const Decoded& decoded,
 
 // Core decoding (Part 2 clause 4.7): the 5.X.2 core, L R C, the LFE, Ls Rs and
 // the top side pair, each top pair's two tones in its side of it 3 dB down, as
-// DEE's 5.1.4 streams decode (src/ac4dec/ERRATA.md, "The core's top pair is
+// DEE's 5.1.4 streams decode (src/ac4/ERRATA.md, "The core's top pair is
 // Tsl and Tsr"), and every other channel's tone at unity on its own.
 void check_core(const std::vector<Channel>& channels, const Decoded& core) {
     const bool lfe =

@@ -679,10 +679,10 @@ std::vector<std::uint8_t> hex_bytes(std::string_view hex) {
 
 TEST_CASE("presentations() names an alternative presentation as its chunks arrive",
           "[ac4dec][api]") {
-    // tests/golden/ac4dec/presentations/presentation-names.tsv: each case a sequence of
+    // tests/golden/ac4/presentations/presentation-names.tsv: each case a sequence of
     // frames' presentation_name bytes, or "-" for a frame without one, and the
     // name after the last. tools/checks/test_ac4_presentation_names.py holds
-    // the Python reference to the same table (src/ac4dec/ERRATA.md, "A
+    // the Python reference to the same table (src/ac4/ERRATA.md, "A
     // presentation name in chunks").
     std::ifstream in(fs::path{AC4DEC_GOLDEN_DIR} / "presentations" / "presentation-names.tsv");
     REQUIRE(in.good());

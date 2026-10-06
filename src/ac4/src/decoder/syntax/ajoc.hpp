@@ -17,8 +17,8 @@
 // 6.3.6.
 //
 // Syntax only: the Huffman indices as read. Differential decoding,
-// dequantisation and the reconstruction are src/ac4core/include/iclforge/ac4core/ajoc's and
-// src/ac4dec/src/pcm/objects.cpp's.
+// dequantisation and the reconstruction are src/ac4/src/core/ajoc's and
+// src/ac4/src/decoder/pcm/objects.cpp's.
 
 namespace iclforge::ac4::detail {
 
@@ -117,7 +117,7 @@ struct AjocDmxDeData {
 
 // `b_iframe` is the substream's: an I-frame without b_dmx_de_cfg clears the
 // configuration, and b_keep_dmx_de_coeffs is ignored in an I-frame and with
-// b_dmx_de_cfg (6.3.6.6.1 and 6.3.6.6.2; src/ac4dec/ERRATA.md, "A-JOC's
+// b_dmx_de_cfg (6.3.6.6.1 and 6.3.6.6.2; src/ac4/ERRATA.md, "A-JOC's
 // dialogue enhancement data across frames").
 [[nodiscard]] ParseResult parse_ajoc_dmx_de_data(BitReader& r, int num_dmx_signals,
                                                  int num_umx_signals, bool b_iframe,

@@ -50,7 +50,7 @@ struct Range {
 [[nodiscard]] Range quantised_range(Kind kind, Quant quant) noexcept;
 
 // Pseudocode 121 for one parameter set of one parameter, from `start_band`
-// (src/ac4dec/ERRATA.md, "Partial coupling starts at acpl_param_band"):
+// (src/ac4/ERRATA.md, "Partial coupling starts at acpl_param_band"):
 // `coded` holds huff_decode_diff()'s values, each codebook index less its
 // cb_off, for bands start_band to num_bands - 1. DIFF_FREQ takes the first
 // as it is and adds each next one to the band below; DIFF_TIME adds each to
@@ -100,7 +100,7 @@ using ParamPrev = std::array<double, kSubbands>;
 // multiplication by its reciprocal, which gives the bits of the division because the reciprocal is
 // exact and both are correctly rounded (a frame of 2 048 samples has 32 slots, its halves 16). The
 // other divisors, 24 and 30 slots and their halves, divide.
-// tests/ac4core/test_ac4core_acpl_exact.cpp holds it to the expression as written.
+// tests/ac4/core/test_ac4core_acpl_exact.cpp holds it to the expression as written.
 class Interpolator {
    public:
     // One band's values for a frame, and the two differences the ramps multiply.
@@ -209,7 +209,7 @@ class Decorrelator {
 // Pseudocodes 112 to 114: attenuates a decorrelator's output where its energy
 // falls faster than its smoothed peak, slot by slot, per parameter band of
 // the 15-band mapping. The energy is the decorrelator's output's own, the
-// signal the gains apply to (src/ac4dec/ERRATA.md, "The transient ducker's
+// signal the gains apply to (src/ac4/ERRATA.md, "The transient ducker's
 // energy"). The energies are dsp::Energy values: Real at double and float, a
 // mantissa and a power of two at Fixed32.
 template <typename Real>

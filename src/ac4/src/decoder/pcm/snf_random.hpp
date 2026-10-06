@@ -10,7 +10,7 @@
 // Pseudocode 57 updates two counters with `x = x++`, which C leaves undefined
 // and C++17 makes a no-op; it is read as an increment, the only reading under
 // which Pseudocode 24's closed form lands where stepping the generator from
-// Pseudocode 55's reset state lands (src/ac4dec/ERRATA.md, "x = x++ in
+// Pseudocode 55's reset state lands (src/ac4/ERRATA.md, "x = x++ in
 // Pseudocode 57").
 
 namespace iclforge::ac4::detail {

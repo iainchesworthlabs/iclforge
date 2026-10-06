@@ -98,7 +98,7 @@ struct HsfStream {
 
 // The cases committed as tests/golden/ac4-hsf/<name>.ac4, with kHsfCommittedFrames frames each,
 // whose digests tools/references/ac4_syntax.py wrote beside the other digests in
-// tests/golden/ac4dec/ (hsf-<name>.tsv): the second transcription's reading of the HSF syntax.
+// tests/golden/ac4/ (hsf-<name>.tsv): the second transcription's reading of the HSF syntax.
 inline constexpr int kHsfCommittedFrames = 4;
 [[nodiscard]] std::vector<HsfCase> committed_hsf_cases();
 

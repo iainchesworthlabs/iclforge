@@ -1,6 +1,6 @@
-# AC-4 (ETSI TS 103 190): `iclforge::ac4dec` and `iclforge::ac4enc`
+# AC-4 (ETSI TS 103 190): `iclforge::ac4` and `iclforge::ac4`
 
-`iclforge/ac4dec/decoder.hpp`, library `iclforge::ac4dec`, and `iclforge/ac4enc/encoder.hpp`, library `iclforge::ac4enc`,
+`iclforge/ac4dec/decoder.hpp`, library `iclforge::ac4`, and `iclforge/ac4enc/encoder.hpp`, library `iclforge::ac4`,
 with the inspector both work through, `iclforge/ac4/ac4.hpp` in library `iclforge::ac4`. An AC-4 decoder and
 encoder written from ETSI TS 103 190-1 V1.4.1 (channel-based coding) and TS 103 190-2 V1.3.1
 (immersive and personalized audio). The libraries are in namespace `ac4` and link nothing from
@@ -126,7 +126,7 @@ the element as full decoding only (Table 8). So the decoder delivers 22.2 as cod
 `downmix` but `kAsCoded` and `decoding = kCore` with `kUnsupported` and a reason that names 22.2, and
 dialogue enhancement acts on L, R and C. DRC groups the channels by Part 2 Table 69. No stream of this
 element and no other decoder is available to check it against; the readings are in
-`src/ac4dec/ERRATA.md` under "The 22.2 element", and the streams its tests decode are built from the
+`src/ac4/ERRATA.md` under "The 22.2 element", and the streams its tests decode are built from the
 standard's tables ([Validation](../verification.md#the-decoders-222-element)).
 
 ### 9.X.4 channel elements
@@ -145,7 +145,7 @@ never a target. Dialogue enhancement acts on Lscr, Rscr and C in full decoding (
 the A-JCC and A-CPL modes in core decoding, by the extension tools of clauses 5.8.2.1 and 5.8.2.2;
 `b_de_simulcast` selects the second `de_data()` for core decoding. DRC groups Lscr and Rscr with L and
 R (Table 69). No stream of these modes and no other decoder is available to check them against; the
-readings are in `src/ac4dec/ERRATA.md` under "The 9.X.4 element", and the streams their tests decode
+readings are in `src/ac4/ERRATA.md` under "The 9.X.4 element", and the streams their tests decode
 are built from the standard's tables.
 
 `DecoderConfig` holds the rest: `output`, `presentation` (below), `concealment`, `level` (the
@@ -185,9 +185,9 @@ for a gain, and the compression of DRC (`DrcMode::kOff` keeps the output level).
 with no extension substream linked is refused too: the text does not say what rate it is at.
 
 No stream at these rates was available, and no other decoder: the tests decode streams built from the
-text (`tests/golden/ac4-hsf/` and `tests/ac4dec/ac4dec_hsf.hpp`), each channel a tone above 24 kHz where the
+text (`tests/golden/ac4-hsf/` and `tests/ac4/decoder/ac4dec_hsf.hpp`), each channel a tone above 24 kHz where the
 base rate has none, and hold the output to its frequency, level and waveform. The readings the text left open
-are in `src/ac4dec/ERRATA.md` under "96 and 192 kHz".
+are in `src/ac4/ERRATA.md` under "96 and 192 kHz".
 
 ## Choosing a presentation
 
@@ -209,7 +209,7 @@ needs no I-frame; its signal starts from silence.
 Of the presentations this decoder can decode, the stream has not disabled and whose `md_compat` is
 within the decoder's level, the one that meets the choice is decoded, the first in the table of
 contents among equals. `iclforge::ac4::select_presentation(toc, choice, level)` makes the same choice from a
-table of contents alone. Where the text leaves the choice open, `src/ac4dec/ERRATA.md` records the
+table of contents alone. Where the text leaves the choice open, `src/ac4/ERRATA.md` records the
 reading taken. `forge decode` takes the choice as `presentation=` (the position),
 `presentation-id=`, `language=`, `associated=` and `headphones`.
 
@@ -468,22 +468,22 @@ namespace tells them apart. A decoder or an encoder that refuses says why in wor
 **In-tree:**
 
 ```cmake
-target_link_libraries(your_target PRIVATE iclforge::ac4dec)   # brings iclforge::ac4 with it
-target_link_libraries(your_target PRIVATE iclforge::ac4enc)   # likewise
+target_link_libraries(your_target PRIVATE iclforge::ac4)   # brings iclforge::ac4 with it
+target_link_libraries(your_target PRIVATE iclforge::ac4)   # likewise
 ```
 
 **Installed package** (`find_package(iclforge)`, see [Using the libraries](index.md)):
 
 ```cmake
 find_package(iclforge REQUIRED)
-target_link_libraries(your_target PRIVATE iclforge::ac4dec_static)   # or iclforge::ac4dec_shared
-target_link_libraries(your_target PRIVATE iclforge::ac4enc_static)   # or iclforge::ac4enc_shared
+target_link_libraries(your_target PRIVATE iclforge::ac4_static)   # or iclforge::ac4_shared
+target_link_libraries(your_target PRIVATE iclforge::ac4_static)   # or iclforge::ac4_shared
 ```
 
 Each decoder and encoder library links the inspector of its own kind, `iclforge::ac4_static` or
 `iclforge::ac4_shared`. A package installed with one linkage, as a vcpkg or Conan one is, also defines
-the bare `iclforge::ac4dec`, `iclforge::ac4enc` and `iclforge::ac4`. The static decoder and encoder call into
-`iclforge::ac4core`, a static archive of the tables and transforms the two share (`libac4core_static.a`,
+the bare `iclforge::ac4`, `iclforge::ac4` and `iclforge::ac4`. The static decoder and encoder call into
+`iclforge::ac4`, a static archive of the tables and transforms the two share (`libac4core_static.a`,
 no headers), which their exported targets name as a link-only dependency; each shared library
 carries the part of it that it uses. Through pkg-config the decoder is `ac4dec` and the encoder
 `ac4enc`, each of which requires `ac4`, and whose static-only forms require `ac4core` privately:

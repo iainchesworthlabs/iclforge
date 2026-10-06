@@ -6,7 +6,7 @@
 // bits into symbols, which gives envelopes, predictor gains and coefficients with the model's own
 // statistics, and the two transcriptions must agree on the size of ssf_data() (where the
 // arithmetic coded data ends, which the next granule starts from), on every stride, band count and
-// line, and on which streams are invalid. tests/golden/ac4dec/ssf/ssf-vectors.txt is its output,
+// line, and on which streams are invalid. tests/golden/ac4/ssf/ssf-vectors.txt is its output,
 // `python tools/references/ssf_ref.py vectors --seed 1 --cases 32 --frames 4`.
 
 #include <cmath>

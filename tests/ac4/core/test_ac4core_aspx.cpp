@@ -1,4 +1,4 @@
-// A-SPX in the AC-4 shared core (src/ac4core/include/iclforge/ac4core/aspx): the subband group
+// A-SPX in the AC-4 shared core (src/ac4/src/core/aspx): the subband group
 // tables of ETSI TS 103 190-1 V1.4.1 Pseudocodes 67 to 74, worked by hand for
 // the two configurations DEE's 2.0 streams use and checked for their
 // invariants over every configuration a stream can select; and the high
@@ -191,7 +191,7 @@ TEST_CASE("every configuration a stream can select gives tables that hold togeth
             }
         }
     }
-    // The counts src/ac4dec/ERRATA.md cites ("The limiter's last group").
+    // The counts src/ac4/ERRATA.md cites ("The limiter's last group").
     CHECK(configurations == 2811);
     CHECK(noise_refusals == 5);
     CHECK(patches_short == 232);
@@ -297,7 +297,7 @@ TEST_CASE("with no tonal adjustment the generator copies each patch's source sub
 TEST_CASE("pre-flattening patches a low band whose envelope is a cubic in dB flat", "[ac4core][aspx]") {
     // Pseudocode 85 fits the cubic exactly, and every subband the patches
     // fill comes out at the fit's mean: the patch is flattened, the reading
-    // src/ac4dec/ERRATA.md takes under "Pre-flattening's direction". Applied
+    // src/ac4/ERRATA.md takes under "Pre-flattening's direction". Applied
     // as printed, the gain's inverse would double the slope instead.
     const aspx::SubbandGroups g = groups_for({.master_freq_scale = 1,
                                               .start_freq = 6,

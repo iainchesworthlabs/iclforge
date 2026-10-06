@@ -1,6 +1,6 @@
 // iclforge_ac4_encoder_* and the table-of-contents/sync-frame helpers - see
 // iclforge.h's AC-4 section, iclforge::ac4::Encoder
-// (src/ac4enc/include/iclforge/ac4enc/encoder.hpp) and ac4/ac4.hpp's carriage section.
+// (src/ac4/include/iclforge/ac4/encoder/encoder.hpp) and ac4/ac4.hpp's carriage section.
 
 #include <algorithm>
 #include <cstdint>

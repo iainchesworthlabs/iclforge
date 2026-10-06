@@ -554,7 +554,7 @@ struct PresentationConfig {
     // Each of `substreams`' groups' gain (sg_gain, Part 2 Table 70): 0 to
     // -15.5 dB in steps of 0.25, or -infinity; empty for 0 dB throughout.
     // Configuration 1, and configuration 4's dialogue enhancement substream,
-    // take none (src/ac4dec/ERRATA.md, "Substream group gains").
+    // take none (src/ac4/ERRATA.md, "Substream group gains").
     std::vector<double> gains_db{};
     std::optional<AssociatedMix> associated{};
     // Payloads in an EMDF payloads substream its emdf_info() names, in every

@@ -81,7 +81,7 @@ header that moved changed with it (`ac3/core/layout.hpp` is `iclforge/base/layou
 | `ac3::audio`, `ac3::sendspin`, `ac3::signing`, `ac3::admbridge`, `ac3::arithmetic` | `iclforge::audio`, `iclforge::sendspin`, `iclforge::signing`, `iclforge::admbridge`, `iclforge::arithmetic` |
 | `matroska::matroska`, `mp4::mp4`, `mpegts::mpegts`, `iamf::iamf` | `iclforge::matroska`, `iclforge::mp4`, `iclforge::mpegts`, `iclforge::iamf` |
 | `ac3iab::ac3iab`, `ac3adm::ac3adm` | `iclforge::iab`, `iclforge::adm` |
-| `ac4::ac4`, `ac4::decoder`, `ac4::encoder`, `ac4::core` | `iclforge::ac4`, `iclforge::ac4dec`, `iclforge::ac4enc`, `iclforge::ac4core` |
+| `ac4::ac4`, `ac4::decoder`, `ac4::encoder`, `ac4::core` | `iclforge::ac4`, `iclforge::ac4`, `iclforge::ac4`, `iclforge::ac4` |
 
 ## Bindings and environment
 

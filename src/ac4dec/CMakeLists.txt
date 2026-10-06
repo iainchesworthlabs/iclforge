@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::ac4dec - an AC-4 decoder, ETSI TS 103 190-1 V1.4.1 and TS 103 190-2
+# iclforge::ac4 - an AC-4 decoder, ETSI TS 103 190-1 V1.4.1 and TS 103 190-2
 # V1.3.1, written from the published texts.
 #
 # A peer of src/ac4 (iclforge::ac4, the bitstream inspector) and, like it,
@@ -11,7 +11,7 @@
 #
 # Made by iclforge_add_library() (cmake/IclforgeLibrary.cmake), as src/ac4 is,
 # and installed and exported with the inspector and the core as
-# iclforge::ac4dec_static and iclforge::ac4dec_shared (cmake/InstallLibrary.cmake).
+# iclforge::ac4_static and iclforge::ac4_shared (cmake/InstallLibrary.cmake).
 # ---------------------------------------------------------------------------
 
 # Each library links the inspector of its own kind, PUBLIC, since the
@@ -64,7 +64,7 @@ iclforge_add_library(ac4dec
         src/syntax/substream.cpp
     DEPENDS ac4
     BUILD_TREE_DEPENDS
-    EMBEDS iclforge::ac4core
+    EMBEDS iclforge::ac4
     PRIVATE_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/src"
     LINK_PRIVATE "$<BUILD_INTERFACE:iclforge::arithmetic>")
 

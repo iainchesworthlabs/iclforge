@@ -2,7 +2,7 @@
 
 The readings this encoder takes where ETSI TS 103 190-1 V1.4.1 (Part 1) and ETSI TS 103 190-2 V1.3.1
 (Part 2) leave a writer's choice open. Where the decoder depends on the same reading,
-`src/ac4dec/ERRATA.md` has the entry and this page points at it; the writer and both readers take it.
+`src/ac4/ERRATA.md` has the entry and this page points at it; the writer and both readers take it.
 
 The evidence for a reading is one of:
 
@@ -36,11 +36,11 @@ The writer takes the decoder's reading of each of these:
   transform is the transpose of the decoder's, through the same windows, with lines scaled by 2^16 so
   that a full-scale input decodes at full scale.
 - [Partial coupling starts at acpl_param_band](../ac4dec/ERRATA.md#partial-coupling-starts-at-acpl_param_band):
-  the A-CPL writer (`src/ac4enc/src/acpl/acpl_syntax.hpp`, phase D5's, for the constructed streams and
+  the A-CPL writer (`src/ac4/src/encoder/acpl/acpl_syntax.hpp`, phase D5's, for the constructed streams and
   for E4) sends each parameter set from `acpl_param_band`, its first value along frequency from the F0
   codebook, as Table 65 reads it.
 - The immersive element (phase D9's, for the constructed 7.X.4 streams): the frame writer's 7.X.4 channel
-  modes with their presence flags, and the A-JCC writer (`src/ac4enc/src/ajcc/ajcc_syntax.hpp`), take
+  modes with their presence flags, and the A-JCC writer (`src/ac4/src/encoder/ajcc/ajcc_syntax.hpp`), take
   [The framing of the immersive element's chparam_info()](../ac4dec/ERRATA.md#the-framing-of-the-immersive-elements-chparam_info)
   and [immersive_codec_mode_code in the trace](../ac4dec/ERRATA.md#immersive_codec_mode_code-in-the-trace);
   `custom_dmx_data()` sends custom downmix data for the height downmix alone ("The height downmix", below)
@@ -49,9 +49,9 @@ The writer takes the decoder's reading of each of these:
   [Where a .2 source's top pair is carried](../ac4dec/ERRATA.md#where-a-2-sources-top-pair-is-carried), and
   a writer that sends custom downmix data in I-frames alone, as DEE does, relies on
   [Custom downmix data](../ac4dec/ERRATA.md#custom-downmix-data) to hold them between.
-- Object audio (phase D10's, for the constructed object streams of `tests/ac4dec/ac4dec_objects.cpp`):
-  the A-JOC writer (`src/ac4enc/src/ajoc/ajoc_syntax.hpp`), the object audio metadata writer
-  (`src/ac4enc/src/oamd/oamd_syntax.hpp`) and the table of contents' object groups take
+- Object audio (phase D10's, for the constructed object streams of `tests/ac4/decoder/ac4dec_objects.cpp`):
+  the A-JOC writer (`src/ac4/src/encoder/ajoc/ajoc_syntax.hpp`), the object audio metadata writer
+  (`src/ac4/src/encoder/oamd/oamd_syntax.hpp`) and the table of contents' object groups take
   [Arrays read as one field](../ac4dec/ERRATA.md#arrays-read-as-one-field),
   [Prefix codes in the trace](../ac4dec/ERRATA.md#prefix-codes-in-the-trace),
   [add_per_object_md()'s parameters](../ac4dec/ERRATA.md#add_per_object_mds-parameters),
@@ -116,7 +116,7 @@ equal on every ASPX stream they write:
   behind the analysis's input; the spectral frontend codes that output as far on, so that the decoder's
   analysis of what it decodes sees the compressed slots on the same axis.
 - **Evidence:** Observation. A 1 kHz tone whose level steps by 30 dB steps by 0.65 of that, 19.5 dB,
-  compressed (`tests/ac4enc/test_ac4enc_aspx.cpp`), and the encoder's companded streams decode within
+  compressed (`tests/ac4/encoder/test_ac4enc_aspx.cpp`), and the encoder's companded streams decode within
   0.4 dB of their source's level.
 
 ### A sinusoid's group carries its energy
@@ -148,7 +148,7 @@ equal on every ASPX stream they write:
   the sweep's values and 80 to 96 % of the music's. DEE's decoded tone lands 15 to 17 dB under the source's
   energy above 16.5 kHz; this encoder's landed 32 to 61 dB under it in 5.1 and 48 to 61 in 5.1.4, and lands 3
   to 4 dB under it with the floors (`tools/checks/score_ac4_encode.py --gold`, G1's sweeps). The sweep test in
-  `tests/ac4enc/test_ac4enc_encoder.cpp` holds it.
+  `tests/ac4/encoder/test_ac4enc_encoder.cpp` holds it.
 
 ### Balance values are sent halved
 
@@ -228,7 +228,7 @@ traces equal on every 5.X and 7.X stream they write:
 - [The 7.X element's additional channels](../ac4dec/ERRATA.md#the-7x-elements-additional-channels): the
   encoder sends `b_use_sap_add_ch` 0, so its additional pair is its own two channels and the reading's
   matrix is not written.
-- Table 213's name for 3/2/2's last pair (the misprints in `src/ac4dec/ERRATA.md`): Tfl and Tfr, as
+- Table 213's name for 3/2/2's last pair (the misprints in `src/ac4/ERRATA.md`): Tfl and Tfr, as
   Tables 88 and 183 have them.
 
 ## A-CPL
@@ -322,7 +322,7 @@ reading of each of these, and the tests hold the three traces equal on every imm
   gain (Table 129), for `out_ch_config` 0 (5.X.0), in I-frames alone, as DEE's streams carry its three
   modes; 7.0.4 and 7.1.4 add the back pair's `gain_b_code`.
 - **Evidence:** Streams: G0's and G1's height downmix legs; the decoder renders the encoder's streams to
-  each route at its gain (`tests/ac4enc/test_ac4enc_immersive.cpp`, `tools/checks/gain_ac4_decode.py`).
+  each route at its gain (`tests/ac4/encoder/test_ac4enc_immersive.cpp`, `tools/checks/gain_ac4_decode.py`).
 
 ### A-JCC's parameters
 
@@ -334,7 +334,7 @@ reading of each of these, and the tests hold the three traces equal on every imm
   A-CPL modules' are; the back module's dry values are the least-squares shares of the column's sum, and
   its wet values those whose decorrelated signals give what the quantised shares leave its covariance.
 - **Evidence:** Readers: one tone per channel decodes on its own channel in full decoding, and in core
-  decoding at Pseudocode 14's gains (`tests/ac4enc/test_ac4enc_immersive.cpp`).
+  decoding at Pseudocode 14's gains (`tests/ac4/encoder/test_ac4enc_immersive.cpp`).
 
 ## Objects
 
@@ -360,7 +360,7 @@ output level's gain and no DRC, so an object presentation refuses DRC gains.
   signal i there.
 - **Evidence:** Readers: each object of a computed downmix, a static 5.1 bed and one with bed objects
   decodes at 40 to 74 dB SNR against the object given, and core decoding gives each downmix signal at its
-  group's centre (`tests/ac4enc/test_ac4enc_objects.cpp`). Chromium's `ac4-ajoc.ac4` has a computed downmix
+  group's centre (`tests/ac4/encoder/test_ac4enc_objects.cpp`). Chromium's `ac4-ajoc.ac4` has a computed downmix
   of ten signals.
 
 ### A-JOC's parameters
@@ -378,7 +378,7 @@ output level's gain and no DRC, so an object presentation refuses DRC gains.
   energy the dry matrix leaves out. Each set goes along frequency, or along time where that takes fewer
   bits outside I-frames, each object sparse where that takes fewer, and not present where every value is
   0. `ajoc_dmx_de_data()` names no dialogue objects.
-- **Evidence:** Readers (`tests/ac4enc/test_ac4enc_objects.cpp`).
+- **Evidence:** Readers (`tests/ac4/encoder/test_ac4enc_objects.cpp`).
 
 ### When an object's metadata changes
 
@@ -394,7 +394,7 @@ output level's gain and no DRC, so an object presentation refuses DRC gains.
   `add_per_object_md()` is sent in every block of an object with trim or headphone data, since each block
   sets them afresh. The ramp is Table 94's code, Table 95's entry or `ramp_duration`, at most 2 047 samples.
 - **Evidence:** Readers: each update of a moving object decodes at its sample, in A-JOC and direct-coded
-  streams (`tests/ac4enc/test_ac4enc_objects.cpp`).
+  streams (`tests/ac4/encoder/test_ac4enc_objects.cpp`).
 
 ### The screen factor and the depth exponent
 
@@ -403,14 +403,14 @@ output level's gain and no DRC, so an object presentation refuses DRC gains.
   `object_depth_factor` (2 bits) together, the factor is printed `object_screen_factor_code+1/8`, and "If the
   object_screen_factor_code element is not present, object_screen_factor shall be 0".
 - **Reading:** the factor is (code + 1) / 8, from 1/8 to 1, as the decoder reads it (`apply_other()` in
-  `src/ac4dec/src/pcm/objects.cpp`), so the group has no code for a factor of 0: a factor of 0 is the group's
+  `src/ac4/src/decoder/pcm/objects.cpp`), so the group has no code for a factor of 0: a factor of 0 is the group's
   absence, which also leaves the depth exponent at 1 ([the decoder's reading](../ac4dec/ERRATA.md#object-audio-metadata)).
   The encoder sends the group for an object whose factor is above 0 or whose exponent is not 1. An exponent
   other than 1 with a factor of 0 has no code. The encoder refuses such an object at configuration, naming the
   reason, and such properties in a metadata update as invalid input; it used to send a factor of 1/8, which
   the decoder then reported. A factor between 0 and 1/16 still rounds to 1/8, the smallest the group holds.
 - **Evidence:** Text; readers: an exponent of each of Table 107's codes with its factor reads back as given
-  (`tests/ac4enc/test_ac4enc_objects.cpp`), and the C API answers a configuration and an update with its two
+  (`tests/ac4/encoder/test_ac4enc_objects.cpp`), and the C API answers a configuration and an update with its two
   encoder statuses (`tests/capi/test_capi_ac4_arguments.cpp`).
 
 ### md_compat for objects
@@ -430,7 +430,7 @@ output level's gain and no DRC, so an object presentation refuses DRC gains.
 - **Reading:** the dynamic objects in their order, five a substream while five are left, then three, two or
   one; the LFE object in the first substream. The group's OAMD substream lists each substream's objects,
   the LFE first, then the element's channels in L, R, C, Ls, Rs order. Bed objects are refused here.
-- **Evidence:** Readers (`tests/ac4enc/test_ac4enc_objects.cpp`).
+- **Evidence:** Readers (`tests/ac4/encoder/test_ac4enc_objects.cpp`).
 
 ## The MP4 sample entry's dac4
 
@@ -441,7 +441,7 @@ contents is derived whole (Annex E.10 and E.11): a single substream group, each 
 targets where the writer gives them (an encoder knows them; `forge mp4` reads them with the decoder);
 what it cannot derive whole it refuses, and `iclforge::ac4::dac4_refusal()` says why. These are the readings it
 takes. Where the evidence is DEE's MP4 muxer, the box it writes is the box `build_dac4()` writes, byte for
-byte (`tests/ac4/test_ac4.cpp`, `tools/checks/check_ac4_encode_readers.py`): for the committed DEE
+byte (`tests/ac4/core/test_ac4.cpp`, `tools/checks/check_ac4_encode_readers.py`): for the committed DEE
 streams and the encoder's single-presentation streams (but for the 3/2/2 layout's top front pair, below),
 and for Chromium's A-JOC stream and DASH-IF's 5.1 test vectors, whose program identifier it copies from
 the table of contents. The muxer refuses a stream of more than one presentation and does not finish one
@@ -535,7 +535,7 @@ every configuration's substream groups as written.
   objects after them.
 - **Evidence:** Streams, for the dynamic case: DEE's muxer writes 0, 1 and 0 for Chromium's A-JOC
   stream, whose upmix of seventeen signals is dynamic objects only. Readers for the encoder's bed objects,
-  which decode as the bed objects they were given (`tests/ac4enc/test_ac4enc_objects.cpp`). Text for the
+  which decode as the bed objects they were given (`tests/ac4/encoder/test_ac4enc_objects.cpp`). Text for the
   rest.
 
 ### An alternative presentation's dac4
@@ -653,9 +653,9 @@ The writer takes the decoder's reading of each of these (phase E5):
 
 ## Presentations
 
-The table of contents of several presentations and their mixing fields (`src/ac4enc/src/frame/toc_writer.cpp`
+The table of contents of several presentations and their mixing fields (`src/ac4/src/encoder/frame/toc_writer.cpp`
 and `metadata.cpp`), which phase D7's test multiplexer writes, and the encoder's presentations of several
-substreams (`src/ac4enc/src/encoder.cpp`), phase E6's. The writer takes the decoder's reading of each of
+substreams (`src/ac4/src/encoder/encoder.cpp`), phase E6's. The writer takes the decoder's reading of each of
 these:
 
 - [presentation_config 1 and 4 read more specifiers than n_substream_groups](../ac4dec/ERRATA.md#presentation_config-1-and-4-read-more-specifiers-than-n_substream_groups)
@@ -708,7 +708,7 @@ these:
   tracks the reading counts, each with `presentation_id` 0 on its one presentation, as the encoder's
   single presentation now has (phases E1 to E5 wrote level 0 and no `presentation_id`). MediaInfo lists
   each committed presentation's level as configured, and the decoder selects each at it
-  (`tests/ac4enc/test_ac4enc_presentations.cpp`).
+  (`tests/ac4/encoder/test_ac4enc_presentations.cpp`).
 
 ### A presentation_id for every presentation that carries audio
 
@@ -764,7 +764,7 @@ these:
   as dialogue beside a complete main, is refused. The 3.0 element is experimental
   (`experimental=three-zero`): no DEE stream has one.
 - **Evidence:** Readers. The decoder and the Python parser read the committed 3.0 stream
-  (`tests/golden/ac4dec/presentations/encoder-three-zero.ac4`) as the encoder wrote it, MediaInfo lists
+  (`tests/golden/ac4/presentations/encoder-three-zero.ac4`) as the encoder wrote it, MediaInfo lists
   it as configured, and the decoder mixes the dialogue channel to channel into the music and effects'
   L, R and C.
 
@@ -780,7 +780,7 @@ these:
   waveform's share alpha_c is the caller's (`DialogueConfig::waveform_share`), sent as
   `de_signal_contribution`.
 - **Evidence:** Text; each method's output measures to 0.01 dB against the main and the waveform decoded
-  alone, as the decoder's reading combines them (`tests/ac4enc/test_ac4enc_presentations.cpp`).
+  alone, as the decoder's reading combines them (`tests/ac4/encoder/test_ac4enc_presentations.cpp`).
 
 ### Mixing values across I-frames
 

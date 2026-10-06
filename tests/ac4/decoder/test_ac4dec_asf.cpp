@@ -1,4 +1,4 @@
-// The AC-4 decoder's ASF syntax (src/ac4dec/src/syntax/asf.cpp) and scale
+// The AC-4 decoder's ASF syntax (src/ac4/src/decoder/syntax/asf.cpp) and scale
 // factor band tables (tables/sfb_tables.cpp) on hand-built bitstreams:
 // sf_info() for long, short and differently framed transforms at each frame
 // length family, sf_data() with every spectral codebook, escapes, scale

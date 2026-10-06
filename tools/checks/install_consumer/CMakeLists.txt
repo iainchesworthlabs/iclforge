@@ -17,8 +17,8 @@
 # pinned to the C driver, which is what a C-only project gets: the shared library carries the C++
 # runtime it needs, and the driver would otherwise be chosen by whatever else lands on the link line.
 #
-# One C++ consumer per AC-4 decoder target the package exports, in the same way: iclforge::ac4dec_shared
-# and iclforge::ac4dec_static, or the bare iclforge::ac4dec of a single-linkage package. consumer_ac4.cpp
+# One C++ consumer per AC-4 decoder target the package exports, in the same way: iclforge::ac4_shared
+# and iclforge::ac4_static, or the bare iclforge::ac4 of a single-linkage package. consumer_ac4.cpp
 # decodes a committed stream through the installed inspector and decoder. And one per AC-4 encoder
 # target: consumer_ac4enc.cpp encodes a tone through the installed encoder and reads the stream
 # back with the inspector. A package built with ICLFORGE_BUILD_AC4=OFF has neither;
@@ -65,7 +65,7 @@ cmake_path(APPEND here .. .. .. tests golden external-baseline ac4-51-film-96 de
 cmake_path(NORMAL_PATH ac4_stream)
 
 set(ac4_consumers)
-foreach(target IN ITEMS iclforge::ac4dec_shared iclforge::ac4dec_static iclforge::ac4dec)
+foreach(target IN ITEMS iclforge::ac4_shared iclforge::ac4_static iclforge::ac4)
     if(NOT TARGET ${target})
         continue()
     endif()
@@ -83,14 +83,14 @@ endforeach()
 if(ICLFORGE_EXPECT_AC4 AND NOT ac4_consumers)
     message(FATAL_ERROR
         "the package was built with ICLFORGE_BUILD_AC4=ON and exports none of "
-        "iclforge::ac4dec_shared, iclforge::ac4dec_static or iclforge::ac4dec - see cmake/InstallLibrary.cmake")
+        "iclforge::ac4_shared, iclforge::ac4_static or iclforge::ac4 - see cmake/InstallLibrary.cmake")
 endif()
 if(ac4_consumers)
     message(STATUS "AC-4 consumers of the installed package, each linked and run: ${ac4_consumers}")
 endif()
 
 set(ac4enc_consumers)
-foreach(target IN ITEMS iclforge::ac4enc_shared iclforge::ac4enc_static iclforge::ac4enc)
+foreach(target IN ITEMS iclforge::ac4_shared iclforge::ac4_static iclforge::ac4)
     if(NOT TARGET ${target})
         continue()
     endif()
@@ -108,7 +108,7 @@ endforeach()
 if(ICLFORGE_EXPECT_AC4 AND NOT ac4enc_consumers)
     message(FATAL_ERROR
         "the package was built with ICLFORGE_BUILD_AC4=ON and exports none of "
-        "iclforge::ac4enc_shared, iclforge::ac4enc_static or iclforge::ac4enc - see cmake/InstallLibrary.cmake")
+        "iclforge::ac4_shared, iclforge::ac4_static or iclforge::ac4 - see cmake/InstallLibrary.cmake")
 endif()
 if(ac4enc_consumers)
     message(STATUS

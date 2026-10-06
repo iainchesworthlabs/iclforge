@@ -1,4 +1,4 @@
-// The inspector's table of contents (src/ac4/src/ac4.cpp) on hand-built
+// The inspector's table of contents (src/ac4/src/core/toc.cpp) on hand-built
 // frames, for the syntax branches no committed stream and no other case in
 // tests/ac4 reaches: every channel_mode code of both parts with its optional
 // fields, the TOC-level escapes (wait frames, payload base, program id,
@@ -7,7 +7,7 @@
 // presentations of every shape, object and A-JOC substream infos with each
 // bed assignment, oamd_common_data()'s nested elements, the sync frame's
 // extended size, and the carriage helpers on a version 0 table of contents.
-// The frames come from tests/ac4/ac4_toc_writer.hpp, which shares no code
+// The frames come from tests/ac4/core/ac4_toc_writer.hpp, which shares no code
 // with src/ac4.
 
 #include <array>

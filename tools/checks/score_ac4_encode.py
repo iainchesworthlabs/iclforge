@@ -171,7 +171,7 @@ LEGS = {
 # SIMPLE, MOS floor), the first measurement less 1 dB, plus 0.5 dB, plus 0.5 dB and less 0.1.
 # Measured 2026-09-25 with the encoder of phase E2 and the decoder of phase D4, whose QMF banks
 # every decode passes through: they reconstruct to about 78 dB, which bounds the sweeps' SNR.
-# Phase D4's reading of pre-flattening (src/ac4dec/ERRATA.md, "Pre-flattening's direction") moved
+# Phase D4's reading of pre-flattening (src/ac4/ERRATA.md, "Pre-flattening's direction") moved
 # the ASPX legs' pins from those phase E2 took. The 5.0 and 5.1 legs, measured with the encoder of
 # phase E3, are scored per channel below its own crossover, and a 5.1 leg's LFE over its whole band,
 # where the 140.6 Hz the LFE is coded to (three scale factor bands, as DEE's) leaves the source's

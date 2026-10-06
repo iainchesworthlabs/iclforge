@@ -122,10 +122,10 @@ set(ICLFORGE_PROBE_HEAP_BUDGET_BYTES "0" CACHE STRING
 target_compile_definitions(iclforge-probe PRIVATE
     ICLFORGE_PROBE_HEAP_BUDGET_BYTES=${ICLFORGE_PROBE_HEAP_BUDGET_BYTES})
 
-# What the AC-4 probe decodes with is iclforge::ac4dec, whose archives bring the inspector
+# What the AC-4 probe decodes with is iclforge::ac4, whose archives bring the inspector
 # and the core; it links nothing of iclforge::ac3, and has no use for its decoders.
 if(ICLFORGE_MINIMAL_AC4)
-    target_link_libraries(iclforge-probe PRIVATE iclforge::ac4dec_static iclforge::minimal_profile
+    target_link_libraries(iclforge-probe PRIVATE iclforge::ac4_static iclforge::minimal_profile
                                            iclforge::warnings)
 else()
     target_link_libraries(iclforge-probe PRIVATE iclforge::ac3_minimal iclforge::warnings)

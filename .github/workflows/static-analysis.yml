@@ -156,7 +156,7 @@ jobs:
         # arithmetic and iec61937; the pattern kept naming forge, so the nightly of
         # 2026-10-01 analysed none of that code. Each library's sources sit in
         # <library>/src, and the pattern says so: an unanchored src/dsp also matches
-        # src/ac4core/src/dsp, which is outside the scope on purpose.
+        # src/ac4/src/core/dsp, which is outside the scope on purpose.
         run: |
           "run-clang-tidy-${LLVM_VERSION}" -j "$(nproc)" -p build/config-linux-llvm-debug \
             -warnings-as-errors='*' \

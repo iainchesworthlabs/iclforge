@@ -27,7 +27,7 @@ phase D6):
            loudness correction where it downmixes: in full decoding Tables 38 to 43 from the
            source's configuration, in core decoding Table 46 over the inverse of Table 45, which
            the as-coded output took, and for two channels and one Table 218 after 5.X.0 with the
-           stereo correction alone, the core's in core decoding (src/ac4dec/ERRATA.md, "The
+           stereo correction alone, the core's in core decoding (src/ac4/ERRATA.md, "The
            channel renderer"). Every channel with signal to 0.01 dB, and what the matrix leaves
            80 dB under the output.
 
@@ -42,7 +42,7 @@ phase D6):
 All skip the first three frames, where the stream's values have not yet reached the QMF domain,
 and stop three frames before the first frame whose values differ from the first frame's: DEE's
 immersive stereo at 24 and 25 fps sends a dialnorm of -24 dBFS in its last frame. DRC's curves and
-dialogue enhancement's gains are held on known input by tests/ac4dec/test_ac4dec_drc.cpp and
+dialogue enhancement's gains are held on known input by tests/ac4/decoder/test_ac4dec_drc.cpp and
 test_ac4dec_de.cpp; this script reads the gains from the stream, as those tests cannot.
 
 The committed legs (tests/golden/external-baseline/) are checked by default. --gold DIR checks
@@ -367,7 +367,7 @@ def render_gains(cdmx, out_ch_config, bs_ch_config):
 
 def downmixes(source, output):
     """Whether rendering configuration `source` to `output` downmixes, the output narrower or
-    lower (src/ac4dec/ERRATA.md, "The loudness correction of a render")."""
+    lower (src/ac4/ERRATA.md, "The loudness correction of a render")."""
     (width_in, tops_in), (width_out, tops_out) = configuration(source), configuration(output)
     return width_out < width_in or tops_out < tops_in
 

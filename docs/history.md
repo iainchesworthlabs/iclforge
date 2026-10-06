@@ -503,7 +503,7 @@ frame rate with the output level, DRC, dialogue enhancement and the downmix, pre
 immersive element and A-JOC objects) was scored against the sources DEE encoded, by SNR,
 log-spectral distance, ViSQOL and each A-SPX tile's energy, and against librempeg's decoder where it
 reads the stream. About seventy places where the standard's pseudocode, a formula and a table
-disagree are kept in `src/ac4dec/ERRATA.md` with the reading taken and its evidence. Two of them
+disagree are kept in `src/ac4/ERRATA.md` with the reading taken and its evidence. Two of them
 changed the output: the QMF synthesis modulation offset, where only Pseudocode 66's 255 reconstructs
 (78 dB, against 43 dB for the formula's 257), and A-SPX's pre-flattening, which the standard prints
 as the inverse of the gain it needs and which left the top of DEE's 5.1 film centre 4.6 dB under the

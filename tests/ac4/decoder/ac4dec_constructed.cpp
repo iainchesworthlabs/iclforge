@@ -187,7 +187,7 @@ constexpr double kGamma = 6552.0 / 16384.0;
 }
 
 // Part 2 Table 21, as a table of this builder's own (the decoder's is in
-// src/ac4dec/src/pcm/routing.cpp): the two LFEs' mono_data(1), then each
+// src/ac4/src/decoder/pcm/routing.cpp): the two LFEs' mono_data(1), then each
 // two_channel_data()'s outputs, in syntax order.
 constexpr std::array<std::pair<Speaker, Speaker>, 11> k22_2Pairs = {{
     {Speaker::kLeft, Speaker::kRight},

@@ -1,4 +1,4 @@
-// The AC-4 decoder probe (planning/ac4.md, D14a): iclforge::ac4dec decoding committed AC-4
+// The AC-4 decoder probe (planning/ac4.md, D14a): iclforge::ac4 decoding committed AC-4
 // streams on a target with no operating system, no filesystem and no C++ exceptions, and
 // reporting what that cost. The AC-4 half of what probe.cpp is for AC-3 and E-AC-3, and
 // like probe.cpp it is neither a demo nor a unit test.

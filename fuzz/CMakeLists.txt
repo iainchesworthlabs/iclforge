@@ -230,7 +230,7 @@ endif()
 # list whose count, per-presentation substream group counts and
 # substream_index_table sizes are all read from the bitstream, after which
 # parse_raw_frame locates payloads by those declared sizes rather than by
-# parsing through audio_data (src/ac4/src/ac4.cpp). parse_raw_frame is called
+# parsing through audio_data (src/ac4/src/core/toc.cpp). parse_raw_frame is called
 # on the raw input as well as reached through scan(), so the TOC parser is
 # pressed without a valid 0xAC40/0xAC41 syncframe having to be guessed first.
 #
@@ -335,7 +335,7 @@ endif()
 # contents fuzz_ac4_parse presses (src/ac4dec) - section lengths, Huffman
 # codewords, A-SPX envelope counts, DRC gain sets and EMDF payloads, each
 # counted by the stream - and, from D2, the reconstruction of what they
-# decode to. iclforge_ac4dec_objects is a library of its own, so it needs its own
+# decode to. iclforge_ac4_objects is a library of its own, so it needs its own
 # instrumentation call, as fuzz_ac4_parse's parser does, and so does the
 # shared core it links (src/ac4core: the tables and transforms). Its seeds
 # are fuzz_ac4_parse's (fuzz/run.sh's seed_source_for).
@@ -347,8 +347,8 @@ endif()
 # fuzz/regressions/fuzz_ac4_decode/.
 if(ICLFORGE_BUILD_AC4)
     iclforge_instrument_for_fuzzing(iclforge_ac4core)
-    iclforge_instrument_for_fuzzing(iclforge_ac4dec_objects)
-    iclforge_add_fuzzer(fuzz_ac4_decode iclforge::ac4dec)
+    iclforge_instrument_for_fuzzing(iclforge_ac4_objects)
+    iclforge_add_fuzzer(fuzz_ac4_decode iclforge::ac4)
 endif()
 
 # iclforge::ac4::Encoder (src/ac4enc): configurations and samples from the input, each
@@ -357,8 +357,8 @@ endif()
 # (planning/ac4.md, the encoder's ladder, items 1 and 8). The core and the
 # decoder are instrumented by the block above.
 if(ICLFORGE_BUILD_AC4)
-    iclforge_instrument_for_fuzzing(iclforge_ac4enc_objects)
-    iclforge_add_fuzzer(fuzz_ac4_encode iclforge::ac4enc iclforge::ac4dec)
+    iclforge_instrument_for_fuzzing(iclforge_ac4_objects)
+    iclforge_add_fuzzer(fuzz_ac4_encode iclforge::ac4 iclforge::ac4)
 endif()
 
 # --- Sendspin (planning/hearth-reference-player.md, A4) ----------------------

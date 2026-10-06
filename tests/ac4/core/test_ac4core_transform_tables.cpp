@@ -1,4 +1,4 @@
-// The inverse transform's built-in tables (src/ac4core/include/iclforge/ac4core/dsp/transform_tables.hpp,
+// The inverse transform's built-in tables (src/ac4/src/core/dsp/transform_tables.hpp,
 // planning/ac4.md, the decoder's memory): at the float and fixed-point tiers a transform reads its
 // roots, twiddles and window from flash for the lengths of a 2048-sample frame, and every value
 // there must be the bits the decoder computes when it builds its own, on the compiler and C

@@ -341,7 +341,7 @@ inline constexpr std::array<std::int32_t, 2> kAc420MusicRms{{
     13283, 18310
 }};
 
-// AC-4 2.0 constructed, A-CPL - tests/golden/ac4dec/constructed/2_0-acpl1-stereoproc.ac4, 2462 bytes, 4 frames.
+// AC-4 2.0 constructed, A-CPL - tests/golden/ac4/constructed/2_0-acpl1-stereoproc.ac4, 2462 bytes, 4 frames.
 inline constexpr int kAc420AcplFrames = 4;
 inline constexpr std::array<std::uint8_t, 2462> kAc420AcplStream{{
     0xac, 0x41, 0x02, 0x61, 0x80, 0x08, 0xee, 0x60, 0x00, 0x00, 0x4b, 0x8b,
@@ -912,7 +912,7 @@ inline constexpr std::array<std::int32_t, 6> kAc451MusicRms{{
     13224, 18281, 14134, 410, 27346, 17513
 }};
 
-// AC-4 5.1 constructed, A-CPL - tests/golden/ac4dec/constructed/5_1-acpl1-config1-matsel7.ac4, 5736 bytes, 4 frames.
+// AC-4 5.1 constructed, A-CPL - tests/golden/ac4/constructed/5_1-acpl1-config1-matsel7.ac4, 5736 bytes, 4 frames.
 inline constexpr int kAc451AcplFrames = 4;
 inline constexpr std::array<std::uint8_t, 5736> kAc451AcplStream{{
     0xac, 0x41, 0x05, 0x7e, 0x80, 0x08, 0xee, 0x60, 0x00, 0x00, 0x4b, 0xe2,

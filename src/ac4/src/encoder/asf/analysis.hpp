@@ -19,7 +19,7 @@
 // Those are what the decoder's overlap-add puts back at the same places.
 //
 // Scale: the decoder's inverse transform returns a windowed round trip at
-// half gain, and writes full scale 1.0 at 32 768 (src/ac4dec/ERRATA.md, "Full
+// half gain, and writes full scale 1.0 at 32 768 (src/ac4/ERRATA.md, "Full
 // scale, and the overlap-add's factor of two"), so the lines are the forward
 // transform of the windowed samples times 65 536.
 

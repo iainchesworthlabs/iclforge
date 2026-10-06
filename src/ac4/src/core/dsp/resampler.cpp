@@ -275,7 +275,7 @@ std::size_t Resampler<Real>::outputs_for(std::size_t count) const noexcept {
 
 template class BasicResamplerFilter<Real>;
 template class Resampler<Real>;
-// The encoder's own sample rate handling (src/ac4enc/src/encoder.cpp) calls
+// The encoder's own sample rate handling (src/ac4/src/encoder/encoder.cpp) calls
 // this at double regardless of the decoder's scalar (see this target's
 // CMakeLists.txt, AC4CORE_ALSO_AT_DOUBLE), with the double filter.
 AC4CORE_ALSO_AT_DOUBLE(template class BasicResamplerFilter<double>;)

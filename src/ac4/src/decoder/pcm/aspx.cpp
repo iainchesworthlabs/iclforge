@@ -39,7 +39,7 @@ constexpr std::array<Real, 4> kSineIm = {Real{0}, Real{1}, Real{0}, Real{-1}};
 
 // Exponents of 2 outside this range come only from streams that are not
 // audio: real envelopes span a few hundred dB at most. Clamping keeps every
-// value the adjuster computes finite (src/ac4dec/ERRATA.md, "Scale factors
+// value the adjuster computes finite (src/ac4/ERRATA.md, "Scale factors
 // far out of range").
 constexpr Energy kMinExponent{-96};
 constexpr Energy kMaxExponent{96};
@@ -183,7 +183,7 @@ void noise_qscf(const AspxChannel& c, const aspx::SubbandGroups& g, int delta,
 
 // Pseudocodes 82 and 83. Pseudocode 82 tests scf_sig_sbg[1][atsg] < 0, which
 // no dequantised value is; the quantised qscf_sig_sbg is read
-// (src/ac4dec/ERRATA.md, "The first signal scale factor below zero").
+// (src/ac4/ERRATA.md, "The first signal scale factor below zero").
 void dequantise(const AspxChannel& c, const aspx::SubbandGroups& g, Envelopes& e) {
     const Energy a = c.qmode_env == 0 ? Energy{2} : Energy{1};
     const AspxFraming& f = c.framing;
@@ -361,7 +361,7 @@ void ChannelAssembly::run(std::vector<QmfValue>& q_high) {
 // Pseudocode 90. The envelope's energy, summed over QMF slots, is divided by
 // its length in QMF slots, where the text divides by A-SPX slots: the mean
 // energy per QMF subsample that clause 3.1 makes a signal scale factor
-// (src/ac4dec/ERRATA.md, "The estimated envelope's time divisor").
+// (src/ac4/ERRATA.md, "The estimated envelope's time divisor").
 void ChannelAssembly::estimate(std::span<const QmfValue> q_high) {
     const int sbx = g_.sbx;
     for (int atsg = 0; atsg < f_.num_env; ++atsg) {
@@ -420,7 +420,7 @@ void ChannelAssembly::map_scale_factors() {
 }
 
 // Pseudocodes 92 and 93. The middle of a group is (int)(0.5 * (sbz + sba)),
-// the cast taken over the product (src/ac4dec/ERRATA.md, "The sinusoid's
+// the cast taken over the product (src/ac4/ERRATA.md, "The sinusoid's
 // subband").
 void ChannelAssembly::place_sinusoids() {
     const int sbx = g_.sbx;
@@ -452,7 +452,7 @@ void ChannelAssembly::place_sinusoids() {
 }
 
 // Pseudocodes 94 and 95. Pseudocode 95 sets b_sine_at_end and then tests
-// p_sine_at_end, Pseudocode 92's; that is the one used (src/ac4dec/ERRATA.md,
+// p_sine_at_end, Pseudocode 92's; that is the one used (src/ac4/ERRATA.md,
 // "b_sine_at_end").
 void ChannelAssembly::compute_gains() {
     constexpr Energy kEpsilon = dsp::qmf_energy<Real>(Energy{1});
@@ -479,9 +479,9 @@ void ChannelAssembly::compute_gains() {
 }
 
 // Pseudocodes 96 to 101, with aspx_limiter set; without it the gains and
-// levels go on as they are (src/ac4dec/ERRATA.md, "aspx_limiter"). A subband
+// levels go on as they are (src/ac4/ERRATA.md, "aspx_limiter"). A subband
 // above the limiter table's last border counts in its last group
-// (src/ac4dec/ERRATA.md, "The limiter's last group").
+// (src/ac4/ERRATA.md, "The limiter's last group").
 void ChannelAssembly::limit() {
     if (!frame_.config->limiter) {
         return;
@@ -550,7 +550,7 @@ void ChannelAssembly::limit() {
 
 // Pseudocodes 102 to 108. The noise and sine indices count on from the last
 // ones the previous interval used, whatever its borders, and time counts from
-// the interval's first QMF slot (src/ac4dec/ERRATA.md, "The noise and tone
+// the interval's first QMF slot (src/ac4/ERRATA.md, "The noise and tone
 // generators' indices").
 // In place: `buffer` holds the high band and leaves holding Y, which is zero wherever
 // Pseudocode 106 writes nothing (each assembled value reads the high band only where it is

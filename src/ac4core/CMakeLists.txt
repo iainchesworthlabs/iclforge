@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::ac4core - what the AC-4 decoder (src/ac4dec) and the AC-4 encoder compute
+# iclforge::ac4 - what the AC-4 decoder (src/ac4dec) and the AC-4 encoder compute
 # alike, built and tested once (planning/ac4.md, "Where the libraries live"):
 # the tables generated from the ETSI attachments, and the transforms.
 #
@@ -14,7 +14,7 @@
 # The syntax is not here: the decoder's reader and the encoder's writer are
 # separate transcriptions of the syntax tables, in opposite directions.
 #
-# Installed and exported as iclforge::ac4core wherever the static decoder and encoder
+# Installed and exported as iclforge::ac4 wherever the static decoder and encoder
 # are (cmake/InstallLibrary.cmake): libac4dec_static.a and libac4enc_static.a
 # call into it and do not contain it, as no archive contains what it links, so
 # their exported targets name it as a link-only dependency and a consumer links
@@ -24,7 +24,7 @@
 # (cmake/PkgConfig.cmake) tell an archive. It has no headers to install.
 # ---------------------------------------------------------------------------
 add_library(iclforge_ac4core STATIC)
-add_library(iclforge::ac4core ALIAS iclforge_ac4core)
+add_library(iclforge::ac4 ALIAS iclforge_ac4core)
 
 target_sources(iclforge_ac4core
     PRIVATE
@@ -91,7 +91,7 @@ endif()
 # acpl/acpl.hpp, ajcc/ajcc.hpp, ajoc/ajoc.hpp, dsp/qmf.hpp, dsp/mdct.hpp,
 # dsp/fft.hpp, dsp/resampler.hpp, dsp/synthesis.hpp) #include
 # "iclforge/ac4core/detail/real.hpp" themselves, and src/ac4dec and src/ac4enc compile
-# against those headers through iclforge::ac4core as a COMPILE_ONLY dependency (their
+# against those headers through iclforge::ac4 as a COMPILE_ONLY dependency (their
 # own CMakeLists.txt) - a consumer that only ever compiles against a target,
 # never links it, still needs that target's PUBLIC usage requirements, this
 # include directory among them, or its own translation units cannot resolve

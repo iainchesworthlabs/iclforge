@@ -15,7 +15,7 @@
 // counterpart performs, in the same order: one IEEE add, subtract or multiply at a
 // time, no fused multiply-add (the build pins -ffp-contract=off, and the seam's
 // operators are single instructions), so a result equals the scalar loop's bit for
-// bit. tests/ac4core/test_ac4core_dsp.cpp holds each to that, on random data, at
+// bit. tests/ac4/core/test_ac4core_dsp.cpp holds each to that, on random data, at
 // both scalars.
 //
 // The planes make the lanes independent: a window's outputs, a transform pass's

@@ -1,5 +1,5 @@
 // The AC-4 decoder's presentation substream syntax
-// (src/ac4dec/src/syntax/presentation.cpp): what presentation_context_v1()
+// (src/ac4/src/decoder/syntax/presentation.cpp): what presentation_context_v1()
 // derives from a table of contents, and ac4_presentation_substream() with its
 // targets, additional data, substream group gains, custom downmix data and
 // loudness corrections, on hand-built bitstreams. The committed DEE streams

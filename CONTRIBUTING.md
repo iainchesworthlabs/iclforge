@@ -71,7 +71,7 @@ This is the constraint the whole project rests on. Breaking it makes the code un
   and the A-JOC and A-JCC codebooks the same way. Those files are the standard, not an
   implementation of it.
 - Where a standard is ambiguous or contradicts itself, the reading taken and its evidence go in
-  an `ERRATA.md` beside the code (`src/ac4dec/ERRATA.md`, `src/ac4enc/ERRATA.md`).
+  an `ERRATA.md` beside the code (`src/ac4/ERRATA.md`, `src/ac4enc/ERRATA.md`).
 
 If you cannot cite where something came from, it does not go in.
 
@@ -215,7 +215,7 @@ Not useful:
 ```
 
 Where behaviour is deliberately narrower than the standard, say so and say why — see the
-opening comment of `src/ac4dec/include/iclforge/ac4dec/decoder.hpp` for the pattern: what the decoder
+opening comment of `src/ac4/include/iclforge/ac4/decoder/decoder.hpp` for the pattern: what the decoder
 does, then what it refuses, by name and with a reason. A clean refusal is a design statement;
 a silent gap is a bug waiting to be found by someone else.
 

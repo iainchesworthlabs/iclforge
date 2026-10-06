@@ -22,7 +22,7 @@ ac4 = ac3.ac4
 RATE = 48_000
 FRAME = 2048
 # Each object's tone sits at the middle of a QMF subband of its own (a parameter band of its own in
-# A-JOC's matrices), the LFE's at 47 Hz, as tests/ac4enc/test_ac4enc_objects.cpp has them.
+# A-JOC's matrices), the LFE's at 47 Hz, as tests/ac4/encoder/test_ac4enc_objects.cpp has them.
 SUBBANDS = [1, 3, 5, 7, 9, 12, 16, 22]
 LFE_HZ = 47.0
 # Six frames of input; the update sits at sample 5000, in the third.

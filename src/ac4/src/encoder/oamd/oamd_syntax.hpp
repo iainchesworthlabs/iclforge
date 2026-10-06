@@ -15,7 +15,7 @@
 // oamd_dyndata_multi(), object_info_block() with object_basic_info(),
 // object_render_info() and add_per_object_md() - and clause 6.2.2.4's
 // oamd_substream(). Transcribed for writing, separate from the decoder's reader
-// (src/ac4dec/src/syntax/oamd.cpp) and the Python parser; the traces agree
+// (src/ac4/src/decoder/syntax/oamd.cpp) and the Python parser; the traces agree
 // record for record.
 //
 // The fields are the syntax's codes. A prefix code (oa_sample_offset_type and

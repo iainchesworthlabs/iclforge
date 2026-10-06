@@ -1,4 +1,4 @@
-// The output level and dynamic range control (src/ac4dec/src/pcm/drc.hpp, ETSI
+// The output level and dynamic range control (src/ac4/src/decoder/pcm/drc.hpp, ETSI
 // TS 103 190-1 V1.4.1 clause 5.7.9): Table 162's profiles and Table 166's
 // transmitted curves against the curves the text defines, DEE's transmitted
 // curves against the profiles it named, Table 161's choice of a DRC decoder
@@ -404,7 +404,7 @@ TEST_CASE("transmitted DRC gains apply by Part 2 Table 69's groups to the immers
           "[ac4dec][drc]") {
     // Table 69 for 7.X.4: L, R and the LFE; C; Ls, Rs, Lb and Rb; the four
     // tops. Core decoding's Tsl and Tsr carry the tops and take their group
-    // (src/ac4dec/ERRATA.md, "DRC's groups in core decoding").
+    // (src/ac4/ERRATA.md, "DRC's groups in core decoding").
     using S = iclforge::ac4::Speaker;
     const std::vector<S> full = {S::kLeft,          S::kRight,        S::kCentre,
                                  S::kLfe,           S::kLeftSurround, S::kRightSurround,

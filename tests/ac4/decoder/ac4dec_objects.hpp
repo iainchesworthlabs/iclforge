@@ -109,7 +109,7 @@ struct BuiltObjectStream {
 // A stream's frames, sync-framed with a CRC, as a file holds them.
 [[nodiscard]] std::vector<std::byte> sync_framed(const BuiltObjectStream& stream);
 
-// The cases committed as tests/golden/ac4dec/objects/<name>.ac4 with
+// The cases committed as tests/golden/ac4/objects/<name>.ac4 with
 // kCommittedObjectFrames frames each, whose digests tools/references/
 // ac4_syntax.py wrote beside the others in tests/golden/ac4dec/.
 inline constexpr int kCommittedObjectFrames = 8;

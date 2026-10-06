@@ -1,4 +1,4 @@
-// iclforge::ac4::Decoder::decode() and the reconstruction behind it (src/ac4dec/src/pcm):
+// iclforge::ac4::Decoder::decode() and the reconstruction behind it (src/ac4/src/decoder/pcm):
 // the noise fill's random number generator against the text's own closed
 // form, and the committed DEE streams decoded to PCM - each channel's tone on
 // its own channel in stereo, 5.1 and 5.1.4, the LFE's included, in full and

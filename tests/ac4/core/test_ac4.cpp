@@ -646,7 +646,7 @@ TEST_CASE("parse_substream_info_obj: dynamic objects with an LFE bed object", "[
     CHECK(obj.b_lfe);
     CHECK(obj.num_objects == 2);
     // The LFE is counted on top of the two dynamic objects, first
-    // (src/ac4dec/ERRATA.md, "n_objects_code and the LFE").
+    // (src/ac4/ERRATA.md, "n_objects_code and the LFE").
     REQUIRE(obj.objects.size() == 3);
     CHECK(obj.objects[0].kind == iclforge::ac4::ObjectKind::kBed);
     CHECK(obj.objects[0].lfe);
@@ -716,7 +716,7 @@ TEST_CASE("parse_substream_info_obj: std bed flags include LFE, unlike bed_dyn_o
 // before that read whatever followed the table and carried on. Each vector
 // ends in substream_index = 2, which only comes back if the parse stayed in
 // sync past the reserved code. Table 60 reserves n_objects_code 5 to 7, the
-// LFE with them (src/ac4dec/ERRATA.md, "n_objects_code and the LFE");
+// LFE with them (src/ac4/ERRATA.md, "n_objects_code and the LFE");
 // isf_config's code 5 - the last entry its table has - pins that boundary.
 namespace {
 

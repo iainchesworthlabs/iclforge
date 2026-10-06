@@ -63,13 +63,13 @@
 # names no ac4:: C++ type, so it needs neither the AC-4 headers nor the
 # static libraries embedded below) with it off.
 #
-# AC-4's static libraries are embedded the same way: iclforge::ac4dec_static
-# PUBLIC-links iclforge::ac4_static and embeds iclforge::ac4core itself
+# AC-4's static libraries are embedded the same way: iclforge::ac4_static
+# PUBLIC-links iclforge::ac4_static and embeds iclforge::ac4 itself
 # (src/ac4dec/CMakeLists.txt), and CMake carries a static library's
 # dependencies to its own consumers as link-only, so naming the decoder and
 # encoder archives is enough to pull in the inspector and the DSP core
 # transitively - apps/cli/CMakeLists.txt relies on the same transitive closure
-# for iclforge::ac4dec/iclforge::ac4enc.
+# for iclforge::ac4/iclforge::ac4.
 set(_capi_sources
     src/atmos.cpp
     src/common.cpp
@@ -84,7 +84,7 @@ set(_capi_sources
 set(_capi_embeds iclforge::ac3_static)
 if(ICLFORGE_BUILD_AC4)
     list(APPEND _capi_sources src/ac4.cpp src/ac4_encoder.cpp)
-    list(APPEND _capi_embeds iclforge::ac4dec_static iclforge::ac4enc_static)
+    list(APPEND _capi_embeds iclforge::ac4_static iclforge::ac4_static)
 else()
     list(APPEND _capi_sources src/ac4_absent.cpp)
 endif()

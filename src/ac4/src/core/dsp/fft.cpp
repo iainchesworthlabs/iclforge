@@ -162,7 +162,7 @@ int Fft<Real>::inverse_scaled(std::span<Complex> data, std::span<Complex> scratc
 }
 
 template class Fft<Real>;
-// ac4core's own tests (tests/ac4core/test_ac4core_dsp.cpp) exercise Fft at
+// ac4core's own tests (tests/ac4/core/test_ac4core_dsp.cpp) exercise Fft at
 // double directly, alongside Real (see this target's CMakeLists.txt,
 // AC4CORE_ALSO_AT_DOUBLE); Mdct<double>'s own Fft member needs it too.
 AC4CORE_ALSO_AT_DOUBLE(template class Fft<double>;)

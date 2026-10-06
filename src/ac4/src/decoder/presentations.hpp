@@ -84,7 +84,7 @@ struct PresentationPlan {
 // where there is no such presentation.
 bool plan_presentation(const Toc& toc, std::size_t index, PresentationPlan& plan);
 
-// Part 2 clause 4.8.2 and the readings of src/ac4dec/ERRATA.md ("Selecting a
+// Part 2 clause 4.8.2 and the readings of src/ac4/ERRATA.md ("Selecting a
 // presentation"): whether a decoder of compatibility level `level` may select
 // the presentation - one it can decode, of a presentation_version it decodes,
 // carrying audio, within its level and enabled.
@@ -111,7 +111,7 @@ bool plan_presentation(const Toc& toc, std::size_t index, PresentationPlan& plan
 
 // A presentation's name as ac4_presentation_substream() sends it (Part 2 clause
 // 6.3.3.1.4): whole in one frame, or in chunks, one a frame, the last of which
-// says how many there were (src/ac4dec/ERRATA.md, "A presentation name in
+// says how many there were (src/ac4/ERRATA.md, "A presentation name in
 // chunks").
 class PresentationName {
    public:

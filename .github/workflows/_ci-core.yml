@@ -1090,7 +1090,7 @@ jobs:
       # again with a decoder built ICLFORGE_DECODE_SCALAR=float, at the same pins,
       # and the float decode against the double one on every committed stream,
       # below and above A-SPX's crossover, at the floors pinned in
-      # tests/golden/ac4dec/scalar-agreement.json. The AC-4 encoder is double in
+      # tests/golden/ac4/scalar-agreement.json. The AC-4 encoder is double in
       # every build (decision 34); its streams are decoded by the float decoder.
       - name: Build a float32 forge
         run: |
@@ -1111,7 +1111,7 @@ jobs:
 
       # The AC-4 decoder's fixed-point tier (planning/ac4.md, D14d), the same three
       # questions: the scorers at the same pins, and the fixed decode against the
-      # double one at the floors in tests/golden/ac4dec/scalar-agreement-fixed.json.
+      # double one at the floors in tests/golden/ac4/scalar-agreement-fixed.json.
       - name: Build a fixed-point forge
         run: |
           cmake --preset config-linux-llvm -B build/decode-scalar-fixed -DICLFORGE_DECODE_SCALAR=fixed

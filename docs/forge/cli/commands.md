@@ -978,7 +978,7 @@ coded channel, LFE last) and `coupling_exponent_strategy`.
 E-AC-3's `0x0B` — so `forge probe stream.ac4` needs no extra flag, and works on `-` (stdin) the
 same way. It reads the sync frame, table of contents, presentation and substream-group framing —
 channel-coded, A-JOC-coded, direct-coded-object and OAMD substream groups alike — and has every
-frame read by the decoder (`iclforge::ac4dec`) without decoding its audio, for what only the
+frame read by the decoder (`iclforge::ac4`) without decoding its audio, for what only the
 substreams carry: each presentation as the decoder sees it, and the metadata of the one it would
 decode. There is no `detail=frames`/`detail=blocks` equivalent (see
 [Verification](../../verification.md#ac-4) for what the inspector's reading does and does not
@@ -1205,7 +1205,7 @@ An AC-4 source becomes one programme: the presentation `presentation=`, `present
 chooses one, its substreams mixed at `dialogue-gain=` and `associated-gain=`. It is decoded as
 coded, with no output level and so no DRC, because ETSI TS 103 190-1 clause 5.7.9.4 asks a
 transcoder to apply none and to hand the AC-3 or E-AC-3 encoder the DRC profile the stream names
-for it instead (`drc_eac3_profile`; `src/ac4dec/ERRATA.md` records why that is the field the
+for it instead (`drc_eac3_profile`; `src/ac4/ERRATA.md` records why that is the field the
 clause means). What carries:
 
 - **`dialnorm`**, to the dB: AC-4 sends it in steps of 0.25 dB, AC-3 and E-AC-3 in whole dB, so

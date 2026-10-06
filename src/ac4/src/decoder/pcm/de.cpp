@@ -87,7 +87,7 @@ DeFrameValues de_frame_values(const DialogEnhancement& de, bool core) {
 void DeStage::configure(int slots, std::span<const Speaker> speakers) {
     slots_ = slots;
     // Part 2 Table 15: the dialogue enhancement channels of 9.X.4 are Lscr, Rscr and C, those of
-    // the other layouts L, R and C (src/ac4dec/ERRATA.md, "Dialogue enhancement's channels for
+    // the other layouts L, R and C (src/ac4/ERRATA.md, "Dialogue enhancement's channels for
     // 9.X.4"). A layout with the screen pair is a full decoding of a 9.X.4 mode; core decoding has
     // none, and its core channels are L, R and C.
     const bool screen = std::ranges::find(speakers, Speaker::kLeftScreen) != speakers.end();

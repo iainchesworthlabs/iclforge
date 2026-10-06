@@ -9,7 +9,7 @@
 // The A-CPL syntax, written: ETSI TS 103 190-1 V1.4.1 Tables 59 to 65
 // (acpl_config_1ch, acpl_config_2ch, acpl_data_1ch, acpl_data_2ch and the
 // elements they call), transcribed for writing. The decoder's reader
-// (src/ac4dec/src/syntax/acpl.cpp) and the Python parser are transcriptions
+// (src/ac4/src/decoder/syntax/acpl.cpp) and the Python parser are transcriptions
 // of their own; the three traces agree record for record.
 //
 // The values here are the syntax's: each parameter set's values are what

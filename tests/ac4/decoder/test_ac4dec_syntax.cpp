@@ -4,7 +4,7 @@
 // separately from ETSI TS 103 190-1 and -2, and writes one digest line per
 // frame and substream: how many syntax elements it read, the bit at which the
 // last ended, and a CRC-32 over every element's (bit offset, width, value).
-// Those lines are committed under tests/golden/ac4dec/, one file per stream,
+// Those lines are committed under tests/golden/ac4/, one file per stream,
 // and this test requires the decoder's own trace to produce them exactly. A
 // field read in the wrong order, at the wrong width or with a different value
 // changes the CRC; a count that goes wrong changes the number of elements.

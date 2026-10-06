@@ -9,8 +9,8 @@
 // here than there was splitting AC-3's decode-only and encode-only builds.
 //
 // Three JS-visible things:
-//   - Ac4Decoder: wraps iclforge::ac4::Decoder (src/ac4dec/include/iclforge/ac4dec/decoder.hpp).
-//   - Ac4Encoder: wraps iclforge::ac4::Encoder (src/ac4enc/include/iclforge/ac4enc/encoder.hpp).
+//   - Ac4Decoder: wraps iclforge::ac4::Decoder (src/ac4/include/iclforge/ac4/decoder/decoder.hpp).
+//   - Ac4Encoder: wraps iclforge::ac4::Encoder (src/ac4/include/iclforge/ac4/encoder/encoder.hpp).
 //   - syncFrame: wraps iclforge::ac4::sync_frame() (src/ac4enc, declared beside Encoder).
 //
 // Scope cut (the same "reasonable cost" cut used for every other binding in

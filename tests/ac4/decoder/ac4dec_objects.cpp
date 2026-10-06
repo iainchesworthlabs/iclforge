@@ -114,7 +114,7 @@ constexpr double kFineStep = 0.10009765625;
 // The fullband track (0 up, in syntax order) whose tone A-JOC input `i` takes.
 [[nodiscard]] int qin_track(const ObjectCase& c, int i) {
     if (c.kind == ObjectCase::Kind::kAjocStatic) {
-        return i;  // L, R, C, Ls and Rs, in that order (src/ac4dec/ERRATA.md)
+        return i;  // L, R, C, Ls and Rs, in that order (src/ac4/ERRATA.md)
     }
     return qin_source(i, c.dmx, c.lfe) - (c.lfe ? 1 : 0);
 }

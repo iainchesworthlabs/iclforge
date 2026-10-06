@@ -33,7 +33,7 @@
 //
 // The text writes KBD_RIGHT(NW, n - Nskip), an argument below the range N <= n
 // < 2N it defines KBD_RIGHT on; the reading taken is the right half at the
-// same position, offset by NW (src/ac4dec/ERRATA.md, "KBD_RIGHT's argument").
+// same position, offset by NW (src/ac4/ERRATA.md, "KBD_RIGHT's argument").
 
 namespace iclforge::ac4::detail::dsp {
 

@@ -8,8 +8,8 @@
 // channels of the aspx_data element that asks for it; companding changes the
 // channel companding_control() names.
 //
-// The streams under tests/golden/ac4dec/constructed/ are the committed cases,
-// byte for byte, and tests/golden/ac4dec/ holds
+// The streams under tests/golden/ac4/constructed/ are the committed cases,
+// byte for byte, and tests/golden/ac4/ holds
 // tools/references/ac4_syntax.py's digests of them, which
 // test_ac4dec_syntax.cpp holds the decoder to. With AC4DEC_WRITE_CONSTRUCTED
 // set to a directory, this writes the committed cases there instead of

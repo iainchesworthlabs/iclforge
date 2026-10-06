@@ -1,4 +1,4 @@
-// The AC-4 decoder's channel elements (src/ac4dec/src/syntax/
+// The AC-4 decoder's channel elements (src/ac4/src/decoder/syntax/
 // channel_elements.cpp) and the A-SPX and A-CPL data they carry (aspx.cpp,
 // acpl.cpp), on hand-built bitstreams. The committed DEE streams are stereo
 // ASPX, 5.1 ASPX_ACPL and IMS; every other codec mode and coding

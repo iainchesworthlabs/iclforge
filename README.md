@@ -235,7 +235,7 @@ and where the raw-pointer boundaries are, the per-access-unit resource limits, a
 src/base/       iclforge::base — bit I/O, the speaker vocabulary, the CPU probe and the profiling
                 hooks every library shares; it knows no codec
 src/arithmetic/ iclforge::arithmetic — header-only: Fixed32, the project's own float functions and the
-                SIMD seam that iclforge::ac3 and iclforge::ac4core share; built in-tree, not installed
+                SIMD seam that iclforge::ac3 and iclforge::ac4 share; built in-tree, not installed
 src/dsp/        iclforge::dsp — the FFT kernel, the 64-band QMF bank, the sample-rate converter and
                 the filter sections more than one library uses
 src/objects/    iclforge::objects — the object-audio model: object paths and scenes, the Object Audio
@@ -245,10 +245,10 @@ src/render/     iclforge::render — the room's layout, routing, the bed and obj
 src/iec61937/   iclforge::iec61937 — IEC 61937 burst packing and detection for AC-3, E-AC-3 and AC-4
 src/ac3/        iclforge::ac3 — the AC-3, E-AC-3 and Atmos codec, GUI-free
 src/ac4/        iclforge::ac4 — a standalone AC-4 sync frame/TOC/presentation/substream inspector
-src/ac4dec/     iclforge::ac4dec — an AC-4 decoder, from ETSI TS 103 190-1 and -2; no iclforge::ac3
+src/ac4dec/     iclforge::ac4 — an AC-4 decoder, from ETSI TS 103 190-1 and -2; no iclforge::ac3
                 dependency
-src/ac4enc/     iclforge::ac4enc — an AC-4 encoder, from the same standards; no iclforge::ac3 dependency
-src/ac4core/    iclforge::ac4core — the tables and transforms the AC-4 decoder and encoder share, a static
+src/ac4enc/     iclforge::ac4 — an AC-4 encoder, from the same standards; no iclforge::ac3 dependency
+src/ac4core/    iclforge::ac4 — the tables and transforms the AC-4 decoder and encoder share, a static
                 library with no headers of its own
 src/matroska/   iclforge::matroska — a standalone MKV muxer, no iclforge::ac3 dependency
 src/mp4/        iclforge::mp4 — a standalone MP4/ISOBMFF muxer plus fMP4/CMAF + HLS/DASH, no iclforge::ac3 dependency

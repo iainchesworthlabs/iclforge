@@ -37,8 +37,8 @@ matrices from the attachment (ssf_tables.hpp and .cpp), their sizes held to the
 table_length the text prints, and the matrices' layout to the evidence in Pseudocode C.1's
 note below.
 
-Writes each header to src/ac4core/include/iclforge/ac4core/tables/ and each source to
-src/ac4core/src/tables/: huffman_tables.hpp and .cpp (every Annex A
+Writes each header to src/ac4/src/core/tables/ and each source to
+src/ac4/src/core/tables/: huffman_tables.hpp and .cpp (every Annex A
 codebook, its entries sorted by length and then codeword, as
 huffman_codebook.hpp's Codebook wants them for reading), huffman_codes.hpp and
 .cpp (the same codebooks in index order, the codeword and its length for each
@@ -115,8 +115,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
 # The headers are public and sit in the include tree; the sources sit beside the other sources.
-HEADER_DIR = REPO / "src" / "ac4core" / "include" / "iclforge" / "ac4core" / "tables"
-SOURCE_DIR = REPO / "src" / "ac4core" / "src" / "tables"
+HEADER_DIR = REPO / "src" / "ac4" / "src" / "core" / "tables"
+SOURCE_DIR = REPO / "src" / "ac4" / "src" / "core" / "tables"
 SPEC_TXT = "ts_10319001v010401p.txt"
 TABLES_C = Path("ts_10319001_attach") / "ts_103190_tables.c"
 SPEC2_TXT = "ts_10319002v010301p.txt"
@@ -1693,7 +1693,7 @@ SSF_HEADER = [
     "",
     "// Annex C.6: ssf_pred_coeff_mat<tab_idx>, as the attachment lays them out. The layout",
     "// is ((nu + Rf) * 33 + eta) * Rt + k, not the index of Pseudocode C.1",
-    "// (src/ac4dec/ERRATA.md, \"The layout of the SSF prediction coefficient tables\").",
+    "// (src/ac4/ERRATA.md, \"The layout of the SSF prediction coefficient tables\").",
     "extern const std::array<std::span<const std::uint8_t>, 37> kSsfPredCoeffQuantMat;",
     "",
     "// Tables C.6 to C.9: CDF_TABLE (index -352 to 352 offset by 352), PREDICTOR_GAIN_CDF_LUT",

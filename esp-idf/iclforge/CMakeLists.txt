@@ -338,7 +338,7 @@ endif()
 # core as a link-only dependency, src/ac4dec/CMakeLists.txt), and its include
 # directories for src/ac4_bridge.cpp.
 if(CONFIG_ICLFORGE_AC4)
-    target_link_libraries(${COMPONENT_LIB} PUBLIC iclforge::ac4dec_static)
+    target_link_libraries(${COMPONENT_LIB} PUBLIC iclforge::ac4_static)
 endif()
 
 # The burst player's source under the same switch as player.cpp: it renders,

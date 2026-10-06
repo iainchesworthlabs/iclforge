@@ -27,7 +27,7 @@ struct ObjectMetadataState {
 // The properties block `block` sets for an object with (`dynamic`) or without
 // render information, against `state`, which it moves on. `previous_gain` is
 // the gain the object before it takes in the same block, which
-// object_gain_code 0b11 copies (0 dB for the first; src/ac4dec/ERRATA.md,
+// object_gain_code 0b11 copies (0 dB for the first; src/ac4/ERRATA.md,
 // "Object audio metadata").
 [[nodiscard]] ObjectProperties apply_block(const ObjectInfoBlock& block, bool dynamic,
                                            std::optional<double> previous_gain,

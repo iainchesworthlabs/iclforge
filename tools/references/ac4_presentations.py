@@ -1,9 +1,9 @@
 """Which presentation of an AC-4 table of contents a decoder selects (ETSI TS 103 190-2 V1.3.1
-clause 4.8.2), transcribed from the text and src/ac4dec/ERRATA.md's readings ("Which presentations
+clause 4.8.2), transcribed from the text and src/ac4/ERRATA.md's readings ("Which presentations
 can be selected", "The order of the preferences") separately from the decoder's
-src/ac4dec/src/presentations.cpp, over the tables of
+src/ac4/src/decoder/presentations.cpp, over the tables of
 contents ac4_parse.py reads. tools/checks/test_ac4_presentation_selection.py holds it to the
-table tests/golden/ac4dec/presentations/presentation-selection.tsv, which the decoder's test
+table tests/golden/ac4/presentations/presentation-selection.tsv, which the decoder's test
 builds and holds the decoder to.
 
 A presentation can be selected when the decoder can decode it: every substream it names is a
@@ -207,7 +207,7 @@ def select_presentation(toc, choice, level):
 class PresentationName:
     """An alternative presentation's name, gathered frame by frame from its presentation
     substream's presentation_name (Part 2 clauses 6.3.3.1.2 to 6.3.3.1.4), as
-    src/ac4dec/ERRATA.md's "A presentation name in chunks" reads the clause: a field whose last
+    src/ac4/ERRATA.md's "A presentation name in chunks" reads the clause: a field whose last
     byte is 0 holds the whole name; else one whose second-last byte is 0 is the last chunk, its
     last byte the number of chunks, and the name is that many chunks of consecutive frames ending
     with it; a chunk before the last is all name. A name ends at its first zero byte. A frame

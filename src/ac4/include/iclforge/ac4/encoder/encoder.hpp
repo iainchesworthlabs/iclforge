@@ -68,7 +68,7 @@
 // initializer names only the fields it sets.
 //
 // src/ac4enc/ERRATA.md records the readings the writer alone needs; where the
-// decoder depends on the same reading, src/ac4dec/ERRATA.md has it.
+// decoder depends on the same reading, src/ac4/ERRATA.md has it.
 
 namespace iclforge::ac4 {
 

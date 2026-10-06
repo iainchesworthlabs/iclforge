@@ -282,7 +282,7 @@ its own, four so far:
 - `asf-ext-code-past-21-bits`: the first run stopped 2,690 executions in. The
   escape of `ext_code` counts leading ones that Part 1's Pseudocode 20 does not
   bound, and a long run of them shifted a 32-bit value by 32. Table 40 limits the
-  escape to 21 bits, which the decoder now enforces (`src/ac4dec/ERRATA.md`,
+  escape to 21 bits, which the decoder now enforces (`src/ac4/ERRATA.md`,
   "ext_code is at most 21 bits").
 - `ajoc-upmix-signals-runaway-count`: `n_fullband_upmix_signals` escapes through
   `variable_bits(3)`, and a 391-byte frame sent 1,227,133,139. The decoder listed

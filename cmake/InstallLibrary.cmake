@@ -218,10 +218,10 @@ if(ICLFORGE_BUILD_IAMF)
         DESCRIPTION "IAMF v1.1.0 OBU / ISO-BMFF writer")
 endif()
 
-# The AC-4 inspector (src/ac4, iclforge::ac4), the AC-4 decoder (src/ac4dec, iclforge::ac4dec) and the
-# AC-4 encoder (src/ac4enc, iclforge::ac4enc) are optional components under one switch,
+# The AC-4 inspector (src/ac4, iclforge::ac4), the AC-4 decoder (src/ac4dec, iclforge::ac4) and the
+# AC-4 encoder (src/ac4enc, iclforge::ac4) are optional components under one switch,
 # ICLFORGE_BUILD_AC4 (see the root CMakeLists.txt), with the core the decoder and the encoder link
-# (src/ac4core, iclforge::ac4core). The four share one export set, ac4Targets, installed below, each
+# (src/ac4core, iclforge::ac4). The four share one export set, ac4Targets, installed below, each
 # with its own install() and its own .pc file - the pairing tools/checks/check_packaging_versions.sh
 # counts. The core is exported as core (src/ac4core/CMakeLists.txt).
 #
@@ -246,8 +246,8 @@ if(ICLFORGE_BUILD_AC4)
 
     get_property(_iclforge_ac4dec_install_targets GLOBAL PROPERTY ICLFORGE_INSTALL_TARGETS_ac4dec)
     get_property(_iclforge_ac4enc_install_targets GLOBAL PROPERTY ICLFORGE_INSTALL_TARGETS_ac4enc)
-    if("iclforge_ac4dec_static" IN_LIST _iclforge_ac4dec_install_targets OR
-       "iclforge_ac4enc_static" IN_LIST _iclforge_ac4enc_install_targets)
+    if("iclforge_ac4_static" IN_LIST _iclforge_ac4dec_install_targets OR
+       "iclforge_ac4_static" IN_LIST _iclforge_ac4enc_install_targets)
         install(TARGETS iclforge_ac4core
             EXPORT ac4Targets
             ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT library)
@@ -283,7 +283,7 @@ if(ICLFORGE_BUILD_CAPI)
     if(ICLFORGE_BUILD_AC4)
         set(_iclforge_capi_pc_description
             "Stable C11 API over the AC-3, E-AC-3 and AC-4 encoders and decoders")
-        set(_iclforge_capi_pc_static_requires iclforge-ac3 iclforge-ac4dec iclforge-ac4enc)
+        set(_iclforge_capi_pc_static_requires iclforge-ac3 iclforge-ac4 iclforge-ac4)
     else()
         set(_iclforge_capi_pc_description
             "Stable C11 API over the AC-3 and E-AC-3 encoders and decoders")

@@ -317,8 +317,8 @@ target_link_libraries(forge-gui
         # AC-4 in the codec list, the QC, the player and the object page, through
         # the decoder's and the encoder's public APIs.
         iclforge::ac4
-        iclforge::ac4dec
-        iclforge::ac4enc
+        iclforge::ac4
+        iclforge::ac4
         iclforge::warnings
         iclforge::fmt
         # Unlike iclforge::ac3's own PRIVATE, $<BUILD_INTERFACE:...>-wrapped link

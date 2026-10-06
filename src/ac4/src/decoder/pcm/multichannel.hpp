@@ -30,7 +30,7 @@
 //   O0 = a3 T0 + b3 U0,   O3 = c3 T0 + d3 U0,
 //   O1 = a4 T1 + b4 U1,   O4 = c4 T1 + d4 U1,   O2 = T2.
 //
-// tests/ac4dec/test_ac4dec_multichannel.cpp holds the table's 300 printed
+// tests/ac4/decoder/test_ac4dec_multichannel.cpp holds the table's 300 printed
 // entries and checks every one against this.
 
 namespace iclforge::ac4::detail {
@@ -75,7 +75,7 @@ using Matrix = std::array<std::array<Real, N>, N>;
 // ungrouping), with the parameters of a chparam_info() read under `base`'s
 // sf_info(), the first input's. The immersive element's step 4 and Table 20
 // (ETSI TS 103 190-2 V1.3.1 clause 5.2.3.2) are such steps too. The inputs
-// must be transformed alike, window for window (src/ac4dec/ERRATA.md, "The 7.X
+// must be transformed alike, window for window (src/ac4/ERRATA.md, "The 7.X
 // element's additional channels"); it fails otherwise. `lengths` are each
 // input's window lengths (window_lengths()).
 [[nodiscard]] ParseResult apply_additional_pair(const SubstreamContext& ctx, const AsfPsyInfo& base,

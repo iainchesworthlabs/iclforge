@@ -1440,8 +1440,8 @@ ICLFORGE_C_EXPORT iclforge_qc_verdict_t iclforge_evaluate_qc_gate(
  * struct as its type allows.
  * iclforge_c/version.h's ICLFORGE_HAS_AC4 (a plain #define, #cmakedefine'd
  * from that option) still tells a caller which behaviour to expect. Mirrors
- * iclforge::ac4::Decoder (src/ac4dec/include/iclforge/ac4dec/decoder.hpp) and
- * iclforge::ac4::Encoder (src/ac4enc/include/iclforge/ac4enc/encoder.hpp), plus the
+ * iclforge::ac4::Decoder (src/ac4/include/iclforge/ac4/decoder/decoder.hpp) and
+ * iclforge::ac4::Encoder (src/ac4/include/iclforge/ac4/encoder/encoder.hpp), plus the
  * table-of-contents helpers of src/ac4/include/iclforge/ac4/ac4.hpp a container muxer needs beside
  * the encoder. AC-4's frame length varies by frame rate (Part 1 Tables 83/84), so unlike the
  * AC-3/E-AC-3 sections above there is no ICLFORGE_SAMPLES_PER_FRAME equivalent - every accessor

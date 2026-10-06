@@ -32,7 +32,7 @@
 // spectral frontend coder, chparam_info(), companding_control() and A-SPX
 // writers, and its frame writer. The element syntax around those, and where
 // each channel goes (Tables 180, 182 and 183), are written here, a
-// transcription separate from the decoder's routing (src/ac4dec/src/pcm/
+// transcription separate from the decoder's routing (src/ac4/src/decoder/pcm/
 // routing.cpp). Where stereo processing mixes tracks, the tracks are the
 // channels through the inverse of the printed matrix (ac4dec_printed_matrices.
 // hpp), so the decoder's matrix must be the printed one for the tones to come
@@ -122,7 +122,7 @@ struct BuiltStream {
 [[nodiscard]] std::vector<std::vector<iclforge::ac4::Speaker>> aspx_elements(int ch_mode,
                                                                              int codec_mode = 1);
 
-// The cases committed as tests/golden/ac4dec/constructed/<name>.ac4, with
+// The cases committed as tests/golden/ac4/constructed/<name>.ac4, with
 // kCommittedFrames frames each, whose digests tools/references/ac4_syntax.py
 // wrote beside the other digests in tests/golden/ac4dec/.
 inline constexpr int kCommittedFrames = 4;

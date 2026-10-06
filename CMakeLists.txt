@@ -323,7 +323,7 @@ endif()
 if(NOT ICLFORGE_BUILD_AC4 AND _ac3_hearth_apps)
     message(FATAL_ERROR "ICLFORGE_BUILD_AC4=OFF requires ICLFORGE_BUILD_HEARTH to be OFF too, "
         "unless ICLFORGE_SENDSPIN_PLAYER_ONLY is set - Hearth's engine reads an AC-4 item's table "
-        "of contents with iclforge::ac4, and its presentations and metadata with iclforge::ac4dec.")
+        "of contents with iclforge::ac4, and its presentations and metadata with iclforge::ac4.")
 endif()
 
 # ICLFORGE_MINIMAL_DECODER's own version of the three guards above. Everything listed here
@@ -552,7 +552,7 @@ elseif(ICLFORGE_MINIMAL_AC4)
     # std::span passed by value, that its passing changed in GCC 7.1. A note about an
     # ABI nothing here links against, hundreds of them in the log of a leg whose
     # output is the numbers.
-    foreach(_ac3_ac4_target IN ITEMS iclforge_ac4_objects iclforge_ac4core iclforge_ac4dec_objects)
+    foreach(_ac3_ac4_target IN ITEMS iclforge_ac4_objects iclforge_ac4core iclforge_ac4_objects)
         target_compile_options(${_ac3_ac4_target} PRIVATE "$<$<CXX_COMPILER_ID:GNU>:-Wno-psabi>")
     endforeach()
     unset(_ac3_ac4_target)

@@ -14,7 +14,7 @@
 // mixing values in place of the source's. The rest of each substream is the
 // source's, bit for bit: the multiplexer finds the fields it replaces by the
 // offsets the decoder's syntax trace gives them. The new fields and the table
-// of contents are written with the encoder's writer (src/ac4enc/src/frame/),
+// of contents are written with the encoder's writer (src/ac4/src/encoder/frame/),
 // which phase E6 extends to the encoder's own presentations.
 //
 // multiplex() writes bitstream_version 2 with version 1 presentations, at the
@@ -24,7 +24,7 @@
 // presentation substream: each substream's metadata() is rewritten at sus_ver
 // 0, carrying its own dialnorm and, where the table of contents makes it
 // associated audio or dialogue, the mixing fields; its table of contents is
-// written with the tests' own writer (tests/ac4/ac4_toc_writer.hpp), the
+// written with the tests' own writer (tests/ac4/core/ac4_toc_writer.hpp), the
 // encoder writing no version 0 presentations.
 
 #include <cstddef>
@@ -76,7 +76,7 @@ struct MuxLayout {
 // own dialnorm (basic_metadata(), Part 1 clause 4.3.12.2.1) and content type.
 // Part 1 clauses 4.3.12.4.1 and 4.3.12.4.2 make it associated audio or
 // dialogue by its content_classifier or its place in a presentation
-// (src/ac4dec/ERRATA.md, "b_associated and b_dialog are parameters at sus_ver
+// (src/ac4/ERRATA.md, "b_associated and b_dialog are parameters at sus_ver
 // 0"), and then extended_metadata() carries these fields, none sent where
 // they are unset; the multiplexer refuses a substream those make one thing in
 // one presentation and another in the next.

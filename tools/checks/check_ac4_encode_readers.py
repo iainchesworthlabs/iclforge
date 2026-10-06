@@ -26,7 +26,7 @@ and an MP4 file, and:
              the muxer leaves out (src/ac4enc/ERRATA.md, "The 3/2/2 layout's top front pair").
 
 Phase E6's presentations: the encoder's streams of several substreams and presentations under
-tests/golden/ac4dec/presentations/ (encoder-*.ac4, which tests/ac4enc/test_ac4enc_presentations.cpp
+tests/golden/ac4/presentations/ (encoder-*.ac4, which tests/ac4/encoder/test_ac4enc_presentations.cpp
 writes with AC4ENC_WRITE_PRESENTATIONS, beside the configuration each was made from as JSON), whose
 MediaInfo reading (`--Output=JSON`) lists every presentation with the configured
 presentation_config, presentation_id, md_compat (MediaInfo's "PresentationLevel"), groups,
@@ -35,12 +35,12 @@ Table 92 code rather than printing it), and every group with its content classif
 whose trace (`--Details=1`) frames each alternative presentation's name as written, name_len its
 bytes and the 0 after them, and holds at MediaInfo's offset the name's bytes; and whose every
 substream field MediaInfo details in the first frame holds the value the decoder's syntax trace
-reads there, which tests/ac4enc/test_ac4enc_presentations.cpp holds equal to the encoder's own.
+reads there, which tests/ac4/encoder/test_ac4enc_presentations.cpp holds equal to the encoder's own.
 MediaInfo reads no substream after a presentation_config 6 (EMDF-only) presentation, so the
 encoder's streams list that presentation last.
 
-Phase E9's objects: the encoder's object streams under tests/golden/ac4dec/objects/ (encoder-*.ac4,
-which tests/ac4enc/test_ac4enc_objects.cpp writes with AC4ENC_WRITE_OBJECTS), whose MediaInfo
+Phase E9's objects: the encoder's object streams under tests/golden/ac4/objects/ (encoder-*.ac4,
+which tests/ac4/encoder/test_ac4enc_objects.cpp writes with AC4ENC_WRITE_OBJECTS), whose MediaInfo
 reading (`--Output=JSON`) gives the count of the objects the stream was configured with, in the
 substreams' `ChannelMode` strings under the audio track's `extra`: an A-JOC substream reads
 `A-JOC <objects>.<LFE> (<core>)`, the core `<n>.<m> object core` for a computed downmix and
@@ -432,7 +432,7 @@ def dac4(path):
 
 # --- Phase E6: the encoder's presentations ------------------------------------------------
 
-PRESENTATION_STREAMS = REPO / "tests" / "golden" / "ac4dec" / "presentations"
+PRESENTATION_STREAMS = REPO / "tests" / "golden" / "ac4" / "presentations"
 # MediaInfo's names for Part 2 Table 53's presentation_config and Part 1 Table 91's
 # content_classifier.
 CONFIG_NAMES = {0: "Music and Effects + Dialogue", 1: "Main + Dialogue Enhancement",
@@ -599,9 +599,9 @@ def check_presentations(mediainfo, cli, work):
 
 # --- Phase E9: the encoder's objects --------------------------------------------------------------
 
-OBJECT_STREAMS = REPO / "tests" / "golden" / "ac4dec" / "objects"
+OBJECT_STREAMS = REPO / "tests" / "golden" / "ac4" / "objects"
 # Each committed stream's objects, the LFE among them, its bed objects and whether its downmix is a
-# static bed, as tests/ac4enc/test_ac4enc_objects.cpp configures them.
+# static bed, as tests/ac4/encoder/test_ac4enc_objects.cpp configures them.
 OBJECT_CONFIGURATIONS = {
     "encoder-ajoc-computed.ac4": (8, 0, False),
     "encoder-ajoc-static-5_1.ac4": (7, 0, True),

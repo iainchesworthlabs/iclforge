@@ -565,7 +565,7 @@ TEST_CASE("object, A-JOC and object metadata substreams are read by their own sy
     // Each is read by the syntax its element names (Part 2 Table 50): four zero
     // bytes end the audio substreams' elements early, and the OAMD substream,
     // which sends no oamd_timing_data() and has none from an earlier frame,
-    // cannot read its oamd_dyndata_multi() (src/ac4dec/ERRATA.md, "Which
+    // cannot read its oamd_dyndata_multi() (src/ac4/ERRATA.md, "Which
     // oamd_timing_data() applies").
     CHECK(find(report, 0).kind == SubstreamReport::Kind::kAudio);
     CHECK(find(report, 1).kind == SubstreamReport::Kind::kAudio);
@@ -1131,7 +1131,7 @@ TEST_CASE("an object group of A-JOC and direct-coded substreams and OAMD reads e
         }
         return std::nullopt;
     };
-    // The prefix codes, one record of the bits read (src/ac4dec/ERRATA.md,
+    // The prefix codes, one record of the bits read (src/ac4/ERRATA.md,
     // "Prefix codes in the trace").
     CHECK(value_of(2, "oa_sample_offset_type") == 0b11);
     CHECK(value_of(2, "basic_info_md") == 0b10);

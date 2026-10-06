@@ -182,11 +182,11 @@ decision on this page, the same way `iclforge::iab` will. `iclforge::render` is 
 the ESP32 player and serves the desktop player as well, it has been a library of its own since the
 re-layout, and its speaker management is new with it.
 
-The AC-4 inspector, decoder and encoder (`iclforge::ac4`, `iclforge::ac4dec`, `iclforge::ac4enc`,
+The AC-4 inspector, decoder and encoder (`iclforge::ac4`, `iclforge::ac4`, `iclforge::ac4`,
 [AC-4](ac4.md)) are Experimental too. Their API has the form
 [planning/ac4.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md) set, and
 the immersive layouts, core decoding and objects came as fields after the ones channel-based
-streams needed. The shared core, `iclforge::ac4core`, has no headers and so no tier. `iclforge::iamf`, the
+streams needed. The shared core, `iclforge::ac4`, has no headers and so no tier. `iclforge::iamf`, the
 IAMF reader and writer, is Experimental as a new module.
 
 `iclforge::adm` and `iclforge::admbridge` are a different case: also opt-in

@@ -10,7 +10,7 @@
 //
 // with the alpha of Table 186 for the transform length. The sums run to
 // p = N, one past the n < N the text gives W for; W is symmetric about N/2
-// and defined there (src/ac4dec/ERRATA.md, "The KBD kernel is summed to
+// and defined there (src/ac4/ERRATA.md, "The KBD kernel is summed to
 // p = N"). The right half is the left half reversed,
 // KBD_RIGHT(N, N + n) = KBD_LEFT(N, N - 1 - n), and the halves that overlap
 // meet the Princen-Bradley condition KBD_LEFT(N, n)^2 + KBD_RIGHT(N, N + n)^2

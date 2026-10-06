@@ -20,7 +20,7 @@
 // which the substream's presence flags give (6.3.2.7.3 to 6.3.2.7.5): 7.X with
 // b_4_back_channels_present and 5.X without; .4 with top_channels_present 3,
 // .2 with 1 or 2, whose Tsl and Tsr the element carries in Tfl and Tfr or in
-// Tbl and Tbr, and .0 with 0 (src/ac4dec/ERRATA.md, "The renderer's input
+// Tbl and Tbr, and .0 with 0 (src/ac4/ERRATA.md, "The renderer's input
 // channel configuration"). The 9.X.4 modes' are 9.X.4, 9.X.2 and 9.X.0 by
 // top_channels_present alike: the 7.X configuration with the screen pair Lscr
 // and Rscr, whatever b_4_back_channels_present says, since Table A.27 has Lb and
@@ -69,7 +69,7 @@ struct RenderGains {
 // the last custom_dmx_data() that sent custom downmix data (none: nullptr),
 // Table 130's defaults for what it does not send, and from bs_ch_config 1 to
 // out_ch_config 4 out_ch_config 1's tool_t4_to_t2() where out_ch_config 4
-// sends none (src/ac4dec/ERRATA.md, "Custom downmix data").
+// sends none (src/ac4/ERRATA.md, "Custom downmix data").
 [[nodiscard]] RenderGains render_gains(const CustomDmxData* cdmx, int out_ch_config) noexcept;
 
 // The layout decode() gives `target` for an immersive element: its channels,

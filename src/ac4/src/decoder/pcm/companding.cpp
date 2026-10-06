@@ -64,7 +64,7 @@ template <typename R>
 }
 
 // L^((1 - alpha) / alpha). The text prints the average gain's exponent as
-// "1alpha / alpha"; it is read as the per-slot gain's (src/ac4dec/ERRATA.md,
+// "1alpha / alpha"; it is read as the per-slot gain's (src/ac4/ERRATA.md,
 // "The companding average").
 //
 // At double this is std::pow, as it always was. At float it is
@@ -144,7 +144,7 @@ void apply_companding(const CompandingControl& control, int sb0, Real full_scale
 
     // sync_flag: g_sync(ts) is the channels' mean gain. Where the channels'
     // intervals differ, each slot averages the channels whose interval holds
-    // it (src/ac4dec/ERRATA.md, "The companding average").
+    // it (src/ac4/ERRATA.md, "The companding average").
     std::array<Energy, kMaxSlots> sync{};
     std::array<int, kMaxSlots> count{};
     int first = kMaxSlots;

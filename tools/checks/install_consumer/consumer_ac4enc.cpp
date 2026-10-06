@@ -1,7 +1,7 @@
 // The AC-4 encoder's consumer of an installed package, built by
 // tools/checks/check_install_consumer.sh twice over, as consumer_ac4.cpp is: through
 // find_package(iclforge) for each exported encoder target (CMakeLists.txt here), and through
-// `pkg-config --cflags --libs iclforge-ac4enc` alone. It sees the installed headers and libraries
+// `pkg-config --cflags --libs iclforge-ac4` alone. It sees the installed headers and libraries
 // and nothing of the build tree, so a header the encoder's includes and the install leave out, an
 // archive a static encoder calls into and the package does not name, or a symbol the shared
 // libraries do not export stops it here.

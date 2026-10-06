@@ -11,7 +11,7 @@ Two sets, from the same legs and sources:
 
 What the streams are for. The decoder in src/ac4dec is checked against them: first its syntax,
 read by two transcriptions whose traces must agree (tools/references/ac4_syntax.py writes the
-committed digests; tests/ac4dec/test_ac4dec_syntax.cpp holds the decoder to them), then, from
+committed digests; tests/ac4/decoder/test_ac4dec_syntax.cpp holds the decoder to them), then, from
 phase D2 on, its PCM, scored against each stream's source. The encoder phases race against the
 same streams. So every leg except ac4-stereo-64 is made with loudness measured and not
 corrected: DEE's default (measure_and_correct) normalises to -24 LKFS and runs a -2 dBFS
@@ -54,7 +54,7 @@ data in the I-frames of the IMS legs.
 Every IMS stream signals presentation_version 2 with channel_mode code 0b1111000, which TS
 103 190-2 Table 56 maps to 7.0, and codes a channel_pair_element: walked as 7.0, 5.0 or 5.1, at
 least every I-frame fails its substream size checks; walked as stereo, every frame ends
-exactly (src/ac4dec/ERRATA.md, "presentation_version 2 is read as immersive stereo").
+exactly (src/ac4/ERRATA.md, "presentation_version 2 is read as immersive stereo").
 
 The three 5.1.4 legs (phase G1) are one tone per channel in each immersive codec mode DEE
 writes, for the phases from D9 on. Both transcriptions read immersive_channel_element() since
@@ -238,7 +238,7 @@ import ac4_syntax
 REPO = Path(__file__).resolve().parent.parent.parent
 AUDIO = REPO / "tests" / "golden" / "audio"
 OUT = REPO / "tests" / "golden" / "external-baseline"
-DIGESTS = REPO / "tests" / "golden" / "ac4dec"
+DIGESTS = REPO / "tests" / "golden" / "ac4"
 SCRATCH = REPO / "build" / "ac4_baseline_scratch"
 
 DEE_DIR = Path(r"C:\Program Files\Dolby\Dolby Media Encoder\resources\dee-dir")
@@ -261,7 +261,7 @@ DDPJOC = "dee_ddpjoc_encoder"
 # 3: planning/ac4.md's phase G0. Every leg but ac4-stereo-64 is made again from 5 s sources
 #    with loudness measured and not corrected, so a decode can be scored against its source;
 #    two one-tone-per-channel legs; source_sha256; walked values computed by ac4_syntax.py;
-#    the digests under tests/golden/ac4dec/ written here; the gold set.
+#    the digests under tests/golden/ac4/ written here; the gold set.
 # 4: phase G1. Three committed 5.1.4 legs, one tone per channel in each immersive codec mode,
 #    without digests until D9; the gold set's g1_legs (the module docstring's "Phase G1"),
 #    with G0's legs, sources and files left as they were.
@@ -331,7 +331,7 @@ _DRC_AND_LTRT = ("drc_profile=film_standard:drc_profile_portable_hp=speech:"
 # The committed legs. "expect" holds what the layout, the rate and the options must give; a
 # walk that disagrees stops main() before anything in the tree changes.
 LEGS = [
-    # tests/ac4/test_ac4.cpp pins this stream's frame count and its MediaInfo-checked TOC
+    # tests/ac4/core/test_ac4.cpp pins this stream's frame count and its MediaInfo-checked TOC
     # fields; tests/cli and fuzz/generate-seeds.sh read it too. "pinned": main() refuses to
     # replace it with different bytes, so it keeps DEE's defaults.
     {"name": "ac4-stereo-64", "encoder": AC4, "source": "reference_stereo", "layout": "stereo",

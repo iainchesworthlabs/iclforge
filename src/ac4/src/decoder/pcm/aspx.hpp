@@ -23,7 +23,7 @@
 // Time runs along Q_low's slots, the QMF matrix delayed by ts_offset_hfgen
 // (5.7.6.3.2): QoutASPX is that delayed matrix below the crossover and the
 // assembled high band above it, and the part of an interval past the frame's
-// last slot waits for the next frame. src/ac4dec/ERRATA.md records the
+// last slot waits for the next frame. src/ac4/ERRATA.md records the
 // readings taken, under "A-SPX".
 
 namespace iclforge::ac4::detail {

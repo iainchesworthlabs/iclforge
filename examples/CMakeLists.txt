@@ -161,7 +161,7 @@ endif()
 # stream. ICLFORGE_BUILD_AC4 defaults ON, and with it off there is no decoder to link.
 if(ICLFORGE_BUILD_AC4)
     add_executable(decode_ac4 decode_ac4.cpp)
-    target_link_libraries(decode_ac4 PRIVATE iclforge::ac4dec iclforge::warnings iclforge::fmt)
+    target_link_libraries(decode_ac4 PRIVATE iclforge::ac4 iclforge::warnings iclforge::fmt)
     set_target_properties(decode_ac4 PROPERTIES FOLDER examples)
     if(ICLFORGE_BUILD_TESTS)
         add_test(NAME "example.decode_ac4" COMMAND decode_ac4

@@ -134,7 +134,7 @@ inline double scalar_exp2(double x) { return std::exp2(x); }
 // (planning/ac4.md, "Arithmetic"): dB conversions in the QMF-domain high-band
 // generator, run at Real, need libm's log10/pow replaced with log2/exp2
 // through this pair, so two platforms' libm cannot disagree in a decoded
-// sample's last bit (src/ac4core/src/aspx/hf_generator.cpp).
+// sample's last bit (src/ac4/src/core/aspx/hf_generator.cpp).
 inline float scalar_exp2(float x) {
     if (x >= 128.0f) {  // 2^128 overflows; the largest float is just under it
         return 3.4028235e38f;

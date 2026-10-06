@@ -10,11 +10,11 @@
 // The companding and A-SPX syntax, written: ETSI TS 103 190-1 V1.4.1 Table 49
 // (companding_control) and Tables 50 to 58 (aspx_config, aspx_data_1ch,
 // aspx_data_2ch and the elements they call), transcribed for writing. The
-// decoder's reader (src/ac4dec/src/syntax/aspx.cpp) and the Python parser
+// decoder's reader (src/ac4/src/decoder/syntax/aspx.cpp) and the Python parser
 // are transcriptions of their own; the three traces agree record for record.
 //
 // The values here are the syntax's: what the encoder decided is turned into
-// them by the encoder (src/ac4enc/src/aspx/aspx_encoder.hpp), which also
+// them by the encoder (src/ac4/src/encoder/aspx/aspx_encoder.hpp), which also
 // derives the counts the syntax reads with.
 
 namespace iclforge::ac4::detail {

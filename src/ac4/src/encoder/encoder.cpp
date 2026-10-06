@@ -2899,7 +2899,7 @@ constexpr std::array<std::uint32_t, 13> kModeChannels = {
 }
 
 // A gain on Part 1 clauses 4.3.12.4.4 to 4.3.12.4.8's scale, -0.3 dB a step
-// from 0 to 254 and 255 silence (src/ac4dec/ERRATA.md, "The main audio's and
+// from 0 to 254 and 255 silence (src/ac4/ERRATA.md, "The main audio's and
 // the dialogue's scaling with associated audio").
 [[nodiscard]] std::optional<int> scale_code(double db) noexcept {
     if (std::isinf(db) && db < 0.0) {
@@ -3032,7 +3032,7 @@ struct StreamPresentation {
 // the writer takes an A-JOC substream to need that level, and 7 above 17
 // objects (src/ac4enc/ERRATA.md, "md_compat for objects").
 constexpr int kAjocObjectsAtLevel3 = 17;
-// The most objects the decoder keeps in one portion (src/ac4dec/ERRATA.md,
+// The most objects the decoder keeps in one portion (src/ac4/ERRATA.md,
 // "The objects oamd_dyndata_multi() lists").
 constexpr int kMaxObjects = 64;
 // The share of an A-JOC substream's frame its parameters may take.
@@ -3180,7 +3180,7 @@ struct ObjectLayout {
 // Nested in an exported class, Impl takes its visibility, so each member
 // function defined out of line below would be exported from libac4enc.so with
 // it. ICLFORGE_AC4ENC_NO_EXPORT on each keeps them to the library, and the exported set
-// to the header's API (tools/ci/abi-allowlist/libiclforge_ac4enc.so.txt).
+// to the header's API (tools/ci/abi-allowlist/libiclforge_ac4.so.txt).
 struct Encoder::Impl {
     // The stream `config` asks for, or why it is not one the encoder writes,
     // or its rate cannot hold its least frame.

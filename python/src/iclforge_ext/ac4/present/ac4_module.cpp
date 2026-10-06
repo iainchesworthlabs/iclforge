@@ -18,8 +18,8 @@
 #include <utility>
 #include <vector>
 
-// The variant of the `ac3.ac4` submodule compiled when iclforge::ac4/iclforge::ac4dec/
-// iclforge::ac4enc are in this build.
+// The variant of the `ac3.ac4` submodule compiled when iclforge::ac4/iclforge::ac4/
+// iclforge::ac4 are in this build.
 //
 // pybind11-direct on iclforge::ac4::Decoder/iclforge::ac4::Encoder, the same policy as the rest of
 // this extension (see bindings.cpp's own header comment) - no intermediate C
@@ -254,9 +254,9 @@ void register_ac4(py::module_& m) {
         "ac4",
         "AC-4 decode/encode (ETSI TS 103 190-1 V1.4.1, TS 103 190-2 V1.3.1) - "
         "iclforge::ac4::Decoder/"
-        "iclforge::ac4::Encoder bound directly. See src/ac4dec/include/iclforge/ac4dec/decoder.hpp "
+        "iclforge::ac4::Encoder bound directly. See src/ac4/include/iclforge/ac4/decoder/decoder.hpp "
         "and "
-        "src/ac4enc/include/iclforge/ac4enc/encoder.hpp for the full scope statement and what each "
+        "src/ac4/include/iclforge/ac4/encoder/encoder.hpp for the full scope statement and what each "
         "refuses; this binding covers a subset of both - see this file's own header comment.");
 
     // --- enums ---------------------------------------------------------------
