@@ -2758,45 +2758,45 @@ Later phases add the readings their tools need.
 
 The writer takes the decoder's reading of each of these:
 
-- [audio_size covers the fill](../ac4dec/ERRATA.md#audio_size-covers-the-fill): a frame's bits beyond
+- [audio_size covers the fill](#audio_size-covers-the-fill): a frame's bits beyond
   its audio are `fill_bits` inside `audio_size`, before `metadata()`.
-- [byte_align is relative to the substream](../ac4dec/ERRATA.md#byte_align-is-relative-to-the-substream).
-- [ext_code is at most 21 bits](../ac4dec/ERRATA.md#ext_code-is-at-most-21-bits): the quantiser clips a
+- [byte_align is relative to the substream](#byte_align-is-relative-to-the-substream).
+- [ext_code is at most 21 bits](#ext_code-is-at-most-21-bits): the quantiser clips a
   line at 8191, and a band whose peak would pass it takes a coarser step.
-- [Scale factors outside 0 to 255](../ac4dec/ERRATA.md#scale-factors-outside-0-to-255): every scale
+- [Scale factors outside 0 to 255](#scale-factors-outside-0-to-255): every scale
   factor the deltas reach stays in range.
-- [Pseudocode 59's stray block](../ac4dec/ERRATA.md#pseudocode-59s-stray-block): the M/S matrix and the
+- [Pseudocode 59's stray block](#pseudocode-59s-stray-block): the M/S matrix and the
   prediction, with `0.1f` a float, and an `alpha_q` sent against a pair of bands `sap_data()` sent no
   coefficient for counted from 0.
-- [Full scale, and the overlap-add's factor of two](../ac4dec/ERRATA.md#full-scale-and-the-overlap-adds-factor-of-two),
-  [KBD_RIGHT's argument](../ac4dec/ERRATA.md#kbd_rights-argument) and
-  [The KBD kernel is summed to p = N](../ac4dec/ERRATA.md#the-kbd-kernel-is-summed-to-p-n): the forward
+- [Full scale, and the overlap-add's factor of two](#full-scale-and-the-overlap-adds-factor-of-two),
+  [KBD_RIGHT's argument](#kbd_rights-argument) and
+  [The KBD kernel is summed to p = N](#the-kbd-kernel-is-summed-to-p-n): the forward
   transform is the transpose of the decoder's, through the same windows, with lines scaled by 2^16 so
   that a full-scale input decodes at full scale.
-- [Partial coupling starts at acpl_param_band](../ac4dec/ERRATA.md#partial-coupling-starts-at-acpl_param_band):
+- [Partial coupling starts at acpl_param_band](#partial-coupling-starts-at-acpl_param_band):
   the A-CPL writer (`src/ac4/src/encoder/acpl/acpl_syntax.hpp`, phase D5's, for the constructed streams and
   for E4) sends each parameter set from `acpl_param_band`, its first value along frequency from the F0
   codebook, as Table 65 reads it.
 - The immersive element (phase D9's, for the constructed 7.X.4 streams): the frame writer's 7.X.4 channel
   modes with their presence flags, and the A-JCC writer (`src/ac4/src/encoder/ajcc/ajcc_syntax.hpp`), take
-  [The framing of the immersive element's chparam_info()](../ac4dec/ERRATA.md#the-framing-of-the-immersive-elements-chparam_info)
-  and [immersive_codec_mode_code in the trace](../ac4dec/ERRATA.md#immersive_codec_mode_code-in-the-trace);
+  [The framing of the immersive element's chparam_info()](#the-framing-of-the-immersive-elements-chparam_info)
+  and [immersive_codec_mode_code in the trace](#immersive_codec_mode_code-in-the-trace);
   `custom_dmx_data()` sends custom downmix data for the height downmix alone ("The height downmix", below)
   and `loud_corr()` no correction for the immersive outputs.
 - The channel renderer (phase D9's): the frame writer's `top_channels_present` takes
-  [Where a .2 source's top pair is carried](../ac4dec/ERRATA.md#where-a-2-sources-top-pair-is-carried), and
+  [Where a .2 source's top pair is carried](#where-a-2-sources-top-pair-is-carried), and
   a writer that sends custom downmix data in I-frames alone, as DEE does, relies on
-  [Custom downmix data](../ac4dec/ERRATA.md#custom-downmix-data) to hold them between.
+  [Custom downmix data](#custom-downmix-data) to hold them between.
 - Object audio (phase D10's, for the constructed object streams of `tests/ac4/decoder/ac4dec_objects.cpp`):
   the A-JOC writer (`src/ac4/src/encoder/ajoc/ajoc_syntax.hpp`), the object audio metadata writer
   (`src/ac4/src/encoder/oamd/oamd_syntax.hpp`) and the table of contents' object groups take
-  [Arrays read as one field](../ac4dec/ERRATA.md#arrays-read-as-one-field),
-  [Prefix codes in the trace](../ac4dec/ERRATA.md#prefix-codes-in-the-trace),
-  [add_per_object_md()'s parameters](../ac4dec/ERRATA.md#add_per_object_mds-parameters),
-  [n_objects_code and the LFE](../ac4dec/ERRATA.md#n_objects_code-and-the-lfe),
-  [The objects of a direct-coded substream](../ac4dec/ERRATA.md#the-objects-of-a-direct-coded-substream),
-  [Which oamd_timing_data() applies](../ac4dec/ERRATA.md#which-oamd_timing_data-applies) and
-  [var_channel_element()'s A-SPX and companding](../ac4dec/ERRATA.md#var_channel_elements-a-spx-and-companding).
+  [Arrays read as one field](#arrays-read-as-one-field),
+  [Prefix codes in the trace](#prefix-codes-in-the-trace),
+  [add_per_object_md()'s parameters](#add_per_object_mds-parameters),
+  [n_objects_code and the LFE](#n_objects_code-and-the-lfe),
+  [The objects of a direct-coded substream](#the-objects-of-a-direct-coded-substream),
+  [Which oamd_timing_data() applies](#which-oamd_timing_data-applies) and
+  [var_channel_element()'s A-SPX and companding](#var_channel_elements-a-spx-and-companding).
   Each budget the syntax gives a nested element (`add_data_bytes`, `add_table_data_size_minus1`, the
   `skip_bits` of `ajoc_bed_info()` and `ext_prec_alt_pos()`) is the fewest bytes that hold what is sent,
   measured as the decoder measures it; where bits of an `add_data` budget are left after `trim()`, the
@@ -2809,21 +2809,21 @@ The readings phase E2 takes for the ASPX codec mode: companding and A-SPX, writt
 decoder's reading of each of these, and the tests and the encoder-space harness hold the three traces
 equal on every ASPX stream they write:
 
-- [Every codec mode passes through the QMF banks](../ac4dec/ERRATA.md#every-codec-mode-passes-through-the-qmf-banks):
+- [Every codec mode passes through the QMF banks](#every-codec-mode-passes-through-the-qmf-banks):
   an ASPX stream lags its input by the SIMPLE mode's delay, 4,385 samples at `frame_rate_index` 13.
-- [Companding measures against full scale 1.0](../ac4dec/ERRATA.md#companding-measures-against-full-scale-10),
-  [Companding's slots are Q_low's](../ac4dec/ERRATA.md#compandings-slots-are-q_lows) and
-  [The companding average](../ac4dec/ERRATA.md#the-companding-average): the compressor below inverts the
+- [Companding measures against full scale 1.0](#companding-measures-against-full-scale-10),
+  [Companding's slots are Q_low's](#compandings-slots-are-q_lows) and
+  [The companding average](#the-companding-average): the compressor below inverts the
   expander those readings give; the writer sends `b_compand_on` per channel and never `sync_flag`.
-- [The estimated envelope's time divisor](../ac4dec/ERRATA.md#the-estimated-envelopes-time-divisor): a
+- [The estimated envelope's time divisor](#the-estimated-envelopes-time-divisor): a
   signal envelope is the input's mean energy per QMF subsample over its groups and slots.
-- [The first signal scale factor below zero](../ac4dec/ERRATA.md#the-first-signal-scale-factor-below-zero):
+- [The first signal scale factor below zero](#the-first-signal-scale-factor-below-zero):
   an envelope coded along frequency whose first value is below the F0 codebooks' floor sends 0 there, and
   the second group's value takes it over.
-- [The sinusoid's subband](../ac4dec/ERRATA.md#the-sinusoids-subband), [b_sine_at_end](../ac4dec/ERRATA.md#b_sine_at_end)
-  and [Before the first interval](../ac4dec/ERRATA.md#before-the-first-interval): what the encoder keeps
+- [The sinusoid's subband](#the-sinusoids-subband), [b_sine_at_end](#b_sine_at_end)
+  and [Before the first interval](#before-the-first-interval): what the encoder keeps
   of the decoder's state to choose delta coding and sinusoids.
-- [Pre-flattening's direction](../ac4dec/ERRATA.md#pre-flattenings-direction): the encoder runs the
+- [Pre-flattening's direction](#pre-flattenings-direction): the encoder runs the
   decoder's high frequency generator on its input's low band to choose inverse filtering, noise floors and
   sinusoids, and flattens the patch as the decoder does. Phase D4 changed the reading.
 
@@ -2960,10 +2960,10 @@ The readings phase E3 takes for 5.0 and 5.1, and for 7.0 and 7.1 as an experimen
 takes the decoder's reading of each of these, and the tests and the encoder-space harness hold the three
 traces equal on every 5.X and 7.X stream they write:
 
-- [The LFE's track is not numbered in Tables 180 and 182](../ac4dec/ERRATA.md#the-lfes-track-is-not-numbered-in-tables-180-and-182):
+- [The LFE's track is not numbered in Tables 180 and 182](#the-lfes-track-is-not-numbered-in-tables-180-and-182):
   the LFE's `mono_data(1)` first, the channel data's tracks counted after it, and in the 7.X element C's
   `mono_data(0)` after the additional pair where `coding_config` 0 and 2 send it.
-- [The 7.X element's additional channels](../ac4dec/ERRATA.md#the-7x-elements-additional-channels): the
+- [The 7.X element's additional channels](#the-7x-elements-additional-channels): the
   encoder sends `b_use_sap_add_ch` 0, so its additional pair is its own two channels and the reading's
   matrix is not written.
 - Table 213's name for 3/2/2's last pair (the misprints in `src/ac4/ERRATA.md`): Tfl and Tfr, as
@@ -2975,13 +2975,13 @@ The readings phase E4 takes for ASPX_ACPL_2 and ASPX_ACPL_3 in the 5.X element, 
 there and A-CPL in the channel pair as experimental options. The writer takes the decoder's reading of
 each of these:
 
-- [When A-CPL's parameters apply](../ac4dec/ERRATA.md#when-a-cpls-parameters-apply): a frame's
+- [When A-CPL's parameters apply](#when-a-cpls-parameters-apply): a frame's
   parameters are estimated from the QMF slots of the A-SPX interval they share a control frame with,
   over a window centred on the last of them, where smooth interpolation reaches the new values.
-- [ASPX_ACPL_1: the framing of the residuals](../ac4dec/ERRATA.md#aspx_acpl_1-the-framing-of-the-residuals):
+- [ASPX_ACPL_1: the framing of the residuals](#aspx_acpl_1-the-framing-of-the-residuals):
   the 5.X element's residuals share A and B's framing and layout group, and `max_sfb_master`, in
   n_side_bits of the largest transform length, stops them at `acpl_qmf_band`.
-- [get_max_sfb() with b_dual_maxsfb](../ac4dec/ERRATA.md#get_max_sfb-with-b_dual_maxsfb): the channel
+- [get_max_sfb() with b_dual_maxsfb](#get_max_sfb-with-b_dual_maxsfb): the channel
   pair's ASPX_ACPL_1 sends one `sf_info()` with `b_dual_maxsfb`, the side stopped at `acpl_qmf_band` by
   its own `max_sfb_side`, and `chparam_info()` at `sap_mode` 0.
 
@@ -3018,15 +3018,15 @@ The readings phase E8 takes for 5.0.4 and 5.1.4 in SCPL, ASPX_SCPL and ASPX_ACPL
 ASPX_AJCC and 7.0.4 and 7.1.4 with the back pair as experimental options. The writer takes the decoder's
 reading of each of these, and the tests hold the three traces equal on every immersive stream they write:
 
-- [Table 19's track numbers are labels](../ac4dec/ERRATA.md#table-19s-track-numbers-are-labels) and
-  [Which channel holds which intermediate signal](../ac4dec/ERRATA.md#which-channel-holds-which-intermediate-signal):
+- [Table 19's track numbers are labels](#table-19s-track-numbers-are-labels) and
+  [Which channel holds which intermediate signal](#which-channel-holds-which-intermediate-signal):
   `core_5ch_grouping` 0 with `2ch_mode` 0, as DEE writes it, and A'' to K'' coded where the channels they
   become are.
-- [The framing of the immersive element's chparam_info()](../ac4dec/ERRATA.md#the-framing-of-the-immersive-elements-chparam_info)
-  and [Table 20's prediction gains](../ac4dec/ERRATA.md#table-20s-prediction-gains): each coupled pair's
+- [The framing of the immersive element's chparam_info()](#the-framing-of-the-immersive-elements-chparam_info)
+  and [Table 20's prediction gains](#table-20s-prediction-gains): each coupled pair's
   difference is predicted from its sum band by band with Pseudocode 59's gain, and a pair and the pair
   predicted from it share a transform layout.
-- [The core's top pair is Tsl and Tsr](../ac4dec/ERRATA.md#the-cores-top-pair-is-tsl-and-tsr): the
+- [The core's top pair is Tsl and Tsr](#the-cores-top-pair-is-tsl-and-tsr): the
   encoder's streams decode in core decoding to 5.X.2, each top pair's two channels in its side of it.
 
 #### Table 20's prediction
@@ -3076,8 +3076,8 @@ reading of each of these, and the tests hold the three traces equal on every imm
 
 ### Objects
 
-The writer takes the decoder's readings of [A-JOC](../ac4dec/ERRATA.md#a-joc) and of [object audio
-metadata and the ISF renderer](../ac4dec/ERRATA.md#object-audio-metadata-and-the-isf-renderer) by
+The writer takes the decoder's readings of [A-JOC](#a-joc) and of [object audio
+metadata and the ISF renderer](#object-audio-metadata-and-the-isf-renderer) by
 running the decoder's own reconstruction (`src/ac4/src/core`'s `ajoc::Reconstruction`) on the parameters it
 weighs: the ramp's counter, the decorrelation input matrix by subband, H'_M by object. Objects take the
 output level's gain and no DRC, so an object presentation refuses DRC gains.
@@ -3142,7 +3142,7 @@ output level's gain and no DRC, so an object presentation refuses DRC gains.
   object_screen_factor_code element is not present, object_screen_factor shall be 0".
 - **Reading:** the factor is (code + 1) / 8, from 1/8 to 1, as the decoder reads it (`apply_other()` in
   `src/ac4/src/decoder/pcm/objects.cpp`), so the group has no code for a factor of 0: a factor of 0 is the group's
-  absence, which also leaves the depth exponent at 1 ([the decoder's reading](../ac4dec/ERRATA.md#object-audio-metadata)).
+  absence, which also leaves the depth exponent at 1 ([the decoder's reading](#object-audio-metadata)).
   The encoder sends the group for an object whose factor is above 0 or whose exponent is not 1. An exponent
   other than 1 with a factor of 0 has no code. The encoder refuses such an object at configuration, naming the
   reason, and such properties in a metadata update as invalid input; it used to send a factor of 1/8, which
@@ -3155,7 +3155,7 @@ output level's gain and no DRC, so an object presentation refuses DRC gains.
 
 - **Where:** Part 2 Table 55, p. 157: md_compat 0 to 3 allow 2, 6, 9 and 11 tracks; the decoder's reading
   of the table for A-JOC is 17 objects and an LFE at md_compat 3 ([The objects oamd_dyndata_multi()
-  lists](../ac4dec/ERRATA.md#the-objects-oamd_dyndata_multi-lists)).
+  lists](#the-objects-oamd_dyndata_multi-lists)).
 - **Reading:** an A-JOC presentation's tracks are its downmix signals, and it takes md_compat 3 at the
   least, 7 above 17 objects; a direct-coded one's tracks are its full-band objects, as a channel-based
   presentation's are its channels.
@@ -3250,8 +3250,8 @@ every configuration's substream groups as written.
   `pres_top_channel_pairs` and the channel groups come from Pseudocode 25 and clauses 6.3.3.1.29 to
   6.3.3.1.30; E.10.3 from `b_pres_centre_present` too (6.3.3.1.29a).
 - **Reading:** the decoder's ([presentation_config 1 and 4 read more specifiers than
-  n_substream_groups](../ac4dec/ERRATA.md#presentation_config-1-and-4-read-more-specifiers-than-n_substream_groups)
-  and [The presentation substream](../ac4dec/ERRATA.md#the-presentation-substream)): every substream of
+  n_substream_groups](#presentation_config-1-and-4-read-more-specifiers-than-n_substream_groups)
+  and [The presentation substream](#the-presentation-substream)): every substream of
   every group the specifiers name, a group named twice once, `superset()` by the channels each mode holds,
   and `b_pres_centre_present` the disjunction of the substreams' `b_centre_present`, where they send
   one. A group the table of contents does not carry (`b_multi_pid`) cannot be described, and is refused.
@@ -3365,17 +3365,17 @@ sample (E.3) and listing each sample's flags where a fragment holds a frame that
 
 The writer takes the decoder's reading of each of these (phase E5):
 
-- [de_data() predicts from the wrong channel](../ac4dec/ERRATA.md#de_data-predicts-from-the-wrong-channel):
+- [de_data() predicts from the wrong channel](#de_data-predicts-from-the-wrong-channel):
   a channel after the first is sent along its own bands in an I-frame.
-- [Dialogue enhancement and DRC configuration across I-frames](../ac4dec/ERRATA.md#dialogue-enhancement-and-drc-configuration-across-i-frames):
+- [Dialogue enhancement and DRC configuration across I-frames](#dialogue-enhancement-and-drc-configuration-across-i-frames):
   `de_config()` and `drc_config()` go in I-frames, and a frame between them sends `b_de_config_flag` 0,
   and `b_drc_present` 0 unless a mode sends gains.
-- [drc_repeat_id copies a whole mode](../ac4dec/ERRATA.md#drc_repeat_id-copies-a-whole-mode): a repeat of
+- [drc_repeat_id copies a whole mode](#drc_repeat_id-copies-a-whole-mode): a repeat of
   a mode that sends gains sends a gainset in `drc_data()` too, that mode's gains again.
-- [drc_gains() is a brace short](../ac4dec/ERRATA.md#drc_gains-is-a-brace-short) and
-  [DRC's units](../ac4dec/ERRATA.md#drcs-units): gains in whole dB2, frequency-differential along the
+- [drc_gains() is a brace short](#drc_gains-is-a-brace-short) and
+  [DRC's units](#drcs-units): gains in whole dB2, frequency-differential along the
   first subframe's bands and time-differential along each band's subframes.
-- [When dialogue enhancement's, DRC's and the downmix's values apply](../ac4dec/ERRATA.md#when-dialogue-enhancements-drcs-and-the-downmixs-values-apply):
+- [When dialogue enhancement's, DRC's and the downmix's values apply](#when-dialogue-enhancements-drcs-and-the-downmixs-values-apply):
   a frame's dialogue enhancement parameters and DRC gains are computed on the block its control data
   meets (above, "Where the encoder's QMF slots fall").
 
@@ -3385,7 +3385,7 @@ The writer takes the decoder's reading of each of these (phase E5):
   Table 74, p. 67 (`bits_left = drc_gainset_size - 2 - used_bits`).
 - **Reading:** the formula's: the size counts `drc_version`'s two bits and `drc_gains()`, which is what
   a reader skipping a gainset by its size needs. The decoder accepts either reading at `drc_version` 0
-  ([drc_gainset_size does and does not count drc_version](../ac4dec/ERRATA.md#drc_gainset_size-does-and-does-not-count-drc_version)).
+  ([drc_gainset_size does and does not count drc_version](#drc_gainset_size-does-and-does-not-count-drc_version)).
 - **Evidence:** Readers. Transmitted gains are experimental (`experimental=drc-gains-0` to
   `drc-gains-3`, one for each DRC mode): no stream DEE writes sends them.
 
@@ -3396,39 +3396,39 @@ and `metadata.cpp`), which phase D7's test multiplexer writes, and the encoder's
 substreams (`src/ac4/src/encoder/encoder.cpp`), phase E6's. The writer takes the decoder's reading of each of
 these:
 
-- [presentation_config 1 and 4 read more specifiers than n_substream_groups](../ac4dec/ERRATA.md#presentation_config-1-and-4-read-more-specifiers-than-n_substream_groups)
-  and [Substream group gains](../ac4dec/ERRATA.md#substream-group-gains): every specifier the
+- [presentation_config 1 and 4 read more specifiers than n_substream_groups](#presentation_config-1-and-4-read-more-specifiers-than-n_substream_groups)
+  and [Substream group gains](#substream-group-gains): every specifier the
   configuration reads, and `sg_gain` for n_substream_groups groups as 6.2.1.3 assigns it: none for
   configuration 1, the main and associated groups' for configuration 4.
-- [The dialogue's gain and pans](../ac4dec/ERRATA.md#the-dialogues-gain-and-pans) and
-  [Panning](../ac4dec/ERRATA.md#panning): `dialog_max_gain` for a g_dialog_max of (1 + `dialog_max_gain`)
+- [The dialogue's gain and pans](#the-dialogues-gain-and-pans) and
+  [Panning](#panning): `dialog_max_gain` for a g_dialog_max of (1 + `dialog_max_gain`)
   x 3 dB, and pans in 1.5 degree steps clockwise from the front, 330 degrees L and 30 degrees R.
-- [The main audio's and the dialogue's scaling with associated audio](../ac4dec/ERRATA.md#the-main-audios-and-the-dialogues-scaling-with-associated-audio):
+- [The main audio's and the dialogue's scaling with associated audio](#the-main-audios-and-the-dialogues-scaling-with-associated-audio):
   `scale_main`, `scale_main_centre` and `scale_main_front` at -0.3 dB a step, 255 for silence.
-- [The hybrid dialogue enhancement's waveform](../ac4dec/ERRATA.md#the-hybrid-dialogue-enhancements-waveform):
+- [The hybrid dialogue enhancement's waveform](#the-hybrid-dialogue-enhancements-waveform):
   a hybrid method's `de_signal_contribution` sets the waveform's share, alpha_c = x / 31, of the gain,
   and the dialogue enhancement substream's channels are d_c in that entry's order (below, "The hybrid
   methods' waveform").
-- [Which presentations can be selected](../ac4dec/ERRATA.md#which-presentations-can-be-selected): each
+- [Which presentations can be selected](#which-presentations-can-be-selected): each
   presentation's `md_compat` is the least its tracks allow (below, "Tracks for md_compat"), so that a
   decoder of that level can select it; a caller may set a higher one, and 7 is selected only by a
   decoder told its level is 7.
-- [The order of the preferences](../ac4dec/ERRATA.md#the-order-of-the-preferences): a presentation's
+- [The order of the preferences](#the-order-of-the-preferences): a presentation's
   language is its dialogue substream's, else its main or music and effects substream's. Each substream's
   language goes in its own group's `content_type()`, so an associated substream's tag, which may be one
   of Table 92's codes such as `qad`, never gives a presentation its language.
-- [b_associated and b_dialog are parameters at sus_ver 0](../ac4dec/ERRATA.md#b_associated-and-b_dialog-are-parameters-at-sus_ver-0):
+- [b_associated and b_dialog are parameters at sus_ver 0](#b_associated-and-b_dialog-are-parameters-at-sus_ver-0):
   at sus_ver 1 the writer sends `b_dialog` for a substream that is the dialogue of a presentation or is
   classified as dialogue, with its mixing values, in every frame.
-- [Levelling before the mix](../ac4dec/ERRATA.md#levelling-before-the-mix): a version 1 presentation
+- [Levelling before the mix](#levelling-before-the-mix): a version 1 presentation
   carries one dialnorm, in its presentation substream, and levels nothing, so each presentation substream
   sends the dialnorm its substreams share: the presentation's own, else the stream's.
-- [oamd_dyndata_single() in metadata() of a channel-coded substream](../ac4dec/ERRATA.md#oamd_dyndata_single-in-metadata-of-a-channel-coded-substream):
+- [oamd_dyndata_single() in metadata() of a channel-coded substream](#oamd_dyndata_single-in-metadata-of-a-channel-coded-substream):
   a channel-coded substream sends none, so one substream serves an alternative presentation and others
   alike.
-- [The end of an EMDF payload list](../ac4dec/ERRATA.md#the-end-of-an-emdf-payload-list): each list ends
+- [The end of an EMDF payload list](#the-end-of-an-emdf-payload-list): each list ends
   with an `emdf_payload_id` of 0 and the alignment, and nothing between.
-- [The presentation substream](../ac4dec/ERRATA.md#the-presentation-substream): `superset(0, 1)` is 1,
+- [The presentation substream](#the-presentation-substream): `superset(0, 1)` is 1,
   so stereo main audio with mono dialogue or associated audio is a stereo presentation, and the fields
   that follow `pres_ch_mode`, `custom_dmx_data()` and `loud_corr()`, follow the superset.
 
@@ -3564,7 +3564,7 @@ these:
   enhancement. Nothing says what signal a writer computes transmitted gains (`drc_gains()`) from where a
   presentation mixes several substreams.
 - **Reading:** the presentation's main or music and effects substream's input alone. The decoder's side
-  chain is the mix of the substreams ([Where the substreams are mixed](../ac4dec/ERRATA.md#where-the-substreams-are-mixed)),
+  chain is the mix of the substreams ([Where the substreams are mixed](#where-the-substreams-are-mixed)),
   so these gains leave the dialogue's and the associated audio's level out; transmitted gains are
   experimental (`experimental=drc-gains-0` to `drc-gains-3`), and the encoder does not compute them from
   the mix, with the presentation's gains, pans and scaling.
