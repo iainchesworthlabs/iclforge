@@ -58,8 +58,9 @@ constexpr std::uint32_t kMaxObjectChannels = 18;  // the Base-Advanced and Advan
 
 [[nodiscard]] LoudnessData loudness_data(const LoudnessInfo& loudness) {
     LoudnessData data;
-    data.integrated_loudness = double_to_q7_8(loudness.integrated_loudness_lkfs);
-    data.digital_peak = double_to_q7_8(loudness.digital_peak_dbfs);
+    data.integrated_loudness =
+        double_to_q7_8(static_cast<double>(loudness.integrated_loudness_lkfs));
+    data.digital_peak = double_to_q7_8(static_cast<double>(loudness.digital_peak_dbfs));
     return data;
 }
 
