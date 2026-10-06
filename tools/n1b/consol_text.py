@@ -217,6 +217,12 @@ C1_PROSE = [
         _TEXT,
         files=("tests/golden/ac4/scalar-agreement",),
     ),
+    # A test that reaches the streams from the external baseline's directory, `/ ".." / "ac4dec" /`
+    Rule(
+        "golden-path-part",
+        r'(/\s*"\.\."\s*/\s*)"ac4dec"(\s*/)',
+        r'\1"ac4"\2',
+    ),
     # A comment that still spells an AC-4 header as it was before N1B (`ac4enc/encoder.hpp`): N1B's
     # header map, followed to the spelling of today (n1b_docs.new_header).
     Rule(
