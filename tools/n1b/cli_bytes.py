@@ -25,7 +25,11 @@ G = "tests/golden"
 
 def corpus(repo: Path):
     a = f"{G}/audio"
-    ac4 = sorted((repo / G / "ac4dec/constructed").glob("*.ac4"))
+    # tests/golden/ac4 from C1 of planning/consolidation.md on, tests/golden/ac4dec before it
+    golden_ac4 = next(
+        (d for d in ("ac4", "ac4dec") if (repo / G / d / "constructed").is_dir()), "ac4"
+    )
+    ac4 = sorted((repo / G / golden_ac4 / "constructed").glob("*.ac4"))
     ext = sorted((repo / G / "external-baseline").glob("*/dee.ac3")) + sorted(
         (repo / G / "external-baseline").glob("*/dee.ec3")
     )
