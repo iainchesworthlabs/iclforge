@@ -61,7 +61,43 @@ C0 = [
     Rule("ac4-zone-marker", r"\bAC4_ZONE_SCOPED_N\b", "ICLFORGE_ZONE_SCOPED_N"),
 ]
 
-STAGES: dict[str, list[Rule]] = {"c0": C0}
+# --- C1 ---------------------------------------------------------------------------------------
+# AC-4's four libraries are one. What names one of the three that go, in a build file, a script, a
+# page or a comment: its CMake target and alias, its file, its pkg-config name, its export macros.
+# The include spellings and the C++ export macros are consol_apply.py's; the AC-4 core, which had
+# no ABI, no headers and no export of its own beyond its archive, is a person's where a sentence
+# says what it was (its target in the tests' links becomes the merged library's).
+_TEXT = ("text",)
+C1 = [
+    Rule(
+        "alias-variant",
+        r"\biclforge::ac4(?:dec|enc)_(static|shared|objects)\b",
+        r"iclforge::ac4_\1",
+        _TEXT,
+    ),
+    Rule("alias", r"\biclforge::ac4(?:dec|enc|core)\b(?![_:])", "iclforge::ac4", _TEXT),
+    Rule(
+        "raw-target",
+        r"\biclforge_ac4(?:dec|enc)_(static|shared|objects)\b",
+        r"iclforge_ac4_\1",
+        _TEXT,
+    ),
+    Rule(
+        "file",
+        r"\blibiclforge_ac4(?:dec|enc)(_static\.a|\.so|\.a|\.dylib|\.dll|\.lib)",
+        r"libiclforge_ac4\1",
+        _TEXT,
+    ),
+    Rule("pkg-config", r"\biclforge-ac4(?:dec|enc)\b(?![-\w])", "iclforge-ac4", _TEXT),
+    Rule(
+        "macro",
+        r"\bICLFORGE_AC4(?:DEC|ENC)_(EXPORT|STATIC_DEFINE|BUILDING_SHARED)\b",
+        r"ICLFORGE_AC4_\1",
+        _TEXT,
+    ),
+]
+
+STAGES: dict[str, list[Rule]] = {"c0": C0, "c1": C1}
 
 
 def kind_of(path: str) -> set[str]:

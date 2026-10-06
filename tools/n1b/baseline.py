@@ -375,7 +375,7 @@ def label_of(build: Path) -> str:
     compiler = Path(cache_value(build, "CMAKE_CXX_COMPILER")).name.lower()
     if "clang-cl" in compiler:
         return "clangcl"
-    if compiler.startswith("cl"):
+    if compiler in ("cl", "cl.exe"):
         return "msvc"
     return re.sub(r"[^a-z0-9]+", "", compiler.replace(".exe", ""))
 
