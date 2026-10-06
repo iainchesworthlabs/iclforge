@@ -35,6 +35,18 @@ from n1b_apply import do_moves, rewrite_docs_and_scripts
 from n1b_lib import CPP_EXT, INCLUDE_RE, Repo, base_parser
 
 
+# What generate_export_header() defines for a library, by the suffix after ICLFORGE_<LIBRARY>_.
+EXPORT_MACRO_SUFFIXES = (
+    "EXPORT",
+    "NO_EXPORT",
+    "DEPRECATED",
+    "DEPRECATED_EXPORT",
+    "DEPRECATED_NO_EXPORT",
+    "STATIC_DEFINE",
+    "BUILDING_SHARED",
+)
+
+
 def library_of(path: str) -> str | None:
     p = path.split("/")
     if p[0] == "src" and len(p) > 2:
@@ -132,11 +144,12 @@ def plan(repo: Repo, stage: str, index) -> dict:
         for old in merged:
             if old == merged[old]:
                 continue
-            mac = f"ICLFORGE_{old.upper()}_EXPORT"
-            if re.search(rf"\b{mac}\b", text):
-                lib = export_target(stage, old, f_new)
-                macros[f][mac] = f"ICLFORGE_{lib.upper()}_EXPORT"
-                stats["export macro"] += 1
+            lib = export_target(stage, old, f_new)
+            for suffix in EXPORT_MACRO_SUFFIXES:
+                mac = f"ICLFORGE_{old.upper()}_{suffix}"
+                if re.search(rf"\b{mac}\b", text):
+                    macros[f][mac] = f"ICLFORGE_{lib.upper()}_{suffix}"
+                    stats["export macro"] += 1
     return {
         "stage": stage,
         "moves": moves,

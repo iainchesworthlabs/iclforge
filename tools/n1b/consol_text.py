@@ -99,7 +99,7 @@ C1 = [
     Rule("pkg-config", r"\biclforge-ac4(?:dec|enc)\b(?![-\w])", "iclforge-ac4", _TEXT),
     Rule(
         "macro",
-        r"\bICLFORGE_AC4(?:DEC|ENC)_(EXPORT|STATIC_DEFINE|BUILDING_SHARED)\b",
+        r"\bICLFORGE_AC4(?:DEC|ENC)_((?:DEPRECATED_)?(?:NO_)?EXPORT|DEPRECATED|STATIC_DEFINE|BUILDING_SHARED)\b",
         r"ICLFORGE_AC4_\1",
         _TEXT,
     ),
