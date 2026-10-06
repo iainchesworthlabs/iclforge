@@ -19,6 +19,8 @@ spellings change in C1 anyway, so a consumer changes once).
                                  config.hpp                   EncoderConfig and its parts
   src/ac4/src/ac4.cpp         -> toc.cpp, elementary.cpp, carriage.cpp
 
+The two new units are added to the inspector's source list (src/ac4/CMakeLists.txt).
+
 A header is read as its include block, its file comment and the top-level declarations of its one
 namespace, each with the comments above it, and every declaration goes to the header the table
 names (PIECES; a describe() overload by its argument). Nothing in a declaration is edited. Each new
@@ -490,6 +492,21 @@ UNIT_STD_EXTRA = {
 }
 
 
+UNIT_BUILD = "src/ac4/CMakeLists.txt"
+
+
+def add_units_to_build(root: Path) -> None:
+    """The two new units beside ac4.cpp in the inspector's source list."""
+    src = Source(root, UNIT_BUILD)
+    old = "        src/ac4.cpp)"
+    if old not in src.text:
+        fail(f"{UNIT_BUILD}: the source list is not `src/ac4.cpp)` alone")
+    src.text = src.text.replace(
+        old, "        src/ac4.cpp\n        src/carriage.cpp\n        src/elementary.cpp)", 1
+    )
+    src.save()
+
+
 # --- consumers ------------------------------------------------------------------------------------
 
 
@@ -552,6 +569,7 @@ def run(root: Path, dry_run: bool) -> None:
             path = root / (Path(s.source).parent / Path(spelling).name)
             edges[spelling] = includes_of(path.read_text(encoding="utf-8"))
     cut_unit(root)
+    add_units_to_build(root)
     n = rewrite_consumers(root, pieces, edges)
     print(f"ac4_cuts: wrote {sum(len(s.pieces) for s in SPLITS)} headers, 3 units; {n} consumers")
 
