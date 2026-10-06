@@ -571,8 +571,17 @@ C3 += [
     ),
 ]
 # A page or a comment that names one of the five as a library names its part of the one; their
-# directories, named bare, are where their files went.
+# directories, named bare, are where their files went; a link to a heading that names a part's
+# namespace follows the heading's new anchor.
 C3_PROSE = [
+    Rule(
+        "anchor",
+        rf"(\]\([^)\s#]*#)([\w-]*iclforge(?:{_C3_PART})[\w-]*)(\))",
+        lambda m: m.group(1)
+        + re.sub(rf"iclforge({_C3_PART})", r"iclforgecontainers\1", m.group(2))
+        + m.group(3),
+        _TEXT,
+    ),
     Rule(
         "part-library",
         rf"\biclforge::({_C3_PART})\b(?![_:])",
