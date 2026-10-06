@@ -33,6 +33,17 @@ from n1b_cmake import (
 from n1b_lib import Repo, base_parser
 
 
+def kept_dirs_out(rules: list[tuple[str, str]], known: set[str]) -> list[tuple[str, str]]:
+    """The directory rules without the directories the stage keeps.
+
+    A library that others merge into keeps its directories (src/ac4/src is the merged library's
+    private root, tests/ac4 its tests' root), and most of the files a kept directory held may still
+    have gone one level down, which is what a rule derived from the moves would follow. A directory
+    that is still there after the moves is named for itself.
+    """
+    return [(old, new) for old, new in rules if old not in known]
+
+
 def transform(text: str, moves, dirs, relative, hold, known) -> str:
     text = rewrite_paths(text, moves, dirs, hold, known)
     if relative:
@@ -54,9 +65,10 @@ def main() -> None:
     root = Path(a.root)
     repo = Repo(a.root)
     moves = json.loads(Path(a.plan).read_text(encoding="utf-8"))["moves"]
-    dirs, split = dir_rules(moves)
-    hold = held_dirs(dirs, split)
     known = path_index(repo.files)
+    dirs, split = dir_rules(moves)
+    dirs = kept_dirs_out(dirs, known)
+    hold = held_dirs(dirs, split)
     print(f"move map: {len(moves)} files, {len(dirs)} directories ({len(split)} split)")
     relative = {base: relative_rules(moves, base) for base in RELATIVE_BASES}
     changed = 0
