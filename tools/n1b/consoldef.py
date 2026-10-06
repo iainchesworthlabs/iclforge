@@ -214,6 +214,8 @@ SPLITS = {"c1": {}, "c2": {"signing": ("ac3", "base")}, "c3": {}}
 def renamed_namespace(stage: str, name: str, unit: str = "") -> str:
     """`name`, a symbol or a line of IR as the old tree spelled it, as the stage spells it. A name
     no table holds (one in an anonymous namespace) goes where the unit it is defined in went."""
+    if stage == "c3":
+        return re.sub(rf"\biclforge::({'|'.join(CONTAINERS)})::", r"iclforge::containers::\1::", name)
     if stage != "c2":
         return name
     import consol_text
