@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "iclforge/ac3/core/crc16.hpp"
 #include "iclforge/ac3/emdf/frame_layout.hpp"
 #include "iclforge/base/crypto/hmac_sha256.hpp"
 
@@ -25,16 +26,6 @@ using ac3::emdf::BitRange;
 using ac3::emdf::FrameLayout;
 
 int prot_bits(int code) { return (code == 0) ? 0 : (code == 1) ? 8 : (code == 2) ? 32 : 128; }
-
-std::uint16_t crc16(const std::byte* p, std::size_t n) {
-    std::uint16_t crc = 0;
-    for (std::size_t i = 0; i < n; ++i) {
-        crc ^= std::uint16_t(std::to_integer<std::uint32_t>(p[i]) << 8);
-        for (int b = 0; b < 8; ++b)
-            crc = (crc & 0x8000) ? std::uint16_t((crc << 1) ^ 0x8005) : std::uint16_t(crc << 1);
-    }
-    return crc;
-}
 
 bool bit_at(std::span<const std::byte> f, std::size_t p) {
     // Matches BitReader::read_bit()'s own contract: past the end reads as
@@ -182,7 +173,7 @@ bool sign_atmos_frame(std::span<std::byte> frame, const base::crypto::SigningKey
             byte &= static_cast<std::byte>(~(1u << (7 - (q & 7))) & 0xFFu);
     }
     // recompute crc2 (last two bytes; covers everything after the 16-bit sync)
-    const std::uint16_t c = crc16(frame.data() + 2, frame.size() - 4);
+    const std::uint16_t c = crc16(std::span<const std::byte>(frame).subspan(2, frame.size() - 4));
     frame[frame.size() - 2] = std::byte(c >> 8);
     frame[frame.size() - 1] = std::byte(c & 0xFF);
     return true;

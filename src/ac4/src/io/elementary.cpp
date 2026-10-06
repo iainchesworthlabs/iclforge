@@ -4,28 +4,11 @@
 #include <cstddef>
 #include <cstring>
 
+#include "iclforge/base/crc16.hpp"
+
 namespace iclforge::ac4 {
 
-namespace {
-
-// --- Annex G: AC-4 sync frame -----------------------------------------------
-
-std::uint16_t crc16(std::span<const std::byte> data) {
-    // Annex G.4.2: generator polynomial x^16+x^15+x^2+1, initial state
-    // 0x0000, no reflection, no final XOR.
-    std::uint16_t crc = 0x0000;
-    constexpr std::uint16_t kPoly = 0x8005;
-    for (const std::byte b : data) {
-        crc ^= static_cast<std::uint16_t>(std::to_integer<unsigned>(b) << 8);
-        for (int i = 0; i < 8; ++i) {
-            crc = (crc & 0x8000) ? static_cast<std::uint16_t>((crc << 1) ^ kPoly)
-                                 : static_cast<std::uint16_t>(crc << 1);
-        }
-    }
-    return crc;
-}
-
-}  // namespace
+// --- Annex G: AC-4 sync frame (G.4.2's CRC is iclforge/base/crc16.hpp) ----------------------
 
 ScanResult scan(std::span<const std::byte> data) {
     ScanResult result;
@@ -66,7 +49,7 @@ ScanResult scan(std::span<const std::byte> data) {
             const auto want =
                 static_cast<std::uint16_t>((std::to_integer<unsigned>(data[frame_end]) << 8) |
                                            std::to_integer<unsigned>(data[frame_end + 1]));
-            crc_ok = crc16(data.subspan(pos + 2, frame_end - (pos + 2))) == want;
+            crc_ok = base::crc16(data.subspan(pos + 2, frame_end - (pos + 2))) == want;
         }
         result.frames.push_back(SyncFrame{
             .offset = pos,
@@ -189,7 +172,7 @@ SyncFrameSplitter::Result SyncFrameSplitter::next() noexcept {
         std::optional<bool> crc_ok;
         if (has_crc) {
             const auto want = static_cast<std::uint16_t>((byte(total - 2) << 8U) | byte(total - 1));
-            crc_ok = crc16(std::span<const std::byte>(storage_).subspan(2, total - 4)) == want;
+            crc_ok = base::crc16(std::span<const std::byte>(storage_).subspan(2, total - 4)) == want;
         }
         handed_ = total;
         return Result{

@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "iclforge/ac4/encoder/encoder.hpp"
+#include "iclforge/base/crc16.hpp"
 
 // Part 1 Annex G.3 and G.4 (Part 2 Annex G refers to it): the sync word, the
 // frame_size, the raw frame and, after sync word 0xAC41, a CRC over frame_size
@@ -11,23 +12,6 @@
 
 namespace iclforge::ac4 {
 namespace {
-
-// G.4.2: generator x^16 + x^15 + x^2 + 1, register starting at 0, input bits
-// MSB first, no reflection and no final XOR.
-[[nodiscard]] std::uint16_t crc16(std::span<const std::byte> bytes) noexcept {
-    std::uint32_t crc = 0;
-    for (const std::byte b : bytes) {
-        for (int bit = 7; bit >= 0; --bit) {
-            const auto in = (std::to_integer<unsigned>(b) >> static_cast<unsigned>(bit)) & 1U;
-            const auto top = (crc >> 15U) & 1U;
-            crc = (crc << 1U) & 0xFFFFU;
-            if ((top ^ in) != 0) {
-                crc ^= 0x8005U;
-            }
-        }
-    }
-    return static_cast<std::uint16_t>(crc);
-}
 
 void put(std::vector<std::byte>& out, std::uint32_t value, int bytes) {
     for (int b = bytes - 1; b >= 0; --b) {
@@ -51,7 +35,8 @@ std::vector<std::byte> sync_frame(std::span<const std::byte> raw_ac4_frame, bool
     }
     out.insert(out.end(), raw_ac4_frame.begin(), raw_ac4_frame.end());
     if (crc) {
-        put(out, crc16(std::span<const std::byte>(out).subspan(protected_start)), 2);
+        // G.4.2's CRC (iclforge/base/crc16.hpp).
+        put(out, base::crc16(std::span<const std::byte>(out).subspan(protected_start)), 2);
     }
     return out;
 }

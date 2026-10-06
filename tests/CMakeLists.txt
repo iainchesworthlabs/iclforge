@@ -86,6 +86,7 @@ add_executable(iclforge-tests
     ac3/decoder/test_block_norm.cpp
     base/test_bit_io.cpp
     base/test_bitwriter.cpp
+    base/test_crc16.cpp
     ac3/meta/test_bsi.cpp
     ac3/encoder/test_bit_reservoir.cpp
     ac3/encoder/test_coupling.cpp
@@ -247,12 +248,12 @@ target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/s
 # fixed-point tier's block exponent, which both decoders share and which is not
 # library surface.
 target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/src/decoder")
-# tests/ac4/decoder/test_ac4dec_{asf,metadata,presentation,channel_elements}.cpp reach the
+# tests/ac4/decoder/test_{asf,metadata,presentation,channel_elements}.cpp reach the
 # AC-4 decoder's syntax functions (src/ac4/src/decoder/syntax/) to hold each branch of
 # the syntax to a hand-built bitstream - the committed streams reach only the
 # branches DEE writes - and the other tests in the block below reach its PCM
-# functions (src/ac4/src/decoder/pcm/) and the encoder's writer (src/ac4/src/encoder/
-# and src/ac4/src/core/bit_writer.hpp). Same pattern as the forge headers above, with
+# functions (src/ac4/src/decoder/pcm/) and the encoder's syntax writers
+# (src/ac4/src/encoder/). Same pattern as the forge headers above, with
 # one difference: those headers are inline, and these functions are compiled into
 # iclforge_ac4_objects under CXX_VISIBILITY_PRESET hidden. With BUILD_SHARED_LIBS=ON,
 # iclforge::ac4 is libiclforge_ac4.so, which exports none of them, so these tests link
