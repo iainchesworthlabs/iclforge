@@ -1,4 +1,4 @@
-# ac4-syntax-digest/1 ../ac4dec/constructed/9_1_4-ajcc-grouping1-route2.ac4
+# ac4-syntax-digest/1 ../ac4/constructed/9_1_4-ajcc-grouping1-route2.ac4
 # frame	substream	kind	records	end_bit	crc32
 0	0	presentation	16	26	0xfb3f10d7
 0	1	audio	2872	19046	0xd64022ee

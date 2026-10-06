@@ -1,4 +1,4 @@
-# ac4-syntax-digest/1 ../ac4dec/constructed/7_1-322-acpl2-config0-second.ac4
+# ac4-syntax-digest/1 ../ac4/constructed/7_1-322-acpl2-config0-second.ac4
 # frame	substream	kind	records	end_bit	crc32
 0	0	presentation	12	22	0x536e99c4
 0	1	audio	1734	11534	0xfd3311ad

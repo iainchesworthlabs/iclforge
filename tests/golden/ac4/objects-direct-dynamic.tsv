@@ -1,4 +1,4 @@
-# ac4-syntax-digest/1 ../ac4dec/objects/direct-dynamic.ac4
+# ac4-syntax-digest/1 ../ac4/objects/direct-dynamic.ac4
 # frame	substream	kind	records	end_bit	crc32
 0	0	audio	3510	28270	0x78e6203f
 0	1	audio	1118	8894	0x9969b5a3

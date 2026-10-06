@@ -1,4 +1,4 @@
-# ac4-syntax-digest/1 ../ac4dec/presentations/encoder-broadcast.ac4
+# ac4-syntax-digest/1 ../ac4/presentations/encoder-broadcast.ac4
 # frame	substream	kind	records	end_bit	crc32
 0	0	presentation	31	65	0xc672aff0
 0	1	presentation	11	21	0x18be2439

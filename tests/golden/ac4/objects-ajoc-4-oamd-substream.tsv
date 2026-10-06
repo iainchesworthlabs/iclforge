@@ -1,4 +1,4 @@
-# ac4-syntax-digest/1 ../ac4dec/objects/ajoc-4-oamd-substream.ac4
+# ac4-syntax-digest/1 ../ac4/objects/ajoc-4-oamd-substream.ac4
 # frame	substream	kind	records	end_bit	crc32
 0	0	audio	4843	37222	0xf66db794
 0	1	oamd	10	22	0xc1db5dae

@@ -1,4 +1,4 @@
-# ac4-syntax-digest/1 ../ac4dec/constructed/9_0_4-aspx_scpl-grouping0-2ch1-unit3.ac4
+# ac4-syntax-digest/1 ../ac4/constructed/9_0_4-aspx_scpl-grouping0-2ch1-unit3.ac4
 # frame	substream	kind	records	end_bit	crc32
 0	0	presentation	16	26	0xfb3f10d7
 0	1	audio	6699	47534	0x78bd0a8c

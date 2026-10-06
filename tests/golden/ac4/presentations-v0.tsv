@@ -1,4 +1,4 @@
-# ac4-syntax-digest/1 ../ac4dec/presentations/presentations-v0.ac4
+# ac4-syntax-digest/1 ../ac4/presentations/presentations-v0.ac4
 # frame	substream	kind	records	end_bit	crc32
 0	0	audio	3319	16980	0x88ba39c7
 0	1	audio	593	2625	0xd0dff7c0

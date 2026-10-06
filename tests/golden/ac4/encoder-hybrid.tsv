@@ -1,4 +1,4 @@
-# ac4-syntax-digest/1 ../ac4dec/presentations/encoder-hybrid.ac4
+# ac4-syntax-digest/1 ../ac4/presentations/encoder-hybrid.ac4
 # frame	substream	kind	records	end_bit	crc32
 0	0	presentation	10	20	0x42bc50f5
 0	1	presentation	19	46	0x0b4d4257

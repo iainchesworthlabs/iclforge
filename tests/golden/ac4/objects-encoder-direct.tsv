@@ -1,4 +1,4 @@
-# ac4-syntax-digest/1 ../ac4dec/objects/encoder-direct.ac4
+# ac4-syntax-digest/1 ../ac4/objects/encoder-direct.ac4
 # frame	substream	kind	records	end_bit	crc32
 0	0	presentation	8	18	0x8ed0df0d
 0	1	audio	1977	7982	0x9d1e183f

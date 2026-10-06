@@ -1,4 +1,4 @@
-# ac4-syntax-digest/1 ../ac4dec/objects/direct-bed-5_1.ac4
+# ac4-syntax-digest/1 ../ac4/objects/direct-bed-5_1.ac4
 # frame	substream	kind	records	end_bit	crc32
 0	0	audio	5741	45958	0xabdab64b
 0	1	oamd	24	32	0xb596252b

@@ -1,4 +1,4 @@
-# ac4-syntax-digest/1 ../ac4dec/objects/ajoc-2to4-coarse.ac4
+# ac4-syntax-digest/1 ../ac4/objects/ajoc-2to4-coarse.ac4
 # frame	substream	kind	records	end_bit	crc32
 0	0	audio	2405	18878	0xcdafc6b9
 0	1	presentation	8	18	0x8ed0df0d

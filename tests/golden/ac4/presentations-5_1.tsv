@@ -1,4 +1,4 @@
-# ac4-syntax-digest/1 ../ac4dec/presentations/presentations-5_1.ac4
+# ac4-syntax-digest/1 ../ac4/presentations/presentations-5_1.ac4
 # frame	substream	kind	records	end_bit	crc32
 0	0	presentation	57	140	0x7e4c7f89
 0	1	presentation	54	127	0x1ab7e23e
