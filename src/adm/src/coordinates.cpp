@@ -135,7 +135,7 @@ namespace {
 
 // TS 103 420 Table B.19. ZM3_SideRight's minX is printed 0.5611; its mirror ZM3_SideLeft's maxX is
 // -0.51611, and every other left/right pair in the table is symmetric, so 0.51611 is used (see
-// src/admbridge/ERRATA.md). kZoneBoundTolerance covers either spelling when reading.
+// src/adm/ERRATA.md). kZoneBoundTolerance covers either spelling when reading.
 enum class Zone : std::uint8_t {
     kZm1,
     kZm2Left,

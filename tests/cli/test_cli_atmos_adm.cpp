@@ -35,13 +35,13 @@
 // run_cli below is a trimmed copy of test_cli.cpp's own helper of the same name (same reasoning for
 // the double-quote wrapping on Windows - see that file's own comment on std::system() and cmd.exe's
 // quoting), and the byte-level BW64/ADM fixture helpers are a copy of
-// tests/admbridge/test_adm_bridge.cpp's own flagship-test fixture (same bed L/R + SR-then-centre
+// tests/adm/test_adm_bridge.cpp's own flagship-test fixture (same bed L/R + SR-then-centre
 // moving object, same known-good ring positions and hold/jump timing) - duplicated per this
 // project's own established per-file test-helper convention (see that file's own comment on this)
 // rather than shared, and deliberately kept byte-identical to that fixture rather than inventing a
 // new one: this file's own job is checking that the real forge binary wires parse_bw64 ->
 // admbridge::build -> AtmosEncoder together correctly end to end, not re-proving admbridge's own
-// BS.2076-2 §10.3 state machine or coordinate conversion, which tests/admbridge/test_adm_bridge.cpp
+// BS.2076-2 §10.3 state machine or coordinate conversion, which tests/adm/test_adm_bridge.cpp
 // already does directly against the library API.
 
 namespace fs = std::filesystem;
@@ -118,7 +118,7 @@ Bytes build_fmt_chunk_3ch() {
 }
 
 // Three tracks: bed-left, bed-right, moving object - byte-identical shape to
-// tests/admbridge/test_adm_bridge.cpp's own build_chna_chunk_3.
+// tests/adm/test_adm_bridge.cpp's own build_chna_chunk_3.
 Bytes build_chna_chunk_3() {
     Bytes chna;
     put_u16le(chna, 3);  // numTracks
@@ -159,7 +159,7 @@ Bytes build_pcm16_3ch(int frames) {
     return data;
 }
 
-// Byte-identical to tests/admbridge/test_adm_bridge.cpp's own kBridgeTestAdmXml: two DirectSpeakers bed
+// Byte-identical to tests/adm/test_adm_bridge.cpp's own kBridgeTestAdmXml: two DirectSpeakers bed
 // channels pinned at the 5.1 ring's L (+30) and R (-30); one Objects channel that holds at SR
 // (-110, this project's own kSR ring constant) for 3 frames (0.096s), then jumps (jumpPosition=1,
 // no interpolationLength) to dead ahead (0 degrees / centre) and holds.
@@ -313,7 +313,7 @@ TEST_CASE("forge atmos-adm parses, bridges and encodes a real ADM BWF master end
     // Decode what the CLI actually wrote - not a re-run through the library API - so this test
     // proves the real binary's argument parsing, iclforge::adm::parse_bw64 call,
     // iclforge::admbridge::build call and per-frame AtmosEncoder loop are all wired together
-    // correctly, not just that each piece works in isolation (tests/admbridge/test_adm_bridge.cpp's
+    // correctly, not just that each piece works in isolation (tests/adm/test_adm_bridge.cpp's
     // own flagship test already covers that).
     std::ifstream stream_in{out_path, std::ios::binary};
     const std::vector<char> raw{std::istreambuf_iterator<char>{stream_in},
@@ -341,7 +341,7 @@ TEST_CASE("forge atmos-adm parses, bridges and encodes a real ADM BWF master end
         REQUIRE(decoded->has_value());
 
         // Check the last frame of each 3-frame hold, the same "settled, not mid-transition"
-        // convention tests/admbridge/test_adm_bridge.cpp's own flagship test (and tests/ac3/oba/test_atmos_motion.cpp's before
+        // convention tests/adm/test_adm_bridge.cpp's own flagship test (and tests/ac3/oba/test_atmos_motion.cpp's before
         // it) use.
         if (f != 2 && f != 5) {
             continue;
@@ -403,7 +403,7 @@ TEST_CASE("forge atmos-adm reports a clear diagnosis for a file with no ADM prog
                 log_path);
     CHECK(rc != 0);
     const auto log = read_log(log_path);
-    // describe(BridgeError::kNoProgramme) - see src/admbridge/src/bridge.cpp - not an opaque
+    // describe(BridgeError::kNoProgramme) - see src/adm/src/bridge.cpp - not an opaque
     // crash or a generic "error" with no diagnosis.
     CHECK(log.find("programme") != std::string::npos);
     CHECK_FALSE(fs::exists(out_path));

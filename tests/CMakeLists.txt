@@ -175,8 +175,8 @@ add_executable(iclforge-tests
     ac3/verify/test_eac3_selfcheck.cpp
     ac3/verify/test_selfcheck.cpp
     ac3/verify/test_trace_export.cpp
-    signing/test_crypto.cpp
-    signing/test_signing.cpp
+    base/test_crypto.cpp
+    ac3/signing/test_signing.cpp
     render/test_spatial.cpp
     ac3/core/test_simd_kernels.cpp
     ac3/core/test_tables.cpp
@@ -888,7 +888,7 @@ target_sources(iclforge-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/apps/crucible/ui/desktop_entries.cpp")
 # test_engine_commands.cpp saves the signing key's env-var fallbacks with
 # std::getenv before clearing them for its own case - same C4996 reasoning as
-# src/signing/src/signing_key.cpp (src/signing/CMakeLists.txt) and
+# src/base/src/crypto/signing_key.cpp (src/signing/CMakeLists.txt) and
 # ac3/core/test_simd_kernels.cpp above.
 if(ICLFORGE_IS_MSVC_LIKE)
     set_source_files_properties(crucible/test_engine_commands.cpp
@@ -954,9 +954,9 @@ endif()
 # it depends on iclforge::adm too, and src/admbridge is only add_subdirectory()'d from inside
 # the same if(ICLFORGE_BUILD_ADM) block in the root CMakeLists.txt.
 if(ICLFORGE_BUILD_ADM)
-    target_sources(iclforge-tests PRIVATE adm/test_adm.cpp admbridge/test_adm_bridge.cpp
-                                    admbridge/test_adm_bridge_write.cpp
-                                    admbridge/test_iab_bridge.cpp)
+    target_sources(iclforge-tests PRIVATE adm/test_adm.cpp adm/test_adm_bridge.cpp
+                                    adm/test_adm_bridge_write.cpp
+                                    adm/test_iab_bridge.cpp)
     target_link_libraries(iclforge-tests PRIVATE iclforge::adm iclforge::admbridge)
 endif()
 

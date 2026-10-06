@@ -37,7 +37,7 @@ private:
 };
 
 // Convenience one-shot over a whole buffer. Exported (unlike Sha256 itself) purely so
-// tests/signing/test_signing.cpp - which reaches this private header directly to run the
+// tests/ac3/signing/test_signing.cpp - which reaches this private header directly to run the
 // FIPS/RFC known-answer vectors, see tests/CMakeLists.txt's own comment - can resolve it when
 // iclforge::signing builds as a shared library (signing_objects' default-hidden visibility would
 // otherwise drop it from the .so's export table). The header itself stays uninstalled and off

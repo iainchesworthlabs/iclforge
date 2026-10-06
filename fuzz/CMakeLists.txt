@@ -46,7 +46,7 @@ endif()
 #
 # iclforge_signing_objects gets the identical treatment, for the identical reason:
 # fuzz_signing_verify drives iclforge::signing's own frame walk and HMAC
-# construction (src/signing/src/emdf_atmos_signer.cpp), which is a separate
+# construction (src/ac3/src/signing/emdf_atmos_signer.cpp), which is a separate
 # target from iclforge::ac3 (see src/signing/CMakeLists.txt) and would otherwise
 # be the one library in this build linked into a fuzzer without coverage
 # counters or sanitizer instrumentation of its own - so a report would only
@@ -314,7 +314,7 @@ iclforge_add_fuzzer(fuzz_osc_parse)
 
 # iclforge::signing::verify_atmos_stream/verify_atmos_frame: the only signing
 # operation that runs on a stream its caller did not produce
-# (src/signing/src/emdf_atmos_signer.cpp). Links iclforge::signing on top of
+# (src/ac3/src/signing/emdf_atmos_signer.cpp). Links iclforge::signing on top of
 # iclforge::ac3; the key is part of the fuzzed input, and nothing here needs or
 # derives a real one - see the harness's own header comment.
 iclforge_add_fuzzer(fuzz_signing_verify iclforge::signing)

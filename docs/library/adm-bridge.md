@@ -160,7 +160,7 @@ not act on either, as for size and zones.
   (`object_div_mode` 2) otherwise. A value that rounds to no divergence sends `b_object_divergence` 0.
   TS 103 420 Annex B has no row for it, so the correspondence is a reading: ADM's value and OAMD's
   `object_divergence` are both the share of the energy moved into two spread objects (§5.2.7).
-  `src/admbridge/ERRATA.md` records it.
+  `src/adm/ERRATA.md` records it.
 - **`screenRef`** becomes `screen_reference` with `screen_factor` 1 and `depth_factor` 1, since ADM's flag is
   all or nothing. The reference screen of Annex B.2.1.3 (`audioProgrammeReferenceScreen`, sized by a
   `ref_screen_ratio` the OAMD syntax does not carry) is not read or written; the renderer's screen applies.
@@ -189,7 +189,7 @@ horizontal presets at once — keeps whatever part did map, and is reported in `
 the two directions. `write()` emits the zone of every OAMD update as a `zoneExclusion`, with both
 label and bounds, so a reader using either recognises it. Table B.19 prints `ZM3_SideRight`'s `minX` as
 `0.5611`; the mirrored `ZM3_SideLeft` has `-0.51611` and every other pair is symmetric, so `0.51611` is
-written (see `src/admbridge/ERRATA.md`).
+written (see `src/adm/ERRATA.md`).
 
 Zone and elevation are discrete decisions, so a path holds the earlier block's value until the next
 block's keyframe, as it does for `snap`.
@@ -411,7 +411,7 @@ not carry at all — `build()` deliberately does not invent defaults for them; c
 
 ## Tests
 
-`tests/admbridge/test_adm_bridge.cpp` covers coordinate conversion (against BS.2076-2 §8's cardinal points
+`tests/adm/test_adm_bridge.cpp` covers coordinate conversion (against BS.2076-2 §8's cardinal points
 and this project's own existing ring constants), `build_channel_path`'s full §10.3 state machine
 (single block, continuous-glide blocks, instant-jump blocks, ramp-then-hold blocks, the
 first-block-always-holds override, the LFE override), `build()`'s graph-walking error paths
@@ -432,7 +432,7 @@ just the library API in isolation — plus two error-path cases (`BridgeError::k
 malformed/non-RIFF file) confirming `describe()` reaches the terminal rather than an opaque crash
 or exit code.
 
-`tests/admbridge/test_iab_bridge.cpp` covers `iab_position_to_room`'s cardinal points, the Table 19
+`tests/adm/test_iab_bridge.cpp` covers `iab_position_to_room`'s cardinal points, the Table 19
 → `BedLabel` mapping (both the codes that resolve and the ones `build_iab()` refuses), MetaID
 cross-frame identity (the same MetaID+ChannelID across several frames is one channel, not several;
 an absent frame silence-fills rather than shrinking the channel count), sub-block keyframe timing

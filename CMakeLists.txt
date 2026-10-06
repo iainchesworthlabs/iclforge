@@ -554,7 +554,7 @@ endif()
 # "depends on nothing of iclforge::ac3" shape as the three container writers above. Gated by
 # ICLFORGE_BUILD_ADM (default OFF, unlike the three above - see the option() itself for why).
 if(ICLFORGE_BUILD_ADM)
-    # IAB reader bridge, phase 3: iclforge::admbridge's own IAB mapping (src/admbridge/src/iab_bridge.cpp)
+    # IAB reader bridge, phase 3: iclforge::admbridge's own IAB mapping (src/adm/src/iab_bridge.cpp)
     # names iclforge::iab::IABitstreamFrame in a public header, so it needs the src/iab add_subdirectory()
     # above to have actually run. ICLFORGE_BUILD_IAB defaults ON, unlike ICLFORGE_BUILD_ADM, so this
     # is the one combination that can silently fail to configure without an explicit guard - every

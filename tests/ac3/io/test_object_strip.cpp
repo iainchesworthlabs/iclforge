@@ -41,7 +41,7 @@ std::vector<float> tone(double hz, std::uint64_t start) {
 }
 
 // A short Atmos stream, container emitted (or not) per `emit_objects` -
-// the same fixture shape tests/signing/test_signing.cpp builds, for the same
+// the same fixture shape tests/ac3/signing/test_signing.cpp builds, for the same
 // reason: it is the one stream in the tree that really carries an EMDF
 // object container.
 Bytes encode_atmos_stream(int frames, bool emit_objects, int objects = 2) {
