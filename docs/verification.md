@@ -1371,7 +1371,7 @@ named otherwise.
 
 - **Through the public API alone**: a test standing in for Hearth's engine decodes every committed
   AC-4 stream (those under `tests/golden/external-baseline/ac4-*` and `tests/golden/ac4/`: 66
-  today) by block through `iclforge/ac4dec/decoder.hpp` alone, placing each block's channels by their
+  today) by block through `iclforge/ac4/decoder/decoder.hpp` alone, placing each block's channels by their
   speakers and changing the output level and dialogue enhancement half way through. No frame is
   refused, only a frame before a stream's first I-frame comes out empty, a stream ends in one short
   block at most, and the output equals `decode()`'s configured the same way, sample for sample.

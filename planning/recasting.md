@@ -173,7 +173,7 @@ summary.
 `docs/forge/gui/`, Crucible's promotion record to `docs/crucible/design/`, and the flat
 bare-metal page was split into `docs/platforms/bare-metal/` (#674). The tree also gained
 `apps/hearth`, `src/sendspin`, `src/arithmetic` and the four AC-4 libraries, `src/ac4`,
-`src/ac4core`, `src/ac4dec` and `src/ac4enc`. N1B ([layout.md](layout.md)) reopens the source
+`src/ac4`. N1B ([layout.md](layout.md)) reopens the source
 layout: its recommended L2 renames `src/ac3` to `src/ac3` and takes five libraries that know
 no codec out of it, so that AC-4 sits beside AC-3 and E-AC-3. That study is a proposal, and
 its decisions are with the user.

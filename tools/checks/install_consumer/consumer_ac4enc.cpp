@@ -20,7 +20,7 @@
 #include <string>
 #include <vector>
 
-#include <iclforge/ac4/ac4.hpp>
+#include <iclforge/ac4/core/toc.hpp>
 #include <iclforge/ac4/encoder/encoder.hpp>
 
 namespace {

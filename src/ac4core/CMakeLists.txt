@@ -79,7 +79,7 @@ endif()
 # src/ac3/CMakeLists.txt); iclforge_ac4core is one static library both ac4dec and
 # ac4enc link (this file's own header comment), so when Real is not already
 # double, each of those kernels' .cpp files also explicitly instantiates
-# <double>. That is done through a macro the per-scalar iclforge/ac4core/detail/real.hpp
+# <double>. That is done through a macro the per-scalar iclforge/ac4/detail/real.hpp
 # defines (src/internal/scalar/<double|float>/, chosen just above): it passes
 # its argument through where Real is float and drops it where Real is already
 # double (a second explicit instantiation of the same specialization would be
@@ -90,7 +90,7 @@ endif()
 # PUBLIC, not PRIVATE: ac4core's own PUBLIC headers (aspx/hf_generator.hpp,
 # acpl/acpl.hpp, ajcc/ajcc.hpp, ajoc/ajoc.hpp, dsp/qmf.hpp, dsp/mdct.hpp,
 # dsp/fft.hpp, dsp/resampler.hpp, dsp/synthesis.hpp) #include
-# "iclforge/ac4core/detail/real.hpp" themselves, and src/ac4 compile
+# "iclforge/ac4/detail/real.hpp" themselves, and src/ac4 compile
 # against those headers through iclforge::ac4 as a COMPILE_ONLY dependency (their
 # own CMakeLists.txt) - a consumer that only ever compiles against a target,
 # never links it, still needs that target's PUBLIC usage requirements, this

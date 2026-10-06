@@ -11,7 +11,7 @@
 #include "iclforge/ac4/export.hpp"
 #include "iclforge/ac4/decoder/frame.hpp"
 
-// What an AC-4 Decoder (iclforge/ac4dec/decoder.hpp) reports of the presentation it
+// What an AC-4 Decoder (iclforge/ac4/decoder/decoder.hpp) reports of the presentation it
 // decodes: its members, and the loudness, DRC, dialogue enhancement and downmix
 // metadata the stream sends for it.
 

@@ -8,7 +8,7 @@
 #include "iclforge/ac4/core/syntax.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 
-// What an AC-4 Encoder (iclforge/ac4enc/encoder.hpp) is configured by: the codec
+// What an AC-4 Encoder (iclforge/ac4/encoder/encoder.hpp) is configured by: the codec
 // and rate modes, the loudness, DRC, downmix and dialogue metadata it sends, the
 // objects, and the substreams and presentations it builds of them.
 

@@ -157,8 +157,8 @@ presentation (from the table of contents: presentations, language, channel mode)
 associated with a mix level, dialogue enhancement level, DRC decoder mode and profile, and the
 downmix modes. Where an AC-4 control and an E-AC-3 control are the same idea, such as DRC mode
 or downmix target, the app shows one control. `src/ac4` is an inspector
-(`src/ac4/include/iclforge/ac4/ac4.hpp:22`) and does not parse the dialogue enhancement or DRC payloads
-yet, which is part of chip D. *As built, the decoder in `src/ac4dec` reads those payloads, and the
+(`src/ac4/include/iclforge/ac4/core/toc.hpp:22`) and does not parse the dialogue enhancement or DRC payloads
+yet, which is part of chip D. *As built, the decoder in `src/ac4/src/decoder` reads those payloads, and the
 controls are live on the Decoder page's AC-4 tab: presentation, language, dialogue enhancement,
 dynamic range, downmix, the immersive layout, full or core decoding and the output level.*
 

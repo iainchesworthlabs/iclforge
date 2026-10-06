@@ -10,7 +10,7 @@
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/export.hpp"
 
-// What an AC-4 Decoder (iclforge/ac4dec/decoder.hpp) is configured by: the output
+// What an AC-4 Decoder (iclforge/ac4/decoder/decoder.hpp) is configured by: the output
 // processing a system asks for, which presentation it decodes, what it does with a
 // frame that will not decode, and full or core decoding.
 

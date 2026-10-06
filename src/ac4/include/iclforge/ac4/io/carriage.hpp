@@ -12,7 +12,7 @@
 
 // AC-4 in a container or a manifest: what a muxer, a segmenter and a playlist
 // writer need of a stream, read off its parsed table of contents
-// (iclforge/ac4/toc.hpp), so that each stays codec-blind.
+// (iclforge/ac4/core/toc.hpp), so that each stays codec-blind.
 
 namespace iclforge::ac4 {
 

@@ -114,7 +114,7 @@ the encoder's scores and the race against DEE are held to pinned floors and keep
 Logic II from Hearth's Decoder page, an AC-4 live session in the Forge GUI, and AC-4 in Matroska,
 which registers no codec ID for it. AC-4's speed and memory are measured and gated: `ac3perf` holds
 AC-4's stereo and 5.1 encode and decode to real time in the gate's build legs, the speed, kernel and
-memory benchmarks carry AC-4's rows (and the transforms of `src/ac4core`), and since #1132
+memory benchmarks carry AC-4's rows (and the transforms of `src/ac4/src/core`), and since #1132
 (2026-09-29) a merge queue entry that changes `src/` fails if any workload, AC-4's included, takes
 twice as long as at the commit it is queued on, or doubles its heap churn.
 
@@ -193,7 +193,7 @@ reading of it; fifteen more committed DEE streams sit beside it (G0 and G1 added
 
 ### The decoder after D1
 
-The position when D1 merged (2026-09-16), which the decoder phases started from. `src/ac4dec`
+The position when D1 merged (2026-09-16), which the decoder phases started from. `src/ac4/src/decoder`
 (`ac4::decoder`) read every syntax element of a channel-coded frame and produced no audio: the
 presentation substream, the Part 1 channel elements with ASF, stereo processing, companding, A-SPX
 and A-CPL data, `metadata()` with DRC and dialogue enhancement, EMDF payload substreams, and a
@@ -703,13 +703,13 @@ Three libraries beside the inspector, none linking `ac3::forge`
 - **The encoder**, `src/ac4enc/` (`ac4::encoder`), in the same pattern, with headers under
   `include/ac4enc/`. It links `ac4::ac4`, whose `Toc` describes what it writes and whose
   `build_dac4()` and `rfc6381_codec_string()` it reuses.
-- **The shared core**, `src/ac4core/` (`ac4::core`): what both directions compute, built and tested
+- **The shared core**, `src/ac4/src/core/` (`ac4::core`): what both directions compute, built and tested
   once ([DSP](#dsp)). It is a static library of position-independent code with hidden symbols,
   linked privately by the other two, so each shared library carries the part it uses, a static
   build links it once, and it has no public headers and no ABI of its own. D2 created it and moved
-  D1's generated tables into it. The bit reader and the Huffman decoder stayed in `src/ac4dec`,
+  D1's generated tables into it. The bit reader and the Huffman decoder stayed in `src/ac4/src/decoder`,
   since they carry the syntax trace and its sink, and the encoder has a bit writer of its own in
-  `src/ac4enc`.
+  `src/ac4/src/encoder`.
 
 The syntax stays apart. The decoder's reader and the encoder's writer are separate transcriptions of
 the syntax tables, in opposite directions, and the Python reference stays independent of both. A
@@ -789,7 +789,7 @@ estimates and, in the A-CPL modes, IIR decorrelators on every channel, and forge
 reconstruction still runs in `float` in every build because of the same filterbank. The speech
 frontend's arithmetic decoder uses integer arithmetic in every build, as the text specifies.
 
-As D6 left it, the pattern held for about a third of the DSP: `src/ac4core`'s kernels were
+As D6 left it, the pattern held for about a third of the DSP: `src/ac4/src/core`'s kernels were
 templates on `Real`, instantiated only at `double` and over `std::complex<Real>`, which a
 fixed-point type cannot instantiate, and the reconstruction in `src/ac4/src/decoder/pcm` spelled `double`
 directly. On 2026-09-25 the user asked that AC-4 follow AC-3's and E-AC-3's approach, `double`,
@@ -1511,10 +1511,10 @@ locally over the whole set; the fuzz target.
 
 **Status:** merged as #1009 on 2026-09-25. Exit met.
 
-- The shared core, `src/ac4core/` ([Where the libraries live](#where-the-libraries-live)): D1's
+- The shared core, `src/ac4/src/core/` ([Where the libraries live](#where-the-libraries-live)): D1's
   generated tables moved into it, and this phase's transforms are written there, the forward MDCT
   beside the inverse, so that E1 finds them built and tested. The bit reader and the Huffman
-  decoder stayed in `src/ac4dec`, since they carry the syntax trace and its sink.
+  decoder stayed in `src/ac4/src/decoder`, since they carry the syntax trace and its sink.
 - ASF reconstruction: scale factors, dequantisation, noise fill, ungrouping.
 - Stereo processing: M/S and prediction.
 - The inverse MDCT on the FFT for 2^a · 3^b · 5^c, the direct form it is tested against, KBD
@@ -1604,7 +1604,7 @@ channel, and one tone per channel lands on its own channel, the LFE included. Co
   a frame, interpolated smoothly in all but a few frames, and difference along frequency in every
   I-frame. librempeg puts out their coded pair as L and R and leaves Ls and Rs silent, so the source
   is the only reference. The decorrelators, the ducker, interpolation and the dequantisation tables
-  are in `src/ac4core` for E4, and the encoder's writer writes A-CPL's syntax for the constructed
+  are in `src/ac4/src/core` for E4, and the encoder's writer writes A-CPL's syntax for the constructed
   streams, eight of them committed; E4 builds its parameter extraction on both.
 - Scored against the source, DEE's streams settled two readings the text leaves open: a frame's
   parameters apply d_ctrl frames later, with its A-SPX data (a frame early or late takes the level
@@ -1837,7 +1837,7 @@ move as their metadata says, is the user's to do; the numbers hold in `test_ac4d
 - Objects and their Annex F properties on the API; the OAMD substream's content, with the second
   `oamd_common_data()` it can carry.
 - Built in D10: both transcriptions read the object syntax, and the encoder's writers gained it for
-  the constructed streams; A-JOC's reconstruction lives in `src/ac4core`, templated on `Real`, and
+  the constructed streams; A-JOC's reconstruction lives in `src/ac4/src/core`, templated on `Real`, and
   the decoder hands each object over with its Annex F properties and the sample of each update. The
   intermediate spatial format is the one kind of object the decoder renders itself, by the
   attachment's matrices; `ac3cli decode` renders the others through the layout renderer Hearth plays
@@ -1937,7 +1937,7 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
 ([The ESP32](#the-esp32)) sets what AC-4 aims for there. One pull request per part.
 
 - **D14a, the scalar and the decoder's size, on the host** (merged as #1096, #1102 and #1123).
-  - `src/ac4/src/decoder/pcm` on the decoder's scalar, as `src/ac4core` is, with a complex type of the
+  - `src/ac4/src/decoder/pcm` on the decoder's scalar, as `src/ac4/src/core` is, with a complex type of the
     project's own in place of `std::complex<Real>`; AC-4 in `AC3FORGE_DECODE_SCALAR`, the `float`
     build compiling with `-Wdouble-promotion` as an error; `ac3::forge`'s `Fixed32`, vector types
     and `float` functions shared through a header-only target
@@ -1954,11 +1954,11 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
 
   **Built in D14a.** Decision 31's header-only target (`src/arithmetic`) moved `Fixed32`
   and the float scalar functions out of `ac3::forge`'s own tree with no copy; both `ac3::forge` and
-  `src/ac4core` link it. `src/ac4core`'s own QMF-domain kernels - the analysis/synthesis pair, the
+  `src/ac4/src/core` link it. `src/ac4/src/core`'s own QMF-domain kernels - the analysis/synthesis pair, the
   FFT and MDCT, A-SPX's high-frequency generator, A-CPL's decorrelators and ducker, A-JOC's
   reconstruction, A-JCC's accumulator - take a complex type of the project's own (`dsp::Complex<Real>`)
   in place of `std::complex<Real>`, joined `AC3FORGE_DECODE_SCALAR` through the directory-selection
-  mechanism `ac3::forge`'s own `decode_scalar_t` uses, and the float build compiles `src/ac4core`
+  mechanism `ac3::forge`'s own `decode_scalar_t` uses, and the float build compiles `src/ac4/src/core`
   alone with `-Wdouble-promotion` as an error: clean, confirmed by building that one target
   (0 warnings). `QmfValue` (`pcm/aspx.hpp`) and `QmfSample` (`aspx_encoder.hpp`) take the same
   complex type, since both cross straight into these kernels at `double`; the double build's output
@@ -1968,7 +1968,7 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   init, and `stereo_parameters()`'s 32 KiB return.
 
   `src/ac4/src/decoder/pcm` is templated on `Real` too, now: the same double-to-`Real` and
-  `std::complex`-to-`dsp::Complex` change this phase's first part made in `src/ac4core`, across all
+  `std::complex`-to-`dsp::Complex` change this phase's first part made in `src/ac4/src/core`, across all
   of its modules - A-SPX, A-CPL, A-JCC, A-JOC, companding, dialogue enhancement, DRC, the downmix,
   S-CPL, stereo and multichannel processing, and the substream orchestrator itself - checked the
   same way. `ac3cli` and the whole test suite build, link and pass at `float` on the host: 2 389
@@ -1980,7 +1980,7 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   already used. `hf_generator.cpp`'s dB gains, which called `std::log10`/`std::pow` directly at
   every scalar, now go through a new `scalar_exp2` (`src/arithmetic`, beside the existing
   `scalar_log2`/`scalar_exp`) at `float` only; the `double` path still calls them directly,
-  unchanged. `src/ac4enc` calls several of `src/ac4core`'s kernels at a literal `double`, since the
+  unchanged. `src/ac4/src/encoder` calls several of `src/ac4/src/core`'s kernels at a literal `double`, since the
   encoder has no `float` tier of its own ([decision 34](#decisions-of-2026-09-25)) and `ac4core` is
   one shared library rather than `ac3::forge`'s separately-compiled encoder and decoder DSP; those
   kernels, and a few others `ac4core`'s own tests exercise directly at `double`, now also explicitly
@@ -2015,7 +2015,7 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   substream serves every channel's transforms. The |q|^(4/3) table is `constexpr` and in flash,
   exact to the `double` nearest each power in place of 8 192 calls filling 64 KB of RAM before
   `main` (`std::pow(m, 4.0 / 3.0)` is up to 6.7e-16 relative off it, since 4.0 / 3.0 is short of
-  4/3 by 7.4e-17). No guarded function-local static remains in `src/ac4core`, `src/ac4dec` or
+  4/3 by 7.4e-17). No guarded function-local static remains in `src/ac4` or
   `src/ac4`, and every object the decode path built on the stack to reset or return is built in
   place, a member, or handed a scratch: `SubstreamPcm::decode`'s frame fell from 15.1 KB to
   3.4 KB and `decode_aspx`'s from 11.7 KB to 3.4 KB. Seven frames are still over 4 KiB in the
@@ -2094,8 +2094,8 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
 
   **Built in D14b.** `CONFIG_AC3FORGE_AC4` builds the inspector, the core and the decoder into the
   component in `float`, behind a switch that is off by default and offered only on a part with a
-  floating-point unit. `AC3FORGE_MINIMAL_AC4` in the root CMake gives `src/ac4`, `src/ac4core` and
-  `src/ac4dec` the minimum-footprint profile's compile options as static archives, with no encoder
+  floating-point unit. `AC3FORGE_MINIMAL_AC4` in the root CMake gives `src/ac4` and
+  `src/ac4/src/decoder` the minimum-footprint profile's compile options as static archives, with no encoder
   and no shared library, and the packer's `--with-ac4` puts their sources in the component archive.
   With the switch off the component's objects disassemble identically to those of the tree before
   it (35 of 35). The player reads a stream that opens with an AC-4 sync word through the same ring,
@@ -2227,7 +2227,7 @@ table designed once in `double`. One pull request.
 
 **Built in D14a4.** The changes above, in `pcm/companding.cpp`, `pcm/aspx.cpp`, `aspx/hf_generator.cpp`,
 `dsp/resampler.{hpp,cpp}` and the new `dsp/real_functions.hpp` and `dsp/resampler_vector.hpp` of
-`src/ac4core`; `src/ac4dec` reaches the arithmetic through the first, as the layering table has it, and
+`src/ac4/src/core`; `src/ac4/src/decoder` reaches the arithmetic through the first, as the layering table has it, and
 compiles with `ac3::arithmetic`'s include directory. The five probe fixtures' hashes did not move; the sixth, `ac4_20_companding`, is
 `5b93c61c57566b0c` on the Cortex-M3 under QEMU, on the x86-64 host and on the board, at 58.6 M instructions
 a frame, 466,163 bytes of peak heap and 75 allocations a frame. The `float` decode of every committed
@@ -2289,12 +2289,12 @@ compile time, with C++23 `constexpr` and `consteval`, "idiomatic". One pull requ
   is hex at 200 MHz. Read in place the half table took the converter 60.5 ms a frame at 23.976 fps (the whole 376 KB
   table 110 ms), against the 22.4 ms of the table designed at run time and read from PSRAM; the filter copies the
   table into its own memory when it is made, and the converter takes 16.5 ms.
-- **Limits.** One translation unit evaluates the tables, only in a `float` build, and `src/ac4core/CMakeLists.txt`
+- **Limits.** One translation unit evaluates the tables, only in a `float` build, and `src/ac4/CMakeLists.txt`
   raises the constant evaluator's limit for it by compiler: `/constexpr:steps` for MSVC, `/clang:-fconstexpr-steps`
   for clang-cl (which accepts and ignores `/constexpr:steps`), `-fconstexpr-steps` for Clang and
   `-fconstexpr-ops-limit` for GCC, which ESP-IDF's component takes through the same file.
 
-**Built in D14a5.** `dsp/portable_math.hpp` and `dsp/resampler_design.hpp` in `src/ac4core`, `bessel_i0` in
+**Built in D14a5.** `dsp/portable_math.hpp` and `dsp/resampler_design.hpp` in `src/ac4/src/core`, `bessel_i0` in
 `dsp/kbd.hpp`, the filter and kernel in `dsp/resampler.{hpp,cpp}` and `dsp/resampler_vector.hpp`, the compile limits,
 and `tests/ac4/core/test_ac4core_portable_math.cpp` with the converter's tests (the table's FNV-1a image three ways, the
 compiler's evaluation against the machine's, the mirrored phases, the reversed kernel). The three tables equal the C
@@ -2408,7 +2408,7 @@ One pull request.
   factor gains are a table and not a `std::pow` for each band; the concealment spectra change places with the frame's in place of a 48 KB copy; the delay queue
   moves each sample once; an element's tracks (15 KB each) are reserved and not moved 63 times a frame; and the two or four lines of a Huffman codeword are
   stored by name, where GCC made a call into ROM's `memcpy` of them.
-- **The compiler and the flash** (`build(esp32p4)`). The kernels of `src/ac4core` at `-O3` and thirteen of `src/ac4dec`'s translation units at `-O2` under
+- **The compiler and the flash** (`build(esp32p4)`). The kernels of `src/ac4/src/core` at `-O3` and thirteen of `src/ac4/src/decoder`'s translation units at `-O2` under
   `ICLFORGE_MINIMAL_HOT_O2`, and `sdkconfig.p4` reading the flash in QIO mode. The mode is the second stage bootloader's, and the application image carries
   none of it.
 
@@ -2450,7 +2450,7 @@ the same tree with the parts added, one image each, flashed with its own bootloa
   The sink's own count is `sink.underruns` and `sink.dry_ms`. The wide TDM sink does not start on this chip revision (`sink/i2s_wide/audio_sink.cpp` has why), so 5.1 itself
   could not be played through a sink, and a wide TDM frame (64 bytes, 196 KB for a 64 ms queue) wants the decoded PCM in a PSRAM ring in front of the sink instead.
 
-**Built in D14e.** `src/ac4core`'s `dsp/fft_kernels.hpp`, `Imdct::inverse_overlap()`, `CubicBasis`, `acpl::Interpolator` and the decorrelator's narrowed tables; in `src/ac4dec`
+**Built in D14e.** `src/ac4/src/core`'s `dsp/fft_kernels.hpp`, `Imdct::inverse_overlap()`, `CubicBasis`, `acpl::Interpolator` and the decorrelator's narrowed tables; in `src/ac4/src/decoder`
 `SubstreamPcm`'s lazy pass-through (`materialize_out()` and `shift_history()`), `ungroup_in_place()`, `scale_factor_gains()` and the cheaper `parse_sf_data()` store
 and `ElementParser::begin()`; the compiler options of both libraries' `CMakeLists.txt`; `sdkconfig.p4`'s QIO line; the page's tables and its Flash mode and What D14e
 changed sections. Four test files hold the changes to the old code, to the bit: `test_ac4core_dsp_exact.cpp` (the passes, the transform and the synthesis against
@@ -2481,9 +2481,9 @@ and a power of two; the decorrelators and the converter's taps on 64-bit accumul
 equal on x86, the Cortex-M3 and the C3; the `double` output and the `float` pins unchanged; the fixed tier's agreement with
 `double` stated and pinned; the C6 and C3 images sized; and on the C6, with WiFi up, core decoding first.
 
-- **The tier.** `ICLFORGE_DECODE_SCALAR=fixed` selects `src/ac4core/variants/scalar-fixed/`, whose `Real` is `Fixed32` (Q7.24 in
+- **The tier.** `ICLFORGE_DECODE_SCALAR=fixed` selects `src/ac4/src/core/variants/scalar-fixed/`, whose `Real` is `Fixed32` (Q7.24 in
   an `int32_t`, `src/arithmetic`). The code that differs by tier is chosen by `if constexpr` on `dsp::kFixed<Real>`
-  (`dsp/scalar_traits.hpp`), so a `double` or `float` build compiles what it compiled before. In `src/ac4dec`'s files that are not
+  (`dsp/scalar_traits.hpp`), so a `double` or `float` build compiles what it compiled before. In `src/ac4/src/decoder`'s files that are not
   templates the fixed branches are templates on the scalar or generic lambdas, for the same reason.
 - **Where the values sit.** A sample of PCM has full scale at 8.0 and a QMF sample sits at 2^-16 of the `double` decoder's, two
   shifts chosen from probes of each domain's smallest and largest values. Each track's spectrum carries an exponent: the
@@ -2504,10 +2504,10 @@ equal on x86, the Cortex-M3 and the C3; the `double` output and the `float` pins
   from flash, so the 1001/960 table costs no RAM: a C6 has no PSRAM, and 188 KB is most of what it has free with WiFi up. A fixed
   image links these three tables and no `float` one.
 
-**Built in D14d.** In `src/arithmetic`, `mant_exp.hpp`; in `src/ac4core`, the `scalar-fixed` variant, `dsp/scalar_traits.hpp`,
+**Built in D14d.** In `src/arithmetic`, `mant_exp.hpp`; in `src/ac4/src/core`, the `scalar-fixed` variant, `dsp/scalar_traits.hpp`,
 `dsp/qmf_fixed.hpp` and the generated `tables/qmf_tables_fixed.hpp` (`tools/generators/gen_ac4_fixed_tables.py`, with `--check`),
 `Fft::inverse_scaled()`, the IMDCT's and the synthesis's overloads that carry a block's exponent, and the fixed branches of
-`aspx/hf_generator.cpp`, `acpl/acpl.cpp` and `dsp/resampler.cpp`; in `src/ac4dec`, the per-track exponent of
+`aspx/hf_generator.cpp`, `acpl/acpl.cpp` and `dsp/resampler.cpp`; in `src/ac4/src/decoder`, the per-track exponent of
 `pcm/asf_reconstruct.cpp` and `pcm/substream_pcm.cpp`, and the `Energy` types of `pcm/aspx.cpp`, `pcm/companding.cpp` and
 `pcm/drc.cpp`. `tests/ac4/core/test_ac4core_mant_exp.cpp` is new; the AC-4 tests take their units from
 `tests/ac4/decoder/ac4dec_units.hpp` and pass at every scalar, and D14e's exact tests, which hold the floating paths to their verbatim
@@ -2574,7 +2574,7 @@ probe, and the larger redesigns decided once the smaller ones had shown where th
   channel's matrix from a slot of Q_low_ext at or after it, and the next frame's history is Q_low_ext's last ten slots, so the
   matrix takes Q_low_ext's first 32 slots, and the history moves to the front when the next frame's `render()` begins, after
   every stage and every substream that mixes this one has read the matrix. The stages after A-SPX, and A-JOC's inputs in
-  `src/ac4core`, take the matrices as spans (`QmfMatrix`).
+  `src/ac4/src/core`, take the matrices as spans (`QmfMatrix`).
 
 **What each step bought**, the fixed tier's peak heap in bytes on the x86-64 host (GCC 14), each row with the ones above it:
 
@@ -2589,8 +2589,8 @@ probe, and the larger redesigns decided once the smaller ones had shown where th
 | the tracks freed | 328,009 | 468,270 | 820,375 | 984,704 | 1,723,427 | 370,291 |
 | the matrix in Q_low_ext | 295,225 | 435,486 | 722,007 | 886,336 | 1,526,819 | 337,507 |
 
-**Built in D14f.** `src/ac4core`'s `dsp/transform_tables.{hpp,cpp}`, the generated `tables/transform_tables.hpp` and the
-generator; `Fft`, `Imdct` and `TransformSet` reading the tables; A-JOC's inputs as spans. In `src/ac4dec`, `pcm/aspx.cpp`,
+**Built in D14f.** `src/ac4/src/core`'s `dsp/transform_tables.{hpp,cpp}`, the generated `tables/transform_tables.hpp` and the
+generator; `Fft`, `Imdct` and `TransformSet` reading the tables; A-JOC's inputs as spans. In `src/ac4/src/decoder`, `pcm/aspx.cpp`,
 `pcm/stereo.{hpp,cpp}`, `pcm/acpl.{hpp,cpp}`, `pcm/substream_pcm.{hpp,cpp}` (`Channel::out()`, the shared transform buffer,
 the history's move, the tracks' release), `syntax/asf.{hpp,cpp}`, `decoder.cpp` and `QmfMatrix` through A-JCC, A-JOC, dialogue
 enhancement, DRC, the downmix and mixing. The probe's peak attribution (`apps/baremetal/ac4_probe.cpp`, `stage_timers.cpp`)
@@ -2971,7 +2971,7 @@ properties over time (`ObjectsConfig`, and `encode()` taking `ObjectMetadataUpda
 computed downmix of one to eleven signals in a `var_channel_element()`, each the sum of a run of the
 objects in azimuth order and sent for core decoding at its group's centre, or a static 5.0 or 5.1 bed
 the objects are panned onto, coded in SIMPLE or ASPX; the dry matrices chosen frame by frame by running
-`src/ac4core`'s reconstruction on candidate fits and keeping the one that comes closest to the objects,
+`src/ac4/src/core`'s reconstruction on candidate fits and keeping the one that comes closest to the objects,
 the decorrelators' wet matrices as an option; bed objects listed in the upmix; and the metadata's blocks
 at the 32-sample step of each update, landing where its input sample comes out. Or direct-coded, the
 dynamic objects in mono, stereo, 3.0 and 5.0 elements with the LFE's `mono_data(1)` before the first,
@@ -2996,7 +2996,7 @@ the intermediate spatial format are refused.
 - E8's race left the shared A-SPX encoder 0.03 to 0.18 under DEE's ViSQOL on 5.1.4's sweeps from 256 to
   512 kbps, the band above the crossover emptier than DEE's. Which layouts and rates show it, the two
   streams' A-SPX side information and decoded band compared frame by frame, and the fix in
-  `src/ac4enc`'s A-SPX analysis.
+  `src/ac4/src/encoder`'s A-SPX analysis.
 
 **Exit:** on the sweep legs ViSQOL within 0.035 of DEE's or over it at every layout and rate where the
 gap was measured, and no other pinned leg regressing beyond its own tolerance; a synthetic sweep through
@@ -3689,7 +3689,7 @@ for the old names and the stale phrases; `mkdocs build --strict` and
   `ac3forge`, is replaced by a port `iclforge` (the winget submission was closed unmerged).
 - N1B is layout and naming only: no algorithm changes and every output byte stays the same. It covers
   where the code sits, the C++ namespaces, the header roots and the CMake target names. The duplicated
-  DSP (FFT, MDCT, QMF and resampler in `src/ac3` and `src/ac4core`) is a later phase.
+  DSP (FFT, MDCT, QMF and resampler in `src/ac3` and `src/ac4/src/core`) is a later phase.
 - The study recommends renaming `src/ac3` to `ac3`, beside the AC-4 libraries, with five
   codec-blind libraries cut out of it, in stages S0 to S6 with N1A in the same freeze. The user has not
   yet answered its 14 decisions ([its section (i)](layout.md#i-decisions)): the layout, the
@@ -3956,11 +3956,11 @@ stand. Each lists its options, the recommendation, what each costs, and what was
     **Taken: (a)**, in the user's answer of 2026-09-24.
 
 15. **Where the encoder lives, and what the two directions share.**
-    - (a) **`src/ac4enc` beside the decoder, and a shared core, `src/ac4core`**: the tables, bit
+    - (a) **`src/ac4/src/encoder` beside the decoder, and a shared core, `src/ac4/src/core`**: the tables, bit
       reading and writing, the transforms, the QMF bank, the reconstruction kernels and the
       converters, in a static library both link privately
       ([Where the libraries live](#where-the-libraries-live)).
-    - (b) The encoder links the decoder, and the shared code stays in `src/ac4dec`.
+    - (b) The encoder links the decoder, and the shared code stays in `src/ac4/src/decoder`.
     - (c) One AC-4 library holding both directions, as `ac3::forge` holds AC-3's and E-AC-3's.
 
     **Recommend (a).** Each direction links what it runs, the syntax stays two separate
@@ -3972,7 +3972,7 @@ stand. Each lists its options, the recommendation, what each costs, and what was
 
     **Taken: (a)**, as recommended; the user raised no objection. As built, D2 moved the generated
     tables into the core and the transforms were written there; the bit reader and the Huffman
-    decoder stayed in `src/ac4dec`, and the encoder has a bit writer of its own in `src/ac4enc`.
+    decoder stayed in `src/ac4/src/decoder`, and the encoder has a bit writer of its own in `src/ac4/src/encoder`.
 
 16. **What the encoder writes by default.**
     - (a) **The syntax DEE's streams exercise**, and everything else behind options named
@@ -4087,7 +4087,7 @@ stand. Each lists its options, the recommendation, what each costs, and what was
 |---|---|---|---|
 | 13 | The validation oracles | librempeg, FFmpeg for framing, MediaInfo, DEE; a device if one is at hand | **librempeg, FFmpeg for framing, MediaInfo, DEE** |
 | 14 | The encoder's scope and the order | Everything, in pairs | **Everything, in pairs** |
-| 15 | Where the encoder lives | `src/ac4enc` and a shared core | **`src/ac4enc` and a shared core** |
+| 15 | Where the encoder lives | `src/ac4/src/encoder` and a shared core | **`src/ac4/src/encoder` and a shared core** |
 | 16 | What the encoder writes by default | DEE's set; the rest experimental | **DEE's set; the rest experimental** |
 | 17 | The psychoacoustic model | The encoder's own | **The encoder's own** |
 | 18 | Dialogue enhancement parameters | From a stem or marked channels | **From a stem or marked channels** |
@@ -4179,8 +4179,8 @@ words, asked for 25 in their own words, and took the recommendations for the res
 
 31. **Sharing `ac3::forge`'s arithmetic.**
     - (a) **A header-only target** holding `Fixed32`, the vector types and the `float` functions,
-      used by `ac3::forge` and `src/ac4core`.
-    - (b) Copies in `src/ac4core`.
+      used by `ac3::forge` and `src/ac4/src/core`.
+    - (b) Copies in `src/ac4/src/core`.
     - (c) `ac3::forge`'s private headers included by path.
 
     **Recommend (a):** decision 7 kept the DSP kernels apart, not the types, and a copied `Fixed32`

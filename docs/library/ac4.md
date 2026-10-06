@@ -1,7 +1,7 @@
 # AC-4 (ETSI TS 103 190): `iclforge::ac4`
 
-`iclforge/ac4dec/decoder.hpp`, library `iclforge::ac4`, and `iclforge/ac4enc/encoder.hpp`, library `iclforge::ac4`,
-with the inspector both work through, `iclforge/ac4/ac4.hpp` in library `iclforge::ac4`. An AC-4 decoder and
+`iclforge/ac4/decoder/decoder.hpp`, library `iclforge::ac4`, and `iclforge/ac4/encoder/encoder.hpp`, library `iclforge::ac4`,
+with the inspector both work through, `iclforge/ac4/core/toc.hpp` in library `iclforge::ac4`. An AC-4 decoder and
 encoder written from ETSI TS 103 190-1 V1.4.1 (channel-based coding) and TS 103 190-2 V1.3.1
 (immersive and personalized audio). The libraries are in namespace `ac4` and link nothing from
 `iclforge::ac3`: AC-4 shares no bitstream syntax with AC-3 or E-AC-3. The encoder is described under
@@ -364,7 +364,7 @@ encoder refuses there, and why, is in the header and `src/ac4/ERRATA.md`.
 
 With `experimental.objects`, a substream codes objects in place of channels: each object's PCM, one
 input channel each, and its metadata over time in the `ObjectProperties` the decoder reports
-(`iclforge/ac4/ac4.hpp`). The applications convert object scenes, ADM BWF and IAB masters into these
+(`iclforge/ac4/core/toc.hpp`). The applications convert object scenes, ADM BWF and IAB masters into these
 (`forge atmos-encode`, `atmos-adm` and `atmos-iab` with `codec=ac4`, and the Forge GUI's encoder
 page, through `apps/common/ac4_objects_core.hpp`); the library reads no scene format.
 

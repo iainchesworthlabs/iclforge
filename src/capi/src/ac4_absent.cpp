@@ -66,7 +66,7 @@ void iclforge_ac4_decoder_config_init(iclforge_ac4_decoder_config_t* config) {
     config->decoding = ICLFORGE_AC4_DECODING_FULL;
 }
 
-// iclforge::ac4::ObjectProperties{}'s defaults (src/ac4/include/iclforge/ac4/ac4.hpp).
+// iclforge::ac4::ObjectProperties{}'s defaults (src/ac4/include/iclforge/ac4/core/toc.hpp).
 void iclforge_ac4_object_properties_init(iclforge_ac4_object_properties_t* properties) {
     if (properties == nullptr) {
         return;

@@ -128,7 +128,7 @@ as active roadmap rows; the new roadmap may mention them only in a legacy index 
 
 | Topic | ROADMAP | Code / docs truth | Inventory note |
 |---|---|---|---|
-| **AC-4 inspect** | IM4 Shipped | `src/ac4/include/iclforge/ac4/ac4.hpp`: "INSPECTOR, not a decoder"; `capabilities.md` AC-4 row | Shipped scope = parse/inspect + carriage in MP4/TS |
+| **AC-4 inspect** | IM4 Shipped | `src/ac4/include/iclforge/ac4/core/toc.hpp`: "INSPECTOR, not a decoder"; `capabilities.md` AC-4 row | Shipped scope = parse/inspect + carriage in MP4/TS |
 | **AC-4 decode** | *(absent)* | `src/ac4dec/`: syntax only | **Partial** — separate row in section A |
 | **IAMF** | IM3 Shipped | `iamf/`: v2.0 reader and writer, object elements, Parameter Blocks, trimming, raw OBU and fragments | Shipped = IAMF v2.0 reader and writer; codec encoders and layer reconstruction open |
 | **IAB** | IM1 Shipped | `iab`: reader, `dlc.hpp` decode, `writer.hpp` write and `encode_dlc` | Shipped = elementary IABitstream read and write, and `write_mxf_iab` for the ST 2067-201 Track File; an IMF validator run on it is the open follow-on |
@@ -153,7 +153,7 @@ From `planning/hearth-reference-player.md` status block, verified against `main`
 | **B1–B5** | Merged | `hearth_sink` example, Sendspin CI (`hearth-esp32s3` job) | **Partial** — firmware done; TDM DAC + Music Assistant on real MA open |
 | **C1–C2** | Merged | ESP32-C6 fixed-point path | **Shipped** |
 | **C3** | Follows B | No C6 sink guide/CI | **Not started** |
-| **D** | First code merged | `src/ac4dec` syntax only | **Partial** — see section A |
+| **D** | First code merged | `src/ac4/src/decoder` syntax only | **Partial** — see section A |
 
 **Open hardware exits** (called out in planning, not in ROADMAP): Onkyo identify tone and
 passthrough tests for A2/A3; TDM DAC boards for sinks; Music Assistant compatibility on real MA
@@ -176,7 +176,7 @@ passthrough tests for A2/A3; TDM DAC boards for sinks; Music Assistant compatibi
 
 | Flag / job | Path | Default | Roadmap relevance |
 |---|---|---|---|
-| `AC3FORGE_BUILD_AC4` | `src/ac4`, `src/ac4dec` | ON | AC-4 inspect + syntax decoder |
+| `AC3FORGE_BUILD_AC4` | `src/ac4` | ON | AC-4 inspect + syntax decoder |
 | `AC3FORGE_BUILD_HEARTH` | `src/sendspin`, `apps/hearth` | OFF | Hearth engine/tests when ON |
 | `AC3FORGE_BUILD_CRUCIBLE` | `apps/crucible` | OFF | UX12; CI sets ON on selected legs |
 | `AC3FORGE_BUILD_IAMF` | `src/iamf` | ON | IM3 phase 1 |

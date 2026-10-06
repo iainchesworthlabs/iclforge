@@ -11,7 +11,7 @@
 
 // AC-4 in an elementary stream: Annex G.3.1's ac4_syncframe() and the walk
 // over them, whole (scan()) or as a stream arrives (SyncFrameSplitter). A sync
-// frame's raw_ac4_frame is what parse_raw_frame() (iclforge/ac4/toc.hpp) reads.
+// frame's raw_ac4_frame is what parse_raw_frame() (iclforge/ac4/core/toc.hpp) reads.
 
 namespace iclforge::ac4 {
 

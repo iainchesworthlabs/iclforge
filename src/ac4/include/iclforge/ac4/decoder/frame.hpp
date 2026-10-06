@@ -12,7 +12,7 @@
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/export.hpp"
 
-// What an AC-4 Decoder (iclforge/ac4dec/decoder.hpp) returns for a frame: the
+// What an AC-4 Decoder (iclforge/ac4/decoder/decoder.hpp) returns for a frame: the
 // decoded channels and objects, the report of what the frame carries, the blocks a
 // streaming caller takes them in, and how a concealed frame was made.
 
