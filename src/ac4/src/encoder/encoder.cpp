@@ -3178,7 +3178,7 @@ struct ObjectLayout {
 }  // namespace
 
 // Nested in an exported class, Impl takes its visibility, so each member
-// function defined out of line below would be exported from libac4enc.so with
+// function defined out of line below would be exported from libiclforge_ac4.so with
 // it. ICLFORGE_AC4_NO_EXPORT on each keeps them to the library, and the exported set
 // to the header's API (tools/ci/abi-allowlist/libiclforge_ac4.so.txt).
 struct Encoder::Impl {

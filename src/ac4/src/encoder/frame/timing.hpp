@@ -12,7 +12,7 @@
 // samples a frame: 46 080 Hz at 24, 30, 48, 60 and 120 fps, 51 200 Hz at 25,
 // 50 and 100, and 46 033.97 Hz at the 1000/1001 rates. The decoder converts to
 // 48 kHz by decoder_up / decoder_down, and the encoder its 48 kHz input to the
-// internal rate by the inverse (ac4core's dsp/resampler.hpp).
+// internal rate by the inverse (the core's dsp/resampler.hpp).
 //
 // The encoder's signal axis against the decoder's. A frame's transform window
 // starts at the frame's first sample, so the decoder's output of frame f,

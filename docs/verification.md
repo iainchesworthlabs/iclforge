@@ -1410,8 +1410,7 @@ named otherwise.
   installs, with both linkages, shared and static-only, is consumed by a C++ program that decodes a
   committed stream through the installed inspector and decoder, linked through
   `find_package(iclforge)` for each exported decoder target and again through
-  `pkg-config --cflags --libs ac4dec`. Every installed archive, `libac4core_static.a` among them,
-  links whole with nothing undefined, and each `.pc` naming one links its archives whole on its own.
+  `pkg-config --cflags --libs iclforge-ac4`. Every installed archive links whole with nothing undefined, and each `.pc` naming one links its archives whole on its own.
 
 Four items of the review of #700 have a test each, and each test failed before its fix:
 
@@ -1431,7 +1430,7 @@ Four items of the review of #700 have a test each, and each test failed before i
   `substream_index_table()` is in the frame's report now, and one that no element of the table of
   contents names is refused as unread (`tests/ac4/decoder/test_ac4dec_decoder.cpp`,
   `tests/ac4/decoder/test_ac4dec_frames.cpp`).
-- **Android, WebAssembly and the Python wheel** compiled the AC-4 libraries and linked none of
+- **Android, WebAssembly and the Python wheel** compiled the AC-4 library and linked nothing of
   them. Each turned `ICLFORGE_BUILD_AC4` off until phase I4 bound them, and
   `tools/checks/test_ac4_build_configurations.py` reads the configurations: the wheel and the
   WebAssembly module now link AC-4, the Android app builds the libraries and its CMake wrapper
@@ -1735,7 +1734,7 @@ paragraph on the objects follows them:
   value's refusal. `tools/checks/check_install_consumer.sh` installs each build and encodes a
   second of tone through the installed encoder, by CMake and by pkg-config, static and shared,
   reading every sync frame and its CRC back with the installed inspector; the ABI gate compares
-  `libac4enc.so`'s exports with the header's API (`tools/ci/abi-allowlist/libiclforge_ac4.so.txt`), and
+  `libiclforge_ac4.so`'s exports with the headers' API (`tools/ci/abi-allowlist/libiclforge_ac4.so.txt`), and
   is advisory until the API freeze. Both run nightly.
 - **The immersive element** (phase E8, `tests/ac4/encoder/test_ac4enc_immersive.cpp`). 5.0.4 and 5.1.4
   are written in the immersive element as DEE writes it: SCPL from 640 kbps, ASPX_SCPL from 480

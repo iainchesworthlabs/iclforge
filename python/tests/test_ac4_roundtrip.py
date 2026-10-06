@@ -4,9 +4,10 @@ Same validation discipline as test_ac3_roundtrip.py (see CONTRIBUTING.md): real 
 silence or DC, distinct per channel, so a channel-order bug would show up as a failed correlation
 rather than passing by coincidence; several frames, not one. Unlike AC-3, AC-4's encoder and
 decoder each carry a real, documented delay (Encoder.delay_samples, Encoder.decoder_delay_samples -
-see ac4enc/include/ac4enc/encoder.hpp's own comment on how the two relate), so this test aligns by
-that amount before comparing rather than searching a small window blind; _best_correlation's own
-small +/-64 sample search then only has to cover rounding, not the delay itself.
+see src/ac4/include/iclforge/ac4/encoder/encoder.hpp's own comment on how the two relate), so this
+test aligns by that amount before comparing rather than searching a small window blind;
+_best_correlation's own small +/-64 sample search then only has to cover rounding, not the delay
+itself.
 
 This is a binding smoke test, not a codec correctness suite - that lives in this project's C++
 Catch2 suite (tests/ac4). It only has to show the Python surface carries a real signal through.
@@ -56,7 +57,8 @@ def _encode_decode(channels, channel_tones, bitrate_kbps):
     Returns (originals, decoded_full, delay): `decoded_full` is one concatenated array per
     channel, and `delay` (Encoder.delay_samples + Encoder.decoder_delay_samples) is how far into
     it the corresponding original sample lands - the exact relationship
-    ac4enc/include/ac4enc/encoder.hpp documents for delay_samples()/decoder_delay_samples().
+    src/ac4/include/iclforge/ac4/encoder/encoder.hpp documents for
+    delay_samples()/decoder_delay_samples().
     """
     config = ac4.EncoderConfig(
         channels=channels,
@@ -186,7 +188,7 @@ def test_prove_correlation_check_can_fail():
 def test_encoder_create_rejects_unsupported_channel_count():
     # 4 input channels is not a valid EncoderConfig.channels value under any configuration this
     # binding exposes (1/2/5/6/9/10 need no experimental flag; 7/8/11/12 need experimental flags
-    # this binding does not expose at all - see ac4enc/include/ac4enc/encoder.hpp).
+    # this binding does not expose at all - see src/ac4/include/iclforge/ac4/encoder/encoder.hpp).
     with pytest.raises(ValueError):
         ac4.Encoder.create(ac4.EncoderConfig(channels=4, sample_rate_hz=SAMPLE_RATE_HZ,
                                              frame_rate_index=FRAME_RATE_INDEX))

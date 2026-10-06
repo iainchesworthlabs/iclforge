@@ -321,7 +321,7 @@ void AcplStage::module(const AcplModuleValues& values, int index, int decorrelat
     }
     for (int ts = 0; ts < num_ts; ++ts) {
         for (int run = 0; run < runs.count; ++run) {
-            // alpha and beta are ac4core's own double-precision interpolation (acpl::Interpolator
+            // alpha and beta are the core's own double-precision interpolation (acpl::Interpolator
             // is not retemplated on Real; see this class's declaration), narrowed once for the run.
             const auto a = static_cast<Real>(interpolator.at(columns_[at(run) * 2], ts));
             const auto b = static_cast<Real>(interpolator.at(columns_[at(run) * 2 + 1], ts));
@@ -423,9 +423,9 @@ void AcplStage::coupling(const AcplCouplingValues& values, std::span<const QmfVa
 
     // Pseudocode 109 once for each run of subbands that shares a parameter band and every
     // parameter's acpl_param_prev, and at each slot: the coefficients the loops below multiply by.
-    // ac4core's interpolation is in double (see this class's declaration); each sum below is formed
-    // in that double precision, as the original single-scalar code computed it, and narrowed to
-    // Real once, at the multiply into a QmfValue - the double build stays bit-for-bit since
+    // The core's interpolation is in double (see this class's declaration); each sum below is
+    // formed in that double precision, as the original single-scalar code computed it, and narrowed
+    // to Real once, at the multiply into a QmfValue - the double build stays bit-for-bit since
     // narrowing a double to double is the identity.
     std::array<const acpl::ParamPrev*, kCouplingInterpolations> prevs{};
     for (std::size_t k = 0; k < params.size(); ++k) {

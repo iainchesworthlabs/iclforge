@@ -223,14 +223,14 @@ set(ICLFORGE_BUILD_AC4 OFF CACHE BOOL "" FORCE)
 # The AC-4 decoder is the one addition to that list, behind a switch that is off
 # by default. ICLFORGE_BUILD_AC4 above stays off, since it also builds the
 # encoder, the applications and the tests; ICLFORGE_MINIMAL_AC4 is the root's
-# own option for the decoder inside this profile - the inspector, the core and
-# the decoder as static archives with the profile's compile options - and this
+# own option for the decoder inside this profile - the AC-4 library's decode-only
+# archive (src/ac4/minimal.cmake) with the profile's compile options - and this
 # is the only place it is set. With CONFIG_ICLFORGE_AC4 off the root configures
 # exactly as before.
 if(CONFIG_ICLFORGE_AC4)
-    if(NOT EXISTS "${ICLFORGE_ROOT}/src/ac4/CMakeLists.txt")
+    if(NOT EXISTS "${ICLFORGE_ROOT}/src/ac4/minimal.cmake")
         message(FATAL_ERROR
-            "CONFIG_ICLFORGE_AC4 is on and there is no AC-4 decoder at '${ICLFORGE_ROOT}/src/ac4/src/decoder'. "
+            "CONFIG_ICLFORGE_AC4 is on and there is no AC-4 decoder at '${ICLFORGE_ROOT}/src/ac4'. "
             "A component archive carries the AC-4 sources only when it was packed with "
             "tools/packaging/pack_esp_component.py --with-ac4.")
     endif()
@@ -334,9 +334,9 @@ target_link_libraries(${COMPONENT_LIB} PUBLIC iclforge::ac3_minimal)
 if(CONFIG_ICLFORGE_SENDSPIN)
     target_link_libraries(${COMPONENT_LIB} PUBLIC iclforge::sendspin)
 endif()
-# The decoder's static archive brings the inspector and the core with it (the
-# core as a link-only dependency, src/ac4/CMakeLists.txt), and its include
-# directories for src/ac4_bridge.cpp.
+# The AC-4 library's decode-only archive (the inspector, the core and the
+# decoder, src/ac4/minimal.cmake), and its include directories for
+# src/ac4_bridge.cpp.
 if(CONFIG_ICLFORGE_AC4)
     target_link_libraries(${COMPONENT_LIB} PUBLIC iclforge::ac4_static)
 endif()

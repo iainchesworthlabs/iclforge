@@ -1,6 +1,6 @@
 # Conan (2.x) recipe for iclforge - installs the library only (iclforge::ac3,
 # iclforge::matroska/iclforge::mp4/iclforge::mpegts behind their own default-on options, and
-# iclforge::c, the AC-4 libraries, iclforge::iab and iclforge::iamf behind default-off "capi",
+# iclforge::c, the AC-4 library, iclforge::iab and iclforge::iamf behind default-off "capi",
 # "ac4", "iab" and "iamf" options), never the CLI, GUI, Hearth, tests, examples or fuzz
 # harnesses. Same scope as the vcpkg port (packaging/vcpkg-port/iclforge/) - one Conan option
 # <-> one ICLFORGE_BUILD_<NAME> CMake option, same pattern that port's vcpkg_check_features()

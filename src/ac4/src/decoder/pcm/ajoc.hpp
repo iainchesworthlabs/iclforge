@@ -87,7 +87,7 @@ class AjocStage {
    private:
     // ajoc::Reconstruction<Real>: its QMF-domain state and computation take
     // Real; its de_gain parameter and AjocFrameValues::coeff stay double,
-    // ac4core's own fixed signature for a value computed once per frame, not
+    // the core's own fixed signature for a value computed once per frame, not
     // per QMF sample (ajoc/ajoc.hpp). It holds the decorrelators' history, 150 KB
     // at double, so the first frame that reconstructs makes it: a stream without
     // A-JOC holds none, and one just made is in the first frame's state.

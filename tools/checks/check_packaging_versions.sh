@@ -275,7 +275,7 @@ fi
 # one line) is, in each recipe, either a component it offers or pinned OFF. One that a recipe
 # neither offers nor pins gets built by it, with whatever it needs: ICLFORGE_BUILD_HEARTH, which
 # defaults ON, had both recipes configure src/sendspin, which stops at a dependency neither
-# declares, and, with the AC-4 libraries off, at upstream's refusal of Hearth without them. ---
+# declares, and, with the AC-4 library off, at upstream's refusal of Hearth without it. ---
 cmakelists="$root/CMakeLists.txt"
 if [[ -f "$cmakelists" ]] && [[ -f "$portfile" ]] && [[ -f "$conanfile" ]]; then
     upstream_on="$( { grep -E '^[[:space:]]*option\(ICLFORGE_BUILD_[A-Z0-9_]+[[:space:]].*[[:space:]]ON\)[[:space:]]*(#.*)?$' "$cmakelists" || true; } \

@@ -10,7 +10,7 @@
 add_executable(iclforge-perf test_performance.cpp)
 
 # The AC-4 cases need no guard: the root CMakeLists.txt refuses
-# ICLFORGE_BUILD_TESTS without ICLFORGE_BUILD_AC4, so the AC-4 libraries exist
+# ICLFORGE_BUILD_TESTS without ICLFORGE_BUILD_AC4, so the AC-4 library exists
 # wherever this directory is built. The same holds for the three targets below.
 target_link_libraries(iclforge-perf
     PRIVATE
@@ -101,7 +101,7 @@ if((WIN32 OR LINUX) AND NOT ICLFORGE_SANITIZERS MATCHES "thread")
 
     target_include_directories(iclforge-membench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-    # The AC-4 libraries' static builds, for the same reason as
+    # The AC-4 library's static build, for the same reason as
     # iclforge::ac3_static: a DLL's allocations would not reach the counters.
     target_link_libraries(iclforge-membench PRIVATE
         iclforge::ac3_static iclforge::ac4_static iclforge::warnings iclforge::fmt)
@@ -125,9 +125,13 @@ endif()
 # ---------------------------------------------------------------------------
 add_executable(iclforge-kernelbench kernel_bench.cpp)
 
-# iclforge::ac4 (static in every build) brings src/ac4/src/core's transform headers,
-# as it does for tests/ac4/core.
-target_link_libraries(iclforge-kernelbench PRIVATE iclforge::ac3 iclforge::ac4 iclforge::warnings iclforge::fmt)
+# The AC-4 kernels it times are private to iclforge::ac4 (src/ac4/src/core), so it
+# links the static library in every build and takes the library's private and
+# scalar-tier directories, as tests/CMakeLists.txt does for tests/ac4/core.
+target_link_libraries(iclforge-kernelbench PRIVATE iclforge::ac3 iclforge::ac4_static iclforge::warnings iclforge::fmt)
+target_include_directories(iclforge-kernelbench PRIVATE
+    "${CMAKE_SOURCE_DIR}/src/ac4/src"
+    "${CMAKE_SOURCE_DIR}/src/ac4/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}")
 
 target_include_directories(iclforge-kernelbench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 

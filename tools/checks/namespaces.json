@@ -3,9 +3,6 @@
   "libraries": {
     "ac3": ["ac3"],
     "ac4": ["ac4"],
-    "ac4core": ["ac4"],
-    "ac4dec": ["ac4"],
-    "ac4enc": ["ac4"],
     "adm": ["adm"],
     "admbridge": ["admbridge"],
     "arithmetic": ["internal"],

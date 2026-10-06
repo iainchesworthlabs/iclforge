@@ -1441,7 +1441,7 @@
           [
             "source",
             "build",
-            "the NDK build compiles the AC-4 libraries; the Shield demo links none of them"
+            "the NDK build compiles the AC-4 library; the Shield demo links none of it"
           ]
         ],
         [

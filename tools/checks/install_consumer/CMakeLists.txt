@@ -17,11 +17,10 @@
 # pinned to the C driver, which is what a C-only project gets: the shared library carries the C++
 # runtime it needs, and the driver would otherwise be chosen by whatever else lands on the link line.
 #
-# One C++ consumer per AC-4 decoder target the package exports, in the same way: iclforge::ac4_shared
-# and iclforge::ac4_static, or the bare iclforge::ac4 of a single-linkage package. consumer_ac4.cpp
-# decodes a committed stream through the installed inspector and decoder. And one per AC-4 encoder
-# target: consumer_ac4enc.cpp encodes a tone through the installed encoder and reads the stream
-# back with the inspector. A package built with ICLFORGE_BUILD_AC4=OFF has neither;
+# Two C++ consumers per AC-4 target the package exports, in the same way: iclforge::ac4_shared and
+# iclforge::ac4_static, or the bare iclforge::ac4 of a single-linkage package. consumer_ac4.cpp
+# decodes a committed stream through the installed inspector and decoder, and consumer_ac4enc.cpp
+# encodes a tone through the installed encoder and reads the stream back with the inspector. A package built with ICLFORGE_BUILD_AC4=OFF has neither;
 # check_install_consumer.sh passes ICLFORGE_EXPECT_AC4 from the tree's own cache, so that a package
 # that should have them and does not fails here.
 cmake_minimum_required(VERSION 3.28)
@@ -94,7 +93,7 @@ foreach(target IN ITEMS iclforge::ac4_shared iclforge::ac4_static iclforge::ac4)
     if(NOT TARGET ${target})
         continue()
     endif()
-    string(REPLACE "::" "_" name "consumer_${target}")
+    string(REPLACE "::" "_" name "consumer_encoder_${target}")
     add_executable(${name} consumer_ac4enc.cpp)
     add_test(NAME ${name} COMMAND ${name})
     target_link_libraries(${name} PRIVATE ${target})

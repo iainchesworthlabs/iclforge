@@ -21,7 +21,7 @@ target_link_libraries(your_target PRIVATE iclforge::c)
 `BUILD_SHARED_LIBS` asks for, same as `iclforge::ac3`; an installed package exports both variants
 explicitly as `iclforge::c_static`/`iclforge::c_shared` — see [Using the libraries](index.md) for
 the equivalent `iclforge::ac3` linking recipe. Unlike `iclforge::ac3`, **both** `iclforge_c` variants
-statically embed the codec core, and the AC-4 libraries where `ICLFORGE_BUILD_AC4` is on,
+statically embed the codec core, and the AC-4 library where `ICLFORGE_BUILD_AC4` is on,
 regardless of `BUILD_SHARED_LIBS`: a binding or embedder reaching
 for a C ABI wants exactly one library to `dlopen`/`ctypes`/`ffi.dlopen`, not a second
 `libiclforge_ac3.so` to also track down and ship — see `src/capi/CMakeLists.txt`'s header comment. On

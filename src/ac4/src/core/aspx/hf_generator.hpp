@@ -62,7 +62,7 @@ struct HfGeneratorState {
 
 // dsp::Complex<Real> here (not std::complex<Real>): a fixed-point type cannot
 // instantiate std::complex, and the QMF matrices these functions read and
-// write are ac4core's own complex type throughout (dsp/complex.hpp).
+// write are the core's own complex type throughout (dsp/complex.hpp).
 
 template <typename Real>
 struct HfGeneratorInput {

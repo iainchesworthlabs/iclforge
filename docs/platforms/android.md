@@ -16,7 +16,7 @@ platforms, see [Building from source](../building.md) and the other pages in thi
 | Live Atmos out HDMI passthrough | Confirmed on real 2017 Shield hardware, into an AV receiver |
 | Object motion from the controller | Confirmed moving; nobody has listened to check a flyover arrives overhead |
 | Capture | None. The app plays; it records nothing |
-| AC-4 | None. The app does not decode, encode or play AC-4. The NDK build compiles the AC-4 libraries and the app links none of them — see [AC-4](#ac-4) |
+| AC-4 | None. The app does not decode, encode or play AC-4. The NDK build compiles the AC-4 library and the app links none of it — see [AC-4](#ac-4) |
 | Distribution | Personal sideload via `adb install`, **never the Play Store**. A release carries the APK (every release since v0.3.0-beta.1 has one) |
 | CI | The `build-android` job builds it in the nightly run and in the run after a merge that changes `apps/android/`; the hardware behaviour is not reproducible in CI |
 
@@ -147,9 +147,9 @@ So the backend is split, unlike the other three:
 ### AC-4
 
 **The app does nothing with AC-4.** Its native library, `iclforge_jni`, links `iclforge::ac3`,
-`iclforge::audio` and `iclforge::signing` and none of the AC-4 libraries (`src/ac4`,
-`src/ac4`). The wrapper `CMakeLists.txt` leaves `ICLFORGE_BUILD_AC4` at its
-default, on, so the NDK build compiles those libraries and holds their sources to building under
+`iclforge::audio` and `iclforge::signing` and not the AC-4 library
+(`src/ac4`). The wrapper `CMakeLists.txt` leaves `ICLFORGE_BUILD_AC4` at its
+default, on, so the NDK build compiles the library and holds its sources to building under
 NDK r26 (`tools/checks/test_ac4_build_configurations.py` holds it to that default), and nothing
 calls them. The live encode loop makes E-AC-3 only. The `play_file` diagnostic (below) replays
 E-AC-3 files only, and refuses a file that does not open with an AC-3 or E-AC-3 syncframe, an

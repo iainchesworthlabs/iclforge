@@ -98,9 +98,9 @@ anything to deprecate *from*. The policy going forward:
   in `CHANGELOG.md` like any other change — a deprecation cycle promises a grace period this
   project isn't promising yet.
 - **At and after `v1.0.0`:** drop `DEFINE_NO_DEPRECATED` from every `generate_export_header()`
-  call (eighteen libraries — `base`, `dsp`, `objects`, `render`, `iec61937`, `ac3`, `capi`,
-  `matroska`, `mp4`, `mpegts`, `adm`, `iab`, `admbridge`, `signing`, `iamf`, `ac4`, `ac4dec`,
-  `ac4enc`; `iclforge::ac3_minimal` has no `SOVERSION` promise to protect and can keep it).
+  call (sixteen libraries — `base`, `dsp`, `objects`, `render`, `iec61937`, `ac3`, `capi`,
+  `matroska`, `mp4`, `mpegts`, `adm`, `iab`, `admbridge`, `signing`, `iamf` and `ac4`;
+  `iclforge::ac3_minimal` has no `SOVERSION` promise to protect and can keep it).
   A symbol scheduled for removal gets `ICLFORGE_DEPRECATED` (or its module's equivalent) in the
   same minor release its replacement ships, stays for at least one further minor release, and is
   only removed in a major release. No symbol needs this yet, so no macro use is being added by
@@ -182,11 +182,11 @@ decision on this page, the same way `iclforge::iab` will. `iclforge::render` is 
 the ESP32 player and serves the desktop player as well, it has been a library of its own since the
 re-layout, and its speaker management is new with it.
 
-The AC-4 inspector, decoder and encoder (`iclforge::ac4`,
-[AC-4](ac4.md)) are Experimental too. Their API has the form
+The AC-4 codec, its inspector, decoder and encoder (`iclforge::ac4`,
+[AC-4](ac4.md)), is Experimental too. Their API has the form
 [planning/ac4.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md) set, and
 the immersive layouts, core decoding and objects came as fields after the ones channel-based
-streams needed. The shared core, `iclforge::ac4`, has no headers and so no tier. `iclforge::iamf`, the
+streams needed. The core its decoder and encoder share has private headers and so no tier. `iclforge::iamf`, the
 IAMF reader and writer, is Experimental as a new module.
 
 `iclforge::adm` and `iclforge::admbridge` are a different case: also opt-in

@@ -128,7 +128,7 @@ class AcplStage {
                 std::span<QmfValue> z1, int num_ts);
     void coupling(const AcplCouplingValues& values, std::span<const QmfValue> x0, std::span<const QmfValue> x1,
                   std::span<std::span<QmfValue>, 5> z, int num_ts);
-    // Pseudocode 109 is ac4core's own acpl::Interpolator (acpl/acpl.hpp), which is not
+    // Pseudocode 109 is the core's own acpl::Interpolator (acpl/acpl.hpp), which is not
     // retemplated on Real - its ParamSets/ParamPrev stay double, a handful of
     // interpolated coefficients per slot rather than per-sample QMF data, in the
     // same "computed in double, kept small" shape as a downmix or DRC gain

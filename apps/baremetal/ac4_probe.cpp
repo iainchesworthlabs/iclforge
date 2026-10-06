@@ -7,7 +7,7 @@
 // the host environment:
 //
 //   1. Does the decoder LINK at all with the encoder, the containers and the I/O layer
-//      absent, and build without exceptions or RTTI? The AC-4 libraries carry no throw,
+//      absent, and build without exceptions or RTTI? The AC-4 library carries no throw,
 //      try or catch of their own (std::expected is the error mechanism throughout), and
 //      -fno-exceptions is what asserts it.
 //

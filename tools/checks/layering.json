@@ -8,10 +8,7 @@
     "render": ["base", "objects"],
     "iec61937": [],
     "ac3": ["base", "dsp", "objects", "render", "arithmetic"],
-    "ac4": [],
-    "ac4core": ["base", "arithmetic"],
-    "ac4dec": ["base", "ac4", "ac4core"],
-    "ac4enc": ["ac4", "ac4core"],
+    "ac4": ["base", "dsp", "objects", "render", "arithmetic"],
     "mp4": [],
     "mpegts": [],
     "matroska": [],
@@ -22,6 +19,6 @@
     "signing": ["ac3"],
     "audio": ["base", "render", "iec61937", "objects"],
     "sendspin": [],
-    "capi": ["ac3", "ac4", "ac4dec", "ac4enc"]
+    "capi": ["ac3", "ac4"]
   }
 }

@@ -297,7 +297,7 @@ updated 2026-08-19) - see
 [docs/library/index.md](library/index.md) for how a consumer uses it either way. It installs the
 library only (`iclforge::ac3`, plus `iclforge::matroska`/`iclforge::mp4`/
 `iclforge::mpegts` behind their own `matroska`/`mp4`/`mpegts` features, `iclforge::c` behind
-`capi` (see the note below), the AC-4 libraries behind `ac4`, `iclforge::iab` behind `iab` and
+`capi` (see the note below), the AC-4 library behind `ac4`, `iclforge::iab` behind `iab` and
 `iclforge::iamf` behind `iamf` - see `cmake/InstallLibrary.cmake`'s `ICLFORGE_BUILD_<NAME>` and
 `ICLFORGE_INSTALL_BOTH_LINKAGES` options), never the CLI/GUI/Hearth/tests/examples/fuzzers.
 `iclforge::adm` (the ADM/BW64 reader) and `iclforge::admbridge` have no vcpkg feature
@@ -385,7 +385,7 @@ vcpkg install iclforge[matroska,mp4,mpegts,capi,ac4,iab,iamf] --classic --overla
 project's *own* build-time dependencies) would otherwise shadow the package-name argument.
 Check for a clean post-build lint (no "not used"/"missing usage" warnings) and that the bare
 `iclforge` install excludes every feature's library (`iclforge::matroska`/`iclforge::mp4`/
-`iclforge::mpegts`/`iclforge::c`, the AC-4 libraries, `iclforge::iab`, `iclforge::iamf`) - not just
+`iclforge::mpegts`/`iclforge::c`, the AC-4 library, `iclforge::iab`, `iclforge::iamf`) - not just
 unlinked, no matching files anywhere in the install tree - while
 `iclforge[matroska,mp4,mpegts,capi,ac4,iab,iamf]` installs all seven.
 `tools/checks/check_install_consumer.sh` makes the same check of any build tree it installs: a
@@ -642,7 +642,7 @@ A Conan (2.x) recipe for `iclforge` is staged in-tree at
 (`conanfile.py`, `conandata.yml`, `test_package/`) and has not been submitted to ConanCenter
 (`conan-center-index`), where no pull request names it. Scoped the same as the vcpkg port - the library only (`iclforge::ac3`,
 plus `iclforge::matroska`/`iclforge::mp4`/`iclforge::mpegts` behind their own default-on `matroska`/
-`mp4`/`mpegts` options, and `iclforge::c`, the AC-4 libraries, `iclforge::iab` and
+`mp4`/`mpegts` options, and `iclforge::c`, the AC-4 library, `iclforge::iab` and
 `iclforge::iamf` behind default-off `capi`/`ac4`/`iab`/`iamf` options), never the
 CLI/GUI/Hearth/tests/examples/fuzzers - with one Conan option per `ICLFORGE_BUILD_<NAME>` CMake option,
 the same pattern the vcpkg port's `vcpkg_check_features()` call already establishes, and the same

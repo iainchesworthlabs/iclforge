@@ -241,7 +241,7 @@ target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/s
 
 # test_scalar_math.cpp includes iclforge/arithmetic/scalar_math.hpp and
 # test_fixed32*.cpp/test_mdct_fixed.cpp include iclforge/arithmetic/fixed32.hpp - the
-# shared arithmetic target (src/arithmetic) both iclforge::ac3 and src/ac4/src/core
+# shared arithmetic target (src/arithmetic) both iclforge::ac3 and iclforge::ac4
 # use (planning/ac4.md, decision 31), worth holding to their own accuracy/
 # correctness bounds rather than only through the fixture hashes that depend
 # on them.
@@ -251,25 +251,34 @@ target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/s
 # fixed-point tier's block exponent, which both decoders share and which is not
 # library surface.
 target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/src/decoder")
-# tests/ac4dec/test_ac4dec_{asf,metadata,presentation,channel_elements}.cpp reach the
+# tests/ac4/decoder/test_ac4dec_{asf,metadata,presentation,channel_elements}.cpp reach the
 # AC-4 decoder's syntax functions (src/ac4/src/decoder/syntax/) to hold each branch of
 # the syntax to a hand-built bitstream - the committed streams reach only the
 # branches DEE writes - and the other tests in the block below reach its PCM
-# functions (src/ac4/src/decoder/pcm/) and the encoder's writer (src/ac4/src/encoder/).
-# Same pattern as the forge headers above, with one difference: those headers
-# are inline, and these functions are compiled into iclforge_ac4_objects and
+# functions (src/ac4/src/decoder/pcm/) and the encoder's writer (src/ac4/src/encoder/
+# and src/ac4/src/core/bit_writer.hpp). Same pattern as the forge headers above, with
+# one difference: those headers are inline, and these functions are compiled into
 # iclforge_ac4_objects under CXX_VISIBILITY_PRESET hidden. With BUILD_SHARED_LIBS=ON,
-# iclforge::ac4 is libac4dec.so and iclforge::ac4 libac4enc.so, which export none
-# of them, so these tests link only against the static libraries and are built
-# only when that is what iclforge::ac4 name. They test the
-# syntax and the arithmetic, not the linkage: every static leg runs them, and
-# the shared-libs pass (config-linux-llvm-shared) still runs the tests of the
-# public API, test_ac4dec_{decoder,frames,syntax}.cpp and test_ac4enc_encoder.cpp,
-# against the real .so files. Linking the static libraries here instead would
-# let those bind to a static copy too, and stop testing the .so files at all.
-# The shared core's headers (src/ac4/src/core, for tests/ac4/core/ and the
-# tables) come with linking iclforge::ac4 below, a static library in every build.
-target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac4/src/decoder")
+# iclforge::ac4 is libiclforge_ac4.so, which exports none of them, so these tests link
+# only against the static library and are built only when that is what iclforge::ac4
+# names. They test the syntax and the arithmetic, not the linkage: every static leg
+# runs them, and the shared-libs pass (config-linux-llvm-shared) still runs the tests
+# of the public API, test_ac4dec_{decoder,frames,syntax}.cpp and
+# test_ac4enc_encoder.cpp, against the real .so file. Linking the static library here
+# instead would let those bind to a static copy too, and stop testing the .so at all.
+#
+# The library's private headers are spelled from src/ac4/src (core/, decoder/,
+# encoder/), with the scalar tier's iclforge/ac4/detail/real.hpp beside them. The
+# kernels the decoder and the encoder share (src/ac4/src/core: the tables and the
+# transforms, ICLFORGE_AC4_KERNEL_SOURCES) are compiled into this target a second
+# time in a shared build, as cpu_features.cpp is below: tests/ac4/core/ holds them to
+# their own bounds in every build, and libiclforge_ac4.so exports none of them.
+target_include_directories(iclforge-tests PRIVATE
+    "${CMAKE_SOURCE_DIR}/src/ac4/src"
+    "${CMAKE_SOURCE_DIR}/src/ac4/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}")
+if(BUILD_SHARED_LIBS AND ICLFORGE_BUILD_AC4)
+    target_sources(iclforge-tests PRIVATE ${ICLFORGE_AC4_KERNEL_SOURCES})
+endif()
 if(NOT BUILD_SHARED_LIBS)
     target_sources(iclforge-tests PRIVATE
         ac4/decoder/ac4dec_constructed.cpp
@@ -306,10 +315,6 @@ if(NOT BUILD_SHARED_LIBS)
         ac4/encoder/test_ac4enc_writer.cpp
         "${CMAKE_SOURCE_DIR}/apps/common/ac4_object_render.cpp")
 endif()
-# tests/ac4/encoder/ reach the encoder's writer (src/ac4/src/encoder/) the same way; the
-# two libraries' internal headers keep distinct names (bit_reader.hpp and
-# syntax/ against bit_writer.hpp, asf/ and frame/).
-target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac4/src/encoder")
 
 # test_simd_kernels.cpp (SIMD kernels) needs the ONE architecture directory
 # CMake selected in src/arithmetic/CMakeLists.txt, so the test exercises the

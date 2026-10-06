@@ -31,8 +31,8 @@ using Real = double;
 
 // Explicit instantiations a translation unit adds at double beside its
 // `template class Foo<Real>;` when Real is not double: the encoder (src/ac4/src/encoder)
-// always runs at double, decision 34 (planning/ac4.md), and ac4core is one
-// archive both ac4dec and ac4enc link, so each kernel the encoder calls is
+// always runs at double, decision 34 (planning/ac4.md), and the core's kernels
+// are one set of objects the decoder and the encoder both call, so each one the encoder calls is
 // instantiated at both. Here Real is double, so the line above is already that
 // instantiation and a second one is ill-formed: this expands to nothing. It
 // takes the instantiation as its argument, rather than a preprocessor

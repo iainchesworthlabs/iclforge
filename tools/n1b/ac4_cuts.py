@@ -218,7 +218,9 @@ FIXED = {"iclforge/ac4/syntax.hpp": ("SyntaxRecord", "SyntaxTrace", "SyntaxSink"
 
 STD = {
     "array": (r"std::array\b",),
-    "concepts": (r"std::(same_as|convertible_to|invocable|derived_from|integral|floating_point)\b",),
+    "concepts": (
+        r"std::(same_as|convertible_to|invocable|derived_from|integral|floating_point)\b",
+    ),
     "cstddef": (r"std::(size_t|byte|ptrdiff_t|nullptr_t)\b",),
     "cstdint": (r"std::u?int(8|16|32|64)_t\b",),
     "expected": (r"std::(expected|unexpected)\b",),
@@ -416,11 +418,15 @@ def add_includes(text: str, anchor: str, news: list[str]) -> str:
 
 # Where ac4.cpp is cut, by the code that opens each part: the scanner from Annex G's banner to the
 # anonymous namespace that opens the table of contents' parse, the carriage from its banner on. The
-# rest, the table of contents' reader, stays in ac4.cpp, which C1's moves rename core/toc.cpp so that
-# it keeps its history.
+# rest, the table of contents' reader, stays in ac4.cpp, which C1's moves rename core/toc.cpp so
+# that it keeps its history.
 UNIT = "src/ac4/src/ac4.cpp"
 UNIT_CUTS = (
-    ("elementary", "// --- Annex G: AC-4 sync frame ---", "namespace {\n\n// --- §4.2.14.15 emdf_reserved"),
+    (
+        "elementary",
+        "// --- Annex G: AC-4 sync frame ---",
+        "namespace {\n\n// --- §4.2.14.15 emdf_reserved",
+    ),
     ("carriage", "// --- Carriage (AC-4 bitstream inspector's separable slice) ---", None),
 )
 
@@ -445,17 +451,22 @@ def cut_unit(root: Path) -> None:
     std_all = re.findall(r"^#include <([^>]+)>", text, flags=re.M)
 
     def unit(own: str, body: str) -> str:
-        used = [h for h in std_all if any(re.search(p, strip_comments(body)) for p in STD.get(h, ()))]
+        bare = strip_comments(body)
+        used = [h for h in std_all if any(re.search(p, bare) for p in STD.get(h, ()))]
         extra = [h for h in std_all if h not in STD and re.search(UNIT_STD_EXTRA[h], body)]
         system = sorted(set(used + extra))
         out = [include_line(own), ""]
         if system:
             out += [f"#include <{h}>" for h in system] + [""]
-        out += ["namespace iclforge::ac4 {", "", body.rstrip("\n"), "", "}  // namespace iclforge::ac4", ""]
+        out += ["namespace iclforge::ac4 {", "", body.rstrip("\n"), ""]
+        out += ["}  // namespace iclforge::ac4", ""]
         return "\n".join(out)
 
-    new_file(root, "src/ac4/src/elementary.cpp", unit("iclforge/ac4/elementary.hpp", elementary_body), src)
-    new_file(root, "src/ac4/src/carriage.cpp", unit("iclforge/ac4/carriage.hpp", carriage_body), src)
+    elementary = unit("iclforge/ac4/elementary.hpp", elementary_body)
+    new_file(root, "src/ac4/src/elementary.cpp", elementary, src)
+    new_file(
+        root, "src/ac4/src/carriage.cpp", unit("iclforge/ac4/carriage.hpp", carriage_body), src
+    )
     # The table of contents' unit keeps the file's history: it is ac4.cpp renamed, by the moves.
     toc = toc_text.replace('#include "iclforge/ac4/ac4.hpp"', '#include "iclforge/ac4/toc.hpp"', 1)
     src.text = toc

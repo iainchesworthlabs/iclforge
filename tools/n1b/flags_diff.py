@@ -1,4 +1,4 @@
-"""Compare how two configured trees compile each unit: the flags, in order, of compile_commands.json.
+"""Compare how two configured trees compile each unit: the flags, in order, of compile_commands.json
 
     flags_diff.py --old <build dir> --new <build dir> [--moves <plan.json>] [--show 20]
 
@@ -11,8 +11,8 @@ a move plan (n1b_apply.py --json, consol_apply.py --json) says it moved; an incl
 moved is compared by its new name too. What differs is printed unit by unit, as the flags one side
 has and the other has not, and as "order" where the two hold the same flags in another order.
 `--links` compares the archive and link steps instead (`ninja -t commands`): the objects and
-libraries each output is made from, in order. `--ignore` drops a flag the stage changes by design from both sides (C0: AC-4's profiling
-directory, which is iclforge::base's now).
+libraries each output is made from, in order. `--ignore` drops a flag the stage changes by design
+from both sides (C0: AC-4's profiling directory, which is iclforge::base's now).
 """
 
 from __future__ import annotations
@@ -139,7 +139,9 @@ def load_links(build: Path, renames: dict[str, str]) -> dict[str, list[tuple[str
                 # a path below the build tree is written relative to it by one generator and
                 # absolute by another
                 a = a.replace("<build>/", "")
-                kept.append("<vcpkg>/" + a[len("vcpkg_installed/") :] if a.startswith("vcpkg_installed/") else a)
+                if a.startswith("vcpkg_installed/"):
+                    a = "<vcpkg>/" + a[len("vcpkg_installed/") :]
+                kept.append(a)
             key = rename(normalise(output, tokens), renames).replace("<build>/", "")
             out.setdefault(key, []).append(tuple(kept))
     return {k: sorted(v) for k, v in out.items()}

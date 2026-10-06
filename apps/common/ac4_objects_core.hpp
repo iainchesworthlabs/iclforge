@@ -74,7 +74,7 @@ struct ObjectSlot {
 // frame.
 inline constexpr int kAc4ObjectFrameRateIndex = 13;
 inline constexpr std::int64_t kAc4ObjectFrameSamples = 2048;
-// "more than 64 objects" (ac4enc's object_layout_of): the decoder keeps at most
+// "more than 64 objects" (the encoder's object_layout_of): the decoder keeps at most
 // this many in one portion (src/ac4/ERRATA.md).
 inline constexpr std::size_t kAc4MaxObjects = 64;
 // The rates an object substream is written at.

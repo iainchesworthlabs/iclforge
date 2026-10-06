@@ -77,16 +77,16 @@ If you cannot cite where something came from, it does not go in.
 
 ## Repository layout
 
-**`src/` is the installable library; `apps/` consumes it, never the reverse.** `src/` holds 22
+**`src/` is the installable library; `apps/` consumes it, never the reverse.** `src/` holds 19
 libraries. Each is a directory with its own CMake target (`iclforge::<name>`), its own public
 headers (`iclforge/<name>/`) and its own row in `tools/checks/layering.json`, which lists the
 libraries it may include from; `check_layering.py` fails an include its row does not list. A
 library's public headers declare into the namespace named for it under the family's root, and
 `check_namespaces.py` (its table is `tools/checks/namespaces.json`) fails a header that declares
 into another library's namespace, or into `iclforge` itself.
-`src/ac3` is the AC-3, E-AC-3 and Atmos codec, in namespace `iclforge::ac3`. `src/ac4`,
-`src/ac4` are the AC-4 codec, in namespace `iclforge::ac4`,
-and link nothing from `src/ac3`.
+`src/ac3` is the AC-3, E-AC-3 and Atmos codec, in namespace `iclforge::ac3`. `src/ac4` is the
+AC-4 codec, in namespace `iclforge::ac4`, laid out by the same areas (`core`, `io`, `decoder`,
+`encoder`), and links nothing from `src/ac3`.
 The two codecs stand on libraries that know no codec: `src/base` (bit I/O, the speaker
 vocabulary, the CPU probe), `src/arithmetic` (header-only: `Fixed32`, the project's own float
 functions and the SIMD seam; it is not installed), `src/dsp` (the transforms more than one
@@ -127,13 +127,13 @@ is in `src/ac3/include/iclforge/ac3/decoder/`, `iclforge/render/layout.hpp` in
 `src/render/include/iclforge/render/`. A library includes headers only of the libraries its row of
 `layering.json` lists. `base`, `dsp`, `objects`, `render` and `iec61937` list no codec, nor do the
 containers (`matroska`, `mp4`, `mpegts`, `iamf`) and the readers (`adm`, `iab`): none of them knows
-AC-3, E-AC-3 or Atmos exist, and they should stay that way. The AC-4 libraries list none of
-`ac3`'s: a separate codec that shares no bitstream syntax with it. `ac4core` is the static library
-the decoder and the encoder share, and has no public headers.
+AC-3, E-AC-3 or Atmos exist, and they should stay that way. The AC-4 library lists none of
+`ac3`'s: a separate codec that shares no bitstream syntax with it. Its core (`src/ac4/src/core`) is
+what the decoder and the encoder share, and has no public headers.
 
 The one deliberate exception to the header root is `capi`: it installs under
 `include/iclforge_c/`, not `iclforge/`, even though it depends on the codecs directly (it wraps
-`iclforge::ac3_static` and the AC-4 libraries). The `iclforge/` tree is C++; `capi` is a C-callable
+`iclforge::ac3_static` and the AC-4 library). The `iclforge/` tree is C++; `capi` is a C-callable
 surface, and a C or non-C++ consumer has no reason to see, or accidentally `#include`, a C++
 header.
 

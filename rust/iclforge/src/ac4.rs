@@ -8,7 +8,7 @@
 //! loudness/DRC/downmix/dialogue-enhancement metadata groups, multi-substream/
 //! multi-presentation configurations, EMDF payloads and the `drc_gains` and
 //! `three_zero` experimental flags are not exposed here either - a caller who
-//! needs them links `ac4enc`/`ac4dec` directly instead of through this crate.
+//! needs them links `iclforge::ac4` directly instead of through this crate.
 //!
 //! Present only when the linked `iclforge_c` was built with `ICLFORGE_BUILD_AC4`
 //! on (the default) - `iclforge-sys`'s bindgen output simply has no

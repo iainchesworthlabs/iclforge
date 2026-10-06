@@ -133,7 +133,7 @@ class AjccStage {
     // b_5fronts' modules take the first nine and twelve. The modules are the two sides (left and
     // right), or the four of b_5fronts' full decoding; its core's two take the front and back
     // framings' coefficients of one side, and the other two entries are not used there.
-    // ac4core's acpl::ParamPrev/ParamSets stay double (see pcm/acpl.hpp's own
+    // The core's acpl::ParamPrev/ParamSets stay double (see pcm/acpl.hpp's own
     // comment on acpl::interpolate() not being retemplated); ajcc::accumulate,
     // unlike acpl::interpolate, is templated on Real, so interp_ (its double
     // output) is narrowed once into interp_real_ before that call.
@@ -143,7 +143,7 @@ class AjccStage {
 
     // Scratch, sized once: the five inputs times (2 + 1/sqrt 2) but C's, the
     // two pre-modified ones, a module's decorrelated inputs, and one
-    // interpolated coefficient in ac4core's double and narrowed to Real.
+    // interpolated coefficient in the core's double and narrowed to Real.
     std::array<std::vector<QmfValue>, 4> x_in_{};
     std::array<std::vector<QmfValue>, 2> w_in_{};
     std::array<std::vector<QmfValue>, 3> y_{};

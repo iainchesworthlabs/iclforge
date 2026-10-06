@@ -580,7 +580,7 @@ constexpr int kPollMs = 60;
     // Gates the Media page's own "Immersive" card - A-JOC's own object
     // metadata is read only far enough to say how the substream folds down
     // (describe_group_substream() above), not to reconstruct objects; a
-    // decoder for it does not exist in this build (ac4dec has no A-JOC
+    // decoder for it does not exist in this build (the AC-4 decoder has no A-JOC
     // support), so the card can only say the layer is present, honestly, not
     // describe what is in it.
     map[QStringLiteral("hasAjoc")] = has_ajoc;

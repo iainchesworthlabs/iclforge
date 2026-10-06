@@ -207,7 +207,7 @@ Quality is measured, not asserted, and checked six independent ways — a normat
 decoder, FFmpeg as an external oracle, independent Python transcriptions of the spec, Dolby's own
 tooling, fuzzing in both directions, and an encoder/decoder mirror self-check — all
 platform-independent, since every coding decision Forge or Crucible makes is a call into
-`iclforge::ac3`, or into the AC-4 libraries for AC-4. What each check reaches and where it runs out:
+`iclforge::ac3`, or into the AC-4 library for AC-4. What each check reaches and where it runs out:
 [Validation](docs/verification.md). AC-4 is checked against Dolby Encoding Engine's streams,
 MediaInfo's readings, librempeg's decoder and a second transcription of its syntax:
 [Validation: AC-4](docs/verification.md#ac-4).
@@ -244,12 +244,9 @@ src/render/     iclforge::render — the room's layout, routing, the bed and obj
                 panner; links no codec
 src/iec61937/   iclforge::iec61937 — IEC 61937 burst packing and detection for AC-3, E-AC-3 and AC-4
 src/ac3/        iclforge::ac3 — the AC-3, E-AC-3 and Atmos codec, GUI-free
-src/ac4/        iclforge::ac4 — a standalone AC-4 sync frame/TOC/presentation/substream inspector
-src/ac4/src/decoder/     iclforge::ac4 — an AC-4 decoder, from ETSI TS 103 190-1 and -2; no iclforge::ac3
-                dependency
-src/ac4/src/encoder/     iclforge::ac4 — an AC-4 encoder, from the same standards; no iclforge::ac3 dependency
-src/ac4/src/core/    iclforge::ac4 — the tables and transforms the AC-4 decoder and encoder share, a static
-                library with no headers of its own
+src/ac4/        iclforge::ac4 — the AC-4 codec, from ETSI TS 103 190-1 and -2: the sync frame, TOC and
+                presentation inspector, the decoder and the encoder, laid out as src/ac3 is (core/,
+                io/, decoder/, encoder/); no iclforge::ac3 dependency
 src/matroska/   iclforge::matroska — a standalone MKV muxer, no iclforge::ac3 dependency
 src/mp4/        iclforge::mp4 — a standalone MP4/ISOBMFF muxer plus fMP4/CMAF + HLS/DASH, no iclforge::ac3 dependency
 src/mpegts/     iclforge::mpegts — a standalone MPEG-2 Transport Stream muxer, no iclforge::ac3 dependency

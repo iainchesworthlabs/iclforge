@@ -14,7 +14,7 @@
 # iclforge::matroska, iclforge::mp4 and iclforge::mpegts are all optional components, off-able via
 # their own ICLFORGE_BUILD_MATROSKA/ICLFORGE_BUILD_MP4/ICLFORGE_BUILD_MPEGTS option (root
 # CMakeLists.txt) - each its own ICLFORGE_BUILD_<NAME> option, its own guarded
-# add_subdirectory(), and its own guarded block below, as are iclforge::c, the AC-4 libraries,
+# add_subdirectory(), and its own guarded block below, as are iclforge::c, the AC-4 library,
 # iclforge::iab and iclforge::iamf. Each maps 1:1 onto its own vcpkg feature
 # (packaging/vcpkg-port/iclforge/vcpkg.json's "matroska"/"mp4"/"mpegts"/"capi"/"ac4"/"iab"/
 # "iamf", wired through portfile.cmake's vcpkg_check_features()) and its own Conan option
@@ -169,7 +169,7 @@ iclforge_install_library(signing
     DESCRIPTION "EMDF Atmos object-signing tag for iclforge"
     REQUIRES iclforge-ac3)
 
-# The optional components below (iclforge::matroska, mp4, mpegts, iab, iamf, the AC-4 libraries,
+# The optional components below (iclforge::matroska, mp4, mpegts, iab, iamf, the AC-4 library,
 # adm and admbridge, and iclforge::c) each have their own ICLFORGE_BUILD_<NAME> option (root
 # CMakeLists.txt) and their own guarded block here, and the vcpkg port's and the Conan recipe's
 # features of the same names switch them (packaging/). Their targets, headers and export sets only
@@ -218,51 +218,15 @@ if(ICLFORGE_BUILD_IAMF)
         DESCRIPTION "IAMF v1.1.0 OBU / ISO-BMFF writer")
 endif()
 
-# The AC-4 inspector (src/ac4, iclforge::ac4), the AC-4 decoder (src/ac4/src/decoder, iclforge::ac4) and the
-# AC-4 encoder (src/ac4/src/encoder, iclforge::ac4) are optional components under one switch,
-# ICLFORGE_BUILD_AC4 (see the root CMakeLists.txt), with the core the decoder and the encoder link
-# (src/ac4/src/core, iclforge::ac4). The four share one export set, ac4Targets, installed below, each
-# with its own install() and its own .pc file - the pairing tools/checks/check_packaging_versions.sh
-# counts. The core is exported as core (src/ac4/CMakeLists.txt).
-#
-# The core is a static archive of hidden symbols with no headers and no ABI of its own. The
-# static decoder's and encoder's archives call into it without containing it, so it is installed
-# wherever either archive is and named by their exported targets as a link-only dependency; the
-# shared libraries carry the part of it that each uses, and a shared-only install has no core. The
-# decoder's and the encoder's .pc files require the inspector's (each header includes the
-# inspector's, and each library links the inspector of its own kind), and their archives call into
-# the core's, which only a static-only install names (iclforge_install_pkgconfig()). The vcpkg
-# port's "ac4" feature and the Conan recipe's "ac4" option switch all four, off unless asked for
-# (packaging/): each adds public targets, which a curated vcpkg port's default features may not.
+# The AC-4 codec (src/ac4, iclforge::ac4: the inspector, the decoder and the encoder, one library)
+# is an optional component, ICLFORGE_BUILD_AC4 (see the root CMakeLists.txt). The vcpkg port's
+# "ac4" feature and the Conan recipe's "ac4" option switch it, off unless asked for (packaging/): it
+# adds public targets, which a curated vcpkg port's default features may not. The tables and the
+# transforms the decoder and the encoder share are inside it, with hidden symbols and private
+# headers, so nothing else is installed for them.
 if(ICLFORGE_BUILD_AC4)
-    iclforge_install_library(ac4 EXPORT_SET ac4Targets
-        DESCRIPTION "AC-4 (ETSI TS 103 190) sync frame, table of contents and presentation reader")
-    iclforge_install_library(ac4dec EXPORT_SET ac4Targets
-        DESCRIPTION "AC-4 decoder (ETSI TS 103 190-1 and TS 103 190-2)"
-        STATIC_REQUIRES iclforge-ac4core)
-    iclforge_install_library(ac4enc EXPORT_SET ac4Targets
-        DESCRIPTION "AC-4 encoder (ETSI TS 103 190-1 and TS 103 190-2)"
-        STATIC_REQUIRES iclforge-ac4core)
-
-    get_property(_iclforge_ac4dec_install_targets GLOBAL PROPERTY ICLFORGE_INSTALL_TARGETS_ac4dec)
-    get_property(_iclforge_ac4enc_install_targets GLOBAL PROPERTY ICLFORGE_INSTALL_TARGETS_ac4enc)
-    if("iclforge_ac4_static" IN_LIST _iclforge_ac4dec_install_targets OR
-       "iclforge_ac4_static" IN_LIST _iclforge_ac4enc_install_targets)
-        install(TARGETS iclforge_ac4core
-            EXPORT ac4Targets
-            ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT library)
-
-        iclforge_install_pkgconfig(
-            NAME iclforge-ac4core
-            DESCRIPTION "The tables and transforms libac4dec_static.a and libac4enc_static.a link (no headers)"
-            LIBNAME iclforge_ac4core_static)
-    endif()
-
-    install(EXPORT ac4Targets
-        FILE ac4Targets.cmake
-        NAMESPACE iclforge::
-        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/iclforge"
-        COMPONENT library)
+    iclforge_install_library(ac4
+        DESCRIPTION "AC-4 (ETSI TS 103 190-1 and TS 103 190-2) inspector, decoder and encoder")
 endif()
 
 # iclforge::c is an optional component (ICLFORGE_BUILD_CAPI, see the root CMakeLists.txt). Roadmap
@@ -283,7 +247,7 @@ if(ICLFORGE_BUILD_CAPI)
     if(ICLFORGE_BUILD_AC4)
         set(_iclforge_capi_pc_description
             "Stable C11 API over the AC-3, E-AC-3 and AC-4 encoders and decoders")
-        set(_iclforge_capi_pc_static_requires iclforge-ac3 iclforge-ac4 iclforge-ac4)
+        set(_iclforge_capi_pc_static_requires iclforge-ac3 iclforge-ac4)
     else()
         set(_iclforge_capi_pc_description
             "Stable C11 API over the AC-3 and E-AC-3 encoders and decoders")

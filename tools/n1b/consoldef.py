@@ -194,7 +194,8 @@ STAGES = {"c1": c1_new, "c2": c2_new, "c3": c3_new}
 REMOVED = {"c1": C1_REMOVED, "c2": C2_REMOVED, "c3": C3_REMOVED}
 
 # The libraries each stage merges, old -> new: what a target, an export macro, an export header, a
-# pkg-config name or an ABI allowlist follows (consol_apply.py, export_diff.py --map, abi_compare.py).
+# pkg-config name or an ABI allowlist follows (consol_apply.py, export_diff.py --map,
+# abi_compare.py).
 LIBRARY_MAP = {
     "c1": {"ac4": "ac4", "ac4core": "ac4", "ac4dec": "ac4", "ac4enc": "ac4"},
     "c2": {"arithmetic": "base", "admbridge": "adm", "signing": "ac3"},

@@ -1,8 +1,8 @@
 """AC-4 opt-in by build configuration (planning/ac4.md, phases D8 and I4).
 
-ICLFORGE_BUILD_AC4 is on by default, and the AC-4 libraries (src/ac4,
-src/ac4) are part of the default target. D8 found three builds that
-linked none of them and turned the option off there instead of compiling all four
+ICLFORGE_BUILD_AC4 is on by default, and the AC-4 library (src/ac4, one library since
+planning/consolidation.md's C1) is part of the default target. D8 found three builds that
+linked none of it and turned the option off there instead of compiling it
 for nothing: the Android app's CMake wrapper, the WebAssembly preset and the Python
 wheel. Phase I4 binds AC-4 into the C API, Python, Rust and WebAssembly:
 
@@ -34,6 +34,8 @@ ROOT = Path(__file__).resolve().parents[2]
 ANDROID = ROOT / "apps" / "android" / "app" / "src" / "main" / "cpp" / "CMakeLists.txt"
 ROOT_CMAKE = ROOT / "CMakeLists.txt"
 BAREMETAL_CMAKE = ROOT / "apps" / "baremetal" / "CMakeLists.txt"
+AC4_CMAKE = ROOT / "src" / "ac4" / "CMakeLists.txt"
+AC4_MINIMAL = ROOT / "src" / "ac4" / "minimal.cmake"
 WASM_CMAKE = ROOT / "apps" / "wasm" / "CMakeLists.txt"
 PYTHON_CMAKE = ROOT / "python" / "CMakeLists.txt"
 PRESETS = ROOT / "CMakePresets.json"
@@ -128,11 +130,17 @@ class Ac4BuildConfigurations(unittest.TestCase):
         text = ROOT_CMAKE.read_text(encoding="utf-8")
         self.assertIn("option(ICLFORGE_MINIMAL_AC4", text)
         self.assertIn("if(ICLFORGE_MINIMAL_AC4 AND NOT ICLFORGE_MINIMAL_DECODER)", text)
-        # The profile's branch builds the inspector, the core and the decoder, and no encoder.
-        branch = text.split("elseif(ICLFORGE_MINIMAL_AC4)", 1)[1].split("\nendif()", 1)[0]
-        for directory in ("src/ac4", "src/ac4/src/core", "src/ac4/src/decoder"):
-            self.assertIn(f"add_subdirectory({directory})", branch)
-        self.assertNotIn("src/ac4/src/encoder", branch)
+        self.assertIn(
+            "if(ICLFORGE_BUILD_AC4 OR ICLFORGE_MINIMAL_AC4)\n    add_subdirectory(src/ac4)", text
+        )
+        # The profile's archive is the inspector, the core and the decoder, and no encoder.
+        library = AC4_CMAKE.read_text(encoding="utf-8")
+        self.assertIn('include("${CMAKE_CURRENT_SOURCE_DIR}/minimal.cmake")', library)
+        minimal = AC4_MINIMAL.read_text(encoding="utf-8")
+        for sources in ("_ac4_decoder_sources", "_ac4_inspector_sources", "_ac4_kernel_sources"):
+            self.assertIn(f"${{{sources}}}", minimal)
+        self.assertNotIn("_ac4_encoder_sources", minimal)
+        self.assertNotIn("src/encoder", minimal)
 
     def test_baremetal_ac4_probe_links_the_decoder_and_nothing_of_the_encoder(self):
         text = BAREMETAL_CMAKE.read_text(encoding="utf-8")

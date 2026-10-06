@@ -1,9 +1,9 @@
 # AC-4 (ETSI TS 103 190): `iclforge::ac4`
 
-`iclforge/ac4/decoder/decoder.hpp`, library `iclforge::ac4`, and `iclforge/ac4/encoder/encoder.hpp`, library `iclforge::ac4`,
-with the inspector both work through, `iclforge/ac4/core/toc.hpp` in library `iclforge::ac4`. An AC-4 decoder and
+`iclforge/ac4/decoder/decoder.hpp` and `iclforge/ac4/encoder/encoder.hpp`, with the table of contents
+both work through, `iclforge/ac4/core/toc.hpp`, all in the library `iclforge::ac4`. An AC-4 decoder and
 encoder written from ETSI TS 103 190-1 V1.4.1 (channel-based coding) and TS 103 190-2 V1.3.1
-(immersive and personalized audio). The libraries are in namespace `ac4` and link nothing from
+(immersive and personalized audio). The library is in namespace `iclforge::ac4` and links nothing from
 `iclforge::ac3`: AC-4 shares no bitstream syntax with AC-3 or E-AC-3. The encoder is described under
 [Encoding a stream](#encoding-a-stream), and the [AC-4 concepts page](../concepts/ac4.md)
 explains the format.
@@ -468,8 +468,7 @@ namespace tells them apart. A decoder or an encoder that refuses says why in wor
 **In-tree:**
 
 ```cmake
-target_link_libraries(your_target PRIVATE iclforge::ac4)   # brings iclforge::ac4 with it
-target_link_libraries(your_target PRIVATE iclforge::ac4)   # likewise
+target_link_libraries(your_target PRIVATE iclforge::ac4)
 ```
 
 **Installed package** (`find_package(iclforge)`, see [Using the libraries](index.md)):
@@ -477,29 +476,24 @@ target_link_libraries(your_target PRIVATE iclforge::ac4)   # likewise
 ```cmake
 find_package(iclforge REQUIRED)
 target_link_libraries(your_target PRIVATE iclforge::ac4_static)   # or iclforge::ac4_shared
-target_link_libraries(your_target PRIVATE iclforge::ac4_static)   # or iclforge::ac4_shared
 ```
 
-Each decoder and encoder library links the inspector of its own kind, `iclforge::ac4_static` or
-`iclforge::ac4_shared`. A package installed with one linkage, as a vcpkg or Conan one is, also defines
-the bare `iclforge::ac4`. The static decoder and encoder call into
-`iclforge::ac4`, a static archive of the tables and transforms the two share (`libac4core_static.a`,
-no headers), which their exported targets name as a link-only dependency; each shared library
-carries the part of it that it uses. Through pkg-config the decoder is `ac4dec` and the encoder
-`ac4enc`, each of which requires `ac4`, and whose static-only forms require `ac4core` privately:
+The inspector, the decoder and the encoder are one library, and the tables and transforms the
+decoder and the encoder share are inside it, with private headers. A package installed with one
+linkage, as a vcpkg or Conan one is, also defines the bare `iclforge::ac4`. Through pkg-config it is
+`iclforge-ac4`:
 
 ```bash
-c++ -std=c++23 player.cpp $(pkg-config --cflags --libs ac4dec)
-c++ -std=c++23 packager.cpp $(pkg-config --cflags --libs ac4enc)
+c++ -std=c++23 player.cpp $(pkg-config --cflags --libs iclforge-ac4)
 ```
 
-`ICLFORGE_BUILD_AC4`, on by default, builds the AC-4 libraries. The vcpkg port and the Conan
-recipe install them where asked for, off by default: `vcpkg install iclforge[ac4]`, or
+`ICLFORGE_BUILD_AC4`, on by default, builds the AC-4 library. The vcpkg port and the Conan
+recipe install it where asked for, off by default: `vcpkg install iclforge[ac4]`, or
 `-o "iclforge/*:ac4=True"` (see [Using the libraries](index.md)). The C API, Python, Rust and
 WebAssembly bindings wrap the decoder and the encoder, the object encoder included ([C
 API](c-api.md#ac-4), [Python API](python-api.md#ac-4), [Rust API](rust-api.md#ac-4) and
-[WebAssembly](../platforms/wasm.md#ac-4-module)). Android's CMake build compiles the libraries and
-links them into nothing in the app. The ESP-IDF component builds the inspector, core and decoder
+[WebAssembly](../platforms/wasm.md#ac-4-module)). Android's CMake build compiles the library and
+links it into nothing in the app. The ESP-IDF component builds the inspector, core and decoder
 behind `CONFIG_ICLFORGE_AC4`, off by default, in single precision on parts with a floating-point
 unit and in the fixed-point tier on the ESP32-C3 and ESP32-C6, and never the encoder
 ([ESP32-P4](../platforms/bare-metal/esp32-p4.md#ac-4), [ESP32-S3](../platforms/bare-metal/esp32-s3.md#ac-4),

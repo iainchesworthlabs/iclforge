@@ -26,7 +26,7 @@ STAGED_TREES below for what that means and where it stops.
 archive, which is the only check that actually establishes the thing this script
 is for. Needs an exported IDF environment; without one it says so and stops.
 
---with-ac4 also stages the AC-4 inspector, core and decoder, for a project that
+--with-ac4 also stages the AC-4 library without its encoder, for a project that
 turns on CONFIG_ICLFORGE_AC4 (planning/ac4.md, D14b). Without it the archive is
 what it was before that option existed: the option is off by default, and a
 project that turns it on against an archive packed without the AC-4 sources is
@@ -66,7 +66,7 @@ STAGED_TREES = (
     "src/objects",
     "src/render",
     "src/iec61937",
-    # The header-only Fixed32 / scalar-function target src/ac3 and src/ac4/src/core
+    # The header-only Fixed32 / scalar-function target src/ac3 and src/ac4
     # both link (planning/ac4.md decision 31); the root CMakeLists.txt adds it
     # with add_subdirectory before it reaches src/ac3, so a staged tree
     # without it stops the configure with "source src/arithmetic ... is not an
@@ -75,15 +75,22 @@ STAGED_TREES = (
     "cmake",
 )
 
-# What --with-ac4 adds: the AC-4 inspector, the core both AC-4 libraries link and
-# the decoder, whole, as the trees above are. Not src/ac4/src/encoder, which no ESP32 part
-# builds (planning/ac4.md, decision 34); the root adds it only under
-# ICLFORGE_BUILD_AC4, which the component keeps off. Off by default, so an
-# archive packed without the flag holds exactly the trees it always did.
-STAGED_AC4_TREES = (
-    "src/ac4",
-    "src/ac4/src/core",
-    "src/ac4/src/decoder",
+# What --with-ac4 adds: the AC-4 library, whose minimum-footprint archive
+# (src/ac4/minimal.cmake) is the inspector, the core and the decoder. Not the
+# encoder, which no ESP32 part builds (planning/ac4.md, decision 34) and which
+# the profile compiles none of: AC4_PRUNE drops its files from the staged
+# copy. Off by default, so an archive packed without the flag holds exactly the
+# trees it always did.
+STAGED_AC4_TREES = ("src/ac4",)
+
+# The encoder's files, which the profile's archive does not list, dropped from
+# an archive packed --with-ac4. Directories as well as files; a stale entry
+# stops the pack, as PRUNE's does.
+AC4_PRUNE = (
+    "src/ac4/include/iclforge/ac4/encoder",
+    "src/ac4/src/encoder",
+    "src/ac4/src/core/bit_writer.cpp",
+    "src/ac4/src/core/bit_writer.hpp",
 )
 
 # Individual files the root build needs before it reaches src/ac3.
@@ -139,6 +146,15 @@ def stage(destination: pathlib.Path, with_ac4: bool = False) -> None:
             raise SystemExit(f"missing staged file: {src}")
         (library).mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, library / name)
+
+    for relative in AC4_PRUNE if with_ac4 else ():
+        target = library / relative
+        if target.is_dir():
+            shutil.rmtree(target)
+        elif target.is_file():
+            target.unlink()
+        else:
+            raise SystemExit(f"prune list is stale, no such file or directory: {relative}")
 
     for relative in PRUNE:
         target = library / relative

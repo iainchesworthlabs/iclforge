@@ -315,7 +315,8 @@ def record_symbols(build: Path) -> dict:
 # exports is the symbols record's business.
 INSTALL_TEXT_EXT = {".cmake", ".pc", ".hpp", ".h", ".in", ".inl", ".ipp", ".txt", ".md", ".json"}
 GIT_STAMP = re.compile(
-    r"^(inline constexpr [\w:]+ git_(?:commit|commit_full|describe|branch|dirty|commits_since_tag) = ).*$",
+    r"^(inline constexpr [\w:]+ "
+    r"git_(?:commit|commit_full|describe|branch|dirty|commits_since_tag) = ).*$",
     re.MULTILINE,
 )
 

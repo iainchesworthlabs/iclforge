@@ -21,8 +21,8 @@ Use this page to link the C++ library. Other interfaces are documented under the
 Every library has its own header directory, `src/<name>/include/iclforge/<name>/`, spelled
 `iclforge/<name>/...` in an `#include`; the [header map](header-map.md) lists what is where. The
 main codec headers are under `src/ac3/include/iclforge/ac3/`, and the AC-4 headers under
-`src/ac4/include/iclforge/ac4/`, `src/ac4/include/iclforge/ac4/decoder/` and
-`src/ac4/include/iclforge/ac4/encoder/`.
+`src/ac4/include/iclforge/ac4/`, by area as AC-3's are: `core/` (the table of contents), `io/`
+(the elementary stream and the carriage), `decoder/` and `encoder/`.
 
 | CMake target | Purpose |
 |---|---|
@@ -36,9 +36,7 @@ main codec headers are under `src/ac3/include/iclforge/ac3/`, and the AC-4 heade
 | `iclforge::iamf` | IAMF reading and writing, as OBUs, ISO-BMFF and fragments; see [IAMF](iamf.md) |
 | `iclforge::adm` | ADM/BW64 reading and writing; opt-in with `ICLFORGE_BUILD_ADM=ON` |
 | `iclforge::admbridge` | Mapping between ADM objects and the Atmos encoder or decoder |
-| `iclforge::ac4` | AC-4 decoding; see [AC-4](ac4.md) |
-| `iclforge::ac4` | AC-4 encoding; see [AC-4](ac4.md#encoding-a-stream) |
-| `iclforge::ac4` | AC-4 sync frames, table of contents and presentations, which the decoder reads through and the encoder describes its streams with |
+| `iclforge::ac4` | AC-4 decoding and encoding, and the sync frames, table of contents and presentations both work through; see [AC-4](ac4.md) |
 
 `iclforge::adm` and `iclforge::admbridge` need the root dependency manifest's `adm` feature
 (`-DVCPKG_MANIFEST_FEATURES=adm`) when building this repository with vcpkg, and are installed as
@@ -46,11 +44,9 @@ shared libraries. The packaged `iclforge` port has no `adm` feature and does not
 target. Their [ADM](adm.md) and [ADM bridge](adm-bridge.md) pages explain the dependency and
 linkage details.
 
-The AC-4 libraries are installed and exported as one set: `iclforge::ac4_static` and
-`iclforge::ac4_shared`, and `iclforge::ac4_static` and `iclforge::ac4_shared`, each linking
-`iclforge::ac4_static` or `iclforge::ac4_shared`. The static decoder and encoder call into
-`iclforge::ac4`, an archive with no headers that their exported targets name as a link-only
-dependency; [AC-4](ac4.md#linking) has the detail.
+The AC-4 library is installed and exported as `iclforge::ac4_static` and `iclforge::ac4_shared`;
+the tables and transforms its decoder and encoder share are inside it, with no headers of their own
+([AC-4](ac4.md#linking) has the detail).
 
 `iclforge::arithmetic` (header-only) is built in-tree and not installed; `iclforge::audio` and
 `iclforge::sendspin` are not installed either (see the end of this page).
@@ -169,7 +165,7 @@ one.
 **pkg-config.** Every installed library also gets its own `.pc` file,
 `${libdir}/pkgconfig/iclforge-<name>.pc` (`iclforge-base`, `-dsp`, `-objects`, `-render`,
 `-iec61937`, `-ac3`, `-signing`, `-matroska`, `-mp4`, `-mpegts`, `-iamf`, `-iab`, `-adm`,
-`-admbridge`, `-ac4`, `-ac4dec`, `-ac4enc`, `-ac4core` and `-c`), for a non-CMake consumer:
+`-admbridge`, `-ac4` and `-c`), for a non-CMake consumer:
 
 ```bash
 pkg-config --cflags --libs iclforge-ac3
@@ -180,8 +176,7 @@ Picks whichever linkage was actually installed (the shared name when
 one — matching what is actually on disk), and chains `Requires:` for a library that PUBLIC-
 links another (`iclforge-ac3` requires `iclforge-base`, `-dsp`, `-objects`, `-render` and
 `-iec61937`; `iclforge-signing` requires `iclforge-ac3`; `iclforge-admbridge` requires
-`iclforge-ac3` and `iclforge-adm`; `iclforge-ac4` and `iclforge-ac4` require
-`iclforge-ac4`). The `prefix=` line resolves relative to wherever the `.pc` file itself ends up
+`iclforge-ac3` and `iclforge-adm`). The `prefix=` line resolves relative to wherever the `.pc` file itself ends up
 (`pkg-config`'s own `${pcfiledir}`), so it works the same whether that's a real system install or
 an unpacked `iclforge-dev-*` archive.
 
@@ -195,24 +190,20 @@ cc consumer.c $(pkg-config --static --cflags --libs iclforge-c)
 ```
 
 `iclforge-c.pc` requires `iclforge-ac3` privately, because `libiclforge_c_static.a` calls into
-`libiclforge_ac3_static.a`, and `iclforge-ac4.pc` and `iclforge-ac4.pc` require
-`iclforge-ac4core` privately, because `libiclforge_ac4_static.a` and
-`libiclforge_ac4_static.a` call into `libiclforge_ac4core_static.a`. `iclforge-ac3.pc`,
+`libiclforge_ac3_static.a` (and `iclforge-ac4` where the C API carries AC-4). `iclforge-ac3.pc`,
 `iclforge-matroska.pc`, `iclforge-mp4.pc`, `iclforge-mpegts.pc`, `iclforge-iamf.pc`,
-`iclforge-iab.pc`, `iclforge-ac4.pc` and `iclforge-ac4core.pc` list the C++ runtime and libm in
+`iclforge-iab.pc` and `iclforge-ac4.pc` list the C++ runtime and libm in
 `Libs.private`. A C compiler does not link them by itself, and a C++ compiler does. The names are
 the ones CMake recorded for the compiler that built the archives: `-lstdc++ -lm` with libstdc++
-and `-lc++ -lm` with libc++ on Linux. `iclforge-signing.pc` gets them through `iclforge-ac3`, and
-`iclforge-ac4.pc` and `iclforge-ac4.pc` through `iclforge-ac4` and `iclforge-ac4core`. A
+and `-lc++ -lm` with libc++ on Linux. `iclforge-signing.pc` gets them through `iclforge-ac3`. A
 `.pc` that names a shared library has neither field: the library records what it needs, and
 `libiclforge_c.so` holds its own copy of the codec, so it does not pull in `libiclforge_ac3.so`.
 An install with both linkages, such as the `iclforge-dev-*` packages, names the shared libraries,
 and `--static` does not switch to the archives, so name them yourself: `-liclforge_c_static`,
 then the `_static` archive of each library its `Requires` chain names, a library before the ones
 it uses (`iclforge_ac3_static`, `iclforge_render_static`, `iclforge_objects_static`,
-`iclforge_dsp_static`, `iclforge_base_static` and `iclforge_iec61937_static`; a build with the
-AC-4 libraries adds `iclforge_ac4_static`, `iclforge_ac4_static`, `iclforge_ac4_static` and
-`iclforge_ac4core_static`), and `-lstdc++ -lm` at the end.
+`iclforge_dsp_static`, `iclforge_base_static` and `iclforge_iec61937_static`; a build with
+AC-4 adds `iclforge_ac4_static`), and `-lstdc++ -lm` at the end.
 
 Live audio — capture, monitor playback, IEC 61937 passthrough — is `iclforge::audio`
 (`src/audio/`), a separate target `forge`/`forge-gui` link alongside `iclforge::ac3` for their own
@@ -254,8 +245,8 @@ re-synced by hand and can drift. Each page's "Full program" link is the canonica
 - [IAMF](iamf.md) — `iclforge::iamf`, a standalone reader and writer: a decoded 7.1.4 programme
   re-wrapped as a channel-based IAMF Audio Element, object-based Audio Elements with animated
   positions, ISO-BMFF, raw OBU streams and fragments (on by default).
-- [AC-4](ac4.md) — `iclforge::ac4` and the inspector both work through,
-  `iclforge::ac4`: the decoder's controls, the choice of presentation and what the decoder reports; the
+- [AC-4](ac4.md) — `iclforge::ac4`, the decoder, the encoder and the inspector both work through:
+  the decoder's controls, the choice of presentation and what the decoder reports; the
   encoder's configuration, substreams and presentations; and linking (on by default).
 - [Measuring quality](quality.md) — `iclforge::ac3::quality`, the decoded-domain distortion measure and the
   tonality/masking model the encoder's decision search is judged on.
@@ -288,7 +279,7 @@ libraries do the same with `iclforge::ac4::Error`, `iclforge::ac4::DecodeError` 
 
 **Namespaces follow the libraries.** Everything is under `iclforge::`, and a library's public
 headers declare into the namespace named for it: `iclforge::ac3` for the AC-3, E-AC-3 and Atmos
-codec, `iclforge::ac4` for the four AC-4 libraries, and `iclforge::mp4`, `iclforge::matroska`,
+codec, `iclforge::ac4` for the AC-4 codec, and `iclforge::mp4`, `iclforge::matroska`,
 `iclforge::mpegts`, `iclforge::iamf`, `iclforge::iab` and `iclforge::adm` for the containers and
 the readers, which know nothing about AC-3, E-AC-3 or Atmos: they take frames as opaque bytes. The
 codec's sub-namespaces keep their names under its own: `iclforge::ac3::eac3`, `iclforge::ac3::oba`,

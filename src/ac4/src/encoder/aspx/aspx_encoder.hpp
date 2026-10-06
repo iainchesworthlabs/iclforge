@@ -40,7 +40,7 @@
 
 namespace iclforge::ac4::detail {
 
-// ac4core's own complex type: see pcm/aspx.hpp's QmfValue, the decoder's
+// The core's own complex type: see pcm/aspx.hpp's QmfValue, the decoder's
 // identical seam.
 using QmfSample = dsp::Complex<double>;
 

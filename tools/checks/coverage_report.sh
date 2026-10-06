@@ -145,6 +145,10 @@ fi
 # passthrough instantiations only run against a card. src/sendspin and
 # apps/hearth now have a real measurement behind their floors.
 #
+# AC-4 is one library since planning/consolidation.md's C1: the inspector's floor was 93/88 and the
+# decoder's and the core's 88/80, and the encoder, now among its files, was not measured. Until a
+# coverage run measures the merged library, it takes the lowest of the three.
+#
 # apps/crucible/engine is the platform-free engine core iclforge-tests compiles in;
 # the rest of apps/crucible keeps its own floors in coverage_crucible.ps1.
 components="
@@ -163,9 +167,7 @@ src/capi              84 74
 src/adm            82 75
 src/admbridge         88 78
 src/sendspin          85 74
-src/ac4               93 88
-src/ac4/src/decoder            88 80
-src/ac4/src/core           88 80
+src/ac4               88 80
 src/iab            90 87
 src/iamf              91 90
 apps/cli              80 71
@@ -214,7 +216,7 @@ html="$build_dir/coverage.html"
 # but it made the DSP-heavy cases 2-6x slower (the ten-minute playout case
 # 4.9 s -> 30.8 s), so the flag stays.
 gcovr --root . \
-    --filter 'src/(ac3|base|dsp|objects|render|iec61937|audio|signing|matroska|mp4|mpegts|capi|adm|admbridge|sendspin|ac4|ac4core|ac4dec|iab|iamf)/.*' \
+    --filter 'src/(ac3|base|dsp|objects|render|iec61937|audio|signing|matroska|mp4|mpegts|capi|adm|admbridge|sendspin|ac4|iab|iamf)/.*' \
     --filter 'apps/cli/.*' \
     --filter 'apps/common/.*' \
     --filter 'apps/crucible/engine/.*' \

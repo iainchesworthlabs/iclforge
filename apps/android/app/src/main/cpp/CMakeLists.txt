@@ -54,7 +54,7 @@ set(ICLFORGE_BUILD_HEARTH OFF CACHE BOOL "" FORCE)
 # iclforge_capi_objects/iclforge_c_static/iclforge_c_shared into every Shield build for nothing.
 set(ICLFORGE_BUILD_CAPI OFF CACHE BOOL "" FORCE)
 
-# The AC-4 libraries (src/ac4) build at the root
+# The AC-4 library (src/ac4) builds at the root
 # CMakeLists.txt's own default (ON, plan phase I4): unlike Hearth above, they depend on
 # nothing outside this tree (packaging/vcpkg-port/iclforge/vcpkg.json's "ac4" feature says
 # the same - "depends on nothing in iclforge::ac3"), so they cross-compile under the NDK with no
