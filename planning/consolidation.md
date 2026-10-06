@@ -1,6 +1,6 @@
 # One shape for every codec, and fewer libraries (a proposal)
 
-!!! note "Status as of 2026-10-06: C0 and C1 run and proved; C2 and C3 wait on the user; decisions 1 to 5, 7 and 10 taken"
+!!! note "Status as of 2026-10-06: C0 and C1 run and proved; C2 and C3 under way; decisions 1 to 5, 7, 10 and 11 taken"
     Asked for by the user on 2026-10-06: "the AC3 codec and the AC4 codec structures are completely
     different. There's also duplication from inside codecs to common stuff", "the ac3 approach is the
     preferred approach", and "should there be 25 libraries? Is it worth consolidating some?". This page
@@ -9,8 +9,8 @@
     later ([layout.md (j)](layout.md#j-what-stays-out-and-follow-on-ideas)). The user took decisions 1 to 5
     below on 2026-10-06, and 7 and 10 before C1; 6, 8 and 9 are open. C0 and C1 ran on the local
     branches `chore/src-consolidation-c0` and `-c1` and changed nothing a build outputs; C1's cut moves
-    the instruction counts of the bare-metal AC-4 probe by up to 68 parts per million, which the user is
-    asked about before C2 ([what the runs found](#what-the-runs-found-that-the-plan-did-not)); nothing
+    the instruction counts of the bare-metal AC-4 probe by up to 68 parts per million, which the user
+    accepted (decision 11) ([what the runs found](#what-the-runs-found-that-the-plan-did-not)); nothing
     is pushed.
 
 ## In brief
@@ -534,9 +534,9 @@ the fixes the proof found (below). 45 commits in all, with this page's and `tool
   their seeds clean. The ESP-IDF packer's `stage()` stages the same files outside AC-4 and AC-4's
   decoder without the encoder (477 files become 483: the headers by area, the cut's units).
 
-The bare-metal difference is the one the user is asked about before C2: the plan said C1 changes no
-output byte, and it does not, but its cut changes the code GCC makes of the inspector's unit, which
-the instruction counts and the image size see.
+The bare-metal difference is the one the user was asked about before C2 (decision 11, accepted): the
+plan said C1 changes no output byte, and it does not, but its cut changes the code GCC makes of the
+inspector's unit, which the instruction counts and the image size see.
 
 Hazards the plan did not name:
 
@@ -587,6 +587,9 @@ the lowest of the three it replaces rather than a measurement.
     directly to src structure so move/consolidate/rename as necessary". `tests/golden/ac4dec/` becomes
     `tests/golden/ac4/` in C1, and a golden directory named for a library that merges follows it in C2
     and C3.
+11. **C1's bare-metal difference.** (a) accept it as the cost of the cut; (b) keep `ac4.cpp` as one
+    unit, the headers still split, so that the probes match. **Taken, after C1: (a).** And the coverage
+    floor of `src/ac4` stays the lowest of the three it replaces until a run with `gcovr` measures it.
 
 ### Open
 
