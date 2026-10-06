@@ -7,8 +7,8 @@
 #include <optional>
 #include <string_view>
 
-#include "iclforge/ac4dec/decoder.hpp"
-#include "bit_reader.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "core/bit_reader.hpp"
 
 // What a substream's syntax needs from outside the substream, and the result
 // type every syntax function returns.

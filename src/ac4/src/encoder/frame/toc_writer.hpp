@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
-#include "bit_writer.hpp"
-#include "oamd/oamd_syntax.hpp"
+#include "core/bit_writer.hpp"
+#include "encoder/oamd/oamd_syntax.hpp"
 
 // The table of contents of a raw_ac4_frame() at bitstream_version 2 (ETSI TS
 // 103 190-2 V1.3.1 clause 6.2.1), for any number of version 1 presentations

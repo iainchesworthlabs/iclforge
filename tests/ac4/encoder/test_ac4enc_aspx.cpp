@@ -19,15 +19,15 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4/syntax.hpp"
-#include "aspx/aspx_encoder.hpp"
-#include "aspx/aspx_syntax.hpp"
-#include "bit_reader.hpp"
-#include "bit_writer.hpp"
-#include "syntax/aspx.hpp"
-#include "syntax/channel_elements.hpp"
-#include "syntax/context.hpp"
-#include "iclforge/ac4core/tables/huffman_codes.hpp"
+#include "iclforge/ac4/core/syntax.hpp"
+#include "encoder/aspx/aspx_encoder.hpp"
+#include "encoder/aspx/aspx_syntax.hpp"
+#include "core/bit_reader.hpp"
+#include "core/bit_writer.hpp"
+#include "decoder/syntax/aspx.hpp"
+#include "decoder/syntax/channel_elements.hpp"
+#include "decoder/syntax/context.hpp"
+#include "core/tables/huffman_codes.hpp"
 
 namespace {
 

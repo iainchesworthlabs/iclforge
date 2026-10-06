@@ -3,8 +3,8 @@
 #include <cstddef>
 #include <vector>
 
-#include "asf/coder.hpp"
-#include "bit_writer.hpp"
+#include "encoder/asf/coder.hpp"
+#include "core/bit_writer.hpp"
 
 // Stereo processing for a channel pair coded with one sf_info() (ETSI TS 103
 // 190-1 V1.4.1 stereo_data() with b_enable_mdct_stereo_proc, Table 23, and

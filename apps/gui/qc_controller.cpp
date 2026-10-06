@@ -20,11 +20,11 @@
 #include "iclforge/ac3/meta/drc.hpp"
 #include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/ac3/meta/qc.hpp"
-#include "iclforge/ac4/elementary.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
 #include "ac4_channels.hpp"
 #include "ac4_presentations.hpp"
 #include "ac4_sync_word.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 #include "container_input.hpp"
 
 using qc_detail::RawProgramme;

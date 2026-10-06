@@ -25,7 +25,7 @@
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/routing.hpp"
 #include "iclforge/sendspin/discovery.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 #include "network_sinks.hpp"
 #include "output_selector.hpp"
 #include "pcm_sink.hpp"

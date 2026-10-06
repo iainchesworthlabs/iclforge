@@ -1,4 +1,4 @@
-#include "iclforge/ac4core/tables/huffman_tables.hpp"
+#include "core/tables/huffman_tables.hpp"
 
 #include <array>
 

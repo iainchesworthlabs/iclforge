@@ -3,7 +3,7 @@
 #include <array>
 #include <cstddef>
 
-#include "iclforge/ac4core/tables/qmf_twiddles.hpp"
+#include "core/tables/qmf_twiddles.hpp"
 
 // The constants of the QMF banks (dsp/qmf.hpp) and their 64-point transform,
 // built at compile time from tables/qmf_twiddles.hpp so that they sit in the

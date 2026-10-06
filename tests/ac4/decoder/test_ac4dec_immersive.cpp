@@ -24,17 +24,17 @@
 
 #include "ac4dec_units.hpp"
 
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4core/acpl/acpl.hpp"
-#include "iclforge/ac4core/ajcc/ajcc.hpp"
-#include "pcm/acpl.hpp"
-#include "pcm/ajcc.hpp"
-#include "pcm/immersive.hpp"
-#include "pcm/routing.hpp"
-#include "pcm/stereo.hpp"
-#include "syntax/asf.hpp"
-#include "syntax/channel_elements.hpp"
-#include "syntax/context.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "core/acpl/acpl.hpp"
+#include "core/ajcc/ajcc.hpp"
+#include "decoder/pcm/acpl.hpp"
+#include "decoder/pcm/ajcc.hpp"
+#include "decoder/pcm/immersive.hpp"
+#include "decoder/pcm/routing.hpp"
+#include "decoder/pcm/stereo.hpp"
+#include "decoder/syntax/asf.hpp"
+#include "decoder/syntax/channel_elements.hpp"
+#include "decoder/syntax/context.hpp"
 
 namespace {
 

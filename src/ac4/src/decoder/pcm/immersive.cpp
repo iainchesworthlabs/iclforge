@@ -1,12 +1,12 @@
-#include "pcm/immersive.hpp"
+#include "decoder/pcm/immersive.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <numbers>
 
-#include "iclforge/ac4core/dsp/qmf.hpp"
-#include "syntax/channel_elements.hpp"
+#include "core/dsp/qmf.hpp"
+#include "decoder/syntax/channel_elements.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

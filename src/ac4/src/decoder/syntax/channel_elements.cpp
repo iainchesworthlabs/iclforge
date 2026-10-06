@@ -1,4 +1,4 @@
-#include "syntax/channel_elements.hpp"
+#include "decoder/syntax/channel_elements.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -6,7 +6,7 @@
 #include <initializer_list>
 #include <utility>
 
-#include "iclforge/ac4core/tables/sfb_tables.hpp"
+#include "core/tables/sfb_tables.hpp"
 
 namespace iclforge::ac4::detail {
 

@@ -9,8 +9,8 @@
 #include <type_traits>
 #include <vector>
 
-#include "iclforge/ac4/toc.hpp"
-#include "iclforge/ac4dec/export.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/export.hpp"
 
 // What an AC-4 Decoder (iclforge/ac4dec/decoder.hpp) returns for a frame: the
 // decoded channels and objects, the report of what the frame carries, the blocks a
@@ -26,7 +26,7 @@ enum class DecodeError : std::uint8_t {
     kMissingIFrame,    // a non-I-frame that needs configuration no I-frame has supplied
 };
 
-[[nodiscard]] ICLFORGE_AC4DEC_EXPORT std::string_view describe(DecodeError error);
+[[nodiscard]] ICLFORGE_AC4_EXPORT std::string_view describe(DecodeError error);
 
 // What a concealed frame's decode() did, on the frame.
 enum class ConcealmentAction : std::uint8_t {
@@ -116,7 +116,7 @@ enum class Speaker : std::uint8_t {
     kCentreBack,         // Cb
 };
 
-[[nodiscard]] ICLFORGE_AC4DEC_EXPORT std::string_view describe(Speaker speaker);
+[[nodiscard]] ICLFORGE_AC4_EXPORT std::string_view describe(Speaker speaker);
 
 // --- Objects -----------------------------------------------------------------
 //

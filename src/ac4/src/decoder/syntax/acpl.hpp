@@ -3,9 +3,9 @@
 #include <array>
 #include <cstdint>
 
-#include "bit_reader.hpp"
-#include "huffman.hpp"
-#include "syntax/context.hpp"
+#include "core/bit_reader.hpp"
+#include "decoder/huffman.hpp"
+#include "decoder/syntax/context.hpp"
 
 // Advanced coupling (A-CPL) syntax: ETSI TS 103 190-1 V1.4.1 clause 4.2.13,
 // semantics 4.3.11, with the parameter band mapping of clause 5.7.7.2 (Table

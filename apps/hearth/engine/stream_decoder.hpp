@@ -20,7 +20,7 @@
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/render.hpp"
 #include "ac4_object_render.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 #include "decoder_settings.hpp"
 
 // Access units in, rendered blocks out (planning/hearth-reference-player.md,

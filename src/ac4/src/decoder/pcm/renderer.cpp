@@ -1,4 +1,4 @@
-#include "pcm/renderer.hpp"
+#include "decoder/pcm/renderer.hpp"
 
 #include <cmath>
 #include <cstddef>

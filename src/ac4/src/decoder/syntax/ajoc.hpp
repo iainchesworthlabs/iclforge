@@ -6,9 +6,9 @@
 #include <optional>
 #include <vector>
 
-#include "bit_reader.hpp"
-#include "iclforge/ac4core/huffman_codebook.hpp"
-#include "syntax/context.hpp"
+#include "core/bit_reader.hpp"
+#include "core/huffman_codebook.hpp"
+#include "decoder/syntax/context.hpp"
 
 // Advanced joint object coding's syntax, ETSI TS 103 190-2 V1.3.1 clause
 // 6.2.5 - ajoc(), ajoc_ctrl_info(), ajoc_data(), ajoc_data_point_info() and

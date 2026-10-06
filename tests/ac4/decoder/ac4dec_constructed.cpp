@@ -12,17 +12,17 @@
 #include <utility>
 
 #include "ac4dec_printed_matrices.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
-#include "acpl/acpl_syntax.hpp"
-#include "ajcc/ajcc_syntax.hpp"
-#include "asf/analysis.hpp"
-#include "asf/coder.hpp"
-#include "asf/layout.hpp"
-#include "asf/stereo.hpp"
-#include "aspx/aspx_encoder.hpp"
-#include "aspx/aspx_syntax.hpp"
-#include "bit_writer.hpp"
-#include "frame/frame_writer.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
+#include "encoder/acpl/acpl_syntax.hpp"
+#include "encoder/ajcc/ajcc_syntax.hpp"
+#include "encoder/asf/analysis.hpp"
+#include "encoder/asf/coder.hpp"
+#include "encoder/asf/layout.hpp"
+#include "encoder/asf/stereo.hpp"
+#include "encoder/aspx/aspx_encoder.hpp"
+#include "encoder/aspx/aspx_syntax.hpp"
+#include "core/bit_writer.hpp"
+#include "encoder/frame/frame_writer.hpp"
 
 namespace ac4dec_test {
 namespace {

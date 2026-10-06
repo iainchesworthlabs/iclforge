@@ -1,4 +1,4 @@
-#include "asf/psycho.hpp"
+#include "encoder/asf/psycho.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -6,8 +6,8 @@
 #include <numbers>
 #include <span>
 
-#include "iclforge/ac4core/dsp/kbd.hpp"
-#include "iclforge/ac4core/dsp/mdct.hpp"
+#include "core/dsp/kbd.hpp"
+#include "core/dsp/mdct.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

@@ -1,4 +1,4 @@
-#include "pcm/aspx.hpp"
+#include "decoder/pcm/aspx.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -6,10 +6,10 @@
 #include <memory>
 
 #include "iclforge/base/detail/profiling.hpp"
-#include "iclforge/ac4core/dsp/real_functions.hpp"
-#include "iclforge/ac4core/dsp/scalar_traits.hpp"
-#include "iclforge/ac4core/tables/qmf_tables_fixed.hpp"
-#include "iclforge/ac4core/tables/qmf_tables.hpp"
+#include "core/dsp/real_functions.hpp"
+#include "core/dsp/scalar_traits.hpp"
+#include "core/tables/qmf_tables_fixed.hpp"
+#include "core/tables/qmf_tables.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

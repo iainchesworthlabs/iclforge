@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "iclforge/ac4/export.hpp"
-#include "iclforge/ac4/toc.hpp"
+#include "iclforge/ac4/core/toc.hpp"
 
 // AC-4 in an elementary stream: Annex G.3.1's ac4_syncframe() and the walk
 // over them, whole (scan()) or as a stream arrives (SyncFrameSplitter). A sync

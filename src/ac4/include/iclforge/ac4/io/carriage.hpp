@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "iclforge/ac4/export.hpp"
-#include "iclforge/ac4/toc.hpp"
+#include "iclforge/ac4/core/toc.hpp"
 
 // AC-4 in a container or a manifest: what a muxer, a segmenter and a playlist
 // writer need of a stream, read off its parsed table of contents

@@ -45,12 +45,12 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4/toc.hpp"
-#include "ac4/ac4_toc_writer.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "ac4/core/ac4_toc_writer.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 #include "ac4dec_mux.hpp"
-#include "pcm/mixer.hpp"
+#include "decoder/pcm/mixer.hpp"
 #include "sanitized.hpp"
 
 namespace {

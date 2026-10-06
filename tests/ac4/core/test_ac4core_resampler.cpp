@@ -22,10 +22,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4core/dsp/resampler.hpp"
-#include "iclforge/ac4core/dsp/resampler_design.hpp"
-#include "iclforge/ac4core/dsp/resampler_vector.hpp"
-#include "iclforge/ac4core/dsp/scalar_traits.hpp"
+#include "core/dsp/resampler.hpp"
+#include "core/dsp/resampler_design.hpp"
+#include "core/dsp/resampler_vector.hpp"
+#include "core/dsp/scalar_traits.hpp"
 
 namespace {
 

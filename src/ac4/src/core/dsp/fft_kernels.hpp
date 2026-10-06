@@ -4,7 +4,7 @@
 #include <type_traits>
 #include <utility>
 
-#include "iclforge/ac4core/dsp/complex.hpp"
+#include "core/dsp/complex.hpp"
 
 // The passes of dsp/fft.hpp's Stockham transform, one function for each radix and
 // direction, with nothing a pass does decided at run time.

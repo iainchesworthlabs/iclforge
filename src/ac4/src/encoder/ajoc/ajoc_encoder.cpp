@@ -1,11 +1,11 @@
-#include "ajoc/ajoc_encoder.hpp"
+#include "encoder/ajoc/ajoc_encoder.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <memory>
 
-#include "bit_writer.hpp"
+#include "core/bit_writer.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

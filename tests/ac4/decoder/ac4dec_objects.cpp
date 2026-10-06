@@ -10,17 +10,17 @@
 #include <stdexcept>
 #include <utility>
 
-#include "iclforge/ac4enc/encoder.hpp"
-#include "ajoc/ajoc_syntax.hpp"
-#include "asf/analysis.hpp"
-#include "asf/coder.hpp"
-#include "asf/layout.hpp"
-#include "asf/stereo.hpp"
-#include "aspx/aspx_encoder.hpp"
-#include "aspx/aspx_syntax.hpp"
-#include "bit_writer.hpp"
-#include "frame/toc_writer.hpp"
-#include "oamd/oamd_syntax.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
+#include "encoder/ajoc/ajoc_syntax.hpp"
+#include "encoder/asf/analysis.hpp"
+#include "encoder/asf/coder.hpp"
+#include "encoder/asf/layout.hpp"
+#include "encoder/asf/stereo.hpp"
+#include "encoder/aspx/aspx_encoder.hpp"
+#include "encoder/aspx/aspx_syntax.hpp"
+#include "core/bit_writer.hpp"
+#include "encoder/frame/toc_writer.hpp"
+#include "encoder/oamd/oamd_syntax.hpp"
 
 namespace ac4dec_test {
 namespace {

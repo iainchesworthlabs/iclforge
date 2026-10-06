@@ -1,4 +1,4 @@
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 
 #include <algorithm>
 #include <array>
@@ -24,8 +24,8 @@
 #include "asf/psycho.hpp"
 #include "asf/stereo.hpp"
 #include "aspx/aspx_encoder.hpp"
-#include "bit_writer.hpp"
-#include "iclforge/ac4core/dsp/resampler.hpp"
+#include "core/bit_writer.hpp"
+#include "core/dsp/resampler.hpp"
 #include "frame/dialogue.hpp"
 #include "frame/drc_gains.hpp"
 #include "frame/frame_writer.hpp"
@@ -33,7 +33,7 @@
 #include "frame/timing.hpp"
 #include "oamd/object_metadata.hpp"
 #include "oamd/oamd_syntax.hpp"
-#include "iclforge/ac4core/tables/sfb_tables.hpp"
+#include "core/tables/sfb_tables.hpp"
 
 namespace iclforge::ac4 {
 

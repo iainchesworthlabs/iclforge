@@ -9,14 +9,14 @@
 #include <span>
 #include <stdexcept>
 
-#include "ac4/ac4_toc_writer.hpp"
+#include "ac4/core/ac4_toc_writer.hpp"
 #include "ac4dec_bits.hpp"
 #include "ac4dec_printed_matrices.hpp"
-#include "iclforge/ac4core/dsp/kbd.hpp"
-#include "iclforge/ac4core/dsp/mdct.hpp"
-#include "iclforge/ac4core/tables/huffman_tables.hpp"
-#include "iclforge/ac4core/tables/sfb_tables.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "core/dsp/kbd.hpp"
+#include "core/dsp/mdct.hpp"
+#include "core/tables/huffman_tables.hpp"
+#include "core/tables/sfb_tables.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 
 namespace ac4dec_test {
 namespace {

@@ -5,12 +5,12 @@
 #include <cstdint>
 #include <vector>
 
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4core/acpl/acpl.hpp"
-#include "iclforge/ac4core/ajcc/ajcc.hpp"
-#include "pcm/acpl.hpp"
-#include "pcm/aspx.hpp"
-#include "syntax/ajcc.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "core/acpl/acpl.hpp"
+#include "core/ajcc/ajcc.hpp"
+#include "decoder/pcm/acpl.hpp"
+#include "decoder/pcm/aspx.hpp"
+#include "decoder/syntax/ajcc.hpp"
 
 // A-JCC's QMF-domain step, ETSI TS 103 190-2 V1.3.1 clause 5.6, for the
 // immersive element in ASPX_AJCC, after A-SPX (4.8.3.12): the five core

@@ -21,12 +21,12 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "ac4dec_bits.hpp"
-#include "bit_reader.hpp"
-#include "huffman.hpp"
-#include "syntax/asf.hpp"
-#include "syntax/context.hpp"
-#include "iclforge/ac4core/tables/huffman_tables.hpp"
-#include "iclforge/ac4core/tables/sfb_tables.hpp"
+#include "core/bit_reader.hpp"
+#include "decoder/huffman.hpp"
+#include "decoder/syntax/asf.hpp"
+#include "decoder/syntax/context.hpp"
+#include "core/tables/huffman_tables.hpp"
+#include "core/tables/sfb_tables.hpp"
 
 namespace {
 

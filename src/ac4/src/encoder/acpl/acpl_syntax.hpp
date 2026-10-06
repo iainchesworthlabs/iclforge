@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <vector>
 
-#include "bit_writer.hpp"
+#include "core/bit_writer.hpp"
 
 // The A-CPL syntax, written: ETSI TS 103 190-1 V1.4.1 Tables 59 to 65
 // (acpl_config_1ch, acpl_config_2ch, acpl_data_1ch, acpl_data_2ch and the

@@ -4,8 +4,8 @@
 #include <span>
 #include <vector>
 
-#include "asf/coder.hpp"
-#include "asf/stereo.hpp"
+#include "encoder/asf/coder.hpp"
+#include "encoder/asf/stereo.hpp"
 
 // The channel data elements of the 5.X and 7.X elements run backwards: ETSI
 // TS 103 190-1 V1.4.1 clause 5.3.3's matrices for three_channel_data(),

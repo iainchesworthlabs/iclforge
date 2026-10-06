@@ -3,9 +3,9 @@
 #include <array>
 #include <cstdint>
 
-#include "bit_reader.hpp"
-#include "huffman.hpp"
-#include "syntax/context.hpp"
+#include "core/bit_reader.hpp"
+#include "decoder/huffman.hpp"
+#include "decoder/syntax/context.hpp"
 
 // Advanced joint channel coding (A-JCC) syntax: ETSI TS 103 190-2 V1.3.1
 // clause 6.2.6, semantics 6.3.7, for the immersive channel element of the

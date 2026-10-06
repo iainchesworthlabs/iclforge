@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "bit_writer.hpp"
+#include "core/bit_writer.hpp"
 
 // The companding and A-SPX syntax, written: ETSI TS 103 190-1 V1.4.1 Table 49
 // (companding_control) and Tables 50 to 58 (aspx_config, aspx_data_1ch,

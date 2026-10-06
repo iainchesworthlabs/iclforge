@@ -7,13 +7,13 @@
 #include <string_view>
 #include <utility>
 
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4/toc.hpp"
-#include "ac4/ac4_toc_writer.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
-#include "bit_writer.hpp"
-#include "frame/toc_writer.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "ac4/core/ac4_toc_writer.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
+#include "core/bit_writer.hpp"
+#include "encoder/frame/toc_writer.hpp"
 
 namespace ac4dec_test {
 namespace {

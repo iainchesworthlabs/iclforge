@@ -4,10 +4,10 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4core/acpl/acpl.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "pcm/aspx.hpp"
-#include "syntax/metadata.hpp"
+#include "core/acpl/acpl.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/pcm/aspx.hpp"
+#include "decoder/syntax/metadata.hpp"
 
 // The dialogue enhancement tool of ETSI TS 103 190-1 V1.4.1 clause 5.7.8: in
 // the QMF domain, before DRC, the dialogue in the front channels (L, R and C,

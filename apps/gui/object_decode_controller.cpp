@@ -17,12 +17,12 @@
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/audio/monitor.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4/toc.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/core/toc.hpp"
 #include "ac4_channels.hpp"
 #include "ac4_presentations.hpp"
 #include "ac4_sync_word.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 #include "container_input.hpp"
 
 using objdec_detail::RawFrame;

@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <vector>
 
-#include "bit_reader.hpp"
-#include "syntax/context.hpp"
+#include "core/bit_reader.hpp"
+#include "decoder/syntax/context.hpp"
 
 // The audio spectral frontend's syntax (ETSI TS 103 190-1 V1.4.1 clauses 4.2.7
 // and 4.2.8, semantics 4.3.6) and stereo audio processing's (4.2.10, 4.3.8):

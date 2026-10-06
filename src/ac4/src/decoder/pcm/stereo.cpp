@@ -1,11 +1,11 @@
-#include "pcm/stereo.hpp"
+#include "decoder/pcm/stereo.hpp"
 
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <utility>
 
-#include "iclforge/ac4core/tables/sfb_tables.hpp"
+#include "core/tables/sfb_tables.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

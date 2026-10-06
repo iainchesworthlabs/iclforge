@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "iclforge/ac4/toc.hpp"
+#include "iclforge/ac4/core/toc.hpp"
 
 // An AC-4 elementary stream as a session plays it (planning/ac4.md, I2): its
 // sync frames, the samples each one decodes to, and which of them a decoder

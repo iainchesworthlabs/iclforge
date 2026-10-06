@@ -23,9 +23,9 @@
 
 #include "ac4dec_units.hpp"
 
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "pcm/de.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/pcm/de.hpp"
 
 namespace {
 

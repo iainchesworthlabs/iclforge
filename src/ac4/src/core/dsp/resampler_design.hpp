@@ -6,9 +6,9 @@
 #include <cstdint>
 #include <numbers>
 
-#include "iclforge/ac4core/dsp/kbd.hpp"
-#include "iclforge/ac4core/dsp/portable_math.hpp"
-#include "iclforge/ac4core/dsp/resampler.hpp"
+#include "core/dsp/kbd.hpp"
+#include "core/dsp/portable_math.hpp"
+#include "core/dsp/resampler.hpp"
 
 // The design of the sample rate converter's filter (dsp/resampler.hpp), and the float tables built
 // from it at compile time.

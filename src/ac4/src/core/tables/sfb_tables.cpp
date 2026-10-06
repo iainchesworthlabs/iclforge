@@ -1,4 +1,4 @@
-#include "iclforge/ac4core/tables/sfb_tables.hpp"
+#include "core/tables/sfb_tables.hpp"
 
 #include <array>
 #include <cstddef>

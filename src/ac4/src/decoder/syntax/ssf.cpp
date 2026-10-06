@@ -1,4 +1,4 @@
-#include "syntax/ssf.hpp"
+#include "decoder/syntax/ssf.hpp"
 
 #include <algorithm>
 #include <array>
@@ -8,7 +8,7 @@
 #include <limits>
 #include <span>
 
-#include "iclforge/ac4core/tables/ssf_tables.hpp"
+#include "core/tables/ssf_tables.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

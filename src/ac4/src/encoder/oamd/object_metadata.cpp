@@ -1,4 +1,4 @@
-#include "oamd/object_metadata.hpp"
+#include "encoder/oamd/object_metadata.hpp"
 
 #include <algorithm>
 #include <cmath>

@@ -20,10 +20,10 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "ac4dec_hsf.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "pcm/downmix.hpp"
-#include "pcm/drc.hpp"
-#include "pcm/substream_pcm.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/pcm/downmix.hpp"
+#include "decoder/pcm/drc.hpp"
+#include "decoder/pcm/substream_pcm.hpp"
 #include "sanitized.hpp"
 
 namespace {

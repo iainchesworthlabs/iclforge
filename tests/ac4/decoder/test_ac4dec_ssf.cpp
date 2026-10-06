@@ -21,12 +21,12 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "ac4/ac4_toc_writer.hpp"
-#include "ac4dec/ac4dec_bits.hpp"
-#include "bit_reader.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "syntax/context.hpp"
-#include "syntax/ssf.hpp"
+#include "ac4/core/ac4_toc_writer.hpp"
+#include "ac4/decoder/ac4dec_bits.hpp"
+#include "core/bit_reader.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/syntax/context.hpp"
+#include "decoder/syntax/ssf.hpp"
 
 namespace {
 

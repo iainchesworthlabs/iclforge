@@ -13,9 +13,9 @@
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/io/probe.hpp"
 #include "iclforge/objects/oamd.hpp"
-#include "iclforge/ac4/carriage.hpp"
-#include "iclforge/ac4/toc.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/io/carriage.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 #include "container_input.hpp"
 #include "json_sink.hpp"
 

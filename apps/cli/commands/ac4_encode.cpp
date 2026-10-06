@@ -19,11 +19,11 @@
 #include "../exit_codes.hpp"
 #include "../support.hpp"
 #include "iclforge/ac3/io/wav.hpp"
-#include "iclforge/ac4/toc.hpp"
+#include "iclforge/ac4/core/toc.hpp"
 #include "ac4_encode_core.hpp"
-#include "iclforge/ac4/syntax.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/core/syntax.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 #include "encode.hpp"
 
 // ac4-encode: WAV to AC-4 through iclforge::ac4::Encoder (src/ac4enc), as a raw stream

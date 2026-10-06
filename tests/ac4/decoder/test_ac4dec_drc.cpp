@@ -27,12 +27,12 @@
 
 #include "ac4dec_units.hpp"
 
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4core/dsp/qmf.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
-#include "pcm/drc.hpp"
-#include "pcm/routing.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "core/dsp/qmf.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
+#include "decoder/pcm/drc.hpp"
+#include "decoder/pcm/routing.hpp"
 #include "sanitized.hpp"
 
 namespace {

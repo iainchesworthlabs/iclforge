@@ -1,4 +1,4 @@
-#include "pcm/acpl.hpp"
+#include "decoder/pcm/acpl.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -10,8 +10,8 @@
 #include <numbers>
 
 #include "iclforge/base/detail/profiling.hpp"
-#include "syntax/acpl.hpp"
-#include "syntax/reset.hpp"
+#include "decoder/syntax/acpl.hpp"
+#include "decoder/syntax/reset.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

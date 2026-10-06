@@ -16,11 +16,11 @@
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/encoder/plan.hpp"
 #include "iclforge/ac3/io/wav.hpp"
-#include "iclforge/ac4/elementary.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
 #include "ac4_channels.hpp"
 #include "ac4_presentations.hpp"
 #include "ac4_sync_word.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 #include "channel_geometry.hpp"
 
 using splayer_detail::RawResult;

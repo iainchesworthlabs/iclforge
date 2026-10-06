@@ -21,8 +21,8 @@
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/decoder/output.hpp"
 
-#include "iclforge/ac4/toc.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 
 namespace iclforge::ac4bridge {
 

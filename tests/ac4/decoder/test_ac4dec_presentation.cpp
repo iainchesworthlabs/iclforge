@@ -13,11 +13,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4/toc.hpp"
+#include "iclforge/ac4/core/toc.hpp"
 #include "ac4dec_bits.hpp"
-#include "bit_reader.hpp"
-#include "syntax/context.hpp"
-#include "syntax/presentation.hpp"
+#include "core/bit_reader.hpp"
+#include "decoder/syntax/context.hpp"
+#include "decoder/syntax/presentation.hpp"
 
 namespace {
 

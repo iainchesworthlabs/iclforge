@@ -1,4 +1,4 @@
-#include "ajoc/downmix.hpp"
+#include "encoder/ajoc/downmix.hpp"
 
 #include <algorithm>
 #include <cmath>

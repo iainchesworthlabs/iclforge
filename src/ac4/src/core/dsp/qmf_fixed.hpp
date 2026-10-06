@@ -8,12 +8,12 @@
 #include <type_traits>
 
 #include "iclforge/arithmetic/fixed32.hpp"
-#include "iclforge/ac4core/dsp/complex.hpp"
-#include "iclforge/ac4core/dsp/qmf.hpp"
-#include "iclforge/ac4core/dsp/qmf_constants.hpp"
-#include "iclforge/ac4core/dsp/qmf_kernels.hpp"
-#include "iclforge/ac4core/dsp/scalar_traits.hpp"
-#include "iclforge/ac4core/tables/qmf_tables_fixed.hpp"
+#include "core/dsp/complex.hpp"
+#include "core/dsp/qmf.hpp"
+#include "core/dsp/qmf_constants.hpp"
+#include "core/dsp/qmf_kernels.hpp"
+#include "core/dsp/scalar_traits.hpp"
+#include "core/tables/qmf_tables_fixed.hpp"
 
 // One slot of the QMF analysis and synthesis (dsp/qmf.hpp) at Fixed32, with a block exponent
 // per slot (planning/ac4.md, D14d). The steps and their order are qmf_kernels.hpp's; what

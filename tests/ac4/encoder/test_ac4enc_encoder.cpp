@@ -20,11 +20,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4/carriage.hpp"
-#include "iclforge/ac4/toc.hpp"
-#include "iclforge/ac4/syntax.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/io/carriage.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/core/syntax.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 #include "sanitized.hpp"
 
 namespace {

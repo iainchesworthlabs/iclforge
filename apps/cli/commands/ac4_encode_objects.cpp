@@ -19,9 +19,9 @@
 #include "../exit_codes.hpp"
 #include "../support.hpp"
 #include "iclforge/ac3/io/wav.hpp"
-#include "iclforge/ac4/toc.hpp"
-#include "iclforge/ac4/syntax.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/core/syntax.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 #include "encode.hpp"
 
 // ac4-encode with objects=<scene>, experimental: the WAV file's channels as

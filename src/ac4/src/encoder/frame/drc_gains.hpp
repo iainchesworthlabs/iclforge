@@ -6,9 +6,9 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4core/dsp/qmf.hpp"
-#include "frame/metadata.hpp"
-#include "frame/timing.hpp"
+#include "core/dsp/qmf.hpp"
+#include "encoder/frame/metadata.hpp"
+#include "encoder/frame/timing.hpp"
 
 // Transmitted DRC gains (ETSI TS 103 190-1 V1.4.1 clause 5.7.9.3.2), computed
 // from a compression curve as a decoder applying the curve would (5.7.9.3.1):

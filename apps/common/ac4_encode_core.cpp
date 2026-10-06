@@ -1,5 +1,5 @@
 #include "ac4_encode_core.hpp"
-#include "iclforge/ac4/carriage.hpp"
+#include "iclforge/ac4/io/carriage.hpp"
 
 #include <algorithm>
 #include <array>

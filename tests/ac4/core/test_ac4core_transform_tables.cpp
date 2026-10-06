@@ -13,11 +13,11 @@
 #include <type_traits>
 #include <vector>
 
-#include "iclforge/ac4core/detail/real.hpp"
-#include "iclforge/ac4core/dsp/fft.hpp"
-#include "iclforge/ac4core/dsp/mdct.hpp"
-#include "iclforge/ac4core/dsp/synthesis.hpp"
-#include "iclforge/ac4core/dsp/transform_tables.hpp"
+#include "iclforge/ac4/detail/real.hpp"
+#include "core/dsp/fft.hpp"
+#include "core/dsp/mdct.hpp"
+#include "core/dsp/synthesis.hpp"
+#include "core/dsp/transform_tables.hpp"
 
 namespace dsp = iclforge::ac4::detail::dsp;
 using iclforge::ac4::detail::Real;

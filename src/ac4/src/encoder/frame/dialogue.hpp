@@ -4,7 +4,7 @@
 #include <span>
 #include <vector>
 
-#include "frame/metadata.hpp"
+#include "encoder/frame/metadata.hpp"
 
 // Dialogue enhancement's parameters (ETSI TS 103 190-1 V1.4.1 clause 5.7.8).
 // The channel-independent method (5.7.8.7) raises channel m by g p m in each

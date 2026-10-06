@@ -24,8 +24,8 @@
 #include "ac4dec_units.hpp"
 
 #include "ac4dec_printed_matrices.hpp"
-#include "pcm/multichannel.hpp"
-#include "pcm/routing.hpp"
+#include "decoder/pcm/multichannel.hpp"
+#include "decoder/pcm/routing.hpp"
 
 namespace {
 

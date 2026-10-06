@@ -6,8 +6,8 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4dec/decoder.hpp"
-#include "syntax/presentation.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/syntax/presentation.hpp"
 
 // Part 2's channel audio renderer, ETSI TS 103 190-2 V1.3.1 clause 5.10.2, for
 // the immersive element: the generalized rendering matrix (5.10.2.2) from the

@@ -3,8 +3,8 @@
 #include <array>
 #include <vector>
 
-#include "asf/coder.hpp"
-#include "asf/layout.hpp"
+#include "encoder/asf/coder.hpp"
+#include "encoder/asf/layout.hpp"
 
 // The encoder's psychoacoustic model (planning/ac4.md, "Rate control and the
 // psychoacoustic model"; decision 17): per scale factor band of each window

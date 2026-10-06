@@ -4,10 +4,10 @@
 #include <cstddef>
 
 #include "iclforge/arithmetic/detail/simd.hpp"
-#include "iclforge/ac4core/dsp/complex.hpp"
-#include "iclforge/ac4core/dsp/qmf_constants.hpp"
-#include "iclforge/ac4core/dsp/qmf_kernels.hpp"
-#include "iclforge/ac4core/tables/qmf_tables.hpp"
+#include "core/dsp/complex.hpp"
+#include "core/dsp/qmf_constants.hpp"
+#include "core/dsp/qmf_kernels.hpp"
+#include "core/tables/qmf_tables.hpp"
 
 // The QMF steps of dsp/qmf_kernels.hpp on the seam's 128-bit vector types
 // (src/arithmetic/arch: f64x2 at double, f32x4 at float), one step for one step.

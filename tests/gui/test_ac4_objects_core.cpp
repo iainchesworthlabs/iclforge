@@ -15,11 +15,11 @@
 
 #include "iclforge/ac3/encoder/assignment.hpp"
 #include "iclforge/objects/scene.hpp"
-#include "iclforge/ac4/toc.hpp"
+#include "iclforge/ac4/core/toc.hpp"
 #include "ac4_encode_core.hpp"
 #include "ac4_objects_core.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 
 // The steps forge's `atmos-encode codec=ac4` and forge-gui's AC-4 objects share
 // (apps/common/ac4_objects_core.hpp): which channels are which objects, where a

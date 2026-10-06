@@ -43,7 +43,7 @@
 #include "iclforge/sendspin/server_host.hpp"
 #include "iclforge/sendspin/server_store.hpp"
 #include "engine_thread.hpp"
-#include "iclforge/ac4/elementary.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
 #include "network_group_sink.hpp"
 #include "sink.hpp"
 

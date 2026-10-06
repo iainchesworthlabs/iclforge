@@ -1,4 +1,4 @@
-#include "syntax/metadata.hpp"
+#include "decoder/syntax/metadata.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -6,8 +6,8 @@
 #include <string_view>
 #include <utility>
 
-#include "huffman.hpp"
-#include "iclforge/ac4core/tables/huffman_tables.hpp"
+#include "decoder/huffman.hpp"
+#include "core/tables/huffman_tables.hpp"
 
 namespace iclforge::ac4::detail {
 

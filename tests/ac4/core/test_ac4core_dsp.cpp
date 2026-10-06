@@ -24,18 +24,18 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4core/detail/real.hpp"
-#include "iclforge/ac4core/dsp/complex.hpp"
-#include "iclforge/ac4core/dsp/fft.hpp"
-#include "iclforge/ac4core/dsp/kbd.hpp"
-#include "iclforge/ac4core/dsp/mdct.hpp"
-#include "iclforge/ac4core/dsp/qmf.hpp"
-#include "iclforge/ac4core/dsp/scalar_traits.hpp"
-#include "iclforge/ac4core/dsp/qmf_constants.hpp"
-#include "iclforge/ac4core/dsp/qmf_kernels.hpp"
-#include "iclforge/ac4core/dsp/qmf_vector.hpp"
-#include "iclforge/ac4core/dsp/synthesis.hpp"
-#include "iclforge/ac4core/tables/qmf_tables.hpp"
+#include "iclforge/ac4/detail/real.hpp"
+#include "core/dsp/complex.hpp"
+#include "core/dsp/fft.hpp"
+#include "core/dsp/kbd.hpp"
+#include "core/dsp/mdct.hpp"
+#include "core/dsp/qmf.hpp"
+#include "core/dsp/scalar_traits.hpp"
+#include "core/dsp/qmf_constants.hpp"
+#include "core/dsp/qmf_kernels.hpp"
+#include "core/dsp/qmf_vector.hpp"
+#include "core/dsp/synthesis.hpp"
+#include "core/tables/qmf_tables.hpp"
 
 namespace {
 

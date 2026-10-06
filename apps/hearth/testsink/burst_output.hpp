@@ -20,7 +20,7 @@
 #include "iclforge/render/render.hpp"
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sendspin/chunks.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 
 // A test sink's output for _iclforge_player@v1 (planning/hearth-sendspin-extension.md): each
 // stream's bursts decoded, AC-3 or E-AC-3 with any object layer, or AC-4, and rendered to the

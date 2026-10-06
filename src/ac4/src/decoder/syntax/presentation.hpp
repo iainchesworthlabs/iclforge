@@ -5,10 +5,10 @@
 #include <optional>
 #include <vector>
 
-#include "iclforge/ac4/toc.hpp"
-#include "bit_reader.hpp"
-#include "syntax/context.hpp"
-#include "syntax/metadata.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "core/bit_reader.hpp"
+#include "decoder/syntax/context.hpp"
+#include "decoder/syntax/metadata.hpp"
 
 // Part 2 clause 6.2.2.3 ac4_presentation_substream() and the presentation data
 // it calls: advanced_de_data() (6.2.2.5), custom_dmx_data(), cdmx_parameters(),

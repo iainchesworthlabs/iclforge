@@ -5,10 +5,10 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4/syntax.hpp"
-#include "bit_writer.hpp"
-#include "frame/metadata.hpp"
-#include "frame/toc_writer.hpp"
+#include "iclforge/ac4/core/syntax.hpp"
+#include "core/bit_writer.hpp"
+#include "encoder/frame/metadata.hpp"
+#include "encoder/frame/toc_writer.hpp"
 
 // The substreams of a raw_ac4_frame() (ETSI TS 103 190-2 V1.3.1 clause 6.2.2,
 // Part 1 clause 4.2.4) and the frame they make with their table of contents

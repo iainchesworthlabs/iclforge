@@ -14,10 +14,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4core/detail/real.hpp"
-#include "iclforge/ac4core/dsp/scalar_traits.hpp"
-#include "iclforge/ac4core/tables/sfb_tables.hpp"
-#include "pcm/asf_reconstruct.hpp"
+#include "iclforge/ac4/detail/real.hpp"
+#include "core/dsp/scalar_traits.hpp"
+#include "core/tables/sfb_tables.hpp"
+#include "decoder/pcm/asf_reconstruct.hpp"
 
 namespace {
 

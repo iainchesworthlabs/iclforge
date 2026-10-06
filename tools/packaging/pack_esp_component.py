@@ -253,7 +253,7 @@ def main_source(with_ac4: bool) -> str:
         '#include "iclforge/ac3/decoder/output.hpp"',
     ]
     if with_ac4:
-        lines.append('#include "iclforge/ac4dec/decoder.hpp"')
+        lines.append('#include "iclforge/ac4/decoder/decoder.hpp"')
     lines += [
         "#include <array>",
         "#include <span>",

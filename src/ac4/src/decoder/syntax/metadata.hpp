@@ -7,9 +7,9 @@
 #include <string_view>
 #include <vector>
 
-#include "bit_reader.hpp"
-#include "syntax/context.hpp"
-#include "syntax/oamd.hpp"
+#include "core/bit_reader.hpp"
+#include "decoder/syntax/context.hpp"
+#include "decoder/syntax/oamd.hpp"
 
 // The metadata of a channel-coded ac4_substream() - Part 2 clause 6.2.7.1's
 // metadata() and the Part 1 clause 4.2.14 elements it calls - and the two

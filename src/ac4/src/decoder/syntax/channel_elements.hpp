@@ -7,13 +7,13 @@
 #include <optional>
 #include <vector>
 
-#include "bit_reader.hpp"
-#include "syntax/acpl.hpp"
-#include "syntax/ajcc.hpp"
-#include "syntax/asf.hpp"
-#include "syntax/aspx.hpp"
-#include "syntax/context.hpp"
-#include "syntax/ssf.hpp"
+#include "core/bit_reader.hpp"
+#include "decoder/syntax/acpl.hpp"
+#include "decoder/syntax/ajcc.hpp"
+#include "decoder/syntax/asf.hpp"
+#include "decoder/syntax/aspx.hpp"
+#include "decoder/syntax/context.hpp"
+#include "decoder/syntax/ssf.hpp"
 
 // audio_data_chan() (ETSI TS 103 190-2 V1.3.1 clause 6.2.3.1) for the Part 1
 // channel elements: single_channel_element, channel_pair_element,

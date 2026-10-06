@@ -13,7 +13,7 @@
 
 #include "internal.hpp"
 #include "internal_ac4.hpp"
-#include "iclforge/ac4/carriage.hpp"
+#include "iclforge/ac4/io/carriage.hpp"
 
 using iclforge_c::guard;
 using iclforge_c::to_cpp;

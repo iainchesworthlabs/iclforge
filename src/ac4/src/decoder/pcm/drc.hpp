@@ -5,9 +5,9 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4dec/decoder.hpp"
-#include "pcm/aspx.hpp"
-#include "syntax/metadata.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/pcm/aspx.hpp"
+#include "decoder/syntax/metadata.hpp"
 
 // The dynamic range control tool of ETSI TS 103 190-1 V1.4.1 clause 5.7.9, with
 // the output level gain it applies (5.7.9.3.3): in the QMF domain, before

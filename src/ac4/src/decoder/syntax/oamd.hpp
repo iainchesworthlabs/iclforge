@@ -6,9 +6,9 @@
 #include <optional>
 #include <vector>
 
-#include "iclforge/ac4/toc.hpp"
-#include "bit_reader.hpp"
-#include "syntax/context.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "core/bit_reader.hpp"
+#include "decoder/syntax/context.hpp"
 
 // Object audio metadata, ETSI TS 103 190-2 V1.3.1 clause 6.2.8:
 // oamd_common_data(), oamd_timing_data(), oamd_dyndata_single(),

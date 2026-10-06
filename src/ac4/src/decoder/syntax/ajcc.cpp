@@ -1,10 +1,10 @@
-#include "syntax/ajcc.hpp"
+#include "decoder/syntax/ajcc.hpp"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 
-#include "iclforge/ac4core/tables/huffman_tables.hpp"
+#include "core/tables/huffman_tables.hpp"
 
 namespace iclforge::ac4::detail {
 

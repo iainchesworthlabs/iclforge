@@ -22,12 +22,12 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "ac4dec_bits.hpp"
-#include "bit_reader.hpp"
-#include "syntax/acpl.hpp"
-#include "syntax/aspx.hpp"
-#include "syntax/channel_elements.hpp"
-#include "syntax/context.hpp"
-#include "syntax/substream.hpp"
+#include "core/bit_reader.hpp"
+#include "decoder/syntax/acpl.hpp"
+#include "decoder/syntax/aspx.hpp"
+#include "decoder/syntax/channel_elements.hpp"
+#include "decoder/syntax/context.hpp"
+#include "decoder/syntax/substream.hpp"
 
 namespace {
 

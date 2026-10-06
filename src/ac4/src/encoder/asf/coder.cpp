@@ -1,12 +1,12 @@
-#include "asf/coder.hpp"
+#include "encoder/asf/coder.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 
-#include "iclforge/ac4core/tables/huffman_codes.hpp"
-#include "iclforge/ac4core/tables/huffman_tables.hpp"
-#include "iclforge/ac4core/tables/sfb_tables.hpp"
+#include "core/tables/huffman_codes.hpp"
+#include "core/tables/huffman_tables.hpp"
+#include "core/tables/sfb_tables.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

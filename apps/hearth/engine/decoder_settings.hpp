@@ -8,7 +8,7 @@
 #include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/decoder/serving.hpp"
 #include "iclforge/render/layout.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 
 // The decoder configuration model (planning/hearth-reference-player.md,
 // "Decoder configuration"): what the app's decoder controls hold, and the

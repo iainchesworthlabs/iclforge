@@ -27,12 +27,12 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4/toc.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 #include "ac4dec_objects.hpp"
-#include "pcm/isf.hpp"
-#include "iclforge/ac4core/tables/isf_tables.hpp"
+#include "decoder/pcm/isf.hpp"
+#include "core/tables/isf_tables.hpp"
 
 namespace {
 

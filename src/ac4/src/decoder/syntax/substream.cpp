@@ -1,9 +1,9 @@
-#include "syntax/substream.hpp"
+#include "decoder/syntax/substream.hpp"
 
 #include <cstddef>
 #include <utility>
 
-#include "syntax/reset.hpp"
+#include "decoder/syntax/reset.hpp"
 
 namespace iclforge::ac4::detail {
 

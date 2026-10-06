@@ -32,7 +32,7 @@
 
 #if CONFIG_ICLFORGE_AC4
 #include "ac4_bridge.hpp"
-#include "iclforge/ac4/elementary.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
 #endif
 
 namespace iclforge {

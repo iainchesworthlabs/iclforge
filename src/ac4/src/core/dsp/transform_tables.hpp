@@ -4,8 +4,8 @@
 #include <span>
 #include <type_traits>
 
-#include "iclforge/ac4core/detail/real.hpp"
-#include "iclforge/ac4core/dsp/complex.hpp"
+#include "iclforge/ac4/detail/real.hpp"
+#include "core/dsp/complex.hpp"
 
 // The inverse transform's tables at the float and fixed-point tiers, in flash
 // (planning/ac4.md, the decoder's memory): for a block of N lines, the roots of the N/2-point

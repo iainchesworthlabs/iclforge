@@ -18,10 +18,10 @@
 
 #include "ac4dec_units.hpp"
 
-#include "iclforge/ac4dec/decoder.hpp"
-#include "pcm/acpl.hpp"
-#include "syntax/acpl.hpp"
-#include "syntax/channel_elements.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/pcm/acpl.hpp"
+#include "decoder/syntax/acpl.hpp"
+#include "decoder/syntax/channel_elements.hpp"
 
 namespace {
 

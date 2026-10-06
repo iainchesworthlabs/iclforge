@@ -4,11 +4,11 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4core/detail/real.hpp"
-#include "pcm/snf_random.hpp"
-#include "syntax/asf.hpp"
-#include "syntax/context.hpp"
-#include "syntax/ssf.hpp"
+#include "iclforge/ac4/detail/real.hpp"
+#include "decoder/pcm/snf_random.hpp"
+#include "decoder/syntax/asf.hpp"
+#include "decoder/syntax/context.hpp"
+#include "decoder/syntax/ssf.hpp"
 
 // The audio spectral frontend's reconstruction, ETSI TS 103 190-1 V1.4.1
 // clause 5.1, from what D1's sf_data() reading kept (syntax/asf.hpp):

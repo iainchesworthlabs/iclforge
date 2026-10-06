@@ -11,8 +11,8 @@
 #include <vector>
 
 #include "iclforge/ac3/io/elementary.hpp"
-#include "iclforge/ac4/toc.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 #include "container_input.hpp"
 #include "queue.hpp"
 #include "stream_decoder.hpp"

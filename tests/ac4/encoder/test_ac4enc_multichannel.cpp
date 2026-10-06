@@ -16,11 +16,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "../ac4dec/ac4dec_printed_matrices.hpp"
-#include "asf/coder.hpp"
-#include "asf/layout.hpp"
-#include "asf/multichannel.hpp"
-#include "asf/stereo.hpp"
+#include "../decoder/ac4dec_printed_matrices.hpp"
+#include "encoder/asf/coder.hpp"
+#include "encoder/asf/layout.hpp"
+#include "encoder/asf/multichannel.hpp"
+#include "encoder/asf/stereo.hpp"
 
 namespace {
 

@@ -3,8 +3,8 @@
 #include <span>
 #include <vector>
 
-#include "asf/layout.hpp"
-#include "iclforge/ac4core/dsp/mdct.hpp"
+#include "encoder/asf/layout.hpp"
+#include "core/dsp/mdct.hpp"
 
 // The forward transform of each block of a frame, windowed as the decoder's
 // synthesis windows it (ETSI TS 103 190-1 V1.4.1 clause 5.5.2.2, Pseudocodes

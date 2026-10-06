@@ -1,12 +1,12 @@
-#include "acpl/acpl_syntax.hpp"
+#include "encoder/acpl/acpl_syntax.hpp"
 
 #include <cstddef>
 #include <cstdint>
 #include <span>
 
-#include "iclforge/ac4core/acpl/acpl.hpp"
-#include "iclforge/ac4core/tables/huffman_codes.hpp"
-#include "iclforge/ac4core/tables/huffman_tables.hpp"
+#include "core/acpl/acpl.hpp"
+#include "core/tables/huffman_codes.hpp"
+#include "core/tables/huffman_tables.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

@@ -1,4 +1,4 @@
-#include "pcm/objects.hpp"
+#include "decoder/pcm/objects.hpp"
 
 #include <algorithm>
 #include <cmath>

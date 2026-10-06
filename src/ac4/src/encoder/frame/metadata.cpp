@@ -1,4 +1,4 @@
-#include "frame/metadata.hpp"
+#include "encoder/frame/metadata.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -9,8 +9,8 @@
 #include <span>
 #include <string_view>
 
-#include "iclforge/ac4core/tables/huffman_codes.hpp"
-#include "iclforge/ac4core/tables/huffman_tables.hpp"
+#include "core/tables/huffman_codes.hpp"
+#include "core/tables/huffman_tables.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

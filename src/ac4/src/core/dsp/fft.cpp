@@ -1,6 +1,6 @@
-#include "iclforge/ac4core/dsp/fft.hpp"
+#include "core/dsp/fft.hpp"
 
-#include "iclforge/ac4core/dsp/transform_tables.hpp"
+#include "core/dsp/transform_tables.hpp"
 
 #include <algorithm>
 #include <type_traits>

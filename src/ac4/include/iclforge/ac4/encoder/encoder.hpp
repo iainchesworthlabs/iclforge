@@ -8,9 +8,9 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/ac4/toc.hpp"
-#include "iclforge/ac4enc/config.hpp"
-#include "iclforge/ac4enc/export.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/encoder/config.hpp"
+#include "iclforge/ac4/export.hpp"
 
 // An AC-4 encoder: ETSI TS 103 190-1 V1.4.1 (2025-07), "Part 1: Channel based
 // coding", and ETSI TS 103 190-2 V1.3.1 (2025-07), "Part 2: Immersive and
@@ -77,7 +77,7 @@ enum class EncodeError : std::uint8_t {
     kInvalidInput,   // a channel count or lengths that do not match, or a sample that is not finite
 };
 
-[[nodiscard]] ICLFORGE_AC4ENC_EXPORT std::string_view describe(EncodeError error);
+[[nodiscard]] ICLFORGE_AC4_EXPORT std::string_view describe(EncodeError error);
 
 // One coded frame: what an MP4 sample holds as it is, and what sync_frame()
 // wraps for a raw .ac4 file or MPEG-2 TS.
@@ -92,7 +92,7 @@ struct EncodedFrame {
     bool iframe = false;   // b_iframe_global
 };
 
-class ICLFORGE_AC4ENC_EXPORT Encoder {
+class ICLFORGE_AC4_EXPORT Encoder {
    public:
     // Fails with EncodeError::kInvalidConfig for a configuration outside what
     // the encoder writes (the rules this header states), or whose rate cannot
@@ -171,7 +171,7 @@ class ICLFORGE_AC4ENC_EXPORT Encoder {
 // Part 2 Annex G.3.1's ac4_syncframe(): the sync word 0xAC40, or 0xAC41 and a
 // trailing crc_word (Annex G.4.2) when `crc` is set, then frame_size and the
 // raw frame.
-[[nodiscard]] ICLFORGE_AC4ENC_EXPORT std::vector<std::byte> sync_frame(std::span<const std::byte> raw_ac4_frame,
+[[nodiscard]] ICLFORGE_AC4_EXPORT std::vector<std::byte> sync_frame(std::span<const std::byte> raw_ac4_frame,
                                                               bool crc);
 
 }  // namespace iclforge::ac4

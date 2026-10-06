@@ -1,4 +1,4 @@
-#include "pcm/de.hpp"
+#include "decoder/pcm/de.hpp"
 
 #include <algorithm>
 #include <cmath>

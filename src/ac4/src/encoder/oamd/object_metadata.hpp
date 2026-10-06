@@ -8,8 +8,8 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/ac4enc/encoder.hpp"
-#include "oamd/oamd_syntax.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
+#include "encoder/oamd/oamd_syntax.hpp"
 
 // Object audio metadata from the encoder's side: ObjectProperties, the terms
 // of ETSI TS 103 190-2 V1.3.1 Annex F, turned into the codes of clause 6.2.8

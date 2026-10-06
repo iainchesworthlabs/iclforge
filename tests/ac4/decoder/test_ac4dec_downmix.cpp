@@ -25,10 +25,10 @@
 
 #include "ac4dec_units.hpp"
 
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4/toc.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "pcm/downmix.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/pcm/downmix.hpp"
 
 namespace {
 

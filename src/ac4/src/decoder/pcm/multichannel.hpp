@@ -5,9 +5,9 @@
 #include <span>
 #include <vector>
 
-#include "pcm/stereo.hpp"
-#include "syntax/asf.hpp"
-#include "syntax/context.hpp"
+#include "decoder/pcm/stereo.hpp"
+#include "decoder/syntax/asf.hpp"
+#include "decoder/syntax/context.hpp"
 
 // Multichannel processing, ETSI TS 103 190-1 V1.4.1 clause 5.3.3: the
 // matrices that turn the tracks of three_channel_data(), four_channel_data()

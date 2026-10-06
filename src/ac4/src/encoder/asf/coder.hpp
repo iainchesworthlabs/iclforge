@@ -6,8 +6,8 @@
 #include <span>
 #include <vector>
 
-#include "asf/layout.hpp"
-#include "bit_writer.hpp"
+#include "encoder/asf/layout.hpp"
+#include "core/bit_writer.hpp"
 
 // The audio spectral frontend's coding of one track, ETSI TS 103 190-1 V1.4.1
 // clauses 4.2.7 and 4.2.8 written in reverse, with the reconstruction of

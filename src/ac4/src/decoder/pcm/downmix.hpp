@@ -5,11 +5,11 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/ac4dec/decoder.hpp"
-#include "pcm/aspx.hpp"
-#include "pcm/renderer.hpp"
-#include "syntax/metadata.hpp"
-#include "syntax/presentation.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/pcm/aspx.hpp"
+#include "decoder/pcm/renderer.hpp"
+#include "decoder/syntax/metadata.hpp"
+#include "decoder/syntax/presentation.hpp"
 
 // Rendering the decoded channels to fewer (ETSI TS 103 190-1 V1.4.1 clause
 // 6.2.17), in the QMF domain after DRC, whose curve gain is the same in every

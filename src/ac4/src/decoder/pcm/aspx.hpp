@@ -5,12 +5,12 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4core/detail/real.hpp"
-#include "iclforge/ac4core/aspx/frequency_tables.hpp"
-#include "iclforge/ac4core/aspx/hf_generator.hpp"
-#include "iclforge/ac4core/dsp/complex.hpp"
-#include "syntax/aspx.hpp"
-#include "syntax/context.hpp"
+#include "iclforge/ac4/detail/real.hpp"
+#include "core/aspx/frequency_tables.hpp"
+#include "core/aspx/hf_generator.hpp"
+#include "core/dsp/complex.hpp"
+#include "decoder/syntax/aspx.hpp"
+#include "decoder/syntax/context.hpp"
 
 // A-SPX in the QMF domain: ETSI TS 103 190-1 V1.4.1 clause 5.7.6 from the
 // parsed aspx_data_1ch() or aspx_data_2ch() to QoutASPX. The envelopes are

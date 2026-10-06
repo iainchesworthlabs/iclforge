@@ -7,10 +7,10 @@
 #include <span>
 #include <string_view>
 
-#include "iclforge/ac4dec/config.hpp"
-#include "iclforge/ac4dec/export.hpp"
-#include "iclforge/ac4dec/frame.hpp"
-#include "iclforge/ac4dec/presentation.hpp"
+#include "iclforge/ac4/decoder/config.hpp"
+#include "iclforge/ac4/export.hpp"
+#include "iclforge/ac4/decoder/frame.hpp"
+#include "iclforge/ac4/decoder/presentation.hpp"
 
 // An AC-4 decoder: ETSI TS 103 190-1 V1.4.1 (2025-07), "Part 1: Channel based
 // coding", and ETSI TS 103 190-2 V1.3.1 (2025-07), "Part 2: Immersive and
@@ -107,7 +107,7 @@ namespace iclforge::ac4 {
 // A system changes the output processing and the presentation while a stream
 // plays with set_output() and set_presentation(), which keep everything the
 // decoder has read: a new decoder waits for an I-frame.
-class ICLFORGE_AC4DEC_EXPORT Decoder {
+class ICLFORGE_AC4_EXPORT Decoder {
    public:
     Decoder();
     explicit Decoder(const DecoderConfig& config);

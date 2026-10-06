@@ -8,7 +8,7 @@
 
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/render.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 
 // An AC-4 presentation's objects rendered to speakers by the renderer Hearth
 // plays E-AC-3's objects through, iclforge::render::LayoutRenderer. The AC-4

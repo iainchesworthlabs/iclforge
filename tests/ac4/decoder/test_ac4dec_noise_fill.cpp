@@ -16,11 +16,11 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4core/detail/real.hpp"
-#include "iclforge/ac4core/dsp/scalar_traits.hpp"
-#include "pcm/asf_reconstruct.hpp"
-#include "pcm/snf_random.hpp"
-#include "syntax/asf.hpp"
+#include "iclforge/ac4/detail/real.hpp"
+#include "core/dsp/scalar_traits.hpp"
+#include "decoder/pcm/asf_reconstruct.hpp"
+#include "decoder/pcm/snf_random.hpp"
+#include "decoder/syntax/asf.hpp"
 
 namespace {
 

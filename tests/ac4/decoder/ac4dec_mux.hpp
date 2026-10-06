@@ -33,7 +33,7 @@
 #include <string>
 #include <vector>
 
-#include "frame/metadata.hpp"
+#include "encoder/frame/metadata.hpp"
 
 namespace ac4dec_test {
 

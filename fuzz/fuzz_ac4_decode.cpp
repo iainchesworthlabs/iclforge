@@ -4,8 +4,8 @@
 #include <optional>
 #include <span>
 
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 
 // iclforge::ac4::Decoder::parse and iclforge::ac4::Decoder::decode (src/ac4dec) - the AC-4
 // decoder's syntax layer, and the reconstruction to PCM behind decode().

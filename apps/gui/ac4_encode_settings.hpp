@@ -9,8 +9,8 @@
 #include <vector>
 
 #include "ac4_objects_core.hpp"
-#include "iclforge/ac4/carriage.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/io/carriage.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 
 // The AC-4 page's choices, Qt-free so that iclforge-tests can hold them to the two
 // things they must agree on: the iclforge::ac4::EncoderConfig the page encodes with and

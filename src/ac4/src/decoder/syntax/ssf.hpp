@@ -5,9 +5,9 @@
 #include <memory>
 #include <vector>
 
-#include "bit_reader.hpp"
-#include "pcm/snf_random.hpp"
-#include "syntax/context.hpp"
+#include "core/bit_reader.hpp"
+#include "decoder/pcm/snf_random.hpp"
+#include "decoder/syntax/context.hpp"
 
 // The speech spectral frontend: ssf_data() (ETSI TS 103 190-1 V1.4.1 clause 4.2.9, Tables 43 to
 // 46, semantics 4.3.7) and its decoding to spectral lines (clause 5.2, Pseudocodes 4a to 58 and

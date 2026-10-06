@@ -9,9 +9,9 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/ac4/toc.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 
 // What forge's `ac4-encode` and forge-gui's AC-4 encode share, so that the
 // command line the GUI echoes writes the same bytes the GUI does: the encoder's

@@ -8,12 +8,12 @@
 #include <utility>
 #include <vector>
 
-#include "aspx/aspx_syntax.hpp"
-#include "iclforge/ac4core/aspx/frequency_tables.hpp"
-#include "iclforge/ac4core/aspx/hf_generator.hpp"
-#include "iclforge/ac4core/dsp/complex.hpp"
-#include "iclforge/ac4core/dsp/qmf.hpp"
-#include "frame/timing.hpp"
+#include "encoder/aspx/aspx_syntax.hpp"
+#include "core/aspx/frequency_tables.hpp"
+#include "core/aspx/hf_generator.hpp"
+#include "core/dsp/complex.hpp"
+#include "core/dsp/qmf.hpp"
+#include "encoder/frame/timing.hpp"
 
 // The encoder's QMF domain: ETSI TS 103 190-1 V1.4.1 clause 5.7 run from the
 // other side. Each channel is analysed by the QMF bank the decoder uses, on

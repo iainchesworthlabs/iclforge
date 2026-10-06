@@ -18,8 +18,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4core/acpl/acpl.hpp"
-#include "iclforge/ac4core/dsp/complex.hpp"
+#include "core/acpl/acpl.hpp"
+#include "core/dsp/complex.hpp"
 
 namespace {
 

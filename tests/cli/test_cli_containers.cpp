@@ -26,8 +26,8 @@
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/io/metadata_edit.hpp"  // restamp_crc, for the non-uniform-access-unit fixture
 #include "iclforge/ac3/io/wav.hpp"
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4/toc.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/core/toc.hpp"
 
 // apps/cli/commands/containers.cpp measured 0.0% line coverage when the
 // apps/cli coverage gate was first pointed at apps/ (re-measured at

@@ -15,8 +15,8 @@
 #include "iclforge/ac3/encoder/assignment.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
 #include "iclforge/objects/scene.hpp"
-#include "iclforge/ac4/toc.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 
 // What forge's `atmos-encode codec=ac4` and `atmos-adm`/`atmos-iab` with
 // codec=ac4 and forge-gui's AC-4 objects share, so that the command line the GUI

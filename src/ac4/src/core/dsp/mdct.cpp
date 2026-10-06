@@ -1,4 +1,4 @@
-#include "iclforge/ac4core/dsp/mdct.hpp"
+#include "core/dsp/mdct.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -7,8 +7,8 @@
 #include <numbers>
 #include <type_traits>
 
-#include "iclforge/ac4core/dsp/scalar_traits.hpp"
-#include "iclforge/ac4core/dsp/transform_tables.hpp"
+#include "core/dsp/scalar_traits.hpp"
+#include "core/dsp/transform_tables.hpp"
 
 namespace iclforge::ac4::detail::dsp {
 namespace {

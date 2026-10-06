@@ -24,10 +24,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4core/acpl/acpl.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "pcm/acpl.hpp"
-#include "syntax/channel_elements.hpp"
+#include "core/acpl/acpl.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/pcm/acpl.hpp"
+#include "decoder/syntax/channel_elements.hpp"
 
 namespace {
 

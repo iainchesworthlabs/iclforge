@@ -6,12 +6,12 @@
 #include <string>
 #include <vector>
 
-#include "iclforge/ac4/carriage.hpp"
-#include "iclforge/ac4/elementary.hpp"
+#include "iclforge/ac4/io/carriage.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
 #include "ac4_encode_core.hpp"
 #include "ac4_encode_settings.hpp"
 #include "ac4_presentations.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 
 // forge-gui's AC-4 page (apps/gui/ac4_encode_settings.hpp): each choice echoes
 // the `forge ac4-encode` token forge's parser reads for it, and builds the

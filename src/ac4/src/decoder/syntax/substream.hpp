@@ -3,12 +3,12 @@
 #include <cstdint>
 #include <optional>
 
-#include "bit_reader.hpp"
-#include "syntax/ajoc.hpp"
-#include "syntax/channel_elements.hpp"
-#include "syntax/context.hpp"
-#include "syntax/metadata.hpp"
-#include "syntax/oamd.hpp"
+#include "core/bit_reader.hpp"
+#include "decoder/syntax/ajoc.hpp"
+#include "decoder/syntax/channel_elements.hpp"
+#include "decoder/syntax/context.hpp"
+#include "decoder/syntax/metadata.hpp"
+#include "decoder/syntax/oamd.hpp"
 
 // ac4_substream() (ETSI TS 103 190-2 V1.3.1 clause 6.2.2.2): the audio_size
 // header, the audio data - audio_data_chan() for a channel-coded substream,

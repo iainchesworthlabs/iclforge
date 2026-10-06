@@ -1,4 +1,4 @@
-#include "pcm/asf_reconstruct.hpp"
+#include "decoder/pcm/asf_reconstruct.hpp"
 
 #include <algorithm>
 #include <array>
@@ -7,9 +7,9 @@
 #include <cstdint>
 #include <utility>
 
-#include "pcm/pow43.hpp"
-#include "iclforge/ac4core/dsp/scalar_traits.hpp"
-#include "iclforge/ac4core/tables/sfb_tables.hpp"
+#include "decoder/pcm/pow43.hpp"
+#include "core/dsp/scalar_traits.hpp"
+#include "core/tables/sfb_tables.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

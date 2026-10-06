@@ -14,10 +14,10 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "ac4dec_bits.hpp"
-#include "bit_reader.hpp"
-#include "syntax/context.hpp"
-#include "syntax/metadata.hpp"
-#include "iclforge/ac4core/tables/huffman_tables.hpp"
+#include "core/bit_reader.hpp"
+#include "decoder/syntax/context.hpp"
+#include "decoder/syntax/metadata.hpp"
+#include "core/tables/huffman_tables.hpp"
 
 namespace {
 

@@ -7,11 +7,11 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4core/acpl/acpl.hpp"
-#include "pcm/aspx.hpp"
-#include "syntax/channel_elements.hpp"
-#include "syntax/context.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "core/acpl/acpl.hpp"
+#include "decoder/pcm/aspx.hpp"
+#include "decoder/syntax/channel_elements.hpp"
+#include "decoder/syntax/context.hpp"
 
 // The A-CPL codec modes' last QMF-domain step, ETSI TS 103 190-1 V1.4.1
 // clause 5.7.7, after A-SPX (6.2.11, Table 214). A frame's parameters are

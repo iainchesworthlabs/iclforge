@@ -7,9 +7,9 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/ac4/toc.hpp"
-#include "iclforge/ac4dec/export.hpp"
-#include "iclforge/ac4dec/frame.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/export.hpp"
+#include "iclforge/ac4/decoder/frame.hpp"
 
 // What an AC-4 Decoder (iclforge/ac4dec/decoder.hpp) reports of the presentation it
 // decodes: its members, and the loudness, DRC, dialogue enhancement and downmix
@@ -34,7 +34,7 @@ enum class SubstreamRole : std::uint8_t {
     kAssociated,
 };
 
-[[nodiscard]] ICLFORGE_AC4DEC_EXPORT std::string_view describe(SubstreamRole role);
+[[nodiscard]] ICLFORGE_AC4_EXPORT std::string_view describe(SubstreamRole role);
 
 struct PresentationMember {
     int substream = 0;  // substream_index: the first of a frame-rate-multiplied series

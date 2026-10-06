@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <vector>
 
-#include "bit_writer.hpp"
+#include "core/bit_writer.hpp"
 
 // The A-JCC syntax, written: ETSI TS 103 190-2 V1.3.1 clause 6.2.6,
 // ajcc_data() with b_5fronts 0 (the 7.X.4 channel modes) or 1 (the 9.X.4 modes)

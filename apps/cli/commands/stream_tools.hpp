@@ -11,7 +11,7 @@
 #include "iclforge/ac3/encoder/plan.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
 #include "../support.hpp"
-#include "iclforge/ac4/elementary.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
 
 // The stream tools: commands that operate on an ALREADY-encoded
 // AC-3/E-AC-3 elementary stream rather than on PCM.

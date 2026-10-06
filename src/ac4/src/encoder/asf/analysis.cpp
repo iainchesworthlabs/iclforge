@@ -1,10 +1,10 @@
-#include "asf/analysis.hpp"
+#include "encoder/asf/analysis.hpp"
 
 #include <algorithm>
 #include <cstddef>
 #include <utility>
 
-#include "iclforge/ac4core/dsp/kbd.hpp"
+#include "core/dsp/kbd.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

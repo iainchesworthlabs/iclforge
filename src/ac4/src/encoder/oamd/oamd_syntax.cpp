@@ -1,4 +1,4 @@
-#include "oamd/oamd_syntax.hpp"
+#include "encoder/oamd/oamd_syntax.hpp"
 
 #include <algorithm>
 #include <cstddef>

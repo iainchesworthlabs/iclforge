@@ -36,8 +36,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 
 namespace {
 

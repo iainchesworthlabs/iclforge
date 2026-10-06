@@ -2,8 +2,8 @@
 
 #include <span>
 
-#include "pcm/aspx.hpp"
-#include "syntax/channel_elements.hpp"
+#include "decoder/pcm/aspx.hpp"
+#include "decoder/syntax/channel_elements.hpp"
 
 // The companding tool: ETSI TS 103 190-1 V1.4.1 clause 5.7.5. It expands, in
 // the QMF domain, what the encoder compressed: each slot of an A-SPX interval

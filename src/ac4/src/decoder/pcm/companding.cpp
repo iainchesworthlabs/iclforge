@@ -1,4 +1,4 @@
-#include "pcm/companding.hpp"
+#include "decoder/pcm/companding.hpp"
 
 #include <algorithm>
 #include <array>
@@ -8,8 +8,8 @@
 #include <cstdlib>
 #include <vector>
 
-#include "iclforge/ac4core/dsp/real_functions.hpp"
-#include "iclforge/ac4core/dsp/scalar_traits.hpp"
+#include "core/dsp/real_functions.hpp"
+#include "core/dsp/scalar_traits.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

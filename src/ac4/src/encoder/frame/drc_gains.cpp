@@ -1,12 +1,12 @@
-#include "frame/drc_gains.hpp"
+#include "encoder/frame/drc_gains.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <complex>
 #include <numbers>
 
-#include "iclforge/ac4core/dsp/complex.hpp"
-#include "iclforge/ac4core/tables/qmf_tables.hpp"
+#include "core/dsp/complex.hpp"
+#include "core/tables/qmf_tables.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

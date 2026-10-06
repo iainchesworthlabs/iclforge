@@ -1,4 +1,4 @@
-#include "syntax/asf.hpp"
+#include "decoder/syntax/asf.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -6,10 +6,10 @@
 #include <expected>
 #include <span>
 
-#include "huffman.hpp"
-#include "syntax/reset.hpp"
-#include "iclforge/ac4core/tables/huffman_tables.hpp"
-#include "iclforge/ac4core/tables/sfb_tables.hpp"
+#include "decoder/huffman.hpp"
+#include "decoder/syntax/reset.hpp"
+#include "core/tables/huffman_tables.hpp"
+#include "core/tables/sfb_tables.hpp"
 
 namespace iclforge::ac4::detail {
 

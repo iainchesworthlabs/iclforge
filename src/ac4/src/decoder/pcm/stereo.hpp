@@ -5,9 +5,9 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4core/detail/real.hpp"
-#include "syntax/asf.hpp"
-#include "syntax/context.hpp"
+#include "iclforge/ac4/detail/real.hpp"
+#include "decoder/syntax/asf.hpp"
+#include "decoder/syntax/context.hpp"
 
 // Stereo processing, ETSI TS 103 190-1 V1.4.1 clause 5.3: Pseudocode 59's
 // parameters a, b, c and d for each window group and scale factor band of a

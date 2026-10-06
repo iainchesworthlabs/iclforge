@@ -26,13 +26,13 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4core/aspx/hf_generator.hpp"
-#include "iclforge/ac4core/detail/real.hpp"
-#include "iclforge/ac4core/dsp/complex.hpp"
-#include "iclforge/ac4core/dsp/fft.hpp"
-#include "iclforge/ac4core/dsp/kbd.hpp"
-#include "iclforge/ac4core/dsp/mdct.hpp"
-#include "iclforge/ac4core/dsp/synthesis.hpp"
+#include "core/aspx/hf_generator.hpp"
+#include "iclforge/ac4/detail/real.hpp"
+#include "core/dsp/complex.hpp"
+#include "core/dsp/fft.hpp"
+#include "core/dsp/kbd.hpp"
+#include "core/dsp/mdct.hpp"
+#include "core/dsp/synthesis.hpp"
 #include "iclforge/arithmetic/scalar_math.hpp"
 
 namespace {

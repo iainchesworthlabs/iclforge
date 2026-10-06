@@ -1,4 +1,4 @@
-#include "iclforge/ac4core/dsp/resampler.hpp"
+#include "core/dsp/resampler.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -9,8 +9,8 @@
 #include <vector>
 
 #include "iclforge/base/detail/profiling.hpp"
-#include "iclforge/ac4core/dsp/resampler_design.hpp"
-#include "iclforge/ac4core/dsp/resampler_vector.hpp"
+#include "core/dsp/resampler_design.hpp"
+#include "core/dsp/resampler_vector.hpp"
 
 namespace iclforge::ac4::detail::dsp {
 namespace {

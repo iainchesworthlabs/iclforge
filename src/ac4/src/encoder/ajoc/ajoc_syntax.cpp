@@ -1,4 +1,4 @@
-#include "ajoc/ajoc_syntax.hpp"
+#include "encoder/ajoc/ajoc_syntax.hpp"
 
 #include <array>
 #include <cstddef>
@@ -6,8 +6,8 @@
 #include <span>
 #include <string_view>
 
-#include "iclforge/ac4core/tables/huffman_codes.hpp"
-#include "iclforge/ac4core/tables/huffman_tables.hpp"
+#include "core/tables/huffman_codes.hpp"
+#include "core/tables/huffman_tables.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

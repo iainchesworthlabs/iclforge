@@ -1,4 +1,4 @@
-#include "frame/dialogue.hpp"
+#include "encoder/frame/dialogue.hpp"
 
 #include <algorithm>
 #include <cmath>

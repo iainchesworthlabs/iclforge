@@ -1,11 +1,11 @@
-#include "syntax/acpl.hpp"
+#include "decoder/syntax/acpl.hpp"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 
-#include "iclforge/ac4core/acpl/acpl.hpp"
-#include "iclforge/ac4core/tables/huffman_tables.hpp"
+#include "core/acpl/acpl.hpp"
+#include "core/tables/huffman_tables.hpp"
 
 namespace iclforge::ac4::detail {
 

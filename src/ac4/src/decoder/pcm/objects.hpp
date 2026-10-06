@@ -4,8 +4,8 @@
 #include <cstddef>
 #include <optional>
 
-#include "iclforge/ac4dec/decoder.hpp"
-#include "syntax/oamd.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/syntax/oamd.hpp"
 
 // What object audio metadata means (ETSI TS 103 190-2 V1.3.1 clause 6.3.9 and
 // Annex F): each object_info_block() an object's properties, against the

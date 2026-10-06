@@ -1,4 +1,4 @@
-#include "pcm/ajoc.hpp"
+#include "decoder/pcm/ajoc.hpp"
 
 #include <algorithm>
 #include <cmath>

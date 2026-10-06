@@ -1,4 +1,4 @@
-#include "pcm/downmix.hpp"
+#include "decoder/pcm/downmix.hpp"
 
 #include <algorithm>
 #include <array>

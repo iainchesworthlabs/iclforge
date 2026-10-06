@@ -14,21 +14,21 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4/toc.hpp"
-#include "iclforge/ac4/syntax.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
-#include "asf/layout.hpp"
-#include "bit_reader.hpp"
-#include "bit_writer.hpp"
-#include "frame/drc_gains.hpp"
-#include "frame/frame_writer.hpp"
-#include "frame/metadata.hpp"
-#include "huffman.hpp"
-#include "pcm/drc.hpp"
-#include "iclforge/ac4core/tables/huffman_codes.hpp"
-#include "iclforge/ac4core/tables/huffman_tables.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/core/syntax.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
+#include "encoder/asf/layout.hpp"
+#include "core/bit_reader.hpp"
+#include "core/bit_writer.hpp"
+#include "encoder/frame/drc_gains.hpp"
+#include "encoder/frame/frame_writer.hpp"
+#include "encoder/frame/metadata.hpp"
+#include "decoder/huffman.hpp"
+#include "decoder/pcm/drc.hpp"
+#include "core/tables/huffman_codes.hpp"
+#include "core/tables/huffman_tables.hpp"
 
 namespace {
 

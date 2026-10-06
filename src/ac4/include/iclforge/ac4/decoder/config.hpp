@@ -6,9 +6,9 @@
 #include <string>
 #include <string_view>
 
-#include "iclforge/ac4/syntax.hpp"
-#include "iclforge/ac4/toc.hpp"
-#include "iclforge/ac4dec/export.hpp"
+#include "iclforge/ac4/core/syntax.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/export.hpp"
 
 // What an AC-4 Decoder (iclforge/ac4dec/decoder.hpp) is configured by: the output
 // processing a system asks for, which presentation it decodes, what it does with a
@@ -59,7 +59,7 @@ enum class DownmixTarget : std::uint8_t {
     k5X2,
 };
 
-[[nodiscard]] ICLFORGE_AC4DEC_EXPORT std::string_view describe(DownmixTarget target);
+[[nodiscard]] ICLFORGE_AC4_EXPORT std::string_view describe(DownmixTarget target);
 
 // Part 1 Table 161's DRC decoder modes, and how decode() chooses one.
 enum class DrcMode : std::uint8_t {
@@ -71,7 +71,7 @@ enum class DrcMode : std::uint8_t {
     kPortableHeadphones,  // 3
 };
 
-[[nodiscard]] ICLFORGE_AC4DEC_EXPORT std::string_view describe(DrcMode mode);
+[[nodiscard]] ICLFORGE_AC4_EXPORT std::string_view describe(DrcMode mode);
 
 // The controls of planning/ac4.md's "One control for both formats" that act on
 // the decoded channels. Decoder::set_output() changes them from the next frame.
@@ -161,7 +161,7 @@ struct PresentationChoice {
 // level `level` (md_compat, Part 1 Table 86 and Part 2 Table 55): its index in
 // Toc::presentations_v1, or in presentations_v0 below bitstream_version 2;
 // nothing when no presentation can be selected.
-[[nodiscard]] ICLFORGE_AC4DEC_EXPORT std::optional<std::size_t> select_presentation(const Toc& toc,
+[[nodiscard]] ICLFORGE_AC4_EXPORT std::optional<std::size_t> select_presentation(const Toc& toc,
                                                                            const PresentationChoice& choice,
                                                                            int level);
 
@@ -203,7 +203,7 @@ enum class DecodingMode : std::uint8_t {
     kCore,
 };
 
-[[nodiscard]] ICLFORGE_AC4DEC_EXPORT std::string_view describe(DecodingMode mode);
+[[nodiscard]] ICLFORGE_AC4_EXPORT std::string_view describe(DecodingMode mode);
 
 // A decoder's configuration. Decoder::set_output() and set_presentation()
 // change the two halves a system changes while a stream plays; the rest is

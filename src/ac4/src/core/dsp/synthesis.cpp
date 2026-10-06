@@ -1,12 +1,12 @@
-#include "iclforge/ac4core/dsp/synthesis.hpp"
+#include "core/dsp/synthesis.hpp"
 
 #include <algorithm>
 #include <type_traits>
 #include <utility>
 
 #include "iclforge/base/detail/profiling.hpp"
-#include "iclforge/ac4core/dsp/kbd.hpp"
-#include "iclforge/ac4core/dsp/transform_tables.hpp"
+#include "core/dsp/kbd.hpp"
+#include "core/dsp/transform_tables.hpp"
 
 namespace iclforge::ac4::detail::dsp {
 namespace {

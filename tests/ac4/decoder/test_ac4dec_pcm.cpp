@@ -25,19 +25,19 @@
 
 #include "ac4dec_units.hpp"
 
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4/toc.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4core/dsp/qmf.hpp"
-#include "pcm/pow43.hpp"
-#include "pcm/snf_random.hpp"
-#include "pcm/stereo.hpp"
-#include "pcm/substream_pcm.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "core/dsp/qmf.hpp"
+#include "decoder/pcm/pow43.hpp"
+#include "decoder/pcm/snf_random.hpp"
+#include "decoder/pcm/stereo.hpp"
+#include "decoder/pcm/substream_pcm.hpp"
 #include "sanitized.hpp"
-#include "syntax/asf.hpp"
-#include "syntax/context.hpp"
-#include "iclforge/ac4core/tables/noise_tables.hpp"
-#include "iclforge/ac4core/tables/sfb_tables.hpp"
+#include "decoder/syntax/asf.hpp"
+#include "decoder/syntax/context.hpp"
+#include "core/tables/noise_tables.hpp"
+#include "core/tables/sfb_tables.hpp"
 
 namespace {
 

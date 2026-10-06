@@ -1,4 +1,4 @@
-#include "syntax/oamd.hpp"
+#include "decoder/syntax/oamd.hpp"
 
 #include <array>
 #include <cstddef>
@@ -6,7 +6,7 @@
 #include <string_view>
 #include <utility>
 
-#include "syntax/metadata.hpp"
+#include "decoder/syntax/metadata.hpp"
 
 namespace iclforge::ac4::detail {
 

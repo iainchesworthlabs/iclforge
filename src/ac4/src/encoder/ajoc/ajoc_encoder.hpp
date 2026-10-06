@@ -6,10 +6,10 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4core/ajoc/ajoc.hpp"
-#include "ajoc/ajoc_syntax.hpp"
-#include "iclforge/ac4core/dsp/qmf.hpp"
-#include "frame/timing.hpp"
+#include "core/ajoc/ajoc.hpp"
+#include "encoder/ajoc/ajoc_syntax.hpp"
+#include "core/dsp/qmf.hpp"
+#include "encoder/frame/timing.hpp"
 
 // The encoder's A-JOC: ETSI TS 103 190-2 V1.3.1 clause 5.7 run from the other
 // side. The downmix signals, in A-JOC's input order, and the objects they

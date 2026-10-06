@@ -45,8 +45,8 @@
 #include "iclforge/sendspin/server_store.hpp"
 #include "iclforge/sendspin/state_roles.hpp"
 #include "iclforge/sendspin/stream_roles.hpp"
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 #include "burst_output.hpp"
 #include "sink.hpp"
 

@@ -21,9 +21,9 @@
 
 #include "../exit_codes.hpp"
 #include "../support.hpp"
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 #include "analysis.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"

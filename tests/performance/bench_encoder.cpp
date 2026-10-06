@@ -49,8 +49,8 @@
 #include "iclforge/ac3/oba/atmos.hpp"
 #include "iclforge/ac3/oba/joc.hpp"
 #include "ac4_bench.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 #include "real_audio.hpp"
 
 namespace {

@@ -1,4 +1,4 @@
-#include "pcm/substream_pcm.hpp"
+#include "decoder/pcm/substream_pcm.hpp"
 
 #include <algorithm>
 #include <array>
@@ -8,14 +8,14 @@
 #include <numbers>
 #include <span>
 
-#include "iclforge/ac4core/aspx/hf_generator.hpp"
-#include "pcm/asf_reconstruct.hpp"
-#include "pcm/companding.hpp"
-#include "pcm/immersive.hpp"
-#include "pcm/multichannel.hpp"
-#include "pcm/snf_random.hpp"
-#include "pcm/stereo.hpp"
-#include "iclforge/ac4core/dsp/scalar_traits.hpp"
+#include "core/aspx/hf_generator.hpp"
+#include "decoder/pcm/asf_reconstruct.hpp"
+#include "decoder/pcm/companding.hpp"
+#include "decoder/pcm/immersive.hpp"
+#include "decoder/pcm/multichannel.hpp"
+#include "decoder/pcm/snf_random.hpp"
+#include "decoder/pcm/stereo.hpp"
+#include "core/dsp/scalar_traits.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

@@ -6,10 +6,10 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4core/ajoc/ajoc.hpp"
-#include "pcm/aspx.hpp"
-#include "syntax/ajoc.hpp"
-#include "syntax/context.hpp"
+#include "core/ajoc/ajoc.hpp"
+#include "decoder/pcm/aspx.hpp"
+#include "decoder/syntax/ajoc.hpp"
+#include "decoder/syntax/context.hpp"
 
 // A-JOC's QMF-domain step, ETSI TS 103 190-2 V1.3.1 clause 5.7, for an A-JOC
 // substream after A-SPX (4.8.3.13): the downmix, its inputs in QinAJOC's order

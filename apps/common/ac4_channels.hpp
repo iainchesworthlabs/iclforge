@@ -9,7 +9,7 @@
 
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 
 // AC-4's channels in WAV files, for forge's `decode` and `ac4-encode` and
 // forge-gui's AC-4 pages alike: a WAV file holds them in the WAVEFORMATEXTENSIBLE

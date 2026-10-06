@@ -1,4 +1,4 @@
-#include "syntax/aspx.hpp"
+#include "decoder/syntax/aspx.hpp"
 
 #include <algorithm>
 #include <array>
@@ -9,8 +9,8 @@
 #include <span>
 #include <string_view>
 
-#include "iclforge/ac4core/aspx/frequency_tables.hpp"
-#include "iclforge/ac4core/tables/huffman_tables.hpp"
+#include "core/aspx/frequency_tables.hpp"
+#include "core/tables/huffman_tables.hpp"
 
 namespace iclforge::ac4::detail {
 

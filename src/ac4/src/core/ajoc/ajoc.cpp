@@ -1,4 +1,4 @@
-#include "iclforge/ac4core/ajoc/ajoc.hpp"
+#include "core/ajoc/ajoc.hpp"
 
 #include <algorithm>
 #include <cmath>

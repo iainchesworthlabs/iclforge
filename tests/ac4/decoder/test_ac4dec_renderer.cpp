@@ -24,11 +24,11 @@
 
 #include "ac4dec_units.hpp"
 
-#include "iclforge/ac4dec/decoder.hpp"
-#include "pcm/downmix.hpp"
-#include "pcm/renderer.hpp"
-#include "syntax/metadata.hpp"
-#include "syntax/presentation.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/pcm/downmix.hpp"
+#include "decoder/pcm/renderer.hpp"
+#include "decoder/syntax/metadata.hpp"
+#include "decoder/syntax/presentation.hpp"
 
 namespace {
 

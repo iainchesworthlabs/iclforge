@@ -6,9 +6,9 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4/carriage.hpp"
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4/toc.hpp"
+#include "iclforge/ac4/io/carriage.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/core/toc.hpp"
 
 // iclforge::ac4::scan, iclforge::ac4::SyncFrameSplitter and iclforge::ac4::parse_raw_frame
 // (src/ac4/src/ ac4.cpp) - the AC-4 bitstream inspector.

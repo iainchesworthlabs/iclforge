@@ -38,9 +38,9 @@
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/iec61937/iec61937.hpp"
 #include "iclforge/render/spatial.hpp"
-#include "iclforge/ac4/elementary.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
 #include "ac4_channels.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 
 namespace forge_cli::commands {
 

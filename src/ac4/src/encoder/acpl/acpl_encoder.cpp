@@ -1,4 +1,4 @@
-#include "acpl/acpl_encoder.hpp"
+#include "encoder/acpl/acpl_encoder.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -9,7 +9,7 @@
 #include <tuple>
 #include <utility>
 
-#include "iclforge/ac4core/ajcc/ajcc.hpp"
+#include "core/ajcc/ajcc.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

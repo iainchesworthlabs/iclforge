@@ -13,8 +13,8 @@
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
 #include "ac4_bench.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 #include "real_audio.hpp"
 
 // Real-time throughput regression guard.

@@ -18,7 +18,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4/toc.hpp"
+#include "iclforge/ac4/core/toc.hpp"
 
 namespace {
 

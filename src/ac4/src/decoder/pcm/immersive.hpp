@@ -3,8 +3,8 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4dec/decoder.hpp"
-#include "pcm/aspx.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/pcm/aspx.hpp"
 
 // The immersive element's tools beside A-CPL and A-JCC, ETSI TS 103 190-2
 // V1.3.1: simple coupling (S-CPL, clause 5.3), in the time domain between the

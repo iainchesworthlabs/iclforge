@@ -6,8 +6,8 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4dec/decoder.hpp"
-#include "pcm/aspx.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/pcm/aspx.hpp"
 
 // Mixing a presentation's substreams (ETSI TS 103 190-1 V1.4.1 clause 6.2.16,
 // ETSI TS 103 190-2 V1.3.1 clauses 4.8.3.17 to 4.8.4): in the QMF domain,

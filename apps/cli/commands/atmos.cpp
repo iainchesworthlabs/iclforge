@@ -1,5 +1,5 @@
 #include "atmos.hpp"
-#include "iclforge/ac4/elementary.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
 
 #include <algorithm>
 #include <array>
@@ -41,7 +41,7 @@
 #include "iclforge/signing/signing_key.hpp"
 #include "ac4_encode_core.hpp"
 #include "ac4_objects_core.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 #include "../adm/atmos_adm.hpp"
 #include "../adm/atmos_iab.hpp"
 

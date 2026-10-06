@@ -1,5 +1,5 @@
 #include "encoder_controller.hpp"
-#include "iclforge/ac4/elementary.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
 
 #include "iclforge/base/detail/profiling.hpp"
 
@@ -58,7 +58,7 @@
 #include "iclforge/mp4/mp4.hpp"
 #include "iclforge/mpegts/mpegts.hpp"
 #include "ac4_encode_core.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 #include "channel_geometry.hpp"
 #include "fmp4_folder_writer.hpp"
 #include "recording_sink.hpp"

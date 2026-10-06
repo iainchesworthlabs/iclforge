@@ -1,4 +1,4 @@
-#include "asf/stereo.hpp"
+#include "encoder/asf/stereo.hpp"
 
 #include <algorithm>
 #include <array>
@@ -9,7 +9,7 @@
 #include <limits>
 #include <utility>
 
-#include "iclforge/ac4core/tables/huffman_codes.hpp"
+#include "core/tables/huffman_codes.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

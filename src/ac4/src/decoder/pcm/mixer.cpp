@@ -1,4 +1,4 @@
-#include "pcm/mixer.hpp"
+#include "decoder/pcm/mixer.hpp"
 
 #include <algorithm>
 #include <cmath>

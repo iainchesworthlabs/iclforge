@@ -1,4 +1,4 @@
-#include "pcm/ajcc.hpp"
+#include "decoder/pcm/ajcc.hpp"
 
 #include <algorithm>
 #include <initializer_list>

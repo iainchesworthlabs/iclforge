@@ -1,4 +1,4 @@
-#include "iclforge/ac4core/aspx/hf_generator.hpp"
+#include "core/aspx/hf_generator.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "iclforge/arithmetic/scalar_math.hpp"
-#include "iclforge/ac4core/dsp/scalar_traits.hpp"
+#include "core/dsp/scalar_traits.hpp"
 
 namespace iclforge::ac4::detail::aspx {
 namespace {

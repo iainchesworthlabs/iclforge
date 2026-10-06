@@ -1,6 +1,6 @@
-#include "pcm/snf_random.hpp"
+#include "decoder/pcm/snf_random.hpp"
 
-#include "iclforge/ac4core/tables/noise_tables.hpp"
+#include "core/tables/noise_tables.hpp"
 
 namespace iclforge::ac4::detail {
 

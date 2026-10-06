@@ -5,9 +5,9 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4dec/decoder.hpp"
-#include "syntax/channel_elements.hpp"
-#include "syntax/context.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/syntax/channel_elements.hpp"
+#include "decoder/syntax/context.hpp"
 
 // Where the tracks of a channel element go, ETSI TS 103 190-1 V1.4.1 clause
 // 5.3.4: the single channel element's one track is C (5.3.3.1); a pair's

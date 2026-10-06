@@ -1,6 +1,6 @@
 #include "ac4_stream.hpp"
-#include "iclforge/ac4/carriage.hpp"
-#include "iclforge/ac4/elementary.hpp"
+#include "iclforge/ac4/io/carriage.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
 
 #include <fmt/format.h>
 

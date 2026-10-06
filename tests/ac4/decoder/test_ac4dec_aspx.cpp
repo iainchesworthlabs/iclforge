@@ -27,9 +27,9 @@
 
 #include "ac4dec_units.hpp"
 #include "iclforge/arithmetic/scalar_math.hpp"
-#include "pcm/aspx.hpp"
-#include "pcm/companding.hpp"
-#include "iclforge/ac4core/tables/qmf_tables.hpp"
+#include "decoder/pcm/aspx.hpp"
+#include "decoder/pcm/companding.hpp"
+#include "core/tables/qmf_tables.hpp"
 
 namespace {
 

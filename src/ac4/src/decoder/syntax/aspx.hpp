@@ -3,9 +3,9 @@
 #include <array>
 #include <cstdint>
 
-#include "bit_reader.hpp"
-#include "huffman.hpp"
-#include "syntax/context.hpp"
+#include "core/bit_reader.hpp"
+#include "decoder/huffman.hpp"
+#include "decoder/syntax/context.hpp"
 
 // Advanced spectral extension (A-SPX) syntax: ETSI TS 103 190-1 V1.4.1 clause
 // 4.2.12, semantics 4.3.10. Part 2 (TS 103 190-2 V1.3.1) Table 48 uses every

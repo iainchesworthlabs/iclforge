@@ -21,7 +21,7 @@
 #include <vector>
 
 #include <iclforge/ac4/ac4.hpp>
-#include <iclforge/ac4enc/encoder.hpp>
+#include <iclforge/ac4/encoder/encoder.hpp>
 
 namespace {
 

@@ -1,11 +1,11 @@
-#include "pcm/isf.hpp"
+#include "decoder/pcm/isf.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <optional>
 
-#include "iclforge/ac4core/tables/isf_tables.hpp"
+#include "core/tables/isf_tables.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

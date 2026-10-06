@@ -1,9 +1,9 @@
-#include "pcm/multichannel.hpp"
+#include "decoder/pcm/multichannel.hpp"
 
 #include <algorithm>
 #include <cstddef>
 
-#include "iclforge/ac4core/tables/sfb_tables.hpp"
+#include "core/tables/sfb_tables.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

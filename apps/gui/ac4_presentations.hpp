@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 
 // What the AC-4 pages show of a stream's presentations, Qt-free so iclforge-tests
 // holds it: each presentation of the table of contents, by its position,

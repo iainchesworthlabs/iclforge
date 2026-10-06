@@ -21,8 +21,8 @@
 
 #include "../exit_codes.hpp"
 #include "../support.hpp"
-#include "iclforge/ac4/elementary.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/audio/capture.hpp"
 #include "iclforge/audio/live_positions.hpp"
