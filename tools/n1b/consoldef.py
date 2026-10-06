@@ -191,6 +191,7 @@ FOLDED = {
     "c2": {},
     "c3": {},
     "c4n": {},
+    "c4": {},
 }
 
 # --- C4's names -------------------------------------------------------------------------------
@@ -221,8 +222,22 @@ def c4n_new(path: str) -> str | None:
     return None
 
 
-STAGES = {"c1": c1_new, "c2": c2_new, "c3": c3_new, "c4n": c4n_new}
-REMOVED = {"c1": C1_REMOVED, "c2": C2_REMOVED, "c3": C3_REMOVED, "c4n": ()}
+# --- C4 ---------------------------------------------------------------------------------------
+# What object audio metadata means and the object and ISF rendering are the codec's object area,
+# as AC-3's are src/ac3/src/oba/ (planning/consolidation.md (d)). The rest of C4 merges copies into
+# one, which is by hand.
+C4_EXACT = {
+    f"src/ac4/src/decoder/pcm/{name}": f"src/ac4/src/oba/{name}"
+    for name in ("objects.hpp", "objects.cpp", "isf.hpp", "isf.cpp")
+}
+
+
+def c4_new(path: str) -> str | None:
+    return C4_EXACT.get(path)
+
+
+STAGES = {"c1": c1_new, "c2": c2_new, "c3": c3_new, "c4n": c4n_new, "c4": c4_new}
+REMOVED = {"c1": C1_REMOVED, "c2": C2_REMOVED, "c3": C3_REMOVED, "c4n": (), "c4": ()}
 
 # The libraries each stage merges, old -> new: what a target, an export macro, an export header, a
 # pkg-config name or an ABI allowlist follows (consol_apply.py, export_diff.py --map,
@@ -232,12 +247,13 @@ LIBRARY_MAP = {
     "c2": {"arithmetic": "base", "admbridge": "adm", "signing": "ac3"},
     "c3": {c: "containers" for c in CONTAINERS},
     "c4n": {},
+    "c4": {},
 }
 
 # The libraries a stage divides, old -> every library its files went to: signing's key, hash and
 # MAC are base's and its signer ac3's, so the exports of signing, ac3 and base are compared as one
 # group (export_diff.py, abi_compare.py).
-SPLITS = {"c1": {}, "c2": {"signing": ("ac3", "base")}, "c3": {}, "c4n": {}}
+SPLITS = {"c1": {}, "c2": {"signing": ("ac3", "base")}, "c3": {}, "c4n": {}, "c4": {}}
 
 # The names a stage moves to another namespace, as the exports spell them: the old namespace and,
 # for each name declared in it, the new one (consol_text.py's tables).
