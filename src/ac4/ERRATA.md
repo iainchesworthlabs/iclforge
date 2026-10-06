@@ -2770,7 +2770,7 @@ The writer takes the decoder's reading of each of these:
   coefficient for counted from 0.
 - [Full scale, and the overlap-add's factor of two](#full-scale-and-the-overlap-adds-factor-of-two),
   [KBD_RIGHT's argument](#kbd_rights-argument) and
-  [The KBD kernel is summed to p = N](#the-kbd-kernel-is-summed-to-p-n): the forward
+  [The KBD kernel is summed to p = N](#the-kbd-kernel-is-summed-to-p--n): the forward
   transform is the transpose of the decoder's, through the same windows, with lines scaled by 2^16 so
   that a full-scale input decodes at full scale.
 - [Partial coupling starts at acpl_param_band](#partial-coupling-starts-at-acpl_param_band):
