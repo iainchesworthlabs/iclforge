@@ -14,6 +14,9 @@ which the split makes cross a library boundary (base to ac3) and so export.
 
   --map l2         the libraries of S2 (the default): `libac3forge.so` against the six it became
   --map identity   every library of the old directory is the same file in the new one (S3, S4)
+  --map c1|c2|c3   a consolidation stage (planning/consolidation.md): the libraries it merges
+                   against the one they become (export_diff.consolidation_map), every other one
+                   against its own file
   --rewrite names  the old names are rewritten first, the way n1b_names.py rewrites the source
                    (export_diff.rewrite), so a namespace rename shows no difference: the
                    allowlists hold demangled names, which unlike the mangled ones can be rewritten
@@ -58,6 +61,10 @@ LIBRARIES: dict[str, list[str]] = {
 
 
 def read(directory: Path, library: str) -> set[str]:
+    """The names a library's allowlist holds; for `a.so+b.so`, the libraries a stage merged, the
+    union of theirs."""
+    if "+" in library:
+        return set().union(*(read(directory, part) for part in library.split("+")))
     path = directory / f"{library}.txt"
     if not path.is_file():
         return set()
@@ -68,6 +75,12 @@ def identity(old_dir: Path) -> dict[str, list[str]]:
     """Every library of the old directory, replaced by the file of the same name."""
     names = [p.name.removesuffix(".txt") for p in sorted(old_dir.glob("*.so.txt"))]
     return {name: [name] for name in names}
+
+
+def consolidation(old_dir: Path, stage: str) -> dict[str, list[str]]:
+    """The libraries of the old directory, those a consolidation stage merges as one group."""
+    names = [p.name.removesuffix(".txt") for p in sorted(old_dir.glob("*.so.txt"))]
+    return export_diff.consolidation_map(stage, names)
 
 
 def compare(
@@ -113,14 +126,18 @@ def main() -> None:
     )
     ap.add_argument("old", type=Path)
     ap.add_argument("new", type=Path)
-    ap.add_argument("--map", choices=["l2", "identity"], default="l2")
+    ap.add_argument("--map", choices=["l2", "identity", "c1", "c2", "c3"], default="l2")
     ap.add_argument("--rewrite", default="", help="comma-separated: cuts, names, idents, ac3ns")
     a = ap.parse_args()
     kinds = {k for k in a.rewrite.split(",") if k}
     unknown = kinds - {"cuts", "names", "idents", "ac3ns"}
     if unknown:
         sys.exit(f"abi_compare: unknown --rewrite {sorted(unknown)}")
-    mapping = identity(a.old) if a.map == "identity" else None
+    mapping = (
+        identity(a.old)
+        if a.map == "identity"
+        else consolidation(a.old, a.map) if a.map in ("c1", "c2", "c3") else None
+    )
     sys.exit(1 if compare(a.old, a.new, mapping=mapping, kinds=kinds) else 0)
 
 

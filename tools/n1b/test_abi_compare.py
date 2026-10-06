@@ -135,6 +135,30 @@ class Compare(unittest.TestCase):
         self.assertIn("only in old: mp4::write()", text)
         self.assertIn("only in new: iclforge::mp4::write()", text)
 
+    def test_the_three_ac4_libraries_c1_merges_export_what_the_one_does(self) -> None:
+        self.write(self.old, "libiclforge_ac4.so", ["iclforge::ac4::scan()"])
+        self.write(self.old, "libiclforge_ac4dec.so", ["iclforge::ac4::Decoder::Decoder()"])
+        self.write(self.old, "libiclforge_ac4enc.so", ["iclforge::ac4::Encoder::Encoder()"])
+        self.write(self.old, "libiclforge_mp4.so", ["iclforge::mp4::write()"])
+        self.write(
+            self.new,
+            "libiclforge_ac4.so",
+            [
+                "iclforge::ac4::scan()",
+                "iclforge::ac4::Decoder::Decoder()",
+                "iclforge::ac4::Encoder::Encoder()",
+            ],
+        )
+        self.write(self.new, "libiclforge_mp4.so", ["iclforge::mp4::write()"])
+        mapping = abi_compare.consolidation(self.old, "c1")
+        out = io.StringIO()
+        changed = abi_compare.compare(self.old, self.new, out, mapping)
+        self.assertEqual(changed, 0, out.getvalue())
+        self.assertIn(
+            "libiclforge_ac4.so+libiclforge_ac4dec.so+libiclforge_ac4enc.so (3) <- 1 library",
+            out.getvalue(),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
