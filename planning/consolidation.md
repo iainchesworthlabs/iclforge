@@ -1,17 +1,18 @@
 # One shape for every codec, and fewer libraries (a proposal)
 
-!!! note "Status as of 2026-10-06: C0, C1 and C2 run and proved; C3 under way; decisions 1 to 7, 10 and 11 taken"
+!!! note "Status as of 2026-10-06: C0 to C3 run and proved, `src/` reviewed after them; decisions 1 to 7, 10 and 11 taken"
     Asked for by the user on 2026-10-06: "the AC3 codec and the AC4 codec structures are completely
     different. There's also duplication from inside codecs to common stuff", "the ac3 approach is the
     preferred approach", and "should there be 25 libraries? Is it worth consolidating some?". This page
     reads the tree as it stood on `main` that day. It follows [layout.md](layout.md) (N1B), which put the
     codecs side by side and left the duplicated DSP, the codec-blind vocabulary and the shape of AC-4 for
     later ([layout.md (j)](layout.md#j-what-stays-out-and-follow-on-ideas)). The user took decisions 1 to 5
-    below on 2026-10-06, 7 and 10 before C1, and 6 before C3; 8 and 9 are open. C0, C1 and C2 ran on
-    the local branches `chore/src-consolidation-c0`, `-c1` and `-c2` and changed nothing a build
-    outputs; C1's cut moves the instruction counts of the bare-metal AC-4 probe by up to 68 parts per
-    million, which the user accepted (decision 11) ([what the runs
-    found](#what-the-runs-found-that-the-plan-did-not)); nothing is pushed.
+    below on 2026-10-06, 7 and 10 before C1, and 6 before C3; 8 and 9 are open. C0 to C3 ran on the
+    local branches `chore/src-consolidation-c0` to `-c3` and changed nothing a build outputs; C1's
+    cut moves the instruction counts of the bare-metal AC-4 probe by up to 68 parts per million,
+    which the user accepted (decision 11) ([what the runs
+    found](#what-the-runs-found-that-the-plan-did-not)); [the review after
+    C3](#after-c3-src-reviewed) says what is left for C4 to C6. Nothing is pushed.
 
 ## In brief
 
@@ -662,6 +663,154 @@ Hazards the plan did not name:
 
 Not run here: as for C1. The coverage floors of `src/adm` take the lower of `adm`'s and `admbridge`'s
 (82/75); `src/base` and `src/ac3` keep theirs, which are under signing's.
+
+### C3, 2026-10-06 (`chore/src-consolidation-c3`)
+
+The commits, after C2: the moves alone (45 renames, every one `R100`); the include spellings (96
+files); the build files and the paths in text (28 files); the text pass (203 files: 1,827 qualified
+names, 58 namespace declarations, 44 relative uses of `iec61937::`, the targets, files, pkg-config
+names and directories), then three corrections of it, each after the commit of its rule (below);
+the hand-written commit (31 files, +181 −335); the links to renamed headings; the consumer check;
+the ABI allowlist. 16 commits, 6 of them the scripts'.
+
+| | the plan | the run |
+|---|---|---|
+| the library | `mp4`, `mpegts`, `matroska`, `iamf`, `iec61937` as one, `iclforge::containers` | so: `src/containers/CMakeLists.txt` builds IEC 61937 always and each other part by its option; the minimum-footprint profile builds no container (it built none before: `iec61937`'s build file returned at once), so the ESP-IDF packer stages no `src/containers` |
+| namespaces (decision 6) | `iclforge::containers::mp4` and so on | so; the iamf tests' `namespace iamf = iclforge::iamf;` aliases keep their relative names, and code in another namespace that wrote `iec61937::` writes `containers::iec61937::` |
+| the options | `ICLFORGE_BUILD_MP4` and the rest keep their names and select sources | so; a part that is off installs no headers (`iclforge_install_library(... EXCLUDE <part>)`), and the vcpkg features and Conan options keep their names |
+| `ac3`'s link to `iec61937` | removed | removed, with `iclforge-ac3.pc`'s `Requires` of it: two programs that included IEC 61937 through that link (`apps/hearth/testsink`, the Crucible spike `s4_throughput`) link the containers now |
+| `audio`'s row | names `containers` | so |
+| libraries | 16 to 12 | 12 (`check_layering.py`: 150 edges); public headers 165 in 11 libraries; the install 236 files to 208; the ABI allowlists 13 to 9 |
+
+**The proof.** Against C2's tree:
+
+- **Identical:** the pinned hashes and the 44 commands of the CLI corpus on both compilers; the five
+  bare-metal probes, every line; the exports (`export_diff.py --map c3 --rewrite c3`: the five
+  libraries' 396 names are `libiclforge_containers.so`'s, every other library −0 +0, 3,268 names in
+  all); the allowlists (`abi_compare.py --map c3 --rewrite c3`: 115 names, −0 +0); the public headers
+  (`check-moves --pure`: 167, none lost or edited).
+- **The whole ctest:** 3,452 tests on GCC and on Clang, all pass but the five that skip themselves.
+- **The IR** (`ir_compare.py --plan --names c3`, 540 units): 527 identical; two the same but for local
+  lambdas' mangled names, whose encoding follows the deeper namespace; the rest what a build writes.
+- **How each unit compiles** (`flags_diff.py --moves`): the consumers trade five `STATIC_DEFINE`s and
+  include directories for one; `ac3`'s units lose IEC 61937's; the five parts' units take the
+  library's flags, among them base's include path and the private {fmt} defines, which only MP4's
+  HLS and DASH writers use (their IR is unchanged).
+- **The installed package:** `check_install_consumer.sh` passes on the GCC tree and on a tree with
+  the four optional parts off, where none of their headers is installed; its programs print what
+  they printed on C0.
+- `check_layering.py`, `check_namespaces.py`, `check_pages.py`, `check_doc_paths.py` (6,190 paths), the
+  unit tests and `precheck.py` (but for the patch attribution) pass.
+
+Hazards the plan did not name:
+
+- **A rule that matches its own output.** The directory rule made `src/mp4` `src/containers/src/mp4`,
+  which holds `src/mp4` again: its first run nested the directories the path pass had already moved
+  (`src/containers/src/containers/src/mp4/`, 10 files), and it matched a file named for its library
+  (`src/mp4.cpp`). The rule now leaves a path inside another and a file name, a repair rule undid the
+  nesting, and the pass is idempotent again. C1's and C2's directory rules map to paths that do not
+  contain their patterns.
+- **Text that is data.** The pass rewrote the ABI allowlists (what a build exported, which `--update`
+  writes) and the namespace checker's own fixtures (which define a library `mp4` of their own); both
+  are kept now and their text restored.
+- **Anchors.** A heading that names a part's namespace has a new anchor, so five links to them were
+  broken; a rule follows them.
+- **Lines past the column limit.** The longer namespace pushes 318 lines in 63 files past 100
+  columns. `n1b_reflow.py` wraps them with `clang-format`, which is not installed here; nothing in CI
+  checks a C++ line, and the reflow is a commit of its own on a machine that has it.
+- **Two checks a consumer runs.** `check_install_consumer.sh` keyed each container on its own
+  `<name>Targets.cmake`; it holds a part to its headers now. Running it found C1's and C2's misses
+  (their sections above).
+
+Not run here: as for C1, and the reflow. The coverage floor of `src/containers` is the lowest of the
+five it replaces (88/83).
+
+## After C3: `src/` reviewed
+
+**What C0 to C3 changed.** Twenty-two libraries are twelve. C0 made every library by
+`iclforge_add_library()` and moved nothing; C1 made AC-4's four one, laid out by area as AC-3's; C2
+put `arithmetic` in `base`, `admbridge` in `adm`, and divided `signing` between `base` (the key, the
+hash, the MAC) and `ac3` (the signer); C3 made the five containers one library with nested namespaces.
+Across the four stages the pinned hashes, the CLI corpus, the exports (3,268 names), the IR of every
+moved unit and the whole ctest are what they were; the one difference is decision 11's (C1's cut
+moves the AC-4 probe's instruction counts by up to 68 ppm and its image by 80 to 112 bytes).
+
+**The libraries now** (`tools/checks/layering.json`, which `check_layering.py` holds the includes to):
+
+| library | may include | installed | ABI allowlist |
+|---|---|---|---|
+| `base` (with `base_arithmetic`, header-only, not installed) | | yes | yes |
+| `dsp` | `base` | yes | yes |
+| `objects` | `base`, `dsp` | yes | yes |
+| `render` | `base`, `objects` | yes | yes |
+| `containers` | `base` | yes | yes |
+| `ac3` | `base`, `dsp`, `objects`, `render` | yes | yes |
+| `ac4` | `base`, `dsp`, `objects`, `render` | yes (`ICLFORGE_BUILD_AC4`) | yes |
+| `iab` | | yes (`ICLFORGE_BUILD_IAB`) | yes |
+| `adm` | `iab`, `objects` | shared only (`ICLFORGE_BUILD_ADM`) | no (CI's shared leg builds no ADM) |
+| `capi` | `ac3`, `ac4` | yes (`ICLFORGE_BUILD_CAPI`) | yes |
+| `audio` | `base`, `render`, `containers`, `objects` | no | no |
+| `sendspin` | | no | no |
+
+That is section (d)'s table, but for one thing: `ac4` lists `base`, `dsp`, `objects` and `render`
+and still includes only `base`'s (the profiling and arithmetic headers, through include paths, linking
+none): C4 and C5 are what make AC-4 use the rest.
+
+**The duplications left, with their paths.**
+
+- *For C4 (no arithmetic touched).* Bit I/O three times: `src/base/include/iclforge/base/bitreader.hpp`
+  and `bitwriter.hpp`; `src/ac4/src/core/bit_reader.hpp` and `bit_writer.hpp`; `src/iab/src/bitreader.hpp`
+  and `bitwriter.hpp`; and readers of their own inside units, `src/ac4/src/core/toc.cpp`'s `Reader`,
+  `src/ac4/src/io/carriage.cpp`'s `DsiWriter`, `src/containers/src/iec61937/iec61937.cpp`'s `TocBits`.
+  The `variable_bits` codings in `src/objects/src/emdf.cpp`, `src/ac3/src/emdf/frame_layout.cpp`,
+  `src/ac4/src/core/bit_writer.cpp` and `src/containers/src/iec61937/iec61937.cpp`. CRC-16 in
+  `src/ac3/include/iclforge/ac3/core/crc16.hpp` and AC-4's in `src/ac4/src/io/elementary.cpp` and
+  `src/ac4/src/encoder/frame/sync_frame.cpp`.
+  `iclforge::ac4::Speaker` (`src/ac4/include/iclforge/ac4/decoder/frame.hpp`) beside
+  `iclforge::base::Location` (`src/base/include/iclforge/base/layout.hpp`). The ISO-BMFF box writers in
+  `src/containers/src/mp4/isobmff_detail.hpp`, `src/containers/src/iamf/container.cpp` and
+  `src/ac3/src/io/dec3.cpp`, now in one library but for AC-3's. AC-4's DRC curve and its
+  K-weighting twice, in `src/ac4/src/decoder/pcm/drc.cpp` and `src/ac4/src/encoder/frame/drc_gains.cpp`,
+  beside AC-3's K-weighting in `src/ac3/src/meta/loudness.cpp`.
+- *For C5 (output moves).* `src/ac4/src/core/dsp/` holds AC-4's FFT (`fft.cpp`, `fft_kernels.hpp`),
+  QMF banks (`qmf*.hpp`, `qmf.cpp`, `synthesis.cpp`), resampler (`resampler*.hpp`, `resampler.cpp`),
+  MDCT and KBD (`mdct.cpp`, `kbd.cpp`) beside `src/dsp/src/{fft,qmf,resampler}.cpp`, and AC-3's MDCT in
+  `src/ac3/src/core/mdct.cpp`.
+- *For C6.* `src/ac3/src/io/wav*.cpp`, `src/ac3/src/meta/loudness.cpp` and
+  `src/ac3/src/analysis/levels.cpp`, which AC-4's programs reach through AC-3's types; the family's
+  version in `src/ac3/src/version.cpp`; the headers installed by directory, not by `FILE_SET`, which is
+  why `base` needs `EXCLUDE arithmetic`; `objects`' namespaces `iclforge::oba` and `iclforge::emdf`.
+
+**What the moves exposed.**
+
+- `io::probe` asks whether a frame carries an authenticity tag through a callback
+  (`ProbeOptions::authenticity`, `apps/cli/commands/probe.cpp`) because `ac3` could not link the
+  signer; the signer is in `ac3` now, and the callback can go (C4).
+- Names that still say what a library was: the macro `AC4CORE_ALSO_AT_DOUBLE` (`src/ac4/src/core/`),
+  the test files' prefixes (`test_ac4dec_*.cpp`, `test_ac4core_*.cpp`) and the Catch2 tags (`[ac4dec]`,
+  `[signing]`, `[admbridge]`), which `ctest -L` and the pages select by: a decision of their own.
+- `iclforge::base_arithmetic` is a target of `base`'s directory that is not `base`: AC-4 and the
+  minimum-footprint archives include `base`'s headers without linking it. When AC-4 links `base`
+  (C4), the target can be its include path alone.
+- The containers' parts each keep a `detail` namespace and private headers of their own
+  (`isobmff_detail.hpp`, `ts_detail.hpp`, `ebml_detail.hpp`, `obu_io.hpp`): one library now, so the
+  shared pieces (the box writer above, the byte readers) can be one file.
+- `libiclforge_adm.so` is shared-only and, in a static build, carries private copies of `objects`,
+  `dsp`, `base` and `iab`, as `admbridge`'s did.
+- The text passes need guards a move-only stage did not: C++ strings are output, golden files and
+  allowlists are data, a rule must not match its own replacement, and the consumer check is the only
+  proof that reads the installed package.
+
+**C4 to C6, as written.** They still make sense, with these changes:
+
+- C4: the box writer is one library's now, which makes it a file move within `containers`; drop the
+  probe's authenticity callback; and AC-4 links `base` once its bit reader is `base`'s, after which
+  `base_arithmetic` shrinks. The speed caveat for the bit reader stands.
+- C5: unchanged; `src/ac4/src/core/dsp/` is where the kernels are, and `layering.json` already lets
+  AC-4 include `dsp`.
+- C6: unchanged, with the `FILE_SET` move also retiring `iclforge_install_library(... EXCLUDE)`.
+- Before C4, the decision on the old names above (macros, test prefixes, tags), and the reflow of C3's
+  long lines where `clang-format` is installed.
 
 ## (g) Decisions
 
