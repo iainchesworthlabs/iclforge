@@ -12,8 +12,8 @@
 #include <string>
 #include <vector>
 
-#include "iclforge/admbridge/coordinates.hpp"
-#include "iclforge/admbridge/iab_bridge.hpp"
+#include "iclforge/adm/coordinates.hpp"
+#include "iclforge/adm/iab_bridge.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
 #include "iclforge/objects/motion.hpp"

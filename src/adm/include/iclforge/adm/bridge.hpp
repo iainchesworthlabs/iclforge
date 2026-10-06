@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/admbridge/export.hpp"
+#include "iclforge/adm/export.hpp"
 #include "iclforge/objects/motion.hpp"
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/adm/model.hpp"
@@ -110,7 +110,7 @@ enum class BridgeError : std::uint8_t {
                               // iclforge::iab::IabError::kBadDlc
 };
 
-[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT std::string_view describe(BridgeError error);
+[[nodiscard]] ICLFORGE_ADM_EXPORT std::string_view describe(BridgeError error);
 
 // Builds one channel's iclforge::oba::ObjectPath from its audioBlockFormat sequence.
 //
@@ -152,7 +152,7 @@ enum class BridgeError : std::uint8_t {
 // Exposed (not file-local) specifically so this state machine can be tested directly against
 // hand-built iclforge::adm::AudioChannelFormat fixtures, independent of a full BW64
 // file/<chna>/pack resolution round trip.
-[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT std::expected<iclforge::oba::ObjectPath, BridgeError>
+[[nodiscard]] ICLFORGE_ADM_EXPORT std::expected<iclforge::oba::ObjectPath, BridgeError>
 build_channel_path(const iclforge::adm::AudioChannelFormat& channel, double object_start_s,
                     bool force_lfe);
 
@@ -214,7 +214,7 @@ struct BridgeResult {
 // objects only, with the bed's own LFE bookkeeping as an implicit, always-present 16th (TS 103
 // 420 §8.3.2.2 caps the total at 16) - the exact cap apps/cli/main.cpp's run_atmos_encode/
 // run_atmos_path already enforce for the same reason, reused here rather than re-derived.
-[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT std::expected<BridgeResult, BridgeError> build(
+[[nodiscard]] ICLFORGE_ADM_EXPORT std::expected<BridgeResult, BridgeError> build(
     const iclforge::adm::AdmDocument& document, std::string_view programme_id = {});
 
 // --- Write direction: the JOC -> ADM BWF writer ---------------------------
@@ -238,7 +238,7 @@ struct BridgeResult {
 // iclforge::oba::DecodedProgram::UpdateBlock (oamd.hpp) a caller assembles by walking every decoded
 // access unit's own object_metadata->blocks in file order and adding each block's own
 // sample_offset to a running total of samples already emitted.
-struct ICLFORGE_ADMBRIDGE_EXPORT WriteObjectUpdate {
+struct ICLFORGE_ADM_EXPORT WriteObjectUpdate {
     std::uint64_t sample_offset = 0;
     // iclforge::oba::UpdateBlock::ramp_duration verbatim - samples, or -1 for the one
     // ramp_duration_bits codeword TS 103 420's own table does not name (oamd.hpp's own comment);
@@ -256,14 +256,14 @@ struct ICLFORGE_ADMBRIDGE_EXPORT WriteObjectUpdate {
 // increasing `sample_offset` order (a caller emitting them in decode order already satisfies this;
 // see build_block_formats()'s own comment on why a non-increasing entry is folded into its
 // predecessor rather than rejected).
-struct ICLFORGE_ADMBRIDGE_EXPORT WriteChannel {
+struct ICLFORGE_ADM_EXPORT WriteChannel {
     std::string name;
     std::span<const float> pcm;                       // this channel's whole-file mono audio
     std::optional<iclforge::oba::BedLabel> bed_label{};     // set: bed/LFE channel; empty: dynamic object
     std::span<const WriteObjectUpdate> updates{};      // dynamic objects only
 };
 
-struct ICLFORGE_ADMBRIDGE_EXPORT WriteInput {
+struct ICLFORGE_ADM_EXPORT WriteInput {
     std::uint32_t sample_rate = 0;
     std::vector<WriteChannel> channels;
 };
@@ -273,7 +273,7 @@ struct ICLFORGE_ADMBRIDGE_EXPORT WriteInput {
 // copied into the returned document's own `audio.channels[i]` (unlike build()'s own
 // BridgeResult::pcm, which borrows - there is no caller-owned buffer here for the result to borrow
 // from once this function returns, since the document is the thing about to be written to disk).
-[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT std::expected<iclforge::adm::AdmDocument, BridgeError>
+[[nodiscard]] ICLFORGE_ADM_EXPORT std::expected<iclforge::adm::AdmDocument, BridgeError>
 write(const WriteInput& input);
 
 }  // namespace iclforge::admbridge

@@ -14,10 +14,10 @@
 #include "iclforge/ac3/core/aht_tables.hpp"
 #include "iclforge/ac3/core/bitalloc_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
-#include "iclforge/arithmetic/detail/simd.hpp"
+#include "iclforge/base/detail/simd.hpp"
 #include "iclforge/base/detail/profiling.hpp"
 #include "bitalloc_internal.hpp"
-#include "iclforge/arithmetic/scalar_math.hpp"
+#include "iclforge/base/arithmetic/scalar_math.hpp"
 
 namespace iclforge::ac3 {
 

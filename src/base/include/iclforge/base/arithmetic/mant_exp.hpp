@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <limits>
 
-#include "iclforge/arithmetic/fixed32.hpp"
+#include "iclforge/base/arithmetic/fixed32.hpp"
 
 // A value as a signed 32-bit mantissa and a power of two, for the AC-4 decoder's fixed-point
 // tier (planning/ac4.md, D14d): the energies, gains and scale factors of A-SPX, the transient

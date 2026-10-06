@@ -3,8 +3,8 @@
 #include <cmath>
 #include <type_traits>
 
-#include "iclforge/arithmetic/mant_exp.hpp"
-#include "iclforge/arithmetic/scalar_math.hpp"
+#include "iclforge/base/arithmetic/mant_exp.hpp"
+#include "iclforge/base/arithmetic/scalar_math.hpp"
 
 // The transcendentals the QMF-domain tools of src/ac4/src/decoder call at the decoder's scalar, where the
 // answer reaches the output and a C library's last bit would be heard on a platform that had

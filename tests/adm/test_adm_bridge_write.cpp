@@ -13,7 +13,7 @@
 
 #include "platform/process.hpp"
 
-#include "iclforge/admbridge/bridge.hpp"
+#include "iclforge/adm/bridge.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"

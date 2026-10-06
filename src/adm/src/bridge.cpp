@@ -1,4 +1,4 @@
-#include "iclforge/admbridge/bridge.hpp"
+#include "iclforge/adm/bridge.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/admbridge/coordinates.hpp"
+#include "iclforge/adm/coordinates.hpp"
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/adm/ac3adm.hpp"
 

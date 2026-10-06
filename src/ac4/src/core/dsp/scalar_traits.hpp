@@ -4,8 +4,8 @@
 #include <limits>
 #include <type_traits>
 
-#include "iclforge/arithmetic/fixed32.hpp"
-#include "iclforge/arithmetic/mant_exp.hpp"
+#include "iclforge/base/arithmetic/fixed32.hpp"
+#include "iclforge/base/arithmetic/mant_exp.hpp"
 #include "core/dsp/complex.hpp"
 
 // What the decoder's tools ask of its scalar beyond arithmetic, so that one source serves the

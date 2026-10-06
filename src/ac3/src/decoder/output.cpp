@@ -17,7 +17,7 @@
 #include "iclforge/ac3/detail/decode_scalar.hpp"
 #include "iclforge/base/detail/profiling.hpp"
 #include "eac3_seat_fold.hpp"
-#include "iclforge/arithmetic/fixed32.hpp"
+#include "iclforge/base/arithmetic/fixed32.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/drc.hpp"  // to_db
 #include "iclforge/ac3/meta/mixing.hpp"

@@ -16,7 +16,7 @@
 #include "iclforge/ac3/core/exponents.hpp"
 #include "iclforge/ac3/core/mdct.hpp"
 #include "iclforge/ac3/core/window.hpp"
-#include "iclforge/arithmetic/detail/simd.hpp"
+#include "iclforge/base/detail/simd.hpp"
 #include "iclforge/base/detail/cpu_features.hpp"
 
 #include "avx2_tier.hpp"

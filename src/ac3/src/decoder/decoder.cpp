@@ -25,7 +25,7 @@
 #include "iclforge/ac3/decoder/diagnostics.hpp"
 #include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/decoder/syntax_trace.hpp"
-#include "iclforge/arithmetic/fixed32.hpp"
+#include "iclforge/base/arithmetic/fixed32.hpp"
 #include "iclforge/ac3/detail/decode_scalar.hpp"
 #include "iclforge/ac3/detail/profile.hpp"
 #include "scalar_inverse.hpp"

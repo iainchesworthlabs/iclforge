@@ -22,7 +22,7 @@
 #include "iclforge/base/detail/profiling.hpp"
 #include "eac3_tools_fixed.hpp"
 #include "iclforge/dsp/detail/fft_kernel.hpp"
-#include "iclforge/arithmetic/fixed32.hpp"
+#include "iclforge/base/arithmetic/fixed32.hpp"
 #include "mdct_fixed.hpp"
 
 namespace iclforge::ac3::eac3 {

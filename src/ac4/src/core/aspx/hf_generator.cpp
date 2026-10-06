@@ -7,7 +7,7 @@
 #include <type_traits>
 #include <vector>
 
-#include "iclforge/arithmetic/scalar_math.hpp"
+#include "iclforge/base/arithmetic/scalar_math.hpp"
 #include "core/dsp/scalar_traits.hpp"
 
 namespace iclforge::ac4::detail::aspx {

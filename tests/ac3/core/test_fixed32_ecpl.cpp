@@ -20,7 +20,7 @@
 
 #include "iclforge/ac3/core/eac3_tools.hpp"
 #include "eac3_tools_fixed.hpp"
-#include "iclforge/arithmetic/fixed32.hpp"
+#include "iclforge/base/arithmetic/fixed32.hpp"
 
 using iclforge::internal::Fixed32;
 

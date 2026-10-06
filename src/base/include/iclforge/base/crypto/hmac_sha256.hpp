@@ -10,12 +10,12 @@
 #include <cstddef>
 #include <span>
 
-#include "iclforge/signing/export.hpp"
+#include "iclforge/base/export.hpp"
 
 namespace iclforge::signing {
 
 // Exported for the same reason sha256.hpp's own one-shot function is - see its comment.
-ICLFORGE_SIGNING_EXPORT std::array<std::byte, 32> hmac_sha256(std::span<const std::byte> key,
+ICLFORGE_BASE_EXPORT std::array<std::byte, 32> hmac_sha256(std::span<const std::byte> key,
                                                          std::span<const std::byte> message);
 
 }  // namespace iclforge::signing

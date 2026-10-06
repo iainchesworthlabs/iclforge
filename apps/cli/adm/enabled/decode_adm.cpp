@@ -3,7 +3,7 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/admbridge/bridge.hpp"
+#include "iclforge/adm/bridge.hpp"
 #include "iclforge/adm/ac3adm.hpp"
 
 // Compiled only when ICLFORGE_BUILD_ADM turned iclforge::adm/iclforge::admbridge on (see

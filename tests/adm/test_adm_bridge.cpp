@@ -13,8 +13,8 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/admbridge/bridge.hpp"
-#include "iclforge/admbridge/coordinates.hpp"
+#include "iclforge/adm/bridge.hpp"
+#include "iclforge/adm/coordinates.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
 #include "iclforge/objects/motion.hpp"

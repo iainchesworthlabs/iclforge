@@ -4,7 +4,7 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/admbridge/export.hpp"
+#include "iclforge/adm/export.hpp"
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/adm/model.hpp"
 #include "iclforge/iab/model.hpp"
@@ -71,18 +71,18 @@ namespace iclforge::admbridge {
 // BS.2076-2 Clause 8's polar convention to the same right/front/top-positive point its own
 // Cartesian axes describe. See this header's own top comment for the full derivation and the
 // three independent checks performed against it.
-[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT iclforge::adm::CartesianPosition polar_to_adm_cartesian(
+[[nodiscard]] ICLFORGE_ADM_EXPORT iclforge::adm::CartesianPosition polar_to_adm_cartesian(
     const iclforge::adm::PolarPosition& polar);
 
 // BS.2076-2's [-1, 1] unit-cube Cartesian convention to iclforge::oba::Position's [0, 1]/[0, 1]/
 // [-1, 1] room-anchored one. Pure affine remap - see this header's own top comment.
-[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT iclforge::oba::Position adm_cartesian_to_room(
+[[nodiscard]] ICLFORGE_ADM_EXPORT iclforge::oba::Position adm_cartesian_to_room(
     const iclforge::adm::CartesianPosition& cartesian);
 
 // Dispatches on iclforge::adm::Position's own variant (ac3adm/model.hpp: PolarPosition or
 // CartesianPosition, selected by AudioBlockFormat::cartesian) and converts whichever alternative
 // is actually present straight to room coordinates.
-[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT iclforge::oba::Position adm_position_to_room(
+[[nodiscard]] ICLFORGE_ADM_EXPORT iclforge::oba::Position adm_position_to_room(
     const iclforge::adm::Position& position);
 
 // The write-direction inverse of adm_cartesian_to_room() above, for the JOC ->
@@ -91,7 +91,7 @@ namespace iclforge::admbridge {
 // checked formula. This writer only ever emits cartesian ADM (the Dolby Atmos Master ADM Profile's
 // own shape), so unlike the read side there is no matching room_to_adm_polar()/room_position_to_adm()
 // pair - a caller wanting a polar master would need one, and none of this project's own writers do.
-[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT iclforge::adm::CartesianPosition room_to_adm_cartesian(
+[[nodiscard]] ICLFORGE_ADM_EXPORT iclforge::adm::CartesianPosition room_to_adm_cartesian(
     const iclforge::oba::Position& room);
 
 // SMPTE ST 2098-2:2022 §11.1's unit cube to iclforge::oba::Position's own room-anchored convention
@@ -110,7 +110,7 @@ namespace iclforge::admbridge {
 // coordinates.hpp's own "one genuine, documented judgement call" above has for ADM, stated
 // plainly rather than asserted as spec fact. See iab_bridge.cpp's own top comment for where this
 // is used; the spread and zone mappings follow below.
-[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT iclforge::oba::Position iab_position_to_room(
+[[nodiscard]] ICLFORGE_ADM_EXPORT iclforge::oba::Position iab_position_to_room(
     const iclforge::iab::Position& position);
 
 // SMPTE ST 2098-2:2022 §10.5.16-17: ObjectSpread is the extent of the object on each axis, as a
@@ -119,7 +119,7 @@ namespace iclforge::admbridge {
 // normalized [0, 1] extent on the room's x, y and z axes, so IAB's spread on x, y and z is
 // width, depth and height. The same rename the ADM bridge makes for BS.2076-2's width, depth and
 // height. This is this bridge's own reading; neither clause equates the two scales.
-[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT iclforge::oba::ObjectSize iab_spread_to_size(
+[[nodiscard]] ICLFORGE_ADM_EXPORT iclforge::oba::ObjectSize iab_spread_to_size(
     const iclforge::iab::ObjectSpread& spread);
 
 // A zone control mapped onto TS 103 420's zone constraints.
@@ -146,7 +146,7 @@ inline constexpr double kIabZoneIncludeThreshold = 0.5;
 //   screen only        the three screen zones
 //   surround only      the two wall zones and the two rear zones
 // The overhead zones set b_enable_elevation: on when either is included.
-[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT IabZoneMapping iab_zones_to_constraint(
+[[nodiscard]] ICLFORGE_ADM_EXPORT IabZoneMapping iab_zones_to_constraint(
     const std::array<double, iclforge::iab::kZoneCount>& gains);
 
 // The same mapping for ObjectZoneDefinition19's 19 zones (§10.6 Table 28), which replace the nine
@@ -154,7 +154,7 @@ inline constexpr double kIabZoneIncludeThreshold = 0.5;
 // the left and right walls from 12 and 14, the rear from 6-8, a rear or screen group counting as
 // included only when all its zones are - and every height layer or ceiling zone feeds
 // b_enable_elevation.
-[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT IabZoneMapping iab_zones19_to_constraint(
+[[nodiscard]] ICLFORGE_ADM_EXPORT IabZoneMapping iab_zones19_to_constraint(
     const std::array<double, iclforge::iab::kZone19Count>& gains);
 
 // ETSI TS 103 420 V1.2.1 Annex B.2.6, Tables B.18 and B.19: OAMD's zone constraint (§5.6.1.6,
@@ -175,7 +175,7 @@ inline constexpr double kIabZoneIncludeThreshold = 0.5;
 // was not recognised, or the recognised ones are not one of the combinations above (an arbitrary
 // box, only ZU without ZB, two different horizontal presets at once): what could be mapped is
 // still returned, the rest is dropped, and the caller decides whether to warn.
-struct ICLFORGE_ADMBRIDGE_EXPORT AdmZoneMapping {
+struct ICLFORGE_ADM_EXPORT AdmZoneMapping {
     iclforge::oba::ZoneConstraint zone = iclforge::oba::ZoneConstraint::kNone;
     bool enable_elevation = true;
     bool exact = true;
@@ -183,12 +183,12 @@ struct ICLFORGE_ADMBRIDGE_EXPORT AdmZoneMapping {
 
 inline constexpr double kZoneBoundTolerance = 0.05;
 
-[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT AdmZoneMapping adm_zone_exclusion_to_constraint(
+[[nodiscard]] ICLFORGE_ADM_EXPORT AdmZoneMapping adm_zone_exclusion_to_constraint(
     std::span<const iclforge::adm::ExclusionZone> zones);
 
 // The write direction: the zoneExclusion that says what `zone` and `enable_elevation` say. Empty
 // for kNone with elevation enabled, which is the ADM default (no zoneExclusion element).
-[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT std::vector<iclforge::adm::ExclusionZone>
+[[nodiscard]] ICLFORGE_ADM_EXPORT std::vector<iclforge::adm::ExclusionZone>
 constraint_to_adm_zone_exclusion(iclforge::oba::ZoneConstraint zone, bool enable_elevation);
 
 }  // namespace iclforge::admbridge

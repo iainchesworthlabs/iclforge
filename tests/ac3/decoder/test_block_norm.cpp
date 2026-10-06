@@ -18,7 +18,7 @@
 #include <vector>
 
 #include "block_norm.hpp"
-#include "iclforge/arithmetic/fixed32.hpp"
+#include "iclforge/base/arithmetic/fixed32.hpp"
 
 using iclforge::internal::Fixed32;
 namespace bn = iclforge::ac3::internal;

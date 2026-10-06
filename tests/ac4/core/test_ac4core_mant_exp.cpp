@@ -10,8 +10,8 @@
 #include <limits>
 #include <random>
 
-#include "iclforge/arithmetic/fixed32.hpp"
-#include "iclforge/arithmetic/mant_exp.hpp"
+#include "iclforge/base/arithmetic/fixed32.hpp"
+#include "iclforge/base/arithmetic/mant_exp.hpp"
 
 using iclforge::internal::Fixed32;
 using iclforge::internal::MantExp;

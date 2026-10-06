@@ -23,7 +23,7 @@
 #include "iclforge/audio/device_watcher.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
-#include "iclforge/signing/signing_key.hpp"
+#include "iclforge/base/crypto/signing_key.hpp"
 #include "bed_mixer.hpp"
 #include "diagnostics.hpp"
 #include "output_policy.hpp"

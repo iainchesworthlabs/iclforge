@@ -22,7 +22,7 @@
 #include "iclforge/ac3/core/exponents.hpp"
 #include "iclforge/ac3/core/mantissas.hpp"
 #include "eac3_tools_fixed.hpp"
-#include "iclforge/arithmetic/fixed32.hpp"
+#include "iclforge/base/arithmetic/fixed32.hpp"
 
 using iclforge::internal::Fixed32;
 

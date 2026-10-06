@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/admbridge/iab_bridge.hpp"
+#include "iclforge/adm/iab_bridge.hpp"
 #include "iclforge/iab/ac3iab.hpp"
 #include "iclforge/iab/mxf.hpp"
 

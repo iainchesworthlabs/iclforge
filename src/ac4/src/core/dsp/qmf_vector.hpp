@@ -3,7 +3,7 @@
 #include <array>
 #include <cstddef>
 
-#include "iclforge/arithmetic/detail/simd.hpp"
+#include "iclforge/base/detail/simd.hpp"
 #include "core/dsp/complex.hpp"
 #include "core/dsp/qmf_constants.hpp"
 #include "core/dsp/qmf_kernels.hpp"

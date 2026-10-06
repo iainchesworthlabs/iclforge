@@ -5,7 +5,7 @@
 #include <type_traits>
 
 #include "iclforge/ac3/core/mdct.hpp"
-#include "iclforge/arithmetic/fixed32.hpp"
+#include "iclforge/base/arithmetic/fixed32.hpp"
 #include "mdct_fixed.hpp"
 #include "iclforge/ac3/detail/decode_scalar.hpp"
 #include "iclforge/ac3/detail/profile.hpp"

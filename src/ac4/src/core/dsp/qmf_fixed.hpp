@@ -7,7 +7,7 @@
 #include <limits>
 #include <type_traits>
 
-#include "iclforge/arithmetic/fixed32.hpp"
+#include "iclforge/base/arithmetic/fixed32.hpp"
 #include "core/dsp/complex.hpp"
 #include "core/dsp/qmf.hpp"
 #include "core/dsp/qmf_constants.hpp"

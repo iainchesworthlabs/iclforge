@@ -1,6 +1,6 @@
 #pragma once
 
-#include "iclforge/arithmetic/fixed32.hpp"
+#include "iclforge/base/arithmetic/fixed32.hpp"
 
 // The type the DECODER carries its coefficients, transform scratch and
 // overlap-add history in, in the FIXED-POINT variant. See the double variant

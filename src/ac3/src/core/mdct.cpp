@@ -9,7 +9,7 @@
 #include <type_traits>
 
 #include "iclforge/ac3/core/window.hpp"
-#include "iclforge/arithmetic/detail/simd.hpp"
+#include "iclforge/base/detail/simd.hpp"
 
 #include "iclforge/base/detail/cpu_features.hpp"
 #include "iclforge/dsp/detail/fft_kernel.hpp"

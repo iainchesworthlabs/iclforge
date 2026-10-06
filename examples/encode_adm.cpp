@@ -39,7 +39,7 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/admbridge/bridge.hpp"
+#include "iclforge/adm/bridge.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
 #include "iclforge/objects/motion.hpp"

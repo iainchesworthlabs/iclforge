@@ -1,4 +1,4 @@
-#include "iclforge/admbridge/coordinates.hpp"
+#include "iclforge/adm/coordinates.hpp"
 
 #include <algorithm>
 #include <array>

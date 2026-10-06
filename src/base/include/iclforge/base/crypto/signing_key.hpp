@@ -16,14 +16,14 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/signing/export.hpp"
+#include "iclforge/base/export.hpp"
 
 namespace iclforge::signing {
 
 // Owns the key bytes and zeroizes them on destruction, so a supplied key does
 // not linger in freed heap after signing finishes. Copyable/movable; every
 // copy scrubs its own bytes when it dies.
-class ICLFORGE_SIGNING_EXPORT SigningKey {
+class ICLFORGE_BASE_EXPORT SigningKey {
 public:
     SigningKey() = default;
     explicit SigningKey(std::vector<std::byte> bytes);
@@ -73,7 +73,7 @@ struct KeyLoadError {
 // no "0x" prefix is deliberately not its own format: such a string is itself
 // valid base64, so the two cannot be auto-distinguished. See
 // docs/concepts/object-signing.md.
-[[nodiscard]] ICLFORGE_SIGNING_EXPORT std::optional<SigningKey> decode_signing_key(
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::optional<SigningKey> decode_signing_key(
     std::span<const std::byte> content);
 
 // Resolves a key from, in order: `explicit_path` if non-empty (the CLI's
@@ -83,7 +83,7 @@ struct KeyLoadError {
 // a key without a persisted file while the file form stays the documented
 // default (a value passed inline shows up in `ps`/shell history; a path does
 // not).
-[[nodiscard]] ICLFORGE_SIGNING_EXPORT std::expected<SigningKey, KeyLoadError> load_signing_key(
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::expected<SigningKey, KeyLoadError> load_signing_key(
     std::string_view explicit_path);
 
 }  // namespace iclforge::signing

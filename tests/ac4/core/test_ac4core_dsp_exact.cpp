@@ -33,7 +33,7 @@
 #include "core/dsp/kbd.hpp"
 #include "core/dsp/mdct.hpp"
 #include "core/dsp/synthesis.hpp"
-#include "iclforge/arithmetic/scalar_math.hpp"
+#include "iclforge/base/arithmetic/scalar_math.hpp"
 
 namespace {
 

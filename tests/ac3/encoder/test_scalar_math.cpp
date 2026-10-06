@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <limits>
 
-#include "iclforge/arithmetic/scalar_math.hpp"
+#include "iclforge/base/arithmetic/scalar_math.hpp"
 
 using iclforge::internal::scalar_exp;
 using iclforge::internal::scalar_exp2;

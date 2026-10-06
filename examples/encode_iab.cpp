@@ -42,7 +42,7 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/admbridge/iab_bridge.hpp"
+#include "iclforge/adm/iab_bridge.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
 #include "iclforge/objects/motion.hpp"

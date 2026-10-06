@@ -1,4 +1,4 @@
-#include "iclforge/signing/emdf_atmos_signer.hpp"
+#include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
 
 #include <algorithm>
 #include <array>
@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "iclforge/ac3/emdf/frame_layout.hpp"
-#include "hmac_sha256.hpp"
+#include "iclforge/base/crypto/hmac_sha256.hpp"
 
 namespace iclforge::signing {
 namespace {

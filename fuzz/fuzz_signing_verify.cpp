@@ -4,8 +4,8 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/signing/emdf_atmos_signer.hpp"
-#include "iclforge/signing/signing_key.hpp"
+#include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
+#include "iclforge/base/crypto/signing_key.hpp"
 
 // iclforge::signing::verify_atmos_stream / verify_atmos_frame (src/signing/src/
 // emdf_atmos_signer.cpp).

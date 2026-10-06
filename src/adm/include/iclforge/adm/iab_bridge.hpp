@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "iclforge/admbridge/bridge.hpp"
-#include "iclforge/admbridge/export.hpp"
+#include "iclforge/adm/bridge.hpp"
+#include "iclforge/adm/export.hpp"
 #include "iclforge/objects/motion.hpp"
 #include "iclforge/iab/ac3iab.hpp"
 
@@ -106,7 +106,7 @@ struct IabBridgeResult {
 // iclforge::iab::parse_mxf_iab()'s own return value, unmodified - onto AtmosEncoder's input shape.
 // Channel count is capped at the same 15 build() itself enforces, for the identical reason (see
 // bridge.cpp's own kMaxChannels comment).
-[[nodiscard]] ICLFORGE_ADMBRIDGE_EXPORT std::expected<IabBridgeResult, BridgeError> build_iab(
+[[nodiscard]] ICLFORGE_ADM_EXPORT std::expected<IabBridgeResult, BridgeError> build_iab(
     std::span<const iclforge::iab::IABitstreamFrame> frames);
 
 }  // namespace iclforge::admbridge

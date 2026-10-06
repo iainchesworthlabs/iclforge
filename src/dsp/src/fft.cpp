@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <span>
 
-#include "iclforge/arithmetic/detail/simd.hpp"
+#include "iclforge/base/detail/simd.hpp"
 
 #include "iclforge/dsp/detail/fft_kernel.hpp"
 

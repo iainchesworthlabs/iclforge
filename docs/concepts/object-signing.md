@@ -68,8 +68,8 @@ Any code that links `iclforge::signing` gets a key-less signer and must construc
 whole API surface is the key type plus the sign/verify calls:
 
 ```cpp
-#include "iclforge/signing/signing_key.hpp"
-#include "iclforge/signing/emdf_atmos_signer.hpp"
+#include "iclforge/base/crypto/signing_key.hpp"
+#include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
 
 // You own the bytes. There is no default, no built-in, no fallback key.
 iclforge::signing::SigningKey key{ my_32_key_bytes };          // or:

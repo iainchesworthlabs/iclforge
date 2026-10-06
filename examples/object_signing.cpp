@@ -18,8 +18,8 @@
 
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
-#include "iclforge/signing/emdf_atmos_signer.hpp"
-#include "iclforge/signing/signing_key.hpp"
+#include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
+#include "iclforge/base/crypto/signing_key.hpp"
 
 namespace {
 

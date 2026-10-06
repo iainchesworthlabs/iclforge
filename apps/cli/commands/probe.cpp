@@ -30,7 +30,7 @@
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/objects/oamd.hpp"
-#include "iclforge/signing/emdf_atmos_signer.hpp"
+#include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
 #include "iclforge/ac3/version.hpp"
 #include "iclforge/ac4/io/carriage.hpp"
 #include "container_input.hpp"

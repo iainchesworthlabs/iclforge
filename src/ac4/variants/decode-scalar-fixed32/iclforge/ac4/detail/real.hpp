@@ -1,6 +1,6 @@
 #pragma once
 
-#include "iclforge/arithmetic/fixed32.hpp"
+#include "iclforge/base/arithmetic/fixed32.hpp"
 
 // The FIXED-POINT variant of src/ac4/src/core's explicit-instantiation scalar. See the
 // double variant under variants/scalar-double/ for what this seam is and why it is

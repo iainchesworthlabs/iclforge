@@ -34,7 +34,7 @@
 #include "iclforge/ac3/detail/decode_scalar.hpp"
 #include "iclforge/ac3/detail/profile.hpp"
 #include "eac3_tools_fixed.hpp"
-#include "iclforge/arithmetic/fixed32.hpp"
+#include "iclforge/base/arithmetic/fixed32.hpp"
 #include "iclforge/objects/joc_domain.hpp"
 #include "scalar_inverse.hpp"
 #include "block_norm.hpp"

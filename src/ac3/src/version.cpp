@@ -4,7 +4,7 @@
 
 #include <string>
 
-#include "iclforge/arithmetic/detail/simd.hpp"
+#include "iclforge/base/detail/simd.hpp"
 
 namespace iclforge::ac3 {
 

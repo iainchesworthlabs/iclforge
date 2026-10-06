@@ -11,12 +11,12 @@
 
 #include "platform/process.hpp"
 
-#include "iclforge/signing/signing_key.hpp"
+#include "iclforge/base/crypto/signing_key.hpp"
 
 // Internal crypto headers - on the include path for this target only (see
 // tests/CMakeLists.txt), the same way the alsa backend's internal header is.
-#include "hmac_sha256.hpp"
-#include "sha256.hpp"
+#include "iclforge/base/crypto/hmac_sha256.hpp"
+#include "iclforge/base/crypto/sha256.hpp"
 
 namespace {
 

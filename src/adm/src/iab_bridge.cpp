@@ -1,4 +1,4 @@
-#include "iclforge/admbridge/iab_bridge.hpp"
+#include "iclforge/adm/iab_bridge.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -9,7 +9,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "iclforge/admbridge/coordinates.hpp"
+#include "iclforge/adm/coordinates.hpp"
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/iab/dlc.hpp"
 #include "iclforge/iab/model.hpp"
