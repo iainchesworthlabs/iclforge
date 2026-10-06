@@ -103,6 +103,14 @@ C1 = [
         r"\1",
         _TEXT,
     ),
+    # A build file that linked two or three of them links the one library once: the repeats, on
+    # one line or on the lines that follow, go.
+    Rule(
+        "dedupe",
+        r"(\biclforge::ac4(?:_static|_shared)?)(?:[ \t]*\n[ \t]*\1(?![\w:])|[ \t]+\1(?![\w:]))+",
+        r"\1",
+        ("cmake",),
+    ),
 ]
 
 STAGES: dict[str, list[Rule]] = {"c0": C0, "c1": C1}
