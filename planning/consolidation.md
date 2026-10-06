@@ -555,6 +555,12 @@ Hazards the plan did not name:
 - **A configuration no preset builds.** `fuzz/CMakeLists.txt` instrumented `iclforge_ac4core`, a
   target that no longer exists; no tree here configures the fuzzers, so only a configure of one found
   it.
+- **A check the proof did not run.** `tools/checks/check_install_consumer.sh` builds two programs
+  against the installed package. The cut gave `install_consumer/consumer_ac4.cpp` and
+  `consumer_ac4enc.cpp` the table of contents' header in place of `ac4.hpp`, and they use the
+  splitter, the scanner and the carriage, which the cut put in `io/`: `ac4_cuts.py` read the tree's
+  consumers but not `tools/checks/`. Found during C3 and fixed on this branch; the check passes and the
+  two programs print what they printed on C0.
 - **N1B's own header map.** `n1b_docs.py`'s map is held to what N1B's layout gives and to the headers of
   the tree, which a later stage makes disagree. The map stays as derived; `LATER_SPELLINGS` follows a
   header a later stage moved (C0's profiling header, C1's five).
