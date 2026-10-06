@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/ac4core/detail/profiling.hpp"
+#include "iclforge/base/detail/profiling.hpp"
 #include "iclforge/ac4core/dsp/resampler_design.hpp"
 #include "iclforge/ac4core/dsp/resampler_vector.hpp"
 
@@ -205,7 +205,7 @@ void Resampler<Real>::rephase(std::int64_t inputs_before) {
 
 template <typename Real>
 void Resampler<Real>::process(std::span<const Real> in, std::vector<Real>& out) {
-    AC4_ZONE_SCOPED_N("ac4_resampler");
+    ICLFORGE_ZONE_SCOPED_N("ac4_resampler");
     const std::int64_t up = filter_->up();
     const std::int64_t down = filter_->down();
     const std::int64_t taps = filter_->taps();

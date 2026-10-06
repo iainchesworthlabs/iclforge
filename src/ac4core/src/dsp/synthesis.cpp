@@ -4,7 +4,7 @@
 #include <type_traits>
 #include <utility>
 
-#include "iclforge/ac4core/detail/profiling.hpp"
+#include "iclforge/base/detail/profiling.hpp"
 #include "iclforge/ac4core/dsp/kbd.hpp"
 #include "iclforge/ac4core/dsp/transform_tables.hpp"
 
@@ -125,7 +125,7 @@ bool ChannelSynthesis<Real>::block(TransformSet<Real>& transforms, std::span<con
     if (imdct == nullptr || kbd.size() != nw) {
         return false;
     }
-    AC4_ZONE_SCOPED_N("ac4_imdct");
+    ICLFORGE_ZONE_SCOPED_N("ac4_imdct");
     const auto full = static_cast<std::size_t>(full_length_);
 
     // A full-length block after a full-length block has no skipped samples, and its transform,

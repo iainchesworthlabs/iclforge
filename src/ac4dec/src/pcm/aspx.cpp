@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <memory>
 
-#include "iclforge/ac4core/detail/profiling.hpp"
+#include "iclforge/base/detail/profiling.hpp"
 #include "iclforge/ac4core/dsp/real_functions.hpp"
 #include "iclforge/ac4core/dsp/scalar_traits.hpp"
 #include "iclforge/ac4core/tables/qmf_tables_fixed.hpp"
@@ -333,7 +333,7 @@ class ChannelAssembly {
 };
 
 void ChannelAssembly::run(std::vector<QmfValue>& q_high) {
-    AC4_ZONE_SCOPED_N("ac4_aspx");
+    ICLFORGE_ZONE_SCOPED_N("ac4_aspx");
     const int q_low_slots = frame_.num_qmf_timeslots + frame_.ts_offset_hfgen;
     q_high.assign(at(q_low_slots) * kSubbands, QmfValue{});
     const aspx::HfGeneratorInput<Real> in{

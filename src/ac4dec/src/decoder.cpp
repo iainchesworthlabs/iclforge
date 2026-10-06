@@ -18,7 +18,7 @@
 #include <vector>
 
 #include "iclforge/ac4/ac4.hpp"
-#include "iclforge/ac4core/detail/profiling.hpp"
+#include "iclforge/base/detail/profiling.hpp"
 #include "bit_reader.hpp"
 #include "pcm/downmix.hpp"
 #include "pcm/drc.hpp"
@@ -2291,7 +2291,7 @@ std::expected<bool, DecodeError> Decoder::Impl::decode_into(
     // first frame of 0.
     // What follows is everything after the syntax: the reconstruction of the
     // presentation's channels, whose kernels carry markers of their own.
-    AC4_ZONE_SCOPED_N("ac4_reconstruct");
+    ICLFORGE_ZONE_SCOPED_N("ac4_reconstruct");
     const int counter = report->sequence_counter;
     const int phase = counter != 0 ? counter % 5 : (d.converter_phase ? (*d.converter_phase + 1) % 5 : 0);
     d.converter_phase = phase;
@@ -2490,7 +2490,7 @@ std::expected<bool, DecodeError> Decoder::Impl::decode_into(
 std::expected<FrameReport, DecodeError> Decoder::Impl::read(
     std::span<const std::byte> raw_ac4_frame,
     std::expected<iclforge::ac4::RawFrame, iclforge::ac4::Error> frame, bool assembled) {
-    AC4_ZONE_SCOPED_N("ac4_parse");
+    ICLFORGE_ZONE_SCOPED_N("ac4_parse");
     Capture* const capture = &frame_capture;
     if (!frame) {
         // The frame is taken to be the one the stream expected next, so that
