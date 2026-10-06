@@ -1227,9 +1227,6 @@ target_link_libraries(iclforge-tests
         iclforge::mp4
         iclforge::mpegts
         iclforge::ac4
-        iclforge::ac4
-        iclforge::ac4
-        iclforge::ac4
         iclforge::warnings
         iclforge::coverage
         iclforge::fmt

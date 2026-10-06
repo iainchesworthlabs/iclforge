@@ -102,8 +102,6 @@ target_link_libraries(forge
         iclforge::mp4
         iclforge::mpegts
         iclforge::ac4
-        iclforge::ac4
-        iclforge::ac4
         iclforge::warnings
         iclforge::fmt
         iclforge::coverage)

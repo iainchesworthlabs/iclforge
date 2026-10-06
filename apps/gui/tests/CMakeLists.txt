@@ -165,8 +165,6 @@ target_link_libraries(forge_gui_qmltests
         iclforge::mp4
         iclforge::mpegts
         iclforge::ac4
-        iclforge::ac4
-        iclforge::ac4
         iclforge::warnings
         iclforge::fmt
         # This target recompiles encoder_controller.cpp/stream_player_controller.cpp

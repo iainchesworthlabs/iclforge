@@ -84,7 +84,7 @@ set(_capi_sources
 set(_capi_embeds iclforge::ac3_static)
 if(ICLFORGE_BUILD_AC4)
     list(APPEND _capi_sources src/ac4.cpp src/ac4_encoder.cpp)
-    list(APPEND _capi_embeds iclforge::ac4_static iclforge::ac4_static)
+    list(APPEND _capi_embeds iclforge::ac4_static)
 else()
     list(APPEND _capi_sources src/ac4_absent.cpp)
 endif()

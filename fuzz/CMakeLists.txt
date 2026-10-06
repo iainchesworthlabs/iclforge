@@ -358,7 +358,7 @@ endif()
 # decoder are instrumented by the block above.
 if(ICLFORGE_BUILD_AC4)
     iclforge_instrument_for_fuzzing(iclforge_ac4_objects)
-    iclforge_add_fuzzer(fuzz_ac4_encode iclforge::ac4 iclforge::ac4)
+    iclforge_add_fuzzer(fuzz_ac4_encode iclforge::ac4)
 endif()
 
 # --- Sendspin (planning/hearth-reference-player.md, A4) ----------------------

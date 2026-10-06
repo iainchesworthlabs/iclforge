@@ -16,7 +16,6 @@ target_link_libraries(iclforge-perf
     PRIVATE
         iclforge::ac3
         iclforge::ac4
-        iclforge::ac4
         iclforge::warnings
         iclforge::fmt
         Catch2::Catch2WithMain)
@@ -50,7 +49,7 @@ catch_discover_tests(iclforge-perf
 # ---------------------------------------------------------------------------
 add_executable(iclforge-bench bench_encoder.cpp)
 
-target_link_libraries(iclforge-bench PRIVATE iclforge::ac3 iclforge::ac4 iclforge::ac4 iclforge::warnings iclforge::fmt)
+target_link_libraries(iclforge-bench PRIVATE iclforge::ac3 iclforge::ac4 iclforge::warnings iclforge::fmt)
 
 target_include_directories(iclforge-bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -105,7 +104,7 @@ if((WIN32 OR LINUX) AND NOT ICLFORGE_SANITIZERS MATCHES "thread")
     # The AC-4 libraries' static builds, for the same reason as
     # iclforge::ac3_static: a DLL's allocations would not reach the counters.
     target_link_libraries(iclforge-membench PRIVATE
-        iclforge::ac3_static iclforge::ac4_static iclforge::ac4_static iclforge::warnings iclforge::fmt)
+        iclforge::ac3_static iclforge::ac4_static iclforge::warnings iclforge::fmt)
 
     # The AC-4 workloads read the real-audio fixture (real_audio.hpp).
     target_compile_definitions(iclforge-membench PRIVATE

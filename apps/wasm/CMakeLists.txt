@@ -168,7 +168,7 @@ add_custom_command(TARGET iclforge_wasm_encode POST_BUILD
 
 if(ICLFORGE_BUILD_AC4)
     add_executable(iclforge_wasm_ac4 ac4_bindings.cpp)
-    target_link_libraries(iclforge_wasm_ac4 PRIVATE iclforge::ac4 iclforge::ac4 iclforge::ac4 iclforge::warnings)
+    target_link_libraries(iclforge_wasm_ac4 PRIVATE iclforge::ac4 iclforge::warnings)
 
     # Same reasoning as iclforge_wasm_decode's own comment on every flag
     # below - -fexceptions, MODULARIZE+EXPORT_NAME (a third distinct name so

@@ -86,7 +86,7 @@ target_include_directories(hearth_engine PUBLIC "${PROJECT_SOURCE_DIR}/apps/comm
 # themselves (network_sinks.hpp), and Group, the burst/PCM streaming path a
 # network output plays through (network_group_sink.hpp). iclforge::signing asks
 # whether frames carry an authenticity tag.
-target_link_libraries(hearth_engine PUBLIC iclforge::audio iclforge::ac3 iclforge::ac4 iclforge::ac4 iclforge::sendspin)
+target_link_libraries(hearth_engine PUBLIC iclforge::audio iclforge::ac3 iclforge::ac4 iclforge::sendspin)
 # iclforge::coverage (coverage floors, tools/checks/coverage_report.sh's "apps/hearth" row) instruments
 # this target's OWN sources - apps/cli's own comment on its matching link explains why the
 # instrumented EXECUTABLE that eventually links this library is not enough on its own: --coverage
