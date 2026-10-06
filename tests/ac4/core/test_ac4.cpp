@@ -2330,7 +2330,7 @@ TEST_CASE("build_dac4 describes every presentation of the encoder's committed pr
         CAPTURE(name);
         const auto raw =
             read_file(std::filesystem::path{ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR} / ".." /
-                      "ac4dec" / "presentations" / (std::string{name} + ".ac4"));
+                      "ac4" / "presentations" / (std::string{name} + ".ac4"));
         const auto scanned = iclforge::ac4::scan(raw);
         REQUIRE_FALSE(scanned.frames.empty());
         auto frame = iclforge::ac4::parse_raw_frame(scanned.frames.front().raw_ac4_frame);
@@ -2737,7 +2737,7 @@ TEST_CASE("cmaf_refusal names the rule of Part 2 Annex H.1.2.1 a stream breaks",
     // The encoder's EMDF stream: an MP4 carries its presentation of
     // configuration 6, and a CMAF track cannot.
     const auto raw = read_file(std::filesystem::path{ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR} / ".." /
-                               "ac4dec" / "presentations" / "encoder-emdf.ac4");
+                               "ac4" / "presentations" / "encoder-emdf.ac4");
     const auto scanned = iclforge::ac4::scan(raw);
     REQUIRE_FALSE(scanned.frames.empty());
     const auto frame = iclforge::ac4::parse_raw_frame(scanned.frames.front().raw_ac4_frame);

@@ -1262,7 +1262,7 @@ TEST_CASE("mp4 describes every presentation of a stream of several in its dac4 o
     const auto dir = scratch_dir();
     const auto log = dir / "ac4_presentations_mp4.log";
     const fs::path presentations =
-        fs::path{ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR} / ".." / "ac4dec" / "presentations";
+        fs::path{ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR} / ".." / "ac4" / "presentations";
     // Phase E6's broadcast stream: fifteen presentations, the eighth an
     // alternative one named Deutsch, whose name the decoder reads from its
     // presentation substream for the box.
