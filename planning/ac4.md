@@ -2481,7 +2481,7 @@ and a power of two; the decorrelators and the converter's taps on 64-bit accumul
 equal on x86, the Cortex-M3 and the C3; the `double` output and the `float` pins unchanged; the fixed tier's agreement with
 `double` stated and pinned; the C6 and C3 images sized; and on the C6, with WiFi up, core decoding first.
 
-- **The tier.** `ICLFORGE_DECODE_SCALAR=fixed` selects `src/ac4/variants/decode-scalar-fixed32/`, whose `Real` is `Fixed32` (Q7.24 in
+- **The tier.** `ICLFORGE_DECODE_SCALAR=fixed` selects `src/dsp/variants/decode-scalar-fixed32/` (AC-4's own `variants/` directory until planning/consolidation.md's C5), whose `Real` is `Fixed32` (Q7.24 in
   an `int32_t`, `src/base`). The code that differs by tier is chosen by `if constexpr` on `dsp::kFixed<Real>`
   (`dsp/scalar_traits.hpp`), so a `double` or `float` build compiles what it compiled before. In `src/ac4/src/decoder`'s files that are not
   templates the fixed branches are templates on the scalar or generic lambdas, for the same reason.
