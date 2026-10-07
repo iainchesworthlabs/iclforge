@@ -22,8 +22,11 @@
 //
 // Structure, all of it fixed here: M = 64 subbands, hop M, prototype length
 // L = 640 (10 taps per subband), fold period 2M = 128 with alternating
-// sign, odd-stacked (k + 1/2) modulation, and a 128-point complex FFT from
-// the same shared radix-2 core mdct.cpp's fast fold and dft512 both run on.
+// sign, odd-stacked (k + 1/2) modulation. The bank runs on the AC-4 banks'
+// engine (src/dsp/src/tiered/qmf_slot.hpp: TS 103 190-1 Pseudocodes 65 and
+// 66 as one 64-point transform each), with this prototype in place of QWIN
+// and a rotation of each subband by the half sample the two modulations
+// differ by (planning/consolidation.md decision 21).
 //
 // Perfect reconstruction is exact, not approximate - analysis followed by
 // synthesis returns the input to floating-point precision (measured: 300 dB
@@ -75,8 +78,10 @@ public:
               std::span<double, kQmfSubbands> imag);
 
 private:
-    // The last kQmfTaps input samples, oldest first.
+    // The last kQmfTaps input samples, as the engine keeps them: ten blocks
+    // of 64, the newest at head_, each its last sample first.
     std::array<double, kQmfTaps> history_{};
+    std::size_t head_ = 0;
 };
 
 // The matching synthesis, likewise one per reconstructed signal.
@@ -89,8 +94,10 @@ public:
               std::span<const double, kQmfSubbands> imag, std::span<float, kQmfHop> out);
 
 private:
-    // Overlap accumulator: position 0 is the oldest not-yet-emitted sample.
-    std::array<double, kQmfTaps> overlap_{};
+    // The engine's delay line: the last ten timeslots' 128 values, the
+    // newest at head_.
+    std::array<double, 2 * kQmfTaps> overlap_{};
+    std::size_t head_ = 0;
 };
 
 // The designed prototype, for tests that check the perfect-reconstruction

@@ -4,8 +4,8 @@
 
 #include "iclforge/base/detail/profiling.hpp"
 #include "tiered/qmf_fixed.hpp"
-#include "tiered/qmf_kernels.hpp"
-#include "tiered/qmf_vector.hpp"
+#include "tiered/qmf_slot.hpp"
+#include "tiered/tables/qmf_tables.hpp"
 
 namespace iclforge::dsp::tiered {
 namespace {
@@ -35,23 +35,19 @@ void QmfAnalysis<Real>::process(std::span<const Real> pcm, std::span<Complex> ou
     ICLFORGE_ZONE_SCOPED_N("ac4_qmf_analysis");
     const std::size_t slots = pcm.size() / kSubbands;
     for (std::size_t ts = 0; ts < slots; ++ts) {
-        // The new block goes over the oldest, and is the newest: qmf_filt[sb] =
-        // pcm[63 - sb] within it.
-        head_ = head_ == 0 ? 9 : head_ - 1;
-        Real* block = filt_.data() + head_ * kSubbands;
         const Real* slot = pcm.data() + ts * kSubbands;
-        for (std::size_t sb = 0; sb < kSubbands; ++sb) {
-            block[sb] = slot[kSubbands - 1 - sb];
-        }
         if constexpr (kFixed<Real>) {
+            // The new block goes over the oldest, and is the newest: qmf_filt[sb] =
+            // pcm[63 - sb] within it.
+            head_ = head_ == 0 ? 9 : head_ - 1;
+            Real* block = filt_.data() + head_ * kSubbands;
+            for (std::size_t sb = 0; sb < kSubbands; ++sb) {
+                block[sb] = slot[kSubbands - 1 - sb];
+            }
             qmf::fixed::analysis_slot(filt_.data(), head_, out.data() + ts * kSubbands, scratch);
         } else {
-            qmf::vec::analysis_window(filt_.data(), head_, scratch.u.data());
-            qmf::vec::analysis_rotate(scratch.u.data(), scratch.a_re.data(), scratch.a_im.data());
-            qmf::vec::fft64(scratch.a_re.data(), scratch.a_im.data(), scratch.b_re.data(),
-                            scratch.b_im.data());
-            qmf::vec::analysis_unpack(scratch.b_re.data(), scratch.b_im.data(),
-                                      out.data() + ts * kSubbands);
+            qmf::analysis_slot(filt_.data(), head_, slot, tables::kQwin.data(),
+                               out.data() + ts * kSubbands, scratch);
         }
     }
 }
@@ -77,19 +73,14 @@ void QmfSynthesis<Real>::process(std::span<const Complex> in, std::span<Real> pc
     ICLFORGE_ZONE_SCOPED_N("ac4_qmf_synthesis");
     const std::size_t slots = in.size() / kSubbands;
     for (std::size_t ts = 0; ts < slots; ++ts) {
-        // The 128 new values go over the oldest block, and are the newest.
-        head_ = head_ == 0 ? 9 : head_ - 1;
         if constexpr (kFixed<Real>) {
+            // The 128 new values go over the oldest block, and are the newest.
+            head_ = head_ == 0 ? 9 : head_ - 1;
             qmf::fixed::synthesis_slot(in.data() + ts * kSubbands, filt_.data(), head_,
                                        pcm.data() + ts * kSubbands, scratch);
         } else {
-            qmf::vec::synthesis_pack(in.data() + ts * kSubbands, scratch.a_re.data(),
-                                     scratch.a_im.data());
-            qmf::vec::fft64(scratch.a_re.data(), scratch.a_im.data(), scratch.b_re.data(),
-                            scratch.b_im.data());
-            qmf::vec::synthesis_rotate(scratch.b_re.data(), scratch.b_im.data(),
-                                       filt_.data() + head_ * 128);
-            qmf::vec::synthesis_window(filt_.data(), head_, pcm.data() + ts * kSubbands);
+            qmf::synthesis_slot(in.data() + ts * kSubbands, filt_.data(), head_,
+                                tables::kQwin.data(), pcm.data() + ts * kSubbands, scratch);
         }
     }
 }

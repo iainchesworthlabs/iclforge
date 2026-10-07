@@ -29,10 +29,11 @@ namespace iclforge::dsp::tiered::qmf {
 
 // u[n] = sum over k < 5 of qmf_filt[n + 128 k] QWIN[n + 128 k], n < 128
 // (Pseudocode 65), from the analysis's ten blocks of 64 (qmf_filt[64 b + s] is
-// block b at s).
-template <typename Real>
-inline void analysis_window(const Real* filt, std::size_t head, Real* u) noexcept {
-    const auto& qwin = iclforge::dsp::tiered::tables::kQwin;
+// block b at s). `qwin` is the bank's window, QWIN unless a bank of another
+// prototype gives its own (JOC's, src/dsp/src/qmf.cpp), of float or double.
+template <typename Real, typename Window>
+inline void analysis_window(const Real* filt, std::size_t head, Real* u,
+                            const Window* qwin) noexcept {
     std::array<const Real*, 10> block{};
     for (std::size_t b = 0; b < 10; ++b) {
         block[b] = filt + physical(head, b) * 64;
@@ -47,6 +48,11 @@ inline void analysis_window(const Real* filt, std::size_t head, Real* u) noexcep
             u[n] = sum;
         }
     }
+}
+
+template <typename Real>
+inline void analysis_window(const Real* filt, std::size_t head, Real* u) noexcept {
+    analysis_window(filt, head, u, iclforge::dsp::tiered::tables::kQwin.data());
 }
 
 // z[m] = (u[2m] + i u[2m + 1]) e^(i pi m / 64), m < 64.
@@ -208,10 +214,11 @@ inline void synthesis_rotate(const Real* fr, const Real* fi, Real* block) noexce
 
 // One slot of output (Pseudocode 66): g[128 k + sb] = qsyn_filt[256 k + sb] and
 // g[128 k + 64 + sb] = qsyn_filt[256 k + 192 + sb], windowed and summed over the
-// ten groups of 64. The delay line's ten blocks are of 128 values each.
-template <typename Real>
-inline void synthesis_window(const Real* filt, std::size_t head, Real* out) noexcept {
-    const auto& qwin = iclforge::dsp::tiered::tables::kQwin;
+// ten groups of 64. The delay line's ten blocks are of 128 values each. `qwin`
+// as analysis_window()'s.
+template <typename Real, typename Window>
+inline void synthesis_window(const Real* filt, std::size_t head, Real* out,
+                             const Window* qwin) noexcept {
     std::array<const Real*, 10> block{};
     for (std::size_t b = 0; b < 10; ++b) {
         block[b] = filt + physical(head, b) * 128;
@@ -224,6 +231,11 @@ inline void synthesis_window(const Real* filt, std::size_t head, Real* out) noex
         }
         out[sb] = sum;
     }
+}
+
+template <typename Real>
+inline void synthesis_window(const Real* filt, std::size_t head, Real* out) noexcept {
+    synthesis_window(filt, head, out, iclforge::dsp::tiered::tables::kQwin.data());
 }
 
 }  // namespace iclforge::dsp::tiered::qmf

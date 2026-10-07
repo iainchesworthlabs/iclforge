@@ -202,6 +202,10 @@ target_include_directories(iclforge_ac3_minimal
         # the same part's sake: in double, transient detection and the
         # forward transform were 64% of an AC-3 5.1 frame on an ESP32-S3.
         "${CMAKE_CURRENT_SOURCE_DIR}/variants/encode-scalar-float32"
+        # dsp's QMF bank, which JOC runs through, is the AC-4 banks' engine (src/dsp/src/tiered),
+        # at double whatever this profile's decode scalar is.
+        "${PROJECT_SOURCE_DIR}/src/dsp/src"
+        "${PROJECT_SOURCE_DIR}/src/dsp/variants/decode-scalar-float64"
         # Tracy is never part of this profile - the disabled variant's macros
         # expand to nothing, which is what a footprint build wants. What CAN
         # answer the same markers here is the stage-timer backend, resolved

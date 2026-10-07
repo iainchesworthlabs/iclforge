@@ -99,6 +99,7 @@ add_executable(iclforge-tests
     ac3/meta/test_drc.cpp
     dsp/test_dsp_biquad.cpp
     dsp/test_dsp_qmf.cpp
+    dsp/test_dsp_qmf_engine.cpp
     dsp/test_dsp_resampler.cpp
     ac3/encoder/test_eac3.cpp
     ac3/encoder/test_eac3_short_syncframes.cpp

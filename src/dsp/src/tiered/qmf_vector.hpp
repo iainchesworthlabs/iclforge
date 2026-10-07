@@ -47,6 +47,8 @@ struct Lanes<double> {
     [[nodiscard]] static V load_window(const float* p) noexcept {
         return V::set(static_cast<double>(p[0]), static_cast<double>(p[1]));
     }
+    // A window of double (JOC's, src/dsp/src/qmf.cpp).
+    [[nodiscard]] static V load_window(const double* p) noexcept { return V::load(p); }
 };
 
 // A vector holding f(0) to f(kCount - 1) in its lanes.
@@ -117,11 +119,11 @@ inline void butterfly4(const CV<Real>* a, CV<Real>* b) noexcept {
 }
 
 // analysis_window(): the outputs n = 64 h + s side by side over s.
-template <typename Real>
-inline void analysis_window(const Real* filt, std::size_t head, Real* u) noexcept {
+template <typename Real, typename Window>
+inline void analysis_window(const Real* filt, std::size_t head, Real* u,
+                            const Window* qwin) noexcept {
     using L = Lanes<Real>;
     using V = typename L::V;
-    const auto& qwin = iclforge::dsp::tiered::tables::kQwin;
     std::array<const Real*, 10> block{};
     for (std::size_t b = 0; b < 10; ++b) {
         block[b] = filt + physical(head, b) * 64;
@@ -136,6 +138,11 @@ inline void analysis_window(const Real* filt, std::size_t head, Real* u) noexcep
             sum.store(u + 64 * h + s);
         }
     }
+}
+
+template <typename Real>
+inline void analysis_window(const Real* filt, std::size_t head, Real* u) noexcept {
+    analysis_window(filt, head, u, iclforge::dsp::tiered::tables::kQwin.data());
 }
 
 // analysis_rotate(): z[m] for kCount values of m at once, from u[2m] and u[2m + 1].
@@ -290,11 +297,11 @@ inline void synthesis_rotate(const Real* fr, const Real* fi, Real* block) noexce
 }
 
 // synthesis_window(): the outputs sb side by side, each summed over k in the scalar order.
-template <typename Real>
-inline void synthesis_window(const Real* filt, std::size_t head, Real* out) noexcept {
+template <typename Real, typename Window>
+inline void synthesis_window(const Real* filt, std::size_t head, Real* out,
+                             const Window* qwin) noexcept {
     using L = Lanes<Real>;
     using V = typename L::V;
-    const auto& qwin = iclforge::dsp::tiered::tables::kQwin;
     std::array<const Real*, 10> block{};
     for (std::size_t b = 0; b < 10; ++b) {
         block[b] = filt + physical(head, b) * 128;
@@ -308,6 +315,11 @@ inline void synthesis_window(const Real* filt, std::size_t head, Real* out) noex
         }
         sum.store(out + sb);
     }
+}
+
+template <typename Real>
+inline void synthesis_window(const Real* filt, std::size_t head, Real* out) noexcept {
+    synthesis_window(filt, head, out, iclforge::dsp::tiered::tables::kQwin.data());
 }
 
 }  // namespace iclforge::dsp::tiered::qmf::vec
