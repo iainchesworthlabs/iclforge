@@ -782,6 +782,43 @@ C4B = [
     ),
 ]
 
+# --- C5 ---------------------------------------------------------------------------------------
+# AC-4's kernels are dsp's (decision 14): iclforge::ac4::detail::dsp is iclforge::dsp::tiered, and
+# the tables that moved with them iclforge::dsp::tiered::tables. Inside iclforge::ac4::detail a bare
+# `dsp::` named AC-4's own namespace; it names iclforge::dsp now, so it gains `tiered::`, except in
+# a file whose `dsp` is a namespace alias (which the qualified rule rewrites). A moved table is
+# spelled in full wherever AC-4 named it, since AC-4's `tables` keeps the rest. The moved kernels
+# take their scalar from dsp's tier header.
+_C5_MOVED = ("src/dsp/src/tiered/", "tests/dsp/tiered/")
+_C5_USERS = ("src/ac4/", "tests/ac4/", "tests/dsp/tiered/", "tests/performance/",
+             "src/dsp/src/tiered/")
+_C5_TABLES = (
+    r"kQwin|kQwinQ30|kAspxNoise|kAspxNoiseQ24|kCosQuadrant|kFftRoots\d+|kPreTwiddle\d+|kKbdLeft\d+"
+)
+C5 = [
+    Rule(
+        "tables-namespace",
+        r"\bnamespace iclforge::ac4::detail::tables\b",
+        "namespace iclforge::dsp::tiered::tables",
+        files=("src/dsp/src/tiered/tables/",),
+    ),
+    Rule(
+        "namespace",
+        r"\bnamespace iclforge::ac4::detail::dsp\b",
+        "namespace iclforge::dsp::tiered",
+        files=_C5_MOVED,
+    ),
+    Rule("qualified", r"\biclforge::ac4::detail::dsp\b", "iclforge::dsp::tiered"),
+    Rule("table", rf"(?:\biclforge::ac4::detail::|(?<![\w:]))tables::({_C5_TABLES})\b",
+         r"iclforge::dsp::tiered::tables::\1", files=_C5_USERS),
+    Rule("bare", r"(?<![\w:])dsp::(?!tiered\b)", "dsp::tiered::", files=_C5_USERS,
+         unless=r"namespace dsp = ", strings=False),
+    Rule("real", r'(#\s*include\s*")iclforge/ac4/detail/real\.hpp(")',
+         r"\1iclforge/dsp/tiered/real.hpp\2", files=_C5_MOVED),
+    Rule("double-macro", r"\bICLFORGE_AC4_ALSO_AT_DOUBLE\b", "ICLFORGE_DSP_ALSO_AT_DOUBLE",
+         files=_C5_MOVED),
+]
+
 STAGES: dict[str, list[Rule]] = {
     "c0": C0,
     "c1": C1 + C1_PROSE,
@@ -790,6 +827,7 @@ STAGES: dict[str, list[Rule]] = {
     "c4n": C4N,
     "c4": C4,
     "c4b": C4B,
+    "c5": C5,
 }
 
 
