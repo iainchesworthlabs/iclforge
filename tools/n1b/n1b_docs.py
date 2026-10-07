@@ -358,7 +358,8 @@ LATER_SPELLINGS: dict[str, str] = {
     # contents', and the core's scalar variant is the library's
     "iclforge/ac4/ac4.hpp": "iclforge/ac4/core/toc.hpp",
     "iclforge/ac4/syntax.hpp": "iclforge/ac4/core/syntax.hpp",
-    "iclforge/ac4core/detail/real.hpp": "iclforge/ac4/detail/real.hpp",
+    # (and C5: the tier's scalar is dsp's tiered kernels')
+    "iclforge/ac4core/detail/real.hpp": "iclforge/dsp/tiered/real.hpp",
     "iclforge/ac4dec/decoder.hpp": "iclforge/ac4/decoder/decoder.hpp",
     "iclforge/ac4enc/encoder.hpp": "iclforge/ac4/encoder/encoder.hpp",
     # C2: arithmetic in base, admbridge in adm, the key in base's crypto and the signer in ac3

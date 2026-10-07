@@ -249,7 +249,10 @@ C5_RULES: list[tuple[re.Pattern, str]] = [
     (re.compile(r"^src/ac4/src/core/dsp/(.+)$"), r"src/dsp/src/tiered/\1"),
     (re.compile(rf"^src/ac4/src/core/tables/({'|'.join(map(re.escape, C5_TABLES))})$"),
      r"src/dsp/src/tiered/tables/\1"),
-    (re.compile(rf"^tests/ac4/core/test_({'|'.join(C5_TESTS)})\.cpp$"), r"tests/dsp/tiered/test_\1.cpp"),
+    (
+        re.compile(rf"^tests/ac4/core/test_({'|'.join(C5_TESTS)})\.cpp$"),
+        r"tests/dsp/tiered/test_\1.cpp",
+    ),
 ]
 
 
@@ -286,7 +289,21 @@ def renamed_namespace(stage: str, name: str, unit: str = "") -> str:
     """`name`, a symbol or a line of IR as the old tree spelled it, as the stage spells it. A name
     no table holds (one in an anonymous namespace) goes where the unit it is defined in went."""
     if stage == "c3":
-        return re.sub(rf"\biclforge::({'|'.join(CONTAINERS)})::", r"iclforge::containers::\1::", name)
+        return re.sub(
+            rf"\biclforge::({'|'.join(CONTAINERS)})::", r"iclforge::containers::\1::", name
+        )
+    if stage == "c5":
+        # AC-4's kernels and the tables that moved with them are dsp's; a mangled name no demangler
+        # reads (a local lambda) has its components rewritten, and its substitutions read alike by
+        # the comparison's "names no demangler reads"
+        moved = (
+            "kQwin|kQwinQ30|kAspxNoise|kAspxNoiseQ24|kCosQuadrant|kFftRoots\\d+|kPreTwiddle\\d+"
+            "|kKbdLeft\\d+"
+        )
+        name = re.sub(r"\biclforge::ac4::detail::dsp::", "iclforge::dsp::tiered::", name)
+        name = re.sub(rf"\biclforge::ac4::detail::tables::({moved})\b",
+                      r"iclforge::dsp::tiered::tables::\1", name)
+        return name.replace("8iclforge3ac46detail3dsp", "8iclforge3dsp6tiered")
     if stage == "c4":
         # the trace and the speakers are base's, iclforge::ac4's names for them aliases
         return re.sub(r"\biclforge::ac4::(SyntaxRecord|SyntaxSink|SyntaxTrace|Speaker)\b",

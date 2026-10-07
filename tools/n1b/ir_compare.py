@@ -12,7 +12,7 @@ another overload, or a string that prints a qualified name.
                   [--asserts] [--source <src dir>]
     ir_compare.py compare <old dir> <new dir> --old-root <src dir> --new-root <src dir>
                   [--diffs <dir>] [--jobs N] [--plan <plan.json>]
-                  [--names ac3ns|none|c2|c3]
+                  [--names ac3ns|none|c2|c3|c5]
 
 `compile` takes the compile_commands.json of a tree configured with a Clang preset (a source archive
 of the parent and one of the new commit, each configured and not built: the IR of a unit needs only
@@ -345,7 +345,7 @@ def compare_pair(
     old_file, new_file, old_root, new_root, diffs, moves, names = args
     old_text = Path(old_file).read_text(errors="replace").replace(old_root, "<T>")
     a = normalise(moved_paths(old_text, moves), old_root, False)
-    if names in ("c2", "c3"):
+    if names in ("c2", "c3", "c5"):
         a = [renamed_line(names, line, source_of(Path(new_file).name)) for line in a]
     b = normalise(Path(new_file).read_text(errors="replace"), new_root, names == "ac3ns")
     name = Path(new_file).name
@@ -449,10 +449,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     k.add_argument(
         "--names",
-        choices=["ac3ns", "none", "c2", "c3"],
+        choices=["ac3ns", "none", "c2", "c3", "c5"],
         default="ac3ns",
         help="ac3ns: the new tree's iclforge::ac3:: reads as iclforge:: (S6); none: as it is;"
-        " c2, c3: the old tree's names read in the namespaces the stage moved them to",
+        " c2, c3, c5: the old tree's names read in the namespaces the stage moved them to",
     )
     a = ap.parse_args(argv)
     if a.mode == "compile":
