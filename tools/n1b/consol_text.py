@@ -820,6 +820,12 @@ C5 = [
          r"\1iclforge/dsp/tiered/real.hpp\2", files=_C5_MOVED),
     Rule("double-macro", r"\bICLFORGE_AC4_ALSO_AT_DOUBLE\b", "ICLFORGE_DSP_ALSO_AT_DOUBLE",
          files=_C5_MOVED),
+    # a test or a benchmark of the kernels names their scalar where it is now
+    Rule("real-name", r"\biclforge::ac4::detail::Real\b", "iclforge::dsp::tiered::Real",
+         files=("tests/dsp/tiered/", "tests/performance/")),
+    # outside namespace iclforge, which most tests are, a bare `dsp` names nothing
+    Rule("tests-qualified", r"(?<![\w:])dsp::tiered::", "iclforge::dsp::tiered::",
+         files=("tests/",), unless=r"namespace dsp = ", strings=False),
 ]
 
 STAGES: dict[str, list[Rule]] = {
