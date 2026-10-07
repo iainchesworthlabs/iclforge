@@ -262,6 +262,10 @@ def renamed_namespace(stage: str, name: str, unit: str = "") -> str:
     no table holds (one in an anonymous namespace) goes where the unit it is defined in went."""
     if stage == "c3":
         return re.sub(rf"\biclforge::({'|'.join(CONTAINERS)})::", r"iclforge::containers::\1::", name)
+    if stage == "c4":
+        # the trace and the speakers are base's, iclforge::ac4's names for them aliases
+        return re.sub(r"\biclforge::ac4::(SyntaxRecord|SyntaxSink|SyntaxTrace|Speaker)\b",
+                      r"iclforge::base::\1", name)
     if stage != "c2":
         return name
     import consol_text

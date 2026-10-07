@@ -1,7 +1,7 @@
 """Compare the exported symbols of the libraries before and after a change (two `symbols` records).
 
     export_diff.py --old <symbols-msvc.json> --new <symbols-msvc.json> [--map identity|l2]
-                   [--rewrite cuts,names,idents,ac3ns,c2,c3] [--copies] [--limit 30]
+                   [--rewrite cuts,names,idents,ac3ns,c2,c3,c4] [--copies] [--limit 30]
 
 `baseline.py record --only symbols` writes one record per build: for every shared library, the
 names it exports, undecorated. This compares two of them. What a stage may change is named by the
@@ -14,7 +14,7 @@ options and nothing else passes.
   --map c1|c2|c3   a consolidation stage's merges (planning/consolidation.md): the union of the
                    libraries merged into one, or divided between several (consoldef.SPLITS),
                    is compared with what they became
-  --rewrite c2|c3  the names a consolidation stage moves to another namespace, rewritten first
+  --rewrite c2|c3|c4  the names a consolidation stage moves to another namespace, rewritten first
                    (consoldef.renamed_namespace)
   --rewrite cuts   the types the seven cuts of S1 moved appear under their new qualified names
   --rewrite names  the namespace root is rewritten the way n1b_names.py rewrites it (S3)
@@ -83,7 +83,7 @@ def rewrite(name: str, kinds: set[str]) -> str:
         name = qualify(name, ac3ns_table())[0]
     if "idents" in kinds:
         name = symbol_rename(name)
-    for stage in ("c2", "c3"):
+    for stage in ("c2", "c3", "c4"):
         if stage in kinds:
             name = consoldef_renamed(stage, name)
     return name
@@ -204,13 +204,13 @@ def main() -> int:
     ap.add_argument("--new", required=True, type=Path)
     ap.add_argument("--map", choices=["identity", "l2", "c1", "c2", "c3"], default="identity")
     ap.add_argument(
-        "--rewrite", default="", help="comma-separated: cuts, names, idents, ac3ns, c2, c3"
+        "--rewrite", default="", help="comma-separated: cuts, names, idents, ac3ns, c2, c3, c4"
     )
     ap.add_argument("--copies", action="store_true", help="a name another library exports is kept")
     ap.add_argument("--limit", type=int, default=30)
     a = ap.parse_args()
     kinds = {k for k in a.rewrite.split(",") if k}
-    unknown = kinds - {"cuts", "names", "idents", "ac3ns", "c2", "c3"}
+    unknown = kinds - {"cuts", "names", "idents", "ac3ns", "c2", "c3", "c4"}
     if unknown:
         sys.exit(f"export_diff: unknown --rewrite {sorted(unknown)}")
     old = json.loads(a.old.read_text(encoding="utf-8"))
