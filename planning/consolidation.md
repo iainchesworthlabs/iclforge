@@ -1,18 +1,18 @@
 # One shape for every codec, and fewer libraries (a proposal)
 
-!!! note "Status as of 2026-10-06: C0 to C3 run and proved, `src/` reviewed after them; decisions 1 to 7, 10 and 11 taken"
+!!! note "Status as of 2026-10-07: C0 to C4 run and proved, C5 a move (decision 14); decisions 1 to 15 taken"
     Asked for by the user on 2026-10-06: "the AC3 codec and the AC4 codec structures are completely
     different. There's also duplication from inside codecs to common stuff", "the ac3 approach is the
     preferred approach", and "should there be 25 libraries? Is it worth consolidating some?". This page
     reads the tree as it stood on `main` that day. It follows [layout.md](layout.md) (N1B), which put the
     codecs side by side and left the duplicated DSP, the codec-blind vocabulary and the shape of AC-4 for
-    later ([layout.md (j)](layout.md#j-what-stays-out-and-follow-on-ideas)). The user took decisions 1 to 5
-    below on 2026-10-06, 7 and 10 before C1, and 6 before C3; 8 and 9 are open. C0 to C3 ran on the
-    local branches `chore/src-consolidation-c0` to `-c3` and changed nothing a build outputs; C1's
-    cut moves the instruction counts of the bare-metal AC-4 probe by up to 68 parts per million,
-    which the user accepted (decision 11) ([what the runs
-    found](#what-the-runs-found-that-the-plan-did-not)); [the review after
-    C3](#after-c3-src-reviewed) says what is left for C4 to C6. Nothing is pushed.
+    later ([layout.md (j)](layout.md#j-what-stays-out-and-follow-on-ideas)). The user took the decisions
+    below between 2026-10-06 and 2026-10-07. C0 to C4 ran on the local branches
+    `chore/src-consolidation-c0` to `-c4` and changed no bitstream or PCM a build outputs; C1's cut
+    moves the bare-metal AC-4 probe's instruction counts by up to 68 parts per million (decision 11),
+    and C4 the Cortex-M3 counts by at most 0.25% and the images by up to 1,296 bytes (decision 15)
+    ([what the runs found](#what-the-runs-found-that-the-plan-did-not)). C5 moves AC-4's kernels into
+    `src/dsp` and merges none (decision 14). Nothing is pushed.
 
 ## In brief
 
@@ -725,6 +725,99 @@ Hazards the plan did not name:
 Not run here: as for C1, and the reflow. The coverage floor of `src/containers` is the lowest of the
 five it replaces (88/83).
 
+### C4, 2026-10-07 (`chore/src-consolidation-c4`)
+
+**First, the old names (decision 12).** 66 test files and helpers lose the prefix of a library that
+merged (`tests/ac4/decoder/test_ac4dec_drc.cpp` is `test_drc.cpp`, `test_ac4.cpp` is `test_toc.cpp`,
+`consumer_ac4enc.cpp` is `consumer_ac4_encoder.cpp`), every rename `R100`; 568 Catch2 tags follow
+(`[ac4dec]` is `[ac4][decoder]`, `[ac4core]` `[ac4][core]`, `[admbridge]` `[adm][bridge]`, so
+`ctest -L ac4 -L decoder` selects what `-L ac4dec` did); the tests' environment variables
+(`AC4DEC_GOLDEN_DIR` is `AC4_GOLDEN_DIR`, `AC4DEC_WRITE_*` `AC4_DECODER_WRITE_*`), the scalar tier's
+macro (`ICLFORGE_AC4_ALSO_AT_DOUBLE`) and the tests' namespaces (`ac4_decoder_test`, `ac4_units`).
+`consoldef.py`'s `c4n` and `consol_text.py`'s `c4n` rules do it; a second run of those rules found
+the file names a page writes without their directory, which the path pass does not read. What stays:
+`ICLFORGE_SIGNING_KEY` and `ICLFORGE_SIGNING_KEY_FILE`, which an operator sets; the CLI's
+`Options::ac4enc`, which names AC-4 encoding; history (the changelog, `docs/renamed.md`, the plans).
+By hand, three messages that named `iclforge::admbridge` name `iclforge::adm`, and the coverage
+filter (`tools/checks/coverage_report.sh`), which C3 had left without `src/containers`, gains it.
+
+**Then C4.** With the names, 35 commits after C3, 9 of them the scripts'.
+
+| | the plan | the run |
+|---|---|---|
+| bit reader and writer | one each in `base`, the trace an optional sink, AC-4 keeping aliases | `iclforge::BitReader` takes AC-4's engine (an 8-byte window reloaded every 4 bytes) and its recorded reads; `iclforge::BitWriter` takes AC-4's recorded writes and keeps AC-3's 64-bit accumulator. The trace is `iclforge::base::SyntaxRecord`, `SyntaxSink`, `SyntaxTrace` (`iclforge/base/syntax_trace.hpp`), aliased in `iclforge::ac4`. AC-4's reader and writer, the inspector's, the DSI writer, MP4's `BitCursor`, IEC 61937's loop and IAB's reader and writer go; what stays of each is its error policy (the inspector's refusal, IAB's `std::expected` and Plex, the packer's `nullopt`) over the one reader or writer |
+| `variable_bits` | two codings, EMDF's and AC-4's | one: TS 102 366 Annex H's and TS 103 190-1 4.2.2's are the same coding (the plan was wrong to say they differ), with TS 103 420's `variable_bits_max` as a group limit; IAB's Plex is the other, and IAB's alone |
+| CRC-16 | in `base` | `iclforge::base::crc16`, AC-3's table; `iclforge::ac3::crc16` is it, beside the GF(2) solver for crc1; three bit-at-a-time copies go |
+| `Speaker` | replaced by `base::Location` | moved to `base` as `iclforge::base::Speaker`, `iclforge::ac4::Speaker` its alias (decision 13); `Location` stays E-AC-3's channel-map code |
+| the box writer | once in `containers` | `src/containers/src/isobmff_writer.hpp`, which MP4's muxer and fragmenter and IAMF's encapsulation use |
+| `meta/`, `oba/` | DRC and K-weighting once, DE's values, OAMD's semantics and the object rendering | `src/ac4/src/meta/drc` (the curve, BS.1770's weighting at the QMF subbands, the QMF energy gain, the smoothing step) and `meta/dialogue` (Tables 172, 173, 209, 210); the two level detectors stay apart, summing in different orders. `oba/objects` and `oba/isf` moved from `decoder/pcm/` |
+| the probe's callback | goes | `ProbeOptions::authenticity` goes; the probe asks the signer |
+| AC-4 links `base` | (review) | `iclforge::ac4` depends on `iclforge::base` (`iclforge-ac4.pc` requires `iclforge-base`), whose trace and speakers its public headers name; the minimum-footprint archive takes `base`'s headers. `iab` may include `base`. `iclforge::base_arithmetic` is `iclforge::base_headers` |
+
+**The proof.** Against C3's records:
+
+- **Identical:** the pinned hashes and the CLI corpus on GCC 16 and Clang 22; every PCM hash, every
+  bitstream hash and every allocation count of the five bare-metal probes; the exports
+  (`export_diff.py --rewrite c4`: 3,268 names, −0 +0); the ABI allowlists (`abi_compare.py
+  --rewrite c4`: −0 +0, with `describe(iclforge::base::Speaker)`, decision 13's one new spelling, in
+  AC-4's).
+- **The whole ctest:** 3,458 tests on each compiler (C3's 3,452 and six new), all pass but the five
+  that skip themselves. `tests/base/test_bit_io.cpp` holds the reader and the writer to verbatim
+  copies of `base`'s, AC-4's and the inspector's on random sequences (about two million checks, also
+  run under AddressSanitizer and UBSan with assertions on); `tests/base/test_crc16.cpp` holds the
+  CRC to a bit-at-a-time one.
+- **Speed (the Cortex-M3 under QEMU, instructions a frame):** the AC-3 decoder 0.05 to 0.25% fewer
+  (the window reads cheaper than byte refills); the AC-3 encoder 0.04 to 0.13% more (the writer's
+  padded last byte; a first writer that packed a byte at a time cost up to 0.58%, and is gone); AC-4
+  within 57 parts per million.
+- **Footprint:** the images grow 680 bytes (AC-3 decoder) to 1,296 (AC-4): `base`'s CRC-16 table
+  (512 bytes), which AC-4 links now; the inspector's table-of-contents reads, which inline the
+  windowed reader (reading a bit at a time through `bit()` recovered 296 bytes, not enough to be
+  worth a reader of its own); `variable_bits` and the DRC smoothing as functions of their own. The
+  AC-4 stage-timer build reached 825,596 bytes against a ceiling of 825,000, which C3 had left 700
+  bytes under; the ceiling is 830,000 (decision 15). The fixed-point probe's stack, 22,712 bytes
+  against 21,500, failed at C3 too.
+- **The installed package:** `check_install_consumer.sh` passes; the install gains `base`'s three
+  headers. The ESP-IDF staging is 493 files from 487 (the moves, `meta/`, `base`'s headers).
+- `check_layering.py` (188 include edges), `check_namespaces.py` (168 public headers),
+  `check_pages.py`, `check_doc_paths.py`, the unit tests (n1b 495, checks 431, ci 581) and
+  `precheck.py` (but for the patch attribution) pass.
+
+Hazards the plan did not name:
+
+- **A rule that translates one API into another is not idempotent.** AC-4's writer counted with
+  `bit_position()` and its reader with `position()`; the writer's becomes `bit_count()` and only then
+  the reader's `bit_position()`, so a second run would rename what the first wrote. `consol_text.py`
+  runs such a stage once (`ONCE`: on a tree that still has AC-4's reader); the idempotent renames are
+  a stage of their own (`c4b`).
+- **Qt defines `emit`.** A reader method named `emit()` broke every Qt program that includes a
+  codec header; it is `record()`.
+- **A public header that names another library's type makes a dependency.** AC-4's headers name
+  `base`'s trace and speakers, so a program that linked `iclforge::ac4` alone stopped finding them.
+- **IAB's writer relies on high bits being ignored** (a negative residual's two's complement): its
+  adapter masks before `put()`, which keeps `base`'s assertion that a value fits its width.
+- **A copy the survey missed:** IAMF's `Out` and `Cursor` pack bit fields of their own
+  (`src/containers/src/iamf/obu_io.hpp`), interleaved with byte-level and leb128 fields and
+  `std::expected` errors. Left, and listed below.
+- **Copies that stay on purpose:** the tests' own writers (`tests/ac4/decoder/bits.hpp`,
+  `tests/ac4/core/toc_writer.hpp`) and the tests' `variable_bits` loops, which are the independent
+  side of what they test.
+
+Not run here: as for C1; the merge queue's host speed and heap comparison and the ESP32-P4 AC-4
+timings the plan asks for (the Cortex-M3 counts above stand in for them).
+
+### C5, decided 2026-10-07: a move, not a merge
+
+Reading the kernels before C5 showed that each merge moves more than its last bits. One FFT moves
+AC-3's MDCT and enhanced coupling, so the AC-3 encoder's pinned bitstreams; `dsp`'s is a compile-time
+radix-4/2 kernel tuned for it, AC-4's a Stockham 2/3/5 plan at every scalar tier. One QMF bank moves
+JOC, in AC-3's Atmos encoder and decoder: `dsp`'s is a perfect-reconstruction design with a delay of
+576 samples, AC-4's Pseudocodes 65 and 66 with QWIN, a conjugate modulation half a sample apart and a
+delay of 577. One resampler moves the offline converter the CLI and the GUI use. And the plan's gate
+that no ESP32 timing get slower cannot run here. The user took (a), decision 14: AC-4's kernels move
+into `src/dsp` with their tiers, beside `dsp`'s own, and change no output; each merge is a decision of
+its own, with the cost above.
+
 ## After C3: `src/` reviewed
 
 **What C0 to C3 changed.** Twenty-two libraries are twelve. C0 made every library by
@@ -838,13 +931,25 @@ none): C4 and C5 are what make AC-4 use the rest.
     unit, the headers still split, so that the probes match. **Taken, after C1: (a).** And the coverage
     floor of `src/ac4` stays the lowest of the three it replaces until a run with `gcovr` measures it.
 
+8. **The order.** (a) C0, C1, C2, C3 as one freeze, then C4, C5, C6 as they are ready; (b) each stage
+   alone; (c) C1 first, before C0. **Taken, by the user's asking for C4 and C5 after C3: (a).**
+9. **C5 at all.** (a) proceed; (b) stop after C4. **Taken: (a)**, and C5's shape is decision 14.
+12. **The old names.** Before C4: the test files, helpers, tags, environment variables and macros
+    that name a library which merged. **Taken: renamed** ("rename the old files").
+13. **`iclforge::ac4::Speaker` and `iclforge::base::Location`.** (a) move `Speaker` into `base` as the
+    codec-blind speaker list, `iclforge::ac4::Speaker` its alias, `Location` staying E-AC-3's
+    channel-map code; (b) leave both; (c) replace `Speaker` with `Location`, breaking AC-4's API, the C
+    API's constants and Python's `ac4.Speaker`. **Taken: (a).**
+14. **C5's shape.** (a) move AC-4's FFT, MDCT, KBD, QMF and resampler into `src/dsp` with their tiers,
+    beside `dsp`'s own, changing no output, and record each merge as a decision with its cost; (b)
+    merge kernel by kernel as written, re-scoring and regenerating the pins; (c) stop after C4.
+    **Taken: (a).**
+15. **C4's footprint.** (a) raise the AC-4 probe's image ceiling to 830,000 bytes, with the reason;
+    (b) win back 300 bytes and look for the rest; (c) stop. **Taken: (a).**
+
 ### Open
 
-8. **The order.** (a) **C0, C1, C2, C3 as one freeze, then C4, C5, C6 as they are ready** (recommended:
-   the mechanical stages are disruptive in the same files and are cheapest together); (b) each stage
-   alone; (c) C1 first, before C0.
-9. **C5 at all.** (a) **proceed, kernel by kernel, with re-scoring** (recommended); (b) stop after C4 and
-   keep two QMF banks and two FFTs, recorded as accepted, as decision 25(b) priced it.
+None.
 
 ## Appendix A: the moves of C1
 
