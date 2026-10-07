@@ -10,7 +10,7 @@
 
 #include "iclforge/ac3/core/bitalloc.hpp"     // DeltaSegments
 #include "iclforge/ac3/core/eac3_tables.hpp"  // StreamType
-#include "iclforge/ac3/core/tables.hpp"       // kBlocksPerFrame
+#include "iclforge/ac3/core/types.hpp"       // kBlocksPerFrame
 #include "iclforge/ac3/export.hpp"
 
 // E-AC-3 encoder/decoder mirror verification - Annex E's counterpart to

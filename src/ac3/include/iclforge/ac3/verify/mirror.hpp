@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "iclforge/ac3/core/bitalloc.hpp"  // DeltaSegments
-#include "iclforge/ac3/core/tables.hpp"    // kBlocksPerFrame
+#include "iclforge/ac3/core/types.hpp"    // kBlocksPerFrame
 #include "iclforge/ac3/export.hpp"
 
 // Encoder/decoder mirror verification.

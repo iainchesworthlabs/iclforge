@@ -11,7 +11,7 @@
 
 #include "iclforge/ac3/core/bitalloc.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/encoder/silent_frame.hpp"  // FrameError
 #include "iclforge/ac3/encoder/transient.hpp"
 #include "iclforge/ac3/export.hpp"

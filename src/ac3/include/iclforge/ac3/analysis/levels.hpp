@@ -5,7 +5,7 @@
 #include <span>
 #include <string_view>
 
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/export.hpp"
 #include "iclforge/base/levels.hpp"
 

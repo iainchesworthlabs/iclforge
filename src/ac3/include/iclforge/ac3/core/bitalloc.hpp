@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <span>
 
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/export.hpp"
 
 // The A/52 §7.2.2 parametric bit allocation — the decoder-defined heart of

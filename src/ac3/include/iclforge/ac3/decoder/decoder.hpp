@@ -14,7 +14,7 @@
 
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/mantissas.hpp"
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/decoder/diagnostics.hpp"
 #include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/decoder/syntax_trace.hpp"

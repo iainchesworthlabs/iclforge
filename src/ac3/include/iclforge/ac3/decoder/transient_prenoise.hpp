@@ -2,7 +2,7 @@
 
 #include <span>
 
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/export.hpp"
 
 // A/52:2018 §3.7.2 / Figure E3.2: transient pre-noise time-scaling synthesis.

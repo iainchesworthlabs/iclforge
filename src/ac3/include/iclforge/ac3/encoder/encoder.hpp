@@ -11,7 +11,7 @@
 
 #include "iclforge/ac3/core/bitalloc.hpp"  // BitAllocCodes, for previous_codes_ below
 #include "iclforge/ac3/core/mantissas.hpp"  // MantissaToken, for the token scratch below
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/quality/distortion.hpp"
 #include "iclforge/ac3/encoder/silent_frame.hpp"  // FrameError, SkipPlan/plan_padding
 #include "iclforge/ac3/encoder/transient.hpp"

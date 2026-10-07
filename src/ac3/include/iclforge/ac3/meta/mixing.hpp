@@ -5,7 +5,7 @@
 #include <optional>
 #include <span>
 
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/export.hpp"
 
 // Mixing and downmix metadata, and the §7.8 downmix the values feed.

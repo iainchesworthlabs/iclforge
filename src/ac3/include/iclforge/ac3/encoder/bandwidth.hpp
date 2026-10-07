@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <span>
 
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/export.hpp"
 
 // Where the coded spectrum should stop.

@@ -13,7 +13,7 @@
 
 #include "iclforge/ac3/core/exponents.hpp"
 #include "iclforge/base/layout.hpp"
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/export.hpp"
 
 // The Annex E tables that both sides of the codec need. An encoder writes a

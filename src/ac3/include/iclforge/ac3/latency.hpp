@@ -1,6 +1,6 @@
 #pragma once
 
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 
 // The latency budget of an encode -> decode chain, in samples at the coded
 // sample rate (bare-metal probe harness).

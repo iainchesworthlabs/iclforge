@@ -8,7 +8,7 @@
 
 #include "iclforge/base/downmix_target.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/export.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"

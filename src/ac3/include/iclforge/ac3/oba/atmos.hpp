@@ -6,7 +6,7 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/dsp/qmf.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/ac3/export.hpp"

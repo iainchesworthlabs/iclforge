@@ -3,7 +3,7 @@
 #include <array>
 #include <span>
 
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/export.hpp"
 
 // Transient detection (A/52 §8.2.2): the basic-encoder recipe that decides
