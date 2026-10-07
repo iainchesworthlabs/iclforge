@@ -295,7 +295,11 @@ if [[ "$DIRECTION" == "ac4" ]]; then
     # the inverse transform's float tables for the five block lengths of a 2048-sample frame in
     # flash where they were built on the heap (dsp/transform_tables.hpp), and 2,400 bytes of
     # .bss the probe's own stage-timer tables hold now that it names the stage at a peak.
-    ICLFORGE_MAX_IMAGE_BYTES=${ICLFORGE_MAX_IMAGE_BYTES_AC4:-825000}
+    #
+    # 830,000 since planning/consolidation.md's C4 (decision 15): one bit reader for every codec
+    # put base's CRC-16 table (512 bytes) and its windowed reads in the inspector, and the
+    # stage-timer build reached 825,596 bytes, which C3 had left 700 under the old 825,000.
+    ICLFORGE_MAX_IMAGE_BYTES=${ICLFORGE_MAX_IMAGE_BYTES_AC4:-830000}
     # The fixed-point tier's image: 727,656 bytes at D14d (725,004 .text), 801,812 on
     # 2026-10-03 with the transform tables (Q7.24, and the post-twiddles the tier has besides)
     # in flash. Its converter tables are Q1.30 integers built by the compiler, the 1001/960 one
