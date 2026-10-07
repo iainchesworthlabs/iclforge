@@ -169,6 +169,8 @@ set(_ac4_kernel_sources
 # float transcendentals, decision 31's "no copies", the same on every platform.
 set(_ac4_private_includes
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    # the complex type and the Stockham passes, iclforge/dsp/detail (not installed)
+    "${PROJECT_SOURCE_DIR}/src/dsp/include"
     "${PROJECT_SOURCE_DIR}/src/dsp/src"
     "${PROJECT_SOURCE_DIR}/src/dsp/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}"
     "${ICLFORGE_PROFILING_INCLUDE_DIR}")

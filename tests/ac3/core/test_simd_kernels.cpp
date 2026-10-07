@@ -48,7 +48,7 @@
 // check against the direct-form oracle and by the cross-build corpus check
 // below.
 //
-// The FFT/DCT-IV kernel itself (fft_kernel.hpp, FFT core follow-ups) is NOT part of
+// The FFT itself (iclforge/dsp/detail/fft_stockham.hpp) is NOT part of
 // this seam: its radix-4 restructuring is an algorithmic change (fewer
 // operations), not a wider-lane one, and carries its own correctness
 // argument in that header's comment.
@@ -528,10 +528,7 @@ namespace {
 // P = 128 (kQuarter, the long transform's own size) as a representative
 // test size: it is a multiple of 4 (the AVX2 kernels' own requirement,
 // documented on each in mdct_avx2.hpp) and matches a real call site
-// exactly, unlike the short pair's P = 64. bitrev is the identity
-// permutation - the kernels only use it as a scatter-target index array,
-// so any permutation exercises the same read/gather + write/scatter code
-// paths; identity keeps the test's own expected-value bookkeeping simple.
+// exactly, unlike the short pair's P = 64.
 constexpr std::size_t kTestP = 128;
 
 std::vector<double> deterministic_doubles(std::size_t n, std::uint64_t seed) {
@@ -540,14 +537,6 @@ std::vector<double> deterministic_doubles(std::size_t n, std::uint64_t seed) {
     std::uniform_real_distribution<double> dist(-1.5, 1.5);
     for (double& x : v) {
         x = dist(rng);
-    }
-    return v;
-}
-
-std::vector<std::uint16_t> identity_bitrev(std::size_t n) {
-    std::vector<std::uint16_t> v(n);
-    for (std::size_t i = 0; i < n; ++i) {
-        v[i] = static_cast<std::uint16_t>(i);
     }
     return v;
 }
@@ -572,19 +561,18 @@ TEST_CASE("AVX2 dct4_pre_twiddle agrees with the scalar form bit-for-bit", "[sim
     const auto u = deterministic_doubles(2 * kTestP, 0x64637434'70726574ULL);
     const auto pre_re = deterministic_doubles(kTestP, 0x64637434'70725245ULL);
     const auto pre_im = deterministic_doubles(kTestP, 0x64637434'70724946ULL);
-    const auto bitrev = identity_bitrev(kTestP);
     const std::size_t m_len = u.size();
 
     std::vector<double> scalar_re(kTestP), scalar_im(kTestP);
     for (std::size_t m = 0; m < kTestP; ++m) {
         const double a = u[2 * m];
         const double b = u[m_len - 1 - 2 * m];
-        scalar_re[bitrev[m]] = a * pre_re[m] - b * pre_im[m];
-        scalar_im[bitrev[m]] = a * pre_im[m] + b * pre_re[m];
+        scalar_re[m] = a * pre_re[m] - b * pre_im[m];
+        scalar_im[m] = a * pre_im[m] + b * pre_re[m];
     }
 
     std::vector<double> avx2_re(kTestP), avx2_im(kTestP);
-    iclforge::ac3::internal::avx2::dct4_pre_twiddle(u, pre_re, pre_im, bitrev, avx2_re, avx2_im);
+    iclforge::ac3::internal::avx2::dct4_pre_twiddle(u, pre_re, pre_im, avx2_re, avx2_im);
 
     CHECK(all_bits_equal(avx2_re, scalar_re));
     CHECK(all_bits_equal(avx2_im, scalar_im));
@@ -620,20 +608,18 @@ TEST_CASE("AVX2 imdct512_pre_twiddle agrees with the scalar form bit-for-bit", "
     const auto coeffs = deterministic_doubles(4 * kTestP, 0x696d6463'74636f65ULL);
     const auto cos1 = deterministic_doubles(kTestP, 0x696d6463'74636f73ULL);
     const auto sin1 = deterministic_doubles(kTestP, 0x696d6463'74736e31ULL);
-    const auto bitrev = identity_bitrev(kTestP);
     const std::size_t k_half_n = coeffs.size();
 
     std::vector<double> scalar_re(kTestP), scalar_im(kTestP);
     for (std::size_t k = 0; k < kTestP; ++k) {
         const double a = coeffs[k_half_n - 2 * k - 1];
         const double b = coeffs[2 * k];
-        scalar_re[bitrev[k]] = a * cos1[k] - b * sin1[k];
-        scalar_im[bitrev[k]] = -(b * cos1[k] + a * sin1[k]);
+        scalar_re[k] = a * cos1[k] - b * sin1[k];
+        scalar_im[k] = -(b * cos1[k] + a * sin1[k]);
     }
 
     std::vector<double> avx2_re(kTestP), avx2_im(kTestP);
-    iclforge::ac3::internal::avx2::imdct512_pre_twiddle(coeffs, cos1, sin1, bitrev, avx2_re,
-                                                        avx2_im);
+    iclforge::ac3::internal::avx2::imdct512_pre_twiddle(coeffs, cos1, sin1, avx2_re, avx2_im);
 
     CHECK(all_bits_equal(avx2_re, scalar_re));
     CHECK(all_bits_equal(avx2_im, scalar_im));

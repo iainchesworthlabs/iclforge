@@ -247,9 +247,12 @@ target_compile_features(iclforge_ac3_minimal PUBLIC cxx_std_23)
 #
 # Each file is here because a board run showed the optimiser paying for it,
 # stage by stage, and the ones it did not pay for are deliberately absent:
-# mdct.cpp and fft.cpp (the float32 IMDCT ran in 3.40 ms either way),
 # exponents.cpp and mantissas.cpp (under a tenth of a millisecond between
-# them). What it bought at 240 MHz, per frame of the 5.1 Atmos fixture:
+# them). mdct.cpp was absent too (the float32 IMDCT ran in 3.40 ms either way)
+# until its transforms ran on the family's one FFT (planning/consolidation.md
+# decision 20), whose passes -Os leaves as calls: at -O2 the Cortex-M3 leg's
+# float32 decode is within 0.4% of what it was on AC-3's own kernel, at -Os
+# 2 to 4% over, for about 9 KB of flash. What it bought at 240 MHz, per frame of the 5.1 Atmos fixture:
 # bit allocation 4.55 -> 2.09 ms, the JOC mixing 11.0 -> 8.2 ms, the
 # E-AC-3 stages in eac3_decoder.cpp about 1.5 ms between them; and, per frame
 # of the 7.1.4 stream folded to stereo, the output stage's seating and fold
@@ -263,6 +266,7 @@ if(ICLFORGE_MINIMAL_HOT_O2)
     set_source_files_properties(
         src/core/bitalloc.cpp
         src/core/eac3_tools.cpp
+        src/core/mdct.cpp
         "${PROJECT_SOURCE_DIR}/src/dsp/src/fft.cpp"
         src/decoder/decoder.cpp
         src/decoder/eac3_decoder.cpp

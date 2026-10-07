@@ -42,8 +42,8 @@ struct f64x4 {
 
     // Lane extraction for the gather/scatter kernels' scalar scatter ends -
     // same reasoning as f64x2::lane0/lane1: the seam carries no scatter-store
-    // instruction, so a kernel that writes to a permuted destination (the
-    // FFT's bitrev table) extracts each lane individually rather than
+    // instruction, so a kernel that writes to a strided or permuted destination
+    // extracts each lane individually rather than
     // vector-storing to a contiguous range it does not actually have.
     [[nodiscard]] double lane0() const { return _mm256_cvtsd_f64(v); }
     [[nodiscard]] double lane1() const {
@@ -76,7 +76,7 @@ struct f64x4 {
 // transform's DATA is one f64x4 per lane-of-independent-transform-instances,
 // but its TWIDDLES are a plain `double` - identical for every instance in
 // the batch, since they only depend on which bin/stage, not which instance
-// - so fft_kernel.hpp's templated `VecType * double` twiddle multiplies
+// - so fft_stockham.hpp's templated `V * W` twiddle multiplies
 // need this pair to compile at `VecType = f64x4`. Broadcasting into all 4
 // lanes and then multiplying is exactly the operation a scalar-times-vector
 // product already is, so this changes no result `f64x4::broadcast(s) * v`

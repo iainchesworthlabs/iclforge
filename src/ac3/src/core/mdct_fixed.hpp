@@ -8,7 +8,7 @@
 #include <span>
 
 #include "iclforge/ac3/core/window.hpp"
-#include "iclforge/dsp/detail/fft_kernel.hpp"
+#include "iclforge/dsp/detail/fft_stockham.hpp"
 #include "iclforge/base/arithmetic/fixed32.hpp"
 
 // The fixed-point tier's §7.9.4 inverse pair (planning/arithmetic-tiers.md,
@@ -54,7 +54,7 @@
 // frame is some 88,000 of them (docs/platforms/bare-metal/esp32-c6.md has
 // what that bought on a board).
 //
-// Header-only and inline, like fft_kernel.hpp: the decoders instantiate it
+// Header-only and inline, like fft_stockham.hpp: the decoders instantiate it
 // through scalar_inverse.hpp and the test instantiates it directly, so no
 // symbol needs exporting from the library. The tables are built once, from
 // the same double expressions mdct.cpp's own tables come from, and rounded
@@ -64,9 +64,9 @@
 namespace iclforge::ac3::internal {
 
 // The pair's working value (see "No saturation" above). The FFT kernel takes
-// it as its VecType, the lane type fft_kernel.hpp's batched callers use, with
-// Fixed32 twiddles, so the kernel's text and its floating instantiations are
-// untouched.
+// it as its value type, as the AVX2 path gives it four transforms in a
+// register, with Fixed32 twiddles (iclforge/dsp/detail/fft_stockham.hpp), so
+// the passes' text and their floating instantiations are untouched.
 struct ImdctValue {
     std::int32_t raw = 0;
 
@@ -103,8 +103,8 @@ struct FixedImdctTables {
     std::array<iclforge::internal::Fixed32, kN / 8> cos2{};
     std::array<iclforge::internal::Fixed32, kN / 8> sin2{};
     // The shared kernel's own tables at the two sizes the pair needs.
-    iclforge::internal::FftTables<kN / 4, iclforge::internal::Fixed32> fft128{};
-    iclforge::internal::FftTables<kN / 8, iclforge::internal::Fixed32> fft64{};
+    iclforge::dsp::fft::StockhamTables<kN / 4, iclforge::internal::Fixed32> fft128{};
+    iclforge::dsp::fft::StockhamTables<kN / 8, iclforge::internal::Fixed32> fft64{};
     // §7.9.4.1 step 5's window, the double table rounded once.
     std::array<iclforge::internal::Fixed32, kN> window{};
 
@@ -147,7 +147,7 @@ inline void imdct512_windowed_fixed(std::span<const iclforge::internal::Fixed32,
     constexpr std::size_t kHalfN = FixedImdctTables::kN / 2;    // 256
 
     // Steps 2 and 3: Z[k] = (X[N/2-2k-1] + j X[2k]) (xcos1[k] + j xsin1[k]),
-    // written conjugated and digit-reversed for the kernel, then the
+    // written conjugated for the transform, then the
     // inverse DFT as conj(FFT(conj(Z))) - the identity mdct.cpp's fast
     // branch uses.
     std::array<ImdctValue, kQuarter> z_re{};
@@ -157,11 +157,12 @@ inline void imdct512_windowed_fixed(std::span<const iclforge::internal::Fixed32,
         const ImdctValue b = imdct_value(coeffs[2 * k]);
         const iclforge::internal::Fixed32 c = t.cos1[k];
         const iclforge::internal::Fixed32 s = t.sin1[k];
-        const std::size_t d = t.fft128.bitrev[k];
+        const std::size_t d = k;
         z_re[d] = (a * c) - (b * s);
         z_im[d] = -((b * c) + (a * s));
     }
-    fft_forward_bitrev<kQuarter, ImdctValue, iclforge::internal::Fixed32>(t.fft128, z_re, z_im);
+    iclforge::dsp::fft::stockham_forward<kQuarter, ImdctValue, iclforge::internal::Fixed32>(
+        t.fft128, std::span<ImdctValue, kQuarter>(z_re), std::span<ImdctValue, kQuarter>(z_im));
 
     // Step 4: the conjugation back and the post-twiddle in one pass:
     // y[n] = conj(Z[n]) (xcos1[n] + j xsin1[n]).
@@ -219,14 +220,16 @@ inline void imdct256_pair_windowed_fixed(std::span<const iclforge::internal::Fix
         const ImdctValue b1 = imdct_value(coeffs[2 * (2 * k)]);
         const ImdctValue a2 = imdct_value(coeffs[(2 * (kQuarter - (2 * k) - 1)) + 1]);
         const ImdctValue b2 = imdct_value(coeffs[(2 * (2 * k)) + 1]);
-        const std::size_t d = t.fft64.bitrev[k];
+        const std::size_t d = k;
         z1_re[d] = (a1 * c) - (b1 * s);
         z1_im[d] = -((b1 * c) + (a1 * s));
         z2_re[d] = (a2 * c) - (b2 * s);
         z2_im[d] = -((b2 * c) + (a2 * s));
     }
-    fft_forward_bitrev<kEighth, ImdctValue, iclforge::internal::Fixed32>(t.fft64, z1_re, z1_im);
-    fft_forward_bitrev<kEighth, ImdctValue, iclforge::internal::Fixed32>(t.fft64, z2_re, z2_im);
+    iclforge::dsp::fft::stockham_forward<kEighth, ImdctValue, iclforge::internal::Fixed32>(
+        t.fft64, std::span<ImdctValue, kEighth>(z1_re), std::span<ImdctValue, kEighth>(z1_im));
+    iclforge::dsp::fft::stockham_forward<kEighth, ImdctValue, iclforge::internal::Fixed32>(
+        t.fft64, std::span<ImdctValue, kEighth>(z2_re), std::span<ImdctValue, kEighth>(z2_im));
 
     // Step 4, both sets.
     std::array<ImdctValue, kEighth> y1_re{};

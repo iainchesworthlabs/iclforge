@@ -30,6 +30,10 @@
 // is what keeps "regenerate on the host" true; the ordinary double build's
 // streams are pinned elsewhere, by tests/golden/bitstream-hashes.json.
 //
+// Re-pinned 2026-10-08 for planning/consolidation.md decision 20: the forward transform
+// runs on the family's one FFT, whose float rounding differs from the radix-4/2 kernel's, and
+// these six streams quantise differently. The double build's streams did not move.
+//
 // What a hash match establishes and what it does not: it says the target's
 // encoder produced the same bitstream the host's did from the same input. It
 // does NOT say either is correct - tests/golden/bitstream-hashes.json and the
@@ -46,11 +50,11 @@ inline constexpr int kEncodeFrames = 6;
 // from the hash: a wrong size is a framing fault, a wrong hash with the right
 // size is an arithmetic one.
 inline constexpr std::size_t kAc3Bytes = 10752;
-inline constexpr std::uint64_t kAc3Hash = 17097054118981639700ULL;
+inline constexpr std::uint64_t kAc3Hash = 10284267085301318837ULL;
 
 // E-AC-3 5.1 at 384 kbit/s: 1,536 bytes an access unit, 9,216 for six.
 inline constexpr std::size_t kEac3Bytes = 9216;
-inline constexpr std::uint64_t kEac3Hash = 57777224631052106ULL;
+inline constexpr std::uint64_t kEac3Hash = 951368733041448521ULL;
 
 // §E3.5 enhanced coupling. 2/0 at 192 kbit/s, and the layout is the finding.
 //
@@ -77,21 +81,21 @@ inline constexpr std::uint64_t kEac3Hash = 57777224631052106ULL;
 //
 // 192 kbit/s 2/0 is 768 bytes an access unit, 4,608 for six.
 inline constexpr std::size_t kEac3EcplBytes = 4608;
-inline constexpr std::uint64_t kEac3EcplHash = 6339175595316876366ULL;
+inline constexpr std::uint64_t kEac3EcplHash = 9535294852911195028ULL;
 
 // AC-3 2/0 at 192 kbit/s - the decode probe's ac3_stereo shape seen from the
 // other side, and the layout most AC-3 encode on a small part actually is.
 // 768 bytes a frame, 4,608 for six. Only two of the PCM block's channels are
 // read: the encoder's own layout decides how many spans it takes.
 inline constexpr std::size_t kAc3StereoBytes = 4608;
-inline constexpr std::uint64_t kAc3StereoHash = 1195752761152509359ULL;
+inline constexpr std::uint64_t kAc3StereoHash = 17450847519567711795ULL;
 
 // E-AC-3 2/0 at 192 kbit/s with the default tools, which is none. The same
 // layout and rate as the enhanced-coupling row above with §E3.5 off, so the
 // two together say what the tool costs - in peak bytes and, under --icount,
 // in instructions - at the same input. 768 bytes an access unit, 4,608 for six.
 inline constexpr std::size_t kEac3StereoBytes = 4608;
-inline constexpr std::uint64_t kEac3StereoHash = 18016255318094015214ULL;
+inline constexpr std::uint64_t kEac3StereoHash = 8189348635516293543ULL;
 
 // E-AC-3 2/0 at 192 kbit/s with standard coupling, spectral extension and the
 // adaptive hybrid transform all in use - the tools the 5.1 row above never
@@ -116,7 +120,7 @@ inline constexpr std::uint64_t kEac3StereoHash = 18016255318094015214ULL;
 // blocks, spx in 6 of 6 and AHT in the syncframe. 768 bytes an access unit,
 // 4,608 for six.
 inline constexpr std::size_t kEac3ToolsBytes = 4608;
-inline constexpr std::uint64_t kEac3ToolsHash = 1673449135140366971ULL;
+inline constexpr std::uint64_t kEac3ToolsHash = 5883803796263611888ULL;
 
 // 7.1 as an access unit: a 5.1 independent substream at 448 kbit/s (1,792
 // bytes) with a four-channel dependent at 224 kbit/s (896 bytes) carrying

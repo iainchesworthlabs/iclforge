@@ -21,7 +21,7 @@
 #include "iclforge/ac3/core/window.hpp"
 #include "iclforge/base/detail/profiling.hpp"
 #include "eac3_tools_fixed.hpp"
-#include "iclforge/dsp/detail/fft_kernel.hpp"
+#include "iclforge/dsp/detail/fft_stockham.hpp"
 #include "iclforge/base/arithmetic/fixed32.hpp"
 #include "mdct_fixed.hpp"
 
@@ -874,42 +874,35 @@ using iclforge::internal::Fixed32;
                                std::span<const Fixed32, 512> imag_in,
                                std::span<Fixed32, 512> real_out,
                                std::span<Fixed32, 512> imag_out) {
-    static const iclforge::internal::FftTables<512, Fixed32> tables;
+    static const iclforge::dsp::fft::StockhamTables<512, Fixed32> tables;
     for (std::size_t n = 0; n < 512; ++n) {
-        real_out[tables.bitrev[n]] = real_in[n];
-        imag_out[tables.bitrev[n]] = imag_in[n];
+        real_out[n] = real_in[n];
+        imag_out[n] = imag_in[n];
     }
     constexpr int kStageCeiling = Fixed32::kFractionBits + 4;
-    const auto shed = [&]() {
+    const auto shed = [&](std::span<Fixed32, 512> re, std::span<Fixed32, 512> im) {
         std::int32_t peak = 0;
         for (std::size_t k = 0; k < 512; ++k) {
-            const std::int32_t re = real_out[k].raw < 0 ? -real_out[k].raw : real_out[k].raw;
-            const std::int32_t im = imag_out[k].raw < 0 ? -imag_out[k].raw : imag_out[k].raw;
-            peak = std::max({peak, re, im});
+            const std::int32_t r = re[k].raw < 0 ? -re[k].raw : re[k].raw;
+            const std::int32_t i = im[k].raw < 0 ? -im[k].raw : im[k].raw;
+            peak = std::max({peak, r, i});
         }
         const int excess = width64(peak) - kStageCeiling;
         if (excess <= 0) {
             return 0;
         }
         for (std::size_t k = 0; k < 512; ++k) {
-            real_out[k] = real_out[k].scaled_by_pow2(-excess);
-            imag_out[k] = imag_out[k].scaled_by_pow2(-excess);
+            re[k] = re[k].scaled_by_pow2(-excess);
+            im[k] = im[k].scaled_by_pow2(-excess);
         }
         return excess;
     };
     int applied = 0;
-    iclforge::internal::fft_radix4_stage<512, 4, Fixed32, Fixed32>(tables, real_out, imag_out);
-    applied += shed();
-    iclforge::internal::fft_radix4_stage<512, 16, Fixed32, Fixed32>(tables, real_out, imag_out);
-    applied += shed();
-    iclforge::internal::fft_radix4_stage<512, 64, Fixed32, Fixed32>(tables, real_out, imag_out);
-    applied += shed();
-    iclforge::internal::fft_radix4_stage<512, 256, Fixed32, Fixed32>(tables, real_out, imag_out);
-    applied += shed();
-    iclforge::internal::fft_radix2_final_stage<512, Fixed32, Fixed32>(tables, real_out, imag_out);
-    // The last stage needs no ceiling of its own - nothing follows it - but
+    // After every pass, the last too: it needs no ceiling of its own - nothing follows it - but
     // what it did to the magnitude still belongs in the exponent.
-    applied += shed();
+    iclforge::dsp::fft::stockham_forward<512, Fixed32, Fixed32>(
+        tables, real_out, imag_out,
+        [&](std::span<Fixed32, 512> re, std::span<Fixed32, 512> im) { applied += shed(re, im); });
     // 1/N is nine bits; the stages have already taken `applied` of them.
     return 9 - applied;
 }

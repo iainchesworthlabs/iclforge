@@ -39,7 +39,7 @@
 // tests/ac3/core/test_simd_kernels.cpp asserts that bit-for-bit for every
 // primitive here, and the kernels built from them inherit the guarantee
 // rather than needing their own bit-exact unit test (see that file's own
-// header comment). fft_kernel.hpp's radix-4 FFT/DCT-IV core (FFT core follow-ups)
+// header comment). The FFT (iclforge/dsp/detail/fft_stockham.hpp)
 // is NOT part of this seam - it is an algorithmic change, not a
 // wider-lane one, and carries its own correctness argument.
 //

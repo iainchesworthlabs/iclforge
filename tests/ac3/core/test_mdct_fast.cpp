@@ -301,7 +301,7 @@ TEST_CASE("float32 inverse transform agrees with the double one", "[mdct][float3
     CHECK(worst < 1e-5);
     // And it should not be absurdly small either - a float32 path that agreed
     // to 1e-12 would mean the float overload had quietly computed in double,
-    // which is exactly the trap fft_kernel.hpp's Scalar parameter exists to
+    // which is exactly the trap StockhamTables' factor type exists to
     // avoid. Catching that here is cheaper than noticing it as a performance
     // mystery on the target.
     CHECK(worst > 1e-9);

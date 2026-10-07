@@ -7,7 +7,7 @@
 
 #include "iclforge/ac3/core/window.hpp"
 
-#include "iclforge/dsp/detail/fft_kernel.hpp"
+#include "iclforge/dsp/detail/fft_stockham.hpp"
 #include "simd_avx2.hpp"
 
 namespace iclforge::ac3::internal::avx2 {
@@ -21,8 +21,8 @@ void apply_analysis_window(std::span<const double, 512> x, std::span<double, 512
 }
 
 void dct4_pre_twiddle(std::span<const double> u, std::span<const double> pre_re,
-                      std::span<const double> pre_im, std::span<const std::uint16_t> bitrev,
-                      std::span<double> z_re, std::span<double> z_im) {
+                      std::span<const double> pre_im, std::span<double> z_re,
+                      std::span<double> z_im) {
     const std::size_t p = pre_re.size();
     const std::size_t m_len = u.size();  // M
     for (std::size_t m = 0; m < p; m += 4) {
@@ -33,10 +33,10 @@ void dct4_pre_twiddle(std::span<const double> u, std::span<const double> pre_re,
         const auto pre_im_v = f64x4::load(&pre_im[m]);
         const auto zr = a * pre_re_v - b * pre_im_v;
         const auto zi = a * pre_im_v + b * pre_re_v;
-        const std::size_t d0 = bitrev[m];
-        const std::size_t d1 = bitrev[m + 1];
-        const std::size_t d2 = bitrev[m + 2];
-        const std::size_t d3 = bitrev[m + 3];
+        const std::size_t d0 = m;
+        const std::size_t d1 = m + 1;
+        const std::size_t d2 = m + 2;
+        const std::size_t d3 = m + 3;
         z_re[d0] = zr.lane0();
         z_im[d0] = zi.lane0();
         z_re[d1] = zr.lane1();
@@ -73,8 +73,8 @@ void dct4_post_twiddle(std::span<const double> z_re, std::span<const double> z_i
 }
 
 void imdct512_pre_twiddle(std::span<const double> coeffs, std::span<const double> cos1,
-                          std::span<const double> sin1, std::span<const std::uint16_t> bitrev,
-                          std::span<double> z_re, std::span<double> z_im) {
+                          std::span<const double> sin1, std::span<double> z_re,
+                          std::span<double> z_im) {
     const std::size_t k_half_n = coeffs.size();  // 512
     const std::size_t quarter = cos1.size();      // 128
     for (std::size_t k = 0; k < quarter; k += 4) {
@@ -86,10 +86,10 @@ void imdct512_pre_twiddle(std::span<const double> coeffs, std::span<const double
         const auto sn = f64x4::load(&sin1[k]);
         const auto zr = a * c - b * sn;
         const auto zi = -(b * c + a * sn);
-        const std::size_t d0 = bitrev[k];
-        const std::size_t d1 = bitrev[k + 1];
-        const std::size_t d2 = bitrev[k + 2];
-        const std::size_t d3 = bitrev[k + 3];
+        const std::size_t d0 = k;
+        const std::size_t d1 = k + 1;
+        const std::size_t d2 = k + 2;
+        const std::size_t d3 = k + 3;
         z_re[d0] = zr.lane0();
         z_im[d0] = zi.lane0();
         z_re[d1] = zr.lane1();
@@ -147,7 +147,7 @@ void imdct256_post_twiddle(std::span<const double> cos2, std::span<const double>
 void imdct512_windowed_batch4(std::span<const double> coeffs0, std::span<const double> coeffs1,
                               std::span<const double> coeffs2, std::span<const double> coeffs3,
                               std::span<const double> cos1, std::span<const double> sin1,
-                              const iclforge::internal::FftTables<128>& fft, std::span<double> x0,
+                              const iclforge::dsp::fft::StockhamTables<128>& fft, std::span<double> x0,
                               std::span<double> x1, std::span<double> x2, std::span<double> x3) {
     constexpr std::size_t kQuarter = 128;
     constexpr std::size_t kEighth = 64;
@@ -177,10 +177,9 @@ void imdct512_windowed_batch4(std::span<const double> coeffs0, std::span<const d
     // objects' values for that bin) instead of one f64x2/f64x4 per group
     // of bins within one object. Same sign convention as
     // imdct512_pre_twiddle above - and, with spectra interleaved, both
-    // reads are plain indexed vector loads rather than gathers; the
-    // bitrev "scatter" is a single f64x4 store per bin (all four objects
-    // move together), since the destination is object-interleaved by
-    // construction.
+    // reads are plain indexed vector loads rather than gathers; the store
+    // is a single f64x4 per bin (all four objects move together), since the
+    // destination is object-interleaved by construction.
     std::array<f64x4, kQuarter> z_re{};
     std::array<f64x4, kQuarter> z_im{};
     for (std::size_t k = 0; k < kQuarter; ++k) {
@@ -190,11 +189,11 @@ void imdct512_windowed_batch4(std::span<const double> coeffs0, std::span<const d
         const double sn = sin1[k];
         const auto zr = (a * c) - (b * sn);
         const auto zi = -((b * c) + (a * sn));
-        const std::size_t d = fft.bitrev[k];
-        z_re[d] = zr;
-        z_im[d] = zi;
+        z_re[k] = zr;
+        z_im[k] = zi;
     }
-    fft_forward_bitrev<kQuarter, f64x4>(fft, z_re, z_im);
+    iclforge::dsp::fft::stockham_forward<kQuarter, f64x4, double>(
+        fft, std::span<f64x4, kQuarter>(z_re), std::span<f64x4, kQuarter>(z_im));
 
     // Post-FFT negate-copy: unit stride, nothing to gather or scatter -
     // same as imdct512_negate_copy above, just f64x4-per-bin.
@@ -268,7 +267,7 @@ void mdct512_forward_batch4(std::span<const double> w0, std::span<const double> 
                             std::span<const double> w2, std::span<const double> w3,
                             std::span<const double> pre_re, std::span<const double> pre_im,
                             std::span<const double> post_re, std::span<const double> post_im,
-                            const iclforge::internal::FftTables<128>& fft, double scale,
+                            const iclforge::dsp::fft::StockhamTables<128>& fft, double scale,
                             std::span<double> c0, std::span<double> c1, std::span<double> c2,
                             std::span<double> c3) {
     constexpr std::size_t kQ = 128;       // NLen / 4
@@ -315,10 +314,9 @@ void mdct512_forward_batch4(std::span<const double> w0, std::span<const double> 
         u[kQ + j + 3] = b3 - e0;
     }
 
-    // dct4_scaled's pre-twiddle: same arithmetic and same bitrev scatter
-    // target as dct4_pre_twiddle above, but u is already interleaved, so
-    // both reads are indexed vector loads and the scatter is one vector
-    // store per m.
+    // dct4_scaled's pre-twiddle: same arithmetic and same target as
+    // dct4_pre_twiddle above, but u is already interleaved, so both reads
+    // are indexed vector loads and the store is one vector store per m.
     std::array<f64x4, kP> z_re{};
     std::array<f64x4, kP> z_im{};
     for (std::size_t m = 0; m < kP; ++m) {
@@ -326,11 +324,11 @@ void mdct512_forward_batch4(std::span<const double> w0, std::span<const double> 
         const auto b = u[kM - 1 - 2 * m];
         const double pr = pre_re[m];
         const double pi = pre_im[m];
-        const std::size_t d = fft.bitrev[m];
-        z_re[d] = (a * pr) - (b * pi);
-        z_im[d] = (a * pi) + (b * pr);
+        z_re[m] = (a * pr) - (b * pi);
+        z_im[m] = (a * pi) + (b * pr);
     }
-    fft_forward_bitrev<kP, f64x4>(fft, z_re, z_im);
+    iclforge::dsp::fft::stockham_forward<kP, f64x4, double>(fft, std::span<f64x4, kP>(z_re),
+                                                            std::span<f64x4, kP>(z_im));
 
     // dct4_scaled's post-twiddle, into an interleaved coefficient scratch:
     // the even/odd split writes stride +2 and -2, which is not a

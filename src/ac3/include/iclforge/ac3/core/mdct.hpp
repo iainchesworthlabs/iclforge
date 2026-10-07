@@ -35,7 +35,7 @@
 // sum against a tabulated (k, n) matrix, and with the +j*sin sign
 // convention it is exactly an unscaled inverse DFT, so the fast path is
 // conj(FFT(conj(Z))) through the same kernel the forward's fast fold
-// already uses (fft_kernel.hpp). Steps 2, 4 and 5 - the normative twiddles
+// already uses (iclforge/dsp/detail/fft_stockham.hpp). Steps 2, 4 and 5 - the normative twiddles
 // and the windowing/de-interleave map - are the identical code either way.
 // Direct remains the default at THIS level for the forward's own reason:
 // the direct evaluation is the spec's statement of the transform and the
@@ -88,7 +88,7 @@ ICLFORGE_AC3_EXPORT void imdct512_windowed(std::span<const float, 256> coeffs,
 // imdct512_windowed(..., /*fast=*/true) run in lockstep, one object per
 // SIMD lane, instead of four separate scalar/SSE2 calls - the axis the SIMD kernels'
 // own per-transform 2/4-lane seam cannot reach (there is no clean
-// within-one-transform grouping in the FFT core; see fft_kernel.hpp). Safe
+// within-one-transform grouping in the FFT; see fft_stockham.hpp). Safe
 // to call unconditionally, the same as every other transform in this file:
 // internally checks iclforge::internal::cpu::has_avx2() and, when it is false,
 // falls back to four ordinary imdct512_windowed(coeffsN, xN,

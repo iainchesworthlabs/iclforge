@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <span>
 
-#include "iclforge/dsp/detail/fft_kernel.hpp"
+#include "iclforge/dsp/detail/fft_stockham.hpp"
 
 // ---------------------------------------------------------------------------
 // AVX2 kernel bodies for src/ac3/src/core/mdct.cpp, dispatched behind
@@ -30,15 +30,14 @@ void apply_analysis_window(std::span<const double, 512> x, std::span<double, 512
 
 // dct4_scaled<NLen>'s pre-twiddle (mdct.cpp), four m at a time instead of
 // two: gathers u at stride +-2, complex-multiplies by pre_re[m]/pre_im[m],
-// scatters the result to z_re[bitrev[m]]/z_im[bitrev[m]]. Not templated on
-// NLen - P (pre_re.size() == pre_im.size() == bitrev.size() ==
+// writes the result to z_re[m]/z_im[m]. Not templated on
+// NLen - P (pre_re.size() == pre_im.size() ==
 // z_re.size() == z_im.size()) is a runtime span length instead, since a
 // template instantiated from mdct.cpp (no AVX2 flag) could not itself use
 // AVX2 intrinsics; P must be a multiple of 4 (true at both call sites, 128
 // and 64). u.size() must be 2*P (M).
 void dct4_pre_twiddle(std::span<const double> u, std::span<const double> pre_re,
-                      std::span<const double> pre_im, std::span<const std::uint16_t> bitrev,
-                      std::span<double> z_re, std::span<double> z_im);
+                      std::span<const double> pre_im, std::span<double> z_re, std::span<double> z_im);
 
 // dct4_scaled<NLen>'s post-twiddle: unit-stride read of z_re/z_im/post_re/
 // post_im (all P long), scaled complex multiply, scatter to out (2*P = M
@@ -51,12 +50,11 @@ void dct4_post_twiddle(std::span<const double> z_re, std::span<const double> z_i
 // gathers coeffs at two different descending/ascending stride-2 walks,
 // complex-multiplies by cos1[k]/sin1[k] with imdct512_windowed's OWN sign
 // convention (zi negated, NOT the same as dct4_pre_twiddle's), scatters to
-// z_re[bitrev[k]]/z_im[bitrev[k]]. kQuarter (cos1.size() == sin1.size() ==
-// bitrev.size() == z_re.size() == z_im.size()) is 128, a multiple of 4.
+// z_re[k]/z_im[k]. kQuarter (cos1.size() == sin1.size() ==
+// z_re.size() == z_im.size()) is 128, a multiple of 4.
 // coeffs.size() must be kHalfN (512).
 void imdct512_pre_twiddle(std::span<const double> coeffs, std::span<const double> cos1,
-                          std::span<const double> sin1, std::span<const std::uint16_t> bitrev,
-                          std::span<double> z_re, std::span<double> z_im);
+                          std::span<const double> sin1, std::span<double> z_re, std::span<double> z_im);
 
 // imdct512_windowed's post-FFT copy-and-negate (fast branch): t_re = z_re,
 // t_im = -z_im, unit stride, four at a time.
@@ -88,8 +86,8 @@ void imdct256_post_twiddle(std::span<const double> cos2, std::span<const double>
 // bins of ONE transform; this batches ACROSS four INDEPENDENT transforms).
 // Every step in between the two layout seams (the FFT itself, the
 // negate-copy, the post-twiddle) is unit-stride f64x4 arithmetic with
-// nothing to gather or scatter, since the bin axis stays natural-order/
-// bitrev-permuted the whole way through exactly as it does for one object.
+// nothing to gather or scatter, since the bin axis stays in natural order
+// the whole way through exactly as it does for one object.
 //
 // The two seams themselves - object-major spans in, object-major spans out,
 // f64x4-per-bin in the middle - are paid in 4x4 block transposes (eight
@@ -119,7 +117,7 @@ void imdct256_post_twiddle(std::span<const double> cos2, std::span<const double>
 void imdct512_windowed_batch4(std::span<const double> coeffs0, std::span<const double> coeffs1,
                               std::span<const double> coeffs2, std::span<const double> coeffs3,
                               std::span<const double> cos1, std::span<const double> sin1,
-                              const iclforge::internal::FftTables<128>& fft, std::span<double> x0,
+                              const iclforge::dsp::fft::StockhamTables<128>& fft, std::span<double> x0,
                               std::span<double> x1, std::span<double> x2, std::span<double> x3);
 
 // iclforge::ac3::mdct512_forward_batch4's AVX2 body (mdct.hpp): the forward twin of
@@ -136,7 +134,7 @@ void imdct512_windowed_batch4(std::span<const double> coeffs0, std::span<const d
 // ascending, two descending, and a descending run is just the same
 // contiguous load with the four RESULT vectors taken in reverse order,
 // which costs nothing. Then the pre-twiddle (u at 2m / M-1-2m, complex
-// multiply by pre_re[m]/pre_im[m], bitrev scatter), the P = 128 FFT, and
+// multiply by pre_re[m]/pre_im[m]), the P = 128 FFT, and
 // the post-twiddle (complex multiply by post_re[k]/post_im[k], times
 // `scale`, out at 2k / M-1-2k) - all of which become plain indexed vector
 // reads and writes once the data is interleaved, exactly as they do on the
@@ -150,7 +148,7 @@ void mdct512_forward_batch4(std::span<const double> w0, std::span<const double> 
                             std::span<const double> w2, std::span<const double> w3,
                             std::span<const double> pre_re, std::span<const double> pre_im,
                             std::span<const double> post_re, std::span<const double> post_im,
-                            const iclforge::internal::FftTables<128>& fft, double scale,
+                            const iclforge::dsp::fft::StockhamTables<128>& fft, double scale,
                             std::span<double> c0, std::span<double> c1, std::span<double> c2,
                             std::span<double> c3);
 

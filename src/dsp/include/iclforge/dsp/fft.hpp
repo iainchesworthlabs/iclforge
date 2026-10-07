@@ -13,8 +13,8 @@
 //   Z[k] = (1/N) * sum_{n=0}^{N-1} (x_re[n] + j.x_im[n]) *
 //                                  (cos(2*pi*k*n/N) - j.sin(2*pi*k*n/N))
 //
-// via the shared FFT kernel (src/dsp/include/iclforge/dsp/detail/fft_kernel.hpp - the same
-// machinery the §7.9.4 fast MDCT runs at P = 64 and 128). It began as the
+// via the family's one FFT (iclforge/dsp/detail/fft_stockham.hpp - the same
+// passes the §7.9.4 fast MDCT runs at P = 64 and 128, and AC-4's transforms at every length). It began as the
 // direct-form O(N^2) sum on this project's correctness-first stance, with
 // the fast structure deferred "once there is a decoder round-trip to
 // validate it against" - that round-trip exists now (the encoder/decoder
@@ -35,7 +35,7 @@ ICLFORGE_DSP_EXPORT void dft512(std::span<const double, kDftLength> real_in,
 // The same transform over float32, for a decoder whose coefficient store is
 // float (the minimum-footprint profile's enhanced-coupling path,
 // ecpl_channel_spectrum's float form). Same kernel, twiddles narrowed once
-// from the double ones (FftTables<512, float>), the 1/N scale an exact
+// from the double ones (StockhamTables<512, float>), the 1/N scale an exact
 // power of two in either type. Not the double result narrowed - the
 // butterflies round in float - which is the same class of difference the
 // float coefficient store already accepted at the inverse transform.

@@ -12,7 +12,7 @@
 #include "iclforge/base/detail/simd.hpp"
 
 #include "iclforge/base/detail/cpu_features.hpp"
-#include "iclforge/dsp/detail/fft_kernel.hpp"
+#include "iclforge/dsp/detail/fft_stockham.hpp"
 #include "mdct_avx2.hpp"
 #include "reference_transform.hpp"
 
@@ -27,7 +27,7 @@ constexpr double kPi = std::numbers::pi;
 //
 // Scalar (float32 for the minimum-footprint profile): the type the twiddles are STORED in.
 // Computed in double and narrowed once on the way in, for the same reason
-// fft_kernel.hpp's FftTables does it - the angle here is small and exact and
+// the transform's own factors are (iclforge/dsp/detail/fft_stockham.hpp) - the angle here is small and exact and
 // deserves the library call at full precision whatever the table holds.
 // Default double, so every existing use is the one it always was.
 template <typename Scalar = double>
@@ -163,10 +163,9 @@ struct FastMdctTables {
     // w[k] post-twiddle exp(-i*pi*(4k+1)/(4M)), split re/im.
     std::array<Scalar, kP> post_re{};
     std::array<Scalar, kP> post_im{};
-    // The P-point FFT's own tables (digit-reversal permutation + stage
-    // twiddles) - the shared kernel's, so dft512 runs the identical
-    // machinery at P = 512; see fft_kernel.hpp.
-    iclforge::internal::FftTables<kP, Scalar> fft{};
+    // The P-point transform's plan - the family's one FFT, which dft512
+    // runs at P = 512 too; see iclforge/dsp/detail/fft_stockham.hpp.
+    iclforge::dsp::fft::StockhamTables<kP, Scalar> fft{};
     FastMdctTables() {
         for (std::size_t m = 0; m < kP; ++m) {
             const double ang = -kPi * static_cast<double>(m) / static_cast<double>(kM);
@@ -198,18 +197,16 @@ const FastMdctTables<NLen, Scalar>& fast_mdct_tables() {
 // (iclforge::internal::cpu::has_avx2(), SIMD kernels's dynamic-dispatch
 // follow-on - see mdct_avx2.hpp/.cpp). Both are complex multiplies whose
 // ARITHMETIC is contiguous even though their memory access is not: the
-// pre-twiddle gathers u at stride +2 and stride -2 and scatters its result
-// to `bitrev[m]` (the kernel wants its input already digit-reversed - see
-// fft_kernel.hpp - so the quarter-split that was already gathering
-// u[2m]/u[M-1-2m] scatters on the way out instead of the kernel spending a
-// pass permuting in place); the post-twiddle reads the kernel's natural-
-// order output at stride +1 and scatters out to stride +2/-2. Neither seam
+// pre-twiddle gathers u at stride +2 and stride -2 and writes its result in
+// natural order, which the transform takes (a Stockham autosort permutes as
+// it goes); the post-twiddle reads the transform's natural-order output at
+// stride +1 and scatters out to stride +2/-2. Neither seam
 // carries a shuffle or scatter-store operation, so every gather and every
 // scatter stays scalar (f64x2::set/f64x4::set to gather, lane0..lane1/
 // lane3 to scatter) and only the arithmetic between them goes wide - which
 // is where the time is. Every lane performs the identical operations on the
 // identical values the scalar form did, so the coefficients are
-// bit-identical regardless of width; see fft_kernel.hpp's own header
+// bit-identical regardless of width; see fft_stockham.hpp's own header
 // comment for the algorithm this feeds and tests/ac3/core/test_simd_kernels.cpp
 // for the bit-exactness check (both tiers).
 //
@@ -237,7 +234,7 @@ void dct4_scaled(const FastMdctTables<NLen, Scalar>& t, std::span<const Scalar> 
     std::array<Scalar, P> z_im{};
     if constexpr (kWide) {
     if (iclforge::internal::cpu::has_avx2()) {
-        internal::avx2::dct4_pre_twiddle(u, t.pre_re, t.pre_im, t.fft.bitrev, z_re, z_im);
+        internal::avx2::dct4_pre_twiddle(u, t.pre_re, t.pre_im, z_re, z_im);
     } else {
         for (std::size_t m = 0; m < P; m += 2) {
             const auto a = iclforge::internal::arch::f64x2::set(u[2 * m], u[2 * m + 2]);
@@ -246,8 +243,8 @@ void dct4_scaled(const FastMdctTables<NLen, Scalar>& t, std::span<const Scalar> 
             const auto pre_im = iclforge::internal::arch::f64x2::load(&t.pre_im[m]);
             const auto zr = a * pre_re - b * pre_im;
             const auto zi = a * pre_im + b * pre_re;
-            const std::size_t d0 = t.fft.bitrev[m];
-            const std::size_t d1 = t.fft.bitrev[m + 1];
+            const std::size_t d0 = m;
+            const std::size_t d1 = m + 1;
             z_re[d0] = zr.lane0();
             z_im[d0] = zi.lane0();
             z_re[d1] = zr.lane1();
@@ -258,12 +255,13 @@ void dct4_scaled(const FastMdctTables<NLen, Scalar>& t, std::span<const Scalar> 
         for (std::size_t m = 0; m < P; ++m) {
             const Scalar a = u[2 * m];
             const Scalar b = u[M - 1 - 2 * m];
-            const std::size_t d = t.fft.bitrev[m];
+            const std::size_t d = m;
             z_re[d] = a * t.pre_re[m] - b * t.pre_im[m];
             z_im[d] = a * t.pre_im[m] + b * t.pre_re[m];
         }
     }
-    iclforge::internal::fft_forward_bitrev<P, Scalar>(t.fft, z_re, z_im);
+    iclforge::dsp::fft::stockham_forward<P, Scalar, Scalar>(t.fft, std::span<Scalar, P>(z_re),
+                                                             std::span<Scalar, P>(z_im));
 
     if constexpr (kWide) {
     if (iclforge::internal::cpu::has_avx2()) {
@@ -485,11 +483,9 @@ void imdct512_windowed_impl(std::span<const Scalar, 256> coeffs, std::span<Scala
     // src/core/reference_transform.hpp so its 256 KiB matrix can be left out
     // of a build entirely (minimum-footprint decoder profile) rather than merely never touched.
     //
-    // The fast branch writes step 2's output already conjugated and already
-    // digit-reversed, which is what lets the kernel skip both the input
-    // conjugation pass and the bit-reversal pass the previous core ran
-    // (fft_kernel.hpp); the direct branch needs neither, so it writes
-    // Z[k] straight.
+    // The fast branch writes step 2's output already conjugated, which is
+    // what lets the transform skip an input conjugation pass; the direct
+    // branch needs none, so it writes Z[k] straight.
     std::array<Scalar, kQuarter> z_re{};
     std::array<Scalar, kQuarter> z_im{};
     std::array<Scalar, kQuarter> t_re{};
@@ -498,9 +494,8 @@ void imdct512_windowed_impl(std::span<const Scalar, 256> coeffs, std::span<Scala
         // Two k at a time through f64x2, four through f32x4 or the AVX2
         // tier (SIMD kernels, iclforge::internal::cpu::has_avx2()), the same
         // gather-compute-scatter shape as dct4_scaled's pre-twiddle: the
-        // coefficient gather runs at stride -2/+2 and the scatter target is
-        // bitrev[k], so both ends stay scalar and only the six multiplies
-        // and two adds between them go wide. kQuarter is 128, a multiple of
+        // coefficient gather runs at stride -2/+2, so that end stays scalar
+        // and only the six multiplies and two adds after it go wide. kQuarter is 128, a multiple of
         // 4, so no width leaves a tail. See dct4_scaled's own comment for
         // the bit-exactness argument this shares.
         const auto& fft = fast_mdct_tables<512, Scalar>().fft;
@@ -520,10 +515,10 @@ void imdct512_windowed_impl(std::span<const Scalar, 256> coeffs, std::span<Scala
                 const auto sn = iclforge::internal::arch::f32x4::load(&tw.sin1[k]);
                 const auto zr = a * c - b * sn;
                 const auto zi = -(b * c + a * sn);
-                const std::size_t d0 = fft.bitrev[k];
-                const std::size_t d1 = fft.bitrev[k + 1];
-                const std::size_t d2 = fft.bitrev[k + 2];
-                const std::size_t d3 = fft.bitrev[k + 3];
+                const std::size_t d0 = k;
+                const std::size_t d1 = k + 1;
+                const std::size_t d2 = k + 2;
+                const std::size_t d3 = k + 3;
                 z_re[d0] = zr.lane0();
                 z_im[d0] = zi.lane0();
                 z_re[d1] = zr.lane1();
@@ -534,8 +529,7 @@ void imdct512_windowed_impl(std::span<const Scalar, 256> coeffs, std::span<Scala
                 z_im[d3] = zi.lane3();
             }
         } else if (iclforge::internal::cpu::has_avx2()) {
-            internal::avx2::imdct512_pre_twiddle(coeffs, tw.cos1, tw.sin1, fft.bitrev, z_re,
-                                                 z_im);
+            internal::avx2::imdct512_pre_twiddle(coeffs, tw.cos1, tw.sin1, z_re, z_im);
         } else {
             constexpr std::size_t kHalfN = static_cast<std::size_t>(kN) / 2;
             for (std::size_t k = 0; k < static_cast<std::size_t>(kQuarter); k += 2) {
@@ -547,16 +541,16 @@ void imdct512_windowed_impl(std::span<const Scalar, 256> coeffs, std::span<Scala
                 const auto sn = iclforge::internal::arch::f64x2::load(&tw.sin1[k]);
                 const auto zr = a * c - b * sn;
                 const auto zi = -(b * c + a * sn);
-                const std::size_t d0 = fft.bitrev[k];
-                const std::size_t d1 = fft.bitrev[k + 1];
+                const std::size_t d0 = k;
+                const std::size_t d1 = k + 1;
                 z_re[d0] = zr.lane0();
                 z_im[d0] = zi.lane0();
                 z_re[d1] = zr.lane1();
                 z_im[d1] = zi.lane1();
             }
         }
-        iclforge::internal::fft_forward_bitrev<static_cast<std::size_t>(kQuarter), Scalar>(
-            fft, z_re, z_im);
+        iclforge::dsp::fft::stockham_forward<static_cast<std::size_t>(kQuarter), Scalar, Scalar>(
+            fft, std::span<Scalar, kQuarter>(z_re), std::span<Scalar, kQuarter>(z_im));
         // Unit stride throughout, so this negation goes wide with nothing
         // to gather or scatter.
         if constexpr (!kWide) {
@@ -711,8 +705,7 @@ void mdct512_forward_batch4(std::span<const double, 512> w0, std::span<const dou
 // See imdct512_windowed_impl above for how the three branches of each
 // vectorised section are chosen. This transform has only one such section -
 // its pre-twiddle is a scalar loop for every instantiation, because the two
-// half-block sets scatter to the same bitrev[k] and neither end is unit
-// stride.
+// half-block sets gather at stride -2/+2 from the same coefficients.
 template <typename Scalar>
 void imdct256_pair_windowed_impl(std::span<const Scalar, 256> coeffs, std::span<Scalar, 512> x,
                                  bool fast) {
@@ -758,16 +751,16 @@ void imdct256_pair_windowed_impl(std::span<const Scalar, 256> coeffs, std::span<
             const Scalar b1 = x1[static_cast<std::size_t>(2 * k)];
             const Scalar a2 = x2[static_cast<std::size_t>(kQuarter - 2 * k - 1)];
             const Scalar b2 = x2[static_cast<std::size_t>(2 * k)];
-            const std::size_t d = fft.bitrev[static_cast<std::size_t>(k)];
+            const auto d = static_cast<std::size_t>(k);
             z1_re[d] = a1 * c - b1 * s;
             z1_im[d] = -(b1 * c + a1 * s);
             z2_re[d] = a2 * c - b2 * s;
             z2_im[d] = -(b2 * c + a2 * s);
         }
-        iclforge::internal::fft_forward_bitrev<static_cast<std::size_t>(kEighth), Scalar>(
-            fft, z1_re, z1_im);
-        iclforge::internal::fft_forward_bitrev<static_cast<std::size_t>(kEighth), Scalar>(
-            fft, z2_re, z2_im);
+        iclforge::dsp::fft::stockham_forward<static_cast<std::size_t>(kEighth), Scalar, Scalar>(
+            fft, std::span<Scalar, kEighth>(z1_re), std::span<Scalar, kEighth>(z1_im));
+        iclforge::dsp::fft::stockham_forward<static_cast<std::size_t>(kEighth), Scalar, Scalar>(
+            fft, std::span<Scalar, kEighth>(z2_re), std::span<Scalar, kEighth>(z2_im));
         for (int n = 0; n < kEighth; ++n) {
             t1_re[static_cast<std::size_t>(n)] = z1_re[static_cast<std::size_t>(n)];
             t1_im[static_cast<std::size_t>(n)] = -z1_im[static_cast<std::size_t>(n)];

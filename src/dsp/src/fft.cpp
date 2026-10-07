@@ -5,23 +5,25 @@
 
 #include "iclforge/base/detail/simd.hpp"
 
-#include "iclforge/dsp/detail/fft_kernel.hpp"
+#include "iclforge/dsp/detail/fft_stockham.hpp"
 
 namespace iclforge {
 
 namespace {
 
-const internal::FftTables<static_cast<std::size_t>(kDftLength)>& tables() {
-    static const internal::FftTables<static_cast<std::size_t>(kDftLength)> t;
+constexpr auto kLength = static_cast<std::size_t>(kDftLength);
+
+const dsp::fft::StockhamTables<kLength>& tables() {
+    static const dsp::fft::StockhamTables<kLength> t;
     return t;
 }
 
-// The float twiddles, built on first use like the double ones: a build whose
+// The float factors, built on first use like the double ones: a build whose
 // decoder never takes the float form never constructs them, and a
 // minimum-footprint decoder that only ever takes it lets --gc-sections drop
 // the double table with the double function.
-const internal::FftTables<static_cast<std::size_t>(kDftLength), float>& tables_f32() {
-    static const internal::FftTables<static_cast<std::size_t>(kDftLength), float> t;
+const dsp::fft::StockhamTables<kLength, float>& tables_f32() {
+    static const dsp::fft::StockhamTables<kLength, float> t;
     return t;
 }
 
@@ -30,20 +32,12 @@ const internal::FftTables<static_cast<std::size_t>(kDftLength), float>& tables_f
 void dft512(std::span<const double, kDftLength> real_in,
            std::span<const double, kDftLength> imag_in, std::span<double, kDftLength> real_out,
            std::span<double, kDftLength> imag_out) {
-    // The output spans double as the FFT's workspace (they were never
-    // permitted to alias the inputs - the old direct-form sum read every
-    // input element under each output index it wrote, so aliasing was
-    // already incorrect before this took over). This copy-in is also where
-    // the kernel's digit-reversal happens: it expects its input already
-    // permuted, so the store index is bitrev[n] instead of n and the pass
-    // the old core spent permuting in place disappears (fft_kernel.hpp).
-    const auto& t = tables();
-    for (std::size_t n = 0; n < static_cast<std::size_t>(kDftLength); ++n) {
-        real_out[t.bitrev[n]] = real_in[n];
-        imag_out[t.bitrev[n]] = imag_in[n];
+    // The output spans are the transform's own (they were never permitted to alias the inputs).
+    for (std::size_t n = 0; n < kLength; ++n) {
+        real_out[n] = real_in[n];
+        imag_out[n] = imag_in[n];
     }
-    internal::fft_forward_bitrev<static_cast<std::size_t>(kDftLength), double>(t, real_out,
-                                                                                imag_out);
+    dsp::fft::stockham_forward<kLength, double, double>(tables(), real_out, imag_out);
     // The spec sum's own 1/N normalisation (see fft.hpp), two bins at a time
     // through the arch seam (SIMD kernels). Multiplication by the reciprocal
     // rather than division: N is 512, so 1/N is exactly representable and
@@ -56,7 +50,7 @@ void dft512(std::span<const double, kDftLength> real_in,
     const auto inv = internal::arch::f64x2::broadcast(kInvN);
     double* const rp = real_out.data();
     double* const ip = imag_out.data();
-    for (std::size_t k = 0; k < static_cast<std::size_t>(kDftLength); k += 2) {
+    for (std::size_t k = 0; k < kLength; k += 2) {
         (internal::arch::f64x2::load(rp + k) * inv).store(rp + k);
         (internal::arch::f64x2::load(ip + k) * inv).store(ip + k);
     }
@@ -64,20 +58,17 @@ void dft512(std::span<const double, kDftLength> real_in,
 
 void dft512(std::span<const float, kDftLength> real_in, std::span<const float, kDftLength> imag_in,
             std::span<float, kDftLength> real_out, std::span<float, kDftLength> imag_out) {
-    // The same shape as the double form above: digit-reversed copy-in, the
-    // shared kernel, then the spec sum's 1/N. A plain loop for the scale
-    // rather than the arch seam - on the part this form exists for the seam
-    // is scalar anyway, and 1,024 multiplies are not where a frame's time
-    // goes.
-    const auto& t = tables_f32();
-    for (std::size_t n = 0; n < static_cast<std::size_t>(kDftLength); ++n) {
-        real_out[t.bitrev[n]] = real_in[n];
-        imag_out[t.bitrev[n]] = imag_in[n];
+    // The same shape as the double form above: copy-in, the transform, then
+    // the spec sum's 1/N. A plain loop for the scale rather than the arch
+    // seam - on the part this form exists for the seam is scalar anyway, and
+    // 1,024 multiplies are not where a frame's time goes.
+    for (std::size_t n = 0; n < kLength; ++n) {
+        real_out[n] = real_in[n];
+        imag_out[n] = imag_in[n];
     }
-    internal::fft_forward_bitrev<static_cast<std::size_t>(kDftLength), float, float>(t, real_out,
-                                                                                      imag_out);
+    dsp::fft::stockham_forward<kLength, float, float>(tables_f32(), real_out, imag_out);
     constexpr float kInvN = 1.0F / static_cast<float>(kDftLength);
-    for (std::size_t k = 0; k < static_cast<std::size_t>(kDftLength); ++k) {
+    for (std::size_t k = 0; k < kLength; ++k) {
         real_out[k] *= kInvN;
         imag_out[k] *= kInvN;
     }

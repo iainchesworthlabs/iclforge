@@ -132,6 +132,7 @@ add_executable(iclforge-kernelbench kernel_bench.cpp)
 target_link_libraries(iclforge-kernelbench PRIVATE iclforge::ac3 iclforge::ac4_static iclforge::warnings iclforge::fmt)
 target_include_directories(iclforge-kernelbench PRIVATE
     "${CMAKE_SOURCE_DIR}/src/ac4/src"
+    "${CMAKE_SOURCE_DIR}/src/dsp/include"
     "${CMAKE_SOURCE_DIR}/src/dsp/src"
     "${CMAKE_SOURCE_DIR}/src/dsp/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}")
 
