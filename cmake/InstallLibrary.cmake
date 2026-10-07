@@ -116,21 +116,20 @@ endif()
 # installed .lib/.dll) - install(EXPORT) otherwise refuses to generate,
 # since it can't resolve a usage-requirement dependency that isn't itself
 # part of any export set.
+# Source headers, from iclforge::ac3's include/ tree, as the file set iclforge_header_set()
+# (cmake/IclforgeLibrary.cmake) gives every library.
+iclforge_header_set(iclforge_ac3_objects "${PROJECT_SOURCE_DIR}/src/ac3/include")
 install(TARGETS ${_iclforge_forge_install_targets}
     EXPORT ac3Targets
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT library
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT libruntime NAMELINK_COMPONENT library
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT library)
-
-# Source headers, from iclforge::ac3's include/ tree.
-install(DIRECTORY "${PROJECT_SOURCE_DIR}/src/ac3/include/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-    COMPONENT library)
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT library
+    FILE_SET HEADERS DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}" COMPONENT library)
 
 # The generated header - the generate_export_header() output (the family's version is
 # iclforge::base's, installed with it) - lives in the library's own binary dir, not
-# its source tree (see src/ac3/CMakeLists.txt), so the install(DIRECTORY
-# .../include/) call above never sees it. A consumer's #include
+# its source tree (see src/ac3/CMakeLists.txt), so the header file set above never
+# sees it. A consumer's #include
 # <iclforge/ac3/export.hpp> needs it installed at the same relative path the
 # in-tree BUILD_INTERFACE include dirs already use.
 install(FILES

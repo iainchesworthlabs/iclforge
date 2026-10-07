@@ -46,6 +46,7 @@
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/ac3/verify/eac3_mirror.hpp"
 #include "bitalloc_internal.hpp"
+#include "rematrix_bands.hpp"
 #include "bitalloc_memo.hpp"
 #include "gain.hpp"
 #include "transient_prenoise_apply.hpp"

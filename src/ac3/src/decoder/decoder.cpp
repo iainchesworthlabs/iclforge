@@ -35,6 +35,7 @@
 #include "iclforge/ac3/meta/drc.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
 #include "bitalloc_internal.hpp"
+#include "rematrix_bands.hpp"
 #include "bitalloc_memo.hpp"
 #include "gain.hpp"
 

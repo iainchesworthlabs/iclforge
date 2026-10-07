@@ -206,6 +206,21 @@ function(iclforge_add_library name)
         ICLFORGE_EXPORT_HEADER "${ARG_EXPORT_HEADER}")
 endfunction()
 
+# The installed headers of `target`: a HEADERS file set of every .hpp and .h under `include_dir`,
+# less any detail/ directory (a library's own plumbing, which no installed header includes) and the
+# directories named after it (a part this build left out, or plumbing kept in-tree). The export set
+# then names each header, and a consumer's include path comes with it.
+function(iclforge_header_set target include_dir)
+    file(GLOB_RECURSE headers CONFIGURE_DEPENDS RELATIVE "${include_dir}"
+        "${include_dir}/*.hpp" "${include_dir}/*.h")
+    list(FILTER headers EXCLUDE REGEX "(^|/)detail/")
+    foreach(dir IN LISTS ARGN)
+        list(FILTER headers EXCLUDE REGEX "(^|/)${dir}/")
+    endforeach()
+    list(TRANSFORM headers PREPEND "${include_dir}/")
+    target_sources(${target} PUBLIC FILE_SET HEADERS BASE_DIRS "${include_dir}" FILES ${headers})
+endfunction()
+
 # The install and export rules of a library iclforge_add_library() made:
 #
 #   iclforge_install_library(<name>
@@ -226,7 +241,7 @@ endfunction()
 # exists. The library also gets a pkg-config file, iclforge-<stem>.pc, that requires the .pc files
 # of the libraries it links: a static-only install has to name every archive on a link line, since
 # nothing in an archive records what it needs (cmake/PkgConfig.cmake). The headers are the library
-# directory's include/ tree and the generated export header.
+# directory's include/ tree, by iclforge_header_set() below, and the generated export header.
 function(iclforge_install_library name)
     cmake_parse_arguments(PARSE_ARGV 1 ARG "SHARED_ONLY" "DESCRIPTION;EXPORT_SET"
         "REQUIRES;STATIC_REQUIRES;GENERATED_HEADERS;EXCLUDE")
@@ -249,19 +264,13 @@ function(iclforge_install_library name)
     else()
         set(export_set "${name}Targets")
     endif()
+    iclforge_header_set(${objects} "${source_dir}/include" ${ARG_EXCLUDE})
     install(TARGETS ${targets}
         EXPORT ${export_set}
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT library
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT libruntime NAMELINK_COMPONENT library
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT library)
-    set(excluded "")
-    foreach(dir IN LISTS ARG_EXCLUDE)
-        list(APPEND excluded PATTERN "${dir}" EXCLUDE)
-    endforeach()
-    install(DIRECTORY "${source_dir}/include/"
-        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-        COMPONENT library
-        ${excluded})
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT library
+        FILE_SET HEADERS DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}" COMPONENT library)
     foreach(header IN ITEMS "${export_header}" ${ARG_GENERATED_HEADERS})
         get_filename_component(header_dir "${header}" DIRECTORY)
         install(FILES "${binary_dir}/generated/${header}"

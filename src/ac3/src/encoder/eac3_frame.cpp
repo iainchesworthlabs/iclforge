@@ -41,6 +41,7 @@
 #include "dither.hpp"
 #include "eac3_seat_fold.hpp"
 #include "exp_strategy.hpp"
+#include "rematrix_bands.hpp"
 #include "iclforge/base/arithmetic/scalar_math.hpp"
 #include "scalar_transform.hpp"
 #include "snr_search.hpp"

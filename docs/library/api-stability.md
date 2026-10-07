@@ -30,7 +30,7 @@ it directly. Four tiers, assigned per header below:
 
 | Header(s) | Tier |
 |---|---|
-| `iclforge/ac3/core/tables.hpp` | Public — `SampleRate`, `Acmod` and the frame constants appear directly in public function signatures everywhere. |
+| `iclforge/ac3/core/types.hpp`, `tables.hpp` | Public — `SampleRate`, `Acmod` and the frame constants appear directly in public function signatures everywhere, and `silent_frame.hpp` sizes a syncframe by Table 5.18. |
 | `iclforge/ac3/core/eac3_tables.hpp` | Public — `chanmap` and `ChannelPlan` are likewise part of `plan.hpp`'s own public surface. |
 | `iclforge/base/layout.hpp`, `downmix_target.hpp` | Public — `Location`, `Layout` and `DownmixTarget` appear in public signatures (`plan.hpp`, the output stage, the renderer) and keep the tier of the headers they left. |
 | `iclforge/base/bitreader.hpp`, `bitwriter.hpp` | Internal — bitstream I/O primitives, never called directly by a caller using the encoder/decoder API. |
@@ -78,7 +78,8 @@ it directly. Four tiers, assigned per header below:
 declare a `namespace detail` alongside their public surface, rather than splitting a private
 helper into its own file. That split already means what this page needs it to mean: nothing
 inside `namespace detail`, in any header at any tier, is covered by any compatibility promise —
-codifying an existing convention as policy, not introducing a new one.
+codifying an existing convention as policy, not introducing a new one. A `detail/` directory
+is the other spelling of the same thing, and is not installed.
 
 ## SemVer and deprecation policy
 

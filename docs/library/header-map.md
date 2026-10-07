@@ -11,7 +11,8 @@ omitted internals) is actually part of the frozen surface once `v1.0.0` ships.
 
 | Header | Contents |
 |---|---|
-| `iclforge/ac3/core/tables.hpp` | `SampleRate`, `Acmod`, `ExpStrategy`, frame constants, Table 5.18. Nearly everything includes it. |
+| `iclforge/ac3/core/types.hpp` | `SampleRate`, `Acmod`, `ExpStrategy` and the frame constants. Nearly everything includes it. |
+| `iclforge/ac3/core/tables.hpp` | Table 5.18: the bit rates (`kBitratesKbps`, `clamp_to_legal_ac3_bitrate`) and the syncframe sizes (`frame_size_bytes`). Includes `types.hpp`. |
 | `iclforge/ac3/core/eac3_tables.hpp` | Annex E: `StreamType` and the Table E2.5 `chanmap` namespace, whose `Location`, `Layout`, `kMaxChannels` and `name` are the speaker vocabulary of `layout.hpp` below, used here under their old spelling. Also the general channel model: `chanmap::ChannelPlan` (a bed acmod/lfe plus however many dependent chanmaps it takes) and `chanmap::allocate(locations)`, which partitions an arbitrary Table E2.5 location bitmask into a `ChannelPlan` — the same shape `iclforge::ac3::plan::LayoutId`'s eight named layouts are themselves expressed in, via their own hand-picked constants rather than by running the allocator (dual mono's is a special case — see [Encoding AC-3](encoding-ac3.md)). |
 | `iclforge/base/bitreader.hpp`, `bitwriter.hpp` | MSB-first bit I/O. |
 | `iclforge/base/layout.hpp` | `Location`, `Layout`, `kMaxChannels`, `name` — the speaker vocabulary: where a channel sits, named the way TS 103 420 and A/52 Table E2.5 name it, and an ordered set of them. In `iclforge::base`, so the renderer, the panner and the audio backends use it without the AC-3 tables; `iclforge::ac3::eac3::chanmap::Location` and `Layout` are the same types. |

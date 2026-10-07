@@ -36,6 +36,7 @@
 #include "scalar_transform.hpp"
 #include "dither.hpp"
 #include "exp_strategy.hpp"
+#include "rematrix_bands.hpp"
 #include "snr_search.hpp"
 
 namespace iclforge::ac3 {
