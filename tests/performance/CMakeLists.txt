@@ -125,13 +125,15 @@ endif()
 # ---------------------------------------------------------------------------
 add_executable(iclforge-kernelbench kernel_bench.cpp)
 
-# The AC-4 kernels it times are private to iclforge::ac4 (src/ac4/src/core), so it
+# The AC-4 kernels it times are private to iclforge::ac4 (src/ac4/src/core, and dsp's tiered
+# kernels it builds, src/dsp/src/tiered), so it
 # links the static library in every build and takes the library's private and
 # scalar-tier directories, as tests/CMakeLists.txt does for tests/ac4/core.
 target_link_libraries(iclforge-kernelbench PRIVATE iclforge::ac3 iclforge::ac4_static iclforge::warnings iclforge::fmt)
 target_include_directories(iclforge-kernelbench PRIVATE
     "${CMAKE_SOURCE_DIR}/src/ac4/src"
-    "${CMAKE_SOURCE_DIR}/src/ac4/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}")
+    "${CMAKE_SOURCE_DIR}/src/dsp/src"
+    "${CMAKE_SOURCE_DIR}/src/dsp/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}")
 
 target_include_directories(iclforge-kernelbench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 

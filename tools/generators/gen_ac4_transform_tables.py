@@ -143,14 +143,14 @@ def render() -> str:
         "// only by src/dsp/src/tiered/transform_tables.cpp, which narrows them to the tier's",
         "// scalar while it compiles.",
         "",
-        "namespace iclforge::ac4::detail::tables {",
+        "namespace iclforge::dsp::tiered::tables {",
         "",
     ]
     for length in LENGTHS:
         lines += table(f"kFftRoots{length}", fft_roots(length // 2))
         lines += table(f"kPreTwiddle{length}", pre_twiddles(length))
         lines += table(f"kKbdLeft{length}", kbd_left(length, ALPHA[length]))
-    lines += ["}  // namespace iclforge::ac4::detail::tables", ""]
+    lines += ["}  // namespace iclforge::dsp::tiered::tables", ""]
     return "\n".join(lines)
 
 

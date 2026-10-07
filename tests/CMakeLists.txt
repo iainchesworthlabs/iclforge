@@ -265,14 +265,16 @@ target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/s
 # instead would let those bind to a static copy too, and stop testing the .so at all.
 #
 # The library's private headers are spelled from src/ac4/src (core/, decoder/,
-# encoder/), with the scalar tier's iclforge/ac4/detail/real.hpp beside them. The
-# kernels the decoder and the encoder share (src/ac4/src/core: the tables and the
-# transforms, ICLFORGE_AC4_KERNEL_SOURCES) are compiled into this target a second
-# time in a shared build, as cpu_features.cpp is below: tests/ac4/core/ holds them to
-# their own bounds in every build, and libiclforge_ac4.so exports none of them.
+# encoder/), with dsp's tiered kernels (src/dsp/src, tiered/) and their scalar tier's
+# iclforge/dsp/tiered/real.hpp beside them. The kernels the decoder and the encoder
+# share (src/ac4/src/core and src/dsp/src/tiered: the tables and the transforms,
+# ICLFORGE_AC4_KERNEL_SOURCES) are compiled into this target a second time in a shared
+# build, as cpu_features.cpp is below: tests/ac4/core/ and tests/dsp/tiered/ hold them
+# to their own bounds in every build, and libiclforge_ac4.so exports none of them.
 target_include_directories(iclforge-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/ac4/src"
-    "${CMAKE_SOURCE_DIR}/src/ac4/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}")
+    "${CMAKE_SOURCE_DIR}/src/dsp/src"
+    "${CMAKE_SOURCE_DIR}/src/dsp/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}")
 if(BUILD_SHARED_LIBS AND ICLFORGE_BUILD_AC4)
     target_sources(iclforge-tests PRIVATE ${ICLFORGE_AC4_KERNEL_SOURCES})
 endif()

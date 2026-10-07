@@ -85,7 +85,7 @@ def render(values: list[float]) -> str:
         "// transform is a multiple of pi / 256; dsp/qmf_constants.hpp builds them all from",
         "// this table by integer angle arithmetic, at compile time.",
         "",
-        "namespace iclforge::ac4::detail::tables {",
+        "namespace iclforge::dsp::tiered::tables {",
         "",
         f"inline constexpr std::array<double, {ENTRIES}> kCosQuadrant = {{",
     ]
@@ -97,7 +97,7 @@ def render(values: list[float]) -> str:
             row = "   "
         row += " " + text
     lines.append(row)
-    lines += ["};", "", "}  // namespace iclforge::ac4::detail::tables", ""]
+    lines += ["};", "", "}  // namespace iclforge::dsp::tiered::tables", ""]
     return "\n".join(lines)
 
 

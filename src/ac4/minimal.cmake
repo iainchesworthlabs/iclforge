@@ -44,11 +44,11 @@ target_compile_options(iclforge_ac4_objects PRIVATE "$<$<CXX_COMPILER_ID:GNU>:-W
 # -O3 gained nothing there and cost 73 KB.
 if(ICLFORGE_MINIMAL_HOT_O2)
     set_source_files_properties(
-        src/core/dsp/fft.cpp
-        src/core/dsp/mdct.cpp
-        src/core/dsp/qmf.cpp
-        src/core/dsp/resampler.cpp
-        src/core/dsp/synthesis.cpp
+        ${_dsp_tiered}/fft.cpp
+        ${_dsp_tiered}/mdct.cpp
+        ${_dsp_tiered}/qmf.cpp
+        ${_dsp_tiered}/resampler.cpp
+        ${_dsp_tiered}/synthesis.cpp
         src/core/aspx/hf_generator.cpp
         src/core/acpl/acpl.cpp
         PROPERTIES COMPILE_OPTIONS "-O3")

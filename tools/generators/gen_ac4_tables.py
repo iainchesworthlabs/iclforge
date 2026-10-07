@@ -46,7 +46,8 @@ index, for writing), sfb_tables.hpp and .cpp (Annex
 B at 44.1 and 48 kHz), noise_tables.hpp and .cpp (Annex C.11, which the
 spectral noise fill of clause 5.1.4 reads through Pseudocode 57) and
 qmf_tables.hpp and .cpp (Annex D.3, the QMF banks' window of clauses 5.7.3 and
-5.7.4, and Annex D.2, A-SPX's noise generator table of clause 5.7.6.4.3) and
+5.7.4, and Annex D.2, A-SPX's noise generator table of clause 5.7.6.4.3, which go
+to src/dsp/src/tiered/tables/ with the banks) and
 isf_tables.hpp and .cpp (Part 2 Annex A.2.1, the intermediate spatial format's
 rendering matrices of Part 2 clause 5.10.3).
 src/ac4/src/core is what the AC-4 decoder and encoder share.
@@ -117,6 +118,9 @@ REPO = Path(__file__).resolve().parent.parent.parent
 # The headers are public and sit in the include tree; the sources sit beside the other sources.
 HEADER_DIR = REPO / "src" / "ac4" / "src" / "core" / "tables"
 SOURCE_DIR = REPO / "src" / "ac4" / "src" / "core" / "tables"
+# The QMF banks are dsp's (planning/consolidation.md, decision 14), and their window with them;
+# Annex D's file holds A-SPX's noise table beside it.
+QMF_DIR = REPO / "src" / "dsp" / "src" / "tiered" / "tables"
 SPEC_TXT = "ts_10319001v010401p.txt"
 TABLES_C = Path("ts_10319001_attach") / "ts_103190_tables.c"
 SPEC2_TXT = "ts_10319002v010301p.txt"
@@ -1442,7 +1446,7 @@ QMF_HEADER = [
     "// by tools/generators/gen_ac4_tables.py from the attachment ts_103190_tables.c;",
     "// do not edit by hand.",
     "",
-    "namespace iclforge::ac4::detail::tables {",
+    "namespace iclforge::dsp::tiered::tables {",
     "",
     "// The window of the QMF analysis and synthesis banks (clauses 5.7.3 and",
     "// 5.7.4), in the float the attachment declares. It carries its own signs.",
@@ -1453,21 +1457,21 @@ QMF_HEADER = [
     "// attachment declares.",
     f"extern const std::array<std::array<float, 2>, {ASPX_NOISE_ENTRIES}> kAspxNoise;",
     "",
-    "}  // namespace iclforge::ac4::detail::tables",
+    "}  // namespace iclforge::dsp::tiered::tables",
 ]
 
 
 def emit_qmf_source(qwin, aspx_noise):
     noise = [f"{{{float_literal(re)}, {float_literal(im)}}}" for re, im in aspx_noise]
-    return ['#include "core/tables/qmf_tables.hpp"', "",
-            "namespace iclforge::ac4::detail::tables {", "",
+    return ['#include "tiered/tables/qmf_tables.hpp"', "",
+            "namespace iclforge::dsp::tiered::tables {", "",
             f"const std::array<float, {QWIN_ENTRIES}> kQwin = {{",
             *wrap([float_literal(text) for text in qwin], "   "),
             "};", "",
             f"const std::array<std::array<float, 2>, {ASPX_NOISE_ENTRIES}> kAspxNoise = {{{{",
             *wrap(noise, "   "),
             "}};", "",
-            "}  // namespace iclforge::ac4::detail::tables"]
+            "}  // namespace iclforge::dsp::tiered::tables"]
 
 
 ISF_HEADER = [
@@ -1878,10 +1882,11 @@ def main():
     for name, out in outputs.items():
         for number, text in enumerate(out, start=1):
             check(len(text) < 100, f"{name}:{number} is {len(text)} columns: {text!r}")
-    HEADER_DIR.mkdir(parents=True, exist_ok=True)
-    SOURCE_DIR.mkdir(parents=True, exist_ok=True)
+    for directory in (HEADER_DIR, SOURCE_DIR, QMF_DIR):
+        directory.mkdir(parents=True, exist_ok=True)
     for name, out in outputs.items():
-        path = (HEADER_DIR if name.endswith(".hpp") else SOURCE_DIR) / name
+        path = (QMF_DIR if name.startswith("qmf_") else
+                HEADER_DIR if name.endswith(".hpp") else SOURCE_DIR) / name
         path.write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
         shown = path.relative_to(REPO) if path.is_relative_to(REPO) else path
         print(f"wrote {shown} ({len(out)} lines)")

@@ -87,7 +87,7 @@ def render() -> str:
         "// tools/generators/gen_ac4_fixed_tables.py from the float tables of",
         "// src/dsp/src/tiered/tables/qmf_tables.cpp; do not edit by hand.",
         "",
-        "namespace iclforge::ac4::detail::tables {",
+        "namespace iclforge::dsp::tiered::tables {",
         "",
         "// QWIN in Q1.30: each float of kQwin times 2^30, rounded half away from zero. One output",
         "// of the analysis sums five taps whose magnitudes add to at most "
@@ -105,7 +105,7 @@ def render() -> str:
         *wrap([f"{{{to_integer(a, 24)}, {to_integer(b, 24)}}}" for a, b in noise]),
         "}};",
         "",
-        "}  // namespace iclforge::ac4::detail::tables",
+        "}  // namespace iclforge::dsp::tiered::tables",
         "",
     ]
     return "\n".join(lines)
