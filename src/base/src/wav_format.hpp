@@ -7,7 +7,7 @@
 #include <span>
 #include <string_view>
 
-#include "iclforge/ac3/io/wav.hpp"
+#include "iclforge/base/wav.hpp"
 
 // The RIFF/RF64 header walk and the sample conversion, shared by wav.cpp's
 // whole-file readers and wav_stream_reader.cpp's block-at-a-time one.
@@ -21,7 +21,7 @@
 // src/io/ - not installed, not part of iclforge::ac3::io's public surface (see
 // ac3/io/wav.hpp for that).
 
-namespace iclforge::ac3::io::detail {
+namespace iclforge::base::detail {
 
 // How samples sit in the data chunk. The container width in bytes is what
 // the reader strides by; the interpretation is what it converts with.
@@ -113,4 +113,4 @@ struct Chunk {
 // the caller has already checked that sample_bytes(format) bytes are there.
 [[nodiscard]] float convert_sample(std::span<const char> raw, std::size_t at, SampleFormat format);
 
-}  // namespace iclforge::ac3::io::detail
+}  // namespace iclforge::base::detail

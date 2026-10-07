@@ -8,9 +8,9 @@
 #include <span>
 #include <string_view>
 
-#include "iclforge/ac3/io/wav.hpp"
+#include "iclforge/base/wav.hpp"
 
-namespace iclforge::ac3::io::detail {
+namespace iclforge::base::detail {
 
 namespace {
 
@@ -190,4 +190,4 @@ float convert_sample(std::span<const char> raw, std::size_t at, SampleFormat for
     return 0.0f;
 }
 
-}  // namespace iclforge::ac3::io::detail
+}  // namespace iclforge::base::detail

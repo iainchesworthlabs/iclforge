@@ -11,8 +11,7 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/ac3/core/tables.hpp"
-#include "iclforge/ac3/export.hpp"
+#include "iclforge/base/export.hpp"
 
 // WAV reading and writing, shared by the CLI and the GUI so neither carries
 // its own copy.
@@ -32,7 +31,7 @@
 // WavPcm16StreamWriter) - because those are the only two shapes this project
 // produces: decoded audio, and an IEC 61937 burst carrier.
 
-namespace iclforge::ac3::io {
+namespace iclforge::base {
 
 enum class WavError : std::uint8_t {
     kCannotOpen,
@@ -45,7 +44,7 @@ enum class WavError : std::uint8_t {
     kTruncated,
 };
 
-[[nodiscard]] ICLFORGE_AC3_EXPORT std::string_view describe(WavError error);
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::string_view describe(WavError error);
 
 struct WavData {
     std::uint32_t sample_rate = 0;
@@ -57,44 +56,17 @@ struct WavData {
     }
 };
 
-[[nodiscard]] ICLFORGE_AC3_EXPORT std::expected<WavData, WavError> read_wav(const std::string& path);
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::expected<WavData, WavError> read_wav(const std::string& path);
 
 // Same parse, from an already-open stream rather than a path - e.g. stdin,
 // for a caller that has put it into binary mode itself (see forge's "-"
 // convention for stdin/stdout in place of a file argument). Both overloads
 // read their whole source into memory before parsing anything, so neither
 // one needs its stream to be seekable.
-[[nodiscard]] ICLFORGE_AC3_EXPORT std::expected<WavData, WavError> read_wav(std::istream& in);
-
-// A WAV file's channel order (the WAVE_FORMAT_EXTENSIBLE convention: FL, FR,
-// FC, LFE, BL, BR) is not A/52 Table 5.8's (L, C, R, SL, SR, LFE), so the two
-// have to be reconciled before any multichannel file reaches the encoder.
-struct Ac3Layout {
-    Acmod acmod = Acmod::k2_0;
-    bool lfe = false;
-    // wav_index[k] is the position in a WAV frame of AC-3 channel k.
-    std::vector<std::size_t> wav_index;
-};
-
-// The AC-3 layout that carries a WAV of this width, or nothing when no legal
-// acmod does (7 channels and up, or none at all).
-[[nodiscard]] ICLFORGE_AC3_EXPORT std::optional<Ac3Layout> ac3_layout_for(std::size_t wav_channels);
-
-// The inverse permutation, in the form write_wav_f32 takes: entry i names the
-// AC-3 channel that belongs at WAV position i.
-//
-// Every acmod is placed by WAVE_FORMAT_EXTENSIBLE speaker position, not by
-// A/52 coded order - including the two mono-surround modes, which sit on
-// SPEAKER_BACK_CENTER. Two things move relative to the bitstream: C swaps
-// with R (WAV is FL FR FC, A/52 is L C R), and the LFE moves from last to
-// fourth. So 3/1 goes out L R C S and 3/1+LFE goes out L R C LFE S, which is
-// what FFmpeg and every other WAV consumer expect. The one exception is 1+1,
-// which carries two independent programmes rather than a soundfield and so
-// has no speaker positions to sort; it goes out in coded order.
-[[nodiscard]] ICLFORGE_AC3_EXPORT std::vector<std::size_t> wav_channel_order(Acmod acmod, bool lfe);
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::expected<WavData, WavError> read_wav(std::istream& in);
 
 // Float32 WAV (format tag 3), channels interleaved in the given order.
-[[nodiscard]] ICLFORGE_AC3_EXPORT std::expected<void, WavError> write_wav_f32(
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::expected<void, WavError> write_wav_f32(
     const std::string& path, std::span<const std::vector<float>> channels,
     std::uint32_t sample_rate, std::span<const std::size_t> channel_order = {});
 
@@ -103,14 +75,14 @@ struct Ac3Layout {
 // so the RIFF/data chunk sizes are known before the first byte goes out:
 // this writes strictly forward, once, and never seeks back to patch a
 // header - it works the same on a plain file and on an unseekable pipe.
-[[nodiscard]] ICLFORGE_AC3_EXPORT std::expected<void, WavError> write_wav_f32(
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::expected<void, WavError> write_wav_f32(
     std::ostream& out, std::span<const std::vector<float>> channels, std::uint32_t sample_rate,
     std::span<const std::size_t> channel_order = {});
 
 // PCM16 WAV wrapping already-formed little-endian 16-bit payload bytes. Used
 // for the IEC 61937 burst carrier, where the payload must pass through
 // untouched.
-[[nodiscard]] ICLFORGE_AC3_EXPORT std::expected<void, WavError> write_wav_pcm16_raw(
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::expected<void, WavError> write_wav_pcm16_raw(
     const std::string& path, std::span<const std::byte> payload, std::uint32_t sample_rate,
     std::uint16_t channels);
 
@@ -119,7 +91,7 @@ struct Ac3Layout {
 // takes interleaved samples as they arrive, and finalizes the RIFF/data
 // chunk sizes on close() - see flush_header()'s own comment for what
 // happens if the process never reaches close() at all.
-class ICLFORGE_AC3_EXPORT WavStreamWriter {
+class ICLFORGE_BASE_EXPORT WavStreamWriter {
    public:
     WavStreamWriter();
     ~WavStreamWriter();  // closes if still open, same as an fstream would
@@ -177,7 +149,7 @@ class ICLFORGE_AC3_EXPORT WavStreamWriter {
 // after close(), the file is byte-identical to what write_wav_pcm16_raw
 // would have produced for the same payload. Bytes pass through untouched;
 // the caller owns their little-endian PCM16 framing, same as the one-shot.
-class ICLFORGE_AC3_EXPORT WavPcm16StreamWriter {
+class ICLFORGE_BASE_EXPORT WavPcm16StreamWriter {
    public:
     WavPcm16StreamWriter();
     ~WavPcm16StreamWriter();  // closes if still open, same as an fstream would
@@ -213,7 +185,7 @@ class ICLFORGE_AC3_EXPORT WavPcm16StreamWriter {
 // file PLUS its planar float copy resident at once - fine for a fixture,
 // gigabytes for a feature-length programme - where this holds one block.
 // Same format support and the same sample conversion as read_wav - the same
-// code, not a parallel copy of it (src/io/wav_format.hpp): every integer and
+// code, not a parallel copy of it (src/base/src/wav_format.hpp): every integer and
 // float depth listed at the top of this header, EXTENSIBLE unwrapped, RF64/
 // BW64 sizes read from ds64, and a data chunk shorter than declared
 // tolerated at its real length. So a block-at-a-time consumer sees exactly
@@ -222,7 +194,7 @@ class ICLFORGE_AC3_EXPORT WavPcm16StreamWriter {
 // only one of the two that can read an RF64 file bigger than memory: the
 // whole-file overloads hold the source AND its planar float copy resident at
 // once by construction.
-class ICLFORGE_AC3_EXPORT WavStreamReader {
+class ICLFORGE_BASE_EXPORT WavStreamReader {
    public:
     WavStreamReader();
     ~WavStreamReader();
@@ -259,4 +231,4 @@ class ICLFORGE_AC3_EXPORT WavStreamReader {
     std::unique_ptr<Impl> impl_;
 };
 
-}  // namespace iclforge::ac3::io
+}  // namespace iclforge::base

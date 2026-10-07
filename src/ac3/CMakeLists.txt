@@ -109,9 +109,6 @@ iclforge_add_library(ac3
         src/io/object_strip.cpp
         src/io/probe.cpp
         src/io/wav.cpp
-        src/io/wav_format.cpp
-        src/io/wav_stream_reader.cpp
-        src/io/wav_stream_writer.cpp
         src/meta/bsi.cpp
         src/meta/bsi_format.cpp
         src/meta/drc.cpp

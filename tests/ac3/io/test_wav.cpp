@@ -318,7 +318,7 @@ TEST_CASE("read_wav rejects data that is not a RIFF/WAVE file", "[wav]") {
 TEST_CASE("read_wav decodes every integer PCM depth with the documented scaling", "[wav]") {
     // One full-scale-negative, one silent, one full-scale-positive sample per
     // depth, plus one arbitrary interior value - the scaling for each width is
-    // stated in src/ac3/src/io/wav_format.cpp's convert_sample and checked
+    // stated in src/base/src/wav_format.cpp's convert_sample and checked
     // here against values worked out by hand rather than against another
     // reader that might share the same mistake.
     SECTION("8-bit PCM is unsigned and biased by 128") {

@@ -260,6 +260,10 @@ iclforge_add_library(base
     SOURCES
         src/cpu_features.cpp
         src/version.cpp
+        src/wav.cpp
+        src/wav_format.cpp
+        src/wav_stream_reader.cpp
+        src/wav_stream_writer.cpp
         src/crypto/sha256.cpp
         src/crypto/hmac_sha256.cpp
         src/crypto/signing_key.cpp
@@ -268,7 +272,9 @@ iclforge_add_library(base
         "${_iclforge_profiling_dir}"
     LINK_PRIVATE
         "$<BUILD_INTERFACE:iclforge::tracy>"
-        "$<BUILD_INTERFACE:iclforge::fmt_private>")
+        "$<BUILD_INTERFACE:iclforge::fmt_private>"
+        # the SIMD tier's directory, whose name version_details() reports
+        "$<BUILD_INTERFACE:iclforge::base_headers>")
 add_dependencies(iclforge_base_objects iclforge_version)
 
 # getenv (ICLFORGE_SIMD_TIER's override, and the signing key's ICLFORGE_SIGNING_KEY and

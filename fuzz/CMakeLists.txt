@@ -241,7 +241,7 @@ iclforge_add_fuzzer(fuzz_eac3_decode)
 
 # iclforge::ac3::io::read_wav: a realistic input too, not only an adversarial one - a
 # truncated or hand-edited WAV is exactly what a user hands the CLI
-# (src/ac3/src/io/wav.cpp).
+# (src/base/src/wav.cpp).
 iclforge_add_fuzzer(fuzz_wav_read)
 
 # iclforge::containers::iec61937::BurstReader: IEC 61937 burst de-framing, driven the way
