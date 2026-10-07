@@ -6,8 +6,8 @@
 #include <vector>
 
 #include "iclforge/dsp/tiered/real.hpp"
-#include "tiered/complex.hpp"
-#include "tiered/fft_kernels.hpp"
+#include "iclforge/dsp/detail/complex.hpp"
+#include "iclforge/dsp/detail/fft_stockham.hpp"
 
 // A complex FFT for every length of the form 2^a * 3^b * 5^c, which covers
 // every transform AC-4 needs: an inverse MDCT of N spectral lines runs an

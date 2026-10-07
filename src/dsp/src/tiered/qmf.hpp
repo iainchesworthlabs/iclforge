@@ -5,7 +5,7 @@
 #include <span>
 
 #include "iclforge/dsp/tiered/real.hpp"
-#include "tiered/complex.hpp"
+#include "iclforge/dsp/detail/complex.hpp"
 
 // The complex QMF analysis and synthesis banks of ETSI TS 103 190-1 V1.4.1
 // clauses 5.7.3 and 5.7.4 (Pseudocodes 65 and 66), with the window QWIN of

@@ -4,7 +4,7 @@
 #include <limits>
 
 #include "iclforge/ac4/detail/real.hpp"
-#include "tiered/complex.hpp"
+#include "iclforge/dsp/detail/complex.hpp"
 #include "tiered/scalar_traits.hpp"
 
 // The decoder's QMF-domain and time-domain values in the units of the build's scalar, for

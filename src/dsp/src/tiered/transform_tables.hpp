@@ -5,7 +5,7 @@
 #include <type_traits>
 
 #include "iclforge/dsp/tiered/real.hpp"
-#include "tiered/complex.hpp"
+#include "iclforge/dsp/detail/complex.hpp"
 
 // The inverse transform's tables at the float and fixed-point tiers, in flash
 // (planning/ac4.md, the decoder's memory): for a block of N lines, the roots of the N/2-point

@@ -7,7 +7,7 @@
 
 #include "iclforge/ac4/detail/real.hpp"
 #include "core/aspx/frequency_tables.hpp"
-#include "tiered/complex.hpp"
+#include "iclforge/dsp/detail/complex.hpp"
 #include "tiered/scalar_traits.hpp"
 
 // A-SPX's high frequency generator: ETSI TS 103 190-1 V1.4.1 clause

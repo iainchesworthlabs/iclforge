@@ -6,7 +6,7 @@
 
 #include "iclforge/base/arithmetic/fixed32.hpp"
 #include "iclforge/base/arithmetic/mant_exp.hpp"
-#include "tiered/complex.hpp"
+#include "iclforge/dsp/detail/complex.hpp"
 
 // What the decoder's tools ask of its scalar beyond arithmetic, so that one source serves the
 // double, float and fixed-point tiers (planning/ac4.md, D14d).

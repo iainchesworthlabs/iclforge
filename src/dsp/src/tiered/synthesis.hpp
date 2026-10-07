@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "iclforge/dsp/tiered/real.hpp"
-#include "tiered/complex.hpp"
+#include "iclforge/dsp/detail/complex.hpp"
 #include "tiered/mdct.hpp"
 
 // The inverse transform's windowing and overlap-add with block switching:

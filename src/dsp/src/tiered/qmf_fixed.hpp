@@ -8,7 +8,7 @@
 #include <type_traits>
 
 #include "iclforge/base/arithmetic/fixed32.hpp"
-#include "tiered/complex.hpp"
+#include "iclforge/dsp/detail/complex.hpp"
 #include "tiered/qmf.hpp"
 #include "tiered/qmf_constants.hpp"
 #include "tiered/qmf_kernels.hpp"

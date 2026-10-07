@@ -28,7 +28,7 @@
 
 #include "core/aspx/hf_generator.hpp"
 #include "iclforge/dsp/tiered/real.hpp"
-#include "tiered/complex.hpp"
+#include "iclforge/dsp/detail/complex.hpp"
 #include "tiered/fft.hpp"
 #include "tiered/kbd.hpp"
 #include "tiered/mdct.hpp"
