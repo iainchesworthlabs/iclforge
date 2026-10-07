@@ -70,22 +70,29 @@ class BitWriter {
     }
 
     // Append the low `bits` bits of `value`, MSB first, unrecorded. 0 <= bits <= 64.
+    //
+    // The bits collect in a 64-bit accumulator and leave it a whole byte at a time, as AC-3's
+    // writer packed a frame: a field is a shift, an or and a byte or two pushed. A byte not yet
+    // whole is put in bytes() only when they are read.
     void put(std::uint64_t value, int bits) {
         assert(bits >= 0 && bits <= 64);
         assert(bits == 64 || (value >> bits) == 0);
-        int left = bits;
-        while (left > 0) {
-            const int used = static_cast<int>(bits_ & 7U);
-            if (used == 0) {
-                bytes_.push_back(std::byte{0});
-            }
-            const int room = 8 - used;
-            const int take = left < room ? left : room;
-            left -= take;
-            const auto chunk = static_cast<unsigned>((value >> left) & ((1U << take) - 1U));
-            bytes_.back() |= static_cast<std::byte>(chunk << (room - take));
-            bits_ += static_cast<std::size_t>(take);
+        if (bits > 32) {
+            put(value >> 32, bits - 32);
+            put(value & 0xFFFFFFFFU, 32);
+            return;
         }
+        if (padded_) {
+            bytes_.pop_back();
+            padded_ = false;
+        }
+        acc_ = (acc_ << bits) | value;
+        pending_ += bits;
+        while (pending_ >= 8) {
+            pending_ -= 8;
+            bytes_.push_back(static_cast<std::byte>((acc_ >> pending_) & 0xFF));
+        }
+        bits_ += static_cast<std::size_t>(bits);
     }
 
     void put_bit(bool bit) { put(bit ? 1U : 0U, 1); }
@@ -173,12 +180,13 @@ class BitWriter {
     // moved by where its bits land here.
     void append(const BitWriter& other) {
         const auto start = bits_;
+        const std::vector<std::byte>& theirs = other.bytes();
         const std::size_t whole = other.bits_ / 8U;
         for (std::size_t i = 0; i < whole; ++i) {
-            put(std::to_integer<unsigned>(other.bytes_[i]), 8);
+            put(std::to_integer<unsigned>(theirs[i]), 8);
         }
         if (const auto rest = static_cast<int>(other.bits_ & 7U); rest > 0) {
-            put(std::to_integer<unsigned>(other.bytes_[whole]) >> (8 - rest), rest);
+            put(std::to_integer<unsigned>(theirs[whole]) >> (8 - rest), rest);
         }
         for (base::SyntaxRecord kept : other.kept_) {
             kept.substream = substream_;
@@ -202,12 +210,19 @@ class BitWriter {
     [[nodiscard]] std::size_t byte_size() const noexcept { return (bits_ + 7) / 8; }
 
     // The bytes written so far, the last one zero-padded.
-    [[nodiscard]] const std::vector<std::byte>& bytes() const noexcept { return bytes_; }
+    [[nodiscard]] const std::vector<std::byte>& bytes() const {
+        if (pending_ > 0 && !padded_) {
+            bytes_.push_back(static_cast<std::byte>((acc_ << (8 - pending_)) & 0xFF));
+            padded_ = true;
+        }
+        return bytes_;
+    }
 
     // Zero-pad to a byte boundary and take the buffer, leaving the writer empty.
     [[nodiscard]] std::vector<std::byte> take() {
         align();
         bits_ = 0;
+        acc_ = 0;
         return std::exchange(bytes_, {});
     }
 
@@ -216,6 +231,9 @@ class BitWriter {
         bytes_.clear();
         kept_.clear();
         bits_ = 0;
+        acc_ = 0;
+        pending_ = 0;
+        padded_ = false;
     }
 
     // The records a buffered writer kept.
@@ -241,7 +259,12 @@ class BitWriter {
     base::SyntaxSink sink_{};
     bool buffering_ = false;
     std::vector<base::SyntaxRecord> kept_;
-    std::vector<std::byte> bytes_;
+    // The whole bytes, and the last one zero-padded while padded_ (bytes() adds it, put() takes
+    // it back): mutable because reading the bytes is what pads them.
+    mutable std::vector<std::byte> bytes_;
+    mutable bool padded_ = false;
+    std::uint64_t acc_ = 0;  // the bits above pending_ are stale and ignored
+    int pending_ = 0;        // bits in acc_ not yet in a whole byte, 0 to 7
     std::size_t bits_ = 0;
 };
 
