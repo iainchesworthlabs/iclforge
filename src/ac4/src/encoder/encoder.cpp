@@ -930,8 +930,8 @@ struct SubstreamCoder {
     int sub_block = 128;
     // At every frame_rate_index but 13, the input converted to the internal
     // rate, a converter per channel and per channel of a dialogue stem.
-    std::vector<detail::dsp::Resampler<double>> converters;
-    std::vector<detail::dsp::Resampler<double>> stem_converters;
+    std::vector<dsp::tiered::Resampler<double>> converters;
+    std::vector<dsp::tiered::Resampler<double>> stem_converters;
     detail::Analysis analysis{2048, 1};
     detail::Psychoacoustics psycho{48000, 2048};
     double cutoff = 20000.0;
@@ -2559,7 +2559,7 @@ struct SubstreamCoder {
     // its converter.
     [[nodiscard]] static std::vector<std::vector<double>> internal(
         std::span<const std::span<const float>> input,
-        std::vector<detail::dsp::Resampler<double>>& through);
+        std::vector<dsp::tiered::Resampler<double>>& through);
 
     // Appends input at the internal rate, and with a stem the dialogue in it.
     void take(const std::vector<std::vector<double>>& programme_input,
@@ -2627,15 +2627,15 @@ std::expected<std::unique_ptr<SubstreamCoder>, Refusal> SubstreamCoder::make(
     coder->psycho = detail::Psychoacoustics(coder->rate_hz, timing->frame_length);
     if (timing->resampled() && converts) {
         // The converters, the inverse of the decoder's.
-        const auto filter = std::make_shared<const detail::dsp::ResamplerFilter>(
+        const auto filter = std::make_shared<const dsp::tiered::ResamplerFilter>(
             timing->decoder_down, timing->decoder_up);
         const int stem_channels =
             config.dialogue && config.dialogue->source == DialogueSource::kStem ? config.channels
                                                                                 : 0;
         coder->converters.assign(static_cast<std::size_t>(config.channels),
-                                 detail::dsp::Resampler<double>(filter));
+                                 dsp::tiered::Resampler<double>(filter));
         coder->stem_converters.assign(static_cast<std::size_t>(stem_channels),
-                                      detail::dsp::Resampler<double>(filter));
+                                      dsp::tiered::Resampler<double>(filter));
     }
     const auto channels = static_cast<std::size_t>(plan->coded);
     const int full_channels =
@@ -4069,7 +4069,7 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
     }
     if (timing->resampled()) {
         // The decoder's converter's delay, which flush() codes past as well.
-        const detail::dsp::ResamplerFilter decoder(timing->decoder_up, timing->decoder_down);
+        const dsp::tiered::ResamplerFilter decoder(timing->decoder_up, timing->decoder_down);
         impl->flush_extra = static_cast<int>(std::ceil(decoder.delay()));
     }
 
@@ -5039,7 +5039,7 @@ std::expected<std::vector<EncodedFrame>, EncodeError> Encoder::Impl::push(
 
 std::vector<std::vector<double>> SubstreamCoder::internal(
     std::span<const std::span<const float>> input,
-    std::vector<detail::dsp::Resampler<double>>& through) {
+    std::vector<dsp::tiered::Resampler<double>>& through) {
     std::vector<std::vector<double>> out(input.size());
     std::vector<double> samples;
     for (std::size_t c = 0; c < input.size(); ++c) {
@@ -5239,7 +5239,7 @@ int Encoder::delay_samples() const noexcept {
     const detail::FrameTiming& t = impl_->timing;
     double delay = static_cast<double>(impl_->delay) * t.decoder_up / t.decoder_down;
     if (t.resampled()) {
-        delay += detail::dsp::ResamplerFilter(t.decoder_down, t.decoder_up).delay();
+        delay += dsp::tiered::ResamplerFilter(t.decoder_down, t.decoder_up).delay();
     }
     return static_cast<int>(std::lround(delay));
 }
@@ -5250,7 +5250,7 @@ int Encoder::decoder_delay_samples() const noexcept {
     const detail::FrameTiming& t = impl_->timing;
     double delay = t.decoder_delay();
     if (t.resampled()) {
-        delay += detail::dsp::ResamplerFilter(t.decoder_up, t.decoder_down).delay();
+        delay += dsp::tiered::ResamplerFilter(t.decoder_up, t.decoder_down).delay();
     }
     return static_cast<int>(std::lround(delay * t.decoder_up / t.decoder_down));
 }

@@ -119,7 +119,7 @@ void expect_noise(const Reconstruction& got, std::size_t band, double level,
             static_cast<double>(detail::get_random_noise_value(noise)) * amplitude;
         // Fixed32 holds a track's lines to its largest line's 2^-31, which the small bands here
         // sit well above; float keeps a part in 10^6.
-        const double tolerance = detail::dsp::kFixed<Real> ? 1e-3 : 1e-5;
+        const double tolerance = dsp::tiered::kFixed<Real> ? 1e-3 : 1e-5;
         CHECK(got.lines[band * kBandWidth + k] ==
               Catch::Approx(expected).epsilon(tolerance).margin(tolerance * amplitude));
     }
@@ -390,7 +390,7 @@ void check_extension(const std::vector<std::vector<BandSpec>>& core,
         reference_lines(built.order, reference_scale_factor, kCounter);
     REQUIRE(scaled.size() == expected.size());
     // Fixed32 holds a track's lines to its largest line's 2^-24 and float to a part in 10^6.
-    const double tolerance = detail::dsp::kFixed<Real> ? 2e-3 : 2e-5;
+    const double tolerance = dsp::tiered::kFixed<Real> ? 2e-3 : 2e-5;
     double largest = 0.0;
     for (const double v : expected) {
         largest = std::max(largest, std::abs(v));
