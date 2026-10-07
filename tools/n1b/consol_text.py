@@ -809,6 +809,9 @@ C5 = [
         files=_C5_MOVED,
     ),
     Rule("qualified", r"\biclforge::ac4::detail::dsp\b", "iclforge::dsp::tiered"),
+    # from inside iclforge::ac4, `detail::dsp::` and `ac4::detail::dsp::`
+    Rule("partly-qualified", r"(?<![\w:])(?:ac4::)?detail::dsp::", "dsp::tiered::", files=_C5_USERS,
+         strings=False),
     Rule("table", rf"(?:\biclforge::ac4::detail::|(?<![\w:]))tables::({_C5_TABLES})\b",
          r"iclforge::dsp::tiered::tables::\1", files=_C5_USERS),
     Rule("bare", r"(?<![\w:])dsp::(?!tiered\b)", "dsp::tiered::", files=_C5_USERS,
