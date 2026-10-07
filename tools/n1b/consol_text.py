@@ -839,6 +839,11 @@ C6 = [
          strings=False),
     Rule("objects-alias-target", r"(namespace \w+ = )iclforge::(oba|emdf)\b(?!::)",
          r"\1iclforge::objects::\2"),
+    # AC-3's public headers that name only its types include core/types.hpp, split from
+    # core/tables.hpp (decision 18); silent_frame.hpp sizes a syncframe by Table 5.18 and keeps it.
+    Rule("types-include", r'#include "iclforge/ac3/core/tables\.hpp"',
+         '#include "iclforge/ac3/core/types.hpp"', files=("src/ac3/include/",),
+         unless=r"\bframe_size_words\(|\bkBitratesKbps\b|\bbitrate_index\("),
 ]
 
 STAGES: dict[str, list[Rule]] = {
