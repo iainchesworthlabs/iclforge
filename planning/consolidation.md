@@ -1,18 +1,21 @@
 # One shape for every codec, and fewer libraries (a proposal)
 
-!!! note "Status as of 2026-10-07: C0 to C5 run and proved (C5 a move, decision 14), C6 under way; decisions 1 to 19 taken"
+!!! note "Status as of 2026-10-07: C0 to C6 run and proved (C5 a move, decision 14); decisions 1 to 19 taken"
     Asked for by the user on 2026-10-06: "the AC3 codec and the AC4 codec structures are completely
     different. There's also duplication from inside codecs to common stuff", "the ac3 approach is the
     preferred approach", and "should there be 25 libraries? Is it worth consolidating some?". This page
     reads the tree as it stood on `main` that day. It follows [layout.md](layout.md) (N1B), which put the
     codecs side by side and left the duplicated DSP, the codec-blind vocabulary and the shape of AC-4 for
     later ([layout.md (j)](layout.md#j-what-stays-out-and-follow-on-ideas)). The user took the decisions
-    below between 2026-10-06 and 2026-10-07. C0 to C4 ran on the local branches
-    `chore/src-consolidation-c0` to `-c4` and changed no bitstream or PCM a build outputs; C1's cut
+    below between 2026-10-06 and 2026-10-07. C0 to C6 ran on the local branches
+    `chore/src-consolidation-c0` to `-c6`; C0 to C4 changed no bitstream or PCM a build outputs; C1's cut
     moves the bare-metal AC-4 probe's instruction counts by up to 68 parts per million (decision 11),
     and C4 the Cortex-M3 counts by at most 0.25% and the images by up to 1,296 bytes (decision 15)
     ([what the runs found](#what-the-runs-found-that-the-plan-did-not)). C5 moved AC-4's kernels into
-    `src/dsp` and merged none (decision 14), changing nothing a build outputs. Nothing is pushed.
+    `src/dsp` and merged none (decision 14), changing nothing a build outputs. C6 gave `base` the
+    version, WAV and the meters, nested `objects`' namespaces and installs the headers by file set,
+    changing no bitstream or PCM either; its installed headers and exports change as decisions 16 to
+    19 say. Nothing is pushed.
 
 ## In brief
 
@@ -871,6 +874,78 @@ Hazards the plan did not name:
 
 Not run here: as for C4. The merges decision 14 leaves (one FFT, one QMF bank, one converter) are
 each a stage of their own, with the cost in the section above.
+
+### C6, 2026-10-07 (`chore/src-consolidation-c6`)
+
+The commits, after C5, in four rounds, each the moves alone (`R100`), then the pass, then the hand
+work: the version (2 files moved), WAV (6), `objects`' namespaces (the pass: 159 files), the meters
+(4 moved), the installed headers (the pass: 25 includes). 15 commits, 5 of them the scripts'. The
+moves were made with `git mv`; `consoldef.py`'s `c6` lists them, for the comparisons.
+
+| | the plan and decisions 16 to 19 | the run |
+|---|---|---|
+| the version | `version.cpp`, `version.hpp.in` to `base` | `iclforge/base/version.hpp` (`version_string`, `version_full`, the git stamp, `version_details()`), stamped by `src/base/CMakeLists.txt` and installed with `base`; `iclforge/ac3/version.hpp` is a hand-written header of aliases |
+| WAV (16) | the codec-blind part to `base`, AC-3's mappings in `ac3`, aliases for a release | `iclforge/base/wav.hpp` (`WavData`, `read_wav`, the stream reader and the writers); `iclforge/ac3/io/wav.hpp` holds `Ac3Layout`, `ac3_layout_for` and `wav_channel_order` and aliases the rest |
+| the meters (17) | to `base`, keyed on `base::Speaker` and an integer rate, AC-3's `Acmod` forms byte for byte | `iclforge/base/levels.hpp`: `LevelMeter` over a channel count or a list of speakers, and `energy_vector` over each channel's azimuth. `iclforge/base/loudness.hpp`: `LoudnessMeter` over a weight per channel (none for an LFE) or a list of speakers weighted by BS.1770-5 Annex 3 (`position_weight(Speaker)`). AC-3's `LevelMeter(Acmod, ...)` and `LoudnessMeter(SampleRate, Acmod, ...)` and `(SampleRate, Layout)` are subclasses that only construct; the A/52 channel names and ring, `position_weight(Location)` and `dialnorm_from_lkfs` stay in `ac3` |
+| the headers (18) | by `FILE_SET`, `detail/` out, `core/tables.hpp` split, the tables private unless needed outside | `iclforge_header_set()` (`cmake/IclforgeLibrary.cmake`) gives every library a `HEADERS` file set of its `include/` less `detail/`, and the export sets name each header. `core/types.hpp` holds the types and constants; Table 5.18 stays public in `core/tables.hpp`, since `silent_frame.hpp` sizes a syncframe by it inline and the GUI, the CLI and Crucible read its bit rates; the rematrix bands are private (`src/ac3/src/core/rematrix_bands.hpp`) |
+| `objects` (19) | `iclforge::objects::oba` and `::emdf`, aliases for a release | so; the aliases are `iclforge/objects/aliases.hpp`, which every public header of `objects` includes, and `check_namespaces.py` gives `objects` its own namespace |
+
+**The proof.** Against C5's records:
+
+- **Identical:** the pinned hashes on GCC 16 and Clang 22; every line of the five bare-metal probes;
+  the CLI corpus but for the version a build stamps (below), which once undone leaves all 44 commands
+  on each compiler identical.
+- **The installed tree:** what C6 meant to change and nothing else. Five headers come
+  (`core/types.hpp`, and `base`'s `version`, `wav`, `levels` and `loudness`) and four go: the two
+  `detail/` headers and the two version templates (`version.hpp.in`, `version.h.in`), which the
+  directory install had shipped. The headers that changed are the ones C6 edited; the export sets
+  list their headers; `iclforge-base.pc` describes the version. The `.pc` files, the version files
+  and the notices differ from C5's by the version stamp only.
+- **The exports** (`export_diff.py --map c6 --rewrite c6`, 3,268 names to 3,285): every library the
+  same but `ac3` and `base`, compared as one, −8 +27, and `adm`, −1 +1. Of the API, `base`'s six new
+  names (the meters' codec-blind constructors, `energy_vector` over azimuths, `position_weight` of a
+  speaker) and the loudness meter's private `init`, gone. The rest are the standard library's template
+  instances, which follow the code (`std::optional<double>` vectors where there were spans of `int`
+  and `double`), and three mangled names whose substitutions follow a namespace of another depth
+  (`base::ChannelSummary`, `objects::oba::ObjectPath`). The ABI allowlists (`abi_compare.py --map c6
+  --rewrite c6`): −1 +6 in `ac3` and `base` together, the same names; every other −0 +0.
+- **The whole ctest:** 3,461 tests on each compiler (C5's 3,458, and `tests/base/test_meters.cpp`,
+  which holds each `base` form of a meter to the AC-3 form beside it, bit for bit), all pass but the
+  five that skip themselves.
+- **The installed package:** `check_install_consumer.sh` passes. The ESP-IDF staging is 504 files
+  from 494 (C6's new headers and sources in the staged trees).
+- `check_layering.py` (228 include edges), `check_namespaces.py` (174 public headers, 4 known debts:
+  `objects/aliases.hpp`'s aliases in `iclforge` is the new one), `check_pages.py`,
+  `check_doc_paths.py`, the unit tests (n1b 495, checks 431, ci 581) and `precheck.py` (but for the
+  patch attribution) pass.
+
+Hazards the plan did not name:
+
+- **A version a build stamps at configure time.** The project derives its version from git when it
+  is configured. C5's trees had been configured when that read `0.0.0-dev`; moving the stamping to
+  `src/base` reconfigured them, and they read `0.10.0-beta.1`. So ten probe outputs, which print the
+  generator's version, and the installed `.pc`, version and notice files differ from C5's records,
+  and only by that. A proof against records taken from a tree configured at another time compares the
+  stamp too.
+- **A pass that renames a heading breaks the links to its anchor.** The `objects` pass rewrote
+  `iclforge::oba::ObjectScene` in a heading of `docs/library/spatial-and-atmos.md`; two pages linked
+  the old anchor, which `precheck.py` found and which were put right by hand, with the C6 version
+  move's path in `CONTRIBUTING.md`.
+- **A table a public header uses inline is public.** Decision 18 had AC-3's tables private unless
+  something outside needed them; Table 5.18 is, so only the rematrix bands left the package.
+- **The meters' geometry is `render`'s.** `base` includes nothing, so a speaker-keyed energy vector,
+  which needs the ring's azimuths, cannot be `base`'s; `base::energy_vector` takes the azimuths, and
+  AC-3's takes them from `render`'s `kSpeakerAzimuthDeg` as before. A `Speaker` form would be a
+  `render` function, and nothing calls for one yet.
+- **A temporary directory under `build/`.** `tools/checks`' unit tests make trees in the temporary
+  directory, and the checkers skip anything under a `build/` directory; with `TMPDIR` in the
+  worktree's `build/`, 31 of them fail. They pass with `TMPDIR=/tmp`.
+
+Not run here: as for C1; the Python, Rust and WASM tests the proof table asks of C6 (`pybind11`,
+`cargo` and `emcc` are not installed; the bindings name the meters through AC-3's names, which stay,
+and the Rust crate goes through the C API, which ctest covers), the Qt GUI (not built here), and
+`mkdocs build --strict` (not installed). The MSVC symbol baseline (`tools/n1b/baselines/
+symbols-msvc.json`) wants a Windows build.
 
 ## After C3: `src/` reviewed
 
