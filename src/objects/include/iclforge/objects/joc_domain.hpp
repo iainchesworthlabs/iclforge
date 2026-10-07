@@ -4,6 +4,8 @@
 
 #include "iclforge/dsp/qmf.hpp"
 
+#include "iclforge/objects/aliases.hpp"
+
 namespace iclforge::objects::oba::joc {
 
 // Which domain reconstruct() applies the matrix in.

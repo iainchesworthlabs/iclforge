@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "iclforge/objects/export.hpp"
+#include "iclforge/objects/aliases.hpp"
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/objects/placement.hpp"
 

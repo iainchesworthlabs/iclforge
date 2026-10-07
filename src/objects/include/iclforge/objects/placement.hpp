@@ -2,6 +2,8 @@
 
 #include "iclforge/objects/oamd.hpp"
 
+#include "iclforge/objects/aliases.hpp"
+
 namespace iclforge::objects::oba {
 
 // One object's placement for one frame. Positions are room-anchored per

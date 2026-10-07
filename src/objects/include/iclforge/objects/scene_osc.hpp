@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "iclforge/objects/export.hpp"
+#include "iclforge/objects/aliases.hpp"
 #include "iclforge/objects/placement.hpp"
 
 // The OSC 1.0 wire form of a live scene update - the third reader of a

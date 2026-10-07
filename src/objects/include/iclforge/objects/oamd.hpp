@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "iclforge/objects/export.hpp"
+#include "iclforge/objects/aliases.hpp"
 
 // Object Audio Metadata - ETSI TS 103 420 clause 5. The payload that says what
 // the objects ARE: how many, where each one sits in the room, how loud, and

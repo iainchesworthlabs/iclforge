@@ -9,6 +9,7 @@
 
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/objects/export.hpp"
+#include "iclforge/objects/aliases.hpp"
 
 // The Extensible Metadata Delivery Format - ETSI TS 102 366 Annex H. A/52:2018
 // Annex H defers to it wholesale rather than restating it, so this is the one
