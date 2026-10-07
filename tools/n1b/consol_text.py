@@ -828,6 +828,19 @@ C5 = [
          files=("tests/",), unless=r"namespace dsp = ", strings=False),
 ]
 
+# --- C6 ---------------------------------------------------------------------------------------
+# objects' namespaces are iclforge::objects::oba and iclforge::objects::emdf (decision 19): what
+# src/objects declares, and every name of them spelled in full; a program's strings are left. The
+# old names stay as aliases for a release (iclforge/objects/aliases.hpp, by hand).
+C6 = [
+    Rule("objects-namespace", r"\bnamespace iclforge::(oba|emdf)\b(?!\s*=)",
+         r"namespace iclforge::objects::\1", files=("src/objects/",)),
+    Rule("objects-qualified", r"\biclforge::(oba|emdf)::", r"iclforge::objects::\1::", _TEXT,
+         strings=False),
+    Rule("objects-alias-target", r"(namespace \w+ = )iclforge::(oba|emdf)\b(?!::)",
+         r"\1iclforge::objects::\2"),
+]
+
 STAGES: dict[str, list[Rule]] = {
     "c0": C0,
     "c1": C1 + C1_PROSE,
@@ -837,6 +850,7 @@ STAGES: dict[str, list[Rule]] = {
     "c4": C4,
     "c4b": C4B,
     "c5": C5,
+    "c6": C6,
 }
 
 
