@@ -119,7 +119,7 @@ as themselves, and "ICL Forge Forge" is never written. In code, `iclforge` names
 the family's identifiers: the CMake package, the packages of each language, the namespace root,
 the header root and the C symbol prefix (`iclforge_`), with `ICLFORGE_` for macros, options and
 environment variables. Every identifier stays lowercase but those. `forge --version` prints
-`iclforge <version>` (`src/ac3/src/version.cpp`), because that is the library's version line and
+`iclforge <version>` (`src/base/src/version.cpp`), because that is the library's version line and
 the Homebrew formula's test asserts it.
 
 **A library's headers are `include/iclforge/<name>/`, and the name is the library.** The second
