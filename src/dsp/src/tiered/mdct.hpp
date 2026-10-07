@@ -5,8 +5,8 @@
 #include <vector>
 
 #include "iclforge/ac4/detail/real.hpp"
-#include "core/dsp/complex.hpp"
-#include "core/dsp/fft.hpp"
+#include "tiered/complex.hpp"
+#include "tiered/fft.hpp"
 
 // The MDCT pair of ETSI TS 103 190-1 V1.4.1 clause 5.5.2.
 //

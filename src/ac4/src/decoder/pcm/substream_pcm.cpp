@@ -15,7 +15,7 @@
 #include "decoder/pcm/multichannel.hpp"
 #include "decoder/pcm/snf_random.hpp"
 #include "decoder/pcm/stereo.hpp"
-#include "core/dsp/scalar_traits.hpp"
+#include "tiered/scalar_traits.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

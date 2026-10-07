@@ -11,8 +11,8 @@
 #include "encoder/aspx/aspx_syntax.hpp"
 #include "core/aspx/frequency_tables.hpp"
 #include "core/aspx/hf_generator.hpp"
-#include "core/dsp/complex.hpp"
-#include "core/dsp/qmf.hpp"
+#include "tiered/complex.hpp"
+#include "tiered/qmf.hpp"
 #include "encoder/frame/timing.hpp"
 
 // The encoder's QMF domain: ETSI TS 103 190-1 V1.4.1 clause 5.7 run from the

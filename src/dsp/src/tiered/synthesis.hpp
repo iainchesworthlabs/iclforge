@@ -5,8 +5,8 @@
 #include <vector>
 
 #include "iclforge/ac4/detail/real.hpp"
-#include "core/dsp/complex.hpp"
-#include "core/dsp/mdct.hpp"
+#include "tiered/complex.hpp"
+#include "tiered/mdct.hpp"
 
 // The inverse transform's windowing and overlap-add with block switching:
 // ETSI TS 103 190-1 V1.4.1 clause 5.5.2.2 steps 5 and 6 (Pseudocodes 63 and

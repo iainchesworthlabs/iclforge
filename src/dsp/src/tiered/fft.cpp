@@ -1,6 +1,6 @@
-#include "core/dsp/fft.hpp"
+#include "tiered/fft.hpp"
 
-#include "core/dsp/transform_tables.hpp"
+#include "tiered/transform_tables.hpp"
 
 #include <algorithm>
 #include <type_traits>

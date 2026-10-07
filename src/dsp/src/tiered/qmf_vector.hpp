@@ -4,10 +4,10 @@
 #include <cstddef>
 
 #include "iclforge/base/detail/simd.hpp"
-#include "core/dsp/complex.hpp"
-#include "core/dsp/qmf_constants.hpp"
-#include "core/dsp/qmf_kernels.hpp"
-#include "core/tables/qmf_tables.hpp"
+#include "tiered/complex.hpp"
+#include "tiered/qmf_constants.hpp"
+#include "tiered/qmf_kernels.hpp"
+#include "tiered/tables/qmf_tables.hpp"
 
 // The QMF steps of dsp/qmf_kernels.hpp on the seam's 128-bit vector types
 // (src/base/variants: f64x2 at double, f32x4 at float), one step for one step.

@@ -4,8 +4,8 @@
 #include <limits>
 
 #include "iclforge/ac4/detail/real.hpp"
-#include "core/dsp/complex.hpp"
-#include "core/dsp/scalar_traits.hpp"
+#include "tiered/complex.hpp"
+#include "tiered/scalar_traits.hpp"
 
 // The decoder's QMF-domain and time-domain values in the units of the build's scalar, for
 // tests that state theirs in the double decoder's: full scale 2^15 (src/ac4/src/decoder/pcm/

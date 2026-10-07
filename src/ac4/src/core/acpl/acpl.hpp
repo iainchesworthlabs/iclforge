@@ -5,8 +5,8 @@
 #include <span>
 
 #include "iclforge/ac4/detail/real.hpp"
-#include "core/dsp/complex.hpp"
-#include "core/dsp/scalar_traits.hpp"
+#include "tiered/complex.hpp"
+#include "tiered/scalar_traits.hpp"
 
 // Advanced coupling's signal processing, ETSI TS 103 190-1 V1.4.1 clause 5.7.7:
 // the parameter bands (5.7.7.2, Table 197), interpolation (5.7.7.3,

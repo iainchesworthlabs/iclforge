@@ -6,10 +6,10 @@
 #include <memory>
 
 #include "iclforge/base/detail/profiling.hpp"
-#include "core/dsp/real_functions.hpp"
-#include "core/dsp/scalar_traits.hpp"
-#include "core/tables/qmf_tables_fixed.hpp"
-#include "core/tables/qmf_tables.hpp"
+#include "tiered/real_functions.hpp"
+#include "tiered/scalar_traits.hpp"
+#include "tiered/tables/qmf_tables_fixed.hpp"
+#include "tiered/tables/qmf_tables.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

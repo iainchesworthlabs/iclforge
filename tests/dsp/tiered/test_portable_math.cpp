@@ -16,8 +16,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-#include "core/dsp/kbd.hpp"
-#include "core/dsp/portable_math.hpp"
+#include "tiered/kbd.hpp"
+#include "tiered/portable_math.hpp"
 
 namespace {
 

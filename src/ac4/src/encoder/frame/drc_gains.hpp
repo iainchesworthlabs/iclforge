@@ -6,7 +6,7 @@
 #include <span>
 #include <vector>
 
-#include "core/dsp/qmf.hpp"
+#include "tiered/qmf.hpp"
 #include "encoder/frame/metadata.hpp"
 #include "encoder/frame/timing.hpp"
 #include "meta/drc.hpp"

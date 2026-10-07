@@ -6,9 +6,9 @@
 #include <cstdint>
 #include <numbers>
 
-#include "core/dsp/kbd.hpp"
-#include "core/dsp/portable_math.hpp"
-#include "core/dsp/resampler.hpp"
+#include "tiered/kbd.hpp"
+#include "tiered/portable_math.hpp"
+#include "tiered/resampler.hpp"
 
 // The design of the sample rate converter's filter (dsp/resampler.hpp), and the float tables built
 // from it at compile time.

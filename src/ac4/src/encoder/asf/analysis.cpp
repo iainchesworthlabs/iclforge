@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <utility>
 
-#include "core/dsp/kbd.hpp"
+#include "tiered/kbd.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

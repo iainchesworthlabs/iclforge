@@ -34,7 +34,7 @@
 
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "constructed.hpp"
-#include "core/dsp/qmf.hpp"
+#include "tiered/qmf.hpp"
 #include "sanitized.hpp"
 
 namespace {

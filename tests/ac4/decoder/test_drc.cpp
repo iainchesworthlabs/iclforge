@@ -28,7 +28,7 @@
 #include "units.hpp"
 
 #include "iclforge/ac4/io/elementary.hpp"
-#include "core/dsp/qmf.hpp"
+#include "tiered/qmf.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "decoder/pcm/drc.hpp"

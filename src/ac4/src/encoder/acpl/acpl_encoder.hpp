@@ -11,8 +11,8 @@
 #include "core/acpl/acpl.hpp"
 #include "encoder/acpl/acpl_syntax.hpp"
 #include "encoder/ajcc/ajcc_syntax.hpp"
-#include "core/dsp/complex.hpp"
-#include "core/dsp/qmf.hpp"
+#include "tiered/complex.hpp"
+#include "tiered/qmf.hpp"
 #include "encoder/frame/timing.hpp"
 
 // The encoder's A-CPL: ETSI TS 103 190-1 V1.4.1 clause 5.7.7 run from the

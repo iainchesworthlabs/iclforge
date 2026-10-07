@@ -14,10 +14,10 @@
 #include <vector>
 
 #include "iclforge/ac4/detail/real.hpp"
-#include "core/dsp/fft.hpp"
-#include "core/dsp/mdct.hpp"
-#include "core/dsp/synthesis.hpp"
-#include "core/dsp/transform_tables.hpp"
+#include "tiered/fft.hpp"
+#include "tiered/mdct.hpp"
+#include "tiered/synthesis.hpp"
+#include "tiered/transform_tables.hpp"
 
 namespace dsp = iclforge::ac4::detail::dsp;
 using iclforge::ac4::detail::Real;

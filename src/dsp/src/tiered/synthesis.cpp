@@ -1,12 +1,12 @@
-#include "core/dsp/synthesis.hpp"
+#include "tiered/synthesis.hpp"
 
 #include <algorithm>
 #include <type_traits>
 #include <utility>
 
 #include "iclforge/base/detail/profiling.hpp"
-#include "core/dsp/kbd.hpp"
-#include "core/dsp/transform_tables.hpp"
+#include "tiered/kbd.hpp"
+#include "tiered/transform_tables.hpp"
 
 namespace iclforge::ac4::detail::dsp {
 namespace {

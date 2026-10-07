@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <numbers>
 
-#include "core/dsp/qmf.hpp"
+#include "tiered/qmf.hpp"
 #include "decoder/syntax/channel_elements.hpp"
 
 namespace iclforge::ac4::detail {

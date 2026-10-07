@@ -6,8 +6,8 @@
 #include <numbers>
 #include <span>
 
-#include "core/dsp/kbd.hpp"
-#include "core/dsp/mdct.hpp"
+#include "tiered/kbd.hpp"
+#include "tiered/mdct.hpp"
 
 namespace iclforge::ac4::detail {
 namespace {

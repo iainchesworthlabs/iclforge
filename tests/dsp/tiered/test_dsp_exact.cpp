@@ -28,11 +28,11 @@
 
 #include "core/aspx/hf_generator.hpp"
 #include "iclforge/ac4/detail/real.hpp"
-#include "core/dsp/complex.hpp"
-#include "core/dsp/fft.hpp"
-#include "core/dsp/kbd.hpp"
-#include "core/dsp/mdct.hpp"
-#include "core/dsp/synthesis.hpp"
+#include "tiered/complex.hpp"
+#include "tiered/fft.hpp"
+#include "tiered/kbd.hpp"
+#include "tiered/mdct.hpp"
+#include "tiered/synthesis.hpp"
 #include "iclforge/base/arithmetic/scalar_math.hpp"
 
 namespace {

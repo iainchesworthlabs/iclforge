@@ -8,7 +8,7 @@
 #include <utility>
 
 #include "decoder/pcm/pow43.hpp"
-#include "core/dsp/scalar_traits.hpp"
+#include "tiered/scalar_traits.hpp"
 #include "core/tables/sfb_tables.hpp"
 
 namespace iclforge::ac4::detail {

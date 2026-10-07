@@ -25,17 +25,17 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "iclforge/ac4/detail/real.hpp"
-#include "core/dsp/complex.hpp"
-#include "core/dsp/fft.hpp"
-#include "core/dsp/kbd.hpp"
-#include "core/dsp/mdct.hpp"
-#include "core/dsp/qmf.hpp"
-#include "core/dsp/scalar_traits.hpp"
-#include "core/dsp/qmf_constants.hpp"
-#include "core/dsp/qmf_kernels.hpp"
-#include "core/dsp/qmf_vector.hpp"
-#include "core/dsp/synthesis.hpp"
-#include "core/tables/qmf_tables.hpp"
+#include "tiered/complex.hpp"
+#include "tiered/fft.hpp"
+#include "tiered/kbd.hpp"
+#include "tiered/mdct.hpp"
+#include "tiered/qmf.hpp"
+#include "tiered/scalar_traits.hpp"
+#include "tiered/qmf_constants.hpp"
+#include "tiered/qmf_kernels.hpp"
+#include "tiered/qmf_vector.hpp"
+#include "tiered/synthesis.hpp"
+#include "tiered/tables/qmf_tables.hpp"
 
 namespace {
 

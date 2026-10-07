@@ -48,9 +48,9 @@
 #include "iclforge/ac3/oba/atmos.hpp"
 #include "iclforge/ac3/oba/joc.hpp"
 #include "iclforge/ac3/oba/joc_tables.hpp"
-#include "core/dsp/fft.hpp"
-#include "core/dsp/mdct.hpp"
-#include "core/dsp/qmf.hpp"
+#include "tiered/fft.hpp"
+#include "tiered/mdct.hpp"
+#include "tiered/qmf.hpp"
 #include "real_audio.hpp"
 
 namespace {

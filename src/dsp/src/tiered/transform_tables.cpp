@@ -1,10 +1,10 @@
-#include "core/dsp/transform_tables.hpp"
+#include "tiered/transform_tables.hpp"
 
 #include <array>
 #include <cstddef>
 #include <type_traits>
 
-#include "core/tables/transform_tables.hpp"
+#include "tiered/tables/transform_tables.hpp"
 
 namespace iclforge::ac4::detail::dsp {
 namespace {

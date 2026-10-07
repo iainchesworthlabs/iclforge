@@ -9,9 +9,9 @@
 #include <vector>
 
 #include "iclforge/ac4/decoder/decoder.hpp"
-#include "core/dsp/qmf.hpp"
-#include "core/dsp/resampler.hpp"
-#include "core/dsp/synthesis.hpp"
+#include "tiered/qmf.hpp"
+#include "tiered/resampler.hpp"
+#include "tiered/synthesis.hpp"
 #include "decoder/pcm/acpl.hpp"
 #include "decoder/pcm/asf_reconstruct.hpp"
 #include "decoder/pcm/ajcc.hpp"

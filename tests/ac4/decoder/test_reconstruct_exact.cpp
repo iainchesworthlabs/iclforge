@@ -15,7 +15,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "iclforge/ac4/detail/real.hpp"
-#include "core/dsp/scalar_traits.hpp"
+#include "tiered/scalar_traits.hpp"
 #include "core/tables/sfb_tables.hpp"
 #include "decoder/pcm/asf_reconstruct.hpp"
 

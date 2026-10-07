@@ -25,7 +25,7 @@
 #include "asf/stereo.hpp"
 #include "aspx/aspx_encoder.hpp"
 #include "iclforge/base/bitwriter.hpp"
-#include "core/dsp/resampler.hpp"
+#include "tiered/resampler.hpp"
 #include "frame/dialogue.hpp"
 #include "frame/drc_gains.hpp"
 #include "frame/frame_writer.hpp"

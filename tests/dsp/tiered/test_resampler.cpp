@@ -22,10 +22,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "core/dsp/resampler.hpp"
-#include "core/dsp/resampler_design.hpp"
-#include "core/dsp/resampler_vector.hpp"
-#include "core/dsp/scalar_traits.hpp"
+#include "tiered/resampler.hpp"
+#include "tiered/resampler_design.hpp"
+#include "tiered/resampler_vector.hpp"
+#include "tiered/scalar_traits.hpp"
 
 namespace {
 

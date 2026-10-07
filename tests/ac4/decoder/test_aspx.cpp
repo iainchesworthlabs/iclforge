@@ -29,7 +29,7 @@
 #include "iclforge/base/arithmetic/scalar_math.hpp"
 #include "decoder/pcm/aspx.hpp"
 #include "decoder/pcm/companding.hpp"
-#include "core/tables/qmf_tables.hpp"
+#include "tiered/tables/qmf_tables.hpp"
 
 namespace {
 

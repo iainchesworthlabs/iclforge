@@ -19,7 +19,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "core/acpl/acpl.hpp"
-#include "core/dsp/complex.hpp"
+#include "tiered/complex.hpp"
 
 namespace {
 

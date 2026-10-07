@@ -8,7 +8,7 @@
 
 #include "core/ajoc/ajoc.hpp"
 #include "encoder/ajoc/ajoc_syntax.hpp"
-#include "core/dsp/qmf.hpp"
+#include "tiered/qmf.hpp"
 #include "encoder/frame/timing.hpp"
 
 // The encoder's A-JOC: ETSI TS 103 190-2 V1.3.1 clause 5.7 run from the other
