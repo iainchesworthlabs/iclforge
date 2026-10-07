@@ -57,7 +57,7 @@ it directly. Four tiers, assigned per header below:
 | `iclforge/containers/iec61937/iec61937.hpp` | Public. |
 | `iclforge/dsp/qmf.hpp` | Public — `oba::joc::Domain::kQmf` is selected through public `AtmosConfig`. |
 | `iclforge/dsp/biquad.hpp`, `resampler.hpp` | Public — `dsp::resample`/`resample_planar` is a documented multi-source-rate-conversion utility, not purely an implementation detail (see `header-map.md`). |
-| `iclforge/ac3/analysis/levels.hpp` | Public. |
+| `iclforge/ac3/analysis/levels.hpp`, `iclforge/base/levels.hpp`, `iclforge/base/loudness.hpp` | Public — the base meters keep the tier of the AC-3 headers they left, whose names stay as aliases for a release. |
 | `iclforge/ac3/quality/distortion.hpp`, `perceptual.hpp` | Public. |
 | `iclforge/ac3/latency.hpp` | Public. |
 | `iclforge/ac3/verify/mirror.hpp`, `selfcheck.hpp`, `eac3_mirror.hpp`, `eac3_selfcheck.hpp`, `trace_export.hpp`, `bap_census.hpp` | Diagnostic. |

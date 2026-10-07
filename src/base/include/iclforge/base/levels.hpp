@@ -6,18 +6,19 @@
 #include <memory>
 #include <optional>
 #include <span>
-#include <string_view>
 #include <vector>
 
-#include "iclforge/ac3/core/tables.hpp"
-#include "iclforge/ac3/export.hpp"
+#include "iclforge/base/export.hpp"
+#include "iclforge/base/speaker.hpp"
 
 // Signal analysis for the front ends: what each channel is carrying, in the
 // units a meter needs. This is presentation-side work, not codec work, but it
 // belongs in the library because forge and forge-gui must report the same
-// numbers from the same ballistics rather than each inventing its own.
+// numbers from the same ballistics rather than each inventing its own. The
+// meter is codec-blind - a channel count and a rate - and AC-3's Acmod form of
+// it is iclforge::ac3::analysis's (iclforge/ac3/analysis/levels.hpp).
 
-namespace iclforge::ac3::analysis {
+namespace iclforge::base {
 
 // Everything at or below this reports as this, so callers never meet
 // log10(0). Well under the -96 dBFS noise floor of 16-bit material.
@@ -28,7 +29,7 @@ inline constexpr double kFloorDb = -120.0;
 // where it actually lands.
 inline constexpr float kFullScale = 32767.0f / 32768.0f;
 
-[[nodiscard]] ICLFORGE_AC3_EXPORT double to_dbfs(double linear);
+[[nodiscard]] ICLFORGE_BASE_EXPORT double to_dbfs(double linear);
 
 // Position of `db` on a meter scaled linearly in decibels from `floor_db` to
 // 0 dBFS, clamped to [0, 1]. Shared so that a bar in the GUI and a bar in the
@@ -39,25 +40,6 @@ inline constexpr float kFullScale = 32767.0f / 32768.0f;
     }
     return std::clamp((db - floor_db) / -floor_db, 0.0, 1.0);
 }
-
-[[nodiscard]] constexpr int channel_count(Acmod acmod, bool lfe) {
-    return fullbw_channel_count(acmod) + (lfe ? 1 : 0);
-}
-
-// A/52 Table 5.8 channel array ordering. `index` runs over the full-bandwidth
-// channels in that order, with the LFE last when present; an out-of-range
-// index gives an empty view.
-[[nodiscard]] ICLFORGE_AC3_EXPORT std::string_view channel_name(Acmod acmod, bool lfe, int index);
-
-// The layout in the spec's own front/rear notation, e.g. "3/2 + LFE".
-[[nodiscard]] ICLFORGE_AC3_EXPORT std::string_view layout_name(Acmod acmod, bool lfe);
-
-// Loudspeaker azimuth for a channel: degrees counterclockwise from front, on
-// the same ITU-R BS.775 ring the spatial renderer pans over. Empty for the
-// LFE, which carries no direction, and for 1+1 dual mono, whose two channels
-// are unrelated programs rather than one soundfield.
-[[nodiscard]] ICLFORGE_AC3_EXPORT std::optional<double> channel_azimuth_deg(Acmod acmod, bool lfe,
-                                                                        int index);
 
 struct MeterBallistics {
     // One-pole averaging time for the RMS bar. 300 ms is the familiar
@@ -82,7 +64,7 @@ struct ChannelLevel {
 // Unweighted statistics over everything fed so far. A file report wants these
 // rather than levels(): ballistics exist to make a moving display readable,
 // and would only smear a question that has an exact answer.
-struct ICLFORGE_AC3_EXPORT ChannelSummary {
+struct ICLFORGE_BASE_EXPORT ChannelSummary {
     double peak = 0.0;  // linear
     double sum_squares = 0.0;
     std::uint64_t samples = 0;
@@ -93,27 +75,16 @@ struct ICLFORGE_AC3_EXPORT ChannelSummary {
     [[nodiscard]] double rms_db() const;
 };
 
-// Meters audio in A/52 channel order. One instance drives both the live
-// display (levels(), ballistic) and the end-of-run report (summary(), exact);
-// a single pass over the samples serves both, which is the point — the two
-// front ends must not disagree about what a signal contains.
-class ICLFORGE_AC3_EXPORT LevelMeter {
+// One instance drives both the live display (levels(), ballistic) and the
+// end-of-run report (summary(), exact); a single pass over the samples serves
+// both, which is the point - the two front ends must not disagree about what a
+// signal contains.
+class ICLFORGE_BASE_EXPORT LevelMeter {
    public:
-    LevelMeter(Acmod acmod, bool lfe, std::uint32_t sample_rate,
-               const MeterBallistics& ballistics = {});
-
-    // Meters `channels` channels instead of the acmod's own count, for a
-    // layout no acmod can name: E-AC-3's dependent substreams add speakers the
-    // coding mode has no word for, and a 7.1.4 access unit carries fourteen
-    // coded channels against a coding mode that tops out at six.
-    //
-    // The acmod still names and places the first channel_count(acmod, lfe) of
-    // them - those are the bed, in Table 5.8 order, and they are what the
-    // soundfield ring is computed from. The rest are metered but contribute no
-    // direction, which is also what channel_azimuth_deg says about them.
-    // `channels` below the acmod's own count is raised to it rather than
-    // truncating a layout the caller has already committed to.
-    LevelMeter(Acmod acmod, bool lfe, std::uint32_t sample_rate, int channels,
+    // A sample rate of 0 is read as 48 kHz.
+    LevelMeter(int channels, std::uint32_t sample_rate, const MeterBallistics& ballistics = {});
+    // One channel per speaker, in the list's order.
+    LevelMeter(std::span<const Speaker> speakers, std::uint32_t sample_rate,
                const MeterBallistics& ballistics = {});
     // Declared (and defined in levels.cpp, where Impl below is complete)
     // rather than implicit: a dllexport class generates every implicit
@@ -127,10 +98,9 @@ class ICLFORGE_AC3_EXPORT LevelMeter {
     LevelMeter(LevelMeter&&) noexcept;
     LevelMeter& operator=(LevelMeter&&) noexcept;
 
-    // Planar, one span per channel in A/52 order. The shortest span sets the
-    // length; channels beyond the ones supplied are metered as silence, so a
-    // caller that hands over fewer spans sees the rest fall away rather than
-    // freeze.
+    // Planar, one span per channel. The shortest span sets the length;
+    // channels beyond the ones supplied are metered as silence, so a caller
+    // that hands over fewer spans sees the rest fall away rather than freeze.
     void process(std::span<const std::span<const float>> channels);
 
     // Interleaved, `stride` samples per frame. The first channel_count() of
@@ -139,8 +109,6 @@ class ICLFORGE_AC3_EXPORT LevelMeter {
 
     [[nodiscard]] std::span<const ChannelLevel> levels() const;
     [[nodiscard]] std::span<const ChannelSummary> summary() const;
-    [[nodiscard]] Acmod acmod() const;
-    [[nodiscard]] bool lfe() const;
     [[nodiscard]] int channel_count() const;
     [[nodiscard]] std::uint32_t sample_rate() const;
 
@@ -151,10 +119,10 @@ class ICLFORGE_AC3_EXPORT LevelMeter {
     // One channel's worth of block statistics, advanced over `seconds`.
     void advance(std::size_t channel, double block_peak, double mean_square, double seconds);
 
-    // Every private data member - acmod/lfe/sample rate, the ballistics
-    // config, the level/summary vectors, all of it - lives behind this one
-    // pimpl, following the same pattern as iclforge::ac3::io::WavStreamReader/Writer
-    // and iclforge::ac3::FrameEncoder. Impl is defined in levels.cpp.
+    // Every private data member - the sample rate, the ballistics config, the
+    // level/summary vectors, all of it - lives behind this one pimpl,
+    // following the same pattern as iclforge::base::WavStreamReader/Writer.
+    // Impl is defined in levels.cpp.
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
@@ -169,10 +137,12 @@ struct SoundfieldVector {
     double level_db = kFloorDb;  // combined RMS of the directional channels
 };
 
-// Computed from the integrated RMS of the full-bandwidth channels only: the
-// LFE has no direction to contribute, and a subwoofer's level would otherwise
-// swamp the sum.
-[[nodiscard]] ICLFORGE_AC3_EXPORT SoundfieldVector energy_vector(std::span<const ChannelLevel> levels,
-                                                             Acmod acmod);
+// Computed from the integrated RMS of the channels `azimuths_deg` gives a
+// direction (degrees counterclockwise from front), one entry per channel of
+// `levels`. An empty entry - an LFE, or a channel with no position - and any
+// channel past the end of `azimuths_deg` contributes nothing: the LFE has no
+// direction, and a subwoofer's level would otherwise swamp the sum.
+[[nodiscard]] ICLFORGE_BASE_EXPORT SoundfieldVector energy_vector(
+    std::span<const ChannelLevel> levels, std::span<const std::optional<double>> azimuths_deg);
 
-}  // namespace iclforge::ac3::analysis
+}  // namespace iclforge::base

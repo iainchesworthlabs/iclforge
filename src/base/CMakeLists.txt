@@ -259,6 +259,8 @@ add_custom_target(iclforge_version ALL
 iclforge_add_library(base
     SOURCES
         src/cpu_features.cpp
+        src/levels.cpp
+        src/loudness.cpp
         src/version.cpp
         src/wav.cpp
         src/wav_format.cpp

@@ -1,7 +1,6 @@
-#include "iclforge/ac3/analysis/levels.hpp"
+#include "iclforge/base/levels.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -9,62 +8,13 @@
 #include <numbers>
 #include <optional>
 #include <span>
-#include <string_view>
 #include <vector>
 
-#include "iclforge/ac3/core/tables.hpp"
-#include "iclforge/render/spatial.hpp"
-
-namespace iclforge::ac3::analysis {
+namespace iclforge::base {
 
 namespace {
 
 constexpr double kDegToRad = std::numbers::pi / 180.0;
-
-// A/52 Table 5.8, "Channel Array Ordering", one row per acmod. Dual mono is
-// two independent programs, so the spec names its channels Ch1/Ch2 rather
-// than giving them positions.
-constexpr std::array<std::array<std::string_view, 5>, 8> kChannelNames = {{
-    {"Ch1", "Ch2"},                  // 0: 1+1
-    {"C"},                           // 1: 1/0
-    {"L", "R"},                      // 2: 2/0
-    {"L", "C", "R"},                 // 3: 3/0
-    {"L", "R", "S"},                 // 4: 2/1
-    {"L", "C", "R", "S"},            // 5: 3/1
-    {"L", "R", "SL", "SR"},          // 6: 2/2
-    {"L", "C", "R", "SL", "SR"},     // 7: 3/2
-}};
-
-// The directions the spec's channel names imply, on the ITU-R BS.775 ring the
-// spatial renderer already pans over. A mono surround sits behind the
-// listener; the 3/2 entries come straight from the renderer's geometry so the
-// two can never drift apart.
-constexpr double kSurroundAzimuth = 180.0;
-
-[[nodiscard]] constexpr std::optional<double> ring_azimuth(Acmod acmod, int index) {
-    using iclforge::spatial::kSpeakerAzimuthDeg;
-    constexpr std::size_t kL = 0, kC = 1, kR = 2, kSL = 3, kSR = 4;
-    const auto at = static_cast<std::size_t>(index);
-    switch (acmod) {
-        case Acmod::kDualMono: return std::nullopt;
-        case Acmod::k1_0: return kSpeakerAzimuthDeg[kC];
-        case Acmod::k2_0:
-            return at == 0 ? kSpeakerAzimuthDeg[kL] : kSpeakerAzimuthDeg[kR];
-        case Acmod::k3_0:
-            return kSpeakerAzimuthDeg[at == 0 ? kL : (at == 1 ? kC : kR)];
-        case Acmod::k2_1:
-            return at == 2 ? kSurroundAzimuth
-                           : kSpeakerAzimuthDeg[at == 0 ? kL : kR];
-        case Acmod::k3_1:
-            return at == 3 ? kSurroundAzimuth
-                           : kSpeakerAzimuthDeg[at == 0 ? kL : (at == 1 ? kC : kR)];
-        case Acmod::k2_2:
-            return kSpeakerAzimuthDeg[at == 0 ? kL : (at == 1 ? kR : (at == 2 ? kSL : kSR))];
-        case Acmod::k3_2:
-            return kSpeakerAzimuthDeg[at];
-    }
-    return std::nullopt;
-}
 
 }  // namespace
 
@@ -76,41 +26,6 @@ double to_dbfs(double linear) {
     return std::max(kFloorDb, 20.0 * std::log10(magnitude));
 }
 
-std::string_view channel_name(Acmod acmod, bool lfe, int index) {
-    const int fullbw = fullbw_channel_count(acmod);
-    if (index < 0 || index >= channel_count(acmod, lfe)) {
-        return {};
-    }
-    if (index == fullbw) {
-        return "LFE";
-    }
-    return kChannelNames[static_cast<std::size_t>(acmod)][static_cast<std::size_t>(index)];
-}
-
-std::string_view layout_name(Acmod acmod, bool lfe) {
-    // Two static tables rather than a runtime concatenation: the caller gets
-    // a view it can hold, and there are only sixteen possible answers.
-    constexpr std::array<std::string_view, 8> kPlain = {
-        "1+1 dual mono", "1/0 mono", "2/0 stereo", "3/0", "2/1", "3/1", "2/2", "3/2",
-    };
-    constexpr std::array<std::string_view, 8> kWithLfe = {
-        "1+1 dual mono + LFE", "1/0 mono + LFE", "2/0 stereo + LFE", "3/0 + LFE",
-        "2/1 + LFE",           "3/1 + LFE",      "2/2 + LFE",        "3/2 + LFE",
-    };
-    const auto at = static_cast<std::size_t>(acmod);
-    return lfe ? kWithLfe[at] : kPlain[at];
-}
-
-std::optional<double> channel_azimuth_deg(Acmod acmod, bool lfe, int index) {
-    if (index < 0 || index >= channel_count(acmod, lfe)) {
-        return std::nullopt;
-    }
-    if (index >= fullbw_channel_count(acmod)) {
-        return std::nullopt;  // the LFE is non-directional by design
-    }
-    return ring_azimuth(acmod, index);
-}
-
 double ChannelSummary::rms() const {
     return samples == 0 ? 0.0 : std::sqrt(sum_squares / static_cast<double>(samples));
 }
@@ -120,10 +35,8 @@ double ChannelSummary::peak_db() const { return to_dbfs(peak); }
 double ChannelSummary::rms_db() const { return to_dbfs(rms()); }
 
 // Every private data member, following the same pimpl pattern as
-// iclforge::ac3::io::WavStreamReader/Writer and iclforge::ac3::FrameEncoder.
+// iclforge::base::WavStreamReader/Writer.
 struct LevelMeter::Impl {
-    Acmod acmod_;
-    bool lfe_;
     std::uint32_t sample_rate_;
     MeterBallistics ballistics_;
     std::vector<ChannelLevel> levels_;
@@ -138,24 +51,14 @@ LevelMeter& LevelMeter::operator=(LevelMeter&&) noexcept = default;
 
 std::span<const ChannelLevel> LevelMeter::levels() const { return impl_->levels_; }
 std::span<const ChannelSummary> LevelMeter::summary() const { return impl_->summary_; }
-Acmod LevelMeter::acmod() const { return impl_->acmod_; }
-bool LevelMeter::lfe() const { return impl_->lfe_; }
 int LevelMeter::channel_count() const { return static_cast<int>(impl_->levels_.size()); }
 std::uint32_t LevelMeter::sample_rate() const { return impl_->sample_rate_; }
 
-LevelMeter::LevelMeter(Acmod acmod, bool lfe, std::uint32_t sample_rate,
-                       const MeterBallistics& ballistics)
-    : LevelMeter(acmod, lfe, sample_rate, analysis::channel_count(acmod, lfe), ballistics) {}
-
-LevelMeter::LevelMeter(Acmod acmod, bool lfe, std::uint32_t sample_rate, int channels,
-                       const MeterBallistics& ballistics)
+LevelMeter::LevelMeter(int channels, std::uint32_t sample_rate, const MeterBallistics& ballistics)
     : impl_(std::make_unique<Impl>(Impl{
-          .acmod_ = acmod,
-          .lfe_ = lfe,
           .sample_rate_ = sample_rate == 0 ? 48000u : sample_rate,
           .ballistics_ = ballistics,
-          .levels_ = std::vector<ChannelLevel>(static_cast<std::size_t>(
-              std::max(channels, analysis::channel_count(acmod, lfe)))),
+          .levels_ = std::vector<ChannelLevel>(static_cast<std::size_t>(std::max(channels, 0))),
           .summary_ = {},
           .mean_square_ = {},
           .hold_elapsed_ = {},
@@ -164,6 +67,10 @@ LevelMeter::LevelMeter(Acmod acmod, bool lfe, std::uint32_t sample_rate, int cha
     impl_->mean_square_.assign(impl_->levels_.size(), 0.0);
     impl_->hold_elapsed_.assign(impl_->levels_.size(), 0.0);
 }
+
+LevelMeter::LevelMeter(std::span<const Speaker> speakers, std::uint32_t sample_rate,
+                       const MeterBallistics& ballistics)
+    : LevelMeter(static_cast<int>(speakers.size()), sample_rate, ballistics) {}
 
 void LevelMeter::reset() {
     std::ranges::fill(impl_->levels_, ChannelLevel{});
@@ -271,15 +178,15 @@ void LevelMeter::process_interleaved(std::span<const float> samples, std::size_t
     }
 }
 
-SoundfieldVector energy_vector(std::span<const ChannelLevel> levels, Acmod acmod) {
+SoundfieldVector energy_vector(std::span<const ChannelLevel> levels,
+                               std::span<const std::optional<double>> azimuths_deg) {
     SoundfieldVector result;
-    const auto fullbw = static_cast<std::size_t>(fullbw_channel_count(acmod));
 
     double x = 0.0;
     double y = 0.0;
     double total = 0.0;
-    for (std::size_t ch = 0; ch < fullbw && ch < levels.size(); ++ch) {
-        const auto azimuth = ring_azimuth(acmod, static_cast<int>(ch));
+    for (std::size_t ch = 0; ch < azimuths_deg.size() && ch < levels.size(); ++ch) {
+        const auto& azimuth = azimuths_deg[ch];
         // A channel resting on the floor contributes nothing: counting it
         // would let the floor's own symmetry invent an image, and a silent
         // bed would report a phantom centre.
@@ -308,4 +215,4 @@ SoundfieldVector energy_vector(std::span<const ChannelLevel> levels, Acmod acmod
     return result;
 }
 
-}  // namespace iclforge::ac3::analysis
+}  // namespace iclforge::base

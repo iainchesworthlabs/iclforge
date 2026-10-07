@@ -1,19 +1,19 @@
-#include "iclforge/ac3/meta/loudness.hpp"
+#include "iclforge/base/loudness.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <numbers>
-#include <numeric>
-#include "iclforge/ac3/core/eac3_tables.hpp"
-#include "iclforge/ac3/core/tables.hpp"
 #include <optional>
 #include <span>
 #include <vector>
 
-namespace iclforge::ac3::meta {
+#include "iclforge/base/speaker.hpp"
+
+namespace iclforge::base {
 
 namespace {
 
@@ -33,7 +33,7 @@ constexpr double kHighpassHz = 38.13547087602444;
 constexpr double kHighpassQ = 0.5003270373238773;
 
 // 400 ms windows advanced by 100 ms, i.e. 75% overlap (BS.1770 §5). Every
-// legal AC-3 rate divides by ten exactly, so a step is a whole number of
+// rate in practical use divides by ten exactly, so a step is a whole number of
 // samples and the windows never drift.
 constexpr int kStepsPerBlock = 4;
 constexpr double kBlockOffsetDb = -0.691;  // BS.1770's -0.691 term
@@ -58,13 +58,6 @@ constexpr int kShortTermSteps = 30;
 constexpr double kLraRelativeGateLu = -20.0;
 constexpr double kLraLowPercentile = 10.0;
 constexpr double kLraHighPercentile = 95.0;
-
-// The one non-unity weight either algorithm uses, and the same number in
-// both: Annex 1's Table 3 gives it to Ls and Rs by name, and Annex 3's
-// Table 4 gives it to whatever sits at 60..120 degrees azimuth below
-// 30 degrees elevation - which is where Ls and Rs are. The LFE participates
-// in neither.
-constexpr double kSurroundWeight = 1.41;
 
 // ITU-R BS.1770-4 Annex 2 ("Guidelines for accurate measurement of
 // 'true-peak' level"): a minimum 4x-oversampling true-peak estimator, built
@@ -113,80 +106,56 @@ constexpr std::array<std::array<double, kTruePeakTaps>, kTruePeakPhases> kTruePe
 
 }  // namespace
 
-std::optional<double> position_weight(eac3::chanmap::Location location) {
-    using Location = eac3::chanmap::Location;
-    switch (location) {
-        // Annex 3 weights "each channel except the LFE channels", so an
-        // LFE-type location is not a term in the sum at all.
-        case Location::kLfe:
-        case Location::kLfe2:
+std::optional<double> position_weight(Speaker speaker) {
+    switch (speaker) {
+        // Annex 3 weights "each channel except the LFE channels", so an LFE
+        // is not a term in the sum at all.
+        case Speaker::kLfe:
+        case Speaker::kLfe2:
             return std::nullopt;
 
         // Table 4's one non-unity cell: 60 <= |theta| <= 120 at |phi| < 30.
-        // Table 5 confirms all three pairs at 1.41 - M±110 (Ls/Rs, the 5.1
-        // surrounds Annex 1's own Table 3 already weighted 1.41, which is why
-        // a 5.1 layout measures the same through either algorithm), M±090
-        // (Lsd/Rsd, the direct-radiating side surrounds a 7.1 layout uses)
-        // and M±060 (Lw/Rw, the wides).
-        //
-        // Ls/Rs and Lsd/Rsd are robust to the exact angle assumed: anywhere
-        // from 90 to 110 degrees is inside the sector. Lw/Rw sit right on its
-        // 60-degree edge, which Table 4 includes ("60 <= |theta|") and Table
-        // 5's M±060 row then states outright at 1.41.
-        case Location::kLeftSurround:
-        case Location::kRightSurround:
-        case Location::kLsd:
-        case Location::kRsd:
-        case Location::kLw:
-        case Location::kRw:
+        // Ls/Rs are the side surrounds of the 7.X modes (M±090..110), robust
+        // to the exact angle assumed; Lw/Rw (M±060) sit on the sector's edge,
+        // which Table 4 includes and Table 5's M±060 row states at 1.41.
+        case Speaker::kLeftSurround:
+        case Speaker::kRightSurround:
+        case Speaker::kLeftWide:
+        case Speaker::kRightWide:
             return kSurroundWeight;
 
-        // Everything else is unity. That is three different cells of Table 4,
-        // listed together because the answer is the same and a switch with
-        // three identical branches is worse to read than one:
-        //
-        //   |theta| < 60 (first column)      - M+000 (C), M±030 (L/R) and
-        //                                      M±SC (Lc/Rc, the "screen" pair
-        //                                      inboard of L/R).
-        //   120 < |theta| <= 180 (third)     - M±135 (Lrs/Rrs, the 7.1 rear
-        //                                      pair) and M+180 (Cs). So
-        //                                      widening 5.1 to 7.1 adds two
-        //                                      channels that are NOT
-        //                                      surround-weighted, whatever
-        //                                      their names suggest.
-        //   |phi| >= 30 (the "else" row)     - every upper-layer and top
-        //                                      position, whatever its azimuth:
-        //                                      U+000/U±030/U±045/U±090/U±110/
-        //                                      U±135/U+180 and T+000 are all
-        //                                      1.00 in Table 5, so no height
-        //                                      channel is ever
-        //                                      surround-weighted. Robust to
-        //                                      the exact elevation assumed,
-        //                                      since any plausible height
-        //                                      angle is at or above 30
-        //                                      degrees and the row spans the
-        //                                      whole azimuth circle.
-        case Location::kLeft:
-        case Location::kCentre:
-        case Location::kRight:
-        case Location::kLc:
-        case Location::kRc:
-        case Location::kLrs:
-        case Location::kRrs:
-        case Location::kCs:
-        case Location::kVhl:
-        case Location::kVhr:
-        case Location::kVhc:
-        case Location::kLts:
-        case Location::kRts:
-        case Location::kTs:
+        // Everything else is unity: the fronts and the screen pair inboard of
+        // them (|theta| < 60); the backs (M±135..150) and the rear centre
+        // (M+180), past 120 degrees, so widening 5.1 to 7.1 adds two channels
+        // that are NOT surround-weighted, whatever their names suggest; and
+        // every top and bottom speaker, at |phi| >= 30 - all 1.00 in Table 5.
+        case Speaker::kLeft:
+        case Speaker::kRight:
+        case Speaker::kCentre:
+        case Speaker::kLeftBack:
+        case Speaker::kRightBack:
+        case Speaker::kTopFrontLeft:
+        case Speaker::kTopFrontRight:
+        case Speaker::kTopBackLeft:
+        case Speaker::kTopBackRight:
+        case Speaker::kTopSideLeft:
+        case Speaker::kTopSideRight:
+        case Speaker::kLeftScreen:
+        case Speaker::kRightScreen:
+        case Speaker::kTopFrontCentre:
+        case Speaker::kTopBackCentre:
+        case Speaker::kTopCentre:
+        case Speaker::kBottomFrontLeft:
+        case Speaker::kBottomFrontRight:
+        case Speaker::kBottomFrontCentre:
+        case Speaker::kCentreBack:
             return 1.0;
     }
     return std::nullopt;
 }
 
 // Every private data member, following the same pimpl pattern as
-// iclforge::ac3::io::WavStreamReader/Writer and iclforge::ac3::FrameEncoder.
+// iclforge::base::WavStreamReader/Writer.
 struct LoudnessMeter::Impl {
     // BS.1770 K-weighting: a high-shelf pre-filter then the RLB high-pass,
     // both biquads, both per channel with their own state.
@@ -259,10 +228,42 @@ LoudnessMeter& LoudnessMeter::operator=(LoudnessMeter&&) noexcept = default;
 
 int LoudnessMeter::channel_count() const { return impl_->channels_; }
 
-void LoudnessMeter::init(SampleRate rate, int channels, std::span<const int> loudness_slots,
-                         std::span<const double> weights) {
-    const auto fs = static_cast<double>(sample_rate_hz(rate));
-    impl_->step_samples_ = static_cast<int>(sample_rate_hz(rate) / 10);
+namespace {
+
+[[nodiscard]] std::vector<std::optional<double>> speaker_weights(std::span<const Speaker> speakers) {
+    std::vector<std::optional<double>> weights;
+    weights.reserve(speakers.size());
+    for (const Speaker speaker : speakers) {
+        weights.push_back(position_weight(speaker));
+    }
+    return weights;
+}
+
+}  // namespace
+
+LoudnessMeter::LoudnessMeter(std::uint32_t sample_rate, std::span<const Speaker> speakers)
+    : LoudnessMeter(sample_rate, speaker_weights(speakers)) {}
+
+LoudnessMeter::LoudnessMeter(std::uint32_t sample_rate,
+                             std::span<const std::optional<double>> channel_weights)
+    : impl_(std::make_unique<Impl>()) {
+    // A channel without a weight (an LFE) is not a term in the sum at all - it
+    // simply never joins either array, while still counting towards channels_
+    // so true peak keeps reading it.
+    std::vector<int> loudness_slots;
+    std::vector<double> weights;
+    loudness_slots.reserve(channel_weights.size());
+    weights.reserve(channel_weights.size());
+    for (std::size_t slot = 0; slot < channel_weights.size(); ++slot) {
+        if (channel_weights[slot].has_value()) {
+            loudness_slots.push_back(static_cast<int>(slot));
+            weights.push_back(*channel_weights[slot]);
+        }
+    }
+    const int channels = static_cast<int>(channel_weights.size());
+
+    const auto fs = static_cast<double>(sample_rate);
+    impl_->step_samples_ = static_cast<int>(sample_rate / 10);
 
     {
         const double k = std::tan(std::numbers::pi * kShelfHz / fs);
@@ -298,63 +299,6 @@ void LoudnessMeter::init(SampleRate rate, int channels, std::span<const int> lou
     impl_->short_term_recent_.assign(count, std::array<double, 30>{});
     impl_->true_peak_history_.assign(static_cast<std::size_t>(impl_->channels_),
                                      std::array<double, 12>{});
-}
-
-LoudnessMeter::LoudnessMeter(SampleRate rate, Acmod acmod, bool lfe)
-    : impl_(std::make_unique<Impl>()) {
-    const int fullbw = fullbw_channel_count(acmod);
-    // Table 5.8 codes the full-bandwidth channels first and the LFE last, so
-    // the loudness terms are simply slots 0..fullbw-1.
-    std::vector<int> slots(static_cast<std::size_t>(fullbw));
-    std::iota(slots.begin(), slots.end(), 0);
-
-    std::vector<double> weights(static_cast<std::size_t>(fullbw), 1.0);
-    // Which coded positions are surrounds depends on acmod (Table 5.8): 2/1
-    // and 3/1 end with a single S, 2/2 and 3/2 end with Ls and Rs, and no
-    // other mode has any. In every case they are the LAST coded channels, so
-    // the count is the only thing that varies.
-    const std::size_t surrounds = [acmod]() -> std::size_t {
-        switch (acmod) {
-            case Acmod::k2_1:
-            case Acmod::k3_1:
-                return 1;
-            case Acmod::k2_2:
-            case Acmod::k3_2:
-                return 2;
-            default:
-                return 0;
-        }
-    }();
-    // Clamped rather than subtracted outright. Table 5.8 guarantees a mode is
-    // at least as wide as its own surround count - 2/1 codes three channels,
-    // 3/2 five - but at -O3 GCC cannot see through fullbw_channel_count() to
-    // prove `weights` is even non-empty, and -Werror=null-dereference fires
-    // on the indexing if it cannot. std::min costs nothing and makes the
-    // bound something the compiler can check rather than something it has to
-    // take on trust.
-    for (std::size_t i = weights.size() - std::min(surrounds, weights.size());
-         i < weights.size(); ++i) {
-        weights[i] = kSurroundWeight;
-    }
-    init(rate, fullbw + (lfe ? 1 : 0), slots, weights);
-}
-
-LoudnessMeter::LoudnessMeter(SampleRate rate, const eac3::chanmap::Layout& layout)
-    : impl_(std::make_unique<Impl>()) {
-    std::vector<int> slots;
-    std::vector<double> weights;
-    slots.reserve(static_cast<std::size_t>(layout.count));
-    weights.reserve(static_cast<std::size_t>(layout.count));
-    for (int slot = 0; slot < layout.count; ++slot) {
-        // std::nullopt is an LFE-type location, which is not a term in the
-        // sum at all - it simply never joins either array, while still
-        // counting towards channels_ so true peak keeps reading it.
-        if (const auto weight = position_weight(layout[slot]); weight.has_value()) {
-            slots.push_back(slot);
-            weights.push_back(*weight);
-        }
-    }
-    init(rate, layout.count, slots, weights);
 }
 
 void LoudnessMeter::push(std::span<const std::span<const float>> channels) {
@@ -614,9 +558,4 @@ std::optional<double> LoudnessMeter::integrated_lkfs() const {
            10.0 * std::log10(gated_sum / static_cast<double>(gated_count));
 }
 
-int dialnorm_from_lkfs(double lkfs) {
-    const auto value = static_cast<int>(std::lround(-lkfs));
-    return std::clamp(value, 1, 31);
-}
-
-}  // namespace iclforge::ac3::meta
+}  // namespace iclforge::base

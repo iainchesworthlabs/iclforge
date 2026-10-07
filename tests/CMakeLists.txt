@@ -87,6 +87,7 @@ add_executable(iclforge-tests
     base/test_bit_io.cpp
     base/test_bitwriter.cpp
     base/test_crc16.cpp
+    base/test_meters.cpp
     ac3/meta/test_bsi.cpp
     ac3/encoder/test_bit_reservoir.cpp
     ac3/encoder/test_coupling.cpp
