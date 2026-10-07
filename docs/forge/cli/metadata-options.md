@@ -1306,10 +1306,10 @@ Optional positional arguments, when omitted:
   `fastmdct` tool token — the opt-in spellings from when this defaulted off — still parse and now
   name what already happens.
 - **`fast-imdct=off`**: the decode-side mirror. `decode` runs §7.9.4 step 3 — the inverse
-  transform's one O(N²) part — through an FFT by default. The kernel
-  (`src/dsp/include/iclforge/dsp/detail/fft_kernel.hpp`) is radix-4 throughout, ending on a single radix-2 stage
-  only where log2(P) is odd — P = 128 and P = 512, not P = 64. The quality evidence that made it
-  the default: 7.8e-14 max peak-normalized relative error against the direct evaluation at the
+  transform's one O(N²) part — through an FFT by default. The FFT
+  (`src/dsp/include/iclforge/dsp/detail/fft_stockham.hpp`, the family's one) is radix-4 throughout, ending on a
+  single radix-2 pass only where log2(P) is odd — P = 128 and P = 512, not P = 64. The quality
+  evidence that made the fast path the default, measured on the radix-4/2 kernel it replaced: 7.8e-14 max peak-normalized relative error against the direct evaluation at the
   transform level, and over 180-second real-material decodes 214.9 dB SNR agreement for AC-3 /
   284.7 dB for E-AC-3, with decodes 4.5–4.7× faster. `fast-imdct=off` forces the pseudocode's
   own direct sum — the reference form, and the oracle the fast path's tests validate against.

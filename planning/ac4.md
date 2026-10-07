@@ -506,8 +506,9 @@ count comes out exact.
 
 **Transform lengths have factors of three and five.** At 48 kHz internal the inverse MDCT runs at
 fifteen lengths from 96 to 2,048 (Part 1 Tables 99 to 105). Ten of them are 96 · 2^k or 120 · 2^k,
-not powers of two. `ac3::forge`'s FFT kernel takes powers of two only
-(`src/dsp/include/iclforge/dsp/detail/fft_kernel.hpp`), and its public MDCT is fixed at 512 and 256 samples.
+not powers of two. `ac3::forge`'s FFT kernel took powers of two only (since
+planning/consolidation.md decision 20 AC-3 runs AC-4's transform, `src/dsp/include/iclforge/dsp/detail/fft_stockham.hpp`),
+and its public MDCT is fixed at 512 and 256 samples.
 
 **The QMF bank has a published window.** AC-4's filterbank has the structure of the one
 `ac3::forge` built for E-AC-3 JOC (`src/dsp/include/iclforge/dsp/qmf.hpp`): 64 complex subbands, a

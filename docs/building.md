@@ -1324,15 +1324,16 @@ carry the types, not a copy of each kernel:
 | §7.2.2.2 exponent to PSD | `src/ac3/src/core/bitalloc.cpp` | Four bins at a time. The only loop in the bit allocator that vectorises at all: §7.2.2.4's excitation function is a serial recurrence and §7.2.2.5's masking curve is a per-band conditional over 50 elements. SSE2/NEON only, same reason as `dft512` above. |
 | `to_fixed25_block` | `src/ac3/src/core/exponents.cpp` | Batched form of `to_fixed25`, about 9,100 calls a frame. SSE2/NEON only, same reason as `dft512` above. |
 
-**The FFT/DCT-IV core itself is not part of this seam.** `src/dsp/include/iclforge/dsp/detail/fft_kernel.hpp`
- is a radix-4 decimation-in-time kernel with a trailing radix-2 stage where
-`log2(P)` is odd, trivial-twiddle elimination on its first stage, and the digit-reversal
-permutation folded into each caller's own input-producing loop rather than run as a pass of its
-own. That is an *algorithmic* speedup — fewer operations, not wider lanes — and it carries its
-own correctness argument in that header's comment, independent of the seam described here. The
-kernels this seam does vectorise sit around it: they gather from and scatter to its
-digit-reversed layout rather than to sequential slots, which is why their gather/scatter ends
-stay scalar even though the arithmetic between them is two-wide.
+**The FFT itself is not part of this seam.** `src/dsp/include/iclforge/dsp/detail/fft_stockham.hpp`
+is the family's one FFT (planning/consolidation.md decision 20): the Stockham autosort passes
+AC-4's plan runs at every length, which AC-3's transforms run at 64, 128 and 512 points with radix
+4 and a trailing radix-2 pass where `log2(P)` is odd, every unit factor's product left out. Its
+input and output are in natural order, so no permutation pass is needed at either end. That is an
+*algorithmic* choice — fewer operations, not wider lanes — and it carries its own correctness
+argument in that header's comment, independent of the seam described here. The kernels this seam
+does vectorise sit around it: they gather from and scatter to stride-2 walks of the coefficients
+rather than to sequential slots, which is why their gather/scatter ends stay scalar even though
+the arithmetic between them is two-wide.
 
 **What is not, and why.** The direct-form (`mode=reference`) MDCT and IMDCT are dot products, and
 splitting a reduction into per-lane partial sums reassociates the additions — which changes the
