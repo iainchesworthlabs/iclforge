@@ -7,7 +7,7 @@
 // only by src/dsp/src/tiered/transform_tables.cpp, which narrows them to the tier's
 // scalar while it compiles.
 
-namespace iclforge::ac4::detail::tables {
+namespace iclforge::dsp::tiered::tables {
 
 inline constexpr std::array<double, 2728> kFftRoots2048 = {
     0x1.0000000000000p+0, -0x0.0p+0, 0x1.0000000000000p+0, -0x0.0p+0, 0x1.0000000000000p+0,
@@ -3351,4 +3351,4 @@ inline constexpr std::array<double, 128> kKbdLeft128 = {
     0x1.fffffd7480131p-1, 0x1.ffffff1b60d6dp-1, 0x1.ffffffc3830c4p-1, 0x1.fffffff7c3111p-1,
 };
 
-}  // namespace iclforge::ac4::detail::tables
+}  // namespace iclforge::dsp::tiered::tables

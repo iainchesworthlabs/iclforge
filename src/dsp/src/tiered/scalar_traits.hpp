@@ -27,7 +27,7 @@
 // a range no absolute format holds; a value the double decoder states in its own units enters
 // this tier's through qmf_energy(), which moves its exponent.
 
-namespace iclforge::ac4::detail::dsp {
+namespace iclforge::dsp::tiered {
 
 using iclforge::internal::Fixed32;
 using iclforge::internal::MantExp;
@@ -142,4 +142,4 @@ template <typename Real>
     }
 }
 
-}  // namespace iclforge::ac4::detail::dsp
+}  // namespace iclforge::dsp::tiered

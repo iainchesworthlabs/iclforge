@@ -22,7 +22,7 @@ namespace ac4_decoder_test {
 namespace {
 
 namespace tables = iclforge::ac4::detail::tables;
-namespace dsp = iclforge::ac4::detail::dsp;
+namespace dsp = iclforge::dsp::tiered;
 using iclforge::ac4::detail::Codebook;
 
 // Table 83's frame_len_base by frame_rate_index.

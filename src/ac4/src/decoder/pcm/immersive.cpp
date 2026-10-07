@@ -134,8 +134,8 @@ BandGains immersive_gains(int codec_mode, DecodingMode decoding, bool fronts,
 }
 
 void apply_band_gains(std::span<QmfValue> matrix, int num_ts, int sbx, BandGains gains) noexcept {
-    constexpr auto kSubbands = static_cast<std::size_t>(dsp::kQmfSubbands);
-    const auto split = static_cast<std::size_t>(std::clamp(sbx, 0, dsp::kQmfSubbands));
+    constexpr auto kSubbands = static_cast<std::size_t>(dsp::tiered::kQmfSubbands);
+    const auto split = static_cast<std::size_t>(std::clamp(sbx, 0, dsp::tiered::kQmfSubbands));
     const std::size_t slots =
         std::min(static_cast<std::size_t>(std::max(num_ts, 0)), matrix.size() / kSubbands);
     // BandGains stays double: two values set once per element per frame, not

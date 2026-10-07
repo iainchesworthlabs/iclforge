@@ -389,7 +389,7 @@ AcplConfig2chFields AcplEncoder::config_2ch() const noexcept {
     return {.num_param_bands_id = num_param_bands_id_, .quant_mode_0 = quant_mode_, .quant_mode_1 = quant_mode_};
 }
 
-void AcplEncoder::push_slot(std::span<const std::array<double, dsp::kQmfSubbands>> samples) {
+void AcplEncoder::push_slot(std::span<const std::array<double, dsp::tiered::kQmfSubbands>> samples) {
     std::vector<Slot>& analysed = slots_.emplace_back(analyses_.size());
     for (std::size_t c = 0; c < analyses_.size() && c < samples.size(); ++c) {
         analyses_[c].process(samples[c], analysed[c]);
@@ -418,7 +418,7 @@ std::vector<AcplEncoder::Spectrum> AcplEncoder::spectra(long long first) const {
             for (std::size_t k = 0; k < at(kWindowSlots); ++k) {
                 std::complex<double> sum{};
                 for (std::size_t t = 0; t < at(kWindowSlots); ++t) {
-                    const dsp::Complex<double> s = slot(c, from + static_cast<long long>(t))[sb];
+                    const dsp::tiered::Complex<double> s = slot(c, from + static_cast<long long>(t))[sb];
                     sum += weights[k][t] * std::complex<double>(s.real(), s.imag());
                 }
                 out[c][sb][k] = sum;

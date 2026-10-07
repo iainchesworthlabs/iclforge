@@ -78,7 +78,7 @@ std::array<double, 64> k_weights(double rate_hz) {
 
 double qmf_energy_gain() noexcept {
     double gain = 0.0;
-    for (const float w : tables::kQwin) {
+    for (const float w : iclforge::dsp::tiered::tables::kQwin) {
         gain += static_cast<double>(w) * static_cast<double>(w);
     }
     return gain;

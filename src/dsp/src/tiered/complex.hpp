@@ -40,7 +40,7 @@
 // handling (C99 Annex G's proviso for multiplication), which never matters
 // for one.
 
-namespace iclforge::ac4::detail::dsp {
+namespace iclforge::dsp::tiered {
 
 template <typename Real>
 struct Complex {
@@ -139,4 +139,4 @@ template <typename Real>
     }
 }
 
-}  // namespace iclforge::ac4::detail::dsp
+}  // namespace iclforge::dsp::tiered

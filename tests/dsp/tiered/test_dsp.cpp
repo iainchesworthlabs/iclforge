@@ -24,7 +24,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "iclforge/ac4/detail/real.hpp"
+#include "iclforge/dsp/tiered/real.hpp"
 #include "tiered/complex.hpp"
 #include "tiered/fft.hpp"
 #include "tiered/kbd.hpp"
@@ -39,7 +39,7 @@
 
 namespace {
 
-namespace dsp = iclforge::ac4::detail::dsp;
+namespace dsp = iclforge::dsp::tiered;
 // the AC-4 core's own complex type (dsp/complex.hpp), not std::complex: every
 // function under test takes this type since D14a (planning/ac4.md).
 using Complex = dsp::Complex<double>;
@@ -566,7 +566,7 @@ std::vector<Complex> qmf_analysis_as_printed(std::span<const double> pcm) {
         }
         std::array<double, 640> z{};
         for (std::size_t n = 0; n < 640; ++n) {
-            z[n] = qmf_filt[n] * static_cast<double>(iclforge::ac4::detail::tables::kQwin[n]);
+            z[n] = qmf_filt[n] * static_cast<double>(iclforge::dsp::tiered::tables::kQwin[n]);
         }
         std::array<double, 128> u{};
         for (std::size_t n = 0; n < 128; ++n) {
@@ -614,7 +614,7 @@ std::vector<double> qmf_synthesis_as_printed(std::span<const Complex> q) {
         }
         std::array<double, 640> w{};
         for (std::size_t n = 0; n < 640; ++n) {
-            w[n] = g[n] * static_cast<double>(iclforge::ac4::detail::tables::kQwin[n]);
+            w[n] = g[n] * static_cast<double>(iclforge::dsp::tiered::tables::kQwin[n]);
         }
         for (std::size_t sb = 0; sb < 64; ++sb) {
             double temp = w[sb];
@@ -1082,7 +1082,7 @@ TEST_CASE("the QMF banks give the bits of the scalar kernels run one after anoth
         CHECK(std::memcmp(got_pcm.data(), expected_pcm.data(), got_pcm.size() * sizeof(R)) == 0);
     };
     // The banks are instantiated at the decoder's scalar and at double, whichever
-    // that is (ICLFORGE_AC4_ALSO_AT_DOUBLE), and at nothing else. At Fixed32 the banks
+    // that is (ICLFORGE_DSP_ALSO_AT_DOUBLE), and at nothing else. At Fixed32 the banks
     // have kernels of their own, with a block exponent per slot (dsp/qmf_fixed.hpp),
     // which the test above holds to the banks at double.
     run(double{}, 8100);

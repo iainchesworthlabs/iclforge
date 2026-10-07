@@ -16,7 +16,7 @@
 // only inside each template's own definition) so that a future phase can
 // still instantiate them at iclforge::internal::Fixed32 too. `Real` here is the
 // unqualified name every explicit-instantiation line outside those templates
-// resolves through ordinary enclosing-namespace lookup: iclforge::ac4::detail::dsp,
+// resolves through ordinary enclosing-namespace lookup: iclforge::dsp::tiered,
 // iclforge::ac4::detail::aspx, iclforge::ac4::detail::acpl, iclforge::ac4::detail::ajcc and
 // iclforge::ac4::detail::ajoc all nest inside iclforge::ac4::detail, where this alias lives.
 //

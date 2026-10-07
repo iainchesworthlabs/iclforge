@@ -40,7 +40,7 @@
 // The values go into the delay line shifted by the slot's exponent, less the 1/128, at the time
 // domain's scale; the window's ten products per output are summed in 64 bits and rounded once.
 
-namespace iclforge::ac4::detail::dsp::qmf::fixed {
+namespace iclforge::dsp::tiered::qmf::fixed {
 
 using iclforge::internal::Fixed32;
 
@@ -88,7 +88,7 @@ template <typename T, std::size_t N>
 // subband values.
 inline void analysis_slot(const Fixed32* filt, std::size_t head, Complex<Fixed32>* out,
                           QmfScratch<Fixed32>& scratch) noexcept {
-    const auto& qwin = tables::kQwinQ30;
+    const auto& qwin = iclforge::dsp::tiered::tables::kQwinQ30;
     std::array<const Fixed32*, 10> block{};
     for (std::size_t b = 0; b < 10; ++b) {
         block[b] = filt + physical(head, b) * 64;
@@ -203,7 +203,7 @@ inline void synthesis_slot(const Complex<Fixed32>* in, Fixed32* filt, std::size_
             block_out[2 * m + 1] = (mul(fr, c.rot_im[m]) + mul(fi, c.rot_re[m])).scaled_by_pow2(back);
         }
     }
-    const auto& qwin = tables::kQwinQ30;
+    const auto& qwin = iclforge::dsp::tiered::tables::kQwinQ30;
     std::array<const Fixed32*, 10> block{};
     for (std::size_t b = 0; b < 10; ++b) {
         block[b] = filt + physical(head, b) * 128;
@@ -219,4 +219,4 @@ inline void synthesis_slot(const Complex<Fixed32>* in, Fixed32* filt, std::size_
     }
 }
 
-}  // namespace iclforge::ac4::detail::dsp::qmf::fixed
+}  // namespace iclforge::dsp::tiered::qmf::fixed

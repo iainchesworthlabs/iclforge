@@ -18,7 +18,7 @@
 // performs, in every lane, the operations this one performs, in the same order
 // and without fused multiply-add, so that the two give the same bits.
 
-namespace iclforge::ac4::detail::dsp::qmf {
+namespace iclforge::dsp::tiered::qmf {
 
 // Logical block `b` of a delay line of ten blocks, 0 the newest, sits at
 // physical block (head + b) mod 10.
@@ -32,7 +32,7 @@ namespace iclforge::ac4::detail::dsp::qmf {
 // block b at s).
 template <typename Real>
 inline void analysis_window(const Real* filt, std::size_t head, Real* u) noexcept {
-    const auto& qwin = tables::kQwin;
+    const auto& qwin = iclforge::dsp::tiered::tables::kQwin;
     std::array<const Real*, 10> block{};
     for (std::size_t b = 0; b < 10; ++b) {
         block[b] = filt + physical(head, b) * 64;
@@ -211,7 +211,7 @@ inline void synthesis_rotate(const Real* fr, const Real* fi, Real* block) noexce
 // ten groups of 64. The delay line's ten blocks are of 128 values each.
 template <typename Real>
 inline void synthesis_window(const Real* filt, std::size_t head, Real* out) noexcept {
-    const auto& qwin = tables::kQwin;
+    const auto& qwin = iclforge::dsp::tiered::tables::kQwin;
     std::array<const Real*, 10> block{};
     for (std::size_t b = 0; b < 10; ++b) {
         block[b] = filt + physical(head, b) * 128;
@@ -226,4 +226,4 @@ inline void synthesis_window(const Real* filt, std::size_t head, Real* out) noex
     }
 }
 
-}  // namespace iclforge::ac4::detail::dsp::qmf
+}  // namespace iclforge::dsp::tiered::qmf

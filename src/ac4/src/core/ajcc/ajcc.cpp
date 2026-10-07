@@ -186,8 +186,8 @@ Term module_term(std::size_t coefficient, std::size_t outputs) noexcept {
 }
 
 template <typename Real>
-void accumulate(std::span<const Real> weight, std::span<const dsp::Complex<Real>> in,
-                std::span<dsp::Complex<Real>> out, int num_ts) noexcept {
+void accumulate(std::span<const Real> weight, std::span<const dsp::tiered::Complex<Real>> in,
+                std::span<dsp::tiered::Complex<Real>> out, int num_ts) noexcept {
     const std::size_t n = at(std::max(num_ts, 0)) * at(kSubbands);
     if (weight.size() < n || in.size() < n || out.size() < n) {
         return;
@@ -237,8 +237,8 @@ void PreModification<Real>::process(int core_mode, int num_ts, std::span<const C
     }
 }
 
-template void accumulate<Real>(std::span<const Real>, std::span<const dsp::Complex<Real>>,
-                               std::span<dsp::Complex<Real>>, int) noexcept;
+template void accumulate<Real>(std::span<const Real>, std::span<const dsp::tiered::Complex<Real>>,
+                               std::span<dsp::tiered::Complex<Real>>, int) noexcept;
 template class PreModification<Real>;
 
 }  // namespace iclforge::ac4::detail::ajcc

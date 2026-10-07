@@ -47,7 +47,7 @@ namespace iclforge::ac4::detail {
 // call site that named `double` directly for a QMF-domain or spectral-domain
 // value now naming `Real`, not a cascading template parameter added to every
 // signature.
-using QmfValue = dsp::Complex<Real>;
+using QmfValue = dsp::tiered::Complex<Real>;
 
 // One channel's QMF-domain matrix as the stages after A-SPX take it, slot after slot of 64
 // subbands: a view, since a decoded channel's lives in the first slots of its Q_low_ext
@@ -126,7 +126,7 @@ struct AspxInterval {
 // them (SubstreamPcm makes one when its first A-SPX frame needs it). Each channel
 // takes them zeroed.
 struct AspxScratch {
-    using EnvelopeMatrix = std::array<std::array<dsp::Energy<Real>, 64>, kAspxMaxSignalEnvelopes>;
+    using EnvelopeMatrix = std::array<std::array<dsp::tiered::Energy<Real>, 64>, kAspxMaxSignalEnvelopes>;
     using FlagMatrix = std::array<std::array<bool, 64>, kAspxMaxSignalEnvelopes>;
     EnvelopeMatrix est_sig{};
     EnvelopeMatrix scf_sig{};

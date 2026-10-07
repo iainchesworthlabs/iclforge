@@ -146,13 +146,13 @@ void check_routing(const BuiltStream& stream, const Decoded& decoded) {
 
 // Mean energy of QMF subbands [first, last) over the steady frames.
 double band_energy(std::span<const float> samples, std::size_t first, std::size_t last) {
-    iclforge::ac4::detail::dsp::QmfAnalysis<double> analysis;
+    iclforge::dsp::tiered::QmfAnalysis<double> analysis;
     const std::size_t slots = samples.size() / 64;
     std::vector<double> pcm(slots * 64);
     for (std::size_t n = 0; n < pcm.size(); ++n) {
         pcm[n] = static_cast<double>(samples[n]);
     }
-    std::vector<iclforge::ac4::detail::dsp::Complex<double>> q(pcm.size());
+    std::vector<iclforge::dsp::tiered::Complex<double>> q(pcm.size());
     analysis.process(pcm, q);
     double sum = 0.0;
     for (std::size_t ts = 0; ts < slots; ++ts) {

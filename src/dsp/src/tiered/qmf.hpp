@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <span>
 
-#include "iclforge/ac4/detail/real.hpp"
+#include "iclforge/dsp/tiered/real.hpp"
 #include "tiered/complex.hpp"
 
 // The complex QMF analysis and synthesis banks of ETSI TS 103 190-1 V1.4.1
@@ -51,7 +51,7 @@
 //
 // A matrix of slots is laid out slot by slot: value [ts * 64 + sb].
 
-namespace iclforge::ac4::detail::dsp {
+namespace iclforge::dsp::tiered {
 
 inline constexpr int kQmfSubbands = 64;
 inline constexpr int kQmfWindowLength = 640;
@@ -72,7 +72,7 @@ struct QmfScratch {
 template <typename Real>
 class QmfAnalysis {
    public:
-    using Complex = iclforge::ac4::detail::dsp::Complex<Real>;
+    using Complex = iclforge::dsp::tiered::Complex<Real>;
 
     // Clears qmf_filt, the 640 delayed samples of Pseudocode 65.
     void reset() noexcept;
@@ -94,7 +94,7 @@ class QmfAnalysis {
 template <typename Real>
 class QmfSynthesis {
    public:
-    using Complex = iclforge::ac4::detail::dsp::Complex<Real>;
+    using Complex = iclforge::dsp::tiered::Complex<Real>;
 
     // Clears qsyn_filt, the 1 280 values of Pseudocode 66.
     void reset() noexcept;
@@ -114,4 +114,4 @@ class QmfSynthesis {
 extern template class QmfAnalysis<Real>;
 extern template class QmfSynthesis<Real>;
 
-}  // namespace iclforge::ac4::detail::dsp
+}  // namespace iclforge::dsp::tiered

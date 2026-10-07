@@ -13,13 +13,13 @@
 #include <type_traits>
 #include <vector>
 
-#include "iclforge/ac4/detail/real.hpp"
+#include "iclforge/dsp/tiered/real.hpp"
 #include "tiered/fft.hpp"
 #include "tiered/mdct.hpp"
 #include "tiered/synthesis.hpp"
 #include "tiered/transform_tables.hpp"
 
-namespace dsp = iclforge::ac4::detail::dsp;
+namespace dsp = iclforge::dsp::tiered;
 using iclforge::ac4::detail::Real;
 
 namespace {

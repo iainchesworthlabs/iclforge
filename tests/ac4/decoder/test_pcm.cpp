@@ -129,13 +129,13 @@ double tone_power(std::span<const float> samples, double hz, int sample_rate_hz)
 
 // Each QMF subband's mean energy over `samples` (Part 1 5.7.3's analysis).
 std::vector<double> subband_energy(std::span<const float> samples) {
-    iclforge::ac4::detail::dsp::QmfAnalysis<double> analysis;
+    iclforge::dsp::tiered::QmfAnalysis<double> analysis;
     const std::size_t slots = samples.size() / 64;
     std::vector<double> pcm(slots * 64);
     for (std::size_t n = 0; n < pcm.size(); ++n) {
         pcm[n] = static_cast<double>(samples[n]);
     }
-    std::vector<iclforge::ac4::detail::dsp::Complex<double>> q(pcm.size());
+    std::vector<iclforge::dsp::tiered::Complex<double>> q(pcm.size());
     analysis.process(pcm, q);
     std::vector<double> energy(64, 0.0);
     for (std::size_t ts = 0; ts < slots; ++ts) {

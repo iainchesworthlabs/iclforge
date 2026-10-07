@@ -26,7 +26,7 @@
 namespace {
 
 namespace acpl = iclforge::ac4::detail::acpl;
-namespace dsp = iclforge::ac4::detail::dsp;
+namespace dsp = iclforge::dsp::tiered;
 using iclforge::ac4::detail::Real;
 
 [[nodiscard]] std::size_t at(int index) noexcept {

@@ -179,7 +179,7 @@ inline constexpr std::array<Region, 3> kRegions = {{{0, 7, 7}, {7, 10, 4}, {23, 
 template <typename Real>
 class Decorrelator {
    public:
-    using Complex = dsp::Complex<Real>;
+    using Complex = dsp::tiered::Complex<Real>;
 
     explicit Decorrelator(int index) noexcept;
 
@@ -210,12 +210,12 @@ class Decorrelator {
 // falls faster than its smoothed peak, slot by slot, per parameter band of
 // the 15-band mapping. The energy is the decorrelator's output's own, the
 // signal the gains apply to (src/ac4/ERRATA.md, "The transient ducker's
-// energy"). The energies are dsp::Energy values: Real at double and float, a
+// energy"). The energies are dsp::tiered::Energy values: Real at double and float, a
 // mantissa and a power of two at Fixed32.
 template <typename Real>
 class TransientDucker {
    public:
-    using Complex = dsp::Complex<Real>;
+    using Complex = dsp::tiered::Complex<Real>;
 
     // The state of before the first frame: 0 (the NOTE after Pseudocode 112).
     void reset() noexcept;
@@ -224,7 +224,7 @@ class TransientDucker {
     void process(std::span<Complex> inout, int num_ts) noexcept;
 
    private:
-    using Energy = dsp::Energy<Real>;
+    using Energy = dsp::tiered::Energy<Real>;
     std::array<Energy, kMaxParamBands> peak_decay_{};
     std::array<Energy, kMaxParamBands> smooth_{};
     std::array<Energy, kMaxParamBands> smooth_peak_diff_{};

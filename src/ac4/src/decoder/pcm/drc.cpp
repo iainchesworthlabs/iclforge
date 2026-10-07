@@ -13,10 +13,10 @@ namespace {
 constexpr int kSubbands = 64;
 // The QMF domain works at the inverse transform's scale, full scale 2^15
 // (substream_pcm.cpp, kQmfFullScale), and at Fixed32 at 2^-3, below the double
-// decoder's by dsp::kQmfShift (dsp/scalar_traits.hpp).
+// decoder's by dsp::tiered::kQmfShift (dsp/scalar_traits.hpp).
 constexpr double kFullScalePower = [] {
-    if constexpr (dsp::kFixed<Real>) {
-        const double full_scale = 1.0 / static_cast<double>(std::int64_t{1} << -(15 + dsp::kQmfShift<Real>));
+    if constexpr (dsp::tiered::kFixed<Real>) {
+        const double full_scale = 1.0 / static_cast<double>(std::int64_t{1} << -(15 + dsp::tiered::kQmfShift<Real>));
         return full_scale * full_scale;
     } else {
         return 32768.0 * 32768.0;
@@ -323,8 +323,8 @@ double DrcStage::slot_level(std::span<const QmfMatrix> side, int slot) const {
             // Real, for the same reason a downmix or DRC gain matrix does:
             // norm(row[k]) is Real, widened once here rather than summed at
             // Real precision; at Fixed32 it is the exact energy as a mantissa
-            // and a power of two (dsp::energy_of).
-            channel += k_weight_[k] * static_cast<double>(dsp::energy_of(row[k]));
+            // and a power of two (dsp::tiered::energy_of).
+            channel += k_weight_[k] * static_cast<double>(dsp::tiered::energy_of(row[k]));
         }
         power += weight * channel;
     }

@@ -6,7 +6,7 @@
 
 #include "tiered/tables/transform_tables.hpp"
 
-namespace iclforge::ac4::detail::dsp {
+namespace iclforge::dsp::tiered {
 namespace {
 
 // {re, im} pairs narrowed as Fft and Imdct narrow theirs: each double cast to the scalar once.
@@ -74,15 +74,15 @@ constexpr Built<R, N, Roots, Pre> build(const std::array<double, Roots>& roots,
 template <typename R>
 const TransformTable<R>* lookup(std::size_t length) noexcept {
     static constexpr auto k2048 =
-        build<R>(tables::kFftRoots2048, tables::kPreTwiddle2048, tables::kKbdLeft2048);
+        build<R>(iclforge::dsp::tiered::tables::kFftRoots2048, iclforge::dsp::tiered::tables::kPreTwiddle2048, iclforge::dsp::tiered::tables::kKbdLeft2048);
     static constexpr auto k1024 =
-        build<R>(tables::kFftRoots1024, tables::kPreTwiddle1024, tables::kKbdLeft1024);
+        build<R>(iclforge::dsp::tiered::tables::kFftRoots1024, iclforge::dsp::tiered::tables::kPreTwiddle1024, iclforge::dsp::tiered::tables::kKbdLeft1024);
     static constexpr auto k512 =
-        build<R>(tables::kFftRoots512, tables::kPreTwiddle512, tables::kKbdLeft512);
+        build<R>(iclforge::dsp::tiered::tables::kFftRoots512, iclforge::dsp::tiered::tables::kPreTwiddle512, iclforge::dsp::tiered::tables::kKbdLeft512);
     static constexpr auto k256 =
-        build<R>(tables::kFftRoots256, tables::kPreTwiddle256, tables::kKbdLeft256);
+        build<R>(iclforge::dsp::tiered::tables::kFftRoots256, iclforge::dsp::tiered::tables::kPreTwiddle256, iclforge::dsp::tiered::tables::kKbdLeft256);
     static constexpr auto k128 =
-        build<R>(tables::kFftRoots128, tables::kPreTwiddle128, tables::kKbdLeft128);
+        build<R>(iclforge::dsp::tiered::tables::kFftRoots128, iclforge::dsp::tiered::tables::kPreTwiddle128, iclforge::dsp::tiered::tables::kKbdLeft128);
     static constexpr std::array<TransformTable<R>, 5> kTables{k2048.view(), k1024.view(), k512.view(),
                                                               k256.view(), k128.view()};
     for (const TransformTable<R>& table : kTables) {
@@ -106,4 +106,4 @@ const TransformTable<Real>* built_in_transform_table(std::size_t length) noexcep
     }.template operator()<Real>(length);
 }
 
-}  // namespace iclforge::ac4::detail::dsp
+}  // namespace iclforge::dsp::tiered

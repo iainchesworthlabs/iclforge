@@ -20,7 +20,7 @@
 // this target, and not in the decoder's, because src/ac4/src/decoder includes from src/ac4/src/core and
 // src/ac4/src/core from src/base (tools/checks/layering.json).
 
-namespace iclforge::ac4::detail::dsp {
+namespace iclforge::dsp::tiered {
 
 // 2^x. At float the argument is clamped to the range of a float's exponent, where the C library's
 // exp2f would overflow to infinity or underflow to zero.
@@ -51,4 +51,4 @@ template <typename Value>
     }
 }
 
-}  // namespace iclforge::ac4::detail::dsp
+}  // namespace iclforge::dsp::tiered

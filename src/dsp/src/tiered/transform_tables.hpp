@@ -4,7 +4,7 @@
 #include <span>
 #include <type_traits>
 
-#include "iclforge/ac4/detail/real.hpp"
+#include "iclforge/dsp/tiered/real.hpp"
 #include "tiered/complex.hpp"
 
 // The inverse transform's tables at the float and fixed-point tiers, in flash
@@ -16,7 +16,7 @@
 // bits from either. Built in for the lengths of a 2048-sample frame at 44.1 and 48 kHz; any
 // other length, and every length at double, builds its tables when it is constructed.
 
-namespace iclforge::ac4::detail::dsp {
+namespace iclforge::dsp::tiered {
 
 template <typename Real>
 struct TransformTable {
@@ -39,4 +39,4 @@ template <typename Value>
     }
 }
 
-}  // namespace iclforge::ac4::detail::dsp
+}  // namespace iclforge::dsp::tiered

@@ -24,7 +24,7 @@
 // everywhere. A ratio that is not one of the three, which only a test asks for, is designed at run
 // time with the same functions and gives the same coefficients.
 
-namespace iclforge::ac4::detail::dsp {
+namespace iclforge::dsp::tiered {
 
 // What the design fixes for a ratio up / down (in lowest terms, not 1): the filter's length and
 // the constants its coefficients are computed from.
@@ -44,7 +44,7 @@ struct PortableMath {
     [[nodiscard]] static constexpr double ceil(double x) noexcept { return portable::ceil(x); }
     [[nodiscard]] static constexpr double sqrt(double x) noexcept { return portable::sqrt(x); }
     [[nodiscard]] static constexpr double sin(double x) noexcept { return portable::sin(x); }
-    [[nodiscard]] static constexpr double bessel_i0(double x) noexcept { return dsp::bessel_i0(x); }
+    [[nodiscard]] static constexpr double bessel_i0(double x) noexcept { return dsp::tiered::bessel_i0(x); }
 };
 
 // The passband runs to 0.86 of the lower rate's Nyquist frequency and the stopband starts at it;
@@ -192,4 +192,4 @@ inline constexpr HalfTable<Up, Down> kHalfTable = design_half_table<Up, Down>();
 template <int Up, int Down>
 inline constexpr HalfTableQ30<Up, Down> kHalfTableQ30 = design_half_table_q30<Up, Down>();
 
-}  // namespace iclforge::ac4::detail::dsp
+}  // namespace iclforge::dsp::tiered

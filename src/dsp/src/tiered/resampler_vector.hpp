@@ -29,7 +29,7 @@
 // what dot_four_lanes() gives on a copy of the phase written out backwards. The seam has no
 // reversing load, so the four coefficients of a vector are four scalar loads.
 
-namespace iclforge::ac4::detail::dsp {
+namespace iclforge::dsp::tiered {
 
 [[nodiscard]] inline float dot_four_lanes(const float* coefficients, const float* samples,
                                           std::size_t taps) noexcept {
@@ -64,4 +64,4 @@ namespace iclforge::ac4::detail::dsp {
     return sum;
 }
 
-}  // namespace iclforge::ac4::detail::dsp
+}  // namespace iclforge::dsp::tiered

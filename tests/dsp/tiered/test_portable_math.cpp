@@ -21,7 +21,7 @@
 
 namespace {
 
-namespace portable = iclforge::ac4::detail::dsp::portable;
+namespace portable = iclforge::dsp::tiered::portable;
 
 // The distance of `got` from `want` in units of the last place of `want`.
 double ulps(double got, double want) {
@@ -64,7 +64,7 @@ static_assert(portable::sin(0.0) == 0.0);
 static_assert(portable::cos(0.0) == 1.0);
 static_assert(portable::sin(-0.5) == -portable::sin(0.5));
 static_assert(portable::cos(-0.5) == portable::cos(0.5));
-static_assert(iclforge::ac4::detail::dsp::bessel_i0(0.0) == 1.0);
+static_assert(iclforge::dsp::tiered::bessel_i0(0.0) == 1.0);
 
 }  // namespace
 
@@ -199,7 +199,7 @@ TEST_CASE("the portable functions give at run time the bits they give at compile
             v.sin[i] = portable::sin(x);
             v.cos[i] = portable::cos(x);
             v.sqrt[i] = portable::sqrt(x * x + 0.5);
-            v.i0[i] = iclforge::ac4::detail::dsp::bessel_i0(x / 14.0);
+            v.i0[i] = iclforge::dsp::tiered::bessel_i0(x / 14.0);
         }
         return v;
     }();
@@ -209,6 +209,6 @@ TEST_CASE("the portable functions give at run time the bits they give at compile
         CHECK(bits(portable::sin(x)) == bits(at_compile_time.sin[i]));
         CHECK(bits(portable::cos(x)) == bits(at_compile_time.cos[i]));
         CHECK(bits(portable::sqrt(x * x + 0.5)) == bits(at_compile_time.sqrt[i]));
-        CHECK(bits(iclforge::ac4::detail::dsp::bessel_i0(x / 14.0)) == bits(at_compile_time.i0[i]));
+        CHECK(bits(iclforge::dsp::tiered::bessel_i0(x / 14.0)) == bits(at_compile_time.i0[i]));
     }
 }

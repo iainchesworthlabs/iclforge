@@ -91,7 +91,7 @@ struct FrameParameters {
 template <typename Real>
 class Reconstruction {
    public:
-    using Complex = dsp::Complex<Real>;
+    using Complex = dsp::tiered::Complex<Real>;
 
     Reconstruction();
 

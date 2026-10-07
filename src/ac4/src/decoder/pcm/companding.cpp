@@ -16,7 +16,7 @@ namespace {
 
 // A level, a gain: Real at double and float, a mantissa and a power of two at
 // Fixed32 (dsp/scalar_traits.hpp).
-using Energy = dsp::Energy<Real>;
+using Energy = dsp::tiered::Energy<Real>;
 
 constexpr Energy kAlpha = Energy(0.65);
 constexpr std::size_t kSubbands = 64;
@@ -35,11 +35,11 @@ constexpr int kMaxSlots = 64;
 // max(|Re|, |Im|) + min(|Re|, |Im|) / 2. At Fixed32 the sum is of the raw
 // values, exactly, in 64 bits.
 template <typename R>
-[[nodiscard]] dsp::Energy<R> slot_level(std::span<const dsp::Complex<R>> slot, int sb0, int sb1,
+[[nodiscard]] dsp::tiered::Energy<R> slot_level(std::span<const dsp::tiered::Complex<R>> slot, int sb0, int sb1,
                                         R full_scale) noexcept {
-    if constexpr (dsp::kFixed<R>) {
+    if constexpr (dsp::tiered::kFixed<R>) {
         if (sb1 <= sb0) {
-            return dsp::MantExp{};
+            return dsp::tiered::MantExp{};
         }
         std::int64_t twice = 0;
         for (int sb = sb0; sb < sb1; ++sb) {
@@ -47,8 +47,8 @@ template <typename R>
             const std::int64_t im = std::abs(static_cast<std::int64_t>(slot[at(sb)].im.raw));
             twice += 2 * std::max(re, im) + std::min(re, im);
         }
-        const dsp::MantExp sum = dsp::MantExp::make(twice, -1 - R::kFractionBits);
-        return dsp::MantExp(0.9105) * sum / dsp::MantExp{sb1 - sb0} / dsp::MantExp{full_scale};
+        const dsp::tiered::MantExp sum = dsp::tiered::MantExp::make(twice, -1 - R::kFractionBits);
+        return dsp::tiered::MantExp(0.9105) * sum / dsp::tiered::MantExp{sb1 - sb0} / dsp::tiered::MantExp{full_scale};
     } else {
         if (sb1 <= sb0) {
             return R{} / full_scale;
@@ -69,22 +69,22 @@ template <typename R>
 //
 // At double this is std::pow, as it always was. At float it is
 // 2^(e log2 L) through iclforge::internal's scalar_exp2 and scalar_log2, which are
-// plain float multiplies and adds (dsp::pow_of): the C libraries' powf differ
+// plain float multiplies and adds (dsp::tiered::pow_of): the C libraries' powf differ
 // in the last bit on some inputs, a gain that differs in its last bit scales
 // the slot's samples by a different float, and the synthesis bank spreads the
 // difference over the frame, so that the host, the Cortex-M3 leg and the
 // ESP32s each gave a PCM of their own for a companded stream (planning/ac4.md,
 // D14a4). A slot with no level gets no gain, as pow gives it.
 [[nodiscard]] Energy gain_of(Energy level) noexcept {
-    return dsp::pow_of(level, (Energy{1} - kAlpha) / kAlpha);
+    return dsp::tiered::pow_of(level, (Energy{1} - kAlpha) / kAlpha);
 }
 
 template <typename R>
-void scale(const CompandingChannel& channel, int sb0, int ts, dsp::Energy<R> factor) noexcept {
+void scale(const CompandingChannel& channel, int sb0, int ts, dsp::tiered::Energy<R> factor) noexcept {
     const std::span<QmfValue> slot = q_low_slot(channel, ts);
     for (int sb = sb0; sb < channel.sb1; ++sb) {
-        if constexpr (dsp::kFixed<R>) {
-            slot[at(sb)] = dsp::apply_gain<R>(factor, slot[at(sb)]);
+        if constexpr (dsp::tiered::kFixed<R>) {
+            slot[at(sb)] = dsp::tiered::apply_gain<R>(factor, slot[at(sb)]);
         } else {
             slot[at(sb)] *= factor;
         }
@@ -100,7 +100,7 @@ void scale(const CompandingChannel& channel, int sb0, int ts, dsp::Energy<R> fac
 
 void apply_companding(const CompandingControl& control, int sb0, Real full_scale,
                       std::span<const CompandingChannel> channels) {
-    const Energy big_g = dsp::exp2_of(Energy{1} / kAlpha);
+    const Energy big_g = dsp::tiered::exp2_of(Energy{1} / kAlpha);
     std::vector<std::array<Energy, kMaxSlots>> level(channels.size());
     std::vector<std::array<Energy, kMaxSlots>> gain(channels.size());
     for (std::size_t c = 0; c < channels.size(); ++c) {

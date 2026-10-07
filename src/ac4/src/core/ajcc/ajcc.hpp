@@ -119,8 +119,8 @@ struct Term {
 // out += weight * in, value by value over `num_ts` slots: one term of
 // Pseudocodes 11 and 14's sums, `weight` the interpolated coefficient.
 template <typename Real>
-void accumulate(std::span<const Real> weight, std::span<const dsp::Complex<Real>> in,
-                std::span<dsp::Complex<Real>> out, int num_ts) noexcept;
+void accumulate(std::span<const Real> weight, std::span<const dsp::tiered::Complex<Real>> in,
+                std::span<dsp::tiered::Complex<Real>> out, int num_ts) noexcept;
 
 // Pseudocode 9, input_sig_pre_modification(): out1 = g in2 + (1 - g) in1 and
 // out2 = g in4 + (1 - g) in3, g 1 while ajcc_core_mode stays 0 and 0 while it
@@ -128,7 +128,7 @@ void accumulate(std::span<const Real> weight, std::span<const dsp::Complex<Real>
 template <typename Real>
 class PreModification {
    public:
-    using Complex = dsp::Complex<Real>;
+    using Complex = dsp::tiered::Complex<Real>;
 
     // ajcc_core_mode_prev takes the next frame's ajcc_core_mode.
     void reset() noexcept { primed_ = false; }
@@ -144,8 +144,8 @@ class PreModification {
 };
 
 extern template void accumulate<Real>(std::span<const Real>,
-                                      std::span<const dsp::Complex<Real>>,
-                                      std::span<dsp::Complex<Real>>, int) noexcept;
+                                      std::span<const dsp::tiered::Complex<Real>>,
+                                      std::span<dsp::tiered::Complex<Real>>, int) noexcept;
 extern template class PreModification<Real>;
 
 }  // namespace iclforge::ac4::detail::ajcc

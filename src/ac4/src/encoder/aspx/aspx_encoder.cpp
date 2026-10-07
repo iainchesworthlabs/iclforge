@@ -7,7 +7,7 @@
 namespace iclforge::ac4::detail {
 namespace {
 
-constexpr std::size_t kSubbands = dsp::kQmfSubbands;
+constexpr std::size_t kSubbands = dsp::tiered::kQmfSubbands;
 
 // Companding (5.7.5): the expander multiplies a slot by 2^(1/alpha)
 // L^((1 - alpha) / alpha), L its level against full scale, so the compressor
@@ -439,7 +439,7 @@ AspxChannelFields AspxChannelEncoder::propose(long long frame, bool iframe) {
     }
     choose_sinusoids(tone_ext, fields);
     fill_undelivered(ext, fields, noise);
-    std::array<bool, dsp::kQmfSubbands> waveform{};
+    std::array<bool, dsp::tiered::kQmfSubbands> waveform{};
     for (const auto& [first, last] : interleaved_subbands(fields)) {
         std::fill(waveform.begin() + first, waveform.begin() + last, true);
     }
@@ -459,9 +459,9 @@ AspxChannelFields AspxChannelEncoder::propose(long long frame, bool iframe) {
 // middle of each high resolution group with aspx_add_harmonic set, from the
 // transient envelope on, or from the first where the last interval ended
 // with it.
-std::array<bool, dsp::kQmfSubbands> AspxChannelEncoder::sine_subbands(const AspxChannelFields& fields,
+std::array<bool, dsp::tiered::kQmfSubbands> AspxChannelEncoder::sine_subbands(const AspxChannelFields& fields,
                                                                       int env) const {
-    std::array<bool, dsp::kQmfSubbands> sines{};
+    std::array<bool, dsp::tiered::kQmfSubbands> sines{};
     const aspx::SubbandGroups& g = setup_->groups;
     for (int sbg = 0; sbg < static_cast<int>(fields.add_harmonic.size()); ++sbg) {
         const int mid = (g.sbg_sig_highres[at(sbg)] + g.sbg_sig_highres[at(sbg + 1)]) / 2;
@@ -547,7 +547,7 @@ void AspxChannelEncoder::choose_sinusoids(std::span<const QmfSample> ext, AspxCh
         int peak = lo;
         double peak_energy = 0.0;
         double total = 0.0;
-        std::array<Residual, dsp::kQmfSubbands> input{};
+        std::array<Residual, dsp::tiered::kQmfSubbands> input{};
         for (int sb = lo; sb < hi; ++sb) {
             input[at(sb)] = predict(ext, aspx::kTsOffsetHfadj, sb, kToneFirst, tone_last);
             total += input[at(sb)].energy;
@@ -602,8 +602,8 @@ void AspxChannelEncoder::fill_undelivered(std::span<const QmfSample> ext,
     generate(ext, modes, state, q_high);
     // The mean energy per QMF subsample of the input's own band and of the
     // patch, by subband.
-    std::array<double, dsp::kQmfSubbands> target{};
-    std::array<double, dsp::kQmfSubbands> patch{};
+    std::array<double, dsp::tiered::kQmfSubbands> target{};
+    std::array<double, dsp::tiered::kQmfSubbands> patch{};
     for (int ts = first; ts < last; ++ts) {
         const std::size_t row = at(ts + aspx::kTsOffsetHfadj) * kSubbands;
         for (int sb = g.sbx; sb < g.sbx + g.num_sb_aspx; ++sb) {
@@ -613,7 +613,7 @@ void AspxChannelEncoder::fill_undelivered(std::span<const QmfSample> ext,
     }
     const double length = static_cast<double>(last - first);
     // Subbands that another part of the syntax delivers whole.
-    std::array<bool, dsp::kQmfSubbands> covered{};
+    std::array<bool, dsp::tiered::kQmfSubbands> covered{};
     for (int sbg = 0; sbg < g.num_sbg_sig_highres; ++sbg) {
         const bool tone = at(sbg) < fields.add_harmonic.size() && fields.add_harmonic[at(sbg)];
         const bool coded =
@@ -966,8 +966,8 @@ std::vector<int> AspxChannelEncoder::choose_inverse_filtering(std::span<const Qm
 // below 0.
 std::vector<int> AspxChannelEncoder::signal_envelope(std::span<const QmfSample> ext, int first, int last,
                                                      bool high_res, int quant_mode,
-                                                     const std::array<bool, dsp::kQmfSubbands>& sines,
-                                                     const std::array<bool, dsp::kQmfSubbands>& waveform) const {
+                                                     const std::array<bool, dsp::tiered::kQmfSubbands>& sines,
+                                                     const std::array<bool, dsp::tiered::kQmfSubbands>& waveform) const {
     const aspx::SubbandGroups& g = setup_->groups;
     const int groups = high_res ? g.num_sbg_sig_highres : g.num_sbg_sig_lowres;
     const std::span<const std::uint8_t> table = high_res ? std::span<const std::uint8_t>(g.sbg_sig_highres)
@@ -981,7 +981,7 @@ std::vector<int> AspxChannelEncoder::signal_envelope(std::span<const QmfSample> 
         const int hi = table[at(sbg + 1)];
         // A group with a sinusoid gives it the scale factor whole (Pseudocode
         // 94), so its envelope is the sinusoid's subband's energy.
-        std::array<double, dsp::kQmfSubbands> per_subband{};
+        std::array<double, dsp::tiered::kQmfSubbands> per_subband{};
         for (int ts = per * first; ts < per * last; ++ts) {
             const std::size_t row = at(ts + aspx::kTsOffsetHfadj) * kSubbands;
             for (int sb = lo; sb < hi; ++sb) {

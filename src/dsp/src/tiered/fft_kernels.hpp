@@ -31,7 +31,7 @@
 //   the same way and the same sum of them. A factor of 1 is not skipped: a product with
 //   it can change the sign of a zero, and so a bit of the output.
 
-namespace iclforge::ac4::detail::dsp::fft_kernels {
+namespace iclforge::dsp::tiered::fft_kernels {
 
 // One pass's description, as the plan lays it out (dsp/fft.hpp).
 struct Stage {
@@ -207,4 +207,4 @@ template <typename Real, bool Inverse, typename First>
     return in;
 }
 
-}  // namespace iclforge::ac4::detail::dsp::fft_kernels
+}  // namespace iclforge::dsp::tiered::fft_kernels

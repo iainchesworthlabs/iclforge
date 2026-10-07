@@ -35,12 +35,12 @@ Psychoacoustics::Psychoacoustics(int sample_rate_hz, int frame_length)
     for (std::size_t k = 0; k < full_scale_.size(); ++k) {
         const int n = frame_length >> k;
         const auto size = static_cast<std::size_t>(n);
-        const double alpha = dsp::kbd_alpha(n, 1);
+        const double alpha = dsp::tiered::kbd_alpha(n, 1);
         if (alpha == 0.0) {
             continue;
         }
-        const std::vector<double> window = dsp::kbd_left(n, alpha);
-        dsp::Mdct<double> mdct(size);
+        const std::vector<double> window = dsp::tiered::kbd_left(n, alpha);
+        dsp::tiered::Mdct<double> mdct(size);
         if (!mdct.valid()) {
             continue;
         }

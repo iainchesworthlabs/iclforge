@@ -60,7 +60,7 @@ struct HfGeneratorState {
     CubicBasis cubic{};
 };
 
-// dsp::Complex<Real> here (not std::complex<Real>): a fixed-point type cannot
+// dsp::tiered::Complex<Real> here (not std::complex<Real>): a fixed-point type cannot
 // instantiate std::complex, and the QMF matrices these functions read and
 // write are the core's own complex type throughout (dsp/complex.hpp).
 
@@ -68,7 +68,7 @@ template <typename Real>
 struct HfGeneratorInput {
     // Q_low_ext: num_qmf_timeslots + ts_offset_hfgen + kTsOffsetHfadj slots
     // of 64 subbands, [slot * 64 + subband]. Only subbands below sbx are read.
-    std::span<const dsp::Complex<Real>> q_low_ext;
+    std::span<const dsp::tiered::Complex<Real>> q_low_ext;
     int num_qmf_timeslots = 0;
     int ts_offset_hfgen = 0;
     // The interval, in Q_low's slots: atsg_sig[0] * num_ts_in_ats up to
@@ -86,38 +86,38 @@ struct HfGeneratorInput {
 template <typename Real>
 void generate_high_band(const SubbandGroups& groups, const PatchTables& patches,
                         const HfGeneratorInput<Real>& in, HfGeneratorState<Real>& state,
-                        std::span<dsp::Complex<Real>> q_high);
+                        std::span<dsp::tiered::Complex<Real>> q_high);
 
 // Pseudocode 85's gain vector, gain_vec[sb] for sb < sbx: 10^((mean - fit[sb]) / 20),
 // with fit the least squares cubic through the low band's energies in dB. The gains are
-// dsp::Energy values: Real at double and float, a mantissa and a power of two at Fixed32.
+// dsp::tiered::Energy values: Real at double and float, a mantissa and a power of two at Fixed32.
 // Exposed for its test. The form with `cubic` takes the fit's vectors from it and makes
 // them there when they are for another number of points; the other makes them for the
 // call.
 template <typename Real>
-void preflattening_gains(std::span<const dsp::Complex<Real>> q_low, int sbx, int ts_begin,
-                         int ts_end, std::span<dsp::Energy<Real>> gain_vec);
+void preflattening_gains(std::span<const dsp::tiered::Complex<Real>> q_low, int sbx, int ts_begin,
+                         int ts_end, std::span<dsp::tiered::Energy<Real>> gain_vec);
 template <typename Real>
-void preflattening_gains(std::span<const dsp::Complex<Real>> q_low, int sbx, int ts_begin,
-                         int ts_end, std::span<dsp::Energy<Real>> gain_vec, CubicBasis& cubic);
+void preflattening_gains(std::span<const dsp::tiered::Complex<Real>> q_low, int sbx, int ts_begin,
+                         int ts_end, std::span<dsp::tiered::Energy<Real>> gain_vec, CubicBasis& cubic);
 
 // Pseudocodes 86 and 87: alpha0[sb] and alpha1[sb] for sb < sba. Exposed for
 // its test.
 template <typename Real>
-void prediction_coefficients(std::span<const dsp::Complex<Real>> q_low_ext, int num_ts_ext, int sba,
-                             std::span<dsp::Complex<Real>> alpha0,
-                             std::span<dsp::Complex<Real>> alpha1);
+void prediction_coefficients(std::span<const dsp::tiered::Complex<Real>> q_low_ext, int num_ts_ext, int sba,
+                             std::span<dsp::tiered::Complex<Real>> alpha0,
+                             std::span<dsp::tiered::Complex<Real>> alpha1);
 
 extern template void generate_high_band<Real>(const SubbandGroups&, const PatchTables&,
                                               const HfGeneratorInput<Real>&,
                                               HfGeneratorState<Real>&,
-                                              std::span<dsp::Complex<Real>>);
-extern template void preflattening_gains<Real>(std::span<const dsp::Complex<Real>>, int, int,
-                                               int, std::span<dsp::Energy<Real>>);
-extern template void preflattening_gains<Real>(std::span<const dsp::Complex<Real>>, int, int, int,
-                                               std::span<dsp::Energy<Real>>, CubicBasis&);
-extern template void prediction_coefficients<Real>(std::span<const dsp::Complex<Real>>, int,
-                                                   int, std::span<dsp::Complex<Real>>,
-                                                   std::span<dsp::Complex<Real>>);
+                                              std::span<dsp::tiered::Complex<Real>>);
+extern template void preflattening_gains<Real>(std::span<const dsp::tiered::Complex<Real>>, int, int,
+                                               int, std::span<dsp::tiered::Energy<Real>>);
+extern template void preflattening_gains<Real>(std::span<const dsp::tiered::Complex<Real>>, int, int, int,
+                                               std::span<dsp::tiered::Energy<Real>>, CubicBasis&);
+extern template void prediction_coefficients<Real>(std::span<const dsp::tiered::Complex<Real>>, int,
+                                                   int, std::span<dsp::tiered::Complex<Real>>,
+                                                   std::span<dsp::tiered::Complex<Real>>);
 
 }  // namespace iclforge::ac4::detail::aspx

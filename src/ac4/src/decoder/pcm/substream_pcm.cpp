@@ -36,12 +36,12 @@ constexpr std::array<int, 14> kControlDelay = {1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 4, 
 // QMF domain works at that scale, and the output is scaled to full scale 1.0.
 // See src/ac4/ERRATA.md, "Full scale, and the overlap-add's factor of two".
 // At Fixed32 the time and QMF domains are below the double decoder's by
-// dsp::kTimeShift and dsp::kQmfShift (core/dsp/scalar_traits.hpp),
+// dsp::tiered::kTimeShift and dsp::tiered::kQmfShift (core/dsp/scalar_traits.hpp),
 // where full scale is 2^(15 + the shift).
 template <typename R>
 [[nodiscard]] constexpr R qmf_full_scale() noexcept {
-    if constexpr (dsp::kFixed<R>) {
-        return R::from_raw(std::int32_t{1} << (R::kFractionBits + 15 + dsp::kQmfShift<R>));
+    if constexpr (dsp::tiered::kFixed<R>) {
+        return R::from_raw(std::int32_t{1} << (R::kFractionBits + 15 + dsp::tiered::kQmfShift<R>));
     } else {
         return R(32768);
     }
@@ -58,12 +58,12 @@ constexpr int kQmfPairDelay = 577;
 // takes exactly.
 template <typename R>
 [[nodiscard]] float time_to_output(R value) noexcept {
-    constexpr float kScale = 1.0F / static_cast<float>(std::int32_t{1} << (15 + dsp::kTimeShift<R>));
+    constexpr float kScale = 1.0F / static_cast<float>(std::int32_t{1} << (15 + dsp::tiered::kTimeShift<R>));
     return static_cast<float>(value) * kScale;
 }
 template <typename R>
 [[nodiscard]] float output_sample(R value) noexcept {
-    if constexpr (dsp::kFixed<R>) {
+    if constexpr (dsp::tiered::kFixed<R>) {
         return time_to_output(value);
     } else {
         constexpr R kFullScale = 32768;
@@ -73,7 +73,7 @@ template <typename R>
 }
 template <typename R>
 [[nodiscard]] float output_sample(R gain, R value) noexcept {
-    if constexpr (dsp::kFixed<R>) {
+    if constexpr (dsp::tiered::kFixed<R>) {
         return time_to_output(gain * value);
     } else {
         constexpr R kFullScale = 32768;
@@ -98,7 +98,7 @@ void align_exponents(std::span<std::vector<R>* const> tracks, std::span<int* con
         if (*exponents[t] == common) {
             continue;
         }
-        if constexpr (dsp::kFixed<R>) {
+        if constexpr (dsp::tiered::kFixed<R>) {
             const int down = *exponents[t] - common;
             for (R& v : *tracks[t]) {
                 v = v.scaled_by_pow2(down);
@@ -108,7 +108,7 @@ void align_exponents(std::span<std::vector<R>* const> tracks, std::span<int* con
     }
 }
 
-constexpr std::size_t kSubbands = dsp::kQmfSubbands;
+constexpr std::size_t kSubbands = dsp::tiered::kQmfSubbands;
 
 // The most channels an element here has (22.2's 24), and aspx_data elements
 // (22.2's eleven).
@@ -200,7 +200,7 @@ int SubstreamPcm::delay_samples() const noexcept {
     if (hsf_multiplier_ > 1) {
         return delay_;  // no QMF banks, and no history of QMF slots
     }
-    return delay_ + kQmfPairDelay + hfgen_ * dsp::kQmfSubbands;
+    return delay_ + kQmfPairDelay + hfgen_ * dsp::tiered::kQmfSubbands;
 }
 
 int SubstreamPcm::output_delay_samples() const noexcept {
@@ -265,7 +265,7 @@ void SubstreamPcm::reset() {
     }
     drc_.reset();
     downmix_.reset();
-    for (std::optional<dsp::Resampler<Real>>& converter : hsf_converters_) {
+    for (std::optional<dsp::tiered::Resampler<Real>>& converter : hsf_converters_) {
         if (converter) {
             converter->reset();
         }
@@ -349,7 +349,7 @@ ParseResult SubstreamPcm::configure(const SubstreamContext& ctx, DecodingMode de
     objects_.clear();
     object_outputs_.clear();
     transforms_.emplace(ctx.frame_len_base, 1);
-    if (!transforms_->valid() || ctx.frame_len_base % dsp::kQmfSubbands != 0) {
+    if (!transforms_->valid() || ctx.frame_len_base % dsp::tiered::kQmfSubbands != 0) {
         transforms_.reset();
         return fail(DecodeError::kInvalidStream, "a frame length with no transform");
     }
@@ -360,7 +360,7 @@ ParseResult SubstreamPcm::configure(const SubstreamContext& ctx, DecodingMode de
     decoding_ = decoding;
     delay_ = kAlignmentDelay[static_cast<std::size_t>(ctx.frame_rate_index)];
     control_delay_ = kControlDelay[static_cast<std::size_t>(ctx.frame_rate_index)];
-    slots_ = full_length_ / dsp::kQmfSubbands;
+    slots_ = full_length_ / dsp::tiered::kQmfSubbands;
     ts_in_ats_ = aspx::num_ts_in_ats(full_length_);
     hfgen_ = aspx::ts_offset_hfgen(full_length_);
     const int ext_slots = aspx::kTsOffsetHfadj + hfgen_ + slots_;
@@ -370,7 +370,7 @@ ParseResult SubstreamPcm::configure(const SubstreamContext& ctx, DecodingMode de
     converter_filter_.reset();
     if (ratio.up != ratio.down) {
         converter_filter_ =
-            std::make_shared<const dsp::BasicResamplerFilter<Real>>(ratio.up, ratio.down);
+            std::make_shared<const dsp::tiered::BasicResamplerFilter<Real>>(ratio.up, ratio.down);
     }
     channels_.clear();
     for (std::size_t c = 0; c < speakers_.size(); ++c) {
@@ -1530,7 +1530,7 @@ ParseResult SubstreamPcm::configure_hsf(const SubstreamContext& ctx, DecodingMod
     converter_filter_.reset();
     if (ratio.up != ratio.down) {
         converter_filter_ =
-            std::make_shared<const dsp::BasicResamplerFilter<Real>>(ratio.up, ratio.down);
+            std::make_shared<const dsp::tiered::BasicResamplerFilter<Real>>(ratio.up, ratio.down);
     }
     channels_.clear();
     for (std::size_t c = 0; c < speakers_.size(); ++c) {
@@ -1783,7 +1783,7 @@ ParseResult SubstreamPcm::render_hsf(const FrameInputs& frame_inputs, const Down
         const std::vector<Real>& source = through ? hsf_aligned_[o] : hsf_mixed_[o];
         std::span<const Real> produced = source;
         if (o < hsf_converters_.size() && hsf_converters_[o]) {
-            dsp::Resampler<Real>& converter = *hsf_converters_[o];
+            dsp::tiered::Resampler<Real>& converter = *hsf_converters_[o];
             if (!converter_phase_) {
                 converter.reset(grid);
             } else if (jumped) {

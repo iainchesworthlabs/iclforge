@@ -7,7 +7,7 @@
 #include "tiered/qmf_kernels.hpp"
 #include "tiered/qmf_vector.hpp"
 
-namespace iclforge::ac4::detail::dsp {
+namespace iclforge::dsp::tiered {
 namespace {
 
 constexpr std::size_t kSubbands = kQmfSubbands;
@@ -98,7 +98,7 @@ template class QmfAnalysis<Real>;
 template class QmfSynthesis<Real>;
 // The encoder's own QMF-domain code (src/ac4/src/encoder/acpl, src/ac4/src/encoder/aspx)
 // calls these at double regardless of the decoder's scalar (see this target's
-// CMakeLists.txt, ICLFORGE_AC4_ALSO_AT_DOUBLE).
-ICLFORGE_AC4_ALSO_AT_DOUBLE(template class QmfAnalysis<double>; template class QmfSynthesis<double>;)
+// CMakeLists.txt, ICLFORGE_DSP_ALSO_AT_DOUBLE).
+ICLFORGE_DSP_ALSO_AT_DOUBLE(template class QmfAnalysis<double>; template class QmfSynthesis<double>;)
 
-}  // namespace iclforge::ac4::detail::dsp
+}  // namespace iclforge::dsp::tiered

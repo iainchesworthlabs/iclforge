@@ -31,7 +31,7 @@ constexpr double kTenOverLog2Of10 = 3.010299956639812;   // 10 / log2(10), for 1
 constexpr double kLog2Of10Over20 = 0.16609640474436812;  // log2(10) / 20, for 10^(y/20)
 
 //
-// At Real = Fixed32 the values are energies and gains (dsp::Energy, a mantissa and a power of
+// At Real = Fixed32 the values are energies and gains (dsp::tiered::Energy, a mantissa and a power of
 // two) and the two forms are the float ones on that type's own integer log2 and exp2.
 template <typename Value>
 [[nodiscard]] Value power_db(Value x) noexcept {
@@ -58,9 +58,9 @@ template <typename Value>
 // a coefficient that one platform finds just under the limit and another at it
 // zeroes a subband's prediction on the second only (planning/ac4.md, D14a4).
 //
-// At Real = Fixed32 the coefficient is solved as a dsp::Energy (MantExp) and compared as at float.
+// At Real = Fixed32 the coefficient is solved as a dsp::tiered::Energy (MantExp) and compared as at float.
 template <typename Value>
-[[nodiscard]] bool reaches_limit(dsp::Complex<Value> alpha) noexcept {
+[[nodiscard]] bool reaches_limit(dsp::tiered::Complex<Value> alpha) noexcept {
     if constexpr (std::is_same_v<Value, double>) {
         return abs(alpha) >= Value{4};
     } else {
@@ -143,7 +143,7 @@ void build_cubic_basis(std::size_t n, CubicBasis& cubic, bool by_products) {
     }
 }
 
-// Value is Real at double and float and dsp::Energy (MantExp) at Fixed32.
+// Value is Real at double and float and dsp::tiered::Energy (MantExp) at Fixed32.
 template <typename Value>
 void fit_cubic(std::span<const Value> y, std::span<Value> fitted, const CubicBasis& cubic) {
     const std::size_t n = y.size();
@@ -165,8 +165,8 @@ void fit_cubic(std::span<const Value> y, std::span<Value> fitted, const CubicBas
 }  // namespace
 
 template <typename Real>
-void preflattening_gains(std::span<const dsp::Complex<Real>> q_low, int sbx, int ts_begin,
-                         int ts_end, std::span<dsp::Energy<Real>> gain_vec) {
+void preflattening_gains(std::span<const dsp::tiered::Complex<Real>> q_low, int sbx, int ts_begin,
+                         int ts_end, std::span<dsp::tiered::Energy<Real>> gain_vec) {
     CubicBasis cubic;
     preflattening_gains<Real>(q_low, sbx, ts_begin, ts_end, gain_vec, cubic);
 }
@@ -175,9 +175,9 @@ void preflattening_gains(std::span<const dsp::Complex<Real>> q_low, int sbx, int
 // decibels are the double decoder's less a constant; the mean and the cubic, which has a
 // constant term, move by it alike, and the gains do not.
 template <typename Real>
-void preflattening_gains(std::span<const dsp::Complex<Real>> q_low, int sbx, int ts_begin,
-                         int ts_end, std::span<dsp::Energy<Real>> gain_vec, CubicBasis& cubic) {
-    using Energy = dsp::Energy<Real>;
+void preflattening_gains(std::span<const dsp::tiered::Complex<Real>> q_low, int sbx, int ts_begin,
+                         int ts_end, std::span<dsp::tiered::Energy<Real>> gain_vec, CubicBasis& cubic) {
+    using Energy = dsp::tiered::Energy<Real>;
     const auto n = at(sbx);
     if (ts_end <= ts_begin || n == 0) {
         std::ranges::fill(gain_vec.first(n), Energy{1});
@@ -190,16 +190,16 @@ void preflattening_gains(std::span<const dsp::Complex<Real>> q_low, int sbx, int
     for (std::size_t sb = 0; sb < n; ++sb) {
         Energy energy{};
         for (int ts = ts_begin; ts < ts_end; ++ts) {
-            energy += dsp::energy_of(q_low[at(ts) * kSubbands + sb]);
+            energy += dsp::tiered::energy_of(q_low[at(ts) * kSubbands + sb]);
         }
         energy /= static_cast<Energy>(ts_end - ts_begin);
-        pow_env[sb] = power_db(energy + dsp::qmf_energy<Real>(Energy{1}));
+        pow_env[sb] = power_db(energy + dsp::tiered::qmf_energy<Real>(Energy{1}));
         mean_energy += pow_env[sb];
     }
     mean_energy /= static_cast<Energy>(n);
     std::vector<Energy> slope(n);
     if (cubic.n != n) {
-        build_cubic_basis(n, cubic, dsp::kFixed<Real>);
+        build_cubic_basis(n, cubic, dsp::tiered::kFixed<Real>);
     }
     fit_cubic<Energy>(pow_env, slope, cubic);
     for (std::size_t sb = 0; sb < n; ++sb) {
@@ -209,35 +209,35 @@ void preflattening_gains(std::span<const dsp::Complex<Real>> q_low, int sbx, int
 
 // Pseudocode 86's sum at Fixed32: the products of the values' raw parts, each below 2^62,
 // summed exactly in 64 bits (unsigned, so that a stream that is not audio wraps rather than
-// overflowing), then as a dsp::Energy. Audio's values are below 2^27, and forty of their
+// overflowing), then as a dsp::tiered::Energy. Audio's values are below 2^27, and forty of their
 // products below 2^60.
-[[nodiscard]] dsp::Complex<dsp::MantExp> covariance(std::span<const dsp::Complex<dsp::Fixed32>> q, int sb,
+[[nodiscard]] dsp::tiered::Complex<dsp::tiered::MantExp> covariance(std::span<const dsp::tiered::Complex<dsp::tiered::Fixed32>> q, int sb,
                                                     int i, int j, int num_ts_ext) noexcept {
     std::uint64_t re = 0;
     std::uint64_t im = 0;
     for (int ts = kTsOffsetHfadj; ts < num_ts_ext; ts += 2) {
-        const dsp::Complex<dsp::Fixed32> a = q[at(ts - 2 * i) * kSubbands + at(sb)];
-        const dsp::Complex<dsp::Fixed32> b = q[at(ts - 2 * j) * kSubbands + at(sb)];
+        const dsp::tiered::Complex<dsp::tiered::Fixed32> a = q[at(ts - 2 * i) * kSubbands + at(sb)];
+        const dsp::tiered::Complex<dsp::tiered::Fixed32> b = q[at(ts - 2 * j) * kSubbands + at(sb)];
         // a conj(b)
         re += static_cast<std::uint64_t>(static_cast<std::int64_t>(a.re.raw) * b.re.raw) +
               static_cast<std::uint64_t>(static_cast<std::int64_t>(a.im.raw) * b.im.raw);
         im += static_cast<std::uint64_t>(static_cast<std::int64_t>(a.im.raw) * b.re.raw) -
               static_cast<std::uint64_t>(static_cast<std::int64_t>(a.re.raw) * b.im.raw);
     }
-    constexpr int kProductPower = -2 * dsp::Fixed32::kFractionBits;
-    return {dsp::MantExp::make(static_cast<std::int64_t>(re), kProductPower),
-            dsp::MantExp::make(static_cast<std::int64_t>(im), kProductPower)};
+    constexpr int kProductPower = -2 * dsp::tiered::Fixed32::kFractionBits;
+    return {dsp::tiered::MantExp::make(static_cast<std::int64_t>(re), kProductPower),
+            dsp::tiered::MantExp::make(static_cast<std::int64_t>(im), kProductPower)};
 }
 
-// At Fixed32 the covariances and the coefficients are solved as dsp::Energy, a mantissa and a
+// At Fixed32 the covariances and the coefficients are solved as dsp::tiered::Energy, a mantissa and a
 // power of two, and a coefficient that passes the limit is brought to Fixed32 for the
 // generator, where |alpha| < 4.
 template <typename Real>
-void prediction_coefficients(std::span<const dsp::Complex<Real>> q_low_ext, int num_ts_ext, int sba,
-                             std::span<dsp::Complex<Real>> alpha0,
-                             std::span<dsp::Complex<Real>> alpha1) {
-    using Value = dsp::Energy<Real>;
-    using Complex = dsp::Complex<Value>;
+void prediction_coefficients(std::span<const dsp::tiered::Complex<Real>> q_low_ext, int num_ts_ext, int sba,
+                             std::span<dsp::tiered::Complex<Real>> alpha0,
+                             std::span<dsp::tiered::Complex<Real>> alpha1) {
+    using Value = dsp::tiered::Energy<Real>;
+    using Complex = dsp::tiered::Complex<Value>;
     // EPSILON_INV of Pseudocode 87.
     const Value regularise = [] {
         if constexpr (std::is_floating_point_v<Value>) {
@@ -252,7 +252,7 @@ void prediction_coefficients(std::span<const dsp::Complex<Real>> q_low_ext, int 
         std::array<std::array<Complex, 3>, 3> cov{};
         for (int i = 0; i < 3; ++i) {
             for (int j = 1; j < 3; ++j) {
-                if constexpr (dsp::kFixed<Real>) {
+                if constexpr (dsp::tiered::kFixed<Real>) {
                     cov[at(i)][at(j)] = covariance(q_low_ext, sb, i, j, num_ts_ext);
                 } else {
                     Complex sum{};
@@ -280,7 +280,7 @@ void prediction_coefficients(std::span<const dsp::Complex<Real>> q_low_ext, int 
             a0 = Complex{};
             a1 = Complex{};
         }
-        if constexpr (dsp::kFixed<Real>) {
+        if constexpr (dsp::tiered::kFixed<Real>) {
             alpha0[at(sb)] = {a0.re.to_fixed(), a0.im.to_fixed()};
             alpha1[at(sb)] = {a1.re.to_fixed(), a1.im.to_fixed()};
         } else {
@@ -293,14 +293,14 @@ void prediction_coefficients(std::span<const dsp::Complex<Real>> q_low_ext, int 
 template <typename Real>
 void generate_high_band(const SubbandGroups& groups, const PatchTables& patches,
                         const HfGeneratorInput<Real>& in, HfGeneratorState<Real>& state,
-                        std::span<dsp::Complex<Real>> q_high) {
-    using Complex = dsp::Complex<Real>;
+                        std::span<dsp::tiered::Complex<Real>> q_high) {
+    using Complex = dsp::tiered::Complex<Real>;
     const int sbx = groups.sbx;
     const int sbz = groups.sbx + groups.num_sb_aspx;
     const int num_ts_ext = in.num_qmf_timeslots + in.ts_offset_hfgen + kTsOffsetHfadj;
     const std::span<const Complex> q_low = in.q_low_ext.subspan(at(kTsOffsetHfadj) * kSubbands);
 
-    std::array<dsp::Energy<Real>, kSubbands> gain_vec{};
+    std::array<dsp::tiered::Energy<Real>, kSubbands> gain_vec{};
     if (in.preflat) {
         preflattening_gains<Real>(q_low, sbx, in.ts_begin, in.ts_end, gain_vec, state.cubic);
     }
@@ -355,7 +355,7 @@ void generate_high_band(const SubbandGroups& groups, const PatchTables& patches,
                 // fitted slope, where the text prints its inverse
                 // (src/ac4/ERRATA.md, "Pre-flattening's direction").
                 if (in.preflat) {
-                    value = dsp::apply_gain<Real>(gain_vec[at(p)], value);
+                    value = dsp::tiered::apply_gain<Real>(gain_vec[at(p)], value);
                 }
                 slot[at(sb_high)] = value;
             }
@@ -366,14 +366,14 @@ void generate_high_band(const SubbandGroups& groups, const PatchTables& patches,
 
 template void generate_high_band<Real>(const SubbandGroups&, const PatchTables&,
                                        const HfGeneratorInput<Real>&, HfGeneratorState<Real>&,
-                                       std::span<dsp::Complex<Real>>);
-template void preflattening_gains<Real>(std::span<const dsp::Complex<Real>>, int, int, int,
-                                        std::span<dsp::Energy<Real>>);
-template void preflattening_gains<Real>(std::span<const dsp::Complex<Real>>, int, int, int,
-                                        std::span<dsp::Energy<Real>>, CubicBasis&);
-template void prediction_coefficients<Real>(std::span<const dsp::Complex<Real>>, int, int,
-                                            std::span<dsp::Complex<Real>>,
-                                            std::span<dsp::Complex<Real>>);
+                                       std::span<dsp::tiered::Complex<Real>>);
+template void preflattening_gains<Real>(std::span<const dsp::tiered::Complex<Real>>, int, int, int,
+                                        std::span<dsp::tiered::Energy<Real>>);
+template void preflattening_gains<Real>(std::span<const dsp::tiered::Complex<Real>>, int, int, int,
+                                        std::span<dsp::tiered::Energy<Real>>, CubicBasis&);
+template void prediction_coefficients<Real>(std::span<const dsp::tiered::Complex<Real>>, int, int,
+                                            std::span<dsp::tiered::Complex<Real>>,
+                                            std::span<dsp::tiered::Complex<Real>>);
 // The A-SPX encoder (src/ac4/src/encoder/aspx/aspx_encoder.cpp) calls
 // generate_high_band at double regardless of the decoder's scalar, to choose
 // its interleaving as a decoder will reconstruct it (see this target's
@@ -384,13 +384,13 @@ ICLFORGE_AC4_ALSO_AT_DOUBLE(
     template void generate_high_band<double>(const SubbandGroups&, const PatchTables&,
                                              const HfGeneratorInput<double>&,
                                              HfGeneratorState<double>&,
-                                             std::span<dsp::Complex<double>>);
-    template void preflattening_gains<double>(std::span<const dsp::Complex<double>>, int, int, int,
+                                             std::span<dsp::tiered::Complex<double>>);
+    template void preflattening_gains<double>(std::span<const dsp::tiered::Complex<double>>, int, int, int,
                                               std::span<double>);
-    template void preflattening_gains<double>(std::span<const dsp::Complex<double>>, int, int, int,
+    template void preflattening_gains<double>(std::span<const dsp::tiered::Complex<double>>, int, int, int,
                                               std::span<double>, CubicBasis&);
-    template void prediction_coefficients<double>(std::span<const dsp::Complex<double>>, int, int,
-                                                  std::span<dsp::Complex<double>>,
-                                                  std::span<dsp::Complex<double>>);)
+    template void prediction_coefficients<double>(std::span<const dsp::tiered::Complex<double>>, int, int,
+                                                  std::span<dsp::tiered::Complex<double>>,
+                                                  std::span<dsp::tiered::Complex<double>>);)
 
 }  // namespace iclforge::ac4::detail::aspx

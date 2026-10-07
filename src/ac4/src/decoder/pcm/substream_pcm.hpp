@@ -196,9 +196,9 @@ class SubstreamPcm {
         // the front when the next frame's render() begins, after every stage has read it.
         [[nodiscard]] QmfMatrix out() noexcept { return QmfMatrix(ext).first(out_count); }
 
-        dsp::ChannelSynthesis<Real> synthesis;
+        dsp::tiered::ChannelSynthesis<Real> synthesis;
         std::vector<Real> delay;  // the last d_pcm samples of the previous frame
-        dsp::QmfAnalysis<Real> analysis;
+        dsp::tiered::QmfAnalysis<Real> analysis;
         // Q_low_ext (pcm/aspx.hpp): kTsOffsetHfadj + ts_offset_hfgen slots of
         // the previous frames' processed QMF matrix, then this frame's.
         std::vector<QmfValue> ext;
@@ -209,8 +209,8 @@ class SubstreamPcm {
     // A channel that comes out, after the downmix: its synthesis bank and, at
     // every frame_rate_index but 13, its sample rate converter.
     struct Output {
-        dsp::QmfSynthesis<Real> synthesis;
-        std::optional<dsp::Resampler<Real>> converter;
+        dsp::tiered::QmfSynthesis<Real> synthesis;
+        std::optional<dsp::tiered::Resampler<Real>> converter;
     };
 
     // The QMF-domain control data of one frame, held d_ctrl frames until the
@@ -339,7 +339,7 @@ class SubstreamPcm {
     int slots_ = 0;          // num_qmf_timeslots
     int ts_in_ats_ = 1;      // num_ts_in_ats
     int hfgen_ = 0;          // ts_offset_hfgen
-    std::optional<dsp::TransformSet<Real>> transforms_;
+    std::optional<dsp::tiered::TransformSet<Real>> transforms_;
     std::span<const Speaker> speakers_;  // the channel mode's, speakers_of()
     std::vector<Channel> channels_;      // in speakers_'s order
     // Core decoding's ASPX_SCPL, by aspx_data_2ch() index; empty otherwise.
@@ -393,7 +393,7 @@ class SubstreamPcm {
     // shares, and the phase of the last frame converted. Its table is kept in
     // Real (designed in double, rounded once), for the dot product to run in
     // Real.
-    std::shared_ptr<const dsp::BasicResamplerFilter<Real>> converter_filter_;
+    std::shared_ptr<const dsp::tiered::BasicResamplerFilter<Real>> converter_filter_;
     std::optional<int> converter_phase_;
     DeStage de_;
     // Core decoding of the 9.X.4 modes' ASPX_AJCC and ASPX_ACPL_2 takes dialogue enhancement from
@@ -437,7 +437,7 @@ class SubstreamPcm {
     // Scratch, kept to save an allocation per frame.
     // The QMF banks' working space, which they use one after another: the banks
     // of the substream's channels share this one.
-    dsp::QmfScratch<Real> qmf_scratch_{};
+    dsp::tiered::QmfScratch<Real> qmf_scratch_{};
     // A-SPX's per-channel matrices (16 KB at double), made by the first frame that
     // decodes A-SPX.
     std::unique_ptr<AspxScratch> aspx_scratch_;
@@ -463,7 +463,7 @@ class SubstreamPcm {
     std::optional<double> hsf_dialnorm_;
     std::vector<std::vector<Real>> hsf_aligned_;
     std::vector<std::vector<Real>> hsf_mixed_;
-    std::vector<std::optional<dsp::Resampler<Real>>> hsf_converters_;
+    std::vector<std::optional<dsp::tiered::Resampler<Real>>> hsf_converters_;
     std::vector<std::vector<Real>> spectra_;  // per channel, in window order
     std::vector<int> track_of_;               // per channel, the track its lines are in
     std::vector<Real> pcm_;

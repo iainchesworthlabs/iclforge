@@ -14,7 +14,7 @@
 namespace iclforge::ac4::detail {
 namespace {
 
-using dsp::MantExp;
+using dsp::tiered::MantExp;
 
 // sign(q) |q|^(4/3), clause 5.1.3.2, from pcm/pow43.hpp's table in read-only
 // data. The note under clause 5.1.3.1's quant_spec makes 8 191 the largest
@@ -269,7 +269,7 @@ ParseResult reconstruct_track_floating(const SfInfo& info, const SfData& data, c
 
 // The fixed-point tier's reconstruction (planning/ac4.md, D14d): the same Pseudocodes 21 to 23,
 // each line's value sign(q) |q|^(4/3) 2^((sf - 100) / 4) formed as a mantissa and a power of two
-// (dsp::MantExp) and the noise fill's levels from the bands' exact energies, by MantExp's own
+// (dsp::tiered::MantExp) and the noise fill's levels from the bands' exact energies, by MantExp's own
 // log2 and exp2. The track is walked twice with the same arithmetic: once for the largest
 // magnitude any line can take, which fixes the track's exponent, and once to write the lines,
 // each of which is then below 1, with the format's seven bits above it for the stereo and
@@ -281,9 +281,9 @@ class FixedTrack {
     FixedTrack(const SfInfo& info, const SfData& data, const HsfSfData* hsf)
         : psy_(info.psy), data_(data), hsf_(hsf) {}
 
-    [[nodiscard]] ParseResult run(RandGenState& noise, std::vector<dsp::Fixed32>& scaled, int& exponent) {
+    [[nodiscard]] ParseResult run(RandGenState& noise, std::vector<dsp::tiered::Fixed32>& scaled, int& exponent) {
         scaled.assign(data_.quant_spec.size() + (hsf_ != nullptr ? hsf_->quant_spec.size() : 0),
-                      dsp::Fixed32{});
+                      dsp::tiered::Fixed32{});
         exponent = 0;
         RandGenState unused = noise;
         if (auto ok = walk(false, unused, scaled); !ok) {
@@ -319,11 +319,11 @@ class FixedTrack {
         }
     }
 
-    [[nodiscard]] dsp::Fixed32 stored(MantExp value) const noexcept {
+    [[nodiscard]] dsp::tiered::Fixed32 stored(MantExp value) const noexcept {
         return value.scaled_by_pow2(-largest_.e).to_fixed();
     }
 
-    [[nodiscard]] ParseResult walk(bool write, RandGenState& noise, std::vector<dsp::Fixed32>& scaled) {
+    [[nodiscard]] ParseResult walk(bool write, RandGenState& noise, std::vector<dsp::tiered::Fixed32>& scaled) {
         const auto& pow43 = kPow43<MantExp>;
         const auto magnitude = [](std::int32_t q) {
             const std::int64_t wide = q;
@@ -439,7 +439,7 @@ template <typename R>
 ParseResult reconstruct_track_at(const SfInfo& info, const SfData& data, const HsfSfData* hsf,
                                  const std::array<R, 256>& sf_gain, RandGenState& noise,
                                  std::vector<R>& scaled, int& exponent) {
-    if constexpr (dsp::kFixed<R>) {
+    if constexpr (dsp::tiered::kFixed<R>) {
         return FixedTrack(info, data, hsf).run(noise, scaled, exponent);
     } else {
         exponent = 0;
@@ -457,7 +457,7 @@ ParseResult reconstruct_track(const SfInfo& info, const SfData& data,
 
 ScaleFactorGains scale_factor_gains() {
     ScaleFactorGains gains{};
-    if (dsp::kFixed<Real>) {
+    if (dsp::tiered::kFixed<Real>) {
         return gains;  // the fixed tier forms each gain as a MantExp (FixedTrack)
     }
     for (std::size_t sf = 0; sf < gains.size(); ++sf) {
@@ -581,7 +581,7 @@ void reconstruct_ssf_track(const SsfData& data, std::vector<Real>& scaled, int& 
     scaled.resize(data.lines.size());
     exponent = 0;
     double factor = 1.0;
-    if constexpr (dsp::kFixed<Real>) {
+    if constexpr (dsp::tiered::kFixed<Real>) {
         double largest = 0.0;
         for (const double value : data.lines) {
             largest = std::max(largest, std::abs(value));

@@ -27,7 +27,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "core/aspx/hf_generator.hpp"
-#include "iclforge/ac4/detail/real.hpp"
+#include "iclforge/dsp/tiered/real.hpp"
 #include "tiered/complex.hpp"
 #include "tiered/fft.hpp"
 #include "tiered/kbd.hpp"
@@ -37,7 +37,7 @@
 
 namespace {
 
-namespace dsp = iclforge::ac4::detail::dsp;
+namespace dsp = iclforge::dsp::tiered;
 using iclforge::ac4::detail::Real;
 
 // What the plan's loop was before the passes took the radix and the direction as arguments: the

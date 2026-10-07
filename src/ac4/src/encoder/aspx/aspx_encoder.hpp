@@ -42,7 +42,7 @@ namespace iclforge::ac4::detail {
 
 // The core's own complex type: see pcm/aspx.hpp's QmfValue, the decoder's
 // identical seam.
-using QmfSample = dsp::Complex<double>;
+using QmfSample = dsp::tiered::Complex<double>;
 
 // At frame_rate_index 13: num_qmf_timeslots and num_aspx_timeslots, the
 // analysis bank's lead on the signal (d_pcm), and the lag of the compressed
@@ -157,7 +157,7 @@ class AspxChannelEncoder {
     [[nodiscard]] std::vector<std::pair<int, int>> interleaved_subbands(const AspxChannelFields& fields) const;
 
    private:
-    using Slot = std::array<QmfSample, dsp::kQmfSubbands>;
+    using Slot = std::array<QmfSample, dsp::tiered::kQmfSubbands>;
 
     [[nodiscard]] const Slot& slot(long long g) const noexcept;
     // Q_low_ext for frame f's interval, from the input's own slots, with
@@ -190,15 +190,15 @@ class AspxChannelEncoder {
     // groups that hold a steady tone the patch does not make, which the
     // spectral frontend then codes; sinusoids take the groups left.
     void choose_interleaving(std::span<const QmfSample> ext, AspxChannelFields& fields) const;
-    [[nodiscard]] std::array<bool, dsp::kQmfSubbands> sine_subbands(const AspxChannelFields& fields, int env) const;
+    [[nodiscard]] std::array<bool, dsp::tiered::kQmfSubbands> sine_subbands(const AspxChannelFields& fields, int env) const;
     // One envelope's quantised values: its groups' mean energy per QMF
     // subsample over A-SPX slots [first, last), or where a group holds one of
     // `sines`, that subband's; a group of `waveform` subbands, which the
     // spectral frontend codes, none.
     [[nodiscard]] std::vector<int> signal_envelope(std::span<const QmfSample> ext, int first, int last,
                                                    bool high_res, int quant_mode,
-                                                   const std::array<bool, dsp::kQmfSubbands>& sines,
-                                                   const std::array<bool, dsp::kQmfSubbands>& waveform) const;
+                                                   const std::array<bool, dsp::tiered::kQmfSubbands>& sines,
+                                                   const std::array<bool, dsp::tiered::kQmfSubbands>& waveform) const;
     // The last envelope's values put on another envelope's groups, as
     // Pseudocode 80 does for delta coding along time.
     [[nodiscard]] std::vector<int> map_resolution(std::span<const int> previous, bool previous_high,
@@ -222,8 +222,8 @@ class AspxChannelEncoder {
                         std::span<const int> noise, bool iframe) const;
 
     const AspxSetup* setup_;
-    dsp::QmfAnalysis<double> analysis_;
-    dsp::QmfSynthesis<double> synthesis_;
+    dsp::tiered::QmfAnalysis<double> analysis_;
+    dsp::tiered::QmfSynthesis<double> synthesis_;
     std::deque<Slot> slots_;
     long long first_slot_ = 0;
     Slot silence_{};
@@ -241,7 +241,7 @@ class AspxChannelEncoder {
     std::vector<int> tna_prev_;
     aspx::HfGeneratorState<double> hf_;
     // Pseudocode 92's sine_idx of the last envelope, by QMF subband.
-    std::array<bool, dsp::kQmfSubbands> sine_prev_{};
+    std::array<bool, dsp::tiered::kQmfSubbands> sine_prev_{};
     // Whether the last values were a balance pair's second channel's, whose
     // values are even: only then can balance values be coded along time.
     bool balance_prev_ = false;

@@ -126,7 +126,7 @@ struct Channel {
 // NoiseTable's entry at `index` (Part 1 Table D.2).
 QmfValue noise_entry(int index) {
     const auto& entry =
-        iclforge::ac4::detail::tables::kAspxNoise[static_cast<std::size_t>(index % 512)];
+        iclforge::dsp::tiered::tables::kAspxNoise[static_cast<std::size_t>(index % 512)];
     return {static_cast<iclforge::ac4::detail::Real>(entry[0]),
             static_cast<iclforge::ac4::detail::Real>(entry[1])};
 }
@@ -367,7 +367,7 @@ TEST_CASE("companding's gains are libm's at double and the project's own functio
     // A generic lambda, so that each scalar's branch is compiled only at that scalar.
     const auto expected = [&]<typename R>(int ts) -> R {
         const R sample = qmf_real(100.0 * (ts + 1));
-        if constexpr (iclforge::ac4::detail::dsp::kFixed<R>) {
+        if constexpr (iclforge::dsp::tiered::kFixed<R>) {
             using iclforge::internal::MantExp;
             const MantExp alpha{0.65};
             const MantExp exponent = (MantExp{1} - alpha) / alpha;
@@ -375,7 +375,7 @@ TEST_CASE("companding's gains are libm's at double and the project's own functio
                                   MantExp{full_scale};
             const MantExp gain = scalar_exp2(exponent * scalar_log2(level));
             const MantExp big_g = scalar_exp2(MantExp{1} / alpha);
-            return iclforge::ac4::detail::dsp::apply_gain<R>(gain * big_g, sample);
+            return iclforge::dsp::tiered::apply_gain<R>(gain * big_g, sample);
         } else {
             constexpr R kAlpha = R(0.65);
             constexpr R kExponent = (R{1} - kAlpha) / kAlpha;

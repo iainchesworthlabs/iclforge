@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "iclforge/base/arithmetic/fixed32.hpp"
-#include "iclforge/ac4/detail/real.hpp"
+#include "iclforge/dsp/tiered/real.hpp"
 
 // The sample rate converter of ETSI TS 103 190-1 V1.4.1 clause 6.2.15, and the
 // same converter the other way round, which the encoder uses. At every
@@ -73,7 +73,7 @@
 // float (25/24's is 4,888 bytes and 15/16's 3,200), and a longer one is read where it is, in
 // flash (1001/960's, 188,376 bytes).
 
-namespace iclforge::ac4::detail::dsp {
+namespace iclforge::dsp::tiered {
 
 // What a filter's table holds a coefficient as: the scalar, but Q1.30 in an int32 at Fixed32.
 template <typename Coefficient>
@@ -183,4 +183,4 @@ class Resampler {
 
 extern template class Resampler<Real>;
 
-}  // namespace iclforge::ac4::detail::dsp
+}  // namespace iclforge::dsp::tiered

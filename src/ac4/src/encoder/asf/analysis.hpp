@@ -27,7 +27,7 @@ namespace iclforge::ac4::detail {
 
 class Analysis {
    public:
-    // `rate_multiplier` as for dsp::TransformSet: 1 at 44.1 and 48 kHz.
+    // `rate_multiplier` as for dsp::tiered::TransformSet: 1 at 44.1 and 48 kHz.
     Analysis(int frame_length, int rate_multiplier);
 
     [[nodiscard]] bool valid() const noexcept { return valid_; }
@@ -44,7 +44,7 @@ class Analysis {
 
     int frame_length_ = 0;
     bool valid_ = false;
-    std::vector<dsp::Mdct<double>> mdct_;
+    std::vector<dsp::tiered::Mdct<double>> mdct_;
     std::vector<std::vector<double>> kbd_;   // KBD_LEFT per block length
     std::vector<double> segment_;
 };

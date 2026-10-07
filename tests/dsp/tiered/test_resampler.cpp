@@ -29,7 +29,7 @@
 
 namespace {
 
-namespace dsp = iclforge::ac4::detail::dsp;
+namespace dsp = iclforge::dsp::tiered;
 
 // The decoder's scalar: float in a float build, where the converter's table is
 // kept and its dot product run at float, and double otherwise.

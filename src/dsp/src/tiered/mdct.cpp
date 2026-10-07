@@ -10,14 +10,14 @@
 #include "tiered/scalar_traits.hpp"
 #include "tiered/transform_tables.hpp"
 
-namespace iclforge::ac4::detail::dsp {
+namespace iclforge::dsp::tiered {
 namespace {
 
 // xcos1[k] + j xsin1[k] = -cos(2 pi (8k + 1) / 16N) - j sin(2 pi (8k + 1) / 16N),
 // Pseudocode 60, for k < N/2.
 template <typename Complex>
 std::vector<Complex> pre_twiddles(std::size_t length) {
-    // Named Scalar, not Real: ICLFORGE_AC4_ALSO_AT_DOUBLE (this target's CMakeLists.txt)
+    // Named Scalar, not Real: ICLFORGE_DSP_ALSO_AT_DOUBLE (this target's CMakeLists.txt)
     // explicitly instantiates Mdct/Imdct<double> alongside <Real> in a float
     // build, and MSVC's /W4 flags a local alias named Real that resolves to a
     // different type than the enclosing iclforge::ac4::detail::Real as hiding it
@@ -286,9 +286,9 @@ template class Mdct<Real>;
 // the core's own tests (tests/dsp/tiered/test_dsp.cpp) exercise both
 // Mdct and Imdct at double directly, alongside Real, to check the pseudocode
 // at the scalar the double build's own reference always uses (see this
-// target's CMakeLists.txt, ICLFORGE_AC4_ALSO_AT_DOUBLE).
-ICLFORGE_AC4_ALSO_AT_DOUBLE(
+// target's CMakeLists.txt, ICLFORGE_DSP_ALSO_AT_DOUBLE).
+ICLFORGE_DSP_ALSO_AT_DOUBLE(
     template class Imdct<double>;
     template class Mdct<double>;)
 
-}  // namespace iclforge::ac4::detail::dsp
+}  // namespace iclforge::dsp::tiered

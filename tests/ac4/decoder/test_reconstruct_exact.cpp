@@ -81,7 +81,7 @@ TEST_CASE("the scale factor gains are the std::pow the reconstruction made for e
     const iclforge::ac4::detail::ScaleFactorGains gains =
         iclforge::ac4::detail::scale_factor_gains();
     // At Fixed32 the table is empty: that tier forms each gain as a MantExp (pcm/asf_reconstruct.cpp).
-    if (iclforge::ac4::detail::dsp::kFixed<Real>) {
+    if (iclforge::dsp::tiered::kFixed<Real>) {
         CHECK(gains == iclforge::ac4::detail::ScaleFactorGains{});
         return;
     }

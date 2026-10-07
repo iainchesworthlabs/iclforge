@@ -528,7 +528,7 @@ int main(int argc, char** argv) {
     // 64-subband slot of the QMF analysis bank (Pseudocode 65) behind A-SPX and
     // A-CPL. Real audio in, same as every kernel above.
     {
-        namespace dsp = iclforge::ac4::detail::dsp;
+        namespace dsp = iclforge::dsp::tiered;
         const std::span<const float> ch0 = audio.channel(0);
         std::vector<double> mdct_in(1024);
         for (std::size_t i = 0; i < mdct_in.size(); ++i) {

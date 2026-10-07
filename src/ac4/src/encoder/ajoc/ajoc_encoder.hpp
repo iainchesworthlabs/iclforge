@@ -58,8 +58,8 @@ class AjocEncoder {
     // Analyses slot slots() of each downmix signal, in A-JOC's input order,
     // and of each object, from the 64 samples of the delayed signal from 64
     // slots() - d_pcm.
-    void push_slot(std::span<const std::array<double, dsp::kQmfSubbands>> dmx,
-                   std::span<const std::array<double, dsp::kQmfSubbands>> objects);
+    void push_slot(std::span<const std::array<double, dsp::tiered::kQmfSubbands>> dmx,
+                   std::span<const std::array<double, dsp::tiered::kQmfSubbands>> objects);
     [[nodiscard]] long long slots() const noexcept {
         return first_slot_ + static_cast<long long>(slots_.size());
     }
@@ -87,7 +87,7 @@ class AjocEncoder {
     void drop_before_frame(long long frame);
 
    private:
-    using Slot = std::array<dsp::Complex<double>, dsp::kQmfSubbands>;
+    using Slot = std::array<dsp::tiered::Complex<double>, dsp::tiered::kQmfSubbands>;
     using Reconstruction = ajoc::Reconstruction<double>;
 
     // A candidate's quantised values: per object, dry [ch][pb] and wet
@@ -115,12 +115,12 @@ class AjocEncoder {
     // Runs `values` on a copy of the state from the frames sent: the objects'
     // error over the frame, and the copy and its output.
     [[nodiscard]] double run(const Values& values, Reconstruction& state,
-                             std::vector<std::vector<dsp::Complex<double>>>& out);
+                             std::vector<std::vector<dsp::tiered::Complex<double>>>& out);
 
     AjocSetup setup_;
     FrameTiming timing_;
-    std::vector<dsp::QmfAnalysis<double>> dmx_analyses_;
-    std::vector<dsp::QmfAnalysis<double>> object_analyses_;
+    std::vector<dsp::tiered::QmfAnalysis<double>> dmx_analyses_;
+    std::vector<dsp::tiered::QmfAnalysis<double>> object_analyses_;
     std::deque<std::vector<Slot>> slots_;  // [slot][downmix signals, then objects]
     long long first_slot_ = 0;
     Reconstruction state_;
@@ -130,8 +130,8 @@ class AjocEncoder {
     bool held_valid_ = false;
     // The frame being proposed: its downmix and objects over its slots, and
     // what propose() chose, with the state it leaves.
-    std::vector<std::vector<dsp::Complex<double>>> x_;
-    std::vector<std::vector<dsp::Complex<double>>> z_;
+    std::vector<std::vector<dsp::tiered::Complex<double>>> x_;
+    std::vector<std::vector<dsp::tiered::Complex<double>>> z_;
     Values proposed_;
     Reconstruction proposed_state_;
     bool proposed_iframe_ = true;

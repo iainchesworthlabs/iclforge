@@ -8,7 +8,7 @@
 namespace iclforge::ac4::detail {
 namespace {
 
-constexpr std::size_t kSubbands = dsp::kQmfSubbands;
+constexpr std::size_t kSubbands = dsp::tiered::kQmfSubbands;
 
 }  // namespace
 
@@ -99,12 +99,12 @@ long long DrcGainEncoder::slots_needed(long long frame) const noexcept {
            timing_.hfgen_slots;
 }
 
-void DrcGainEncoder::push_slot(std::span<const std::array<double, dsp::kQmfSubbands>> samples) {
+void DrcGainEncoder::push_slot(std::span<const std::array<double, dsp::tiered::kQmfSubbands>> samples) {
     // The programme's K-weighted power in the slot, as a mean square per
     // sample at full scale 1.0: the slot's 64 samples put sum(QWIN^2) times
     // their power into the subbands.
     double power = 0.0;
-    std::array<dsp::Complex<double>, kSubbands> slot{};
+    std::array<dsp::tiered::Complex<double>, kSubbands> slot{};
     for (std::size_t c = 0; c < analyses_.size() && c < samples.size(); ++c) {
         analyses_[c].process(samples[c], slot);
         if (weight_[c] == 0.0) {

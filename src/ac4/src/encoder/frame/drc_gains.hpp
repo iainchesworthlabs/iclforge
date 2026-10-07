@@ -56,7 +56,7 @@ class DrcGainEncoder {
 
     // Analyses slot slots() of each channel, from the 64 samples of the
     // delayed input (full scale 1.0) from 64 slots() - d_pcm.
-    void push_slot(std::span<const std::array<double, dsp::kQmfSubbands>> samples);
+    void push_slot(std::span<const std::array<double, dsp::tiered::kQmfSubbands>> samples);
     [[nodiscard]] long long slots() const noexcept { return slots_; }
 
     // The slot after the last one frame f's gains read.
@@ -74,9 +74,9 @@ class DrcGainEncoder {
     int groups_ = 1;
     int bands_ = 1;
     std::vector<double> weight_;  // BS.1770's, per channel
-    std::array<double, dsp::kQmfSubbands> k_weight_{};
+    std::array<double, dsp::tiered::kQmfSubbands> k_weight_{};
     double qmf_gain_ = 1.0;  // sum of QWIN^2
-    std::vector<dsp::QmfAnalysis<double>> analyses_;
+    std::vector<dsp::tiered::QmfAnalysis<double>> analyses_;
     DrcSmoothing smoothing_;
     // The smoothed gain of each slot analysed and not yet sent, from slot
     // `first_`.

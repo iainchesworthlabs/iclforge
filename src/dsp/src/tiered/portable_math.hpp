@@ -24,7 +24,7 @@
 // bits however the last bit of its double falls, except where that value lies within it of a
 // rounding boundary of float, about one in 2^29.
 
-namespace iclforge::ac4::detail::dsp::portable {
+namespace iclforge::dsp::tiered::portable {
 
 // The smallest whole number not below x, for a finite x of magnitude below 2^62.
 [[nodiscard]] constexpr double ceil(double x) noexcept {
@@ -174,4 +174,4 @@ struct Reduced {
     }
 }
 
-}  // namespace iclforge::ac4::detail::dsp::portable
+}  // namespace iclforge::dsp::tiered::portable

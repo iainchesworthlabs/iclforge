@@ -10,12 +10,12 @@
 namespace iclforge::ac4::detail {
 namespace {
 
-using Complex = dsp::Complex<double>;
+using Complex = dsp::tiered::Complex<double>;
 
 constexpr int kFrameSlots = 32;
 // The centred window's lead past the frame's slots.
 constexpr int kLookahead = 16;
-constexpr int kSubbands = dsp::kQmfSubbands;
+constexpr int kSubbands = dsp::tiered::kQmfSubbands;
 
 [[nodiscard]] std::size_t at(int index) noexcept {
     return static_cast<std::size_t>(index);
@@ -80,8 +80,8 @@ AjocEncoder::AjocEncoder(const AjocSetup& setup, const FrameTiming& timing)
       x_(at(setup.num_dmx)),
       z_(at(setup.num_umx)) {}
 
-void AjocEncoder::push_slot(std::span<const std::array<double, dsp::kQmfSubbands>> dmx,
-                            std::span<const std::array<double, dsp::kQmfSubbands>> objects) {
+void AjocEncoder::push_slot(std::span<const std::array<double, dsp::tiered::kQmfSubbands>> dmx,
+                            std::span<const std::array<double, dsp::tiered::kQmfSubbands>> objects) {
     std::vector<Slot>& analysed = slots_.emplace_back(at(setup_.num_dmx + setup_.num_umx));
     for (std::size_t c = 0; c < dmx_analyses_.size(); ++c) {
         dmx_analyses_[c].process(dmx[c], analysed[c]);

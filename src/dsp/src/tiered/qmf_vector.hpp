@@ -25,7 +25,7 @@
 // counted down from 63 - the values are gathered and scattered through the seam's
 // set() and lane accessors, which are a load or a store each and no arithmetic.
 
-namespace iclforge::ac4::detail::dsp::qmf::vec {
+namespace iclforge::dsp::tiered::qmf::vec {
 
 namespace arch = iclforge::internal::arch;
 
@@ -86,7 +86,7 @@ template <typename Real>
 [[nodiscard]] inline CV<Real> operator-(CV<Real> a, CV<Real> b) noexcept {
     return {a.re - b.re, a.im - b.im};
 }
-// The plain cross form, as dsp::Complex's operator*.
+// The plain cross form, as dsp::tiered::Complex's operator*.
 template <typename Real>
 [[nodiscard]] inline CV<Real> operator*(CV<Real> a, CV<Real> b) noexcept {
     return {a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re};
@@ -121,7 +121,7 @@ template <typename Real>
 inline void analysis_window(const Real* filt, std::size_t head, Real* u) noexcept {
     using L = Lanes<Real>;
     using V = typename L::V;
-    const auto& qwin = tables::kQwin;
+    const auto& qwin = iclforge::dsp::tiered::tables::kQwin;
     std::array<const Real*, 10> block{};
     for (std::size_t b = 0; b < 10; ++b) {
         block[b] = filt + physical(head, b) * 64;
@@ -294,7 +294,7 @@ template <typename Real>
 inline void synthesis_window(const Real* filt, std::size_t head, Real* out) noexcept {
     using L = Lanes<Real>;
     using V = typename L::V;
-    const auto& qwin = tables::kQwin;
+    const auto& qwin = iclforge::dsp::tiered::tables::kQwin;
     std::array<const Real*, 10> block{};
     for (std::size_t b = 0; b < 10; ++b) {
         block[b] = filt + physical(head, b) * 128;
@@ -310,4 +310,4 @@ inline void synthesis_window(const Real* filt, std::size_t head, Real* out) noex
     }
 }
 
-}  // namespace iclforge::ac4::detail::dsp::qmf::vec
+}  // namespace iclforge::dsp::tiered::qmf::vec

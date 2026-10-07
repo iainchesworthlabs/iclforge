@@ -396,7 +396,7 @@ void Decorrelator<Real>::process(std::span<const Complex> in, std::span<Complex>
         for (std::size_t ts = 0; ts < n; ++ts) {
             x[kIn + ts] = in[ts * kSubbands + s];
         }
-        if constexpr (dsp::kFixed<Real>) {
+        if constexpr (dsp::tiered::kFixed<Real>) {
             // a[0] is 1 in every table, so there is nothing to divide by.
             const std::span<const std::int32_t> aq = coefficients_q30(index_, region);
             for (std::size_t ts = 0; ts < n; ++ts) {
@@ -456,12 +456,12 @@ void TransientDucker<Real>::process(std::span<Complex> inout, int num_ts) noexce
     const auto smoothing = static_cast<Energy>(kAlphaSmooth);
     const auto gamma = static_cast<Energy>(kGamma);
     // An energy of the double decoder's QMF domain, in the scalar's (dsp/scalar_traits.hpp).
-    const auto epsilon = dsp::qmf_energy<Real>(static_cast<Energy>(kEpsilon));
+    const auto epsilon = dsp::tiered::qmf_energy<Real>(static_cast<Energy>(kEpsilon));
     for (std::size_t ts = 0; ts < n; ++ts) {
         // Pseudocode 113, then 112, then 114, for this slot.
         std::array<Energy, kMaxParamBands> energy{};
         for (std::size_t sb = 0; sb < kSubbands; ++sb) {
-            energy[at(kBand[sb])] += dsp::energy_of(inout[ts * kSubbands + sb]);
+            energy[at(kBand[sb])] += dsp::tiered::energy_of(inout[ts * kSubbands + sb]);
         }
         std::array<Energy, kMaxParamBands> gain{};
         for (std::size_t pb = 0; pb < at(kMaxParamBands); ++pb) {
@@ -474,7 +474,7 @@ void TransientDucker<Real>::process(std::span<Complex> inout, int num_ts) noexce
                            : Energy{1};
         }
         for (std::size_t sb = 0; sb < kSubbands; ++sb) {
-            inout[ts * kSubbands + sb] = dsp::apply_gain<Real>(gain[at(kBand[sb])], inout[ts * kSubbands + sb]);
+            inout[ts * kSubbands + sb] = dsp::tiered::apply_gain<Real>(gain[at(kBand[sb])], inout[ts * kSubbands + sb]);
         }
     }
 }

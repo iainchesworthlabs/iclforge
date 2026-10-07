@@ -12,7 +12,7 @@
 #include "tiered/resampler_design.hpp"
 #include "tiered/resampler_vector.hpp"
 
-namespace iclforge::ac4::detail::dsp {
+namespace iclforge::dsp::tiered {
 namespace {
 
 // The design's functions as the C library has them, which design the table at double as the
@@ -21,7 +21,7 @@ struct LibmMath {
     [[nodiscard]] static double ceil(double x) noexcept { return std::ceil(x); }
     [[nodiscard]] static double sqrt(double x) noexcept { return std::sqrt(x); }
     [[nodiscard]] static double sin(double x) noexcept { return std::sin(x); }
-    [[nodiscard]] static double bessel_i0(double x) noexcept { return dsp::bessel_i0(x); }
+    [[nodiscard]] static double bessel_i0(double x) noexcept { return dsp::tiered::bessel_i0(x); }
 };
 
 }  // namespace
@@ -277,8 +277,8 @@ template class BasicResamplerFilter<Real>;
 template class Resampler<Real>;
 // The encoder's own sample rate handling (src/ac4/src/encoder/encoder.cpp) calls
 // this at double regardless of the decoder's scalar (see this target's
-// CMakeLists.txt, ICLFORGE_AC4_ALSO_AT_DOUBLE), with the double filter.
-ICLFORGE_AC4_ALSO_AT_DOUBLE(template class BasicResamplerFilter<double>;)
-ICLFORGE_AC4_ALSO_AT_DOUBLE(template class Resampler<double>;)
+// CMakeLists.txt, ICLFORGE_DSP_ALSO_AT_DOUBLE), with the double filter.
+ICLFORGE_DSP_ALSO_AT_DOUBLE(template class BasicResamplerFilter<double>;)
+ICLFORGE_DSP_ALSO_AT_DOUBLE(template class Resampler<double>;)
 
-}  // namespace iclforge::ac4::detail::dsp
+}  // namespace iclforge::dsp::tiered

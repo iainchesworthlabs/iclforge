@@ -5,7 +5,7 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac4/detail/real.hpp"
+#include "iclforge/dsp/tiered/real.hpp"
 #include "tiered/complex.hpp"
 #include "tiered/fft_kernels.hpp"
 
@@ -26,12 +26,12 @@
 // Written against a scalar type (planning/ac4.md, "Arithmetic"); only double
 // is instantiated until the float and fixed-point tiers arrive.
 
-namespace iclforge::ac4::detail::dsp {
+namespace iclforge::dsp::tiered {
 
 template <typename Real>
 class Fft {
    public:
-    using Complex = iclforge::ac4::detail::dsp::Complex<Real>;
+    using Complex = iclforge::dsp::tiered::Complex<Real>;
 
     // A length with a prime factor above 5, or 0, gives a plan that is not
     // valid() and transforms nothing.
@@ -102,4 +102,4 @@ class Fft {
 
 extern template class Fft<Real>;
 
-}  // namespace iclforge::ac4::detail::dsp
+}  // namespace iclforge::dsp::tiered

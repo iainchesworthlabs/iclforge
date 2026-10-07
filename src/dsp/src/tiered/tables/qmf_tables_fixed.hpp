@@ -7,7 +7,7 @@
 // tools/generators/gen_ac4_fixed_tables.py from the float tables of
 // src/dsp/src/tiered/tables/qmf_tables.cpp; do not edit by hand.
 
-namespace iclforge::ac4::detail::tables {
+namespace iclforge::dsp::tiered::tables {
 
 // QWIN in Q1.30: each float of kQwin times 2^30, rounded half away from zero. One output
 // of the analysis sums five taps whose magnitudes add to at most 1.000139, and one
@@ -220,4 +220,4 @@ inline constexpr std::array<std::array<std::int32_t, 2>, 512> kAspxNoiseQ24 = {{
     {16603270, -2409661}, {16332486, -3837302}, {16748124, 987559}, {-2443082, 16598388},
 }};
 
-}  // namespace iclforge::ac4::detail::tables
+}  // namespace iclforge::dsp::tiered::tables

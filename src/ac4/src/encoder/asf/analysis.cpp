@@ -19,16 +19,16 @@ Analysis::Analysis(int frame_length, int rate_multiplier) : frame_length_(frame_
     // splits into eighths or quarters at most, and the halvings stop there.
     for (int k = 0; k < kLengthsPerFrame; ++k) {
         const int length = frame_length >> k;
-        const double alpha = dsp::kbd_alpha(length, rate_multiplier);
+        const double alpha = dsp::tiered::kbd_alpha(length, rate_multiplier);
         if (alpha == 0.0) {
             break;
         }
-        dsp::Mdct<double> mdct(static_cast<std::size_t>(length));
+        dsp::tiered::Mdct<double> mdct(static_cast<std::size_t>(length));
         if (!mdct.valid()) {
             return;
         }
         mdct_.push_back(std::move(mdct));
-        kbd_.push_back(dsp::kbd_left(length, alpha));
+        kbd_.push_back(dsp::tiered::kbd_left(length, alpha));
     }
     valid_ = !mdct_.empty();
 }

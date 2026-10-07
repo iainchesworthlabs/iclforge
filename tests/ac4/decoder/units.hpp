@@ -16,10 +16,10 @@
 namespace ac4_units {
 
 using Real = iclforge::ac4::detail::Real;
-using QmfValue = iclforge::ac4::detail::dsp::Complex<Real>;
+using QmfValue = iclforge::dsp::tiered::Complex<Real>;
 
-inline constexpr int kQmfShift = iclforge::ac4::detail::dsp::kQmfShift<Real>;
-inline constexpr int kTimeShift = iclforge::ac4::detail::dsp::kTimeShift<Real>;
+inline constexpr int kQmfShift = iclforge::dsp::tiered::kQmfShift<Real>;
+inline constexpr int kTimeShift = iclforge::dsp::tiered::kTimeShift<Real>;
 
 // A QMF-domain value given in the double decoder's units.
 [[nodiscard]] inline Real qmf_real(double value) {
@@ -37,7 +37,7 @@ inline constexpr int kTimeShift = iclforge::ac4::detail::dsp::kTimeShift<Real>;
 // The scalar's relative rounding: its epsilon at double and float, and at Fixed32 one raw unit
 // against a value of 1/16, the size of the tests' QMF values in the fixed tier's units.
 [[nodiscard]] inline double relative_epsilon() {
-    if constexpr (iclforge::ac4::detail::dsp::kFixed<Real>) {
+    if constexpr (iclforge::dsp::tiered::kFixed<Real>) {
         return 0x1p-20;
     } else {
         return static_cast<double>(std::numeric_limits<Real>::epsilon());
@@ -48,7 +48,7 @@ inline constexpr int kTimeShift = iclforge::ac4::detail::dsp::kTimeShift<Real>;
 // stereo and multichannel tools by themselves: at Fixed32 the decoder holds a track's lines at
 // an exponent of the track's own (src/ac4/src/decoder/pcm/asf_reconstruct.hpp), and these hold a
 // test's at 2^12, which keeps lines of a few thousand inside the format.
-inline constexpr int kLineExponent = iclforge::ac4::detail::dsp::kFixed<Real> ? 12 : 0;
+inline constexpr int kLineExponent = iclforge::dsp::tiered::kFixed<Real> ? 12 : 0;
 [[nodiscard]] inline Real line_real(double value) {
     return static_cast<Real>(std::ldexp(value, -kLineExponent));
 }

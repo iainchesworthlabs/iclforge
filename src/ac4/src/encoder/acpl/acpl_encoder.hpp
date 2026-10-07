@@ -118,7 +118,7 @@ class AcplEncoder {
 
     // Analyses slot slots() of each channel, from the 64 samples of the
     // delayed input (full scale 1.0) from 64 slots() - d_pcm.
-    void push_slot(std::span<const std::array<double, dsp::kQmfSubbands>> samples);
+    void push_slot(std::span<const std::array<double, dsp::tiered::kQmfSubbands>> samples);
     [[nodiscard]] long long slots() const noexcept { return first_slot_ + static_cast<long long>(slots_.size()); }
 
     // The first slot frame f's parameters apply to, and the slot after the
@@ -148,14 +148,14 @@ class AcplEncoder {
     void drop_before_frame(long long frame);
 
    private:
-    // The core's own complex type: Slot crosses into dsp::QmfAnalysis<Real>
+    // The core's own complex type: Slot crosses into dsp::tiered::QmfAnalysis<Real>
     // (push_slot()), which takes it since D14a (planning/ac4.md). Spectrum
     // is the encoder's own DFT bins, built from Slot's history but never
     // itself passed to the core, so it keeps std::complex<double>.
-    using Slot = std::array<dsp::Complex<double>, dsp::kQmfSubbands>;
+    using Slot = std::array<dsp::tiered::Complex<double>, dsp::tiered::kQmfSubbands>;
     // A channel's subbands over a frame's estimation window, each as its
     // DFT's bins (acpl_encoder.cpp, kBandCentreBin).
-    using Spectrum = std::array<std::array<std::complex<double>, kAcplWindowSlots>, dsp::kQmfSubbands>;
+    using Spectrum = std::array<std::array<std::complex<double>, kAcplWindowSlots>, dsp::tiered::kQmfSubbands>;
     // A parameter's quantised values per band, [band].
     using Values = std::array<int, acpl::kMaxParamBands>;
 
@@ -184,7 +184,7 @@ class AcplEncoder {
     int quant_mode_ = 0;
     int qmf_band_ = 0;
     int start_band_ = 0;
-    std::vector<dsp::QmfAnalysis<double>> analyses_;
+    std::vector<dsp::tiered::QmfAnalysis<double>> analyses_;
     std::deque<std::vector<Slot>> slots_;  // [slot][channel]
     long long first_slot_ = 0;
     // What the decoder holds for DIFF_TIME (Pseudocode 121's acpl_SET_q_prev):

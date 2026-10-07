@@ -8,7 +8,7 @@
 #include "tiered/kbd.hpp"
 #include "tiered/transform_tables.hpp"
 
-namespace iclforge::ac4::detail::dsp {
+namespace iclforge::dsp::tiered {
 namespace {
 
 // Block lengths are the full length halved up to four times (clause 5.5.3).
@@ -61,7 +61,7 @@ std::vector<Real> TransformSet<Real>::computed_kbd_left(int length, int rate_mul
     // once, here - the vector<double>-to-vector<Real> range constructor
     // narrows implicitly per element, which -Wdouble-promotion's sibling
     // warning (MSVC's C4244) rightly flags as an error on the float build.
-    const std::vector<double> window = dsp::kbd_left(length, kbd_alpha(length, rate_multiplier));
+    const std::vector<double> window = dsp::tiered::kbd_left(length, kbd_alpha(length, rate_multiplier));
     std::vector<Real> narrowed(window.size());
     std::ranges::transform(window, narrowed.begin(), [](double w) { return static_cast<Real>(w); });
     return narrowed;
@@ -176,9 +176,9 @@ template class TransformSet<Real>;
 template class ChannelSynthesis<Real>;
 // The core's own tests (tests/dsp/tiered/test_dsp.cpp) exercise both at
 // double directly, alongside Real (see this target's CMakeLists.txt,
-// ICLFORGE_AC4_ALSO_AT_DOUBLE).
-ICLFORGE_AC4_ALSO_AT_DOUBLE(
+// ICLFORGE_DSP_ALSO_AT_DOUBLE).
+ICLFORGE_DSP_ALSO_AT_DOUBLE(
     template class TransformSet<double>;
     template class ChannelSynthesis<double>;)
 
-}  // namespace iclforge::ac4::detail::dsp
+}  // namespace iclforge::dsp::tiered
