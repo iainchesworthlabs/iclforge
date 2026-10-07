@@ -192,6 +192,7 @@ FOLDED = {
     "c3": {},
     "c4n": {},
     "c4": {},
+    "c5": {},
 }
 
 # --- C4's names -------------------------------------------------------------------------------
@@ -236,8 +237,31 @@ def c4_new(path: str) -> str | None:
     return C4_EXACT.get(path)
 
 
-STAGES = {"c1": c1_new, "c2": c2_new, "c3": c3_new, "c4n": c4n_new, "c4": c4_new}
-REMOVED = {"c1": C1_REMOVED, "c2": C2_REMOVED, "c3": C3_REMOVED, "c4n": (), "c4": ()}
+# --- C5 ---------------------------------------------------------------------------------------
+# AC-4's transforms, QMF banks and sample rate converter, and the tables they read, are dsp's
+# (decision 14): src/dsp/src/tiered/, namespace iclforge::dsp::tiered, the kernels written against a
+# scalar tier, beside dsp's own. The QMF tables move whole: QWIN is the banks' window, and Annex
+# D's file holds A-SPX's noise table beside it, which its generator writes together.
+C5_TABLES = ("qmf_tables.hpp", "qmf_tables.cpp", "qmf_tables_fixed.hpp", "qmf_twiddles.hpp",
+             "transform_tables.hpp")
+C5_TESTS = ("dsp", "dsp_exact", "resampler", "transform_tables", "portable_math")
+C5_RULES: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"^src/ac4/src/core/dsp/(.+)$"), r"src/dsp/src/tiered/\1"),
+    (re.compile(rf"^src/ac4/src/core/tables/({'|'.join(map(re.escape, C5_TABLES))})$"),
+     r"src/dsp/src/tiered/tables/\1"),
+    (re.compile(rf"^tests/ac4/core/test_({'|'.join(C5_TESTS)})\.cpp$"), r"tests/dsp/tiered/test_\1.cpp"),
+]
+
+
+def c5_new(path: str) -> str | None:
+    for rx, repl in C5_RULES:
+        if rx.match(path):
+            return rx.sub(repl, path)
+    return None
+
+
+STAGES = {"c1": c1_new, "c2": c2_new, "c3": c3_new, "c4n": c4n_new, "c4": c4_new, "c5": c5_new}
+REMOVED = {"c1": C1_REMOVED, "c2": C2_REMOVED, "c3": C3_REMOVED, "c4n": (), "c4": (), "c5": ()}
 
 # The libraries each stage merges, old -> new: what a target, an export macro, an export header, a
 # pkg-config name or an ABI allowlist follows (consol_apply.py, export_diff.py --map,
@@ -248,12 +272,13 @@ LIBRARY_MAP = {
     "c3": {c: "containers" for c in CONTAINERS},
     "c4n": {},
     "c4": {},
+    "c5": {},
 }
 
 # The libraries a stage divides, old -> every library its files went to: signing's key, hash and
 # MAC are base's and its signer ac3's, so the exports of signing, ac3 and base are compared as one
 # group (export_diff.py, abi_compare.py).
-SPLITS = {"c1": {}, "c2": {"signing": ("ac3", "base")}, "c3": {}, "c4n": {}, "c4": {}}
+SPLITS = {"c1": {}, "c2": {"signing": ("ac3", "base")}, "c3": {}, "c4n": {}, "c4": {}, "c5": {}}
 
 # The names a stage moves to another namespace, as the exports spell them: the old namespace and,
 # for each name declared in it, the new one (consol_text.py's tables).
