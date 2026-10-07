@@ -35,7 +35,7 @@ struct DirectAnalysis {
     void push(std::span<const float> block, std::span<double> re, std::span<double> im) {
         std::rotate(history.begin(), history.begin() + kM, history.end());
         for (std::size_t n = 0; n < kM; ++n) {
-            history[kL - kM + n] = block[n];
+            history[kL - kM + n] = static_cast<double>(block[n]);
         }
         const auto proto = iclforge::dsp::qmf_prototype();
         std::array<double, kFold> folded{};
