@@ -117,7 +117,8 @@ std::vector<Speaker> destinations(const ElementRoute& route) {
 
 }  // namespace
 
-TEST_CASE("Table 178's matrices equal the table's printed entries", "[ac4][decoder][multichannel]") {
+TEST_CASE("Table 178's matrices equal the table's printed entries",
+          "[ac4][decoder][multichannel]") {
     std::mt19937 rng(178);
     for (int trial = 0; trial < 20; ++trial) {
         const RandomParams p = random_parameters(rng, 2);
@@ -131,7 +132,8 @@ TEST_CASE("Table 178's matrices equal the table's printed entries", "[ac4][decod
     }
 }
 
-TEST_CASE("Table 179's matrices equal the table's printed entries", "[ac4][decoder][multichannel]") {
+TEST_CASE("Table 179's matrices equal the table's printed entries",
+          "[ac4][decoder][multichannel]") {
     std::mt19937 rng(179);
     for (int trial = 0; trial < 20; ++trial) {
         const RandomParams p = random_parameters(rng, 5);

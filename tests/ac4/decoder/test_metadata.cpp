@@ -664,7 +664,8 @@ int drc_code_bits(int diff) {
 
 }  // namespace
 
-TEST_CASE("drc_frame reads a configuration of three modes and their gains", "[ac4][decoder][metadata]") {
+TEST_CASE("drc_frame reads a configuration of three modes and their gains",
+          "[ac4][decoder][metadata]") {
     // 5.1 at frame_len_base 512: three DRC channels and two subframes; mode 0
     // has drc_gains_config 2, two bands, so twelve gains, the first
     // drc_gain_val and eleven drc_gain_code differences of +1.
@@ -1183,7 +1184,8 @@ TEST_CASE("dialog_enhancement reads M/S processing and the signal contribution",
     }
 }
 
-TEST_CASE("dialog_enhancement's configuration follows the I-frame rule", "[ac4][decoder][metadata]") {
+TEST_CASE("dialog_enhancement's configuration follows the I-frame rule",
+          "[ac4][decoder][metadata]") {
     const auto& abs0 = tables::kDeHcbAbs0;
     const auto& diff0 = tables::kDeHcbDiff0;
     // One centre channel, de_method 0.
@@ -1388,7 +1390,8 @@ TEST_CASE("emdf_payloads_substream reads each payload configuration", "[ac4][dec
     CHECK_FALSE(third.config.smpoffst.has_value());
 }
 
-TEST_CASE("emdf_payloads_substream refuses a payload size past the end", "[ac4][decoder][metadata]") {
+TEST_CASE("emdf_payloads_substream refuses a payload size past the end",
+          "[ac4][decoder][metadata]") {
     BitWriter w;
     w.put(2, 5);
     w.put(0, 4);

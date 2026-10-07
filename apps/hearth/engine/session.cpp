@@ -28,8 +28,9 @@ namespace {
         largest = std::max(largest, frame.size());
     }
     const iclforge::ac4::Toc& toc = units.first.toc;
-    const std::optional<containers::iec61937::BurstDataType> type = containers::iec61937::ac4_burst_type_for(
-        largest, toc.sample_rate_hz == 44100 ? 0 : 1, toc.frame_rate_index);
+    const std::optional<containers::iec61937::BurstDataType> type =
+        containers::iec61937::ac4_burst_type_for(largest, toc.sample_rate_hz == 44100 ? 0 : 1,
+                                                 toc.frame_rate_index);
     if (!type) {
         return std::nullopt;
     }

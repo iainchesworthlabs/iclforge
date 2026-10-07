@@ -15,16 +15,15 @@
 // library target of its own (see recording_sink.hpp's own comment), and this
 // is smaller than either.
 //
-// Lives here rather than in iclforge::ac3 itself: iclforge::containers::matroska/iclforge::containers::mp4/
-// iclforge::containers::mpegts each say plainly they have no dependency on iclforge::ac3 (see
-// e.g. matroska/reader.hpp's own header comment) - the containers are
-// deliberately independent of the codec, and giving the codec library a
-// dependency back on them would invert that for every third party that links
-// iclforge::ac3 to decode bare elementary streams and wants nothing else. This
-// file depends on both instead, which is fine at this layer - apps/common
-// already does for RecordingSink (ac3/io/wav.hpp, ac3/iec61937/iec61937.hpp) -
-// since disambiguating a container from a bare elementary stream is exactly
-// where knowing both sides earns its keep (see ContainerKind's own comment).
+// Lives here rather than in iclforge::ac3 itself:
+// iclforge::containers::matroska/iclforge::containers::mp4/ iclforge::containers::mpegts each say
+// plainly they have no dependency on iclforge::ac3 (see e.g. matroska/reader.hpp's own header
+// comment) - the containers are deliberately independent of the codec, and giving the codec library
+// a dependency back on them would invert that for every third party that links iclforge::ac3 to
+// decode bare elementary streams and wants nothing else. This file depends on both instead, which
+// is fine at this layer - apps/common already does for RecordingSink (ac3/io/wav.hpp,
+// ac3/iec61937/iec61937.hpp) - since disambiguating a container from a bare elementary stream is
+// exactly where knowing both sides earns its keep (see ContainerKind's own comment).
 
 namespace iclforge::containers::mp4 {
 struct ReadTrack;

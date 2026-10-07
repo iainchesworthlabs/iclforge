@@ -81,8 +81,9 @@ std::vector<std::byte> osc_bundle(std::initializer_list<std::vector<std::byte>> 
     return out;
 }
 
-iclforge::objects::oba::ObjectScene must_create(std::vector<iclforge::objects::oba::SceneObject> objects,
-                                  const iclforge::objects::oba::Orientation& orientation = {}) {
+iclforge::objects::oba::ObjectScene must_create(
+    std::vector<iclforge::objects::oba::SceneObject> objects,
+    const iclforge::objects::oba::Orientation& orientation = {}) {
     auto scene = iclforge::objects::oba::ObjectScene::create(std::move(objects), orientation);
     REQUIRE(scene.has_value());
     return std::move(*scene);
@@ -137,8 +138,8 @@ TEST_CASE("parse_osc_packet reads gain, lfe and release", "[oba][scene][osc]") {
 }
 
 TEST_CASE("int32 arguments widen losslessly wherever float is accepted", "[oba][scene][osc]") {
-    const auto updates =
-        iclforge::objects::oba::parse_osc_packet(osc_message_i("/object/0/xyz", ",iii", {1, 0, -1}));
+    const auto updates = iclforge::objects::oba::parse_osc_packet(
+        osc_message_i("/object/0/xyz", ",iii", {1, 0, -1}));
     REQUIRE(updates.size() == 1);
     REQUIRE(updates[0].position.has_value());
     CHECK(updates[0].position->x == 1.0);
@@ -165,8 +166,8 @@ TEST_CASE("malformed or unrecognised messages are dropped and counted, not fatal
     iclforge::objects::oba::OscParseStats stats;
 
     SECTION("unknown address") {
-        const auto updates =
-            iclforge::objects::oba::parse_osc_packet(osc_message_f("/mixer/1/level", ",f", {0.5F}), &stats);
+        const auto updates = iclforge::objects::oba::parse_osc_packet(
+            osc_message_f("/mixer/1/level", ",f", {0.5F}), &stats);
         CHECK(updates.empty());
         CHECK(stats.messages_dropped == 1);
     }
@@ -237,7 +238,8 @@ TEST_CASE("truncated and unterminated packets are rejected without reading out o
         CHECK(stats.messages_dropped == 1);
     }
     SECTION("a completely empty packet") {
-        const auto updates = iclforge::objects::oba::parse_osc_packet(std::span<const std::byte>{}, &stats);
+        const auto updates =
+            iclforge::objects::oba::parse_osc_packet(std::span<const std::byte>{}, &stats);
         CHECK(updates.empty());
         CHECK(stats.packets_rejected == 1);
     }
@@ -448,7 +450,8 @@ TEST_CASE("parse_osc_packet_into reads, drops and rejects exactly what parse_osc
         const auto expected = iclforge::objects::oba::parse_osc_packet(corpus[n], &vector_stats);
         iclforge::objects::oba::OscParseStats into_stats;
         std::array<iclforge::objects::oba::SceneOscUpdate, 32> out{};
-        const auto count = iclforge::objects::oba::parse_osc_packet_into(corpus[n], out, &into_stats);
+        const auto count =
+            iclforge::objects::oba::parse_osc_packet_into(corpus[n], out, &into_stats);
         REQUIRE(count == expected.size());
         CHECK(into_stats.messages_dropped == vector_stats.messages_dropped);
         CHECK(into_stats.packets_rejected == vector_stats.packets_rejected);
@@ -499,7 +502,8 @@ TEST_CASE("apply merges a wire update onto a base placement", "[oba][scene][osc]
         CHECK_FALSE(iclforge::objects::oba::apply(update, base).has_value());
     }
     SECTION("position only: base's gain and lfe_send carry through") {
-        const iclforge::objects::oba::SceneOscUpdate update{.position = iclforge::objects::oba::Position{.x = 0.9}};
+        const iclforge::objects::oba::SceneOscUpdate update{
+            .position = iclforge::objects::oba::Position{.x = 0.9}};
         const auto merged = iclforge::objects::oba::apply(update, base);
         REQUIRE(merged.has_value());
         CHECK(merged->position.x == 0.9);
@@ -544,8 +548,8 @@ TEST_CASE("apply through a live cursor rotates the wire position exactly once",
     const auto sampled = cursor.sample(0.0)[0];
 
     // The correct answer: the wire position rotated exactly once.
-    const auto expected =
-        iclforge::objects::oba::rotate(wire, iclforge::objects::oba::orientation_from_degrees(90, 0, 0));
+    const auto expected = iclforge::objects::oba::rotate(
+        wire, iclforge::objects::oba::orientation_from_degrees(90, 0, 0));
     CHECK_THAT(sampled.position.x, WithinAbs(expected.x, 1e-12));
     CHECK_THAT(sampled.position.y, WithinAbs(expected.y, 1e-12));
     // Gain rode through from base, unrelated to rotation.
@@ -553,8 +557,8 @@ TEST_CASE("apply through a live cursor rotates the wire position exactly once",
 
     // What a double rotation would have produced, so this test would fail if
     // apply() ever started from base's (already-rotated) position instead.
-    const auto double_rotated =
-        iclforge::objects::oba::rotate(base.position, iclforge::objects::oba::orientation_from_degrees(90, 0, 0));
+    const auto double_rotated = iclforge::objects::oba::rotate(
+        base.position, iclforge::objects::oba::orientation_from_degrees(90, 0, 0));
     CHECK(sampled.position.x != double_rotated.x);
 }
 

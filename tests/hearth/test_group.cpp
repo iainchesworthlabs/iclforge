@@ -1107,11 +1107,12 @@ TEST_CASE("group: ten minutes of E-AC-3 JOC in step on two test sinks", "[.][hea
 
 // D11 (planning/ac4.md): the Dolby Encoding Engine's 2.0 AC-4 stream at 48 kHz and frame_rate_index
 // 13, the rate the decoder on main decodes, sent to a paired test sink over _iclforge_player@v1:
-// each frame in its own AC-4 data-burst, with the Pc and Pd iclforge::containers::iec61937::Ac4BurstPacker
-// writes and the frame's 2 048 samples on the group's timeline. The sink's WAV must be the local
-// decode of the same frames rendered to its layout as its BurstOutput renders them, sample for
-// sample; what its decoder found must reach the host; and every burst's logged play time must put
-// the first frame at the same local time, within 1 ms.
+// each frame in its own AC-4 data-burst, with the Pc and Pd
+// iclforge::containers::iec61937::Ac4BurstPacker writes and the frame's 2 048 samples on the
+// group's timeline. The sink's WAV must be the local decode of the same frames rendered to its
+// layout as its BurstOutput renders them, sample for sample; what its decoder found must reach the
+// host; and every burst's logged play time must put the first frame at the same local time, within
+// 1 ms.
 TEST_CASE("group: a paired test sink decodes AC-4 sent over the extension role",
           "[hearth][group][websocket][iclforge][ac4]") {
     const fs::path scratch =

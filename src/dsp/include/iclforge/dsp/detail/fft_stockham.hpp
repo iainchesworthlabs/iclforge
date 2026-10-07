@@ -296,8 +296,8 @@ struct StockhamTables {
                 for (std::size_t k = 0; k < r; ++k) {
                     const double angle = -2.0 * std::numbers::pi *
                                          static_cast<double>((p * k) % n) / static_cast<double>(n);
-                    twiddles[count + p * r + k] =
-                        Complex<W>{static_cast<W>(std::cos(angle)), static_cast<W>(std::sin(angle))};
+                    twiddles[count + p * r + k] = Complex<W>{static_cast<W>(std::cos(angle)),
+                                                             static_cast<W>(std::sin(angle))};
                 }
             }
             count += m * r;

@@ -907,7 +907,8 @@ PYBIND11_MODULE(_iclforge, m) {
         .def_readwrite("release_db_per_second",
                        &iclforge::ac3::meta::HeavyConfig::release_db_per_second);
 
-    py::class_<iclforge::objects::oba::Position>(m, "Position", "Room-anchored object position (§4.2.1)")
+    py::class_<iclforge::objects::oba::Position>(m, "Position",
+                                                 "Room-anchored object position (§4.2.1)")
         .def(py::init([](py::kwargs kwargs) {
             return KwargBinder<iclforge::objects::oba::Position>(std::move(kwargs))
                 .field("x", &iclforge::objects::oba::Position::x)

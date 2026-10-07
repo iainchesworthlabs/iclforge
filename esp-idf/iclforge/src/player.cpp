@@ -519,12 +519,12 @@ struct Player::Impl {
         }
         const std::size_t count =
             reconstruct && pcm.index == 0 ? gather_places(pcm, places.data()) : 0;
-        output_block(BlockView{
-            .index = pcm.index,
-            .channels = pcm.channels,
-            .objects = pcm.objects,
-            .bed = have_bed ? &bed : nullptr,
-            .places = std::span<const iclforge::objects::oba::DisplayObject>(places.data(), count)});
+        output_block(BlockView{.index = pcm.index,
+                               .channels = pcm.channels,
+                               .objects = pcm.objects,
+                               .bed = have_bed ? &bed : nullptr,
+                               .places = std::span<const iclforge::objects::oba::DisplayObject>(
+                                   places.data(), count)});
     }
 
     // Into the hold, which the play's first block arms with room for blocks
@@ -579,14 +579,14 @@ struct Player::Impl {
         hold.release([&](std::size_t /*position*/, int index,
                          std::span<const std::span<const float>> channels,
                          std::span<const std::span<const float>> objects) {
-            output_block(
-                BlockView{.index = index,
-                          .channels = channels,
-                          .objects = objects,
-                          .bed = held_has_bed ? &held_bed : nullptr,
-                          .places = index == 0 ? std::span<const iclforge::objects::oba::DisplayObject>(
-                                                     held_places.data(), held_place_count)
-                                               : std::span<const iclforge::objects::oba::DisplayObject>{}});
+            output_block(BlockView{
+                .index = index,
+                .channels = channels,
+                .objects = objects,
+                .bed = held_has_bed ? &held_bed : nullptr,
+                .places = index == 0 ? std::span<const iclforge::objects::oba::DisplayObject>(
+                                           held_places.data(), held_place_count)
+                                     : std::span<const iclforge::objects::oba::DisplayObject>{}});
         });
         free_hold();
     }

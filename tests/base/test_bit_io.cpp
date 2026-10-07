@@ -18,11 +18,11 @@
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/base/bitwriter.hpp"
 
-// planning/consolidation.md's C4 made one bit reader and one writer of the six the tree had: base's,
-// which AC-3, EMDF and OAMD read and write through, AC-4's decoder's and encoder's, which record a
-// syntax trace, and the AC-4 inspector's. Below are those as they were before C4, verbatim but for
-// their namespaces, and the random sequences of operations that hold the one reader and the one
-// writer to each: the same values, positions, overflow flags, bytes and records.
+// planning/consolidation.md's C4 made one bit reader and one writer of the six the tree had:
+// base's, which AC-3, EMDF and OAMD read and write through, AC-4's decoder's and encoder's, which
+// record a syntax trace, and the AC-4 inspector's. Below are those as they were before C4, verbatim
+// but for their namespaces, and the random sequences of operations that hold the one reader and the
+// one writer to each: the same values, positions, overflow flags, bytes and records.
 
 using iclforge::base::SyntaxRecord;
 using iclforge::base::SyntaxSink;
@@ -214,7 +214,8 @@ std::uint32_t read_variable_bits(old_base::BitReader& r, int group_bits) {
     }
 }
 
-[[nodiscard]] std::uint32_t read_variable_bits_max(old_base::BitReader& r, int group_bits, int max_groups) {
+[[nodiscard]] std::uint32_t read_variable_bits_max(old_base::BitReader& r, int group_bits,
+                                                   int max_groups) {
     std::uint32_t value = 0;
     for (int group = 1;; ++group) {
         value += r.read(group_bits);
@@ -629,7 +630,8 @@ inline unsigned variable_bits_width(unsigned n_bits, std::uint64_t value) noexce
     return static_cast<unsigned>(split(n_bits, value).count) * (n_bits + 1);
 }
 
-inline BitWriter::BitWriter(int substream, SyntaxSink sink) noexcept : substream_(substream), sink_(sink) {}
+inline BitWriter::BitWriter(int substream, SyntaxSink sink) noexcept
+    : substream_(substream), sink_(sink) {}
 
 inline BitWriter BitWriter::buffered() {
     BitWriter writer;
@@ -686,20 +688,21 @@ inline void BitWriter::write(unsigned bits, std::uint64_t value, std::string_vie
     }
     const auto offset = bits_;
     put(bits, value);
-    emit(SyntaxRecord{substream_, static_cast<std::uint32_t>(offset), static_cast<std::uint16_t>(bits), value, name});
+    emit(SyntaxRecord{substream_, static_cast<std::uint32_t>(offset),
+                      static_cast<std::uint16_t>(bits), value, name});
 }
 
-inline void BitWriter::write_variable_bits(unsigned n_bits, std::uint64_t value, std::string_view name) {
+inline void BitWriter::write_variable_bits(unsigned n_bits, std::uint64_t value,
+                                           std::string_view name) {
     const auto offset = bits_;
     const Groups groups = split(n_bits, value);
     for (std::size_t i = groups.count; i > 0; --i) {
         put(n_bits, groups.values[i - 1]);
         put(1, i > 1 ? 1U : 0U);
     }
-    emit(SyntaxRecord{substream_, static_cast<std::uint32_t>(offset), static_cast<std::uint16_t>(bits_ - offset),
-                      value, name});
+    emit(SyntaxRecord{substream_, static_cast<std::uint32_t>(offset),
+                      static_cast<std::uint16_t>(bits_ - offset), value, name});
 }
-
 
 inline void BitWriter::write_unrecorded(unsigned bits, std::uint64_t value) {
     put(bits, value);
@@ -719,10 +722,12 @@ inline void BitWriter::write_zero_run(std::uint64_t bits, std::string_view name)
     }
 }
 
-inline void BitWriter::write_as(unsigned bits, std::uint64_t raw, std::uint64_t value, std::string_view name) {
+inline void BitWriter::write_as(unsigned bits, std::uint64_t raw, std::uint64_t value,
+                                std::string_view name) {
     const auto offset = bits_;
     put(bits, raw);
-    emit(SyntaxRecord{substream_, static_cast<std::uint32_t>(offset), static_cast<std::uint16_t>(bits), value, name});
+    emit(SyntaxRecord{substream_, static_cast<std::uint32_t>(offset),
+                      static_cast<std::uint16_t>(bits), value, name});
 }
 
 inline void BitWriter::align() {
@@ -861,7 +866,9 @@ std::vector<std::byte> random_bytes(std::mt19937& rng, std::size_t max_size) {
     return data;
 }
 
-int pick(std::mt19937& rng, int lo, int hi) { return std::uniform_int_distribution<int>(lo, hi)(rng); }
+int pick(std::mt19937& rng, int lo, int hi) {
+    return std::uniform_int_distribution<int>(lo, hi)(rng);
+}
 
 bool same(const std::vector<SyntaxRecord>& a, const std::vector<SyntaxRecord>& b) {
     return std::ranges::equal(a, b, [](const SyntaxRecord& x, const SyntaxRecord& y) {
@@ -997,7 +1004,8 @@ TEST_CASE("the bit reader reads and records as AC-4's reader did before C4", "[b
     }
 }
 
-TEST_CASE("the bit reader reads as the AC-4 inspector's reader did before C4", "[base][bitreader]") {
+TEST_CASE("the bit reader reads as the AC-4 inspector's reader did before C4",
+          "[base][bitreader]") {
     std::mt19937 rng(1031901);
     for (int trial = 0; trial < 4000; ++trial) {
         const auto data = random_bytes(rng, 24);
@@ -1112,31 +1120,34 @@ TEST_CASE("the bit writer writes and records as AC-4's writer did before C4", "[
             switch (pick(rng, 0, 7)) {
                 case 0: {
                     const auto bits = static_cast<unsigned>(pick(rng, 0, 64));
-                    const std::uint64_t value =
-                        bits == 64 ? (std::uint64_t{rng()} << 32 | rng())
-                                   : ((std::uint64_t{rng()} << 32 | rng()) & ((std::uint64_t{1} << bits) - 1));
+                    const std::uint64_t value = bits == 64 ? (std::uint64_t{rng()} << 32 | rng())
+                                                           : ((std::uint64_t{rng()} << 32 | rng()) &
+                                                              ((std::uint64_t{1} << bits) - 1));
                     b.write(bits, value, name);
                     a.write(bits, value, name);
                     break;
                 }
                 case 1: {
-                    const std::uint64_t value = (std::uint64_t{rng()} << 32 | rng()) >> pick(rng, 0, 63);
+                    const std::uint64_t value =
+                        (std::uint64_t{rng()} << 32 | rng()) >> pick(rng, 0, 63);
                     const auto n = static_cast<unsigned>(pick(rng, 1, 11));
                     b.write_variable_bits(n, value, name);
                     a.write_variable_bits(n, value, name);
-                    REQUIRE(old_ac4::variable_bits_width(n, value) == iclforge::variable_bits_width(n, value));
+                    REQUIRE(old_ac4::variable_bits_width(n, value) ==
+                            iclforge::variable_bits_width(n, value));
                     break;
                 }
                 case 2: {
                     const auto bits = static_cast<unsigned>(pick(rng, 0, 32));
-                    const std::uint64_t value = bits == 0 ? 0 : (rng() & ((std::uint64_t{1} << bits) - 1));
+                    const std::uint64_t value =
+                        bits == 0 ? 0 : (rng() & ((std::uint64_t{1} << bits) - 1));
                     b.write_unrecorded(bits, value);
                     a.put(value, static_cast<int>(bits));
                     break;
                 }
                 case 3: {
-                    const auto bits = static_cast<std::uint64_t>(pick(rng, 0, 70000) * (pick(rng, 0, 9) == 0 ? 1 : 0) +
-                                                                 pick(rng, 0, 40));
+                    const auto bits = static_cast<std::uint64_t>(
+                        pick(rng, 0, 70000) * (pick(rng, 0, 9) == 0 ? 1 : 0) + pick(rng, 0, 40));
                     b.write_zero_run(bits, name);
                     a.write_zero_run(bits, name);
                     break;

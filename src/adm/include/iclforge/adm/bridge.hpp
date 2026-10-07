@@ -15,9 +15,9 @@
 
 // Roadmap item B1 phase 2 of 3 ("ADM BWF reader feeding the JOC encoder"): maps
 // the object graph iclforge::adm (phase 1) parses from a BW64/ADM master onto
-// iclforge::ac3::oba::AtmosEncoder's input shape - one iclforge::objects::oba::ObjectPath plus one mono PCM
-// span per channel, ready to drive encode_frame() in a loop. Phase 3 (a CLI/GUI-facing end-to-end
-// command) is a separate, later task; this module is the mapping/bridge library only.
+// iclforge::ac3::oba::AtmosEncoder's input shape - one iclforge::objects::oba::ObjectPath plus one
+// mono PCM span per channel, ready to drive encode_frame() in a loop. Phase 3 (a CLI/GUI-facing
+// end-to-end command) is a separate, later task; this module is the mapping/bridge library only.
 //
 // iclforge::adm sits between two modules that otherwise know nothing about each other:
 // iclforge::adm (src/adm, codec-blind by design - see its own header comments) and
@@ -65,8 +65,8 @@
 //     field for it, and listed in BridgeResult::unmapped where it does not. Carried: width/height/
 //     depth (object size), channelLock (snap), zoneExclusion (Annex B.2.6 zone constraints),
 //     objectDivergence's value (Tables 40-42) and screenRef (b_object_use_screen_ref). Not carried:
-//     diffuse, headLocked, a channelLock maxDistance, divergence's azimuthRange/positionRange, and a
-//     zoneExclusion that is not one of Table B.18's presets. AtmosEncoder transmits the carried
+//     diffuse, headLocked, a channelLock maxDistance, divergence's azimuthRange/positionRange, and
+//     a zoneExclusion that is not one of Table B.18's presets. AtmosEncoder transmits the carried
 //     items in the OAMD payload and stops there - its own bed render treats every object as a point
 //     source (see ObjectPlacement). docs/library/adm-bridge.md has the full account.
 namespace iclforge::adm {
@@ -99,8 +99,8 @@ enum class BridgeError : std::uint8_t {
                              // DynamicObject state to place it, even a static, never-moving one)
     kEmptyIabStream,         // build_iab() only: the frame span passed to it was empty
     kUnsupportedIabChannel,  // build_iab() only: a BedDefinition used a Table 19 ChannelID with no
-                             // iclforge::objects::oba::BedLabel equivalent - see iab_bridge.cpp's own
-                             // comment on exactly which codes map and which are refused
+                             // iclforge::objects::oba::BedLabel equivalent - see iab_bridge.cpp's
+                             // own comment on exactly which codes map and which are refused
     kNoIabEssenceForChannel,  // build_iab() only: a channel's non-zero AudioDataID (§10.3.6/Table
                               // 8's own field) never resolved to an AudioDataPCM or AudioDataDLC
                               // element in any frame it was active in. AudioDataID == 0 is
@@ -115,8 +115,8 @@ enum class BridgeError : std::uint8_t {
 // Builds one channel's iclforge::objects::oba::ObjectPath from its audioBlockFormat sequence.
 //
 // BS.2076-2 §5.4.1: a channel with exactly one audioBlockFormat is static - one keyframe, held
-// everywhere (iclforge::objects::oba::KeyframePath's own "a single keyframe holds its placement everywhere"
-// behaviour is exactly this).
+// everywhere (iclforge::objects::oba::KeyframePath's own "a single keyframe holds its placement
+// everywhere" behaviour is exactly this).
 //
 // For more than one block, §10.3's own state machine (verified directly against the standard's
 // text and its Figs 7-10, not assumed from a paraphrase - an earlier draft of this bridge had it
@@ -196,8 +196,8 @@ struct BridgeResult {
 // audioObjects - §5.6: "AudioObjects can be nested and so they can refer to other audioObjects" -
 // with a cycle guard per §5.6.7's own prohibition), classifies each leaf audioObject as a bed or
 // a dynamic object via its resolved audioPackFormat's TypeDefinition, builds one
-// iclforge::objects::oba::ObjectPath per channel from its audioBlockFormat sequence, and resolves its audio
-// via <chna>.
+// iclforge::objects::oba::ObjectPath per channel from its audioBlockFormat sequence, and resolves
+// its audio via <chna>.
 //
 // Absolute program-timeline time for a channel's automation is `object.start_s + block.rtime_s` -
 // TWO levels, not three. BS.2076-2 Table 24 defines audioObject's own `start` as "relative to the
@@ -235,8 +235,8 @@ struct BridgeResult {
 
 // One OAMD update to a dynamic object's DynamicObject state, timestamped in absolute samples from
 // the start of the whole decode (not the access unit it arrived in) - the flattened form of
-// iclforge::objects::oba::DecodedProgram::UpdateBlock (oamd.hpp) a caller assembles by walking every decoded
-// access unit's own object_metadata->blocks in file order and adding each block's own
+// iclforge::objects::oba::DecodedProgram::UpdateBlock (oamd.hpp) a caller assembles by walking
+// every decoded access unit's own object_metadata->blocks in file order and adding each block's own
 // sample_offset to a running total of samples already emitted.
 struct ICLFORGE_ADM_EXPORT WriteObjectUpdate {
     std::uint64_t sample_offset = 0;
@@ -248,14 +248,14 @@ struct ICLFORGE_ADM_EXPORT WriteObjectUpdate {
 };
 
 // One channel to write into the master. A bed channel (`bed_label` set) is written as a static
-// DirectSpeakers channel pinned at its own room position (iclforge::objects::oba::bed_label_position) -
-// `updates` is ignored for these, the same "a bed channel has no direction to pin, `force_lfe`
-// discards it entirely" convention build_channel_path's own doc comment states for the read
-// direction. A dynamic object (`bed_label` empty) is written as an Objects channel whose
-// audioBlockFormat sequence comes from `updates`, which must be non-empty and in strictly
-// increasing `sample_offset` order (a caller emitting them in decode order already satisfies this;
-// see build_block_formats()'s own comment on why a non-increasing entry is folded into its
-// predecessor rather than rejected).
+// DirectSpeakers channel pinned at its own room position
+// (iclforge::objects::oba::bed_label_position) - `updates` is ignored for these, the same "a bed
+// channel has no direction to pin, `force_lfe` discards it entirely" convention
+// build_channel_path's own doc comment states for the read direction. A dynamic object (`bed_label`
+// empty) is written as an Objects channel whose audioBlockFormat sequence comes from `updates`,
+// which must be non-empty and in strictly increasing `sample_offset` order (a caller emitting them
+// in decode order already satisfies this; see build_block_formats()'s own comment on why a
+// non-increasing entry is folded into its predecessor rather than rejected).
 struct ICLFORGE_ADM_EXPORT WriteChannel {
     std::string name;
     std::span<const float> pcm;                       // this channel's whole-file mono audio

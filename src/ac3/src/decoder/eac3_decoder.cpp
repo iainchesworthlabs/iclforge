@@ -2940,7 +2940,8 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
                             impl_->config_.syntax->add_emdf_payload(payload.id);
                         }
                         if (payload.id == iclforge::objects::emdf::kPayloadIdOamd) {
-                            out.object_metadata = iclforge::objects::oba::parse_payload(payload.bytes);
+                            out.object_metadata =
+                                iclforge::objects::oba::parse_payload(payload.bytes);
                         } else if (payload.id == iclforge::objects::emdf::kPayloadIdJoc &&
                                    joc_bytes.empty()) {
                             joc_bytes.assign(payload.bytes.begin(), payload.bytes.end());
@@ -3968,7 +3969,8 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
         if (out.object_metadata && !joc_bytes.empty() &&
             !impl_->config_.skip_object_reconstruction) {
             const auto params = oba::joc::parse_payload(joc_bytes);
-            const auto indices = iclforge::objects::oba::joc_object_indices(out.object_metadata->program);
+            const auto indices =
+                iclforge::objects::oba::joc_object_indices(out.object_metadata->program);
             // §6.3.2.2 Table 47: a downmix wider than the five channels this
             // substream carries needs a dependent substream's extra pair -
             // Lb/Rb (kDmxConfig7X) or Tfl/Tfr (kDmxConfig5XPlus2 and

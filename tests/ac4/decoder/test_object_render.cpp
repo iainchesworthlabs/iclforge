@@ -214,8 +214,9 @@ TEST_CASE(
     }
 }
 
-TEST_CASE("the moving object streams for listening are written where AC4_DECODER_WRITE_LISTENING says",
-          "[ac4][decoder][objects]") {
+TEST_CASE(
+    "the moving object streams for listening are written where AC4_DECODER_WRITE_LISTENING says",
+    "[ac4][decoder][objects]") {
     // Ten seconds of each moving case, for forge decode and the ear: object
     // 0's tone crosses the front from the left wall to the right one.
     const char* dir = std::getenv("AC4_DECODER_WRITE_LISTENING");

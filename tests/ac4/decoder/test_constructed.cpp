@@ -1116,7 +1116,8 @@ TEST_CASE("the committed constructed streams are the builder's", "[ac4][decoder]
     const char* write_to = std::getenv("AC4_DECODER_WRITE_CONSTRUCTED");
     for (const ElementCase& c : ac4_decoder_test::committed_cases()) {
         CAPTURE(c.name);
-        const BuiltStream stream = ac4_decoder_test::build_stream(c, ac4_decoder_test::kCommittedFrames);
+        const BuiltStream stream =
+            ac4_decoder_test::build_stream(c, ac4_decoder_test::kCommittedFrames);
         (void)decode_checked(stream);
         const std::vector<std::byte> bytes = ac4_decoder_test::sync_framed(stream);
         if (write_to != nullptr) {

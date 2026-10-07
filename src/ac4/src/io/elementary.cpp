@@ -172,7 +172,8 @@ SyncFrameSplitter::Result SyncFrameSplitter::next() noexcept {
         std::optional<bool> crc_ok;
         if (has_crc) {
             const auto want = static_cast<std::uint16_t>((byte(total - 2) << 8U) | byte(total - 1));
-            crc_ok = base::crc16(std::span<const std::byte>(storage_).subspan(2, total - 4)) == want;
+            crc_ok =
+                base::crc16(std::span<const std::byte>(storage_).subspan(2, total - 4)) == want;
         }
         handed_ = total;
         return Result{

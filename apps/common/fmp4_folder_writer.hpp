@@ -81,8 +81,8 @@ class Fmp4FolderWriter {
 
    private:
     [[nodiscard]] std::string start(std::span<const std::byte> first_frame);
-    [[nodiscard]] std::string write_manifests(const iclforge::containers::mp4::FragmentWriter& writer,
-                                              bool finished);
+    [[nodiscard]] std::string write_manifests(
+        const iclforge::containers::mp4::FragmentWriter& writer, bool finished);
 
     std::filesystem::path dir_;
     std::uint32_t window_segments_ = 0;
@@ -93,7 +93,8 @@ class Fmp4FolderWriter {
     iclforge::containers::mp4::DashOptions dash_;
     // ISO 8601 UTC, stamped once when the first segment's timeline starts: a
     // live MPD's @availabilityStartTime must not move as the session runs,
-    // and iclforge::containers::mp4:: has no clock of its own to read (iclforge::containers::mp4::MpdOptions).
+    // and iclforge::containers::mp4:: has no clock of its own to read
+    // (iclforge::containers::mp4::MpdOptions).
     std::string availability_start_;
     std::optional<iclforge::containers::mp4::FragmentWriter> writer_;
 };

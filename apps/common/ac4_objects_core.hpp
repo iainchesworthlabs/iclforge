@@ -142,7 +142,8 @@ struct Ac4SourceView {
     const iclforge::objects::oba::ObjectPlacement& p);
 
 // Every object's placement at a time, in the stream's order.
-using Ac4Placements = std::function<std::vector<iclforge::objects::oba::ObjectPlacement>(double time_s)>;
+using Ac4Placements =
+    std::function<std::vector<iclforge::objects::oba::ObjectPlacement>(double time_s)>;
 
 // What E9's writer is given besides the audio and the metadata.
 struct Ac4ObjectsParams {
@@ -202,11 +203,13 @@ struct Ac4ObjectsEncoded {
 // pinned channel held at its ring position and the LFE at the room's centre.
 [[nodiscard]] std::expected<Ac4ObjectsEncoded, Ac4ObjectsError> encode_ac4_scene(
     const Ac4ObjectsParams& params, std::span<const Ac4ObjectSlot> slots,
-    std::span<const std::vector<float>> flat_planes, const iclforge::objects::oba::ObjectScene& motion);
+    std::span<const std::vector<float>> flat_planes,
+    const iclforge::objects::oba::ObjectScene& motion);
 
 // The placements of a scene of slots at a time: the form encode_ac4_scene
 // hands encode_ac4_objects, for a caller that wants the initial values.
 [[nodiscard]] std::vector<iclforge::objects::oba::ObjectPlacement> ac4_scene_placements(
-    std::span<const Ac4ObjectSlot> slots, const iclforge::objects::oba::ObjectScene& motion, double time_s);
+    std::span<const Ac4ObjectSlot> slots, const iclforge::objects::oba::ObjectScene& motion,
+    double time_s);
 
 }  // namespace iclforge::apps

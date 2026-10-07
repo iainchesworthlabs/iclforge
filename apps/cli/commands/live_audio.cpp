@@ -612,8 +612,8 @@ int run_spatial(std::string_view in_path, int device_index, const Options& meta)
     // to open, or went away.
     const auto spatial_unit = [&](const iclforge::ac3::DecodedAccessUnit& out) -> int {
         if (!started) {
-            const bool has_lfe =
-                out.object_metadata && iclforge::objects::oba::has_lfe(out.object_metadata->program);
+            const bool has_lfe = out.object_metadata &&
+                                 iclforge::objects::oba::has_lfe(out.object_metadata->program);
             const auto started_result =
                 sink.start(device_id, sample_rate_hz(out.sample_rate),
                           has_lfe ? kSpeakerLowFrequency : 0U,
@@ -1299,8 +1299,9 @@ int run_live(std::string_view out_path, int capture_device, std::uint32_t second
                              device.name,
                              *type == iclforge::containers::iec61937::BurstDataType::kEac3
                                  ? "Dolby Digital Plus"
-                             : *type == iclforge::containers::iec61937::BurstDataType::kAc3 ? "Dolby Digital"
-                                                                                : "AC-4");
+                             : *type == iclforge::containers::iec61937::BurstDataType::kAc3
+                                 ? "Dolby Digital"
+                                 : "AC-4");
                 fmt::println(stderr,
                              "  'forge record <out.ec3> <seconds> 0 {}' records the elementary "
                              "stream instead, and 'forge unspdif' recovers one from a capture "
@@ -1398,8 +1399,8 @@ int run_live(std::string_view out_path, int capture_device, std::uint32_t second
             // used to be described as "the hook a real live position source
             // drops into once one exists" (see live_audio.hpp's own header):
             // positions= is that source now, sampled through the same
-            // SceneCursor seam iclforge::objects::oba::SceneCursor was built for, at the frame-end time
-            // `t` either path already needs.
+            // SceneCursor seam iclforge::objects::oba::SceneCursor was built for, at the frame-end
+            // time `t` either path already needs.
             const double t = static_cast<double>(n0) / static_cast<double>(rate_hz);
             if (position_source) {
                 position_source->drain_into(*position_cursor, t);
@@ -1516,7 +1517,8 @@ int run_live(std::string_view out_path, int capture_device, std::uint32_t second
                 // the monitor and the file exactly as it always has.
                 const auto leg_frame = downmix_encoder->encode_frame(bed_views);
                 if (leg_frame.has_value()) {
-                    if (const auto wrapped = iclforge::containers::iec61937::wrap_frame(*leg_frame)) {
+                    if (const auto wrapped =
+                            iclforge::containers::iec61937::wrap_frame(*leg_frame)) {
                         bursts.push_back(*wrapped);
                     }
                 }
@@ -1527,7 +1529,8 @@ int run_live(std::string_view out_path, int capture_device, std::uint32_t second
                         if (packed && *packed) {
                             bursts.push_back(std::move(**packed));
                         }
-                    } else if (const auto wrapped = iclforge::containers::iec61937::wrap_frame(unit.bytes)) {
+                    } else if (const auto wrapped =
+                                   iclforge::containers::iec61937::wrap_frame(unit.bytes)) {
                         bursts.push_back(*wrapped);
                     }
                 }

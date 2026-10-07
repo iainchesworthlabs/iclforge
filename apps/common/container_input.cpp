@@ -195,9 +195,11 @@ constexpr std::size_t kContainerSniffBytes = 64 * 1024;
     return facts;
 }
 
-[[nodiscard]] std::string_view signalling_token(iclforge::containers::mpegts::CodecSignalling signalling) {
+[[nodiscard]] std::string_view signalling_token(
+    iclforge::containers::mpegts::CodecSignalling signalling) {
     switch (signalling) {
-        case iclforge::containers::mpegts::CodecSignalling::kAtscStreamType: return "atsc_stream_type";
+        case iclforge::containers::mpegts::CodecSignalling::kAtscStreamType:
+            return "atsc_stream_type";
         case iclforge::containers::mpegts::CodecSignalling::kDvbDescriptor: return "dvb_descriptor";
         case iclforge::containers::mpegts::CodecSignalling::kRegistrationDescriptor:
             return "registration_descriptor";
@@ -246,7 +248,8 @@ std::string_view container_token(ContainerKind kind) {
     return "";
 }
 
-StreamTrim trim_from_edit_list(const iclforge::containers::mp4::ReadTrack& track, std::string& note) {
+StreamTrim trim_from_edit_list(const iclforge::containers::mp4::ReadTrack& track,
+                               std::string& note) {
     StreamTrim trim;
     note.clear();
     const iclforge::containers::mp4::EditListEntry* media = nullptr;
@@ -333,8 +336,10 @@ ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> f
             const auto demuxed = iclforge::containers::matroska::demux(file);
             if (!demuxed) {
                 return {.bytes = {},
-                       .error = std::string{"Matroska/WebM file this build cannot demux ("} +
-                                std::string{iclforge::containers::matroska::describe(demuxed.error())} + ")"};
+                        .error =
+                            std::string{"Matroska/WebM file this build cannot demux ("} +
+                            std::string{iclforge::containers::matroska::describe(demuxed.error())} +
+                            ")"};
             }
             return {.bytes = concat_frames(demuxed->frames),
                     .error = {},
@@ -344,8 +349,9 @@ ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> f
             const auto demuxed = iclforge::containers::mp4::demux(file);
             if (!demuxed) {
                 return {.bytes = {},
-                       .error = std::string{"MP4 file this build cannot demux ("} +
-                                std::string{iclforge::containers::mp4::describe(demuxed.error())} + ")"};
+                        .error = std::string{"MP4 file this build cannot demux ("} +
+                                 std::string{iclforge::containers::mp4::describe(demuxed.error())} +
+                                 ")"};
             }
             if (demuxed->track.codec_id == iclforge::containers::mp4::kCodecAc4) {
                 // An 'ac-4' sample is the raw_ac4_frame ALONE (TS 103 190-2
@@ -384,9 +390,11 @@ ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> f
         case ContainerKind::kMpegTs: {
             const auto demuxed = iclforge::containers::mpegts::demux(file);
             if (!demuxed) {
-                return {.bytes = {},
-                       .error = std::string{"Transport Stream this build cannot demux ("} +
-                                std::string{iclforge::containers::mpegts::describe(demuxed.error())} + ")"};
+                return {
+                    .bytes = {},
+                    .error = std::string{"Transport Stream this build cannot demux ("} +
+                             std::string{iclforge::containers::mpegts::describe(demuxed.error())} +
+                             ")"};
             }
             return {.bytes = concat_frames(demuxed->payloads),
                     .error = {},

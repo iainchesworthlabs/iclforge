@@ -555,12 +555,13 @@ Bytes build_moof_relative(std::uint32_t track_id, std::uint32_t tfhd_extra_flags
 TEST_CASE("MP4 round-trips mux()'s frames back byte-for-byte", "[mp4][reader]") {
     const std::vector<Bytes> frames{frame_of(700, 0x11), frame_of(512, 0x22),
                                     frame_of(1024, 0x33), frame_of(64, 0x44)};
-    const iclforge::containers::mp4::AudioTrack track{.codec_id = std::string{iclforge::containers::mp4::kCodecEac3},
-                                .sample_rate = 48000,
-                                .channels = 6,
-                                .samples_per_frame = 1536,
-                                .codec_config = atmos_dec3(),
-                                .language = "eng"};
+    const iclforge::containers::mp4::AudioTrack track{
+        .codec_id = std::string{iclforge::containers::mp4::kCodecEac3},
+        .sample_rate = 48000,
+        .channels = 6,
+        .samples_per_frame = 1536,
+        .codec_config = atmos_dec3(),
+        .language = "eng"};
     const auto file = iclforge::containers::mp4::mux(track, views_of(frames));
     REQUIRE(file.has_value());
 
@@ -591,14 +592,16 @@ TEST_CASE("MP4 round-trips mux()'s frames back byte-for-byte", "[mp4][reader]") 
 
 TEST_CASE("MP4 round-trips mux()'s edit list, batch and streamed", "[mp4][reader]") {
     const std::vector<Bytes> frames{frame_of(700, 0x11), frame_of(512, 0x22), frame_of(1024, 0x33)};
-    const iclforge::containers::mp4::AudioTrack track{.codec_id = std::string{iclforge::containers::mp4::kCodecEac3},
-                                .sample_rate = 48000,
-                                .channels = 6,
-                                .samples_per_frame = 1536,
-                                .codec_config = atmos_dec3(),
-                                .language = "eng"};
+    const iclforge::containers::mp4::AudioTrack track{
+        .codec_id = std::string{iclforge::containers::mp4::kCodecEac3},
+        .sample_rate = 48000,
+        .channels = 6,
+        .samples_per_frame = 1536,
+        .codec_config = atmos_dec3(),
+        .language = "eng"};
     iclforge::containers::mp4::MuxOptions options;
-    options.edit = iclforge::containers::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = (3 * 1536) - 356};
+    options.edit = iclforge::containers::mp4::MuxOptions::Edit{
+        .start_samples = 256, .duration_samples = (3 * 1536) - 356};
     const auto file = iclforge::containers::mp4::mux(track, views_of(frames), options);
     REQUIRE(file.has_value());
 
@@ -705,12 +708,12 @@ TEST_CASE("MP4 reads edit lists this project never writes", "[mp4][reader]") {
     SECTION("an edit list over ReadOptions::max_edits is left out") {
         MoovSpec spec{.sizes = {32}};
         spec.edts = edts_box(0, {HandEdit{}, HandEdit{}, HandEdit{}});
-        const auto out =
-            iclforge::containers::mp4::demux(assemble(spec), iclforge::containers::mp4::ReadOptions{.max_edits = 2});
+        const auto out = iclforge::containers::mp4::demux(
+            assemble(spec), iclforge::containers::mp4::ReadOptions{.max_edits = 2});
         REQUIRE(out.has_value());
         CHECK(out->track.edits.empty());
-        const auto within =
-            iclforge::containers::mp4::demux(assemble(spec), iclforge::containers::mp4::ReadOptions{.max_edits = 3});
+        const auto within = iclforge::containers::mp4::demux(
+            assemble(spec), iclforge::containers::mp4::ReadOptions{.max_edits = 3});
         REQUIRE(within.has_value());
         CHECK(within->track.edits.size() == 3);
     }
@@ -749,14 +752,16 @@ TEST_CASE("MP4 round-trips fragment()'s media segments", "[mp4][reader][fragment
         frames.push_back(frame_of(200 + (static_cast<std::size_t>(i) * 7),
                                   static_cast<std::uint8_t>(0x40 + i)));
     }
-    const iclforge::containers::mp4::AudioTrack track{.codec_id = std::string{iclforge::containers::mp4::kCodecEac3},
-                                .sample_rate = 48000,
-                                .channels = 6,
-                                .samples_per_frame = 1536,
-                                .codec_config = atmos_dec3(),
-                                .language = "und"};
-    const auto out = iclforge::containers::mp4::fragment(track, views_of(frames),
-                                   iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = 6});
+    const iclforge::containers::mp4::AudioTrack track{
+        .codec_id = std::string{iclforge::containers::mp4::kCodecEac3},
+        .sample_rate = 48000,
+        .channels = 6,
+        .samples_per_frame = 1536,
+        .codec_config = atmos_dec3(),
+        .language = "und"};
+    const auto out = iclforge::containers::mp4::fragment(
+        track, views_of(frames),
+        iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = 6});
     REQUIRE(out.has_value());
 
     // A CMAF track is delivered as the init segment followed by every media
@@ -862,12 +867,13 @@ TEST_CASE("MP4 Reader over arbitrary chunk boundaries matches demux()", "[mp4][r
     const std::vector<Bytes> frames{frame_of(700, 0x11), frame_of(3, 0x22), frame_of(1500, 0x33),
                                     frame_of(64, 0x44), frame_of(900, 0x55)};
     const auto file = iclforge::containers::mp4::mux(
-        iclforge::containers::mp4::AudioTrack{.codec_id = std::string{iclforge::containers::mp4::kCodecEac3},
-                                  .sample_rate = 48000,
-                                  .channels = 6,
-                                  .samples_per_frame = 1536,
-                                  .codec_config = atmos_dec3(),
-                                  .language = "und"},
+        iclforge::containers::mp4::AudioTrack{
+            .codec_id = std::string{iclforge::containers::mp4::kCodecEac3},
+            .sample_rate = 48000,
+            .channels = 6,
+            .samples_per_frame = 1536,
+            .codec_config = atmos_dec3(),
+            .language = "und"},
         views_of(frames));
     REQUIRE(file.has_value());
 
@@ -1136,10 +1142,12 @@ TEST_CASE("MP4 rejects sample tables that lie", "[mp4][reader]") {
 }
 
 TEST_CASE("MP4 describe() names every demux error", "[mp4][reader]") {
-    for (const auto error :
-         {iclforge::containers::mp4::DemuxError::kNotIsobmff, iclforge::containers::mp4::DemuxError::kTruncated,
-          iclforge::containers::mp4::DemuxError::kMalformed, iclforge::containers::mp4::DemuxError::kNoAudioTrack,
-          iclforge::containers::mp4::DemuxError::kLimitExceeded, iclforge::containers::mp4::DemuxError::kMoovAfterMdat}) {
+    for (const auto error : {iclforge::containers::mp4::DemuxError::kNotIsobmff,
+                             iclforge::containers::mp4::DemuxError::kTruncated,
+                             iclforge::containers::mp4::DemuxError::kMalformed,
+                             iclforge::containers::mp4::DemuxError::kNoAudioTrack,
+                             iclforge::containers::mp4::DemuxError::kLimitExceeded,
+                             iclforge::containers::mp4::DemuxError::kMoovAfterMdat}) {
         CHECK_FALSE(iclforge::containers::mp4::describe(error).empty());
         CHECK(iclforge::containers::mp4::describe(error) != "unknown error");
     }
@@ -1362,7 +1370,8 @@ TEST_CASE("MP4 stsd handles malformed and foreign sample entries", "[mp4][reader
     SECTION("a stsd body under 8 bytes is malformed") {
         // Bypasses raw_stsd(), which always writes a full 8-byte
         // verflags+entry_count body - this needs fewer bytes than that.
-        const auto out = iclforge::containers::mp4::demux(with_stsd(box("stsd", Bytes(4, std::byte{0}))));
+        const auto out =
+            iclforge::containers::mp4::demux(with_stsd(box("stsd", Bytes(4, std::byte{0}))));
         REQUIRE_FALSE(out.has_value());
         CHECK(out.error() == iclforge::containers::mp4::DemuxError::kMalformed);
     }
@@ -1517,8 +1526,8 @@ TEST_CASE("MP4 build_sample_refs handles every sample-table shape", "[mp4][reade
     }
 
     SECTION("sizes and offsets with no stsc at all is malformed") {
-        const auto out =
-            iclforge::containers::mp4::demux(assemble(MoovSpec{.sizes = {16, 16}}, /*omit_stsc=*/true));
+        const auto out = iclforge::containers::mp4::demux(
+            assemble(MoovSpec{.sizes = {16, 16}}, /*omit_stsc=*/true));
         REQUIRE_FALSE(out.has_value());
         CHECK(out.error() == iclforge::containers::mp4::DemuxError::kMalformed);
     }
@@ -1536,13 +1545,15 @@ TEST_CASE("MP4 explicit ReadOptions::track_id selects a specific track", "[mp4][
     file.insert(file.end(), mdat.begin(), mdat.end());
 
     SECTION("the matching track_id is found") {
-        const auto out = iclforge::containers::mp4::demux(file, iclforge::containers::mp4::ReadOptions{.track_id = 7});
+        const auto out = iclforge::containers::mp4::demux(
+            file, iclforge::containers::mp4::ReadOptions{.track_id = 7});
         REQUIRE(out.has_value());
         CHECK(out->track.track_id == 7);
     }
 
     SECTION("a non-matching track_id is not found") {
-        const auto out = iclforge::containers::mp4::demux(file, iclforge::containers::mp4::ReadOptions{.track_id = 9});
+        const auto out = iclforge::containers::mp4::demux(
+            file, iclforge::containers::mp4::ReadOptions{.track_id = 9});
         REQUIRE_FALSE(out.has_value());
         CHECK(out.error() == iclforge::containers::mp4::DemuxError::kNoAudioTrack);
     }
@@ -1632,7 +1643,8 @@ TEST_CASE("MP4 fragmented reader across tfhd/trun flag combinations", "[mp4][rea
 
     SECTION("neither a default nor a per-sample size is malformed") {
         const auto moof = build_moof_relative(kTrackId, 0, 0x000000U, {TrunSample{}});
-        const auto out = iclforge::containers::mp4::demux(assemble(1536, 0, moof, frame_of(40, 0x42)));
+        const auto out =
+            iclforge::containers::mp4::demux(assemble(1536, 0, moof, frame_of(40, 0x42)));
         REQUIRE_FALSE(out.has_value());
         CHECK(out.error() == iclforge::containers::mp4::DemuxError::kMalformed);
     }
@@ -1663,7 +1675,8 @@ TEST_CASE("MP4 fragmented reader across tfhd/trun flag combinations", "[mp4][rea
         const auto trun =
             build_trun_flagged(0x000201U, 0, std::nullopt, {TrunSample{.size = 40}});
         const auto moof = build_moof_with(1, tfhd, trun);
-        const auto out = iclforge::containers::mp4::demux(assemble(1536, 0, moof, frame_of(40, 0x61)));
+        const auto out =
+            iclforge::containers::mp4::demux(assemble(1536, 0, moof, frame_of(40, 0x61)));
         REQUIRE(out.has_value());
         CHECK(out->samples.empty());
     }
@@ -1673,7 +1686,8 @@ TEST_CASE("MP4 fragmented reader across tfhd/trun flag combinations", "[mp4][rea
         const auto trun = build_trun_flagged(0x000201U, -1000, std::nullopt,
                                              {TrunSample{.size = 40}});
         const auto moof = build_moof_with(1, tfhd, trun);
-        const auto out = iclforge::containers::mp4::demux(assemble(1536, 0, moof, frame_of(40, 0x62)));
+        const auto out =
+            iclforge::containers::mp4::demux(assemble(1536, 0, moof, frame_of(40, 0x62)));
         REQUIRE_FALSE(out.has_value());
         CHECK(out.error() == iclforge::containers::mp4::DemuxError::kMalformed);
     }
@@ -1708,7 +1722,8 @@ TEST_CASE("MP4 fragmented reader across tfhd/trun flag combinations", "[mp4][rea
         const auto trun =
             build_trun_flagged(0x000201U, 0, std::nullopt, {TrunSample{.size = 40}});
         const auto moof = build_moof_with(1, tfhd, trun);
-        const auto out = iclforge::containers::mp4::demux(assemble(1536, 0, moof, frame_of(40, 0x63)));
+        const auto out =
+            iclforge::containers::mp4::demux(assemble(1536, 0, moof, frame_of(40, 0x63)));
         REQUIRE_FALSE(out.has_value());
         CHECK(out.error() == iclforge::containers::mp4::DemuxError::kMalformed);
     }
@@ -1757,7 +1772,8 @@ TEST_CASE("MP4 walk() handles box-shape edge cases", "[mp4][reader]") {
         const auto mdat = box("mdat", frame_of(16, 0x72));
         file.insert(file.end(), mdat.begin(), mdat.end());
 
-        const auto out = iclforge::containers::mp4::demux(file, iclforge::containers::mp4::ReadOptions{.max_chunks = 1});
+        const auto out = iclforge::containers::mp4::demux(
+            file, iclforge::containers::mp4::ReadOptions{.max_chunks = 1});
         REQUIRE_FALSE(out.has_value());
         CHECK(out.error() == iclforge::containers::mp4::DemuxError::kLimitExceeded);
     }

@@ -288,13 +288,12 @@ struct FragmentedOutput {
     const AudioTrack& track, std::span<const std::vector<std::byte>> frames,
     const FragmentOptions& options = {});
 
-// iclforge::containers::matroska::Writer's and iclforge::containers::mpegts::Writer's sibling, for a
-// session whose length is not known up front - a live capture, where
-// fragment() above cannot help: it needs every frame before it can group them
-// into fragments at all. A fragmented movie is the one container shape this
-// needs no invention for, which is the whole reason ISO/IEC 14496-12 §8.8
-// exists: every fragment carries its own moof, so nothing in a fragment
-// depends on a later one.
+// iclforge::containers::matroska::Writer's and iclforge::containers::mpegts::Writer's sibling, for
+// a session whose length is not known up front - a live capture, where fragment() above cannot
+// help: it needs every frame before it can group them into fragments at all. A fragmented movie is
+// the one container shape this needs no invention for, which is the whole reason ISO/IEC 14496-12
+// §8.8 exists: every fragment carries its own moof, so nothing in a fragment depends on a later
+// one.
 //
 // Contract, the same one iclforge::containers::mpegts::Writer's own tests assert: for the same
 // track, options and frames, the media segments this class hands back are

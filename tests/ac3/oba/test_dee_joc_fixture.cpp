@@ -117,8 +117,9 @@ TEST_CASE("the DEE fixture's OAMD is a twelve-channel bed with a trim element",
     CHECK(program.program.dynamic_objects == 0);
     CHECK(iclforge::objects::oba::object_count(program.program) == 12);
     CHECK(program.program.bed ==
-          (iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC | iclforge::objects::oba::bed::kLfe |
-           iclforge::objects::oba::bed::kLsRs | iclforge::objects::oba::bed::kLbRb | iclforge::objects::oba::bed::kTflTfr |
+          (iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC |
+           iclforge::objects::oba::bed::kLfe | iclforge::objects::oba::bed::kLsRs |
+           iclforge::objects::oba::bed::kLbRb | iclforge::objects::oba::bed::kTflTfr |
            iclforge::objects::oba::bed::kTblTbr));
 
     // Two oa_elements, where exactly one used to be allowed.

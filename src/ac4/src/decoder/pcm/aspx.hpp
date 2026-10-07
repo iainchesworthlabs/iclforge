@@ -126,7 +126,8 @@ struct AspxInterval {
 // them (SubstreamPcm makes one when its first A-SPX frame needs it). Each channel
 // takes them zeroed.
 struct AspxScratch {
-    using EnvelopeMatrix = std::array<std::array<dsp::tiered::Energy<Real>, 64>, kAspxMaxSignalEnvelopes>;
+    using EnvelopeMatrix =
+        std::array<std::array<dsp::tiered::Energy<Real>, 64>, kAspxMaxSignalEnvelopes>;
     using FlagMatrix = std::array<std::array<bool, 64>, kAspxMaxSignalEnvelopes>;
     EnvelopeMatrix est_sig{};
     EnvelopeMatrix scf_sig{};

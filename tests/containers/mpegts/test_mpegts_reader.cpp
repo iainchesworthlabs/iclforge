@@ -266,10 +266,11 @@ Bytes build_stream(std::span<const EsSpec> streams, const std::vector<Bytes>& fr
 TEST_CASE("MPEG-TS round-trips mux()'s access units", "[mpegts][reader]") {
     const std::vector<Bytes> frames{frame_of(700, 0x11), frame_of(512, 0x22),
                                     frame_of(1024, 0x33), frame_of(64, 0x44)};
-    const iclforge::containers::mpegts::AudioTrack track{.codec = iclforge::containers::mpegts::AudioCodec::kEac3,
-                                   .sample_rate = 48000,
-                                   .channels = 6,
-                                   .samples_per_frame = 1536};
+    const iclforge::containers::mpegts::AudioTrack track{
+        .codec = iclforge::containers::mpegts::AudioCodec::kEac3,
+        .sample_rate = 48000,
+        .channels = 6,
+        .samples_per_frame = 1536};
     const auto file = iclforge::containers::mpegts::mux(track, views_of(frames));
     REQUIRE(file.has_value());
 
@@ -290,10 +291,11 @@ TEST_CASE("MPEG-TS round-trips mux()'s access units", "[mpegts][reader]") {
 TEST_CASE("MPEG-TS round-trips an AC-3 track and the Writer's own output", "[mpegts][reader]") {
     const std::vector<Bytes> frames{frame_of(400, 0xA1), frame_of(400, 0xA2),
                                     frame_of(400, 0xA3)};
-    const iclforge::containers::mpegts::AudioTrack track{.codec = iclforge::containers::mpegts::AudioCodec::kAc3,
-                                   .sample_rate = 48000,
-                                   .channels = 2,
-                                   .samples_per_frame = 1536};
+    const iclforge::containers::mpegts::AudioTrack track{
+        .codec = iclforge::containers::mpegts::AudioCodec::kAc3,
+        .sample_rate = 48000,
+        .channels = 2,
+        .samples_per_frame = 1536};
 
     auto writer = iclforge::containers::mpegts::Writer::create(track);
     REQUIRE(writer.has_value());
@@ -316,10 +318,11 @@ TEST_CASE("MPEG-TS Reader over arbitrary chunk boundaries matches demux()", "[mp
     const std::vector<Bytes> frames{frame_of(700, 0x11), frame_of(3, 0x22), frame_of(1500, 0x33),
                                     frame_of(64, 0x44)};
     const auto file = iclforge::containers::mpegts::mux(
-        iclforge::containers::mpegts::AudioTrack{.codec = iclforge::containers::mpegts::AudioCodec::kEac3,
-                                     .sample_rate = 48000,
-                                     .channels = 6,
-                                     .samples_per_frame = 1536},
+        iclforge::containers::mpegts::AudioTrack{
+            .codec = iclforge::containers::mpegts::AudioCodec::kEac3,
+            .sample_rate = 48000,
+            .channels = 6,
+            .samples_per_frame = 1536},
         views_of(frames));
     REQUIRE(file.has_value());
 
@@ -338,7 +341,8 @@ TEST_CASE("MPEG-TS reads every way a PMT names the codec", "[mpegts][reader]") {
         const auto out = iclforge::containers::mpegts::demux(build_stream(streams, frames));
         REQUIRE(out.has_value());
         CHECK_FALSE(out->stream.eac3);
-        CHECK(out->stream.signalling == iclforge::containers::mpegts::CodecSignalling::kAtscStreamType);
+        CHECK(out->stream.signalling ==
+              iclforge::containers::mpegts::CodecSignalling::kAtscStreamType);
         CHECK(concat(out->payloads) == concat(frames));
     }
 
@@ -347,7 +351,8 @@ TEST_CASE("MPEG-TS reads every way a PMT names the codec", "[mpegts][reader]") {
         const auto out = iclforge::containers::mpegts::demux(build_stream(streams, frames));
         REQUIRE(out.has_value());
         CHECK(out->stream.eac3);
-        CHECK(out->stream.signalling == iclforge::containers::mpegts::CodecSignalling::kAtscStreamType);
+        CHECK(out->stream.signalling ==
+              iclforge::containers::mpegts::CodecSignalling::kAtscStreamType);
     }
 
     SECTION("DVB's Enhanced_AC3_descriptor on a private-data stream_type") {
@@ -360,7 +365,8 @@ TEST_CASE("MPEG-TS reads every way a PMT names the codec", "[mpegts][reader]") {
         const auto out = iclforge::containers::mpegts::demux(build_stream(streams, frames));
         REQUIRE(out.has_value());
         CHECK(out->stream.eac3);
-        CHECK(out->stream.signalling == iclforge::containers::mpegts::CodecSignalling::kDvbDescriptor);
+        CHECK(out->stream.signalling ==
+              iclforge::containers::mpegts::CodecSignalling::kDvbDescriptor);
     }
 
     SECTION("a registration descriptor's 'EAC3' format identifier") {
@@ -409,10 +415,11 @@ TEST_CASE("MPEG-TS reads the M2TS and 204-byte grids", "[mpegts][reader]") {
                                     frame_of(500, 0x73), frame_of(500, 0x74),
                                     frame_of(500, 0x75), frame_of(500, 0x76)};
     const auto plain = iclforge::containers::mpegts::mux(
-        iclforge::containers::mpegts::AudioTrack{.codec = iclforge::containers::mpegts::AudioCodec::kEac3,
-                                     .sample_rate = 48000,
-                                     .channels = 6,
-                                     .samples_per_frame = 1536},
+        iclforge::containers::mpegts::AudioTrack{
+            .codec = iclforge::containers::mpegts::AudioCodec::kEac3,
+            .sample_rate = 48000,
+            .channels = 6,
+            .samples_per_frame = 1536},
         views_of(frames));
     REQUIRE(plain.has_value());
 
@@ -539,18 +546,19 @@ TEST_CASE("MPEG-TS refuses what it cannot read", "[mpegts][reader]") {
 }
 
 TEST_CASE("MPEG-TS describe() names every demux error", "[mpegts][reader]") {
-    for (const auto error :
-         {iclforge::containers::mpegts::DemuxError::kNotTransportStream,
-          iclforge::containers::mpegts::DemuxError::kNoProgramme, iclforge::containers::mpegts::DemuxError::kNoAudioStream,
-          iclforge::containers::mpegts::DemuxError::kMalformed, iclforge::containers::mpegts::DemuxError::kLimitExceeded}) {
+    for (const auto error : {iclforge::containers::mpegts::DemuxError::kNotTransportStream,
+                             iclforge::containers::mpegts::DemuxError::kNoProgramme,
+                             iclforge::containers::mpegts::DemuxError::kNoAudioStream,
+                             iclforge::containers::mpegts::DemuxError::kMalformed,
+                             iclforge::containers::mpegts::DemuxError::kLimitExceeded}) {
         CHECK_FALSE(iclforge::containers::mpegts::describe(error).empty());
         CHECK(iclforge::containers::mpegts::describe(error) != "unknown error");
     }
     // DemuxError has an explicit uint8_t underlying type, so a value outside
     // every enumerator is well-defined to construct and switch on - describe()'s
     // fallthrough is reachable this way without invoking any UB to get there.
-    CHECK(iclforge::containers::mpegts::describe(static_cast<iclforge::containers::mpegts::DemuxError>(200)) ==
-          "unknown error");
+    CHECK(iclforge::containers::mpegts::describe(
+              static_cast<iclforge::containers::mpegts::DemuxError>(200)) == "unknown error");
 }
 
 // --- error-path and less-common-shape coverage -----------------------------
@@ -637,8 +645,8 @@ TEST_CASE("MPEG-TS select_from_pmt handles malformed and foreign shapes", "[mpeg
         const std::array<EsSpec, 1> streams{EsSpec{.stream_type = 0x81, .pid = 0x0100, .descriptors = {}}};
         const auto pmt = psi_packet(0x1000, pmt_cc, pmt_section(7, streams));
         file.insert(file.end(), pmt.begin(), pmt.end());
-        const auto out =
-            iclforge::containers::mpegts::demux(file, iclforge::containers::mpegts::ReadOptions{.program_number = 5});
+        const auto out = iclforge::containers::mpegts::demux(
+            file, iclforge::containers::mpegts::ReadOptions{.program_number = 5});
         REQUIRE_FALSE(out.has_value());
         CHECK(out.error() == iclforge::containers::mpegts::DemuxError::kNoAudioStream);
     }
@@ -920,8 +928,8 @@ TEST_CASE("MPEG-TS find_sync locks onto a very short capture", "[mpegts][reader]
 
 TEST_CASE("MPEG-TS gives up on a sync search past its own budget", "[mpegts][reader]") {
     Bytes file(2048, std::byte{0x00});  // no 0x47 anywhere
-    const auto out =
-        iclforge::containers::mpegts::demux(file, iclforge::containers::mpegts::ReadOptions{.max_sync_search_bytes = 512});
+    const auto out = iclforge::containers::mpegts::demux(
+        file, iclforge::containers::mpegts::ReadOptions{.max_sync_search_bytes = 512});
     REQUIRE_FALSE(out.has_value());
     CHECK(out.error() == iclforge::containers::mpegts::DemuxError::kNotTransportStream);
 }
@@ -931,7 +939,8 @@ TEST_CASE("MPEG-TS Reader surfaces a walk error directly from push()", "[mpegts]
     // might still hold the start of a grid, counting only what it drops
     // beyond that against the search budget - so the pushed chunk has to be
     // bigger than that tail for one push() to exceed a small budget outright.
-    iclforge::containers::mpegts::Reader reader{iclforge::containers::mpegts::ReadOptions{.max_sync_search_bytes = 64}};
+    iclforge::containers::mpegts::Reader reader{
+        iclforge::containers::mpegts::ReadOptions{.max_sync_search_bytes = 64}};
     const Bytes garbage(1200, std::byte{0x00});  // no 0x47 anywhere
     const auto sink = [](std::span<const std::byte>) {};
     const auto pushed = reader.push(garbage, sink);
@@ -944,10 +953,11 @@ TEST_CASE("MPEG-TS reads the service descriptor back through mux()/demux()",
     const std::vector<Bytes> frames{frame_of(300, 0x11)};
 
     SECTION("DVB E-AC-3: an associated service with asvc and substreams round-trips") {
-        iclforge::containers::mpegts::AudioTrack track{.codec = iclforge::containers::mpegts::AudioCodec::kEac3,
-                                 .sample_rate = 48000,
-                                 .channels = 2,
-                                 .samples_per_frame = 1536};
+        iclforge::containers::mpegts::AudioTrack track{
+            .codec = iclforge::containers::mpegts::AudioCodec::kEac3,
+            .sample_rate = 48000,
+            .channels = 2,
+            .samples_per_frame = 1536};
         track.service.bsmod = 2;  // visually impaired
         track.service.bsid = 16;
         track.service.mix_metadata = true;
@@ -975,10 +985,11 @@ TEST_CASE("MPEG-TS reads the service descriptor back through mux()/demux()",
     }
 
     SECTION("DVB AC-3: a main service round-trips, full_service resolves to Table D.4's pin") {
-        iclforge::containers::mpegts::AudioTrack track{.codec = iclforge::containers::mpegts::AudioCodec::kAc3,
-                                 .sample_rate = 48000,
-                                 .channels = 2,
-                                 .samples_per_frame = 1536};
+        iclforge::containers::mpegts::AudioTrack track{
+            .codec = iclforge::containers::mpegts::AudioCodec::kAc3,
+            .sample_rate = 48000,
+            .channels = 2,
+            .samples_per_frame = 1536};
         track.service.bsmod = 0;  // complete main
         track.service.bsid = 8;
         // full_service left std::nullopt: Table D.4 pins CM to 1 regardless,
@@ -999,10 +1010,11 @@ TEST_CASE("MPEG-TS reads the service descriptor back through mux()/demux()",
     }
 
     SECTION("ATSC E-AC-3: an associated service with asvc and substreams round-trips") {
-        iclforge::containers::mpegts::AudioTrack track{.codec = iclforge::containers::mpegts::AudioCodec::kEac3,
-                                 .sample_rate = 48000,
-                                 .channels = 6,
-                                 .samples_per_frame = 1536};
+        iclforge::containers::mpegts::AudioTrack track{
+            .codec = iclforge::containers::mpegts::AudioCodec::kEac3,
+            .sample_rate = 48000,
+            .channels = 6,
+            .samples_per_frame = 1536};
         track.service.bsmod = 5;  // commentary
         track.service.bsid = 16;
         track.service.asvc = 0x01;
@@ -1025,10 +1037,11 @@ TEST_CASE("MPEG-TS reads the service descriptor back through mux()/demux()",
     }
 
     SECTION("ATSC AC-3: a main service with mainid, priority and sample_rate_code round-trips") {
-        iclforge::containers::mpegts::AudioTrack track{.codec = iclforge::containers::mpegts::AudioCodec::kAc3,
-                                 .sample_rate = 44100,
-                                 .channels = 2,
-                                 .samples_per_frame = 1536};
+        iclforge::containers::mpegts::AudioTrack track{
+            .codec = iclforge::containers::mpegts::AudioCodec::kAc3,
+            .sample_rate = 44100,
+            .channels = 2,
+            .samples_per_frame = 1536};
         track.service.bsmod = 0;
         track.service.bsid = 8;
         track.service.sample_rate_code = 1;  // 44.1 kHz, Table A4.2
@@ -1049,12 +1062,15 @@ TEST_CASE("MPEG-TS reads the service descriptor back through mux()/demux()",
     }
 
     SECTION("ATSC AC-3: the plain 3-byte form (no association) still parses") {
-        const iclforge::containers::mpegts::AudioTrack track{.codec = iclforge::containers::mpegts::AudioCodec::kAc3,
-                                       .sample_rate = 48000,
-                                       .channels = 2,
-                                       .samples_per_frame = 1536};
-        const auto file = iclforge::containers::mpegts::mux(track, views_of(frames),
-                                      iclforge::containers::mpegts::MuxOptions{.profile = iclforge::containers::mpegts::BroadcastProfile::kAtsc});
+        const iclforge::containers::mpegts::AudioTrack track{
+            .codec = iclforge::containers::mpegts::AudioCodec::kAc3,
+            .sample_rate = 48000,
+            .channels = 2,
+            .samples_per_frame = 1536};
+        const auto file = iclforge::containers::mpegts::mux(
+            track, views_of(frames),
+            iclforge::containers::mpegts::MuxOptions{
+                .profile = iclforge::containers::mpegts::BroadcastProfile::kAtsc});
         REQUIRE(file.has_value());
 
         const auto out = iclforge::containers::mpegts::demux(*file);
@@ -1080,10 +1096,11 @@ TEST_CASE("MPEG-TS reads the service descriptor back through mux()/demux()",
     }
 
     SECTION("an AC-4 stream has no A/52 descriptor to read") {
-        const iclforge::containers::mpegts::AudioTrack track{.codec = iclforge::containers::mpegts::AudioCodec::kAc4,
-                                       .sample_rate = 48000,
-                                       .channels = 2,
-                                       .samples_per_frame = 2048};
+        const iclforge::containers::mpegts::AudioTrack track{
+            .codec = iclforge::containers::mpegts::AudioCodec::kAc4,
+            .sample_rate = 48000,
+            .channels = 2,
+            .samples_per_frame = 2048};
         const auto file = iclforge::containers::mpegts::mux(track, views_of(frames));
         REQUIRE(file.has_value());
         const auto out = iclforge::containers::mpegts::demux(*file);
@@ -1098,10 +1115,11 @@ TEST_CASE("MPEG-TS reads the service descriptor back through mux()/demux()",
     // rather than merely reachable in principle.
 
     SECTION("DVB AC-3: mainid round-trips (the DVB E-AC-3 section above only covers asvc)") {
-        iclforge::containers::mpegts::AudioTrack track{.codec = iclforge::containers::mpegts::AudioCodec::kAc3,
-                                 .sample_rate = 48000,
-                                 .channels = 2,
-                                 .samples_per_frame = 1536};
+        iclforge::containers::mpegts::AudioTrack track{
+            .codec = iclforge::containers::mpegts::AudioCodec::kAc3,
+            .sample_rate = 48000,
+            .channels = 2,
+            .samples_per_frame = 1536};
         track.service.bsmod = 0;
         track.service.mainid = 4;
         const auto file = iclforge::containers::mpegts::mux(track, views_of(frames));
@@ -1116,10 +1134,11 @@ TEST_CASE("MPEG-TS reads the service descriptor back through mux()/demux()",
     }
 
     SECTION("DVB AC-3: an associated service's asvc round-trips") {
-        iclforge::containers::mpegts::AudioTrack track{.codec = iclforge::containers::mpegts::AudioCodec::kAc3,
-                                 .sample_rate = 48000,
-                                 .channels = 2,
-                                 .samples_per_frame = 1536};
+        iclforge::containers::mpegts::AudioTrack track{
+            .codec = iclforge::containers::mpegts::AudioCodec::kAc3,
+            .sample_rate = 48000,
+            .channels = 2,
+            .samples_per_frame = 1536};
         track.service.bsmod = 4;  // dialogue
         track.service.asvc = 0x02;
         const auto file = iclforge::containers::mpegts::mux(track, views_of(frames));
@@ -1135,10 +1154,11 @@ TEST_CASE("MPEG-TS reads the service descriptor back through mux()/demux()",
     }
 
     SECTION("DVB E-AC-3: mainid round-trips (the section above only covers asvc)") {
-        iclforge::containers::mpegts::AudioTrack track{.codec = iclforge::containers::mpegts::AudioCodec::kEac3,
-                                 .sample_rate = 48000,
-                                 .channels = 2,
-                                 .samples_per_frame = 1536};
+        iclforge::containers::mpegts::AudioTrack track{
+            .codec = iclforge::containers::mpegts::AudioCodec::kEac3,
+            .sample_rate = 48000,
+            .channels = 2,
+            .samples_per_frame = 1536};
         track.service.bsmod = 0;
         track.service.mainid = 1;
         const auto file = iclforge::containers::mpegts::mux(track, views_of(frames));
@@ -1152,10 +1172,11 @@ TEST_CASE("MPEG-TS reads the service descriptor back through mux()/demux()",
     }
 
     SECTION("ATSC AC-3: an associated service's asvc round-trips (svc >= 0x2 branch)") {
-        iclforge::containers::mpegts::AudioTrack track{.codec = iclforge::containers::mpegts::AudioCodec::kAc3,
-                                 .sample_rate = 48000,
-                                 .channels = 2,
-                                 .samples_per_frame = 1536};
+        iclforge::containers::mpegts::AudioTrack track{
+            .codec = iclforge::containers::mpegts::AudioCodec::kAc3,
+            .sample_rate = 48000,
+            .channels = 2,
+            .samples_per_frame = 1536};
         track.service.bsmod = 3;  // hearing impaired
         track.service.asvc = 0x08;
         const auto file = iclforge::containers::mpegts::mux(track, views_of(frames),
@@ -1171,10 +1192,11 @@ TEST_CASE("MPEG-TS reads the service descriptor back through mux()/demux()",
     }
 
     SECTION("ATSC AC-3: acmod 1+1 takes the langcod2 branch (num_channels_field == 0)") {
-        iclforge::containers::mpegts::AudioTrack track{.codec = iclforge::containers::mpegts::AudioCodec::kAc3,
-                                 .sample_rate = 48000,
-                                 .channels = 2,
-                                 .samples_per_frame = 1536};
+        iclforge::containers::mpegts::AudioTrack track{
+            .codec = iclforge::containers::mpegts::AudioCodec::kAc3,
+            .sample_rate = 48000,
+            .channels = 2,
+            .samples_per_frame = 1536};
         track.service.acmod = 0;  // A/52 Table 5.8's own code for 1+1 (dual mono)
         track.service.bsmod = 0;
         track.service.mainid = 2;  // forces the extended form past langcod2
@@ -1190,10 +1212,11 @@ TEST_CASE("MPEG-TS reads the service descriptor back through mux()/demux()",
     }
 
     SECTION("ATSC E-AC-3: mainid round-trips (the section above only covers asvc)") {
-        iclforge::containers::mpegts::AudioTrack track{.codec = iclforge::containers::mpegts::AudioCodec::kEac3,
-                                 .sample_rate = 48000,
-                                 .channels = 6,
-                                 .samples_per_frame = 1536};
+        iclforge::containers::mpegts::AudioTrack track{
+            .codec = iclforge::containers::mpegts::AudioCodec::kEac3,
+            .sample_rate = 48000,
+            .channels = 6,
+            .samples_per_frame = 1536};
         track.service.bsmod = 0;
         track.service.mainid = 5;
         track.service.priority = 1;
@@ -1229,65 +1252,78 @@ TEST_CASE("MPEG-TS parse_service_descriptor rejects truncated and unknown input"
 
     SECTION("an unrecognised tag is refused, not guessed at") {
         CHECK_FALSE(
-            iclforge::containers::mpegts::parse_service_descriptor(0x9B, Bytes{std::byte{0x00}}).has_value());
+            iclforge::containers::mpegts::parse_service_descriptor(0x9B, Bytes{std::byte{0x00}})
+                .has_value());
     }
 
     SECTION("DVB AC-3: an empty body") {
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kDvbAc3, {}).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kDvbAc3, {}).has_value());
     }
 
     SECTION("DVB AC-3: component_type_flag set but the byte is missing") {
         const Bytes body{std::byte{0x80}};  // component_type_flag alone
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kDvbAc3, body).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kDvbAc3, body).has_value());
     }
 
     SECTION("DVB AC-3: bsid_flag set but the byte is missing") {
         const Bytes body{std::byte{0x40}};
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kDvbAc3, body).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kDvbAc3, body).has_value());
     }
 
     SECTION("DVB AC-3: mainid_flag set but the byte is missing") {
         const Bytes body{std::byte{0x20}};
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kDvbAc3, body).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kDvbAc3, body).has_value());
     }
 
     SECTION("DVB AC-3: asvc_flag set but the byte is missing") {
         const Bytes body{std::byte{0x10}};
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kDvbAc3, body).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kDvbAc3, body).has_value());
     }
 
     SECTION("DVB E-AC-3: an empty body") {
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kDvbEac3, {}).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kDvbEac3, {}).has_value());
     }
 
     SECTION("DVB E-AC-3: component_type_flag set but the byte is missing") {
         const Bytes body{std::byte{0x80}};
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kDvbEac3, body).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kDvbEac3, body).has_value());
     }
 
     SECTION("DVB E-AC-3: bsid_flag set but the byte is missing") {
         const Bytes body{std::byte{0x40}};
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kDvbEac3, body).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kDvbEac3, body).has_value());
     }
 
     SECTION("DVB E-AC-3: mainid_flag set but the byte is missing") {
         const Bytes body{std::byte{0x20}};
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kDvbEac3, body).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kDvbEac3, body).has_value());
     }
 
     SECTION("DVB E-AC-3: asvc_flag set but the byte is missing") {
         const Bytes body{std::byte{0x10}};
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kDvbEac3, body).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kDvbEac3, body).has_value());
     }
 
     SECTION("DVB E-AC-3: substream1_flag set but the byte is missing") {
         const Bytes body{std::byte{0x04}};  // substream1_flag alone
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kDvbEac3, body).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kDvbEac3, body).has_value());
     }
 
     SECTION("ATSC AC-3: a body shorter than the fixed 3-byte prefix") {
         const Bytes body{std::byte{0x00}, std::byte{0x00}};
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kAtscAc3, body).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kAtscAc3, body).has_value());
     }
 
     SECTION("ATSC AC-3: longer than 3 bytes but the association byte never arrives") {
@@ -1295,37 +1331,43 @@ TEST_CASE("MPEG-TS parse_service_descriptor rejects truncated and unknown input"
         // then langcod - exactly 4 bytes, one short of the mainid/asvcflags
         // byte the 4th byte's own length implies should follow.
         const Bytes body{std::byte{0x00}, std::byte{0x00}, std::byte{0x08}, std::byte{0xFF}};
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kAtscAc3, body).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kAtscAc3, body).has_value());
     }
 
     SECTION("ATSC E-AC-3: a body shorter than the fixed 3-byte prefix") {
         const Bytes body{std::byte{0x00}};
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kAtscEac3, body).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kAtscEac3, body).has_value());
     }
 
     SECTION("ATSC E-AC-3: mainid_flag set but the byte is missing") {
         const Bytes body{std::byte{0x20}, std::byte{0x00}, std::byte{0x10}};
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kAtscEac3, body).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kAtscEac3, body).has_value());
     }
 
     SECTION("ATSC E-AC-3: asvc_flag set but the byte is missing") {
         const Bytes body{std::byte{0x10}, std::byte{0x00}, std::byte{0x10}};
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kAtscEac3, body).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kAtscEac3, body).has_value());
     }
 
     SECTION("ATSC E-AC-3: substream1_flag set but the byte is missing") {
         const Bytes body{std::byte{0x04}, std::byte{0x00}, std::byte{0x10}};
-        CHECK_FALSE(iclforge::containers::mpegts::parse_service_descriptor(kAtscEac3, body).has_value());
+        CHECK_FALSE(
+            iclforge::containers::mpegts::parse_service_descriptor(kAtscEac3, body).has_value());
     }
 }
 
 TEST_CASE("MPEG-TS round-trips an AC-4 track", "[mpegts][reader][ac4]") {
     const std::vector<Bytes> frames{frame_of(700, 0x1A), frame_of(512, 0x2B),
                                     frame_of(280, 0x3C)};
-    const iclforge::containers::mpegts::AudioTrack track{.codec = iclforge::containers::mpegts::AudioCodec::kAc4,
-                                   .sample_rate = 48000,
-                                   .channels = 2,
-                                   .samples_per_frame = 2048};
+    const iclforge::containers::mpegts::AudioTrack track{
+        .codec = iclforge::containers::mpegts::AudioCodec::kAc4,
+        .sample_rate = 48000,
+        .channels = 2,
+        .samples_per_frame = 2048};
     const auto file = iclforge::containers::mpegts::mux(track, views_of(frames));
     REQUIRE(file.has_value());
 
@@ -1334,7 +1376,8 @@ TEST_CASE("MPEG-TS round-trips an AC-4 track", "[mpegts][reader][ac4]") {
     CHECK(out->stream.ac4);
     CHECK_FALSE(out->stream.eac3);
     CHECK(out->stream.stream_type == 0x06);
-    CHECK(out->stream.signalling == iclforge::containers::mpegts::CodecSignalling::kDvbExtensionDescriptor);
+    CHECK(out->stream.signalling ==
+          iclforge::containers::mpegts::CodecSignalling::kDvbExtensionDescriptor);
     // The payload passes through untouched - the reader never frames it.
     CHECK(concat(out->payloads) == concat(frames));
 }

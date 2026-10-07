@@ -383,7 +383,8 @@ TEST_CASE("single_channel_element reads SIMPLE and ASPX mono", "[ac4][decoder][c
     }
 }
 
-TEST_CASE("channel_pair_element reads every stereo codec mode", "[ac4][decoder][channel_elements]") {
+TEST_CASE("channel_pair_element reads every stereo codec mode",
+          "[ac4][decoder][channel_elements]") {
     SECTION("SIMPLE, with and without MDCT stereo processing") {
         for (const bool mdct : {true, false}) {
             ElementWriter e;
@@ -834,7 +835,8 @@ TEST_CASE("5_X_channel_element reads the four SIMPLE and ASPX coding configurati
     }
 }
 
-TEST_CASE("5_X_channel_element reads the three A-CPL codec modes", "[ac4][decoder][channel_elements]") {
+TEST_CASE("5_X_channel_element reads the three A-CPL codec modes",
+          "[ac4][decoder][channel_elements]") {
     SECTION("ASPX_ACPL_1 and ASPX_ACPL_2, both coding configurations") {
         for (const int mode : {codec_mode::kAspxAcpl1, codec_mode::kAspxAcpl2}) {
             for (const int config : {0, 1}) {
@@ -1241,7 +1243,8 @@ TEST_CASE("aspx_data_1ch reads each interval class", "[ac4][decoder][channel_ele
     }
 }
 
-TEST_CASE("aspx_data_1ch refuses what its syntax cannot follow", "[ac4][decoder][channel_elements]") {
+TEST_CASE("aspx_data_1ch refuses what its syntax cannot follow",
+          "[ac4][decoder][channel_elements]") {
     const auto refused = [](const BitWriter& w, const SubstreamContext& ctx, const AspxConfig& config,
                             AspxElementState& state) {
         AspxData1ch out;

@@ -41,11 +41,12 @@ struct IabChannelKeyHash {
     }
 };
 
-// §10.3.5 Table 19's ChannelID/DestinationChannelID codes with a clean iclforge::objects::oba::BedLabel
-// equivalent - see iab_bridge.hpp's own top comment for the full reasoning on the surround-zone
-// collapse (0x6/0xA -> Ls/Rs, 0x7/0x8 -> Lb/Rb, 0x5/0x9 refused) and why several other codes are
-// deliberately left unmapped rather than guessed at. 0x80-0x89 are Table 19's own BS.2051-2-named
-// alternative codes for a subset of the same physical positions (heights, wide, dual-LFE); 0xE/0xF
+// §10.3.5 Table 19's ChannelID/DestinationChannelID codes with a clean
+// iclforge::objects::oba::BedLabel equivalent - see iab_bridge.hpp's own top comment for the full
+// reasoning on the surround-zone collapse (0x6/0xA -> Ls/Rs, 0x7/0x8 -> Lb/Rb, 0x5/0x9 refused) and
+// why several other codes are deliberately left unmapped rather than guessed at. 0x80-0x89 are
+// Table 19's own BS.2051-2-named alternative codes for a subset of the same physical positions
+// (heights, wide, dual-LFE); 0xE/0xF
 // ("Left/Right Height", unqualified - the same pattern 0x0/0x4 "Left"/"Right" alone use for the
 // front row, versus the explicitly-qualified "Surround Height"/"Side Surround Height"/"Rear
 // Surround Height" variants below 0x11) are the front-height pair, matching 0x80/0x81's own "Top
@@ -71,14 +72,17 @@ struct IabChannelKeyHash {
         case 0x85: return iclforge::objects::oba::BedLabel::kTsr;            // Top side right / H
         case 0x86: return iclforge::objects::oba::BedLabel::kLfe;            // LFE1 / H
         case 0x87: return iclforge::objects::oba::BedLabel::kLfe2;           // LFE2 / H
-        case 0x88: return iclforge::objects::oba::BedLabel::kLw;             // Front Left (Wide) / H
-        case 0x89: return iclforge::objects::oba::BedLabel::kRw;             // Front Right (Wide) / H
+        case 0x88:
+            return iclforge::objects::oba::BedLabel::kLw;  // Front Left (Wide) / H
+        case 0x89:
+            return iclforge::objects::oba::BedLabel::kRw;  // Front Right (Wide) / H
         default: return std::nullopt;
     }
 }
 
 [[nodiscard]] bool is_lfe_label(iclforge::objects::oba::BedLabel label) {
-    return label == iclforge::objects::oba::BedLabel::kLfe || label == iclforge::objects::oba::BedLabel::kLfe2;
+    return label == iclforge::objects::oba::BedLabel::kLfe ||
+           label == iclforge::objects::oba::BedLabel::kLfe2;
 }
 
 struct ChannelIdentity {

@@ -170,7 +170,8 @@ iclforge::ac3::eac3::FrameEncoder make_eac3_auto(iclforge::ac3::Acmod acmod, boo
 }
 
 std::vector<iclforge::objects::oba::ObjectPlacement> object_placement() {
-    std::vector<iclforge::objects::oba::ObjectPlacement> placement(static_cast<std::size_t>(kObjects));
+    std::vector<iclforge::objects::oba::ObjectPlacement> placement(
+        static_cast<std::size_t>(kObjects));
     for (int obj = 0; obj < kObjects; ++obj) {
         placement[static_cast<std::size_t>(obj)] = {
             .position = {.x = 0.2 + 0.2 * obj, .y = 0.5, .z = 0.0}, .gain = 1.0};
@@ -236,8 +237,9 @@ Result bench_eac3_auto(std::string name, perf::FrameSource& source, iclforge::ac
 // configuration rather than "whatever the default is" (the same relationship
 // plain_51 has to plain_51_fast_mdct), so the trend series stay continuous
 // across a default change instead of taking a step nobody can read later.
-Result bench_atmos_4obj(perf::FrameSource& source, bool fast_mdct,
-                        iclforge::objects::oba::joc::Domain domain = iclforge::objects::oba::joc::Domain::kMdctBand) {
+Result bench_atmos_4obj(
+    perf::FrameSource& source, bool fast_mdct,
+    iclforge::objects::oba::joc::Domain domain = iclforge::objects::oba::joc::Domain::kMdctBand) {
     iclforge::ac3::oba::AtmosEncoder encoder{
         {.bitrate_kbps = 448, .fast_mdct = fast_mdct, .joc_domain = domain}, kObjects};
     const char* name = "atmos_4obj";
@@ -532,8 +534,8 @@ int main(int argc, char** argv) {
     // series stay continuous across a default change instead of taking a
     // step nobody can read later.
     if (wanted("atmos_4obj_qmf_fast_mdct")) {
-        results.push_back(
-            bench_atmos_4obj(four_object, /*fast_mdct=*/true, iclforge::objects::oba::joc::Domain::kQmf));
+        results.push_back(bench_atmos_4obj(four_object, /*fast_mdct=*/true,
+                                           iclforge::objects::oba::joc::Domain::kQmf));
     }
     if (wanted("ac3_51_decode")) {
         results.push_back(bench_ac3_decode(ac3_stream));

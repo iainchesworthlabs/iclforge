@@ -72,9 +72,10 @@ constexpr std::array<BedChannel, 10> kInput = {{
     {"Rs", 660.0}, {"Tfl", 740.0}, {"Tfr", 831.6}, {"Tbl", 880.0}, {"Tbr", 1108.8},
 }};
 
-constexpr std::uint16_t kBed514 = iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC |
-                                  iclforge::objects::oba::bed::kLfe | iclforge::objects::oba::bed::kLsRs |
-                                  iclforge::objects::oba::bed::kTflTfr | iclforge::objects::oba::bed::kTblTbr;
+constexpr std::uint16_t kBed514 =
+    iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC |
+    iclforge::objects::oba::bed::kLfe | iclforge::objects::oba::bed::kLsRs |
+    iclforge::objects::oba::bed::kTflTfr | iclforge::objects::oba::bed::kTblTbr;
 
 }  // namespace
 
@@ -87,7 +88,8 @@ TEST_CASE("AtmosEncoder's BedProgram constructor writes a real bed programme, no
     CHECK(encoder.program().dynamic_objects == 0);
     CHECK(encoder.dynamic_object_count() == 0);
     CHECK(iclforge::objects::oba::object_count(encoder.program()) == 10);
-    CHECK(iclforge::objects::oba::joc_object_count(encoder.program()) == 9);  // 10 bed channels less the LFE
+    CHECK(iclforge::objects::oba::joc_object_count(encoder.program()) ==
+          9);  // 10 bed channels less the LFE
 }
 
 TEST_CASE("Eac3Decoder recovers program.bed != 0 with 0 dynamic objects from a CBI encode",
@@ -215,9 +217,11 @@ TEST_CASE("a CBI encode with a 9.1.6 layout writes the wider bed and no dynamic 
     // docs/concepts/atmos-joc.md for which layouts are checked against a real
     // DEE stream and which are extended from Table 12's own channel order.
     constexpr std::uint16_t kBed916 =
-        iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC | iclforge::objects::oba::bed::kLfe |
-        iclforge::objects::oba::bed::kLsRs | iclforge::objects::oba::bed::kLbRb | iclforge::objects::oba::bed::kLwRw |
-        iclforge::objects::oba::bed::kTflTfr | iclforge::objects::oba::bed::kTslTsr | iclforge::objects::oba::bed::kTblTbr;
+        iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC |
+        iclforge::objects::oba::bed::kLfe | iclforge::objects::oba::bed::kLsRs |
+        iclforge::objects::oba::bed::kLbRb | iclforge::objects::oba::bed::kLwRw |
+        iclforge::objects::oba::bed::kTflTfr | iclforge::objects::oba::bed::kTslTsr |
+        iclforge::objects::oba::bed::kTblTbr;
     REQUIRE(iclforge::objects::oba::bed::channel_count(kBed916) == 16);
 
     iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 768},

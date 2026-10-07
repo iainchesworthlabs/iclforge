@@ -707,57 +707,57 @@ public:
     // Called once per encode frame - this is the only place deflection_
     // decays, so the spring-back happens on its own every frame regardless
     // of whether any input arrived.
-    std::array<iclforge::objects::oba::ObjectPlacement, kObjects> advance(double time_s, int scene, int from,
-                                                            double blend) {
-        std::lock_guard lock(mutex_);
-        for (int i = 0; i < kInteractiveObjects; ++i) {
-            // A played-back recording REPLACES the scene's trajectory for the
-            // lead, but deflection still applies on top of it - the recorded
-            // path behaves exactly like any other course, including being
-            // pushable and springing back to itself.
-            const auto base =
-                (i == 0 && record_state_ == RecordState::kPlaying && !recorded_.empty())
-                    ? recorded_[static_cast<std::size_t>(
-                          static_cast<std::int64_t>((time_s - playback_start_s_) / kFrameSeconds) %
-                          static_cast<std::int64_t>(recorded_.size()))]
-                    : blended_position(scene, from, blend, i, time_s);
-            auto& defl = deflection_[static_cast<std::size_t>(i)];
-            // Clamp to oamd.hpp's Position contract on top of the
-            // deflection's own bounding-box clamp in deflect_selected():
-            // that one keeps the BIAS itself bounded, this one keeps the
-            // final trajectory+bias position inside the room even right at
-            // the trajectory's own extremes (x,y in [0,1], z in [-1,1] - see
-            // src/objects/include/iclforge/objects/oamd.hpp).
-            placements_[static_cast<std::size_t>(i)] = {
-                .position = {.x = std::clamp(base.x + defl.x, 0.0, 1.0),
-                            .y = std::clamp(base.y + defl.y, 0.0, 1.0),
-                            .z = std::clamp(base.z + defl.z, -1.0, 1.0)},
-                .gain = 1.0,
-            };
-            defl.x *= kDeflectionDecayPerFrame;
-            defl.y *= kDeflectionDecayPerFrame;
-            defl.z *= kDeflectionDecayPerFrame;
+ std::array<iclforge::objects::oba::ObjectPlacement, kObjects> advance(double time_s, int scene,
+                                                                       int from, double blend) {
+     std::lock_guard lock(mutex_);
+     for (int i = 0; i < kInteractiveObjects; ++i) {
+         // A played-back recording REPLACES the scene's trajectory for the
+         // lead, but deflection still applies on top of it - the recorded
+         // path behaves exactly like any other course, including being
+         // pushable and springing back to itself.
+         const auto base =
+             (i == 0 && record_state_ == RecordState::kPlaying && !recorded_.empty())
+                 ? recorded_[static_cast<std::size_t>(
+                       static_cast<std::int64_t>((time_s - playback_start_s_) / kFrameSeconds) %
+                       static_cast<std::int64_t>(recorded_.size()))]
+                 : blended_position(scene, from, blend, i, time_s);
+         auto& defl = deflection_[static_cast<std::size_t>(i)];
+         // Clamp to oamd.hpp's Position contract on top of the
+         // deflection's own bounding-box clamp in deflect_selected():
+         // that one keeps the BIAS itself bounded, this one keeps the
+         // final trajectory+bias position inside the room even right at
+         // the trajectory's own extremes (x,y in [0,1], z in [-1,1] - see
+         // src/objects/include/iclforge/objects/oamd.hpp).
+         placements_[static_cast<std::size_t>(i)] = {
+             .position = {.x = std::clamp(base.x + defl.x, 0.0, 1.0),
+                          .y = std::clamp(base.y + defl.y, 0.0, 1.0),
+                          .z = std::clamp(base.z + defl.z, -1.0, 1.0)},
+             .gain = 1.0,
+         };
+         defl.x *= kDeflectionDecayPerFrame;
+         defl.y *= kDeflectionDecayPerFrame;
+         defl.z *= kDeflectionDecayPerFrame;
 
-            // Record the FINAL placed position, deflection and clamps
-            // included - what gets replayed is where the object actually
-            // went, not where the trajectory alone would have put it.
-            if (i == 0 && record_state_ == RecordState::kRecording) {
-                if (recorded_.size() < static_cast<std::size_t>(kMaxRecordFrames)) {
-                    recorded_.push_back(placements_[0].position);
-                } else {
-                    // Out of room: keep what was captured and start playing it
-                    // rather than silently recording nothing further.
-                    playback_start_s_ = time_s;
-                    record_state_ = RecordState::kPlaying;
-                }
-            }
-        }
-        for (int i = kInteractiveObjects; i < kObjects; ++i) {
-            placements_[static_cast<std::size_t>(i)] = {
-                .position = blended_position(scene, from, blend, i, time_s), .gain = 1.0};
-        }
-        return placements_;
-    }
+         // Record the FINAL placed position, deflection and clamps
+         // included - what gets replayed is where the object actually
+         // went, not where the trajectory alone would have put it.
+         if (i == 0 && record_state_ == RecordState::kRecording) {
+             if (recorded_.size() < static_cast<std::size_t>(kMaxRecordFrames)) {
+                 recorded_.push_back(placements_[0].position);
+             } else {
+                 // Out of room: keep what was captured and start playing it
+                 // rather than silently recording nothing further.
+                 playback_start_s_ = time_s;
+                 record_state_ = RecordState::kPlaying;
+             }
+         }
+     }
+     for (int i = kInteractiveObjects; i < kObjects; ++i) {
+         placements_[static_cast<std::size_t>(i)] = {
+             .position = blended_position(scene, from, blend, i, time_s), .gain = 1.0};
+     }
+     return placements_;
+ }
 
     // Instantly zeroes the selected object's deflection, rather than waiting
     // out kDeflectionDecayPerFrame's own ~1.5s time constant - called from a
@@ -1351,9 +1351,9 @@ void run_loop() {
         }
         if (*push_result && !(*push_result)->empty()) {
             if (frames == 0) {
-                __android_log_print(ANDROID_LOG_INFO, kLogTag,
-                                    "first burst ready: %zu bytes (expect %zu)",
-                                    (*push_result)->size(), iclforge::containers::iec61937::kEac3BurstBytes);
+                __android_log_print(
+                    ANDROID_LOG_INFO, kLogTag, "first burst ready: %zu bytes (expect %zu)",
+                    (*push_result)->size(), iclforge::containers::iec61937::kEac3BurstBytes);
             }
             int retry_count = 0;
             bool submitted = false;

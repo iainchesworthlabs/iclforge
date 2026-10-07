@@ -77,7 +77,8 @@ public:
     // PCMData, the opaque AudioDataDLC payload) is placed at a point the syntax tables already
     // guarantee is byte-aligned (see this class's own header comment) - the align_to_byte()
     // call here makes that precondition explicit rather than assumed.
-    [[nodiscard]] std::expected<std::span<const std::byte>, IabError> read_bytes(std::size_t count) {
+    [[nodiscard]] std::expected<std::span<const std::byte>, IabError> read_bytes(
+        std::size_t count) {
         align_to_byte();
         if (count > bits_remaining() / 8) {
             return std::unexpected(IabError::kTruncated);

@@ -82,7 +82,8 @@ std::string Fmp4FolderWriter::start(std::span<const std::byte> first_frame) {
     }
     const bool eac3 = scanned->kind == iclforge::ac3::io::StreamKind::kEac3;
     track_ = iclforge::containers::mp4::AudioTrack{
-        .codec_id = std::string{eac3 ? iclforge::containers::mp4::kCodecEac3 : iclforge::containers::mp4::kCodecAc3},
+        .codec_id = std::string{eac3 ? iclforge::containers::mp4::kCodecEac3
+                                     : iclforge::containers::mp4::kCodecAc3},
         .sample_rate = iclforge::ac3::sample_rate_hz(scanned->sample_rate),
         .channels = scanned->channels,
         .samples_per_frame = iclforge::ac3::kSamplesPerFrame,
@@ -117,18 +118,19 @@ std::string Fmp4FolderWriter::start(std::span<const std::byte> first_frame) {
     return {};
 }
 
-std::string Fmp4FolderWriter::write_manifests(const iclforge::containers::mp4::FragmentWriter& writer,
-                                             bool finished) {
+std::string Fmp4FolderWriter::write_manifests(
+    const iclforge::containers::mp4::FragmentWriter& writer, bool finished) {
     const auto window = writer.window();
     auto hls = hls_;
     hls.vod = finished;
     if (!write_text(dir_ / "audio.m3u8",
                     iclforge::containers::mp4::build_hls_media_playlist(track_, window, hls)) ||
-        !write_text(dir_ / "master.m3u8",
-                    iclforge::containers::mp4::build_hls_master_playlist(track_, window, "audio.m3u8", hls))) {
+        !write_text(dir_ / "master.m3u8", iclforge::containers::mp4::build_hls_master_playlist(
+                                              track_, window, "audio.m3u8", hls))) {
         return kWriteFailed;
     }
-    const auto adaptation_set = iclforge::containers::mp4::build_dash_adaptation_set(track_, window, dash_);
+    const auto adaptation_set =
+        iclforge::containers::mp4::build_dash_adaptation_set(track_, window, dash_);
     // Dynamic while the take runs, static once it stops - the MPD's half of
     // the before/after the HLS playlist's #EXT-X-ENDLIST makes.
     // timeShiftBufferDepth matches the rolling window when there is one;
@@ -143,8 +145,8 @@ std::string Fmp4FolderWriter::write_manifests(const iclforge::containers::mp4::F
     const iclforge::containers::mp4::MpdOptions mpd_options{.is_static = finished,
                                       .availability_start_time = availability_start_,
                                       .time_shift_buffer_depth_seconds = window_seconds};
-    if (!write_text(dir_ / "manifest.mpd",
-                    iclforge::containers::mp4::build_dash_mpd(track_, window, adaptation_set, mpd_options))) {
+    if (!write_text(dir_ / "manifest.mpd", iclforge::containers::mp4::build_dash_mpd(
+                                               track_, window, adaptation_set, mpd_options))) {
         return kWriteFailed;
     }
     return {};

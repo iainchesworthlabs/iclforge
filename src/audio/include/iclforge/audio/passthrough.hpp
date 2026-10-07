@@ -118,11 +118,14 @@ enum class BitstreamFormat : std::uint8_t { kAc3, kEac3, kAc4, kAc4Hbr4, kAc4Hbr
         case BitstreamFormat::kEac3:
             return containers::iec61937::kEac3BurstBytes;
         case BitstreamFormat::kAc4:
-            return containers::iec61937::repetition_period(containers::iec61937::BurstDataType::kAc4);
+            return containers::iec61937::repetition_period(
+                containers::iec61937::BurstDataType::kAc4);
         case BitstreamFormat::kAc4Hbr4:
-            return containers::iec61937::repetition_period(containers::iec61937::BurstDataType::kAc4Hbr4);
+            return containers::iec61937::repetition_period(
+                containers::iec61937::BurstDataType::kAc4Hbr4);
         case BitstreamFormat::kAc4Hbr16:
-            return containers::iec61937::repetition_period(containers::iec61937::BurstDataType::kAc4Hbr16);
+            return containers::iec61937::repetition_period(
+                containers::iec61937::BurstDataType::kAc4Hbr16);
     }
     return containers::iec61937::kBurstBytes;
 }

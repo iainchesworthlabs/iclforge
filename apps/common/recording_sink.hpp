@@ -69,7 +69,8 @@ class RecordingSink {
         // kSpdif: the IEC 61937-14 burst type the stream's largest frame
         // needs, and the carrier a WAV file holds its link in (HBR16's eight
         // channels at a quarter of the link's rate).
-        iclforge::containers::iec61937::BurstDataType burst_type = iclforge::containers::iec61937::BurstDataType::kAc4;
+        iclforge::containers::iec61937::BurstDataType burst_type =
+            iclforge::containers::iec61937::BurstDataType::kAc4;
         std::uint32_t carrier_rate_hz = 48000;
         std::uint16_t carrier_channels = 2;
         // kFmp4: the track, each sample the raw frame alone (Annex E.4).

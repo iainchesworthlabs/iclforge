@@ -640,7 +640,8 @@ TEST_CASE("a decode begun at an I-frame gives the whole stream's output from the
     }
 }
 
-TEST_CASE("a splice at an I-frame joins the two streams' audio without a gap", "[ac4][decoder][pcm]") {
+TEST_CASE("a splice at an I-frame joins the two streams' audio without a gap",
+          "[ac4][decoder][pcm]") {
     // Part 1 clause 6.2.19: a switch at an I-frame decodes without a flaw,
     // and the first frame after a splice is read without what the frames
     // before it sent. The signal carries on: the first stream's audio comes out

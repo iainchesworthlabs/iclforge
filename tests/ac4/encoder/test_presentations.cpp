@@ -739,7 +739,8 @@ TEST_CASE("the table of contents holds the presentations and substreams as confi
     }
 }
 
-TEST_CASE("the encoder's presentations read back with its own trace", "[ac4][encoder][presentations]") {
+TEST_CASE("the encoder's presentations read back with its own trace",
+          "[ac4][encoder][presentations]") {
     read_back(encoded_broadcast());
     read_back(encoded_hybrid());
     read_back(encoded_emdf());
@@ -1059,7 +1060,8 @@ TEST_CASE("3.0 carries the dialogue of a music and effects presentation and a wa
     CHECK_FALSE(accepted(config));
 }
 
-TEST_CASE("the 7.X pair is the 7.X substream's beside mono dialogue", "[ac4][encoder][presentations]") {
+TEST_CASE("the 7.X pair is the 7.X substream's beside mono dialogue",
+          "[ac4][encoder][presentations]") {
     // 7.1 music and effects (L R C LFE Ls Rs and the back pair) with mono
     // English dialogue: experimental.seven_x names the 7.1 substream's pair,
     // and the dialogue codes as it would alone.

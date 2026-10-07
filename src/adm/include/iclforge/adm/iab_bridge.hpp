@@ -13,9 +13,9 @@
 
 // Roadmap item IM1 phase 3 of 3 ("IAB (SMPTE ST 2098-2) reader"): maps the parsed
 // IAB bed/object graph (iclforge::iab, phases 1-2) onto iclforge::ac3::oba::AtmosEncoder's input
-// shape - one iclforge::objects::oba::ObjectPath plus one mono PCM buffer per bed speaker feed or dynamic
-// object, the same destination shape build() (bridge.hpp) already produces for ADM. This is still
-// the one place iclforge::iab and iclforge::ac3/iclforge::oba are allowed to meet - see
+// shape - one iclforge::objects::oba::ObjectPath plus one mono PCM buffer per bed speaker feed or
+// dynamic object, the same destination shape build() (bridge.hpp) already produces for ADM. This is
+// still the one place iclforge::iab and iclforge::ac3/iclforge::oba are allowed to meet - see
 // bridge.hpp's own top comment on why that boundary exists - just a second source feeding it. Gated
 // by the same ICLFORGE_BUILD_ADM flag as the rest of iclforge::adm (this module's own
 // CMakeLists.txt has the full reasoning); ICLFORGE_BUILD_IAB (default ON) is a separate,
@@ -37,20 +37,20 @@
 //     represent continuous audio" - for a Bed channel, combined with its own ChannelID per
 //     §10.3.5's note on ST 2098-1's Channel Identifier function) - fixing AtmosEncoder's channel
 //     count and order once, the same role collect_leaf_objects() plays for build()'s own ADM walk.
-//     A timeline pass then builds one iclforge::objects::oba::ObjectPath per identity spanning the WHOLE
-//     sequence: a frame where that identity is absent, or only conditionally Activated (an
+//     A timeline pass then builds one iclforge::objects::oba::ObjectPath per identity spanning the
+//     WHOLE sequence: a frame where that identity is absent, or only conditionally Activated (an
 //     alternate-target-environment mix per §10.3.2/§10.5.1's own Activation/UseCase fields - the
 //     same "pick the one primary set" choice build() already makes among several audioProgrammes),
 //     contributes no new keyframe (silence-filled PCM, the timeline simply holds/interpolates
 //     through the gap) rather than shrinking the channel count.
 //   - Bed channels have no per-block position data at all (unlike ADM's audioBlockFormat
 //     sequence) - a Bed's own ChannelID (Table 19) is a closed, physical-position vocabulary
-//     resolved once via iclforge::objects::oba::bed_label_position(), the same "pinned, unmoving placement"
-//     bed channels already get from ADM's speakerLabel; only BedChannel::gain (§10.3.8) can
-//     legitimately vary frame to frame, so a bed channel's timeline is one keyframe per frame it is
-//     present in. An LFE bed channel (ChannelID 0xD, or 0x86/0x87's BS.2051-2 LFE1/LFE2 aliases) is
-//     routed at gain 0 / lfe_send 1, the exact convention build_channel_path's own doc comment
-//     states for ADM ("Objects never reach the LFE by panning").
+//     resolved once via iclforge::objects::oba::bed_label_position(), the same "pinned, unmoving
+//     placement" bed channels already get from ADM's speakerLabel; only BedChannel::gain (§10.3.8)
+//     can legitimately vary frame to frame, so a bed channel's timeline is one keyframe per frame
+//     it is present in. An LFE bed channel (ChannelID 0xD, or 0x86/0x87's BS.2051-2 LFE1/LFE2
+//     aliases) is routed at gain 0 / lfe_send 1, the exact convention build_channel_path's own doc
+//     comment states for ADM ("Objects never reach the LFE by panning").
 //   - Table 19's cinema channel vocabulary is richer than iclforge::objects::oba::BedLabel's own
 //   consumer-layout
 //     one in exactly one place: it names THREE distinct surround zones per side (Side Surround,

@@ -24,9 +24,9 @@ namespace {
 using Bytes = std::vector<std::byte>;
 
 // A 48 kHz track as the MP4 reader reports one, with `edits`.
-iclforge::containers::mp4::ReadTrack track_with(std::vector<iclforge::containers::mp4::EditListEntry> edits,
-                                    std::uint32_t timescale = 48000,
-                                    std::uint32_t movie_timescale = 48000) {
+iclforge::containers::mp4::ReadTrack track_with(
+    std::vector<iclforge::containers::mp4::EditListEntry> edits, std::uint32_t timescale = 48000,
+    std::uint32_t movie_timescale = 48000) {
     iclforge::containers::mp4::ReadTrack track;
     track.sample_rate = 48000;
     track.timescale = timescale;
@@ -368,8 +368,8 @@ TEST_CASE("elementary_stream_from_bytes reports an MP4's edit list as a trim",
     const std::span<const std::span<const std::byte>> units(scanned->access_units);
 
     iclforge::containers::mp4::MuxOptions edited;
-    edited.edit =
-        iclforge::containers::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = (3 * 1536) - 356};
+    edited.edit = iclforge::containers::mp4::MuxOptions::Edit{.start_samples = 256,
+                                                              .duration_samples = (3 * 1536) - 356};
     const auto with_edit = iclforge::containers::mp4::mux(track, units, edited);
     REQUIRE(with_edit.has_value());
     const auto trimmed = iclforge::apps::elementary_stream_from_bytes(*with_edit);

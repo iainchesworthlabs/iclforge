@@ -1121,7 +1121,8 @@ ICLFORGE_C_EXPORT int iclforge_scanned_stream_access_unit_at_sample(
 ICLFORGE_C_EXPORT int iclforge_scanned_stream_access_unit_at_seconds(
     const iclforge_scanned_stream_t* stream, double seconds, size_t* out_index);
 /* The one length every access unit shares - returns 0 (out_samples
- * untouched) when they differ, 1 otherwise. iclforge::containers::mp4::AudioTrack/iclforge::containers::mpegts::
+ * untouched) when they differ, 1 otherwise.
+ * iclforge::containers::mp4::AudioTrack/iclforge::containers::mpegts::
  * AudioTrack/iclforge::containers::matroska::AudioTrack each need exactly this before a stream can
  * be muxed into a fixed-duration track. */
 ICLFORGE_C_EXPORT int iclforge_scanned_stream_uniform_access_unit_samples(
@@ -1156,8 +1157,8 @@ typedef struct iclforge_object_placement {
     double lfe_send; /* linear, default 0.0 — the only route an object reaches the LFE */
 } iclforge_object_placement_t;
 
-/* Fills `placement` with the same defaults iclforge::objects::oba::ObjectPlacement's own default member
- * initializers give — room-centre position (x 0.5, y 0.5, z 0.0), unity gain, no LFE send —
+/* Fills `placement` with the same defaults iclforge::objects::oba::ObjectPlacement's own default
+ * member initializers give — room-centre position (x 0.5, y 0.5, z 0.0), unity gain, no LFE send —
  * call this before setting only the fields you need, the same convention every
  * iclforge_*_config_init() above follows. Without it, a zero-initialized
  * iclforge_object_placement_t silently encodes gain 0.0 (a muted object) rather than the

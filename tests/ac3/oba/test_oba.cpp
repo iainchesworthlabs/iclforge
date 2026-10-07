@@ -178,8 +178,8 @@ TEST_CASE("reconstruct is a delayed identity when the matrix is a pure passthrou
     // oba::joc::reconstruction_delay() is the single place either number is
     // written down, so a test that used the wrong one could not silently
     // pass by measuring a shifted signal against itself.
-    for (const auto domain :
-         {iclforge::objects::oba::joc::Domain::kMdctBand, iclforge::objects::oba::joc::Domain::kQmf}) {
+    for (const auto domain : {iclforge::objects::oba::joc::Domain::kMdctBand,
+                              iclforge::objects::oba::joc::Domain::kQmf}) {
         CAPTURE(domain == iclforge::objects::oba::joc::Domain::kQmf);
         iclforge::ac3::oba::joc::FrameParameters params{.objects = 1, .num_bands_idx = 4};
         params.matrix.assign(params.coefficient_count(), 0.0);
@@ -226,8 +226,8 @@ TEST_CASE("clip_gain scales reconstructed object PCM by exactly that factor", "[
     // multiply reads it, so the two runs' pre-multiply PCM is identical and any
     // deviation from an exact `* clip_gain` relationship means the multiply landed
     // in the wrong place, or not at all.
-    for (const auto domain :
-         {iclforge::objects::oba::joc::Domain::kMdctBand, iclforge::objects::oba::joc::Domain::kQmf}) {
+    for (const auto domain : {iclforge::objects::oba::joc::Domain::kMdctBand,
+                              iclforge::objects::oba::joc::Domain::kQmf}) {
         CAPTURE(domain == iclforge::objects::oba::joc::Domain::kQmf);
 
         iclforge::ac3::oba::joc::FrameParameters unity{.objects = 1, .num_bands_idx = 4};
@@ -315,8 +315,9 @@ TEST_CASE("an object's overlap tail drains while absent instead of staying stale
     iclforge::ac3::oba::joc::ReconstructionState state;
 
     // Frame 1: object present, real signal - builds a real, nonzero overlap tail.
-    const auto out1 = iclforge::ac3::oba::joc::reconstruct(loud_views, present_params, state, false,
-                                                      false, iclforge::objects::oba::joc::Domain::kMdctBand);
+    const auto out1 =
+        iclforge::ac3::oba::joc::reconstruct(loud_views, present_params, state, false, false,
+                                             iclforge::objects::oba::joc::Domain::kMdctBand);
     double energy1 = 0.0;
     for (const float v : out1[0]) {
         const double d = static_cast<double>(v);
@@ -332,9 +333,9 @@ TEST_CASE("an object's overlap tail drains while absent instead of staying stale
     // failed to drain the tail, frame 1's energy leaks back in here via a stale overlap-add.
     std::vector<std::vector<float>> out;
     for (int f = 0; f < 2; ++f) {
-        out =
-            iclforge::ac3::oba::joc::reconstruct(silent_views, silent_present_params, state, false,
-                                                 false, iclforge::objects::oba::joc::Domain::kMdctBand);
+        out = iclforge::ac3::oba::joc::reconstruct(silent_views, silent_present_params, state,
+                                                   false, false,
+                                                   iclforge::objects::oba::joc::Domain::kMdctBand);
     }
     double energy_after = 0.0;
     for (const float v : out[0]) {
@@ -392,8 +393,8 @@ TEST_CASE("a smooth two-data-point object ramps from the first coefficient towar
                                                  iclforge::objects::oba::joc::Domain::kMdctBand);
     REQUIRE(out.size() == 1);
 
-    const int delay =
-        iclforge::objects::oba::joc::reconstruction_delay(iclforge::objects::oba::joc::Domain::kMdctBand);
+    const int delay = iclforge::objects::oba::joc::reconstruction_delay(
+        iclforge::objects::oba::joc::Domain::kMdctBand);
     const int usable = iclforge::ac3::kSamplesPerFrame - delay;
     const int quarter = usable / 4;
     double first_quarter = 0.0;
@@ -787,7 +788,8 @@ TEST_CASE("OAMD round-trips object size, snap and zone constraints", "[oba][oamd
     // Table 17's three shapes, plus the two rendering flags §5.6.1.5/§5.6.1.6
     // put beside them. Every size value here sits on the 31-step grid so the
     // comparison can be exact rather than a tolerance.
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 3};
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 3};
     const std::array<iclforge::objects::oba::DynamicObject, 3> objects{{
         {.position = {.x = 0.5, .y = 0.5, .z = 0.0},
          .size = {},  // object_size_idx 0b00, a point source
@@ -827,7 +829,8 @@ TEST_CASE("OAMD round-trips a non-default object priority", "[oba][oamd]") {
     // §5.6.1.3.2: the 5-bit field spans [0; 1) in 32nds, and 1,0 is reachable
     // only through b_default_object_priority - so 1,0 and 31/32 have to come
     // back distinguishable.
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 3};
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 3};
     const std::array<iclforge::objects::oba::DynamicObject, 3> objects{{
         {.priority = 1.0},
         {.priority = 31.0 / 32.0},
@@ -1015,7 +1018,8 @@ TEST_CASE("OAMD skips an oa_element it does not recognise", "[oba][oamd]") {
     // §5.6.4.3's whole purpose: an unknown element costs a decoder a seek,
     // not the payload. Built by splicing a reserved-id element in front of a
     // real one produced by build_payload.
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .lfe = true, .dynamic_objects = 1};
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = true, .dynamic_objects = 1};
     const std::array<iclforge::objects::oba::DynamicObject, 1> objects{
         {{.position = {.x = 0.5, .y = 0.5, .z = 0.0}}}};
     const auto original = iclforge::objects::oba::build_payload(program, objects);
@@ -1073,7 +1077,8 @@ std::vector<std::vector<double>> decode_divergence(
 
     const iclforge::objects::oba::Program program{
         .dynamic_only = true, .lfe = true, .dynamic_objects = objects};
-    const std::vector<iclforge::objects::oba::DynamicObject> state(static_cast<std::size_t>(objects));
+    const std::vector<iclforge::objects::oba::DynamicObject> state(
+        static_cast<std::size_t>(objects));
     std::vector<iclforge::objects::oba::ObjectUpdate> updates;
     for (int blk = 0; blk < blocks; ++blk) {
         updates.push_back({.block_offset_factor = blk * 4, .ramp_duration = 512, .objects = state});
@@ -1264,7 +1269,8 @@ TEST_CASE("OAMD writes b_object_not_active and nothing else for a silent object"
     // §5.5.9's short-circuit on the WRITE side: object 1 gets exactly two
     // bits (not_active, then b_additional_table_data_exists), none of the
     // basic/render info object 0 gets right beside it.
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 2};
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 2};
     const std::array<iclforge::objects::oba::DynamicObject, 2> objects{{
         {.position = {.x = 0.5, .y = 0.5, .z = 0.0}, .gain_db = 0.0},
         {.position = {.x = 1.0, .y = 0.0, .z = -1.0}, .gain_db = 9.0, .active = false},
@@ -1295,7 +1301,8 @@ TEST_CASE("OAMD writes b_object_not_active and nothing else for a silent object"
 }
 
 TEST_CASE("OAMD round-trips an inactive object back to its defaults", "[oba][oamd]") {
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 2};
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 2};
     // Object 0's position sits exactly on the quantizer's grid (0, 1 over
     // 62nds/15ths), the same reason the very first OAMD test in this file can
     // assert exact codes rather than tolerances - a mid-scale value like 0.25
@@ -1338,7 +1345,8 @@ TEST_CASE("OAMD round-trips an inactive object back to its defaults", "[oba][oam
 }
 
 TEST_CASE("OAMD writes every representable sample_offset_code shape", "[oba][oamd]") {
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 1};
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 1};
     const std::array<iclforge::objects::oba::DynamicObject, 1> objects{
         {{.position = {.x = 0.5, .y = 0.5, .z = 0.0}}}};
 
@@ -1353,7 +1361,8 @@ TEST_CASE("OAMD writes every representable sample_offset_code shape", "[oba][oam
 
     SECTION("zero takes the one-code-word shape") {
         const iclforge::objects::oba::ObjectUpdate update{.sample_offset = 0, .objects = objects};
-        const auto payload = iclforge::objects::oba::build_payload_updates(program, std::span{&update, 1});
+        const auto payload =
+            iclforge::objects::oba::build_payload_updates(program, std::span{&update, 1});
         iclforge::BitReader r{payload};
         skip_to_sample_offset(r);
         CHECK(r.read(2) == 0b00);
@@ -1375,7 +1384,8 @@ TEST_CASE("OAMD writes every representable sample_offset_code shape", "[oba][oam
     SECTION("any other in-range value takes the 5-bit literal") {
         for (const int offset : {1, 5, 30, 31}) {
             CAPTURE(offset);
-            const iclforge::objects::oba::ObjectUpdate update{.sample_offset = offset, .objects = objects};
+            const iclforge::objects::oba::ObjectUpdate update{.sample_offset = offset,
+                                                              .objects = objects};
             const auto payload =
                 iclforge::objects::oba::build_payload_updates(program, std::span{&update, 1});
             iclforge::BitReader r{payload};
@@ -1387,13 +1397,16 @@ TEST_CASE("OAMD writes every representable sample_offset_code shape", "[oba][oam
 }
 
 TEST_CASE("OAMD round-trips every representable sample_offset value", "[oba][oamd]") {
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 1};
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 1};
     const std::array<iclforge::objects::oba::DynamicObject, 1> objects{
         {{.position = {.x = 0.5, .y = 0.5, .z = 0.0}}}};
     for (const int offset : {0, 8, 16, 18, 24, 1, 5, 30, 31}) {
         CAPTURE(offset);
-        const iclforge::objects::oba::ObjectUpdate update{.sample_offset = offset, .objects = objects};
-        const auto payload = iclforge::objects::oba::build_payload_updates(program, std::span{&update, 1});
+        const iclforge::objects::oba::ObjectUpdate update{.sample_offset = offset,
+                                                          .objects = objects};
+        const auto payload =
+            iclforge::objects::oba::build_payload_updates(program, std::span{&update, 1});
         const auto decoded = iclforge::objects::oba::parse_payload(payload);
         REQUIRE(decoded.has_value());
         REQUIRE(decoded->blocks.size() == 1);
@@ -1674,13 +1687,16 @@ iclforge::objects::oba::DynamicObject with_divergence(double divergence) {
 }  // namespace
 
 TEST_CASE("OAMD round-trips every value of Table 42", "[oba][oamd][divergence]") {
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 1};
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 1};
     // Code 0 is reserved and code 1 is no divergence, so both read as 0; every other code comes
     // back as the value the table prints, exactly.
     for (std::size_t code = 2; code < kTable42.size(); ++code) {
         CAPTURE(code);
-        const std::array<iclforge::objects::oba::DynamicObject, 1> objects{with_divergence(kTable42[code])};
-        const auto decoded = iclforge::objects::oba::parse_payload(iclforge::objects::oba::build_payload(program, objects));
+        const std::array<iclforge::objects::oba::DynamicObject, 1> objects{
+            with_divergence(kTable42[code])};
+        const auto decoded = iclforge::objects::oba::parse_payload(
+            iclforge::objects::oba::build_payload(program, objects));
         REQUIRE(decoded.has_value());
         REQUIRE(decoded->objects.size() == 1);
         CHECK(decoded->objects[0].divergence == kTable42[code]);
@@ -1688,10 +1704,13 @@ TEST_CASE("OAMD round-trips every value of Table 42", "[oba][oamd][divergence]")
 }
 
 TEST_CASE("OAMD quantizes divergence to the nearest Table 42 value", "[oba][oamd][divergence]") {
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 1};
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 1};
     const auto round_trip = [&](double divergence) {
-        const std::array<iclforge::objects::oba::DynamicObject, 1> objects{with_divergence(divergence)};
-        const auto decoded = iclforge::objects::oba::parse_payload(iclforge::objects::oba::build_payload(program, objects));
+        const std::array<iclforge::objects::oba::DynamicObject, 1> objects{
+            with_divergence(divergence)};
+        const auto decoded = iclforge::objects::oba::parse_payload(
+            iclforge::objects::oba::build_payload(program, objects));
         REQUIRE(decoded.has_value());
         return decoded->objects.at(0).divergence;
     };
@@ -1706,9 +1725,11 @@ TEST_CASE("OAMD quantizes divergence to the nearest Table 42 value", "[oba][oamd
 }
 
 TEST_CASE("OAMD writes the extended_object_element only when an object diverges", "[oba][oamd][divergence]") {
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 2};
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 2};
     const std::array<iclforge::objects::oba::DynamicObject, 2> none{{with_divergence(0.0), with_divergence(0.0)}};
-    const std::array<iclforge::objects::oba::DynamicObject, 2> some{{with_divergence(0.0), with_divergence(0.5)}};
+    const std::array<iclforge::objects::oba::DynamicObject, 2> some{
+        {with_divergence(0.0), with_divergence(0.5)}};
     const auto plain = iclforge::objects::oba::build_payload(program, none);
     const auto extended = iclforge::objects::oba::build_payload(program, some);
     // oa_element_count_bits is the four bits after oa_md_version (2), object_count (5), the two
@@ -1726,7 +1747,8 @@ TEST_CASE("OAMD writes the extended_object_element only when an object diverges"
 TEST_CASE("OAMD codes divergence as Table 40 says: table, reuse or code", "[oba][oamd][divergence]") {
     // The extended_object_element's bits, read back by hand from the payload: skip the
     // object_element by its size, then walk §5.5.13 and §5.5.14 field by field.
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 1};
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 1};
 
     struct Elements {
         std::uint32_t extended_id = 0;
@@ -1751,7 +1773,8 @@ TEST_CASE("OAMD codes divergence as Table 40 says: table, reuse or code", "[oba]
         return out;
     };
     const auto one_block = [&](double divergence) {
-        const std::array<iclforge::objects::oba::DynamicObject, 1> objects{with_divergence(divergence)};
+        const std::array<iclforge::objects::oba::DynamicObject, 1> objects{
+            with_divergence(divergence)};
         return std::array<iclforge::objects::oba::ObjectUpdate, 1>{{{.objects = objects}}};
     };
 
@@ -1791,7 +1814,8 @@ TEST_CASE("OAMD codes divergence as Table 40 says: table, reuse or code", "[oba]
 }
 
 TEST_CASE("OAMD reads divergence modes and carries a repeated value across blocks", "[oba][oamd][divergence]") {
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 2};
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 2};
     const auto a0 = std::array{with_divergence(0.608529), with_divergence(0.0)};
     const auto a1 = std::array{with_divergence(0.608529), with_divergence(0.3)};
     const auto a2 = std::array{with_divergence(0.0), with_divergence(0.3)};
@@ -1811,11 +1835,14 @@ TEST_CASE("OAMD reads divergence modes and carries a repeated value across block
 }
 
 TEST_CASE("OAMD sends no divergence for an inactive object", "[oba][oamd][divergence]") {
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 2};
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 2};
     iclforge::objects::oba::DynamicObject silent = with_divergence(0.9);
     silent.active = false;
-    const std::array<iclforge::objects::oba::DynamicObject, 2> objects{{silent, with_divergence(0.5)}};
-    const auto decoded = iclforge::objects::oba::parse_payload(iclforge::objects::oba::build_payload(program, objects));
+    const std::array<iclforge::objects::oba::DynamicObject, 2> objects{
+        {silent, with_divergence(0.5)}};
+    const auto decoded = iclforge::objects::oba::parse_payload(
+        iclforge::objects::oba::build_payload(program, objects));
     REQUIRE(decoded.has_value());
     CHECK_FALSE(decoded->objects[0].active);
     CHECK(decoded->objects[0].divergence == 0.0);
@@ -1824,7 +1851,8 @@ TEST_CASE("OAMD sends no divergence for an inactive object", "[oba][oamd][diverg
 }
 
 TEST_CASE("OAMD round-trips the screen reference and its two factors", "[oba][oamd][screen]") {
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 4};
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 4};
     const auto object = [](bool screen, double screen_factor, double depth_factor) {
         iclforge::objects::oba::DynamicObject o;
         o.position = {.x = 0.5, .y = 0.0, .z = 0.0};
@@ -1860,7 +1888,8 @@ TEST_CASE("OAMD round-trips the screen reference and its two factors", "[oba][oa
 }
 
 TEST_CASE("OAMD quantizes the screen and depth factors to the nearest code", "[oba][oamd][screen]") {
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .lfe = false, .dynamic_objects = 1};
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 1};
     iclforge::objects::oba::DynamicObject o;
     o.screen_reference = true;
     o.screen_factor = 0.52;  // nearer 4/8 than 5/8

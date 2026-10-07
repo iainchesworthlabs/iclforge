@@ -267,7 +267,8 @@ TEST_CASE("7.X folds to 5.X by Table 219 for each additional pair and add_ch_bas
     CHECK(matrix_for(kFiveOne, false, iclforge::ac4::DownmixTarget::k5X, values).size() == 6);
 }
 
-TEST_CASE("3.0, stereo and mono take Table 217, the sum and the 0.707 upmix", "[ac4][decoder][downmix]") {
+TEST_CASE("3.0, stereo and mono take Table 217, the sum and the 0.707 upmix",
+          "[ac4][decoder][downmix]") {
     detail::DownmixValues values;
     values.coeff = coefficients(5, 4, 3, 4, std::nullopt, 1);
     const std::array<S, 3> three = {S::kLeft, S::kRight, S::kCentre};

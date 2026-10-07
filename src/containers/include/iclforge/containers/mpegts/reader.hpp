@@ -13,8 +13,8 @@
 #include "iclforge/containers/export.hpp"
 #include "iclforge/containers/mpegts/mpegts.hpp"
 
-// The read side of iclforge::containers::mpegts::mux()/iclforge::containers::mpegts::Writer: pulling one programme's
-// audio back out of a transport stream.
+// The read side of iclforge::containers::mpegts::mux()/iclforge::containers::mpegts::Writer:
+// pulling one programme's audio back out of a transport stream.
 //
 // A container reader and nothing more, the same way the writer beside it is
 // a container writer and nothing more (see mpegts/mpegts.hpp): it locks to

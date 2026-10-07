@@ -133,7 +133,8 @@ constexpr int kPollMs = 60;
 
 // Forward-declared: defined below, in the play-monitor section, but the
 // Media page's own OAMD table (media_objects_to_list()) needs it too.
-[[nodiscard]] QVariantMap display_object_to_map(const iclforge::objects::oba::DisplayObject& object);
+[[nodiscard]] QVariantMap display_object_to_map(
+    const iclforge::objects::oba::DisplayObject& object);
 
 [[nodiscard]] QVariantMap media_container_to_map(const apps::ContainerFacts& facts) {
     QVariantMap map;
@@ -994,7 +995,8 @@ constexpr int kPollMs = 60;
 // apps/gui's ObjectDecodeController already settled on for its own room-plan
 // view (object_decode_controller.cpp), so the two applications' object
 // markers read the same fields the same way.
-[[nodiscard]] QVariantMap display_object_to_map(const iclforge::objects::oba::DisplayObject& object) {
+[[nodiscard]] QVariantMap display_object_to_map(
+    const iclforge::objects::oba::DisplayObject& object) {
     QVariantMap map;
     map[QStringLiteral("x")] = object.position.x;
     map[QStringLiteral("y")] = object.position.y;

@@ -73,16 +73,21 @@ constexpr Built<R, N, Roots, Pre> build(const std::array<double, Roots>& roots,
 // neither evaluates nor links any of it. Constant-initialised: no guard.
 template <typename R>
 const TransformTable<R>* lookup(std::size_t length) noexcept {
-    static constexpr auto k2048 =
-        build<R>(iclforge::dsp::tiered::tables::kFftRoots2048, iclforge::dsp::tiered::tables::kPreTwiddle2048, iclforge::dsp::tiered::tables::kKbdLeft2048);
-    static constexpr auto k1024 =
-        build<R>(iclforge::dsp::tiered::tables::kFftRoots1024, iclforge::dsp::tiered::tables::kPreTwiddle1024, iclforge::dsp::tiered::tables::kKbdLeft1024);
-    static constexpr auto k512 =
-        build<R>(iclforge::dsp::tiered::tables::kFftRoots512, iclforge::dsp::tiered::tables::kPreTwiddle512, iclforge::dsp::tiered::tables::kKbdLeft512);
-    static constexpr auto k256 =
-        build<R>(iclforge::dsp::tiered::tables::kFftRoots256, iclforge::dsp::tiered::tables::kPreTwiddle256, iclforge::dsp::tiered::tables::kKbdLeft256);
-    static constexpr auto k128 =
-        build<R>(iclforge::dsp::tiered::tables::kFftRoots128, iclforge::dsp::tiered::tables::kPreTwiddle128, iclforge::dsp::tiered::tables::kKbdLeft128);
+    static constexpr auto k2048 = build<R>(iclforge::dsp::tiered::tables::kFftRoots2048,
+                                           iclforge::dsp::tiered::tables::kPreTwiddle2048,
+                                           iclforge::dsp::tiered::tables::kKbdLeft2048);
+    static constexpr auto k1024 = build<R>(iclforge::dsp::tiered::tables::kFftRoots1024,
+                                           iclforge::dsp::tiered::tables::kPreTwiddle1024,
+                                           iclforge::dsp::tiered::tables::kKbdLeft1024);
+    static constexpr auto k512 = build<R>(iclforge::dsp::tiered::tables::kFftRoots512,
+                                          iclforge::dsp::tiered::tables::kPreTwiddle512,
+                                          iclforge::dsp::tiered::tables::kKbdLeft512);
+    static constexpr auto k256 = build<R>(iclforge::dsp::tiered::tables::kFftRoots256,
+                                          iclforge::dsp::tiered::tables::kPreTwiddle256,
+                                          iclforge::dsp::tiered::tables::kKbdLeft256);
+    static constexpr auto k128 = build<R>(iclforge::dsp::tiered::tables::kFftRoots128,
+                                          iclforge::dsp::tiered::tables::kPreTwiddle128,
+                                          iclforge::dsp::tiered::tables::kKbdLeft128);
     static constexpr std::array<TransformTable<R>, 5> kTables{k2048.view(), k1024.view(), k512.view(),
                                                               k256.view(), k128.view()};
     for (const TransformTable<R>& table : kTables) {

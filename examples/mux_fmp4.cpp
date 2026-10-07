@@ -1,8 +1,8 @@
 // Fragment an elementary stream into CMAF and signal it for HLS/DASH.
 //
-// iclforge::containers::mp4::fragment() shares its AudioTrack/frame shape with iclforge::containers::mp4::mux() (see
-// examples/mux_mp4.cpp) - the only new step is FragmentOptions and reading
-// back FragmentedOutput's init_segment/media_segments. mp4/hls.hpp and
+// iclforge::containers::mp4::fragment() shares its AudioTrack/frame shape with
+// iclforge::containers::mp4::mux() (see examples/mux_mp4.cpp) - the only new step is
+// FragmentOptions and reading back FragmentedOutput's init_segment/media_segments. mp4/hls.hpp and
 // mp4/dash.hpp then build the manifests that point at those same segments,
 // codec-blind the same way iclforge::containers::mp4 itself is: nothing here is AC-3/E-AC-3
 // specific except HlsOptions::channels_attribute, which - like
@@ -72,9 +72,10 @@ int main() {
     const auto fragmented = iclforge::containers::mp4::fragment(
         track, frames, iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = 8});
     if (!fragmented) {
-        fmt::printf("fragment failed: %.*s\n",
-                    static_cast<int>(iclforge::containers::mp4::describe(fragmented.error()).size()),
-                    iclforge::containers::mp4::describe(fragmented.error()).data());
+        fmt::printf(
+            "fragment failed: %.*s\n",
+            static_cast<int>(iclforge::containers::mp4::describe(fragmented.error()).size()),
+            iclforge::containers::mp4::describe(fragmented.error()).data());
         return 1;
     }
 

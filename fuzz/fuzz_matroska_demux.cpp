@@ -5,14 +5,12 @@
 
 #include "iclforge/containers/matroska/reader.hpp"
 
-// iclforge::containers::matroska::demux and iclforge::containers::matroska::Reader are the first thing to touch a
-// container nobody has vetted: a disc rip, a broadcast capture, an HTTP
-// download. Every length in an EBML file is self-declared, so this is the
-// entry point where a hostile input gets to ask for an out-of-bounds read
-// (a lace whose declared sizes overrun its block), an unbounded allocation
-// (an element claiming to be gigabytes) or unbounded recursion (masters
-// nested until a walker's stack gives out). None of those may do anything
-// but return an error.
+// iclforge::containers::matroska::demux and iclforge::containers::matroska::Reader are the first
+// thing to touch a container nobody has vetted: a disc rip, a broadcast capture, an HTTP download.
+// Every length in an EBML file is self-declared, so this is the entry point where a hostile input
+// gets to ask for an out-of-bounds read (a lace whose declared sizes overrun its block), an
+// unbounded allocation (an element claiming to be gigabytes) or unbounded recursion (masters nested
+// until a walker's stack gives out). None of those may do anything but return an error.
 //
 // Both entry points run, on the same bytes, because they are NOT the same
 // code path at the boundaries: demux() sees the whole input at once, while

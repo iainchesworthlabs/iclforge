@@ -74,8 +74,8 @@ double error_db(std::complex<double> got, std::complex<double> want) {
 // end (0-indexed) lands exactly on an authored keyframe for every frame,
 // never mid-interpolation, which is what makes the LAST frame of each hold a
 // clean, fully settled check point (see the flagship test below).
-iclforge::objects::oba::KeyframePath make_holds(std::span<const iclforge::objects::oba::Position> waypoints,
-                                       int hold_frames) {
+iclforge::objects::oba::KeyframePath make_holds(
+    std::span<const iclforge::objects::oba::Position> waypoints, int hold_frames) {
     std::vector<iclforge::objects::oba::Keyframe> keyframes;
     int frame_index = 1;
     for (const auto& p : waypoints) {
@@ -150,7 +150,8 @@ TEST_CASE("make_orbit_path reproduces the closed-form circle", "[atmos][motion]"
     constexpr double kRateHz = 0.25;
     constexpr double kPhaseRad = 0.3;
     constexpr double kHeight = -0.5;
-    const auto path = iclforge::objects::oba::make_orbit_path(kRateHz, kPhaseRad, kHeight, 0.6, 0.1);
+    const auto path =
+        iclforge::objects::oba::make_orbit_path(kRateHz, kPhaseRad, kHeight, 0.6, 0.1);
     for (const double t : {0.0, 0.7, 3.1, 12.5}) {
         CAPTURE(t);
         const double angle = 2.0 * std::numbers::pi * kRateHz * t + kPhaseRad;

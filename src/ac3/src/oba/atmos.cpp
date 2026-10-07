@@ -162,8 +162,10 @@ constexpr double kExtensionDownmixScale = 0.70710678118654752;  // -3 dB
 // plain 5.1 mix would carry, physically unattenuated - and only a channel
 // ADDED alongside them takes kExtensionDownmixScale's headroom cut.
 [[nodiscard]] constexpr bool is_base_ring_label(iclforge::objects::oba::BedLabel label) {
-    return label == iclforge::objects::oba::BedLabel::kL || label == iclforge::objects::oba::BedLabel::kC ||
-           label == iclforge::objects::oba::BedLabel::kR || label == iclforge::objects::oba::BedLabel::kLs ||
+    return label == iclforge::objects::oba::BedLabel::kL ||
+           label == iclforge::objects::oba::BedLabel::kC ||
+           label == iclforge::objects::oba::BedLabel::kR ||
+           label == iclforge::objects::oba::BedLabel::kLs ||
            label == iclforge::objects::oba::BedLabel::kRs;
 }
 
@@ -354,8 +356,8 @@ struct AtmosEncoder::Impl {
     Impl(const AtmosConfig& config, BedProgram bed)
         : config_(config),
           objects_(0),
-          essences_(
-              joc_object_count(iclforge::objects::oba::Program{.dynamic_only = false, .bed = bed.bed})),
+          essences_(joc_object_count(
+              iclforge::objects::oba::Program{.dynamic_only = false, .bed = bed.bed})),
           program_{.dynamic_only = false, .bed = bed.bed, .dynamic_objects = 0},
           encoder_(eac3::AccessUnitConfig{
               .independent = {.sample_rate = config.sample_rate,

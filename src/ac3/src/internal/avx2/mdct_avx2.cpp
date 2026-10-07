@@ -147,8 +147,9 @@ void imdct256_post_twiddle(std::span<const double> cos2, std::span<const double>
 void imdct512_windowed_batch4(std::span<const double> coeffs0, std::span<const double> coeffs1,
                               std::span<const double> coeffs2, std::span<const double> coeffs3,
                               std::span<const double> cos1, std::span<const double> sin1,
-                              const iclforge::dsp::fft::StockhamTables<128>& fft, std::span<double> x0,
-                              std::span<double> x1, std::span<double> x2, std::span<double> x3) {
+                              const iclforge::dsp::fft::StockhamTables<128>& fft,
+                              std::span<double> x0, std::span<double> x1, std::span<double> x2,
+                              std::span<double> x3) {
     constexpr std::size_t kQuarter = 128;
     constexpr std::size_t kEighth = 64;
     constexpr std::size_t kHalfN = 256;  // coeffsN.size()

@@ -199,7 +199,8 @@ TEST_CASE("a sinusoid sits in its group's middle subband, a quarter turn further
     CHECK(abs(channel.at(0, 43) / level - unit[1]) < Real(1e-3));
 }
 
-TEST_CASE("the noise generator's index runs on from one interval into the next", "[ac4][decoder][aspx]") {
+TEST_CASE("the noise generator's index runs on from one interval into the next",
+          "[ac4][decoder][aspx]") {
     // With nothing to patch and no sinusoid, the extension is noise only:
     // one level times NoiseTable at index (base + 20 ts + sb + 1) % 512,
     // base 0 after master_reset and then the previous interval's last.
@@ -249,7 +250,8 @@ TEST_CASE("an interval past its frame's end reaches the output in the next frame
           static_cast<Real>(kRelativeTolerance) * abs(level));
 }
 
-TEST_CASE("a balanced pair shares the sum's scale factors as the balance says", "[ac4][decoder][aspx]") {
+TEST_CASE("a balanced pair shares the sum's scale factors as the balance says",
+          "[ac4][decoder][aspx]") {
     // Pseudocode 84: with qmode 0, a balance of 32 (16 per step of the
     // balance codebook) puts channel 0 2^(32/2 - 12) = 16 times above channel 1.
     AspxConfig config = dee_128k_config();
@@ -286,7 +288,8 @@ TEST_CASE("a balanced pair shares the sum's scale factors as the balance says", 
                    10.0 * std::log10(16.0)) < 0.5);
 }
 
-TEST_CASE("companding scales each slot by its level against full scale 1.0", "[ac4][decoder][aspx]") {
+TEST_CASE("companding scales each slot by its level against full scale 1.0",
+          "[ac4][decoder][aspx]") {
     // 5.7.5.2 with alpha 0.65: g = (L / full scale)^(0.35 / 0.65), G = 2^(1 / 0.65).
     constexpr double kFullScale = 32768.0;
     std::vector<QmfValue> ext(static_cast<std::size_t>(kExtSlots) * 64);

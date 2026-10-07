@@ -12,8 +12,8 @@
 // Coordinate conversion between the two position systems Recommendation ITU-R BS.2076-2 (10/2019)
 // Annex 1 defines for audioBlockFormat (Tables 15-17, and Clause 8 "Coordinate system" for the
 // sign conventions those tables' column headings alone don't spell out) and
-// iclforge::objects::oba::Position's own room-anchored convention (ac3/oba/oamd.hpp, ETSI TS 103 420
-// clause 4.2.1).
+// iclforge::objects::oba::Position's own room-anchored convention (ac3/oba/oamd.hpp, ETSI TS 103
+// 420 clause 4.2.1).
 //
 // Clause 8, verified directly against the published Recommendation text (not transcribed from
 // any secondary source):
@@ -30,9 +30,9 @@
 //
 // (Table 16 adds the range: "the values 1.0 and -1.0 are on the surface of the cube.")
 //
-// iclforge::objects::oba::Position (oamd.hpp): x runs 0 (left wall) to 1 (right wall), y runs 0 (front wall)
-// to 1 (back wall), z runs -1 (floor) to +1 (ceiling) - left-handed, normalized to the room cuboid,
-// with (0.5, 0, 0) the centre of the front wall.
+// iclforge::objects::oba::Position (oamd.hpp): x runs 0 (left wall) to 1 (right wall), y runs 0
+// (front wall) to 1 (back wall), z runs -1 (floor) to +1 (ceiling) - left-handed, normalized to the
+// room cuboid, with (0.5, 0, 0) the centre of the front wall.
 //
 // polar_to_adm_cartesian() turns a polar/spherical position into the same right-positive/
 // front-positive/top-positive point BS.2076-2's own Cartesian axes describe, via the ordinary
@@ -48,11 +48,11 @@
 // reproduces those exact room coordinates.
 //
 // adm_cartesian_to_room() then rescales that point from BS.2076-2's [-1, 1] unit cube (both axes
-// signed, origin at the room's centre) onto iclforge::objects::oba::Position's own [0, 1] (x, y) / [-1, 1]
-// (z) convention (origin off-centre on x/y, centred on z) - a pure affine remap, not a design
-// choice: x_room = (x_adm + 1) / 2, y_room = (1 - y_adm) / 2 (BS.2076-2's Y is front-positive,
-// oba's y is front-zero/back-one, hence the sign flip), z_room = z_adm (both top-positive, both
-// already
+// signed, origin at the room's centre) onto iclforge::objects::oba::Position's own [0, 1] (x, y) /
+// [-1, 1] (z) convention (origin off-centre on x/y, centred on z) - a pure affine remap, not a
+// design choice: x_room = (x_adm + 1) / 2, y_room = (1 - y_adm) / 2 (BS.2076-2's Y is
+// front-positive, oba's y is front-zero/back-one, hence the sign flip), z_room = z_adm (both
+// top-positive, both already
 // [-1, 1] - no rescale needed).
 //
 // One genuine, documented judgement call: BS.2076-2 nowhere equates a polar position's unit
@@ -74,7 +74,8 @@ namespace iclforge::adm {
 [[nodiscard]] ICLFORGE_ADM_EXPORT iclforge::adm::CartesianPosition polar_to_adm_cartesian(
     const iclforge::adm::PolarPosition& polar);
 
-// BS.2076-2's [-1, 1] unit-cube Cartesian convention to iclforge::objects::oba::Position's [0, 1]/[0, 1]/
+// BS.2076-2's [-1, 1] unit-cube Cartesian convention to iclforge::objects::oba::Position's [0,
+// 1]/[0, 1]/
 // [-1, 1] room-anchored one. Pure affine remap - see this header's own top comment.
 [[nodiscard]] ICLFORGE_ADM_EXPORT iclforge::objects::oba::Position adm_cartesian_to_room(
     const iclforge::adm::CartesianPosition& cartesian);
@@ -94,7 +95,8 @@ namespace iclforge::adm {
 [[nodiscard]] ICLFORGE_ADM_EXPORT iclforge::adm::CartesianPosition room_to_adm_cartesian(
     const iclforge::objects::oba::Position& room);
 
-// SMPTE ST 2098-2:2022 §11.1's unit cube to iclforge::objects::oba::Position's own room-anchored convention
+// SMPTE ST 2098-2:2022 §11.1's unit cube to iclforge::objects::oba::Position's own room-anchored
+// convention
 // - for IAB reader bridge, phase 3 ("atmos-iab", mapping the IAB bed/object graph onto this same
 // ObjectPath layer). Unlike BS.2076-2's Cartesian convention above, this needs no formula at all:
 // §11.1 defines IAB's x ("0 corresponds to left wall... 1 corresponds to right wall") and y ("0
@@ -189,6 +191,7 @@ inline constexpr double kZoneBoundTolerance = 0.05;
 // The write direction: the zoneExclusion that says what `zone` and `enable_elevation` say. Empty
 // for kNone with elevation enabled, which is the ADM default (no zoneExclusion element).
 [[nodiscard]] ICLFORGE_ADM_EXPORT std::vector<iclforge::adm::ExclusionZone>
-constraint_to_adm_zone_exclusion(iclforge::objects::oba::ZoneConstraint zone, bool enable_elevation);
+constraint_to_adm_zone_exclusion(iclforge::objects::oba::ZoneConstraint zone,
+                                 bool enable_elevation);
 
 }  // namespace iclforge::adm

@@ -195,11 +195,12 @@ std::vector<std::uint32_t> read_stco(std::span<const std::byte> file, const Elem
 }
 
 iclforge::containers::mp4::AudioTrack sample_track(int channels = 6) {
-    return iclforge::containers::mp4::AudioTrack{.codec_id = std::string{iclforge::containers::mp4::kCodecEac3},
-                           .sample_rate = 48000,
-                           .channels = channels,
-                           .samples_per_frame = 1536,
-                           .codec_config = Bytes{std::byte{0xAA}, std::byte{0xBB}, std::byte{0xCC}}};
+    return iclforge::containers::mp4::AudioTrack{
+        .codec_id = std::string{iclforge::containers::mp4::kCodecEac3},
+        .sample_rate = 48000,
+        .channels = channels,
+        .samples_per_frame = 1536,
+        .codec_config = Bytes{std::byte{0xAA}, std::byte{0xBB}, std::byte{0xCC}}};
 }
 
 }  // namespace
@@ -313,25 +314,30 @@ TEST_CASE("MP4 muxer rejects what it cannot describe", "[mp4]") {
 
     auto bad_channels = track;
     bad_channels.channels = 0;
-    CHECK(iclforge::containers::mp4::mux(bad_channels, one).error() == iclforge::containers::mp4::MuxError::kInvalidTrack);
+    CHECK(iclforge::containers::mp4::mux(bad_channels, one).error() ==
+          iclforge::containers::mp4::MuxError::kInvalidTrack);
 
     auto bad_rate = track;
     bad_rate.sample_rate = 0;
-    CHECK(iclforge::containers::mp4::mux(bad_rate, one).error() == iclforge::containers::mp4::MuxError::kInvalidTrack);
+    CHECK(iclforge::containers::mp4::mux(bad_rate, one).error() ==
+          iclforge::containers::mp4::MuxError::kInvalidTrack);
 
     auto bad_codec = track;
     bad_codec.codec_id = "mp4a";  // this module only knows ac-3/ec-3
-    CHECK(iclforge::containers::mp4::mux(bad_codec, one).error() == iclforge::containers::mp4::MuxError::kInvalidTrack);
+    CHECK(iclforge::containers::mp4::mux(bad_codec, one).error() ==
+          iclforge::containers::mp4::MuxError::kInvalidTrack);
 
     auto no_config = track;
     no_config.codec_config.clear();
-    CHECK(iclforge::containers::mp4::mux(no_config, one).error() == iclforge::containers::mp4::MuxError::kInvalidTrack);
+    CHECK(iclforge::containers::mp4::mux(no_config, one).error() ==
+          iclforge::containers::mp4::MuxError::kInvalidTrack);
 }
 
 TEST_CASE("MP4 muxer writes one edit, and presents the edit's duration", "[mp4]") {
     const std::vector<Bytes> frames(4, frame_of(512, 0x5A));
     iclforge::containers::mp4::MuxOptions options;
-    options.edit = iclforge::containers::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = 5000};
+    options.edit =
+        iclforge::containers::mp4::MuxOptions::Edit{.start_samples = 256, .duration_samples = 5000};
     const auto file = iclforge::containers::mp4::mux(sample_track(), frames, options);
     REQUIRE(file.has_value());
     const auto elements = parse(*file);
@@ -385,8 +391,8 @@ TEST_CASE("MP4 muxer refuses an edit outside the frames", "[mp4]") {
     const std::vector<Bytes> two(2, frame_of(64, 0));  // 3,072 samples
     const auto with = [&two](std::uint64_t start, std::uint64_t duration) {
         iclforge::containers::mp4::MuxOptions options;
-        options.edit =
-            iclforge::containers::mp4::MuxOptions::Edit{.start_samples = start, .duration_samples = duration};
+        options.edit = iclforge::containers::mp4::MuxOptions::Edit{.start_samples = start,
+                                                                   .duration_samples = duration};
         return iclforge::containers::mp4::mux(sample_track(), two, options);
     };
     CHECK(with(0, 3072).has_value());

@@ -6,10 +6,10 @@
 // container + ADM XML graph, iclforge::adm::build() maps it onto
 // iclforge::ac3::oba::AtmosEncoder's flat object-list input shape (one bed speaker feed pinned in
 // place, one dynamic object panned by its own authored motion), and a plain per-frame loop calls
-// iclforge::objects::oba::evaluate_placements() plus AtmosEncoder::encode_frame() the same way every other
-// Atmos example in this directory does. The CLI command and this example deliberately share nothing
-// but that library API - see docs/library/adm-bridge.md's own note on why no separate "driving
-// loop" abstraction exists.
+// iclforge::objects::oba::evaluate_placements() plus AtmosEncoder::encode_frame() the same way
+// every other Atmos example in this directory does. The CLI command and this example deliberately
+// share nothing but that library API - see docs/library/adm-bridge.md's own note on why no separate
+// "driving loop" abstraction exists.
 //
 // Like examples/read_adm.cpp, this writes its own tiny-but-valid BW64/ADM fixture to a temp file
 // first, rather than shipping a real production master this project has no license to embed: one
@@ -300,10 +300,11 @@ int main(int argc, char** argv) {
                     bridged->is_bed[i] ? "bed speaker feed" : "dynamic object");
     }
 
-    // Step 3: drive AtmosEncoder::encode_frame() in a loop - iclforge::objects::oba::evaluate_placements()
-    // reads each channel's iclforge::objects::oba::ObjectPath at the frame's own end time, exactly the
-    // pattern forge's own atmos-path/atmos-encode/atmos-adm commands and every other Atmos example
-    // in this directory use.
+    // Step 3: drive AtmosEncoder::encode_frame() in a loop -
+    // iclforge::objects::oba::evaluate_placements() reads each channel's
+    // iclforge::objects::oba::ObjectPath at the frame's own end time, exactly the pattern forge's
+    // own atmos-path/atmos-encode/atmos-adm commands and every other Atmos example in this
+    // directory use.
     const auto objects = static_cast<int>(bridged->channel_count());
     iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, objects};
 

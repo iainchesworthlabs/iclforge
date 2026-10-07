@@ -99,8 +99,10 @@ std::vector<std::byte> emdf_container(int dmx_config_idx, int channels) {
     // entries so decode_access_unit_core's own count check passes - what
     // the objects' own positions say is irrelevant to reconstructing their
     // audio.
-    const iclforge::objects::oba::Program program{.dynamic_only = true, .dynamic_objects = channels};
-    const std::vector<iclforge::objects::oba::DynamicObject> objects(static_cast<std::size_t>(channels));
+    const iclforge::objects::oba::Program program{.dynamic_only = true,
+                                                  .dynamic_objects = channels};
+    const std::vector<iclforge::objects::oba::DynamicObject> objects(
+        static_cast<std::size_t>(channels));
     const auto oamd_payload = iclforge::objects::oba::build_payload(program, objects);
     const auto joc_payload = identity_routing_joc(dmx_config_idx, channels);
     const std::vector<iclforge::objects::emdf::Payload> payloads = {

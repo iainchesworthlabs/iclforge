@@ -129,12 +129,13 @@ std::string RecordingSink::open(const std::string& path, const Config& config) {
     }
 
     if (config.container == Container::kMatroska) {
-        auto writer = iclforge::containers::matroska::Writer::create(iclforge::containers::matroska::AudioTrack{
-            .codec_id = std::string{config.eac3 ? iclforge::containers::matroska::kCodecEac3
-                                                : iclforge::containers::matroska::kCodecAc3},
-            .sample_rate = config.sample_rate,
-            .channels = config.channels,
-            .samples_per_frame = iclforge::ac3::kSamplesPerFrame});
+        auto writer = iclforge::containers::matroska::Writer::create(
+            iclforge::containers::matroska::AudioTrack{
+                .codec_id = std::string{config.eac3 ? iclforge::containers::matroska::kCodecEac3
+                                                    : iclforge::containers::matroska::kCodecAc3},
+                .sample_rate = config.sample_rate,
+                .channels = config.channels,
+                .samples_per_frame = iclforge::ac3::kSamplesPerFrame});
         if (!writer.has_value()) {
             return std::string{iclforge::containers::matroska::describe(writer.error())};
         }
@@ -143,15 +144,16 @@ std::string RecordingSink::open(const std::string& path, const Config& config) {
         // An AC-4 track's PMT says no more than its codec (the presentation
         // detail lives in the table of contents), as 'forge ts' writes it.
         const bool ac4 = config.ac4.has_value();
-        auto writer = iclforge::containers::mpegts::Writer::create(iclforge::containers::mpegts::AudioTrack{
-            .codec = ac4           ? iclforge::containers::mpegts::AudioCodec::kAc4
-                     : config.eac3 ? iclforge::containers::mpegts::AudioCodec::kEac3
-                                   : iclforge::containers::mpegts::AudioCodec::kAc3,
-            .sample_rate = config.sample_rate,
-            .channels = ac4 ? 2 : config.channels,
-            .samples_per_frame =
-                ac4 ? config.ac4->samples_per_frame
-                    : static_cast<std::uint32_t>(iclforge::ac3::kSamplesPerFrame)});
+        auto writer =
+            iclforge::containers::mpegts::Writer::create(iclforge::containers::mpegts::AudioTrack{
+                .codec = ac4           ? iclforge::containers::mpegts::AudioCodec::kAc4
+                         : config.eac3 ? iclforge::containers::mpegts::AudioCodec::kEac3
+                                       : iclforge::containers::mpegts::AudioCodec::kAc3,
+                .sample_rate = config.sample_rate,
+                .channels = ac4 ? 2 : config.channels,
+                .samples_per_frame =
+                    ac4 ? config.ac4->samples_per_frame
+                        : static_cast<std::uint32_t>(iclforge::ac3::kSamplesPerFrame)});
         if (!writer.has_value()) {
             return std::string{iclforge::containers::mpegts::describe(writer.error())};
         }

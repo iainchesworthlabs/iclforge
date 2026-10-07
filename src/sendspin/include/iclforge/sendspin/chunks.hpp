@@ -97,7 +97,8 @@ enum class ChunkError : std::uint8_t {
 bool write_player_chunk_header(std::span<std::uint8_t> out, std::int64_t timestamp_us,
                                std::uint32_t send_ahead_us, Dialect dialect);
 
-// Pc bits 0 to 6 (IEC 61937-2 Table 2), as iclforge::containers::iec61937::BurstDataType names them.
+// Pc bits 0 to 6 (IEC 61937-2 Table 2), as iclforge::containers::iec61937::BurstDataType names
+// them.
 enum class BurstDataType : std::uint8_t {
     kAc3 = 1,
     kEac3 = 21,

@@ -1629,8 +1629,8 @@ int run_spdif_ac4(std::span<const std::byte> stream, std::string_view in_path,
                      in_path);
         return kExitInput;
     }
-    const auto type =
-        iclforge::containers::iec61937::ac4_burst_type_for(largest, head->fs_index, head->frame_rate_index);
+    const auto type = iclforge::containers::iec61937::ac4_burst_type_for(largest, head->fs_index,
+                                                                         head->frame_rate_index);
     const auto timing = type.has_value() ? iclforge::containers::iec61937::ac4_burst_timing(
                                                *type, head->fs_index, head->frame_rate_index)
                                          : std::nullopt;
@@ -1668,8 +1668,8 @@ int run_spdif_ac4(std::span<const std::byte> stream, std::string_view in_path,
     const auto status = status_stream();
     status_println(status,
                    "wrapped {} AC-4 sync frames into IEC 61937-14 {} bursts -> {} ({} Hz{})",
-                   frames.size(), iclforge::containers::iec61937::data_type_name(*type), out_path, carrier_rate,
-                   hbr16 ? ", eight channels" : " carrier");
+                   frames.size(), iclforge::containers::iec61937::data_type_name(*type), out_path,
+                   carrier_rate, hbr16 ? ", eight channels" : " carrier");
     status_println(status,
                    "no receiver found takes AC-4 over IEC 61937 yet; 'unspdif' reads the frames "
                    "back unchanged.");
@@ -1962,7 +1962,8 @@ int run_unspdif(std::string_view in_path, std::string_view out_path, bool keep_p
         // something, but the reader's own contract (a whole final burst) was
         // not met, which the exit code alone does not distinguish from a
         // clean stop.
-        fmt::println(stderr, "warning: {}", iclforge::containers::iec61937::describe(finished.error()));
+        fmt::println(stderr, "warning: {}",
+                     iclforge::containers::iec61937::describe(finished.error()));
     }
     return kExitOk;
 }

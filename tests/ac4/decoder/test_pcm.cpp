@@ -313,7 +313,8 @@ TEST_CASE("a SIMPLE stereo music stream decodes every frame", "[ac4][decoder][pc
     CHECK(peak < 0.3F);
 }
 
-TEST_CASE("an ASPX stereo stream decodes every frame with its high band rebuilt", "[ac4][decoder][pcm]") {
+TEST_CASE("an ASPX stereo stream decodes every frame with its high band rebuilt",
+          "[ac4][decoder][pcm]") {
     // DEE's 2.0 speech at 128 kbps: A-SPX recreates QMF subbands 36 (13.5
     // kHz) to 55 from the waveform-coded band below. Its source speech has
     // content up to 16 kHz, 10 to 25 dB under the 7.5 to 11 kHz band.

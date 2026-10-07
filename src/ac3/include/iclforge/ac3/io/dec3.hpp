@@ -47,9 +47,9 @@ namespace iclforge::ac3::io {
 // Beside build_codec_config_box for its own reason: which locations an AC-3
 // or E-AC-3 stream carries is acmod/lfeon/chanmap syntax, read by the scanner
 // and derived nowhere else. A container or manifest writer (iclforge::containers::mp4::, and
-// iclforge::containers::mp4::DashOptions::dolby_channel_configuration in particular) has no business
-// re-deriving AC-3 semantics to fill in one attribute, the same boundary the
-// dac3/dec3 payload above already draws.
+// iclforge::containers::mp4::DashOptions::dolby_channel_configuration in particular) has no
+// business re-deriving AC-3 semantics to fill in one attribute, the same boundary the dac3/dec3
+// payload above already draws.
 [[nodiscard]] ICLFORGE_AC3_EXPORT std::string dash_channel_configuration(const ScannedStream& stream);
 
 }  // namespace iclforge::ac3::io

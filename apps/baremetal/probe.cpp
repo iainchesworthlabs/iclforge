@@ -531,7 +531,8 @@ int decode_ac3(const char* codec, std::span<const std::uint8_t> bytes,
 // timing stay separable in the output the runner scripts gate on.
 int decode_eac3(const char* codec, std::span<const std::uint8_t> bytes,
                 std::span<const std::int32_t> expected, bool bed_only,
-                iclforge::objects::oba::joc::Domain domain, const iclforge::ac3::OutputConfig& output) {
+                iclforge::objects::oba::joc::Domain domain,
+                const iclforge::ac3::OutputConfig& output) {
     const std::span<const std::byte> stream{
         reinterpret_cast<const std::byte*>(bytes.data()), bytes.size()};
     const auto units = iclforge::ac3::split_access_units(stream);
@@ -649,7 +650,8 @@ std::array<std::array<float, kRenderBlock>, kRenderSlots> g_render_block{};
 std::array<std::array<double, kRenderSlots>, kMaxObjects> g_render_gains{};
 
 int render_eac3(const char* codec, std::span<const std::uint8_t> bytes,
-                std::span<const std::int32_t> expected, iclforge::objects::oba::joc::Domain domain) {
+                std::span<const std::int32_t> expected,
+                iclforge::objects::oba::joc::Domain domain) {
     using iclforge::ac3::eac3::chanmap::Location;
     const std::span<const std::byte> stream{
         reinterpret_cast<const std::byte*>(bytes.data()), bytes.size()};
@@ -709,9 +711,10 @@ int render_eac3(const char* codec, std::span<const std::uint8_t> bytes,
             const std::uint64_t entered_us = iclforge_probe::now_us();
             if (block.index == 0) {
                 // Each object's gains onto the panned targets, once per unit.
-                const auto objects = block.object_metadata != nullptr
-                                         ? iclforge::objects::oba::describe_objects(*block.object_metadata)
-                                         : std::vector<iclforge::objects::oba::DisplayObject>{};
+                const auto objects =
+                    block.object_metadata != nullptr
+                        ? iclforge::objects::oba::describe_objects(*block.object_metadata)
+                        : std::vector<iclforge::objects::oba::DisplayObject>{};
                 object_count = std::min({objects.size(), block.objects.size(), kMaxObjects});
                 for (std::size_t i = 0; i < object_count; ++i) {
                     gains[i].fill(0.0);

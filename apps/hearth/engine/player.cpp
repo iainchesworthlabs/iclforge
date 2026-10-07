@@ -356,10 +356,11 @@ void Player::send_unit_to_group(std::span<const std::byte> unit, std::uint32_t s
         // session rather than from what has been queued, which the decoder's
         // blocks run short of by what it holds back.
         if (!ac4_packer_) {
-            ac4_packer_.emplace(
-                *stream == audio::BitstreamFormat::kAc4Hbr16  ? containers::iec61937::BurstDataType::kAc4Hbr16
-                : *stream == audio::BitstreamFormat::kAc4Hbr4 ? containers::iec61937::BurstDataType::kAc4Hbr4
-                                                              : containers::iec61937::BurstDataType::kAc4);
+            ac4_packer_.emplace(*stream == audio::BitstreamFormat::kAc4Hbr16
+                                    ? containers::iec61937::BurstDataType::kAc4Hbr16
+                                : *stream == audio::BitstreamFormat::kAc4Hbr4
+                                    ? containers::iec61937::BurstDataType::kAc4Hbr4
+                                    : containers::iec61937::BurstDataType::kAc4);
         }
         const auto packed = ac4_packer_->push(unit);
         if (!packed) {

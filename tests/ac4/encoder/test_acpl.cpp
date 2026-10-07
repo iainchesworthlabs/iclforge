@@ -171,7 +171,8 @@ TEST_CASE("acpl_config_2ch() and acpl_data_2ch() read back as written", "[ac4][e
     }
 }
 
-TEST_CASE("the A-CPL writer takes the values each codebook holds and no others", "[ac4][encoder][acpl]") {
+TEST_CASE("the A-CPL writer takes the values each codebook holds and no others",
+          "[ac4][encoder][acpl]") {
     for (const AcplKind kind : {AcplKind::kAlpha, AcplKind::kBeta, AcplKind::kBeta3, AcplKind::kGamma}) {
         for (int quant = 0; quant < 2; ++quant) {
             for (int diff_type = 0; diff_type < 2; ++diff_type) {

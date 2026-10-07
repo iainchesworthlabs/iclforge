@@ -1457,7 +1457,8 @@ enum Object : std::size_t {
 // with linear automation - the default, and what this cue sheet was written
 // against. Names come from kObjectNames, keyed by the enum above, so the enum
 // stays the single place an object is introduced.
-iclforge::objects::oba::SceneObject make_object(std::vector<iclforge::objects::oba::AutomationPoint> automation) {
+iclforge::objects::oba::SceneObject make_object(
+    std::vector<iclforge::objects::oba::AutomationPoint> automation) {
     return {.name = {}, .bed = 0, .automation = std::move(automation)};
 }
 

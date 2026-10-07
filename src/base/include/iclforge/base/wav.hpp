@@ -56,7 +56,8 @@ struct WavData {
     }
 };
 
-[[nodiscard]] ICLFORGE_BASE_EXPORT std::expected<WavData, WavError> read_wav(const std::string& path);
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::expected<WavData, WavError> read_wav(
+    const std::string& path);
 
 // Same parse, from an already-open stream rather than a path - e.g. stdin,
 // for a caller that has put it into binary mode itself (see forge's "-"

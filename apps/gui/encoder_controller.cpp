@@ -443,7 +443,8 @@ std::expected<Mp4Scan, QString> scan_for_mp4(const std::vector<std::vector<std::
     }
     const bool eac3 = scanned->kind == iclforge::ac3::io::StreamKind::kEac3;
     iclforge::containers::mp4::AudioTrack track{
-        .codec_id = std::string{eac3 ? iclforge::containers::mp4::kCodecEac3 : iclforge::containers::mp4::kCodecAc3},
+        .codec_id = std::string{eac3 ? iclforge::containers::mp4::kCodecEac3
+                                     : iclforge::containers::mp4::kCodecAc3},
         .sample_rate = iclforge::ac3::sample_rate_hz(scanned->sample_rate),
         .channels = scanned->channels,
         .samples_per_frame = iclforge::ac3::kSamplesPerFrame,
@@ -2638,7 +2639,8 @@ void EncoderController::clearObjectPath(int objectIndex) {
     }
 }
 
-std::vector<iclforge::objects::oba::Keyframe> EncoderController::sortedKeyframes(int objectIndex) const {
+std::vector<iclforge::objects::oba::Keyframe> EncoderController::sortedKeyframes(
+    int objectIndex) const {
     const auto object_key = keyForObjectIndex(objectIndex);
     if (!object_key) {
         return {};
@@ -2673,9 +2675,10 @@ void EncoderController::addObjectKeyframe(int objectIndex, double timeS) {
     // Same moment, not the same float: two cues a hundredth of a second apart
     // are not a user trying to nudge one, they are a mis-click.
     constexpr double kSameInstant = 0.01;
-    const auto existing = std::ranges::find_if(keyframes, [&](const iclforge::objects::oba::Keyframe& key) {
-        return std::abs(key.time_s - timeS) < kSameInstant;
-    });
+    const auto existing =
+        std::ranges::find_if(keyframes, [&](const iclforge::objects::oba::Keyframe& key) {
+            return std::abs(key.time_s - timeS) < kSameInstant;
+        });
     // Seeded with the same inverse-root gain a path-less object encodes at
     // (encodeObjects' static fallback): unity here made an object ~3-9 dB
     // louder the moment its first key was added, and several keyed objects
@@ -2710,9 +2713,10 @@ void EncoderController::moveObjectKeyframe(int objectIndex, double fromS, double
     }
     auto keyframes = sortedKeyframes(objectIndex);
     constexpr double kSameInstant = 0.01;
-    const auto found = std::ranges::find_if(keyframes, [&](const iclforge::objects::oba::Keyframe& key) {
-        return std::abs(key.time_s - fromS) < kSameInstant;
-    });
+    const auto found =
+        std::ranges::find_if(keyframes, [&](const iclforge::objects::oba::Keyframe& key) {
+            return std::abs(key.time_s - fromS) < kSameInstant;
+        });
     if (found == keyframes.end()) {
         return;
     }
@@ -2979,8 +2983,9 @@ void EncoderController::startMotionPreview() {
         const bool lfe_pin = location == Location::kLfe || location == Location::kLfe2;
         const auto azimuth =
             lfe_pin ? std::optional<double>{} : location_azimuth_deg(location);
-        const auto position = azimuth ? speaker_pin_position(*azimuth)
-                                      : iclforge::objects::oba::Position{.x = 0.5, .y = 0.5, .z = 0.0};
+        const auto position = azimuth
+                                  ? speaker_pin_position(*azimuth)
+                                  : iclforge::objects::oba::Position{.x = 0.5, .y = 0.5, .z = 0.0};
         auto pin_path = iclforge::objects::oba::KeyframePath::create(
             {{.time_s = 0.0,
               .position = position,
@@ -4667,7 +4672,8 @@ void EncoderController::playFileToReceiver(const QString& path, int deviceIndex)
                                 }
                                 burst = std::move(**result);
                             } else {
-                                const auto wrapped = iclforge::containers::iec61937::wrap_frame(unit);
+                                const auto wrapped =
+                                    iclforge::containers::iec61937::wrap_frame(unit);
                                 if (!wrapped) {
                                     break;
                                 }
@@ -4881,11 +4887,11 @@ std::unique_ptr<EncoderController::LiveOutputWriters> EncoderController::openLiv
     writers->matroska = container_index_ == kContainerMatroska;
     // Two containers are special-cased for a live session, and they are
     // exactly the two with an INCREMENTAL writer behind them:
-    // iclforge::containers::matroska::Writer and iclforge::containers::mp4::FragmentWriter. iclforge::containers::mp4::mux and
-    // iclforge::containers::mpegts::mux are batch APIs - every frame has to be known up front (see
-    // mp4.hpp/mpegts.hpp's own header comments) - so MP4, S/PDIF and MPEG-TS
-    // still fall through to the same plain elementary-stream write, rather
-    // than gaining a new failure mode.
+    // iclforge::containers::matroska::Writer and iclforge::containers::mp4::FragmentWriter.
+    // iclforge::containers::mp4::mux and iclforge::containers::mpegts::mux are batch APIs - every
+    // frame has to be known up front (see mp4.hpp/mpegts.hpp's own header comments) - so MP4,
+    // S/PDIF and MPEG-TS still fall through to the same plain elementary-stream write, rather than
+    // gaining a new failure mode.
     //
     // Matroska's own track/writer construction needs the RENDERED channel
     // count (the plan/atmos bed), which is not resolved yet at this point -
@@ -5376,8 +5382,8 @@ void EncoderController::runLiveSession(iclforge::audio::DeviceInfo device,
     if (writers && writers->matroska) {
         const int channels_for_track = renderedChannelCount();
         auto created = iclforge::containers::matroska::Writer::create(
-            {.codec_id =
-                 std::string{eac3 ? iclforge::containers::matroska::kCodecEac3 : iclforge::containers::matroska::kCodecAc3},
+            {.codec_id = std::string{eac3 ? iclforge::containers::matroska::kCodecEac3
+                                          : iclforge::containers::matroska::kCodecAc3},
              .sample_rate = device.sample_rate,
              .channels = channels_for_track,
              .samples_per_frame = iclforge::ac3::kSamplesPerFrame});
@@ -5535,7 +5541,8 @@ void EncoderController::runLiveSession(iclforge::audio::DeviceInfo device,
             std::max<std::size_t>(nobjects, 1),
             std::vector<float>(iclforge::ac3::kSamplesPerFrame, 0.0f));
         std::vector<std::span<const float>> object_views(std::max<std::size_t>(nobjects, 1));
-        std::vector<iclforge::objects::oba::ObjectPlacement> placement(std::max<std::size_t>(nobjects, 1));
+        std::vector<iclforge::objects::oba::ObjectPlacement> placement(
+            std::max<std::size_t>(nobjects, 1));
         std::vector<std::span<const float>> bed_views(6);
 
         const std::size_t coded_count =
@@ -7075,8 +7082,8 @@ QString EncoderController::writeOutput(const QString& path,
     if (container_index_ == kContainerMatroska) {
         const bool eac3 = atmos_enabled_ || codec_ == plan::Codec::kEac3;
         const iclforge::containers::matroska::AudioTrack track{
-            .codec_id =
-                std::string{eac3 ? iclforge::containers::matroska::kCodecEac3 : iclforge::containers::matroska::kCodecAc3},
+            .codec_id = std::string{eac3 ? iclforge::containers::matroska::kCodecEac3
+                                         : iclforge::containers::matroska::kCodecAc3},
             .sample_rate = sample_rate,
             .channels = channels,
             .samples_per_frame = iclforge::ac3::kSamplesPerFrame};
@@ -7125,8 +7132,8 @@ QString EncoderController::writeOutput(const QString& path,
         // needed here, matching forge's own run_ts (main.cpp).
         const bool eac3 = atmos_enabled_ || codec_ == plan::Codec::kEac3;
         const iclforge::containers::mpegts::AudioTrack track{
-            .codec =
-                eac3 ? iclforge::containers::mpegts::AudioCodec::kEac3 : iclforge::containers::mpegts::AudioCodec::kAc3,
+            .codec = eac3 ? iclforge::containers::mpegts::AudioCodec::kEac3
+                          : iclforge::containers::mpegts::AudioCodec::kAc3,
             .sample_rate = sample_rate,
             .channels = channels,
             .samples_per_frame = iclforge::ac3::kSamplesPerFrame};
@@ -7223,8 +7230,8 @@ QString EncoderController::writeOutput(const QString& path,
             .dolby_channel_configuration = built->dolby_channel_configuration};
         const auto adaptation_set = iclforge::containers::mp4::build_dash_adaptation_set(
             built->track, fragmented->media_segments, dash_options);
-        const auto mpd =
-            iclforge::containers::mp4::build_dash_mpd(built->track, fragmented->media_segments, adaptation_set);
+        const auto mpd = iclforge::containers::mp4::build_dash_mpd(
+            built->track, fragmented->media_segments, adaptation_set);
         if (!write_text_to_path(dir / "manifest.mpd", mpd)) {
             return QStringLiteral("Could not write manifest.mpd to \"%1\".").arg(path);
         }
@@ -7775,9 +7782,9 @@ void EncoderController::encodeAc4Objects(const QString& path) {
     const std::size_t count = stream_objects.size();
     const QString coding =
         ac4_.object_coding == 0 ? QStringLiteral("A-JOC") : QStringLiteral("direct-coded");
-    jobs_.run([this, path, scene_path, json = iclforge::objects::oba::to_json(*scene), stream_objects,
-               flat = std::move(flat), scene = std::move(*scene), params, mp4, crc, kbps, count,
-               coding] {
+    jobs_.run([this, path, scene_path, json = iclforge::objects::oba::to_json(*scene),
+               stream_objects, flat = std::move(flat), scene = std::move(*scene), params, mp4, crc,
+               kbps, count, coding] {
         const Ac4Outcome outcome = encode_ac4_objects_file(path, scene_path, json, stream_objects,
                                                            flat, scene, params, mp4, crc);
         QMetaObject::invokeMethod(this, [this, outcome, count, coding, kbps] {
@@ -7877,8 +7884,9 @@ void EncoderController::encodeObjects(const QString& path,
         const bool lfe_pin = location == Location::kLfe || location == Location::kLfe2;
         const auto azimuth =
             lfe_pin ? std::optional<double>{} : location_azimuth_deg(location);
-        const auto position = azimuth ? speaker_pin_position(*azimuth)
-                                      : iclforge::objects::oba::Position{.x = 0.5, .y = 0.5, .z = 0.0};
+        const auto position = azimuth
+                                  ? speaker_pin_position(*azimuth)
+                                  : iclforge::objects::oba::Position{.x = 0.5, .y = 0.5, .z = 0.0};
         auto pin_path = iclforge::objects::oba::KeyframePath::create(
             {{.time_s = 0.0,
               .position = position,

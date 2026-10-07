@@ -94,11 +94,10 @@ Bytes build_media_styp(const FragmentOptions& options) {
 // sample_degradation_priority(16). sample_depends_on = 2 ("this sample does
 // not depend on others") and sample_is_non_sync_sample = 0 (it IS a
 // sync/random-access sample) are true of every AC-3/E-AC-3 access unit
-// iclforge::ac3::io::scan groups into the one opaque frame iclforge::containers::mp4:: ever sees (the
-// independent substream plus any dependents - see mp4.hpp's own header
-// comment) - so every sample is both independently decodable and a valid
-// fragment/segment start point. An AC-4 frame between I-frames is neither;
-// the trun that holds one lists every sample's flags (build_trun).
+// iclforge::ac3::io::scan groups into the one opaque frame iclforge::containers::mp4:: ever sees
+// (the independent substream plus any dependents - see mp4.hpp's own header comment) - so every
+// sample is both independently decodable and a valid fragment/segment start point. An AC-4 frame
+// between I-frames is neither; the trun that holds one lists every sample's flags (build_trun).
 Bytes build_trex(std::uint32_t default_sample_duration) {
     Bytes body;
     put_u32(body, 1);  // track_ID

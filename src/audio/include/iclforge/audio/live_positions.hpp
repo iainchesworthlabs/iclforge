@@ -41,8 +41,10 @@ enum class PositionSourceError : std::uint8_t {
 // fault the session needs to know about any other way.
 struct PositionSourceStats {
     std::uint64_t datagrams = 0;          // UDP datagrams received
-    std::uint64_t packets_rejected = 0;   // iclforge::objects::oba::OscParseStats::packets_rejected, summed
-    std::uint64_t messages_dropped = 0;   // iclforge::objects::oba::OscParseStats::messages_dropped, summed
+    std::uint64_t packets_rejected =
+        0;  // iclforge::objects::oba::OscParseStats::packets_rejected, summed
+    std::uint64_t messages_dropped =
+        0;  // iclforge::objects::oba::OscParseStats::messages_dropped, summed
     std::uint64_t updates_applied = 0;    // SceneCursor::push calls this source has made
 };
 

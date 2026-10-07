@@ -4,12 +4,11 @@
 
 #include "iclforge/containers/mp4/reader.hpp"
 
-// iclforge::containers::mp4::demux and iclforge::containers::mp4::Reader over bytes nobody has vetted. An MP4 is a
-// harder target than the Matroska sibling for one reason: its sample table
-// is an INDEX rather than an in-line framing. stsc names chunks, stco names
-// absolute file offsets and stsz names sizes, all self-declared and all
-// resolved against each other before a single byte of audio is touched - so
-// a hostile file gets to point a sample at an offset that does not exist,
+// iclforge::containers::mp4::demux and iclforge::containers::mp4::Reader over bytes nobody has
+// vetted. An MP4 is a harder target than the Matroska sibling for one reason: its sample table is
+// an INDEX rather than an in-line framing. stsc names chunks, stco names absolute file offsets and
+// stsz names sizes, all self-declared and all resolved against each other before a single byte of
+// audio is touched - so a hostile file gets to point a sample at an offset that does not exist,
 // claim four billion of them, or describe a chunk map that walks off the end
 // of the size table. None of that may do anything but return an error.
 //

@@ -61,21 +61,25 @@ constexpr Energy kMaxExponent{96};
 // by the 64-bit product of dsp::tiered::apply_gain, and the noise is ASPX_NOISE in Q7.24
 // (tables/qmf_tables_fixed.hpp).
 template <typename R>
-[[nodiscard]] dsp::tiered::Complex<R> assembled(const dsp::tiered::Energy<R>& sig_gain, dsp::tiered::Complex<R> high,
-                                        const dsp::tiered::Energy<R>& noise_level, int noise_index,
-                                        const dsp::tiered::Energy<R>& sine_level, R sign,
-                                        int sine_index) noexcept {
+[[nodiscard]] dsp::tiered::Complex<R> assembled(const dsp::tiered::Energy<R>& sig_gain,
+                                                dsp::tiered::Complex<R> high,
+                                                const dsp::tiered::Energy<R>& noise_level,
+                                                int noise_index,
+                                                const dsp::tiered::Energy<R>& sine_level, R sign,
+                                                int sine_index) noexcept {
     const auto i = static_cast<std::size_t>(noise_index);
     const auto t = static_cast<std::size_t>(sine_index);
     if constexpr (dsp::tiered::kFixed<R>) {
         const auto& noise = iclforge::dsp::tiered::tables::kAspxNoiseQ24[i];
         const dsp::tiered::Complex<R> noise_value(R::from_raw(noise[0]), R::from_raw(noise[1]));
         const R tone = dsp::tiered::from_energy<R>(sine_level);
-        return dsp::tiered::apply_gain<R>(sig_gain, high) + dsp::tiered::apply_gain<R>(noise_level, noise_value) +
+        return dsp::tiered::apply_gain<R>(sig_gain, high) +
+               dsp::tiered::apply_gain<R>(noise_level, noise_value) +
                dsp::tiered::Complex<R>(tone * kSineRe[t], tone * sign * kSineIm[t]);
     } else {
         const auto& noise = iclforge::dsp::tiered::tables::kAspxNoise[i];
-        const dsp::tiered::Complex<R> noise_value(static_cast<R>(noise[0]), static_cast<R>(noise[1]));
+        const dsp::tiered::Complex<R> noise_value(static_cast<R>(noise[0]),
+                                                  static_cast<R>(noise[1]));
         return sig_gain * high + noise_level * noise_value +
                dsp::tiered::Complex<R>(sine_level * kSineRe[t], sine_level * sign * kSineIm[t]);
     }
@@ -216,7 +220,8 @@ void dequantise_balance(const AspxChannel& c, const aspx::SubbandGroups& g, Enve
         for (int sbg = 0; sbg < signal_groups(g, f.atsg_freqres[at(atsg)]); ++sbg) {
             const Energy qa = static_cast<Energy>(sum.qscf_sig[at(atsg)][at(sbg)]) / a;
             const Energy qb = static_cast<Energy>(balance.qscf_sig[at(atsg)][at(sbg)]) / a;
-            const Energy nom = dsp::tiered::qmf_energy<Real>(exp2_clamped(qa + Energy{1}) * Energy(64));
+            const Energy nom =
+                dsp::tiered::qmf_energy<Real>(exp2_clamped(qa + Energy{1}) * Energy(64));
             sum.scf_sig[at(atsg)][at(sbg)] = nom / (Energy{1} + exp2_clamped(kPanOffset - qb));
             balance.scf_sig[at(atsg)][at(sbg)] = nom / (Energy{1} + exp2_clamped(qb - kPanOffset));
         }
@@ -513,7 +518,8 @@ void ChannelAssembly::limit() {
         std::array<Energy, kSubbands> max_gain{};
         for (int sb = 0; sb < g_.num_sb_aspx; ++sb) {
             const auto k = at(group[at(sb)]);
-            max_gain[at(sb)] = std::min(dsp::tiered::sqrt_of(nom[k] / denom[k]) * kLimGain, kMaxSigGain);
+            max_gain[at(sb)] =
+                std::min(dsp::tiered::sqrt_of(nom[k] / denom[k]) * kLimGain, kMaxSigGain);
         }
         // Pseudocodes 97 and 98.
         for (int sb = 0; sb < g_.num_sb_aspx; ++sb) {

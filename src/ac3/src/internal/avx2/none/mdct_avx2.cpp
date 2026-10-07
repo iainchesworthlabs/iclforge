@@ -80,8 +80,8 @@ void mdct512_forward_batch4(std::span<const double> /*w0*/, std::span<const doub
                             std::span<const double> /*pre_re*/, std::span<const double> /*pre_im*/,
                             std::span<const double> /*post_re*/,
                             std::span<const double> /*post_im*/,
-                            const iclforge::dsp::fft::StockhamTables<128>& /*fft*/, double /*scale*/,
-                            std::span<double> /*c0*/, std::span<double> /*c1*/,
+                            const iclforge::dsp::fft::StockhamTables<128>& /*fft*/,
+                            double /*scale*/, std::span<double> /*c0*/, std::span<double> /*c1*/,
                             std::span<double> /*c2*/, std::span<double> /*c3*/) {
     std::unreachable();
 }

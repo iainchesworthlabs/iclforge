@@ -13,8 +13,8 @@
 
 #include "iclforge/containers/export.hpp"
 
-// The read side of iclforge::containers::mp4::mux()/iclforge::containers::mp4::fragment(): pulling one audio track's
-// samples back out of an MP4, plain or fragmented.
+// The read side of iclforge::containers::mp4::mux()/iclforge::containers::mp4::fragment(): pulling
+// one audio track's samples back out of an MP4, plain or fragmented.
 //
 // A container reader and nothing more, in the sense mp4/mp4.hpp's writer is a
 // container writer and nothing more: it walks ISOBMFF boxes, finds the

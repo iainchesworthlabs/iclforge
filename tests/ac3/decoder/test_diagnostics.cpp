@@ -149,7 +149,8 @@ TEST_CASE("an unrecognised EMDF payload id reaches the diagnostic sink",
     // does not interpret at all. §H.2.2's own design means this never fails
     // the frame; before AP11 nothing anywhere reported it either.
     const std::vector<std::byte> payload_bytes = {std::byte{0xAB}, std::byte{0xCD}};
-    const std::vector<iclforge::objects::emdf::Payload> payloads = {{.id = 5, .bytes = payload_bytes}};
+    const std::vector<iclforge::objects::emdf::Payload> payloads = {
+        {.id = 5, .bytes = payload_bytes}};
     const auto container = iclforge::objects::emdf::build_container(payloads);
 
     iclforge::ac3::eac3::FrameEncoder encoder{

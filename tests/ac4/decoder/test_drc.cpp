@@ -155,7 +155,8 @@ double rms_db(std::span<const float> x) {
 
 }  // namespace
 
-TEST_CASE("Table 162's profiles are the compression curves the text defines", "[ac4][decoder][drc]") {
+TEST_CASE("Table 162's profiles are the compression curves the text defines",
+          "[ac4][decoder][drc]") {
     struct Point {
         int profile;
         double level;
@@ -347,7 +348,8 @@ TEST_CASE("the DRC stage moves to a new gain with the attack and release time co
     }
 }
 
-TEST_CASE("transmitted DRC gains apply by channel group, band and subframe", "[ac4][decoder][drc]") {
+TEST_CASE("transmitted DRC gains apply by channel group, band and subframe",
+          "[ac4][decoder][drc]") {
     const std::array<iclforge::ac4::Speaker, 6> speakers = {
         iclforge::ac4::Speaker::kLeft,         iclforge::ac4::Speaker::kRight,
         iclforge::ac4::Speaker::kCentre,       iclforge::ac4::Speaker::kLfe,

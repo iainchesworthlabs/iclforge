@@ -124,7 +124,8 @@ void write_oamd_stream(const fs::path& path, const iclforge::objects::oba::Progr
 // AC-3 has no skip-field syntax at all - which is exactly why a real
 // legacy-core Atmos delivery puts its object layer in the dependent instead
 // (decoder.hpp's DecodedAccessUnit::object_metadata comment).
-void write_legacy_core_oamd_stream(const fs::path& path, const iclforge::objects::oba::Program& program,
+void write_legacy_core_oamd_stream(const fs::path& path,
+                                   const iclforge::objects::oba::Program& program,
                                    std::span<const iclforge::objects::oba::DynamicObject> objects) {
     const auto payload = iclforge::objects::oba::build_payload(program, objects);
     const std::vector<iclforge::objects::emdf::Payload> payloads = {
@@ -436,7 +437,8 @@ TEST_CASE("monitor describes a stream's object layer the way decode does",
     // decode's report is checked on every machine. monitor prints its own only
     // once a render endpoint opens; without one, the check is that it spoke.
     const auto dir = scratch_dir();
-    const auto check_both = [&dir](const std::string& name, const iclforge::objects::oba::Program& program,
+    const auto check_both = [&dir](const std::string& name,
+                                   const iclforge::objects::oba::Program& program,
                                    std::span<const iclforge::objects::oba::DynamicObject> objects,
                                    const std::string& line) {
         const auto stream = dir / (name + ".ec3");
@@ -465,8 +467,9 @@ TEST_CASE("monitor describes a stream's object layer the way decode does",
     }};
 
     SECTION("a bed program, as channel-based immersive content is, names its bed") {
-        constexpr auto k514 = static_cast<std::uint16_t>(
-            iclforge::objects::oba::bed::k51 | iclforge::objects::oba::bed::kTflTfr | iclforge::objects::oba::bed::kTblTbr);
+        constexpr auto k514 = static_cast<std::uint16_t>(iclforge::objects::oba::bed::k51 |
+                                                         iclforge::objects::oba::bed::kTflTfr |
+                                                         iclforge::objects::oba::bed::kTblTbr);
         check_both("monitor_bed_program",
                    {.dynamic_only = false, .bed = k514, .dynamic_objects = 2}, objects,
                    "  bed [L R C LFE Ls Rs Tfl Tfr Tbl Tbr] + 2 dynamic objects = 12 objects, "

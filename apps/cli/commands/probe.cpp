@@ -184,8 +184,9 @@ void print_table(std::string_view path, const io::ProbeReport& report,
     }
     if (report.program.has_value()) {
         fmt::println("{:<16}{} object(s): bed {}, {} dynamic, in {} frame(s)", "object audio",
-                     iclforge::objects::oba::object_count(*report.program), bed_label(*report.program),
-                     report.program->dynamic_objects, report.object_frames);
+                     iclforge::objects::oba::object_count(*report.program),
+                     bed_label(*report.program), report.program->dynamic_objects,
+                     report.object_frames);
     } else if (report.oba_complexity_index.has_value()) {
         fmt::println("{:<16}addbsi marker only, no OAMD payload parsed", "object audio");
     } else {

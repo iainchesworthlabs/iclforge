@@ -122,7 +122,8 @@ class BitWriter {
             int groups = 1;
             std::uint64_t base = 0;
             while (groups < max_groups) {
-                const std::uint64_t capacity = std::uint64_t{1} << (static_cast<unsigned>(groups) * n_bits);
+                const std::uint64_t capacity = std::uint64_t{1}
+                                               << (static_cast<unsigned>(groups) * n_bits);
                 if (value < base + capacity) {
                     break;
                 }

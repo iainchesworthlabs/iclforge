@@ -61,8 +61,8 @@ struct HlsOptions {
     // written from the FIRST listed segment's own sequence number either way -
     // is what tells a player that segments have rolled off the front of the
     // playlist since it last reloaded. Rewrite the playlist from
-    // iclforge::containers::mp4::FragmentWriter::window() each time a segment closes, then rewrite it
-    // once more with vod = true when the session ends.
+    // iclforge::containers::mp4::FragmentWriter::window() each time a segment closes, then rewrite
+    // it once more with vod = true when the session ends.
     bool vod = true;
 };
 

@@ -141,7 +141,8 @@ BufferCheck check_buffer(const std::vector<std::size_t>& sizes, const std::vecto
 
 }  // namespace
 
-TEST_CASE("an average rate stream never needs more than the buffer it signals", "[ac4][encoder][rate]") {
+TEST_CASE("an average rate stream never needs more than the buffer it signals",
+          "[ac4][encoder][rate]") {
     struct Leg {
         int frame_rate_index;
         double frames_per_second;

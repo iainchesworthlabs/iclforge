@@ -35,8 +35,8 @@ constexpr int kMaxSlots = 64;
 // max(|Re|, |Im|) + min(|Re|, |Im|) / 2. At Fixed32 the sum is of the raw
 // values, exactly, in 64 bits.
 template <typename R>
-[[nodiscard]] dsp::tiered::Energy<R> slot_level(std::span<const dsp::tiered::Complex<R>> slot, int sb0, int sb1,
-                                        R full_scale) noexcept {
+[[nodiscard]] dsp::tiered::Energy<R> slot_level(std::span<const dsp::tiered::Complex<R>> slot,
+                                                int sb0, int sb1, R full_scale) noexcept {
     if constexpr (dsp::tiered::kFixed<R>) {
         if (sb1 <= sb0) {
             return dsp::tiered::MantExp{};
@@ -48,7 +48,8 @@ template <typename R>
             twice += 2 * std::max(re, im) + std::min(re, im);
         }
         const dsp::tiered::MantExp sum = dsp::tiered::MantExp::make(twice, -1 - R::kFractionBits);
-        return dsp::tiered::MantExp(0.9105) * sum / dsp::tiered::MantExp{sb1 - sb0} / dsp::tiered::MantExp{full_scale};
+        return dsp::tiered::MantExp(0.9105) * sum / dsp::tiered::MantExp{sb1 - sb0} /
+               dsp::tiered::MantExp{full_scale};
     } else {
         if (sb1 <= sb0) {
             return R{} / full_scale;
@@ -80,7 +81,8 @@ template <typename R>
 }
 
 template <typename R>
-void scale(const CompandingChannel& channel, int sb0, int ts, dsp::tiered::Energy<R> factor) noexcept {
+void scale(const CompandingChannel& channel, int sb0, int ts,
+           dsp::tiered::Energy<R> factor) noexcept {
     const std::span<QmfValue> slot = q_low_slot(channel, ts);
     for (int sb = sb0; sb < channel.sb1; ++sb) {
         if constexpr (dsp::tiered::kFixed<R>) {

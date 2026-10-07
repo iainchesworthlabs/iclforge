@@ -171,14 +171,19 @@ TEST_CASE("build_iab maps supported Table 19 ChannelIDs to the right BedLabel po
         iclforge::objects::oba::BedLabel label;
     };
     // A representative subset, not the full table - see iab_bridge.cpp's own comment for the rest.
-    const auto test_case = GENERATE(
-        Case{0x0, iclforge::objects::oba::BedLabel::kL}, Case{0x2, iclforge::objects::oba::BedLabel::kC},
-        Case{0x4, iclforge::objects::oba::BedLabel::kR}, Case{0x6, iclforge::objects::oba::BedLabel::kLs},
-        Case{0xA, iclforge::objects::oba::BedLabel::kRs}, Case{0x7, iclforge::objects::oba::BedLabel::kLb},
-        Case{0x8, iclforge::objects::oba::BedLabel::kRb}, Case{0x86, iclforge::objects::oba::BedLabel::kLfe},
-        Case{0x87, iclforge::objects::oba::BedLabel::kLfe2}, Case{0x88, iclforge::objects::oba::BedLabel::kLw},
-        Case{0x89, iclforge::objects::oba::BedLabel::kRw}, Case{0x80, iclforge::objects::oba::BedLabel::kTfl},
-        Case{0x84, iclforge::objects::oba::BedLabel::kTsl});
+    const auto test_case = GENERATE(Case{0x0, iclforge::objects::oba::BedLabel::kL},
+                                    Case{0x2, iclforge::objects::oba::BedLabel::kC},
+                                    Case{0x4, iclforge::objects::oba::BedLabel::kR},
+                                    Case{0x6, iclforge::objects::oba::BedLabel::kLs},
+                                    Case{0xA, iclforge::objects::oba::BedLabel::kRs},
+                                    Case{0x7, iclforge::objects::oba::BedLabel::kLb},
+                                    Case{0x8, iclforge::objects::oba::BedLabel::kRb},
+                                    Case{0x86, iclforge::objects::oba::BedLabel::kLfe},
+                                    Case{0x87, iclforge::objects::oba::BedLabel::kLfe2},
+                                    Case{0x88, iclforge::objects::oba::BedLabel::kLw},
+                                    Case{0x89, iclforge::objects::oba::BedLabel::kRw},
+                                    Case{0x80, iclforge::objects::oba::BedLabel::kTfl},
+                                    Case{0x84, iclforge::objects::oba::BedLabel::kTsl});
     CAPTURE(test_case.channel_id);
 
     auto frame = make_frame({make_bed(1, {make_bed_channel(test_case.channel_id)})});
@@ -513,7 +518,8 @@ TEST_CASE("build_iab refuses an empty frame span", "[adm][bridge][iab]") {
     CHECK(result.error() == iclforge::adm::BridgeError::kEmptyIabStream);
 }
 
-TEST_CASE("build_iab refuses a non-zero AudioDataID with no matching essence", "[adm][bridge][iab]") {
+TEST_CASE("build_iab refuses a non-zero AudioDataID with no matching essence",
+          "[adm][bridge][iab]") {
     auto frame = make_frame({make_bed(1, {make_bed_channel(0x2, /*audio_data_id=*/9)})});
     // No AudioDataPCM element with audio_data_id == 9 anywhere in the frame.
     const auto result = iclforge::adm::build_iab(std::span{&frame, 1});

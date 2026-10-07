@@ -84,16 +84,19 @@ namespace {
 // starts at the first burst rather than a quarter-second into it.
 int record_passthrough(std::string_view out_path, std::uint32_t seconds,
                        iclforge::audio::Capture& capture,
-                       iclforge::containers::iec61937::PassthroughDetector& detector, const Options& meta) {
+                       iclforge::containers::iec61937::PassthroughDetector& detector,
+                       const Options& meta) {
     const auto channels = capture.channels();
-    const auto type = detector.detected().value_or(iclforge::containers::iec61937::BurstDataType::kAc3);
+    const auto type =
+        detector.detected().value_or(iclforge::containers::iec61937::BurstDataType::kAc3);
     const auto status = status_stream(out_path);
     status_println(status, "");
-    status_println(
-        status, "capture is bitstreaming {}, not PCM: recording the elementary stream",
-        type == iclforge::containers::iec61937::BurstDataType::kEac3  ? "Dolby Digital Plus (data type 0x15)"
-        : type == iclforge::containers::iec61937::BurstDataType::kAc3 ? "Dolby Digital (data type 0x01)"
-                                                     : "AC-4 (IEC 61937-14, data type 24)");
+    status_println(status, "capture is bitstreaming {}, not PCM: recording the elementary stream",
+                   type == iclforge::containers::iec61937::BurstDataType::kEac3
+                       ? "Dolby Digital Plus (data type 0x15)"
+                   : type == iclforge::containers::iec61937::BurstDataType::kAc3
+                       ? "Dolby Digital (data type 0x01)"
+                       : "AC-4 (IEC 61937-14, data type 24)");
     if (meta.container != RecordingSink::Container::kElementary) {
         // Said rather than silently ignored: mkv/ts/spdif/fmp4 all need the
         // frame boundaries RecordingSink works from, and this path never has
@@ -127,7 +130,8 @@ int record_passthrough(std::string_view out_path, std::uint32_t seconds,
         payload.clear();
         const auto pushed = reader.push(carrier, payload);
         if (!pushed.has_value()) {
-            fmt::println(stderr, "error: {}", iclforge::containers::iec61937::describe(pushed.error()));
+            fmt::println(stderr, "error: {}",
+                         iclforge::containers::iec61937::describe(pushed.error()));
             return false;
         }
         if (payload.empty()) {
@@ -211,7 +215,8 @@ int record_passthrough(std::string_view out_path, std::uint32_t seconds,
     }
     const auto stats = capture.stats();
     status_println(status, "wrote {} {} bursts ({} bytes) to {}", reader.bursts(),
-                   iclforge::containers::iec61937::data_type_name(type), elementary_bytes, out_path);
+                   iclforge::containers::iec61937::data_type_name(type), elementary_bytes,
+                   out_path);
     status_println(status, "captured {} frames, {} silence-filled, {} dropped",
                    stats.frames_captured, stats.frames_silence_filled, stats.frames_dropped);
     if (reader.skipped_bursts() > 0 || reader.false_syncs() > 0) {

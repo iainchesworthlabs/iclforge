@@ -398,11 +398,11 @@ std::string ac4_decoding(iclforge::ac4::DecodingMode decoding) {
 
 // AC-4 objects into an ADM BWF master (planning/ac4.md, I5), reusing decode_adm.hpp's writer
 // (forge_cli::write_adm_atmos_master) rather than a second one: the first seventeen of
-// iclforge::ac4::Speaker and iclforge::objects::oba::BedLabel name the same loudspeaker positions in the
-// same order (both TS 103 190-2 Annex F.3 and this project's own bed labels descend from the same
-// room layout), so a bed object's speaker carries over by position. The speakers Table A.27 adds
-// (the 22.2 layout's centre, top and bottom channels, and 9.X.4's screen pair) have no bed label,
-// as before they had no Speaker: such a bed object is written with none.
+// iclforge::ac4::Speaker and iclforge::objects::oba::BedLabel name the same loudspeaker positions
+// in the same order (both TS 103 190-2 Annex F.3 and this project's own bed labels descend from the
+// same room layout), so a bed object's speaker carries over by position. The speakers Table A.27
+// adds (the 22.2 layout's centre, top and bottom channels, and 9.X.4's screen pair) have no bed
+// label, as before they had no Speaker: such a bed object is written with none.
 std::optional<iclforge::objects::oba::BedLabel> to_oba_bed_label(iclforge::ac4::Speaker speaker) {
     switch (speaker) {
         case iclforge::ac4::Speaker::kLeft: return iclforge::objects::oba::BedLabel::kL;
@@ -436,20 +436,21 @@ std::optional<iclforge::objects::oba::BedLabel> to_oba_bed_label(iclforge::ac4::
     return std::nullopt;
 }
 
-// iclforge::ac4::ObjectProperties (TS 103 190-2 Annex F) into iclforge::objects::oba::DynamicObject (this
-// project's own ADM-facing object model, TS 103 420 §5.6.1): position and gain carry over as
+// iclforge::ac4::ObjectProperties (TS 103 190-2 Annex F) into iclforge::objects::oba::DynamicObject
+// (this project's own ADM-facing object model, TS 103 420 §5.6.1): position and gain carry over as
 // run_atmos_objects_to_ac4 (atmos.cpp) documents for the encode direction, and every other Annex F
 // field this decoder reports has a same-shaped §5.6.1 counterpart (size, priority, snap,
 // elevation-enable, screen reference/factor, depth factor, distance, divergence, active) except
 // zone_mask, trim_disabled, headphone_render_mode and head_track_disabled, which have no ADM
 // representation and are dropped here (they reach neither ADM's schema nor this decode's other
 // outputs, objects_dir and the rendered WAV, so nothing this decode already promised is lost).
-// zone_mask (Annex F.8, Table 104) and iclforge::objects::oba::ZoneConstraint (TS 103 420 Table 20) number
-// the same six room-zone constraints alike, 0 to 5. Table 104 goes on to 6, "Only proscenium zone
-// enabled", which TS 103 420 has no counterpart for (its 6 and 7 are reserved), and reserves 7:
-// both fall back to kNone rather than carry a code the E-AC-3 side cannot hold into the ADM file.
-// Checked against both tables' text, 2026-09-29.
-iclforge::objects::oba::DynamicObject to_oba_dynamic_object(const iclforge::ac4::ObjectProperties& p) {
+// zone_mask (Annex F.8, Table 104) and iclforge::objects::oba::ZoneConstraint (TS 103 420 Table 20)
+// number the same six room-zone constraints alike, 0 to 5. Table 104 goes on to 6, "Only proscenium
+// zone enabled", which TS 103 420 has no counterpart for (its 6 and 7 are reserved), and reserves
+// 7: both fall back to kNone rather than carry a code the E-AC-3 side cannot hold into the ADM
+// file. Checked against both tables' text, 2026-09-29.
+iclforge::objects::oba::DynamicObject to_oba_dynamic_object(
+    const iclforge::ac4::ObjectProperties& p) {
     iclforge::objects::oba::DynamicObject out;
     out.position = {.x = p.position[0], .y = p.position[1], .z = p.position[2]};
     out.gain_db = p.gain_db;
@@ -943,11 +944,11 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     //
     // The LFE channel this lambda appends below is NOT yet delayed to match the objects beside
     // it - decode_access_unit hands the two to it already
-    // iclforge::objects::oba::joc::reconstruction_delay() samples apart (docs/library/decoding.md, "Atmos
-    // objects lag the bed"), and appending both verbatim, unit by unit, carries that same gap
-    // straight into adm_input.channels. delay_pcm() fixes it in one pass, once, on the finished LFE
-    // channel below rather than here per unit - this lambda has no reason to know the decoder's own
-    // joc_domain.
+    // iclforge::objects::oba::joc::reconstruction_delay() samples apart (docs/library/decoding.md,
+    // "Atmos objects lag the bed"), and appending both verbatim, unit by unit, carries that same
+    // gap straight into adm_input.channels. delay_pcm() fixes it in one pass, once, on the finished
+    // LFE channel below rather than here per unit - this lambda has no reason to know the decoder's
+    // own joc_domain.
     const bool have_adm_output = !adm_out.empty();
     forge_cli::AdmMasterInput adm_input;
     bool adm_input_ready = false;
@@ -1198,9 +1199,9 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
             // there is no need to have tracked which index it landed at above.
             if (!adm_input.channels.empty() && adm_input.channels.back().bed_label.has_value()) {
                 auto& lfe = adm_input.channels.back().pcm;
-                lfe =
-                    delay_pcm(lfe, static_cast<std::size_t>(
-                                       iclforge::objects::oba::joc::reconstruction_delay(meta.joc_domain)));
+                lfe = delay_pcm(
+                    lfe, static_cast<std::size_t>(
+                             iclforge::objects::oba::joc::reconstruction_delay(meta.joc_domain)));
             }
             const auto written_adm = forge_cli::write_adm_atmos_master(adm_out, adm_input);
             if (!written_adm.has_value()) {

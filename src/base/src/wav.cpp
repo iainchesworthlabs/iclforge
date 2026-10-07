@@ -88,7 +88,8 @@ std::string_view describe(WavError error) {
     switch (error) {
         case WavError::kCannotOpen: return "cannot open file";
         case WavError::kNotRiffWave: return "not a RIFF/RF64/BW64 WAVE file";
-        case WavError::kUnsupportedFormat: return "unsupported WAV format (need 8/16/24/32-bit PCM or 32/64-bit float)";
+        case WavError::kUnsupportedFormat:
+            return "unsupported WAV format (need 8/16/24/32-bit PCM or 32/64-bit float)";
         case WavError::kTruncated: return "truncated WAV data";
     }
     return "unknown error";

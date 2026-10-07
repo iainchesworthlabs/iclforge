@@ -283,7 +283,8 @@ void check_stream(const Directories& dirs, const fs::path& golden_path, const ch
 
 }  // namespace
 
-TEST_CASE("the AC-4 decoder's syntax digests match the independent Python transcription", "[ac4][decoder][syntax]") {
+TEST_CASE("the AC-4 decoder's syntax digests match the independent Python transcription",
+          "[ac4][decoder][syntax]") {
     const Directories dirs = directories();
     std::vector<fs::path> goldens;
     for (const auto& entry : fs::directory_iterator(dirs.golden)) {

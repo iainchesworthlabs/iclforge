@@ -156,7 +156,8 @@ TEST_CASE("wrap_frame: round-trips through split_frames", "[iec61937][ac3]") {
 }
 
 TEST_CASE("wrap_frame: rejects non-AC-3 input and oversized frames", "[iec61937][ac3]") {
-    CHECK(iclforge::containers::iec61937::wrap_frame(std::vector<std::byte>{std::byte{0}, std::byte{0}})
+    CHECK(iclforge::containers::iec61937::wrap_frame(
+              std::vector<std::byte>{std::byte{0}, std::byte{0}})
               .error() == iclforge::containers::iec61937::WrapError::kNotAFrame);
 
     // A frame that carries a legal sync word but is too big for one burst.
@@ -283,7 +284,8 @@ TEST_CASE("Eac3BurstPacker: rejects non-syncframe input and resets on overflow",
     oversized[0] = std::byte{0x0B};
     oversized[1] = std::byte{0x77};
     oversized[5] = static_cast<std::byte>(16 << 3);  // bsid 16
-    CHECK(overflow_packer.push(oversized).error() == iclforge::containers::iec61937::WrapError::kFrameTooLarge);
+    CHECK(overflow_packer.push(oversized).error() ==
+          iclforge::containers::iec61937::WrapError::kFrameTooLarge);
 
     // The failed push must not leave stale bytes behind for the next one.
     const auto frame = fake_syncframe(/*bsid=*/16, /*fscod=*/0, /*numblkscod=*/3);

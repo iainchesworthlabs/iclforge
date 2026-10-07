@@ -21,9 +21,9 @@
 // src/adm/CMakeLists.txt's own header comment) - NOT ICLFORGE_BUILD_IAB alone, which
 // defaults ON and is not the gating question here: iclforge::iab by itself has nothing that can
 // drive AtmosEncoder, only iclforge::adm's build_iab() does that, and that function only
-// exists when ICLFORGE_BUILD_ADM turned iclforge::adm on. So this command reuses adm/atmos_adm.hpp's
-// own Needs::kAdm/adm_capability() gate rather than asking a new question - the availability test
-// is identical either way.
+// exists when ICLFORGE_BUILD_ADM turned iclforge::adm on. So this command reuses
+// adm/atmos_adm.hpp's own Needs::kAdm/adm_capability() gate rather than asking a new question - the
+// availability test is identical either way.
 //
 // apps/cli/CMakeLists.txt adds exactly one of adm/enabled/atmos_iab.cpp or
 // adm/disabled/atmos_iab.cpp to the forge target; main.cpp calls load_iab_atmos_source below
@@ -43,7 +43,7 @@ struct IabAtmosSource {
     std::uint32_t sample_rate = 0;
     std::vector<bool> is_bed;                 // parallel to paths/pcm; true = bed speaker feed
     std::vector<iclforge::objects::oba::ObjectPath>
-        paths;                                // pass directly to iclforge::objects::oba::evaluate_placements
+        paths;  // pass directly to iclforge::objects::oba::evaluate_placements
     std::vector<std::span<const float>> pcm;  // one mono span per channel; see `handle` above
     std::shared_ptr<void> handle;             // opaque - owns the bridged result, if any
 

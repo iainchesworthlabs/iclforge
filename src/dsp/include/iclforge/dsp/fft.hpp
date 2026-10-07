@@ -14,14 +14,12 @@
 //                                  (cos(2*pi*k*n/N) - j.sin(2*pi*k*n/N))
 //
 // via the family's one FFT (iclforge/dsp/detail/fft_stockham.hpp - the same
-// passes the §7.9.4 fast MDCT runs at P = 64 and 128, and AC-4's transforms at every length). It began as the
-// direct-form O(N^2) sum on this project's correctness-first stance, with
-// the fast structure deferred "once there is a decoder round-trip to
-// validate it against" - that round-trip exists now (the encoder/decoder
-// ecpl legs of tools/ci/quality_race.py, plus this transform's own property
-// tests), and the FFT holds those to tighter error than the direct form
-// did. The output spans must not alias the inputs (never legal here, even
-// in the direct form).
+// passes the §7.9.4 fast MDCT runs at P = 64 and 128, and AC-4's transforms at every length). It
+// began as the direct-form O(N^2) sum on this project's correctness-first stance, with the fast
+// structure deferred "once there is a decoder round-trip to validate it against" - that round-trip
+// exists now (the encoder/decoder ecpl legs of tools/ci/quality_race.py, plus this transform's own
+// property tests), and the FFT holds those to tighter error than the direct form did. The output
+// spans must not alias the inputs (never legal here, even in the direct form).
 
 namespace iclforge {
 

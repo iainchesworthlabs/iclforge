@@ -80,8 +80,9 @@ AjocEncoder::AjocEncoder(const AjocSetup& setup, const FrameTiming& timing)
       x_(at(setup.num_dmx)),
       z_(at(setup.num_umx)) {}
 
-void AjocEncoder::push_slot(std::span<const std::array<double, dsp::tiered::kQmfSubbands>> dmx,
-                            std::span<const std::array<double, dsp::tiered::kQmfSubbands>> objects) {
+void AjocEncoder::push_slot(
+    std::span<const std::array<double, dsp::tiered::kQmfSubbands>> dmx,
+    std::span<const std::array<double, dsp::tiered::kQmfSubbands>> objects) {
     std::vector<Slot>& analysed = slots_.emplace_back(at(setup_.num_dmx + setup_.num_umx));
     for (std::size_t c = 0; c < dmx_analyses_.size(); ++c) {
         dmx_analyses_[c].process(dmx[c], analysed[c]);

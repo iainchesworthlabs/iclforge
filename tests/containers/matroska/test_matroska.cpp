@@ -358,7 +358,8 @@ TEST_CASE("Matroska Writer's assembled output matches mux()'s own track, framing
 TEST_CASE("Matroska Writer buffers at most one cluster's worth of frames", "[matroska][writer]") {
     // 1536 samples at 48 kHz is 32 ms/frame; a 100 ms cluster budget closes
     // on the 5th frame (128 ms), keeping the first four (96 ms).
-    auto writer = iclforge::containers::matroska::Writer::create({.channels = 2}, {.cluster_ms = 100});
+    auto writer =
+        iclforge::containers::matroska::Writer::create({.channels = 2}, {.cluster_ms = 100});
     REQUIRE(writer.has_value());
 
     for (int i = 0; i < 4; ++i) {
@@ -385,8 +386,9 @@ TEST_CASE("Matroska Writer::create() rejects an invalid track the same way mux()
           "[matroska][writer]") {
     CHECK(iclforge::containers::matroska::Writer::create({.channels = 0}).error() ==
           iclforge::containers::matroska::MuxError::kInvalidTrack);
-    CHECK(iclforge::containers::matroska::Writer::create({.sample_rate = 0, .channels = 2}).error() ==
-          iclforge::containers::matroska::MuxError::kInvalidTrack);
+    CHECK(
+        iclforge::containers::matroska::Writer::create({.sample_rate = 0, .channels = 2}).error() ==
+        iclforge::containers::matroska::MuxError::kInvalidTrack);
     CHECK(iclforge::containers::matroska::Writer::create({.codec_id = "", .channels = 2}).error() ==
           iclforge::containers::matroska::MuxError::kInvalidTrack);
 }

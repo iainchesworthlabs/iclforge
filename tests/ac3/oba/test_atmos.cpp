@@ -604,7 +604,8 @@ TEST_CASE("QMF-domain JOC reconstructs objects at least as well as the MDCT-band
             REQUIRE(decoded->has_value());
             const auto& sub = **decoded;
 
-            const auto joc_bytes = find_payload(frame_bytes, iclforge::objects::emdf::kPayloadIdJoc);
+            const auto joc_bytes =
+                find_payload(frame_bytes, iclforge::objects::emdf::kPayloadIdJoc);
             REQUIRE(joc_bytes.has_value());
             const auto params = iclforge::ac3::oba::joc::parse_payload(*joc_bytes);
             REQUIRE(params.has_value());
@@ -624,8 +625,8 @@ TEST_CASE("QMF-domain JOC reconstructs objects at least as well as the MDCT-band
             }
         }
 
-        const auto delay =
-            static_cast<std::size_t>(256 + iclforge::objects::oba::joc::reconstruction_delay(decode_domain));
+        const auto delay = static_cast<std::size_t>(
+            256 + iclforge::objects::oba::joc::reconstruction_delay(decode_domain));
         const std::size_t skip = static_cast<std::size_t>(2 * kFrame);
         std::array<double, kObjects> snr{};
         for (std::size_t object = 0; object < kObjects; ++object) {
@@ -650,9 +651,10 @@ TEST_CASE("QMF-domain JOC reconstructs objects at least as well as the MDCT-band
         return total / static_cast<double>(snr.size());
     };
 
-    const auto mdct =
-        measure(iclforge::objects::oba::joc::Domain::kMdctBand, iclforge::objects::oba::joc::Domain::kMdctBand);
-    const auto qmf = measure(iclforge::objects::oba::joc::Domain::kQmf, iclforge::objects::oba::joc::Domain::kQmf);
+    const auto mdct = measure(iclforge::objects::oba::joc::Domain::kMdctBand,
+                              iclforge::objects::oba::joc::Domain::kMdctBand);
+    const auto qmf = measure(iclforge::objects::oba::joc::Domain::kQmf,
+                             iclforge::objects::oba::joc::Domain::kQmf);
 
     for (std::size_t object = 0; object < mdct.size(); ++object) {
         CAPTURE(object, mdct[object], qmf[object]);
@@ -694,10 +696,10 @@ TEST_CASE("QMF-domain JOC reconstructs objects at least as well as the MDCT-band
     // coefficient's magnitude depends on where the tone sits relative to
     // the block boundary, so per-band power read off it is noisy in a way
     // a complex subband's magnitude is not.
-    const double cross_mdct_qmf =
-        mean(measure(iclforge::objects::oba::joc::Domain::kMdctBand, iclforge::objects::oba::joc::Domain::kQmf));
-    const double cross_qmf_mdct =
-        mean(measure(iclforge::objects::oba::joc::Domain::kQmf, iclforge::objects::oba::joc::Domain::kMdctBand));
+    const double cross_mdct_qmf = mean(measure(iclforge::objects::oba::joc::Domain::kMdctBand,
+                                               iclforge::objects::oba::joc::Domain::kQmf));
+    const double cross_qmf_mdct = mean(measure(iclforge::objects::oba::joc::Domain::kQmf,
+                                               iclforge::objects::oba::joc::Domain::kMdctBand));
     CAPTURE(cross_mdct_qmf, cross_qmf_mdct);
     CHECK(cross_mdct_qmf < qmf_mean);
     CHECK(cross_qmf_mdct < qmf_mean);
@@ -1094,8 +1096,8 @@ TEST_CASE("short syncframes carry the object layer end to end",
     // the same amount of material at every code.
     constexpr std::size_t kTotalSamples = 36 * 1536;
 
-    const auto domain =
-        GENERATE(iclforge::objects::oba::joc::Domain::kQmf, iclforge::objects::oba::joc::Domain::kMdctBand);
+    const auto domain = GENERATE(iclforge::objects::oba::joc::Domain::kQmf,
+                                 iclforge::objects::oba::joc::Domain::kMdctBand);
     CAPTURE(domain == iclforge::objects::oba::joc::Domain::kQmf ? "qmf" : "mdct");
 
     // Per-code bit rates, not one rate for all: the OAMD+JOC container
@@ -1165,14 +1167,16 @@ TEST_CASE("short syncframes carry the object layer end to end",
 
             // The OAMD update's ramp covers exactly one frame - the field a
             // fixed-1536 writer would get wrong at every short code.
-            const auto oamd_bytes = find_payload(frame_bytes, iclforge::objects::emdf::kPayloadIdOamd);
+            const auto oamd_bytes =
+                find_payload(frame_bytes, iclforge::objects::emdf::kPayloadIdOamd);
             REQUIRE(oamd_bytes.has_value());
             const auto program = iclforge::objects::oba::parse_payload(*oamd_bytes);
             REQUIRE(program.has_value());
             REQUIRE(program->blocks.size() == 1);
             CHECK(program->blocks[0].ramp_duration == static_cast<int>(frame_samples));
 
-            const auto joc_bytes = find_payload(frame_bytes, iclforge::objects::emdf::kPayloadIdJoc);
+            const auto joc_bytes =
+                find_payload(frame_bytes, iclforge::objects::emdf::kPayloadIdJoc);
             REQUIRE(joc_bytes.has_value());
             const auto params = iclforge::ac3::oba::joc::parse_payload(*joc_bytes);
             REQUIRE(params.has_value());
@@ -1198,8 +1202,8 @@ TEST_CASE("short syncframes carry the object layer end to end",
             }
         }
 
-        const auto delay =
-            static_cast<std::size_t>(256 + iclforge::objects::oba::joc::reconstruction_delay(domain));
+        const auto delay = static_cast<std::size_t>(
+            256 + iclforge::objects::oba::joc::reconstruction_delay(domain));
         constexpr std::size_t kSkip = 1536;  // warm-up/cool-down, all codes alike
         double worst = 1e9;
         for (std::size_t i = 0; i < 4; ++i) {

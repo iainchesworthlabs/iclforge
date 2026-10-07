@@ -117,7 +117,8 @@ std::vector<VectorCase> read_vectors() {
 
 }  // namespace
 
-TEST_CASE("ssf_data decodes random streams as the reference transcription does", "[ac4][decoder][ssf]") {
+TEST_CASE("ssf_data decodes random streams as the reference transcription does",
+          "[ac4][decoder][ssf]") {
     const std::vector<VectorCase> cases = read_vectors();
     REQUIRE_FALSE(cases.empty());
     std::size_t frames_ok = 0;

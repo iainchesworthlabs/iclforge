@@ -58,8 +58,9 @@ int main() {
     constexpr int kTotalFrames = 62;  // two seconds
     // encode+decode (256), plus reconstruct's own pass - which is 256 or 576
     // depending on the domain it runs in, so the library is asked.
-    constexpr std::size_t kDelay = static_cast<std::size_t>(
-        256 + iclforge::objects::oba::joc::reconstruction_delay(iclforge::objects::oba::joc::Domain::kQmf));
+    constexpr std::size_t kDelay =
+        static_cast<std::size_t>(256 + iclforge::objects::oba::joc::reconstruction_delay(
+                                           iclforge::objects::oba::joc::Domain::kQmf));
 
     double position_error_sum = 0.0;
     int position_samples = 0;

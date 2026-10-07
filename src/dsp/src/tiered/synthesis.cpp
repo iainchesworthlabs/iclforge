@@ -61,7 +61,8 @@ std::vector<Real> TransformSet<Real>::computed_kbd_left(int length, int rate_mul
     // once, here - the vector<double>-to-vector<Real> range constructor
     // narrows implicitly per element, which -Wdouble-promotion's sibling
     // warning (MSVC's C4244) rightly flags as an error on the float build.
-    const std::vector<double> window = dsp::tiered::kbd_left(length, kbd_alpha(length, rate_multiplier));
+    const std::vector<double> window =
+        dsp::tiered::kbd_left(length, kbd_alpha(length, rate_multiplier));
     std::vector<Real> narrowed(window.size());
     std::ranges::transform(window, narrowed.begin(), [](double w) { return static_cast<Real>(w); });
     return narrowed;

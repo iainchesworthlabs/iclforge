@@ -3,14 +3,15 @@
 // not a new encoder output. This encodes a synthetic 7.1.4 E-AC-3 stream (an independent 3/2+LFE
 // bed plus two dependent substreams, exactly examples/encode_eac3.cpp's own encode_714()), decodes
 // each access unit back with iclforge::ac3::Eac3Decoder, permutes the result from Table E2.5's bit
-// order into iclforge::containers::iamf::'s own L,C,R,Lss,Rss,Lrs,Rrs,Ltf,Rtf,Ltb,Rtb,LFE order (IAMF v1.1.0
-// §3.6.2, loudspeaker_layout = 7), and writes it out as an IAMF ISOBMFF file with
+// order into iclforge::containers::iamf::'s own L,C,R,Lss,Rss,Lrs,Rrs,Ltf,Rtf,Ltb,Rtb,LFE order
+// (IAMF v1.1.0 §3.6.2, loudspeaker_layout = 7), and writes it out as an IAMF ISOBMFF file with
 // iclforge::containers::iamf::mux().
 //
-// iclforge::containers::iamf itself is codec-blind (see iamf/iamf.hpp) - the permutation below is what a caller
-// bridging a real decode into it looks like, kept here rather than inside the module for the same
-// reason iclforge::containers::mp4::AudioTrack::codec_config's ETSI TS 102 366 payload is built by the CALLER
-// (iclforge::ac3::io::build_codec_config_box) rather than by iclforge::containers::mp4:: itself.
+// iclforge::containers::iamf itself is codec-blind (see iamf/iamf.hpp) - the permutation below is
+// what a caller bridging a real decode into it looks like, kept here rather than inside the module
+// for the same reason iclforge::containers::mp4::AudioTrack::codec_config's ETSI TS 102 366 payload
+// is built by the CALLER (iclforge::ac3::io::build_codec_config_box) rather than by
+// iclforge::containers::mp4:: itself.
 
 #include <array>
 #include <cmath>
@@ -52,10 +53,10 @@ std::vector<std::span<const float>> views_of(const std::vector<std::vector<float
     return views;
 }
 
-// The 12 locations a 7.1.4 access unit renders, in the order iclforge::containers::iamf::Frame::channels
-// declares (IAMF §3.6.2 loudspeaker_layout = 7's own "L/C/R/Lss/Rss/Lrs/Rrs/Ltf/Rtf/Ltb/Rtb/LFE"):
-// Vhl/Vhr are Table E2.5's front-height pair (IAMF's Ltf/Rtf) and Lts/Rts its rear-height pair
-// (Ltb/Rtb).
+// The 12 locations a 7.1.4 access unit renders, in the order
+// iclforge::containers::iamf::Frame::channels declares (IAMF §3.6.2 loudspeaker_layout = 7's own
+// "L/C/R/Lss/Rss/Lrs/Rrs/Ltf/Rtf/Ltb/Rtb/LFE"): Vhl/Vhr are Table E2.5's front-height pair (IAMF's
+// Ltf/Rtf) and Lts/Rts its rear-height pair (Ltb/Rtb).
 constexpr std::array<Location, 12> kIamf714Order{
     Location::kLeft,          Location::kCentre,  Location::kRight,
     Location::kLeftSurround,  Location::kRightSurround,

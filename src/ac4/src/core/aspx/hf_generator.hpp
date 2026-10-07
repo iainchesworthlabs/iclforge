@@ -99,23 +99,25 @@ void preflattening_gains(std::span<const dsp::tiered::Complex<Real>> q_low, int 
                          int ts_end, std::span<dsp::tiered::Energy<Real>> gain_vec);
 template <typename Real>
 void preflattening_gains(std::span<const dsp::tiered::Complex<Real>> q_low, int sbx, int ts_begin,
-                         int ts_end, std::span<dsp::tiered::Energy<Real>> gain_vec, CubicBasis& cubic);
+                         int ts_end, std::span<dsp::tiered::Energy<Real>> gain_vec,
+                         CubicBasis& cubic);
 
 // Pseudocodes 86 and 87: alpha0[sb] and alpha1[sb] for sb < sba. Exposed for
 // its test.
 template <typename Real>
-void prediction_coefficients(std::span<const dsp::tiered::Complex<Real>> q_low_ext, int num_ts_ext, int sba,
-                             std::span<dsp::tiered::Complex<Real>> alpha0,
+void prediction_coefficients(std::span<const dsp::tiered::Complex<Real>> q_low_ext, int num_ts_ext,
+                             int sba, std::span<dsp::tiered::Complex<Real>> alpha0,
                              std::span<dsp::tiered::Complex<Real>> alpha1);
 
 extern template void generate_high_band<Real>(const SubbandGroups&, const PatchTables&,
                                               const HfGeneratorInput<Real>&,
                                               HfGeneratorState<Real>&,
                                               std::span<dsp::tiered::Complex<Real>>);
-extern template void preflattening_gains<Real>(std::span<const dsp::tiered::Complex<Real>>, int, int,
-                                               int, std::span<dsp::tiered::Energy<Real>>);
-extern template void preflattening_gains<Real>(std::span<const dsp::tiered::Complex<Real>>, int, int, int,
-                                               std::span<dsp::tiered::Energy<Real>>, CubicBasis&);
+extern template void preflattening_gains<Real>(std::span<const dsp::tiered::Complex<Real>>, int,
+                                               int, int, std::span<dsp::tiered::Energy<Real>>);
+extern template void preflattening_gains<Real>(std::span<const dsp::tiered::Complex<Real>>, int,
+                                               int, int, std::span<dsp::tiered::Energy<Real>>,
+                                               CubicBasis&);
 extern template void prediction_coefficients<Real>(std::span<const dsp::tiered::Complex<Real>>, int,
                                                    int, std::span<dsp::tiered::Complex<Real>>,
                                                    std::span<dsp::tiered::Complex<Real>>);

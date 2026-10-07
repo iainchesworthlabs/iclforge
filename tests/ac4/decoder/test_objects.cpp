@@ -153,8 +153,9 @@ std::span<const float> steady(const std::vector<float>& samples, std::size_t ski
 // `tolerance_db`), and none of the other downmix or object tones; an object
 // that takes a decorrelator's output carries its tones, at a level the check
 // leaves alone.
-void check_objects(const std::vector<ac4_decoder_test::ExpectedObject>& expected, const Decoded& decoded,
-                   const std::vector<double>& all_tones, double tolerance_db) {
+void check_objects(const std::vector<ac4_decoder_test::ExpectedObject>& expected,
+                   const Decoded& decoded, const std::vector<double>& all_tones,
+                   double tolerance_db) {
     REQUIRE(decoded.samples.size() == expected.size());
     for (std::size_t o = 0; o < expected.size(); ++o) {
         CAPTURE(o);
@@ -206,14 +207,16 @@ std::vector<std::byte> read_file(const fs::path& path) {
 
 }  // namespace
 
-TEST_CASE("object audio streams read as the encoder's writer wrote them", "[ac4][decoder][objects]") {
+TEST_CASE("object audio streams read as the encoder's writer wrote them",
+          "[ac4][decoder][objects]") {
     for (const ObjectCase& c : ac4_decoder_test::committed_object_cases()) {
         CAPTURE(c.name);
         parse_checked(ac4_decoder_test::build_objects(c, kFrames));
     }
 }
 
-TEST_CASE("A-JOC downmixes of one to seven signals read in both codec modes", "[ac4][decoder][objects]") {
+TEST_CASE("A-JOC downmixes of one to seven signals read in both codec modes",
+          "[ac4][decoder][objects]") {
     // Every var_channel_element() shape: one signal, pairs, and an odd count
     // over each var_coding_config, SIMPLE and ASPX (companding_control() up
     // to five signals), with and without the LFE.
@@ -346,10 +349,10 @@ TEST_CASE("A-JOC dialogue enhancement raises the dialogue object and its share o
         std::vector<ac4_decoder_test::ExpectedObject> core(stream.core.size());
         for (int ch = 0; ch < 2; ++ch) {
             for (int in = 0; in < 2; ++in) {
-                const double a =
-                    (ch == in ? 1.0 : 0.0) + (de_gain - 1.0) *
-                                                 ac4_decoder_test::ajoc_dialogue_dmx_coefficient(c, ch) *
-                                                 ac4_decoder_test::ajoc_dry_coefficient(c, 0, in);
+                const double a = (ch == in ? 1.0 : 0.0) +
+                                 (de_gain - 1.0) *
+                                     ac4_decoder_test::ajoc_dialogue_dmx_coefficient(c, ch) *
+                                     ac4_decoder_test::ajoc_dry_coefficient(c, 0, in);
                 if (std::abs(a) > 1e-9) {
                     core[static_cast<std::size_t>(ch)].tones.push_back(
                         {ac4_decoder_test::ajoc_input_tone_hz(c, in), std::abs(a) * amplitude});

@@ -4,7 +4,8 @@
 
 #include "iclforge/containers/mpegts/reader.hpp"
 
-// iclforge::containers::mpegts::demux and iclforge::containers::mpegts::Reader over bytes nobody has vetted.
+// iclforge::containers::mpegts::demux and iclforge::containers::mpegts::Reader over bytes nobody
+// has vetted.
 //
 // A transport stream is the container most likely to arrive damaged - it is
 // designed to be tuned into mid-flight and to survive bit errors - so

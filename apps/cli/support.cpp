@@ -4003,10 +4003,10 @@ RecordingSink::Config take_sink_config(const Options& meta, const TakePlan& take
     // none does.
     ac4.carrier_rate_hz = 0;
     const int fs_index = toc->sample_rate_hz == 44100 ? 0 : 1;
-    if (const auto type = iclforge::containers::iec61937::ac4_burst_type_for(encoder->ac4_max_frame_bytes(),
-                                                            fs_index, toc->frame_rate_index)) {
-        if (const auto timing =
-                iclforge::containers::iec61937::ac4_burst_timing(*type, fs_index, toc->frame_rate_index)) {
+    if (const auto type = iclforge::containers::iec61937::ac4_burst_type_for(
+            encoder->ac4_max_frame_bytes(), fs_index, toc->frame_rate_index)) {
+        if (const auto timing = iclforge::containers::iec61937::ac4_burst_timing(
+                *type, fs_index, toc->frame_rate_index)) {
             const bool hbr16 = *type == iclforge::containers::iec61937::BurstDataType::kAc4Hbr16;
             ac4.burst_type = *type;
             ac4.carrier_rate_hz = hbr16 ? timing->link_rate_hz / 4 : timing->link_rate_hz;
@@ -4017,14 +4017,14 @@ RecordingSink::Config take_sink_config(const Options& meta, const TakePlan& take
     // time scale, Table H.1's brands, and the manifests' values for the
     // presentation with the widest compatibility, as fmp4 writes them.
     if (const auto timing = iclforge::ac4::media_timing(*toc)) {
-        ac4.fmp4.audio =
-            iclforge::containers::mp4::AudioTrack{.codec_id = std::string{iclforge::containers::mp4::kCodecAc4},
-                            .sample_rate = static_cast<std::uint32_t>(toc->sample_rate_hz),
-                            .channels = 2,  // TS 103 190-2 E.4.5
-                            .samples_per_frame = timing->sample_delta,
-                            .codec_config = iclforge::ac4::build_dac4(*toc),
-                            .rfc6381 = iclforge::ac4::rfc6381_codec_string(*toc),
-                            .timescale = timing->timescale};
+        ac4.fmp4.audio = iclforge::containers::mp4::AudioTrack{
+            .codec_id = std::string{iclforge::containers::mp4::kCodecAc4},
+            .sample_rate = static_cast<std::uint32_t>(toc->sample_rate_hz),
+            .channels = 2,  // TS 103 190-2 E.4.5
+            .samples_per_frame = timing->sample_delta,
+            .codec_config = iclforge::ac4::build_dac4(*toc),
+            .rfc6381 = iclforge::ac4::rfc6381_codec_string(*toc),
+            .timescale = timing->timescale};
     }
     ac4.fmp4.brands = {"ca4m", "ca4s"};
     if (const std::optional<int> channels = iclforge::ac4::presentation_channel_count(*toc)) {
@@ -4526,8 +4526,8 @@ void print_object_summary(FILE* status,
             labels = fmt::format("{} channels", iclforge::objects::oba::bed_channel_count(program));
         }
         status_println(status, "  bed [{}] + {} dynamic objects = {} objects, OAMD present{}",
-                       labels, program.dynamic_objects, iclforge::objects::oba::object_count(program),
-                       joc_note);
+                       labels, program.dynamic_objects,
+                       iclforge::objects::oba::object_count(program), joc_note);
     }
     if (decoded.trim.has_value()) {
         const auto& trim = *decoded.trim;

@@ -136,7 +136,8 @@ std::vector<float> as_capture_floats(std::span<const std::byte> carrier) {
 
 TEST_CASE("unwrap_stream: AC-3 bursts round-trip back to the exact frames", "[iec61937][unwrap]") {
     const auto frames = encode_ac3(5);
-    const auto carrier = iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
+    const auto carrier =
+        iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
     REQUIRE(carrier.has_value());
 
     const auto recovered = iclforge::containers::iec61937::unwrap_stream(*carrier);
@@ -155,7 +156,8 @@ TEST_CASE("unwrap_stream: AC-3 bursts round-trip back to the exact frames", "[ie
 TEST_CASE("unwrap_stream: E-AC-3 bursts round-trip back to the exact access units",
           "[iec61937][unwrap]") {
     const auto units = encode_eac3(4);
-    const auto carrier = iclforge::containers::iec61937::wrap_stream(views_of(units), /*eac3=*/true);
+    const auto carrier =
+        iclforge::containers::iec61937::wrap_stream(views_of(units), /*eac3=*/true);
     REQUIRE(carrier.has_value());
 
     const auto recovered = iclforge::containers::iec61937::unwrap_stream(*carrier);
@@ -258,7 +260,8 @@ TEST_CASE("repetition_period: 6144 for AC-3, 24576 for E-AC-3", "[iec61937][unwr
 TEST_CASE("BurstReader: reads a big-endian carrier as well as the little-endian one",
           "[iec61937][unwrap]") {
     const auto frames = encode_ac3(3);
-    const auto little = iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
+    const auto little =
+        iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
     REQUIRE(little.has_value());
     const auto big = to_big_endian_carrier(*little);
 
@@ -275,14 +278,16 @@ TEST_CASE("BurstReader: reads a big-endian carrier as well as the little-endian 
 
 TEST_CASE("BurstReader: chunk boundaries never change the result", "[iec61937][unwrap]") {
     const auto units = encode_eac3(3);
-    const auto carrier = iclforge::containers::iec61937::wrap_stream(views_of(units), /*eac3=*/true);
+    const auto carrier =
+        iclforge::containers::iec61937::wrap_stream(views_of(units), /*eac3=*/true);
     REQUIRE(carrier.has_value());
     const auto expected = concat(units);
 
     // Sizes chosen to split the preamble itself (1, 3), to land mid-payload
     // (7, 4096) and to straddle a burst boundary (kEac3BurstBytes - 1).
-    for (const std::size_t chunk : {std::size_t{1}, std::size_t{3}, std::size_t{7},
-                                    std::size_t{4096}, iclforge::containers::iec61937::kEac3BurstBytes - 1}) {
+    for (const std::size_t chunk :
+         {std::size_t{1}, std::size_t{3}, std::size_t{7}, std::size_t{4096},
+          iclforge::containers::iec61937::kEac3BurstBytes - 1}) {
         BurstReader reader;
         std::vector<std::byte> out;
         for (std::size_t at = 0; at < carrier->size(); at += chunk) {
@@ -298,7 +303,8 @@ TEST_CASE("BurstReader: chunk boundaries never change the result", "[iec61937][u
 TEST_CASE("BurstReader: leading and trailing junk around the bursts is skipped",
           "[iec61937][unwrap]") {
     const auto frames = encode_ac3(2);
-    const auto carrier = iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
+    const auto carrier =
+        iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
     REQUIRE(carrier.has_value());
 
     // A capture that started mid-programme: whatever the device was doing
@@ -323,7 +329,8 @@ TEST_CASE("BurstReader: a Pd bigger than the repetition period is refused, not a
         std::byte{0x72}, std::byte{0xF8}, std::byte{0x1F}, std::byte{0x4E},
         std::byte{0x01}, std::byte{0x00}, std::byte{0xFF}, std::byte{0xFF},
         std::byte{0x77}, std::byte{0x0B}, std::byte{0x00}, std::byte{0x00}};
-    CHECK(iclforge::containers::iec61937::unwrap_stream(hostile).error() == UnwrapError::kPayloadTooLarge);
+    CHECK(iclforge::containers::iec61937::unwrap_stream(hostile).error() ==
+          UnwrapError::kPayloadTooLarge);
 }
 
 TEST_CASE("BurstReader: a preamble with no syncframe behind it is a false sync",
@@ -374,7 +381,8 @@ TEST_CASE("BurstReader: a false preamble inside a payload does not derail the re
 TEST_CASE("BurstReader: a burst cut off mid-payload is reported, not half-emitted",
           "[iec61937][unwrap]") {
     const auto frames = encode_ac3(2);
-    const auto carrier = iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
+    const auto carrier =
+        iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
     REQUIRE(carrier.has_value());
     // Cut inside the second burst's payload: 8 preamble bytes plus a few.
     const auto truncated =
@@ -385,7 +393,8 @@ TEST_CASE("BurstReader: a burst cut off mid-payload is reported, not half-emitte
     REQUIRE(reader.push(truncated, out).has_value());
     CHECK(reader.bursts() == 1);
     CHECK(reader.finish().error() == UnwrapError::kTruncatedBurst);
-    CHECK(iclforge::containers::iec61937::unwrap_stream(truncated).error() == UnwrapError::kTruncatedBurst);
+    CHECK(iclforge::containers::iec61937::unwrap_stream(truncated).error() ==
+          UnwrapError::kTruncatedBurst);
 }
 
 TEST_CASE("BurstReader: a carrier of another codec's bursts yields nothing, not garbage",
@@ -432,7 +441,8 @@ TEST_CASE("BurstReader: an empty or sub-preamble carrier is kNoSync, not a crash
     // Every prefix of a real burst: no length short of the whole payload may
     // produce output, and none may trip an assertion on the way.
     const auto frames = encode_ac3(1);
-    const auto carrier = iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
+    const auto carrier =
+        iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
     REQUIRE(carrier.has_value());
     for (std::size_t n = 0; n < 8 + frames[0].size(); ++n) {
         BurstReader reader;
@@ -455,7 +465,8 @@ TEST_CASE("describe: every UnwrapError has a message", "[iec61937][unwrap]") {
 TEST_CASE("PassthroughDetector: recognises an AC-3 carrier arriving as capture floats",
           "[iec61937][unwrap][capture]") {
     const auto frames = encode_ac3(2);
-    const auto carrier = iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
+    const auto carrier =
+        iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
     REQUIRE(carrier.has_value());
     const auto floats = as_capture_floats(*carrier);
 
@@ -477,7 +488,8 @@ TEST_CASE("PassthroughDetector: recognises an AC-3 carrier arriving as capture f
 
 TEST_CASE("PassthroughDetector: recognises an E-AC-3 carrier", "[iec61937][unwrap][capture]") {
     const auto units = encode_eac3(2);
-    const auto carrier = iclforge::containers::iec61937::wrap_stream(views_of(units), /*eac3=*/true);
+    const auto carrier =
+        iclforge::containers::iec61937::wrap_stream(views_of(units), /*eac3=*/true);
     REQUIRE(carrier.has_value());
 
     iclforge::containers::iec61937::PassthroughDetector detector;
@@ -510,7 +522,8 @@ TEST_CASE("PassthroughDetector: real audio decides 'not a bitstream' and stops b
 TEST_CASE("PassthroughDetector: a multichannel capture still sees the stereo carrier",
           "[iec61937][unwrap][capture]") {
     const auto frames = encode_ac3(2);
-    const auto carrier = iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
+    const auto carrier =
+        iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
     REQUIRE(carrier.has_value());
     const auto stereo = as_capture_floats(*carrier);
 
@@ -551,7 +564,8 @@ TEST_CASE("carrier_from_capture: PCM16 words survive the trip through float exac
     // a session that detected one carrier and then recorded a different one
     // would be worse than not detecting at all.
     const auto frames = encode_ac3(1);
-    const auto carrier = iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
+    const auto carrier =
+        iclforge::containers::iec61937::wrap_stream(views_of(frames), /*eac3=*/false);
     REQUIRE(carrier.has_value());
     const auto as_floats = as_capture_floats(*carrier);
     std::vector<std::byte> rebuilt;
@@ -567,7 +581,8 @@ TEST_CASE("PassthroughDetector: a big push does not make it hold a big buffer",
     iclforge::containers::iec61937::PassthroughDetector detector;
     const std::vector<float> loud(2 * 96000, 0.75f);
     detector.push(loud, 2);
-    CHECK(detector.inspected_bytes() <= iclforge::containers::iec61937::PassthroughDetector::kInspectBytes + 4);
+    CHECK(detector.inspected_bytes() <=
+          iclforge::containers::iec61937::PassthroughDetector::kInspectBytes + 4);
     CHECK(detector.decided());
     CHECK(detector.buffered().empty());
 }

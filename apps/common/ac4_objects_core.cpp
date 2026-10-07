@@ -167,7 +167,8 @@ std::vector<std::vector<float>> ac4_object_planes(std::span<const Ac4ObjectSlot>
     return out;
 }
 
-iclforge::ac4::ObjectProperties ac4_object_properties(const iclforge::objects::oba::ObjectPlacement& p) {
+iclforge::ac4::ObjectProperties ac4_object_properties(
+    const iclforge::objects::oba::ObjectPlacement& p) {
     iclforge::ac4::ObjectProperties out;
     out.position = {p.position.x, p.position.y, p.position.z};
     out.gain_db =
@@ -224,7 +225,8 @@ std::optional<std::string> ac4_objects_refusal(std::span<const Ac4ObjectSlot> sl
 }
 
 std::vector<iclforge::objects::oba::ObjectPlacement> ac4_scene_placements(
-    std::span<const Ac4ObjectSlot> slots, const iclforge::objects::oba::ObjectScene& motion, double time_s) {
+    std::span<const Ac4ObjectSlot> slots, const iclforge::objects::oba::ObjectScene& motion,
+    double time_s) {
     std::vector<iclforge::objects::oba::ObjectPlacement> out(slots.size());
     const std::vector<iclforge::objects::oba::ObjectPlacement> moving = motion.evaluate(time_s);
     std::size_t dynamic = 0;
@@ -301,7 +303,8 @@ std::expected<Ac4ObjectsEncoded, Ac4ObjectsError> encode_ac4_objects(
 
 std::expected<Ac4ObjectsEncoded, Ac4ObjectsError> encode_ac4_scene(
     const Ac4ObjectsParams& params, std::span<const Ac4ObjectSlot> slots,
-    std::span<const std::vector<float>> flat_planes, const iclforge::objects::oba::ObjectScene& motion) {
+    std::span<const std::vector<float>> flat_planes,
+    const iclforge::objects::oba::ObjectScene& motion) {
     const std::vector<std::vector<float>> planes = ac4_object_planes(slots, flat_planes);
     const std::vector<std::span<const float>> pcm(planes.begin(), planes.end());
     // Sized, not reserved: GCC 16's -Wnull-dereference flags vector<bool>::reserve on an

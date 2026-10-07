@@ -1589,7 +1589,8 @@ private:
     // objectKeyframes/evaluateObjectPath all build on: object_keyframes_'s
     // entry for this index's (source, channel) identity, sorted by time, or
     // empty if it has none.
-    [[nodiscard]] std::vector<iclforge::objects::oba::Keyframe> sortedKeyframes(int objectIndex) const;
+    [[nodiscard]] std::vector<iclforge::objects::oba::Keyframe> sortedKeyframes(
+        int objectIndex) const;
     // Every object both export paths write, as iclforge::objects::oba::SceneObjects indexed
     // by FLAT channel index - so a bed-pinned channel's index is present but
     // empty, which is how the keyframe column form spells a skipped object.

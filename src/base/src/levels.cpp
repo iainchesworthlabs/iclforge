@@ -97,7 +97,8 @@ void LevelMeter::advance(std::size_t channel, double block_peak, double mean_squ
         impl_->hold_elapsed_[channel] = 0.0;
     } else {
         impl_->hold_elapsed_[channel] += seconds;
-        const double over = impl_->hold_elapsed_[channel] - impl_->ballistics_.peak_hold_ms / 1000.0;
+        const double over =
+            impl_->hold_elapsed_[channel] - impl_->ballistics_.peak_hold_ms / 1000.0;
         if (over > 0.0) {
             level.hold_db = std::max(
                 level.peak_db, level.hold_db - impl_->ballistics_.peak_decay_db_per_s * seconds);

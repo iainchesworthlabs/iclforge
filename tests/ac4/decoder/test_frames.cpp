@@ -636,7 +636,8 @@ TEST_CASE("a presentation of three groups reads each and a group without substre
     check_read(find(report, 4), SubstreamReport::Kind::kPresentation);
 }
 
-TEST_CASE("an HSF extension whose owner cannot be read is refused with it", "[ac4][decoder][frames]") {
+TEST_CASE("an HSF extension whose owner cannot be read is refused with it",
+          "[ac4][decoder][frames]") {
     // A 96 kHz stereo substream in ASPX mode, not an I-frame: with no
     // configuration its element fails, and the extension it links is
     // refused as unreadable alongside it.
@@ -700,7 +701,8 @@ std::vector<std::byte> hsf_owner(int max_sfb) {
 
 }  // namespace
 
-TEST_CASE("an HSF extension is refused alone when its own data is malformed", "[ac4][decoder][frames]") {
+TEST_CASE("an HSF extension is refused alone when its own data is malformed",
+          "[ac4][decoder][frames]") {
     PresV1 p;
     p.presentation_substream = 2;
     ChanInfo info;

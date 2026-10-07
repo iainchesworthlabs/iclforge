@@ -15,13 +15,13 @@
 // Bitstream into an IaFrame per frame (see model.hpp for the full element graph).
 //
 // Roadmap item IM1 phase 1 of 3 ('s "IAB (SMPTE ST 2098-2) reader" entry): a
-// standalone bitstream reader, the "codec-blind" shape iclforge::containers::matroska, iclforge::containers::mp4 and
-// iclforge::containers::mpegts already use for their own containers (bare `include/ac3iab/` prefix, not
-// `ac3/ac3iab/` - see CONTRIBUTING.md's repository-layout section on what that prefix means).
-// AudioDataDLC's lossless coder (Annex B) is kept as coded bytes by the reader and decoded by
-// decode_dlc() in dlc.hpp. Phase 2 (MXF/KLV extraction for IAB track files - see
-// mxf.hpp) is implemented alongside this header. Phase 3 (mapping onto iclforge::adm's
-// ObjectPath layer, the `atmos-iab` CLI command) is separate, later work.
+// standalone bitstream reader, the "codec-blind" shape iclforge::containers::matroska,
+// iclforge::containers::mp4 and iclforge::containers::mpegts already use for their own containers
+// (bare `include/ac3iab/` prefix, not `ac3/ac3iab/` - see CONTRIBUTING.md's repository-layout
+// section on what that prefix means). AudioDataDLC's lossless coder (Annex B) is kept as coded
+// bytes by the reader and decoded by decode_dlc() in dlc.hpp. Phase 2 (MXF/KLV extraction for IAB
+// track files - see mxf.hpp) is implemented alongside this header. Phase 3 (mapping onto
+// iclforge::adm's ObjectPath layer, the `atmos-iab` CLI command) is separate, later work.
 //
 // Every table and algorithm this module implements is transcribed directly from the published
 // standard (SMPTE ST 2098-2:2022, a free PDF since SMPTE opened its catalogue on 2026-06-17),

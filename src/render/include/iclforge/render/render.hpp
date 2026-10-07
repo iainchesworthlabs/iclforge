@@ -172,7 +172,8 @@ class LayoutRenderer {
     // empties the LFE's delay line, so the LFE is silent for the new lag
     // rather than played out of order.
     void set_joc_domain(iclforge::objects::oba::joc::Domain domain) {
-        const auto lag = static_cast<std::size_t>(iclforge::objects::oba::joc::reconstruction_delay(domain));
+        const auto lag =
+            static_cast<std::size_t>(iclforge::objects::oba::joc::reconstruction_delay(domain));
         if (lag != object_lag_) {
             object_lag_ = lag;
             size_lfe_delay();
@@ -295,14 +296,16 @@ class LayoutRenderer {
     // The same, from the metadata a PcmBlock carries. `audio_count` is how
     // many object signals the block has (PcmBlock::objects.size()); the
     // description and the audio are parallel, so the shorter wins.
-    void set_objects(const iclforge::objects::oba::DecodedProgram* metadata, std::size_t audio_count) {
+    void set_objects(const iclforge::objects::oba::DecodedProgram* metadata,
+                     std::size_t audio_count) {
         if (metadata == nullptr || audio_count == 0) {
             object_count_ = 0;
             return;
         }
         const std::vector<iclforge::objects::oba::DisplayObject> described = iclforge::objects::oba::describe_objects(*metadata);
         const std::size_t count = std::min(described.size(), audio_count);
-        set_objects(std::span<const iclforge::objects::oba::DisplayObject>(described.data(), count));
+        set_objects(
+            std::span<const iclforge::objects::oba::DisplayObject>(described.data(), count));
     }
 
     [[nodiscard]] std::size_t object_count() const { return object_count_; }
@@ -656,16 +659,18 @@ class LayoutRenderer {
     // (lfe_delay_taken_), and is a vector rather than an array for the stack
     // reason the header comment gives. add_lfe()'s modulo relies on the lag
     // never being zero.
-    std::size_t object_lag_ = static_cast<std::size_t>(
-        iclforge::objects::oba::joc::reconstruction_delay(iclforge::objects::oba::joc::Domain::kQmf));
+    std::size_t object_lag_ =
+        static_cast<std::size_t>(iclforge::objects::oba::joc::reconstruction_delay(
+            iclforge::objects::oba::joc::Domain::kQmf));
     std::array<std::uint8_t, kMaxCoded> lfe_coded_{};
     std::size_t lfe_channels_ = 0;
     bool lfe_delay_taken_ = false;
     std::size_t lfe_delay_at_ = 0;
     std::vector<float> lfe_delay_;
-    static_assert(iclforge::objects::oba::joc::reconstruction_delay(iclforge::objects::oba::joc::Domain::kQmf) > 0 &&
-                  iclforge::objects::oba::joc::reconstruction_delay(iclforge::objects::oba::joc::Domain::kMdctBand) >
-                      0);
+    static_assert(iclforge::objects::oba::joc::reconstruction_delay(
+                      iclforge::objects::oba::joc::Domain::kQmf) > 0 &&
+                  iclforge::objects::oba::joc::reconstruction_delay(
+                      iclforge::objects::oba::joc::Domain::kMdctBand) > 0);
 };
 
 }  // namespace iclforge::render

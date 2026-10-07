@@ -434,7 +434,8 @@ TEST_CASE("chunks: AC-4 HBR4 counts in bytes and HBR16 in 8-byte units with the 
     const std::vector<std::byte> frame = ac4_sync_frame(9001);
     REQUIRE(frame.size() == 9005);
 
-    iclforge::containers::iec61937::Ac4BurstPacker hbr4(iclforge::containers::iec61937::BurstDataType::kAc4Hbr4);
+    iclforge::containers::iec61937::Ac4BurstPacker hbr4(
+        iclforge::containers::iec61937::BurstDataType::kAc4Hbr4);
     REQUIRE(hbr4.push(frame).has_value());
     CHECK(hbr4.last()->pc == 0x0D38);
     CHECK(hbr4.last()->pd == 9005);
@@ -443,7 +444,8 @@ TEST_CASE("chunks: AC-4 HBR4 counts in bytes and HBR16 in 8-byte units with the 
     CHECK(four->data_type() == BurstDataType::kAc4Hbr4);
 
     // HBR16's payload is the frame and three zeros: 1 126 units of 8 bytes.
-    iclforge::containers::iec61937::Ac4BurstPacker hbr16(iclforge::containers::iec61937::BurstDataType::kAc4Hbr16);
+    iclforge::containers::iec61937::Ac4BurstPacker hbr16(
+        iclforge::containers::iec61937::BurstDataType::kAc4Hbr16);
     REQUIRE(hbr16.push(frame).has_value());
     CHECK(hbr16.last()->pc == 0x0D58);
     CHECK(hbr16.last()->pd == 1126);

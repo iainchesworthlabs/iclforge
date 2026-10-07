@@ -27,9 +27,9 @@ constexpr double kPi = std::numbers::pi;
 //
 // Scalar (float32 for the minimum-footprint profile): the type the twiddles are STORED in.
 // Computed in double and narrowed once on the way in, for the same reason
-// the transform's own factors are (iclforge/dsp/detail/fft_stockham.hpp) - the angle here is small and exact and
-// deserves the library call at full precision whatever the table holds.
-// Default double, so every existing use is the one it always was.
+// the transform's own factors are (iclforge/dsp/detail/fft_stockham.hpp) - the angle here is small
+// and exact and deserves the library call at full precision whatever the table holds. Default
+// double, so every existing use is the one it always was.
 template <typename Scalar = double>
 struct Twiddles {
     std::array<Scalar, kN / 4> cos1;

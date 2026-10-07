@@ -24,8 +24,8 @@ namespace iclforge {
 // past the end of the data are zeros in it, which is what a read past the end returns.
 //
 // A read given a name is a syntax element: with a base::SyntaxSink attached, the reader emits one
-// base::SyntaxRecord for it (iclforge/base/syntax_trace.hpp). A read without one, skip() and align()
-// record nothing, and cost nothing for the sink.
+// base::SyntaxRecord for it (iclforge/base/syntax_trace.hpp). A read without one, skip() and
+// align() record nothing, and cost nothing for the sink.
 class BitReader {
    public:
     explicit BitReader(std::span<const std::byte> data) noexcept : data_(data) {}
@@ -58,7 +58,8 @@ class BitReader {
     // the same). The loop ends at a clear continuation bit, at the end of the data, or after
     // `max_groups` groups when that is above 0 (TS 103 420 §5.5.1's variable_bits_max). A value too
     // large for 64 bits is returned, and recorded, modulo 2^64.
-    std::uint64_t variable_bits(int n_bits, std::string_view name = {}, int max_groups = 0) noexcept {
+    std::uint64_t variable_bits(int n_bits, std::string_view name = {},
+                                int max_groups = 0) noexcept {
         const std::size_t start = pos_;
         std::uint64_t value = 0;
         for (int group = 1;; ++group) {

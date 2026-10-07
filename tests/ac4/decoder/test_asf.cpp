@@ -282,7 +282,8 @@ TEST_CASE("sf_info reads side-limited and dual max_sfb for both halves of a spli
     }
 }
 
-TEST_CASE("sf_info at the shorter frame lengths reads one transform length", "[ac4][decoder][asf]") {
+TEST_CASE("sf_info at the shorter frame lengths reads one transform length",
+          "[ac4][decoder][asf]") {
     struct Case {
         int frame_len_base;
         int transf_length;
@@ -560,7 +561,8 @@ SfInfo short_info_512(int max_sfb) {
 
 }  // namespace
 
-TEST_CASE("sf_data and sf_hsf_data share a section straddling the 48 kHz bands", "[ac4][decoder][asf]") {
+TEST_CASE("sf_data and sf_hsf_data share a section straddling the 48 kHz bands",
+          "[ac4][decoder][asf]") {
     // max_sfb 13 and max_sfb_ext_hsf 3 at 96 kHz: bands 0 to 15, of which 14
     // and 15 are the extension's. Sections: none for 0-12, codebook 1 for
     // 13-14 (split at 14), none for 15. Each band is 16 lines of four windows.
@@ -682,7 +684,8 @@ TEST_CASE("the HSF extension at 192 kHz and its limits", "[ac4][decoder][asf]") 
 
 // --- the scale factor band tables --------------------------------------------
 
-TEST_CASE("the scale factor band tables answer only for the lengths they list", "[ac4][decoder][asf]") {
+TEST_CASE("the scale factor band tables answer only for the lengths they list",
+          "[ac4][decoder][asf]") {
     CHECK(tables::num_sfb_48(128) == 14);
     CHECK(tables::num_sfb_48(2048) == 63);
     CHECK(tables::num_sfb_48(100) == 0);
@@ -698,7 +701,8 @@ TEST_CASE("the scale factor band tables answer only for the lengths they list", 
     CHECK(tables::sfb_offsets_192(512).back() == 512);
 }
 
-TEST_CASE("max_sfb_from_master maps a master max_sfb to shorter transforms", "[ac4][decoder][asf]") {
+TEST_CASE("max_sfb_from_master maps a master max_sfb to shorter transforms",
+          "[ac4][decoder][asf]") {
     using tables::max_sfb_from_master;
     CHECK(max_sfb_from_master(2048, 10, 2048) == 10);
     CHECK(max_sfb_from_master(2048, 64, 2048) == -1);
@@ -948,7 +952,8 @@ std::vector<std::byte> random_bytes(std::size_t count, unsigned seed) {
 
 }  // namespace
 
-TEST_CASE("the bit reader's cache gives what reading bit by bit gives", "[ac4][decoder][asf][reader]") {
+TEST_CASE("the bit reader's cache gives what reading bit by bit gives",
+          "[ac4][decoder][asf][reader]") {
     // Data of every length from nothing to a few words, so that the cache is loaded
     // whole, near the end and past it; then a long run of reads, peeks, skips,
     // alignments and seeks, some past the end.
@@ -1027,7 +1032,8 @@ std::pair<int, int> search_decode(std::span<const std::byte> data, std::size_t p
 
 }  // namespace
 
-TEST_CASE("every codebook's shortcut table names only real codewords", "[ac4][decoder][asf][huffman]") {
+TEST_CASE("every codebook's shortcut table names only real codewords",
+          "[ac4][decoder][asf][huffman]") {
     for (const Codebook* book : tables::kAllCodebooks) {
         CAPTURE(book->name);
         REQUIRE(book->fast.size() == iclforge::ac4::detail::kHuffFastSize);

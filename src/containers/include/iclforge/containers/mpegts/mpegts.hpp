@@ -19,9 +19,8 @@
 // packets and takes each access unit as opaque bytes. It has NO dependency
 // on iclforge::ac3 beyond the caller telling it AC-3 vs. E-AC-3 (AudioCodec,
 // below) - which is the point of keeping it a separate library, the same
-// shape as iclforge::containers::matroska (src/containers/src/matroska/). A caller muxing E-AC-3 hands
-// over whole access units; the module knows nothing about what is inside
-// them.
+// shape as iclforge::containers::matroska (src/containers/src/matroska/). A caller muxing E-AC-3
+// hands over whole access units; the module knows nothing about what is inside them.
 //
 // Scope, deliberately narrow for a first, mergeable implementation:
 //   - single program: one PAT, one PMT, one elementary stream, all on PIDs

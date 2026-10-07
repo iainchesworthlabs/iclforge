@@ -99,7 +99,8 @@ long long DrcGainEncoder::slots_needed(long long frame) const noexcept {
            timing_.hfgen_slots;
 }
 
-void DrcGainEncoder::push_slot(std::span<const std::array<double, dsp::tiered::kQmfSubbands>> samples) {
+void DrcGainEncoder::push_slot(
+    std::span<const std::array<double, dsp::tiered::kQmfSubbands>> samples) {
     // The programme's K-weighted power in the slot, as a mean square per
     // sample at full scale 1.0: the slot's 64 samples put sum(QWIN^2) times
     // their power into the subbands.

@@ -26,13 +26,15 @@ iclforge::adm::CartesianPosition polar_to_adm_cartesian(const iclforge::adm::Pol
             .z = r * std::sin(elevation_rad)};
 }
 
-iclforge::objects::oba::Position adm_cartesian_to_room(const iclforge::adm::CartesianPosition& cartesian) {
+iclforge::objects::oba::Position adm_cartesian_to_room(
+    const iclforge::adm::CartesianPosition& cartesian) {
     return {.x = (cartesian.x + 1.0) / 2.0,
             .y = (1.0 - cartesian.y) / 2.0,
             .z = cartesian.z};
 }
 
-iclforge::adm::CartesianPosition room_to_adm_cartesian(const iclforge::objects::oba::Position& room) {
+iclforge::adm::CartesianPosition room_to_adm_cartesian(
+    const iclforge::objects::oba::Position& room) {
     return {.x = 2.0 * room.x - 1.0, .y = 1.0 - 2.0 * room.y, .z = room.z};
 }
 
@@ -65,11 +67,16 @@ struct Preset {
 
 constexpr std::array<Preset, 6> kPresets{{
     {iclforge::objects::oba::ZoneConstraint::kNone, {true, true, true, true, true, true, true}},
-    {iclforge::objects::oba::ZoneConstraint::kBackExcluded, {true, true, true, true, true, false, false}},
-    {iclforge::objects::oba::ZoneConstraint::kSideExcluded, {true, true, true, false, false, true, true}},
-    {iclforge::objects::oba::ZoneConstraint::kCentreAndBackOnly, {false, true, false, false, false, true, true}},
-    {iclforge::objects::oba::ZoneConstraint::kScreenOnly, {true, true, true, false, false, false, false}},
-    {iclforge::objects::oba::ZoneConstraint::kSurroundOnly, {false, false, false, true, true, true, true}},
+    {iclforge::objects::oba::ZoneConstraint::kBackExcluded,
+     {true, true, true, true, true, false, false}},
+    {iclforge::objects::oba::ZoneConstraint::kSideExcluded,
+     {true, true, true, false, false, true, true}},
+    {iclforge::objects::oba::ZoneConstraint::kCentreAndBackOnly,
+     {false, true, false, false, false, true, true}},
+    {iclforge::objects::oba::ZoneConstraint::kScreenOnly,
+     {true, true, true, false, false, false, false}},
+    {iclforge::objects::oba::ZoneConstraint::kSurroundOnly,
+     {false, false, false, true, true, true, true}},
 }};
 
 [[nodiscard]] IabZoneMapping match_preset(const HorizontalPattern& pattern, bool elevation) {

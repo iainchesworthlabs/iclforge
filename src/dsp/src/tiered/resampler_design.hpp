@@ -45,7 +45,9 @@ struct PortableMath {
     [[nodiscard]] static constexpr double ceil(double x) noexcept { return portable::ceil(x); }
     [[nodiscard]] static constexpr double sqrt(double x) noexcept { return portable::sqrt(x); }
     [[nodiscard]] static constexpr double sin(double x) noexcept { return portable::sin(x); }
-    [[nodiscard]] static constexpr double bessel_i0(double x) noexcept { return dsp::tiered::bessel_i0(x); }
+    [[nodiscard]] static constexpr double bessel_i0(double x) noexcept {
+        return dsp::tiered::bessel_i0(x);
+    }
 };
 
 // The design's functions as the C library has them, which design the table at double as the

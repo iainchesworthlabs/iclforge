@@ -195,10 +195,10 @@ class AspxChannelEncoder {
     // subsample over A-SPX slots [first, last), or where a group holds one of
     // `sines`, that subband's; a group of `waveform` subbands, which the
     // spectral frontend codes, none.
-    [[nodiscard]] std::vector<int> signal_envelope(std::span<const QmfSample> ext, int first, int last,
-                                                   bool high_res, int quant_mode,
-                                                   const std::array<bool, dsp::tiered::kQmfSubbands>& sines,
-                                                   const std::array<bool, dsp::tiered::kQmfSubbands>& waveform) const;
+    [[nodiscard]] std::vector<int> signal_envelope(
+        std::span<const QmfSample> ext, int first, int last, bool high_res, int quant_mode,
+        const std::array<bool, dsp::tiered::kQmfSubbands>& sines,
+        const std::array<bool, dsp::tiered::kQmfSubbands>& waveform) const;
     // The last envelope's values put on another envelope's groups, as
     // Pseudocode 80 does for delta coding along time.
     [[nodiscard]] std::vector<int> map_resolution(std::span<const int> previous, bool previous_high,

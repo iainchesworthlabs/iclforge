@@ -1302,10 +1302,12 @@ constexpr std::size_t kMaxParameterBands = static_cast<std::size_t>(kNumBands.ba
 std::vector<std::vector<float>> reconstruct(std::span<const std::span<const float>> bed,
                                             const FrameParameters& params,
                                             ReconstructionState& state, bool fast_mdct,
-                                            bool fast_imdct, iclforge::objects::oba::joc::Domain domain) {
+                                            bool fast_imdct,
+                                            iclforge::objects::oba::joc::Domain domain) {
     assert(bed.size() == static_cast<std::size_t>(params.channels));
     assert(params.channels >= 1 && params.channels <= kMaxChannels);
-    assert(domain != iclforge::objects::oba::joc::Domain::kQmf || params.channels == kNumChannels5X);
+    assert(domain != iclforge::objects::oba::joc::Domain::kQmf ||
+           params.channels == kNumChannels5X);
     assert(params.matrix.size() == params.coefficient_count());
 
     // Each domain function maintains its own previous_matrix/older_matrix/

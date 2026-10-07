@@ -131,12 +131,14 @@ struct Ac4Payload {
 // packer's choice for every frame but the first after a splice. Nothing for a frame whose rate the
 // tables have no row for.
 [[nodiscard]] std::uint64_t ac4_frame_samples(std::span<const std::byte> sync_frame) {
-    const std::optional<containers::iec61937::Ac4SyncFrame> read = containers::iec61937::read_ac4_sync_frame(sync_frame);
+    const std::optional<containers::iec61937::Ac4SyncFrame> read =
+        containers::iec61937::read_ac4_sync_frame(sync_frame);
     if (!read) {
         return 0;
     }
-    const std::optional<containers::iec61937::Ac4BurstTiming> timing = containers::iec61937::ac4_burst_timing(
-        containers::iec61937::BurstDataType::kAc4, read->fs_index, read->frame_rate_index);
+    const std::optional<containers::iec61937::Ac4BurstTiming> timing =
+        containers::iec61937::ac4_burst_timing(containers::iec61937::BurstDataType::kAc4,
+                                               read->fs_index, read->frame_rate_index);
     return timing ? timing->periods[static_cast<std::size_t>(read->sequence_counter % 5)] : 0;
 }
 

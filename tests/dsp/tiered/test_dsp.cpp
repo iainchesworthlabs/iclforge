@@ -506,7 +506,8 @@ TEST_CASE("windowed blocks reconstruct their input across every Table 187 transi
     }
 }
 
-TEST_CASE("the transforms leave their output alone when given the wrong sizes", "[ac4][core][dsp]") {
+TEST_CASE("the transforms leave their output alone when given the wrong sizes",
+          "[ac4][core][dsp]") {
     dsp::Fft<double> fft(8);
     std::vector<Complex> short_data(4, Complex(1.0, 0.0));
     fft.forward(short_data);
@@ -671,7 +672,8 @@ TEST_CASE("the QMF synthesis equals Pseudocode 66 as printed", "[ac4][core][dsp]
     CHECK(max_abs_difference(fast, printed) <= 1e-12 * max_abs(std::span<const double>(printed)));
 }
 
-TEST_CASE("the QMF pair gives back its input 577 samples later, to 78 dB", "[ac4][core][dsp][qmf]") {
+TEST_CASE("the QMF pair gives back its input 577 samples later, to 78 dB",
+          "[ac4][core][dsp][qmf]") {
     const std::vector<double> x = random_values(64 * 400, 577);
     dsp::QmfAnalysis<double> analysis;
     dsp::QmfSynthesis<double> synthesis;

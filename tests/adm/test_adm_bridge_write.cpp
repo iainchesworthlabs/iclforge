@@ -122,7 +122,8 @@ TEST_CASE("a real decoded Atmos programme survives write_bw64 -> parse_bw64 -> b
         const auto frame_start = static_cast<std::size_t>(f) * static_cast<std::size_t>(kFrame);
         const std::span<const float> object_signal{tone.data() + frame_start, static_cast<std::size_t>(kFrame)};
         const double t = static_cast<double>((f + 1) * kFrame) / kSampleRate;
-        const auto placement = iclforge::objects::oba::evaluate_placements(std::span{&object_path, 1}, t);
+        const auto placement =
+            iclforge::objects::oba::evaluate_placements(std::span{&object_path, 1}, t);
         const std::array<std::span<const float>, 1> objects{object_signal};
         const auto unit = encoder.encode_frame(objects, placement);
         REQUIRE(unit.has_value());

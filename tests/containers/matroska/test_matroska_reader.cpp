@@ -249,11 +249,12 @@ TEST_CASE("Matroska reads back a Writer's unknown-size Segment", "[matroska][rea
                                     frame_of(300, 0xA2), frame_of(300, 0xA3),
                                     frame_of(300, 0xA4)};
     auto writer = iclforge::containers::matroska::Writer::create(
-        iclforge::containers::matroska::AudioTrack{.codec_id = std::string{iclforge::containers::matroska::kCodecAc3},
-                             .sample_rate = 44100,
-                             .channels = 2,
-                             .samples_per_frame = 1536,
-                             .language = "und"},
+        iclforge::containers::matroska::AudioTrack{
+            .codec_id = std::string{iclforge::containers::matroska::kCodecAc3},
+            .sample_rate = 44100,
+            .channels = 2,
+            .samples_per_frame = 1536,
+            .language = "und"},
         iclforge::containers::matroska::MuxOptions{.cluster_ms = 100, .writing_app = "iclforge"});
     REQUIRE(writer.has_value());
 
@@ -279,11 +280,12 @@ TEST_CASE("Matroska Reader over arbitrary chunk boundaries matches demux()",
     const std::vector<Bytes> frames{frame_of(700, 0x11), frame_of(3, 0x22), frame_of(1500, 0x33),
                                     frame_of(64, 0x44), frame_of(900, 0x55)};
     const auto file = iclforge::containers::matroska::mux(
-        iclforge::containers::matroska::AudioTrack{.codec_id = std::string{iclforge::containers::matroska::kCodecEac3},
-                                       .sample_rate = 48000,
-                                       .channels = 6,
-                                       .samples_per_frame = 1536,
-                                       .language = "und"},
+        iclforge::containers::matroska::AudioTrack{
+            .codec_id = std::string{iclforge::containers::matroska::kCodecEac3},
+            .sample_rate = 48000,
+            .channels = 6,
+            .samples_per_frame = 1536,
+            .language = "und"},
         views_of(frames),
         iclforge::containers::matroska::MuxOptions{.cluster_ms = 50, .writing_app = "iclforge"});
     REQUIRE(file.has_value());
@@ -300,11 +302,12 @@ TEST_CASE("Matroska Reader over arbitrary chunk boundaries matches demux()",
 TEST_CASE("Matroska Reader reports the track and frame count it read", "[matroska][reader]") {
     const std::vector<Bytes> frames{frame_of(100, 1), frame_of(100, 2), frame_of(100, 3)};
     const auto file = iclforge::containers::matroska::mux(
-        iclforge::containers::matroska::AudioTrack{.codec_id = std::string{iclforge::containers::matroska::kCodecEac3},
-                                       .sample_rate = 48000,
-                                       .channels = 2,
-                                       .samples_per_frame = 1536,
-                                       .language = "und"},
+        iclforge::containers::matroska::AudioTrack{
+            .codec_id = std::string{iclforge::containers::matroska::kCodecEac3},
+            .sample_rate = 48000,
+            .channels = 2,
+            .samples_per_frame = 1536,
+            .language = "und"},
         views_of(frames));
     REQUIRE(file.has_value());
 
@@ -486,8 +489,8 @@ TEST_CASE("Matroska track selection picks the audio AC-3 track", "[matroska][rea
     }
 
     SECTION("an explicit track number overrides the codec filter") {
-        const auto out =
-            iclforge::containers::matroska::demux(file, iclforge::containers::matroska::ReadOptions{.track_number = 2});
+        const auto out = iclforge::containers::matroska::demux(
+            file, iclforge::containers::matroska::ReadOptions{.track_number = 2});
         REQUIRE(out.has_value());
         CHECK(out->track.codec_id == "A_AAC");
         REQUIRE(out->frames.size() == 1);
@@ -495,8 +498,8 @@ TEST_CASE("Matroska track selection picks the audio AC-3 track", "[matroska][rea
     }
 
     SECTION("a track number nothing matches is kNoAudioTrack") {
-        const auto out =
-            iclforge::containers::matroska::demux(file, iclforge::containers::matroska::ReadOptions{.track_number = 99});
+        const auto out = iclforge::containers::matroska::demux(
+            file, iclforge::containers::matroska::ReadOptions{.track_number = 99});
         REQUIRE_FALSE(out.has_value());
         CHECK(out.error() == iclforge::containers::matroska::DemuxError::kNoAudioTrack);
     }
@@ -609,11 +612,12 @@ TEST_CASE("Matroska truncated mid-cluster keeps the frames before the cut", "[ma
     const std::vector<Bytes> frames{frame_of(400, 0x11), frame_of(400, 0x22),
                                     frame_of(400, 0x33)};
     const auto complete = iclforge::containers::matroska::mux(
-        iclforge::containers::matroska::AudioTrack{.codec_id = std::string{iclforge::containers::matroska::kCodecEac3},
-                                       .sample_rate = 48000,
-                                       .channels = 2,
-                                       .samples_per_frame = 1536,
-                                       .language = "und"},
+        iclforge::containers::matroska::AudioTrack{
+            .codec_id = std::string{iclforge::containers::matroska::kCodecEac3},
+            .sample_rate = 48000,
+            .channels = 2,
+            .samples_per_frame = 1536,
+            .language = "und"},
         views_of(frames), iclforge::containers::matroska::MuxOptions{.cluster_ms = 30});
     REQUIRE(complete.has_value());
 
@@ -810,10 +814,11 @@ TEST_CASE("Matroska rejects malformed and hostile layouts", "[matroska][reader]"
 }
 
 TEST_CASE("Matroska describe() names every demux error", "[matroska][reader]") {
-    for (const auto error :
-         {iclforge::containers::matroska::DemuxError::kNotMatroska, iclforge::containers::matroska::DemuxError::kTruncated,
-          iclforge::containers::matroska::DemuxError::kMalformed, iclforge::containers::matroska::DemuxError::kNoAudioTrack,
-          iclforge::containers::matroska::DemuxError::kLimitExceeded}) {
+    for (const auto error : {iclforge::containers::matroska::DemuxError::kNotMatroska,
+                             iclforge::containers::matroska::DemuxError::kTruncated,
+                             iclforge::containers::matroska::DemuxError::kMalformed,
+                             iclforge::containers::matroska::DemuxError::kNoAudioTrack,
+                             iclforge::containers::matroska::DemuxError::kLimitExceeded}) {
         CHECK_FALSE(iclforge::containers::matroska::describe(error).empty());
         CHECK(iclforge::containers::matroska::describe(error) != "unknown error");
     }

@@ -327,8 +327,8 @@ TEST_CASE("the bed's LFE and its other channels arrive together", "[render][late
 
 TEST_CASE("the objects' LFE arrives with the objects", "[render][latency]") {
     const Domain domain = GENERATE(Domain::kQmf, Domain::kMdctBand);
-    const int object_lag =
-        iclforge::ac3::kTransformDelaySamples + iclforge::objects::oba::joc::reconstruction_delay(domain);
+    const int object_lag = iclforge::ac3::kTransformDelaySamples +
+                           iclforge::objects::oba::joc::reconstruction_delay(domain);
     CAPTURE(domain == Domain::kQmf ? "kQmf" : "kMdctBand", object_lag);
 
     const auto in = programme(kFrames * iclforge::ac3::kSamplesPerFrame, kPulseAt);
@@ -353,8 +353,8 @@ TEST_CASE("the objects' LFE arrives with the objects", "[render][latency]") {
 TEST_CASE("the renderer's lag is the one the decoder's default domain has", "[render]") {
     const LayoutRenderer renderer{*OutputLayout::named("5.1")};
     CHECK(renderer.object_lag() ==
-          static_cast<std::size_t>(
-              iclforge::objects::oba::joc::reconstruction_delay(iclforge::ac3::DecoderConfig{}.joc_domain)));
+          static_cast<std::size_t>(iclforge::objects::oba::joc::reconstruction_delay(
+              iclforge::ac3::DecoderConfig{}.joc_domain)));
 }
 
 TEST_CASE("render holds the bed's LFE back by the objects' lag, whatever the block length",
@@ -362,7 +362,8 @@ TEST_CASE("render holds the bed's LFE back by the objects' lag, whatever the blo
     const Domain domain = GENERATE(Domain::kQmf, Domain::kMdctBand);
     // A block's worth, one that divides neither lag, and one longer than both.
     const std::size_t block = GENERATE(std::size_t{256}, std::size_t{100}, std::size_t{2048});
-    const auto lag = static_cast<std::size_t>(iclforge::objects::oba::joc::reconstruction_delay(domain));
+    const auto lag =
+        static_cast<std::size_t>(iclforge::objects::oba::joc::reconstruction_delay(domain));
     CAPTURE(lag, block);
 
     LayoutRenderer renderer{*OutputLayout::named("5.1")};  // L C R Ls Rs LFE

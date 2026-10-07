@@ -31,8 +31,8 @@ constexpr double kTenOverLog2Of10 = 3.010299956639812;   // 10 / log2(10), for 1
 constexpr double kLog2Of10Over20 = 0.16609640474436812;  // log2(10) / 20, for 10^(y/20)
 
 //
-// At Real = Fixed32 the values are energies and gains (dsp::tiered::Energy, a mantissa and a power of
-// two) and the two forms are the float ones on that type's own integer log2 and exp2.
+// At Real = Fixed32 the values are energies and gains (dsp::tiered::Energy, a mantissa and a power
+// of two) and the two forms are the float ones on that type's own integer log2 and exp2.
 template <typename Value>
 [[nodiscard]] Value power_db(Value x) noexcept {
     if constexpr (std::is_same_v<Value, double>) {
@@ -58,7 +58,8 @@ template <typename Value>
 // a coefficient that one platform finds just under the limit and another at it
 // zeroes a subband's prediction on the second only (planning/ac4.md, D14a4).
 //
-// At Real = Fixed32 the coefficient is solved as a dsp::tiered::Energy (MantExp) and compared as at float.
+// At Real = Fixed32 the coefficient is solved as a dsp::tiered::Energy (MantExp) and compared as at
+// float.
 template <typename Value>
 [[nodiscard]] bool reaches_limit(dsp::tiered::Complex<Value> alpha) noexcept {
     if constexpr (std::is_same_v<Value, double>) {
@@ -176,7 +177,8 @@ void preflattening_gains(std::span<const dsp::tiered::Complex<Real>> q_low, int 
 // constant term, move by it alike, and the gains do not.
 template <typename Real>
 void preflattening_gains(std::span<const dsp::tiered::Complex<Real>> q_low, int sbx, int ts_begin,
-                         int ts_end, std::span<dsp::tiered::Energy<Real>> gain_vec, CubicBasis& cubic) {
+                         int ts_end, std::span<dsp::tiered::Energy<Real>> gain_vec,
+                         CubicBasis& cubic) {
     using Energy = dsp::tiered::Energy<Real>;
     const auto n = at(sbx);
     if (ts_end <= ts_begin || n == 0) {
@@ -229,12 +231,12 @@ void preflattening_gains(std::span<const dsp::tiered::Complex<Real>> q_low, int 
             dsp::tiered::MantExp::make(static_cast<std::int64_t>(im), kProductPower)};
 }
 
-// At Fixed32 the covariances and the coefficients are solved as dsp::tiered::Energy, a mantissa and a
-// power of two, and a coefficient that passes the limit is brought to Fixed32 for the
-// generator, where |alpha| < 4.
+// At Fixed32 the covariances and the coefficients are solved as dsp::tiered::Energy, a mantissa and
+// a power of two, and a coefficient that passes the limit is brought to Fixed32 for the generator,
+// where |alpha| < 4.
 template <typename Real>
-void prediction_coefficients(std::span<const dsp::tiered::Complex<Real>> q_low_ext, int num_ts_ext, int sba,
-                             std::span<dsp::tiered::Complex<Real>> alpha0,
+void prediction_coefficients(std::span<const dsp::tiered::Complex<Real>> q_low_ext, int num_ts_ext,
+                             int sba, std::span<dsp::tiered::Complex<Real>> alpha0,
                              std::span<dsp::tiered::Complex<Real>> alpha1) {
     using Value = dsp::tiered::Energy<Real>;
     using Complex = dsp::tiered::Complex<Value>;
@@ -385,12 +387,12 @@ ICLFORGE_AC4_ALSO_AT_DOUBLE(
                                              const HfGeneratorInput<double>&,
                                              HfGeneratorState<double>&,
                                              std::span<dsp::tiered::Complex<double>>);
-    template void preflattening_gains<double>(std::span<const dsp::tiered::Complex<double>>, int, int, int,
-                                              std::span<double>);
-    template void preflattening_gains<double>(std::span<const dsp::tiered::Complex<double>>, int, int, int,
-                                              std::span<double>, CubicBasis&);
-    template void prediction_coefficients<double>(std::span<const dsp::tiered::Complex<double>>, int, int,
-                                                  std::span<dsp::tiered::Complex<double>>,
+    template void preflattening_gains<double>(std::span<const dsp::tiered::Complex<double>>, int,
+                                              int, int, std::span<double>);
+    template void preflattening_gains<double>(std::span<const dsp::tiered::Complex<double>>, int,
+                                              int, int, std::span<double>, CubicBasis&);
+    template void prediction_coefficients<double>(std::span<const dsp::tiered::Complex<double>>,
+                                                  int, int, std::span<dsp::tiered::Complex<double>>,
                                                   std::span<dsp::tiered::Complex<double>>);)
 
 }  // namespace iclforge::ac4::detail::aspx

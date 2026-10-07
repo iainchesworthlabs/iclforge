@@ -118,8 +118,8 @@ struct LivePositionSource::Impl {
             // the receiver thread, never the audio/encode path drain_into
             // runs on.
             iclforge::objects::oba::OscParseStats parse_stats;
-            const auto updates =
-                iclforge::objects::oba::parse_osc_packet(std::span{recv_buffer}.first(*got), &parse_stats);
+            const auto updates = iclforge::objects::oba::parse_osc_packet(
+                std::span{recv_buffer}.first(*got), &parse_stats);
 
             const std::lock_guard<std::mutex> lock(mutex);
             ++stats.datagrams;

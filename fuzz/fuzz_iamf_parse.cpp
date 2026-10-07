@@ -6,15 +6,16 @@
 #include "iclforge/containers/iamf/iamf.hpp"
 #include "iclforge/containers/iamf/sequence.hpp"
 
-// iclforge::containers::iamf::read_sequence (the standalone raw OBU stream) and read_isobmff (the ISO-BMFF
-// encapsulation, whole files and movie fragments) on the same bytes, then the paths that consume
-// what they return: writing the Sequence back out and decoding an Audio Element's PCM
+// iclforge::containers::iamf::read_sequence (the standalone raw OBU stream) and read_isobmff (the
+// ISO-BMFF encapsulation, whole files and movie fragments) on the same bytes, then the paths that
+// consume what they return: writing the Sequence back out and decoding an Audio Element's PCM
 // (src/containers/src/iamf/sequence_read.cpp, container.cpp, iamf.cpp).
 //
 // Both readers exist to read files this project did not write, and both size almost everything from
 // numbers the file chose: leb128 OBU sizes, the counts of substreams, parameters, layouts, labels
-// and sub blocks, the Parameter Blocks' durations, and the box sizes, sample tables and trun entries
-// of the ISO-BMFF walk. Two framings of one input share a corpus better than two harnesses would.
+// and sub blocks, the Parameter Blocks' durations, and the box sizes, sample tables and trun
+// entries of the ISO-BMFF walk. Two framings of one input share a corpus better than two harnesses
+// would.
 //
 // Writing a Sequence back checks what the reader produced is something the writer accepts or
 // refuses cleanly, and decode_pcm reaches the sample reader with sizes and trims the file chose.

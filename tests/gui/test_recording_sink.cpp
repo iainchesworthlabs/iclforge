@@ -139,10 +139,11 @@ TEST_CASE("RecordingSink's MPEG-TS take is byte-identical to iclforge::mpegts::m
     const auto file = pushed_through(RecordingSink::Container::kMpegts, false,
                                      scratch_dir() / "take.ts", frames);
     const auto one_shot = iclforge::containers::mpegts::mux(
-        iclforge::containers::mpegts::AudioTrack{.codec = iclforge::containers::mpegts::AudioCodec::kAc3,
-                           .sample_rate = 48000,
-                           .channels = 2,
-                           .samples_per_frame = iclforge::ac3::kSamplesPerFrame},
+        iclforge::containers::mpegts::AudioTrack{
+            .codec = iclforge::containers::mpegts::AudioCodec::kAc3,
+            .sample_rate = 48000,
+            .channels = 2,
+            .samples_per_frame = iclforge::ac3::kSamplesPerFrame},
         as_views(frames));
     REQUIRE(one_shot.has_value());
     CHECK(file == *one_shot);
@@ -171,11 +172,12 @@ TEST_CASE("RecordingSink's Matroska take matches iclforge::matroska::Writer's ow
     const auto file = pushed_through(RecordingSink::Container::kMatroska, false,
                                      scratch_dir() / "take.mkv", frames);
 
-    auto writer = iclforge::containers::matroska::Writer::create(
-        iclforge::containers::matroska::AudioTrack{.codec_id = std::string{iclforge::containers::matroska::kCodecAc3},
-                             .sample_rate = 48000,
-                             .channels = 2,
-                             .samples_per_frame = iclforge::ac3::kSamplesPerFrame});
+    auto writer =
+        iclforge::containers::matroska::Writer::create(iclforge::containers::matroska::AudioTrack{
+            .codec_id = std::string{iclforge::containers::matroska::kCodecAc3},
+            .sample_rate = 48000,
+            .channels = 2,
+            .samples_per_frame = iclforge::ac3::kSamplesPerFrame});
     REQUIRE(writer.has_value());
     std::vector<std::byte> expected = writer->header();
     for (const auto& frame : frames) {
@@ -191,10 +193,10 @@ TEST_CASE("RecordingSink's Matroska take matches iclforge::matroska::Writer's ow
 TEST_CASE("RecordingSink's fragmented-MP4 take matches iclforge::mp4::fragment's own segments",
           "[gui]") {
     // The one container here that writes a FOLDER. Its media segments are
-    // iclforge::containers::mp4::fragment()'s byte for byte (iclforge::containers::mp4::FragmentWriter's own contract), so
-    // this checks each written segment*.m4s against the batch form over the
-    // same frames, and that the manifests the session leaves behind are the
-    // closed, VOD-shaped pair rather than the live ones it wrote while
+    // iclforge::containers::mp4::fragment()'s byte for byte
+    // (iclforge::containers::mp4::FragmentWriter's own contract), so this checks each written
+    // segment*.m4s against the batch form over the same frames, and that the manifests the session
+    // leaves behind are the closed, VOD-shaped pair rather than the live ones it wrote while
     // running. 100 frames at the default 48 per fragment is three segments -
     // two full and a short one - so a fragment boundary and a partial flush
     // are both in the take.
@@ -685,14 +687,14 @@ RecordingSink::Ac4Carriage carriage_of(const Ac4Frames& take) {
     carriage.carrier_channels = hbr16 ? 8 : 2;
     const auto timing = iclforge::ac4::media_timing(take.toc);
     REQUIRE(timing.has_value());
-    carriage.fmp4.audio =
-        iclforge::containers::mp4::AudioTrack{.codec_id = std::string{iclforge::containers::mp4::kCodecAc4},
-                                  .sample_rate = 48000,
-                                  .channels = 2,
-                                  .samples_per_frame = timing->sample_delta,
-                                  .codec_config = iclforge::ac4::build_dac4(take.toc),
-                                  .rfc6381 = iclforge::ac4::rfc6381_codec_string(take.toc),
-                                  .timescale = timing->timescale};
+    carriage.fmp4.audio = iclforge::containers::mp4::AudioTrack{
+        .codec_id = std::string{iclforge::containers::mp4::kCodecAc4},
+        .sample_rate = 48000,
+        .channels = 2,
+        .samples_per_frame = timing->sample_delta,
+        .codec_config = iclforge::ac4::build_dac4(take.toc),
+        .rfc6381 = iclforge::ac4::rfc6381_codec_string(take.toc),
+        .timescale = timing->timescale};
     carriage.fmp4.brands = {"ca4m", "ca4s"};
     return carriage;
 }
@@ -732,10 +734,11 @@ TEST_CASE("RecordingSink writes an AC-4 take raw and as MPEG-TS as the one-shot 
     const auto ts = scratch_dir() / "take_ac4.ts";
     push_ac4(RecordingSink::Container::kMpegts, ts);
     const auto one_shot = iclforge::containers::mpegts::mux(
-        iclforge::containers::mpegts::AudioTrack{.codec = iclforge::containers::mpegts::AudioCodec::kAc4,
-                                     .sample_rate = 48000,
-                                     .channels = 2,
-                                     .samples_per_frame = 2048},
+        iclforge::containers::mpegts::AudioTrack{
+            .codec = iclforge::containers::mpegts::AudioCodec::kAc4,
+            .sample_rate = 48000,
+            .channels = 2,
+            .samples_per_frame = 2048},
         as_views(take.sync));
     REQUIRE(one_shot.has_value());
     CHECK(read_file_bytes(ts) == *one_shot);
@@ -770,10 +773,10 @@ TEST_CASE("RecordingSink fragments an AC-4 take at its I-frames as iclforge::mp4
 
     // The batch form over the raw frames, with the same flags and brands.
     const auto carriage = carriage_of(take);
-    const auto batch =
-        iclforge::containers::mp4::fragment(carriage.fmp4.audio, as_views(take.raw),
-                                iclforge::containers::mp4::FragmentOptions{.sync_samples = take.iframes,
-                                                               .brands = carriage.fmp4.brands});
+    const auto batch = iclforge::containers::mp4::fragment(
+        carriage.fmp4.audio, as_views(take.raw),
+        iclforge::containers::mp4::FragmentOptions{.sync_samples = take.iframes,
+                                                   .brands = carriage.fmp4.brands});
     REQUIRE(batch.has_value());
     // The first fragment waits past 48 frames for the I-frame at frame 50.
     REQUIRE(batch->media_segments.size() >= 2);

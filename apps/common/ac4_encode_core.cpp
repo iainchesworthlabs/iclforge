@@ -256,18 +256,20 @@ std::expected<Ac4Packaged, Ac4PackageError> package_ac4(
                 iclforge::ac4::dac4_refusal(toc)),
             .usage = true});
     }
-    const iclforge::containers::mp4::AudioTrack track{.codec_id = std::string{iclforge::containers::mp4::kCodecAc4},
-                                .sample_rate = static_cast<std::uint32_t>(toc.sample_rate_hz),
-                                .channels = 2,  // TS 103 190-2 E.4.5: "should be set to 2"
-                                .samples_per_frame = timing->sample_delta,
-                                .codec_config = std::move(dac4),
-                                .rfc6381 = iclforge::ac4::rfc6381_codec_string(toc),
-                                .timescale = timing->timescale};
+    const iclforge::containers::mp4::AudioTrack track{
+        .codec_id = std::string{iclforge::containers::mp4::kCodecAc4},
+        .sample_rate = static_cast<std::uint32_t>(toc.sample_rate_hz),
+        .channels = 2,  // TS 103 190-2 E.4.5: "should be set to 2"
+        .samples_per_frame = timing->sample_delta,
+        .codec_config = std::move(dac4),
+        .rfc6381 = iclforge::ac4::rfc6381_codec_string(toc),
+        .timescale = timing->timescale};
     out.rfc6381 = track.rfc6381;
     auto muxed = iclforge::containers::mp4::mux(track, samples, options);
     if (!muxed.has_value()) {
         return std::unexpected(Ac4PackageError{
-            .message = std::string{iclforge::containers::mp4::describe(muxed.error())}, .usage = false});
+            .message = std::string{iclforge::containers::mp4::describe(muxed.error())},
+            .usage = false});
     }
     out.chunks.push_back(std::move(*muxed));
     return out;

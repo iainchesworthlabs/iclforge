@@ -471,7 +471,8 @@ TEST_CASE("an object's metadata updates come out where their input samples do",
     }
 }
 
-TEST_CASE("the object encoder's streams are the same from the same input", "[ac4][encoder][objects]") {
+TEST_CASE("the object encoder's streams are the same from the same input",
+          "[ac4][encoder][objects]") {
     for (const Case& c : {computed(), static_bed(), beds_and_decorrelation(), direct()}) {
         CAPTURE(c.name);
         const std::vector<std::vector<float>> input = input_of(c, 4 * kFrame);
@@ -484,7 +485,8 @@ TEST_CASE("the object encoder's streams are the same from the same input", "[ac4
     }
 }
 
-TEST_CASE("the committed encoder object streams are the configurations'", "[ac4][encoder][objects]") {
+TEST_CASE("the committed encoder object streams are the configurations'",
+          "[ac4][encoder][objects]") {
     const char* write_to = std::getenv("AC4_ENCODER_WRITE_OBJECTS");
     for (const Case& c : {computed(), static_bed(), beds_and_decorrelation(), direct()}) {
         CAPTURE(c.name);
@@ -518,7 +520,8 @@ TEST_CASE("the committed encoder object streams are the configurations'", "[ac4]
     }
 }
 
-TEST_CASE("the encoder refuses the object configurations it does not write", "[ac4][encoder][objects]") {
+TEST_CASE("the encoder refuses the object configurations it does not write",
+          "[ac4][encoder][objects]") {
     const auto reason = [](const std::function<void(iclforge::ac4::EncoderConfig&)>& change) {
         iclforge::ac4::EncoderConfig config = config_of(computed());
         change(config);

@@ -12,8 +12,8 @@
 
 #include "iclforge/containers/export.hpp"
 
-// The read side of iclforge::containers::matroska::mux()/iclforge::containers::matroska::Writer: pulling one audio
-// track's frames back out of a Matroska file.
+// The read side of iclforge::containers::matroska::mux()/iclforge::containers::matroska::Writer:
+// pulling one audio track's frames back out of a Matroska file.
 //
 // This is a container reader and nothing more, in exactly the sense the
 // writer beside it is a container writer and nothing more (see

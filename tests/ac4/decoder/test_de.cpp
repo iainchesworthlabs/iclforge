@@ -139,7 +139,8 @@ std::vector<std::vector<float>> decode_all(std::span<const std::byte> stream,
 
 }  // namespace
 
-TEST_CASE("Tables 209, 210 and 172 dequantise dialogue enhancement's parameters", "[ac4][decoder][de]") {
+TEST_CASE("Tables 209, 210 and 172 dequantise dialogue enhancement's parameters",
+          "[ac4][decoder][de]") {
     CHECK(detail::de_parameter(0, false) == 0.0);
     CHECK(std::abs(detail::de_parameter(10, false) - 1.0) < 1e-12);
     CHECK(std::abs(detail::de_parameter(15, false) - 1.5) < 1e-12);
@@ -413,7 +414,8 @@ TEST_CASE("9.X.4's dialogue enhancement channels are Lscr, Rscr and C", "[ac4][d
     }
 }
 
-TEST_CASE("core decoding takes the second de_data() when b_de_simulcast says so", "[ac4][decoder][de]") {
+TEST_CASE("core decoding takes the second de_data() when b_de_simulcast says so",
+          "[ac4][decoder][de]") {
     // Part 2 clause 4.8.3.15.
     detail::DialogEnhancement de;
     de.b_de_data_present = true;

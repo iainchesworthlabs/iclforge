@@ -401,17 +401,18 @@ struct ScannedStream {
 //
 // Where access unit i starts and how long it lasts. Every container writer in
 // this project computes this privately from a samples_per_frame it was handed
-// (iclforge::containers::mp4::AudioTrack, iclforge::containers::mpegts::AudioTrack, iclforge::containers::matroska::AudioTrack all take
-// one), which is correct only while every access unit is the same length - true of everything this
-// project's own encoders produce and not true in general, and in any case not something a caller
-// could ask about before this existed.
+// (iclforge::containers::mp4::AudioTrack, iclforge::containers::mpegts::AudioTrack,
+// iclforge::containers::matroska::AudioTrack all take one), which is correct only while every
+// access unit is the same length - true of everything this project's own encoders produce and not
+// true in general, and in any case not something a caller could ask about before this existed.
 //
 // The arithmetic is deliberately integer: a frame duration is very often not
 // a whole number of ticks in whatever timescale a container uses (1536
 // samples at 44.1 kHz is 34.83 ms), so a running sum of per-frame increments
 // drifts. Every value below is computed from the ABSOLUTE sample position, so
 // the error against the true time never exceeds one tick however long the
-// stream runs - the same rule iclforge::containers::mpegts::/iclforge::containers::matroska:: already follow internally.
+// stream runs - the same rule iclforge::containers::mpegts::/iclforge::containers::matroska::
+// already follow internally.
 //
 // All of it works over the FIRST programme's own `access_units`/
 // `access_unit_samples` (ScannedStream's own convention), same as the scalar
@@ -476,9 +477,9 @@ struct AccessUnitTiming {
 // The one length every access unit shares, or nothing when they differ. This
 // is exactly the question a fixed-duration container track can answer and a
 // variable one cannot:
-// iclforge::containers::mp4::AudioTrack/iclforge::containers::mpegts::AudioTrack/iclforge::containers::matroska::AudioTrack each hold a
-// single samples_per_frame, so a stream this returns nothing for cannot be described to them
-// without per-sample durations they do not model.
+// iclforge::containers::mp4::AudioTrack/iclforge::containers::mpegts::AudioTrack/iclforge::containers::matroska::AudioTrack
+// each hold a single samples_per_frame, so a stream this returns nothing for cannot be described to
+// them without per-sample durations they do not model.
 [[nodiscard]] ICLFORGE_AC3_EXPORT std::optional<std::uint32_t> uniform_access_unit_samples(
     const ScannedStream& stream);
 

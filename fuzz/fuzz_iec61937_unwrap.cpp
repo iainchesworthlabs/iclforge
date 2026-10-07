@@ -58,7 +58,8 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     // fields of its table of contents from bytes as untrusted as these, one
     // of its four burst types picked by the first byte. Whatever it packs has
     // to be as long as the period it chose and read back as the frame itself.
-    const auto type = static_cast<iclforge::containers::iec61937::BurstDataType>(24U | ((data[0] & 3U) << 5U));
+    const auto type =
+        static_cast<iclforge::containers::iec61937::BurstDataType>(24U | ((data[0] & 3U) << 5U));
     iclforge::containers::iec61937::Ac4BurstPacker packer(type);
     if (const auto burst = packer.push(carrier)) {
         const auto back = iclforge::containers::iec61937::unwrap_stream(*burst);

@@ -226,7 +226,8 @@ TEST_CASE("the linear prediction of Pseudocodes 86 and 87 finds a two-slot recur
     CHECK(alpha1[3] == Complex{});
 }
 
-TEST_CASE("pre-flattening flattens an envelope that is a cubic in dB exactly", "[ac4][core][aspx]") {
+TEST_CASE("pre-flattening flattens an envelope that is a cubic in dB exactly",
+          "[ac4][core][aspx]") {
     // |Q[sb]|^2 = 10^(p(sb)/10) - 1 on every slot, so Pseudocode 85's
     // 10 log10(energy + 1) is p(sb), which the cubic fit returns unchanged.
     constexpr int kSbx = 20;

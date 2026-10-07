@@ -19,7 +19,8 @@ TEST_CASE("burst size follows the format, not a fixed guess") {
     // length, silently rejecting every real AtmosEncoder/Eac3BurstPacker
     // frame the app hands it.
     CHECK(burst_bytes_for(BitstreamFormat::kAc3) == iclforge::containers::iec61937::kBurstBytes);
-    CHECK(burst_bytes_for(BitstreamFormat::kEac3) == iclforge::containers::iec61937::kEac3BurstBytes);
+    CHECK(burst_bytes_for(BitstreamFormat::kEac3) ==
+          iclforge::containers::iec61937::kEac3BurstBytes);
     CHECK(burst_bytes_for(BitstreamFormat::kEac3) > burst_bytes_for(BitstreamFormat::kAc3));
 }
 

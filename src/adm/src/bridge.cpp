@@ -45,9 +45,10 @@ std::string_view describe(BridgeError error) {
 namespace {
 
 // A real Dirac/instantaneous jump has no representation in KeyframePath's piecewise-linear model
-// (two keyframes cannot share one time_s - see iclforge::objects::oba::PathError::kDuplicateTimestamp). This
-// is the same resolution tests/ac3/oba/test_atmos_motion.cpp's own make_holds() helper relies on
-// implicitly: every caller in this codebase samples ObjectPath::evaluate() once per encoded frame
+// (two keyframes cannot share one time_s - see
+// iclforge::objects::oba::PathError::kDuplicateTimestamp). This is the same resolution
+// tests/ac3/oba/test_atmos_motion.cpp's own make_holds() helper relies on implicitly: every caller
+// in this codebase samples ObjectPath::evaluate() once per encoded frame
 // (iclforge::ac3::kSamplesPerFrame = 1536 samples, 32 ms at 48 kHz - see
 // iclforge::ac3::oba::AtmosEncoder:: encode_frame's own doc comment, "one placement per frame"), so
 // any transition faster than one frame period is already indistinguishable from instantaneous at
@@ -133,8 +134,8 @@ std::expected<iclforge::objects::oba::ObjectPath, BridgeError> build_channel_pat
     // same nominal time) into a valid, strictly-increasing keyframe sequence without needing a
     // separate branch for each. See kInstantJumpEpsilon's own comment for why this is inaudible
     // at the resolution that reaches the bitstream.
-    const auto push_keyframe = [&](double time_s, iclforge::objects::oba::Position position, double gain,
-                                   const Rendering& rendering) {
+    const auto push_keyframe = [&](double time_s, iclforge::objects::oba::Position position,
+                                   double gain, const Rendering& rendering) {
         if (!keyframes.empty() && time_s <= keyframes.back().time_s) {
             time_s = keyframes.back().time_s + kInstantJumpEpsilon;
         }
@@ -153,7 +154,8 @@ std::expected<iclforge::objects::oba::ObjectPath, BridgeError> build_channel_pat
     if (channel.block_formats.size() == 1) {
         // §5.4.1: "If there is only one audioBlockFormat within an audioChannelFormat, the
         // characteristics of the parent audioChannelFormat are considered to be static over
-        // time" - one keyframe, which iclforge::objects::oba::KeyframePath already holds everywhere.
+        // time" - one keyframe, which iclforge::objects::oba::KeyframePath already holds
+        // everywhere.
         const auto& block = channel.block_formats.front();
         const auto [position, gain] = placement_of(block);
         push_keyframe(object_start_s + block.rtime_s, position, gain, rendering_of(block));
@@ -579,7 +581,8 @@ std::expected<iclforge::adm::AdmDocument, BridgeError> write(const WriteInput& i
             iclforge::adm::AudioBlockFormat block;
             block.cartesian = true;
             block.position = room_to_adm_cartesian(iclforge::objects::oba::bed_label_position(*channel.bed_label));
-            block.speaker_labels = {std::string(iclforge::objects::oba::describe(*channel.bed_label))};
+            block.speaker_labels = {
+                std::string(iclforge::objects::oba::describe(*channel.bed_label))};
             channel_format.block_formats.push_back(std::move(block));
         } else {
             if (channel.updates.empty()) {

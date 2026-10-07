@@ -223,16 +223,17 @@ TEST_CASE("a scene of slots encodes to a stream that decodes to its objects, one
 
     const auto rear = iclforge::apps::ac4_pin_position(-110.0);
     const auto front = iclforge::apps::ac4_pin_position(0.0);
-    const auto scene = iclforge::objects::oba::ObjectScene::create(
-        {iclforge::objects::oba::SceneObject{.name = "moving",
-                               .automation = {{.time_s = 0.0,
-                                               .position = rear,
-                                               .gain = 1.0,
-                                               .interp = iclforge::objects::oba::Interpolation::kHold},
-                                              {.time_s = 0.096,
-                                               .position = front,
-                                               .gain = 1.0,
-                                               .interp = iclforge::objects::oba::Interpolation::kHold}}}});
+    const auto scene =
+        iclforge::objects::oba::ObjectScene::create({iclforge::objects::oba::SceneObject{
+            .name = "moving",
+            .automation = {{.time_s = 0.0,
+                            .position = rear,
+                            .gain = 1.0,
+                            .interp = iclforge::objects::oba::Interpolation::kHold},
+                           {.time_s = 0.096,
+                            .position = front,
+                            .gain = 1.0,
+                            .interp = iclforge::objects::oba::Interpolation::kHold}}}});
     REQUIRE(scene.has_value());
 
     iclforge::apps::Ac4ObjectsParams params;

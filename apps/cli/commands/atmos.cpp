@@ -130,8 +130,8 @@ std::optional<iclforge::objects::oba::ObjectScene> scene_of(std::string_view pat
                                                       .lfe_send = rest.lfe_send});
         }
     }
-    auto scene =
-        iclforge::objects::oba::ObjectScene::create(std::move(contents.objects), contents.orientation);
+    auto scene = iclforge::objects::oba::ObjectScene::create(std::move(contents.objects),
+                                                             contents.orientation);
     if (!scene.has_value()) {
         fmt::println(stderr, "error: {}: {}", path, scene.error().message);
         return std::nullopt;
@@ -155,16 +155,18 @@ struct CbiLayout {
 };
 
 constexpr std::array<CbiLayout, 3> kCbiLayouts{{
-    {"5.1.4", iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC | iclforge::objects::oba::bed::kLfe |
-                  iclforge::objects::oba::bed::kLsRs | iclforge::objects::oba::bed::kTflTfr |
-                  iclforge::objects::oba::bed::kTblTbr},
-    {"7.1.4", iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC | iclforge::objects::oba::bed::kLfe |
-                  iclforge::objects::oba::bed::kLsRs | iclforge::objects::oba::bed::kLbRb |
+    {"5.1.4", iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC |
+                  iclforge::objects::oba::bed::kLfe | iclforge::objects::oba::bed::kLsRs |
                   iclforge::objects::oba::bed::kTflTfr | iclforge::objects::oba::bed::kTblTbr},
-    {"9.1.6", iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC | iclforge::objects::oba::bed::kLfe |
-                  iclforge::objects::oba::bed::kLsRs | iclforge::objects::oba::bed::kLbRb |
-                  iclforge::objects::oba::bed::kLwRw | iclforge::objects::oba::bed::kTflTfr |
-                  iclforge::objects::oba::bed::kTslTsr | iclforge::objects::oba::bed::kTblTbr},
+    {"7.1.4", iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC |
+                  iclforge::objects::oba::bed::kLfe | iclforge::objects::oba::bed::kLsRs |
+                  iclforge::objects::oba::bed::kLbRb | iclforge::objects::oba::bed::kTflTfr |
+                  iclforge::objects::oba::bed::kTblTbr},
+    {"9.1.6", iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC |
+                  iclforge::objects::oba::bed::kLfe | iclforge::objects::oba::bed::kLsRs |
+                  iclforge::objects::oba::bed::kLbRb | iclforge::objects::oba::bed::kLwRw |
+                  iclforge::objects::oba::bed::kTflTfr | iclforge::objects::oba::bed::kTslTsr |
+                  iclforge::objects::oba::bed::kTblTbr},
 }};
 
 [[nodiscard]] std::optional<std::uint16_t> resolve_cbi_layout(std::string_view name) {
@@ -180,17 +182,19 @@ constexpr std::array<CbiLayout, 3> kCbiLayouts{{
 // unambiguous because 10 (5.1.4), 12 (7.1.4) and 16 (9.1.6) are all distinct.
 [[nodiscard]] std::optional<std::uint16_t> cbi_layout_for_channel_count(std::size_t channels) {
     for (const auto& layout : kCbiLayouts) {
-        if (static_cast<std::size_t>(iclforge::objects::oba::bed::channel_count(layout.bed)) == channels) {
+        if (static_cast<std::size_t>(iclforge::objects::oba::bed::channel_count(layout.bed)) ==
+            channels) {
             return layout.bed;
         }
     }
     return std::nullopt;
 }
 
-// atmos-adm/atmos-iab with codec=ac4 (planning/ac4.md, I5): iclforge::objects::oba::ObjectPlacement (this
-// project's E-AC-3/Atmos object model) and iclforge::ac4::ObjectProperties (TS 103 190-2 Annex F)
-// share one room coordinate system - X 0 (left wall) to 1 (right), Y 0 (front) to 1 (back), Z -1
-// (floor) to 1 (ceiling), confirmed against apps/common/ac4_object_render.hpp's own header comment
+// atmos-adm/atmos-iab with codec=ac4 (planning/ac4.md, I5): iclforge::objects::oba::ObjectPlacement
+// (this project's E-AC-3/Atmos object model) and iclforge::ac4::ObjectProperties (TS 103 190-2
+// Annex F) share one room coordinate system - X 0 (left wall) to 1 (right), Y 0 (front) to 1
+// (back), Z -1 (floor) to 1 (ceiling), confirmed against apps/common/ac4_object_render.hpp's own
+// header comment
 // - so position carries over unconverted; gain does not, since oba's is linear and AC-4's is dB
 // (Table 108-adjacent range +15 to -49, or -infinity for silence).
 // iclforge::apps::ac4_object_properties does both.
@@ -200,11 +204,11 @@ constexpr std::array<CbiLayout, 3> kCbiLayouts{{
 // branches beside this function give a bed channel (panned by position, no speaker-anchored
 // iclforge::ac4::BedChannel assigned) - is_bed is reported in the summary line and nothing else,
 // exactly as it already is for E-AC-3 above. AC-4's object substream is frame_rate_index 13 only
-// (iclforge/ac4/encoder/encoder.hpp, SubstreamConfig::objects), so metadata updates land on that fixed
-// 2048-sample grid: one update per object per frame, ramped over the whole frame from the previous
-// one, evaluated at the frame's END time - the convention every Atmos-encode command in this file
-// uses. The steps themselves are apps/common/ac4_objects_core.cpp's, which forge-gui's AC-4 objects
-// take too.
+// (iclforge/ac4/encoder/encoder.hpp, SubstreamConfig::objects), so metadata updates land on that
+// fixed 2048-sample grid: one update per object per frame, ramped over the whole frame from the
+// previous one, evaluated at the frame's END time - the convention every Atmos-encode command in
+// this file uses. The steps themselves are apps/common/ac4_objects_core.cpp's, which forge-gui's
+// AC-4 objects take too.
 int run_atmos_objects_to_ac4(std::string_view source_kind, std::uint32_t sample_rate,
                              const std::vector<bool>& is_bed,
                              const std::vector<iclforge::objects::oba::ObjectPath>& paths,
@@ -230,8 +234,9 @@ int run_atmos_objects_to_ac4(std::string_view source_kind, std::uint32_t sample_
         .dialnorm_db = static_cast<double>(meta.p.dialnorm),
         .coding = meta.ac4_atmos_coding.value_or(iclforge::ac4::ObjectCoding::kAjoc)};
     const auto encoded = iclforge::apps::encode_ac4_objects(
-        params, std::vector<bool>{}, pcm,
-        [&paths](double time_s) { return iclforge::objects::oba::evaluate_placements(paths, time_s); });
+        params, std::vector<bool>{}, pcm, [&paths](double time_s) {
+            return iclforge::objects::oba::evaluate_placements(paths, time_s);
+        });
     if (!encoded.has_value()) {
         switch (encoded.error().kind) {
             case iclforge::apps::Ac4ObjectsError::Kind::kRefused:
@@ -1315,7 +1320,8 @@ int run_atmos_adm(std::string_view in_path, std::string_view out_path, std::uint
     status_println(status,
                    "  {} bed speaker feed(s) + {} dynamic object(s) + the bed's LFE = {} objects, "
                    "JOC over a 5.1 downmix",
-                   bed_count, count - bed_count, iclforge::objects::oba::object_count(encoder.program()));
+                   bed_count, count - bed_count,
+                   iclforge::objects::oba::object_count(encoder.program()));
     print_channel_summary(meter, status);
     return kExitOk;
 }
@@ -1437,7 +1443,8 @@ int run_atmos_iab(std::string_view in_path, std::string_view out_path, std::uint
     status_println(status,
                    "  {} bed channel(s) + {} dynamic object(s) + the bed's LFE = {} objects, "
                    "JOC over a 5.1 downmix",
-                   bed_count, count - bed_count, iclforge::objects::oba::object_count(encoder.program()));
+                   bed_count, count - bed_count,
+                   iclforge::objects::oba::object_count(encoder.program()));
     print_channel_summary(meter, status);
     return kExitOk;
 }

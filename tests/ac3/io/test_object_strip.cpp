@@ -48,7 +48,8 @@ Bytes encode_atmos_stream(int frames, bool emit_objects, int objects = 2) {
     iclforge::ac3::oba::AtmosEncoder encoder{
         {.bitrate_kbps = 448, .num_bands_idx = 4, .emit_object_metadata = emit_objects},
         objects};
-    std::vector<iclforge::objects::oba::ObjectPlacement> placement(static_cast<std::size_t>(objects));
+    std::vector<iclforge::objects::oba::ObjectPlacement> placement(
+        static_cast<std::size_t>(objects));
     std::vector<std::vector<float>> essence(static_cast<std::size_t>(objects));
     std::vector<std::span<const float>> views(static_cast<std::size_t>(objects));
     Bytes stream;

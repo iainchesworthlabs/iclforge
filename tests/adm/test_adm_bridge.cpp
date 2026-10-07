@@ -1271,7 +1271,8 @@ TEST_CASE("build() lists the ADM features it does not carry, per channel", "[adm
 // objectDivergence and screenRef
 // ---------------------------------------------------------------------------
 
-TEST_CASE("build_channel_path carries objectDivergence and screenRef", "[adm][bridge][divergence]") {
+TEST_CASE("build_channel_path carries objectDivergence and screenRef",
+          "[adm][bridge][divergence]") {
     auto first = block_at(0.0, 1.0, polar(0.0, 0.0));
     first.has_object_divergence = true;
     first.object_divergence.value = 0.4;

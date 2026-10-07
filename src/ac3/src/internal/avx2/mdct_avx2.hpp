@@ -37,7 +37,8 @@ void apply_analysis_window(std::span<const double, 512> x, std::span<double, 512
 // AVX2 intrinsics; P must be a multiple of 4 (true at both call sites, 128
 // and 64). u.size() must be 2*P (M).
 void dct4_pre_twiddle(std::span<const double> u, std::span<const double> pre_re,
-                      std::span<const double> pre_im, std::span<double> z_re, std::span<double> z_im);
+                      std::span<const double> pre_im, std::span<double> z_re,
+                      std::span<double> z_im);
 
 // dct4_scaled<NLen>'s post-twiddle: unit-stride read of z_re/z_im/post_re/
 // post_im (all P long), scaled complex multiply, scatter to out (2*P = M
@@ -54,7 +55,8 @@ void dct4_post_twiddle(std::span<const double> z_re, std::span<const double> z_i
 // z_re.size() == z_im.size()) is 128, a multiple of 4.
 // coeffs.size() must be kHalfN (512).
 void imdct512_pre_twiddle(std::span<const double> coeffs, std::span<const double> cos1,
-                          std::span<const double> sin1, std::span<double> z_re, std::span<double> z_im);
+                          std::span<const double> sin1, std::span<double> z_re,
+                          std::span<double> z_im);
 
 // imdct512_windowed's post-FFT copy-and-negate (fast branch): t_re = z_re,
 // t_im = -z_im, unit stride, four at a time.
@@ -117,8 +119,9 @@ void imdct256_post_twiddle(std::span<const double> cos2, std::span<const double>
 void imdct512_windowed_batch4(std::span<const double> coeffs0, std::span<const double> coeffs1,
                               std::span<const double> coeffs2, std::span<const double> coeffs3,
                               std::span<const double> cos1, std::span<const double> sin1,
-                              const iclforge::dsp::fft::StockhamTables<128>& fft, std::span<double> x0,
-                              std::span<double> x1, std::span<double> x2, std::span<double> x3);
+                              const iclforge::dsp::fft::StockhamTables<128>& fft,
+                              std::span<double> x0, std::span<double> x1, std::span<double> x2,
+                              std::span<double> x3);
 
 // iclforge::ac3::mdct512_forward_batch4's AVX2 body (mdct.hpp): the forward twin of
 // imdct512_windowed_batch4 above, and the same three-part shape - transpose

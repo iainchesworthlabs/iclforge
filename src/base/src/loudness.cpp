@@ -230,7 +230,8 @@ int LoudnessMeter::channel_count() const { return impl_->channels_; }
 
 namespace {
 
-[[nodiscard]] std::vector<std::optional<double>> speaker_weights(std::span<const Speaker> speakers) {
+[[nodiscard]] std::vector<std::optional<double>> speaker_weights(
+    std::span<const Speaker> speakers) {
     std::vector<std::optional<double>> weights;
     weights.reserve(speakers.size());
     for (const Speaker speaker : speakers) {
@@ -307,7 +308,8 @@ void LoudnessMeter::push(std::span<const std::span<const float>> channels) {
     // not be dropped from the loop bound the way the K-weighting path
     // below deliberately ignores it.
     std::size_t length = 0;
-    for (int ch = 0; ch < impl_->channels_ && static_cast<std::size_t>(ch) < channels.size(); ++ch) {
+    for (int ch = 0; ch < impl_->channels_ && static_cast<std::size_t>(ch) < channels.size();
+         ++ch) {
         length = std::max(length, channels[static_cast<std::size_t>(ch)].size());
     }
     for (std::size_t n = 0; n < length; ++n) {
@@ -383,7 +385,8 @@ void LoudnessMeter::push_true_peak(int channel, float sample) {
     // kTruePeakTaps-1 samples of the stream). Folding the raw sample into
     // the same running max costs nothing and guarantees the oversampled
     // reading is never fractionally lower than plain sample-peak would be.
-    impl_->true_peak_abs_max_ = std::max(impl_->true_peak_abs_max_, std::abs(static_cast<double>(sample)));
+    impl_->true_peak_abs_max_ =
+        std::max(impl_->true_peak_abs_max_, std::abs(static_cast<double>(sample)));
     impl_->true_peak_seen_ = true;
 }
 

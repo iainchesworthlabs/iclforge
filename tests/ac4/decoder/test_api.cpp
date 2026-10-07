@@ -539,7 +539,8 @@ TEST_CASE(
     }
 }
 
-TEST_CASE("decode_by_block hands over what it holds before a change of layout", "[ac4][decoder][api]") {
+TEST_CASE("decode_by_block hands over what it holds before a change of layout",
+          "[ac4][decoder][api]") {
     const auto frames = frames_of(baseline("ac4-51-music-384"));
     iclforge::ac4::Decoder decoder;
     std::vector<std::size_t> widths;
@@ -737,7 +738,8 @@ TEST_CASE("describe names every substream role", "[ac4][decoder][api]") {
     CHECK(iclforge::ac4::describe(static_cast<iclforge::ac4::SubstreamRole>(99)) == "?");
 }
 
-TEST_CASE("presentations() lists each presentation of the table of contents", "[ac4][decoder][api]") {
+TEST_CASE("presentations() lists each presentation of the table of contents",
+          "[ac4][decoder][api]") {
     SECTION("a DEE stream's one presentation") {
         const auto frames = frames_of(baseline("ac4-51-music-192"));
         iclforge::ac4::Decoder decoder;
