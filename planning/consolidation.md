@@ -18,7 +18,7 @@
     19 say. Then M1 to M3 (decisions 20 to 22) made the converter, the QMF bank and the FFT one each:
     AC-4's output and the pinned bitstreams unchanged, AC-3's decoded PCM moved by rounding, the
     fixed tier's and the size profile's encode pins re-pinned
-    ([the merges](#the-merges-decision-14-left-2026-10-08-chore-dsp-merge-1-resampler-to-3-fft)).
+    ([the merges](#the-merges-decision-14-left-2026-10-08-choredsp-merge-1-resampler-to-3-fft)).
     Nothing is pushed.
 
 ## In brief
