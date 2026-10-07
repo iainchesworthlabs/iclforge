@@ -1,6 +1,6 @@
 # One shape for every codec, and fewer libraries (a proposal)
 
-!!! note "Status as of 2026-10-07: C0 to C6 run and proved (C5 a move, decision 14); decisions 1 to 19 taken"
+!!! note "Status as of 2026-10-08: C0 to C6 run and proved, and the three merges decision 14 left (M1 to M3); decisions 1 to 23 taken"
     Asked for by the user on 2026-10-06: "the AC3 codec and the AC4 codec structures are completely
     different. There's also duplication from inside codecs to common stuff", "the ac3 approach is the
     preferred approach", and "should there be 25 libraries? Is it worth consolidating some?". This page
@@ -15,7 +15,11 @@
     `src/dsp` and merged none (decision 14), changing nothing a build outputs. C6 gave `base` the
     version, WAV and the meters, nested `objects`' namespaces and installs the headers by file set,
     changing no bitstream or PCM either; its installed headers and exports change as decisions 16 to
-    19 say. Nothing is pushed.
+    19 say. Then M1 to M3 (decisions 20 to 22) made the converter, the QMF bank and the FFT one each:
+    AC-4's output and the pinned bitstreams unchanged, AC-3's decoded PCM moved by rounding, the
+    fixed tier's and the size profile's encode pins re-pinned
+    ([the merges](#the-merges-decision-14-left-2026-10-08-chore-dsp-merge-1-resampler-to-3-fft)).
+    Nothing is pushed.
 
 ## In brief
 
@@ -947,6 +951,59 @@ and the Rust crate goes through the C API, which ctest covers), the Qt GUI (not 
 `mkdocs build --strict` (not installed). The MSVC symbol baseline (`tools/n1b/baselines/
 symbols-msvc.json`) wants a Windows build.
 
+### The merges decision 14 left, 2026-10-08 (`chore/dsp-merge-1-resampler` to `-3-fft`)
+
+Three stages after C6, each its own branch from the one before, decisions 20 to 23.
+
+| | the decision | the run |
+|---|---|---|
+| M1, the converter (22) | AC-4's design and engine | `dsp::resample` is the converter's grid and dot product over the whole buffer, output m at input position m down / up, from the converter's table, or its design one phase at a time where a table would pass 2^20 coefficients (two rates with no common factor). `dsp` builds `tiered/resampler.cpp` at double; the design's C library functions (`LibmMath`) are `resampler_design.hpp`'s, shared |
+| M2, the QMF bank (21) | AC-4's engine, window and modulation its parameters | the engine's slot (`tiered/qmf_slot.hpp`) takes its window, of float or double; JOC's bank is that slot with its prototype in the engine's order (backwards for the analysis, the fold's alternating sign folded in), and each subband turned by e^(−iπ(2k+1)253/256) after the analysis and e^(+iπ(2k+1)255/256) before the synthesis, the half sample the two modulations differ by. The delay stays 576 |
+| M3, the FFT (20) | AC-4's Stockham plan | the passes are `iclforge/dsp/detail/fft_stockham.hpp`, generic over the value and the factor (double, float, AVX2's four lanes, the fixed tier's `ImdctValue` with Fixed32 factors), writing through a callable so one pass serves AC-4's interleaved complex buffers and AC-3's split arrays. AC-3's 64-, 128- and 512-point transforms take a plan fixed when compiled (`StockhamTables`, `stockham_forward`), the passes unrolled with their strides constant and the unit factors' products left out; AC-4's plan multiplies by them as it always did. `dsp/detail/fft_kernel.hpp` is gone, and AC-3's inputs are in natural order, so the AVX2 pre-twiddles lose their permutation |
+
+**The proof.** Against C6's records, on GCC 16 and Clang 22:
+
+- **Identical:** the pinned bitstream hashes; AC-4's every output (the probe PCM hashes, the scalar
+  agreement, every AC-4 score); the exports but for standard-library instances that moved between
+  `ac3` and `dsp` (3,285 names to 3,283), and the ABI allowlists (all match).
+- **Moved, by rounding only:** one CLI output, the float PCM of an AC-3 stereo decode (220 dB SNR against
+  C6's, its R channel identical). The fixed tier's 14 PCM hashes and the size profile's six
+  float-front-end encodes are re-pinned (`tests/golden/fixed-probe-pcm-hashes.json`,
+  `apps/baremetal/encode_fixture.hpp`), the x86 host and the Cortex-M3 leg agreeing on each.
+- **Scored again** (decision 23), every step the same as C6's: the gold reference gate at double,
+  float and fixed (37 of 37 each); the quality race's CI gate; the DRC and coupling checks (DRC's four
+  failures, ffmpeg's downmix levels, as before); the trend and object series (no row's SNR, LSD or MOS
+  moved); AC-4's decode and encode scores at three tiers, gain and mixing. The float decoder agrees
+  with the double one to 138.6 to 139.2 dB (+0.0 to +0.13), the fixed one to 116.5 to 122.2 dB (−0.16
+  to −0.41, floor 110).
+- **Speed, the Cortex-M3 under QEMU, instructions a frame:** AC-4 within 0.1%. AC-3, as a board builds
+  it (`ICLFORGE_MINIMAL_HOT_O2`, which the ESP-IDF component turns on): within 0.4% at both tiers;
+  the size profile (`-Os` throughout) 2 to 4% more at float and 10 to 19% at fixed, every row under its
+  ceiling. Images 2.4 to 3.2% larger (9 to 11 KB). The AC-3 encoder probe 1 to 2% more.
+- **The whole ctest:** 3,466 tests on each compiler (C6's 3,461, the converter's three, the QMF
+  engine's two), all pass but the five that skip themselves. `check_install_consumer.sh` passes; the
+  ESP-IDF staging is 504 files; the static checks and the scripts' unit tests pass as at C6.
+
+Hazards the plan did not name:
+
+- **A generic engine at `-Os`.** The Stockham passes, written for a compiler that inlines, left their
+  input and output callables and their butterflies as calls under the size profile, which is what the
+  fixed tier paid: the same 225 complex products a 128-point transform needs, and a call per value
+  besides. Forcing the inlining made the float tier slower; compiling `mdct.cpp` at `-O2`, as the
+  profile already compiles the decoders that hold the fixed tier's transform, recovered it.
+- **A unit factor is not free in a Stockham pass.** Its k = 0 output's factor is 1 for every p, so a
+  radix-4 butterfly multiplies four times where a decimation-in-time one with its trivial group skipped
+  multiplies three; leaving the unit products out is what brought the float tier from +16 to +3%.
+  AC-4's plan keeps them, since a product with 1 can change the sign of a zero.
+- **The float-encode build fails with Clang 22** (`-Werror=double-promotion` in `eac3_frame.cpp`) on
+  C6 as on these branches; it builds with GCC, where its gold-reference gate passes its quality checks
+  and, as on C6, mismatches the double front end's pinned hashes it cannot produce.
+- **The scoring's builds need an existing vcpkg tree.** A sandboxed configure cannot take vcpkg's lock
+  under `~/vcpkg`; every tree here configures against `build/wt/c0-before`'s installed packages with
+  the manifest install off.
+
+Not run here: as for C6, and the ESP32 boards' own timings, which the Cortex-M3 counts stand in for.
+
 ## After C3: `src/` reviewed
 
 **What C0 to C3 changed.** Twenty-two libraries are twelve. C0 made every library by
@@ -1090,6 +1147,22 @@ none): C4 and C5 are what make AC-4 use the rest.
 19. **`objects`' namespaces.** (a) `iclforge::objects::oba` and `iclforge::objects::emdf`, with
     `iclforge::oba` and `iclforge::emdf` aliases for a release; (b) both flattened into
     `iclforge::objects`; (c) left, a debt in the namespace lock. **Taken, before C6: (a).**
+
+20. **One FFT.** (a) AC-4's Stockham plan is the one, AC-3's MDCT, its AVX2 and fixed-point paths
+    and `dft512` on it, AC-3's output moving in its last bits; (b) `dsp`'s radix-4/2 kernel extended
+    for AC-4, AC-4's output moving; (c) one interface over both; (d) leave. **Taken, after C6: (a).**
+    And, once the run measured its cost on the Cortex-M3 leg, `mdct.cpp` joins the minimum-footprint
+    profile's `-O2` list (a board within 0.4% for about 9 KB of flash), with the pins it moves
+    re-pinned and the reason recorded.
+21. **One QMF bank.** (a) AC-4's tiered engine, the window and the modulation its parameters, JOC
+    keeping its prototype and its delay of 576; (b) JOC on QWIN as well; (c) leave. **Taken, after C6:
+    (a).**
+22. **One sample rate converter.** (a) AC-4's Kaiser design and polyphase engine, `dsp::resample`
+    keeping its signature and behaviour; (b) `dsp`'s Blackman design for AC-4; (c) leave. **Taken,
+    after C6: (a).**
+23. **The scoring.** (a) a virtual environment under `build/` from the repository's hashed lock
+    (`requirements/requirements-ffmpeg-validate.txt`), the quality race and the gold-reference gate
+    run before and after; (b) record the race as not run. **Taken: (a).**
 
 ### Open
 
