@@ -67,7 +67,7 @@ class ToneFrames {
    private:
     double hz_;
     long long n_ = 0;
-    dsp::tiered::QmfAnalysis<detail::Real> analysis_;
+    iclforge::dsp::tiered::QmfAnalysis<detail::Real> analysis_;
 };
 
 // The amplitude of a 997 Hz sine in one channel whose loudness is `relative`

@@ -38,7 +38,7 @@
 namespace {
 
 namespace dsp = iclforge::dsp::tiered;
-using iclforge::ac4::detail::Real;
+using iclforge::dsp::tiered::Real;
 
 // What the plan's loop was before the passes took the radix and the direction as arguments: the
 // factorisation, the factors, the generic butterfly with its runtime radix and the Stockham loop,

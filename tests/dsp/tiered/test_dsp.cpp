@@ -783,7 +783,7 @@ TEST_CASE("the QMF banks give the same output however the slots are split across
 
 TEST_CASE("the QMF banks at the decoder's scalar agree with the banks at double",
           "[ac4][core][dsp][qmf]") {
-    using Scalar = iclforge::ac4::detail::Real;
+    using Scalar = iclforge::dsp::tiered::Real;
     using ScalarComplex = dsp::Complex<Scalar>;
     // Where the decoder's scalar is double these are one type and the difference
     // is exactly 0; at float it is float's rounding through the window and the
@@ -1086,8 +1086,8 @@ TEST_CASE("the QMF banks give the bits of the scalar kernels run one after anoth
     // have kernels of their own, with a block exponent per slot (dsp/qmf_fixed.hpp),
     // which the test above holds to the banks at double.
     run(double{}, 8100);
-    if (!dsp::kFixed<iclforge::ac4::detail::Real>) {
-        run(iclforge::ac4::detail::Real{}, 8200);
+    if (!dsp::kFixed<iclforge::dsp::tiered::Real>) {
+        run(iclforge::dsp::tiered::Real{}, 8200);
     }
 }
 

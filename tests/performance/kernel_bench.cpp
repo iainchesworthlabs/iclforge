@@ -589,8 +589,8 @@ int main(int argc, char** argv) {
             }));
         };
         bench_qmf(std::type_identity<double>{}, "");
-        if constexpr (!std::is_same_v<iclforge::ac4::detail::Real, double>) {
-            bench_qmf(std::type_identity<iclforge::ac4::detail::Real>{}, "_real");
+        if constexpr (!std::is_same_v<iclforge::dsp::tiered::Real, double>) {
+            bench_qmf(std::type_identity<iclforge::dsp::tiered::Real>{}, "_real");
         }
     }
 

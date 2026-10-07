@@ -8,7 +8,7 @@
 //
 // The tones are worked back through the decoder's own transform as the text prints it: each
 // frame's block of the sine, windowed by the KBD window of Table 186 and taken through the
-// forward transform that undoes clause 5.5.2's inverse (dsp::tiered::Mdct, scaled by the factor of two the
+// forward transform that undoes clause 5.5.2's inverse (iclforge::dsp::tiered::Mdct, scaled by the factor of two the
 // decoder's reading of the pseudocode needs), then quantised with the printed power law (clause
 // 5.1.3.2) at scale factors that put the largest line of each band near a quantised value of 100,
 // and written in the syntax of Tables 37 to 42c with the extension's bands past num_sfb_48 in

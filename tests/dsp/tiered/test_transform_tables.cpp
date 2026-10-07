@@ -20,7 +20,7 @@
 #include "tiered/transform_tables.hpp"
 
 namespace dsp = iclforge::dsp::tiered;
-using iclforge::ac4::detail::Real;
+using iclforge::dsp::tiered::Real;
 
 namespace {
 

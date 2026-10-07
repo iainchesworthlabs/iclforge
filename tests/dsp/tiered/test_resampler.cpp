@@ -33,7 +33,7 @@ namespace dsp = iclforge::dsp::tiered;
 
 // The decoder's scalar: float in a float build, where the converter's table is
 // kept and its dot product run at float, and double otherwise.
-using Real = iclforge::ac4::detail::Real;
+using Real = iclforge::dsp::tiered::Real;
 using RealFilter = dsp::BasicResamplerFilter<Real>;
 
 struct Rate {
