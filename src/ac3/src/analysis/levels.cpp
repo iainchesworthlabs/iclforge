@@ -109,6 +109,9 @@ LevelMeter::LevelMeter(Acmod acmod, bool lfe, std::uint32_t sample_rate, int cha
       acmod_(acmod),
       lfe_(lfe) {}
 
+Acmod LevelMeter::acmod() const { return acmod_; }
+bool LevelMeter::lfe() const { return lfe_; }
+
 SoundfieldVector energy_vector(std::span<const ChannelLevel> levels, Acmod acmod) {
     std::array<std::optional<double>, 5> azimuths{};
     const auto fullbw =

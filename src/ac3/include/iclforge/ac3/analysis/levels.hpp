@@ -64,8 +64,8 @@ class ICLFORGE_AC3_EXPORT LevelMeter : public base::LevelMeter {
     LevelMeter(Acmod acmod, bool lfe, std::uint32_t sample_rate, int channels,
                const MeterBallistics& ballistics = {});
 
-    [[nodiscard]] Acmod acmod() const { return acmod_; }
-    [[nodiscard]] bool lfe() const { return lfe_; }
+    [[nodiscard]] Acmod acmod() const;
+    [[nodiscard]] bool lfe() const;
 
    private:
     Acmod acmod_;
