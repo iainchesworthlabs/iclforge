@@ -1,6 +1,6 @@
 # One shape for every codec, and fewer libraries (a proposal)
 
-!!! note "Status as of 2026-10-07: C0 to C4 run and proved, C5 a move (decision 14); decisions 1 to 15 taken"
+!!! note "Status as of 2026-10-07: C0 to C5 run and proved (C5 a move, decision 14), C6 under way; decisions 1 to 19 taken"
     Asked for by the user on 2026-10-06: "the AC3 codec and the AC4 codec structures are completely
     different. There's also duplication from inside codecs to common stuff", "the ac3 approach is the
     preferred approach", and "should there be 25 libraries? Is it worth consolidating some?". This page
@@ -11,8 +11,8 @@
     `chore/src-consolidation-c0` to `-c4` and changed no bitstream or PCM a build outputs; C1's cut
     moves the bare-metal AC-4 probe's instruction counts by up to 68 parts per million (decision 11),
     and C4 the Cortex-M3 counts by at most 0.25% and the images by up to 1,296 bytes (decision 15)
-    ([what the runs found](#what-the-runs-found-that-the-plan-did-not)). C5 moves AC-4's kernels into
-    `src/dsp` and merges none (decision 14). Nothing is pushed.
+    ([what the runs found](#what-the-runs-found-that-the-plan-did-not)). C5 moved AC-4's kernels into
+    `src/dsp` and merged none (decision 14), changing nothing a build outputs. Nothing is pushed.
 
 ## In brief
 
@@ -818,6 +818,60 @@ that no ESP32 timing get slower cannot run here. The user took (a), decision 14:
 into `src/dsp` with their tiers, beside `dsp`'s own, and change no output; each merge is a decision of
 its own, with the cost above.
 
+### C5, 2026-10-07 (`chore/src-consolidation-c5`)
+
+The commits, after C4: the moves alone (35 renames, every one `R100`); the include spellings (61
+files); the build files and the paths in text (33 files); the text pass (75 files: 50 namespace
+declarations, 33 qualified names, 234 of AC-4's bare `dsp::`, 29 table names, the tier header and
+macro), then two corrections of it, each after its rule; the hand-written commit. 17 commits, 7 of
+them the scripts'.
+
+| | decision 14 | the run |
+|---|---|---|
+| where | `src/dsp` | `src/dsp/src/tiered/`, namespace `iclforge::dsp::tiered`: AC-4's mixed-radix FFT, MDCT and KBD windows, QMF banks and synthesis, sample rate converter, their kernels and vector paths, and the tables they read (`tiered/tables/`: the transform tables, the QMF twiddles, Annex D's QWIN). The sub-namespace keeps them apart from `dsp`'s own `QmfAnalysis` and `kQmfSubbands` |
+| the tier | the kernels' scalar tiers come with them | `src/dsp/variants/decode-scalar-<tier>/iclforge/dsp/tiered/real.hpp` (`Real`, `ICLFORGE_DSP_ALSO_AT_DOUBLE`); AC-4's three variants are one header that aliases it (`src/ac4/src/iclforge/ac4/detail/real.hpp`) |
+| who builds them | | the codec that calls them, at its tier: `iclforge::dsp`'s library is built at none, so `src/ac4/CMakeLists.txt` and `minimal.cmake` list them from `src/dsp`, as `src/ac3/minimal.cmake` builds `dsp`'s files into AC-3's archive; `src/dsp/CMakeLists.txt` says so |
+| the tests | follow `src/` (decision 10) | `tests/dsp/tiered/` (the kernels' five); AC-4's own stay in `tests/ac4/core/` |
+| the generators | | `gen_ac4_tables.py`, `gen_ac4_fixed_tables.py`, `gen_ac4_qmf_twiddles.py` and `gen_ac4_transform_tables.py` write the moved tables where they are, in `iclforge::dsp::tiered::tables`; the last three's `--check` passes, and `gen_ac4_tables.py`'s QMF header is what it writes (the ETSI attachments it reads are not in the tree) |
+
+**The proof.** Against C4's records:
+
+- **Identical:** the pinned hashes and the CLI corpus on GCC 16 and Clang 22; the installed tree (the
+  kernels' headers are private); every line of the five bare-metal probes, instruction counts and
+  image sizes included; the exports (`export_diff.py --rewrite c5`: 3,268 names, −0 +0) and the ABI
+  allowlists (all match).
+- **The IR** (`ir_compare.py --plan --names c5`, 442 units): 437 identical; two the same but for local
+  lambdas' mangled names, whose encoding follows the deeper namespace; three differ by what a build
+  writes (the commit and branch in `version.cpp`, Hearth's `network_controller` as at C3).
+- **The whole ctest:** 3,458 tests on each compiler, all pass but the five that skip themselves.
+- **The installed package:** `check_install_consumer.sh` passes. The ESP-IDF staging is 494 files from
+  493.
+- `check_layering.py` (223 include edges: AC-4 includes `dsp`'s now), `check_namespaces.py`,
+  `check_pages.py`, `check_doc_paths.py`, the scripts' unit tests (495) pass.
+
+Hazards the plan did not name:
+
+- **A move into a library its users name from inside another namespace.** Inside
+  `iclforge::ac4::detail`, a bare `dsp::` named AC-4's own namespace; after the move it names
+  `iclforge::dsp`, so the rule adds `tiered::`, except in a file whose `dsp` is a namespace alias.
+  The first run missed `detail::dsp::` written from inside `iclforge::ac4`, and wrote `dsp::tiered::`
+  in tests outside `namespace iclforge`, where it names nothing; the rule's second and third forms
+  are the fixes.
+- **The CMake pass read five moved tests as their directory's** (`tests/ac4/core/` to
+  `tests/dsp/tiered/`) and rewrote the nine that stay; the list was put right by hand. The path pass
+  had it right.
+- **A generated file that holds two things.** Annex D's `qmf_tables.cpp` holds QWIN, the banks'
+  window, and A-SPX's noise table, which its generator writes together; the file moved whole, so
+  `dsp` holds `kAspxNoise`, which only AC-4 reads. Splitting it is a change to the generators.
+- **A static analysis scope that names directories.** clang-tidy's header filter and the nightly's
+  file pattern named `src/dsp`, which now holds the tiered kernels that were out of scope as AC-4's
+  code; both name `dsp`'s own files now. They also named `matroska`, `mp4`, `mpegts` and `iec61937` at
+  the top of `src/`, so since C3 the nightly had analysed none of the containers; they name
+  `src/containers` now.
+
+Not run here: as for C4. The merges decision 14 leaves (one FFT, one QMF bank, one converter) are
+each a stage of their own, with the cost in the section above.
+
 ## After C3: `src/` reviewed
 
 **What C0 to C3 changed.** Twenty-two libraries are twelve. C0 made every library by
@@ -946,6 +1000,21 @@ none): C4 and C5 are what make AC-4 use the rest.
     **Taken: (a).**
 15. **C4's footprint.** (a) raise the AC-4 probe's image ceiling to 830,000 bytes, with the reason;
     (b) win back 300 bytes and look for the rest; (c) stop. **Taken: (a).**
+
+16. **WAV I/O.** (a) the codec-blind part (`WavData`, `read_wav`, the writers) to `base`, AC-3's two
+    mappings to A/52's order staying in `ac3`, with `iclforge::ac3::io` aliases for a release; (b) the
+    same without aliases; (c) left in `ac3`. **Taken, before C6: (a).**
+17. **The meters.** (a) the level meter and the BS.1770 loudness meter to `base`, taking a channel list
+    of `iclforge::base::Speaker` and an integer rate, with `Acmod` overloads in `ac3` that keep AC-3's
+    output byte for byte; (b) keyed on `base::Layout`, E-AC-3's channel-map code; (c) left in `ac3`.
+    **Taken, before C6: (a).**
+18. **The installed headers.** (a) by `FILE_SET`, `detail/` left out, `core/tables.hpp` split into the
+    public types (`core/types.hpp`, which `tables.hpp` includes for a release) and the tables, private
+    unless something outside `src/ac3` needs them; (b) `FILE_SET` leaving out `detail/` only; (c) as
+    now. **Taken, before C6: (a).**
+19. **`objects`' namespaces.** (a) `iclforge::objects::oba` and `iclforge::objects::emdf`, with
+    `iclforge::oba` and `iclforge::emdf` aliases for a release; (b) both flattened into
+    `iclforge::objects`; (c) left, a debt in the namespace lock. **Taken, before C6: (a).**
 
 ### Open
 
