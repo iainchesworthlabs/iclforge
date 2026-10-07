@@ -174,7 +174,7 @@ bool ChannelSynthesis<Real>::block(TransformSet<Real>& transforms, std::span<con
 
 template class TransformSet<Real>;
 template class ChannelSynthesis<Real>;
-// The core's own tests (tests/ac4/core/test_dsp.cpp) exercise both at
+// The core's own tests (tests/dsp/tiered/test_dsp.cpp) exercise both at
 // double directly, alongside Real (see this target's CMakeLists.txt,
 // ICLFORGE_AC4_ALSO_AT_DOUBLE).
 ICLFORGE_AC4_ALSO_AT_DOUBLE(

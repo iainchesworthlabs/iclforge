@@ -914,7 +914,7 @@ the manifest's parts, with the decoder switched on and constructed (in the fixed
 parts with no floating-point unit).
 CI narrows that to the ESP32-P4, the ESP32-C3 and the ESP32-C6 with `--verify-targets esp32p4,esp32c3,esp32c6`:
 the `float` tier and the fixed-point tier on the two parts with no floating-point unit. A `float` build evaluates the
-converter's tables while it compiles `src/ac4/src/core/dsp/resampler.cpp`, which takes ESP-IDF's
+converter's tables while it compiles `src/dsp/src/tiered/resampler.cpp`, which takes ESP-IDF's
 RISC-V GCC 15.2 8.4 s where it took 1.5, and `src/ac4/CMakeLists.txt` raises the compiler's limit
 on constant evaluation for that file (`-fconstexpr-ops-limit`).
 

@@ -49,7 +49,7 @@
 // companding, A-SPX and A-CPL leave it out (Tables 212 to 214).
 //
 // At every frame_rate_index but 13 the frame is coded at an internal rate, and
-// the sample rate converter (Part 1 clause 6.2.15, src/ac4/src/core/dsp/
+// the sample rate converter (Part 1 clause 6.2.15, src/dsp/src/tiered/
 // resampler.hpp) takes the synthesis's output to 48 kHz, its phase locked to
 // sequence_counter as Part 2 clause 5.11 locks it.
 //

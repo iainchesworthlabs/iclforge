@@ -283,7 +283,7 @@ template class Imdct<Real>;
 template class Mdct<Real>;
 // The encoder's forward transform (src/ac4/src/encoder/frame/analysis.cpp,
 // psycho.cpp) calls Mdct at double regardless of the decoder's scalar, and
-// the core's own tests (tests/ac4/core/test_dsp.cpp) exercise both
+// the core's own tests (tests/dsp/tiered/test_dsp.cpp) exercise both
 // Mdct and Imdct at double directly, alongside Real, to check the pseudocode
 // at the scalar the double build's own reference always uses (see this
 // target's CMakeLists.txt, ICLFORGE_AC4_ALSO_AT_DOUBLE).

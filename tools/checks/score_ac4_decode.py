@@ -107,7 +107,7 @@ RESAMPLING = {0: (1001, 960), 1: (25, 24), 2: (15, 16), 3: (1001, 960), 4: (25, 
 # At the other frame rates DEE's IMS encoder writes, the lag by frame_rate_index, as first
 # measured. DEE's IMS encoder delays by half a frame at 48 kHz, as at index 13 (1 024); this
 # decoder by its d_pcm, the QMF banks' 577 samples and 384 of history at the internal rate, and
-# its converter's delay() (src/ac4/src/core/dsp/resampler.hpp), taken to 48 kHz.
+# its converter's delay() (src/dsp/src/tiered/resampler.hpp), taken to 48 kHz.
 # Their sum comes within 1.3 samples of each lag: 1 000 + 1 301.0 + 49.0 at 24 fps,
 # 1 001 + 1 302.4 + 49.1 at 23.976, 960 + 1 230.9 + 46.8 at 25, 800.8 + 1 102.1 + 49.1 at 29.97.
 LAG_AT_RATE = {(baseline.IMS, 0): 2353, (baseline.IMS, 1): 2351, (baseline.IMS, 2): 2239,

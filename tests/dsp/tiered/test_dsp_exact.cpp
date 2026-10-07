@@ -1,4 +1,4 @@
-// The transforms of src/ac4/src/core/dsp against verbatim copies of the code
+// The transforms of src/dsp/src/tiered against verbatim copies of the code
 // they replaced (planning/ac4.md, D14e): the FFT passes, the inverse MDCT and the windowed
 // overlap-add are held to the BITS of the plan's generic radix loop, the old inverse transform and
 // the old block synthesis, at the decoder's scalar and at double, in both directions, on dense data
@@ -42,7 +42,7 @@ using iclforge::ac4::detail::Real;
 
 // What the plan's loop was before the passes took the radix and the direction as arguments: the
 // factorisation, the factors, the generic butterfly with its runtime radix and the Stockham loop,
-// as src/ac4/src/core/dsp/fft.cpp had them.
+// as src/dsp/src/tiered/fft.cpp had them.
 namespace reference {
 
 std::vector<int> factor(std::size_t length, bool& ok) {

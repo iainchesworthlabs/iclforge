@@ -1077,7 +1077,7 @@ clause's formula.
   loudness measured only) decodes at 0.005 dB below its source, and the 2.0 music leg at 0.02 dB below;
   with the example's factor both would be 6.02 dB above. librempeg decodes both at the same level,
   within 0.001 dB of this decoder. Through the literal transform and a forward MDCT without scaling, a
-  windowed round trip has a gain of 1/2 (`tests/ac4/core/test_dsp.cpp`), which is what a factor of
+  windowed round trip has a gain of 1/2 (`tests/dsp/tiered/test_dsp.cpp`), which is what a factor of
   two in the example would restore.
 
 #### KBD_RIGHT's argument
@@ -1090,7 +1090,7 @@ clause's formula.
 - **Evidence:** Streams, and the text's own condition. DEE switches block lengths in 31 of the 120 frames
   of the 2.0 music leg, which decodes at the SNR librempeg reaches. With this reading the windows meet
   the Princen-Bradley condition and blocks reconstruct their input to 1e-12 across every transition
-  Table 187 allows (`tests/ac4/core/test_dsp.cpp`); the argument as printed lies outside the
+  Table 187 allows (`tests/dsp/tiered/test_dsp.cpp`); the argument as printed lies outside the
   function's domain.
 
 #### The KBD kernel is summed to p = N
@@ -1101,7 +1101,7 @@ clause's formula.
   symmetric about N/2, with W(N, N) = W(N, 0).
 - **Evidence:** Text. With the term at p = N the halves meet the Princen-Bradley condition exactly; the
   windows equal numpy's Kaiser window of N + 1 points, cumulated, to 1e-12
-  (`tests/ac4/core/test_dsp.cpp`).
+  (`tests/dsp/tiered/test_dsp.cpp`).
 
 #### The overlap buffer before the first block
 
@@ -2134,11 +2134,11 @@ output level and DRC (5.7.9) and the downmix (6.2.17), and after it, the sample 
   filters"; Part 2 5.11 and Table 47, p. 110, give the number of samples each frame yields at the
   1000/1001 rates, by phase.
 - **Reading:** a Kaiser-windowed sinc, polyphase, with the passband to 0.86 of the lower rate's Nyquist
-  frequency and the stopband from that frequency 100 dB down (`src/ac4/src/core/dsp/resampler.hpp`). Output
+  frequency and the stopband from that frequency 100 dB down (`src/dsp/src/tiered/resampler.hpp`). Output
   sample m is complete once (m + 1) x down / up input samples have arrived, so frame t of N samples
   yields floor((t + 1) R) - floor(t R), R = N x up / down: Table 47's sequence for phi_t = t modulo 5, and
   a constant count at the other rates. A converter starting at phi_t starts its grid t frames in.
-- **Evidence:** Text, and Table 47 held in `tests/ac4/core/test_resampler.cpp`. DEE's IMS streams
+- **Evidence:** Text, and Table 47 held in `tests/dsp/tiered/test_resampler.cpp`. DEE's IMS streams
   at 23.976, 24, 25 and 29.97 fps lag their sources by a constant per rate, within 1.3 samples of DEE's half
   frame plus this decoder's delay (`tools/checks/score_ac4_decode.py`, LAG_AT_RATE).
 

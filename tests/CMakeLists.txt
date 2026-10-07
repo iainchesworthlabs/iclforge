@@ -54,12 +54,12 @@ add_executable(iclforge-tests
     ac4/core/test_acpl_exact.cpp
     ac4/core/test_ajoc.cpp
     ac4/core/test_aspx.cpp
-    ac4/core/test_dsp.cpp
-    ac4/core/test_dsp_exact.cpp
+    dsp/tiered/test_dsp.cpp
+    dsp/tiered/test_dsp_exact.cpp
     ac4/core/test_mant_exp.cpp
-    ac4/core/test_transform_tables.cpp
-    ac4/core/test_portable_math.cpp
-    ac4/core/test_resampler.cpp
+    dsp/tiered/test_transform_tables.cpp
+    dsp/tiered/test_portable_math.cpp
+    dsp/tiered/test_resampler.cpp
     ac4/decoder/test_api.cpp
     ac4/decoder/test_decoder.cpp
     ac4/decoder/test_frames.cpp

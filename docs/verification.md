@@ -1026,7 +1026,7 @@ transforms, the QMF banks, A-SPX's tables and high frequency generator, and A-CP
 transient ducker, interpolation and dequantisation tables are in `src/ac4/src/core`, the core the decoder
 shares with the encoder. Six checks stand in for the reference output neither part defines:
 
-- **Each transform against its formula** (`tests/ac4/core/test_dsp.cpp`): the FFT against the
+- **Each transform against its formula** (`tests/dsp/tiered/test_dsp.cpp`): the FFT against the
   DFT; the inverse MDCT against a verbatim transcription of Pseudocodes 60 to 63 and against the cosine
   sum they come to, at every transform length of clause 5.5.3; the forward MDCT against its own sum; the
   KBD windows against numpy's Kaiser window, cumulated; the QMF analysis and synthesis banks against
@@ -1173,7 +1173,7 @@ downmix), and what the decoder does at I-frames, at a change of source and with 
 decode. Where the text leaves a choice open, the reading is in `src/ac4/ERRATA.md`, under "Output
 processing" and in "A change of source" and "What an I-frame does not restore".
 
-- **The sample rate converter** (`tests/ac4/core/test_resampler.cpp`): over 100,000 frames at
+- **The sample rate converter** (`tests/dsp/tiered/test_resampler.cpp`): over 100,000 frames at
   each of the decoder's three ratios and the encoder's inverses the output count is exact, frame by
   frame in Part 2 Table 47's sequence at the 1000/1001 rates and from any starting frame, and a
   converter whose phase jumps goes on converting at the new phase's counts. Tones in the passband come
@@ -1186,7 +1186,7 @@ processing" and in "A change of source" and "What an I-frame does not restore".
   coefficient of it; the phases the table keeps and the ones it reads backwards agree with each other
   and with a copy written out; the compiler's evaluation equals the same function run on the machine,
   bit for bit; and the dot product that reads a phase backwards equals the four-lane sum of that phase
-  written out. `tests/ac4/core/test_portable_math.cpp` holds the functions the design calls
+  written out. `tests/dsp/tiered/test_portable_math.cpp` holds the functions the design calls
   without a library (sin, cos, sqrt, ceil and the Kaiser window's I0) to their definitions, to the C
   library's values and to their own values at compile time.
 - **The output level and DRC** (`tests/ac4/decoder/test_drc.cpp`): Table 162's profiles and the

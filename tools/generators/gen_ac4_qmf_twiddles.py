@@ -1,12 +1,12 @@
 """Emit the quarter-wave cosine table the AC-4 QMF banks' twiddle factors are built from.
 
-Every rotation the QMF analysis and synthesis banks (src/ac4/src/core/dsp/qmf.cpp) and
+Every rotation the QMF analysis and synthesis banks (src/dsp/src/tiered/qmf.cpp) and
 their 64-point transform apply is a multiple of pi / 256: the pre- and post-rotations
 are e^(i pi m / 64) and e^(+-i pi (2k + 1) / 256), the transform's factors
 e^(2 pi i p k / 64) and e^(2 pi i p k / 16), and the synthesis's e^(-i pi (2k + 1) 255 /
 256). So one table, cos(pi j / 256) for j = 0 to 128 (a quarter of the circle), gives
 every one of them by an integer angle reduction
-(src/ac4/src/core/dsp/qmf_constants.hpp), each the double nearest to the exact
+(src/dsp/src/tiered/qmf_constants.hpp), each the double nearest to the exact
 value rather than what a platform's cos() and sin() return for an angle that has already been
 rounded once.
 
@@ -26,7 +26,7 @@ from decimal import Decimal, getcontext
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-OUT = REPO / "src" / "ac4" / "src" / "core" / "tables" / "qmf_twiddles.hpp"
+OUT = REPO / "src" / "dsp" / "src" / "tiered" / "tables" / "qmf_twiddles.hpp"
 
 STEPS = 256  # half the circle is 256 steps of pi / 256
 ENTRIES = STEPS // 2 + 1  # j = 0 to 128

@@ -1994,7 +1994,7 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
 
   The QMF banks are each one 64-point complex transform between a rotation that packs pairs of
   samples into complex values and a butterfly that pairs subband k with 63 - k, which is
-  Pseudocode 65 and 66 reduced algebraically (the derivation is in `src/ac4/src/core/dsp/qmf.hpp`),
+  Pseudocode 65 and 66 reduced algebraically (the derivation is in `src/dsp/src/tiered/qmf.hpp`),
   on separate real and imaginary planes, with ten-block delay lines that move an index. Every
   twiddle factor is a `constexpr` array built by integer angle arithmetic from one generated
   quarter-wave cosine table, the `Real` nearest its exact value, and the banks share them. They are
@@ -2296,7 +2296,7 @@ compile time, with C++23 `constexpr` and `consteval`, "idiomatic". One pull requ
 
 **Built in D14a5.** `dsp/portable_math.hpp` and `dsp/resampler_design.hpp` in `src/ac4/src/core`, `bessel_i0` in
 `dsp/kbd.hpp`, the filter and kernel in `dsp/resampler.{hpp,cpp}` and `dsp/resampler_vector.hpp`, the compile limits,
-and `tests/ac4/core/test_portable_math.cpp` with the converter's tests (the table's FNV-1a image three ways, the
+and `tests/dsp/tiered/test_portable_math.cpp` with the converter's tests (the table's FNV-1a image three ways, the
 compiler's evaluation against the machine's, the mirrored phases, the reversed kernel). The three tables equal the C
 library's design rounded to `float` in every coefficient, so no `float` PCM hash moved; the tests pin the FNV-1a image
 of each table, which is new here. The Cortex-M3 probe's image is 683,448 bytes from 485,032, which its ceiling follows (750,000).
@@ -2556,9 +2556,9 @@ probe, and the larger redesigns decided once the smaller ones had shown where th
   and the A-SPX streams in A-SPX.
 - **The inverse transform's tables in flash** (`perf(ac4core)`). For the five block lengths of a 2048-sample frame at 44.1 and
   48 kHz, the FFT's roots, the IMDCT's pre-twiddles, the fixed tier's post-twiddles and the KBD windows are narrowed to the
-  tier's scalar while `src/ac4/src/core/dsp/transform_tables.cpp` compiles, from doubles `tools/generators/gen_ac4_transform_tables.py`
+  tier's scalar while `src/dsp/src/tiered/transform_tables.cpp` compiles, from doubles `tools/generators/gen_ac4_transform_tables.py`
   computes as the runtime code does (the same operations in the same order and the same C library's `cos`, `sin` and `sqrt`,
-  written as exact hexadecimal literals). `tests/ac4/core/test_transform_tables.cpp` holds every narrowed value to the
+  written as exact hexadecimal literals). `tests/dsp/tiered/test_transform_tables.cpp` holds every narrowed value to the
   runtime computation's bits on the compiler that runs it. `double`, and every other length, builds its tables as before.
 - **A-SPX's high band assembled in place.** Pseudocode 106 reads each value of the high band only where it writes Y, so one
   buffer for an element's channels replaces the two each channel allocated.
