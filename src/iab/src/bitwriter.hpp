@@ -18,8 +18,8 @@ namespace iclforge::iab::detail {
 class BitWriter {
 public:
     void put_bits(std::uint64_t value, unsigned count) {
-        bits_.put(count >= 64 ? value : value & ((std::uint64_t{1} << count) - 1),
-                  static_cast<int>(count));
+        bits_.put_wide(count >= 64 ? value : value & ((std::uint64_t{1} << count) - 1),
+                       static_cast<int>(count));
     }
 
     // §5.2 Plex(n): the value is written in `initial_width` bits unless it equals or exceeds the

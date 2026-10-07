@@ -19,8 +19,8 @@ namespace iclforge::base::detail {
 // group before it is what is left once that one is removed, less one. At most 64 bits of value, so
 // at most 64 groups.
 struct VariableBits {
-    std::array<std::uint64_t, 64> values{};
-    std::size_t count = 0;  // values[count - 1] is written first
+    std::array<std::uint64_t, 64> values;  // [0, count) only
+    std::size_t count = 0;                 // values[count - 1] is written first
 };
 
 [[nodiscard]] inline VariableBits split_variable_bits(unsigned n_bits,
@@ -69,19 +69,14 @@ class BitWriter {
         return writer;
     }
 
-    // Append the low `bits` bits of `value`, MSB first, unrecorded. 0 <= bits <= 64.
+    // Append the low `bits` bits of `value`, MSB first, unrecorded. 0 <= bits <= 32.
     //
     // The bits collect in a 64-bit accumulator and leave it a whole byte at a time, as AC-3's
     // writer packed a frame: a field is a shift, an or and a byte or two pushed. A byte not yet
     // whole is put in bytes() only when they are read.
     void put(std::uint64_t value, int bits) {
-        assert(bits >= 0 && bits <= 64);
-        assert(bits == 64 || (value >> bits) == 0);
-        if (bits > 32) {
-            put(value >> 32, bits - 32);
-            put(value & 0xFFFFFFFFU, 32);
-            return;
-        }
+        assert(bits >= 0 && bits <= 32);
+        assert(bits == 32 || (value >> bits) == 0);
         if (padded_) {
             bytes_.pop_back();
             padded_ = false;
@@ -92,7 +87,16 @@ class BitWriter {
             pending_ -= 8;
             bytes_.push_back(static_cast<std::byte>((acc_ >> pending_) & 0xFF));
         }
-        bits_ += static_cast<std::size_t>(bits);
+    }
+
+    // Up to 64 bits, as two fields.
+    void put_wide(std::uint64_t value, int bits) {
+        if (bits > 32) {
+            put(value >> 32, bits - 32);
+            put(value & 0xFFFFFFFFU, 32);
+        } else {
+            put(value, bits);
+        }
     }
 
     void put_bit(bool bit) { put(bit ? 1U : 0U, 1); }
@@ -102,8 +106,8 @@ class BitWriter {
         if (bits == 0) {
             return;
         }
-        const auto offset = bits_;
-        put(value, static_cast<int>(bits));
+        const auto offset = bit_count();
+        put_wide(value, static_cast<int>(bits));
         record(offset, bits, value, name);
     }
 
@@ -113,7 +117,7 @@ class BitWriter {
     // many groups, the last of them taking what is left of the value modulo its width.
     void write_variable_bits(unsigned n_bits, std::uint64_t value, std::string_view name = {},
                              int max_groups = 0) {
-        const auto offset = bits_;
+        const auto offset = bit_count();
         if (max_groups > 0) {
             int groups = 1;
             std::uint64_t base = 0;
@@ -128,17 +132,18 @@ class BitWriter {
             const std::uint64_t encoded = value - base;
             const std::uint64_t mask = (std::uint64_t{1} << n_bits) - 1;
             for (int group = groups - 1; group >= 0; --group) {
-                put((encoded >> (static_cast<unsigned>(group) * n_bits)) & mask, static_cast<int>(n_bits));
+                put_wide((encoded >> (static_cast<unsigned>(group) * n_bits)) & mask,
+                         static_cast<int>(n_bits));
                 put(group == 0 ? 0U : 1U, 1);
             }
         } else {
             const auto groups = base::detail::split_variable_bits(n_bits, value);
             for (std::size_t i = groups.count; i > 0; --i) {
-                put(groups.values[i - 1], static_cast<int>(n_bits));
+                put_wide(groups.values[i - 1], static_cast<int>(n_bits));
                 put(i > 1 ? 1U : 0U, 1);
             }
         }
-        record(offset, static_cast<unsigned>(bits_ - offset), value, name);
+        record(offset, static_cast<unsigned>(bit_count() - offset), value, name);
     }
 
     // A run of zero bits the syntax does not interpret, recorded as a reader records such a run:
@@ -147,9 +152,9 @@ class BitWriter {
         constexpr std::uint64_t kMaxRecordBits = 65535;
         while (bits > 0) {
             const std::uint64_t width = bits < kMaxRecordBits ? bits : kMaxRecordBits;
-            const auto offset = bits_;
+            const auto offset = bit_count();
             for (std::uint64_t left = width; left > 0;) {
-                const int step = left < 64 ? static_cast<int>(left) : 64;
+                const int step = left < 32 ? static_cast<int>(left) : 32;
                 put(0, step);
                 left -= static_cast<std::uint64_t>(step);
             }
@@ -161,31 +166,30 @@ class BitWriter {
     // An element whose bits are not its value, such as an escape code or a Huffman codeword:
     // `raw` in `bits` bits, recorded with `value`.
     void write_as(unsigned bits, std::uint64_t raw, std::uint64_t value, std::string_view name) {
-        const auto offset = bits_;
-        put(raw, static_cast<int>(bits));
+        const auto offset = bit_count();
+        put_wide(raw, static_cast<int>(bits));
         record(offset, bits, value, name);
     }
 
     // Zero bits to the next byte boundary of this writer's bits.
-    void align() { put(0, static_cast<int>((8U - (bits_ & 7U)) & 7U)); }
+    void align() { put(0, (8 - pending_) & 7); }
 
     // Aligns, then appends whole bytes.
     void put_bytes(std::span<const std::byte> bytes) {
         align();
         bytes_.insert(bytes_.end(), bytes.begin(), bytes.end());
-        bits_ += bytes.size() * 8U;
     }
 
     // Copies another writer's bits after this one's, and sends the records it kept, their offsets
     // moved by where its bits land here.
     void append(const BitWriter& other) {
-        const auto start = bits_;
+        const auto start = bit_count();
         const std::vector<std::byte>& theirs = other.bytes();
-        const std::size_t whole = other.bits_ / 8U;
+        const std::size_t whole = other.bit_count() / 8U;
         for (std::size_t i = 0; i < whole; ++i) {
             put(std::to_integer<unsigned>(theirs[i]), 8);
         }
-        if (const auto rest = static_cast<int>(other.bits_ & 7U); rest > 0) {
+        if (const auto rest = other.pending_; rest > 0) {
             put(std::to_integer<unsigned>(theirs[whole]) >> (8 - rest), rest);
         }
         for (base::SyntaxRecord kept : other.kept_) {
@@ -206,8 +210,10 @@ class BitWriter {
         bytes_[byte_offset + 1] = static_cast<std::byte>(value & 0xFF);
     }
 
-    [[nodiscard]] std::size_t bit_count() const noexcept { return bits_; }
-    [[nodiscard]] std::size_t byte_size() const noexcept { return (bits_ + 7) / 8; }
+    [[nodiscard]] std::size_t bit_count() const noexcept {
+        return (bytes_.size() - (padded_ ? 1U : 0U)) * 8U + static_cast<std::size_t>(pending_);
+    }
+    [[nodiscard]] std::size_t byte_size() const noexcept { return (bit_count() + 7) / 8; }
 
     // The bytes written so far, the last one zero-padded.
     [[nodiscard]] const std::vector<std::byte>& bytes() const {
@@ -221,7 +227,6 @@ class BitWriter {
     // Zero-pad to a byte boundary and take the buffer, leaving the writer empty.
     [[nodiscard]] std::vector<std::byte> take() {
         align();
-        bits_ = 0;
         acc_ = 0;
         return std::exchange(bytes_, {});
     }
@@ -230,7 +235,6 @@ class BitWriter {
     void clear() noexcept {
         bytes_.clear();
         kept_.clear();
-        bits_ = 0;
         acc_ = 0;
         pending_ = 0;
         padded_ = false;
@@ -265,7 +269,6 @@ class BitWriter {
     mutable bool padded_ = false;
     std::uint64_t acc_ = 0;  // the bits above pending_ are stale and ignored
     int pending_ = 0;        // bits in acc_ not yet in a whole byte, 0 to 7
-    std::size_t bits_ = 0;
 };
 
 }  // namespace iclforge
