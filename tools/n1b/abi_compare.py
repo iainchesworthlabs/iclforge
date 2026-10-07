@@ -1,7 +1,7 @@
 """The exported-symbol allowlists of the old layout against the ones the moved layout writes.
 
     abi_compare.py <old allowlist dir> <new allowlist dir> [--map l2|identity]
-                   [--rewrite cuts,names,idents,ac3ns,c2,c3,c4,c5]
+                   [--rewrite cuts,names,idents,ac3ns,c2,c3,c4,c5,c6]
 
 tools/ci/abi-allowlist holds one `<library>.so.txt` per shared library, the demangled names it
 exports (tools/ci/check_abi_symbols.py). Stage S2 renames every library (`libac3iab.so` becomes
@@ -14,7 +14,7 @@ which the split makes cross a library boundary (base to ac3) and so export.
 
   --map l2         the libraries of S2 (the default): `libac3forge.so` against the six it became
   --map identity   every library of the old directory is the same file in the new one (S3, S4)
-  --map c1|c2|c3   a consolidation stage (planning/consolidation.md): the libraries it merges
+  --map c1|c2|c3|c6   a consolidation stage (planning/consolidation.md): the libraries it merges
                    against the one they become (export_diff.consolidation_map), every other one
                    against its own file
   --rewrite names  the old names are rewritten first, the way n1b_names.py rewrites the source
@@ -126,19 +126,21 @@ def main() -> None:
     )
     ap.add_argument("old", type=Path)
     ap.add_argument("new", type=Path)
-    ap.add_argument("--map", choices=["l2", "identity", "c1", "c2", "c3"], default="l2")
+    ap.add_argument("--map", choices=["l2", "identity", "c1", "c2", "c3", "c6"], default="l2")
     ap.add_argument(
-        "--rewrite", default="", help="comma-separated: cuts, names, idents, ac3ns, c2, c3, c4, c5"
+        "--rewrite",
+        default="",
+        help="comma-separated: cuts, names, idents, ac3ns, c2, c3, c4, c5, c6",
     )
     a = ap.parse_args()
     kinds = {k for k in a.rewrite.split(",") if k}
-    unknown = kinds - {"cuts", "names", "idents", "ac3ns", "c2", "c3", "c4", "c5"}
+    unknown = kinds - {"cuts", "names", "idents", "ac3ns", "c2", "c3", "c4", "c5", "c6"}
     if unknown:
         sys.exit(f"abi_compare: unknown --rewrite {sorted(unknown)}")
     mapping = (
         identity(a.old)
         if a.map == "identity"
-        else consolidation(a.old, a.map) if a.map in ("c1", "c2", "c3") else None
+        else consolidation(a.old, a.map) if a.map in ("c1", "c2", "c3", "c6") else None
     )
     sys.exit(1 if compare(a.old, a.new, mapping=mapping, kinds=kinds) else 0)
 

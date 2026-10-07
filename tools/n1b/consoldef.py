@@ -263,8 +263,34 @@ def c5_new(path: str) -> str | None:
     return None
 
 
-STAGES = {"c1": c1_new, "c2": c2_new, "c3": c3_new, "c4n": c4n_new, "c4": c4_new, "c5": c5_new}
-REMOVED = {"c1": C1_REMOVED, "c2": C2_REMOVED, "c3": C3_REMOVED, "c4n": (), "c4": (), "c5": ()}
+# --- C6 ---------------------------------------------------------------------------------------
+# What ac3 held that is not AC-3's is base's: the family's version, WAV reading and writing
+# (decision 16) and the level and loudness meters (decision 17). Each file moves whole and is then
+# cut by hand: AC-3's mappings, its acmod and channel-map forms of the meters and the aliases are
+# new files at the old paths.
+C6_EXACT = {
+    "src/ac3/include/iclforge/ac3/version.hpp.in": "src/base/include/iclforge/base/version.hpp.in",
+    "src/ac3/src/version.cpp": "src/base/src/version.cpp",
+    "src/ac3/include/iclforge/ac3/io/wav.hpp": "src/base/include/iclforge/base/wav.hpp",
+    "src/ac3/include/iclforge/ac3/analysis/levels.hpp": "src/base/include/iclforge/base/levels.hpp",
+    "src/ac3/include/iclforge/ac3/meta/loudness.hpp": "src/base/include/iclforge/base/loudness.hpp",
+    "src/ac3/src/analysis/levels.cpp": "src/base/src/levels.cpp",
+    "src/ac3/src/meta/loudness.cpp": "src/base/src/loudness.cpp",
+} | {
+    f"src/ac3/src/io/{name}": f"src/base/src/{name}"
+    for name in ("wav.cpp", "wav_format.cpp", "wav_format.hpp", "wav_stream_reader.cpp",
+                 "wav_stream_writer.cpp")
+}
+
+
+def c6_new(path: str) -> str | None:
+    return C6_EXACT.get(path)
+
+
+STAGES = {"c1": c1_new, "c2": c2_new, "c3": c3_new, "c4n": c4n_new, "c4": c4_new, "c5": c5_new,
+          "c6": c6_new}
+REMOVED = {"c1": C1_REMOVED, "c2": C2_REMOVED, "c3": C3_REMOVED, "c4n": (), "c4": (), "c5": (),
+           "c6": ()}
 
 # The libraries each stage merges, old -> new: what a target, an export macro, an export header, a
 # pkg-config name or an ABI allowlist follows (consol_apply.py, export_diff.py --map,
@@ -276,12 +302,28 @@ LIBRARY_MAP = {
     "c4n": {},
     "c4": {},
     "c5": {},
+    "c6": {},
 }
 
 # The libraries a stage divides, old -> every library its files went to: signing's key, hash and
 # MAC are base's and its signer ac3's, so the exports of signing, ac3 and base are compared as one
-# group (export_diff.py, abi_compare.py).
-SPLITS = {"c1": {}, "c2": {"signing": ("ac3", "base")}, "c3": {}, "c4n": {}, "c4": {}, "c5": {}}
+# group (export_diff.py, abi_compare.py). C6 gives part of ac3 to base.
+SPLITS = {"c1": {}, "c2": {"signing": ("ac3", "base")}, "c3": {}, "c4n": {}, "c4": {}, "c5": {},
+          "c6": {"ac3": ("ac3", "base")}}
+
+# The names C6 gives base: what was iclforge::ac3::io's of WAV, iclforge::ac3::analysis's and
+# iclforge::ac3::meta's of the meters but their acmod and channel-map constructors, and the version.
+C6_WAV = ("WavData", "WavError", "WavPcm16StreamWriter", "WavStreamReader", "WavStreamWriter",
+          "read_wav", "write_wav_f32", "write_wav_pcm16_raw")
+C6_LEVELS = ("ChannelLevel", "ChannelSummary", "MeterBallistics", "SoundfieldVector", "to_dbfs",
+             "kFloorDb", "kFullScale", "meter_fraction")
+C6_METER_MEMBERS = {
+    "LevelMeter": ("process", "process_interleaved", "levels", "summary", "channel_count",
+                   "sample_rate", "reset", "advance", "~LevelMeter", "operator="),
+    "LoudnessMeter": ("push", "integrated_lkfs", "momentary_lkfs", "short_term_lkfs",
+                      "loudness_range", "true_peak_dbtp", "channel_count", "push_block",
+                      "push_true_peak", "~LoudnessMeter", "operator="),
+}
 
 # The names a stage moves to another namespace, as the exports spell them: the old namespace and,
 # for each name declared in it, the new one (consol_text.py's tables).
@@ -292,6 +334,8 @@ def renamed_namespace(stage: str, name: str, unit: str = "") -> str:
         return re.sub(
             rf"\biclforge::({'|'.join(CONTAINERS)})::", r"iclforge::containers::\1::", name
         )
+    if stage == "c6":
+        return c6_renamed(name)
     if stage == "c5":
         # AC-4's kernels and the tables that moved with them are dsp's; a mangled name no demangler
         # reads (a local lambda) has its components rewritten, and its substitutions read alike by
@@ -329,6 +373,30 @@ def renamed_namespace(stage: str, name: str, unit: str = "") -> str:
         return unit_namespace + n
 
     return re.sub(r"\biclforge::signing::(\w+|\(anonymous namespace\))", where, name)
+
+
+def c6_renamed(name: str) -> str:
+    name = re.sub(rf"\biclforge::ac3::io::({'|'.join(C6_WAV)})\b", r"iclforge::base::\1", name)
+    name = name.replace("iclforge::ac3::io::describe(iclforge::base::WavError)",
+                        "iclforge::base::describe(iclforge::base::WavError)")
+    name = re.sub(rf"\biclforge::ac3::analysis::({'|'.join(C6_LEVELS)})\b", r"iclforge::base::\1",
+                  name)
+    for cls, ns in (("LevelMeter", "analysis"), ("LoudnessMeter", "meta")):
+        members = "|".join(re.escape(m) for m in C6_METER_MEMBERS[cls])
+        name = re.sub(rf"\biclforge::ac3::{ns}::{cls}::({members})(?=\()",
+                      rf"iclforge::base::{cls}::\1", name)
+        # the move constructor and assignment take the class they belong to, now base's
+        name = re.sub(rf"(iclforge::base::{cls}::(?:operator=)\()iclforge::ac3::{ns}::{cls}&&",
+                      rf"\1iclforge::base::{cls}&&", name)
+        name = name.replace(f"iclforge::ac3::{ns}::{cls}::{cls}(iclforge::ac3::{ns}::{cls}&&)",
+                            f"iclforge::base::{cls}::{cls}(iclforge::base::{cls}&&)")
+        name = name.replace(f"iclforge::ac3::{ns}::{cls}::Impl", f"iclforge::base::{cls}::Impl")
+    name = re.sub(r"\biclforge::ac3::(version_details)\b", r"iclforge::base::\1", name)
+    # objects' namespaces nest under iclforge::objects (decision 19); a mangled name no demangler
+    # reads has its components rewritten, its substitutions read alike by the comparison
+    name = re.sub(r"\biclforge::(oba|emdf)::", r"iclforge::objects::\1::", name)
+    return name.replace("8iclforge3oba", "8iclforge7objects3oba").replace(
+        "8iclforge4emdf", "8iclforge7objects4emdf")
 
 
 def moves(stage: str, files: list[str]) -> dict[str, str]:
