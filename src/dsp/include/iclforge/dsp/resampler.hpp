@@ -17,18 +17,20 @@
 // rate (e.g. 44.1kHz -> 48kHz) before it ever reaches the encoder - a
 // completely different cost/quality tradeoff, since a one-shot offline
 // conversion can and should afford a proper windowed-sinc polyphase FIR
-// kernel instead of a cheap two-tap interpolation. See resampler.cpp for the
-// window choice, kernel width and cutoff backoff, and why each was picked.
+// kernel instead of a cheap two-tap interpolation.
+//
+// The filter is the AC-4 sample rate converter's (src/dsp/src/tiered/resampler.hpp,
+// planning/consolidation.md decision 22): a Kaiser-windowed sinc designed for the
+// ratio in lowest terms, the passband to 0.86 of the lower rate's Nyquist
+// frequency, the stopband from it, 100 dB down.
 
 namespace iclforge::dsp {
 
-// Resamples one channel of audio from input_rate to output_rate via a
-// windowed-sinc polyphase FIR filter, computed offline over the whole
-// buffer at once. For each output frame, walks the fractional input
-// position the resample ratio implies and evaluates a fixed-width
-// windowed-sinc kernel centered there - the standard polyphase realization,
-// good for any rational or irrational ratio without needing a rational
-// approximation or an interpolation/decimation stage pair.
+// Resamples one channel of audio from input_rate to output_rate via that
+// polyphase filter, computed offline over the whole buffer at once: output
+// frame m is the input at m * input_rate / output_rate, the input being
+// silence before its first sample and after its last. Two integer rates make
+// a rational ratio, so every phase the conversion reaches is designed exactly.
 //
 // input_rate == output_rate is handled as an exact identity (the input is
 // copied back unchanged) rather than run through the filter - a 1:1

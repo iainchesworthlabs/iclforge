@@ -13,18 +13,6 @@
 #include "tiered/resampler_vector.hpp"
 
 namespace iclforge::dsp::tiered {
-namespace {
-
-// The design's functions as the C library has them, which design the table at double as the
-// converter has always designed it.
-struct LibmMath {
-    [[nodiscard]] static double ceil(double x) noexcept { return std::ceil(x); }
-    [[nodiscard]] static double sqrt(double x) noexcept { return std::sqrt(x); }
-    [[nodiscard]] static double sin(double x) noexcept { return std::sin(x); }
-    [[nodiscard]] static double bessel_i0(double x) noexcept { return dsp::tiered::bessel_i0(x); }
-};
-
-}  // namespace
 
 template <typename Coefficient>
 BasicResamplerFilter<Coefficient>::BasicResamplerFilter(int up, int down) {

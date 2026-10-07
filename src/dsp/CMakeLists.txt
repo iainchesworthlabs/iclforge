@@ -5,11 +5,10 @@
 #
 # src/tiered/ holds the kernels written against a decode tier's scalar (iclforge::dsp::tiered:
 # AC-4's mixed-radix FFT, MDCT and KBD windows, its QMF banks and synthesis, its sample rate
-# converter, and the tables they read; planning/consolidation.md, C5). This library is built at no
-# tier, so it lists none of them: the codec that calls them builds them at its tier
-# (src/ac4/CMakeLists.txt), with the tier's scalar from variants/decode-scalar-<tier>/. Making the
-# two FFTs, the two QMF banks and the two converters one each is a decision of its own, since each
-# moves output (planning/consolidation.md, decision 14).
+# converter, and the tables they read; planning/consolidation.md, C5). The codec that calls them
+# builds them at its tier (src/ac4/CMakeLists.txt), with the tier's scalar from
+# variants/decode-scalar-<tier>/. This library builds those its own functions are made of, at
+# double: the sample rate converter, which dsp::resample is (decision 22).
 # ---------------------------------------------------------------------------
 # The minimum-footprint profile compiles what it needs into one archive (src/ac3/minimal.cmake),
 # so no library is built here for it.
@@ -23,9 +22,11 @@ iclforge_add_library(dsp
         src/fft.cpp
         src/qmf.cpp
         src/resampler.cpp
+        src/tiered/resampler.cpp
     DEPENDS base
     PRIVATE_INCLUDES
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
+        "${CMAKE_CURRENT_SOURCE_DIR}/variants/decode-scalar-float64"
     LINK_PRIVATE
         "$<BUILD_INTERFACE:iclforge::tracy>"
         "$<BUILD_INTERFACE:iclforge::base_headers>")

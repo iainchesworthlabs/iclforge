@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <numbers>
@@ -45,6 +46,16 @@ struct PortableMath {
     [[nodiscard]] static constexpr double sqrt(double x) noexcept { return portable::sqrt(x); }
     [[nodiscard]] static constexpr double sin(double x) noexcept { return portable::sin(x); }
     [[nodiscard]] static constexpr double bessel_i0(double x) noexcept { return dsp::tiered::bessel_i0(x); }
+};
+
+// The design's functions as the C library has them, which design the table at double as the
+// converter has always designed it, and with which iclforge::dsp::resample designs (src/dsp/src/
+// resampler.cpp).
+struct LibmMath {
+    [[nodiscard]] static double ceil(double x) noexcept { return std::ceil(x); }
+    [[nodiscard]] static double sqrt(double x) noexcept { return std::sqrt(x); }
+    [[nodiscard]] static double sin(double x) noexcept { return std::sin(x); }
+    [[nodiscard]] static double bessel_i0(double x) noexcept { return dsp::tiered::bessel_i0(x); }
 };
 
 // The passband runs to 0.86 of the lower rate's Nyquist frequency and the stopband starts at it;

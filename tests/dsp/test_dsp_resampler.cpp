@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <numbers>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include "iclforge/dsp/resampler.hpp"
@@ -145,9 +146,8 @@ TEST_CASE("resample attenuates a tone above the new Nyquist instead of aliasing 
     // resampler naively decimated without lowpass filtering first, this
     // component would fold (alias) down to 24000 - 18000 = 6000Hz, landing
     // squarely and audibly inside the passband. A working windowed-sinc
-    // resampler kills it before decimation instead: kCutoffBackoff *
-    // limiting_rate/2 = 0.9 * 24000/2 = 10800Hz, comfortably below 18000Hz,
-    // deep into the Blackman-windowed kernel's stopband.
+    // resampler kills it before decimation instead: the stopband starts at
+    // the new Nyquist, 12000Hz, and 18000Hz is deep in it.
     constexpr std::uint32_t kInRate = 48000;
     constexpr std::uint32_t kOutRate = 24000;
     constexpr double kAboveNyquistFreq = 18000.0;
@@ -243,4 +243,51 @@ TEST_CASE("resample preserves the amplitude of a safely in-band tone", "[dsp][re
     // normalization) would miss this; silence or a badly-scaled stub would
     // miss it by far more than 5%.
     CHECK(output_rms == Catch::Approx(input_rms).epsilon(0.05));
+}
+
+namespace {
+
+// The largest difference between `output` and the tone it should be, at the output rate and on
+// the input's own timeline (output m at time m / output_rate), away from the edges.
+double worst_error(std::span<const float> output, double freq, double output_rate,
+                   double amplitude, std::size_t trim) {
+    double worst = 0.0;
+    for (std::size_t m = trim; m + trim < output.size(); ++m) {
+        const double expected = amplitude * std::sin(2.0 * std::numbers::pi * freq *
+                                                     static_cast<double>(m) / output_rate);
+        worst = std::max(worst, std::abs(static_cast<double>(output[m]) - expected));
+    }
+    return worst;
+}
+
+}  // namespace
+
+// planning/consolidation.md decision 22: the AC-4 converter's filter, 100 dB down, centred on the
+// input's timeline as the old converter was.
+TEST_CASE("resample keeps a tone on the input's timeline, to within the filter's ripple",
+          "[dsp][resampler]") {
+    for (const auto& [in_rate, out_rate] :
+         {std::pair<std::uint32_t, std::uint32_t>{44100, 48000}, {48000, 44100}, {48000, 96000}}) {
+        const auto input = generate_sine(in_rate, 1000.0, in_rate, 0.5);
+        const auto output = resample(input, in_rate, out_rate);
+        CAPTURE(in_rate, out_rate);
+        // 0.5 * 10^(-90/20): a delay of a hundredth of a sample at 1 kHz would be 30 times this.
+        CHECK(worst_error(output, 1000.0, out_rate, 0.5, 400) < 2e-5);
+    }
+}
+
+TEST_CASE("resample's stopband is 100 dB down", "[dsp][resampler]") {
+    const auto input = generate_sine(96000, 18000.0, 48000, 0.8);
+    const auto output = resample(input, 48000, 24000);
+    const std::span<const float> middle(output.data() + 400, output.size() - 800);
+    CHECK(rms(middle) < 0.8 / std::numbers::sqrt2 * 1e-5);
+}
+
+TEST_CASE("resample designs a phase at a time where a table would be too long",
+          "[dsp][resampler]") {
+    // 47999 and 48000 share no factor: 47999 phases of about a hundred taps each.
+    const auto input = generate_sine(48000, 1000.0, 48000, 0.5);
+    const auto output = resample(input, 48000, 47999);
+    REQUIRE(output.size() == expected_out_frames(input.size(), 48000, 47999));
+    CHECK(worst_error(output, 1000.0, 47999, 0.5, 400) < 2e-5);
 }
