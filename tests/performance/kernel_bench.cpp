@@ -456,7 +456,7 @@ int main(int argc, char** argv) {
             static iclforge::ac3::oba::joc::ReconstructionState state;
             const auto out =
                 iclforge::ac3::oba::joc::reconstruct(bed, params, state, /*fast_mdct=*/true,
-                                      /*fast_imdct=*/true, iclforge::oba::joc::Domain::kMdctBand);
+                                      /*fast_imdct=*/true, iclforge::objects::oba::joc::Domain::kMdctBand);
             g_sink += static_cast<double>(out[0][128]);
         }));
         // PF8: bed analysis' own forward transform, isolated from the object
@@ -467,14 +467,14 @@ int main(int argc, char** argv) {
             static iclforge::ac3::oba::joc::ReconstructionState state;
             const auto out =
                 iclforge::ac3::oba::joc::reconstruct(bed, params, state, /*fast_mdct=*/false,
-                                      /*fast_imdct=*/true, iclforge::oba::joc::Domain::kMdctBand);
+                                      /*fast_imdct=*/true, iclforge::objects::oba::joc::Domain::kMdctBand);
             g_sink += static_cast<double>(out[0][128]);
         }));
         results.push_back(time_kernel("joc_reconstruct_qmf_4obj", [&] {
             static iclforge::ac3::oba::joc::ReconstructionState state;
             const auto out =
                 iclforge::ac3::oba::joc::reconstruct(bed, params, state, /*fast_mdct=*/true,
-                                      /*fast_imdct=*/true, iclforge::oba::joc::Domain::kQmf);
+                                      /*fast_imdct=*/true, iclforge::objects::oba::joc::Domain::kQmf);
             g_sink += static_cast<double>(out[0][128]);
         }));
 
@@ -509,14 +509,14 @@ int main(int argc, char** argv) {
                 static iclforge::ac3::oba::joc::ReconstructionState state;
                 const auto out = iclforge::ac3::oba::joc::reconstruct(
                     bed, wide, state, /*fast_mdct=*/true,
-                    /*fast_imdct=*/true, iclforge::oba::joc::Domain::kMdctBand);
+                    /*fast_imdct=*/true, iclforge::objects::oba::joc::Domain::kMdctBand);
                 g_sink += static_cast<double>(out[0][128]);
             }));
             results.push_back(time_kernel("joc_reconstruct_qmf_12obj", [&] {
                 static iclforge::ac3::oba::joc::ReconstructionState state;
                 const auto out =
                     iclforge::ac3::oba::joc::reconstruct(bed, wide, state, /*fast_mdct=*/true,
-                                          /*fast_imdct=*/true, iclforge::oba::joc::Domain::kQmf);
+                                          /*fast_imdct=*/true, iclforge::objects::oba::joc::Domain::kQmf);
                 g_sink += static_cast<double>(out[0][128]);
             }));
         }

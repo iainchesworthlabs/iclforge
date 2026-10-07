@@ -332,7 +332,7 @@ TEST_CASE("JOC object reconstruction costs the QMF filterbank's own delay", "[la
     iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, kObjects};
     iclforge::ac3::Eac3Decoder decoder;
 
-    const iclforge::oba::ObjectPlacement placement{
+    const iclforge::objects::oba::ObjectPlacement placement{
         .position = {.x = 0.5, .y = 0.9, .z = 0.0}, .gain = 1.0};
     // The bed's channels individually depend on where the object was panned,
     // and a near-silent one carries nothing to correlate against - so measure
@@ -346,7 +346,7 @@ TEST_CASE("JOC object reconstruction costs the QMF filterbank's own delay", "[la
             in.data() + static_cast<std::size_t>(frame) * iclforge::ac3::kSamplesPerFrame,
             static_cast<std::size_t>(iclforge::ac3::kSamplesPerFrame)};
         const std::array<std::span<const float>, 1> objects{block};
-        const std::array<iclforge::oba::ObjectPlacement, 1> placements{placement};
+        const std::array<iclforge::objects::oba::ObjectPlacement, 1> placements{placement};
         const auto unit = encoder.encode_frame(objects, placements);
         REQUIRE(unit.has_value());
         const auto decoded = decoder.decode_access_unit(unit->bytes);

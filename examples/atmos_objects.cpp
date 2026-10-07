@@ -59,7 +59,7 @@ int main() {
     // encode+decode (256), plus reconstruct's own pass - which is 256 or 576
     // depending on the domain it runs in, so the library is asked.
     constexpr std::size_t kDelay = static_cast<std::size_t>(
-        256 + iclforge::oba::joc::reconstruction_delay(iclforge::oba::joc::Domain::kQmf));
+        256 + iclforge::objects::oba::joc::reconstruction_delay(iclforge::objects::oba::joc::Domain::kQmf));
 
     double position_error_sum = 0.0;
     int position_samples = 0;
@@ -80,7 +80,7 @@ int main() {
         // ceiling (0 is listener height). Each object circles at its own rate
         // and height - real motion, not a single static placement.
         const double seconds = frame * iclforge::ac3::kSamplesPerFrame / 48000.0;
-        std::array<iclforge::oba::ObjectPlacement, kObjects> placement{};
+        std::array<iclforge::objects::oba::ObjectPlacement, kObjects> placement{};
         for (std::size_t obj = 0; obj < kObjects; ++obj) {
             const double angle =
                 2.0 * std::numbers::pi * seconds / (2.0 + static_cast<double>(obj));

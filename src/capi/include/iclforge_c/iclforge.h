@@ -555,7 +555,7 @@ ICLFORGE_C_EXPORT int iclforge_eac3_encoder_latency_samples(const iclforge_eac3_
  * second encode_frame() overload) instead of measuring them from `channels`
  * - the access-unit path needs this so every substream of one programme
  * agrees; NULL measures internally, matching a standalone stream. `aux`/
- * `aux_size` carry a caller-built EMDF container (iclforge::emdf::build_container)
+ * `aux_size` carry a caller-built EMDF container (iclforge::objects::emdf::build_container)
  * in the frame's aux data, or NULL/0 for none - at most 511 bytes (it rides
  * block 0's skip field, whose skipl is 9 bits); a larger payload fails with
  * ICLFORGE_ERROR_ENCODE_INVALID_OBJECT_AUDIO. On success, *out_frame
@@ -761,7 +761,7 @@ ICLFORGE_C_EXPORT const float* iclforge_decoded_substream_channel_samples(
 ICLFORGE_C_EXPORT int iclforge_decoded_substream_block_switched(
     const iclforge_decoded_substream_t* substream, size_t channel_index, int block_index);
 
-/* --- object audio: OAMD (iclforge::oba::DecodedProgram) + JOC reconstruction -- */
+/* --- object audio: OAMD (iclforge::objects::oba::DecodedProgram) + JOC reconstruction -- */
 
 ICLFORGE_C_EXPORT int iclforge_decoded_substream_has_object_metadata(
     const iclforge_decoded_substream_t* substream);
@@ -1147,7 +1147,7 @@ typedef struct iclforge_atmos_config {
 
 ICLFORGE_C_EXPORT void iclforge_atmos_config_init(iclforge_atmos_config_t* config);
 
-/* One object's placement for one frame — mirrors iclforge::oba::ObjectPlacement.
+/* One object's placement for one frame — mirrors iclforge::objects::oba::ObjectPlacement.
  * Position is §4.2.1's room-anchored system, same ranges as
  * iclforge_decoded_substream_dynamic_object()'s out_x/out_y/out_z above. */
 typedef struct iclforge_object_placement {
@@ -1156,7 +1156,7 @@ typedef struct iclforge_object_placement {
     double lfe_send; /* linear, default 0.0 — the only route an object reaches the LFE */
 } iclforge_object_placement_t;
 
-/* Fills `placement` with the same defaults iclforge::oba::ObjectPlacement's own default member
+/* Fills `placement` with the same defaults iclforge::objects::oba::ObjectPlacement's own default member
  * initializers give — room-centre position (x 0.5, y 0.5, z 0.0), unity gain, no LFE send —
  * call this before setting only the fields you need, the same convention every
  * iclforge_*_config_init() above follows. Without it, a zero-initialized

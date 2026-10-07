@@ -47,7 +47,7 @@ int run_spatial(std::string_view in_path, int device_index, const forge_cli::Opt
 // either the same orbiting math run_atmos's synthetic demo uses (elapsed
 // wall-clock time, recomputed every frame), or, when positions= names a
 // live source (live OSC object positions - OSC today), a real one - iclforge::audio::
-// LivePositionSource drained into an iclforge::oba::SceneCursor at the same
+// LivePositionSource drained into an iclforge::objects::oba::SceneCursor at the same
 // frame-end instant the orbit already samples at, so switching the source
 // on changes WHERE objects go, never the shape of this loop.
 int run_live(std::string_view out_path, int capture_device, std::uint32_t seconds,

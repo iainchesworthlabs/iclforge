@@ -62,7 +62,7 @@ iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, kObjects};
 // Positions are room-anchored per §4.2.1: x 0 at the left wall to 1 at
 // the right, y 0 front to 1 back, z -1 at the floor to +1 at the
 // ceiling (0 is listener height).
-std::array<iclforge::oba::ObjectPlacement, kObjects> placement{};
+std::array<iclforge::objects::oba::ObjectPlacement, kObjects> placement{};
 placement[obj] = {
     .position = {.x = 0.5 + 0.45 * std::cos(angle),
                  .y = 0.5 + 0.45 * std::sin(angle),
@@ -91,7 +91,7 @@ placement[obj] = {
     .snap = false,
     // §5.6.1.6 Table 20/21: which horizontal zones the renderer may use,
     // and whether the Top-Bottom zone is in play at all.
-    .zone = iclforge::oba::ZoneConstraint::kScreenOnly,
+    .zone = iclforge::objects::oba::ZoneConstraint::kScreenOnly,
     .enable_elevation = true,
     // §5.5.14 / Tables 40-42: the share of the object's energy spread into two
     // objects along X (§5.2.7), 0 to 1. Quantized to Table 42's values and sent
@@ -156,7 +156,7 @@ is — see [Atmos & JOC](../concepts/atmos-joc.md#oamd)'s "a programme need not 
 assignment) instead of an object count:
 
 ```cpp
-using iclforge::oba::bed;
+using iclforge::objects::oba::bed;
 const std::uint16_t layout = bed::kLR | bed::kC | bed::kLfe | bed::kLsRs |
                              bed::kTflTfr | bed::kTblTbr;  // 5.1.4
 iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, iclforge::ac3::oba::BedProgram{.bed = layout}};
@@ -164,11 +164,11 @@ iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, iclforge::ac3::o
 
 `encode_bed_frame` replaces `encode_frame`: no `ObjectPlacement` to supply, because a bed
 channel's position comes from its label, not an argument (TS 103 420 §5.5.9) — just one span of
-audio per channel, in `iclforge::oba::bed_labels(layout)`'s own order (LFE included, at whichever
+audio per channel, in `iclforge::objects::oba::bed_labels(layout)`'s own order (LFE included, at whichever
 position that order puts it):
 
 ```cpp
-// channels.size() == iclforge::oba::bed_channel_count(encoder.program()).
+// channels.size() == iclforge::objects::oba::bed_channel_count(encoder.program()).
 const auto unit = encoder.encode_bed_frame(channels);
 ```
 
@@ -194,7 +194,7 @@ estimated in. The result **lags the bed**, and by how much depends on the domain
 
 ```cpp
 // 256 samples of encode+decode, plus the JOC transform pair's own delay.
-const int delay = 256 + iclforge::oba::joc::reconstruction_delay(config.joc_domain);
+const int delay = 256 + iclforge::objects::oba::joc::reconstruction_delay(config.joc_domain);
 ```
 
 `oba::joc::reconstruction_delay()` returns 576 for `kQmf` (the filterbank's 640-tap window less one
@@ -205,7 +205,7 @@ instead of the reconstruction, and still looks plausible.
 The filterbank is usable on its own as `iclforge::dsp::QmfAnalysis` / `QmfSynthesis` (`iclforge/dsp/qmf.hpp`)
 — 64 complex subbands, one timeslot per 64 samples, perfect reconstruction.
 
-## Scripted motion: `iclforge::oba::motion`
+## Scripted motion: `iclforge::objects::oba::motion`
 
 `iclforge/objects/motion.hpp`. `AtmosEncoder::encode_frame` always took a fresh `ObjectPlacement` per
 call; what this adds is a shared way to say *where* an object is at a given moment, so a caller
@@ -214,12 +214,12 @@ stops reimplementing that per-frame math independently the way `atmos_objects.cp
 ```cpp
 // A closed-form orbit - evaluated exactly rather than decimated into
 // keyframes, so it stays an exact circle.
-const auto orbit = iclforge::oba::make_orbit_path(/*rate_hz=*/0.5, /*phase_rad=*/0.0,
+const auto orbit = iclforge::objects::oba::make_orbit_path(/*rate_hz=*/0.5, /*phase_rad=*/0.0,
                                              /*height=*/0.5, /*gain=*/0.6, /*lfe_send=*/0.0);
 
 // Sparse authored points, linearly interpolated between neighbours and held
 // at the ends rather than extrapolated.
-auto keyframed = iclforge::oba::KeyframePath::create({
+auto keyframed = iclforge::objects::oba::KeyframePath::create({
     {.time_s = 0.0, .position = {.x = 0.0, .y = 0.5, .z = 0.0}, .gain = 0.0},
     {.time_s = 0.8, .position = {.x = 0.5, .y = 0.9, .z = 0.0}, .gain = 0.8},
     {.time_s = 1.6, .position = {.x = 1.0, .y = 0.5, .z = 0.0}, .gain = 0.0},
@@ -229,7 +229,7 @@ auto keyframed = iclforge::oba::KeyframePath::create({
 ```cpp
 // One call per frame gets every object's placement at that instant, in
 // path order - exactly the span encode_frame() wants.
-const auto placement = iclforge::oba::evaluate_placements(paths, seconds);
+const auto placement = iclforge::objects::oba::evaluate_placements(paths, seconds);
 const auto unit = encoder.encode_frame(views, placement);
 ```
 
@@ -240,7 +240,7 @@ caller doesn't need to know which one it holds. It is the *per-object* layer: on
 path, no notion of a scene. `forge atmos`'s built-in orbit and `live`'s `atmos` mode use it
 directly; anything with more than one object and a file to load from wants `ObjectScene` below.
 
-## The scene: `iclforge::oba::ObjectScene`
+## The scene: `iclforge::objects::oba::ObjectScene`
 
 `iclforge/objects/scene.hpp`. `AtmosEncoder::encode_frame` takes one `ObjectPlacement` per object per
 frame and nothing more, so every caller that wanted a *scene* — objects with names, a bed
@@ -256,8 +256,8 @@ same kind of thing: it rewrites the coordinates that go into OAMD, so what reach
 bitstream is an ordinary scene that happens to have been turned.
 
 ```cpp
-using iclforge::oba::Interpolation;
-auto built = iclforge::oba::ObjectScene::create({
+using iclforge::objects::oba::Interpolation;
+auto built = iclforge::objects::oba::ObjectScene::create({
     {.name = "flyby",
      .automation = {{.time_s = 0.0, .position = {.x = 0.0, .y = 0.5, .z = 0.5}, .gain = 0.6,
                      .interp = Interpolation::kSmooth},
@@ -267,7 +267,7 @@ auto built = iclforge::oba::ObjectScene::create({
 });
 const auto& scene = *built;
 
-std::vector<iclforge::oba::ObjectPlacement> placement(scene.object_count());
+std::vector<iclforge::objects::oba::ObjectPlacement> placement(scene.object_count());
 scene.evaluate_into(seconds, placement);        // allocation-free, once per frame
 const auto unit = encoder.encode_frame(views, placement);
 ```
@@ -302,7 +302,7 @@ all-zero `Orientation` is an *exact* no-op, not a rotation by zero, so an un-tur
 positions are bit-identical to the authored doubles.
 
 ```cpp
-scene.set_orientation(iclforge::oba::orientation_from_degrees(90, 0, 0));  // front wall → right wall
+scene.set_orientation(iclforge::objects::oba::orientation_from_degrees(90, 0, 0));  // front wall → right wall
 ```
 
 ### The live half: `SceneCursor`
@@ -313,7 +313,7 @@ the one live source; the `positions=` token takes nothing else, and no MIDI or g
 source exists.
 
 ```cpp
-iclforge::oba::SceneCursor cursor{std::move(scene)};
+iclforge::objects::oba::SceneCursor cursor{std::move(scene)};
 cursor.push({.object = 0, .placement = {.position = {.x = 0.75}, .gain = 0.9}});
 cursor.sample_into(seconds, placement);   // overridden objects report the pushed value
 cursor.release(0);                        // back to the authored timeline
@@ -341,8 +341,8 @@ const auto datagram = osc_xyz_message("/object/0/xyz", 0.9F, 0.1F, 0.5F);
 ```
 
 ```cpp
-iclforge::oba::OscParseStats stats;
-for (const auto& update : iclforge::oba::parse_osc_packet(datagram, &stats)) {
+iclforge::objects::oba::OscParseStats stats;
+for (const auto& update : iclforge::objects::oba::parse_osc_packet(datagram, &stats)) {
     if (update.release) {
         cursor.release(update.object);
         continue;
@@ -352,7 +352,7 @@ for (const auto& update : iclforge::oba::parse_osc_packet(datagram, &stats)) {
     // 1.0 - see apply()'s own header comment for why this step exists
     // and cannot be skipped in favour of pushing `update` directly.
     const auto base = cursor.scene().evaluate(update.object, 0.0);
-    if (const auto merged = iclforge::oba::apply(update, base)) {
+    if (const auto merged = iclforge::objects::oba::apply(update, base)) {
         cursor.push({.object = update.object, .placement = *merged});
     }
 }

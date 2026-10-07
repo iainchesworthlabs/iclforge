@@ -34,7 +34,7 @@ struct Encoder {
     std::unique_ptr<iclforge::ac3::oba::AtmosEncoder> encoder;
     std::vector<std::vector<float>> objects;
     std::vector<std::span<const float>> views;
-    std::vector<iclforge::oba::ObjectPlacement> placements;
+    std::vector<iclforge::objects::oba::ObjectPlacement> placements;
     std::vector<std::span<const float>> bed_views;
     std::vector<std::byte> unit;
     double phase = 0.0;

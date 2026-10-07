@@ -97,7 +97,7 @@ struct AtmosConfig {
     // Default kQmf since the evidence was measured: +5.1 dB mean per-object
     // SNR through a QMF reconstruction, for +0.26 ms/frame of encode
     // (0.55 -> 0.80 ms of a 32 ms budget, four objects).
-    iclforge::oba::joc::Domain joc_domain = iclforge::oba::joc::Domain::kQmf;
+    iclforge::objects::oba::joc::Domain joc_domain = iclforge::objects::oba::joc::Domain::kQmf;
     // §E2.3.1.4 short syncframes, same field and same meaning as
     // eac3::FrameConfig::numblkscod (default 3 = six blocks; 0/1/2 shorten
     // the frame to 1/2/3 blocks - 256/512/768 samples). The object layer
@@ -112,7 +112,7 @@ struct AtmosConfig {
 
 // Selects AtmosEncoder's other constructor: a channel-based-immersive (CBI)
 // bed programme instead of dynamic objects. `bed` is the Table 12 standard
-// assignment (iclforge::oba::bed::k* flags, OR'd together - e.g. bed::k51 |
+// assignment (iclforge::objects::oba::bed::k* flags, OR'd together - e.g. bed::k51 |
 // bed::kTflTfr | bed::kTblTbr for a 5.1.4 bed) this encoder declares; the
 // programme's dynamic_objects is always 0. A distinct type rather than a
 // second int/uint16_t constructor parameter so the two constructors cannot be
@@ -151,7 +151,7 @@ class ICLFORGE_AC3_EXPORT AtmosEncoder {
     // its aux data.
     [[nodiscard]] std::expected<eac3::AccessUnit, FrameError> encode_frame(
         std::span<const std::span<const float>> objects,
-        std::span<const iclforge::oba::ObjectPlacement> placement);
+        std::span<const iclforge::objects::oba::ObjectPlacement> placement);
 
     // One frame of a CBI bed's audio - only on an encoder built with the
     // BedProgram constructor. `channels` is exactly bed_channel_count(program())
@@ -216,7 +216,7 @@ class ICLFORGE_AC3_EXPORT AtmosEncoder {
     // Dynamic objects only. The program has one more - the bed's LFE - which
     // is what the free object_count(Program) counts.
     [[nodiscard]] int dynamic_object_count() const;
-    [[nodiscard]] const iclforge::oba::Program& program() const;
+    [[nodiscard]] const iclforge::objects::oba::Program& program() const;
 
     // The 5.1 bed the last frame encoded, in AC-3 coded order (L, C, R, Ls,
     // Rs, LFE). Exposed because it is what a legacy decoder hears, and that

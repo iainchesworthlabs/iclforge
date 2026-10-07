@@ -7,7 +7,7 @@
 // iclforge::iab::parse_iabitstream() reads the frame sequence, iclforge::adm::build_iab()
 // maps it onto iclforge::ac3::oba::AtmosEncoder's flat object-list input shape (one bed channel
 // pinned in place, one dynamic object panned by its own authored motion), and a plain per-frame
-// loop calls iclforge::oba::evaluate_placements() plus AtmosEncoder::encode_frame() the same way
+// loop calls iclforge::objects::oba::evaluate_placements() plus AtmosEncoder::encode_frame() the same way
 // every other Atmos example in this directory does. The CLI command and this example deliberately
 // share nothing but that library API - see docs/library/adm-bridge.md's own note on why no separate
 // "driving loop" abstraction exists (the same reasoning applies here).
@@ -334,8 +334,8 @@ int main(int argc, char** argv) {
                     bridged->is_bed[i] ? "bed channel" : "dynamic object");
     }
 
-    // Step 3: drive AtmosEncoder::encode_frame() in a loop - iclforge::oba::evaluate_placements()
-    // reads each channel's iclforge::oba::ObjectPath at the frame's own end time, the same pattern
+    // Step 3: drive AtmosEncoder::encode_frame() in a loop - iclforge::objects::oba::evaluate_placements()
+    // reads each channel's iclforge::objects::oba::ObjectPath at the frame's own end time, the same pattern
     // every other Atmos example in this directory uses.
     const auto objects = static_cast<int>(bridged->channel_count());
     iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, objects};
@@ -356,7 +356,7 @@ int main(int argc, char** argv) {
         const double t =
             static_cast<double>(start + static_cast<std::size_t>(iclforge::ac3::kSamplesPerFrame)) /
             static_cast<double>(kSampleRate);
-        const auto placement = iclforge::oba::evaluate_placements(bridged->paths, t);
+        const auto placement = iclforge::objects::oba::evaluate_placements(bridged->paths, t);
 
         const auto unit = encoder.encode_frame(views, placement);
         if (!unit) {

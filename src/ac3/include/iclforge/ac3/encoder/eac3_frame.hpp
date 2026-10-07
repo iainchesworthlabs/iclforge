@@ -505,7 +505,7 @@ struct FrameConfig {
 // word count this format can ever signal, whatever bitrate produced it.
 inline constexpr std::uint32_t kMaxFrameWords = 2048;
 
-// An EMDF container (iclforge::emdf::build_container) to carry in this frame's aux
+// An EMDF container (iclforge::objects::emdf::build_container) to carry in this frame's aux
 // data, or an empty span for none.
 //
 // It travels in block 0's skip field (Annex E audblk's skiple/skipl/skipfld), not in

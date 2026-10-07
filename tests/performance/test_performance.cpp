@@ -83,8 +83,8 @@ const iclforge::ac3::io::WavData& fixture() {
     return audio;
 }
 
-std::vector<iclforge::oba::ObjectPlacement> object_placement(int objects) {
-    std::vector<iclforge::oba::ObjectPlacement> placement(static_cast<std::size_t>(objects));
+std::vector<iclforge::objects::oba::ObjectPlacement> object_placement(int objects) {
+    std::vector<iclforge::objects::oba::ObjectPlacement> placement(static_cast<std::size_t>(objects));
     for (int obj = 0; obj < objects; ++obj) {
         placement[static_cast<std::size_t>(obj)] = {
             .position = {.x = 0.2 + 0.2 * obj, .y = 0.5, .z = 0.0}, .gain = 1.0};

@@ -907,50 +907,50 @@ PYBIND11_MODULE(_iclforge, m) {
         .def_readwrite("release_db_per_second",
                        &iclforge::ac3::meta::HeavyConfig::release_db_per_second);
 
-    py::class_<iclforge::oba::Position>(m, "Position", "Room-anchored object position (§4.2.1)")
+    py::class_<iclforge::objects::oba::Position>(m, "Position", "Room-anchored object position (§4.2.1)")
         .def(py::init([](py::kwargs kwargs) {
-            return KwargBinder<iclforge::oba::Position>(std::move(kwargs))
-                .field("x", &iclforge::oba::Position::x)
-                .field("y", &iclforge::oba::Position::y)
-                .field("z", &iclforge::oba::Position::z)
+            return KwargBinder<iclforge::objects::oba::Position>(std::move(kwargs))
+                .field("x", &iclforge::objects::oba::Position::x)
+                .field("y", &iclforge::objects::oba::Position::y)
+                .field("z", &iclforge::objects::oba::Position::z)
                 .finish();
         }))
-        .def_readwrite("x", &iclforge::oba::Position::x)
-        .def_readwrite("y", &iclforge::oba::Position::y)
-        .def_readwrite("z", &iclforge::oba::Position::z)
-        .def("__repr__", [](const iclforge::oba::Position& p) {
+        .def_readwrite("x", &iclforge::objects::oba::Position::x)
+        .def_readwrite("y", &iclforge::objects::oba::Position::y)
+        .def_readwrite("z", &iclforge::objects::oba::Position::z)
+        .def("__repr__", [](const iclforge::objects::oba::Position& p) {
             return "Position(x=" + std::to_string(p.x) + ", y=" + std::to_string(p.y) +
                    ", z=" + std::to_string(p.z) + ")";
         });
 
-    py::class_<iclforge::oba::ObjectPlacement>(m, "ObjectPlacement",
+    py::class_<iclforge::objects::oba::ObjectPlacement>(m, "ObjectPlacement",
                                           "One object's placement for one frame")
         .def(py::init([](py::kwargs kwargs) {
-            return KwargBinder<iclforge::oba::ObjectPlacement>(std::move(kwargs))
-                .field("position", &iclforge::oba::ObjectPlacement::position)
-                .field("gain", &iclforge::oba::ObjectPlacement::gain)
-                .field("lfe_send", &iclforge::oba::ObjectPlacement::lfe_send)
+            return KwargBinder<iclforge::objects::oba::ObjectPlacement>(std::move(kwargs))
+                .field("position", &iclforge::objects::oba::ObjectPlacement::position)
+                .field("gain", &iclforge::objects::oba::ObjectPlacement::gain)
+                .field("lfe_send", &iclforge::objects::oba::ObjectPlacement::lfe_send)
                 .finish();
         }))
-        .def_readwrite("position", &iclforge::oba::ObjectPlacement::position)
-        .def_readwrite("gain", &iclforge::oba::ObjectPlacement::gain)
-        .def_readwrite("lfe_send", &iclforge::oba::ObjectPlacement::lfe_send);
+        .def_readwrite("position", &iclforge::objects::oba::ObjectPlacement::position)
+        .def_readwrite("gain", &iclforge::objects::oba::ObjectPlacement::gain)
+        .def_readwrite("lfe_send", &iclforge::objects::oba::ObjectPlacement::lfe_send);
 
-    py::class_<iclforge::oba::DynamicObject>(m, "DynamicObject",
+    py::class_<iclforge::objects::oba::DynamicObject>(m, "DynamicObject",
                                              "A decoded object's position and gain")
-        .def_readonly("position", &iclforge::oba::DynamicObject::position)
-        .def_readonly("gain_db", &iclforge::oba::DynamicObject::gain_db);
+        .def_readonly("position", &iclforge::objects::oba::DynamicObject::position)
+        .def_readonly("gain_db", &iclforge::objects::oba::DynamicObject::gain_db);
 
-    py::class_<iclforge::oba::Program>(m, "Program", "OAMD programme shape (§5.6)")
-        .def_readonly("dynamic_only", &iclforge::oba::Program::dynamic_only)
-        .def_readonly("lfe", &iclforge::oba::Program::lfe)
-        .def_readonly("bed", &iclforge::oba::Program::bed)
-        .def_readonly("dynamic_objects", &iclforge::oba::Program::dynamic_objects);
+    py::class_<iclforge::objects::oba::Program>(m, "Program", "OAMD programme shape (§5.6)")
+        .def_readonly("dynamic_only", &iclforge::objects::oba::Program::dynamic_only)
+        .def_readonly("lfe", &iclforge::objects::oba::Program::lfe)
+        .def_readonly("bed", &iclforge::objects::oba::Program::bed)
+        .def_readonly("dynamic_objects", &iclforge::objects::oba::Program::dynamic_objects);
 
-    py::class_<iclforge::oba::DecodedProgram>(m, "DecodedProgram",
+    py::class_<iclforge::objects::oba::DecodedProgram>(m, "DecodedProgram",
                                          "Decoded OAMD: programme shape plus every object")
-        .def_readonly("program", &iclforge::oba::DecodedProgram::program)
-        .def_readonly("objects", &iclforge::oba::DecodedProgram::objects);
+        .def_readonly("program", &iclforge::objects::oba::DecodedProgram::program)
+        .def_readonly("objects", &iclforge::objects::oba::DecodedProgram::objects);
 
     // --- encoder -------------------------------------------------------------
     py::class_<iclforge::ac3::EncoderConfig>(m, "EncoderConfig")
@@ -1401,7 +1401,7 @@ PYBIND11_MODULE(_iclforge, m) {
         .def(
             "encode_frame",
             [](iclforge::ac3::oba::AtmosEncoder& self, const py::object& objects,
-               std::vector<iclforge::oba::ObjectPlacement> placement) {
+               std::vector<iclforge::objects::oba::ObjectPlacement> placement) {
                 auto views = extract_channel_views(
                     objects, static_cast<std::size_t>(iclforge::ac3::kSamplesPerFrame));
                 if (views.spans.size() != static_cast<std::size_t>(self.dynamic_object_count())) {

@@ -184,7 +184,7 @@ void print_table(std::string_view path, const io::ProbeReport& report,
     }
     if (report.program.has_value()) {
         fmt::println("{:<16}{} object(s): bed {}, {} dynamic, in {} frame(s)", "object audio",
-                     iclforge::oba::object_count(*report.program), bed_label(*report.program),
+                     iclforge::objects::oba::object_count(*report.program), bed_label(*report.program),
                      report.program->dynamic_objects, report.object_frames);
     } else if (report.oba_complexity_index.has_value()) {
         fmt::println("{:<16}addbsi marker only, no OAMD payload parsed", "object audio");
@@ -263,7 +263,7 @@ void print_access_unit(const io::ProbeAccessUnit& unit, Detail detail) {
         }
         if (frame.objects.has_value()) {
             fmt::println("    objects: {} total, {} dynamic, bed {}",
-                         iclforge::oba::object_count(frame.objects->program),
+                         iclforge::objects::oba::object_count(frame.objects->program),
                          frame.objects->program.dynamic_objects,
                          bed_label(frame.objects->program));
         }
@@ -351,7 +351,7 @@ void write_syncframe(JsonWriter& json, const io::ProbeSyncframe& frame, Detail d
         json.key("objects");
         json.begin_object();
         json.member("total", static_cast<std::int64_t>(
-                                 iclforge::oba::object_count(frame.objects->program)));
+                                 iclforge::objects::oba::object_count(frame.objects->program)));
         json.member("dynamic",
                     static_cast<std::int64_t>(frame.objects->program.dynamic_objects));
         json.member("bed", bed_label(frame.objects->program));

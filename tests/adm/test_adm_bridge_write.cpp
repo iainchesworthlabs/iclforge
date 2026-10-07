@@ -96,13 +96,13 @@ TEST_CASE("a real decoded Atmos programme survives write_bw64 -> parse_bw64 -> b
     constexpr double kJumpEpsilon = 1.0e-6;
 
     const double hold_end = static_cast<double>(3 * kFrame) / kSampleRate;  // 0.096s
-    const auto path = iclforge::oba::KeyframePath::create({
+    const auto path = iclforge::objects::oba::KeyframePath::create({
         {.time_s = 0.0, .position = {.x = 0.9, .y = 0.5, .z = 0.0}},          // far right
         {.time_s = hold_end, .position = {.x = 0.9, .y = 0.5, .z = 0.0}},     // still right
         {.time_s = hold_end + kJumpEpsilon, .position = {.x = 0.1, .y = 0.5, .z = 0.0}},  // jumped left
     });
     REQUIRE(path.has_value());
-    const iclforge::oba::ObjectPath object_path{*path};
+    const iclforge::objects::oba::ObjectPath object_path{*path};
 
     // --- Phase 1: encode + decode a real Atmos stream, accumulating exactly what decode.cpp's
     // own --adm output does. ---
@@ -122,7 +122,7 @@ TEST_CASE("a real decoded Atmos programme survives write_bw64 -> parse_bw64 -> b
         const auto frame_start = static_cast<std::size_t>(f) * static_cast<std::size_t>(kFrame);
         const std::span<const float> object_signal{tone.data() + frame_start, static_cast<std::size_t>(kFrame)};
         const double t = static_cast<double>((f + 1) * kFrame) / kSampleRate;
-        const auto placement = iclforge::oba::evaluate_placements(std::span{&object_path, 1}, t);
+        const auto placement = iclforge::objects::oba::evaluate_placements(std::span{&object_path, 1}, t);
         const std::array<std::span<const float>, 1> objects{object_signal};
         const auto unit = encoder.encode_frame(objects, placement);
         REQUIRE(unit.has_value());
@@ -142,7 +142,7 @@ TEST_CASE("a real decoded Atmos programme survives write_bw64 -> parse_bw64 -> b
                                     .updates = accumulator.object_updates});
     write_input.channels.push_back({.name = "LFE",
                                     .pcm = accumulator.lfe_pcm,
-                                    .bed_label = iclforge::oba::BedLabel::kLfe,
+                                    .bed_label = iclforge::objects::oba::BedLabel::kLfe,
                                     .updates = {}});
 
     const auto built = iclforge::adm::write(write_input);
@@ -216,7 +216,7 @@ TEST_CASE("a real decoded Atmos programme survives write_bw64 -> parse_bw64 -> b
             views[i] = bridged->pcm[i].subspan(start, static_cast<std::size_t>(kFrame));
         }
         const double t = static_cast<double>(start + static_cast<std::size_t>(kFrame)) / kSampleRate;
-        const auto placement = iclforge::oba::evaluate_placements(bridged->paths, t);
+        const auto placement = iclforge::objects::oba::evaluate_placements(bridged->paths, t);
         const auto unit = reencoder.encode_frame(views, placement);
         REQUIRE(unit.has_value());
 
@@ -248,7 +248,7 @@ TEST_CASE("a real decoded Atmos programme survives write_bw64 -> parse_bw64 -> b
 // zoneExclusion (TS 103 420 Annex B.2.6). The same file read back through build() has to give the
 // zone and the elevation switch of each update, in the block it came from.
 TEST_CASE("zone constraints survive write() -> write_bw64 -> parse_bw64 -> build", "[adm][bridge][write][zones]") {
-    using iclforge::oba::ZoneConstraint;
+    using iclforge::objects::oba::ZoneConstraint;
     constexpr std::uint32_t kRate = 48000;
     std::vector<float> pcm(static_cast<std::size_t>(kRate) * 3, 0.1F);
 

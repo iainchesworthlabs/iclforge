@@ -316,7 +316,7 @@ TEST_CASE("media_probe_to_map: EMDF payload ids and the reconstructed object cou
           "[hearth][hearth-controller]") {
     iclforge::ac3::io::ProbeReport report;
     report.emdf_payload_ids = {2, 6, 118};
-    iclforge::oba::Program program{};
+    iclforge::objects::oba::Program program{};
     program.dynamic_objects = 5;
     report.program = program;
 
@@ -432,7 +432,7 @@ TEST_CASE("channel_level_to_map: peak/hold/rms/clipped copy across unchanged",
 
 TEST_CASE("display_object_to_map: position/gain/flags copy across, and raised follows z > 0",
           "[hearth][hearth-controller]") {
-    iclforge::oba::DisplayObject object;
+    iclforge::objects::oba::DisplayObject object;
     object.position = {.x = 0.25, .y = 0.75, .z = 0.5};
     object.gain_db = -6.0;
     object.snap = true;
@@ -459,7 +459,7 @@ TEST_CASE("display_object_to_map: position/gain/flags copy across, and raised fo
 }
 
 TEST_CASE("display_object_to_map: a dynamic object's label is empty", "[hearth][hearth-controller]") {
-    iclforge::oba::DisplayObject object;
+    iclforge::objects::oba::DisplayObject object;
     object.label = "";  // dynamic (unlabelled) objects, per this function's own comment
     const QVariantMap map = iclforge::hearth::ui::display_object_to_map(object);
     CHECK(map.value(QStringLiteral("label")).toString().isEmpty());
@@ -480,7 +480,7 @@ TEST_CASE("decoder settings: every control round-trips through the map", "[heart
     settings.mix_lfe = true;
     settings.dual_mono = iclforge::hearth::DualMonoChoice::kSecond;
     settings.objects = iclforge::ac3::render::ObjectsPolicy::kAlways;
-    settings.joc_domain = iclforge::oba::joc::Domain::kMdctBand;
+    settings.joc_domain = iclforge::objects::oba::joc::Domain::kMdctBand;
     settings.concealment = iclforge::ac3::ConcealmentPolicy::kMute;
     settings.fast_inverse_transform = false;
 

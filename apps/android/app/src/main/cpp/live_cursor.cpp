@@ -364,7 +364,7 @@ double triangle01(double phase) {
     return frac < 0.5 ? frac * 2.0 : (1.0 - frac) * 2.0;
 }
 
-iclforge::oba::Position trajectory_position(int scene, int obj, double time_s) {
+iclforge::objects::oba::Position trajectory_position(int scene, int obj, double time_s) {
     const auto& p = kScenes[static_cast<std::size_t>(scene)]
                         .objects[static_cast<std::size_t>(obj)];
     const double angle = 2.0 * std::numbers::pi * p.rate_hz * time_s + p.phase_rad;
@@ -404,7 +404,7 @@ iclforge::oba::Position trajectory_position(int scene, int obj, double time_s) {
 // The position an object is at, accounting for a scene change still in
 // progress. `from` is the scene being left; once the blend is complete the
 // caller stops passing one.
-iclforge::oba::Position blended_position(int scene, int from, double blend, int obj,
+iclforge::objects::oba::Position blended_position(int scene, int from, double blend, int obj,
                                          double time_s) {
     const auto to_pos = trajectory_position(scene, obj, time_s);
     if (blend >= 1.0 || scene == from) {
@@ -427,7 +427,7 @@ iclforge::oba::Position blended_position(int scene, int from, double blend, int 
 // pause/mute feature rather than complement it.
 constexpr double kDistanceFalloffK = 1.0;
 constexpr double kDistanceAttenFloor = 0.4;
-double distance_attenuation(const iclforge::oba::Position& pos) {
+double distance_attenuation(const iclforge::objects::oba::Position& pos) {
     const double dx = pos.x - 0.5;
     const double dy = pos.y - 0.5;
     const double dz = pos.z;  // z is already centred on the listener's ear height
@@ -707,7 +707,7 @@ public:
     // Called once per encode frame - this is the only place deflection_
     // decays, so the spring-back happens on its own every frame regardless
     // of whether any input arrived.
-    std::array<iclforge::oba::ObjectPlacement, kObjects> advance(double time_s, int scene, int from,
+    std::array<iclforge::objects::oba::ObjectPlacement, kObjects> advance(double time_s, int scene, int from,
                                                             double blend) {
         std::lock_guard lock(mutex_);
         for (int i = 0; i < kInteractiveObjects; ++i) {
@@ -796,7 +796,7 @@ public:
     // For the room visualization: the placements advance() last computed,
     // without advancing anything - RoomView polls this far more often
     // (every UI vsync) than the encode loop actually produces new frames.
-    std::array<iclforge::oba::ObjectPlacement, kObjects> snapshot() const {
+    std::array<iclforge::objects::oba::ObjectPlacement, kObjects> snapshot() const {
         std::lock_guard lock(mutex_);
         return placements_;
     }
@@ -848,11 +848,11 @@ public:
 private:
     mutable std::mutex mutex_;
     std::array<Deflection, kInteractiveObjects> deflection_{};
-    std::array<iclforge::oba::ObjectPlacement, kObjects> placements_{};
+    std::array<iclforge::objects::oba::ObjectPlacement, kObjects> placements_{};
     int selected_ = 0;
 
     RecordState record_state_ = RecordState::kIdle;
-    std::vector<iclforge::oba::Position> recorded_;
+    std::vector<iclforge::objects::oba::Position> recorded_;
     double playback_start_s_ = 0.0;
 };
 

@@ -124,7 +124,7 @@ boundary before (Python is pybind11-direct C++, WASM is Embind, Android is JNI, 
 compiling the same C++23 source this binding instead links as a black box). Four things surfaced:
 
 1. **`iclforge_object_placement_t` had no `_init()`, unlike every sibling config struct.**
-   `iclforge::oba::ObjectPlacement` default-member-initializes `gain = 1.0`; the C struct's own doc
+   `iclforge::objects::oba::ObjectPlacement` default-member-initializes `gain = 1.0`; the C struct's own doc
    comment says "gain: linear, default 1.0" — but nothing prevented a caller from
    zero-initializing it and silently getting a muted object (`gain = 0.0`), with no
    `iclforge_object_placement_init()` to catch the trap the way every other config struct's own

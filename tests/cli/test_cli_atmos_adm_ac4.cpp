@@ -41,7 +41,7 @@
 //
 // The round trip: atmos-adm codec=ac4 (A-JOC, this project's own writer) -> decode's objects_dir
 // (each object's raw PCM) and adm_out (a fresh ADM BWF master, iclforge::ac4::ObjectProperties
-// bridged onto iclforge::oba::DynamicObject - apps/cli/commands/decode.cpp's
+// bridged onto iclforge::objects::oba::DynamicObject - apps/cli/commands/decode.cpp's
 // to_oba_dynamic_object). "Match the master" is checked by parsing BOTH the original fixture and
 // the round-tripped adm_out back through the same
 // iclforge::adm::parse_bw64/iclforge::adm::build the read side already uses, evaluating each

@@ -502,7 +502,7 @@ struct Options {
     // not silently pick the worse one. mode=reference has nothing to add
     // either - the default is already §6.6.6's own domain - so mode= stays
     // exactly the two transform switches it has always been.
-    iclforge::oba::joc::Domain joc_domain = iclforge::oba::joc::Domain::kQmf;
+    iclforge::objects::oba::joc::Domain joc_domain = iclforge::objects::oba::joc::Domain::kQmf;
     // 'bed-only' on decode: DecoderConfig::skip_object_reconstruction. Render
     // the 5.1 bed an Atmos stream carries and do not reconstruct its objects.
     // Not a quality option - the bed is bit-identical either way - but a memory
@@ -1068,7 +1068,7 @@ bool resolve_layout(std::string_view name, iclforge::ac3::plan::Codec codec,
 
 // The bed's LFE is not an object, so it never goes through JOC reconstruction
 // - but a decoded programme's dynamic objects did, and that costs
-// iclforge::oba::joc::reconstruction_delay(domain) samples the LFE does not pay
+// iclforge::objects::oba::joc::reconstruction_delay(domain) samples the LFE does not pay
 // (docs/library/decoding.md, "Atmos objects lag the bed"). Any command that
 // submits or meters a decoded unit's object_audio beside that same unit's
 // undelayed bed LFE - 'spatial', 'qc objects=' - has to hold the LFE back by
@@ -1300,7 +1300,7 @@ std::optional<iclforge::ac3::signing::VerifySummary> apply_object_verification(
 // trim element, skipped elements and more than one update block per frame
 // each add a line. Every line goes to `status` (see status_stream above).
 void print_object_summary(FILE* status,
-                          const std::optional<iclforge::oba::DecodedProgram>& metadata,
+                          const std::optional<iclforge::objects::oba::DecodedProgram>& metadata,
                           std::string_view joc_note);
 
 }  // namespace forge_cli

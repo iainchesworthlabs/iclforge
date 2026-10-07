@@ -18,7 +18,7 @@
 // evaluate(time_s) shape is deliberately time-based so a future live-driven
 // cursor could reuse it, but that plumbing is not built here.
 
-namespace iclforge::oba {
+namespace iclforge::objects::oba {
 
 // One authored point in a per-object motion path: a placement anchored to a
 // moment in time.
@@ -110,4 +110,4 @@ class ICLFORGE_OBJECTS_EXPORT ObjectPath {
 [[nodiscard]] ICLFORGE_OBJECTS_EXPORT std::vector<ObjectPlacement> evaluate_placements(
     std::span<const ObjectPath> paths, double time_s);
 
-}  // namespace iclforge::oba
+}  // namespace iclforge::objects::oba

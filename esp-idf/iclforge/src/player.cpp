@@ -72,7 +72,7 @@ struct BlockView {
     std::span<const std::span<const float>> channels;
     std::span<const std::span<const float>> objects;
     const iclforge::ac3::eac3::chanmap::Layout* bed = nullptr;
-    std::span<const iclforge::oba::DisplayObject> places;
+    std::span<const iclforge::objects::oba::DisplayObject> places;
 };
 
 bool same_layout(const iclforge::ac3::eac3::chanmap::Layout& a,
@@ -212,7 +212,7 @@ struct Player::Impl {
     iclforge::ac3::eac3::chanmap::Layout renderer_bed{};
     bool renderer_has_bed = false;
     // A unit's object descriptions, gathered on its first block.
-    std::array<iclforge::oba::DisplayObject, kMaxObjects> places{};
+    std::array<iclforge::objects::oba::DisplayObject, kMaxObjects> places{};
 
     // The hold on a play's first unit (PlayerConfig::hold_first_unit), set at
     // start(). The hold is armed by the unit's first block and released when
@@ -225,7 +225,7 @@ struct Player::Impl {
     float* hold_storage = nullptr;
     iclforge::ac3::eac3::chanmap::Layout held_bed{};
     bool held_has_bed = false;
-    std::array<iclforge::oba::DisplayObject, kMaxObjects> held_places{};
+    std::array<iclforge::objects::oba::DisplayObject, kMaxObjects> held_places{};
     std::size_t held_place_count = 0;
 
     // Written by the tasks, read by anyone.
@@ -439,12 +439,12 @@ struct Player::Impl {
     // reads is kept - the label views the decoder's storage, which is gone
     // once the decode call returns, so it is cleared.
     static std::size_t gather_places(const iclforge::ac3::PcmBlock& pcm,
-                                     iclforge::oba::DisplayObject* into) {
+                                     iclforge::objects::oba::DisplayObject* into) {
         if (pcm.object_metadata == nullptr || pcm.objects.empty()) {
             return 0;
         }
-        const std::vector<iclforge::oba::DisplayObject> described =
-            iclforge::oba::describe_objects(*pcm.object_metadata);
+        const std::vector<iclforge::objects::oba::DisplayObject> described =
+            iclforge::objects::oba::describe_objects(*pcm.object_metadata);
         const std::size_t count = std::min({described.size(), pcm.objects.size(), kMaxObjects});
         for (std::size_t i = 0; i < count; ++i) {
             into[i] = described[i];
@@ -524,7 +524,7 @@ struct Player::Impl {
             .channels = pcm.channels,
             .objects = pcm.objects,
             .bed = have_bed ? &bed : nullptr,
-            .places = std::span<const iclforge::oba::DisplayObject>(places.data(), count)});
+            .places = std::span<const iclforge::objects::oba::DisplayObject>(places.data(), count)});
     }
 
     // Into the hold, which the play's first block arms with room for blocks
@@ -584,9 +584,9 @@ struct Player::Impl {
                           .channels = channels,
                           .objects = objects,
                           .bed = held_has_bed ? &held_bed : nullptr,
-                          .places = index == 0 ? std::span<const iclforge::oba::DisplayObject>(
+                          .places = index == 0 ? std::span<const iclforge::objects::oba::DisplayObject>(
                                                      held_places.data(), held_place_count)
-                                               : std::span<const iclforge::oba::DisplayObject>{}});
+                                               : std::span<const iclforge::objects::oba::DisplayObject>{}});
         });
         free_hold();
     }

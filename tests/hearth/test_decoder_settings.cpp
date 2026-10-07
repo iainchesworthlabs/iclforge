@@ -40,7 +40,7 @@ TEST_CASE("decoder settings: the defaults are line mode, a Lo/Ro fold for two sp
     CHECK(stereo.config.output.mix_override == iclforge::ac3::MixLevelOverride{});
     CHECK(stereo.config.skip_object_reconstruction);
     CHECK_FALSE(stereo.config.programme.has_value());
-    CHECK(stereo.config.joc_domain == iclforge::oba::joc::Domain::kQmf);
+    CHECK(stereo.config.joc_domain == iclforge::objects::oba::joc::Domain::kQmf);
     CHECK(stereo.config.concealment == iclforge::ac3::ConcealmentPolicy::kRepeatFade);
     CHECK(stereo.config.fast_imdct);
 
@@ -69,7 +69,7 @@ TEST_CASE("decoder settings: every control reaches the configuration", "[hearth]
     settings.mix_levels.lfe_mix_level_db = 3.0;
     settings.programme = 2;
     settings.objects = iclforge::ac3::render::ObjectsPolicy::kNever;
-    settings.joc_domain = iclforge::oba::joc::Domain::kMdctBand;
+    settings.joc_domain = iclforge::objects::oba::joc::Domain::kMdctBand;
     settings.concealment = iclforge::ac3::ConcealmentPolicy::kMute;
     settings.fast_inverse_transform = false;
 
@@ -96,7 +96,7 @@ TEST_CASE("decoder settings: every control reaches the configuration", "[hearth]
     CHECK_FALSE(config.programme.has_value());
     CHECK(config.concealment == iclforge::ac3::ConcealmentPolicy::kMute);
     CHECK(config.skip_object_reconstruction);
-    CHECK(config.joc_domain == iclforge::oba::joc::Domain::kMdctBand);
+    CHECK(config.joc_domain == iclforge::objects::oba::joc::Domain::kMdctBand);
     CHECK_FALSE(config.fast_imdct);
 }
 
@@ -206,7 +206,7 @@ TEST_CASE("decoder settings: a transcode decodes the programme as coded, whateve
     listener.mix_lfe = true;
     listener.mix_levels.loro_clev = 0.5;
     listener.objects = iclforge::ac3::render::ObjectsPolicy::kAlways;
-    listener.joc_domain = iclforge::oba::joc::Domain::kMdctBand;
+    listener.joc_domain = iclforge::objects::oba::joc::Domain::kMdctBand;
     // What a receiver cannot choose for itself is kept.
     listener.dual_mono = iclforge::hearth::DualMonoChoice::kSecond;
     listener.concealment = iclforge::ac3::ConcealmentPolicy::kMute;
@@ -223,7 +223,7 @@ TEST_CASE("decoder settings: a transcode decodes the programme as coded, whateve
     // Objects are off in a transcode, so the domain choice would reach
     // nothing; it resets with the rest of the object controls rather than
     // following the listener across.
-    CHECK(neutral.joc_domain == iclforge::oba::joc::Domain::kQmf);
+    CHECK(neutral.joc_domain == iclforge::objects::oba::joc::Domain::kQmf);
     // Not a listener's choice to keep: the transform never reaches the
     // encoded bits (decoder.hpp's own fast_imdct doc comment), so a
     // transcode always takes the fast default, whatever the listener chose.

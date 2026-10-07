@@ -526,7 +526,7 @@ caller-buffer form, because that is the only pair `iclforge::ac3::FrameDecoder`/
 themselves expose one for (see [Zero-copy numpy](#zero-copy-numpy-and-buffer-reuse) above); a
 single substream's own PCM is always freshly allocated.
 
-`iclforge::oba::ObjectScene` (the object-scene timeline behind `forge atmos-path` and the GUI's
+`iclforge::objects::oba::ObjectScene` (the object-scene timeline behind `forge atmos-path` and the GUI's
 export - see [Spatial & Atmos objects](spatial-and-atmos.md#the-scene-iclforgeobaobjectscene)) is not
 here either. Its shape has settled: `SceneCursor` is the seam a live position source plugs into,
 and the OSC wire form ([`iclforge/objects/scene_osc.hpp`](spatial-and-atmos.md#the-osc-wire-form)), a

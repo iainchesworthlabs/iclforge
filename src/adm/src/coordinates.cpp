@@ -26,24 +26,24 @@ iclforge::adm::CartesianPosition polar_to_adm_cartesian(const iclforge::adm::Pol
             .z = r * std::sin(elevation_rad)};
 }
 
-iclforge::oba::Position adm_cartesian_to_room(const iclforge::adm::CartesianPosition& cartesian) {
+iclforge::objects::oba::Position adm_cartesian_to_room(const iclforge::adm::CartesianPosition& cartesian) {
     return {.x = (cartesian.x + 1.0) / 2.0,
             .y = (1.0 - cartesian.y) / 2.0,
             .z = cartesian.z};
 }
 
-iclforge::adm::CartesianPosition room_to_adm_cartesian(const iclforge::oba::Position& room) {
+iclforge::adm::CartesianPosition room_to_adm_cartesian(const iclforge::objects::oba::Position& room) {
     return {.x = 2.0 * room.x - 1.0, .y = 1.0 - 2.0 * room.y, .z = room.z};
 }
 
-iclforge::oba::Position iab_position_to_room(const iclforge::iab::Position& position) {
+iclforge::objects::oba::Position iab_position_to_room(const iclforge::iab::Position& position) {
     // Direct passthrough - see coordinates.hpp's own comment on iab_position_to_room for why no
     // formula is needed: x/y already share oba::Position's convention exactly, and z is already
     // anchored at the same screen/ear-height zero, just never negative.
     return {.x = position.x, .y = position.y, .z = position.z};
 }
 
-iclforge::oba::ObjectSize iab_spread_to_size(const iclforge::iab::ObjectSpread& spread) {
+iclforge::objects::oba::ObjectSize iab_spread_to_size(const iclforge::iab::ObjectSpread& spread) {
     if (spread.mode == iclforge::iab::ObjectSpreadMode::kNone) {
         return {};
     }
@@ -59,17 +59,17 @@ namespace {
 using HorizontalPattern = std::array<bool, 7>;
 
 struct Preset {
-    iclforge::oba::ZoneConstraint zone;
+    iclforge::objects::oba::ZoneConstraint zone;
     HorizontalPattern pattern;
 };
 
 constexpr std::array<Preset, 6> kPresets{{
-    {iclforge::oba::ZoneConstraint::kNone, {true, true, true, true, true, true, true}},
-    {iclforge::oba::ZoneConstraint::kBackExcluded, {true, true, true, true, true, false, false}},
-    {iclforge::oba::ZoneConstraint::kSideExcluded, {true, true, true, false, false, true, true}},
-    {iclforge::oba::ZoneConstraint::kCentreAndBackOnly, {false, true, false, false, false, true, true}},
-    {iclforge::oba::ZoneConstraint::kScreenOnly, {true, true, true, false, false, false, false}},
-    {iclforge::oba::ZoneConstraint::kSurroundOnly, {false, false, false, true, true, true, true}},
+    {iclforge::objects::oba::ZoneConstraint::kNone, {true, true, true, true, true, true, true}},
+    {iclforge::objects::oba::ZoneConstraint::kBackExcluded, {true, true, true, true, true, false, false}},
+    {iclforge::objects::oba::ZoneConstraint::kSideExcluded, {true, true, true, false, false, true, true}},
+    {iclforge::objects::oba::ZoneConstraint::kCentreAndBackOnly, {false, true, false, false, false, true, true}},
+    {iclforge::objects::oba::ZoneConstraint::kScreenOnly, {true, true, true, false, false, false, false}},
+    {iclforge::objects::oba::ZoneConstraint::kSurroundOnly, {false, false, false, true, true, true, true}},
 }};
 
 [[nodiscard]] IabZoneMapping match_preset(const HorizontalPattern& pattern, bool elevation) {
@@ -111,15 +111,15 @@ IabZoneMapping iab_zones19_to_constraint(const std::array<double, iclforge::iab:
     }
     IabZoneMapping mapping = match_preset(pattern, elevation);
     if (rear_mixed) {
-        mapping.zone = iclforge::oba::ZoneConstraint::kNone;
+        mapping.zone = iclforge::objects::oba::ZoneConstraint::kNone;
         mapping.exact = false;
     }
     return mapping;
 }
 
-iclforge::oba::Position adm_position_to_room(const iclforge::adm::Position& position) {
+iclforge::objects::oba::Position adm_position_to_room(const iclforge::adm::Position& position) {
     return std::visit(
-        [](const auto& p) -> iclforge::oba::Position {
+        [](const auto& p) -> iclforge::objects::oba::Position {
             using T = std::decay_t<decltype(p)>;
             if constexpr (std::is_same_v<T, iclforge::adm::PolarPosition>) {
                 return adm_cartesian_to_room(polar_to_adm_cartesian(p));
@@ -255,15 +255,15 @@ AdmZoneMapping adm_zone_exclusion_to_constraint(std::span<const iclforge::adm::E
         return mapping;
     }
     if (horizontal == bit(Zone::kZm1)) {
-        mapping.zone = iclforge::oba::ZoneConstraint::kBackExcluded;
+        mapping.zone = iclforge::objects::oba::ZoneConstraint::kBackExcluded;
     } else if (horizontal == kSideMask) {
-        mapping.zone = iclforge::oba::ZoneConstraint::kSideExcluded;
+        mapping.zone = iclforge::objects::oba::ZoneConstraint::kSideExcluded;
     } else if (horizontal == kCentreBackMask) {
-        mapping.zone = iclforge::oba::ZoneConstraint::kCentreAndBackOnly;
+        mapping.zone = iclforge::objects::oba::ZoneConstraint::kCentreAndBackOnly;
     } else if (horizontal == bit(Zone::kZm4)) {
-        mapping.zone = iclforge::oba::ZoneConstraint::kScreenOnly;
+        mapping.zone = iclforge::objects::oba::ZoneConstraint::kScreenOnly;
     } else if (horizontal == bit(Zone::kZm5)) {
-        mapping.zone = iclforge::oba::ZoneConstraint::kSurroundOnly;
+        mapping.zone = iclforge::objects::oba::ZoneConstraint::kSurroundOnly;
     } else {
         // Some other combination of horizontal zones: OAMD carries one preset or none.
         mapping.exact = false;
@@ -272,28 +272,28 @@ AdmZoneMapping adm_zone_exclusion_to_constraint(std::span<const iclforge::adm::E
 }
 
 std::vector<iclforge::adm::ExclusionZone> constraint_to_adm_zone_exclusion(
-    iclforge::oba::ZoneConstraint zone, bool enable_elevation) {
+    iclforge::objects::oba::ZoneConstraint zone, bool enable_elevation) {
     std::vector<iclforge::adm::ExclusionZone> out;
     switch (zone) {
-        case iclforge::oba::ZoneConstraint::kNone:
+        case iclforge::objects::oba::ZoneConstraint::kNone:
             break;
-        case iclforge::oba::ZoneConstraint::kBackExcluded:
+        case iclforge::objects::oba::ZoneConstraint::kBackExcluded:
             out.push_back(to_exclusion_zone(Zone::kZm1));
             break;
-        case iclforge::oba::ZoneConstraint::kSideExcluded:
+        case iclforge::objects::oba::ZoneConstraint::kSideExcluded:
             out.push_back(to_exclusion_zone(Zone::kZm2Left));
             out.push_back(to_exclusion_zone(Zone::kZm2Right));
             break;
-        case iclforge::oba::ZoneConstraint::kCentreAndBackOnly:
+        case iclforge::objects::oba::ZoneConstraint::kCentreAndBackOnly:
             out.push_back(to_exclusion_zone(Zone::kZm3ScreenLeft));
             out.push_back(to_exclusion_zone(Zone::kZm3SideLeft));
             out.push_back(to_exclusion_zone(Zone::kZm3ScreenRight));
             out.push_back(to_exclusion_zone(Zone::kZm3SideRight));
             break;
-        case iclforge::oba::ZoneConstraint::kScreenOnly:
+        case iclforge::objects::oba::ZoneConstraint::kScreenOnly:
             out.push_back(to_exclusion_zone(Zone::kZm4));
             break;
-        case iclforge::oba::ZoneConstraint::kSurroundOnly:
+        case iclforge::objects::oba::ZoneConstraint::kSurroundOnly:
             out.push_back(to_exclusion_zone(Zone::kZm5));
             break;
     }

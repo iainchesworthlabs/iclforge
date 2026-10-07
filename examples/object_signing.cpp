@@ -46,7 +46,7 @@ int main() {
     for (const auto& source : sources) {
         views.emplace_back(source);
     }
-    const std::array<iclforge::oba::ObjectPlacement, kObjects> placement{{
+    const std::array<iclforge::objects::oba::ObjectPlacement, kObjects> placement{{
         {.position = {.x = 0.3, .y = 0.5, .z = 0.0}, .gain = 0.8},
         {.position = {.x = 0.7, .y = 0.5, .z = 0.0}, .gain = 0.8},
     }};

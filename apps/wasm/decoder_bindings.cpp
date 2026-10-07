@@ -310,8 +310,8 @@ class PushDecoder {
         // AtmosEncoder writes, or the bed's own channels for channel-based-
         // immersive third-party content).
         const auto objects = unit.object_metadata
-                                  ? iclforge::oba::describe_objects(*unit.object_metadata)
-                                  : std::vector<iclforge::oba::DisplayObject>{};
+                                  ? iclforge::objects::oba::describe_objects(*unit.object_metadata)
+                                  : std::vector<iclforge::objects::oba::DisplayObject>{};
         object_positions_.reserve(objects.size());
         object_labels_.reserve(objects.size());
         for (const auto& object : objects) {

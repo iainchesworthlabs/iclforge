@@ -119,24 +119,24 @@ Destination at(Location location) {
 
 // An authored scene: `count` objects, each held for the first 40 ms at one place and moving
 // to another by 90 ms, at unity.
-iclforge::oba::ObjectScene moving_scene(std::size_t count) {
-    std::vector<iclforge::oba::SceneObject> objects;
+iclforge::objects::oba::ObjectScene moving_scene(std::size_t count) {
+    std::vector<iclforge::objects::oba::SceneObject> objects;
     for (std::size_t i = 0; i < count; ++i) {
         const double x = 0.15 + 0.7 * static_cast<double>(i) / static_cast<double>(count);
-        iclforge::oba::SceneObject o;
+        iclforge::objects::oba::SceneObject o;
         o.name = "object " + std::to_string(i);
         o.automation = {
             {.time_s = 0.0, .position = {.x = x, .y = 0.2, .z = 0.0}, .gain = 0.5},
             {.time_s = 0.09, .position = {.x = 1.0 - x, .y = 0.8, .z = 0.5}, .gain = 0.5}};
         objects.push_back(std::move(o));
     }
-    auto scene = iclforge::oba::ObjectScene::create(std::move(objects));
+    auto scene = iclforge::objects::oba::ObjectScene::create(std::move(objects));
     REQUIRE(scene.has_value());
     return std::move(*scene);
 }
 
-fs::path write_scene(const fs::path& path, const iclforge::oba::ObjectScene& scene) {
-    std::ofstream{path, std::ios::binary} << iclforge::oba::to_json(scene);
+fs::path write_scene(const fs::path& path, const iclforge::objects::oba::ObjectScene& scene) {
+    std::ofstream{path, std::ios::binary} << iclforge::objects::oba::to_json(scene);
     return path;
 }
 
@@ -144,7 +144,7 @@ fs::path write_scene(const fs::path& path, const iclforge::oba::ObjectScene& sce
 std::vector<std::byte> shared_bytes(const std::vector<const iclforge::ac3::io::WavData*>& sources,
                                     const std::vector<std::size_t>& offsets,
                                     const Assignment& assignment,
-                                    const iclforge::oba::ObjectScene& scene, int kbps,
+                                    const iclforge::objects::oba::ObjectScene& scene, int kbps,
                                     iclforge::ac4::ObjectCoding coding, bool mp4, bool crc) {
     std::vector<SourceShape> shapes;
     std::vector<iclforge::apps::Ac4SourceView> views;

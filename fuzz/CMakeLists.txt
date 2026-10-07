@@ -272,12 +272,12 @@ iclforge_add_fuzzer(fuzz_differential_eac3_decode)
 # the real payloads inside the Atmos streams generate-seeds.sh already builds
 # - see fuzz/extract-metadata-seeds.py.
 
-# iclforge::emdf::parse_container: ETSI TS 102 366 Annex H's container, located by
+# iclforge::objects::emdf::parse_container: ETSI TS 102 366 Annex H's container, located by
 # a bit-by-bit sync scan and sized by its own 16-bit length field
 # (src/objects/src/emdf.cpp).
 iclforge_add_fuzzer(fuzz_emdf_parse)
 
-# iclforge::oba::parse_payload: TS 103 420 §5's object_audio_metadata_payload
+# iclforge::objects::oba::parse_payload: TS 103 420 §5's object_audio_metadata_payload
 # (src/objects/src/oamd.cpp).
 iclforge_add_fuzzer(fuzz_oamd_parse)
 
@@ -287,7 +287,7 @@ iclforge_add_fuzzer(fuzz_oamd_parse)
 iclforge_add_fuzzer(fuzz_joc_parse)
 
 # --- Live position input (live OSC object positions) ---------------------------------------
-# iclforge::oba::parse_osc_packet: the OSC 1.0 wire form of a live scene update
+# iclforge::objects::oba::parse_osc_packet: the OSC 1.0 wire form of a live scene update
 # (src/objects/src/scene_osc.cpp). Not behind the bitstream at all - this
 # is the project's first NETWORK-facing parser, reached straight from a UDP
 # datagram by iclforge::audio::LivePositionSource whenever a live session opts

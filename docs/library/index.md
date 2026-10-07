@@ -280,7 +280,7 @@ namespace of their own, `iclforge::base`, `iclforge::render`, `iclforge::dsp` an
 Five names are declared both by another library under `iclforge::` and by the codec under
 `iclforge::ac3::`: `oba`, `emdf`, `render`, `internal` and `detail`. Inside `iclforge::ac3` an
 unqualified `oba::` is the codec's, so the objects library's `Position` is written
-`iclforge::oba::Position` there. The directory and the header root say which library a header is
+`iclforge::objects::oba::Position` there. The directory and the header root say which library a header is
 in, and so does the namespace; `tools/checks/check_namespaces.py` holds the headers to it, with
 three exceptions it lists as debts (`BitReader` and `BitWriter` of `iclforge/base/`, and `dft512`
 of `iclforge/dsp/fft.hpp`, which are declared in `iclforge` itself).

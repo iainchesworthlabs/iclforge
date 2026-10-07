@@ -148,7 +148,7 @@ authored keeps the preset's name in the object table until a hand edit makes it 
 **Export paths…** writes every dynamic object's current motion — or, for a path-less object, its
 static position as a single time-0 keyframe — to a file `forge atmos-path` and `atmos-encode`
 read. Which form depends on the name you save under: a `.json` name writes the
-`iclforge::oba::ObjectScene` form (named objects, per-segment interpolation, a scene orientation — see
+`iclforge::objects::oba::ObjectScene` form (named objects, per-segment interpolation, a scene orientation — see
 [Spatial & Atmos objects](../../library/spatial-and-atmos.md#the-serialised-form)), and anything else
 writes the keyframe columns this export has always produced (`object_index time_s x y z gain
 lfe_send`, one line per keyframe, addressed by each object's flat WAV channel index). `forge`

@@ -75,7 +75,7 @@ struct OutputStatus {
 // LFE). The DD 5.1 leg reads the bed; the bypass path reads all of it.
 struct RawFrame {
     std::span<const std::span<const float>> objects;
-    std::span<const iclforge::oba::ObjectPlacement> placements;
+    std::span<const iclforge::objects::oba::ObjectPlacement> placements;
     std::span<const std::span<const float>> bed;
 };
 

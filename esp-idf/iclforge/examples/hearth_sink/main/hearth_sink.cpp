@@ -108,9 +108,9 @@ constexpr iclforge::PlayerConfig::Objects kObjects =
     CONFIG_ICLFORGE_EXAMPLE_OBJECTS == 1   ? iclforge::PlayerConfig::Objects::kNever
     : CONFIG_ICLFORGE_EXAMPLE_OBJECTS == 2 ? iclforge::PlayerConfig::Objects::kAlways
                                            : iclforge::PlayerConfig::Objects::kAuto;
-constexpr iclforge::oba::joc::Domain kJocDomain = CONFIG_ICLFORGE_EXAMPLE_JOC_DOMAIN != 0
-                                                 ? iclforge::oba::joc::Domain::kMdctBand
-                                                 : iclforge::oba::joc::Domain::kQmf;
+constexpr iclforge::objects::oba::joc::Domain kJocDomain = CONFIG_ICLFORGE_EXAMPLE_JOC_DOMAIN != 0
+                                                 ? iclforge::objects::oba::joc::Domain::kMdctBand
+                                                 : iclforge::objects::oba::joc::Domain::kQmf;
 constexpr iclforge::ac3::OperatingMode kMode = CONFIG_ICLFORGE_EXAMPLE_DRC_MODE == 1   ? iclforge::ac3::OperatingMode::kRf
                                      : CONFIG_ICLFORGE_EXAMPLE_DRC_MODE == 2 ? iclforge::ac3::OperatingMode::kCustom
                                                                              : iclforge::ac3::OperatingMode::kLine;

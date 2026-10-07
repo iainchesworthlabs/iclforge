@@ -344,7 +344,7 @@ independent object decode of an ICL Forge stream. What exists instead is a self-
 series with real resolution — `tools/ci/quality_race.py`'s `objects` mode scores a committed
 five-object scene per object per rate in the nightly run, trended at [Object quality
 trend](https://iainchesworthlabs.github.io/iclforge/object-quality-trend/). If you are changing
-`iclforge::oba::joc` or `iclforge::oba`, run it before and after and put both numbers in the commit message;
+`iclforge::objects::oba::joc` or `iclforge::oba`, run it before and after and put both numbers in the commit message;
 it takes seconds and it is the only quality signal that layer has.
 
 Neither decoder covers everything, and the gaps do not overlap: see the [verification-gap

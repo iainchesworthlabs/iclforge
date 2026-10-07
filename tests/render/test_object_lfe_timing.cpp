@@ -43,7 +43,7 @@
 
 namespace {
 
-using iclforge::oba::joc::Domain;
+using iclforge::objects::oba::joc::Domain;
 using iclforge::render::LayoutRenderer;
 using iclforge::render::OutputLayout;
 using Location = iclforge::ac3::eac3::chanmap::Location;
@@ -147,7 +147,7 @@ struct Rendered {
 // the bed otherwise.
 Rendered encode_decode_render(std::span<const float> in, Domain domain, bool objects) {
     iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448, .joc_domain = domain}, 1};
-    const iclforge::oba::ObjectPlacement placement{
+    const iclforge::objects::oba::ObjectPlacement placement{
         .position = {.x = 0.5, .y = 0.0, .z = 0.0}, .gain = 1.0, .lfe_send = 1.0};
 
     const OutputLayout layout = *OutputLayout::named("5.1");
@@ -175,7 +175,7 @@ Rendered encode_decode_render(std::span<const float> in, Domain domain, bool obj
     const auto frame = static_cast<std::size_t>(iclforge::ac3::kSamplesPerFrame);
     for (std::size_t start = 0; start < in.size(); start += frame) {
         const std::array<std::span<const float>, 1> audio{in.subspan(start, frame)};
-        const std::array<iclforge::oba::ObjectPlacement, 1> placements{placement};
+        const std::array<iclforge::objects::oba::ObjectPlacement, 1> placements{placement};
         const auto unit = encoder.encode_frame(audio, placements);
         REQUIRE(unit.has_value());
         bool carried_objects = false;
@@ -298,8 +298,8 @@ long first_difference(const std::vector<float>& got, Want want) {
     return -1;
 }
 
-std::array<iclforge::oba::DisplayObject, 1> at_the_centre() {
-    iclforge::oba::DisplayObject object;
+std::array<iclforge::objects::oba::DisplayObject, 1> at_the_centre() {
+    iclforge::objects::oba::DisplayObject object;
     object.position = {.x = 0.5, .y = 0.0, .z = 0.0};
     return {object};
 }
@@ -328,7 +328,7 @@ TEST_CASE("the bed's LFE and its other channels arrive together", "[render][late
 TEST_CASE("the objects' LFE arrives with the objects", "[render][latency]") {
     const Domain domain = GENERATE(Domain::kQmf, Domain::kMdctBand);
     const int object_lag =
-        iclforge::ac3::kTransformDelaySamples + iclforge::oba::joc::reconstruction_delay(domain);
+        iclforge::ac3::kTransformDelaySamples + iclforge::objects::oba::joc::reconstruction_delay(domain);
     CAPTURE(domain == Domain::kQmf ? "kQmf" : "kMdctBand", object_lag);
 
     const auto in = programme(kFrames * iclforge::ac3::kSamplesPerFrame, kPulseAt);
@@ -354,7 +354,7 @@ TEST_CASE("the renderer's lag is the one the decoder's default domain has", "[re
     const LayoutRenderer renderer{*OutputLayout::named("5.1")};
     CHECK(renderer.object_lag() ==
           static_cast<std::size_t>(
-              iclforge::oba::joc::reconstruction_delay(iclforge::ac3::DecoderConfig{}.joc_domain)));
+              iclforge::objects::oba::joc::reconstruction_delay(iclforge::ac3::DecoderConfig{}.joc_domain)));
 }
 
 TEST_CASE("render holds the bed's LFE back by the objects' lag, whatever the block length",
@@ -362,7 +362,7 @@ TEST_CASE("render holds the bed's LFE back by the objects' lag, whatever the blo
     const Domain domain = GENERATE(Domain::kQmf, Domain::kMdctBand);
     // A block's worth, one that divides neither lag, and one longer than both.
     const std::size_t block = GENERATE(std::size_t{256}, std::size_t{100}, std::size_t{2048});
-    const auto lag = static_cast<std::size_t>(iclforge::oba::joc::reconstruction_delay(domain));
+    const auto lag = static_cast<std::size_t>(iclforge::objects::oba::joc::reconstruction_delay(domain));
     CAPTURE(lag, block);
 
     LayoutRenderer renderer{*OutputLayout::named("5.1")};  // L C R Ls Rs LFE

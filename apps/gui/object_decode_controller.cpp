@@ -80,7 +80,7 @@ std::optional<RawResult> measure_eac3_objects(std::span<const std::byte> stream,
         // Every JOC output, not just the dynamic objects: a bed programme has
         // none of the latter and eleven of the former, and used to show as an
         // empty dialog.
-        const auto described = iclforge::oba::describe_objects(*sub.object_metadata);
+        const auto described = iclforge::objects::oba::describe_objects(*sub.object_metadata);
 
         RawFrame f;
         f.time_s = time_s;
@@ -109,7 +109,7 @@ std::optional<RawResult> measure_eac3_objects(std::span<const std::byte> stream,
 
         result.dynamic_object_count = static_cast<int>(described.size());
         result.dynamic_only = program.dynamic_only;
-        result.has_lfe = iclforge::oba::has_lfe(program);
+        result.has_lfe = iclforge::objects::oba::has_lfe(program);
 
         if (result.object_audio.size() != described.size()) {
             result.object_audio.assign(described.size(), {});

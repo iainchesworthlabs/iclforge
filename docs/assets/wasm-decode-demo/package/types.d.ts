@@ -46,7 +46,7 @@ export interface FlushEntry {
 }
 export interface ObjectFrame {
     label: string;
-    /** [x, y, z, gain_db, width, depth, height] - see iclforge::oba::DisplayObject's own comment. */
+    /** [x, y, z, gain_db, width, depth, height] - see iclforge::objects::oba::DisplayObject's own comment. */
     position: Float32Array;
 }
 export type ScanOutcome = {

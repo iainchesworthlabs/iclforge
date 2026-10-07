@@ -166,7 +166,7 @@ SAMPLES = [
                 "appears anywhere in the file. FFmpeg reports this as "
                 "\"Dolby Digital Plus + Dolby Atmos\", but the OAMD payload the "
                 "dependent's block skip field carries does not decode here: "
-                "iclforge::oba::parse_payload refuses several object_element fields "
+                "iclforge::objects::oba::parse_payload refuses several object_element fields "
                 "(num_obj_info_blocks, sample_offset_code, b_object_not_active "
                 "among them) to exactly the shape this project's own encoder "
                 "emits, and Dolby's commercial encoder does not produce that "

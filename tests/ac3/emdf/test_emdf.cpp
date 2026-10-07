@@ -34,8 +34,8 @@ std::uint32_t read_variable_bits(iclforge::BitReader& r, int group_bits) {
 
 std::vector<std::byte> encode_variable_bits(std::uint32_t value, int group_bits) {
     iclforge::BitWriter w;
-    iclforge::emdf::put_variable_bits(w, value, group_bits);
-    const int size = iclforge::emdf::variable_bits_size(value, group_bits);
+    iclforge::objects::emdf::put_variable_bits(w, value, group_bits);
+    const int size = iclforge::objects::emdf::variable_bits_size(value, group_bits);
     CHECK(static_cast<int>(w.bit_count()) == size);
     return w.take();
 }
@@ -49,7 +49,7 @@ std::size_t find_emdf_sync(std::span<const std::byte> frame) {
     for (std::size_t bit = 0; bit + 16 <= total; ++bit) {
         iclforge::BitReader r{frame};
         r.skip(bit);
-        if (r.read(16) == iclforge::emdf::kSyncWord) {
+        if (r.read(16) == iclforge::objects::emdf::kSyncWord) {
             return bit;
         }
     }
@@ -75,11 +75,11 @@ TEST_CASE("variable_bits spends the fewest groups it can", "[emdf]") {
     // Table H.2.1: one group covers [0, 2^n), two cover the next 2^2n values.
     // Getting the group_offset wrong makes the boundary values collide - two
     // encodings for one value, and a decoder one group out of step.
-    CHECK(iclforge::emdf::variable_bits_size(0, 8) == 9);
-    CHECK(iclforge::emdf::variable_bits_size(255, 8) == 9);
-    CHECK(iclforge::emdf::variable_bits_size(256, 8) == 18);   // 2^8, first 2-group
-    CHECK(iclforge::emdf::variable_bits_size(65791, 8) == 18); // 2^8 + 2^16 - 1
-    CHECK(iclforge::emdf::variable_bits_size(65792, 8) == 27);
+    CHECK(iclforge::objects::emdf::variable_bits_size(0, 8) == 9);
+    CHECK(iclforge::objects::emdf::variable_bits_size(255, 8) == 9);
+    CHECK(iclforge::objects::emdf::variable_bits_size(256, 8) == 18);   // 2^8, first 2-group
+    CHECK(iclforge::objects::emdf::variable_bits_size(65791, 8) == 18); // 2^8 + 2^16 - 1
+    CHECK(iclforge::objects::emdf::variable_bits_size(65792, 8) == 27);
 
     // The boundary pair must decode to adjacent values, not the same one.
     for (const std::uint32_t value : {255u, 256u, 65791u, 65792u}) {
@@ -92,11 +92,11 @@ TEST_CASE("variable_bits spends the fewest groups it can", "[emdf]") {
 TEST_CASE("EMDF container carries its payloads verbatim", "[emdf]") {
     const std::vector<std::byte> oamd{std::byte{0xDE}, std::byte{0xAD}};
     const std::vector<std::byte> joc{std::byte{0xBE}, std::byte{0xEF}, std::byte{0x01}};
-    const std::array<iclforge::emdf::Payload, 2> payloads{{
-        {.id = iclforge::emdf::kPayloadIdOamd, .bytes = oamd},
-        {.id = iclforge::emdf::kPayloadIdJoc, .bytes = joc},
+    const std::array<iclforge::objects::emdf::Payload, 2> payloads{{
+        {.id = iclforge::objects::emdf::kPayloadIdOamd, .bytes = oamd},
+        {.id = iclforge::objects::emdf::kPayloadIdJoc, .bytes = joc},
     }};
-    const auto container = iclforge::emdf::build_container(payloads, 1);
+    const auto container = iclforge::objects::emdf::build_container(payloads, 1);
 
     iclforge::BitReader r{container};
     CHECK(r.read(16) == 0x5838);
@@ -146,20 +146,20 @@ TEST_CASE("EMDF container carries its payloads verbatim", "[emdf]") {
 TEST_CASE("parse_container decodes back to the payloads it was given", "[emdf]") {
     const std::vector<std::byte> oamd{std::byte{0xDE}, std::byte{0xAD}, std::byte{0x00}};
     const std::vector<std::byte> joc{std::byte{0xBE}, std::byte{0xEF}, std::byte{0x01}, std::byte{0xFF}};
-    const std::array<iclforge::emdf::Payload, 2> payloads{{
-        {.id = iclforge::emdf::kPayloadIdOamd, .bytes = oamd},
-        {.id = iclforge::emdf::kPayloadIdJoc, .bytes = joc},
+    const std::array<iclforge::objects::emdf::Payload, 2> payloads{{
+        {.id = iclforge::objects::emdf::kPayloadIdOamd, .bytes = oamd},
+        {.id = iclforge::objects::emdf::kPayloadIdJoc, .bytes = joc},
     }};
-    const auto container = iclforge::emdf::build_container(payloads, 2);
+    const auto container = iclforge::objects::emdf::build_container(payloads, 2);
 
-    const auto result = iclforge::emdf::parse_container(container);
+    const auto result = iclforge::objects::emdf::parse_container(container);
     REQUIRE(result.has_value());
     REQUIRE(result->has_value());
     const auto& decoded = **result;
     REQUIRE(decoded.size() == 2);
-    CHECK(decoded[0].id == iclforge::emdf::kPayloadIdOamd);
+    CHECK(decoded[0].id == iclforge::objects::emdf::kPayloadIdOamd);
     CHECK(decoded[0].bytes == oamd);
-    CHECK(decoded[1].id == iclforge::emdf::kPayloadIdJoc);
+    CHECK(decoded[1].id == iclforge::objects::emdf::kPayloadIdJoc);
     CHECK(decoded[1].bytes == joc);
 }
 
@@ -167,9 +167,9 @@ TEST_CASE("parse_container decodes a container that does not start at bit 0", "[
     // §H.2.2.1.1's own justification for scanning rather than a fixed offset:
     // nothing says the container starts where a decoder might expect it to.
     const std::vector<std::byte> oamd{std::byte{0x01}, std::byte{0x02}};
-    const std::array<iclforge::emdf::Payload, 1> payloads{
-        {{.id = iclforge::emdf::kPayloadIdOamd, .bytes = oamd}}};
-    const auto container = iclforge::emdf::build_container(payloads);
+    const std::array<iclforge::objects::emdf::Payload, 1> payloads{
+        {{.id = iclforge::objects::emdf::kPayloadIdOamd, .bytes = oamd}}};
+    const auto container = iclforge::objects::emdf::build_container(payloads);
 
     iclforge::BitWriter w;
     w.put(0b0101101, 7);  // arbitrary, non-byte-aligned leading noise
@@ -178,7 +178,7 @@ TEST_CASE("parse_container decodes a container that does not start at bit 0", "[
     }
     const auto data = w.take();
 
-    const auto result = iclforge::emdf::parse_container(data);
+    const auto result = iclforge::objects::emdf::parse_container(data);
     REQUIRE(result.has_value());
     REQUIRE(result->has_value());
     REQUIRE((*result)->size() == 1);
@@ -187,7 +187,7 @@ TEST_CASE("parse_container decodes a container that does not start at bit 0", "[
 
 TEST_CASE("parse_container tolerates data with no EMDF at all", "[emdf]") {
     const std::vector<std::byte> silence(64, std::byte{0x00});
-    const auto result = iclforge::emdf::parse_container(silence);
+    const auto result = iclforge::objects::emdf::parse_container(silence);
     REQUIRE(result.has_value());
     CHECK_FALSE(result->has_value());
 
@@ -196,24 +196,24 @@ TEST_CASE("parse_container tolerates data with no EMDF at all", "[emdf]") {
     for (std::size_t i = 0; i < noise.size(); ++i) {
         noise[i] = static_cast<std::byte>((i * 37 + 11) & 0xFF);
     }
-    const auto noise_result = iclforge::emdf::parse_container(noise);
+    const auto noise_result = iclforge::objects::emdf::parse_container(noise);
     REQUIRE(noise_result.has_value());
     CHECK_FALSE(noise_result->has_value());
 }
 
 TEST_CASE("parse_container rejects a container truncated after the sync word", "[emdf]") {
     const std::vector<std::byte> oamd{std::byte{0xAA}, std::byte{0xBB}, std::byte{0xCC}};
-    const std::array<iclforge::emdf::Payload, 1> payloads{
-        {{.id = iclforge::emdf::kPayloadIdOamd, .bytes = oamd}}};
-    const auto container = iclforge::emdf::build_container(payloads);
+    const std::array<iclforge::objects::emdf::Payload, 1> payloads{
+        {{.id = iclforge::objects::emdf::kPayloadIdOamd, .bytes = oamd}}};
+    const auto container = iclforge::objects::emdf::build_container(payloads);
 
     for (const std::size_t cut : {std::size_t{4}, container.size() / 2, container.size() - 1}) {
         CAPTURE(cut);
         const std::vector<std::byte> truncated(container.begin(),
                                                container.begin() + static_cast<std::ptrdiff_t>(cut));
-        const auto result = iclforge::emdf::parse_container(truncated);
+        const auto result = iclforge::objects::emdf::parse_container(truncated);
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error() == iclforge::emdf::ParseError::kTruncated);
+        CHECK(result.error() == iclforge::objects::emdf::ParseError::kTruncated);
     }
 }
 
@@ -228,7 +228,7 @@ TEST_CASE("parse_container reads a payload config outside Table 56's shape", "[e
     iclforge::BitWriter body;
     body.put(0, 2);  // emdf_version
     body.put(0, 3);  // key_id
-    body.put(iclforge::emdf::kPayloadIdOamd, 5);
+    body.put(iclforge::objects::emdf::kPayloadIdOamd, 5);
     body.put(1, 1);     // smploffste: the deviation under test
     body.put(1234, 11); // smploffst
     body.put(0, 1);     // reserved
@@ -253,19 +253,19 @@ TEST_CASE("parse_container reads a payload config outside Table 56's shape", "[e
     const auto payload_bytes = body.take();
 
     iclforge::BitWriter out;
-    out.put(iclforge::emdf::kSyncWord, 16);
+    out.put(iclforge::objects::emdf::kSyncWord, 16);
     out.put(static_cast<std::uint32_t>(payload_bytes.size()), 16);
     for (const auto byte : payload_bytes) {
         out.put(std::to_integer<std::uint32_t>(byte), 8);
     }
     const auto data = out.take();
 
-    const auto result = iclforge::emdf::parse_container(data);
+    const auto result = iclforge::objects::emdf::parse_container(data);
     REQUIRE(result.has_value());
     REQUIRE(result->has_value());
     const auto& payloads = **result;
     REQUIRE(payloads.size() == 1);
-    CHECK(payloads[0].id == iclforge::emdf::kPayloadIdOamd);
+    CHECK(payloads[0].id == iclforge::objects::emdf::kPayloadIdOamd);
     CHECK(payloads[0].config.sample_offset == 1234);
     CHECK(payloads[0].config.group_id == 2);
     CHECK(payloads[0].config.duration == -1);
@@ -278,9 +278,9 @@ TEST_CASE("parse_container reads a payload config outside Table 56's shape", "[e
 
 TEST_CASE("an EMDF container rides in a block skip field", "[emdf][eac3]") {
     const std::vector<std::byte> payload(6, std::byte{0x5A});
-    const std::array<iclforge::emdf::Payload, 1> payloads{
-        {{.id = iclforge::emdf::kPayloadIdOamd, .bytes = payload}}};
-    const auto container = iclforge::emdf::build_container(payloads);
+    const std::array<iclforge::objects::emdf::Payload, 1> payloads{
+        {{.id = iclforge::objects::emdf::kPayloadIdOamd, .bytes = payload}}};
+    const auto container = iclforge::objects::emdf::build_container(payloads);
 
     const iclforge::ac3::eac3::FrameConfig config{
         .bitrate_kbps = 448, .acmod = iclforge::ac3::Acmod::k3_2, .lfe = true};

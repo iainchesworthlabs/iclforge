@@ -77,8 +77,8 @@ constexpr iclforge::ac3::DownmixTarget kStereoFold =
 constexpr iclforge::ac3::render::ObjectsPolicy kObjects = CONFIG_ICLFORGE_EXAMPLE_OBJECTS == 1   ? iclforge::ac3::render::ObjectsPolicy::kNever
                                                 : CONFIG_ICLFORGE_EXAMPLE_OBJECTS == 2 ? iclforge::ac3::render::ObjectsPolicy::kAlways
                                                                                        : iclforge::ac3::render::ObjectsPolicy::kAuto;
-constexpr iclforge::oba::joc::Domain kJocDomain =
-    CONFIG_ICLFORGE_EXAMPLE_JOC_DOMAIN != 0 ? iclforge::oba::joc::Domain::kMdctBand : iclforge::oba::joc::Domain::kQmf;
+constexpr iclforge::objects::oba::joc::Domain kJocDomain =
+    CONFIG_ICLFORGE_EXAMPLE_JOC_DOMAIN != 0 ? iclforge::objects::oba::joc::Domain::kMdctBand : iclforge::objects::oba::joc::Domain::kQmf;
 
 // The decoder settings this board takes from a server: every one the
 // extension page names that the library has a setting for. drc_cut and

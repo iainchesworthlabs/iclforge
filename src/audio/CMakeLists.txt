@@ -16,7 +16,7 @@
 # `positions=osc:<port>` - it is not part of the distributed iclforge-dev
 # package (see docs/library/index.md).
 #
-# PUBLIC-links iclforge::ac3: live_positions.hpp names iclforge::oba::SceneCursor in
+# PUBLIC-links iclforge::ac3: live_positions.hpp names iclforge::objects::oba::SceneCursor in
 # its own public interface (LivePositionSource::drain_into), so forge is a
 # genuine usage requirement for anything that includes this library's
 # headers, not merely something the .cpp files reach for privately the way

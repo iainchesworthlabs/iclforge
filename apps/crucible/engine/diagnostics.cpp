@@ -100,7 +100,7 @@ std::string_view describe_source(KeySource source) {
     return "none";
 }
 
-std::string position_of(const iclforge::oba::Position& p) {
+std::string position_of(const iclforge::objects::oba::Position& p) {
     return "(" + fixed(p.x, 2) + ", " + fixed(p.y, 2) + ", " + fixed(p.z, 2) + ")";
 }
 

@@ -33,7 +33,7 @@ namespace forge_cli {
 struct AdmObjectUpdate {
     std::uint64_t sample_offset = 0;
     int ramp_duration_samples = 0;
-    iclforge::oba::DynamicObject state;
+    iclforge::objects::oba::DynamicObject state;
 };
 
 // One channel of the master being written - a bed channel (`bed_label` set, pinned at its own
@@ -42,7 +42,7 @@ struct AdmObjectUpdate {
 struct AdmMasterChannel {
     std::string name;
     std::vector<float> pcm;
-    std::optional<iclforge::oba::BedLabel> bed_label{};
+    std::optional<iclforge::objects::oba::BedLabel> bed_label{};
     std::vector<AdmObjectUpdate> updates{};
 };
 

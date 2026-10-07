@@ -1104,7 +1104,7 @@ TEST_CASE("atmos-encode with a keyframes file authors motion", "[cli][atmos-enco
 }
 
 // atmos-path's file argument used to be the keyframe grammar and only that.
-// It now reads an iclforge::oba::ObjectScene in JSON as well, told apart by the
+// It now reads an iclforge::objects::oba::ObjectScene in JSON as well, told apart by the
 // first character - so the two spellings of one scene have to encode to the
 // same stream, byte for byte, or "migrate your file" would silently be a
 // change to the mix.
@@ -1133,12 +1133,12 @@ TEST_CASE("atmos-path reads a keyframe file and its JSON form identically",
         std::ifstream in{keyframes_path, std::ios::binary};
         const std::string text{std::istreambuf_iterator<char>{in},
                                std::istreambuf_iterator<char>{}};
-        const auto scene = iclforge::oba::scene_from_text(text);
+        const auto scene = iclforge::objects::oba::scene_from_text(text);
         REQUIRE(scene.has_value());
         REQUIRE(scene->object_count() == 2);
         std::ofstream json{scene_path, std::ios::binary};
         REQUIRE(json.is_open());
-        json << iclforge::oba::to_json(*scene);
+        json << iclforge::objects::oba::to_json(*scene);
     }
 
     const auto from_keyframes = dir / "scene_from_keyframes.ec3";

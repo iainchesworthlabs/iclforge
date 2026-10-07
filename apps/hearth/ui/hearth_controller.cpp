@@ -133,7 +133,7 @@ constexpr int kPollMs = 60;
 
 // Forward-declared: defined below, in the play-monitor section, but the
 // Media page's own OAMD table (media_objects_to_list()) needs it too.
-[[nodiscard]] QVariantMap display_object_to_map(const iclforge::oba::DisplayObject& object);
+[[nodiscard]] QVariantMap display_object_to_map(const iclforge::objects::oba::DisplayObject& object);
 
 [[nodiscard]] QVariantMap media_container_to_map(const apps::ContainerFacts& facts) {
     QVariantMap map;
@@ -207,13 +207,13 @@ constexpr int kPollMs = 60;
 // same map shape the Play page's own monitor already uses for a playing
 // unit's objects (see this file's own poll()).
 [[nodiscard]] QVariantList media_objects_to_list(
-    const std::optional<iclforge::oba::DecodedProgram>& objects) {
+    const std::optional<iclforge::objects::oba::DecodedProgram>& objects) {
     QVariantList list;
     if (!objects) {
         return list;
     }
-    const std::vector<iclforge::oba::DisplayObject> described =
-        iclforge::oba::describe_objects(*objects);
+    const std::vector<iclforge::objects::oba::DisplayObject> described =
+        iclforge::objects::oba::describe_objects(*objects);
     list.reserve(static_cast<qsizetype>(described.size()));
     for (const auto& object : described) {
         list.push_back(display_object_to_map(object));
@@ -705,13 +705,13 @@ constexpr int kPollMs = 60;
     return iclforge::ac3::render::ObjectsPolicy::kAuto;
 }
 
-[[nodiscard]] QString joc_domain_name(iclforge::oba::joc::Domain domain) {
-    return domain == iclforge::oba::joc::Domain::kMdctBand ? QStringLiteral("mdct") : QStringLiteral("qmf");
+[[nodiscard]] QString joc_domain_name(iclforge::objects::oba::joc::Domain domain) {
+    return domain == iclforge::objects::oba::joc::Domain::kMdctBand ? QStringLiteral("mdct") : QStringLiteral("qmf");
 }
 
-[[nodiscard]] iclforge::oba::joc::Domain joc_domain_from_name(const QString& name) {
-    return name == QLatin1String("mdct") ? iclforge::oba::joc::Domain::kMdctBand
-                                          : iclforge::oba::joc::Domain::kQmf;
+[[nodiscard]] iclforge::objects::oba::joc::Domain joc_domain_from_name(const QString& name) {
+    return name == QLatin1String("mdct") ? iclforge::objects::oba::joc::Domain::kMdctBand
+                                          : iclforge::objects::oba::joc::Domain::kQmf;
 }
 
 [[nodiscard]] QString concealment_name(iclforge::ac3::ConcealmentPolicy policy) {
@@ -994,7 +994,7 @@ constexpr int kPollMs = 60;
 // apps/gui's ObjectDecodeController already settled on for its own room-plan
 // view (object_decode_controller.cpp), so the two applications' object
 // markers read the same fields the same way.
-[[nodiscard]] QVariantMap display_object_to_map(const iclforge::oba::DisplayObject& object) {
+[[nodiscard]] QVariantMap display_object_to_map(const iclforge::objects::oba::DisplayObject& object) {
     QVariantMap map;
     map[QStringLiteral("x")] = object.position.x;
     map[QStringLiteral("y")] = object.position.y;
@@ -1753,8 +1753,8 @@ void HearthController::poll() {
 
         if (report->objects) {
             new_has_object_metadata = true;
-            const std::vector<iclforge::oba::DisplayObject> described =
-                iclforge::oba::describe_objects(*report->objects);
+            const std::vector<iclforge::objects::oba::DisplayObject> described =
+                iclforge::objects::oba::describe_objects(*report->objects);
             new_objects.reserve(static_cast<qsizetype>(described.size()));
             for (const auto& object : described) {
                 new_objects.push_back(display_object_to_map(object));

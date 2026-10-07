@@ -136,7 +136,7 @@ TEST_CASE("atmos-cbi encodes a 5.1.4 WAV into a real bed OAMD+JOC stream", "[cli
         const auto& program = (*decoded)->object_metadata->program;
         CHECK_FALSE(program.dynamic_only);
         CHECK(program.dynamic_objects == 0);
-        CHECK(iclforge::oba::object_count(program) == 10);
+        CHECK(iclforge::objects::oba::object_count(program) == 10);
 
         const auto& audio = (*decoded)->object_audio;
         if (accumulated.empty()) {
@@ -198,7 +198,7 @@ TEST_CASE("atmos-cbi infers the layout from the file's channel count", "[cli][at
     REQUIRE(decoded->has_value());
     REQUIRE((*decoded)->object_metadata.has_value());
     CHECK((*decoded)->object_metadata->program.dynamic_objects == 0);
-    CHECK(iclforge::oba::object_count((*decoded)->object_metadata->program) == 10);
+    CHECK(iclforge::objects::oba::object_count((*decoded)->object_metadata->program) == 10);
 }
 
 TEST_CASE("atmos-cbi refuses a layout whose channel count does not match the file",

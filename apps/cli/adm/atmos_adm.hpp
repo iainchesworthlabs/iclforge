@@ -54,8 +54,8 @@ namespace forge_cli {
 struct AdmAtmosSource {
     std::uint32_t sample_rate = 0;
     std::vector<bool> is_bed;                 // parallel to paths/pcm; true = bed speaker feed
-    std::vector<iclforge::oba::ObjectPath>
-        paths;                                // pass directly to iclforge::oba::evaluate_placements
+    std::vector<iclforge::objects::oba::ObjectPath>
+        paths;                                // pass directly to iclforge::objects::oba::evaluate_placements
     std::vector<std::span<const float>> pcm;  // one mono span per channel; see `handle` above
     std::shared_ptr<void> handle;             // opaque - owns the parsed document, if any
     std::vector<std::string> warnings;        // one line per channel whose ADM metadata asks for

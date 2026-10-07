@@ -15,7 +15,7 @@
 
 // Roadmap item B1 phase 2 of 3 ("ADM BWF reader feeding the JOC encoder"): maps
 // the object graph iclforge::adm (phase 1) parses from a BW64/ADM master onto
-// iclforge::ac3::oba::AtmosEncoder's input shape - one iclforge::oba::ObjectPath plus one mono PCM
+// iclforge::ac3::oba::AtmosEncoder's input shape - one iclforge::objects::oba::ObjectPath plus one mono PCM
 // span per channel, ready to drive encode_frame() in a loop. Phase 3 (a CLI/GUI-facing end-to-end
 // command) is a separate, later task; this module is the mapping/bridge library only.
 //
@@ -99,7 +99,7 @@ enum class BridgeError : std::uint8_t {
                              // DynamicObject state to place it, even a static, never-moving one)
     kEmptyIabStream,         // build_iab() only: the frame span passed to it was empty
     kUnsupportedIabChannel,  // build_iab() only: a BedDefinition used a Table 19 ChannelID with no
-                             // iclforge::oba::BedLabel equivalent - see iab_bridge.cpp's own
+                             // iclforge::objects::oba::BedLabel equivalent - see iab_bridge.cpp's own
                              // comment on exactly which codes map and which are refused
     kNoIabEssenceForChannel,  // build_iab() only: a channel's non-zero AudioDataID (§10.3.6/Table
                               // 8's own field) never resolved to an AudioDataPCM or AudioDataDLC
@@ -112,10 +112,10 @@ enum class BridgeError : std::uint8_t {
 
 [[nodiscard]] ICLFORGE_ADM_EXPORT std::string_view describe(BridgeError error);
 
-// Builds one channel's iclforge::oba::ObjectPath from its audioBlockFormat sequence.
+// Builds one channel's iclforge::objects::oba::ObjectPath from its audioBlockFormat sequence.
 //
 // BS.2076-2 §5.4.1: a channel with exactly one audioBlockFormat is static - one keyframe, held
-// everywhere (iclforge::oba::KeyframePath's own "a single keyframe holds its placement everywhere"
+// everywhere (iclforge::objects::oba::KeyframePath's own "a single keyframe holds its placement everywhere"
 // behaviour is exactly this).
 //
 // For more than one block, §10.3's own state machine (verified directly against the standard's
@@ -152,7 +152,7 @@ enum class BridgeError : std::uint8_t {
 // Exposed (not file-local) specifically so this state machine can be tested directly against
 // hand-built iclforge::adm::AudioChannelFormat fixtures, independent of a full BW64
 // file/<chna>/pack resolution round trip.
-[[nodiscard]] ICLFORGE_ADM_EXPORT std::expected<iclforge::oba::ObjectPath, BridgeError>
+[[nodiscard]] ICLFORGE_ADM_EXPORT std::expected<iclforge::objects::oba::ObjectPath, BridgeError>
 build_channel_path(const iclforge::adm::AudioChannelFormat& channel, double object_start_s,
                     bool force_lfe);
 
@@ -173,8 +173,8 @@ struct BridgeResult {
     std::vector<bool> is_bed;                 // true: a DirectSpeakers bed channel
     std::vector<bool> is_lfe;                 // true only for a bed channel routed via lfe_send
                                                // (see this header's own top comment)
-    std::vector<iclforge::oba::ObjectPath>
-        paths;  // pass directly to iclforge::oba::evaluate_placements
+    std::vector<iclforge::objects::oba::ObjectPath>
+        paths;  // pass directly to iclforge::objects::oba::evaluate_placements
     std::vector<std::span<const float>>
         pcm;                        // one mono span per channel, borrowed from the
                                     // AdmDocument passed to build() - the caller must
@@ -196,7 +196,7 @@ struct BridgeResult {
 // audioObjects - §5.6: "AudioObjects can be nested and so they can refer to other audioObjects" -
 // with a cycle guard per §5.6.7's own prohibition), classifies each leaf audioObject as a bed or
 // a dynamic object via its resolved audioPackFormat's TypeDefinition, builds one
-// iclforge::oba::ObjectPath per channel from its audioBlockFormat sequence, and resolves its audio
+// iclforge::objects::oba::ObjectPath per channel from its audioBlockFormat sequence, and resolves its audio
 // via <chna>.
 //
 // Absolute program-timeline time for a channel's automation is `object.start_s + block.rtime_s` -
@@ -235,20 +235,20 @@ struct BridgeResult {
 
 // One OAMD update to a dynamic object's DynamicObject state, timestamped in absolute samples from
 // the start of the whole decode (not the access unit it arrived in) - the flattened form of
-// iclforge::oba::DecodedProgram::UpdateBlock (oamd.hpp) a caller assembles by walking every decoded
+// iclforge::objects::oba::DecodedProgram::UpdateBlock (oamd.hpp) a caller assembles by walking every decoded
 // access unit's own object_metadata->blocks in file order and adding each block's own
 // sample_offset to a running total of samples already emitted.
 struct ICLFORGE_ADM_EXPORT WriteObjectUpdate {
     std::uint64_t sample_offset = 0;
-    // iclforge::oba::UpdateBlock::ramp_duration verbatim - samples, or -1 for the one
+    // iclforge::objects::oba::UpdateBlock::ramp_duration verbatim - samples, or -1 for the one
     // ramp_duration_bits codeword TS 103 420's own table does not name (oamd.hpp's own comment);
     // build_block_formats() (bridge.cpp) treats a negative value as an instant jump (ramp 0).
     int ramp_duration_samples = 0;
-    iclforge::oba::DynamicObject state;
+    iclforge::objects::oba::DynamicObject state;
 };
 
 // One channel to write into the master. A bed channel (`bed_label` set) is written as a static
-// DirectSpeakers channel pinned at its own room position (iclforge::oba::bed_label_position) -
+// DirectSpeakers channel pinned at its own room position (iclforge::objects::oba::bed_label_position) -
 // `updates` is ignored for these, the same "a bed channel has no direction to pin, `force_lfe`
 // discards it entirely" convention build_channel_path's own doc comment states for the read
 // direction. A dynamic object (`bed_label` empty) is written as an Objects channel whose
@@ -259,7 +259,7 @@ struct ICLFORGE_ADM_EXPORT WriteObjectUpdate {
 struct ICLFORGE_ADM_EXPORT WriteChannel {
     std::string name;
     std::span<const float> pcm;                       // this channel's whole-file mono audio
-    std::optional<iclforge::oba::BedLabel> bed_label{};     // set: bed/LFE channel; empty: dynamic object
+    std::optional<iclforge::objects::oba::BedLabel> bed_label{};     // set: bed/LFE channel; empty: dynamic object
     std::span<const WriteObjectUpdate> updates{};      // dynamic objects only
 };
 

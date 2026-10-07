@@ -74,9 +74,9 @@ double error_db(std::complex<double> got, std::complex<double> want) {
 // end (0-indexed) lands exactly on an authored keyframe for every frame,
 // never mid-interpolation, which is what makes the LAST frame of each hold a
 // clean, fully settled check point (see the flagship test below).
-iclforge::oba::KeyframePath make_holds(std::span<const iclforge::oba::Position> waypoints,
+iclforge::objects::oba::KeyframePath make_holds(std::span<const iclforge::objects::oba::Position> waypoints,
                                        int hold_frames) {
-    std::vector<iclforge::oba::Keyframe> keyframes;
+    std::vector<iclforge::objects::oba::Keyframe> keyframes;
     int frame_index = 1;
     for (const auto& p : waypoints) {
         for (int h = 0; h < hold_frames; ++h) {
@@ -88,7 +88,7 @@ iclforge::oba::KeyframePath make_holds(std::span<const iclforge::oba::Position> 
             ++frame_index;
         }
     }
-    auto created = iclforge::oba::KeyframePath::create(std::move(keyframes));
+    auto created = iclforge::objects::oba::KeyframePath::create(std::move(keyframes));
     REQUIRE(created.has_value());
     return std::move(*created);
 }
@@ -96,7 +96,7 @@ iclforge::oba::KeyframePath make_holds(std::span<const iclforge::oba::Position> 
 }  // namespace
 
 TEST_CASE("keyframe paths interpolate linearly and hold past the ends", "[atmos][motion]") {
-    const auto path = iclforge::oba::KeyframePath::create({
+    const auto path = iclforge::objects::oba::KeyframePath::create({
         {.time_s = 0.0, .position = {.x = 0.0, .y = 0.0, .z = -1.0}, .gain = 0.2, .lfe_send = 0.0},
         {.time_s = 2.0, .position = {.x = 1.0, .y = 1.0, .z = 1.0}, .gain = 1.0, .lfe_send = 0.5},
     });
@@ -119,7 +119,7 @@ TEST_CASE("keyframe paths interpolate linearly and hold past the ends", "[atmos]
 }
 
 TEST_CASE("a single keyframe holds its placement everywhere", "[atmos][motion]") {
-    const auto path = iclforge::oba::KeyframePath::create({
+    const auto path = iclforge::objects::oba::KeyframePath::create({
         {.time_s = 3.0, .position = {.x = 0.2, .y = 0.8, .z = 0.5}, .gain = 0.7, .lfe_send = 0.1},
     });
     REQUIRE(path.has_value());
@@ -134,23 +134,23 @@ TEST_CASE("a single keyframe holds its placement everywhere", "[atmos][motion]")
 
 TEST_CASE("KeyframePath::create rejects no keyframes or a duplicate timestamp",
          "[atmos][motion]") {
-    const auto empty = iclforge::oba::KeyframePath::create({});
+    const auto empty = iclforge::objects::oba::KeyframePath::create({});
     REQUIRE_FALSE(empty.has_value());
-    CHECK(empty.error() == iclforge::oba::PathError::kNoKeyframes);
+    CHECK(empty.error() == iclforge::objects::oba::PathError::kNoKeyframes);
 
-    const auto duplicate = iclforge::oba::KeyframePath::create({
+    const auto duplicate = iclforge::objects::oba::KeyframePath::create({
         {.time_s = 1.0, .position = {}, .gain = 1.0, .lfe_send = 0.0},
         {.time_s = 1.0, .position = {.x = 0.1}, .gain = 0.5, .lfe_send = 0.0},
     });
     REQUIRE_FALSE(duplicate.has_value());
-    CHECK(duplicate.error() == iclforge::oba::PathError::kDuplicateTimestamp);
+    CHECK(duplicate.error() == iclforge::objects::oba::PathError::kDuplicateTimestamp);
 }
 
 TEST_CASE("make_orbit_path reproduces the closed-form circle", "[atmos][motion]") {
     constexpr double kRateHz = 0.25;
     constexpr double kPhaseRad = 0.3;
     constexpr double kHeight = -0.5;
-    const auto path = iclforge::oba::make_orbit_path(kRateHz, kPhaseRad, kHeight, 0.6, 0.1);
+    const auto path = iclforge::objects::oba::make_orbit_path(kRateHz, kPhaseRad, kHeight, 0.6, 0.1);
     for (const double t : {0.0, 0.7, 3.1, 12.5}) {
         CAPTURE(t);
         const double angle = 2.0 * std::numbers::pi * kRateHz * t + kPhaseRad;
@@ -167,16 +167,16 @@ TEST_CASE("make_orbit_path reproduces the closed-form circle", "[atmos][motion]"
 
 TEST_CASE("evaluate_placements evaluates every path at one instant, in order",
          "[atmos][motion]") {
-    auto keyframe = iclforge::oba::KeyframePath::create(
+    auto keyframe = iclforge::objects::oba::KeyframePath::create(
         {{.time_s = 0.0, .position = {.x = 0.1, .y = 0.2, .z = 0.3}, .gain = 0.9}});
     REQUIRE(keyframe.has_value());
-    const auto orbit = iclforge::oba::make_orbit_path(0.5, 0.0, 0.0, 0.8, 0.0);
+    const auto orbit = iclforge::objects::oba::make_orbit_path(0.5, 0.0, 0.0, 0.8, 0.0);
 
-    std::vector<iclforge::oba::ObjectPath> paths;
+    std::vector<iclforge::objects::oba::ObjectPath> paths;
     paths.emplace_back(std::move(*keyframe));
     paths.push_back(orbit);
 
-    const auto placement = iclforge::oba::evaluate_placements(paths, 1.0);
+    const auto placement = iclforge::objects::oba::evaluate_placements(paths, 1.0);
     REQUIRE(placement.size() == 2);
     CHECK(placement[0].position.x == 0.1);
     CHECK(placement[0].gain == 0.9);
@@ -200,13 +200,13 @@ TEST_CASE("evaluate_placements evaluates every path at one instant, in order",
 // ever would.
 TEST_CASE("a moving object's decoded bed tracks its authored path frame by frame",
          "[atmos][motion]") {
-    constexpr iclforge::oba::Position kL{.x = 0.25, .y = 0.066987, .z = 0.0};
-    constexpr iclforge::oba::Position kSR{.x = 0.969846, .y = 0.671010, .z = 0.0};
-    constexpr iclforge::oba::Position kR{.x = 0.75, .y = 0.066987, .z = 0.0};
+    constexpr iclforge::objects::oba::Position kL{.x = 0.25, .y = 0.066987, .z = 0.0};
+    constexpr iclforge::objects::oba::Position kSR{.x = 0.969846, .y = 0.671010, .z = 0.0};
+    constexpr iclforge::objects::oba::Position kR{.x = 0.75, .y = 0.066987, .z = 0.0};
     constexpr int kHoldFrames = 3;
-    const std::array<iclforge::oba::Position, 3> waypoints{kL, kSR, kR};
+    const std::array<iclforge::objects::oba::Position, 3> waypoints{kL, kSR, kR};
 
-    std::vector<iclforge::oba::ObjectPath> paths;
+    std::vector<iclforge::objects::oba::ObjectPath> paths;
     paths.emplace_back(make_holds(waypoints, kHoldFrames));
 
     iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, 1};
@@ -222,7 +222,7 @@ TEST_CASE("a moving object's decoded bed tracks its authored path frame by frame
 
         const double t =
             static_cast<double>(start + static_cast<std::uint64_t>(kFrame)) / 48000.0;
-        const auto placement = iclforge::oba::evaluate_placements(paths, t);
+        const auto placement = iclforge::objects::oba::evaluate_placements(paths, t);
         const auto unit = encoder.encode_frame(views, placement);
         REQUIRE(unit.has_value());
 
@@ -265,10 +265,10 @@ TEST_CASE("a moving object's decoded bed tracks its authored path frame by frame
 // motion, not motion surviving the bitstream (the flagship test above
 // already covers that).
 TEST_CASE("two independently moving objects keep reconstructing cleanly", "[atmos][motion]") {
-    constexpr iclforge::oba::Position kFrontLeft{.x = 0.0, .y = 0.0, .z = 0.0};
-    constexpr iclforge::oba::Position kFrontRight{.x = 1.0, .y = 0.0, .z = 0.0};
-    constexpr iclforge::oba::Position kBackLeftUp{.x = 0.0, .y = 1.0, .z = 1.0};
-    constexpr iclforge::oba::Position kBackRightUp{.x = 1.0, .y = 1.0, .z = 1.0};
+    constexpr iclforge::objects::oba::Position kFrontLeft{.x = 0.0, .y = 0.0, .z = 0.0};
+    constexpr iclforge::objects::oba::Position kFrontRight{.x = 1.0, .y = 0.0, .z = 0.0};
+    constexpr iclforge::objects::oba::Position kBackLeftUp{.x = 0.0, .y = 1.0, .z = 1.0};
+    constexpr iclforge::objects::oba::Position kBackRightUp{.x = 1.0, .y = 1.0, .z = 1.0};
     constexpr int kHoldFrames = 3;
     constexpr double kHzA = 311.0;
     constexpr double kHzB = 997.0;
@@ -277,10 +277,10 @@ TEST_CASE("two independently moving objects keep reconstructing cleanly", "[atmo
     // Object A: front-left, then swaps to the diagonally opposite corner.
     // Object B: front-right, then swaps to ITS diagonally opposite corner -
     // never sharing a direction with A at either interval.
-    const std::array<iclforge::oba::Position, 2> waypoints_a{kFrontLeft, kBackRightUp};
-    const std::array<iclforge::oba::Position, 2> waypoints_b{kFrontRight, kBackLeftUp};
+    const std::array<iclforge::objects::oba::Position, 2> waypoints_a{kFrontLeft, kBackRightUp};
+    const std::array<iclforge::objects::oba::Position, 2> waypoints_b{kFrontRight, kBackLeftUp};
 
-    std::vector<iclforge::oba::ObjectPath> paths;
+    std::vector<iclforge::objects::oba::ObjectPath> paths;
     paths.emplace_back(make_holds(waypoints_a, kHoldFrames));
     paths.emplace_back(make_holds(waypoints_b, kHoldFrames));
 
@@ -300,7 +300,7 @@ TEST_CASE("two independently moving objects keep reconstructing cleanly", "[atmo
 
         const double t =
             static_cast<double>(start + static_cast<std::uint64_t>(kFrame)) / 48000.0;
-        const auto placement = iclforge::oba::evaluate_placements(paths, t);
+        const auto placement = iclforge::objects::oba::evaluate_placements(paths, t);
         const auto unit = encoder.encode_frame(views, placement);
         REQUIRE(unit.has_value());
 
@@ -330,18 +330,18 @@ TEST_CASE("keyframe paths ramp object size but hold the rendering flags", "[atmo
     // parameters and TS 103 420 sends them per metadata update, so a growing
     // object is expressible on both sides. snap/zone/enable_elevation are
     // discrete decisions with no halfway point, so they step instead.
-    const auto path = iclforge::oba::KeyframePath::create({
+    const auto path = iclforge::objects::oba::KeyframePath::create({
         {.time_s = 0.0,
          .position = {.x = 0.0, .y = 0.0, .z = 0.0},
          .size = {.width = 0.0, .depth = 0.2, .height = 1.0},
          .snap = false,
-         .zone = iclforge::oba::ZoneConstraint::kNone,
+         .zone = iclforge::objects::oba::ZoneConstraint::kNone,
          .enable_elevation = true},
         {.time_s = 2.0,
          .position = {.x = 1.0, .y = 1.0, .z = 0.0},
          .size = {.width = 1.0, .depth = 0.6, .height = 0.0},
          .snap = true,
-         .zone = iclforge::oba::ZoneConstraint::kSurroundOnly,
+         .zone = iclforge::objects::oba::ZoneConstraint::kSurroundOnly,
          .enable_elevation = false},
     });
     REQUIRE(path.has_value());
@@ -352,12 +352,12 @@ TEST_CASE("keyframe paths ramp object size but hold the rendering flags", "[atmo
     CHECK_THAT(mid.size.height, Catch::Matchers::WithinAbs(0.5, 1e-12));
     // Held at the EARLIER keyframe's values right up to the later one.
     CHECK_FALSE(mid.snap);
-    CHECK(mid.zone == iclforge::oba::ZoneConstraint::kNone);
+    CHECK(mid.zone == iclforge::objects::oba::ZoneConstraint::kNone);
     CHECK(mid.enable_elevation);
 
     const auto at_end = path->evaluate(2.0);
     CHECK(at_end.snap);
-    CHECK(at_end.zone == iclforge::oba::ZoneConstraint::kSurroundOnly);
+    CHECK(at_end.zone == iclforge::objects::oba::ZoneConstraint::kSurroundOnly);
     CHECK_FALSE(at_end.enable_elevation);
     CHECK_THAT(at_end.size.width, Catch::Matchers::WithinAbs(1.0, 1e-12));
 }
@@ -369,12 +369,12 @@ TEST_CASE("AtmosEncoder transmits an object's size, snap and zone", "[atmos][mot
     iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, 1};
     const auto source = tone(440.0, 0.4, 0.0, 0);
     const std::array<std::span<const float>, 1> audio{std::span<const float>{source}};
-    const std::array<iclforge::oba::ObjectPlacement, 1> placement{
+    const std::array<iclforge::objects::oba::ObjectPlacement, 1> placement{
         {{.position = {.x = 0.25, .y = 0.75, .z = 0.5},
           .gain = 1.0,
           .size = {.width = 8.0 / 31.0, .depth = 20.0 / 31.0, .height = 31.0 / 31.0},
           .snap = true,
-          .zone = iclforge::oba::ZoneConstraint::kCentreAndBackOnly,
+          .zone = iclforge::objects::oba::ZoneConstraint::kCentreAndBackOnly,
           .enable_elevation = false}}};
 
     const auto unit = encoder.encode_frame(audio, placement);
@@ -391,12 +391,12 @@ TEST_CASE("AtmosEncoder transmits an object's size, snap and zone", "[atmos][mot
     CHECK(objects[0].size.depth == 20.0 / 31.0);
     CHECK(objects[0].size.height == 1.0);
     CHECK(objects[0].snap);
-    CHECK(objects[0].zone == iclforge::oba::ZoneConstraint::kCentreAndBackOnly);
+    CHECK(objects[0].zone == iclforge::objects::oba::ZoneConstraint::kCentreAndBackOnly);
     CHECK_FALSE(objects[0].enable_elevation);
 }
 
 TEST_CASE("keyframe paths ramp divergence but hold the screen reference", "[atmos][motion]") {
-    const auto path = iclforge::oba::KeyframePath::create({
+    const auto path = iclforge::objects::oba::KeyframePath::create({
         {.time_s = 0.0, .divergence = 0.0, .screen_reference = false, .screen_factor = 1.0, .depth_factor = 1.0},
         {.time_s = 2.0, .divergence = 1.0, .screen_reference = true, .screen_factor = 0.5, .depth_factor = 2.0},
     });
@@ -416,7 +416,7 @@ TEST_CASE("AtmosEncoder transmits an object's divergence and screen reference", 
     iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, 1};
     const auto source = tone(440.0, 0.4, 0.0, 0);
     const std::array<std::span<const float>, 1> audio{std::span<const float>{source}};
-    const std::array<iclforge::oba::ObjectPlacement, 1> placement{
+    const std::array<iclforge::objects::oba::ObjectPlacement, 1> placement{
         {{.position = {.x = 0.25, .y = 0.5, .z = 0.0},
           .gain = 1.0,
           .divergence = 0.608529,  // Table 41 index 1

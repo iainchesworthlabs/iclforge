@@ -30,7 +30,7 @@ std::vector<float> tone(double hz, std::uint64_t start) {
 std::vector<std::byte> encode_atmos_stream(int frames, bool emit_objects) {
     iclforge::ac3::oba::AtmosEncoder encoder{
         {.bitrate_kbps = 448, .num_bands_idx = 4, .emit_object_metadata = emit_objects}, 1};
-    const std::array<iclforge::oba::ObjectPlacement, 1> placement{{{}}};
+    const std::array<iclforge::objects::oba::ObjectPlacement, 1> placement{{{}}};
     std::vector<std::span<const float>> views(1);
     std::vector<std::byte> stream;
     for (int f = 0; f < frames; ++f) {

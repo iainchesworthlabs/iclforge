@@ -41,7 +41,7 @@ void iclforge_object_placement_init(iclforge_object_placement_t* placement) {
     if (placement == nullptr) {
         return;
     }
-    const iclforge::oba::ObjectPlacement defaults{};
+    const iclforge::objects::oba::ObjectPlacement defaults{};
     *placement = iclforge_object_placement_t{.x = defaults.position.x,
                                               .y = defaults.position.y,
                                               .z = defaults.position.z,
@@ -97,12 +97,12 @@ iclforge_status_t iclforge_atmos_encoder_encode_frame(
             }
             object_spans.emplace_back(objects[i], samples_per_object);
         }
-        std::vector<iclforge::oba::ObjectPlacement> placement_values;
+        std::vector<iclforge::objects::oba::ObjectPlacement> placement_values;
         placement_values.reserve(placement_count);
         for (size_t i = 0; i < placement_count; ++i) {
             const auto& p = placements[i];
-            placement_values.push_back(iclforge::oba::ObjectPlacement{
-                .position = iclforge::oba::Position{.x = p.x, .y = p.y, .z = p.z},
+            placement_values.push_back(iclforge::objects::oba::ObjectPlacement{
+                .position = iclforge::objects::oba::Position{.x = p.x, .y = p.y, .z = p.z},
                 .gain = p.gain,
                 .lfe_send = p.lfe_send});
         }

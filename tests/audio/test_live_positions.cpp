@@ -73,13 +73,13 @@ std::vector<std::byte> osc_release(std::size_t object) {
     return out;
 }
 
-iclforge::oba::SceneCursor two_object_cursor() {
-    auto scene = iclforge::oba::ObjectScene::create({
+iclforge::objects::oba::SceneCursor two_object_cursor() {
+    auto scene = iclforge::objects::oba::ObjectScene::create({
         {.name = "a", .automation = {{.time_s = 0.0, .position = {.x = 0.1}, .gain = 0.5}}},
         {.name = "b", .automation = {{.time_s = 0.0, .position = {.x = 0.9}, .gain = 0.6}}},
     });
     REQUIRE(scene.has_value());
-    return iclforge::oba::SceneCursor{std::move(*scene)};
+    return iclforge::objects::oba::SceneCursor{std::move(*scene)};
 }
 
 // Retries `predicate` (which itself drains the source) for up to `timeout` -
@@ -171,7 +171,7 @@ TEST_CASE("a gain-only update waits, across drains, for a position", "[audio][li
     REQUIRE(sender.send_to("127.0.0.1", port, osc_gain(1, 0.2F)));
 
     auto cursor = two_object_cursor();
-    // The gain-only message has nothing to apply yet (iclforge::oba::apply's own
+    // The gain-only message has nothing to apply yet (iclforge::objects::oba::apply's own
     // contract) - draining repeatedly must never spuriously mark it live.
     for (int i = 0; i < 5; ++i) {
         source.drain_into(cursor, 0.0);
@@ -246,14 +246,14 @@ TEST_CASE("a burst of concurrent sends never crashes or corrupts the mailbox",
     // two_object_cursor only has 2 objects; drain against a 4-object scene
     // instead so every slot LivePositionSource was constructed with has
     // somewhere to land.
-    auto scene = iclforge::oba::ObjectScene::create({
+    auto scene = iclforge::objects::oba::ObjectScene::create({
         {.automation = {{.time_s = 0.0}}},
         {.automation = {{.time_s = 0.0}}},
         {.automation = {{.time_s = 0.0}}},
         {.automation = {{.time_s = 0.0}}},
     });
     REQUIRE(scene.has_value());
-    iclforge::oba::SceneCursor wide_cursor{std::move(*scene)};
+    iclforge::objects::oba::SceneCursor wide_cursor{std::move(*scene)};
 
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
     while (std::chrono::steady_clock::now() < deadline) {

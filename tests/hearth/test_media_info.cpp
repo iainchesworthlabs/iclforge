@@ -463,7 +463,7 @@ TEST_CASE("media info: a stream with two programmes lists both", "[hearth][media
 TEST_CASE("media info: objects, and whether they are signed", "[hearth][media-info]") {
     iclforge::ac3::oba::AtmosEncoder encoder{
         {.bitrate_kbps = 448, .num_bands_idx = 4, .emit_object_metadata = true}, 1};
-    const std::array<iclforge::oba::ObjectPlacement, 1> placement{{{}}};
+    const std::array<iclforge::objects::oba::ObjectPlacement, 1> placement{{{}}};
     std::vector<std::span<const float>> views(1);
     std::vector<std::byte> stream;
     for (int f = 0; f < 4; ++f) {
@@ -486,7 +486,7 @@ TEST_CASE("media info: objects, and whether they are signed", "[hearth][media-in
     // payload" this stream's probe->program above already summarises.
     REQUIRE(unsigned_info.objects.has_value());
     CHECK(unsigned_info.objects->program.dynamic_objects == 1);
-    const std::vector<iclforge::oba::DisplayObject> displayed = iclforge::oba::describe_objects(*unsigned_info.objects);
+    const std::vector<iclforge::objects::oba::DisplayObject> displayed = iclforge::objects::oba::describe_objects(*unsigned_info.objects);
     // One JOC output: the placed object. Its LFE send, if the program's bed
     // carries one, is bypassed from JOC's own object count (§6.3.2.2) either
     // way.

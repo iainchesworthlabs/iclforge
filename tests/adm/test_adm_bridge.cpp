@@ -952,7 +952,7 @@ TEST_CASE("a real ADM BWF master's bed and moving object survive the ADM bridge 
             views[i] = result->pcm[i].subspan(start, static_cast<std::size_t>(kFrame));
         }
         const double t = static_cast<double>(start + static_cast<std::size_t>(kFrame)) / 48000.0;
-        const auto placement = iclforge::oba::evaluate_placements(result->paths, t);
+        const auto placement = iclforge::objects::oba::evaluate_placements(result->paths, t);
         const auto unit = encoder.encode_frame(views, placement);
         REQUIRE(unit.has_value());
 
@@ -1006,7 +1006,7 @@ TEST_CASE("a real ADM BWF master's bed and moving object survive the ADM bridge 
 namespace {
 
 using iclforge::adm::ExclusionZone;
-using iclforge::oba::ZoneConstraint;
+using iclforge::objects::oba::ZoneConstraint;
 
 ExclusionZone zone_labelled(std::string label) {
     return {.label = std::move(label)};

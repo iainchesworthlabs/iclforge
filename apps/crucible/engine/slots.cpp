@@ -4,8 +4,8 @@
 
 namespace iclforge::crucible {
 
-iclforge::oba::ObjectPlacement bed_placement(BedChannel channel) {
-    iclforge::oba::ObjectPlacement placement;
+iclforge::objects::oba::ObjectPlacement bed_placement(BedChannel channel) {
+    iclforge::objects::oba::ObjectPlacement placement;
     switch (channel) {
         case BedChannel::kL: placement.position = {0.0, 0.0, 0.0}; break;
         case BedChannel::kR: placement.position = {1.0, 0.0, 0.0}; break;

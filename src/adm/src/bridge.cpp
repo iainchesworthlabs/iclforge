@@ -45,7 +45,7 @@ std::string_view describe(BridgeError error) {
 namespace {
 
 // A real Dirac/instantaneous jump has no representation in KeyframePath's piecewise-linear model
-// (two keyframes cannot share one time_s - see iclforge::oba::PathError::kDuplicateTimestamp). This
+// (two keyframes cannot share one time_s - see iclforge::objects::oba::PathError::kDuplicateTimestamp). This
 // is the same resolution tests/ac3/oba/test_atmos_motion.cpp's own make_holds() helper relies on
 // implicitly: every caller in this codebase samples ObjectPath::evaluate() once per encoded frame
 // (iclforge::ac3::kSamplesPerFrame = 1536 samples, 32 ms at 48 kHz - see
@@ -61,9 +61,9 @@ constexpr double kInstantJumpEpsilon = 1.0e-6;
 
 // The non-positional, non-gain part of a Keyframe that comes from one audioBlockFormat.
 struct Rendering {
-    iclforge::oba::ObjectSize size{};
+    iclforge::objects::oba::ObjectSize size{};
     bool snap = false;
-    iclforge::oba::ZoneConstraint zone = iclforge::oba::ZoneConstraint::kNone;
+    iclforge::objects::oba::ZoneConstraint zone = iclforge::objects::oba::ZoneConstraint::kNone;
     bool enable_elevation = true;
     double divergence = 0.0;
     bool screen_reference = false;
@@ -71,7 +71,7 @@ struct Rendering {
 
 }  // namespace
 
-std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
+std::expected<iclforge::objects::oba::ObjectPath, BridgeError> build_channel_path(
     const iclforge::adm::AudioChannelFormat& channel, double object_start_s, bool force_lfe) {
     if (channel.block_formats.empty()) {
         return std::unexpected(BridgeError::kEmptyBlockSequence);
@@ -83,9 +83,9 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
     // entirely: an LFE bed channel has no direction to pin (ac3/oba/atmos.hpp: "Objects never
     // reach the LFE by panning"), so it reaches the bed only via lfe_send.
     const auto placement_of = [&](const iclforge::adm::AudioBlockFormat& block)
-        -> std::pair<iclforge::oba::Position, double> {
+        -> std::pair<iclforge::objects::oba::Position, double> {
         if (force_lfe) {
-            return {iclforge::oba::Position{}, 0.0};
+            return {iclforge::objects::oba::Position{}, 0.0};
         }
         return {adm_position_to_room(block.position), block.gain};
     };
@@ -124,7 +124,7 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
     };
     const double lfe_send = force_lfe ? 1.0 : 0.0;
 
-    std::vector<iclforge::oba::Keyframe> keyframes;
+    std::vector<iclforge::objects::oba::Keyframe> keyframes;
     keyframes.reserve(channel.block_formats.size() * 2);
 
     // Monotonically-increasing insertion with a minimum spacing of kInstantJumpEpsilon - the one
@@ -133,7 +133,7 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
     // same nominal time) into a valid, strictly-increasing keyframe sequence without needing a
     // separate branch for each. See kInstantJumpEpsilon's own comment for why this is inaudible
     // at the resolution that reaches the bitstream.
-    const auto push_keyframe = [&](double time_s, iclforge::oba::Position position, double gain,
+    const auto push_keyframe = [&](double time_s, iclforge::objects::oba::Position position, double gain,
                                    const Rendering& rendering) {
         if (!keyframes.empty() && time_s <= keyframes.back().time_s) {
             time_s = keyframes.back().time_s + kInstantJumpEpsilon;
@@ -153,7 +153,7 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
     if (channel.block_formats.size() == 1) {
         // §5.4.1: "If there is only one audioBlockFormat within an audioChannelFormat, the
         // characteristics of the parent audioChannelFormat are considered to be static over
-        // time" - one keyframe, which iclforge::oba::KeyframePath already holds everywhere.
+        // time" - one keyframe, which iclforge::objects::oba::KeyframePath already holds everywhere.
         const auto& block = channel.block_formats.front();
         const auto [position, gain] = placement_of(block);
         push_keyframe(object_start_s + block.rtime_s, position, gain, rendering_of(block));
@@ -205,7 +205,7 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
         }
     }
 
-    auto created = iclforge::oba::KeyframePath::create(std::move(keyframes));
+    auto created = iclforge::objects::oba::KeyframePath::create(std::move(keyframes));
     if (!created.has_value()) {
         // Unreachable in practice - push_keyframe's own monotonic nudge guarantees a strictly
         // increasing sequence, and it is never called with an empty channel.block_formats (the
@@ -214,7 +214,7 @@ std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
         // file-derived data.
         return std::unexpected(BridgeError::kEmptyBlockSequence);
     }
-    return iclforge::oba::ObjectPath(std::move(*created));
+    return iclforge::objects::oba::ObjectPath(std::move(*created));
 }
 
 namespace {
@@ -480,7 +480,7 @@ std::vector<iclforge::adm::AudioBlockFormat> build_block_formats(std::span<const
         return static_cast<double>(sample) / static_cast<double>(sample_rate);
     };
     const auto place = [](iclforge::adm::AudioBlockFormat& block,
-                          const iclforge::oba::DynamicObject& state) {
+                          const iclforge::objects::oba::DynamicObject& state) {
         block.cartesian = true;
         block.position = room_to_adm_cartesian(state.position);
         block.gain = std::pow(10.0, state.gain_db / 20.0);
@@ -578,8 +578,8 @@ std::expected<iclforge::adm::AdmDocument, BridgeError> write(const WriteInput& i
 
             iclforge::adm::AudioBlockFormat block;
             block.cartesian = true;
-            block.position = room_to_adm_cartesian(iclforge::oba::bed_label_position(*channel.bed_label));
-            block.speaker_labels = {std::string(iclforge::oba::describe(*channel.bed_label))};
+            block.position = room_to_adm_cartesian(iclforge::objects::oba::bed_label_position(*channel.bed_label));
+            block.speaker_labels = {std::string(iclforge::objects::oba::describe(*channel.bed_label))};
             channel_format.block_formats.push_back(std::move(block));
         } else {
             if (channel.updates.empty()) {

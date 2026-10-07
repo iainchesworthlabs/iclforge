@@ -168,17 +168,17 @@ TEST_CASE("build_iab maps supported Table 19 ChannelIDs to the right BedLabel po
           "[adm][bridge][iab]") {
     struct Case {
         std::uint32_t channel_id;
-        iclforge::oba::BedLabel label;
+        iclforge::objects::oba::BedLabel label;
     };
     // A representative subset, not the full table - see iab_bridge.cpp's own comment for the rest.
     const auto test_case = GENERATE(
-        Case{0x0, iclforge::oba::BedLabel::kL}, Case{0x2, iclforge::oba::BedLabel::kC},
-        Case{0x4, iclforge::oba::BedLabel::kR}, Case{0x6, iclforge::oba::BedLabel::kLs},
-        Case{0xA, iclforge::oba::BedLabel::kRs}, Case{0x7, iclforge::oba::BedLabel::kLb},
-        Case{0x8, iclforge::oba::BedLabel::kRb}, Case{0x86, iclforge::oba::BedLabel::kLfe},
-        Case{0x87, iclforge::oba::BedLabel::kLfe2}, Case{0x88, iclforge::oba::BedLabel::kLw},
-        Case{0x89, iclforge::oba::BedLabel::kRw}, Case{0x80, iclforge::oba::BedLabel::kTfl},
-        Case{0x84, iclforge::oba::BedLabel::kTsl});
+        Case{0x0, iclforge::objects::oba::BedLabel::kL}, Case{0x2, iclforge::objects::oba::BedLabel::kC},
+        Case{0x4, iclforge::objects::oba::BedLabel::kR}, Case{0x6, iclforge::objects::oba::BedLabel::kLs},
+        Case{0xA, iclforge::objects::oba::BedLabel::kRs}, Case{0x7, iclforge::objects::oba::BedLabel::kLb},
+        Case{0x8, iclforge::objects::oba::BedLabel::kRb}, Case{0x86, iclforge::objects::oba::BedLabel::kLfe},
+        Case{0x87, iclforge::objects::oba::BedLabel::kLfe2}, Case{0x88, iclforge::objects::oba::BedLabel::kLw},
+        Case{0x89, iclforge::objects::oba::BedLabel::kRw}, Case{0x80, iclforge::objects::oba::BedLabel::kTfl},
+        Case{0x84, iclforge::objects::oba::BedLabel::kTsl});
     CAPTURE(test_case.channel_id);
 
     auto frame = make_frame({make_bed(1, {make_bed_channel(test_case.channel_id)})});
@@ -187,7 +187,7 @@ TEST_CASE("build_iab maps supported Table 19 ChannelIDs to the right BedLabel po
     REQUIRE(result->channel_count() == 1);
     CHECK(result->is_bed[0]);
 
-    const auto expected = iclforge::oba::bed_label_position(test_case.label);
+    const auto expected = iclforge::objects::oba::bed_label_position(test_case.label);
     const auto placement = result->paths[0].evaluate(0.0);
     CHECK_THAT(placement.position.x, Catch::Matchers::WithinAbs(expected.x, 1e-9));
     CHECK_THAT(placement.position.y, Catch::Matchers::WithinAbs(expected.y, 1e-9));
@@ -331,7 +331,7 @@ TEST_CASE("build_iab places each active Object sub block's keyframe at its own e
 
 namespace {
 
-using iclforge::oba::ZoneConstraint;
+using iclforge::objects::oba::ZoneConstraint;
 
 // Zone order of ST 2098-2 Table 24: screen left, screen centre, screen right, left wall, right
 // wall, rear left, rear right, overhead left, overhead right.
@@ -812,7 +812,7 @@ TEST_CASE(
                             .subspan(start, static_cast<std::size_t>(kFrame));
         }
         const double t = static_cast<double>(start + static_cast<std::size_t>(kFrame)) / 48000.0;
-        const auto placement = iclforge::oba::evaluate_placements(result->paths, t);
+        const auto placement = iclforge::objects::oba::evaluate_placements(result->paths, t);
         const auto unit = encoder.encode_frame(views, placement);
         REQUIRE(unit.has_value());
 

@@ -179,7 +179,7 @@ Ac4Outcome encode_ac4_objects_file(const QString& path, const QString& scene_pat
                                    const std::string& scene_json,
                                    const std::vector<iclforge::apps::Ac4ObjectSlot>& stream_objects,
                                    const std::vector<std::vector<float>>& flat,
-                                   const iclforge::oba::ObjectScene& motion,
+                                   const iclforge::objects::oba::ObjectScene& motion,
                                    const iclforge::apps::Ac4ObjectsParams& params, bool mp4,
                                    bool crc) {
     Ac4Outcome out;
@@ -560,7 +560,7 @@ using forge_gui::location_azimuth_deg;
 // VBAP at a speaker's exact angle puts the whole gain there. Only the five
 // 5.1 ring positions are reachable this way; object mode's bed is always
 // 5.1, and setAssignment's own vocabulary check keeps anything wider out.
-iclforge::oba::Position speaker_pin_position(double azimuth_deg) {
+iclforge::objects::oba::Position speaker_pin_position(double azimuth_deg) {
     const double radians = azimuth_deg * std::numbers::pi / 180.0;
     return {.x = 0.5 - 0.45 * std::sin(radians), .y = 0.5 - 0.45 * std::cos(radians), .z = 0.0};
 }
@@ -1130,7 +1130,7 @@ plan::Assignment EncoderController::ac4ObjectAssignment() const {
     return every;
 }
 
-std::optional<iclforge::oba::ObjectScene> EncoderController::ac4ObjectScene(
+std::optional<iclforge::objects::oba::ObjectScene> EncoderController::ac4ObjectScene(
     const std::vector<iclforge::apps::Ac4ObjectSlot>& stream_objects) const {
     const auto dynamic =
         static_cast<std::size_t>(std::ranges::count_if(stream_objects, [](const auto& slot) {
@@ -1139,7 +1139,7 @@ std::optional<iclforge::oba::ObjectScene> EncoderController::ac4ObjectScene(
     // The inverse-root gain E-AC-3's fallback gives a path-less object: objects panned into the
     // same speakers add there, so they share the headroom.
     const double scale = 1.0 / std::sqrt(static_cast<double>(std::max<std::size_t>(dynamic, 1)));
-    std::vector<iclforge::oba::SceneObject> objects;
+    std::vector<iclforge::objects::oba::SceneObject> objects;
     for (const auto& slot : stream_objects) {
         if (slot.kind != iclforge::apps::Ac4ObjectSlot::Kind::kDynamic || slot.taps.empty()) {
             continue;
@@ -1147,13 +1147,13 @@ std::optional<iclforge::oba::ObjectScene> EncoderController::ac4ObjectScene(
         // The identity its authored state hangs from: its first channel's (source, channel), as
         // keyForObjectIndex resolves an objm group.
         const auto key = sourceChannelForFlatIndex(slot.taps.front().first);
-        iclforge::oba::SceneObject object;
+        iclforge::objects::oba::SceneObject object;
         const QString label = map_value(object_path_labels_, key);
         object.name =
             (label.isEmpty() ? QStringLiteral("object %1").arg(objects.size() + 1) : label)
                 .toStdString();
         auto keyframes = map_value(object_keyframes_, key);
-        std::ranges::sort(keyframes, {}, &iclforge::oba::Keyframe::time_s);
+        std::ranges::sort(keyframes, {}, &iclforge::objects::oba::Keyframe::time_s);
         if (keyframes.empty()) {
             const auto config = map_value(object_configs_, key);
             object.automation.push_back({.time_s = 0.0,
@@ -1169,7 +1169,7 @@ std::optional<iclforge::oba::ObjectScene> EncoderController::ac4ObjectScene(
         }
         objects.push_back(std::move(object));
     }
-    auto scene = iclforge::oba::ObjectScene::create(std::move(objects));
+    auto scene = iclforge::objects::oba::ObjectScene::create(std::move(objects));
     if (!scene.has_value()) {
         return std::nullopt;
     }
@@ -1209,12 +1209,12 @@ QString EncoderController::ac4ObjectsRefusal() const {
 
 QString EncoderController::ac4ObjectsDeepRefusal(
     const std::vector<iclforge::apps::Ac4ObjectSlot>& stream_objects,
-    const iclforge::oba::ObjectScene& scene) const {
+    const iclforge::objects::oba::ObjectScene& scene) const {
     // AC-4 codes an object's gain from +15 to -49 dB, or silence, and its place inside the room.
     std::size_t number = 0;
-    for (const iclforge::oba::SceneObject& object : scene.objects()) {
+    for (const iclforge::objects::oba::SceneObject& object : scene.objects()) {
         ++number;
-        for (const iclforge::oba::AutomationPoint& point : object.automation) {
+        for (const iclforge::objects::oba::AutomationPoint& point : object.automation) {
             const auto p = iclforge::apps::ac4_object_properties(
                 {.position = point.position, .gain = point.gain});
             const bool gain_ok =
@@ -2607,7 +2607,7 @@ void EncoderController::setObjectPathKeyframes(int objectIndex, const QVariantLi
         emit objectsChanged();
         return;
     }
-    std::vector<iclforge::oba::Keyframe> parsed;
+    std::vector<iclforge::objects::oba::Keyframe> parsed;
     parsed.reserve(static_cast<std::size_t>(keyframes.size()));
     for (const auto& entry : keyframes) {
         const auto map = entry.toMap();
@@ -2638,13 +2638,13 @@ void EncoderController::clearObjectPath(int objectIndex) {
     }
 }
 
-std::vector<iclforge::oba::Keyframe> EncoderController::sortedKeyframes(int objectIndex) const {
+std::vector<iclforge::objects::oba::Keyframe> EncoderController::sortedKeyframes(int objectIndex) const {
     const auto object_key = keyForObjectIndex(objectIndex);
     if (!object_key) {
         return {};
     }
     auto keyframes = map_value(object_keyframes_, *object_key);
-    std::ranges::sort(keyframes, {}, &iclforge::oba::Keyframe::time_s);
+    std::ranges::sort(keyframes, {}, &iclforge::objects::oba::Keyframe::time_s);
     return keyframes;
 }
 
@@ -2673,7 +2673,7 @@ void EncoderController::addObjectKeyframe(int objectIndex, double timeS) {
     // Same moment, not the same float: two cues a hundredth of a second apart
     // are not a user trying to nudge one, they are a mis-click.
     constexpr double kSameInstant = 0.01;
-    const auto existing = std::ranges::find_if(keyframes, [&](const iclforge::oba::Keyframe& key) {
+    const auto existing = std::ranges::find_if(keyframes, [&](const iclforge::objects::oba::Keyframe& key) {
         return std::abs(key.time_s - timeS) < kSameInstant;
     });
     // Seeded with the same inverse-root gain a path-less object encodes at
@@ -2686,7 +2686,7 @@ void EncoderController::addObjectKeyframe(int objectIndex, double timeS) {
         std::max<std::size_t>(std::min<std::size_t>(dynamicObjectChannels().size(),
                                                     static_cast<std::size_t>(objectLimit())),
                               1);
-    iclforge::oba::Keyframe key{.time_s = timeS,
+    iclforge::objects::oba::Keyframe key{.time_s = timeS,
                            .position = {.x = config.x, .y = config.y, .z = config.z},
                            .gain = 0.7 / std::sqrt(static_cast<double>(ndynamic)),
                            .lfe_send = config.lfe_send};
@@ -2710,7 +2710,7 @@ void EncoderController::moveObjectKeyframe(int objectIndex, double fromS, double
     }
     auto keyframes = sortedKeyframes(objectIndex);
     constexpr double kSameInstant = 0.01;
-    const auto found = std::ranges::find_if(keyframes, [&](const iclforge::oba::Keyframe& key) {
+    const auto found = std::ranges::find_if(keyframes, [&](const iclforge::objects::oba::Keyframe& key) {
         return std::abs(key.time_s - fromS) < kSameInstant;
     });
     if (found == keyframes.end()) {
@@ -2721,7 +2721,7 @@ void EncoderController::moveObjectKeyframe(int objectIndex, double fromS, double
     keyframes.erase(found);
     // Landing on another key replaces it - addObjectKeyframe's same-moment
     // rule, so a drag can never stack two cues on one instant.
-    std::erase_if(keyframes, [&](const iclforge::oba::Keyframe& key) {
+    std::erase_if(keyframes, [&](const iclforge::objects::oba::Keyframe& key) {
         return std::abs(key.time_s - moved.time_s) < kSameInstant;
     });
     keyframes.push_back(moved);
@@ -2773,7 +2773,7 @@ void EncoderController::removeObjectKeyframe(int objectIndex, double timeS) {
     auto keyframes = sortedKeyframes(objectIndex);
     constexpr double kSameInstant = 0.01;
     const auto before = keyframes.size();
-    std::erase_if(keyframes, [&](const iclforge::oba::Keyframe& key) {
+    std::erase_if(keyframes, [&](const iclforge::objects::oba::Keyframe& key) {
         return std::abs(key.time_s - timeS) < kSameInstant;
     });
     if (keyframes.size() == before) {
@@ -2795,13 +2795,13 @@ QVariantMap EncoderController::evaluateObjectPath(int objectIndex, double timeS)
         return out;
     }
     const auto config = map_value(object_configs_, *object_key);
-    iclforge::oba::Position position{.x = config.x, .y = config.y, .z = config.z};
+    iclforge::objects::oba::Position position{.x = config.x, .y = config.y, .z = config.z};
     double gain = 1.0;
     double lfe_send = config.lfe_send;
 
     const auto keyframes = sortedKeyframes(objectIndex);
     if (!keyframes.empty()) {
-        if (const auto path = iclforge::oba::KeyframePath::create(keyframes)) {
+        if (const auto path = iclforge::objects::oba::KeyframePath::create(keyframes)) {
             const auto placement = path->evaluate(timeS);
             position = placement.position;
             gain = placement.gain;
@@ -2816,11 +2816,11 @@ QVariantMap EncoderController::evaluateObjectPath(int objectIndex, double timeS)
     return out;
 }
 
-std::vector<iclforge::oba::SceneObject> EncoderController::exportableSceneObjects() const {
+std::vector<iclforge::objects::oba::SceneObject> EncoderController::exportableSceneObjects() const {
     const auto dynamic = dynamicObjectChannels();
     const auto ndynamic = std::max<std::size_t>(
         std::min<std::size_t>(dynamic.size(), static_cast<std::size_t>(objectLimit())), 1);
-    std::vector<iclforge::oba::SceneObject> objects;
+    std::vector<iclforge::objects::oba::SceneObject> objects;
     for (int i = 0; i < object_count_; ++i) {
         // An objm group's export uses its first channel's flat index - the
         // atmos-encode file format this feeds has no concept of a folded
@@ -2887,14 +2887,14 @@ bool EncoderController::exportObjectPaths(const QUrl& url) const {
         const auto stream_objects =
             iclforge::apps::ac4_object_slots(ac4ObjectAssignment(), sourceShapes());
         const auto scene = ac4ObjectScene(stream_objects);
-        return scene && writeTextFile(url, iclforge::oba::to_keyframe_text(*scene));
+        return scene && writeTextFile(url, iclforge::objects::oba::to_keyframe_text(*scene));
     }
     // The grammar itself lives in iclforge::oba now (scene.hpp), so this writes
     // through the same function forge's own reader is paired with rather
     // than through a second, hand-rolled copy of the column layout that could
     // drift from it. The span overload is the one that keeps a gap - a
     // bed-pinned channel's flat index - out of the file, exactly as before.
-    return writeTextFile(url, iclforge::oba::to_keyframe_text(exportableSceneObjects()));
+    return writeTextFile(url, iclforge::objects::oba::to_keyframe_text(exportableSceneObjects()));
 }
 
 bool EncoderController::exportObjectScene(const QUrl& url) const {
@@ -2903,9 +2903,9 @@ bool EncoderController::exportObjectScene(const QUrl& url) const {
         const auto stream_objects =
             iclforge::apps::ac4_object_slots(ac4ObjectAssignment(), sourceShapes());
         const auto scene = ac4ObjectScene(stream_objects);
-        return scene && writeTextFile(url, iclforge::oba::to_json(*scene));
+        return scene && writeTextFile(url, iclforge::objects::oba::to_json(*scene));
     }
-    // The same objects as an iclforge::oba::ObjectScene in JSON: named, with
+    // The same objects as an iclforge::objects::oba::ObjectScene in JSON: named, with
     // per-segment interpolation and an orientation the keyframe columns have
     // nowhere to put. forge's atmos-path and atmos-encode read this form too,
     // so a scene saved here reloads there without going through the lossy
@@ -2924,11 +2924,11 @@ bool EncoderController::exportObjectScene(const QUrl& url) const {
         object.name = QStringLiteral("bed-pinned channel").toStdString();
         object.automation.push_back({.time_s = 0.0, .gain = 0.0});
     }
-    const auto scene = iclforge::oba::ObjectScene::create(std::move(objects));
+    const auto scene = iclforge::objects::oba::ObjectScene::create(std::move(objects));
     if (!scene) {
         return false;
     }
-    return writeTextFile(url, iclforge::oba::to_json(*scene));
+    return writeTextFile(url, iclforge::objects::oba::to_json(*scene));
 }
 
 void EncoderController::startMotionPreview() {
@@ -2953,20 +2953,20 @@ void EncoderController::startMotionPreview() {
     const std::size_t ndynamic = std::min<std::size_t>(dynamic.size(), 15);
     const std::size_t nobjects = ndynamic + pinned.size();
 
-    std::vector<iclforge::oba::ObjectPath> paths;
+    std::vector<iclforge::objects::oba::ObjectPath> paths;
     paths.reserve(nobjects);
     for (std::size_t i = 0; i < ndynamic; ++i) {
         const auto object_key = sourceChannelForFlatIndex(dynamic[i].front());
         const auto authored = object_keyframes_.find(object_key);
         if (authored != object_keyframes_.end() && !authored->second.empty()) {
-            auto created = iclforge::oba::KeyframePath::create(authored->second);
+            auto created = iclforge::objects::oba::KeyframePath::create(authored->second);
             if (created) {
                 paths.emplace_back(std::move(*created));
                 continue;
             }
         }
         const auto config = map_value(object_configs_, object_key);
-        auto fallback = iclforge::oba::KeyframePath::create(
+        auto fallback = iclforge::objects::oba::KeyframePath::create(
             {{.time_s = 0.0,
               .position = {.x = config.x, .y = config.y, .z = config.z},
               .gain = 0.7 / std::sqrt(static_cast<double>(std::max<std::size_t>(ndynamic, 1))),
@@ -2980,8 +2980,8 @@ void EncoderController::startMotionPreview() {
         const auto azimuth =
             lfe_pin ? std::optional<double>{} : location_azimuth_deg(location);
         const auto position = azimuth ? speaker_pin_position(*azimuth)
-                                      : iclforge::oba::Position{.x = 0.5, .y = 0.5, .z = 0.0};
-        auto pin_path = iclforge::oba::KeyframePath::create(
+                                      : iclforge::objects::oba::Position{.x = 0.5, .y = 0.5, .z = 0.0};
+        auto pin_path = iclforge::objects::oba::KeyframePath::create(
             {{.time_s = 0.0,
               .position = position,
               .gain = lfe_pin ? 0.0 : 1.0,
@@ -3099,7 +3099,7 @@ void EncoderController::startMotionPreview() {
             // frame - same convention encodeObjects() uses.
             const double t = static_cast<double>(start + iclforge::ac3::kSamplesPerFrame) /
                              static_cast<double>(sample_rate);
-            const auto placement = iclforge::oba::evaluate_placements(paths, t);
+            const auto placement = iclforge::objects::oba::evaluate_placements(paths, t);
             const auto unit = encoder->encode_frame(views, placement);
             if (!unit) {
                 problem = QStringLiteral(
@@ -5450,10 +5450,10 @@ void EncoderController::runLiveSession(iclforge::audio::DeviceInfo device,
         // below still computes inline) so an object nothing on the network
         // has addressed yet holds exactly where the room already had it,
         // at the level this session would have given it anyway.
-        std::optional<iclforge::oba::SceneCursor> position_cursor;
+        std::optional<iclforge::objects::oba::SceneCursor> position_cursor;
         if (atmos && live_position_source_) {
             const auto seed = liveObjectSnapshot();
-            std::vector<iclforge::oba::SceneObject> objects(nobjects);
+            std::vector<iclforge::objects::oba::SceneObject> objects(nobjects);
             for (std::size_t i = 0; i < nobjects; ++i) {
                 const auto& config = i < seed.size() ? seed[i] : ObjectConfig{};
                 objects[i].automation.push_back(
@@ -5462,7 +5462,7 @@ void EncoderController::runLiveSession(iclforge::audio::DeviceInfo device,
                      .gain = 0.7 / std::sqrt(static_cast<double>(nobjects)),
                      .lfe_send = config.lfe_send / std::sqrt(static_cast<double>(nobjects))});
             }
-            auto scene = iclforge::oba::ObjectScene::create(std::move(objects));
+            auto scene = iclforge::objects::oba::ObjectScene::create(std::move(objects));
             if (scene) {
                 position_cursor.emplace(std::move(*scene));
             }
@@ -5535,7 +5535,7 @@ void EncoderController::runLiveSession(iclforge::audio::DeviceInfo device,
             std::max<std::size_t>(nobjects, 1),
             std::vector<float>(iclforge::ac3::kSamplesPerFrame, 0.0f));
         std::vector<std::span<const float>> object_views(std::max<std::size_t>(nobjects, 1));
-        std::vector<iclforge::oba::ObjectPlacement> placement(std::max<std::size_t>(nobjects, 1));
+        std::vector<iclforge::objects::oba::ObjectPlacement> placement(std::max<std::size_t>(nobjects, 1));
         std::vector<std::span<const float>> bed_views(6);
 
         const std::size_t coded_count =
@@ -7775,7 +7775,7 @@ void EncoderController::encodeAc4Objects(const QString& path) {
     const std::size_t count = stream_objects.size();
     const QString coding =
         ac4_.object_coding == 0 ? QStringLiteral("A-JOC") : QStringLiteral("direct-coded");
-    jobs_.run([this, path, scene_path, json = iclforge::oba::to_json(*scene), stream_objects,
+    jobs_.run([this, path, scene_path, json = iclforge::objects::oba::to_json(*scene), stream_objects,
                flat = std::move(flat), scene = std::move(*scene), params, mp4, crc, kbps, count,
                coding] {
         const Ac4Outcome outcome = encode_ac4_objects_file(path, scene_path, json, stream_objects,
@@ -7831,7 +7831,7 @@ void EncoderController::encodeObjects(const QString& path,
     // for the whole file. Built here, on the GUI thread, and moved into the
     // worker below - the same timing today's per-object capture already
     // relied on, so nothing about that thread-safety changes.
-    std::vector<iclforge::oba::ObjectPath> paths;
+    std::vector<iclforge::objects::oba::ObjectPath> paths;
     paths.reserve(nobjects);
     for (std::size_t i = 0; i < ndynamic; ++i) {
         // dynamic[i]'s IDENTITY channel (its first - see
@@ -7843,14 +7843,14 @@ void EncoderController::encodeObjects(const QString& path,
         const auto object_key = sourceChannelForFlatIndex(dynamic[i].front());
         const auto authored = object_keyframes_.find(object_key);
         if (authored != object_keyframes_.end() && !authored->second.empty()) {
-            auto created = iclforge::oba::KeyframePath::create(authored->second);
+            auto created = iclforge::objects::oba::KeyframePath::create(authored->second);
             if (created) {
                 paths.emplace_back(std::move(*created));
                 continue;
             }
         }
         const auto config = map_value(object_configs_, object_key);
-        auto fallback = iclforge::oba::KeyframePath::create(
+        auto fallback = iclforge::objects::oba::KeyframePath::create(
             {{.time_s = 0.0,
               .position = {.x = config.x, .y = config.y, .z = config.z},
               // Every object is panned into the SAME five channels, so their
@@ -7878,8 +7878,8 @@ void EncoderController::encodeObjects(const QString& path,
         const auto azimuth =
             lfe_pin ? std::optional<double>{} : location_azimuth_deg(location);
         const auto position = azimuth ? speaker_pin_position(*azimuth)
-                                      : iclforge::oba::Position{.x = 0.5, .y = 0.5, .z = 0.0};
-        auto pin_path = iclforge::oba::KeyframePath::create(
+                                      : iclforge::objects::oba::Position{.x = 0.5, .y = 0.5, .z = 0.0};
+        auto pin_path = iclforge::objects::oba::KeyframePath::create(
             {{.time_s = 0.0,
               .position = position,
               .gain = lfe_pin ? 0.0 : 1.0,
@@ -7967,7 +7967,7 @@ void EncoderController::encodeObjects(const QString& path,
             // inside the loop, not be hoisted above it.
             const double t = static_cast<double>(start + iclforge::ac3::kSamplesPerFrame) /
                              static_cast<double>(sample_rate);
-            const auto placement = iclforge::oba::evaluate_placements(paths, t);
+            const auto placement = iclforge::objects::oba::evaluate_placements(paths, t);
             const auto unit = encoder.encode_frame(views, placement);
             if (!unit) {
                 problem = QStringLiteral(
@@ -8028,7 +8028,7 @@ void EncoderController::encodeObjects(const QString& path,
         }
 
         const auto count = frames.size();
-        const auto objects = iclforge::oba::object_count(encoder.program());
+        const auto objects = iclforge::objects::oba::object_count(encoder.program());
         QMetaObject::invokeMethod(this, [this, count, bytes, nobjects, objects, cancelled,
                                          problem, partial_note, totals = std::move(totals)] {
             setBusy(false);

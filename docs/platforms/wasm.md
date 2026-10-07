@@ -251,7 +251,7 @@ loads the very same modules via `../`) drives the already-bound `AtmosBedEncoder
 as objects, encode cadence locked to real time so the room is *performed*, and the same
 scan/push round-trip preview so the pan drawn on the canvas is what plays back.
 
-What counts as "an object" in the decode demo's room view is every JOC output, which `iclforge::oba::describe_objects()` spells
+What counts as "an object" in the decode demo's room view is every JOC output, which `iclforge::objects::oba::describe_objects()` spells
 out: a dynamic object supplies its own position, size and gain, and a bed channel — what
 channel-based-immersive third-party content carries — is drawn at the nominal room position of the
 speaker its label names, with that label on its solo button. Each object's per-frame record also

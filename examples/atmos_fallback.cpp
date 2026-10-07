@@ -48,7 +48,7 @@ std::pair<std::vector<std::byte>, iclforge::ac3::DecodedAccessUnit> run(
     for (const auto& source : sources) {
         views.emplace_back(source);
     }
-    const std::array<iclforge::oba::ObjectPlacement, kObjects> placement{{
+    const std::array<iclforge::objects::oba::ObjectPlacement, kObjects> placement{{
         {.position = {.x = 0.25, .y = 0.6, .z = 0.0}, .gain = 0.8},
         {.position = {.x = 0.75, .y = 0.6, .z = 0.0}, .gain = 0.8},
     }};

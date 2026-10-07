@@ -2932,19 +2932,19 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
             // reason for existing: a decoder that does not understand this
             // data reads the rest of the frame exactly as it would without it.
             if (!out.object_metadata.has_value()) {
-                const auto container = iclforge::emdf::parse_container(skip_bytes);
+                const auto container = iclforge::objects::emdf::parse_container(skip_bytes);
                 if (container.has_value() && container->has_value()) {
                     for (const auto& payload : **container) {
                         if (impl_->config_.syntax != nullptr) {
                             impl_->config_.syntax->add_emdf_payload(payload.id);
                         }
-                        if (payload.id == iclforge::emdf::kPayloadIdOamd) {
-                            out.object_metadata = iclforge::oba::parse_payload(payload.bytes);
-                        } else if (payload.id == iclforge::emdf::kPayloadIdJoc &&
+                        if (payload.id == iclforge::objects::emdf::kPayloadIdOamd) {
+                            out.object_metadata = iclforge::objects::oba::parse_payload(payload.bytes);
+                        } else if (payload.id == iclforge::objects::emdf::kPayloadIdJoc &&
                                    joc_bytes.empty()) {
                             joc_bytes.assign(payload.bytes.begin(), payload.bytes.end());
-                        } else if (payload.id != iclforge::emdf::kPayloadIdOamd &&
-                                   payload.id != iclforge::emdf::kPayloadIdJoc &&
+                        } else if (payload.id != iclforge::objects::emdf::kPayloadIdOamd &&
+                                   payload.id != iclforge::objects::emdf::kPayloadIdJoc &&
                                    impl_->config_.diagnostics != nullptr) {
                             // Any id this decoder does not interpret at all -
                             // a second JOC payload (joc_bytes already taken)
@@ -3967,7 +3967,7 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
         if (out.object_metadata && !joc_bytes.empty() &&
             !impl_->config_.skip_object_reconstruction) {
             const auto params = oba::joc::parse_payload(joc_bytes);
-            const auto indices = iclforge::oba::joc_object_indices(out.object_metadata->program);
+            const auto indices = iclforge::objects::oba::joc_object_indices(out.object_metadata->program);
             // §6.3.2.2 Table 47: a downmix wider than the five channels this
             // substream carries needs a dependent substream's extra pair -
             // Lb/Rb (kDmxConfig7X) or Tfl/Tfr (kDmxConfig5XPlus2 and
@@ -4615,7 +4615,7 @@ std::expected<std::optional<DecodedAccessUnit>, DecodeError> Eac3Decoder::decode
         constexpr auto kMaxObjectViews = static_cast<std::size_t>(oba::joc::kMaxObjects);
         std::array<std::span<const float>, kMaxObjectViews> object_views{};
         const std::size_t objects = std::min(out.object_audio.size(), kMaxObjectViews);
-        const iclforge::oba::DecodedProgram* const metadata =
+        const iclforge::objects::oba::DecodedProgram* const metadata =
             out.object_metadata.has_value() ? &*out.object_metadata : nullptr;
         // Its own zone, so the time a caller's sink spends in here reads as
         // the caller's rather than as the access unit's.
@@ -4724,7 +4724,7 @@ std::expected<std::optional<DecodedAccessUnit>, DecodeError> Eac3Decoder::decode
             const auto params = oba::joc::parse_payload(sub.joc_pending_bytes);
             const auto indices =
                 out.object_metadata.has_value()
-                    ? iclforge::oba::joc_object_indices(out.object_metadata->program)
+                    ? iclforge::objects::oba::joc_object_indices(out.object_metadata->program)
                     : std::vector<int>{};
             if (!params || !out.object_metadata.has_value() ||
                 params->objects != static_cast<int>(indices.size())) {
@@ -4769,7 +4769,7 @@ std::expected<std::optional<DecodedAccessUnit>, DecodeError> Eac3Decoder::decode
             // this is new wiring onto an existing generic path, not new DSP.
             out.object_audio = oba::joc::reconstruct(
                 bed, *params, *joc_slot, impl_->config_.fast_mdct, impl_->config_.fast_imdct,
-                iclforge::oba::joc::Domain::kMdctBand);
+                iclforge::objects::oba::joc::Domain::kMdctBand);
             out.object_indices = indices;
             break;
         }

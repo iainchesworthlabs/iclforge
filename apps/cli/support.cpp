@@ -1768,11 +1768,11 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         if (key == "joc-domain") {
             if (value == "qmf") {
-                out.joc_domain = iclforge::oba::joc::Domain::kQmf;
+                out.joc_domain = iclforge::objects::oba::joc::Domain::kQmf;
                 continue;
             }
             if (value == "mdct") {
-                out.joc_domain = iclforge::oba::joc::Domain::kMdctBand;
+                out.joc_domain = iclforge::objects::oba::joc::Domain::kMdctBand;
                 continue;
             }
             fmt::println(stderr,
@@ -4499,7 +4499,7 @@ std::optional<iclforge::ac3::signing::VerifySummary> apply_object_verification(
 }
 
 void print_object_summary(FILE* status,
-                          const std::optional<iclforge::oba::DecodedProgram>& metadata,
+                          const std::optional<iclforge::objects::oba::DecodedProgram>& metadata,
                           std::string_view joc_note) {
     if (!metadata.has_value()) {
         return;
@@ -4509,24 +4509,24 @@ void print_object_summary(FILE* status,
     if (program.dynamic_only) {
         status_println(status, "  {} dynamic objects{} = {} objects, OAMD present{}",
                        decoded.objects.size(), program.lfe ? " + the bed's LFE" : "",
-                       iclforge::oba::object_count(program), joc_note);
+                       iclforge::objects::oba::object_count(program), joc_note);
     } else {
         // A bed program - what channel-based-immersive third-party content
         // is. Naming the bed's channels is the useful half here: "12 objects"
         // says nothing, "L R C LFE Ls Rs Lb Rb Tfl Tfr Tbl Tbr" says what the
         // stream actually carries.
         std::string labels;
-        for (const auto label : iclforge::oba::bed_labels(program.bed)) {
+        for (const auto label : iclforge::objects::oba::bed_labels(program.bed)) {
             if (!labels.empty()) {
                 labels += ' ';
             }
-            labels += iclforge::oba::describe(label);
+            labels += iclforge::objects::oba::describe(label);
         }
         if (labels.empty()) {
-            labels = fmt::format("{} channels", iclforge::oba::bed_channel_count(program));
+            labels = fmt::format("{} channels", iclforge::objects::oba::bed_channel_count(program));
         }
         status_println(status, "  bed [{}] + {} dynamic objects = {} objects, OAMD present{}",
-                       labels, program.dynamic_objects, iclforge::oba::object_count(program),
+                       labels, program.dynamic_objects, iclforge::objects::oba::object_count(program),
                        joc_note);
     }
     if (decoded.trim.has_value()) {

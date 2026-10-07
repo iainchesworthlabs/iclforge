@@ -15,7 +15,7 @@ import type { IclForgeEmbindModule, FoldOptions } from "./types.js";
 // whole-file Embind Decoder's own kEnergyBlockSamples; this is presentation
 // logic, not codec logic, so it belongs here rather than in C++.
 const ENERGY_BLOCK_SAMPLES = 1024;
-// x, y, z, gain_db, width, depth, height - iclforge::oba::DisplayObject's own shape.
+// x, y, z, gain_db, width, depth, height - iclforge::objects::oba::DisplayObject's own shape.
 const OBJECT_POSITION_STRIDE = 7;
 
 export interface DecodedProgram {

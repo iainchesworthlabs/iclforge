@@ -112,7 +112,7 @@ struct Ac4ObjectSlot {
 // room's centre, at the speaker's azimuth, the place ADM's polar coordinates
 // give a bed channel (iclforge::adm), so that a pinned channel and an ADM bed
 // channel come out at one position.
-[[nodiscard]] iclforge::oba::Position ac4_pin_position(double azimuth_deg);
+[[nodiscard]] iclforge::objects::oba::Position ac4_pin_position(double azimuth_deg);
 
 // One source file's channels as the encoder's flat input: `offset_samples` of
 // leading silence, then its samples.
@@ -134,15 +134,15 @@ struct Ac4SourceView {
     std::span<const Ac4ObjectSlot> slots, std::span<const std::vector<float>> flat_planes);
 
 // An object's ObjectProperties for a placement: the position unconverted, since
-// iclforge::oba::Position and TS 103 190-2 Annex F share one room (X from the left
+// iclforge::objects::oba::Position and TS 103 190-2 Annex F share one room (X from the left
 // wall to the right, Y from the front to the back, Z from the floor to the
 // ceiling), and the gain in dB, where the placement's is linear (-infinity for
 // none). The LFE send has no AC-4 counterpart and is dropped.
 [[nodiscard]] iclforge::ac4::ObjectProperties ac4_object_properties(
-    const iclforge::oba::ObjectPlacement& p);
+    const iclforge::objects::oba::ObjectPlacement& p);
 
 // Every object's placement at a time, in the stream's order.
-using Ac4Placements = std::function<std::vector<iclforge::oba::ObjectPlacement>(double time_s)>;
+using Ac4Placements = std::function<std::vector<iclforge::objects::oba::ObjectPlacement>(double time_s)>;
 
 // What E9's writer is given besides the audio and the metadata.
 struct Ac4ObjectsParams {
@@ -158,7 +158,7 @@ struct Ac4ObjectsParams {
 // Encoder::refusal_reason() is asked about before anything is read.
 [[nodiscard]] iclforge::ac4::EncoderConfig ac4_objects_config(
     const Ac4ObjectsParams& params, const std::vector<bool>& lfe,
-    std::span<const iclforge::oba::ObjectPlacement> initial);
+    std::span<const iclforge::objects::oba::ObjectPlacement> initial);
 
 // Why an object encode of `slots` at `params` cannot be written, in the terms
 // the page and the command both use: what is known from the counts, the rate
@@ -202,11 +202,11 @@ struct Ac4ObjectsEncoded {
 // pinned channel held at its ring position and the LFE at the room's centre.
 [[nodiscard]] std::expected<Ac4ObjectsEncoded, Ac4ObjectsError> encode_ac4_scene(
     const Ac4ObjectsParams& params, std::span<const Ac4ObjectSlot> slots,
-    std::span<const std::vector<float>> flat_planes, const iclforge::oba::ObjectScene& motion);
+    std::span<const std::vector<float>> flat_planes, const iclforge::objects::oba::ObjectScene& motion);
 
 // The placements of a scene of slots at a time: the form encode_ac4_scene
 // hands encode_ac4_objects, for a caller that wants the initial values.
-[[nodiscard]] std::vector<iclforge::oba::ObjectPlacement> ac4_scene_placements(
-    std::span<const Ac4ObjectSlot> slots, const iclforge::oba::ObjectScene& motion, double time_s);
+[[nodiscard]] std::vector<iclforge::objects::oba::ObjectPlacement> ac4_scene_placements(
+    std::span<const Ac4ObjectSlot> slots, const iclforge::objects::oba::ObjectScene& motion, double time_s);
 
 }  // namespace iclforge::apps

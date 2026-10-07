@@ -143,14 +143,14 @@ TEST_CASE("an E-AC-3 CRC mismatch reaches the diagnostic sink", "[eac3][decoder]
 
 TEST_CASE("an unrecognised EMDF payload id reaches the diagnostic sink",
           "[eac3][decoder][diagnostics]") {
-    // A real EMDF container (iclforge::emdf::build_container), carried in the
+    // A real EMDF container (iclforge::objects::emdf::build_container), carried in the
     // frame's skip field exactly as AtmosEncoder's OAMD/JOC pair are - see
     // AuxPayload's own doc comment - but with a payload id (5) this decoder
     // does not interpret at all. §H.2.2's own design means this never fails
     // the frame; before AP11 nothing anywhere reported it either.
     const std::vector<std::byte> payload_bytes = {std::byte{0xAB}, std::byte{0xCD}};
-    const std::vector<iclforge::emdf::Payload> payloads = {{.id = 5, .bytes = payload_bytes}};
-    const auto container = iclforge::emdf::build_container(payloads);
+    const std::vector<iclforge::objects::emdf::Payload> payloads = {{.id = 5, .bytes = payload_bytes}};
+    const auto container = iclforge::objects::emdf::build_container(payloads);
 
     iclforge::ac3::eac3::FrameEncoder encoder{
         {.bitrate_kbps = 192, .acmod = iclforge::ac3::Acmod::k2_0}};
@@ -173,9 +173,9 @@ TEST_CASE("an unrecognised EMDF payload id reaches the diagnostic sink",
 TEST_CASE("a recognised EMDF payload id (OAMD/JOC) does not reach the sink",
           "[eac3][decoder][diagnostics]") {
     const std::vector<std::byte> payload_bytes = {std::byte{0x00}, std::byte{0x00}};
-    const std::vector<iclforge::emdf::Payload> payloads = {
-        {.id = iclforge::emdf::kPayloadIdOamd, .bytes = payload_bytes}};
-    const auto container = iclforge::emdf::build_container(payloads);
+    const std::vector<iclforge::objects::emdf::Payload> payloads = {
+        {.id = iclforge::objects::emdf::kPayloadIdOamd, .bytes = payload_bytes}};
+    const auto container = iclforge::objects::emdf::build_container(payloads);
 
     iclforge::ac3::eac3::FrameEncoder encoder{
         {.bitrate_kbps = 192, .acmod = iclforge::ac3::Acmod::k2_0}};

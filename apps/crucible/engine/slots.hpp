@@ -41,10 +41,10 @@ enum class BedChannel : std::uint8_t { kL = 0, kR = 1, kC = 2, kLs = 3, kRs = 4 
     return kPositionedSlots + static_cast<int>(channel);
 }
 
-// Where each bed slot sits, in room coordinates (iclforge::oba::Position: x 0 left
+// Where each bed slot sits, in room coordinates (iclforge::objects::oba::Position: x 0 left
 // to 1 right, y 0 front to 1 back, z 0 on the listener plane). Snapped, so a
 // renderer sends each to its nearest speaker rather than panning.
-[[nodiscard]] iclforge::oba::ObjectPlacement bed_placement(BedChannel channel);
+[[nodiscard]] iclforge::objects::oba::ObjectPlacement bed_placement(BedChannel channel);
 
 // One application's standing in the plan.
 struct AppSlot {

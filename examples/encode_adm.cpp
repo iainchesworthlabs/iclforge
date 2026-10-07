@@ -6,7 +6,7 @@
 // container + ADM XML graph, iclforge::adm::build() maps it onto
 // iclforge::ac3::oba::AtmosEncoder's flat object-list input shape (one bed speaker feed pinned in
 // place, one dynamic object panned by its own authored motion), and a plain per-frame loop calls
-// iclforge::oba::evaluate_placements() plus AtmosEncoder::encode_frame() the same way every other
+// iclforge::objects::oba::evaluate_placements() plus AtmosEncoder::encode_frame() the same way every other
 // Atmos example in this directory does. The CLI command and this example deliberately share nothing
 // but that library API - see docs/library/adm-bridge.md's own note on why no separate "driving
 // loop" abstraction exists.
@@ -300,8 +300,8 @@ int main(int argc, char** argv) {
                     bridged->is_bed[i] ? "bed speaker feed" : "dynamic object");
     }
 
-    // Step 3: drive AtmosEncoder::encode_frame() in a loop - iclforge::oba::evaluate_placements()
-    // reads each channel's iclforge::oba::ObjectPath at the frame's own end time, exactly the
+    // Step 3: drive AtmosEncoder::encode_frame() in a loop - iclforge::objects::oba::evaluate_placements()
+    // reads each channel's iclforge::objects::oba::ObjectPath at the frame's own end time, exactly the
     // pattern forge's own atmos-path/atmos-encode/atmos-adm commands and every other Atmos example
     // in this directory use.
     const auto objects = static_cast<int>(bridged->channel_count());
@@ -318,7 +318,7 @@ int main(int argc, char** argv) {
             views[ch] = bridged->pcm[ch].subspan(start, static_cast<std::size_t>(kFrame));
         }
         const double t = static_cast<double>(start + static_cast<std::size_t>(kFrame)) / 48000.0;
-        const auto placement = iclforge::oba::evaluate_placements(bridged->paths, t);
+        const auto placement = iclforge::objects::oba::evaluate_placements(bridged->paths, t);
 
         // Step 4: write - the raw elementary E-AC-3 stream, same convention every Atmos-encode
         // path in this project uses (container wrapping, if wanted, is a separate later step via

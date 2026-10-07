@@ -109,7 +109,7 @@ struct ObjectDivergenceInfo {
 //
 // Fields cover the common sub-elements (§5.4.3, Table 11) plus the
 // typeDefinition-specific ones this phase's downstream consumer (the
-// motion-mapping phase 2, see iclforge::oba::motion's KeyframePath) actually
+// motion-mapping phase 2, see iclforge::objects::oba::motion's KeyframePath) actually
 // needs: position/width/height/depth/speakerLabel/diffuse for
 // DirectSpeakers and Objects (§§5.4.3.1, 5.4.3.3), plus HOA's order/degree/
 // normalization (§5.4.3.4). channelLock, jumpPosition/interpolationLength

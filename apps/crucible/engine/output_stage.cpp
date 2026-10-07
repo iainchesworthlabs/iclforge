@@ -46,7 +46,7 @@ struct SpatialXyz {
     float x, y, z;
 };
 
-SpatialXyz to_windows_spatial(const iclforge::oba::Position& p) {
+SpatialXyz to_windows_spatial(const iclforge::objects::oba::Position& p) {
     constexpr float kHalfWidthM = 2.0F;
     constexpr float kHalfDepthM = 2.0F;
     constexpr float kHeightM = 1.0F;
@@ -57,7 +57,7 @@ SpatialXyz to_windows_spatial(const iclforge::oba::Position& p) {
 
 // The bed's LFE is not an object, so it never goes through JOC reconstruction
 // - but the dynamic objects submit()'s kHeadphones branch places beside it
-// did, and that costs iclforge::oba::joc::reconstruction_delay(domain) samples the
+// did, and that costs iclforge::objects::oba::joc::reconstruction_delay(domain) samples the
 // LFE does not pay (docs/library/decoding.md, "Atmos objects lag the bed").
 // Submitted to the spatial sink as soon as each unit decodes, the LFE would
 // reach the room that far ahead of the objects beside it, so it goes through
@@ -326,7 +326,7 @@ const OutputStatus& OutputStage::apply(std::vector<EndpointFacts> facts, bool si
             const iclforge::ac3::DecoderConfig decoder_config{};
             impl_->decoder = std::make_unique<iclforge::ac3::Eac3Decoder>(decoder_config);
             impl_->lfe_delay.emplace(static_cast<std::size_t>(
-                iclforge::oba::joc::reconstruction_delay(decoder_config.joc_domain)));
+                iclforge::objects::oba::joc::reconstruction_delay(decoder_config.joc_domain)));
             break;
         }
         case OutputMode::kNone: return status_;
@@ -480,13 +480,13 @@ void OutputStage::submit(std::span<const std::byte> unit, const RawFrame& raw) {
 
     if (status_.mode == OutputMode::kHeadphones) {
         const bool has_lfe =
-            out.object_metadata && iclforge::oba::has_lfe(out.object_metadata->program);
+            out.object_metadata && iclforge::objects::oba::has_lfe(out.object_metadata->program);
         if (!ensure_spatial(has_lfe, out.object_audio.size())) {
             return;
         }
         impl.dynamic_updates.clear();
         if (out.object_metadata.has_value()) {
-            const auto positions = iclforge::oba::describe_objects(*out.object_metadata);
+            const auto positions = iclforge::objects::oba::describe_objects(*out.object_metadata);
             for (std::size_t i = 0; i < out.object_audio.size() && i < positions.size(); ++i) {
                 const auto xyz = to_windows_spatial(positions[i].position);
                 impl.dynamic_updates.push_back(
@@ -498,7 +498,7 @@ void OutputStage::submit(std::span<const std::byte> unit, const RawFrame& raw) {
             }
         }
         impl.static_updates.clear();
-        if (out.object_metadata && iclforge::oba::has_lfe(out.object_metadata->program) &&
+        if (out.object_metadata && iclforge::objects::oba::has_lfe(out.object_metadata->program) &&
             !out.channels.empty()) {
             // Delayed to arrive with the dynamic objects above, not ahead of
             // them - see LfeDelayLine's own comment.

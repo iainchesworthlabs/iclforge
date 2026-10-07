@@ -380,7 +380,7 @@ class WasmAtmosBedEncoder {
         }
         const auto spans = spans_of(storage);
 
-        std::vector<iclforge::oba::ObjectPlacement> placement(
+        std::vector<iclforge::objects::oba::ObjectPlacement> placement(
             static_cast<std::size_t>(object_count_));
         for (int i = 0; i < object_count_; ++i) {
             const emscripten::val entry = placements_js[i];

@@ -65,7 +65,7 @@ impl AtmosConfig {
     }
 }
 
-/// One object's placement for one frame — `iclforge::oba::ObjectPlacement` via
+/// One object's placement for one frame — `iclforge::objects::oba::ObjectPlacement` via
 /// `iclforge_object_placement_t`. Position is §4.2.1's room-anchored system (`x`/`y` in
 /// `[0, 1]`, `z` in `[-1, 1]`).
 ///

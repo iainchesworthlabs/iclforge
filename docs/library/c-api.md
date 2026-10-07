@@ -277,7 +277,7 @@ position and gain (`..._dynamic_object`), and JOC's reconstructed per-object aud
 (`..._object_audio`/`..._object_audio_count`). Those audio entries are index-parallel to the
 dynamic objects for the dynamic-object-only programme this project's own encoder writes; for a
 bed programme they are its bed channels instead, and the C++ surface
-(`DecodedSubstream::object_indices`, `iclforge::oba::joc_object_indices`) is what says which. See
+(`DecodedSubstream::object_indices`, `iclforge::objects::oba::joc_object_indices`) is what says which. See
 [Spatial & Atmos objects](spatial-and-atmos.md) for what the position/gain values mean and how
 `iclforge_atmos_encoder_t` (the C counterpart to `iclforge::ac3::oba::AtmosEncoder`) produces them.
 
@@ -622,7 +622,7 @@ metadata beyond the loudness values (the DRC, dialogue enhancement and downmix i
 `iclforge_ac4_encoder_toc()` and the functions that take its result cover what a container muxer
 needs from the encoder's own stream.
 
-`iclforge::oba::ObjectScene` (the object-scene timeline behind `forge atmos-path` and the GUI's
+`iclforge::objects::oba::ObjectScene` (the object-scene timeline behind `forge atmos-path` and the GUI's
 export - see [Spatial & Atmos objects](spatial-and-atmos.md#the-scene-iclforgeobaobjectscene)) is not
 here either. Its shape has settled: `SceneCursor` is the seam a live position source plugs into,
 and the OSC wire form ([`iclforge/objects/scene_osc.hpp`](spatial-and-atmos.md#the-osc-wire-form)), a

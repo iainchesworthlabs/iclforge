@@ -238,8 +238,8 @@ TEST_CASE("stream decoder: the JOC domain setting reaches the renderer's LFE lag
           "[hearth][stream-decoder]") {
     const auto layout = iclforge::render::OutputLayout::parse("5.1.2");
     REQUIRE(layout.has_value());
-    using iclforge::oba::joc::Domain;
-    using iclforge::oba::joc::reconstruction_delay;
+    using iclforge::objects::oba::joc::Domain;
+    using iclforge::objects::oba::joc::reconstruction_delay;
 
     // The default is kQmf, which is also a freshly built LayoutRenderer's own
     // default lag (render.hpp) - so a decoder that never touches the setting
@@ -462,7 +462,7 @@ TEST_CASE("stream decoder: an E-AC-3 unit's report comes with the call that deli
 TEST_CASE("stream decoder: a unit's objects are in its report", "[hearth][stream-decoder]") {
     iclforge::ac3::oba::AtmosEncoder encoder{
         {.bitrate_kbps = 448, .num_bands_idx = 4, .emit_object_metadata = true}, 1};
-    const std::array<iclforge::oba::ObjectPlacement, 1> placement{{{}}};
+    const std::array<iclforge::objects::oba::ObjectPlacement, 1> placement{{{}}};
     std::vector<std::span<const float>> views(1);
     std::vector<std::vector<std::byte>> units;
     for (int f = 0; f < 3; ++f) {

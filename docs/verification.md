@@ -582,7 +582,7 @@ Two divergences are recorded rather than resolved:
   failing frame sits — see `tools/generators/gen_external_baseline.py`'s module docstring.)
 - **`the_great_wall_7.1.eac3`'s OAMD payload does not decode.** FFmpeg reports the file as
   "Dolby Digital Plus + Dolby Atmos", and its arrangement is the real Annex E structure
-  described above, but `iclforge::oba::parse_payload` refuses several `object_element` fields
+  described above, but `iclforge::objects::oba::parse_payload` refuses several `object_element` fields
   (`num_obj_info_blocks`, `sample_offset_code`, `b_object_not_active` among them) to exactly the
   shape this project's own `AtmosEncoder` emits, and Dolby's commercial encoder does not produce
   that same shape. This is a pre-existing, generic scope limit of the OAMD parser - equally true

@@ -135,7 +135,7 @@ TEST_CASE("AC-4 object planes sum each slot's taps at their gains", "[gui][ac4]"
 }
 
 TEST_CASE("an AC-4 object keeps its position and turns its linear gain into dB", "[gui][ac4]") {
-    iclforge::oba::ObjectPlacement placement;
+    iclforge::objects::oba::ObjectPlacement placement;
     placement.position = {.x = 0.2, .y = 0.7, .z = -0.5};
     placement.gain = 0.5;
     placement.lfe_send = 1.0;
@@ -192,7 +192,7 @@ TEST_CASE("the encoder takes the 64 objects the page and the command allow, and 
     const auto config_of = [](std::size_t n) {
         iclforge::apps::Ac4ObjectsParams params;
         params.bitrate_kbps = 512;
-        const std::vector<iclforge::oba::ObjectPlacement> placements(n);
+        const std::vector<iclforge::objects::oba::ObjectPlacement> placements(n);
         return iclforge::apps::ac4_objects_config(params, std::vector<bool>{}, placements);
     };
     CHECK(iclforge::apps::kAc4MaxObjects == 64);
@@ -223,16 +223,16 @@ TEST_CASE("a scene of slots encodes to a stream that decodes to its objects, one
 
     const auto rear = iclforge::apps::ac4_pin_position(-110.0);
     const auto front = iclforge::apps::ac4_pin_position(0.0);
-    const auto scene = iclforge::oba::ObjectScene::create(
-        {iclforge::oba::SceneObject{.name = "moving",
+    const auto scene = iclforge::objects::oba::ObjectScene::create(
+        {iclforge::objects::oba::SceneObject{.name = "moving",
                                .automation = {{.time_s = 0.0,
                                                .position = rear,
                                                .gain = 1.0,
-                                               .interp = iclforge::oba::Interpolation::kHold},
+                                               .interp = iclforge::objects::oba::Interpolation::kHold},
                                               {.time_s = 0.096,
                                                .position = front,
                                                .gain = 1.0,
-                                               .interp = iclforge::oba::Interpolation::kHold}}}});
+                                               .interp = iclforge::objects::oba::Interpolation::kHold}}}});
     REQUIRE(scene.has_value());
 
     iclforge::apps::Ac4ObjectsParams params;

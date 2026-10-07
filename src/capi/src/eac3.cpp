@@ -11,8 +11,8 @@ static_assert(static_cast<int>(iclforge::ac3::eac3::chanmap::Location::kLfe) ==
               ICLFORGE_LOCATION_LFE);
 static_assert(static_cast<int>(iclforge::ac3::eac3::chanmap::kMaxChannels) == 22);
 
-static_assert(iclforge::oba::bed::kLR == ICLFORGE_BED_LR);
-static_assert(iclforge::oba::bed::kLfe2 == ICLFORGE_BED_LFE2);
+static_assert(iclforge::objects::oba::bed::kLR == ICLFORGE_BED_LR);
+static_assert(iclforge::objects::oba::bed::kLfe2 == ICLFORGE_BED_LFE2);
 
 extern "C" {
 

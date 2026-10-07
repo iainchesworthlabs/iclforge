@@ -92,12 +92,12 @@ std::string read_log(const fs::path& log) {
 // audio. This is for the program shapes this project's own encoder never
 // writes - AtmosEncoder's programs are always dynamic objects plus the bed's
 // LFE.
-void write_oamd_stream(const fs::path& path, const iclforge::oba::Program& program,
-                       std::span<const iclforge::oba::DynamicObject> objects) {
-    const auto payload = iclforge::oba::build_payload(program, objects);
-    const std::vector<iclforge::emdf::Payload> payloads = {
-        {.id = iclforge::emdf::kPayloadIdOamd, .bytes = payload}};
-    const auto container = iclforge::emdf::build_container(payloads);
+void write_oamd_stream(const fs::path& path, const iclforge::objects::oba::Program& program,
+                       std::span<const iclforge::objects::oba::DynamicObject> objects) {
+    const auto payload = iclforge::objects::oba::build_payload(program, objects);
+    const std::vector<iclforge::objects::emdf::Payload> payloads = {
+        {.id = iclforge::objects::emdf::kPayloadIdOamd, .bytes = payload}};
+    const auto container = iclforge::objects::emdf::build_container(payloads);
 
     iclforge::ac3::eac3::FrameEncoder encoder{
         {.bitrate_kbps = 448, .acmod = iclforge::ac3::Acmod::k3_2, .lfe = true}};
@@ -124,12 +124,12 @@ void write_oamd_stream(const fs::path& path, const iclforge::oba::Program& progr
 // AC-3 has no skip-field syntax at all - which is exactly why a real
 // legacy-core Atmos delivery puts its object layer in the dependent instead
 // (decoder.hpp's DecodedAccessUnit::object_metadata comment).
-void write_legacy_core_oamd_stream(const fs::path& path, const iclforge::oba::Program& program,
-                                   std::span<const iclforge::oba::DynamicObject> objects) {
-    const auto payload = iclforge::oba::build_payload(program, objects);
-    const std::vector<iclforge::emdf::Payload> payloads = {
-        {.id = iclforge::emdf::kPayloadIdOamd, .bytes = payload}};
-    const auto container = iclforge::emdf::build_container(payloads);
+void write_legacy_core_oamd_stream(const fs::path& path, const iclforge::objects::oba::Program& program,
+                                   std::span<const iclforge::objects::oba::DynamicObject> objects) {
+    const auto payload = iclforge::objects::oba::build_payload(program, objects);
+    const std::vector<iclforge::objects::emdf::Payload> payloads = {
+        {.id = iclforge::objects::emdf::kPayloadIdOamd, .bytes = payload}};
+    const auto container = iclforge::objects::emdf::build_container(payloads);
 
     iclforge::ac3::FrameEncoder core{
         {.bitrate_kbps = 448, .acmod = iclforge::ac3::Acmod::k3_2, .lfe = true}};
@@ -436,8 +436,8 @@ TEST_CASE("monitor describes a stream's object layer the way decode does",
     // decode's report is checked on every machine. monitor prints its own only
     // once a render endpoint opens; without one, the check is that it spoke.
     const auto dir = scratch_dir();
-    const auto check_both = [&dir](const std::string& name, const iclforge::oba::Program& program,
-                                   std::span<const iclforge::oba::DynamicObject> objects,
+    const auto check_both = [&dir](const std::string& name, const iclforge::objects::oba::Program& program,
+                                   std::span<const iclforge::objects::oba::DynamicObject> objects,
                                    const std::string& line) {
         const auto stream = dir / (name + ".ec3");
         write_oamd_stream(stream, program, objects);
@@ -459,14 +459,14 @@ TEST_CASE("monitor describes a stream's object layer the way decode does",
             CHECK(monitored.find(line) != std::string::npos);
         }
     };
-    const std::array<iclforge::oba::DynamicObject, 2> objects{{
+    const std::array<iclforge::objects::oba::DynamicObject, 2> objects{{
         {.position = {.x = 0.25, .y = 0.5, .z = 0.0}, .gain_db = 0.0},
         {.position = {.x = 0.75, .y = 0.5, .z = 0.0}, .gain_db = 0.0},
     }};
 
     SECTION("a bed program, as channel-based immersive content is, names its bed") {
         constexpr auto k514 = static_cast<std::uint16_t>(
-            iclforge::oba::bed::k51 | iclforge::oba::bed::kTflTfr | iclforge::oba::bed::kTblTbr);
+            iclforge::objects::oba::bed::k51 | iclforge::objects::oba::bed::kTflTfr | iclforge::objects::oba::bed::kTblTbr);
         check_both("monitor_bed_program",
                    {.dynamic_only = false, .bed = k514, .dynamic_objects = 2}, objects,
                    "  bed [L R C LFE Ls Rs Tfl Tfr Tbl Tbr] + 2 dynamic objects = 12 objects, "
@@ -496,7 +496,7 @@ TEST_CASE("spatial reads a legacy-core stream instead of refusing it as plain AC
     // this stream must never hit, not merely "some" refusal.
     const auto dir = scratch_dir();
     const auto stream = dir / "spatial_legacy_core.ec3";
-    const std::array<iclforge::oba::DynamicObject, 2> objects{{
+    const std::array<iclforge::objects::oba::DynamicObject, 2> objects{{
         {.position = {.x = 0.25, .y = 0.5, .z = 0.0}, .gain_db = 0.0},
         {.position = {.x = 0.75, .y = 0.5, .z = 0.0}, .gain_db = 0.0},
     }};

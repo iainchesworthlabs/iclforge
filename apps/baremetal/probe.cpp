@@ -531,7 +531,7 @@ int decode_ac3(const char* codec, std::span<const std::uint8_t> bytes,
 // timing stay separable in the output the runner scripts gate on.
 int decode_eac3(const char* codec, std::span<const std::uint8_t> bytes,
                 std::span<const std::int32_t> expected, bool bed_only,
-                iclforge::oba::joc::Domain domain, const iclforge::ac3::OutputConfig& output) {
+                iclforge::objects::oba::joc::Domain domain, const iclforge::ac3::OutputConfig& output) {
     const std::span<const std::byte> stream{
         reinterpret_cast<const std::byte*>(bytes.data()), bytes.size()};
     const auto units = iclforge::ac3::split_access_units(stream);
@@ -649,7 +649,7 @@ std::array<std::array<float, kRenderBlock>, kRenderSlots> g_render_block{};
 std::array<std::array<double, kRenderSlots>, kMaxObjects> g_render_gains{};
 
 int render_eac3(const char* codec, std::span<const std::uint8_t> bytes,
-                std::span<const std::int32_t> expected, iclforge::oba::joc::Domain domain) {
+                std::span<const std::int32_t> expected, iclforge::objects::oba::joc::Domain domain) {
     using iclforge::ac3::eac3::chanmap::Location;
     const std::span<const std::byte> stream{
         reinterpret_cast<const std::byte*>(bytes.data()), bytes.size()};
@@ -710,8 +710,8 @@ int render_eac3(const char* codec, std::span<const std::uint8_t> bytes,
             if (block.index == 0) {
                 // Each object's gains onto the panned targets, once per unit.
                 const auto objects = block.object_metadata != nullptr
-                                         ? iclforge::oba::describe_objects(*block.object_metadata)
-                                         : std::vector<iclforge::oba::DisplayObject>{};
+                                         ? iclforge::objects::oba::describe_objects(*block.object_metadata)
+                                         : std::vector<iclforge::objects::oba::DisplayObject>{};
                 object_count = std::min({objects.size(), block.objects.size(), kMaxObjects});
                 for (std::size_t i = 0; i < object_count; ++i) {
                     gains[i].fill(0.0);
@@ -882,7 +882,7 @@ struct Eac3Fixture {
     // it, and it is the whole reason that fixture can be here: see its row.
     bool bed_only = false;
     // DecoderConfig::joc_domain. Only the object row sets it; see there.
-    iclforge::oba::joc::Domain joc_domain = iclforge::oba::joc::Domain::kQmf;
+    iclforge::objects::oba::joc::Domain joc_domain = iclforge::objects::oba::joc::Domain::kQmf;
     // DecoderConfig::output. As coded for every row but the fold.
     iclforge::ac3::OutputConfig output{};
     // Render the objects onto 7.1.4 (render_eac3) instead of accumulating
@@ -925,7 +925,7 @@ constexpr std::array<Eac3Fixture, 10> kEac3Fixtures{{
     // below is what makes the order stop mattering, so this row sits where it would naturally
     // rather than where it happens to pass.
     {"eac3_atmos_objects", iclforge_probe::kEac3AtmosBedStream, iclforge_probe::kEac3AtmosBedRms,
-     211851, false, iclforge::oba::joc::Domain::kMdctBand},
+     211851, false, iclforge::objects::oba::joc::Domain::kMdctBand},
     // 2/0, and Annex E's own rematrixing syntax - the E-AC-3 half of what the
     // ac3_stereo row covers for AC-3. Also the first E-AC-3 fixture whose
     // channel count is not six, so the layout-driven half of the level check is
@@ -946,7 +946,7 @@ constexpr std::array<Eac3Fixture, 10> kEac3Fixtures{{
      iclforge_probe::kEac3FoldRms,
      182030,
      false,
-     iclforge::oba::joc::Domain::kQmf,
+     iclforge::objects::oba::joc::Domain::kQmf,
      {.target = iclforge::ac3::DownmixTarget::kLoRo, .mode = iclforge::ac3::OperatingMode::kLine}},
     // The 7.1.4 stream folded the same way: a stereo player's frame at the
     // widest programme the encoder makes, and the output stage's layout form
@@ -958,7 +958,7 @@ constexpr std::array<Eac3Fixture, 10> kEac3Fixtures{{
      iclforge_probe::kEac3714FoldRms,
      244502,
      false,
-     iclforge::oba::joc::Domain::kQmf,
+     iclforge::objects::oba::joc::Domain::kQmf,
      {.target = iclforge::ac3::DownmixTarget::kLoRo, .mode = iclforge::ac3::OperatingMode::kLine}},
     // Line mode's own work, apart from any fold: a 5.1 stream encoded with
     // dynrng words and dialnorm 24, decoded as coded in line mode - §7.7.1's
@@ -970,7 +970,7 @@ constexpr std::array<Eac3Fixture, 10> kEac3Fixtures{{
      iclforge_probe::kEac3LineRms,
      175750,
      false,
-     iclforge::oba::joc::Domain::kQmf,
+     iclforge::objects::oba::joc::Domain::kQmf,
      {.mode = iclforge::ac3::OperatingMode::kLine}},
     // Objects reconstructed (kMdctBand, as the objects row) and then PLACED
     // onto 7.1.4 by their own positions - see render_eac3, and
@@ -984,7 +984,7 @@ constexpr std::array<Eac3Fixture, 10> kEac3Fixtures{{
      iclforge_probe::kEac3AtmosRenderRms,
      212221,
      false,
-     iclforge::oba::joc::Domain::kMdctBand,
+     iclforge::objects::oba::joc::Domain::kMdctBand,
      {},
      true},
 }};

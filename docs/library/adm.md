@@ -254,4 +254,4 @@ See also: [File I/O](file-io.md) — the plain-WAV reader this module's containe
 deliberately does not share an implementation with, despite the family resemblance;
 [ADM → Atmos bridging](adm-bridge.md) — `iclforge::adm`, which maps this graph onto
 `iclforge::ac3::oba::AtmosEncoder`; [Spatial & Atmos objects](spatial-and-atmos.md) — the
-`iclforge::ac3::oba::AtmosEncoder`/`iclforge::oba::motion` surface that bridge drives.
+`iclforge::ac3::oba::AtmosEncoder`/`iclforge::objects::oba::motion` surface that bridge drives.

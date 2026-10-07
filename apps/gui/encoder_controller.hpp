@@ -695,7 +695,7 @@ class EncoderController : public QObject {
     // ---- live object-position source over OSC (live OSC object positions) ----------------
     // A real live position source for the live room's objects instead of
     // manual placement - iclforge::audio::LivePositionSource drained into an
-    // iclforge::oba::SceneCursor once per encode frame, the same seam
+    // iclforge::objects::oba::SceneCursor once per encode frame, the same seam
     // 'forge live mode=atmos positions=osc:<port>' lands on. Pre-flight
     // only, same reasoning as liveWavSafetyCopy above: startLiveSession
     // reads these once, at session start, and they are fixed for that
@@ -1123,7 +1123,7 @@ public:
     // Where an object sits at timeS: along its authored path if it has one,
     // else its static position, unmoving. What the motion timeline's preview
     // playhead reads so the room plan animates exactly what encodeObjects()
-    // will actually place - the same iclforge::oba::KeyframePath, not a second
+    // will actually place - the same iclforge::objects::oba::KeyframePath, not a second
     // interpolation that could disagree with it.
     Q_INVOKABLE [[nodiscard]] QVariantMap evaluateObjectPath(int objectIndex, double timeS) const;
     // Writes every dynamic object's authored path - or, for a path-less
@@ -1138,7 +1138,7 @@ public:
     // channels have no equivalent in atmos-encode's model and are not
     // written. Returns false if the file could not be opened for writing.
     Q_INVOKABLE bool exportObjectPaths(const QUrl& url) const;
-    // The same objects as an iclforge::oba::ObjectScene in JSON (ac3/oba/scene.hpp)
+    // The same objects as an iclforge::objects::oba::ObjectScene in JSON (ac3/oba/scene.hpp)
     // rather than as keyframe columns: named, with per-segment interpolation
     // and an orientation the columns have nowhere to put, and reloadable
     // without loss. forge's atmos-path and atmos-encode read this form too,
@@ -1545,14 +1545,14 @@ private:
     // ones): each object's authored keyframes where it has them, else its
     // static position, under the inverse-root gain law E-AC-3's fallback uses.
     // Nothing where a scene cannot be built from them (two keys at one instant).
-    [[nodiscard]] std::optional<iclforge::oba::ObjectScene> ac4ObjectScene(
+    [[nodiscard]] std::optional<iclforge::objects::oba::ObjectScene> ac4ObjectScene(
         const std::vector<iclforge::apps::Ac4ObjectSlot>& stream_objects) const;
     // What ac4ObjectsRefusal() leaves to Encode, found the way the encoder finds
     // it: an object's keyframe outside the gain and the room AC-4 codes, and the
     // configuration the writer refuses for this many objects at this rate.
     [[nodiscard]] QString ac4ObjectsDeepRefusal(
         const std::vector<iclforge::apps::Ac4ObjectSlot>& stream_objects,
-        const iclforge::oba::ObjectScene& scene) const;
+        const iclforge::objects::oba::ObjectScene& scene) const;
     // Encodes them to `path` and writes ac4PathsName() beside it.
     void encodeAc4Objects(const QString& path);
     // Whether what a run writes is an E-AC-3 stream, which the Play button and
@@ -1589,13 +1589,13 @@ private:
     // objectKeyframes/evaluateObjectPath all build on: object_keyframes_'s
     // entry for this index's (source, channel) identity, sorted by time, or
     // empty if it has none.
-    [[nodiscard]] std::vector<iclforge::oba::Keyframe> sortedKeyframes(int objectIndex) const;
-    // Every object both export paths write, as iclforge::oba::SceneObjects indexed
+    [[nodiscard]] std::vector<iclforge::objects::oba::Keyframe> sortedKeyframes(int objectIndex) const;
+    // Every object both export paths write, as iclforge::objects::oba::SceneObjects indexed
     // by FLAT channel index - so a bed-pinned channel's index is present but
     // empty, which is how the keyframe column form spells a skipped object.
     // exportObjectScene fills those in; exportObjectPaths leaves them out, the
     // behaviour that form has always had.
-    [[nodiscard]] std::vector<iclforge::oba::SceneObject> exportableSceneObjects() const;
+    [[nodiscard]] std::vector<iclforge::objects::oba::SceneObject> exportableSceneObjects() const;
     // Writes `text` to `url` (a local file where it names one), returning
     // false if it could not be opened or fully written - the return both
     // export entry points give QML.
@@ -1902,7 +1902,7 @@ private:
     // Authored motion, keyed the same way. An identity absent here (the
     // common case) falls back to the object's static ObjectConfig placement
     // in encodeObjects, held constant for the whole file.
-    std::map<ObjectKey, std::vector<iclforge::oba::Keyframe>> object_keyframes_;
+    std::map<ObjectKey, std::vector<iclforge::objects::oba::Keyframe>> object_keyframes_;
     // The preset name that authored an object's path ("orbit", "lift"),
     // absent for hand-authored or hand-edited paths - what the object
     // table's Path column prints instead of a bare "path". Kept strictly in
@@ -1924,7 +1924,7 @@ private:
     struct LiveObjectBackup {
         int count = 0;
         std::map<ObjectKey, ObjectConfig> configs;
-        std::map<ObjectKey, std::vector<iclforge::oba::Keyframe>> keyframes;
+        std::map<ObjectKey, std::vector<iclforge::objects::oba::Keyframe>> keyframes;
         std::map<ObjectKey, QString> path_labels;
         int selected_index = 0;
     };
@@ -2125,7 +2125,7 @@ private:
     mutable std::mutex live_object_mutex_;
     std::vector<ObjectConfig> live_object_snapshot_;
     // Parallel to live_object_snapshot_, same size, same guard: true for a
-    // slot iclforge::oba::SceneCursor::is_live() currently reports live - i.e.
+    // slot iclforge::objects::oba::SceneCursor::is_live() currently reports live - i.e.
     // iclforge::audio::LivePositionSource has pushed a placement for it and
     // nothing has since released it. Read by objectModel() (which object to
     // take from the snapshot instead of object_configs_) and by

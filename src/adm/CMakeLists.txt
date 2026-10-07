@@ -228,7 +228,7 @@ target_compile_options(ac3adm_suppress_gcc15_null_deref INTERFACE
 # encoder takes, and back. It was a library of its own, iclforge::admbridge, until
 # planning/consolidation.md's C2 merged it here: it is meaningless without the parser and gated by
 # the same ICLFORGE_BUILD_ADM. Its public headers name iclforge::oba's and iclforge::iab's types in
-# their signatures (iclforge::oba::ObjectPath, iclforge::iab::IABitstreamFrame), so anything linking
+# their signatures (iclforge::objects::oba::ObjectPath, iclforge::iab::IABitstreamFrame), so anything linking
 # iclforge::adm needs both: LINK_PUBLIC. The parser stays codec-blind; the object model is not a
 # codec's (src/objects).
 iclforge_add_library(adm

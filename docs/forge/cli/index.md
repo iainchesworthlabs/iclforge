@@ -11,7 +11,7 @@ this page's own live-audio commands get when the platform can't run them either 
 library documented under [Library](../../library/index.md); every codec and format decision lives in
 the library, and the CLI keeps only small local helpers of its own (the DASH MPD document wrapper
 `fmp4` writes; the scene files behind `atmos-path`/`atmos-encode` are parsed by the library's
-own `iclforge::oba::read_scene`).
+own `iclforge::objects::oba::read_scene`).
 
 Run it with no arguments for the full usage text — the command list in [Commands](commands.md)
 is transcribed from it by hand. Nothing in the build compares the two, so the binary is the

@@ -234,7 +234,7 @@ reaching them means calling `iclforge_sys` directly:
 
 The E-AC-3 config leaves out what the C struct leaves out, listed under
 [What is deliberately out of scope](c-api.md#what-is-deliberately-out-of-scope). Scene files
-(`iclforge::oba::ObjectScene`) are not in the C API and so not here either.
+(`iclforge::objects::oba::ObjectScene`) are not in the C API and so not here either.
 
 ## Notes for the next binding
 

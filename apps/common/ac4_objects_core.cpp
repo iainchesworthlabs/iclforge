@@ -120,7 +120,7 @@ std::vector<Ac4ObjectSlot> ac4_object_slots(
     return out;
 }
 
-iclforge::oba::Position ac4_pin_position(double azimuth_deg) {
+iclforge::objects::oba::Position ac4_pin_position(double azimuth_deg) {
     const double radians = azimuth_deg * std::numbers::pi / 180.0;
     return {.x = 0.5 - 0.5 * std::sin(radians), .y = 0.5 - 0.5 * std::cos(radians), .z = 0.0};
 }
@@ -167,7 +167,7 @@ std::vector<std::vector<float>> ac4_object_planes(std::span<const Ac4ObjectSlot>
     return out;
 }
 
-iclforge::ac4::ObjectProperties ac4_object_properties(const iclforge::oba::ObjectPlacement& p) {
+iclforge::ac4::ObjectProperties ac4_object_properties(const iclforge::objects::oba::ObjectPlacement& p) {
     iclforge::ac4::ObjectProperties out;
     out.position = {p.position.x, p.position.y, p.position.z};
     out.gain_db =
@@ -177,7 +177,7 @@ iclforge::ac4::ObjectProperties ac4_object_properties(const iclforge::oba::Objec
 
 iclforge::ac4::EncoderConfig ac4_objects_config(
     const Ac4ObjectsParams& params, const std::vector<bool>& lfe,
-    std::span<const iclforge::oba::ObjectPlacement> initial) {
+    std::span<const iclforge::objects::oba::ObjectPlacement> initial) {
     iclforge::ac4::ObjectsConfig objects;
     objects.coding = params.coding;
     objects.objects.resize(initial.size());
@@ -223,10 +223,10 @@ std::optional<std::string> ac4_objects_refusal(std::span<const Ac4ObjectSlot> sl
     return std::nullopt;
 }
 
-std::vector<iclforge::oba::ObjectPlacement> ac4_scene_placements(
-    std::span<const Ac4ObjectSlot> slots, const iclforge::oba::ObjectScene& motion, double time_s) {
-    std::vector<iclforge::oba::ObjectPlacement> out(slots.size());
-    const std::vector<iclforge::oba::ObjectPlacement> moving = motion.evaluate(time_s);
+std::vector<iclforge::objects::oba::ObjectPlacement> ac4_scene_placements(
+    std::span<const Ac4ObjectSlot> slots, const iclforge::objects::oba::ObjectScene& motion, double time_s) {
+    std::vector<iclforge::objects::oba::ObjectPlacement> out(slots.size());
+    const std::vector<iclforge::objects::oba::ObjectPlacement> moving = motion.evaluate(time_s);
     std::size_t dynamic = 0;
     for (std::size_t i = 0; i < slots.size(); ++i) {
         switch (slots[i].kind) {
@@ -262,7 +262,7 @@ std::expected<Ac4ObjectsEncoded, Ac4ObjectsError> encode_ac4_objects(
                                                  static_cast<std::int64_t>(total) - start);
         const double t =
             static_cast<double>(start + ramp) / static_cast<double>(params.sample_rate_hz);
-        const std::vector<iclforge::oba::ObjectPlacement> placed = placements(t);
+        const std::vector<iclforge::objects::oba::ObjectPlacement> placed = placements(t);
         for (std::size_t i = 0; i < count; ++i) {
             updates.push_back({.object = static_cast<int>(i),
                                .sample = start,
@@ -271,7 +271,7 @@ std::expected<Ac4ObjectsEncoded, Ac4ObjectsError> encode_ac4_objects(
         }
     }
 
-    const std::vector<iclforge::oba::ObjectPlacement> initial = placements(0.0);
+    const std::vector<iclforge::objects::oba::ObjectPlacement> initial = placements(0.0);
     const iclforge::ac4::EncoderConfig config = ac4_objects_config(params, lfe, initial);
     auto encoder = iclforge::ac4::Encoder::create(config);
     if (!encoder.has_value()) {
@@ -301,7 +301,7 @@ std::expected<Ac4ObjectsEncoded, Ac4ObjectsError> encode_ac4_objects(
 
 std::expected<Ac4ObjectsEncoded, Ac4ObjectsError> encode_ac4_scene(
     const Ac4ObjectsParams& params, std::span<const Ac4ObjectSlot> slots,
-    std::span<const std::vector<float>> flat_planes, const iclforge::oba::ObjectScene& motion) {
+    std::span<const std::vector<float>> flat_planes, const iclforge::objects::oba::ObjectScene& motion) {
     const std::vector<std::vector<float>> planes = ac4_object_planes(slots, flat_planes);
     const std::vector<std::span<const float>> pcm(planes.begin(), planes.end());
     // Sized, not reserved: GCC 16's -Wnull-dereference flags vector<bool>::reserve on an

@@ -15,7 +15,7 @@
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/base/bitwriter.hpp"
 
-namespace iclforge::oba {
+namespace iclforge::objects::oba {
 
 namespace {
 
@@ -1202,4 +1202,4 @@ std::optional<DecodedProgram> parse_payload(std::span<const std::byte> payload) 
     return out;
 }
 
-}  // namespace iclforge::oba
+}  // namespace iclforge::objects::oba

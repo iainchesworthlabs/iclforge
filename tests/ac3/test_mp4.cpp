@@ -648,7 +648,7 @@ TEST_CASE("dec3 box signals Dolby Atmos objects", "[dec3]") {
         views.emplace_back(source);
     }
     constexpr std::array<double, kObjects> kTones{440.0, 880.0, 1320.0};
-    std::array<iclforge::oba::ObjectPlacement, kObjects> placement{};
+    std::array<iclforge::objects::oba::ObjectPlacement, kObjects> placement{};
     for (auto& p : placement) {
         p = {.position = {.x = 0.5, .y = 0.5, .z = 0.0}, .gain = 1.0};
     }

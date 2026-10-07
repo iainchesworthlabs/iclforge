@@ -213,7 +213,7 @@ struct SpatialObjectSink::Impl {
     // std::atomic's own contract - so instances live behind a unique_ptr and
     // only the pointer relocates when the owning vector grows. The atomics
     // themselves are latest-value-wins with no interpolation between
-    // updates, the same convention iclforge::oba::SceneCursor documents for a
+    // updates, the same convention iclforge::objects::oba::SceneCursor documents for a
     // live position source arriving slower than render rate (submit() here
     // is called once per decode block, ~32 ms; the render period is much
     // shorter). Four independent atomics rather than one struct: lock-free

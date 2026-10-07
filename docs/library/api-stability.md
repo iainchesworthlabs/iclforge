@@ -49,7 +49,7 @@ it directly. Four tiers, assigned per header below:
 | `iclforge/ac3/meta/bsi.hpp`, `drc.hpp`, `loudness.hpp`, `mixing.hpp`, `qc.hpp` | Public. |
 | `iclforge/render/spatial.hpp` | Public. |
 | `iclforge/render/layout.hpp`, `render.hpp`, `routing.hpp`, `trim_delay.hpp`, `identify.hpp`, `float_biquad.hpp` | **Experimental** — the output layout, renderer and speaker management the ESP32 player and Hearth share ([Hearth reference-player plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-reference-player.md)), outside the `v1.0.0` freeze while Hearth's phases settle their shape; see [Experimental modules](#experimental-modules). |
-| `iclforge/ac3/oba/atmos.hpp`, `joc.hpp`, `oamd.hpp`, `motion.hpp`, `scene.hpp`, `scene_osc.hpp` | Public — `iclforge::oba::joc` included, now that AP2 folded it into `iclforge::oba` proper. |
+| `iclforge/ac3/oba/atmos.hpp`, `joc.hpp`, `oamd.hpp`, `motion.hpp`, `scene.hpp`, `scene_osc.hpp` | Public — `iclforge::objects::oba::joc` included, now that AP2 folded it into `iclforge::oba` proper. |
 | `iclforge/objects/joc_domain.hpp` | Public — `joc::Domain` is selected through `AtmosConfig` and `reconstruct()`, as it was in `joc.hpp`. |
 | `iclforge/objects/emdf.hpp` | Public. |
 | `iclforge/ac3/emdf/frame_layout.hpp` | Internal — the bit-accurate frame walk `strip_objects` and `iclforge::ac3::signing` share; a caller uses them, not it. |

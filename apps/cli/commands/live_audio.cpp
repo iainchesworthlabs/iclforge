@@ -484,7 +484,7 @@ constexpr std::string_view kSpatialGoneReasons =
     "unplugged, switched off, disabled, or taken by the system";
 
 // TS 103 420 §4.2.1's room-anchored cube (x,y in [0,1]; z in [-1,1] about ear
-// height - see iclforge::oba::scene.hpp's Orientation comment and
+// height - see iclforge::objects::oba::scene.hpp's Orientation comment and
 // bed_label_position's "front wall at y=0, ceiling at z=+1, sides at x=0 and
 // 1", and the GUI's ObjectInspectorDialog.qml plan/elevation views, which
 // draw the same cube the same way) to ISpatialAudioObject::SetPosition's
@@ -496,7 +496,7 @@ constexpr std::string_view kSpatialGoneReasons =
 // plausible small-room half-extent, not a measured one - what is NOT a
 // guess is the axis correspondence, and the listener sits at the room's
 // centre facing the front (screen) wall, the same reference point
-// iclforge::oba::Orientation::rotate already treats as "centred". Moving away
+// iclforge::objects::oba::Orientation::rotate already treats as "centred". Moving away
 // from centre still moves an object further away in the right direction;
 // only the absolute distance is approximate.
 struct SpatialXyz {
@@ -505,7 +505,7 @@ struct SpatialXyz {
     float z;
 };
 
-SpatialXyz to_windows_spatial(const iclforge::oba::Position& p) {
+SpatialXyz to_windows_spatial(const iclforge::objects::oba::Position& p) {
     constexpr float kHalfWidthM = 2.0F;  // left/right wall distance from centre
     constexpr float kHalfDepthM = 2.0F;  // front/rear wall distance from centre
     constexpr float kHeightM = 1.0F;     // ceiling/floor distance from ear height
@@ -604,7 +604,7 @@ int run_spatial(std::string_view in_path, int device_index, const Options& meta)
     std::vector<iclforge::audio::DynamicObjectUpdate> dynamic_updates;
     std::vector<iclforge::audio::StaticObjectUpdate> static_updates;
     LfeDelayLine lfe_delay{static_cast<std::size_t>(
-        iclforge::oba::joc::reconstruction_delay(decoder_config.joc_domain))};
+        iclforge::objects::oba::joc::reconstruction_delay(decoder_config.joc_domain))};
     std::vector<float> delayed_lfe;
 
     // Plays one unit, opening the sink on the first. kExitOk to carry on;
@@ -613,7 +613,7 @@ int run_spatial(std::string_view in_path, int device_index, const Options& meta)
     const auto spatial_unit = [&](const iclforge::ac3::DecodedAccessUnit& out) -> int {
         if (!started) {
             const bool has_lfe =
-                out.object_metadata && iclforge::oba::has_lfe(out.object_metadata->program);
+                out.object_metadata && iclforge::objects::oba::has_lfe(out.object_metadata->program);
             const auto started_result =
                 sink.start(device_id, sample_rate_hz(out.sample_rate),
                           has_lfe ? kSpeakerLowFrequency : 0U,
@@ -635,7 +635,7 @@ int run_spatial(std::string_view in_path, int device_index, const Options& meta)
 
         dynamic_updates.clear();
         if (out.object_metadata.has_value()) {
-            const auto positions = iclforge::oba::describe_objects(*out.object_metadata);
+            const auto positions = iclforge::objects::oba::describe_objects(*out.object_metadata);
             for (std::size_t i = 0; i < out.object_audio.size() && i < positions.size(); ++i) {
                 const auto xyz = to_windows_spatial(positions[i].position);
                 dynamic_updates.push_back(
@@ -647,7 +647,7 @@ int run_spatial(std::string_view in_path, int device_index, const Options& meta)
             }
         }
         static_updates.clear();
-        if (out.object_metadata && iclforge::oba::has_lfe(out.object_metadata->program) &&
+        if (out.object_metadata && iclforge::objects::oba::has_lfe(out.object_metadata->program) &&
             !out.channels.empty()) {
             // Table 5.8's coded order puts the LFE last regardless of acmod
             // (iclforge::ac3::DecodedAccessUnit::channels' own doc comment) - never a
@@ -981,7 +981,7 @@ int run_live(std::string_view out_path, int capture_device, std::uint32_t second
     // already in use would put a different scene in the file than the one
     // asked for, discovered only at playback.
     std::unique_ptr<iclforge::audio::LivePositionSource> position_source;
-    std::optional<iclforge::oba::SceneCursor> position_cursor;
+    std::optional<iclforge::objects::oba::SceneCursor> position_cursor;
     if (atmos && meta.positions.has_value()) {
         position_source = std::make_unique<iclforge::audio::LivePositionSource>(nobjects);
         const auto bound = position_source->start(meta.positions->bind, meta.positions->port);
@@ -998,7 +998,7 @@ int run_live(std::string_view out_path, int capture_device, std::uint32_t second
         // cannot separate co-located objects) - and this session's own
         // gain law, so switching positions= on changes WHERE objects start,
         // never how loud they are.
-        std::vector<iclforge::oba::SceneObject> objects(nobjects);
+        std::vector<iclforge::objects::oba::SceneObject> objects(nobjects);
         for (std::size_t i = 0; i < nobjects; ++i) {
             const double angle =
                 2.0 * std::numbers::pi * static_cast<double>(i) / static_cast<double>(nobjects);
@@ -1014,7 +1014,7 @@ int run_live(std::string_view out_path, int capture_device, std::uint32_t second
                  .gain = 0.7 / std::sqrt(static_cast<double>(nobjects)),
                  .lfe_send = i == 0 ? 0.2 : 0.0});
         }
-        auto scene = iclforge::oba::ObjectScene::create(std::move(objects));
+        auto scene = iclforge::objects::oba::ObjectScene::create(std::move(objects));
         if (!scene.has_value()) {
             fmt::println(stderr, "error: internal: {}", scene.error().message);
             return kExitUsage;
@@ -1230,7 +1230,7 @@ int run_live(std::string_view out_path, int capture_device, std::uint32_t second
     // narrower than - reusing one for both risked (and in an earlier version
     // of this loop, did) an out-of-bounds write.
     std::vector<std::span<const float>> bed_views(bed_channels);
-    std::vector<iclforge::oba::ObjectPlacement> placement(nobjects);
+    std::vector<iclforge::objects::oba::ObjectPlacement> placement(nobjects);
 
     // Both capture devices are watched: a session that keeps running on a
     // vanished device reads as healthy with nothing coming in (see
@@ -1398,7 +1398,7 @@ int run_live(std::string_view out_path, int capture_device, std::uint32_t second
             // used to be described as "the hook a real live position source
             // drops into once one exists" (see live_audio.hpp's own header):
             // positions= is that source now, sampled through the same
-            // SceneCursor seam iclforge::oba::SceneCursor was built for, at the frame-end time
+            // SceneCursor seam iclforge::objects::oba::SceneCursor was built for, at the frame-end time
             // `t` either path already needs.
             const double t = static_cast<double>(n0) / static_cast<double>(rate_hz);
             if (position_source) {

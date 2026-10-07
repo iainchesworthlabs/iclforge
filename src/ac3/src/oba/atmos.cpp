@@ -123,25 +123,25 @@ constexpr double kAbsoluteFloor = 1e-20;
 // dynamic object. std::nullopt is the two LFEs: unpanned, fed straight into
 // the bed's own LFE channel instead of through this table at all (see
 // AtmosEncoder::encode_bed_frame).
-[[nodiscard]] std::optional<double> bed_label_azimuth_deg(iclforge::oba::BedLabel label) {
+[[nodiscard]] std::optional<double> bed_label_azimuth_deg(iclforge::objects::oba::BedLabel label) {
     switch (label) {
-        case iclforge::oba::BedLabel::kL:
-        case iclforge::oba::BedLabel::kTfl:  return 30.0;
-        case iclforge::oba::BedLabel::kC:    return 0.0;
-        case iclforge::oba::BedLabel::kR:
-        case iclforge::oba::BedLabel::kTfr:  return -30.0;
-        case iclforge::oba::BedLabel::kLs:
-        case iclforge::oba::BedLabel::kTsl:  return 110.0;
-        case iclforge::oba::BedLabel::kRs:
-        case iclforge::oba::BedLabel::kTsr:  return -110.0;
-        case iclforge::oba::BedLabel::kLb:
-        case iclforge::oba::BedLabel::kTbl:  return 150.0;
-        case iclforge::oba::BedLabel::kRb:
-        case iclforge::oba::BedLabel::kTbr:  return -150.0;
-        case iclforge::oba::BedLabel::kLw:   return 60.0;
-        case iclforge::oba::BedLabel::kRw:   return -60.0;
-        case iclforge::oba::BedLabel::kLfe:
-        case iclforge::oba::BedLabel::kLfe2: return std::nullopt;
+        case iclforge::objects::oba::BedLabel::kL:
+        case iclforge::objects::oba::BedLabel::kTfl:  return 30.0;
+        case iclforge::objects::oba::BedLabel::kC:    return 0.0;
+        case iclforge::objects::oba::BedLabel::kR:
+        case iclforge::objects::oba::BedLabel::kTfr:  return -30.0;
+        case iclforge::objects::oba::BedLabel::kLs:
+        case iclforge::objects::oba::BedLabel::kTsl:  return 110.0;
+        case iclforge::objects::oba::BedLabel::kRs:
+        case iclforge::objects::oba::BedLabel::kTsr:  return -110.0;
+        case iclforge::objects::oba::BedLabel::kLb:
+        case iclforge::objects::oba::BedLabel::kTbl:  return 150.0;
+        case iclforge::objects::oba::BedLabel::kRb:
+        case iclforge::objects::oba::BedLabel::kTbr:  return -150.0;
+        case iclforge::objects::oba::BedLabel::kLw:   return 60.0;
+        case iclforge::objects::oba::BedLabel::kRw:   return -60.0;
+        case iclforge::objects::oba::BedLabel::kLfe:
+        case iclforge::objects::oba::BedLabel::kLfe2: return std::nullopt;
     }
     return std::nullopt;
 }
@@ -161,10 +161,10 @@ constexpr double kExtensionDownmixScale = 0.70710678118654752;  // -3 dB
 // The base 5.1 ring channels fold in at unity - literally the same audio a
 // plain 5.1 mix would carry, physically unattenuated - and only a channel
 // ADDED alongside them takes kExtensionDownmixScale's headroom cut.
-[[nodiscard]] constexpr bool is_base_ring_label(iclforge::oba::BedLabel label) {
-    return label == iclforge::oba::BedLabel::kL || label == iclforge::oba::BedLabel::kC ||
-           label == iclforge::oba::BedLabel::kR || label == iclforge::oba::BedLabel::kLs ||
-           label == iclforge::oba::BedLabel::kRs;
+[[nodiscard]] constexpr bool is_base_ring_label(iclforge::objects::oba::BedLabel label) {
+    return label == iclforge::objects::oba::BedLabel::kL || label == iclforge::objects::oba::BedLabel::kC ||
+           label == iclforge::objects::oba::BedLabel::kR || label == iclforge::objects::oba::BedLabel::kLs ||
+           label == iclforge::objects::oba::BedLabel::kRs;
 }
 
 }  // namespace
@@ -251,7 +251,7 @@ struct AtmosEncoder::Impl {
     // either way - see joc_object_count's own §6.3.2.2 bypass). Always equal
     // to joc_object_count(program_).
     int essences_ = 0;
-    iclforge::oba::Program program_{};
+    iclforge::objects::oba::Program program_{};
     eac3::AccessUnitEncoder encoder_;
     joc::FrameParameters params_{};
 
@@ -341,7 +341,7 @@ struct AtmosEncoder::Impl {
         params_.num_bands_idx = config.num_bands_idx;
         params_.fine_quant = config.fine_quant;
         params_.matrix.assign(params_.coefficient_count(), 0.0);
-        if (config.joc_domain == iclforge::oba::joc::Domain::kQmf) {
+        if (config.joc_domain == iclforge::objects::oba::joc::Domain::kQmf) {
             object_qmf_.resize(static_cast<std::size_t>(objects));
         }
     }
@@ -355,7 +355,7 @@ struct AtmosEncoder::Impl {
         : config_(config),
           objects_(0),
           essences_(
-              joc_object_count(iclforge::oba::Program{.dynamic_only = false, .bed = bed.bed})),
+              joc_object_count(iclforge::objects::oba::Program{.dynamic_only = false, .bed = bed.bed})),
           program_{.dynamic_only = false, .bed = bed.bed, .dynamic_objects = 0},
           encoder_(eac3::AccessUnitConfig{
               .independent = {.sample_rate = config.sample_rate,
@@ -380,7 +380,7 @@ struct AtmosEncoder::Impl {
         params_.num_bands_idx = config.num_bands_idx;
         params_.fine_quant = config.fine_quant;
         params_.matrix.assign(params_.coefficient_count(), 0.0);
-        if (config.joc_domain == iclforge::oba::joc::Domain::kQmf) {
+        if (config.joc_domain == iclforge::objects::oba::joc::Domain::kQmf) {
             object_qmf_.resize(static_cast<std::size_t>(essences_));
         }
 
@@ -390,7 +390,7 @@ struct AtmosEncoder::Impl {
         // same order build_payload's anchored-object loop assumes.
         std::size_t essence = 0;
         std::size_t index = 0;
-        for (const auto label : iclforge::oba::bed_labels(program_.bed)) {
+        for (const auto label : iclforge::objects::oba::bed_labels(program_.bed)) {
             const auto azimuth = bed_label_azimuth_deg(label);
             if (!azimuth.has_value()) {
                 assert(!bed_lfe_index_.has_value() &&
@@ -438,13 +438,13 @@ LatencyBudget AtmosEncoder::latency() const {
     LatencyBudget budget = bed_latency();
     if (impl_->config_.emit_object_metadata) {
         budget.transform_samples +=
-            iclforge::oba::joc::reconstruction_delay(impl_->config_.joc_domain);
+            iclforge::objects::oba::joc::reconstruction_delay(impl_->config_.joc_domain);
     }
     return budget;
 }
 LatencyBudget AtmosEncoder::bed_latency() const { return impl_->encoder_.latency(); }
 int AtmosEncoder::dynamic_object_count() const { return impl_->objects_; }
-const iclforge::oba::Program& AtmosEncoder::program() const { return impl_->program_; }
+const iclforge::objects::oba::Program& AtmosEncoder::program() const { return impl_->program_; }
 std::span<const std::vector<float>> AtmosEncoder::bed() const { return impl_->bed_; }
 const joc::FrameParameters& AtmosEncoder::parameters() const { return impl_->params_; }
 
@@ -520,7 +520,7 @@ void AtmosEncoder::Impl::render_and_reconstruct(
     for (std::size_t object = 0; object < count; ++object) {
         const auto slot = std::span{power}.subspan(
             object * static_cast<std::size_t>(bands), static_cast<std::size_t>(bands));
-        if (config_.joc_domain == iclforge::oba::joc::Domain::kQmf) {
+        if (config_.joc_domain == iclforge::objects::oba::joc::Domain::kQmf) {
             qmf_band_energy(audio[object], mapping, slot, object_qmf_[object]);
         } else {
             band_energy(audio[object], mapping, slot, config_.fast_mdct);
@@ -611,7 +611,7 @@ void AtmosEncoder::Impl::render_and_reconstruct(
 
 std::expected<eac3::AccessUnit, FrameError> AtmosEncoder::encode_frame(
     std::span<const std::span<const float>> objects,
-    std::span<const iclforge::oba::ObjectPlacement> placement) {
+    std::span<const iclforge::objects::oba::ObjectPlacement> placement) {
     ICLFORGE_ZONE_SCOPED_N("AtmosEncoder::encode_frame");
     assert(impl_->program_.dynamic_only);
     assert(static_cast<int>(objects.size()) == impl_->objects_);
@@ -663,7 +663,7 @@ std::expected<eac3::AccessUnit, FrameError> AtmosEncoder::encode_frame(
     impl_->render_and_reconstruct(objects, pan, target, scale, target_lfe);
 
     // --- 5. Metadata --------------------------------------------------------
-    std::vector<iclforge::oba::DynamicObject> described(count);
+    std::vector<iclforge::objects::oba::DynamicObject> described(count);
     for (std::size_t object = 0; object < count; ++object) {
         described[object].position = placement[object].position;
         // The gain is inside the reconstructed essence (see step 1), so the
@@ -705,11 +705,11 @@ std::expected<eac3::AccessUnit, FrameError> AtmosEncoder::encode_frame(
     if (impl_->config_.emit_object_metadata) {
         const auto oamd = build_payload(impl_->program_, described, impl_->frame_samples_);
         const auto joc_payload = joc::build_payload(impl_->params_);
-        const std::array<iclforge::emdf::Payload, 2> payloads{{
-            {.id = iclforge::emdf::kPayloadIdOamd, .bytes = oamd},
-            {.id = iclforge::emdf::kPayloadIdJoc, .bytes = joc_payload},
+        const std::array<iclforge::objects::emdf::Payload, 2> payloads{{
+            {.id = iclforge::objects::emdf::kPayloadIdOamd, .bytes = oamd},
+            {.id = iclforge::objects::emdf::kPayloadIdJoc, .bytes = joc_payload},
         }};
-        container = iclforge::emdf::build_container(payloads);
+        container = iclforge::objects::emdf::build_container(payloads);
     }
 
     // --- 6. The stream ------------------------------------------------------
@@ -795,11 +795,11 @@ std::expected<eac3::AccessUnit, FrameError> AtmosEncoder::encode_bed_frame(
     if (impl_->config_.emit_object_metadata) {
         const auto oamd = build_payload(impl_->program_, {}, impl_->frame_samples_);
         const auto joc_payload = joc::build_payload(impl_->params_);
-        const std::array<iclforge::emdf::Payload, 2> payloads{{
-            {.id = iclforge::emdf::kPayloadIdOamd, .bytes = oamd},
-            {.id = iclforge::emdf::kPayloadIdJoc, .bytes = joc_payload},
+        const std::array<iclforge::objects::emdf::Payload, 2> payloads{{
+            {.id = iclforge::objects::emdf::kPayloadIdOamd, .bytes = oamd},
+            {.id = iclforge::objects::emdf::kPayloadIdJoc, .bytes = joc_payload},
         }};
-        container = iclforge::emdf::build_container(payloads);
+        container = iclforge::objects::emdf::build_container(payloads);
     }
 
     std::array<std::span<const float>, 6> views{};

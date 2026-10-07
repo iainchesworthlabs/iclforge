@@ -935,7 +935,7 @@ ApplicationWindow {
     // (see window.cliLine) is honestly reproducible.
     //
     // Two forms, chosen by the name the user saves under: ".json" writes the
-    // iclforge::oba::ObjectScene form (named objects, per-segment interpolation, an
+    // iclforge::objects::oba::ObjectScene form (named objects, per-segment interpolation, an
     // orientation) and anything else the keyframe columns this dialog has
     // always written. forge tells them apart by their first character, not by
     // suffix, so either file works wherever the other does.

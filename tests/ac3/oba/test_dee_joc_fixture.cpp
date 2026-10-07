@@ -115,18 +115,18 @@ TEST_CASE("the DEE fixture's OAMD is a twelve-channel bed with a trim element",
     CHECK_FALSE(program.program.dynamic_only);
     CHECK(program.program.bed_chan_distribute);
     CHECK(program.program.dynamic_objects == 0);
-    CHECK(iclforge::oba::object_count(program.program) == 12);
+    CHECK(iclforge::objects::oba::object_count(program.program) == 12);
     CHECK(program.program.bed ==
-          (iclforge::oba::bed::kLR | iclforge::oba::bed::kC | iclforge::oba::bed::kLfe |
-           iclforge::oba::bed::kLsRs | iclforge::oba::bed::kLbRb | iclforge::oba::bed::kTflTfr |
-           iclforge::oba::bed::kTblTbr));
+          (iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC | iclforge::objects::oba::bed::kLfe |
+           iclforge::objects::oba::bed::kLsRs | iclforge::objects::oba::bed::kLbRb | iclforge::objects::oba::bed::kTflTfr |
+           iclforge::objects::oba::bed::kTblTbr));
 
     // Two oa_elements, where exactly one used to be allowed.
     REQUIRE(program.trim.has_value());
     CHECK(program.trim->warp_mode == 1);
     CHECK(program.trim->global_trim_mode == 2);  // custom_trim
     CHECK(program.trim->configs.size() ==
-          static_cast<std::size_t>(iclforge::oba::kNumTrimConfigs));
+          static_cast<std::size_t>(iclforge::objects::oba::kNumTrimConfigs));
     CHECK(program.trim->disable_per_object.size() == 12);
     CHECK(program.skipped_elements.empty());
 

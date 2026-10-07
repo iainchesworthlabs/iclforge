@@ -67,7 +67,7 @@ std::vector<std::byte> atmos_stream(bool emit_objects, int objects, int frames) 
     for (auto& source : sources) {
         views.emplace_back(source);
     }
-    std::vector<iclforge::oba::ObjectPlacement> placement(
+    std::vector<iclforge::objects::oba::ObjectPlacement> placement(
         static_cast<std::size_t>(objects),
         {.position = {.x = 0.5, .y = 0.5, .z = 0.0}, .gain = 1.0});
 

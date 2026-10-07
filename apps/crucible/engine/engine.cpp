@@ -171,14 +171,14 @@ struct Engine::Impl {
     // whole; this ordering is the backstop, and decides only what happens
     // if that join is ever lost.
     std::jthread probe_thread;
-    std::unordered_map<AppId, iclforge::oba::Position> wanted_positions;
+    std::unordered_map<AppId, iclforge::objects::oba::Position> wanted_positions;
     std::unordered_map<AppId, bool> split_choice;  // per-app override of split_by_default
     std::unordered_map<AppId, double> sizes;       // per-app object extent, default a point
     std::unordered_map<AppId, AppSession> known;
     std::unordered_map<AppId, float> levels;
     std::vector<std::vector<float>> objects;
     std::vector<std::span<const float>> views;
-    std::vector<iclforge::oba::ObjectPlacement> placements;
+    std::vector<iclforge::objects::oba::ObjectPlacement> placements;
     std::vector<std::span<const float>> bed_views;
     std::vector<std::byte> unit_bytes;
     std::size_t frames_per = 0;
@@ -433,18 +433,18 @@ struct Engine::Impl {
     // in; a freed slot fades out where it is.
     std::unordered_map<int, AppId> slot_owner;
     // Custom pair positions: left and right, when a side has been placed.
-    std::unordered_map<AppId, std::array<iclforge::oba::Position, 2>> pair_positions;
+    std::unordered_map<AppId, std::array<iclforge::objects::oba::Position, 2>> pair_positions;
     // The pair's two positions as they stand: custom, or the spread.
-    std::array<iclforge::oba::Position, 2> pair_of(AppId app) const {
+    std::array<iclforge::objects::oba::Position, 2> pair_of(AppId app) const {
         if (const auto custom = pair_positions.find(app); custom != pair_positions.end()) {
             return custom->second;
         }
         const auto wanted = wanted_positions.find(app);
-        const iclforge::oba::Position centre = wanted == wanted_positions.end()
-                                                   ? iclforge::oba::Position{0.5, 0.5, 0.0}
+        const iclforge::objects::oba::Position centre = wanted == wanted_positions.end()
+                                                   ? iclforge::objects::oba::Position{0.5, 0.5, 0.0}
                                                    : wanted->second;
-        iclforge::oba::Position left = centre;
-        iclforge::oba::Position right = centre;
+        iclforge::objects::oba::Position left = centre;
+        iclforge::objects::oba::Position right = centre;
         left.x = std::clamp(centre.x - config.split_spread, 0.0, 1.0);
         right.x = std::clamp(centre.x + config.split_spread, 0.0, 1.0);
         return {left, right};
@@ -470,8 +470,8 @@ struct Engine::Impl {
                 continue;
             }
             const auto wanted = wanted_positions.find(after->second);
-            iclforge::oba::Position where =
-                wanted == wanted_positions.end() ? iclforge::oba::Position{0.5, 0.5, 0.0} : wanted->second;
+            iclforge::objects::oba::Position where =
+                wanted == wanted_positions.end() ? iclforge::objects::oba::Position{0.5, 0.5, 0.0} : wanted->second;
             // A split pair's objects sit where the pair puts them: at the
             // standard spread either side of the placed position, or where
             // each was dragged to.
@@ -943,13 +943,13 @@ void Engine::stop() {
     impl_->snapshot.running = false;
 }
 
-void Engine::position(AppId app, iclforge::oba::Position where) {
+void Engine::position(AppId app, iclforge::objects::oba::Position where) {
     impl_->post([this, app, where] {
         // A custom pair moves as one: both objects by the same amount.
         if (const auto custom = impl_->pair_positions.find(app); custom != impl_->pair_positions.end()) {
             const auto old = impl_->wanted_positions.find(app);
-            const iclforge::oba::Position from =
-                old == impl_->wanted_positions.end() ? iclforge::oba::Position{0.5, 0.5, 0.0} : old->second;
+            const iclforge::objects::oba::Position from =
+                old == impl_->wanted_positions.end() ? iclforge::objects::oba::Position{0.5, 0.5, 0.0} : old->second;
             for (auto& p : custom->second) {
                 p.x = std::clamp(p.x + (where.x - from.x), 0.0, 1.0);
                 p.y = std::clamp(p.y + (where.y - from.y), 0.0, 1.0);
@@ -993,7 +993,7 @@ void Engine::set_split(AppId app, bool split) {
     });
 }
 
-void Engine::position_side(AppId app, int side, iclforge::oba::Position where) {
+void Engine::position_side(AppId app, int side, iclforge::objects::oba::Position where) {
     impl_->post([this, app, side, where] {
         if (side != 0 && side != 1) {
             return;

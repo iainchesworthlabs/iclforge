@@ -99,14 +99,14 @@ std::vector<std::byte> emdf_container(int dmx_config_idx, int channels) {
     // entries so decode_access_unit_core's own count check passes - what
     // the objects' own positions say is irrelevant to reconstructing their
     // audio.
-    const iclforge::oba::Program program{.dynamic_only = true, .dynamic_objects = channels};
-    const std::vector<iclforge::oba::DynamicObject> objects(static_cast<std::size_t>(channels));
-    const auto oamd_payload = iclforge::oba::build_payload(program, objects);
+    const iclforge::objects::oba::Program program{.dynamic_only = true, .dynamic_objects = channels};
+    const std::vector<iclforge::objects::oba::DynamicObject> objects(static_cast<std::size_t>(channels));
+    const auto oamd_payload = iclforge::objects::oba::build_payload(program, objects);
     const auto joc_payload = identity_routing_joc(dmx_config_idx, channels);
-    const std::vector<iclforge::emdf::Payload> payloads = {
-        {.id = iclforge::emdf::kPayloadIdOamd, .bytes = oamd_payload},
-        {.id = iclforge::emdf::kPayloadIdJoc, .bytes = joc_payload}};
-    return iclforge::emdf::build_container(payloads);
+    const std::vector<iclforge::objects::emdf::Payload> payloads = {
+        {.id = iclforge::objects::emdf::kPayloadIdOamd, .bytes = oamd_payload},
+        {.id = iclforge::objects::emdf::kPayloadIdJoc, .bytes = joc_payload}};
+    return iclforge::objects::emdf::build_container(payloads);
 }
 
 // Builds a stream (E-AC-3 independent 5.1 carrying the EMDF container, plus

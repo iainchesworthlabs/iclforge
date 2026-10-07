@@ -10,7 +10,7 @@
 #include <variant>
 #include <vector>
 
-namespace iclforge::oba {
+namespace iclforge::objects::oba {
 
 namespace {
 
@@ -111,4 +111,4 @@ std::vector<ObjectPlacement> evaluate_placements(std::span<const ObjectPath> pat
     return placement;
 }
 
-}  // namespace iclforge::oba
+}  // namespace iclforge::objects::oba

@@ -1,7 +1,7 @@
 // Drive Atmos objects from an authored scene instead of hand-rolled trig.
 //
 // atmos_objects.cpp computes each object's position with its own per-frame
-// sin/cos math. iclforge::oba::ObjectScene is the shared layer that replaces that:
+// sin/cos math. iclforge::objects::oba::ObjectScene is the shared layer that replaces that:
 // named objects with position/gain automation, each segment saying how it is
 // traversed (hold, linear, smooth), evaluated once per frame into the
 // ObjectPlacement span AtmosEncoder::encode_frame wants. A scene also has a
@@ -25,8 +25,8 @@
 int main() {
     constexpr int kObjects = 2;
 
-    using iclforge::oba::Interpolation;
-    auto built = iclforge::oba::ObjectScene::create({
+    using iclforge::objects::oba::Interpolation;
+    auto built = iclforge::objects::oba::ObjectScene::create({
         // A slow sweep from the left wall to the right, easing in and out of
         // the front-centre cue so the pan does not corner where the segments
         // meet - that is what kSmooth buys over a straight line.
@@ -69,7 +69,7 @@ int main() {
 
     // Filled in place once per frame rather than reallocated - evaluate_into
     // is the allocation-free form for exactly this loop.
-    std::vector<iclforge::oba::ObjectPlacement> placement(kObjects);
+    std::vector<iclforge::objects::oba::ObjectPlacement> placement(kObjects);
     std::vector<std::byte> stream;
     for (int frame = 0; frame < 93; ++frame) {  // three seconds
         for (std::size_t obj = 0; obj < kObjects; ++obj) {
@@ -97,7 +97,7 @@ int main() {
     // The same scene as text. Save this next to the stream and `forge
     // atmos-path out.ec3 scene.json` reproduces the motion from the file -
     // and so does the keyframe grammar, which that command still reads.
-    const auto text = iclforge::oba::to_json(scene);
+    const auto text = iclforge::objects::oba::to_json(scene);
     fmt::printf("scene serialises to %zu bytes of JSON, %.1f s long\n", text.size(),
                 scene.duration_s());
     return 0;

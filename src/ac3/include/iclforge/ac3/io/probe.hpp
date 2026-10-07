@@ -132,7 +132,7 @@ struct ProbeSyncframe {
     // §7.7.1.2's effective word per block, persistence already resolved.
     std::array<std::uint8_t, kBlocksPerFrame> dynrng{};
     // The object layer this syncframe carried, when it carried one.
-    std::optional<iclforge::oba::DecodedProgram> objects = std::nullopt;
+    std::optional<iclforge::objects::oba::DecodedProgram> objects = std::nullopt;
 };
 
 // One access unit: an AC-3 syncframe, or an E-AC-3 independent substream
@@ -220,7 +220,7 @@ struct ProbeReport {
     bool joc = false;
     // The program the first OAMD payload described: its bed configuration and
     // dynamic object count. std::nullopt where no OAMD parsed.
-    std::optional<iclforge::oba::Program> program = std::nullopt;
+    std::optional<iclforge::objects::oba::Program> program = std::nullopt;
     std::uint64_t object_frames = 0;
     // Frames carrying a non-zero authenticity tag (ProbeSyncframe::authenticity_tag).
     std::uint64_t authenticity_tagged_frames = 0;

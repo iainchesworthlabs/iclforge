@@ -9,9 +9,9 @@
 #include "iclforge/objects/scene.hpp"
 
 // A live object-position source over OSC (live OSC object positions): a UDP listener on
-// its own thread, feeding an iclforge::oba::SceneCursor once per encoder frame.
+// its own thread, feeding an iclforge::objects::oba::SceneCursor once per encoder frame.
 // This is the socket-and-thread half; the OSC 1.0 wire form itself
-// (iclforge::oba::parse_osc_packet/apply, src/ac3) is pure and portable, and
+// (iclforge::objects::oba::parse_osc_packet/apply, src/ac3) is pure and portable, and
 // lives in the distributed library instead - see that header's own comment
 // for why the split falls where it does.
 //
@@ -41,8 +41,8 @@ enum class PositionSourceError : std::uint8_t {
 // fault the session needs to know about any other way.
 struct PositionSourceStats {
     std::uint64_t datagrams = 0;          // UDP datagrams received
-    std::uint64_t packets_rejected = 0;   // iclforge::oba::OscParseStats::packets_rejected, summed
-    std::uint64_t messages_dropped = 0;   // iclforge::oba::OscParseStats::messages_dropped, summed
+    std::uint64_t packets_rejected = 0;   // iclforge::objects::oba::OscParseStats::packets_rejected, summed
+    std::uint64_t messages_dropped = 0;   // iclforge::objects::oba::OscParseStats::messages_dropped, summed
     std::uint64_t updates_applied = 0;    // SceneCursor::push calls this source has made
 };
 
@@ -83,10 +83,10 @@ public:
     // source has received since the last call onto `cursor`'s objects and
     // pushes the result; an object with a pending gain/lfe-only update and
     // no position yet is left pending rather than applied (see
-    // iclforge::oba::apply's own comment) and is retried on the next call, not
+    // iclforge::objects::oba::apply's own comment) and is retried on the next call, not
     // dropped. Allocates nothing: the pending-update slots are sized once,
     // at construction, to `objects`.
-    void drain_into(iclforge::oba::SceneCursor& cursor, double time_s);
+    void drain_into(iclforge::objects::oba::SceneCursor& cursor, double time_s);
 
 private:
     struct Impl;

@@ -176,7 +176,7 @@ void print_concealment_summary(FILE* status, std::size_t concealed, std::size_t 
 // as the decode runs (run_decode_eac3's append_objects) - by the time this
 // prints, the files are already closed; this only says what happened.
 int report_decoded_objects(FILE* status,
-                           const std::optional<iclforge::oba::DecodedProgram>& metadata,
+                           const std::optional<iclforge::objects::oba::DecodedProgram>& metadata,
                            bool have_object_audio, std::size_t objects_written,
                            std::string_view objects_dir) {
     print_object_summary(status, metadata,
@@ -398,30 +398,30 @@ std::string ac4_decoding(iclforge::ac4::DecodingMode decoding) {
 
 // AC-4 objects into an ADM BWF master (planning/ac4.md, I5), reusing decode_adm.hpp's writer
 // (forge_cli::write_adm_atmos_master) rather than a second one: the first seventeen of
-// iclforge::ac4::Speaker and iclforge::oba::BedLabel name the same loudspeaker positions in the
+// iclforge::ac4::Speaker and iclforge::objects::oba::BedLabel name the same loudspeaker positions in the
 // same order (both TS 103 190-2 Annex F.3 and this project's own bed labels descend from the same
 // room layout), so a bed object's speaker carries over by position. The speakers Table A.27 adds
 // (the 22.2 layout's centre, top and bottom channels, and 9.X.4's screen pair) have no bed label,
 // as before they had no Speaker: such a bed object is written with none.
-std::optional<iclforge::oba::BedLabel> to_oba_bed_label(iclforge::ac4::Speaker speaker) {
+std::optional<iclforge::objects::oba::BedLabel> to_oba_bed_label(iclforge::ac4::Speaker speaker) {
     switch (speaker) {
-        case iclforge::ac4::Speaker::kLeft: return iclforge::oba::BedLabel::kL;
-        case iclforge::ac4::Speaker::kRight: return iclforge::oba::BedLabel::kR;
-        case iclforge::ac4::Speaker::kCentre: return iclforge::oba::BedLabel::kC;
-        case iclforge::ac4::Speaker::kLfe: return iclforge::oba::BedLabel::kLfe;
-        case iclforge::ac4::Speaker::kLeftSurround: return iclforge::oba::BedLabel::kLs;
-        case iclforge::ac4::Speaker::kRightSurround: return iclforge::oba::BedLabel::kRs;
-        case iclforge::ac4::Speaker::kLeftBack: return iclforge::oba::BedLabel::kLb;
-        case iclforge::ac4::Speaker::kRightBack: return iclforge::oba::BedLabel::kRb;
-        case iclforge::ac4::Speaker::kLeftWide: return iclforge::oba::BedLabel::kLw;
-        case iclforge::ac4::Speaker::kRightWide: return iclforge::oba::BedLabel::kRw;
-        case iclforge::ac4::Speaker::kTopFrontLeft: return iclforge::oba::BedLabel::kTfl;
-        case iclforge::ac4::Speaker::kTopFrontRight: return iclforge::oba::BedLabel::kTfr;
-        case iclforge::ac4::Speaker::kTopBackLeft: return iclforge::oba::BedLabel::kTbl;
-        case iclforge::ac4::Speaker::kTopBackRight: return iclforge::oba::BedLabel::kTbr;
-        case iclforge::ac4::Speaker::kTopSideLeft: return iclforge::oba::BedLabel::kTsl;
-        case iclforge::ac4::Speaker::kTopSideRight: return iclforge::oba::BedLabel::kTsr;
-        case iclforge::ac4::Speaker::kLfe2: return iclforge::oba::BedLabel::kLfe2;
+        case iclforge::ac4::Speaker::kLeft: return iclforge::objects::oba::BedLabel::kL;
+        case iclforge::ac4::Speaker::kRight: return iclforge::objects::oba::BedLabel::kR;
+        case iclforge::ac4::Speaker::kCentre: return iclforge::objects::oba::BedLabel::kC;
+        case iclforge::ac4::Speaker::kLfe: return iclforge::objects::oba::BedLabel::kLfe;
+        case iclforge::ac4::Speaker::kLeftSurround: return iclforge::objects::oba::BedLabel::kLs;
+        case iclforge::ac4::Speaker::kRightSurround: return iclforge::objects::oba::BedLabel::kRs;
+        case iclforge::ac4::Speaker::kLeftBack: return iclforge::objects::oba::BedLabel::kLb;
+        case iclforge::ac4::Speaker::kRightBack: return iclforge::objects::oba::BedLabel::kRb;
+        case iclforge::ac4::Speaker::kLeftWide: return iclforge::objects::oba::BedLabel::kLw;
+        case iclforge::ac4::Speaker::kRightWide: return iclforge::objects::oba::BedLabel::kRw;
+        case iclforge::ac4::Speaker::kTopFrontLeft: return iclforge::objects::oba::BedLabel::kTfl;
+        case iclforge::ac4::Speaker::kTopFrontRight: return iclforge::objects::oba::BedLabel::kTfr;
+        case iclforge::ac4::Speaker::kTopBackLeft: return iclforge::objects::oba::BedLabel::kTbl;
+        case iclforge::ac4::Speaker::kTopBackRight: return iclforge::objects::oba::BedLabel::kTbr;
+        case iclforge::ac4::Speaker::kTopSideLeft: return iclforge::objects::oba::BedLabel::kTsl;
+        case iclforge::ac4::Speaker::kTopSideRight: return iclforge::objects::oba::BedLabel::kTsr;
+        case iclforge::ac4::Speaker::kLfe2: return iclforge::objects::oba::BedLabel::kLfe2;
         case iclforge::ac4::Speaker::kLeftScreen:
         case iclforge::ac4::Speaker::kRightScreen:
         case iclforge::ac4::Speaker::kTopFrontCentre:
@@ -436,7 +436,7 @@ std::optional<iclforge::oba::BedLabel> to_oba_bed_label(iclforge::ac4::Speaker s
     return std::nullopt;
 }
 
-// iclforge::ac4::ObjectProperties (TS 103 190-2 Annex F) into iclforge::oba::DynamicObject (this
+// iclforge::ac4::ObjectProperties (TS 103 190-2 Annex F) into iclforge::objects::oba::DynamicObject (this
 // project's own ADM-facing object model, TS 103 420 §5.6.1): position and gain carry over as
 // run_atmos_objects_to_ac4 (atmos.cpp) documents for the encode direction, and every other Annex F
 // field this decoder reports has a same-shaped §5.6.1 counterpart (size, priority, snap,
@@ -444,20 +444,20 @@ std::optional<iclforge::oba::BedLabel> to_oba_bed_label(iclforge::ac4::Speaker s
 // zone_mask, trim_disabled, headphone_render_mode and head_track_disabled, which have no ADM
 // representation and are dropped here (they reach neither ADM's schema nor this decode's other
 // outputs, objects_dir and the rendered WAV, so nothing this decode already promised is lost).
-// zone_mask (Annex F.8, Table 104) and iclforge::oba::ZoneConstraint (TS 103 420 Table 20) number
+// zone_mask (Annex F.8, Table 104) and iclforge::objects::oba::ZoneConstraint (TS 103 420 Table 20) number
 // the same six room-zone constraints alike, 0 to 5. Table 104 goes on to 6, "Only proscenium zone
 // enabled", which TS 103 420 has no counterpart for (its 6 and 7 are reserved), and reserves 7:
 // both fall back to kNone rather than carry a code the E-AC-3 side cannot hold into the ADM file.
 // Checked against both tables' text, 2026-09-29.
-iclforge::oba::DynamicObject to_oba_dynamic_object(const iclforge::ac4::ObjectProperties& p) {
-    iclforge::oba::DynamicObject out;
+iclforge::objects::oba::DynamicObject to_oba_dynamic_object(const iclforge::ac4::ObjectProperties& p) {
+    iclforge::objects::oba::DynamicObject out;
     out.position = {.x = p.position[0], .y = p.position[1], .z = p.position[2]};
     out.gain_db = p.gain_db;
     out.size = {.width = p.width[0], .depth = p.width[1], .height = p.width[2]};
     out.priority = p.priority;
     out.zone = p.zone_mask >= 0 && p.zone_mask <= 5
-                   ? static_cast<iclforge::oba::ZoneConstraint>(p.zone_mask)
-                   : iclforge::oba::ZoneConstraint::kNone;
+                   ? static_cast<iclforge::objects::oba::ZoneConstraint>(p.zone_mask)
+                   : iclforge::objects::oba::ZoneConstraint::kNone;
     out.enable_elevation = p.enable_elevation;
     out.snap = p.snap;
     out.screen_reference = p.screen_factor != 0.0;
@@ -465,7 +465,7 @@ iclforge::oba::DynamicObject to_oba_dynamic_object(const iclforge::ac4::ObjectPr
     out.depth_factor = p.depth_exponent;
     if (p.distance.has_value()) {
         const bool at_infinity = std::isinf(*p.distance);
-        out.distance = iclforge::oba::ObjectDistance{.at_infinity = at_infinity,
+        out.distance = iclforge::objects::oba::ObjectDistance{.at_infinity = at_infinity,
                                                 .factor = at_infinity ? 1.1 : *p.distance};
     }
     out.active = p.active;
@@ -943,7 +943,7 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     //
     // The LFE channel this lambda appends below is NOT yet delayed to match the objects beside
     // it - decode_access_unit hands the two to it already
-    // iclforge::oba::joc::reconstruction_delay() samples apart (docs/library/decoding.md, "Atmos
+    // iclforge::objects::oba::joc::reconstruction_delay() samples apart (docs/library/decoding.md, "Atmos
     // objects lag the bed"), and appending both verbatim, unit by unit, carries that same gap
     // straight into adm_input.channels. delay_pcm() fixes it in one pass, once, on the finished LFE
     // channel below rather than here per unit - this lambda has no reason to know the decoder's own
@@ -954,7 +954,7 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     bool adm_bed_warned = false;
     std::uint64_t adm_samples_emitted = 0;
     const auto accumulate_adm = [&](const std::vector<std::vector<float>>& object_audio,
-                                    const std::optional<iclforge::oba::DecodedProgram>&
+                                    const std::optional<iclforge::objects::oba::DecodedProgram>&
                                         object_metadata,
                                     std::span<const std::vector<float>> channels,
                                     iclforge::ac3::eac3::chanmap::Layout layout,
@@ -988,7 +988,7 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
             }
             if (have_lfe) {
                 adm_input.channels.back().name = "LFE";
-                adm_input.channels.back().bed_label = iclforge::oba::BedLabel::kLfe;
+                adm_input.channels.back().bed_label = iclforge::objects::oba::BedLabel::kLfe;
             }
             adm_input_ready = true;
         }
@@ -1200,7 +1200,7 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
                 auto& lfe = adm_input.channels.back().pcm;
                 lfe =
                     delay_pcm(lfe, static_cast<std::size_t>(
-                                       iclforge::oba::joc::reconstruction_delay(meta.joc_domain)));
+                                       iclforge::objects::oba::joc::reconstruction_delay(meta.joc_domain)));
             }
             const auto written_adm = forge_cli::write_adm_atmos_master(adm_out, adm_input);
             if (!written_adm.has_value()) {

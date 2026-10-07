@@ -90,14 +90,14 @@ std::optional<int> apply_object_signing(std::vector<std::vector<std::byte>>& uni
 // Returns the file's objects and orientation without filling in the indices a
 // keyframe file skipped: what those should be is this command's policy and
 // each caller below applies its own.
-std::optional<iclforge::oba::SceneContents> read_scene_file(std::string_view path) {
+std::optional<iclforge::objects::oba::SceneContents> read_scene_file(std::string_view path) {
     std::ifstream in{std::string{path}, std::ios::binary};
     if (!in) {
         fmt::println(stderr, "error: cannot open {}", path);
         return std::nullopt;
     }
     const std::string text{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
-    auto contents = iclforge::oba::read_scene(text);
+    auto contents = iclforge::objects::oba::read_scene(text);
     if (!contents.has_value()) {
         // Line 0 means the format had no line to point at (a JSON-level
         // complaint about the scene as a whole); everything else keeps the
@@ -117,13 +117,13 @@ std::optional<iclforge::oba::SceneContents> read_scene_file(std::string_view pat
 // (an index the file skipped, or one past its end), then validated. `fallback`
 // is asked for an index because atmos-encode's default placement differs per
 // object where atmos-path's does not.
-std::optional<iclforge::oba::ObjectScene> scene_of(std::string_view path,
-                                                   iclforge::oba::SceneContents contents,
+std::optional<iclforge::objects::oba::ObjectScene> scene_of(std::string_view path,
+                                                   iclforge::objects::oba::SceneContents contents,
                                                    std::size_t count, const auto& fallback) {
     contents.objects.resize(count);
     for (std::size_t i = 0; i < count; ++i) {
         if (contents.objects[i].automation.empty()) {
-            const iclforge::oba::ObjectPlacement rest = fallback(i);
+            const iclforge::objects::oba::ObjectPlacement rest = fallback(i);
             contents.objects[i].automation.push_back({.time_s = 0.0,
                                                       .position = rest.position,
                                                       .gain = rest.gain,
@@ -131,7 +131,7 @@ std::optional<iclforge::oba::ObjectScene> scene_of(std::string_view path,
         }
     }
     auto scene =
-        iclforge::oba::ObjectScene::create(std::move(contents.objects), contents.orientation);
+        iclforge::objects::oba::ObjectScene::create(std::move(contents.objects), contents.orientation);
     if (!scene.has_value()) {
         fmt::println(stderr, "error: {}: {}", path, scene.error().message);
         return std::nullopt;
@@ -142,7 +142,7 @@ std::optional<iclforge::oba::ObjectScene> scene_of(std::string_view path,
 // atmos-cbi's named layouts. DEE's own --input-format cbi_wav channel order
 // (measured against a real Dolby Encoding Engine 5.1.4 stream - see
 // tools/generators/gen_object_fixture.py and tests/ac3/oba/test_dee_joc_fixture.cpp)
-// is exactly iclforge::oba::bed_labels()'s Table 12 order for that bed, so this
+// is exactly iclforge::objects::oba::bed_labels()'s Table 12 order for that bed, so this
 // table names each layout only by its bed flags and lets bed_labels() derive
 // the channel order AtmosEncoder::encode_bed_frame expects - no separate,
 // hand-maintained channel list to keep in sync with it. Only the 5.1.4 row has
@@ -155,16 +155,16 @@ struct CbiLayout {
 };
 
 constexpr std::array<CbiLayout, 3> kCbiLayouts{{
-    {"5.1.4", iclforge::oba::bed::kLR | iclforge::oba::bed::kC | iclforge::oba::bed::kLfe |
-                  iclforge::oba::bed::kLsRs | iclforge::oba::bed::kTflTfr |
-                  iclforge::oba::bed::kTblTbr},
-    {"7.1.4", iclforge::oba::bed::kLR | iclforge::oba::bed::kC | iclforge::oba::bed::kLfe |
-                  iclforge::oba::bed::kLsRs | iclforge::oba::bed::kLbRb |
-                  iclforge::oba::bed::kTflTfr | iclforge::oba::bed::kTblTbr},
-    {"9.1.6", iclforge::oba::bed::kLR | iclforge::oba::bed::kC | iclforge::oba::bed::kLfe |
-                  iclforge::oba::bed::kLsRs | iclforge::oba::bed::kLbRb |
-                  iclforge::oba::bed::kLwRw | iclforge::oba::bed::kTflTfr |
-                  iclforge::oba::bed::kTslTsr | iclforge::oba::bed::kTblTbr},
+    {"5.1.4", iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC | iclforge::objects::oba::bed::kLfe |
+                  iclforge::objects::oba::bed::kLsRs | iclforge::objects::oba::bed::kTflTfr |
+                  iclforge::objects::oba::bed::kTblTbr},
+    {"7.1.4", iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC | iclforge::objects::oba::bed::kLfe |
+                  iclforge::objects::oba::bed::kLsRs | iclforge::objects::oba::bed::kLbRb |
+                  iclforge::objects::oba::bed::kTflTfr | iclforge::objects::oba::bed::kTblTbr},
+    {"9.1.6", iclforge::objects::oba::bed::kLR | iclforge::objects::oba::bed::kC | iclforge::objects::oba::bed::kLfe |
+                  iclforge::objects::oba::bed::kLsRs | iclforge::objects::oba::bed::kLbRb |
+                  iclforge::objects::oba::bed::kLwRw | iclforge::objects::oba::bed::kTflTfr |
+                  iclforge::objects::oba::bed::kTslTsr | iclforge::objects::oba::bed::kTblTbr},
 }};
 
 [[nodiscard]] std::optional<std::uint16_t> resolve_cbi_layout(std::string_view name) {
@@ -180,14 +180,14 @@ constexpr std::array<CbiLayout, 3> kCbiLayouts{{
 // unambiguous because 10 (5.1.4), 12 (7.1.4) and 16 (9.1.6) are all distinct.
 [[nodiscard]] std::optional<std::uint16_t> cbi_layout_for_channel_count(std::size_t channels) {
     for (const auto& layout : kCbiLayouts) {
-        if (static_cast<std::size_t>(iclforge::oba::bed::channel_count(layout.bed)) == channels) {
+        if (static_cast<std::size_t>(iclforge::objects::oba::bed::channel_count(layout.bed)) == channels) {
             return layout.bed;
         }
     }
     return std::nullopt;
 }
 
-// atmos-adm/atmos-iab with codec=ac4 (planning/ac4.md, I5): iclforge::oba::ObjectPlacement (this
+// atmos-adm/atmos-iab with codec=ac4 (planning/ac4.md, I5): iclforge::objects::oba::ObjectPlacement (this
 // project's E-AC-3/Atmos object model) and iclforge::ac4::ObjectProperties (TS 103 190-2 Annex F)
 // share one room coordinate system - X 0 (left wall) to 1 (right), Y 0 (front) to 1 (back), Z -1
 // (floor) to 1 (ceiling), confirmed against apps/common/ac4_object_render.hpp's own header comment
@@ -207,7 +207,7 @@ constexpr std::array<CbiLayout, 3> kCbiLayouts{{
 // take too.
 int run_atmos_objects_to_ac4(std::string_view source_kind, std::uint32_t sample_rate,
                              const std::vector<bool>& is_bed,
-                             const std::vector<iclforge::oba::ObjectPath>& paths,
+                             const std::vector<iclforge::objects::oba::ObjectPath>& paths,
                              const std::vector<std::span<const float>>& pcm,
                              std::string_view in_path, std::string_view out_path,
                              std::uint32_t bitrate, const Options& meta) {
@@ -231,7 +231,7 @@ int run_atmos_objects_to_ac4(std::string_view source_kind, std::uint32_t sample_
         .coding = meta.ac4_atmos_coding.value_or(iclforge::ac4::ObjectCoding::kAjoc)};
     const auto encoded = iclforge::apps::encode_ac4_objects(
         params, std::vector<bool>{}, pcm,
-        [&paths](double time_s) { return iclforge::oba::evaluate_placements(paths, time_s); });
+        [&paths](double time_s) { return iclforge::objects::oba::evaluate_placements(paths, time_s); });
     if (!encoded.has_value()) {
         switch (encoded.error().kind) {
             case iclforge::apps::Ac4ObjectsError::Kind::kRefused:
@@ -308,7 +308,7 @@ int run_atmos(std::string_view out_path, std::uint32_t seconds, std::uint32_t bi
     // Distinct tones so the objects are separable in the first place, and a
     // reader with an object renderer can tell which one ended up where.
     std::vector<double> tone_hz(count);
-    std::vector<iclforge::oba::ObjectPath> paths;
+    std::vector<iclforge::objects::oba::ObjectPath> paths;
     paths.reserve(count);
     for (std::size_t i = 0; i < count; ++i) {
         tone_hz[i] = 220.0 * std::pow(2.0, static_cast<double>(i) * 0.45);
@@ -324,7 +324,7 @@ int run_atmos(std::string_view out_path, std::uint32_t seconds, std::uint32_t bi
         const double height = count == 1 ? 0.5
                                          : -1.0 + 2.0 * static_cast<double>(i) /
                                                       static_cast<double>(count - 1);
-        paths.push_back(iclforge::oba::make_orbit_path(
+        paths.push_back(iclforge::objects::oba::make_orbit_path(
             rate, phase, height, 0.7 / std::sqrt(static_cast<double>(count)),
             // Only the lowest object feeds the LFE, and only a little: it is
             // the one channel JOC never touches.
@@ -352,7 +352,7 @@ int run_atmos(std::string_view out_path, std::uint32_t seconds, std::uint32_t bi
         // because that is where both metadata layers interpolate to: OAMD's
         // ramp and the JOC matrix both finish there.
         const double t = static_cast<double>(n0 + frame_samples) / 48000.0;
-        const auto placement = iclforge::oba::evaluate_placements(paths, t);
+        const auto placement = iclforge::objects::oba::evaluate_placements(paths, t);
         for (std::size_t i = 0; i < count; ++i) {
             for (std::size_t n = 0; n < frame_samples; ++n) {
                 essences[i][static_cast<std::size_t>(n)] = static_cast<float>(
@@ -399,7 +399,7 @@ int run_atmos(std::string_view out_path, std::uint32_t seconds, std::uint32_t bi
     if (emit_objects) {
         status_println(status_stream(),
                        "  {} dynamic objects + the bed's LFE = {} objects, JOC over a 5.1 downmix",
-                       objects, iclforge::oba::object_count(encoder.program()));
+                       objects, iclforge::objects::oba::object_count(encoder.program()));
     } else {
         status_println(status_stream(),
                        "  bed51: 5.1 bed only, no object container — plays as 5.1 on a decoder "
@@ -433,7 +433,7 @@ int run_atmos_path(std::string_view out_path, std::string_view paths_path, std::
     // An object the file never mentions sits still at room centre under the
     // same inverse-root gain law 'atmos' and the GUI use, exactly as before.
     const auto scene = scene_of(paths_path, std::move(*contents), objects, [objects](std::size_t) {
-        return iclforge::oba::ObjectPlacement{.position = {.x = 0.5, .y = 0.5, .z = 0.0},
+        return iclforge::objects::oba::ObjectPlacement{.position = {.x = 0.5, .y = 0.5, .z = 0.0},
                                          .gain = 0.7 / std::sqrt(static_cast<double>(objects)),
                                          .lfe_send = 0.0};
     });
@@ -475,7 +475,7 @@ int run_atmos_path(std::string_view out_path, std::string_view paths_path, std::
 
     // Reused every frame rather than reallocated: evaluate_into fills it in
     // place, which is the whole reason it exists alongside the vector form.
-    std::vector<iclforge::oba::ObjectPlacement> placement(objects);
+    std::vector<iclforge::objects::oba::ObjectPlacement> placement(objects);
     std::uint64_t n0 = 0;
     for (std::uint64_t f = 0; f < frames; ++f) {
         const double t = static_cast<double>(n0 + frame_samples) / 48000.0;
@@ -529,8 +529,8 @@ namespace {
 // run has no source layout to take one from): an even fan around the room at ear height, each at
 // the inverse-root gain 'atmos' and the GUI use, so that objects panned into the same five channels
 // add to about unity.
-std::vector<iclforge::oba::ObjectPlacement> fan_placements(std::size_t count) {
-    std::vector<iclforge::oba::ObjectPlacement> placement(count);
+std::vector<iclforge::objects::oba::ObjectPlacement> fan_placements(std::size_t count) {
+    std::vector<iclforge::objects::oba::ObjectPlacement> placement(count);
     for (std::size_t i = 0; i < count; ++i) {
         const double azimuth = 360.0 * static_cast<double>(i) / static_cast<double>(count);
         const double radians = azimuth * std::numbers::pi / 180.0;
@@ -545,9 +545,9 @@ std::vector<iclforge::oba::ObjectPlacement> fan_placements(std::size_t count) {
 
 // The same for the first `count` channels of one file of `src_channels`: a channel that already
 // has a direction keeps it, the rest fan out evenly.
-std::vector<iclforge::oba::ObjectPlacement> layout_placements(std::size_t src_channels,
+std::vector<iclforge::objects::oba::ObjectPlacement> layout_placements(std::size_t src_channels,
                                                          std::size_t count) {
-    std::vector<iclforge::oba::ObjectPlacement> placement(count);
+    std::vector<iclforge::objects::oba::ObjectPlacement> placement(count);
     const auto layout = iclforge::ac3::io::ac3_layout_for(src_channels);
     for (std::size_t i = 0; i < count; ++i) {
         double azimuth = 0.0;
@@ -673,12 +673,12 @@ int run_atmos_encode_multi(std::string_view in_path, std::string_view out_path,
     // rather than stacked at one point. A multi-source map= has no source
     // layout to take a direction from the way one file does, so this is the
     // even fan every time.
-    const std::vector<iclforge::oba::ObjectPlacement> placement = fan_placements(count);
+    const std::vector<iclforge::objects::oba::ObjectPlacement> placement = fan_placements(count);
 
     // Authored motion, keyed by OBJECT index (the order map= produced them
     // in), not by channel: with several sources a channel index alone would
     // not identify anything.
-    std::optional<iclforge::oba::ObjectScene> scene;
+    std::optional<iclforge::objects::oba::ObjectScene> scene;
     if (!paths_path.empty()) {
         auto contents = read_scene_file(paths_path);
         if (!contents.has_value()) {
@@ -777,7 +777,7 @@ int run_atmos_encode_multi(std::string_view in_path, std::string_view out_path,
                    out_sink.frames(), bitrate, sources->sample_rate, out_path);
     status_println(status,
                    "  {} objects + the bed's LFE = {} objects, JOC over a 5.1 downmix", count,
-                   iclforge::oba::object_count(encoder.program()));
+                   iclforge::objects::oba::object_count(encoder.program()));
     print_channel_summary(meter, status);
     return kExitOk;
 }
@@ -891,9 +891,9 @@ int run_atmos_encode_ac4(std::string_view in_path, std::string_view out_path, st
 
     // The dynamic objects' motion: the scene file's, and the default placement of any it does not
     // mention (or of all, without one).
-    const std::vector<iclforge::oba::ObjectPlacement> placement =
+    const std::vector<iclforge::objects::oba::ObjectPlacement> placement =
         routed ? fan_placements(dynamic) : layout_placements(shapes.front().channels, dynamic);
-    iclforge::oba::SceneContents contents;
+    iclforge::objects::oba::SceneContents contents;
     if (!paths_path.empty()) {
         auto read = read_scene_file(paths_path);
         if (!read.has_value()) {
@@ -1050,7 +1050,7 @@ int run_atmos_encode(std::string_view in_path, std::string_view out_path,
     // cannot pull apart again, so the source's channels are spread across the
     // room rather than stacked at one point. A channel that already has a
     // direction keeps it; the rest fan out evenly.
-    const std::vector<iclforge::oba::ObjectPlacement> placement =
+    const std::vector<iclforge::objects::oba::ObjectPlacement> placement =
         layout_placements(src_channels, count);
 
     // An authored scene file (same format/addressing as atmos-path, object
@@ -1058,7 +1058,7 @@ int run_atmos_encode(std::string_view in_path, std::string_view out_path,
     // placement above; empty (the default) leaves that placement reused
     // unchanged every frame, exactly as before this argument existed - see
     // the per-frame loop below.
-    std::optional<iclforge::oba::ObjectScene> scene;
+    std::optional<iclforge::objects::oba::ObjectScene> scene;
     if (!paths_path.empty()) {
         auto contents = read_scene_file(paths_path);
         if (!contents.has_value()) {
@@ -1179,7 +1179,7 @@ int run_atmos_encode(std::string_view in_path, std::string_view out_path,
     status_println(status,
                    "  {} objects from {} source channels + the bed's LFE = {} objects, "
                    "JOC over a 5.1 downmix",
-                   count, src_channels, iclforge::oba::object_count(encoder.program()));
+                   count, src_channels, iclforge::objects::oba::object_count(encoder.program()));
     print_channel_summary(meter, status);
     return kExitOk;
 }
@@ -1274,7 +1274,7 @@ int run_atmos_adm(std::string_view in_path, std::string_view out_path, std::uint
         }
         // Evaluated at the frame's END time, the same convention run_atmos_path/run_atmos_encode
         // use.
-        const auto placement = iclforge::oba::evaluate_placements(
+        const auto placement = iclforge::objects::oba::evaluate_placements(
             source->paths, static_cast<double>(start + frame_samples) /
                                 static_cast<double>(source->sample_rate));
         auto unit = encoder.encode_frame(views, placement);
@@ -1315,7 +1315,7 @@ int run_atmos_adm(std::string_view in_path, std::string_view out_path, std::uint
     status_println(status,
                    "  {} bed speaker feed(s) + {} dynamic object(s) + the bed's LFE = {} objects, "
                    "JOC over a 5.1 downmix",
-                   bed_count, count - bed_count, iclforge::oba::object_count(encoder.program()));
+                   bed_count, count - bed_count, iclforge::objects::oba::object_count(encoder.program()));
     print_channel_summary(meter, status);
     return kExitOk;
 }
@@ -1400,7 +1400,7 @@ int run_atmos_iab(std::string_view in_path, std::string_view out_path, std::uint
         }
         // Evaluated at the frame's END time, the same convention every other Atmos-encode command
         // uses.
-        const auto placement = iclforge::oba::evaluate_placements(
+        const auto placement = iclforge::objects::oba::evaluate_placements(
             source->paths, static_cast<double>(start + frame_samples) /
                                 static_cast<double>(source->sample_rate));
         auto unit = encoder.encode_frame(views, placement);
@@ -1437,7 +1437,7 @@ int run_atmos_iab(std::string_view in_path, std::string_view out_path, std::uint
     status_println(status,
                    "  {} bed channel(s) + {} dynamic object(s) + the bed's LFE = {} objects, "
                    "JOC over a 5.1 downmix",
-                   bed_count, count - bed_count, iclforge::oba::object_count(encoder.program()));
+                   bed_count, count - bed_count, iclforge::objects::oba::object_count(encoder.program()));
     print_channel_summary(meter, status);
     return kExitOk;
 }
@@ -1493,7 +1493,7 @@ int run_atmos_cbi(std::string_view in_path, std::string_view out_path, std::uint
             return kExitUsage;
         }
         const auto expected =
-            static_cast<std::size_t>(iclforge::oba::bed::channel_count(*bed_flags));
+            static_cast<std::size_t>(iclforge::objects::oba::bed::channel_count(*bed_flags));
         if (expected != src_channels) {
             fmt::println(stderr, "error: {} is a {}-channel bed, but {} has {} channel(s)",
                          layout_arg, expected, in_path, src_channels);
@@ -1617,8 +1617,8 @@ int run_atmos_cbi(std::string_view in_path, std::string_view out_path, std::uint
     status_println(status,
                    "  {}-channel channel-based-immersive bed, 0 dynamic objects -> {} objects "
                    "total, {} of them JOC-reconstructed from a 5.1 downmix",
-                   src_channels, iclforge::oba::object_count(encoder.program()),
-                   iclforge::oba::joc_object_count(encoder.program()));
+                   src_channels, iclforge::objects::oba::object_count(encoder.program()),
+                   iclforge::objects::oba::joc_object_count(encoder.program()));
     print_channel_summary(meter, status);
     return kExitOk;
 }

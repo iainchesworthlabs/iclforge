@@ -103,12 +103,12 @@ Ac4ObjectRenderer::Gains Ac4ObjectRenderer::speaker_gains(iclforge::ac4::Speaker
 
 std::vector<float> Ac4ObjectRenderer::object_gains(
     const iclforge::ac4::ObjectProperties& properties) {
-    iclforge::oba::DisplayObject object;
+    iclforge::objects::oba::DisplayObject object;
     object.position = {
         .x = properties.position[0], .y = properties.position[1], .z = properties.position[2]};
     object.gain_db = properties.gain_db;
     object.active = properties.active;
-    renderer_.set_objects(std::span<const iclforge::oba::DisplayObject>(&object, 1));
+    renderer_.set_objects(std::span<const iclforge::objects::oba::DisplayObject>(&object, 1));
     std::vector<float> out(speakers_.size());
     for (std::size_t slot = 0; slot < speakers_.size(); ++slot) {
         out[slot] = renderer_.object_gain(0, slot);

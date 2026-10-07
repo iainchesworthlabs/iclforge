@@ -841,7 +841,7 @@ struct BurstPlayer::Impl {
         }
         const iclforge::ac3::DecodedAccessUnit& au = **decoded;
         const std::int32_t objects =
-            au.object_metadata ? static_cast<std::int32_t>(iclforge::oba::describe_objects(*au.object_metadata).size()) : 0;
+            au.object_metadata ? static_cast<std::int32_t>(iclforge::objects::oba::describe_objects(*au.object_metadata).size()) : 0;
         have_decoder_report = true;
         decoder_report = ac::DecoderReport{.data_type = data_type,
                                            .acmod = static_cast<std::int32_t>(au.acmod),

@@ -69,10 +69,10 @@ Result run(int numblkscod, unsigned bitrate_kbps, int seconds) {
     std::vector<std::vector<float>> tap_pcm(kTaps);
     std::vector<std::vector<float>> objects(kObjects, std::vector<float>(frames_per, 0.0f));
     std::vector<std::span<const float>> views(kObjects);
-    std::vector<iclforge::oba::ObjectPlacement> placement(kObjects);
+    std::vector<iclforge::objects::oba::ObjectPlacement> placement(kObjects);
 
     // Bed slots: pinned to speakers, snapped.
-    const iclforge::oba::Position bed_pos[kBedSlots] = {
+    const iclforge::objects::oba::Position bed_pos[kBedSlots] = {
         {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.5, 0.0, 0.0}, {0.0, 1.0, 0.0}, {1.0, 1.0, 0.0}};
     for (int b = 0; b < kBedSlots; ++b) {
         placement[kPositioned + b].position = bed_pos[b];

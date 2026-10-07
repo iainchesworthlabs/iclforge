@@ -4,7 +4,7 @@
 
 #include "iclforge/objects/scene_osc.hpp"
 
-// iclforge::oba::parse_osc_packet (src/objects/src/scene_osc.cpp) - one UDP
+// iclforge::objects::oba::parse_osc_packet (src/objects/src/scene_osc.cpp) - one UDP
 // datagram's worth of OSC 1.0, as iclforge::audio::LivePositionSource hands it
 // over the instant a byte arrives on the socket it opened for
 // `positions=osc:<port>`. No CRC, no container, no length field checked by
@@ -15,6 +15,6 @@
 // cap - are exactly what this harness exists to keep honest.
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
     const std::span<const std::byte> bytes{reinterpret_cast<const std::byte*>(data), size};
-    (void)iclforge::oba::parse_osc_packet(bytes);
+    (void)iclforge::objects::oba::parse_osc_packet(bytes);
     return 0;
 }

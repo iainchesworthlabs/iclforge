@@ -24,8 +24,8 @@ this repository that must not crash, read out of bounds, or loop unboundedly on 
 | AC-4 elementary streams: sync frames and the table of contents | `iclforge::ac4::scan`, `iclforge::ac4::SyncFrameSplitter`, `iclforge::ac4::parse_raw_frame` | yes — `fuzz_ac4_parse` |
 | AC-4 substreams: the syntax layer and the reconstruction to PCM | `iclforge::ac4::Decoder::parse`, `iclforge::ac4::Decoder::decode`, `decode_by_block` | yes — `fuzz_ac4_decode` |
 | Format sniffing before any decoder commits | `iclforge::ac3::io::scan` | yes |
-| EMDF containers in a skip field (§H.2.2) | `iclforge::emdf::parse_container` | yes — `fuzz_emdf_parse`, plus indirectly through the E-AC-3 harnesses |
-| OAMD object metadata (TS 103 420 §5.5) | `iclforge::oba::parse_payload` | yes — `fuzz_oamd_parse`, plus indirectly through the E-AC-3 harnesses |
+| EMDF containers in a skip field (§H.2.2) | `iclforge::objects::emdf::parse_container` | yes — `fuzz_emdf_parse`, plus indirectly through the E-AC-3 harnesses |
+| OAMD object metadata (TS 103 420 §5.5) | `iclforge::objects::oba::parse_payload` | yes — `fuzz_oamd_parse`, plus indirectly through the E-AC-3 harnesses |
 | JOC payloads (TS 103 420 §6) | `iclforge::ac3::oba::joc::parse_payload` | yes — `fuzz_joc_parse`, plus indirectly through the E-AC-3 harnesses |
 | WAV / RIFF headers and PCM | `iclforge::ac3::io::read_wav`, `iclforge::ac3::io::WavStreamReader` | yes |
 | IAB (SMPTE ST 2098-2) elementary streams and MXF track files | `iclforge::iab::parse_iabitstream`, `iclforge::iab::parse_mxf_iab`, `iclforge::iab::parse_iaframe` | yes — `fuzz_iab_parse` |
@@ -35,7 +35,7 @@ this repository that must not crash, read out of bounds, or loop unboundedly on 
 | Matroska/WebM containers | `iclforge::containers::matroska::demux`, `iclforge::containers::matroska::Reader` | yes |
 | MP4/ISOBMFF containers | `iclforge::containers::mp4::demux`, `iclforge::containers::mp4::Reader` | yes |
 | MPEG-TS containers | `iclforge::containers::mpegts::demux`, `iclforge::containers::mpegts::Reader` | yes |
-| OSC control packets (UDP), a live object-position source | `iclforge::oba::parse_osc_packet` | yes — `fuzz_osc_parse`, part of `fuzz/run.sh`'s default target list alongside the other object/metadata-layer harnesses |
+| OSC control packets (UDP), a live object-position source | `iclforge::objects::oba::parse_osc_packet` | yes — `fuzz_osc_parse`, part of `fuzz/run.sh`'s default target list alongside the other object/metadata-layer harnesses |
 | Sendspin's handshake messages from a network peer (Hearth build) | `iclforge::sendspin::handshake` | yes — `fuzz_sendspin_handshake` |
 | Sendspin's messages after the handshake, JSON included (Hearth build) | `iclforge::sendspin::json::Document::parse`, the readers in `iclforge::sendspin::messages`, `pairing_messages`, `iclforge` and the other roles' namespaces | yes — `fuzz_sendspin_json`, `fuzz_sendspin_messages` |
 | Sendspin's fragments and binary messages: `player@v1`'s audio chunks, `_iclforge_player@v1`'s bursts, and the artwork, visualizer and source messages (Hearth build) | `iclforge::sendspin::Reassembler`, `parse_player_chunk`, `parse_burst_chunk`, `artwork::parse_message`, `visualizer::parse_frame`, `source::parse_chunk` | yes — `fuzz_sendspin_frames` |
@@ -401,7 +401,7 @@ surface on top of opt-in surface: a session listens for OSC at all only when `po
 the GUI toggle) is explicitly used, and listens on every interface only when that is explicitly
 widened too.
 
-What a successful spoof or injection buys an attacker is narrow. `iclforge::oba::apply`
+What a successful spoof or injection buys an attacker is narrow. `iclforge::objects::oba::apply`
 (`src/objects/src/scene_osc.cpp`) merges only position, gain and `lfe_send` onto an object's
 existing placement, or releases it back to its authored automation (`/object/<n>/release`) —
 there is no path from this input to encoder configuration, to the filesystem, or to anything

@@ -107,9 +107,9 @@ struct Out {
     }
 };
 
-iclforge::oba::DisplayObject object_at(double x, double y, double z, double gain_db = 0.0,
+iclforge::objects::oba::DisplayObject object_at(double x, double y, double z, double gain_db = 0.0,
                                   bool active = true) {
-    iclforge::oba::DisplayObject object;
+    iclforge::objects::oba::DisplayObject object;
     object.position = {.x = x, .y = y, .z = z};
     object.gain_db = gain_db;
     object.active = active;
@@ -348,7 +348,7 @@ TEST_CASE("the LFE feeds", "[io][layout][render]") {
 TEST_CASE("objects are placed by their positions and their gains", "[io][layout][render]") {
     LayoutRenderer renderer{*OutputLayout::parse("5.1.4")};
     // Slots: L C R Ls Rs Vhl Vhr Lts Rts LFE.
-    const std::array<iclforge::oba::DisplayObject, 4> objects = {
+    const std::array<iclforge::objects::oba::DisplayObject, 4> objects = {
         object_at(0.5, 0.0, 0.0),          // the front wall's centre: C, exactly
         object_at(0.5, 0.5, 1.0),          // the ceiling's centre: the two front heights
         object_at(0.5, 0.0, 0.0, -6.0206), // as the first, 6 dB down
@@ -374,7 +374,7 @@ TEST_CASE("objects are placed by their positions and their gains", "[io][layout]
     }
 
     // Seventeen described: the sixteen JOC can carry are placed, no more.
-    std::vector<iclforge::oba::DisplayObject> many(17, object_at(0.5, 0.0, 0.0));
+    std::vector<iclforge::objects::oba::DisplayObject> many(17, object_at(0.5, 0.0, 0.0));
     renderer.set_objects(many);
     REQUIRE(renderer.object_count() == 16);
 }
@@ -382,7 +382,7 @@ TEST_CASE("objects are placed by their positions and their gains", "[io][layout]
 TEST_CASE("render sums the objects into the slots and passes the bed's LFE", "[io][layout][render]") {
     LayoutRenderer renderer{*OutputLayout::parse("5.1.4")};
     renderer.set_bed(coded(k51));
-    const std::array<iclforge::oba::DisplayObject, 2> objects = {
+    const std::array<iclforge::objects::oba::DisplayObject, 2> objects = {
         object_at(0.5, 0.0, 0.0),  // C
         object_at(0.5, 0.5, 1.0),  // Vhl and Vhr at 0.7071
     };
@@ -537,7 +537,7 @@ TEST_CASE("the slots a bed reaches, and the speakers it leaves silent", "[io][la
 TEST_CASE("the slots objects reach", "[io][layout][render]") {
     LayoutRenderer renderer{*OutputLayout::parse("5.1.4")};
     // Slots: L C R Ls Rs Vhl Vhr Lts Rts LFE.
-    const std::array<iclforge::oba::DisplayObject, 2> objects = {
+    const std::array<iclforge::objects::oba::DisplayObject, 2> objects = {
         object_at(0.5, 0.0, 0.0),              // the front wall's centre: C alone
         object_at(0.5, 0.5, 1.0, 0.0, false),  // inactive, so nowhere
     };

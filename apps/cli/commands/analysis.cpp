@@ -614,7 +614,7 @@ std::optional<QcProgrammeResult> measure_qc_eac3_objects(std::span<const std::by
     // (LfeDelayLine's own comment, apps/cli/support.hpp) - held back to match
     // before either reaches the meter.
     LfeDelayLine lfe_delay{static_cast<std::size_t>(
-        iclforge::oba::joc::reconstruction_delay(decoder_config.joc_domain))};
+        iclforge::objects::oba::joc::reconstruction_delay(decoder_config.joc_domain))};
 
     for (const auto& unit : *units) {
         const auto decoded = decoder->decode_access_unit(unit);
@@ -667,8 +667,8 @@ std::optional<QcProgrammeResult> measure_qc_eac3_objects(std::span<const std::by
         // sample count always matches how much bed audio has actually gone by.
         lfe_buffer = lfe_delay.process(lfe_buffer);
         const auto objects = out.object_metadata
-                                 ? iclforge::oba::describe_objects(*out.object_metadata)
-                                 : std::vector<iclforge::oba::DisplayObject>{};
+                                 ? iclforge::objects::oba::describe_objects(*out.object_metadata)
+                                 : std::vector<iclforge::objects::oba::DisplayObject>{};
         const auto object_count = std::min(objects.size(), out.object_audio.size());
         for (std::size_t i = 0; i < object_count; ++i) {
             if (!objects[i].active) {
