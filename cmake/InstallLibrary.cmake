@@ -127,14 +127,13 @@ install(DIRECTORY "${PROJECT_SOURCE_DIR}/src/ac3/include/"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     COMPONENT library)
 
-# Generated headers - iclforge/ac3/version.hpp (from iclforge/ac3/version.hpp.in) and the
-# generate_export_header() output - live in the library's own binary dir, not
+# The generated header - the generate_export_header() output (the family's version is
+# iclforge::base's, installed with it) - lives in the library's own binary dir, not
 # its source tree (see src/ac3/CMakeLists.txt), so the install(DIRECTORY
-# .../include/) call above never sees them. A consumer's
-# #include <iclforge/ac3/version.hpp>/<ac3/export.hpp> needs both installed at the
-# same relative paths the in-tree BUILD_INTERFACE include dirs already use.
+# .../include/) call above never sees it. A consumer's #include
+# <iclforge/ac3/export.hpp> needs it installed at the same relative path the
+# in-tree BUILD_INTERFACE include dirs already use.
 install(FILES
-        "${CMAKE_BINARY_DIR}/src/ac3/generated/iclforge/ac3/version.hpp"
         "${CMAKE_BINARY_DIR}/src/ac3/generated/iclforge/ac3/export.hpp"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/iclforge/ac3"
     COMPONENT library)
@@ -152,7 +151,8 @@ iclforge_install_pkgconfig(
 # Fixed32 and the scalar arithmetic (iclforge/base/arithmetic/) are in-tree build plumbing, never
 # installed: iclforge::base_headers (src/base/CMakeLists.txt).
 iclforge_install_library(base
-    DESCRIPTION "The bit reader and writer, the speaker vocabulary, the CPU feature probe and the signing key, SHA-256 and HMAC-SHA-256 the iclforge libraries build on"
+    DESCRIPTION "The family's version, the bit reader and writer, the speaker vocabulary, the CPU feature probe and the signing key, SHA-256 and HMAC-SHA-256 the iclforge libraries build on"
+    GENERATED_HEADERS iclforge/base/version.hpp
     EXCLUDE arithmetic)
 iclforge_install_library(dsp
     DESCRIPTION "The FFT, the QMF bank, the sample-rate converter and the biquad sections the iclforge codecs share")

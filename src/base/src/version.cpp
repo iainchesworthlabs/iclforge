@@ -1,4 +1,4 @@
-#include "iclforge/ac3/version.hpp"
+#include "iclforge/base/version.hpp"
 
 #include <fmt/format.h>
 
@@ -6,7 +6,7 @@
 
 #include "iclforge/base/detail/simd.hpp"
 
-namespace iclforge::ac3 {
+namespace iclforge::base {
 
 std::string version_details() {
     // The headline: the tag's version, plus the commits past it as build
@@ -32,4 +32,4 @@ std::string version_details() {
     return out;
 }
 
-}  // namespace iclforge::ac3
+}  // namespace iclforge::base

@@ -207,9 +207,59 @@ if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
     return()
 endif()
 
+# --- Version + git stamp ---------------------------------------------------
+# The family's version, which every library of the package shares (iclforge/base/version.hpp; AC-3's
+# until planning/consolidation.md's C6).
+find_package(Git QUIET)
+set(ICLFORGE_VERSION_TEMPLATE "${CMAKE_CURRENT_SOURCE_DIR}/include/iclforge/base/version.hpp.in")
+set(ICLFORGE_VERSION_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/iclforge/base/version.hpp")
+
+# OS/architecture/compiler this binary is built for, for version_details()'s --version/About-dialog
+# output. Computed here (CMake already knows all three from the toolchain it configured) rather than
+# read back with predefined macros at compile time, so version.cpp needs no #ifdef.
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(ICLFORGE_BUILD_OS "macOS")
+else()
+    set(ICLFORGE_BUILD_OS "${CMAKE_SYSTEM_NAME}")
+endif()
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(ICLFORGE_BUILD_COMPILER "GCC ${CMAKE_CXX_COMPILER_VERSION}")
+else()
+    # AppleClang, Clang and MSVC already spell their own CMAKE_CXX_COMPILER_ID the way version_details() wants it.
+    set(ICLFORGE_BUILD_COMPILER "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+endif()
+
+set(ICLFORGE_BUILD_TARGET "${ICLFORGE_BUILD_OS} ${ICLFORGE_BUILD_ARCH} (${ICLFORGE_BUILD_COMPILER})")
+
+# Generate once at configure time so the header exists for the first build.
+set(ICLFORGE_VERSION "${PROJECT_VERSION}")
+set(ICLFORGE_VERSION_FULL "${PROJECT_VERSION_FULL}")
+set(SRC "${ICLFORGE_VERSION_TEMPLATE}")
+set(DST "${ICLFORGE_VERSION_HEADER}")
+set(WORKDIR "${PROJECT_SOURCE_DIR}")
+include("${PROJECT_SOURCE_DIR}/cmake/GenerateVersion.cmake")
+
+# Re-stamp on every build so the git information tracks new commits without a reconfigure.
+# configure_file only rewrites when the content changes, so this does not recompile dependants.
+add_custom_target(iclforge_version ALL
+    BYPRODUCTS "${ICLFORGE_VERSION_HEADER}"
+    COMMAND "${CMAKE_COMMAND}"
+        "-DICLFORGE_VERSION=${PROJECT_VERSION}"
+        "-DICLFORGE_VERSION_FULL=${PROJECT_VERSION_FULL}"
+        "-DICLFORGE_BUILD_TARGET=${ICLFORGE_BUILD_TARGET}"
+        "-DSRC=${ICLFORGE_VERSION_TEMPLATE}"
+        "-DDST=${ICLFORGE_VERSION_HEADER}"
+        "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+        "-DWORKDIR=${PROJECT_SOURCE_DIR}"
+        -P "${PROJECT_SOURCE_DIR}/cmake/GenerateVersion.cmake"
+    COMMENT "Stamping version and git information"
+    VERBATIM)
+
 iclforge_add_library(base
     SOURCES
         src/cpu_features.cpp
+        src/version.cpp
         src/crypto/sha256.cpp
         src/crypto/hmac_sha256.cpp
         src/crypto/signing_key.cpp
@@ -219,6 +269,7 @@ iclforge_add_library(base
     LINK_PRIVATE
         "$<BUILD_INTERFACE:iclforge::tracy>"
         "$<BUILD_INTERFACE:iclforge::fmt_private>")
+add_dependencies(iclforge_base_objects iclforge_version)
 
 # getenv (ICLFORGE_SIMD_TIER's override, and the signing key's ICLFORGE_SIGNING_KEY and
 # ICLFORGE_SIGNING_KEY_FILE) is flagged by MSVC's CRT (C4996). Scoped to these files rather than

@@ -1,14 +1,15 @@
 #pragma once
 
 // NOTE: this header is generated from version.hpp.in by cmake/GenerateVersion.cmake.
-// Do not edit the generated copy; edit the template instead.
+// Do not edit the generated copy; edit the template instead. The family's version: every
+// library of the package has the one (iclforge/ac3/version.hpp names it too, for a release).
 
 #include <string>
 #include <string_view>
 
-#include "iclforge/ac3/export.hpp"
+#include "iclforge/base/export.hpp"
 
-namespace iclforge::ac3 {
+namespace iclforge::base {
 
 // Semantic version (https://semver.org).
 inline constexpr int version_major = @ICLFORGE_VERSION_MAJOR@;
@@ -34,12 +35,12 @@ inline constexpr bool git_dirty = @ICLFORGE_GIT_DIRTY@;
 inline constexpr int git_commits_since_tag = @ICLFORGE_GIT_COMMITS_SINCE_TAG@;
 
 // OS/architecture/compiler this binary was built for, e.g. "Linux x86_64
-// (Clang 22.1.2)". Computed by src/ac3/CMakeLists.txt from the toolchain
+// (Clang 22.1.2)". Computed by src/base/CMakeLists.txt from the toolchain
 // CMake itself configured, not read back from predefined compiler macros.
 inline constexpr std::string_view build_target = "@ICLFORGE_BUILD_TARGET@";
 
 // A multi-line, human-readable version + build-provenance block, suitable for
 // `--version` output or an About dialog.
-[[nodiscard]] ICLFORGE_AC3_EXPORT std::string version_details();
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::string version_details();
 
-}  // namespace iclforge::ac3
+}  // namespace iclforge::base
