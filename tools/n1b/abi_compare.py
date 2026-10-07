@@ -1,7 +1,7 @@
 """The exported-symbol allowlists of the old layout against the ones the moved layout writes.
 
     abi_compare.py <old allowlist dir> <new allowlist dir> [--map l2|identity]
-                   [--rewrite cuts,names,idents,ac3ns,c2,c3,c4]
+                   [--rewrite cuts,names,idents,ac3ns,c2,c3,c4,c5]
 
 tools/ci/abi-allowlist holds one `<library>.so.txt` per shared library, the demangled names it
 exports (tools/ci/check_abi_symbols.py). Stage S2 renames every library (`libac3iab.so` becomes
@@ -128,11 +128,11 @@ def main() -> None:
     ap.add_argument("new", type=Path)
     ap.add_argument("--map", choices=["l2", "identity", "c1", "c2", "c3"], default="l2")
     ap.add_argument(
-        "--rewrite", default="", help="comma-separated: cuts, names, idents, ac3ns, c2, c3, c4"
+        "--rewrite", default="", help="comma-separated: cuts, names, idents, ac3ns, c2, c3, c4, c5"
     )
     a = ap.parse_args()
     kinds = {k for k in a.rewrite.split(",") if k}
-    unknown = kinds - {"cuts", "names", "idents", "ac3ns", "c2", "c3", "c4"}
+    unknown = kinds - {"cuts", "names", "idents", "ac3ns", "c2", "c3", "c4", "c5"}
     if unknown:
         sys.exit(f"abi_compare: unknown --rewrite {sorted(unknown)}")
     mapping = (
