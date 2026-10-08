@@ -8,7 +8,7 @@
 
 #include "iclforge/sendspin/base64url.hpp"
 #include "iclforge/sendspin/handshake.hpp"
-#include "sendspin/sendspin_test_support.hpp"
+#include "sendspin_test_support.hpp"
 
 // The handshake phase's messages. These parse bytes from a peer nobody has
 // authenticated yet, so most cases are refusals, and the order in which a server

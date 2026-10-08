@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "iclforge/sendspin/crypto.hpp"
-#include "sendspin/sendspin_test_support.hpp"
+#include "sendspin_test_support.hpp"
 
 // The crypto seam over mbedTLS's PSA Crypto API, and the HMAC built on its
 // hashes. Expected values are the published ones (FIPS 180-4's "abc", RFC 4231,

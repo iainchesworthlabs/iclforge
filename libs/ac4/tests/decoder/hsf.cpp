@@ -9,7 +9,7 @@
 #include <span>
 #include <stdexcept>
 
-#include "ac4/core/toc_writer.hpp"
+#include "core/toc_writer.hpp"
 #include "bits.hpp"
 #include "printed_matrices.hpp"
 #include "tiered/kbd.hpp"

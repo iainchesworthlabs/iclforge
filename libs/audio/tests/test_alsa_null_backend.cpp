@@ -22,7 +22,7 @@
 #include "iclforge/audio/spatial.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/render/layout.hpp"
-#include "audio/alsa_null_device.hpp"
+#include "alsa_null_device.hpp"
 
 // The ALSA backend's capture, monitor and passthrough classes against software
 // ALSA devices (audio/alsa_null_device.hpp), so what they do once a device

@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "iclforge/sendspin/pairing.hpp"
-#include "sendspin/sendspin_test_support.hpp"
+#include "sendspin_test_support.hpp"
 
 // Sendspin's pairing values. The two token vectors are pairing.md's own; the
 // derived values were computed with Python from pairing.md's formulas and from

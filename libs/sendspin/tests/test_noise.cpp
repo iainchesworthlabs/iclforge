@@ -13,7 +13,7 @@
 #include "iclforge/sendspin/crypto.hpp"
 #include "iclforge/sendspin/handshake.hpp"
 #include "iclforge/sendspin/noise.hpp"
-#include "sendspin/sendspin_test_support.hpp"
+#include "sendspin_test_support.hpp"
 
 // Noise KKpsk2 for both Sendspin suites. The first two cases are the cacophony
 // test vectors for Noise_KKpsk2_25519_ChaChaPoly_SHA256 and

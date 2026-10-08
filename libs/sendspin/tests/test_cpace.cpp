@@ -10,7 +10,7 @@
 
 #include "iclforge/sendspin/cpace.hpp"
 #include "iclforge/sendspin/crypto.hpp"
-#include "sendspin/sendspin_test_support.hpp"
+#include "sendspin_test_support.hpp"
 
 // CPACE-X25519-SHA512 against draft-irtf-cfrg-cpace-21's own test vectors
 // (Appendix B.1, "Test vector for CPace using group X25519 and hash SHA-512"), the

@@ -19,7 +19,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "iclforge/ac4/core/toc.hpp"
-#include "ac4/core/toc_writer.hpp"
+#include "core/toc_writer.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "core/tables/huffman_codes.hpp"
 

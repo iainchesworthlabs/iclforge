@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include "ac4/decoder/bits.hpp"
+#include "decoder/bits.hpp"
 
 namespace ac4_toc_test {
 

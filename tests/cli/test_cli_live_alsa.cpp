@@ -24,7 +24,7 @@
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
-#include "audio/alsa_null_device.hpp"
+#include "alsa_null_device.hpp"
 
 // The device-facing forge commands against software ALSA devices
 // (audio/alsa_null_device.hpp), run as the real binary with its own
