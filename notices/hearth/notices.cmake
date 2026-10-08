@@ -156,11 +156,11 @@ list(APPEND ICLFORGE_HEARTH_NOTICE_TOKENS
 # marker no fragment mentions, so passing all five here unconditionally is safe
 # regardless of platform, Qt-bundling or ICLFORGE_ENABLE_TRACY.
 list(APPEND ICLFORGE_HEARTH_NOTICE_FILES
-    "LGPL3=${CMAKE_SOURCE_DIR}/apps/crucible/notices/licences/LGPL-3.0.txt"
-    "FMT_MIT=${CMAKE_SOURCE_DIR}/apps/crucible/notices/licences/MIT-fmt.txt"
-    "OFL=${CMAKE_SOURCE_DIR}/apps/gui/fonts/OFL.txt"
-    "MATERIAL_SYMBOLS_LICENSE=${CMAKE_SOURCE_DIR}/apps/gui/fonts/MaterialSymbolsSharp-Apache-2.0.txt"
-    "TRACY_BSD=${CMAKE_SOURCE_DIR}/apps/crucible/notices/licences/BSD-3-Clause-Tracy.txt")
+    "LGPL3=${CMAKE_SOURCE_DIR}/notices/licences/LGPL-3.0.txt"
+    "FMT_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-fmt.txt"
+    "OFL=${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/OFL.txt"
+    "MATERIAL_SYMBOLS_LICENSE=${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/MaterialSymbolsSharp-Apache-2.0.txt"
+    "TRACY_BSD=${CMAKE_SOURCE_DIR}/notices/licences/BSD-3-Clause-Tracy.txt")
 
 if(NOT ICLFORGE_HEARTH_NOTICES_FILE)
     message(FATAL_ERROR

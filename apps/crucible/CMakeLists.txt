@@ -19,18 +19,18 @@
 # option.
 
 add_library(crucible_engine STATIC
-    engine/slots.cpp
-    engine/bed_mixer.cpp
-    engine/placement.cpp
-    engine/output_policy.cpp
-    engine/tap_pool.cpp
-    engine/output_stage.cpp
-    engine/signing_hook.cpp
-    engine/library_devices.cpp
-    engine/diagnostics.cpp
-    engine/engine.cpp)
+    engine/src/slots.cpp
+    engine/src/bed_mixer.cpp
+    engine/src/placement.cpp
+    engine/src/output_policy.cpp
+    engine/src/tap_pool.cpp
+    engine/src/output_stage.cpp
+    engine/src/signing_hook.cpp
+    engine/src/library_devices.cpp
+    engine/src/diagnostics.cpp
+    engine/src/engine.cpp)
 add_library(iclforge::crucible_engine ALIAS crucible_engine)
-target_include_directories(crucible_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/engine")
+target_include_directories(crucible_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/engine/src")
 target_compile_features(crucible_engine PUBLIC cxx_std_23)
 # iclforge::coverage is inert unless ICLFORGE_ENABLE_COVERAGE is on
 # (config-windows-llvm-coverage); then this library, the window and its
@@ -56,16 +56,16 @@ target_link_libraries(crucible_engine
 # repeats at its head.
 if(WIN32)
     target_sources(crucible_engine PRIVATE
-        engine/platform/windows/session_monitor.cpp
-        engine/platform/windows/default_device.cpp
-        engine/platform/windows/driver_tools.cpp
-        engine/platform/windows/driver_tools.hpp
-        engine/platform/windows/foreground.cpp)
+        engine/src/platform/windows/session_monitor.cpp
+        engine/src/platform/windows/default_device.cpp
+        engine/src/platform/windows/driver_tools.cpp
+        engine/src/platform/windows/driver_tools.hpp
+        engine/src/platform/windows/foreground.cpp)
     target_compile_definitions(crucible_engine PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
     # COM for the session manager and policy config, the shell for the
     # full-screen query and the Settings fallback.
     target_link_libraries(crucible_engine PRIVATE ole32 shell32 user32 version)
-    # This platform's notices directory (notices/notices.cmake).
+    # This platform's notices directory (../../notices/crucible/notices.cmake).
     set(ICLFORGE_CRUCIBLE_PLATFORM_DIR windows)
 elseif(UNIX AND NOT APPLE)
     # Crucible needs a per-application tap, and on Linux only the PipeWire
@@ -88,10 +88,10 @@ elseif(UNIX AND NOT APPLE)
             "is not yet - see docs/crucible/design/promotion.md, \"ALSA or PipeWire\".")
     endif()
     target_sources(crucible_engine PRIVATE
-        engine/platform/linux/session_monitor.cpp
-        engine/platform/linux/default_device.cpp
-        engine/platform/linux/foreground.cpp
-        engine/platform/linux/virtual_device.cpp)
+        engine/src/platform/linux/session_monitor.cpp
+        engine/src/platform/linux/default_device.cpp
+        engine/src/platform/linux/foreground.cpp
+        engine/src/platform/linux/virtual_device.cpp)
     # The library's own PipeWire helpers (for_each_audio_node, the node
     # property readers) are reused rather than reimplemented, so this needs
     # both that private header's directory and libpipewire itself.
@@ -118,13 +118,13 @@ elseif(UNIX AND NOT APPLE)
     else()
         pkg_check_modules(ICLFORGE_CRUCIBLE_XCB QUIET IMPORTED_TARGET xcb)
     endif()
-    target_sources(crucible_engine PRIVATE engine/platform/linux/x11_foreground.cpp)
+    target_sources(crucible_engine PRIVATE engine/src/platform/linux/x11_foreground.cpp)
     if(ICLFORGE_CRUCIBLE_XCB_FOUND)
-        target_sources(crucible_engine PRIVATE engine/platform/linux/xcb_window_reader.cpp)
+        target_sources(crucible_engine PRIVATE engine/src/platform/linux/xcb_window_reader.cpp)
         target_link_libraries(crucible_engine PRIVATE PkgConfig::ICLFORGE_CRUCIBLE_XCB)
         set(ICLFORGE_CRUCIBLE_X11_BACKEND xcb PARENT_SCOPE)
     else()
-        target_sources(crucible_engine PRIVATE engine/platform/linux/no_xcb_window_reader.cpp)
+        target_sources(crucible_engine PRIVATE engine/src/platform/linux/no_xcb_window_reader.cpp)
         set(ICLFORGE_CRUCIBLE_X11_BACKEND none PARENT_SCOPE)
         if(ICLFORGE_CRUCIBLE_X11 STREQUAL "AUTO")
             message(STATUS "libxcb not found: Crucible's X11 full-screen check is left out "
@@ -132,7 +132,7 @@ elseif(UNIX AND NOT APPLE)
                            "-DICLFORGE_CRUCIBLE_X11=OFF silences this)")
         endif()
     endif()
-    # This platform's notices directory (notices/notices.cmake).
+    # This platform's notices directory (../../notices/crucible/notices.cmake).
     set(ICLFORGE_CRUCIBLE_PLATFORM_DIR linux)
 elseif(APPLE)
     # macOS (Crucible cross-platform promotion, docs/crucible/design/promotion.md's Phase 5). The four
@@ -143,7 +143,7 @@ elseif(APPLE)
     # has been run, and each says so.
     #
     # AudioDevices is deliberately NOT in this list. That seam is the one
-    # platform service that is not per-platform: engine/library_devices.cpp
+    # platform service that is not per-platform: engine/src/library_devices.cpp
     # forwards it to iclforge::audio, whose macOS backend
     # (libs/audio/src/backend/macos/) already answers for render devices, sinks
     # and the tap - so a macos/audio_devices.cpp would be a second definition
@@ -161,7 +161,7 @@ elseif(APPLE)
     # NSAudioCaptureUsageDescription Info.plist key this target declares
     # nowhere (apps/gui/Info.plist.in is the precedent for supplying one), and
     # the tap's own mono/stereo and sample-rate refusals.
-    # engine/platform/macos/session_monitor.cpp's header lists them;
+    # engine/src/platform/macos/session_monitor.cpp's header lists them;
     # docs/platforms/macos.md, "Per-application capture: the Core Audio
     # process tap", carries the mechanism and the stack.
     #
@@ -188,12 +188,12 @@ elseif(APPLE)
     endif()
     enable_language(OBJCXX)
     target_sources(crucible_engine PRIVATE
-        engine/platform/macos/session_monitor.cpp
-        engine/platform/macos/default_device.cpp
-        engine/platform/macos/virtual_device.cpp
-        engine/platform/macos/foreground.mm
-        engine/platform/macos/bundle_facts.hpp
-        engine/platform/macos/process_facts.hpp)
+        engine/src/platform/macos/session_monitor.cpp
+        engine/src/platform/macos/default_device.cpp
+        engine/src/platform/macos/virtual_device.cpp
+        engine/src/platform/macos/foreground.mm
+        engine/src/platform/macos/bundle_facts.hpp
+        engine/src/platform/macos/process_facts.hpp)
     # target_compile_features(... cxx_std_23) at the top of this file speaks
     # for CXX only; the .mm sources need the same standard said again for
     # their own language, because platform_services.hpp reaches them through
@@ -222,7 +222,7 @@ elseif(APPLE)
     # NOMINMAX, which is why it lives here rather than as a #define at the top
     # of a .mm.
     #
-    # The engine's own headers use none of those three names today, so today's
+    # The engine/src's own headers use none of those three names today, so today's
     # include order in foreground.mm may well survive without this; the point
     # is that nothing here can be run to find out, and the next include added
     # after that #import would be the one to break it.
@@ -241,10 +241,10 @@ elseif(APPLE)
     # session is one of the two reasons the Foreground publishes.
     target_link_libraries(crucible_engine PRIVATE
         "-framework CoreAudio" "-framework CoreFoundation" "-framework AppKit")
-    # This platform's notices directory (notices/notices.cmake).
+    # This platform's notices directory (../../notices/crucible/notices.cmake).
     set(ICLFORGE_CRUCIBLE_PLATFORM_DIR macos)
 endif()
-# The profiling header pair, on every platform: the engine loop and the
+# The profiling header pair, on every platform: the engine/src loop and the
 # controller carry Tracy zones whichever platform half is compiled in. This
 # sat inside the Windows arm when there was only one arm, and lived inside
 # the Linux arm for a while after the second was added - which is how a
@@ -253,7 +253,7 @@ target_include_directories(crucible_engine PUBLIC
     "$<IF:$<BOOL:${ICLFORGE_ENABLE_TRACY}>,${CMAKE_SOURCE_DIR}/libs/base/variants/profiling-tracy_enabled,${CMAKE_SOURCE_DIR}/libs/base/variants/profiling-tracy_disabled>")
 
 # The console runner: Phase 2's exit criterion, and the thing the UI replaces.
-add_executable(crucible-run runner/main.cpp)
+add_executable(crucible-run runner/src/main.cpp)
 target_link_libraries(crucible-run PRIVATE iclforge::crucible_engine iclforge::warnings)
 target_compile_definitions(crucible-run PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 set_target_properties(crucible-run PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
@@ -262,13 +262,13 @@ set_target_properties(crucible-run PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_
 # The window: crucible, Qt Quick, module Crucible (Phase 3).
 #
 # Qt is a prebuilt kit found the way apps/gui finds it (cmake/FindQt6.cmake).
-# It is optional here so that a build with the engine and runner but no Qt
+# It is optional here so that a build with the engine/src and runner but no Qt
 # kit still configures: the UI is simply skipped, with a warning.
 #
 # Theme, Card, RailBlock and SegmentedControl are the GUI's own files, not
 # copies: cmake/SharedFamilyQml.cmake reads each at configure time, rewrites
 # its `import ForgeGui` to this module's URI, and writes the result to an
-# ignored directory under ui/qml/. Edit apps/gui/qml/*.qml and both apps
+# ignored directory under ui/assets/qml Edit apps/gui/qml/*.qml and both apps
 # follow. The Theme needs the GUI's SystemTheme singleton (the desktop accent
 # colour), so that C++ is compiled into this target too, where QML_ELEMENT
 # registers it in this module.
@@ -283,13 +283,13 @@ set_target_properties(crucible-run PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_
 find_package(Qt6 6.8 QUIET COMPONENTS Core Gui Widgets Qml Quick QuickControls2 LinguistTools)
 if(NOT Qt6_FOUND)
     message(WARNING "Qt6 not found: the Crucible's window (crucible) is skipped; "
-                    "the engine and the crucible-run runner still build.")
+                    "the engine/src and the crucible-run runner still build.")
     # The runner still installs, with the notices for what it alone carries.
-    include("${CMAKE_CURRENT_SOURCE_DIR}/notices/notices.cmake")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/../../notices/crucible/notices.cmake")
 else()
     qt_standard_project_setup(REQUIRES 6.8)
 
-    # Qt Quick 3D is optional: the room's 3D picture (ui/qml/Room3DView.qml)
+    # Qt Quick 3D is optional: the room's 3D picture (ui/assets/qml/Room3DView.qml)
     # is built when the kit has it and the page hides its toggle when not.
     # The value reaches the controller as a compile-time constant, not a
     # conditional: CrucibleController::has3D() returns ICLFORGE_CRUCIBLE_QUICK3D.
@@ -297,7 +297,7 @@ else()
     if(Qt6Quick3D_FOUND)
         set(ICLFORGE_CRUCIBLE_QUICK3D 1)
         set(ICLFORGE_CRUCIBLE_QUICK3D_LIB Qt6::Quick3D)
-        set(ICLFORGE_CRUCIBLE_QUICK3D_QML "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/Room3DView.qml")
+        set(ICLFORGE_CRUCIBLE_QUICK3D_QML "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/Room3DView.qml")
     else()
         set(ICLFORGE_CRUCIBLE_QUICK3D 0)
         set(ICLFORGE_CRUCIBLE_QUICK3D_LIB)
@@ -308,12 +308,12 @@ else()
     # This build's third-party notices, assembled now that the two facts that
     # change them are known (the kit, and whether it has Quick 3D): installed
     # with the package below and embedded as :/notices/NOTICES.txt for
-    # About > Licences (notices/notices.cmake).
-    include("${CMAKE_CURRENT_SOURCE_DIR}/notices/notices.cmake")
+    # About > Licences (../../notices/crucible/notices.cmake).
+    include("${CMAKE_CURRENT_SOURCE_DIR}/../../notices/crucible/notices.cmake")
     # Qt SVG is optional the same way: linked when the kit has it, so that
     # an application whose icon-theme entry is SVG only (org.gnome.*, most
     # Flatpaks) resolves in the Linux icon provider, windeployqt copies the
-    # svg image format and icon engine on Windows, and the .deb's shlibdeps
+    # svg image format and icon engine/src on Windows, and the .deb's shlibdeps
     # names libqt6svg6. Without it those applications show the monogram,
     # and the configure log says so.
     find_package(Qt6 6.8 QUIET COMPONENTS Svg)
@@ -324,7 +324,7 @@ else()
         message(STATUS "Qt SVG not found: SVG-only application icons show the monogram")
     endif()
 
-    # Generated INTO the source tree (ignored by git, see ui/qml/shared/.gitignore)
+    # Generated INTO the source tree (ignored by git, see ui/assets/qml/shared/.gitignore)
     # rather than the build tree: the QML ahead-of-time compiler names its
     # cache files after the path relative to the source directory, and a
     # build-tree path produced an unusable name with a drive letter in the
@@ -336,24 +336,24 @@ else()
     iclforge_stage_shared_qml(Crucible "${ICLFORGE_CRUCIBLE_SHARED_DIR}" ICLFORGE_CRUCIBLE_SHARED_OUT)
 
     set(ICLFORGE_CRUCIBLE_QML_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/Main.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/RoomPage.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/RoomView.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/RoomKeys.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/RoomWords.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/A11y.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/AppRow.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/BedChip.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/Monogram.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/AboutDialog.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/FirstRunDialog.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/LicencesDialog.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/AppIcon.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/CrucibleButton.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/CrucibleCheck.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/OutputPage.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/SignalPath.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/SettingsPage.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/Main.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/RoomPage.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/RoomView.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/RoomKeys.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/RoomWords.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/A11y.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/AppRow.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/BedChip.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/Monogram.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/AboutDialog.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/FirstRunDialog.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/LicencesDialog.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/AppIcon.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/CrucibleButton.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/CrucibleCheck.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/OutputPage.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/SignalPath.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/SettingsPage.qml"
         ${ICLFORGE_CRUCIBLE_QUICK3D_QML}
         ${ICLFORGE_CRUCIBLE_SHARED_OUT})
     foreach(qml_file IN LISTS ICLFORGE_CRUCIBLE_QML_FILES)
@@ -366,35 +366,35 @@ else()
     # theme is: every view that says where something is, and everything that
     # wants a sentence read out, reaches the same object.
     set_source_files_properties(
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/RoomWords.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/A11y.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/RoomWords.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/A11y.qml"
         PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
-    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/tray.svg"
+    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/tray.svg"
         PROPERTIES QT_RESOURCE_ALIAS "tray.svg")
 
     qt_add_executable(crucible
-        ui/main.cpp
-        ui/crucible_controller.cpp
-        ui/crucible_controller.hpp
-        ../gui/system_theme.cpp
-        ../gui/system_theme.hpp
-        ../gui/language_manager.cpp
-        ../gui/language_manager.hpp
-        ../gui/settings_migration.cpp
-        ../gui/settings_migration.hpp
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/app_icon_provider.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/tray_support.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/app_entry.hpp"
+        ui/src/main.cpp
+        ui/src/crucible_controller.cpp
+        ui/src/crucible_controller.hpp
+        ../shared/theme/src/system_theme.cpp
+        ../shared/theme/src/system_theme.hpp
+        ../shared/preferences/src/language_manager.cpp
+        ../shared/preferences/src/language_manager.hpp
+        ../shared/preferences/src/settings_migration.cpp
+        ../shared/preferences/src/settings_migration.hpp
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/src/app_icon_provider.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/src/tray_support.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/src/app_entry.hpp"
     )
     # The application-icon provider and the tray answer are the two parts of
     # the window that talk to the operating system directly, so they are a
     # platform directory like engine/platform/: Windows asks the shell for an
     # executable's icon; Linux resolves the icon theme and the .desktop entries
-    # (see ui/platform/linux/app_icon_provider.cpp for the four rungs), and the
-    # Qt-free reader for those entries (ui/desktop_entries.cpp) is compiled
+    # (see ui/src/platform/linux/app_icon_provider.cpp for the four rungs), and the
+    # Qt-free reader for those entries (ui/src/desktop_entries.cpp) is compiled
     # here beside it and into iclforge-tests on every platform; macOS asks
     # NSWorkspace for a bundle's icon, which needs Objective-C++ and so needs
-    # the OBJCXX language the engine's APPLE arm above turned on.
+    # the OBJCXX language the engine/src's APPLE arm above turned on.
     #
     # EVERY file added under ui/platform/ here has to be added to
     # ui/tests/CMakeLists.txt as well: that target compiles the same
@@ -402,21 +402,21 @@ else()
     # and nothing sooner. That is the mistake this pair of blocks exists to
     # stop being made again.
     if(WIN32)
-        target_sources(crucible PRIVATE ui/platform/windows/app_icon_provider.cpp
-                                           ui/platform/windows/tray_support.cpp)
+        target_sources(crucible PRIVATE ui/src/platform/windows/app_icon_provider.cpp
+                                           ui/src/platform/windows/tray_support.cpp)
     elseif(LINUX)
-        target_sources(crucible PRIVATE ui/platform/linux/app_icon_provider.cpp
-                                           ui/platform/linux/tray_support.cpp)
-        target_sources(crucible PRIVATE ui/desktop_entries.cpp ui/desktop_entries.hpp)
+        target_sources(crucible PRIVATE ui/src/platform/linux/app_icon_provider.cpp
+                                           ui/src/platform/linux/tray_support.cpp)
+        target_sources(crucible PRIVATE ui/src/desktop_entries.cpp ui/src/desktop_entries.hpp)
     elseif(APPLE)
-        target_sources(crucible PRIVATE ui/platform/macos/app_icon_provider.mm
-                                           ui/platform/macos/tray_support.cpp)
+        target_sources(crucible PRIVATE ui/src/platform/macos/app_icon_provider.mm
+                                           ui/src/platform/macos/tray_support.cpp)
         set_target_properties(crucible PROPERTIES
             OBJCXX_STANDARD 23
             OBJCXX_STANDARD_REQUIRED ON
             OBJCXX_EXTENSIONS OFF)
         # AppKit's check()/verify()/require() macros against Qt's own
-        # verify(pos, n) - see the engine's APPLE arm above for the whole
+        # verify(pos, n) - see the engine/src's APPLE arm above for the whole
         # reasoning. This target is where it matters most: app_icon_provider.mm
         # reads a dozen Qt headers after its #import.
         target_compile_definitions(crucible
@@ -427,7 +427,7 @@ else()
         URI Crucible
         VERSION 1.0
         QML_FILES ${ICLFORGE_CRUCIBLE_QML_FILES}
-        RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/tray.svg")
+        RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/tray.svg")
     # ui/ for the generated type registrations to find crucible_controller.hpp,
     # ../gui for system_theme.hpp.
     target_include_directories(crucible PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ui" "${CMAKE_CURRENT_SOURCE_DIR}/../gui")
@@ -435,7 +435,7 @@ else()
     # Settings screen's install/remove buttons look when no driver/ folder
     # sits beside the executable (a build-tree run).
     target_compile_definitions(crucible PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX
-        ICLFORGE_CRUCIBLE_DRIVER_SOURCE_DIR="${CMAKE_SOURCE_DIR}/apps/windows/driver"
+        ICLFORGE_CRUCIBLE_DRIVER_SOURCE_DIR="${CMAKE_SOURCE_DIR}/apps/crucible/windows/driver"
         ICLFORGE_CRUCIBLE_QUICK3D=${ICLFORGE_CRUCIBLE_QUICK3D})
     # iclforge::warnings is deliberately not linked: Qt's generated sources would
     # be compiled under it (apps/gui carries a workaround for exactly that).
@@ -448,10 +448,10 @@ else()
     endif()
     qt_add_resources(crucible "crucible_icons"
         PREFIX "/icons"
-        BASE "${CMAKE_SOURCE_DIR}/apps/gui/icons"
+        BASE "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons"
         FILES
-            "${CMAKE_SOURCE_DIR}/apps/gui/icons/iclforge-32.png"
-            "${CMAKE_SOURCE_DIR}/apps/gui/icons/iclforge-256.png")
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge-32.png"
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge-256.png")
     # The GUI app's faces, so this window renders as designed on a machine
     # that never installed Archivo, and so Arabic, Hebrew and Yiddish have
     # glyphs (the shared LanguageManager selects the Noto faces by name).
@@ -459,17 +459,17 @@ else()
     # package's NOTICES.txt, which About > Licences shows.
     qt_add_resources(crucible "crucible_fonts"
         PREFIX "/fonts"
-        BASE "${CMAKE_SOURCE_DIR}/apps/gui/fonts"
+        BASE "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts"
         FILES
-            "${CMAKE_SOURCE_DIR}/apps/gui/fonts/Archivo-Regular.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/gui/fonts/Archivo-Medium.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/gui/fonts/Archivo-SemiBold.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/gui/fonts/Archivo-ExtraBold.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/gui/fonts/NotoSansArabic.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/gui/fonts/NotoSansHebrew.ttf")
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-Regular.ttf"
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-Medium.ttf"
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-SemiBold.ttf"
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-ExtraBold.ttf"
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/NotoSansArabic.ttf"
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/NotoSansHebrew.ttf")
     # The same NOTICES.txt the package installs, so the Licences dialog shows
     # exactly what this build ships. The file exists at configure time
-    # (notices/notices.cmake wrote it), like the rewritten shared QML above,
+    # (../../notices/crucible/notices.cmake wrote it), like the rewritten shared QML above,
     # so no GENERATED plumbing is needed.
     qt_add_resources(crucible "crucible_notices"
         PREFIX "/notices"
@@ -484,13 +484,13 @@ else()
     # freedesktop menu finds it.
     if(WIN32)
         enable_language(RC)
-        set(ICLFORGE_GUI_ICON_ICO "${CMAKE_SOURCE_DIR}/apps/gui/icons/iclforge.ico")
+        set(ICLFORGE_GUI_ICON_ICO "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge.ico")
         file(TO_CMAKE_PATH "${ICLFORGE_GUI_ICON_ICO}" ICLFORGE_GUI_ICON_ICO)
-        configure_file("${CMAKE_SOURCE_DIR}/apps/gui/icons/forge-gui.rc.in" "${CMAKE_CURRENT_BINARY_DIR}/crucible.rc" @ONLY)
+        configure_file("${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/forge-gui.rc.in" "${CMAKE_CURRENT_BINARY_DIR}/crucible.rc" @ONLY)
         target_sources(crucible PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/crucible.rc")
         set_target_properties(crucible PROPERTIES WIN32_EXECUTABLE ON)
     elseif(APPLE)
-        set(ICLFORGE_CRUCIBLE_ICON_ICNS "${CMAKE_SOURCE_DIR}/apps/gui/icons/iclforge.icns")
+        set(ICLFORGE_CRUCIBLE_ICON_ICNS "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge.icns")
         set_source_files_properties("${ICLFORGE_CRUCIBLE_ICON_ICNS}" PROPERTIES
             MACOSX_PACKAGE_LOCATION Resources)
         target_sources(crucible PRIVATE "${ICLFORGE_CRUCIBLE_ICON_ICNS}")
@@ -518,12 +518,12 @@ else()
     # docs/crucible/localisation.md, which is a different and smaller claim
     # than being right, and the window's own language note says so.
     set(ICLFORGE_CRUCIBLE_TS_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/translations/crucible_fr.ts"
-        "${CMAKE_CURRENT_SOURCE_DIR}/translations/crucible_de.ts"
-        "${CMAKE_CURRENT_SOURCE_DIR}/translations/crucible_es.ts"
-        "${CMAKE_CURRENT_SOURCE_DIR}/translations/crucible_ar.ts"
-        "${CMAKE_CURRENT_SOURCE_DIR}/translations/crucible_he.ts"
-        "${CMAKE_CURRENT_SOURCE_DIR}/translations/crucible_yi.ts")
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/translations/crucible_fr.ts"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/translations/crucible_de.ts"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/translations/crucible_es.ts"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/translations/crucible_ar.ts"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/translations/crucible_he.ts"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/translations/crucible_yi.ts")
     qt_add_translations(crucible
         IMMEDIATE_CALL
         SOURCE_TARGETS crucible
@@ -542,7 +542,7 @@ else()
         if(ICLFORGE_CRUCIBLE_WINDEPLOYQT)
             add_custom_command(TARGET crucible POST_BUILD
                 COMMAND "${ICLFORGE_CRUCIBLE_WINDEPLOYQT}"
-                    --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml"
+                    --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml"
                     --qmldir "${ICLFORGE_CRUCIBLE_SHARED_DIR}"
                     --compiler-runtime
                     "$<TARGET_FILE:crucible>"
@@ -641,9 +641,9 @@ include(GNUInstallDirs)
 install(TARGETS crucible-run RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT crucible)
 if(WIN32)
     install(FILES
-            "${CMAKE_SOURCE_DIR}/apps/windows/driver/install.ps1"
-            "${CMAKE_SOURCE_DIR}/apps/windows/driver/remove.ps1"
-            "${CMAKE_SOURCE_DIR}/apps/windows/driver/NullSinkDevice.ps1"
+            "${CMAKE_SOURCE_DIR}/apps/crucible/windows/driver/install.ps1"
+            "${CMAKE_SOURCE_DIR}/apps/crucible/windows/driver/remove.ps1"
+            "${CMAKE_SOURCE_DIR}/apps/crucible/windows/driver/NullSinkDevice.ps1"
         DESTINATION "${CMAKE_INSTALL_BINDIR}/driver" COMPONENT crucible)
     # The notices and the licence at the archive root, beside bin/ - the
     # layout tools/ci/check_crucible_package.py asserts and reads.
@@ -651,7 +651,7 @@ if(WIN32)
     install(FILES "${CMAKE_SOURCE_DIR}/LICENSE" DESTINATION "." RENAME "LICENSE.txt" COMPONENT crucible)
 elseif(APPLE)
     # The notices and the licence at the archive root, beside crucible.app -
-    # notices/platform/macos/components.cmake's own ICLFORGE_CRUCIBLE_NOTICES_LOCATION
+    # ../../notices/crucible/platform/macos/components.cmake's own ICLFORGE_CRUCIBLE_NOTICES_LOCATION
     # string already promised this layout, and it is the same place
     # apps/notices/notices.cmake puts the runtime component's own pair beside
     # forge-gui.app. Harmless in the one place these two pairs share a
@@ -675,10 +675,10 @@ elseif(LINUX)
         DESTINATION "${CMAKE_INSTALL_DATADIR}/applications" COMPONENT crucible)
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/crucible.metainfo.xml"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo" COMPONENT crucible)
-    install(FILES "${CMAKE_SOURCE_DIR}/apps/gui/icons/iclforge-256.png"
+    install(FILES "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge-256.png"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"
         RENAME "crucible.png" COMPONENT crucible)
-    install(FILES "${CMAKE_SOURCE_DIR}/apps/gui/icons/iclforge-32.png"
+    install(FILES "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge-32.png"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/32x32/apps"
         RENAME "crucible.png" COMPONENT crucible)
     # The notices and the licence under share/doc/<package>/, where a .deb

@@ -1,30 +1,30 @@
 # ---------------------------------------------------------------------------
 # forge - the command-line front end over iclforge::ac3.
 # ---------------------------------------------------------------------------
-add_executable(forge main.cpp support.cpp usage.cpp json.cpp multi_source.cpp ../common/fmp4_folder_writer.cpp ../common/recording_sink.cpp ../common/container_input.cpp ../common/stream_playback.cpp ../common/ac4_object_render.cpp ../common/ac4_encode_core.cpp ../common/ac4_objects_core.cpp commands/containers.cpp commands/audio_io.cpp commands/live_audio.cpp commands/synth.cpp commands/atmos.cpp commands/encode.cpp commands/ac4_encode.cpp commands/ac4_encode_objects.cpp commands/decode.cpp commands/analysis.cpp commands/probe.cpp commands/stream_tools.cpp)
+add_executable(forge src/main.cpp src/support.cpp src/usage.cpp src/json.cpp src/multi_source.cpp ../../shared/media/src/fmp4_folder_writer.cpp ../../shared/media/src/recording_sink.cpp ../../shared/media/src/container_input.cpp ../../shared/media/src/stream_playback.cpp ../../shared/media/src/ac4_object_render.cpp ../../shared/media/src/ac4_encode_core.cpp ../../shared/media/src/ac4_objects_core.cpp src/commands/containers.cpp src/commands/audio_io.cpp src/commands/live_audio.cpp src/commands/synth.cpp src/commands/atmos.cpp src/commands/encode.cpp src/commands/ac4_encode.cpp src/commands/ac4_encode_objects.cpp src/commands/decode.cpp src/commands/analysis.cpp src/commands/probe.cpp src/commands/stream_tools.cpp)
 
-# ../common/recording_sink.cpp + fmp4_folder_writer.cpp: the take writer
+# ../../shared/media/src/recording_sink.cpp + fmp4_folder_writer.cpp: the take writer
 # 'record' and 'live' stream their output through (wide-layout record/live paths), shared
 # verbatim with the GUI rather than reimplemented - see
 # apps/common/recording_sink.hpp's own comment for why they sit there and not
 # in either app. Compiled straight in; apps/common has no library target,
 # matching how tests/CMakeLists.txt already compiles the same files into
-# iclforge-tests. ../common/container_input.cpp (container readers (mkv/mp4/ts)) is the same shape,
+# iclforge-tests. ../../shared/media/src/container_input.cpp (container readers (mkv/mp4/ts)) is the same shape,
 # for turning a container file into an elementary stream instead, and so is
-# ../common/stream_playback.cpp, the decoder choice and end-of-stream flush
-# 'monitor' and 'spatial' play a stream with, ../common/ac4_encode_core.cpp,
+# ../../shared/media/src/stream_playback.cpp, the decoder choice and end-of-stream flush
+# 'monitor' and 'spatial' play a stream with, ../../shared/media/src/ac4_encode_core.cpp,
 # the steps of 'ac4-encode' forge-gui's AC-4 encode takes too, and
-# ../common/ac4_objects_core.cpp, the object slots and the AC-4 objects' steps
+# ../../shared/media/src/ac4_objects_core.cpp, the object slots and the AC-4 objects' steps
 # 'atmos-encode', 'atmos-adm' and 'atmos-iab' take, which forge-gui's AC-4 objects take too.
-target_include_directories(forge PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../common")
+target_include_directories(forge PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/media/src")
 
 # forge's platform-specific code, two seams' worth: putting stdin/stdout into
 # binary mode for the "-" stdin/stdout file-argument convention (see
-# platform/stdio_binary.hpp for why Windows needs a call there and POSIX
+# src/platform/stdio_binary.hpp for why Windows needs a call there and POSIX
 # does not), and putting the console on UTF-8 so the section signs in this
-# CLI's specification citations render (platform/console_encoding.hpp for what
+# CLI's specification citations render (src/platform/console_encoding.hpp for what
 # was going wrong and why a redirect is untouched by the fix). Selected here
-# rather than behind an #ifdef in main.cpp, the same platform-tree pattern
+# rather than behind an #ifdef in src/main.cpp, the same platform-tree pattern
 # iclforge::audio uses for WASAPI/ALSA (libs/audio/CMakeLists.txt) -
 # tools/checks/check_platform_macros.ps1 enforces there being no third option.
 #
@@ -35,55 +35,55 @@ target_include_directories(forge PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../common"
 # names. PRIVATE and inside the WIN32 arm, so no other configuration sees a
 # definition that means nothing to it.
 if(WIN32)
-    target_sources(forge PRIVATE platform/windows/stdio_binary.cpp
-                                  platform/windows/console_encoding.cpp)
+    target_sources(forge PRIVATE src/platform/windows/stdio_binary.cpp
+                                  src/platform/windows/console_encoding.cpp)
     target_compile_definitions(forge PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 else()
-    target_sources(forge PRIVATE platform/posix/stdio_binary.cpp
-                                  platform/posix/console_encoding.cpp)
+    target_sources(forge PRIVATE src/platform/posix/stdio_binary.cpp
+                                  src/platform/posix/console_encoding.cpp)
 endif()
 
-# ../common/probe_json.cpp: probe's JSON stream summary and its vocabulary,
+# ../../shared/media/src/probe_json.cpp: probe's JSON stream summary and its vocabulary,
 # which Hearth's media information writes too (apps/hearth/engine), compiled
 # in the same way as the apps/common files above.
-target_sources(forge PRIVATE ../common/probe_json.cpp)
+target_sources(forge PRIVATE ../../shared/media/src/probe_json.cpp)
 
-# main.cpp's 'atmos-adm' command (ADM BWF reader phase 3) needs iclforge::adm - this
+# src/main.cpp's 'atmos-adm' command (ADM BWF reader phase 3) needs iclforge::adm - this
 # project's one optional, non-default library dependency (ICLFORGE_BUILD_ADM, default OFF - see
 # the root CMakeLists.txt's own option() for why: libadm's Boost dependency). Unlike
 # iclforge::containers below (default ON, and a FATAL_ERROR guard in the
 # root CMakeLists.txt refuses to build this target at all without them), forge builds and works
 # perfectly well with this flag off - it just lacks the one command, refused with a clear reason at
-# dispatch time (main.cpp's Needs::kAdm/unmet()) rather than missing from the binary's usage
+# dispatch time (src/main.cpp's Needs::kAdm/unmet()) rather than missing from the binary's usage
 # listing entirely.
 #
-# main.cpp itself never names iclforge::adm or includes either of their headers -
+# src/main.cpp itself never names iclforge::adm or includes either of their headers -
 # not even behind a preprocessor guard, since tools/checks/check_platform_macros.ps1 (CI-enforced)
 # refuses ANY #if/#ifdef/#ifndef anywhere under src/, feature flags included, not just platform
 # ones (that script's own header comment). So the same platform-tree shape the WIN32/else split
 # above already uses for stdio_binary.cpp applies here too, for a library-linked-or-not axis
-# instead of an OS one: adm/atmos_adm.hpp declares the narrow, iclforge::adm-type-free seam
-# main.cpp calls unconditionally (forge_cli::load_adm_atmos_source(), forge_cli::adm_capability()), and
+# instead of an OS one: src/adm/atmos_adm.hpp declares the narrow, iclforge::adm-type-free seam
+# src/main.cpp calls unconditionally (forge_cli::load_adm_atmos_source(), forge_cli::adm_capability()), and
 # exactly one of the two files below actually implements it - never both, never neither - so
 # forge links successfully and behaves correctly either way with zero preprocessor conditionals
-# anywhere in this target's sources. See adm/atmos_adm.hpp's own top comment for the full
+# anywhere in this target's sources. See src/adm/atmos_adm.hpp's own top comment for the full
 # reasoning, including why this replaced an earlier #ifdef-based design once
 # tools/checks/check_platform_macros.ps1 was actually run against it.
 # 'atmos-iab' (IAB reader phase 3) rides the exact same ICLFORGE_BUILD_ADM gate as 'atmos-adm'
-# above, for the reason adm/atmos_iab.hpp's own top comment gives: iclforge::iab by itself
+# above, for the reason src/adm/atmos_iab.hpp's own top comment gives: iclforge::iab by itself
 # (ICLFORGE_BUILD_IAB, default ON) has nothing that can drive AtmosEncoder - only
 # iclforge::adm's own build_iab() does that, and iclforge::adm only exists when ICLFORGE_BUILD_ADM
-# turned it on. adm/enabled/atmos_iab.cpp additionally needs iclforge::iab directly (to sniff and
+# turned it on. src/adm/enabled/atmos_iab.cpp additionally needs iclforge::iab directly (to sniff and
 # parse the input container), already linked unconditionally elsewhere in this target - see the
 # root CMakeLists.txt's own ICLFORGE_BUILD_ADM-requires-ICLFORGE_BUILD_IAB guard for why that
 # combination cannot actually diverge.
 if(ICLFORGE_BUILD_ADM)
-    target_sources(forge PRIVATE adm/enabled/atmos_adm.cpp adm/enabled/decode_adm.cpp
-                                  adm/enabled/atmos_iab.cpp)
+    target_sources(forge PRIVATE src/adm/enabled/atmos_adm.cpp src/adm/enabled/decode_adm.cpp
+                                  src/adm/enabled/atmos_iab.cpp)
     target_link_libraries(forge PRIVATE iclforge::adm)
 else()
-    target_sources(forge PRIVATE adm/disabled/atmos_adm.cpp adm/disabled/decode_adm.cpp
-                                  adm/disabled/atmos_iab.cpp)
+    target_sources(forge PRIVATE src/adm/disabled/atmos_adm.cpp src/adm/disabled/decode_adm.cpp
+                                  src/adm/disabled/atmos_iab.cpp)
 endif()
 
 # iclforge::coverage (coverage floors) instruments this target's OWN sources. Linking
@@ -114,7 +114,7 @@ target_link_libraries(forge
 # iclforge::containers are only ever unavailable when ICLFORGE_BUILD_MP4=OFF/
 # ICLFORGE_BUILD_MPEGTS=OFF, which the root CMakeLists.txt's own FATAL_ERROR guards
 # already refuse to combine with ICLFORGE_BUILD_CLI=ON - so unlike iclforge::audio's
-# Needs::kCapture/kPassthrough/kMonitor runtime-availability checks (main.cpp), the
+# Needs::kCapture/kPassthrough/kMonitor runtime-availability checks (src/main.cpp), the
 # `mp4`/`ts` commands below need no such check: this target is simply never configured
 # at all in a build where either would be missing.
 # -Wnull-dereference false positive, GNU only: SampleQueue::reset()'s
@@ -138,14 +138,14 @@ target_link_libraries(forge
 # GCC 16 instead, in this one file. Scoped to the file rather than widening
 # either of those guards: nothing else in this project has hit it, so
 # silencing it everywhere would risk hiding a genuine one elsewhere.
-set_source_files_properties(commands/stream_tools.cpp
+set_source_files_properties(src/commands/stream_tools.cpp
     PROPERTIES COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:GNU>:-Wno-null-dereference>")
 
 # The same post-inlining misattribution as stream_tools.cpp's
 # -Wnull-dereference case just above, a different diagnostic from the same
 # root cause: run_demux's AC-4 re-wrap lambda (on_mp4_sample, the MP4 branch)
 # builds `framed` with reserve() then a nested `put` lambda's push_back()
-# loop (commands/containers.cpp ~901-907). At -O3 (Release; not seen at the
+# loop (src/commands/containers.cpp ~901-907). At -O3 (Release; not seen at the
 # -debug preset's lower optimization - confirmed building config-linux-gcc-debug
 # clean with the same compiler) GCC inlines the whole call chain - through
 # std::_Function_handler<...>::_M_invoke, the lambda itself, and
@@ -161,7 +161,7 @@ set_source_files_properties(commands/stream_tools.cpp
 # file the same way stream_tools.cpp's instance is rather than version-gated
 # in cmake/CompilerWarnings.cmake - a GCC-version condition earns its keep
 # there for a warning several files hit; this is one lambda in one file.
-set_source_files_properties(commands/containers.cpp
+set_source_files_properties(src/commands/containers.cpp
     PROPERTIES COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:GNU>:-Wno-free-nonheap-object>")
 
 include(GNUInstallDirs)
@@ -177,7 +177,7 @@ install(TARGETS forge
 # The man page and the four shell completions (CLI shell completions).
 #
 # GENERATED, not written: `forge man` and `forge completions <shell>` render
-# both from main.cpp's own command table (see apps/cli/usage.cpp), so a new
+# both from src/main.cpp's own command table (see apps/cli/usage.cpp), so a new
 # command or option reaches the man page, all four completion scripts and the
 # --help text at once and cannot be forgotten in one of them. That is the
 # whole reason to generate rather than check in five hand-maintained files.

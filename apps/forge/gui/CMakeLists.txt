@@ -21,42 +21,42 @@ set(ICLFORGE_GUI_QT_VERSION "${Qt6_VERSION}" PARENT_SCOPE)
 qt_standard_project_setup(REQUIRES 6.5)
 
 qt_add_executable(forge-gui
-    main.cpp
-    encoder_controller.cpp
-    encoder_controller.hpp
-    qc_controller.cpp
-    qc_controller.hpp
-    object_decode_controller.cpp
-    object_decode_controller.hpp
-    stream_player_controller.cpp
-    stream_player_controller.hpp
-    background_jobs.hpp
-    channel_geometry.cpp
-    channel_geometry.hpp
-    gui_diagnostics.cpp
-    gui_diagnostics.hpp
-    ac4_encode_settings.cpp
-    ac4_encode_settings.hpp
-    ac4_presentations.cpp
-    ac4_presentations.hpp
-    ../common/ac4_sync_word.hpp
-    ../common/fmp4_folder_writer.cpp
-    ../common/fmp4_folder_writer.hpp
-    ../common/recording_sink.cpp
-    ../common/recording_sink.hpp
-    ../common/container_input.cpp
-    ../common/container_input.hpp
-    ../common/ac4_encode_core.cpp
-    ../common/ac4_encode_core.hpp
-    ../common/ac4_objects_core.cpp
-    ../common/ac4_objects_core.hpp
-    ../common/ac4_channels.hpp
-    system_theme.cpp
-    system_theme.hpp
-    language_manager.cpp
-    language_manager.hpp
-    settings_migration.cpp
-    settings_migration.hpp)
+    src/main.cpp
+    src/encoder_controller.cpp
+    src/encoder_controller.hpp
+    src/qc_controller.cpp
+    src/qc_controller.hpp
+    src/object_decode_controller.cpp
+    src/object_decode_controller.hpp
+    src/stream_player_controller.cpp
+    src/stream_player_controller.hpp
+    src/background_jobs.hpp
+    src/channel_geometry.cpp
+    src/channel_geometry.hpp
+    src/gui_diagnostics.cpp
+    src/gui_diagnostics.hpp
+    src/ac4_encode_settings.cpp
+    src/ac4_encode_settings.hpp
+    src/ac4_presentations.cpp
+    src/ac4_presentations.hpp
+    ../../shared/media/src/ac4_sync_word.hpp
+    ../../shared/media/src/fmp4_folder_writer.cpp
+    ../../shared/media/src/fmp4_folder_writer.hpp
+    ../../shared/media/src/recording_sink.cpp
+    ../../shared/media/src/recording_sink.hpp
+    ../../shared/media/src/container_input.cpp
+    ../../shared/media/src/container_input.hpp
+    ../../shared/media/src/ac4_encode_core.cpp
+    ../../shared/media/src/ac4_encode_core.hpp
+    ../../shared/media/src/ac4_objects_core.cpp
+    ../../shared/media/src/ac4_objects_core.hpp
+    ../../shared/media/src/ac4_channels.hpp
+    ../../shared/theme/src/system_theme.cpp
+    ../../shared/theme/src/system_theme.hpp
+    ../../shared/preferences/src/language_manager.cpp
+    ../../shared/preferences/src/language_manager.hpp
+    ../../shared/preferences/src/settings_migration.cpp
+    ../../shared/preferences/src/settings_migration.hpp)
 
 # RecordingSink and its Fmp4FolderWriter moved to apps/common when
 # `forge record`/`live` started writing their takes through the same classes
@@ -71,7 +71,7 @@ qt_add_executable(forge-gui
 # thing it wraps. container_input.cpp (container readers (mkv/mp4/ts)) joined it the same way,
 # for the QC/Inspect pickers below to accept a container in place of a bare
 # elementary stream the same way forge's decode/qc/levels/play/monitor do.
-target_include_directories(forge-gui PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../common")
+target_include_directories(forge-gui PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/media/src")
 
 # The QML lives in qml/ on disk but belongs at the root of the QML module, so
 # every file is aliased to its bare name. Left alone, Qt lays the module out as
@@ -81,59 +81,59 @@ target_include_directories(forge-gui PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../com
 # kind of registration that matters. That is what Qt policy QTP0004 warns
 # about; aliasing removes the second root instead of papering over it with a
 # generated qmldir, and keeps working whichever way the policy defaults later.
-# Absolute, not "qml/Main.qml": qt_add_qml_module resolves QML_FILES against
+# Absolute, not "assets/qml/Main.qml": qt_add_qml_module resolves QML_FILES against
 # whichever CMakeLists.txt calls it, and tests/CMakeLists.txt below reuses
 # this same list to embed an identical module into forge_gui_qmltests - a
 # relative path would resolve against the wrong directory from there.
 set(AC3_QML_FILES
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/Main.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/Theme.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/Card.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/SectionHeader.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/StatTile.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/AppButton.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/AppCheckBox.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/IconButton.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/AppSlider.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/AppTextField.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/AppComboBox.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/ChannelMeter.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/SoundfieldView.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/SegmentedControl.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/FocusRing.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/LoudnessGroup.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/VbrPanel.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/Ac4Panel.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/GuidedWizard.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/RailBlock.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/AssignmentPanel.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/FirstRunScreen.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/PreferencesDialog.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/AboutDialog.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/QcGateMeter.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/QcDialog.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/ObjectInspectorDialog.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/StreamPlayerDialog.qml")
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Main.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/Theme.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/Card.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/SectionHeader.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/StatTile.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/AppButton.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/AppCheckBox.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/IconButton.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/AppSlider.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/AppTextField.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/AppComboBox.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/ChannelMeter.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/SoundfieldView.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/SegmentedControl.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/FocusRing.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LoudnessGroup.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/VbrPanel.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Ac4Panel.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/GuidedWizard.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/RailBlock.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/AssignmentPanel.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/FirstRunScreen.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/PreferencesDialog.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/AboutDialog.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/QcGateMeter.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/QcDialog.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/ObjectInspectorDialog.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/StreamPlayerDialog.qml")
 
 # GUI localisation: one .ts per shipped language, French/German/Spanish/Arabic/
 # Hebrew/Yiddish - the same set and order LanguageManager's kLanguages uses
-# (language_manager.cpp), matching the canonical set already shipped by the
+# (../../shared/preferences/src/language_manager.cpp), matching the canonical set already shipped by the
 # sibling CountdownSolver project (R:\CountdownSolver). Shared with
 # tests/CMakeLists.txt below for the same reason AC3_QML_FILES is: that file
 # is include()d into this one's own scope, not a separate directory, so a
 # plain variable set here is already visible there. See
 # docs/forge/gui/localisation.md for how to update or add to this list, and
-# translations/forge_gui_xx.ts (tools/generators/gen_pseudo_locale.py) for the
+# assets/translations/forge_gui_xx.ts (tools/generators/gen_pseudo_locale.py) for the
 # separate pseudo-locale QA fixture, which is intentionally NOT part of this
 # list - it is loaded only through the ICLFORGE_GUI_LOCALE test override, never
 # through the real qt_add_translations() pipeline below.
 set(AC3_TS_FILES
-    "${CMAKE_CURRENT_SOURCE_DIR}/translations/forge_gui_fr.ts"
-    "${CMAKE_CURRENT_SOURCE_DIR}/translations/forge_gui_de.ts"
-    "${CMAKE_CURRENT_SOURCE_DIR}/translations/forge_gui_es.ts"
-    "${CMAKE_CURRENT_SOURCE_DIR}/translations/forge_gui_ar.ts"
-    "${CMAKE_CURRENT_SOURCE_DIR}/translations/forge_gui_he.ts"
-    "${CMAKE_CURRENT_SOURCE_DIR}/translations/forge_gui_yi.ts")
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/forge_gui_fr.ts"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/forge_gui_de.ts"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/forge_gui_es.ts"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/forge_gui_ar.ts"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/forge_gui_he.ts"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/forge_gui_yi.ts")
 
 # The pseudo-locale QA fixture (see AC3_TS_FILES's own comment above) -
 # deliberately kept out of that list and out of forge-gui's own
@@ -142,7 +142,7 @@ set(AC3_TS_FILES
 # ALONGSIDE AC3_TS_FILES instead, purely for tst_localisation_pipeline.qml's
 # ICLFORGE_GUI_LOCALE=xx suite.
 set(AC3_PSEUDO_TS_FILE
-    "${CMAKE_CURRENT_SOURCE_DIR}/translations/forge_gui_xx.ts")
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/forge_gui_xx.ts")
 
 foreach(qml_file IN LISTS AC3_QML_FILES)
     get_filename_component(qml_name "${qml_file}" NAME)
@@ -161,7 +161,7 @@ endforeach()
 # whether to emit a `singleton` line in the generated qmldir. Set it
 # afterwards and Theme registers as a plain type instead, so every Theme.*
 # binding silently resolves to undefined at runtime.
-set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/qml/Theme.qml"
+set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/Theme.qml"
     PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_qml_module(forge-gui
@@ -170,11 +170,11 @@ qt_add_qml_module(forge-gui
     QML_FILES ${AC3_QML_FILES})
 
 # The handoff's typeface, bundled so the design renders as designed on a
-# machine that never installed it. Archivo is SIL OFL 1.1 (fonts/OFL.txt
+# machine that never installed it. Archivo is SIL OFL 1.1 (../../shared/theme/assets/fonts/OFL.txt
 # ships beside the faces - keep them together; the license requires it).
 # Static weights rather than the variable font: Qt's font database resolves
 # named static weights on every platform this builds for, while variable-
-# font axis selection is only dependable from Qt 6.7 up. main.cpp registers
+# font axis selection is only dependable from Qt 6.7 up. src/main.cpp registers
 # these with QFontDatabase before the engine loads.
 #
 # NotoSansArabic/NotoSansHebrew (GUI localisation, RTL languages) are the same
@@ -184,34 +184,34 @@ qt_add_qml_module(forge-gui
 # re-sourced, license files included per font per Noto's own naming.
 qt_add_resources(forge-gui "forge_gui_fonts"
     PREFIX "/fonts"
-    BASE "${CMAKE_CURRENT_SOURCE_DIR}/fonts"
+    BASE "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/fonts"
     FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/fonts/Archivo-Regular.ttf"
-        "${CMAKE_CURRENT_SOURCE_DIR}/fonts/Archivo-Medium.ttf"
-        "${CMAKE_CURRENT_SOURCE_DIR}/fonts/Archivo-SemiBold.ttf"
-        "${CMAKE_CURRENT_SOURCE_DIR}/fonts/Archivo-ExtraBold.ttf"
-        "${CMAKE_CURRENT_SOURCE_DIR}/fonts/OFL.txt"
-        "${CMAKE_CURRENT_SOURCE_DIR}/fonts/NotoSansArabic.ttf"
-        "${CMAKE_CURRENT_SOURCE_DIR}/fonts/NotoSansArabic-OFL.txt"
-        "${CMAKE_CURRENT_SOURCE_DIR}/fonts/NotoSansHebrew.ttf"
-        "${CMAKE_CURRENT_SOURCE_DIR}/fonts/NotoSansHebrew-OFL.txt")
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/fonts/Archivo-Regular.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/fonts/Archivo-Medium.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/fonts/Archivo-SemiBold.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/fonts/Archivo-ExtraBold.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/fonts/OFL.txt"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/fonts/NotoSansArabic.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/fonts/NotoSansArabic-OFL.txt"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/fonts/NotoSansHebrew.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/fonts/NotoSansHebrew-OFL.txt")
 
-# The build-tree/window-icon PNGs (main.cpp's QGuiApplication::setWindowIcon)
+# The build-tree/window-icon PNGs (src/main.cpp's QGuiApplication::setWindowIcon)
 # plus AboutDialog.qml's own Image. Generated, along with every other
 # platform's icon asset, by assets/icon/generate_icons.py - see that
 # script's header comment before editing any file under icons/ by hand.
 qt_add_resources(forge-gui "forge_gui_icons"
     PREFIX "/icons"
-    BASE "${CMAKE_CURRENT_SOURCE_DIR}/icons"
+    BASE "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/icons"
     FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/icons/iclforge-32.png"
-        "${CMAKE_CURRENT_SOURCE_DIR}/icons/iclforge-256.png")
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/icons/iclforge-32.png"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/icons/iclforge-256.png")
 
 # ---------------------------------------------------------------------------
 # GUI localisation: lupdate (scan every source SOURCE_TARGETS' own target already
 # lists - AC3_QML_FILES is the only source of qsTr() calls in this app; no
 # .cpp file has one) plus lrelease (.ts -> .qm) and a /i18n resource
-# embedding, all in one call. LanguageManager (language_manager.cpp) loads
+# embedding, all in one call. LanguageManager (../../shared/preferences/src/language_manager.cpp) loads
 # the matching forge_gui_<code>.qm at runtime.
 #
 # IMMEDIATE_CALL, and SOURCE_TARGETS given explicitly rather than left to the
@@ -251,8 +251,8 @@ qt_add_translations(forge-gui
 # include directories SYSTEM; generated sources have no include directory to
 # mark, so they are excluded here instead. Nothing in this directory is
 # authored into the binary dir, so "generated by Qt" is exactly "under
-# CMAKE_CURRENT_BINARY_DIR", and matching on that is enough; our own main.cpp
-# and encoder_controller.cpp keep the full set.
+# CMAKE_CURRENT_BINARY_DIR", and matching on that is enough; our own src/main.cpp
+# and src/encoder_controller.cpp keep the full set.
 #
 # MSVC gets a narrower carve-out (see cmake/CompilerWarnings.cmake) rather
 # than the blanket "-w" clang-cl/GCC get: cl has almost nothing to say about
@@ -352,15 +352,15 @@ if(WIN32)
     # rc.exe's own path parsing is happier with forward slashes than the
     # backslashes CMAKE_CURRENT_SOURCE_DIR carries on Windows - avoids the
     # icon path being misread as containing escape sequences.
-    set(ICLFORGE_GUI_ICON_ICO "${CMAKE_CURRENT_SOURCE_DIR}/icons/iclforge.ico")
+    set(ICLFORGE_GUI_ICON_ICO "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/icons/iclforge.ico")
     file(TO_CMAKE_PATH "${ICLFORGE_GUI_ICON_ICO}" ICLFORGE_GUI_ICON_ICO)
     configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/icons/forge-gui.rc.in"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/icons/forge-gui.rc.in"
         "${CMAKE_CURRENT_BINARY_DIR}/forge-gui.rc"
         @ONLY)
     target_sources(forge-gui PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/forge-gui.rc")
 elseif(APPLE)
-    set(ICLFORGE_GUI_ICON_ICNS "${CMAKE_CURRENT_SOURCE_DIR}/icons/iclforge.icns")
+    set(ICLFORGE_GUI_ICON_ICNS "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/icons/iclforge.icns")
     # MACOSX_PACKAGE_LOCATION is what makes add_executable/qt_add_executable
     # copy this source into Contents/Resources instead of trying to compile
     # it; MACOSX_BUNDLE_ICON_FILE below takes just the bare filename since
@@ -370,16 +370,16 @@ elseif(APPLE)
     target_sources(forge-gui PRIVATE "${ICLFORGE_GUI_ICON_ICNS}")
     set_target_properties(forge-gui PROPERTIES MACOSX_BUNDLE_ICON_FILE iclforge.icns)
 
-    # GUI AppStream packaging: a custom Info.plist (Info.plist.in, beside this file). It
+    # GUI AppStream packaging: a custom Info.plist (packaging/macos/Info.plist.in, beside this file). It
     # carried .ac3/.ec3's CFBundleDocumentTypes/UTExportedTypeDeclarations until
-    # hearth took them over (Info.plist.in says why) and declares none now. Supplying
+    # hearth took them over (packaging/macos/Info.plist.in says why) and declares none now. Supplying
     # a template of our own means opting out of the default Info.plist CMake
     # generates when MACOSX_BUNDLE_INFO_PLIST is left unset, so every variable
     # that default would have substituted is set explicitly here too. These are plain CMake
     # variables (not target properties) because that is what CMake's own
     # bundle-generation logic - the same logic MACOSX_BUNDLE_ICON_FILE's
     # target property above already reaches through - substitutes into
-    # Info.plist.in's ${VAR} tokens.
+    # packaging/macos/Info.plist.in's ${VAR} tokens.
     set(MACOSX_BUNDLE_EXECUTABLE_NAME "forge-gui")
     set(MACOSX_BUNDLE_BUNDLE_NAME "forge-gui")
     set(MACOSX_BUNDLE_INFO_STRING "${PROJECT_DESCRIPTION}")
@@ -390,7 +390,7 @@ elseif(APPLE)
     set(MACOSX_BUNDLE_LONG_VERSION_STRING "${PROJECT_VERSION_FULL}")
     set(MACOSX_BUNDLE_COPYRIGHT "Copyright (c) Iain Chesworth")
     set_target_properties(forge-gui PROPERTIES
-        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in")
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/Info.plist.in")
 endif()
 
 # ---------------------------------------------------------------------------
@@ -449,7 +449,7 @@ if(WIN32)
         add_custom_command(TARGET forge-gui POST_BUILD
             COMMAND "${CMAKE_COMMAND}" -E env "VCINSTALLDIR=${AC3_VCINSTALLDIR}"
                 "${AC3_WINDEPLOYQT_EXECUTABLE}"
-                --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/qml"
+                --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml"
                 --compiler-runtime
                 "$<TARGET_FILE:forge-gui>"
             COMMAND "${CMAKE_COMMAND}" -E copy_if_different
@@ -481,7 +481,7 @@ endif()
 # the build tree with "the QML failed to load" (no Fusion style plugin, no
 # QtQuick.Controls modules - nothing qmlimportscanner would have caught).
 # qt_generate_deploy_qml_app_script() is the QML-aware sibling that actually
-# scans main.cpp's engine.loadFromModule() and the .qml files, matching what
+# scans src/main.cpp's engine.loadFromModule() and the .qml files, matching what
 # the POST_BUILD windeployqt --qmldir call above already does for the build
 # tree - including bundling every built-in QtQuick.Controls style (Fusion
 # among them), because QQuickStyle::setStyle("Fusion") is a runtime C++ call
@@ -590,11 +590,11 @@ if(LINUX)
     # in-app window/taskbar icon above embeds via qt_add_resources) - the
     # hicolor theme picks whichever fits, same convention every other
     # freedesktop-menu application follows.
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/icons/iclforge-256.png"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/icons/iclforge-256.png"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"
         RENAME "forge-gui.png"
         COMPONENT runtime)
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/icons/iclforge-32.png"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/icons/iclforge-32.png"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/32x32/apps"
         RENAME "forge-gui.png"
         COMPONENT runtime)

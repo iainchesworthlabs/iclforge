@@ -4,7 +4,7 @@
 # them, from a computer and in CI. It can run a test sink of its own, the reference a board's levels
 # are held to, so it links the sink's library. Never installed or packaged. It reads a board's
 # /status with cpp-httplib, configured as libs/sendspin configures it (iclforge_sendspin_httplib).
-add_executable(hearth-testserver main.cpp server_store.cpp)
+add_executable(hearth-testserver src/main.cpp src/server_store.cpp)
 target_include_directories(hearth-testserver PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_features(hearth-testserver PRIVATE cxx_std_23)
 target_link_libraries(hearth-testserver PRIVATE hearth_testsink iclforge_sendspin_httplib iclforge::warnings)

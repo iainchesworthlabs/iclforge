@@ -2,6 +2,6 @@
 # stream decoder the window plays it with - into a WAV file, so tools/checks/gain_ac4_decode.py
 # --engine holds what the engine puts out to the formulas it holds forge decode's to. Qt-free; never
 # installed or packaged.
-add_executable(hearth-render main.cpp)
+add_executable(hearth-render src/main.cpp)
 target_compile_features(hearth-render PRIVATE cxx_std_23)
 target_link_libraries(hearth-render PRIVATE hearth_engine iclforge::warnings)

@@ -19,9 +19,9 @@
 #
 # Unlike crucible_qmltests, this target carries no tray, no icon provider
 # and no per-platform sources: apps/hearth/ui/CMakeLists.txt's own qt_add_executable(hearth ...)
-# lists only main.cpp, hearth_controller.cpp/.hpp, item_loader.cpp/.hpp,
+# lists only src/main.cpp, hearth_controller.cpp/.hpp, item_loader.cpp/.hpp,
 # network_controller.cpp/.hpp and apps/common/container_input.cpp/.hpp - this
-# target embeds the same controller/loader sources (main.cpp is excluded: it
+# target embeds the same controller/loader sources (src/main.cpp is excluded: it
 # is hearth's own entry point, and qml_test_main.cpp is this target's).
 # network_controller.cpp/.hpp are included from tst_network_sink_settings.qml
 # onwards (issue #875): NetworkController is a second QML_SINGLETON, and
@@ -30,7 +30,7 @@
 # only register a QML_ELEMENT class that is actually part of the target it runs
 # against. apps/gui/language_manager.cpp/.hpp is the third, for the same
 # reason: Settings.qml imports HearthLanguage, whose LanguageManager
-# main.cpp registers as a singleton instance.
+# src/main.cpp registers as a singleton instance.
 # ---------------------------------------------------------------------------
 find_package(Qt6 6.8 REQUIRED COMPONENTS QuickTest Test)
 
@@ -43,20 +43,20 @@ qt_add_executable(hearth_qmltests
     # reason test_room.hpp gives.
     tests/test_room.cpp
     tests/test_room.hpp
-    test_outputs.hpp
-    hearth_controller.cpp
-    hearth_controller.hpp
-    item_loader.cpp
-    item_loader.hpp
-    network_controller.cpp
-    network_controller.hpp
+    src/test_outputs.hpp
+    src/hearth_controller.cpp
+    src/hearth_controller.hpp
+    src/item_loader.cpp
+    src/item_loader.hpp
+    src/network_controller.cpp
+    src/network_controller.hpp
     # Settings.qml imports HearthLanguage now, so the suite needs the
     # same LanguageManager hearth itself compiles in - a third singleton,
     # registered the same way and failing the same way without its sources.
-    "${PROJECT_SOURCE_DIR}/apps/gui/language_manager.cpp"
-    "${PROJECT_SOURCE_DIR}/apps/gui/language_manager.hpp"
-    "${PROJECT_SOURCE_DIR}/apps/common/container_input.cpp"
-    "${PROJECT_SOURCE_DIR}/apps/common/container_input.hpp")
+    "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/language_manager.cpp"
+    "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/language_manager.hpp"
+    "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.cpp"
+    "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.hpp")
 
 qt_add_qml_module(hearth_qmltests
     URI Hearth
@@ -78,7 +78,7 @@ add_dependencies(hearth_qmltests hearth)
 target_include_directories(hearth_qmltests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_SOURCE_DIR}/apps/gui"
-    "${CMAKE_SOURCE_DIR}/apps/common")
+    "${CMAKE_SOURCE_DIR}/apps/shared/media/src")
 target_compile_definitions(hearth_qmltests PRIVATE
     QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/qml")
 target_link_libraries(hearth_qmltests PRIVATE
@@ -129,7 +129,7 @@ if(WIN32)
     if(ICLFORGE_HEARTH_QMLTEST_WINDEPLOYQT)
         add_custom_command(TARGET hearth_qmltests POST_BUILD
             COMMAND "${ICLFORGE_HEARTH_QMLTEST_WINDEPLOYQT}"
-                --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/qml"
+                --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml"
                 --qmldir "${ICLFORGE_HEARTH_SHARED_DIR}"
                 --no-compiler-runtime
                 "$<TARGET_FILE:hearth_qmltests>"

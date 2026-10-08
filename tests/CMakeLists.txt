@@ -12,7 +12,7 @@ include(IclforgeTests)
 iclforge_add_test_binary(iclforge-apps-tests SOURCES)
 
 # ---------------------------------------------------------------------------
-# forge integration tests (cli/test_cli.cpp). main.cpp compiles straight into
+# forge integration tests (../apps/forge/cli/tests/test_cli.cpp). main.cpp compiles straight into
 # the forge executable with everything in an anonymous namespace, so there
 # is no library surface for parse_options/gather_frame/run_atmos_encode's own
 # logic to link against directly - these tests instead run the real, built
@@ -22,7 +22,7 @@ iclforge_add_test_binary(iclforge-apps-tests SOURCES)
 # top-level CMakeLists.txt processes apps/cli before tests/, so the target
 # already exists here whenever it is going to.
 # ---------------------------------------------------------------------------
-# cli/test_cli_live.cpp rides the same gate and the same ICLFORGE_CLI_EXE: it covers
+# ../apps/forge/cli/tests/test_cli_live.cpp rides the same gate and the same ICLFORGE_CLI_EXE: it covers
 # the device-facing commands (devices/outputs/record/live/monitor), which no
 # test touched at all until coverage floors measured commands/audio_io.cpp and
 # commands/live_audio.cpp at 0.0% line coverage. Its cases assert what holds
@@ -31,20 +31,20 @@ iclforge_add_test_binary(iclforge-apps-tests SOURCES)
 # `ctest -L concurrency` (ThreadSanitizer leg).
 if(TARGET forge)
     target_sources(iclforge-apps-tests PRIVATE
-        cli/test_cli.cpp cli/test_cli_ac4.cpp cli/test_cli_ac4_decode.cpp cli/test_cli_ac4_encode.cpp
-        cli/test_cli_atmos_cbi.cpp cli/test_cli_atmos_encode_ac4.cpp
-        cli/test_cli_containers.cpp
-        cli/test_cli_live.cpp cli/test_cli_probe.cpp cli/test_cli_stream_tools.cpp
-        cli/test_cli_options.cpp cli/test_cli_synth.cpp cli/test_cli_analysis.cpp
-        cli/test_cli_encode_paths.cpp cli/test_cli_stream_edges.cpp
-        cli/test_cli_inspect_edges.cpp cli/test_cli_atmos_edges.cpp)
+        ../apps/forge/cli/tests/test_cli.cpp ../apps/forge/cli/tests/test_cli_ac4.cpp ../apps/forge/cli/tests/test_cli_ac4_decode.cpp ../apps/forge/cli/tests/test_cli_ac4_encode.cpp
+        ../apps/forge/cli/tests/test_cli_atmos_cbi.cpp ../apps/forge/cli/tests/test_cli_atmos_encode_ac4.cpp
+        ../apps/forge/cli/tests/test_cli_containers.cpp
+        ../apps/forge/cli/tests/test_cli_live.cpp ../apps/forge/cli/tests/test_cli_probe.cpp ../apps/forge/cli/tests/test_cli_stream_tools.cpp
+        ../apps/forge/cli/tests/test_cli_options.cpp ../apps/forge/cli/tests/test_cli_synth.cpp ../apps/forge/cli/tests/test_cli_analysis.cpp
+        ../apps/forge/cli/tests/test_cli_encode_paths.cpp ../apps/forge/cli/tests/test_cli_stream_edges.cpp
+        ../apps/forge/cli/tests/test_cli_inspect_edges.cpp ../apps/forge/cli/tests/test_cli_atmos_edges.cpp)
     # The same device-facing commands with a device to find: software ALSA
     # devices (tests/support/alsa_null_device.hpp), so only in the ALSA configuration.
     if(ICLFORGE_AUDIO_BACKEND STREQUAL "alsa")
-        target_sources(iclforge-apps-tests PRIVATE cli/test_cli_live_alsa.cpp)
+        target_sources(iclforge-apps-tests PRIVATE ../apps/forge/cli/tests/test_cli_live_alsa.cpp)
     endif()
     target_compile_definitions(iclforge-apps-tests PRIVATE "ICLFORGE_CLI_EXE=\"$<TARGET_FILE:forge>\"")
-    # cli/test_cli_probe.cpp probes the committed FFmpeg/DEE-encoded fixtures as
+    # ../apps/forge/cli/tests/test_cli_probe.cpp probes the committed FFmpeg/DEE-encoded fixtures as
     # well as this encoder's own output - they exercise syntax iclforge never
     # emits (AHT, spectral extension, and frames this decoder declines
     # outright), which is the only way to check that `probe` describes a FORMAT
@@ -53,7 +53,7 @@ if(TARGET forge)
     # tree, nowhere near the fixtures.
     target_compile_definitions(iclforge-apps-tests PRIVATE
         "ICLFORGE_EXTERNAL_BASELINE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden/external-baseline\"")
-    # cli/test_cli.cpp decodes one fuzz seed under `quiet`: the DEE-encoded
+    # ../apps/forge/cli/tests/test_cli.cpp decodes one fuzz seed under `quiet`: the DEE-encoded
     # E-AC-3 stream a quiet decode was first seen failing on, whose report
     # carries infomdat lines that FFmpeg's encode of the same programme does
     # not. A path for the same reason ICLFORGE_EXTERNAL_BASELINE_DIR is one.
@@ -61,12 +61,12 @@ if(TARGET forge)
         "ICLFORGE_FUZZ_SEED_DIR=\"${CMAKE_SOURCE_DIR}/libs/ac3/fuzz/seeds\"")
 endif()
 
-# RecordingSink (gui/test_recording_sink.cpp) is deliberately Qt-free - std::
+# RecordingSink (../apps/shared/media/tests/test_recording_sink.cpp) is deliberately Qt-free - std::
 # and the container libraries only, exactly so its streamed-equals-one-shot
 # contract can be held here, in the plain Catch2 suite, without a QML engine
 # in the room (apps/gui's Qt Quick tests cover the interactive surfaces; this
 # covers the bytes). Its sources compile straight into this target the same
-# way cli/test_cli.cpp's subject rides its own binary: there is no library
+# way ../apps/forge/cli/tests/test_cli.cpp's subject rides its own binary: there is no library
 # surface to link against. The fragmented-MP4 cases exercise Fmp4FolderWriter,
 # RecordingSink's own kFmp4 backend, so its source comes along too.
 #
@@ -98,21 +98,21 @@ endif()
 # this target also compiles the Crucible's own diagnostics.cpp and has both
 # directories on its include path.
 target_sources(iclforge-apps-tests PRIVATE
-    gui/test_recording_sink.cpp
-    gui/test_gui_diagnostics.cpp
-    gui/test_ac4_encode_settings.cpp
-    gui/test_ac4_objects_core.cpp
-    "${CMAKE_SOURCE_DIR}/apps/common/fmp4_folder_writer.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/common/recording_sink.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/common/container_input.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/common/stream_playback.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/common/ac4_encode_core.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/common/ac4_objects_core.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/gui/gui_diagnostics.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/gui/ac4_encode_settings.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/gui/ac4_presentations.cpp")
+    ../apps/shared/media/tests/test_recording_sink.cpp
+    ../apps/forge/gui/tests/test_gui_diagnostics.cpp
+    ../apps/forge/gui/tests/test_ac4_encode_settings.cpp
+    ../apps/shared/media/tests/test_ac4_objects_core.cpp
+    "${CMAKE_SOURCE_DIR}/apps/shared/media/src/fmp4_folder_writer.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/shared/media/src/recording_sink.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/shared/media/src/container_input.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/shared/media/src/stream_playback.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/shared/media/src/ac4_encode_core.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/shared/media/src/ac4_objects_core.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/forge/gui/src/gui_diagnostics.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/forge/gui/src/ac4_encode_settings.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/forge/gui/src/ac4_presentations.cpp")
 target_include_directories(iclforge-apps-tests PRIVATE
-    "${CMAKE_SOURCE_DIR}/apps/common"
+    "${CMAKE_SOURCE_DIR}/apps/shared/media/src"
     "${CMAKE_SOURCE_DIR}/apps/gui")
 
 # iclforge-settings-tests - Catch2 coverage for apps/gui/settings_migration.cpp, the copy of what a
@@ -127,9 +127,9 @@ if(ICLFORGE_BUILD_GUI OR ICLFORGE_BUILD_CRUCIBLE OR ICLFORGE_BUILD_HEARTH)
     find_package(Qt6 6.8 QUIET COMPONENTS Core)
     if(Qt6_FOUND)
         add_executable(iclforge-settings-tests
-            gui/test_settings_migration.cpp
-            "${CMAKE_SOURCE_DIR}/apps/gui/settings_migration.cpp"
-            "${CMAKE_SOURCE_DIR}/apps/gui/settings_migration.hpp")
+            ../apps/shared/preferences/tests/test_settings_migration.cpp
+            "${CMAKE_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.cpp"
+            "${CMAKE_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.hpp")
         target_include_directories(iclforge-settings-tests PRIVATE "${CMAKE_SOURCE_DIR}/apps/gui")
         target_link_libraries(iclforge-settings-tests PRIVATE
             iclforge::warnings iclforge::coverage Qt6::Core Catch2::Catch2WithMain)
@@ -177,7 +177,7 @@ endif()
 # the frame loop owns a SigningHook. It is the same argument one step up: the
 # loop is written over the three seams EngineConfig injects (devices,
 # sessions, foreground), so with fakes in all three it runs here as plain C++
-# on any platform - and until crucible/test_engine.cpp nothing in the suite
+# on any platform - and until ../apps/crucible/engine/tests/test_engine.cpp nothing in the suite
 # constructed an Engine at all, which is how a probe thread that was never
 # joined reached a released branch. That file also asserts what the loop does
 # about opening taps: the platform seams it would otherwise reach for are the
@@ -186,43 +186,43 @@ endif()
 # which is linked below and answers with kNoBackend where there is none; the
 # engine notes that and carries on.
 #
-# crucible/test_engine_start.cpp rides the same block for what start()
+# ../apps/crucible/engine/tests/test_engine_start.cpp rides the same block for what start()
 # answers: that a machine with nothing to play into is refused rather than
 # reported as running, which is what the window's status strip prints and
 # what the QML suites' "the engine did not start here" skips test for.
 target_sources(iclforge-apps-tests PRIVATE
-    crucible/test_slots.cpp
-    crucible/test_bed_mixer.cpp
-    crucible/test_placement.cpp
-    crucible/test_output_policy.cpp
-    crucible/test_tap_pool.cpp
-    crucible/test_output_stage.cpp
-    crucible/test_engine_start.cpp
-    crucible/test_nullsink_position.cpp
-    crucible/test_platform_seams.cpp
-    crucible/test_diagnostics.cpp
-    crucible/test_desktop_entries.cpp
-    crucible/test_translations.cpp
-    crucible/test_engine.cpp
-    crucible/test_engine_commands.cpp
-    crucible/test_output_stage_edges.cpp
-    crucible/platform_services_stub.cpp
-    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/slots.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/bed_mixer.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/placement.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/output_policy.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/tap_pool.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/diagnostics.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/output_stage.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/signing_hook.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/engine.cpp"
-    "${CMAKE_SOURCE_DIR}/apps/crucible/ui/desktop_entries.cpp")
+    ../apps/crucible/engine/tests/test_slots.cpp
+    ../apps/crucible/engine/tests/test_bed_mixer.cpp
+    ../apps/crucible/engine/tests/test_placement.cpp
+    ../apps/crucible/engine/tests/test_output_policy.cpp
+    ../apps/crucible/engine/tests/test_tap_pool.cpp
+    ../apps/crucible/engine/tests/test_output_stage.cpp
+    ../apps/crucible/engine/tests/test_engine_start.cpp
+    ../apps/crucible/engine/tests/test_nullsink_position.cpp
+    ../apps/crucible/engine/tests/test_platform_seams.cpp
+    ../apps/crucible/engine/tests/test_diagnostics.cpp
+    ../apps/crucible/ui/tests/test_desktop_entries.cpp
+    ../apps/crucible/ui/tests/test_translations.cpp
+    ../apps/crucible/engine/tests/test_engine.cpp
+    ../apps/crucible/engine/tests/test_engine_commands.cpp
+    ../apps/crucible/engine/tests/test_output_stage_edges.cpp
+    ../apps/crucible/engine/tests/platform_services_stub.cpp
+    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/src/slots.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/src/bed_mixer.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/src/placement.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/src/output_policy.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/src/tap_pool.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/src/diagnostics.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/src/output_stage.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/src/signing_hook.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/src/engine.cpp"
+    "${CMAKE_SOURCE_DIR}/apps/crucible/ui/src/desktop_entries.cpp")
 # test_engine_commands.cpp saves the signing key's env-var fallbacks with
 # std::getenv before clearing them for its own case - same C4996 reasoning as
 # libs/base/src/crypto/signing_key.cpp (libs/base/CMakeLists.txt) and
 # libs/ac3/tests/core/test_simd_kernels.cpp.
 if(ICLFORGE_IS_MSVC_LIKE)
-    set_source_files_properties(crucible/test_engine_commands.cpp
+    set_source_files_properties(../apps/crucible/engine/tests/test_engine_commands.cpp
         PROPERTIES COMPILE_OPTIONS "/wd4996")
 endif()
 # The null-sink driver's position clock (apps/windows/driver/Source/Main/
@@ -233,9 +233,9 @@ endif()
 # plain C++ over std::filesystem for the same reason and rides the same
 # target, Qt-free, on every platform.
 target_include_directories(iclforge-apps-tests PRIVATE
-    "${CMAKE_SOURCE_DIR}/apps/crucible/engine"
+    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/src"
     "${CMAKE_SOURCE_DIR}/apps/crucible/ui"
-    "${CMAKE_SOURCE_DIR}/apps/windows/driver/Source/Main")
+    "${CMAKE_SOURCE_DIR}/apps/crucible/windows/driver/Source/Main")
 # The profiling header pair, for engine.cpp's Tracy zones: the same
 # generator expression apps/crucible/CMakeLists.txt uses for
 # crucible_engine, and for the same reason - the header is PRIVATE to
@@ -267,11 +267,11 @@ target_link_libraries(iclforge-apps-tests PRIVATE iclforge::tracy)
 # where libpipewire is.
 if(LINUX)
     target_sources(iclforge-apps-tests PRIVATE
-        crucible/platform/linux/test_x11_foreground.cpp
-        crucible/platform/linux/test_session_facts.cpp
-        "${CMAKE_SOURCE_DIR}/apps/crucible/engine/platform/linux/x11_foreground.cpp")
+        ../apps/crucible/engine/tests/platform/linux/test_x11_foreground.cpp
+        ../apps/crucible/engine/tests/platform/linux/test_session_facts.cpp
+        "${CMAKE_SOURCE_DIR}/apps/crucible/engine/src/platform/linux/x11_foreground.cpp")
     target_include_directories(iclforge-apps-tests PRIVATE
-        "${CMAKE_SOURCE_DIR}/apps/crucible/engine/platform/linux")
+        "${CMAKE_SOURCE_DIR}/apps/crucible/engine/src/platform/linux")
 endif()
 
 # test_cli_atmos_adm.cpp (ADM BWF reader phase 3, forge's 'atmos-adm' command) needs BOTH conditions
@@ -284,8 +284,8 @@ endif()
 # (ICLFORGE_CLI_EXE might not be defined at all, e.g. ICLFORGE_BUILD_CLI=OFF) is sufficient by itself -
 # both are checked together here, after both blocks above have already run.
 if(ICLFORGE_BUILD_ADM AND TARGET forge)
-    target_sources(iclforge-apps-tests PRIVATE cli/test_cli_atmos_adm.cpp cli/test_cli_atmos_iab.cpp
-                                    cli/test_cli_decode_adm.cpp cli/test_cli_atmos_adm_ac4.cpp)
+    target_sources(iclforge-apps-tests PRIVATE ../apps/forge/cli/tests/test_cli_atmos_adm.cpp ../apps/forge/cli/tests/test_cli_atmos_iab.cpp
+                                    ../apps/forge/cli/tests/test_cli_decode_adm.cpp ../apps/forge/cli/tests/test_cli_atmos_adm_ac4.cpp)
     # These four build ADM and IAB fixtures with the libraries' own headers; the binary that held
     # them linked both through the library tests it also held (libs/adm/tests, libs/iab/tests).
     target_link_libraries(iclforge-apps-tests PRIVATE iclforge::adm)
@@ -301,26 +301,26 @@ if(ICLFORGE_BUILD_HEARTH)
     # libs/sendspin's player half: a core-only build still builds and tests it,
     # unlike the test sink further down.
     target_sources(iclforge-apps-tests PRIVATE
-        hearth/test_ac3_transcoder.cpp
-        hearth/test_ac4_engine.cpp
-        hearth/test_decoder_settings.cpp
-        hearth/test_device_sink_live.cpp
-        hearth/test_diagnostics.cpp
-        hearth/test_engine.cpp
-        hearth/test_engine_queue_commands.cpp
-        hearth/test_media_info.cpp
-        hearth/test_media_info_json.cpp
-        hearth/test_network_view.cpp
-        hearth/test_output_decision.cpp
-        hearth/test_output_selector.cpp
-        hearth/test_play_meters.cpp
-        hearth/test_player.cpp
-        hearth/test_player_bitstream.cpp
-        hearth/test_queue.cpp
-        hearth/test_session.cpp
-        hearth/test_settings_model.cpp
-        hearth/test_stream_decoder.cpp
-        hearth/test_transport.cpp)
+        ../apps/hearth/engine/tests/test_ac3_transcoder.cpp
+        ../apps/hearth/engine/tests/test_ac4_engine.cpp
+        ../apps/hearth/engine/tests/test_decoder_settings.cpp
+        ../apps/hearth/engine/tests/test_device_sink_live.cpp
+        ../apps/hearth/engine/tests/test_diagnostics.cpp
+        ../apps/hearth/engine/tests/test_engine.cpp
+        ../apps/hearth/engine/tests/test_engine_queue_commands.cpp
+        ../apps/hearth/engine/tests/test_media_info.cpp
+        ../apps/hearth/engine/tests/test_media_info_json.cpp
+        ../apps/hearth/engine/tests/test_network_view.cpp
+        ../apps/hearth/engine/tests/test_output_decision.cpp
+        ../apps/hearth/engine/tests/test_output_selector.cpp
+        ../apps/hearth/engine/tests/test_play_meters.cpp
+        ../apps/hearth/engine/tests/test_player.cpp
+        ../apps/hearth/engine/tests/test_player_bitstream.cpp
+        ../apps/hearth/engine/tests/test_queue.cpp
+        ../apps/hearth/engine/tests/test_session.cpp
+        ../apps/hearth/engine/tests/test_settings_model.cpp
+        ../apps/hearth/engine/tests/test_stream_decoder.cpp
+        ../apps/hearth/engine/tests/test_transport.cpp)
     target_link_libraries(iclforge-apps-tests PRIVATE hearth_engine)
     # -Wnull-dereference false positive, GNU only: GCC at -O3 inlines std::operator==(const string&,
     # const char*) into a CHECK that compares a title against a literal ("b"), follows it down to
@@ -330,12 +330,12 @@ if(ICLFORGE_BUILD_HEARTH)
     # never null. Restructuring the test away from it was tried first and changes nothing, since the
     # comparison itself is what gets inlined; scoped to these two files rather than widened, for the
     # reason libs/ac3/tests/CMakeLists.txt gives for io/test_metadata_edit.cpp.
-    set_source_files_properties(hearth/test_queue.cpp hearth/test_transport.cpp
+    set_source_files_properties(../apps/hearth/engine/tests/test_queue.cpp ../apps/hearth/engine/tests/test_transport.cpp
         PROPERTIES COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:GNU>:-Wno-null-dereference>")
     # test_ac4_engine.cpp takes a directory of further AC-4 streams from std::getenv, as
     # libs/ac4/tests/decoder/test_api.cpp does - the same C4996 reasoning as that file's.
     if(ICLFORGE_IS_MSVC_LIKE)
-        set_source_files_properties(hearth/test_ac4_engine.cpp PROPERTIES COMPILE_OPTIONS "/wd4996")
+        set_source_files_properties(../apps/hearth/engine/tests/test_ac4_engine.cpp PROPERTIES COMPILE_OPTIONS "/wd4996")
     endif()
 
     # hearth_controller_tests - Catch2 coverage for hearth_controller.cpp's
@@ -359,12 +359,12 @@ if(ICLFORGE_BUILD_HEARTH)
         find_package(Qt6 6.8 QUIET COMPONENTS Core Gui Qml)
         if(Qt6_FOUND)
             add_executable(hearth_controller_tests
-                hearth/test_hearth_controller.cpp
-                "${CMAKE_SOURCE_DIR}/apps/hearth/ui/hearth_controller.hpp"
-                "${CMAKE_SOURCE_DIR}/apps/hearth/ui/item_loader.cpp"
-                "${CMAKE_SOURCE_DIR}/apps/hearth/ui/item_loader.hpp"
-                "${CMAKE_SOURCE_DIR}/apps/common/container_input.cpp"
-                "${CMAKE_SOURCE_DIR}/apps/common/container_input.hpp")
+                ../apps/hearth/ui/tests/test_hearth_controller.cpp
+                "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/hearth_controller.hpp"
+                "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/item_loader.cpp"
+                "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/item_loader.hpp"
+                "${CMAKE_SOURCE_DIR}/apps/shared/media/src/container_input.cpp"
+                "${CMAKE_SOURCE_DIR}/apps/shared/media/src/container_input.hpp")
             # hearth_controller.cpp itself is NOT listed as a source: it is
             # #include'd directly by test_hearth_controller.cpp (that file's own
             # header explains why - internal-linkage functions with no header to
@@ -378,7 +378,7 @@ if(ICLFORGE_BUILD_HEARTH)
             set_target_properties(hearth_controller_tests PROPERTIES AUTOMOC ON)
             target_include_directories(hearth_controller_tests PRIVATE
                 "${CMAKE_SOURCE_DIR}/apps/hearth/ui"
-                "${CMAKE_SOURCE_DIR}/apps/common")
+                "${CMAKE_SOURCE_DIR}/apps/shared/media/src")
             # A DEE AC-4 stream, for media_ac4_to_map()'s case.
             target_compile_definitions(hearth_controller_tests PRIVATE
                 "ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden/external-baseline\"")
@@ -432,36 +432,36 @@ if(ICLFORGE_BUILD_HEARTH)
         # (tools/sendspin/aiosendspin_group_exit.py) - a group with the scripted player as one
         # of its members, played from the app's own Engine.
         target_sources(iclforge-apps-tests PRIVATE
-            hearth/test_aiosendspin.cpp
-            hearth/test_aiosendspin_group.cpp
-            hearth/test_group.cpp
-            hearth/test_testsink.cpp
-            hearth/test_testsink_edges.cpp)
+            ../apps/hearth/engine/tests/test_aiosendspin.cpp
+            ../apps/hearth/engine/tests/test_aiosendspin_group.cpp
+            ../apps/hearth/engine/tests/test_group.cpp
+            ../apps/hearth/engine/tests/test_testsink.cpp
+            ../apps/hearth/engine/tests/test_testsink_edges.cpp)
         # The engine's pairing records, its Network page bookkeeping (A6), its
         # NetworkGroupSink (A6, streaming to a group) and issue #874's own
         # exit - a group of two test sinks played from iclforge::hearth::Engine
         # itself - all of which need libs/sendspin's server half, which a
         # core-only build leaves out.
         target_sources(iclforge-apps-tests PRIVATE
-            hearth/test_pairing_store.cpp
-            hearth/test_network_sinks.cpp
-            hearth/test_network_sinks_rows.cpp
-            hearth/test_network_live.cpp
-            hearth/test_server_host_dialling.cpp
-            hearth/test_server_identity.cpp
-            hearth/test_network_group_sink.cpp
-            hearth/test_engine_network_group.cpp
-            hearth/test_sink_firmware.cpp)
+            ../apps/hearth/engine/tests/test_pairing_store.cpp
+            ../apps/hearth/engine/tests/test_network_sinks.cpp
+            ../apps/hearth/engine/tests/test_network_sinks_rows.cpp
+            ../apps/hearth/engine/tests/test_network_live.cpp
+            ../apps/hearth/engine/tests/test_server_host_dialling.cpp
+            ../apps/hearth/engine/tests/test_server_identity.cpp
+            ../apps/hearth/engine/tests/test_network_group_sink.cpp
+            ../apps/hearth/engine/tests/test_engine_network_group.cpp
+            ../apps/hearth/engine/tests/test_sink_firmware.cpp)
         # A sink's firmware routes against a stand-in board on 127.0.0.1, which is a cpp-httplib
         # server, so compiled on its own with cpp-httplib configured as libs/sendspin configures
         # it - the reason libs/sendspin/tests gives for test_websocket.cpp.
-        add_library(iclforge_tests_sink_firmware_board OBJECT hearth/test_sink_firmware_board.cpp)
+        add_library(iclforge_tests_sink_firmware_board OBJECT ../apps/hearth/engine/tests/test_sink_firmware_board.cpp)
         target_link_libraries(iclforge_tests_sink_firmware_board
             PRIVATE hearth_engine iclforge::sendspin iclforge_sendspin_httplib iclforge::warnings iclforge::coverage Catch2::Catch2)
         target_link_libraries(iclforge-apps-tests PRIVATE iclforge_tests_sink_firmware_board)
         # The opt-in diagnostics endpoint (diagnostics_server.hpp) against a real bound server -
         # same reason, same isolation as iclforge_tests_sink_firmware_board just above.
-        add_library(iclforge_tests_diagnostics_server OBJECT hearth/test_diagnostics_server.cpp)
+        add_library(iclforge_tests_diagnostics_server OBJECT ../apps/hearth/engine/tests/test_diagnostics_server.cpp)
         target_link_libraries(iclforge_tests_diagnostics_server
             PRIVATE hearth_engine iclforge_sendspin_httplib iclforge::warnings iclforge::coverage Catch2::Catch2)
         target_link_libraries(iclforge-apps-tests PRIVATE iclforge_tests_diagnostics_server)
@@ -472,8 +472,8 @@ if(ICLFORGE_BUILD_HEARTH)
         # test_sink_firmware_board.cpp's live case its board and image.
         if(ICLFORGE_IS_MSVC_LIKE)
             set_source_files_properties(
-                hearth/test_aiosendspin.cpp hearth/test_aiosendspin_group.cpp hearth/test_network_live.cpp
-                hearth/test_sink_firmware_board.cpp
+                ../apps/hearth/engine/tests/test_aiosendspin.cpp ../apps/hearth/engine/tests/test_aiosendspin_group.cpp ../apps/hearth/engine/tests/test_network_live.cpp
+                ../apps/hearth/engine/tests/test_sink_firmware_board.cpp
                 PROPERTIES COMPILE_OPTIONS "/wd4996")
         endif()
     endif()
@@ -487,17 +487,17 @@ target_link_libraries(iclforge-apps-tests
         iclforge::containers
         iclforge::ac4)
 
-# crucible/test_translations.cpp reads the Crucible's six Qt Linguist
+# ../apps/crucible/ui/tests/test_translations.cpp reads the Crucible's six Qt Linguist
 # catalogues as files (no Qt in this target), on the same reasoning as the golden data's
 # directories (tests/support/CMakeLists.txt): a source-tree path, because ctest runs the binary
 # from the build tree.
 target_compile_definitions(iclforge-apps-tests
-    PRIVATE "ICLFORGE_CRUCIBLE_TS_DIR=\"${CMAKE_SOURCE_DIR}/apps/crucible/translations\""
+    PRIVATE "ICLFORGE_CRUCIBLE_TS_DIR=\"${CMAKE_SOURCE_DIR}/apps/crucible/ui/assets/translations\""
     # The GUI's seven catalogues are held to the same two rules as Crucible's
     # six, from the same parser. They were filled on 2026-09-06 and a rule
     # that holds them there belongs beside the one that holds Crucible's,
     # rather than in a workflow step on one leg.
-    PRIVATE "ICLFORGE_GUI_TS_DIR=\"${CMAKE_SOURCE_DIR}/apps/gui/translations\"")
+    PRIVATE "ICLFORGE_GUI_TS_DIR=\"${CMAKE_SOURCE_DIR}/apps/forge/gui/assets/translations\"")
 
 # ---------------------------------------------------------------------------
 # iclforge-perf - real-time throughput regression guards, deliberately a SEPARATE

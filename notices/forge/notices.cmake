@@ -155,12 +155,12 @@ ac3_generate_notices("${ICLFORGE_NOTICES_FILE}"
         # configuration, so the tracy fragment only ever names the one binary that does.
         "TRACY_USERS=forge-gui"
     FILES
-        "LGPL3=${CMAKE_SOURCE_DIR}/apps/crucible/notices/licences/LGPL-3.0.txt"
-        "OFL=${CMAKE_SOURCE_DIR}/apps/gui/fonts/OFL.txt"
-        "FMT_MIT=${CMAKE_SOURCE_DIR}/apps/crucible/notices/licences/MIT-fmt.txt"
-        "MESA_MIT=${CMAKE_SOURCE_DIR}/apps/crucible/notices/licences/MIT-mesa.txt"
-        "DXC_NCSA=${CMAKE_SOURCE_DIR}/apps/crucible/notices/licences/NCSA-dxc.txt"
-        "TRACY_BSD=${CMAKE_SOURCE_DIR}/apps/crucible/notices/licences/BSD-3-Clause-Tracy.txt")
+        "LGPL3=${CMAKE_SOURCE_DIR}/notices/licences/LGPL-3.0.txt"
+        "OFL=${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/OFL.txt"
+        "FMT_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-fmt.txt"
+        "MESA_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-mesa.txt"
+        "DXC_NCSA=${CMAKE_SOURCE_DIR}/notices/licences/NCSA-dxc.txt"
+        "TRACY_BSD=${CMAKE_SOURCE_DIR}/notices/licences/BSD-3-Clause-Tracy.txt")
 message(STATUS "Forge notices  : ${ICLFORGE_NOTICES_PLATFORM} build, sections: ${ICLFORGE_NOTICE_FRAGMENTS}")
 
 # ---------------------------------------------------------------------------

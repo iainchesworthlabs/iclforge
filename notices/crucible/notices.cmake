@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # This build's NOTICES.txt (docs/crucible/design/promotion.md, Phase 6).
 #
-# include()d from ../CMakeLists.txt once the two build facts that change the
+# include()d from ../../apps/crucible/CMakeLists.txt once the two build facts that change the
 # file are known - whether a Qt kit was found, and whether it has Quick 3D -
 # and before anything reads ICLFORGE_CRUCIBLE_NOTICES_FILE: the resource embeddings
 # (the window's and the test binary's) and the install rules.
@@ -51,7 +51,7 @@ endif()
 
 # The versions, from what CMake already holds: the kit's (cmake/FindQt6.cmake),
 # {fmt}'s from its package or the pinned fallback (cmake/Fmt.cmake), PipeWire's
-# from pkg-config (../CMakeLists.txt), Tracy's from its package (cmake/Tracy.cmake).
+# from pkg-config (../../apps/crucible/CMakeLists.txt), Tracy's from its package (cmake/Tracy.cmake).
 if(fmt_VERSION)
     set(ICLFORGE_CRUCIBLE_FMT_VERSION "${fmt_VERSION}")
 else()
@@ -100,8 +100,8 @@ ac3_generate_notices("${ICLFORGE_CRUCIBLE_NOTICES_FILE}"
         "TRACY_USERS=crucible and crucible-run"
     FILES
         "LGPL3=${ICLFORGE_CRUCIBLE_NOTICES_DIR}/licences/LGPL-3.0.txt"
-        "OFL=${CMAKE_SOURCE_DIR}/apps/gui/fonts/OFL.txt"
-        "MSPL=${CMAKE_SOURCE_DIR}/apps/windows/driver/LICENSE"
+        "OFL=${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/OFL.txt"
+        "MSPL=${CMAKE_SOURCE_DIR}/apps/crucible/windows/driver/LICENSE"
         "FMT_MIT=${ICLFORGE_CRUCIBLE_NOTICES_DIR}/licences/MIT-fmt.txt"
         "PW_MIT=${ICLFORGE_CRUCIBLE_NOTICES_DIR}/licences/MIT-pipewire.txt"
         "TRACY_BSD=${ICLFORGE_CRUCIBLE_NOTICES_DIR}/licences/BSD-3-Clause-Tracy.txt"

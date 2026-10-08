@@ -649,12 +649,12 @@ endif()
 # ICLFORGE_BUILD_* option - there is nothing to opt in or out of on a host
 # that isn't targeting WASM in the first place.
 if(EMSCRIPTEN)
-    add_subdirectory(apps/wasm)
+    add_subdirectory(apps/demos/wasm)
 endif()
 
 # The minimum-footprint probe, decoder or encoder (docs/building.md). Gated on
 # the profile rather than on an option of its own, for the same reason
-# apps/wasm is gated on EMSCRIPTEN: outside that profile there is no
+# apps/demos/wasm is gated on EMSCRIPTEN: outside that profile there is no
 # iclforge::ac3_minimal for it to link, so there is nothing to opt in or out of.
 if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
     # Guarded on existence because this tree is also PACKED, as the ESP-IDF
@@ -668,7 +668,7 @@ if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
 endif()
 
 # Forge's own LICENSE.txt and NOTICES.txt, and the install() rules that put
-# them in the `runtime` component (apps/notices/notices.cmake). After both
+# them in the `runtime` component (notices/forge/notices.cmake). After both
 # application subdirectories, because it needs ICLFORGE_BUILD_GUI settled and
 # ICLFORGE_GUI_QT_VERSION exported; before include(Packaging), because CPack
 # packages the install rules it declares. Gated on the two applications
@@ -682,7 +682,7 @@ endif()
 # runtime package had until now - and that is separate work, over install
 # rules in cmake/InstallLibrary.cmake rather than these, not started here.
 if(ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI)
-    include("${CMAKE_CURRENT_SOURCE_DIR}/apps/notices/notices.cmake")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/notices/forge/notices.cmake")
 endif()
 
 # After every target's install() rules (apps/cli, apps/gui) have been declared.

@@ -72,31 +72,31 @@ else()
     iclforge_stage_shared_qml(Hearth "${ICLFORGE_HEARTH_SHARED_DIR}" ICLFORGE_HEARTH_SHARED_OUT)
 
     qt_add_executable(hearth
-        main.cpp
-        hearth_controller.cpp
-        hearth_controller.hpp
-        item_loader.cpp
-        item_loader.hpp
-        network_controller.cpp
-        network_controller.hpp
-        qsettings_store.hpp
+        src/main.cpp
+        src/hearth_controller.cpp
+        src/hearth_controller.hpp
+        src/item_loader.cpp
+        src/item_loader.hpp
+        src/network_controller.cpp
+        src/network_controller.hpp
+        src/qsettings_store.hpp
         # The family's own translator installer, shared rather than copied -
         # apps/crucible/CMakeLists.txt takes it from the same place, and the
         # class's own header says it exists so a second Qt app in this
         # repository reuses it.
-        "${PROJECT_SOURCE_DIR}/apps/gui/language_manager.cpp"
-        "${PROJECT_SOURCE_DIR}/apps/gui/language_manager.hpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/language_manager.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/language_manager.hpp"
         # What a person saved under the program's old names, copied once at start-up;
         # shared by the three programs the same way.
-        "${PROJECT_SOURCE_DIR}/apps/gui/settings_migration.cpp"
-        "${PROJECT_SOURCE_DIR}/apps/gui/settings_migration.hpp"
-        "${PROJECT_SOURCE_DIR}/apps/common/container_input.cpp"
-        "${PROJECT_SOURCE_DIR}/apps/common/container_input.hpp")
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.hpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.hpp")
     target_include_directories(hearth PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}"
         "${PROJECT_SOURCE_DIR}/apps/gui"
         "${CMAKE_CURRENT_SOURCE_DIR}/../engine"
-        "${PROJECT_SOURCE_DIR}/apps/common")
+        "${PROJECT_SOURCE_DIR}/apps/shared/media/src")
     target_link_libraries(hearth PRIVATE
         hearth_engine
         # container_input.cpp's own container readers - apps/gui/CMakeLists.txt's
@@ -108,34 +108,34 @@ else()
         Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2)
 
     set(ICLFORGE_HEARTH_QML_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/Main.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/OutputPicker.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/PlayPage.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/PlayObjectsCard.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/PlaySignalPathCard.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/Media.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/Speakers.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/DecoderPage.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/DecoderEac3.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/DecoderAc4.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/Network.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/NetworkSinkList.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/NetworkPairing.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/NetworkSinkInfo.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/NetworkSinkSettings.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/NetworkSinkSpeakers.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/NetworkSinkDecoder.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/qml/NetworkSinkFirmware.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/NetworkSinkReport.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/NetworkSinkOnlyOnSink.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/NetworkGroupEdit.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/PlaceholderPage.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/Settings.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/ShortcutsDialog.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/TransportBar.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/AboutDialog.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/LicencesDialog.qml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/qml/FirstRunDialog.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Main.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/OutputPicker.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/PlayPage.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/PlayObjectsCard.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/PlaySignalPathCard.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Media.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Speakers.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/DecoderPage.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/DecoderEac3.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/DecoderAc4.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Network.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkSinkList.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkPairing.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkSinkInfo.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkSinkSettings.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkSinkSpeakers.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkSinkDecoder.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkSinkFirmware.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkSinkReport.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkSinkOnlyOnSink.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkGroupEdit.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/PlaceholderPage.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Settings.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/ShortcutsDialog.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/TransportBar.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/AboutDialog.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LicencesDialog.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/FirstRunDialog.qml"
         ${ICLFORGE_HEARTH_SHARED_OUT})
     foreach(qml_file IN LISTS ICLFORGE_HEARTH_QML_FILES)
         get_filename_component(qml_name "${qml_file}" NAME)
@@ -164,25 +164,25 @@ else()
     # ships this today, so it is not in apps/gui's own font resource list.
     qt_add_resources(hearth "hearth_fonts"
         PREFIX "/fonts"
-        BASE "${CMAKE_SOURCE_DIR}/apps/gui/fonts"
+        BASE "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts"
         FILES
-            "${CMAKE_SOURCE_DIR}/apps/gui/fonts/Archivo-Regular.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/gui/fonts/Archivo-Medium.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/gui/fonts/Archivo-SemiBold.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/gui/fonts/Archivo-ExtraBold.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/gui/fonts/MaterialSymbolsSharp-Regular.ttf"
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-Regular.ttf"
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-Medium.ttf"
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-SemiBold.ttf"
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-ExtraBold.ttf"
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/MaterialSymbolsSharp-Regular.ttf"
             # Archivo has no Arabic or Hebrew coverage, and Yiddish is
             # written in Hebrew script, so without these two faces three of
             # the six languages below render as tofu. apps/gui bundles the
             # same pair for the same reason.
-            "${CMAKE_SOURCE_DIR}/apps/gui/fonts/NotoSansArabic.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/gui/fonts/NotoSansHebrew.ttf")
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/NotoSansArabic.ttf"
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/NotoSansHebrew.ttf")
     qt_add_resources(hearth "hearth_icons"
         PREFIX "/icons"
-        BASE "${CMAKE_SOURCE_DIR}/apps/gui/icons"
+        BASE "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons"
         FILES
-            "${CMAKE_SOURCE_DIR}/apps/gui/icons/iclforge-32.png"
-            "${CMAKE_SOURCE_DIR}/apps/gui/icons/iclforge-256.png")
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge-32.png"
+            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge-256.png")
     # The package's own NOTICES.txt, so the Licences dialog (About > Licences)
     # shows exactly what this build ships - the same qt_add_resources call
     # apps/crucible/CMakeLists.txt makes for crucible_notices. A
@@ -210,7 +210,7 @@ else()
     # whose source string is gone is kept as translation memory otherwise,
     # and git history is that memory.
     #
-    # They carry every source string and NO translations yet - each entry is
+    # They carry every source string and NO assets/translations yet - each entry is
     # marked unfinished, which is what Qt calls an untranslated message, and
     # what it does with one is fall back to the English source. So choosing a
     # language today changes the layout direction and the font (which is why
@@ -225,16 +225,16 @@ else()
     # CI does check that they match the sources: the windows-msvc leg
     # reruns hearth_lupdate and fails if the result differs from what is
     # committed in anything but <location> lines
-    # (.github/workflows/_ci-windows.yml, "Check the Hearth translations are
+    # (.github/workflows/_ci-windows.yml, "Check the Hearth assets/translations are
     # up to date"). So moving a string within its file needs no
     # regeneration, and adding, removing or rewording one does.
     set(ICLFORGE_HEARTH_TS_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/translations/hearth_fr.ts"
-        "${CMAKE_CURRENT_SOURCE_DIR}/translations/hearth_de.ts"
-        "${CMAKE_CURRENT_SOURCE_DIR}/translations/hearth_es.ts"
-        "${CMAKE_CURRENT_SOURCE_DIR}/translations/hearth_ar.ts"
-        "${CMAKE_CURRENT_SOURCE_DIR}/translations/hearth_he.ts"
-        "${CMAKE_CURRENT_SOURCE_DIR}/translations/hearth_yi.ts")
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/hearth_fr.ts"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/hearth_de.ts"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/hearth_es.ts"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/hearth_ar.ts"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/hearth_he.ts"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/hearth_yi.ts")
     qt_add_translations(hearth
         IMMEDIATE_CALL
         SOURCE_TARGETS hearth
@@ -246,24 +246,24 @@ else()
     set_target_properties(hearth PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
     if(WIN32)
         enable_language(RC)
-        set(ICLFORGE_GUI_ICON_ICO "${CMAKE_SOURCE_DIR}/apps/gui/icons/iclforge.ico")
+        set(ICLFORGE_GUI_ICON_ICO "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge.ico")
         file(TO_CMAKE_PATH "${ICLFORGE_GUI_ICON_ICO}" ICLFORGE_GUI_ICON_ICO)
-        configure_file("${CMAKE_SOURCE_DIR}/apps/gui/icons/forge-gui.rc.in" "${CMAKE_CURRENT_BINARY_DIR}/hearth.rc" @ONLY)
+        configure_file("${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/forge-gui.rc.in" "${CMAKE_CURRENT_BINARY_DIR}/hearth.rc" @ONLY)
         target_sources(hearth PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/hearth.rc")
         set_target_properties(hearth PROPERTIES WIN32_EXECUTABLE ON)
     elseif(APPLE)
-        set(ICLFORGE_HEARTH_ICON_ICNS "${CMAKE_SOURCE_DIR}/apps/gui/icons/iclforge.icns")
+        set(ICLFORGE_HEARTH_ICON_ICNS "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge.icns")
         set_source_files_properties("${ICLFORGE_HEARTH_ICON_ICNS}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
         target_sources(hearth PRIVATE "${ICLFORGE_HEARTH_ICON_ICNS}")
         set_target_properties(hearth PROPERTIES MACOSX_BUNDLE ON)
 
-        # A custom Info.plist (Info.plist.in, beside this file), the same
+        # A custom Info.plist (packaging/macos/Info.plist.in, beside this file), the same
         # reason and shape as apps/gui/CMakeLists.txt's own APPLE branch:
         # hearth now owns .ac3/.ec3's CFBundleDocumentTypes/
         # UTExportedTypeDeclarations (Hearth phase A7), which the default
         # template CMake would otherwise generate carries neither. These are
         # plain CMake variables, not target properties, because that is what
-        # CMake's own bundle-generation logic substitutes into Info.plist.in's
+        # CMake's own bundle-generation logic substitutes into packaging/macos/Info.plist.in's
         # ${VAR} tokens.
         set(MACOSX_BUNDLE_EXECUTABLE_NAME "hearth")
         set(MACOSX_BUNDLE_BUNDLE_NAME "Hearth")
@@ -276,7 +276,7 @@ else()
         set(MACOSX_BUNDLE_LONG_VERSION_STRING "${PROJECT_VERSION_FULL}")
         set(MACOSX_BUNDLE_COPYRIGHT "Copyright (c) Iain Chesworth")
         set_target_properties(hearth PROPERTIES
-            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in")
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/Info.plist.in")
     endif()
 
     # Qt runtime next to the executable, as apps/gui and apps/crucible do it,
@@ -289,7 +289,7 @@ else()
         if(ICLFORGE_HEARTH_WINDEPLOYQT)
             add_custom_command(TARGET hearth POST_BUILD
                 COMMAND "${ICLFORGE_HEARTH_WINDEPLOYQT}"
-                    --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/qml"
+                    --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml"
                     --qmldir "${ICLFORGE_HEARTH_SHARED_DIR}"
                     --compiler-runtime
                     "$<TARGET_FILE:hearth>"
@@ -411,10 +411,10 @@ else()
             DESTINATION "${CMAKE_INSTALL_DATADIR}/applications" COMPONENT hearth)
         install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/hearth.metainfo.xml"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo" COMPONENT hearth)
-        install(FILES "${CMAKE_SOURCE_DIR}/apps/gui/icons/iclforge-256.png"
+        install(FILES "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge-256.png"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"
             RENAME "hearth.png" COMPONENT hearth)
-        install(FILES "${CMAKE_SOURCE_DIR}/apps/gui/icons/iclforge-32.png"
+        install(FILES "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge-32.png"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/32x32/apps"
             RENAME "hearth.png" COMPONENT hearth)
         # The notices and the licence under share/doc/<package>/, where a

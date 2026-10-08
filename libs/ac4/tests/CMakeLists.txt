@@ -92,8 +92,8 @@ if(NOT BUILD_SHARED_LIBS)
         encoder/test_writer.cpp
         # decoder/test_object_render.cpp's subject is Forge's shared code (apps/common), compiled
         # in as source; it moves to that code's own tests with it (planning/monorepo.md, C7-2).
-        "${PROJECT_SOURCE_DIR}/apps/common/ac4_object_render.cpp")
-    target_include_directories(iclforge-ac4-tests PRIVATE "${PROJECT_SOURCE_DIR}/apps/common")
+        "${PROJECT_SOURCE_DIR}/apps/shared/media/src/ac4_object_render.cpp")
+    target_include_directories(iclforge-ac4-tests PRIVATE "${PROJECT_SOURCE_DIR}/apps/shared/media/src")
     target_link_libraries(iclforge-ac4-tests PRIVATE iclforge::objects iclforge::render)
 endif()
 

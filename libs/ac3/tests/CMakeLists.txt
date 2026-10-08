@@ -58,7 +58,7 @@ iclforge_add_test_binary(iclforge-ac3-tests PROJECT ac3 SOURCES
     decoder/test_output_stage.cpp
     meta/test_loudness.cpp
     core/test_mantissas.cpp
-    test_container_input.cpp
+    ../../../apps/shared/media/tests/test_container_input.cpp
     core/test_mdct.cpp
     core/test_mdct_fast.cpp
     meta/test_meta_qc.cpp
@@ -301,17 +301,17 @@ if(NOT BUILD_SHARED_LIBS)
 endif()
 
 # Two of these tests' subjects are Forge's shared code in apps/common, compiled in as source:
-# test_container_input.cpp holds iclforge::apps::sniff_container/elementary_stream_from_bytes, which
+# ../../../apps/shared/media/tests/test_container_input.cpp holds iclforge::apps::sniff_container/elementary_stream_from_bytes, which
 # decode/qc/levels/play/monitor and the GUI's QC/Inspect pickers all call, so a sniffing
 # regression belongs in the plain Catch2 suite rather than only in the Python encoder-space fuzzer
 # that first found one (REGRESSION_SEEDS' 3600083275727211684 in tools/ci/fuzz_encoder_space.py) -
 # this file covers it deterministically and without needing ffmpeg on the machine running it.
-# decoder/test_stream_playback.cpp holds stream_playback.cpp, for the reason its own header gives:
+# ../../../apps/shared/media/tests/test_stream_playback.cpp holds stream_playback.cpp, for the reason its own header gives:
 # 'monitor' and 'spatial' pick their decoder and drain the end-of-stream flush through it, and
 # neither command reaches its decode loop without a render device. They move to that code's own
 # tests with it (planning/monorepo.md, C7-2).
 target_sources(iclforge-ac3-tests PRIVATE
-    decoder/test_stream_playback.cpp
-    "${PROJECT_SOURCE_DIR}/apps/common/container_input.cpp"
-    "${PROJECT_SOURCE_DIR}/apps/common/stream_playback.cpp")
-target_include_directories(iclforge-ac3-tests PRIVATE "${PROJECT_SOURCE_DIR}/apps/common")
+    ../../../apps/shared/media/tests/test_stream_playback.cpp
+    "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.cpp"
+    "${PROJECT_SOURCE_DIR}/apps/shared/media/src/stream_playback.cpp")
+target_include_directories(iclforge-ac3-tests PRIVATE "${PROJECT_SOURCE_DIR}/apps/shared/media/src")

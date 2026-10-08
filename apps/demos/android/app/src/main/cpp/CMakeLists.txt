@@ -13,7 +13,7 @@
 #     links those two libraries plus this app's own native sources.
 #
 # See docs/platforms/android.md for the full architecture writeup and
-# ../../../../../../CMakeLists.txt (the repo root, six directories up: cpp ->
+# ../../../../../../../CMakeLists.txt (the repo root, six directories up: cpp ->
 # main -> src -> app -> android -> apps -> repo root) for what
 # add_subdirectory() below actually configures.
 # ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@
 # itself runs - not a mock: every leaf QML component already reads it
 # directly rather than through passed-in properties, and this project's own
 # code deliberately avoids a second, parallel API that the real one could
-# silently disagree with (see encoder_controller.hpp's own header comment).
+# silently disagree with (see src/encoder_controller.hpp's own header comment).
 #
 # Included (not add_subdirectory()'d) from ../CMakeLists.txt, so every path
 # below is written relative to apps/gui, not apps/gui/tests - see the comment
@@ -22,39 +22,39 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS QuickTest)
 
 qt_add_executable(forge_gui_qmltests
     tests/qml_test_main.cpp
-    encoder_controller.cpp
-    encoder_controller.hpp
-    qc_controller.cpp
-    qc_controller.hpp
-    object_decode_controller.cpp
-    object_decode_controller.hpp
-    stream_player_controller.cpp
-    stream_player_controller.hpp
-    background_jobs.hpp
-    channel_geometry.cpp
-    channel_geometry.hpp
-    gui_diagnostics.cpp
-    gui_diagnostics.hpp
-    ac4_encode_settings.cpp
-    ac4_encode_settings.hpp
-    ac4_presentations.cpp
-    ac4_presentations.hpp
-    ../common/ac4_sync_word.hpp
-    ../common/fmp4_folder_writer.cpp
-    ../common/fmp4_folder_writer.hpp
-    ../common/recording_sink.cpp
-    ../common/recording_sink.hpp
-    ../common/container_input.cpp
-    ../common/container_input.hpp
-    ../common/ac4_encode_core.cpp
-    ../common/ac4_encode_core.hpp
-    ../common/ac4_objects_core.cpp
-    ../common/ac4_objects_core.hpp
-    ../common/ac4_channels.hpp
-    system_theme.cpp
-    system_theme.hpp
-    language_manager.cpp
-    language_manager.hpp)
+    src/encoder_controller.cpp
+    src/encoder_controller.hpp
+    src/qc_controller.cpp
+    src/qc_controller.hpp
+    src/object_decode_controller.cpp
+    src/object_decode_controller.hpp
+    src/stream_player_controller.cpp
+    src/stream_player_controller.hpp
+    src/background_jobs.hpp
+    src/channel_geometry.cpp
+    src/channel_geometry.hpp
+    src/gui_diagnostics.cpp
+    src/gui_diagnostics.hpp
+    src/ac4_encode_settings.cpp
+    src/ac4_encode_settings.hpp
+    src/ac4_presentations.cpp
+    src/ac4_presentations.hpp
+    ../../shared/media/src/ac4_sync_word.hpp
+    ../../shared/media/src/fmp4_folder_writer.cpp
+    ../../shared/media/src/fmp4_folder_writer.hpp
+    ../../shared/media/src/recording_sink.cpp
+    ../../shared/media/src/recording_sink.hpp
+    ../../shared/media/src/container_input.cpp
+    ../../shared/media/src/container_input.hpp
+    ../../shared/media/src/ac4_encode_core.cpp
+    ../../shared/media/src/ac4_encode_core.hpp
+    ../../shared/media/src/ac4_objects_core.cpp
+    ../../shared/media/src/ac4_objects_core.hpp
+    ../../shared/media/src/ac4_channels.hpp
+    ../../shared/theme/src/system_theme.cpp
+    ../../shared/theme/src/system_theme.hpp
+    ../../shared/preferences/src/language_manager.cpp
+    ../../shared/preferences/src/language_manager.hpp)
 
 # apps/common, for the same reason ../CMakeLists.txt names it: RecordingSink
 # and Fmp4FolderWriter moved there when forge's own takes started streaming
@@ -63,7 +63,7 @@ qt_add_executable(forge_gui_qmltests
 # always did - qc_controller.cpp/object_decode_controller.cpp call
 # iclforge::apps::elementary_stream_from_bytes too, so it needs the same
 # definition forge-gui's own target links.
-target_include_directories(forge_gui_qmltests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../common")
+target_include_directories(forge_gui_qmltests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/media/src")
 
 qt_add_qml_module(forge_gui_qmltests
     URI ForgeGui
@@ -261,8 +261,8 @@ foreach(ICLFORGE_GUI_QML_TEST_FILE IN LISTS ICLFORGE_GUI_QML_TEST_FILES)
     # forced deterministically rather than whatever this machine's own
     # system locale happens to be - LanguageManager::applyInitialLanguage()
     # reads ICLFORGE_GUI_LOCALE ahead of the persisted setting/system locale for
-    # exactly this (language_manager.cpp), and "xx" selects the pseudo-
-    # locale QA fixture (translations/forge_gui_xx.ts) every other suite has no
+    # exactly this (../../shared/preferences/src/language_manager.cpp), and "xx" selects the pseudo-
+    # locale QA fixture (assets/translations/forge_gui_xx.ts) every other suite has no
     # reason to load.
     set(ICLFORGE_GUI_QML_TEST_ENV "${ICLFORGE_GUI_QMLTESTS_ENV}")
     if(ICLFORGE_GUI_QML_TEST_SUITE STREQUAL "localisation_pipeline")
@@ -306,7 +306,7 @@ if(WIN32)
         add_custom_command(TARGET forge_gui_qmltests POST_BUILD
             COMMAND "${CMAKE_COMMAND}" -E env "VCINSTALLDIR=${AC3_VCINSTALLDIR}"
                 "${AC3_WINDEPLOYQT_EXECUTABLE}"
-                --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/qml"
+                --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml"
                 --compiler-runtime
                 "$<TARGET_FILE:forge_gui_qmltests>"
             COMMAND "${CMAKE_COMMAND}" -E copy_if_different

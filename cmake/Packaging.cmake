@@ -55,8 +55,8 @@ if(WIN32)
         # installer/uninstaller windows and shortcut both otherwise default
         # to NSIS's own generic icon. NSIS wants a Windows .ico specifically
         # for both variables, which generate_icons.py already produces.
-        set(CPACK_NSIS_MUI_ICON "${PROJECT_SOURCE_DIR}/apps/gui/icons/iclforge.ico")
-        set(CPACK_NSIS_MUI_UNIICON "${PROJECT_SOURCE_DIR}/apps/gui/icons/iclforge.ico")
+        set(CPACK_NSIS_MUI_ICON "${PROJECT_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge.ico")
+        set(CPACK_NSIS_MUI_UNIICON "${PROJECT_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge.ico")
 
         # Start Menu entries. Until this, the installer laid forge.exe and
         # forge-gui.exe down under $INSTDIR\bin and created nothing anywhere a
