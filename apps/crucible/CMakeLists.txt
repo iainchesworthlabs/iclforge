@@ -268,7 +268,7 @@ set_target_properties(crucible-run PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_
 # Theme, Card, RailBlock and SegmentedControl are the GUI's own files, not
 # copies: cmake/SharedFamilyQml.cmake reads each at configure time, rewrites
 # its `import ForgeGui` to this module's URI, and writes the result to an
-# ignored directory under ui/assets/qml Edit apps/gui/qml/*.qml and both apps
+# ignored directory under ui/assets/qml Edit apps/shared/theme/assets/qml/*.qml and every app
 # follow. The Theme needs the GUI's SystemTheme singleton (the desktop accent
 # colour), so that C++ is compiled into this target too, where QML_ELEMENT
 # registers it in this module.

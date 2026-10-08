@@ -87,7 +87,7 @@ $scanRoots = @($srcRoot)
 # 2026-09-23 and cost nothing to hold; tests/ and python/ were cleaned to join
 # them. A library's own tests and fuzz targets are in libs/<lib>/ (planning/monorepo.md, C7-1),
 # so libs/ holds what libs/, tests/ and fuzz/ held; external/ is the vendored code that was in
-# src/sendspin/third_party.
+# the sendspin library.
 foreach ($name in @('apps', 'tests', 'external', 'examples', 'tools', 'python')) {
     $candidate = Join-Path $Root $name
     if (Test-Path $candidate) {

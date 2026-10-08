@@ -158,7 +158,7 @@ jobs:
       # missing apt package, which is why this comment spells it out.
       #
       # The qml6-module-* lines are the RUNTIME modules forge-gui's own imports
-      # resolve to, read off apps/gui/qml/*.qml: QtQuick, Controls and the
+      # resolve to, read off apps/forge/gui/assets/qml/*.qml: QtQuick, Controls and the
       # Templates underneath them, Dialogs and the folder model its
       # non-native FileDialog falls back on, Layouts, Window, QtCore for
       # Main.qml's Settings, and the two QtQml modules QtQuick's own qmldir
@@ -887,7 +887,7 @@ jobs:
             echo "::error::the Crucible window was not configured although Qt $QT_VER is present: see the configure log above"
             exit 1
           fi
-          cmake --build build/crucible --target crucible crucible_qmltests iclforge-tests -- -k 0
+          cmake --build build/crucible --target crucible crucible_qmltests iclforge-crucible-tests iclforge-audio-tests -- -k 0
           test -x build/crucible/bin/crucible || {
             echo "::error::the Crucible build reported success but produced no crucible"
             exit 1
@@ -899,7 +899,8 @@ jobs:
           # leg runs on PipeWire; then the window's Qt Quick suite, headless.
           # --no-tests=error, because a label with nothing behind it once
           # passed a step like this having run nothing.
-          (cd build/crucible && ./bin/iclforge-tests "[crucible],[seams],[audio-backend]")
+          (cd build/crucible && ./bin/iclforge-crucible-tests "[crucible],[seams]" \
+            && ./bin/iclforge-audio-tests "[audio-backend]")
           QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
             ctest --test-dir build/crucible -L crucible-ui --no-tests=error --output-on-failure
 
@@ -1057,7 +1058,7 @@ jobs:
       # characteristic of this configuration, not runner noise, and not a
       # regression in the codec itself.
       #
-      # ctest alone cannot say whether iclforge-tests ran against libiclforge_ac3.so, and
+      # ctest alone cannot say whether iclforge-ac3-tests ran against libiclforge_ac3.so, and
       # at one point it did not: the C API library embeds the codec as a static
       # archive, exported its C++ symbols, and put the archive on the link line
       # of everything that linked it, all of which beat the .so. Every test
@@ -1076,7 +1077,7 @@ jobs:
           cmake --build build/config-linux-llvm-shared -- -k 0
           ctest --preset test-linux-llvm-shared -LE Performance
           bash tools/checks/check_shared_forge_binding.sh \
-            build/config-linux-llvm-shared/bin/iclforge-tests \
+            build/config-linux-llvm-shared/bin/iclforge-ac3-tests \
             build/config-linux-llvm-shared/libs/ac3/libiclforge_ac3.so \
             build/config-linux-llvm-shared/libs/base/libiclforge_base.so \
             build/config-linux-llvm-shared/libs/dsp/libiclforge_dsp.so \

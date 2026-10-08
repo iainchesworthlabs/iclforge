@@ -272,7 +272,7 @@ QtObject {
     // scale has no rung for (8, 19, 20, 26, 30 and 52) are written inline as
     // Math.round(n * Theme.fontScale), the form Crucible's own Main.qml
     // already used for its status pill. Before trusting the claim again:
-    //   grep -n "font.pixelSize: [0-9]" apps/gui/qml/*.qml apps/crucible/ui/assets/qml/*.qml
+    //   grep -n "font.pixelSize: [0-9]" apps/forge/gui/assets/qml/*.qml apps/shared/theme/assets/qml/*.qml apps/crucible/ui/assets/qml/*.qml
     // Three hits are expected and correct: Room3DView.qml sizes text that is a
     // face INSIDE the 3D scene, in scene units against the room's own 400-unit
     // width rather than in screen pixels, and each of the three says so where

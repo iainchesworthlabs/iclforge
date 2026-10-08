@@ -594,7 +594,7 @@ class Ac4Encoder {
     // Planar samples at full scale 1.0, one Float32Array per input channel (or
     // per object of the object substream) - the same shape encoder_
     // bindings.cpp's copy_channels()/spans_of() take, reimplemented locally
-    // here since this is a separate translation unit (apps/wasm/decoder_
+    // here since this is a separate translation unit (apps/demos/wasm/decoder_
     // bindings.cpp and encoder_bindings.cpp are likewise each fully
     // self-contained, sharing no helper header between them) - and the changes
     // to the objects' metadata within this input or after it, as an array of

@@ -62,11 +62,11 @@ else()
 
     qt_standard_project_setup(REQUIRES 6.8)
 
-    # The shared family components, copied from apps/gui/qml and rewritten by
+    # The shared family components, copied from apps/shared/theme/assets/qml and rewritten by
     # cmake/SharedFamilyQml.cmake's iclforge_stage_shared_qml() - the same
     # function apps/crucible/CMakeLists.txt calls (see that file's header for
     # why this is a shared function rather than each app running its own copy
-    # of the loop). Edit apps/gui/qml/*.qml and every app that copies it follows.
+    # of the loop). Edit apps/shared/theme/assets/qml/*.qml and every app that copies it follows.
     include(SharedFamilyQml)
     set(ICLFORGE_HEARTH_SHARED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/shared")
     iclforge_stage_shared_qml(Hearth "${ICLFORGE_HEARTH_SHARED_DIR}" ICLFORGE_HEARTH_SHARED_OUT)

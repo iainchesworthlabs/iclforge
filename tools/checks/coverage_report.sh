@@ -11,7 +11,7 @@
 # libs/ac3 - and "which module is thin" is exactly the question a
 # per-component table exists to answer.
 #
-# apps/forge/cli/src is gated here too (coverage floors), not just src/. It is about 6,500
+# apps/forge/cli/src is gated here too (coverage floors), not just libs/. It is about 6,500
 # lines across seven command modules, it is the executable the codec matrix,
 # the gold-reference gate and the encoder-space fuzzer all drive, and it had
 # no floor at all - while the two CLI bugs this project has actually shipped
@@ -88,7 +88,7 @@ if [[ ! -f CMakePresets.json ]]; then
 fi
 
 # Component floors, one row per component: <path> <line%> <branch%>. A path,
-# not a bare name, since coverage floors added apps/ alongside src/.
+# not a bare name, since coverage floors added apps/ alongside libs/.
 #
 # Calibrated 2026-08-20 (src/*) and 2026-08-24 (apps/forge/cli/src, re-measured after
 # merging container readers (mkv/mp4/ts)'s container-reader/probe work) against WSL2 runs on
@@ -157,7 +157,7 @@ fi
 # libs/containers, which takes the lowest line and branch floors of the five until a coverage run
 # measures it.
 #
-# apps/crucible/engine is the platform-free engine core iclforge-tests compiles in;
+# apps/crucible/engine/src is the platform-free engine core iclforge-crucible-tests compiles in;
 # the rest of apps/crucible keeps its own floors in coverage_crucible.ps1.
 components="
 libs/ac3               90 82
@@ -174,7 +174,7 @@ libs/ac4               88 80
 libs/iab               90 87
 apps/forge/cli/src              80 71
 apps/shared/media/src           78 66
-apps/crucible/engine  90 82
+apps/crucible/engine/src        90 82
 apps/hearth           87 77
 "
 
@@ -220,10 +220,10 @@ html="$build_dir/coverage.html"
 gcovr --root . \
     --filter 'libs/(ac3|base|dsp|objects|render|containers|audio|capi|adm|sendspin|ac4|iab)/.*' \
     --exclude 'libs/[^/]*/(tests|fuzz)/.*' \
-    --filter 'apps/cli/.*' \
-    --filter 'apps/shared/media/.*' \
-    --filter 'apps/crucible/engine/.*' \
-    --filter 'apps/hearth/(engine|testsink)/.*' \
+    --filter 'apps/forge/cli/src/.*' \
+    --filter 'apps/shared/media/src/.*' \
+    --filter 'apps/crucible/engine/src/.*' \
+    --filter 'apps/hearth/(engine|testsink)/src/.*' \
     --gcov-executable "$gcov_exe" \
     --exclude-throw-branches --exclude-unreachable-branches \
     --gcov-ignore-errors=no_working_dir_found \

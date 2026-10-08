@@ -477,7 +477,7 @@ endif()
 
 # Live capture, monitor playback and IEC 61937 passthrough - the only
 # platform-specific code in the project. After libs/ac3 and libs/containers (it links
-# the codec, and the containers' IEC 61937 framer); before apps/cli/apps/gui/tests, which
+# the codec, and the containers' IEC 61937 framer); before apps/forge/cli, apps/forge/gui and the tests, which
 # link it alongside iclforge::ac3 for their live-audio commands/features. Not
 # linked by examples/ - none of them touch live audio.
 #

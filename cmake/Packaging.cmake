@@ -249,7 +249,7 @@ elseif(UNIX)
         #   without them installs cleanly and then dies at the first import
         #   - which is what the released .deb has been doing.
         #
-        # The list is forge-gui's own imports, read off apps/gui/qml/*.qml, not
+        # The list is forge-gui's own imports, read off apps/forge/gui/assets/qml/*.qml, not
         # copied from the Crucible pass in .github/workflows/_build.yml: the
         # two windows import different things. forge-gui imports QtQuick,
         # QtQuick.Controls, QtQuick.Dialogs, QtQuick.Layouts, QtQuick.Window
@@ -394,7 +394,7 @@ receiver over HDMI or S/PDIF as a bitstream. In a group, the ESP32 sinks take
 AC-3 and E-AC-3 only.")
             # The QML modules THIS window's own qml/*.qml files import today
             # (apps/hearth/ui/assets/qml/, plus the shared family components it
-            # copies from apps/gui/qml/) - the same shlibdeps gap and the
+            # copies from apps/shared/theme/assets/qml/) - the same shlibdeps gap and the
             # same reasoning as CPACK_DEBIAN_RUNTIME_PACKAGE_DEPENDS's own
             # comment above: a QML import is invisible to a library-level
             # scan in every case, distro kit or not, so this states what the

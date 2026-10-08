@@ -318,7 +318,7 @@ jobs:
   # two more steps inside it, matching how every other gate here is shaped: the
   # two verdicts stay independent, so a flake while timing the speed benches
   # cannot take the memory verdict with it. The cost of that independence is a
-  # second container bootstrap and vcpkg setup on each entry that changes src/.
+  # second container bootstrap and vcpkg setup on each entry that changes libs/.
   memory-compare:
     name: Memory vs base
     runs-on: ${{ fromJSON(inputs.runner) }}

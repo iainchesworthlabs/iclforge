@@ -2,7 +2,7 @@
   "_comment": "The AC-4 float decode's agreement with the double decode, per committed stream (tools/checks/check_ac4_decode_scalar_snr.py): the floors, in dB, of the worst channel's SNR below the lowest A-SPX crossover and above the highest, over half-overlapped Hann frames of 2048 samples, a channel with less than 1e-6 in a region (per frame) left out of it. Each is the figure measured on 2026-09-30 less 3.0 dB (the three IMS streams', whose frame-rate converter runs at float, measured again after D14a4 moved it there); MSVC, GCC 16 and Clang 22 gave figures within 0.1 dB of one another. Re-pin when a stream's decode changes on purpose.",
   "margin_db": 3.0,
   "streams": {
-    "apps/gui/tests/fixtures/ac4-objects.ac4": {
+    "apps/forge/gui/tests/fixtures/ac4-objects.ac4": {
       "below": 132.7,
       "above": 98.5
     },

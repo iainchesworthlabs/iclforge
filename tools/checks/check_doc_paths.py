@@ -41,7 +41,7 @@ runnable the same way locally:
     and CHANGELOG.md, whose released entries are immutable. Their links are
     still checked; only their prose is exempt.
 
-(c) Every path literal starting docs/, apps/, libs/, external/, src/ or tools/ inside
+(c) Every path literal starting docs/, apps/, libs/, external/, notices/, src/ or tools/ inside
     .github/workflows/*.yml, cmake/**/*.cmake, CMakePresets.json and
     tools/**/*.{py,sh,ps1} names something that exists. Conservative on
     purpose. A token has to start at a word boundary, contain a slash and end
@@ -97,7 +97,7 @@ LITERAL_GLOBS = (
 # The prefixes the literal check treats as a repo-relative path.
 # "src" stays: there is no top-level src/ since planning/monorepo.md's C7-1, so a literal that
 # starts with it is a path nothing moved, and is reported unless FOREIGN_PATHS says whose it is.
-LITERAL_PREFIXES = ("docs", "apps", "libs", "external", "src", "tools")
+LITERAL_PREFIXES = ("docs", "apps", "libs", "external", "notices", "src", "tools")
 
 # Tokens that read as repo-relative paths but are not. Each is a deliberate
 # exception with its reason, printed on every run so the list stays under the
@@ -153,9 +153,9 @@ PROSE_PATHS_UNCHECKED = {
         "inventory; a dated snapshot of the tree, naming the paths the proposed layout moves"
     ),
     "docs/crucible/design/promotion.md": (
-        "phase record; names the pre-promotion apps/crucible/windows layout"
+        "phase record; names the layout from before Crucible's promotion"
     ),
-    "docs/platforms/windows-demo.md": "phase record; names the pre-promotion apps/crucible/windows layout",
+    "docs/platforms/windows-demo.md": "phase record; names the layout from before Crucible's promotion",
     "CHANGELOG.md": "released entries are an immutable record of the tree as it was",
 }
 

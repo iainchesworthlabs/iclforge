@@ -37,29 +37,41 @@ import sys
 from collections.abc import Iterable
 
 # Directory prefixes that put a changed path in a lane. A path can land in
-# more than one lane - apps/forge/cli/src/ is windows AND linux AND macos, because it
+# more than one lane - apps/forge/cli/ is windows AND linux AND macos, because it
 # is one desktop CLI built and tested on all three, not three separate
 # programs. Every prefix ends in "/" so a differently-named sibling directory
 # that merely starts with the same characters cannot accidentally match.
+# A program's tests are beside it (planning/monorepo.md), and the Catch2 binaries among them are
+# core's still, as they were in tests/: the Qt Quick suites that sat next to the windows stay with
+# the program. A directory that holds both kinds names its Catch2 files by their test_ prefix.
+APP_TESTS = (
+    "apps/forge/cli/tests/", "apps/shared/media/tests/", "apps/shared/preferences/tests/",
+    "apps/hearth/engine/tests/", "apps/crucible/engine/tests/",
+    "apps/forge/gui/tests/test_", "apps/hearth/ui/tests/test_hearth_controller.cpp",
+    "apps/crucible/ui/tests/test_desktop_entries.cpp", "apps/crucible/ui/tests/test_translations.cpp",
+)
 LANE_PREFIXES: dict[str, tuple[str, ...]] = {
     "core": (
         "libs/", "external/", "tests/", "tools/fuzz/", "cmake/", "tools/checks/", "tools/ci/",
-        "requirements/",
+        "requirements/", *APP_TESTS,
     ),
     "windows": (
-        "apps/crucible/windows/", "notices/forge/platform/windows/", "packaging/winget/",
+        "notices/forge/platform/windows/", "packaging/winget/",
         "packaging/conan/", "packaging/vcpkg-port/",
-        "apps/forge/cli/src/", "apps/forge/gui/", "apps/shared/media/src/", "apps/crucible/", "apps/hearth/",
+        "apps/forge/cli/", "apps/forge/gui/", "apps/shared/", "apps/crucible/", "apps/hearth/",
+        "notices/crucible/", "notices/hearth/", "notices/fragments/", "notices/licences/",
     ),
     "linux": (
-        "apps/crucible/linux/", "notices/forge/platform/linux/",
+        "notices/forge/platform/linux/",
         "packaging/conan/", "packaging/vcpkg-port/",
-        "apps/forge/cli/src/", "apps/forge/gui/", "apps/shared/media/src/", "apps/crucible/", "apps/hearth/",
+        "apps/forge/cli/", "apps/forge/gui/", "apps/shared/", "apps/crucible/", "apps/hearth/",
+        "notices/crucible/", "notices/hearth/", "notices/fragments/", "notices/licences/",
     ),
     "macos": (
         "notices/forge/platform/macos/", "packaging/homebrew/",
         "packaging/conan/", "packaging/vcpkg-port/",
-        "apps/forge/cli/src/", "apps/forge/gui/", "apps/shared/media/src/", "apps/crucible/", "apps/hearth/",
+        "apps/forge/cli/", "apps/forge/gui/", "apps/shared/", "apps/crucible/", "apps/hearth/",
+        "notices/crucible/", "notices/hearth/", "notices/fragments/", "notices/licences/",
     ),
     "android": ("apps/demos/android/",),
     "wasm": ("apps/demos/wasm/", "js/"),
@@ -95,7 +107,17 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
 # that names a library's own tree does not take them: a test-only change does not light the
 # ESP-IDF lane.
 LIBRARY_CONSUMERS = re.compile(r"^libs/[^/]+/(?:tests|fuzz)/")
-LANE_EXCLUDES: dict[str, re.Pattern[str]] = {"esp": LIBRARY_CONSUMERS}
+# Crucible's Windows driver and Linux tray VM sit in apps/crucible/, which the three desktop lanes
+# take whole; each is one platform's only (they were top-level trees of their own). Forge's five
+# notice fragments were in a tree no lane named, so a change to one lit every lane, and still does:
+# they are named here, among the fragments the desktop lanes take, to be left out of all three.
+FORGE_FRAGMENTS = r"notices/fragments/(?:forge-|qt-linux|qt-macos|qt-windows)"
+LANE_EXCLUDES: dict[str, re.Pattern[str]] = {
+    "esp": LIBRARY_CONSUMERS,
+    "windows": re.compile(rf"^(?:apps/crucible/linux/|{FORGE_FRAGMENTS})"),
+    "linux": re.compile(rf"^(?:apps/crucible/windows/|{FORGE_FRAGMENTS})"),
+    "macos": re.compile(rf"^(?:apps/crucible/(?:windows|linux)/|{FORGE_FRAGMENTS})"),
+}
 
 # Root-level files matched by exact name, not a directory prefix - a nested
 # apps/*/CMakeLists.txt must light only its own app's lane (already covered

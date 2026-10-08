@@ -31,12 +31,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 
-ANDROID = ROOT / "apps" / "android" / "app" / "src" / "main" / "cpp" / "CMakeLists.txt"
+ANDROID = ROOT / "apps" / "demos" / "android" / "app" / "src" / "main" / "cpp" / "CMakeLists.txt"
 ROOT_CMAKE = ROOT / "CMakeLists.txt"
 BAREMETAL_CMAKE = ROOT / "apps" / "baremetal" / "CMakeLists.txt"
 AC4_CMAKE = ROOT / "libs" / "ac4" / "CMakeLists.txt"
 AC4_MINIMAL = ROOT / "libs" / "ac4" / "minimal.cmake"
-WASM_CMAKE = ROOT / "apps" / "wasm" / "CMakeLists.txt"
+WASM_CMAKE = ROOT / "apps" / "demos" / "wasm" / "CMakeLists.txt"
 PYTHON_CMAKE = ROOT / "python" / "CMakeLists.txt"
 PRESETS = ROOT / "CMakePresets.json"
 PYPROJECT = ROOT / "python" / "pyproject.toml"

@@ -34,7 +34,7 @@
 
     C26495 (uninitialized member variable) - 1750 alerts opened in a single
       burst on 2026-09-17, 100% under
-      build/config-windows-msvc/apps/gui/.rcc/qmlcache/forge_gui_qmltests_qml/:
+      build/config-windows-msvc/apps/forge/gui/.rcc/qmlcache/forge_gui_qmltests_assets/:
       qmlcachegen's generated glue for the GUI's QML tests, one
       compiler-synthesized Storage struct per QML binding closure, not
       project source (see issue #718). forge_gui_qmltests is include()'d into

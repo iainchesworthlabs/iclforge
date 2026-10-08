@@ -44,7 +44,7 @@ class BuildRelevant(unittest.TestCase):
             "apps/forge/gui/assets/qml/Main.qml",
             "apps/hearth/ui/assets/qml/Main.qml",
             "apps/crucible/src/engine.cpp",
-            "apps/common/settings.cpp",
+            "apps/shared/media/src/settings.cpp",
             "apps/hearth/engine/tests/test_engine.cpp",
             "cmake/FindQt6.cmake",
         ):
@@ -88,7 +88,7 @@ class NotBuiltByTheLinuxGate(unittest.TestCase):
             "esp-idf/iclforge/component.c",
             "esphome/x.yaml",
             "apps/demos/android/app/build.gradle.kts",
-            "apps/wasm/main.cpp",
+            "apps/demos/wasm/main.cpp",
             "apps/baremetal/probe.cpp",
             "python/iclforge/__init__.py",
             "rust/src/lib.rs",
@@ -228,7 +228,7 @@ class Compare(unittest.TestCase):
         self.assertEqual((got["build"], got["gui"], got["compare"]), ("true", "false", "true"))
 
     def test_one_library_path_among_others_is_enough(self):
-        got = plan("docs/a.md", "apps/cli/x.cpp", "libs/ac3/src/x.cpp")
+        got = plan("docs/a.md", "apps/forge/cli/src/x.cpp", "libs/ac3/src/x.cpp")
         self.assertEqual(got["compare"], "true")
 
     def test_changes_that_cannot_alter_the_library_do_not(self):
@@ -260,7 +260,9 @@ class Compare(unittest.TestCase):
 
     def test_the_queue_mode_asks_the_same_question(self):
         self.assertEqual(gate.plan(["libs/ac3/src/x.cpp"], gui_on_build=True)["compare"], "true")
-        self.assertEqual(gate.plan(["apps/cli/x.cpp"], gui_on_build=True)["compare"], "false")
+        self.assertEqual(
+            gate.plan(["apps/forge/cli/src/x.cpp"], gui_on_build=True)["compare"], "false"
+        )
 
 
 class Reason(unittest.TestCase):

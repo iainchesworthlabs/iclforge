@@ -1,6 +1,6 @@
 # forge-gui feature coverage (Qt Quick Test)
 
-What every user-facing feature of the Forge GUI (`apps/gui/qml`, driven by
+What every user-facing feature of the Forge GUI (`apps/forge/gui/assets/qml`, driven by
 `EncoderController`, `QcController`, `ObjectDecodeController`,
 `StreamPlayerController`, `LanguageManager`) is exercised by. Two sets of tests
 hold it: the Qt Quick suites in `apps/forge/gui/tests/qml/tst_*.qml` (36 suites, 215

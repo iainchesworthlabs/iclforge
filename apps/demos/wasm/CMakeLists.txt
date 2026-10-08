@@ -160,7 +160,7 @@ add_custom_command(TARGET iclforge_wasm_encode POST_BUILD
 # configures cleanly.
 #
 # No servable demo page is assembled here (unlike wasm_decode_demo/ and
-# wasm_encode_demo/ above): apps/wasm/ac4/ does not exist yet, and a minimal
+# wasm_encode_demo/ above): apps/demos/wasm/ac4/ does not exist yet, and a minimal
 # AC-4 demo page is optional polish this task's brief left to a later pass -
 # the compiled iclforge_ac4.js/.wasm still land in their own output
 # directory below, ready for one for whoever adds it.

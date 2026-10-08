@@ -1115,8 +1115,9 @@ jobs:
       # guessed from windeployqt's differently-named flag) is linuxdeploy-
       # plugin-qt's equivalent of windeployqt's --qmldir: extra paths added
       # to (not replacing) that default AppDir scan, so pointing it at the
-      # real source tree's apps/gui/qml - the same directory the Windows
-      # step already uses - lets the scanner see the actual `import
+      # real source tree's apps/forge/gui/assets/qml - the same directory the Windows
+      # step already uses - and the family components' apps/shared/theme/assets/qml
+      # lets the scanner see the actual `import
       # QtQuick.Controls` statements and bundle the plugin they need.
       #
       # QQuickStyle::setStyle("Fusion") (apps/forge/gui/src/main.cpp) is a runtime C++
@@ -1133,7 +1134,7 @@ jobs:
           export VERSION="$version"
           export APPIMAGE_EXTRACT_AND_RUN=1
           export EXTRA_PLATFORM_PLUGINS=libqoffscreen.so
-          export QML_SOURCES_PATHS="$PWD/apps/gui/qml"
+          export QML_SOURCES_PATHS="$PWD/apps/forge/gui/assets/qml:$PWD/apps/shared/theme/assets/qml"
           libstdcxx="/usr/lib/x86_64-linux-gnu/libstdc++.so.6"
           libgcc_s="/usr/lib/x86_64-linux-gnu/libgcc_s.so.1"
           for f in "$libstdcxx" "$libgcc_s"; do
@@ -2728,7 +2729,7 @@ jobs:
           # over REST reads back, and a play started over REST finishes at it;
           # Stop reads back as stopped, on the page too.
           # device-ui/board/smoke.spec.js has the details.
-          (cd "$GITHUB_WORKSPACE/apps/wasm/tests" && ICLFORGE_DEVICE_URL=http://127.0.0.1:8080/ CI=1 npm run test:board) || fail "the page did not drive the board (Playwright's output is above)"
+          (cd "$GITHUB_WORKSPACE/apps/demos/wasm/tests" && ICLFORGE_DEVICE_URL=http://127.0.0.1:8080/ CI=1 npm run test:board) || fail "the page did not drive the board (Playwright's output is above)"
 
           # The play the test started, at the volume it set: a quarter of the
           # boot play's levels, 56,673 and 47,346.
@@ -2809,7 +2810,7 @@ jobs:
 
           # What the page says each output layout does with each stream, on
           # this board: device-ui/board/layouts.spec.js.
-          (cd "$GITHUB_WORKSPACE/apps/wasm/tests" && ICLFORGE_DEVICE_URL=http://127.0.0.1:8080/ ICLFORGE_STREAM_BASE=http://10.0.2.2:8000 CI=1 npm run test:board-layouts) || fail "the page did not report the layouts (Playwright's output is above)"
+          (cd "$GITHUB_WORKSPACE/apps/demos/wasm/tests" && ICLFORGE_DEVICE_URL=http://127.0.0.1:8080/ ICLFORGE_STREAM_BASE=http://10.0.2.2:8000 CI=1 npm run test:board-layouts) || fail "the page did not report the layouts (Playwright's output is above)"
 
           # Then the console, once the page's last play has ended.
           settled=

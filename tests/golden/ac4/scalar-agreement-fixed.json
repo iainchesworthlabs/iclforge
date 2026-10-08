@@ -2,7 +2,7 @@
   "_comment": "The AC-4 fixed decode's agreement with the double decode, per committed stream (tools/checks/check_ac4_decode_scalar_snr.py): the floors, in dB, of the worst channel's SNR below the lowest A-SPX crossover and above the highest, over half-overlapped Hann frames of 2048 samples, a channel with less than 1e-6 in a region (per frame) left out of it. Each is the figure measured less 3.0 dB. Re-pin when a stream's decode changes on purpose.",
   "margin_db": 3.0,
   "streams": {
-    "apps/gui/tests/fixtures/ac4-objects.ac4": {
+    "apps/forge/gui/tests/fixtures/ac4-objects.ac4": {
       "below": 125.8,
       "above": 93.9
     },

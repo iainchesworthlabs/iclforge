@@ -15,8 +15,8 @@ _static.yml's static job and runnable the same way locally:
 
 What counts as a library is the second component of a path under libs/: libs/<library>/. A library's
 own tests/ and fuzz/ directories sit beside its code (planning/monorepo.md); they consume libraries
-and are not library code, so they are not read here, as they were not while they were outside
-src/. While the
+and are not library code, so they are not read here, as they were not while they were outside the
+libraries' directory. While the
 tree was being re-laid out (planning/layout.md) the table had a "layout" section with two
 adjustments, a directory that holds several libraries split by path rules, first match wins, and a
 directory renamed for the library it holds; the script still reads such a section, and a table

@@ -62,8 +62,8 @@ GATE_MACHINERY = (
 # the library. Tests, apps and build files are not here on purpose, since the comparison
 # measures the library's own benchmarks, at two builds a job. A library's own tests/ and
 # fuzz/ are beside its code (planning/monorepo.md) and are tests all the same.
-# external/ is the vendored code that was under src/sendspin/third_party, and is held to what
-# src/ was.
+# external/ is the vendored code that was inside the sendspin library, and is held to what the
+# libraries are.
 COMPARE_PREFIXES = ("libs/", "external/")
 LIBRARY_CONSUMERS = re.compile(r"^libs/[^/]+/(?:tests|fuzz)/")
 
@@ -110,11 +110,25 @@ GUI_PREFIXES = (
     "apps/forge/gui/",
     "apps/hearth/",
     "apps/crucible/",
-    "apps/shared/media/src/",
-    "apps/forge/gui/tests/",
-    "apps/hearth/engine/tests/",
-    "apps/crucible/engine/tests/",
+    "apps/shared/",
+    "notices/crucible/",
+    "notices/hearth/",
+    "notices/fragments/",
+    "notices/licences/",
     "cmake/",
+)
+# Inside those trees, and built by the Linux gate without Qt: Crucible's Windows driver (it was a
+# top-level tree of its own), the three tests of the shared media code that were in libs/ac3/tests
+# and libs/audio/tests, and Forge's five notice fragments (they were Forge's own, not Crucible's).
+GUI_EXCEPTIONS = (
+    "apps/crucible/windows/",
+    "apps/shared/media/tests/test_container_input.cpp",
+    "apps/shared/media/tests/test_stream_playback.cpp",
+    "apps/shared/media/tests/test_sink_wait.cpp",
+    "notices/fragments/forge-",
+    "notices/fragments/qt-linux.txt",
+    "notices/fragments/qt-macos.txt",
+    "notices/fragments/qt-windows.txt",
 )
 GUI_ROOT_FILES = ("CMakeLists.txt", "CMakePresets.json", "vcpkg.json")
 
@@ -125,9 +139,8 @@ KNOWN_NON_GUI = (
     "tests/",
     "tools/fuzz/",
     "examples/",
-    "apps/forge/cli/src/",
+    "apps/forge/cli/",
     "notices/",
-    "apps/crucible/windows/",
     "tools/checks/",
     "tools/generators/",
     "tools/references/",
@@ -193,7 +206,9 @@ def plan(
         compare = compare or (
             path.startswith(COMPARE_PREFIXES) and not LIBRARY_CONSUMERS.match(path)
         )
-        if path.startswith(GUI_PREFIXES) or ("/" not in path and path in GUI_ROOT_FILES):
+        if path.startswith(GUI_EXCEPTIONS):
+            pass
+        elif path.startswith(GUI_PREFIXES) or ("/" not in path and path in GUI_ROOT_FILES):
             gui_reason = gui_reason or path
         elif not path.startswith(KNOWN_NON_GUI):
             gui_reason = gui_reason or f"{path} (not a path this planner recognises)"

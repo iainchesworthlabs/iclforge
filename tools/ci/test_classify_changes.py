@@ -187,7 +187,7 @@ class SatellitesDirectTest(unittest.TestCase):
             ("esp-idf/iclforge/CMakeLists.txt", "esp"),
             ("rust/iclforge/src/lib.rs", "rust"),
             ("python/iclforge/__init__.py", "python"),
-            ("apps/wasm/src/main.cpp", "wasm"),
+            ("apps/demos/wasm/src/main.cpp", "wasm"),
         ):
             with self.subTest(path=path):
                 self.assertEqual(lit(self.classify(path), *ALL_LANES), {lane})

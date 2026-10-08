@@ -2,7 +2,7 @@
 
 planning/hearth-reference-player.md, A4's exit, with the stand-in for Sendspin's reference player
 that planning/hearth-sendspin-extension.md's Decisions chose. For each codec this starts the
-scripted player in aiosendspin_player.py on a loopback port, runs iclforge-tests' hidden
+scripted player in aiosendspin_player.py on a loopback port, runs iclforge-hearth-tests' hidden
 [aiosendspin] case (apps/hearth/engine/tests/test_aiosendspin.cpp) with the player's URL, token and a
 directory, and checks what the player took against the programme and start time the case wrote
 there:
@@ -145,7 +145,7 @@ async def exercise(codec: str, iclforge_tests: Path, directory: Path) -> list[st
         process.kill()
         await process.wait()
         await player.stop()
-        return [f"{codec}: iclforge-tests did not finish within 180 s"]
+        return [f"{codec}: iclforge-hearth-tests did not finish within 180 s"]
     with contextlib.suppress(TimeoutError):
         await asyncio.wait_for(player.closed.wait(), timeout=10)
     await player.stop()
@@ -172,7 +172,7 @@ async def run(iclforge_tests: Path, codecs: list[str], out: Path) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
-        "--iclforge-tests", required=True, type=Path, help="the iclforge-tests binary"
+        "--iclforge-tests", required=True, type=Path, help="the iclforge-hearth-tests binary"
     )
     parser.add_argument("--codecs", default="pcm,flac,opus")
     parser.add_argument(

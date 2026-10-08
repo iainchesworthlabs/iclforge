@@ -12,7 +12,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
-android_dir="$repo_root/apps/android"
+android_dir="$repo_root/apps/demos/android"
 sdk="${ICLFORGE_ANDROID_SDK:-${ANDROID_HOME:-$HOME/.local/share/iclforge/android-sdk}}"
 sm="$sdk/cmdline-tools/latest/bin/sdkmanager"
 

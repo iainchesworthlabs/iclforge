@@ -23,7 +23,7 @@ English has no `.ts` file — it is the literal `qsTr()` source text. `apps/forg
 `AC3_QML_FILES` lists, which is where nearly all of the marked strings are, and the `tr()` calls in
 `encoder_controller.cpp` — for translatable strings, then compiles each `.ts` to a `.qm` and embeds
 it as a resource under `:/i18n` at build time.
-`LanguageManager` (`apps/gui/language_manager.{hpp,cpp}`) loads the matching `.qm` for the active
+`LanguageManager` (`apps/shared/preferences/src/language_manager.{hpp,cpp}`) loads the matching `.qm` for the active
 language and applies right-to-left layout mirroring for Arabic, Hebrew and Yiddish
 (`Main.qml`'s `LayoutMirroring` root, and the bundled Noto Sans Arabic/Hebrew faces those three
 scripts need — Latin has no glyph coverage for either).

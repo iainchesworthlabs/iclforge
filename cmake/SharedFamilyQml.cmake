@@ -1,4 +1,4 @@
-# Copies the family's shared QML components (apps/gui/qml/*.qml: Theme, Card,
+# Copies the family's shared QML components (apps/shared/theme/assets/qml/*.qml: Theme, Card,
 # SectionHeader, StatTile, AppButton, AppCheckBox, IconButton, AppSlider, AppTextField, AppComboBox, RailBlock,
 # SegmentedControl, FocusRing) into a Qt
 # application's own qml/shared/ directory, rewriting `import ForgeGui` to that

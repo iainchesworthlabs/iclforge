@@ -47,8 +47,9 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SOURCE_TS = REPO_ROOT / "apps" / "gui" / "translations" / "forge_gui_fr.ts"
-OUTPUT_TS = REPO_ROOT / "apps" / "gui" / "translations" / "forge_gui_xx.ts"
+GUI_TRANSLATIONS = REPO_ROOT / "apps" / "forge" / "gui" / "assets" / "translations"
+SOURCE_TS = GUI_TRANSLATIONS / "forge_gui_fr.ts"
+OUTPUT_TS = GUI_TRANSLATIONS / "forge_gui_xx.ts"
 
 _VOWEL_ACCENTS = str.maketrans(
     "aeiouAEIOU",
@@ -112,7 +113,7 @@ def build_pseudo_locale() -> ET.ElementTree:
             numerusforms = [] if translation_el is None else translation_el.findall("numerusform")
             out_translation = ET.SubElement(out_message, "translation")
             if numerusforms:
-                # No %n usage exists in apps/gui/qml today (see this script's
+                # No %n usage exists in apps/forge/gui/assets/qml today (see this script's
                 # own docstring), but handled rather than silently dropped in
                 # case one is ever added: every numerus form gets the same
                 # treatment as a plain source string.

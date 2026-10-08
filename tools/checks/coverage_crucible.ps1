@@ -100,7 +100,7 @@ if ($LASTEXITCODE -ne 0) { throw "llvm-profdata merge failed ($LASTEXITCODE)" }
 # `$binaries[1..($binaries.Count - 1)]` reads as a REVERSED range when the
 # count is one - 1..0 - and hands back element 0, passing the positional
 # binary to llvm-cov a second time as an -object.
-$binaries = @(@('bin\iclforge-tests.exe', 'bin\crucible_qmltests.exe', 'bin\crucible.exe') |
+$binaries = @(@('bin\iclforge-crucible-tests.exe', 'bin\crucible_qmltests.exe', 'bin\crucible.exe') |
     ForEach-Object { Join-Path $BuildDir $_ } | Where-Object { Test-Path $_ })
 if (-not $binaries) { throw "no instrumented binaries under $BuildDir\bin" }
 $objects = @()

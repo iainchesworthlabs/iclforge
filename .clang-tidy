@@ -97,5 +97,5 @@ WarningsAsErrors: '*'
 # 2026-09-30 re-layout, now ac3, objects, base, dsp and render), IEC 61937 and Matroska (parts of
 # libs/containers since planning/consolidation.md's C3) and the CLI. dsp's own files are in scope
 # and its tiered kernels (libs/dsp/src/tiered, AC-4's until C5) are not, as AC-4's code is not.
-HeaderFilterRegex: '(libs/(ac3|base|objects|render)/(include|src)/.*|libs/dsp/include/.*|libs/dsp/src/[^/]*|libs/containers/(include/iclforge/containers|src)/(iec61937|matroska)/.*|apps/cli/.*)'
+HeaderFilterRegex: '(libs/(ac3|base|objects|render)/(include|src)/.*|libs/dsp/include/.*|libs/dsp/src/[^/]*|libs/containers/(include/iclforge/containers|src)/(iec61937|matroska)/.*|apps/forge/cli/src/.*)'
 FormatStyle: none

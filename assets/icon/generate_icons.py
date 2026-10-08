@@ -153,7 +153,7 @@ ANDROID_DENSITIES = (
 
 
 def main() -> None:
-    icons_dir = REPO_ROOT / "apps" / "gui" / "icons"
+    icons_dir = REPO_ROOT / "apps" / "shared" / "theme" / "assets" / "icons"
     icons_dir.mkdir(parents=True, exist_ok=True)
 
     write_ico(icons_dir / "iclforge.ico")
@@ -162,7 +162,7 @@ def main() -> None:
     render_badge(256).save(icons_dir / "iclforge-256.png")
     print(f"wrote {icons_dir}/iclforge.{{ico,icns}}, iclforge-{{32,256}}.png")
 
-    res_dir = REPO_ROOT / "apps" / "android" / "app" / "src" / "main" / "res"
+    res_dir = REPO_ROOT / "apps" / "demos" / "android" / "app" / "src" / "main" / "res"
 
     # Legacy launcher icon, every density bucket - the fallback for
     # launchers/contexts (app-list entries, Settings) that don't use the
@@ -188,7 +188,7 @@ def main() -> None:
     render_banner().save(banner_dir / "banner.png")
     print(f"wrote {banner_dir}/banner.png")
 
-    wasm_dir = REPO_ROOT / "apps" / "wasm"
+    wasm_dir = REPO_ROOT / "apps" / "demos" / "wasm"
     render_badge(32).save(wasm_dir / "favicon-32.png")
     print(f"wrote {wasm_dir}/favicon-32.png")
 
