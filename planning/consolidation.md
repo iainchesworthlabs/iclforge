@@ -1004,6 +1004,20 @@ Hazards the plan did not name:
 
 Not run here: as for C6, and the ESP32 boards' own timings, which the Cortex-M3 counts stand in for.
 
+### What C3 and C6 left, closed 2026-10-08 (`chore/src-consolidation-reflow`, `-exclude`)
+
+- **C3's reflow.** `n1b_reflow.py --base 9bc5a540e --until-stable` with clang-format 22.1.2 (the S3
+  run's, installed from PyPI by hash into `build/`): 642 lines in 164 files that C3's passes and the
+  later ones pushed past 100 columns, the second pass stable. Every changed file is the same code and
+  the same comment words once comments and white space are set aside; the build, the 3,466 tests, the
+  pinned hashes and the CLI corpus are unchanged. Three lines do not wrap (two string literals in
+  `apps/hearth/engine/player.cpp`, a comment in `iclforge/ac3/io/elementary.hpp`).
+- **C6's `EXCLUDE arithmetic`.** The three arithmetic headers moved (`R100`) to `src/base/internal/`,
+  which `iclforge::base_headers` alone puts on an include path; their spelling,
+  `iclforge/base/arithmetic/…`, is the same, and `base` installs its `include/` whole. The installed
+  file list is C6's, file for file; the probes count the same instructions; the consumer check passes.
+  `iclforge_install_library()` keeps `EXCLUDE` for the containers' parts a build leaves out.
+
 ## After C3: `src/` reviewed
 
 **What C0 to C3 changed.** Twenty-two libraries are twelve. C0 made every library by
