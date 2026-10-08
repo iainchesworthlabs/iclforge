@@ -32,6 +32,7 @@ rather than none of them.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from collections.abc import Iterable
 
@@ -42,7 +43,8 @@ from collections.abc import Iterable
 # that merely starts with the same characters cannot accidentally match.
 LANE_PREFIXES: dict[str, tuple[str, ...]] = {
     "core": (
-        "src/", "tests/", "fuzz/", "cmake/", "tools/checks/", "tools/ci/", "requirements/",
+        "libs/", "external/", "tests/", "tools/fuzz/", "cmake/", "tools/checks/", "tools/ci/",
+        "requirements/",
     ),
     "windows": (
         "apps/windows/", "apps/notices/platform/windows/", "packaging/winget/",
@@ -87,6 +89,13 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
     "ci_self": (".github/workflows/", ".github/actions/", ".github/toolchain/"),
     "docs": ("docs/",),
 }
+
+# A library keeps its tests and fuzz targets beside its code (planning/monorepo.md):
+# libs/<lib>/tests/ and libs/<lib>/fuzz/. They were outside src/, in tests/ and fuzz/, so a lane
+# that names a library's own tree does not take them: a test-only change does not light the
+# ESP-IDF lane.
+LIBRARY_CONSUMERS = re.compile(r"^libs/[^/]+/(?:tests|fuzz)/")
+LANE_EXCLUDES: dict[str, re.Pattern[str]] = {"esp": LIBRARY_CONSUMERS}
 
 # Root-level files matched by exact name, not a directory prefix - a nested
 # apps/*/CMakeLists.txt must light only its own app's lane (already covered
@@ -141,7 +150,8 @@ def classify(
         saw_path = True
         matched = False
         for lane, prefixes in LANE_PREFIXES.items():
-            if path.startswith(prefixes):
+            excluded = LANE_EXCLUDES.get(lane)
+            if path.startswith(prefixes) and not (excluded and excluded.match(path)):
                 hits[lane] = True
                 matched = True
         if "/" not in path and path in CORE_ROOT_FILES:

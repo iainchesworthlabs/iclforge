@@ -218,7 +218,8 @@ html="$build_dir/coverage.html"
 # but it made the DSP-heavy cases 2-6x slower (the ten-minute playout case
 # 4.9 s -> 30.8 s), so the flag stays.
 gcovr --root . \
-    --filter 'src/(ac3|base|dsp|objects|render|containers|audio|capi|adm|sendspin|ac4|iab)/.*' \
+    --filter 'libs/(ac3|base|dsp|objects|render|containers|audio|capi|adm|sendspin|ac4|iab)/.*' \
+    --exclude 'libs/[^/]*/(tests|fuzz)/.*' \
     --filter 'apps/cli/.*' \
     --filter 'apps/common/.*' \
     --filter 'apps/crucible/engine/.*' \
@@ -251,7 +252,7 @@ while read -r comp line_min branch_min; do
 
     echo
     echo "== $comp (gate: line >= $line_min%, branch >= $branch_min%) =="
-    if ! gcovr --root . --add-tracefile "$json" --filter "$comp/.*" \
+    if ! gcovr --root . --add-tracefile "$json" --filter "$comp/.*" --exclude 'libs/[^/]*/(tests|fuzz)/.*' \
         --print-summary \
         --fail-under-line "$line_min" --fail-under-branch "$branch_min"; then
         echo "::error::coverage gate missed for $comp (need line >= $line_min%, branch >= $branch_min%)"

@@ -38,6 +38,7 @@ have no single PR diff to read.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from collections.abc import Iterable
 
@@ -59,8 +60,12 @@ GATE_MACHINERY = (
 
 # The trees whose change can alter how fast the encoder runs or how much it allocates:
 # the library. Tests, apps and build files are not here on purpose, since the comparison
-# measures the library's own benchmarks, at two builds a job.
-COMPARE_PREFIXES = ("src/",)
+# measures the library's own benchmarks, at two builds a job. A library's own tests/ and
+# fuzz/ are beside its code (planning/monorepo.md) and are tests all the same.
+# external/ is the vendored code that was under src/sendspin/third_party, and is held to what
+# src/ was.
+COMPARE_PREFIXES = ("libs/", "external/")
+LIBRARY_CONSUMERS = re.compile(r"^libs/[^/]+/(?:tests|fuzz)/")
 
 # Trees a Linux C++ build has nothing to say about. Their own lanes run in the
 # post-merge verification (docs/ci-agentic.md), and the static checks already
@@ -115,9 +120,10 @@ GUI_ROOT_FILES = ("CMakeLists.txt", "CMakePresets.json", "vcpkg.json")
 
 # Built by the Linux gate, and known not to need Qt.
 KNOWN_NON_GUI = (
-    "src/",
+    "libs/",
+    "external/",
     "tests/",
-    "fuzz/",
+    "tools/fuzz/",
     "examples/",
     "apps/cli/",
     "apps/notices/",
@@ -184,7 +190,9 @@ def plan(
             continue
 
         build_reason = build_reason or path
-        compare = compare or path.startswith(COMPARE_PREFIXES)
+        compare = compare or (
+            path.startswith(COMPARE_PREFIXES) and not LIBRARY_CONSUMERS.match(path)
+        )
         if path.startswith(GUI_PREFIXES) or ("/" not in path and path in GUI_ROOT_FILES):
             gui_reason = gui_reason or path
         elif not path.startswith(KNOWN_NON_GUI):

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Fail when a public header declares into a namespace that is not its library's.
 
-Every library under src/ is one namespace under the family root `iclforge`: the AC-3 and E-AC-3
+Every library under libs/ is one namespace under the family root `iclforge`: the AC-3 and E-AC-3
 codec is `iclforge::ac3`, AC-4 is `iclforge::ac4`, the MP4 writer is `iclforge::containers::mp4`
 (planning/layout.md). A codec that declares into the root itself, as the AC-3 library did until the
 namespaces were nested, is a name every other library and every consumer shares with it, and a
 consumer cannot tell from the spelling which library a name belongs to. This check makes the
 mapping data: tools/checks/namespaces.json lists each library and the namespaces under `iclforge`
-its public headers (src/<library>/include/iclforge/<library>/, and the templates `*.hpp.in` that
+its public headers (libs/<library>/include/iclforge/<library>/, and the templates `*.hpp.in` that
 the build turns into headers) may open, and this script reads every such header the way the
 compiler sees its braces (comments and literals blanked) and reports
 
@@ -43,6 +43,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+LIBRARY_ROOT = "libs"
 DEFAULT_TABLE = HERE / "namespaces.json"
 ROOT_NS = "iclforge"
 HEADER_SUFFIXES = (".hpp", ".h", ".hh", ".hxx", ".inl", ".ipp", ".hpp.in", ".h.in")
@@ -155,13 +156,13 @@ class Table:
 
 
 def public_headers(files: list[str]) -> dict[str, list[str]]:
-    """library -> its public headers: src/<library>/include/iclforge/<library>/..."""
+    """library -> its public headers: libs/<library>/include/iclforge/<library>/..."""
     out: dict[str, list[str]] = defaultdict(list)
     for f in files:
         parts = f.split("/")
         if (
             len(parts) > 5
-            and parts[0] == "src"
+            and parts[0] == LIBRARY_ROOT
             and parts[2] == "include"
             and parts[3] == ROOT_NS
             and parts[4] == parts[1]
@@ -225,16 +226,18 @@ def check(root: Path, table: Table, files: list[str]) -> Report:
 
 
 def tracked(root: Path) -> list[str]:
-    """The files under src/: what git tracks, or what is there when the tree is no repository."""
+    """The files under libs/: what git tracks, or what is there when the tree is no repository."""
     try:
         out = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "-z", "--", "src"],
+            ["git", "-C", str(root), "ls-files", "-z", "--", LIBRARY_ROOT],
             capture_output=True,
             check=True,
         ).stdout.decode("utf-8", "surrogateescape")
         return [f for f in out.split("\0") if f]
     except (subprocess.CalledProcessError, FileNotFoundError):
-        walked = (p.relative_to(root).as_posix() for p in (root / "src").rglob("*") if p.is_file())
+        walked = (
+            p.relative_to(root).as_posix() for p in (root / LIBRARY_ROOT).rglob("*") if p.is_file()
+        )
         return sorted(walked)
 
 

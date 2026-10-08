@@ -3,7 +3,7 @@ namespace and the root namespace holds no declaration of its own.
 
 stdlib `unittest`, for the reason the script is stdlib-only: this runs in _static.yml's static job.
 
-Each test builds a small temporary tree (no git repository in it, so the script walks src/) with a
+Each test builds a small temporary tree (no git repository in it, so the script walks libs/) with a
 table beside it, and runs the check over it, so the cases are the rules the script's header states:
 a header in its library's namespace passes; one in another's fails with its name; a block that
 declares into `iclforge` itself fails and one that only holds namespaces does not; comments and
@@ -31,7 +31,7 @@ def write(root: Path, rel: str, text: str) -> None:
 
 
 def header(lib: str, name: str = "x.hpp") -> str:
-    return f"src/{lib}/include/iclforge/{lib}/{name}"
+    return f"libs/{lib}/include/iclforge/{lib}/{name}"
 
 
 class Namespaces(unittest.TestCase):
@@ -61,7 +61,7 @@ class Namespaces(unittest.TestCase):
         write(self.root, header("ac3"), "namespace iclforge::mp4 {\nstruct A {};\n}\n")
         code, out = self.run_check({"ac3": ["ac3"]})
         self.assertEqual(code, 1)
-        self.assertIn("src/ac3/include/iclforge/ac3/x.hpp: opens iclforge::mp4", out)
+        self.assertIn("libs/ac3/include/iclforge/ac3/x.hpp: opens iclforge::mp4", out)
 
     def test_a_library_may_have_several_namespaces_when_the_table_says_so(self) -> None:
         write(
@@ -117,8 +117,8 @@ class Namespaces(unittest.TestCase):
         self.assertEqual(code, 1)
 
     def test_a_private_header_and_a_source_are_not_public(self) -> None:
-        write(self.root, "src/ac3/src/x.hpp", "namespace iclforge {\nint f();\n}\n")
-        write(self.root, "src/ac3/src/x.cpp", "namespace iclforge {\nint f() { return 1; }\n}\n")
+        write(self.root, "libs/ac3/src/x.hpp", "namespace iclforge {\nint f();\n}\n")
+        write(self.root, "libs/ac3/src/x.cpp", "namespace iclforge {\nint f() { return 1; }\n}\n")
         write(self.root, header("ac3"), "namespace iclforge::ac3 {\n}\n")
         code, out = self.run_check({"ac3": ["ac3"]})
         self.assertEqual(code, 0, out)
@@ -146,7 +146,8 @@ class Namespaces(unittest.TestCase):
         code, out = self.run_check({"base": ["base"]}, debts)
         self.assertEqual(code, 0, out)
         self.assertIn(
-            "known debt: libs/base/include/iclforge/base/bitreader.hpp: BitReader is the root's", out
+            "known debt: libs/base/include/iclforge/base/bitreader.hpp: BitReader is the root's",
+            out,
         )
         self.assertIn("0 failures, 1 known debts", out)
 
@@ -173,7 +174,7 @@ class Namespaces(unittest.TestCase):
         write(self.root, header("ac3", "io.hpp"), "namespace iclforge::mp4 {\n}\n")
         out = cn.census(self.root, cn.tracked(self.root))
         self.assertIn("ac3: 2 headers open mp4 (1)", out)
-        self.assertIn("declares into the root: src/ac3/include/iclforge/ac3/x.hpp", out)
+        self.assertIn("declares into the root: libs/ac3/include/iclforge/ac3/x.hpp", out)
 
 
 class CommittedTable(unittest.TestCase):

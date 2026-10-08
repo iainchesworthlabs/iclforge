@@ -41,7 +41,7 @@ runnable the same way locally:
     and CHANGELOG.md, whose released entries are immutable. Their links are
     still checked; only their prose is exempt.
 
-(c) Every path literal starting docs/, apps/, src/ or tools/ inside
+(c) Every path literal starting docs/, apps/, libs/, external/, src/ or tools/ inside
     .github/workflows/*.yml, cmake/**/*.cmake, CMakePresets.json and
     tools/**/*.{py,sh,ps1} names something that exists. Conservative on
     purpose. A token has to start at a word boundary, contain a slash and end
@@ -95,7 +95,9 @@ LITERAL_GLOBS = (
     "tools/**/*.ps1",
 )
 # The prefixes the literal check treats as a repo-relative path.
-LITERAL_PREFIXES = ("docs", "apps", "src", "tools")
+# "src" stays: there is no top-level src/ since planning/monorepo.md's C7-1, so a literal that
+# starts with it is a path nothing moved, and is reported unless FOREIGN_PATHS says whose it is.
+LITERAL_PREFIXES = ("docs", "apps", "libs", "external", "src", "tools")
 
 # Tokens that read as repo-relative paths but are not. Each is a deliberate
 # exception with its reason, printed on every run so the list stays under the
@@ -118,10 +120,10 @@ FOREIGN_PATHS = {
 # deleted from here, which is what makes the plan's own prose fall due. Only a page that is not in
 # PROSE_PATHS_UNCHECKED needs an entry: that table already excuses the prose of the other plans.
 PLANNED_PATHS = {
-    "src/ac3/include/iclforge/ac3/decoder/associated_service.hpp": (
+    "libs/ac3/include/iclforge/ac3/decoder/associated_service.hpp": (
         "proposed by the programme-mixing-metadata plan's Phase 5, not created yet"
     ),
-    "src/ac3/src/decoder/associated_service.cpp": (
+    "libs/ac3/src/decoder/associated_service.cpp": (
         "proposed by the programme-mixing-metadata plan's Phase 5, not created yet"
     ),
 }

@@ -40,7 +40,8 @@ MediaInfo reads no substream after a presentation_config 6 (EMDF-only) presentat
 encoder's streams list that presentation last.
 
 Phase E9's objects: the encoder's object streams under tests/golden/ac4/objects/ (encoder-*.ac4,
-which libs/ac4/tests/encoder/test_objects.cpp writes with AC4_ENCODER_WRITE_OBJECTS), whose MediaInfo
+which libs/ac4/tests/encoder/test_objects.cpp writes with AC4_ENCODER_WRITE_OBJECTS), whose
+MediaInfo
 reading (`--Output=JSON`) gives the count of the objects the stream was configured with, in the
 substreams' `ChannelMode` strings under the audio track's `extra`: an A-JOC substream reads
 `A-JOC <objects>.<LFE> (<core>)`, the core `<n>.<m> object core` for a computed downmix and

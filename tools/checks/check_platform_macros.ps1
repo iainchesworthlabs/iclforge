@@ -67,26 +67,28 @@ $ErrorActionPreference = 'Stop'
 $directivePattern = '^\s*#\s*(if|ifdef|ifndef|elif|elifdef|elifndef|else|endif)\b'
 $cplusplusGuardPattern = '^\s*#\s*ifdef\s+__cplusplus\b'
 
-$srcRoot = Join-Path $Root 'src'
+$srcRoot = Join-Path $Root 'libs'
 if (-not (Test-Path $srcRoot)) {
-    Write-Error "No src/ directory under '$Root'. Pass -Root <repo-root>."
+    Write-Error "No libs/ directory under '$Root'. Pass -Root <repo-root>."
     exit 2
 }
 
 # apps/ (the runnable-application tree - forge, forge-gui, the Android and WASM
-# demos) carries the same rule and is scanned alongside src/ once it exists.
+# demos) carries the same rule and is scanned alongside libs/ once it exists.
 # Optional rather than required: a repo state mid-way through the src/->apps/
 # consolidation (or a checkout of an older tag, before apps/ existed at all)
-# still has a valid src/ to scan even with no apps/ yet.
+# still has a valid libs/ to scan even with no apps/ yet.
 $scanRoots = @($srcRoot)
 
 # Every other first-party C++ tree, each optional in the same way and for the
 # same reason apps/ is: a checkout mid-way through a reorganisation, or of an
-# older tag from before one of these existed, still has a valid src/ to scan.
-# fuzz/, examples/ and tools/ were already clean when they were added here on
+# older tag from before one of these existed, still has a valid libs/ to scan.
+# examples/ and tools/ were already clean when they were added here on
 # 2026-09-23 and cost nothing to hold; tests/ and python/ were cleaned to join
-# them.
-foreach ($name in @('apps', 'tests', 'fuzz', 'examples', 'tools', 'python')) {
+# them. A library's own tests and fuzz targets are in libs/<lib>/ (planning/monorepo.md, C7-1),
+# so libs/ holds what libs/, tests/ and fuzz/ held; external/ is the vendored code that was in
+# src/sendspin/third_party.
+foreach ($name in @('apps', 'tests', 'external', 'examples', 'tools', 'python')) {
     $candidate = Join-Path $Root $name
     if (Test-Path $candidate) {
         $scanRoots += $candidate
@@ -120,7 +122,7 @@ $files = @($files | Where-Object { -not $_.FullName.StartsWith($driverRoot, [Sys
 # idf.py (docs/platforms/bare-metal/esp32-s3.md), and CMake's generated ac3/export.hpp is a
 # conditional-compilation header by its very nature. One such build produced
 # 658 "violations", every one of them generated and none of them anybody's
-# code. src/quarantine/ was the same story waiting to happen on the src/ side.
+# code. src/quarantine/ was the same story waiting to happen on the libs/ side.
 #
 # Ask git which files are source rather than pattern-matching directory names
 # here: .gitignore already carries that answer and stays the single place it is
@@ -216,7 +218,7 @@ if ($violations.Count -gt 0) {
     exit 1
 }
 
-$summary = "OK: no preprocessor conditionals in src/, apps/, tests/, fuzz/, examples/, tools/ or python/ ($($files.Count) files scanned"
+$summary = "OK: no preprocessor conditionals in libs/, apps/, tests/, external/, examples/, tools/ or python/ ($($files.Count) files scanned"
 if ($excludedCount -gt 0) {
     # Printed rather than left implicit: this filter turning the check
     # green for the wrong reason - by excluding real source - is the one

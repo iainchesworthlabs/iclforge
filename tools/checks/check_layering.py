@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""Fail when a library under src/ includes a header its row of the dependency table forbids.
+"""Fail when a library under libs/ includes a header its row of the dependency table forbids.
 
-The libraries under src/ form a graph, and the graph has no cycle today. What keeps it that way
+The libraries under libs/ form a graph, and the graph has no cycle today. What keeps it that way
 is nothing but the habit of the people editing it, and a habit does not survive the next
 library: the day a codec-blind library includes a codec's header, that codec can no longer be
 left out of a build that does not want it. This check makes the direction data.
 tools/checks/layering.json lists every library and the libraries it may include from; this script
-resolves every #include of every C/C++ file under src/ the way the compiler does (relative to the
+resolves every #include of every C/C++ file under libs/ the way the compiler does (relative to the
 including file, then by the spelling a header is reached by) and reports each include that
 crosses from one library into another the table does not allow. Stdlib-only, run from
 _static.yml's static job and runnable the same way locally:
 
     python3 tools/checks/check_layering.py [--root <repo>] [--table <json>] [--edges]
 
-What counts as a library is the second component of a path under src/: src/<library>/. While the
+What counts as a library is the second component of a path under libs/: libs/<library>/. A library's
+own tests/ and fuzz/ directories sit beside its code (planning/monorepo.md); they consume libraries
+and are not library code, so they are not read here, as they were not while they were outside
+src/. While the
 tree was being re-laid out (planning/layout.md) the table had a "layout" section with two
 adjustments, a directory that holds several libraries split by path rules, first match wins, and a
 directory renamed for the library it holds; the script still reads such a section, and a table
@@ -54,6 +57,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+# Where the libraries are, and the directories of a library that are its consumers, not its code.
+LIBRARY_ROOT = "libs"
+CONSUMER_DIRS = ("tests", "fuzz")
 DEFAULT_TABLE = HERE / "layering.json"
 DEFAULT_DEBT = HERE / "layering_debt"
 
@@ -67,7 +73,7 @@ MAX_SUFFIX_PARTS = 5
 
 @dataclass(frozen=True)
 class Table:
-    """The dependency table and how a path under src/ is filed under a library."""
+    """The dependency table and how a path under libs/ is filed under a library."""
 
     libraries: dict[str, list[str]]
     rename: dict[str, str]
@@ -75,7 +81,7 @@ class Table:
 
     def library_of(self, path: str) -> str | None:
         parts = path.split("/")
-        if parts[0] != "src" or len(parts) < 3:
+        if parts[0] != LIBRARY_ROOT or len(parts) < 3 or parts[2] in CONSUMER_DIRS:
             return None
         for pattern, library in self.split:
             if pattern.search(path):
@@ -104,20 +110,30 @@ def load_table(path: Path) -> Table:
     )
 
 
-def tracked_src_files(root: Path) -> list[str]:
-    """Every file under src/ that git tracks, or every file there when this is not a work tree."""
+def tracked_library_files(root: Path) -> list[str]:
+    """The files under libs/ that git tracks, or every file there when this is not a work tree.
+
+    A library's tests/ and fuzz/ are left out (CONSUMER_DIRS): they are read by nothing here.
+    """
     try:
         listed = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "-z", "--", "src"],
+            ["git", "-C", str(root), "ls-files", "-z", "--", LIBRARY_ROOT],
             capture_output=True,
             check=True,
         ).stdout.decode("utf-8", "surrogateescape")
     except (OSError, subprocess.CalledProcessError):
-        base = root / "src"
-        return sorted(p.relative_to(root).as_posix() for p in base.rglob("*") if p.is_file())
+        base = root / LIBRARY_ROOT
+        files = sorted(p.relative_to(root).as_posix() for p in base.rglob("*") if p.is_file())
+        return [f for f in files if not is_consumer(f)]
     files = sorted(f for f in listed.split("\0") if f)
     # A path git lists and the checkout lacks (a deletion not yet committed) is not a file.
-    return [f for f in files if (root / f).is_file()]
+    return [f for f in files if (root / f).is_file() and not is_consumer(f)]
+
+
+def is_consumer(path: str) -> bool:
+    """Whether a path under libs/ is in a library's tests/ or fuzz/."""
+    parts = path.split("/")
+    return len(parts) > 2 and parts[2] in CONSUMER_DIRS
 
 
 def header_spellings(path: str) -> list[str]:
@@ -219,7 +235,7 @@ def table_problems(table: Table, files: list[str]) -> list[str]:
             problems.append(f"{library} lists itself")
     filed = {table.library_of(f) for f in files}
     for library in sorted(known - filed):
-        problems.append(f"{library} is in the table and nothing under src/ is filed under it")
+        problems.append(f"{library} is in the table and nothing under libs/ is filed under it")
     problems.extend(f"cycle in the table: {' -> '.join(c)}" for c in cycles(table.libraries))
     return problems
 
@@ -285,9 +301,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     table = load_table(args.table)
-    files = tracked_src_files(args.root)
+    files = tracked_library_files(args.root)
     if not files:
-        print(f"::error::check_layering: no files under {args.root / 'src'}; nothing was checked")
+        print(
+            f"::error::check_layering: no files under {args.root / LIBRARY_ROOT}; "
+            "nothing was checked"
+        )
         return 1
     edges = find_edges(args.root, files, table)
     if args.edges:
@@ -305,7 +324,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"::error::check_layering: {problem}")
         failures += 1
     for library in sorted({table.library_of(f) for f in files} - set(table.libraries) - {None}):
-        print(f"::error::check_layering: src/ holds files of {library}, which the table lacks")
+        print(
+            f"::error::check_layering: {LIBRARY_ROOT}/ holds files of {library}, "
+            "which the table lacks"
+        )
         failures += 1
 
     debt = load_debt(args.debt)

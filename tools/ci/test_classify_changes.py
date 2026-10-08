@@ -89,8 +89,8 @@ class SharedDesktopAppTest(unittest.TestCase):
 class CoreFanoutTest(unittest.TestCase):
     """A library change has to be validated everywhere it is built."""
 
-    def test_src_change_fans_out_to_every_platform_and_language_lane(self):
-        hits = gate.classify(["src/coder/eac3_encoder.cpp"])
+    def test_libs_change_fans_out_to_every_platform_and_language_lane(self):
+        hits = gate.classify(["libs/ac4/src/encoder/encoder.cpp"])
         self.assertEqual(
             lit(hits, *ALL_LANES),
             {"core", "windows", "linux", "macos", "android", "wasm", "esp", "rust", "python"},
@@ -174,11 +174,11 @@ class SatellitesDirectTest(unittest.TestCase):
         return gate.classify(list(paths), satellites_direct=True)
 
     def test_a_core_change_reaches_the_platforms_and_no_satellite(self):
-        hits = self.classify("src/coder/eac3_encoder.cpp")
+        hits = self.classify("libs/ac4/src/encoder/encoder.cpp")
         self.assertEqual(lit(hits, *ALL_LANES), {"core", "windows", "linux", "macos"})
 
     def test_the_nightly_still_fans_a_core_change_out_to_every_satellite(self):
-        hits = gate.classify(["src/coder/eac3_encoder.cpp"])
+        hits = gate.classify(["libs/ac4/src/encoder/encoder.cpp"])
         self.assertTrue(all(hits[lane] for lane in gate.SATELLITES if lane != "npm"))
 
     def test_a_satellites_own_tree_still_lights_it(self):
@@ -193,7 +193,7 @@ class SatellitesDirectTest(unittest.TestCase):
                 self.assertEqual(lit(self.classify(path), *ALL_LANES), {lane})
 
     def test_a_core_change_and_a_satellite_change_together_light_both(self):
-        hits = self.classify("src/coder/x.cpp", "rust/iclforge/src/lib.rs")
+        hits = self.classify("libs/ac4/src/x.cpp", "rust/iclforge/src/lib.rs")
         self.assertEqual(lit(hits, *ALL_LANES), {"core", "windows", "linux", "macos", "rust"})
 
     def test_a_path_only_a_platform_owns_is_unchanged(self):
@@ -216,8 +216,8 @@ class SatellitesDirectTest(unittest.TestCase):
 
     def test_the_trees_the_esp_component_ships_light_the_esp_lane_too(self):
         for path in (
-            "src/ac3/coder/eac3_encoder.cpp",
-            "src/base/detail/cpu_features.cpp",
+            "libs/ac3/src/encoder/eac3_encoder.cpp",
+            "libs/base/src/cpu_features.cpp",
             "libs/base/internal/iclforge/base/arithmetic/fixed32.hpp",
             "cmake/Compiler.cmake",
             "CMakeLists.txt",
@@ -227,6 +227,31 @@ class SatellitesDirectTest(unittest.TestCase):
                 # The other satellites stay with the nightly run.
                 self.assertEqual(lit(hits, *gate.SATELLITES), {"esp"})
                 self.assertTrue(hits["core"])
+
+    def test_a_librarys_own_tests_and_fuzz_do_not_light_the_esp_lane(self):
+        # libs/<lib>/tests and libs/<lib>/fuzz were tests/<lib> and fuzz/: core's, never the
+        # component's.
+        for path in (
+            "libs/ac3/tests/core/test_bitalloc.cpp",
+            "libs/base/tests/test_bits.cpp",
+            "libs/ac3/fuzz/fuzz_scan.cpp",
+            "libs/ac3/fuzz/seeds/fuzz_scan/x.bin",
+        ):
+            with self.subTest(path=path):
+                hits = self.classify(path)
+                self.assertFalse(hits["esp"])
+                self.assertTrue(hits["core"])
+
+    def test_vendored_code_and_its_pages_are_core_s(self):
+        # external/ holds what src/sendspin/third_party held, and src/ made a page there core's too.
+        hits = self.classify("external/time-filter/sendspin_time_filter.cpp")
+        self.assertEqual(lit(hits, *ALL_LANES), {"core", "windows", "linux", "macos"})
+        hits = self.classify("external/time-filter/README.md")
+        self.assertEqual(lit(hits, *ALL_LANES), {"core", "windows", "linux", "macos", "docs"})
+
+    def test_the_fuzz_scripts_are_core_s(self):
+        hits = self.classify("tools/fuzz/run.sh")
+        self.assertEqual(lit(hits, *ALL_LANES), {"core", "windows", "linux", "macos"})
 
     def test_the_ac4_trees_leave_the_esp_lane_to_the_nightly_run(self):
         hits = self.classify("libs/ac4/src/decoder/decoder.cpp")
@@ -300,7 +325,7 @@ class MainTest(unittest.TestCase):
         self.assertIn("false", lanes.values())
 
     def test_satellites_direct_flag_holds_the_fanout_back(self):
-        _, lanes = self.run_main(["x", "--satellites-direct"], stdin="src/coder/x.cpp\n")
+        _, lanes = self.run_main(["x", "--satellites-direct"], stdin="libs/ac4/src/x.cpp\n")
         self.assertEqual((lanes["core"], lanes["linux"]), ("true", "true"))
         self.assertEqual(
             {lanes[s] for s in ("android", "wasm", "esp", "rust", "python", "npm")}, {"false"}

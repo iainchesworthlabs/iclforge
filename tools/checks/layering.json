@@ -1,5 +1,5 @@
 {
-  "_comment": "The dependency table of the libraries under src/. libraries: each library and the libraries it may include from, in dependency order; check_layering.py fails an include that is not listed.",
+  "_comment": "The dependency table of the libraries under libs/. libraries: each library and the libraries it may include from, in dependency order; check_layering.py fails an include that is not listed.",
   "libraries": {
     "base": [],
     "dsp": ["base"],

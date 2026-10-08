@@ -10,12 +10,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 SCAN_DIRS = (
-    "src",
+    "libs",
     "apps",
     "tests",
     "cmake",
     "examples",
-    "fuzz",
+    "external",
     "python",
     ".github",
     "esp-idf",

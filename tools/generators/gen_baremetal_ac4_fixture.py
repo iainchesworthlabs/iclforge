@@ -78,11 +78,13 @@ class Stream(typing.NamedTuple):
 
 
 STREAMS = (
-    Stream("ac4_20_music", "Ac420Music", "libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-20-music-192-3frames.ac4",
+    Stream("ac4_20_music", "Ac420Music",
+           "libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-20-music-192-3frames.ac4",
            "AC-4 2.0 from DEE, A-SPX, 192 kbit/s", "stereo"),
     Stream("ac4_20_acpl", "Ac420Acpl", "tests/golden/ac4/constructed/2_0-acpl1-stereoproc.ac4",
            "AC-4 2.0 constructed, A-CPL", "stereo"),
-    Stream("ac4_51_music", "Ac451Music", "libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-51-music-192-3frames.ac4",
+    Stream("ac4_51_music", "Ac451Music",
+           "libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-51-music-192-3frames.ac4",
            "AC-4 5.1 from DEE, 192 kbit/s", "51"),
     Stream("ac4_51_acpl", "Ac451Acpl",
            "tests/golden/ac4/constructed/5_1-acpl1-config1-matsel7.ac4",

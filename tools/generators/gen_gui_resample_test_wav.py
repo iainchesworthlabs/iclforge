@@ -29,7 +29,7 @@ import wave
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-OUT = REPO / "fuzz" / "seeds" / "fuzz_wav_read" / "resample-44100.wav"
+OUT = REPO / "libs" / "base" / "fuzz" / "seeds" / "fuzz_wav_read" / "resample-44100.wav"
 
 RATE = 44100
 DURATION_S = 1.5

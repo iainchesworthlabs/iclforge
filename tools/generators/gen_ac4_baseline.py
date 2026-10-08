@@ -9,7 +9,8 @@ Two sets, from the same legs and sources:
   while the local DEE licence ran (it ends on 2026-11-06 and is not renewed, so no DEE stream
   can be made after that date).
 
-What the streams are for. The decoder in libs/ac4/src/decoder is checked against them: first its syntax,
+What the streams are for. The decoder in libs/ac4/src/decoder is checked against them: first its
+syntax,
 read by two transcriptions whose traces must agree (tools/references/ac4_syntax.py writes the
 committed digests; libs/ac4/tests/decoder/test_syntax.cpp holds the decoder to them), then, from
 phase D2 on, its PCM, scored against each stream's source. The encoder phases race against the
