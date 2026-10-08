@@ -353,24 +353,29 @@ Raised by the sample tree the user gave with decision 2 (`libs/<lib>/{include,sr
     `assets/`; about 270 more moves inside the products, `.qrc` and `qt_add_qml_module` paths
     rewritten. (b) A program's sources at its directory's root, as now.
 
-**Taken on 2026-10-08:** 1 (a) `libs/`; 2 (a) separate `include/iclforge/<lib>/` and `src/`, the
-user's sample tree with each library's `include/`, `src/`, `tests/` and `CMakeLists.txt`; 3 (a)
-tests and fuzz beside each project; 4 (a) apps by product.
+**Taken on 2026-10-08, every one (a):** 1 `libs/`; 2 separate `include/iclforge/<lib>/` and `src/`,
+the user's sample tree with each library's `include/`, `src/`, `tests/` and `CMakeLists.txt`; 3 tests
+and fuzz beside each project; 4 apps by product; 5 `apps/shared/{media,theme}`; 6 `bindings/` and
+`firmware/`; 7 `testdata/`; 8 `firmware/hearth-sink/`; 9 the driver in
+`apps/crucible/windows/driver/`; 10 one lockstep version; 11 one notices system, `notices/`; 12 the
+planner after C7; 13 the scripts retired after C7; 14 `external/`; 15 a program's `src/`, `assets/`
+and `tests/`.
 
-Raised by the sample tree the user gave with decision 2 (`libs/<lib>/{include,src,tests}`,
-`apps/<app>/{src,assets}`, `external/`):
+The tree that follows from them:
 
-14. **Third-party code.** (a) **`external/<name>/`** for what the tree carries (today one vendored
-    library, `src/sendspin/third_party/time-filter`, 6 files with its `LICENSE` and `VENDORED.md`),
-    and the FetchContent declarations (fmt, Catch2, libadm and libbw64) in `cmake/External.cmake`
-    pointing at it or fetching into the build tree, as now (recommended: vcpkg stays the manager for
-    what it provides); (b) `external/` holds FetchContent's sources as git submodules too; (c) the
-    vendored library stays inside `sendspin`, the project that uses it.
-15. **A program's directory.** (a) **`apps/<product>/<program>/{CMakeLists.txt, src/, assets/,
-    tests/}`** (recommended): sources in `src/`, Qt resources (fonts, icons, QML, translations) in
-    `assets/`; about 270 more moves inside the products, `.qrc` and `qt_add_qml_module` paths
-    rewritten. (b) A program's sources at its directory's root, as now.
-
-**Taken on 2026-10-08:** 1 (a) `libs/`; 2 (a) separate `include/iclforge/<lib>/` and `src/`, the
-user's sample tree with each library's `include/`, `src/`, `tests/` and `CMakeLists.txt`; 3 (a)
-tests and fuzz beside each project; 4 (a) apps by product.
+```text
+libs/<lib>/          CMakeLists.txt  include/iclforge/<lib>/  src/  variants/  tests/  fuzz/
+apps/forge/          cli/  gui/                       each program: CMakeLists.txt  src/  assets/  tests/
+apps/hearth/         engine/  ui/  render/  testsink/  testserver/
+apps/crucible/       engine/  ui/  runner/  spikes/  windows/{driver,driver-vm}/  linux/tray-vm/
+apps/demos/          android/  wasm/
+apps/shared/         media/ (app-media)  theme/ (app-theme)
+bindings/            python/  rust/  js/
+firmware/            esp-idf/iclforge/  hearth-sink/  esphome/  baremetal/
+external/            time-filter/
+notices/             the fragments; cmake/Notices.cmake assembles them per product
+tests/               integration tests; support/ (iclforge::test_support); performance/
+testdata/            was tests/golden
+tools/fuzz/          the fuzz scripts
+examples/ tools/ docs/ planning/ packaging/ cmake/ requirements/ assets/
+```
