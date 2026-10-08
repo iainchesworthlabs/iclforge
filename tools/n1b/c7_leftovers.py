@@ -15,6 +15,18 @@ file, for a person to read:
   tests-lib    `tests/<library>/` (a library's tests are libs/<lib>/tests)
   third-party  `third_party/time-filter` (it is external/time-filter)
 
+C7-2 (the products) adds:
+
+  apps-roots   `apps/cli`, `apps/gui`, `apps/common`, `apps/notices`, `apps/windows`, `apps/linux`,
+               `apps/android`, `apps/wasm` (they are apps/forge/{cli,gui}, apps/shared/media,
+               notices/, apps/crucible/{windows,linux}, apps/demos/{android,wasm})
+  tests-prod   `tests/cli`, `tests/gui`, `tests/hearth`, `tests/crucible` (each program's tests
+               are beside it: apps/<product>/<program>/tests)
+  prog-files   `apps/{hearth,crucible}/<program>/<file>` for a source, a header or a resource
+               that now sits in the program's src/ or assets/, and `apps/crucible/translations`
+  apps-parts   a product root built from parts: `"apps", "gui"`, `Path("apps") / "cli"`,
+               `apps/${name}`
+
     c7_leftovers.py [--root <worktree>] [--kind K] [--exclude PREFIX ...] [--show N]
 
 Nothing here fails a build: a hit is a line to read. The first run of C7-1 found, this way, the
@@ -43,6 +55,22 @@ KINDS: dict[str, re.Pattern[str]] = {
     "fuzz": re.compile(START + r"\.?/?fuzz(?:/|\b(?=[\"'*,\s)]|$))|\}/fuzz(?:/|\b)"),
     "tests-lib": re.compile(START + rf"tests/(?:{LIBS})(?:/|\b)|\}}/tests/(?:{LIBS})(?:/|\b)"),
     "third-party": re.compile(r"third_party/time-filter"),
+    "apps-roots": re.compile(
+        r"(?<![A-Za-z0-9_.-])apps/(?:cli|gui|common|notices|windows|linux|android|wasm)"
+        r"(?![A-Za-z0-9_-])"
+    ),
+    "tests-prod": re.compile(
+        START + r"tests/(?:cli|gui|hearth|crucible)(?:/|\b)|\}/tests/(?:cli|gui|hearth|crucible)(?:/|\b)"
+    ),
+    "prog-files": re.compile(
+        r"apps/(?:hearth|crucible)/(?:engine|ui|render|testsink|testserver|runner)/"
+        r"(?!src/|tests/|assets/|platform/|packaging/)[A-Za-z0-9_.-]+\.(?:cpp|hpp|h|mm|qml|ts|svg|png)"
+        r"|apps/crucible/translations"
+    ),
+    "apps-parts": re.compile(
+        r"""["']apps["']\s*[,/]\s*["'](?:cli|gui|common|notices|windows|linux|android|wasm)["']"""
+        r"|apps/\$\{|apps/\{"
+    ),
 }
 BINARY = (
     ".ts",
