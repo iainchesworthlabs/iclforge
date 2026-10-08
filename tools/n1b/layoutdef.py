@@ -99,6 +99,10 @@ def spelling_of(path: str) -> str | None:
     g = path[:-3] if path.endswith((".hpp.in", ".h.in")) else path
     if "/include/" in g:
         return g.split("/include/", 1)[1]
+    # a library's internal headers, which iclforge::base_headers puts on the include path
+    # (src/base/internal, planning/consolidation.md's closing of C6)
+    if "/internal/iclforge/" in g:
+        return "iclforge/" + g.split("/internal/iclforge/", 1)[1]
     m = _CONVERSION_TAIL.match(g)
     if m:
         return m.group(1)

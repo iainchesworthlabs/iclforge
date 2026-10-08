@@ -193,6 +193,8 @@ FOLDED = {
     "c4n": {},
     "c4": {},
     "c5": {},
+    "c6": {},
+    "c7-1": {},
 }
 
 # --- C4's names -------------------------------------------------------------------------------
@@ -287,10 +289,60 @@ def c6_new(path: str) -> str | None:
     return C6_EXACT.get(path)
 
 
+# --- C7-1 (planning/monorepo.md) ------------------------------------------------------------------
+# The libraries are projects of their own under libs/: each with its tests and its fuzz targets
+# beside it (decisions 1 and 3), the cross-project test helpers in tests/support (the test-support
+# library), the vendored time filter in external/ (decision 14), the fuzz scripts in tools/fuzz.
+C7_LIBS = ("ac3", "ac4", "adm", "audio", "base", "capi", "containers", "dsp", "iab", "objects",
+           "render", "sendspin")
+C7_FUZZ_LIB = {
+    "ac3_decode": "ac3", "differential_ac3_decode": "ac3", "differential_eac3_decode": "ac3",
+    "eac3_decode": "ac3", "scan": "ac3", "signing_verify": "ac3", "joc_parse": "ac3",
+    "ac4_decode": "ac4", "ac4_encode": "ac4", "ac4_parse": "ac4", "adm_parse": "adm",
+    "iab_parse": "iab", "iamf_parse": "containers", "iec61937_unwrap": "containers",
+    "matroska_demux": "containers", "mp4_demux": "containers", "mpegts_demux": "containers",
+    "emdf_parse": "objects", "oamd_parse": "objects", "osc_parse": "objects",
+    "sendspin_frames": "sendspin", "sendspin_handshake": "sendspin", "sendspin_json": "sendspin",
+    "sendspin_messages": "sendspin", "wav_read": "base",
+}
+C7_FUZZ_SHARED = {"crc_mutator.hpp": "ac3", "differential_oracle.hpp": "ac3"}
+C7_SUPPORT = ("tests/platform/", "tests/crt/", "tests/sanitized.hpp", "tests/ac4_stream_kinds.hpp",
+              "tests/audio/alsa_null_device.hpp")
+
+
+def c7_1_new(path: str) -> str | None:
+    p = path.split("/")
+    if path.startswith("src/sendspin/third_party/time-filter/"):
+        return "external/time-filter/" + path[len("src/sendspin/third_party/time-filter/"):]
+    if p[0] == "src" and len(p) > 2 and p[1] in C7_LIBS:
+        return "libs/" + "/".join(p[1:])
+    for s in C7_SUPPORT:
+        if path == s or (s.endswith("/") and path.startswith(s)):
+            rest = path[len("tests/"):]
+            return "tests/support/" + (rest.split("/", 1)[1] if rest.startswith("audio/") else rest)
+    if p[0] == "tests" and len(p) > 2 and p[1] in C7_LIBS:
+        return f"libs/{p[1]}/tests/" + "/".join(p[2:])
+    if p[0] == "fuzz":
+        if len(p) == 2:
+            m = re.match(r"fuzz_(.+)\.cpp$", p[1])
+            if m and m.group(1) in C7_FUZZ_LIB:
+                return f"libs/{C7_FUZZ_LIB[m.group(1)]}/fuzz/{p[1]}"
+            if p[1] in C7_FUZZ_SHARED:
+                return f"libs/{C7_FUZZ_SHARED[p[1]]}/fuzz/{p[1]}"
+            if p[1] == "CMakeLists.txt":
+                return "cmake/IclforgeFuzz.cmake"
+            return f"tools/fuzz/{p[1]}"
+        if p[1] in ("seeds", "regressions") and len(p) > 3:
+            lib = C7_FUZZ_LIB.get(p[2].removeprefix("fuzz_"))
+            if lib:
+                return f"libs/{lib}/fuzz/{p[1]}/" + "/".join(p[2:])
+    return None
+
+
 STAGES = {"c1": c1_new, "c2": c2_new, "c3": c3_new, "c4n": c4n_new, "c4": c4_new, "c5": c5_new,
-          "c6": c6_new}
+          "c6": c6_new, "c7-1": c7_1_new}
 REMOVED = {"c1": C1_REMOVED, "c2": C2_REMOVED, "c3": C3_REMOVED, "c4n": (), "c4": (), "c5": (),
-           "c6": ()}
+           "c6": (), "c7-1": ()}
 
 # The libraries each stage merges, old -> new: what a target, an export macro, an export header, a
 # pkg-config name or an ABI allowlist follows (consol_apply.py, export_diff.py --map,
@@ -303,13 +355,14 @@ LIBRARY_MAP = {
     "c4": {},
     "c5": {},
     "c6": {},
+    "c7-1": {},
 }
 
 # The libraries a stage divides, old -> every library its files went to: signing's key, hash and
 # MAC are base's and its signer ac3's, so the exports of signing, ac3 and base are compared as one
 # group (export_diff.py, abi_compare.py). C6 gives part of ac3 to base.
 SPLITS = {"c1": {}, "c2": {"signing": ("ac3", "base")}, "c3": {}, "c4n": {}, "c4": {}, "c5": {},
-          "c6": {"ac3": ("ac3", "base")}}
+          "c6": {"ac3": ("ac3", "base")}, "c7-1": {}}
 
 # The names C6 gives base: what was iclforge::ac3::io's of WAV, iclforge::ac3::analysis's and
 # iclforge::ac3::meta's of the meters but their acmod and channel-map constructors, and the version.

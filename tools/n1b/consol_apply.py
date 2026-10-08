@@ -49,15 +49,29 @@ EXPORT_MACRO_SUFFIXES = (
 
 def library_of(path: str) -> str | None:
     p = path.split("/")
-    if p[0] == "src" and len(p) > 2:
+    if p[0] in ("src", "libs") and len(p) > 2:
         return p[1]
     return None
 
 
 def private_spelling(path: str) -> str | None:
-    """The spelling of a private header from its library's private root, `src/<library>/src/`."""
-    m = re.match(r"^src/[^/]+/src/(.+)$", path)
+    """The spelling of a private header from its library's private root, `src/<library>/src/`
+    (`libs/<library>/src/` from C7-1 of planning/monorepo.md)."""
+    m = re.match(r"^(?:src|libs)/[^/]+/src/(.+)$", path)
     return m.group(1) if m else None
+
+
+# The include roots of the tests, the first that holds a helper being the one it is spelled from:
+# the test-support library's, a library's own tests', and tests/ for what is still there.
+TEST_ROOTS = (r"^tests/support/(.+)$", r"^libs/[^/]+/tests/(.+)$", r"^tests/(.+)$")
+
+
+def test_spelling(path: str) -> str | None:
+    for rx in TEST_ROOTS:
+        m = re.match(rx, path)
+        if m:
+            return m.group(1)
+    return None
 
 
 def new_spelling(path: str) -> str | None:
@@ -119,13 +133,13 @@ def plan(repo: Repo, stage: str, index) -> dict:
             still = posixpath.normpath(posixpath.join(posixpath.dirname(f_new), sp))
             if here == target and still == t_new:
                 continue  # beside its header before and after
-            if target.startswith("tests/") and t_new.startswith("tests/"):
-                # a test's helper, spelled as it was: from tests/ (the tests' include directory)
-                # or relative to the includer
+            if target.startswith("tests/") and test_spelling(t_new) is not None:
+                # a test's helper, spelled as it was: relative to the includer, or from the include
+                # root of the tests it is in (TEST_ROOTS)
                 if here == target:
                     sn = posixpath.relpath(t_new, posixpath.dirname(f_new))
                 elif "tests/" + sp == target:
-                    sn = t_new[len("tests/") :]
+                    sn = test_spelling(t_new)
                 else:
                     problems.append((f, sp, target, t_new))
                     continue
@@ -133,6 +147,8 @@ def plan(repo: Repo, stage: str, index) -> dict:
                     edits[f][sp] = sn
                     stats["test helper"] += 1
                 continue
+            if target.endswith("/" + sp) and t_new.endswith("/" + sp):
+                continue  # its include root moves with it (planning/monorepo.md, C7-1)
             sn = new_spelling(t_new)
             if layoutdef.spelling_of(t_new):
                 if sn != sp:
