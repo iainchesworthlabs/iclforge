@@ -293,7 +293,7 @@ class ICLFORGE_AC3_EXPORT Prober {
 // fixed byte offset, which only means strmtyp in a genuine Annex E frame - in
 // an AC-3 one those bits belong to crc1, so its grouping of a stream whose
 // leading substream is not bsid 16 depends on a checksum (see
-// apps/android/.../file_replay.cpp's group_by_bsid, which documents a real
+// apps/demos/android/.../file_replay.cpp's group_by_bsid, which documents a real
 // commercial disc where that mis-grouped 176 of 480 access units). This goes
 // through read_frame_header, which settles the generation from bsid at bit 40
 // first - the deterministic route that comment recommends - and so groups such

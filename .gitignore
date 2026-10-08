@@ -32,9 +32,9 @@ CMakeUserPresets.json
 # committed (npm ci's own integrity-hash pinning, this project's equivalent
 # of requirements/*.txt's --require-hashes); only the installed tree and
 # Playwright's own run output are not.
-apps/wasm/tests/node_modules/
-apps/wasm/tests/test-results/
-apps/wasm/tests/playwright-report/
+apps/demos/wasm/tests/node_modules/
+apps/demos/wasm/tests/test-results/
+apps/demos/wasm/tests/playwright-report/
 
 # The iclforge-wasm-decoder package. Same package-lock.json
 # convention as apps/demos/wasm/tests above; js/dist/ is also covered by the
@@ -63,7 +63,7 @@ spec/
 # runtime. The desktop tools take it by path/env (never a file in the tree),
 # but the Shield app signs on-device and so reads it from a bundled asset: that
 # asset is written from a CI secret at build time and must never be committed.
-apps/android/app/src/main/assets/signing.key
+apps/demos/android/app/src/main/assets/signing.key
 
 # The older RE-derived signer OVERLAY predates the committed src/signing and is
 # still quarantined: it additionally embeds the key extracted from Dolby's

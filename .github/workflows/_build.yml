@@ -1499,7 +1499,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -f apps/android/app/src/main/assets/signing.key
+          rm -f apps/demos/android/app/src/main/assets/signing.key
           echo "Object-signing key asset removed - the release APK will be unsigned bed51."
 
       # Only meaningful for a release build with a keystore actually
@@ -1555,7 +1555,7 @@ jobs:
           set -euo pipefail
           version="${VERSION_TAG_INPUT:-0.0.0-dev}"
           mkdir -p packages
-          cp apps/android/app/build/outputs/apk/release/app-release.apk \
+          cp apps/demos/android/app/build/outputs/apk/release/app-release.apk \
              "packages/iclforge-shield-${version}.apk"
           ( cd packages && sha512sum "iclforge-shield-${version}.apk" > "iclforge-shield-${version}.apk.sha512" )
 
@@ -1774,7 +1774,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: device-ui-coverage
-          path: apps/wasm/tests/test-results/device-ui-coverage
+          path: apps/demos/wasm/tests/test-results/device-ui-coverage
           if-no-files-found: warn
 
   # The Rust bindings (rust/): a Cargo workspace living in-tree but deliberately

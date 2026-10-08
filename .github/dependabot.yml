@@ -75,7 +75,7 @@ updates:
       prefix: "build"
 
   - package-ecosystem: "npm"
-    directory: "/apps/wasm/tests"
+    directory: "/apps/demos/wasm/tests"
     target-branch: "main"
     schedule:
       interval: "weekly"
@@ -103,7 +103,7 @@ updates:
   # gap that let apps/demos/android/app/gradle.lockfile carry a CVE-flagged
   # protobuf-kotlin unnoticed (osv-scanner.yml is what actually caught it).
   - package-ecosystem: "gradle"
-    directory: "/apps/android"
+    directory: "/apps/demos/android"
     target-branch: "main"
     schedule:
       interval: "weekly"

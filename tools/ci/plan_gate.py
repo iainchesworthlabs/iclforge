@@ -111,7 +111,7 @@ GUI_PREFIXES = (
     "apps/hearth/",
     "apps/crucible/",
     "apps/shared/media/src/",
-    "tests/gui/",
+    "apps/forge/gui/tests/",
     "apps/hearth/engine/tests/",
     "apps/crucible/engine/tests/",
     "cmake/",

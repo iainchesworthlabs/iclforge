@@ -3,8 +3,8 @@
 What every user-facing feature of the Forge GUI (`apps/gui/qml`, driven by
 `EncoderController`, `QcController`, `ObjectDecodeController`,
 `StreamPlayerController`, `LanguageManager`) is exercised by. Two sets of tests
-hold it: the Qt Quick suites in `apps/gui/tests/qml/tst_*.qml` (36 suites, 215
-test functions), and the Qt-free C++ cases in `tests/gui/*.cpp` (four files, 45
+hold it: the Qt Quick suites in `apps/forge/gui/tests/qml/tst_*.qml` (36 suites, 215
+test functions), and the Qt-free C++ cases in `apps/forge/gui/tests/*.cpp` (four files, 45
 cases, tagged `[gui]` and built into `iclforge-tests`). All the QML suites run the
 real controllers, not mocks.
 

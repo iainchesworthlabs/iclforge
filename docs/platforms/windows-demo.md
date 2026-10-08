@@ -100,7 +100,7 @@ inventory the plan is built on, with the header each item lives in.
 | Decoder with §7.8 downmix for the decoded headphone path | exists | `ac3::OutputStage`, `libs/ac3/include/iclforge/ac3/decoder/output.hpp` |
 | Object signing hook pattern | exists, on Android | `apps/demos/android/app/src/main/cpp/shield_signing_hook.hpp` |
 | Draggable room widget, plan plus elevation | exists, in the GUI's Live tab | `apps/forge/gui/assets/qml/Main.qml` (`liveRoom`), `SoundfieldView.qml` |
-| Reference live encode loop | exists, twice | `apps/forge/cli/src/commands/live_audio.cpp` (`run_live`), `apps/android/.../live_cursor.cpp` |
+| Reference live encode loop | exists, twice | `apps/forge/cli/src/commands/live_audio.cpp` (`run_live`), `apps/demos/android/.../live_cursor.cpp` |
 | **Per-process loopback capture** | **landed** (Phase 1) | `Capture::start_process_loopback`, Windows backend only, see [Library additions](../crucible/design/promotion.md#library-additions) |
 | **Render-device arrival and removal notifications** | **landed** (Phase 1) | `ac3::audio::DeviceWatcher`, Windows backend only |
 | **Audio session enumeration** (who is playing, PID, name, icon) | **new, app-level** | `apps/crucible/windows/` |

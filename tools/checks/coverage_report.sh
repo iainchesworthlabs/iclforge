@@ -221,7 +221,7 @@ gcovr --root . \
     --filter 'libs/(ac3|base|dsp|objects|render|containers|audio|capi|adm|sendspin|ac4|iab)/.*' \
     --exclude 'libs/[^/]*/(tests|fuzz)/.*' \
     --filter 'apps/cli/.*' \
-    --filter 'apps/common/.*' \
+    --filter 'apps/shared/media/.*' \
     --filter 'apps/crucible/engine/.*' \
     --filter 'apps/hearth/(engine|testsink)/.*' \
     --gcov-executable "$gcov_exe" \

@@ -512,7 +512,7 @@ TEST_CASE("AccessUnitReader delimits access units the way the format defines the
         // reads byte 2's top bits as strmtyp, which only means strmtyp in an
         // Annex E frame - in an AC-3 one those bits are part of crc1, so its
         // answer here would depend on a checksum. That is a known property
-        // rather than a discovery (apps/android/.../file_replay.cpp documents
+        // rather than a discovery (apps/demos/android/.../file_replay.cpp documents
         // it against a real disc, and deliberately works around it locally
         // rather than changing the shared path), and every caller of it in
         // this repo already branches on bsid. AccessUnitReader is not affected

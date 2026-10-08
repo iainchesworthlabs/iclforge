@@ -71,7 +71,7 @@ std::string quoted(const fs::path& path) { return "\"" + path.string() + "\""; }
 
 // `channels` channels of a `hz` tone at `amplitude`, `frames` long. 1 kHz by
 // default; at 48 kHz that is exactly 48 samples a cycle, so the bytes repeat
-// at a fixed period - which once made apps/common/container_input's MPEG-TS
+// at a fixed period - which once made apps/shared/media/src/container_input's MPEG-TS
 // grid test take such a WAV for a transport stream; the regression test
 // below pins that down directly. The loudness tests pass 997 Hz, BS.1770's
 // own reference frequency, where K-weighting is exactly 0 dB.
@@ -141,7 +141,7 @@ TEST_CASE("levels refuses a WAV wider than 5.1 and an input it cannot read",
               .find("error: cannot read " + missing.string()) != std::string::npos);
 }
 
-// apps/common/container_input's own regression: sniff_container ran its
+// apps/shared/media/src/container_input's own regression: sniff_container ran its
 // MPEG-TS packet-grid test on a WAV, and a valid float WAV `forge decode`
 // wrote from a 1 kHz `sine` had five 0x47 bytes exactly 192 bytes apart, so
 // levels (and every command that sniffs its input) refused it as "a

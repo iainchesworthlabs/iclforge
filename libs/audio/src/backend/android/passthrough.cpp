@@ -48,7 +48,7 @@
 // sizes the track's buffer; the Kotlin side never needs to know the codec.
 //
 // The Kotlin side (app-specific, not part of iclforge::audio - see
-// apps/android/app/src/main/java/.../NativeBridge.kt and
+// apps/demos/android/app/src/main/java/.../NativeBridge.kt and
 // PassthroughBridge.kt) is expected to expose exactly this contract, called
 // through the method IDs cached in registerPassthroughBridge() below:
 //

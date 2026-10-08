@@ -65,7 +65,7 @@ class PlatformOnlyChangeTest(unittest.TestCase):
         self.assertEqual(lit(hits, *ALL_LANES), {"rust"})
 
     def test_windows_driver_change_does_not_light_other_platforms(self):
-        hits = gate.classify(["apps/windows/driver/ac3sink.inf"])
+        hits = gate.classify(["apps/crucible/windows/driver/ac3sink.inf"])
         self.assertEqual(lit(hits, *ALL_LANES), {"windows"})
         self.assertFalse(hits["core"])
 

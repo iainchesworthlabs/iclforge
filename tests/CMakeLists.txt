@@ -74,7 +74,7 @@ endif()
 # their takes through them now, so the bytes they produce are worth checking
 # in a CLI-only build too - and apps/shared/media/src, unlike apps/forge/gui, is present
 # whatever ICLFORGE_BUILD_GUI says. The test file itself stays under
-# tests/gui/ so its history and its "[gui]" tag are unbroken.
+# apps/forge/gui/tests/ so its history and its "[gui]" tag are unbroken.
 #
 # container_input.cpp (container readers (mkv/mp4/ts)) joined the same way for the same reason:
 # iclforge::apps::sniff_container/elementary_stream_from_bytes are what

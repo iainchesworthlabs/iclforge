@@ -150,7 +150,7 @@ namespace {
 // the time. A stream may legally mix the two: real commercial discs author a
 // bsid-6 independent substream with a bsid-16 Atmos-carrying dependent right
 // behind it, and reading crc1 as strmtyp there swallows whole runs of access
-// units into one group (see apps/android/.../file_replay.cpp, which measured
+// units into one group (see apps/demos/android/.../file_replay.cpp, which measured
 // exactly that and worked around it locally). bsid does not move - it sits at
 // bit 40 in both generations, deliberately - so gating on it is the reading
 // that is correct for either.

@@ -150,7 +150,7 @@ watchdog and a clock-drift servo shared between a real-time callback thread and 
 thread.
 
 Its test preset runs only the `concurrency` ctest label — the cases under `libs/audio/tests/`, the
-CLI's live-capture commands (`tests/cli/test_cli_live*.cpp`), the Crucible engine's threads
+CLI's live-capture commands (`apps/forge/cli/tests/test_cli_live*.cpp`), the Crucible engine's threads
 (`apps/crucible/engine/tests/`) and the Hearth engine's threaded cases (`apps/hearth/engine/tests/`) — because TSan's
 shadow memory makes everything several times slower and the rest of the suite is single-threaded
 codec maths. The label comes from the Catch2 tags themselves
