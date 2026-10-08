@@ -71,7 +71,21 @@ qt_add_executable(forge-gui
 # thing it wraps. container_input.cpp (container readers (mkv/mp4/ts)) joined it the same way,
 # for the QC/Inspect pickers below to accept a container in place of a bare
 # elementary stream the same way forge's decode/qc/levels/play/monitor do.
-target_include_directories(forge-gui PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/media/src")
+target_include_directories(forge-gui PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/media/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/preferences/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/src")
+
+# The family components (apps/shared/theme/assets/qml) are staged into assets/qml/shared and
+# compiled from there, as Hearth and Crucible compile theirs (cmake/SharedFamilyQml.cmake; the copies
+# are ignored by git). Qt names a module's QML cache file after the file's path relative to this
+# directory, with the target in front, and a path that climbs out of this directory ("../..") loses
+# the target when the path is normalised: forge-gui and forge_gui_qmltests, which compile the same
+# files from the same directory, would then name the same output twice. Staged here, the paths stay
+# inside it. The import is the module's own, so the copies are the sources byte for byte.
+include(SharedFamilyQml)
+set(ICLFORGE_GUI_SHARED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/shared")
+iclforge_stage_shared_qml(ForgeGui "${ICLFORGE_GUI_SHARED_DIR}" ICLFORGE_GUI_SHARED_OUT)
 
 # The QML lives in qml/ on disk but belongs at the root of the QML module, so
 # every file is aliased to its bare name. Left alone, Qt lays the module out as
@@ -87,25 +101,25 @@ target_include_directories(forge-gui PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../
 # relative path would resolve against the wrong directory from there.
 set(AC3_QML_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Main.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/Theme.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/Card.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/SectionHeader.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/StatTile.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/AppButton.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/AppCheckBox.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/IconButton.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/AppSlider.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/AppTextField.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/AppComboBox.qml"
+    "${ICLFORGE_GUI_SHARED_DIR}/Theme.qml"
+    "${ICLFORGE_GUI_SHARED_DIR}/Card.qml"
+    "${ICLFORGE_GUI_SHARED_DIR}/SectionHeader.qml"
+    "${ICLFORGE_GUI_SHARED_DIR}/StatTile.qml"
+    "${ICLFORGE_GUI_SHARED_DIR}/AppButton.qml"
+    "${ICLFORGE_GUI_SHARED_DIR}/AppCheckBox.qml"
+    "${ICLFORGE_GUI_SHARED_DIR}/IconButton.qml"
+    "${ICLFORGE_GUI_SHARED_DIR}/AppSlider.qml"
+    "${ICLFORGE_GUI_SHARED_DIR}/AppTextField.qml"
+    "${ICLFORGE_GUI_SHARED_DIR}/AppComboBox.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/ChannelMeter.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/SoundfieldView.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/SegmentedControl.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/FocusRing.qml"
+    "${ICLFORGE_GUI_SHARED_DIR}/SegmentedControl.qml"
+    "${ICLFORGE_GUI_SHARED_DIR}/FocusRing.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LoudnessGroup.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/VbrPanel.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Ac4Panel.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/GuidedWizard.qml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/RailBlock.qml"
+    "${ICLFORGE_GUI_SHARED_DIR}/RailBlock.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/AssignmentPanel.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/FirstRunScreen.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/PreferencesDialog.qml"
@@ -161,7 +175,7 @@ endforeach()
 # whether to emit a `singleton` line in the generated qmldir. Set it
 # afterwards and Theme registers as a plain type instead, so every Theme.*
 # binding silently resolves to undefined at runtime.
-set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/qml/Theme.qml"
+set_source_files_properties("${ICLFORGE_GUI_SHARED_DIR}/Theme.qml"
     PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_qml_module(forge-gui
@@ -618,5 +632,5 @@ endif()
 # this file's, so every path inside it is written relative to apps/forge/gui, not
 # apps/forge/gui/tests.
 if(ICLFORGE_BUILD_TESTS)
-    include(tests/CMakeLists.txt)
+    include(tests/qml.cmake)
 endif()

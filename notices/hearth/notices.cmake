@@ -42,7 +42,7 @@ function(hearth_port_version port out)
     set(${out} "${version}" PARENT_SCOPE)
 endfunction()
 
-set(ICLFORGE_HEARTH_NOTICE_FRAGMENTS header cpp-httplib mbedtls mdns libflac)
+set(ICLFORGE_HEARTH_NOTICE_FRAGMENTS hearth-header cpp-httplib mbedtls mdns libflac)
 
 # Qt, bundled into the package on Windows (beside hearth.exe) and inside
 # hearth.app on macOS - apps/hearth/ui/CMakeLists.txt's windeployqt /
@@ -126,7 +126,7 @@ if(EXISTS "${ICLFORGE_HEARTH_VCPKG_SHARE}/libogg/copyright")
     list(APPEND ICLFORGE_HEARTH_NOTICE_TOKENS "LIBOGG_VERSION=${version}")
     list(APPEND ICLFORGE_HEARTH_NOTICE_FILES "LIBOGG_COPYRIGHT=${ICLFORGE_HEARTH_VCPKG_SHARE}/libogg/copyright")
 endif()
-list(APPEND ICLFORGE_HEARTH_NOTICE_FRAGMENTS opus time-filter fmt fonts material-symbols trademarks)
+list(APPEND ICLFORGE_HEARTH_NOTICE_FRAGMENTS opus time-filter fmt hearth-fonts material-symbols trademarks)
 # Tracy's client library: hearth_engine (engine/CMakeLists.txt) links iclforge::tracy
 # unconditionally, which only pulls in Tracy::TracyClient - and so is only worth
 # disclosing - when ICLFORGE_ENABLE_TRACY is on (cmake/Tracy.cmake). Same fact,
@@ -169,12 +169,11 @@ if(NOT ICLFORGE_HEARTH_NOTICES_FILE)
         "rules and this generator agree on the same path without either having to run first.")
 endif()
 ac3_generate_notices("${ICLFORGE_HEARTH_NOTICES_FILE}"
-    # This directory first, then Crucible's, whose trademark paragraph and Qt section (bundled
+    # One directory for all three programs: the trademark paragraph and the Qt section (bundled
     # verbatim, tokenised - cmake/Notices.cmake's header says why it is shared rather than
-    # copied) are the same text for every application that includes them.
-    FRAGMENT_DIR
-        "${ICLFORGE_HEARTH_NOTICES_DIR}/fragments"
-        "${CMAKE_SOURCE_DIR}/notices/fragments"
+    # copied) are the same text for every application that includes them, and hearth-header
+    # and hearth-fonts are Hearth's own.
+    FRAGMENT_DIR "${CMAKE_SOURCE_DIR}/notices/fragments"
     FRAGMENTS ${ICLFORGE_HEARTH_NOTICE_FRAGMENTS}
     TOKENS ${ICLFORGE_HEARTH_NOTICE_TOKENS}
     FILES ${ICLFORGE_HEARTH_NOTICE_FILES})

@@ -332,7 +332,7 @@ else()
     # loop itself now (apps/hearth/ui/CMakeLists.txt calls the same function) -
     # see its header for why.
     include(SharedFamilyQml)
-    set(ICLFORGE_CRUCIBLE_SHARED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/shared")
+    set(ICLFORGE_CRUCIBLE_SHARED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/shared")
     iclforge_stage_shared_qml(Crucible "${ICLFORGE_CRUCIBLE_SHARED_DIR}" ICLFORGE_CRUCIBLE_SHARED_OUT)
 
     set(ICLFORGE_CRUCIBLE_QML_FILES
@@ -428,9 +428,12 @@ else()
         VERSION 1.0
         QML_FILES ${ICLFORGE_CRUCIBLE_QML_FILES}
         RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/tray.svg")
-    # ui/ for the generated type registrations to find crucible_controller.hpp,
-    # ../gui for system_theme.hpp.
-    target_include_directories(crucible PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ui" "${CMAKE_CURRENT_SOURCE_DIR}/../gui")
+    # ui/src for the generated type registrations to find crucible_controller.hpp, the shared
+    # theme for system_theme.hpp and the shared preferences for language_manager.hpp and
+    # settings_migration.hpp.
+    target_include_directories(crucible PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ui/src"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../shared/preferences/src"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../shared/theme/src")
     # The driver folder in the source tree is the default place the
     # Settings screen's install/remove buttons look when no driver/ folder
     # sits beside the executable (a build-tree run).

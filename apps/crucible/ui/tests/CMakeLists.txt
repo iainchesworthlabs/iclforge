@@ -78,7 +78,8 @@ qt6_add_resources(crucible_qmltests "crucible_qmltests_notices"
 # FakeSessionMonitor/FakeDevices the engine/src's Catch2 cases use, so the two
 # suites cannot disagree about what a scripted machine is.
 target_include_directories(crucible_qmltests PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/ui" "${CMAKE_CURRENT_SOURCE_DIR}/../gui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ui/src" "${CMAKE_CURRENT_SOURCE_DIR}/../shared/preferences/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../shared/theme/src"
     "${CMAKE_SOURCE_DIR}/apps/crucible/engine/tests")
 target_compile_definitions(crucible_qmltests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX
     ICLFORGE_CRUCIBLE_DRIVER_SOURCE_DIR="${CMAKE_SOURCE_DIR}/apps/crucible/windows/driver"

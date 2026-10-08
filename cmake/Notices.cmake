@@ -11,20 +11,18 @@
 # Assembles a third-party notices file at configure time from plain-text
 # fragments, so the one file a package installs and an application embeds
 # is written once, from the versions CMake already knows, rather than kept
-# by hand per platform. notices/ is the first user;
-# notices/ (Forge - forge and forge-gui) is the second.
+# by hand per platform. notices/crucible/, notices/forge/ and notices/hearth/ are
+# its three users, one per product, over the one directory of fragments, notices/fragments/.
 #
-# FRAGMENT_DIR takes more than one directory because those two callers share
-# text. A fragment that names no application - the typefaces, the trademark
-# line, and {fmt} once the binaries it is compiled into are a token - is the
-# same paragraph for both, and keeping two copies is how the two come to
-# disagree. So Forge lists its own fragment directory first and Crucible's
-# second: a name found in the earlier directory wins, and anything Forge has
-# no version of comes from the shared set. A fragment that describes what a
-# package CONTAINS is never shared this way - the Qt sections and the header
-# differ per application, and each caller keeps its own. If the shared ones
-# ever earn a family-level directory, this search path is what makes that a
-# move rather than a rewrite.
+# FRAGMENT_DIR still takes more than one directory, searched in order, though
+# every caller passes the one. A fragment that names no application - the
+# typefaces, the trademark line, and {fmt} once the binaries it is compiled
+# into are a token - is the same paragraph for every product, and keeping
+# copies is how they come to disagree. A fragment that describes what a
+# package CONTAINS is never shared - the Qt sections, the header and the
+# Windows runtime section differ per product, and are named for it
+# (forge-header, crucible-header, hearth-header, forge-windows-runtime,
+# crucible-windows-runtime, hearth-fonts).
 #
 # Substitution is string(REPLACE) on {{TOKEN}} markers, deliberately not
 # configure_file(@ONLY): licence texts must stay byte-exact, and copyright

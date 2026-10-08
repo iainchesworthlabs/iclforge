@@ -7,4 +7,4 @@
 # notices.cmake, so nothing here names an option.
 set(ICLFORGE_CRUCIBLE_NOTICES_PLATFORM "Linux")
 set(ICLFORGE_CRUCIBLE_NOTICES_LOCATION "/usr/share/doc/iclforge-crucible/NOTICES.txt (share/doc/iclforge-crucible/ in the tarball), beside LICENSE.txt")
-set(ICLFORGE_CRUCIBLE_NOTICE_FRAGMENTS header qt-system pipewire fmt fonts trademarks)
+set(ICLFORGE_CRUCIBLE_NOTICE_FRAGMENTS crucible-header qt-system pipewire fmt fonts trademarks)

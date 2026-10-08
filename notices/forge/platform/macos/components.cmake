@@ -2,7 +2,7 @@
 # The .dmg is monolithic (cmake/CPackProjectConfig.cmake forces DragNDrop
 # that way), so NOTICES.txt sits at its root, beside LICENSE.txt and
 # whatever the build produced - bin/ for forge, forge-gui.app for the window.
-# No windows-runtime section: the files that fragment covers are a Windows
+# No forge-windows-runtime section: the files that fragment covers are a Windows
 # Qt kit's, and macdeployqt places none of them.
 #
 # Nothing here has been read off a built package. This project has no macOS
@@ -15,4 +15,4 @@
 # (CMakePresets.json), so a CLI-only .dmg is the ordinary local case.
 set(ICLFORGE_NOTICES_PLATFORM "macOS")
 set(ICLFORGE_NOTICES_LOCATION "NOTICES.txt at the root of the disk image, beside LICENSE.txt")
-set(ICLFORGE_NOTICE_FRAGMENTS header qt-macos fmt fonts trademarks)
+set(ICLFORGE_NOTICE_FRAGMENTS forge-header qt-macos fmt fonts trademarks)

@@ -37,7 +37,7 @@ set(ICLFORGE_CRUCIBLE_NOTICES_PLATFORM "macOS")
 # named after the target, crucible.app; MACOSX_BUNDLE_BUNDLE_NAME
 # ("Crucible") is the display name and not the path.
 set(ICLFORGE_CRUCIBLE_NOTICES_LOCATION "NOTICES.txt beside crucible.app, next to LICENSE.txt")
-set(ICLFORGE_CRUCIBLE_NOTICE_FRAGMENTS header qt-bundled fmt fonts trademarks)
+set(ICLFORGE_CRUCIBLE_NOTICE_FRAGMENTS crucible-header qt-bundled fmt fonts trademarks)
 
 # The two sentences in the shared qt-bundled fragment that describe where this
 # package's Qt actually sits. Windows' own components.cmake supplies the

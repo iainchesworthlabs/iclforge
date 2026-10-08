@@ -26,7 +26,7 @@ add_library(hearth_engine STATIC
     src/stream_decoder.cpp
     src/transport.cpp
     src/unit_reports.cpp)
-target_include_directories(hearth_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(hearth_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_compile_features(hearth_engine PUBLIC cxx_std_23)
 
 # src/native_log_sink.hpp's one function, exactly one platform/<os>/*.cpp

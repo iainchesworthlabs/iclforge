@@ -570,7 +570,7 @@ if(ICLFORGE_BUILD_PYTHON)
 endif()
 
 if(ICLFORGE_BUILD_CLI)
-    add_subdirectory(apps/forge/cli/src)
+    add_subdirectory(apps/forge/cli)
 endif()
 
 if(ICLFORGE_BUILD_GUI)
@@ -602,12 +602,24 @@ if(ICLFORGE_BUILD_CRUCIBLE AND (WIN32 OR APPLE OR LINUX))
 endif()
 
 # The tests, a binary per project (planning/monorepo.md, (e)): tests/ first, for the test-support
-# library every binary links and the products' tests, then each library's own tests/, after every
+# library every binary links, then the tests/ beside each program and each library, after every
 # target they link. `cmake --build ... --target iclforge-tests` builds them all.
 if(ICLFORGE_BUILD_TESTS)
     include(External)
     iclforge_find_catch2()
     add_subdirectory(tests)
+    # The products', beside the programs they test. Forge's command line is run as a subprocess, so
+    # its tests need the target; the shared code and the GUI's Qt-free part are held on every leg.
+    if(TARGET forge)
+        add_subdirectory(apps/forge/cli/tests)
+    endif()
+    add_subdirectory(apps/shared/media/tests)
+    add_subdirectory(apps/shared/preferences/tests)
+    add_subdirectory(apps/forge/gui/tests)
+    if(ICLFORGE_BUILD_HEARTH)
+        add_subdirectory(apps/hearth/engine/tests)
+    endif()
+    add_subdirectory(apps/crucible/engine/tests)
     foreach(_iclforge_lib IN ITEMS base dsp objects render ac3 containers audio ac4 iab adm capi sendspin)
         set(_iclforge_lib_target "iclforge::${_iclforge_lib}")
         if(_iclforge_lib STREQUAL "capi")

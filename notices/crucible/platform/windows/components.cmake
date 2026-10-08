@@ -5,7 +5,7 @@
 # build - are inserted by notices.cmake, so nothing here names an option.
 set(ICLFORGE_CRUCIBLE_NOTICES_PLATFORM "Windows")
 set(ICLFORGE_CRUCIBLE_NOTICES_LOCATION "NOTICES.txt in the folder crucible.exe was unpacked to, beside LICENSE.txt")
-set(ICLFORGE_CRUCIBLE_NOTICE_FRAGMENTS header qt-bundled windows-runtime fmt fonts driver trademarks)
+set(ICLFORGE_CRUCIBLE_NOTICE_FRAGMENTS crucible-header qt-bundled crucible-windows-runtime fmt fonts driver trademarks)
 
 # Where this package's Qt sits, and how the loader finds it. Both sentences
 # were literal text inside fragments/qt-bundled.txt until 2026-09-06, when

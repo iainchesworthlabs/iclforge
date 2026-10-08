@@ -63,7 +63,7 @@ include("${ICLFORGE_NOTICES_DIR}/platform/${ICLFORGE_NOTICES_PLATFORM_DIR}/compo
 # both be true; the configure fails there first.
 if(NOT ICLFORGE_BUILD_GUI)
     list(REMOVE_ITEM ICLFORGE_NOTICE_FRAGMENTS
-        qt-windows qt-macos qt-linux windows-runtime fonts)
+        qt-windows qt-macos qt-linux forge-windows-runtime fonts)
 endif()
 
 # Tracy's client library: apps/forge/gui/CMakeLists.txt's forge-gui links iclforge::tracy
@@ -128,17 +128,14 @@ string(REGEX MATCH "^[0-9]+\\.[0-9]+" ICLFORGE_NOTICES_QT_SERIES "${ICLFORGE_GUI
 
 set(ICLFORGE_NOTICES_FILE "${CMAKE_BINARY_DIR}/notices/NOTICES.txt")
 ac3_generate_notices("${ICLFORGE_NOTICES_FILE}"
-    # This directory first, notices/fragments second: fmt,
-    # fonts and trademarks are the same paragraphs for both applications and
-    # are taken from there rather than copied, while header and the Qt
-    # sections describe what a Forge package contains and are this
-    # directory's own. The licence texts come from the same place for the
-    # same reason - notices/licences/ is where the LGPL, the
-    # {fmt} MIT, the Mesa MIT and the NCSA texts already live, and a second
-    # byte-identical copy is a second thing to keep current.
-    FRAGMENT_DIR
-        "${ICLFORGE_NOTICES_DIR}/fragments"
-        "${CMAKE_SOURCE_DIR}/notices/fragments"
+    # One directory of fragments for all three programs: fmt, fonts and
+    # trademarks are the same paragraphs for every one of them, while
+    # forge-header, forge-windows-runtime and the Qt sections describe what
+    # a Forge package contains. The licence texts come from notices/licences/
+    # for the same reason - the LGPL, the {fmt} MIT, the Mesa MIT and the NCSA
+    # texts live there once, and a second byte-identical copy is a second
+    # thing to keep current.
+    FRAGMENT_DIR "${CMAKE_SOURCE_DIR}/notices/fragments"
     FRAGMENTS ${ICLFORGE_NOTICE_FRAGMENTS}
     TOKENS
         "VERSION=${PROJECT_VERSION_FULL}"

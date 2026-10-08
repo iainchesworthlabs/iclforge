@@ -46,7 +46,7 @@ endif()
 # An engine-and-runner build: no window, so no Qt, no fonts, and nothing the
 # Qt deployment tool placed beside the executable.
 if(NOT Qt6_FOUND)
-    list(REMOVE_ITEM ICLFORGE_CRUCIBLE_NOTICE_FRAGMENTS qt-bundled qt-system qt-quick3d fonts windows-runtime)
+    list(REMOVE_ITEM ICLFORGE_CRUCIBLE_NOTICE_FRAGMENTS qt-bundled qt-system qt-quick3d fonts crucible-windows-runtime)
 endif()
 
 # The versions, from what CMake already holds: the kit's (cmake/FindQt6.cmake),
@@ -66,7 +66,7 @@ string(REGEX MATCH "^[0-9]+\\.[0-9]+" ICLFORGE_CRUCIBLE_QT_SERIES "${Qt6_VERSION
 
 set(ICLFORGE_CRUCIBLE_NOTICES_FILE "${CMAKE_CURRENT_BINARY_DIR}/notices/NOTICES.txt")
 ac3_generate_notices("${ICLFORGE_CRUCIBLE_NOTICES_FILE}"
-    FRAGMENT_DIR "${ICLFORGE_CRUCIBLE_NOTICES_DIR}/fragments"
+    FRAGMENT_DIR "${CMAKE_SOURCE_DIR}/notices/fragments"
     FRAGMENTS ${ICLFORGE_CRUCIBLE_NOTICE_FRAGMENTS}
     TOKENS
         "VERSION=${PROJECT_VERSION_FULL}"
@@ -99,12 +99,12 @@ ac3_generate_notices("${ICLFORGE_CRUCIBLE_NOTICES_FILE}"
         # lists) and each has a different answer.
         "TRACY_USERS=crucible and crucible-run"
     FILES
-        "LGPL3=${ICLFORGE_CRUCIBLE_NOTICES_DIR}/licences/LGPL-3.0.txt"
+        "LGPL3=${CMAKE_SOURCE_DIR}/notices/licences/LGPL-3.0.txt"
         "OFL=${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/OFL.txt"
         "MSPL=${CMAKE_SOURCE_DIR}/apps/crucible/windows/driver/LICENSE"
-        "FMT_MIT=${ICLFORGE_CRUCIBLE_NOTICES_DIR}/licences/MIT-fmt.txt"
-        "PW_MIT=${ICLFORGE_CRUCIBLE_NOTICES_DIR}/licences/MIT-pipewire.txt"
-        "TRACY_BSD=${ICLFORGE_CRUCIBLE_NOTICES_DIR}/licences/BSD-3-Clause-Tracy.txt"
-        "MESA_MIT=${ICLFORGE_CRUCIBLE_NOTICES_DIR}/licences/MIT-mesa.txt"
-        "DXC_NCSA=${ICLFORGE_CRUCIBLE_NOTICES_DIR}/licences/NCSA-dxc.txt")
+        "FMT_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-fmt.txt"
+        "PW_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-pipewire.txt"
+        "TRACY_BSD=${CMAKE_SOURCE_DIR}/notices/licences/BSD-3-Clause-Tracy.txt"
+        "MESA_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-mesa.txt"
+        "DXC_NCSA=${CMAKE_SOURCE_DIR}/notices/licences/NCSA-dxc.txt")
 message(STATUS "Crucible notices: ${ICLFORGE_CRUCIBLE_NOTICES_PLATFORM} build, sections: ${ICLFORGE_CRUCIBLE_NOTICE_FRAGMENTS}")

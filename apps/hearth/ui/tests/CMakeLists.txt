@@ -76,8 +76,8 @@ qt_add_qml_module(hearth_qmltests
 add_dependencies(hearth_qmltests hearth)
 
 target_include_directories(hearth_qmltests PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}"
-    "${CMAKE_SOURCE_DIR}/apps/forge/gui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/apps/shared/preferences/src"
     "${CMAKE_SOURCE_DIR}/apps/shared/media/src")
 target_compile_definitions(hearth_qmltests PRIVATE
     QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/qml")

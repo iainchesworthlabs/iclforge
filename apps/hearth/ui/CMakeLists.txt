@@ -68,7 +68,7 @@ else()
     # why this is a shared function rather than each app running its own copy
     # of the loop). Edit apps/gui/qml/*.qml and every app that copies it follows.
     include(SharedFamilyQml)
-    set(ICLFORGE_HEARTH_SHARED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/qml/shared")
+    set(ICLFORGE_HEARTH_SHARED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/shared")
     iclforge_stage_shared_qml(Hearth "${ICLFORGE_HEARTH_SHARED_DIR}" ICLFORGE_HEARTH_SHARED_OUT)
 
     qt_add_executable(hearth
@@ -93,9 +93,9 @@ else()
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.cpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.hpp")
     target_include_directories(hearth PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}"
-        "${PROJECT_SOURCE_DIR}/apps/forge/gui"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../engine"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../engine/src"
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src")
     target_link_libraries(hearth PRIVATE
         hearth_engine

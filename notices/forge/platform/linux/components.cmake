@@ -8,4 +8,4 @@
 # section has to be true of both.
 set(ICLFORGE_NOTICES_PLATFORM "Linux")
 set(ICLFORGE_NOTICES_LOCATION "/usr/share/doc/iclforge/NOTICES.txt (share/doc/iclforge/ in the tarball, usr/share/doc/iclforge/ inside the AppImage), beside LICENSE.txt")
-set(ICLFORGE_NOTICE_FRAGMENTS header qt-linux fmt fonts trademarks)
+set(ICLFORGE_NOTICE_FRAGMENTS forge-header qt-linux fmt fonts trademarks)
