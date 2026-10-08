@@ -1,6 +1,7 @@
 """Compare how two configured trees compile each unit: the flags, in order, of compile_commands.json
 
     flags_diff.py --old <build dir> --new <build dir> [--moves <plan.json>] [--show 20]
+                  [--rename OLD=NEW ...] [--rename-re PATTERN=>NEW ...]
 
 A stage that changes how the libraries are made (planning/consolidation.md, C0) must compile every
 unit with the same flags: the same definitions, the same include directories in the same order,
@@ -13,6 +14,13 @@ has and the other has not, and as "order" where the two hold the same flags in a
 `--links` compares the archive and link steps instead (`ninja -t commands`): the objects and
 libraries each output is made from, in order. `--ignore` drops a flag the stage changes by design
 from both sides (C0: AC-4's profiling directory, which is iclforge::base's now).
+
+A rename is made in one pass, the longest name first, so that a path a rule has written is not
+read by another (C7-2: `tests/crucible` -> `apps/crucible/engine/tests` and the directory
+`apps/crucible/engine` -> `apps/crucible/engine/src` both apply, and the first must not be
+renamed again by the second). `--rename OLD=NEW` adds a literal rule, for what a plan does not
+know, such as the build tree of a generated Qt directory (`<build>/apps/gui` ->
+`<build>/apps/forge/gui`); `--rename-re PATTERN=>NEW` adds a regular expression with groups.
 """
 
 from __future__ import annotations
@@ -84,9 +92,17 @@ def load(
     return {k: sorted(v) for k, v in out.items()}
 
 
+RENAME_RE: list[tuple[re.Pattern[str], str]] = []
+
+
 def rename(text: str, renames: dict[str, str]) -> str:
-    for old, new in renames.items():
-        text = text.replace(old, new)
+    if renames:
+        # one pass, the longest name first (the dict is ordered that way), so that what a rule
+        # wrote is not renamed again
+        rx = re.compile("|".join(re.escape(k) for k in sorted(renames, key=lambda k: -len(k))))
+        text = rx.sub(lambda m: renames[m.group(0)], text)
+    for pattern, new in RENAME_RE:
+        text = pattern.sub(new, text)
     return text
 
 
@@ -208,6 +224,10 @@ def main() -> int:
     ap.add_argument("--new", required=True, type=Path)
     ap.add_argument("--moves", type=Path, default=None, help="a move plan; units follow it")
     ap.add_argument("--show", type=int, default=20)
+    ap.add_argument("--rename", action="append", default=[], help="OLD=NEW, a literal rule")
+    ap.add_argument(
+        "--rename-re", action="append", default=[], help="PATTERN=>NEW, a regular expression"
+    )
     ap.add_argument(
         "--links", action="store_true", help="compare the archive and link steps instead"
     )
@@ -226,6 +246,12 @@ def main() -> int:
         )
         old_files = [f for f in listed.stdout.decode("utf-8", "surrogateescape").split("\0") if f]
     renames = plan_renames(a.moves, old_files)
+    for rule in a.rename:
+        old, _, new = rule.partition("=")
+        renames[old] = new
+    for rule in a.rename_re:
+        pattern, _, new = rule.partition("=>")
+        RENAME_RE.append((re.compile(pattern), new))
     if a.links:
         return compare(load_links(a.old, renames), load_links(a.new, {}), a.show)
     ignore = [re.compile(x) for x in a.ignore]
