@@ -6,7 +6,7 @@ below, not edited by hand in any of the .ico/.icns/.png/mipmap files this
 writes. Re-run this script (`python assets/icon/generate_icons.py`) after
 changing the design, rather than touching a generated output directly.
 Mirrors the "commit the binary asset into the tree" precedent
-apps/gui/fonts/*.ttf already sets for this project - just generated here
+apps/shared/theme/assets/fonts/*.ttf already sets for this project - just generated here
 rather than third-party.
 
 Pillow only (confirmed available: 12.3+, including native ICO and ICNS
@@ -25,7 +25,7 @@ from PIL import Image, ImageDraw
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-# The WASM demo page's own existing palette (apps/wasm/index.html's
+# The WASM demo page's own existing palette (apps/demos/wasm/index.html's
 # :root CSS vars: --bg/--accent) - reused here rather than inventing a
 # third brand color for a project that already has one established.
 BG = (11, 18, 32, 255)  # #0b1220

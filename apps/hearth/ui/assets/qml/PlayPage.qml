@@ -76,7 +76,7 @@ Item {
     // a probe has found so far, joined with " · " and skipping anything not
     // known yet - HearthController.queue's own fields fill in progressively,
     // the first time an item is about to play or is read ahead
-    // (apps/hearth/engine/player.cpp's start_session()/prepare_next()), not
+    // (apps/hearth/engine/src/player.cpp's start_session()/prepare_next()), not
     // at addFiles() time.
     function queueMetadataLine(item) {
         var parts = [];

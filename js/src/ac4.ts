@@ -1,5 +1,5 @@
-// A typed wrapper over the AC-4 embind module apps/wasm/ac4_bindings.cpp
-// builds (apps/wasm/CMakeLists.txt's `iclforge_wasm_ac4` target,
+// A typed wrapper over the AC-4 embind module apps/demos/wasm/ac4_bindings.cpp
+// builds (apps/demos/wasm/CMakeLists.txt's `iclforge_wasm_ac4` target,
 // `-sEXPORT_NAME=createIclForgeAc4Module`) - the AC-4 counterpart of
 // push-decoder.ts, not of decoder-worker.ts.
 //
@@ -13,7 +13,7 @@
 // surface is wider and unrelated to a fold (presentations, concealment,
 // object audio), and there is no existing encode-side Worker/ring-buffer
 // precedent anywhere in this package to extend either: encoder_bindings.cpp's
-// own consumer (apps/wasm/encode/app.js) drives its `Encoder` class directly
+// own consumer (apps/demos/wasm/encode/app.js) drives its `Encoder` class directly
 // from the page, no Worker involved. Rather than force AC-4's shape onto a
 // protocol built for a different job, or invent a second, unrelated Worker
 // protocol from nothing, this is a plain ES module: it loads the glue and
@@ -417,7 +417,7 @@ export interface NativeAc4Encoder {
   delete(): void;
 }
 
-/** The Embind module `apps/wasm/ac4_bindings.cpp` builds - what `createIclForgeAc4Module()` resolves to. */
+/** The Embind module `apps/demos/wasm/ac4_bindings.cpp` builds - what `createIclForgeAc4Module()` resolves to. */
 export interface Ac4EmbindModule {
   Ac4Decoder: new (
     outputLevelDbfs: number,
@@ -434,13 +434,13 @@ export interface Ac4EmbindModule {
   syncFrame(rawFrame: Uint8Array, crc: boolean): Uint8Array;
 }
 
-/** The MODULARIZE factory Emscripten attaches as `createIclForgeAc4Module` - see apps/wasm/CMakeLists.txt's link options. */
+/** The MODULARIZE factory Emscripten attaches as `createIclForgeAc4Module` - see apps/demos/wasm/CMakeLists.txt's link options. */
 export type Ac4ModuleFactory = (moduleOverrides?: Record<string, unknown>) => Promise<Ac4EmbindModule>;
 
 async function loadEmscriptenGlue(glueUrl: string): Promise<Ac4ModuleFactory> {
   const source = await (await fetch(glueUrl)).text();
   // createIclForgeAc4Module is the MODULARIZE+EXPORT_NAME global the glue
-  // defines when evaluated as a plain script (apps/wasm/CMakeLists.txt's
+  // defines when evaluated as a plain script (apps/demos/wasm/CMakeLists.txt's
   // link options for iclforge_wasm_ac4) - re-exporting it is what makes the
   // Blob URL below `import`able, the same technique decoder-worker.ts uses
   // for createIclForgeModule.

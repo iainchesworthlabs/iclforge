@@ -77,7 +77,7 @@
 //       // nothing. AudioTrack.getPlaybackHeadPosition() as an unsigned
 //       // count, or -1 with no track; pause() and play(); and a flush of a
 //       // paused track. A minified app keeps these only if its R8 rules
-//       // name them (apps/android/app/proguard-rules.pro).
+//       // name them (apps/demos/android/app/proguard-rules.pro).
 //       fun playbackHeadPosition(): Long
 //       fun pause(): Boolean
 //       fun resume(): Boolean
@@ -690,7 +690,7 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
 // the mangling convention (Java_<package>_<Class>_<method>), not by us.
 //
 // JNI_OnLoad is defined here, not in the app's own native code
-// (apps/android/app/src/main/cpp/), because capturing the JavaVM is
+// (apps/demos/android/app/src/main/cpp/), because capturing the JavaVM is
 // iclforge::audio's own concern (jni_env() above needs it) and a
 // process may load exactly one JNI_OnLoad per shared object - this is the
 // only translation unit in iclforge_jni.so that needs it.

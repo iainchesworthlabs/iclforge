@@ -86,7 +86,7 @@ jobs:
     # A backstop against GitHub's own 360-minute default: the macos-llvm
     # leg's first-ever GUI run hung in the Test step and silently consumed
     # the full 6 hours before being force-cancelled (see
-    # apps/gui/tests/CMakeLists.txt's QSG_RENDER_LOOP comment for the
+    # apps/forge/gui/tests/CMakeLists.txt's QSG_RENDER_LOOP comment for the
     # hypothesis and the per-test TIMEOUT that now also bounds that specific
     # case). This is deliberately generous - the slowest leg observed so far
     # (windows-llvm, packaging included on windows-msvc) is ~22 minutes - so
@@ -739,14 +739,14 @@ jobs:
         run: |
           set -euo pipefail
           cmake --build "build/config-${MATRIX_PRESET}" --target crucible_lupdate
-          git diff --exit-code -- apps/crucible/translations || {
-            echo "::error::a qsTr() string changed without regenerating the catalogues -           build the crucible_lupdate target and commit apps/crucible/translations"
+          git diff --exit-code -- apps/crucible/ui/assets/translations || {
+            echo "::error::a qsTr() string changed without regenerating the catalogues -           build the crucible_lupdate target and commit apps/crucible/ui/assets/translations"
             exit 1
           }
         env:
           MATRIX_PRESET: ${{ matrix.preset }}
 
-      # The same drift check for Hearth's six (apps/hearth/ui/translations).
+      # The same drift check for Hearth's six (apps/hearth/ui/assets/translations).
       # Every Windows leg builds hearth, so it needs no matrix flag, and it
       # runs on windows-msvc alone for the reason given above. It is here
       # rather than beside the GUI's on Linux GCC because this leg's lupdate
@@ -770,8 +770,8 @@ jobs:
           set -euo pipefail
           cmake --build "build/config-${MATRIX_PRESET}" --target hearth_lupdate
           git diff --exit-code -I '^[[:space:]]*<location filename="[^"]*" line="[0-9]+"/>' \
-            -- apps/hearth/ui/translations || {
-            echo "::error::a qsTr() string changed without regenerating the catalogues - build the hearth_lupdate target and commit apps/hearth/ui/translations"
+            -- apps/hearth/ui/assets/translations || {
+            echo "::error::a qsTr() string changed without regenerating the catalogues - build the hearth_lupdate target and commit apps/hearth/ui/assets/translations"
             exit 1
           }
         env:
@@ -832,12 +832,12 @@ jobs:
       # The Crucible's coverage floor - what ci.yml's `coverage` job
       # is for the library, for the one first-party tree that job cannot see.
       #
-      # It cannot see it for the reason its own header gives about apps/gui:
+      # It cannot see it for the reason its own header gives about apps/forge/gui:
       # instrumenting a Qt application needs a Qt kit on the instrumented leg,
-      # and no Linux leg installs one. Crucible is worse off than apps/gui
+      # and no Linux leg installs one. Crucible is worse off than apps/forge/gui
       # there, because more of it lives behind Qt - the window, its controller,
       # and the Qt Quick suites that are the ONLY thing driving the Linux
-      # platform seams (tests/crucible/platform_services_stub.cpp is what the
+      # platform seams (apps/crucible/engine/tests/platform_services_stub.cpp is what the
       # Catch2 binary links). So the figure is taken where the kit already is.
       #
       # One extra pass inside this leg rather than a job of its own, the same
@@ -878,7 +878,7 @@ jobs:
           # and friends) do not cover, so the preset alone finds no Qt6 here.
           # Without it this configure does not degrade into a smaller number -
           # it fails outright, because ICLFORGE_BUILD_GUI is ON for every
-          # windows-llvm preset (CMakePresets.json) and apps/gui/CMakeLists.txt
+          # windows-llvm preset (CMakePresets.json) and apps/forge/gui/CMakeLists.txt
           # asks for Qt6 REQUIRED.
           #
           # Asserted rather than assumed: an empty QT_ROOT_DIR would pass an

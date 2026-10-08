@@ -25,7 +25,7 @@
 #include "engine_thread.hpp"
 #include "pcm_sink.hpp"
 
-// iclforge::hearth::Engine (apps/hearth/engine/engine_thread.cpp): the player on a thread
+// iclforge::hearth::Engine (apps/hearth/engine/src/engine_thread.cpp): the player on a thread
 // of its own. The device here has a clock that a second thread runs, as a
 // real device's render thread would, so the engine, the device and the test's
 // own thread - posting commands and reading snapshots - all run at once.

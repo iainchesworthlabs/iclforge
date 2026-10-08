@@ -18,7 +18,7 @@ re-read from the catalogue.
 | Code | Language | Catalogue |
 | --- | --- | --- |
 | `en` | English | none — the `qsTr()` source text |
-| `fr` | Français | `apps/crucible/translations/crucible_fr.ts` |
+| `fr` | Français | `apps/crucible/ui/assets/translations/crucible_fr.ts` |
 | `de` | Deutsch | `crucible_de.ts` |
 | `es` | Español | `crucible_es.ts` |
 | `ar` | العربية | `crucible_ar.ts` |
@@ -39,7 +39,7 @@ Three sources, in this order; the first that names a language the app ships wins
 ## Right to left
 
 Arabic, Hebrew and Yiddish set the application's layout direction, and the window root
-(`apps/crucible/ui/qml/Main.qml`) mirrors on it: rows run right to left, anchors swap sides, the
+(`apps/crucible/ui/assets/qml/Main.qml`) mirrors on it: rows run right to left, anchors swap sides, the
 header title sits at the right edge, and the combo-box chevrons move to the left of their
 controls. Padding is outside that: neither a `Text`'s padding nor a `Control`'s `leftPadding` and
 `rightPadding` swaps on its own, so a control padded differently on its two sides reads its own
@@ -56,7 +56,7 @@ Two things stay where they are:
 
 Arabic and Hebrew script have no coverage in Archivo, the window's own face, so the two bundled
 Noto Sans faces are swapped in for those three languages (`font_family_for()` in
-`apps/gui/language_manager.cpp`, and `Theme.rtlFonts`, which carry the same pairing).
+`apps/shared/preferences/src/language_manager.cpp`, and `Theme.rtlFonts`, which carry the same pairing).
 
 Two cases in `apps/crucible/ui/tests/qml/tst_shell.qml` hold this: the header title moves to the
 right half of the window under Arabic and back under English, and the plan's L speaker stays in
@@ -203,7 +203,7 @@ in `apps/crucible/translations/crucible_<code>.ts` at commit `c5c9df76`, under `
 
 ## What the gate checks
 
-`tests/crucible/test_translations.cpp` reads the six files and runs on every platform, in the
+`apps/crucible/ui/tests/test_translations.cpp` reads the six files and runs on every platform, in the
 plain `iclforge-tests` binary, so a developer's own `ctest` sees it:
 
 | Rule | State |
@@ -223,7 +223,7 @@ than that every translation is right — the review the glossary describes is wh
 arming these rules does not stand in for it.
 
 `.github/workflows/_ci-windows.yml` also runs `crucible_lupdate` and then
-`git diff --exit-code -- apps/crucible/translations`, the way it already does for `forge-gui`. It
+`git diff --exit-code -- apps/crucible/ui/assets/translations`, the way it already does for `forge-gui`. It
 runs on the `windows-msvc` leg alone, because the `crucible_lupdate` target exists only where
 Crucible is configured and the matrix build tree carries Crucible on Windows; one leg is enough,
 since extraction does not depend on the compiler. It turns a forgotten regeneration into a red

@@ -155,7 +155,7 @@
   {
    "file": "demo.ec3",
    "what": "the WASM page's demo: 5.1 with objects, JOC in the QMF domain",
-   "source": "apps/wasm/assets/demo.ec3",
+   "source": "apps/demos/wasm/assets/demo.ec3",
    "psram": false,
    "refused": null,
    "codec": "E-AC-3",

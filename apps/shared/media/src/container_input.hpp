@@ -11,7 +11,7 @@
 // Turning a container file into the elementary stream iclforge::ac3 actually
 // decodes (container readers (mkv/mp4/ts)) - shared by forge (decode/qc/levels/play/monitor)
 // and forge-gui (the QC/Inspect pickers), compiled straight into both the same
-// way RecordingSink/Fmp4FolderWriter beside this file are: apps/common has no
+// way RecordingSink/Fmp4FolderWriter beside this file are: apps/shared/media/src has no
 // library target of its own (see recording_sink.hpp's own comment), and this
 // is smaller than either.
 //
@@ -21,7 +21,7 @@
 // comment) - the containers are deliberately independent of the codec, and giving the codec library
 // a dependency back on them would invert that for every third party that links iclforge::ac3 to
 // decode bare elementary streams and wants nothing else. This file depends on both instead, which
-// is fine at this layer - apps/common already does for RecordingSink (ac3/io/wav.hpp,
+// is fine at this layer - apps/shared/media/src already does for RecordingSink (ac3/io/wav.hpp,
 // ac3/iec61937/iec61937.hpp) - since disambiguating a container from a bare elementary stream is
 // exactly where knowing both sides earns its keep (see ContainerKind's own comment).
 

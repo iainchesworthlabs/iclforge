@@ -3,7 +3,7 @@
 
 const { test, expect } = require('@playwright/test');
 
-// Coverage for the Atmos object-authoring page (apps/wasm/atmos/), the UX6
+// Coverage for the Atmos object-authoring page (apps/demos/wasm/atmos/), the UX6
 // piece that turns AtmosBedEncoder from "bound but nothing drives it" into a
 // working authoring surface. Two layers, same philosophy as encode.spec.js:
 // drive the real Embind API end to end with assertions on computed values,

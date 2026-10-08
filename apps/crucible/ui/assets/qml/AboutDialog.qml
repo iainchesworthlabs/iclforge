@@ -76,7 +76,7 @@ Dialog {
         }
         // No component is named here: what this build carries from others
         // differs by platform and by build, and the notices file generated
-        // for it (apps/crucible/notices/) is the one place that says.
+        // for it (notices/) is the one place that says.
         Body {
             text: qsTr("What this build carries from others - Qt, the {fmt} library, the Archivo and Noto Sans typefaces, and what the silent device needs on this platform - is listed with each licence under Licences; the same text ships in the package as NOTICES.txt.")
         }

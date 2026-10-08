@@ -5,11 +5,11 @@
 
 #include "session.hpp"
 
-// The application's ItemLoader (apps/hearth/engine/session.hpp: "the path is
+// The application's ItemLoader (apps/hearth/engine/src/session.hpp: "the path is
 // turned into bytes by an ItemLoader, which the application supplies").
 //
 // This first slice reads a raw `.ac3`/`.ec3`/`.ac4` elementary stream from
-// disk and nothing else: apps/common/container_input.hpp's Matroska/MP4/
+// disk and nothing else: apps/shared/media/src/container_input.hpp's Matroska/MP4/
 // MPEG-TS readers join this loader in a later slice, the same way the plan's
 // Media section describes. A path this loader does not recognise is not a
 // crash - it comes back as an error, which Session::open() turns into the

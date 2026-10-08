@@ -128,7 +128,7 @@ What runs against it:
   (`Linux LLVM TSan`, a `deep`-tier leg in `.github/ci/legs.jsonc`, so it runs in the nightly run;
   preset `linux-llvm-tsan`) rather than more entries on the one above. It runs the `concurrency`
   ctest label only — the audio layer's tests (`libs/audio/tests/`), `forge live`'s
-  (`tests/cli/test_cli_live.cpp`) and the Hearth tests that carry the tag —
+  (`apps/forge/cli/tests/test_cli_live.cpp`) and the Hearth tests that carry the tag —
   because TSan's shadow memory makes everything several times slower and the rest of the suite is
   single-threaded codec maths. `tsan.supp` at the repository root holds the suppressions and is
   near-empty.
@@ -196,7 +196,7 @@ floats. Use the allocating forms if the sizes are not statically obvious.
 
 ### The WASM bindings and the JNI bridge
 
-The WASM decoder (`apps/wasm/decoder_bindings.cpp`) copies the JavaScript byte array into a
+The WASM decoder (`apps/demos/wasm/decoder_bindings.cpp`) copies the JavaScript byte array into a
 `std::vector` before parsing, so the decode itself never reads JS-owned memory. What it hands
 *back* is a zero-copy `typed_memory_view` into the decoder instance's own buffers: those views
 are invalidated by the next `decode()` call or by the instance's destruction, and JavaScript
@@ -204,12 +204,12 @@ holding one past that point reads freed WASM heap. The module is built with
 `ALLOW_MEMORY_GROWTH` under a 1 GiB `MAXIMUM_MEMORY` ceiling, which turns heap exhaustion into a
 catchable `std::bad_alloc` and a readable refusal instead of a dead tab.
 
-The AC-4 bindings (`apps/wasm/ac4_bindings.cpp`) have the same shape. The decoder copies the
+The AC-4 bindings (`apps/demos/wasm/ac4_bindings.cpp`) have the same shape. The decoder copies the
 JavaScript byte array before parsing and returns each frame's channels and object samples as
 `typed_memory_view`s, valid until that instance's next call. The encoder copies every frame it
 returns into a `Uint8Array` of its own, because one call can return several.
 
-The Android JNI bridge (`apps/android/app/src/main/cpp/`) is demo-app scope: it returns strings
+The Android JNI bridge (`apps/demos/android/app/src/main/cpp/`) is demo-app scope: it returns strings
 through `NewStringUTF` and does not take byte arrays across the boundary, so it has no
 `GetByteArrayElements`-style pinned-buffer contract to get wrong. It is not part of the library's
 supported surface.

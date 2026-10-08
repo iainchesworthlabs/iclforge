@@ -1,7 +1,7 @@
 import Crucible
 
 // The family's flat bordered button, which this file used to carry its own
-// copy of. It now lives in apps/gui/qml/AppButton.qml and is staged into
+// copy of. It now lives in apps/shared/theme/assets/qml/AppButton.qml and is staged into
 // every family member's module by cmake/SharedFamilyQml.cmake, the same way
 // Theme/Card/SegmentedControl already were - two copies of one control is
 // how the two come to disagree (that file's own header says so).

@@ -36,7 +36,7 @@
 # module's namespace is `iclforge::adm` and not `adm`).
 #
 # NOT wired into the Android/Shield CMake tree - matroska/mp4/mpegts stay out
-# of that tree too (see apps/android's own notes - not an NDK build-gap issue
+# of that tree too (see apps/demos/android's own notes - not an NDK build-gap issue
 # any more, now that the project uses {fmt} rather than std::format; it's
 # purely because the app has no use for them), and this module adds an even
 # less NDK-friendly dependency (Boost) on top of a capability (ADM ingest)

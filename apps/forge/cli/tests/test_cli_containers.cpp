@@ -29,8 +29,8 @@
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 
-// apps/cli/commands/containers.cpp measured 0.0% line coverage when the
-// apps/cli coverage gate was first pointed at apps/ (re-measured at
+// apps/forge/cli/src/commands/containers.cpp measured 0.0% line coverage when the
+// apps/forge/cli/src coverage gate was first pointed at apps/ (re-measured at
 // 30.4% after the container-reader/probe work landed and
 // incidentally exercised some of it - see CLI container command tests). mkv/mp4/ts were
 // already reached as fixture-building helpers inside test_cli.cpp's demux
@@ -42,7 +42,7 @@
 // hit the three refusal branches containers.cpp's own comments describe but
 // nothing had triggered.
 //
-// Same subprocess plumbing as tests/cli/test_cli.cpp's run_cli - see its
+// Same subprocess plumbing as apps/forge/cli/tests/test_cli.cpp's run_cli - see its
 // comment for why the extra outer quote pair is needed on Windows and must
 // not appear on POSIX. Duplicated here rather than shared, per this project's
 // per-file test-helper convention (see test_cli_stream_tools.cpp).
@@ -52,7 +52,7 @@ using iclforge::test::kSanitized;
 
 namespace {
 
-// See tests/cli/test_cli.cpp's own scratch_dir for the reasoning this copy
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir for the reasoning this copy
 // shares, including the PID fold; the leaf name below is this file's own.
 std::string scratch_pid_suffix() { return iclforge::test::platform::process_id(); }
 

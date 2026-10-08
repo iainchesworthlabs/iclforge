@@ -17,9 +17,9 @@
 
 #include "iclforge/ac3/io/wav.hpp"
 
-// The two reading commands - probe (apps/cli/commands/probe.cpp and the JSON
-// document apps/common/probe_json.cpp writes through apps/cli/json.cpp) and
-// decode (apps/cli/commands/decode.cpp) - on damaged input, on outputs they
+// The two reading commands - probe (apps/forge/cli/src/commands/probe.cpp and the JSON
+// document apps/shared/media/src/probe_json.cpp writes through apps/forge/cli/src/json.cpp) and
+// decode (apps/forge/cli/src/commands/decode.cpp) - on damaged input, on outputs they
 // cannot write, and on the stream shapes whose report lines only appear for
 // that shape: 1+1's second programme, an object layer, a channel-based bed,
 // a dependent substream, Annex D, and E-AC-3's own informational and mixing
@@ -37,7 +37,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// See tests/cli/test_cli.cpp's own scratch_dir for the reasoning this copy
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir for the reasoning this copy
 // shares, including the PID fold; the leaf name below is this file's own.
 std::string scratch_pid_suffix() {
     return iclforge::test::platform::process_id();
@@ -379,7 +379,7 @@ TEST_CASE("decode refuses an output, census or object directory it cannot write"
 }
 
 // E-AC-3's own version of this same warning (adm_out= against a programme with no object layer)
-// lives in tests/cli/test_cli_decode_adm.cpp, not here: decode.cpp's run_decode_eac3 checks
+// lives in apps/forge/cli/tests/test_cli_decode_adm.cpp, not here: decode.cpp's run_decode_eac3 checks
 // forge_cli::adm_capability() before it can even tell whether the programme has an object layer, so
 // that path only reaches these warnings (rather than exiting 2 with "this build was not configured
 // with -DICLFORGE_BUILD_ADM=ON") when ADM support was actually built. Plain AC-3 has no such

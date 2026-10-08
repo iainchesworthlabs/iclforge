@@ -14,7 +14,7 @@
 // plays E-AC-3's objects through, iclforge::render::LayoutRenderer. The AC-4
 // decoder hands each object over with the properties its metadata sets (ETSI
 // TS 103 190-2 Annex F) for an application to render; this is forge's
-// rendering, kept apart from apps/cli so that a test holds it and so that
+// rendering, kept apart from apps/forge/cli/src so that a test holds it and so that
 // Hearth's engine can take it up when it decodes AC-4. Compiled straight into
 // forge and iclforge-tests, as stream_playback.cpp beside it is.
 //

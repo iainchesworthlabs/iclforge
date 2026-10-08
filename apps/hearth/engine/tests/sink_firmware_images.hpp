@@ -1,7 +1,7 @@
 #pragma once
 
 // Whole ESP-IDF application images, made from nothing for the tests of
-// apps/hearth/engine/sink_firmware.hpp: a header, one segment that starts with
+// apps/hearth/engine/src/sink_firmware.hpp: a header, one segment that starts with
 // the application description, the checksum byte that ends the last 16-byte
 // block, and the SHA-256 the build appends - laid out as ESP-IDF v6.1 lays
 // them (esp_app_format.h, esp_image_format.c), so that the file checks walk

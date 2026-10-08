@@ -1838,7 +1838,7 @@ OBJECT_LEGS = [
 # the bed itself, plus reconstruct()'s own pass over that decoded bed. That
 # second delay depends on the domain reconstruct() runs in, and these legs
 # exercise the CLI's default (AtmosConfig::joc_domain / DecoderConfig::
-# joc_domain = iclforge::objects::oba::joc::Domain::kQmf, apps/cli/support.hpp), which is
+# joc_domain = iclforge::objects::oba::joc::Domain::kQmf, apps/forge/cli/src/support.hpp), which is
 # iclforge::dsp::kQmfDelay = kQmfTaps - kQmfHop = 576 samples (libs/ac3/include/
 # iclforge/dsp/qmf.hpp), not the 256-sample MDCT round trip the older
 # Domain::kMdctBand path used. 256 + 576 = 832.

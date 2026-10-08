@@ -118,7 +118,7 @@ Symbol self-time attributes inlined header code to whoever inlined it, so an
 accidentally-quadratic accessor appears as arithmetic in its caller. When a symbol
 looks hot, confirm *which lines* before designing a fix. A `RelWithDebInfo` build with
 `-O3 -g` is enough; on this repo it also needs `-Wno-error=null-dereference` for a GCC
-false positive in `apps/cli/commands/audio_io.cpp` that the Release preset does not trip.
+false positive in `apps/forge/cli/src/commands/audio_io.cpp` that the Release preset does not trip.
 
 The same method found the second-largest win: `aht_bin_gaq_bits` fully quantising six
 mantissas per candidate gain to read one integer width off each result — 43% of an

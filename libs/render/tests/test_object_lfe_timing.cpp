@@ -443,7 +443,7 @@ TEST_CASE("reset, a real bed change and a new domain each empty the line; a repe
         CHECK(out[5][0] == static_cast<float>(1024 - lag + 1));
     }
     SECTION("set_bed called again with the same bed changes nothing") {
-        // tests/hearth/test_group.cpp's decode_and_render calls set_bed() on
+        // apps/hearth/engine/tests/test_group.cpp's decode_and_render calls set_bed() on
         // every unit's first block whatever the bed is; BurstOutput::place()
         // instead guards the call with same_layout() and only calls it when
         // the bed changes. Two renderers fed the same programme through the
@@ -476,9 +476,9 @@ TEST_CASE("reset, a real bed change and a new domain each empty the line; a repe
 TEST_CASE("two renderers of the same programme agree whether or not the caller repeats set_bed",
           "[render]") {
     // The exact shape of the regression PR #722's own fix caught in CI's
-    // Hearth leg rather than in this file: tests/hearth/test_group.cpp's
+    // Hearth leg rather than in this file: apps/hearth/engine/tests/test_group.cpp's
     // decode_and_render calls set_bed() on every unit's first block whatever
-    // the bed is; apps/hearth/testsink/burst_output.cpp's BurstOutput::place()
+    // the bed is; apps/hearth/testsink/src/burst_output.cpp's BurstOutput::place()
     // instead guards the call with same_layout() and skips a repeat. Both
     // decode and render the SAME programme, so their LFE output has to be the
     // same sample for sample - a set_bed() that unconditionally emptied the

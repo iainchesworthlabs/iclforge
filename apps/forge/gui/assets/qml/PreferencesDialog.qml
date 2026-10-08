@@ -258,7 +258,7 @@ Dialog {
                     // falls back to English any more.
                     //
                     // Word for word what Crucible's language note says
-                    // (apps/crucible/ui/qml/SettingsPage.qml), on purpose: the
+                    // (apps/crucible/ui/assets/qml/SettingsPage.qml), on purpose: the
                     // two windows sit under the same picker, offer the same
                     // six languages from the same pipeline, and carry the same
                     // caveat. One sentence between them means one rendering

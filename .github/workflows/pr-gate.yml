@@ -388,8 +388,8 @@ jobs:
           cmake --build --preset build-linux-gcc --target forge-gui_lupdate -- -k 0
           git config --global --add safe.directory "${GITHUB_WORKSPACE}"
           cd "${GITHUB_WORKSPACE}"
-          git diff --exit-code -- apps/gui/translations || {
-            echo "::error::a qsTr() string changed without regenerating the catalogues - build the forge-gui_lupdate target and commit apps/gui/translations"
+          git diff --exit-code -- apps/forge/gui/assets/translations || {
+            echo "::error::a qsTr() string changed without regenerating the catalogues - build the forge-gui_lupdate target and commit apps/forge/gui/assets/translations"
             exit 1
           }
 
@@ -476,8 +476,8 @@ jobs:
           set -euo pipefail
           cmake --build "build/config-windows-msvc" --target hearth_lupdate
           git diff --exit-code -I '^[[:space:]]*<location filename="[^"]*" line="[0-9]+"/>' \
-            -- apps/hearth/ui/translations || {
-            echo "::error::a qsTr() string changed without regenerating the catalogues - build the hearth_lupdate target and commit apps/hearth/ui/translations"
+            -- apps/hearth/ui/assets/translations || {
+            echo "::error::a qsTr() string changed without regenerating the catalogues - build the hearth_lupdate target and commit apps/hearth/ui/assets/translations"
             exit 1
           }
 

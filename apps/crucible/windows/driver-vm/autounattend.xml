@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Unattended Windows 11 install for the driver test VM
-  (apps/windows/driver-vm/README.md). Windows Setup picks this file up from
+  (apps/crucible/windows/driver-vm/README.md). Windows Setup picks this file up from
   the root of any attached removable medium; New-DriverTestVm.ps1 wraps it
   in a small ISO and attaches it beside the Windows ISO.
 

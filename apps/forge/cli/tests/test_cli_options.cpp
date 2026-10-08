@@ -20,7 +20,7 @@
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
 
-// parse_options (apps/cli/support.cpp) at the level a user meets it: the real
+// parse_options (apps/forge/cli/src/support.cpp) at the level a user meets it: the real
 // forge binary, run as a subprocess, and what it says about a key=value
 // token it was handed.
 //
@@ -44,7 +44,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// See tests/cli/test_cli.cpp's own scratch_dir for the reasoning this copy
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir for the reasoning this copy
 // shares, including the PID fold; the leaf name below is this file's own.
 std::string scratch_pid_suffix() {
     return iclforge::test::platform::process_id();

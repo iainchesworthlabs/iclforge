@@ -33,7 +33,7 @@
 #include "player.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
 
-// iclforge::hearth::Player (apps/hearth/engine/player.cpp) against a fake device.
+// iclforge::hearth::Player (apps/hearth/engine/src/player.cpp) against a fake device.
 //
 // A3's exit: "a queue of mixed containers plays to a fake device gaplessly,
 // with the expected sample count at every join". The device here has a clock
@@ -313,7 +313,7 @@ std::vector<std::byte> in_mkv(const std::vector<std::byte>& stream) {
 }
 
 // "Files" in memory, read the way the application reads a real one: the
-// container, if any, is demuxed by apps/common's container input.
+// container, if any, is demuxed by apps/shared/media/src's container input.
 struct Library {
     std::map<std::string, std::vector<std::byte>> files;
 

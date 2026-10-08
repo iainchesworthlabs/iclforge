@@ -17,7 +17,7 @@
 // its pairing PSK, its pairing records, the names of the servers they are with,
 // and the last-playback server (pairing.md, Pairing Records; connection.md,
 // Multiple servers). It is the board's form of the test sink's state directory
-// (apps/hearth/testsink/store.hpp), and like that one it is also the player's
+// (apps/hearth/testsink/src/store.hpp), and like that one it is also the player's
 // key ring.
 //
 // The identity and the pairing PSK come from the hardware RNG on a board's

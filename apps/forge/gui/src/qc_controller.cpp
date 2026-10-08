@@ -61,7 +61,7 @@ struct MeasureOutcome {
     RawResult result = RawResult();
 };
 
-// AC-3 (bsid <= 8): mirrors apps/cli/main.cpp's measure_qc_ac3 exactly -
+// AC-3 (bsid <= 8): mirrors apps/forge/cli/src/main.cpp's measure_qc_ac3 exactly -
 // same per-frame decode loop, same dual-mono split, feeding
 // iclforge::ac3::meta::LoudnessMeter instead of printing anything. Kept in step with
 // the CLI's own reference implementation deliberately, per this change's own
@@ -272,7 +272,7 @@ std::optional<RawResult> measure_eac3(std::span<const std::byte> stream, QString
     return result;
 }
 
-// AC-4: mirrors forge's measure_qc_ac4 (apps/cli/commands/analysis.cpp) at
+// AC-4: mirrors forge's measure_qc_ac4 (apps/forge/cli/src/commands/analysis.cpp) at
 // layout=bed - the presentation `presentation` chooses (the decoder's own
 // choice where unset), decoded as the stream codes it (no output level, so no
 // DRC, dialogue enhancement or downmix), metered over its 1/0, 2/0, 3/0 or 3/2

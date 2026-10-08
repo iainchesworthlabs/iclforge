@@ -552,7 +552,7 @@ record/live options (record, live; any order, after the positional arguments):
 ### `container=`
 
 All five values write the take **incrementally, as it is captured** — the same `RecordingSink`
-the GUI's own takes go through (`apps/common/recording_sink.hpp`), shared verbatim between the two
+the GUI's own takes go through (`apps/shared/media/src/recording_sink.hpp`), shared verbatim between the two
 front ends rather than reimplemented. Two consequences worth stating: a take of any length costs
 one frame of memory rather than the whole session, and a crash an hour in leaves an hour of
 playable file rather than nothing.
@@ -563,7 +563,7 @@ playable file rather than nothing.
 | `mkv` (alias `matroska`) | Matroska, via `iclforge::containers::matroska::Writer`'s unknown-size Segment | `mkv` over the same frames, modulo the streaming Segment header |
 | `ts` (alias `mpegts`) | MPEG-2 Transport Stream, DVB profile | `ts` over the same frames |
 | `spdif` | IEC 61937 bursts inside a PCM16 WAV carrier | `spdif` over the same frames |
-| `fmp4` (alias `cmaf`) | A directory of fragmented MP4/CMAF segments plus HLS/DASH manifests, via `Fmp4FolderWriter` (`apps/common/fmp4_folder_writer.hpp`) | see below |
+| `fmp4` (alias `cmaf`) | A directory of fragmented MP4/CMAF segments plus HLS/DASH manifests, via `Fmp4FolderWriter` (`apps/shared/media/src/fmp4_folder_writer.hpp`) | see below |
 
 Plain `mp4` is deliberately absent: `moov`/`stco` need every frame's final offset and the
 `dac3`/`dec3` box needs a bitstream scan, so it cannot be written before the take ends — the

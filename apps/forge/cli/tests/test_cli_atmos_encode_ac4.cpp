@@ -25,9 +25,9 @@
 
 // forge atmos-encode with codec=ac4 (planning/ac4.md, I5b): the source's channels
 // as AC-4 objects, run against the real binary and held to the steps the page takes
-// (apps/common/ac4_objects_core.hpp, ac4_encode_core.hpp): the file the command
+// (apps/shared/media/src/ac4_objects_core.hpp, ac4_encode_core.hpp): the file the command
 // writes is the file those steps write for the same sources, assignment and scene.
-// The Qt Quick suite (apps/gui/tests/qml/tst_e2e_ac4_objects.qml) runs the line the
+// The Qt Quick suite (apps/forge/gui/tests/qml/tst_e2e_ac4_objects.qml) runs the line the
 // page echoes through this command and compares the bytes; this file holds the
 // command's half, and what it refuses.
 //

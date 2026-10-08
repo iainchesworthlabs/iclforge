@@ -11,7 +11,7 @@
 # libs/ac3 - and "which module is thin" is exactly the question a
 # per-component table exists to answer.
 #
-# apps/cli is gated here too (coverage floors), not just src/. It is about 6,500
+# apps/forge/cli/src is gated here too (coverage floors), not just src/. It is about 6,500
 # lines across seven command modules, it is the executable the codec matrix,
 # the gold-reference gate and the encoder-space fuzzer all drive, and it had
 # no floor at all - while the two CLI bugs this project has actually shipped
@@ -20,17 +20,17 @@
 # printed below the gate so a thin command shows up as thin rather than
 # averaging away inside the aggregate.
 #
-# apps/gui is NOT gated and is deliberately out of scope. Its C++ needs a Qt
+# apps/forge/gui is NOT gated and is deliberately out of scope. Its C++ needs a Qt
 # kit on the coverage leg, and no Linux CI leg installs one today
 # (.github/workflows/_build.yml installs Qt only on the `gui: true` matrix
 # entries, which are plain builds, not instrumented ones). Adding it means
 # either putting Qt on the coverage job or standing up a second instrumented
 # leg - a separate decision with its own runner-time cost, not something to
-# smuggle in behind a threshold table. apps/gui's interactive surfaces are
+# smuggle in behind a threshold table. apps/forge/gui's interactive surfaces are
 # covered by its own Qt Quick tests, and its Qt-free pieces are exercised by
 # iclforge-tests on every leg even though no row below gates them: RecordingSink
-# (since moved to apps/common) and, from 2026-09-06,
-# apps/gui/gui_diagnostics.cpp, whose whole reason for being Qt-free is that
+# (since moved to apps/shared/media/src) and, from 2026-09-06,
+# apps/forge/gui/src/gui_diagnostics.cpp, whose whole reason for being Qt-free is that
 # the no-secrets rule it holds is checked on legs that build no window.
 #
 # apps/crucible is out of scope here for the same reason and gated anyway,
@@ -44,10 +44,10 @@
 # libs/sendspin and apps/hearth (Hearth, planning/hearth-reference-player.md) ARE gated here,
 # unlike apps/crucible above: config-linux-gcc-coverage is the one coverage preset that turns
 # ICLFORGE_BUILD_HEARTH on (CMakePresets.json), and both iclforge::sendspin and hearth_engine link
-# iclforge::coverage themselves for exactly the reason apps/cli's own link does - see their
+# iclforge::coverage themselves for exactly the reason apps/forge/cli/src's own link does - see their
 # CMakeLists.txt. apps/hearth/testsink joins the apps/hearth row (its sources link into iclforge-tests
 # too); apps/hearth/testserver does not, since nothing on this leg ever runs that executable, and
-# apps/hearth/ui is Qt - same reason apps/gui is out of scope above, no Qt kit on this leg.
+# apps/hearth/ui is Qt - same reason apps/forge/gui is out of scope above, no Qt kit on this leg.
 #
 # Run by .github/workflows/ci.yml's coverage job after `ctest`; runnable
 # locally the same way, from the repository root (see docs/building.md):
@@ -90,13 +90,13 @@ fi
 # Component floors, one row per component: <path> <line%> <branch%>. A path,
 # not a bare name, since coverage floors added apps/ alongside src/.
 #
-# Calibrated 2026-08-20 (src/*) and 2026-08-24 (apps/cli, re-measured after
+# Calibrated 2026-08-20 (src/*) and 2026-08-24 (apps/forge/cli/src, re-measured after
 # merging container readers (mkv/mp4/ts)'s container-reader/probe work) against WSL2 runs on
 # the CI toolchain pins (gcov 15.2.0, gcovr 8.6), measured per component as:
 #
 #   forge 93.2/86.0 audio 34.2/22.8   signing 89.2/68.9  matroska 92.9/87.7
 #   mp4 94.9/92.5   mpegts 94.1/90.7  capi 87.8/79.2      ac3adm 87.9/82.4
-#   admbridge 91.8/85.6               apps/cli 54.0/46.5
+#   admbridge 91.8/85.6               apps/forge/cli/src 54.0/46.5
 #
 # Each floor sits ~4-8 points under its measurement: a couple of points for
 # the known WSL-reads-higher-than-hosted effect (see ci.yml's coverage job
@@ -109,10 +109,10 @@ fi
 # note below). libs/capi's remaining gap is libs/capi/src/internal.hpp's guard()
 # catch clauses and the defensively unreachable enum fallthroughs beside them.
 #
-# apps/cli's device commands (audio_io, live_audio) used to execute only to
+# apps/forge/cli/src's device commands (audio_io, live_audio) used to execute only to
 # the extent the runner had a capture or render endpoint, which differed
 # between a developer's WSL and a headless CI container. The software-device
-# suites give both the same endpoints, so apps/cli's margin no longer has to
+# suites give both the same endpoints, so apps/forge/cli/src's margin no longer has to
 # absorb that difference.
 #
 # Re-measured 2026-09-24 after the coverage review that added the ALSA
@@ -122,9 +122,9 @@ fi
 #
 #   forge 93.6/87.7   audio 78.1/64.3   signing 95.3/83.1  matroska 93.6/88.1
 #   mp4 93.7/88.6     mpegts 96.8/90.0  capi 88.0/78.9     ac3adm 87.2/81.5
-#   admbridge 93.3/84.0                 sendspin 90.4/80.2 apps/cli 86.1/77.8
+#   admbridge 93.3/84.0                 sendspin 90.4/80.2 apps/forge/cli/src 86.1/77.8
 #   apps/hearth 92.4/83.1               ac4 98.0/93.4      ac4dec 92.7/85.4
-#   ac3iab 95.4/92.9  iamf 96.1/96.2    apps/common 83.3/71.9
+#   ac3iab 95.4/92.9  iamf 96.1/96.2    apps/shared/media/src 83.3/71.9
 #   apps/crucible/engine 95.9/87.8
 #
 # forge is six components since the layout change of planning/layout.md, one row each below. Measured
@@ -136,12 +136,12 @@ fi
 # base is 107 lines and 68 branches, so a single line moves its figures by about one and a half
 # points and its floors are set further under than the rest.
 #
-# libs/audio and apps/cli's device commands no longer depend on the runner
+# libs/audio and apps/forge/cli/src's device commands no longer depend on the runner
 # having an audio endpoint: their success paths run against alsa-lib's
 # built-in null/file/route/multi plugins. What they still miss needs a real
 # card (snd_card_next() walks /dev/snd/controlC* directly), so libs/audio's
 # floor is the agreed 70%-class floor for hardware-bound code rather than
-# 85%. apps/common is below 85% for the same reason: sink_wait.hpp's play and
+# 85%. apps/shared/media/src is below 85% for the same reason: sink_wait.hpp's play and
 # passthrough instantiations only run against a card. libs/sendspin and
 # apps/hearth now have a real measurement behind their floors.
 #
@@ -172,8 +172,8 @@ libs/adm               82 75
 libs/sendspin          85 74
 libs/ac4               88 80
 libs/iab               90 87
-apps/cli              80 71
-apps/common           78 66
+apps/forge/cli/src              80 71
+apps/shared/media/src           78 66
 apps/crucible/engine  90 82
 apps/hearth           87 77
 "
@@ -242,7 +242,7 @@ while read -r comp line_min branch_min; do
     # that lost ICLFORGE_BUILD_ADM=ON or ICLFORGE_BUILD_CLI=ON), not a
     # 0%-covered component. Fail loudly rather than letting a silent no-data
     # "pass" or a misleading 0% stand in for the real answer. This is exactly
-    # what caught apps/cli linking an instrumented library without being
+    # what caught apps/forge/cli/src linking an instrumented library without being
     # instrumented itself - see cmake/Coverage.cmake's own note.
     if ! grep -q "$comp/" "$json"; then
         echo "::error::coverage: no data for $comp - was it built with ICLFORGE_ENABLE_COVERAGE on?"
@@ -262,17 +262,17 @@ done <<EOF
 $components
 EOF
 
-# apps/cli's per-command breakdown. Reported, never gated: one floor on the
+# apps/forge/cli/src's per-command breakdown. Reported, never gated: one floor on the
 # aggregate is what stops a regression, and a floor per command module would
 # be ten more numbers to re-calibrate every time a command moves between
 # files. What this exists for is visibility - the aggregate alone would let
 # a command sitting at 0% hide behind six that are not, which is precisely
-# the state apps/cli was in when this gate was written (containers, audio_io
+# the state apps/forge/cli/src was in when this gate was written (containers, audio_io
 # and live_audio were all at 0.0% line while the aggregate read 44.9%).
 echo
-echo "== apps/cli per command (reported, not gated) =="
+echo "== apps/forge/cli/src per command (reported, not gated) =="
 printf '%-26s %8s %8s\n' "module" "line" "branch"
-for src in apps/cli/*.cpp apps/cli/commands/*.cpp; do
+for src in apps/forge/cli/src/*.cpp apps/forge/cli/src/commands/*.cpp; do
     [[ -e "$src" ]] || continue
     # --print-summary writes its two lines after the per-file table, so the
     # whole report is captured and those two picked out of it. Redirecting the
@@ -281,7 +281,7 @@ for src in apps/cli/*.cpp apps/cli/commands/*.cpp; do
         --print-summary 2>/dev/null || true)"
     line_pct="$(echo "$summary" | awk '/^lines:/ {print $2}')"
     branch_pct="$(echo "$summary" | awk '/^branches:/ {print $2}')"
-    printf '%-26s %8s %8s\n' "${src#apps/cli/}" "${line_pct:-n/a}" "${branch_pct:-n/a}"
+    printf '%-26s %8s %8s\n' "${src#apps/forge/cli/src/}" "${line_pct:-n/a}" "${branch_pct:-n/a}"
 done
 
 exit "$fail"

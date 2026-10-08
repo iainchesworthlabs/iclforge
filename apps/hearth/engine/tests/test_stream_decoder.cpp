@@ -22,7 +22,7 @@
 #include "decoder_settings.hpp"
 #include "stream_decoder.hpp"
 
-// iclforge::hearth::StreamDecoder (apps/hearth/engine/stream_decoder.cpp): access
+// iclforge::hearth::StreamDecoder (apps/hearth/engine/src/stream_decoder.cpp): access
 // units in, rendered blocks out, and nothing lost at the end of a stream.
 //
 // The count that matters for A3's gapless exit is the one checked here: every

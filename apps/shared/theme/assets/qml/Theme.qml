@@ -272,7 +272,7 @@ QtObject {
     // scale has no rung for (8, 19, 20, 26, 30 and 52) are written inline as
     // Math.round(n * Theme.fontScale), the form Crucible's own Main.qml
     // already used for its status pill. Before trusting the claim again:
-    //   grep -n "font.pixelSize: [0-9]" apps/gui/qml/*.qml apps/crucible/ui/qml/*.qml
+    //   grep -n "font.pixelSize: [0-9]" apps/gui/qml/*.qml apps/crucible/ui/assets/qml/*.qml
     // Three hits are expected and correct: Room3DView.qml sizes text that is a
     // face INSIDE the 3D scene, in scene units against the room's own 400-unit
     // width rather than in screen pixels, and each of the three says so where
@@ -339,10 +339,10 @@ QtObject {
     }
 
     // ---- icons --------------------------------------------------------
-    // Material Symbols Sharp (apps/gui/fonts/MaterialSymbolsSharp-Regular.ttf,
+    // Material Symbols Sharp (apps/shared/theme/assets/fonts/MaterialSymbolsSharp-Regular.ttf,
     // Apache License 2.0), subset to the handful of glyphs Hearth's
     // transport bar and queue controls use - only Hearth registers this
-    // face today (apps/hearth/ui/main.cpp), so the probe falls back to the
+    // face today (apps/hearth/ui/src/main.cpp), so the probe falls back to the
     // platform font everywhere else, the same shape headingFamily/
     // monoFamily above already use for a face that might not be installed.
     // Named per Material Symbols' own icon name so a codepoint is never

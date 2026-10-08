@@ -22,7 +22,7 @@
 // through its own support()/state() rather than being absent, so the UI can
 // explain the gap instead of the code having to test for a hole.
 //
-// tests/crucible/platform_services_stub.cpp provides the same five for a
+// apps/crucible/engine/tests/platform_services_stub.cpp provides the same five for a
 // build with no platform half at all, which is what lets the engine's tests
 // run on a Linux CI leg that has no audio hardware.
 

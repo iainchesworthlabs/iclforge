@@ -2,7 +2,7 @@
 
 #include "position.h"
 
-// The null-sink driver's clock (apps/windows/driver/Source/Main/position.h):
+// The null-sink driver's clock (apps/crucible/windows/driver/Source/Main/position.h):
 // the one piece of the driver that is logic rather than framework plumbing,
 // kept free of kernel dependencies so it can be pinned down here, where
 // coverage is measured, rather than in a guest where it cannot be. Every

@@ -719,7 +719,7 @@ run_ffmpeg_check atmos_enc.ec3
 # atmos-path: a tiny hand-authored keyframe file, proving the file-driven
 # object path round-trips too, not just the built-in synthetic orbit 'atmos'
 # uses. Format is 'object time_s x y z gain lfe_send' per run_atmos_path's
-# parser (apps/cli/main.cpp).
+# parser (apps/forge/cli/src/main.cpp).
 cat > atmos_paths.txt <<'PATHSEOF'
 0 0.0 0.1 0.5 0.0 0.7 0.0
 0 2.0 0.9 0.5 1.0 0.7 0.0
@@ -753,7 +753,7 @@ run_ffmpeg_check atmos_path.ec3
 # flat bin/ directory regardless of which source subdirectory built it.
 ADM_FIXTURE_TOOL="$(dirname "$CLI")/encode_adm"
 if "$CLI" 2>&1 | grep -E '^  forge atmos-adm[[:space:]]' | grep -q 'UNAVAILABLE HERE'; then
-    echo "    [skip] atmos-adm: this forge build has no -DICLFORGE_BUILD_ADM=ON (apps/cli/adm/atmos_adm.hpp) - covered instead by the adm-validate CI job and tests/cli/test_cli_atmos_adm.cpp, which do build with it"
+    echo "    [skip] atmos-adm: this forge build has no -DICLFORGE_BUILD_ADM=ON (apps/forge/cli/src/adm/atmos_adm.hpp) - covered instead by the adm-validate CI job and apps/forge/cli/tests/test_cli_atmos_adm.cpp, which do build with it"
 elif [[ ! -x "$ADM_FIXTURE_TOOL" ]]; then
     echo "    [skip] atmos-adm: examples/encode_adm was not built alongside this forge (ICLFORGE_BUILD_EXAMPLES=OFF?), so its --write-fixture mode is unavailable to generate a real ADM file"
 else
@@ -766,7 +766,7 @@ else
     # trip the phase's exit criterion names. Neither ffprobe (no AC-4 decoder) nor
     # run_ac4_frames_check (defined later in this file, in the plain-AC-4 section below) is
     # available this early, so 'decode' reading the file back to PCM and to an ADM master without
-    # error is this leg's own coverage; tests/cli/test_cli_atmos_adm.cpp pins the numbers
+    # error is this leg's own coverage; apps/forge/cli/tests/test_cli_atmos_adm.cpp pins the numbers
     # (positions, gains, timing) this smoke coverage does not.
     run atmos-adm atmos_adm_fixture.wav atmos_adm.ac4 256 "" codec=ac4
     run decode atmos_adm.ac4 atmos_adm_ac4.wav atmos_adm_ac4_objects atmos_adm_ac4_roundtrip.wav
@@ -774,7 +774,7 @@ fi
 
 # atmos-iab (IAB reader phase 3): the identical conditional-command shape atmos-adm above uses,
 # and for the same reason - it needs iclforge::adm's own IAB mapping, gated by the same
-# ICLFORGE_BUILD_ADM flag (see apps/cli/adm/atmos_iab.hpp's own header comment: iclforge::iab
+# ICLFORGE_BUILD_ADM flag (see apps/forge/cli/src/adm/atmos_iab.hpp's own header comment: iclforge::iab
 # itself is on by default, but build_iab() only exists once iclforge::adm is). Detected the same
 # "ask the real usage listing" way, not guessed from a preset name. examples/encode_iab's own
 # --write-fixture mode produces a real elementary IAB file on disk, so this is driven through a
@@ -782,7 +782,7 @@ fi
 # itself - see ADM_FIXTURE_TOOL's own comment above for why.
 IAB_FIXTURE_TOOL="$(dirname "$CLI")/encode_iab"
 if "$CLI" 2>&1 | grep -E '^  forge atmos-iab[[:space:]]' | grep -q 'UNAVAILABLE HERE'; then
-    echo "    [skip] atmos-iab: this forge build has no -DICLFORGE_BUILD_ADM=ON (apps/cli/adm/atmos_iab.hpp) - covered instead by tests/cli/test_cli_atmos_iab.cpp, which does build with it"
+    echo "    [skip] atmos-iab: this forge build has no -DICLFORGE_BUILD_ADM=ON (apps/forge/cli/src/adm/atmos_iab.hpp) - covered instead by apps/forge/cli/tests/test_cli_atmos_iab.cpp, which does build with it"
 elif [[ ! -x "$IAB_FIXTURE_TOOL" ]]; then
     echo "    [skip] atmos-iab: examples/encode_iab was not built alongside this forge (ICLFORGE_BUILD_EXAMPLES=OFF?), so its --write-fixture mode is unavailable to generate a real IAB file"
 else
@@ -807,7 +807,7 @@ fi
 # Table 12 order, but a channel COUNT match is all this smoke-coverage script
 # needs - the per-channel semantic labeling (which physical channel lands as
 # which OAMD bed label) is what libs/ac3/tests/oba/test_atmos_cbi.cpp and
-# tests/cli/test_cli_atmos_cbi.cpp prove, with a distinct tone per channel
+# apps/forge/cli/tests/test_cli_atmos_cbi.cpp prove, with a distinct tone per channel
 # identified after JOC reconstruction, which this script does not repeat.
 # Always a 5.1 bed physically (OAMD+JOC ride in the same independent
 # substream, same as every other Atmos command above), so FFmpeg reads it and
@@ -1193,7 +1193,7 @@ run_ac4_frames_check ac4_514_256.ac4 -f ac4
 run decode ac4_514_256.ac4 i5_ac4_514.wav
 run probe ac4_514_256.ac4
 # Objects (planning/ac4.md, phase I5): experimental=objects/objects=<scene>, E9's own CLI surface
-# (apps/cli/commands/ac4_encode_objects.cpp), A-JOC by default and direct-coded as the explicit
+# (apps/forge/cli/src/commands/ac4_encode_objects.cpp), A-JOC by default and direct-coded as the explicit
 # second leg - then back through decode's objects_dir, unconditionally available (unlike adm_out,
 # which needs -DICLFORGE_BUILD_ADM=ON and is covered by the atmos-adm/atmos-iab AC-4 legs above).
 cat > ac4_objects_scene.txt <<'SCENE'

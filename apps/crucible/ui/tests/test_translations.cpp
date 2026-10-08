@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-// The six Crucible translation catalogues (apps/crucible/translations/
+// The six Crucible translation catalogues (apps/crucible/ui/assets/translations/
 // crucible_<code>.ts), read as files rather than through Qt: these cases
 // ride the plain iclforge-tests binary, so they run on a developer's own ctest and
 // on every CI leg, including the ones that build no Qt at all. What they
@@ -258,7 +258,7 @@ TEST_CASE("crucible translation catalogues carry no unfinished entry",
 // set is complete: nothing unfinished, nothing dead. They are read with the
 // parser above and not through Qt, the same way and for the same reason.
 //
-// Seven and not six: apps/gui/translations carries an `xx` pseudo-locale
+// Seven and not six: apps/forge/gui/assets/translations carries an `xx` pseudo-locale
 // beside the six languages, which exists to make an untranslated string
 // obvious in a screenshot, so it is included here rather than excepted - a
 // pseudo-locale with a hole in it is as wrong as any other.

@@ -23,7 +23,7 @@
 // echoes writes the same bytes the GUI does: which channels become which
 // objects, where a channel pinned to a speaker sits, the audio each object
 // carries, the metadata updates one a frame, and the call into E9's writer.
-// Compiled straight into each application, as the rest of apps/common is
+// Compiled straight into each application, as the rest of apps/shared/media/src is
 // (recording_sink.hpp says why there is no library target).
 
 namespace iclforge::apps {

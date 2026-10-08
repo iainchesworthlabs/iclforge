@@ -32,7 +32,7 @@ namespace {
 // one long if-chain over `key`, with no list to read), so it can drift. Two
 // things hold it: parse_options' own unknown-option path prints
 // print_meta_usage(), which is generated from the same prose the entries here
-// describe, and tests/cli's completion test asserts every bare (valueless)
+// describe, and apps/forge/cli/tests's completion test asserts every bare (valueless)
 // token below is actually accepted by a real invocation. A key= token cannot
 // be checked that cheaply - its value grammar differs per option - so those
 // are checked by eye against parse_options when either changes.
@@ -1048,7 +1048,7 @@ void print_command_help(const CommandInfo& command) {
 }
 
 void print_man_page(std::span<const CommandInfo> commands) {
-    // Generated, never hand-edited: apps/cli/CMakeLists.txt runs this at
+    // Generated, never hand-edited: apps/forge/cli/CMakeLists.txt runs this at
     // build time into forge.1. The .TH date is deliberately the project
     // version rather than a build date - a date would make the file differ
     // between two builds of the same source, which is exactly what a

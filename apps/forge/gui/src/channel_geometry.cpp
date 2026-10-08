@@ -5,7 +5,7 @@
 namespace forge_gui {
 
 std::optional<double> location_azimuth_deg(iclforge::ac3::eac3::chanmap::Location location) {
-    // The one table the soundfield ring and the AC-4 pins read, in apps/common so that
+    // The one table the soundfield ring and the AC-4 pins read, in apps/shared/media/src so that
     // forge's atmos-encode reads it too.
     return iclforge::apps::location_azimuth_deg(location);
 }

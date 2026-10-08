@@ -22,7 +22,7 @@
 #include "decoder_settings.hpp"
 #include "stream_decoder.hpp"
 
-// iclforge::hearth::Ac3Transcoder (apps/hearth/engine/ac3_transcoder.cpp): six
+// iclforge::hearth::Ac3Transcoder (apps/hearth/engine/src/ac3_transcoder.cpp): six
 // slots of 5.1 in, AC-3 syncframes out, with the source's metadata written
 // into each and every sample taken coming back out after the encoder's
 // 256-sample shift.

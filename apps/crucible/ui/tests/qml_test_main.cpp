@@ -34,7 +34,7 @@
 
 // Qt Quick Test entry point for the Crucible's window: runs every
 // tst_*.qml under QUICK_TEST_SOURCE_DIR against the REAL CrucibleController the
-// embedded Crucible module registers - the same rule apps/gui/tests
+// embedded Crucible module registers - the same rule apps/forge/gui/tests
 // follows, and for the same reason: a parallel fake API is a second thing
 // the real one can silently disagree with. The controller starts the
 // engine only when a test (or Main.qml) calls start(), so suites that never
@@ -145,7 +145,7 @@ private:
 };
 
 // The machine, scripted: the five platform seams replaced by the same fakes
-// the engine's Catch2 cases use (tests/crucible/fake_services.hpp,
+// the engine's Catch2 cases use (apps/crucible/engine/tests/fake_services.hpp,
 // fake_devices.hpp), so a suite can say "there are two applications with
 // sound and one stereo endpoint" and then drive the real controller and the
 // real engine over that.

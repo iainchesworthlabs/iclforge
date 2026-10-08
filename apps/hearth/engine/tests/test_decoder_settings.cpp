@@ -9,7 +9,7 @@
 #include "iclforge/render/layout.hpp"
 #include "decoder_settings.hpp"
 
-// iclforge::hearth::decoder_setup (apps/hearth/engine/decoder_settings.cpp): every
+// iclforge::hearth::decoder_setup (apps/hearth/engine/src/decoder_settings.cpp): every
 // decoder control lands where the library reads it, for the layout it serves.
 // What each setting then does to the audio is the library's to test, and
 // libs/ac3/tests/meta/test_drc.cpp and libs/ac3/tests/decoder/test_output_stage.cpp do.

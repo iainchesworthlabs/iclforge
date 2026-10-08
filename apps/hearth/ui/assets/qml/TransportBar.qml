@@ -15,7 +15,7 @@ Rectangle {
     implicitHeight: 48
 
     // mm:ss, the shape every other duration readout in the family uses
-    // (apps/gui/qml/Main.qml's own formatTime()) and what the design's
+    // (apps/forge/gui/assets/qml/Main.qml's own formatTime()) and what the design's
     // footer shows (docs/hearth/design/screenshots/main-play.png) - no hour
     // rollover, since nothing this app plays runs that long.
     function formatMs(ms) {
@@ -89,7 +89,7 @@ Rectangle {
             // Connections below rather than trusted to survive a drag
             // (Slider's own drag handling writes `value` directly, which
             // breaks a declarative binding on it for good) - the same shape
-            // apps/gui/qml/StreamPlayerDialog.qml's own scrub slider uses,
+            // apps/forge/gui/assets/qml/StreamPlayerDialog.qml's own scrub slider uses,
             // and for the same reason: pausing for the drag's duration is
             // what stops that resync fighting the user, since positionMs
             // then only moves in response to seek() below. play() resumes

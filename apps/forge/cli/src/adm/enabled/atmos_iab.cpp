@@ -15,7 +15,7 @@
 #include "iclforge/iab/mxf.hpp"
 
 // Compiled only when ICLFORGE_BUILD_ADM turned iclforge::iab/iclforge::adm on (see
-// apps/cli/CMakeLists.txt) - see ../atmos_iab.hpp's own top comment for why this file, rather than
+// apps/forge/cli/CMakeLists.txt) - see ../atmos_iab.hpp's own top comment for why this file, rather than
 // a preprocessor conditional inside main.cpp, is the mechanism.
 
 namespace forge_cli {

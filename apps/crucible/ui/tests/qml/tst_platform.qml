@@ -10,7 +10,7 @@ import CrucibleLanguage
 
 // The platform seams the window itself reads, asserted on the platform that
 // answers them - which is the only place they can be. The Catch2 suite links
-// tests/crucible/platform_services_stub.cpp, so no platform directory is
+// apps/crucible/engine/tests/platform_services_stub.cpp, so no platform directory is
 // compiled into it at all; these suites run the real controller over the real
 // seams, so this file is where ui/platform/<os>/tray_support.cpp and the
 // Linux VirtualDevice are reached.

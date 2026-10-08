@@ -79,7 +79,7 @@ bool save_window(QQmlApplicationEngine& engine, const QString& path) {
 }
 
 // Ties Tracy's frame view to real Qt Quick presentation instead of leaving it
-// empty - see apps/crucible/ui/main.cpp's identical helper for why this is a
+// empty - see apps/crucible/ui/src/main.cpp's identical helper for why this is a
 // NAMED ("UI") frame mark rather than the bare ICLFORGE_FRAME_MARK(), and why the
 // connection is direct rather than queued.
 void mark_frames_for_tracy(QQuickWindow* window) {

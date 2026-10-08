@@ -1,4 +1,4 @@
-# apps/windows: the Windows-only pieces of Crucible
+# apps/crucible/windows: the Windows-only pieces of Crucible
 
 The application itself moved to [`apps/crucible/`](../crucible/) when it was promoted from a
 Windows demo to a cross-platform product (Crucible cross-platform promotion,
@@ -40,7 +40,7 @@ alone because Crucible's signal path calls its own station that, and a device of
 would stand beside it.
 
 Crucible finds the device by its name. `kWindowsSilentDeviceName`
-(`apps/crucible/engine/virtual_device.hpp`) is the one constant for it in the application, read by
+(`apps/crucible/engine/src/virtual_device.hpp`) is the one constant for it in the application, read by
 the engine's and the output stage's default filter and by the Windows `VirtualDevice`; the INF's
 `DeviceDesc` and the guest scripts carry the same words. One run of
 `tools/n1b/n1d_driver_names.py` changes any of the names in every place that holds it.

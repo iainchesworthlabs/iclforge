@@ -260,7 +260,7 @@ wrote a bed-metering step into the same `views` vector the encoder read object e
 sized to the object count (as few as one) rather than the bed's fixed six channels — an
 out-of-bounds heap write, surfacing as a crash partway through an otherwise-successful session.
 Both are fixed (see `MonitorSink::submit` in `libs/audio/src/backend/windows/monitor.cpp` and
-`run_live`'s `bed_views` in `apps/cli/commands/live_audio.cpp`).
+`run_live`'s `bed_views` in `apps/forge/cli/src/commands/live_audio.cpp`).
 
 What that hardware testing did and did not confirm, precisely: `MonitorSink` played real
 microphone capture and real decoded AC-3/E-AC-3 (including an Atmos stream's 5.1 bed) through
@@ -384,7 +384,7 @@ than a separate system — `ac3::plan::channel_plan_for(id)` is a one-line looku
   restored around the session instead), a warning appears before Start if VBR is on (a live
   session always drops it), and the window title reflects an active session the same way it
   already did for a plain recording.
-- `ac3gui --smoke-shot` (`apps/gui/main.cpp`): grabs a window screenshot without encoding
+- `ac3gui --smoke-shot` (`apps/forge/gui/src/main.cpp`): grabs a window screenshot without encoding
   anything, for documentation screenshots where a specific UI state matters and a completed run
   in the strip would be noise. The existing `--smoke`/`--smoke-record`/`--smoke-live` property
   mechanism gained two special-cased tokens alongside it — `preset=` (invokes

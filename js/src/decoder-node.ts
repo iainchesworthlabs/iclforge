@@ -20,7 +20,7 @@ export interface IclForgeDecoderNodeOptions {
   workletProcessorUrl: string | URL;
   /** URL of this package's compiled `decoder-worker.js` - same resolution story as workletProcessorUrl. */
   workerUrl: string | URL;
-  /** URL of the Emscripten glue (`iclforge_decode.js`) built from apps/wasm/ - this package embeds no compiled binary of its own. */
+  /** URL of the Emscripten glue (`iclforge_decode.js`) built from apps/demos/wasm/ - this package embeds no compiled binary of its own. */
   wasmGlueUrl: string | URL;
   /** Default: no fold (raw/coded channels), so `channelCount` must be supplied. */
   fold?: FoldOptions;

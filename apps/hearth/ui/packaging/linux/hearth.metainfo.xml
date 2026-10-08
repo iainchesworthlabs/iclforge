@@ -2,7 +2,7 @@
 <!--
   AppStream metainfo (Hearth phase A7) - what puts hearth in a Linux
   desktop's own application menu/software centre, alongside
-  hearth.desktop (the entry itself) and apps/gui/packaging/linux/
+  hearth.desktop (the entry itself) and apps/forge/gui/packaging/linux/
   forge-gui-mime.xml (the audio/ac3, audio/eac3 types it opens - the same
   shared-mime-info fragment forge-gui installed first; declaring the same
   glob twice would conflict, so this component reuses it rather than

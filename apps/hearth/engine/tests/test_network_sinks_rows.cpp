@@ -8,7 +8,7 @@
 #include "network_sinks.hpp"
 #include "settings_model.hpp"
 
-// More of NetworkSinks' bookkeeping (apps/hearth/engine/network_sinks.cpp), driven the way
+// More of NetworkSinks' bookkeeping (apps/hearth/engine/src/network_sinks.cpp), driven the way
 // test_network_sinks.cpp drives it - hand-built discovery::Service and ClientView facts through
 // the listener overrides, a real ServerHost with browse off behind them, and a refused loopback
 // port for every dial: how a row reads a standard player, a test sink and a paired sink, what

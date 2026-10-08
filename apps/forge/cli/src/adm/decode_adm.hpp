@@ -13,9 +13,9 @@
 // AdmAtmosSource/load_adm_atmos_source. Same reason for existing: decode.cpp cannot
 // #include "iclforge/adm/adm.hpp" or "iclforge/adm/bridge.hpp" itself, not even behind a
 // preprocessor guard (tools/checks/check_platform_macros.ps1 refuses ANY #if/#ifdef/#ifndef
-// under src/ or apps/cli/commands - see atmos_adm.hpp's own top comment for the full reasoning),
+// under src/ or apps/forge/cli/src/commands - see atmos_adm.hpp's own top comment for the full reasoning),
 // so this header is declared entirely in terms of iclforge::oba's own types (always available) and
-// plain strings, and apps/cli/CMakeLists.txt selects exactly one of adm/enabled/decode_adm.cpp or
+// plain strings, and apps/forge/cli/CMakeLists.txt selects exactly one of adm/enabled/decode_adm.cpp or
 // adm/disabled/decode_adm.cpp to implement it - decode.cpp calls the function below
 // unconditionally either way, gating only on forge_cli::adm_capability() (declared in
 // atmos_adm.hpp, reused here rather than duplicated - "is ADM available in this build?" is the

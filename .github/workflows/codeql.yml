@@ -31,14 +31,14 @@
 #
 # The other two legs (non-C++ lint and scan) cover code the C++ leg never saw: ~30
 # Python files (the oracles and CI gates under tools/, plus the python/
-# binding package) and apps/wasm/demo.js. They take build-mode: none -
+# binding package) and apps/demos/wasm/demo.js. They take build-mode: none -
 # nothing needs compiling for CodeQL to extract them - and so run straight on
 # the hosted runner without this workflow's container, GCC install or vcpkg
 # step, which is why the steps below are conditioned on the language rather
 # than split into a second workflow.
 #
 # The java-kotlin leg builds, because it has to. CodeQL's Kotlin extractor
-# has no buildless mode and apps/android is 100% Kotlin, so build-mode:
+# has no buildless mode and apps/demos/android is 100% Kotlin, so build-mode:
 # none extracts nothing at all - measured, not assumed: dispatched as a
 # buildless leg once (run 32637028120, 2026-08-23), CodeQL 2.26.3 reported
 # "Detected 11 Kotlin files in your project that could not be processed
@@ -231,7 +231,7 @@ jobs:
         with:
           node-version: "24"
 
-      # apps/android/gradle/wrapper/gradle-wrapper.jar is a committed binary
+      # apps/demos/android/gradle/wrapper/gradle-wrapper.jar is a committed binary
       # (OpenSSF Scorecard's Binary-Artifacts check, alert #65) - it can't be
       # dropped since gradlew needs it, so this verifies its checksum against
       # Gradle's own known-good release hashes instead. Same step
@@ -328,7 +328,7 @@ jobs:
       # artifact, and _build.yml still owns producing those.
       - name: Build debug APK
         if: matrix.language == 'java-kotlin'
-        working-directory: apps/android
+        working-directory: apps/demos/android
         shell: bash
         run: |
           set -euo pipefail

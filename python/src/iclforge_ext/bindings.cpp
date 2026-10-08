@@ -394,7 +394,7 @@ py::list blksw_to_list(const std::vector<std::array<bool, iclforge::ac3::kBlocks
 }
 
 // AC-3's own channel labels (Table 5.8) - independent of the E-AC-3 Table E2.5 chanmap machinery
-// used for DecodedSubstream/DecodedAccessUnit below, same split apps/wasm/decoder_bindings.cpp
+// used for DecodedSubstream/DecodedAccessUnit below, same split apps/demos/wasm/decoder_bindings.cpp
 // draws between its own ac3_channel_labels() and apply_layout()/apply_layout_substream().
 std::vector<std::string> ac3_channel_labels(iclforge::ac3::Acmod acmod, bool lfe) {
     static const std::array<std::vector<std::string>, 8> kByAcmod{{
@@ -1211,7 +1211,7 @@ PYBIND11_MODULE(_iclforge, m) {
         .def_property_readonly("channel_labels", [](const iclforge::ac3::DecodedAccessUnit& u) {
             // Dual mono has no Table E2.5 layout at all (DecodedAccessUnit::layout's own
             // comment) - fall back to the plain AC-3 acmod labels, same as
-            // apps/wasm/decoder_bindings.cpp's apply_layout() does.
+            // apps/demos/wasm/decoder_bindings.cpp's apply_layout() does.
             if (u.layout.count == 0) {
                 return ac3_channel_labels(u.acmod, false);
             }

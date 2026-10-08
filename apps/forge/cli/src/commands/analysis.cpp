@@ -611,7 +611,7 @@ std::optional<QcProgrammeResult> measure_qc_eac3_objects(std::span<const std::by
     bool have_first = false;
     // The panned object buffers below are JOC-reconstructed and so lag the
     // bed LFE buffer beside them by reconstruction_delay(joc_domain) samples
-    // (LfeDelayLine's own comment, apps/cli/support.hpp) - held back to match
+    // (LfeDelayLine's own comment, apps/forge/cli/src/support.hpp) - held back to match
     // before either reaches the meter.
     LfeDelayLine lfe_delay{static_cast<std::size_t>(
         iclforge::objects::oba::joc::reconstruction_delay(decoder_config.joc_domain))};

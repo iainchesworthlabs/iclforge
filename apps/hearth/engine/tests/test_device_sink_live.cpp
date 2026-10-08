@@ -13,7 +13,7 @@
 #include "iclforge/render/layout.hpp"
 #include "pcm_sink.hpp"
 
-// Hearth's real local output (apps/hearth/engine/device_sink.cpp, the sink the
+// Hearth's real local output (apps/hearth/engine/src/device_sink.cpp, the sink the
 // window builds) against a real device. Every other test of the player runs it
 // against a fake device that opens at any rate, which is how a machine whose
 // output would not take an item's own rate went unnoticed.

@@ -6,7 +6,7 @@
 
 #include "queue.hpp"
 
-// iclforge::hearth::Queue (apps/hearth/engine/queue.cpp): the play queue, and what
+// iclforge::hearth::Queue (apps/hearth/engine/src/queue.cpp): the play queue, and what
 // happens to the item that is playing when the list changes around it.
 //
 // Every case here is a person doing something ordinary to a queue while a

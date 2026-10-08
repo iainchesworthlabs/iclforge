@@ -10,22 +10,22 @@
 # Windows and macOS, the SIL OFL for the typefaces it embeds, or the MIT text
 # for the {fmt} compiled into both binaries.
 #
-# include()d from the top-level CMakeLists.txt, after apps/cli and apps/gui
+# include()d from the top-level CMakeLists.txt, after apps/forge/cli/src and apps/forge/gui
 # have added their targets - so ICLFORGE_BUILD_CLI/ICLFORGE_BUILD_GUI are
 # settled and every one of those directories' own install() rules has run -
 # and before include(Packaging), which needs the install rules below to exist
 # for the component to contain them.
 #
 # The platform is a directory, platform/<os>/components.cmake, the same rule
-# apps/crucible/notices/ follows and the same rule the C++ platform trees
+# notices/ follows and the same rule the C++ platform trees
 # follow (tools/checks/check_platform_macros.ps1): the per-platform strings
 # live in one small file per operating system rather than in an if() chain
 # threaded through the prose. What is NOT a platform - whether the GUI was
 # built at all - is decided here, because it applies to all three.
 #
-# Qt6_VERSION cannot be read here: apps/gui's find_package(Qt6) ran inside
+# Qt6_VERSION cannot be read here: apps/forge/gui's find_package(Qt6) ran inside
 # add_subdirectory()'s own scope, which does not reach the top level. That is
-# what ICLFORGE_GUI_QT_VERSION is for - apps/gui/CMakeLists.txt exports it
+# what ICLFORGE_GUI_QT_VERSION is for - apps/forge/gui/CMakeLists.txt exports it
 # PARENT_SCOPE next to its find_package call, the same shape apps/crucible
 # already uses for ICLFORGE_CRUCIBLE_X11_BACKEND.
 # ---------------------------------------------------------------------------
@@ -47,7 +47,7 @@ else()
     # macOS and Linux are the three this project verifies (docs/building.md,
     # "Verified configuration").
     message(FATAL_ERROR
-        "notices: no apps/notices/platform/<os>/components.cmake for "
+        "notices: no notices/forge/platform/<os>/components.cmake for "
         "CMAKE_SYSTEM_NAME '${CMAKE_SYSTEM_NAME}'. Add one - it is three "
         "set() calls; copy platform/linux/components.cmake and correct the "
         "location the package installs NOTICES.txt to.")
@@ -58,7 +58,7 @@ include("${ICLFORGE_NOTICES_DIR}/platform/${ICLFORGE_NOTICES_PLATFORM_DIR}/compo
 
 # A CLI-only build carries no Qt and no typefaces: forge links neither, and
 # a package that named them would be describing files it does not contain.
-# ICLFORGE_BUILD_GUI is the whole test - apps/gui's find_package(Qt6 6.5
+# ICLFORGE_BUILD_GUI is the whole test - apps/forge/gui's find_package(Qt6 6.5
 # REQUIRED ...) means the option being ON and a Qt kit being absent cannot
 # both be true; the configure fails there first.
 if(NOT ICLFORGE_BUILD_GUI)
@@ -66,13 +66,13 @@ if(NOT ICLFORGE_BUILD_GUI)
         qt-windows qt-macos qt-linux windows-runtime fonts)
 endif()
 
-# Tracy's client library: apps/gui/CMakeLists.txt's forge-gui links iclforge::tracy
+# Tracy's client library: apps/forge/gui/CMakeLists.txt's forge-gui links iclforge::tracy
 # unconditionally, which only pulls in Tracy::TracyClient - and so is only worth
 # disclosing - when ICLFORGE_ENABLE_TRACY is on (cmake/Tracy.cmake); forge links no
 # such thing, so a CLI-only build (ICLFORGE_BUILD_GUI off) never carries this section
-# either way. Same fact, same fragment (found via the apps/crucible/notices/fragments
+# either way. Same fact, same fragment (found via the notices/fragments
 # FRAGMENT_DIR entry below, not copied) and same conditional as
-# apps/crucible/notices/notices.cmake's and apps/hearth/notices/notices.cmake's own
+# notices/crucible/notices.cmake's and notices/hearth/notices.cmake's own
 # tracy sections.
 if(ICLFORGE_BUILD_GUI AND ICLFORGE_ENABLE_TRACY)
     list(APPEND ICLFORGE_NOTICE_FRAGMENTS tracy)
@@ -80,7 +80,7 @@ endif()
 
 # Who each section is about. The header names the programs the reader has;
 # FMT_USERS and FONT_USER fill the two fragments shared verbatim with
-# apps/crucible/notices/fragments/ (see the FRAGMENT_DIR search path below,
+# notices/fragments/ (see the FRAGMENT_DIR search path below,
 # and cmake/Notices.cmake's header for why those two are shared and the Qt
 # sections are not).
 if(ICLFORGE_BUILD_CLI AND ICLFORGE_BUILD_GUI)
@@ -95,14 +95,14 @@ else()
 endif()
 
 # The versions, from what CMake already holds: {fmt}'s from its package or the
-# pinned fallback (cmake/Fmt.cmake), Qt's from apps/gui (see the header above).
+# pinned fallback (cmake/Fmt.cmake), Qt's from apps/forge/gui (see the header above).
 if(fmt_VERSION)
     set(ICLFORGE_NOTICES_FMT_VERSION "${fmt_VERSION}")
 else()
     set(ICLFORGE_NOTICES_FMT_VERSION "${ICLFORGE_FMT_VERSION}")
 endif()
 # Tracy's version, from its package - the same Tracy_VERSION/"not reported" choice
-# apps/crucible/notices/notices.cmake makes for the identical shared fragment.
+# notices/crucible/notices.cmake makes for the identical shared fragment.
 if(Tracy_VERSION)
     set(ICLFORGE_NOTICES_TRACY_VERSION "${Tracy_VERSION}")
 else()
@@ -113,32 +113,32 @@ endif()
 # check untouched - the {{QT_VERSION}} marker is still substituted, just
 # with nothing - so the failure would be a shipped notice reading "Qt " and
 # a source URL with an empty version in the middle of it, which nobody
-# reading a configure log would see. Moving apps/gui behind another
+# reading a configure log would see. Moving apps/forge/gui behind another
 # directory level, or include()ing it instead of add_subdirectory()ing it,
 # is all it takes to break the PARENT_SCOPE export that fills this.
 if(ICLFORGE_BUILD_GUI AND NOT ICLFORGE_GUI_QT_VERSION)
     message(FATAL_ERROR
         "notices: ICLFORGE_BUILD_GUI is ON but ICLFORGE_GUI_QT_VERSION is empty, so "
         "the Qt section would name no version and its source URL would point nowhere. "
-        "apps/gui/CMakeLists.txt exports it with set(... PARENT_SCOPE) beside its "
-        "find_package(Qt6), which reaches this file only while apps/gui is "
+        "apps/forge/gui/CMakeLists.txt exports it with set(... PARENT_SCOPE) beside its "
+        "find_package(Qt6), which reaches this file only while apps/forge/gui is "
         "add_subdirectory()'d straight from the top-level CMakeLists.txt.")
 endif()
 string(REGEX MATCH "^[0-9]+\\.[0-9]+" ICLFORGE_NOTICES_QT_SERIES "${ICLFORGE_GUI_QT_VERSION}")
 
 set(ICLFORGE_NOTICES_FILE "${CMAKE_BINARY_DIR}/notices/NOTICES.txt")
 ac3_generate_notices("${ICLFORGE_NOTICES_FILE}"
-    # This directory first, apps/crucible/notices/fragments second: fmt,
+    # This directory first, notices/fragments second: fmt,
     # fonts and trademarks are the same paragraphs for both applications and
     # are taken from there rather than copied, while header and the Qt
     # sections describe what a Forge package contains and are this
     # directory's own. The licence texts come from the same place for the
-    # same reason - apps/crucible/notices/licences/ is where the LGPL, the
+    # same reason - notices/licences/ is where the LGPL, the
     # {fmt} MIT, the Mesa MIT and the NCSA texts already live, and a second
     # byte-identical copy is a second thing to keep current.
     FRAGMENT_DIR
         "${ICLFORGE_NOTICES_DIR}/fragments"
-        "${CMAKE_SOURCE_DIR}/apps/crucible/notices/fragments"
+        "${CMAKE_SOURCE_DIR}/notices/fragments"
     FRAGMENTS ${ICLFORGE_NOTICE_FRAGMENTS}
     TOKENS
         "VERSION=${PROJECT_VERSION_FULL}"

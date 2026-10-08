@@ -7,7 +7,7 @@
 # silently disagree with (see src/encoder_controller.hpp's own header comment).
 #
 # Included (not add_subdirectory()'d) from ../CMakeLists.txt, so every path
-# below is written relative to apps/gui, not apps/gui/tests - see the comment
+# below is written relative to apps/forge/gui, not apps/forge/gui/tests - see the comment
 # at that include() call for why that distinction is load-bearing here and
 # not just a style choice.
 #
@@ -56,7 +56,7 @@ qt_add_executable(forge_gui_qmltests
     ../../shared/preferences/src/language_manager.cpp
     ../../shared/preferences/src/language_manager.hpp)
 
-# apps/common, for the same reason ../CMakeLists.txt names it: RecordingSink
+# apps/shared/media/src, for the same reason ../CMakeLists.txt names it: RecordingSink
 # and Fmp4FolderWriter moved there when forge's own takes started streaming
 # through them (wide-layout record/live paths), and container_input.cpp joined them the same
 # way for container readers (mkv/mp4/ts). This target compiles the same files in, exactly as it
@@ -128,8 +128,8 @@ target_compile_definitions(forge_gui_qmltests PRIVATE
 
 # The byte-equality suites (tst_e2e_ac4.qml) run the command line a page
 # echoes through this build's own forge (qml_test_main.cpp's CliRunner), so
-# the binary is built first and named here. apps/cli is configured before
-# apps/gui (the root CMakeLists.txt), so the target exists by now wherever the
+# the binary is built first and named here. apps/forge/cli/src is configured before
+# apps/forge/gui (the root CMakeLists.txt), so the target exists by now wherever the
 # build has one; without it the path is empty and the suites skip. The choice
 # is made here rather than behind an #ifdef, which
 # tools/checks/check_platform_macros.ps1 refuses.
@@ -173,7 +173,7 @@ target_link_libraries(forge_gui_qmltests
         # Inert unless ICLFORGE_ENABLE_COVERAGE is on - see cmake/Coverage.cmake:
         # linking an instrumented library gives this target only the gcov
         # runtime, not instrumentation of the controller sources it
-        # recompiles, so without this a gcovr filter for apps/gui measured
+        # recompiles, so without this a gcovr filter for apps/forge/gui measured
         # nothing these suites ran (Crucible's qmltests link it the same way).
         iclforge::coverage
         Qt6::Core

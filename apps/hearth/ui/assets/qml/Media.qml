@@ -9,11 +9,11 @@ import Hearth
 // information; docs/hearth/design/screenshots/media-ac3.png, media-eac3-
 // joc.png, media-ac4.png): what the picked queue item's own file says about
 // itself, read once for the whole file (HearthController.inspectedMedia,
-// backed by apps/hearth/engine/media_info.hpp's MediaInfo off a thread of
+// backed by apps/hearth/engine/src/media_info.hpp's MediaInfo off a thread of
 // its own). Defaults to the item playing now; the "Showing" picker can ask
 // about any other queue item instead. An AC-4 item's presentations and
 // metadata are what iclforge::ac4::Decoder reads of the whole stream
-// (apps/common/probe_json.hpp's Ac4Summary; planning/ac4.md, "Media
+// (apps/shared/media/src/probe_json.hpp's Ac4Summary; planning/ac4.md, "Media
 // information").
 Item {
     id: root

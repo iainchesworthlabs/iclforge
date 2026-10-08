@@ -4,9 +4,9 @@
 // refuses; qc, levels and loudness of an AC-4 presentation; fmp4, mkv, probe
 // and spdif on AC-4; and the help that names it all. The streams are short
 // (half a second of tones) because the sanitizer legs run every one of these.
-// record, live and monitor need a device: tests/cli/test_cli_live_alsa.cpp
+// record, live and monitor need a device: apps/forge/cli/tests/test_cli_live_alsa.cpp
 // takes codec=ac4 through software ALSA devices, and
-// tests/gui/test_recording_sink.cpp holds RecordingSink's AC-4 containers to
+// apps/shared/media/tests/test_recording_sink.cpp holds RecordingSink's AC-4 containers to
 // their one-shot writers.
 
 #include <catch2/catch_test_macros.hpp>
@@ -34,7 +34,7 @@ namespace fs = std::filesystem;
 namespace {
 
 // Per this project's per-file test-helper convention (see
-// tests/cli/test_cli_containers.cpp, whose shapes these copy).
+// apps/forge/cli/tests/test_cli_containers.cpp, whose shapes these copy).
 fs::path scratch_dir() {
     auto dir =
         fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("cli_ac4_" + iclforge::test::platform::process_id());
@@ -72,7 +72,7 @@ bool contains(std::string_view text, std::string_view needle) {
 }
 
 // A scalar of the pretty-printed probe document, looked up inside the section
-// that owns it (tests/cli/test_cli_probe.cpp has the reasoning).
+// that owns it (apps/forge/cli/tests/test_cli_probe.cpp has the reasoning).
 std::string json_field(std::string_view document, std::string_view key) {
     const std::string needle = "\"" + std::string{key} + "\": ";
     const auto at = document.find(needle);

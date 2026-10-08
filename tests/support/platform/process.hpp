@@ -10,7 +10,7 @@
 // that needed them - nineteen copies of the process-id branch and eight of
 // the std::system() one, each with its own drifting copy of the explanatory
 // comment. That is exactly the arrangement the rest of this repository does
-// not have: libs/audio/src/backend/<backend>/, apps/cli/platform/<os>/ and
+// not have: libs/audio/src/backend/<backend>/, apps/forge/cli/src/platform/<os>/ and
 // tests/support/crt/<runtime>/ all ship one filename per directory and let CMake
 // compile the directory that matches the target, so no source file has to ask
 // which platform it is on. tools/checks/check_platform_macros.ps1 holds that
@@ -40,7 +40,7 @@ namespace iclforge::test::platform {
 std::string process_id();
 
 // Runs `command` through the system command interpreter and returns the
-// child's OWN exit code - 0..7 for forge (apps/cli/exit_codes.hpp), or
+// child's OWN exit code - 0..7 for forge (apps/forge/cli/src/exit_codes.hpp), or
 // 128 + signal where a POSIX child was killed rather than exiting, or -1
 // where the interpreter could not be started at all.
 //

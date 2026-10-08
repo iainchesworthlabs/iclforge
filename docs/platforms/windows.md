@@ -5,7 +5,7 @@ alike: Windows MSVC in the merge queue, and both in the run after a merge to mai
 [CI for many agents](../ci-agentic.md)). This page covers what is specific to Windows; for the
 full preset reference, options list and troubleshooting, see [Building from source](../building.md).
 Crucible's kernel driver and driver VM live under
-[`apps/windows/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/apps/windows/README.md),
+[`apps/crucible/windows/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/apps/crucible/windows/README.md),
 separate from the application in `apps/crucible/`.
 
 ## Status
@@ -87,7 +87,7 @@ is explicit about the difference.
     pipeline's Atmos metering step writing past the end of a buffer sized for the object count
     rather than the bed's fixed six channels. Both are fixed; see
     `libs/audio/src/backend/windows/monitor.cpp` and `run_live` in
-    `apps/cli/commands/live_audio.cpp`.
+    `apps/forge/cli/src/commands/live_audio.cpp`.
 
 !!! note "MonitorSink: a format refusal is told apart from a WASAPI failure, and any rate plays"
     `MonitorSink::start()` reports `MonitorError::kFormatRejected` for `AUDCLNT_E_UNSUPPORTED_FORMAT`

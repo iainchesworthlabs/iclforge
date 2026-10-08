@@ -7,7 +7,7 @@ doc), which always means a real aiosendspin process by that phrase, never a seco
 double (aiosendspin_exit.py's own docstring is the A4 case this mirrors).
 
 Starts the scripted player in aiosendspin_player.py on a loopback port, runs iclforge-tests's hidden
-[aiosendspin-group] case (tests/hearth/test_aiosendspin_group.cpp) with the player's URL, token and
+[aiosendspin-group] case (apps/hearth/engine/tests/test_aiosendspin_group.cpp) with the player's URL, token and
 a directory, and checks what the player took against programme.wav, the case's own local decode and
 render of the programme, carried through the same full-scale-to-16-bit rescale
 NetworkGroupSink::submit_pcm() and Group::rescaled() apply before a PCM member's encoder ever sees a

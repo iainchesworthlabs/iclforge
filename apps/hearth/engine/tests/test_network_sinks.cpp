@@ -8,7 +8,7 @@
 #include "network_sinks.hpp"
 #include "settings_model.hpp"
 
-// iclforge::hearth::NetworkSinks (apps/hearth/engine/network_sinks.cpp): the
+// iclforge::hearth::NetworkSinks (apps/hearth/engine/src/network_sinks.cpp): the
 // discovery/pairing bookkeeping, driven directly through its
 // discovery::BrowseListener/ServerHostEvents overrides (public on this class
 // for exactly this reason - see network_sinks.hpp's own comment) with
@@ -501,7 +501,7 @@ TEST_CASE("network sinks: volume and mute on a real group reach a synthetic, una
     // actually accepted a connection for (the same reasoning
     // test_network_sinks.cpp's own header comment gives for select_sink()'s
     // real, harmlessly-refused host_->pair() call) - not that the volume
-    // takes effect, which needs a real accepted sink (tests/hearth/
+    // takes effect, which needs a real accepted sink (apps/hearth/engine/tests/
     // test_group.cpp's own job).
     MemorySettingsStore settings;
     PairingStore store{settings, today};

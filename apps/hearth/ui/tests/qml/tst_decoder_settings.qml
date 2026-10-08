@@ -12,7 +12,7 @@ import Hearth
 //
 // DecoderPage.qml/DecoderEac3.qml/DecoderAc4.qml carry no objectName on any
 // control (checked by grep before writing this file) except the shared
-// SegmentedControl component's own "seg-<value>" cells (apps/gui/qml/SegmentedControl.qml).
+// SegmentedControl component's own "seg-<value>" cells (apps/shared/theme/assets/qml/SegmentedControl.qml).
 // The mode/stereoFold/dualMono/objects/jocDomain/concealment fields are
 // exercised through those real cells with a real mouseClick(); drcCut,
 // drcBoost, heavyCompression, normaliseDialogue, rfCeilingDb,

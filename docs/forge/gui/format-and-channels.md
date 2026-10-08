@@ -237,7 +237,7 @@ The command bar echoes one command, `forge ac4-encode <source> out.ac4 <kbps> <o
 `out.mp4` for MP4, since `ac4-encode` writes the MP4 file itself. Run where the source is, it
 writes the same bytes the page writes; the Qt Quick Tests hold a raw stream, an MP4 file and a
 5.1 downmix to that. The page and the command share their channel order, loudness measurement
-and packaging (`apps/common/ac4_encode_core.hpp`).
+and packaging (`apps/shared/media/src/ac4_encode_core.hpp`).
 
 `aspx-acpl-1` is on the Codec mode list, but `ac4-encode` takes it only with `experimental=acpl`,
 which the page never sets, so choosing it ends in the encoder's refusal.

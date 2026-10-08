@@ -556,7 +556,7 @@ constexpr int kPollMs = 60;
     map[QStringLiteral("presentationCount")] = toc.n_presentations;
     map[QStringLiteral("substreamCount")] = toc.n_substreams;
     // What the decoder reads of the presentations, and the metadata of the
-    // one it selects with no preferences (apps/common/probe_json.hpp).
+    // one it selects with no preferences (apps/shared/media/src/probe_json.hpp).
     map[QStringLiteral("presentations")] = ac4_presentations_to_list(summary.presentations);
     if (summary.metadata) {
         map[QStringLiteral("metadata")] = ac4_metadata_to_map(*summary.metadata);
@@ -992,7 +992,7 @@ constexpr int kPollMs = 60;
 }
 
 // oba::describe_objects()'s DisplayObject, as QML reads it - the same shape
-// apps/gui's ObjectDecodeController already settled on for its own room-plan
+// apps/forge/gui's ObjectDecodeController already settled on for its own room-plan
 // view (object_decode_controller.cpp), so the two applications' object
 // markers read the same fields the same way.
 [[nodiscard]] QVariantMap display_object_to_map(
@@ -1167,7 +1167,7 @@ QString HearthController::versionDetails() const {
 
 QString HearthController::licenceNotices() const {
     // The same file the package installs, embedded by
-    // apps/hearth/notices/notices.cmake once hearth exists for it to
+    // notices/hearth/notices.cmake once hearth exists for it to
     // embed into, so the dialog cannot say something the package does not.
     // A binary built without the embedding gets a sentence that says so
     // rather than an empty view - the same fallback

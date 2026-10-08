@@ -187,7 +187,7 @@ SET = [
     {
         "file": "demo.ec3",
         "what": "the WASM page's demo: 5.1 with objects, JOC in the QMF domain",
-        "copy": "apps/wasm/assets/demo.ec3",
+        "copy": "apps/demos/wasm/assets/demo.ec3",
     },
     {
         "file": "514-joc-dee.ec3",

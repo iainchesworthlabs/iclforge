@@ -10,7 +10,7 @@ import ForgeGui
 //
 // Basic's own non-editable ComboBox is the furthest of any native control
 // from this sheet: a flat palette.button block with NO border at rest. This
-// is Crucible's own already-styled combo (apps/crucible/ui/qml/
+// is Crucible's own already-styled combo (apps/crucible/ui/assets/qml/
 // SettingsPage.qml's language box) lifted into the shared set, since Hearth's
 // Settings, Decoder, Media and Speakers pages all need the same one.
 QQC.ComboBox {

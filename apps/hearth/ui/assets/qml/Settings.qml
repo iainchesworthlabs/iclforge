@@ -11,9 +11,9 @@ import HearthLanguage
 // in), appearance, language and a diagnostics export - the same five cards
 // the mockup shows, in the same order. Playback and network are real engine
 // settings, kept through HearthController's QSettingsStore
-// (apps/hearth/ui/hearth_controller.cpp) the way
-// apps/hearth/engine/settings_model.hpp says the window has to. Appearance
-// writes straight to Theme, the way apps/crucible/ui/qml/SettingsPage.qml's
+// (apps/hearth/ui/src/hearth_controller.cpp) the way
+// apps/hearth/engine/src/settings_model.hpp says the window has to. Appearance
+// writes straight to Theme, the way apps/crucible/ui/assets/qml/SettingsPage.qml's
 // own theme/palette/textScale trio does - Main.qml binds Theme to it the
 // same way.
 ScrollView {
@@ -29,7 +29,7 @@ ScrollView {
 
     // Where the diagnostics file goes. selectedFile is set before open(), so
     // the suggested name and folder appear in the dialog - the same shape as
-    // apps/gui/qml/PreferencesDialog.qml's own diagnosticsDialog.
+    // apps/forge/gui/assets/qml/PreferencesDialog.qml's own diagnosticsDialog.
     FileDialog {
         id: diagnosticsDialog
         title: qsTr("Save diagnostics")
@@ -494,7 +494,7 @@ ScrollView {
                             // Re-chosen from the manager's own state whenever
                             // the model is rebuilt (every retranslate rebuilds
                             // it) or the language changes, so a chosen
-                            // language stays chosen - apps/crucible/ui/qml/
+                            // language stays chosen - apps/crucible/ui/assets/qml/
                             // SettingsPage.qml's own box does the same.
                             function sync() {
                                 currentIndex = LanguageManager.hasOverride()

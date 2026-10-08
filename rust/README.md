@@ -17,7 +17,7 @@ with no host-project entanglement, and bindgen regenerated against a header at a
 commit than the library it links is exactly the drift this binding exists to catch — which only
 works if both come from the same checkout on every PR.
 
-The precedent already in this repo is `apps/android`: a real Gradle/NDK build living in-tree,
+The precedent already in this repo is `apps/demos/android`: a real Gradle/NDK build living in-tree,
 never wired into the root `CMakeLists.txt`, built and tested by its own CI job
 (`_build.yml`'s `build-android`). This crate follows the same shape for Cargo: committed, owned,
 covered by CI (`build-rust`), but never `add_subdirectory()`'d from the root — Cargo stays out of

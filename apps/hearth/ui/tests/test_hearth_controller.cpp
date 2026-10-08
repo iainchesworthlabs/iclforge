@@ -15,7 +15,7 @@
 #include <utility>
 #include <vector>
 
-// apps/hearth/ui/hearth_controller.cpp's own QML-translation layer (issue
+// apps/hearth/ui/src/hearth_controller.cpp's own QML-translation layer (issue
 // #886, part 2): queue_row(), media_info_to_map() and its field-by-field
 // helpers, decoder_settings_to_map()/from_map(), channel_level_to_map(),
 // display_object_to_map() and friends are what actually produce the
@@ -54,7 +54,7 @@
 // loop. HearthController's own class methods compile as part of this
 // translation unit too (the .cpp is included whole), which is why this
 // target also links hearth_engine, item_loader.cpp and
-// apps/common/container_input.cpp - what HearthController::start()/
+// apps/shared/media/src/container_input.cpp - what HearthController::start()/
 // addFolder() reference has to resolve at link time even though no test
 // here calls them.
 #include "hearth_controller.cpp"
@@ -83,7 +83,7 @@ using iclforge::hearth::MediaInfo;
 using iclforge::hearth::MediaProgramme;
 using iclforge::hearth::QueueItem;
 
-// Matches tests/hearth/test_queue.cpp's own QueueItem factory shape (fields
+// Matches apps/hearth/engine/tests/test_queue.cpp's own QueueItem factory shape (fields
 // set one at a time, not one braced initialiser that both reads and moves
 // from the same string - that file's own comment says why: a GNU
 // -Wnull-dereference false positive at -O3 this project already works

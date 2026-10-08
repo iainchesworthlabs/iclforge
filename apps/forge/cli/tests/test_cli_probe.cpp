@@ -47,7 +47,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// See tests/cli/test_cli.cpp's own scratch_dir for the reasoning this copy
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir for the reasoning this copy
 // shares, including the PID fold; the leaf name below is this file's own.
 std::string scratch_pid_suffix() { return iclforge::test::platform::process_id(); }
 
@@ -500,7 +500,7 @@ TEST_CASE("probe names a reserved dmixmod in both output forms, for both codecs"
 TEST_CASE("probe names bsmod 7 by acmod: voice over at 1/0, karaoke wider", "[cli][probe]") {
     // Table 5.7's one code that means two different services, split by acmod
     // rather than by bsmod alone - see bsmod_label's own comment in
-    // apps/common/probe_json.cpp.
+    // apps/shared/media/src/probe_json.cpp.
     // bsmod is unconditional in AC-3's bsi (§5.4.2.2), so 'metadata' can stamp
     // 7 onto a plain sine tone without needing a fixture that transmitted it
     // already; that keeps this to the acmod boundary the bug was actually in,

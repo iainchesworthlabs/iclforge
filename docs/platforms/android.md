@@ -1,7 +1,7 @@
 # Android (NVIDIA Shield)
 
 Android support is a separate, small, Shield-specific demo app, **Shield Atmos Demo**
-(`apps/android/`), that plays an Atmos/JOC stream out through the Shield's HDMI passthrough
+(`apps/demos/android/`), that plays an Atmos/JOC stream out through the Shield's HDMI passthrough
 output to an AV receiver, with a controller or remote moving one of a few objects around the
 room live. Neither `forge` nor `forge-gui` is ported to Android. The app exists to show the
 encoder's object audio moving in 3D space on consumer hardware, and is not a general-purpose
@@ -18,7 +18,7 @@ platforms, see [Building from source](../building.md) and the other pages in thi
 | Capture | None. The app plays; it records nothing |
 | AC-4 | None. The app does not decode, encode or play AC-4. The NDK build compiles the AC-4 library and the app links none of it — see [AC-4](#ac-4) |
 | Distribution | Personal sideload via `adb install`, **never the Play Store**. A release carries the APK (every release since v0.3.0-beta.1 has one) |
-| CI | The `build-android` job builds it in the nightly run and in the run after a merge that changes `apps/android/`; the hardware behaviour is not reproducible in CI |
+| CI | The `build-android` job builds it in the nightly run and in the run after a merge that changes `apps/demos/android/`; the hardware behaviour is not reproducible in CI |
 
 --8<-- "docs-snippets/generated/platform-android.md"
 
@@ -34,7 +34,7 @@ An Android SDK with **NDK 26.1.10909125** and **CMake 3.31.6** installed (`local
 `sdk.dir`), plus a Shield TV reachable over the network or USB:
 
 ```bash
-cd apps/android
+cd apps/demos/android
 ./gradlew assembleDebug --no-daemon
 adb connect <shield-ip>:5555          # if not on USB
 adb -s <shield-ip>:5555 install -r app/build/outputs/apk/debug/app-debug.apk
@@ -47,7 +47,7 @@ adb -s <shield-ip>:5555 shell am start -n com.iclforge.shield/.MainActivity
 
 `iclforge::ac3` (`libs/ac3/`) — the codec and `AtmosEncoder` — and the libraries it links, among them
 `iclforge::containers::iec61937` for the IEC 61937 framing, are fully platform-independent and are linked into the app **unmodified**, via a thin wrapper
-`CMakeLists.txt` (`apps/android/app/src/main/cpp/CMakeLists.txt`) that `add_subdirectory()`s
+`CMakeLists.txt` (`apps/demos/android/app/src/main/cpp/CMakeLists.txt`) that `add_subdirectory()`s
 the real repo root rather than duplicating its target definitions. `iclforge::audio` (`libs/audio/`)
 gains its own backend, `libs/audio/src/backend/android/`, alongside `windows`/`alsa`/`pipewire`/
 `posix`/`macos`, selected by CMake's own `ANDROID` variable (set by the NDK toolchain file, a peer check
@@ -56,7 +56,7 @@ anywhere, per the project's
 [platform-tree convention](raspberry-pi.md#why-theres-no-raspberry-pi-specific-code).
 
 Everything else — the Gradle app shell, the JNI bridge, the live encode loop, input handling, the
-room visualization — is new and lives entirely under `apps/android/`, outside the CMake
+room visualization — is new and lives entirely under `apps/demos/android/`, outside the CMake
 project the desktop tools build from.
 
 ## Toolchain
@@ -76,7 +76,7 @@ around that, the whole project uses [{fmt}](https://github.com/fmtlib/fmt) — `
 `fmt::print` in place of `std::format`/`std::print` everywhere — since {fmt} has no
 such gap (see `cmake/Fmt.cmake` and `CONTRIBUTING.md`'s code-conventions section). That single
 choice is also what lets `iclforge::containers::mp4`'s HLS/DASH signaling helpers build for Android at all; see the
-note in `apps/android/app/src/main/cpp/CMakeLists.txt` for why this app still doesn't link them
+note in `apps/demos/android/app/src/main/cpp/CMakeLists.txt` for why this app still doesn't link them
 regardless (it never muxes a file).
 
 The same libc++ implements only `<charconv>`'s **integer** `from_chars`, not its floating-point
@@ -168,7 +168,7 @@ been compiled but never run on a device.
 
 `am start ... --es play_file /sdcard/Download/<file>.ec3` skips the live cursor and the demo and
 streams that already-encoded E-AC-3 file through the same `PassthroughSink`
-(`apps/android/app/src/main/cpp/file_replay.cpp`). It exists to separate "is this app's
+(`apps/demos/android/app/src/main/cpp/file_replay.cpp`). It exists to separate "is this app's
 `AudioTrack` passthrough configuration right" from "is this project's own Atmos output right":
 a known-good commercial Dolby stream either lights the receiver's Atmos indicator through this
 code path or it does not. It groups access units by each frame's `bsid` rather than by
@@ -721,7 +721,7 @@ To build a signed APK on your own machine, drop your own `signing.key` (base64 o
 ## Building and running
 
 ```bash
-cd apps/android
+cd apps/demos/android
 ./gradlew assembleDebug --no-daemon
 adb connect <shield-ip>:5555          # if not on USB
 adb -s <shield-ip>:5555 install -r app/build/outputs/apk/debug/app-debug.apk
@@ -738,7 +738,7 @@ build, also drop a `signing.key` asset into `app/src/main/assets/` as described 
 The app builds alongside the desktop packages rather than only ever being hand-built locally:
 `.github/workflows/_build.yml`'s `build-android` job builds the **debug** variant in every run in
 which the Android lane runs: the nightly run, and the run after a merge that changes
-`apps/android/` (no Android SDK/NDK setup beyond what `ubuntu-latest` ships plus an explicit
+`apps/demos/android/` (no Android SDK/NDK setup beyond what `ubuntu-latest` ships plus an explicit
 `sdkmanager` install of the exact NDK version, `26.1.10909125`, the same "don't trust whatever the
 image happens to cache" reasoning every other toolchain step in that workflow already follows) — a
 smoke test proving the Gradle/CMake/NDK toolchain and every native source file still build. A
@@ -813,7 +813,7 @@ like any other non-experimental job.
     green three consecutive times on GitHub's hosted runners — see [Release / CI](#release-ci) above.
 
 !!! note "Automated in CI"
-    `apps/android/app/src/androidTest/` adds `NativeBridgeInstrumentedTest` and
+    `apps/demos/android/app/src/androidTest/` adds `NativeBridgeInstrumentedTest` and
     `PassthroughBridgeInstrumentedTest`, which `build-android` runs on every build via
     `./gradlew :app:connectedDebugAndroidTest` against a GitHub-hosted API-30 x86_64 emulator
     (KVM acceleration is x86/x86_64-only on those runners, so the debug build type targets

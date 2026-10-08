@@ -16,7 +16,7 @@
 // is what lets the whole table of cases run on a machine with no sound card -
 // including the cases one desk with one receiver can never produce.
 //
-// Shaped after Crucible's own decision (apps/crucible/engine/output_policy.hpp)
+// Shaped after Crucible's own decision (apps/crucible/engine/src/output_policy.hpp)
 // so the two applications' Output screens can be read against each other.
 // What differs is what is being chosen between: Hearth plays a stream that
 // already exists rather than encoding a live one, so its modes are "bitstream

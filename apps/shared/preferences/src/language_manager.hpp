@@ -48,7 +48,7 @@ public:
 
     // One { "code": QString, "name": QString } entry per supported REAL
     // language - "en" (no .qm - falls back to the untranslated source
-    // strings) first, then every language apps/gui/translations/ ships.
+    // strings) first, then every language apps/forge/gui/assets/translations/ ships.
     // Deliberately excludes the "xx" pseudo-locale fixture: it exists to
     // prove the extraction/compile/load pipeline and to catch a qsTr()
     // bypass, not as something a user would ever pick from Preferences.

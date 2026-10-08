@@ -11,7 +11,7 @@ described in [CI for many agents](ci-agentic.md), and `ci.yml` has no `pull_requ
 `merge_group` trigger. `ci.yml` runs on every push to main (one run at a time), on the nightly
 schedule, and on a dispatch, and it uses the lanes on this page to decide what to run: a lane is a
 set of source paths and the jobs that build or test them. The `changes` job classifies the files a
-run has to answer for, and a change confined to `apps/android/` runs the Android build and none
+run has to answer for, and a change confined to `apps/demos/android/` runs the Android build and none
 of the other platforms. This page describes the classification, what it gates, and what it does not
 gate.
 
@@ -66,7 +66,7 @@ tiers](ci-agentic.md#the-tiers)), and some jobs are nightly only: `linux-appimag
 `core` jobs `coverage`, `abi-gate` and `ffmpeg-validate` do not run in the run after a merge
 (`inputs.tier != 't2'`).
 
-A change confined to `apps/android/` runs `build-android` after a merge and skips `build-wasm`,
+A change confined to `apps/demos/android/` runs `build-android` after a merge and skips `build-wasm`,
 `build-esp32s3`/`hearth-esp32s3`/`c3`, `build-footprint`, `build-rust`, `build-windows`,
 `windows-driver`, `build-linux`, `linux-appimage`, `build-macos` and `package-macos-universal`.
 
@@ -157,11 +157,11 @@ comes from.
 | Lane | Paths that light it directly | Also lit by |
 |---|---|---|
 | `core` | `src/`, `tests/`, `fuzz/`, `cmake/`, `tools/checks/`, `tools/ci/`, `requirements/`, root `CMakeLists.txt`/`CMakePresets.json`/`vcpkg.json` | - |
-| `windows` | `apps/windows/`, `apps/notices/platform/windows/`, `packaging/winget/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
-| `linux` | `apps/linux/`, `apps/notices/platform/linux/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
-| `macos` | `apps/notices/platform/macos/`, `packaging/homebrew/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
-| `android` | `apps/android/` | `core` (not after a merge) |
-| `wasm` | `apps/wasm/`, `js/` (its E2E demo) | `core` (not after a merge) |
+| `windows` | `apps/crucible/windows/`, `notices/forge/platform/windows/`, `packaging/winget/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
+| `linux` | `apps/crucible/linux/`, `notices/forge/platform/linux/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
+| `macos` | `notices/forge/platform/macos/`, `packaging/homebrew/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
+| `android` | `apps/demos/android/` | `core` (not after a merge) |
+| `wasm` | `apps/demos/wasm/`, `js/` (its E2E demo) | `core` (not after a merge) |
 | `esp` | `esp-idf/`, `esphome/`, `apps/baremetal/`, `tools/packaging/`, and the trees its component ships: `libs/ac3/`, `libs/base/`, `cmake/`, root `CMakeLists.txt` | `core` (not after a merge) |
 | `rust` | `rust/` | `core` (not after a merge) |
 | `python` | `python/`, `examples/python/` | `core` (not after a merge) |
@@ -169,7 +169,7 @@ comes from.
 | `ci_self` | `.github/workflows/`, `.github/actions/`, `.github/toolchain/` | - |
 | `docs` | `docs/`, any `*.md`, `LICENSE`, `mkdocs.yml` | - |
 
-`apps/cli/`, `apps/gui/`, `apps/common/`, `apps/crucible/` and `apps/hearth/` light `windows`,
+`apps/forge/cli/src/`, `apps/forge/gui/`, `apps/shared/media/src/`, `apps/crucible/` and `apps/hearth/` light `windows`,
 `linux` and `macos` directly - they are one desktop program built and tested on all three, not
 three separate programs, so they are not written as "core, therefore fanned out" but as a direct
 hit on each of the three lanes.

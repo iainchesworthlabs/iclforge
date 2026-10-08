@@ -2165,14 +2165,14 @@ output level and DRC (5.7.9) and the downmix (6.2.17), and after it, the sample 
   name; Table 160 is `drc_eac3_profile`'s, which 4.3.13.2.2 describes as the (E-)AC-3 profile to use
   when transcoding.
 - **Reading:** the field is `drc_eac3_profile`, the one of the presentation transcoded. `forge
-  transcode` (`apps/cli/commands/stream_tools.cpp`) decodes that presentation with no output level, and
+  transcode` (`apps/forge/cli/src/commands/stream_tools.cpp`) decodes that presentation with no output level, and
   so no DRC, and the AC-3 or E-AC-3 encoder computes its `dynrng` with the profile the field names: 1 to
   5 the five of Table 162, and 0 ("None") and the reserved 6 and 7 none, the re-encode then writing no
   `dynrng`. The clause names one curve, so it shapes the line mode's gains; the RF mode's `compr` stays
   the encoder's own option (`heavy`).
 - **Evidence:** Text. The value reaches the transcoder as the decoder reports it
   (`DrcInfo::eac3_profile`), not through the syntax the two transcriptions read, so neither has a
-  reading to take; `tests/cli/test_cli_ac4.cpp` transcodes streams whose profile is film light and one
+  reading to take; `apps/forge/cli/tests/test_cli_ac4.cpp` transcodes streams whose profile is film light and one
   that sends no DRC.
 
 ### Presentations

@@ -18,7 +18,7 @@ struct LanguageInfo {
 };
 
 // "en" first (no .qm - the untranslated source strings are already English),
-// then every language apps/gui/translations/ ships - the same set, same
+// then every language apps/forge/gui/assets/translations/ ships - the same set, same
 // order, as CountdownSolver's own kLanguages (GUI localisation: build to that
 // project's already-shipped canonical set rather than invent a second one).
 // Real translation coverage is partial today (see docs/forge/gui/localisation.md);
@@ -35,7 +35,7 @@ constexpr std::array<LanguageInfo, 7> kLanguages{{
 }};
 
 // The pseudo-locale QA fixture (tools/generators/gen_pseudo_locale.py,
-// apps/gui/translations/forge_gui_xx.ts) - reachable only through the
+// apps/forge/gui/assets/translations/forge_gui_xx.ts) - reachable only through the
 // ICLFORGE_GUI_LOCALE override below, never through availableLanguages()/
 // setLanguage(), since it exists to prove the pipeline and catch a qsTr()
 // bypass rather than to be user-selectable.

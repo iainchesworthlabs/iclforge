@@ -26,7 +26,7 @@
 // This header is deliberately codec-blind, the same way iclforge::containers::iec61937's
 // framing is the only iclforge::ac3-adjacent thing iclforge::audio depends on: it
 // knows nothing about OAMD, JOC, or which of a programme's objects are bed
-// vs dynamic. That interpretation (see apps/cli/commands/live_audio.cpp's
+// vs dynamic. That interpretation (see apps/forge/cli/src/commands/live_audio.cpp's
 // run_spatial) is the caller's job, for the same layering reason PassthroughSink
 // doesn't know what IEC 61937 framing means either. A static object's
 // channel identity is expressed as a WAVEFORMATEXTENSIBLE SPEAKER_* bit - the

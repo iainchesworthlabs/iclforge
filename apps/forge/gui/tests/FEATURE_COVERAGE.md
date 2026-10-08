@@ -157,7 +157,7 @@ suites, so **Before** reads "new".
 | QC: presentation picker | new | UI | Ac4Decode::test_qcMeasuresThePresentationItsPickerChooses |
 | Object page: presentations, bed and dynamic objects, the note that it exports nothing | new | UI | Ac4Decode::test_objectPageListsWhatTheDecoderReports, E2eAc4::test_rawStream… |
 | The AC-4 name filter of the QC, Inspect objects and Open stream file pickers | new | none | No case. The tests set the picker's `selectedFile` and accept it, so a name filter is not exercised. |
-| AC-4 page settings → ac4-encode tokens and iclforge::ac4::EncoderConfig; presentation labels | new | logic | iclforge-tests [gui]: tests/gui/test_ac4_encode_settings.cpp (Qt-free) |
+| AC-4 page settings → ac4-encode tokens and iclforge::ac4::EncoderConfig; presentation labels | new | logic | iclforge-tests [gui]: apps/forge/gui/tests/test_ac4_encode_settings.cpp (Qt-free) |
 
 ## AC-4 objects
 
@@ -180,7 +180,7 @@ objects `forge atmos-encode … codec=ac4` writes, so **Before** reads "new".
 | The echoed `forge atmos-encode … codec=ac4` line, run through forge, writes the page's bytes (raw A-JOC; MP4 direct-coded of two sources with an assignment, an offset, a trim, a fold, a speaker and an LFE) | new | UI | E2eAc4Objects::test_rawStreamOfOneSource…, test_mp4OfSeveralSources… (qml_test_main.cpp's cliRunner) |
 | The object page reads the page's AC-4 objects: their count, movement and gain | new | UI | E2eAc4Objects::test_rawStreamOfOneSource…, test_mp4OfSeveralSources… |
 | An ADM master's scene (two bed channels, one object that jumps) authored on the page decodes with its objects within 0.06 per axis and 2 dB | new | logic | E2eAc4Objects::test_anAdmMasterAuthoredOnThePageDecodesWithItsObjectsInTolerance (controller-level; the page reads audio, not ADM) |
-| Object slots, pinned places, flat planes, object planes, the encode; AC-4 object settings → tokens and parameters | new | logic | iclforge-tests [gui]: tests/gui/test_ac4_objects_core.cpp, test_ac4_encode_settings.cpp (Qt-free); [cli][atmos][ac4]: tests/cli/test_cli_atmos_encode_ac4.cpp |
+| Object slots, pinned places, flat planes, object planes, the encode; AC-4 object settings → tokens and parameters | new | logic | iclforge-tests [gui]: apps/shared/media/tests/test_ac4_objects_core.cpp, test_ac4_encode_settings.cpp (Qt-free); [cli][atmos][ac4]: apps/forge/cli/tests/test_cli_atmos_encode_ac4.cpp |
 
 ## Stream player (decode)
 
@@ -240,8 +240,8 @@ objects `forge atmos-encode … codec=ac4` writes, so **Before** reads "new".
 | Start/Stop session gating, safety copy, OSC toggle, receiver combo | UI/logic (hardware) | UI/logic (hardware) | LiveSession::* (checkboxes clicked; no session actually started) |
 | Running a live session, recording, reconnect banner, layout switch mid-session, live objects | none (hardware) | none (hardware) | Needs a real capture device. The no-op paths are covered in LiveSession/LiveMultiDevice. |
 | A live session or the rail's Monitor with AC-4 as the codec is refused with a status line | new | none | No case. `startLiveSession` refuses before it looks at the capture device, so no device is needed to reach it. |
-| The take a live session or Record… writes: raw stream, MPEG-TS, IEC 61937 WAV, Matroska, fragmented-MP4 folder, and each one's reporting of a bad destination, a full disk and an empty take | logic | logic | iclforge-tests [gui]: tests/gui/test_recording_sink.cpp (19 cases, Qt-free; `RecordingSink` is shared with the CLI's `record`) |
-| The same take with AC-4 frames: raw, MPEG-TS, IEC 61937-14 bursts, fragments at I-frames; Matroska refused | new | logic | iclforge-tests [gui]: tests/gui/test_recording_sink.cpp (4 cases) |
+| The take a live session or Record… writes: raw stream, MPEG-TS, IEC 61937 WAV, Matroska, fragmented-MP4 folder, and each one's reporting of a bad destination, a full disk and an empty take | logic | logic | iclforge-tests [gui]: apps/shared/media/tests/test_recording_sink.cpp (19 cases, Qt-free; `RecordingSink` is shared with the CLI's `record`) |
+| The same take with AC-4 frames: raw, MPEG-TS, IEC 61937-14 bursts, fragments at I-frames; Matroska refused | new | logic | iclforge-tests [gui]: apps/shared/media/tests/test_recording_sink.cpp (4 cases) |
 | Receiver passthrough (Play to receiver) | none (hardware) | none (hardware) | Needs an S/PDIF/HDMI endpoint |
 
 ## Guided wizard
@@ -264,7 +264,7 @@ objects `forge atmos-encode … codec=ac4` writes, so **Before** reads "new".
 | Language manager (available, persist, RTL) | logic | logic | LanguageManager::* |
 | Pseudo-locale pipeline | logic | logic | LocalisationPipeline::* |
 | Save diagnostics… → file written, message shown | logic | UI | E2eSettings::test_preferencesSaveDiagnosticsWritesTheSupportFile |
-| Diagnostics report content | logic | logic | Diagnostics::*; iclforge-tests [gui]: tests/gui/test_gui_diagnostics.cpp (5 cases, Qt-free: the message ring, notes, the named facts, no signing value, the scrub) |
+| Diagnostics report content | logic | logic | Diagnostics::*; iclforge-tests [gui]: apps/forge/gui/tests/test_gui_diagnostics.cpp (5 cases, Qt-free: the message ring, notes, the named facts, no signing value, the scrub) |
 | Output folder chooser / Reset | none | none | FolderDialog. Same seam would work, but no case. |
 | Meters show (mode), monitor button, clip latch | UI/logic | UI/logic | ClipLatch::test_clipLatchStaysLitUntilClickedOrANewTransportStarts (UI); meter mode: none |
 | About dialog shows version, closes | none | UI | E2eSettings::test_aboutDialogShowsTheBuildsVersionAndCloses |
@@ -285,7 +285,7 @@ objects `forge atmos-encode … codec=ac4` writes, so **Before** reads "new".
 reads "new" arrived after the tst_e2e_* suites, so **Before** counts only the
 115 rows that existed then.
 
-C++ line coverage of `apps/gui/*.cpp|hpp` as it stood on 2026-09-24 (commit
+C++ line coverage of `apps/forge/gui/*.cpp|hpp` as it stood on 2026-09-24 (commit
 `8ee7eb7f2`), from the QML suites plus the C++ unit tests that also compile
 `gui_diagnostics.cpp`. It was measured with `/opt/gui-cov.sh`, a script kept
 outside this repository. Before that change `forge_gui_qmltests` was not

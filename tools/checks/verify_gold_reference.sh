@@ -29,7 +29,7 @@ COMPARE="$REPO_ROOT/tools/checks/compare_wav.py"
 
 # Pin drc_scale to 0 on both sides so a dynamic-range-compression default
 # mismatch between FFmpeg and forge's own decoder (which also defaults
-# drc_scale to 0 - see apps/cli/support.hpp's Options, and the drc_scale row
+# drc_scale to 0 - see apps/forge/cli/src/support.hpp's Options, and the drc_scale row
 # of docs/library/decoding.md for why) can never masquerade as a fidelity
 # loss.
 #

@@ -7,7 +7,7 @@
 #include "queue.hpp"
 #include "transport.hpp"
 
-// iclforge::hearth::Transport (apps/hearth/engine/transport.cpp): play, pause,
+// iclforge::hearth::Transport (apps/hearth/engine/src/transport.cpp): play, pause,
 // stop, next, previous, seek, and what the engine has to do about each.
 //
 // Tagged [transport-state] rather than [transport]: libs/sendspin/tests/ uses

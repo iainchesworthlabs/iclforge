@@ -14,7 +14,7 @@
 // decode to.
 //
 // The same arithmetic the test sink's burst output uses on a computer
-// (apps/hearth/testsink/burst_output.cpp), for the same reasons, so that a
+// (apps/hearth/testsink/src/burst_output.cpp), for the same reasons, so that a
 // board and a test sink place a stream's channels alike.
 
 namespace iclforge {

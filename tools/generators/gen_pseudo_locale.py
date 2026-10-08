@@ -27,16 +27,16 @@ translation would leave them alone too.
 
 Run after regenerating the real catalog (regenerating this fixture is a
 separate, explicit step - see docs/forge/gui/localisation.md - not part of the
-default build, since apps/gui/translations/forge_gui_xx.ts is committed, static
+default build, since apps/forge/gui/assets/translations/forge_gui_xx.ts is committed, static
 input to forge_gui_qmltests):
 
     cmake --build <preset> --target forge-gui_lupdate
     python tools/generators/gen_pseudo_locale.py
 
-It reads apps/gui/translations/forge_gui_fr.ts purely as a source of TRUTH for
+It reads apps/forge/gui/assets/translations/forge_gui_fr.ts purely as a source of TRUTH for
 which messages currently exist (any one of the six real .ts files would do -
 lupdate scans the identical QML sources for all of them) and writes
-apps/gui/translations/forge_gui_xx.ts from scratch with the same message set.
+apps/forge/gui/assets/translations/forge_gui_xx.ts from scratch with the same message set.
 Deterministic: same input always produces the same output byte for byte.
 """
 

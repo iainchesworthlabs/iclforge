@@ -36,7 +36,7 @@
 
 namespace iclforge::crucible {
 
-// The Windows silent device's name: the device description of the driver in apps/windows/driver
+// The Windows silent device's name: the device description of the driver in apps/crucible/windows/driver
 // (IclForgeNullSink.inx, `DeviceDesc`), which Windows shows as "Speakers (<name>)". The engine's
 // and the output stage's default filter and the Windows VirtualDevice all read this one constant.
 // The INF's strings, the guest scripts and the Crucible tests carry the same words, and

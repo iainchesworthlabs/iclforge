@@ -4,10 +4,10 @@
 
 #include "network_view.hpp"
 
-// iclforge::hearth::to_row()/to_detail() (apps/hearth/engine/network_view.cpp): what
+// iclforge::hearth::to_row()/to_detail() (apps/hearth/engine/src/network_view.cpp): what
 // the Network page's list row and "THIS SINK" panel show, built from
 // hand-written SinkFacts. Nothing here opens a socket - see
-// tests/hearth/test_network_sinks.cpp for NetworkSinks itself, the way
+// apps/hearth/engine/tests/test_network_sinks.cpp for NetworkSinks itself, the way
 // test_output_decision.cpp and player.cpp/device_sink.cpp split the same way.
 //
 // Reason and label text is checked for the substance a person needs, not word

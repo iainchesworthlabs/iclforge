@@ -28,7 +28,7 @@ TestCase {
         for (const code of ["fr", "de", "es", "ar", "he", "yi"]) {
             verify(codes.indexOf(code) >= 0, code + " missing from availableLanguages()");
         }
-        // The pseudo-locale QA fixture (apps/gui/translations/forge_gui_xx.ts)
+        // The pseudo-locale QA fixture (apps/forge/gui/assets/translations/forge_gui_xx.ts)
         // is reachable only through the ICLFORGE_GUI_LOCALE environment override -
         // never a real, user-selectable entry.
         verify(codes.indexOf("xx") < 0);

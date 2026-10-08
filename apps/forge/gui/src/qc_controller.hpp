@@ -25,7 +25,7 @@
 // One instance per programme measured - one for every layout except 1+1 dual
 // mono, which is two (Ch1, Ch2): §E1.3 makes them unrelated, unmixed
 // programmes sharing one syncframe rather than a single soundfield BS.1770
-// could measure as one, the same reason apps/cli/main.cpp's own
+// could measure as one, the same reason apps/forge/cli/src/main.cpp's own
 // QcProgrammeResult exists in this same shape. Every field carries its own
 // default member initializer for the same -Wmissing-field-initializers
 // reason that type's own header comment gives - every construction here is a
@@ -78,7 +78,7 @@ struct RawResult {
 // alongside it - see encoder_controller.hpp's own header comment on why
 // nothing here should disagree with what forge would say, which is exactly
 // the property a bolted-on second concern risks breaking first. QcController
-// mirrors `forge qc` (apps/cli/main.cpp's run_qc/measure_qc_ac3/
+// mirrors `forge qc` (apps/forge/cli/src/main.cpp's run_qc/measure_qc_ac3/
 // measure_qc_eac3) instead: reads a file, decodes it with the same
 // iclforge::ac3::FrameDecoder/iclforge::ac3::Eac3Decoder EncoderController's own monitor path
 // already uses, measures it with iclforge::ac3::meta::LoudnessMeter (the same meter

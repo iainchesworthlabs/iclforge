@@ -1121,7 +1121,7 @@ source has a network seam of its own — [`main/network.hpp`](main/network.hpp),
 `sdkconfig.ci-http` selects the latter with the stream served from the host:
 
 ```bash
-python3 -m http.server 8000 --bind 0.0.0.0 --directory apps/wasm/assets &
+python3 -m http.server 8000 --bind 0.0.0.0 --directory apps/demos/wasm/assets &
 SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.ci-http" idf.py build
 idf.py qemu
 ```

@@ -29,7 +29,7 @@
 // command line a page echoes through the forge this build made, in a folder
 // of the test's choosing, and comparing what it wrote with what the page
 // wrote. ICLFORGE_GUI_TEST_CLI is the build's own forge, or empty where the
-// build has none (apps/gui/tests/CMakeLists.txt); then available() is false
+// build has none (apps/forge/gui/tests/CMakeLists.txt); then available() is false
 // and a suite skips.
 class CliRunner : public QObject {
     Q_OBJECT
@@ -128,7 +128,7 @@ public slots:
         // Qt Quick Controls resolves to the platform's native style, whose
         // native-theme queries are the documented cause of a real,
         // reproducible hang under the offscreen QPA platform (see
-        // apps/gui/qml/Main.qml's "native Button inside a Repeater fed real
+        // apps/forge/gui/assets/qml/Main.qml's "native Button inside a Repeater fed real
         // data" comment for the first occurrence, on Windows). That
         // occurrence was worked around locally in QML; a second one surfaced
         // here on macOS - not in the Repeater that fix already covers, but

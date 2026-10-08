@@ -1,5 +1,5 @@
 // The reusable push-frame primitive (roadmap UX5): a thin, typed wrapper
-// over the Embind PushDecoder class apps/wasm/decoder_bindings.cpp builds,
+// over the Embind PushDecoder class apps/demos/wasm/decoder_bindings.cpp builds,
 // which itself decodes through iclforge::ac3::Eac3Decoder::decode_access_unit_into -
 // the caller-buffer form, so the hot path allocates nothing on the C++ side.
 // Every other piece of this package (the whole-file convenience helper in

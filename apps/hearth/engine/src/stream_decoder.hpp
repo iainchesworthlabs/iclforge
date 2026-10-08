@@ -29,7 +29,7 @@
 // One AC-3 syncframe or one E-AC-3 access unit at a time, decoded and placed
 // onto the output layout a 256-frame block at a time, with nothing copied
 // that the decoders' block form does not already hand over. The shape is the
-// one apps/hearth/testsink/burst_output.cpp settled on for the same job, and
+// one apps/hearth/testsink/src/burst_output.cpp settled on for the same job, and
 // for the same reasons:
 //
 //   * A unit that is exactly one AC-3 syncframe goes to the AC-3 decoder, and

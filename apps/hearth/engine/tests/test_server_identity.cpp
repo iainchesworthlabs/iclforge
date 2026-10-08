@@ -9,7 +9,7 @@
 #include "settings_model.hpp"
 
 // This computer's Sendspin server identity, kept in the settings
-// (apps/hearth/engine/server_identity.hpp): made once, then the same on every
+// (apps/hearth/engine/src/server_identity.hpp): made once, then the same on every
 // start, so a sink's pairing record - bound to the identity that made it - still
 // matches after a restart.
 

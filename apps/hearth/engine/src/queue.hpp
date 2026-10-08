@@ -44,7 +44,7 @@ struct ItemFacts {
     std::optional<double> bitrate_kbps = std::nullopt;
     // From the access-unit count and the samples each one carries - NOT a
     // fixed 1536, which is wrong for an E-AC-3 frame with fewer than six
-    // blocks (the plan's own note on apps/gui/stream_player_controller.cpp).
+    // blocks (the plan's own note on apps/forge/gui/src/stream_player_controller.cpp).
     std::optional<std::chrono::milliseconds> duration = std::nullopt;
     // Set when the item was recognised but cannot be played here: an AC-4
     // stream with no presentation this build decodes, say. It stays in the

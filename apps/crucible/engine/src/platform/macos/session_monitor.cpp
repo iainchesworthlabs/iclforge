@@ -32,7 +32,7 @@
 // at what it contained, whether the names are right, whether a paused player
 // lingers, or whether the bundle grouping below puts a browser helper where
 // this file says it will. The seam tests still link the stub
-// (tests/crucible/platform_services_stub.cpp). So the sentences a person sees
+// (apps/crucible/engine/tests/platform_services_stub.cpp). So the sentences a person sees
 // are still written to be true of the API rather than of anything observed.
 //
 // The mechanism. macOS 14.0 added an object class to the HAL for a process:
@@ -135,7 +135,7 @@
 //     NSAudioCaptureUsageDescription, and this application's bundle declares
 //     none: apps/crucible/CMakeLists.txt's APPLE arm sets MACOSX_BUNDLE and
 //     the .icns and takes CMake's default Info.plist template, which has no
-//     such key. apps/gui/Info.plist.in is the precedent for supplying one.
+//     such key. apps/forge/gui/packaging/macos/Info.plist.in is the precedent for supplying one.
 //   - The channel count. A CATapDescription's mixdown descriptions are mono
 //     and stereo, so the backend refuses anything else with
 //     kFormatUnsupported. TapPool opens at stereo and widens only to follow a

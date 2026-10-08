@@ -5,7 +5,7 @@
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "crc_mutator.hpp"
 
-// Mirrors forge's own 'decode' path (apps/cli/main.cpp: run_decode): split the
+// Mirrors forge's own 'decode' path (apps/forge/cli/src/main.cpp: run_decode): split the
 // raw stream into syncframes, then decode each one with a single FrameDecoder
 // so overlap-add state carries across frames exactly as it does for a real
 // caller. A malformed differential exponent chain walking the reconstruction

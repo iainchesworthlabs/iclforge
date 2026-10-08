@@ -54,7 +54,7 @@ function setStatus(text, isError) {
 async function loadModules() {
     // createIclForgeEncodeModule / createIclForgeModule are the global
     // factory functions MODULARIZE+EXPORT_NAME produce for each module (see
-    // apps/wasm/CMakeLists.txt's link options) - distinct names so both can
+    // apps/demos/wasm/CMakeLists.txt's link options) - distinct names so both can
     // load on this one page without colliding.
     encodeModule = await createIclForgeEncodeModule();
     decodeModule = await createIclForgeModule();

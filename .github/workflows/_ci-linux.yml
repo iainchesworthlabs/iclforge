@@ -154,7 +154,7 @@ jobs:
       # all resolve fine, so the REQUIRED call as a whole reports success);
       # it instead leaves qt_add_translations undefined, surfacing much
       # later as "Unknown CMake command" at the call site in
-      # apps/gui/CMakeLists.txt - a confusing error to trace back to a
+      # apps/forge/gui/CMakeLists.txt - a confusing error to trace back to a
       # missing apt package, which is why this comment spells it out.
       #
       # The qml6-module-* lines are the RUNTIME modules forge-gui's own imports
@@ -559,7 +559,7 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
           MATRIX_PRESET: ${{ matrix.preset }}
-        # apps/gui/CMakeLists.txt sets MACOSX_BUNDLE ON unconditionally, but it
+        # apps/forge/gui/CMakeLists.txt sets MACOSX_BUNDLE ON unconditionally, but it
         # is a no-op everywhere except APPLE, where it moves the built
         # executable to bin/forge-gui.app/Contents/MacOS/forge-gui instead of plain
         # bin/forge-gui - the property Linux never sets and Windows doesn't need
@@ -568,7 +568,7 @@ jobs:
         #
         # QSG_RENDER_LOOP=basic and the perl-alarm wrapper are both macOS-only
         # and both about the same hang the "Test" step hit on this leg's
-        # first-ever GUI run (see apps/gui/tests/CMakeLists.txt's identical
+        # first-ever GUI run (see apps/forge/gui/tests/CMakeLists.txt's identical
         # QSG_RENDER_LOOP comment for the render-loop-deadlock hypothesis).
         # forge-gui --smoke drives the same QQmlApplicationEngine/QQuickWindow
         # path forge_gui_qmltests does, so it is at equal risk and had no bound
@@ -595,7 +595,7 @@ jobs:
 
       # GUI localisation's own literal ask: "newly added strings cannot silently
       # fall out of the catalogue". Re-runs lupdate (the forge-gui_lupdate
-      # target qt_add_translations() creates - apps/gui/CMakeLists.txt)
+      # target qt_add_translations() creates - apps/forge/gui/CMakeLists.txt)
       # against the same QML/C++ sources it scans at release time, then
       # fails if that changed any of the six real .ts files - a qsTr()
       # string added or edited without re-running lupdate would otherwise
@@ -608,7 +608,7 @@ jobs:
       # "zero unfinished" bar would now pass - every forge-gui catalogue was
       # filled on 2026-09-06 and carries no unfinished entry - but it belongs
       # in the test suite rather than here, where Crucible's equivalent
-      # already lives: tests/crucible/test_translations.cpp now asserts it
+      # already lives: apps/crucible/ui/tests/test_translations.cpp now asserts it
       # over this application's seven catalogues as well as Crucible's six,
       # runs on every platform, and names the entry that failed. A second
       # copy in a workflow step would gate the same thing on one leg and
@@ -626,7 +626,7 @@ jobs:
           git rev-parse --show-toplevel || echo "rev-parse failed"
           echo "::endgroup::"
           cd "${GITHUB_WORKSPACE}"
-          git diff --exit-code -- apps/gui/translations
+          git diff --exit-code -- apps/forge/gui/assets/translations
         env:
           MATRIX_PRESET: ${{ matrix.preset }}
 
@@ -764,7 +764,7 @@ jobs:
       #
       # Running the `crucible` ctest label here would look like more coverage
       # and be none. Those cases drive the engine over the fakes and link
-      # tests/crucible/platform_services_stub.cpp, not the Linux platform half
+      # apps/crucible/engine/tests/platform_services_stub.cpp, not the Linux platform half
       # this leg exists to build, and every other Linux leg already runs them.
       # (Worse, an earlier version of this step ran that label without
       # building iclforge-tests. catch_discover_tests registers cases at build time,
@@ -1163,7 +1163,7 @@ jobs:
 
       # The counterpart to the two Windows asserts above, for the files that
       # had no assertion at all: forge's generated man page and its four
-      # shell completions (apps/cli/CMakeLists.txt, CLI shell completions). Those are
+      # shell completions (apps/forge/cli/CMakeLists.txt, CLI shell completions). Those are
       # produced by running the freshly built forge, so a cross build skips
       # them - and until #527 that test was CMAKE_CROSSCOMPILING, which is
       # TRUE on every native Linux and macOS build here (each

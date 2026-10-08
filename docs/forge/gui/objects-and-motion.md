@@ -245,7 +245,7 @@ it writes the same bytes the page writes. The Qt Quick Tests hold a raw stream, 
 run of two sources with an assignment, an offset, a trim, a fold, a speaker and an LFE to that.
 The page and the command share which channels become which objects and where a pinned channel
 sits, the audio each object carries, the metadata updates and the call into the writer
-(`apps/common/ac4_objects_core.hpp`).
+(`apps/shared/media/src/ac4_objects_core.hpp`).
 
 **What it leaves out.** A live session encodes AC-3 or E-AC-3 only, so a live session is refused
 under AC-4, and Guided's Movement step writes E-AC-3 objects. **Preview** plays the objects

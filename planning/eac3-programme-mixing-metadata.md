@@ -45,7 +45,7 @@
 | Data model | Complete | `ac3::meta::MixMetadata`/`MixingParameters`/`ExternalScales`/`SpeechEnhancement`/`PanInfo` (`libs/ac3/include/iclforge/ac3/meta/mixing.hpp:254-320`) model every field Table E1.2 defines. |
 | Encoder | Complete; one bug found and fixed during Phase 2 | `eac3_frame.cpp:1267-1600` writes every field/variant, including the `strmtyp` gate (`!dependent`, i.e. `kIndependent` **or** `kConvertible` — deliberately, not `kDependent` alone; see below). Writing the Phase 2 `blkmixcfginfo`×`numblkscod==0x0` test (below) surfaced one: the encoder always wrote `blkmixcfginfo`'s six-block wire form regardless of `numblkscod`, while the decoder (and the independent Python reference parser, `tools/references/eac3_parse.py`) already correctly implemented §E2.3.1.60's one-block special case — so the two went out of sync whenever a caller combined `numblkscod=0` with `blkmixcfginfo`, and the encoder's own stream failed its own decoder. Fixed in the same phase; see the Phase 2 write-up. |
 | Decoder | Complete, correct | `eac3_decoder.cpp:128-286` (`read_mixing_parameters`/`read_mixing_metadata`) reads the full group symmetrically, including `mixdef==3`'s length-prefixed skip-forward for sub-fields this build doesn't otherwise need. |
-| CLI authoring (primary programme) | Complete, under-documented | `apps/cli/support.cpp:1136-1267` implements `pgmscl=`/`pgmscl2=`/`extpgmscl=`/`mixdef=`/`premixcmp=`/`mixdata=`/`extmix=`/`auxmix=`/`speechmix=`/`paninfo=`/`paninfo2=`/`blkmixcfg=` in full, documented in `docs/forge/cli/metadata-options.md:68-85,210-235` — but absent from `ac3cli --help` (`apps/cli/usage.cpp`). |
+| CLI authoring (primary programme) | Complete, under-documented | `apps/forge/cli/src/support.cpp:1136-1267` implements `pgmscl=`/`pgmscl2=`/`extpgmscl=`/`mixdef=`/`premixcmp=`/`mixdata=`/`extmix=`/`auxmix=`/`speechmix=`/`paninfo=`/`paninfo2=`/`blkmixcfg=` in full, documented in `docs/forge/cli/metadata-options.md:68-85,210-235` — but absent from `ac3cli --help` (`apps/forge/cli/src/usage.cpp`). |
 | Round-trip tests | Real, but incomplete | `libs/ac3/tests/meta/test_bsi.cpp`'s "DC4" section (lines 435-767) round-trips most of the struct through real encode→decode. Specific gaps below. |
 | Docs (C++ API) | Accurate | `docs/library/metadata.md:116-160` describes the full struct correctly, with a working example. |
 
@@ -68,16 +68,16 @@ strikethrough says.*
 
 | Gap | Where | Detail |
 |---|---|---|
-| CLI decode reporting stops early | `apps/cli/commands/decode.cpp:263-291` (`print_mix_summary`) | Prints `pgmscl`/`extpgmscl` in full, `mixdef` as a bare number with coarse sub-field presence only, `pan.panmean` only. Never prints `pgmscl2`, `pan2`, `pan.paninfo`, any `mixdef` variant's actual values, or `blkmixcfginfo`'s six words. |
+| CLI decode reporting stops early | `apps/forge/cli/src/commands/decode.cpp:263-291` (`print_mix_summary`) | Prints `pgmscl`/`extpgmscl` in full, `mixdef` as a bare number with coarse sub-field presence only, `pan.panmean` only. Never prints `pgmscl2`, `pan2`, `pan.paninfo`, any `mixdef` variant's actual values, or `blkmixcfginfo`'s six words. |
 | CLI docs overstate this | `docs/forge/cli/metadata-options.md:233-235` | Claims decode prints "any... programme-mixing field the stream actually carries" — false against the code above. |
-| Hearth JSON stops earlier | `apps/hearth/engine/media_info.cpp:355-394` (`write_mix`) | Reports `dmixmod`, the four fold levels, `lfemixlevcod`, `pgmscl`/`pgmscl2`/`extpgmscl`. `mixdef`, `pan`/`pan2`, `blkmixcfginfo` are absent entirely. |
+| Hearth JSON stops earlier | `apps/hearth/engine/src/media_info.cpp:355-394` (`write_mix`) | Reports `dmixmod`, the four fold levels, `lfemixlevcod`, `pgmscl`/`pgmscl2`/`extpgmscl`. `mixdef`, `pan`/`pan2`, `blkmixcfginfo` are absent entirely. |
 | `ac3cli probe` structurally cannot report most of it | `ac3/io/probe.hpp:153-229`, `ac3/io/elementary.hpp:163-198` | `ProbeReport`/`FrameHeader` carry exactly one mixing field, `dmixmod`. This is a missing-struct-member gap, not a missing-print-statement gap. |
-| GUI exposes 3 of ~30 fields | `apps/gui/encoder_controller.hpp:380-384`, `qml/Main.qml:4112-4167` | `mixmeta` toggle, `dmixIndex`, `lfeMix`. Zero references anywhere in `apps/gui/` to `mixdepth`/`pgmscl`/`mixdef`/`paninfo`/`blkmixcfg`. |
+| GUI exposes 3 of ~30 fields | `apps/forge/gui/src/encoder_controller.hpp:380-384`, `qml/Main.qml:4112-4167` | `mixmeta` toggle, `dmixIndex`, `lfeMix`. Zero references anywhere in `apps/forge/gui/` to `mixdepth`/`pgmscl`/`mixdef`/`paninfo`/`blkmixcfg`. |
 | C API: no surface at all | `libs/capi/include/iclforge_c/iclforge.h:427-437` | Self-documented: *"Not mirrored here: the `mixmdate`/`infomdat` metadata groups... see docs/library/c-api.md's 'What is deliberately out of scope'."* Confirmed in `docs/library/c-api.md:312-324`. |
 | Python bindings: no surface at all | `python/src/iclforge_ext/bindings.cpp:1487-1490` | Self-documented as *"a real gap, not a stable design decision."* |
 | Test coverage holes | `libs/ac3/tests/meta/test_bsi.cpp` | `mixdef==kNone` has no dedicated round-trip assertion; the `addche` auxiliary pair is tested only as one-set-one-absent, never both-set or fully cleared; `SpeechEnhancement`'s two shallower legal nesting states are untested (only the fully-nested case is); `blkmixcfginfo` is never tested under `numblkscod==0x0` (§E2.3.1.60's one-block-inferred case — no test sets `numblkscod` at all); `valid_mix_metadata()` is exercised for exactly one branch (`dmixmod` reserved). `libs/ac3/tests/meta/test_mixing.cpp` tests none of this despite its name — it covers only §7.8 downmix math. `libs/ac3/tests/encoder/test_eac3.cpp`/`test_plan.cpp` have zero references to any of this. |
 | Nothing *uses* the decoded values | `libs/ac3/src/decoder/output.cpp:566-583` (`mix_levels`) | Reads only the 4 fold levels + `dmixmod` + `lfemixlevcod`. `pgmscl`/`pgmscl2`/`extpgmscl`, all of `mixdef`, `pan`/`pan2`, `blkmixcfginfo` have zero effect on decoded audio anywhere in the codebase (confirmed also in `stream_tools.cpp`'s transcode path and `metadata_edit.cpp`, both of which explicitly skip these fields by design). |
-~~`programme2=` can't set its own mixing metadata~~ | ~~`apps/cli/commands/encode.cpp:197-200`~~ | **Resolved outside this plan, 2026-09-22.** Was self-documented: *"a second programme's DRC profile, mix metadata and downmix levels are its own, and this first cut does not offer a way to say what they are."* "EAC3 multi-program authoring implementation" generalized this to `programmeN=`/`programmeN-<field>=` for N=2..8 with full per-programme metadata parity (incl. `dialnorm=auto` measurement), verified live via an 8-programme CLI round-trip. Kept here as a resolved record, not a current gap. |
+~~`programme2=` can't set its own mixing metadata~~ | ~~`apps/forge/cli/src/commands/encode.cpp:197-200`~~ | **Resolved outside this plan, 2026-09-22.** Was self-documented: *"a second programme's DRC profile, mix metadata and downmix levels are its own, and this first cut does not offer a way to say what they are."* "EAC3 multi-program authoring implementation" generalized this to `programmeN=`/`programmeN-<field>=` for N=2..8 with full per-programme metadata parity (incl. `dialnorm=auto` measurement), verified live via an 8-programme CLI round-trip. Kept here as a resolved record, not a current gap. |
 
 ## Phases
 
@@ -87,9 +87,9 @@ Each phase is its own branch off a freshly-fetched `main` and its own PR.
 
 ### Phase 1 — Reporting completeness
 
-**Status: built** (#797). `print_mix_summary()` in `apps/cli/commands/decode.cpp` prints `pgmscl2`, `pan2` and
+**Status: built** (#797). `print_mix_summary()` in `apps/forge/cli/src/commands/decode.cpp` prints `pgmscl2`, `pan2` and
 `paninfo`, every `mixdef` variant's values, the speech-enhancement tree and `blkmixcfginfo`'s words, and
-`write_mix()` in `apps/hearth/engine/media_info.cpp` writes the same as JSON. The claim in
+`write_mix()` in `apps/hearth/engine/src/media_info.cpp` writes the same as JSON. The claim in
 `docs/forge/cli/metadata-options.md` that `decode` prints any programme-mixing field the stream carries is now true.
 
 Make every already-decoded field visible somewhere. No new struct fields needed except in probe

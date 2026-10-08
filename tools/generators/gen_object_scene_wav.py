@@ -177,7 +177,7 @@ def make_objects() -> list[list[float]]:
 
 
 # "object time_s x y z gain lfe_send" rows, in atmos-path's own format (see
-# parse_path_file in apps/cli/commands/atmos.cpp). x/y/z are room coordinates
+# parse_path_file in apps/forge/cli/src/commands/atmos.cpp). x/y/z are room coordinates
 # in [0,1]: x runs left(0) to right(1), y front(0) to back(1), z floor(0) to
 # ceiling(1). Every gain is 1.0 on purpose - see the module docstring.
 PLACEMENTS: list[tuple[int, list[tuple[float, float, float, float]]]] = [

@@ -50,7 +50,7 @@ driver folder that would mean nothing there.
 
 **On macOS** there is nothing here to install: process taps mute each application where they
 capture it, so there's no default output to move either. The macOS seam answers that a silent
-device isn't needed (`apps/crucible/engine/platform/macos/virtual_device.cpp`), and the whole card
+device isn't needed (`apps/crucible/engine/src/platform/macos/virtual_device.cpp`), and the whole card
 is hidden wherever a platform answers that way. Crucible's macOS half compiles and its test suites
 run in CI, but nothing has launched on a Mac ([Install](install.md#macos)).
 
@@ -60,7 +60,7 @@ A disclosure under the card, closed by default, holding what a source build and 
 need.
 
 - **Driver folder** — where `install.ps1`, `remove.ps1` and a source-built driver package live.
-  The scripts are beside the application by default; a source tree uses `apps/windows/driver`.
+  The scripts are beside the application by default; a source tree uses `apps/crucible/windows/driver`.
   Windows only; on Linux the row is not shown.
 - **Remove driver** / **Remove device** — undoes what the button above installed or created. On
   Linux this removes the application's own node, which also goes when the application does. It
@@ -166,7 +166,7 @@ The tray's menu is flat on every platform: the signal path appears there as a he
 seven choices (Headphones only where an OS renderer exists) rather than a submenu. A `Menu` nested
 inside a tray icon's menu hit a Qt bug on Linux (handed the QWidget fallback, then read as a D-Bus
 menu) that crashed the window on nine or ten launches out of ten, and a flat menu cannot reach it
-(`apps/crucible/ui/platform/linux/tray_support.cpp`).
+(`apps/crucible/ui/src/platform/linux/tray_support.cpp`).
 
 **Show applications with no audio.** On by default. Running applications with a window but no
 audio session, greyed until they play. Off hides them unless they are placed. This is a Windows

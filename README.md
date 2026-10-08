@@ -71,10 +71,10 @@ adds the sanitizers, coverage, the ABI gate and the FFmpeg validation. `Branch N
 [Verified configuration](docs/building.md#verified-configuration); what has run on real hardware
 is in [Where it runs](#where-it-runs).
 
-**Also in the tree:** **Shield Atmos Demo** (`apps/android/`) streams live, controller-driven
+**Also in the tree:** **Shield Atmos Demo** (`apps/demos/android/`) streams live, controller-driven
 Atmos object motion out an NVIDIA Shield's HDMI passthrough to a real AV receiver, sideload-only
 — see [docs/platforms/android.md](docs/platforms/android.md) — and the **browser demos**
-(`apps/wasm/`) decode and encode AC-3 and E-AC-3 in a page over the library compiled to
+(`apps/demos/wasm/`) decode and encode AC-3 and E-AC-3 in a page over the library compiled to
 WebAssembly; the AC-4 module beside them has no demo page. Both demonstrate the library rather
 than being products of their own.
 
@@ -276,12 +276,12 @@ apps/baremetal/ iclforge-probe — the minimum-footprint probes (AC-3 and E-AC-3
                 natively on the host
 
 # Forge — the CLI and the GUI, built and packaged as one thing
-apps/cli/       forge — command-line front end
-apps/gui/       forge-gui — Qt Quick front end (QML module "ForgeGui")
-apps/common/    the recording sink, fMP4 folder writer, container input and AC-4 encode and object
+apps/forge/cli/src/       forge — command-line front end
+apps/forge/gui/       forge-gui — Qt Quick front end (QML module "ForgeGui")
+apps/shared/media/src/    the recording sink, fMP4 folder writer, container input and AC-4 encode and object
                 steps the CLI and GUI compile in directly, and Hearth's engine in part; no
                 library target of its own
-apps/notices/   the NOTICES.txt and LICENSE.txt that Forge's packages install
+notices/   the NOTICES.txt and LICENSE.txt that Forge's packages install
 
 # Crucible — the desktop application and its Windows driver
 apps/crucible/  Crucible: the engine, the crucible-run runner, the crucible
@@ -289,9 +289,9 @@ apps/crucible/  Crucible: the engine, the crucible-run runner, the crucible
                 with. Windows and Linux run it; the macOS platform half beside them, under
                 engine/platform/macos and ui/platform/macos, compiles and is exercised by the
                 CI suites; the application itself has never been launched on a Mac
-apps/windows/   the Windows-only pieces of Crucible: the IclForgeNullSink driver (MS-PL,
+apps/crucible/windows/   the Windows-only pieces of Crucible: the IclForgeNullSink driver (MS-PL,
                 separately licensed) and the VMware guest it is verified in
-apps/linux/     the Linux-only tooling of Crucible: a scripted VM guest built to find the tray
+apps/crucible/linux/     the Linux-only tooling of Crucible: a scripted VM guest built to find the tray
                 crash; not built or packaged
 
 # Hearth — desktop player and ESP32 Sendspin sinks
@@ -300,8 +300,8 @@ esp-idf/        ESP-IDF component and examples: hearth_sink (Sendspin player) an
 esphome/        ESPHome external component wrapping the ESP32-S3 decoder; not a media_player yet
 
 # beside those — demonstrations of the library, not products of their own
-apps/android/   Shield Atmos Demo — Android TV app, live Atmos object motion over HDMI
-apps/wasm/      the browser demos, decode and encode, over iclforge::ac3 compiled to WASM, and the
+apps/demos/android/   Shield Atmos Demo — Android TV app, live Atmos object motion over HDMI
+apps/demos/wasm/      the browser demos, decode and encode, over iclforge::ac3 compiled to WASM, and the
                 AC-4 module
 
 # shared, owned by none of them

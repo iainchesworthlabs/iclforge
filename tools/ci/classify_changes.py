@@ -37,7 +37,7 @@ import sys
 from collections.abc import Iterable
 
 # Directory prefixes that put a changed path in a lane. A path can land in
-# more than one lane - apps/cli/ is windows AND linux AND macos, because it
+# more than one lane - apps/forge/cli/src/ is windows AND linux AND macos, because it
 # is one desktop CLI built and tested on all three, not three separate
 # programs. Every prefix ends in "/" so a differently-named sibling directory
 # that merely starts with the same characters cannot accidentally match.
@@ -47,22 +47,22 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
         "requirements/",
     ),
     "windows": (
-        "apps/windows/", "apps/notices/platform/windows/", "packaging/winget/",
+        "apps/crucible/windows/", "notices/forge/platform/windows/", "packaging/winget/",
         "packaging/conan/", "packaging/vcpkg-port/",
-        "apps/cli/", "apps/gui/", "apps/common/", "apps/crucible/", "apps/hearth/",
+        "apps/forge/cli/src/", "apps/forge/gui/", "apps/shared/media/src/", "apps/crucible/", "apps/hearth/",
     ),
     "linux": (
-        "apps/linux/", "apps/notices/platform/linux/",
+        "apps/crucible/linux/", "notices/forge/platform/linux/",
         "packaging/conan/", "packaging/vcpkg-port/",
-        "apps/cli/", "apps/gui/", "apps/common/", "apps/crucible/", "apps/hearth/",
+        "apps/forge/cli/src/", "apps/forge/gui/", "apps/shared/media/src/", "apps/crucible/", "apps/hearth/",
     ),
     "macos": (
-        "apps/notices/platform/macos/", "packaging/homebrew/",
+        "notices/forge/platform/macos/", "packaging/homebrew/",
         "packaging/conan/", "packaging/vcpkg-port/",
-        "apps/cli/", "apps/gui/", "apps/common/", "apps/crucible/", "apps/hearth/",
+        "apps/forge/cli/src/", "apps/forge/gui/", "apps/shared/media/src/", "apps/crucible/", "apps/hearth/",
     ),
-    "android": ("apps/android/",),
-    "wasm": ("apps/wasm/", "js/"),
+    "android": ("apps/demos/android/",),
+    "wasm": ("apps/demos/wasm/", "js/"),
     # tools/packaging/ holds only pack_esp_component.py (the ESP-IDF
     # component/ESPHome workflow's own packaging step) - see docs/ci-lanes.md.
     # libs/ac3/, libs/base/, libs/dsp/, libs/objects/, libs/render/ and cmake/ are the trees that

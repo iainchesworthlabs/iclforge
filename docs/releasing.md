@@ -749,7 +749,7 @@ Windows x64 additionally ships Crucible as its own
 `iclforge-crucible-*-win64.zip` ([the Crucible guide](crucible/index.md)): the
 `crucible` CPack component - `crucible.exe`, the `crucible-run` runner, the driver's
 install/remove scripts, a Qt runtime of its own, and `NOTICES.txt` beside `LICENSE.txt` at the
-archive root (the third-party notices, generated per platform from `apps/crucible/notices/` at
+archive root (the third-party notices, generated per platform from `notices/` at
 configure time) - packaged by the same `windows-msvc` leg as the first row, uploaded inside that
 leg's own `packages-windows-msvc` artifact and attached to the release with everything else in it.
 It is a separate download rather than part of the `runtime` component, and deliberately absent

@@ -62,7 +62,7 @@ reports differ, and a test on a board needs something to point a device at.
 
 | Streams | Where | What they carry, checked with `ac3cli probe` |
 |---|---|---|
-| The WASM page's demo | `apps/wasm/assets/demo.ec3` | E-AC-3 5.1, JOC objects in the QMF domain, 8 s. What CI's HTTP step serves. |
+| The WASM page's demo | `apps/demos/wasm/assets/demo.ec3` | E-AC-3 5.1, JOC objects in the QMF domain, 8 s. What CI's HTTP step serves. |
 | The example's own | `esp-idf/iclforge/examples/hearth_sink/stream/` | `sample.ac3` (AC-3 5.1, six frames), flashed to a partition; `height.ec3` (the probe's height fixture: five objects over a 5.1 bed, three on the ceiling, MDCT-band domain, six access units), which `sdkconfig.ci-render` plays from FAT onto 7.1.4 |
 | The fuzz seeds | `libs/ac3/fuzz/seeds/fuzz_eac3_decode/` | One-second streams from `tools/fuzz/generate-seeds.sh`: a tone per speaker at every layout the encoder names, the Annex E tool combinations at 5.1 and 7.1.4, objects, two external streams |
 | The external baseline | `tests/golden/external-baseline/` | Dolby Encoding Engine and FFmpeg streams: AC-3 and E-AC-3, stereo and 5.1, music and speech |
@@ -443,7 +443,7 @@ PSRAM-only streams, two of them since 2026-09-16 (7). The fold at 2.0 was handed
 core and changed there (8).
 
 1. **Where the set lives.** (a) **`www/` beside the example, left out of the registry archive**;
-   (b) `apps/wasm/assets/`, which CI's HTTP step already serves; (c) served from where the streams
+   (b) `apps/demos/wasm/assets/`, which CI's HTTP step already serves; (c) served from where the streams
    are now. **Recommend (a).** (b) puts some forty device fixtures in the WASM page's asset
    directory, beside the one file that page loads. (c) ties the device's checks to fuzz seeds that
    `tools/fuzz/generate-seeds.sh` rewrites and to fixtures kept for other checks. Cost: 1.2 MB of new

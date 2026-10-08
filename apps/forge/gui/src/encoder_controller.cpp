@@ -79,7 +79,7 @@ struct Ac4Outcome {
 };
 
 // `forge ac4-encode`'s steps for one input and one substream
-// (apps/cli/commands/ac4_encode.cpp): the configuration checked with loudness
+// (apps/forge/cli/src/commands/ac4_encode.cpp): the configuration checked with loudness
 // values in place, then the programme measured for dialnorm=auto and
 // loudness=, the encode, and the sync frames or MP4 file written to `path`.
 // `planes` are the WAV file's channels as read.
@@ -171,7 +171,7 @@ Ac4Outcome encode_ac4_file(const QString& path, const forge_gui::Ac4EncodeSettin
 }
 
 // `forge atmos-encode ... codec=ac4`'s steps for the objects of one or more
-// sources (apps/cli/commands/atmos.cpp): the scene the command reads written
+// sources (apps/forge/cli/src/commands/atmos.cpp): the scene the command reads written
 // beside the output, then the objects' audio and metadata through E9's writer
 // (iclforge::apps::encode_ac4_scene) and the sync frames or MP4 file written to
 // `path`. `flat` is every source's channels in flat order, offsets applied.
@@ -429,7 +429,7 @@ struct Mp4Scan {
 // built from a real iclforge::ac3::io::ScannedStream - bsid/bsmod/the Atmos marker are
 // bitstream syntax this controller does not otherwise track. So MP4 and
 // fMP4 both re-scan the frames they are about to write, the same way
-// forge's own run_mp4/run_fmp4 (apps/cli/main.cpp) re-scan an already-
+// forge's own run_mp4/run_fmp4 (apps/forge/cli/src/main.cpp) re-scan an already-
 // encoded file before wrapping it. Returns the QString writeOutput() already
 // uses for its error contract on failure.
 std::expected<Mp4Scan, QString> scan_for_mp4(const std::vector<std::vector<std::byte>>& frames) {
@@ -7207,7 +7207,7 @@ QString EncoderController::writeOutput(const QString& path,
         }
         // Dolby Digital Plus with Atmos objects needs CHANNELS="<N>/JOC"
         // instead of a plain channel count - see mp4/hls.hpp's own
-        // citations, and run_fmp4 (apps/cli/main.cpp) for the CLI's
+        // citations, and run_fmp4 (apps/forge/cli/src/main.cpp) for the CLI's
         // identical construction.
         const iclforge::containers::mp4::HlsOptions hls_options{
             .channels_attribute = built->oba_complexity_index
@@ -8172,7 +8172,7 @@ forge_gui::ReportFacts EncoderController::buildReportFacts() const {
     // writes to. A default-constructed QSettings reads whatever organisation
     // and application names the process set: main.cpp sets "iclforge" and
     // "forge-gui", so an interactive run lands in the person's own store, and
-    // apps/gui/tests/qml_test_main.cpp sets "iclforge-tests"/"forge_gui_qmltests"
+    // apps/forge/gui/tests/qml_test_main.cpp sets "iclforge-tests"/"forge_gui_qmltests"
     // with QSettings::setPath pointed at a QTemporaryDir, so the Qt Quick
     // suite reads a store on disk that evaporates with the process - which is
     // what lets tst_diagnostics.qml assert on a value that harness itself

@@ -12,7 +12,7 @@
 #include "engine_thread.hpp"
 #include "queue.hpp"
 
-// Hearth's diagnostics file (apps/hearth/engine/diagnostic_log.hpp and
+// Hearth's diagnostics file (apps/hearth/engine/src/diagnostic_log.hpp and
 // diagnostics_report.hpp): the ring keeps the newest lines in order and
 // counts what it dropped, a note is one line no longer than the cap, and the
 // file never carries a path - the Settings page's "pairing keys, codes and

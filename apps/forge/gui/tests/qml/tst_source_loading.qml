@@ -13,7 +13,7 @@ TestCase {
         Main {}
     }
 
-    // The same fixture apps/gui/main.cpp's --smoke harness already trusts, so
+    // The same fixture apps/forge/gui/src/main.cpp's --smoke harness already trusts, so
     // the two can never disagree about what a "known good" WAV looks like.
     readonly property url fixtureUrl:
         Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")

@@ -50,7 +50,7 @@
 //     (ac3/oba/atmos.hpp) - nothing in that signature distinguishes "a bed channel" from "a
 //     dynamic object". A bed channel is therefore represented the only way the API allows: as an
 //     object with an unmoving, pinned placement, the same convention every existing caller
-//     (apps/cli/main.cpp's run_atmos_encode, apps/gui/encoder_controller.cpp's encodeObjects)
+//     (apps/forge/cli/src/main.cpp's run_atmos_encode, apps/forge/gui/src/encoder_controller.cpp's encodeObjects)
 //     already uses. This module follows suit - a bed channel becomes one more entry in the same
 //     flat channel list, with a static (or, rarely, dynamic - see build_channel_path()'s own
 //     comment) ObjectPath pinned at its speakerLabel's room position, at unity gain; a bed
@@ -212,7 +212,7 @@ struct BridgeResult {
 //
 // Channel count is capped at 15: AtmosEncoder's own constructor `objects` parameter is dynamic
 // objects only, with the bed's own LFE bookkeeping as an implicit, always-present 16th (TS 103
-// 420 §8.3.2.2 caps the total at 16) - the exact cap apps/cli/main.cpp's run_atmos_encode/
+// 420 §8.3.2.2 caps the total at 16) - the exact cap apps/forge/cli/src/main.cpp's run_atmos_encode/
 // run_atmos_path already enforce for the same reason, reused here rather than re-derived.
 [[nodiscard]] ICLFORGE_ADM_EXPORT std::expected<BridgeResult, BridgeError> build(
     const iclforge::adm::AdmDocument& document, std::string_view programme_id = {});

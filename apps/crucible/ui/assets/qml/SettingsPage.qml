@@ -241,7 +241,7 @@ Flickable {
                             input.onEditingFinished: CrucibleController.driverDir = input.text
                         }
                     }
-                    Note { visible: advanced.open && CrucibleController.silentDeviceFromPackage; text: qsTr("Where install.ps1, remove.ps1 and the built package live: beside this app by default, or apps/windows/driver in a source tree.") + " " + (CrucibleController.driverPackageFound ? qsTr("A built package is there.") : qsTr("No built package is there.")) }
+                    Note { visible: advanced.open && CrucibleController.silentDeviceFromPackage; text: qsTr("Where install.ps1, remove.ps1 and the built package live: beside this app by default, or apps/crucible/windows/driver in a source tree.") + " " + (CrucibleController.driverPackageFound ? qsTr("A built package is there.") : qsTr("No built package is there.")) }
                     Flow {
                         visible: advanced.open
                         Layout.fillWidth: true

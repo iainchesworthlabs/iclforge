@@ -64,7 +64,7 @@ struct LivePositionSource::Impl {
     // parsed packet in) and drain_into (reading and clearing it) - guarded
     // by the same mutex the GUI's own live_object_mutex_ uses for the
     // identical writer-thread/frame-reader-thread shape
-    // (apps/gui/encoder_controller.hpp), just with the roles that precedent
+    // (apps/forge/gui/src/encoder_controller.hpp), just with the roles that precedent
     // already establishes generalised to a network source instead of a
     // Q_INVOKABLE call from the GUI thread.
     mutable std::mutex mutex;

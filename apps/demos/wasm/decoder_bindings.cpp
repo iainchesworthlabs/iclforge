@@ -1,6 +1,6 @@
 // Embind wrapper around iclforge::ac3's decode path, for the reusable push-frame
 // package (WASM streaming decoder package, js/) and the docs demo built on top of it
-// (apps/wasm/index.html - see js/src/decode-file.ts for the whole-file
+// (apps/demos/wasm/index.html - see js/src/decode-file.ts for the whole-file
 // convenience helper the demo actually calls).
 //
 // Two entry points:
@@ -236,7 +236,7 @@ class PushDecoder {
     // Zero-copy view into the last pushAccessUnit() call's coded/rendered PCM
     // for `channel` - valid only until the next pushAccessUnit()/flush()
     // call, the same contract the original whole-file Decoder's channelPcm()
-    // documented and apps/wasm/demo.js already respects (copy out
+    // documented and apps/demos/wasm/demo.js already respects (copy out
     // immediately, never hold the view).
     [[nodiscard]] emscripten::val channelPcm(int channel) const {
         if (channel < 0 || static_cast<std::size_t>(channel) >= last_channel_count_) {

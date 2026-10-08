@@ -7,7 +7,7 @@
 
 // See queue.hpp. The only judgements in here are what happens to "current"
 // when the list changes underneath it, and each is a case in
-// tests/hearth/test_queue.cpp.
+// apps/hearth/engine/tests/test_queue.cpp.
 
 namespace iclforge::hearth {
 

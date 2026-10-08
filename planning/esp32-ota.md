@@ -768,7 +768,7 @@ Speakers and Decoder tabs. O5 adds a third tab, **Firmware** ([decision 19](#dec
   browser.
 
 **How it works** ([decision 21](#decisions)). `ac3::hearth::SinkFirmware`
-(`apps/hearth/engine/sink_firmware.hpp`) is `ota.py push` in C++, on a thread of its own for each
+(`apps/hearth/engine/src/sink_firmware.hpp`) is `ota.py push` in C++, on a thread of its own for each
 sink:
 
 - It talks to the board's web server on port 80, at the address mDNS gave for the sink. Nothing

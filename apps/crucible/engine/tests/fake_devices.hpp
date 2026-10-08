@@ -335,7 +335,7 @@ public:
     // platform - on macOS a round trip to coreaudiod - and this is how a
     // case reproduces that without waiting for it: hold the gate, and the
     // caller is inside enumerate() for exactly as long as the case wants.
-    // tests/crucible/test_engine.cpp uses it to catch the engine's probe in
+    // apps/crucible/engine/tests/test_engine.cpp uses it to catch the engine's probe in
     // flight and pin what stop() does about it.
     void hold_enumerations() {
         const std::lock_guard<std::mutex> gate(gate_mutex_);

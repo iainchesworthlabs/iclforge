@@ -9,7 +9,7 @@
 # ---------------------------------------------------------------------------
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Concurrent LinguistTools)
 
-# The kit's version, out to the top level, for apps/notices/notices.cmake's Qt
+# The kit's version, out to the top level, for notices/forge/notices.cmake's Qt
 # section: that file is include()d from the top-level CMakeLists.txt and cannot
 # read Qt6_VERSION, which find_package set in THIS directory's scope only.
 # PARENT_SCOPE for exactly the reason apps/crucible/CMakeLists.txt exports
@@ -58,14 +58,14 @@ qt_add_executable(forge-gui
     ../../shared/preferences/src/settings_migration.cpp
     ../../shared/preferences/src/settings_migration.hpp)
 
-# RecordingSink and its Fmp4FolderWriter moved to apps/common when
+# RecordingSink and its Fmp4FolderWriter moved to apps/shared/media/src when
 # `forge record`/`live` started writing their takes through the same classes
 # (wide-layout record/live paths) - see recording_sink.hpp's own header comment, and
 # Fmp4FolderWriter's own comment on the third near-identical copy this move
 # closes. `RecordingSink::Config::fmp4_window_segments` carries container=
 # fmp4's fmp4-window= knob through to Fmp4FolderWriter::open(), so there is no
 # separate writer for it any more. Compiled straight into this target as it
-# always was (the source lines above); apps/common has no CMakeLists.txt and
+# always was (the source lines above); apps/shared/media/src has no CMakeLists.txt and
 # no library target of its own, because a two-class static library shared by
 # exactly two executables in the same build would be more machinery than the
 # thing it wraps. container_input.cpp (container readers (mkv/mp4/ts)) joined it the same way,
@@ -227,7 +227,7 @@ qt_add_resources(forge-gui "forge_gui_icons"
 # -no-obsolete, the same as apps/crucible's call, and for the same reason:
 # an entry whose source string is gone is kept as translation memory
 # otherwise, and git history is that memory. It also matters to the gate -
-# tests/crucible/test_translations.cpp holds these seven catalogues to
+# apps/crucible/ui/tests/test_translations.cpp holds these seven catalogues to
 # carrying nothing unfinished and nothing dead, and without this flag a
 # reworded string leaves its old self behind as a vanished entry and fails
 # that case. Which is how this was found, on 2026-09-06: one note was
@@ -507,7 +507,7 @@ endif()
 # ---------------------------------------------------------------------------
 include(GNUInstallDirs)
 
-# COMPONENT runtime - see apps/cli/CMakeLists.txt's identical forge install()
+# COMPONENT runtime - see apps/forge/cli/CMakeLists.txt's identical forge install()
 # for why.
 install(TARGETS forge-gui
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT runtime
@@ -615,8 +615,8 @@ endif()
 # unless QT_FORCE_STDERR_LOGGING=1 is also set - confirmed by reproducing
 # the CI failure locally with the Release preset. include() keeps
 # tests/CMakeLists.txt's own CMAKE_CURRENT_SOURCE_DIR/BINARY_DIR equal to
-# this file's, so every path inside it is written relative to apps/gui, not
-# apps/gui/tests.
+# this file's, so every path inside it is written relative to apps/forge/gui, not
+# apps/forge/gui/tests.
 if(ICLFORGE_BUILD_TESTS)
     include(tests/CMakeLists.txt)
 endif()

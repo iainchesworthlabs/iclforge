@@ -8,7 +8,7 @@ import Hearth
 // carries. Reached from ShortcutsDialog's own About… button ("? -> Shortcuts
 // -> About -> Licences" - Main.qml's own comment says why there is no
 // second header control for this). The same shape as Crucible's
-// About (apps/crucible/ui/qml/AboutDialog.qml), on Hearth's own theme, for
+// About (apps/crucible/ui/assets/qml/AboutDialog.qml), on Hearth's own theme, for
 // Hearth's own notices.
 Dialog {
     id: root
@@ -48,7 +48,7 @@ Dialog {
     // HearthController.versionDetails is a multi-line diagnostics dump -
     // release, commit, branch, target, kernels and (when the build has
     // uncommitted changes) a dirty-state line - meant for the diagnostics
-    // export (apps/hearth/engine/diagnostic_log.hpp), not a real user
+    // export (apps/hearth/engine/src/diagnostic_log.hpp), not a real user
     // glancing at About. Collapses it to the build target and a short
     // commit on one line, matching docs/hearth/design/screenshots/about.png,
     // and never shows the dirty-state line here; the export still reads
@@ -121,7 +121,7 @@ Dialog {
         }
         // No component is named here: what this build carries from others
         // differs by platform and by build, and the notices file generated
-        // for it (apps/hearth/notices/) is the one place that says.
+        // for it (notices/) is the one place that says.
         Body {
             text: qsTr("Licences lists the third-party code in this build with each one's licence. "
                         + "The package carries the same text as NOTICES.txt.")

@@ -58,7 +58,7 @@ std::string one_line(std::string_view text) {
 // and the terminator. Every caller here passes a small `decimals` and a
 // duration or an offset, so 64 would hold every answer - but then the size
 // depends on an argument no compiler can see, which is the shape that made
-// the Crucible widen its own copy (apps/crucible/engine/diagnostics.cpp,
+// the Crucible widen its own copy (apps/crucible/engine/src/diagnostics.cpp,
 // and see MessageLog::note below for the case where it actually became a
 // build error). Same size here, for the same reason.
 std::string fixed(double value, int decimals) {
@@ -107,7 +107,7 @@ void MessageLog::note(std::string_view line) {
     // is where that stopped being theoretical - GCC 16 under the coverage
     // preset's -fno-inline cannot see that a millisecond count since this
     // object was constructed is small, and reports the truncation as an
-    // error (apps/crucible/engine/diagnostics.cpp).
+    // error (apps/crucible/engine/src/diagnostics.cpp).
     std::array<char, 48> stamp{};
     std::snprintf(stamp.data(), stamp.size(), "+%04lld.%03lld ", static_cast<long long>(elapsed / 1000),
                   static_cast<long long>(elapsed % 1000));

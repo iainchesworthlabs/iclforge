@@ -6,8 +6,8 @@ add_executable(forge src/main.cpp src/support.cpp src/usage.cpp src/json.cpp src
 # ../../shared/media/src/recording_sink.cpp + fmp4_folder_writer.cpp: the take writer
 # 'record' and 'live' stream their output through (wide-layout record/live paths), shared
 # verbatim with the GUI rather than reimplemented - see
-# apps/common/recording_sink.hpp's own comment for why they sit there and not
-# in either app. Compiled straight in; apps/common has no library target,
+# apps/shared/media/src/recording_sink.hpp's own comment for why they sit there and not
+# in either app. Compiled straight in; apps/shared/media/src has no library target,
 # matching how tests/CMakeLists.txt already compiles the same files into
 # iclforge-tests. ../../shared/media/src/container_input.cpp (container readers (mkv/mp4/ts)) is the same shape,
 # for turning a container file into an elementary stream instead, and so is
@@ -45,7 +45,7 @@ endif()
 
 # ../../shared/media/src/probe_json.cpp: probe's JSON stream summary and its vocabulary,
 # which Hearth's media information writes too (apps/hearth/engine), compiled
-# in the same way as the apps/common files above.
+# in the same way as the apps/shared/media/src files above.
 target_sources(forge PRIVATE ../../shared/media/src/probe_json.cpp)
 
 # src/main.cpp's 'atmos-adm' command (ADM BWF reader phase 3) needs iclforge::adm - this
@@ -88,8 +88,8 @@ endif()
 
 # iclforge::coverage (coverage floors) instruments this target's OWN sources. Linking
 # an instrumented library is not enough and never was: --coverage is
-# target-scoped, so before this line every .cpp under apps/cli compiled
-# uninstrumented and produced no .gcno at all - a gcovr filter for apps/cli
+# target-scoped, so before this line every .cpp under apps/forge/cli/src compiled
+# uninstrumented and produced no .gcno at all - a gcovr filter for apps/forge/cli/src
 # came back with zero files rather than a low percentage. It is an INTERFACE
 # target that adds nothing when ICLFORGE_ENABLE_COVERAGE is off (the default),
 # so this costs every other configuration nothing.
@@ -177,7 +177,7 @@ install(TARGETS forge
 # The man page and the four shell completions (CLI shell completions).
 #
 # GENERATED, not written: `forge man` and `forge completions <shell>` render
-# both from src/main.cpp's own command table (see apps/cli/usage.cpp), so a new
+# both from src/main.cpp's own command table (see apps/forge/cli/src/usage.cpp), so a new
 # command or option reaches the man page, all four completion scripts and the
 # --help text at once and cannot be forgotten in one of them. That is the
 # whole reason to generate rather than check in five hand-maintained files.

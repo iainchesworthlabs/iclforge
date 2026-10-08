@@ -2,7 +2,7 @@
 # The ESP32-P4 shape of the minimum-footprint probe.
 #
 # An ESP-IDF project, driven by idf.py rather than by this repo's presets, for
-# the same reason apps/android is a Gradle project: the SDK owns the top-level
+# the same reason apps/demos/android is a Gradle project: the SDK owns the top-level
 # build. IDF is reached from the other direction - esp-idf/iclforge/
 # add_subdirectory()s the repo root - so there is no iclforge preset for this
 # target and no entry in cmake/toolchains/.

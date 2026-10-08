@@ -28,7 +28,7 @@
 // These commands are the only place in this repository where the audio
 // backend, the lock-free SPSC ring, the silence watchdog and the clock-drift
 // servo are driven together by real code rather than by a unit test - and
-// they were also the only part of apps/cli that no test touched at all
+// they were also the only part of apps/forge/cli/src that no test touched at all
 // (commands/audio_io.cpp and commands/live_audio.cpp both measured 0.0% line
 // coverage when tools/checks/coverage_report.sh was first pointed at apps/,
 // coverage floors).
@@ -52,7 +52,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// See tests/cli/test_cli.cpp's own scratch_dir for the reasoning this copy
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir for the reasoning this copy
 // shares, including the PID fold; the leaf name below is this file's own.
 std::string scratch_pid_suffix() { return iclforge::test::platform::process_id(); }
 
@@ -62,7 +62,7 @@ fs::path scratch_dir() {
     return dir;
 }
 
-// Same subprocess shape as tests/cli/test_cli.cpp's own run_cli; the platform
+// Same subprocess shape as apps/forge/cli/tests/test_cli.cpp's own run_cli; the platform
 // differences live in tests/support/platform/process.hpp's run_shell, not here.
 // `redirects` follows the arguments on the command line.
 int run_cli_redirected(const std::string& args, const std::string& redirects) {
@@ -246,7 +246,7 @@ TEST_CASE("outputs enumerates or explains itself, and points at the spdif substi
     }
 }
 
-// 'identify' (apps/cli/commands/audio_io.cpp's run_identify) had no test in
+// 'identify' (apps/forge/cli/src/commands/audio_io.cpp's run_identify) had no test in
 // this suite at all until the three below - added to the CLI after
 // devices/outputs/record/live/monitor above, so coverage floors never
 // reached it either.
@@ -590,7 +590,7 @@ TEST_CASE("monitor either plays a stream or refuses by name", "[cli][audio-io][c
     check_spoke_either_way(rc, read_log(log));
 }
 
-// 'play' (apps/cli/commands/audio_io.cpp's run_play) had no test in this
+// 'play' (apps/forge/cli/src/commands/audio_io.cpp's run_play) had no test in this
 // suite at all until this one - unlike devices/outputs/record/live/monitor
 // above, added when this file was, coverage floors never reached it.
 

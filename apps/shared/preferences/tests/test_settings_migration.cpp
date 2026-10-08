@@ -20,7 +20,7 @@
 #include "settings_migration.hpp"
 
 // What forge-gui, Hearth and Crucible copy at start-up from the store their old names kept
-// (apps/gui/settings_migration.hpp): once, before anything reads a setting, only when the new store
+// (apps/shared/preferences/src/settings_migration.hpp): once, before anything reads a setting, only when the new store
 // holds nothing of its own, never writing the old one. The stores are INI files in a temporary
 // directory (QSettings::setPath), the way the Qt Quick suites isolate theirs, so no test reads or
 // writes the registry or a real user's settings, and the directories of QStandardPaths are the

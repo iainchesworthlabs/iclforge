@@ -33,7 +33,7 @@
 //   fold levels that follows from it.
 // - For AC-4: the sync frames, the first frame's table of contents -
 //   presentations, substream groups, channel modes, bitrates and A-JOC - and
-//   what iclforge::ac4::Decoder reads of the whole stream (apps/common/probe_json.hpp's
+//   what iclforge::ac4::Decoder reads of the whole stream (apps/shared/media/src/probe_json.hpp's
 //   Ac4Summary).
 //
 // Reading a whole stream takes a noticeable part of a second for a long item,

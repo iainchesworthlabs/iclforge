@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerate apps/android/app/gradle.lockfile after dependency bumps.
+# Regenerate apps/demos/android/app/gradle.lockfile after dependency bumps.
 #
 # Run from WSL (Debian): bash tools/ci/regenerate_android_locks.sh
 #

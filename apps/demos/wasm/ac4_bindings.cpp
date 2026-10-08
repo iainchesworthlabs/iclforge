@@ -1,7 +1,7 @@
 // Embind wrapper around iclforge::ac3's AC-4 decode and encode paths (libs/ac4,
 // libs/ac4), for the roadmap plan phase I4 bindings sweep. One
 // combined module, unlike the AC-3 side's separate decode_bindings.cpp/
-// encoder_bindings.cpp executables (apps/wasm/CMakeLists.txt's own comment on
+// encoder_bindings.cpp executables (apps/demos/wasm/CMakeLists.txt's own comment on
 // why AC-3 split them): the task this file was written for calls for "an
 // AC-4 embind module beside the decode and encode modules", singular, and
 // AC-4's decoder and encoder share one table-of-contents/framing library
@@ -418,7 +418,7 @@ class Ac4Decoder {
             // channel/object Float32Array views describe_frame() builds
             // point into DecodedFrame's own vectors, which must outlive this
             // call (the usual "valid until next call" contract every other
-            // PCM-view-returning method in apps/wasm/ already documents).
+            // PCM-view-returning method in apps/demos/wasm/ already documents).
             last_frame_ = std::move(**result);
             return describe_frame(*last_frame_);
         } catch (const std::bad_alloc&) {

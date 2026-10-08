@@ -15,17 +15,17 @@ on:
       - "CONTRIBUTING.md"
       - "ROADMAP.md"
       # The WASM decode demo the deploy job below rebuilds fresh and embeds
-      # at docs/wasm-demo.md - without these, an apps/wasm/ change on
+      # at docs/wasm-demo.md - without these, an apps/demos/wasm/ change on
       # main would never trigger a redeploy at all, and the published demo
       # would silently drift from source. libs/ac3/ is deliberately NOT
       # listed: an ordinary codec change touches it constantly and has no
       # reason to redeploy the docs site on its own; a change that also
-      # needs the demo republished goes through apps/wasm/ (or one of
+      # needs the demo republished goes through apps/demos/wasm/ (or one of
       # the paths below) too.
-      - "apps/wasm/**"
+      - "apps/demos/wasm/**"
       # iclforge-wasm-decoder (WASM streaming decoder package) - the demo embeds js/dist/
       # alongside the compiled decoder, so a package-only change also has
-      # to trigger a redeploy, same reasoning as apps/wasm/** above.
+      # to trigger a redeploy, same reasoning as apps/demos/wasm/** above.
       - "js/**"
       - "CMakeLists.txt"
       - "CMakePresets.json"
@@ -44,10 +44,10 @@ on:
       - ".github/workflows/docs.yml"
       - "CONTRIBUTING.md"
       - "ROADMAP.md"
-      - "apps/wasm/**"
+      - "apps/demos/wasm/**"
       # iclforge-wasm-decoder (WASM streaming decoder package) - the demo embeds js/dist/
       # alongside the compiled decoder, so a package-only change also has
-      # to trigger a redeploy, same reasoning as apps/wasm/** above.
+      # to trigger a redeploy, same reasoning as apps/demos/wasm/** above.
       - "js/**"
       - "CMakeLists.txt"
       - "CMakePresets.json"
@@ -86,36 +86,36 @@ jobs:
       # docs/assets/wasm-decode-demo/ and docs/assets/wasm-encode-demo/ are committed fallbacks for
       # a local `mkdocs build` (and this job's own strict build below) - see the deploy job's
       # "Rebuild WASM demos" step for why the *published* site never depends on either staying in
-      # sync. But each demo's page files have no reason to differ from apps/wasm/'s own source at
-      # all - they are plain copies (see apps/wasm/CMakeLists.txt's two POST_BUILD steps), not
+      # sync. But each demo's page files have no reason to differ from apps/demos/wasm/'s own source at
+      # all - they are plain copies (see apps/demos/wasm/CMakeLists.txt's two POST_BUILD steps), not
       # Emscripten output, so nothing here needs the toolchain this job deliberately doesn't
       # install. The genuine build artifacts (each demo's .js/.wasm) have no source-tree
       # counterpart to diff against, so they're not part of this check.
-      - name: Check WASM demo fallbacks are in sync with apps/wasm/
+      - name: Check WASM demo fallbacks are in sync with apps/demos/wasm/
         run: |
           set -euo pipefail
           status=0
           for f in index.html demo.js favicon.svg favicon-32.png assets/demo.ec3; do
-            if ! cmp -s "apps/wasm/$f" "docs/assets/wasm-decode-demo/$f"; then
-              echo "::error file=docs/assets/wasm-decode-demo/$f::Out of sync with apps/wasm/$f - re-copy it (see docs/platforms/wasm.md)."
+            if ! cmp -s "apps/demos/wasm/$f" "docs/assets/wasm-decode-demo/$f"; then
+              echo "::error file=docs/assets/wasm-decode-demo/$f::Out of sync with apps/demos/wasm/$f - re-copy it (see docs/platforms/wasm.md)."
               status=1
             fi
           done
           for f in index.html app.js; do
-            if ! cmp -s "apps/wasm/encode/$f" "docs/assets/wasm-encode-demo/$f"; then
-              echo "::error file=docs/assets/wasm-encode-demo/$f::Out of sync with apps/wasm/encode/$f - re-copy it (see docs/platforms/wasm.md)."
+            if ! cmp -s "apps/demos/wasm/encode/$f" "docs/assets/wasm-encode-demo/$f"; then
+              echo "::error file=docs/assets/wasm-encode-demo/$f::Out of sync with apps/demos/wasm/encode/$f - re-copy it (see docs/platforms/wasm.md)."
               status=1
             fi
           done
           for f in favicon.svg favicon-32.png; do
-            if ! cmp -s "apps/wasm/$f" "docs/assets/wasm-encode-demo/$f"; then
-              echo "::error file=docs/assets/wasm-encode-demo/$f::Out of sync with apps/wasm/$f - re-copy it (see docs/platforms/wasm.md)."
+            if ! cmp -s "apps/demos/wasm/$f" "docs/assets/wasm-encode-demo/$f"; then
+              echo "::error file=docs/assets/wasm-encode-demo/$f::Out of sync with apps/demos/wasm/$f - re-copy it (see docs/platforms/wasm.md)."
               status=1
             fi
           done
           for f in index.html app.js; do
-            if ! cmp -s "apps/wasm/atmos/$f" "docs/assets/wasm-encode-demo/atmos/$f"; then
-              echo "::error file=docs/assets/wasm-encode-demo/atmos/$f::Out of sync with apps/wasm/atmos/$f - re-copy it (see docs/platforms/wasm.md)."
+            if ! cmp -s "apps/demos/wasm/atmos/$f" "docs/assets/wasm-encode-demo/atmos/$f"; then
+              echo "::error file=docs/assets/wasm-encode-demo/atmos/$f::Out of sync with apps/demos/wasm/atmos/$f - re-copy it (see docs/platforms/wasm.md)."
               status=1
             fi
           done
@@ -157,7 +157,7 @@ jobs:
 
       - run: pip install --require-hashes -r requirements/requirements-docs.txt
 
-      # Rebuilds both WASM demos (apps/wasm, WASM browser demo and UX6) fresh and
+      # Rebuilds both WASM demos (apps/demos/wasm, WASM browser demo and UX6) fresh and
       # overwrites the committed docs/assets/wasm-{decode,encode}-demo/ copies
       # before `mkdocs gh-deploy` runs its own `mkdocs build` internally - so
       # what actually gets published always reflects current source, not

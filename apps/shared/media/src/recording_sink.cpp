@@ -98,7 +98,7 @@ std::string RecordingSink::open(const std::string& path, const Config& config) {
             return {};
         }
         // The carrier runs at 4x the content rate for E-AC-3 - see
-        // forge's own run_spdif (apps/cli/main.cpp) for the citation.
+        // forge's own run_spdif (apps/forge/cli/src/main.cpp) for the citation.
         const auto carrier_rate =
             config.eac3 ? config.sample_rate * 4 : config.sample_rate;
         if (!wav_.open(path, carrier_rate, 2)) {

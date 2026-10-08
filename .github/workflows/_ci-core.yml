@@ -4,7 +4,7 @@
 # (docs/ci-lanes.md). Moved out of ci.yml so `run_core`/the `core` lane
 # finally gates something: none of these jobs test anything platform-specific
 # (see each one's own header, carried over unchanged below), so a PR confined
-# to a single platform lane (`apps/android/`, `apps/windows/driver/`, ...)
+# to a single platform lane (`apps/demos/android/`, `apps/crucible/windows/driver/`, ...)
 # no longer pays for any of them.
 #
 # The performance and memory comparisons and their gates used to be here, on
@@ -86,7 +86,7 @@ jobs:
   # adm-validate passes by hand - iclforge::adm/admbridge. Originally libs/ac3 only
   # ("the library is what was asked for"); extended once the rest of the
   # library surface existed and was already being EXERCISED by this same
-  # suite, just uninstrumented and unreported. apps/cli and apps/gui stay out
+  # suite, just uninstrumented and unreported. apps/forge/cli/src and apps/forge/gui stay out
   # of scope: they are applications, not the library, and the coverage
   # preset builds neither.
   #
@@ -203,7 +203,7 @@ jobs:
       # mdct.cpp suspicious-hits gcov-bug workaround this step used to carry
       # inline moved there with the rest of the gcovr flags.
       #
-      # The gate covers apps/cli as well as the nine library components since
+      # The gate covers apps/forge/cli/src as well as the nine library components since
       # coverage floors - which is why config-linux-gcc-coverage now builds the
       # CLI, and why the Test step above takes longer than it used to. That
       # table also prints a per-command breakdown below the gate, so a
@@ -212,14 +212,14 @@ jobs:
         shell: bash
         run: bash tools/checks/coverage_report.sh -g gcov-16
 
-      # apps/gui is the one first-party tree with no coverage number at all,
+      # apps/forge/gui is the one first-party tree with no coverage number at all,
       # and deliberately so (coverage floors called it out as a separate
       # decision): instrumenting its C++ needs a Qt kit on THIS job, and no
       # Linux leg installs one - _build.yml puts Qt only on its `gui: true`
       # matrix entries, which are plain builds. Adding it means either putting
       # Qt on this container or standing up a second instrumented leg, both of
       # which cost real runner time for a tree whose interactive surfaces are
-      # already covered by apps/gui/tests' own Qt Quick suite and whose one
+      # already covered by apps/forge/gui/tests' own Qt Quick suite and whose one
       # Qt-free class (RecordingSink) is already in iclforge-tests. See
       # tools/checks/coverage_report.sh's header for the same note beside the
       # threshold table.
@@ -298,7 +298,7 @@ jobs:
   # named three legs that needed this same override and missed this one.
   #
   # ICLFORGE_BUILD_CLI/EXAMPLES stay at their preset default (ON): ADM BWF reader phase 3 (the
-  # 'atmos-adm' forge command, apps/cli/main.cpp's run_atmos_adm, and examples/encode_adm.cpp) is
+  # 'atmos-adm' forge command, apps/forge/cli/src/main.cpp's run_atmos_adm, and examples/encode_adm.cpp) is
   # the first code outside tests/ to link iclforge::adm at all, so unlike phases 1
   # and 2 (when neither the CLI nor the examples touched this module, hence this job originally
   # turning both off), this job now has to build and run both too or the CLI command and example

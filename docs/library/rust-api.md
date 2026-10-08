@@ -12,7 +12,7 @@ Two crates over [the C API](c-api.md), both in-tree under
 The crates cover the C API's scope: AC-3, E-AC-3, Atmos (OAMD + JOC) and AC-4 (`iclforge::ac4`,
 below) — see [AC-4](ac4.md) for the wider C++ library both mirror a subset of.
 
-Cargo is not part of the root CMake build, the same arrangement as `apps/android` and Gradle. CI
+Cargo is not part of the root CMake build, the same arrangement as `apps/demos/android` and Gradle. CI
 builds and tests the workspace on Linux, Windows and macOS (`build-rust` in
 `.github/workflows/_build.yml`: `cargo build`, `cargo test`, `cargo clippy -D warnings`,
 `cargo fmt --check`), against the toolchain pinned in `rust/rust-toolchain.toml`. Build

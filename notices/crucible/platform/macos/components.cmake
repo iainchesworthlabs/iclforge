@@ -32,7 +32,7 @@
 set(ICLFORGE_CRUCIBLE_NOTICES_PLATFORM "macOS")
 # Where the notices sit: apps/crucible/CMakeLists.txt's own APPLE install()
 # branch puts this file and LICENSE.txt at the archive root, beside the
-# bundle, the same DESTINATION "." apps/notices/notices.cmake already used
+# bundle, the same DESTINATION "." notices/forge/notices.cmake already used
 # for the runtime component's pair beside forge-gui.app. The bundle directory is
 # named after the target, crucible.app; MACOSX_BUNDLE_BUNDLE_NAME
 # ("Crucible") is the display name and not the path.

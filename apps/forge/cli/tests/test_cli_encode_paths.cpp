@@ -19,8 +19,8 @@
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 
-// The encode front ends (apps/cli/commands/encode.cpp: encode, eac3-encode,
-// their src=/map= multi-source twins in apps/cli/multi_source.cpp, and
+// The encode front ends (apps/forge/cli/src/commands/encode.cpp: encode, eac3-encode,
+// their src=/map= multi-source twins in apps/forge/cli/src/multi_source.cpp, and
 // programmeN='s extra programmes) along the paths a user takes when
 // something about the input or the request is wrong: every refusal's exit
 // code and reason, and - for the requests that should work - what the
@@ -39,7 +39,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// See tests/cli/test_cli.cpp's own scratch_dir for the reasoning this copy
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir for the reasoning this copy
 // shares, including the PID fold; the leaf name below is this file's own.
 std::string scratch_pid_suffix() {
     return iclforge::test::platform::process_id();

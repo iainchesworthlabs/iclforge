@@ -73,7 +73,7 @@ ac3_generate_notices("${ICLFORGE_CRUCIBLE_NOTICES_FILE}"
         "PLATFORM=${ICLFORGE_CRUCIBLE_NOTICES_PLATFORM}"
         "LOCATION=${ICLFORGE_CRUCIBLE_NOTICES_LOCATION}"
         # Which binaries the shared fmt and fonts fragments are talking about.
-        # Those two name no application otherwise, so apps/notices/ (Forge)
+        # Those two name no application otherwise, so notices/ (Forge)
         # takes them verbatim through cmake/Notices.cmake's FRAGMENT_DIR search
         # path and passes its own values here - see that module's header. The
         # fonts one stays "The executable" rather than naming crucible: this
@@ -94,8 +94,8 @@ ac3_generate_notices("${ICLFORGE_CRUCIBLE_NOTICES_FILE}"
         "FMT_VERSION=${ICLFORGE_CRUCIBLE_FMT_VERSION}"
         "PIPEWIRE_VERSION=${ICLFORGE_CRUCIBLE_PIPEWIRE_VERSION}"
         "TRACY_VERSION=${ICLFORGE_CRUCIBLE_TRACY_VERSION}"
-        # Named explicitly, not left implicit, now that apps/hearth/notices/notices.cmake and
-        # apps/notices/notices.cmake share this fragment too (search their own FRAGMENT_DIR
+        # Named explicitly, not left implicit, now that notices/hearth/notices.cmake and
+        # notices/forge/notices.cmake share this fragment too (search their own FRAGMENT_DIR
         # lists) and each has a different answer.
         "TRACY_USERS=crucible and crucible-run"
     FILES

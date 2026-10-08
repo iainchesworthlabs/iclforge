@@ -41,7 +41,7 @@ class PlatformOnlyChangeTest(unittest.TestCase):
     """The reason this classifier exists: a platform-only PR skips the rest."""
 
     def test_android_only_change_lights_only_android(self):
-        hits = gate.classify(["apps/android/app/build.gradle.kts"])
+        hits = gate.classify(["apps/demos/android/app/build.gradle.kts"])
         self.assertEqual(lit(hits, *ALL_LANES), {"android"})
 
     def test_esp_only_change_lights_only_esp(self):
@@ -71,18 +71,18 @@ class PlatformOnlyChangeTest(unittest.TestCase):
 
 
 class SharedDesktopAppTest(unittest.TestCase):
-    """apps/cli, apps/gui, apps/common, apps/crucible, apps/hearth: one program on three OSes."""
+    """apps/forge/cli/src, apps/forge/gui, apps/shared/media/src, apps/crucible, apps/hearth: one program on three OSes."""
 
     def test_shared_cli_change_lights_all_three_desktop_platforms_only(self):
-        hits = gate.classify(["apps/cli/commands/audio_io.cpp"])
+        hits = gate.classify(["apps/forge/cli/src/commands/audio_io.cpp"])
         self.assertEqual(lit(hits, *ALL_LANES), {"windows", "linux", "macos"})
 
     def test_crucible_change_lights_all_three_desktop_platforms_only(self):
-        hits = gate.classify(["apps/crucible/engine/engine.cpp"])
+        hits = gate.classify(["apps/crucible/engine/src/engine.cpp"])
         self.assertEqual(lit(hits, *ALL_LANES), {"windows", "linux", "macos"})
 
     def test_hearth_change_lights_all_three_desktop_platforms_only(self):
-        hits = gate.classify(["apps/hearth/engine/player.cpp"])
+        hits = gate.classify(["apps/hearth/engine/src/player.cpp"])
         self.assertEqual(lit(hits, *ALL_LANES), {"windows", "linux", "macos"})
 
 
@@ -100,7 +100,7 @@ class CoreFanoutTest(unittest.TestCase):
 
     def test_root_cmakelists_counts_as_core_but_a_nested_one_does_not(self):
         self.assertTrue(gate.classify(["CMakeLists.txt"])["core"])
-        hits = gate.classify(["apps/wasm/CMakeLists.txt"])
+        hits = gate.classify(["apps/demos/wasm/CMakeLists.txt"])
         self.assertFalse(hits["core"])
         self.assertEqual(lit(hits, *ALL_LANES), {"wasm"})
 
@@ -127,11 +127,11 @@ class ConservativeDefaultTest(unittest.TestCase):
         # A mostly-recognisable PR with one path this script has no rule for
         # must not fall back to "only what matched" - the unmapped path is
         # exactly the case the fallback exists for.
-        hits = gate.classify(["apps/android/app/build.gradle.kts", "planning/notes.txt"])
+        hits = gate.classify(["apps/demos/android/app/build.gradle.kts", "planning/notes.txt"])
         self.assertEqual(hits, dict.fromkeys(gate.LANES, True))
 
     def test_force_all_ignores_the_path_list_entirely(self):
-        hits = gate.classify(["apps/android/app/build.gradle.kts"], force_all=True)
+        hits = gate.classify(["apps/demos/android/app/build.gradle.kts"], force_all=True)
         self.assertEqual(hits, dict.fromkeys(gate.LANES, True))
 
     def test_ci_self_change_lights_every_lane(self):
@@ -183,7 +183,7 @@ class SatellitesDirectTest(unittest.TestCase):
 
     def test_a_satellites_own_tree_still_lights_it(self):
         for path, lane in (
-            ("apps/android/app/build.gradle.kts", "android"),
+            ("apps/demos/android/app/build.gradle.kts", "android"),
             ("esp-idf/iclforge/CMakeLists.txt", "esp"),
             ("rust/iclforge/src/lib.rs", "rust"),
             ("python/iclforge/__init__.py", "python"),
@@ -197,7 +197,7 @@ class SatellitesDirectTest(unittest.TestCase):
         self.assertEqual(lit(hits, *ALL_LANES), {"core", "windows", "linux", "macos", "rust"})
 
     def test_a_path_only_a_platform_owns_is_unchanged(self):
-        hits = self.classify("apps/cli/commands/audio_io.cpp")
+        hits = self.classify("apps/forge/cli/src/commands/audio_io.cpp")
         self.assertEqual(lit(hits, *ALL_LANES), {"windows", "linux", "macos"})
 
     def test_the_conservative_cases_still_light_everything(self):
@@ -319,7 +319,7 @@ class MainTest(unittest.TestCase):
         self.assertTrue(all(v == "true" for v in lanes.values()))
 
     def test_stdin_paths_are_classified(self):
-        rc, lanes = self.run_main(["x"], stdin="apps/android/app/build.gradle.kts\n\n")
+        rc, lanes = self.run_main(["x"], stdin="apps/demos/android/app/build.gradle.kts\n\n")
         self.assertEqual(rc, 0)
         self.assertEqual(lanes["android"], "true")
         self.assertIn("false", lanes.values())

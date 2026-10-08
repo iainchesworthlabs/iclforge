@@ -3,7 +3,7 @@
 // audio track pulled straight out of a commercial Dolby Atmos demo trailer's
 // MKV, no re-encoding at all) through the exact same PassthroughSink this
 // app's own encoder output goes through. Mirrors forge's run_play
-// (apps/cli/main.cpp) almost exactly - same split_access_units/BurstPacker/
+// (apps/forge/cli/src/main.cpp) almost exactly - same split_access_units/BurstPacker/
 // submit-with-retry shape - just triggered over JNI instead of a CLI arg.
 //
 // Purpose: isolate "is this app's AudioTrack passthrough configuration

@@ -123,7 +123,7 @@ void print_common_options();
 void print_meta_usage();
 
 // A groff man page (section 1) on stdout, generated from `commands`. Written
-// to a file at build time by apps/cli/CMakeLists.txt and installed as
+// to a file at build time by apps/forge/cli/CMakeLists.txt and installed as
 // forge.1; `forge man` is also perfectly usable on its own through a pipe
 // into `man -l -`.
 void print_man_page(std::span<const CommandInfo> commands);

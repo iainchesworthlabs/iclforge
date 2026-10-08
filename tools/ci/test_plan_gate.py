@@ -36,16 +36,16 @@ class BuildRelevant(unittest.TestCase):
         self.assertEqual((got["build"], got["gui"], got["docs_only"]), ("true", "false", "false"))
 
     def test_cli_change_builds_without_the_gui(self):
-        got = plan("apps/cli/commands/decode.cpp")
+        got = plan("apps/forge/cli/src/commands/decode.cpp")
         self.assertEqual((got["build"], got["gui"]), ("true", "false"))
 
     def test_gui_trees_pull_qt_in(self):
         for path in (
-            "apps/gui/qml/Main.qml",
-            "apps/hearth/ui/qml/Main.qml",
+            "apps/forge/gui/assets/qml/Main.qml",
+            "apps/hearth/ui/assets/qml/Main.qml",
             "apps/crucible/src/engine.cpp",
             "apps/common/settings.cpp",
-            "tests/hearth/test_engine.cpp",
+            "apps/hearth/engine/tests/test_engine.cpp",
             "cmake/FindQt6.cmake",
         ):
             with self.subTest(path=path):
@@ -87,7 +87,7 @@ class NotBuiltByTheLinuxGate(unittest.TestCase):
         for path in (
             "esp-idf/iclforge/component.c",
             "esphome/x.yaml",
-            "apps/android/app/build.gradle.kts",
+            "apps/demos/android/app/build.gradle.kts",
             "apps/wasm/main.cpp",
             "apps/baremetal/probe.cpp",
             "python/iclforge/__init__.py",
@@ -95,7 +95,7 @@ class NotBuiltByTheLinuxGate(unittest.TestCase):
             "js/package.json",
             "packaging/conan/conanfile.py",
             "requirements/requirements-lint.txt",
-            "apps/linux/tray-vm/guest/provision.sh",
+            "apps/crucible/linux/tray-vm/guest/provision.sh",
         ):
             with self.subTest(path=path):
                 got = plan(path)
@@ -237,8 +237,8 @@ class Compare(unittest.TestCase):
             "libs/ac3/tests/core/test_x.cpp",
             "libs/ac3/fuzz/fuzz_scan.cpp",
             "libs/ac3/fuzz/CMakeLists.txt",
-            "apps/cli/commands/decode.cpp",
-            "apps/gui/qml/Main.qml",
+            "apps/forge/cli/src/commands/decode.cpp",
+            "apps/forge/gui/assets/qml/Main.qml",
             "cmake/Compiler.cmake",
             "CMakeLists.txt",
             "tools/checks/x.py",
@@ -269,8 +269,8 @@ class Reason(unittest.TestCase):
         self.assertIn("libs/ac3/src/x.cpp", got["reason"])
 
     def test_names_the_path_that_pulled_qt_in(self):
-        got = plan("libs/ac3/src/x.cpp", "apps/gui/qml/Main.qml")
-        self.assertIn("apps/gui/qml/Main.qml", got["gui_reason"])
+        got = plan("libs/ac3/src/x.cpp", "apps/forge/gui/assets/qml/Main.qml")
+        self.assertIn("apps/forge/gui/assets/qml/Main.qml", got["gui_reason"])
 
     def test_docs_only_reason(self):
         self.assertIn("documentation", plan("docs/a.md")["reason"])

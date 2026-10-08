@@ -78,7 +78,7 @@ set(ICLFORGE_ESP_PROFILE "decoder")   # or "encoder"
 ```
 
 The component pre-seeds the root's `option()`s and `add_subdirectory()`s the repo root, the same
-shape `apps/android/app/src/main/cpp/CMakeLists.txt` uses. Re-listing
+shape `apps/demos/android/app/src/main/cpp/CMakeLists.txt` uses. Re-listing
 `libs/ac3/minimal.cmake`'s sources in an `idf_component_register(SRCS ...)` was rejected: two
 copies of a source list drift, and the drift surfaces as a link error rather than a diff.
 
@@ -195,7 +195,7 @@ they produce:
   within one unit of the probe's `eac3_atmos_render` row
   ([Placed on loudspeakers](#placed-on-loudspeakers)).
 - `sdkconfig.ci-http`: the `http` source over QEMU's OpenCores Ethernet MAC in place of WiFi
-  (`main/net/openeth/`), fetching the E-AC-3 demo stream (`apps/wasm/assets/demo.ec3`)
+  (`main/net/openeth/`), fetching the E-AC-3 demo stream (`apps/demos/wasm/assets/demo.ec3`)
   from a server on the runner; the guest is 10.0.2.15 and the host 10.0.2.2. The same step drives
   the control surface through a port forward: `GET /status`, `POST /volume` with 0.5, a replay
   through `POST /play` whose levels must come out at half, and `POST /stop`. A further step drives

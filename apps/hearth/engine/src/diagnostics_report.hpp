@@ -16,7 +16,7 @@
 // error.
 //
 // The page says pairing keys, codes and file paths are left out. The rule is
-// held as Crucible's is (apps/crucible/engine/diagnostics.hpp): first by what
+// held as Crucible's is (apps/crucible/engine/src/diagnostics.hpp): first by what
 // the report reads, then by a scrub of what it wrote.
 // - The facts are named fields, and none of them is a path, a key or a code.
 // - Of the engine's snapshot, the report never reads an item's path except

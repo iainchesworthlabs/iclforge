@@ -147,8 +147,8 @@ the rest of the backend includes; `libs/audio/CMakeLists.txt`'s `APPLE` block en
 that one file.
 
 The tree holds **three `.mm` files and two directories that enable `OBJCXX`**. The other two are
-Crucible's, for AppKit rather than Core Audio — `apps/crucible/engine/platform/macos/foreground.mm`
-(NSWorkspace) and `apps/crucible/ui/platform/macos/app_icon_provider.mm` (NSWorkspace and NSImage)
+Crucible's, for AppKit rather than Core Audio — `apps/crucible/engine/src/platform/macos/foreground.mm`
+(NSWorkspace) and `apps/crucible/ui/src/platform/macos/app_icon_provider.mm` (NSWorkspace and NSImage)
 — and `apps/crucible/CMakeLists.txt`'s `APPLE` arm makes its own `enable_language(OBJCXX)` call
 rather than relying on this one. Both call sites pin `CMAKE_OBJCXX_COMPILER` to the C++ compiler
 the toolchain file chose, and `cmake/toolchains/macos.llvm.toolchain.cmake` sets
@@ -164,7 +164,7 @@ quit.
 
 It also makes an open tap something Crucible has to be careful about holding. Its engine opens no
 tap while its output stage has no endpoint, and releases any it holds when one goes away
-(`Impl::sync_taps()` in `apps/crucible/engine/engine.cpp`), so a Mac where the output policy finds
+(`Impl::sync_taps()` in `apps/crucible/engine/src/engine.cpp`), so a Mac where the output policy finds
 nothing usable is not one where every application it listed falls silent. The same code runs on
 Windows and Linux, where a tap mutes nothing and the rule costs nothing.
 
@@ -310,7 +310,7 @@ presets select, and Boost and Tracy only if you opt into the `adm`/`profiling` f
 same reason the Linux presets do (see [GUI on Linux](../building.md#gui-on-linux)): a Qt kit
 isn't assumed present on every Mac, not because `forge-gui` cannot be built here. `cmake/FindQt6.cmake`
 already searches both Homebrew prefixes (`/opt/homebrew/opt/qt`/`/opt/homebrew/opt/qt6` on Apple
-Silicon, `/usr/local/opt/qt`/`/usr/local/opt/qt6` on Intel), and `apps/gui/CMakeLists.txt`'s
+Silicon, `/usr/local/opt/qt`/`/usr/local/opt/qt6` on Intel), and `apps/forge/gui/CMakeLists.txt`'s
 `APPLE` branch — `MACOSX_BUNDLE`, the `.icns` bundle icon, and `qt_generate_deploy_qml_app_script()`
 for packaging — was written for this from the start; it was never exercised until the
 `macos-llvm` CI leg turned the option on. Opt in explicitly once Qt is installed:
@@ -373,7 +373,7 @@ Neither route has been run end to end on a Mac.
 `.ec3` — a custom `Info.plist.in` (`apps/hearth/ui/`) rather than CMake's default template, since
 neither extension is a system-known UTI and each needs its own `UTTypeConformsTo: public.audio`
 declaration tying it to `audio/ac3`/`audio/eac3` — and claims them with `LSHandlerRank Owner`.
-`apps/gui/Info.plist.in` no longer does either, because a UTI with two owners leaves Launch
+`apps/forge/gui/packaging/macos/Info.plist.in` no longer does either, because a UTI with two owners leaves Launch
 Services to pick one. The release `.dmg` carries `forge-gui.app` and not Hearth, so it registers no
 `.ac3` or `.ec3` handler today, and nothing on macOS declares `.ac4`. Configure/build-verified
 only, like the rest of this file's GUI coverage below — nobody has opened an `.ac3` file from
@@ -389,7 +389,7 @@ confirmed clean on a second push after two fixes, 582 ctest entries all passed, 
 took 39.74 s of a 56.81 s total run. The fixes were `QSG_RENDER_LOOP=basic` for a Qt Quick
 render-loop deadlock, and forcing the `Fusion` style in the test binary for a
 native-`ComboBox`-under-offscreen hang (see [GUI on macOS](#gui-on-macos) above and
-`apps/gui/tests/CMakeLists.txt` and `qml_test_main.cpp` for the detail).
+`apps/forge/gui/tests/CMakeLists.txt` and `qml_test_main.cpp` for the detail).
 
 The SNR numbers from the run that first proved the gold-reference gate on macOS were 61.81 and
 61.82 dB, against 67.84 and 67.82 dB on Linux and Windows for the same material. This page and
@@ -408,7 +408,7 @@ value ([One floor per
 channel](../verification.md#one-floor-per-channel-not-one-per-file)).
 
 **Crucible on macOS, as of 2026-09-06.** Both legs build it — every `.mm`, every file under
-`apps/crucible/engine/platform/macos/`, and `bin/crucible.app/Contents/MacOS/crucible` —
+`apps/crucible/engine/src/platform/macos/`, and `bin/crucible.app/Contents/MacOS/crucible` —
 and both run its Qt Quick suites: eleven on that date, and sixteen `tst_*.qml` files are in the
 tree on 2026-09-30. Of the eleven, eight drive the macOS platform seams themselves rather than
 fakes: `Main.qml` starts the engine whenever the window is built, so the session monitor, the
@@ -426,7 +426,7 @@ it and for the gate that now refuses that path. The three suites run green on bo
 
 Worth separating from that, because the two hangs on this runner have different causes and the
 same symptom. `macos-llvm`'s first-ever GUI run deadlocked in the threaded Qt Quick render loop,
-which is why `apps/gui/tests/CMakeLists.txt` sets `QSG_RENDER_LOOP=basic` on `APPLE` (see
+which is why `apps/forge/gui/tests/CMakeLists.txt` sets `QSG_RENDER_LOOP=basic` on `APPLE` (see
 [GUI on macOS](#gui-on-macos)), and Crucible's suites set `QT_QUICK_BACKEND=software` beside
 `offscreen` for the same family of reason. Those are rendering. This one was Core Audio, and no
 amount of render-loop configuration would have moved it.

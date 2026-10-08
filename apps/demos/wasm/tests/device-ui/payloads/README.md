@@ -10,7 +10,7 @@ the shape the example reports since as well. It serves each payload to the page 
 
 | File | What the device had just done |
 |---|---|
-| `finished-eac3.json` | The boot play: the WASM page's demo (`apps/wasm/assets/demo.ec3`, E-AC-3 5.1 with objects), 250 access units to the end of the stream. |
+| `finished-eac3.json` | The boot play: the WASM page's demo (`apps/demos/wasm/assets/demo.ec3`, E-AC-3 5.1 with objects), 250 access units to the end of the stream. |
 | `finished-ac3.json` | `POST /play` of the example's own sample (`stream/sample.ac3`, AC-3 5.1, no objects), played to its end. |
 | `refused.json` | `POST /play` of an `ftp://` location, which the `http` source refuses: `202`, then the state stays `stopped` and the location stays the previous one. |
 | `playing-eac3.json` | `POST /play` of the demo concatenated eight times, taken mid-way (`passes` 0, 200 or more frames). |

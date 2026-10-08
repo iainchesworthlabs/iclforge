@@ -27,7 +27,7 @@ import "HearthTestHelpers.js" as H
 // through, as the window slides from one setting's audio to the next's.
 // The waits count the device's frames, not the clock's milliseconds, so a
 // runner that decodes behind real time is given the audio it needs.
-// tests/hearth/test_ac4_engine.cpp holds the same formulas sample for sample
+// apps/hearth/engine/tests/test_ac4_engine.cpp holds the same formulas sample for sample
 // through the engine alone; these hold that the page's controls reach them.
 TestCase {
     id: testCase

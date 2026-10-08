@@ -153,9 +153,9 @@ PROSE_PATHS_UNCHECKED = {
         "inventory; a dated snapshot of the tree, naming the paths the proposed layout moves"
     ),
     "docs/crucible/design/promotion.md": (
-        "phase record; names the pre-promotion apps/windows layout"
+        "phase record; names the pre-promotion apps/crucible/windows layout"
     ),
-    "docs/platforms/windows-demo.md": "phase record; names the pre-promotion apps/windows layout",
+    "docs/platforms/windows-demo.md": "phase record; names the pre-promotion apps/crucible/windows layout",
     "CHANGELOG.md": "released entries are an immutable record of the tree as it was",
 }
 

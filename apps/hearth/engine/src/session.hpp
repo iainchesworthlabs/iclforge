@@ -50,7 +50,7 @@
 //
 // No file I/O: the path is turned into bytes by an ItemLoader, which the
 // application supplies (reading the file and demuxing Matroska, MP4 or
-// MPEG-TS through apps/common/container_input.hpp, whose functions the engine
+// MPEG-TS through apps/shared/media/src/container_input.hpp, whose functions the engine
 // does not compile) and a test supplies over memory.
 //
 // AC-4 (planning/ac4.md, I2): the units are the stream's sync frames, and

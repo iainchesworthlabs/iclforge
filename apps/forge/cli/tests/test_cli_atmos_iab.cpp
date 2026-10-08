@@ -19,7 +19,7 @@
 #include "iclforge/ac3/decoder/decoder.hpp"
 
 // forge's 'atmos-iab' command (IAB reader phase 3 of 3 - 's "IAB (SMPTE ST 2098-2)
-// reader" entry; apps/cli/commands/atmos.cpp's run_atmos_iab). Real, subprocess-level integration
+// reader" entry; apps/forge/cli/src/commands/atmos.cpp's run_atmos_iab). Real, subprocess-level integration
 // tests, the same shape test_cli_atmos_adm.cpp already uses for 'atmos-adm' and for the identical
 // reason - main.cpp compiles everything into one binary with no library surface run_atmos_iab's
 // own logic could be linked into this test binary and called directly.
@@ -40,7 +40,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// See tests/cli/test_cli.cpp's own scratch_dir for the reasoning this copy
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir for the reasoning this copy
 // shares, including the PID fold; the leaf name below is this file's own.
 std::string scratch_pid_suffix() { return iclforge::test::platform::process_id(); }
 

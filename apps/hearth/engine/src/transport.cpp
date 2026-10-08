@@ -5,7 +5,7 @@
 #include <utility>
 
 // See transport.hpp. Every branch here is a case in
-// tests/hearth/test_transport.cpp; the comments say what a person would
+// apps/hearth/engine/tests/test_transport.cpp; the comments say what a person would
 // expect of the transport rather than restating the code.
 
 namespace iclforge::hearth {

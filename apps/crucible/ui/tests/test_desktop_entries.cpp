@@ -34,7 +34,7 @@ namespace {
 // tests/CMakeLists.txt for why it is a build-tree path) is the whole
 // suite's root; the leaf below is this file's own, emptied on each use so a
 // previous run's files cannot pass a case. The leaf also carries this
-// process's own PID - see tests/cli/test_cli.cpp's own scratch_dir comment
+// process's own PID - see apps/forge/cli/tests/test_cli.cpp's own scratch_dir comment
 // for why that is needed on top of the build-tree root.
 std::string scratch_pid_suffix() { return iclforge::test::platform::process_id(); }
 

@@ -13,7 +13,7 @@
     missing](#what-is-missing) item 3 objects to. The conformance checks and the schema below say
     nothing about AC-4, and that gap would have to close before a report is built. The line
     numbers and counts are from 2026-09-07: `ac3cli` has 44 commands, not forty-one, the
-    coverage floors are now `libs/ac3 90 82` and `apps/cli 80 71`, and the CI is the one
+    coverage floors are now `libs/ac3 90 82` and `apps/forge/cli/src 80 71`, and the CI is the one
     described in [CI for many agents](../docs/ci-agentic.md).
 
     This page plans a **delivery-shaped QC report** — the artefact someone attaches when handing
@@ -57,19 +57,19 @@ tested today.
 | Loudness range (EBU Tech 3342) | `loudness.hpp:150` | shipped |
 | True peak (BS.1770-4 Annex 2, oversampled) | `loudness.hpp:159` | shipped |
 | Rendered-layout loudness (BS.1770-5 Annex 3, per-position weights) | `loudness.hpp:73` `position_weight()`, and `LoudnessMeter`'s second constructor | shipped |
-| Object re-render loudness (BS.1770-5 Annex 4) | `qc ... objects=71\|512\|514\|714`, `apps/cli/commands/analysis.cpp:539` | shipped |
+| Object re-render loudness (BS.1770-5 Annex 4) | `qc ... objects=71\|512\|514\|714`, `apps/forge/cli/src/commands/analysis.cpp:539` | shipped |
 | dialnorm derivation and consistency | `loudness.hpp:186` `dialnorm_from_lkfs()`; `analysis.cpp:705-717` | shipped |
 | Five delivery presets with primary-source citations | `ac3/meta/qc.hpp` — `ebu-r128-s2`, `atsc-a85`, `atsc-a85-streaming`, `netflix`, `apple-music-atmos` | shipped |
 | Band-vs-ceiling gate semantics | `qc.hpp` `QcLoudnessLimit`, `evaluate_qc_gate()` | shipped |
-| **An exit code a CI job can gate on** | `apps/cli/exit_codes.hpp:63` `kExitQcGate = 6`, returned at `analysis.cpp:1055` | **shipped** |
+| **An exit code a CI job can gate on** | `apps/forge/cli/src/exit_codes.hpp:63` `kExitQcGate = 6`, returned at `analysis.cpp:1055` | **shipped** |
 | The same gates through the C API | `ac3forge_qc_preset`, `ac3forge_evaluate_qc_gate` (`libs/capi/src/qc.cpp`) | shipped |
-| The same gates in a window | `apps/gui/qc_controller.cpp`, `qml/QcDialog.qml`, `qml/QcGateMeter.qml` | shipped |
+| The same gates in a window | `apps/forge/gui/src/qc_controller.cpp`, `qml/QcDialog.qml`, `qml/QcGateMeter.qml` | shipped |
 | Declared stream facts — layout, substream map, OAMD counts, CRC integrity | `ac3cli probe`, and its `ac3forge.probe/1` JSON document | shipped |
-| AC-4 loudness, true peak, dialnorm and stated loudness | `measure_qc_ac4` in `apps/cli/commands/analysis.cpp`, and the GUI's QC dialog | shipped since the AC-4 plan's I1 and I3; not in the original table |
+| AC-4 loudness, true peak, dialnorm and stated loudness | `measure_qc_ac4` in `apps/forge/cli/src/commands/analysis.cpp`, and the GUI's QC dialog | shipped since the AC-4 plan's I1 and I3; not in the original table |
 
 The third of the brief's three candidate output forms — an exit code — therefore already exists,
 and is already documented as distinguishing a failed gate from a failed read
-(`apps/cli/usage.cpp:738-740`). Nothing in this plan changes it.
+(`apps/forge/cli/src/usage.cpp:738-740`). Nothing in this plan changes it.
 
 ### Two headers that do not belong to this
 
@@ -107,7 +107,7 @@ Five things, in the order they matter.
 
 3. **The measurement result has no library type, and is duplicated.** `QcResult` and
    `QcProgrammeResult` (`analysis.cpp:54-89`) and `qc_detail::RawResult` and
-   `qc_detail::RawProgramme` (`apps/gui/qc_controller.hpp:33-49`) are the same six and seven
+   `qc_detail::RawProgramme` (`apps/forge/gui/src/qc_controller.hpp:33-49`) are the same six and seven
    fields written twice. So are the measurement drivers: `qc_controller.hpp:16-18` says its
    helpers are "an anonymous namespace mirroring ac3cli's own
    `measure_qc_ac3`/`measure_qc_eac3`". Any third surface — a report writer — would be the third
@@ -138,14 +138,14 @@ Recommended. `qc` already takes the file, decodes it, measures it and gates it. 
 `ac3::meta::QcReport` so the CLI, the GUI and the writers share one type instead of three.
 
 The build already draws this boundary. `ac3::meta` is where `qc.hpp`, `loudness.hpp` and
-`drc.hpp` live and is installed with the library; `apps/cli` is where the rendering of those
+`drc.hpp` live and is installed with the library; `apps/forge/cli/src` is where the rendering of those
 numbers into text already happens; `AC3FORGE_BUILD_CLI` already gates it. No new target, no new
 CPack component, no new registry identifier, no new `.desktop`, no new `.ts` catalogue, no new
 CI leg.
 
 Cost: `ac3cli` gains two options on one of its forty-one verbs (44 now), and Forge's coverage
-floor (`apps/cli 40 34`; now 80 71) has to survive a new renderer that ctest can exercise from a fixture. The
-report writers live in `apps/cli/` and are reachable from the library's own consumers only
+floor (`apps/forge/cli/src 40 34`; now 80 71) has to survive a new renderer that ctest can exercise from a fixture. The
+report writers live in `apps/forge/cli/src/` and are reachable from the library's own consumers only
 through the C API, which is where option A's limit lies — a Python caller gets the model but
 renders the document itself.
 
@@ -200,7 +200,7 @@ identifier appears anywhere.
 
 Cost: a third binary in `runtime` that duplicates `ac3cli`'s argument parsing, its
 `read_elementary_stream`, its programme selection and its exit-code table —
-`apps/cli/support.cpp` and `apps/cli/exit_codes.hpp` are shared today because there is one
+`apps/forge/cli/src/support.cpp` and `apps/forge/cli/src/exit_codes.hpp` are shared today because there is one
 binary. It buys a shorter command name and costs a second copy of the CLI's front end.
 `ac3cli qc` is already the command.
 
@@ -325,12 +325,12 @@ delivery operator's position both are "this file is not what was ordered".
 | `libs/ac3/include/iclforge/ac3/meta/qc.hpp` | the five presets, `QcLoudnessLimit`, `evaluate_qc_gate()`, `QcVerdict`, `parse_qc_preset()` — unchanged |
 | `libs/ac3/include/iclforge/ac3/meta/loudness.hpp` | `LoudnessMeter` (both constructors), `position_weight()`, `dialnorm_from_lkfs()` — unchanged |
 | `libs/ac3/include/iclforge/ac3/encoder/plan.hpp:64-73` | `LayoutId` and `LayoutInfo` as the layout vocabulary the conformance check compares against |
-| `apps/cli/commands/analysis.cpp:54-89` | `QcResult`/`QcProgrammeResult`, **promoted** into the library |
-| `apps/cli/commands/analysis.cpp:109,244,408,539` | `measure_qc_ac3`, `measure_qc_eac3_bed`, `measure_qc_eac3_rendered`, `measure_qc_eac3_objects`, **promoted** |
-| `apps/cli/commands/analysis.cpp:680-781` | `report_qc_programme()`, **split** into a model pass and a text renderer |
-| `apps/cli/json.hpp`, `apps/cli/json.cpp` | `JsonWriter` — the streaming, dependency-free writer `probe` uses. Reused as it stands |
-| `apps/cli/commands/probe.cpp` | the shape of a `json=1` verb, and the OAMD/integrity reads the conformance checks need |
-| `apps/cli/exit_codes.hpp:63` | `kExitQcGate` — unchanged |
+| `apps/forge/cli/src/commands/analysis.cpp:54-89` | `QcResult`/`QcProgrammeResult`, **promoted** into the library |
+| `apps/forge/cli/src/commands/analysis.cpp:109,244,408,539` | `measure_qc_ac3`, `measure_qc_eac3_bed`, `measure_qc_eac3_rendered`, `measure_qc_eac3_objects`, **promoted** |
+| `apps/forge/cli/src/commands/analysis.cpp:680-781` | `report_qc_programme()`, **split** into a model pass and a text renderer |
+| `apps/forge/cli/src/json.hpp`, `apps/forge/cli/src/json.cpp` | `JsonWriter` — the streaming, dependency-free writer `probe` uses. Reused as it stands |
+| `apps/forge/cli/src/commands/probe.cpp` | the shape of a `json=1` verb, and the OAMD/integrity reads the conformance checks need |
+| `apps/forge/cli/src/exit_codes.hpp:63` | `kExitQcGate` — unchanged |
 | `apps/gui/qc_controller.{hpp,cpp}`, `qml/QcDialog.qml`, `qml/QcGateMeter.qml` | the dialog that gains **Save report…**; its duplicate model and helpers deleted in favour of the promoted ones |
 | `docs/forge/cli/commands.md` ("Versioning") | the JSON versioning contract `ac3forge.qc/1` copies verbatim |
 | `docs/forge/gui/qc.md` | the dialog's documented behaviour, extended by one button |
@@ -354,7 +354,7 @@ Six additions, all in `ac3::meta`, all needed by any of the four placement optio
    binding call one function instead of mirroring four. This is where the CLI's four
    `measure_qc_*` helpers land.
 4. **Stream facts on the report** — the OAMD counts and CRC/parse integrity that `probe` reads
-   today inside `apps/cli`, so a QC report needs neither a second walk of the file nor a shell
+   today inside `apps/forge/cli/src`, so a QC report needs neither a second walk of the file nor a shell
    pipeline through `probe`.
 5. **A loudness time series** — `LoudnessMeter` exposes `momentary_lkfs()` and
    `short_term_lkfs()` as instantaneous values (`loudness.hpp:136,140`), with nothing retained.
@@ -449,23 +449,23 @@ If decision 1 takes option C instead, the identity becomes: target `ac3assay`, n
 `ac3tests` is one binary (`tests/CMakeLists.txt:617`,
 `catch_discover_tests(ac3tests ADD_TAGS_AS_LABELS)`), so ctest labels come from Catch2 tags rather
 than from CMake. The existing QC tags are `[qc]` (`libs/ac3/tests/meta/test_meta_qc.cpp`) and `[cli][qc]`
-(`tests/cli/test_cli.cpp:2008`).
+(`apps/forge/cli/tests/test_cli.cpp:2008`).
 
 | Suite | File | Tags / label | What it pins |
 |---|---|---|---|
 | Library | `libs/ac3/tests/meta/test_meta_qc.cpp` (extended) | `[qc]` | `QcExpectations` and `evaluate_qc_conformance()`: every mismatch fails, every match passes, and an expectation left unset gates nothing |
 | Library | `tests/meta/test_qc_report.cpp` (new) | `[qc]` | `QcReport` round-trips every field the two renderers read; a report with no measurable loudness carries `std::nullopt` rather than a sentinel |
-| CLI | `tests/cli/test_cli.cpp` (extended) | `[cli][qc]` | `json=1` emits a document that parses, carries `schema == "ac3forge.qc/1"`, and has **every** documented member present — including the null ones, which is the contract's own rule and the thing a renderer regression breaks first |
-| CLI | `tests/cli/test_cli.cpp` | `[cli][qc]` | determinism: two runs with `SOURCE_DATE_EPOCH` pinned are byte-identical |
-| CLI | `tests/cli/test_cli.cpp` | `[cli][qc]` | the exit code stays `kExitQcGate` for a failed conformance check, and `kExitInput` for an unreadable file |
-| GUI | `apps/gui/tests/qml/tst_qc_panel.qml` (extended) | `gui` | **Save report…** writes both files to a temporary path, and the dialog reports the failure when the path is unwritable |
+| CLI | `apps/forge/cli/tests/test_cli.cpp` (extended) | `[cli][qc]` | `json=1` emits a document that parses, carries `schema == "ac3forge.qc/1"`, and has **every** documented member present — including the null ones, which is the contract's own rule and the thing a renderer regression breaks first |
+| CLI | `apps/forge/cli/tests/test_cli.cpp` | `[cli][qc]` | determinism: two runs with `SOURCE_DATE_EPOCH` pinned are byte-identical |
+| CLI | `apps/forge/cli/tests/test_cli.cpp` | `[cli][qc]` | the exit code stays `kExitQcGate` for a failed conformance check, and `kExitInput` for an unreadable file |
+| GUI | `apps/forge/gui/tests/qml/tst_qc_panel.qml` (extended) | `gui` | **Save report…** writes both files to a temporary path, and the dialog reports the failure when the path is unwritable |
 
 **Coverage.** `tools/checks/coverage_report.sh:118-127` holds `libs/ac3 88 78` and
-`apps/cli 40 34` (line, branch). The library additions sit inside `libs/ac3` and must clear
+`apps/forge/cli/src 40 34` (line, branch). The library additions sit inside `libs/ac3` and must clear
 88/78 like everything else there — a report model and two pure evaluation functions are
 straightforwardly testable from a fixture, so this is a floor to meet rather than to move.
 
-The CLI floor is the one to watch. That table's own comment explains why `apps/cli` sits at 40 —
+The CLI floor is the one to watch. That table's own comment explains why `apps/forge/cli/src` sits at 40 —
 roughly 15% of its lines are device paths that never execute headless. Two new renderer files are
 fully exercisable from a fixture stream, so they should *raise* the measured number rather than
 press on the floor. **Proposal: leave both floors untouched in Phases 1–4, and re-measure before
@@ -511,7 +511,7 @@ NSIS installer, the DEB and RPM named `ac3forge`, the `.dmg`, the winget entry
 of them, and the release asset route is untouched: `release.yml` collects by the `packages-*`
 artifact prefix (`release.yml:275-279`), and no new artifact appears.
 
-The one packaged thing that changes: `apps/cli`'s shell completions and its man page list the `qc`
+The one packaged thing that changes: `apps/forge/cli/src`'s shell completions and its man page list the `qc`
 verb's options, so `report=` and `json=` join four completion files and `ac3cli.1`. Both are
 installed under `runtime` already.
 
@@ -565,7 +565,7 @@ would become four.
 Under the recommendation this reaches one surface: the GUI's **Save report…** button and its error
 states.
 
-- **Catalogues.** `apps/gui/translations/` holds seven `.ts` files — `ar`, `de`, `es`, `fr`, `he`,
+- **Catalogues.** `apps/forge/gui/assets/translations/` holds seven `.ts` files — `ar`, `de`, `es`, `fr`, `he`,
   `yi` and the `xx` pseudo-locale. Every new string is `qsTr()`-wrapped and `lupdate` refreshes all
   seven. `QcDialog.qml` already wraps every string it draws.
 - **RTL.** `ar` and `he` are right-to-left; the button joins a dialog already laid out for both, so
@@ -581,7 +581,7 @@ states.
   rather than leaving as an oversight; it is decision 4.
 
 Under option C, a new application needs its own six catalogues plus `xx`, its own RTL pass and its
-own accessibility audit. Note for whoever takes that on: `apps/crucible/translations/` has `ar`,
+own accessibility audit. Note for whoever takes that on: `apps/crucible/ui/assets/translations/` has `ar`,
 `de`, `es`, `fr`, `he`, `yi` and **no `xx`**, so the pseudo-locale is a GUI-only practice today
 rather than a family one (Hearth's six catalogues have none either).
 
@@ -614,7 +614,7 @@ outstanding one rather than the first.
 
 ## Third-party notices
 
-`apps/notices/` composes `NOTICES.txt` per platform from fragments — `header.txt`, `qt-linux.txt`,
+`notices/` composes `NOTICES.txt` per platform from fragments — `header.txt`, `qt-linux.txt`,
 `qt-macos.txt`, `qt-windows.txt`, `windows-runtime.txt` — selected by
 `platform/<os>/components.cmake`. **Any new dependency needs a fragment**, and a fragment is a
 licence text plus an attribution rather than a line in a list.
@@ -629,7 +629,7 @@ where it bites, exactly as this page's brief anticipated.
 | libharu | new | a new fragment | zlib/libpng — permissive, GPL-3-compatible | Rejected: a C PDF library, a new vcpkg port, a new fragment, and a second layout engine to maintain beside the HTML one |
 | PoDoFo | new | a new fragment | **LGPL-2.1** — needs care: LGPL-2.1-**only** is incompatible with GPL-3; only the `or later` form can be taken to LGPL-3 and combined | Rejected on the dependency cost before the licence question is reached |
 
-The JSON renderer reuses `apps/cli/json.hpp`, which is in-tree and has no dependency. So the
+The JSON renderer reuses `apps/forge/cli/src/json.hpp`, which is in-tree and has no dependency. So the
 notices tree is untouched by this plan in full.
 
 ## Licensing
@@ -653,7 +653,7 @@ every case.
 
 | Channel | Obligation | Met by |
 |---|---|---|
-| GitHub release archives, DEB, RPM, `.dmg`, NSIS, AppImage | GPL-3 §4/§6 — licence text with the binary, source offer | `apps/notices/` installs `LICENSE.txt` and `NOTICES.txt`; the source is the tagged public repository |
+| GitHub release archives, DEB, RPM, `.dmg`, NSIS, AppImage | GPL-3 §4/§6 — licence text with the binary, source offer | `notices/` installs `LICENSE.txt` and `NOTICES.txt`; the source is the tagged public repository |
 | Homebrew formula and cask | the formula declares the licence | already `GPL-3.0` |
 | winget | the manifest declares `License` and `LicenseUrl` | already in the staged manifests |
 | PyPI (`ac3forge`) | wheel metadata | unchanged — no Python surface in this plan |
@@ -704,8 +704,8 @@ Write this page, add it to the `mkdocs.yml` nav under **Forge**, and open a PR.
 ### Phase 2 — promote the model into the library
 
 **Status: not built.** `QcResult` and `QcProgrammeResult` are still in
-`apps/cli/commands/analysis.cpp` and `RawResult` and `RawProgramme` in
-`apps/gui/qc_controller.hpp`, each now with AC-4 fields, and `ac3/meta/qc_report.hpp` does not
+`apps/forge/cli/src/commands/analysis.cpp` and `RawResult` and `RawProgramme` in
+`apps/forge/gui/src/qc_controller.hpp`, each now with AC-4 fields, and `ac3/meta/qc_report.hpp` does not
 exist.
 
 `ac3::meta::QcReport`, `QcExpectations`, `evaluate_qc_conformance()` and `measure_qc()` in
@@ -801,8 +801,8 @@ roadmap row would move under that product name — still without a numeric ID.
 
 **Open pull requests.** `gh pr list` on 2026-09-07 shows five open, four of them Crucible engine
 and threading fixes (#532, #534, #535, #536) and one Dependabot Actions bump (#531). None touches
-`apps/cli`, `libs/ac3/*/meta`, `apps/gui/qc_controller.*` or `docs/`, so Phase 1 collides with
-nothing. Phase 2 edits `apps/gui`, so it should re-check the queue first.
+`apps/forge/cli/src`, `libs/ac3/*/meta`, `apps/gui/qc_controller.*` or `docs/`, so Phase 1 collides with
+nothing. Phase 2 edits `apps/forge/gui`, so it should re-check the queue first.
 
 **The GUI and the CLI in one change.** Phase 2 deletes a struct from each and is one PR rather than
 two: leaving either surface on its own copy for a release would make the duplication permanent in
@@ -851,7 +851,7 @@ The open questions. Each carries a recommendation and the cost of taking it.
    into the library; (b) the GUI as well, in Phase 4; (c) its own named member with its own binary;
    (d) a third Forge binary `ac3qc`. **Recommend (a) with (b)**: it is the boundary the build,
    install rules, packaging and docs already draw, and it needs no decision from any registry.
-   Cost: the report renderers live in `apps/cli` and are reachable from other languages only
+   Cost: the report renderers live in `apps/forge/cli/src` and are reachable from other languages only
    through the C API added in Phase 5. Taking (c) later costs nothing already spent — Phase 2's
    promotion is the first step under all four. [The topology plan](topology.md) reaches the same
    conclusion from the family's source/sink/transport frame, which is independent evidence rather
@@ -876,8 +876,8 @@ The open questions. Each carries a recommendation and the cost of taking it.
    catalogues, with citations left untranslated. **Recommend (a).** Cost: an operator working in
    Arabic or Hebrew reads an English report; the GUI chrome around it is translated either way.
 
-5. **The coverage floors.** (a) leave `libs/ac3 88 78` and `apps/cli 40 34` untouched through
-   Phase 4 and re-measure before Phase 5; (b) raise `apps/cli` on the strength of the new renderers.
+5. **The coverage floors.** (a) leave `libs/ac3 88 78` and `apps/forge/cli/src 40 34` untouched through
+   Phase 4 and re-measure before Phase 5; (b) raise `apps/forge/cli/src` on the strength of the new renderers.
    **Recommend (a).** Cost: the floor understates the achieved number for a release. Raising it on
    one PR's additions is how a floor becomes unmeetable later.
 

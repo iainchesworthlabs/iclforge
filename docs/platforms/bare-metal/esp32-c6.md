@@ -212,7 +212,7 @@ load a Sendspin player carries, since the Sendspin server connects to the player
 starts once 32,768 bytes have arrived, and the bytes are counted and dropped.
 
 A host sent 1,536 kbit/s in 32 ms chunks, the rate of 48 kHz 16-bit stereo PCM, cycling the bytes
-of `apps/wasm/assets/demo.ec3`. During the decode the part received 1,500 to 1,537 kbit/s, and
+of `apps/demos/wasm/assets/demo.ec3`. During the decode the part received 1,500 to 1,537 kbit/s, and
 the longest gap between two reads was 81 to 114 ms. The access point negotiated 802.11n on
 channel 1 at -61 dBm, so the part's WiFi 6 was not exercised.
 

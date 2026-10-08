@@ -19,9 +19,9 @@
 # link the instrumented iclforge::ac3 with no iclforge::coverage of their own and link
 # fine) - but --coverage is target-scoped at COMPILE time, so a consumer's own
 # .cpp files still compile without -fprofile-arcs and emit no .gcno. That is
-# why forge has to link this explicitly (apps/cli/CMakeLists.txt) now that
+# why forge has to link this explicitly (apps/forge/cli/CMakeLists.txt) now that
 # tools/checks/coverage_report.sh gates it: without it a gcovr filter for
-# apps/cli returns zero files, not a low percentage.
+# apps/forge/cli/src returns zero files, not a low percentage.
 #
 # The coverage preset still turns ICLFORGE_BUILD_EXAMPLES off, as a pure
 # build-time saving: examples/ is documentation that happens to compile, over
@@ -43,7 +43,7 @@ if(ICLFORGE_ENABLE_COVERAGE)
         # clang-cl (the config-windows-llvm-coverage preset): LLVM's own
         # source-based coverage rather than gcov, because that is what
         # clang-cl supports and because llvm-cov reports BRANCH coverage,
-        # which the Windows-only code (apps/windows) has no other way of
+        # which the Windows-only code (apps/crucible/windows) has no other way of
         # getting. Two things differ from the GCC arm: the link step is
         # MSVC-style and never goes through the compiler driver, so the
         # profile runtime has to be named explicitly (it lives in clang's

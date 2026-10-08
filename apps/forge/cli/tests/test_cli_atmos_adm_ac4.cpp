@@ -31,7 +31,7 @@
 // E-AC-3 object tests use, encoded to AC-4 by atmos-adm and decoded with adm_out, gives objects
 // whose positions, gains and timing match the master within tolerances you pin." Real,
 // subprocess-level integration test, the same "run the actual built binary" shape
-// tests/cli/test_cli_atmos_adm.cpp and test_cli_decode_adm.cpp use, and for the same reason (their
+// apps/forge/cli/tests/test_cli_atmos_adm.cpp and test_cli_decode_adm.cpp use, and for the same reason (their
 // own top comments: main.cpp compiles run_atmos_adm/run_decode_ac4 into one anonymous-namespace
 // binary this test binary cannot link directly). Separate file, same two-part
 // ICLFORGE_BUILD_ADM-and-forge gate as those two files (tests/CMakeLists.txt); the fixture below
@@ -41,7 +41,7 @@
 //
 // The round trip: atmos-adm codec=ac4 (A-JOC, this project's own writer) -> decode's objects_dir
 // (each object's raw PCM) and adm_out (a fresh ADM BWF master, iclforge::ac4::ObjectProperties
-// bridged onto iclforge::objects::oba::DynamicObject - apps/cli/commands/decode.cpp's
+// bridged onto iclforge::objects::oba::DynamicObject - apps/forge/cli/src/commands/decode.cpp's
 // to_oba_dynamic_object). "Match the master" is checked by parsing BOTH the original fixture and
 // the round-tripped adm_out back through the same
 // iclforge::adm::parse_bw64/iclforge::adm::build the read side already uses, evaluating each
@@ -330,7 +330,7 @@ double gain_db(double linear) {
 }
 
 // "  the decoder's output lags the input by <N> samples" (run_atmos_objects_to_ac4's own status
-// line, apps/cli/commands/atmos.cpp) - the encoder's delay_samples() plus the decoder's
+// line, apps/forge/cli/src/commands/atmos.cpp) - the encoder's delay_samples() plus the decoder's
 // decoder_delay_samples(), both fixed for frame_rate_index 13 (which this command's AC-4 path
 // always uses - encoder.hpp's own ObjectsConfig comment). adm_out's timeline is the DECODER's own
 // output sample count from its first (silent, priming) frame, so a position "at ADM time t" in the

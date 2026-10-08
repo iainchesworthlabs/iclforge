@@ -22,9 +22,9 @@
 #include "iclforge/ac4/encoder/encoder.hpp"
 
 // The steps forge's `atmos-encode codec=ac4` and forge-gui's AC-4 objects share
-// (apps/common/ac4_objects_core.hpp): which channels are which objects, where a
+// (apps/shared/media/src/ac4_objects_core.hpp): which channels are which objects, where a
 // pinned channel sits, the audio each object carries, and the writer call.
-// tests/cli/test_cli_atmos_encode_ac4.cpp holds the command to these, and the
+// apps/forge/cli/tests/test_cli_atmos_encode_ac4.cpp holds the command to these, and the
 // Qt Quick suite (tst_e2e_ac4_objects.qml) the page.
 
 using iclforge::apps::Ac4ObjectSlot;
@@ -207,7 +207,7 @@ TEST_CASE("the encoder takes the 64 objects the page and the command allow, and 
 
 TEST_CASE("a scene of slots encodes to a stream that decodes to its objects, one update a frame",
           "[gui][ac4]") {
-    // The ADM fixture's shape (tests/cli/test_cli_atmos_adm.cpp): two channels held at the
+    // The ADM fixture's shape (apps/forge/cli/tests/test_cli_atmos_adm.cpp): two channels held at the
     // speakers' places and one dynamic object held at the rear right for 0.096 s, then at the
     // front. Three tones, 0.192 s.
     constexpr std::size_t kSamples = 6 * 1536;

@@ -126,7 +126,7 @@
 # sides of the split, differing only by CPU architecture. See cross-platform reproducibility notes below for the fuller note; the underlying mechanism itself is still
 # open.
 #
-# Qt Quick Test harness: apps/gui/tests/ adds forge_gui_qml_tests_*, one real
+# Qt Quick Test harness: apps/forge/gui/tests/ adds forge_gui_qml_tests_*, one real
 # ctest entry per tst_*.qml suite (label "gui") that Quick-Test-drives the
 # actual EncoderController singleton and Main.qml shell, registered only
 # when ICLFORGE_BUILD_GUI is ON - so it rides the existing GUI axis rather

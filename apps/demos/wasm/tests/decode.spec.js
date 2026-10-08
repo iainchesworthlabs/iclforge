@@ -9,7 +9,7 @@ const { test, expect } = require('@playwright/test');
 // the module compiles. WASM streaming decoder package replaced the demo's own bespoke Embind
 // Decoder class with the published iclforge-wasm-decoder package
 // (js/src/decode-file.ts's decodeFile(), built on PushDecoder) - this test
-// now drives THAT, the same call apps/wasm/demo.js itself makes, against the
+// now drives THAT, the same call apps/demos/wasm/demo.js itself makes, against the
 // bundled 8-second, 3-object Atmos-in-DD+ fixture, and asserts the same real
 // values a human previously checked by eye.
 test('decodes the bundled Atmos-in-DD+ fixture with real, moving object positions', async ({

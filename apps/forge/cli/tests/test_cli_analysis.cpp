@@ -18,7 +18,7 @@
 
 #include "iclforge/ac3/io/wav.hpp"
 
-// The measurement and carrier commands (apps/cli/commands/analysis.cpp:
+// The measurement and carrier commands (apps/forge/cli/src/commands/analysis.cpp:
 // levels, loudness, qc, spdif, unspdif) at the level a user meets them: the
 // real binary as a subprocess, its exit code and the report it prints. The
 // numbers asserted are the ones a full-scale-referenced sine makes exact -
@@ -34,7 +34,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// See tests/cli/test_cli.cpp's own scratch_dir for the reasoning this copy
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir for the reasoning this copy
 // shares, including the PID fold; the leaf name below is this file's own.
 std::string scratch_pid_suffix() {
     return iclforge::test::platform::process_id();

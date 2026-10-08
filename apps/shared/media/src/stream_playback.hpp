@@ -13,8 +13,8 @@
 // becomes of the audio the E-AC-3 one is still holding when the stream ends.
 // forge's 'monitor' and 'spatial' use both. Compiled straight into forge
 // and iclforge-tests, the way container_input.cpp beside it is (see
-// recording_sink.hpp for why apps/common has no library target), and kept
-// out of apps/cli so a test can hold both without a render device - neither
+// recording_sink.hpp for why apps/shared/media/src has no library target), and kept
+// out of apps/forge/cli/src so a test can hold both without a render device - neither
 // command gets past opening one on a headless CI leg.
 
 namespace iclforge::apps {

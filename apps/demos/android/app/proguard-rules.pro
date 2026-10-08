@@ -1,7 +1,7 @@
 # isMinifyEnabled is true (see app/build.gradle.kts) - R8 shrinks/renames
 # anything it cannot prove is reachable from an ordinary Kotlin/Java call
 # site. Two classes are reachable a different way, invisible to that
-# analysis, because native code (apps/android/app/src/main/cpp/ and
+# analysis, because native code (apps/demos/android/app/src/main/cpp/ and
 # libs/audio/src/backend/android/passthrough.cpp) finds them by NAME at
 # runtime rather than through a normal call graph edge:
 

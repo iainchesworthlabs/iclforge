@@ -1,4 +1,4 @@
-// The AC-4 object renderer of apps/common/ac4_object_render.hpp - forge's,
+// The AC-4 object renderer of apps/shared/media/src/ac4_object_render.hpp - forge's,
 // through the layout renderer Hearth plays E-AC-3's objects with - on the
 // constructed object streams of objects.hpp, whose object 0 moves from
 // the left wall to the right one over the stream. Each speaker's output is

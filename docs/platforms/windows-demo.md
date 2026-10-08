@@ -8,16 +8,16 @@
 
 !!! info "Renamed: this application is now AC3Forge Crucible"
     This page is the design and phase record of the Windows demo, kept under the names it was
-    built with (`ac3desk`, `ac3::windemo`, `apps/windows/`). The application was promoted to a
+    built with (`ac3desk`, `ac3::windemo`, `apps/crucible/windows/`). The application was promoted to a
     cross-platform product on 2026-09-04 and renamed: it is now **AC3Forge Crucible**,
     `ac3crucible`, `ac3::crucible`, under `apps/crucible/`. For what it is today, and for the
     Linux and macOS work, see [the promotion plan](../crucible/design/promotion.md).
-    The null-sink driver, under `apps/windows/driver/`, kept its old names until 2026-10-01; the
+    The null-sink driver, under `apps/crucible/windows/driver/`, kept its old names until 2026-10-01; the
     note after this one says what it is called now.
 
     Read the names below through this table. The window `ac3desk` is `ac3crucible`, and the
-    runner `ac3windemo` is `ac3crucible-run`. `apps/windows/{engine,runner,ui,translations,spikes}`
-    are under `apps/crucible/`, and `tests/windemo/` is `tests/crucible/`. The CMake option
+    runner `ac3windemo` is `ac3crucible-run`. `apps/crucible/windows/{engine,runner,ui,translations,spikes}`
+    are under `apps/crucible/`, and `tests/windemo/` is `apps/crucible/engine/tests/`. The CMake option
     `AC3FORGE_BUILD_WINDEMO` is `AC3FORGE_BUILD_CRUCIBLE`, the archive
     `ac3forge-desktop-atmos-<version>-win64.zip` is `ac3forge-crucible-<version>-win64.zip`,
     `tools/ci/check_windemo_package.py` is `tools/ci/check_crucible_package.py`, and the legs'
@@ -49,7 +49,7 @@
 
 This describes the Windows demo as it was planned and built, before it became a product. It
 works differently from the Shield app: the Shield app plays one authored stream and lets a
-controller move one object, while the Windows app, **Desktop Atmos Demo** (`apps/windows/`, the
+controller move one object, while the Windows app, **Desktop Atmos Demo** (`apps/crucible/windows/`, the
 working name; now `apps/crucible/`), installs itself as the PC's output
 device the way FxSound does, takes every application that is playing sound, and lets the user
 drag each one to a position in the room. What comes out over HDMI is a live E-AC-3 JOC (Atmos)
@@ -98,16 +98,16 @@ inventory the plan is built on, with the header each item lives in.
 | Windows Spatial Sound object sink (headphones) | exists, confirmed against a real spatial endpoint | `ac3::audio::SpatialObjectSink`, `spatial.hpp` |
 | Whole-endpoint WASAPI loopback capture | exists | `ac3::audio::Capture` with `DeviceKind::kLoopback`, `libs/audio/src/backend/windows/capture.cpp` |
 | Decoder with §7.8 downmix for the decoded headphone path | exists | `ac3::OutputStage`, `libs/ac3/include/iclforge/ac3/decoder/output.hpp` |
-| Object signing hook pattern | exists, on Android | `apps/android/app/src/main/cpp/shield_signing_hook.hpp` |
-| Draggable room widget, plan plus elevation | exists, in the GUI's Live tab | `apps/gui/qml/Main.qml` (`liveRoom`), `SoundfieldView.qml` |
-| Reference live encode loop | exists, twice | `apps/cli/commands/live_audio.cpp` (`run_live`), `apps/android/.../live_cursor.cpp` |
+| Object signing hook pattern | exists, on Android | `apps/demos/android/app/src/main/cpp/shield_signing_hook.hpp` |
+| Draggable room widget, plan plus elevation | exists, in the GUI's Live tab | `apps/forge/gui/assets/qml/Main.qml` (`liveRoom`), `SoundfieldView.qml` |
+| Reference live encode loop | exists, twice | `apps/forge/cli/src/commands/live_audio.cpp` (`run_live`), `apps/android/.../live_cursor.cpp` |
 | **Per-process loopback capture** | **landed** (Phase 1) | `Capture::start_process_loopback`, Windows backend only, see [Library additions](../crucible/design/promotion.md#library-additions) |
 | **Render-device arrival and removal notifications** | **landed** (Phase 1) | `ac3::audio::DeviceWatcher`, Windows backend only |
-| **Audio session enumeration** (who is playing, PID, name, icon) | **new, app-level** | `apps/windows/` |
-| **Virtual null-sink audio device** | **new, separate driver project** | `apps/windows/driver/` |
-| **Output-mode state machine with hot switching** | **new, app-level** | `apps/windows/` |
+| **Audio session enumeration** (who is playing, PID, name, icon) | **new, app-level** | `apps/crucible/windows/` |
+| **Virtual null-sink audio device** | **new, separate driver project** | `apps/crucible/windows/driver/` |
+| **Output-mode state machine with hot switching** | **new, app-level** | `apps/crucible/windows/` |
 | **Low-latency mode** | **new, configuration of existing knobs** | `AtmosConfig::numblkscod`, capture buffer size |
-| Tray-resident Qt Quick UI | new | `apps/windows/` |
+| Tray-resident Qt Quick UI | new | `apps/crucible/windows/` |
 
 Nothing in `libs/ac3/` changes. The library additions are two Windows-backend files and their
 `kNoBackend` twins in every other backend, per the
@@ -387,7 +387,7 @@ the GUI rather than copying them. Screens:
 - **Output**: what mode is active, which endpoint, why (the probe result in one line each), and
   a pin. The default-device switch lives here with its confirmation.
 - **Settings**: six blocks, whose keys are `DeskController`'s in
-  `apps/crucible/ui/crucible_controller.cpp`. Latency (normal or low-latency frames,
+  `apps/crucible/ui/src/crucible_controller.cpp`. Latency (normal or low-latency frames,
   `codec/lowLatency`). Codec (the bitrate, `codec/bitrate`, and the split-stereo default for
   applications the engine meets from now on, `codec/splitStereo`). Signing key (the key
   file's path, `signing/keyPath`; the `AC3FORGE_SIGNING_KEY_FILE` and `AC3FORGE_SIGNING_KEY`
@@ -410,7 +410,7 @@ the 2D views work, not part of the first cut.
 ## Structure
 
 ```
-apps/windows/
+apps/crucible/windows/
   CMakeLists.txt                  in-tree, behind option(AC3FORGE_BUILD_WINDEMO) and if(WIN32)
   engine/                         headless, namespace ac3::windemo, no Qt
     slots.{hpp,cpp}               the plan: 10 positioned + 5 bed slots, full-screen rule   [landed]
@@ -442,7 +442,7 @@ tests/windemo/                    Catch2, on every CI leg, ungated: the four pur
 ```
 
 The pure modules, and the tap pool and output stage over the `AudioDevices` fakes, compile
-into `ac3tests` on every platform, the way `apps/common` does, so the rules the UI hangs on
+into `ac3tests` on every platform, the way `apps/shared/media/src` does, so the rules the UI hangs on
 (the slot budget, what a full-screen application does, which output wins when) hold on a
 Linux CI leg that could never run the demo. The `platform/windows/` half builds only under
 the option.
@@ -471,7 +471,7 @@ defaulting OFF, with the same pre-seeded `OFF` list for the targets it does not 
 
 ### The driver, and its licence
 
-`apps/windows/driver/` is derived from Microsoft's AudioCodec ACX sample (until 2026-09-04,
+`apps/crucible/windows/driver/` is derived from Microsoft's AudioCodec ACX sample (until 2026-09-04,
 from the Simple Audio Sample, a PortCls/WaveRT miniport; the port is on
 [its own page](windows-driver-acx.md)), cut down to one render endpoint that
 discards its input and advertises 7.1 at 48 kHz. The sample is licensed
@@ -556,7 +556,7 @@ exercised: any bitstream mode (no receiver, and this workstation's HDMI endpoint
 neither format), the spatial path (Windows Sonic is off here), and a real device-arrival
 switch. Fades on a mode switch are not written; the switch is a stop and a start.
 
-The runner's surface as it stands on 2026-09-03 (`apps/crucible/runner/main.cpp`). Flags:
+The runner's surface as it stands on 2026-09-03 (`apps/crucible/runner/src/main.cpp`). Flags:
 `--null-sink SUBSTR` names the silent endpoint (default "Desktop Atmos" then, and "Crucible Silent
 Output" since 2026-10-01); `--key PATH` loads a signing key file, otherwise the
 `AC3FORGE_SIGNING_KEY_FILE` and `AC3FORGE_SIGNING_KEY` variables are read; `--pin MODE` starts
@@ -576,13 +576,13 @@ and tray residency. Exit: the user story above, minus the driver, works end to e
 **Progress, 2026-09-03:** built to the design canvas after a human-factors pass on it.
 `ac3desk` (`apps/crucible/ui/`, QML module `Ac3ForgeDesk`) has the three pages, the tray icon
 with its output submenu and default-output switch, the status strip, and the capture aids
-borrowed from the GUI's smoke modes (`apps/crucible/ui/main.cpp`): `--shot <png>` grabs the
+borrowed from the GUI's smoke modes (`apps/crucible/ui/src/main.cpp`): `--shot <png>` grabs the
 window once it has settled and quits, `--page room|output|settings|room3d` picks the page it
 shows first, and `--place Name=x,y,z[,split]` positions a listed application, as a pair with
 the suffix, before the capture. The GUI's Theme, Card, RailBlock and
 SegmentedControl are not copied: the demo's CMake rewrites each one's module import at
 configure time into an ignored directory and registers the result, so an edit to
-`apps/gui/qml/Theme.qml` reaches both apps. `DeskController` is a QML singleton that polls the
+`apps/shared/theme/assets/qml/Theme.qml` reaches both apps. `DeskController` is a QML singleton that polls the
 engine's status snapshot a few times a second and republishes it as properties, and persists
 settings through QSettings under the GUI's organisation. Localisation shares the GUI's
 `LanguageManager` (given a translation basename so a second app can use it, and a way back to
@@ -620,7 +620,7 @@ with no bugcheck, and `remove.ps1` takes the device and package out again. Not y
 on the workstation, which still has test signing off and memory integrity on; the Settings
 screen says so. The base turned out to be Microsoft's
 *Simple Audio Sample* rather than SysVAD: the same WaveRT virtual-device machinery at a fifth
-of the size. `apps/windows/driver/` carries it under its own MS-PL `LICENSE` with a `README`
+of the size. `apps/crucible/windows/driver/` carries it under its own MS-PL `LICENSE` with a `README`
 that lists every cut: the mic-array endpoint, the tone generator and the file-saving path are
 gone, the speaker is 7.1 at 48 kHz, rendered data is discarded while the DMA position still
 advances at the nominal rate, and the INF is rewritten for one endpoint under the hardware id
@@ -631,7 +631,7 @@ on `C:`) to a test-signed package: `inf2cat`'s signability test passes, `infveri
 INF valid, and the build generates its own WDK test certificate. `install.ps1` and `remove.ps1`
 stage the package with `pnputil` and create or remove the root-enumerated device with the
 WDK's `devcon`. Loading it needs test signing on and memory integrity off, so its first runs
-happen in a throwaway VMware guest rather than on the workstation: `apps/windows/driver-vm/`
+happen in a throwaway VMware guest rather than on the workstation: `apps/crucible/windows/driver-vm/`
 creates a Windows 11 VM that installs itself unattended into exactly that state, snapshots
 it, installs the package from a virtual CD and reports devices, endpoints, the driver's
 service state and any bugcheck (a blue screen in the guest is a guest reboot, nothing more).
@@ -649,7 +649,7 @@ on the workstation, where neither prerequisite holds, it says so and the buttons
 harmful.
 
 **Driver quality, the WDK standard.** A kernel driver is held to two tiers, both scripted.
-The static tier (`apps/windows/driver/Analyze-Driver.ps1`) is Code Analysis with the WDK's
+The static tier (`apps/crucible/windows/driver/Analyze-Driver.ps1`) is Code Analysis with the WDK's
 driver rule set, the successor to PREfast for Drivers; CodeQL with Microsoft's
 `windows-drivers` pack (the `mustfix` and `recommended` suites), which is what the kit now
 directs you to in place of the retired Static Driver Verifier; and `dvl.exe` for the Driver
@@ -677,7 +677,7 @@ argument, annotated non-null but documented to take null for a thread resource, 
 that reason. The moral is narrow and worth keeping: in sample-derived kernel code an ignored
 status can be load-bearing, so re-install in the guest after every driver change rather than
 trusting that a static-analysis fix is inert. The
-dynamic tier (`apps/windows/driver-vm/Verify-Driver.ps1`) runs in the same throwaway guest:
+dynamic tier (`apps/crucible/windows/driver-vm/Verify-Driver.ps1`) runs in the same throwaway guest:
 Driver Verifier with the standard checks plus the KMDF flags and the KMDF framework verifier,
 armed for the driver, then the driver installed and exercised (default endpoint, playback,
 device restarts idle and under a live stream, reinstall) and any bugcheck read back;
@@ -760,20 +760,20 @@ gate is gcov on the Linux preset and the demo is Windows-only. Three steps, in t
    preset; that coverage script (`tools/checks/coverage_crucible.ps1` since the rename)
    ran the `windemo` and `desk` ctest labels
    under `LLVM_PROFILE_FILE`, merges with `llvm-profdata` and prints `llvm-cov report` over
-   `apps/windows`, which gives line and *branch* figures per file (OpenCppCoverage, the
+   `apps/crucible/windows`, which gives line and *branch* figures per file (OpenCppCoverage, the
    MSVC alternative, reports lines only). The numbers go into this page and, once stable,
    into per-component floors the way `coverage_report.sh` gates the library.
 3. *Seams in the engine.* `OutputStage` and `TapPool` construct the library's WASAPI classes
    directly, so the frame loop and the five routes cannot run without an audio device. A
    small sink interface (open, submit, stop) and a capture-source interface behind the tap
    pool, with the library classes as the production implementations and in-memory fakes in
-   `tests/crucible/`, let Catch2 drive the loop: taps in, access units and bed out, a mode
+   `apps/crucible/engine/tests/`, let Catch2 drive the loop: taps in, access units and bed out, a mode
    switch mid-stream, the bypass fold, the null-sink width change, a starved tap. The
    platform files stay integration-tested by the guest.
 
 All three landed on 2026-09-03. `ac3desk_qmltests` runs five suites (shell, settings, output,
 room, language) under the `desk` label; `AudioDevices` (`engine/audio_devices.hpp`) is the
-seam, with `wasapi_devices.cpp` behind it in the app and `tests/crucible/fake_devices.hpp` in
+seam, with `wasapi_devices.cpp` behind it in the app and `apps/crucible/engine/tests/fake_devices.hpp` in
 the tests, and the tap pool and output stage now compile into `ac3tests` on every platform
 (59 `windemo` cases at the end of Phase 5, 17 of them over the fakes in `test_tap_pool.cpp` and
 `test_output_stage.cpp`: the five routes with real access units, the bypass fold, a mode
@@ -799,7 +799,7 @@ suites), all passing:
 | `platform/windows/driver_tools.cpp` | 14% | 4% | elevation and transcripts need the guest |
 | `engine/signing_hook.cpp` | 63% | 30% | no key in the tests |
 | `ui/main.cpp` | 0% | 0% | the test binary has its own entry point |
-| **apps/windows total** | **72%** | **60%** | 2,227 lines, 1,004 branches |
+| **apps/crucible/windows total** | **72%** | **60%** | 2,227 lines, 1,004 branches |
 
 The QML itself is outside these figures: llvm-cov sees compiled C++, and the five suites
 exercise the pages by driving them, not by instrumenting them. The thin rows are the ones
@@ -1094,7 +1094,7 @@ platform plugin, and the `QtQuick`/`QtQuick3D` QML modules. It runs in CI and ag
 running the window from it: it starts, the room draws in 3D, and the signal path reads.
 
 The driver is built in CI too, since later the same day: `_build.yml`'s `windows-driver` job
-restores the WDK and SDK as NuGet packages (`apps/windows/driver/packages.config`, the same
+restores the WDK and SDK as NuGet packages (`apps/crucible/windows/driver/packages.config`, the same
 kit build number the EWDK carries) and builds and test-signs the package with MSBuild from
 the runner's own Visual Studio, which is where the two pieces the packages do not carry come
 from - the "Windows Driver Kit" component, meaning the `WindowsKernelModeDriver10.0` toolset,

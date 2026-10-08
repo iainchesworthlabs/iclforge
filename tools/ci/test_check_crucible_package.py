@@ -7,7 +7,7 @@ its linters, and the script under test is stdlib-only itself.
 The rules this file holds down are the content rules: the gate reads
 NOTICES.txt rather than only listing it, because the ways a notices file goes
 wrong leave every file name in place. A notices file assembled from the other
-platform's component list (apps/crucible/notices/platform/<os>/) still
+platform's component list (notices/crucible/platform/<os>/) still
 appears as NOTICES.txt; so does one whose Qt Quick 3D section is missing while
 qml/QtQuick3D/ shipped, or present while it did not. Each case here builds
 the smallest archive that has the right shape and the wrong words, and

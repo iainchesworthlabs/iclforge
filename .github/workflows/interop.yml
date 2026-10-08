@@ -63,7 +63,7 @@ on:
       # the corpus reaches; decode.cpp is the entry point the script invokes.
       - 'libs/ac3/src/decoder/**'
       - 'libs/ac3/include/iclforge/ac3/decoder/**'
-      - 'apps/cli/commands/decode.cpp'
+      - 'apps/forge/cli/src/commands/decode.cpp'
   workflow_dispatch:
 
 concurrency:

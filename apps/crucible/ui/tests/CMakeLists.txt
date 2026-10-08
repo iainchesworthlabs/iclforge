@@ -1,11 +1,11 @@
 # ---------------------------------------------------------------------------
 # crucible_qmltests - Qt Quick Test coverage for the Crucible's
 # window (ui/assets/qml), driving the real CrucibleController the way forge_gui_qmltests
-# drives the real EncoderController (apps/gui/tests/CMakeLists.txt, whose
+# drives the real EncoderController (apps/forge/gui/tests/CMakeLists.txt, whose
 # reasoning this file follows and does not repeat).
 #
 # include()d from ../../CMakeLists.txt inside its Qt6_FOUND block, after
-# crucible is defined, so paths are relative to apps/windows and the
+# crucible is defined, so paths are relative to apps/crucible/windows and the
 # ICLFORGE_CRUCIBLE_QML_FILES / ICLFORGE_CRUCIBLE_TS_FILES lists are the ones crucible itself
 # embeds: the two targets cannot list different files without both being
 # edited. Second, independent embedding of the Crucible module, not a
@@ -73,13 +73,13 @@ qt6_add_resources(crucible_qmltests "crucible_qmltests_notices"
     BASE "${CMAKE_CURRENT_BINARY_DIR}/notices"
     FILES "${ICLFORGE_CRUCIBLE_NOTICES_FILE}")
 
-# tests/crucible for the header-only fakes the scripted-machine singleton
+# apps/crucible/engine/tests for the header-only fakes the scripted-machine singleton
 # builds (ui/tests/qml_test_main.cpp, TestServices): the same
 # FakeSessionMonitor/FakeDevices the engine/src's Catch2 cases use, so the two
 # suites cannot disagree about what a scripted machine is.
 target_include_directories(crucible_qmltests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/ui" "${CMAKE_CURRENT_SOURCE_DIR}/../gui"
-    "${CMAKE_SOURCE_DIR}/tests/crucible")
+    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/tests")
 target_compile_definitions(crucible_qmltests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX
     ICLFORGE_CRUCIBLE_DRIVER_SOURCE_DIR="${CMAKE_SOURCE_DIR}/apps/crucible/windows/driver"
     ICLFORGE_CRUCIBLE_QUICK3D=${ICLFORGE_CRUCIBLE_QUICK3D}
@@ -109,7 +109,7 @@ if(ICLFORGE_CRUCIBLE_WINDEPLOYQT)
             --no-compiler-runtime
             "$<TARGET_FILE:crucible_qmltests>"
         # windeployqt deploys the windows platform plugin only; the suites
-        # run under offscreen (apps/gui/tests does the same copy). Without
+        # run under offscreen (apps/forge/gui/tests does the same copy). Without
         # it Qt reports the plugin missing and then waits on a message box.
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "${ICLFORGE_CRUCIBLE_QT_BIN_DIR}/../plugins/platforms/qoffscreen$<$<CONFIG:Debug>:d>.dll"
@@ -137,7 +137,7 @@ qt6_add_resources(crucible_qmltests "crucible_qmltests_translations"
 # label written below, so renaming it here means editing that script's
 # -Labels default and CMakePresets.json's test-windows-llvm-coverage filter
 # with it. QT_FORCE_STDERR_LOGGING
-# for the reason apps/gui/tests gives: without it Qt on Windows routes the
+# for the reason apps/forge/gui/tests gives: without it Qt on Windows routes the
 # PASS/FAIL lines away from stderr when it decides no console is attached.
 file(GLOB ICLFORGE_CRUCIBLE_QML_TEST_FILES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/ui/tests/qml/tst_*.qml")

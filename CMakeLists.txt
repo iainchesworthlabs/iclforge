@@ -163,14 +163,14 @@ option(ICLFORGE_BUILD_MP4 "Build the standalone MP4/ISOBMFF container writer (li
 option(ICLFORGE_BUILD_MPEGTS "Build the standalone MPEG-TS container writer (libs/containers/src/mpegts)" ON)
 # The AC-4 codec (libs/ac4): the sync-frame/TOC/presentation/substream-group
 # inspector, the decoder and the encoder, one library. Same "own option,
-# defaults ON" treatment as the three above - apps/cli's `probe` command links
+# defaults ON" treatment as the three above - apps/forge/cli/src's `probe` command links
 # it unconditionally.
 option(ICLFORGE_BUILD_AC4 "Build the AC-4 codec: the bitstream inspector, the decoder and the encoder (libs/ac4)" ON)
 
 # iclforge::iab (libs/iab) - IAB reader, phase 1: a standalone reader for SMPTE
 # ST 2098-2's Immersive Audio Bitstream. Like the three container writers above, it needs no
 # opt-in third-party library (unlike iclforge::adm, see its own option() below), so it defaults ON the
-# same way; unlike them, nothing in apps/cli, apps/gui or examples/ links it yet (IAB reader's
+# same way; unlike them, nothing in apps/forge/cli/src, apps/forge/gui or examples/ links it yet (IAB reader's
 # phase 3 is what will eventually give it a consumer), so there is no matching FATAL_ERROR
 # guard here - tests/CMakeLists.txt only adds iclforge::iab's own test file and links iclforge::iab
 # when this option is on, the same conditional shape it already uses for iclforge::adm/
@@ -181,7 +181,7 @@ option(ICLFORGE_BUILD_IAB "Build the standalone Immersive Audio Bitstream reader
 # IAMF (Immersive Audio Model and Formats) v1.1.0, emitting `ipcm` substreams for a channel-based
 # 7.1.4 element. Same zero-third-party-dependency shape as iclforge::iab immediately above (unlike
 # iclforge::adm, see its own option() below), so it defaults ON the same way and for the same reason;
-# also like iclforge::iab, nothing in apps/cli, apps/gui or examples/ links it unconditionally yet (only
+# also like iclforge::iab, nothing in apps/forge/cli/src, apps/forge/gui or examples/ links it unconditionally yet (only
 # examples/mux_iamf.cpp does, guarded on this option) - see libs/containers/CMakeLists.txt's own header
 # comment.
 option(ICLFORGE_BUILD_IAMF "Build the standalone IAMF OBU/ISOBMFF reader and writer (libs/containers/src/iamf)" ON)
@@ -284,7 +284,7 @@ else()
         "ICLFORGE_DECODE_SCALAR is 'double', 'float' or 'fixed' (got '${ICLFORGE_DECODE_SCALAR}')")
 endif()
 
-# apps/cli, apps/gui, tests/ and examples/ all link iclforge::containers and
+# apps/forge/cli/src, apps/forge/gui, tests/ and examples/ all link iclforge::containers and
 # iclforge::containers unconditionally - none of them are written to cope with any of the three being
 # absent. ICLFORGE_BUILD_MATROSKA=OFF, ICLFORGE_BUILD_MP4=OFF or ICLFORGE_BUILD_MPEGTS=OFF only
 # make sense with all four also OFF (this is the shape a vcpkg or Conan build without the
@@ -399,7 +399,7 @@ endif()
 # ADM BWF reader, phase 1, parsing
 # BW64/RF64 + the Audio Definition Model rather than muxing a container. Unlike
 # matroska/mp4/mpegts, it defaults OFF rather than ON and is genuinely additive: nothing in
-# apps/cli, apps/gui, tests/ or examples/ links it unconditionally, so every one of those builds
+# apps/forge/cli/src, apps/forge/gui, tests/ or examples/ links it unconditionally, so every one of those builds
 # identically whether this is on or off. The reason for the different default is its
 # dependency footprint - see libs/adm/CMakeLists.txt's own header comment - libadm needs
 # several Boost header libraries, resolved through a dedicated opt-in vcpkg feature
@@ -414,7 +414,7 @@ option(ICLFORGE_BUILD_ADM "Build the standalone BW64/RF64 + ADM parser (libs/adm
 option(ICLFORGE_BUILD_CAPI "Build the C API over the encode/decode core (libs/capi)" ON)
 
 # Python on PyPI: the pybind11 extension module (python/) - off by default like ICLFORGE_BUILD_ADM
-# above, and for the same reason: nothing under src/, apps/cli, apps/gui, tests/ or examples/ links
+# above, and for the same reason: nothing under src/, apps/forge/cli/src, apps/forge/gui, tests/ or examples/ links
 # it or is affected by it either way. A normal C++ build (and every existing CI leg) is unchanged
 # with this OFF. Turned ON by python/pyproject.toml's own cmake.define when scikit-build-core
 # drives the configure for `pip install`/cibuildwheel - see python/CMakeLists.txt.
@@ -442,7 +442,7 @@ option(ICLFORGE_BUILD_HEARTH "Build Hearth: libs/sendspin and apps/hearth - see 
 # enable_testing() has to run before ANY add_subdirectory() that might contain
 # an add_test() call, not merely before tests/ itself - CTest silently drops
 # an add_test() registered from a directory processed earlier in the same
-# configure pass (confirmed the hard way: apps/gui/tests/'s forge_gui_qml_tests_*
+# configure pass (confirmed the hard way: apps/forge/gui/tests/'s forge_gui_qml_tests_*
 # entries were invisible to `ctest -N` until this moved here). Calling it unconditionally
 # is harmless when ICLFORGE_BUILD_TESTS is OFF - nothing calls add_test() then.
 if(ICLFORGE_BUILD_TESTS)
@@ -570,11 +570,11 @@ if(ICLFORGE_BUILD_PYTHON)
 endif()
 
 if(ICLFORGE_BUILD_CLI)
-    add_subdirectory(apps/cli)
+    add_subdirectory(apps/forge/cli/src)
 endif()
 
 if(ICLFORGE_BUILD_GUI)
-    add_subdirectory(apps/gui)
+    add_subdirectory(apps/forge/gui)
 endif()
 
 # Hearth's applications, the test sink so far (planning/hearth-reference-player.md). Not in a
@@ -587,7 +587,7 @@ endif()
 # Crucible (docs/crucible/design/promotion.md).
 # In-tree like the GUI rather than wrapping the root the way the Android app
 # does, because it shares this toolchain. All three desktop platforms now have
-# a half under apps/crucible/engine/platform/ and apps/crucible/ui/platform/,
+# a half under apps/crucible/engine/src/platform/ and apps/crucible/ui/src/platform/,
 # so all three are allowed in; the guard names them rather than being dropped,
 # because a platform with no arm in apps/crucible/CMakeLists.txt would
 # configure and then fail to link, which is what this list has always been for.
@@ -596,7 +596,7 @@ endif()
 # of the code compiling and nothing more: no Mac has run any part of this
 # application, and docs/crucible/design/promotion.md's "What cannot be verified, and
 # why" table still says so. The engine core is tested everywhere regardless
-# (tests/crucible).
+# (apps/crucible/engine/tests).
 if(ICLFORGE_BUILD_CRUCIBLE AND (WIN32 OR APPLE OR LINUX))
     add_subdirectory(apps/crucible)
 endif()
@@ -638,10 +638,10 @@ if(ICLFORGE_BUILD_FUZZERS)
 endif()
 
 # The browser decode demo (docs/platforms/wasm.md) - a platform
-# app, same shape and reasoning as apps/android/'s Shield app: a small
+# app, same shape and reasoning as apps/demos/android/'s Shield app: a small
 # demo consuming iclforge::ac3 unmodified, kept out of both src/ (not library
 # code) and examples/ (not a single-API-call snippet backing a
-# docs/library/*.md page, see CONTRIBUTING.md). Unlike apps/android/,
+# docs/library/*.md page, see CONTRIBUTING.md). Unlike apps/demos/android/,
 # which is a wholly separate Gradle/NDK build reached from the other
 # direction, this platform has no non-CMake build system to work around, so
 # it is a normal add_subdirectory() gated on EMSCRIPTEN (set by
@@ -685,7 +685,7 @@ if(ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI)
     include("${CMAKE_CURRENT_SOURCE_DIR}/notices/forge/notices.cmake")
 endif()
 
-# After every target's install() rules (apps/cli, apps/gui) have been declared.
+# After every target's install() rules (apps/forge/cli/src, apps/forge/gui) have been declared.
 # Nothing to package under ICLFORGE_MINIMAL_DECODER - no application is built
 # and nothing is installed (see include(InstallLibrary) above).
 if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
@@ -702,7 +702,7 @@ message(STATUS "  Build Python   : ${ICLFORGE_BUILD_PYTHON}")
 # and 'play' work in this build at all - see the platform tree in
 # libs/audio/CMakeLists.txt. 'posix' is the one that means no.
 message(STATUS "  Audio backend  : ${ICLFORGE_AUDIO_BACKEND}")
-# Which of apps/crucible/engine/platform/linux/'s two X11 readers Crucible
+# Which of apps/crucible/engine/src/platform/linux/'s two X11 readers Crucible
 # compiled (docs/crucible/design/promotion.md, "X11 full-screen detection"): 'xcb'
 # reads the active window through libxcb; 'none' says so at runtime and
 # leaves the full-screen rule off. Linux only, since only Linux has the

@@ -19,13 +19,13 @@
 # time and concatenated into the package's NOTICES.txt (cmake/Notices.cmake);
 # the generator normalises line endings, and pinning the blobs to LF keeps
 # the checked-in bytes the same on every platform too.
-apps/crucible/notices/** text eol=lf
+notices/** text eol=lf
 
 # Forge's own notice fragments and platform files, read the same way by the
-# same generator (apps/notices/notices.cmake), pinned for the same reason.
+# same generator (notices/forge/notices.cmake), pinned for the same reason.
 # Without this the tree above is LF on every checkout and this one is CRLF
 # on a Windows one, for two sets of files that are concatenated together.
-apps/notices/** text eol=lf
+notices/** text eol=lf
 
 # The ESP32 player's web page. The component embeds these files in firmware
 # byte for byte (esp-idf/iclforge/CMakeLists.txt, EMBED_FILES), and the host

@@ -18,7 +18,7 @@ per language:
 | `he` | עברית | `forge_gui_he.ts` |
 | `yi` | יידיש | `forge_gui_yi.ts` |
 
-English has no `.ts` file — it is the literal `qsTr()` source text. `apps/gui/CMakeLists.txt`'s
+English has no `.ts` file — it is the literal `qsTr()` source text. `apps/forge/gui/CMakeLists.txt`'s
 `qt_add_translations()` call wires these in: it scans the target's sources — every QML file
 `AC3_QML_FILES` lists, which is where nearly all of the marked strings are, and the `tr()` calls in
 `encoder_controller.cpp` — for translatable strings, then compiles each `.ts` to a `.qm` and embeds
@@ -56,7 +56,7 @@ Preferences → Appearance note reads "The translations are machine-made and hav
 speaker."
 
 Two checks hold the completeness above. The `[gui][translations]` case in
-`tests/crucible/test_translations.cpp` reads the seven `apps/gui` catalogues — the six languages
+`apps/crucible/ui/tests/test_translations.cpp` reads the seven `apps/forge/gui` catalogues — the six languages
 and `xx` — and fails on any `unfinished`, `vanished` or `obsolete` entry, naming it; it runs on
 every platform. The other check is drift: that the committed catalogues match what `lupdate`
 extracts. It reruns `forge-gui_lupdate` and fails on a diff, in the pull-request gate
@@ -69,7 +69,7 @@ Everything above is `forge-gui`, half of [Forge](../index.md).
 application, and reuses `LanguageManager` rather than copying it: the class takes a translation
 basename (`"forge-gui"` by default, `"crucible"` for Crucible) that names the `.qm` files it
 loads from `:/i18n/`, and `useSystemLanguage()` forgets a saved override so the app follows the
-system locale again. Crucible ships the same six languages (`apps/crucible/translations/`), has
+system locale again. Crucible ships the same six languages (`apps/crucible/ui/assets/translations/`), has
 its own `crucible_lupdate` target, and honours the same `ICLFORGE_GUI_LOCALE` override for smoke
 checks. What is Crucible's own — the glossary its six languages are held to, the window's
 right-to-left half, and the gate over its catalogues — is on
@@ -106,9 +106,9 @@ area of a large `.ts` file.
 ## Adding a new language
 
 1. Add `translations/forge_gui_<code>.ts` to the `TS_FILES` list in `qt_add_translations()`
-   (`apps/gui/CMakeLists.txt`'s `AC3_TS_FILES`), then run `forge-gui_lupdate` to generate the initial
+   (`apps/forge/gui/CMakeLists.txt`'s `AC3_TS_FILES`), then run `forge-gui_lupdate` to generate the initial
    file and translate it as above.
-2. Add `{code, "Native name"}` to the `kLanguages` array in `apps/gui/language_manager.cpp`. Miss
+2. Add `{code, "Native name"}` to the `kLanguages` array in `apps/shared/preferences/src/language_manager.cpp`. Miss
    this and `LanguageManager::setLanguage()` rejects the code as unsupported — the language never
    appears in Preferences' picker even with a fully-translated `.ts`/`.qm`.
 3. If the script is right-to-left, `LanguageManager` already derives layout direction from
@@ -121,7 +121,7 @@ area of a large `.ts` file.
 
 ## The pseudo-locale QA fixture
 
-`apps/gui/translations/forge_gui_xx.ts` is not a language — "xx" is not an ISO 639 code, and it
+`apps/forge/gui/assets/translations/forge_gui_xx.ts` is not a language — "xx" is not an ISO 639 code, and it
 never appears in `LanguageManager::availableLanguages()` or Preferences' picker. It exists to prove
 the extraction → compile → load pipeline works end to end without depending on any one language's
 catalogue, and to catch a string that bypasses `qsTr()` entirely.
@@ -145,6 +145,6 @@ python tools/generators/gen_pseudo_locale.py
 
 It is loaded only through an `ICLFORGE_GUI_LOCALE=xx` environment override
 (`LanguageManager::applyInitialLanguage()`, checked ahead of the persisted setting and the system
-locale) — `apps/gui/tests/CMakeLists.txt` sets this for `tst_localisation_pipeline.qml`'s ctest
+locale) — `apps/forge/gui/tests/CMakeLists.txt` sets this for `tst_localisation_pipeline.qml`'s ctest
 entry alone, and it is embedded only into `forge_gui_qmltests`, never into the shipped `forge-gui`
-binary (`apps/gui/CMakeLists.txt`'s own comment on `AC3_PSEUDO_TS_FILE` says why).
+binary (`apps/forge/gui/CMakeLists.txt`'s own comment on `AC3_PSEUDO_TS_FILE` says why).

@@ -15,7 +15,7 @@
 #include "session_monitor.hpp"
 
 // The Linux SessionMonitor's bookkeeping, with no PipeWire daemon in the room
-// (apps/crucible/engine/platform/linux/proc_facts.hpp, and session_monitor.cpp
+// (apps/crucible/engine/src/platform/linux/proc_facts.hpp, and session_monitor.cpp
 // beside it for what stays behind the daemon). Four things live here and none
 // of them needs a session:
 //

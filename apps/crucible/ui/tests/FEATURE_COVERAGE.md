@@ -12,7 +12,7 @@ the `CrucibleController` surface it drives to the Qt Quick Test cases
   invokable or QML function directly, with no control pressed.
 - **None**: not covered.
 
-"Scripted machine" means the fake platform seams from `tests/crucible`
+"Scripted machine" means the fake platform seams from `apps/crucible/engine/tests`
 (sessions, devices, default device, full-screen, silent device) that
 `ui/tests/qml_test_main.cpp` installs under the real controller and the real
 engine. Because the default output there is a fake, the cases that move it

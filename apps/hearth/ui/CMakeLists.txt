@@ -2,7 +2,7 @@
 # hearth - the desktop reference player's window
 # (planning/hearth-reference-player.md, A5). Qt is a PREBUILT dependency
 # discovered by cmake/FindQt6.cmake, never vcpkg (qt-integration-convention),
-# the same as apps/gui and apps/crucible. QUIET, and a warning rather than a
+# the same as apps/forge/gui and apps/crucible. QUIET, and a warning rather than a
 # hard failure, so a core-only or Hearth-engine-only build still configures
 # on a machine with no Qt kit - apps/crucible/CMakeLists.txt's own arm is
 # the precedent this follows.
@@ -40,15 +40,15 @@
 # comment spells out the same split.
 find_package(Qt6 6.8 QUIET COMPONENTS Core Gui Qml Quick QuickControls2 LinguistTools)
 
-# Exported so apps/hearth/notices/notices.cmake (include()d from
+# Exported so notices/hearth/notices.cmake (include()d from
 # apps/hearth/CMakeLists.txt, one directory up) can tell whether the hearth
 # package's NOTICES.txt needs a Qt section, on the platforms that bundle Qt
 # into it (Windows, macOS - the install() rules below). Set unconditionally,
 # not only in the Qt6_FOUND branch, so that file can tell "Qt6 not found
 # here" (this defined and false) apart from "apps/hearth/CMakeLists.txt
 # hasn't add_subdirectory()'d this directory yet" (not defined at all) - the
-# same PARENT_SCOPE-across-add_subdirectory() reason apps/gui/CMakeLists.txt
-# exports ICLFORGE_GUI_QT_VERSION for apps/notices/notices.cmake.
+# same PARENT_SCOPE-across-add_subdirectory() reason apps/forge/gui/CMakeLists.txt
+# exports ICLFORGE_GUI_QT_VERSION for notices/forge/notices.cmake.
 set(ICLFORGE_HEARTH_UI_QT_FOUND "${Qt6_FOUND}" PARENT_SCOPE)
 
 if(NOT Qt6_FOUND)
@@ -94,16 +94,16 @@ else()
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.hpp")
     target_include_directories(hearth PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}"
-        "${PROJECT_SOURCE_DIR}/apps/gui"
+        "${PROJECT_SOURCE_DIR}/apps/forge/gui"
         "${CMAKE_CURRENT_SOURCE_DIR}/../engine"
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src")
     target_link_libraries(hearth PRIVATE
         hearth_engine
-        # container_input.cpp's own container readers - apps/gui/CMakeLists.txt's
+        # container_input.cpp's own container readers - apps/forge/gui/CMakeLists.txt's
         # forge-gui target links the same three for the same reason: the media
         # information this application's loader hands to describe_media() needs
         # a container's own facts (container_input.hpp, "whose functions the
-        # engine does not compile" - apps/hearth/engine/session.hpp's comment).
+        # engine does not compile" - apps/hearth/engine/src/session.hpp's comment).
         iclforge::containers
         Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2)
 
@@ -161,7 +161,7 @@ else()
     # (play_arrow e037, pause e034, stop e047, skip_previous e045,
     # skip_next e044, create_new_folder e2cc, add e145, volume_up e050) via
     # fontTools - 2 KB rather than the upstream file's 8.46 MB. Only Hearth
-    # ships this today, so it is not in apps/gui's own font resource list.
+    # ships this today, so it is not in apps/forge/gui's own font resource list.
     qt_add_resources(hearth "hearth_fonts"
         PREFIX "/fonts"
         BASE "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts"
@@ -173,7 +173,7 @@ else()
             "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/MaterialSymbolsSharp-Regular.ttf"
             # Archivo has no Arabic or Hebrew coverage, and Yiddish is
             # written in Hebrew script, so without these two faces three of
-            # the six languages below render as tofu. apps/gui bundles the
+            # the six languages below render as tofu. apps/forge/gui bundles the
             # same pair for the same reason.
             "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/NotoSansArabic.ttf"
             "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/NotoSansHebrew.ttf")
@@ -206,7 +206,7 @@ else()
     # `cmake --build <dir> --target hearth_lupdate` to re-extract every
     # qsTr() in ICLFORGE_HEARTH_QML_FILES, and every tr() in this target's C++,
     # into them after changing a string.
-    # -no-obsolete for the reason apps/gui and Crucible both give: an entry
+    # -no-obsolete for the reason apps/forge/gui and Crucible both give: an entry
     # whose source string is gone is kept as translation memory otherwise,
     # and git history is that memory.
     #
@@ -219,7 +219,7 @@ else()
     # one; the machinery is what was missing.
     #
     # Deliberately no test asserting the catalogues are complete, unlike
-    # tests/crucible/test_translations.cpp: Crucible's are filled, and
+    # apps/crucible/ui/tests/test_translations.cpp: Crucible's are filled, and
     # holding these to the same bar would fail from the first commit.
     #
     # CI does check that they match the sources: the windows-msvc leg
@@ -258,7 +258,7 @@ else()
         set_target_properties(hearth PROPERTIES MACOSX_BUNDLE ON)
 
         # A custom Info.plist (packaging/macos/Info.plist.in, beside this file), the same
-        # reason and shape as apps/gui/CMakeLists.txt's own APPLE branch:
+        # reason and shape as apps/forge/gui/CMakeLists.txt's own APPLE branch:
         # hearth now owns .ac3/.ec3's CFBundleDocumentTypes/
         # UTExportedTypeDeclarations (Hearth phase A7), which the default
         # template CMake would otherwise generate carries neither. These are
@@ -279,7 +279,7 @@ else()
             MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/Info.plist.in")
     endif()
 
-    # Qt runtime next to the executable, as apps/gui and apps/crucible do it,
+    # Qt runtime next to the executable, as apps/forge/gui and apps/crucible do it,
     # so the window runs from the build tree. Windows only - see
     # apps/crucible/CMakeLists.txt's own comment on why a Linux build needs
     # nothing copied.
@@ -327,7 +327,7 @@ else()
     # include()d rather than add_subdirectory()'d so it sees ICLFORGE_HEARTH_QML_FILES and
     # ICLFORGE_HEARTH_SHARED_DIR as this scope set them, and so its own qt_add_executable()/
     # qt_add_qml_module() pair runs in THIS directory's scope rather than a nested one -
-    # apps/gui/CMakeLists.txt's own comment on its identical include() explains why that
+    # apps/forge/gui/CMakeLists.txt's own comment on its identical include() explains why that
     # distinction is load-bearing for AUTOMOC's metatypes JSON handoff to qmltyperegistrar.
     if(ICLFORGE_BUILD_TESTS)
         include(tests/CMakeLists.txt)
@@ -383,7 +383,7 @@ else()
     elseif(APPLE)
         # The notices and the licence at the archive root, beside
         # hearth.app - apps/crucible/CMakeLists.txt's own comment on why
-        # this is safe to share a destination with apps/notices/notices.cmake's
+        # this is safe to share a destination with notices/forge/notices.cmake's
         # runtime-component pair and with Crucible's own pair applies here
         # too: add_subdirectory(apps/hearth) runs before
         # cmake/Packaging.cmake's include(), so whichever installs last wins
@@ -395,14 +395,14 @@ else()
     elseif(LINUX)
         # What a freedesktop menu needs: the launcher, the AppStream record a
         # software centre reads, and the icon in the hicolor theme at the two
-        # sizes the window itself embeds - the same layout apps/gui installs
+        # sizes the window itself embeds - the same layout apps/forge/gui installs
         # under `runtime` and apps/crucible/CMakeLists.txt installs under
         # `crucible`, this is `hearth` because the application is its own
         # package (cmake/Packaging.cmake). No hearth-mime.xml: the
         # audio/ac3 and audio/eac3 shared-mime-info types are already
-        # declared by apps/gui/packaging/linux/forge-gui-mime.xml, which every
+        # declared by apps/forge/gui/packaging/linux/forge-gui-mime.xml, which every
         # Linux build installs unconditionally
-        # (apps/notices/notices.cmake's runtime component) - a second
+        # (notices/forge/notices.cmake's runtime component) - a second
         # <mime-type> declaring the same glob would conflict rather than add
         # anything, so this component only CLAIMS the types (.desktop's
         # MimeType=, this metainfo.xml's <provides><mediatype>), which is

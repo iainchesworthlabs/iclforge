@@ -105,7 +105,7 @@ signalling:
   properties and the `ceao` compatibility brand.
 - `libs/containers/include/iclforge/containers/mp4/reader.hpp` — **the read direction**, so a sink can pull an access unit
   back out of a segment without new demuxing code.
-- `apps/common/fmp4_folder_writer.hpp` — and this is the piece that matters most. It writes
+- `apps/shared/media/src/fmp4_folder_writer.hpp` — and this is the piece that matters most. It writes
   `init.mp4`, one `segment<N>.m4s` per closed fragment, and `audio.m3u8`, `master.m3u8` and
   `manifest.mpd` rewritten beside them on every close. Its own header says what that makes it:
   *"Live-shaped while the take runs — no `#EXT-X-ENDLIST`, a `type="dynamic"` MPD with an

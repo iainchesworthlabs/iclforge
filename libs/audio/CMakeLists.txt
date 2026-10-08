@@ -342,7 +342,7 @@ if(APPLE)
     # APPLE arm, for Crucible's two AppKit seams (engine/platform/macos/
     # foreground.mm and ui/platform/macos/app_icon_provider.mm). There is no
     # OBJC anywhere, and the tree's other second languages are unrelated:
-    # examples/CMakeLists.txt enables C for the C API example, and apps/gui +
+    # examples/CMakeLists.txt enables C for the C API example, and apps/forge/gui +
     # apps/crucible enable RC for a Windows version resource.
     #
     # The reason here is narrow and is argued in
@@ -461,7 +461,7 @@ endif(APPLE)
 if(ANDROID)
     # -----------------------------------------------------------------------
     # NVIDIA Shield / Android TV, for the Shield Atmos demo app
-    # (apps/android/app/) - see docs/platforms/android.md.
+    # (apps/demos/android/app/) - see docs/platforms/android.md.
     #
     # Split unlike the other three backends: monitor.cpp is genuine AAudio
     # (the NDK's native audio API), but passthrough.cpp is a JNI shim to a

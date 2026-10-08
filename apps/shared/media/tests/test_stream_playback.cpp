@@ -19,10 +19,10 @@
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "stream_playback.hpp"
 
-// apps/common/stream_playback.hpp: the decoder choice and the end-of-stream
+// apps/shared/media/src/stream_playback.hpp: the decoder choice and the end-of-stream
 // flush that forge's 'monitor' and 'spatial' play a stream with. Both
 // commands open a render device before their first unit plays, so
-// tests/cli/test_cli_live.cpp can only show what they do on a machine that has
+// apps/forge/cli/tests/test_cli_live.cpp can only show what they do on a machine that has
 // one. These cases hold the two pieces those loops are built from on every CI
 // leg, with real encoders and real decoders.
 //

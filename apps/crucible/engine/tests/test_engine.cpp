@@ -19,7 +19,7 @@
 #include "slots.hpp"
 
 // The engine's frame loop over the three seams EngineConfig injects
-// (apps/crucible/engine/engine.hpp): it starts, it brings the output stage
+// (apps/crucible/engine/src/engine.hpp): it starts, it brings the output stage
 // up on the endpoint the policy chose, it taps every application the
 // session monitor lists, and it stops.
 //
@@ -38,7 +38,7 @@
 //
 // The three cases after it hold a second rule of the same loop: a tap is
 // opened only while the output stage has an endpoint to play to. See
-// Impl::sync_taps() in apps/crucible/engine/engine.cpp for why that matters
+// Impl::sync_taps() in apps/crucible/engine/src/engine.cpp for why that matters
 // on macOS, where the Core Audio process tap mutes the application it taps,
 // and why it changes nothing audible on Windows or Linux, where a tap is a
 // pure capture.
@@ -121,7 +121,7 @@ struct Rig {
 
 // Field by field rather than a designated initialiser: AppSession has
 // eleven members and clang's -Wmissing-designated-field-initializers is an
-// error here, which is the same shape tests/crucible/test_platform_seams.cpp
+// error here, which is the same shape apps/crucible/engine/tests/test_platform_seams.cpp
 // already uses.
 AppSession playing(AppId app, std::string name) {
     AppSession session;
@@ -214,7 +214,7 @@ TEST_CASE("crucible engine: start brings the output up on the endpoint the polic
     const auto status = engine.status();
     CHECK(status.running);
     // No signing key, so the AVR takes DD+ 5.1 rather than Atmos - the same
-    // choice tests/crucible/test_output_stage.cpp makes over the stage alone.
+    // choice apps/crucible/engine/tests/test_output_stage.cpp makes over the stage alone.
     CHECK(status.mode == OutputMode::kDdPlus51);
     CHECK(status.endpoint_name == "AVR (HDMI)");
     CHECK_FALSE(status.objects_enabled);

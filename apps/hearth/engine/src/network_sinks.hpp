@@ -253,7 +253,7 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
     // the more usual private override, so a test can drive this class with a
     // synthetic Service or ClientView directly instead of standing up a real
     // mDNS multicast group or WebSocket to prove the reaction to one (the
-    // same reason a fake sink in tests/hearth/test_engine.cpp stands in for
+    // same reason a fake sink in apps/hearth/engine/tests/test_engine.cpp stands in for
     // a device). Nothing outside a test calls these directly; discovery and
     // ServerHost reach them through the base class references this
     // constructor hands them, never through this name.

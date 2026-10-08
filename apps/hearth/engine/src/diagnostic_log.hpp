@@ -11,7 +11,7 @@
 
 // The diagnostics ring (planning/hearth-reference-player.md, A3: "a
 // diagnostics ring in Crucible's pattern", after
-// apps/crucible/engine/diagnostics.hpp): a bounded ring of one-line notes that
+// apps/crucible/engine/src/diagnostics.hpp): a bounded ring of one-line notes that
 // the player, the engine and the window write to, and the means of keeping
 // paths out of it. diagnostics_report.hpp turns the ring into the file the
 // Settings page saves.

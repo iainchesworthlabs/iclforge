@@ -5,7 +5,7 @@
 
 // See output_decision.hpp for what this decides and why it is a pure
 // function. The order of the rules below is the order they are applied, and
-// each one is a case in tests/hearth/test_output_decision.cpp.
+// each one is a case in apps/hearth/engine/tests/test_output_decision.cpp.
 
 namespace iclforge::hearth {
 

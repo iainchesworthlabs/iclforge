@@ -39,7 +39,7 @@ target_link_libraries(crucible_engine
     PUBLIC iclforge::ac3 iclforge::audio iclforge::tracy
     PRIVATE iclforge::warnings iclforge::coverage)
 
-# The platform half, selected the way apps/cli/CMakeLists.txt selects its
+# The platform half, selected the way apps/forge/cli/CMakeLists.txt selects its
 # platform/ directory: a platform is a directory, never a conditional inside
 # a source file. Three arms now (Crucible cross-platform promotion) - Windows over COM and WASAPI,
 # Linux over PipeWire, macOS over the CoreAudio HAL and AppKit. The
@@ -159,7 +159,7 @@ elseif(APPLE)
     # Behind that sit the things that were expected to be in the way and have
     # not been reached: the code-signing identity, the
     # NSAudioCaptureUsageDescription Info.plist key this target declares
-    # nowhere (apps/gui/Info.plist.in is the precedent for supplying one), and
+    # nowhere (apps/forge/gui/packaging/macos/Info.plist.in is the precedent for supplying one), and
     # the tap's own mono/stereo and sample-rate refusals.
     # engine/src/platform/macos/session_monitor.cpp's header lists them;
     # docs/platforms/macos.md, "Per-application capture: the Core Audio
@@ -172,7 +172,7 @@ elseif(APPLE)
     # block enables the language for separately. enable_language() from a
     # subdirectory rather than from the root is what this file already does
     # further down, in the window's own icon block, where the WIN32 arm calls
-    # enable_language(RC) before compiling crucible.rc (apps/gui does the
+    # enable_language(RC) before compiling crucible.rc (apps/forge/gui does the
     # same); the precedent is the call site, not the compiler pin below it,
     # which has none.
     #
@@ -261,7 +261,7 @@ set_target_properties(crucible-run PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_
 # ---------------------------------------------------------------------------
 # The window: crucible, Qt Quick, module Crucible (Phase 3).
 #
-# Qt is a prebuilt kit found the way apps/gui finds it (cmake/FindQt6.cmake).
+# Qt is a prebuilt kit found the way apps/forge/gui finds it (cmake/FindQt6.cmake).
 # It is optional here so that a build with the engine/src and runner but no Qt
 # kit still configures: the UI is simply skipped, with a warning.
 #
@@ -438,7 +438,7 @@ else()
         ICLFORGE_CRUCIBLE_DRIVER_SOURCE_DIR="${CMAKE_SOURCE_DIR}/apps/crucible/windows/driver"
         ICLFORGE_CRUCIBLE_QUICK3D=${ICLFORGE_CRUCIBLE_QUICK3D})
     # iclforge::warnings is deliberately not linked: Qt's generated sources would
-    # be compiled under it (apps/gui carries a workaround for exactly that).
+    # be compiled under it (apps/forge/gui carries a workaround for exactly that).
     target_link_libraries(crucible PRIVATE
         iclforge::crucible_engine
         iclforge::coverage
@@ -478,7 +478,7 @@ else()
     set_target_properties(crucible PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
     # The executable's own icon, per platform, the same three-way split as
-    # apps/gui/CMakeLists.txt. Windows: a resource script compiled in (RC has
+    # apps/forge/gui/CMakeLists.txt. Windows: a resource script compiled in (RC has
     # to be enabled by hand under Ninja). macOS: the .icns copied into the
     # bundle. Linux: nothing here - the hicolor theme install below is how a
     # freedesktop menu finds it.
@@ -508,11 +508,11 @@ else()
     #
     # -no-obsolete drops an entry whose source string is gone rather than
     # keeping it as translation memory: git history is that memory, and
-    # tests/crucible/test_translations.cpp wants the files clean after a
+    # apps/crucible/ui/tests/test_translations.cpp wants the files clean after a
     # regeneration. The catalogues were regenerated and filled on 2026-09-06,
     # so all six carry every source string with a translation and none marked
     # unfinished, vanished or obsolete - which is what
-    # tests/crucible/test_translations.cpp now asserts rather than warns
+    # apps/crucible/ui/tests/test_translations.cpp now asserts rather than warns
     # about. They have still not been read by a speaker of any of the six
     # languages: they were made against the glossary in
     # docs/crucible/localisation.md, which is a different and smaller claim
@@ -532,7 +532,7 @@ else()
         LUPDATE_TARGET crucible_lupdate
         LRELEASE_TARGET crucible_lrelease)
 
-    # Qt runtime next to the executable, as apps/gui does it, so the window
+    # Qt runtime next to the executable, as apps/forge/gui does it, so the window
     # runs from the build tree. Windows only: a Linux build finds Qt through
     # the system's own loader and needs nothing copied, and a warning that
     # "crucible.exe will not run standalone" there would be wrong twice.
@@ -553,7 +553,7 @@ else()
     endif()
 
     # Four windeployqt passes share bin/: forge-gui's, forge_gui_qmltests's (ordered
-    # after it, apps/gui/tests/CMakeLists.txt says why), this one, and
+    # after it, apps/forge/gui/tests/CMakeLists.txt says why), this one, and
     # crucible_qmltests's (ordered after this one, below). The GUI's pair and
     # the demo's pair were not ordered against each other, and on a real
     # "build everything" run two of them copying the same Qt file into bin/
@@ -574,7 +574,7 @@ else()
         include(ui/tests/CMakeLists.txt)
     endif()
 
-    # Install + Qt runtime deployment for packaging, the shape apps/gui uses
+    # Install + Qt runtime deployment for packaging, the shape apps/forge/gui uses
     # (see its own header for why the _qml_ variant is the one that works and
     # why this is separate from the POST_BUILD windeployqt above, which
     # targets the build tree). COMPONENT crucible, not runtime: the demo is
@@ -584,7 +584,7 @@ else()
     # this target above and CMake refuses an install() of a bundle executable
     # that does not say where the .app goes - which is exactly how the first
     # macOS configure of this application failed, on 2026-09-06. The dot is
-    # the archive root, the same place apps/gui puts forge-gui.app, so a .dmg
+    # the archive root, the same place apps/forge/gui puts forge-gui.app, so a .dmg
     # opens on the application rather than on a bin/ directory. RUNTIME is
     # still needed: it is what Windows and Linux use, where the target is not
     # a bundle and this keyword is ignored.
@@ -653,7 +653,7 @@ elseif(APPLE)
     # The notices and the licence at the archive root, beside crucible.app -
     # ../../notices/crucible/platform/macos/components.cmake's own ICLFORGE_CRUCIBLE_NOTICES_LOCATION
     # string already promised this layout, and it is the same place
-    # apps/notices/notices.cmake puts the runtime component's own pair beside
+    # notices/forge/notices.cmake puts the runtime component's own pair beside
     # forge-gui.app. Harmless in the one place these two pairs share a
     # destination - the monolithic macOS .dmg (cmake/CPackProjectConfig.cmake) -
     # since add_subdirectory(apps/crucible) in the top-level CMakeLists.txt runs
@@ -666,7 +666,7 @@ elseif(APPLE)
 elseif(LINUX)
     # What a freedesktop menu needs: the launcher, the AppStream record a
     # software centre reads, and the icon in the hicolor theme at the two
-    # sizes the window itself embeds. Same layout apps/gui installs under
+    # sizes the window itself embeds. Same layout apps/forge/gui installs under
     # `runtime`; this is `crucible` because the application is its own
     # package (cmake/Packaging.cmake). No driver scripts: Linux needs no
     # driver, and a PowerShell script in a .deb is a mistake waiting for a

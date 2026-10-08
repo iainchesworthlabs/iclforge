@@ -469,7 +469,7 @@ PCM and its metadata over time in `iclforge::ac4::ObjectProperties`, and reads n
 applications feed it the layers on this page and the ADM and IAB bridges: `forge atmos-encode`,
 `atmos-adm` and `atmos-iab` with `codec=ac4`, and the Forge GUI's encoder page, turn each object's
 authored position and gain into one metadata update a frame
-(`apps/common/ac4_objects_core.hpp`). `ObjectScene`, `motion.hpp` and `AtmosEncoder` know nothing
+(`apps/shared/media/src/ac4_objects_core.hpp`). `ObjectScene`, `motion.hpp` and `AtmosEncoder` know nothing
 of AC-4.
 
 ## Objects-or-nothing: `AtmosConfig::emit_object_metadata`

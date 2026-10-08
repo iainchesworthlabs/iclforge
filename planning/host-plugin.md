@@ -158,7 +158,7 @@ Two consequences follow, and they set the shape of everything below.
 
 A plugin's `process()` **is** the host's audio callback. This is the difference between a plugin
 and everything the project has built so far, and it is worth stating plainly: Crucible does not
-run the encoder on a callback. `apps/crucible/engine/engine.hpp:20` says "One thread runs the
+run the encoder on a callback. `apps/crucible/engine/src/engine.hpp:20` says "One thread runs the
 frame loop", commands are applied at frame boundaries, and `output_stage.hpp` splits endpoint
 work into a "slow half, safe on any thread" and a "fast half, frame thread only" — the comment
 there records that the slow half, run on the frame thread, once cost seven seconds. Crucible's
@@ -472,8 +472,8 @@ It is an **analyser**: audio passes through unchanged.
 | Broadcast presets, pass/fail | `libs/ac3/include/iclforge/ac3/meta/qc.hpp:60` | complete |
 | Wide-layout loudness (5.1.4, 7.1.4) | `LoudnessMeter`'s Annex 3 constructor | complete |
 | Level analysis | `libs/ac3/include/iclforge/ac3/analysis/levels.hpp` | complete |
-| Qt Quick UI patterns, theming, accessibility | `apps/gui`, `apps/crucible/ui` | complete, but see [10](#10-localisation-and-accessibility) |
-| Notices composition | `apps/notices/notices.cmake` | complete |
+| Qt Quick UI patterns, theming, accessibility | `apps/forge/gui`, `apps/crucible/ui` | complete, but see [10](#10-localisation-and-accessibility) |
+| Notices composition | `notices/forge/notices.cmake` | complete |
 | Packaging components | `cmake/Packaging.cmake:454` | needs one component added |
 
 **What is missing in the library, and it is one thing.** `LoudnessMeter` is built for a file: a
@@ -662,12 +662,12 @@ exercised by half the catalogue rather than being theoretical. Assay ships
 `ac3assay_{ar,de,es,fr,he,yi,xx}.ts`, and CI gains the plugin to its "translations are up to
 date" check (`_build.yml:1199`).
 
-A gap worth fixing while here: `apps/gui/translations/` has `ac3gui_xx.ts` and
-`apps/crucible/translations/` has **no** `ac3crucible_xx.ts`. Crucible was promoted without the
+A gap worth fixing while here: `apps/forge/gui/assets/translations/` has `ac3gui_xx.ts` and
+`apps/crucible/ui/assets/translations/` has **no** `ac3crucible_xx.ts`. Crucible was promoted without the
 pseudo-locale that catches untranslated strings and layout overflow. Assay should ship `xx` from
 its first commit, and Crucible's absence is worth a separate issue rather than being fixed here.
 
-**Accessible roles and names on every control**, matching `apps/gui` and `apps/crucible`: each
+**Accessible roles and names on every control**, matching `apps/forge/gui` and `apps/crucible`: each
 meter, readout, preset selector and reset control gets an accessible name and role, and the
 numbers are readable as text rather than only as bar geometry — which matters more for a meter
 than for most UI, since the entire content is numeric.
@@ -720,8 +720,8 @@ same care applies to any Avid or Apple mark if those formats are ever added.
 
 ### 12. Third-party notices
 
-`apps/notices/notices.cmake` composes per-platform notices from fragments in
-`apps/notices/fragments/` — today `header.txt`, `qt-linux.txt`, `qt-macos.txt`,
+`notices/forge/notices.cmake` composes per-platform notices from fragments in
+`notices/fragments/` — today `header.txt`, `qt-linux.txt`, `qt-macos.txt`,
 `qt-windows.txt` and `windows-runtime.txt`. Assay adds:
 
 | Fragment | For | Required by |

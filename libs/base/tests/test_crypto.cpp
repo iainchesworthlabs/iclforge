@@ -20,7 +20,7 @@
 
 namespace {
 
-// See tests/cli/test_cli.cpp's own scratch_dir comment for why the
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir comment for why the
 // TEST_CASE below folds this into its scratch leaf, on top of
 // ICLFORGE_TEST_SCRATCH_DIR's build-tree rooting.
 std::string scratch_pid_suffix() { return iclforge::test::platform::process_id(); }
@@ -80,7 +80,7 @@ TEST_CASE("HMAC-SHA-256 matches RFC 4231 test vectors", "[signing][hmac]") {
 TEST_CASE("load_signing_key reads a key file", "[signing][key]") {
     namespace fs = std::filesystem;
     // ICLFORGE_TEST_SCRATCH_DIR rather than fs::temp_directory_path(), for the
-    // reason tests/cli/test_cli.cpp's own scratch_dir explains - the key
+    // reason apps/forge/cli/tests/test_cli.cpp's own scratch_dir explains - the key
     // filenames below are fixed, so a machine-global directory is one two
     // concurrently running iclforge-tests binaries would collide in. The leaf also
     // carries this process's own PID, since ICLFORGE_TEST_SCRATCH_DIR's

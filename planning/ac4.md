@@ -876,7 +876,7 @@ class Decoder {  // a Pimpl, as the library's other stateful classes are
 - **The syntax trace.** D8 settled the sink's lifetime, which `DecoderConfig` had wrong, by
   ownership: the configuration owns a copy of the callable, and the encoder's write trace follows the
   same rule.
-- **Hearth.** The engine's `StreamDecoder` (`apps/hearth/engine/stream_decoder.hpp`) decodes a unit
+- **Hearth.** The engine's `StreamDecoder` (`apps/hearth/engine/src/stream_decoder.hpp`) decodes a unit
   into blocks rendered onto a `render::OutputLayout`; `decode_by_block` and the frame's layout are
   what an adapter there needs, and the adapter lives in the engine, since the decoder does not link
   `ac3::forge`'s renderer.
@@ -1842,7 +1842,7 @@ move as their metadata says, is the user's to do; the numbers hold in `test_obje
   the decoder hands each object over with its Annex F properties and the sample of each update. The
   intermediate spatial format is the one kind of object the decoder renders itself, by the
   attachment's matrices; `ac3cli decode` renders the others through the layout renderer Hearth plays
-  E-AC-3's objects with (`apps/common/ac4_object_render.hpp`).
+  E-AC-3's objects with (`apps/shared/media/src/ac4_object_render.hpp`).
 - Chromium's `ac4-ajoc.ac4` is the only encoded A-JOC stream here: ten downmix signals in a SIMPLE
   `var_channel_element()`, seventeen objects, no LFE and no decorrelators, one metadata block a
   frame, and every object at X 0.5, Y 0 and Z −1, the front of the room on the floor, in all 64
@@ -3086,7 +3086,7 @@ against a real device (the software-ALSA tests run on Linux CI).
 - `ac3::plan::Codec` gains AC-4, and every helper that decides by codec becomes a switch that
   refuses a codec it does not know: they were two-way ternaries, under which a third codec read as
   E-AC-3 (`libs/ac3/include/iclforge/ac3/encoder/plan.hpp`). The help topics' bitmask, which was full
-  (`apps/cli/usage.hpp`), is widened.
+  (`apps/forge/cli/src/usage.hpp`), is widened.
 
 - Built: `transcode` decodes an AC-4 presentation as coded, since 5.7.9.4 asks a transcoder for no
   DRC, and hands the AC-3 or E-AC-3 encoder the profile the stream names; 5.7.9.4 calls the field
@@ -3115,9 +3115,9 @@ against a real device (the software-ALSA tests run on Linux CI).
 
 **Status:** merged as #1068 on 2026-09-26. Exit met.
 
-- An AC-4 decoder in the engine's `StreamDecoder` shape (`apps/hearth/engine/stream_decoder.hpp`),
+- An AC-4 decoder in the engine's `StreamDecoder` shape (`apps/hearth/engine/src/stream_decoder.hpp`),
   rendering onto `render::OutputLayout`, and `Session::open` accepting AC-4
-  (`apps/hearth/engine/ac4_stream.hpp`). An item's units are its sync frames, each as long as Part 2
+  (`apps/hearth/engine/src/ac4_stream.hpp`). An item's units are its sync frames, each as long as Part 2
   Table 47 makes it for the frame's place in the `sequence_counter` cycle, so a queue's sample
   counts stay exact at the 1000/1001 rates. The decoder runs through `ac4::Decoder`'s public API
   alone, 256 samples at a time; what it holds back is flushed before a frame that waits for an
@@ -3169,7 +3169,7 @@ effect tone by tone at the fake device); the gain scripts through the engine, wi
 **Status:** merged as #1084 on 2026-09-29. Exit met.
 
 - AC-4 in the codec list, which mapped index 1 to E-AC-3 and every other index to AC-3
-  (`apps/gui/encoder_controller.cpp`), with its encode options and the command line the page echoes.
+  (`apps/forge/gui/src/encoder_controller.cpp`), with its encode options and the command line the page echoes.
 - AC-4 decode in the QC, object and stream player controllers, which dispatched on `stream_bsid`.
 - I3 built both. The page encodes one source in its own layout, mono to 5.1, to a raw stream or an
   MP4 file, as `ac4-encode` takes a WAV file; its AC-4 tab carries the frame rate, the rate and
@@ -3177,7 +3177,7 @@ effect tone by tone at the fake device); the gain scripts through the engine, wi
   stereo downmix and dialogue enhancement, and the page echoes one `ac3cli ac4-encode` command.
   The steps that decide the bytes (the input's channel order, the BS.1770 measurement behind
   `dialnorm=auto` and `loudness=`, and the raw or MP4 packaging) moved from `ac4-encode` to
-  `apps/common/ac4_encode_core.hpp`, with `ac4_channels.hpp` and `is_ac4_stream`, so the page and
+  `apps/shared/media/src/ac4_encode_core.hpp`, with `ac4_channels.hpp` and `is_ac4_stream`, so the page and
   the command run the same code. QC, the player and the object page recognise AC-4 by its sync
   word; QC and the player take a presentation by position as `presentation=` does, and the object
   page shows the presentations, beds and objects the decoder reports, read-only, saying in its
@@ -3226,17 +3226,17 @@ Android NDK build were not built on the machine that made it, and are checked by
   underlying error), not the `Ac3EncodeError`/`Ac3DecodeError` hierarchy the rest of the package
   uses — a deliberate difference from the AC-3/E-AC-3 bindings, recorded rather than silently
   inconsistent.
-- WebAssembly's `ac3forge_wasm_ac4` (`apps/wasm/ac4_bindings.cpp`) is one combined decode-and-encode
+- WebAssembly's `ac3forge_wasm_ac4` (`apps/demos/wasm/ac4_bindings.cpp`) is one combined decode-and-encode
   Embind module, unlike the AC-3 side's decode/encode split — AC-4's decoder and encoder share one
   table-of-contents/framing library regardless, so a second executable had less to gain here.
   `js/src/ac4.ts` is a plain ES module wrapping `Ac4Decoder`/`Ac4Encoder` directly, not a Worker
   wrapper like `decoder-worker.ts`'s realtime pipeline: nothing about that protocol's shape (built
   for one decode-only class with a channels-vs-fold output choice) fits a module that covers both
-  decode and encode with a wider decoder surface. There is no `ac4` directory under `apps/wasm` and
+  decode and encode with a wider decoder surface. There is no `ac4` directory under `apps/demos/wasm` and
   no demo page — optional polish this phase left to a later pass — so the compiled module lands in
   its own output directory (`bin/wasm_ac4_demo`) with nothing to serve it yet; `js/src/ac4.ts` compiles
   into `js/dist/ac4.js`, which I4b added to `package.json`'s `exports` map.
-- Android's CMake wrapper (`apps/android/app/src/main/cpp/CMakeLists.txt`) no longer forces
+- Android's CMake wrapper (`apps/demos/android/app/src/main/cpp/CMakeLists.txt`) no longer forces
   `AC3FORGE_BUILD_AC4` off: the libraries depend on nothing outside this tree and cross-compile
   cleanly under the NDK, unlike the third-party dependencies (MbedTLS, httplib, FLAC, Opus, mdns)
   that keep Hearth off this build, so D8's "not linked, don't compile" reasoning had nothing left
@@ -3405,7 +3405,7 @@ into the same ADM BWF writer E-AC-3's own IM2 item built, through a new conversi
 420 §5.6.1 sharing one room and one dB convention). `probe`'s JSON gains an `oamd_common_data`
 object on an A-JOC substream's own entry, additive, the schema unchanged.
 
-The round trip the exit criterion names - an ADM master from the fixture `tests/cli/
+The round trip the exit criterion names - an ADM master from the fixture `apps/forge/cli/tests/
 test_cli_atmos_adm.cpp` already commits (two bed channels and one dynamic object jumping position at
 a known time), encoded to AC-4 by `atmos-adm`, decoded with `objects_dir` and `adm_out`, and the
 written master re-parsed through `ac3adm`/`ac3::admbridge` - matches the original's own automation,
@@ -3413,7 +3413,7 @@ object for object (matched by which tone each carries, not by index), to within 
 quantization once the encoder's and the decoder's combined delay (reported on `atmos-adm`'s own
 status line, and pinned in the test rather than hardcoded) is accounted for: position within 0.06 in
 each axis, gain within 2 dB, and the moving object's jump is still there rather than the whole
-reading being flat (`tests/cli/test_cli_atmos_adm_ac4.cpp`).
+reading being flat (`apps/forge/cli/tests/test_cli_atmos_adm_ac4.cpp`).
 
 Hearth's engine now reads a whole AC-4 frame through `ac4::Decoder::decode()` in place of
 `decode_by_block()`, so a presentation with objects renders through `Ac4ObjectRenderer` (the same
@@ -3440,9 +3440,9 @@ own read-only listing already covered AC-4 before this phase. The encoder page's
 authoring UI was E-AC-3-only when this phase merged (`EncoderController::setAtmosEnabled` forced
 `codec_` away from `kAc4`); [I5b](#i5b-the-encoder-pages-ac-4-objects) gave it an AC-4 path.
 
-Checks: `tests/cli/test_cli_atmos_adm_ac4.cpp` (new), the extended `tests/cli/test_cli_ac4_decode.cpp`,
-`tests/hearth/test_ac4_engine.cpp` and `tests/hearth/test_decoder_settings.cpp` (new cases), the
-extended `tests/hearth/test_diagnostics.cpp`, `apps/gui/tests/qml/tst_e2e_inspect.qml` (new case),
+Checks: `apps/forge/cli/tests/test_cli_atmos_adm_ac4.cpp` (new), the extended `apps/forge/cli/tests/test_cli_ac4_decode.cpp`,
+`apps/hearth/engine/tests/test_ac4_engine.cpp` and `apps/hearth/engine/tests/test_decoder_settings.cpp` (new cases), the
+extended `apps/hearth/engine/tests/test_diagnostics.cpp`, `apps/forge/gui/tests/qml/tst_e2e_inspect.qml` (new case),
 `tools/ci/run_codec_matrix.sh`'s new AC-4 legs (5.1.4, objects both codings, both Atmos-ingest
 commands' `codec=ac4`), and the whole of `ac3tests` once, at the end (a full run's own numbers are in
 the phase's report rather than repeated here, since a later merge would make them stale immediately).
@@ -3468,7 +3468,7 @@ options in its report; the user asked for the page to author AC-4 objects.
   one of them the LFE) are in the page's own text, and what cannot apply is named and, where a
   control can be, disabled, before Encode is pressed.
 - The page echoes one `ac3cli` command that writes the same bytes. The object steps both need move
-  into `apps/common`; the command line's behaviour and its tests stay as they are.
+  into `apps/shared/media/src`; the command line's behaviour and its tests stay as they are.
 
 **Exit:** each new control has a test; the command line the page echoes, run through `ac3cli`,
 writes the same bytes as the page; an ADM master (the fixture I5's round trip commits: two bed
@@ -3478,8 +3478,8 @@ in each axis, 2 dB).
 
 **Verified by:** the GUI's Qt Quick Tests and C++ tests, and the CLI matrix.
 
-**Built (phase I5b):** `apps/common/ac4_objects_core.hpp` holds the steps `ac3cli` and the page
-both run: `ObjectSlot` and `object_slots_from_assignment` (moved from `apps/cli/support.hpp`),
+**Built (phase I5b):** `apps/shared/media/src/ac4_objects_core.hpp` holds the steps `ac3cli` and the page
+both run: `ObjectSlot` and `object_slots_from_assignment` (moved from `apps/forge/cli/src/support.hpp`),
 `location_azimuth_deg` (moved from the GUI's `channel_geometry.cpp`, which forwards to it), the
 order of a stream's objects (each `obj` row, each `objm` group, each channel assigned to a speaker,
 then the LFE), the audio each carries, one metadata update per object per 2 048-sample frame,
@@ -3517,8 +3517,8 @@ A live session refuses AC-4, since the page's live path takes AC-3 and E-AC-3 (`
 and Preview plays an AC-4 object encode through the E-AC-3 object encoder's bed, the first fifteen
 objects, whichever codec is chosen. The page reads audio, with the scene authored on it, and has no
 reader for ADM BWF or IAB masters, which `atmos-adm` and `atmos-iab` write to AC-4 with
-`codec=ac4`. The exit's ADM master is therefore the one `tests/cli/test_cli_atmos_adm.cpp`
-builds, written to `apps/gui/tests/fixtures/adm-two-beds-one-object.wav` with its `axml` and `chna`
+`codec=ac4`. The exit's ADM master is therefore the one `apps/forge/cli/tests/test_cli_atmos_adm.cpp`
+builds, written to `apps/forge/gui/tests/fixtures/adm-two-beds-one-object.wav` with its `axml` and `chna`
 chunks as that test builds them. The page reads its audio, and the scene is authored on the page:
 the two bed channels assigned to L and R, and the third channel an object at azimuth -110 degrees
 for 0.096 s and then dead ahead. The stream the page writes, read by `ObjectDecodeController` as
@@ -3526,11 +3526,11 @@ the object page reads it, has its three objects at those places at unity within 
 and 2 dB, before the jump and after it (0.0081 and 0.000 dB at worst), and the object's jump is
 there.
 
-Checks: `tests/cli/test_cli_atmos_encode_ac4.cpp` (new, 6 Catch2 test cases: the raw and
+Checks: `apps/forge/cli/tests/test_cli_atmos_encode_ac4.cpp` (new, 6 Catch2 test cases: the raw and
 direct-coded bytes equal the shared core's, `crc=off` and an MP4 file, `src=`, `map=` and
 `offset=` with a speaker and an LFE, the default placements, the refusals with their exit codes,
-and E-AC-3 unchanged); `tests/gui/test_ac4_objects_core.cpp` (new, 8); `tests/gui/
-test_ac4_encode_settings.cpp` (4 new); `apps/gui/tests/qml/tst_ac4_objects.qml` (new, 10 tests, one
+and E-AC-3 unchanged); `apps/shared/media/tests/test_ac4_objects_core.cpp` (new, 8); `tests/gui/
+test_ac4_encode_settings.cpp` (4 new); `apps/forge/gui/tests/qml/tst_ac4_objects.qml` (new, 10 tests, one
 for each control and refusal); `tst_e2e_ac4_objects.qml` (new, 3: a raw stream and an MP4 file
 equal to the echoed line run through `ac3cli`, and the ADM master); `tst_guided_wizard.qml` (1
 new); and, unchanged and passing, the accessibility and channel-count suites, `tst_e2e_objects.qml`,
@@ -3601,7 +3601,7 @@ the CMake project's description (which reaches pkg-config and the Debian package
 site's description, the Homebrew formula, the desktop entries and the Windows file-type label said
 AC-3 and E-AC-3 alone, and a few pages described `ac4dec::` and `ac4enc::` namespaces the code does
 not have. #1076, #1077, #1078 and #1133 corrected most of that. On 2026-09-30 the man page's name
-and description lines (`apps/cli/usage.cpp`) and some of the GUI's own strings (#1133 lists them)
+and description lines (`apps/forge/cli/src/usage.cpp`) and some of the GUI's own strings (#1133 lists them)
 still name AC-3 and E-AC-3 alone. The Windows file-type label (`cmake/Packaging.cmake`) names the
 two extensions the installer registers, `.ac3` and `.ec3`, and is wrong only once `.ac4` is
 registered. The user found a program called `ac3cli` doing AC-4 wrong in itself, and took renaming
@@ -4374,8 +4374,8 @@ outright, with no compatibility shim.
   `tests/CMakeLists.txt`, `cmake/IclforgeFuzz.cmake`, `cmake/InstallLibrary.cmake`,
   `tools/ci/classify_changes.py`, `CHANGELOG.md`, `docs/verification.md`,
   `tools/checks/check_doc_paths.py`, `tools/ci/run_codec_matrix.sh`, `.github/workflows/_ci-core.yml`
-  (FFmpeg Validate), `apps/cli/main.cpp`'s command table, `ac3::plan::Codec`,
-  `docs/assets/data/support-catalogue.json`, `libs/capi/`, `python/`, `rust/` and `apps/wasm/`.
+  (FFmpeg Validate), `apps/forge/cli/src/main.cpp`'s command table, `ac3::plan::Codec`,
+  `docs/assets/data/support-catalogue.json`, `libs/capi/`, `python/`, `rust/` and `apps/demos/wasm/`.
 - `tools/ci/classify_changes.py` has no lane of its own for AC-4 (`libs/ac4*` is in the core lane),
   and `tools/generators/` and `tools/references/` match no lane, so every lane runs when they
   change. No phase gave AC-4 a lane. The ESP32 lane lights after a merge for `libs/ac3/`,

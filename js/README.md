@@ -20,7 +20,7 @@ Four pieces for AC-3 and E-AC-3:
 
 This package embeds no compiled `.wasm`/`.js` binary of its own - every API here takes the
 `createIclForgeModule` factory (or a URL to it) as a parameter. Build it from
-[`apps/wasm/`](https://github.com/iainchesworthlabs/iclforge/tree/main/apps/wasm) in the main
+[`apps/demos/wasm/`](https://github.com/iainchesworthlabs/iclforge/tree/main/apps/demos/wasm) in the main
 repository (see [docs/platforms/wasm.md](https://iainchesworthlabs.github.io/iclforge/platforms/wasm/))
 and host the resulting `iclforge_decode.js`/`.wasm` yourself - the same way most WASM packages let
 you control your own CORS/CDN story instead of assuming a bundler will do it for you.
@@ -47,7 +47,7 @@ npm install /path/to/iclforge/js
 ## Loading the WASM module
 
 Load `iclforge_decode.js` as a classic script (it defines a global `createIclForgeModule`
-factory - see `apps/wasm/CMakeLists.txt`'s `-sMODULARIZE=1 -sEXPORT_NAME=createIclForgeModule`):
+factory - see `apps/demos/wasm/CMakeLists.txt`'s `-sMODULARIZE=1 -sEXPORT_NAME=createIclForgeModule`):
 
 ```html
 <script src="/path/to/iclforge_decode.js"></script>
@@ -129,7 +129,7 @@ failing silently when it's missing.
 ## AC-4
 
 The `iclforge-wasm-decoder/ac4` subpath exports `Ac4Decoder` and `Ac4Encoder`, typed wrappers over
-the AC-4 Embind module `apps/wasm/` builds as `iclforge_ac4.js` (`loadAc4Module(glueUrl)` loads
+the AC-4 Embind module `apps/demos/wasm/` builds as `iclforge_ac4.js` (`loadAc4Module(glueUrl)` loads
 it). The encoder writes channel-based content or one object substream of A-JOC or direct-coded
 objects, with each object's metadata and the changes to it given beside the PCM; the decoder
 returns each object's properties and the block updates within a frame. Every field an options
@@ -199,7 +199,7 @@ hls.attachMedia(videoElement); // video still decodes natively; only audio is di
 ## What's verified
 
 - The push-frame API and the AudioWorklet ring-buffer pipeline: unit-tested (`ring-buffer.test.js`)
-  and exercised end-to-end in headless Chromium by `apps/wasm/tests/` (the main repository's CI).
+  and exercised end-to-end in headless Chromium by `apps/demos/wasm/tests/` (the main repository's CI).
 - `fmp4.ts`'s box walker: unit-tested against an ffmpeg-remuxed fragmented-MP4 fixture
   (`fmp4.test.js`), asserting every extracted sample lands exactly on an AC-3/E-AC-3 syncword.
 - The `MediaSource`/`addSourceBuffer` shim's mechanics: unit-tested against a fake `MediaSource`

@@ -215,7 +215,7 @@ TS 103 420 simply has nothing to say about it.
 order (version 0 or 1), each with its `segment_duration` in the movie's timescale,
 `ReadTrack::movie_timescale` from `mvhd`, and its `media_time` in the track's own timescale, where
 -1 marks an empty edit. Nothing here applies them, because what a media time means depends on
-the codec. `apps/common/container_input.hpp` turns the shape an audio encoder writes into a
+the codec. `apps/shared/media/src/container_input.hpp` turns the shape an audio encoder writes into a
 `StreamTrim`: any empty edits, then one edit at normal speed. The trim is the samples to skip and
 the samples to play, and Hearth's player plays only that part. Any other shape leaves the stream
 whole, with a note saying why. `forge` and the GUI do not apply the trim. Neither `elst`
@@ -616,7 +616,7 @@ that is also what keeps the manifests deterministic under test.
 
 This is what `forge record`/`forge live` with `container=fmp4` and the GUI's live session with
 **fragmented MP4/CMAF** selected write through: the directory is a servable live origin while the
-session runs, and a closed VOD one afterwards. `Fmp4FolderWriter` (`apps/common`) scans an AC-3 or
+session runs, and a closed VOD one afterwards. `Fmp4FolderWriter` (`apps/shared/media/src`) scans an AC-3 or
 E-AC-3 take's first frame for its track, and takes an AC-4 take's track, brands and manifest values
 from its caller (`Fmp4FolderWriter::Track`), with each frame's sync flag.
 

@@ -152,7 +152,7 @@ TONES_HZ = (440.0, 620.0, 800.0, 90.0, 1030.0, 1270.0)
 TOP_TONES_HZ = (1490.0, 1730.0, 1970.0, 2210.0)
 ENCODER_SECONDS = 4
 # --engine: the layout of a stream's own channels, in the order forge decode writes them. The
-# heights take the locations Hearth's engine places them at (apps/hearth/engine/stream_decoder.cpp):
+# heights take the locations Hearth's engine places them at (apps/hearth/engine/src/stream_decoder.cpp):
 # Tfl and Tfr at Vhl and Vhr, Tbl and Tbr at Lts and Rts, and an immersive layout's Lb and Rb at
 # Lrs and Rrs. Eight channels are left out, being 7.1 or 5.1.2 by the count alone.
 ENGINE_LAYOUTS = {
@@ -247,7 +247,7 @@ def stereo_matrix(values, target):
 # Part 2 5.10.2.2's generalized rendering matrix: its channels by index.
 GENERAL = ("L", "R", "C", "Ls", "Rs", "Lb", "Rb", "Tfl", "Tfr", "Tbl", "Tbr", "LFE", "Tsl", "Tsr")
 # The immersive element's layouts by speakers= name: the configuration each is (Table 34's names)
-# and its channels in forge's WAV order (apps/common/ac4_channels.hpp).
+# and its channels in forge's WAV order (apps/shared/media/src/ac4_channels.hpp).
 IMMERSIVE_LAYOUTS = {
     "7.1.4": ("7.X.4", ("L", "R", "C", "LFE", "Lb", "Rb", "Ls", "Rs", "Tfl", "Tfr", "Tbl", "Tbr")),
     "7.1.2": ("7.X.2", ("L", "R", "C", "LFE", "Lb", "Rb", "Ls", "Rs", "Tsl", "Tsr")),
@@ -588,7 +588,7 @@ def decode(cli, stream, out_wav, *options):
 
 def engine_settings(options, layout):
     """forge decode's `options` as hearth-render's settings, the Decoder page's AC-4 controls
-    (apps/hearth/engine/decoder_settings.hpp), on `layout` unless an option folds it."""
+    (apps/hearth/engine/src/decoder_settings.hpp), on `layout` unless an option folds it."""
     settings = []
     for option in options:
         key, _, value = option.partition("=")

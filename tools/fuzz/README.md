@@ -756,7 +756,7 @@ so it took two ordinary numbers to reach. Nothing else could have seen it -
 `run_codec_matrix.sh`'s only WAV source is 48 kHz, and `eac3-sine`/
 `eac3-silence` have no sample-rate argument at all. It now reports the actual
 limit, `--check-envelope` gates the refusal staying a clean exit 1, and
-`tests/cli/test_cli.cpp`'s `[frmsiz]` case pins the message.
+`apps/forge/cli/tests/test_cli.cpp`'s `[frmsiz]` case pins the message.
 
 ```bash
 ICLFORGE_CLI=build/config-linux-llvm/bin/forge python3 tools/ci/fuzz_eac3_encoder_space.py --seconds 120

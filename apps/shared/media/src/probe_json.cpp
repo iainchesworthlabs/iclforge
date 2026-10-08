@@ -12,7 +12,7 @@
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
 
-// See probe_json.hpp. Moved here from apps/cli/commands/probe.cpp, which
+// See probe_json.hpp. Moved here from apps/forge/cli/src/commands/probe.cpp, which
 // writes the same document it always did through these.
 
 namespace iclforge::apps::probe_json {

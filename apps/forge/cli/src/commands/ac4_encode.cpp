@@ -38,9 +38,9 @@
 // substreamN= and presentationN=, several substreams, each an input of its
 // own or a hybrid dialogue enhancement's waveform, and the presentations of
 // Part 2 Table 53 made of them. Each WAV file's channels are taken in the
-// order `decode` writes them (apps/common/ac4_channels.hpp). The steps forge-gui's
+// order `decode` writes them (apps/shared/media/src/ac4_channels.hpp). The steps forge-gui's
 // AC-4 encode shares, so that the two write the same bytes, are in
-// apps/common/ac4_encode_core.hpp.
+// apps/shared/media/src/ac4_encode_core.hpp.
 
 namespace forge_cli::commands {
 namespace {

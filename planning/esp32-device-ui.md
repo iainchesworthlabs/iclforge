@@ -793,14 +793,14 @@ WCAG 2.2 AA is the target.
 ## Tests
 
 **On the host.** Playwright, from the WASM demo's harness: its package, its lockfile and its
-Chromium install in `apps/wasm/tests`, with a second configuration for the device page
+Chromium install in `apps/demos/wasm/tests`, with a second configuration for the device page
 (`device-ui.config.js`), so there is one browser-test stack in the repository. A small Node
 server stands in for the device (`device-ui/stub.js`), one per test: it serves the page and the
 script with the headers Control sends, and implements the REST contract - routes, methods, status
 codes, reply texts, content types, and the state a play goes through. `contract.spec.js` compares
 its reply texts, headers and routes with the literals in `control.cpp`, and checks that every
 request the script makes is to a route the firmware registers. The host suite (nine spec files
-under `apps/wasm/tests/device-ui/`) drives every action
+under `apps/demos/wasm/tests/device-ui/`) drives every action
 through the page and asserts on the requests the stand-in received; every error path (`400` and
 `409` replies, a connection closed unanswered, a device that does not answer, a malformed or
 partial `/status`); the polling rules on Playwright's clock (one request in flight, none while
@@ -945,7 +945,7 @@ run as root, so Playwright can install Chromium's system libraries).
    of (a): a page on another site, opened by someone on the same network, can drive the player,
    as it can today. Cost of (b): every existing `curl` command changes.
 
-10. **Where the host tests live.** (a) **a second Playwright configuration in `apps/wasm/tests`,
+10. **Where the host tests live.** (a) **a second Playwright configuration in `apps/demos/wasm/tests`,
     sharing its package, lockfile and browser**; (b) a package of their own beside the page.
     **Recommend (a)**, which is one browser-test stack. Cost: tests for a device page under a
     directory named for the WASM demos. **Taken, (a).**
@@ -1025,7 +1025,7 @@ run as root, so Playwright can install Chromium's system libraries).
     factory partition. What changed is that a settings page is a form per setting, and each of
     the four costs a label, a control and a sentence saying what it does. Sending 20 KB rather
     than 16 costs one more lwIP send buffer's worth of turns on a load that happens when
-    somebody opens the page, not while anything plays. `apps/wasm/tests/device-ui/budget.spec.js`
+    somebody opens the page, not while anything plays. `apps/demos/wasm/tests/device-ui/budget.spec.js`
     holds the new figure.
 
     **Re-derived 2026-09-16 (Hearth B3): 28,672 bytes.** The Sendspin player's section took the
@@ -1045,7 +1045,7 @@ run as root, so Playwright can install Chromium's system libraries).
     while the board runs, so (b) would resend the same bytes once a second forever for no reason
     - the exact waste decision 1 already chose polling over WebSockets to avoid elsewhere on this
     page - and would grow `/status`'s own key-order contract test
-    (`apps/wasm/tests/device-ui/contract.spec.js`) with a second hand-maintained nested-object
+    (`apps/demos/wasm/tests/device-ui/contract.spec.js`) with a second hand-maintained nested-object
     special case beside `sendspin`'s. (c) puts exactly the fact a board misbehaving in the field
     needs - "I am an ESP32-P4, revision 1.3, no PSRAM" - somewhere a phone browser on the same
     network cannot reach, which is the debugging path this exists to shorten. Cost of (a): a
@@ -1116,7 +1116,7 @@ run as root, so Playwright can install Chromium's system libraries).
     list, the S3 board's image is 1,428,624 bytes of its 1,572,864-byte factory partition
     (144,240 free), the C6's 1,591,344 of 2,097,152, the P4's 1,473,744 of 4,194,304, and the CI
     shape's 1,065,344. The page is 3% of the S3 board's image. The new figure is in
-    `apps/wasm/tests/device-ui/budget.spec.js`.
+    `apps/demos/wasm/tests/device-ui/budget.spec.js`.
 
     **Re-derived again 2026-09-25: 57,344 bytes.** The firmware section (decision 29) took the
     page to 55,454: the section, the upload and its checks on the image's head, and the dialog

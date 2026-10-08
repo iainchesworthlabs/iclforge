@@ -127,7 +127,7 @@ void append_levels(std::string& out, const char* key, const std::vector<float>& 
 // A JSON array of strings: GET /hardware's "capabilities" and "notices".
 // Placed here, ABOVE the sendspin object's own appender (which follows
 // straight after) rather than below it or between on_status and on_play
-// further down: apps/wasm/tests/device-ui/contract.spec.js extracts each of
+// further down: apps/demos/wasm/tests/device-ui/contract.spec.js extracts each of
 // those two functions' own keys by searching this file's plain text between
 // their names, so anything of this feature's sitting inside either span
 // would read as one of THEIR fields. Everything GET /hardware writes stays

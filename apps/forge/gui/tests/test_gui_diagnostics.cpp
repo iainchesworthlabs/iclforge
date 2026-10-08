@@ -8,7 +8,7 @@
 
 #include "gui_diagnostics.hpp"
 
-// forge-gui's diagnostics module (apps/gui/gui_diagnostics.hpp): the ring keeps
+// forge-gui's diagnostics module (apps/forge/gui/src/gui_diagnostics.hpp): the ring keeps
 // the newest lines in order and counts what it dropped, a note is one line no
 // longer than the cap, and the report never carries the signing key, the path
 // to a key file, or one byte of a loaded source - the rule
@@ -85,7 +85,7 @@ TEST_CASE("a gui note is one line and no longer than the cap", "[gui][diagnostic
     // Two spaces between "first" and "second", not one: one_line() maps each
     // control character to its own space rather than collapsing a run of
     // them, so a line keeps the width of what was logged and a reader can see
-    // that something was taken out. apps/crucible/engine/diagnostics.cpp does
+    // that something was taken out. apps/crucible/engine/src/diagnostics.cpp does
     // the same, and this helper is a copy of it.
     REQUIRE(has(lines[0], "first  second third"));
     REQUIRE(lines[0].find('\n') == std::string::npos);

@@ -439,7 +439,7 @@ count, ~2.2 s over a 30 s `kMdctBand` decode. It has no effect under the default
 
 The Catch2 suites (`iclforge-tests` plus the `iclforge-perf` throughput suite) plus one `ctest` entry per
 example program, run per platform. The Qt Quick Test harnesses add one entry per `tst_*.qml`
-suite on a build with the application enabled: `forge_gui_qmltests` for `apps/gui/tests/qml/` (36
+suite on a build with the application enabled: `forge_gui_qmltests` for `apps/forge/gui/tests/qml/` (36
 today), Hearth's for `apps/hearth/ui/tests/qml/` (15) and Crucible's for
 `apps/crucible/ui/tests/qml/` (16). The audio backend's device-free tests
 (`libs/audio/tests/backend/<backend>/`) join `iclforge-tests` for whichever backend the build selected, ALSA,
@@ -1726,7 +1726,7 @@ paragraph on the objects follows them:
   (`test_encoder.cpp`), as the configuration's designated initializers hold its defaults;
   `fuzz_ac4_encode` holds it to `create()` on every configuration it draws, and `fuzz_ac4_parse`
   holds `dac4_refusal()` to `build_dac4()` on every table of contents that reads.
-  Every option of `forge ac4-encode` has a test: `tests/cli/test_cli_ac4_encode.cpp` reads what
+  Every option of `forge ac4-encode` has a test: `apps/forge/cli/tests/test_cli_ac4_encode.cpp` reads what
   each writes back from the table of contents and the encoder's syntax trace (the codec modes,
   the downmix, DRC and loudness values, the dialogue enhancement methods and the hybrid ones'
   waveform, the I-frame options, each experimental tool, `crc=`, and every `substreamN-` and
@@ -1840,7 +1840,7 @@ of spacing between bursts. A stream packed and read back returns every frame unc
 frame rate of every type, with each burst's period, measured from the carrier as a receiver would
 measure it, its place in its sequence and its `Pc` fields as the tables give them; DEE's streams
 at four frame rates do the same. For the extension role, a loopback test
-(`tests/hearth/test_group.cpp`) sends DEE's 2.0 stream at 48 kHz through `_iclforge_player@v1`
+(`apps/hearth/engine/tests/test_group.cpp`) sends DEE's 2.0 stream at 48 kHz through `_iclforge_player@v1`
 to a test sink, whose output equals the local decode, rendered the same way, sample for sample.
 The two readings Part 14 leaves open, which frame starts a burst sequence and whether `Pd` counts
 bits or bytes, are given in `libs/containers/src/iec61937/iec61937.cpp`.
@@ -1848,7 +1848,7 @@ bits or bytes, are given in `libs/containers/src/iec61937/iec61937.cpp`.
 ### Hearth's engine
 
 Phase I2 plays AC-4 in Hearth through the decoder's public API. The tests are in
-`tests/hearth/test_ac4_engine.cpp` unless named otherwise.
+`apps/hearth/engine/tests/test_ac4_engine.cpp` unless named otherwise.
 
 - **Every committed stream**: the engine plays each committed stream the decoder decodes onto a
   layout with a slot for each speaker, and its output equals `iclforge::ac4::Decoder`'s own `decode()` of
@@ -1877,7 +1877,7 @@ Phase I2 plays AC-4 in Hearth through the decoder's public API. The tests are in
   Decoder page's setting for it. On the committed legs and the encoder's, every gain was within
   0.0001 dB of its formula and what it left was 148 dB or more under the output when phase I2
   wrote it; the Hearth CI job runs both, after each merge and nightly.
-- **To a network group** (`tests/hearth/test_engine_network_group.cpp`): the engine plays an AC-4
+- **To a network group** (`apps/hearth/engine/tests/test_engine_network_group.cpp`): the engine plays an AC-4
   item to a group of a player@v1 sink, which is sent the decoded PCM, and a test sink on the
   extension role that lists AC-4, which is sent each sync frame as a burst and decodes it. The
   second's output equals `iclforge::ac4::Decoder`'s decode of the frames, rendered on its layout, sample for

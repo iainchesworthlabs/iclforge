@@ -2,7 +2,7 @@
 # Hearth's NOTICES.txt: the third-party software libs/sendspin brings into Hearth's programs,
 # plus - on Windows and macOS - the Qt it bundles (planning/hearth-reference-player.md,
 # Dependencies), assembled by cmake/Notices.cmake from the fragments beside this file (and, for
-# the Qt section, apps/crucible/notices/fragments/, shared rather than copied - see that file's
+# the Qt section, notices/fragments/, shared rather than copied - see that file's
 # header). The licence texts are the copyright files vcpkg installs with each port, and the
 # versions are those vcpkg recorded (Qt's from apps/hearth/ui/CMakeLists.txt's own find_package),
 # so the file describes what this build actually links and bundles.
@@ -48,7 +48,7 @@ set(ICLFORGE_HEARTH_NOTICE_FRAGMENTS header cpp-httplib mbedtls mdns libflac)
 # hearth.app on macOS - apps/hearth/ui/CMakeLists.txt's windeployqt /
 # qt_generate_deploy_qml_app_script install rules (A7). Linux links the
 # system Qt and ships none, the same split
-# apps/crucible/notices/platform/<os>/components.cmake makes per platform for
+# notices/crucible/platform/<os>/components.cmake makes per platform for
 # Crucible. ICLFORGE_HEARTH_UI_QT_FOUND/ICLFORGE_HEARTH_UI_QT_VERSION are that ui/
 # directory's own PARENT_SCOPE exports (see its comment); reaching this file
 # at all depends on apps/hearth/CMakeLists.txt add_subdirectory()'ing ui/
@@ -65,7 +65,7 @@ set(ICLFORGE_HEARTH_QT_LOOKUP "")
 if(ICLFORGE_HEARTH_UI_QT_FOUND AND (WIN32 OR APPLE))
     # Found and bundled but blank would mean the version export above broke
     # loose from the find_package it travels with - the same failure
-    # apps/notices/notices.cmake guards against for apps/gui, and for the
+    # notices/forge/notices.cmake guards against for apps/forge/gui, and for the
     # same reason: an unfilled {{QT_VERSION}} still passes
     # ac3_generate_notices's leftover check (a token is substituted with
     # nothing, not left as a marker), so a shipped "Qt " with an empty
@@ -93,14 +93,14 @@ if(ICLFORGE_HEARTH_UI_QT_FOUND AND (WIN32 OR APPLE))
 endif()
 # {fmt}'s version, from its package or the pinned FetchContent fallback
 # (cmake/Fmt.cmake) - the same fmt_VERSION/ICLFORGE_FMT_VERSION choice
-# apps/crucible/notices/notices.cmake makes for the identical shared fragment.
+# notices/crucible/notices.cmake makes for the identical shared fragment.
 if(fmt_VERSION)
     set(ICLFORGE_HEARTH_FMT_VERSION "${fmt_VERSION}")
 else()
     set(ICLFORGE_HEARTH_FMT_VERSION "${ICLFORGE_FMT_VERSION}")
 endif()
 # Tracy's version, from its package - the same Tracy_VERSION/"not reported" choice
-# apps/crucible/notices/notices.cmake makes for the identical shared fragment (see the
+# notices/crucible/notices.cmake makes for the identical shared fragment (see the
 # ICLFORGE_ENABLE_TRACY block below for why this is computed unconditionally).
 if(Tracy_VERSION)
     set(ICLFORGE_HEARTH_TRACY_VERSION "${Tracy_VERSION}")
@@ -130,8 +130,8 @@ list(APPEND ICLFORGE_HEARTH_NOTICE_FRAGMENTS opus time-filter fmt fonts material
 # Tracy's client library: hearth_engine (engine/CMakeLists.txt) links iclforge::tracy
 # unconditionally, which only pulls in Tracy::TracyClient - and so is only worth
 # disclosing - when ICLFORGE_ENABLE_TRACY is on (cmake/Tracy.cmake). Same fact,
-# same fragment (found via the apps/crucible/notices/fragments FRAGMENT_DIR entry
-# below, not copied) and same conditional as apps/crucible/notices/notices.cmake's
+# same fragment (found via the notices/fragments FRAGMENT_DIR entry
+# below, not copied) and same conditional as notices/crucible/notices.cmake's
 # own tracy section.
 if(ICLFORGE_ENABLE_TRACY)
     list(APPEND ICLFORGE_HEARTH_NOTICE_FRAGMENTS tracy)
@@ -141,7 +141,7 @@ list(APPEND ICLFORGE_HEARTH_NOTICE_TOKENS
     "QT_SERIES=${ICLFORGE_HEARTH_QT_SERIES}"
     "QT_PAYLOAD=${ICLFORGE_HEARTH_QT_PAYLOAD}"
     "QT_LOOKUP=${ICLFORGE_HEARTH_QT_LOOKUP}"
-    # fmt, fonts and tracy are apps/crucible/notices/fragments/ fragments shared
+    # fmt, fonts and tracy are notices/fragments/ fragments shared
     # verbatim across applications (like qt-bundled above) - these are Hearth's own
     # values for the tokens they each leave for the including app to fill.
     "FMT_VERSION=${ICLFORGE_HEARTH_FMT_VERSION}"
@@ -174,7 +174,7 @@ ac3_generate_notices("${ICLFORGE_HEARTH_NOTICES_FILE}"
     # copied) are the same text for every application that includes them.
     FRAGMENT_DIR
         "${ICLFORGE_HEARTH_NOTICES_DIR}/fragments"
-        "${CMAKE_SOURCE_DIR}/apps/crucible/notices/fragments"
+        "${CMAKE_SOURCE_DIR}/notices/fragments"
     FRAGMENTS ${ICLFORGE_HEARTH_NOTICE_FRAGMENTS}
     TOKENS ${ICLFORGE_HEARTH_NOTICE_TOKENS}
     FILES ${ICLFORGE_HEARTH_NOTICE_FILES})

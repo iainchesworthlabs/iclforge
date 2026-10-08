@@ -52,12 +52,12 @@ reads the changed files and decides:
 - **Documentation only** (`docs/`, `docs-snippets/`, `planning/`, `overrides/`, `assets/`, any
   `.md` file, `LICENSE`, `mkdocs.yml`): the static checks run, nothing is built.
 - **Nothing a Linux C++ build reads** (`python/`, `rust/`, `js/`, `esp-idf/`, `esphome/`,
-  `apps/android/`, `apps/wasm/`, `apps/baremetal/`, `apps/linux/`, `packaging/`, `requirements/`,
+  `apps/demos/android/`, `apps/demos/wasm/`, `apps/baremetal/`, `apps/crucible/linux/`, `packaging/`, `requirements/`,
   the scripts under `tools/ci/`, `tools/hearth/`, `tools/packaging/` and `tools/release/`, other
   workflows, editor and lint configuration): the static checks run, nothing is built. Those lanes
   run after the merge.
 - **Anything else builds Linux GCC**, and installs Qt and builds the GUI only when the change is
-  in `apps/gui`, `apps/hearth`, `apps/crucible`, `apps/common`, their tests, `cmake/`, or the
+  in `apps/forge/gui`, `apps/hearth`, `apps/crucible`, `apps/shared/media/src`, their tests, `cmake/`, or the
   top-level CMake and vcpkg files. A path the planner does not recognise builds everything.
 - **The gate's own files** (`pr-gate.yml`, `_static.yml`, `.github/actions/`, the toolchain
   scripts) build everything, because they are proven by running.

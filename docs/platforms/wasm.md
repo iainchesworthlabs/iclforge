@@ -1,7 +1,7 @@
 # WebAssembly (browser demos and package)
 
 WASM support is `iclforge::ac3` compiled to WebAssembly, reached three ways. Two small demo apps
-under **`apps/wasm/`** run it client-side in a static HTML page: a **decode** demo
+under **`apps/demos/wasm/`** run it client-side in a static HTML page: a **decode** demo
 loads an elementary stream, plays the decoded bed through the Web Audio API, and shows
 per-channel energy on a speaker-ring visualization; for a stream carrying Atmos objects, each
 object's decoded position (OAMD) moves in a room view and its reconstructed audio (JOC) can be
@@ -9,7 +9,7 @@ soloed. An **encode** demo drops a `.wav` file — mono, stereo, 5.1, or the
 wide E-AC-3 layouts 7.1/5.1.4/7.1.4 — or records live from the microphone, and returns an
 AC-3/E-AC-3 elementary stream carrying a measured dialnorm, a BS.1770 loudness/true-peak QC
 verdict against five delivery presets, and a round-trip preview through the decode module; a
-subdirectory of the same demo (`apps/wasm/atmos/`) is an **Atmos object-authoring page** — drag
+subdirectory of the same demo (`apps/demos/wasm/atmos/`) is an **Atmos object-authoring page** — drag
 audio objects around a room canvas while the page encodes, each drag becoming that frame's OAMD
 placement in an E-AC-3 + JOC stream. The third surface is
 **[`js/`](https://github.com/iainchesworthlabs/iclforge/tree/main/js)**, the
@@ -79,13 +79,13 @@ WSL2/Emscripten 6.0.6 toolchain `build-wasm` uses:
   pass/fail table is necessarily an end-of-file readout, not a live one — `momentaryLkfs()`/
   `shortTermLkfs()` are what a future live product would show updating in real time.
 
-`apps/wasm/encoder_bindings.cpp` binds the full surface above (including Atmos/JOC).
-`apps/wasm/encode/`'s page exposes AC-3/E-AC-3 bed encoding, and the object-authoring page in
-`apps/wasm/atmos/` drives the bound `AtmosBedEncoder`.
+`apps/demos/wasm/encoder_bindings.cpp` binds the full surface above (including Atmos/JOC).
+`apps/demos/wasm/encode/`'s page exposes AC-3/E-AC-3 bed encoding, and the object-authoring page in
+`apps/demos/wasm/atmos/` drives the bound `AtmosBedEncoder`.
 
 ## AC-4 module
 
-`apps/wasm/ac4_bindings.cpp` is a third Embind module, `iclforge_wasm_ac4`
+`apps/demos/wasm/ac4_bindings.cpp` is a third Embind module, `iclforge_wasm_ac4`
 (`iclforge_ac4.js`/`.wasm`, `-sEXPORT_NAME=createIclForgeAc4Module`), wrapping `iclforge::ac4::Decoder` and
 `iclforge::ac4::Encoder` (ETSI TS 103 190) beside the decode and encode modules above. Unlike those two, it
 is one combined decode-and-encode module: AC-4's decoder and encoder share one table-of-contents/
@@ -146,7 +146,7 @@ cmake --preset config-wasm-emscripten
 cmake --build build/config-wasm-emscripten
 ```
 
-Then build `js/` and assemble it alongside the Emscripten output — `apps/wasm/CMakeLists.txt`
+Then build `js/` and assemble it alongside the Emscripten output — `apps/demos/wasm/CMakeLists.txt`
 only knows how to copy its own static files, so this is a plain shell step, the same one
 `.github/workflows/_build.yml`'s `build-wasm` job runs:
 
@@ -170,16 +170,16 @@ Open `http://localhost:8000/`. Each demo directory is independently servable —
 carries its own copy of the decode module (for its round-trip preview) rather than assuming the
 decode demo's directory is a sibling. For the decode demo's realtime section, serve with
 `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`
-response headers instead — `apps/wasm/tests/serve.js` is a small Node static server that already
+response headers instead — `apps/demos/wasm/tests/serve.js` is a small Node static server that already
 sets both, and doubles as exactly that.
 
 ## What's reused, what's new
 
 `iclforge::ac3` (`libs/ac3/`) — the codec, `FrameDecoder`/`Eac3Decoder`, elementary-stream scanning — and
-the libraries it links are fully platform-independent and are linked into both demos **unmodified**, the same way `apps/wasm/CMakeLists.txt`
+the libraries it links are fully platform-independent and are linked into both demos **unmodified**, the same way `apps/demos/wasm/CMakeLists.txt`
 links it as any other consumer would: `add_executable` + `target_link_libraries(... iclforge::ac3 ...)`,
-no fork, no `#ifdef`. Unlike `apps/android/`, this doesn't need a separate build system reached
-from the other direction — WASM is a plain CMake cross-compile, so `apps/wasm/` is a normal
+no fork, no `#ifdef`. Unlike `apps/demos/android/`, this doesn't need a separate build system reached
+from the other direction — WASM is a plain CMake cross-compile, so `apps/demos/wasm/` is a normal
 `add_subdirectory()` from the root `CMakeLists.txt`, gated on `EMSCRIPTEN` (set by
 `cmake/toolchains/wasm.emscripten.toolchain.cmake`) rather than an `ICLFORGE_BUILD_*` option.
 `iclforge::audio` (`libs/audio/`) gains **no** WASM backend — there is no live-capture/passthrough
@@ -216,7 +216,7 @@ parameter, so a consumer controls their own hosting/CORS story for the binary th
 step produces.
 
 `index.html`/`demo.js` (the page, Web Audio playback of already-decoded PCM, the Canvas
-visualizations ported from `apps/gui/qml/SoundfieldView.qml` and Main.qml's Objects tab) are the
+visualizations ported from `apps/forge/gui/assets/qml/SoundfieldView.qml` and Main.qml's Objects tab) are the
 one remaining piece specific to the demo, and are now a *consumer* of `js/` - they hold no decode
 logic, no WASM-module loading, and no hand-rolled fold. The object visualization/audio is a thin
 JS-facing surface over `Eac3Decoder`'s own real `object_metadata` (OAMD positions/gain,
@@ -228,7 +228,7 @@ independent Embind wrapper (its own `add_executable`, its own `EMSCRIPTEN_BINDIN
 `EXPORT_NAME` so the two modules can load on one page without colliding), linking `iclforge::ac3`
 **unmodified** the same way the decode target does — no fork, no `#ifdef`, confirming the "encoders
 are already proven platform-free" premise this depended on (the same `iclforge::ac3` target already
-links unmodified into `apps/android`'s NDK build and `python/`'s pybind11 module). `apps/wasm/encode/`
+links unmodified into `apps/demos/android`'s NDK build and `python/`'s pybind11 module). `apps/demos/wasm/encode/`
 (`index.html`/`app.js`) is the page: a drop zone and file picker, format (AC-3/E-AC-3)/sample-rate/
 bitrate controls (the channel layout is derived from the dropped WAV itself), a
 record-from-microphone card, the QC verdict table, and the round-trip preview. It reorders a
@@ -245,7 +245,7 @@ unmeasured default 31 would leave a real decoder's normalisation under-attenuati
 this page produced. Microphone capture (`getUserMedia` → an inline-Blob `AudioWorklet` → the same
 encoder) opens with a measure-only pre-roll (~1.5 s) for the same reason: the pre-roll's reading
 sets dialnorm, then the buffered audio drains through the encoder so nothing of the take is
-lost. The authoring page (`apps/wasm/atmos/`, shipped as a subdirectory of the encode demo so it
+lost. The authoring page (`apps/demos/wasm/atmos/`, shipped as a subdirectory of the encode demo so it
 loads the very same modules via `../`) drives the already-bound `AtmosBedEncoder` with one
 `ObjectPlacement` set per 1536-sample frame, read live from its room canvas — synthesised tones
 as objects, encode cadence locked to real time so the room is *performed*, and the same
@@ -293,7 +293,7 @@ Actions artefact; the `publish` job below it runs only on a manual `workflow_dis
 Until it does, the way to use the package is to build it from source:
 `cd js && npm ci && npm run build` — the same install and build the `build-wasm` job runs, which
 follows them with `npm test` — then depend on the resulting `js/dist/`. The package embeds no
-`.wasm` of its own, so a consumer also needs the decoder module from `apps/wasm/` (see Build and
+`.wasm` of its own, so a consumer also needs the decoder module from `apps/demos/wasm/` (see Build and
 run above). A reader who only wants to see the decoder work needs neither: the [live decode
 demo](../wasm-demo.md) runs it in the browser with nothing installed.
 
@@ -317,7 +317,7 @@ manual dispatch has been seen to work.
 The demos build alongside the desktop packages rather than only ever being hand-built locally:
 `.github/workflows/_build.yml`'s `build-wasm` job configures and builds both (one `cmake --build`
 over the whole preset) in every run in which the WASM lane runs — the nightly run, and the run
-after a merge that changes `apps/wasm/` or `js/`, the same smoke-test role `build-android` plays —
+after a merge that changes `apps/demos/wasm/` or `js/`, the same smoke-test role `build-android` plays —
 proving the Emscripten toolchain and every file it touches still build.
 Like `build-android`, it's its own job rather than a `build` matrix entry: this leg has no ctest
 suite, no cpack package and no gold-reference gate, so folding it into that matrix would mean
@@ -331,18 +331,18 @@ the ring buffer, the `MediaSource` shim) runs there too.
 and `docs/assets/wasm-encode-demo/` are committed to the repo as working fallbacks (so a plain local
 `mkdocs build` — or this repo's own PR-time docs check — still has something to embed without anyone
 needing Emscripten installed just to preview docs), but `.github/workflows/docs.yml`'s `deploy` job
-(push to `main` only) installs Emscripten, rebuilds `apps/wasm/` from source, and overwrites both
+(push to `main` only) installs Emscripten, rebuilds `apps/demos/wasm/` from source, and overwrites both
 directories *before* `mkdocs gh-deploy` runs — so what actually reaches the live site always
 reflects current source, never a possibly-stale commit. Both jobs share one Emscripten install step,
 `.github/actions/setup-emscripten` (pinned to the same version this page's Toolchain section names),
 so the two never drift onto different SDK versions.
 
 The committed fallbacks are not immune to going stale, though: nothing rewrites them except a human
-manually re-copying `apps/wasm/`'s output, and `docs.yml`'s own `deploy` job overwrites its
+manually re-copying `apps/demos/wasm/`'s output, and `docs.yml`'s own `deploy` job overwrites its
 working copy in a throwaway CI workspace rather than committing the refresh back. `docs.yml`'s
 `build` job (run for any PR that touches the docs or the WASM sources — see the trigger `paths:`
 list below — `mkdocs build --strict`) therefore also byte-compares
-`index.html`, `demo.js`, the two favicon files and `assets/demo.ec3` against their `apps/wasm/`
+`index.html`, `demo.js`, the two favicon files and `assets/demo.ec3` against their `apps/demos/wasm/`
 originals, and does the same for the encode demo's `encode/index.html`/`encode/app.js` and its
 own favicon copies against `docs/assets/wasm-encode-demo/`, and for the Atmos page's `index.html`
 and `app.js` against `docs/assets/wasm-encode-demo/atmos/` — the plain copies, not Emscripten
@@ -350,11 +350,11 @@ output, so the check needs no toolchain. The `.js`/`.wasm` build artifacts (both
 outside this check's scope; they only get refreshed by an actual Emscripten rebuild. The AC-4
 module has no committed copy at all.
 
-`docs.yml`'s trigger `paths:` list includes `apps/wasm/**`, `CMakeLists.txt`,
+`docs.yml`'s trigger `paths:` list includes `apps/demos/wasm/**`, `CMakeLists.txt`,
 `CMakePresets.json`, `.github/actions/setup-emscripten/**` and the WASM toolchain file
 specifically — without them, a source change there
 would never trigger a redeploy at all, and the live demo would silently drift from what's in
-`apps/wasm/`.
+`apps/demos/wasm/`.
 
 ## What has and has not been verified
 
@@ -388,7 +388,7 @@ would never trigger a redeploy at all, and the live demo would silently drift fr
     the source audio replayed — and reports the right sample rate and channel count back.
 
 !!! note "Automated in CI"
-    `apps/wasm/tests/` is a Playwright harness `build-wasm` runs in every run of the job, right
+    `apps/demos/wasm/tests/` is a Playwright harness `build-wasm` runs in every run of the job, right
     after the demo artifact uploads: two projects, one per demo, each serving its own just-built
     directory (seven tests in the run of 2026-09-29).
     `decode.spec.js` loads `index.html` in a headless Chromium and drives the packaged decoder
@@ -437,7 +437,7 @@ would never trigger a redeploy at all, and the live demo would silently drift fr
     for the same gap stated from the package's own side, including the A/V-sync approximation
     it ships with.
 
-    **The decode demo's realtime section's pacing** (`apps/wasm/demo.js`'s `setTimeout`-based push
+    **The decode demo's realtime section's pacing** (`apps/demos/wasm/demo.js`'s `setTimeout`-based push
     loop, simulating a live feed from the bundled file) is a demo simplification that a
     backgrounded browser tab can starve — Chrome throttles `setTimeout` heavily once a tab is
     hidden, while the (unthrottled) audio graph keeps consuming, which can read as a stuck

@@ -151,7 +151,7 @@ thread.
 
 Its test preset runs only the `concurrency` ctest label — the cases under `libs/audio/tests/`, the
 CLI's live-capture commands (`tests/cli/test_cli_live*.cpp`), the Crucible engine's threads
-(`tests/crucible/`) and the Hearth engine's threaded cases (`tests/hearth/`) — because TSan's
+(`apps/crucible/engine/tests/`) and the Hearth engine's threaded cases (`apps/hearth/engine/tests/`) — because TSan's
 shadow memory makes everything several times slower and the rest of the suite is single-threaded
 codec maths. The label comes from the Catch2 tags themselves
 (`catch_discover_tests(... ADD_TAGS_AS_LABELS)` in `tests/CMakeLists.txt`), so `ctest -L ring`,
@@ -187,7 +187,7 @@ platform/compiler pair. It inherits a `coverage` fragment setting
 and on clang-cl LLVM's source-based coverage; MSVC just warns and skips it),
 `ICLFORGE_BUILD_ADM=ON` with vcpkg's `adm` feature (so the opt-in ADM pair — `iclforge::adm` and its
 bridge — is measured alongside the always-on library components) and `ICLFORGE_BUILD_CLI=ON`,
-since `apps/cli` is gated too. Only `ICLFORGE_BUILD_EXAMPLES` stays off, as a build-time saving: `examples/` is
+since `apps/forge/cli/src` is gated too. Only `ICLFORGE_BUILD_EXAMPLES` stays off, as a build-time saving: `examples/` is
 documentation that happens to compile, over an API surface `tests/` already covers, and each one
 is its own `ctest` process. `config-linux-gcc-coverage` itself (not the shared `coverage`
 fragment, since `config-windows-llvm-coverage` also inherits that fragment and stays
@@ -199,17 +199,17 @@ profile runtime is built against the release CRT), with Crucible on and ADM and 
 test preset runs the `crucible` and `crucible-ui` labels, and
 `tools/checks/coverage_crucible.ps1` reads its result.
 
-Note that `forge` has to link `iclforge::coverage` itself (`apps/cli/CMakeLists.txt`) and not merely
+Note that `forge` has to link `iclforge::coverage` itself (`apps/forge/cli/CMakeLists.txt`) and not merely
 link an instrumented library. The gcov *runtime* propagates to consumers automatically, but
 `--coverage` is target-scoped at compile time — so without that link every `.cpp` under
-`apps/cli` compiles uninstrumented and emits no `.gcno` at all, which reads as *no data* rather
+`apps/forge/cli/src` compiles uninstrumented and emits no `.gcno` at all, which reads as *no data* rather
 than as low coverage. The same applies to any other executable added to the report later.
 
 After `ctest`, `tools/checks/coverage_report.sh` (the same script the `coverage` job of
 `_ci-core.yml` runs) makes one `gcovr` extraction pass and then gates line *and* branch coverage
-per component — the `src/` library components, `apps/cli`, `apps/common`, Crucible's platform-free
+per component — the `src/` library components, `apps/forge/cli/src`, `apps/shared/media/src`, Crucible's platform-free
 engine and Hearth's engine and test sink — and prints a per-command
-breakdown of `apps/cli` below the gate, reported but not gated, so a thin command module shows as
+breakdown of `apps/forge/cli/src` below the gate, reported but not gated, so a thin command module shows as
 thin instead of averaging away inside the aggregate. See the script's own floor table for the
 current thresholds and the measured baseline each was calibrated against:
 
@@ -220,9 +220,9 @@ ctest --preset test-linux-gcc-coverage -LE Performance
 ./tools/checks/coverage_report.sh -g gcov-16
 ```
 
-`apps/gui` is deliberately absent from that report: instrumenting its C++ needs a Qt kit on the
+`apps/forge/gui` is deliberately absent from that report: instrumenting its C++ needs a Qt kit on the
 coverage job, which installs none (CI puts Qt only on the plain `gui` build legs, which are not
-instrumented). Its interactive surfaces are covered by `apps/gui/tests`' own Qt Quick suite, and
+instrumented). Its interactive surfaces are covered by `apps/forge/gui/tests`' own Qt Quick suite, and
 its one Qt-free class (`RecordingSink`) is already in `iclforge-tests`. `python/` has its own floor
 instead, in `.github/workflows/wheels.yml`'s `python-coverage` job — `pytest --cov` against the
 built wheel; see that job's own comment for what a Python percentage does and does not measure
@@ -1125,8 +1125,8 @@ Result: configure, build and `ctest` all clean on both compilers, GUI and ALSA b
 The base suite is `iclforge-tests` and `iclforge-perf`'s Catch2 cases plus one ctest entry per example
 program; `ICLFORGE_WITH_ALSA`'s `libs/audio/tests/backend/alsa/` adds its own cases (or, on a build that
 selected pipewire/ instead, `libs/audio/tests/backend/pipewire/` does), and the GUI's Qt Quick
-Test harness (`forge_gui_qmltests`, `apps/gui/tests/CMakeLists.txt`) adds one more per `tst_*.qml`
-suite under `apps/gui/tests/qml/` — unlike every other GUI-related target, that one
+Test harness (`forge_gui_qmltests`, `apps/forge/gui/tests/CMakeLists.txt`) adds one more per `tst_*.qml`
+suite under `apps/forge/gui/tests/qml/` — unlike every other GUI-related target, that one
 harness *does* register its own `ctest` entries, gated on both
 `ICLFORGE_BUILD_GUI` and `ICLFORGE_BUILD_TESTS`. A Linux build with neither ALSA nor the GUI
 runs the base suite; with the GUI on and ALSA off it matches Windows exactly. `forge-gui --smoke`
@@ -1176,7 +1176,7 @@ the Annex E tool combinations the one fixed gold-reference sample does not itsel
 
 The coverage job (nightly only) gates line and branch coverage per component, not as one blended
 number, using the same GCC 16 pin as the other Linux legs; the floor table, the measurement each
-floor was calibrated against, and why `libs/audio` and `apps/common` sit on a hardware-class floor
+floor was calibrated against, and why `libs/audio` and `apps/shared/media/src` sit on a hardware-class floor
 (their device paths run headless against alsa-lib's software devices, but card enumeration
 needs a real card) all live in `tools/checks/coverage_report.sh`, with the calibration history in the coverage job's own
 comment in `_ci-core.yml`.
@@ -1231,17 +1231,17 @@ too (Qt installed via `install-qt-action`, not Homebrew's `qt` formula — see
 [GUI on macOS](platforms/macos.md#gui-on-macos)), which adds
 the same per-suite `forge_gui_qml_tests_*` entries to that same suite the same way it does on Linux:
 confirmed on a real run before the harness split into one ctest entry per `tst_*.qml` suite (see
-`apps/gui/tests/CMakeLists.txt`), 582 ctest entries total, 100% passing, the GUI harness (then
+`apps/forge/gui/tests/CMakeLists.txt`), 582 ctest entries total, 100% passing, the GUI harness (then
 still a single entry) in 39.74s (56.81s for the whole suite) — the first time that number had
 existed for macOS at all, so there was no prior baseline to compare it against. Getting there
-needed two real fixes, not just turning the option on: `QSG_RENDER_LOOP=basic` (`apps/gui/tests/CMakeLists.txt`,
+needed two real fixes, not just turning the option on: `QSG_RENDER_LOOP=basic` (`apps/forge/gui/tests/CMakeLists.txt`,
 `APPLE` only) for a Qt Quick threaded-render-loop deadlock that hung the suite outright before a
 single test ran, and forcing the `Fusion` style in `qml_test_main.cpp` — matching what `main.cpp` already does —
 for a second, narrower hang in a native `ComboBox` populated by real capture-device data once a
 test entered live-session mode: the same native-style-under-offscreen fragility a comment in
-`apps/gui/qml/Main.qml` already documents one earlier instance of, on Windows, in a different
+`apps/forge/gui/assets/qml/Main.qml` already documents one earlier instance of, on Windows, in a different
 control (a `Repeater`'s per-device `Button`, worked around there directly in QML rather than at
-the style level). See `apps/gui/tests/CMakeLists.txt` and `qml_test_main.cpp` for the full detail
+the style level). See `apps/forge/gui/tests/CMakeLists.txt` and `qml_test_main.cpp` for the full detail
 on both macOS fixes.
 
 `libs/audio/CMakeLists.txt` selects a real CoreAudio backend on macOS (`libs/audio/src/backend/macos/`,

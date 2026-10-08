@@ -21,7 +21,7 @@
 // the records it leaves (planning/hearth-reference-player.md, B3;
 // planning/hearth-sendspin-extension.md). libs/sendspin's player half does the
 // protocol; this is what a board adds around it, and what the test sink's
-// Sink class (apps/hearth/testsink/sink.cpp) is on a computer.
+// Sink class (apps/hearth/testsink/src/sink.cpp) is on a computer.
 //
 // ONE TASK RUNS EVERY SESSION. The host is an esp_http_server instance of its
 // own, on the Sendspin port, and that server's task receives each WebSocket

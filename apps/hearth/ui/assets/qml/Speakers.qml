@@ -515,7 +515,7 @@ ScrollView {
                 spacing: 1
 
                 // The grid's own single Tab stop (matching SegmentedControl's
-                // group-is-the-stop idiom, apps/gui/qml/SegmentedControl.qml) -
+                // group-is-the-stop idiom, apps/shared/theme/assets/qml/SegmentedControl.qml) -
                 // individual cells no longer declare activeFocusOnTab
                 // themselves. Landing here from Tab hands real focus straight
                 // to a cell below, so the focus ring and Space/Enter both work

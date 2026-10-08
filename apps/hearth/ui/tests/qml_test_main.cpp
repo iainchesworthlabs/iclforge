@@ -39,7 +39,7 @@
 
 // Qt Quick Test entry point for the Hearth window: runs every tst_*.qml under
 // QUICK_TEST_SOURCE_DIR against the REAL HearthController the embedded
-// Hearth module registers - the same rule apps/gui/tests and
+// Hearth module registers - the same rule apps/forge/gui/tests and
 // apps/crucible/ui/tests follow, and for the same reason: a parallel fake API
 // is a second thing the real one could silently disagree with. Unlike
 // CrucibleController, HearthController is QML_SINGLETON, so no manual
@@ -359,7 +359,7 @@ private:
 };
 
 // Mirrors DeskIsolation (apps/crucible/ui/tests/qml_test_main.cpp) and
-// apps/gui/tests: real organisation/application names plus a QTemporaryDir
+// apps/forge/gui/tests: real organisation/application names plus a QTemporaryDir
 // settings path, so HearthController's QSettings (organisation "iclforge",
 // application "Hearth", the shipped app's own - hearth_controller.cpp's
 // constructor) read and write a store that is empty at start and gone at

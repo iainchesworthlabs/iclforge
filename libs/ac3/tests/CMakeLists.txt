@@ -300,7 +300,7 @@ if(NOT BUILD_SHARED_LIBS)
     target_sources(iclforge-ac3-tests PRIVATE core/test_fixed32_ecpl.cpp)
 endif()
 
-# Two of these tests' subjects are Forge's shared code in apps/common, compiled in as source:
+# Two of these tests' subjects are Forge's shared code in apps/shared/media/src, compiled in as source:
 # ../../../apps/shared/media/tests/test_container_input.cpp holds iclforge::apps::sniff_container/elementary_stream_from_bytes, which
 # decode/qc/levels/play/monitor and the GUI's QC/Inspect pickers all call, so a sniffing
 # regression belongs in the plain Catch2 suite rather than only in the Python encoder-space fuzzer

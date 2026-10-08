@@ -263,9 +263,9 @@ was complete.
 
 ### Phase 1: identity
 
-The rename, mechanically and completely: `apps/windows/` to `apps/crucible/`, `ac3::windemo` to
+The rename, mechanically and completely: `apps/crucible/windows/` to `apps/crucible/`, `ac3::windemo` to
 `ac3::crucible`, `ac3desk` to `ac3crucible`, `ac3windemo` to the same binary's console mode,
-`tests/windemo/` to `tests/crucible/`, `AC3FORGE_BUILD_WINDEMO` to `AC3FORGE_BUILD_CRUCIBLE`,
+`tests/windemo/` to `apps/crucible/engine/tests/`, `AC3FORGE_BUILD_WINDEMO` to `AC3FORGE_BUILD_CRUCIBLE`,
 the `desk`/`windemo` ctest labels to `crucible`, `ac3desk_*.ts` to `ac3crucible_*.ts`, the CPack
 component and its archive name, and `tools/ci/check_windemo_package.py` with them.
 
@@ -275,8 +275,8 @@ records, and the driver subtree. The driver's own naming is held back — see
 [Coordination](#coordination-with-the-driver-signing-session).
 
 !!! success "Done 2026-09-04"
-    The tree moved (`apps/windows/{engine,runner,ui,translations,spikes}` to `apps/crucible/`,
-    `tests/windemo/` to `tests/crucible/`), the namespace with it (`ac3::windemo` to
+    The tree moved (`apps/crucible/windows/{engine,runner,ui,translations,spikes}` to `apps/crucible/`,
+    `tests/windemo/` to `apps/crucible/engine/tests/`), the namespace with it (`ac3::windemo` to
     `ac3::crucible`, and the window's own `ac3::desk` to `ac3::crucible::ui`), the binaries
     became `ac3crucible` and `ac3crucible-run`, and the option, CPack component, archive name,
     coverage script, CI matrix flag and ctest labels (`windemo` and `desk` to `crucible` and
@@ -300,7 +300,7 @@ records, and the driver subtree. The driver's own naming is held back — see
 
 Extract `SessionMonitor`, `Foreground`, `DefaultDevice` and `VirtualDevice` as interfaces beside
 `AudioDevices`, move the Windows implementations behind them, and add fakes for each to
-`tests/crucible/`. `platform_services.hpp` gains one factory per seam, one
+`apps/crucible/engine/tests/`. `platform_services.hpp` gains one factory per seam, one
 `platform/<os>/` definition each, and `wasapi_devices()` is renamed
 `platform_audio_devices()` with it, so nothing above the seam names an operating system.
 
@@ -327,7 +327,7 @@ rather than three Windows booleans; the QML tests move with them.
     All four seams are in. Nothing in `apps/crucible/` above `engine/platform/` names an
     operating system: `platform_services.hpp` hands back an `AudioDevices`, a `SessionMonitor`,
     a `Foreground`, a `DefaultDevice` and a `VirtualDevice`, one `platform/<os>/` definition
-    each, and `tests/crucible/platform_services_stub.cpp` answers inertly where no platform half
+    each, and `apps/crucible/engine/tests/platform_services_stub.cpp` answers inertly where no platform half
     is built.
 
     2b was the one that changed the window rather than only its plumbing. `SettingsPage.qml` had
@@ -835,8 +835,8 @@ places one, and encodes; the signal path renders with the null sink as the defau
     because a 2 GB Pi could not run the one thing that would: an address sanitiser, or Qt's own
     debug symbols. So the next step was a machine that could.
 
-    **The VM.** [`apps/linux/tray-vm/`](https://github.com/iainchesworthlabs/iclforge/tree/main/apps/linux/tray-vm) is a scripted VMware guest,
-    the same shape as the Windows driver guest in `apps/windows/driver-vm/`: Debian 13, which
+    **The VM.** [`apps/crucible/linux/tray-vm/`](https://github.com/iainchesworthlabs/iclforge/tree/main/apps/crucible/linux/tray-vm) is a scripted VMware guest,
+    the same shape as the Windows driver guest in `apps/crucible/windows/driver-vm/`: Debian 13, which
     carries the Pi's exact Qt (6.8.2) and publishes matching `-dbgsym` packages, on labwc with
     waybar as the panel — the Pi's own stack a step out, since `wf-panel-pi` has no amd64 build
     and waybar is linked against the same `libdbusmenu-gtk3` that makes the call. x86_64, so the
@@ -919,7 +919,7 @@ places one, and encodes; the signal path renders with the null sink as the defau
     no `createSubMenu()`, and `QDBusPlatformMenuItem::setMenu()` `static_cast`s whatever it is
     handed. Either half alone would be enough to fix it — a `createSubMenu()` that returns a new
     `QDBusPlatformMenu`, or a `qobject_cast` in `setMenu()` that refuses what it cannot use.
-    Reproduced on Qt 6.8.2 on two architectures; `apps/linux/tray-vm/` builds the machine that
+    Reproduced on Qt 6.8.2 on two architectures; `apps/crucible/linux/tray-vm/` builds the machine that
     shows it.
 
 !!! success "Done 2026-09-07: the probe thread outlived what it was enumerating"
@@ -968,7 +968,7 @@ run by anyone here**; see below.
 
 !!! note "Written 2026-09-06: both halves exist and compile; almost none of it has run"
     `libs/audio/src/backend/macos/process_tap.{hpp,mm}`,
-    `apps/crucible/engine/platform/macos/` and `apps/crucible/ui/platform/macos/` are all
+    `apps/crucible/engine/src/platform/macos/` and `apps/crucible/ui/src/platform/macos/` are all
     written, and the root guard in `CMakeLists.txt` is now `WIN32 OR APPLE OR LINUX` — macOS is a
     supported platform rather than an excluded one.
 
@@ -1254,7 +1254,7 @@ run by anyone here**; see below.
     avoided, and abandoning the thread instead needs the Mac this phase does not have. What it
     does buy is every refusal that reports rather than wedges - no usable endpoint, a sink that
     will not open - which is the case the window and the QML suites were written for and could
-    not reach. `tests/crucible/test_engine_start.cpp` holds all of it over the fakes (which is
+    not reach. `apps/crucible/engine/tests/test_engine_start.cpp` holds all of it over the fakes (which is
     why `engine.cpp` now compiles into `ac3tests`), and `TestServices.scriptMachineWithNoOutput()`
     lets a QML suite script the refusal rather than wait for a seat that happens to have no
     sound card.
@@ -1334,7 +1334,7 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
     with anything under `signing/` written as withheld, and the environment is never
     enumerated. Then the finished text is scrubbed of every spelling of the key path and of
     the inline `AC3FORGE_SIGNING_KEY` value, for lines that arrived through the message ring.
-    `tests/crucible/test_diagnostics.cpp` holds the rule over the renderer on every CI leg and
+    `apps/crucible/engine/tests/test_diagnostics.cpp` holds the rule over the renderer on every CI leg and
     `tst_settings.qml` holds it over the window with a chosen key file; `tst_shell.qml` checks
     the engine's own notes reach the report and the status line that names the file never
     does. `SigningHook` gained `source_kind()` and `failure()` so the engine can say how the
@@ -1343,7 +1343,7 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
 !!! success "Done 2026-09-05: third-party licence notices per platform"
     Every Crucible package now carries a `NOTICES.txt` written for it, and the About box's
     Licences… button shows the same text. The file is generated at configure time by
-    `cmake/Notices.cmake` from `apps/crucible/notices/`: shared fragments, a component list per
+    `cmake/Notices.cmake` from `notices/`: shared fragments, a component list per
     platform directory (`platform/windows/`, `platform/linux/` - the same selection rule as
     `engine/platform/`, so no fragment, QML or C++ file names an operating system), verbatim
     licence texts under `licences/`, and the versions CMake already holds (`Qt6_VERSION`, the
@@ -1371,7 +1371,7 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
     combined work; any later plan to offer Crucible under other terms, or through a store that
     refuses the GPL, would have to drop or replace the 3D view. The driver credit is corrected
     with the rest: the notices and the About box say AudioCodec ACX sample, and
-    `apps/windows/driver/README.md` records that the three scripts travel into the package under
+    `apps/crucible/windows/driver/README.md` records that the three scripts travel into the package under
     that directory's terms.
 
     `tools/ci/check_crucible_package.py` reads the notices as well as the archive's names: each
@@ -1422,7 +1422,7 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
     same suite reaches when the machine can answer.
 
     The Linux platform half barely appears here, and it is worth being exact about why. The
-    Catch2 binary links `tests/crucible/platform_services_stub.cpp`, which supplies every
+    Catch2 binary links `apps/crucible/engine/tests/platform_services_stub.cpp`, which supplies every
     `platform_*()` factory, so no platform seam is compiled into it on any operating system.
     What it does take out of `engine/platform/linux/` is the part of that directory needing
     neither xcb nor PipeWire: `x11_foreground.cpp`, the X11 Foreground's policy over an
@@ -1475,7 +1475,7 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
     it compiles without the PipeWire headers, and the /proc readers, the per-process fact
     cache and the record-building sat in an anonymous namespace inside it. They are now
     `engine/platform/linux/proc_facts.hpp` - the same split `process_tree.hpp` already was -
-    and `tests/crucible/platform/linux/test_session_facts.cpp` drives them on any Linux
+    and `apps/crucible/engine/tests/platform/linux/test_session_facts.cpp` drives them on any Linux
     machine against a `/proc` the test writes itself: a `comm` holding a space, a `stat` line
     whose comm holds a `)`, a pid with no `exe` link across a sandbox boundary. What it pins:
     the stat parse starting from the LAST `)`, /proc being read once per process and not once
@@ -1507,7 +1507,7 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
     (0.05, Shift 0.01, Ctrl 0.25), Page Up and Page Down for height, Home to recentre, Enter to
     place one that is in the bed, Delete to return it, plus and minus for size — the same keys
     whichever picture is on screen, because nothing in it asks which. `Ctrl+1/2/3` switch pages,
-    F1 opens About, Escape closes a dialog. A new shared `apps/gui/qml/FocusRing.qml` draws a
+    F1 opens About, Escape closes a dialog. A new shared `apps/shared/theme/assets/qml/FocusRing.qml` draws a
     two-pixel accent-derived ring outside a control's own border while it has the keyboard;
     clicking a button does not take focus, so a mouse user sees no rings, and clicking a row, a
     marker or a chip does, because that is where the arrows continue from.
@@ -1527,7 +1527,7 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
     alpha over the background, which is what a reader sees — measuring the unmixed token reports
     about 15:1 for a colour that reads at 5), `accentInk`, focus-ring tokens, `textMuted` at 68%
     and `divider` at 50%, and `accentText` is now whichever end of the palette reads better on
-    the accent. Every literal `font.pixelSize` under `apps/crucible/ui/qml` is a `Theme` token
+    the accent. Every literal `font.pixelSize` under `apps/crucible/ui/assets/qml` is a `Theme` token
     times a new `Theme.fontScale`, and the header, footer, buttons, chips, fields and combo boxes
     derive their heights from their labels; the exceptions are the three Texts inside the 3D
     scene graph, which are scene units and say so. A Text size setting (100/125/150/175/System,
@@ -1546,7 +1546,7 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
     fill stays the design system's colour; the alternative, filling the button with `accentInk`
     and keeping the pale label, reaches 4.5:1 and darkens the button instead. `tst_accessibility`
     asserts ">= 3, and the better of the two", `docs/crucible/accessibility.md` states both
-    numbers plainly, and `apps/gui` inherits whichever way this goes, so the design owner's
+    numbers plainly, and `apps/forge/gui` inherits whichever way this goes, so the design owner's
     answer belongs here before it merges.
 
     Qt floor raised to 6.8 (`Accessible.announce` is `Q_REVISION(6, 8)`) in all four
@@ -1736,8 +1736,8 @@ it works. The demo page's discipline applies: what is claimed is what was checke
 
 **Both halves of Phase 5 were written on 2026-09-06, and the same day something ran them.** The
 library gained the Core Audio process tap (`libs/audio/src/backend/macos/process_tap.{hpp,mm}`);
-there is a `macos` directory under both `apps/crucible/engine/platform/` and
-`apps/crucible/ui/platform/`; and macOS is a supported platform in the root `CMakeLists.txt`
+there is a `macos` directory under both `apps/crucible/engine/src/platform/` and
+`apps/crucible/ui/src/platform/`; and macOS is a supported platform in the root `CMakeLists.txt`
 rather than an excluded one. Both legs compile and link all of it, after a first attempt that
 stopped during configure at an install rule.
 
@@ -1760,12 +1760,12 @@ run there and what has not.
 
 ## Coordination with the driver-signing session
 
-Driver signing was worked in a separate session against `apps/windows/driver/`, and the driver is
+Driver signing was worked in a separate session against `apps/crucible/windows/driver/`, and the driver is
 still test-signed with its old device name. Two consequences for this plan, and neither is
 optional:
 
 **The driver subtree's naming is not renamed in Phase 1.** The application rename stops at the
-driver's door. `apps/windows/driver/` keeps its paths, its INF and its
+driver's door. `apps/crucible/windows/driver/` keeps its paths, its INF and its
 `Ac3ForgeNullSink` identity so that work in flight does not collide with a rename underneath it.
 
 **The device name should change before attestation is paid for, not after.** The endpoint

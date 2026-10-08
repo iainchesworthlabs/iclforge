@@ -33,7 +33,7 @@
 #include "pcm_sink.hpp"
 #include "player.hpp"
 
-// iclforge::hearth::Player's bitstream output (apps/hearth/engine/player.cpp),
+// iclforge::hearth::Player's bitstream output (apps/hearth/engine/src/player.cpp),
 // against a fake IEC 61937 link and a fake PCM device, each with a clock the
 // test runs.
 //

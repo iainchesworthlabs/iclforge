@@ -8,7 +8,7 @@
 # Nothing here has been read off a built package. This project has no macOS
 # host (docs/building.md, "Verified configuration") and no .dmg has been
 # made since this file was written, so what the sections say the image
-# carries is what apps/gui/CMakeLists.txt's install rules and Qt's own
+# carries is what apps/forge/gui/CMakeLists.txt's install rules and Qt's own
 # deployment script put there, rather than a listing anyone has taken. The
 # location line names only LICENSE.txt because forge-gui.app may not be in the
 # image at all: the macos-llvm preset has the GUI off by default

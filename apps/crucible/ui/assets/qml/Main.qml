@@ -22,7 +22,7 @@ ApplicationWindow {
 
     // Right-to-left languages mirror the window: rows reverse and anchors
     // swap sides under the direction LanguageManager sets from the active
-    // language (apps/gui/language_manager.cpp), and childrenInherit carries
+    // language (apps/shared/preferences/src/language_manager.cpp), and childrenInherit carries
     // that to every page, the room views included. Padding is not part of
     // it - neither a Text's nor a Control's swaps on its own - so a control
     // padded differently on its two sides reads its own mirrored flag and
@@ -30,7 +30,7 @@ ApplicationWindow {
     // pages do. What holds still in the room views is their markers and
     // speakers: those are placed at an explicit x, which mirroring leaves
     // alone, so the plan stays a map and L stays on the left.
-    // apps/gui/qml/Main.qml carries the same root.
+    // apps/forge/gui/assets/qml/Main.qml carries the same root.
     LayoutMirroring.enabled: Qt.application.layoutDirection === Qt.RightToLeft
     LayoutMirroring.childrenInherit: true
 

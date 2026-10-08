@@ -25,13 +25,13 @@
 // adm/atmos_adm.hpp's own Needs::kAdm/adm_capability() gate rather than asking a new question - the
 // availability test is identical either way.
 //
-// apps/cli/CMakeLists.txt adds exactly one of adm/enabled/atmos_iab.cpp or
+// apps/forge/cli/CMakeLists.txt adds exactly one of adm/enabled/atmos_iab.cpp or
 // adm/disabled/atmos_iab.cpp to the forge target; main.cpp calls load_iab_atmos_source below
 // completely unconditionally either way, the same pattern atmos_adm.hpp's own
 // load_adm_atmos_source already establishes.
 namespace forge_cli {
 
-// Everything run_atmos_iab (apps/cli/commands/atmos.cpp) needs from one parsed-and-bridged IAB
+// Everything run_atmos_iab (apps/forge/cli/src/commands/atmos.cpp) needs from one parsed-and-bridged IAB
 // source, expressed purely in iclforge::oba terms - the same shape AdmAtmosSource (atmos_adm.hpp)
 // already uses for ADM, for the identical reason: main.cpp never needs iclforge::iab::IabError or
 // iclforge::adm::BridgeError, only text to print. `handle` owns whatever `pcm`'s spans

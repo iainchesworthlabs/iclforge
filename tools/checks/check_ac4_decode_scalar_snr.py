@@ -58,7 +58,7 @@ FIXED_PINS = REPO_ROOT / "tests" / "golden" / "ac4" / "scalar-agreement-fixed.js
 STREAM_GLOBS = (
     "tests/golden/external-baseline/*/dee.ac4",
     "tests/golden/ac4/**/*.ac4",
-    "apps/gui/tests/fixtures/*.ac4",
+    "apps/forge/gui/tests/fixtures/*.ac4",
 )
 # Below this the error is at the level of the double decode's own rounding to float in the
 # output WAV, and a figure is not a measurement of the float build.

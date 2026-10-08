@@ -31,12 +31,12 @@
 #include "network_group_sink.hpp"
 #include "sink.hpp"
 
-// iclforge::hearth::NetworkGroupSink (apps/hearth/engine/network_group_sink.cpp)
+// iclforge::hearth::NetworkGroupSink (apps/hearth/engine/src/network_group_sink.cpp)
 // against a real iclforge::sendspin::Group and two real in-process test sinks
 // (apps/hearth/testsink), proving what Player itself does not re-prove: that
 // this sink's own translation is correct - planar float to Group::push()'s
 // interleaved int32 (checked sample for sample against the sink's WAV, the
-// same way tests/hearth/test_group.cpp checks Group itself), and a burst's
+// same way apps/hearth/engine/tests/test_group.cpp checks Group itself), and a burst's
 // pc/pd/payload/frame forwarded to Group::push_burst() unchanged (checked by
 // the sink's own burst count and frame total, since decoding a real AC-3
 // frame correctly is what test_group.cpp and the wider codec suite already

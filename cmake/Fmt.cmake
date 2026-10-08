@@ -14,7 +14,7 @@
 # tests/CMakeLists.txt, whose find-then-FetchContent-fallback shape this
 # mirrors). Desktop builds get it from vcpkg (see vcpkg.json's base
 # "dependencies"); the Android app build never wires vcpkg's toolchain in at
-# all (apps/android/app/src/main/cpp/CMakeLists.txt has no vcpkg/VCPKG
+# all (apps/demos/android/app/src/main/cpp/CMakeLists.txt has no vcpkg/VCPKG
 # reference anywhere), so it silently takes the FetchContent fallback below -
 # {fmt} is a plain CMake/C++ library and builds cleanly under the NDK
 # toolchain with no further plumbing needed, unlike bolting vcpkg's own
@@ -33,8 +33,8 @@
 set(ICLFORGE_FMT_VERSION 12.2.0)
 
 # The oldest {fmt} a local copy may be. fmt/base.h, which cpu_features.cpp and
-# most of apps/cli include, first shipped in 11.0.0, but no 11.0.x release
-# builds this tree with Clang 22: apps/common/fmp4_folder_writer.cpp formats a
+# most of apps/forge/cli/src include, first shipped in 11.0.0, but no 11.0.x release
+# builds this tree with Clang 22: apps/shared/media/src/fmp4_folder_writer.cpp formats a
 # system_clock time_point with "{:%FT%TZ}", and write_floating_seconds() in
 # 11.0.x's fmt/chrono.h then fails with "call to consteval function
 # 'fmt::basic_format_string<...>' ... is not a constant expression". 11.1.0 is

@@ -193,7 +193,7 @@ constexpr std::array<CbiLayout, 3> kCbiLayouts{{
 // atmos-adm/atmos-iab with codec=ac4 (planning/ac4.md, I5): iclforge::objects::oba::ObjectPlacement
 // (this project's E-AC-3/Atmos object model) and iclforge::ac4::ObjectProperties (TS 103 190-2
 // Annex F) share one room coordinate system - X 0 (left wall) to 1 (right), Y 0 (front) to 1
-// (back), Z -1 (floor) to 1 (ceiling), confirmed against apps/common/ac4_object_render.hpp's own
+// (back), Z -1 (floor) to 1 (ceiling), confirmed against apps/shared/media/src/ac4_object_render.hpp's own
 // header comment
 // - so position carries over unconverted; gain does not, since oba's is linear and AC-4's is dB
 // (Table 108-adjacent range +15 to -49, or -infinity for silence).
@@ -207,7 +207,7 @@ constexpr std::array<CbiLayout, 3> kCbiLayouts{{
 // (iclforge/ac4/encoder/encoder.hpp, SubstreamConfig::objects), so metadata updates land on that
 // fixed 2048-sample grid: one update per object per frame, ramped over the whole frame from the
 // previous one, evaluated at the frame's END time - the convention every Atmos-encode command in
-// this file uses. The steps themselves are apps/common/ac4_objects_core.cpp's, which forge-gui's
+// this file uses. The steps themselves are apps/shared/media/src/ac4_objects_core.cpp's, which forge-gui's
 // AC-4 objects take too.
 int run_atmos_objects_to_ac4(std::string_view source_kind, std::uint32_t sample_rate,
                              const std::vector<bool>& is_bed,
@@ -795,7 +795,7 @@ namespace {
 // E-AC-3 (object_slots_from_assignment, with a channel mapped to a speaker a dynamic object held
 // there and one mapped to an LFE the LFE object - iclforge::apps::ac4_object_slots), and an
 // authored scene file moves the dynamic objects, in that order; without one each keeps
-// atmos-encode's default placement. The steps from there are apps/common/ac4_objects_core.cpp's and
+// atmos-encode's default placement. The steps from there are apps/shared/media/src/ac4_objects_core.cpp's and
 // ac4_encode_core.cpp's, which forge-gui's AC-4 objects take too, so the line the GUI echoes writes
 // the bytes the GUI does.
 int run_atmos_encode_ac4(std::string_view in_path, std::string_view out_path, std::uint32_t bitrate,

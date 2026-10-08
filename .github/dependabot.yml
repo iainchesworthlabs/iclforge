@@ -61,7 +61,7 @@ updates:
     commit-message:
       prefix: "build"
 
-  # WASM demo TypeScript toolchain (js/) and browser test deps (apps/wasm/tests/).
+  # WASM demo TypeScript toolchain (js/) and browser test deps (apps/demos/wasm/tests/).
   - package-ecosystem: "npm"
     directory: "/js"
     target-branch: "main"
@@ -100,7 +100,7 @@ updates:
       prefix: "build"
 
   # Shield Android app. Previously untracked by Dependabot entirely - the
-  # gap that let apps/android/app/gradle.lockfile carry a CVE-flagged
+  # gap that let apps/demos/android/app/gradle.lockfile carry a CVE-flagged
   # protobuf-kotlin unnoticed (osv-scanner.yml is what actually caught it).
   - package-ecosystem: "gradle"
     directory: "/apps/android"

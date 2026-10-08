@@ -1,4 +1,4 @@
-// A scripted stand-in for the Embind module apps/wasm/decoder_bindings.cpp
+// A scripted stand-in for the Embind module apps/demos/wasm/decoder_bindings.cpp
 // builds, so the TypeScript wrappers over it (push-decoder.ts, decode-file.ts,
 // decoder-worker.ts) can be tested in Node without an Emscripten build. It
 // holds no codec: each push() returns the next scripted result, and the PCM
@@ -120,7 +120,7 @@ export const pcm = (...values) => Float32Array.from(values);
 
 // --- AC-4 (js/src/ac4.ts) ---------------------------------------------------
 //
-// A scripted stand-in for the Embind module apps/wasm/ac4_bindings.cpp
+// A scripted stand-in for the Embind module apps/demos/wasm/ac4_bindings.cpp
 // builds, so ac4.ts can be tested in Node without an Emscripten build - the
 // same "no codec, just scripted outputs, same method names as the real
 // Embind classes 1:1" approach as makeFakeModule() above, for

@@ -38,7 +38,7 @@
 // what the bytes at that offset happen to be, which is why removing an
 // unrelated QML block or adding an empty Qt.callLater moved it - those
 // change the heap, not the schedule. The measured arms, ten launches each,
-// on the VM (apps/linux/tray-vm) on 2026-09-06:
+// on the VM (apps/crucible/linux/tray-vm) on 2026-09-06:
 //
 //   the tray's menu as it was, with one nested Menu   0 of 10, then 1 of 10
 //   the same menu with that submenu's items lifted   10 of 10

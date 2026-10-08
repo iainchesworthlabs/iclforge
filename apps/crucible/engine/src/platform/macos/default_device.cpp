@@ -75,7 +75,7 @@
 // what this platform does instead, not what it lacks.
 //
 // **Checked on 2026-09-06 before relying on it:** the first-run dialog already
-// reads this. apps/crucible/ui/qml/FirstRunDialog.qml line 46 computes
+// reads this. apps/crucible/ui/assets/qml/FirstRunDialog.qml line 46 computes
 // `movesDefault: CrucibleController.movesDefault && CrucibleController.silentDeviceNeeded`,
 // and its first step renders "Applications are silenced where they are tapped"
 // with the body "Nothing in your sound settings changes here: each application

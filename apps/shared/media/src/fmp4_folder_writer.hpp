@@ -20,12 +20,12 @@
 // servable origin mid-take - and closed to the VOD/static forms by close().
 //
 // Shared by every write-as-you-go path in BOTH front ends: RecordingSink
-// (apps/cli's record/live and the GUI's Record button take, both via
+// (apps/forge/cli/src's record/live and the GUI's Record button take, both via
 // RecordingSink::Container::kFmp4) and the GUI's own live session
 // (EncoderController's LiveOutputWriters). fMP4 is the one container all
 // three reach for the same code here rather than each growing its own copy -
-// which a fourth, near-identical copy in forge (apps/cli/support.hpp's
-// Fmp4SessionWriter) used to be, before moving this class to apps/common
+// which a fourth, near-identical copy in forge (apps/forge/cli/src/support.hpp's
+// Fmp4SessionWriter) used to be, before moving this class to apps/shared/media/src
 // gave it the same shared home RecordingSink already has.
 //
 // Qt-free on purpose, matching RecordingSink: everything here is std:: and

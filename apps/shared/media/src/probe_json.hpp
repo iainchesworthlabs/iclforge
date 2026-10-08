@@ -24,7 +24,7 @@
 // carries the same object so one stream is never described two ways. Also the
 // fixed names both of forge probe's forms use, and the AC-4 walk.
 //
-// Compiled into each application that uses it, like the rest of apps/common:
+// Compiled into each application that uses it, like the rest of apps/shared/media/src:
 // it needs iclforge::ac3, iclforge::ac4, which both applications
 // link.
 

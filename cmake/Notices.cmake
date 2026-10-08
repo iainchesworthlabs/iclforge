@@ -11,8 +11,8 @@
 # Assembles a third-party notices file at configure time from plain-text
 # fragments, so the one file a package installs and an application embeds
 # is written once, from the versions CMake already knows, rather than kept
-# by hand per platform. apps/crucible/notices/ is the first user;
-# apps/notices/ (Forge - forge and forge-gui) is the second.
+# by hand per platform. notices/ is the first user;
+# notices/ (Forge - forge and forge-gui) is the second.
 #
 # FRAGMENT_DIR takes more than one directory because those two callers share
 # text. A fragment that names no application - the typefaces, the trademark

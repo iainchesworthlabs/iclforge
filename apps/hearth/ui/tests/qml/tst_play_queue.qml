@@ -9,7 +9,7 @@ import Hearth
 // declaration order - so every test here reads its OWN starting queue
 // length before asserting, rather than assuming the queue starts empty, and
 // removes whatever it added before returning, the same discipline
-// apps/gui/tests/qml/tst_guided_wizard.qml's own header comment (see
+// apps/forge/gui/tests/qml/tst_guided_wizard.qml's own header comment (see
 // [[gui-qml-test-function-alphabetical-order]]) had to add after the fact.
 //
 // addFiles()/addFolder() do not need the paths they are given to resolve to
@@ -98,10 +98,10 @@ TestCase {
         // otherwise (queue_row()'s own comment).
         compare(row1.playable, true);
         compare(row2.playable, true);
-        // current is deliberately NOT asserted here: Queue::add() (apps/hearth/engine/queue.cpp)
+        // current is deliberately NOT asserted here: Queue::add() (apps/hearth/engine/src/queue.cpp)
         // auto-selects the first item added to a previously-empty queue as current - real,
         // correct engine behaviour, not something this file's own title-from-filename test needs
-        // to characterise (tests/hearth/test_queue.cpp already covers Queue::add()'s own
+        // to characterise (apps/hearth/engine/tests/test_queue.cpp already covers Queue::add()'s own
         // selection rule), and this test does not control whether the queue was empty before it
         // ran (another test's own leftover state, alphabetical order - see this file's header).
 

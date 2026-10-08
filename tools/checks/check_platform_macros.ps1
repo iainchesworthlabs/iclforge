@@ -108,7 +108,7 @@ foreach ($name in @('apps', 'tests', 'external', 'examples', 'tools', 'python'))
 # match the directive pattern.
 $files = Get-ChildItem -Path $scanRoots -Recurse -File -Include '*.h', '*.hpp', '*.cpp', '*.cc', '*.cxx', '*.inl', '*.mm'
 
-# apps/windows/driver/ is Microsoft's Simple Audio Sample under its own MS-PL
+# apps/crucible/windows/driver/ is Microsoft's Simple Audio Sample under its own MS-PL
 # licence (see its README): a separate kernel-mode work that shares no code
 # with the rest of the tree, kept as close to the sample as possible so its
 # cuts read as a diff. It is written the way Windows drivers are written,

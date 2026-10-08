@@ -1,12 +1,12 @@
 // iclforge WASM decode demo - a consumer of the bundled iclforge-wasm-decoder
 // bindings from js/. This file owns the page
 // (Web Audio playback of already-decoded PCM, the Canvas visualizations ported
-// from apps/gui/qml/SoundfieldView.qml and Main.qml's Objects tab, scrub/solo
+// from apps/forge/gui/assets/qml/SoundfieldView.qml and Main.qml's Objects tab, scrub/solo
 // controls) - decoding, the §7.8 fold and the realtime AudioWorklet pipeline
 // all come from those bindings.
 //
 // `./package/` is `js/dist/` copied in alongside the
-// Emscripten build output (see apps/wasm/CMakeLists.txt's build docs in
+// Emscripten build output (see apps/demos/wasm/CMakeLists.txt's build docs in
 // docs/platforms/wasm.md) - a self-contained servable directory needs both.
 // `iclforge_decode.js` (loaded as a plain classic <script> in index.html,
 // exactly as before) supplies the `createIclForgeModule` factory the bindings
@@ -18,7 +18,7 @@ import { decodeFile, DownmixTarget, IclForgeDecoderNode, scanStream } from './pa
 // Ear-level ring: iclforge::spatial's kSpeakerAzimuthDeg
 // (libs/render/include/iclforge/render/spatial.hpp), ITU-R BS.775, degrees CCW from
 // front, left positive. Ceiling ring: the same azimuth convention extended to
-// Table E2.5's height locations, matching apps/gui/qml/SoundfieldView.qml's own
+// Table E2.5's height locations, matching apps/forge/gui/assets/qml/SoundfieldView.qml's own
 // extension (its location_azimuth_deg()) - a second, smaller, dashed ring for
 // elevated channels, not a fabricated height axis. A plain 5.1/7.1
 // stream (like the bundled demo) never populates it; a real 7.1.4 stream does.
@@ -132,7 +132,7 @@ function currentPlaybackSeconds() {
     return audioCtx.currentTime - playStartCtxTime;
 }
 
-// --- Visualization: ported from apps/gui/qml/SoundfieldView.qml -----------
+// --- Visualization: ported from apps/forge/gui/assets/qml/SoundfieldView.qml -----------
 // (screenX/screenY azimuth->pixel mapping, ring radius, opacity-by-RMS,
 // energy-vector arrow - see that file for the original QML this was ported
 // from, and the PR description for why it's channel energy, not objects.)
@@ -170,7 +170,7 @@ function drawSpeaker(ctx, cx, cy, radius, az, label, level, color) {
     return { x: Math.sin(azRad) * level, y: Math.cos(azRad) * level };
 }
 
-// Ported from apps/gui/qml/SoundfieldView.qml: an ear-level ring plus a
+// Ported from apps/forge/gui/assets/qml/SoundfieldView.qml: an ear-level ring plus a
 // smaller, dashed ceiling ring for elevated channels (its own
 // visual cue for "a conceptually different, flattened-height plane"), driven
 // throughout by real per-channel RMS from the decoder - not a fabricated
@@ -307,7 +307,7 @@ function drawObjectDot(ctx, x, y, radius, color, label, highlighted) {
     ctx.fillText(label, x, y - radius - 6);
 }
 
-// Ported from apps/gui/qml/Main.qml's Objects tab (top-down + elevation room
+// Ported from apps/forge/gui/assets/qml/Main.qml's Objects tab (top-down + elevation room
 // panels, side by side - see docs/platforms/android.md's own description of
 // the same layout in the Shield app). Unlike that GUI's own version, which
 // previews positions about to be ENCODED, this one is driven entirely by

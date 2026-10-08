@@ -8,12 +8,12 @@
 // opens the "Before you play anything" dialog (firstrun), the
 // keyboard-shortcuts reference (shortcuts, issue #830), the About dialog
 // (about) or its Licences view (licences) over the Play page, the same
-// special values apps/crucible/ui/main.cpp's own `--page` accepts. A
+// special values apps/crucible/ui/src/main.cpp's own `--page` accepts. A
 // `--shot` run never shows the first-run dialog unless `--page firstrun`
 // asked for it (Crucible's own main.cpp carries the identical shape for the
 // identical reason), and now also runs HearthController against a scratch
 // settings store instead of the real per-user one (registry key
-// HKCU\Software\iclforge\Hearth on Windows) - apps/gui/main.cpp's `--smoke`
+// HKCU\Software\iclforge\Hearth on Windows) - apps/forge/gui/src/main.cpp's `--smoke`
 // uses the identical recipe - so repeated captures on a shared machine
 // neither inherit nor pollute anyone's real queue/device/pairing state
 // (issue #884). `--open-output-picker` opens the output picker dialog
@@ -24,7 +24,7 @@
 // (issue #901).
 //
 // Translations run through the family's own LanguageManager
-// (apps/gui/language_manager.cpp, shared rather than copied), pointed at
+// (apps/shared/preferences/src/language_manager.cpp, shared rather than copied), pointed at
 // this app's own hearth_<code>.qm catalogues under :/i18n/. The six
 // languages are the same set forge-gui and Crucible ship. The catalogues carry
 // every source string and no translations yet, so what a language change
@@ -68,7 +68,7 @@ bool save_window(QQmlApplicationEngine& engine, const QString& path) {
 }
 
 // Ties Tracy's frame view to real Qt Quick presentation instead of leaving it
-// empty - see apps/crucible/ui/main.cpp's identical helper for why this is a
+// empty - see apps/crucible/ui/src/main.cpp's identical helper for why this is a
 // NAMED ("UI") frame mark rather than the bare ICLFORGE_FRAME_MARK(), and why the
 // connection is direct rather than queued.
 void mark_frames_for_tracy(QQuickWindow* window) {
@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
     app_icon.addFile(QStringLiteral(":/icons/iclforge-256.png"));
     QGuiApplication::setWindowIcon(app_icon);
 
-    // The family's own faces (apps/gui/fonts), registered before the engine
+    // The family's own faces (apps/shared/theme/assets/fonts), registered before the engine
     // loads so the Theme's font probe finds them.
     for (const auto* face : {":/fonts/Archivo-Regular.ttf", ":/fonts/Archivo-Medium.ttf",
                              ":/fonts/Archivo-SemiBold.ttf", ":/fonts/Archivo-ExtraBold.ttf",
@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
     // (hearth_controller.hpp's own comment explains why), so overriding the
     // process-wide default here - before the engine, and so
     // HearthController's QML singleton, exists - reaches it with no change
-    // to HearthController itself, the same recipe apps/gui/main.cpp's
+    // to HearthController itself, the same recipe apps/forge/gui/src/main.cpp's
     // --smoke already uses. shot_settings_scratch has to outlive the run, so
     // it is kept in scope here rather than left as a temporary whose
     // directory would vanish immediately.
@@ -177,7 +177,7 @@ int main(int argc, char** argv) {
     // URI rather than this module's: registering a type into Hearth
     // by hand marks that module registered, and its own types
     // (HearthController, NetworkController) then never register at load.
-    // apps/crucible/ui/main.cpp carries the identical comment for the
+    // apps/crucible/ui/src/main.cpp carries the identical comment for the
     // identical reason.
     qmlRegisterSingletonInstance("HearthLanguage", 1, 0, "LanguageManager",
                                  &language_manager);

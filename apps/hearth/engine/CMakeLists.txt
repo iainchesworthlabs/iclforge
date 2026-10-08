@@ -31,7 +31,7 @@ target_compile_features(hearth_engine PUBLIC cxx_std_23)
 
 # src/native_log_sink.hpp's one function, exactly one platform/<os>/*.cpp
 # defining it, no #ifdef selecting between them - the same shape
-# apps/crucible/engine/platform_services.hpp's own comment states for
+# apps/crucible/engine/src/platform_services.hpp's own comment states for
 # platform_session_monitor(). Windows' is the only one that needs
 # <windows.h>, hence the same WIN32_LEAN_AND_MEAN/NOMINMAX pair Crucible's
 # own WIN32 block already sets.
@@ -65,7 +65,7 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
     target_link_libraries(hearth_engine PRIVATE iclforge_sendspin_httplib)
 endif()
 
-# From apps/common, which has no library target: the container facts an item's
+# From apps/shared/media/src, which has no library target: the container facts an item's
 # loader hands over (container_input.hpp, whose functions the application's
 # loader compiles), probe's JSON stream summary, which the media information
 # writes as forge probe does, and Ac4ObjectRenderer (planning/ac4.md, I5),
@@ -88,7 +88,7 @@ target_include_directories(hearth_engine PUBLIC "${PROJECT_SOURCE_DIR}/apps/shar
 # whether frames carry an authenticity tag.
 target_link_libraries(hearth_engine PUBLIC iclforge::audio iclforge::ac3 iclforge::ac4 iclforge::sendspin)
 # iclforge::coverage (coverage floors, tools/checks/coverage_report.sh's "apps/hearth" row) instruments
-# this target's OWN sources - apps/cli's own comment on its matching link explains why the
+# this target's OWN sources - apps/forge/cli/src's own comment on its matching link explains why the
 # instrumented EXECUTABLE that eventually links this library is not enough on its own: --coverage
 # is a compile-time flag, so without this a coverage build's .cpp files here would produce no
 # .gcno at all and read as no data rather than as low coverage.

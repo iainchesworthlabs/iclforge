@@ -51,7 +51,7 @@ if(WIN32)
         list(APPEND CPACK_GENERATOR "NSIS")
         set(CPACK_NSIS_PACKAGE_NAME "${CPACK_PACKAGE_NAME}")
         set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-        # Same source forge-gui's own .rc uses (apps/gui/CMakeLists.txt) - the
+        # Same source forge-gui's own .rc uses (apps/forge/gui/CMakeLists.txt) - the
         # installer/uninstaller windows and shortcut both otherwise default
         # to NSIS's own generic icon. NSIS wants a Windows .ico specifically
         # for both variables, which generate_icons.py already produces.
@@ -63,7 +63,7 @@ if(WIN32)
         # user looks - the Start Menu folder CPack always makes held nothing
         # but the Uninstall shortcut, so an installed copy was reachable only
         # by browsing to the folder it went into. The Linux .deb has had a
-        # menu entry (apps/gui/packaging/linux/forge-gui.desktop);
+        # menu entry (apps/forge/gui/packaging/linux/forge-gui.desktop);
         # Windows had never been given the same thing.
         #
         # CPACK_PACKAGE_EXECUTABLES is the shape CPack's NSIS generator wants:
@@ -393,7 +393,7 @@ Sendspin network sinks. AC-3 and E-AC-3 streams can also be sent to a
 receiver over HDMI or S/PDIF as a bitstream. In a group, the ESP32 sinks take
 AC-3 and E-AC-3 only.")
             # The QML modules THIS window's own qml/*.qml files import today
-            # (apps/hearth/ui/qml/, plus the shared family components it
+            # (apps/hearth/ui/assets/qml/, plus the shared family components it
             # copies from apps/gui/qml/) - the same shlibdeps gap and the
             # same reasoning as CPACK_DEBIAN_RUNTIME_PACKAGE_DEPENDS's own
             # comment above: a QML import is invisible to a library-level
@@ -539,7 +539,7 @@ endif()
 # The `runtime` component is forge/forge-gui plus the
 # generated forge.1 man page and the bash/zsh/fish/PowerShell completion
 # scripts - all install()'d with COMPONENT runtime from
-# apps/cli/CMakeLists.txt, so every generator below picks them up with the
+# apps/forge/cli/CMakeLists.txt, so every generator below picks them up with the
 # binary rather than needing a component of their own. They are absent only
 # from a package built where the host cannot run the target's binary - they are
 # produced by running the freshly built forge - which is a host/target

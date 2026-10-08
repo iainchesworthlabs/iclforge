@@ -42,7 +42,7 @@ std::vector<std::byte> build_codec_config_box(const ScannedStream& stream) {
     // is an AC-3 frame. Neither is a description of what is in mdat, and
     // guessing one produces a file whose header contradicts its payload -
     // so this returns nothing and leaves the muxer to refuse the stream
-    // (apps/cli/commands/containers.cpp does, before ever reaching here).
+    // (apps/forge/cli/src/commands/containers.cpp does, before ever reaching here).
     if (stream.kind == StreamKind::kAc3CoreEac3Extension) {
         return {};
     }

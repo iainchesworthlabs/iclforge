@@ -5,7 +5,7 @@
 
 // Where a JSON document written token by token goes, for the writers two
 // applications share: forge's probe streams its document to stdout through
-// its own writer (apps/cli/json.hpp), and Hearth's media information builds a
+// its own writer (apps/forge/cli/src/json.hpp), and Hearth's media information builds a
 // string with iclforge::sendspin's. probe_json.hpp's functions write to either
 // through this.
 //

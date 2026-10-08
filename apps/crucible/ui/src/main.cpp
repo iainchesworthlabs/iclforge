@@ -161,7 +161,7 @@ int main(int argc, char** argv) {
     }
     // A capture in one language, with the person's own settings left
     // alone: ICLFORGE_GUI_LOCALE is the override LanguageManager already reads
-    // ahead of the saved key (apps/gui/language_manager.cpp), so setting it
+    // ahead of the saved key (apps/shared/preferences/src/language_manager.cpp), so setting it
     // here shows the window in that language without writing language/code
     // to the store the way setLanguage() would. An unsupported code is
     // ignored by the manager and the run falls back to the saved language.

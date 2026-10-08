@@ -6,7 +6,7 @@
 // The X11WindowReader for a build configured without libxcb
 // (apps/crucible/CMakeLists.txt: ICLFORGE_CRUCIBLE_X11=OFF, or AUTO on a
 // machine without the headers). Inert rather than absent, the same rule as
-// tests/crucible/platform_services_stub.cpp: a platform that cannot do
+// apps/crucible/engine/tests/platform_services_stub.cpp: a platform that cannot do
 // something says so through its own support(), so the X11 Foreground above
 // this never tests for a null reader, and the UI prints what is missing.
 

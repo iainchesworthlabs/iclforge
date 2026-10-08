@@ -8,8 +8,8 @@
   the FILE PATH, so a false positive is not dismissed once: every file
   move re-mints the alert with a fresh ID and the dismissal (a manual API
   call, 280-character comment limit) has to be repeated - exactly what
-  happened when PR #291 extracted apps/cli/commands/analysis.cpp out of
-  apps/cli/main.cpp and alerts #83-94 resurrected findings already
+  happened when PR #291 extracted apps/forge/cli/src/commands/analysis.cpp out of
+  apps/forge/cli/src/main.cpp and alerts #83-94 resurrected findings already
   documented and dismissed under #70/#71/#8/#11/#22. Neither rule has a
   portable in-source suppression (#pragma warning(suppress:) breaks
   -Werror on GCC/clang, and [[gsl::suppress]] only covers C26xxx and
@@ -38,7 +38,7 @@
       qmlcachegen's generated glue for the GUI's QML tests, one
       compiler-synthesized Storage struct per QML binding closure, not
       project source (see issue #718). forge_gui_qmltests is include()'d into
-      apps/gui's own CMake directory scope (apps/gui/CMakeLists.txt has the
+      apps/forge/gui's own CMake directory scope (apps/forge/gui/CMakeLists.txt has the
       comment explaining why), so this action's directory-scoped
       ignoredTargetPaths can't cleanly separate the test target from the
       production forge-gui target without also blinding analysis to real GUI

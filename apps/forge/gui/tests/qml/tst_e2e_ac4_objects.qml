@@ -13,7 +13,7 @@ import ForgeGui
 // file is then decoded by the object page, each object's place and gain read back.
 //
 // The last case is I5's round trip held to the page: an ADM BWF master (the fixture
-// tests/cli/test_cli_atmos_adm_ac4.cpp writes: two bed channels and one dynamic object that
+// apps/forge/cli/tests/test_cli_atmos_adm_ac4.cpp writes: two bed channels and one dynamic object that
 // jumps position) has its scene authored on the page as AC-4 - the page reads audio, not ADM,
 // so the scene is the one the master states - and decodes with its objects, positions within
 // 0.06 in each axis and gains within 2 dB.

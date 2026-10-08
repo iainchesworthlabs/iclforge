@@ -273,7 +273,7 @@ of objects takes them from `decode()`.
 
 `forge decode` renders a presentation with objects to speakers through the layout renderer Hearth
 plays E-AC-3's objects with (`iclforge::render::LayoutRenderer`, by way of
-`apps/common/ac4_object_render.hpp`): each object panned from its position at its gain, moving to
+`apps/shared/media/src/ac4_object_render.hpp`): each object panned from its position at its gain, moving to
 each update over its ramp, to the layout `speakers=`, `channels=` or `downmix=` names, 7.1.4
 without them. Width, divergence, zones and the screen factor are not rendered.
 
@@ -366,7 +366,7 @@ With `experimental.objects`, a substream codes objects in place of channels: eac
 input channel each, and its metadata over time in the `ObjectProperties` the decoder reports
 (`iclforge/ac4/core/toc.hpp`). The applications convert object scenes, ADM BWF and IAB masters into these
 (`forge atmos-encode`, `atmos-adm` and `atmos-iab` with `codec=ac4`, and the Forge GUI's encoder
-page, through `apps/common/ac4_objects_core.hpp`); the library reads no scene format.
+page, through `apps/shared/media/src/ac4_objects_core.hpp`); the library reads no scene format.
 
 ```cpp
 iclforge::ac4::EncoderConfig config{.bitrate_kbps = 256};

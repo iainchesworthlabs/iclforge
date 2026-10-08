@@ -19,7 +19,7 @@
 // plus the one action the caller should carry out, so every transition -
 // including the ones that only happen at the end of a track, or when the
 // queue changes underneath a playing item - is a case in
-// tests/hearth/test_transport.cpp rather than something only reachable with a
+// apps/hearth/engine/tests/test_transport.cpp rather than something only reachable with a
 // sound card and a stopwatch.
 //
 // Gapless lives here too, as the decision of whether the next item can join

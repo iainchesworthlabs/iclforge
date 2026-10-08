@@ -43,7 +43,7 @@ iclforge::hearth::ItemLoader make_file_item_loader() {
         // splits, and AC-4, whose sync frames Session::open() splits
         // (planning/ac4.md, I2).
         if (extension != ".ac3" && extension != ".ec3" && extension != ".ac4") {
-            // apps/common/container_input.hpp's readers join this loader in a
+            // apps/shared/media/src/container_input.hpp's readers join this loader in a
             // later slice; until then a container is recognised but not
             // playable, which is what this sentence says.
             return std::unexpected("not yet playable: hearth reads raw .ac3/.ec3/.ac4 only so far");

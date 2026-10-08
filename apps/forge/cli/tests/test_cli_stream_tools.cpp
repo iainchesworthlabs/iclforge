@@ -28,7 +28,7 @@
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac3/meta/drc.hpp"
 
-// The stream tools, driven the same way tests/cli/test_cli.cpp drives
+// The stream tools, driven the same way apps/forge/cli/tests/test_cli.cpp drives
 // every other command: the real built forge.exe as a subprocess, inspecting
 // what it actually wrote.
 //
@@ -49,7 +49,7 @@ namespace {
 
 // Rooted at ICLFORGE_TEST_SCRATCH_DIR rather than fs::temp_directory_path() -
 // see tests/CMakeLists.txt's comment on that define for why. The leaf also
-// carries this process's own PID - see tests/cli/test_cli.cpp's own
+// carries this process's own PID - see apps/forge/cli/tests/test_cli.cpp's own
 // scratch_dir comment for why that is needed on top of the build-tree root.
 std::string scratch_pid_suffix() { return iclforge::test::platform::process_id(); }
 
@@ -124,8 +124,8 @@ fs::path make_stream(const std::string& name, const std::string& command,
 // bed, immediately followed by the Annex E dependent that extends it to 7.1
 // rear (k71Rear replaces the bed's own Ls/Rs and adds Lrs/Rrs - see
 // eac3_tables.hpp's own comment on the constant). Built the raw
-// FrameEncoder/eac3::FrameEncoder way libs/ac3/tests/decoder/test_stream_playback.cpp's
-// legacy_core_streams() and tests/cli/test_cli_containers.cpp's
+// FrameEncoder/eac3::FrameEncoder way apps/shared/media/tests/test_stream_playback.cpp's
+// legacy_core_streams() and apps/forge/cli/tests/test_cli_containers.cpp's
 // legacy_core_stream() both are, not AccessUnitEncoder, which always writes
 // Annex E syntax for the independent substream too and so cannot produce a
 // genuine AC-3-syntax core.
@@ -191,7 +191,7 @@ fs::path write_legacy_core_stream(const std::string& name) {
 }
 
 // The power of one frequency in `x`, whatever its phase - the same matched
-// correlation libs/ac3/tests/decoder/test_stream_playback.cpp's own tone_power uses.
+// correlation apps/shared/media/tests/test_stream_playback.cpp's own tone_power uses.
 // Phase-independent, so it needs no compensation for a fixed decode/encode
 // latency: a delay only rotates re/im between each other, it does not shrink
 // re^2+im^2 once the signal runs thousands of samples (there is no JOC
@@ -643,9 +643,9 @@ TEST_CASE("transcode reads a legacy-core stream's Annex E dependent, not just th
     }
 }
 
-// Regression for the same bug apps/cli/commands/decode.cpp's own
+// Regression for the same bug apps/forge/cli/src/commands/decode.cpp's own
 // "decode plays a legacy core's held-back last unit..." case guards
-// (tests/cli/test_cli.cpp): decode_and_render's flush() tail used to push
+// (apps/forge/cli/tests/test_cli.cpp): decode_and_render's flush() tail used to push
 // each flushed substream's channels into the SampleQueue by calling
 // SampleQueue::push once per substream per Table E2.5 location, so a bed and
 // the dependent that held the last unit back could both push into slots the
@@ -653,7 +653,7 @@ TEST_CASE("transcode reads a legacy-core stream's Annex E dependent, not just th
 // channel append grows unevenly rather than just mismatching lengths, since
 // it has no per-call slot tracking of its own. decode_and_render now builds
 // the whole held-back unit first via iclforge::apps::held_back_unit
-// (apps/common/stream_playback.hpp) and pushes it exactly once per slot,
+// (apps/shared/media/src/stream_playback.hpp) and pushes it exactly once per slot,
 // same as every other unit. A genuine E-AC-3 bed (not a legacy core - see
 // the separately-flagged decode_and_render dispatch gap for
 // kAc3CoreEac3Extension) so this exercises transcode's own eac3_source path
@@ -687,7 +687,7 @@ TEST_CASE("transcode carries a held-back last unit's samples through, not just t
     };
 
     // A genuine E-AC-3 5.1 bed (transient-pre-noise held) with a k71Rear
-    // dependent - same shape as tests/cli/test_cli.cpp's own legacy-core
+    // dependent - same shape as apps/forge/cli/tests/test_cli.cpp's own legacy-core
     // case, except the bed itself is Annex E from the start (strmtyp 0,
     // bsid 16), so iclforge::ac3::io::scan reports StreamKind::kEac3 rather than
     // kAc3CoreEac3Extension and decode_and_render's eac3_source check

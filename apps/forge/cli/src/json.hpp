@@ -23,7 +23,7 @@
 // and no schema validation, because the only consumer is one command emitting
 // one documented shape - see docs/forge/cli/commands.md for that shape, which is the
 // contract, rather than anything here. The member() shorthands, and the
-// writers of the document's stream summary (apps/common/probe_json.hpp), take
+// writers of the document's stream summary (apps/shared/media/src/probe_json.hpp), take
 // it as the JsonSink it is, which Hearth's media information writes to as well.
 
 namespace forge_cli {

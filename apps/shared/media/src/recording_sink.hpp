@@ -42,7 +42,7 @@
 // EncoderController's status line already shows - empty means fine.
 //
 // Shared by BOTH front ends since wide-layout record/live paths, which is why it lives in
-// apps/common rather than apps/gui: `forge record`/`forge live` write their
+// apps/shared/media/src rather than apps/forge/gui: `forge record`/`forge live` write their
 // takes through this same class, so a CLI take and a GUI take of the same
 // container are the same bytes produced the same way, and the crash-safety
 // and bounded-memory properties above are one implementation rather than

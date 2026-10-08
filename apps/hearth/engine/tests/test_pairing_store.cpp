@@ -14,7 +14,7 @@
 #include "pairing_store.hpp"
 #include "settings_model.hpp"
 
-// Hearth's pairing records (apps/hearth/engine/pairing_store.hpp): a record
+// Hearth's pairing records (apps/hearth/engine/src/pairing_store.hpp): a record
 // is written the moment its pairing completes and read back by the next
 // start; one the store would not write is not kept; a forgotten one is gone
 // for good; what pairing.md keeps only for a session is kept in memory only.

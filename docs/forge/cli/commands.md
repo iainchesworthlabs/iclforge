@@ -1428,7 +1428,7 @@ yet addressing some of its objects therefore degrades gracefully: those objects 
 audible, never silent, never snapped to room centre.
 
 Status lines at session start and end report what actually happened (the text is in
-`apps/cli/commands/live_audio.cpp`, searchable as `"positions:"`):
+`apps/forge/cli/src/commands/live_audio.cpp`, searchable as `"positions:"`):
 
 ```text
 positions: OSC on 127.0.0.1:9000, objects 0-3 (/object/<n>/xyz|gain|lfe|release)
@@ -1505,7 +1505,7 @@ of folding the objects into a bed first. On Windows that renderer is
 `ISpatialAudioObjectRenderStream`, reached through `iclforge::audio::SpatialObjectSink`; no other
 backend in the tree implements one, so on Linux, macOS and Android the command is listed and
 reports itself unavailable — the same treatment the capture and passthrough commands get where
-their backends are missing (`Needs::kSpatial` in `apps/cli/main.cpp`, answered by
+their backends are missing (`Needs::kSpatial` in `apps/forge/cli/src/main.cpp`, answered by
 `libs/audio/src/backend/<os>/audio_backend.cpp`).
 
 ```bash
@@ -1526,7 +1526,7 @@ Every dynamic object goes out at its own position, converted from TS 103 420 §4
 room-anchored cube to the renderer's listener-relative metres; the bed's LFE goes out as a static
 object, which is the only shape it can take (§6.3.2.2 never makes the LFE a JOC output, so it is
 only ever a coded channel). The axis correspondence is exact. The metre scale is not: OAMD's cube
-carries no absolute size, so the room half-extents in `apps/cli/commands/live_audio.cpp` — 2 m to
+carries no absolute size, so the room half-extents in `apps/forge/cli/src/commands/live_audio.cpp` — 2 m to
 each side wall, 2 m front and back, 1 m to ceiling and floor — are a plausible small room rather
 than a measured one. Moving an object moves it in the right direction by the right proportion, at
 an approximate absolute distance. The session prints its object count and endpoint at the start,

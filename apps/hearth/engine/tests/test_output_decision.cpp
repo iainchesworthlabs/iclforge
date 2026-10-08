@@ -8,7 +8,7 @@
 #include "iclforge/audio/passthrough.hpp"
 #include "output_decision.hpp"
 
-// iclforge::hearth::choose_output's case table (apps/hearth/engine/output_decision.cpp).
+// iclforge::hearth::choose_output's case table (apps/hearth/engine/src/output_decision.cpp).
 //
 // A2's exit for this is "the output decision's case table runs with no sound
 // card", and that is the point of the decision being pure: every row here is

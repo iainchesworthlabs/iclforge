@@ -19,7 +19,7 @@ iclforge_add_test_binary(iclforge-apps-tests SOURCES)
 # forge binary as a subprocess and inspect what it actually wrote.
 #
 # Only added when forge itself is being built (ICLFORGE_BUILD_CLI): the
-# top-level CMakeLists.txt processes apps/cli before tests/, so the target
+# top-level CMakeLists.txt processes apps/forge/cli/src before tests/, so the target
 # already exists here whenever it is going to.
 # ---------------------------------------------------------------------------
 # ../apps/forge/cli/tests/test_cli_live.cpp rides the same gate and the same ICLFORGE_CLI_EXE: it covers
@@ -64,15 +64,15 @@ endif()
 # RecordingSink (../apps/shared/media/tests/test_recording_sink.cpp) is deliberately Qt-free - std::
 # and the container libraries only, exactly so its streamed-equals-one-shot
 # contract can be held here, in the plain Catch2 suite, without a QML engine
-# in the room (apps/gui's Qt Quick tests cover the interactive surfaces; this
+# in the room (apps/forge/gui's Qt Quick tests cover the interactive surfaces; this
 # covers the bytes). Its sources compile straight into this target the same
 # way ../apps/forge/cli/tests/test_cli.cpp's subject rides its own binary: there is no library
 # surface to link against. The fragmented-MP4 cases exercise Fmp4FolderWriter,
 # RecordingSink's own kFmp4 backend, so its source comes along too.
 #
-# Ungated since wide-layout record/live paths moved both to apps/common: both front ends write
+# Ungated since wide-layout record/live paths moved both to apps/shared/media/src: both front ends write
 # their takes through them now, so the bytes they produce are worth checking
-# in a CLI-only build too - and apps/common, unlike apps/gui, is present
+# in a CLI-only build too - and apps/shared/media/src, unlike apps/forge/gui, is present
 # whatever ICLFORGE_BUILD_GUI says. The test file itself stays under
 # tests/gui/ so its history and its "[gui]" tag are unbroken.
 #
@@ -87,8 +87,8 @@ endif()
 # and 'spatial' pick their decoder and drain the end-of-stream flush through
 # it, and neither command reaches its decode loop without a render device.
 # The tests of those two and of sink_wait.hpp are in libs/ac3/tests and libs/audio/tests until
-# apps/common moves (planning/monorepo.md, C7-2); Hearth's and the CLI's tests here reach them too.
-# forge-gui's diagnostics module (apps/gui/gui_diagnostics.hpp) rides the same
+# apps/shared/media/src moves (planning/monorepo.md, C7-2); Hearth's and the CLI's tests here reach them too.
+# forge-gui's diagnostics module (apps/forge/gui/src/gui_diagnostics.hpp) rides the same
 # target for the same reason and with the same discipline: it is Qt-free, so
 # the rule it exists to hold - the support file carries no signing key, no
 # environment value and no byte of a loaded source - is checked on every CI
@@ -113,9 +113,9 @@ target_sources(iclforge-apps-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/apps/forge/gui/src/ac4_presentations.cpp")
 target_include_directories(iclforge-apps-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/apps/shared/media/src"
-    "${CMAKE_SOURCE_DIR}/apps/gui")
+    "${CMAKE_SOURCE_DIR}/apps/forge/gui")
 
-# iclforge-settings-tests - Catch2 coverage for apps/gui/settings_migration.cpp, the copy of what a
+# iclforge-settings-tests - Catch2 coverage for apps/shared/preferences/src/settings_migration.cpp, the copy of what a
 # program stored under its old names (organisation ac3forge) that forge-gui, Hearth and Crucible
 # make at start-up, once, before anything reads a setting: old store only, new store only, both,
 # neither, a second start, the directories, and the rule that the old store is never written.
@@ -130,7 +130,7 @@ if(ICLFORGE_BUILD_GUI OR ICLFORGE_BUILD_CRUCIBLE OR ICLFORGE_BUILD_HEARTH)
             ../apps/shared/preferences/tests/test_settings_migration.cpp
             "${CMAKE_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.cpp"
             "${CMAKE_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.hpp")
-        target_include_directories(iclforge-settings-tests PRIVATE "${CMAKE_SOURCE_DIR}/apps/gui")
+        target_include_directories(iclforge-settings-tests PRIVATE "${CMAKE_SOURCE_DIR}/apps/forge/gui")
         target_link_libraries(iclforge-settings-tests PRIVATE
             iclforge::warnings iclforge::coverage Qt6::Core Catch2::Catch2WithMain)
         # Windows: this target links Qt6 as shared libraries and has nothing of its own to put them
@@ -157,17 +157,17 @@ endif()
 # output-mode policy. All four are plain C++ over iclforge::oba types with no
 # platform in them - the platform layer next to them is what talks to WASAPI
 # or PipeWire - so they compile into this target on every platform, ungated,
-# the same way apps/common does above: the rules the window's UI hangs on
+# the same way apps/shared/media/src does above: the rules the window's UI hangs on
 # are worth holding on a CI leg that does not build the window itself. The
 # app target (ICLFORGE_BUILD_CRUCIBLE, Windows and Linux) is separate.
 #
 # The tap pool and the output stage joined them once they were written over
-# the AudioDevices seam (apps/crucible/engine/audio_devices.hpp): with the
+# the AudioDevices seam (apps/crucible/engine/src/audio_devices.hpp): with the
 # WASAPI classes behind an interface they are plain C++ over the library's
-# codec, packer and decoder, and tests/crucible/fake_devices.hpp stands in
+# codec, packer and decoder, and apps/crucible/engine/tests/fake_devices.hpp stands in
 # for the machine. platform_audio_devices() itself is declared in
 # platform_services.hpp and defined in
-# apps/crucible/engine/library_devices.cpp, which this target does not
+# apps/crucible/engine/src/library_devices.cpp, which this target does not
 # compile; these tests never call it, and the one place the stage would
 # (a null `devices` in its config) is a path the tests do not take, so the
 # reference resolves to the stub below on every platform and to the real
@@ -225,11 +225,11 @@ if(ICLFORGE_IS_MSVC_LIKE)
     set_source_files_properties(../apps/crucible/engine/tests/test_engine_commands.cpp
         PROPERTIES COMPILE_OPTIONS "/wd4996")
 endif()
-# The null-sink driver's position clock (apps/windows/driver/Source/Main/
+# The null-sink driver's position clock (apps/crucible/windows/driver/Source/Main/
 # position.h) is a header with no kernel dependencies, kept that way so the
 # one piece of the driver that is logic rather than framework plumbing is
 # tested here, on every platform, where kernel code could never be. The
-# window's .desktop-entry reader (apps/crucible/ui/desktop_entries.hpp) is
+# window's .desktop-entry reader (apps/crucible/ui/src/desktop_entries.hpp) is
 # plain C++ over std::filesystem for the same reason and rides the same
 # target, Qt-free, on every platform.
 target_include_directories(iclforge-apps-tests PRIVATE
@@ -278,7 +278,7 @@ endif()
 # above to hold at once, not just ICLFORGE_BUILD_ADM alone: it runs the real, built forge binary
 # as a subprocess (ICLFORGE_CLI_EXE, defined only inside the `if(TARGET forge)` block above) against an
 # ADM fixture, so the command it exercises only exists in that binary at all when
-# ICLFORGE_BUILD_ADM was ALSO on for this same configure (apps/cli/CMakeLists.txt's own
+# ICLFORGE_BUILD_ADM was ALSO on for this same configure (apps/forge/cli/CMakeLists.txt's own
 # ICLFORGE_BUILD_ADM guard). Neither `if(TARGET forge)` alone (ICLFORGE_BUILD_ADM could be off,
 # and 'atmos-adm' simply would not exist in that binary) nor `if(ICLFORGE_BUILD_ADM)` alone
 # (ICLFORGE_CLI_EXE might not be defined at all, e.g. ICLFORGE_BUILD_CLI=OFF) is sufficient by itself -
@@ -340,7 +340,7 @@ if(ICLFORGE_BUILD_HEARTH)
 
     # hearth_controller_tests - Catch2 coverage for hearth_controller.cpp's
     # QML-translation layer (issue #886, part 2: queue_row(), media_info_to_map()
-    # and friends - see tests/hearth/test_hearth_controller.cpp's own header for
+    # and friends - see apps/hearth/ui/tests/test_hearth_controller.cpp's own header for
     # the full rationale). A SEPARATE small binary rather than folding into
     # iclforge-apps-tests above: iclforge-apps-tests is Qt-free by design (see gui_diagnostics.cpp's
     # and the Crucible engine sources' own comments elsewhere in this file), and
@@ -406,7 +406,7 @@ if(ICLFORGE_BUILD_HEARTH)
             if(WIN32 AND TARGET hearth)
                 add_dependencies(hearth_controller_tests hearth)
             endif()
-            # Same rationale as apps/gui/tests/CMakeLists.txt's identical loop:
+            # Same rationale as apps/forge/gui/tests/CMakeLists.txt's identical loop:
             # Qt's generated moc output for THIS target compiles under the
             # strict warning set unless excluded.
             get_target_property(ICLFORGE_HEARTH_CTRLTEST_SOURCES hearth_controller_tests SOURCES)

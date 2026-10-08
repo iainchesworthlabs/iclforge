@@ -17,7 +17,7 @@
 
 #include "iclforge/ac3/io/wav.hpp"
 
-// The WAV-driven object encoders (apps/cli/commands/atmos.cpp: atmos-encode,
+// The WAV-driven object encoders (apps/forge/cli/src/commands/atmos.cpp: atmos-encode,
 // its src=/map= form, and atmos-cbi) on the requests they refuse and the
 // report lines only some requests produce. test_cli.cpp and
 // test_cli_atmos_cbi.cpp hold the main round trips; this file holds the
@@ -31,7 +31,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// See tests/cli/test_cli.cpp's own scratch_dir for the reasoning this copy
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir for the reasoning this copy
 // shares, including the PID fold; the leaf name below is this file's own.
 std::string scratch_pid_suffix() {
     return iclforge::test::platform::process_id();

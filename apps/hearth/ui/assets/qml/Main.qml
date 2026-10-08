@@ -29,7 +29,7 @@ ApplicationWindow {
     // own text at Basic's fixed near-black default against Theme's dark
     // background - almost unreadable, and identical on every such control, so
     // nothing in the QML itself (colour, enabled, opacity) shows why. Same
-    // root cause and same fix apps/gui/qml/Main.qml's own comment describes
+    // root cause and same fix apps/forge/gui/assets/qml/Main.qml's own comment describes
     // ("pale pink on every switch and slider") for Fusion.
     //
     // palette.button is neutral300, not Theme.surface: Basic's own
@@ -58,7 +58,7 @@ ApplicationWindow {
     palette.toolTipText: Theme.text
     palette.placeholderText: Theme.textMuted
 
-    // apps/gui/qml/Main.qml carries the same root; see its own comment for
+    // apps/forge/gui/assets/qml/Main.qml carries the same root; see its own comment for
     // what padding still has to do on its own.
     LayoutMirroring.enabled: Qt.application.layoutDirection === Qt.RightToLeft
     LayoutMirroring.childrenInherit: true
@@ -75,7 +75,7 @@ ApplicationWindow {
     property string decoderFormat: "eac3"
 
     // The text size choice becomes Theme.fontScale here rather than in
-    // Theme.qml itself, the same split apps/crucible/ui/qml/Main.qml's own
+    // Theme.qml itself, the same split apps/crucible/ui/assets/qml/Main.qml's own
     // applyTextScale() keeps: Theme has no idea what a shell's settings look
     // like, only what the resolved scale means to the tokens it hands out.
     // "system" takes the point size the platform theme reports and counts

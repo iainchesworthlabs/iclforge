@@ -14,7 +14,7 @@
 // renderer that turns named facts and that ring into plain text.
 //
 // The rule this module exists to hold, taken from the Crucible's own
-// (apps/crucible/engine/diagnostics.hpp) because it was written for exactly
+// (apps/crucible/engine/src/diagnostics.hpp) because it was written for exactly
 // this and has held since 2026-09: the file never carries the signing key,
 // the path to a key file, the value of any environment variable, or one byte
 // of anything the person loaded.
@@ -45,13 +45,13 @@
 // This is a second copy of the Crucible's ring and scrub rather than a shared
 // one, because that header's ReportFacts is welded to the Crucible engine's
 // own types (EngineStatus, RenderEndpoint, SilentDeviceState) and forge-gui has
-// none of them. Lifting the ring and scrub into apps/common/ and leaving each
+// none of them. Lifting the ring and scrub into apps/shared/media/src/ and leaving each
 // window its own ReportFacts would remove the duplication; that is a change
 // to a module the Crucible's tests already hold, and is worth doing on its
 // own rather than inside an accessibility pass.
 //
 // No Qt here, deliberately, for the same reason the Crucible's is Qt-free:
-// tests/gui/test_gui_diagnostics.cpp compiles this file straight into iclforge-tests,
+// apps/forge/gui/tests/test_gui_diagnostics.cpp compiles this file straight into iclforge-tests,
 // so the rule is checked on every CI leg including the ones that build no
 // window at all. That is also why the file carries a gui_ prefix inside a
 // directory already called gui: iclforge-tests compiles this module and the

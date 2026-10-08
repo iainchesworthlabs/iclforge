@@ -1019,10 +1019,10 @@ int run_ts(std::string_view in_path, std::string_view out_path, std::string_view
 // --- container input (container readers (mkv/mp4/ts)) -------------------------------------
 //
 // ContainerKind/sniff_container used to live here alone; both are now
-// apps/common/container_input.hpp's, promoted so forge's own
+// apps/shared/media/src/container_input.hpp's, promoted so forge's own
 // read_elementary_stream (support.cpp) and forge-gui's QC/Inspect pickers can
 // each sniff a file the same way this command does - see that header's own
-// comment for why apps/common rather than support.hpp itself or iclforge::ac3.
+// comment for why apps/shared/media/src rather than support.hpp itself or iclforge::ac3.
 
 namespace {
 
@@ -1145,7 +1145,7 @@ int run_demux(std::string_view in_path, std::string_view out_path) {
         // E.4); writing samples back to back would produce a stream nothing
         // can re-sync on, so each is re-wrapped in Annex G.3.1's
         // ac4_syncframe on the way out - the same re-framing
-        // apps/common/container_input.cpp applies for the decode/qc path,
+        // apps/shared/media/src/container_input.cpp applies for the decode/qc path,
         // and byte-for-byte what 'forge ts' produces for the same input.
         // A/52 tracks pass through untouched, exactly as before.
         const auto on_mp4_sample = [&reader, &on_frame](std::span<const std::byte> sample) {

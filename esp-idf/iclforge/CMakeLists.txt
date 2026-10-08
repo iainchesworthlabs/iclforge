@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # iclforge::ac3_minimal as an ESP-IDF component - a THIN wrapper, not a second
 # copy of iclforge's build graph, and deliberately the same shape as
-# apps/android/app/src/main/cpp/CMakeLists.txt: pre-seed the repo root's
+# apps/demos/android/app/src/main/cpp/CMakeLists.txt: pre-seed the repo root's
 # option()s, then add_subdirectory() the root so the library is built from the
 # SAME source-of-truth target definitions every other platform uses. A change
 # to libs/ac3/minimal.cmake's source list is picked up here automatically,

@@ -5,7 +5,7 @@ import ForgeGui
 
 // The support file the window offers under Preferences > Diagnostics.
 //
-// apps/gui/gui_diagnostics.hpp holds the RULE (no signing key, no
+// apps/forge/gui/src/gui_diagnostics.hpp holds the RULE (no signing key, no
 // environment value, no byte of a loaded source) and tests/gui/
 // test_gui_diagnostics.cpp holds it on every CI leg, window or not. This
 // suite covers the other half: that the controller fills the report's named

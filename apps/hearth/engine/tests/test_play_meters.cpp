@@ -11,7 +11,7 @@
 #include "iclforge/render/layout.hpp"
 #include "play_meters.hpp"
 
-// iclforge::hearth::PlayMeters (apps/hearth/engine/play_meters.cpp): meters that
+// iclforge::hearth::PlayMeters (apps/hearth/engine/src/play_meters.cpp): meters that
 // measure the output as it is rendered and hand a reading out only when the
 // device's clock has reached the audio it describes.
 

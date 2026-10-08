@@ -23,10 +23,10 @@
 # floors, one row per component with a line percentage and a branch
 # percentage, every figure reported before the script exits so the log shows
 # the whole picture rather than only the first miss. One row, because
-# apps/crucible IS the component - it sits beside libs/ac3 and apps/cli,
+# apps/crucible IS the component - it sits beside libs/ac3 and apps/forge/cli/src,
 # not as a tree of components (planning/recasting.md). The
 # per-file breakdown printed under it is reported and never gated, the way
-# apps/cli's per-command breakdown is: one floor on the aggregate is what
+# apps/forge/cli/src's per-command breakdown is: one floor on the aggregate is what
 # stops a regression, and a floor per file would be twenty-five numbers to
 # re-calibrate every time a class moves.
 #
@@ -110,7 +110,7 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $sources = Join-Path $root 'apps\crucible'
 # The filter every pass below shares, so the reported table, the gated number
 # and the HTML cannot describe different sets of files. tests/ and shared/ are
-# the suites themselves and the QML copied in from apps/gui; _autogen and .qt
+# the suites themselves and the QML copied in from apps/forge/gui; _autogen and .qt
 # are Qt's generated moc/qmltyperegistrar output; driver/ is the kernel driver,
 # which no user-mode test may execute.
 $ignore = '-ignore-filename-regex=.*(tests|shared|_autogen|\.qt|driver)[\\/].*'
@@ -135,7 +135,7 @@ Write-Host "`nHTML report: $html\index.html"
 # which is both the gated figure and the breakdown under it.
 #
 # Component floors, one row per component: <path> <line%> <branch%>, the
-# shape tools/checks/coverage_report.sh uses for src/* and apps/cli.
+# shape tools/checks/coverage_report.sh uses for src/* and apps/forge/cli/src.
 #
 # Calibrated 2026-09-06 against the first CI run of this gate, on the
 # windows-llvm leg it runs on: 68.5% of lines (1,401 of 4,442 missed) and

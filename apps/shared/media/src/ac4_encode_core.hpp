@@ -18,7 +18,7 @@
 // input channels for a WAV file's channel count, the programme's BS.1770
 // measurements behind dialnorm=auto and loudness=, and the sync frames or the
 // MP4 file the encoded frames become. Compiled straight into each application,
-// as the rest of apps/common is (recording_sink.hpp says why there is no
+// as the rest of apps/shared/media/src is (recording_sink.hpp says why there is no
 // library target).
 
 namespace iclforge::apps {

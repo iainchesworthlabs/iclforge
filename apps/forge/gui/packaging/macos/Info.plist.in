@@ -7,11 +7,11 @@
   supplying a template of our own via MACOSX_BUNDLE_INFO_PLIST). Every
   ${VAR}-style token here is one of CMake's own documented MACOSX_BUNDLE_*
   variables, substituted the same way its default template substitutes
-  them - see apps/gui/CMakeLists.txt's APPLE branch for where each is set.
+  them - see apps/forge/gui/CMakeLists.txt's APPLE branch for where each is set.
 
   .ac3/.ec3 no longer appear here (Hearth phase A7,
   planning/hearth-reference-player.md): hearth is the reference player
-  and now owns both UTIs in apps/hearth/ui/Info.plist.in, the same
+  and now owns both UTIs in apps/hearth/ui/packaging/macos/Info.plist.in, the same
   CFBundleDocumentTypes/UTExportedTypeDeclarations shape this file used to
   carry. A UTI with two LSHandlerRank Owner claims is undefined which
   application Launch Services picks, so only one bundle may declare it.

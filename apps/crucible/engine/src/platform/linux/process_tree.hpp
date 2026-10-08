@@ -22,7 +22,7 @@
 // Bounded at sixteen hops, as the Windows walk is: parent ids are recycled
 // and a stale chain can loop. The readers are injected so the walk is
 // tested against a tree built by hand rather than against /proc
-// (tests/crucible/platform/linux/test_x11_foreground.cpp).
+// (apps/crucible/engine/tests/platform/linux/test_x11_foreground.cpp).
 
 namespace iclforge::crucible {
 

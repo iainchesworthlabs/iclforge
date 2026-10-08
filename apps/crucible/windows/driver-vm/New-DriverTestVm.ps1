@@ -35,7 +35,7 @@ $toolsIso = Join-Path $Workstation 'windows.iso'
 foreach ($f in @($vmrun, $vdisk, $toolsIso, $WindowsIso)) { if (-not (Test-Path $f)) { throw "missing: $f" } }
 $PackageDir = (Resolve-Path $PackageDir).Path
 $inf = Join-Path $PackageDir 'IclForgeNullSink.inf'
-if (-not (Test-Path $inf)) { throw "no driver package at $PackageDir (build apps/windows/driver first)" }
+if (-not (Test-Path $inf)) { throw "no driver package at $PackageDir (build apps/crucible/windows/driver first)" }
 
 # Stock Microsoft media stops at "Press any key to boot from CD or DVD" under
 # EFI and nobody is there to press it; boot a no-prompt re-pack instead.

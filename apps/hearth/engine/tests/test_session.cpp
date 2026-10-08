@@ -17,7 +17,7 @@
 #include "session.hpp"
 #include "stream_decoder.hpp"
 
-// iclforge::hearth::Session (apps/hearth/engine/session.cpp) against a stream whose
+// iclforge::hearth::Session (apps/hearth/engine/src/session.cpp) against a stream whose
 // decoder runs a frame behind: what a handover to a new decoder has to
 // release rather than drop.
 

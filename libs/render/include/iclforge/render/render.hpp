@@ -198,7 +198,7 @@ class LayoutRenderer {
         }
         // set_bed() has to be idempotent when the bed is unchanged - a caller
         // that re-announces the same coded layout every unit (decode_and_render
-        // in tests/hearth/test_group.cpp does; BurstOutput::place() instead
+        // in apps/hearth/engine/tests/test_group.cpp does; BurstOutput::place() instead
         // guards the call with same_layout()) must not disturb the LFE's delay
         // line, or two renderers fed the identical programme through the two
         // styles of caller fall out of phase with each other and diverge

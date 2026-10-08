@@ -18,7 +18,7 @@
 // of three kinds of sink on an endpoint, open a per-process tap. The
 // production implementation for each platform (platform/<os>/, behind
 // platform_audio_devices() in platform_services.hpp) forwards
-// to iclforge::audio; tests/crucible/fake_devices.hpp scripts endpoints and
+// to iclforge::audio; apps/crucible/engine/tests/fake_devices.hpp scripts endpoints and
 // records what was submitted, so the frame loop, the five routes, the
 // bypass fold and a mode switch mid-stream run in a plain Catch2 process
 // with no audio hardware.

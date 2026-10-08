@@ -5,8 +5,8 @@ const { test, expect } = require('@playwright/test');
 
 // Closes WASM/mobile headless coverage(a) for the encode module the same way decode.spec.js
 // closes it for the decode one: drives the real Embind API
-// (apps/wasm/encoder_bindings.cpp's Encoder/QcMeter classes, called the same
-// way apps/wasm/encode/app.js does) end to end - encode a real signal,
+// (apps/demos/wasm/encoder_bindings.cpp's Encoder/QcMeter classes, called the same
+// way apps/demos/wasm/encode/app.js does) end to end - encode a real signal,
 // measure it with the real BS.1770 QC meter, and round-trip it through the
 // real decode module - and asserts on real, computed values rather than "no
 // error was thrown".

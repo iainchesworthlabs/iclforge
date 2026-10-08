@@ -6,7 +6,7 @@
 
 #include "diagnostics_server.hpp"
 
-// DiagnosticsHttpServer (apps/hearth/engine/diagnostics_server.hpp): a real
+// DiagnosticsHttpServer (apps/hearth/engine/src/diagnostics_server.hpp): a real
 // httplib::Client against a real bound server, the same reason
 // test_sink_firmware_board.cpp is compiled on its own with cpp-httplib
 // configured as libs/sendspin configures it (tests/CMakeLists.txt's own

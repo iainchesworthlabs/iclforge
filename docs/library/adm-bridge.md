@@ -418,7 +418,7 @@ the decoded bitstream's channel energy actually lands where the authored ADM pos
 jump timing say it should, the same standard `libs/ac3/tests/oba/test_atmos_motion.cpp`'s own flagship test
 holds itself to.
 
-`tests/cli/test_cli_atmos_adm.cpp` covers the same fixture shape one level up: it runs the
+`apps/forge/cli/tests/test_cli_atmos_adm.cpp` covers the same fixture shape one level up: it runs the
 real, built `forge` binary's `atmos-adm` command as a subprocess against a real ADM BWF file on
 disk, then decodes what that binary actually wrote and checks the same channel-energy assertions —
 proving the CLI's own argument parsing and its `parse_bw64` → `build` → `AtmosEncoder` wiring, not
@@ -435,7 +435,7 @@ start), and one flagship test with the identical rigor `test_adm_bridge.cpp`'s o
 — a real byte-level IAB fixture (one Bed Center channel, one Object holding hard right then
 jumping hard left), parsed with the real `iclforge::iab::parse_iabitstream()`, bridged, and driven through
 a real `AtmosEncoder`/`Eac3Decoder` round trip confirming decoded channel energy lands where
-authored. `tests/cli/test_cli_atmos_iab.cpp` covers the same fixture shape one level up, the same
+authored. `apps/forge/cli/tests/test_cli_atmos_iab.cpp` covers the same fixture shape one level up, the same
 way `test_cli_atmos_adm.cpp` does for `atmos-adm`.
 
 ---

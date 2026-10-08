@@ -932,7 +932,7 @@ std::vector<std::byte> read_all(std::string_view path);
 
 // The elementary stream at `in_path`: `in_path`'s own bytes verbatim if it is
 // already one, or (container readers (mkv/mp4/ts)) the first AC-3/E-AC-3 track demuxed out of a
-// recognised Matroska/MP4/MPEG-TS container, via apps/common/
+// recognised Matroska/MP4/MPEG-TS container, via apps/shared/media/src/
 // container_input.hpp's iclforge::apps::elementary_stream_from_bytes - the same
 // three readers `forge demux` already streams through, run here in their
 // batch/zero-copy form since every caller has the file resident anyway.
@@ -1219,7 +1219,7 @@ class TakeEncoder {
 // describes: shared by `atmos-encode`, `live mode=atmos` and the AC-4 objects,
 // and by the GUI, so that the objects a given map= produces are the same
 // objects every way - a GUI assignment reproduced headlessly has to reproduce.
-// They live in apps/common/ac4_objects_core.hpp, where the GUI reaches them.
+// They live in apps/shared/media/src/ac4_objects_core.hpp, where the GUI reaches them.
 using iclforge::apps::object_slots_from_assignment;
 using iclforge::apps::ObjectSlot;
 
@@ -1242,7 +1242,7 @@ std::optional<iclforge::ac3::plan::Routing> routing_or_error(const iclforge::ac3
 
 // --- AC-4 ----------------------------------------------------------------------
 
-// Whether `bytes` opens with an AC-4 sync word (apps/common/ac4_sync_word.hpp):
+// Whether `bytes` opens with an AC-4 sync word (apps/shared/media/src/ac4_sync_word.hpp):
 // how every command that reads a stream decides which decoder reads it.
 using iclforge::apps::is_ac4_stream;
 

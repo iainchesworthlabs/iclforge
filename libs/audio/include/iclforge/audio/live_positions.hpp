@@ -16,8 +16,8 @@
 // for why the split falls where it does.
 //
 // The seam both front ends share: `forge live mode=atmos positions=osc:
-// <port>` (apps/cli/commands/live_audio.cpp) and the GUI's live room
-// (apps/gui/encoder_controller.cpp) each construct one of these and call
+// <port>` (apps/forge/cli/src/commands/live_audio.cpp) and the GUI's live room
+// (apps/forge/gui/src/encoder_controller.cpp) each construct one of these and call
 // drain_into() once per encode frame, exactly the way the GUI's live room
 // already drains its own mutex-guarded manual-placement snapshot every
 // frame - this generalises that established pattern rather than inventing a
@@ -34,7 +34,7 @@ enum class PositionSourceError : std::uint8_t {
 
 [[nodiscard]] std::string_view describe(PositionSourceError error);
 
-// Counters for a status line - see apps/cli/commands/live_audio.cpp's
+// Counters for a status line - see apps/forge/cli/src/commands/live_audio.cpp's
 // `positions:` line and the GUI's liveOscDatagrams/Updates/Dropped
 // properties for what reads these. Never a reason to stop listening: a
 // malformed or unaddressed datagram is exactly what these count, not a

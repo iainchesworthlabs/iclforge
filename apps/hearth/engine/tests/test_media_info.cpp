@@ -36,7 +36,7 @@
 #include "iclforge/containers/mp4/mp4.hpp"
 #include "iclforge/containers/mpegts/mpegts.hpp"
 
-// iclforge::hearth's media information (apps/hearth/engine/media_info.cpp and
+// iclforge::hearth's media information (apps/hearth/engine/src/media_info.cpp and
 // media_inspector.cpp): what a queue item's file says about itself, read on a
 // thread of its own and written out as iclforge.hearth.media/1.
 

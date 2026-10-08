@@ -79,7 +79,7 @@ endif()
 # consumer, this binary included.
 target_include_directories(iclforge-audio-tests PRIVATE "${ICLFORGE_AUDIO_NET_DIR}")
 
-# ../../../apps/shared/media/tests/test_sink_wait.cpp's subject is Forge's shared code (apps/common/sink_wait.hpp, header-only):
+# ../../../apps/shared/media/tests/test_sink_wait.cpp's subject is Forge's shared code (apps/shared/media/src/sink_wait.hpp, header-only):
 # 'play', 'monitor', 'identify' and 'live' wait on their sinks through it, and this holds those
 # waits against sinks that stop on cue. It moves to that code's own tests with it
 # (planning/monorepo.md, C7-2).

@@ -7,7 +7,7 @@ for nothing: the Android app's CMake wrapper, the WebAssembly preset and the Pyt
 wheel. Phase I4 binds AC-4 into the C API, Python, Rust and WebAssembly:
 
 - Python and WebAssembly turn the option back on AND link ac4:: targets (the pybind11
-  extension's `ac4` submodule; the apps/wasm/ iclforge_wasm_ac4 embind module).
+  extension's `ac4` submodule; the apps/demos/wasm/ iclforge_wasm_ac4 embind module).
 - Android turns the option back on too - the libraries depend on nothing outside this
   tree (packaging/vcpkg-port/iclforge/vcpkg.json's own "ac4" feature description says
   the same) and cross-compile under the NDK with no extra package friction - but the

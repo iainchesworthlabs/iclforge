@@ -15,7 +15,7 @@ find_package(pybind11 CONFIG REQUIRED)
 pybind11_add_module(_iclforge src/iclforge_ext/bindings.cpp)
 
 # Deliberately not iclforge::warnings, unlike every other in-tree consumer of
-# iclforge::ac3 (examples/, tests/, apps/cli, apps/gui) - that target makes this
+# iclforge::ac3 (examples/, tests/, apps/forge/cli/src, apps/forge/gui) - that target makes this
 # project's OWN warnings fatal, and pybind11's vendored headers are not this
 # project's code to hold to that bar. A real external consumer wrapping
 # iclforge::ac3 would not inherit iclforge::warnings either; this target is exactly

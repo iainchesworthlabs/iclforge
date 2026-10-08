@@ -1521,7 +1521,7 @@ private:
     void encodeChannels(const QString& path, std::vector<std::vector<float>> planes,
                         const iclforge::ac3::plan::Routing& routing, std::uint32_t sample_rate);
     // AC-4: the source's own channels through iclforge::ac4::Encoder, the steps
-    // `forge ac4-encode` takes (apps/common/ac4_encode_core.hpp), so the
+    // `forge ac4-encode` takes (apps/shared/media/src/ac4_encode_core.hpp), so the
     // command line the page echoes writes these bytes.
     void encodeAc4(const QString& path, std::vector<std::vector<float>> planes,
                    std::uint32_t sample_rate);
@@ -1534,7 +1534,7 @@ private:
     void setAc4Choice(std::optional<std::size_t>& choice, int index, std::size_t size);
     // AC-4 object mode (ac4Objects()): what the assignments make of the loaded
     // channels as AC-4 objects, the scene that moves them, and the encode, all
-    // the steps `forge atmos-encode ... codec=ac4` takes (apps/common/
+    // the steps `forge atmos-encode ... codec=ac4` takes (apps/shared/media/src/
     // ac4_objects_core.hpp), so that the command line the page echoes writes
     // these bytes.
     //

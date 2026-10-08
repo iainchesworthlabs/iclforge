@@ -1861,8 +1861,8 @@
     </message>
     <message>
         <location filename="../qml/SettingsPage.qml" line="244"/>
-        <source>Where install.ps1, remove.ps1 and the built package live: beside this app by default, or apps/windows/driver in a source tree.</source>
-        <translation>היכן נמצאים install.ps1, remove.ps1 והחבילה הבנויה: ליד היישום הזה כברירת מחדל, או apps/windows/driver בעץ מקור.</translation>
+        <source>Where install.ps1, remove.ps1 and the built package live: beside this app by default, or apps/crucible/windows/driver in a source tree.</source>
+        <translation>היכן נמצאים install.ps1, remove.ps1 והחבילה הבנויה: ליד היישום הזה כברירת מחדל, או apps/crucible/windows/driver בעץ מקור.</translation>
     </message>
     <message>
         <location filename="../qml/SettingsPage.qml" line="391"/>

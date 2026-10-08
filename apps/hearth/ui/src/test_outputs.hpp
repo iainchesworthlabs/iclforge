@@ -17,7 +17,7 @@
 // not start sounding test tones), so a suite that wants to see the engine
 // actually play - position advancing, meters moving, the output picker
 // moving playback to another endpoint - hands the controller a fake device
-// with a clock of its own, the way tests/hearth/test_engine.cpp's
+// with a clock of its own, the way apps/hearth/engine/tests/test_engine.cpp's
 // ClockedDevice stands in for one under iclforge-tests.
 //
 // Kept out of hearth_controller.hpp (which forward-declares it) for the

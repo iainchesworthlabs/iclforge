@@ -52,7 +52,7 @@ enum class Detail : std::uint8_t {
 // --- naming ----------------------------------------------------------------
 // The document's vocabulary - fixed text keyed off transmitted values - and
 // its stream summary are shared with Hearth's media information, so that no
-// two tools here name one stream two ways (apps/common/probe_json.hpp). The
+// two tools here name one stream two ways (apps/shared/media/src/probe_json.hpp). The
 // table uses the same names.
 
 using iclforge::apps::probe_json::Ac4Summary;

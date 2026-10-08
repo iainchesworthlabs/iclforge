@@ -1,11 +1,11 @@
 // Embind wrapper around iclforge::ac3's encode path, for the roadmap-UX6
-// browser encode page (apps/wasm/encode/index.html). Three JS-visible
+// browser encode page (apps/demos/wasm/encode/index.html). Three JS-visible
 // classes:
 //   - WasmEncoder: real AC-3 (iclforge::ac3::FrameEncoder) or E-AC-3
 //     (iclforge::ac3::eac3::FrameEncoder) bed encoding, frame by frame.
 //   - WasmAtmosBedEncoder: real Atmos/JOC bed encoding
 //     (iclforge::ac3::oba::AtmosEncoder) - the class the object-authoring page
-//     (apps/wasm/atmos/) drives, one placement set per frame so a drag on
+//     (apps/demos/wasm/atmos/) drives, one placement set per frame so a drag on
 //     its room canvas IS the pan.
 //   - WasmQcMeter: iclforge::ac3::meta::LoudnessMeter plus a verdict against every
 //     iclforge::ac3::meta::QcPresetId - the "browser-side qc... in the page" roadmap

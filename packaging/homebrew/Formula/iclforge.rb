@@ -48,7 +48,7 @@ class Iclforge < Formula
     system "cmake", "--install", "build"
 
     # `cmake --install` already placed the generated man page and the four
-    # shell completion scripts (see apps/cli/CMakeLists.txt,
+    # shell completion scripts (see apps/forge/cli/CMakeLists.txt,
     # which generates them by running the freshly built forge) under
     # #{prefix}/share. Homebrew links share/man/man1 and
     # share/zsh/site-functions itself, so those two need nothing here. bash

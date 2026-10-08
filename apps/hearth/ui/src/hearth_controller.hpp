@@ -35,10 +35,10 @@ struct TestOutputs;  // test_outputs.hpp
 // does that hop once for the whole snapshot instead.
 //
 // This first slice owns the engine directly, with a device PCM sink
-// (apps/hearth/engine/pcm_sink.hpp) and a loader that reads raw
+// (apps/hearth/engine/src/pcm_sink.hpp) and a loader that reads raw
 // `.ac3`/`.ec3` files (item_loader.hpp). The engine is given every render
 // endpoint to decide between (EngineOutputs::endpoints,
-// apps/hearth/engine/output_selector.hpp) rather than one fixed sink, so the
+// apps/hearth/engine/src/output_selector.hpp) rather than one fixed sink, so the
 // output picker's "Play here" can name an endpoint - no passthrough sink is
 // given yet, so every item still decodes to PCM, on the platform's default
 // device until a picker row is chosen. The layout is no longer fixed either:
@@ -90,7 +90,7 @@ class HearthController : public QObject {
     // Whether FirstRunDialog.qml has been dismissed once already. Persisted
     // through QSettings under organisation "iclforge", application "Hearth"
     // (set in main.cpp) - this window's only settings storage so far. The
-    // queue/decoder/speaker settings apps/hearth/engine/settings_model.hpp
+    // queue/decoder/speaker settings apps/hearth/engine/src/settings_model.hpp
     // describes are a separate, later piece (the Settings page proper), not
     // wired to this controller yet.
     Q_PROPERTY(bool firstRunSeen READ firstRunSeen WRITE setFirstRunSeen NOTIFY firstRunSeenChanged)
@@ -275,7 +275,7 @@ class HearthController : public QObject {
     // Playback and network are iclforge::hearth::EngineSettings, kept through a
     // SettingsStore this controller implements over QSettings
     // (hearth_controller.cpp's own QSettingsStore) - the way
-    // apps/hearth/engine/settings_model.hpp says the window has to. Read
+    // apps/hearth/engine/src/settings_model.hpp says the window has to. Read
     // fresh from the store on every call rather than cached here as
     // EngineSettings by value, for the same reason decoderSettings() above
     // takes a fresh read rather than a cached DecoderSettings: caching the
@@ -300,7 +300,7 @@ class HearthController : public QObject {
     // than through the engine's SettingsStore. "system"/"light"/"dark",
     // the palette name, and "100"/"125"/"150"/"175"/"system" - Main.qml
     // writes these straight into Theme.preference/Theme.paletteChoice/
-    // Theme.fontScale, the same trio apps/crucible/ui/crucible_controller.hpp
+    // Theme.fontScale, the same trio apps/crucible/ui/src/crucible_controller.hpp
     // exposes for the same reason, so the two windows' Settings pages behave
     // alike.
     Q_PROPERTY(QString theme READ theme WRITE setTheme NOTIFY settingsChanged)
@@ -514,7 +514,7 @@ public:
     // (diagnostics_report.hpp says how that is held); a suggested file: URL
     // in the Documents folder; and the export itself, which writes UTF-8
     // with LF line endings and reports through diagnosticsMessage - the same
-    // three-invokable shape apps/crucible/ui/crucible_controller.hpp uses.
+    // three-invokable shape apps/crucible/ui/src/crucible_controller.hpp uses.
     [[nodiscard]] QString diagnosticsMessage() const { return diagnostics_message_; }
     Q_INVOKABLE QString diagnosticsReport() const;
     Q_INVOKABLE QString suggestedDiagnosticsFile() const;
@@ -576,7 +576,7 @@ private:
     // The four-argument constructor: the two-argument one always uses the
     // native store (the registry here) whatever QSettings::setDefaultFormat
     // says, which would let a QML test suite read and write the developer's
-    // own settings - apps/crucible/ui/crucible_controller.cpp's own
+    // own settings - apps/crucible/ui/src/crucible_controller.cpp's own
     // constructor carries the identical comment for the identical reason.
     QSettings settings_;
     // Implements iclforge::hearth::SettingsStore over settings_

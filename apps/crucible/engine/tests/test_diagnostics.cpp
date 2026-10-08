@@ -10,7 +10,7 @@
 #include "diagnostics.hpp"
 #include "engine.hpp"
 
-// The diagnostics module (apps/crucible/engine/diagnostics.hpp): the ring
+// The diagnostics module (apps/crucible/engine/src/diagnostics.hpp): the ring
 // keeps the newest lines in order and counts what it dropped, a note is one
 // line no longer than the cap, and the report never carries the signing key,
 // the path to it, the status line that names the file, or an executable's

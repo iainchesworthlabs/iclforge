@@ -46,7 +46,7 @@ Card {
             model: HearthController.objects
 
             // oba::Position's own room cuboid (x: 0 left wall to 1 right
-            // wall, y: 0 front to 1 back) - the same frame apps/gui's
+            // wall, y: 0 front to 1 back) - the same frame apps/forge/gui's
             // ObjectInspectorDialog plan view places its markers in
             // (object_decode_controller.cpp), placed here directly with no
             // reprojection. label distinguishes a bed/speaker entry (named)

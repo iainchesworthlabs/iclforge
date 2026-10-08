@@ -15,7 +15,7 @@
 // The AC-4 page's choices, Qt-free so that iclforge-tests can hold them to the two
 // things they must agree on: the iclforge::ac4::EncoderConfig the page encodes with and
 // the `forge ac4-encode` tokens it echoes, each spelled as forge's parser
-// reads it (apps/cli/support.cpp). A choice at the command's own default
+// reads it (apps/forge/cli/src/support.cpp). A choice at the command's own default
 // echoes nothing, so a plain encode's command line stays plain.
 //
 // What the page leaves to the command line: substreams and presentations,
@@ -158,7 +158,7 @@ struct Ac4EncodeSettings {
 // --- Object mode ---------------------------------------------------------------
 //
 // Objects under the AC-4 codec are written by `forge atmos-encode ... codec=ac4`
-// (apps/common/ac4_objects_core.hpp), which takes fewer options than the channels'
+// (apps/shared/media/src/ac4_objects_core.hpp), which takes fewer options than the channels'
 // ac4-encode: an object stream is written at frame_rate_index 13 in a constant
 // rate, and the loudness values, DRC, the stereo downmix and dialogue enhancement
 // describe channels. What it takes is the coding (coding=), the dialnorm in whole

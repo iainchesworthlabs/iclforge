@@ -17,8 +17,8 @@
 #include "iclforge/ac3/meta/bsi.hpp"
 
 // The commands that take an already-encoded stream somewhere else - the
-// container wrappers (apps/cli/commands/containers.cpp: mkv, mp4, fmp4, ts,
-// demux) and the stream tools (apps/cli/commands/stream_tools.cpp:
+// container wrappers (apps/forge/cli/src/commands/containers.cpp: mkv, mp4, fmp4, ts,
+// demux) and the stream tools (apps/forge/cli/src/commands/stream_tools.cpp:
 // transcode, metadata, normalize, cut, cat) - on the inputs and outputs they
 // have to turn away, plus the multi-substream and dual-mono shapes their
 // reports describe differently. test_cli_containers.cpp and
@@ -29,7 +29,7 @@
 //
 // The stream tools answer every failure - an unreadable input and an
 // unwritable output included - with exit code 1, where the encode and
-// decode commands use 2 and 3 (apps/cli/exit_codes.hpp). Those cases below
+// decode commands use 2 and 3 (apps/forge/cli/src/exit_codes.hpp). Those cases below
 // check only for a non-zero exit, so they stay true whichever way that is
 // settled.
 //
@@ -41,7 +41,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// See tests/cli/test_cli.cpp's own scratch_dir for the reasoning this copy
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir for the reasoning this copy
 // shares, including the PID fold; the leaf name below is this file's own.
 std::string scratch_pid_suffix() {
     return iclforge::test::platform::process_id();

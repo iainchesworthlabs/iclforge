@@ -333,7 +333,7 @@ _DRC_AND_LTRT = ("drc_profile=film_standard:drc_profile_portable_hp=speech:"
 # walk that disagrees stops main() before anything in the tree changes.
 LEGS = [
     # libs/ac4/tests/core/test_toc.cpp pins this stream's frame count and its MediaInfo-checked TOC
-    # fields; tests/cli and tools/fuzz/generate-seeds.sh read it too. "pinned": main() refuses to
+    # fields; apps/forge/cli/tests and tools/fuzz/generate-seeds.sh read it too. "pinned": main() refuses to
     # replace it with different bytes, so it keeps DEE's defaults.
     {"name": "ac4-stereo-64", "encoder": AC4, "source": "reference_stereo", "layout": "stereo",
      "kbps": 64, "options": [], "pinned": True,

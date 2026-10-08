@@ -5,7 +5,7 @@
 // decode_by_block()'s blocks, presentations() with their names, metadata()
 // against what the frames sent, latency_samples() against the encoder's
 // figure for the same frame rate, and an engine in the shape of Hearth's
-// (apps/hearth/engine/stream_decoder.hpp) standing in for it, which decodes
+// (apps/hearth/engine/src/stream_decoder.hpp) standing in for it, which decodes
 // every committed AC-4 stream by block.
 //
 // AC4_API_STREAM_DIR, when set, names a directory whose .ac4 files the
@@ -14,7 +14,7 @@
 //
 // Under the sanitizers (tests/support/sanitized.hpp) the engine plays one committed
 // stream of each kind, and of a long stream its first 5 frames
-// (tests/support/ac4_stream_kinds.hpp, which tests/hearth/test_ac4_engine.cpp shares).
+// (tests/support/ac4_stream_kinds.hpp, which apps/hearth/engine/tests/test_ac4_engine.cpp shares).
 // Each stream is decoded twice, and DEE's 120-frame legs took most of the ASan
 // leg's time for this test. A kind is a frame rate, the channels and substream
 // roles of the presentation decode() plays, how the stream codes its objects,

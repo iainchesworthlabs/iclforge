@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# The Shield app (apps/android) is a full Gradle/NDK project outside the
+# The Shield app (apps/demos/android) is a full Gradle/NDK project outside the
 # iclforge CMake configure entirely, reached from the other direction (its own
 # CMakeLists.txt add_subdirectory()s the repo root). This platform doesn't
 # need that indirection - there's no non-CMake build system in the way, so
@@ -134,7 +134,7 @@ add_custom_command(TARGET iclforge_wasm_encode POST_BUILD
         "${CMAKE_BINARY_DIR}/bin/wasm_encode_demo"
     COMMENT "Assembling the servable wasm_encode_demo/ directory")
 
-# The Atmos object-authoring page (apps/wasm/atmos/) ships as a SUBDIRECTORY
+# The Atmos object-authoring page (apps/demos/wasm/atmos/) ships as a SUBDIRECTORY
 # of the encode demo rather than a third top-level demo: it loads the very
 # same iclforge_encode.js/.wasm via "../", so wasm_encode_demo/ stays the one
 # directory that is copied around (docs site, local serving) with the

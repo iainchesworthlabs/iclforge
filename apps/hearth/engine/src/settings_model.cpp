@@ -103,7 +103,7 @@ constexpr std::string_view kSpeakersRoutingOutputs = "speakers/routingOutputs";
 // comment). std::from_chars for floating point is unavailable only on
 // Android and at the macOS wheel's deployment target (CONTRIBUTING.md) -
 // neither is a target apps/hearth's CMakeLists.txt builds for (WIN32 OR
-// APPLE OR LINUX, desktop only), the same platform set apps/cli/support.cpp
+// APPLE OR LINUX, desktop only), the same platform set apps/forge/cli/src/support.cpp
 // already relies on this for.
 [[nodiscard]] std::optional<double> double_of(const std::optional<std::string>& text) {
     if (!text || text->empty()) {

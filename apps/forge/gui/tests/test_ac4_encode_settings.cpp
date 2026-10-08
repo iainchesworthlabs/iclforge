@@ -13,7 +13,7 @@
 #include "ac4_presentations.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 
-// forge-gui's AC-4 page (apps/gui/ac4_encode_settings.hpp): each choice echoes
+// forge-gui's AC-4 page (apps/forge/gui/src/ac4_encode_settings.hpp): each choice echoes
 // the `forge ac4-encode` token forge's parser reads for it, and builds the
 // configuration ac4-encode builds from that token. The Qt Quick suite
 // (tst_e2e_ac4.qml) runs the echoed line through forge and compares the

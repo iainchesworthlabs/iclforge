@@ -5,7 +5,7 @@
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "crc_mutator.hpp"
 
-// Mirrors forge's 'decode' path for E-AC-3 (apps/cli/main.cpp:
+// Mirrors forge's 'decode' path for E-AC-3 (apps/forge/cli/src/main.cpp:
 // run_decode_eac3): split the raw stream into access units, then render each
 // one with a single Eac3Decoder. decode_access_unit calls split_frames and
 // decode_substream internally, so this one harness exercises the whole Annex

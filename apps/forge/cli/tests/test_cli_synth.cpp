@@ -16,7 +16,7 @@
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
 
-// The synthetic generators (apps/cli/commands/synth.cpp: silence, sine,
+// The synthetic generators (apps/forge/cli/src/commands/synth.cpp: silence, sine,
 // orbit, eac3-silence, eac3-sine) and the two object generators that sit
 // beside them in commands/atmos.cpp (atmos, atmos-path), at the level a user
 // meets them: the real binary as a subprocess, its exit code, what it says,
@@ -36,7 +36,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// See tests/cli/test_cli.cpp's own scratch_dir for the reasoning this copy
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir for the reasoning this copy
 // shares, including the PID fold; the leaf name below is this file's own.
 std::string scratch_pid_suffix() {
     return iclforge::test::platform::process_id();

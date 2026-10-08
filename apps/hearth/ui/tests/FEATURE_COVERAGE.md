@@ -1,6 +1,6 @@
 # Hearth window: feature coverage from the UI
 
-Every user-facing feature of `apps/hearth/ui/qml` and the
+Every user-facing feature of `apps/hearth/ui/assets/qml` and the
 `HearthController`/`NetworkController` surface it drives, mapped to the Qt
 Quick Test cases (`apps/hearth/ui/tests/qml/tst_*.qml`) that exercise it.
 Case names are `Suite::test_function` (the suite is the TestCase `name`).
@@ -128,9 +128,9 @@ Status:
 | 102 | Media | AC-4 item: Stream, Presentations and Metadata cards, and it plays | none | UI | MediaPage::test_ac4ItemIsDescribedAndPlays |
 | 103 | Play | Signal-path hint when a sink is paired but no group is chosen as the output (with or without a group existing yet) | none | UI | NetworkPairing::test_playPageHintsAboutAPairedSinkNotInThePlayingGroup |
 | 104 | Network | Post-pairing group prompt: create a group (named after the sink) or add to an existing one, gone once the sink is actually a member, "Not now" dismisses it | none | UI | NetworkPairing::test_networkPageOffersToGroupAJustPairedSink |
-| 105 | Decoder | AC-4 Immersive and objects card: Layout (As coded, 5.1, 5.1.2, 5.1.4, 7.1, 7.1.2, 7.1.4) and Core decoding | none | none | No QML case drives the card. The settings reach the decoder in `[hearth][decoder-settings]` (`tests/hearth/test_decoder_settings.cpp`) and the layout fold in `[hearth][ac4]` (`tests/hearth/test_ac4_engine.cpp`), and neither goes through the page. `HearthController`'s map round-trip case does not carry these two keys, and its name mapping has none for the 5.1 segment |
+| 105 | Decoder | AC-4 Immersive and objects card: Layout (As coded, 5.1, 5.1.2, 5.1.4, 7.1, 7.1.2, 7.1.4) and Core decoding | none | none | No QML case drives the card. The settings reach the decoder in `[hearth][decoder-settings]` (`apps/hearth/engine/tests/test_decoder_settings.cpp`) and the layout fold in `[hearth][ac4]` (`apps/hearth/engine/tests/test_ac4_engine.cpp`), and neither goes through the page. `HearthController`'s map round-trip case does not carry these two keys, and its name mapping has none for the 5.1 segment |
 | 106 | Settings | Diagnostics "View live…" dialog (the report, refreshed every 500 ms while open) | none | none | Not opened by any case. The report it shows is the one the Copy case reads back |
-| 107 | Settings | Diagnostics HTTP endpoint (`ICLFORGE_HEARTH_DIAGNOSTICS_PORT`) | none | none | Not a window feature, so no QML case. `DiagnosticsHttpServer` is tested over a real loopback socket by `tests/hearth/test_diagnostics_server.cpp` (`[hearth][diagnostics]`, in `iclforge_tests_diagnostics_server`); the controller reading the variable is not tested |
+| 107 | Settings | Diagnostics HTTP endpoint (`ICLFORGE_HEARTH_DIAGNOSTICS_PORT`) | none | none | Not a window feature, so no QML case. `DiagnosticsHttpServer` is tested over a real loopback socket by `apps/hearth/engine/tests/test_diagnostics_server.cpp` (`[hearth][diagnostics]`, in `iclforge_tests_diagnostics_server`); the controller reading the variable is not tested |
 
 ### Totals
 
@@ -168,7 +168,7 @@ Gaps that remain inside covered rows:
 - The group volume slider and each member's mute checkbox are not driven. Only a member's volume slider is (row 77).
 - A stream whose object metadata is not read makes row 20's case skip, and no case plays an AC-4 item with objects through the window.
 - The Only-on-sink panel is rendered but its text is not read.
-- The Firmware tab's Update, Roll back and Restart are not driven: the test sink serves no firmware routes. The client behind them (`apps/hearth/engine/sink_firmware.hpp`) is tested in `iclforge-tests` against a stand-in board on loopback (`[sink-firmware]`), and against a real board by the hidden live case in `tests/hearth/test_sink_firmware_board.cpp`.
+- The Firmware tab's Update, Roll back and Restart are not driven: the test sink serves no firmware routes. The client behind them (`apps/hearth/engine/src/sink_firmware.hpp`) is tested in `iclforge-tests` against a stand-in board on loopback (`[sink-firmware]`), and against a real board by the hidden live case in `apps/hearth/engine/tests/test_sink_firmware_board.cpp`.
 
 ## UI bugs found (fixed)
 

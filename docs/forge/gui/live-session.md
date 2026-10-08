@@ -423,7 +423,7 @@ capabilities this page describes, through the same code where the code is sharea
 - **Container choice**, and **take durability** with it. Both commands take
   `container=raw|mkv|ts|spdif|fmp4` (`cmaf` is an accepted alias for the last; see
   [CLI → Options & grammars](../cli/metadata-options.md#container)) and write through
-  `RecordingSink` — literally the same class, moved to `apps/common/` and compiled into both
+  `RecordingSink` — literally the same class, moved to `apps/shared/media/src/` and compiled into both
   front ends — so a CLI take and a GUI take of the same container are the same bytes produced
   the same way, with the same bounded memory and the same
   [mid-session crash safety](#take-durability).

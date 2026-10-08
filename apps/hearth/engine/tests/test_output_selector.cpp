@@ -10,7 +10,7 @@
 #include "iclforge/audio/sink_capabilities.hpp"
 #include "output_selector.hpp"
 
-// iclforge::hearth::OutputSelector (apps/hearth/engine/output_selector.cpp): the
+// iclforge::hearth::OutputSelector (apps/hearth/engine/src/output_selector.cpp): the
 // rows the output decision is asked about, and when they are read.
 //
 // The decision itself is test_output_decision.cpp's. What is checked here is

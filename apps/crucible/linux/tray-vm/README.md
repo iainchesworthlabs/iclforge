@@ -9,7 +9,7 @@ machine that found out why.
 fallback and then `static_cast` to the D-Bus one; the panel's first request for the menu layout
 reads a `QWidgetPlatformMenu` as a `QDBusPlatformMenu` and refcounts whatever is at the offset.
 The tray's menu is flat now and the tray is back.
-[`apps/crucible/ui/platform/linux/tray_support.cpp`](../../crucible/ui/platform/linux/tray_support.cpp)
+[`apps/crucible/ui/src/platform/linux/tray_support.cpp`](../../crucible/ui/platform/linux/tray_support.cpp)
 carries the finding and
 [docs/crucible/design/promotion.md](../../../docs/crucible/design/promotion.md) the measurements, under
 Phase 4.
@@ -18,7 +18,7 @@ The crash was found on a Raspberry Pi 4B with 1844 MB of usable RAM. That machin
 address sanitiser over Qt and has no room for Debian's Qt debug archive, which is where the
 investigation stopped, four wrong explanations in. This is a scripted, throwaway VMware
 Workstation guest that can, the same shape as the Windows one in
-[`apps/windows/driver-vm/`](../../windows/driver-vm/): it provisions itself into a desktop with
+[`apps/crucible/windows/driver-vm/`](../../windows/driver-vm/): it provisions itself into a desktop with
 a StatusNotifier host, Qt 6.8.2, Qt's own `-dbgsym` packages, `gdb` and `valgrind`.
 
 Debian 13 (trixie) because it carries **Qt 6.8.2**, the same Qt the Pi carries, and because
@@ -50,7 +50,7 @@ Nothing. Unlike the Windows guest, which needs an install ISO from Microsoft,
 | `guest/build-crucible.sh` | `crucible-build` in the guest. `--nest-submenu` puts a submenu back in the tray's menu, `--tray` forces the tray on where the seam says the session has none, `--asan` instruments our half. Both edits are reverted from a pristine copy after every build, so the shipped source in the guest never drifts. |
 | `guest/run-trials.sh` | `crucible-trials` in the guest: N launches, a survival count, and the gdb and valgrind modes. |
 
-`apps/windows/driver-vm/guest_console.py` works against this guest too — `--port 5952` — for the
+`apps/crucible/windows/driver-vm/guest_console.py` works against this guest too — `--port 5952` — for the
 stretch before ssh is up.
 
 ## A run
@@ -71,7 +71,7 @@ cd apps\linux\tray-vm
 ## The reproducer
 
 `crucible-build --nest-submenu` adds one `Platform.Menu` of literals to the tray's menu in
-`apps/crucible/ui/qml/Main.qml`, and reverts it from a pristine copy after the build, so the
+`apps/crucible/ui/assets/qml/Main.qml`, and reverts it from a pristine copy after the build, so the
 shipped source never drifts. A single launch is evidence of nothing; ten is the measurement.
 Read on this guest, 2026-09-06:
 

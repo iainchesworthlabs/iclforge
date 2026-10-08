@@ -28,7 +28,7 @@ namespace iclforge::ac4bridge {
 
 // Whether `bytes` opens with an AC-4 sync word, 0xAC40 or 0xAC41 (ETSI TS 103
 // 190-2 Annex G.4.1) where AC-3's and E-AC-3's is 0x0B77: how every front end
-// that reads a stream decides which decoder reads it (apps/common/
+// that reads a stream decides which decoder reads it (apps/shared/media/src/
 // ac4_sync_word.hpp, which the desktop applications use and this component
 // cannot reach, since its archive carries no apps/).
 [[nodiscard]] inline bool is_ac4(std::span<const std::byte> bytes) noexcept {
@@ -38,7 +38,7 @@ namespace iclforge::ac4bridge {
 
 // Where an AC-4 speaker is among A/52's Table E2.5 locations, for the layout
 // renderer that places a decoded bed on the player's output layout: the same
-// reading as apps/common/ac4_channels.hpp's ac4_location(), which the desktop
+// reading as apps/shared/media/src/ac4_channels.hpp's ac4_location(), which the desktop
 // applications place a decoded presentation by. Lb and Rb are the rear
 // surrounds, Lw and Rw the wides, the top front pair the vertical heights, the
 // top back and top side pairs the top surrounds (Table E2.5 has one pair for

@@ -34,7 +34,7 @@ int run_shell(std::string_view command) {
     // signal-terminated child (a crash, an abort()) has no exit code of its
     // own to report; 128 + signal is the shell's convention for that, and
     // sits clear of every real forge exit code (0..7 -
-    // apps/cli/exit_codes.hpp).
+    // apps/forge/cli/src/exit_codes.hpp).
     return WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
 }
 

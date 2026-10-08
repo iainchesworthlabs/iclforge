@@ -6,9 +6,9 @@
 // which is the actual requirement. worklet-processor.ts, running in the
 // audio thread proper, only drains the RingBuffer this file writes into.
 //
-// The Emscripten glue (apps/wasm/decoder_bindings.cpp's compiled output,
+// The Emscripten glue (apps/demos/wasm/decoder_bindings.cpp's compiled output,
 // `iclforge_decode.js`) is a MODULARIZE-style script, not an ES module
-// (apps/wasm/CMakeLists.txt does not set -sEXPORT_ES6) - so it can't be
+// (apps/demos/wasm/CMakeLists.txt does not set -sEXPORT_ES6) - so it can't be
 // `import`ed directly here the way ring-buffer.ts/push-decoder.ts can. It's
 // loaded by fetching its source as text and re-exporting the
 // `createIclForgeModule` global it defines as a Blob-URL ES module - a
@@ -53,7 +53,7 @@ export type InboundMessage = InitMessage | PushMessage | { type: "flush" } | { t
 async function loadEmscriptenGlue(glueUrl: string): Promise<IclForgeModuleFactory> {
   const source = await (await fetch(glueUrl)).text();
   // createIclForgeModule is the MODULARIZE+EXPORT_NAME global the glue
-  // defines when evaluated as a plain script (apps/wasm/CMakeLists.txt's
+  // defines when evaluated as a plain script (apps/demos/wasm/CMakeLists.txt's
   // link options) - re-exporting it is what makes the Blob URL below
   // `import`able.
   const blob = new Blob([source, "\nexport default createIclForgeModule;\n"], {

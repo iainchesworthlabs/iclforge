@@ -5,7 +5,7 @@
 // to 5.X, headphones, the syntax trace, and what decode says about options the
 // other format reads; and phase D10's objects, rendered to speakers; and the constructed streams
 // at 96 and 192 kHz (tests/golden/ac4-hsf/), written at their own rate.
-// tests/cli/test_cli_containers.cpp has the first of them (output-level=, presentation-id=,
+// apps/forge/cli/tests/test_cli_containers.cpp has the first of them (output-level=, presentation-id=,
 // language=, dialogue-gain=, dialogue-enhancement=, channels=2 and 1, downmix=loro, conceal=).
 
 #include <catch2/catch_test_macros.hpp>
@@ -34,7 +34,7 @@ using iclforge::test::kSanitized;
 namespace {
 
 // Per this project's per-file test-helper convention (see
-// tests/cli/test_cli_containers.cpp, whose shapes these copy).
+// apps/forge/cli/tests/test_cli_containers.cpp, whose shapes these copy).
 fs::path scratch_dir() {
     auto dir = fs::path{ICLFORGE_TEST_SCRATCH_DIR} /
                ("cli_ac4_decode_" + iclforge::test::platform::process_id());
@@ -70,7 +70,7 @@ fs::path multiplexed() {
 constexpr std::size_t kSanitizedFrames = 24;
 
 // A committed AC-4 stream as a decode test takes it (the shape of
-// tests/cli/test_cli_containers.cpp's): whole, or under the sanitizers
+// apps/forge/cli/tests/test_cli_containers.cpp's): whole, or under the sanitizers
 // (tests/support/sanitized.hpp) its first `frames` sync frames, written to `prefix`.
 fs::path decoded_stream(const fs::path& stream, std::size_t frames, const fs::path& prefix) {
     if (!kSanitized) {

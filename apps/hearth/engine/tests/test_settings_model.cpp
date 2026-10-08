@@ -13,7 +13,7 @@
 #include "settings_model.hpp"
 #include "transport.hpp"
 
-// The engine's settings model (apps/hearth/engine/settings_model.hpp): what
+// The engine's settings model (apps/hearth/engine/src/settings_model.hpp): what
 // each Playback and Network setting reads as, with its default for anything
 // missing or damaged; the network name as the network carries it; the queue
 // kept for the next start; and the speaker setup kept for the next start

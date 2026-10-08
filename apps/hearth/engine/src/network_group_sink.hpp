@@ -35,7 +35,7 @@ class Group;
 // member playing player@v1 (iclforge::sendspin::Group::push()), and the item's own
 // coded units, packed into IEC 61937 bursts, for a member playing
 // _iclforge_player@v1 (Group::push_burst()) - a mixed group takes both from
-// the same session together (tests/hearth/test_group.cpp's own proof).
+// the same session together (apps/hearth/engine/tests/test_group.cpp's own proof).
 // Neither PcmSink nor BitstreamSink fits alone - pcm_sink.hpp's own comment
 // says why: "a network group takes a stream... a seam of its own" - so this
 // is its own interface rather than a third mode bent into either.

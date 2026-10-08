@@ -64,7 +64,7 @@ QString channel_label(const std::vector<iclforge::ac3::eac3::chanmap::Location>&
 
 // Appends one access unit/frame's planar channels into `dst`, permuted by
 // `order` (order[i] names which of `src`'s channels belongs at position i) -
-// the accumulate-as-you-go counterpart of apps/cli/support.hpp's
+// the accumulate-as-you-go counterpart of apps/forge/cli/src/support.hpp's
 // interleave_reordered, kept planar here rather than interleaved so the
 // result is already write_wav_f32's own input shape.
 void append_planar(std::vector<std::vector<float>>& dst,
@@ -84,7 +84,7 @@ struct DecodeOutcome {
 };
 
 // AC-4 through iclforge::ac4::Decoder's public API, as `forge play` (monitor_ac4 in
-// apps/cli/commands/live_audio.cpp) and Hearth's engine decode it: the
+// apps/forge/cli/src/commands/live_audio.cpp) and Hearth's engine decode it: the
 // presentation `presentation` chooses (the decoder's own choice where unset),
 // each frame's channels in the WAV order `forge decode` writes, frames that
 // wait for an I-frame playing nothing. A layout that changes mid-stream is
@@ -166,7 +166,7 @@ bool decode_ac4_to_memory(const QString& path, std::span<const std::byte> stream
         // has_objects/object_count/object_audio fields the E-AC-3 path above fills, so
         // exportObjects() - already codec-agnostic - writes AC-4's objects the same way it
         // already writes E-AC-3 JOC's. A mid-stream count change is skipped, the same
-        // convention run_decode_eac3's own append_objects (apps/cli/commands/decode.cpp) uses.
+        // convention run_decode_eac3's own append_objects (apps/forge/cli/src/commands/decode.cpp) uses.
         if (!pcm.objects.empty()) {
             result.has_objects = true;
             result.object_count = static_cast<int>(pcm.objects.size());

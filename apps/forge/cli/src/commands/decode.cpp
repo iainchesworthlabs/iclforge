@@ -486,7 +486,7 @@ iclforge::objects::oba::DynamicObject to_oba_dynamic_object(
 // clause 5.10.2), and a damaged frame concealed as conceal= says. A
 // presentation with objects is rendered to the layout those options name,
 // 7.1.4 by default, through the layout renderer Hearth plays E-AC-3's objects
-// with (apps/common/ac4_object_render.hpp); the object options, which write
+// with (apps/shared/media/src/ac4_object_render.hpp); the object options, which write
 // E-AC-3's objects out, are reported rather than applied.
 int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, std::string_view out_path,
                    const forge_cli::Options& meta, std::string_view objects_dir, std::string_view adm_out) {

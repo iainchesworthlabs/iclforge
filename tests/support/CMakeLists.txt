@@ -29,7 +29,7 @@ endif()
 
 # ---------------------------------------------------------------------------
 # The test suite's own platform seam - the same shape as the CRT hook above,
-# and as libs/audio/src/backend/<backend>/ and apps/cli/platform/<os>/.
+# and as libs/audio/src/backend/<backend>/ and apps/forge/cli/src/platform/<os>/.
 #
 # Two things a test needs that the standard library does not portably give it:
 # this process's id (for the per-process scratch leaf every writing test takes)

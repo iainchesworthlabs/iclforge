@@ -23,7 +23,7 @@
 // floor(phase * L) for a frame of L samples, taken here in the time scale
 // iclforge::ac4::media_timing() gives for the stream, in which a frame is whole. The
 // session's timeline is built from these, before anything is decoded; the
-// decoder's own counts are the check (tests/hearth/test_ac4_engine.cpp).
+// decoder's own counts are the check (apps/hearth/engine/tests/test_ac4_engine.cpp).
 //
 // Where a decoder can start: an I-frame (b_iframe_global), whose substreams
 // send the configuration every other frame reuses. A decoder started anywhere

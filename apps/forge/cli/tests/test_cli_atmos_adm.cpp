@@ -18,9 +18,9 @@
 #include "iclforge/ac3/decoder/decoder.hpp"
 
 // forge's 'atmos-adm' command (ADM BWF reader, phase 3 of 3, feeding the JOC
-// encoder; apps/cli/main.cpp's run_atmos_adm). Real, subprocess-level
+// encoder; apps/forge/cli/src/main.cpp's run_atmos_adm). Real, subprocess-level
 // integration tests: the same "run the actual built binary, inspect what it wrote" shape
-// tests/cli/test_cli.cpp's own atmos-encode test uses, and for the same reason - main.cpp compiles
+// apps/forge/cli/tests/test_cli.cpp's own atmos-encode test uses, and for the same reason - main.cpp compiles
 // everything into one anonymous-namespace binary with no library surface run_atmos_adm's own
 // logic could be linked into this test binary and called directly (see test_cli.cpp's own top
 // comment).
@@ -48,7 +48,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// See tests/cli/test_cli.cpp's own scratch_dir for the reasoning this copy
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir for the reasoning this copy
 // shares, including the PID fold; the leaf name below is this file's own.
 std::string scratch_pid_suffix() { return iclforge::test::platform::process_id(); }
 

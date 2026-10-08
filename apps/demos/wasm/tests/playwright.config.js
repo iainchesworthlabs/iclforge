@@ -7,7 +7,7 @@ const { defineConfig } = require('@playwright/test');
 // WASM/mobile headless coverage(a): headless-browser coverage for the WASM demos -
 // docs/platforms/wasm.md's "Not yet verified" section names every
 // functional claim this closes. WASM_DEMO_DIR/WASM_ENCODE_DEMO_DIR point at
-// the directories apps/wasm/CMakeLists.txt's build produces
+// the directories apps/demos/wasm/CMakeLists.txt's build produces
 // (${CMAKE_BINARY_DIR}/bin/wasm_decode_demo/, .../wasm_encode_demo/);
 // _build.yml's build-wasm job sets both. Defaulting to the
 // config-wasm-emscripten preset's own build tree keeps `npx playwright test`
@@ -40,7 +40,7 @@ module.exports = defineConfig({
     retries: process.env.CI ? 1 : 0,
     reporter: process.env.CI ? 'line' : 'list',
     // Two independent static servers, one per demo directory - each demo is
-    // meant to be independently servable (see apps/wasm/CMakeLists.txt's own
+    // meant to be independently servable (see apps/demos/wasm/CMakeLists.txt's own
     // "any static file server" framing for each), so the test harness serves
     // them the same way rather than assuming one directory nests the other.
     webServer: [
@@ -92,7 +92,7 @@ module.exports = defineConfig({
         },
         {
             // The Atmos authoring page ships as a subdirectory of the encode
-            // demo (see apps/wasm/CMakeLists.txt), so it is served by the
+            // demo (see apps/demos/wasm/CMakeLists.txt), so it is served by the
             // same server under the same base URL.
             name: 'atmos',
             testMatch: 'atmos.spec.js',

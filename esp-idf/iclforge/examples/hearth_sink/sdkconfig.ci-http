@@ -3,7 +3,7 @@
 # qemu-system-xtensa has no WiFi, but `idf.py qemu` attaches an OpenCores
 # Ethernet MAC to the host's network (`-nic user,model=open_eth`), and the guest
 # reaches the host at 10.0.2.2. So the source's network seam picks net/openeth/
-# instead of net/wifi/, the workflow serves apps/wasm/assets/ on port 8000 for
+# instead of net/wifi/, the workflow serves apps/demos/wasm/assets/ on port 8000 for
 # the run's duration, and everything above the network - the HTTP client, the
 # framer, an E-AC-3 decode of a stream with objects - runs exactly as it does on
 # a board. Only the radio is left for hardware.

@@ -22,7 +22,7 @@
 // two records a refresh builds - lives in proc_facts.hpp beside this file,
 // because this translation unit cannot be compiled at all without the
 // PipeWire headers and none of that needs them. That is what
-// tests/crucible/platform/linux/test_session_facts.cpp drives; what is left
+// apps/crucible/engine/tests/platform/linux/test_session_facts.cpp drives; what is left
 // here needs a running daemon and is checked by hand on hardware with
 // tools/checks/crucible_platform_probe.cpp.
 //
@@ -173,7 +173,7 @@ private:
     // The /proc facts per process, the identity from the stream kept beside
     // them, and the eviction of both. proc_facts.hpp holds all three, and the
     // reasoning for each, because none of it needs PipeWire and all of it is
-    // worth a test (tests/crucible/platform/linux/test_session_facts.cpp).
+    // worth a test (apps/crucible/engine/tests/platform/linux/test_session_facts.cpp).
     ProcessFactsCache facts_;
 };
 

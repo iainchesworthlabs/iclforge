@@ -84,10 +84,10 @@ NOT_BUILT = (
     "js/",
     "esp-idf/",
     "esphome/",
-    "apps/android/",
-    "apps/wasm/",
+    "apps/demos/android/",
+    "apps/demos/wasm/",
     "apps/baremetal/",
-    "apps/linux/",
+    "apps/crucible/linux/",
     "examples/python/",
 )
 
@@ -107,13 +107,13 @@ NOT_BUILT_ROOT_FILES = (
 # Trees the Qt build reads. Anything the C++ build reads that is NOT here and
 # NOT in KNOWN_NON_GUI is unrecognised, and unrecognised means Qt too.
 GUI_PREFIXES = (
-    "apps/gui/",
+    "apps/forge/gui/",
     "apps/hearth/",
     "apps/crucible/",
-    "apps/common/",
+    "apps/shared/media/src/",
     "tests/gui/",
-    "tests/hearth/",
-    "tests/crucible/",
+    "apps/hearth/engine/tests/",
+    "apps/crucible/engine/tests/",
     "cmake/",
 )
 GUI_ROOT_FILES = ("CMakeLists.txt", "CMakePresets.json", "vcpkg.json")
@@ -125,9 +125,9 @@ KNOWN_NON_GUI = (
     "tests/",
     "tools/fuzz/",
     "examples/",
-    "apps/cli/",
-    "apps/notices/",
-    "apps/windows/",
+    "apps/forge/cli/src/",
+    "notices/",
+    "apps/crucible/windows/",
     "tools/checks/",
     "tools/generators/",
     "tools/references/",

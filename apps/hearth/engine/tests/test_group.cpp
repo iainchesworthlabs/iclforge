@@ -71,7 +71,7 @@ namespace m = iclforge::sendspin::messages;
 namespace testsink = iclforge::hearth::testsink;
 using namespace std::chrono_literals;
 
-// See tests/cli/test_cli.cpp's own scratch_dir comment for why every
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir comment for why every
 // TEST_CASE below folds this into its scratch leaf, on top of
 // ICLFORGE_TEST_SCRATCH_DIR's build-tree rooting.
 std::string scratch_pid_suffix() { return iclforge::test::platform::process_id(); }

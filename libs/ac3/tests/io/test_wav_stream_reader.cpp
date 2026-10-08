@@ -25,7 +25,7 @@
 namespace {
 
 // Rooted at ICLFORGE_TEST_SCRATCH_DIR rather than
-// std::filesystem::temp_directory_path() for the reason tests/cli/test_cli.cpp's
+// std::filesystem::temp_directory_path() for the reason apps/forge/cli/tests/test_cli.cpp's
 // own scratch_dir explains; the leaf is this file's own, with this process's own
 // PID folded on top for the same cross-process reason that file's comment gives.
 // The directory is created in the constructor rather than by a scratch_dir()

@@ -14,7 +14,7 @@ This package carries only its install, remove and device-creation scripts
 (bin/driver/install.ps1, remove.ps1 and NullSinkDevice.ps1). They are this
 project's own and travel under the same MS-PL terms as the directory they
 come from. The driver binary itself is not included while it is
-test-signed; apps/windows/driver/README.md in the source says how to build
+test-signed; apps/crucible/windows/driver/README.md in the source says how to build
 and install it.
 
 {{FILE:MSPL}}

@@ -32,7 +32,7 @@
 #include "iclforge/ac3/meta/qc.hpp"
 #include "iclforge/objects/scene.hpp"
 
-// apps/cli/main.cpp compiles directly into the forge executable, everything
+// apps/forge/cli/src/main.cpp compiles directly into the forge executable, everything
 // in an anonymous namespace - there is no library surface parse_options,
 // gather_frame or run_atmos_encode's own logic could be linked into this
 // binary and called directly. So these are integration tests: they run the
@@ -73,7 +73,7 @@ fs::path scratch_dir() {
 
 // Runs `forge <args>`, both streams redirected to `log` so a failing
 // assertion can print exactly what the binary said. Returns forge's own
-// exit code (apps/cli/exit_codes.hpp), portable across std::system()'s
+// exit code (apps/forge/cli/src/exit_codes.hpp), portable across std::system()'s
 // platform-specific return-value shape and quoting rules - see
 // tests/support/platform/process.hpp's run_shell, which owns both.
 int run_cli(const std::string& args, const fs::path& log) {
@@ -3029,9 +3029,9 @@ TEST_CASE(
 // left others once, corrupting the sink's per-slot carry rather than just
 // leaving a length mismatch. run_decode_eac3 (and decode_and_render in
 // stream_tools.cpp, tested separately below) now build the whole held-back
-// unit first via iclforge::apps::held_back_unit - apps/common/stream_playback.hpp
+// unit first via iclforge::apps::held_back_unit - apps/shared/media/src/stream_playback.hpp
 // - the same assembly decode_access_unit itself uses, and append it exactly
-// once per slot like any other unit. libs/ac3/tests/decoder/test_stream_playback.cpp
+// once per slot like any other unit. apps/shared/media/tests/test_stream_playback.cpp
 // proves held_back_unit's own placement is correct; this proves decode.cpp
 // actually calls it and routes its output to the right WAV channels.
 TEST_CASE("decode plays a legacy core's held-back last unit without swapping the "
@@ -3055,7 +3055,7 @@ TEST_CASE("decode plays a legacy core's held-back last unit without swapping the
 
     // Silence until kOnsetSample of unit kOnsetUnit, then each channel's own
     // steady tone - a cosine, so the onset is a step clear of §8.2.2's
-    // silence gate, same construction as libs/ac3/tests/decoder/test_stream_playback.cpp's
+    // silence gate, same construction as apps/shared/media/tests/test_stream_playback.cpp's
     // own unit_pcm.
     const auto unit_pcm = [&](std::span<const double> tones, int unit) {
         const auto onset = static_cast<std::size_t>(kOnsetUnit) * kFrame + kOnsetSample;
@@ -3147,7 +3147,7 @@ TEST_CASE("decode plays a legacy core's held-back last unit without swapping the
 
     // The power of one frequency in the LAST unit's window, whatever its
     // phase - same DFT-single-bin technique as
-    // libs/ac3/tests/decoder/test_stream_playback.cpp's own tone_power.
+    // apps/shared/media/tests/test_stream_playback.cpp's own tone_power.
     const auto tone_power = [&](std::span<const float> x, double hz) {
         double re = 0.0;
         double im = 0.0;
@@ -3243,7 +3243,7 @@ TEST_CASE("every failure path returns its own documented exit code", "[cli][exit
 
     // The numbers here are the contract, not an implementation detail: a
     // script distinguishes a bad command line from a bad file from a failed
-    // gate by exactly these. apps/cli/exit_codes.hpp is where they are chosen
+    // gate by exactly these. apps/forge/cli/src/exit_codes.hpp is where they are chosen
     // and docs/forge/cli/metadata-options.md#exit-codes is where they are published;
     // this is what keeps all three agreeing.
     SECTION("0 - success") {
@@ -4008,7 +4008,7 @@ TEST_CASE("demux refuses what is not a container it reads", "[cli][demux]") {
 // read_elementary_stream call and need real audio hardware to exercise, so
 // are not re-tested here) all take a container in place of a raw .ac3/.ec3,
 // sniffed by content rather than by extension - exactly what demux already
-// does, reused via apps/common/container_input.hpp's
+// does, reused via apps/shared/media/src/container_input.hpp's
 // iclforge::apps::elementary_stream_from_bytes rather than duplicated a third
 // time (support.cpp's own read_elementary_stream, and the GUI's
 // qc_controller.cpp/object_decode_controller.cpp).
@@ -4451,7 +4451,7 @@ TEST_CASE("bap-census= is refused by commands that cannot produce one",
     }
 }
 
-// apps/cli/commands/encode.cpp's own layout_for_source() call sites - the
+// apps/forge/cli/src/commands/encode.cpp's own layout_for_source() call sites - the
 // single-file eac3-encode path, its src= multi-source counterpart, the AC-3
 // multi-source path, and programme2='s own second source - each report the
 // same "no standard speaker layout" refusal independently rather than through
@@ -4547,7 +4547,7 @@ TEST_CASE("multi-source AC-3 encode infers a layout from the combined channel co
     // 2 s: BS.1770's own gating needs whole 400 ms blocks to integrate over -
     // the layout-gap vectors above never reach a measurement at all, but this
     // one has to actually pass the -70 LKFS absolute gate, so it needs the
-    // same real duration tests/cli/test_cli.cpp's other dialnorm=auto cases
+    // same real duration apps/forge/cli/tests/test_cli.cpp's other dialnorm=auto cases
     // use rather than the handful of samples a layout check alone needs.
     constexpr std::size_t kDialnormFrames = 96000;
     REQUIRE(iclforge::ac3::io::write_wav_f32(first.string(),

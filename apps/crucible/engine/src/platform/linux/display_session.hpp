@@ -29,7 +29,7 @@
 // the wrong claim foreground.hpp warns about.
 //
 // Pure, so it is tested with facts built by hand rather than with a process
-// environment (tests/crucible/platform/linux/test_x11_foreground.cpp).
+// environment (apps/crucible/engine/tests/platform/linux/test_x11_foreground.cpp).
 
 namespace iclforge::crucible {
 
