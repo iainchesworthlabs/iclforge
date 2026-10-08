@@ -43,7 +43,7 @@ BINARIES = (
     ("apps/crucible/", "iclforge-crucible-tests"),
 )
 NAME = re.compile(r"(?<![\"'A-Za-z0-9_-])iclforge-tests(?![\"'A-Za-z0-9_-])")
-BARE = re.compile(r"(?<![A-Za-z0-9_./-])tests/CMakeLists\.txt")
+BARE = re.compile(r"(?<![A-Za-z0-9_./-])(?<!include\()(?<!add_subdirectory\()tests/CMakeLists\.txt")
 GUI_QML = re.compile(r"(?<![A-Za-z0-9_-])apps/forge/gui/tests/CMakeLists\.txt")
 # The tests/CMakeLists.txt a bare mention means, by the file that makes it (first prefix that fits).
 TESTS_FILE = (
