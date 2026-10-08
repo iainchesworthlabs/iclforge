@@ -26,7 +26,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BUILD_DIR="${ICLFORGE_FUZZ_BUILD_DIR:-$REPO_ROOT/build/fuzz}"
 
 command -v ffmpeg >/dev/null 2>&1 || {
@@ -71,5 +71,5 @@ measure() {
     echo
 }
 
-measure fuzz_differential_ac3_decode "$REPO_ROOT/fuzz/seeds/fuzz_ac3_decode"
-measure fuzz_differential_eac3_decode "$REPO_ROOT/fuzz/seeds/fuzz_eac3_decode"
+measure fuzz_differential_ac3_decode "$REPO_ROOT/libs/ac3/fuzz/seeds/fuzz_ac3_decode"
+measure fuzz_differential_eac3_decode "$REPO_ROOT/libs/ac3/fuzz/seeds/fuzz_eac3_decode"

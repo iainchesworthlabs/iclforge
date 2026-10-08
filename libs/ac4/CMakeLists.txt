@@ -152,7 +152,7 @@ set(_ac4_kernel_sources
 # libs/ac3/CMakeLists.txt); here one set of kernels serves both, so when Real is
 # not already double, each of those kernels' .cpp files also explicitly
 # instantiates <double>. That is done through a macro the per-tier
-# iclforge/dsp/tiered/real.hpp defines (src/dsp/variants/decode-scalar-<tier>/,
+# iclforge/dsp/tiered/real.hpp defines (libs/dsp/variants/decode-scalar-<tier>/,
 # chosen just below; AC-4's is ICLFORGE_AC4_ALSO_AT_DOUBLE): it passes its argument through where Real is float and drops it
 # where Real is already double (a second explicit instantiation of the same
 # specialization would be ill-formed), so no source file asks which build it is
@@ -172,7 +172,7 @@ set(_ac4_private_includes
     # the complex type and the Stockham passes, iclforge/dsp/detail (not installed)
     "${PROJECT_SOURCE_DIR}/libs/dsp/include"
     "${PROJECT_SOURCE_DIR}/libs/dsp/src"
-    "${PROJECT_SOURCE_DIR}/src/dsp/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}"
+    "${PROJECT_SOURCE_DIR}/libs/dsp/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}"
     "${ICLFORGE_PROFILING_INCLUDE_DIR}")
 set(_ac4_link_private
     "$<BUILD_INTERFACE:iclforge::base_headers>"

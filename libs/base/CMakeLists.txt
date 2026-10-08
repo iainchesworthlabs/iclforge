@@ -70,7 +70,7 @@ endif()
 #
 # The kernels themselves are NOT duplicated per directory. They live once,
 # in shared code (iclforge::ac3's src/core/mdct.cpp, bitalloc.cpp and exponents.cpp,
-# libs/ac4/src/core's src/dsp/qmf_vector.hpp), written against the 128-bit vector types
+# libs/dsp/src/tiered/qmf_vector.hpp), written against the 128-bit vector types
 # the header defines; the directories carry the types and their operations. See
 # the generic header for why that is what makes the bit-exactness claim testable.
 #
@@ -116,8 +116,8 @@ set(ICLFORGE_ARCH_INCLUDE_DIR
 if(NOT IS_DIRECTORY "${ICLFORGE_ARCH_INCLUDE_DIR}")
     message(FATAL_ERROR
         "ICLFORGE_SIMD=${ICLFORGE_SIMD} resolved to '${ICLFORGE_SIMD_RESOLVED}', which has no "
-        "directory under src/base/variants/. Add "
-        "src/base/variants/arch-<name>/iclforge/base/detail/simd.hpp - the arch-generic "
+        "directory under libs/base/variants/. Add "
+        "libs/base/variants/arch-<name>/iclforge/base/detail/simd.hpp - the arch-generic "
         "copy is the portable implementation and is a working starting point.")
 endif()
 

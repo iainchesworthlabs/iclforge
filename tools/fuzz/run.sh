@@ -22,18 +22,20 @@
 # Env overrides:
 #   ICLFORGE_FUZZ_SECONDS       per-target time budget in `run` mode (default 60)
 #   ICLFORGE_FUZZ_BUILD_DIR     CMake build directory (default build/fuzz)
-#   ICLFORGE_FUZZ_CORPUS_DIR    grown, persistent corpus (default fuzz/corpus, gitignored)
-#   ICLFORGE_FUZZ_ARTIFACT_DIR  where crashing inputs land (default fuzz/artifacts, gitignored)
+#   ICLFORGE_FUZZ_CORPUS_DIR    grown, persistent corpus (default build/fuzz-corpus, gitignored)
+#   ICLFORGE_FUZZ_ARTIFACT_DIR  where crashing inputs land (default build/fuzz-artifacts, gitignored)
 #   ICLFORGE_FUZZ_ADM           also build and run fuzz_adm_parse; needs VCPKG_ROOT and network
 #                               access (see configure_and_build's own comment)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# shellcheck source=tools/fuzz/harnesses.sh
+. "$SCRIPT_DIR/harnesses.sh"
 
 BUILD_DIR="${ICLFORGE_FUZZ_BUILD_DIR:-$REPO_ROOT/build/fuzz}"
-CORPUS_ROOT="${ICLFORGE_FUZZ_CORPUS_DIR:-$REPO_ROOT/fuzz/corpus}"
-ARTIFACT_DIR="${ICLFORGE_FUZZ_ARTIFACT_DIR:-$REPO_ROOT/fuzz/artifacts}"
+CORPUS_ROOT="${ICLFORGE_FUZZ_CORPUS_DIR:-$REPO_ROOT/build/fuzz-corpus}"
+ARTIFACT_DIR="${ICLFORGE_FUZZ_ARTIFACT_DIR:-$REPO_ROOT/build/fuzz-artifacts}"
 SECONDS_PER_TARGET="${ICLFORGE_FUZZ_SECONDS:-60}"
 
 # The crash-only targets fuzz-regress/fuzz-short/fuzz-nightly run by
@@ -155,10 +157,11 @@ cmd_run() {
         # target's OWN name always - a divergence found by
         # fuzz_differential_ac3_decode is a different class of finding from
         # a crash found by fuzz_ac3_decode, and minimizes into its own
-        # fuzz/regressions/fuzz_differential_ac3_decode/ directory.
+        # regressions/fuzz_differential_ac3_decode/ directory beside the harness.
         local seeds
-        seeds="$REPO_ROOT/fuzz/seeds/$(seed_source_for "$target")"
-        local regressions="$REPO_ROOT/fuzz/regressions/$target"
+        seeds="$(fuzz_dir_of "$(seed_source_for "$target")")/seeds/$(seed_source_for "$target")"
+        local regressions
+        regressions="$(fuzz_dir_of "$target")/regressions/$target"
         local extra_corpora=()
         [ -d "$seeds" ] && extra_corpora+=("$seeds")
         [ -d "$regressions" ] && extra_corpora+=("$regressions")
@@ -195,8 +198,9 @@ cmd_regress() {
     local status=0
     for target in "${requested[@]}"; do
         local seeds
-        seeds="$REPO_ROOT/fuzz/seeds/$(seed_source_for "$target")"
-        local regressions="$REPO_ROOT/fuzz/regressions/$target"
+        seeds="$(fuzz_dir_of "$(seed_source_for "$target")")/seeds/$(seed_source_for "$target")"
+        local regressions
+        regressions="$(fuzz_dir_of "$target")/regressions/$target"
         local inputs=()
         [ -d "$seeds" ] && inputs+=("$seeds")
         [ -d "$regressions" ] && inputs+=("$regressions")

@@ -48,14 +48,16 @@ else()
     set(_ac3_sendspin_pic ON)
 endif()
 
-# Sendspin's reference time filter, vendored unmodified (third_party/time-filter/VENDORED.md).
+# Sendspin's reference time filter, vendored unmodified (external/time-filter/VENDORED.md).
 # A target of its own so the project's warning set, which upstream's code was not written
 # against, does not apply to it; its headers reach consumers as SYSTEM includes for the same
-# reason.
-add_library(iclforge_sendspin_time_filter STATIC third_party/time-filter/sendspin_time_filter.cpp)
+# reason. Built here rather than by a CMakeLists.txt of its own beside it, so that the vendored
+# directory holds only upstream's files.
+set(_ac3_sendspin_time_filter "${PROJECT_SOURCE_DIR}/external/time-filter")
+add_library(iclforge_sendspin_time_filter STATIC "${_ac3_sendspin_time_filter}/sendspin_time_filter.cpp")
 target_include_directories(iclforge_sendspin_time_filter SYSTEM
     PUBLIC
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/time-filter>")
+        "$<BUILD_INTERFACE:${_ac3_sendspin_time_filter}>")
 target_compile_features(iclforge_sendspin_time_filter PUBLIC cxx_std_17)
 set_target_properties(iclforge_sendspin_time_filter PROPERTIES POSITION_INDEPENDENT_CODE ${_ac3_sendspin_pic})
 

@@ -14,13 +14,18 @@
 #
 #   ICLFORGE_CLI_BIN=build/config-windows-msvc-debug/bin/forge.exe tools/fuzz/generate-seeds.sh
 #
-# Usage: tools/fuzz/generate-seeds.sh [output-dir]   (default: fuzz/seeds)
+# Usage: tools/fuzz/generate-seeds.sh [output-dir]
+#
+# With no output-dir each harness's seeds go beside it, to libs/<lib>/fuzz/seeds/<harness>/
+# (tools/fuzz/harnesses.sh); with one, every harness's go under it, a directory each.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# shellcheck source=tools/fuzz/harnesses.sh
+. "$SCRIPT_DIR/harnesses.sh"
 ICLFORGE_CLI="${ICLFORGE_CLI_BIN:-}"
-OUT="${1:-$REPO_ROOT/fuzz/seeds}"
+OUT_ROOT="${1:-}"
 
 if [ -z "$ICLFORGE_CLI" ] || [ ! -f "$ICLFORGE_CLI" ]; then
     echo "error: set ICLFORGE_CLI_BIN to a built forge (see this script's header)" >&2
@@ -29,6 +34,8 @@ fi
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
+# The corpus is assembled here, a directory per harness, and copied out at the end.
+OUT="$WORK/seeds"
 
 mkdir -p "$OUT/fuzz_scan" "$OUT/fuzz_ac3_decode" "$OUT/fuzz_eac3_decode" "$OUT/fuzz_wav_read" \
          "$OUT/fuzz_signing_verify" "$OUT/fuzz_iec61937_unwrap" \
@@ -47,7 +54,7 @@ add_seed() {
 }
 
 # AC-4 has no encoder here, so its seed is the checked-in Dolby Encoding
-# Engine baseline tests/ac4 already parses - a real stream from a real
+# Engine baseline libs/ac4/tests already parses - a real stream from a real
 # encoder, and a better starting corpus than anything this repo could
 # synthesise for a format it only reads.
 echo "==> AC-4: the checked-in DEE baseline, as a parser seed"
@@ -247,5 +254,13 @@ python3 "$SCRIPT_DIR/metadata-seeds.py" ac4-carrier "$OUT" \
 
 echo "==> done:"
 for d in "$OUT"/fuzz_*; do
-    printf '    %-20s %s files\n' "$(basename "$d")" "$(find "$d" -type f | wc -l)"
+    harness="$(basename "$d")"
+    if [ -n "$OUT_ROOT" ]; then
+        dest="$OUT_ROOT/$harness"
+    else
+        dest="$(fuzz_dir_of "$harness")/seeds/$harness"
+    fi
+    mkdir -p "$dest"
+    cp "$d"/* "$dest"/
+    printf '    %-20s %s files -> %s\n' "$harness" "$(find "$d" -type f | wc -l)" "${dest#"$REPO_ROOT"/}"
 done

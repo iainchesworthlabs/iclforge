@@ -93,7 +93,7 @@ add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 #  - It is invisible. Nothing in the source says a contraction happened, so
 #    the difference cannot be reviewed, only measured after the fact.
 #  - It would break the SIMD seam's correctness argument outright.
-#    src/base/variants/arch-*/iclforge/base/detail/simd.hpp maps every
+#    libs/base/variants/arch-*/iclforge/base/detail/simd.hpp maps every
 #    operation to exactly one IEEE-754 add/subtract/multiply so that a
 #    vectorised kernel is bit-identical to the scalar loop it replaced. That
 #    holds only if the scalar loop is not silently getting a fused form the
@@ -143,16 +143,16 @@ option(ICLFORGE_BUILD_GUI "Build the Qt6 Quick GUI application" ON)
 option(ICLFORGE_BUILD_CRUCIBLE "Build Crucible (Windows, Linux and macOS)" OFF)
 option(ICLFORGE_BUILD_TESTS "Build the unit test suite" ON)
 # Catch2 is the only build-time dependency. Turn this off to insist it comes
-# from a package manager instead of the network (see tests/CMakeLists.txt).
+# from a package manager instead of the network (see cmake/External.cmake).
 option(ICLFORGE_FETCH_CATCH2 "Download Catch2 when no local copy is found" ON)
 option(ICLFORGE_BUILD_EXAMPLES "Build the documented library examples" ON)
-# libFuzzer harnesses over iclforge::ac3's untrusted-input entry points (see
-# fuzz/). Off by default: it needs upstream Clang (GCC and MSVC do not ship
+# libFuzzer harnesses over the libraries' untrusted-input entry points (see
+# libs/<lib>/fuzz/ and tools/fuzz/). Off by default: it needs upstream Clang (GCC and MSVC do not ship
 # libFuzzer) and instruments iclforge itself with ASan+UBSan, which no other
 # configuration wants paid for. Use tools/fuzz/run.sh rather than this option
 # directly - it configures a dedicated build/fuzz directory with the right
 # compiler.
-option(ICLFORGE_BUILD_FUZZERS "Build libFuzzer harnesses (Clang only; see fuzz/)" OFF)
+option(ICLFORGE_BUILD_FUZZERS "Build libFuzzer harnesses (Clang only; see tools/fuzz/)" OFF)
 # Every other library component (iclforge::containers, and the AC-4,
 # IAB and IAMF libraries below) gets its own ICLFORGE_BUILD_<NAME> option, defaulting ON so
 # nothing changes for today's direct/CPack builds. This is what lets the vcpkg port and the Conan
@@ -601,8 +601,24 @@ if(ICLFORGE_BUILD_CRUCIBLE AND (WIN32 OR APPLE OR LINUX))
     add_subdirectory(apps/crucible)
 endif()
 
+# The tests, a binary per project (planning/monorepo.md, (e)): tests/ first, for the test-support
+# library every binary links and the products' tests, then each library's own tests/, after every
+# target they link. `cmake --build ... --target iclforge-tests` builds them all.
 if(ICLFORGE_BUILD_TESTS)
+    include(External)
+    iclforge_find_catch2()
     add_subdirectory(tests)
+    foreach(_iclforge_lib IN ITEMS base dsp objects render ac3 containers audio ac4 iab adm capi sendspin)
+        set(_iclforge_lib_target "iclforge::${_iclforge_lib}")
+        if(_iclforge_lib STREQUAL "capi")
+            set(_iclforge_lib_target "iclforge::c")
+        endif()
+        if(TARGET ${_iclforge_lib_target})
+            add_subdirectory(libs/${_iclforge_lib}/tests)
+        endif()
+    endforeach()
+    unset(_iclforge_lib)
+    unset(_iclforge_lib_target)
 endif()
 
 # After the tests block: the examples register themselves as tests, which needs
@@ -611,8 +627,14 @@ if(ICLFORGE_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
+# Each library's libFuzzer harnesses (libs/<lib>/fuzz), over what cmake/IclforgeFuzz.cmake
+# instruments; each file guards its harnesses on the option that builds their library.
 if(ICLFORGE_BUILD_FUZZERS)
-    add_subdirectory(fuzz)
+    include(IclforgeFuzz)
+    foreach(_iclforge_lib IN ITEMS ac3 base containers iab objects ac4 adm sendspin)
+        add_subdirectory(libs/${_iclforge_lib}/fuzz)
+    endforeach()
+    unset(_iclforge_lib)
 endif()
 
 # The browser decode demo (docs/platforms/wasm.md) - a platform

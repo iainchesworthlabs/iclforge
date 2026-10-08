@@ -1,10 +1,10 @@
 # ---------------------------------------------------------------------------
 # iclforge-perf - real-time throughput regression guards (hard pass/fail). See
-# test_performance.cpp for why this is a separate target from iclforge-tests, and
+# test_performance.cpp for why this is a separate target from the test binaries, and
 # why the whole thing exists at all (a ~28x, zero-test-coverage regression in
 # the forward MDCT, found profiling the Shield Android app with Tracy).
 #
-# Catch2 is already resolved by the parent tests/CMakeLists.txt before this
+# Catch2 is already resolved by the root CMakeLists.txt (cmake/External.cmake) before this
 # subdirectory is added, so this file only defines the target.
 # ---------------------------------------------------------------------------
 add_executable(iclforge-perf test_performance.cpp)
@@ -128,13 +128,13 @@ add_executable(iclforge-kernelbench kernel_bench.cpp)
 # The AC-4 kernels it times are private to iclforge::ac4 (libs/ac4/src/core, and dsp's tiered
 # kernels it builds, libs/dsp/src/tiered), so it
 # links the static library in every build and takes the library's private and
-# scalar-tier directories, as tests/CMakeLists.txt does for libs/ac4/tests/core.
+# scalar-tier directories, as libs/ac4/tests/CMakeLists.txt does for its core/ tests.
 target_link_libraries(iclforge-kernelbench PRIVATE iclforge::ac3 iclforge::ac4_static iclforge::warnings iclforge::fmt)
 target_include_directories(iclforge-kernelbench PRIVATE
     "${CMAKE_SOURCE_DIR}/libs/ac4/src"
     "${CMAKE_SOURCE_DIR}/libs/dsp/include"
     "${CMAKE_SOURCE_DIR}/libs/dsp/src"
-    "${CMAKE_SOURCE_DIR}/src/dsp/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}")
+    "${CMAKE_SOURCE_DIR}/libs/dsp/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}")
 
 target_include_directories(iclforge-kernelbench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 

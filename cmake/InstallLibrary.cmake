@@ -133,7 +133,7 @@ install(TARGETS ${_iclforge_forge_install_targets}
 # <iclforge/ac3/export.hpp> needs it installed at the same relative path the
 # in-tree BUILD_INTERFACE include dirs already use.
 install(FILES
-        "${CMAKE_BINARY_DIR}/src/ac3/generated/iclforge/ac3/export.hpp"
+        "${CMAKE_BINARY_DIR}/libs/ac3/generated/iclforge/ac3/export.hpp"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/iclforge/ac3"
     COMPONENT library)
 
