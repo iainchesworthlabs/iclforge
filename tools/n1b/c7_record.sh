@@ -5,6 +5,8 @@
 #   WT=c7-before OUT=before tools/n1b/c7_record.sh        # the tree before a stage
 #   WT=merge     OUT=after  tools/n1b/c7_record.sh        # the stage's tree
 #   TREES="gcc llvm" ...                                  # only some of gcc, llvm, llvm-shared
+#   CMAKE_EXTRA="-DICLFORGE_BUILD_GUI=ON" ...             # more configure arguments, for every tree
+#   VCPKG_PKGS_FROM=<dir> ...                             # a directory holding build/config-linux-{gcc,llvm}/vcpkg_installed
 #
 # WT is a directory of build/wt/ in the main checkout; OUT a directory of build/work/c7/. Each tree
 # is configured with the presets of CMakePresets.json (GCC 16 and Clang 22, Release; Clang 22 shared,
@@ -37,9 +39,9 @@ tree() {  # tree <dir> <preset> <cmake args...>
 
 for t in ${TREES:-gcc llvm llvm-shared}; do
     case $t in
-        gcc) tree gcc config-linux-gcc $GCC && python3 tools/n1b/baseline.py record --build build/gcc --out "$O" --label g16 --only hashes,cli,install ;;
-        llvm) tree llvm config-linux-llvm $LLVM && python3 tools/n1b/baseline.py record --build build/llvm --out "$O" --label c22 --only hashes,cli,install ;;
-        llvm-shared) tree llvm-shared config-linux-llvm-shared $LLVM && python3 tools/n1b/baseline.py record --build build/llvm-shared --out "$O" --label c22s --only symbols,install ;;
+        gcc) tree gcc config-linux-gcc $GCC ${CMAKE_EXTRA:-} && python3 tools/n1b/baseline.py record --build build/gcc --out "$O" --label g16 --only hashes,cli,install ;;
+        llvm) tree llvm config-linux-llvm $LLVM ${CMAKE_EXTRA:-} && python3 tools/n1b/baseline.py record --build build/llvm --out "$O" --label c22 --only hashes,cli,install ;;
+        llvm-shared) tree llvm-shared config-linux-llvm-shared $LLVM ${CMAKE_EXTRA_SHARED:-} && python3 tools/n1b/baseline.py record --build build/llvm-shared --out "$O" --label c22s --only symbols,install ;;
     esac
 done
 python3 tools/n1b/baseline.py record --root . --only headers --out "$O"
