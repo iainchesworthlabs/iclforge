@@ -146,6 +146,7 @@ PROSE_PATHS_UNCHECKED = {
     "planning/qc-report.md": "plan; proposes source files it would add",
     "planning/layout.md": "study; proposes a layout, paths and names that do not exist yet",
     "planning/consolidation.md": "plan; proposes merged libraries and paths that do not exist yet",
+    "planning/monorepo.md": "study; proposes a layout, projects and paths that do not exist yet",
     "planning/layout-inventory.md": (
         "inventory; a dated snapshot of the tree, naming the paths the proposed layout moves"
     ),
