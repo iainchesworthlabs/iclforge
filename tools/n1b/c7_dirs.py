@@ -15,6 +15,10 @@ through its old directory. This respells the directories that moved whole, at a 
     tests/gui -> apps/forge/gui/tests         tests/hearth -> apps/hearth/engine/tests
     tests/crucible -> apps/crucible/engine/tests   (and apps/gui/{tests,translations,packaging})
 
+In a comment under a product, a document about one and the workflows, the directories of a program
+are also named from the program's own (`engine/platform/macos`, `ui/qml`, `ui/translations`):
+those are `engine/src/platform/macos`, `ui/assets/qml` and `ui/assets/translations` now.
+
 A name that goes on below the directory is looked up in the tree: where `<new>/<rest>` is not there
 but `<new>/src/<rest>` (or assets/, tests/, packaging/) is, that is the file's place. Where neither
 is there but the first directory of the name is (an ignored build output, a name wrapped across
@@ -50,6 +54,23 @@ DIRS = [
 ]
 # Below these a name is looked up under the first of these subdirectories that has it.
 SUBDIRS = ("", "src/", "assets/", "tests/", "packaging/")
+# What a comment under a product calls a directory of its own, from the program's directory: the
+# platform seams are in src/, the Qt resources in assets/. (A path from the repository root is the
+# rules above's.)
+SHORTHAND_IN = (
+    "apps/crucible/",
+    "apps/hearth/",
+    "cmake/toolchains/",
+    "docs/crucible/",
+    "docs/hearth/",
+    "docs/platforms/",
+    ".github/workflows/",
+)
+SHORTHAND = [
+    (re.compile(r"(?<![/\w.-])(engine|ui)/platform(?![\w-])"), r"\1/src/platform"),
+    (re.compile(r"(?<![/\w.-])ui/(qml|translations)(?![\w-])"), r"ui/assets/\1"),
+    (re.compile(r"(?<![\w.-])apps/crucible/ui/qml(?![\w-])"), "apps/crucible/ui/assets/qml"),
+]
 SKIP = (
     "planning/consolidation.md",
     "planning/monorepo.md",
@@ -145,6 +166,10 @@ def main() -> int:
         except (UnicodeDecodeError, OSError):
             continue
         new, n, unplaced = respell(text, rs, known, dirs)
+        if f.startswith(SHORTHAND_IN):
+            for rx, repl in SHORTHAND:
+                new, k = rx.subn(repl, new)
+                n += k
         if n and new != text:
             changed += 1
             total += n
