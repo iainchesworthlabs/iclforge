@@ -61,7 +61,7 @@ public:
     // and hides the whole device step, and every Send control is disabled
     // because there is no silent device to send to - but SignalPath.qml's
     // station 1 is still drawn and still advises sending applications to one
-    // (engine/platform/macos/default_device.cpp records the reading, and
+    // (engine/src/platform/macos/default_device.cpp records the reading, and
     // docs/crucible/design/promotion.md's Phase 5 carries the gap).
     [[nodiscard]] virtual bool moves_default() const = 0;
 

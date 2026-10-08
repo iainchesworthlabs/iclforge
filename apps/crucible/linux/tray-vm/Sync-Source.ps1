@@ -45,7 +45,7 @@ if ($LASTEXITCODE -ne 0) { throw 'scp failed' }
 # places and none of them is built here.
 $extract = @'
 mkdir -p ~/src
-rm -f ~/src/apps/crucible/ui/qml/Main.qml.pristine
+rm -f ~/src/apps/crucible/ui/assets/qml/Main.qml.pristine
 tar -xf /tmp/crucible-src.tar -C ~/src
 rm /tmp/crucible-src.tar
 find ~/src \( -name '*.qml' -o -name '*.cpp' -o -name '*.hpp' -o -name '*.h' \

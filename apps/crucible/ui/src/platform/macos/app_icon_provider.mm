@@ -33,7 +33,7 @@
 // not what is in it, and nobody has looked at one.
 //
 // Objective-C++ because NSWorkspace and NSImage have no C entry point, the
-// same wall engine/platform/macos/foreground.mm hits. The file's path is what
+// same wall engine/src/platform/macos/foreground.mm hits. The file's path is what
 // says "macOS"; there is no #ifdef here, and
 // tools/checks/check_platform_macros.ps1 holds that rule for the whole of
 // apps/ (its extension list gained .mm on 2026-09-06, with these two files).
@@ -58,7 +58,7 @@
 // picture winning:
 //
 //   1. The .app bundle. The session monitor puts the OUTERMOST bundle in
-//      image_path where a process has one (engine/platform/macos/
+//      image_path where a process has one (engine/src/platform/macos/
 //      process_facts.hpp's icon_path_of, over bundle_facts.hpp), so a
 //      browser's audio helper arrives here as the browser and gets the
 //      browser's icon rather than a helper binary's.
@@ -93,7 +93,7 @@
 // alone; NSGraphicsContext's current-context stack is per-thread but the
 // image being drawn is not. So the lookup and the draw run on the GUI thread,
 // one queued call per new identity, which the reader thread waits on - exactly
-// what ui/platform/linux/app_icon_provider.cpp does for QIconLoader, whose own
+// what ui/src/platform/linux/app_icon_provider.cpp does for QIconLoader, whose own
 // reason is different (one process-wide set of caches with no lock) and whose
 // consequence is identical.
 //

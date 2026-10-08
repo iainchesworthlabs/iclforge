@@ -6,7 +6,7 @@
 #include <vector>
 
 // The Linux twin of the Windows session monitor's root_of()
-// (engine/platform/windows/session_monitor.cpp): a pid and every ancestor
+// (engine/src/platform/windows/session_monitor.cpp): a pid and every ancestor
 // that runs the same executable, nearest first.
 //
 // The engine's full-screen rule matches the window's process against each

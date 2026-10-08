@@ -27,7 +27,7 @@ qt_add_executable(crucible_qmltests
 # The icon provider and the tray answer are per platform, the same way the
 # window's own target selects them (apps/crucible/CMakeLists.txt): this target
 # embeds the same sources and has to make the same choice. Every file listed
-# under ui/platform/ there belongs here too - the controller is compiled into
+# under ui/src/platform/ there belongs here too - the controller is compiled into
 # this binary, so a seam this target does not choose is an unresolved symbol
 # at link time and nothing sooner.
 #

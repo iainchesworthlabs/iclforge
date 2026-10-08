@@ -1,6 +1,6 @@
 # Crucible: feature coverage from the UI
 
-This file maps each user-facing feature of the Crucible window (`ui/qml`) and
+This file maps each user-facing feature of the Crucible window (`ui/assets/qml`) and
 the `CrucibleController` surface it drives to the Qt Quick Test cases
 (`ui/tests/qml/tst_*.qml`) that exercise it.
 

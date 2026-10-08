@@ -759,7 +759,7 @@ jobs:
       # back to on the GCC legs, whose assertion expects posix.
       #
       # What this covers is exactly one thing: the Linux platform half -
-      # engine/platform/linux/, over the PipeWire capture and device watcher -
+      # engine/src/platform/linux/, over the PipeWire capture and device watcher -
       # compiling and linking. It deliberately runs no tests.
       #
       # Running the `crucible` ctest label here would look like more coverage

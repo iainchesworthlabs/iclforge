@@ -50,7 +50,7 @@ if [[ -z "$builddir" ]]; then
 fi
 
 export VCPKG_ROOT=${VCPKG_ROOT:-/opt/vcpkg}
-qml=$SRC/apps/crucible/ui/qml/Main.qml
+qml=$SRC/apps/crucible/ui/assets/qml/Main.qml
 [[ -f "$qml" ]] || { echo "no $qml; run Sync-Source.ps1 from the host first" >&2; exit 1; }
 [[ -f "$qml.pristine" ]] || cp "$qml" "$qml.pristine"
 cp "$qml.pristine" "$qml"

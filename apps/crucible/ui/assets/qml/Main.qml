@@ -447,7 +447,7 @@ ApplicationWindow {
             // fallback and then static_cast to the D-Bus one. There is one
             // shape here rather than one per platform because a submenu is
             // not worth two: the whole record, with what was measured, is in
-            // ui/platform/linux/tray_support.cpp.
+            // ui/src/platform/linux/tray_support.cpp.
             Platform.MenuItem {
                 text: qsTr("Signal path · %1").arg(CrucibleController.pinned === "auto" ? qsTr("auto") : CrucibleController.pinned)
                 enabled: false

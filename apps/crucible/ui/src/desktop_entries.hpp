@@ -13,7 +13,7 @@ namespace iclforge::crucible::ui {
 // platform-neutral - std::filesystem and std::string only - so the parser
 // and the match rules compile into iclforge-crucible-tests on every platform, where the
 // icon theme itself cannot. The Linux AppIconProvider is the one caller
-// (ui/platform/linux/app_icon_provider.cpp).
+// (ui/src/platform/linux/app_icon_provider.cpp).
 //
 // The Desktop Entry Specification is the reference: the [Desktop Entry]
 // group, and Type, Hidden, NoDisplay, Exec, TryExec, Icon, StartupWMClass

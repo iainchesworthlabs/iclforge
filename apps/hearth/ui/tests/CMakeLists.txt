@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# hearth_qmltests - Qt Quick Test coverage for the Hearth window (ui/qml),
+# hearth_qmltests - Qt Quick Test coverage for the Hearth window (ui/assets/qml),
 # driving the real HearthController the way crucible_qmltests drives the
 # real CrucibleController and forge_gui_qmltests drives the real
 # EncoderController (apps/crucible/ui/tests/CMakeLists.txt's own header,

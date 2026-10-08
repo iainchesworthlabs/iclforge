@@ -106,7 +106,7 @@
 //
 // -[NSWorkspace sharedWorkspace] is documented as usable from any thread and
 // this reads one property of the object it returns. It is NOT AppKit drawing,
-// which is main-thread-only; ui/platform/macos/app_icon_provider.mm is the
+// which is main-thread-only; ui/src/platform/macos/app_icon_provider.mm is the
 // file in this application that has that constraint, and it says so.
 
 namespace iclforge::crucible {

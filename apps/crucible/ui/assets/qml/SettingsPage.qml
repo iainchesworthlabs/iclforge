@@ -161,7 +161,7 @@ Flickable {
                         // to see it. driverDir() finds install.ps1 beside a
                         // packaged executable, so a packaged copy lands on this
                         // branch too: package_complete()
-                        // (engine/platform/windows/driver_tools.cpp) also wants
+                        // (engine/src/platform/windows/driver_tools.cpp) also wants
                         // the driver's .inf, and the zip carries no driver at
                         // all. Told to build one and point Advanced at it, a
                         // packaged reader has a checkout and the WDK ahead of

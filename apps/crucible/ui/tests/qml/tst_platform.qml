@@ -12,7 +12,7 @@ import CrucibleLanguage
 // answers them - which is the only place they can be. The Catch2 suite links
 // apps/crucible/engine/tests/platform_services_stub.cpp, so no platform directory is
 // compiled into it at all; these suites run the real controller over the real
-// seams, so this file is where ui/platform/<os>/tray_support.cpp and the
+// seams, so this file is where ui/src/platform/<os>/tray_support.cpp and the
 // Linux VirtualDevice are reached.
 //
 // Three of them live here. The tray, which asks Qt the same question on every
@@ -92,7 +92,7 @@ TestCase {
         // Linux publishes a tray again, and asks Qt the same question
         // Windows does, so the seam and Qt must not drift apart. It refused
         // for a while: publishing a StatusNotifierItem killed the window,
-        // and ui/platform/linux/tray_support.cpp carries that record and
+        // and ui/src/platform/linux/tray_support.cpp carries that record and
         // what it was - a Qt type confusion reached only through a Menu
         // nested inside the tray's menu, which is why
         // test_theTrayMenuNestsNoSubmenu below is the assertion that matters
@@ -117,7 +117,7 @@ TestCase {
         // QWidget fallback and then static_cast to the D-Bus one. The window
         // dies on the panel's first request for its layout - nine or ten
         // launches in ten, measured both ways on two machines
-        // (ui/platform/linux/tray_support.cpp). The menu is flat everywhere
+        // (ui/src/platform/linux/tray_support.cpp). The menu is flat everywhere
         // rather than on one platform, because one shape is worth more than
         // a submenu. This is here so that adding one back fails a test
         // rather than a person's session.
@@ -162,7 +162,7 @@ TestCase {
         // under - answers no. The Linux refusal that this file was written
         // beside is gone, and the fault behind it lands one rung short of
         // this platform rather than nowhere near it
-        // (ui/platform/macos/tray_support.cpp carries the reasoning, and the
+        // (ui/src/platform/macos/tray_support.cpp carries the reasoning, and the
         // reproducer to run before trusting any of it).
         const probe = createTemporaryObject(trayProbe, testCase);
         verify(probe, "a SystemTrayIcon was created");
@@ -259,7 +259,7 @@ TestCase {
             // placeholder, because a placeholder would put a device in the
             // room's vocabulary that is not on the machine; every consumer
             // guards an empty search before using it
-            // (engine/platform/macos/virtual_device.cpp lists them).
+            // (engine/src/platform/macos/virtual_device.cpp lists them).
             compare(CrucibleController.nullSinkName, "");
         }
 

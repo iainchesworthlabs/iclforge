@@ -230,7 +230,7 @@ since extraction does not depend on the compiler. It turns a forgotten regenerat
 check rather than a quietly stale catalogue.
 
 **`lupdate` sees only the platform it runs on, and deletes what it cannot see.** The seams under
-`ui/platform/<os>/` are one file per platform with one compiled, so `tray_support.cpp`'s `tr()`
+`ui/src/platform/<os>/` are one file per platform with one compiled, so `tray_support.cpp`'s `tr()`
 reaches `lupdate` on exactly one of them. Running it on Linux drops the Windows sentence —
 translated, in every catalogue — and replaces it with the Linux one, unfinished; running it on
 macOS does the same with its own. Nothing warns. That the gate above runs on `windows-msvc`

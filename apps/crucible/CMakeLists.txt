@@ -11,7 +11,7 @@
 # split in two the way the CLI's own platform/ directory is: the pure modules
 # (slot plan, bed mixer, placement, output policy) name no operating system
 # and are ALSO compiled into iclforge-crucible-tests on every platform (apps/crucible/engine/tests/CMakeLists.txt);
-# the modules under engine/platform/<os>/ talk to that platform's session
+# the modules under engine/src/platform/<os>/ talk to that platform's session
 # enumeration, default device and silent device, and exactly one directory of
 # them is ever compiled. The rest of engine/ (taps, output stage, signing
 # hook, the frame loop) is written against iclforge::audio and iclforge::ac3 and
@@ -49,10 +49,10 @@ target_link_libraries(crucible_engine
 # deliberately does not carry them.
 #
 # The macOS arm compiles and has never run: both macOS CI legs built every
-# file under engine/platform/macos/ on 2026-09-06, and no Mac has executed a
+# file under engine/src/platform/macos/ on 2026-09-06, and no Mac has executed a
 # line of any of them - the seam tests link the stub and the QML tests drive
 # fakes. That is what docs/crucible/design/promotion.md's "What cannot be verified,
-# and why" table says and what every file under engine/platform/macos/
+# and why" table says and what every file under engine/src/platform/macos/
 # repeats at its head.
 if(WIN32)
     target_sources(crucible_engine PRIVATE
@@ -139,7 +139,7 @@ elseif(APPLE)
     # seams are the CoreAudio HAL's process object list, NSWorkspace, the HAL's
     # default output device, and a silent device that does not exist because
     # this platform silences at the tap instead. Read the header of each file
-    # under engine/platform/macos/ before changing anything here: none of it
+    # under engine/src/platform/macos/ before changing anything here: none of it
     # has been run, and each says so.
     #
     # AudioDevices is deliberately NOT in this list. That seam is the one
@@ -388,7 +388,7 @@ else()
     )
     # The application-icon provider and the tray answer are the two parts of
     # the window that talk to the operating system directly, so they are a
-    # platform directory like engine/platform/: Windows asks the shell for an
+    # platform directory like engine/src/platform/: Windows asks the shell for an
     # executable's icon; Linux resolves the icon theme and the .desktop entries
     # (see ui/src/platform/linux/app_icon_provider.cpp for the four rungs), and the
     # Qt-free reader for those entries (ui/src/desktop_entries.cpp) is compiled
@@ -396,7 +396,7 @@ else()
     # NSWorkspace for a bundle's icon, which needs Objective-C++ and so needs
     # the OBJCXX language the engine/src's APPLE arm above turned on.
     #
-    # EVERY file added under ui/platform/ here has to be added to
+    # EVERY file added under ui/src/platform/ here has to be added to
     # ui/tests/CMakeLists.txt as well: that target compiles the same
     # controller, so a seam it does not choose is an unresolved symbol at link
     # and nothing sooner. That is the mistake this pair of blocks exists to

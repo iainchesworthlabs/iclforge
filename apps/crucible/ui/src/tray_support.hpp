@@ -3,7 +3,7 @@
 #include <QString>
 
 // Whether this build publishes a system tray icon, and what to say when it
-// does not. A platform seam like ui/platform/<os>/app_icon_provider.cpp: one
+// does not. A platform seam like ui/src/platform/<os>/app_icon_provider.cpp: one
 // file per operating system, exactly one compiled, no #ifdefs
 // (docs/crucible/design/promotion.md, "The platform tree").
 //

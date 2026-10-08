@@ -163,7 +163,7 @@ private:
 };
 
 // The path the icon provider is handed. The bundle where there is one, so
-// ui/platform/macos/app_icon_provider.mm can ask NSWorkspace for the picture
+// ui/src/platform/macos/app_icon_provider.mm can ask NSWorkspace for the picture
 // that belongs to the application rather than the one that belongs to a helper
 // binary buried inside it; the executable itself otherwise, which yields no
 // icon and leaves the monogram, and that is the right answer for a

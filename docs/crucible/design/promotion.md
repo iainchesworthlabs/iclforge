@@ -324,7 +324,7 @@ coupling that stops it compiling anywhere else; the Settings page reads `SilentD
 rather than three Windows booleans; the QML tests move with them.
 
 !!! success "Done 2026-09-04"
-    All four seams are in. Nothing in `apps/crucible/` above `engine/platform/` names an
+    All four seams are in. Nothing in `apps/crucible/` above `engine/src/platform/` names an
     operating system: `platform_services.hpp` hands back an `AudioDevices`, a `SessionMonitor`,
     a `Foreground`, a `DefaultDevice` and a `VirtualDevice`, one `platform/<os>/` definition
     each, and `apps/crucible/engine/tests/platform_services_stub.cpp` answers inertly where no platform half
@@ -909,7 +909,7 @@ places one, and encodes; the signal path renders with the null sink as the defau
     or write in 180 seconds, and `GetLayout` called by hand returns all nineteen items.
 
     `ui/tray_support.hpp` is still the seam, one file per platform beside
-    `ui/platform/<os>/app_icon_provider.cpp` — but both platforms now answer it with
+    `ui/src/platform/<os>/app_icon_provider.cpp` — but both platforms now answer it with
     `QSystemTrayIcon::isSystemTrayAvailable()`, which is what a seam should look like when the
     platforms agree. Where a session has no tray at all, the sentence beside the greyed "keep
     running in the tray" setting is still the platform's own, and `onClosing` still quits rather
@@ -1345,7 +1345,7 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
     Licences… button shows the same text. The file is generated at configure time by
     `cmake/Notices.cmake` from `notices/`: shared fragments, a component list per
     platform directory (`platform/windows/`, `platform/linux/` - the same selection rule as
-    `engine/platform/`, so no fragment, QML or C++ file names an operating system), verbatim
+    `engine/src/platform/`, so no fragment, QML or C++ file names an operating system), verbatim
     licence texts under `licences/`, and the versions CMake already holds (`Qt6_VERSION`, the
     `{fmt}` and PipeWire versions, `PROJECT_VERSION_FULL`). The Qt Quick 3D and Tracy sections
     are inserted by the same build facts that gate `Room3DView.qml` and `ac3::tracy`. A missing
@@ -1396,7 +1396,7 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
     `engine/diagnostics.cpp` 91% of lines, `ui/desktop_entries.cpp` 94%, `engine/slots.cpp` 96%,
     `engine/tap_pool.cpp` 97%. What is thin is thin for reasons that are on this page already:
     `ui/main.cpp` is 0%, because the Qt Quick harness has an entry point of its own and never
-    runs the application's; `engine/platform/windows/driver_tools.cpp` is 30%, because the rest
+    runs the application's; `engine/src/platform/windows/driver_tools.cpp` is 30%, because the rest
     of it launches an elevated PowerShell script that no test may run; and
     `platform/windows/{default_device,foreground}.cpp` sit near 46%, because their other half
     is what a machine with a real endpoint and a real front window does.
@@ -1424,7 +1424,7 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
     The Linux platform half barely appears here, and it is worth being exact about why. The
     Catch2 binary links `apps/crucible/engine/tests/platform_services_stub.cpp`, which supplies every
     `platform_*()` factory, so no platform seam is compiled into it on any operating system.
-    What it does take out of `engine/platform/linux/` is the part of that directory needing
+    What it does take out of `engine/src/platform/linux/` is the part of that directory needing
     neither xcb nor PipeWire: `x11_foreground.cpp`, the X11 Foreground's policy over an
     injected reader, and - since the seams pass below - `proc_facts.hpp`, the session monitor's
     /proc readers, its per-process fact cache and the two records a refresh builds, moved into
@@ -1459,7 +1459,7 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
     seams - the parts of this application that differ per platform and therefore have the
     fewest readers.
 
-    **The tray.** `ui/platform/{windows,linux}/tray_support.cpp` are now driven by
+    **The tray.** `ui/src/platform/{windows,linux}/tray_support.cpp` are now driven by
     `ui/tests/qml/tst_platform.qml`, on both platforms, through the same
     `CrucibleController.trayAvailable`/`trayAbsentReason` the window binds. The invariant it
     holds everywhere is that a tray which is not published carries a sentence a person can
@@ -1471,10 +1471,10 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
     (Phase 4, "The tray, and the Qt bug that took it away for a day").
 
     **The Linux session monitor.** Its bookkeeping was unreachable rather than untested:
-    `engine/platform/linux/session_monitor.cpp` includes `pipewire_support.hpp`, so nothing in
+    `engine/src/platform/linux/session_monitor.cpp` includes `pipewire_support.hpp`, so nothing in
     it compiles without the PipeWire headers, and the /proc readers, the per-process fact
     cache and the record-building sat in an anonymous namespace inside it. They are now
-    `engine/platform/linux/proc_facts.hpp` - the same split `process_tree.hpp` already was -
+    `engine/src/platform/linux/proc_facts.hpp` - the same split `process_tree.hpp` already was -
     and `apps/crucible/engine/tests/platform/linux/test_session_facts.cpp` drives them on any Linux
     machine against a `/proc` the test writes itself: a `comm` holding a space, a `stat` line
     whose comm holds a `)`, a pid with no `exe` link across a sandbox boundary. What it pins:
@@ -1484,7 +1484,7 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
     records - the sounding one and the kept one - including the ancestor list the full-screen
     rule matches against.
 
-    **The Linux silent device.** `engine/platform/linux/virtual_device.cpp` cannot be reached
+    **The Linux silent device.** `engine/src/platform/linux/virtual_device.cpp` cannot be reached
     from the Catch2 binary at all (the stub is linked there, and it needs libpipewire), so
     what is testable without creating a real node is asserted through the window in the same
     `tst_platform.qml`: the device is named by the platform that owns it ("Crucible (silent)",
@@ -1502,7 +1502,7 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
     rather than assumed. Every hand-drawn control is a tab stop that Space and Return press
     (`CrucibleButton`, `CrucibleCheck`, `BedChip`, the header pill, the Advanced disclosure);
     the shared `SegmentedControl` is one tab stop with Left/Right/Home/End choosing inside it,
-    the way a radio group behaves elsewhere. A new `ui/qml/RoomKeys.qml`, a `FocusScope` around
+    the way a radio group behaves elsewhere. A new `ui/assets/qml/RoomKeys.qml`, a `FocusScope` around
     both room views, moves whichever application is selected: arrows across and front to back
     (0.05, Shift 0.01, Ctrl 0.25), Page Up and Page Down for height, Home to recentre, Enter to
     place one that is in the bed, Delete to return it, plus and minus for size — the same keys
@@ -1592,7 +1592,7 @@ AudioCodec ACX sample; the window is the one place that still says otherwise.
     unfinished), so what remains is the review by a reader of each language, not extraction.
 
     The right-to-left half of that item is done, and this note said otherwise until 2026-09-06:
-    `ui/qml/Main.qml` took a `LayoutMirroring` root on 2026-09-05, two cases in
+    `ui/assets/qml/Main.qml` took a `LayoutMirroring` root on 2026-09-05, two cases in
     `ui/tests/qml/tst_shell.qml` hold it - the header title crosses the window under Arabic, the
     plan's L speaker does not under Hebrew - and [Languages](../localisation.md) is the record for
     what mirrors and what deliberately does not.
