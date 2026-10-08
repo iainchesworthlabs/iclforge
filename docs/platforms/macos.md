@@ -115,7 +115,7 @@ disk. That part is platform-independent and shares the verification the framing 
 [Windows](windows.md#passthrough-capture) for what is and is not confirmed.
 
 The backend is CI-verified only: the parts that need no live device — enumeration on a machine
-with none, format matching, sample conversion — run under `iclforge-tests` on the hosted runner, same
+with none, format matching, sample conversion — run under `iclforge-audio-tests` on the hosted runner, same
 as everywhere else without hardware, but no Mac has ever run this code against a digital
 output, and no receiver has been asked to lock onto its output.
 

@@ -437,12 +437,12 @@ count, ~2.2 s over a 30 s `kMdctBand` decode. It has no effect under the default
 
 ## Test suite
 
-The Catch2 suites (`iclforge-tests` plus the `iclforge-perf` throughput suite) plus one `ctest` entry per
+The Catch2 suites (a binary per project, `iclforge-<project>-tests`, plus the `iclforge-perf` throughput suite) plus one `ctest` entry per
 example program, run per platform. The Qt Quick Test harnesses add one entry per `tst_*.qml`
 suite on a build with the application enabled: `forge_gui_qmltests` for `apps/forge/gui/tests/qml/` (36
 today), Hearth's for `apps/hearth/ui/tests/qml/` (15) and Crucible's for
 `apps/crucible/ui/tests/qml/` (16). The audio backend's device-free tests
-(`libs/audio/tests/backend/<backend>/`) join `iclforge-tests` for whichever backend the build selected, ALSA,
+(`libs/audio/tests/backend/<backend>/`) join `iclforge-audio-tests` for whichever backend the build selected, ALSA,
 PipeWire, macOS, Windows or Android, and an ALSA build also runs
 `libs/audio/tests/test_alsa_null_backend.cpp` against software ALSA devices, so its success paths run
 without a card. `ctest` runs whatever the configuration registered:
@@ -1904,7 +1904,7 @@ covered where it's most relevant rather than repeated here:
 - [Linux](platforms/linux.md#what-has-and-has-not-been-verified) — the ALSA backend is verified
   headless only; no real S/PDIF or HDMI output has been tried.
 - [macOS](platforms/macos.md#audio-backend-coreaudio) — the CoreAudio backend is CI-verified
-  only: its device-free logic runs under `iclforge-tests` on hosted runners, but no real Mac hardware
+  only: its device-free logic runs under `iclforge-audio-tests` on hosted runners, but no real Mac hardware
   has ever run it.
 - [Raspberry Pi](platforms/raspberry-pi.md#verified-configuration) — real-hardware validation on
   a Pi 4B: the full suite on both compilers, ALSA device enumeration against the Pi's real

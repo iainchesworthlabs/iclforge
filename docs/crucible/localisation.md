@@ -204,7 +204,7 @@ in `apps/crucible/translations/crucible_<code>.ts` at commit `c5c9df76`, under `
 ## What the gate checks
 
 `apps/crucible/ui/tests/test_translations.cpp` reads the six files and runs on every platform, in the
-plain `iclforge-tests` binary, so a developer's own `ctest` sees it:
+plain `iclforge-crucible-tests` binary, so a developer's own `ctest` sees it:
 
 | Rule | State |
 | --- | --- |

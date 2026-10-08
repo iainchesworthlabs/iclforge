@@ -93,7 +93,7 @@ is explicit about the difference.
     `MonitorSink::start()` reports `MonitorError::kFormatRejected` for `AUDCLNT_E_UNSUPPORTED_FORMAT`
     (`0x88890008`), checked on both the `IAudioClient3` low-latency path and the ordinary
     fallback; every other failure in `start()` still reports `kComFailure`. That was added on
-    2026-09-22, debugging why `iclforge-tests "[monitor-unplug]"` would not open the "AV Receiver
+    2026-09-22, debugging why `iclforge-audio-tests "[monitor-unplug]"` would not open the "AV Receiver
     (NVIDIA High Definition Audio)" HDMI endpoint the exclusive-mode passthrough confirmation
     below used: `start()` had no way to say why beyond "a Windows audio (WASAPI/COM) call
     failed", and a standalone WASAPI probe written outside this codebase found the refusal at
@@ -121,7 +121,7 @@ is explicit about the difference.
 
 !!! note "Playback position, pause and flush are confirmed; a multichannel patch is not"
     `MonitorSink`'s playback position, `pause()`/`resume()` and `flush()` have been exercised
-    against the default Realtek endpoint by `iclforge-tests "[monitor-live]"` — a hidden case, since it
+    against the default Realtek endpoint by `iclforge-audio-tests "[monitor-live]"` — a hidden case, since it
     needs a sound card and makes a noise: the position advances with the device's own clock, a
     pause holds it while the queue goes on taking frames, a flush drops both buffers and the
     count restarts, and playback resumes from the next submit. `forge identify` walked the tone
@@ -182,7 +182,7 @@ is explicit about the difference.
     stops signalling the event it waits on, so a wait that times out asks the endpoint for its
     padding rather than waiting again. Either answer stops the sink — `running()` turns false,
     `position()` reports nothing, `submit()` refuses — and `start()` opens again with no
-    `stop()` first, on the same endpoint once it is back. `iclforge-tests "[passthrough-unplug]"` and
+    `stop()` first, on the same endpoint once it is back. `iclforge-audio-tests "[passthrough-unplug]"` and
     `"[monitor-unplug]"` are hidden cases that take a person through it.
 
     **`[passthrough-unplug]` is confirmed**, against the same AV Receiver endpoint the exclusive-
@@ -202,7 +202,7 @@ is explicit about the difference.
     the stream's own `GetAvailableDynamicObjectCount`: Microsoft's reference for that call says
     not to use it once streaming has started, since `BeginUpdatingAudioObjects` already provides
     the same count from then on - the client-level call carries no such restriction.
-    `iclforge-tests "[spatial-unplug]"` is its own hidden case, not yet run against real hardware.
+    `iclforge-audio-tests "[spatial-unplug]"` is its own hidden case, not yet run against real hardware.
 
 !!! note "No EDID/ELD backend on Windows"
     `forge play` asks a chosen sink what it actually accepts before committing to a format —
@@ -387,7 +387,7 @@ to a different program.
 
 A loopback-only bind needs none of this - Windows does not gate loopback traffic - and is skipped
 before `ensure_inbound_rule()` is ever called. `hearth-testserver`'s own `ServerHost` and
-reference sink are loopback-only today and so never reach it; `iclforge-tests`' own `ServerHost`
+reference sink are loopback-only today and so never reach it; the Sendspin and Hearth test binaries' own `ServerHost`
 fixtures are the same. Linux and macOS build a no-op implementation of the same two functions and
 never show a prompt of any kind.
 

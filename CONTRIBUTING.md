@@ -96,21 +96,25 @@ the CPU probe, the signing key, SHA-256 and HMAC-SHA-256, and, header-only and n
 than one library uses), `libs/objects` (the object-audio model and the Object Audio Metadata
 payload), `libs/render` (layouts, routing and the renderer) and `libs/containers` (IEC 61937 burst
 packing, and the Matroska, MP4, MPEG-TS and IAMF writers and readers, each in a part of its own).
-`apps/{cli,gui,crucible,hearth,android,wasm,baremetal}` consume them (Crucible and the Shield app
-use the AC-3, E-AC-3 and Atmos codec only), and `apps/shared/media/src` is shared application code,
-compiled directly into its consumers. `apps/crucible/windows` holds Crucible's separately licensed
-null-sink driver and its guest VM, `apps/crucible/linux` a scripted guest for Crucible's Linux tray, and
-`notices` the licence notices Forge's packages install. Nothing under `libs/` may depend on
-anything under `apps/`.
+`apps/{forge,crucible,hearth,demos}` and `apps/baremetal` consume them (Crucible and the Shield app
+use the AC-3, E-AC-3 and Atmos codec only), and `apps/shared/{media,theme,preferences}` is application
+code that more than one program compiles in directly, with no library target of its own. A product is
+a directory of programs (`apps/forge/{cli,gui}`, `apps/hearth/{engine,ui,render,testsink,testserver}`,
+`apps/crucible/{engine,ui,runner}`), each with its `src/`, its `assets/` where it has Qt resources
+and its `tests/`. `apps/crucible/windows` holds Crucible's separately licensed null-sink driver and
+its guest VM, `apps/crucible/linux` a scripted guest for Crucible's Linux tray, and `notices` the
+licence notices each product's packages install. Nothing under `libs/` may depend on anything under
+`apps/` but the one test that compiles shared application code into its library's binary
+(`libs/ac4/tests`, `decoder/test_object_render.cpp`).
 
 **The tree holds four products, and the directories say which is which.** `libs/`
 other than `libs/audio` and `libs/sendspin`, the bindings under `python/`, `js/` and `rust/`, and
 `examples/` and `apps/baremetal` are **the library**; `iclforge` names it, and names its
-packages too. `apps/forge/cli/src`, `apps/forge/gui` and `apps/shared/media/src` are **Forge**, the tooling pair, built and
+packages too. `apps/forge` is **Forge**, the tooling pair (`forge` and `forge-gui`), built and
 packaged as one thing. `apps/crucible`, with the driver in `apps/crucible/windows`, is **Crucible**.
 `apps/hearth`, `libs/sendspin` and the `hearth_sink` example are **Hearth**. `apps/demos/android` and
-`apps/demos/wasm` are library demonstrations. `libs/audio`, `tests/`, `tools/`, `cmake/`, `packaging/`
-and the version line are shared and owned by no one product.
+`apps/demos/wasm` are library demonstrations. `libs/audio`, `apps/shared`, `notices/`, `tests/`,
+`tools/`, `cmake/`, `packaging/` and the version line are shared and owned by no one product.
 [The naming and scope plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/recasting.md)
 records what each member owns, down to the targets, packages and CI legs, under the names it was
 written with; [Renamed](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/renamed.md) maps them

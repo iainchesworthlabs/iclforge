@@ -23,7 +23,7 @@ turning it on additionally needs `-DVCPKG_MANIFEST_FEATURES=adm` (see
 cmake --preset config-windows-msvc-debug -DICLFORGE_BUILD_ADM=ON -DVCPKG_MANIFEST_FEATURES=adm
 ```
 
-Every other target in this project — `forge`, `forge-gui`, `iclforge-tests`, every other example — builds
+Every other target in this project — `forge`, `forge-gui`, the `iclforge-<project>-tests` binaries, every other example — builds
 identically whether `ICLFORGE_BUILD_ADM` is on or off; nothing links `iclforge::adm`
 unconditionally. See "Why opt-in" below for the reasoning.
 

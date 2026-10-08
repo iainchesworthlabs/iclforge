@@ -129,7 +129,7 @@ presets have no test preset.
 `ICLFORGE_SANITIZERS=address,undefined` (see `cmake/Sanitizers.cmake`; MSVC is rejected outright,
 so this only exists for GCC/Clang). Its test preset leaves out the `Performance` label, because
 the throughput guards are not meant to run under a sanitizer. With any `ICLFORGE_SANITIZERS` set,
-`tests/CMakeLists.txt` defines `ICLFORGE_TEST_SANITIZED=1` for `iclforge-tests` (0 otherwise), and
+`tests/support/CMakeLists.txt` defines `ICLFORGE_TEST_SANITIZED=1` for the test binaries (0 otherwise), and
 `tests/support/sanitized.hpp` gives it to the tests as `iclforge::test::kSanitized`.
 The heaviest AC-4 tests take less under it: fewer frames, shorter signals, a stride through their
 cases, one leg per frame rate, one committed stream of each kind (`tests/support/ac4_stream_kinds.hpp`,
@@ -223,7 +223,7 @@ ctest --preset test-linux-gcc-coverage -LE Performance
 `apps/forge/gui` is deliberately absent from that report: instrumenting its C++ needs a Qt kit on the
 coverage job, which installs none (CI puts Qt only on the plain `gui` build legs, which are not
 instrumented). Its interactive surfaces are covered by `apps/forge/gui/tests`' own Qt Quick suite, and
-its one Qt-free class (`RecordingSink`) is already in `iclforge-tests`. `python/` has its own floor
+its one Qt-free class (`RecordingSink`) is already in `iclforge-app-media-tests`. `python/` has its own floor
 instead, in `.github/workflows/wheels.yml`'s `python-coverage` job — `pytest --cov` against the
 built wheel; see that job's own comment for what a Python percentage does and does not measure
 when nearly all of the binding surface is C++.
@@ -232,12 +232,12 @@ when nearly all of the binding surface is C++.
 `test-linux-llvm-shared`, same shape again: an instrumented variant of `linux-llvm`, Debug-only.
 It inherits a `shared-libs` fragment setting `BUILD_SHARED_LIBS=ON`, proving
 `iclforge::ac3_shared`/`iclforge::containers_shared` actually work — not just that the CMake topology
-configures, but that every in-tree consumer (`forge`, `forge-gui`, `iclforge-tests`, `examples/`) links
+configures, but that every in-tree consumer (`forge`, `forge-gui`, the `iclforge-<project>-tests` binaries, `examples/`) links
 and runs against the real `.so`. `.github/workflows/_ci-linux.yml` runs it as an extra step inside
 the existing `linux-llvm` leg rather than a new matrix entry (in the nightly run only), the same
 shape as the ASan/UBSan pass.
 
-Passing tests do not show that `iclforge-tests` ran against `libiclforge_ac3.so`, so that is checked
+Passing tests do not show that `iclforge-ac3-tests` ran against `libiclforge_ac3.so`, so that is checked
 separately: `tools/checks/check_shared_forge_binding.sh` reads the dynamic linker's bindings
 (`LD_DEBUG=bindings`) and fails if any `iclforge::` symbol the test binary takes from `libiclforge_ac3.so`
 binds to another library, or if the binary carries its own copy of the codec. The few test files
@@ -299,26 +299,31 @@ platform/compiler fragment matches your machine.
 ## Running the tests
 
 The test presets (`test-<platform>[-debug]`) run `ctest` over what CMake registered for that
-build. `iclforge-tests`, the Catch2 binary that holds nearly all of the C++ cases, registers one ctest
-entry per test case, and `catch_discover_tests(... ADD_TAGS_AS_LABELS)` turns every Catch2 tag on a
-case into a ctest label, so a tag selects a subset in two ways:
+build. A project's tests are one Catch2 binary, `iclforge-<project>-tests`, built from the `tests/`
+beside the project's code (`libs/<lib>/tests` for each library, and `iclforge-forge-cli-tests`,
+`iclforge-forge-gui-tests`, `iclforge-app-media-tests`, `iclforge-hearth-tests` and
+`iclforge-crucible-tests` from the programs'); the target `iclforge-tests` builds them all. Each
+registers one ctest entry per test case, and `catch_discover_tests(... ADD_TAGS_AS_LABELS)` turns
+every Catch2 tag on a case into a ctest label, and the directory adds the project's name as one
+(`ctest -L ac3`), so a subset is selected in two ways:
 
 ```bash
 ctest --preset test-linux-gcc-debug -L ac4 -L decoder  # the cases tagged [ac4] and [decoder], through ctest
 ctest --preset test-linux-gcc-debug -N -L ac4           # list what a label selects, run nothing
-build/config-linux-gcc-debug/bin/iclforge-tests "[ac4][decoder]"    # the same cases, through the Catch2 binary
-build/config-linux-gcc-debug/bin/iclforge-tests --list-tags   # every tag and how many cases carry it
+build/config-linux-gcc-debug/bin/iclforge-ac4-tests "[ac4][decoder]"    # the same cases, through the Catch2 binary
+build/config-linux-gcc-debug/bin/iclforge-ac4-tests --list-tags   # every tag in that binary and how many cases carry it
 ```
 
 A case carries several tags, one for the component under test and others for what it checks. The
 codecs have `eac3` and `ac4`, with an area beside the codec's (`[ac4][decoder]`, `[ac4][core]`); the
 libraries and applications `cli`, `capi`, `hearth`, `sendspin` and `crucible`; and there are `oba`
 (Atmos objects), `dsp`, `iec61937`, `fixed32`, `simd` and `avx2`, and `concurrency` for the cases
-ThreadSanitizer runs. `iclforge-tests --list-tags` has the full list.
+ThreadSanitizer runs. A binary's `--list-tags` has its list.
 
-Three things register their own ctest entries beside `iclforge-tests`. `iclforge-perf`, the real-time
+Four things register their own ctest entries beside those binaries. `iclforge-perf`, the real-time
 throughput guards, is a separate binary whose cases carry the `Performance` label, so
-`ctest -LE Performance` leaves them out. The Qt Quick suites register one entry per `tst_*.qml`
+`ctest -LE Performance` leaves them out. `iclforge-settings-tests` (label `app-preferences`) and
+`hearth_controller_tests` are small Qt binaries, built where Qt is. The Qt Quick suites register one entry per `tst_*.qml`
 file: `forge_gui_qml_tests_*` (label `gui`), `hearth_qml_tests_*` (`hearth-ui`) and
 `crucible_qml_tests_*` (`crucible-ui`), and only when the matching application is built.
 `ctest -R <name>` selects by test name and `ctest --rerun-failed --output-on-failure` repeats
@@ -1122,10 +1127,10 @@ The Linux instructions were run on:
 | vcpkg | checkout at `/opt/vcpkg` |
 
 Result: configure, build and `ctest` all clean on both compilers, GUI and ALSA both included.
-The base suite is `iclforge-tests` and `iclforge-perf`'s Catch2 cases plus one ctest entry per example
+The base suite is the per-project Catch2 binaries' and `iclforge-perf`'s cases plus one ctest entry per example
 program; `ICLFORGE_WITH_ALSA`'s `libs/audio/tests/backend/alsa/` adds its own cases (or, on a build that
 selected pipewire/ instead, `libs/audio/tests/backend/pipewire/` does), and the GUI's Qt Quick
-Test harness (`forge_gui_qmltests`, `apps/forge/gui/tests/CMakeLists.txt`) adds one more per `tst_*.qml`
+Test harness (`forge_gui_qmltests`, `apps/forge/gui/tests/qml.cmake`) adds one more per `tst_*.qml`
 suite under `apps/forge/gui/tests/qml/` — unlike every other GUI-related target, that one
 harness *does* register its own `ctest` entries, gated on both
 `ICLFORGE_BUILD_GUI` and `ICLFORGE_BUILD_TESTS`. A Linux build with neither ALSA nor the GUI
@@ -1249,7 +1254,7 @@ built on the Audio HAL — `AudioObjectID`/`AudioDeviceIOProc` — the same laye
 occupy on their own platforms), not the no-backend stub it fell back to before. `ICLFORGE_BUILD_GUI`
 still defaults off there (`macos-llvm` opts it on in CI the same way the Linux legs do — see
 [GUI on macOS](platforms/macos.md#gui-on-macos)) — capture, monitor playback and IEC 61937
-passthrough compile and link for real either way, and `iclforge-tests` exercises the backend's
+passthrough compile and link for real either way, and `iclforge-audio-tests` exercises the backend's
 device-free logic (format matching, sample conversion) directly. What CI cannot exercise is a
 real device: the hosted runner enumerates
 whatever HAL objects macOS itself reports and touches nothing beyond that, same as ALSA's own
@@ -1420,7 +1425,7 @@ an arm64 or universal macOS build does not build it at all, rather than building
 flag.
 
 **Testing — compile everywhere, execute only where capable.** `forge_simd_avx2` links into
-`iclforge-tests` on every x86_64 leg unconditionally, proving the AVX2 code is valid, compilable,
+`iclforge-ac3-tests` on every x86_64 leg unconditionally, proving the AVX2 code is valid, compilable,
 linkable C++ on MSVC, clang-cl, GCC, Clang and AppleClang alike, with zero hardware dependency.
 `libs/ac3/tests/core/test_simd_kernels.cpp`'s `[avx2]`-tagged cases go further and actually execute it —
 guarded by `has_avx2()`, with a loud, explicit `SKIP()` (never a silent pass) on hardware that

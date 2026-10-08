@@ -683,7 +683,7 @@ sets the link: the content rate for AC-4 and AC-4 LD (48 kHz only), four times i
 sixteen times it on eight channels for HBR16. `ac4_burst_type_for()` picks the smallest type a
 stream's largest frame fits. After each burst, `last()` reports its `Pc`, `Pd`, period, place in
 its sequence and link rate; `wrap_ac4_stream` is the batch form. The packer is written from the
-standard's text, and `iclforge-tests` checks its periods, sequences and `Pc` codes against a second
+standard's text, and `iclforge-containers-tests` checks its periods, sequences and `Pc` codes against a second
 transcription of the tables. No device here accepts AC-4.
 
 Part 14 leaves two choices, and the header says which reading the packer takes. It numbers the
@@ -752,7 +752,7 @@ disabled), the sink stops itself. `running()` turns false, `position()` reports 
 `submit()` and `can_submit()` refuse, `flush()` returns at once, and `pause()` and `resume()`
 refuse with `kNotRunning`. A caller that retries `submit()` while the queue is full has to check
 `running()` as well, because waiting does not bring a lost device back. `start()` can be called
-again without a `stop()` first. The hidden `[passthrough-unplug]` case in `iclforge-tests` takes a
+again without a `stop()` first. The hidden `[passthrough-unplug]` case in `iclforge-audio-tests` takes a
 person through this on real hardware.
 
 Stated plainly, because this project's docs don't soften verification gaps: of the desktop
