@@ -195,6 +195,7 @@ FOLDED = {
     "c5": {},
     "c6": {},
     "c7-1": {},
+    "c7-2": {},
 }
 
 # --- C4's names -------------------------------------------------------------------------------
@@ -339,10 +340,127 @@ def c7_1_new(path: str) -> str | None:
     return None
 
 
+# --- C7-2 (planning/monorepo.md) ------------------------------------------------------------------
+# The products (decisions 4, 5, 11 and 15): apps/forge/{cli,gui}, apps/hearth and apps/crucible with
+# each program's sources in src/, its Qt resources in assets/ and its tests in tests/, what two
+# products share in apps/shared/{media,theme,preferences}, the demos in apps/demos, the Windows
+# driver and the two test VMs with Crucible, every notice fragment in notices/. The products' C++
+# tests move beside the program they test, the four library tests of apps/common's code with it.
+#
+# Forge GUI is the source of what Hearth and Crucible also take: system_theme (the theme), the
+# typefaces, the icons and the family's QML components (apps/shared/theme), language_manager and
+# settings_migration (apps/shared/preferences). The study found system_theme alone.
+C7_2_FAMILY_QML = ("Theme", "Card", "SectionHeader", "StatTile", "AppButton", "AppCheckBox",
+                   "IconButton", "AppSlider", "AppTextField", "AppComboBox", "RailBlock",
+                   "SegmentedControl", "FocusRing")
+C7_2_PREFERENCES = ("language_manager.", "settings_migration.")
+C7_2_THEME = ("system_theme.",)
+C7_2_PROGRAMS = ("apps/forge/cli", "apps/forge/gui", "apps/hearth/engine", "apps/hearth/ui",
+                 "apps/hearth/render", "apps/hearth/testsink", "apps/hearth/testserver",
+                 "apps/crucible/engine", "apps/crucible/ui", "apps/crucible/runner")
+# A notice fragment's new name where two products had a fragment of the same name.
+C7_2_FRAGMENTS = {
+    "apps/notices/fragments/header.txt": "notices/fragments/forge-header.txt",
+    "apps/notices/fragments/windows-runtime.txt": "notices/fragments/forge-windows-runtime.txt",
+    "apps/crucible/notices/fragments/header.txt": "notices/fragments/crucible-header.txt",
+    "apps/crucible/notices/fragments/windows-runtime.txt":
+        "notices/fragments/crucible-windows-runtime.txt",
+    "apps/hearth/notices/fragments/header.txt": "notices/fragments/hearth-header.txt",
+    "apps/hearth/notices/fragments/fonts.txt": "notices/fragments/hearth-fonts.txt",
+}
+# The library tests that test apps/common's code, which they compiled in. libs/ac4/tests/decoder/
+# test_object_render.cpp stays: it builds its streams with that library's own test helper
+# (objects.hpp), which includes the encoder's private headers.
+C7_2_MEDIA_TESTS = {
+    "libs/ac3/tests/test_container_input.cpp": "apps/shared/media/tests/test_container_input.cpp",
+    "libs/ac3/tests/decoder/test_stream_playback.cpp":
+        "apps/shared/media/tests/test_stream_playback.cpp",
+    "libs/audio/tests/test_sink_wait.cpp": "apps/shared/media/tests/test_sink_wait.cpp",
+    "tests/gui/test_recording_sink.cpp": "apps/shared/media/tests/test_recording_sink.cpp",
+    "tests/gui/test_ac4_objects_core.cpp": "apps/shared/media/tests/test_ac4_objects_core.cpp",
+}
+
+
+def c7_2_program_file(program: str, rel: str) -> str:
+    """A program's file `rel` (relative to the program's old directory) in the program's new one."""
+    p = rel.split("/")
+    if rel == "CMakeLists.txt" or p[0] in ("tests", "packaging"):
+        return f"{program}/{rel}"
+    if p[0] in ("qml", "translations"):
+        return f"{program}/assets/{rel}"
+    if rel == "Info.plist.in":
+        return f"{program}/packaging/macos/{rel}"
+    return f"{program}/src/{rel}"
+
+
+def c7_2_new(path: str) -> str | None:
+    if path in C7_2_MEDIA_TESTS:
+        return C7_2_MEDIA_TESTS[path]
+    if path in C7_2_FRAGMENTS:
+        return C7_2_FRAGMENTS[path]
+    p = path.split("/")
+    if p[0] == "apps" and len(p) > 2:
+        rest = "/".join(p[2:])
+        if p[1] == "notices":
+            if p[2] == "notices.cmake":
+                return "notices/forge/notices.cmake"
+            return "notices/forge/" + rest if p[2] == "platform" else "notices/" + rest
+        if p[1] in ("windows", "linux"):
+            return f"apps/crucible/{p[1]}/{rest}"
+        if p[1] in ("android", "wasm"):
+            return f"apps/demos/{p[1]}/{rest}"
+        if p[1] == "common":
+            return f"apps/shared/media/src/{rest}"
+        if p[1] == "cli":
+            return c7_2_program_file("apps/forge/cli", rest)
+        if p[1] == "gui":
+            if rest.startswith("qml/") and rest[4:-4] in C7_2_FAMILY_QML and rest.endswith(".qml"):
+                return f"apps/shared/theme/assets/{rest}"
+            if rest.split("/")[0] in ("fonts", "icons"):
+                return f"apps/shared/theme/assets/{rest}"
+            if rest.startswith(C7_2_THEME):
+                return f"apps/shared/theme/src/{rest}"
+            if rest.startswith(C7_2_PREFERENCES):
+                return f"apps/shared/preferences/src/{rest}"
+            return c7_2_program_file("apps/forge/gui", rest)
+        if p[1] == "hearth" and p[2] == "notices":
+            if p[3:] == ["notices.cmake"]:
+                return "notices/hearth/notices.cmake"
+            return "notices/" + "/".join(p[3:])
+        if p[1] == "crucible" and p[2] == "notices":
+            if p[3:] == ["notices.cmake"]:
+                return "notices/crucible/notices.cmake"
+            if p[3] == "platform":
+                return "notices/crucible/" + "/".join(p[3:])
+            return "notices/" + "/".join(p[3:])
+        if p[1] == "crucible" and p[2] == "translations":
+            return "apps/crucible/ui/assets/" + rest
+        program = f"apps/{p[1]}/{p[2]}"
+        if program in C7_2_PROGRAMS and len(p) > 3:
+            return c7_2_program_file(program, "/".join(p[3:]))
+    if p[0] == "tests" and len(p) > 2:
+        rest = "/".join(p[2:])
+        if p[1] == "cli":
+            return f"apps/forge/cli/tests/{rest}"
+        if p[1] == "gui":
+            if rest == "test_settings_migration.cpp":
+                return f"apps/shared/preferences/tests/{rest}"
+            return f"apps/forge/gui/tests/{rest}"
+        if p[1] == "hearth":
+            if rest == "test_hearth_controller.cpp":
+                return f"apps/hearth/ui/tests/{rest}"
+            return f"apps/hearth/engine/tests/{rest}"
+        if p[1] == "crucible":
+            if rest in ("test_desktop_entries.cpp", "test_translations.cpp"):
+                return f"apps/crucible/ui/tests/{rest}"
+            return f"apps/crucible/engine/tests/{rest}"
+    return None
+
+
 STAGES = {"c1": c1_new, "c2": c2_new, "c3": c3_new, "c4n": c4n_new, "c4": c4_new, "c5": c5_new,
-          "c6": c6_new, "c7-1": c7_1_new}
+          "c6": c6_new, "c7-1": c7_1_new, "c7-2": c7_2_new}
 REMOVED = {"c1": C1_REMOVED, "c2": C2_REMOVED, "c3": C3_REMOVED, "c4n": (), "c4": (), "c5": (),
-           "c6": (), "c7-1": ()}
+           "c6": (), "c7-1": (), "c7-2": ()}
 
 # The libraries each stage merges, old -> new: what a target, an export macro, an export header, a
 # pkg-config name or an ABI allowlist follows (consol_apply.py, export_diff.py --map,
@@ -356,13 +474,14 @@ LIBRARY_MAP = {
     "c5": {},
     "c6": {},
     "c7-1": {},
+    "c7-2": {},
 }
 
 # The libraries a stage divides, old -> every library its files went to: signing's key, hash and
 # MAC are base's and its signer ac3's, so the exports of signing, ac3 and base are compared as one
 # group (export_diff.py, abi_compare.py). C6 gives part of ac3 to base.
 SPLITS = {"c1": {}, "c2": {"signing": ("ac3", "base")}, "c3": {}, "c4n": {}, "c4": {}, "c5": {},
-          "c6": {"ac3": ("ac3", "base")}, "c7-1": {}}
+          "c6": {"ac3": ("ac3", "base")}, "c7-1": {}, "c7-2": {}}
 
 # The names C6 gives base: what was iclforge::ac3::io's of WAV, iclforge::ac3::analysis's and
 # iclforge::ac3::meta's of the meters but their acmod and channel-map constructors, and the version.

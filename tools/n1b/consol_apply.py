@@ -107,6 +107,7 @@ def plan(repo: Repo, stage: str, index) -> dict:
     macros: dict[str, dict[str, str]] = defaultdict(dict)
     stats: Counter = Counter()
     problems = []
+    needs: dict[tuple[str, str], list[str]] = defaultdict(list)
     global_map = spellings_of(moves)
     for f in repo.files:
         if repo.ext(f) not in CPP_EXT and not f.endswith((".hpp.in", ".h.in")):
@@ -133,6 +134,23 @@ def plan(repo: Repo, stage: str, index) -> dict:
             still = posixpath.normpath(posixpath.join(posixpath.dirname(f_new), sp))
             if here == target and still == t_new:
                 continue  # beside its header before and after
+            if stage == "c7-2":
+                if here == target:
+                    if "/" not in sp and posixpath.dirname(f_new) != posixpath.dirname(t_new):
+                        # a bare name found beside the includer, now in another directory: the
+                        # spelling stays, and the includer's target needs that directory as an
+                        # include directory (planning/monorepo.md, C7-2)
+                        needs[(posixpath.dirname(f_new), posixpath.dirname(t_new))].append(f)
+                        continue
+                    # a relative include whose header and includer moved apart or differently
+                    # (apps/crucible/ui/tests/ reaching ../crucible_controller.hpp, now in ../src/)
+                    sn = posixpath.relpath(t_new, posixpath.dirname(f_new))
+                    if sn != sp:
+                        edits[f][sp] = sn
+                        stats["relative"] += 1
+                    continue
+                if t_new == target and target.startswith("tests/"):
+                    continue  # tests/support's include root, reached from the includer's new place
             if target.startswith("tests/") and test_spelling(t_new) is not None:
                 # a test's helper, spelled as it was: relative to the includer, or from the include
                 # root of the tests it is in (TEST_ROOTS)
@@ -181,6 +199,7 @@ def plan(repo: Repo, stage: str, index) -> dict:
         "edits": {k: v for k, v in edits.items() if v},
         "macros": {k: v for k, v in macros.items() if v},
         "problems": problems,
+        "needs_include_dir": {f"{a} <- {b}": v for (a, b), v in sorted(needs.items())},
         "spellings": global_map,
         "stats": dict(stats),
     }
