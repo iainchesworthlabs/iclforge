@@ -2,8 +2,9 @@
 
     consol_paths.py --root <worktree> --plan <plan.json> --stage c1|c2|c3 [--dry-run]
 
-n1b_paths.py with two changes: the consolidation's and the monorepo's own plans (planning/consolidation.md,
-planning/monorepo.md), which name the paths before and after every stage on purpose, are left alone as the layout study was; and the
+n1b_paths.py with two changes: the consolidation's and the monorepo's own plans
+(planning/consolidation.md, planning/monorepo.md), which name the paths before and after every
+stage on purpose, are left alone as the layout study was; and the
 renames no move plan lists are the stage's ABI allowlists (the libraries that merge take the name of
 the one that replaces them) and the files folded into another (consoldef.FOLDED: the AC-4 encoder's
 errata are a section of src/ac4/ERRATA.md), not S2's. A directory the stage keeps is not renamed

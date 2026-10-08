@@ -90,16 +90,42 @@ def rename(text: str, renames: dict[str, str]) -> str:
     return text
 
 
-def plan_renames(plan: Path | None) -> dict[str, str]:
-    """`<source>/<old path>` -> `<source>/<new path>`, for the files and directories that moved."""
+def plan_renames(plan: Path | None, old_files: list[str] | None = None) -> dict[str, str]:
+    """`<source>/<old path>` -> `<source>/<new path>`, for the files and directories that moved.
+
+    With `old_files`, the old tree's tracked files, a directory is renamed only when it moved whole:
+    every file below it is in the plan and lands at the same place below its new name. A file that
+    moves out of `tests/` does not rename `tests/` (planning/monorepo.md, C7-1), which the
+    parent-of-a-moved-file rule below, used without `old_files`, did. A CMake binary directory
+    follows its source directory (`<build>/src/ac3` -> `<build>/libs/ac3`).
+    """
     if plan is None:
         return {}
     moves: dict[str, str] = json.loads(plan.read_text(encoding="utf-8"))["moves"]
+    out = {f"<source>/{o}": f"<source>/{n}" for o, n in moves.items()}
+    if old_files is not None:
+        under: Counter = Counter()
+        for f in old_files:
+            parts = f.split("/")
+            for i in range(1, len(parts)):
+                under["/".join(parts[:i])] += 1
+        whole: Counter = Counter()
+        for old, new in moves.items():
+            po, pn = old.split("/"), new.split("/")
+            # an ancestor of the old path whose remaining path is the same below the new one
+            for i in range(1, len(po)):
+                tail = po[i:]
+                if len(pn) > len(tail) and pn[len(pn) - len(tail) :] == tail:
+                    whole[("/".join(po[:i]), "/".join(pn[: len(pn) - len(tail)]))] += 1
+        for (o, n), count in whole.items():
+            if o != n and count == under[o]:
+                out[f"<source>/{o}"] = f"<source>/{n}"
+                out[f"<build>/{o}"] = f"<build>/{n}"
+        return dict(sorted(out.items(), key=lambda kv: -len(kv[0])))
     dirs: dict[str, set[str]] = {}
     for old, new in moves.items():
         o, n = old.rsplit("/", 1)[0], new.rsplit("/", 1)[0]
         dirs.setdefault(o, set()).add(n)
-    out = {f"<source>/{o}": f"<source>/{n}" for o, n in moves.items()}
     for o, ns in dirs.items():
         if len(ns) == 1:
             out[f"<source>/{o}"] = f"<source>/{next(iter(ns))}"
@@ -192,7 +218,14 @@ def main() -> int:
         help="a flag, as a regular expression on its tokenised text, the stage changes by design",
     )
     a = ap.parse_args()
-    renames = plan_renames(a.moves)
+    old_files = None
+    if a.moves is not None:
+        home = cache(a.old.resolve(), "CMAKE_HOME_DIRECTORY")
+        listed = subprocess.run(
+            ["git", "-C", home, "ls-files", "-z"], capture_output=True, check=True
+        )
+        old_files = [f for f in listed.stdout.decode("utf-8", "surrogateescape").split("\0") if f]
+    renames = plan_renames(a.moves, old_files)
     if a.links:
         return compare(load_links(a.old, renames), load_links(a.new, {}), a.show)
     ignore = [re.compile(x) for x in a.ignore]

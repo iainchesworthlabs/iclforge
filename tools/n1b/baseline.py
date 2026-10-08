@@ -11,7 +11,8 @@ five).
 
 A stage that changes names and paths must change nothing else. Four things stand for "nothing else":
 
-  headers  every public header (a tracked file under src/*/include/) with its git blob id. After
+  headers  every public header (a tracked file under libs/*/include/, src/*/include/ before C7-1)
+           with its git blob id. After
            the moves each one must exist at the place the move plan sends it (`check-moves`), and
            after the pure `git mv` commit with the same blob id (`--pure`): a header cannot be
            lost or edited by a move. It is read from git, so it needs no build.
@@ -116,8 +117,11 @@ CLI_NAMES = ("forge", "ac3cli")
 
 
 def public_headers(root: Path) -> dict[str, str]:
-    """Every tracked public header under src/ and its git blob id."""
-    listed = git(root, "ls-files", "-s", "-z", "--", "src")
+    """Every tracked public header under libs/ (src/ before C7-1) and its git blob id.
+
+    A library's tests/ and fuzz/ are beside its code now and hold no public header.
+    """
+    listed = git(root, "ls-files", "-s", "-z", "--", "libs", "src")
     out: dict[str, str] = {}
     for entry in listed.split("\0"):
         if not entry:
@@ -125,7 +129,7 @@ def public_headers(root: Path) -> dict[str, str]:
         meta, path = entry.split("\t", 1)
         blob = meta.split()[1]
         is_header = posixpath.splitext(path)[1] in HEADER_EXT or path.endswith((".hpp.in", ".h.in"))
-        if is_header and "/include/" in path:
+        if is_header and "/include/" in path and path.split("/")[2:3] not in (["tests"], ["fuzz"]):
             out[path] = blob
     return dict(sorted(out.items()))
 

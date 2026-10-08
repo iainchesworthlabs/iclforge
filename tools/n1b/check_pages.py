@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Hold the pages that name headers and CMake targets to the tree.
 
-check_doc_paths.py reads the repository paths a page names (`src/ac3/include/...`). A page also
+check_doc_paths.py reads the repository paths a page names (`libs/ac3/include/...`). A page also
 names a header by the spelling a program includes it by (`iclforge/base/layout.hpp`) and a library
 by its target (`iclforge::dsp`), and neither is a path, so after a rename of the libraries nothing
 else asks whether those spellings reach a file. This does, for every tracked page outside the
 history:
 
   - each backticked `iclforge/<library>/<file>` and `iclforge_c/<file>` is a header of a library
-    (under `src/<library>/include/` or its `variants/`), of the ESP-IDF component, or an export or
+    (under `libs/<library>/include/` or its `variants/`; `src/<library>/` before
+    planning/monorepo.md's C7-1), of the ESP-IDF component, or an export or
     version header the build generates;
   - each backticked `iclforge::<name>` that names a library (`iclforge::dsp`,
     `iclforge::ac3_static`) is a target a CMake file makes;
@@ -68,7 +69,7 @@ def headers_of(files: list[str]) -> set[str]:
     for f in files:
         if not f.endswith((".hpp", ".h", ".in")):
             continue
-        m = re.match(r"src/[^/]+/(?:include|variants/[^/]+)/(iclforge(?:_c)?/.+)$", f)
+        m = re.match(r"(?:libs|src)/[^/]+/(?:include|variants/[^/]+)/(iclforge(?:_c)?/.+)$", f)
         m = m or re.match(r"esp-idf/iclforge/include/(iclforge/.+)$", f)
         if m:
             found.add(m.group(1).removesuffix(".in"))
@@ -86,8 +87,9 @@ def targets_of(root: Path, files: list[str], libs: list[str]) -> set[str]:
         made |= {f"iclforge::{lib}", f"iclforge::{lib}_static", f"iclforge::{lib}_shared"}
     for lib in libs:
         name = NAME_OF.get(lib, lib)
-        cmake = root / f"src/{lib}/CMakeLists.txt"
-        body = cmake.read_text(encoding="utf-8", errors="replace") if cmake.is_file() else ""
+        candidates = (root / f"libs/{lib}/CMakeLists.txt", root / f"src/{lib}/CMakeLists.txt")
+        cmake = next((c for c in candidates if c.is_file()), None)
+        body = cmake.read_text(encoding="utf-8", errors="replace") if cmake else ""
         for suffix in ("", "_static", "_shared"):
             if f"iclforge::{name}{suffix}" in body:
                 made.add(f"iclforge::{name}{suffix}")
@@ -113,7 +115,7 @@ def check(root: Path) -> list[str]:
     index_text = index.read_text(encoding="utf-8", errors="replace") if index.is_file() else ""
     for lib in libs:
         if not any(h.startswith(header_root(lib)) for h in headers):
-            problems.append(f"library {lib}: no header under src/{lib}/include/{header_root(lib)}")
+            problems.append(f"library {lib}: no header under libs/{lib}/include/{header_root(lib)}")
         target = f"iclforge::{NAME_OF.get(lib, lib)}"
         if target not in index_text:
             problems.append(f"docs/library/index.md: the library {lib} is not named ({target})")
