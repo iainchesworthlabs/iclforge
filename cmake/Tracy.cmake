@@ -3,8 +3,8 @@
 #
 # Defines an INTERFACE target `iclforge::tracy` that, when ICLFORGE_ENABLE_TRACY is
 # on, links Tracy's client library and defines ICLFORGE_TRACY_ENABLED, which
-# the iclforge/base/detail/profiling.hpp variant selected by src/ac3/CMakeLists.txt
-# (src/base/variants/profiling-tracy_enabled/, chosen over its tracy_disabled/
+# the iclforge/base/detail/profiling.hpp variant selected by libs/ac3/CMakeLists.txt
+# (libs/base/variants/profiling-tracy_enabled/, chosen over its tracy_disabled/
 # sibling by an include-dir switch, not an #ifdef) uses to turn ICLFORGE_ZONE_SCOPED()
 # etc. into real Tracy zones instead of no-ops. Off by default, matching
 # Coverage.cmake's shape: normal dev/CI builds pay no instrumentation cost and

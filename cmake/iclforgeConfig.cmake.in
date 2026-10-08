@@ -17,7 +17,7 @@ if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/iabTargets.cmake")
     include("${CMAKE_CURRENT_LIST_DIR}/iabTargets.cmake")
 endif()
 # admTargets.cmake, when present, defines ONLY a *_shared target (never *_static) - see
-# cmake/InstallLibrary.cmake's ICLFORGE_BUILD_ADM block and src/adm/CMakeLists.txt's header comment
+# cmake/InstallLibrary.cmake's ICLFORGE_BUILD_ADM block and libs/adm/CMakeLists.txt's header comment
 # for why iclforge::adm is shared-only, unlike every other component here.
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/admTargets.cmake")
     include("${CMAKE_CURRENT_LIST_DIR}/admTargets.cmake")

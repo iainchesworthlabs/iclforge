@@ -70,11 +70,11 @@ endif()
 #
 # The kernels themselves are NOT duplicated per directory. They live once,
 # in shared code (iclforge::ac3's src/core/mdct.cpp, bitalloc.cpp and exponents.cpp,
-# src/ac4/src/core's src/dsp/qmf_vector.hpp), written against the 128-bit vector types
+# libs/ac4/src/core's src/dsp/qmf_vector.hpp), written against the 128-bit vector types
 # the header defines; the directories carry the types and their operations. See
 # the generic header for why that is what makes the bit-exactness claim testable.
 #
-# The directories were src/forge/src/internal/arch/ until src/ac4/src/core's QMF
+# The directories were src/forge/src/internal/arch/ until libs/ac4/src/core's QMF
 # banks took vector kernels of their own (planning/ac4.md, D14a, and decision 31's
 # "the vector types" in a header-only target both consumers link): iclforge::base_headers below
 # carries the include path, so linking it is all a consumer does.
@@ -82,7 +82,7 @@ endif()
 # ICLFORGE_SIMD forces a directory. `generic` in particular is what a
 # reproducibility comparison wants (is a difference between two machines the
 # vector kernels or something else?), and is the reference
-# tests/ac3/core/test_simd_kernels.cpp's scalar side is written to match.
+# libs/ac3/tests/core/test_simd_kernels.cpp's scalar side is written to match.
 # ---------------------------------------------------------------------------
 set(ICLFORGE_SIMD "auto" CACHE STRING
     "SIMD kernel directory: auto (from the effective target architecture), generic, x86_64, or aarch64")
@@ -123,7 +123,7 @@ endif()
 
 # The scalar building blocks (iclforge/base/arithmetic/: Fixed32, the Q7.24 fixed-point tier's type,
 # MantExp, and the cross-platform-identical float transcendentals) and the SIMD directory, as a
-# header-only target: iclforge::ac3, its minimum-footprint archive, src/ac4/src/core and src/dsp
+# header-only target: iclforge::ac3, its minimum-footprint archive, libs/ac4/src/core and libs/dsp
 # include them, and the minimum-footprint profile and AC-4 link no iclforge::base, so they take the
 # include path from this target rather than from the library. One copy of Fixed32, which decision
 # 31 of planning/ac4.md asks for, without AC-4 linking the AC-3 codec to reach it. Not installed and
@@ -150,7 +150,7 @@ set(ICLFORGE_BUILD_ARCH "${ICLFORGE_BUILD_ARCH}" PARENT_SCOPE)
 
 
 # AVX2 is not architectural: a build machine cannot know the deployment machine has it, so it needs a
-# runtime answer. The kernels live in src/ac3 (iclforge_ac3_simd_avx2); the probe that answers
+# runtime answer. The kernels live in libs/ac3 (iclforge_ac3_simd_avx2); the probe that answers
 # has_avx2() lives here, and one of variants/cpu-probe-{none,msvc,builtin}/ goes on the include path.
 # msvc/ is shared by real MSVC and clang-cl: clang-cl reports CMAKE_CXX_COMPILER_ID "Clang" with
 # CMAKE_CXX_COMPILER_FRONTEND_VARIANT "MSVC", and __builtin_cpu_supports needs compiler-rt's cpu-model
@@ -194,7 +194,7 @@ endif()
 set(ICLFORGE_PROFILING_STAGE_TIMERS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/variants/profiling-stage_timers" PARENT_SCOPE)
 # The directory a library outside this one compiles its markers against when it cannot take it from
 # this library's usage requirements, because the minimum-footprint profile builds no iclforge::base
-# (the AC-4 core, src/ac4/src/core): the stage timers in that profile when they are asked for, else what
+# (the AC-4 core, libs/ac4/src/core): the stage timers in that profile when they are asked for, else what
 # this library's own users see.
 if(ICLFORGE_STAGE_TIMERS)
     set(ICLFORGE_PROFILING_INCLUDE_DIR
@@ -203,7 +203,7 @@ else()
     set(ICLFORGE_PROFILING_INCLUDE_DIR "${_iclforge_profiling_dir}" PARENT_SCOPE)
 endif()
 
-# The minimum-footprint profile compiles the sources it needs itself (src/ac3/minimal.cmake), so no
+# The minimum-footprint profile compiles the sources it needs itself (libs/ac3/minimal.cmake), so no
 # library is built here for it.
 if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
     return()

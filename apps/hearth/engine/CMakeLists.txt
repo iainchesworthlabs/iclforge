@@ -42,7 +42,7 @@ else()
     target_sources(hearth_engine PRIVATE platform/posix/native_log_sink.cpp)
 endif()
 
-# The pairing records are a key ring for src/sendspin's server sessions, which
+# The pairing records are a key ring for libs/sendspin's server sessions, which
 # a core-only build leaves out, so they are left out with them, and the server
 # identity those records are bound to with them. NetworkSinks (discovery and
 # pairing, A6) needs the same server half - ServerHost and the computer's own
@@ -52,7 +52,7 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
     target_sources(hearth_engine PRIVATE pairing_store.cpp server_identity.cpp network_sinks.cpp
                                             network_group_sink.cpp)
     # A Hearth sink's firmware (planning/esp32-ota.md, O5): the board's own HTTP routes over
-    # cpp-httplib, configured as src/sendspin configures it, and the board's own headers for what
+    # cpp-httplib, configured as libs/sendspin configures it, and the board's own headers for what
     # GET /firmware says and what an image must be (esp-idf/iclforge/include, free of ESP-IDF,
     # as iclforge-tests already reads them), so that this app holds an image to the rules the board
     # holds it to.
@@ -106,4 +106,4 @@ target_link_libraries(hearth_engine PUBLIC Threads::Threads)
 # per-executable).
 target_link_libraries(hearth_engine PUBLIC iclforge::tracy)
 target_include_directories(hearth_engine PUBLIC
-    "$<IF:$<BOOL:${ICLFORGE_ENABLE_TRACY}>,${CMAKE_SOURCE_DIR}/src/base/variants/profiling-tracy_enabled,${CMAKE_SOURCE_DIR}/src/base/variants/profiling-tracy_disabled>")
+    "$<IF:$<BOOL:${ICLFORGE_ENABLE_TRACY}>,${CMAKE_SOURCE_DIR}/libs/base/variants/profiling-tracy_enabled,${CMAKE_SOURCE_DIR}/libs/base/variants/profiling-tracy_disabled>")

@@ -25,7 +25,7 @@ iclforge_add_library(ac4
 target_compile_options(iclforge_ac4_objects PRIVATE "$<$<CXX_COMPILER_ID:GNU>:-Wno-psabi>")
 
 # The units a frame's time goes to, under the profile's ICLFORGE_MINIMAL_HOT_O2
-# (named for the AC-3 and E-AC-3 decoders' -O2 in src/ac3/minimal.cmake, whose
+# (named for the AC-3 and E-AC-3 decoders' -O2 in libs/ac3/minimal.cmake, whose
 # switch this is). A size-optimised build is what the profile is; these are the
 # files a stage timer showed the optimiser paying for, and it costs flash and
 # not SRAM (planning/ac4.md, D14e has what it bought on the ESP32-P4 and what it

@@ -751,7 +751,7 @@ def parse_substream_info_obj(r, fs_index, frame_rate_factor, b_substreams_presen
     # flat [0, 1, 2, 3, 5, 7] would give 5 seven objects, which no channel
     # element carries, and its loop counts the LFE among num_objects where the
     # table and audio_data_objs() count it on top; the table is read, the LFE
-    # listed first (src/ac4/ERRATA.md, "n_objects_code and the LFE"). A
+    # listed first (libs/ac4/ERRATA.md, "n_objects_code and the LFE"). A
     # reserved code names no objects.
     num_objects = [0, 1, 2, 3, 5][n_objects_code] if n_objects_code < 5 else None
     b_dynamic_objects = r.bits(1)

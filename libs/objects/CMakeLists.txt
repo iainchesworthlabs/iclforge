@@ -5,7 +5,7 @@
 # container it travels in. Codec-blind: E-AC-3 JOC and the Atmos encoder that use it stay in
 # iclforge::ac3.
 # ---------------------------------------------------------------------------
-# The minimum-footprint profile compiles what it needs into one archive (src/ac3/minimal.cmake),
+# The minimum-footprint profile compiles what it needs into one archive (libs/ac3/minimal.cmake),
 # so no library is built here for it.
 if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
     return()

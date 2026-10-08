@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::ac3_minimal - the whole of src/ac3 under the minimum-footprint
+# iclforge::ac3_minimal - the whole of libs/ac3 under the minimum-footprint
 # profile (ICLFORGE_MINIMAL_DECODER, or ICLFORGE_MINIMAL_ENCODER for the
 # encode-only archive). Included and returned from by CMakeLists.txt in this
 # directory, so the ordinary static+shared build below it cannot be perturbed
@@ -44,11 +44,11 @@ add_library(iclforge::ac3_minimal ALIAS iclforge_ac3_minimal)
 # already refused the option outside this profile.
 if(ICLFORGE_STAGE_TIMERS)
     set(_ac3_minimal_profiling_dir
-        "${PROJECT_SOURCE_DIR}/src/base/variants/profiling-stage_timers")
+        "${PROJECT_SOURCE_DIR}/libs/base/variants/profiling-stage_timers")
     message(STATUS "Minimum-footprint profile: zone markers routed to the stage-timer backend")
 else()
     set(_ac3_minimal_profiling_dir
-        "${PROJECT_SOURCE_DIR}/src/base/variants/profiling-tracy_disabled")
+        "${PROJECT_SOURCE_DIR}/libs/base/variants/profiling-tracy_disabled")
 endif()
 
 target_sources(iclforge_ac3_minimal
@@ -61,7 +61,7 @@ target_sources(iclforge_ac3_minimal
         src/core/eac3_tools.cpp      # spx/ecpl band geometry and the §3.5.5 enhanced-coupling
                                      # reconstruction the decoder shares
         src/core/exponents.cpp       # §7.1 exponent decoding
-        "${PROJECT_SOURCE_DIR}/src/dsp/src/fft.cpp"  # the 512-point DFT §3.5.5 enhanced coupling
+        "${PROJECT_SOURCE_DIR}/libs/dsp/src/fft.cpp"  # the 512-point DFT §3.5.5 enhanced coupling
                                      # needs
         src/core/mantissas.cpp       # §7.3 mantissa ungrouping and dither
         src/core/mdct.cpp            # §7.9.4 inverse transform (and the unused forward)
@@ -87,7 +87,7 @@ target_sources(iclforge_ac3_minimal
         # translation unit rather than a branch. none/mdct_avx2.cpp supplies
         # the std::unreachable() bodies for the declarations mdct.cpp calls on
         # the branch a constant-false has_avx2() makes dead.
-        "${PROJECT_SOURCE_DIR}/src/base/src/minimal/cpu_features.cpp"
+        "${PROJECT_SOURCE_DIR}/libs/base/src/minimal/cpu_features.cpp"
         src/internal/avx2/none/mdct_avx2.cpp)
 
 # --- and then one direction or the other ------------------------------------
@@ -110,8 +110,8 @@ target_sources(iclforge_ac3_minimal
                                             # from decode_frame_core/apply_output/conceal
         src/decoder/transient_prenoise.cpp  # §3.7 post-IMDCT correction
         # --- what the decoders call into ---------------------------------
-        "${PROJECT_SOURCE_DIR}/src/dsp/src/qmf.cpp"  # the polyphase QMF bank JOC runs through
-        "${PROJECT_SOURCE_DIR}/src/objects/src/emdf.cpp"  # the TS 102 366 Annex H container
+        "${PROJECT_SOURCE_DIR}/libs/dsp/src/qmf.cpp"  # the polyphase QMF bank JOC runs through
+        "${PROJECT_SOURCE_DIR}/libs/objects/src/emdf.cpp"  # the TS 102 366 Annex H container
                                    # the objects ride in
         # --- getting a stream IN ------------------------------------------
         # The profile had no input path at all until these: the probe decodes a
@@ -130,7 +130,7 @@ target_sources(iclforge_ac3_minimal
         src/meta/drc.cpp           # §7.7 dynrng/compr application
         src/meta/mixing.cpp        # §7.8 downmix coefficients - OutputStage::apply's own
         src/oba/joc.cpp            # §6 object reconstruction from the bed
-        "${PROJECT_SOURCE_DIR}/src/objects/src/oamd.cpp"  # §H.1 object metadata
+        "${PROJECT_SOURCE_DIR}/libs/objects/src/oamd.cpp"  # §H.1 object metadata
         # --- and placing them -----------------------------------------------
         # Reconstructed objects are mono signals with a position each; a part
         # driving loudspeakers has to pan them onto its layout, and this is
@@ -139,7 +139,7 @@ target_sources(iclforge_ac3_minimal
         # for any Table E2.5 layout. Pure arithmetic over <vector> and <cmath>
         # - no fmt, no exceptions - which is why it can be here. The probe's
         # eac3_atmos_render row exercises it onto 7.1.4.
-        "${PROJECT_SOURCE_DIR}/src/render/src/spatial.cpp"
+        "${PROJECT_SOURCE_DIR}/libs/render/src/spatial.cpp"
 )
 else()
 target_sources(iclforge_ac3_minimal
@@ -187,10 +187,10 @@ target_include_directories(iclforge_ac3_minimal
         # The profile is one archive of files from six libraries (base, dsp, objects and render
         # are not built on their own here: their CMakeLists.txt return early for it), so it
         # carries all six public include trees and the six export headers, generated below.
-        "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/base/include>"
-        "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/dsp/include>"
-        "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/objects/include>"
-        "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/render/include>"
+        "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/libs/base/include>"
+        "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/libs/dsp/include>"
+        "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/libs/objects/include>"
+        "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/libs/render/include>"
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>"
         "$<INSTALL_INTERFACE:include>"
     PRIVATE
@@ -202,17 +202,17 @@ target_include_directories(iclforge_ac3_minimal
         # the same part's sake: in double, transient detection and the
         # forward transform were 64% of an AC-3 5.1 frame on an ESP32-S3.
         "${CMAKE_CURRENT_SOURCE_DIR}/variants/encode-scalar-float32"
-        # dsp's QMF bank, which JOC runs through, is the AC-4 banks' engine (src/dsp/src/tiered),
+        # dsp's QMF bank, which JOC runs through, is the AC-4 banks' engine (libs/dsp/src/tiered),
         # at double whatever this profile's decode scalar is.
-        "${PROJECT_SOURCE_DIR}/src/dsp/src"
-        "${PROJECT_SOURCE_DIR}/src/dsp/variants/decode-scalar-float64"
+        "${PROJECT_SOURCE_DIR}/libs/dsp/src"
+        "${PROJECT_SOURCE_DIR}/libs/dsp/variants/decode-scalar-float64"
         # Tracy is never part of this profile - the disabled variant's macros
         # expand to nothing, which is what a footprint build wants. What CAN
         # answer the same markers here is the stage-timer backend, resolved
         # above this target_sources() block: the application supplies the
         # clock and the table, the library only calls in.
         "${_ac3_minimal_profiling_dir}"
-        # The SIMD arch seam is resolved by src/base/CMakeLists.txt and comes
+        # The SIMD arch seam is resolved by libs/base/CMakeLists.txt and comes
         # with iclforge::base_headers, linked below: mdct.cpp/bitalloc.cpp/exponents.cpp
         # include iclforge/base/detail/simd.hpp unconditionally, so this profile needs
         # a directory the same way the ordinary build does.
@@ -225,14 +225,14 @@ target_include_directories(iclforge_ac3_minimal
         # here; a minimum-footprint build for aarch64 takes the NEON directory, whose
         # float32 decode path holds four lanes.
         # The runtime-AVX2 seam's three directories, resolved exactly as
-        # src/ac3/CMakeLists.txt resolves them for the full library and for
+        # libs/ac3/CMakeLists.txt resolves them for the full library and for
         # the same reason - the include SPELLING must not depend on which
         # directory answers it. This profile always takes probe/none: an
         # arm-none-eabi Cortex-M3 has no AVX2 to detect, so has_avx2() is a
         # constant false here rather than a question. src/internal/avx2 is on
         # the path for mdct_avx2.hpp's plain-signature declarations, which
         # mdct.cpp includes unconditionally on every configuration.
-        "${PROJECT_SOURCE_DIR}/src/base/variants/cpu-probe-none"
+        "${PROJECT_SOURCE_DIR}/libs/base/variants/cpu-probe-none"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/internal/avx2")
 
 target_compile_features(iclforge_ac3_minimal PUBLIC cxx_std_23)
@@ -267,7 +267,7 @@ if(ICLFORGE_MINIMAL_HOT_O2)
         src/core/bitalloc.cpp
         src/core/eac3_tools.cpp
         src/core/mdct.cpp
-        "${PROJECT_SOURCE_DIR}/src/dsp/src/fft.cpp"
+        "${PROJECT_SOURCE_DIR}/libs/dsp/src/fft.cpp"
         src/decoder/decoder.cpp
         src/decoder/eac3_decoder.cpp
         src/decoder/output.cpp

@@ -37,8 +37,8 @@ matrices from the attachment (ssf_tables.hpp and .cpp), their sizes held to the
 table_length the text prints, and the matrices' layout to the evidence in Pseudocode C.1's
 note below.
 
-Writes each header to src/ac4/src/core/tables/ and each source to
-src/ac4/src/core/tables/: huffman_tables.hpp and .cpp (every Annex A
+Writes each header to libs/ac4/src/core/tables/ and each source to
+libs/ac4/src/core/tables/: huffman_tables.hpp and .cpp (every Annex A
 codebook, its entries sorted by length and then codeword, as
 huffman_codebook.hpp's Codebook wants them for reading), huffman_codes.hpp and
 .cpp (the same codebooks in index order, the codeword and its length for each
@@ -47,10 +47,10 @@ B at 44.1 and 48 kHz), noise_tables.hpp and .cpp (Annex C.11, which the
 spectral noise fill of clause 5.1.4 reads through Pseudocode 57) and
 qmf_tables.hpp and .cpp (Annex D.3, the QMF banks' window of clauses 5.7.3 and
 5.7.4, and Annex D.2, A-SPX's noise generator table of clause 5.7.6.4.3, which go
-to src/dsp/src/tiered/tables/ with the banks) and
+to libs/dsp/src/tiered/tables/ with the banks) and
 isf_tables.hpp and .cpp (Part 2 Annex A.2.1, the intermediate spatial format's
 rendering matrices of Part 2 clause 5.10.3).
-src/ac4/src/core is what the AC-4 decoder and encoder share.
+libs/ac4/src/core is what the AC-4 decoder and encoder share.
 
 Checks, all of them before anything is written, every one failing the run:
   Huffman  Annex A names the same codebooks as the attachment, with the
@@ -1697,7 +1697,7 @@ SSF_HEADER = [
     "",
     "// Annex C.6: ssf_pred_coeff_mat<tab_idx>, as the attachment lays them out. The layout",
     "// is ((nu + Rf) * 33 + eta) * Rt + k, not the index of Pseudocode C.1",
-    "// (src/ac4/ERRATA.md, \"The layout of the SSF prediction coefficient tables\").",
+    "// (libs/ac4/ERRATA.md, \"The layout of the SSF prediction coefficient tables\").",
     "extern const std::array<std::span<const std::uint8_t>, 37> kSsfPredCoeffQuantMat;",
     "",
     "// Tables C.6 to C.9: CDF_TABLE (index -352 to 352 offset by 352), PREDICTOR_GAIN_CDF_LUT",

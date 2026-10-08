@@ -3,10 +3,10 @@
 #
 # install() rules + package config for distributing iclforge::ac3, iclforge::containers and
 # the other libraries below independently, consumable via find_package(iclforge). iclforge::audio
-# (src/audio/) is deliberately NOT installed/exported here - it is a CLI/GUI implementation
+# (libs/audio/) is deliberately NOT installed/exported here - it is a CLI/GUI implementation
 # detail, not part of the distributed package; see docs/library/index.md.
 #
-# include()'d from the root CMakeLists.txt after add_subdirectory(src/ac3), src/containers and each
+# include()'d from the root CMakeLists.txt after add_subdirectory(libs/ac3), libs/containers and each
 # optional component's own guarded add_subdirectory(), before include(Packaging) - CPack's own
 # library component (cmake/Packaging.cmake) packages exactly what gets install()'d here.
 #
@@ -62,7 +62,7 @@ option(ICLFORGE_INSTALL_BOTH_LINKAGES "Install/export both static and shared lib
 if(ICLFORGE_INSTALL_BOTH_LINKAGES)
     set(_iclforge_forge_install_targets iclforge_ac3_objects iclforge_ac3_static iclforge_ac3_shared)
 elseif(BUILD_SHARED_LIBS)
-    # iclforge::c (src/capi/CMakeLists.txt) statically embeds iclforge::ac3_static PRIVATE
+    # iclforge::c (libs/capi/CMakeLists.txt) statically embeds iclforge::ac3_static PRIVATE
     # unconditionally, regardless of BUILD_SHARED_LIBS - see that file's header comment for why
     # (a self-contained C ABI, not one that depends on a separately-shipped forge shared
     # library). iclforge_ac3_static used to have to be in an export set here: iclforge_capi_objects is an
@@ -85,7 +85,7 @@ endif()
 
 # iclforge_ac3_simd_avx2 (runtime SIMD dispatch, x86_64 only,
 # ICLFORGE_AVX2) is PUBLIC-linked into both iclforge_ac3_static and iclforge_ac3_shared
-# unconditionally (src/ac3/CMakeLists.txt), so it needs the same
+# unconditionally (libs/ac3/CMakeLists.txt), so it needs the same
 # export-set membership iclforge_ac3_objects gets just above and for the same
 # reason: install(EXPORT) cannot resolve a usage-requirement dependency
 # that is not itself part of an export set, regardless of which branch
@@ -118,7 +118,7 @@ endif()
 # part of any export set.
 # Source headers, from iclforge::ac3's include/ tree, as the file set iclforge_header_set()
 # (cmake/IclforgeLibrary.cmake) gives every library.
-iclforge_header_set(iclforge_ac3_objects "${PROJECT_SOURCE_DIR}/src/ac3/include")
+iclforge_header_set(iclforge_ac3_objects "${PROJECT_SOURCE_DIR}/libs/ac3/include")
 install(TARGETS ${_iclforge_forge_install_targets}
     EXPORT ac3Targets
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT library
@@ -128,7 +128,7 @@ install(TARGETS ${_iclforge_forge_install_targets}
 
 # The generated header - the generate_export_header() output (the family's version is
 # iclforge::base's, installed with it) - lives in the library's own binary dir, not
-# its source tree (see src/ac3/CMakeLists.txt), so the header file set above never
+# its source tree (see libs/ac3/CMakeLists.txt), so the header file set above never
 # sees it. A consumer's #include
 # <iclforge/ac3/export.hpp> needs it installed at the same relative path the
 # in-tree BUILD_INTERFACE include dirs already use.
@@ -145,10 +145,10 @@ iclforge_install_pkgconfig(
     LIBNAME "${_iclforge_forge_pc_libname}"
     REQUIRES iclforge-base iclforge-dsp iclforge-objects iclforge-render)
 
-# The codec-blind libraries iclforge::ac3 links (src/base, dsp, objects, render), and the
+# The codec-blind libraries iclforge::ac3 links (libs/base, dsp, objects, render), and the
 # containers: each is a mandatory component, installed and exported like the codec.
 # Fixed32 and the scalar arithmetic (iclforge/base/arithmetic/) are in-tree build plumbing, never
-# installed: they are in src/base/internal, which iclforge::base_headers (src/base/CMakeLists.txt)
+# installed: they are in libs/base/internal, which iclforge::base_headers (libs/base/CMakeLists.txt)
 # alone puts on an include path.
 iclforge_install_library(base
     DESCRIPTION "The family's version, the bit reader and writer, the speaker vocabulary, the CPU feature probe and the signing key, SHA-256 and HMAC-SHA-256 the iclforge libraries build on"
@@ -181,7 +181,7 @@ endif()
 # ICLFORGE_INSTALL_BOTH_LINKAGES and BUILD_SHARED_LIBS: it embeds the third-party libbw64 and libadm
 # (never installed or exported by this project in their own right), which only a self-contained
 # shared library can absorb without either re-exporting them or leaving a static archive with
-# unresolved symbols (src/adm/CMakeLists.txt's header comment). Its .pc names the object model and
+# unresolved symbols (libs/adm/CMakeLists.txt's header comment). Its .pc names the object model and
 # the IAB reader, which the bridge's headers name. No vcpkg or Conan feature: iclforge::adm needs
 # Boost (docs/library/index.md).
 if(ICLFORGE_BUILD_ADM)
@@ -190,7 +190,7 @@ if(ICLFORGE_BUILD_ADM)
         REQUIRES iclforge-objects iclforge-iab)
 endif()
 
-# The AC-4 codec (src/ac4, iclforge::ac4: the inspector, the decoder and the encoder, one library)
+# The AC-4 codec (libs/ac4, iclforge::ac4: the inspector, the decoder and the encoder, one library)
 # is an optional component, ICLFORGE_BUILD_AC4 (see the root CMakeLists.txt). The vcpkg port's
 # "ac4" feature and the Conan recipe's "ac4" option switch it, off unless asked for (packaging/): it
 # adds public targets, which a curated vcpkg port's default features may not. The tables and the
@@ -213,7 +213,7 @@ endif()
 # names the archive here. iclforge_install_pkgconfig() says why that goes to Requires.private:
 # libiclforge_c.so embeds the codec and needs no libiclforge_ac3.so beside it. iclforge.h declares
 # its AC-4 section either way; with ICLFORGE_BUILD_AC4 off those functions return
-# ICLFORGE_ERROR_UNSUPPORTED (src/capi/src/ac4_absent.cpp). With it on, the archive also calls into
+# ICLFORGE_ERROR_UNSUPPORTED (libs/capi/src/ac4_absent.cpp). With it on, the archive also calls into
 # the decoder's and the encoder's (capiTargets carries their $<LINK_ONLY:...> archives too), and the
 # .pc of each brings the inspector and the core.
 if(ICLFORGE_BUILD_CAPI)
@@ -248,7 +248,7 @@ configure_package_config_file(
     INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/iclforge")
 
 # SameMajorVersion, not exact: pre-1.0, there is no ABI-compatibility promise
-# across any two releases (see src/ac3/CMakeLists.txt's SOVERSION comment for
+# across any two releases (see libs/ac3/CMakeLists.txt's SOVERSION comment for
 # the full reasoning), but SameMajorVersion is the conventional default and
 # is what actually governs here - find_package()'s own version matching
 # against a requested `find_package(iclforge X.Y.Z)`, not the .so's SONAME

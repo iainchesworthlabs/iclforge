@@ -44,7 +44,7 @@ list(REMOVE_DUPLICATES _ICLFORGE_PC_CXX_RUNTIME_LIBS)
 unset(_iclforge_pc_lib)
 
 # NAME: pkg-config name, e.g. `pkg-config --libs iclforge-ac3`: iclforge-<library>, the library's
-# file name (iclforge_<library>, see e.g. src/ac3/CMakeLists.txt) with a hyphen, which is also
+# file name (iclforge_<library>, see e.g. libs/ac3/CMakeLists.txt) with a hyphen, which is also
 # the on-disk library basename whenever the shared variant is what's actually installed.
 # LIBNAME: the `-l<LIBNAME>` this component's install actually provides - see
 # iclforge_pkgconfig_libname() below for how callers derive this correctly for whichever
@@ -59,7 +59,7 @@ unset(_iclforge_pc_lib)
 # pkg-config follows for the link line only with --static, and only when LIBNAME is a static
 # archive. A Requires: line would make every consumer of the shared libiclforge_c.so depend on
 # libiclforge_ac3.so as well, although that library embeds the codec so that it is the one library to
-# load (src/capi/CMakeLists.txt).
+# load (libs/capi/CMakeLists.txt).
 #
 # A .pc that names a static archive (its LIBNAME ends in _static, the name that
 # iclforge_pkgconfig_libname() below picks) also gets Libs.private with the C++ runtime and libm,

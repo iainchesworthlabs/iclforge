@@ -106,7 +106,7 @@ FAILURES: list[str] = []
 # identify writes no file at all - it plays a tone through an output and
 # prints which speaker each rendered channel reached, so there is nothing for
 # a matrix to check and nothing to check it with on a runner with no sound
-# card. What can be checked without one is in tests/audio/test_pcm_output.cpp
+# card. What can be checked without one is in libs/audio/tests/test_pcm_output.cpp
 # (the width and the patch it chooses, against fake device records); the
 # playing itself is the hidden [.][monitor-live] case and real hardware.
 EXCLUDED_COMMANDS = {

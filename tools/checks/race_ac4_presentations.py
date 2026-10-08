@@ -4,7 +4,7 @@ DEE writes one presentation of one substream, so its side of the race is phase D
 multiplexer over the gold set's legs of music and effects, dialogue and associated audio, each a
 DEE encode of its own source at its own rate (phases G0 and G1); the encoder's side encodes the same
 sources into the same presentations, each substream at its leg's rate. `iclforge-tests "[.race]"`
-(tests/ac4/encoder/test_presentations_race.cpp) writes both streams of each race; this decodes
+(libs/ac4/tests/encoder/test_presentations_race.cpp) writes both streams of each race; this decodes
 every presentation of both with `forge decode presentation-id=`, and scores each against its
 sources' mix, the plain sum the presentations' default mixing values give: music and effects with
 dialogue (presentation 1), with associated audio as well (2), and each substream alone (10 to 12).

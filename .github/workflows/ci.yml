@@ -37,13 +37,13 @@
 #                                     _build.yml. Also runs the codec-matrix
 #                                     script's full layout/tool/atmos sweep
 #   coverage                GREEN     per-component line/branch gates over all
-#                                     nine library components (src/ac3 92.2%
+#                                     nine library components (libs/ac3 92.2%
 #                                     line / 84.1% branch on the 2026-08-20
 #                                     WSL2 calibration run - no hosted run of
 #                                     the per-component gate recorded here
-#                                     yet; src/audio measured genuinely thin,
-#                                     src/capi's own thin spot closed the same
-#                                     day when tests/capi/test_capi.cpp gained its
+#                                     yet; libs/audio measured genuinely thin,
+#                                     libs/capi's own thin spot closed the same
+#                                     day when libs/capi/tests/test_capi.cpp gained its
 #                                     E-AC-3 half) - the floors and the full
 #                                     measured table live in
 #                                     tools/checks/coverage_report.sh
@@ -133,7 +133,7 @@
 # than adding a new one, and the existing `ctest --preset test-<leg>` step
 # picks it up with zero changes to this file or _build.yml.
 #
-# ALSA-conditional tests (tests/audio/backend/alsa/, see tests/CMakeLists.txt)
+# ALSA-conditional tests (libs/audio/tests/backend/alsa/, see tests/CMakeLists.txt)
 # register only when ICLFORGE_WITH_ALSA finds libasound, which is why a
 # no-ALSA fallback run reports fewer tests than the same leg's full run - a
 # configuration difference, not tests going missing.

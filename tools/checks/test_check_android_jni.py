@@ -155,7 +155,7 @@ class Native(Fixture):
             NATIVE.replace("nativeVersion", "nativeVersionGone"),
         )
         self.put(
-            "src/audio/src/backend/android/passthrough.cpp",
+            "libs/audio/src/backend/android/passthrough.cpp",
             'extern "C" void Java_com_example_shield_NativeBridge_nativeVersion(JNIEnv*, jclass)'
             " {}\n",
         )

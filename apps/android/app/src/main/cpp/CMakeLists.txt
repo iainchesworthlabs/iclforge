@@ -4,7 +4,7 @@
 #
 #  1. Pull in the real repo root's CMakeLists.txt via add_subdirectory(), so
 #     iclforge::ac3 and iclforge::audio (including this app's own
-#     src/audio/src/backend/android/ backend) are built from the SAME
+#     libs/audio/src/backend/android/ backend) are built from the SAME
 #     source-of-truth target definitions the desktop CLI/GUI use - a change
 #     to the core lib is picked up here automatically, nothing to keep in
 #     sync by hand.
@@ -41,7 +41,7 @@ set(ICLFORGE_BUILD_GUI OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_FUZZERS OFF CACHE BOOL "" FORCE)
-# Defaults ON (root CMakeLists.txt) and add_subdirectory()s src/sendspin, which hard-requires
+# Defaults ON (root CMakeLists.txt) and add_subdirectory()s libs/sendspin, which hard-requires
 # MbedTLS/httplib/FLAC/Opus/mdns via find_package(... REQUIRED) - packages that exist nowhere
 # in an NDK cross-compile (no vcpkg toolchain here, see setup-vcpkg's own desktop-only scope).
 # Same gap python/pyproject.toml and rust/iclforge-sys/build.rs had for the same reason.
@@ -49,12 +49,12 @@ set(ICLFORGE_BUILD_HEARTH OFF CACHE BOOL "" FORCE)
 
 # iclforge_jni's own target_link_libraries below is iclforge::ac3/iclforge::audio only
 # (see the comment above the MATROSKA/MP4/MPEGTS block just below) - this app never links
-# iclforge::c, so there is no reason to compile src/capi at all here. Off explicitly rather
+# iclforge::c, so there is no reason to compile libs/capi at all here. Off explicitly rather
 # than relying on the root CMakeLists.txt's default ON: leaving it on would silently compile
 # iclforge_capi_objects/iclforge_c_static/iclforge_c_shared into every Shield build for nothing.
 set(ICLFORGE_BUILD_CAPI OFF CACHE BOOL "" FORCE)
 
-# The AC-4 library (src/ac4) builds at the root
+# The AC-4 library (libs/ac4) builds at the root
 # CMakeLists.txt's own default (ON, plan phase I4): unlike Hearth above, they depend on
 # nothing outside this tree (packaging/vcpkg-port/iclforge/vcpkg.json's "ac4" feature says
 # the same - "depends on nothing in iclforge::ac3"), so they cross-compile under the NDK with no
@@ -70,7 +70,7 @@ set(ICLFORGE_BUILD_CAPI OFF CACHE BOOL "" FORCE)
 # condition the root CMakeLists.txt's own FATAL_ERROR guards require before
 # these three may also be OFF ("this is the shape a vcpkg build without the
 # matching feature actually uses"). Turning them off here is purely an
-# unused-code trim now: iclforge::containers's HLS/DASH signaling helpers (src/containers/src/mp4/
+# unused-code trim now: iclforge::containers's HLS/DASH signaling helpers (libs/containers/src/mp4/
 # hls.cpp, dash.cpp) used to fail to compile for Android outright - NDK r26's
 # bundled libc++ (LLVM 17) ships <format> gated behind
 # __has_feature(experimental_library), undefined unless the compiler is
@@ -98,13 +98,13 @@ add_library(iclforge_jni SHARED
 target_compile_features(iclforge_jni PRIVATE cxx_std_23)
 
 # log: android/log.h, used by jni_entry.cpp and by
-# src/audio/src/backend/android/passthrough.cpp (linked in transitively via
+# libs/audio/src/backend/android/passthrough.cpp (linked in transitively via
 # iclforge::audio, which already declares its own aaudio/log deps - see
-# src/audio/CMakeLists.txt's ANDROID branch).
+# libs/audio/CMakeLists.txt's ANDROID branch).
 # android: android/asset_manager_jni.h (AAssetManager_fromJava), used by
 # live_cursor.cpp to load the bundled lead-object voice sample and by
 # shield_signing_hook.cpp to load the bundled signing key.
-# iclforge::ac3 carries the committed clean-room EMDF object signer (src/ac3/src/signing,
+# iclforge::ac3 carries the committed clean-room EMDF object signer (libs/ac3/src/signing,
 # dependency-free) with the codec. Always linked now - the signer
 # has no embedded secret to keep out of the tree; whether it actually signs
 # depends on the runtime key asset, not on a build variant. See

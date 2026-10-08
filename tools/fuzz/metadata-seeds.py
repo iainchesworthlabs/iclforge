@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Seed corpora for the metadata-parser harnesses (signing-verify fuzz walk).
 
-Two subcommands, both driven from fuzz/generate-seeds.sh:
+Two subcommands, both driven from tools/fuzz/generate-seeds.sh:
 
   extract <out-dir> <stream.ec3>...
       Pulls the real EMDF containers, and the OAMD and JOC payloads inside
@@ -18,7 +18,7 @@ Two subcommands, both driven from fuzz/generate-seeds.sh:
       Synthesises BW64/RF64 fixtures for fuzz_adm_parse. Nothing forge
       produces is an ADM file, so unlike every other seed corpus here this
       one cannot come from the encoder - these mirror the fixtures
-      tests/adm/test_adm.cpp builds in memory (BS.2088-1 chunk layout,
+      libs/adm/tests/test_adm.cpp builds in memory (BS.2088-1 chunk layout,
       BS.2076-2 ADM XML), which are the shapes the reader is known to accept
       and therefore the ones worth mutating from.
 
@@ -32,7 +32,7 @@ Two subcommands, both driven from fuzz/generate-seeds.sh:
       frames a burst, Pc 0x0D18, Pd the frame's length in bits.
 
 The EMDF container syntax below is a deliberate second implementation of
-src/objects/src/emdf.cpp's own reader, in a different language, for the
+libs/objects/src/emdf.cpp's own reader, in a different language, for the
 narrow purpose of finding payload boundaries. It is not a check on that
 reader and is not authoritative: if the two ever disagree, this script simply
 extracts fewer (or worse) seeds, which shows up as a smaller corpus rather
@@ -45,7 +45,7 @@ import pathlib
 import struct
 import sys
 
-# --- EMDF container reader (mirrors src/objects/src/emdf.cpp) -----------
+# --- EMDF container reader (mirrors libs/objects/src/emdf.cpp) -----------
 
 EMDF_SYNC = 0x5838
 PAYLOAD_ID_OAMD = 11
@@ -249,7 +249,7 @@ def cmd_extract(out_root: pathlib.Path, streams: list[pathlib.Path]) -> int:
 # --- BW64/ADM fixtures for fuzz_adm_parse ----------------------------------
 
 # BS.2076-2 Annex 1: one Objects-type channel, fully cross-referenced. Kept in
-# step with tests/adm/test_adm.cpp's kCarAdmXml, which is the document the
+# step with libs/adm/tests/test_adm.cpp's kCarAdmXml, which is the document the
 # reader is actually tested against.
 CAR_ADM_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
 <audioFormatExtended version="ITU-R_BS.2076-2">

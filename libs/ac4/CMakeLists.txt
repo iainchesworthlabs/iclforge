@@ -24,7 +24,7 @@
 # Made by iclforge_add_library() (cmake/IclforgeLibrary.cmake). The
 # minimum-footprint profile (ICLFORGE_MINIMAL_AC4, planning/ac4.md, D14b)
 # builds the decode-only archive from a narrower list of the same sources
-# (minimal.cmake), as src/ac3 does; the encoder has no such archive, being
+# (minimal.cmake), as libs/ac3 does; the encoder has no such archive, being
 # built for no ESP32 part (decision 34).
 # ---------------------------------------------------------------------------
 
@@ -111,10 +111,10 @@ set(_ac4_inspector_sources
 # What the decoder and the encoder compute alike: the tables generated from the
 # ETSI attachments, in namespace iclforge::ac4::detail, and the transforms, the
 # QMF banks and the sample rate converter, which are dsp's tiered kernels
-# (src/dsp/src/tiered, iclforge::dsp::tiered; planning/consolidation.md, decision
+# (libs/dsp/src/tiered, iclforge::dsp::tiered; planning/consolidation.md, decision
 # 14). Those are written against the decode tier's scalar, which iclforge::dsp's
 # own library is built at none of, so the codec that calls them builds them, as
-# src/ac3/minimal.cmake builds dsp's files into AC-3's archive.
+# libs/ac3/minimal.cmake builds dsp's files into AC-3's archive.
 set(_dsp_tiered ../dsp/src/tiered)
 set(_ac4_kernel_sources
     src/core/acpl/acpl.cpp
@@ -149,7 +149,7 @@ set(_ac4_kernel_sources
 # fixed-point tier of its own, so it does not follow ICLFORGE_DECODE_SCALAR.
 # iclforge::ac3 avoids this by compiling its encoder's and decoder's DSP
 # separately (ICLFORGE_ENCODE_SCALAR beside ICLFORGE_DECODE_SCALAR,
-# src/ac3/CMakeLists.txt); here one set of kernels serves both, so when Real is
+# libs/ac3/CMakeLists.txt); here one set of kernels serves both, so when Real is
 # not already double, each of those kernels' .cpp files also explicitly
 # instantiates <double>. That is done through a macro the per-tier
 # iclforge/dsp/tiered/real.hpp defines (src/dsp/variants/decode-scalar-<tier>/,
@@ -163,15 +163,15 @@ set(_ac4_kernel_sources
 # in an ordinary build, a Tracy zone under ICLFORGE_ENABLE_TRACY, and in the
 # minimum-footprint profile under ICLFORGE_STAGE_TIMERS the two functions the
 # application supplies. The profile builds no iclforge::base, so the directory
-# comes from src/base by variable (ICLFORGE_PROFILING_INCLUDE_DIR).
+# comes from libs/base by variable (ICLFORGE_PROFILING_INCLUDE_DIR).
 #
-# iclforge::base_headers (src/base): Fixed32, MantExp and the project's own
+# iclforge::base_headers (libs/base): Fixed32, MantExp and the project's own
 # float transcendentals, decision 31's "no copies", the same on every platform.
 set(_ac4_private_includes
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     # the complex type and the Stockham passes, iclforge/dsp/detail (not installed)
-    "${PROJECT_SOURCE_DIR}/src/dsp/include"
-    "${PROJECT_SOURCE_DIR}/src/dsp/src"
+    "${PROJECT_SOURCE_DIR}/libs/dsp/include"
+    "${PROJECT_SOURCE_DIR}/libs/dsp/src"
     "${PROJECT_SOURCE_DIR}/src/dsp/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}"
     "${ICLFORGE_PROFILING_INCLUDE_DIR}")
 set(_ac4_link_private
@@ -219,7 +219,7 @@ if(ICLFORGE_DECODE_SCALAR_TIER STREQUAL "float32" AND
 endif()
 
 # The float tables of the sample rate converter are built by the compiler, in
-# src/dsp/src/tiered/resampler.cpp and in no other translation unit and only in a
+# libs/dsp/src/tiered/resampler.cpp and in no other translation unit and only in a
 # build whose scalar is float, and the Q1.30 tables alike only in one whose
 # scalar is fixed (planning/ac4.md, D14d) (tiered/resampler_design.hpp: the
 # three ratios the decoder uses, 1001/960 the long one, 47,094 coefficients each
@@ -236,7 +236,7 @@ endif()
 # 15 8.4 where 1.5, Clang 22 8.8 where 1.0 and MSVC 14.7 where 0.7
 # (planning/ac4.md, D14a5); a double build pays nothing. The ESP-IDF component
 # reaches this file through the root CMakeLists.txt, so the same limits apply
-# there. src/dsp/src/tiered/transform_tables.cpp narrows the inverse transform's
+# there. libs/dsp/src/tiered/transform_tables.cpp narrows the inverse transform's
 # tables (core/dsp/transform_tables.hpp) to the tier's scalar the same way:
 # about 13,000 doubles, well inside the same limits.
 if(ICLFORGE_DECODE_SCALAR_TIER STREQUAL "float32" OR ICLFORGE_DECODE_SCALAR_TIER STREQUAL "fixed32")

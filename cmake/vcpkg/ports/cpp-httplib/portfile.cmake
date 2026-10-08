@@ -1,6 +1,6 @@
 # Overlay port: microsoft/vcpkg's cpp-httplib port as of commit d725c087, with this comment and
 # one patch of ours. It pins 0.56.0 ahead of vcpkg.json's builtin-baseline, which still has
-# 0.52.0: src/sendspin's WebSocket transport needs 0.56.0's ws::WebSocket::set_read_timeout(),
+# 0.52.0: libs/sendspin's WebSocket transport needs 0.56.0's ws::WebSocket::set_read_timeout(),
 # which hands a blocked read back as ReadResult::Timeout without closing the connection and is
 # safe to call while another thread reads.
 #

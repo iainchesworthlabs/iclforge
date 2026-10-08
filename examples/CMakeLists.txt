@@ -33,7 +33,7 @@ set(ICLFORGE_EXAMPLES
     atmos_fallback
     qc_report)
 
-# read_adm demonstrates iclforge::adm (src/adm), the standalone BW64/RF64 + ADM
+# read_adm demonstrates iclforge::adm (libs/adm), the standalone BW64/RF64 + ADM
 # parser - "standalone" meaning zero dependency on iclforge::ac3, unlike every other
 # example in the list above. encode_adm (ADM BWF reader phase 3) is the end-to-end
 # counterpart: iclforge::adm::parse_bw64 -> iclforge::adm::build -> iclforge::ac3::oba::AtmosEncoder, so unlike
@@ -44,7 +44,7 @@ set(ICLFORGE_EXAMPLES
 if(ICLFORGE_BUILD_ADM)
     list(APPEND ICLFORGE_EXAMPLES read_adm encode_adm)
     # encode_iab (IAB reader phase 3) needs iclforge::adm's own IAB mapping (build_iab), gated
-    # the same way encode_adm needs the ADM one - see src/adm/CMakeLists.txt's own header
+    # the same way encode_adm needs the ADM one - see libs/adm/CMakeLists.txt's own header
     # comment for why that whole module rides ICLFORGE_BUILD_ADM. Unlike encode_adm it does NOT
     # need iclforge::adm directly (iclforge::iab, its own container reader, is always available -
     # ICLFORGE_BUILD_IAB defaults ON).
@@ -63,7 +63,7 @@ if(ICLFORGE_BUILD_IAMF)
     list(APPEND ICLFORGE_EXAMPLES iamf_objects)
 endif()
 
-# read_iab demonstrates iclforge::iab (src/iab), IAB reader phases 1-2 - "standalone" meaning
+# read_iab demonstrates iclforge::iab (libs/iab), IAB reader phases 1-2 - "standalone" meaning
 # zero dependency on iclforge::ac3, the same shape read_adm has for iclforge::adm above. Unlike
 # ICLFORGE_BUILD_ADM (default OFF), ICLFORGE_BUILD_IAB defaults ON, so this is unconditional like
 # mux_mkv rather than gated in the foreach below.
@@ -74,8 +74,8 @@ endif()
 foreach(example IN LISTS ICLFORGE_EXAMPLES)
     add_executable(${example} "${example}.cpp")
     if(example STREQUAL "read_adm")
-        # No iclforge::ac3 here - src/adm is deliberately independent of it (see
-        # src/adm/CMakeLists.txt's header comment), so this example only needs
+        # No iclforge::ac3 here - libs/adm is deliberately independent of it (see
+        # libs/adm/CMakeLists.txt's header comment), so this example only needs
         # the parser itself plus the same iclforge::warnings every other example gets.
         target_link_libraries(${example} PRIVATE iclforge::adm iclforge::warnings iclforge::fmt)
     elseif(example STREQUAL "encode_adm")
@@ -88,8 +88,8 @@ foreach(example IN LISTS ICLFORGE_EXAMPLES)
     elseif(example STREQUAL "iamf_objects")
         target_link_libraries(${example} PRIVATE iclforge::containers iclforge::warnings iclforge::fmt)
     elseif(example STREQUAL "read_iab")
-        # No iclforge::ac3 here either - src/iab is deliberately independent of it (see
-        # src/iab/CMakeLists.txt's header comment), the same reason read_adm above needs none.
+        # No iclforge::ac3 here either - libs/iab is deliberately independent of it (see
+        # libs/iab/CMakeLists.txt's header comment), the same reason read_adm above needs none.
         target_link_libraries(${example} PRIVATE iclforge::iab iclforge::warnings iclforge::fmt)
     elseif(example STREQUAL "encode_iab")
         # The one example (and IAB reader's own phase-3 deliverable) needing iclforge::ac3
@@ -143,7 +143,7 @@ if(ICLFORGE_BUILD_CAPI)
         # Both call sin() to make their tone, and a C link, unlike a clang++/g++ one, does not add
         # libm. They never had to name it: the static codec rode along on iclforge::c's link
         # interface, which made CMake link them with the C++ driver. With BUILD_SHARED_LIBS=ON it
-        # no longer does (src/capi/CMakeLists.txt), so they link as the C programs they are.
+        # no longer does (libs/capi/CMakeLists.txt), so they link as the C programs they are.
         if(UNIX)
             target_link_libraries(${capi_example} PRIVATE m)
         endif()
@@ -155,7 +155,7 @@ if(ICLFORGE_BUILD_CAPI)
     endif()
 endif()
 
-# decode_ac4 demonstrates the AC-4 inspector and decoder (src/ac4), which link nothing
+# decode_ac4 demonstrates the AC-4 inspector and decoder (libs/ac4), which link nothing
 # of iclforge::ac3, as read_iab links nothing of it. It decodes the stream it is given, so it keeps out
 # of the list above, whose programs ctest runs with no arguments, and ctest hands it a committed DEE
 # stream. ICLFORGE_BUILD_AC4 defaults ON, and with it off there is no decoder to link.

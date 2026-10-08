@@ -206,7 +206,7 @@ add_executable(iclforge-tests
 # the plain Linux GCC/GCC-arm64 legs all hit it). `tampered` is a full copy
 # of a real encoded AC-3 syncframe, always far more than 6 bytes, so nothing
 # here is genuinely null-unsafe. Scoped to the file rather than widening
-# that project-wide guard, the same reasoning src/adm/CMakeLists.txt's
+# that project-wide guard, the same reasoning libs/adm/CMakeLists.txt's
 # own GCC-15 instance of this category gives for scoping to its one target:
 # nothing else in this project has hit it, so silencing it everywhere would
 # risk hiding a genuine one elsewhere.
@@ -231,31 +231,31 @@ set_source_files_properties(hearth/test_queue.cpp hearth/test_transport.cpp
 # translation units rather than library surface - same pattern, same reason.
 # test_exp_strategy.cpp includes exp_strategy.hpp, the exponent-run planner the
 # two encoder translation units share. It is deliberately not library surface -
-# nothing outside src/ac3/src/encoder/ has any business planning exponent
+# nothing outside libs/ac3/src/encoder/ has any business planning exponent
 # runs - but what it decides is a cost judgement, and that is worth holding to
 # account on inputs chosen to make the right answer obvious rather than only
 # through a whole encode: a library's src/ dir on this target's include path only, the pattern the
 # ALSA backend's internal header uses below.
-target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/src/encoder")
+target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/libs/ac3/src/encoder")
 
 # test_scalar_math.cpp includes iclforge/base/arithmetic/scalar_math.hpp and
 # test_fixed32*.cpp/test_mdct_fixed.cpp include iclforge/base/arithmetic/fixed32.hpp - the
-# shared arithmetic target (src/base) both iclforge::ac3 and iclforge::ac4
+# shared arithmetic target (libs/base) both iclforge::ac3 and iclforge::ac4
 # use (planning/ac4.md, decision 31), worth holding to their own accuracy/
 # correctness bounds rather than only through the fixture hashes that depend
 # on them.
 target_link_libraries(iclforge-tests PRIVATE iclforge::base_headers)
-target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/src/core")
-# test_block_norm.cpp includes src/ac3/src/decoder/block_norm.hpp, the
+target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/libs/ac3/src/core")
+# test_block_norm.cpp includes libs/ac3/src/decoder/block_norm.hpp, the
 # fixed-point tier's block exponent, which both decoders share and which is not
 # library surface.
-target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/src/decoder")
+target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/libs/ac3/src/decoder")
 # tests/ac4/decoder/test_{asf,metadata,presentation,channel_elements}.cpp reach the
-# AC-4 decoder's syntax functions (src/ac4/src/decoder/syntax/) to hold each branch of
+# AC-4 decoder's syntax functions (libs/ac4/src/decoder/syntax/) to hold each branch of
 # the syntax to a hand-built bitstream - the committed streams reach only the
 # branches DEE writes - and the other tests in the block below reach its PCM
-# functions (src/ac4/src/decoder/pcm/) and the encoder's syntax writers
-# (src/ac4/src/encoder/). Same pattern as the forge headers above, with
+# functions (libs/ac4/src/decoder/pcm/) and the encoder's syntax writers
+# (libs/ac4/src/encoder/). Same pattern as the forge headers above, with
 # one difference: those headers are inline, and these functions are compiled into
 # iclforge_ac4_objects under CXX_VISIBILITY_PRESET hidden. With BUILD_SHARED_LIBS=ON,
 # iclforge::ac4 is libiclforge_ac4.so, which exports none of them, so these tests link
@@ -266,16 +266,16 @@ target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/src/ac3/s
 # test_encoder.cpp, against the real .so file. Linking the static library here
 # instead would let those bind to a static copy too, and stop testing the .so at all.
 #
-# The library's private headers are spelled from src/ac4/src (core/, decoder/,
-# encoder/), with dsp's tiered kernels (src/dsp/src, tiered/) and their scalar tier's
+# The library's private headers are spelled from libs/ac4/src (core/, decoder/,
+# encoder/), with dsp's tiered kernels (libs/dsp/src, tiered/) and their scalar tier's
 # iclforge/dsp/tiered/real.hpp beside them. The kernels the decoder and the encoder
-# share (src/ac4/src/core and src/dsp/src/tiered: the tables and the transforms,
+# share (libs/ac4/src/core and libs/dsp/src/tiered: the tables and the transforms,
 # ICLFORGE_AC4_KERNEL_SOURCES) are compiled into this target a second time in a shared
-# build, as cpu_features.cpp is below: tests/ac4/core/ and tests/dsp/tiered/ hold them
+# build, as cpu_features.cpp is below: libs/ac4/tests/core/ and libs/dsp/tests/tiered/ hold them
 # to their own bounds in every build, and libiclforge_ac4.so exports none of them.
 target_include_directories(iclforge-tests PRIVATE
-    "${CMAKE_SOURCE_DIR}/src/ac4/src"
-    "${CMAKE_SOURCE_DIR}/src/dsp/src"
+    "${CMAKE_SOURCE_DIR}/libs/ac4/src"
+    "${CMAKE_SOURCE_DIR}/libs/dsp/src"
     "${CMAKE_SOURCE_DIR}/src/dsp/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}")
 if(BUILD_SHARED_LIBS AND ICLFORGE_BUILD_AC4)
     target_sources(iclforge-tests PRIVATE ${ICLFORGE_AC4_KERNEL_SOURCES})
@@ -318,9 +318,9 @@ if(NOT BUILD_SHARED_LIBS)
 endif()
 
 # test_simd_kernels.cpp (SIMD kernels) needs the ONE architecture directory
-# CMake selected in src/base/CMakeLists.txt, so the test exercises the
+# CMake selected in libs/base/CMakeLists.txt, so the test exercises the
 # f64x2/i32x4 the library was actually built with rather than a different
-# one - same white-box arrangement as src/ac3/src/encoder just above and the
+# one - same white-box arrangement as libs/ac3/src/encoder just above and the
 # ALSA backend's internal header below.
 target_include_directories(iclforge-tests PRIVATE "${ICLFORGE_ARCH_INCLUDE_DIR}")
 
@@ -348,11 +348,11 @@ target_include_directories(iclforge-tests PRIVATE
 # test_simd_kernels.cpp's CPU-feature-detection cases (the runtime AVX2
 # dispatch) need cpu_features.cpp compiled a SECOND time,
 # directly into this target, against the same resolved probe directory
-# src/ac3/CMakeLists.txt selected for the library - rather than calling
+# libs/ac3/CMakeLists.txt selected for the library - rather than calling
 # into iclforge_ac3_objects's own copy of has_avx2(), which would need
 # dllexport/dllimport treatment that would otherwise only matter for the
 # config-linux-llvm-shared (BUILD_SHARED_LIBS=ON) leg. Same white-box
-# arrangement as src/ac3/src/encoder above, and unconditional: has_avx2()
+# arrangement as libs/ac3/src/encoder above, and unconditional: has_avx2()
 # correctly answering "false" on a build with no AVX2 tier is exactly as
 # worth testing as it answering "true" where one exists.
 target_sources(iclforge-tests PRIVATE "${ICLFORGE_CPU_FEATURES_SOURCE}")
@@ -367,7 +367,7 @@ endif()
 # The AVX2 kernel side of the same follow-on: avx2_probe.cpp and
 # mdct_avx2.cpp compiled a second time into this target too, same reasoning
 # as cpu_features.cpp just above. ICLFORGE_AVX2_INCLUDE_DIR is empty (falsy)
-# whenever src/ac3/CMakeLists.txt did not build the AVX2 tier at all
+# whenever libs/ac3/CMakeLists.txt did not build the AVX2 tier at all
 # (ICLFORGE_AVX2=OFF, or a non-x86_64 target) - the test sources are
 # conditional on the exact same condition the library used.
 #
@@ -403,16 +403,16 @@ if(ICLFORGE_AVX2_INCLUDE_DIR)
             COMPILE_OPTIONS "-mavx2")
     endif()
 else()
-    # mdct_avx2.hpp too: src/ac3/src/internal/avx2/none/mdct_avx2.cpp already
+    # mdct_avx2.hpp too: libs/ac3/src/internal/avx2/none/mdct_avx2.cpp already
     # gives every kernel it declares a std::unreachable() body inside
     # iclforge_ac3_objects in exactly this configuration, so the absent variant reuses
     # those rather than defining a second set (which is a duplicate-symbol link
     # error, not a harmless overlap). Reaching into src/ by path is the same
     # white-box arrangement this file already uses for
-    # src/ac3/src/{encoder,core,decoder} above.
+    # libs/ac3/src/{encoder,core,decoder} above.
     target_include_directories(iclforge-tests PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/ac3/core/avx2/absent"
-        "${CMAKE_SOURCE_DIR}/src/ac3/src/internal/avx2")
+        "${CMAKE_SOURCE_DIR}/libs/ac3/src/internal/avx2")
     target_sources(iclforge-tests PRIVATE ac3/core/avx2/absent/avx2_tier.cpp)
 endif()
 
@@ -483,13 +483,13 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/render/abi/unknown")
 endif()
 
-# ac3/core/test_crc_mutator.cpp includes fuzz/crc_mutator.hpp - the re-stamping
+# ac3/core/test_crc_mutator.cpp includes libs/ac3/fuzz/crc_mutator.hpp - the re-stamping
 # half of the libFuzzer custom mutator (signing-verify fuzz walk). The mutator itself only
 # builds under Clang with -fsanitize=fuzzer, but the header's
 # restamp_syncframe_crcs is ordinary portable C++ over iclforge::ac3::crc16 and the
 # frame-size tables, and whether it produces a crc1 the decoder accepts is
 # exactly the kind of thing that should be checked on every platform rather
-# than inferred from a coverage number on one. Same shape as the src/ac3/src
+# than inferred from a coverage number on one. Same shape as the libs/ac3/src
 # includes above: a directory outside the public include tree, on this
 # target's path only.
 target_include_directories(iclforge-tests PRIVATE "${CMAKE_SOURCE_DIR}/fuzz")
@@ -511,18 +511,18 @@ target_compile_definitions(iclforge-tests
 target_compile_definitions(iclforge-tests
     PRIVATE "ICLFORGE_TEST_DECODE_SCALAR=\"${ICLFORGE_DECODE_SCALAR}\"")
 
-# The third-party Dolby fixture tests/ac3/oba/test_dee_joc_fixture.cpp reads, on the
+# The third-party Dolby fixture libs/ac3/tests/oba/test_dee_joc_fixture.cpp reads, on the
 # same reasoning: a path, because ctest runs from the build tree.
 target_compile_definitions(iclforge-tests
     PRIVATE "ICLFORGE_GOLDEN_OBJECT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden/object-fixture\"")
 
-# tests/ac4/core/test_toc.cpp reads the real DEE-produced AC-4 fixtures under
+# libs/ac4/tests/core/test_toc.cpp reads the real DEE-produced AC-4 fixtures under
 # here (tools/generators/gen_ac4_baseline.py) - same reasoning as the two
 # defines above.
 target_compile_definitions(iclforge-tests
     PRIVATE "ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden/external-baseline\"")
 
-# tests/ac4/decoder/test_syntax.cpp holds the AC-4 decoder's syntax trace to
+# libs/ac4/tests/decoder/test_syntax.cpp holds the AC-4 decoder's syntax trace to
 # the digests tools/references/ac4_syntax.py wrote for the same streams.
 target_compile_definitions(iclforge-tests
     PRIVATE "AC4_GOLDEN_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden/ac4\"")
@@ -562,7 +562,7 @@ target_compile_definitions(iclforge-tests
     PRIVATE "ICLFORGE_TEST_SCRATCH_DIR=\"${CMAKE_CURRENT_BINARY_DIR}/scratch\"")
 
 # Whether the tests run under the sanitizers (cmake/Sanitizers.cmake), for
-# tests/sanitized.hpp's kSanitized: there the heaviest tests take fewer frames,
+# tests/support/sanitized.hpp's kSanitized: there the heaviest tests take fewer frames,
 # shorter signals and fewer cases, each still running every code path it
 # covers, so that the ASan+UBSan leg, which runs ctest serially in a debug
 # build, finishes within its time (.github/workflows/_ci-linux.yml). Defined as
@@ -582,14 +582,14 @@ endif()
 # for clang-cl too) rather than on WIN32.
 # ---------------------------------------------------------------------------
 if(MSVC)
-    target_sources(iclforge-tests PRIVATE crt/msvc/crt_report.cpp)
+    target_sources(iclforge-tests PRIVATE support/crt/msvc/crt_report.cpp)
 else()
-    target_sources(iclforge-tests PRIVATE crt/stub/crt_report.cpp)
+    target_sources(iclforge-tests PRIVATE support/crt/stub/crt_report.cpp)
 endif()
 
 # ---------------------------------------------------------------------------
 # The test suite's own platform seam - the same shape as the CRT hook above,
-# and as src/audio/src/backend/<backend>/ and apps/cli/platform/<os>/.
+# and as libs/audio/src/backend/<backend>/ and apps/cli/platform/<os>/.
 #
 # Two things a test needs that the standard library does not portably give it:
 # this process's id (for the per-process scratch leaf every writing test takes)
@@ -606,17 +606,17 @@ endif()
 # quoting just as much as an MSVC one does.
 # ---------------------------------------------------------------------------
 if(WIN32)
-    target_sources(iclforge-tests PRIVATE platform/windows/process.cpp)
+    target_sources(iclforge-tests PRIVATE support/platform/windows/process.cpp)
 else()
-    target_sources(iclforge-tests PRIVATE platform/posix/process.cpp)
+    target_sources(iclforge-tests PRIVATE support/platform/posix/process.cpp)
 endif()
 
 # ---------------------------------------------------------------------------
 # The audio backend's own tests, on the same axis the library selects it on.
 #
-# src/audio/CMakeLists.txt compiles exactly one src/backend/<backend>/ directory
+# libs/audio/CMakeLists.txt compiles exactly one src/backend/<backend>/ directory
 # and publishes which one; a backend with device-free logic worth testing gets
-# a matching tests/audio/backend/<backend>/ directory here, added only in the build
+# a matching libs/audio/tests/backend/<backend>/ directory here, added only in the build
 # that compiled it. So the suite can never test a backend the library does not
 # contain, and no test source needs to ask which platform it is on.
 #
@@ -627,7 +627,7 @@ if(ICLFORGE_AUDIO_BACKEND STREQUAL "alsa")
     target_sources(iclforge-tests PRIVATE
         audio/backend/alsa/test_alsa_device_names.cpp
         audio/backend/alsa/test_alsa_eld_parsing.cpp
-        # Software ALSA devices (audio/alsa_null_device.hpp): the backend's
+        # Software ALSA devices (support/alsa_null_device.hpp): the backend's
         # classes and the device-facing forge commands against alsa-lib's
         # null/file/route plugins, so their success paths run without a card.
         audio/test_alsa_null_backend.cpp)
@@ -640,7 +640,7 @@ elseif(ICLFORGE_AUDIO_BACKEND STREQUAL "pipewire")
     target_include_directories(iclforge-tests PRIVATE "${ICLFORGE_AUDIO_BACKEND_DIR}")
     # test_pipewire_support.cpp includes pipewire_support.hpp directly, which
     # in turn includes PipeWire's own headers - the same PkgConfig::PipeWire
-    # target src/audio/CMakeLists.txt linked iclforge_audio against, needed again
+    # target libs/audio/CMakeLists.txt linked iclforge_audio against, needed again
     # here since this is a separate translation unit in a separate target.
     target_link_libraries(iclforge-tests PRIVATE PkgConfig::PipeWire)
 elseif(ICLFORGE_AUDIO_BACKEND STREQUAL "android")
@@ -653,23 +653,23 @@ elseif(ICLFORGE_AUDIO_BACKEND STREQUAL "android")
     target_include_directories(iclforge-tests PRIVATE "${ICLFORGE_AUDIO_BACKEND_DIR}")
 elseif(ICLFORGE_AUDIO_BACKEND STREQUAL "macos")
     # Unlike alsa/android above, this branch DOES run on desktop-hosted
-    # iclforge-tests for real: src/audio/CMakeLists.txt selects macos/
+    # iclforge-tests for real: libs/audio/CMakeLists.txt selects macos/
     # unconditionally under APPLE, so every macOS CI leg's iclforge-tests build
     # compiles and runs this file.
     target_sources(iclforge-tests PRIVATE audio/backend/macos/test_macos_support.cpp)
     target_include_directories(iclforge-tests PRIVATE "${ICLFORGE_AUDIO_BACKEND_DIR}")
 elseif(ICLFORGE_AUDIO_BACKEND STREQUAL "windows")
     # Like macos above, this branch runs on desktop-hosted iclforge-tests for real:
-    # src/audio/CMakeLists.txt selects windows/ unconditionally under WIN32,
+    # libs/audio/CMakeLists.txt selects windows/ unconditionally under WIN32,
     # so every Windows CI leg's iclforge-tests build compiles and runs this file.
     target_sources(iclforge-tests PRIVATE audio/backend/windows/test_windows_support.cpp)
     target_include_directories(iclforge-tests PRIVATE "${ICLFORGE_AUDIO_BACKEND_DIR}")
 endif()
 
-# audio/test_live_positions.cpp needs UdpSocket (src/audio/src/net/udp_socket.hpp)
+# audio/test_live_positions.cpp needs UdpSocket (libs/audio/src/net/udp_socket.hpp)
 # to send itself test datagrams over real loopback - internal to iclforge::audio,
 # not installed, on the include path the same way a backend's own internal
-# header is above (ICLFORGE_AUDIO_NET_DIR, published by src/audio/CMakeLists.txt
+# header is above (ICLFORGE_AUDIO_NET_DIR, published by libs/audio/CMakeLists.txt
 # next to ICLFORGE_AUDIO_BACKEND_DIR). No separate ws2_32 link is needed on
 # Windows: iclforge_audio already carries that requirement for any static-library
 # consumer, iclforge-tests included.
@@ -703,7 +703,7 @@ if(TARGET forge)
         cli/test_cli_encode_paths.cpp cli/test_cli_stream_edges.cpp
         cli/test_cli_inspect_edges.cpp cli/test_cli_atmos_edges.cpp)
     # The same device-facing commands with a device to find: software ALSA
-    # devices (audio/alsa_null_device.hpp), so only in the ALSA configuration.
+    # devices (support/alsa_null_device.hpp), so only in the ALSA configuration.
     if(ICLFORGE_AUDIO_BACKEND STREQUAL "alsa")
         target_sources(iclforge-tests PRIVATE cli/test_cli_live_alsa.cpp)
     endif()
@@ -888,7 +888,7 @@ target_sources(iclforge-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/apps/crucible/ui/desktop_entries.cpp")
 # test_engine_commands.cpp saves the signing key's env-var fallbacks with
 # std::getenv before clearing them for its own case - same C4996 reasoning as
-# src/base/src/crypto/signing_key.cpp (src/base/CMakeLists.txt) and
+# libs/base/src/crypto/signing_key.cpp (libs/base/CMakeLists.txt) and
 # ac3/core/test_simd_kernels.cpp above.
 if(ICLFORGE_IS_MSVC_LIKE)
     set_source_files_properties(crucible/test_engine_commands.cpp
@@ -912,14 +912,14 @@ target_include_directories(iclforge-tests PRIVATE
 # picking it up from iclforge::ac3. Which of the two identically-pathed
 # variants is chosen is CMake's decision, never an #ifdef.
 target_include_directories(iclforge-tests PRIVATE
-    "$<IF:$<BOOL:${ICLFORGE_ENABLE_TRACY}>,${CMAKE_SOURCE_DIR}/src/base/variants/profiling-tracy_enabled,${CMAKE_SOURCE_DIR}/src/base/variants/profiling-tracy_disabled>")
+    "$<IF:$<BOOL:${ICLFORGE_ENABLE_TRACY}>,${CMAKE_SOURCE_DIR}/libs/base/variants/profiling-tracy_enabled,${CMAKE_SOURCE_DIR}/libs/base/variants/profiling-tracy_disabled>")
 target_link_libraries(iclforge-tests PRIVATE iclforge::tracy)
 
 # The Linux Foreground's X11 half has a pure policy (x11_foreground.cpp: when
 # a read yields a pid, when a lost display becomes a reason) over an injected
 # reader, and the session classification and the process-tree walk beside it
 # are headers. None of it needs xcb or a display, so it is tested here with a
-# fake reader - on Linux only, the way tests/audio/backend/pipewire rides its
+# fake reader - on Linux only, the way libs/audio/tests/backend/pipewire rides its
 # backend: the files live in a platform directory and are compiled nowhere
 # else. Ungated on ICLFORGE_BUILD_CRUCIBLE for the reason the block above
 # gives: the rules are worth holding on a leg that never builds the app.
@@ -947,11 +947,11 @@ endif()
 # option() for why it is not on by default like matroska/mp4/mpegts) - test_adm.cpp is only
 # added, and iclforge::adm only linked, when that option turned this target on. Unlike cli/test_cli.cpp
 # above this can't key off TARGET iclforge::adm existing, since that alias is only defined
-# inside src/adm/CMakeLists.txt's own add_subdirectory(), which never runs unless
+# inside libs/adm/CMakeLists.txt's own add_subdirectory(), which never runs unless
 # ICLFORGE_BUILD_ADM is already ON - so the option itself is what's checked here instead.
 #
-# test_adm_bridge.cpp (iclforge::adm, ADM BWF reader phase 2, src/adm) rides the same gate:
-# it depends on iclforge::adm too, and src/adm is only add_subdirectory()'d from inside
+# test_adm_bridge.cpp (iclforge::adm, ADM BWF reader phase 2, libs/adm) rides the same gate:
+# it depends on iclforge::adm too, and libs/adm is only add_subdirectory()'d from inside
 # the same if(ICLFORGE_BUILD_ADM) block in the root CMakeLists.txt.
 if(ICLFORGE_BUILD_ADM)
     target_sources(iclforge-tests PRIVATE adm/test_adm.cpp adm/test_adm_bridge.cpp
@@ -974,7 +974,7 @@ if(ICLFORGE_BUILD_ADM AND TARGET forge)
                                     cli/test_cli_decode_adm.cpp cli/test_cli_atmos_adm_ac4.cpp)
 endif()
 
-# iclforge::iab (IAB reader phase 1, src/iab) is gated by its own ICLFORGE_BUILD_IAB
+# iclforge::iab (IAB reader phase 1, libs/iab) is gated by its own ICLFORGE_BUILD_IAB
 # (default ON, see the root CMakeLists.txt's own option()) rather than being linked
 # unconditionally in the iclforge::containers list below - nothing else
 # in this test binary depends on it, so there is no FATAL_ERROR guard forcing the option to
@@ -986,7 +986,7 @@ if(ICLFORGE_BUILD_IAB)
     target_link_libraries(iclforge-tests PRIVATE iclforge::iab)
 endif()
 
-# iclforge::containers (IAMF writer phase 1, src/containers/src/iamf) is gated by its own ICLFORGE_BUILD_IAMF (default ON,
+# iclforge::containers (IAMF writer phase 1, libs/containers/src/iamf) is gated by its own ICLFORGE_BUILD_IAMF (default ON,
 # see the root CMakeLists.txt's own option()), same conditional shape as the ICLFORGE_BUILD_IAB
 # block immediately above.
 if(ICLFORGE_BUILD_IAMF)
@@ -1002,11 +1002,11 @@ if(ICLFORGE_BUILD_CAPI)
     target_link_libraries(iclforge-tests PRIVATE iclforge::c)
 endif()
 
-# iclforge::sendspin (src/sendspin) is opt-in through ICLFORGE_BUILD_HEARTH, the same shape as the
+# iclforge::sendspin (libs/sendspin) is opt-in through ICLFORGE_BUILD_HEARTH, the same shape as the
 # ICLFORGE_BUILD_ADM block above.
 if(ICLFORGE_BUILD_HEARTH)
     # The engine (apps/hearth/engine) comes first because it needs nothing from
-    # src/sendspin's player half: a core-only build still builds and tests it,
+    # libs/sendspin's player half: a core-only build still builds and tests it,
     # unlike the test sink further down.
     target_sources(iclforge-tests PRIVATE
         hearth/test_ac3_transcoder.cpp
@@ -1161,9 +1161,9 @@ if(ICLFORGE_BUILD_HEARTH)
             sendspin/test_session_driver.cpp
             sendspin/test_sessions.cpp)
         # test_mdns.cpp reads the mdns backend's packet layer, which is private to the library.
-        target_include_directories(iclforge-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src/sendspin/src")
+        target_include_directories(iclforge-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../libs/sendspin/src")
         # test_websocket.cpp writes a WebSocket client's bytes by hand through cpp-httplib's socket
-        # functions, so it is compiled on its own with cpp-httplib configured as src/sendspin
+        # functions, so it is compiled on its own with cpp-httplib configured as libs/sendspin
         # configures it (iclforge_sendspin_httplib), leaving the rest of the suite's flags alone.
         add_library(iclforge_tests_websocket OBJECT sendspin/test_websocket.cpp)
         target_link_libraries(iclforge_tests_websocket
@@ -1182,7 +1182,7 @@ if(ICLFORGE_BUILD_HEARTH)
         # The engine's pairing records, its Network page bookkeeping (A6), its
         # NetworkGroupSink (A6, streaming to a group) and issue #874's own
         # exit - a group of two test sinks played from iclforge::hearth::Engine
-        # itself - all of which need src/sendspin's server half, which a
+        # itself - all of which need libs/sendspin's server half, which a
         # core-only build leaves out.
         target_sources(iclforge-tests PRIVATE
             hearth/test_pairing_store.cpp
@@ -1195,7 +1195,7 @@ if(ICLFORGE_BUILD_HEARTH)
             hearth/test_engine_network_group.cpp
             hearth/test_sink_firmware.cpp)
         # A sink's firmware routes against a stand-in board on 127.0.0.1, which is a cpp-httplib
-        # server, so compiled on its own with cpp-httplib configured as src/sendspin configures
+        # server, so compiled on its own with cpp-httplib configured as libs/sendspin configures
         # it - test_websocket.cpp's reason above.
         add_library(iclforge_tests_sink_firmware_board OBJECT hearth/test_sink_firmware_board.cpp)
         target_link_libraries(iclforge_tests_sink_firmware_board
@@ -1236,7 +1236,7 @@ target_link_libraries(iclforge-tests
         Catch2::Catch2WithMain)
 
 # ac3/core/test_fixed32_ecpl.cpp calls the fixed-point tier's enhanced-coupling
-# functions, which are internal to the library: declared under src/ac3/src/
+# functions, which are internal to the library: declared under libs/ac3/src/
 # rather than in the installed include tree, and so not exported from
 # libiclforge_ac3.so. With BUILD_SHARED_LIBS=ON there is nothing for it to link
 # against, and linking the static archive in as well would put a second copy of
@@ -1253,7 +1253,7 @@ include(Catch)
 # a second discovery pass, a duplicated registration, or a name-based -R guess
 # that a renamed test would silently drop out of.
 #
-# The label that matters today is `concurrency`: tests/audio/ (the lock-free
+# The label that matters today is `concurrency`: libs/audio/tests/ (the lock-free
 # SPSC ring, the silence watchdog, the clock-drift servo and the backend
 # contract), cli/test_cli_live.cpp (the commands that actually start the
 # capture and render threads) and crucible/test_engine.cpp (the Crucible
@@ -1275,7 +1275,7 @@ include(Catch)
 # watchdog's clock arithmetic), deliberately: the label marks what
 # ThreadSanitizer should be watching, and the types those cases exercise are
 # the ones that cross the audio-thread boundary in production. A new test
-# added to tests/audio/ inherits the leg by inheriting the tag.
+# added to libs/audio/tests/ inherits the leg by inheriting the tag.
 #
 # Every other tag in the suite becomes a label too, which costs nothing and
 # makes `ctest -L encoder` and friends work for free.

@@ -1,6 +1,6 @@
 """AC-4 opt-in by build configuration (planning/ac4.md, phases D8 and I4).
 
-ICLFORGE_BUILD_AC4 is on by default, and the AC-4 library (src/ac4, one library since
+ICLFORGE_BUILD_AC4 is on by default, and the AC-4 library (libs/ac4, one library since
 planning/consolidation.md's C1) is part of the default target. D8 found three builds that
 linked none of it and turned the option off there instead of compiling it
 for nothing: the Android app's CMake wrapper, the WebAssembly preset and the Python
@@ -131,7 +131,7 @@ class Ac4BuildConfigurations(unittest.TestCase):
         self.assertIn("option(ICLFORGE_MINIMAL_AC4", text)
         self.assertIn("if(ICLFORGE_MINIMAL_AC4 AND NOT ICLFORGE_MINIMAL_DECODER)", text)
         self.assertIn(
-            "if(ICLFORGE_BUILD_AC4 OR ICLFORGE_MINIMAL_AC4)\n    add_subdirectory(src/ac4)", text
+            "if(ICLFORGE_BUILD_AC4 OR ICLFORGE_MINIMAL_AC4)\n    add_subdirectory(libs/ac4)", text
         )
         # The profile's archive is the inspector, the core and the decoder, and no encoder.
         library = AC4_CMAKE.read_text(encoding="utf-8")

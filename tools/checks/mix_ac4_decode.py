@@ -1,7 +1,7 @@
 """Check the mixes of forge's AC-4 presentations against Part 1's and Part 2's formulas.
 
 For each presentation of several substreams in the multiplexed streams under
-tests/golden/ac4/presentations/ (planning/ac4.md, phase D7; tests/ac4/decoder/mux.hpp builds
+tests/golden/ac4/presentations/ (planning/ac4.md, phase D7; libs/ac4/tests/decoder/mux.hpp builds
 them from DEE's tone legs and the encoder's tone streams), this decodes the presentation with
 `forge decode presentation-id=`, and each of its substreams alone through the single-group
 presentations the streams also carry, and holds the mix to the matrix the texts give. The
@@ -17,7 +17,7 @@ Python reference parser (tools/references/ac4_parse.py, ac4_presentations.py):
            channels; the associated audio by its group's gain and g_assoc, which a premixed
            service does not take; a mono substream panned by pan_dialog or pan_associated (1.5
            degrees a step, 0 where none is sent), the rest channel to channel; summed, not
-           divided by the number of substreams (src/ac4/ERRATA.md, "The mixer's sum"). The
+           divided by the number of substreams (libs/ac4/ERRATA.md, "The mixer's sum"). The
            pan puts L at 330 degrees, C at 0 and R at 30 (Part 1 clause 4.3.12.4.9 and Table
            216), the surrounds at Table D.1's 110 degrees either side, and shares a signal
            linearly between the two channels either side of its angle, which Table 216's 0.5 and

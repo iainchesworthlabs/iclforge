@@ -2,7 +2,7 @@
 committed stream (planning/ac4.md, D14a and D14d).
 
 `ICLFORGE_DECODE_SCALAR=float` builds the decoder's QMF banks, transforms, A-SPX, A-CPL and
-the rest of src/ac4/src/decoder/pcm in `float`, and `ICLFORGE_DECODE_SCALAR=fixed` in Q7.24 with
+the rest of libs/ac4/src/decoder/pcm in `float`, and `ICLFORGE_DECODE_SCALAR=fixed` in Q7.24 with
 block exponents; the default builds them in `double`. This decodes each committed AC-4 stream
 with the double CLI and the other tier's and holds the second decode to the first, in two
 regions of each channel's spectrum:

@@ -9,7 +9,7 @@ view of the encoder configuration's
 one object substream. Each scene is therefore configured twice, by keywords and by assigning
 attributes, and the two streams have to be the same bytes; the decoder then reads every object back
 within what each field's code can hold, with its own tone, and a metadata update at the sample its
-input sample comes out. tests/capi/test_capi.cpp holds the C API to iclforge::ac4::Encoder byte
+input sample comes out. libs/capi/tests/test_capi.cpp holds the C API to iclforge::ac4::Encoder byte
 for byte.
 """
 
@@ -22,7 +22,7 @@ ac4 = ac3.ac4
 RATE = 48_000
 FRAME = 2048
 # Each object's tone sits at the middle of a QMF subband of its own (a parameter band of its own in
-# A-JOC's matrices), the LFE's at 47 Hz, as tests/ac4/encoder/test_objects.cpp has them.
+# A-JOC's matrices), the LFE's at 47 Hz, as libs/ac4/tests/encoder/test_objects.cpp has them.
 SUBBANDS = [1, 3, 5, 7, 9, 12, 16, 22]
 LFE_HZ = 47.0
 # Six frames of input; the update sits at sample 5000, in the third.

@@ -218,7 +218,7 @@ class SatellitesDirectTest(unittest.TestCase):
         for path in (
             "src/ac3/coder/eac3_encoder.cpp",
             "src/base/detail/cpu_features.cpp",
-            "src/base/internal/iclforge/base/arithmetic/fixed32.hpp",
+            "libs/base/internal/iclforge/base/arithmetic/fixed32.hpp",
             "cmake/Compiler.cmake",
             "CMakeLists.txt",
         ):
@@ -229,7 +229,7 @@ class SatellitesDirectTest(unittest.TestCase):
                 self.assertTrue(hits["core"])
 
     def test_the_ac4_trees_leave_the_esp_lane_to_the_nightly_run(self):
-        hits = self.classify("src/ac4/src/decoder/decoder.cpp")
+        hits = self.classify("libs/ac4/src/decoder/decoder.cpp")
         self.assertEqual(lit(hits, *ALL_LANES), {"core", "windows", "linux", "macos"})
 
     def test_a_root_file_the_component_does_not_ship_does_not_light_it(self):

@@ -38,7 +38,7 @@ target_include_directories(_iclforge PRIVATE src/iclforge_ext)
 # three hundred lines of its module body. It is now a directory-selected
 # translation unit per group, on exactly the same condition - the shape every
 # other either/or in this tree uses (src/core/transform/{reference,stub}/,
-# src/internal/avx2/none/, tests/ac3/core/avx2/{present,absent}/) and the one
+# src/internal/avx2/none/, libs/ac3/tests/core/avx2/{present,absent}/) and the one
 # tools/checks/check_platform_macros.ps1 exists to keep. See
 # src/iclforge_ext/optional_modules.hpp for the seam itself.
 if(ICLFORGE_BUILD_MATROSKA AND ICLFORGE_BUILD_MP4 AND ICLFORGE_BUILD_MPEGTS)

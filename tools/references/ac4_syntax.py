@@ -1,4 +1,4 @@
-"""AC-4 substream syntax transcription (the Python reference for src/ac4/src/decoder).
+"""AC-4 substream syntax transcription (the Python reference for libs/ac4/src/decoder).
 
 Written from ETSI TS 103 190-1 V1.4.1 (Part 1) and ETSI TS 103 190-2 V1.3.1
 (Part 2) alone. Part 2 clause 6 amends Part 1 clause 4 (Part 2 tables 48/49);
@@ -29,7 +29,7 @@ Usage:
   python ac4_syntax.py digest <file.ac4> > out.tsv
   python ac4_syntax.py trace <file.ac4> [first_frame last_frame] > out.tsv
 Options (before the command): --literal-ims  do not apply the empirical
-presentation_version 2 stereo rule (see src/ac4/ERRATA.md).
+presentation_version 2 stereo rule (see libs/ac4/ERRATA.md).
 Diagnostics (refusals, invariant failures) go to stderr; the exit status is
 1 when any invariant failed.
 
@@ -284,7 +284,7 @@ def superset(a, b, sets=_CH_SETS):
     # the presentation has no single channel mode, and the presentation
     # substream reads the fields that answer to that. Returning the larger mode
     # would name a layout the presentation does not have, dropping the LFE of
-    # 5/2/0.1 against 9.0.4 (src/ac4/ERRATA.md, "The presentation
+    # 5/2/0.1 against 9.0.4 (libs/ac4/ERRATA.md, "The presentation
     # substream").
     return -1
 
@@ -383,7 +383,7 @@ def sf_info_lfe(r, ctx):
     # Table 35 gives the LFE no transf_length: its transform covers the frame,
     # so the index is the whole-frame one. This used to be 4 whatever the frame
     # length, which reads sect_len_incr 5 bits wide at 512 and 384 samples where
-    # Table 39 takes 3 (src/ac4/ERRATA.md, "sf_info_lfe() below 1536 samples"
+    # Table 39 takes 3 (libs/ac4/ERRATA.md, "sf_info_lfe() below 1536 samples"
     # and "n_sect_bits below 1536 samples").
     s.tl = (_full_frame_index(flb),) * 2
     s.tl_len = (flb, flb)
@@ -784,7 +784,7 @@ def parse_sf_hsf_data(r, sfi, core):
 def ext_code(r):
     """Pseudocode 20: one record for the whole escape, value 2^(N_ext+4) + ext_val.
     Table 40 gives ext_code 5 to 21 bits (2 * N_ext + 5), so a ninth leading
-    one fails the substream, with nothing recorded (see src/ac4/ERRATA.md)."""
+    one fails the substream, with nothing recorded (see libs/ac4/ERRATA.md)."""
     pos = r.pos
     n_ext = 0
     while r._get(1):
@@ -877,7 +877,7 @@ def _aspx_bands(cfg, xover):
     # 5.7.6.3.1.3 caps num_sbg_noise at 5. Five of the 1,808 legal A-SPX
     # settings give more, all with aspx_noise_sbg 3 on the low-resolution
     # master scale, and reading on there would take a noise envelope per band
-    # the syntax does not have (src/ac4/ERRATA.md, "num_sbg_noise above 5").
+    # the syntax does not have (libs/ac4/ERRATA.md, "num_sbg_noise above 5").
     if n_noise > 5:
         raise SyntaxFail(f'num_sbg_noise {n_noise} exceeds 5 (5.7.6.3.1.3)')
     return n_high, n_low, n_noise
@@ -1088,7 +1088,7 @@ def aspx_data_2ch(r, ctx):
             c1.qmode = 0
     else:
         # aspx_framing(1) is not read: channel 1 takes channel 0's framing
-        # (src/ac4/ERRATA.md)
+        # (libs/ac4/ERRATA.md)
         c1 = AspxChannel()
         for slot in ('int_class', 'num_env', 'num_noise', 'freq_res', 'var_bord_left',
                      'var_bord_right', 'rel_left', 'rel_right', 'tsg_ptr', 'atsg_freqres'):
@@ -1349,7 +1349,7 @@ def _tracks_at(ctx, mark, positions):
 
 def _residual_sfis(r, bases):
     """max_sfb_master and the sf_info of the two residuals after it (Part 1
-    4.3.5.13, notes to Tables 25 and 33; see src/ac4/ERRATA.md). Residual
+    4.3.5.13, notes to Tables 25 and 33; see libs/ac4/ERRATA.md). Residual
     i has the framing of the track its A-CPL module pairs it with, bases[i];
     max_sfb_master is n_side_bits of the largest transform length the two
     base sf_info() signal; a window group of that length takes it as its
@@ -1553,7 +1553,7 @@ def seven_x_channel_element(r, ctx, ch_mode):
         if r.f(1, 'b_use_sap_add_ch'):
             # Table 183: F and G are coded against D and E for 3/4/0 and
             # against A and B otherwise; each chparam_info() has that track's
-            # framing (see src/ac4/ERRATA.md).
+            # framing (see libs/ac4/ERRATA.md).
             s0, s1 = _tracks_at(ctx, mark, (d, e) if back_pair else (a, b))
             chparam_info(r, s0)
             chparam_info(r, s1)
@@ -1688,7 +1688,7 @@ def immersive_channel_element(r, ctx, b_lfe, b_5fronts):
     core_channel_config is 7CH_STATIC in every mode but ASPX_AJCC (Table 74).
 
     The chparam_info() elements need a framing (Part 1 Table 47), which the
-    syntax does not name (src/ac4/ERRATA.md): each takes the framing of the
+    syntax does not name (libs/ac4/ERRATA.md): each takes the framing of the
     track the step it parameterises codes another against, as the 7_X
     element's take the tracks Table 183 names. The two b_use_sap_add_ch sends
     are 5.2.3.2 step 4's, which codes F and G against D and E; the four after
@@ -1812,7 +1812,7 @@ def audio_data_chan(r, ctx, ch_mode):
 # ---------------------------------------------------------------------------
 
 # The most objects one OAMD portion describes; more is refused, as the decoder
-# refuses it (src/ac4/ERRATA.md, "The objects of an A-JOC substream").
+# refuses it (libs/ac4/ERRATA.md, "The objects of an A-JOC substream").
 MAX_OAMD_OBJECTS = 64
 
 
@@ -1863,7 +1863,7 @@ OBJS_TO_CHANNEL_MODE = {1: 0, 2: 1, 3: 2, 5: 3}
 
 def audio_data_objs(r, ctx, n_objects, b_lfe):
     """Part 2 6.2.3.2, n_objects being the substream's objects beside its LFE
-    (Table 60; src/ac4/ERRATA.md, 'n_objects_code and the LFE')."""
+    (Table 60; libs/ac4/ERRATA.md, 'n_objects_code and the LFE')."""
     if b_lfe:
         mono_data(r, ctx, 1)
     if n_objects != 0:
@@ -1953,7 +1953,7 @@ def _dlg_dmx_coeff_idx(r):
 
 def ajoc_dmx_de_data(r, ctx, num_dmx_signals, num_umx_signals):
     """Part 2 6.2.3.5. The configuration's dialogue objects carry to later
-    frames; an I-frame without one clears it (src/ac4/ERRATA.md, "A-JOC's
+    frames; an I-frame without one clears it (libs/ac4/ERRATA.md, "A-JOC's
     dialogue enhancement data across frames")."""
     st = ctx.state
     b_dmx_de_cfg = r.f(1, 'b_dmx_de_cfg')
@@ -1982,7 +1982,7 @@ def ajoc_bed_info(r):
 
 
 def _timing_blocks(own, group, carried):
-    """num_obj_info_blocks for an OAMD portion (src/ac4/ERRATA.md, 'Which
+    """num_obj_info_blocks for an OAMD portion (libs/ac4/ERRATA.md, 'Which
     oamd_timing_data() applies'): its own timing this frame, else the group's
     OAMD substream's, else its own from an earlier frame."""
     if own is not None:
@@ -2151,7 +2151,7 @@ def object_render_info(r, all_new, b_no_delta):
 
 def add_per_object_md(r, b_object_not_active, b_dynamic_object):
     """Part 2 6.2.8.10, its parameters taken by name (object_info_block() passes
-    them the other way round; src/ac4/ERRATA.md, "add_per_object_md()'s
+    them the other way round; libs/ac4/ERRATA.md, "add_per_object_md()'s
     parameters")."""
     r.f(1, 'b_obj_trim_disable')
     if not b_object_not_active and b_dynamic_object:
@@ -2651,7 +2651,7 @@ def _nr_drc_channels(ch_mode):
     """Part 1 Table 168 and Part 2 Table 69. A mode without LFE takes the count
     of its twin with LFE; 3.0, which has no twin, and a presentation with no
     channel mode have none, so channel-dependent gains there are refused (see
-    src/ac4/ERRATA.md)."""
+    libs/ac4/ERRATA.md)."""
     if ch_mode in (0, 1):
         return 1
     if 3 <= ch_mode <= 10:
@@ -2665,7 +2665,7 @@ def drc_frame(r, b_iframe, state, ch_mode, flb):
     if not r.f(1, 'b_drc_present'):
         # An I-frame that carries no drc_frame() clears the configuration a
         # previous one sent, so a later frame that needs one fails as missing
-        # its I-frame (src/ac4/ERRATA.md, "Dialogue enhancement and DRC
+        # its I-frame (libs/ac4/ERRATA.md, "Dialogue enhancement and DRC
         # configuration across I-frames").
         if b_iframe:
             state.pop('drc_config', None)
@@ -2699,7 +2699,7 @@ def drc_frame(r, b_iframe, state, ch_mode, flb):
                 used = r.pos - start
             # Version 0 reads nothing by the size, which the text counts both
             # with and without drc_version; any other size is a misread (see
-            # src/ac4/ERRATA.md).
+            # libs/ac4/ERRATA.md).
             if version == 0 and size not in (used, used + 2):
                 raise SyntaxFail(f'drc_gainset_size {size} does not match the {used} bits read')
             if version >= 1:
@@ -2814,7 +2814,7 @@ def metadata(r, ctx, sus_ver, b_alternative, b_ajoc, b_associated=0, b_dialog=0,
     extended_metadata(r, ctx.ch_mode, sus_ver, b_associated, b_dialog)
     # oamd_dyndata_single() for b_alternative with b_ajoc 0 belongs to
     # direct-coded object substreams alone; a channel-coded substream carries
-    # none (see src/ac4/ERRATA.md).
+    # none (see libs/ac4/ERRATA.md).
     if b_alternative and not b_ajoc and oc is not None:
         if oc['group_blocks'] is None:
             raise SyntaxFail('oamd_dyndata_single() needs an oamd_timing_data() that no frame '
@@ -3158,7 +3158,7 @@ def _groups_of(toc, p):
     (group_index for bitstream_version 2, inline dicts for version 1), each
     once. A presentation may name one group twice; the group holds the same
     substreams either way, so the helpers of 6.3.3.1.29 to 6.3.3.1.31 count
-    them once (src/ac4/ERRATA.md, 'A substream group named twice')."""
+    them once (libs/ac4/ERRATA.md, 'A substream group named twice')."""
     groups = toc.get('substream_groups') or []
     out = []
     for ref in p.get('group_refs', []):
@@ -3324,7 +3324,7 @@ def substream_roles(toc):
 
 
 def _ajoc_portion(assigned, n_fullband, b_lfe):
-    """The objects of an A-JOC substream's OAMD portion (src/ac4/ERRATA.md,
+    """The objects of an A-JOC substream's OAMD portion (libs/ac4/ERRATA.md,
     'The objects of an A-JOC substream'): the LFE first where b_lfe is set
     (is_lfe[0] = 1), the objects bed_dyn_obj_assignment() lists, then dynamic
     objects up to n_fullband - no further than one past the most the decoder
@@ -3342,7 +3342,7 @@ def _ajoc_portion(assigned, n_fullband, b_lfe):
 
 
 def _object_share(info, run):
-    """A direct-coded substream's objects (src/ac4/ERRATA.md, 'The objects of
+    """A direct-coded substream's objects (libs/ac4/ERRATA.md, 'The objects of
     a direct-coded substream'): with dynamic objects its own list; for a bed or
     intermediate spatial format, the substream that starts it gives the list
     and it and the substreams after it take its fullband objects in order,
@@ -3401,7 +3401,7 @@ def _carried_for(a, oc):
 
 
 def apply_ims_rule(toc):
-    """The observed rule (src/ac4/ERRATA.md): in a presentation_version 2 presentation,
+    """The observed rule (libs/ac4/ERRATA.md): in a presentation_version 2 presentation,
     channel_mode 0b1111000 is read as stereo (ch_mode 1)."""
     for p in toc['presentations']:
         if p.get('presentation_version') != 2:
@@ -3414,7 +3414,7 @@ def apply_ims_rule(toc):
 
 
 def _derive_assoc_dialog(p, info):
-    """Part 1 4.3.12.4.1 / 4.3.12.4.2 for sus_ver 0 (src/ac4/ERRATA.md)."""
+    """Part 1 4.3.12.4.1 / 4.3.12.4.2 for sus_ver 0 (libs/ac4/ERRATA.md)."""
     cfg = p.get('presentation_config')
     subs = [x for _, x in p.get('substreams', [])]
     pos = next((i for i, x in enumerate(subs) if x is info), -1)
@@ -3438,7 +3438,7 @@ class StreamWalker:
     def skip_frame(self):
         """A frame whose table of contents does not read is taken to be the
         frame the stream expected; after a 0 any counter but 0 continues, and
-        still does (src/ac4/ERRATA.md, "A change of source")."""
+        still does (libs/ac4/ERRATA.md, "A change of source")."""
         previous = self.previous_counter
         if previous not in (None, 0):
             self.previous_counter = 1 if previous == 1020 else previous + 1
@@ -3585,7 +3585,7 @@ class StreamWalker:
                 out.append((ext_idx, 'hsf_ext', ext_recs, ext_err))
 
         # The OAMD substreams first, whose timing the object substreams of their
-        # groups take (src/ac4/ERRATA.md, "Which oamd_timing_data() applies").
+        # groups take (libs/ac4/ERRATA.md, "Which oamd_timing_data() applies").
         order = [i for i in range(len(sizes)) if (roles.get(i) or ('',))[0] == 'oamd']
         order += [i for i in range(len(sizes)) if i not in order]
         for idx in order:

@@ -1,8 +1,8 @@
 """The AC-4 reference parser's presentation selection against the committed selection table.
 
-tests/ac4/decoder/test_presentations.cpp builds a table of tables of contents, each with a
+libs/ac4/tests/decoder/test_presentations.cpp builds a table of tables of contents, each with a
 choice (presentation_id, position, language, associated audio, headphones), a decoder level and
-the presentation ETSI TS 103 190-2 clause 4.8.2 and src/ac4/ERRATA.md's readings select, and
+the presentation ETSI TS 103 190-2 clause 4.8.2 and libs/ac4/ERRATA.md's readings select, and
 holds the decoder to it; the table is committed as
 tests/golden/ac4/presentations/presentation-selection.tsv. This test holds
 tools/references/ac4_presentations.py, the selection transcribed separately in Python over

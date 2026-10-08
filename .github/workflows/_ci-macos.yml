@@ -340,7 +340,7 @@ jobs:
             export QSG_RENDER_LOOP=basic
           fi
           smoke_args=(--smoke
-            fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav
+            libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav
             "${RUNNER_TEMP}/forge-gui-smoke.ac3"
             "${RUNNER_TEMP}/forge-gui-smoke.png")
           if [ "$RUNNER_OS" = "macOS" ]; then

@@ -103,7 +103,7 @@ jobs:
       #
       # libasound2-dev is the ALSA backend's only dependency, and the reason it
       # is here rather than left out is that its ABSENCE is not a build
-      # failure: src/audio/CMakeLists.txt would fall back to the no-op
+      # failure: libs/audio/CMakeLists.txt would fall back to the no-op
       # posix/ directory and CI would go green having compiled none of
       # src/audio/src/backend/alsa/. The alsa_fallback step at the end covers
       # the other half of that switch on purpose.
@@ -339,7 +339,7 @@ jobs:
       # A third run of the same gate, against a decoder built float32 rather
       # than double (minimum-footprint decoder profile). Unlike mode=reference above this cannot be a
       # token: ICLFORGE_DECODE_SCALAR is a BUILD option
-      # (src/ac3/variants/), so it needs its own binary.
+      # (libs/ac3/variants/), so it needs its own binary.
       #
       # Why it is worth a second build. Every fixture both bare-metal legs
       # decode goes through the float32 path, and until this existed nothing
@@ -584,7 +584,7 @@ jobs:
             export QSG_RENDER_LOOP=basic
           fi
           smoke_args=(--smoke
-            fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav
+            libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav
             "${RUNNER_TEMP}/forge-gui-smoke.ac3"
             "${RUNNER_TEMP}/forge-gui-smoke.png")
           if [ "$RUNNER_OS" = "macOS" ]; then
@@ -716,7 +716,7 @@ jobs:
 
       # The other side of the ALSA switch: a Linux machine without libasound's
       # development headers must still configure, build and pass everything,
-      # falling back to src/audio/src/backend/posix/ - that is the whole point
+      # falling back to libs/audio/src/backend/posix/ - that is the whole point
       # of the dependency being optional, and it is a claim that rots silently
       # unless something checks it.
       #
@@ -1032,7 +1032,7 @@ jobs:
       # release: iclforge::ac3_shared/iclforge::containers_shared existing and
       # configuring cleanly (already exercised by every leg's normal
       # config-<preset> build, since both variants are always built
-      # regardless of BUILD_SHARED_LIBS - see src/ac3/CMakeLists.txt) is not
+      # regardless of BUILD_SHARED_LIBS - see libs/ac3/CMakeLists.txt) is not
       # the same claim as every in-tree consumer actually linking and
       # running against the real .so - forge/iclforge-tests/every example,
       # including mux_mkv, the one that needs libmatroska.so alongside
@@ -1084,7 +1084,7 @@ jobs:
             build/config-linux-llvm-shared/src/render/libiclforge_render.so \
             build/config-linux-llvm-shared/src/iec61937/libiclforge_containers.so
 
-      # A build tree is not an installed package. tests/capi and the C examples compile against
+      # A build tree is not an installed package. libs/capi/tests and the C examples compile against
       # the build tree, where every generated header is already on the include path whether or
       # not an install rule copies it, so `cmake --install` shipped an iclforge_c/iclforge.h that
       # #included an iclforge_c/version.h it never installed, and nothing here noticed. This

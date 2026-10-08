@@ -25,13 +25,13 @@ target_include_directories(forge PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../common"
 # CLI's specification citations render (platform/console_encoding.hpp for what
 # was going wrong and why a redirect is untouched by the fix). Selected here
 # rather than behind an #ifdef in main.cpp, the same platform-tree pattern
-# iclforge::audio uses for WASAPI/ALSA (src/audio/CMakeLists.txt) -
+# iclforge::audio uses for WASAPI/ALSA (libs/audio/CMakeLists.txt) -
 # tools/checks/check_platform_macros.ps1 enforces there being no third option.
 #
 # WIN32_LEAN_AND_MEAN/NOMINMAX are here rather than #define'd above the
 # <windows.h> include for the same reason and by the same rule: that script's
 # header comment says header-configuration defines belong in
-# target_compile_definitions, and src/audio/CMakeLists.txt is the example it
+# target_compile_definitions, and libs/audio/CMakeLists.txt is the example it
 # names. PRIVATE and inside the WIN32 arm, so no other configuration sees a
 # definition that means nothing to it.
 if(WIN32)
@@ -133,7 +133,7 @@ target_link_libraries(forge
 # cmake/CompilerWarnings.cmake documents this exact false-positive category
 # for GCC < 15 against libstdc++ internals reached from this project's own
 # code (see its own comment, and gcc.gnu.org/bugzilla PR 108757 and
-# neighbours), and src/adm/CMakeLists.txt has an identical GCC-15 instance
+# neighbours), and libs/adm/CMakeLists.txt has an identical GCC-15 instance
 # already scoped to just that target - this is the same category surfacing on
 # GCC 16 instead, in this one file. Scoped to the file rather than widening
 # either of those guards: nothing else in this project has hit it, so

@@ -34,7 +34,7 @@ vcpkg_check_features(
 # in a tarball checkout and falls back to "0.0.0-dev" - thread the real tag through instead.
 #
 # ICLFORGE_BUILD_HEARTH defaults ON upstream and builds Hearth, an application (apps/hearth) and a
-# library nothing installs (src/sendspin), with dependencies this port does not declare
+# library nothing installs (libs/sendspin), with dependencies this port does not declare
 # (cpp-httplib, mdns, mbedTLS, libFLAC, Opus); upstream also refuses it beside
 # ICLFORGE_BUILD_AC4=OFF, the ac4 feature's absence.
 #

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# fuzz/generate-seeds.sh - grow a fuzzing corpus from iclforge's own valid
+# tools/fuzz/generate-seeds.sh - grow a fuzzing corpus from iclforge's own valid
 # output, by running forge across the layout/codec/tool matrix this project
 # already supports. Cheaper and more representative than hand-written corpus
 # files: every seed here is a real, self-consistent stream this project can
@@ -12,9 +12,9 @@
 # better reason than that it is the one already built on the development
 # host - every other leg builds clean too.
 #
-#   ICLFORGE_CLI_BIN=build/config-windows-msvc-debug/bin/forge.exe fuzz/generate-seeds.sh
+#   ICLFORGE_CLI_BIN=build/config-windows-msvc-debug/bin/forge.exe tools/fuzz/generate-seeds.sh
 #
-# Usage: fuzz/generate-seeds.sh [output-dir]   (default: fuzz/seeds)
+# Usage: tools/fuzz/generate-seeds.sh [output-dir]   (default: fuzz/seeds)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -58,7 +58,7 @@ add_seed "fuzz_ac4_parse" "$REPO_ROOT/tests/golden/external-baseline/ac4-stereo-
 # which this script's ICLFORGE_CLI_BIN contract does not cover. It is committed
 # instead; regenerate with:
 #
-#     encode_iab --write-fixture fuzz/seeds/fuzz_iab_parse/iab-bed-object.iab
+#     encode_iab --write-fixture libs/iab/fuzz/seeds/fuzz_iab_parse/iab-bed-object.iab
 
 echo "==> AC-3: silence, sine and orbit across every layout AC-3 can carry"
 for layout in mono stereo 51 51c; do

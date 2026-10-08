@@ -183,7 +183,7 @@ target_link_libraries(forge_gui_qmltests
         Qt6::QuickTest
         Qt6::Concurrent)
 target_include_directories(forge_gui_qmltests PRIVATE
-    "$<IF:$<BOOL:${ICLFORGE_ENABLE_TRACY}>,${CMAKE_SOURCE_DIR}/src/base/variants/profiling-tracy_enabled,${CMAKE_SOURCE_DIR}/src/base/variants/profiling-tracy_disabled>")
+    "$<IF:$<BOOL:${ICLFORGE_ENABLE_TRACY}>,${CMAKE_SOURCE_DIR}/libs/base/variants/profiling-tracy_enabled,${CMAKE_SOURCE_DIR}/libs/base/variants/profiling-tracy_disabled>")
 
 # QT_QPA_PLATFORM=offscreen on the test itself, not just -platform offscreen
 # on the command line: belt and suspenders again, and it means running the

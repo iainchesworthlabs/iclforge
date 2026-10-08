@@ -4,7 +4,7 @@
 # libFuzzer (-fsanitize=fuzzer) is an LLVM built-in, unavailable under GCC or
 # MSVC, so this whole directory requires upstream Clang - not clang-cl, whose
 # libFuzzer support this project has never exercised. Configure through
-# fuzz/run.sh rather than by hand; it sets up a dedicated build/fuzz directory
+# tools/fuzz/run.sh rather than by hand; it sets up a dedicated build/fuzz directory
 # with the right compiler and none of ICLFORGE_BUILD_CLI/GUI/TESTS, which this
 # needs neither of and which would otherwise drag in vcpkg/Qt/Catch2 for
 # nothing this directory uses.
@@ -14,7 +14,7 @@ if(NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL
     message(FATAL_ERROR
         "ICLFORGE_BUILD_FUZZERS needs upstream Clang: libFuzzer (-fsanitize=fuzzer) is an "
         "LLVM built-in, not available under GCC or MSVC. Configure with "
-        "-DCMAKE_CXX_COMPILER=clang++, or run fuzz/run.sh, which does this for you.")
+        "-DCMAKE_CXX_COMPILER=clang++, or run tools/fuzz/run.sh, which does this for you.")
 endif()
 if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     message(FATAL_ERROR
@@ -39,13 +39,13 @@ endif()
 # print and run straight past.
 #
 # Set on iclforge_ac3_objects, not the iclforge_ac3_static/iclforge_ac3_shared wrapper
-# targets: the actual codec sources compile there (see src/ac3/CMakeLists.txt),
+# targets: the actual codec sources compile there (see libs/ac3/CMakeLists.txt),
 # and PUBLIC on an OBJECT library's usage requirements still propagates
 # through PUBLIC target_link_libraries(iclforge_ac3_static PUBLIC iclforge_ac3_objects)
 # to whatever finally links iclforge::ac3 - here, each fuzz harness below. That
 # includes the EMDF Atmos signer fuzz_signing_verify drives (its frame walk,
-# src/ac3/src/signing/emdf_atmos_signer.cpp), which is a part of iclforge::ac3. The HMAC-SHA-256 it
-# computes is iclforge::base's (src/base/src/crypto), so iclforge_base_objects is instrumented too.
+# libs/ac3/src/signing/emdf_atmos_signer.cpp), which is a part of iclforge::ac3. The HMAC-SHA-256 it
+# computes is iclforge::base's (libs/base/src/crypto), so iclforge_base_objects is instrumented too.
 function(iclforge_instrument_for_fuzzing target)
     target_compile_options(${target} PUBLIC
         -fsanitize=address,undefined,fuzzer-no-link
@@ -74,7 +74,7 @@ iclforge_instrument_for_fuzzing(iclforge_containers_objects)
 # iclforge_ac4_objects and iclforge_iab_objects, for the same reason: fuzz_ac4_parse and
 # fuzz_iab_parse below mutate parsers that take their counts and lengths from
 # the file. Each is a library of its own rather than part of iclforge::ac3 (see
-# src/ac4/ and src/iab/), so nothing iclforge::ac3 carries reaches their
+# libs/ac4/ and libs/iab/), so nothing iclforge::ac3 carries reaches their
 # sources, and until these calls existed both harnesses ran against
 # uninstrumented parsers. A harness executable still carries the ASan
 # runtime, so a segfault, a timeout or an allocation over -rss_limit_mb
@@ -88,14 +88,14 @@ iclforge_instrument_for_fuzzing(iclforge_containers_objects)
 # UnknownChunk constructor, which takes &data_[0] of an empty vector for a
 # zero-length chunk, and does the same in Bw64Reader::read() for a <data> chunk
 # of zero length. Both are patched in the dependency itself at populate time
-# (src/adm/patch_libbw64.cmake, wired up in src/adm/CMakeLists.txt), which
+# (libs/adm/patch_libbw64.cmake, wired up in libs/adm/CMakeLists.txt), which
 # is what let this call join the set.
 #
 # An ignorelist scoped to libbw64 was the alternative, and would have hidden
 # more than it suppressed: a <fmt > whose channel count and width overflow
 # libbw64's uint16_t block alignment gets its read buffer sized from the wrapped
 # value and decoded against the real one, which ASan reports as a heap overread
-# against iclforge::adm's own read_pcm. That one is guarded in src/adm/src/adm.cpp,
+# against iclforge::adm's own read_pcm. That one is guarded in libs/adm/src/adm.cpp,
 # and an uninstrumented iclforge::adm reads it as a clean execution.
 #
 # Each call is guarded on the option that decides whether its library exists,
@@ -159,24 +159,24 @@ function(iclforge_add_container_fuzzer name library)
 endfunction()
 
 # iclforge::ac3::io::scan: format-sniffing over an unidentified byte stream, before any
-# decoder commits to a layout (src/ac3/src/io/elementary.cpp).
+# decoder commits to a layout (libs/ac3/src/io/elementary.cpp).
 iclforge_add_fuzzer(fuzz_scan)
 
 # iclforge::containers::matroska::demux + iclforge::containers::matroska::Reader: the EBML walk over a container that came
 # from a disc rip, a broadcast capture or a download - every length in it
-# self-declared (src/containers/src/matroska/reader.cpp).
+# self-declared (libs/containers/src/matroska/reader.cpp).
 iclforge_add_container_fuzzer(fuzz_matroska_demux iclforge::containers)
 
 # iclforge::containers::mp4::demux + iclforge::containers::mp4::Reader: the box walk, and the sample table it resolves
 # against the file - an INDEX of self-declared offsets and sizes, which is a
 # wider attack surface than Matroska's in-line framing
-# (src/containers/src/mp4/reader.cpp).
+# (libs/containers/src/mp4/reader.cpp).
 iclforge_add_container_fuzzer(fuzz_mp4_demux iclforge::containers)
 
 # iclforge::containers::mpegts::demux + iclforge::containers::mpegts::Reader: sync search, PSI section reassembly and PES
 # reassembly, all loops driven by self-declared lengths over a format that is
 # EXPECTED to arrive damaged - the harness most likely to find a hang rather
-# than a crash (src/containers/src/mpegts/reader.cpp).
+# than a crash (libs/containers/src/mpegts/reader.cpp).
 iclforge_add_container_fuzzer(fuzz_mpegts_demux iclforge::containers)
 
 # --- The other two Dolby bitstreams this repo reads --------------------------
@@ -188,7 +188,7 @@ iclforge_add_container_fuzzer(fuzz_mpegts_demux iclforge::containers)
 #
 # iclforge::iab::parse_iabitstream + parse_mxf_iab + parse_iaframe: §7's
 # Preamble+IAFrame run, the SMPTE ST 2067-201 KLV wrapper an IAB track file
-# clip-wraps it in, and §9.1's single extracted frame (src/iab/). One
+# clip-wraps it in, and §9.1's single extracted frame (libs/iab/). One
 # harness over all three because they are three framings of the same bytes and
 # a shared corpus serves them better than three split ones. Includes
 # BitReader::read_plex, whose §5.2 escape bound is exactly the sort of clause
@@ -204,7 +204,7 @@ endif()
 
 # iclforge::containers::iamf::read_sequence + read_isobmff, and write_sequence, write_isobmff and decode_pcm on
 # what they return: the standalone OBU stream and the ISO-BMFF encapsulation, both read from numbers
-# the file chose (src/containers/src/iamf/). One harness over both framings of the same bytes.
+# the file chose (libs/containers/src/iamf/). One harness over both framings of the same bytes.
 if(ICLFORGE_BUILD_IAMF)
     iclforge_add_fuzzer(fuzz_iamf_parse iclforge::containers)
 endif()
@@ -213,7 +213,7 @@ endif()
 # list whose count, per-presentation substream group counts and
 # substream_index_table sizes are all read from the bitstream, after which
 # parse_raw_frame locates payloads by those declared sizes rather than by
-# parsing through audio_data (src/ac4/src/core/toc.cpp). parse_raw_frame is called
+# parsing through audio_data (libs/ac4/src/core/toc.cpp). parse_raw_frame is called
 # on the raw input as well as reached through scan(), so the TOC parser is
 # pressed without a valid 0xAC40/0xAC41 syncframe having to be guessed first.
 #
@@ -231,21 +231,21 @@ if(ICLFORGE_BUILD_AC4)
 endif()
 
 # split_frames + FrameDecoder::decode_frame, driven the way forge's 'decode'
-# drives them (src/ac3/src/decoder/decoder.cpp).
+# drives them (libs/ac3/src/decoder/decoder.cpp).
 iclforge_add_fuzzer(fuzz_ac3_decode)
 
 # split_access_units + Eac3Decoder::decode_access_unit (which calls
 # decode_substream internally), driven the way forge's 'decode' drives them
-# for E-AC-3 (src/ac3/src/decoder/eac3_decoder.cpp).
+# for E-AC-3 (libs/ac3/src/decoder/eac3_decoder.cpp).
 iclforge_add_fuzzer(fuzz_eac3_decode)
 
 # iclforge::ac3::io::read_wav: a realistic input too, not only an adversarial one - a
 # truncated or hand-edited WAV is exactly what a user hands the CLI
-# (src/base/src/wav.cpp).
+# (libs/base/src/wav.cpp).
 iclforge_add_fuzzer(fuzz_wav_read)
 
 # iclforge::containers::iec61937::BurstReader: IEC 61937 burst de-framing, driven the way
-# forge's 'unspdif' drives it (src/containers/src/iec61937/iec61937.cpp). The one
+# forge's 'unspdif' drives it (libs/containers/src/iec61937/iec61937.cpp). The one
 # entry point here whose input is by definition off a wire - an S/PDIF or
 # HDMI capture - and whose Pd word is an attacker-chosen length.
 iclforge_add_fuzzer(fuzz_iec61937_unwrap)
@@ -253,7 +253,7 @@ iclforge_add_fuzzer(fuzz_iec61937_unwrap)
 # --- Differential mode (differential decoder fuzzing) -----------------------------------------
 # Same decode paths as fuzz_ac3_decode/fuzz_eac3_decode above, but instead of
 # only checking for a crash/sanitizer trip, these also decode the same
-# mutated bytes with FFmpeg and diff the PCM (fuzz/differential_oracle.hpp
+# mutated bytes with FFmpeg and diff the PCM (libs/ac3/fuzz/differential_oracle.hpp
 # has the full reasoning for what counts as a reportable divergence). Needs
 # `ffmpeg` on PATH at RUN time only - the build itself has no new dependency,
 # since differential_oracle.hpp shells out rather than linking anything.
@@ -274,21 +274,21 @@ iclforge_add_fuzzer(fuzz_differential_eac3_decode)
 
 # iclforge::objects::emdf::parse_container: ETSI TS 102 366 Annex H's container, located by
 # a bit-by-bit sync scan and sized by its own 16-bit length field
-# (src/objects/src/emdf.cpp).
+# (libs/objects/src/emdf.cpp).
 iclforge_add_fuzzer(fuzz_emdf_parse)
 
 # iclforge::objects::oba::parse_payload: TS 103 420 §5's object_audio_metadata_payload
-# (src/objects/src/oamd.cpp).
+# (libs/objects/src/oamd.cpp).
 iclforge_add_fuzzer(fuzz_oamd_parse)
 
 # iclforge::ac3::oba::joc::parse_payload: TS 103 420 §6's joc() payload, the one metadata
 # parser here that Huffman-decodes and that sizes a matrix from the stream's
-# own numbers (src/ac3/src/oba/joc.cpp).
+# own numbers (libs/ac3/src/oba/joc.cpp).
 iclforge_add_fuzzer(fuzz_joc_parse)
 
 # --- Live position input (live OSC object positions) ---------------------------------------
 # iclforge::objects::oba::parse_osc_packet: the OSC 1.0 wire form of a live scene update
-# (src/objects/src/scene_osc.cpp). Not behind the bitstream at all - this
+# (libs/objects/src/scene_osc.cpp). Not behind the bitstream at all - this
 # is the project's first NETWORK-facing parser, reached straight from a UDP
 # datagram by iclforge::audio::LivePositionSource whenever a live session opts
 # into positions=osc:<port>, with no CRC or container ahead of it the way
@@ -297,17 +297,17 @@ iclforge_add_fuzzer(fuzz_osc_parse)
 
 # iclforge::ac3::signing::verify_atmos_stream/verify_atmos_frame: the only signing
 # operation that runs on a stream its caller did not produce
-# (src/ac3/src/signing/emdf_atmos_signer.cpp). Links iclforge::ac3 on top of
+# (libs/ac3/src/signing/emdf_atmos_signer.cpp). Links iclforge::ac3 on top of
 # iclforge::ac3; the key is part of the fuzzed input, and nothing here needs or
 # derives a real one - see the harness's own header comment.
 iclforge_add_fuzzer(fuzz_signing_verify)
 
 # iclforge::adm::parse_bw64: BW64/RF64 chunks plus an arbitrary ADM XML document
-# (src/adm/src/adm.cpp). Gated on the same ICLFORGE_BUILD_ADM the library
+# (libs/adm/src/adm.cpp). Gated on the same ICLFORGE_BUILD_ADM the library
 # itself is - that option is OFF by default and additionally needs vcpkg's
 # "adm" feature for libadm's Boost headers, which the rest of this build
-# deliberately has no vcpkg dependency at all (see fuzz/run.sh's own
-# -DICLFORGE_BUILD_* list). fuzz/run.sh turns it on via ICLFORGE_FUZZ_ADM=1;
+# deliberately has no vcpkg dependency at all (see tools/fuzz/run.sh's own
+# -DICLFORGE_BUILD_* list). tools/fuzz/run.sh turns it on via ICLFORGE_FUZZ_ADM=1;
 # without that this harness simply is not built, exactly as iclforge::adm itself is
 # not.
 if(ICLFORGE_BUILD_ADM)
@@ -315,12 +315,12 @@ if(ICLFORGE_BUILD_ADM)
 endif()
 
 # iclforge::ac4::Decoder::parse: every substream of an AC-4 frame below the table of
-# contents fuzz_ac4_parse presses (src/ac4/src/decoder) - section lengths, Huffman
+# contents fuzz_ac4_parse presses (libs/ac4/src/decoder) - section lengths, Huffman
 # codewords, A-SPX envelope counts, DRC gain sets and EMDF payloads, each
 # counted by the stream - and, from D2, the reconstruction of what they
-# decode to. The decoder, the shared core (src/ac4/src/core: the tables and
+# decode to. The decoder, the shared core (libs/ac4/src/core: the tables and
 # transforms) and the parser are all iclforge_ac4_objects, which the call above
-# instruments. Its seeds are fuzz_ac4_parse's (fuzz/run.sh's seed_source_for).
+# instruments. Its seeds are fuzz_ac4_parse's (tools/fuzz/run.sh's seed_source_for).
 #
 # Its first run from short seeds (one to three frames of the committed DEE
 # streams) stopped 2,690 executions in: ext_code's escape, whose leading ones
@@ -331,7 +331,7 @@ if(ICLFORGE_BUILD_AC4)
     iclforge_add_fuzzer(fuzz_ac4_decode iclforge::ac4)
 endif()
 
-# iclforge::ac4::Encoder (src/ac4/src/encoder): configurations and samples from the input, each
+# iclforge::ac4::Encoder (libs/ac4/src/encoder): configurations and samples from the input, each
 # frame read back by the decoder, whose trace must be the encoder's, decoded
 # to finite PCM, and written again byte for byte by a second encoder
 # (planning/ac4.md, the encoder's ladder, items 1 and 8). The encoder is
@@ -343,26 +343,26 @@ endif()
 # --- Sendspin (planning/hearth-reference-player.md, A4) ----------------------
 # iclforge::sendspin's parsers are the first code a network peer's bytes reach, on
 # hearth's server and on a sink. Gated on ICLFORGE_BUILD_HEARTH like the
-# library; fuzz/run.sh turns it on with ICLFORGE_SENDSPIN_CORE_ONLY, which
+# library; tools/fuzz/run.sh turns it on with ICLFORGE_SENDSPIN_CORE_ONLY, which
 # builds the library's dependency-free core and keeps this build free of vcpkg.
 if(TARGET iclforge_sendspin)
     iclforge_instrument_for_fuzzing(iclforge_sendspin)
 
     # iclforge::sendspin::json::Document::parse, with a write-and-reparse check
-    # (src/sendspin/src/json.cpp).
+    # (libs/sendspin/src/json.cpp).
     iclforge_add_container_fuzzer(fuzz_sendspin_json iclforge::sendspin)
 
     # iclforge::sendspin::Reassembler in both fragment forms, and the player@v1 and
-    # _iclforge_player@v1 chunk parsers (src/sendspin/src/frames.cpp, chunks.cpp).
+    # _iclforge_player@v1 chunk parsers (libs/sendspin/src/frames.cpp, chunks.cpp).
     iclforge_add_container_fuzzer(fuzz_sendspin_frames iclforge::sendspin)
 
     # The handshake phase's messages - client/init, server/init, server/error,
     # noise/handshake and the two Noise payloads - read and written back
-    # (src/sendspin/src/handshake.cpp).
+    # (libs/sendspin/src/handshake.cpp).
     iclforge_add_container_fuzzer(fuzz_sendspin_handshake iclforge::sendspin)
 
     # The core and pairing messages after the handshake, every reader in both dialects, with a
     # check that what is written back reads and writes back to itself
-    # (src/sendspin/src/messages.cpp, pairing_messages.cpp).
+    # (libs/sendspin/src/messages.cpp, pairing_messages.cpp).
     iclforge_add_container_fuzzer(fuzz_sendspin_messages iclforge::sendspin)
 endif()

@@ -4,7 +4,7 @@
 # the panning math under it. Mostly headers; spatial.cpp holds the panner.
 # It links no codec: a decoder hands it PcmBlocks (iclforge/render/pcm_block.hpp).
 # ---------------------------------------------------------------------------
-# The minimum-footprint profile compiles what it needs into one archive (src/ac3/minimal.cmake),
+# The minimum-footprint profile compiles what it needs into one archive (libs/ac3/minimal.cmake),
 # so no library is built here for it.
 if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
     return()

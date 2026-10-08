@@ -151,7 +151,7 @@ add_custom_command(TARGET iclforge_wasm_encode POST_BUILD
     COMMENT "Assembling the wasm_encode_demo/atmos/ authoring page")
 
 # ---------------------------------------------------------------------------
-# AC-4 (src/ac4): one combined decode+encode embind
+# AC-4 (libs/ac4): one combined decode+encode embind
 # module, unlike the AC-3 decode/encode split above - see ac4_bindings.cpp's
 # own header comment for why one module suits AC-4 here. Guarded on
 # ICLFORGE_BUILD_AC4 (root CMakeLists.txt option(), default ON; the

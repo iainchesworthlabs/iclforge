@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# Hearth's NOTICES.txt: the third-party software src/sendspin brings into Hearth's programs,
+# Hearth's NOTICES.txt: the third-party software libs/sendspin brings into Hearth's programs,
 # plus - on Windows and macOS - the Qt it bundles (planning/hearth-reference-player.md,
 # Dependencies), assembled by cmake/Notices.cmake from the fragments beside this file (and, for
 # the Qt section, apps/crucible/notices/fragments/, shared rather than copied - see that file's
@@ -111,7 +111,7 @@ string(REGEX MATCH "^[0-9]+\\.[0-9]+" ICLFORGE_HEARTH_QT_SERIES "${ICLFORGE_HEAR
 
 set(ICLFORGE_HEARTH_NOTICE_TOKENS "VERSION=${PROJECT_VERSION_FULL}")
 set(ICLFORGE_HEARTH_NOTICE_FILES
-    "TIME_FILTER_APACHE=${CMAKE_SOURCE_DIR}/src/sendspin/third_party/time-filter/LICENSE")
+    "TIME_FILTER_APACHE=${CMAKE_SOURCE_DIR}/external/time-filter/LICENSE")
 foreach(port cpp-httplib mbedtls mdns libflac opus)
     hearth_port_version(${port} version)
     string(TOUPPER "${port}" key)

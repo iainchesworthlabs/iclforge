@@ -4,7 +4,7 @@
 # apps/android/app/src/main/cpp/CMakeLists.txt: pre-seed the repo root's
 # option()s, then add_subdirectory() the root so the library is built from the
 # SAME source-of-truth target definitions every other platform uses. A change
-# to src/ac3/minimal.cmake's source list is picked up here automatically,
+# to libs/ac3/minimal.cmake's source list is picked up here automatically,
 # with nothing to keep in sync by hand.
 #
 # The alternative - re-listing minimal.cmake's 24 sources in an
@@ -38,7 +38,7 @@
 # (include/iclforge/player.hpp, src/player.cpp - a fetch task, a decode task and
 # the ring between them, over a source seam and a sink seam) and the
 # planar-to-interleaved conversion every sink shares (iclforge/interleave.hpp,
-# tested on the host by tests/ac3/io/test_interleave.cpp, and on its way into the
+# tested on the host by libs/ac3/tests/io/test_interleave.cpp, and on its way into the
 # library - see planning/esp32-player.md). freertos, esp_timer and heap are what
 # the player's own sources include.
 #
@@ -161,7 +161,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/src/ac3/CMakeLists.txt")
 else()
     get_filename_component(ICLFORGE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 endif()
-if(NOT EXISTS "${ICLFORGE_ROOT}/src/ac3/CMakeLists.txt")
+if(NOT EXISTS "${ICLFORGE_ROOT}/libs/ac3/CMakeLists.txt")
     message(FATAL_ERROR
         "iclforge: no library sources at '${ICLFORGE_ROOT}'. In a checkout this component "
         "lives at esp-idf/iclforge/; packed, it carries its own lib/ - see "
@@ -224,13 +224,13 @@ set(ICLFORGE_BUILD_AC4 OFF CACHE BOOL "" FORCE)
 # by default. ICLFORGE_BUILD_AC4 above stays off, since it also builds the
 # encoder, the applications and the tests; ICLFORGE_MINIMAL_AC4 is the root's
 # own option for the decoder inside this profile - the AC-4 library's decode-only
-# archive (src/ac4/minimal.cmake) with the profile's compile options - and this
+# archive (libs/ac4/minimal.cmake) with the profile's compile options - and this
 # is the only place it is set. With CONFIG_ICLFORGE_AC4 off the root configures
 # exactly as before.
 if(CONFIG_ICLFORGE_AC4)
-    if(NOT EXISTS "${ICLFORGE_ROOT}/src/ac4/minimal.cmake")
+    if(NOT EXISTS "${ICLFORGE_ROOT}/libs/ac4/minimal.cmake")
         message(FATAL_ERROR
-            "CONFIG_ICLFORGE_AC4 is on and there is no AC-4 decoder at '${ICLFORGE_ROOT}/src/ac4'. "
+            "CONFIG_ICLFORGE_AC4 is on and there is no AC-4 decoder at '${ICLFORGE_ROOT}/libs/ac4'. "
             "A component archive carries the AC-4 sources only when it was packed with "
             "tools/packaging/pack_esp_component.py --with-ac4.")
     endif()
@@ -239,7 +239,7 @@ else()
     set(ICLFORGE_MINIMAL_AC4 OFF CACHE BOOL "" FORCE)
 endif()
 
-# src/sendspin's player half, for the Sendspin player: the core and the
+# libs/sendspin's player half, for the Sendspin player: the core and the
 # player's session, pairing and Noise, with its crypto seam over ESP-IDF's own
 # mbedTLS (the PSA Crypto API, which v6.1's mbedTLS 4 provides). The WebSocket
 # and mDNS a computer takes from vcpkg are the component's and the example's
@@ -254,7 +254,7 @@ else()
     set(ICLFORGE_BUILD_HEARTH OFF CACHE BOOL "" FORCE)
 endif()
 
-# The decode-critical sources at -O2. src/ac3/minimal.cmake lists them, with
+# The decode-critical sources at -O2. libs/ac3/minimal.cmake lists them, with
 # what each one measured, and the probe under apps/baremetal/platform/esp32s3/
 # has always been built this way - so the timing docs/platforms/bare-metal/esp32-s3.md
 # quotes is this build, and a player built from this component without it
@@ -265,7 +265,7 @@ endif()
 #
 # or on the command line, `idf.py -DICLFORGE_MINIMAL_HOT_O2=OFF build`.
 set(ICLFORGE_MINIMAL_HOT_O2 ON CACHE BOOL
-    "Decode-critical sources at -O2; see src/ac3/minimal.cmake")
+    "Decode-critical sources at -O2; see libs/ac3/minimal.cmake")
 
 # The player's own source with them, under the same switch: the render onto the
 # layout and the calls into the sink run there, six times a frame, and the
@@ -279,7 +279,7 @@ endif()
 # WHICH ARITHMETIC. idf_component.yml says the decode arithmetic follows the
 # part: single precision where there is a floating-point unit, the fixed-point
 # tier where there is not (planning/arithmetic-tiers.md). This is where a
-# project that has not chosen gets that. src/ac3/minimal.cmake builds float32
+# project that has not chosen gets that. libs/ac3/minimal.cmake builds float32
 # for every value except `fixed`, including no value at all, so without this a
 # project for a part with no FPU decodes in float, where every floating-point
 # operation is a compiled subroutine.
@@ -335,7 +335,7 @@ if(CONFIG_ICLFORGE_SENDSPIN)
     target_link_libraries(${COMPONENT_LIB} PUBLIC iclforge::sendspin)
 endif()
 # The AC-4 library's decode-only archive (the inspector, the core and the
-# decoder, src/ac4/minimal.cmake), and its include directories for
+# decoder, libs/ac4/minimal.cmake), and its include directories for
 # src/ac4_bridge.cpp.
 if(CONFIG_ICLFORGE_AC4)
     target_link_libraries(${COMPONENT_LIB} PUBLIC iclforge::ac4_static)

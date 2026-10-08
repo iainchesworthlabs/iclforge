@@ -39,7 +39,7 @@ OUT = REPO / "esp-idf/iclforge/examples/hearth_sink/www"
 RATE = 48000
 
 # The output layout the levels are for: "7.1.4" in the player's slot order
-# (src/render/include/iclforge/render/layout.hpp - ring, heights, LFE).
+# (libs/render/include/iclforge/render/layout.hpp - ring, heights, LFE).
 LAYOUT_714 = ["L", "C", "R", "Ls", "Rs", "Lrs", "Rrs", "Vhl", "Vhr", "Lts", "Rts", "LFE"]
 
 # One tone per speaker, a third of an octave apart, so that each slot can be
@@ -204,37 +204,37 @@ SET = [
     {
         "file": "layout-10.ec3",
         "what": "E-AC-3 1/0",
-        "copy": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-mono.ec3",
+        "copy": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-mono.ec3",
     },
     {
         "file": "layout-20.ec3",
         "what": "E-AC-3 2/0",
-        "copy": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-stereo.ec3",
+        "copy": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-stereo.ec3",
     },
     {
         "file": "layout-51.ec3",
         "what": "E-AC-3 5.1",
-        "copy": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-51.ec3",
+        "copy": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-51.ec3",
     },
     {
         "file": "layout-71.ec3",
         "what": "E-AC-3 7.1: 5.1 and a dependent substream",
-        "copy": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-71.ec3",
+        "copy": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-71.ec3",
     },
     {
         "file": "layout-512.ec3",
         "what": "E-AC-3 5.1.2: 5.1 and a dependent substream",
-        "copy": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-512.ec3",
+        "copy": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-512.ec3",
     },
     {
         "file": "layout-514.ec3",
         "what": "E-AC-3 5.1.4: 5.1 and a dependent substream",
-        "copy": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-514.ec3",
+        "copy": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-514.ec3",
     },
     {
         "file": "layout-714.ec3",
         "what": "E-AC-3 7.1.4: 5.1 and two dependent substreams",
-        "copy": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-714.ec3",
+        "copy": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-714.ec3",
     },
     # The Annex E coding tools, at 7.1.4 so every substream carries them.
     {

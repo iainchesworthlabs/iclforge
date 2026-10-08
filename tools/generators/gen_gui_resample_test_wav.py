@@ -1,6 +1,6 @@
 """44.1kHz reference WAV for the GUI's resample-on-load QML test.
 
-Produces fuzz/seeds/fuzz_wav_read/resample-44100.wav: a small, checked-in
+Produces libs/base/fuzz/seeds/fuzz_wav_read/resample-44100.wav: a small, checked-in
 stereo PCM16 WAV at 44100 Hz - deliberately a rate that does NOT match
 roundtrip-stereo.wav/roundtrip-51.wav's 48000 Hz, since forge-gui's own
 addSourceFile() only resamples a second source onto the primary's rate when

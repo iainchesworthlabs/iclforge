@@ -17,7 +17,7 @@ be measured tone by tone:
   de-mono.ac4             mono        64  977 Hz
 
 All SIMPLE, at frame_rate_index 13, FRAMES frames long. They are committed under
-tests/golden/ac4/presentations/sources/, and tests/ac4/decoder/test_presentations.cpp
+tests/golden/ac4/presentations/sources/, and libs/ac4/tests/decoder/test_presentations.cpp
 multiplexes them, byte for byte, into the streams committed beside them; the encoder's bytes are
 not promised across toolchains, so the test takes the committed sources rather than encoding
 them again. Run this after a change to the encoder that should reach them, then the test with

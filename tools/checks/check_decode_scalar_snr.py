@@ -12,7 +12,7 @@ the arithmetic every bare-metal fixture is decoded with. Nothing measured it.
 docs/building.md records "~139 dB worst-channel SNR against the double decode
 across four streams", and that number was true when it was taken. It came from
 a build made by hand: until the scalar was split onto its own CMake axis
-(src/ac3/variants/, ICLFORGE_DECODE_SCALAR) it could only be float in a
+(libs/ac3/variants/, ICLFORGE_DECODE_SCALAR) it could only be float in a
 configuration that was ALSO decode-only and had no `forge` to compare with. So
 the figure has sat in prose for months with nothing able to re-derive it, while
 the path it describes is the one two CI legs decode every fixture through.

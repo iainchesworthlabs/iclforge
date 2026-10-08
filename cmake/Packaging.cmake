@@ -362,7 +362,7 @@ a PipeWire node Crucible creates while it runs.")
         # The -dev package's headers/static-archives are useless without a
         # matching runtime .so to actually link and load - and since this
         # project makes no ABI-compatibility promise pre-1.0 (see
-        # src/ac3/CMakeLists.txt's SOVERSION comment), the pin has to be
+        # libs/ac3/CMakeLists.txt's SOVERSION comment), the pin has to be
         # exact, not a >= floor. libiclforge0 itself declares no such
         # dependency the other way: it is a plain .so with no headers or
         # symlink of its own, valid to have installed alone.

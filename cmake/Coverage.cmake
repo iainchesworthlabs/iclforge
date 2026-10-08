@@ -27,7 +27,7 @@
 # build-time saving: examples/ is documentation that happens to compile, over
 # an API surface tests/ already covers, and each one is its own ctest process -
 # see CMakePresets.json. Vendored third-party code
-# (src/adm's FetchContent'd libbw64/libadm) is deliberately NOT
+# (libs/adm's FetchContent'd libbw64/libadm) is deliberately NOT
 # instrumented: these flags are target-scoped and nothing links iclforge::coverage
 # into those targets, and tools/checks/coverage_report.sh's filters are
 # first-party-only anyway.

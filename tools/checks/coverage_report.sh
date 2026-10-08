@@ -5,10 +5,10 @@
 # One gcov extraction pass over an ICLFORGE_ENABLE_COVERAGE build (the
 # config-linux-gcc-coverage preset - see CMakePresets.json), then one cheap
 # gate pass per component off the shared JSON trace. Line and branch coverage
-# are gated PER COMPONENT rather than as one blended number: src/ac3 is an
+# are gated PER COMPONENT rather than as one blended number: libs/ac3 is an
 # order of magnitude larger than any container writer, so a blend would let a
-# real regression in src/containers/src/mpegts or src/capi hide inside ordinary drift in
-# src/ac3 - and "which module is thin" is exactly the question a
+# real regression in libs/containers/src/mpegts or libs/capi hide inside ordinary drift in
+# libs/ac3 - and "which module is thin" is exactly the question a
 # per-component table exists to answer.
 #
 # apps/cli is gated here too (coverage floors), not just src/. It is about 6,500
@@ -41,7 +41,7 @@
 # that are the only thing driving its platform seams - so a figure taken in
 # this job would cover the platform-free engine core and nothing else.
 #
-# src/sendspin and apps/hearth (Hearth, planning/hearth-reference-player.md) ARE gated here,
+# libs/sendspin and apps/hearth (Hearth, planning/hearth-reference-player.md) ARE gated here,
 # unlike apps/crucible above: config-linux-gcc-coverage is the one coverage preset that turns
 # ICLFORGE_BUILD_HEARTH on (CMakePresets.json), and both iclforge::sendspin and hearth_engine link
 # iclforge::coverage themselves for exactly the reason apps/cli's own link does - see their
@@ -103,10 +103,10 @@ fi
 # comment), the rest as ordinary in-flight-churn headroom. Re-check against
 # the first hosted run and tighten if the margin proves generous.
 #
-# src/audio's floor used to be low because its measurement was: no test
+# libs/audio's floor used to be low because its measurement was: no test
 # opened an audio device, so the ALSA capture/monitor/passthrough paths never
 # ran headless. They do now, against software devices (see the 2026-09-24
-# note below). src/capi's remaining gap is src/capi/src/internal.hpp's guard()
+# note below). libs/capi's remaining gap is libs/capi/src/internal.hpp's guard()
 # catch clauses and the defensively unreachable enum fallthroughs beside them.
 #
 # apps/cli's device commands (audio_io, live_audio) used to execute only to
@@ -116,7 +116,7 @@ fi
 # absorb that difference.
 #
 # Re-measured 2026-09-24 after the coverage review that added the ALSA
-# software-device suites (tests/audio/alsa_null_device.hpp), the AC-4 syntax
+# software-device suites (tests/support/alsa_null_device.hpp), the AC-4 syntax
 # suites and the CLI/Crucible/Hearth/IAB edge suites, on GCC 14.2 / gcovr 8.6
 # (not the CI pin - hence the ~4-6 point margins rather than tighter ones):
 #
@@ -136,42 +136,42 @@ fi
 # base is 107 lines and 68 branches, so a single line moves its figures by about one and a half
 # points and its floors are set further under than the rest.
 #
-# src/audio and apps/cli's device commands no longer depend on the runner
+# libs/audio and apps/cli's device commands no longer depend on the runner
 # having an audio endpoint: their success paths run against alsa-lib's
 # built-in null/file/route/multi plugins. What they still miss needs a real
-# card (snd_card_next() walks /dev/snd/controlC* directly), so src/audio's
+# card (snd_card_next() walks /dev/snd/controlC* directly), so libs/audio's
 # floor is the agreed 70%-class floor for hardware-bound code rather than
 # 85%. apps/common is below 85% for the same reason: sink_wait.hpp's play and
-# passthrough instantiations only run against a card. src/sendspin and
+# passthrough instantiations only run against a card. libs/sendspin and
 # apps/hearth now have a real measurement behind their floors.
 #
 # AC-4 is one library since planning/consolidation.md's C1: the inspector's floor was 93/88 and the
 # decoder's and the core's 88/80, and the encoder, now among its files, was not measured. Until a
 # coverage run measures the merged library, it takes the lowest of the three.
 #
-# C2 moved signing's key, hash and MAC into src/base and its signer into src/ac3, whose floors are
-# under signing's 90/76 and stay as they were, and admbridge into src/adm, which takes the lower of
+# C2 moved signing's key, hash and MAC into libs/base and its signer into libs/ac3, whose floors are
+# under signing's 90/76 and stay as they were, and admbridge into libs/adm, which takes the lower of
 # the two floors (82/75 and 88/78) until a coverage run measures it.
 #
 # C3 merged mp4 (90/85), mpegts (92/85), matroska (88/85), iamf (91/90) and iec61937 (91/83) into
-# src/containers, which takes the lowest line and branch floors of the five until a coverage run
+# libs/containers, which takes the lowest line and branch floors of the five until a coverage run
 # measures it.
 #
 # apps/crucible/engine is the platform-free engine core iclforge-tests compiles in;
 # the rest of apps/crucible keeps its own floors in coverage_crucible.ps1.
 components="
-src/ac3               90 82
-src/base              80 56
-src/dsp               82 88
-src/objects           88 80
-src/render            91 83
-src/containers        88 83
-src/audio             72 58
-src/capi              84 74
-src/adm               82 75
-src/sendspin          85 74
-src/ac4               88 80
-src/iab               90 87
+libs/ac3               90 82
+libs/base              80 56
+libs/dsp               82 88
+libs/objects           88 80
+libs/render            91 83
+libs/containers        88 83
+libs/audio             72 58
+libs/capi              84 74
+libs/adm               82 75
+libs/sendspin          85 74
+libs/ac4               88 80
+libs/iab               90 87
 apps/cli              80 71
 apps/common           78 66
 apps/crucible/engine  90 82
@@ -190,7 +190,7 @@ html="$build_dir/coverage.html"
 # artifact glob would have to chase), and prints the whole-library summary.
 #
 # --gcov-ignore-parse-errors=suspicious_hits.warn: mdct.cpp's
-# ForwardCosTable-driven hot loop (src/ac3/src/core/mdct.cpp) trips a documented gcov
+# ForwardCosTable-driven hot loop (libs/ac3/src/core/mdct.cpp) trips a documented gcov
 # bug (gcc.gnu.org/bugzilla#68080, a false "suspicious hit value" on a tight
 # accumulation loop) that otherwise aborts gcovr outright rather than just
 # under/over-reporting that one line's count - gcovr's own error message

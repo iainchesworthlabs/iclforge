@@ -46,8 +46,8 @@ option(ICLFORGE_FETCH_FMT "Fetch {fmt} from source via FetchContent when no loca
 # Without a version, find_package() takes whatever {fmt} it finds, and an older
 # one fails the build at the first #include <fmt/base.h> instead of here.
 # Ubuntu 26.04's libfmt-dev is 10.1.1 (its CMake package reports 10.1.0); a
-# fuzz/run.sh configure on a machine with it installed picked it up and stopped
-# compiling src/base/src/cpu_features.cpp. With the minimum,
+# tools/fuzz/run.sh configure on a machine with it installed picked it up and stopped
+# compiling libs/base/src/cpu_features.cpp. With the minimum,
 # find_package() passes over a copy like that, including one an existing build
 # directory has already cached in fmt_DIR, and the fallback below applies.
 #
@@ -102,7 +102,7 @@ if(NOT fmt_FOUND)
     # fmt's own CMakeLists does not set POSITION_INDEPENDENT_CODE on its
     # `fmt` target, and a plain FetchContent build defaults to whatever the
     # ambient (unset) value is - fine for a static-only consumer, but
-    # iclforge_ac3_shared (src/ac3/CMakeLists.txt) links every dependency,
+    # iclforge_ac3_shared (libs/ac3/CMakeLists.txt) links every dependency,
     # including this one, into a real .so/.dll. Confirmed the hard way: the
     # WASM leg and the manylinux wheel build (neither wires vcpkg's toolchain
     # in, so both take this fallback) both failed linking libiclforge_ac3.so with
@@ -143,8 +143,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 endif()
 
 # iclforge::fmt_private - a private copy of {fmt}, compiled into the object files of a library that is
-# installed as a static archive: iclforge::ac3 (src/ac3/CMakeLists.txt) and iclforge::containers
-# (src/containers/CMakeLists.txt).
+# installed as a static archive: iclforge::ac3 (libs/ac3/CMakeLists.txt) and iclforge::containers
+# (libs/containers/CMakeLists.txt).
 #
 # An archive is not linked. Each function its objects call without defining stays an undefined
 # reference until a consumer's own link, and the installed package names no {fmt} for that link to

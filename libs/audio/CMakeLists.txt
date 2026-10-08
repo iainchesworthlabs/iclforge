@@ -27,7 +27,7 @@
 #
 # Always STATIC, deliberately, regardless of the ambient BUILD_SHARED_LIBS a
 # whole-project configure might set for iclforge::ac3/iclforge::containers's own
-# benefit (see src/ac3/CMakeLists.txt): this target carries no export
+# benefit (see libs/ac3/CMakeLists.txt): this target carries no export
 # annotations at all, so building it SHARED produces a DLL with nothing
 # exported and no usable import library - a link failure for every in-tree
 # consumer, not a working shared iclforge_audio. It isn't part of the distributed
@@ -120,8 +120,8 @@ target_sources(iclforge_audio PRIVATE src/live_positions.cpp)
 if(NOT WIN32 AND NOT LINUX AND NOT APPLE AND NOT ANDROID)
     message(FATAL_ERROR
         "iclforge_audio has no backend directory for this system. Add "
-        "src/audio/src/backend/<backend>/{audio_backend,capture,passthrough,monitor,"
-        "sink_capabilities,spatial,device_watcher}.cpp - src/audio/src/backend/posix/ is the no-backend "
+        "libs/audio/src/backend/<backend>/{audio_backend,capture,passthrough,monitor,"
+        "sink_capabilities,spatial,device_watcher}.cpp - libs/audio/src/backend/posix/ is the no-backend "
         "implementation and is a working starting point - then select it here.")
 endif()
 
@@ -512,7 +512,7 @@ set(ICLFORGE_AUDIO_BACKEND_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/${ICLFOR
 # Two directories on their own axis is the smaller thing, and this project
 # already carries independent per-platform trees on more than one axis (see
 # docs/building.md, "SIMD kernels and the architecture tree", for
-# src/base/variants/'s own version of the same idea).
+# libs/base/variants/'s own version of the same idea).
 #
 # No FATAL_ERROR fallback, unlike the backend selection above: an
 # unrecognised system gets posix/, because Berkeley sockets ARE the
@@ -530,7 +530,7 @@ endif()
 
 # Published the same way ICLFORGE_AUDIO_BACKEND_DIR is (see above):
 # tests/CMakeLists.txt puts this on iclforge-tests' own include path so
-# tests/audio/test_live_positions.cpp can open a second, independent
+# libs/audio/tests/test_live_positions.cpp can open a second, independent
 # UdpSocket to send itself test datagrams over real loopback - reusing the
 # exact class LivePositionSource is built on rather than hand-rolling a
 # second raw-socket implementation just for the test.

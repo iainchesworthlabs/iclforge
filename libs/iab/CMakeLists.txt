@@ -4,10 +4,10 @@
 # codec-blind bitstream parser, the same shape iclforge::containers
 # and iclforge::containers already use for their own containers: it links nothing
 # from iclforge::ac3 and knows nothing about AC-3, E-AC-3 or JOC, so it can be
-# reasoned about, tested and reused on its own (see src/containers/CMakeLists.txt's
+# reasoned about, tested and reused on its own (see libs/containers/CMakeLists.txt's
 # own header, which this file mirrors structurally).
 #
-# Unlike iclforge::adm (src/adm), this module has no third-party dependency at
+# Unlike iclforge::adm (libs/adm), this module has no third-party dependency at
 # all - IAB's own element/Plex-coded bitstream needs nothing beyond this
 # module's own bit reader (src/bitreader.hpp) - so, like the three container
 # writers, it defaults ON rather than OFF, and (also unlike iclforge::adm) has no

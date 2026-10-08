@@ -6,11 +6,11 @@
 # src/tiered/ holds the kernels written against a decode tier's scalar (iclforge::dsp::tiered:
 # AC-4's mixed-radix FFT, MDCT and KBD windows, its QMF banks and synthesis, its sample rate
 # converter, and the tables they read; planning/consolidation.md, C5). The codec that calls them
-# builds them at its tier (src/ac4/CMakeLists.txt), with the tier's scalar from
+# builds them at its tier (libs/ac4/CMakeLists.txt), with the tier's scalar from
 # variants/decode-scalar-<tier>/. This library builds those its own functions are made of, at
 # double: the sample rate converter, which dsp::resample is (decision 22).
 # ---------------------------------------------------------------------------
-# The minimum-footprint profile compiles what it needs into one archive (src/ac3/minimal.cmake),
+# The minimum-footprint profile compiles what it needs into one archive (libs/ac3/minimal.cmake),
 # so no library is built here for it.
 if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
     return()

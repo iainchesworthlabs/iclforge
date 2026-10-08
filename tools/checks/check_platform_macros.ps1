@@ -3,7 +3,7 @@
 # Platform-isolation guard.
 #
 # iclforge branches on the operating system in CMake, never in the preprocessor:
-# src/audio/CMakeLists.txt picks one src/audio/src/backend/<backend>/ directory
+# libs/audio/CMakeLists.txt picks one libs/audio/src/backend/<backend>/ directory
 # (alsa/android/macos/pipewire/posix/windows) for the target OS, so exactly one
 # audio_backend.cpp/capture.cpp/monitor.cpp/passthrough.cpp set is ever
 # compiled. That only stays true if nobody reaches for an #ifdef, and an #ifdef
@@ -15,7 +15,7 @@
 # check costs nothing to keep at zero, and zero is a far easier line to hold
 # than "only the justified ones". Header-configuration defines that a platform
 # header genuinely requires (WIN32_LEAN_AND_MEAN, NOMINMAX) belong in
-# target_compile_definitions -- see the WIN32 block in src/audio/CMakeLists.txt
+# target_compile_definitions -- see the WIN32 block in libs/audio/CMakeLists.txt
 # for the worked example.
 #
 # The scan covered src/ and apps/ only until 2026-09-23, and tests/ had quietly
@@ -23,8 +23,8 @@
 # getpid() branch, eight of a cmd.exe quoting one, eleven AVX2 cases whose
 # bodies a non-x86_64 leg never even parsed, and an MSVC-only pair of ABI size
 # assertions. Each is now the same directory-selected shape the rest of the
-# tree uses -- tests/platform/<os>/, tests/ac3/core/avx2/{present,absent}/,
-# tests/render/abi/{msvc,unknown}/ -- and python/ likewise
+# tree uses -- tests/support/platform/<os>/, libs/ac3/tests/core/avx2/{present,absent}/,
+# libs/render/tests/abi/{msvc,unknown}/ -- and python/ likewise
 # (python/src/iclforge_ext/{signing,containers}/{present,absent}/), so every
 # tree here starts at zero rather than being grandfathered in with a waiver list.
 #
@@ -39,7 +39,7 @@
 #
 # Include guards are not affected: the codebase uses #pragma once.
 #
-# One other narrow exception, added for src/capi/include/iclforge_c/iclforge.h
+# One other narrow exception, added for libs/capi/include/iclforge_c/iclforge.h
 # (C API): `#ifdef __cplusplus` / `extern "C" {` / `#endif` is the
 # standard idiom that lets one header be included from both a C and a C++
 # translation unit, which a C-callable public header genuinely needs -
@@ -94,7 +94,7 @@ foreach ($name in @('apps', 'tests', 'fuzz', 'examples', 'tools', 'python')) {
 }
 
 # '*.mm' was added on 2026-09-06 with the first Objective-C++ in the tree:
-# src/audio/src/backend/macos/process_tap.mm, the seam for Core Audio's
+# libs/audio/src/backend/macos/process_tap.mm, the seam for Core Audio's
 # process tap, and apps/crucible's foreground.mm and app_icon_provider.mm.
 # Those files say in their own headers that this check holds the no-#ifdef
 # rule over them, and that was not true while the extension list stopped at
@@ -203,7 +203,7 @@ foreach ($file in $files) {
 if ($violations.Count -gt 0) {
     Write-Host ''
     Write-Host 'Platform-isolation violation: preprocessor conditional in a scanned tree.' -ForegroundColor Red
-    Write-Host 'Per-OS code is selected by CMake (see the WIN32 block in src/audio/CMakeLists.txt),'
+    Write-Host 'Per-OS code is selected by CMake (see the WIN32 block in libs/audio/CMakeLists.txt),'
     Write-Host 'so it belongs in its own translation unit, not behind an #ifdef.'
     Write-Host ''
     foreach ($v in $violations) {

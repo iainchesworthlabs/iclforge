@@ -80,10 +80,10 @@ permissions:
   contents: read
 
 jobs:
-  # iclforge-tests coverage over every library component: src/ac3 plus audio,
+  # iclforge-tests coverage over every library component: libs/ac3 plus audio,
   # signing, matroska, mp4, mpegts, capi, and - via the coverage preset's
   # ICLFORGE_BUILD_ADM=ON with vcpkg's 'adm' feature, the same pair
-  # adm-validate passes by hand - iclforge::adm/admbridge. Originally src/ac3 only
+  # adm-validate passes by hand - iclforge::adm/admbridge. Originally libs/ac3 only
   # ("the library is what was asked for"); extended once the rest of the
   # library surface existed and was already being EXERCISED by this same
   # suite, just uninstrumented and unreported. apps/cli and apps/gui stay out
@@ -101,7 +101,7 @@ jobs:
   # The gate is PER COMPONENT - a line floor and a branch floor per
   # src/<dir>, not one blended number a small component's regression could
   # hide inside - and lives in tools/checks/coverage_report.sh alongside the
-  # measured baseline each floor was calibrated against. src/ac3's original
+  # measured baseline each floor was calibrated against. libs/ac3's original
   # 80/70 floor (set a few points under its first hosted run's 81.3/72.0,
   # measured 2026-08-09 while block switching, delta bit allocation, half
   # sample rate and dual mono were still landing) is now 88/78: the suite
@@ -263,15 +263,15 @@ jobs:
         env:
           STATUS: ${{ job.status }}
         run: echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-  # iclforge::adm (src/adm) is opt-in - ICLFORGE_BUILD_ADM defaults OFF, unlike every other
-  # library component (see the root CMakeLists.txt's own option() and src/adm/CMakeLists.txt's
+  # iclforge::adm (libs/adm) is opt-in - ICLFORGE_BUILD_ADM defaults OFF, unlike every other
+  # library component (see the root CMakeLists.txt's own option() and libs/adm/CMakeLists.txt's
   # header comment for why: libadm needs Boost header libraries, a third-party dependency that
   # only -DVCPKG_MANIFEST_FEATURES=adm resolves). No leg in
   # build-and-test's matrix (_build.yml) ever passes -DICLFORGE_BUILD_ADM=ON; besides this job,
   # the only other build with it on is the coverage job's instrumented Debug preset, which turns
   # the CLI and examples OFF - so without this job, ADM BWF reader phase 3's CLI command and example
   # (see below) would still have zero CI builds, and a change to the module or to its vendored
-  # libbw64/libadm pins (src/adm/CMakeLists.txt's GIT_TAG values) would never be exercised at
+  # libbw64/libadm pins (libs/adm/CMakeLists.txt's GIT_TAG values) would never be exercised at
   # -O2 or under the full default configuration anybody actually installs.
   #
   # A dedicated job rather than an extra pass inside an existing Linux leg (the shape
@@ -292,7 +292,7 @@ jobs:
   #
   # -DICLFORGE_BUILD_HEARTH=OFF: that option now defaults ON (CMakeLists.txt's own comment),
   # and without this override this job's plain "adm" manifest feature never installs mbedTLS/
-  # cpp-httplib/libFLAC/Opus/mdns, so add_subdirectory(src/sendspin) failed configuring at
+  # cpp-httplib/libFLAC/Opus/mdns, so add_subdirectory(libs/sendspin) failed configuring at
   # find_package(MbedTLS) - a real regression this job hit on main, not something this job's
   # own change caused; the root CMakeLists.txt's own comment on ICLFORGE_BUILD_HEARTH's default
   # named three legs that needed this same override and missed this one.
@@ -370,7 +370,7 @@ jobs:
       # (config-linux-gcc's own "core" preset fragment sets VCPKG_MANIFEST_
       # FEATURES to "hearth" to match), but this job's own -D above replaces
       # that with "adm" alone rather than adding to it - so without turning
-      # the option off explicitly, src/sendspin still configures and calls
+      # the option off explicitly, libs/sendspin still configures and calls
       # find_package(MbedTLS), which was never installed for this job's
       # narrower feature set. Same reasoning as CMakePresets.json's own
       # minimal-decoder/minimal-encoder/wasm-emscripten/config-windows-llvm-
@@ -384,7 +384,7 @@ jobs:
             # defaults ON now (root CMakeLists.txt), but -DVCPKG_MANIFEST_FEATURES=adm above
             # REPLACES CMakePresets.json's own default ("hearth") rather than extending it, so
             # vcpkg never installs Hearth's ports here while CMakeLists.txt would still try to
-            # configure against them - src/sendspin/CMakeLists.txt's find_package(MbedTLS)
+            # configure against them - libs/sendspin/CMakeLists.txt's find_package(MbedTLS)
             # failing outright. This job has nothing to do with Hearth either way (see this
             # file's own header comment above ADM Module), so turning it off is also just
             # correct scope, the same way minimal-decoder/minimal-encoder/wasm-emscripten/
@@ -444,7 +444,7 @@ jobs:
         env:
           STATUS: ${{ job.status }}
         run: echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-  # iclforge::sendspin (src/sendspin, planning/hearth-reference-player.md A4): ICLFORGE_BUILD_HEARTH
+  # iclforge::sendspin (libs/sendspin, planning/hearth-reference-player.md A4): ICLFORGE_BUILD_HEARTH
   # defaults ON (root CMakeLists.txt), with vcpkg's "hearth" feature - cpp-httplib, mdns, mbedTLS,
   # libFLAC and Opus - selected by default too, via CMakePresets.json's "core" fragment. Every
   # build-and-test leg builds and tests it without being asked, so the [sendspin] and [hearth]

@@ -180,9 +180,9 @@ AC4_CEILINGS="$REPO/tests/golden/ac4-probe-ceilings.json"
 # ICLFORGE_MAX_IMAGE_BYTES was re-based from 400,000 to 465,000 after the profile's own
 # feature branch (PR #351) picked up several mid-flight merges
 # from `develop` - most significantly DC10's QMF-domain JOC reconstruction,
-# which the decode path now needs (src/dsp/src/qmf.cpp and
-# src/ac3/src/verify/eac3_mirror.cpp, both correctly added to
-# src/ac3/minimal.cmake's source list) - between when 354,060/400,000 were
+# which the decode path now needs (libs/dsp/src/qmf.cpp and
+# libs/ac3/src/verify/eac3_mirror.cpp, both correctly added to
+# libs/ac3/minimal.cmake's source list) - between when 354,060/400,000 were
 # first measured and when the PR actually merged. The image had already
 # reached 412,516 bytes at that point; nobody re-measured before merging.
 # See docs/performance-trend.md's footprint table for the current breakdown.

@@ -263,7 +263,7 @@ jobs:
       # Before checkout: the bare image has no git, and actions/checkout silently
       # degrades to a tarball download without it. ccache is here for the compiler
       # cache (build-leg configures it), and libasound2-dev because its absence
-      # is not a build failure: src/audio would fall back to the no-op backend
+      # is not a build failure: libs/audio would fall back to the no-op backend
       # and the gate would go green having compiled none of the ALSA one.
       # Three attempts, 30 s apart, each re-running the index update: a mirror
       # mid-sync fails a single attempt outright now and then.
@@ -372,7 +372,7 @@ jobs:
         run: |
           set -euo pipefail
           build/config-linux-gcc/bin/forge-gui --smoke \
-            fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav \
+            libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav \
             "${RUNNER_TEMP}/forge-gui-smoke.ac3" \
             "${RUNNER_TEMP}/forge-gui-smoke.png"
 

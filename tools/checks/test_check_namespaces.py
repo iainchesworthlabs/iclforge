@@ -146,7 +146,7 @@ class Namespaces(unittest.TestCase):
         code, out = self.run_check({"base": ["base"]}, debts)
         self.assertEqual(code, 0, out)
         self.assertIn(
-            "known debt: src/base/include/iclforge/base/bitreader.hpp: BitReader is the root's", out
+            "known debt: libs/base/include/iclforge/base/bitreader.hpp: BitReader is the root's", out
         )
         self.assertIn("0 failures, 1 known debts", out)
 

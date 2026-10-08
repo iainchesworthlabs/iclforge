@@ -274,7 +274,7 @@ fi
 # --- Every ICLFORGE_BUILD_<NAME> option the root CMakeLists.txt defaults ON (each is declared on
 # one line) is, in each recipe, either a component it offers or pinned OFF. One that a recipe
 # neither offers nor pins gets built by it, with whatever it needs: ICLFORGE_BUILD_HEARTH, which
-# defaults ON, had both recipes configure src/sendspin, which stops at a dependency neither
+# defaults ON, had both recipes configure libs/sendspin, which stops at a dependency neither
 # declares, and, with the AC-4 library off, at upstream's refusal of Hearth without it. ---
 cmakelists="$root/CMakeLists.txt"
 if [[ -f "$cmakelists" ]] && [[ -f "$portfile" ]] && [[ -f "$conanfile" ]]; then

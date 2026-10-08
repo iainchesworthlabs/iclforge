@@ -1,7 +1,7 @@
 """Compare the two AC-4 syntax transcriptions where no encoded stream reaches.
 
 The committed DEE streams, and the local census, exercise only part of the
-syntax the decoder in src/ac4/src/decoder and tools/references/ac4_syntax.py read. This
+syntax the decoder in libs/ac4/src/decoder and tools/references/ac4_syntax.py read. This
 script makes streams that reach the rest, reads each through both
 transcriptions and compares their traces.
 
@@ -31,7 +31,7 @@ before it are DEE's own, which the digest tests already compare. Findings:
   STOP      one stopped with an error where the other read on - the two check
             some values at different elements, so this is reported and does
             not fail the run;
-  TOC       the two tables of contents (src/ac4's and ac4_parse.py's) disagree
+  TOC       the two tables of contents (libs/ac4's and ac4_parse.py's) disagree
             on whether the frame parses or where its substreams are, so that
             frame's substreams are not compared, and only the first such frame
             of a case is reported. A frame both sides refuse is no finding, and
@@ -51,7 +51,7 @@ header). Run from the repo root:
 --streams adds every *.ac4 under each directory (the local census, say) to the
 committed streams under tests/golden/external-baseline/ and tests/golden/ac4-hsf/.
 --inputs compares the files under each directory instead, every frame of each: a corpus
-fuzz/run.sh grew for fuzz_ac4_decode reaches syntax random streams do not.
+tools/fuzz/run.sh grew for fuzz_ac4_decode reaches syntax random streams do not.
 """
 
 import argparse

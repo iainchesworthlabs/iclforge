@@ -98,13 +98,13 @@ elseif(UNIX AND NOT APPLE)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(ICLFORGE_CRUCIBLE_PIPEWIRE REQUIRED IMPORTED_TARGET libpipewire-0.3)
     target_include_directories(crucible_engine
-        PRIVATE "${CMAKE_SOURCE_DIR}/src/audio/src/backend/pipewire")
+        PRIVATE "${CMAKE_SOURCE_DIR}/libs/audio/src/backend/pipewire")
     target_link_libraries(crucible_engine PRIVATE PkgConfig::ICLFORGE_CRUCIBLE_PIPEWIRE)
     # X11 full-screen detection (docs/crucible/design/promotion.md, Phase 4's X11
     # addendum). libxcb, not libX11: thread-safe, no global error handler,
     # and already on every machine that runs Qt's xcb platform plugin, so
     # the .deb's shlibdeps add nothing new. Optional the way the audio
-    # backends are (src/audio/CMakeLists.txt): AUTO takes it when the
+    # backends are (libs/audio/CMakeLists.txt): AUTO takes it when the
     # headers are there, ON demands them, OFF leaves it out. Without it the
     # Foreground says so at runtime and the rule is off; exactly one of the
     # two readers is compiled, the same rule as a platform directory.
@@ -145,15 +145,15 @@ elseif(APPLE)
     # AudioDevices is deliberately NOT in this list. That seam is the one
     # platform service that is not per-platform: engine/library_devices.cpp
     # forwards it to iclforge::audio, whose macOS backend
-    # (src/audio/src/backend/macos/) already answers for render devices, sinks
+    # (libs/audio/src/backend/macos/) already answers for render devices, sinks
     # and the tap - so a macos/audio_devices.cpp would be a second definition
     # of platform_audio_devices() and a duplicate symbol at link, not a gap.
     # That backend now carries the Core Audio process tap itself
-    # (src/audio/src/backend/macos/process_tap.mm) and reports process_loopback
+    # (libs/audio/src/backend/macos/process_tap.mm) and reports process_loopback
     # NOT available since 2026-09-06: the first machine ever to run the path
     # never returned from AudioDeviceCreateIOProcID on the tap's aggregate
     # device and wedged the rest of the process's HAL with it, so the path is
-    # refused before that call (src/audio/src/backend/macos/coreaudio_names.hpp
+    # refused before that call (libs/audio/src/backend/macos/coreaudio_names.hpp
     # carries the observation and the ICLFORGE_MACOS_PROCESS_TAP opt-in). So
     # Crucible lists applications here and taps none of them, and says so.
     # Behind that sit the things that were expected to be in the way and have
@@ -168,7 +168,7 @@ elseif(APPLE)
     # OBJCXX, and why this directory turns it on. NSWorkspace and NSImage have
     # no C entry point, so the Foreground and the icon provider are .mm
     # translation units - two of the three in the tree, the third being the
-    # library's own process_tap.mm, which src/audio/CMakeLists.txt's APPLE
+    # library's own process_tap.mm, which libs/audio/CMakeLists.txt's APPLE
     # block enables the language for separately. enable_language() from a
     # subdirectory rather than from the root is what this file already does
     # further down, in the window's own icon block, where the WIN32 arm calls
@@ -207,7 +207,7 @@ elseif(APPLE)
     # reimplemented, exactly as the Linux arm reuses iclforge::pipewire's, so this
     # needs that private header's directory.
     target_include_directories(crucible_engine
-        PRIVATE "${CMAKE_SOURCE_DIR}/src/audio/src/backend/macos")
+        PRIVATE "${CMAKE_SOURCE_DIR}/libs/audio/src/backend/macos")
     # Apple's <AssertMacros.h> - reached from AppKit through
     # ApplicationServices and CarbonCore/Debugging.h - defines function-like
     # macros called check(), verify() and require() unless this is 0. Qt's own
@@ -232,7 +232,7 @@ elseif(APPLE)
     # read hands back, AppKit for NSWorkspace. Apple frameworks are linked as
     # plain "-framework <name>" strings rather than through find_library -
     # there is nothing to find, they ship with every macOS SDK
-    # (src/audio/CMakeLists.txt's APPLE block says the same).
+    # (libs/audio/CMakeLists.txt's APPLE block says the same).
     #
     # AppKit reaches crucible-run, the console runner, along with the rest
     # of this static library. That is a GUI framework in a command-line
@@ -250,7 +250,7 @@ endif()
 # the Linux arm for a while after the second was added - which is how a
 # Windows build came to lose iclforge/base/detail/profiling.hpp.
 target_include_directories(crucible_engine PUBLIC
-    "$<IF:$<BOOL:${ICLFORGE_ENABLE_TRACY}>,${CMAKE_SOURCE_DIR}/src/base/variants/profiling-tracy_enabled,${CMAKE_SOURCE_DIR}/src/base/variants/profiling-tracy_disabled>")
+    "$<IF:$<BOOL:${ICLFORGE_ENABLE_TRACY}>,${CMAKE_SOURCE_DIR}/libs/base/variants/profiling-tracy_enabled,${CMAKE_SOURCE_DIR}/libs/base/variants/profiling-tracy_disabled>")
 
 # The console runner: Phase 2's exit criterion, and the thing the UI replaces.
 add_executable(crucible-run runner/main.cpp)

@@ -10,7 +10,7 @@ ICLFORGE_ROOT points outside the installed tree. That was the state of the
 manifest until this script existed, and nothing said so: the pack SUCCEEDS.
 
 So the sources are staged INTO a copy of the component first. The staged tree is
-generated, never committed: a second copy of src/ac3/ in the repository is
+generated, never committed: a second copy of libs/ac3/ in the repository is
 exactly the drift this project avoids everywhere else.
 
 WHAT GOES IN is the minimum the minimum-footprint profile compiles, worked out
@@ -48,7 +48,7 @@ REPO = pathlib.Path(__file__).resolve().parents[2]
 COMPONENT = REPO / "esp-idf" / "iclforge"
 
 # Whole directories copied verbatim. Directories rather than a file list on
-# purpose: src/ac3/minimal.cmake names its own sources and changes without
+# purpose: libs/ac3/minimal.cmake names its own sources and changes without
 # telling this script, so anything narrower would need keeping in step with it -
 # which is the failure this repo has hit before (the bare-metal fixture, 131
 # encoder commits stale). Copying the tree costs archive size and cannot go
@@ -59,33 +59,33 @@ COMPONENT = REPO / "esp-idf" / "iclforge"
 # carry the part that builds for this chip.
 STAGED_TREES = (
     # The AC-3 codec and the four libraries it is built from: the minimum-footprint profile is
-    # one archive of files from all five (src/ac3/minimal.cmake). src/base also holds the header-only
-    # Fixed32 and scalar functions src/ac3 and src/ac4 both include (planning/ac4.md decision 31).
-    "src/ac3",
-    "src/base",
-    "src/dsp",
-    "src/objects",
-    "src/render",
+    # one archive of files from all five (libs/ac3/minimal.cmake). libs/base also holds the header-only
+    # Fixed32 and scalar functions libs/ac3 and libs/ac4 both include (planning/ac4.md decision 31).
+    "libs/ac3",
+    "libs/base",
+    "libs/dsp",
+    "libs/objects",
+    "libs/render",
     "cmake",
 )
 
 # What --with-ac4 adds: the AC-4 library, whose minimum-footprint archive
-# (src/ac4/minimal.cmake) is the inspector, the core and the decoder. Not the
+# (libs/ac4/minimal.cmake) is the inspector, the core and the decoder. Not the
 # encoder, which no ESP32 part builds (planning/ac4.md, decision 34) and which
 # the profile compiles none of: AC4_PRUNE drops its files from the staged
 # copy. Off by default, so an archive packed without the flag holds exactly the
 # trees it always did.
-STAGED_AC4_TREES = ("src/ac4",)
+STAGED_AC4_TREES = ("libs/ac4",)
 
 # The encoder's files, which the profile's archive does not list, dropped from
 # an archive packed --with-ac4. Directories as well as files; a stale entry
 # stops the pack, as PRUNE's does.
 AC4_PRUNE = (
-    "src/ac4/include/iclforge/ac4/encoder",
-    "src/ac4/src/encoder",
+    "libs/ac4/include/iclforge/ac4/encoder",
+    "libs/ac4/src/encoder",
 )
 
-# Individual files the root build needs before it reaches src/ac3.
+# Individual files the root build needs before it reaches libs/ac3.
 STAGED_FILES = (
     "CMakeLists.txt",
     "LICENSE",
@@ -93,18 +93,18 @@ STAGED_FILES = (
 )
 
 # Dropped from the staged copy. Both are excluded from the minimum-footprint
-# profile already (src/ac3/minimal.cmake), so removing them changes nothing
+# profile already (libs/ac3/minimal.cmake), so removing them changes nothing
 # that builds - they are here because an archive carrying AVX2 kernels for a
 # part with no AVX2 is just bigger.
 #
 # Repo-relative, and applied against the staged tree unchanged, because the
-# staging preserves the layout. Written the other way - relative to src/ac3 -
+# staging preserves the layout. Written the other way - relative to libs/ac3 -
 # they still worked, and tools/checks/check_doc_paths.py rightly called them
 # paths that do not exist: a reader cannot tell a wrong path from one that is
 # merely relative to something else.
 PRUNE = (
-    "src/ac3/src/internal/avx2/mdct_avx2.cpp",
-    "src/ac3/src/internal/avx2/avx2_probe.cpp",
+    "libs/ac3/src/internal/avx2/mdct_avx2.cpp",
+    "libs/ac3/src/internal/avx2/avx2_probe.cpp",
 )
 
 
@@ -348,7 +348,7 @@ def main() -> int:
 
     print(f"packed {final}")
     print(f"  entries: {entries}")
-    print(f"  src/ac3 sources: {sources}")
+    print(f"  libs/ac3 sources: {sources}")
     if args.with_ac4:
         print("  with the AC-4 inspector, core and decoder")
     # The number that would have caught the original three-file archive. A

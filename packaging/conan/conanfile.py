@@ -108,7 +108,7 @@ class IclforgeConan(ConanFile):
         # vcpkg_cmake_configure() call.
         tc.variables["ICLFORGE_BUILD_CLI"] = False
         tc.variables["ICLFORGE_BUILD_GUI"] = False
-        # Hearth, an application (apps/hearth) and a library nothing installs (src/sendspin), needs
+        # Hearth, an application (apps/hearth) and a library nothing installs (libs/sendspin), needs
         # dependencies this recipe does not declare; upstream also refuses it beside
         # ICLFORGE_BUILD_AC4=OFF.
         tc.variables["ICLFORGE_BUILD_HEARTH"] = False

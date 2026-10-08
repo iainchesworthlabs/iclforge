@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# fuzz/run.sh - build iclforge's libFuzzer harnesses under Clang+ASan+UBSan and
+# tools/fuzz/run.sh - build iclforge's libFuzzer harnesses under Clang+ASan+UBSan and
 # run each for a bounded time budget. This is deliberately NOT continuous
 # fuzzing infrastructure (no OSS-Fuzz-style always-on service) - see
 # .github/workflows/fuzz.yml for how CI bounds it further, and the README in
 # this directory for what "bounded" means and why.
 #
 # Usage:
-#   fuzz/run.sh                     # build, then run every default-list harness
-#   fuzz/run.sh fuzz_scan            # build, then run just this harness
-#   fuzz/run.sh regress              # replay every seed + regression corpus once, no mutation
-#   fuzz/run.sh minimize <target> <path-to-crash-file>
+#   tools/fuzz/run.sh                     # build, then run every default-list harness
+#   tools/fuzz/run.sh fuzz_scan            # build, then run just this harness
+#   tools/fuzz/run.sh regress              # replay every seed + regression corpus once, no mutation
+#   tools/fuzz/run.sh minimize <target> <path-to-crash-file>
 #
 # The differential harnesses (fuzz_differential_ac3_decode,
 # fuzz_differential_eac3_decode - differential decoder fuzzing: same mutated bytes decoded by
-# both iclforge and FFmpeg, PCM diffed - see fuzz/differential_oracle.hpp)
+# both iclforge and FFmpeg, PCM diffed - see libs/ac3/fuzz/differential_oracle.hpp)
 # are NOT in the default target list `run`/`regress` use with no arguments:
 # they need `ffmpeg` on PATH and are much slower per-exec, so name them
-# explicitly, e.g. `fuzz/run.sh run fuzz_differential_ac3_decode`. CI's
+# explicitly, e.g. `tools/fuzz/run.sh run fuzz_differential_ac3_decode`. CI's
 # fuzz-differential job (fuzz.yml) does exactly this.
 #
 # Env overrides:
@@ -42,7 +42,7 @@ SECONDS_PER_TARGET="${ICLFORGE_FUZZ_SECONDS:-60}"
 # list: they need `ffmpeg` on PATH and are much slower per-exec (a real
 # FFmpeg process per comparable input), so they get their own CI job
 # (fuzz.yml's fuzz-differential) that names them explicitly, the same way
-# `fuzz/run.sh run fuzz_scan` already lets a caller run just one target from
+# `tools/fuzz/run.sh run fuzz_scan` already lets a caller run just one target from
 # this list. See seed_source_for below for how they reuse seed corpora
 # without duplicating any files.
 #
@@ -121,7 +121,7 @@ target_binary() {
 # A differential target (differential decoder fuzzing) shares its crash-only sibling's seed
 # corpus rather than duplicating those files under a second directory - it
 # drives the exact same decode path, just with an extra FFmpeg comparison on
-# top (see fuzz/differential_oracle.hpp). Every other target is its own seed
+# top (see libs/ac3/fuzz/differential_oracle.hpp). Every other target is its own seed
 # source, unchanged.
 seed_source_for() {
     case "$1" in
@@ -177,7 +177,7 @@ cmd_run() {
     if [ "$status" -ne 0 ]; then
         echo "" >&2
         echo "fuzzing found something - minimize it with:" >&2
-        echo "  fuzz/run.sh minimize <target> <artifact file>" >&2
+        echo "  tools/fuzz/run.sh minimize <target> <artifact file>" >&2
     fi
     exit "$status"
 }
@@ -217,8 +217,8 @@ cmd_regress() {
 }
 
 cmd_minimize() {
-    local target="${1:?usage: fuzz/run.sh minimize <target> <crash-file>}"
-    local input="${2:?usage: fuzz/run.sh minimize <target> <crash-file>}"
+    local target="${1:?usage: tools/fuzz/run.sh minimize <target> <crash-file>}"
+    local input="${2:?usage: tools/fuzz/run.sh minimize <target> <crash-file>}"
     configure_and_build
     mkdir -p "$ARTIFACT_DIR"
     "$(target_binary "$target")" -minimize_crash=1 -runs=100000 \

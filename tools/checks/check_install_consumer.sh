@@ -2,7 +2,7 @@
 #
 # Installed-package consumer check for iclforge's C API and its AC-4 decoder and encoder.
 #
-# tests/capi and the C examples compile against the build tree, where the generated headers sit
+# libs/capi/tests and the C examples compile against the build tree, where the generated headers sit
 # under <build>/src/capi/generated whether or not an install rule copies them. That is how
 # `cmake --install` shipped an iclforge_c/iclforge.h nobody could include: it #includes
 # iclforge_c/version.h, which is generated, and only the source include/ directory and export.h

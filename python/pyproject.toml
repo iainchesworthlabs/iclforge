@@ -56,12 +56,12 @@ ICLFORGE_BUILD_TESTS = "OFF"
 ICLFORGE_BUILD_EXAMPLES = "OFF"
 ICLFORGE_BUILD_FUZZERS = "OFF"
 ICLFORGE_BUILD_ADM = "OFF"
-# Off for the same reason as the rest of this list: Hearth (src/sendspin, apps/hearth) is no part
+# Off for the same reason as the rest of this list: Hearth (libs/sendspin, apps/hearth) is no part
 # of the F2 binding surface, and this option's default is ON (root CMakeLists.txt), so leaving it
 # unset here tries to find_package() cpp-httplib/mbedTLS/libFLAC/Opus/mdns that cibuildwheel's
 # manylinux/musllinux/macOS/Windows images never install - see that option's own comment.
 ICLFORGE_BUILD_HEARTH = "OFF"
-# The AC-4 library (src/ac4) defaults ON - ON here too since
+# The AC-4 library (libs/ac4) defaults ON - ON here too since
 # plan phase I4 binds them (planning/ac4.md): the wheel carries iclforge.ac4 (iclforge::ac4::Decoder/
 # iclforge::ac4::Encoder bound directly, python/src/iclforge_ext/ac4/present/ac4_module.cpp), the same
 # "wheel always carries the full surface" reasoning as the matroska/mp4/mpegts/signing targets

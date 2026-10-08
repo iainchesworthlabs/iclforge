@@ -9,9 +9,9 @@ Two sets, from the same legs and sources:
   while the local DEE licence ran (it ends on 2026-11-06 and is not renewed, so no DEE stream
   can be made after that date).
 
-What the streams are for. The decoder in src/ac4/src/decoder is checked against them: first its syntax,
+What the streams are for. The decoder in libs/ac4/src/decoder is checked against them: first its syntax,
 read by two transcriptions whose traces must agree (tools/references/ac4_syntax.py writes the
-committed digests; tests/ac4/decoder/test_syntax.cpp holds the decoder to them), then, from
+committed digests; libs/ac4/tests/decoder/test_syntax.cpp holds the decoder to them), then, from
 phase D2 on, its PCM, scored against each stream's source. The encoder phases race against the
 same streams. So every leg except ac4-stereo-64 is made with loudness measured and not
 corrected: DEE's default (measure_and_correct) normalises to -24 LKFS and runs a -2 dBFS
@@ -54,7 +54,7 @@ data in the I-frames of the IMS legs.
 Every IMS stream signals presentation_version 2 with channel_mode code 0b1111000, which TS
 103 190-2 Table 56 maps to 7.0, and codes a channel_pair_element: walked as 7.0, 5.0 or 5.1, at
 least every I-frame fails its substream size checks; walked as stereo, every frame ends
-exactly (src/ac4/ERRATA.md, "presentation_version 2 is read as immersive stereo").
+exactly (libs/ac4/ERRATA.md, "presentation_version 2 is read as immersive stereo").
 
 The three 5.1.4 legs (phase G1) are one tone per channel in each immersive codec mode DEE
 writes, for the phases from D9 on. Both transcriptions read immersive_channel_element() since
@@ -331,8 +331,8 @@ _DRC_AND_LTRT = ("drc_profile=film_standard:drc_profile_portable_hp=speech:"
 # The committed legs. "expect" holds what the layout, the rate and the options must give; a
 # walk that disagrees stops main() before anything in the tree changes.
 LEGS = [
-    # tests/ac4/core/test_toc.cpp pins this stream's frame count and its MediaInfo-checked TOC
-    # fields; tests/cli and fuzz/generate-seeds.sh read it too. "pinned": main() refuses to
+    # libs/ac4/tests/core/test_toc.cpp pins this stream's frame count and its MediaInfo-checked TOC
+    # fields; tests/cli and tools/fuzz/generate-seeds.sh read it too. "pinned": main() refuses to
     # replace it with different bytes, so it keeps DEE's defaults.
     {"name": "ac4-stereo-64", "encoder": AC4, "source": "reference_stereo", "layout": "stereo",
      "kbps": 64, "options": [], "pinned": True,

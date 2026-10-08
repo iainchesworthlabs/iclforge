@@ -102,7 +102,7 @@ include(FetchContent)
 #
 # Pinned to a commit, not a branch or tag - github.com/pwnified/libbw64 has neither, being a
 # personal, actively-pushed-to fork rather than a versioned release. Re-pinning is a deliberate
-# act (bump the SHA below, re-run the verification this module's own tests and fuzz/README.md
+# act (bump the SHA below, re-run the verification this module's own tests and tools/fuzz/README.md
 # describe), never an implicit "whatever master happens to be today".
 #
 # PATCH_COMMAND: two small patches against the pinned commit - patch_libbw64.cmake's own header
@@ -112,7 +112,7 @@ include(FetchContent)
 # 64-bit WAVE_FORMAT_IEEE_FLOAT <fmt > outright even though this fork's own decode/encode already
 # handle 64-bit float correctly. The undefined behaviour an earlier libbw64 pin needed patching
 # for (an empty std::vector<char> passed to &buffer[0], which blocked instrumenting
-# iclforge_adm_objects for fuzzing - see fuzz/CMakeLists.txt) is already fixed here, upstream of this
+# iclforge_adm_objects for fuzzing - see cmake/IclforgeFuzz.cmake) is already fixed here, upstream of this
 # fork too - that is not a third patch. The script runs in libbw64's own source directory (where
 # the patch step puts it), edits tokens rather than lines so a CRLF checkout patches the same
 # way, does nothing to an already-patched tree, and stops the configure if it finds a tree
@@ -213,7 +213,7 @@ target_compile_options(ac3adm_suppress_gcc15_null_deref INTERFACE
 # bw64/adm/ac3adm_suppress_gcc15_null_deref are all wrapped in $<BUILD_INTERFACE:...>, not just
 # iclforge::warnings/iclforge::coverage: iclforge_adm_objects is an OBJECT library, which has no link step of its
 # own to hide a PRIVATE dependency behind - a PRIVATE link on an OBJECT library still leaks into
-# that library's own INTERFACE_LINK_LIBRARIES (see src/capi/CMakeLists.txt's iclforge_capi_objects/
+# that library's own INTERFACE_LINK_LIBRARIES (see libs/capi/CMakeLists.txt's iclforge_capi_objects/
 # iclforge::ac3_static for the same leak forcing a real export-set fix there). Since iclforge_adm_objects
 # is itself part of the admTargets export set (cmake/InstallLibrary.cmake), an unwrapped bw64/adm
 # would make install(EXPORT admTargets) fail outright ("requires target ... that is not in any
@@ -230,7 +230,7 @@ target_compile_options(ac3adm_suppress_gcc15_null_deref INTERFACE
 # the same ICLFORGE_BUILD_ADM. Its public headers name iclforge::oba's and iclforge::iab's types in
 # their signatures (iclforge::objects::oba::ObjectPath, iclforge::iab::IABitstreamFrame), so anything linking
 # iclforge::adm needs both: LINK_PUBLIC. The parser stays codec-blind; the object model is not a
-# codec's (src/objects).
+# codec's (libs/objects).
 iclforge_add_library(adm
     NO_C4251_SUPPRESSION
     SOURCES

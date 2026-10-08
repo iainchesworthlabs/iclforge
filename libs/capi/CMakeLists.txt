@@ -8,7 +8,7 @@
 #
 # Built and installed as both a static and a shared library, same OBJECT-
 # library-plus-two-thin-wrappers shape as iclforge::ac3 itself - see
-# src/ac3/CMakeLists.txt's header comment for the full reasoning.
+# libs/ac3/CMakeLists.txt's header comment for the full reasoning.
 #
 # Unlike iclforge_ac3_static/iclforge_ac3_shared, BOTH variants here statically embed
 # iclforge::ac3_static (PRIVATE - forge's own types never appear in this
@@ -18,7 +18,7 @@
 # ffi.dlopen all expect a single self-contained module) - making
 # iclforge_c_shared's own linkage depend on a separately-shipped
 # libiclforge_ac3.so would defeat that. iclforge_ac3_static's objects are already built
-# PIC (src/ac3/CMakeLists.txt), so embedding them in a shared library is
+# PIC (libs/ac3/CMakeLists.txt), so embedding them in a shared library is
 # safe on every platform this project targets.
 #
 # The embedded codec has to stay private to this library, or a program that
@@ -122,7 +122,7 @@ configure_file(
 # allowlist were codec symbols, beside its 216 C functions. A process that then
 # loaded libiclforge_ac3.so had the C++ API, and libiclforge_ac3.so's own calls to
 # itself, bound to the copy in this library. --exclude-libs makes the linker
-# treat every symbol it takes from an archive as local; src/adm/CMakeLists.txt
+# treat every symbol it takes from an archive as local; libs/adm/CMakeLists.txt
 # does the same for the same reason. ELF linkers only (GNU ld, gold, lld, mold):
 # Mach-O's has no such option and MSVC's link.exe exports what an object marks
 # dllexport, so macOS and Windows are left as they were.

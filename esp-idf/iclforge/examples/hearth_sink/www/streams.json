@@ -278,7 +278,7 @@
   {
    "file": "layout-10.ec3",
    "what": "E-AC-3 1/0",
-   "source": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-mono.ec3",
+   "source": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-mono.ec3",
    "psram": false,
    "refused": null,
    "codec": "E-AC-3",
@@ -313,7 +313,7 @@
   {
    "file": "layout-20.ec3",
    "what": "E-AC-3 2/0",
-   "source": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-stereo.ec3",
+   "source": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-stereo.ec3",
    "psram": false,
    "refused": null,
    "codec": "E-AC-3",
@@ -349,7 +349,7 @@
   {
    "file": "layout-51.ec3",
    "what": "E-AC-3 5.1",
-   "source": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-51.ec3",
+   "source": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-51.ec3",
    "psram": false,
    "refused": null,
    "codec": "E-AC-3",
@@ -389,7 +389,7 @@
   {
    "file": "layout-71.ec3",
    "what": "E-AC-3 7.1: 5.1 and a dependent substream",
-   "source": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-71.ec3",
+   "source": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-71.ec3",
    "psram": false,
    "refused": null,
    "codec": "E-AC-3",
@@ -431,7 +431,7 @@
   {
    "file": "layout-512.ec3",
    "what": "E-AC-3 5.1.2: 5.1 and a dependent substream",
-   "source": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-512.ec3",
+   "source": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-512.ec3",
    "psram": false,
    "refused": null,
    "codec": "E-AC-3",
@@ -473,7 +473,7 @@
   {
    "file": "layout-514.ec3",
    "what": "E-AC-3 5.1.4: 5.1 and a dependent substream",
-   "source": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-514.ec3",
+   "source": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-514.ec3",
    "psram": false,
    "refused": null,
    "codec": "E-AC-3",
@@ -517,7 +517,7 @@
   {
    "file": "layout-714.ec3",
    "what": "E-AC-3 7.1.4: 5.1 and two dependent substreams",
-   "source": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-714.ec3",
+   "source": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-714.ec3",
    "psram": false,
    "refused": null,
    "codec": "E-AC-3",

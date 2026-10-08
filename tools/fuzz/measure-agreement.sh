@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# fuzz/measure-agreement.sh - the calibration method behind
+# tools/fuzz/measure-agreement.sh - the calibration method behind
 # differential_oracle.hpp's kMinAgreementDb (differential decoder fuzzing). Runs every file in
-# fuzz/seeds/fuzz_ac3_decode/ and fuzz/seeds/fuzz_eac3_decode/ - real,
+# libs/ac3/fuzz/seeds/fuzz_ac3_decode/ and libs/ac3/fuzz/seeds/fuzz_eac3_decode/ - real,
 # already-shipping, unmutated content - through the differential harnesses
 # once each with ICLFORGE_DIFF_MEASURE_ONLY=1 (measures and prints; never
 # aborts, unlike a normal run) and reports the worst-channel SNR FFmpeg and
@@ -17,9 +17,9 @@
 # assumed - and after any change to compare_pcm's own alignment/silence-skip
 # logic.
 #
-# Usage: fuzz/measure-agreement.sh
+# Usage: tools/fuzz/measure-agreement.sh
 # Needs the two differential harness binaries already built
-# (fuzz/run.sh regress fuzz_differential_ac3_decode fuzz_differential_eac3_decode
+# (tools/fuzz/run.sh regress fuzz_differential_ac3_decode fuzz_differential_eac3_decode
 # builds them, even before ffmpeg is on PATH - it is only the differential
 # comparison itself, not the build, that needs ffmpeg) and ffmpeg on PATH to
 # measure anything at all.
@@ -38,7 +38,7 @@ measure() {
     local harness="$1" seeds_dir="$2"
     local binary="$BUILD_DIR/bin/$harness"
     if [ ! -x "$binary" ]; then
-        echo "error: $binary not built - run: fuzz/run.sh regress $harness" >&2
+        echo "error: $binary not built - run: tools/fuzz/run.sh regress $harness" >&2
         exit 1
     fi
     echo "=== $harness (against $seeds_dir) ==="

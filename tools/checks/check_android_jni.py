@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 APP = "apps/android/app"
-NATIVE_DIRS = ("apps/android/app/src/main/cpp", "src/audio/src/backend/android")
+NATIVE_DIRS = ("apps/android/app/src/main/cpp", "libs/audio/src/backend/android")
 # the app's Gradle source sets, under <app>/src: their Kotlin and the native code of `main`
 SOURCE_SETS = ("main", "androidTest")
 KOTLIN_DIRS = tuple("/".join(("src", name, "java")) for name in SOURCE_SETS)

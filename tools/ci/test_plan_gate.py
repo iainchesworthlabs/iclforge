@@ -230,7 +230,7 @@ class Compare(unittest.TestCase):
                 self.assertEqual(plan(path)["compare"], "false")
 
     def test_documentation_under_src_is_still_documentation(self):
-        got = plan("src/ac4/ERRATA.md")
+        got = plan("libs/ac4/ERRATA.md")
         self.assertEqual((got["docs_only"], got["compare"]), ("true", "false"))
 
     def test_the_gates_own_machinery_does_not(self):

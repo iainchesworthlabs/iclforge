@@ -1,4 +1,4 @@
-# hearth-testsink (planning/hearth-reference-player.md, The test sink): src/sendspin's player
+# hearth-testsink (planning/hearth-reference-player.md, The test sink): libs/sendspin's player
 # half as a program. The sink itself is a static library, so the loopback tests in iclforge-tests can run
 # sinks in-process; the executable adds the command line. Never installed or packaged.
 add_library(hearth_testsink STATIC burst_output.cpp sink.cpp store.cpp wav_output.cpp)

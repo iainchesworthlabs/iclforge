@@ -10,7 +10,7 @@
 # dependencies from vcpkg's "hearth" feature on a computer: mbedTLS for the crypto seam over
 # the PSA Crypto API and the Noise, PSK, CPace and pairing code above it, cpp-httplib for the
 # WebSocket transport, mdns for discovery, and libFLAC and Opus for player@v1's codecs.
-# ICLFORGE_SENDSPIN_CORE_ONLY builds the core alone, which is what fuzz/run.sh does so the
+# ICLFORGE_SENDSPIN_CORE_ONLY builds the core alone, which is what tools/fuzz/run.sh does so the
 # fuzz build keeps no vcpkg dependency.
 #
 # ICLFORGE_SENDSPIN_PLAYER_ONLY builds the core and the player half, which is what a board
@@ -21,7 +21,7 @@
 #
 # Written for the player half's hardest host, an ESP32 inside an HTTP server task:
 # no thread_local, no recursion over input, no large stack frames, and allocations
-# bounded by limits the caller sets (see the plan's constraints on src/sendspin). The
+# bounded by limits the caller sets (see the plan's constraints on libs/sendspin). The
 # WebSocket transport over cpp-httplib is the exception, since only a computer builds it.
 #
 # Always STATIC and never installed, like iclforge::audio: no export annotations, and not

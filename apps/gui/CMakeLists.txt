@@ -316,7 +316,7 @@ target_link_libraries(forge-gui
         iclforge::warnings
         iclforge::fmt
         # Unlike iclforge::ac3's own PRIVATE, $<BUILD_INTERFACE:...>-wrapped link
-        # (src/ac3/CMakeLists.txt), this app has no intermediate engine
+        # (libs/ac3/CMakeLists.txt), this app has no intermediate engine
         # library of its own to hang the profiling header pair on the way
         # apps/crucible/CMakeLists.txt and apps/hearth/engine/CMakeLists.txt
         # do for their windows - so forge-gui (and forge_gui_qmltests, tests/CMakeLists.txt's
@@ -328,7 +328,7 @@ target_link_libraries(forge-gui
         Qt6::QuickControls2
         Qt6::Concurrent)
 target_include_directories(forge-gui PRIVATE
-    "$<IF:$<BOOL:${ICLFORGE_ENABLE_TRACY}>,${CMAKE_SOURCE_DIR}/src/base/variants/profiling-tracy_enabled,${CMAKE_SOURCE_DIR}/src/base/variants/profiling-tracy_disabled>")
+    "$<IF:$<BOOL:${ICLFORGE_ENABLE_TRACY}>,${CMAKE_SOURCE_DIR}/libs/base/variants/profiling-tracy_enabled,${CMAKE_SOURCE_DIR}/libs/base/variants/profiling-tracy_disabled>")
 
 # A GUI app rather than a console one. MACOSX_BUNDLE moves the binary to
 # bin/forge-gui.app/Contents/MacOS/forge-gui, which is where --smoke lives on macOS;
