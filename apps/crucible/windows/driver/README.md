@@ -119,7 +119,7 @@ anything: mount the EWDK ISO and run, from its root,
 
 ```bat
 LaunchBuildEnv.cmd
-msbuild <repo>\apps\windows\driver\IclForgeNullSink.sln /p:Configuration=Release /p:Platform=x64
+msbuild <repo>\apps\crucible\windows\driver\IclForgeNullSink.sln /p:Configuration=Release /p:Platform=x64
 ```
 
 The `package` project runs `inf2cat` and test-signs the package with a WDK test certificate.

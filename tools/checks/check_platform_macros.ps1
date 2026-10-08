@@ -114,7 +114,7 @@ $files = Get-ChildItem -Path $scanRoots -Recurse -File -Include '*.h', '*.hpp', 
 # cuts read as a diff. It is written the way Windows drivers are written,
 # include guards and all, and the rule this check holds is about iclforge's
 # own code selecting platforms in CMake - so the sample is left out.
-$driverRoot = Join-Path (Join-Path $Root 'apps') 'windows\driver'
+$driverRoot = Join-Path (Join-Path $Root 'apps') 'crucible\windows\driver'
 $files = @($files | Where-Object { -not $_.FullName.StartsWith($driverRoot, [System.StringComparison]::OrdinalIgnoreCase) })
 
 # Build output is not source, and a build configured INSIDE the tree puts some

@@ -56,7 +56,7 @@ stretch before ssh is up.
 ## A run
 
 ```powershell
-cd apps\linux\tray-vm
+cd apps\crucible\linux\tray-vm
 .\New-TrayTestVm.ps1     # 20-40 min unattended: a desktop, a Qt kit, Qt's debug symbols, vcpkg
 ```
 

@@ -36,7 +36,7 @@ from its CD, writes the marker and reboots.
 ## A run
 
 ```powershell
-cd apps\windows\driver-vm
+cd apps\crucible\windows\driver-vm
 .\New-DriverTestVm.ps1 -WindowsIso D:\ISOs\Win11_25H2_English_x64_v2.iso # 15-30 min unattended
 .\Wait-DriverTestVm.ps1                                                  # snapshot when ready
 .\Test-Driver.ps1                                                        # install and report

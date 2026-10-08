@@ -1893,7 +1893,7 @@ jobs:
           if (-not $vs) { throw 'no Visual Studio with the C++ tools on this runner' }
           Import-Module "$vs\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
           Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
-          Set-Location "$env:GITHUB_WORKSPACE\apps\windows\driver"
+          Set-Location "$env:GITHUB_WORKSPACE\apps\crucible\windows\driver"
           Write-Host "Visual Studio: $vs"
           Write-Host "MSVC toolset:  $env:VCToolsVersion"
           msbuild .\IclForgeNullSink.sln /p:Configuration=Release /p:Platform=x64 /t:Rebuild /m /v:m /nologo
@@ -1919,7 +1919,7 @@ jobs:
           $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
           Import-Module "$vs\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
           Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
-          Set-Location "$env:GITHUB_WORKSPACE\apps\windows\driver"
+          Set-Location "$env:GITHUB_WORKSPACE\apps\crucible\windows\driver"
           $ruleset = (Get-ChildItem .\packages -Recurse -Filter 'DriverRecommendedRules.ruleset' | Select-Object -First 1).FullName
           if (-not $ruleset) { throw 'DriverRecommendedRules.ruleset not found in the WDK package' }
           Get-ChildItem .\Source -Recurse -Filter '*.nativecodeanalysis.xml' | Remove-Item -Force
