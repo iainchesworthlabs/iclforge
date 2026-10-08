@@ -22,7 +22,7 @@ TestCase {
     }
 
     readonly property url stereoUrl:
-        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
+        Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
 
     function makeWindow() {
         const win = createTemporaryObject(mainWindowComponent, testCase);

@@ -28,7 +28,7 @@ TestCase {
     // directly, rather than encoding one first, exercises exactly the real
     // workflow this dialog exists for: opening a file that already exists.
     readonly property url realStreamUrl:
-        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.ac3")
+        Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.ac3")
 
     function init() {
         QcController.presetIndex = 0;

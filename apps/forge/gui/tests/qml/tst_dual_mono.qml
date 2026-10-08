@@ -16,13 +16,13 @@ TestCase {
     }
 
     readonly property url stereoUrl:
-        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
+        Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
     // Ch1 silent, Ch2 a real 300 Hz tone - built for the independent-
     // measurement tests below, where a blended pass across both dual-mono
     // channels (the bug) and a per-channel one (the fix) give different,
     // observable pass/fail outcomes rather than just different numbers.
     readonly property url ch2OnlyUrl:
-        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/dual-mono-ch2-only.wav")
+        Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/dual-mono-ch2-only.wav")
     readonly property url outputUrl:
         Qt.resolvedUrl("_test_output/tst_dual_mono.ac3")
 

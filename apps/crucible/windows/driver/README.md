@@ -2,8 +2,8 @@
 
 A root-enumerated virtual audio device with one render endpoint, "Speakers (Crucible Silent Output)",
 that advertises 7.1 at 48 kHz and discards everything it is given. Crucible
-([`../../crucible/`](../../crucible/), WASAPI process-loopback tap,
-[docs/platforms/windows-demo.md](../../../docs/platforms/windows-demo.md)) makes it the Windows
+([`../../`](../../), WASAPI process-loopback tap,
+[docs/platforms/windows-demo.md](../../../../docs/platforms/windows-demo.md)) makes it the Windows
 default output so that every application renders into a device nobody hears while Crucible taps
 each one individually; a game that can render surround renders 7.1 into it and reaches Crucible's
 bed intact.
@@ -12,7 +12,7 @@ It is an ACX driver (Audio Class eXtensions, Microsoft's current audio driver fr
 KMDF: a plain WDF driver of about 1,800 lines of C++, about 1,270 of them code, in place of the
 PortCls/WaveRT miniport that held this directory until 2026-09-04 and carried 9,700 lines of
 sample code to do the same job. Why the port was made, what it keeps and how it was verified
-are on [docs/platforms/windows-driver-acx.md](../../../docs/platforms/windows-driver-acx.md).
+are on [docs/platforms/windows-driver-acx.md](../../../../docs/platforms/windows-driver-acx.md).
 
 ## Its names, and where each is read
 

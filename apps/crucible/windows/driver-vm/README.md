@@ -64,7 +64,7 @@ streams at once, removal and driver unload under a live stream, a reinstall from
 with no bugcheck and no minidump. The PortCls driver's record of 2026-09-03 (111 of 111
 allocations, the KASAN proof with its `0x50` and `0x1F2` signatures) is on the plan page;
 the KASAN pass is repeated against the ACX driver and recorded on
-[docs/platforms/windows-driver-acx.md](../../../docs/platforms/windows-driver-acx.md).
+[docs/platforms/windows-driver-acx.md](../../../../docs/platforms/windows-driver-acx.md).
 
 Verified 2026-10-01 against the renamed driver (`IclForgeNullSink`, the endpoint "Speakers
 (Crucible Silent Output)"), in the same guest from the same snapshot, with the package built under

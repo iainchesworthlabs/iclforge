@@ -1,8 +1,8 @@
 # apps/crucible/windows: the Windows-only pieces of Crucible
 
-The application itself moved to [`apps/crucible/`](../crucible/) when it was promoted from a
+The application itself moved to [`apps/crucible/`](../) when it was promoted from a
 Windows demo to a cross-platform product (Crucible cross-platform promotion,
-[docs/crucible/design/promotion.md](../../docs/crucible/design/promotion.md)). What is left here is the part
+[docs/crucible/design/promotion.md](../../../docs/crucible/design/promotion.md)). What is left here is the part
 that cannot move, because it is Windows and nothing else:
 
 | Directory | What it is |

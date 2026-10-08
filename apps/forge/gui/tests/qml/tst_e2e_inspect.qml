@@ -28,7 +28,7 @@ TestCase {
     }
 
     readonly property url ac3StreamUrl:
-        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.ac3")
+        Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.ac3")
     readonly property url atmosStreamUrl: Qt.resolvedUrl("../fixtures/atmos-objects.ec3")
     // A dedicated fixture (like atmos-objects.ec3 above, rather than a fuzz/robustness corpus
     // file or one of tests/golden/ac4's own short, sparse-I-frame decoder-unit-test streams):
@@ -36,7 +36,7 @@ TestCase {
     // grammar) - planning/ac4.md, I5.
     readonly property url ac4ObjectStreamUrl: Qt.resolvedUrl("../fixtures/ac4-objects.ac4")
     readonly property url notAStreamUrl:
-        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
+        Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
     readonly property url objectsOutUrl: Qt.resolvedUrl("_test_output")
 
     function init() {

@@ -22,7 +22,7 @@ TestCase {
     }
 
     readonly property url wavFixtureUrl:
-        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
+        Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
     // The same real Atmos E-AC-3 fixture tst_stream_player.qml/
     // tst_object_inspector.qml already use - .ec3 exercises the same
     // ".ac3"/".ec3" branch a plain .ac3 file would, and reusing it avoids a

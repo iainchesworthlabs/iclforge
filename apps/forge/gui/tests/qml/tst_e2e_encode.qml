@@ -32,7 +32,7 @@ TestCase {
     }
 
     readonly property url wavUrl:
-        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
+        Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
     readonly property url ac3OutUrl: Qt.resolvedUrl("_test_output/tst_e2e_encode.ac3")
     readonly property url ec3OutUrl: Qt.resolvedUrl("_test_output/tst_e2e_encode.ec3")
     readonly property url toolsOutUrl: Qt.resolvedUrl("_test_output/tst_e2e_encode_tools.ec3")

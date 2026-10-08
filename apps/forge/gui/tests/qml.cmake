@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
 # forge_gui_qmltests - Qt Quick Test coverage for the interactive surfaces in
-# ../qml/. Drives the REAL EncoderController, the same singleton forge-gui
+# ../assets/qml/. Drives the REAL EncoderController, the same singleton forge-gui
 # itself runs - not a mock: every leaf QML component already reads it
 # directly rather than through passed-in properties, and this project's own
 # code deliberately avoids a second, parallel API that the real one could

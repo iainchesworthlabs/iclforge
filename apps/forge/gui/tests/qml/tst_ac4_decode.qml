@@ -21,7 +21,7 @@ TestCase {
     }
 
     readonly property url streamUrl:
-        Qt.resolvedUrl("../../../../tests/golden/ac4/presentations/encoder-hybrid.ac4")
+        Qt.resolvedUrl("../../../../../tests/golden/ac4/presentations/encoder-hybrid.ac4")
 
     // Every test ends with the pickers back at the decoder's own choice, and
     // setting the index reads the open file again on a worker. That has to be

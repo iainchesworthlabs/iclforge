@@ -1,5 +1,5 @@
 // crucible: the Crucible's window (docs/platforms/windows-demo.md,
-// "UI"). Everything that is not the window lives in ../engine; this file
+// "UI"). Everything that is not the window lives in ../../engine/src; this file
 // only stands the QML up, applies the language, and offers one debugging
 // aid: `--shot <path.png>` grabs the window after it has settled and quits,
 // the way forge-gui's smoke modes do, so a headless check can see the screen;

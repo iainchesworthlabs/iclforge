@@ -24,7 +24,7 @@ TestCase {
     }
 
     readonly property url wavUrl:
-        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
+        Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
     readonly property url mkvOutUrl: Qt.resolvedUrl("_test_output/tst_e2e_settings.mkv")
     readonly property url drcOutUrl: Qt.resolvedUrl("_test_output/tst_e2e_settings_drc.ac3")
     readonly property url diagnosticsUrl:

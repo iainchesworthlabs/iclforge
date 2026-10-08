@@ -14,10 +14,10 @@ const { defineConfig } = require('@playwright/test');
 // runnable straight from a local build with no extra flags.
 const decodeDemoDir = path.resolve(
     process.env.WASM_DEMO_DIR ||
-        path.join(__dirname, '../../../build/config-wasm-emscripten/bin/wasm_decode_demo'));
+        path.join(__dirname, '../../../../build/config-wasm-emscripten/bin/wasm_decode_demo'));
 const encodeDemoDir = path.resolve(
     process.env.WASM_ENCODE_DEMO_DIR ||
-        path.join(__dirname, '../../../build/config-wasm-emscripten/bin/wasm_encode_demo'));
+        path.join(__dirname, '../../../../build/config-wasm-emscripten/bin/wasm_encode_demo'));
 
 const decodePort = 4173;
 const encodePort = 4174;

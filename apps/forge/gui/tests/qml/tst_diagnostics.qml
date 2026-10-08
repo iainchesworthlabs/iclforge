@@ -25,7 +25,7 @@ TestCase {
     // The same fixture tst_source_loading.qml and the --smoke harness use,
     // so the three cannot disagree about what a known-good WAV looks like.
     readonly property url fixtureUrl:
-        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
+        Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
 
     // The controller singleton is shared across the cases in this binary -
     // leaving a source loaded would change what a later case reports.

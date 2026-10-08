@@ -10,7 +10,7 @@
 param(
     [string]$VmDir = 'D:\Virtual Machines\Crucible Tray Test',
     [string]$Name = 'Crucible Tray Test',
-    [string]$Repo = (Join-Path $PSScriptRoot '..\..\..'),
+    [string]$Repo = (Join-Path $PSScriptRoot '..\..\..\..'),
     [string]$Address
 )
 $ErrorActionPreference = 'Stop'

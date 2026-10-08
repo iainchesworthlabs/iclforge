@@ -25,7 +25,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const UI_DIR = path.resolve(__dirname, '../../../../esp-idf/iclforge/ui');
+const UI_DIR = path.resolve(__dirname, '../../../../../esp-idf/iclforge/ui');
 
 const POLICY =
     "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src data:; frame-ancestors 'none'";

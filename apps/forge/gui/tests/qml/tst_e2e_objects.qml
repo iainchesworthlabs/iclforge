@@ -24,7 +24,7 @@ TestCase {
     }
 
     readonly property url wavUrl:
-        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
+        Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
     readonly property url pathsUrl: Qt.resolvedUrl("_test_output/tst_e2e_objects-paths.txt")
     readonly property url atmosOutUrl: Qt.resolvedUrl("_test_output/tst_e2e_objects.ec3")
 

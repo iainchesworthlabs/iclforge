@@ -1,7 +1,7 @@
 # apps/crucible/linux: the Linux-only pieces of Crucible
 
-Crucible itself is in [`apps/crucible/`](../crucible/), one application with a platform tree
-under it ([docs/crucible/design/promotion.md](../../docs/crucible/design/promotion.md), "The platform tree").
+Crucible itself is in [`apps/crucible/`](../), one application with a platform tree
+under it ([docs/crucible/design/promotion.md](../../../docs/crucible/design/promotion.md), "The platform tree").
 What lives here is the part that is not the application: a machine, built to answer one question
 about it.
 
