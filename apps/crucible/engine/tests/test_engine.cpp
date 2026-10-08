@@ -48,7 +48,7 @@
 // running is kept for the next frame, not spent on the one in flight.
 //
 // Every case here carries [concurrency], so the ThreadSanitizer leg reaches
-// them through `ctest -L concurrency` (tests/CMakeLists.txt's note on the
+// them through `ctest -L concurrency` (apps/crucible/engine/tests/CMakeLists.txt's note on the
 // label). The engine is the shape that label is for: three threads - the
 // frame loop, the session monitor and the probe - over three mutexes, four
 // atomics and an OutputStage, none of which any other gate can see into. The

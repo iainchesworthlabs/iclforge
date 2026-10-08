@@ -17,7 +17,7 @@
 // line over src/ and apps/; this directory is what lets it hold over tests/
 // too, which is where every remaining violation lived.
 //
-// See this directory's WIN32/else split in tests/CMakeLists.txt for the
+// See this directory's WIN32/else split in tests/support/CMakeLists.txt for the
 // selection itself.
 
 namespace iclforge::test::platform {
@@ -25,7 +25,7 @@ namespace iclforge::test::platform {
 // This process's OS-assigned id, rendered as a string.
 //
 // Every test that writes a file puts its artefacts under a leaf of
-// ICLFORGE_TEST_SCRATCH_DIR (see tests/CMakeLists.txt), and that root is
+// ICLFORGE_TEST_SCRATCH_DIR (see tests/support/CMakeLists.txt), and that root is
 // keyed to the build tree rather than to the process - so two iclforge-tests
 // runs against one build tree (a concurrent re-run, or two sessions sharing
 // a tree) would otherwise race on the same directory, one's

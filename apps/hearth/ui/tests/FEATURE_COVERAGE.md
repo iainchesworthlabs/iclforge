@@ -178,7 +178,7 @@ Each was first shown failing on the unfixed code, then fixed.
    - Cause: `Network.qml`'s `Loader.sourceComponent` read members off a local (`const group = NetworkController.selectedGroup; if (group && group.id ...)`). qmlcachegen compiled that as a value-type lookup on QVariant, passing `QMetaType::fromName("QVariant").metaObject()` (null) to `AOTCompiledContext::initGetValueLookup()`, which dereferenced it.
    - Fix: the binding reads `NetworkController.selectedGroup.id`, `.selectedSink.id` and `.selectedSink.badge` straight off the singleton. The generated `Network_qml.cpp` now has no QVariant value lookups. The behaviour is unchanged, because an empty map's `.id` is undefined. A comment at the binding says why it must not be "simplified" back.
    - Check: `QT_QPA_PLATFORM=offscreen build/gui-cov/bin/hearth` under `timeout 5` now exits 124 (still running); before the fix it exited 139.
-   - The `QML_DISABLE_DISK_CACHE=1` workaround is gone from `tests/CMakeLists.txt`, so every suite runs the compiled QML.
+   - The `QML_DISABLE_DISK_CACHE=1` workaround is gone from `apps/hearth/ui/tests/CMakeLists.txt`, so every suite runs the compiled QML.
    - Regression: `NetworkPageAot::test_networkPageBuildsWithNothingSelected` and `test_networkPageBuildsWithAGroupSelected` (unskipped; both segfaulted before the fix, as did `shell`).
 2. **Speakers "Clear" did nothing while a device was open.**
    - Cause: `HearthController::clearRouting()` posted a patch sized for zero outputs, which `PcmOutput::set_routing()` refuses.

@@ -4,7 +4,7 @@
 # real CrucibleController and forge_gui_qmltests drives the real
 # EncoderController (apps/crucible/ui/tests/CMakeLists.txt's own header,
 # whose reasoning this file follows and does not repeat) - closer template
-# than apps/forge/gui/tests/CMakeLists.txt since Hearth, like Crucible, keeps its
+# than apps/forge/gui/tests/qml.cmake since Hearth, like Crucible, keeps its
 # window under its own ui/ subdirectory rather than inline in the app's
 # top-level CMakeLists.txt. apps/hearth/ui/CMakeLists.txt's own comment, next
 # to the windeployqt chain (search "A5's exit"), has anticipated this file's
@@ -68,7 +68,7 @@ qt_add_qml_module(hearth_qmltests
     QML_FILES ${ICLFORGE_HEARTH_QML_FILES})
 
 # Forces this target's own POST_BUILD windeployqt step (below) to run only
-# after hearth's has finished - apps/forge/gui/tests/CMakeLists.txt's own
+# after hearth's has finished - apps/forge/gui/tests/qml.cmake's own
 # add_dependencies(forge_gui_qmltests forge-gui) comment explains why: two
 # windeployqt passes racing to write the same shared bin/ fails with "Cannot
 # create a file when that file already exists" on a real "build everything"
@@ -96,7 +96,7 @@ target_link_libraries(hearth_qmltests PRIVATE
     # qml_test_main.cpp).
     Qt6::Test)
 
-# Same rationale as apps/forge/gui/tests/CMakeLists.txt's identical loop: Qt's
+# Same rationale as apps/forge/gui/tests/qml.cmake's identical loop: Qt's
 # generated moc/rcc/qmlcachegen output for THIS target compiles under the
 # strict warning set unless excluded, and qmlcachegen is known to emit at
 # least one warning clang-cl/GCC's -Wconversion rejects.
@@ -144,7 +144,7 @@ if(WIN32)
 endif()
 
 # One ctest entry per tst_*.qml suite, each its own process and its own fresh
-# HearthController singleton - apps/forge/gui/tests/CMakeLists.txt's own comment on
+# HearthController singleton - apps/forge/gui/tests/qml.cmake's own comment on
 # why (failure isolation, tighter per-suite isolation than one shared
 # process) applies unchanged. QT_QPA_PLATFORM=offscreen and
 # QT_FORCE_STDERR_LOGGING=1 for the reasons both existing suites give:

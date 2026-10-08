@@ -86,7 +86,7 @@ jobs:
     # A backstop against GitHub's own 360-minute default: the macos-llvm
     # leg's first-ever GUI run hung in the Test step and silently consumed
     # the full 6 hours before being force-cancelled (see
-    # apps/forge/gui/tests/CMakeLists.txt's QSG_RENDER_LOOP comment for the
+    # apps/forge/gui/tests/qml.cmake's QSG_RENDER_LOOP comment for the
     # hypothesis and the per-test TIMEOUT that now also bounds that specific
     # case). This is deliberately generous - the slowest leg observed so far
     # (windows-llvm, packaging included on windows-msvc) is ~22 minutes - so

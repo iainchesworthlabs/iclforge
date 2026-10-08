@@ -35,7 +35,7 @@
 // The two records a refresh builds - the sounding one and the kept one - and
 // the fill a second stream from one process does to the first's entry.
 //
-// Linux only, by tests/CMakeLists.txt, the way test_x11_foreground.cpp is:
+// Linux only, by apps/crucible/engine/tests/CMakeLists.txt, the way test_x11_foreground.cpp is:
 // the file under test lives in a platform directory and is compiled nowhere
 // else. What cannot be reached from here is the refresh() around it, which
 // needs a graph to walk; tools/checks/crucible_platform_probe.cpp is what
@@ -60,7 +60,7 @@ using iclforge::crucible::StreamFacts;
 namespace {
 
 // A /proc of this case's own. ICLFORGE_TEST_SCRATCH_DIR (see
-// tests/CMakeLists.txt for why it is a build-tree path) is the whole suite's
+// apps/crucible/engine/tests/CMakeLists.txt for why it is a build-tree path) is the whole suite's
 // root, and it is emptied on each use so a previous run's pids cannot pass a
 // case. `name` is per CASE and not per file, deliberately: catch_discover_tests
 // registers one ctest entry per test case, so two cases in this file are two

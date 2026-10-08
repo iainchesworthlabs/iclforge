@@ -208,7 +208,7 @@ std::vector<float> adversarial_floats() {
 //
 // Two questions, in order. First, is the AVX2 tier in this binary at all?
 // iclforge::test::avx2::kTierCompiled answers that at compile time
-// (core/avx2/{present,absent}/avx2_tier.hpp, selected by tests/CMakeLists.txt):
+// (core/avx2/{present,absent}/avx2_tier.hpp, selected by libs/ac3/tests/CMakeLists.txt):
 // ICLFORGE_AVX2=OFF, or a target that is not x86_64, means there is nothing
 // here to run. Second, compile-everywhere/execute-if-capable
 // (docs/building.md): the AVX2 translation units in this same binary already

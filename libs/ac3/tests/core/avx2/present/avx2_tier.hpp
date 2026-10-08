@@ -6,7 +6,7 @@
 // The variant of tests/core/avx2/avx2_tier.hpp compiled when libs/ac3 really
 // built the AVX2 tier (x86_64, ICLFORGE_AVX2=ON). It is a pass-through: the
 // real declarations come straight from libs/ac3/src/internal/avx2/, which
-// tests/CMakeLists.txt puts on this target's include path in exactly the
+// libs/ac3/tests/CMakeLists.txt puts on this target's include path in exactly the
 // build that compiles avx2_probe.cpp and mdct_avx2.cpp into it a second time.
 //
 // Both variants ship this filename; CMake puts the matching directory on the

@@ -31,7 +31,7 @@ using iclforge::crucible::ui::xdg_data_dirs;
 namespace {
 
 // Scratch space for this file's own tests. ICLFORGE_TEST_SCRATCH_DIR (see
-// tests/CMakeLists.txt for why it is a build-tree path) is the whole
+// apps/crucible/engine/tests/CMakeLists.txt for why it is a build-tree path) is the whole
 // suite's root; the leaf below is this file's own, emptied on each use so a
 // previous run's files cannot pass a case. The leaf also carries this
 // process's own PID - see apps/forge/cli/tests/test_cli.cpp's own scratch_dir comment

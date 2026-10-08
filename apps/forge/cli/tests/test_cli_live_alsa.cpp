@@ -43,7 +43,7 @@
 // which needs one, is not reachable here (see cli/test_cli_live.cpp for its
 // refusal).
 //
-// ALSA configurations only (tests/CMakeLists.txt), and [concurrency] on every
+// ALSA configurations only (apps/forge/cli/tests/CMakeLists.txt), and [concurrency] on every
 // case for the same reason cli/test_cli_live.cpp gives: these start the
 // capture and render threads.
 

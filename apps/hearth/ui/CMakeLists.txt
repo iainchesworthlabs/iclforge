@@ -307,7 +307,7 @@ else()
     # everything" run). hearth's single pass joins the end of that chain -
     # add_dependencies is transitive for ordering, so chaining after the
     # deepest target that exists is enough; nothing needs re-checking against
-    # every earlier link. hearth_qmltests (issue #886, tests/CMakeLists.txt's
+    # every earlier link. hearth_qmltests (issue #886, apps/hearth/ui/tests/CMakeLists.txt's
     # own add_dependencies(hearth_qmltests hearth), included below) now
     # extends that same chain one more link the same way crucible_qmltests
     # chains after crucible, rather than starting a second one.
@@ -323,14 +323,14 @@ else()
         endif()
     endif()
 
-    # hearth's own Qt Quick Test suite (issue #886, A5's exit): tests/CMakeLists.txt,
+    # hearth's own Qt Quick Test suite (issue #886, A5's exit): apps/hearth/ui/tests/CMakeLists.txt,
     # include()d rather than add_subdirectory()'d so it sees ICLFORGE_HEARTH_QML_FILES and
     # ICLFORGE_HEARTH_SHARED_DIR as this scope set them, and so its own qt_add_executable()/
     # qt_add_qml_module() pair runs in THIS directory's scope rather than a nested one -
     # apps/forge/gui/CMakeLists.txt's own comment on its identical include() explains why that
     # distinction is load-bearing for AUTOMOC's metatypes JSON handoff to qmltyperegistrar.
     if(ICLFORGE_BUILD_TESTS)
-        include(tests/CMakeLists.txt)
+        include(apps/hearth/ui/tests/CMakeLists.txt)
     endif()
 
     # ---------------------------------------------------------------------

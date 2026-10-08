@@ -40,7 +40,7 @@
 // step produces) and inspect what it actually wrote, rather than
 // re-implementing its argument parsing against a copy of the source.
 //
-// ICLFORGE_CLI_EXE (see tests/CMakeLists.txt) is the absolute path to that binary,
+// ICLFORGE_CLI_EXE (see apps/forge/cli/tests/CMakeLists.txt) is the absolute path to that binary,
 // supplied by CMake via $<TARGET_FILE:forge> - these tests do not run at
 // all if ICLFORGE_BUILD_CLI is OFF, the same way the alsa/android platform
 // tests above do not run outside their own backend.
@@ -50,7 +50,7 @@ namespace fs = std::filesystem;
 namespace {
 
 // Scratch space for this file's own tests. ICLFORGE_TEST_SCRATCH_DIR (see
-// tests/CMakeLists.txt for why it is a build-tree path and not
+// apps/forge/cli/tests/CMakeLists.txt for why it is a build-tree path and not
 // fs::temp_directory_path()) is the whole suite's root; the leaf below is this
 // file's own. Duplicated in every test file that needs scratch space rather
 // than shared, per this project's per-file test-helper convention - only the

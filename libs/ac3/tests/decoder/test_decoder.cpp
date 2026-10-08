@@ -26,7 +26,7 @@ namespace {
 // This function used to carry a [[gnu::noinline]] behind a
 // `#if defined(__GNUC__) && !defined(__clang__)` macro, to dodge a GCC -O3
 // VRP false positive - see the -Wno-array-bounds entry for this file in
-// tests/CMakeLists.txt, which now states that case and answers it where every
+// libs/ac3/tests/CMakeLists.txt, which now states that case and answers it where every
 // other compiler-specific flag in this tree is answered.
 void patch_bits(std::vector<std::byte>& frame, std::size_t offset, int count,
                 std::uint32_t value) {

@@ -38,7 +38,7 @@ QueueItem item(std::string title, std::uint32_t rate = 48000) {
     // reads and moves from `title`: the two are sequenced either way, but GCC
     // at -O3 inlines the string operations and then reports a null dereference
     // inside libstdc++ - the misattribution cmake/CompilerWarnings.cmake and
-    // tests/CMakeLists.txt already document for io/test_metadata_edit.cpp.
+    // apps/hearth/engine/tests/CMakeLists.txt already document for io/test_metadata_edit.cpp.
     // Spelling the steps out avoids both the warning and the argument.
     QueueItem entry;
     entry.path = title + ".ec3";

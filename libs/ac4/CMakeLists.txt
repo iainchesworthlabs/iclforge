@@ -178,7 +178,7 @@ set(_ac4_link_private
     "$<BUILD_INTERFACE:iclforge::base_headers>"
     "$<BUILD_INTERFACE:iclforge::tracy>")
 
-# tests/CMakeLists.txt compiles the kernels a second time into iclforge-tests in a shared build, where
+# libs/ac4/tests/CMakeLists.txt compiles the kernels a second time into iclforge-tests in a shared build, where
 # libiclforge_ac4.so exports none of them.
 list(TRANSFORM _ac4_kernel_sources PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/"
     OUTPUT_VARIABLE ICLFORGE_AC4_KERNEL_SOURCES)

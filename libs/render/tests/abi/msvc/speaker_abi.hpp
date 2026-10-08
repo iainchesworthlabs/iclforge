@@ -18,7 +18,7 @@
 // worth having: it turns "someone reorders a field and the board boot-loops"
 // into "the build fails", the same trade the kTextBytes comment records.
 //
-// Both variants ship this filename and tests/CMakeLists.txt puts the matching
+// Both variants ship this filename and libs/render/tests/CMakeLists.txt puts the matching
 // directory on the include path, so libs/render/tests/test_layout.cpp includes it
 // unconditionally - the numbers are an ABI fact, and a fact that only holds on
 // some toolchains is exactly the kind of either/or this tree answers in CMake

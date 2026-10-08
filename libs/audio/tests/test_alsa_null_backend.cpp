@@ -33,7 +33,7 @@
 // test_audio_backend.cpp holds the contract every backend keeps without a
 // device; test_monitor_live.cpp and test_passthrough_live.cpp are the hidden
 // cases for real hardware. This file is only built in the ALSA configuration
-// (tests/CMakeLists.txt), and every case starts the backend's own threads, so
+// (libs/audio/tests/CMakeLists.txt), and every case starts the backend's own threads, so
 // every case carries [concurrency].
 
 namespace fs = std::filesystem;

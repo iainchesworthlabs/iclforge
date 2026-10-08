@@ -568,7 +568,7 @@ jobs:
         #
         # QSG_RENDER_LOOP=basic and the perl-alarm wrapper are both macOS-only
         # and both about the same hang the "Test" step hit on this leg's
-        # first-ever GUI run (see apps/forge/gui/tests/CMakeLists.txt's identical
+        # first-ever GUI run (see apps/forge/gui/tests/qml.cmake's identical
         # QSG_RENDER_LOOP comment for the render-loop-deadlock hypothesis).
         # forge-gui --smoke drives the same QQmlApplicationEngine/QQuickWindow
         # path forge_gui_qmltests does, so it is at equal risk and had no bound

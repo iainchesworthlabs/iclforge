@@ -15,7 +15,7 @@
 // mdct_avx2.hpp a std::unreachable() body compiled into forge_objects in
 // exactly this configuration (see libs/ac3/CMakeLists.txt) - the same
 // directory-selected shape, for the same reason. So the header comes straight
-// from src/internal/avx2, which tests/CMakeLists.txt puts on the include path
+// from src/internal/avx2, which libs/ac3/tests/CMakeLists.txt puts on the include path
 // here, and iclforge-tests links the stubs it already had.
 //
 // avx2_probe.cpp is the one gap: it has no `none/` twin, because nothing in

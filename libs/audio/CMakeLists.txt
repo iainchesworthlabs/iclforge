@@ -114,7 +114,7 @@ target_sources(iclforge_audio PRIVATE src/live_positions.cpp)
 # rather than required.
 #
 # ICLFORGE_AUDIO_BACKEND names the selected directory and is published to the
-# parent scope: tests/CMakeLists.txt reads it to add that backend's own
+# parent scope: libs/audio/tests/CMakeLists.txt reads it to add that backend's own
 # device-free tests, the same way this file adds its sources.
 # ---------------------------------------------------------------------------
 if(NOT WIN32 AND NOT LINUX AND NOT APPLE AND NOT ANDROID)
@@ -223,7 +223,7 @@ if(LINUX)
     else()
         find_package(PkgConfig)
         if(PkgConfig_FOUND)
-            # GLOBAL: tests/CMakeLists.txt links PkgConfig::PipeWire too (its
+            # GLOBAL: libs/audio/tests/CMakeLists.txt links PkgConfig::PipeWire too (its
             # own translation unit needs PipeWire's headers), and tests/ is a
             # sibling of this directory under the top-level CMakeLists.txt,
             # not a descendant - an imported target created without GLOBAL is
@@ -529,7 +529,7 @@ else()
 endif()
 
 # Published the same way ICLFORGE_AUDIO_BACKEND_DIR is (see above):
-# tests/CMakeLists.txt puts this on iclforge-tests' own include path so
+# libs/audio/tests/CMakeLists.txt puts this on iclforge-tests' own include path so
 # libs/audio/tests/test_live_positions.cpp can open a second, independent
 # UdpSocket to send itself test datagrams over real loopback - reusing the
 # exact class LivePositionSource is built on rather than hand-rolling a

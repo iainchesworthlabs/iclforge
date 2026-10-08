@@ -96,7 +96,7 @@ iclforge_stage_shared_qml(ForgeGui "${ICLFORGE_GUI_SHARED_DIR}" ICLFORGE_GUI_SHA
 # about; aliasing removes the second root instead of papering over it with a
 # generated qmldir, and keeps working whichever way the policy defaults later.
 # Absolute, not "assets/qml/Main.qml": qt_add_qml_module resolves QML_FILES against
-# whichever CMakeLists.txt calls it, and tests/CMakeLists.txt below reuses
+# whichever CMakeLists.txt calls it, and apps/forge/gui/tests/qml.cmake below reuses
 # this same list to embed an identical module into forge_gui_qmltests - a
 # relative path would resolve against the wrong directory from there.
 set(AC3_QML_FILES
@@ -133,7 +133,7 @@ set(AC3_QML_FILES
 # Hebrew/Yiddish - the same set and order LanguageManager's kLanguages uses
 # (../../shared/preferences/src/language_manager.cpp), matching the canonical set already shipped by the
 # sibling CountdownSolver project (R:\CountdownSolver). Shared with
-# tests/CMakeLists.txt below for the same reason AC3_QML_FILES is: that file
+# apps/forge/gui/tests/qml.cmake below for the same reason AC3_QML_FILES is: that file
 # is include()d into this one's own scope, not a separate directory, so a
 # plain variable set here is already visible there. See
 # docs/forge/gui/localisation.md for how to update or add to this list, and
@@ -152,7 +152,7 @@ set(AC3_TS_FILES
 # The pseudo-locale QA fixture (see AC3_TS_FILES's own comment above) -
 # deliberately kept out of that list and out of forge-gui's own
 # qt_add_translations() call below, since production forge-gui.exe has no
-# reason to carry it. tests/CMakeLists.txt embeds it into forge_gui_qmltests
+# reason to carry it. apps/forge/gui/tests/qml.cmake embeds it into forge_gui_qmltests
 # ALONGSIDE AC3_TS_FILES instead, purely for tst_localisation_pipeline.qml's
 # ICLFORGE_GUI_LOCALE=xx suite.
 set(AC3_PSEUDO_TS_FILE
@@ -167,7 +167,7 @@ endforeach()
 # embeds the QML and the generated type registrations directly into it - no
 # separate plugin, and none of the WHOLE_ARCHIVE gymnastics a standalone
 # backing library would need to keep its resource initialisers alive.
-# tests/CMakeLists.txt's forge_gui_qmltests target follows the same pattern - a
+# apps/forge/gui/tests/qml.cmake's forge_gui_qmltests target follows the same pattern - a
 # second, independent embedding of the identical module, not a shared
 # library - for exactly this reason.
 # Theme is a QML singleton. This MUST run before qt_add_qml_module below:
@@ -333,7 +333,7 @@ target_link_libraries(forge-gui
         # (libs/ac3/CMakeLists.txt), this app has no intermediate engine
         # library of its own to hang the profiling header pair on the way
         # apps/crucible/CMakeLists.txt and apps/hearth/engine/CMakeLists.txt
-        # do for their windows - so forge-gui (and forge_gui_qmltests, tests/CMakeLists.txt's
+        # do for their windows - so forge-gui (and forge_gui_qmltests, apps/forge/gui/tests/qml.cmake's
         # identical pair below) links and includes it directly.
         iclforge::tracy
         Qt6::Core
@@ -618,7 +618,7 @@ endif()
 # way tests/ is at the top level, and kept beside the GUI code it exercises
 # rather than inside the Qt-free tests/ Catch2 tree.
 #
-# include(), not add_subdirectory(): tests/CMakeLists.txt's qt_add_executable
+# include(), not add_subdirectory(): apps/forge/gui/tests/qml.cmake's qt_add_executable
 # and qt_add_qml_module calls for forge_gui_qmltests need to run in THIS
 # directory's own scope, not a nested one - add_subdirectory() creates one,
 # and a fresh CI build (never an incrementally-rebuilt local tree, which can
@@ -628,7 +628,7 @@ endif()
 # boundary, leaving qmltyperegistrar fed an empty file with no visible error
 # unless QT_FORCE_STDERR_LOGGING=1 is also set - confirmed by reproducing
 # the CI failure locally with the Release preset. include() keeps
-# tests/CMakeLists.txt's own CMAKE_CURRENT_SOURCE_DIR/BINARY_DIR equal to
+# apps/forge/gui/tests/qml.cmake's own CMAKE_CURRENT_SOURCE_DIR/BINARY_DIR equal to
 # this file's, so every path inside it is written relative to apps/forge/gui, not
 # apps/forge/gui/tests.
 if(ICLFORGE_BUILD_TESTS)

@@ -8,7 +8,7 @@
 //
 // avx2_probe.cpp is compiled with an AVX2 target flag (/arch:AVX2 or
 // -mavx2 - see libs/ac3/CMakeLists.txt's forge_simd_avx2 object library
-// and tests/CMakeLists.txt's matching per-source flag on the SAME file
+// and libs/ac3/tests/CMakeLists.txt's matching per-source flag on the SAME file
 // compiled a second time directly into the test binary) TWICE: once into
 // the library proper, once into iclforge-tests, so the AVX2 codegen path is
 // exercised - proven to compile, link and execute correctly - on both,
@@ -18,7 +18,7 @@
 // crossing a possible DLL export boundary, which is exactly why it is
 // compiled a second time rather than linked against the library's own
 // forge_simd_avx2 object - the same white-box arrangement
-// tests/CMakeLists.txt already gives src/signing/src.
+// libs/ac3/tests/CMakeLists.txt already gives src/signing/src.
 //
 // Internal to libs/ac3/ on purpose - never installed, never part of the
 // public ac3/ API, exactly like ac3/internal/profiling.hpp beside it.

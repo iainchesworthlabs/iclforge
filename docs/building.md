@@ -1236,17 +1236,17 @@ too (Qt installed via `install-qt-action`, not Homebrew's `qt` formula — see
 [GUI on macOS](platforms/macos.md#gui-on-macos)), which adds
 the same per-suite `forge_gui_qml_tests_*` entries to that same suite the same way it does on Linux:
 confirmed on a real run before the harness split into one ctest entry per `tst_*.qml` suite (see
-`apps/forge/gui/tests/CMakeLists.txt`), 582 ctest entries total, 100% passing, the GUI harness (then
+`apps/forge/gui/tests/qml.cmake`), 582 ctest entries total, 100% passing, the GUI harness (then
 still a single entry) in 39.74s (56.81s for the whole suite) — the first time that number had
 existed for macOS at all, so there was no prior baseline to compare it against. Getting there
-needed two real fixes, not just turning the option on: `QSG_RENDER_LOOP=basic` (`apps/forge/gui/tests/CMakeLists.txt`,
+needed two real fixes, not just turning the option on: `QSG_RENDER_LOOP=basic` (`apps/forge/gui/tests/qml.cmake`,
 `APPLE` only) for a Qt Quick threaded-render-loop deadlock that hung the suite outright before a
 single test ran, and forcing the `Fusion` style in `qml_test_main.cpp` — matching what `main.cpp` already does —
 for a second, narrower hang in a native `ComboBox` populated by real capture-device data once a
 test entered live-session mode: the same native-style-under-offscreen fragility a comment in
 `apps/forge/gui/assets/qml/Main.qml` already documents one earlier instance of, on Windows, in a different
 control (a `Repeater`'s per-device `Button`, worked around there directly in QML rather than at
-the style level). See `apps/forge/gui/tests/CMakeLists.txt` and `qml_test_main.cpp` for the full detail
+the style level). See `apps/forge/gui/tests/qml.cmake` and `qml_test_main.cpp` for the full detail
 on both macOS fixes.
 
 `libs/audio/CMakeLists.txt` selects a real CoreAudio backend on macOS (`libs/audio/src/backend/macos/`,

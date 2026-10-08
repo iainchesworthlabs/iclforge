@@ -28,10 +28,10 @@
 // A separate file rather than folded into test_cli.cpp: this file's own tests only make sense
 // when ICLFORGE_BUILD_ADM turned on iclforge::adm AND forge was actually built
 // (so its own binary has the 'atmos-adm' command at all) - a narrower, two-part condition
-// test_cli.cpp's single TARGET-forge gate does not express. See tests/CMakeLists.txt's own
+// test_cli.cpp's single TARGET-forge gate does not express. See apps/forge/cli/tests/CMakeLists.txt's own
 // gating comment for exactly how both conditions are checked before this file is even compiled.
 //
-// ICLFORGE_CLI_EXE is supplied the same way as test_cli.cpp's own (see tests/CMakeLists.txt);
+// ICLFORGE_CLI_EXE is supplied the same way as test_cli.cpp's own (see apps/forge/cli/tests/CMakeLists.txt);
 // run_cli below is a trimmed copy of test_cli.cpp's own helper of the same name (same reasoning for
 // the double-quote wrapping on Windows - see that file's own comment on std::system() and cmd.exe's
 // quoting), and the byte-level BW64/ADM fixture helpers are a copy of

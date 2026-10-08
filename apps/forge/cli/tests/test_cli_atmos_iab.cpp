@@ -26,7 +26,7 @@
 //
 // A separate file rather than folded into test_cli.cpp, gated the same two-part way
 // test_cli_atmos_adm.cpp is (ICLFORGE_BUILD_ADM AND forge actually built) - see
-// tests/CMakeLists.txt's own comment.
+// apps/forge/cli/tests/CMakeLists.txt's own comment.
 //
 // The byte-level IAB fixture below is a copy of libs/adm/tests/test_iab_bridge.cpp's own flagship
 // fixture (same Bed Center channel + hard-right-then-hard-left Object, same 300/800 Hz tones) -

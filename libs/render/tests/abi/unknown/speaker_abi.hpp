@@ -12,5 +12,5 @@
 // mean maintaining sizes for an ABI nobody has measured; asserting the MSVC
 // ones everywhere would fail the GCC and Clang legs for no defect.
 //
-// Both variants ship this filename; tests/CMakeLists.txt puts the matching
+// Both variants ship this filename; libs/render/tests/CMakeLists.txt puts the matching
 // directory on the include path.

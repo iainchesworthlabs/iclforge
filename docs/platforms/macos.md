@@ -389,7 +389,7 @@ confirmed clean on a second push after two fixes, 582 ctest entries all passed, 
 took 39.74 s of a 56.81 s total run. The fixes were `QSG_RENDER_LOOP=basic` for a Qt Quick
 render-loop deadlock, and forcing the `Fusion` style in the test binary for a
 native-`ComboBox`-under-offscreen hang (see [GUI on macOS](#gui-on-macos) above and
-`apps/forge/gui/tests/CMakeLists.txt` and `qml_test_main.cpp` for the detail).
+`apps/forge/gui/tests/qml.cmake` and `qml_test_main.cpp` for the detail).
 
 The SNR numbers from the run that first proved the gold-reference gate on macOS were 61.81 and
 61.82 dB, against 67.84 and 67.82 dB on Linux and Windows for the same material. This page and
@@ -426,7 +426,7 @@ it and for the gate that now refuses that path. The three suites run green on bo
 
 Worth separating from that, because the two hangs on this runner have different causes and the
 same symptom. `macos-llvm`'s first-ever GUI run deadlocked in the threaded Qt Quick render loop,
-which is why `apps/forge/gui/tests/CMakeLists.txt` sets `QSG_RENDER_LOOP=basic` on `APPLE` (see
+which is why `apps/forge/gui/tests/qml.cmake` sets `QSG_RENDER_LOOP=basic` on `APPLE` (see
 [GUI on macOS](#gui-on-macos)), and Crucible's suites set `QT_QUICK_BACKEND=software` beside
 `offscreen` for the same family of reason. Those are rendering. This one was Core Audio, and no
 amount of render-loop configuration would have moved it.

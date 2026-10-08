@@ -173,7 +173,7 @@ the tier the window opens in.
 Most of what this page describes is checked by reading the code. The Qt Quick suites hold a named,
 countable part of it, and that part is a good deal smaller than **What can be done without a mouse**
 and **What a screen reader is told** above. They are built where the window is built with
-`ICLFORGE_BUILD_TESTS` on, one ctest entry per `tst_*.qml` (`apps/forge/gui/tests/CMakeLists.txt`), and
+`ICLFORGE_BUILD_TESTS` on, one ctest entry per `tst_*.qml` (`apps/forge/gui/tests/qml.cmake`), and
 they run under the offscreen platform, which has no accessibility bridge, so they read the
 properties a bridge would read and leave what a screen reader does with them untested.
 

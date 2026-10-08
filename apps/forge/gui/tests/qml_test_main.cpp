@@ -29,7 +29,7 @@
 // command line a page echoes through the forge this build made, in a folder
 // of the test's choosing, and comparing what it wrote with what the page
 // wrote. ICLFORGE_GUI_TEST_CLI is the build's own forge, or empty where the
-// build has none (apps/forge/gui/tests/CMakeLists.txt); then available() is false
+// build has none (apps/forge/gui/tests/qml.cmake); then available() is false
 // and a suite skips.
 class CliRunner : public QObject {
     Q_OBJECT

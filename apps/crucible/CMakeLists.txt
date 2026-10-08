@@ -10,7 +10,7 @@
 # engine/ is the headless part - what the UI drives and the spikes proved -
 # split in two the way the CLI's own platform/ directory is: the pure modules
 # (slot plan, bed mixer, placement, output policy) name no operating system
-# and are ALSO compiled into iclforge-crucible-tests on every platform (tests/CMakeLists.txt);
+# and are ALSO compiled into iclforge-crucible-tests on every platform (apps/crucible/engine/tests/CMakeLists.txt);
 # the modules under engine/platform/<os>/ talk to that platform's session
 # enumeration, default device and silent device, and exactly one directory of
 # them is ever compiled. The rest of engine/ (taps, output stage, signing
@@ -556,7 +556,7 @@ else()
     endif()
 
     # Four windeployqt passes share bin/: forge-gui's, forge_gui_qmltests's (ordered
-    # after it, apps/forge/gui/tests/CMakeLists.txt says why), this one, and
+    # after it, apps/forge/gui/tests/qml.cmake says why), this one, and
     # crucible_qmltests's (ordered after this one, below). The GUI's pair and
     # the demo's pair were not ordered against each other, and on a real
     # "build everything" run two of them copying the same Qt file into bin/

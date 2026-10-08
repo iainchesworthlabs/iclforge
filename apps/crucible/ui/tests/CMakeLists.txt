@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # crucible_qmltests - Qt Quick Test coverage for the Crucible's
 # window (ui/assets/qml), driving the real CrucibleController the way forge_gui_qmltests
-# drives the real EncoderController (apps/forge/gui/tests/CMakeLists.txt, whose
+# drives the real EncoderController (apps/forge/gui/tests/qml.cmake, whose
 # reasoning this file follows and does not repeat).
 #
 # include()d from ../../CMakeLists.txt inside its Qt6_FOUND block, after

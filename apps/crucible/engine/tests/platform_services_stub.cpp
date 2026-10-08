@@ -3,7 +3,7 @@
 #include "platform_services.hpp"
 
 // iclforge-crucible-tests compiles the application's engine core on every platform
-// (tests/CMakeLists.txt), and that core falls back to the platform's own
+// (apps/crucible/engine/tests/CMakeLists.txt), and that core falls back to the platform's own
 // services when a test hands it none - a path the tests never take, since
 // every one of them passes a fake. These definitions satisfy the linker
 // where no platform directory is built, and answer with nothing if they are

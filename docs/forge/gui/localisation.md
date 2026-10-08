@@ -145,6 +145,6 @@ python tools/generators/gen_pseudo_locale.py
 
 It is loaded only through an `ICLFORGE_GUI_LOCALE=xx` environment override
 (`LanguageManager::applyInitialLanguage()`, checked ahead of the persisted setting and the system
-locale) — `apps/forge/gui/tests/CMakeLists.txt` sets this for `tst_localisation_pipeline.qml`'s ctest
+locale) — `apps/forge/gui/tests/qml.cmake` sets this for `tst_localisation_pipeline.qml`'s ctest
 entry alone, and it is embedded only into `forge_gui_qmltests`, never into the shipped `forge-gui`
 binary (`apps/forge/gui/CMakeLists.txt`'s own comment on `AC3_PSEUDO_TS_FILE` says why).

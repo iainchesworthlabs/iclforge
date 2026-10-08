@@ -255,7 +255,7 @@ TEMPLATE_TEST_CASE("16-bit stereo pairs interleave left then right", "[io][inter
 TEST_CASE("an interleave with no conversion named uses the part's", "[io][interleave]") {
     // What the sinks do: call the interleave with no template argument and get
     // the conversion iclforge/slot_conversion.hpp names. On the host that is the
-    // float one (tests/CMakeLists.txt), and a part without an FPU gets the other
+    // float one (libs/ac3/tests/CMakeLists.txt), and a part without an FPU gets the other
     // from the component's CMakeLists.txt.
     STATIC_REQUIRE(std::is_same_v<iclforge::SlotConversion, iclforge::FloatConversion>);
 

@@ -36,7 +36,7 @@
 // not a format - and the "describes a stream it cannot decode" claim is only
 // testable against a stream that really does not decode.
 //
-// ICLFORGE_CLI_EXE and ICLFORGE_EXTERNAL_BASELINE_DIR come from tests/CMakeLists.txt;
+// ICLFORGE_CLI_EXE and ICLFORGE_EXTERNAL_BASELINE_DIR come from apps/forge/cli/tests/CMakeLists.txt;
 // run_cli below is a trimmed copy of test_cli.cpp's helper of the same name,
 // duplicated per this project's own per-file test-helper convention (see
 // test_cli_atmos_adm.cpp, which does the same), including its Windows

@@ -14,7 +14,7 @@
 #include "iclforge/base/crypto/signing_key.hpp"
 
 // Internal crypto headers - on the include path for this target only (see
-// tests/CMakeLists.txt), the same way the alsa backend's internal header is.
+// libs/base/tests/CMakeLists.txt), the same way the alsa backend's internal header is.
 #include "iclforge/base/crypto/hmac_sha256.hpp"
 #include "iclforge/base/crypto/sha256.hpp"
 
