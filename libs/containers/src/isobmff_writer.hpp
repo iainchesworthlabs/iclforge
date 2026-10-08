@@ -9,7 +9,7 @@
 
 // The ISO/IEC 14496-12 box primitives the containers' writers share: big-endian fields, a box's
 // type, a Box and a FullBox. MP4's muxer and fragmenter (mp4/isobmff_detail.hpp) and IAMF's
-// encapsulation (iamf/container.cpp) build their boxes with them. Internal to src/containers.
+// encapsulation (iamf/container.cpp) build their boxes with them. Internal to libs/containers.
 //
 // Every free function here is `inline`: this header is included by more than one .cpp in the
 // same target, so ODR requires it.

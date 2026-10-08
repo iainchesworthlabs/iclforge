@@ -1,4 +1,4 @@
-// A-CPL's interpolation and decorrelators (src/ac4/src/core/acpl/acpl.cpp) against verbatim copies
+// A-CPL's interpolation and decorrelators (libs/ac4/src/core/acpl/acpl.cpp) against verbatim copies
 // of the code they replaced (planning/ac4.md, D14e): Pseudocode 109 evaluated at every subband and
 // the decorrelators' coefficients narrowed at every tap. Both are held to the BITS of what they
 // gave, at the decoder's scalar and at double, on parameters of every framing and band count and on

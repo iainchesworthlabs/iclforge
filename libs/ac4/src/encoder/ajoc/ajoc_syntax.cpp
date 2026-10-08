@@ -241,7 +241,7 @@ void write_ajoc_dmx_de_data(BitWriter& w, int num_dmx_signals, const AjocDmxDeFi
     if (fields.cfg) {
         w.write(2, static_cast<std::uint64_t>(fields.max_gain), "de_max_gain");
         // de_main_dlg_flag[] in one field, [0] its first bit (the decoder's
-        // reading, src/ac4/ERRATA.md, "Arrays read as one field").
+        // reading, libs/ac4/ERRATA.md, "Arrays read as one field").
         std::uint64_t flags = 0;
         num_dlg_obj = 0;
         for (const int flag : fields.dialogue) {

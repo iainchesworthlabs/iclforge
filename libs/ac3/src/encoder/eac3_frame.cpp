@@ -2387,7 +2387,7 @@ std::expected<std::vector<std::byte>, FrameError> finish_frame(
     // it cost. BitWriter::put grows bytes_ one byte at a time - its own header
     // puts the bill at "~11 geometric reallocations for a full syncframe" - and
     // both writers here start from capacity 0, so a frame paid that twice for
-    // nothing. src/ac3/src/encoder/encoder.cpp does reserve on the AC-3 side;
+    // nothing. libs/ac3/src/encoder/encoder.cpp does reserve on the AC-3 side;
     // this is the same line, and total_bytes was already sitting two statements
     // above it.
     BitWriter probe;
@@ -2613,7 +2613,7 @@ struct FrameEncoder::Impl {
     // every frame, so reuse only removes the re-allocation.
     std::vector<std::array<std::int32_t, 256>> fixed_scratch_;
     // The previous frame's converged SNR-offset composite, warm-starting the
-    // next frame's search (src/ac3/src/encoder/snr_search.hpp). Negative
+    // next frame's search (libs/ac3/src/encoder/snr_search.hpp). Negative
     // until a frame has been encoded.
     //
     // Two of them, one per predicate. The delta decision runs the search

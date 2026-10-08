@@ -20,8 +20,8 @@ Use this page to link the C++ library. Other interfaces are documented under the
 
 Every library has its own header directory, `src/<name>/include/iclforge/<name>/`, spelled
 `iclforge/<name>/...` in an `#include`; the [header map](header-map.md) lists what is where. The
-main codec headers are under `src/ac3/include/iclforge/ac3/`, and the AC-4 headers under
-`src/ac4/include/iclforge/ac4/`, by area as AC-3's are: `core/` (the table of contents), `io/`
+main codec headers are under `libs/ac3/include/iclforge/ac3/`, and the AC-4 headers under
+`libs/ac4/include/iclforge/ac4/`, by area as AC-3's are: `core/` (the table of contents), `io/`
 (the elementary stream and the carriage), `decoder/` and `encoder/`.
 
 | CMake target | Purpose |
@@ -196,7 +196,7 @@ it uses (`iclforge_ac3_static`, `iclforge_render_static`, `iclforge_objects_stat
 AC-4 adds `iclforge_ac4_static`), and `-lstdc++ -lm` at the end.
 
 Live audio — capture, monitor playback, IEC 61937 passthrough — is `iclforge::audio`
-(`src/audio/`), a separate target `forge`/`forge-gui` link alongside `iclforge::ac3` for their own
+(`libs/audio/`), a separate target `forge`/`forge-gui` link alongside `iclforge::ac3` for their own
 live-audio commands. It is **not** part of the distributed package: it isn't installed, isn't
 exported, and `find_package(iclforge)` says nothing about it. A consumer wanting live capture
 on their own platform provides their own audio I/O and feeds the resulting PCM to the codec API

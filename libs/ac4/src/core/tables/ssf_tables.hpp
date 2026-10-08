@@ -25,7 +25,7 @@ extern const std::array<std::int8_t, 37> kSsfPredRtsTable;
 
 // Annex C.6: ssf_pred_coeff_mat<tab_idx>, as the attachment lays them out. The layout
 // is ((nu + Rf) * 33 + eta) * Rt + k, not the index of Pseudocode C.1
-// (src/ac4/ERRATA.md, "The layout of the SSF prediction coefficient tables").
+// (libs/ac4/ERRATA.md, "The layout of the SSF prediction coefficient tables").
 extern const std::array<std::span<const std::uint8_t>, 37> kSsfPredCoeffQuantMat;
 
 // Tables C.6 to C.9: CDF_TABLE (index -352 to 352 offset by 352), PREDICTOR_GAIN_CDF_LUT

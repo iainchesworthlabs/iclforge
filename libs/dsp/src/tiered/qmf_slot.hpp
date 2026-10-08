@@ -8,7 +8,7 @@
 
 // One time slot of the QMF banks (dsp/qmf.hpp) at a floating scalar, over a delay line and a
 // window the caller holds: AC-4's banks with QWIN (tiered/qmf.cpp), and JOC's with the prototype
-// of TS 103 420 (src/dsp/src/qmf.cpp, planning/consolidation.md decision 21), the one engine for
+// of TS 103 420 (libs/dsp/src/qmf.cpp, planning/consolidation.md decision 21), the one engine for
 // both. The fixed-point tier's slot is dsp/qmf_fixed.hpp's, QWIN's alone.
 
 namespace iclforge::dsp::tiered::qmf {

@@ -8,7 +8,7 @@
 #include "iclforge/ac3/core/eac3_tables.hpp"
 
 // iclforge::audio's speaker mask: WAVEFORMATEXTENSIBLE's positions against the
-// renderer's locations (src/audio/src/speakers.cpp).
+// renderer's locations (libs/audio/src/speakers.cpp).
 //
 // Nothing here touches a device. The one judgement worth testing at all is the
 // pair of names that depends on the company it keeps: SPEAKER_BACK_LEFT and

@@ -114,7 +114,7 @@ the encoder's scores and the race against DEE are held to pinned floors and keep
 Logic II from Hearth's Decoder page, an AC-4 live session in the Forge GUI, and AC-4 in Matroska,
 which registers no codec ID for it. AC-4's speed and memory are measured and gated: `ac3perf` holds
 AC-4's stereo and 5.1 encode and decode to real time in the gate's build legs, the speed, kernel and
-memory benchmarks carry AC-4's rows (and the transforms of `src/ac4/src/core`), and since #1132
+memory benchmarks carry AC-4's rows (and the transforms of `libs/ac4/src/core`), and since #1132
 (2026-09-29) a merge queue entry that changes `src/` fails if any workload, AC-4's included, takes
 twice as long as at the commit it is queued on, or doubles its heap churn.
 
@@ -142,7 +142,7 @@ speech frontend waiting for a stream that uses it, and so does
 
 - written clean-room from ETSI TS 103 190-1 V1.4.1 and ETSI TS 103 190-2 V1.3.1 (both 2025-07),
   which ETSI publishes free with their table attachments;
-- libraries beside `src/ac4` that do not depend on `ac3::forge`, as the inspector does not;
+- libraries beside `libs/ac4` that do not depend on `ac3::forge`, as the inspector does not;
 - free of FFmpeg and every other codec library, with other codecs used only as separate programs
   whose output is compared, and never read;
 - callable from the applications through APIs that mirror `ac3::forge`'s where the concepts match,
@@ -159,7 +159,7 @@ writes are what the phases worked from, with what the phases added to them.
 
 ### The inspector
 
-`src/ac4` (`ac4::ac4`, roadmap IM4, PR #442) reads sync frames and their CRC (Annex G), the table
+`libs/ac4` (`ac4::ac4`, roadmap IM4, PR #442) reads sync frames and their CRC (Annex G), the table
 of contents, presentation information v0 and v1, substream group information for channel-coded,
 A-JOC, direct-coded object and OAMD substreams, and the substream index table. It builds `dac4`,
 reports samples per frame and writes the RFC 6381 codec string. It reports `audio_data()` and
@@ -183,17 +183,17 @@ decoder phases added to it, and what the decoder and the encoder meet in it now:
   profile. `CONFIG_AC3FORGE_AC4` (D14b) builds the inspector, the core and the decoder into the
   component through `AC3FORGE_MINIMAL_AC4`.
 - The two defects found while planning are fixed: `fuzz_ac4_parse` links an instrumented
-  inspector (`fuzz/CMakeLists.txt`), and an EMDF-only presentation reads its EMDF substream
+  inspector (`cmake/IclforgeFuzz.cmake`), and an EMDF-only presentation reads its EMDF substream
   list on both table-of-contents paths, checked by frames built in both languages.
 
 The Python reference parser `tools/references/ac4_parse.py` reads the same framing, transcribed
-independently; CI runs it through `ac4_syntax.py`'s digest test. `tests/ac4/core/test_toc.cpp` checks one
+independently; CI runs it through `ac4_syntax.py`'s digest test. `libs/ac4/tests/core/test_toc.cpp` checks one
 committed DEE stream, `tests/golden/external-baseline/ac4-stereo-64/dee.ac4`, against MediaInfo's
 reading of it; fifteen more committed DEE streams sit beside it (G0 and G1 added the later ones).
 
 ### The decoder after D1
 
-The position when D1 merged (2026-09-16), which the decoder phases started from. `src/ac4/src/decoder`
+The position when D1 merged (2026-09-16), which the decoder phases started from. `libs/ac4/src/decoder`
 (`ac4::decoder`) read every syntax element of a channel-coded frame and produced no audio: the
 presentation substream, the Part 1 channel elements with ASF, stereo processing, companding, A-SPX
 and A-CPL data, `metadata()` with DRC and dialogue enhancement, EMDF payload substreams, and a
@@ -202,13 +202,13 @@ immersive and 22.2 elements, object substreams, and the efficient high frame rat
 D2 to D10 made it decode all of them but the speech frontend, the 9.X.4 and 22.2 layouts and the
 efficient high frame rate mode; 22.2 has been decoded since (in full decoding, as coded), and so
 have the 9.X.4 modes (in full and core decoding), and the rest it still refuses; the header
-`src/ac4/include/iclforge/ac4/decoder/decoder.hpp` says what it decodes and what it refuses.
-`src/ac4/ERRATA.md` records every reading taken where the text is ambiguous or defective, with
+`libs/ac4/include/iclforge/ac4/decoder/decoder.hpp` says what it decodes and what it refuses.
+`libs/ac4/ERRATA.md` records every reading taken where the text is ambiguous or defective, with
 its evidence.
 
 The syntax is transcribed twice, in C++ and in `tools/references/ac4_syntax.py`, and the two traces
 must agree record for record: `tests/golden/ac4/*.tsv` holds the Python parser's digests of the
-committed streams, `tests/ac4/decoder/test_syntax.cpp` holds the decoder to them in `ac3tests`,
+committed streams, `libs/ac4/tests/decoder/test_syntax.cpp` holds the decoder to them in `ac3tests`,
 which every build leg runs, and `tools/checks/test_ac4_syntax_digests.py` holds the Python parser
 to the same files. Over the local census (107 DEE streams, 50,728 frames) and 6,670 frames of
 public streams from other Dolby encoders, every digest agreed when D1 merged.
@@ -302,7 +302,7 @@ literally:
 - A-JOC's differential decoding, which writes the wrong wet-matrix index (Part 2 5.7.3.2).
 
 The implementation keeps a register of them: for each, the clause, the reading taken, and the
-evidence for that reading. `src/ac4/ERRATA.md` has 165 entries today and `src/ac4/ERRATA.md`,
+evidence for that reading. `libs/ac4/ERRATA.md` has 165 entries today and `libs/ac4/ERRATA.md`,
 for the readings only the writer needs, 48.
 
 ### Material
@@ -507,11 +507,11 @@ count comes out exact.
 **Transform lengths have factors of three and five.** At 48 kHz internal the inverse MDCT runs at
 fifteen lengths from 96 to 2,048 (Part 1 Tables 99 to 105). Ten of them are 96 · 2^k or 120 · 2^k,
 not powers of two. `ac3::forge`'s FFT kernel took powers of two only (since
-planning/consolidation.md decision 20 AC-3 runs AC-4's transform, `src/dsp/include/iclforge/dsp/detail/fft_stockham.hpp`),
+planning/consolidation.md decision 20 AC-3 runs AC-4's transform, `libs/dsp/include/iclforge/dsp/detail/fft_stockham.hpp`),
 and its public MDCT is fixed at 512 and 256 samples.
 
 **The QMF bank has a published window.** AC-4's filterbank has the structure of the one
-`ac3::forge` built for E-AC-3 JOC (`src/dsp/include/iclforge/dsp/qmf.hpp`): 64 complex subbands, a
+`ac3::forge` built for E-AC-3 JOC (`libs/dsp/include/iclforge/dsp/qmf.hpp`): 64 complex subbands, a
 hop of 64 samples and a 640-tap window. ETSI TS 103 420 does not publish that window, so the
 repository designed its own. AC-4 publishes `QWIN`, which carries the alternating sign in the table
 itself, uses a different phase convention, reconstructs to about 78 dB, and delays by 577 samples.
@@ -522,7 +522,7 @@ depend on `QWIN`'s response and phase. Several QMF-domain tools are not scale-in
 companding exponent, A-SPX's envelope estimate, DRC levels), and Part 1 does not state its
 full-scale convention. Phase D3 settled the first two against DEE's streams: A-SPX's envelopes read at
 the inverse transform's scale, full scale 2^15, and companding measures its levels against full scale
-1.0 (`src/ac4/ERRATA.md`).
+1.0 (`libs/ac4/ERRATA.md`).
 
 **QMF-domain parameters arrive ahead of their audio.** The inverse MDCT output is delayed so that
 the control data of A-SPX, A-CPL, dialogue enhancement and DRC applies one, two or four frames
@@ -640,7 +640,7 @@ what the decoder will be told:
 transmitted exponents with a normative model, and an encoder tunes a few of its parameters. ASF
 sends scale factors and codebooks directly, as MPEG AAC does, so every choice of precision is the
 encoder's, and coding quality rests on its psychoacoustic model and its rate loop. The nearest thing
-in the tree is `ac3::quality`'s model (`src/ac3/include/iclforge/ac3/quality/perceptual.hpp`): Johnston's
+in the tree is `ac3::quality`'s model (`libs/ac3/include/iclforge/ac3/quality/perceptual.hpp`): Johnston's
 perceptual entropy with the tonality measure of ISO/IEC 11172-3 Annex D.2 and Schroeder's spreading,
 over A/52's 50 bands. It prices AC-3's allocation parameters and has never driven an allocation.
 
@@ -698,19 +698,19 @@ and a second decoder.
 Three libraries beside the inspector, none linking `ac3::forge`
 ([decision 15](#decisions-for-the-encoder-and-the-applications)):
 
-- **The decoder**, `src/ac4/src/decoder/` (`ac4::decoder`), as D1 built it: an OBJECT library with static
+- **The decoder**, `libs/ac4/src/decoder/` (`ac4::decoder`), as D1 built it: an OBJECT library with static
   and shared wrappers, headers under `include/ac4dec/`, types in namespace `ac4`, linking `ac4::ac4`
   for the table of contents and presentation types.
-- **The encoder**, `src/ac4/src/encoder/` (`ac4::encoder`), in the same pattern, with headers under
+- **The encoder**, `libs/ac4/src/encoder/` (`ac4::encoder`), in the same pattern, with headers under
   `include/ac4enc/`. It links `ac4::ac4`, whose `Toc` describes what it writes and whose
   `build_dac4()` and `rfc6381_codec_string()` it reuses.
-- **The shared core**, `src/ac4/src/core/` (`ac4::core`): what both directions compute, built and tested
+- **The shared core**, `libs/ac4/src/core/` (`ac4::core`): what both directions compute, built and tested
   once ([DSP](#dsp)). It is a static library of position-independent code with hidden symbols,
   linked privately by the other two, so each shared library carries the part it uses, a static
   build links it once, and it has no public headers and no ABI of its own. D2 created it and moved
-  D1's generated tables into it. The bit reader and the Huffman decoder stayed in `src/ac4/src/decoder`,
+  D1's generated tables into it. The bit reader and the Huffman decoder stayed in `libs/ac4/src/decoder`,
   since they carry the syntax trace and its sink, and the encoder has a bit writer of its own in
-  `src/ac4/src/encoder`.
+  `libs/ac4/src/encoder`.
 
 The syntax stays apart. The decoder's reader and the encoder's writer are separate transcriptions of
 the syntax tables, in opposite directions, and the Python reference stays independent of both. A
@@ -758,10 +758,10 @@ The two directions carry their own ([decision 7](#decisions)), in the shared cor
 - the kernels of reconstruction an encoder also runs, to see what a decoder will produce. As built,
   the core holds A-SPX's subband tables and HF generator, A-CPL's parameter bands, tables,
   interpolation, three decorrelators and transient ducker, and A-JCC's and A-JOC's reconstruction,
-  which reuse the decorrelators (`src/ac4/src/core/aspx`, `acpl`, `ajcc` and `ajoc`).
+  which reuse the decorrelators (`libs/ac4/src/core/aspx`, `acpl`, `ajcc` and `ajoc`).
   Dequantisation, the stereo and multichannel matrices, companding and A-SPX's envelope adjustment
-  stayed in the decoder (`src/ac4/src/decoder/pcm`), and the encoder has the matrices' inverses of its own
-  (`src/ac4/src/encoder/asf`);
+  stayed in the decoder (`libs/ac4/src/decoder/pcm`), and the encoder has the matrices' inverses of its own
+  (`libs/ac4/src/encoder/asf`);
 - the sample rate converters in both directions: from the internal rate to 48 kHz for the decoder,
   and from 48 kHz to the internal rate for the encoder;
 - the tables: the Huffman codebooks, in the decoder's order and in the index order an encoder looks
@@ -790,9 +790,9 @@ estimates and, in the A-CPL modes, IIR decorrelators on every channel, and forge
 reconstruction still runs in `float` in every build because of the same filterbank. The speech
 frontend's arithmetic decoder uses integer arithmetic in every build, as the text specifies.
 
-As D6 left it, the pattern held for about a third of the DSP: `src/ac4/src/core`'s kernels were
+As D6 left it, the pattern held for about a third of the DSP: `libs/ac4/src/core`'s kernels were
 templates on `Real`, instantiated only at `double` and over `std::complex<Real>`, which a
-fixed-point type cannot instantiate, and the reconstruction in `src/ac4/src/decoder/pcm` spelled `double`
+fixed-point type cannot instantiate, and the reconstruction in `libs/ac4/src/decoder/pcm` spelled `double`
 directly. On 2026-09-25 the user asked that AC-4 follow AC-3's and E-AC-3's approach, `double`,
 `float` and fixed point by target ([decision 25](#decisions-of-2026-09-25)), and D14a did it: the
 kernels and the reconstruction are templates on `Real` over `dsp::Complex<Real>`, a complex type of
@@ -812,7 +812,7 @@ across toolchains.
 ### The API
 
 The decoder takes one `raw_ac4_frame` at a time and returns PCM for one presentation. This is the
-sketch the design started from; `src/ac4/include/iclforge/ac4/decoder/decoder.hpp` is the API as built, and the
+sketch the design started from; `libs/ac4/include/iclforge/ac4/decoder/decoder.hpp` is the API as built, and the
 notes after the sketch say where it differs:
 
 ```cpp
@@ -894,7 +894,7 @@ extension it reads and does not decode.
 
 The encoder takes PCM at 48 kHz, or at 44.1 kHz for `frame_rate_index` 13, the one index Part 1
 Table 84 defines at that rate, in blocks of any length, and returns each `raw_ac4_frame` as it
-completes. This is the design's sketch; `src/ac4/include/iclforge/ac4/encoder/encoder.hpp` is the API as built,
+completes. This is the design's sketch; `libs/ac4/include/iclforge/ac4/encoder/encoder.hpp` is the API as built,
 and the notes after the sketch say where it differs:
 
 ```cpp
@@ -990,7 +990,7 @@ and `encode()` has overloads for a dialogue stem and for the metadata updates of
   `wait_frames` needs; a variable rate is an average rate without the buffer, in which frames lend
   each other up to two seconds' share of the rate (`wait_frames` 7).
 - **The closed loop.** The rate loop is open: it estimates each band's noise from the quantiser's
-  step (`src/ac4/src/encoder/asf/psycho.hpp`) and does not reconstruct the frame to measure it. The
+  step (`libs/ac4/src/encoder/asf/psycho.hpp`) and does not reconstruct the frame to measure it. The
   encoder runs the core's kernels where a tool's choice depends on what the decoder will make of it:
   A-SPX's envelopes, noise floors and tones against the HF generator (E2, E10), and A-JOC's dry
   matrices against its reconstruction (E9).
@@ -1142,7 +1142,7 @@ built in WSL under `D:\ac3bld\librempeg` from a pinned commit, with the compiler
 architecture, which costs speed and nothing else (its x86 build without assembly does not link). Its
 `ffmpeg` program builds only with `--enable-agpl`, which puts that program under the AGPL; it runs
 here as a separate tool and is never linked or distributed. Its binary is named `ffmpeg`, and the
-gold gate, `quality_race.py`, `fuzz/differential_oracle.hpp` and most other scripts call FFmpeg by
+gold gate, `quality_race.py`, `libs/ac3/fuzz/differential_oracle.hpp` and most other scripts call FFmpeg by
 name from `PATH`, so it is only ever called by its full path, never put on `PATH`, where it would
 replace the pinned FFmpeg 8.0.1. Before its output counts as evidence for a tool, it decodes the
 committed and census DEE streams and is scored against their sources as the decoder is; that
@@ -1213,7 +1213,7 @@ the ones it uses.
 6. **Constructed streams reach what no encoder here writes.** A test multiplexer builds
    presentations of several substreams from the substreams of separate DEE encodes, rewriting their
    `extended_metadata`. The encoder's writer, driven directly by the tests
-   (`tests/ac4/decoder/constructed.cpp`), builds syntax no encoder here writes by default: A-CPL
+   (`libs/ac4/tests/decoder/constructed.cpp`), builds syntax no encoder here writes by default: A-CPL
    mode 1, A-JCC, transmitted DRC gains, and dialogue enhancement methods 1 to 3. The encoder's own
    streams reach it too. These check parsing, the invariants, and gains on known input; the writer,
    the encoder and the decoder can share a misreading.
@@ -1342,9 +1342,9 @@ How each phase is run:
   and what verified it.
 - From D2 on, each phase's pull request records the comparison with librempeg; from E1 on, each
   encoder phase's pull request records the race against DEE.
-- Every reading taken where the text is ambiguous goes into `src/ac4/ERRATA.md`, and both
+- Every reading taken where the text is ambiguous goes into `libs/ac4/ERRATA.md`, and both
   transcriptions take it. A reading only the writer needs, such as the value of a field decoders
-  ignore or an order the text leaves open, goes into `src/ac4/ERRATA.md`, which points at the
+  ignore or an order the text leaves open, goes into `libs/ac4/ERRATA.md`, which points at the
   decoder's entry wherever both depend on one reading.
 - Each phase updates what it changes of the support catalogue, the status table, the capabilities
   and validation pages, CHANGELOG and ROADMAP.
@@ -1483,7 +1483,7 @@ same install. G2 (#1054, 2026-09-26) made the last for AC-3, E-AC-3, E-AC-3 JOC 
 **Status:** merged as #700 on 2026-09-16, with the readings of #712 and #715; the HSF extension's
 content followed in #786. Exit met: every criterion below, the third-party streams included.
 
-- `src/ac4/src/decoder/` with its CMake, tests and an instrumented fuzz target, and the inspector additions
+- `libs/ac4/src/decoder/` with its CMake, tests and an instrumented fuzz target, and the inspector additions
   under [What the inspector grows](#what-the-inspector-grows).
 - The whole syntax of channel-coded substreams in the Part 1 channel elements, from Part 1 clause 4
   and Part 2 clause 6: ASF section, spectral, scale factor and noise fill data decoded to quantised
@@ -1495,7 +1495,7 @@ content followed in #786. Exit met: every criterion below, the third-party strea
   rendering of its page.
 - The Python reference parser grows the same syntax, transcribed separately from the text and not
   from the C++.
-- The errata register (`src/ac4/ERRATA.md`), and the generator for the committed streams.
+- The errata register (`libs/ac4/ERRATA.md`), and the generator for the committed streams.
 - As built, also: a differential check (`tools/checks/ac4_syntax_differential.py`) that compares
   the two transcriptions' traces on mutated DEE frames, synthetic tables of contents and fuzzing
   corpora, where no encoded stream reaches the syntax.
@@ -1512,10 +1512,10 @@ locally over the whole set; the fuzz target.
 
 **Status:** merged as #1009 on 2026-09-25. Exit met.
 
-- The shared core, `src/ac4/src/core/` ([Where the libraries live](#where-the-libraries-live)): D1's
+- The shared core, `libs/ac4/src/core/` ([Where the libraries live](#where-the-libraries-live)): D1's
   generated tables moved into it, and this phase's transforms are written there, the forward MDCT
   beside the inverse, so that E1 finds them built and tested. The bit reader and the Huffman
-  decoder stayed in `src/ac4/src/decoder`, since they carry the syntax trace and its sink.
+  decoder stayed in `libs/ac4/src/decoder`, since they carry the syntax trace and its sink.
 - ASF reconstruction: scale factors, dequantisation, noise fill, ungrouping.
 - Stereo processing: M/S and prediction.
 - The inverse MDCT on the FFT for 2^a · 3^b · 5^c, the direct form it is tested against, KBD
@@ -1585,7 +1585,7 @@ and over the full set locally.
   the gain that flattens the low band's slope, which doubles the slope, and the top group of film's
   centre came out 4.6 dB under the source at 256 kbps, lost to the limiter, and 10.9 dB under at 192.
   D4 flattens the patch, in the decoder and in the encoder's analysis, and measures both scorers' ASPX
-  legs again (`src/ac4/ERRATA.md`, "Pre-flattening's direction").
+  legs again (`libs/ac4/ERRATA.md`, "Pre-flattening's direction").
 
 **Exit:** every DEE 5.1 stream from 192 to 768 kbps decodes with the checks of D2 and D3 on each
 channel, and one tone per channel lands on its own channel, the LFE included. Constructed 3.0 and
@@ -1605,13 +1605,13 @@ channel, and one tone per channel lands on its own channel, the LFE included. Co
   a frame, interpolated smoothly in all but a few frames, and difference along frequency in every
   I-frame. librempeg puts out their coded pair as L and R and leaves Ls and Rs silent, so the source
   is the only reference. The decorrelators, the ducker, interpolation and the dequantisation tables
-  are in `src/ac4/src/core` for E4, and the encoder's writer writes A-CPL's syntax for the constructed
+  are in `libs/ac4/src/core` for E4, and the encoder's writer writes A-CPL's syntax for the constructed
   streams, eight of them committed; E4 builds its parameter extraction on both.
 - Scored against the source, DEE's streams settled two readings the text leaves open: a frame's
   parameters apply d_ctrl frames later, with its A-SPX data (a frame early or late takes the level
   difference's distance from the source from 2.6 dB to 3.8 and 3.6), and the transient ducker weighs
   its own input, the decorrelator's output, though it barely moves these measures
-  (`src/ac4/ERRATA.md`, "A-CPL").
+  (`libs/ac4/ERRATA.md`, "A-CPL").
 
 **Exit:**
 
@@ -1644,7 +1644,7 @@ channel, and one tone per channel lands on its own channel, the LFE included. Co
   I-frame is seamless (Part 1 6.2.19). A frame whose table of contents does not read counts as
   the frame the stream expected. A decode begun at an I-frame is right from the next frame's
   audio, except that A-SPX's noise and tone indices run from the decoder's first frame and A-CPL's
-  decorrelators settle within four frames (`src/ac4/ERRATA.md`, "What an I-frame does not
+  decorrelators settle within four frames (`libs/ac4/ERRATA.md`, "What an I-frame does not
   restore").
 
 **Exit:**
@@ -1693,7 +1693,7 @@ channel, and one tone per channel lands on its own channel, the LFE included. Co
   0. librempeg decodes a presentation's first substream alone, refuses a table of contents of more
   than 16 presentations, and refuses `bitstream_version` 1. MediaInfo reads the streams' tables of
   contents, and a second parameter set after `de_ms_proc_flag`, which E5's Mid streams and the
-  multiplexer's show as "NOK: tools_metadata"; the text sends one (`src/ac4/ERRATA.md`,
+  multiplexer's show as "NOK: tools_metadata"; the text sends one (`libs/ac4/ERRATA.md`,
   "Presentations" and "de_ms_proc_flag leaves one parameter set").
 
 **Exit:** a table of constructed tables of contents selects as Part 2 4.8.2 requires; every mix,
@@ -1742,7 +1742,7 @@ three angles Part 1 Table 216 defines; the multiplexed streams parse in both imp
   leaves open which bytes of a chunk are the name's and where a decoder joining in the middle begins.
   The register reads a chunk before the last as name bytes throughout and the last as two bytes
   shorter, and takes the name once as many consecutive chunks as the count says have arrived
-  (`src/ac4/ERRATA.md`, "A presentation name in chunks"); the Python reference takes the same
+  (`libs/ac4/ERRATA.md`, "A presentation name in chunks"); the Python reference takes the same
   reading on 14 cases. No stream here names a presentation.
 - DEE's 5.1 streams send no `lfe_mixgain`, so the LFE's place in a two-channel downmix is tested on
   an encoder stream written with `lfemix=-4.5`.
@@ -1838,7 +1838,7 @@ move as their metadata says, is the user's to do; the numbers hold in `test_obje
 - Objects and their Annex F properties on the API; the OAMD substream's content, with the second
   `oamd_common_data()` it can carry.
 - Built in D10: both transcriptions read the object syntax, and the encoder's writers gained it for
-  the constructed streams; A-JOC's reconstruction lives in `src/ac4/src/core`, templated on `Real`, and
+  the constructed streams; A-JOC's reconstruction lives in `libs/ac4/src/core`, templated on `Real`, and
   the decoder hands each object over with its Annex F properties and the sample of each update. The
   intermediate spatial format is the one kind of object the decoder renders itself, by the
   attachment's matrices; `ac3cli decode` renders the others through the layout renderer Hearth plays
@@ -1850,7 +1850,7 @@ move as their metadata says, is the user's to do; the numbers hold in `test_obje
   contents lists them; rendered, it all comes from the centre speaker. The rest is read from the
   encoder's writer: eight committed constructed streams, whose objects each carry a known sum of
   tones, and the differential check's mutations of them.
-- The text needed readings (`src/ac4/ERRATA.md`): A-JOC's ramp advances once a slot and stops
+- The text needed readings (`libs/ac4/ERRATA.md`): A-JOC's ramp advances once a slot and stops
   on its target (Pseudocode 17 as printed would pass it by a step); the decorrelation input matrix
   is taken subband by subband for objects of different band counts; Pseudocode 22's `de_gain > 1`
   test belongs to full decoding, since core decoding's `de_gain` is 10^(G/20) − 1; H'_M is kept by
@@ -1938,7 +1938,7 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
 ([The ESP32](#the-esp32)) sets what AC-4 aims for there. One pull request per part.
 
 - **D14a, the scalar and the decoder's size, on the host** (merged as #1096, #1102 and #1123).
-  - `src/ac4/src/decoder/pcm` on the decoder's scalar, as `src/ac4/src/core` is, with a complex type of the
+  - `libs/ac4/src/decoder/pcm` on the decoder's scalar, as `libs/ac4/src/core` is, with a complex type of the
     project's own in place of `std::complex<Real>`; AC-4 in `AC3FORGE_DECODE_SCALAR`, the `float`
     build compiling with `-Wdouble-promotion` as an error; `ac3::forge`'s `Fixed32`, vector types
     and `float` functions shared through a header-only target
@@ -1953,13 +1953,13 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   - Vector kernels on the host (`f32x4`, `f64x2`) on the split planes, each identical bit for bit
     to the loop it replaces.
 
-  **Built in D14a.** Decision 31's header-only target (`src/base`) moved `Fixed32`
+  **Built in D14a.** Decision 31's header-only target (`libs/base`) moved `Fixed32`
   and the float scalar functions out of `ac3::forge`'s own tree with no copy; both `ac3::forge` and
-  `src/ac4/src/core` link it. `src/ac4/src/core`'s own QMF-domain kernels - the analysis/synthesis pair, the
+  `libs/ac4/src/core` link it. `libs/ac4/src/core`'s own QMF-domain kernels - the analysis/synthesis pair, the
   FFT and MDCT, A-SPX's high-frequency generator, A-CPL's decorrelators and ducker, A-JOC's
   reconstruction, A-JCC's accumulator - take a complex type of the project's own (`dsp::Complex<Real>`)
   in place of `std::complex<Real>`, joined `AC3FORGE_DECODE_SCALAR` through the directory-selection
-  mechanism `ac3::forge`'s own `decode_scalar_t` uses, and the float build compiles `src/ac4/src/core`
+  mechanism `ac3::forge`'s own `decode_scalar_t` uses, and the float build compiles `libs/ac4/src/core`
   alone with `-Wdouble-promotion` as an error: clean, confirmed by building that one target
   (0 warnings). `QmfValue` (`pcm/aspx.hpp`) and `QmfSample` (`aspx_encoder.hpp`) take the same
   complex type, since both cross straight into these kernels at `double`; the double build's output
@@ -1968,8 +1968,8 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   from the scalar work: `bitrate_kbps()`'s guarded hash map, the |q|^(4/3) table's guarded lazy
   init, and `stereo_parameters()`'s 32 KiB return.
 
-  `src/ac4/src/decoder/pcm` is templated on `Real` too, now: the same double-to-`Real` and
-  `std::complex`-to-`dsp::Complex` change this phase's first part made in `src/ac4/src/core`, across all
+  `libs/ac4/src/decoder/pcm` is templated on `Real` too, now: the same double-to-`Real` and
+  `std::complex`-to-`dsp::Complex` change this phase's first part made in `libs/ac4/src/core`, across all
   of its modules - A-SPX, A-CPL, A-JCC, A-JOC, companding, dialogue enhancement, DRC, the downmix,
   S-CPL, stereo and multichannel processing, and the substream orchestrator itself - checked the
   same way. `ac3cli` and the whole test suite build, link and pass at `float` on the host: 2 389
@@ -1979,9 +1979,9 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   own coefficients from `acpl::interpolate()`, deliberately left untouched - keep `double`, narrowed
   once where they multiply a `Real` or `QmfValue`, in the shape the QMF banks' own twiddle factors
   already used. `hf_generator.cpp`'s dB gains, which called `std::log10`/`std::pow` directly at
-  every scalar, now go through a new `scalar_exp2` (`src/base`, beside the existing
+  every scalar, now go through a new `scalar_exp2` (`libs/base`, beside the existing
   `scalar_log2`/`scalar_exp`) at `float` only; the `double` path still calls them directly,
-  unchanged. `src/ac4/src/encoder` calls several of `src/ac4/src/core`'s kernels at a literal `double`, since the
+  unchanged. `libs/ac4/src/encoder` calls several of `libs/ac4/src/core`'s kernels at a literal `double`, since the
   encoder has no `float` tier of its own ([decision 34](#decisions-of-2026-09-25)) and `ac4core` is
   one shared library rather than `ac3::forge`'s separately-compiled encoder and decoder DSP; those
   kernels, and a few others `ac4core`'s own tests exercise directly at `double`, now also explicitly
@@ -1995,7 +1995,7 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
 
   The QMF banks are each one 64-point complex transform between a rotation that packs pairs of
   samples into complex values and a butterfly that pairs subband k with 63 - k, which is
-  Pseudocode 65 and 66 reduced algebraically (the derivation is in `src/dsp/src/tiered/qmf.hpp`),
+  Pseudocode 65 and 66 reduced algebraically (the derivation is in `libs/dsp/src/tiered/qmf.hpp`),
   on separate real and imaginary planes, with ten-block delay lines that move an index. Every
   twiddle factor is a `constexpr` array built by integer angle arithmetic from one generated
   quarter-wave cosine table, the `Real` nearest its exact value, and the banks share them. They are
@@ -2003,7 +2003,7 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   sum, at both scalars. A slot takes 0.77 us in analysis and 0.83 us in synthesis at `double`, from
   3.15 and 3.3. The vector kernels (`qmf_vector.hpp`) put the seven steps of a slot on `f32x4` and
   `f64x2`, each tested equal bit for bit to the scalar loop it replaces, at both scalars, and the
-  banks to those loops composed. The SIMD seam moved from `src/ac3` to `src/base` for them
+  banks to those loops composed. The SIMD seam moved from `libs/ac3` to `libs/base` for them
   (`ac3::arithmetic` now carries the architecture directory): on the x86-64 seam a slot is 2.2 to
   3.9 times faster at `float` and 0.9 to 1.6 times at `double`. On the Cortex-M3 leg the seam is the
   generic directory, and the same kernels run 0.2 to 0.3% fewer instructions and add 4.2 KB to the image
@@ -2016,8 +2016,8 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   substream serves every channel's transforms. The |q|^(4/3) table is `constexpr` and in flash,
   exact to the `double` nearest each power in place of 8 192 calls filling 64 KB of RAM before
   `main` (`std::pow(m, 4.0 / 3.0)` is up to 6.7e-16 relative off it, since 4.0 / 3.0 is short of
-  4/3 by 7.4e-17). No guarded function-local static remains in `src/ac4` or
-  `src/ac4`, and every object the decode path built on the stack to reset or return is built in
+  4/3 by 7.4e-17). No guarded function-local static remains in `libs/ac4` or
+  `libs/ac4`, and every object the decode path built on the stack to reset or return is built in
   place, a member, or handed a scratch: `SubstreamPcm::decode`'s frame fell from 15.1 KB to
   3.4 KB and `decode_aspx`'s from 11.7 KB to 3.4 KB. Seven frames are still over 4 KiB in the
   `float` build, each a sum of smaller locals: the A-CPL coupling parameters' (12.4 KB),
@@ -2095,8 +2095,8 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
 
   **Built in D14b.** `CONFIG_AC3FORGE_AC4` builds the inspector, the core and the decoder into the
   component in `float`, behind a switch that is off by default and offered only on a part with a
-  floating-point unit. `AC3FORGE_MINIMAL_AC4` in the root CMake gives `src/ac4` and
-  `src/ac4/src/decoder` the minimum-footprint profile's compile options as static archives, with no encoder
+  floating-point unit. `AC3FORGE_MINIMAL_AC4` in the root CMake gives `libs/ac4` and
+  `libs/ac4/src/decoder` the minimum-footprint profile's compile options as static archives, with no encoder
   and no shared library, and the packer's `--with-ac4` puts their sources in the component archive.
   With the switch off the component's objects disassemble identically to those of the tree before
   it (35 of 35). The player reads a stream that opens with an AC-4 sync word through the same ring,
@@ -2228,7 +2228,7 @@ table designed once in `double`. One pull request.
 
 **Built in D14a4.** The changes above, in `pcm/companding.cpp`, `pcm/aspx.cpp`, `aspx/hf_generator.cpp`,
 `dsp/resampler.{hpp,cpp}` and the new `dsp/real_functions.hpp` and `dsp/resampler_vector.hpp` of
-`src/ac4/src/core`; `src/ac4/src/decoder` reaches the arithmetic through the first, as the layering table has it, and
+`libs/ac4/src/core`; `libs/ac4/src/decoder` reaches the arithmetic through the first, as the layering table has it, and
 compiles with `ac3::arithmetic`'s include directory. The five probe fixtures' hashes did not move; the sixth, `ac4_20_companding`, is
 `5b93c61c57566b0c` on the Cortex-M3 under QEMU, on the x86-64 host and on the board, at 58.6 M instructions
 a frame, 466,163 bytes of peak heap and 75 allocations a frame. The `float` decode of every committed
@@ -2290,14 +2290,14 @@ compile time, with C++23 `constexpr` and `consteval`, "idiomatic". One pull requ
   is hex at 200 MHz. Read in place the half table took the converter 60.5 ms a frame at 23.976 fps (the whole 376 KB
   table 110 ms), against the 22.4 ms of the table designed at run time and read from PSRAM; the filter copies the
   table into its own memory when it is made, and the converter takes 16.5 ms.
-- **Limits.** One translation unit evaluates the tables, only in a `float` build, and `src/ac4/CMakeLists.txt`
+- **Limits.** One translation unit evaluates the tables, only in a `float` build, and `libs/ac4/CMakeLists.txt`
   raises the constant evaluator's limit for it by compiler: `/constexpr:steps` for MSVC, `/clang:-fconstexpr-steps`
   for clang-cl (which accepts and ignores `/constexpr:steps`), `-fconstexpr-steps` for Clang and
   `-fconstexpr-ops-limit` for GCC, which ESP-IDF's component takes through the same file.
 
-**Built in D14a5.** `dsp/portable_math.hpp` and `dsp/resampler_design.hpp` in `src/ac4/src/core`, `bessel_i0` in
+**Built in D14a5.** `dsp/portable_math.hpp` and `dsp/resampler_design.hpp` in `libs/ac4/src/core`, `bessel_i0` in
 `dsp/kbd.hpp`, the filter and kernel in `dsp/resampler.{hpp,cpp}` and `dsp/resampler_vector.hpp`, the compile limits,
-and `tests/dsp/tiered/test_portable_math.cpp` with the converter's tests (the table's FNV-1a image three ways, the
+and `libs/dsp/tests/tiered/test_portable_math.cpp` with the converter's tests (the table's FNV-1a image three ways, the
 compiler's evaluation against the machine's, the mirrored phases, the reversed kernel). The three tables equal the C
 library's design rounded to `float` in every coefficient, so no `float` PCM hash moved; the tests pin the FNV-1a image
 of each table, which is new here. The Cortex-M3 probe's image is 683,448 bytes from 485,032, which its ceiling follows (750,000).
@@ -2409,7 +2409,7 @@ One pull request.
   factor gains are a table and not a `std::pow` for each band; the concealment spectra change places with the frame's in place of a 48 KB copy; the delay queue
   moves each sample once; an element's tracks (15 KB each) are reserved and not moved 63 times a frame; and the two or four lines of a Huffman codeword are
   stored by name, where GCC made a call into ROM's `memcpy` of them.
-- **The compiler and the flash** (`build(esp32p4)`). The kernels of `src/ac4/src/core` at `-O3` and thirteen of `src/ac4/src/decoder`'s translation units at `-O2` under
+- **The compiler and the flash** (`build(esp32p4)`). The kernels of `libs/ac4/src/core` at `-O3` and thirteen of `libs/ac4/src/decoder`'s translation units at `-O2` under
   `ICLFORGE_MINIMAL_HOT_O2`, and `sdkconfig.p4` reading the flash in QIO mode. The mode is the second stage bootloader's, and the application image carries
   none of it.
 
@@ -2451,7 +2451,7 @@ the same tree with the parts added, one image each, flashed with its own bootloa
   The sink's own count is `sink.underruns` and `sink.dry_ms`. The wide TDM sink does not start on this chip revision (`sink/i2s_wide/audio_sink.cpp` has why), so 5.1 itself
   could not be played through a sink, and a wide TDM frame (64 bytes, 196 KB for a 64 ms queue) wants the decoded PCM in a PSRAM ring in front of the sink instead.
 
-**Built in D14e.** `src/ac4/src/core`'s `dsp/fft_kernels.hpp`, `Imdct::inverse_overlap()`, `CubicBasis`, `acpl::Interpolator` and the decorrelator's narrowed tables; in `src/ac4/src/decoder`
+**Built in D14e.** `libs/ac4/src/core`'s `dsp/fft_kernels.hpp`, `Imdct::inverse_overlap()`, `CubicBasis`, `acpl::Interpolator` and the decorrelator's narrowed tables; in `libs/ac4/src/decoder`
 `SubstreamPcm`'s lazy pass-through (`materialize_out()` and `shift_history()`), `ungroup_in_place()`, `scale_factor_gains()` and the cheaper `parse_sf_data()` store
 and `ElementParser::begin()`; the compiler options of both libraries' `CMakeLists.txt`; `sdkconfig.p4`'s QIO line; the page's tables and its Flash mode and What D14e
 changed sections. Four test files hold the changes to the old code, to the bit: `test_dsp_exact.cpp` (the passes, the transform and the synthesis against
@@ -2482,9 +2482,9 @@ and a power of two; the decorrelators and the converter's taps on 64-bit accumul
 equal on x86, the Cortex-M3 and the C3; the `double` output and the `float` pins unchanged; the fixed tier's agreement with
 `double` stated and pinned; the C6 and C3 images sized; and on the C6, with WiFi up, core decoding first.
 
-- **The tier.** `ICLFORGE_DECODE_SCALAR=fixed` selects `src/dsp/variants/decode-scalar-fixed32/` (AC-4's own `variants/` directory until planning/consolidation.md's C5), whose `Real` is `Fixed32` (Q7.24 in
-  an `int32_t`, `src/base`). The code that differs by tier is chosen by `if constexpr` on `dsp::kFixed<Real>`
-  (`dsp/scalar_traits.hpp`), so a `double` or `float` build compiles what it compiled before. In `src/ac4/src/decoder`'s files that are not
+- **The tier.** `ICLFORGE_DECODE_SCALAR=fixed` selects `libs/dsp/variants/decode-scalar-fixed32/` (AC-4's own `variants/` directory until planning/consolidation.md's C5), whose `Real` is `Fixed32` (Q7.24 in
+  an `int32_t`, `libs/base`). The code that differs by tier is chosen by `if constexpr` on `dsp::kFixed<Real>`
+  (`dsp/scalar_traits.hpp`), so a `double` or `float` build compiles what it compiled before. In `libs/ac4/src/decoder`'s files that are not
   templates the fixed branches are templates on the scalar or generic lambdas, for the same reason.
 - **Where the values sit.** A sample of PCM has full scale at 8.0 and a QMF sample sits at 2^-16 of the `double` decoder's, two
   shifts chosen from probes of each domain's smallest and largest values. Each track's spectrum carries an exponent: the
@@ -2493,7 +2493,7 @@ equal on x86, the Cortex-M3 and the C3; the `double` output and the `float` pins
   reaches 2^28, and the block's exponent carries every shift out to the PCM. A QMF analysis slot sums its window products in 64
   bits with a Q30 window and normalises its 128 values; a synthesis slot is normalised by the sum of its parts' magnitudes, which
   keeps the bits of a sparse slot that a normalisation by its largest part lost.
-- **Energies as a mantissa and a power of two.** `MantExp` (`src/base/internal/iclforge/base/arithmetic/mant_exp.hpp`: a 30-bit
+- **Energies as a mantissa and a power of two.** `MantExp` (`libs/base/internal/iclforge/base/arithmetic/mant_exp.hpp`: a 30-bit
   mantissa and an exponent, with integer `log2`, `exp2` and square root) holds A-SPX's envelopes, noise floors, gains, limiter and preflattening
   gains, the HF generator's covariances and its solve of Pseudocode 87, the A-CPL transient ducker's energies, companding's levels
   and gains and DRC's slot levels. A gain reaches a sample as one 64-bit product and a shift. At `double` and `float` the same
@@ -2505,13 +2505,13 @@ equal on x86, the Cortex-M3 and the C3; the `double` output and the `float` pins
   from flash, so the 1001/960 table costs no RAM: a C6 has no PSRAM, and 188 KB is most of what it has free with WiFi up. A fixed
   image links these three tables and no `float` one.
 
-**Built in D14d.** In `src/base`, `mant_exp.hpp`; in `src/ac4/src/core`, the `scalar-fixed` variant, `dsp/scalar_traits.hpp`,
+**Built in D14d.** In `libs/base`, `mant_exp.hpp`; in `libs/ac4/src/core`, the `scalar-fixed` variant, `dsp/scalar_traits.hpp`,
 `dsp/qmf_fixed.hpp` and the generated `tables/qmf_tables_fixed.hpp` (`tools/generators/gen_ac4_fixed_tables.py`, with `--check`),
 `Fft::inverse_scaled()`, the IMDCT's and the synthesis's overloads that carry a block's exponent, and the fixed branches of
-`aspx/hf_generator.cpp`, `acpl/acpl.cpp` and `dsp/resampler.cpp`; in `src/ac4/src/decoder`, the per-track exponent of
+`aspx/hf_generator.cpp`, `acpl/acpl.cpp` and `dsp/resampler.cpp`; in `libs/ac4/src/decoder`, the per-track exponent of
 `pcm/asf_reconstruct.cpp` and `pcm/substream_pcm.cpp`, and the `Energy` types of `pcm/aspx.cpp`, `pcm/companding.cpp` and
-`pcm/drc.cpp`. `tests/ac4/core/test_mant_exp.cpp` is new; the AC-4 tests take their units from
-`tests/ac4/decoder/units.hpp` and pass at every scalar, and D14e's exact tests, which hold the floating paths to their verbatim
+`pcm/drc.cpp`. `libs/ac4/tests/core/test_mant_exp.cpp` is new; the AC-4 tests take their units from
+`libs/ac4/tests/decoder/units.hpp` and pass at every scalar, and D14e's exact tests, which hold the floating paths to their verbatim
 copies, run where the scalar is floating. `check_ac4_decode_scalar_snr.py --fixed-cli` measures the tier against `double`;
 `run_baremetal_probe.sh --ac4 --scalar=fixed` builds the probe at the tier, with its own instruction and image ceilings. CI runs
 both, the scorers with a fixed CLI and the probe's hashes on the Linux host and the Cortex-M3 leg. `CONFIG_ICLFORGE_AC4` no longer
@@ -2557,9 +2557,9 @@ probe, and the larger redesigns decided once the smaller ones had shown where th
   and the A-SPX streams in A-SPX.
 - **The inverse transform's tables in flash** (`perf(ac4core)`). For the five block lengths of a 2048-sample frame at 44.1 and
   48 kHz, the FFT's roots, the IMDCT's pre-twiddles, the fixed tier's post-twiddles and the KBD windows are narrowed to the
-  tier's scalar while `src/dsp/src/tiered/transform_tables.cpp` compiles, from doubles `tools/generators/gen_ac4_transform_tables.py`
+  tier's scalar while `libs/dsp/src/tiered/transform_tables.cpp` compiles, from doubles `tools/generators/gen_ac4_transform_tables.py`
   computes as the runtime code does (the same operations in the same order and the same C library's `cos`, `sin` and `sqrt`,
-  written as exact hexadecimal literals). `tests/dsp/tiered/test_transform_tables.cpp` holds every narrowed value to the
+  written as exact hexadecimal literals). `libs/dsp/tests/tiered/test_transform_tables.cpp` holds every narrowed value to the
   runtime computation's bits on the compiler that runs it. `double`, and every other length, builds its tables as before.
 - **A-SPX's high band assembled in place.** Pseudocode 106 reads each value of the high band only where it writes Y, so one
   buffer for an element's channels replaces the two each channel allocated.
@@ -2575,7 +2575,7 @@ probe, and the larger redesigns decided once the smaller ones had shown where th
   channel's matrix from a slot of Q_low_ext at or after it, and the next frame's history is Q_low_ext's last ten slots, so the
   matrix takes Q_low_ext's first 32 slots, and the history moves to the front when the next frame's `render()` begins, after
   every stage and every substream that mixes this one has read the matrix. The stages after A-SPX, and A-JOC's inputs in
-  `src/ac4/src/core`, take the matrices as spans (`QmfMatrix`).
+  `libs/ac4/src/core`, take the matrices as spans (`QmfMatrix`).
 
 **What each step bought**, the fixed tier's peak heap in bytes on the x86-64 host (GCC 14), each row with the ones above it:
 
@@ -2590,8 +2590,8 @@ probe, and the larger redesigns decided once the smaller ones had shown where th
 | the tracks freed | 328,009 | 468,270 | 820,375 | 984,704 | 1,723,427 | 370,291 |
 | the matrix in Q_low_ext | 295,225 | 435,486 | 722,007 | 886,336 | 1,526,819 | 337,507 |
 
-**Built in D14f.** `src/ac4/src/core`'s `dsp/transform_tables.{hpp,cpp}`, the generated `tables/transform_tables.hpp` and the
-generator; `Fft`, `Imdct` and `TransformSet` reading the tables; A-JOC's inputs as spans. In `src/ac4/src/decoder`, `pcm/aspx.cpp`,
+**Built in D14f.** `libs/ac4/src/core`'s `dsp/transform_tables.{hpp,cpp}`, the generated `tables/transform_tables.hpp` and the
+generator; `Fft`, `Imdct` and `TransformSet` reading the tables; A-JOC's inputs as spans. In `libs/ac4/src/decoder`, `pcm/aspx.cpp`,
 `pcm/stereo.{hpp,cpp}`, `pcm/acpl.{hpp,cpp}`, `pcm/substream_pcm.{hpp,cpp}` (`Channel::out()`, the shared transform buffer,
 the history's move, the tracks' release), `syntax/asf.{hpp,cpp}`, `decoder.cpp` and `QmfMatrix` through A-JCC, A-JOC, dialogue
 enhancement, DRC, the downmix and mixing. The probe's peak attribution (`apps/baremetal/ac4_probe.cpp`, `stage_timers.cpp`)
@@ -2630,8 +2630,8 @@ decode with the invariants holding and MediaInfo's and librempeg's readings reco
 
 **Status:** merged as #1011 on 2026-09-25. Exit met.
 
-- `src/ac4/src/encoder/`, with its CMake, tests, an instrumented fuzz target over its configuration and
-  input, the write trace, and `src/ac4/ERRATA.md`.
+- `libs/ac4/src/encoder/`, with its CMake, tests, an instrumented fuzz target over its configuration and
+  input, the write trace, and `libs/ac4/ERRATA.md`.
 - The frame writer: `ac4_toc()` at bitstream version 2 with one version 1 presentation, one
   substream group and the substream index table; the presentation substream with dialnorm; the audio
   substream's `metadata()`; the sync frame, with Annex G's CRC on request; and raw frames for MP4
@@ -2709,7 +2709,7 @@ pinned tolerance; log-spectral distance and ViSQOL pinned. The race at 2.0 and 4
   its matrices of three to five channels and the 3.0 element's pair come out 6 to 19 dB down, it
   refuses the 5/2/0 and 3/2/2 layouts, and it writes a 3/4/0 stream's L on every channel. DEE's
   muxer leaves 3/2/2's top front pair out of the `dac4` channel groups Part 2 Table A.27 and
-  Pseudocode E.3 both give it (`src/ac4/ERRATA.md`).
+  Pseudocode E.3 both give it (`libs/ac4/ERRATA.md`).
 - In the race, this encoder's SNR below the crossover trails DEE's by 7.3 to 11.6 dB at 192 kbps,
   where DEE keeps the bass clean and lets the band from 8 kHz go, with ViSQOL at or above DEE's
   there; above 288 kbps its SNR leads and its ViSQOL is up to 0.05 under DEE's on film. DEE splits a
@@ -2737,7 +2737,7 @@ and E2's checks; the race at 5.1 from 192 to 768 kbps.
   I-frames, no companding, and A-SPX
   from subband 32 to 23.25 kHz with a 12.75 kHz crossover in ASPX_ACPL_2, to 18.75 kHz from 12 kHz in
   ASPX_ACPL_3. The encoder writes that. Its ASPX_ACPL_3 gammas follow DEE's four relations, which
-  DEE's streams hold in all but 37 of 7,110 bands (`src/ac4/ERRATA.md`, "ASPX_ACPL_3's gammas").
+  DEE's streams hold in all but 37 of 7,110 bands (`libs/ac4/ERRATA.md`, "ASPX_ACPL_3's gammas").
 - Each band's parameters are estimated over 48 QMF slots centred on the frame's last, where smooth
   interpolation reaches them, from a DFT of each subband's slots, reading the bins of its own band. A
   subband's own band lies in half of its spectrum; its neighbours reach the other half through the
@@ -2759,7 +2759,7 @@ and E2's checks; the race at 5.1 from 192 to 768 kbps.
   ASPX_ACPL_1 0.04 over it at 64. librempeg refuses the ASPX_ACPL_1 streams, whose residuals and side send
   fewer bands than their bases, and reads D5's constructed ones, which send as many. The stereo form
   showed the decoder reading a side with fewer bands than its mid at the mid's offsets, fixed in D5
-  (`src/ac4/ERRATA.md`, "get_max_sfb() with b_dual_maxsfb").
+  (`libs/ac4/ERRATA.md`, "get_max_sfb() with b_dual_maxsfb").
 
 **Exit:** for each A-CPL parameter band and each reconstructed pair, the decoded level difference
 and correlation within the tolerance fixed at the first measurement; the waveform-coded channels
@@ -2815,7 +2815,7 @@ meet E1's and E2's checks; the race at 5.1 and 96, 128 and 144 kbps.
   lacks, except mono; 3.0 carries only a dialogue enhancement signal or the dialogue of a music and
   effects presentation; and CMAF's limits hold: 64 presentations at most, a `presentation_id` in
   every sample and one table of contents configuration throughout.
-- E6 found the text leaving a writer these choices (`src/ac4/ERRATA.md`, "Presentations"): the
+- E6 found the text leaving a writer these choices (`libs/ac4/ERRATA.md`, "Presentations"): the
   tracks `md_compat` counts, every channel but the LFE of every substream a presentation names, the
   dialogue enhancement substream's included, which DEE's levels agree with (0 in stereo, 1 in 5.1, 2
   in 5.1.4, and `presentation_id` 0 on their one presentation, which E1 to E5 left out); a name sent
@@ -2880,7 +2880,7 @@ languages and levels as configured.
   of more than one presentation and does not finish one of an alternative presentation, so the box
   is held to the text and to MediaInfo's trace, and to the muxer's box byte for byte for Chromium's
   A-JOC stream and DASH-IF's 5.1 test vectors. MediaInfo reads `n_targets` as `n_targets_minus1`.
-  `src/ac4/ERRATA.md` records the readings, among them where Pseudocode E.3 leaves channel groups
+  `libs/ac4/ERRATA.md` records the readings, among them where Pseudocode E.3 leaves channel groups
   out and when `b_presentation_core_differs` is set.
 - A configuration 6 presentation has no field for the `presentation_id` Annex H.1.2.1 asks of every
   presentation of a CMAF track. `ac4::cmaf_refusal()` names the rule a table of contents breaks, and
@@ -2972,14 +2972,14 @@ properties over time (`ObjectsConfig`, and `encode()` taking `ObjectMetadataUpda
 computed downmix of one to eleven signals in a `var_channel_element()`, each the sum of a run of the
 objects in azimuth order and sent for core decoding at its group's centre, or a static 5.0 or 5.1 bed
 the objects are panned onto, coded in SIMPLE or ASPX; the dry matrices chosen frame by frame by running
-`src/ac4/src/core`'s reconstruction on candidate fits and keeping the one that comes closest to the objects,
+`libs/ac4/src/core`'s reconstruction on candidate fits and keeping the one that comes closest to the objects,
 the decorrelators' wet matrices as an option; bed objects listed in the upmix; and the metadata's blocks
 at the 32-sample step of each update, landing where its input sample comes out. Or direct-coded, the
 dynamic objects in mono, stereo, 3.0 and 5.0 elements with the LFE's `mono_data(1)` before the first,
 and the group's OAMD substream. One presentation of the substream alone, at md_compat 3 for A-JOC and by
 its tracks direct-coded, through E6's presentation machinery. Decoded in full, each object of the
 committed cases comes back at 40 to 75 dB SNR against its source, the tones each in a parameter band of
-their own (pinned in `tests/ac4/encoder/test_objects.cpp`), and core decoding gives the downmix at its
+their own (pinned in `libs/ac4/tests/encoder/test_objects.cpp`), and core decoding gives the downmix at its
 metadata; the encoder's trace, the decoder's and the Python parser's agree on the committed streams
 (`tests/golden/ac4/objects/encoder-*.ac4`) and on the encoder-space harness's object draws.
 `ac3cli ac4-encode objects=` takes a scene file of the library's terms for the harness and the listening
@@ -2997,7 +2997,7 @@ the intermediate spatial format are refused.
 - E8's race left the shared A-SPX encoder 0.03 to 0.18 under DEE's ViSQOL on 5.1.4's sweeps from 256 to
   512 kbps, the band above the crossover emptier than DEE's. Which layouts and rates show it, the two
   streams' A-SPX side information and decoded band compared frame by frame, and the fix in
-  `src/ac4/src/encoder`'s A-SPX analysis.
+  `libs/ac4/src/encoder`'s A-SPX analysis.
 
 **Exit:** on the sweep legs ViSQOL within 0.035 of DEE's or over it at every layout and rate where the
 gap was measured, and no other pinned leg regressing beyond its own tolerance; a synthetic sweep through
@@ -3042,7 +3042,7 @@ sends the floor at which (share + Q) / (1 + Q) reaches three quarters, when it i
 the tonality rule chose: `qscf_noise` 4 for an empty patch. Music, film, speech, noise, transients and
 tones at 2.0 from 48 to 144 kbps, 5.1 from 96 to 320 and 5.1.4 from 192 to 512 encode to the same bytes
 as before (91 streams); only the sweeps change, and the SIMPLE and SCPL rates have no A-SPX. The test
-(`tests/ac4/encoder/test_encoder.cpp`) encodes a sweep from 11 to 21 kHz in one channel of a stereo and
+(`libs/ac4/tests/encoder/test_encoder.cpp`) encodes a sweep from 11 to 21 kHz in one channel of a stereo and
 a 5.1.4 stream and holds the energy of each band from 16.5 to 20.5 kHz to 6 dB of the source's: before,
 seven of the eight came back 8 to 13 dB under it, and after all eight 2 to 4 dB under. Against DEE's
 streams ViSQOL is now over DEE's on every sweep leg: 0.15 to 0.28 at 2.0, 0.05 to 0.48 at 5.1 and 0.13 to
@@ -3052,7 +3052,7 @@ raises by 0.2 to 0.9 dB on sweeps, to 0.55, 0.79 and 1.14 dB over DEE's at 2.0 a
 and 0.55 to 2.7 dB under it everywhere else. The pins moved for that reason alone: the 5.1.4 sweeps' LSD
 ceilings up 0.4 to 0.7 dB, their ViSQOL floors up 0.17 to 0.63, their tile ceilings down by 7 to 19 dB, and
 their SNR floors unchanged but for 0.1 dB in a channel or two at 256 to 320 kbps; the 2.0 and 5.1 sweeps
-and the three A-CPL ones are pinned for the first time. `src/ac4/ERRATA.md` records the reading. Not
+and the three A-CPL ones are pinned for the first time. `libs/ac4/ERRATA.md` records the reading. Not
 done: `choose_sinusoids` holds a group's tone to twice the group's mean energy, which no group of two
 subbands can show, so sinusoids reach only the three-subband groups above 16.5 kHz and the single
 subbands; changing it would change music's streams, and E10 leaves it.
@@ -3085,12 +3085,12 @@ against a real device (the software-ALSA tests run on Linux CI).
 - `spdif` and `unspdif` for AC-4, from D11; `record` and `live` encode AC-4 with `codec=ac4`.
 - `ac3::plan::Codec` gains AC-4, and every helper that decides by codec becomes a switch that
   refuses a codec it does not know: they were two-way ternaries, under which a third codec read as
-  E-AC-3 (`src/ac3/include/iclforge/ac3/encoder/plan.hpp`). The help topics' bitmask, which was full
+  E-AC-3 (`libs/ac3/include/iclforge/ac3/encoder/plan.hpp`). The help topics' bitmask, which was full
   (`apps/cli/usage.hpp`), is widened.
 
 - Built: `transcode` decodes an AC-4 presentation as coded, since 5.7.9.4 asks a transcoder for no
   DRC, and hands the AC-3 or E-AC-3 encoder the profile the stream names; 5.7.9.4 calls the field
-  `drc_eac3_transcode_curve`, which Part 1 does not have, and `src/ac4/ERRATA.md` reads it as
+  `drc_eac3_transcode_curve`, which Part 1 does not have, and `libs/ac4/ERRATA.md` reads it as
   `drc_eac3_profile`. The downmix values map by linear coefficient, AC-4's half-dB LFE steps going
   half a dB up to E-AC-3's whole dB and back down the other way, so the two directions undo each
   other; a 7.X presentation keeps its pair in E-AC-3 at Table E2.5's locations and folds for AC-3
@@ -3104,7 +3104,7 @@ against a real device (the software-ALSA tests run on Linux CI).
   has an ID and a mapping. `record` no longer writes the frames of its bitstream check after the
   rest of the take. `play` decodes AC-4 to PCM, since no receiver found takes it over IEC 61937, and
   `live` sends a receiver the 5.1 AC-3 leg. `fmp4`'s CMAF track takes the readings
-  `src/ac4/ERRATA.md` records under "Manifests and CMAF tracks".
+  `libs/ac4/ERRATA.md` records under "Manifests and CMAF tracks".
 
 **Exit:** every new option has a test; the codec matrix covers every AC-4 command, as
 `tools/checks/check_matrix_coverage.py` requires; the man page and completions list them.
@@ -3211,7 +3211,7 @@ Android NDK build were not built on the machine that made it, and are checked by
   the existing opaque-handle and `_config_init()` conventions, two new status ranges
   (`AC3FORGE_ERROR_AC4_DECODE_*` at 60–64, `AC3FORGE_ERROR_AC4_ENCODE_*` at 80–81) behind a new
   `AC3FORGE_HAS_AC4` compile-time guard (`ac3forge_c/version.h`, `#cmakedefine`'d from
-  `AC3FORGE_BUILD_AC4`); `src/capi/CMakeLists.txt`'s
+  `AC3FORGE_BUILD_AC4`); `libs/capi/CMakeLists.txt`'s
   `forge_c_objects`/`forge_c_static`/`forge_c_shared` targets now embed `ac4::decoder_static`/
   `ac4::encoder_static` the same way they already embedded `ac3::forge_static`, gated on the same
   option, so a package built with both the `capi` and `ac4` features/options carries the AC-4 C API
@@ -3254,7 +3254,7 @@ Android NDK build were not built on the machine that made it, and are checked by
   A-JOC and direct-coded objects reached the bindings in I4b).
 
 **Exit:** each binding's tests decode a committed stream and encode one that the decoder reads back;
-the package checks pass. Met: the C API's `tests/capi/test_capi.cpp` adds 8 Catch2 test cases (600
+the package checks pass. Met: the C API's `libs/capi/tests/test_capi.cpp` adds 8 Catch2 test cases (600
 assertions, MSVC-built and passing); Rust's `tests/ac4_roundtrip.rs` adds 6 integration tests,
 passing alongside the crate's full existing suite with no regressions, `clippy -D warnings` clean;
 Python's `test_ac4_roundtrip.py` adds 6 round-trip tests, passing alongside the full 115-test
@@ -3336,7 +3336,7 @@ metadata, so the decoder reports it with gain -infinity and priority 0. E9's `ob
 wrote the screen factor and the depth exponent as one group of fields whose factor has no code for
 0, so an object with a depth exponent other than 1 and a screen factor of 0 decoded with a factor of
 1/8; the tests gave such an object a factor, and the encoder now refuses it, naming the reason
-(`src/ac4/ERRATA.md`, "The screen factor and the depth exponent"). Python binds the C++
+(`libs/ac4/ERRATA.md`, "The screen factor and the depth exponent"). Python binds the C++
 structs, so its streams are the C++ encoder's by construction: its test holds two ways of
 configuring the same scene to the same bytes, and the decoder's read-back holds each field. A C
 caller can store any int in an enumeration-typed field, and reading a value the enumeration does not
@@ -3344,8 +3344,8 @@ name is undefined in C++ (Clang's `-fsanitize=enum` reports it), so the checks o
 the downmix, a bed object's channel and the seven-channel pair read the field's bytes
 (`stored_value()` in `internal_ac4.hpp`), and the tests that hand them such values write the bytes.
 The AC-4 entry points' argument and error arms, and the accessors the round trips do not reach, are
-held by `tests/capi/test_capi_ac4_arguments.cpp` against the C++ decoder and encoder they wrap.
-`src/capi`'s branch coverage is 81.1% with them, against a floor of 74% that main's 71.1% had missed.
+held by `libs/capi/tests/test_capi_ac4_arguments.cpp` against the C++ decoder and encoder they wrap.
+`libs/capi`'s branch coverage is 81.1% with them, against a floor of 74% that main's 71.1% had missed.
 
 **Exit:** in each of the C API, Rust, Python and JavaScript, a test encodes a small object scene,
 A-JOC and direct-coded, that the same binding's decoder reads back with the objects' positions and
@@ -3690,8 +3690,8 @@ for the old names and the stale phrases; `mkdocs build --strict` and
   `ac3forge`, is replaced by a port `iclforge` (the winget submission was closed unmerged).
 - N1B is layout and naming only: no algorithm changes and every output byte stays the same. It covers
   where the code sits, the C++ namespaces, the header roots and the CMake target names. The duplicated
-  DSP (FFT, MDCT, QMF and resampler in `src/ac3` and `src/ac4/src/core`) is a later phase.
-- The study recommends renaming `src/ac3` to `ac3`, beside the AC-4 libraries, with five
+  DSP (FFT, MDCT, QMF and resampler in `libs/ac3` and `libs/ac4/src/core`) is a later phase.
+- The study recommends renaming `libs/ac3` to `ac3`, beside the AC-4 libraries, with five
   codec-blind libraries cut out of it, in stages S0 to S6 with N1A in the same freeze. The user has not
   yet answered its 14 decisions ([its section (i)](layout.md#i-decisions)): the layout, the
   namespace root, grouping, the order with N1A, the merge method, the repository and Pages names,
@@ -3957,11 +3957,11 @@ stand. Each lists its options, the recommendation, what each costs, and what was
     **Taken: (a)**, in the user's answer of 2026-09-24.
 
 15. **Where the encoder lives, and what the two directions share.**
-    - (a) **`src/ac4/src/encoder` beside the decoder, and a shared core, `src/ac4/src/core`**: the tables, bit
+    - (a) **`libs/ac4/src/encoder` beside the decoder, and a shared core, `libs/ac4/src/core`**: the tables, bit
       reading and writing, the transforms, the QMF bank, the reconstruction kernels and the
       converters, in a static library both link privately
       ([Where the libraries live](#where-the-libraries-live)).
-    - (b) The encoder links the decoder, and the shared code stays in `src/ac4/src/decoder`.
+    - (b) The encoder links the decoder, and the shared code stays in `libs/ac4/src/decoder`.
     - (c) One AC-4 library holding both directions, as `ac3::forge` holds AC-3's and E-AC-3's.
 
     **Recommend (a).** Each direction links what it runs, the syntax stays two separate
@@ -3973,7 +3973,7 @@ stand. Each lists its options, the recommendation, what each costs, and what was
 
     **Taken: (a)**, as recommended; the user raised no objection. As built, D2 moved the generated
     tables into the core and the transforms were written there; the bit reader and the Huffman
-    decoder stayed in `src/ac4/src/decoder`, and the encoder has a bit writer of its own in `src/ac4/src/encoder`.
+    decoder stayed in `libs/ac4/src/decoder`, and the encoder has a bit writer of its own in `libs/ac4/src/encoder`.
 
 16. **What the encoder writes by default.**
     - (a) **The syntax DEE's streams exercise**, and everything else behind options named
@@ -4088,7 +4088,7 @@ stand. Each lists its options, the recommendation, what each costs, and what was
 |---|---|---|---|
 | 13 | The validation oracles | librempeg, FFmpeg for framing, MediaInfo, DEE; a device if one is at hand | **librempeg, FFmpeg for framing, MediaInfo, DEE** |
 | 14 | The encoder's scope and the order | Everything, in pairs | **Everything, in pairs** |
-| 15 | Where the encoder lives | `src/ac4/src/encoder` and a shared core | **`src/ac4/src/encoder` and a shared core** |
+| 15 | Where the encoder lives | `libs/ac4/src/encoder` and a shared core | **`libs/ac4/src/encoder` and a shared core** |
 | 16 | What the encoder writes by default | DEE's set; the rest experimental | **DEE's set; the rest experimental** |
 | 17 | The psychoacoustic model | The encoder's own | **The encoder's own** |
 | 18 | Dialogue enhancement parameters | From a stem or marked channels | **From a stem or marked channels** |
@@ -4180,8 +4180,8 @@ words, asked for 25 in their own words, and took the recommendations for the res
 
 31. **Sharing `ac3::forge`'s arithmetic.**
     - (a) **A header-only target** holding `Fixed32`, the vector types and the `float` functions,
-      used by `ac3::forge` and `src/ac4/src/core`.
-    - (b) Copies in `src/ac4/src/core`.
+      used by `ac3::forge` and `libs/ac4/src/core`.
+    - (b) Copies in `libs/ac4/src/core`.
     - (c) `ac3::forge`'s private headers included by path.
 
     **Recommend (a):** decision 7 kept the DSP kernels apart, not the types, and a copied `Fixed32`
@@ -4371,15 +4371,15 @@ outright, with no compatibility shim.
   from D11; the renderer that D10 and I5 hand objects to is the one Hearth's phase A1 moved into
   `ac3::forge`.
 - Files several phases edit, where merges conflict first: the root `CMakeLists.txt`,
-  `tests/CMakeLists.txt`, `fuzz/CMakeLists.txt`, `cmake/InstallLibrary.cmake`,
+  `tests/CMakeLists.txt`, `cmake/IclforgeFuzz.cmake`, `cmake/InstallLibrary.cmake`,
   `tools/ci/classify_changes.py`, `CHANGELOG.md`, `docs/verification.md`,
   `tools/checks/check_doc_paths.py`, `tools/ci/run_codec_matrix.sh`, `.github/workflows/_ci-core.yml`
   (FFmpeg Validate), `apps/cli/main.cpp`'s command table, `ac3::plan::Codec`,
-  `docs/assets/data/support-catalogue.json`, `src/capi/`, `python/`, `rust/` and `apps/wasm/`.
-- `tools/ci/classify_changes.py` has no lane of its own for AC-4 (`src/ac4*` is in the core lane),
+  `docs/assets/data/support-catalogue.json`, `libs/capi/`, `python/`, `rust/` and `apps/wasm/`.
+- `tools/ci/classify_changes.py` has no lane of its own for AC-4 (`libs/ac4*` is in the core lane),
   and `tools/generators/` and `tools/references/` match no lane, so every lane runs when they
-  change. No phase gave AC-4 a lane. The ESP32 lane lights after a merge for `src/ac3/`,
-  `src/base/` and `cmake/` (#1131) and leaves the AC-4 trees, which the component's pack stages
+  change. No phase gave AC-4 a lane. The ESP32 lane lights after a merge for `libs/ac3/`,
+  `libs/base/` and `cmake/` (#1131) and leaves the AC-4 trees, which the component's pack stages
   only for `--with-ac4`, to the nightly run.
 - librempeg's binary is named `ffmpeg`; nothing puts it on `PATH` ([The oracles](#the-oracles)).
 - D11's change sits in `ac3::iec61937`, inside `ac3::forge`, beside the passthrough work of

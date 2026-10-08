@@ -65,7 +65,7 @@ const AudioBackend& audio_backend() {
         };
         // Keeps audio_backend().process_loopback and
         // process_loopback_available() saying the same thing, which the
-        // backend contract test (tests/audio/test_audio_backend.cpp) requires
+        // backend contract test (libs/audio/tests/test_audio_backend.cpp) requires
         // of every platform.
         if (!process_loopback_available()) {
             backend.process_loopback = {.available = false,

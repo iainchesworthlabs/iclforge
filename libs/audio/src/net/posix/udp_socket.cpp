@@ -3,7 +3,7 @@
 // Berkeley sockets - Linux, macOS and Android all implement this identically
 // (Android's bionic libc included), which is exactly why this file exists on
 // its own small axis rather than as a fifth file repeated across
-// src/audio/src/backend/{alsa,pipewire,macos,android,posix}/ - see
+// libs/audio/src/backend/{alsa,pipewire,macos,android,posix}/ - see
 // udp_socket.hpp's own header comment.
 
 #include <arpa/inet.h>

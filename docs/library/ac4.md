@@ -126,7 +126,7 @@ the element as full decoding only (Table 8). So the decoder delivers 22.2 as cod
 `downmix` but `kAsCoded` and `decoding = kCore` with `kUnsupported` and a reason that names 22.2, and
 dialogue enhancement acts on L, R and C. DRC groups the channels by Part 2 Table 69. No stream of this
 element and no other decoder is available to check it against; the readings are in
-`src/ac4/ERRATA.md` under "The 22.2 element", and the streams its tests decode are built from the
+`libs/ac4/ERRATA.md` under "The 22.2 element", and the streams its tests decode are built from the
 standard's tables ([Validation](../verification.md#the-decoders-222-element)).
 
 ### 9.X.4 channel elements
@@ -145,7 +145,7 @@ never a target. Dialogue enhancement acts on Lscr, Rscr and C in full decoding (
 the A-JCC and A-CPL modes in core decoding, by the extension tools of clauses 5.8.2.1 and 5.8.2.2;
 `b_de_simulcast` selects the second `de_data()` for core decoding. DRC groups Lscr and Rscr with L and
 R (Table 69). No stream of these modes and no other decoder is available to check them against; the
-readings are in `src/ac4/ERRATA.md` under "The 9.X.4 element", and the streams their tests decode
+readings are in `libs/ac4/ERRATA.md` under "The 9.X.4 element", and the streams their tests decode
 are built from the standard's tables.
 
 `DecoderConfig` holds the rest: `output`, `presentation` (below), `concealment`, `level` (the
@@ -185,9 +185,9 @@ for a gain, and the compression of DRC (`DrcMode::kOff` keeps the output level).
 with no extension substream linked is refused too: the text does not say what rate it is at.
 
 No stream at these rates was available, and no other decoder: the tests decode streams built from the
-text (`tests/golden/ac4-hsf/` and `tests/ac4/decoder/hsf.hpp`), each channel a tone above 24 kHz where the
+text (`tests/golden/ac4-hsf/` and `libs/ac4/tests/decoder/hsf.hpp`), each channel a tone above 24 kHz where the
 base rate has none, and hold the output to its frequency, level and waveform. The readings the text left open
-are in `src/ac4/ERRATA.md` under "96 and 192 kHz".
+are in `libs/ac4/ERRATA.md` under "96 and 192 kHz".
 
 ## Choosing a presentation
 
@@ -209,7 +209,7 @@ needs no I-frame; its signal starts from silence.
 Of the presentations this decoder can decode, the stream has not disabled and whose `md_compat` is
 within the decoder's level, the one that meets the choice is decoded, the first in the table of
 contents among equals. `iclforge::ac4::select_presentation(toc, choice, level)` makes the same choice from a
-table of contents alone. Where the text leaves the choice open, `src/ac4/ERRATA.md` records the
+table of contents alone. Where the text leaves the choice open, `libs/ac4/ERRATA.md` records the
 reading taken. `forge decode` takes the choice as `presentation=` (the position),
 `presentation-id=`, `language=`, `associated=` and `headphones`.
 
@@ -358,7 +358,7 @@ config.presentations = {
 presentation gets the least `md_compat` its tracks need and a `presentation_id` of its own unless it
 sets them, and its own dialnorm, loudness, DRC and downmix where it sets them. The substreams take
 shares of the rate in proportion to their full-band channels unless they set their own. What the
-encoder refuses there, and why, is in the header and `src/ac4/ERRATA.md`.
+encoder refuses there, and why, is in the header and `libs/ac4/ERRATA.md`.
 
 ### Encoding objects
 
@@ -450,7 +450,7 @@ probe:
   G.1, or the Dolby 2015 scheme's word); and `iclforge::ac4::dash_supplemental_properties(toc)` the frame
   rate and a pre-virtualized presentation's descriptors (G.3). `iclforge::ac4::configuration_difference(a,
   b)` names the Annex H.1.2.4 parameter in which two tables of contents differ, empty where every
-  sample of a CMAF track may carry both. `src/ac4/ERRATA.md` ("Manifests and CMAF tracks") has
+  sample of a CMAF track may carry both. `libs/ac4/ERRATA.md` ("Manifests and CMAF tracks") has
   the readings these take.
 
 ## Errors

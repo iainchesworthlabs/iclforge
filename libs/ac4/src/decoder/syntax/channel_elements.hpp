@@ -159,7 +159,7 @@ struct ChannelElementState {
 [[nodiscard]] std::optional<int> objs_to_channel_mode(int n_objects) noexcept;
 
 // Part 2 clause 6.2.3.2 audio_data_objs(n_objects, b_lfe, b_iframe), with
-// `n_objects` the substream's fullband objects (src/ac4/ERRATA.md,
+// `n_objects` the substream's fullband objects (libs/ac4/ERRATA.md,
 // "n_objects_code and the LFE"). A count objs_to_channel_mode() has no mode
 // for fails as invalid.
 [[nodiscard]] ParseResult parse_audio_data_objs(BitReader& r, const SubstreamContext& ctx,

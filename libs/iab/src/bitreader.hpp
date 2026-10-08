@@ -8,7 +8,7 @@
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/iab/ac3iab.hpp"
 
-// IAB's reader of one element's payload, over iclforge::BitReader (src/base): what it adds is
+// IAB's reader of one element's payload, over iclforge::BitReader (libs/base): what it adds is
 // this format's refusals as std::expected and Plex(n). It is the bit reader scoped to one
 // element's payload span, matching §5.1's bit-
 // order rule ("bitstream data fields... shall be encoded... most-significant-bit-first...

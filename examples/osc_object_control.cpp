@@ -1,6 +1,6 @@
 // The OSC wire form of a live scene update, with no socket in sight.
 //
-// iclforge::audio::LivePositionSource (src/audio, not part of this distributed
+// iclforge::audio::LivePositionSource (libs/audio, not part of this distributed
 // library - see docs/library/index.md) owns the actual UDP listener behind
 // `forge live mode=atmos positions=osc:<port>` and the GUI's live room.
 // Everything it does with a datagram once it has one, though, is these three

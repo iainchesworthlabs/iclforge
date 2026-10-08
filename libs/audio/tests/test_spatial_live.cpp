@@ -9,7 +9,7 @@
 #include "iclforge/audio/spatial.hpp"
 
 // SpatialObjectSink against a real spatial-capable output
-// (src/audio/src/backend/*/spatial.cpp).
+// (libs/audio/src/backend/*/spatial.cpp).
 //
 // Hidden: the tag starts with a dot, so `iclforge-tests` does not run this. Real
 // device loss can't be simulated - it needs an endpoint with a spatial sound

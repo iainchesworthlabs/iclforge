@@ -37,7 +37,7 @@
 //                               Rscr).
 //
 // The core (acpl/acpl.hpp) holds the decorrelators, the transient ducker and
-// interpolation. src/ac4/ERRATA.md records the readings taken, under
+// interpolation. libs/ac4/ERRATA.md records the readings taken, under
 // "A-CPL".
 
 namespace iclforge::ac4::detail {

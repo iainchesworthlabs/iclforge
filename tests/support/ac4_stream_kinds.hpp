@@ -1,7 +1,7 @@
 #pragma once
 
 // Which committed AC-4 streams a heavy test plays under the sanitizers
-// (tests/sanitized.hpp), and how much of each. A normal build plays every
+// (tests/support/sanitized.hpp), and how much of each. A normal build plays every
 // stream to its end. Under the sanitizers a test plays one stream of each kind,
 // and of a long stream its first kSanitizedFrames frames. A kind is a frame
 // rate, the channels and substream roles of the presentation decode() plays,
@@ -10,7 +10,7 @@
 // still played.
 //
 // The tests that play the committed streams share it:
-// tests/ac4/decoder/test_api.cpp and tests/hearth/test_ac4_engine.cpp.
+// libs/ac4/tests/decoder/test_api.cpp and tests/hearth/test_ac4_engine.cpp.
 
 #include <algorithm>
 #include <cstddef>

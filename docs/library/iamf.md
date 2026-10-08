@@ -80,7 +80,7 @@ one-directional, and this is what it looks like.
 ## What gets written
 
 Every OBU and box field is transcribed from the published IAMF v2.0.0 specification (the structure is
-named at each call site in `src/containers/src/iamf/`), per this project's clean-room rule — `libiamf`, FFmpeg and
+named at each call site in `libs/containers/src/iamf/`), per this project's clean-room rule — `libiamf`, FFmpeg and
 AOM's Open Audio Renderer are oracles used to validate the output, never sources this code was
 transcribed from.
 
@@ -160,7 +160,7 @@ decodes the first substream to the input samples within 24-bit rounding, honouri
 48,000 samples after a 1,500 and 100 sample trim). FFmpeg 7.0.2 reads IAMF v1.0.0; it has no
 object-based elements, so the v2.0 additions (object elements, position and momentary loudness
 parameters, the Mix Presentation's rendering config extension, `is_not_key_frame`) have no external
-oracle here. They are covered by the tests in `tests/containers/iamf/`, which assemble OBU bytes by hand from the
+oracle here. They are covered by the tests in `libs/containers/tests/iamf/`, which assemble OBU bytes by hand from the
 syntax (the position fields' bit packing, trimming headers, delimiters) and round-trip a Sequence that
 uses every structure.
 

@@ -52,7 +52,7 @@ namespace m = ss::messages;
 
 constexpr std::uint32_t kSampleRate = 48000;
 // The one port, which a build without the player cannot name through
-// src/sendspin.
+// libs/sendspin.
 static_assert(kSendspinPort == ss::transport::websocket::kClientPort, "a player listens on Sendspin's client port");
 // From Kconfig (main/Kconfig.projbuild), as plain constants.
 constexpr std::size_t kRingBytes = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_RING_BYTES;

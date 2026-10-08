@@ -16,15 +16,15 @@
 // file), fragment.cpp (fragment(), the CMAF path) and reader.cpp (demux()
 // and Reader, which walk back in what the other two lay out): the low-level
 // box/FullBox primitives in both directions (the writing ones the
-// containers' own, src/containers/src/isobmff_writer.hpp), and every box builder whose
+// containers' own, libs/containers/src/isobmff_writer.hpp), and every box builder whose
 // shape does not differ between the two writers (ftyp/styp's shared format, mvhd/tkhd/mdhd/
 // hdlr/smhd/dinf, the 'ac-3'/'ec-3' sample entry + stsd, and the sample
 // tables stts/stsc/stsz/stco - a fragmented track's init segment writes
 // those last four EMPTY, but empty is just what these already do when
 // called with a zero count / empty span, so no separate "empty" variant is
-// needed). Internal to src/containers/src/mp4/ on purpose - this is plumbing between
+// needed). Internal to libs/containers/src/mp4/ on purpose - this is plumbing between
 // translation units of the same library, not public API; see
-// src/ac3/src/encoder/snr_search.hpp for the identical pattern elsewhere in
+// libs/ac3/src/encoder/snr_search.hpp for the identical pattern elsewhere in
 // this codebase.
 //
 // Every free function here is `inline`: this header is included by more

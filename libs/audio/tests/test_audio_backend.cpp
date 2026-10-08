@@ -13,7 +13,7 @@
 
 // The backend tree, tested from outside it.
 //
-// One directory of src/audio/src/backend/ is compiled into the library and the
+// One directory of libs/audio/src/backend/ is compiled into the library and the
 // others are not, so this file cannot name a backend - and does not want to.
 // What it checks is the contract every backend has to keep, which is that
 // iclforge::audio::audio_backend() and the implementations beside it agree:
@@ -199,7 +199,7 @@ TEST_CASE("process loopback refusals agree with the reported capability",
         // third reason: Core Audio's process tap exists on every CI runner's
         // OS, but the path is not entered by default since the first machine
         // to run it hung inside AudioDeviceCreateIOProcID
-        // (src/audio/src/backend/macos/coreaudio_names.hpp). Any of the three
+        // (libs/audio/src/backend/macos/coreaudio_names.hpp). Any of the three
         // errors says which of them is missing.
         CHECK((result.error() == CaptureError::kNoBackend ||
                result.error() == CaptureError::kProcessLoopbackUnavailable));

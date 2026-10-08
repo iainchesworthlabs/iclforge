@@ -7971,7 +7971,7 @@ void EncoderController::encodeObjects(const QString& path,
             // The placement is the object's position at the END of the
             // frame - same convention forge's 'atmos' uses, because that is
             // where OAMD's ramp and the JOC matrix both finish. Re-evaluated
-            // every frame - see tests/ac3/oba/test_atmos_motion.cpp; this must stay
+            // every frame - see libs/ac3/tests/oba/test_atmos_motion.cpp; this must stay
             // inside the loop, not be hoisted above it.
             const double t = static_cast<double>(start + iclforge::ac3::kSamplesPerFrame) /
                              static_cast<double>(sample_rate);

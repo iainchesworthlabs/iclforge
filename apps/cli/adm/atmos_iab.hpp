@@ -18,7 +18,7 @@
 // reasoning (tools/checks/check_platform_macros.ps1's own #ifdef ban is what rules out the obvious
 // alternative). 'atmos-iab' needs iclforge::adm specifically (its own IAB mapping, gated by
 // ICLFORGE_BUILD_ADM the same as everything else in that module - see
-// src/adm/CMakeLists.txt's own header comment) - NOT ICLFORGE_BUILD_IAB alone, which
+// libs/adm/CMakeLists.txt's own header comment) - NOT ICLFORGE_BUILD_IAB alone, which
 // defaults ON and is not the gating question here: iclforge::iab by itself has nothing that can
 // drive AtmosEncoder, only iclforge::adm's build_iab() does that, and that function only
 // exists when ICLFORGE_BUILD_ADM turned iclforge::adm on. So this command reuses

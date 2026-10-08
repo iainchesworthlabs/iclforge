@@ -22,7 +22,7 @@
 // front of it is still unobserved.
 //
 // Objective-C++ because it has to be. NSWorkspace is an AppKit class with no C
-// entry point, which is the same wall src/audio/src/backend/macos/capture.cpp
+// entry point, which is the same wall libs/audio/src/backend/macos/capture.cpp
 // records for CATapDescription; this is the first .mm in the tree and
 // apps/crucible/CMakeLists.txt's APPLE arm is where OBJCXX is turned on. The
 // file's path is what says "macOS" - there is no #ifdef here, and

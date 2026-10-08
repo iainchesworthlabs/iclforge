@@ -17,7 +17,7 @@ it, so everything here requires upstream Clang - specifically the
 `linux-llvm` / `macos-llvm` toolchain this project already has presets for
 (`windows-llvm` is clang-cl, whose libFuzzer support on Windows this project
 has never exercised, so it is deliberately out of scope; see
-`fuzz/CMakeLists.txt`'s `CMAKE_CXX_COMPILER_FRONTEND_VARIANT` guard).
+`cmake/IclforgeFuzz.cmake`'s `CMAKE_CXX_COMPILER_FRONTEND_VARIANT` guard).
 
 `.github/toolchain/03-llvm-toolchain.sh` installs `libclang-rt-<ver>-dev` (the
 ASan/UBSan/libFuzzer runtime archives) and `llvm-<ver>` (`llvm-symbolizer`, which
@@ -25,7 +25,7 @@ turns a sanitizer report's addresses into file and line) with the Clang compiler
 itself, for every Linux LLVM leg: the sanitizer legs need them too, so the script
 does not fork the install. `fuzz.yml` needs no separate step for it; a local
 Debian/Ubuntu run needs `apt-get install libclang-rt-22-dev` (or your distro's
-equivalent) before `fuzz/run.sh` will link.
+equivalent) before `tools/fuzz/run.sh` will link.
 
 ## `-Werror` is on for this build too
 
@@ -207,14 +207,14 @@ sets per-exec cost here, so that is the likely reason rather than anything
 about the repair itself. Recorded as observed; the coverage columns are the
 result this change is claiming.
 The mutator's re-stamping half also has its own portable unit test
-(`tests/ac3/core/test_crc_mutator.cpp`), so a crc1 solved wrongly would fail the
+(`libs/ac3/tests/core/test_crc_mutator.cpp`), so a crc1 solved wrongly would fail the
 ordinary test suite on every platform rather than only showing up as a
 coverage number that quietly stopped improving.
 
 ## Status: the IAB and AC-4 harnesses, instrumented
 
 `fuzz_iab_parse` and `fuzz_ac4_parse` were added without their libraries in
-`fuzz/CMakeLists.txt`'s instrumented set: `iclforge_iab_objects` and `iclforge_ac4_objects`
+`cmake/IclforgeFuzz.cmake`'s instrumented set: `iclforge_iab_objects` and `iclforge_ac4_objects`
 compiled with no ASan, UBSan or coverage flags. The harness executable still
 carried the sanitizer runtime, so a segfault, a timeout or an oversized
 allocation stopped a run, but nothing the parser did within its own memory was
@@ -224,7 +224,7 @@ them in `fuzz_ac4_parse`, 183 in `fuzz_iab_parse`.
 The opt-in `fuzz_adm_parse` had the same gap; it is covered in its own section
 below, since closing it needed a change to a dependency first.
 
-Measured on WSL2 Ubuntu 26.04, Clang 22.1.2, through `fuzz/run.sh`, 300 s per
+Measured on WSL2 Ubuntu 26.04, Clang 22.1.2, through `tools/fuzz/run.sh`, 300 s per
 harness from an empty grown corpus, both builds running at once. "Before" is
 `main` without the instrumentation; "after" is instrumented, with the fixes
 below. The replay column feeds each grown corpus, plus the committed seeds and
@@ -245,24 +245,24 @@ count.
 
 ### What instrumenting them found
 
-Each is fixed, with a test in `tests/ac4/` or `tests/iab/` that fails on the
+Each is fixed, with a test in `tests/ac4/` or `libs/iab/tests/` that fails on the
 old code under ASan+UBSan:
 
 - **Before any mutation**, replaying the committed AC-4 corpus: a
   stack-buffer-overflow. `n_objects_code` and both `isf_config` fields are 3
   bits wide and indexed six-entry count tables, so codes 6 and 7 read past
-  them. The input was `fuzz/regressions/fuzz_ac4_parse/ac4-substream-size-not-transmitted`,
+  them. The input was `libs/ac4/fuzz/regressions/fuzz_ac4_parse/ac4-substream-size-not-transmitted`,
   committed for an earlier fix; the uninstrumented runs read whatever followed
   the table and carried on.
 - **After 8,606 executions**, a UBSan signed overflow:
   `presentation_config_ext_info()` computed its skip as `8 * n_skip_bytes` in
   `int`, with `n_skip_bytes` escaping through `variable_bits()` to 2^32
-  (`fuzz/regressions/fuzz_ac4_parse/ac4-presentation-config-ext-skip-overflow`).
+  (`libs/ac4/fuzz/regressions/fuzz_ac4_parse/ac4-presentation-config-ext-skip-overflow`).
 - **After 1.67 million executions**, a timeout in `fuzz_iab_parse`:
   `parse_mxf_iab`'s KLV walk bounded a Value with `value_offset + length`, and a
   Length of `0xFFFFFFFFFFFFFFE7` at offset 25 wrapped that sum to 0, so the
   walk returned to the start of the file forever
-  (`fuzz/regressions/fuzz_iab_parse/mxf-klv-length-wraps-to-start`). This one
+  (`libs/iab/fuzz/regressions/fuzz_iab_parse/mxf-klv-length-wraps-to-start`). This one
   hangs the uninstrumented build too; its runs never reached it.
 
 Reading the AC-4 code around those fixes turned up the same shapes elsewhere,
@@ -272,9 +272,9 @@ escape through `variable_bits()` could overflow.
 
 ## Status: the AC-4 decoder and encoder harnesses
 
-`fuzz_ac4_decode` and `fuzz_ac4_encode` are in `fuzz/run.sh`'s default list, so
+`fuzz_ac4_decode` and `fuzz_ac4_encode` are in `tools/fuzz/run.sh`'s default list, so
 `fuzz-regress`, `fuzz-short` and `fuzz-nightly` run them with the others.
-`fuzz/CMakeLists.txt` instruments `iclforge_ac4_objects` for them, as it does for
+`cmake/IclforgeFuzz.cmake` instruments `iclforge_ac4_objects` for them, as it does for
 `fuzz_ac4_parse`.
 `fuzz_ac4_decode` starts from `fuzz_ac4_parse`'s seeds and keeps regressions of
 its own, four so far:
@@ -282,7 +282,7 @@ its own, four so far:
 - `asf-ext-code-past-21-bits`: the first run stopped 2,690 executions in. The
   escape of `ext_code` counts leading ones that Part 1's Pseudocode 20 does not
   bound, and a long run of them shifted a 32-bit value by 32. Table 40 limits the
-  escape to 21 bits, which the decoder now enforces (`src/ac4/ERRATA.md`,
+  escape to 21 bits, which the decoder now enforces (`libs/ac4/ERRATA.md`,
   "ext_code is at most 21 bits").
 - `ajoc-upmix-signals-runaway-count`: `n_fullband_upmix_signals` escapes through
   `variable_bits(3)`, and a 391-byte frame sent 1,227,133,139. The decoder listed
@@ -299,7 +299,7 @@ its own, four so far:
 `fuzz_ac4_encode` has no regression inputs: a violation aborts, and libFuzzer
 keeps the input.
 
-The corpus `fuzz/run.sh` grows for `fuzz_ac4_decode` also feeds
+The corpus `tools/fuzz/run.sh` grows for `fuzz_ac4_decode` also feeds
 `tools/checks/ac4_syntax_differential.py` (`--inputs <directory>`), which reads
 every frame of each file through both syntax transcriptions, the decoder's and
 `tools/references/ac4_syntax.py`, and compares their traces. Without `--inputs`
@@ -340,13 +340,13 @@ until the findings below were fixed — several of them cost whole seconds per
 execution, and the instrumented run reached 489 exec/s once they were gone.
 
 **What it found.** Two in libbw64, patched at the time; the rest in `iclforge::adm`'s
-own code. Each has a reproducer under `fuzz/regressions/fuzz_adm_parse/`:
+own code. Each has a reproducer under `libs/adm/fuzz/regressions/fuzz_adm_parse/`:
 
 - **`&buffer[0]` of an empty `std::vector<char>`**, in libbw64's `UnknownChunk`
   constructor (any zero-length chunk of an id it has no class for) and in
   `Bw64Reader::read()` (a zero-length `<data>`). Undefined behaviour, which UBSan
   reports and a standard library with its bounds checks enabled aborts over.
-  (`zero-length-unknown-chunk`, `zero-length-data-chunk`, and `tests/adm/`.)
+  (`zero-length-unknown-chunk`, `zero-length-data-chunk`, and `libs/adm/tests/`.)
 - **A heap overread the length of a whole frame**, from a `<fmt >` whose channel
   count and sample width overflow libbw64's `uint16_t` block alignment: the read
   buffer is sized from the wrapped value and decoded against the real one. WAVE's
@@ -380,7 +380,7 @@ not. See the next section for how that was closed.
 
 ### Re-pinned to a maintained fork
 
-`src/adm/CMakeLists.txt` now fetches libbw64 from a maintained fork,
+`libs/adm/CMakeLists.txt` now fetches libbw64 from a maintained fork,
 `github.com/pwnified/libbw64`, rather than the EBU's own repository - see that
 file's own header comment for why, and `docs/library/adm.md`/`docs/threat-model.md`
 for what changed. Two consequences for this harness:
@@ -391,7 +391,7 @@ for what changed. Two consequences for this harness:
   chunk's size through the `<ds64>` table, not only `<data>`'s, and refuses
   anything that then runs past the real end of the file - confirmed empirically
   by replaying both crafted inputs from that gap (now clean) and by
-  `tests/adm/test_adm.cpp`'s own dedicated case for it.
+  `libs/adm/tests/test_adm.cpp`'s own dedicated case for it.
 - The fork also added native `WAVE_FORMAT_IEEE_FLOAT` support, which this module
   did not have a use for before: `float_pcm_bw64.cpp`/`.hpp`, the hand-rolled
   container walk that used to exist purely to read float samples libbw64
@@ -404,7 +404,7 @@ memory-safety finding, just a capability gap against what this module's own
 docs claimed:
 
 - Its chunk-header scan has no exception for `<data>` running past the file,
-  so a recording truncated mid-capture - which `tests/adm/test_adm.cpp`
+  so a recording truncated mid-capture - which `libs/adm/tests/test_adm.cpp`
   requires to still parse, and which every prior version of libbw64 allowed -
   is refused outright.
 - `FormatInfoChunk`'s constructor (`chunks.hpp`) accepts `bitsPerSample` 16, 24
@@ -416,7 +416,7 @@ docs claimed:
   first vendored, and no test had ever exercised the 64-bit half of that claim
   until this pass added one - which is what surfaced this.
 
-`src/adm/patch_libbw64.cmake` carves out both; see its own comment for the
+`libs/adm/patch_libbw64.cmake` carves out both; see its own comment for the
 reasoning and for the upstream PRs proposing the same fixes, which would let
 each half of this patch be deleted once it lands.
 
@@ -480,7 +480,7 @@ inside the payload, and a mutator so the indirect path stops throwing its
 inputs away at the checksum.
 
 They are separate harnesses rather than one chained one because seeding
-matters more here than reach. `fuzz/metadata-seeds.py extract` pulls the real
+matters more here than reach. `tools/fuzz/metadata-seeds.py extract` pulls the real
 containers and the real OAMD/JOC payloads out of the Atmos streams
 `generate-seeds.sh` has just encoded, so each harness starts from bytes its
 own parser accepts; reaching the same states through a container would spend
@@ -503,12 +503,12 @@ caller's own buffer, and a caller signs a stream it just encoded.
 ### The ADM harness is opt-in
 
 `fuzz_adm_parse` is the one harness here not built by default, and not in
-`fuzz/run.sh`'s default target list. `iclforge::adm` is the one library in this
+`tools/fuzz/run.sh`'s default target list. `iclforge::adm` is the one library in this
 build with a third-party dependency footprint beyond {fmt}: `ICLFORGE_BUILD_ADM`
 is OFF by default, and turning it on additionally needs vcpkg's `adm` feature
 for libadm's Boost headers plus network access for the `FetchContent` pulls of
 libbw64 and libadm themselves - none of which anything else in this build
-touches. `ICLFORGE_FUZZ_ADM=1 VCPKG_ROOT=... fuzz/run.sh` turns all of that
+touches. `ICLFORGE_FUZZ_ADM=1 VCPKG_ROOT=... tools/fuzz/run.sh` turns all of that
 on and appends the harness to the default list.
 
 It is also the one harness whose reports may not land in ICL Forge's own code:
@@ -537,7 +537,7 @@ and therefore all of the object metadata lives, died two orders of magnitude
 before the parser it was aimed at.
 
 `fuzz_ac3_decode` and `fuzz_eac3_decode` now define an
-`LLVMFuzzerCustomMutator` (`fuzz/crc_mutator.hpp`): run libFuzzer's own
+`LLVMFuzzerCustomMutator` (`libs/ac3/fuzz/crc_mutator.hpp`): run libFuzzer's own
 mutation first, then walk the result as a concatenation of syncframes -
 same bsid-at-bit-40 test and same two size derivations `iclforge::ac3::split_frames`
 uses - and rewrite each frame's CRC words in place.
@@ -547,7 +547,7 @@ crc1 **precedes** the region it protects: A/52 §7.10.1 requires the register
 to read zero after the first 5/8 of the syncframe has been shifted through,
 and says outright that crc1 is not the CRC of that region. It has to be
 solved for, through the GF(2) polynomial inverse `iclforge::ac3::solve_leading_crc`
-implements - the same call `src/ac3/src/encoder/encoder.cpp` makes, down to
+implements - the same call `libs/ac3/src/encoder/encoder.cpp` makes, down to
 its crc2 == `kSyncWord` avoidance step (a crc2 that happens to equal 0x0B77
 would make the frame's own tail look like the start of the next syncframe, so
 the encoder flips crcrsv and recomputes; a mutator skipping that would hand
@@ -577,7 +577,7 @@ exact same decode paths as `fuzz_ac3_decode`/`fuzz_eac3_decode` above, but
 instead of (in addition to - a crash is still a crash) only checking for a
 crash or sanitizer trip, they decode the SAME mutated bytes a second time
 with FFmpeg and diff the resulting PCM against this project's own decode.
-`fuzz/differential_oracle.hpp` has the full mechanism and reasoning; the
+`libs/ac3/fuzz/differential_oracle.hpp` has the full mechanism and reasoning; the
 short version:
 
 - Both decoders have to accept the ENTIRE input - every frame/access unit,
@@ -595,17 +595,17 @@ short version:
   coupling, transient pre-noise processing, a second dependent substream/
   7.1.4 - see `docs/verification.md`'s "Where the oracles don't reach").
 - Where a comparison IS eligible, the floor - `kMinAgreementDb = 6.0` in
-  `fuzz/differential_oracle.hpp` - is deliberately loose relative to what a
+  `libs/ac3/fuzz/differential_oracle.hpp` - is deliberately loose relative to what a
   clean, non-fuzzed stream actually measures at (`docs/verification.md`:
   float32-precision parity for the plain path, 98+ dB for coupling/spectral
   extension, 62-89 dB for AHT). It started from
   `tools/checks/verify_gold_reference.sh`'s own `CPLBNDSTRCE0_MIN_SNR_DB=15`
   precedent - this project's one existing floor for "two decodes of a
   bitstream neither side controls" - and was then calibrated down to 6 dB
-  after `fuzz/measure-agreement.sh` found committed seeds that legitimately
+  after `tools/fuzz/measure-agreement.sh` found committed seeds that legitimately
   measure below 15 dB (real, unmutated content whose bap-0 reconstruction
   FFmpeg dithers and this decoder zeros).
-- `fuzz/measure-agreement.sh` is the calibration method behind that floor:
+- `tools/fuzz/measure-agreement.sh` is the calibration method behind that floor:
   it runs every committed seed through the differential harnesses in
   measure-only mode and reports the worst-channel SNR each one lands on.
   Re-run it after adding seed content, and after any change to
@@ -615,13 +615,13 @@ short version:
 
 Because every comparable input spawns an FFmpeg process, these two
 harnesses are much slower per-exec than every other harness here and are
-NOT in `fuzz/run.sh`'s default target list, so the `fuzz-regress` and
+NOT in `tools/fuzz/run.sh`'s default target list, so the `fuzz-regress` and
 `fuzz-short` CI jobs do not run them. `fuzz-differential` runs them on every
 push, and `fuzz-nightly` runs them again in steps of its own at its deeper
 budget (see the CI section below). They need `ffmpeg` on PATH to
 compare anything at all (silently a no-op otherwise, same as running without
 `ffmpeg` installed locally). They share their crash-only siblings' seed
-corpora rather than duplicating those files (`fuzz/run.sh`'s
+corpora rather than duplicating those files (`tools/fuzz/run.sh`'s
 `seed_source_for`) - same bytes, same decode path, just with an extra
 comparison bolted on.
 
@@ -634,7 +634,7 @@ across its own legal configuration space by adversarial but perfectly valid
 audio, ever emit a stream a decoder refuses" - is
 **`tools/ci/fuzz_encoder_space.py`**, and nothing here asks it.
 
-It is not a libFuzzer target and not part of `fuzz/run.sh`: it drives the real
+It is not a libFuzzer target and not part of `tools/fuzz/run.sh`: it drives the real
 `forge`, so it needs the ordinary CLI build rather than this directory's
 sanitizer/libFuzzer toolchain, and its failure signal is a decoder refusing a
 stream rather than a sanitizer report. Per case it draws a random legal
@@ -815,15 +815,15 @@ which has a separate dispatch budget for each (`encoder_space_seconds`,
 ```bash
 # One-time: Clang 22 with libFuzzer; CI installs it the way ci.yml's linux-llvm leg
 # does (.github/toolchain/03-llvm-toolchain.sh).
-fuzz/run.sh                    # build, then run every default-list harness for 60s each
-fuzz/run.sh fuzz_scan          # just one harness
-ICLFORGE_FUZZ_SECONDS=600 fuzz/run.sh   # a deeper local run
-fuzz/run.sh regress            # replay seeds + regressions, no mutation (fast)
-fuzz/run.sh minimize fuzz_scan fuzz/artifacts/fuzz_scan-crash-<hash>
+tools/fuzz/run.sh                    # build, then run every default-list harness for 60s each
+tools/fuzz/run.sh fuzz_scan          # just one harness
+ICLFORGE_FUZZ_SECONDS=600 tools/fuzz/run.sh   # a deeper local run
+tools/fuzz/run.sh regress            # replay seeds + regressions, no mutation (fast)
+tools/fuzz/run.sh minimize fuzz_scan fuzz/artifacts/fuzz_scan-crash-<hash>
 
 # Differential harnesses need `ffmpeg` on PATH and are named explicitly -
 # see "Differential mode" above for why they're not in the default list.
-fuzz/run.sh run fuzz_differential_ac3_decode fuzz_differential_eac3_decode
+tools/fuzz/run.sh run fuzz_differential_ac3_decode fuzz_differential_eac3_decode
 ```
 
 On Windows, run this from WSL or inside a Linux container - there is no
@@ -831,13 +831,13 @@ libFuzzer under MSVC or clang-cl here. The commands used to develop this
 directory ran inside `docker run ubuntu:26.04` with the repo bind-mounted,
 which is exactly what `.github/workflows/fuzz.yml`'s containers do.
 
-See `fuzz/run.sh --help`-equivalent (its own header comment) for the full
+See `tools/fuzz/run.sh --help`-equivalent (its own header comment) for the full
 environment-variable list.
 
 ## Seed corpus
 
 `fuzz/seeds/<harness>/` is a curated, committed bootstrap corpus, most of it
-generated from ICL Forge's own valid output - `fuzz/generate-seeds.sh` drives
+generated from ICL Forge's own valid output - `tools/fuzz/generate-seeds.sh` drives
 `forge` across the layout/codec/Annex-E-tool matrix this project already
 supports (every layout token, every tool combination, both codecs, silence and
 audio, coupled and uncoupled, Atmos objects and the bed51 fallback) and
@@ -850,7 +850,7 @@ directory and start from an empty corpus.
 
 The corpora of `fuzz_emdf_parse`, `fuzz_oamd_parse`, `fuzz_joc_parse` and
 `fuzz_adm_parse`, and one file of `fuzz_iec61937_unwrap`'s, are not raw `forge`
-output and are built by `fuzz/metadata-seeds.py`, which `generate-seeds.sh` calls:
+output and are built by `tools/fuzz/metadata-seeds.py`, which `generate-seeds.sh` calls:
 
 - `fuzz_emdf_parse`, `fuzz_oamd_parse`, `fuzz_joc_parse` - `metadata-seeds.py
   extract` reads the Atmos streams just encoded, locates each frame's EMDF
@@ -862,7 +862,7 @@ output and are built by `fuzz/metadata-seeds.py`, which `generate-seeds.sh` call
   teaches the engine nothing the sixth did not.
 - `fuzz_adm_parse` - `metadata-seeds.py adm` synthesises BW64/RF64 fixtures,
   because nothing `forge` produces is an ADM file. They mirror the ones
-  `tests/adm/test_adm.cpp` builds in memory: BS.2088-1 chunk layout,
+  `libs/adm/tests/test_adm.cpp` builds in memory: BS.2088-1 chunk layout,
   BS.2076-2 ADM XML, one Objects document and one DirectSpeakers document,
   plus an RF64 whose `<data>` size resolves through `<ds64>` and a file with
   no `<axml>` at all.
@@ -897,7 +897,7 @@ the parser.
 Regenerate it with:
 
 ```bash
-ICLFORGE_CLI_BIN=build/config-windows-msvc-debug/bin/forge.exe fuzz/generate-seeds.sh
+ICLFORGE_CLI_BIN=build/config-windows-msvc-debug/bin/forge.exe tools/fuzz/generate-seeds.sh
 ```
 
 (Any *working* `forge` build does - this only needs it to produce valid
@@ -908,14 +908,14 @@ Windows host simply because it is the one already built there.)
 `fuzz/corpus/` - what a real mutation run *grows* into over its time budget -
 is not: it is regenerable from the seeds plus a mutation budget, and libFuzzer
 corpora can reach hundreds of MB, which does not belong in git history. It is
-gitignored; `fuzz/run.sh` creates it on demand.
+gitignored; `tools/fuzz/run.sh` creates it on demand.
 
 ## When a fuzzer finds something
 
-1. libFuzzer minimizes automatically (or run `fuzz/run.sh minimize <target>
+1. libFuzzer minimizes automatically (or run `tools/fuzz/run.sh minimize <target>
    <path>` on a saved artifact).
 2. The minimized input is added to `fuzz/regressions/<harness>/` and
-   committed - `fuzz/run.sh regress` (and `fuzz-regress` in CI) replays every
+   committed - `tools/fuzz/run.sh regress` (and `fuzz-regress` in CI) replays every
    file there on every run, so a fixed bug can never silently regress.
 3. The underlying bug gets a spec-grounded fix in the library - never
    just enough to make the fuzzer stop finding it.
@@ -934,7 +934,7 @@ gitignored; `fuzz/run.sh` creates it on demand.
   is `true`). Seconds, not minutes, and not marked experimental: a failure here
   means a previously-fixed bug came back, which should always be loud.
 - `fuzz-short` - a 60-second-per-harness mutation budget over the crash-only
-  harnesses (every harness in `fuzz/run.sh`'s default list), push only (not
+  harnesses (every harness in `tools/fuzz/run.sh`'s default list), push only (not
   pull_request, to keep PR turnaround unaffected).
 - `fuzz-differential` - the same 60-second-per-harness mutation budget, push
   only, but over ONLY the two differential harnesses (see "Differential
@@ -960,7 +960,7 @@ gitignored; `fuzz/run.sh` creates it on demand.
   `workflow_dispatch`, with a 15-minute default budget each
   (`encoder_space_seconds`, `eac3_encoder_space_seconds` and
   `ac4_encoder_space_seconds`). Shares none of the machinery of the other
-  five (no libFuzzer, no sanitizer runtime, not in `fuzz/run.sh`): it builds
+  five (no libFuzzer, no sanitizer runtime, not in `tools/fuzz/run.sh`): it builds
   the plain `linux-llvm` CLI with vcpkg and a pinned `ffmpeg`, the way the
   `ffmpeg-validate` job of `_ci-core.yml` does. Each half runs its
   `--check-envelope` gate first, and the E-AC-3 half its `--check-oracles`

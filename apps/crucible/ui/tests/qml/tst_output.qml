@@ -44,7 +44,7 @@ TestCase {
 
     // The headphones pin hands decoded objects to the platform's own object
     // renderer, and the policy refuses it outright on a build without one
-    // (src/audio/src/backend/*/spatial.cpp, every backend but Windows), so
+    // (libs/audio/src/backend/*/spatial.cpp, every backend but Windows), so
     // the entry is offered exactly where it can be honoured, and the page
     // says why where it is not.
     //

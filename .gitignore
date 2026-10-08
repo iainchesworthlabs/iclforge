@@ -72,7 +72,7 @@ apps/android/app/src/main/assets/signing.key
 # quarantine on main" check backs this up.
 src/quarantine/
 
-# Grown fuzzing corpus and crash artifacts (fuzz/run.sh): reproducible from
+# Grown fuzzing corpus and crash artifacts (tools/fuzz/run.sh): reproducible from
 # fuzz/seeds/ plus a mutation budget, and can grow large. What must survive a
 # fix - the minimized input that proved a bug - lives in fuzz/regressions/
 # instead, which IS tracked.

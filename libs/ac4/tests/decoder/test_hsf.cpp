@@ -744,7 +744,7 @@ TEST_CASE("Table 106 for the base length is Tables 107 and 108 for the longer on
     // Clause 4.3.6.2.1: with b_hsf_ext the n_msfb_bits and n_msfbl_bits of the high sampling
     // frequency's transform length are taken from Table 107 (96 kHz) or 108 (192 kHz). The decoder
     // reads them by the base length's, Table 106: the same widths, for every length
-    // (src/ac4/ERRATA.md, "The widths of max_sfb at 96 and 192 kHz"). Tables 106 to 108 as
+    // (libs/ac4/ERRATA.md, "The widths of max_sfb at 96 and 192 kHz"). Tables 106 to 108 as
     // printed (n_msfb_bits, then n_msfbl_bits where there is one, 0 where the table says N/A):
     struct Row {
         int length;

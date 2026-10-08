@@ -89,15 +89,15 @@ inventory the plan is built on, with the header each item lives in.
 
 | Piece | Status | Where |
 |---|---|---|
-| E-AC-3 JOC encoder, 5.1 bed plus up to 15 dynamic objects, count fixed at construction | exists | `ac3::oba::AtmosEncoder`, `src/ac3/include/iclforge/ac3/oba/atmos.hpp` |
-| Live per-object placement surface the UI pushes into once per frame | exists | `ac3::oba::SceneCursor`, `src/objects/include/iclforge/objects/scene.hpp`; the three-call pattern is `examples/osc_object_control.cpp` |
+| E-AC-3 JOC encoder, 5.1 bed plus up to 15 dynamic objects, count fixed at construction | exists | `ac3::oba::AtmosEncoder`, `libs/ac3/include/iclforge/ac3/oba/atmos.hpp` |
+| Live per-object placement surface the UI pushes into once per frame | exists | `ac3::oba::SceneCursor`, `libs/objects/include/iclforge/objects/scene.hpp`; the three-call pattern is `examples/osc_object_control.cpp` |
 | 5.1 bed panner for the AC-3-only receiver case | exists | `ac3::spatial::BedRenderer`, shown in `examples/spatial_objects.cpp` |
-| IEC 61937 burst framing for AC-3 and E-AC-3 | exists | `ac3::iec61937`, `src/containers/include/iclforge/containers/iec61937/iec61937.hpp` |
-| Exclusive-mode HDMI/S/PDIF bitstream sink, with a per-device format probe | exists, confirmed against a real receiver on Windows (via `ac3cli`, not this demo's own app yet) | `ac3::audio::PassthroughSink`, `enumerate_render_devices()`, `src/audio/include/iclforge/audio/passthrough.hpp` |
+| IEC 61937 burst framing for AC-3 and E-AC-3 | exists | `ac3::iec61937`, `libs/containers/include/iclforge/containers/iec61937/iec61937.hpp` |
+| Exclusive-mode HDMI/S/PDIF bitstream sink, with a per-device format probe | exists, confirmed against a real receiver on Windows (via `ac3cli`, not this demo's own app yet) | `ac3::audio::PassthroughSink`, `enumerate_render_devices()`, `libs/audio/include/iclforge/audio/passthrough.hpp` |
 | Shared-mode multichannel PCM sink | exists | `ac3::audio::MonitorSink`, `monitor.hpp` |
 | Windows Spatial Sound object sink (headphones) | exists, confirmed against a real spatial endpoint | `ac3::audio::SpatialObjectSink`, `spatial.hpp` |
-| Whole-endpoint WASAPI loopback capture | exists | `ac3::audio::Capture` with `DeviceKind::kLoopback`, `src/audio/src/backend/windows/capture.cpp` |
-| Decoder with §7.8 downmix for the decoded headphone path | exists | `ac3::OutputStage`, `src/ac3/include/iclforge/ac3/decoder/output.hpp` |
+| Whole-endpoint WASAPI loopback capture | exists | `ac3::audio::Capture` with `DeviceKind::kLoopback`, `libs/audio/src/backend/windows/capture.cpp` |
+| Decoder with §7.8 downmix for the decoded headphone path | exists | `ac3::OutputStage`, `libs/ac3/include/iclforge/ac3/decoder/output.hpp` |
 | Object signing hook pattern | exists, on Android | `apps/android/app/src/main/cpp/shield_signing_hook.hpp` |
 | Draggable room widget, plan plus elevation | exists, in the GUI's Live tab | `apps/gui/qml/Main.qml` (`liveRoom`), `SoundfieldView.qml` |
 | Reference live encode loop | exists, twice | `apps/cli/commands/live_audio.cpp` (`run_live`), `apps/android/.../live_cursor.cpp` |
@@ -109,7 +109,7 @@ inventory the plan is built on, with the header each item lives in.
 | **Low-latency mode** | **new, configuration of existing knobs** | `AtmosConfig::numblkscod`, capture buffer size |
 | Tray-resident Qt Quick UI | new | `apps/windows/` |
 
-Nothing in `src/ac3/` changes. The library additions are two Windows-backend files and their
+Nothing in `libs/ac3/` changes. The library additions are two Windows-backend files and their
 `kNoBackend` twins in every other backend, per the
 [platform-tree convention](raspberry-pi.md#why-theres-no-raspberry-pi-specific-code).
 
@@ -447,10 +447,10 @@ into `ac3tests` on every platform, the way `apps/common` does, so the rules the 
 Linux CI leg that could never run the demo. The `platform/windows/` half builds only under
 the option.
 
-The library gains, in `src/audio`:
+The library gains, in `libs/audio`:
 
 - **`Capture::start_process_loopback(pid, mode, format)`**, implemented in
-  `src/audio/src/backend/windows/capture.cpp` with the activation-params route, sharing the
+  `libs/audio/src/backend/windows/capture.cpp` with the activation-params route, sharing the
   capture thread with the endpoint paths; every other backend refuses it with `kNoBackend` or
   `kProcessLoopbackUnavailable`, and `process_loopback_available()` answers for the machine
   rather than the build. **Landed 2026-09-03.**
@@ -515,7 +515,7 @@ on S2, which is now done.
 The process-loopback capture entry point and the device watcher, both in the Windows backend
 with `kNoBackend` twins elsewhere, the device-free logic (parameter validation, refusal paths,
 watcher lifecycle) covered by the unconditional backend contract test rather than a new
-`tests/audio/backend/windows/` directory, and `docs/platforms/windows.md` updated. Exit: a program
+`libs/audio/tests/backend/windows/` directory, and `docs/platforms/windows.md` updated. Exit: a program
 tapping one process through the library and reading the tone back. **Done 2026-09-03**:
 `s1_library_tap` in the spikes tree reads the spawned player's tone through
 `start_process_loopback` at the expected level and frequency, refuses a process id nobody

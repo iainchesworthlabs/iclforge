@@ -182,7 +182,7 @@ unpanned — it is not a JOC object either way (§6.3.2.2 bypasses it for a bed 
 it does for a dynamic-object one).
 
 Only the 5.1.4 channel order has been checked against a real DEE-produced stream
-(`tests/ac3/oba/test_dee_joc_fixture.cpp`); 7.1.4 and 9.1.6 extend it by Table 12's own channel order,
+(`libs/ac3/tests/oba/test_dee_joc_fixture.cpp`); 7.1.4 and 9.1.6 extend it by Table 12's own channel order,
 unverified against DEE itself. `forge atmos-cbi` is the CLI surface — see
 [CLI commands](../forge/cli/commands.md).
 
@@ -391,7 +391,7 @@ pushed has nothing safe to push yet — `apply()` returns `std::nullopt` in that
 update against the object and re-applying it once a position finally arrives.
 
 This header is pure, portable, zero-socket, zero-thread code — no I/O of any kind — and is
-fuzzed (`fuzz/fuzz_osc_parse.cpp`) and unit-tested (`tests/objects/test_scene_osc.cpp`) accordingly.
+fuzzed (`libs/objects/fuzz/fuzz_osc_parse.cpp`) and unit-tested (`libs/objects/tests/test_scene_osc.cpp`) accordingly.
 The actual UDP listener, `iclforge::audio::LivePositionSource`, is a separate, app-serving-only piece
 and is **not** part of this installed library, for the same reason the rest of `iclforge::audio`
 isn't (see [Using the libraries](index.md)'s note on live audio); `forge live mode=atmos

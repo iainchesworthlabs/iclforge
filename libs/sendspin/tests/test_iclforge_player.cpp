@@ -401,7 +401,7 @@ TEST_CASE("iclforge_player: settings", "[sendspin][iclforge]") {
     CHECK(refused(R"({"revision":17,"decoder":[]})") == 17);
     CHECK(refused(R"({"revision":18,"decoder":{"objects":"sometimes"}})") == 18);
     // A number the writer could not write back, and a crossover that its tenth of a hertz rounds to
-    // nothing (fuzz/regressions/fuzz_sendspin_messages).
+    // nothing (libs/sendspin/fuzz/regressions/fuzz_sendspin_messages).
     CHECK(refused(R"({"revision":19,"trim_db":[7.7e62,0]})") == 19);
     CHECK(refused(R"({"revision":20,"crossover_hz":0.04})") == 20);
     CHECK(read_settings(R"({"revision":21,"crossover_hz":0.05})").has_value());

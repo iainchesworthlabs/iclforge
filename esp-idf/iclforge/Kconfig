@@ -1,7 +1,7 @@
 menu "iclforge"
 
 # THE SENDSPIN PLAYER - include/iclforge/sendspin_host.hpp and
-# include/iclforge/burst_player.hpp, over src/sendspin's player half
+# include/iclforge/burst_player.hpp, over libs/sendspin's player half
 # (planning/hearth-reference-player.md, B3). Off by default: a firmware that
 # only decodes from its own storage carries none of it.
 config ICLFORGE_SENDSPIN
@@ -12,7 +12,7 @@ config ICLFORGE_SENDSPIN
     select MBEDTLS_CHACHA20_C
     select MBEDTLS_CHACHAPOLY_C
     help
-        Builds src/sendspin's player half into the component with the parts a
+        Builds libs/sendspin's player half into the component with the parts a
         board adds to it: the WebSocket a Sendspin server connects to, on
         esp_http_server; pairing records in NVS; and a player that decodes
         timestamped bursts and PCM and plays each sample at the time the
@@ -25,7 +25,7 @@ config ICLFORGE_SENDSPIN
         rest: X25519, SHA-256, SHA-512 and AES-256-GCM are on in ESP-IDF's
         default configuration.
 
-# THE AC-4 DECODER - src/ac4, and the player's
+# THE AC-4 DECODER - libs/ac4, and the player's
 # reading of AC-4 streams (src/ac4_bridge.hpp; planning/ac4.md, D14b). Off by
 # default: a firmware that plays AC-3 and E-AC-3 carries none of it, and its
 # build is what it was without this option.

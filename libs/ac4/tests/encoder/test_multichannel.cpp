@@ -1,7 +1,7 @@
 // The encoder's channel data matrices undone (src/ac4/src/encoder/asf/multichannel.
 // hpp) held to ETSI TS 103 190-1 V1.4.1 as printed: Tables 178 and 179 and
 // clause 5.3.3.4's matrix, in the transcription the decoder's tests keep
-// (tests/ac4/decoder/printed_matrices.hpp). A unit's output channels,
+// (libs/ac4/tests/decoder/printed_matrices.hpp). A unit's output channels,
 // turned into its tracks, must come back through the printed matrix of the
 // parameters the encoder chose, or was given, band by band.
 

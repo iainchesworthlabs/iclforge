@@ -8,7 +8,7 @@
 
 // The PipeWire backend's pure half, tested with no PipeWire session running
 // at all - CMake adds this file to the suite only when it selected the
-// pipewire/ platform directory (the same axis tests/audio/backend/alsa/'s own
+// pipewire/ platform directory (the same axis libs/audio/tests/backend/alsa/'s own
 // file rides), and puts that directory on the include path.
 //
 // What is worth testing here is what does not need a session to get wrong:
@@ -37,7 +37,7 @@ spa_dict make_dict(const spa_dict_item* items, std::uint32_t n_items) {
     // Plain aggregate init, not the SPA_DICT_INIT macro: it expands to a C99
     // compound literal, which -Werror -Wc99-extensions (Clang) flags outside
     // the system header that otherwise shelters it - see
-    // src/audio/src/backend/pipewire/capture.cpp's identical note on
+    // libs/audio/src/backend/pipewire/capture.cpp's identical note on
     // SPA_POD_BUILDER_INIT.
     return spa_dict{0, n_items, items};
 }

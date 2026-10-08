@@ -1,5 +1,5 @@
 // The mathematical functions of the converter's filter design
-// (src/dsp/src/tiered/portable_math.hpp): a series or an iteration each, in
+// (libs/dsp/src/tiered/portable_math.hpp): a series or an iteration each, in
 // plain double arithmetic with no library call, so that the compiler's constant evaluator, a host
 // and a part with a soft-float double all give the same bits. Each is held to its definition, to
 // the C library's value to a few units in the last place, and to itself at compile time.

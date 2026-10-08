@@ -41,7 +41,7 @@ std::vector<float> tone(double hz, std::uint64_t start) {
 }
 
 // A short Atmos stream, container emitted (or not) per `emit_objects` -
-// the same fixture shape tests/ac3/signing/test_signing.cpp builds, for the same
+// the same fixture shape libs/ac3/tests/signing/test_signing.cpp builds, for the same
 // reason: it is the one stream in the tree that really carries an EMDF
 // object container.
 Bytes encode_atmos_stream(int frames, bool emit_objects, int objects = 2) {
@@ -109,7 +109,7 @@ Bytes stereo_eac3_stream(int frames) {
 }
 
 // A stream carrying TS 103 420 §8.3.1's addbsi object marker with no EMDF
-// container behind it - the shape src/ac3/src/oba/atmos.cpp used to emit
+// container behind it - the shape libs/ac3/src/oba/atmos.cpp used to emit
 // for a bed51 request before PR #344 closed that hole at the source (see
 // AtmosConfig::emit_object_metadata's own comment). AtmosEncoder can no
 // longer build this shape - that IS the fix - so strip_objects' "marker left

@@ -1,5 +1,5 @@
 // The immersive element's tools of ETSI TS 103 190-2 V1.3.1 in the decoder
-// (src/ac4/src/decoder/pcm): Table 20's prediction gains (clause 5.2.3.2, step 5),
+// (libs/ac4/src/decoder/pcm): Table 20's prediction gains (clause 5.2.3.2, step 5),
 // S-CPL's Tables 23 and 24 (clause 5.3), the gains the QMF domain applies after
 // A-SPX (clauses 4.8.3.11, 4.8.3.14 and 5.4), A-CPL's four modules (clause
 // 5.5.2, Table 25 and Pseudocode 2), and A-JCC (clause 5.6): its differential

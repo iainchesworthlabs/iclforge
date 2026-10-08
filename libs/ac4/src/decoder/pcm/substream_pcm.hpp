@@ -49,7 +49,7 @@
 // companding, A-SPX and A-CPL leave it out (Tables 212 to 214).
 //
 // At every frame_rate_index but 13 the frame is coded at an internal rate, and
-// the sample rate converter (Part 1 clause 6.2.15, src/dsp/src/tiered/
+// the sample rate converter (Part 1 clause 6.2.15, libs/dsp/src/tiered/
 // resampler.hpp) takes the synthesis's output to 48 kHz, its phase locked to
 // sequence_counter as Part 2 clause 5.11 locks it.
 //
@@ -357,7 +357,7 @@ class SubstreamPcm {
     // A-CPL: the stage and its state, the quantised values DIFF_TIME refers
     // to, and the codec modes of the last frame read and of the last applied,
     // a change of which starts A-CPL from its first frame's state
-    // (src/ac4/ERRATA.md, "A change of codec mode"). The stage is 119 KB at
+    // (libs/ac4/ERRATA.md, "A change of codec mode"). The stage is 119 KB at
     // double and 65 KB at float, five decorrelators' history for the most part,
     // so it is made by the first frame whose codec mode applies A-CPL: a stream
     // with none holds none, and a stage just made is in the first frame's state.

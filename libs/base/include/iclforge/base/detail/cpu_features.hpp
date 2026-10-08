@@ -6,7 +6,7 @@
 // Runtime CPU-feature detection, x86-64 only (SIMD kernels's follow-on
 // dynamic-dispatch work).
 //
-// The arch seam (src/base/variants/{arch-generic,arch-x86_64,arch-aarch64}/) is
+// The arch seam (libs/base/variants/{arch-generic,arch-x86_64,arch-aarch64}/) is
 // compile-time only, deliberately: SSE2 and NEON are both part of their
 // architecture, guaranteed present, so nothing needs asking. AVX2 is
 // different - a real CPU FEATURE that may or may not be present on the
@@ -22,7 +22,7 @@
 // outright. The one genuinely platform-specific piece - the raw hardware
 // probe itself, CPUID+XGETBV on real MSVC vs __builtin_cpu_supports
 // elsewhere - is the only part selected by directory (see this file's own
-// .cpp and src/ac3/CMakeLists.txt's ICLFORGE_AVX2 block); everything
+// .cpp and libs/ac3/CMakeLists.txt's ICLFORGE_AVX2 block); everything
 // else here (caching, the debug override, the abort-not-fault guarantee)
 // is ordinary portable C++, so it lives once instead of being duplicated
 // per platform the way the arch seam's own primitives sometimes have to be.
@@ -41,7 +41,7 @@ namespace iclforge::internal::cpu {
 // forced down to SSE2 for a reproducibility comparison, or forced up to
 // prove the AVX2 kernels execute (and are compared bit-for-bit against the
 // SSE2 baseline) on a machine that actually has it - see
-// tests/ac3/core/test_simd_kernels.cpp and tools/ci/run_codec_matrix.sh. Forcing
+// libs/ac3/tests/core/test_simd_kernels.cpp and tools/ci/run_codec_matrix.sh. Forcing
 // up on a CPU that cannot actually run AVX2, or on a build with no AVX2
 // tier compiled in at all (ICLFORGE_AVX2=OFF, or a non-x86-64 target),
 // aborts with a clear message rather than ever letting an illegal

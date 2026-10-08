@@ -32,7 +32,7 @@ Track File, parses both, and prints that they agree.
 
 **Defaults on**, unlike `iclforge::adm`. `ICLFORGE_BUILD_IAB` defaults **ON** — IAB's own
 Plex(n)-coded bitstream and its MXF/KLV wrapper both need nothing beyond this module's own bit
-reader (`src/iab/src/bitreader.hpp`), no third-party dependency at all, so it builds the same
+reader (`libs/iab/src/bitreader.hpp`), no third-party dependency at all, so it builds the same
 way the three container writers do:
 
 ```bash
@@ -56,7 +56,7 @@ examples) consumes it.
   `AuthoringToolInfo` and `UserData`. Positions (§5.4's `DistanceXY`/`DistanceZ` formulas), gains
   and spreads (§5.5) are resolved to their final linear/physical values on the way in, the same
   "plain aggregate, already-resolved" shape [`iclforge/adm/model.hpp`](adm.md) uses for ADM — see
-  [`iclforge/iab/model.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/iab/include/iclforge/iab/model.hpp)
+  [`iclforge/iab/model.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/iab/include/iclforge/iab/model.hpp)
   for the full struct-by-struct citation trail.
 - **`AudioDataDLC`** (§9.6/§10.7, Annex B) is kept as its coded bytes by the reader and decoded by
   `decode_dlc()` (`dlc.hpp`): the lattice predictor and its Rice/Golomb or direct-PCM residual,
@@ -65,7 +65,7 @@ examples) consumes it.
   with the element's `ShiftBits` applied, or normalized floats through `DlcAudio::normalized()`. A
   96 kHz element can be decoded to its base layer alone (`DlcDecodeOptions::base_layer_only`).
   `decode_audio()` returns a frame's `AudioDataPCM` and `AudioDataDLC` essence together as
-  `AudioDataPcm`, which is what `build_iab()` uses. `src/iab/ERRATA.md` records the one reading
+  `AudioDataPcm`, which is what `build_iab()` uses. `libs/iab/ERRATA.md` records the one reading
   taken where Table 10's 96 kHz Rice branch is braced differently from its 48 kHz one.
 - **The MXF wrapping** (`mxf.hpp`) — SMPTE ST 2098-2 itself has no MXF content at all; the
   wrapping is a separate, much shorter standard, **SMPTE ST 2067-201:2021** ("IMF — Immersive Audio
@@ -83,7 +83,7 @@ examples) consumes it.
   skips everything that is not a match by that KLV's own declared Length, and hands the one KLV
   whose Key matches ST 2067-201 Table 4.2's registered value straight to `parse_iabitstream`'s
   `std::istream` overload, unmodified. See
-  [`src/iab/src/mxf_reader.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/iab/src/mxf_reader.cpp)'s
+  [`libs/iab/src/mxf_reader.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/iab/src/mxf_reader.cpp)'s
   own header comment for the full clause-by-clause trail, including why Header Metadata's
   Preface/ContentStorage/Package object graph is never parsed at all (locating essence is a
   KLV-Key matter, not an object-graph one).
@@ -119,7 +119,7 @@ const auto written = iclforge::iab::write_mxf_iab("feature_iab.mxf", frames, opt
 `MxfWriteOptions` also sets the Identification strings, the ST 2067-2 Annex E items (reference image edit
 rate and audio alignment level, which default to the frame rate and -20 dBFS), whether the Channel
 SubDescriptors are written, the timestamp, and a seed for the UUIDs and package identifier so the same
-input gives the same bytes. `src/iab/ERRATA.md` records the readings the writer takes. The writer's output
+input gives the same bytes. `libs/iab/ERRATA.md` records the readings the writer takes. The writer's output
 parses in `parse_mxf_iab()`, and FFmpeg's MXF demuxer reads its partitions, Header Metadata, timecode and
 duration; FFmpeg does not know the IAB Essence Descriptor, so it reports the audio stream as unsupported.
 

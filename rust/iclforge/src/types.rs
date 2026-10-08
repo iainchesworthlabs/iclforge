@@ -300,7 +300,7 @@ impl Default for DecoderConfig {
         let mut raw = unsafe { std::mem::zeroed() };
         // SAFETY: iclforge_decoder_config_init() unconditionally overwrites every field of
         // `raw` via a full struct assignment (see e.g. iclforge_atmos_config_init()'s
-        // implementation in src/capi/src/atmos.cpp) - `raw` is never read before being written.
+        // implementation in libs/capi/src/atmos.cpp) - `raw` is never read before being written.
         unsafe { sys::iclforge_decoder_config_init(&mut raw) };
         DecoderConfig {
             drc_scale: raw.drc_scale,

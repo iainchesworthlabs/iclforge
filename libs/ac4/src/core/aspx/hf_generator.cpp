@@ -268,7 +268,7 @@ void prediction_coefficients(std::span<const dsp::tiered::Complex<Real>> q_low_e
         }
         // Pseudocode 87. alpha0 is -(cov01 + alpha1 conj(cov12)) / cov11, the
         // solution of the normal equations that give alpha1 as printed
-        // (src/ac4/ERRATA.md, "alpha0's parentheses").
+        // (libs/ac4/ERRATA.md, "alpha0's parentheses").
         const Complex denom = cov[2][2] * cov[1][1] - norm(cov[1][2]) * regularise;
         Complex a1{};
         if (denom != Complex{}) {
@@ -355,7 +355,7 @@ void generate_high_band(const SubbandGroups& groups, const PatchTables& patches,
                                 c * c * alpha1[at(p)] * source(n - 4);
                 // Pre-flattening: the gain that flattens the low band's
                 // fitted slope, where the text prints its inverse
-                // (src/ac4/ERRATA.md, "Pre-flattening's direction").
+                // (libs/ac4/ERRATA.md, "Pre-flattening's direction").
                 if (in.preflat) {
                     value = dsp::tiered::apply_gain<Real>(gain_vec[at(p)], value);
                 }
@@ -376,10 +376,10 @@ template void preflattening_gains<Real>(std::span<const dsp::tiered::Complex<Rea
 template void prediction_coefficients<Real>(std::span<const dsp::tiered::Complex<Real>>, int, int,
                                             std::span<dsp::tiered::Complex<Real>>,
                                             std::span<dsp::tiered::Complex<Real>>);
-// The A-SPX encoder (src/ac4/src/encoder/aspx/aspx_encoder.cpp) calls
+// The A-SPX encoder (libs/ac4/src/encoder/aspx/aspx_encoder.cpp) calls
 // generate_high_band at double regardless of the decoder's scalar, to choose
 // its interleaving as a decoder will reconstruct it (see this target's
-// CMakeLists.txt, ICLFORGE_AC4_ALSO_AT_DOUBLE), and tests/ac4/core/test_aspx.cpp
+// CMakeLists.txt, ICLFORGE_AC4_ALSO_AT_DOUBLE), and libs/ac4/tests/core/test_aspx.cpp
 // calls the other two at double: a call inlined into generate_high_band<double>
 // leaves no symbol for GCC to link a test against, where MSVC emits one anyway.
 ICLFORGE_AC4_ALSO_AT_DOUBLE(

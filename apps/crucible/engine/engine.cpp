@@ -69,7 +69,7 @@ constexpr std::size_t kMinSinkQueueBound = 1440;
 //   kProbeDeadline covers the first probe's verdict, which is what says
 //   whether this machine has anything that will take the stream. Running
 //   out of it is NOT a refusal, and that asymmetry is deliberate: PipeWire
-//   spends up to two seconds per endpoint (src/audio/src/backend/pipewire/
+//   spends up to two seconds per endpoint (libs/audio/src/backend/pipewire/
 //   passthrough.cpp, kProbeTimeoutSeconds), so the machines slow to answer
 //   are exactly the ones that have endpoints to answer with, while a
 //   machine with nothing to probe answers at once. Giving up here reports
@@ -322,7 +322,7 @@ struct Engine::Impl {
     //
     //   macOS - correctness. The Core Audio process tap is created with
     //     muteBehavior = CATapMutedWhenTapped
-    //     (src/audio/src/backend/macos/process_tap.mm), so tapping an
+    //     (libs/audio/src/backend/macos/process_tap.mm), so tapping an
     //     application silences it at the point the tap takes its audio.
     //     That is deliberate - it is why this platform needs no silent
     //     device at all (docs/platforms/macos.md, "Per-application

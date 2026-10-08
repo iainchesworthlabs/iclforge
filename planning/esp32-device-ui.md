@@ -243,8 +243,8 @@ device's answers rather than work out the player's rules in the script.
 
 ### What a layout does
 
-From the code - `esp-idf/iclforge/src/player.cpp`, `src/render/include/iclforge/render/render.hpp` and the
-decoder's output stage, `src/ac3/src/decoder/output.cpp` - and checked under QEMU with the
+From the code - `esp-idf/iclforge/src/player.cpp`, `libs/render/include/iclforge/render/render.hpp` and the
+decoder's output stage, `libs/ac3/src/decoder/output.cpp` - and checked under QEMU with the
 [stream set](esp32-stream-set.md):
 
 | The layout | What the player does, whatever the stream |

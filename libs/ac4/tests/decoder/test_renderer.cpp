@@ -1,4 +1,4 @@
-// Part 2's channel renderer for the immersive element (src/ac4/src/decoder/pcm/
+// Part 2's channel renderer for the immersive element (libs/ac4/src/decoder/pcm/
 // renderer.hpp, ETSI TS 103 190-2 V1.3.1 clause 5.10.2) and the downmix stage
 // that runs it (pcm/downmix.hpp): Tables 38 to 43 and 45 and 46 transcribed
 // here a second time, as printed, and held against the renderer's matrices
@@ -65,7 +65,7 @@ constexpr double kGainT1 = 0.22;
 constexpr std::array<double, 6> kGainT2 = {0.31, 0.32, 0.33, 0.34, 0.35, 0.36};
 
 // The gains the 9.X rows print as gain_f1 and gain_f2, with a value of their own each. The tables'
-// labels are taken the other way round (src/ac4/ERRATA.md, "The 9.X.4 element's rendering"):
+// labels are taken the other way round (libs/ac4/ERRATA.md, "The 9.X.4 element's rendering"):
 // the coefficient printed gain_f1, on L and R, is the one Table 129's gain_f2 sets (default 0 dB),
 // and the one printed gain_f2, on C, Table 128's gain_f1 (default -inf).
 constexpr double kGainF1 = 0.41;  // RenderGains::gain_f1, Table 128
@@ -308,7 +308,7 @@ std::vector<S> decoded_714(bool lfe) {
 }
 
 // Where each decoded channel enters the generalized matrix under `layout`
-// in full decoding, by Tables 57 and 59 (src/ac4/ERRATA.md, "The
+// in full decoding, by Tables 57 and 59 (libs/ac4/ERRATA.md, "The
 // renderer's input channel configuration"): -1 where the input configuration
 // has no such channel.
 int full_input(const detail::ImmersiveLayout& layout, S speaker) {

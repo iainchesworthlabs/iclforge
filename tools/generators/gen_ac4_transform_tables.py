@@ -34,7 +34,7 @@ from _header_gen import wrap, write_or_check
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 HEADER = (
     REPO_ROOT
-    / "src"
+    / "libs"
     / "dsp"
     / "src"
     / "tiered"

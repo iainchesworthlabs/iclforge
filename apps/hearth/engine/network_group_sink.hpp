@@ -16,8 +16,8 @@
 
 // Forward-declared, not included: player.hpp includes this header
 // unconditionally (PlayerOutputs::group), and player.cpp/player.hpp must
-// stay buildable without src/sendspin at all (ICLFORGE_SENDSPIN_CORE_ONLY,
-// fuzz/run.sh) - the same reason output_decision.hpp carries a group by
+// stay buildable without libs/sendspin at all (ICLFORGE_SENDSPIN_CORE_ONLY,
+// tools/fuzz/run.sh) - the same reason output_decision.hpp carries a group by
 // plain std::string rather than a sendspin type, and pcm_sink.hpp/
 // bitstream_sink.hpp name no backend. GroupResolver only names
 // std::shared_ptr<Group>, never constructs or dereferences one, so the

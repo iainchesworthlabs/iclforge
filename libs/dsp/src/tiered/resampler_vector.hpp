@@ -5,7 +5,7 @@
 #include "iclforge/base/detail/simd.hpp"
 
 // The sample rate converter's dot product at float (dsp/resampler.cpp), on the seam's
-// 128-bit f32x4 (src/base/variants).
+// 128-bit f32x4 (libs/base/variants).
 //
 // A sequential sum of 94 to 100 products is a chain of dependent adds, and on the ESP32-P4's
 // single-precision FPU each add waits for the last. The sum is therefore split over four
@@ -16,7 +16,7 @@
 // multiply-add: the build pins -ffp-contract=off and the seam's operators are single
 // operations per lane), which is the seam's contract for its three directories: the x86-64
 // seam's SSE and the generic seam's four scalars, on the Cortex-M3 and the ESP32s, give the
-// same float, and the aarch64 seam's NEON is held to the same. tests/ac4/core/
+// same float, and the aarch64 seam's NEON is held to the same. libs/ac4/tests/core/
 // test_resampler.cpp holds the kernel to a loop of that description, written out, bit
 // for bit.
 //

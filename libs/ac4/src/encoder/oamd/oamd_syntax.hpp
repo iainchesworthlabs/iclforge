@@ -15,12 +15,12 @@
 // oamd_dyndata_multi(), object_info_block() with object_basic_info(),
 // object_render_info() and add_per_object_md() - and clause 6.2.2.4's
 // oamd_substream(). Transcribed for writing, separate from the decoder's reader
-// (src/ac4/src/decoder/syntax/oamd.cpp) and the Python parser; the traces agree
+// (libs/ac4/src/decoder/syntax/oamd.cpp) and the Python parser; the traces agree
 // record for record.
 //
 // The fields are the syntax's codes. A prefix code (oa_sample_offset_type and
 // oa_sample_offset_code, basic_info_md, object_gain_code) is one record of the
-// bits written, valued at them, as the decoder records it (src/ac4/
+// bits written, valued at them, as the decoder records it (libs/ac4/
 // ERRATA.md, "Prefix codes in the trace"); a flag array (group_zone_flag[],
 // trim_balance_presence[], ext_prec_pos_presence[]) is one field, its highest
 // index first.

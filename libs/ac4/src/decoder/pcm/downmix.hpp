@@ -31,13 +31,13 @@
 // pcm/renderer.hpp) instead of step 1: to the layout asked for, with the
 // correction 4.8.5.3 gives that output, and to 5.X.0 on the way to two
 // channels or one, the steps to which follow as for 5.X with the Lo/Ro or
-// Lt/Rt correction alone, the core's in core decoding (src/ac4/ERRATA.md,
+// Lt/Rt correction alone, the core's in core decoding (libs/ac4/ERRATA.md,
 // "The renderer's two-channel output").
 //
 // The mix values, the custom downmix data and the loudness corrections
 // persist from the frame that sends them until another does (6.2.17.0, Part
 // 2 clause 4.8.5.3). The gains are in dB, their linear values 10^(dB/20)
-// (src/ac4/ERRATA.md, "The downmix gains").
+// (libs/ac4/ERRATA.md, "The downmix gains").
 
 namespace iclforge::ac4::detail {
 

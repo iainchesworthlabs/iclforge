@@ -1,7 +1,7 @@
 # Header map
 
 The headers a caller normally reaches for, and what lives in each. The second component of a
-header's path is its library: `iclforge/render/layout.hpp` is in `src/render/include/` and belongs
+header's path is its library: `iclforge/render/layout.hpp` is in `libs/render/include/` and belongs
 to `iclforge::render`, and `iclforge_c/iclforge.h` is the C API's. Not the complete set under
 `src/*/include/` — the pure table headers (`iclforge/ac3/core/aht_tables.hpp`, `bitalloc_tables.hpp`,
 `iclforge/ac3/oba/joc_tables.hpp`), the primitives the ones below are built out of

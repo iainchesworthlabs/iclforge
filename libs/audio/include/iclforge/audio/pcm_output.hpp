@@ -20,7 +20,7 @@
 // six-channel shared-mode stream that Windows spreads over eight outputs
 // however its mixer sees fit, PipeWire and ALSA likewise, and Core Audio
 // refuses outright - a HAL device has no engine layer to do the reconciling
-// (src/audio/src/backend/macos/monitor.cpp's own header says why). None of
+// (libs/audio/src/backend/macos/monitor.cpp's own header says why). None of
 // that is what a player wants. Which speaker a rendered channel comes out of
 // is the room's business, and the renderer already has the type that records
 // it: iclforge::render::Routing.

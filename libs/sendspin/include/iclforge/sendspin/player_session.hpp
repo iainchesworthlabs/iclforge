@@ -27,7 +27,7 @@
 #include "iclforge/sendspin/transport.hpp"
 
 // One connection from a Sendspin client with the player role to a server: the player half of
-// src/sendspin (planning/hearth-reference-player.md, A4), as the test sink and hearth_sink use
+// libs/sendspin (planning/hearth-reference-player.md, A4), as the test sink and hearth_sink use
 // it.
 //
 // The session runs the handshake as the Noise responder, answers server/hello with its

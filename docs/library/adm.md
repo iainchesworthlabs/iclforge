@@ -64,7 +64,7 @@ back and prints what it found.
   `audioBlockFormat` time-divisions — position, gain, width/height/depth, `channelLock`,
   `jumpPosition`, `zoneExclusion`, `objectDivergence`, `screenRef`, `headLocked`, HOA
   order/degree/normalization) → `audioStreamFormat`/`audioTrackFormat` →
-  `audioTrackUID`. See [`iclforge/adm/model.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/adm/include/iclforge/adm/model.hpp) for exactly which sub-elements are carried and which
+  `audioTrackUID`. See [`iclforge/adm/model.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/adm/include/iclforge/adm/model.hpp) for exactly which sub-elements are carried and which
   are deliberately out of scope (the Matrix block's coefficients, which libadm has no model for,
   the Binaural-specific sub-elements, and loudness metadata — `iclforge::ac3::meta::loudness`
   already measures loudness independently).
@@ -93,17 +93,17 @@ above), `chna` (the join table, one `ChnaEntry` per physical-track-to-ADM-ID row
 (the decoded PCM, one `std::vector<float>` per channel, same `[-1, 1)` normalization convention
 `iclforge::ac3::io::WavData` uses). `AdmError` covers open/parse failure — `kCannotOpen`, `kNotRiff`,
 `kMalformedXml`, `kMalformedAdm`, `kOther`;
-see [`iclforge/adm/ac3adm.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/adm/include/iclforge/adm/ac3adm.hpp) for the full list. In practice, the two libraries underneath this
+see [`iclforge/adm/ac3adm.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/adm/include/iclforge/adm/ac3adm.hpp) for the full list. In practice, the two libraries underneath this
 module (see below) report almost everything through one broad exception family each, so most
 real failures surface as `kCannotOpen` (bad/truncated container), `kMalformedXml` (axml
 isn't well-formed XML) or `kMalformedAdm` (well-formed XML that isn't a valid ADM document) — see
-[`src/adm/src/adm.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/adm/src/adm.cpp)'s own comments for exactly which library exception maps to which `AdmError`.
+[`libs/adm/src/adm.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/adm/src/adm.cpp)'s own comments for exactly which library exception maps to which `AdmError`.
 
 ## Writing
 
 `write_bw64(path, document)` is the read side's mirror image: it turns an `AdmModel` (the same
 plain-data graph `parse_bw64` produces) into a libadm `adm::Document` (a new translator,
-`build_libadm_document()` in `src/adm/src/adm_model.cpp`, alongside the existing read-side
+`build_libadm_document()` in `libs/adm/src/adm_model.cpp`, alongside the existing read-side
 `build_adm_model()`), serializes it with `adm::writeXml()`, and writes the BW64 container
 (`<fmt >`/`<chna>`/`<axml>`/`<data>`) with libbw64's `Bw64Writer` (`bw64::writeFile()`) — the same
 two vendored libraries as the read side, in the other direction. 24-bit integer PCM by default
@@ -166,17 +166,17 @@ than cartesian (a default-constructed `AudioBlockFormat` is one: its `position` 
 
 Unlike every other module in this project, `iclforge::adm` is not a from-scratch implementation
 of its format. It is a thin translation layer over two vendored third-party libraries, fetched
-via CMake `FetchContent` (see [`src/adm/CMakeLists.txt`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/adm/CMakeLists.txt)):
+via CMake `FetchContent` (see [`libs/adm/CMakeLists.txt`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/adm/CMakeLists.txt)):
 
 - **[libbw64](https://github.com/pwnified/libbw64)** (Apache-2.0, header-only, no dependency of
   its own) — the BW64/RF64 chunk-walking and PCM-decoding layer, including native IEEE-float
   support. Fetched from a maintained fork of the EBU's own `github.com/ebu/libbw64`, pinned to a
   commit rather than a tag or branch — see
-  [`src/adm/CMakeLists.txt`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/adm/CMakeLists.txt)
+  [`libs/adm/CMakeLists.txt`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/adm/CMakeLists.txt)
   for why the EBU's own repository is not what this module fetches, and
   [the threat model](../threat-model.md#adm-xml-and-bw64) for what the pin does and does not
   cover. Patched at populate time by
-  [`src/adm/patch_libbw64.cmake`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/adm/patch_libbw64.cmake)
+  [`libs/adm/patch_libbw64.cmake`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/adm/patch_libbw64.cmake)
   for two behaviours this module's own tests need that the pinned commit does not have by
   default (a truncated recording reading as far as it goes; 64-bit float actually reaching the
   decode this fork's own utilities already support) — see that script.
@@ -187,7 +187,7 @@ libadm is the EBU/BBC/IRT team's own repository, the same team that authored the
 Recommendations (BS.2088-1, BS.2076-2) themselves; libbw64's fork carries that team's original
 code forward with fixes of its own on top. Using both means this module's own code only has to
 translate an already-validated object graph into `iclforge::adm`'s own types
-([`src/adm/src/adm_model.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/adm/src/adm_model.cpp)), rather than re-implementing container-walking and XML/schema
+([`libs/adm/src/adm_model.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/adm/src/adm_model.cpp)), rather than re-implementing container-walking and XML/schema
 validation this project has no comparative advantage in getting exactly right on the first try.
 An earlier attempt at exactly that hand-rolled approach is what prompted switching to these
 libraries instead.
@@ -220,7 +220,7 @@ libbw64/libadm, and behaves identically to a build of this project before this m
 no `iclforge::adm_static` to link against, since a static archive would leave a downstream
 consumer with unresolved symbols into libbw64/libadm (neither installed/exported by this project
 in its own right); a self-contained `.so` absorbs both at its own build step instead. It is
-**not** wired into the Android/Shield NDK build — see `src/adm/CMakeLists.txt`'s own header
+**not** wired into the Android/Shield NDK build — see `libs/adm/CMakeLists.txt`'s own header
 comment for both points.
 
 ## PCM formats
@@ -242,7 +242,7 @@ stored, not two.
 
 A file libbw64 opens and then rejects surfaces as `AdmError::kCannotOpen`; its exceptions carry
 no type this module could map to anything more specific — see
-[`ac3adm.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/adm/include/iclforge/adm/ac3adm.hpp)'s
+[`ac3adm.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/adm/include/iclforge/adm/ac3adm.hpp)'s
 own comment on `AdmError`.
 
 Most real ADM BWF masters are 16- or 24-bit integer (EBU Tech 3306/BS.2088-1 Annex 2 §2's own

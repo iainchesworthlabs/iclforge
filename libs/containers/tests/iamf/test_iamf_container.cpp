@@ -13,7 +13,7 @@
 
 // ISO-BMFF tests for iclforge::iamf: a file written by write_isobmff() read back by read_isobmff(),
 // trimming and the edit list, non-sync samples, and the fragmented writer, whose output is also
-// walked box by box with a reader written here independently of src/containers/src/iamf.
+// walked box by box with a reader written here independently of libs/containers/src/iamf.
 
 namespace iamf = iclforge::containers::iamf;
 

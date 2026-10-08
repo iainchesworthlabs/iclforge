@@ -3,10 +3,10 @@
 // Build-profile facts, in the MINIMUM-FOOTPRINT DECODER variant
 // (ICLFORGE_MINIMAL_DECODER, minimum-footprint decoder profile). Every ordinary build compiles the
 // identically-pathed header under src/internal/profile/full/ instead;
-// src/ac3/CMakeLists.txt picks the directory, so no source file here asks
+// libs/ac3/CMakeLists.txt picks the directory, so no source file here asks
 // which profile it is in with a preprocessor conditional
 // (tools/checks/check_platform_macros.ps1's rule, the same mechanism
-// ac3/internal/profiling.hpp and src/audio's platform backends use).
+// ac3/internal/profiling.hpp and libs/audio's platform backends use).
 //
 // Internal, never installed: these are facts about how this library was
 // built, not part of its API. A caller that needs to know whether the

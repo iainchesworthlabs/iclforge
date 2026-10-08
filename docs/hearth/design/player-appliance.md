@@ -56,7 +56,7 @@ Detail: [Hearth overview](../index.md).
   decoded for every local output, with the Decoder page's AC-4 controls and the Media page's AC-4
   information. A network group's members on the extension role that list AC-4 are sent the stream
   as bursts, and its PCM members get the decoded audio. No ESP32 sink lists AC-4 yet (phase I6).
-- **`src/sendspin`.** Shared by the desktop tools and the board.
+- **`libs/sendspin`.** Shared by the desktop tools and the board.
 - **ESP32-C6.** Decode probe timed on a board. `hearth_sink`'s Sendspin player runs on this board,
   stereo only: a ten-minute group run with an ESP32-S3 had no underruns on either board. Setup:
   [README, "On the ESP32-C6"](https://github.com/iainchesworthlabs/iclforge/blob/main/esp-idf/iclforge/examples/hearth_sink/README.md#on-the-esp32-c6).

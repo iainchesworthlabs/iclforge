@@ -19,7 +19,7 @@
 // `forge probe` (probe command), at the level its consumers actually use it:
 // the real binary, run as a subprocess, and the text it puts on stdout.
 //
-// tests/ac3/io/test_probe.cpp already holds the library's own contract - what the
+// libs/ac3/tests/io/test_probe.cpp already holds the library's own contract - what the
 // walk concludes about a stream. What is checked HERE is the part a library
 // test cannot see: that the JSON document matches the schema docs/forge/cli/
 // commands.md publishes, that the exit code is usable as a gate, and that both
@@ -242,7 +242,7 @@ TEST_CASE("probe reads a foreign E-AC-3 stream at both tiers", "[cli][probe]") {
     //
     // It parses cleanly now, and so does every other committed third-party
     // fixture, so the non-zero side of those counters has no committed stream
-    // left to reach it; tests/ac3/io/test_probe.cpp owns the synthetic side. What
+    // left to reach it; libs/ac3/tests/io/test_probe.cpp owns the synthetic side. What
     // this fixture still proves is worth keeping: the layout, rate, duration
     // and substream map below all come off the wire, and the parse tier agrees
     // with them on a stream no encoder here produced.
@@ -433,7 +433,7 @@ TEST_CASE("probe names a reserved dmixmod in both output forms, for both codecs"
     // mixmdate as well. The encoder will not write it, so each stream is the
     // '01' and '10' encodes of one tone ORed byte by byte - '01' | '10' is
     // '11', and every other bit meets an identical copy of itself - with each
-    // syncframe's CRCs re-stamped. tests/ac3/meta/test_bsi.cpp checks that this
+    // syncframe's CRCs re-stamped. libs/ac3/tests/meta/test_bsi.cpp checks that this
     // changes nothing but dmixmod.
     const auto make_reserved = [](const std::string& command, const std::string& name,
                                   const std::string& args) {
@@ -584,10 +584,10 @@ TEST_CASE("probe refuses a file that is not an elementary stream", "[cli][probe]
 // AC-3/E-AC-3 one above (see probe.cpp's own top comment on why), dispatched
 // by peeking the stream's first byte - 0x0B for AC-3/E-AC-3, 0xAC for AC-4 -
 // so nothing above exercises a line of it. The real DEE fixture below (the
-// same one tests/ac4/core/test_toc.cpp and test_cli_containers.cpp already use)
+// same one libs/ac4/tests/core/test_toc.cpp and test_cli_containers.cpp already use)
 // covers the "chan" substream shape; the two hand-built streams after it
 // cover the "ajoc" and "obj" shapes and a substream group's own OAMD flag,
-// none of which any committed fixture reaches - see tests/ac4/core/test_toc.cpp's
+// none of which any committed fixture reaches - see libs/ac4/tests/core/test_toc.cpp's
 // own "Synthetic object/A-JOC/OAMD vectors" section for the reasoning and the
 // BitWriter this is a trimmed copy of, duplicated per this project's own
 // per-file test-helper convention rather than shared across the two test
@@ -621,7 +621,7 @@ class Ac4BitWriter {
     std::vector<bool> bits_;
 };
 
-// tests/ac4/core/test_toc.cpp's write_ac4_object_coded_preamble() and
+// libs/ac4/tests/core/test_toc.cpp's write_ac4_object_coded_preamble() and
 // write_ac4_object_coded_group_preamble() concatenated - see that file for
 // the field-by-field trace against parse_toc()/parse_presentation_v1_info()/
 // parse_substream_group_info(): bitstream_version 2, a single presentation
@@ -669,7 +669,7 @@ void write_ac4_preamble(Ac4BitWriter& w) {
     w.put(0, 1);  // b_channel_coded
 }
 
-// tests/ac4/core/test_toc.cpp's write_ac4_single_empty_substream_index_table():
+// libs/ac4/tests/core/test_toc.cpp's write_ac4_single_empty_substream_index_table():
 // n_substreams=1, one zero-length substream_size entry. probe never reads a
 // substream's own audio bytes, so a zero-length entry round-trips fine.
 void write_ac4_single_empty_substream_index_table(Ac4BitWriter& w) {
@@ -680,7 +680,7 @@ void write_ac4_single_empty_substream_index_table(Ac4BitWriter& w) {
 }
 
 // Wraps a TOC's raw bytes (preamble + payload + trailer - exactly the span
-// iclforge::ac4::parse_raw_frame() itself expects, and what tests/ac4/core/test_toc.cpp
+// iclforge::ac4::parse_raw_frame() itself expects, and what libs/ac4/tests/core/test_toc.cpp
 // hands straight to it) into one Annex G.3.1 syncframe: sync_word 0xAC40 (no
 // crc_word - summarize_ac4() only counts a transmitted, failing CRC as a
 // failure, so omitting it costs this vector nothing) plus a plain 2-byte
@@ -716,7 +716,7 @@ TEST_CASE("probe reads a real AC-4 stream, in table and JSON form", "[cli][probe
     CHECK(json_field(document, "schema") == "\"iclforge.probe/1\"");
     const auto stream = json_section(document, "stream");
     CHECK(json_field(stream, "codec") == "\"ac4\"");
-    // Cross-checked against tests/ac4/core/test_toc.cpp's own scan() of this same
+    // Cross-checked against libs/ac4/tests/core/test_toc.cpp's own scan() of this same
     // fixture: 73 sync frames, every one CRC-clean.
     CHECK(json_field(stream, "access_units") == "73");
     CHECK(json_field(stream, "syncframes") == "73");
@@ -755,7 +755,7 @@ TEST_CASE("probe reads a real AC-4 stream, in table and JSON form", "[cli][probe
 
 TEST_CASE("probe writes an AC-4 stream's presentations and metadata", "[cli][probe][ac4]") {
     // DEE's 5.1 film leg: one version 1 presentation, and the metadata its
-    // presentation substream and I-frames send (tests/ac4/decoder/
+    // presentation substream and I-frames send (libs/ac4/tests/decoder/
     // test_api.cpp holds the decoder's report of them to the trace).
     const auto input = baseline("ac4-51-film-96", "dee.ac4");
     const auto log = scratch_dir() / "ac4_media.json";
@@ -806,7 +806,7 @@ TEST_CASE("probe writes an AC-4 stream's presentations and metadata", "[cli][pro
 }
 
 TEST_CASE("probe reports a hand-built AC-4 stream's A-JOC substream", "[cli][probe][ac4]") {
-    // The exact vector tests/ac4/core/test_toc.cpp's "parse_substream_info_ajoc:
+    // The exact vector libs/ac4/tests/core/test_toc.cpp's "parse_substream_info_ajoc:
     // static_dmx, minimal upmix" test already validated field by field -
     // reused verbatim rather than combined with another vector: an earlier
     // draft of this file spliced this payload onto the OAMD vector below's
@@ -858,7 +858,7 @@ TEST_CASE("probe reports a hand-built AC-4 stream's A-JOC substream", "[cli][pro
 TEST_CASE("probe reports a hand-built AC-4 stream's group-level OAMD flag", "[cli][probe][ac4]") {
     // ac4_substream_group_info()'s own OAMD flag (b_oamd_substream) is
     // independent of any one substream's kind - the exact vector
-    // tests/ac4/core/test_toc.cpp's "parse_oamd_substream_info via
+    // libs/ac4/tests/core/test_toc.cpp's "parse_oamd_substream_info via
     // ac4_substream_group_info's b_oamd_substream" test already validated,
     // reused verbatim (see the A-JOC test above for why this is its own
     // frame rather than spliced onto that one).
@@ -955,7 +955,7 @@ TEST_CASE("probe reports the common data of a group's own OAMD substream", "[cli
 TEST_CASE("probe reports a hand-built AC-4 stream's Obj substream and its bed/dynamic objects",
           "[cli][probe][ac4]") {
     // Section 6.3.2.10's dynamic-objects-plus-LFE-bed shape - the exact
-    // vector tests/ac4/core/test_toc.cpp's "parse_substream_info_obj: dynamic
+    // vector libs/ac4/tests/core/test_toc.cpp's "parse_substream_info_obj: dynamic
     // objects with an LFE bed object" test already validated field by field.
     Ac4BitWriter w;
     write_ac4_preamble(w);
@@ -993,7 +993,7 @@ TEST_CASE("probe reports a hand-built AC-4 stream's Obj substream and its bed/dy
     REQUIRE(run_cli("probe \"" + path.string() + "\"", table_log) == 0);
     const auto table = read_log(table_log);
     INFO(table);
-    // The LFE on top of n_objects_code's two (src/ac4/ERRATA.md,
+    // The LFE on top of n_objects_code's two (libs/ac4/ERRATA.md,
     // "n_objects_code and the LFE").
     CHECK(table.find("object, 3 object(s) (dynamic)") != std::string::npos);
 }

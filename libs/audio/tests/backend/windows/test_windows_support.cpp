@@ -12,12 +12,12 @@
 // ComScope/make_enumerator actually touch - COM itself, and whatever
 // endpoints happen to be attached. What is left, and worth testing on its
 // own, is stream_gone(): a pure HRESULT classifier, the same shape
-// tests/audio/backend/android/test_android_support.cpp's track_is_dead() is for
+// libs/audio/tests/backend/android/test_android_support.cpp's track_is_dead() is for
 // AudioTrack.write()'s return value.
 //
 // CMake adds this file to the suite only when it selected the windows/
 // platform directory, and puts that directory on the include path - the same
-// selection tests/audio/backend/alsa, tests/audio/backend/android and tests/audio/backend/macos
+// selection libs/audio/tests/backend/alsa, libs/audio/tests/backend/android and libs/audio/tests/backend/macos
 // already use for their own backend's internal header.
 
 using iclforge::windows_audio::stream_gone;

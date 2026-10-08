@@ -19,7 +19,7 @@
 // A Sendspin player on a board: the WebSocket a server connects to, a
 // PlayerSession for each connection, admission between servers, pairing and
 // the records it leaves (planning/hearth-reference-player.md, B3;
-// planning/hearth-sendspin-extension.md). src/sendspin's player half does the
+// planning/hearth-sendspin-extension.md). libs/sendspin's player half does the
 // protocol; this is what a board adds around it, and what the test sink's
 // Sink class (apps/hearth/testsink/sink.cpp) is on a computer.
 //

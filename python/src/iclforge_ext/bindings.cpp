@@ -2,7 +2,7 @@
 // iclforge::ac3::FrameDecoder, iclforge::ac3::Eac3Decoder and iclforge::ac3::oba::AtmosEncoder
 // directly (pybind11-direct, per the roadmap's own dependency note - no intermediate C API). Every
 // C++ class kept here is exactly the one declared in
-// src/ac3/include/iclforge/ac3/{encoder/encoder,decoder/decoder,oba/atmos}.hpp; this file adds no
+// libs/ac3/include/iclforge/ac3/{encoder/encoder,decoder/decoder,oba/atmos}.hpp; this file adds no
 // codec behaviour of its own; error handling exists only because Python has no std::expected-shaped
 // calling convention.
 //
@@ -184,7 +184,7 @@ struct ScanProgrammeInfo {
 // programme's) already converted to owned py::bytes - see ScanProgrammeInfo's comment above for
 // why. access_unit_timing()/stream_duration_samples() and friends (bound as free functions
 // below) only ever read `access_unit_samples`/`sample_rate` off a ScannedStream (confirmed
-// against src/ac3/src/io/elementary.cpp), so they reconstruct a throwaway
+// against libs/ac3/src/io/elementary.cpp), so they reconstruct a throwaway
 // iclforge::ac3::io::ScannedStream from those two fields alone rather than needing this struct to
 // keep the real one, spans and all, alive.
 struct ScanResult {

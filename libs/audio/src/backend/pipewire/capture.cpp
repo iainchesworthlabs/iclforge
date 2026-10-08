@@ -2,7 +2,7 @@
 
 // The PipeWire capture backend. CMake compiles this directory's capture.cpp
 // on a Linux host that selected pipewire/ over alsa/ (see
-// src/audio/CMakeLists.txt for the precedence between them) and another
+// libs/audio/CMakeLists.txt for the precedence between them) and another
 // directory's everywhere else, so there is no #ifdef here - the file's path
 // is what says "PipeWire".
 //

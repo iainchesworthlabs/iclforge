@@ -25,7 +25,7 @@
 //
 // So the definitions live in ONE of two CMake-selected translation units -
 // src/core/transform/{reference,stub}/reference_transform.cpp - exactly as
-// ac3/internal/profiling.hpp and src/audio's platform backends are selected,
+// ac3/internal/profiling.hpp and libs/audio's platform backends are selected,
 // and for the same reason (tools/checks/check_platform_macros.ps1: no
 // #ifdef). iclforge::ac3::internal::kReferenceTransformAvailable
 // (ac3/internal/profile.hpp, selected the same way) says which one is in the

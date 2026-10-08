@@ -1,4 +1,4 @@
-// A-JOC in the AC-4 shared core (src/ac4/src/core/ajoc): ETSI TS 103 190-2
+// A-JOC in the AC-4 shared core (libs/ac4/src/core/ajoc): ETSI TS 103 190-2
 // V1.3.1 clause 5.7's band mapping (Table 28), dequantisation (Tables 29 to
 // 32) and differential decoding (Pseudocode 16), and the reconstruction
 // (Pseudocodes 17 and 18) against its formulas on inputs whose outputs can be
@@ -189,7 +189,7 @@ TEST_CASE("A-JOC's dry matrix gives C_dry x once its ramp has run", "[ac4][core]
 TEST_CASE("A-JOC's ramp reaches its target in ajoc_ramp_len slots and holds", "[ac4][core][ajoc]") {
     // Pseudocodes 17 and 18: the value moves by (target - prev) / ramp_len a
     // slot from the slot after ajoc_start_pos, so it arrives after ramp_len
-    // slots and stays (src/ac4/ERRATA.md, "A-JOC's ramp").
+    // slots and stays (libs/ac4/ERRATA.md, "A-JOC's ramp").
     ajoc::FrameParameters p = parameters({{1.0}}, 1, 4, 8);
     auto r = std::make_unique<ajoc::Reconstruction<double>>();
     Run run({constant({1.0, 0.0})}, 1);
@@ -279,7 +279,7 @@ TEST_CASE("A-JOC's wet path is the ducked decorrelator of D x, D = |C_wet| C_dry
 
 TEST_CASE("A-JOC's decorrelation input matrix takes each object at its own bands",
           "[ac4][core][ajoc]") {
-    // Two objects of 23 bands and of 1 on one decorrelator (src/ac4/
+    // Two objects of 23 bands and of 1 on one decorrelator (libs/ac4/
     // ERRATA.md, "The decorrelation input matrix"): in subband sb, D is
     // |wet_0| dry_0 at object 0's band of sb plus |wet_1| dry_1, object 1's
     // one band covering every subband.

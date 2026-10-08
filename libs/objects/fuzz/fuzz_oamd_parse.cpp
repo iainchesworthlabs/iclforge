@@ -4,7 +4,7 @@
 
 #include "iclforge/objects/oamd.hpp"
 
-// iclforge::objects::oba::parse_payload (src/objects/src/oamd.cpp) - the
+// iclforge::objects::oba::parse_payload (libs/objects/src/oamd.cpp) - the
 // object_audio_metadata_payload of TS 103 420 §5, as recovered from an EMDF
 // payload with id 11.
 //

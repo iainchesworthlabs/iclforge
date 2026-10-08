@@ -19,9 +19,9 @@ TestCase {
     }
 
     readonly property url stereoUrl:
-        Qt.resolvedUrl("../../../../fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
+        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
     readonly property url surroundUrl:
-        Qt.resolvedUrl("../../../../fuzz/seeds/fuzz_wav_read/roundtrip-51.wav")
+        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-51.wav")
 
     // The controller is one singleton shared across every tst_*.qml file in
     // this binary, run in a platform-dependent order - a test here that left

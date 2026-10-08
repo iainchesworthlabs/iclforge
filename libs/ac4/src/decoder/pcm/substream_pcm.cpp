@@ -34,7 +34,7 @@ constexpr std::array<int, 14> kControlDelay = {1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 4, 
 // 2" from the informative example after Table 187, puts full scale at 2^15:
 // DEE's streams of a -20 dBFS tone decode to 0.1 * 32 768 within 0.01 dB. The
 // QMF domain works at that scale, and the output is scaled to full scale 1.0.
-// See src/ac4/ERRATA.md, "Full scale, and the overlap-add's factor of two".
+// See libs/ac4/ERRATA.md, "Full scale, and the overlap-add's factor of two".
 // At Fixed32 the time and QMF domains are below the double decoder's by
 // dsp::tiered::kTimeShift and dsp::tiered::kQmfShift (core/dsp/scalar_traits.hpp),
 // where full scale is 2^(15 + the shift).
@@ -48,7 +48,7 @@ template <typename R>
 }
 constexpr Real kQmfFullScale = qmf_full_scale<Real>();
 
-// The QMF analysis and synthesis banks together (tests/ac4/core).
+// The QMF analysis and synthesis banks together (libs/ac4/tests/core).
 constexpr int kQmfPairDelay = 577;
 
 // An output sample, times `gain`, at full scale 1.0. Output far beyond full
@@ -691,7 +691,7 @@ void SubstreamPcm::apply(const Control& control) {
 
 void SubstreamPcm::apply_ajoc(const AjocFrameValues& values, double dialogue_db) {
     // QinAJOC: a var_channel_element()'s outputs through Pseudocode 14a, or a
-    // static downmix's L, R, C, Ls and Rs (src/ac4/ERRATA.md, "A static
+    // static downmix's L, R, C, Ls and Rs (libs/ac4/ERRATA.md, "A static
     // downmix's inputs").
     const int m = values.params.num_dmx;
     ajoc_inputs_.clear();
@@ -759,7 +759,7 @@ void SubstreamPcm::synthesise_objects(const FrameInputs& frame_inputs, const Drc
     }
     // Clause 5.7.9.3.3's output level gain, 2^((Lout - dialnorm) / 6), where
     // the system sets an output level; no compression, which Part 1 defines
-    // on channels (src/ac4/ERRATA.md, "DRC and object audio").
+    // on channels (libs/ac4/ERRATA.md, "DRC and object audio").
     double gain = 1.0;
     if (frame_inputs.output.output_level_dbfs && drc.dialnorm) {
         gain = std::pow(2.0, (*frame_inputs.output.output_level_dbfs - *drc.dialnorm) / 6.0);
@@ -1022,7 +1022,7 @@ ParseResult SubstreamPcm::decode(const SubstreamContext& ctx, const AudioSubstre
         // Part 2 Table 8 lists the 22_2_channel_element for "only full
         // decoding supported", and no table of clause 5.10.2's renderer
         // (Tables 35 to 43) has a 22.2 input: the element is delivered as
-        // coded, 24 channels, or not at all (src/ac4/ERRATA.md, "The 22.2
+        // coded, 24 channels, or not at all (libs/ac4/ERRATA.md, "The 22.2
         // element's output").
         if (frame_inputs.decoding == DecodingMode::kCore) {
             return fail(

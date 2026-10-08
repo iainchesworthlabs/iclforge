@@ -232,41 +232,41 @@ and where the raw-pointer boundaries are, the per-access-unit resource limits, a
 # the libraries — src/ is installable, apps/ consumes it and never the reverse. Each src/<name>/ is
 # the CMake target iclforge::<name>, the headers iclforge/<name>/ and the library iclforge_<name>;
 # tools/checks/layering.json says which library may include which
-src/base/       iclforge::base — bit I/O, the speaker vocabulary, the CPU probe and the profiling
+libs/base/       iclforge::base — bit I/O, the speaker vocabulary, the CPU probe and the profiling
                 hooks every library shares, the signing key with SHA-256 and HMAC-SHA-256, and,
                 header-only and not installed, Fixed32, the project's own float functions and the
                 SIMD seam iclforge::ac3 and iclforge::ac4 share; it knows no codec
-src/dsp/        iclforge::dsp — the FFT kernel, the 64-band QMF bank, the sample-rate converter and
+libs/dsp/        iclforge::dsp — the FFT kernel, the 64-band QMF bank, the sample-rate converter and
                 the filter sections more than one library uses
-src/objects/    iclforge::objects — the object-audio model: object paths and scenes, the Object Audio
+libs/objects/    iclforge::objects — the object-audio model: object paths and scenes, the Object Audio
                 Metadata payload and the EMDF container it travels in; codec-blind
-src/render/     iclforge::render — the room's layout, routing, the bed and object renderer and the
+libs/render/     iclforge::render — the room's layout, routing, the bed and object renderer and the
                 panner; links no codec
-src/ac3/        iclforge::ac3 — the AC-3, E-AC-3 and Atmos codec, and the EMDF object signer (key
+libs/ac3/        iclforge::ac3 — the AC-3, E-AC-3 and Atmos codec, and the EMDF object signer (key
                 supplied at runtime), GUI-free
-src/ac4/        iclforge::ac4 — the AC-4 codec, from ETSI TS 103 190-1 and -2: the sync frame, TOC and
-                presentation inspector, the decoder and the encoder, laid out as src/ac3 is (core/,
+libs/ac4/        iclforge::ac4 — the AC-4 codec, from ETSI TS 103 190-1 and -2: the sync frame, TOC and
+                presentation inspector, the decoder and the encoder, laid out as libs/ac3 is (core/,
                 io/, decoder/, encoder/); no iclforge::ac3 dependency
-src/containers/ iclforge::containers — codec-blind carriage, no iclforge::ac3 dependency, in parts
+libs/containers/ iclforge::containers — codec-blind carriage, no iclforge::ac3 dependency, in parts
                 (iclforge::containers::<part>): iec61937 (burst packing and detection for AC-3,
                 E-AC-3 and AC-4), matroska (MKV), mp4 (MP4/ISOBMFF plus fMP4/CMAF + HLS/DASH),
                 mpegts (MPEG-2 Transport Stream) and iamf (IAMF v2.0 OBU/ISOBMFF, fed from an
                 E-AC-3 decode), each a writer and a reader
-src/iab/        iclforge::iab — a standalone SMPTE ST 2098-2 (IAB) bitstream reader, codec-blind
-src/adm/        iclforge::adm — BW64/RF64 + Audio Definition Model reader, and the bridge from the
+libs/iab/        iclforge::iab — a standalone SMPTE ST 2098-2 (IAB) bitstream reader, codec-blind
+libs/adm/        iclforge::adm — BW64/RF64 + Audio Definition Model reader, and the bridge from the
                 object graph it parses to the Atmos encoder's input (opt-in, needs Boost)
-src/capi/       iclforge_c — a plain-C11 surface over the AC-3, E-AC-3 and AC-4 encode/decode
+libs/capi/       iclforge_c — a plain-C11 surface over the AC-3, E-AC-3 and AC-4 encode/decode
                 cores, for bindings and callers that do not link C++23
-src/sendspin/   iclforge::sendspin — Sendspin player and server for Hearth (desktop tools and the
+libs/sendspin/   iclforge::sendspin — Sendspin player and server for Hearth (desktop tools and the
                 ESP32 sink); built with the hearth feature, not as part of the codec library
 python/         the iclforge Python package — pybind11 bindings straight onto iclforge::ac3 and the
                 AC-4 library
 js/             iclforge-wasm-decoder — the npm streaming decoder package (AudioWorklet + Worker),
                 with a typed wrapper for the AC-4 WebAssembly module
-rust/           iclforge-sys and iclforge — Rust crates over the C API in src/capi
+rust/           iclforge-sys and iclforge — Rust crates over the C API in libs/capi
 examples/       the programs docs/library/ is written from
 fuzz/           libFuzzer harnesses over untrusted-input entry points (Clang only, off by
-                default) — see fuzz/README.md
+                default) — see tools/fuzz/README.md
 apps/baremetal/ iclforge-probe — the minimum-footprint probes (AC-3 and E-AC-3 decode, the encoders,
                 the AC-4 decoder), cross-compiled for arm-none-eabi and run under QEMU, or built
                 natively on the host
@@ -304,7 +304,7 @@ apps/wasm/      the browser demos, decode and encode, over iclforge::ac3 compile
 cmake/          toolchains, Qt/CPack/sanitizer/coverage modules, vcpkg triplet overlays
 assets/         the app-icon source: one procedural mark, plus a hand-authored SVG for the
                 WASM favicon; every .ico/.icns/.png/mipmap in the tree is generated from it
-src/audio/      iclforge::audio — the platform audio backends: WASAPI, ALSA, PipeWire, CoreAudio,
+libs/audio/      iclforge::audio — the platform audio backends: WASAPI, ALSA, PipeWire, CoreAudio,
                 Android, null fallback; linked by the programs, not installed
 tests/          Catch2 unit tests; golden/ vectors generated by tools/
 tools/          Python: table/fixture generators and the published conformance vector

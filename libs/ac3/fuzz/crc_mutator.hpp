@@ -3,7 +3,7 @@
 // A libFuzzer custom mutator that re-stamps AC-3/E-AC-3 CRC words after
 // mutating, shared by fuzz_ac3_decode and fuzz_eac3_decode.
 //
-// Why: fuzz/README.md's own note on the differential harnesses records the
+// Why: tools/fuzz/README.md's own note on the differential harnesses records the
 // problem - "the overwhelming majority of mutations get rejected immediately
 // by this project's own decoder (bad sync word, bad CRC, a reserved field)".
 // Of those three, bad CRC is the one that is pure loss. A bad sync word or a
@@ -21,7 +21,7 @@
 // read zero after the first 5/8 of the syncframe has been shifted through,
 // and explicitly says crc1 is not the CRC of that region. It is solved for,
 // through the GF(2) polynomial inverse iclforge::ac3::solve_leading_crc implements -
-// the same call src/ac3/src/encoder/encoder.cpp makes, including its
+// the same call libs/ac3/src/encoder/encoder.cpp makes, including its
 // crc2 == kSyncWord avoidance step (a crc2 that happens to equal 0x0B77 would
 // make the frame's own tail look like the start of the next syncframe, so the
 // encoder flips crcrsv and recomputes; a mutator that skipped this would

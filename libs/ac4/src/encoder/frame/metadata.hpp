@@ -208,7 +208,7 @@ struct EmdfPayloadCodes {
 
 // An alternative presentation's fields in its presentation substream (Part 2
 // clause 6.2.2.3): its name's bytes, sent whole with a 0 after them (clause
-// 6.3.3.1.4), and one target, which src/ac4/ERRATA.md ("An alternative
+// 6.3.3.1.4), and one target, which libs/ac4/ERRATA.md ("An alternative
 // presentation's target") reads.
 struct AlternativeCodes {
     std::vector<std::uint8_t> name;  // without the terminating 0; empty for no name

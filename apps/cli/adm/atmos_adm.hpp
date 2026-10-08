@@ -23,7 +23,7 @@
 // header comment says a feature-flag #ifdef is "just as unwelcome as a platform one". So whether
 // iclforge::adm exist in this particular build has to be a build-time FILE
 // choice, the same "exactly one implementation, selected by CMake" shape
-// apps/cli/platform/{windows,posix}/ stdio_binary.cpp and src/audio's own src/backend/<os>/
+// apps/cli/platform/{windows,posix}/ stdio_binary.cpp and libs/audio's own src/backend/<os>/
 // directory already use for an OS difference - here for a library-linked-or-not difference instead.
 // apps/cli/CMakeLists.txt adds exactly one of adm/enabled/atmos_adm.cpp or
 // adm/disabled/atmos_adm.cpp to the forge target; main.cpp calls the two functions below

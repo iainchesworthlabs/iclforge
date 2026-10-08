@@ -34,7 +34,7 @@ constexpr std::size_t kNone = kIndices;
 
 using Rows = std::array<std::array<double, kIndices>, kIndices>;  // [out][in]
 
-// A coefficient in dB as the tables print it, linear (src/ac4/ERRATA.md,
+// A coefficient in dB as the tables print it, linear (libs/ac4/ERRATA.md,
 // "The downmix gains").
 [[nodiscard]] double from_db(double db) noexcept {
     return std::pow(10.0, db / 20.0);
@@ -283,7 +283,7 @@ RenderGains render_gains(const CustomDmxData* cdmx, int out_ch_config) noexcept 
         // Table 128's gain_f1 (3.0 to -6.0 dB, then -inf) and Table 129's gain_f2.
         constexpr std::array<double, 8> kGainF1Db = {3.0, 1.5, 0.0, -1.5, -3.0, -4.5, -6.0, 0.0};
         // tool_scr_to_c_l() (6.2.9.4) sends the screen pair to C (b_put_screen_to_c 1, gain_f1) or
-        // to L and R (0, gain_f2): the one it does not name takes -inf dB (src/ac4/ERRATA.md,
+        // to L and R (0, gain_f2): the one it does not name takes -inf dB (libs/ac4/ERRATA.md,
         // "The 9.X.4 element's rendering").
         if (own->b_put_screen_to_c) {
             (*own->b_put_screen_to_c ? g.gain_f2 : g.gain_f1) = 0.0;

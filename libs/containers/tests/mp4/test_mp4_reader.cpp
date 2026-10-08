@@ -24,7 +24,7 @@ namespace {
 
 using Bytes = std::vector<std::byte>;
 
-// --- a hand ISOBMFF writer, independent of src/containers/src/mp4 ----------------------
+// --- a hand ISOBMFF writer, independent of libs/containers/src/mp4 ----------------------
 
 void put_u8(Bytes& out, std::uint8_t value) { out.push_back(static_cast<std::byte>(value)); }
 

@@ -12,9 +12,9 @@
 // engine decodes as well, the local gold set or the third-party streams; a
 // stream in syntax this version refuses by name is counted, not failed.
 //
-// Under the sanitizers (tests/sanitized.hpp) the engine plays one committed
+// Under the sanitizers (tests/support/sanitized.hpp) the engine plays one committed
 // stream of each kind, and of a long stream its first 5 frames
-// (tests/ac4_stream_kinds.hpp, which tests/hearth/test_ac4_engine.cpp shares).
+// (tests/support/ac4_stream_kinds.hpp, which tests/hearth/test_ac4_engine.cpp shares).
 // Each stream is decoded twice, and DEE's 120-frame legs took most of the ASan
 // leg's time for this test. A kind is a frame rate, the channels and substream
 // roles of the presentation decode() plays, how the stream codes its objects,
@@ -683,7 +683,7 @@ TEST_CASE("presentations() names an alternative presentation as its chunks arriv
     // tests/golden/ac4/presentations/presentation-names.tsv: each case a sequence of
     // frames' presentation_name bytes, or "-" for a frame without one, and the
     // name after the last. tools/checks/test_ac4_presentation_names.py holds
-    // the Python reference to the same table (src/ac4/ERRATA.md, "A
+    // the Python reference to the same table (libs/ac4/ERRATA.md, "A
     // presentation name in chunks").
     std::ifstream in(fs::path{AC4_GOLDEN_DIR} / "presentations" / "presentation-names.tsv");
     REQUIRE(in.good());

@@ -5,7 +5,7 @@ package com.iclforge.shield
  * call that goes the other way.
  *
  * `registerPassthroughBridge` is declared here now (implemented in
- * src/audio/src/backend/android/passthrough.cpp) even though
+ * libs/audio/src/backend/android/passthrough.cpp) even though
  * [PassthroughBridge] itself does not exist yet - the native symbol name is
  * part of the JNI contract fixed by mangling
  * (`Java_com_iclforge_shield_NativeBridge_registerPassthroughBridge`), so the
@@ -175,7 +175,7 @@ object NativeBridge {
      *
      * The two height lines are not independent measurements: the decoded one
      * is the intended one put through the format's own quantiser, and
-     * `tests/ac3/oba/test_atmos.cpp` asserts exactly that. What is worth seeing is
+     * `libs/ac3/tests/oba/test_atmos.cpp` asserts exactly that. What is worth seeing is
      * the QUANTISER — height travels in 16 steps against a smooth intended
      * line — and, when OBJECTS OFF is engaged, the third value going to zero,
      * which is a decoder independently confirming the object layer is no

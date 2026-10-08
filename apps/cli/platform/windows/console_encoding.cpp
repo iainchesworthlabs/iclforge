@@ -5,7 +5,7 @@
 // WIN32_LEAN_AND_MEAN and NOMINMAX come from target_compile_definitions in
 // this directory's CMakeLists.txt, not from a #define above the include -
 // tools/checks/check_platform_macros.ps1's header comment says why, and
-// src/audio/CMakeLists.txt is the worked example it points at.
+// libs/audio/CMakeLists.txt is the worked example it points at.
 
 namespace iclforge::cli::platform {
 

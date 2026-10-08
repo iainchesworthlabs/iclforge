@@ -7,7 +7,7 @@
 
 #include "iclforge/base/bitwriter.hpp"
 
-// IAB's writer over iclforge::BitWriter (src/base), the mirror of bitreader.hpp: what it adds is
+// IAB's writer over iclforge::BitWriter (libs/base), the mirror of bitreader.hpp: what it adds is
 // Plex(n), and a field's bits above its width ignored, as this format's writers rely on. The first
 // bit written is the most significant bit of the first byte (SMPTE ST 2098-2:2022 §5.1). Position 0
 // is the start of the element being built, so align() pads relative to the element, as the

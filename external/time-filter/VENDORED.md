@@ -8,7 +8,7 @@
   and `LICENSE`, all unmodified.
 
 The Sendspin specification requires a player to use this filter to map server timestamps to its
-own clock (`messaging.md`, Clock Synchronization). `src/sendspin` builds it as its own target,
+own clock (`messaging.md`, Clock Synchronization). `libs/sendspin` builds it as its own target,
 `ac3sendspin_time_filter`, outside the project's warning set, so the files stay as upstream
 wrote them. Update by replacing the five files from a newer commit and changing the commit
 above.

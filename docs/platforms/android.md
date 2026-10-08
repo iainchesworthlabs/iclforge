@@ -45,13 +45,13 @@ adb -s <shield-ip>:5555 shell am start -n com.iclforge.shield/.MainActivity
 
 ## What's reused, what's new
 
-`iclforge::ac3` (`src/ac3/`) — the codec and `AtmosEncoder` — and the libraries it links, among them
+`iclforge::ac3` (`libs/ac3/`) — the codec and `AtmosEncoder` — and the libraries it links, among them
 `iclforge::containers::iec61937` for the IEC 61937 framing, are fully platform-independent and are linked into the app **unmodified**, via a thin wrapper
 `CMakeLists.txt` (`apps/android/app/src/main/cpp/CMakeLists.txt`) that `add_subdirectory()`s
-the real repo root rather than duplicating its target definitions. `iclforge::audio` (`src/audio/`)
-gains its own backend, `src/audio/src/backend/android/`, alongside `windows`/`alsa`/`pipewire`/
+the real repo root rather than duplicating its target definitions. `iclforge::audio` (`libs/audio/`)
+gains its own backend, `libs/audio/src/backend/android/`, alongside `windows`/`alsa`/`pipewire`/
 `posix`/`macos`, selected by CMake's own `ANDROID` variable (set by the NDK toolchain file, a peer check
-to the existing `WIN32`/`LINUX`/`APPLE` blocks in `src/audio/CMakeLists.txt`) — no `#ifdef`
+to the existing `WIN32`/`LINUX`/`APPLE` blocks in `libs/audio/CMakeLists.txt`) — no `#ifdef`
 anywhere, per the project's
 [platform-tree convention](raspberry-pi.md#why-theres-no-raspberry-pi-specific-code).
 
@@ -82,8 +82,8 @@ regardless (it never muxes a file).
 The same libc++ implements only `<charconv>`'s **integer** `from_chars`, not its floating-point
 overloads — a gap {fmt} does not close, since {fmt} only formats text *out*, the same direction
 `std::format` goes. Library code that has to turn text *into* a `double` therefore uses `strtod`
-instead (`src/ac3/src/encoder/plan.cpp`, `encoder/assignment.cpp`,
-`src/objects/src/scene_text.hpp`, which also serves the object-scene file formats' parsing —
+instead (`libs/ac3/src/encoder/plan.cpp`, `encoder/assignment.cpp`,
+`libs/objects/src/scene_text.hpp`, which also serves the object-scene file formats' parsing —
 the write side of that same file goes through `fmt::format`, like everything else, once {fmt}
 made that safe). The macOS wheel's own deployment target has the identical `from_chars` gap
 (`'from_chars' is unavailable: introduced in macOS 26.0`) — {fmt}'s own vendored formatting avoids
@@ -148,7 +148,7 @@ So the backend is split, unlike the other three:
 
 **The app does nothing with AC-4.** Its native library, `iclforge_jni`, links `iclforge::ac3` (with
 its object signer) and `iclforge::audio` and not the AC-4 library
-(`src/ac4`). The wrapper `CMakeLists.txt` leaves `ICLFORGE_BUILD_AC4` at its
+(`libs/ac4`). The wrapper `CMakeLists.txt` leaves `ICLFORGE_BUILD_AC4` at its
 default, on, so the NDK build compiles the library and holds its sources to building under
 NDK r26 (`tools/checks/test_ac4_build_configurations.py` holds it to that default), and nothing
 calls them. The live encode loop makes E-AC-3 only. The `play_file` diagnostic (below) replays
@@ -233,7 +233,7 @@ locked, audio never did). `app/build.gradle.kts`'s `debug` build type now overri
 profiling (`ICLFORGE_ENABLE_TRACY`) traced the rest of the gap to `mdct_forward_core`
 recomputing `std::cos()` fresh every iteration inside an O(N²) loop, while the *inverse*
 transform beside it already used a precomputed table; fixing the forward transform to match
-(`ForwardCosTable` in `src/ac3/src/core/mdct.cpp`) gave a further ~3.8x. This is a real
+(`ForwardCosTable` in `libs/ac3/src/core/mdct.cpp`) gave a further ~3.8x. This is a real
 library-level fix — bit-exact against the full test suite, benefiting every platform's Atmos
 encode path, not an Android-specific workaround. With both fixes the Shield holds an exact
 32.0 ms/frame cadence with zero underruns. See [Performance trend](../performance-trend.md) for
@@ -393,7 +393,7 @@ believing anything the panel says.
   NOT Dolby's. §7.1 fixes the filterbank's shape and does not publish its coefficients". A
   per-object SNR here would hold constant precisely the variable most likely to explain a
   disagreement with a real decoder, which is worse than useless: it would look like evidence.
-- **The decoded position is an algebraic identity, not a discovery.** `tests/ac3/oba/test_atmos.cpp`
+- **The decoded position is an algebraic identity, not a discovery.** `libs/ac3/tests/oba/test_atmos.cpp`
   asserts that the decoded position equals the encoder's own `quantize_xy`/`quantize_z` of the
   intended one, exactly. It cannot surprise unless the bitstream is broken.
 - **So what is it showing?** The **quantiser**. Height is sent as a sign bit plus four bits of
@@ -679,7 +679,7 @@ receiver into an on-screen accusation.
     audio: a real Dolby-licensed decoder gates JOC object decode on a keyed HMAC over the EMDF
     protection field. The algorithm that produces that tag is in-tree; the key it needs is not.
 
-The signer is `iclforge::ac3::signing` (`src/ac3/src/signing/`) — committed, clean-room and dependency-free, the
+The signer is `iclforge::ac3::signing` (`libs/ac3/src/signing/`) — committed, clean-room and dependency-free, the
 same library `forge` uses. Its full design (what's signed, why the algorithm is committable but
 the key isn't) is in [Object signing](../concepts/object-signing.md); this section covers only what
 is specific to the app. The app's seam is `shield_signing_hook.{hpp,cpp}`, one committed
@@ -818,7 +818,7 @@ like any other non-experimental job.
     `./gradlew :app:connectedDebugAndroidTest` against a GitHub-hosted API-30 x86_64 emulator
     (KVM acceleration is x86/x86_64-only on those runners, so the debug build type targets
     x86_64 alongside the real device's arm64-v8a; release stays arm64-v8a-only). Before this,
-    nothing ran any Kotlin-level test at all — only `tests/audio/backend/android/`'s C++-side
+    nothing ran any Kotlin-level test at all — only `libs/audio/tests/backend/android/`'s C++-side
     device-free logic (burst sizing, carrier rate, render-device construction) on the ordinary
     desktop-hosted CTest suite. Every emulator case is a **"no receiver attached" contract
     check**: the emulator runs `-noaudio`, which makes `isDirectPlaybackSupported` deterministically

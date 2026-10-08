@@ -99,7 +99,7 @@ fs::path tones_wav(const std::string& name, std::size_t count, std::size_t secon
 }
 
 // The tones of a run that reads its first frame's syntax alone: one frame
-// under the sanitizers (tests/sanitized.hpp), where a run costs a process start
+// under the sanitizers (tests/support/sanitized.hpp), where a run costs a process start
 // and each frame it encodes. The encoder's delay gives the run three frames or
 // more, and its first is the same from a whole frame of tones.
 constexpr std::size_t kSanitizedSamples = 2048;
@@ -220,7 +220,7 @@ TEST_CASE("ac4-encode's stream options each write what they name", "[cli][ac4]")
     const auto trace = dir / "ac4_stream_options.tsv";
     const fs::path out = dir / "ac4_stream_options.ac4";
     // Each run reads its first frame's syntax and the status lines, so under
-    // the sanitizers (tests/sanitized.hpp) its input is a frame in place of two
+    // the sanitizers (tests/support/sanitized.hpp) its input is a frame in place of two
     // seconds. loudness= measures the programme in blocks of 400 ms (BS.1770),
     // so its input is half a second.
     const fs::path stereo = first_frame_tones_wav("ac4_options_stereo.wav", 2, 2);
@@ -418,7 +418,7 @@ TEST_CASE("ac4-encode's experimental tools each write their syntax", "[cli][ac4]
     const auto log = dir / "ac4_experimental.log";
     const auto trace = dir / "ac4_experimental.tsv";
     const fs::path out = dir / "ac4_experimental.ac4";
-    // Two seconds of signal, or under the sanitizers (tests/sanitized.hpp) half
+    // Two seconds of signal, or under the sanitizers (tests/support/sanitized.hpp) half
     // a second, where a run costs a process start and each frame it encodes:
     // each of the first four tools' syntax shows within a few frames. The
     // immersive layouts' and the seven-channel runs read their first frame's

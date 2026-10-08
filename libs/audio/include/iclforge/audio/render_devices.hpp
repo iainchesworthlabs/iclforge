@@ -31,7 +31,7 @@
 // enumeration and the callback - a caller's callback therefore always runs
 // on one thread it can reason about, and may take its own locks.
 //
-// Tested without a sound card in tests/audio/test_render_devices.cpp, through
+// Tested without a sound card in libs/audio/tests/test_render_devices.cpp, through
 // the Sources seam below: an enumeration of the test's own and no platform
 // watcher is exactly the shape ALSA runs in.
 

@@ -20,7 +20,7 @@
 // on.
 //
 // Each frame weighs candidate parameters by running the decoder's own
-// reconstruction (src/ac4/src/core's ajoc::Reconstruction) from the state the
+// reconstruction (libs/ac4/src/core's ajoc::Reconstruction) from the state the
 // frames sent leave it in, and keeps the one whose objects come closest to
 // the objects given, within the bits the frame allows. Every candidate has one
 // data point at the frame's first slot. Its dry matrix, per object and

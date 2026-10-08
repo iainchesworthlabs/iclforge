@@ -3,7 +3,7 @@
 
 // The PipeWire passthrough backend. CMake compiles this directory's
 // passthrough.cpp on a Linux host that selected pipewire/ over alsa/ (see
-// src/audio/CMakeLists.txt) and another directory's everywhere else, so
+// libs/audio/CMakeLists.txt) and another directory's everywhere else, so
 // there is no #ifdef - the file's path is what says "PipeWire".
 //
 // ---------------------------------------------------------------------------

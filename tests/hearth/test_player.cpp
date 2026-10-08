@@ -55,7 +55,7 @@ using iclforge::hearth::QueueItem;
 using iclforge::hearth::TransportState;
 
 // A device whose clock the test runs. Like the real backends
-// (src/audio/src/backend/*/monitor.cpp), the clock keeps running when there
+// (libs/audio/src/backend/*/monitor.cpp), the clock keeps running when there
 // is nothing to play, and the silence it runs through counts as played: that
 // is what makes an underrun visible in the figures the player reads.
 class FakeDevice final : public PcmSink {
@@ -2395,7 +2395,7 @@ TEST_CASE("player: routing and device facts are PcmSink's own, and default to it
 
 // The identify tone (ac3/render/identify.hpp): pink noise on one render
 // layout slot at a time, in place of the item playing there. The generator
-// itself is tested in tests/render/test_identify.cpp; these prove the
+// itself is tested in libs/render/tests/test_identify.cpp; these prove the
 // wiring - that take_block() actually substitutes it, silences every other
 // slot, picks the low band for an LFE slot, and leaves trim_delay_ out of
 // it - against "5.1" (L C R Ls Rs LFE), so slot 0 is a full-bandwidth

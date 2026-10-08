@@ -28,11 +28,11 @@
 // element, so the decoder must read those as printed for the tones to come
 // back where they started.
 //
-// They are written with the encoder's writer (src/ac4/src/encoder): its audio
+// They are written with the encoder's writer (libs/ac4/src/encoder): its audio
 // spectral frontend coder, chparam_info(), companding_control() and A-SPX
 // writers, and its frame writer. The element syntax around those, and where
 // each channel goes (Tables 180, 182 and 183), are written here, a
-// transcription separate from the decoder's routing (src/ac4/src/decoder/pcm/
+// transcription separate from the decoder's routing (libs/ac4/src/decoder/pcm/
 // routing.cpp). Where stereo processing mixes tracks, the tracks are the
 // channels through the inverse of the printed matrix (ac4dec_printed_matrices.
 // hpp), so the decoder's matrix must be the printed one for the tones to come

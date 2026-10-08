@@ -16,7 +16,7 @@
 // (the inverse of the decoder's clause 6.3.9 tables), each object's changes
 // kept in time, and each frame's object_info_block()s built from them.
 //
-// Timing (src/ac4/ERRATA.md, "When an object's metadata changes"): an
+// Timing (libs/ac4/ERRATA.md, "When an object's metadata changes"): an
 // update at sample s of the encoder's delayed signal lands in the frame that
 // codes s, at block_offset_factor (s - the frame's first sample) / 32 with
 // oa_sample_offset 0, where the decoder places it at the sample the input
@@ -27,7 +27,7 @@ namespace iclforge::ac4::detail {
 // Why `p` cannot be sent, or an empty view where it can: a value off the range
 // encoder.hpp gives it, or a depth exponent other than 1 with a screen factor
 // of 0. The two are one group of fields (Part 2 clause 6.2.8.7's
-// group_other_mask 0b0010), and the factor has no code for 0 (src/ac4/
+// group_other_mask 0b0010), and the factor has no code for 0 (libs/ac4/
 // ERRATA.md, "The screen factor and the depth exponent").
 [[nodiscard]] std::string_view properties_refusal(const ObjectProperties& p) noexcept;
 

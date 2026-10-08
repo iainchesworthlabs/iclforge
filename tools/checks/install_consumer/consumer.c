@@ -1,6 +1,6 @@
 /* A consumer of an INSTALLED iclforge package's C API, built by
  * tools/checks/check_install_consumer.sh against `cmake --install`'s output rather than the
- * build tree. The in-tree C examples and tests/capi compile against build-tree include paths,
+ * build tree. The in-tree C examples and libs/capi/tests compile against build-tree include paths,
  * which hold files an install has to be told to copy (the generated version.h among them), so
  * only this translation unit includes iclforge_c/iclforge.h the way a downstream project does.
  *
@@ -15,7 +15,7 @@
 
 #include <iclforge_c/iclforge.h>
 
-/* version.h's own promise, the one tests/capi checks from C++ (this is the C11 spelling). */
+/* version.h's own promise, the one libs/capi/tests checks from C++ (this is the C11 spelling). */
 _Static_assert(ICLFORGE_C_VERSION == ICLFORGE_C_VERSION_MAJOR * 1000000 +
                                          ICLFORGE_C_VERSION_MINOR * 1000 +
                                          ICLFORGE_C_VERSION_PATCH,

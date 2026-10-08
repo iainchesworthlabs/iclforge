@@ -1,6 +1,6 @@
 // The audio spectral frontend's noise fill (ETSI TS 103 190-1 V1.4.1 clause 5.1.4, Pseudocodes 22
 // and 23) in reconstruct_track(), held to the clause's own steps on a hand-built SfData. No stream
-// available here sets b_snf_data_exists (src/ac4/ERRATA.md, "x = x++ in Pseudocode 57"), so
+// available here sets b_snf_data_exists (libs/ac4/ERRATA.md, "x = x++ in Pseudocode 57"), so
 // the committed streams never reach this code; the generator under it is held by
 // test_pcm.cpp, and these hold what draws from it: the level each filled band takes, which
 // bands are filled, and the order and count of the draws.
@@ -231,7 +231,7 @@ TEST_CASE("noise fill draws continue across tracks of a frame rather than restar
 // The extension's scale factors and noise levels are each a difference from the one transmitted
 // before (Tables 42b and 42c carry on from asf_scalefac_data() and asf_snf_data()), so the walk of
 // Pseudocodes 21 to 23 takes every group's core bands and then every group's extension bands
-// (src/ac4/ERRATA.md, "Scale factors and noise levels across an HSF extension"). The
+// (libs/ac4/ERRATA.md, "Scale factors and noise levels across an HSF extension"). The
 // reference here is that order written out over a flat list of bands.
 
 namespace hsf_test {

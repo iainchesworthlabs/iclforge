@@ -21,7 +21,7 @@ namespace iclforge_probe {
 inline constexpr int kAc4SampleRateHz = 48000;
 inline constexpr int kAc4SamplesPerFrame = 2048;
 
-// AC-4 2.0 from DEE, A-SPX, 192 kbit/s - fuzz/seeds/fuzz_ac4_parse/ac4-20-music-192-3frames.ac4, 3709 bytes, 3 frames.
+// AC-4 2.0 from DEE, A-SPX, 192 kbit/s - libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-20-music-192-3frames.ac4, 3709 bytes, 3 frames.
 inline constexpr int kAc420MusicFrames = 3;
 inline constexpr std::array<std::uint8_t, 3709> kAc420MusicStream{{
     0xac, 0x41, 0x04, 0x00, 0xbf, 0xbe, 0xfb, 0xc0, 0xc2, 0x01, 0xa2, 0x2d,
@@ -557,7 +557,7 @@ inline constexpr std::array<std::int32_t, 2> kAc420AcplRms{{
     60863, 57398
 }};
 
-// AC-4 5.1 from DEE, 192 kbit/s - fuzz/seeds/fuzz_ac4_parse/ac4-51-music-192-3frames.ac4, 4130 bytes, 3 frames.
+// AC-4 5.1 from DEE, 192 kbit/s - libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-51-music-192-3frames.ac4, 4130 bytes, 3 frames.
 inline constexpr int kAc451MusicFrames = 3;
 inline constexpr std::array<std::uint8_t, 4130> kAc451MusicStream{{
     0xac, 0x41, 0x04, 0x00, 0xbf, 0xbe, 0xfb, 0xc0, 0xc6, 0x01, 0xa2, 0x16,
@@ -1400,7 +1400,7 @@ inline constexpr std::array<std::int32_t, 6> kAc451AcplRms{{
     60909, 57192, 61372, 62156, 57536, 57849
 }};
 
-// AC-4 5.1.4 from DEE, tones, 256 kbit/s - fuzz/seeds/fuzz_ac4_parse/ac4-514-tones-256-2frames.ac4, 3727 bytes, 2 frames.
+// AC-4 5.1.4 from DEE, tones, 256 kbit/s - libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-514-tones-256-2frames.ac4, 3727 bytes, 2 frames.
 inline constexpr int kAc4514TonesFrames = 2;
 inline constexpr std::array<std::uint8_t, 3727> kAc4514TonesStream{{
     0xac, 0x41, 0x07, 0x94, 0xbf, 0xbe, 0xfb, 0xc0, 0xca, 0x01, 0xa2, 0xb7,
@@ -1721,7 +1721,7 @@ inline constexpr std::array<std::int32_t, 10> kAc4514TonesRms{{
     36, 35, 52, 110, 80, 80, 7, 12, 7, 12
 }};
 
-// AC-4 2.0 from DEE, A-SPX with companding, 48 kbit/s - fuzz/seeds/fuzz_ac4_parse/ac4-20-music-48-3frames.ac4, 1071 bytes, 3 frames.
+// AC-4 2.0 from DEE, A-SPX with companding, 48 kbit/s - libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-20-music-48-3frames.ac4, 1071 bytes, 3 frames.
 inline constexpr int kAc420CompandingFrames = 3;
 inline constexpr std::array<std::uint8_t, 1071> kAc420CompandingStream{{
     0xac, 0x41, 0x01, 0x2e, 0xbf, 0xbe, 0xfb, 0xc0, 0xc2, 0x01, 0xa3, 0xc7,

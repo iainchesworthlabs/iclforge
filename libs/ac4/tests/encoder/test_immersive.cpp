@@ -4,9 +4,9 @@
 // experimental 7.1.4 with the back pair and ASPX_ACPL_1. Each stream reads back
 // with the trace the encoder recorded and decodes, in full decoding, with each
 // channel's tone on its own channel, and in core decoding with each on the
-// core layout's speaker at the core gain, as src/ac4/src/decoder's tests hold DEE's
+// core layout's speaker at the core gain, as libs/ac4/src/decoder's tests hold DEE's
 // 5.1.4 streams to. The signals are half a second long, and a third of a
-// second under the sanitizers (tests/sanitized.hpp), where the height downmix
+// second under the sanitizers (tests/support/sanitized.hpp), where the height downmix
 // takes its one route that sends both of the syntax's branches.
 
 #include <algorithm>
@@ -233,7 +233,7 @@ void check_routing(const std::vector<Channel>& channels, const Decoded& decoded,
 
 // Core decoding (Part 2 clause 4.7): the 5.X.2 core, L R C, the LFE, Ls Rs and
 // the top side pair, each top pair's two tones in its side of it 3 dB down, as
-// DEE's 5.1.4 streams decode (src/ac4/ERRATA.md, "The core's top pair is
+// DEE's 5.1.4 streams decode (libs/ac4/ERRATA.md, "The core's top pair is
 // Tsl and Tsr"), and every other channel's tone at unity on its own.
 void check_core(const std::vector<Channel>& channels, const Decoded& core) {
     const bool lfe =

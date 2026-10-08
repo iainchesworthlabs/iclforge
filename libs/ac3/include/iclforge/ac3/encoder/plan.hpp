@@ -49,7 +49,7 @@ enum class Codec : std::uint8_t {
     kEac3,  // bsid 16, A/52 Annex E
     // ETSI TS 103 190. iclforge::ac3 does not encode it: a plan names it for a front
     // end that hands the plan's channels, rate and metadata to iclforge::ac4::Encoder
-    // (src/ac4/src/encoder), and ac3_config()/eac3_config() have nothing to say about it.
+    // (libs/ac4/src/encoder), and ac3_config()/eac3_config() have nothing to say about it.
     kAc4,
 };
 

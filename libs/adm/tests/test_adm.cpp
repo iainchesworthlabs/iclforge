@@ -21,8 +21,8 @@
 #include "iclforge/adm/ac3adm.hpp"
 
 // These tests build BW64/RF64 fixtures byte-by-byte, independently of
-// src/adm's own implementation (which is itself just a thin translation
-// layer over the vendored libbw64/libadm - see src/adm/CMakeLists.txt),
+// libs/adm's own implementation (which is itself just a thin translation
+// layer over the vendored libbw64/libadm - see libs/adm/CMakeLists.txt),
 // rather than round-tripping data this same code produced - the same
 // reasoning test_mpegts.cpp and test_matroska.cpp document for their own
 // independent readers/writers. iclforge::adm began as a reader only (phase 1
@@ -500,7 +500,7 @@ iclforge::adm::AdmDocument objects_document(
 }
 
 // Where a write test puts its files: a directory of its own under ICLFORGE_TEST_SCRATCH_DIR, with
-// this process's id folded in (tests/platform/process.hpp says why).
+// this process's id folded in (tests/support/platform/process.hpp says why).
 std::filesystem::path write_scratch_dir(std::string_view name) {
     auto dir = std::filesystem::path{ICLFORGE_TEST_SCRATCH_DIR} /
                (std::string(name) + "_" + iclforge::test::platform::process_id());
@@ -615,7 +615,7 @@ TEST_CASE("rejects a file that is not RIFF/RF64/BW64", "[adm]") {
     REQUIRE_FALSE(doc.has_value());
     // libbw64 reports "not a recognized container" the same way it reports
     // "could not open" - a single std::runtime_error family with no
-    // distinguishing exception type (see src/adm/src/adm.cpp's own
+    // distinguishing exception type (see libs/adm/src/adm.cpp's own
     // comment on parse_bw64_path) - so this, too, surfaces as kCannotOpen
     // rather than the more specific kNotRiff.
     CHECK(doc.error() == iclforge::adm::AdmError::kCannotOpen);
@@ -681,7 +681,7 @@ TEST_CASE("malformed XML in axml surfaces as kMalformedXml", "[adm]") {
     // dependency) turned out to be lenient about mismatched close tags - a
     // "<a><b></a>" style fixture parses "successfully" (in whatever shape rapidxml
     // produces for it) and only fails later, as an ADM-structure complaint
-    // (AdmError::kMalformedAdm, see the next test and src/adm/src/adm.cpp's own
+    // (AdmError::kMalformedAdm, see the next test and libs/adm/src/adm.cpp's own
     // comment on why). This fixture instead breaks XML tokenizing itself, which is
     // needed to actually reach kMalformedXml - confirmed empirically, not assumed.
     const Bytes axml = "<audioFormatExtended><audioObject audioObjectID=\"AO_1";
@@ -707,7 +707,7 @@ TEST_CASE("a missing required ADM attribute surfaces as kMalformedXml", "[adm]")
     // (xml_parser_helper.hpp's parseAttribute()) throws a plain, untyped std::runtime_error
     // rather than one of its own ::adm::error:: types - confirmed by catching and printing the
     // real exception during development, not assumed from the enum's own naming. See
-    // iclforge::adm::AdmError's own doc comment (ac3adm.hpp) and src/adm/src/adm.cpp's
+    // iclforge::adm::AdmError's own doc comment (ac3adm.hpp) and libs/adm/src/adm.cpp's
     // read_adm_model() for the full explanation.
     CHECK(doc.error() == iclforge::adm::AdmError::kMalformedXml);
 }
@@ -828,7 +828,7 @@ TEST_CASE("a file with no axml chunk still parses, with an empty ADM model", "[a
 // numberOfFrames() is the <data> chunk's DECLARED size over the block
 // alignment, so a sixty-byte file claiming four gigabytes of PCM made
 // read_pcm allocate four gigabytes. The reproducer is committed as
-// fuzz/regressions/fuzz_adm_parse/oversized-data-chunk-oom; this is the same
+// libs/adm/fuzz/regressions/fuzz_adm_parse/oversized-data-chunk-oom; this is the same
 // shape as a unit test, and it fails (out of memory, or a bad_alloc) against
 // the pre-fix read_pcm.
 //
@@ -898,7 +898,7 @@ TEST_CASE("a non-data chunk declaring more than the file holds is refused", "[ad
 // layers have to agree on that for this to hold: chunk_sizes_fit() exempts
 // <data> from its own pre-scan (immediately above), AND libbw64's own
 // internal chunk-table walk has to as well - which the pinned commit refuses
-// outright unless patched (src/adm/patch_libbw64.cmake's whole reason for
+// outright unless patched (libs/adm/patch_libbw64.cmake's whole reason for
 // existing; see its own comment for why upstream doesn't do this itself).
 TEST_CASE("a file truncated inside its data chunk still parses", "[adm]") {
     Bytes file = minimal_fixture_bytes(false);
@@ -959,11 +959,11 @@ TEST_CASE("a ds64 table entry oversizing a non-data chunk is still refused", "[a
 // UnknownChunk, whose 0.10.0 constructor resizes a std::vector<char> to the
 // declared size and then hands stream.read() `&data_[0]` - undefined behaviour
 // when that size is zero, and the report that kept `ac3adm_objects` out of
-// fuzz/CMakeLists.txt's instrumented set until src/adm/patch_libbw64.cmake
+// cmake/IclforgeFuzz.cmake's instrumented set until libs/adm/patch_libbw64.cmake
 // existed. A zero-length chunk is ordinary content: BS.2088-1 §4 puts no floor
 // under a chunk's size, and an empty JUNK is a normal thing for a producer to
 // leave behind. The same shape is committed as
-// fuzz/regressions/fuzz_adm_parse/zero-length-unknown-chunk.
+// libs/adm/fuzz/regressions/fuzz_adm_parse/zero-length-unknown-chunk.
 //
 // An unpatched libbw64 fails this under UBSan ("reference binding to null
 // pointer of type 'char'") and on any standard library with its bounds checks
@@ -1067,7 +1067,7 @@ TEST_CASE("a fmt whose block alignment overflows 16 bits is refused outright", "
 // <fmt > chunk, which is what made the old find_chunk() walk past <data> instead of stopping at
 // the chunk it was looking for. Kept as a regression against the code that replaced it: this
 // exact fixture (and the one the fuzzer produced, past a mutated "fmp ",
-// fuzz/regressions/fuzz_adm_parse/chunk-size-wraps-the-walk) now reaches libbw64's own reader
+// libs/adm/fuzz/regressions/fuzz_adm_parse/chunk-size-wraps-the-walk) now reaches libbw64's own reader
 // instead, missing its mandatory <fmt > chunk, and should fail cleanly rather than hang either
 // way.
 TEST_CASE("a chunk size that once wrapped the retired float-detection walk still parses cleanly",
@@ -1320,7 +1320,7 @@ TEST_CASE("write_bw64 reports an audioTrackUID naming a track and a channel form
 namespace {
 
 // zoneExclusion is the one element libadm does not parse, so this fixture is where the text scan
-// in src/adm/src/adm_xml_extras.cpp is exercised: a prefixed element name, a
+// in libs/adm/src/adm_xml_extras.cpp is exercised: a prefixed element name, a
 // comment and a CDATA section holding text that looks like a zone, an entity in a label, a zone
 // with bounds only, one with a label only, and a block without any zones in between two with.
 constexpr std::string_view kZoneAdmXml = R"(<?xml version="1.0" encoding="UTF-8"?>

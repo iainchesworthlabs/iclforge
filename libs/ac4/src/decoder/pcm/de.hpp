@@ -26,7 +26,7 @@
 // independent method (one for the Mid with de_ms_proc_flag), one channel
 // rendered by r with the cross-channel method. Without that substream they
 // enhance by their parametric data alone, as the clause allows a
-// low-complexity decoder to, at the whole gain (src/ac4/ERRATA.md,
+// low-complexity decoder to, at the whole gain (libs/ac4/ERRATA.md,
 // "Dialogue enhancement without its waveform").
 //
 // Subbands above Table 173's last band, 40, have no parameters and pass
@@ -126,7 +126,7 @@ struct DeCoreCoefficients {
 
 // ETSI TS 103 190-2 V1.3.1 clauses 5.8.2.1 and 5.8.2.2: y = (M_interp | I) (m, u), the core's L,
 // R and C (u) with M_interp m added, m being A'', B'' and C'' as the A-JCC core takes them, or
-// the A-CPL replacement gain gives them (src/ac4/ERRATA.md, "Core decoding's dialogue
+// the A-CPL replacement gain gives them (libs/ac4/ERRATA.md, "Core decoding's dialogue
 // enhancement for 9.X.4"). M_interp is Pseudocode 20's interpolation, per subband and input, of
 // the enhancement matrix (H - I) times the coefficient of the input (C_L, C_R, and 1 for C), from
 // the matrix the last frame ended on to this frame's.

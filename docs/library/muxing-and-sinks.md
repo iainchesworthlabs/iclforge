@@ -99,7 +99,7 @@ a rip, a capture or a download rather than from this project's own writer. `Read
 the element size the reader will hold (16 MiB by default; anything larger that it does not need
 is skipped without ever being buffered), the frames one laced block may carry, the number of
 `TrackEntry` elements, and how deep masters may nest — the walker is iterative, so nothing an
-input declares can exhaust the call stack. `fuzz/fuzz_matroska_demux.cpp` drives both entry
+input declares can exhaust the call stack. `libs/containers/fuzz/fuzz_matroska_demux.cpp` drives both entry
 points with arbitrary bytes under ASan/UBSan.
 
 ## Muxing: `iclforge::containers::mp4::mux`
@@ -229,7 +229,7 @@ touched. `ReadOptions` bounds the box size the reader will hold, the sample and 
 (`max_samples` defaults to about 35 hours of access units), and the nesting depth; the walk is
 iterative. A chunk offset pointing past the end of the file drops that sample rather than
 failing the file — a truncated download is ordinary, and the samples that *are* present are all
-real. `fuzz/fuzz_mp4_demux.cpp` drives both entry points with arbitrary bytes.
+real. `libs/containers/fuzz/fuzz_mp4_demux.cpp` drives both entry points with arbitrary bytes.
 
 ## Muxing: `iclforge::containers::mpegts::mux`
 
@@ -401,7 +401,7 @@ self-checked against the standard test vector) is verified before the PAT/PMT it
 believed — a bit-damaged PMT is thrown away rather than locking onto a wrong PID for the rest of
 the file. `ReadOptions` bounds the PES and PSI section sizes the reader will assemble (the
 unbounded PES form has no ceiling of its own otherwise) and how far it will search for the packet
-grid. `fuzz/fuzz_mpegts_demux.cpp` drives both entry points with arbitrary bytes — this is also
+grid. `libs/containers/fuzz/fuzz_mpegts_demux.cpp` drives both entry points with arbitrary bytes — this is also
 the container reader most likely to find a hang rather than a crash, since the sync
 search, section reassembly and PES reassembly are all loops a hostile stream can try to stall.
 
@@ -574,7 +574,7 @@ the ones `fragment` would have built. The initialization segment differs in exac
 `mvhd`/`tkhd`/`mdhd` carry duration 0, since a live session does not know its total (ISO/IEC
 14496-12 §8.8.2 provides `mehd` for the fragmented movie that *does*). That is the same
 concession `iclforge::containers::matroska::Writer` makes with EBML's unknown-size Segment and its omitted Duration.
-Both halves are asserted in `tests/ac3/test_fmp4.cpp`, the init segment by patching the
+Both halves are asserted in `libs/ac3/tests/test_fmp4.cpp`, the init segment by patching the
 three duration fields back and then requiring full byte equality.
 
 ```cpp
@@ -707,7 +707,7 @@ The input is by definition untrusted — a burst carrier comes off a wire or out
 device — so nothing taken from `Pd` is believed past its data type's repetition period, and a
 preamble not backed by a syncframe (`0x0B77`, or AC-4's `0xAC40` or `0xAC41`) is treated as a false
 match to resync past rather than a fatal error. An AC-4 burst's `Pd` also has to agree with the
-length its sync frame states. `fuzz/fuzz_iec61937_unwrap.cpp` keeps that accurate, and feeds the
+length its sync frame states. `libs/containers/fuzz/fuzz_iec61937_unwrap.cpp` keeps that accurate, and feeds the
 same bytes to the AC-4 packer.
 
 This is also what closes the loop on the wrap side: bursts written by this project *and* by
@@ -826,7 +826,7 @@ hardware in real time, and a live microphone capture → encode → monitor sess
 end-to-end. Building this path against real hardware surfaced two bugs that neither
 unit tests nor silent/synthetic input would have caught — see
 [Windows](../platforms/windows.md#audio-backend-wasapi) for the details, and
-`src/audio/src/backend/windows/monitor.cpp` for the fixes.
+`libs/audio/src/backend/windows/monitor.cpp` for the fixes.
 
 ## Capture: `iclforge::audio`
 

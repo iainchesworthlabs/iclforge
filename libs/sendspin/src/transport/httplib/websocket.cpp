@@ -26,7 +26,7 @@
 #include "listen_socket.hpp"
 
 // The WebSocket transport over cpp-httplib 0.56. The macros that configure cpp-httplib come
-// from src/sendspin/CMakeLists.txt.
+// from libs/sendspin/CMakeLists.txt.
 
 namespace iclforge::sendspin::transport::websocket {
 

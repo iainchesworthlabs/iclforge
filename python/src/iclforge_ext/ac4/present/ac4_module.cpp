@@ -25,7 +25,7 @@
 // this extension (see bindings.cpp's own header comment) - no intermediate C
 // API. The surface bound here is a deliberate subset of what the two headers
 // declare, matching the cut this project's AC-4 C API took for the same
-// reason (see src/capi's own AC-4 header): decoder output config, presentation
+// reason (see libs/capi's own AC-4 header): decoder output config, presentation
 // selection, concealment, decoded PCM/speakers/objects (with their metadata
 // updates within a frame) and loudness metadata; encoder config - the core
 // fields, the I-frame lists, the experimental flags that need no nested group,
@@ -254,9 +254,9 @@ void register_ac4(py::module_& m) {
         "ac4",
         "AC-4 decode/encode (ETSI TS 103 190-1 V1.4.1, TS 103 190-2 V1.3.1) - "
         "iclforge::ac4::Decoder/"
-        "iclforge::ac4::Encoder bound directly. See src/ac4/include/iclforge/ac4/decoder/decoder.hpp "
+        "iclforge::ac4::Encoder bound directly. See libs/ac4/include/iclforge/ac4/decoder/decoder.hpp "
         "and "
-        "src/ac4/include/iclforge/ac4/encoder/encoder.hpp for the full scope statement and what each "
+        "libs/ac4/include/iclforge/ac4/encoder/encoder.hpp for the full scope statement and what each "
         "refuses; this binding covers a subset of both - see this file's own header comment.");
 
     // --- enums ---------------------------------------------------------------

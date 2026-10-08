@@ -7,7 +7,7 @@
 
 #include "iclforge/sendspin/handshake.hpp"
 
-// The handshake phase's message parsers (src/sendspin/src/handshake.cpp): what a
+// The handshake phase's message parsers (libs/sendspin/src/handshake.cpp): what a
 // server reads from a client that has not authenticated at all (client/init),
 // what a client reads before the Noise handshake binds anything (server/init,
 // server/error, noise/handshake), and the two payloads decrypted from the Noise

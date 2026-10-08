@@ -8,7 +8,7 @@
 // one too few for both, which left every later field of the table of contents
 // a group index's width out of place. No encoder this project has writes
 // either configuration, so the frames here are built bit by bit, with a
-// writer that shares no code with src/ac4, and each is followed by an
+// writer that shares no code with libs/ac4, and each is followed by an
 // ordinary presentation whose flags are set to values a misaligned read would
 // not reproduce.
 

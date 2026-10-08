@@ -119,7 +119,7 @@ using detail::wrap_add;
 //
 // Table 10's 96 kHz Rice branch is indented differently from the 48 kHz one and would, read
 // literally, drop the quotient and the sign when RiceRemBits is 0. The two branches are the same
-// syntax; this reads both as the 48 kHz one. See src/iab/ERRATA.md.
+// syntax; this reads both as the 48 kHz one. See libs/iab/ERRATA.md.
 [[nodiscard]] std::expected<void, IabError> read_residual_sub_block(BitReader& br, unsigned count,
                                                                     std::int32_t* out) {
     auto code_type = br.read_bits(1);

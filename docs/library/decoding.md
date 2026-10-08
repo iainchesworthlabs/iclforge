@@ -795,13 +795,13 @@ filterbank's own `dsp::kQmfDelay` (576 samples) on top of the bed's 256, for 832
 in the same `DecodedAccessUnit` still lags by 256, so **objects and bed are not aligned with each
 other** — anything mixing the two has to delay the bed by 576 samples. `oba::AtmosEncoder::latency()`
 reports the object path's budget and `bed_latency()` the bed's; the 832 is measured end to end in
-[`tests/ac3/decoder/test_latency.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/tests/ac3/decoder/test_latency.cpp).
+[`libs/ac3/tests/decoder/test_latency.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/ac3/tests/decoder/test_latency.cpp).
 
 With `DecoderConfig::joc_domain` set to `kMdctBand`, the reconstruction costs 256 samples rather
 than 576, so objects lag their input by 512 and the bed has to be delayed by 256.
 `iclforge::render::LayoutRenderer` does this delaying for the one bed channel it plays beside placed
 objects, the LFE, once `set_joc_domain()` has told it the decoder's domain;
-[`tests/render/test_object_lfe_timing.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/tests/render/test_object_lfe_timing.cpp)
+[`libs/render/tests/test_object_lfe_timing.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/render/tests/test_object_lfe_timing.cpp)
 measures the rendered feeds.
 
 ## Streams with more than one programme

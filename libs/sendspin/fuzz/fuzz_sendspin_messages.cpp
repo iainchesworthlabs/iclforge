@@ -11,7 +11,7 @@
 #include "iclforge/sendspin/messages.hpp"
 #include "iclforge/sendspin/pairing_messages.hpp"
 
-// The core and pairing messages' readers (src/sendspin/src/messages.cpp and
+// The core and pairing messages' readers (libs/sendspin/src/messages.cpp and
 // pairing_messages.cpp): what a server reads from a client once the handshake is done
 // (client/hello, client/state, client/time, client/command, client-stream/start, client/goodbye,
 // and the client's pairing messages) and what a client reads from a server (server/hello,

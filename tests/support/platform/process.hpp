@@ -10,8 +10,8 @@
 // that needed them - nineteen copies of the process-id branch and eight of
 // the std::system() one, each with its own drifting copy of the explanatory
 // comment. That is exactly the arrangement the rest of this repository does
-// not have: src/audio/src/backend/<backend>/, apps/cli/platform/<os>/ and
-// tests/crt/<runtime>/ all ship one filename per directory and let CMake
+// not have: libs/audio/src/backend/<backend>/, apps/cli/platform/<os>/ and
+// tests/support/crt/<runtime>/ all ship one filename per directory and let CMake
 // compile the directory that matches the target, so no source file has to ask
 // which platform it is on. tools/checks/check_platform_macros.ps1 holds that
 // line over src/ and apps/; this directory is what lets it hold over tests/

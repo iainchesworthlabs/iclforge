@@ -27,7 +27,7 @@
 #include "iclforge/sendspin/stream_roles.hpp"
 #include "iclforge/sendspin/transport.hpp"
 
-// One connection from a Sendspin server to a client: the server half of src/sendspin
+// One connection from a Sendspin server to a client: the server half of libs/sendspin
 // (planning/hearth-reference-player.md, A4), one per client in hearth's engine.
 //
 // The session runs the handshake as the Noise initiator, sends server/hello, reads the

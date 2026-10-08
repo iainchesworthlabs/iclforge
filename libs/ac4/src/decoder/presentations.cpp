@@ -104,7 +104,7 @@ void add_member(PresentationPlan& plan, std::size_t& count, const ChannelSubstre
 // Which sg_gain a group at `position` takes (Part 2 clause 6.2.2.3 reads
 // n_substream_groups of them): one per ac4_sgi_specifier() in order, but for
 // configurations 1 and 4, whose dialogue enhancement group n_substream_groups
-// leaves out, and a single group, which is sent none (src/ac4/ERRATA.md,
+// leaves out, and a single group, which is sent none (libs/ac4/ERRATA.md,
 // "Substream group gains").
 [[nodiscard]] std::optional<std::size_t> gain_slot_v1(const PresentationInfoV1& p, std::size_t position) noexcept {
     if (!p.presentation_config) {

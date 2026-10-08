@@ -6,20 +6,20 @@
 
 #include "iclforge/adm/ac3adm.hpp"
 
-// iclforge::adm::parse_bw64(std::istream&) (src/adm/src/adm.cpp) - the BW64/RF64
+// iclforge::adm::parse_bw64(std::istream&) (libs/adm/src/adm.cpp) - the BW64/RF64
 // container walk plus the ADM XML document inside <axml>.
 //
 // The widest untrusted surface in the tree by input language: a BW64 file is
 // chunk-structured binary carrying an arbitrary XML document, and both halves
 // come straight from whoever produced the file. It is also the one parser
 // here that is not clean-room - it delegates to the vendored libbw64 and
-// libadm (see src/adm/CMakeLists.txt) - so a report from this harness may
+// libadm (see libs/adm/CMakeLists.txt) - so a report from this harness may
 // land in third-party code rather than in iclforge's own; that is worth
 // knowing either way, since the bytes reach it through an iclforge API.
 //
 // Built only with -DICLFORGE_BUILD_ADM=ON, which is off by default and
 // additionally needs vcpkg's "adm" feature for libadm's Boost headers, so
-// this harness is not in fuzz/run.sh's default target list - see fuzz/
+// this harness is not in tools/fuzz/run.sh's default target list - see fuzz/
 // README.md's "The ADM harness is opt-in".
 //
 // parse_bw64 spools the stream to a temporary file and reopens it by path

@@ -28,7 +28,7 @@ TestCase {
     readonly property url atmosStreamUrl:
         Qt.resolvedUrl("../fixtures/atmos-objects.ec3")
     readonly property url wavFixtureUrl:
-        Qt.resolvedUrl("../../../../fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
+        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
     readonly property url outputUrl:
         Qt.resolvedUrl("_test_output/tst_stream_player.ec3")
 

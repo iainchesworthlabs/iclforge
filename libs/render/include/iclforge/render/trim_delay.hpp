@@ -21,7 +21,7 @@
 // computer in a vector; nothing here allocates. Sixteen outputs of 20 ms at
 // 48 kHz is 15,360 floats, about 61 KB. Per sample the work is a swap into a
 // ring and a float multiply, and an output at 0 dB with no delay costs
-// nothing. Tested on the host in tests/render/test_trim_delay.cpp.
+// nothing. Tested on the host in libs/render/tests/test_trim_delay.cpp.
 
 namespace iclforge::render {
 

@@ -696,7 +696,7 @@ exponent runs through its own encoder.
 
 The extra churn was a defect rather than the planner's intended cost, and was
 tracked as [#544](https://github.com/iainchesworthlabs/iclforge/issues/544).
-`encode_run` in `src/ac3/src/encoder/eac3_frame.cpp` assigned the by-value
+`encode_run` in `libs/ac3/src/encoder/eac3_frame.cpp` assigned the by-value
 return of `iclforge::ac3::encode_exponents`, which owns a `std::vector`, so each run
 reallocated that buffer on every frame; the planner multiplied the number of
 runs from one per channel to one per run per channel. The bench's own columns
@@ -762,15 +762,15 @@ trees ([CI lane partitions](ci-lanes.md)) and in every nightly run, and
 The table below was first measured early in the bare-metal probe's own feature branch (PR #351). Several
 `develop` merges landed on that branch afterwards but before it merged to `main` — most
 significantly DC10's QMF-domain JOC reconstruction, which the decode path needs
-(`src/dsp/src/qmf.cpp` and `src/ac3/src/verify/eac3_mirror.cpp`, both correctly added to
-`src/ac3/minimal.cmake`'s source list at the time, per that merge's own commit message), plus
+(`libs/dsp/src/qmf.cpp` and `libs/ac3/src/verify/eac3_mirror.cpp`, both correctly added to
+`libs/ac3/minimal.cmake`'s source list at the time, per that merge's own commit message), plus
 the FFT/IMDCT rewrite and the decoder output stage — and nobody re-measured the table
 or the ceiling before merging. The image had already reached 412,516 bytes by then.
 
 The same thing happened a second time. The largest movement in that re-measurement was a
 relocation rather than growth. The Pimpl sweep (`ee5ff91e`) gave both decoders a
 `struct Impl; std::unique_ptr<Impl> impl_;`
-(both in `src/ac3/include/iclforge/ac3/decoder/decoder.hpp`), so `sizeof(iclforge::ac3::FrameDecoder)` and
+(both in `libs/ac3/include/iclforge/ac3/decoder/decoder.hpp`), so `sizeof(iclforge::ac3::FrameDecoder)` and
 `sizeof(iclforge::ac3::Eac3Decoder)` fell from 12,952 and 27,408 bytes to a single 4-byte pointer each, and
 the state they used to hold in place now lives on the heap. That state came out of automatic
 storage: both decoders are locals in `decode_ac3()` and `decode_eac3()`, and `.bss` was unchanged
@@ -810,7 +810,7 @@ instantiation.
 `fixture.hpp` is `constexpr` `std::array` data linked into `probe.cpp.obj`'s read-only section.
 It held 19,968 bytes of stream before the enhanced-coupling and 2/0 fixtures, 33,792 with them,
 and 52,224 now across seven streams. None of the tools those fixtures reach added code —
-`eac3_tools.cpp`, `fft.cpp`, `joc.cpp` and `oamd.cpp` were already in `src/ac3/minimal.cmake`'s
+`eac3_tools.cpp`, `fft.cpp`, `joc.cpp` and `oamd.cpp` were already in `libs/ac3/minimal.cmake`'s
 source list and already linked, which is the point: what the fixtures added was execution, not
 size.
 

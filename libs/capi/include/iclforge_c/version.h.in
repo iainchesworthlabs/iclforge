@@ -1,7 +1,7 @@
 #pragma once
 
 /* Compile-time version macros for iclforge's C API (AP1). Generated from
- * version.h.in by src/capi/CMakeLists.txt - do not edit the generated copy.
+ * version.h.in by libs/capi/CMakeLists.txt - do not edit the generated copy.
  *
  * These are the SDK version a caller built against, known at preprocessor
  * time (#if ICLFORGE_C_VERSION >= ...) - not what iclforge_version() reports,

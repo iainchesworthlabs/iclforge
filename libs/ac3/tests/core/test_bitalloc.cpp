@@ -179,7 +179,7 @@ TEST_CASE("monotonicity: more snr offset never allocates fewer bits", "[bitalloc
 // contract was a debug assert.
 //
 // The reproducer is committed as
-// fuzz/regressions/fuzz_signing_verify/empty-bitalloc-region-ub. This is the
+// libs/ac3/fuzz/regressions/fuzz_signing_verify/empty-bitalloc-region-ub. This is the
 // same call with nothing else around it, and it is a UBSan trip (not a
 // CHECK failure) against the pre-fix function - so run it under the
 // sanitizer preset for the failing half of the evidence.
@@ -214,7 +214,7 @@ TEST_CASE("compute_bit_allocation refuses a region outside its own contract", "[
 }
 
 // The float form (the float encode path's), on the same shapes as the double
-// cases above. Its log2 is the project's own (src/ac3/src/core/
+// cases above. Its log2 is the project's own (libs/ac3/src/core/
 // scalar_math.hpp), exact at powers of two, so the +6 dB boost lands on the
 // same psd unit and the same Table 5.17 code.
 TEST_CASE("choose_delta_segments' float form finds the same divergence", "[bitalloc]") {

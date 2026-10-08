@@ -1,4 +1,4 @@
-// MantExp (src/base/internal/iclforge/base/arithmetic/mant_exp.hpp), the mantissa and power of
+// MantExp (libs/base/internal/iclforge/base/arithmetic/mant_exp.hpp), the mantissa and power of
 // two the AC-4 decoder's fixed-point tier carries its energies, gains and scale factors in
 // (planning/ac4.md, D14d): its representation and rounding held exactly, and its arithmetic,
 // root, log2 and exp2 held to double within its thirty-bit mantissa.

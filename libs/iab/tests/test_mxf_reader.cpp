@@ -11,7 +11,7 @@
 #include "iclforge/iab/mxf.hpp"
 
 // iclforge::iab::parse_mxf_iab (mxf.hpp) - IAB reader, phase 2. These tests build MXF-level KLV
-// fixtures byte-by-byte, independently of src/iab/src/mxf_reader.cpp's own implementation - the
+// fixtures byte-by-byte, independently of libs/iab/src/mxf_reader.cpp's own implementation - the
 // same "independent fixture" convention test_ac3iab.cpp already establishes for its own IAB
 // bitstream fixtures. Key byte values are transcribed directly from SMPTE ST 377-1:2019 Table 4/6
 // (Partition Pack Key), ST 379-1:2009 Table 2 (Essence Element Key) and ST 2067-201:2021 Table 4.2
@@ -207,7 +207,7 @@ TEST_CASE("parse_mxf_iab rejects the reserved indefinite-length BER token", "[ac
 // 8-byte long-form Length near 2^64 wraps that sum. Here the Value would start at byte 25 and the
 // Length is 0xFFFFFFFFFFFFFFE7, so the sum wrapped to exactly 0: the check passed, the next KLV was
 // placed back at offset 0, and find_iab_essence() re-read this same Fill Item forever. Found by
-// fuzz/fuzz_iab_parse.cpp, as a timeout, once ac3iab_objects was built with coverage
+// libs/iab/fuzz/fuzz_iab_parse.cpp, as a timeout, once ac3iab_objects was built with coverage
 // instrumentation; this is that input's shape with a real Fill Item Key in place of fuzzed bytes.
 TEST_CASE("parse_mxf_iab reports a Length that wraps past the end of the file as truncated",
           "[ac3iab][mxf]") {

@@ -4,7 +4,7 @@
 //! An object scene is encoded through `iclforge::ac4` and, independently, through the raw
 //! `iclforge_sys` calls with structs this file builds by hand (never through the crate's own
 //! conversions): the two streams have to be the same bytes, so a field the wrapper drops or
-//! misplaces shows. `tests/capi/test_capi.cpp` holds the raw C API to `iclforge::ac4::Encoder` byte for
+//! misplaces shows. `libs/capi/tests/test_capi.cpp` holds the raw C API to `iclforge::ac4::Encoder` byte for
 //! byte, so the three agree. The crate's decoder then reads the scene back with every object's
 //! metadata within what each field's code can hold, its own tone, and a metadata update at the
 //! sample its input sample comes out.
@@ -20,7 +20,7 @@ use iclforge_sys as sys;
 const RATE: f64 = 48_000.0;
 const FRAME: usize = 2048;
 // Each object's tone sits at the middle of a QMF subband of its own (a parameter band of its own
-// in A-JOC's matrices), the LFE's at 47 Hz, as tests/ac4/encoder/test_objects.cpp has them.
+// in A-JOC's matrices), the LFE's at 47 Hz, as libs/ac4/tests/encoder/test_objects.cpp has them.
 const SUBBANDS: [usize; 8] = [1, 3, 5, 7, 9, 12, 16, 22];
 const LFE_HZ: f64 = 47.0;
 // Six frames of input; the update sits at sample 5000, in the third.

@@ -84,7 +84,7 @@ constexpr std::uint32_t kDac4 = fourcc("dac4");
 // The read twin of iclforge::ac3::io::build_codec_config_box (ac3/io/dec3.hpp), field
 // for field: ETSI TS 102 366 Annex F §F.4 (AC3SpecificBox) and §F.6
 // (EC3SpecificBox), plus TS 103 420 §8.3.1/§8.3.2.2's Atmos extension, read
-// through iclforge::BitReader (src/base), which zero-extends past the end rather
+// through iclforge::BitReader (libs/base), which zero-extends past the end rather
 // than failing: every field below is optional-by-truncation in some real file,
 // and a short box means "this muxer stopped here", not "corrupt". The caller
 // checks remaining_bits() where the difference matters - see the Atmos

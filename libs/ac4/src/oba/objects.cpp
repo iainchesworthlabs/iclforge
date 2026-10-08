@@ -86,7 +86,7 @@ void apply_position(const ObjectRenderInfo& r, const std::optional<ExtPrecPos>& 
         p.position[2] = clip3(-1.0, 1.0,
                               clip3(-15, 15, prev[2]) / 15.0 + clip3(-4, 3, r.diff_pos3d_z) / 15.0 +
                                   clip3(-2, 2, ez) / (15.0 * 5.0));
-        // The standard precision the next difference refers to (src/ac4/
+        // The standard precision the next difference refers to (libs/ac4/
         // ERRATA.md, "Object audio metadata").
         s.standard = {clip3(0, 62, prev[0] + r.diff_pos3d_x),
                       clip3(0, 62, prev[1] + r.diff_pos3d_y),
@@ -118,7 +118,7 @@ void apply_zone(const ObjectRenderInfo& r, ObjectProperties& p) {
 }
 
 // 6.3.9.8.10 to 6.3.9.8.23: the other properties' group, each absent one at
-// its default (src/ac4/ERRATA.md, "Object audio metadata").
+// its default (libs/ac4/ERRATA.md, "Object audio metadata").
 void apply_other(const ObjectRenderInfo& r, ObjectProperties& p) {
     const double previous_divergence = p.divergence;
     p.width = {};
@@ -237,7 +237,7 @@ ObjectProperties apply_block(const ObjectInfoBlock& block, bool dynamic,
         }
     }
 
-    // add_per_object_md(), for this block (src/ac4/ERRATA.md, "Object
+    // add_per_object_md(), for this block (libs/ac4/ERRATA.md, "Object
     // audio metadata").
     p.trim_disabled = block.per_object && block.per_object->b_obj_trim_disable;
     p.headphone_render_mode.reset();

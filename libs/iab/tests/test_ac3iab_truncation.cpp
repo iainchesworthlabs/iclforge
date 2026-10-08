@@ -24,7 +24,7 @@
 // treatment, and describe() names every error.
 //
 // Fixtures are written with this file's own MSB-first BitWriter, independently of
-// src/iab/src/bitreader.hpp, as test_ac3iab.cpp's are.
+// libs/iab/src/bitreader.hpp, as test_ac3iab.cpp's are.
 
 namespace {
 

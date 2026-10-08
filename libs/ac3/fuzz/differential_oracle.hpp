@@ -56,9 +56,9 @@
 // tools/ci/quality_race.py's broadband synthetic material, and an early
 // version of this harness reused tools/checks/verify_gold_reference.sh's
 // CPLBNDSTRCE0_MIN_SNR_DB=15 precedent on that basis - then
-// fuzz/measure-agreement.sh (ICLFORGE_DIFF_MEASURE_ONLY=1, see
+// tools/fuzz/measure-agreement.sh (ICLFORGE_DIFF_MEASURE_ONLY=1, see
 // run_differential below) run once over every file in
-// fuzz/seeds/fuzz_ac3_decode/ and fuzz/seeds/fuzz_eac3_decode/ - real,
+// libs/ac3/fuzz/seeds/fuzz_ac3_decode/ and libs/ac3/fuzz/seeds/fuzz_eac3_decode/ - real,
 // already-shipping, unmutated content this project has never doubted - found
 // two seeds well under that floor: fuzz_ac3_decode/ac3-orbit.ac3 (a panning
 // source, worst channel 12.74 dB) and the plain single-tone
@@ -86,7 +86,7 @@
 // the failure modes this harness exists to catch - a genuine decode bug
 // (verified by deliberately introducing one - see this project's "prove the
 // test can fail" rule) collapses agreement into low single digits or
-// negative, not merely below double digits. Re-run fuzz/measure-agreement.sh
+// negative, not merely below double digits. Re-run tools/fuzz/measure-agreement.sh
 // after adding any new seed content, the same way this number was derived -
 // it is a measurement, not a guess, and a new corner of legitimate
 // disagreement would need it revisited again.
@@ -335,7 +335,7 @@ inline CompareResult compare_pcm(const std::vector<std::vector<float>>& ours,
 
 // Prints a diagnostic and aborts - a divergence has to become an actual
 // process crash for libFuzzer to catch, minimize and save it the same way
-// it already does for a real memory-safety bug (see fuzz/README.md's "when
+// it already does for a real memory-safety bug (see tools/fuzz/README.md's "when
 // a fuzzer finds something"). Deliberately std::abort(), not assert(): the
 // fuzz build is RelWithDebInfo, which defines NDEBUG by default (see the
 // clang-tidy assert/NDEBUG blindspot this project has already been bitten
@@ -344,7 +344,7 @@ inline CompareResult compare_pcm(const std::vector<std::vector<float>>& ours,
     std::fprintf(stderr,
                  "iclforge differential fuzzer: %s decode diverges from FFmpeg's own decode of "
                  "the SAME bitstream (worst-channel agreement %.2f dB, floor %.2f dB) - both "
-                 "decoders accepted this input as valid. See fuzz/README.md's \"when a fuzzer "
+                 "decoders accepted this input as valid. See tools/fuzz/README.md's \"when a fuzzer "
                  "finds something\" section.\n",
                  codec_label, worst_channel_snr_db, kMinAgreementDb);
     std::fflush(stderr);
@@ -362,9 +362,9 @@ inline CompareResult compare_pcm(const std::vector<std::vector<float>>& ours,
 //
 // Two environment variables change this function's behaviour for a human
 // investigating a specific input rather than for a fuzzing run - neither is
-// ever set by fuzz.yml or a normal `fuzz/run.sh` invocation:
+// ever set by fuzz.yml or a normal `tools/fuzz/run.sh` invocation:
 //   ICLFORGE_DIFF_MEASURE_ONLY  prints every comparable result and never
-//                               aborts - see fuzz/measure-agreement.sh.
+//                               aborts - see tools/fuzz/measure-agreement.sh.
 //   ICLFORGE_DIFF_DEBUG         keeps the three scratch files instead of
 //                               deleting them and prints their paths, so a
 //                               specific divergence (or a specific seed

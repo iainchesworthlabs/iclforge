@@ -160,7 +160,7 @@ struct SubstreamContext {
     // An object substream's: ac4_substream_info_ajoc()'s (Part 2 clause
     // 6.2.1.9) b_lfe, b_static_dmx, n_fullband_dmx_signals and
     // n_fullband_upmix_signals, or ac4_substream_info_obj()'s (6.2.1.11) b_lfe
-    // and fullband object count, which audio_data_objs() takes (src/ac4/
+    // and fullband object count, which audio_data_objs() takes (libs/ac4/
     // ERRATA.md, "n_objects_code and the LFE"). Its channel_mode is negative
     // (6.2.2.2's NOTE 2): ch_mode is -1.
     AudioCoding coding = AudioCoding::kChannel;

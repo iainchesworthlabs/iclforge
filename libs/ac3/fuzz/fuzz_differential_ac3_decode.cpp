@@ -9,10 +9,10 @@
 
 // Differential mode for AC-3 (differential decoder fuzzing): the same split_frames +
 // FrameDecoder path fuzz_ac3_decode.cpp already crash-fuzzes (this harness
-// shares its seed corpus - see fuzz/run.sh's seed_source_for), but instead
+// shares its seed corpus - see tools/fuzz/run.sh's seed_source_for), but instead
 // of only checking for a crash/sanitizer trip, this decodes the SAME
 // mutated bytes a second time with FFmpeg and diffs the resulting PCM. See
-// fuzz/differential_oracle.hpp's own module comment for exactly when a
+// libs/ac3/fuzz/differential_oracle.hpp's own module comment for exactly when a
 // mismatch is treated as a reportable divergence versus expected
 // disagreement on a mutated/malformed frame.
 //
@@ -22,7 +22,7 @@
 // accepted the whole input end to end: the overwhelming majority of
 // mutations get rejected immediately (bad sync word, bad CRC, a reserved
 // field), and none of those are worth an FFmpeg process under a bounded
-// time budget (see fuzz.yml's fuzz-differential job, and fuzz/README.md for
+// time budget (see fuzz.yml's fuzz-differential job, and tools/fuzz/README.md for
 // why this is bounded mutation, not continuous fuzzing).
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
     const std::span<const std::byte> bytes{reinterpret_cast<const std::byte*>(data), size};

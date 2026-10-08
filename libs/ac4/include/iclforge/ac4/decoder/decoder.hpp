@@ -53,7 +53,7 @@
 // metadata sets (clause 6.3.9, Annex F), for the application to render
 // (DecodedFrame::objects); it renders an intermediate spatial format itself
 // (clause 5.10.3). The table of contents and the substream framing come from
-// iclforge::ac4::parse_raw_frame (the inspector, src/ac4); this library starts
+// iclforge::ac4::parse_raw_frame (the inspector, libs/ac4); this library starts
 // where the inspector stops.
 //
 // A presentation in the efficient high frame rate mode (Part 2 clause 5.1.3)

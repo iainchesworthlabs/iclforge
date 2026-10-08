@@ -10,7 +10,7 @@
 #include "iclforge/audio/monitor.hpp"
 
 // MonitorSink's playback position, pause and flush against a real output
-// device (src/audio/src/backend/*/monitor.cpp).
+// device (libs/audio/src/backend/*/monitor.cpp).
 //
 // Hidden: the tag starts with a dot, so `iclforge-tests` does not run this - it
 // needs a sound card, plays about a second of quiet tone through the default

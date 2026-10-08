@@ -25,7 +25,7 @@ TestCase {
     // circling continuously for real (not a single static frame; see
     // CONTRIBUTING.md's "test with real audio, from frame 1 onward" rule),
     // generated the same way examples/atmos_objects.cpp's own end-to-end
-    // proof is. NOT fuzz/seeds/fuzz_eac3_decode/atmos-objects.ec3, despite
+    // proof is. NOT libs/ac3/fuzz/seeds/fuzz_eac3_decode/atmos-objects.ec3, despite
     // the similar name: that corpus seed decodes cleanly (it exists to fuzz
     // robustness, not to exercise a real payload) but carries no OAMD this
     // decoder recognises - verified directly, 0 of its 32 frames carry

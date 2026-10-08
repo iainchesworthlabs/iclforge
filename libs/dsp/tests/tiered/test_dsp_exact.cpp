@@ -1,4 +1,4 @@
-// The transforms of src/dsp/src/tiered against verbatim copies of the code
+// The transforms of libs/dsp/src/tiered against verbatim copies of the code
 // they replaced (planning/ac4.md, D14e): the FFT passes, the inverse MDCT and the windowed
 // overlap-add are held to the BITS of the plan's generic radix loop, the old inverse transform and
 // the old block synthesis, at the decoder's scalar and at double, in both directions, on dense data
@@ -42,7 +42,7 @@ using iclforge::dsp::tiered::Real;
 
 // What the plan's loop was before the passes took the radix and the direction as arguments: the
 // factorisation, the factors, the generic butterfly with its runtime radix and the Stockham loop,
-// as src/dsp/src/tiered/fft.cpp had them.
+// as libs/dsp/src/tiered/fft.cpp had them.
 namespace reference {
 
 std::vector<int> factor(std::size_t length, bool& ok) {
@@ -484,7 +484,7 @@ void synthesis_matches_reference(int full, int rate_multiplier) {
 }
 
 // Pseudocode 85's pre-flattening gains as they were before the cubic fit's vectors were kept
-// between calls: src/ac4/src/core/aspx/hf_generator.cpp's fit_cubic and preflattening_gains, with
+// between calls: libs/ac4/src/core/aspx/hf_generator.cpp's fit_cubic and preflattening_gains, with
 // its two dB conversions, verbatim.
 namespace reference_aspx {
 

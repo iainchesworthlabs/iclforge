@@ -32,10 +32,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _header_gen import wrap, write_or_check
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-SOURCE = REPO_ROOT / "src" / "dsp" / "src" / "tiered" / "tables" / "qmf_tables.cpp"
+SOURCE = REPO_ROOT / "libs" / "dsp" / "src" / "tiered" / "tables" / "qmf_tables.cpp"
 HEADER = (
     REPO_ROOT
-    / "src"
+    / "libs"
     / "dsp"
     / "src"
     / "tiered"

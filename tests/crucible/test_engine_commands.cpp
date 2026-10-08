@@ -122,7 +122,7 @@ std::string scratch_pid_suffix() {
     return iclforge::test::platform::process_id();
 }
 
-// This process's environment only (tests/platform/process.hpp's seam).
+// This process's environment only (tests/support/platform/process.hpp's seam).
 void set_env(const char* name, const char* value) {
     iclforge::test::platform::set_environment(name, value);
 }

@@ -211,7 +211,7 @@ The macOS `process_loopback` cell says two things because two things happened. I
 Phase 5, and since 2026-09-06 it reports **not available**: the first machine ever to run the
 path never returned from `AudioDeviceCreateIOProcID` on the tap's aggregate device. The refusal,
 the observation behind it and the `AC3FORGE_MACOS_PROCESS_TAP` opt-in that reverses it are in
-`src/audio/src/backend/macos/coreaudio_names.hpp`; the stack is in the
+`libs/audio/src/backend/macos/coreaudio_names.hpp`; the stack is in the
 [Phase 5](#phase-5-macos) record.
 
 ### ALSA or PipeWire
@@ -1078,7 +1078,7 @@ run by anyone here**; see below.
 
     Two consequences worth naming. Objective-C++ enters the tree, in **three `.mm` files across
     two directories that enable the language**: the library's own `process_tap.mm`, under
-    `enable_language(OBJCXX)` in `src/audio/CMakeLists.txt`'s APPLE block, and Crucible's
+    `enable_language(OBJCXX)` in `libs/audio/CMakeLists.txt`'s APPLE block, and Crucible's
     `foreground.mm` and `app_icon_provider.mm`, under a second such call in
     `apps/crucible/CMakeLists.txt`'s APPLE arm. Both call sites pin `CMAKE_OBJCXX_COMPILER` to
     the C++ compiler the toolchain file chose, and
@@ -1202,7 +1202,7 @@ run by anyone here**; see below.
     the capability available on the strength of it. That was the thing that turned out to be
     wrong: every documented precondition was satisfied on the machine that hung. So the backend
     now carries a second gate beside the version one
-    (`src/audio/src/backend/macos/coreaudio_names.hpp`), the capability reports **not available**
+    (`libs/audio/src/backend/macos/coreaudio_names.hpp`), the capability reports **not available**
     with a reason that names the hang, and `Capture::start_process_loopback()` refuses before it
     reaches the blocking call. `AC3FORGE_MACOS_PROCESS_TAP` in the environment turns the path back
     on for whoever has a Mac to settle it on.

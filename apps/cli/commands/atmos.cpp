@@ -141,7 +141,7 @@ std::optional<iclforge::objects::oba::ObjectScene> scene_of(std::string_view pat
 
 // atmos-cbi's named layouts. DEE's own --input-format cbi_wav channel order
 // (measured against a real Dolby Encoding Engine 5.1.4 stream - see
-// tools/generators/gen_object_fixture.py and tests/ac3/oba/test_dee_joc_fixture.cpp)
+// tools/generators/gen_object_fixture.py and libs/ac3/tests/oba/test_dee_joc_fixture.cpp)
 // is exactly iclforge::objects::oba::bed_labels()'s Table 12 order for that bed, so this
 // table names each layout only by its bed flags and lets bed_labels() derive
 // the channel order AtmosEncoder::encode_bed_frame expects - no separate,

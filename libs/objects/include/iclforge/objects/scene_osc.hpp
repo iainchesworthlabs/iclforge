@@ -36,7 +36,7 @@
 // Untrusted input (docs/threat-model.md): this is the project's first
 // network-facing parser. It cannot crash, read out of bounds, or loop
 // unboundedly on any input - see parse_osc_packet's own comment for the
-// specific bounds - and is covered by fuzz/fuzz_osc_parse.cpp accordingly.
+// specific bounds - and is covered by libs/objects/fuzz/fuzz_osc_parse.cpp accordingly.
 
 namespace iclforge::objects::oba {
 

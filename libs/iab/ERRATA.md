@@ -1,6 +1,6 @@
 # IAB: readings
 
-The readings `src/iab` takes where SMPTE ST 2098-2:2022 leaves a reader's or writer's choice open or
+The readings `libs/iab` takes where SMPTE ST 2098-2:2022 leaves a reader's or writer's choice open or
 contradicts itself.
 
 ## AudioDataDLC: the 96 kHz Rice branch

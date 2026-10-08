@@ -46,7 +46,7 @@ bool DiagnosticsHttpServer::start(std::uint16_t port) {
     impl_->port = static_cast<std::uint16_t>(bound);
     // The socket is already listening, so a request that arrives before
     // this thread reaches accept() waits in the backlog rather than being
-    // refused - the same reasoning src/sendspin's own Listener::start()
+    // refused - the same reasoning libs/sendspin's own Listener::start()
     // carries for the identical shape.
     impl_->accept_thread = std::thread([&server] { server.listen_after_bind(); });
     server.wait_until_ready();

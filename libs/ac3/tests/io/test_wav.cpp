@@ -15,7 +15,7 @@
 
 #include "iclforge/ac3/io/wav.hpp"
 
-// iclforge::ac3::io::read_wav/parse_wav (src/ac3/src/io/wav.cpp) is the file every
+// iclforge::ac3::io::read_wav/parse_wav (libs/ac3/src/io/wav.cpp) is the file every
 // codec-path test in this suite leans on to get real audio in and decoded
 // audio back out - but nothing exercises the parser itself: its RIFF/WAVE
 // validation, its integer decode paths (every other test only round-trips
@@ -318,7 +318,7 @@ TEST_CASE("read_wav rejects data that is not a RIFF/WAVE file", "[wav]") {
 TEST_CASE("read_wav decodes every integer PCM depth with the documented scaling", "[wav]") {
     // One full-scale-negative, one silent, one full-scale-positive sample per
     // depth, plus one arbitrary interior value - the scaling for each width is
-    // stated in src/base/src/wav_format.cpp's convert_sample and checked
+    // stated in libs/base/src/wav_format.cpp's convert_sample and checked
     // here against values worked out by hand rather than against another
     // reader that might share the same mistake.
     SECTION("8-bit PCM is unsigned and biased by 128") {

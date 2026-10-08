@@ -62,7 +62,7 @@
 // colours, transport, artwork and visualizer frames, and a controller's volume and mute reach every
 // player in the group.
 //
-// It dials, so under ThreadSanitizer it needs what tests/sendspin/test_websocket.cpp says.
+// It dials, so under ThreadSanitizer it needs what libs/sendspin/tests/test_websocket.cpp says.
 
 namespace {
 
@@ -659,7 +659,7 @@ TEST_CASE("group: unpairing a sink delivers client/goodbye's own reason to the h
     // ServerHostEvents::on_client_goodbye() (HostConnection::on_goodbye(), server_host.cpp) rather
     // than being discarded, as issue #876 found it. The reasons NetworkSinks actually reads
     // meaning into (kAnotherServer, kConcurrentAttempt) are player_session.cpp's own admission
-    // outcomes, covered end to end already by tests/sendspin/test_sessions.cpp's "the owner
+    // outcomes, covered end to end already by libs/sendspin/tests/test_sessions.cpp's "the owner
     // rejects an activation, or another server displaces the connection" - this test is only
     // for the plumbing between here and there, which kUnpaired reaches just as directly.
     const fs::path scratch = fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_goodbye_" + scratch_pid_suffix());

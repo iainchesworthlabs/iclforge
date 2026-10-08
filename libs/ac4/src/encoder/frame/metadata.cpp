@@ -595,9 +595,9 @@ void write_drc_frame(BitWriter& w, const DrcCodes* codes, bool iframe,
             curve = true;
             continue;
         }
-        // drc_gains() (Table 75), under the reading src/ac4/ERRATA.md
+        // drc_gains() (Table 75), under the reading libs/ac4/ERRATA.md
         // "drc_gains() is a brace short" takes; drc_gainset_size counts
-        // drc_version, as bits_left's formula does (src/ac4/ERRATA.md,
+        // drc_version, as bits_left's formula does (libs/ac4/ERRATA.md,
         // "drc_gainset_size counts drc_version").
         const DrcModeGains& set = gains[m];
         BitWriter body = BitWriter::buffered();
@@ -818,7 +818,7 @@ void write_de_data(BitWriter& w, const DeConfigCodes& config, const DeFrameParam
         } else {
             for (std::size_t band = 0; band < kDeBands; ++band) {
                 if (iframe) {
-                    // Part 1's reading, src/ac4/ERRATA.md "de_data() predicts
+                    // Part 1's reading, libs/ac4/ERRATA.md "de_data() predicts
                     // from the wrong channel": along the channel's own bands.
                     code(diff_codes, row[band] - ref + diff_off);
                     ref = row[band];
@@ -965,7 +965,7 @@ void write_emdf_payloads(BitWriter& w, std::span<const EmdfPayloadCodes> payload
         }
     }
     // while (emdf_payload_id != 0): the 0 that ends the list, and nothing
-    // after it but the alignment (src/ac4/ERRATA.md, "The end of an EMDF
+    // after it but the alignment (libs/ac4/ERRATA.md, "The end of an EMDF
     // payload list").
     w.write(5, 0, "emdf_payload_id");
     w.align();
@@ -988,7 +988,7 @@ void write_alternative(BitWriter& w, const AlternativeCodes& codes) {
         w.write(8, 0, "presentation_name");
     }
     // One target: the presentation's level, every device category, and every
-    // substream active with no alternative data set (src/ac4/ERRATA.md,
+    // substream active with no alternative data set (libs/ac4/ERRATA.md,
     // "An alternative presentation's target").
     w.write(2, 0, "n_targets_minus1");
     w.write(3, static_cast<std::uint64_t>(codes.target_level), "target_level");

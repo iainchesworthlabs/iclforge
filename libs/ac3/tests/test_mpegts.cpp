@@ -31,7 +31,7 @@ Bytes frame_of(std::size_t size, std::uint8_t fill) {
 constexpr std::size_t kTsPacketSize = 188;
 
 // ISO/IEC 13818-1 Annex B's CRC_32, transcribed independently of
-// src/containers/src/mpegts/mpegts.cpp's own copy (same reasoning as that file's own
+// libs/containers/src/mpegts/mpegts.cpp's own copy (same reasoning as that file's own
 // comment on why this is worth self-checking rather than trusting by
 // construction): non-reflected CRC-32/MPEG-2, poly 0x04C11DB7, init
 // all-ones, no output XOR.

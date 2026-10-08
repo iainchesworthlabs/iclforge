@@ -9,7 +9,7 @@
 #include "iclforge/base/bitwriter.hpp"
 
 // The shape of every Huffman codebook of both parts' Annex A, shared by the
-// decoder, which reads codewords (src/ac4/src/decoder/huffman.hpp), and the encoder,
+// decoder, which reads codewords (libs/ac4/src/decoder/huffman.hpp), and the encoder,
 // which writes them.
 //
 // Part 1 Annex A.0: each codebook is a table of codeword lengths and a table

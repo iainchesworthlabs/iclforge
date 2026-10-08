@@ -11,7 +11,7 @@
 // The one place the application asks for the machine it is running on.
 //
 // Exactly one platform/<os>/services.cpp defines these, chosen by CMake the
-// way src/audio/src/backend/<os>/ is chosen for the library
+// way libs/audio/src/backend/<os>/ is chosen for the library
 // (docs/platforms/raspberry-pi.md, "Why there's no Raspberry Pi-specific
 // code"). Nothing above this header names an operating system, and no
 // #ifdef selects between them: a platform is a directory.

@@ -13,7 +13,7 @@
 // std::thread with a flag and a condition variable, not std::jthread: this
 // file is compiled into ac3audio for every platform including Android, whose
 // NDK libc++ does not implement <stop_token> at all (see
-// src/audio/src/backend/android/monitor.cpp's own note). The condition
+// libs/audio/src/backend/android/monitor.cpp's own note). The condition
 // variable is what makes a stop prompt anyway - a re-probe interval of
 // seconds must not be how long stop() takes.
 

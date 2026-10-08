@@ -1,5 +1,5 @@
-// The encoder's A-CPL syntax writer (src/ac4/src/encoder/acpl/acpl_syntax.hpp) read
-// back by the decoder's parser (src/ac4/src/decoder/syntax/acpl.hpp): every
+// The encoder's A-CPL syntax writer (libs/ac4/src/encoder/acpl/acpl_syntax.hpp) read
+// back by the decoder's parser (libs/ac4/src/decoder/syntax/acpl.hpp): every
 // configuration, framing and parameter kind, in both differencing directions,
 // uses every bit and records what was written; and the writer takes exactly
 // the values each of the 24 codebooks holds.

@@ -26,7 +26,7 @@
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "encode.hpp"
 
-// ac4-encode: WAV to AC-4 through iclforge::ac4::Encoder (src/ac4/src/encoder), as a raw stream
+// ac4-encode: WAV to AC-4 through iclforge::ac4::Encoder (libs/ac4/src/encoder), as a raw stream
 // of sync frames with the CRC of TS 103 190-2 Annex G (without it where
 // crc=off), or in an MP4 file with Annex E's 'ac-4' sample entry when the
 // output is named .mp4, .m4a or .mov. What the encoder writes: mono, stereo,

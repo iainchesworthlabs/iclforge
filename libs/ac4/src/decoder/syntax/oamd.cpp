@@ -44,7 +44,7 @@ constexpr std::array<int, 16> kRampDurationTable = {32,   64,   128,  256,  320,
 // A nested element that returns the bits it read (trim(), bed_render_info(),
 // headphone(), add_per_object_md(), ext_prec_alt_pos() and ajoc_bed_info()),
 // measured as the reader's position after it less its position before
-// (src/ac4/ERRATA.md, "bits_used from trim()/bed_render_info()/
+// (libs/ac4/ERRATA.md, "bits_used from trim()/bed_render_info()/
 // headphone() is measured, not returned"). One whose bits run past the
 // budget the syntax gives it fails the substream (the same register, "An
 // add_data budget a nested element overruns fails the substream").
@@ -182,7 +182,7 @@ constexpr ToolNames kTfNames{"b_top_front_to_front", "b_top_front_to_side", "gai
 constexpr int kNumTrimConfigs = 9;
 
 // trim_balance_presence[]'s five flags are one field, [4] its first bit
-// (src/ac4/ERRATA.md, "Arrays read as one field"), as the inspector reads
+// (libs/ac4/ERRATA.md, "Arrays read as one field"), as the inspector reads
 // the table of contents' trim().
 [[nodiscard]] std::optional<iclforge::ac4::Trim> parse_trim(BitReader& r) {
     if (!r.read_flag("b_trim_present")) {
@@ -331,7 +331,7 @@ void parse_object_render_info(BitReader& r, InfoStatus status, bool b_no_delta,
 // 6.2.8.10 add_per_object_md(). The object_info_block() calls it with
 // (b_dynamic_object, b_object_not_active), the definition names its parameters
 // (b_object_not_active, b_dynamic_object): the parameters are read by name
-// (src/ac4/ERRATA.md, "add_per_object_md()'s parameters").
+// (libs/ac4/ERRATA.md, "add_per_object_md()'s parameters").
 [[nodiscard]] ParseResult parse_add_per_object_md(BitReader& r, bool b_object_not_active,
                                                   bool b_dynamic_object, AddPerObjectMd& out) {
     out.b_obj_trim_disable = r.read_flag("b_obj_trim_disable");

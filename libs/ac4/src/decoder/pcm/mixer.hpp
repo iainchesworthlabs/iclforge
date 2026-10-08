@@ -19,7 +19,7 @@
 // the listener's g_dialog, the associated audio by g_assoc; a mono substream
 // panned by its angle (pan_dialog, pan_associated) with the law Part 1 Table
 // 216 fixes three points of, and the others channel to channel. The sum is not
-// divided by the number of substreams (src/ac4/ERRATA.md, "The mixer's
+// divided by the number of substreams (libs/ac4/ERRATA.md, "The mixer's
 // sum").
 
 namespace iclforge::ac4::detail {

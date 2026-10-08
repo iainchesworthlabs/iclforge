@@ -325,7 +325,7 @@ void write_stream(JsonSink& json, const ac3::io::ProbeReport& report) {
 //
 // A separate walk from everything above, over iclforge::ac4::scan()/parse_raw_frame()
 // rather than iclforge::ac3::io::Prober - AC-4 is a different codec with a different
-// bitstream (see src/ac4/include/iclforge/ac4/core/toc.hpp's own scope note: TOC/
+// bitstream (see libs/ac4/include/iclforge/ac4/core/toc.hpp's own scope note: TOC/
 // presentation/substream-group framing, not audio decode), so none of the
 // AC-3/E-AC-3-specific fields above (acmod, bsmod, chanmap, dialnorm,
 // exponent_strategy, ...) apply to it. Rather than writing thirty `null`

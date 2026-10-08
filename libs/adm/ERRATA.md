@@ -13,7 +13,7 @@ in it is symmetric about X = 0 except one:
 | `ZM3_SideRight` | 0.5611 | 1 |
 
 `0.5611` is read as a dropped digit for `0.51611`, the mirror of `ZM3_SideLeft`'s `maxX`. The
-transcription is in `src/adm/src/coordinates.cpp` (`kZoneTable`).
+transcription is in `libs/adm/src/coordinates.cpp` (`kZoneTable`).
 
 - **Writing** uses `0.51611`.
 - **Reading** recognises a zone by its label first, and by its bounds only when it has none. The bounds

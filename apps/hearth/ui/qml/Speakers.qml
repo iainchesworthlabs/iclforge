@@ -16,7 +16,7 @@ import Hearth
 // only the label and the small-speaker flag. Rather than extend the engine
 // for one diagram, this file keeps its own label-to-angle/elevation table,
 // ported by hand from iclforge::spatial::direction_of
-// (src/render/src/spatial.cpp) - see speakerAngles/directionOf
+// (libs/render/src/spatial.cpp) - see speakerAngles/directionOf
 // below. Keep the two in sync if that table ever changes.
 ScrollView {
     id: root

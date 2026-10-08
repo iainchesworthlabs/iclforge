@@ -13,7 +13,7 @@
 // The one FFT of the family (planning/consolidation.md decision 20): the passes of a Stockham
 // autosort transform, decimation in frequency, one function for each radix and direction, with
 // nothing a pass does decided at run time. AC-4's plan for every length 2^a 3^b 5^c
-// (src/dsp/src/tiered/fft.hpp) runs them, and so does every transform of AC-3 and dsp at a
+// (libs/dsp/src/tiered/fft.hpp) runs them, and so does every transform of AC-3 and dsp at a
 // length known when it is compiled (StockhamTables and stockham_forward below): the MDCT's 64 and
 // 128 points, enhanced coupling's 512.
 //
@@ -26,12 +26,12 @@
 //
 // The value and the factor have types of their own, V and W. AC-4's plan has both its scalar;
 // AC-3's MDCT runs double, float, four transforms side by side in an AVX2 register (V f64x4, W
-// double) and its fixed-point tier's ImdctValue with Fixed32 factors (src/ac3/src/core/
+// double) and its fixed-point tier's ImdctValue with Fixed32 factors (libs/ac3/src/core/
 // mdct_fixed.hpp). Every expression below is a sum, a difference or a product of a V and a W, so
 // each instantiation performs the same operations in the same order.
 //
 // Every statement performs the operations of the loop this replaced in AC-4's plan, in the same
-// order, so its outputs are the same bits at every scalar (tests/dsp/tiered/test_dsp_exact.cpp
+// order, so its outputs are the same bits at every scalar (libs/dsp/tests/tiered/test_dsp_exact.cpp
 // holds each to a verbatim copy of that loop). Two rewrites are not a copy of the old text, and
 // each is an identity of IEEE 754 arithmetic rather than a reassociation:
 //
@@ -348,7 +348,7 @@ union Scratch {
 // imaginary parts in natural order, in place, with the unit factors' products left out (SkipUnit
 // above): these transforms run on parts with no FPU, where each is a software multiply.
 // `between(re, im)` sees the values after each pass, in whichever buffer holds them, and may
-// change them: a fixed-point caller sheds bits there (src/ac3/src/core/eac3_tools.cpp's
+// change them: a fixed-point caller sheds bits there (libs/ac3/src/core/eac3_tools.cpp's
 // dft512_fixed).
 template <std::size_t P, typename V, typename W, typename Between>
 void stockham_forward(const StockhamTables<P, W>& t, std::span<V, P> re, std::span<V, P> im,

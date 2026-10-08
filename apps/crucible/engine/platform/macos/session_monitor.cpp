@@ -46,7 +46,7 @@
 // needs, because the HAL keeps this list itself.
 //
 // The three properties are read through the library's own CoreAudio helpers
-// (src/audio/src/backend/macos/coreaudio_support.hpp: address(),
+// (libs/audio/src/backend/macos/coreaudio_support.hpp: address(),
 // get_property<T>(), CFOwned, to_utf8), reused rather than reimplemented for
 // the same reason the Linux half reuses iclforge::pipewire's - a second copy of
 // the two-call property idiom is a second place for it to be wrong. That is
@@ -67,13 +67,13 @@
 // otherwise. It was written in a worktree where nothing in src/ called
 // system_audio_tap_api_available(), and concluded from that that no build had
 // ever emitted a __builtin_available here. A test had, since before this
-// branch: tests/audio/backend/macos/test_macos_support.cpp's "this CI runner's OS
+// branch: libs/audio/tests/backend/macos/test_macos_support.cpp's "this CI runner's OS
 // build exposes the Core Audio tap API" calls it, and it passes on both macOS
 // legs on main. Clang lowers a __builtin_available to a call into compiler-rt
 // (__isPlatformVersionAtLeast), so the Homebrew clang the toolchain file picks
 // does link its builtins here and the gate does answer on a hosted runner.
 // What is new on this branch is that the library calls it too
-// (src/audio/src/backend/macos/capture.cpp's process_loopback_available()).
+// (libs/audio/src/backend/macos/capture.cpp's process_loopback_available()).
 // None of that says anything about the property reads below; it says the
 // version test itself is a mechanism that links and returns.
 //
@@ -101,7 +101,7 @@
 // processes do on Linux.
 //
 // What the taps do, which is what a reader of this file asks next. The tap is
-// written. src/audio/src/backend/macos/process_tap.mm builds the
+// written. libs/audio/src/backend/macos/process_tap.mm builds the
 // CATapDescription and the aggregate device behind it, and it works as far as
 // reading the tap's format. audio_backend.cpp nonetheless reports
 // process_loopback NOT available, for the reason in the first bullet below.
@@ -116,7 +116,7 @@
 //     returned - taking the rest of the process's Core Audio with it, so the
 //     window froze rather than reporting a failed tap. The backend now says
 //     process_loopback is unavailable and refuses before that call
-//     (src/audio/src/backend/macos/coreaudio_names.hpp). So the room lists
+//     (libs/audio/src/backend/macos/coreaudio_names.hpp). So the room lists
 //     applications here and taps none of them. The four below are what was
 //     EXPECTED to be in the way and have not been reached; each is still
 //     real, and each is still unchecked.

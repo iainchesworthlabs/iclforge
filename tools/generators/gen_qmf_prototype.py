@@ -51,7 +51,7 @@ from pathlib import Path
 import numpy as np
 
 REPO = Path(__file__).resolve().parent.parent.parent
-OUT = REPO / "src" / "dsp" / "src" / "qmf_prototype.hpp"
+OUT = REPO / "libs" / "dsp" / "src" / "qmf_prototype.hpp"
 
 M = 64  # subbands
 L = 640  # prototype taps

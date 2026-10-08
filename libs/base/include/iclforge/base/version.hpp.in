@@ -35,7 +35,7 @@ inline constexpr bool git_dirty = @ICLFORGE_GIT_DIRTY@;
 inline constexpr int git_commits_since_tag = @ICLFORGE_GIT_COMMITS_SINCE_TAG@;
 
 // OS/architecture/compiler this binary was built for, e.g. "Linux x86_64
-// (Clang 22.1.2)". Computed by src/base/CMakeLists.txt from the toolchain
+// (Clang 22.1.2)". Computed by libs/base/CMakeLists.txt from the toolchain
 // CMake itself configured, not read back from predefined compiler macros.
 inline constexpr std::string_view build_target = "@ICLFORGE_BUILD_TARGET@";
 

@@ -9,7 +9,7 @@
 #include "iclforge/audio/playback_counter.hpp"
 
 // iclforge::audio::PlaybackCounter against a fake device's clock
-// (src/audio/include/iclforge/audio/playback_counter.hpp).
+// (libs/audio/include/iclforge/audio/playback_counter.hpp).
 //
 // The counter is the platform-independent half of MonitorPosition: every
 // backend hands it the frames it has given the device and the frames the

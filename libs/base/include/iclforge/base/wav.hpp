@@ -186,7 +186,7 @@ class ICLFORGE_BASE_EXPORT WavPcm16StreamWriter {
 // file PLUS its planar float copy resident at once - fine for a fixture,
 // gigabytes for a feature-length programme - where this holds one block.
 // Same format support and the same sample conversion as read_wav - the same
-// code, not a parallel copy of it (src/base/src/wav_format.hpp): every integer and
+// code, not a parallel copy of it (libs/base/src/wav_format.hpp): every integer and
 // float depth listed at the top of this header, EXTENSIBLE unwrapped, RF64/
 // BW64 sizes read from ds64, and a data chunk shorter than declared
 // tolerated at its real length. So a block-at-a-time consumer sees exactly

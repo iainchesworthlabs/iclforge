@@ -8,7 +8,7 @@
 #include "tiered/scalar_traits.hpp"
 
 // The decoder's QMF-domain and time-domain values in the units of the build's scalar, for
-// tests that state theirs in the double decoder's: full scale 2^15 (src/ac4/src/decoder/pcm/
+// tests that state theirs in the double decoder's: full scale 2^15 (libs/ac4/src/decoder/pcm/
 // substream_pcm.cpp). At double and float the two are the same and these are identities; at
 // Fixed32 the QMF domain is 2^kQmfShift and the time domain 2^kTimeShift below them
 // (core/dsp/scalar_traits.hpp, planning/ac4.md, D14d).
@@ -46,7 +46,7 @@ inline constexpr int kTimeShift = iclforge::dsp::tiered::kTimeShift<Real>;
 
 // A spectral line given in the double decoder's units, for a test that moves lines through the
 // stereo and multichannel tools by themselves: at Fixed32 the decoder holds a track's lines at
-// an exponent of the track's own (src/ac4/src/decoder/pcm/asf_reconstruct.hpp), and these hold a
+// an exponent of the track's own (libs/ac4/src/decoder/pcm/asf_reconstruct.hpp), and these hold a
 // test's at 2^12, which keeps lines of a few thousand inside the format.
 inline constexpr int kLineExponent = iclforge::dsp::tiered::kFixed<Real> ? 12 : 0;
 [[nodiscard]] inline Real line_real(double value) {

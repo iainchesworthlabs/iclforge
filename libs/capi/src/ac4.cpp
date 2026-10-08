@@ -1,5 +1,5 @@
 // iclforge_ac4_decoder_* - see iclforge.h's AC-4 section and iclforge::ac4::Decoder
-// (src/ac4/include/iclforge/ac4/decoder/decoder.hpp).
+// (libs/ac4/include/iclforge/ac4/decoder/decoder.hpp).
 
 #include <memory>
 #include <span>
@@ -149,7 +149,7 @@ const char* iclforge_ac4_decoder_refusal_reason(const iclforge_ac4_decoder_t* de
     // string_view::data() is not guaranteed NUL-terminated in general, but
     // iclforge::ac4::Decoder::refusal_reason() is always backed by a string literal
     // when non-empty (iclforge::ac4::describe(DecodeError) or a literal `reason`
-    // passed at the point a substream was refused - see src/ac4/src/decoder/decoder.cpp),
+    // passed at the point a substream was refused - see libs/ac4/src/decoder/decoder.cpp),
     // which is. The empty case (a decode() that decoded normally) is
     // std::string_view{} - data() is NULL by the standard there, not a
     // zero-length slice of a literal, so it is normalized to "" the same way

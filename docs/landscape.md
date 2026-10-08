@@ -322,7 +322,7 @@ The five added at version 2 close two different gaps.
 
 **Rates where the Annex E tools run.** ICL Forge's `auto` decides per frame,
 from the rate and the frame's own content
-(`src/ac3/src/encoder/eac3_frame.cpp`): coupling starts below about
+(`libs/ac3/src/encoder/eac3_frame.cpp`): coupling starts below about
 12 + 14n kbit/s per channel for n channels, and spectral extension below a
 ceiling of 55 to 110 kbit/s per channel, higher the emptier the frame's top
 end. The

@@ -10,10 +10,10 @@
 
 // Differential mode for E-AC-3 (differential decoder fuzzing): the same split_access_units +
 // Eac3Decoder path fuzz_eac3_decode.cpp already crash-fuzzes (this harness
-// shares its seed corpus - see fuzz/run.sh's seed_source_for), but instead
+// shares its seed corpus - see tools/fuzz/run.sh's seed_source_for), but instead
 // of only checking for a crash/sanitizer trip, this decodes the SAME
 // mutated bytes a second time with FFmpeg and diffs the resulting PCM. See
-// fuzz/differential_oracle.hpp's own module comment for exactly when a
+// libs/ac3/fuzz/differential_oracle.hpp's own module comment for exactly when a
 // mismatch is treated as a reportable divergence versus expected
 // disagreement on a mutated/malformed frame.
 //

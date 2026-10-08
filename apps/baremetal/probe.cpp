@@ -9,7 +9,7 @@
 //   1. Does the decode-only archive LINK at all with the encoder, the
 //      containers, the I/O layer and the direct-form transform tables absent?
 //      A missing symbol here is a fact about the source list in
-//      src/ac3/minimal.cmake, and --gc-sections means an unreachable
+//      libs/ac3/minimal.cmake, and --gc-sections means an unreachable
 //      function cannot paper over one.
 //
 //   2. Does it produce the right audio? Every frame of every fixture in
@@ -898,7 +898,7 @@ constexpr std::array<Eac3Fixture, 10> kEac3Fixtures{{
     // §E3.5's alternate coupling mode. `tools=all` does not select it
     // (plan::parse_tools maps "all" to cpl+spx+aht), so without this row
     // ecpl_channel_spectrum - and the 512-point DFT
-    // src/dsp/src/fft.cpp is in the minimal source list for - are
+    // libs/dsp/src/fft.cpp is in the minimal source list for - are
     // linked into every build of this profile and executed by none of them.
     {"eac3_ecpl", iclforge_probe::kEac3EcplStream, iclforge_probe::kEac3EcplRms, 159141},
     // An Atmos stream decoded for its BED. §6 object reconstruction allocates

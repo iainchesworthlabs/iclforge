@@ -43,7 +43,7 @@ constexpr std::array k714_core = {S::kLeft,        S::kRight,        S::kCentre,
 // The 9.X.4 modes in full decoding, in Part 2 Table A.27's order by speaker
 // index as the 22.2 layout is: L, R, C, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr, the
 // LFE (index 11), then Lscr and Rscr (24 and 25). Core decoding makes the same
-// 5.X.2 the 7.X.4 modes' core is (src/ac4/ERRATA.md, "The 9.X.4 element's
+// 5.X.2 the 7.X.4 modes' core is (libs/ac4/ERRATA.md, "The 9.X.4 element's
 // output").
 constexpr std::array k904 = {S::kLeft,          S::kRight,       S::kCentre,       S::kLeftSurround,
                              S::kRightSurround, S::kLeftBack,    S::kRightBack,    S::kTopFrontLeft,
@@ -731,7 +731,7 @@ std::vector<AspxUnit> aspx_units(int ch_mode, int codec_mode, DecodingMode decod
     if (const int n = var_signals(ch_mode); n > 0) {
         // Part 2 clause 6.2.4.4: an aspx_data_2ch() per pair of fullband
         // signals in syntax order, then an aspx_data_1ch() for an odd last one
-        // (src/ac4/ERRATA.md, "var_channel_element()'s A-SPX and
+        // (libs/ac4/ERRATA.md, "var_channel_element()'s A-SPX and
         // companding").
         if (codec_mode != codec_mode::kAspx) {
             return {};
@@ -779,7 +779,7 @@ std::vector<AspxUnit> aspx_units(int ch_mode, int codec_mode, DecodingMode decod
                 // b_5fronts (L, Lscr) and (R, Rscr) stand in place of (L, R):
                 // two aspx_data_2ch() the syntax sends, and in core decoding
                 // the first channel of each, as Table 9 lists L and R for the
-                // post-processing then (src/ac4/ERRATA.md, "The 9.X.4
+                // post-processing then (libs/ac4/ERRATA.md, "The 9.X.4
                 // element's A-SPX in core decoding").
                 std::vector<AspxUnit> units = {{.pair = true,
                                                 .index = 0,

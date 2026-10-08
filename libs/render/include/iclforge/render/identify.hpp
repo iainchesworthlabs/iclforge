@@ -27,7 +27,7 @@
 // arithmetic per sample and no allocation, for a board as much as a computer.
 //
 // Levels are RMS relative to full scale (1.0), as iclforge::ac3::analysis::LevelMeter
-// reports them. Tested on the host in tests/render/test_identify.cpp.
+// reports them. Tested on the host in libs/render/tests/test_identify.cpp.
 
 namespace iclforge::render {
 
@@ -121,7 +121,7 @@ class IdentifyTone {
     // The low band's RMS relative to the full band's for the same noise, -11.5
     // dB: measured over sixty seconds of this generator at 44.1, 48 and 96 kHz
     // (-11.50, -11.53 and -11.56 dB), and held to the stated level by
-    // tests/render/test_identify.cpp at each of those rates.
+    // libs/render/tests/test_identify.cpp at each of those rates.
     static constexpr double kLowBandRelativeRms = 0.2652;
 
     // xorshift32 (Marsaglia), as a signed source on [-kHalfRange, kHalfRange).

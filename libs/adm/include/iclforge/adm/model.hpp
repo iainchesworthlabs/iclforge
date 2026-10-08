@@ -28,13 +28,13 @@
 //
 // NOTE on the "ac3adm" name: this module is implemented internally on top
 // of the vendored third-party libraries libbw64 and libadm (see
-// src/adm/CMakeLists.txt) - and libadm's own public C++ namespace is
+// libs/adm/CMakeLists.txt) - and libadm's own public C++ namespace is
 // `adm`. This project's namespace here is deliberately "ac3adm", not "adm",
 // specifically to avoid colliding with that dependency: `::adm::AudioObject`
 // (libadm's parsed-XML class) and this header's own AudioObject would
 // otherwise be the same fully-qualified name for two different types.
 // ac3adm's own types are independent of and not derived from libadm's -
-// src/adm/src/adm_model.cpp is the only place both namespaces meet, and
+// libs/adm/src/adm_model.cpp is the only place both namespaces meet, and
 // it stays entirely inside this module's implementation, never in a public
 // header.
 
@@ -119,7 +119,7 @@ struct ObjectDivergenceInfo {
 // screenRef and headLocked - since a consumer that drops them changes how the
 // object is rendered. libadm does not parse zoneExclusion at all (its parser
 // and writer both leave a TODO for it), so that one element is read from the
-// axml text by src/adm/src/adm_xml_extras.cpp instead. Matrix blocks carry no
+// axml text by libs/adm/src/adm_xml_extras.cpp instead. Matrix blocks carry no
 // coefficients here: libadm has no model for them either.
 struct AudioBlockFormat {
     std::string id;  // audioBlockFormatID, e.g. "AB_00031001_00000001"

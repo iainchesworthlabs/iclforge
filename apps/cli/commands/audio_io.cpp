@@ -900,7 +900,7 @@ int submit_units_to_sink(iclforge::audio::PassthroughSink& sink,
 }
 
 // A path unique across concurrent processes and repeated calls within one -
-// same technique src/adm/src/adm.cpp's make_temp_path() uses (a
+// same technique libs/adm/src/adm.cpp's make_temp_path() uses (a
 // high-resolution clock reading XORed with a random_device draw and an
 // in-process counter), duplicated locally rather than shared across modules
 // for one temp file each.

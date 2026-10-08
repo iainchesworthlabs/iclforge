@@ -1,6 +1,6 @@
-// The POSIX half of the test suite's platform seam (tests/platform/process.hpp).
+// The POSIX half of the test suite's platform seam (tests/support/platform/process.hpp).
 //
-// Every platform ships the same filename under tests/platform/<os>/; CMake
+// Every platform ships the same filename under tests/support/platform/<os>/; CMake
 // compiles the directory that matches the target, so there is no #ifdef here -
 // the file's path is what says "POSIX".
 

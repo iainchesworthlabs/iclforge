@@ -14,7 +14,7 @@ TestCase {
     }
 
     readonly property url fixtureUrl:
-        Qt.resolvedUrl("../../../../fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
+        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
     readonly property url outputUrl:
         Qt.resolvedUrl("_test_output/tst_run_history.ac3")
 

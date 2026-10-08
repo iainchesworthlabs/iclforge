@@ -8,7 +8,7 @@
 // This is the only file in the repository whose contents depend on the
 // PROCESSOR rather than on the operating system, which is why it sits in its
 // own platform directory and is added to the target only by the cross build
-// (apps/baremetal/CMakeLists.txt) - the same mechanism src/audio's backends
+// (apps/baremetal/CMakeLists.txt) - the same mechanism libs/audio's backends
 // and ac3/internal/profiling.hpp use, and the reason nothing here needs an
 // #ifdef.
 

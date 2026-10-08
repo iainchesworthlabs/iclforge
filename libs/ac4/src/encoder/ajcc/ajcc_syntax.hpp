@@ -9,7 +9,7 @@
 // The A-JCC syntax, written: ETSI TS 103 190-2 V1.3.1 clause 6.2.6,
 // ajcc_data() with b_5fronts 0 (the 7.X.4 channel modes) or 1 (the 9.X.4 modes)
 // and the elements it calls, transcribed for writing. The decoder's reader
-// (src/ac4/src/decoder/syntax/ajcc.cpp) and the Python parser are transcriptions of
+// (libs/ac4/src/decoder/syntax/ajcc.cpp) and the Python parser are transcriptions of
 // their own; the traces agree record for record.
 //
 // The values here are the syntax's: each parameter set's values are what

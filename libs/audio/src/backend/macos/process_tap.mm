@@ -60,7 +60,7 @@
 // Memory management
 // ---------------------------------------------------------------------------
 // This file is compiled with -fobjc-arc (see the APPLE block of
-// src/audio/CMakeLists.txt), so the Objective-C objects below are released by
+// libs/audio/CMakeLists.txt), so the Objective-C objects below are released by
 // the compiler and the toll-free bridge to CFDictionaryRef is spelled
 // __bridge. The @autoreleasepool is not decoration: create_process_tap() is
 // called from whatever thread the caller happens to be on, which on this

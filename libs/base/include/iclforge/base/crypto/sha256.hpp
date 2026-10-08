@@ -37,7 +37,7 @@ private:
 };
 
 // Convenience one-shot over a whole buffer. Exported (unlike Sha256 itself) so that
-// tests/base/test_crypto.cpp can run FIPS 180-4's known-answer vectors against a shared
+// libs/base/tests/test_crypto.cpp can run FIPS 180-4's known-answer vectors against a shared
 // libiclforge_base.
 ICLFORGE_BASE_EXPORT std::array<std::byte, 32> sha256(std::span<const std::byte> data);
 

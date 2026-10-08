@@ -12,7 +12,7 @@
 // = 2^(1 / alpha); or by one gain from the interval's average; or not at all.
 // The gain depends on the level's scale. The QMF domain runs at the inverse
 // transform's, full scale 2^15, where A-SPX's envelopes are measured; the
-// levels here are measured against full scale 1.0 (src/ac4/ERRATA.md,
+// levels here are measured against full scale 1.0 (libs/ac4/ERRATA.md,
 // "Companding measures against full scale 1.0").
 
 namespace iclforge::ac4::detail {

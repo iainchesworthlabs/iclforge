@@ -48,7 +48,7 @@ pub enum Error {
     Ac4EncodeInvalidInput,
     /// A raw `iclforge_status_t` value this crate doesn't recognize. `iclforge_status_message`
     /// still gives a human-readable string for it (`"unknown status"` for a value the C library
-    /// itself doesn't recognize either — see `src/capi/src/common.cpp`'s own fallback), so
+    /// itself doesn't recognize either — see `libs/capi/src/common.cpp`'s own fallback), so
     /// [`Error`]'s `Display` impl works for this variant exactly like every other one.
     Other(u32),
 }
@@ -188,7 +188,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // SAFETY: iclforge_status_message() returns a pointer to library-owned storage valid
         // for the process lifetime for every possible input, including a value it doesn't
-        // recognize (src/capi/src/common.cpp falls through to "unknown status") - never NULL,
+        // recognize (libs/capi/src/common.cpp falls through to "unknown status") - never NULL,
         // never freed here.
         let message = unsafe { CStr::from_ptr(iclforge_sys::iclforge_status_message(self.raw())) };
         write!(f, "{}", message.to_string_lossy())

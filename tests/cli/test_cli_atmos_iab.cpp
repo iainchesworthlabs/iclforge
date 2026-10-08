@@ -28,13 +28,13 @@
 // test_cli_atmos_adm.cpp is (ICLFORGE_BUILD_ADM AND forge actually built) - see
 // tests/CMakeLists.txt's own comment.
 //
-// The byte-level IAB fixture below is a copy of tests/adm/test_iab_bridge.cpp's own flagship
+// The byte-level IAB fixture below is a copy of libs/adm/tests/test_iab_bridge.cpp's own flagship
 // fixture (same Bed Center channel + hard-right-then-hard-left Object, same 300/800 Hz tones) -
 // duplicated per this project's own established per-file test-helper convention (see that file's
 // own comment) rather than shared: this file's own job is checking that the real forge binary
 // wires parse_iabitstream -> adm::build_iab -> AtmosEncoder together correctly end to end,
 // not re-proving the ADM bridge's own Table 19 mapping or coordinate conversion, which
-// tests/adm/test_iab_bridge.cpp already does directly against the library API.
+// libs/adm/tests/test_iab_bridge.cpp already does directly against the library API.
 
 namespace fs = std::filesystem;
 
@@ -279,7 +279,7 @@ TEST_CASE("forge atmos-iab parses, bridges and encodes a real IAB fixture end to
     // Decode what the CLI actually wrote - proves the real binary's argument parsing, the MXF/
     // elementary sniff, iclforge::adm::build_iab call and per-frame AtmosEncoder loop are all
     // wired together correctly, not just that each piece works in isolation
-    // (tests/adm/test_iab_bridge.cpp's own flagship test already covers that).
+    // (libs/adm/tests/test_iab_bridge.cpp's own flagship test already covers that).
     std::ifstream stream_in{out_path, std::ios::binary};
     const std::vector<char> raw{std::istreambuf_iterator<char>{stream_in},
                                 std::istreambuf_iterator<char>{}};

@@ -17,10 +17,10 @@
 // not a virtual interface, since this codebase's platform seam has never
 // been one.
 //
-// Its own small platform tree, src/audio/src/net/{posix,windows}/ - a
-// SECOND axis from src/audio/src/backend/<backend>/, deliberately, not a
+// Its own small platform tree, libs/audio/src/net/{posix,windows}/ - a
+// SECOND axis from libs/audio/src/backend/<backend>/, deliberately, not a
 // fifth file added to every one of that tree's six directories. See
-// src/audio/CMakeLists.txt's own comment on the net/ block for why: the
+// libs/audio/CMakeLists.txt's own comment on the net/ block for why: the
 // backend axis is the AUDIO SUBSYSTEM (WASAPI vs ALSA vs PipeWire vs
 // CoreAudio genuinely differ), sockets are the OPERATING SYSTEM (Berkeley
 // sockets are one implementation across Linux/macOS/Android; only Windows
@@ -78,7 +78,7 @@ public:
     // it would for port 0 above.
     //
     // LivePositionSource itself never calls this - it only ever receives.
-    // It exists so tests/audio/test_live_positions.cpp can send itself real
+    // It exists so libs/audio/tests/test_live_positions.cpp can send itself real
     // loopback datagrams through this exact class rather than a second,
     // parallel socket implementation that would only exist for the test.
     [[nodiscard]] bool send_to(std::string_view address, std::uint16_t port,

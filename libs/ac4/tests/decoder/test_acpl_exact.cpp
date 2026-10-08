@@ -1,4 +1,4 @@
-// The decoder's A-CPL stage (src/ac4/src/decoder/pcm/acpl.cpp) against a verbatim copy of the stage it
+// The decoder's A-CPL stage (libs/ac4/src/decoder/pcm/acpl.cpp) against a verbatim copy of the stage it
 // replaced (planning/ac4.md, D14e): one interpolated matrix of doubles for every parameter, product
 // and sum, and every coefficient narrowed to Real at every element. The stage now interpolates once
 // for each run of subbands that shares a band and its acpl_param_prev and narrows once for the run;
@@ -51,7 +51,7 @@ constexpr double kSqrt2 = 1.4142135623730951;
     return static_cast<std::size_t>(index);
 }
 
-// The stage as src/ac4/src/decoder/pcm/acpl.cpp had it, for the elements the test builds: a pair, and
+// The stage as libs/ac4/src/decoder/pcm/acpl.cpp had it, for the elements the test builds: a pair, and
 // the 5.X element in ASPX_ACPL_1, 2 and 3.
 namespace reference {
 

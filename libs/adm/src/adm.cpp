@@ -27,7 +27,7 @@
 #include "adm_xml_extras.hpp"
 
 // Every `bw64::`/`::adm::` symbol below is a vendored third-party library
-// (libbw64/libadm respectively, see src/adm/CMakeLists.txt); every
+// (libbw64/libadm respectively, see libs/adm/CMakeLists.txt); every
 // `iclforge::adm::` symbol is this module's own. Both libraries report failure by
 // throwing std::runtime_error (or, for libadm's XML/schema errors, the
 // ::adm::error::AdmException hierarchy) - this project's own convention is
@@ -149,7 +149,7 @@ PcmAudio read_pcm(bw64::Bw64Reader& reader, std::uint64_t file_bytes) {
     // wraps, and that call happens inside parseFormatInfoChunk's own sanity check - before a
     // Bw64Reader is ever constructed. Both fixtures above now fail the whole open (kCannotOpen)
     // rather than reaching this function at all, confirmed by re-running them after the re-pin
-    // (tests/adm/test_adm.cpp's own case for this). This check stays regardless, the same
+    // (libs/adm/tests/test_adm.cpp's own case for this). This check stays regardless, the same
     // defense-in-depth reasoning as chunk_sizes_fit()'s own comment above parse_bw64_path: it is
     // this project's own code, and does not depend on the pinned dependency continuing to throw
     // here rather than wrap.

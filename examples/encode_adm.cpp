@@ -1,7 +1,7 @@
 // A real ADM BWF master, all the way to a Dolby Atmos E-AC-3 (DD+ JOC) elementary stream.
 //
-// Roadmap item B1 phase 3 of 3 (the last piece - phase 1 is iclforge::adm, src/adm; phase 2 is
-// iclforge::adm, src/adm). This is a minimal, standalone illustration of the same
+// Roadmap item B1 phase 3 of 3 (the last piece - phase 1 is iclforge::adm, libs/adm; phase 2 is
+// iclforge::adm, libs/adm). This is a minimal, standalone illustration of the same
 // pipeline forge's 'atmos-adm' command drives for real: iclforge::adm::parse_bw64() reads the
 // container + ADM XML graph, iclforge::adm::build() maps it onto
 // iclforge::ac3::oba::AtmosEncoder's flat object-list input shape (one bed speaker feed pinned in
@@ -53,7 +53,7 @@ using Bytes = std::string;
 // examples under its own `ctest` (examples/CMakeLists.txt registers each as a
 // test case), several checkouts commonly run at once, and they share a temp
 // directory - two runs on one fixed name read and delete each other's files.
-// Same ingredients as src/adm/src/adm.cpp's make_temp_path, same reason.
+// Same ingredients as libs/adm/src/adm.cpp's make_temp_path, same reason.
 // Only for the paths this example picks itself; --write-fixture's path comes
 // from the caller (tools/ci/run_codec_matrix.sh) and stays exactly as given.
 std::string scratch_path(std::string_view name) {

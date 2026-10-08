@@ -35,7 +35,7 @@
 // the three pairing methods, including a code shown as a QR token, a wrong code, an attempt
 // cancelled from either end and the static code's window opened by the operator.
 //
-// It dials, so under ThreadSanitizer it needs what tests/sendspin/test_websocket.cpp says.
+// It dials, so under ThreadSanitizer it needs what libs/sendspin/tests/test_websocket.cpp says.
 
 namespace {
 

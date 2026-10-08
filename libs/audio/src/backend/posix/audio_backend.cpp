@@ -2,8 +2,8 @@
 
 // This is now reachable only as iclforge::audio's Linux fallback, when
 // libasound's development headers are not present (see the ICLFORGE_WITH_ALSA
-// AUTO/ON/OFF block in src/audio/CMakeLists.txt) - macOS gets a real
-// CoreAudio backend of its own, src/audio/src/backend/macos/, unconditionally.
+// AUTO/ON/OFF block in libs/audio/CMakeLists.txt) - macOS gets a real
+// CoreAudio backend of its own, libs/audio/src/backend/macos/, unconditionally.
 //
 // None of the three capabilities exist here, and on a Linux host without
 // ALSA that is a real absence rather than an oversight: live capture would

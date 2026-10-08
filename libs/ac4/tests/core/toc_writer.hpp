@@ -2,7 +2,7 @@
 
 // A writer for hand-built raw_ac4_frame()s: the table of contents of either
 // part, field by field, and the assembly of a frame from its substreams. It
-// shares no code with src/ac4, so a frame it builds checks the inspector
+// shares no code with libs/ac4, so a frame it builds checks the inspector
 // rather than restating it. Clause and table numbers are Part 2's for
 // bitstream_version 2 and Part 1's below it.
 

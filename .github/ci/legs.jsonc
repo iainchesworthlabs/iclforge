@@ -42,7 +42,7 @@
       "preset": "linux-gcc",
       "ccache": true,
       "parallel_tests": true,
-      // Hearth (planning/hearth-reference-player.md, A7): src/sendspin and apps/hearth,
+      // Hearth (planning/hearth-reference-player.md, A7): libs/sendspin and apps/hearth,
       // with the [sendspin] and [hearth] cases ctest runs below. ICLFORGE_BUILD_HEARTH
       // defaults ON (root CMakeLists.txt) and CMakePresets.json's "core" fragment selects
       // vcpkg's "hearth" feature by default too, so every leg here builds and tests it
@@ -193,7 +193,7 @@
       // matrix ran out of time at 90, and on #1057 ctest took 7,204 s,
       // 5,964 of them in the AC-4 tests, before the leg ran out of 150.
       // Under the sanitizers those tests now take fewer frames, shorter
-      // signals and fewer cases (tests/sanitized.hpp), which cut their
+      // signals and fewer cases (tests/support/sanitized.hpp), which cut their
       // serial time by 71 % in WSL; the 150 stays for the phases still to
       // come.
       "timeout_minutes": 150
@@ -203,7 +203,7 @@
       // ASan+UBSan leg above, not a duplicate of it: ASan/UBSan ask
       // whether one thread's memory and arithmetic are sound, TSan asks
       // whether two threads agree on who owns what - and no other gate in
-      // this repository can see a data race at all. src/audio is a
+      // this repository can see a data race at all. libs/audio is a
       // lock-free SPSC ring, a silence watchdog and a clock-drift servo
       // shared between a real-time callback thread and the encoder
       // thread, which is exactly the shape where a missing

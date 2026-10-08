@@ -92,7 +92,7 @@ struct Fx {
 // `env_in` is 3 * env_alloc in 1 dB steps (Qx.0), `i_rfu` f_rfu in Q.10, `widths` the bands'
 // widths, `num_bins` the coded lines; the result is the weights in dB, Q.10, per band.
 //
-// Two readings (src/ac4/ERRATA.md): `band` is set to 0 before the reverse water-filling, which
+// Two readings (libs/ac4/ERRATA.md): `band` is set to 0 before the reverse water-filling, which
 // the text leaves at num_bands from the loop before it, and an input of Qx.10 is formed from
 // f_rfu by rounding, in the caller.
 [[nodiscard]] bool heuristic_scaling(Fx& fx, std::int32_t i_rfu,
@@ -305,7 +305,7 @@ class AcDecoder {
             std::int32_t right = fx.n(std::int64_t{left} + step);
             // Both ends are kept to +-kMaxValue: Pseudocode 51 clamps only the left end from below
             // and the right from above, which leaves CdfEst() a symbol wholly beyond +-10 to look
-            // up outside its table (src/ac4/ERRATA.md). Such a symbol's interval is empty.
+            // up outside its table (libs/ac4/ERRATA.md). Such a symbol's interval is empty.
             left = std::clamp(left, -kMaxValue, kMaxValue);
             right = std::clamp(right, -kMaxValue, kMaxValue);
             const std::uint32_t low = cdf_est(fx, left);
@@ -406,7 +406,7 @@ class AcDecoder {
 // --- Annex C.6 and Pseudocode 39: C(nu, eta, k) ---------------------------------------------
 
 // The quantized prediction coefficient of table `tab_idx` at (nu, eta, k), eta 0 to 32, in the
-// layout ((nu + Rf) * 33 + eta) * Rt + k (src/ac4/ERRATA.md).
+// layout ((nu + Rf) * 33 + eta) * Rt + k (libs/ac4/ERRATA.md).
 [[nodiscard]] double pred_coeff(int tab_idx, int nu, int eta, int k) noexcept {
     const int rf = tab::kSsfPredRfsTable[static_cast<std::size_t>(tab_idx)];
     const int rt = tab::kSsfPredRtsTable[static_cast<std::size_t>(tab_idx)];
@@ -668,7 +668,7 @@ ParseResult GranuleDecoder::run() {
     }
 
     // The spectra buffers hold lines of the length they were kept at: bring them to this
-    // granule's (src/ac4/ERRATA.md).
+    // granule's (libs/ac4/ERRATA.md).
     for (std::vector<double>& row : st.spec_buffer) {
         row.resize(bins, 0.0);
     }

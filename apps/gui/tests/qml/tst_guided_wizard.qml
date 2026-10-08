@@ -20,9 +20,9 @@ TestCase {
     }
 
     readonly property url stereoUrl:
-        Qt.resolvedUrl("../../../../fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
+        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
     readonly property url surroundUrl:
-        Qt.resolvedUrl("../../../../fuzz/seeds/fuzz_wav_read/roundtrip-51.wav")
+        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-51.wav")
 
     // The window (and the Layout chain feeding this page's real geometry)
     // takes a handful of polish passes after creation to settle; a real

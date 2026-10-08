@@ -11,7 +11,7 @@
 // header's own comment) but the iclforge::ac4:: C++ types behind them are only when
 // ICLFORGE_BUILD_AC4 is on: this header is included only from the "present"
 // translation units (ac4.cpp, ac4_encoder.cpp), which CMake compiles only
-// then (src/capi/CMakeLists.txt). ac4_absent.cpp, compiled the other way,
+// then (libs/capi/CMakeLists.txt). ac4_absent.cpp, compiled the other way,
 // never includes it and never names an iclforge::ac4:: type - every opaque handle it
 // touches stays an incomplete pointer, which is all a NULL comparison or a
 // pass-through needs.

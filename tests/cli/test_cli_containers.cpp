@@ -87,7 +87,7 @@ void append(std::vector<std::byte>& out, std::span<const std::byte> bytes) {
 }
 
 // A/52 §E2.3.1.2's legacy-core delivery, built the same way
-// tests/ac3/io/test_elementary.cpp's own legacy_core_stream() is: an AC-3
+// libs/ac3/tests/io/test_elementary.cpp's own legacy_core_stream() is: an AC-3
 // syncframe carrying the 5.1 bed, with the DEPENDENT substream of an ordinary
 // E-AC-3 access unit riding immediately behind it. reject_legacy_core (see
 // containers.cpp) is the only place any of the three simple writers ever
@@ -125,7 +125,7 @@ std::vector<std::byte> legacy_core_stream() {
     return stream;
 }
 
-// A header-level fixture, same recipe as tests/ac3/io/test_elementary.cpp's "a
+// A header-level fixture, same recipe as libs/ac3/tests/io/test_elementary.cpp's "a
 // stream whose access units differ in length has no uniform figure": two
 // six-block E-AC-3 access units with a three-block one spliced between them.
 // track_samples_per_frame (containers.cpp) refuses every stream like this -
@@ -522,7 +522,7 @@ TEST_CASE("decode takes AC-4's presentation by presentation-id= and language=, m
     const auto log = dir / "ac4_decode_presentation.log";
     // tests/golden/ac4/presentations/presentations-5_1.ac4: presentation_id
     // 1 is 5.1 music and effects with English dialogue, 2 the same with
-    // German, 21 the English dialogue alone (tests/ac4/decoder/
+    // German, 21 the English dialogue alone (libs/ac4/tests/decoder/
     // test_presentations.cpp).
     const fs::path stream = fs::path{AC4_GOLDEN_DIR} / "presentations" / "presentations-5_1.ac4";
     const auto mixed_wav = dir / "ac4_mixed.wav";

@@ -32,7 +32,7 @@ namespace {
 using Microsoft::WRL::ComPtr;
 
 // COM lifetime for one thread, the same shape as iclforge::windows_audio::ComScope
-// (src/audio/src/backend/windows/windows_support.hpp) but not shared with it: sendspin does not
+// (libs/audio/src/backend/windows/windows_support.hpp) but not shared with it: sendspin does not
 // otherwise depend on iclforge::audio, and this is eight lines.
 class ComScope {
    public:

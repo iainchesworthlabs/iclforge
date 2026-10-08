@@ -1,4 +1,4 @@
-// The encoder's companding and A-SPX writer (src/ac4/src/encoder/aspx/) read back
+// The encoder's companding and A-SPX writer (libs/ac4/src/encoder/aspx/) read back
 // by the decoder's reader: aspx_config(), every interval class, one and two
 // channels, balance, sinusoids, both kinds of interleaved waveform coding and
 // companding's three forms, each element's trace the writer's record for

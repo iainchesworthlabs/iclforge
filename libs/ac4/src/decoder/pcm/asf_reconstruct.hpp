@@ -46,7 +46,7 @@ using ScaleFactorGains = std::array<Real, 256>;
 // `hsf` is the track's HSF extension (ETSI TS 103 190-1 clause 4.2.8.7 to 4.2.8.9) where it
 // has one: the vector then holds the core's lines and, after them, the extension's, one
 // exponent for both. Its scale factors and noise levels carry on from the core's, in the order
-// the bitstream sends them (src/ac4/ERRATA.md, "Scale factors and noise levels across an HSF
+// the bitstream sends them (libs/ac4/ERRATA.md, "Scale factors and noise levels across an HSF
 // extension"); without it the result is what it was.
 [[nodiscard]] ParseResult reconstruct_track(const SfInfo& info, const SfData& data,
                                             const ScaleFactorGains& sf_gain, RandGenState& noise,

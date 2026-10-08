@@ -3,7 +3,7 @@
 // The type the DECODER carries its coefficients, transform scratch and
 // overlap-add history in, in the DOUBLE variant (the minimum-footprint profile uses float32).
 // The float variant is the identically-pathed header under
-// src/internal/scalar/float32/; src/ac3/CMakeLists.txt picks the directory
+// src/internal/scalar/float32/; libs/ac3/CMakeLists.txt picks the directory
 // from ICLFORGE_DECODE_SCALAR, so no source file asks which it is with a
 // preprocessor conditional (tools/checks/check_platform_macros.ps1's rule).
 //
@@ -28,7 +28,7 @@ namespace iclforge::ac3::internal {
 // are all stated in terms of this path's arithmetic.
 //
 // Decode-side only in every variant. The encoder is not built in the
-// minimum-footprint profile at all - src/ac3/minimal.cmake carries
+// minimum-footprint profile at all - libs/ac3/minimal.cmake carries
 // encoder/coupling.cpp and encoder/eac3_tools.cpp solely for the dequantiser
 // and the spx/ecpl geometry the DECODER calls into - so the forward transforms
 // and everything that pins their output stay double on every build that has

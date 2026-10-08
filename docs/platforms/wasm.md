@@ -175,17 +175,17 @@ sets both, and doubles as exactly that.
 
 ## What's reused, what's new
 
-`iclforge::ac3` (`src/ac3/`) — the codec, `FrameDecoder`/`Eac3Decoder`, elementary-stream scanning — and
+`iclforge::ac3` (`libs/ac3/`) — the codec, `FrameDecoder`/`Eac3Decoder`, elementary-stream scanning — and
 the libraries it links are fully platform-independent and are linked into both demos **unmodified**, the same way `apps/wasm/CMakeLists.txt`
 links it as any other consumer would: `add_executable` + `target_link_libraries(... iclforge::ac3 ...)`,
 no fork, no `#ifdef`. Unlike `apps/android/`, this doesn't need a separate build system reached
 from the other direction — WASM is a plain CMake cross-compile, so `apps/wasm/` is a normal
 `add_subdirectory()` from the root `CMakeLists.txt`, gated on `EMSCRIPTEN` (set by
 `cmake/toolchains/wasm.emscripten.toolchain.cmake`) rather than an `ICLFORGE_BUILD_*` option.
-`iclforge::audio` (`src/audio/`) gains **no** WASM backend — there is no live-capture/passthrough
+`iclforge::audio` (`libs/audio/`) gains **no** WASM backend — there is no live-capture/passthrough
 equivalent to add; a browser gets audio playback from the Web Audio API in JavaScript instead, and
-`src/audio` is skipped from the configure entirely under `EMSCRIPTEN` (the skip lives in the root
-`CMakeLists.txt`'s `add_subdirectory` gate; `src/audio/CMakeLists.txt` itself hard-fails otherwise,
+`libs/audio` is skipped from the configure entirely under `EMSCRIPTEN` (the skip lives in the root
+`CMakeLists.txt`'s `add_subdirectory` gate; `libs/audio/CMakeLists.txt` itself hard-fails otherwise,
 for having no browser platform directory).
 
 `decoder_bindings.cpp` (the Embind wrapper) is new, but is now deliberately minimal: `scanStream()`

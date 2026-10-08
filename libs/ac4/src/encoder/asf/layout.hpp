@@ -67,7 +67,7 @@ struct FrameLayout {
 [[nodiscard]] int lfe_max_sfb_bits(int frame_length) noexcept;
 
 // A frame of one block. Below 1 536 samples its transf_length is the whole
-// frame's index, the one sf_info_lfe() takes as well (src/ac4/ERRATA.md,
+// frame's index, the one sf_info_lfe() takes as well (libs/ac4/ERRATA.md,
 // "sf_info_lfe() below 1536 samples").
 [[nodiscard]] FrameLayout long_layout(int frame_length);
 

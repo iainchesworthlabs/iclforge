@@ -23,7 +23,7 @@
 // desktop player and the test sink render with the boards' own code
 // (planning/hearth-reference-player.md, A1). It includes nothing
 // platform-specific, allocates nothing, and is tested on the host
-// (tests/render/test_layout.cpp) - the part where a wrong index puts the
+// (libs/render/tests/test_layout.cpp) - the part where a wrong index puts the
 // centre channel in a subwoofer.
 //
 // Two ways to say it, both in one string, because planning/esp32-player.md's

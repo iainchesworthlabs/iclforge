@@ -19,7 +19,7 @@ namespace iclforge::objects::oba {
 
 namespace {
 
-// §5.5.1 variable_bits_max(n, max_num_groups), which BitWriter writes (src/base): EMDF's
+// §5.5.1 variable_bits_max(n, max_num_groups), which BitWriter writes (libs/base): EMDF's
 // variable_bits with the group count capped, so the last group carries no read_more of any
 // consequence and the field cannot run away.
 void put_variable_bits_max(BitWriter& w, std::uint32_t value, int group_bits, int max_groups) {

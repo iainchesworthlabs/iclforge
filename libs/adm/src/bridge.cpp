@@ -47,7 +47,7 @@ namespace {
 // A real Dirac/instantaneous jump has no representation in KeyframePath's piecewise-linear model
 // (two keyframes cannot share one time_s - see
 // iclforge::objects::oba::PathError::kDuplicateTimestamp). This is the same resolution
-// tests/ac3/oba/test_atmos_motion.cpp's own make_holds() helper relies on implicitly: every caller
+// libs/ac3/tests/oba/test_atmos_motion.cpp's own make_holds() helper relies on implicitly: every caller
 // in this codebase samples ObjectPath::evaluate() once per encoded frame
 // (iclforge::ac3::kSamplesPerFrame = 1536 samples, 32 ms at 48 kHz - see
 // iclforge::ac3::oba::AtmosEncoder:: encode_frame's own doc comment, "one placement per frame"), so
@@ -106,7 +106,7 @@ std::expected<iclforge::objects::oba::ObjectPath, BridgeError> build_channel_pat
     //
     // objectDivergence (§10.5) value maps to OAMD's object_divergence (§5.2.7, Tables 40 to 42): both
     // are the share of the object's energy moved into two objects spread along X, 0 to 1. Annex B
-    // does not print the correspondence; src/adm/ERRATA.md has the reading. screenRef (§10.6)
+    // does not print the correspondence; libs/adm/ERRATA.md has the reading. screenRef (§10.6)
     // maps to b_object_use_screen_ref with a full screen_factor and depth_factor (see
     // Keyframe), since ADM's flag is all or nothing.
     const auto rendering_of = [&](const iclforge::adm::AudioBlockFormat& block) -> Rendering {
@@ -600,7 +600,7 @@ std::expected<iclforge::adm::AdmDocument, BridgeError> write(const WriteInput& i
         // zero and are thereby marked as ADM elements which should be ignored" - id_assignment.hpp's
         // own doc comment), which the shortcut alone triggers - every audioChannelFormat this
         // writer produces collapsed to the same "AC_00000000" id until this chain was added
-        // (caught by tests/adm/test_adm_bridge_write.cpp's own round trip, not by
+        // (caught by libs/adm/tests/test_adm_bridge_write.cpp's own round trip, not by
         // construction here). This is also the exact wiring libadm's own
         // adm/utilities/object_creation.cpp uses for its Objects-type helper.
         iclforge::adm::AudioStreamFormat stream_format;

@@ -456,7 +456,7 @@ std::expected<void, CaptureError> Capture::start_process_loopback(
     // Availability before the argument checks, the same order the Windows
     // backend takes and for the same reason: a machine that cannot do this at
     // all should say so whatever it was asked. It is also what
-    // tests/audio/test_audio_backend.cpp's "process loopback refusals agree
+    // libs/audio/tests/test_audio_backend.cpp's "process loopback refusals agree
     // with the reported capability" case depends on - the two have to agree
     // on which of kProcessNotFound and kProcessLoopbackUnavailable comes
     // back. Since 2026-09-06 the macOS CI legs take the unavailable branch,

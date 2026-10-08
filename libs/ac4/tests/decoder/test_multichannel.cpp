@@ -70,7 +70,7 @@ RandomParams random_parameters(std::mt19937& rng, std::size_t count) {
 // The tolerance a matrix entry (a product or sum of a handful of the
 // parameters above) can differ from entry()'s double formula by: a few ulps
 // of Real, since the double build's own bit-exactness is checked separately
-// (tests/ac4/core and this suite's other assertions) and this test's job is
+// (libs/ac4/tests/core and this suite's other assertions) and this test's job is
 // the formula, not the scalar.
 template <std::size_t N>
 void check_printed(const iclforge::ac4::detail::Matrix<N>& m, std::string_view printed,

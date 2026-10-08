@@ -23,7 +23,7 @@ namespace {
 
 using Microsoft::WRL::ComPtr;
 
-// Spelled out for the reason src/audio's Windows backend gives: no import
+// Spelled out for the reason libs/audio's Windows backend gives: no import
 // library defines these, and __uuidof is an MSVC extension.
 constexpr CLSID kClsidMmDeviceEnumerator = {  // {bcde0395-e52f-467c-8e3d-c4579291692e}
     0xbcde0395, 0xe52f, 0x467c, {0x8e, 0x3d, 0xc4, 0x57, 0x92, 0x91, 0x69, 0x2e}};

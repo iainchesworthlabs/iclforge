@@ -8,7 +8,7 @@
 #include "syntax/context.hpp"
 
 // Huffman decoding for every codebook of both parts' Annex A. The codebooks
-// and their shape are the shared core's (src/ac4/src/core/huffman_codebook.hpp
+// and their shape are the shared core's (libs/ac4/src/core/huffman_codebook.hpp
 // and tables/huffman_tables.hpp); reading them is the decoder's.
 
 namespace iclforge::ac4::detail {

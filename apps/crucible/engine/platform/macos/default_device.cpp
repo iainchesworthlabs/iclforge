@@ -23,7 +23,7 @@
 // endpoint list is the library's own enumerate_render_devices(), which is what
 // the output stage already probes, and the name search over it is the same
 // substring match Windows and Linux both do. The list's ids are Core Audio
-// device UIDs (src/audio/src/backend/macos/passthrough.cpp), which is what
+// device UIDs (libs/audio/src/backend/macos/passthrough.cpp), which is what
 // makes them comparable with the default read below.
 //
 // The default itself is one property read:

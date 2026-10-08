@@ -70,7 +70,7 @@ using QuantSets = std::array<std::array<int, acpl::kMaxParamBands>, acpl::kMaxPa
 }
 
 // Tables 203 to 206 for an alpha and the beta that goes with it. Bands below
-// start_band carry no values and are 0 (src/ac4/ERRATA.md, "Partial
+// start_band carry no values and are 0 (libs/ac4/ERRATA.md, "Partial
 // coupling starts at acpl_param_band").
 void dequantise_alpha_beta(const QuantSets& alpha_q, const QuantSets& beta_q, acpl::Quant quant, int num_sets,
                            int start_band, int num_bands, acpl::ParamSets& alpha, acpl::ParamSets& beta) {
@@ -118,7 +118,7 @@ struct AcplMapping {
     // 3/4/0 sends no add_ch_base; Table 202 codes its surrounds against the
     // back pair, as add_ch_base 1 codes the 5/2/0 and 3/2/2 surrounds against
     // their last pair, and Pseudocode 120's scalings are read alike
-    // (src/ac4/ERRATA.md, "add_ch_base in 3/4/0").
+    // (libs/ac4/ERRATA.md, "add_ch_base in 3/4/0").
     const bool back = ch_mode == ch_mode::k7_0_340 || ch_mode == ch_mode::k7_1_340;
     const bool surround_base = back || add_ch_base;
     std::array<S, 2> last{};
@@ -282,7 +282,7 @@ void AcplStage::reset() {
 }
 
 // Pseudocode 111, then Pseudocode 114 with the gains of Pseudocodes 112 and
-// 113 (src/ac4/ERRATA.md, "The transient ducker's energy").
+// 113 (libs/ac4/ERRATA.md, "The transient ducker's energy").
 void AcplStage::decorrelate(int decorrelator, std::span<const QmfValue> in, std::span<QmfValue> out, int num_ts) {
     // D0, D1 and D2, then the immersive element's second D0, D1 and D2.
     static constexpr std::array<int, kDecorrelatorSlots> kIndex = {0, 1, 2, 0, 1, 2};

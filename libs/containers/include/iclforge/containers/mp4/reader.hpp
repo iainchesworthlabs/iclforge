@@ -44,12 +44,12 @@
 // samples, and boxes can nest until a recursive walker's stack gives out.
 // ReadOptions bounds each of those, the walk is iterative, and every sample
 // range is checked against the data actually present rather than trusted.
-// fuzz/fuzz_mp4_demux.cpp drives the walker with arbitrary bytes.
+// libs/containers/fuzz/fuzz_mp4_demux.cpp drives the walker with arbitrary bytes.
 
 namespace iclforge::containers::mp4 {
 
 namespace detail {
-// Reader's parse state, defined in src/containers/src/mp4/reader.cpp - a namespace-scope
+// Reader's parse state, defined in libs/containers/src/mp4/reader.cpp - a namespace-scope
 // type rather than a private nested one so the walker's own free functions
 // there can name it.
 struct ReaderState;

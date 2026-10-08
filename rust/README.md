@@ -46,7 +46,7 @@ CMake step is incremental like any other CMake build.
 
 ### How linking works
 
-`build.rs` builds `forge_c_shared` specifically (not `forge_c_static`): `src/capi/CMakeLists.txt`
+`build.rs` builds `forge_c_shared` specifically (not `forge_c_static`): `libs/capi/CMakeLists.txt`
 says plainly why that variant exists — "a binding or embedder reaching for a C ABI wants exactly
 one library to load" — it statically embeds the whole codec core, so this crate links exactly one
 library instead of independently rediscovering `forge_c_static`'s transitive static dependencies

@@ -26,7 +26,7 @@ fn rms(samples: &[f32]) -> f32 {
 }
 
 /// 5.1.2 = a 5.1 bed plus one dependent substream adding the Vhl/Vhr height pair
-/// (`ICLFORGE_CHANMAP_512_HEIGHT`) - the same recipe tests/capi/test_capi.cpp proves at the C
+/// (`ICLFORGE_CHANMAP_512_HEIGHT`) - the same recipe libs/capi/tests/test_capi.cpp proves at the C
 /// level. A wide layout the single-substream encoder cannot express is exactly what
 /// AccessUnitEncoder exists for.
 #[test]

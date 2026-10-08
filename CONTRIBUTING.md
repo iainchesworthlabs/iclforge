@@ -71,7 +71,7 @@ This is the constraint the whole project rests on. Breaking it makes the code un
   and the A-JOC and A-JCC codebooks the same way. Those files are the standard, not an
   implementation of it.
 - Where a standard is ambiguous or contradicts itself, the reading taken and its evidence go in
-  an `ERRATA.md` beside the code (`src/ac4/ERRATA.md`, `src/ac4/ERRATA.md`).
+  an `ERRATA.md` beside the code (`libs/ac4/ERRATA.md`, `libs/ac4/ERRATA.md`).
 
 If you cannot cite where something came from, it does not go in.
 
@@ -84,14 +84,14 @@ libraries it may include from; `check_layering.py` fails an include its row does
 library's public headers declare into the namespace named for it under the family's root, and
 `check_namespaces.py` (its table is `tools/checks/namespaces.json`) fails a header that declares
 into another library's namespace, or into `iclforge` itself.
-`src/ac3` is the AC-3, E-AC-3 and Atmos codec, in namespace `iclforge::ac3`. `src/ac4` is the
+`libs/ac3` is the AC-3, E-AC-3 and Atmos codec, in namespace `iclforge::ac3`. `libs/ac4` is the
 AC-4 codec, in namespace `iclforge::ac4`, laid out by the same areas (`core`, `io`, `decoder`,
-`encoder`), and links nothing from `src/ac3`.
-The two codecs stand on libraries that know no codec: `src/base` (bit I/O, the speaker vocabulary,
+`encoder`), and links nothing from `libs/ac3`.
+The two codecs stand on libraries that know no codec: `libs/base` (bit I/O, the speaker vocabulary,
 the CPU probe, the signing key, SHA-256 and HMAC-SHA-256, and, header-only and not installed,
-`Fixed32`, the project's own float functions and the SIMD seam), `src/dsp` (the transforms more
-than one library uses), `src/objects` (the object-audio model and the Object Audio Metadata
-payload), `src/render` (layouts, routing and the renderer) and `src/containers` (IEC 61937 burst
+`Fixed32`, the project's own float functions and the SIMD seam), `libs/dsp` (the transforms more
+than one library uses), `libs/objects` (the object-audio model and the Object Audio Metadata
+payload), `libs/render` (layouts, routing and the renderer) and `libs/containers` (IEC 61937 burst
 packing, and the Matroska, MP4, MPEG-TS and IAMF writers and readers, each in a part of its own).
 `apps/{cli,gui,crucible,hearth,android,wasm,baremetal}` consume them (Crucible and the Shield app
 use the AC-3, E-AC-3 and Atmos codec only), and `apps/common` is shared application code,
@@ -101,12 +101,12 @@ null-sink driver and its guest VM, `apps/linux` a scripted guest for Crucible's 
 anything under `apps/`.
 
 **The tree holds four products, and the directories say which is which.** `src/`
-other than `src/audio` and `src/sendspin`, the bindings under `python/`, `js/` and `rust/`, and
+other than `libs/audio` and `libs/sendspin`, the bindings under `python/`, `js/` and `rust/`, and
 `examples/`, `fuzz/` and `apps/baremetal` are **the library**; `iclforge` names it, and names its
 packages too. `apps/cli`, `apps/gui` and `apps/common` are **Forge**, the tooling pair, built and
 packaged as one thing. `apps/crucible`, with the driver in `apps/windows`, is **Crucible**.
-`apps/hearth`, `src/sendspin` and the `hearth_sink` example are **Hearth**. `apps/android` and
-`apps/wasm` are library demonstrations. `src/audio`, `tests/`, `tools/`, `cmake/`, `packaging/`
+`apps/hearth`, `libs/sendspin` and the `hearth_sink` example are **Hearth**. `apps/android` and
+`apps/wasm` are library demonstrations. `libs/audio`, `tests/`, `tools/`, `cmake/`, `packaging/`
 and the version line are shared and owned by no one product.
 [The naming and scope plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/recasting.md)
 records what each member owns, down to the targets, packages and CI legs, under the names it was
@@ -119,17 +119,17 @@ as themselves, and "ICL Forge Forge" is never written. In code, `iclforge` names
 the family's identifiers: the CMake package, the packages of each language, the namespace root,
 the header root and the C symbol prefix (`iclforge_`), with `ICLFORGE_` for macros, options and
 environment variables. Every identifier stays lowercase but those. `forge --version` prints
-`iclforge <version>` (`src/base/src/version.cpp`), because that is the library's version line and
+`iclforge <version>` (`libs/base/src/version.cpp`), because that is the library's version line and
 the Homebrew formula's test asserts it.
 
 **A library's headers are `include/iclforge/<name>/`, and the name is the library.** The second
 component of an include path says which library a header belongs to: `iclforge/ac3/decoder/decoder.hpp`
-is in `src/ac3/include/iclforge/ac3/decoder/`, `iclforge/render/layout.hpp` in
-`src/render/include/iclforge/render/`. A library includes headers only of the libraries its row of
+is in `libs/ac3/include/iclforge/ac3/decoder/`, `iclforge/render/layout.hpp` in
+`libs/render/include/iclforge/render/`. A library includes headers only of the libraries its row of
 `layering.json` lists. `base`, `dsp`, `objects`, `render` and `containers` list no codec, nor do the
 readers (`adm`, `iab`): none of them knows
 AC-3, E-AC-3 or Atmos exist, and they should stay that way. The AC-4 library lists none of
-`ac3`'s: a separate codec that shares no bitstream syntax with it. Its core (`src/ac4/src/core`) is
+`ac3`'s: a separate codec that shares no bitstream syntax with it. Its core (`libs/ac4/src/core`) is
 what the decoder and the encoder share, and has no public headers.
 
 The one deliberate exception to the header root is `capi`: it installs under
@@ -139,7 +139,7 @@ surface, and a C or non-C++ consumer has no reason to see, or accidentally `#inc
 header.
 
 **One subdirectory per platform audio backend, selected by CMake, never `#ifdef`.**
-`src/audio/src/backend/{alsa,pipewire,android,macos,posix,windows}` — adding a backend means a
+`libs/audio/src/backend/{alsa,pipewire,android,macos,posix,windows}` — adding a backend means a
 new directory and a new CMake guard, not a new preprocessor branch. There are no
 preprocessor conditionals in `src/`, `apps/`, `tests/` or `python/` (the C API header's
 `#ifdef __cplusplus` pair is the one exemption, and `esp-idf/` uses Kconfig's `#if CONFIG_*`);
@@ -171,8 +171,8 @@ window tables and several spec-table self-checks are
 `from_chars` is unavailable both on the NDK's bundled libc++ and at the macOS wheel's deployment
 target (`'from_chars' is unavailable: introduced in macOS 26.0`) — the **integer** overloads are
 fine everywhere and are used directly. Code that has to parse a decimal from user- or
-file-supplied text therefore goes through `strtod` instead (`src/ac3/src/encoder/plan.cpp`,
-`encoder/assignment.cpp`, `src/objects/src/scene_text.hpp`). Neither gap shows up on a Windows,
+file-supplied text therefore goes through `strtod` instead (`libs/ac3/src/encoder/plan.cpp`,
+`encoder/assignment.cpp`, `libs/objects/src/scene_text.hpp`). Neither gap shows up on a Windows,
 Linux or Homebrew-macOS build, so the CI legs that catch it are Android (Shield) and Build wheels
 (macos-latest).
 
@@ -216,7 +216,7 @@ Not useful:
 ```
 
 Where behaviour is deliberately narrower than the standard, say so and say why — see the
-opening comment of `src/ac4/include/iclforge/ac4/decoder/decoder.hpp` for the pattern: what the decoder
+opening comment of `libs/ac4/include/iclforge/ac4/decoder/decoder.hpp` for the pattern: what the decoder
 does, then what it refuses, by name and with a reason. A clean refusal is a design statement;
 a silent gap is a bug waiting to be found by someone else.
 

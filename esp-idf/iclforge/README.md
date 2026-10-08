@@ -11,7 +11,7 @@ ESP32-P4 has run it on a board, and the ESP32-S3 under QEMU.
 This directory is the component. For the codec it is a wrapper: `CMakeLists.txt` pre-seeds the
 repository's options, `add_subdirectory()`s the repository root and links `iclforge::ac3_minimal`,
 so the library is built from the same target definitions every other platform uses and nothing
-here can drift from `src/ac3/minimal.cmake`. What it adds of its own is the layer that cannot
+here can drift from `libs/ac3/minimal.cmake`. What it adds of its own is the layer that cannot
 live in the library because it is made of FreeRTOS:
 
 - **`iclforge::Player`** ([`include/iclforge/player.hpp`](include/iclforge/player.hpp)): a fetch
@@ -43,20 +43,20 @@ live in the library because it is made of FreeRTOS:
   clock the sink passes in, and it counts, per play, the blocks that arrived to an empty queue,
   how long the queue was dry, and the least that was left. The streaming example's `i2s` and
   `i2s_wide` sinks keep one each for their `sink.*` line. Free of ESP-IDF and tested on the host
-  against a simulated DMA (`tests/ac3/io/test_dac_queue_model.cpp`).
+  against a simulated DMA (`libs/ac3/tests/io/test_dac_queue_model.cpp`).
 
 The player renders through the library's `iclforge::render` headers, which began in this component
-and moved to `src/render/include/iclforge/render/` so that the desktop player and its test sink render
+and moved to `libs/render/include/iclforge/render/` so that the desktop player and its test sink render
 with the same code ([`planning/hearth-reference-player.md`](../../planning/hearth-reference-player.md)).
 **`iclforge::render::OutputLayout`**
-([`layout.hpp`](../../src/render/include/iclforge/render/layout.hpp)) is the speakers a player has, one
+([`layout.hpp`](../../libs/render/include/iclforge/render/layout.hpp)) is the speakers a player has, one
 per slot, from a name (`2.0`, `5.1`, `7.1.4`, `9.2.4`) or a speaker list (`L,R,C,LFE,Ls,Rs`, or
-angles). **`iclforge::render::LayoutRenderer`** ([`render.hpp`](../../src/render/include/iclforge/render/render.hpp))
+angles). **`iclforge::render::LayoutRenderer`** ([`render.hpp`](../../libs/render/include/iclforge/render/render.hpp))
 turns the decoder's block - the coded channels and, when the stream has them, the objects with
 their positions - into one block per slot: a stereo or mono layout is the decoder's own §7.8
 fold; anything else has the bed placed channel by channel through `iclforge::spatial::pan_direction`,
 and a layout with height speakers has the objects placed by their own positions instead. Both
-are tested on the host (`tests/render/test_layout.cpp`).
+are tested on the host (`libs/render/tests/test_layout.cpp`).
 
 `idf_component.yml` is the registry manifest, and it is not published yet — see
 [the CI workflow](../../.github/workflows/esp-component.yml) for why the publish job is gated.
@@ -76,7 +76,7 @@ The two profiles are mutually exclusive: no two of decode, AC-3 encode and E-AC-
 this part's internal SRAM at once. Switching needs `idf.py fullclean` first, since the choice
 reaches the library as CMake cache variables a warm build directory has already resolved.
 
-Packed for the component registry, the archive carries `src/ac3` and `cmake` inside this
+Packed for the component registry, the archive carries `libs/ac3` and `cmake` inside this
 directory, staged by [`tools/packaging/pack_esp_component.py`](../../tools/packaging/pack_esp_component.py);
 the component's own CMake finds the library either way.
 

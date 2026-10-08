@@ -17,7 +17,7 @@ constexpr std::array<Real, 4> kMidSide = {Real{1}, Real{1}, Real{1}, Real{-1}};
 // 0.1f makes of it. This one conversion stays double-then-float-then-double
 // (not Real) regardless of the decoder's own scalar: it is what the text's
 // own arithmetic prints, a fixed reading already taken at double
-// (src/ac4/ERRATA.md has no entry for it because it does not depend on the
+// (libs/ac4/ERRATA.md has no entry for it because it does not depend on the
 // decoder's scalar), narrowed to Real only in the value prediction() returns.
 [[nodiscard]] double sap_gain(int alpha_q) noexcept {
     return static_cast<double>(static_cast<float>(alpha_q) * 0.1f);

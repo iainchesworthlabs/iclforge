@@ -325,7 +325,7 @@ void DownmixStage::rebuild_immersive() {
         return;
     }
     // Step 2 from the 5.X.0 the renderer gives, with the Lo/Ro or Lt/Rt
-    // correction alone, the core's in core decoding (src/ac4/ERRATA.md,
+    // correction alone, the core's in core decoding (libs/ac4/ERRATA.md,
     // "The renderer's two-channel output").
     const auto row = [&](Speaker s) {
         const auto it = std::ranges::find(plan_.speakers, s);

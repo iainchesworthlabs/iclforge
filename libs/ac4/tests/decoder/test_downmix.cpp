@@ -1,4 +1,4 @@
-// The downmix (src/ac4/src/decoder/pcm/downmix.hpp, ETSI TS 103 190-1 V1.4.1 clause
+// The downmix (libs/ac4/src/decoder/pcm/downmix.hpp, ETSI TS 103 190-1 V1.4.1 clause
 // 6.2.17): Tables 149 and 149a's gains, every matrix of the cascade - 7.X to
 // 5.X by Table 219, 5.X and 3.0 to Lo/Ro, Lt/Rt and its Pro Logic II form by
 // Tables 217 and 218, with the LFE and the loudness corrections, and to mono -

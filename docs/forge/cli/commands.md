@@ -1205,7 +1205,7 @@ An AC-4 source becomes one programme: the presentation `presentation=`, `present
 chooses one, its substreams mixed at `dialogue-gain=` and `associated-gain=`. It is decoded as
 coded, with no output level and so no DRC, because ETSI TS 103 190-1 clause 5.7.9.4 asks a
 transcoder to apply none and to hand the AC-3 or E-AC-3 encoder the DRC profile the stream names
-for it instead (`drc_eac3_profile`; `src/ac4/ERRATA.md` records why that is the field the
+for it instead (`drc_eac3_profile`; `libs/ac4/ERRATA.md` records why that is the field the
 clause means). What carries:
 
 - **`dialnorm`**, to the dB: AC-4 sends it in steps of 0.25 dB, AC-3 and E-AC-3 in whole dB, so
@@ -1506,7 +1506,7 @@ of folding the objects into a bed first. On Windows that renderer is
 backend in the tree implements one, so on Linux, macOS and Android the command is listed and
 reports itself unavailable — the same treatment the capture and passthrough commands get where
 their backends are missing (`Needs::kSpatial` in `apps/cli/main.cpp`, answered by
-`src/audio/src/backend/<os>/audio_backend.cpp`).
+`libs/audio/src/backend/<os>/audio_backend.cpp`).
 
 ```bash
 forge spatial programme.ec3       # the default endpoint

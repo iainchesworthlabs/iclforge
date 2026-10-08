@@ -10,7 +10,7 @@
 // iclforge::hearth::Transport (apps/hearth/engine/transport.cpp): play, pause,
 // stop, next, previous, seek, and what the engine has to do about each.
 //
-// Tagged [transport-state] rather than [transport]: tests/sendspin/ uses
+// Tagged [transport-state] rather than [transport]: libs/sendspin/tests/ uses
 // [transport] for Sendspin's own transport (the memory pair and the
 // WebSocket), and a filter that quietly runs both suites is how one of them
 // gets blamed for the other's failure.

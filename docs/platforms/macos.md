@@ -83,7 +83,7 @@ neither Hearth nor Crucible. v0.10.0-beta.1 (2026-09-01) is the first release bu
 
 ## Audio backend: CoreAudio
 
-`src/audio/CMakeLists.txt` selects a real CoreAudio backend on macOS, `src/audio/src/backend/macos/`
+`libs/audio/CMakeLists.txt` selects a real CoreAudio backend on macOS, `libs/audio/src/backend/macos/`
 — capture, monitor playback and IEC 61937 passthrough are built on the Audio HAL
 (`AudioObjectID`/`AudioDeviceIOProc`), the same layer WASAPI and ALSA occupy on their own
 platforms, rather than the no-backend stub that used to fall back to here. Its passthrough
@@ -91,7 +91,7 @@ mechanism differs from both: CoreAudio has no per-open bitstream flag the way
 WASAPI's exclusive-mode subformat or ALSA's channel-status device name are, so bitstreaming means
 taking hog mode on a digital output and retuning its *physical* stream format
 (`kAudioStreamPropertyPhysicalFormat`) to `kAudioFormat60958AC3` for AC-3 — see
-`src/audio/src/backend/macos/passthrough.cpp`'s own header for the full mechanism, cross-checked
+`libs/audio/src/backend/macos/passthrough.cpp`'s own header for the full mechanism, cross-checked
 against three independent real-world implementations of the same thing (MythTV, mpv, VLC) while
 writing it, since there was no Mac available locally to try it on directly. For E-AC-3, the same
 walk additionally probes a stream's available physical formats for `kAudioFormatEnhancedAC3`:
@@ -141,9 +141,9 @@ What macOS 14.2 (Sonoma) added instead is the per-*process* tap, and
 `Capture::start_process_loopback(pid, mode, format)` is built on it:
 `AudioHardwareCreateProcessTap` over a `CATapDescription`, carried by a private aggregate device
 whose `AudioDeviceIOProcID` reads the way an input device's does. Because `CATapDescription` is an
-Objective-C class with no C entry point, `src/audio/src/backend/macos/process_tap.mm` is the
+Objective-C class with no C entry point, `libs/audio/src/backend/macos/process_tap.mm` is the
 library's one Objective-C++ translation unit, behind the plain-C++ header `process_tap.hpp` that
-the rest of the backend includes; `src/audio/CMakeLists.txt`'s `APPLE` block enables `OBJCXX` for
+the rest of the backend includes; `libs/audio/CMakeLists.txt`'s `APPLE` block enables `OBJCXX` for
 that one file.
 
 The tree holds **three `.mm` files and two directories that enable `OBJCXX`**. The other two are
@@ -203,7 +203,7 @@ the same answer with the matching reason — both go through
 
 The first is the OS version. The floor is pinned in one place —
 `iclforge::coreaudio::kSystemAudioTapMinimumOs` in
-`src/audio/src/backend/macos/coreaudio_names.hpp` — and it is **14.2** rather than the 14.4 some
+`libs/audio/src/backend/macos/coreaudio_names.hpp` — and it is **14.2** rather than the 14.4 some
 third-party write-ups require. Apple's SDK annotates the API `API_AVAILABLE(macos(14.2))`, which
 is what `@available` and the weak-linked symbols are keyed to, and taking 14.4 would mean
 refusing a machine whose own operating system declares the API present, on the strength of a
@@ -249,7 +249,7 @@ The first macOS CI attempt at any of it never reached a compiler: it stopped dur
 an `install(TARGETS crucible)` rule that named no `BUNDLE DESTINATION` for a target with
 `MACOSX_BUNDLE` on. With that fixed, both legs compiled `process_tap.mm` and linked it into
 `iclforge_audio`. Their `ctest` runs cover the version gate
-(`tests/audio/backend/macos/test_macos_support.cpp`, the one place the `__builtin_available` lowering
+(`libs/audio/tests/backend/macos/test_macos_support.cpp`, the one place the `__builtin_available` lowering
 is executed rather than merely compiled), the agreement between the capability report and
 `process_loopback_available()` and their shared refusal sentence, and — since the Crucible Qt
 Quick suites run there — the engine driving the platform seams and being told no by the tap.
@@ -279,7 +279,7 @@ carries a deprecation annotation in recent SDKs that nobody here can check again
 build. If it turns out notifications do not reach a run-loop-less process, that property is the
 lever to pull. Registration itself needs no device and no
 session, so `audio_backend().device_watch` reports available on any Mac, and the contract case in
-`tests/audio/test_audio_backend.cpp` exercises that on the runners: it starts a watcher, checks it
+`libs/audio/tests/test_audio_backend.cpp` exercises that on the runners: it starts a watcher, checks it
 is running, checks a second start is refused, stops it, starts it again and stops it again. That
 case passed on both macOS legs, so this is the one part of the backend that has run on a Mac. It
 is also the least of it. No callback has ever been seen to arrive, because a hosted runner's

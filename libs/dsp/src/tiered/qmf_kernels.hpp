@@ -30,7 +30,7 @@ namespace iclforge::dsp::tiered::qmf {
 // u[n] = sum over k < 5 of qmf_filt[n + 128 k] QWIN[n + 128 k], n < 128
 // (Pseudocode 65), from the analysis's ten blocks of 64 (qmf_filt[64 b + s] is
 // block b at s). `qwin` is the bank's window, QWIN unless a bank of another
-// prototype gives its own (JOC's, src/dsp/src/qmf.cpp), of float or double.
+// prototype gives its own (JOC's, libs/dsp/src/qmf.cpp), of float or double.
 template <typename Real, typename Window>
 inline void analysis_window(const Real* filt, std::size_t head, Real* u,
                             const Window* qwin) noexcept {

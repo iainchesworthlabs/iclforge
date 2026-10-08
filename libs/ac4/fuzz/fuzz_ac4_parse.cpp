@@ -11,7 +11,7 @@
 #include "iclforge/ac4/core/toc.hpp"
 
 // iclforge::ac4::scan, iclforge::ac4::SyncFrameSplitter and iclforge::ac4::parse_raw_frame
-// (src/ac4/src/ ac4.cpp) - the AC-4 bitstream inspector.
+// (libs/ac4/src/ ac4.cpp) - the AC-4 bitstream inspector.
 //
 // AC-4 reaches this project the same way AC-3 does, as bytes from a file or a
 // stream nobody here produced, and the TOC is the densest untrusted structure

@@ -596,7 +596,7 @@ TEST_CASE("E-AC-3 dual mono's output-stage dialnorm normalisation levels Ch2 by 
           "[eac3][decoder][output][dual-mono]") {
     using iclforge::ac3::Acmod;
     // Same claim as the AC-3 version of this test
-    // (tests/ac3/decoder/test_decoder.cpp): §5.4.2.16's dialnorm2 is Ch2's OWN
+    // (libs/ac3/tests/decoder/test_decoder.cpp): §5.4.2.16's dialnorm2 is Ch2's OWN
     // reference, and Eac3Decoder::apply_output - the only place
     // decode_access_unit's output stage actually runs - has to normalise Ch2
     // by it rather than by Ch1's dialnorm (27 vs 18, an 11 dB gap). Both
@@ -668,7 +668,7 @@ TEST_CASE("E-AC-3 dual mono: Ch2's own heavy compression is not Ch1's, and is no
     using iclforge::ac3::Acmod;
     // This decoder is default-constructed, so it never applies compr/compr2
     // to the reconstructed audio regardless of the words it reports (see
-    // Eac3Decoder's DecoderConfig-driven gain; tests/ac3/meta/test_drc.cpp exercises
+    // Eac3Decoder's DecoderConfig-driven gain; libs/ac3/tests/meta/test_drc.cpp exercises
     // heavy_compression actually applying it, including the peak-level cross-
     // channel check the AC-3 sibling test does). This test instead stays at
     // the word level: it compares Ch2's OWN compr2 word across two encodes
@@ -2079,7 +2079,7 @@ TEST_CASE("dithflag=1 on a coupled E-AC-3 channel dithers independently of its s
     // it only depends on which optional fields are structurally present).
     constexpr std::size_t kDithflagBit0 = 108;
 
-    // The encoder decides these flags from content now (src/ac3/src/
+    // The encoder decides these flags from content now (libs/ac3/src/
     // encoder/dither.hpp), so the dither-off baseline is established by hand
     // rather than assumed from what it wrote - this test is about the
     // decoder, and both sides of the comparison belong here.
@@ -2460,7 +2460,7 @@ TEST_CASE("an AC-3 core plus an E-AC-3 dependent decodes to 7.1", "[eac3][decode
         stream.insert(stream.end(), dep_frame->begin(), dep_frame->end());
     }
 
-    // The scanner recognises the arrangement (tests/ac3/io/test_elementary.cpp
+    // The scanner recognises the arrangement (libs/ac3/tests/io/test_elementary.cpp
     // covers that claim directly); here the point is that split_access_units
     // groups each core with its dependent, and Eac3Decoder renders the pair.
     const auto units = iclforge::ac3::split_access_units(stream);

@@ -42,7 +42,7 @@
 // without hardware, and it is exactly the claim the stdout/stderr-leak and
 // argv-mangling bugs in this CLI's history broke.
 //
-// [concurrency] on every case: this file and tests/audio/ are what the
+// [concurrency] on every case: this file and libs/audio/tests/ are what the
 // ThreadSanitizer leg runs (`ctest -L concurrency` - see
 // CMakePresets.json's test-linux-llvm-tsan preset). A race between the
 // capture callback thread and the encoder thread is invisible to the
@@ -63,7 +63,7 @@ fs::path scratch_dir() {
 }
 
 // Same subprocess shape as tests/cli/test_cli.cpp's own run_cli; the platform
-// differences live in tests/platform/process.hpp's run_shell, not here.
+// differences live in tests/support/platform/process.hpp's run_shell, not here.
 // `redirects` follows the arguments on the command line.
 int run_cli_redirected(const std::string& args, const std::string& redirects) {
     const std::string command = "\"" + std::string(ICLFORGE_CLI_EXE) + "\" " + args + redirects;
@@ -117,7 +117,7 @@ void write_oamd_stream(const fs::path& path, const iclforge::objects::oba::Progr
 // A §E2.3.1.2 legacy-core delivery whose object layer rides in the Annex E
 // dependent, not the core: an AC-3 syncframe carrying a silent 5.1 bed,
 // immediately followed by a dependent extending it to 7.1 (same shape as
-// tests/ac3/decoder/test_eac3_decoder.cpp's "an AC-3 core plus an E-AC-3
+// libs/ac3/tests/decoder/test_eac3_decoder.cpp's "an AC-3 core plus an E-AC-3
 // dependent decodes to 7.1"), whose skip field carries `program`/`objects`
 // as an OAMD payload with no JOC beside it - write_oamd_stream's own
 // convention, above. The core cannot carry the container itself - plain
@@ -197,7 +197,7 @@ void write_bytes(const fs::path& path, const std::vector<std::byte>& data) {
 // Overwrite `count` bits at `offset` and restore the syncframe's trailing
 // crc2, so a patched frame is still a legal, CRC-clean syncframe and the
 // decoder's own semantic checks (not a CRC failure) are what reject it.
-// Copied from tests/ac3/decoder/test_eac3_decoder.cpp's own helper of the same
+// Copied from libs/ac3/tests/decoder/test_eac3_decoder.cpp's own helper of the same
 // name - see that file's "the E-AC-3 decoder rejects malformed spectral
 // extension streams" test, which this file's own "monitor reports a decode
 // failure" test below reuses field-for-field.
@@ -390,7 +390,7 @@ TEST_CASE("live mode=atmos positions=osc either runs a live-driven session or re
     fs::remove(out_path);
     // port 0 asks the OS for an ephemeral port - this can never collide with
     // anything else running on the machine, the same reason
-    // tests/audio/test_live_positions.cpp binds the same way.
+    // libs/audio/tests/test_live_positions.cpp binds the same way.
     const auto rc =
         run_cli("live \"" + out_path.string() + "\" 0 1 192 -2 -2 atmos positions=osc:local:0",
                 log);
@@ -700,7 +700,7 @@ TEST_CASE("monitor reports a decode failure by name, distinct from a device refu
     // A semantically invalid but framing-correct, CRC-correct E-AC-3 access
     // unit - spxbegf placed past spxendf, collapsing the spectral extension
     // region to nothing (see iclforge::ac3::describe(DecodeError::kInvalidStream)) -
-    // the exact vector tests/ac3/decoder/test_eac3_decoder.cpp's "the E-AC-3
+    // the exact vector libs/ac3/tests/decoder/test_eac3_decoder.cpp's "the E-AC-3
     // decoder rejects malformed spectral extension streams" test already
     // validates bit-for-bit at the library level, reused here through the
     // CLI. run_monitor decodes its first access unit before ever calling

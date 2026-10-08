@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 fn main() {
     // This crate lives at <repo>/rust/iclforge-sys, so two levels up is the CMake source
-    // directory that owns src/capi/ - see rust/README.md for why this crate builds the C
+    // directory that owns libs/capi/ - see rust/README.md for why this crate builds the C
     // library itself (bindgen against a header that was NOT built into the library it links
     // is exactly the drift AP9 exists to catch, so there is no "assume it's preinstalled" path).
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
@@ -14,13 +14,13 @@ fn main() {
         .to_path_buf();
 
     for rel in [
-        "src/capi",
-        "src/ac3/include",
-        "src/base",
-        "src/dsp",
-        "src/objects",
-        "src/render",
-        "src/containers/src/iec61937",
+        "libs/capi",
+        "libs/ac3/include",
+        "libs/base",
+        "libs/dsp",
+        "libs/objects",
+        "libs/render",
+        "libs/containers/src/iec61937",
         "CMakeLists.txt",
     ] {
         println!("cargo:rerun-if-changed={}", repo_root.join(rel).display());
@@ -76,7 +76,7 @@ fn main() {
         header.display()
     );
 
-    // generate_export_header() (src/capi/CMakeLists.txt) writes export.h under this target's own
+    // generate_export_header() (libs/capi/CMakeLists.txt) writes export.h under this target's own
     // binary dir at configure/build time - a real generated file, not something `cmake --install`
     // is needed for either.
     let generated_include_dir = find_dir_containing(&build_dir, Path::new("iclforge_c/export.h"))

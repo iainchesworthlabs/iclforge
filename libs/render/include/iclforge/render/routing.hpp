@@ -24,7 +24,7 @@
 // list keeps for its slots, where a list already is a patch.
 //
 // Fixed-size and allocation-free, so a sink on a board can hold one beside its
-// layout. Tested on the host in tests/render/test_routing.cpp.
+// layout. Tested on the host in libs/render/tests/test_routing.cpp.
 
 namespace iclforge::render {
 

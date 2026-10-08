@@ -253,7 +253,7 @@ This closes the sink-tiers plan's exit criterion 1 in full: fourteen fixtures an
 ## AC-4
 
 `CONFIG_ICLFORGE_AC4` (off by default, and offered only on a part with a floating-point unit)
-builds the AC-4 inspector, core and decoder of `src/ac4` into the
+builds the AC-4 inspector, core and decoder of `libs/ac4` into the
 component, in single precision and in the minimum-footprint profile (`ICLFORGE_MINIMAL_AC4`), and
 lets the player read a stream that opens with an AC-4 sync word. It takes the ring, the renderer
 and the sinks an AC-3 or E-AC-3 stream takes, with `iclforge::ac4::SyncFrameSplitter` and `iclforge::ac4::Decoder` in
@@ -496,10 +496,10 @@ reserved and not moved 63 times a frame; and the two or four lines of a Huffman 
 made a call into ROM's `memcpy` for 8 or 16 bytes. The reconstruction takes 8.1 ms a 5.1 SIMPLE frame from 15.7 with these,
 and parse 11.2 from 13.7.
 
-**The compiler.** `src/ac4/src/core`'s kernels (the FFT, the inverse transform, the QMF banks, the converter, the synthesis, A-SPX's
+**The compiler.** `libs/ac4/src/core`'s kernels (the FFT, the inverse transform, the QMF banks, the converter, the synthesis, A-SPX's
 generator and A-CPL) are built at `-O3` under `ICLFORGE_MINIMAL_HOT_O2` from `-O2`, which unrolls their loops and interleaves
 the independent multiplies that a rolled loop leaves waiting on the FPU of an in-order core: 2.7 to 2.9 ms a 5.1 frame for
-9 KB of flash. Thirteen of `src/ac4/src/decoder`'s translation units (the Huffman and scale factor reading, the reconstruction, the
+9 KB of flash. Thirteen of `libs/ac4/src/decoder`'s translation units (the Huffman and scale factor reading, the reconstruction, the
 stereo and downmix passes) are built at `-O2` where they stayed at `-Os`: 1.6 to 3.8 ms a 5.1 frame for 71 KB of flash, and
 1.8 KB more of the decode task's stack. `-O3` on those files gained nothing over `-O2` and cost 73 KB more.
 
@@ -914,8 +914,8 @@ the manifest's parts, with the decoder switched on and constructed (in the fixed
 parts with no floating-point unit).
 CI narrows that to the ESP32-P4, the ESP32-C3 and the ESP32-C6 with `--verify-targets esp32p4,esp32c3,esp32c6`:
 the `float` tier and the fixed-point tier on the two parts with no floating-point unit. A `float` build evaluates the
-converter's tables while it compiles `src/dsp/src/tiered/resampler.cpp`, which takes ESP-IDF's
-RISC-V GCC 15.2 8.4 s where it took 1.5, and `src/ac4/CMakeLists.txt` raises the compiler's limit
+converter's tables while it compiles `libs/dsp/src/tiered/resampler.cpp`, which takes ESP-IDF's
+RISC-V GCC 15.2 8.4 s where it took 1.5, and `libs/ac4/CMakeLists.txt` raises the compiler's limit
 on constant evaluation for that file (`-fconstexpr-ops-limit`).
 
 ## QEMU

@@ -1,4 +1,4 @@
-// Dialogue enhancement (src/ac4/src/decoder/pcm/de.hpp, ETSI TS 103 190-1 V1.4.1
+// Dialogue enhancement (libs/ac4/src/decoder/pcm/de.hpp, ETSI TS 103 190-1 V1.4.1
 // clause 5.7.8): Tables 209, 210 and 172 and the rendering vector; at 0 dB the
 // tool leaves the matrices as bypassing it would; at its cap it applies the
 // gains its parameters give to 0.01 dB, measured on known input, in each

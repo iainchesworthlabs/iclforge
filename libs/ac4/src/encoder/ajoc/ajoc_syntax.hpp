@@ -12,7 +12,7 @@
 // ajoc_ctrl_info(), ajoc_data_point_info(), ajoc_data() and ajoc_huff_data(),
 // and clause 6.2.3.5's ajoc_dmx_de_data() and 6.2.3.6's ajoc_bed_info(), which
 // audio_data_ajoc() reads around it. Transcribed for writing, separate from the
-// decoder's reader (src/ac4/src/decoder/syntax/ajoc.cpp) and the Python parser; the
+// decoder's reader (libs/ac4/src/decoder/syntax/ajoc.cpp) and the Python parser; the
 // traces agree record for record.
 //
 // The values are the syntax's: each ajoc_huff_data()'s are what it returns, the

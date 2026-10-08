@@ -87,7 +87,7 @@ void QmfSynthesis<Real>::process(std::span<const Complex> in, std::span<Real> pc
 
 template class QmfAnalysis<Real>;
 template class QmfSynthesis<Real>;
-// The encoder's own QMF-domain code (src/ac4/src/encoder/acpl, src/ac4/src/encoder/aspx)
+// The encoder's own QMF-domain code (libs/ac4/src/encoder/acpl, libs/ac4/src/encoder/aspx)
 // calls these at double regardless of the decoder's scalar (see this target's
 // CMakeLists.txt, ICLFORGE_DSP_ALSO_AT_DOUBLE).
 ICLFORGE_DSP_ALSO_AT_DOUBLE(template class QmfAnalysis<double>;

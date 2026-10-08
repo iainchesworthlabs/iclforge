@@ -64,7 +64,7 @@ reports differ, and a test on a board needs something to point a device at.
 |---|---|---|
 | The WASM page's demo | `apps/wasm/assets/demo.ec3` | E-AC-3 5.1, JOC objects in the QMF domain, 8 s. What CI's HTTP step serves. |
 | The example's own | `esp-idf/iclforge/examples/hearth_sink/stream/` | `sample.ac3` (AC-3 5.1, six frames), flashed to a partition; `height.ec3` (the probe's height fixture: five objects over a 5.1 bed, three on the ceiling, MDCT-band domain, six access units), which `sdkconfig.ci-render` plays from FAT onto 7.1.4 |
-| The fuzz seeds | `fuzz/seeds/fuzz_eac3_decode/` | One-second streams from `fuzz/generate-seeds.sh`: a tone per speaker at every layout the encoder names, the Annex E tool combinations at 5.1 and 7.1.4, objects, two external streams |
+| The fuzz seeds | `libs/ac3/fuzz/seeds/fuzz_eac3_decode/` | One-second streams from `tools/fuzz/generate-seeds.sh`: a tone per speaker at every layout the encoder names, the Annex E tool combinations at 5.1 and 7.1.4, objects, two external streams |
 | The external baseline | `tests/golden/external-baseline/` | Dolby Encoding Engine and FFmpeg streams: AC-3 and E-AC-3, stereo and 5.1, music and speech |
 | A licensed encoder's objects | `tests/golden/object-fixture/dee_joc_514.ec3` | 5.1.4 carried as JOC objects, QMF domain |
 
@@ -446,7 +446,7 @@ core and changed there (8).
    (b) `apps/wasm/assets/`, which CI's HTTP step already serves; (c) served from where the streams
    are now. **Recommend (a).** (b) puts some forty device fixtures in the WASM page's asset
    directory, beside the one file that page loads. (c) ties the device's checks to fuzz seeds that
-   `fuzz/generate-seeds.sh` rewrites and to fixtures kept for other checks. Cost: 1.2 MB of new
+   `tools/fuzz/generate-seeds.sh` rewrites and to fixtures kept for other checks. Cost: 1.2 MB of new
    files in the repository, and an entry in `pack_esp_component.py`.
 
 2. **How the streams are made.** (a) **a generator in `tools/generators`, its output committed**;
@@ -459,7 +459,7 @@ core and changed there (8).
    recorded in the manifest**; (b) the target's own first run, recorded. **Recommend (a)**, which
    is independent of the thing it checks. Cost: every stream in the set has to place exactly on
    7.1.4, so none has a channel 7.1.4 lacks (Lw, Rw, Vhc, Ts, Cs, LFE2); those are spread by the
-   renderer, which `tests/render/test_layout.cpp` covers on the host.
+   renderer, which `libs/render/tests/test_layout.cpp` covers on the host.
 
 4. **Objects in CI's network shape.** (a) **played as their bed**; (b) placed, with the object
    streams left out of the plays; (c) placed, with room made - a smaller ring, a larger decode

@@ -42,7 +42,7 @@
 // frame correctly is what test_group.cpp and the wider codec suite already
 // cover - this is about the wrapper, not the codec).
 //
-// It dials, so under ThreadSanitizer it needs what tests/sendspin/test_websocket.cpp says.
+// It dials, so under ThreadSanitizer it needs what libs/sendspin/tests/test_websocket.cpp says.
 
 namespace {
 

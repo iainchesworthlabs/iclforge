@@ -2,7 +2,7 @@
 # anything it cannot prove is reachable from an ordinary Kotlin/Java call
 # site. Two classes are reachable a different way, invisible to that
 # analysis, because native code (apps/android/app/src/main/cpp/ and
-# src/audio/src/backend/android/passthrough.cpp) finds them by NAME at
+# libs/audio/src/backend/android/passthrough.cpp) finds them by NAME at
 # runtime rather than through a normal call graph edge:
 
 # 1. Every `external fun` on NativeBridge is a JNI entry point resolved by

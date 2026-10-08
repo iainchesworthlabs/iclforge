@@ -291,7 +291,7 @@ struct Assignment {
 // The objects of an A-JOC substream's OAMD portion (Part 2 clause 6.2.3.4): the
 // LFE first where b_lfe is set (is_lfe[0] = 1), then the bed or intermediate
 // spatial format objects bed_dyn_obj_assignment() lists, then dynamic objects
-// up to the portion's fullband count (src/ac4/ERRATA.md, "The objects of an
+// up to the portion's fullband count (libs/ac4/ERRATA.md, "The objects of an
 // A-JOC substream"). False where the assignment lists more than the count,
 // which 6.3.2.8.1 leaves undefined.
 [[nodiscard]] bool ajoc_portion(const std::vector<ObjectEntry>& assigned, int n_fullband,
@@ -315,7 +315,7 @@ struct Assignment {
 
 // A bed's or intermediate spatial format's objects, as the direct-coded
 // substream that starts them lists them, and how many of them the group's
-// substreams have taken so far (src/ac4/ERRATA.md, "The objects of a
+// substreams have taken so far (libs/ac4/ERRATA.md, "The objects of a
 // direct-coded substream").
 struct StaticRun {
     std::vector<ObjectEntry> objects;
@@ -835,7 +835,7 @@ void assign_v1(const Toc& toc, std::map<int, Assignment>& out) {
             if (oamd_claimed) {
                 // 6.3.9.5: oamd_dyndata_multi() lists "all object essences
                 // present over all audio substreams of the according substream
-                // group in the order of bitstream presence" (src/ac4/
+                // group in the order of bitstream presence" (libs/ac4/
                 // ERRATA.md, "The objects oamd_dyndata_multi() lists").
                 out.at(*oamd_key).oamd->objects = group_objects;
             }
@@ -1142,7 +1142,7 @@ struct Decoder::Impl {
     std::map<int, AudioSubstreamState> audio;
     std::map<int, PresentationSubstreamState> presentation;
     // What a substream group's OAMD substream sent last, keyed by its index:
-    // the timing its substreams take where they send none (src/ac4/
+    // the timing its substreams take where they send none (libs/ac4/
     // ERRATA.md, "Which oamd_timing_data() applies"), and the common data.
     struct OamdGroupState {
         std::optional<detail::OamdTimingData> timing;
@@ -1253,7 +1253,7 @@ struct Decoder::Impl {
     // stream goes, the mixing values and what metadata() holds with it, and
     // the signal of the substreams that output last carries on, so that their
     // audio comes out to its end and overlaps the new source's first frame
-    // (src/ac4/ERRATA.md, "A change of source").
+    // (libs/ac4/ERRATA.md, "A change of source").
     void forget_stream() {
         audio.clear();
         presentation.clear();
@@ -1582,7 +1582,7 @@ detail::ParseResult Decoder::Impl::decode_objects(const CapturedAudio& member,
     // downmix's in core decoding; a direct-coded substream's in its group's
     // OAMD substream, or in its own metadata() in an alternative
     // presentation. A portion that sends no timing takes the downmix's
-    // (b_derive_timing_from_dmx), the group's, or its own last (src/ac4/
+    // (b_derive_timing_from_dmx), the group's, or its own last (libs/ac4/
     // ERRATA.md, "Which oamd_timing_data() applies").
     // The common data: an A-JOC substream's own in the table of contents,
     // else its group's OAMD substream's.
@@ -2141,7 +2141,7 @@ bool Decoder::Impl::assemble_unit(int fraction, iclforge::ac4::RawFrame& unit) {
     // The unit is a frame of the codec's own rate (Table 18), numbered by its codec frame: its
     // first transmission frame's counter over the fraction. Those counters step by `fraction`
     // from one unit to the next, so this steps by one; the 0 a splicer writes stays 0
-    // (src/ac4/ERRATA.md, "The efficient high frame rate mode").
+    // (libs/ac4/ERRATA.md, "The efficient high frame rate mode").
     unit.toc = first.toc;
     unit.toc.frame_rate_index =
         detail::audio_frame_rate_index(first.toc.frame_rate_index, fraction);
@@ -2668,7 +2668,7 @@ std::expected<FrameReport, DecodeError> Decoder::Impl::read(
     }
 
     // Two passes: the OAMD substreams first, whose timing the object audio
-    // substreams of their groups take (src/ac4/ERRATA.md, "Which
+    // substreams of their groups take (libs/ac4/ERRATA.md, "Which
     // oamd_timing_data() applies"), then the rest in index order.
     for (const bool oamd_pass : {true, false}) {
         for (auto& [index, assignment] : assignments) {

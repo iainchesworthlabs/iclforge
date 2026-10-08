@@ -61,7 +61,7 @@ fs::path scratch_dir() {
 
 // Runs `forge <args>` with both streams redirected to `log`. The platform
 // differences - cmd.exe's quoting and std::system()'s two return-value
-// shapes - live in tests/platform/process.hpp's run_shell, not here.
+// shapes - live in tests/support/platform/process.hpp's run_shell, not here.
 int run_cli(const std::string& args, const fs::path& log) {
     const std::string command =
         "\"" + std::string(ICLFORGE_CLI_EXE) + "\" " + args + " > \"" + log.string() + "\" 2>&1";
@@ -124,7 +124,7 @@ fs::path make_stream(const std::string& name, const std::string& command,
 // bed, immediately followed by the Annex E dependent that extends it to 7.1
 // rear (k71Rear replaces the bed's own Ls/Rs and adds Lrs/Rrs - see
 // eac3_tables.hpp's own comment on the constant). Built the raw
-// FrameEncoder/eac3::FrameEncoder way tests/ac3/decoder/test_stream_playback.cpp's
+// FrameEncoder/eac3::FrameEncoder way libs/ac3/tests/decoder/test_stream_playback.cpp's
 // legacy_core_streams() and tests/cli/test_cli_containers.cpp's
 // legacy_core_stream() both are, not AccessUnitEncoder, which always writes
 // Annex E syntax for the independent substream too and so cannot produce a
@@ -191,7 +191,7 @@ fs::path write_legacy_core_stream(const std::string& name) {
 }
 
 // The power of one frequency in `x`, whatever its phase - the same matched
-// correlation tests/ac3/decoder/test_stream_playback.cpp's own tone_power uses.
+// correlation libs/ac3/tests/decoder/test_stream_playback.cpp's own tone_power uses.
 // Phase-independent, so it needs no compensation for a fixed decode/encode
 // latency: a delay only rotates re/im between each other, it does not shrink
 // re^2+im^2 once the signal runs thousands of samples (there is no JOC
@@ -519,7 +519,7 @@ TEST_CASE("transcode carries a reserved dmixmod across as not indicated", "[cli]
     // that decodes fine. The source is the '01' and '10' encodes of one tone
     // ORed byte by byte ('01' | '10' is '11', every other bit meets an
     // identical copy) with each syncframe's CRCs re-stamped;
-    // tests/ac3/meta/test_bsi.cpp checks that this changes nothing but dmixmod.
+    // libs/ac3/tests/meta/test_bsi.cpp checks that this changes nothing but dmixmod.
     const auto dir = scratch_dir();
     const auto ltrt = read_bytes(
         make_stream("tx_dmix_ltrt.ec3", "eac3-encode", "none 51 off mixmeta dmixmod=ltrt"));

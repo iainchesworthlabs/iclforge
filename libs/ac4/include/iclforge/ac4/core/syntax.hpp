@@ -2,7 +2,7 @@
 
 #include "iclforge/base/syntax_trace.hpp"
 
-// The syntax trace both directions share: the AC-4 decoder (src/ac4/src/decoder) emits
+// The syntax trace both directions share: the AC-4 decoder (libs/ac4/src/decoder) emits
 // one record per syntax element it reads, and the AC-4 encoder one per element
 // it writes, in the same shape, so that the two, and the Python reference
 // parser (tools/references/ac4_syntax.py), can be compared record for record.

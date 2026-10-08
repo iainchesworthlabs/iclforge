@@ -8,7 +8,7 @@
 
 // Offline, whole-buffer sample-rate conversion for a loaded file - NOT the
 // live capture drift-correction resampler (iclforge::audio::DriftResampler,
-// src/audio/include/iclforge/audio/resampler.hpp). That one runs once per
+// libs/audio/include/iclforge/audio/resampler.hpp). That one runs once per
 // audio-thread callback, correcting tens-of-ppm clock drift between two
 // devices, so it deliberately spends nothing on kernel quality: linear
 // interpolation is accurate enough at those drift magnitudes and keeps the
@@ -19,7 +19,7 @@
 // conversion can and should afford a proper windowed-sinc polyphase FIR
 // kernel instead of a cheap two-tap interpolation.
 //
-// The filter is the AC-4 sample rate converter's (src/dsp/src/tiered/resampler.hpp,
+// The filter is the AC-4 sample rate converter's (libs/dsp/src/tiered/resampler.hpp,
 // planning/consolidation.md decision 22): a Kaiser-windowed sinc designed for the
 // ratio in lowest terms, the passband to 0.86 of the lower rate's Nyquist
 // frequency, the stopband from it, 100 dB down.

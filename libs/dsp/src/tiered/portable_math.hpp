@@ -14,7 +14,7 @@
 // iteration each and no library call: the compiler's evaluator, an x86-64 host, a Cortex-M3 and an
 // ESP32's soft-float double run the same additions, subtractions, multiplications and divisions in
 // the same order and give the same bits (the build pins -ffp-contract=off, so no multiply and add
-// is fused). tests/dsp/tiered/test_portable_math.cpp checks each against its definition and
+// is fused). libs/dsp/tests/tiered/test_portable_math.cpp checks each against its definition and
 // against the C library's, and a function's value at compile time against its value at run time.
 //
 // ceil and sqrt give what the standard's give, the sqrt the double nearest the root as IEEE 754

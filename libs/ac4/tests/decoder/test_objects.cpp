@@ -281,7 +281,7 @@ TEST_CASE("A-JOC objects carry their dry coefficients' share of each downmix sig
 
 TEST_CASE("a static downmix's core objects are its LFE and its bed at L R C Ls and Rs",
           "[ac4][decoder][objects]") {
-    // src/ac4/ERRATA.md, "A static downmix's inputs": in core decoding the
+    // libs/ac4/ERRATA.md, "A static downmix's inputs": in core decoding the
     // objects of an A-JOC substream over a static 5.1 downmix are its bed.
     ObjectCase c;
     for (const ObjectCase& committed : ac4_decoder_test::committed_object_cases()) {

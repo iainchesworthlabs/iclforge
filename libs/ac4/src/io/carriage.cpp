@@ -32,7 +32,7 @@ void put_bitrate_dsi(BitWriter& w, const Toc& toc) {
 // ch_mode 10 no L/R or Ls/Rs and the centre as group 2, never the 9.X layouts'
 // Lscr/Rscr, and 22.2's Tsl/Tsr only for one top pair; the groups here are the
 // ones Table A.27 gives each mode, which is what DEE's muxer writes
-// (src/ac4/ERRATA.md).
+// (libs/ac4/ERRATA.md).
 std::uint32_t channel_groups(int ch_mode, bool centre, bool four_back, int top_pairs) {
     std::uint32_t groups = 0;
     const auto set = [&groups](int g) { groups |= 1u << g; };
@@ -98,7 +98,7 @@ using Refusal = std::string_view;
 // each mode holds in full: its channel groups with the centre, the four back
 // channels and both top pairs present. The lowest mode holding every channel
 // of both; -1 identity, superset(0, 1) is 1 as the clause says, and -1 where no
-// mode holds both, as src/ac4/ERRATA.md ("The presentation substream") reads
+// mode holds both, as libs/ac4/ERRATA.md ("The presentation substream") reads
 // the six pairs the clause leaves without one.
 [[nodiscard]] int superset(int a, int b) {
     if (a < 0) {
@@ -136,7 +136,7 @@ using Refusal = std::string_view;
 
 // What Pseudocodes 25 and 26 and clauses 6.3.3.1.29 to 6.3.3.1.30 derive from
 // every substream of the substream groups a presentation's specifiers name,
-// each group once, as the decoder takes them (src/ac4/ERRATA.md,
+// each group once, as the decoder takes them (libs/ac4/ERRATA.md,
 // "presentation_config 1 and 4 read more specifiers than n_substream_groups").
 struct PresentationShape {
     int ch_mode = -1;  // pres_ch_mode
@@ -216,7 +216,7 @@ std::expected<PresentationShape, Refusal> shape_of(const Toc& toc, const Present
         shape.core = -1;
     }
     // Nothing contributes to a presentation without audio substreams, so it
-    // sends no rate (src/ac4/ERRATA.md, "The bit rate and the indicators").
+    // sends no rate (libs/ac4/ERRATA.md, "The bit rate and the indicators").
     shape.bitrate_info = any && every_rate;
     return shape;
 }
@@ -291,7 +291,7 @@ std::optional<Refusal> put_group_dsi(BitWriter& w, const SubstreamGroupInfo& gro
             w.put(static_cast<std::uint32_t>(ajoc.n_fullband_upmix_signals - 1), 6);
             // The upmix's objects (Table E.15): bed_dyn_obj_assignment() lists
             // its bed and ISF objects, and the signals it does not list are
-            // dynamic (src/ac4/ERRATA.md, "An A-JOC substream's objects").
+            // dynamic (libs/ac4/ERRATA.md, "An A-JOC substream's objects").
             int listed = 0;
             for (const ObjectEntry& object : ajoc.upmix_objects) {
                 bed = bed || object.kind == ObjectKind::kBed;
@@ -442,7 +442,7 @@ std::expected<std::vector<std::byte>, Refusal> presentation_v1_dsi(const Toc& to
     w.put(static_cast<std::uint32_t>(pres.emdf.key_id), 10);
 
     // The presentation's channel mode (Pseudocode 25) and its channel groups
-    // (Pseudocode E.3, as Table A.27 gives them: src/ac4/ERRATA.md).
+    // (Pseudocode E.3, as Table A.27 gives them: libs/ac4/ERRATA.md).
     w.put(shape->ch_mode >= 0 ? 1U : 0U, 1);  // b_presentation_channel_coded
     if (shape->ch_mode >= 0) {
         w.put(static_cast<std::uint32_t>(shape->ch_mode), 5);
@@ -455,7 +455,7 @@ std::expected<std::vector<std::byte>, Refusal> presentation_v1_dsi(const Toc& to
               18);
     }
     // b_presentation_core_differs where the core mode (Pseudocode 26) is not
-    // -1 (Table E.11 prints "is -1"; src/ac4/ERRATA.md), and Table E.14's
+    // -1 (Table E.11 prints "is -1"; libs/ac4/ERRATA.md), and Table E.14's
     // code for it.
     w.put(shape->core >= 0 ? 1U : 0U, 1);
     if (shape->core >= 0) {
@@ -497,7 +497,7 @@ std::expected<std::vector<std::byte>, Refusal> presentation_v1_dsi(const Toc& to
         // alternative_info() (E.12): the name's bytes without the 0 the
         // presentation substream closes it with, and each target's level and
         // device categories, Table 67's four Booleans above the four bits
-        // tdc_extension would add (src/ac4/ERRATA.md, "An alternative
+        // tdc_extension would add (libs/ac4/ERRATA.md, "An alternative
         // presentation's dac4").
         const AlternativeInfo& alternative = *pres.alternative_info;
         if (alternative.name.size() > 0xFFFF || alternative.targets.empty() ||

@@ -12,7 +12,7 @@
 // A.2.1 (tables/isf_tables.hpp). Clause 4.8.3's object audio substream hands
 // the tool each present object with its properties, so the object's gain
 // (Annex F.5, -infinity for an inactive object) applies before the matrix
-// (src/ac4/ERRATA.md, "The intermediate spatial format").
+// (libs/ac4/ERRATA.md, "The intermediate spatial format").
 
 namespace iclforge::ac4::detail {
 

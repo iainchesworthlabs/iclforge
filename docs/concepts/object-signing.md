@@ -22,8 +22,8 @@ key, reads none from the build, and has no way to obtain or derive one. What it 
 
 | Part | Where it comes from | In the library? |
 |---|---|---|
-| **HMAC-SHA-256** | FIPS 180-4 / RFC 2104, public standards | Yes — `src/base/src/crypto/`, dependency-free |
-| **What gets authenticated** — which frame regions feed the HMAC, and where the tag is written | The public container layout this codec already emits (`src/objects/src/emdf.cpp`, the E-AC-3 syntax, TS 103 420) | Yes — `src/ac3/src/signing/emdf_atmos_signer.cpp` |
+| **HMAC-SHA-256** | FIPS 180-4 / RFC 2104, public standards | Yes — `libs/base/src/crypto/`, dependency-free |
+| **What gets authenticated** — which frame regions feed the HMAC, and where the tag is written | The public container layout this codec already emits (`libs/objects/src/emdf.cpp`, the E-AC-3 syntax, TS 103 420) | Yes — `libs/ac3/src/signing/emdf_atmos_signer.cpp` |
 | **The key** | You provision it — exactly as a licensed tool (DEE) receives its own via iLok | **No — never** |
 
 A stream signed with a key that does not match a given decoder's simply fails that decoder's check,
@@ -192,7 +192,7 @@ target Evolution HMAC, parallel to but separate from the EMDF policy on this pag
 ## Sibling: AC-4
 
 AC-4 objects carry no such tag in this project. The AC-4 encoder writes its EMDF containers with no
-protection bytes (`src/ac4/ERRATA.md`), and the decoder reconstructs objects without a key. See
+protection bytes (`libs/ac4/ERRATA.md`), and the decoder reconstructs objects without a key. See
 [AC-4](ac4.md).
 
 ## Planned decode modes

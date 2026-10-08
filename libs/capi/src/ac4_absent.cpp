@@ -1,4 +1,4 @@
-// The "absent" half of iclforge_c's AC-4 support (src/capi/CMakeLists.txt
+// The "absent" half of iclforge_c's AC-4 support (libs/capi/CMakeLists.txt
 // compiles this file instead of ac4.cpp/ac4_encoder.cpp when
 // ICLFORGE_BUILD_AC4 is off): every function iclforge.h's AC-4 section
 // declares, given a body that names no iclforge::ac4:: C++ type. The public header
@@ -19,8 +19,8 @@
 
 // --- config initializers -----------------------------------------------
 // Pure C structs; the defaults below are iclforge::ac4::OutputConfig{}'s,
-// iclforge::ac4::DecoderConfig{}'s and iclforge::ac4::EncoderConfig{}'s (src/ac4/include/
-// iclforge/ac4/decoder/decoder.hpp, src/ac4/include/iclforge/ac4/encoder/encoder.hpp) spelled as C
+// iclforge::ac4::DecoderConfig{}'s and iclforge::ac4::EncoderConfig{}'s (libs/ac4/include/
+// iclforge/ac4/decoder/decoder.hpp, libs/ac4/include/iclforge/ac4/encoder/encoder.hpp) spelled as C
 // literals, so a config built by this library is the same whichever way
 // ICLFORGE_BUILD_AC4 was set - naming no iclforge::ac4:: type does not have to mean
 // guessing at its defaults.
@@ -66,7 +66,7 @@ void iclforge_ac4_decoder_config_init(iclforge_ac4_decoder_config_t* config) {
     config->decoding = ICLFORGE_AC4_DECODING_FULL;
 }
 
-// iclforge::ac4::ObjectProperties{}'s defaults (src/ac4/include/iclforge/ac4/core/toc.hpp).
+// iclforge::ac4::ObjectProperties{}'s defaults (libs/ac4/include/iclforge/ac4/core/toc.hpp).
 void iclforge_ac4_object_properties_init(iclforge_ac4_object_properties_t* properties) {
     if (properties == nullptr) {
         return;

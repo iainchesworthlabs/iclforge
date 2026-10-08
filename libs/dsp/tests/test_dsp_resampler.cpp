@@ -18,7 +18,7 @@ using iclforge::dsp::resample_planar;
 namespace {
 
 // Mono sine generator - deliberately local rather than shared with
-// tests/audio/test_resampler.cpp's own generate_sine/generate_sine_mono: these are
+// libs/audio/tests/test_resampler.cpp's own generate_sine/generate_sine_mono: these are
 // two independent test binaries' worth of helpers (iclforge::dsp::resample is a
 // plain single-channel std::vector<float>, not interleaved multi-channel PCM
 // like iclforge::audio::DriftResampler operates on), and the rest of tests/
@@ -35,7 +35,7 @@ std::vector<float> generate_sine(std::size_t frames, double freq, double sample_
 }
 
 // Average rising-zero-crossing period, converted to a frequency estimate.
-// Same technique tests/audio/test_resampler.cpp uses for DriftResampler - cheap
+// Same technique libs/audio/tests/test_resampler.cpp uses for DriftResampler - cheap
 // and robust enough for the tolerances below without an FFT dependency.
 double measured_frequency(std::span<const float> mono, double sample_rate) {
     std::vector<std::size_t> crossings;

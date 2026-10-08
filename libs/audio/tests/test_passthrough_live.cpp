@@ -14,7 +14,7 @@
 #include "iclforge/containers/iec61937/iec61937.hpp"
 
 // PassthroughSink's playback position, pause and flush against a real
-// receiver (src/audio/src/backend/*/passthrough.cpp).
+// receiver (libs/audio/src/backend/*/passthrough.cpp).
 //
 // Hidden: the tag starts with a dot, so `iclforge-tests` does not run this. It
 // needs an output that takes AC-3 over IEC 61937 - an HDMI or S/PDIF link to

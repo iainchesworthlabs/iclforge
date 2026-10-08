@@ -51,7 +51,7 @@ struct PortableMath {
 };
 
 // The design's functions as the C library has them, which design the table at double as the
-// converter has always designed it, and with which iclforge::dsp::resample designs (src/dsp/src/
+// converter has always designed it, and with which iclforge::dsp::resample designs (libs/dsp/src/
 // resampler.cpp).
 struct LibmMath {
     [[nodiscard]] static double ceil(double x) noexcept { return std::ceil(x); }

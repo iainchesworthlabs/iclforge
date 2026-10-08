@@ -323,7 +323,7 @@ as uncontrolled: `ICLFORGE_BUILD_ADM`/`ICLFORGE_ENABLE_TRACY` explicitly OFF (al
 project's own default, pinned so a future default change can't silently pull an undeclared
 dependency into this port), and `ICLFORGE_WITH_ALSA`/`ICLFORGE_WITH_PIPEWIRE` explicitly OFF -
 without that, this library-only build still probes the build machine's ambient ALSA/PipeWire
-installs (`src/audio/` is `add_subdirectory()`'d unconditionally outside Emscripten, not gated
+installs (`libs/audio/` is `add_subdirectory()`'d unconditionally outside Emscripten, not gated
 on `ICLFORGE_BUILD_CLI`/`ICLFORGE_BUILD_GUI`) even though `iclforge::audio` is never installed or
 exported. `vcpkg.json` also declares `"supports": "!(android & !arm64)"` - only `arm64-v8a`
 Android is a real target (see [docs/platforms/android.md](platforms/android.md)); other Android

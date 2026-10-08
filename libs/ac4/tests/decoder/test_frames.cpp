@@ -565,7 +565,7 @@ TEST_CASE("object, A-JOC and object metadata substreams are read by their own sy
     // Each is read by the syntax its element names (Part 2 Table 50): four zero
     // bytes end the audio substreams' elements early, and the OAMD substream,
     // which sends no oamd_timing_data() and has none from an earlier frame,
-    // cannot read its oamd_dyndata_multi() (src/ac4/ERRATA.md, "Which
+    // cannot read its oamd_dyndata_multi() (libs/ac4/ERRATA.md, "Which
     // oamd_timing_data() applies").
     CHECK(find(report, 0).kind == SubstreamReport::Kind::kAudio);
     CHECK(find(report, 1).kind == SubstreamReport::Kind::kAudio);
@@ -1133,7 +1133,7 @@ TEST_CASE("an object group of A-JOC and direct-coded substreams and OAMD reads e
         }
         return std::nullopt;
     };
-    // The prefix codes, one record of the bits read (src/ac4/ERRATA.md,
+    // The prefix codes, one record of the bits read (libs/ac4/ERRATA.md,
     // "Prefix codes in the trace").
     CHECK(value_of(2, "oa_sample_offset_type") == 0b11);
     CHECK(value_of(2, "basic_info_md") == 0b10);
@@ -1236,7 +1236,7 @@ std::vector<std::byte> ajoc_upmix_signals_frame(std::uint32_t upmix_signals, boo
 // Regression: n_fullband_upmix_signals escapes through variable_bits(3), which
 // the syntax bounds no further, and the decoder listed that many objects for
 // every A-JOC substream of a group before it checked how many one may
-// describe. The 391-byte frame at fuzz/regressions/fuzz_ac4_decode/
+// describe. The 391-byte frame at libs/ac4/fuzz/regressions/fuzz_ac4_decode/
 // ajoc-upmix-signals-runaway-count sends 1,227,133,139, and fuzz_ac4_decode
 // stopped on malloc(3221225472) as the list grew. The substream is refused as
 // unsupported without one, as it is at any count over the limit.

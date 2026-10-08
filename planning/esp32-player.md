@@ -14,7 +14,7 @@
       taken: E-AC-3 5.1 does not encode in real time on the S3
       ([ESP32-S3 → Encoding](../docs/platforms/bare-metal/esp32-s3.md#encoding)).
     - **Phase 6, a Sendspin player shape:** built on 2026-09-16, on the repository's own
-      library, `src/sendspin`, in place of `sendspin-cpp`. [The reference player
+      library, `libs/sendspin`, in place of `sendspin-cpp`. [The reference player
       plan](hearth-reference-player.md) replaced it.
     - **Phase 7, E-AC-3 over Sendspin:** replaced. E-AC-3 travels in Hearth's own role,
       `_ac3forge_player@v1` ([the extension plan](hearth-sendspin-extension.md)), and not as a
@@ -48,7 +48,7 @@
     becomes a runtime setting there, which settles decision 5.
 
     **On 2026-09-16 B3 made `hearth_sink` a Sendspin player** on the repository's own library,
-    `src/sendspin`. Measured against it, `sendspin-cpp` took 173,604 bytes more flash and left
+    `libs/sendspin`. Measured against it, `sendspin-cpp` took 173,604 bytes more flash and left
     50,504 bytes less internal RAM free while streaming, and it stopped 0.8 s into ten seconds of
     PCM with `Lost sync`. Two boards played one E-AC-3 JOC programme as a group for ten minutes
     with no underrun, and their reported play times stayed within 549 µs of each other. That is
@@ -134,7 +134,7 @@ Seven, and five of them exist. The order is the order bytes take.
 4. **Sample format.** Planar float to interleaved 16-bit, or 24-in-32 with slot padding for TDM.
    Exists as [`ac3forge/interleave.hpp`](../esp-idf/iclforge/include/iclforge/interleave.hpp),
    moved on 2026-09-10 from inside the streaming example into the component, free of ESP-IDF, and
-   tested on the host by `tests/ac3/io/test_interleave.cpp`. It is library code with a temporary home.
+   tested on the host by `libs/ac3/tests/io/test_interleave.cpp`. It is library code with a temporary home.
 5. **Bytes to PCM.** The loop over 1 to 4: feed bytes, take frames, with hold-back (§3.7) and
    end-of-stream handled once. Written three times, as above. Library code with no home.
 6. **Buffering and tasks.** A fetch task filling a ring buffer, a decode task draining it and
@@ -161,15 +161,15 @@ Three homes, and the rule for choosing is the one the repository already uses: p
 in the library, platform-specific code in the platform's own directory, and an example shows how
 to use both.
 
-**The library, `src/ac3`.** Layers 4 and 5. `ac3::io::interleave` is a move of code that already
+**The library, `libs/ac3`.** Layers 4 and 5. `ac3::io::interleave` is a move of code that already
 has host tests. A `StreamDecoder` over the accumulator, the E-AC-3 decoder and the output stage,
 with `feed()` and `next()` into caller-owned spans, is the loop written three times, written once.
-Both are hand-over items for whoever owns `src/ac3`, so this page describes them and does not
+Both are hand-over items for whoever owns `libs/ac3`, so this page describes them and does not
 touch that tree. Until they land, the component carries copies, marked as
 such, and the day they land is the day the copies are deleted. **As built,** neither has landed:
 `ac3forge/interleave.hpp` and the player's loop are still the component's. The layout and the
-renderer did move into the library, as `ac3::render` (`src/render/include/iclforge/render/`, tests in
-`tests/render/`), for Hearth.
+renderer did move into the library, as `ac3::render` (`libs/render/include/iclforge/render/`, tests in
+`libs/render/tests/`), for Hearth.
 
 **The component, `esp-idf/iclforge/`.** Layer 6, and the seams for 7. The component registered no
 sources when this was written; it gains `esp-idf/iclforge/include/iclforge/player.hpp` and
@@ -417,7 +417,7 @@ speaker already does in its `spdif_mode`, so the technique is proven on this sil
 
 **Atmos.** "Audio to Atmos" is `ac3::oba::AtmosEncoder`: a 5.1 bed and mono objects with
 positions, JOC-coded into one E-AC-3 access unit. It is not in the minimum-footprint profile.
-`src/ac3/minimal.cmake`'s encoder list carries neither `oba/atmos.cpp` nor the QMF bank the
+`libs/ac3/minimal.cmake`'s encoder list carries neither `oba/atmos.cpp` nor the QMF bank the
 JOC solve estimates in, so it has never been built for Xtensa and there is no footprint or timing
 for it. On the host the object layer adds 0.80 ms a frame for four objects over the bed's encode;
 this part decodes about fifty times slower than a desktop core, so the object layer alone would
@@ -432,7 +432,7 @@ statement of how far short it falls.
 **Status, 2026-09-30: replaced, and built otherwise.** [The reference player
 plan](hearth-reference-player.md) replaced this section on 2026-09-15, and its phase B3 built the
 player on 2026-09-16. `hearth_sink` is a Sendspin player on the repository's own library,
-`src/sendspin`, not `sendspin-cpp`. It takes stereo PCM at 48 kHz through `player@v1`, for Music
+`libs/sendspin`, not `sendspin-cpp`. It takes stereo PCM at 48 kHz through `player@v1`, for Music
 Assistant, and AC-3 and E-AC-3 undecoded through Hearth's own role, `_ac3forge_player@v1`; it
 offers no FLAC or Opus. [An ESP32-S3 sink](../docs/hearth/sink-esp32-s3.md) is the guide. What
 follows is the design as it stood on 2026-09-10, kept for its reasoning.
@@ -651,13 +651,13 @@ the slave role played against a SigmaDSP as master; a 7.1.4 stream decoded and r
 the player on the board with its per-frame cost recorded beside the probe's 0.90x for the
 decode alone.
 
-**Verified by:** `tests/ac3/io/test_interleave.cpp` for the layout and the probe's render row for the
+**Verified by:** `libs/ac3/tests/io/test_interleave.cpp` for the layout and the probe's render row for the
 levels; hardware for the role and the timing, which have no substitute.
 
 **Built 2026-09-10, everything but what needs a board.** (Both headers and their tests have since
-moved into the library, as `src/render/include/iclforge/render/` and `tests/render/test_layout.cpp`,
+moved into the library, as `libs/render/include/iclforge/render/` and `libs/render/tests/test_layout.cpp`,
 for [Hearth](hearth-reference-player.md#a1-the-renderer-moves-into-the-library).)
-`OutputLayout` (now `src/render/include/iclforge/render/layout.hpp`) is a name (`7.1.4`) or a speaker
+`OutputLayout` (now `libs/render/include/iclforge/render/layout.hpp`) is a name (`7.1.4`) or a speaker
 list (`L,R,C,LFE,Ls,Rs`, or angles), one speaker per slot, sixteen at most, and `LayoutRenderer`
 (now `render.hpp` beside it) turns a `PcmBlock`
 into one block per slot: unit gain to a slot whose location matches, `pan_direction` for one that
@@ -673,7 +673,7 @@ runs 32-bit slots by default and takes the slave role from Kconfig, the TDM sink
 four 32-bit slots (an S3 TDM frame holds 128 bits) with its DMA descriptors sized from the bus
 width, and `PUT /layout` changes the
 layout for the next play. Host tests: eleven cases in `tests/io/test_layout.cpp`, which moved with
-the header and has 22 now (`tests/render/test_layout.cpp`). QEMU: the
+the header and has 22 now (`libs/render/tests/test_layout.cpp`). QEMU: the
 stereo, TDM and HTTP shapes unchanged to the digit, and a fourth, `sdkconfig.ci-render`, that
 plays the probe's height-object fixture onto 7.1.4 through the twelve-slot TDM conversion with
 every slot's RMS equal to `render_fixture.hpp`'s - one lap, as coded, MDCT-band domain, an 8 KB
@@ -766,7 +766,7 @@ passthrough path in Music Assistant. Not schedulable here; the exit is the answe
 
 ### Hand-over to the decoder core
 
-Six items for whoever owns `src/ac3`; this page describes them and does not touch
+Six items for whoever owns `libs/ac3`; this page describes them and does not touch
 that tree.
 
 1. **A defect, found by the streaming example's CI shape on 2026-09-10.**
@@ -787,7 +787,7 @@ that tree.
    the comment above the two decoders in `player.hpp` still says `Eac3Decoder` does not survive a
    fold.
 2. `ac3::io::interleave`, moved from the example with its host tests. **Status: not done.**
-   `ac3forge/interleave.hpp` is still the component's, with `tests/ac3/io/test_interleave.cpp`.
+   `ac3forge/interleave.hpp` is still the component's, with `libs/ac3/tests/io/test_interleave.cpp`.
 3. `ac3::io::StreamDecoder` over the accumulator, both decoders and the output stage, with
    `feed()` and `next()` into caller-owned spans, tested over both generations. The component's
    copy goes when it lands. **Status: not done.** The library has no `StreamDecoder`.
@@ -861,7 +861,7 @@ Outcomes, 2026-09-30:
   only: the ESPHome half of it is not.
 - **2, 3, 6, 9, 10:** not acted on. They belong to Phases 3 and 5, which are not built.
 - **11, 12:** replaced by [the reference player plan](hearth-reference-player.md). The player is
-  on `src/sendspin`, which the plan measured against `sendspin-cpp` (173,604 bytes more flash and
+  on `libs/sendspin`, which the plan measured against `sendspin-cpp` (173,604 bytes more flash and
   50,504 bytes less internal RAM free while streaming, and a `Lost sync` 0.8 s into ten seconds of
   PCM). E-AC-3 travels in `_ac3forge_player@v1`.
 
@@ -869,7 +869,7 @@ Outcomes, 2026-09-30:
    library, behind a FreeRTOS abstraction; (c) the example, as it is. **Recommend (a).** The
    library is platform-free and stays so; the example is where an integrator copies from, and a
    player they have to copy is one they will get wrong. Cost: the component stops being a
-   three-file wrapper, and the packing script's claim that everything real is in `src/ac3`
+   three-file wrapper, and the packing script's claim that everything real is in `libs/ac3`
    becomes "and in the component's own `src/`".
 
 2. **The ESPHome route.** (a) **an `ac3forge` media player platform now, upstream after**; (b)
@@ -909,7 +909,7 @@ Outcomes, 2026-09-30:
    must agree, checked by expanding every name through the list form in a test. **Taken, (a),
    2026-09-10**: `ac3forge::OutputLayout` (now `ac3::render::OutputLayout`) parses both from one
    string - `7.1.4`, or `L,R,C,LFE,Ls,Rs`, or `30/0,-30/0,lfe` - and a name is exactly the list of
-   its Table E2.5 locations, which `tests/render/test_layout.cpp` checks.
+   its Table E2.5 locations, which `libs/render/tests/test_layout.cpp` checks.
 
 8. **The control surface.** (a) **REST in the component for ESP-IDF, the `media_player` entity
    for ESPHome, sensors for the counters**; (b) REST everywhere, including under ESPHome; (c) the

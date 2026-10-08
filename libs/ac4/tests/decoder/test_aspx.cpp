@@ -1,4 +1,4 @@
-// The decoder's QMF-domain tools (src/ac4/src/decoder/pcm/aspx.cpp and
+// The decoder's QMF-domain tools (libs/ac4/src/decoder/pcm/aspx.cpp and
 // companding.cpp) on hand-built A-SPX data, for the paths DEE's streams do not
 // take: frequency and time interleaved waveform coding, a balanced pair, the
 // tone generator's phase, the noise generator's index across intervals, an

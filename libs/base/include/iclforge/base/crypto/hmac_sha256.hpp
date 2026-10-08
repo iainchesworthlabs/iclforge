@@ -14,7 +14,7 @@
 
 namespace iclforge::base::crypto {
 
-// Exported: iclforge::ac3's signer calls it, and tests/base/test_crypto.cpp runs RFC 4231's
+// Exported: iclforge::ac3's signer calls it, and libs/base/tests/test_crypto.cpp runs RFC 4231's
 // vectors against it.
 ICLFORGE_BASE_EXPORT std::array<std::byte, 32> hmac_sha256(std::span<const std::byte> key,
                                                          std::span<const std::byte> message);

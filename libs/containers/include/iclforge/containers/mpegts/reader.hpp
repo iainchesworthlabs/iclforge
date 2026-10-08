@@ -51,13 +51,13 @@
 // errors - so "malformed" is the normal case rather than the exceptional
 // one. Every PSI section's CRC is checked before it is believed, a section
 // or PES that outruns its declared length is dropped rather than trusted,
-// and ReadOptions bounds what may be buffered. fuzz/fuzz_mpegts_demux.cpp
+// and ReadOptions bounds what may be buffered. libs/containers/fuzz/fuzz_mpegts_demux.cpp
 // drives both entry points with arbitrary bytes.
 
 namespace iclforge::containers::mpegts {
 
 namespace detail {
-// Reader's parse state, defined in src/containers/src/mpegts/reader.cpp - a
+// Reader's parse state, defined in libs/containers/src/mpegts/reader.cpp - a
 // namespace-scope type rather than a private nested one so the walker's own
 // free functions there can name it.
 struct ReaderState;

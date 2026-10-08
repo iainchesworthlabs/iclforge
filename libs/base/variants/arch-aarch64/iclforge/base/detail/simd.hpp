@@ -7,7 +7,7 @@
 
 // ---------------------------------------------------------------------------
 // The AArch64 (Advanced SIMD / NEON) member of the arch seam. See
-// src/base/variants/arch-generic/iclforge/base/detail/simd.hpp for what the
+// libs/base/variants/arch-generic/iclforge/base/detail/simd.hpp for what the
 // seam is, how CMake selects between the three directories, and why no
 // header here needs a preprocessor conditional to name its architecture.
 //

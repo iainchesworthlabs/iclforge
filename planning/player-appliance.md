@@ -4,7 +4,7 @@
     Written and decided 2026-09-07, and reframed the same day. This form — a headless daemon, a
     web control page, a kiosk window and an HLS client — was replaced on 2026-09-15 by
     [hearth-reference-player.md](hearth-reference-player.md). That later plan is built, apart from
-    the items its own status names: `apps/hearth` and `src/sendspin` exist for it and the desktop
+    the items its own status names: `apps/hearth` and `libs/sendspin` exist for it and the desktop
     player plays. Nothing on this page was shipped as specified;
     [What became of each part](#what-became-of-each-part) says what happened to each section.
 
@@ -189,7 +189,7 @@ bullet on a fourth member is superseded by name, `CONTRIBUTING.md:54`'s consumer
 `hearth`, and the seven-tab nav becomes eight. That is about six files and no identifier anyone
 has installed. [Decision 2](#decisions) is where it is taken.
 
-What the appliance **shares** rather than owns is the family's floor: `src/audio` (never
+What the appliance **shares** rather than owns is the family's floor: `libs/audio` (never
 installed, `cmake/InstallLibrary.cmake:4-7`), the library itself, the single `ac3tests` binary,
 CI and the version line — exactly as Crucible does.
 
@@ -250,16 +250,16 @@ this list is revised.
 | `apps/cli/commands/audio_io.cpp:721-849` (`run_play`) | The whole passthrough decision and submit loop, proven on real hardware | Reads the entire file into memory (`read_elementary_stream`), splits every unit up front, then blocks in one loop until done. No transport, no queue, no cancellation, no re-follow. A five-minute Atmos programme is fine; an appliance left running is not. |
 | `apps/cli/commands/audio_io.cpp:682-720` (`play_via_ac3_transcode`) | UX9's transcode-to-passthrough leg, metadata carried across | Goes through a **temp file**: the whole stream is transcoded to disk before a note is heard. On an SD-card appliance that is a write-amplification and latency problem both. Needs to become a streaming transcode. |
 | `apps/gui/stream_player_controller.{cpp,hpp}` | Transport, seek, position reporting, level publication, the worker-thread and shared-result ownership pattern (see its own header comment on why `result_` is a `shared_ptr`) | Decodes the whole file to memory and plays PCM through `MonitorSink`. It is a *monitor*, not a passthrough player, and it is Qt. The transport *state machine* is what transfers; none of the code does. |
-| `src/audio/include/iclforge/audio/passthrough.hpp` | `PassthroughSink`, `enumerate_render_devices()`, the live AC-3/E-AC-3/exclusive-PCM probe | Nothing missing; this is the load-bearing piece and it works. |
-| `src/audio/include/iclforge/audio/sink_capabilities.hpp` + `src/backend/*/sink_capabilities.cpp` | UX9's EDID/ELD read | Real on **ALSA only** (84 lines, reading `/proc/asound/<card>/eld#*`). PipeWire, WASAPI, CoreAudio and posix each return `kNoBackend`, by name. See [What UX9 needs](#what-ux9-needs-before-it-can-carry-this). |
-| `src/audio/include/iclforge/audio/device_watcher.hpp` | Endpoint added / removed / state-changed / default-changed, on Windows, PipeWire and CoreAudio | **Nothing calls it from `play`.** It was written for Crucible (UX11). ALSA has no such API — that is udev's job — which matters, because ALSA is one of the appliance's two Linux backends. |
-| `src/containers/include/iclforge/containers/iec61937/iec61937.hpp` | `wrap_frame`, `Eac3BurstPacker`, `BurstReader`, `PassthroughDetector`, the 6144/24576-byte burst constants | Nothing missing. |
+| `libs/audio/include/iclforge/audio/passthrough.hpp` | `PassthroughSink`, `enumerate_render_devices()`, the live AC-3/E-AC-3/exclusive-PCM probe | Nothing missing; this is the load-bearing piece and it works. |
+| `libs/audio/include/iclforge/audio/sink_capabilities.hpp` + `src/backend/*/sink_capabilities.cpp` | UX9's EDID/ELD read | Real on **ALSA only** (84 lines, reading `/proc/asound/<card>/eld#*`). PipeWire, WASAPI, CoreAudio and posix each return `kNoBackend`, by name. See [What UX9 needs](#what-ux9-needs-before-it-can-carry-this). |
+| `libs/audio/include/iclforge/audio/device_watcher.hpp` | Endpoint added / removed / state-changed / default-changed, on Windows, PipeWire and CoreAudio | **Nothing calls it from `play`.** It was written for Crucible (UX11). ALSA has no such API — that is udev's job — which matters, because ALSA is one of the appliance's two Linux backends. |
+| `libs/containers/include/iclforge/containers/iec61937/iec61937.hpp` | `wrap_frame`, `Eac3BurstPacker`, `BurstReader`, `PassthroughDetector`, the 6144/24576-byte burst constants | Nothing missing. |
 | `apps/crucible/engine/output_policy.{cpp,hpp}` | The pattern: a **pure** decision over gathered facts returning a mode, an endpoint and a one-line reason — which is what lets the whole case table run on every CI leg | The policy itself does not transfer (null sink, default-endpoint exclusion, object modes). The *shape* is the thing to copy, and the plan copies it exactly. |
 | `apps/crucible/engine/output_stage.{cpp,hpp}` | Owning whichever sink the mode means, routing units to it, switching without disturbing upstream, counting underruns | Built around `RawFrame` (objects + placements + bed) from a live encoder. An appliance's unit is an already-encoded access unit off disk. |
 | `apps/crucible/runner/main.cpp` (`ac3crucible-run`) | The precedent for a headless binary over the same engine, driven by a line protocol, with a `status` verb | It reads stdin. An appliance has no stdin after boot. |
 | `apps/common/container_input.{cpp,hpp}` | `sniff_container` / `elementary_stream_from_bytes` — what `decode`, `qc`, `levels`, `play`, `monitor` and both GUI pickers all call | Whole-buffer. An appliance wants an incremental reader for large files, though whole-buffer is acceptable for v1 on a 2 GB Pi given typical elementary-stream sizes. |
-| `src/audio/src/net/udp_socket.hpp` + `net/{posix,windows}/` | **An in-tree socket layer on its own OS axis**, already justified in that header's own comment (sockets are the operating system, not the audio subsystem) | UDP only, receive-oriented. A TCP listener would have belonged beside it on the same axis; [decision 8](#decisions) took `cpp-httplib` instead, once the API became a third-party surface and an HLS client was needed too. |
-| `src/audio/include/iclforge/audio/live_positions.hpp` (UX4) | A working control-surface precedent: a socket and thread owning an OS resource, feeding a lock-free-ish snapshot, with counters for a status line, and an OSC 1.0 parser that is pure and lives in the library | It drives object positions in an encoder, not transport in a player. The *architecture* is directly reusable and the plan reuses it. |
+| `libs/audio/src/net/udp_socket.hpp` + `net/{posix,windows}/` | **An in-tree socket layer on its own OS axis**, already justified in that header's own comment (sockets are the operating system, not the audio subsystem) | UDP only, receive-oriented. A TCP listener would have belonged beside it on the same axis; [decision 8](#decisions) took `cpp-httplib` instead, once the API became a third-party surface and an HLS client was needed too. |
+| `libs/audio/include/iclforge/audio/live_positions.hpp` (UX4) | A working control-surface precedent: a socket and thread owning an OS resource, feeding a lock-free-ish snapshot, with counters for a status line, and an OSC 1.0 parser that is pure and lives in the library | It drives object positions in an encoder, not transport in a player. The *architecture* is directly reusable and the plan reuses it. |
 | `apps/crucible/notices/`, `apps/notices/` | Per-platform composed notices, one small file per OS | A new component needs its own `notices.cmake` and platform directory. |
 | `cmake/Packaging.cmake:300-317,399-401,463-464,534-537` | The exact recipe for a second application component with its own DEB/RPM names, its own `Depends`, and an archive name that is not CPack's default suffix | A third component follows it line for line. |
 
@@ -309,7 +309,7 @@ surface.
 | **A web control page, recommended** | Every phone, tablet and laptop on the network already has the client. No app store, no signing, no install, no second codebase to ship. Works on the day the box is unboxed. The page is static assets compiled into the binary, so there is no web server to configure and no document root to get wrong. | Needs a TCP listener and enough HTTP/1.1 to serve a few files and a JSON API — new code, though see below on why it is not a new dependency. Needs the user to find the URL ([Identity assets](#identity-assets)). |
 | A phone app | Native controls, offline, push | Two app stores, two signing identities (and DR6 is unresolved for the *desktop* ones), two toolchains, and a release cadence tied to review queues. For a control surface with roughly eight controls this is not proportionate. |
 | A physical remote over HDMI-CEC | No second device. The remote is already in the room and pointed at the television. | CEC is the least reliable part of consumer HDMI; `libcec` is LGPL-2.1-or-later (compatible, but a new dependency); the Pi's CEC support depends on the vc4 driver and the receiver's willingness to forward keys; and the appliance is not the active source, so it may never receive them. Worth adding **later**, as a convenience over the same command layer, never as the only surface. |
-| An OSC/HTTP API with no page | The project already has OSC: `ac3::audio::LivePositionSource` over `src/audio/src/net/udp_socket.hpp`, with a pure OSC 1.0 parser in the library (UX4). Cheapest possible surface. | An API is not a first-run story. Somebody with a new box and no keyboard cannot send an OSC packet. It is a good *second* surface for automation, and the plan keeps it as one. |
+| An OSC/HTTP API with no page | The project already has OSC: `ac3::audio::LivePositionSource` over `libs/audio/src/net/udp_socket.hpp`, with a pure OSC 1.0 parser in the library (UX4). Cheapest possible surface. | An API is not a first-run story. Somebody with a new box and no keyboard cannot send an OSC packet. It is a good *second* surface for automation, and the plan keeps it as one. |
 
 **The HTTP layer is `cpp-httplib`** ([decision 8](#decisions)), not the in-tree subset this page
 originally recommended. Three things changed between the recommendation and the decision, and
@@ -398,7 +398,7 @@ that sharing explicit rather than duplicating it:
 > platform layer). A third copy in the appliance is where drift starts. The recommendation is a
 > small `ac3::audio` helper — facts gathered from `read_sink_capabilities()` with
 > `enumerate_render_devices()` as the documented fallback, returned as one struct — that all
-> three call. It sits in `src/audio`, which is already named as the family's shared floor
+> three call. It sits in `libs/audio`, which is already named as the family's shared floor
 > ([recasting](recasting.md#the-model)), it is pure above the backend seam, and it is where the
 > fallback rule is currently written as a comment in a CLI command.
 
@@ -444,7 +444,7 @@ stand between it and carrying an appliance, in the order they bite.
    the single most important fix and it is small: resolve the default endpoint to its id, then
    take the same path every named endpoint takes.
 
-2. **There is no PipeWire capability read.** `src/audio/src/backend/pipewire/sink_capabilities.cpp`
+2. **There is no PipeWire capability read.** `libs/audio/src/backend/pipewire/sink_capabilities.cpp`
    returns `kNoBackend`, and its comment gives a good reason: the property names that would map
    a node back to `/proc/asound/<card>/eld#*` are not confirmed stable, and guessing would hand
    a caller a confidently wrong answer. DR9 has since supplied the missing confirmation from the
@@ -553,7 +553,7 @@ the backend and the socket axis, so a leg that meant to build the PipeWire arm a
 the ALSA one fails loudly.
 
 **Coverage floor.** `tools/checks/coverage_report.sh:118-129` holds per-component line/branch
-floors, and its own comment explains the two low ones: `src/audio` sits at 25/15 and
+floors, and its own comment explains the two low ones: `libs/audio` sits at 25/15 and
 `apps/cli` at 40/34 because device paths never execute headless — "the floor holds the line
 while that is true; raising it is a matter of writing the missing tests, not of editing this
 table."
@@ -844,7 +844,7 @@ look for and CPack's DEB generator never writes (`apps/crucible/CMakeLists.txt:6
 | Dependency | Licence | Fragment needed |
 |---|---|---|
 | `{fmt}` | MIT | Reuse Forge's existing fragment; it is compiled in the same way |
-| The library and `src/audio` | GPL-3.0, this project | The project's own licence text |
+| The library and `libs/audio` | GPL-3.0, this project | The project's own licence text |
 | ALSA (`libasound2`) | LGPL-2.1-or-later | New fragment. Dynamically linked, so the LGPL's relinking condition is met by the shared library |
 | PipeWire (`libpipewire-0.3`) | MIT | New fragment; Crucible's notices already carry one — reuse |
 | **cpp-httplib** | MIT | **New fragment required** ([decision 8](#decisions)). Header-only, so it is compiled in rather than linked — the notice travels with the binary either way |
@@ -989,7 +989,7 @@ PR as docs-only and skips the matrix; `tools/checks/check_doc_paths.py` green.
 ### Phase 1: close UX9's gaps in `ac3cli play`
 
 **Status: partly built, mostly in Hearth's engine.** The PipeWire capability read exists
-(`src/audio/src/backend/pipewire/sink_capabilities.cpp`) and `describe()` gives each missing-descriptor
+(`libs/audio/src/backend/pipewire/sink_capabilities.cpp`) and `describe()` gives each missing-descriptor
 case its own reason. `ac3cli play` still probes only a device it was given: the default endpoint is taken
 at its word, capabilities are read once, and the transcode leg writes a temp file. The shared helper was
 not built: `apps/crucible/engine/output_policy.hpp` and `apps/hearth/engine/output_decision.hpp` each
@@ -1160,8 +1160,8 @@ non-free-firmware statement.
 ## Coordination
 
 **Open pull requests.** Checked 2026-09-07: #531 (dependabot), #532, #534, #535 and #536, all
-`apps/crucible` engine bugfixes — none touches `apps/cli`, `src/audio` or `docs/`. Phase 0
-collides with nothing. Phase 1 touches `src/audio` and `apps/crucible/engine/output_policy.*`,
+`apps/crucible` engine bugfixes — none touches `apps/cli`, `libs/audio` or `docs/`. Phase 0
+collides with nothing. Phase 1 touches `libs/audio` and `apps/crucible/engine/output_policy.*`,
 so it should land with the Crucible queue drained; `gh pr list` first, the way the recasting
 plan's tree-wide phases do.
 
@@ -1196,7 +1196,7 @@ needs none, which is the point.
 - **Encoding anything.** The appliance decodes and passes through; Crucible encodes.
 - **Room correction, renderers and binaural folds** — already off the roadmap.
 - **A web framework, a webfont, or any new vcpkg dependency.**
-- **Splitting `ac3tests`**, exporting `src/audio`, or moving any existing directory.
+- **Splitting `ac3tests`**, exporting `libs/audio`, or moving any existing directory.
 - **Renaming any published identifier**, including the ones this member would add. *Overtaken by phase
   N1 of the AC-4 plan: `ac3hearth` becomes `hearth`.*
 - **Renumbering the roadmap or editing `ROADMAP.md` from this plan.** This page is a superseded
@@ -1301,7 +1301,7 @@ The original ten, as put:
 
 8. **The HTTP layer.** (a) **an in-tree HTTP/1.1 subset over a `TcpListener` beside
    `UdpSocket`**; (b) cpp-httplib (MIT); (c) Boost.Beast (BSL-1.0). **Recommend (a)**: the
-   dependency list is `catch2` and `fmt`, `src/audio/src/net/` already establishes the OS axis
+   dependency list is `catch2` and `fmt`, `libs/audio/src/net/` already establishes the OS axis
    and the reasoning for it, and the surface needed is a few hundred lines that fuzz well. Cost:
    the project owns a request parser, which is exactly why Phase 3 makes it a fuzz target and
    gives it a threat-model section. (b) and (c) are both GPL-3.0-compatible and each costs one

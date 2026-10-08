@@ -6,7 +6,7 @@
 
 // The one Objective-C++ seam in this backend, and its C++ face.
 //
-// Everything else under src/audio/src/backend/macos/ is plain C++ against
+// Everything else under libs/audio/src/backend/macos/ is plain C++ against
 // CoreAudio's C API - AudioObjectGetPropertyData, AudioDeviceCreateIOProcID,
 // AudioHardwareCreateAggregateDevice are all ordinary C functions a .cpp can
 // call. Core Audio's process tap is the one exception in the whole directory:

@@ -26,7 +26,7 @@
 // file's own top comment for why (main.cpp compiles everything into one anonymous-namespace
 // binary with no library surface run_atmos_cbi's own logic could be linked into this test binary
 // and called directly). This file's job is the CLI wiring (arg parsing, layout resolution, WAV
-// channel order -> AtmosEncoder::encode_bed_frame) - tests/ac3/oba/test_atmos_cbi.cpp already proves
+// channel order -> AtmosEncoder::encode_bed_frame) - libs/ac3/tests/oba/test_atmos_cbi.cpp already proves
 // the reconstruction math itself against every bed channel's own tone.
 
 namespace fs = std::filesystem;
@@ -41,7 +41,7 @@ fs::path scratch_dir() {
 
 // Runs `forge <args>` with both streams redirected to `log`. The platform
 // differences - cmd.exe's quoting and std::system()'s two return-value
-// shapes - live in tests/platform/process.hpp's run_shell, not here.
+// shapes - live in tests/support/platform/process.hpp's run_shell, not here.
 int run_cli(const std::string& args, const fs::path& log) {
     const std::string command =
         "\"" + std::string(ICLFORGE_CLI_EXE) + "\" " + args + " > \"" + log.string() + "\" 2>&1";
@@ -54,7 +54,7 @@ std::string read_log(const fs::path& log) {
 }
 
 // DEE's own cbi_wav channel order for 5.1.4 (tools/generators/gen_object_fixture.py) - see
-// tests/ac3/oba/test_atmos_cbi.cpp's own header comment for the full provenance.
+// libs/ac3/tests/oba/test_atmos_cbi.cpp's own header comment for the full provenance.
 struct BedChannel {
     const char* label;
     double frequency;

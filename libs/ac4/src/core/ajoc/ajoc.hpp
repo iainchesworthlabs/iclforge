@@ -20,7 +20,7 @@
 //
 // The decoder runs these on the QMF matrices of the downmix after A-SPX; a
 // matrix of slots is laid out as the QMF banks' (dsp/qmf.hpp): value
-// [ts * 64 + sb]. src/ac4/ERRATA.md, "A-JOC", records the readings: the
+// [ts * 64 + sb]. libs/ac4/ERRATA.md, "A-JOC", records the readings: the
 // ramp's counter, its comparison, the decorrelation input matrix of objects of
 // different band counts, and the rest.
 

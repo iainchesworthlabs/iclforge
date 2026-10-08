@@ -39,7 +39,7 @@
 // logged for every unit; then a sink restarted on the same state directory is reached under the
 // long-term PSK without pairing again.
 //
-// It dials, so under ThreadSanitizer it needs what tests/sendspin/test_websocket.cpp says.
+// It dials, so under ThreadSanitizer it needs what libs/sendspin/tests/test_websocket.cpp says.
 
 namespace {
 

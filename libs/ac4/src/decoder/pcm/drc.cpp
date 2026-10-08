@@ -49,7 +49,7 @@ constexpr double kFullScalePower = [] {
 // Table 168's channel group, by the channel's speaker; the pair a 7.X mode adds
 // joins group 0 or 2 by add_ch_base, and the back pair is always group 2. The
 // immersive element's top channels are Part 2 Table 69's fourth group, and so
-// are core decoding's Tsl and Tsr, which carry them (src/ac4/ERRATA.md,
+// are core decoding's Tsl and Tsr, which carry them (libs/ac4/ERRATA.md,
 // "DRC's groups in core decoding"). Part 2 Table 69's 22.2 row puts Bfl, Bfr,
 // Bfc and Cb in its third group and Tsl, Tsr, Tfc, Tbc and Tc in its fourth;
 // its first group's LFE, LFE2, Lw and Rw are what the default gives group 0.

@@ -11,7 +11,7 @@
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "crc_mutator.hpp"
 
-// fuzz/crc_mutator.hpp's re-stamping half, held to the only thing that
+// libs/ac3/fuzz/crc_mutator.hpp's re-stamping half, held to the only thing that
 // actually matters about it: after corrupting a byte inside a syncframe, does
 // the decoder stop rejecting the frame for its CRC?
 //

@@ -16,7 +16,7 @@
 // Table 181 in ASPX_ACPL_1 and 2, and 5.3.4.3.3 in ASPX_ACPL_3; the 7.X
 // element's by Table 182, with Table 183's two last steps, and by Tables 184
 // and 185 in the A-CPL modes (5.3.4.4.2 and 5.3.4.4.3); an LFE's mono_data(1)
-// is the LFE, and the tables number the tracks after it (src/ac4/ERRATA.md,
+// is the LFE, and the tables number the tracks after it (libs/ac4/ERRATA.md,
 // "The LFE's track is not numbered in Tables 180 and 182").
 //
 // The channels the A-CPL modes leave without a track (R of a pair in
@@ -26,7 +26,7 @@
 // against the channels their A-CPL modules pair them with: 5.3.4.3.2's matrix
 // in the 5.X element, (L, Ls) = P0 (A, s3) and (R, Rs) = P1 (B, s4), and the
 // same step on Table 202's pairs in the 7.X element, each residual's
-// chparam_info() read under the residual's own sf_info() (src/ac4/
+// chparam_info() read under the residual's own sf_info() (libs/ac4/
 // ERRATA.md, "ASPX_ACPL_1: the framing of the residuals").
 //
 // Table 182 names the 7.X element's outputs A to G before Table 183 makes
@@ -51,7 +51,7 @@
 // 13th signals, which Table 19 calls L and M and Tables 23 and 25 L'' and M'', in
 // Lscr and Rscr, where Table 25 has A-CPL's inputs x3 and x4. Core decoding keeps A''
 // to G'' (Table 24), F'' and G'' in the core's Tsl and Tsr, and reads H to M
-// without decoding them. src/ac4/ERRATA.md, "The immersive element" and "The
+// without decoding them. libs/ac4/ERRATA.md, "The immersive element" and "The
 // 9.X.4 element", records the readings.
 //
 // The 22.2 element (Part 2 clause 5.2.4, Table 21) is two LFE tracks and eleven
@@ -102,7 +102,7 @@ inline constexpr int kObjectsWithLfeBase = 96;
 // and Tsr in core decoding (Part 2 clause 4.7). The Part 1 modes' are the same
 // in both. 22.2's are Part 2 Table A.27's, by speaker index: L, R, C, Ls, Rs,
 // Lb, Rb, Tfl, Tfr, Tbl, Tbr, LFE, Tsl, Tsr, Tfc, Tbc, Tc, LFE2, Bfl, Bfr, Bfc,
-// Cb, Lw, Rw (src/ac4/ERRATA.md, "The 22.2 element's output"), and the 9.X.4
+// Cb, Lw, Rw (libs/ac4/ERRATA.md, "The 22.2 element's output"), and the 9.X.4
 // modes' in full decoding the same table's L, R, C, Ls, Rs, Lb, Rb, Tfl, Tfr,
 // Tbl, Tbr, LFE (9.1.4), Lscr, Rscr ("The 9.X.4 element's output"); their core
 // is the 7.X.4 modes'. Empty for a mode no element here turns into PCM.

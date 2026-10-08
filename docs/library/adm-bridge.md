@@ -42,15 +42,15 @@ iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, static_cast<int>
 
 ## Where it lives
 
-The bridge is a part of `iclforge::adm` (`src/adm/`), which stays codec-blind: its headers name the
+The bridge is a part of `iclforge::adm` (`libs/adm/`), which stays codec-blind: its headers name the
 object model's types (`iclforge::objects::oba::ObjectPath`, from `iclforge::objects`) and the IAB reader's
-(`iclforge::iab`), and `iclforge::adm` links both publicly, never `iclforge::ac3`. `src/ac3` is built
+(`iclforge::iab`), and `iclforge::adm` links both publicly, never `iclforge::ac3`. `libs/ac3` is built
 by every configuration and cannot depend on the opt-in, Boost-requiring `iclforge::adm`, which is why
 the bridge stops at the object model the Atmos encoder takes. Like the rest of `iclforge::adm` (see
 [ADM / BW64 reading](adm.md)), it is part of the installed `find_package(iclforge)` package, shared
 only: `iclforge::adm_shared` and the bare `iclforge::adm` alias, no `_static` variant.
 `build_iab()` (`iclforge/adm/iab_bridge.hpp`) maps a whole parsed `iclforge::iab::IABitstreamFrame`
-sequence — from either of `iclforge::iab`'s two readers (`src/iab`: a bare elementary `.iab`
+sequence — from either of `iclforge::iab`'s two readers (`libs/iab`: a bare elementary `.iab`
 file or a real MXF Track File) — onto this same `ObjectPath` layer, driven end to end by `forge
 atmos-iab` (see [Commands](../forge/cli/commands.md)). `iclforge::adm::AdmDocument` and `iclforge::iab::
 IABitstreamFrame` are therefore both input shapes here, sharing the coordinate-conversion and
@@ -88,7 +88,7 @@ parsing — see "Bridging IAB" below for exactly what differs between the two.
   front-positive, Z top-positive, `[-1, 1]` unit cube) conventions, both converted to
   `iclforge::objects::oba::Position`'s room-anchored `[0, 1]`/`[0, 1]`/`[-1, 1]` one. Checked against the
   standard's own axis-direction text at the cardinal points, and empirically against this
-  project's own existing ring-position constants (`tests/ac3/oba/test_atmos_motion.cpp`'s `kL`/`kR`/`kSR`)
+  project's own existing ring-position constants (`libs/ac3/tests/oba/test_atmos_motion.cpp`'s `kL`/`kR`/`kSR`)
   — the BS.2076-2 `M+030`/`M-030`/`M-110` speaker-label azimuths reproduce those exact values
   through this conversion.
 - **Absolute timeline time** for a channel's automation is `object.start_s + block.rtime_s` — two
@@ -154,7 +154,7 @@ not act on either, as for size and zones.
   (`object_div_mode` 2) otherwise. A value that rounds to no divergence sends `b_object_divergence` 0.
   TS 103 420 Annex B has no row for it, so the correspondence is a reading: ADM's value and OAMD's
   `object_divergence` are both the share of the energy moved into two spread objects (§5.2.7).
-  `src/adm/ERRATA.md` records it.
+  `libs/adm/ERRATA.md` records it.
 - **`screenRef`** becomes `screen_reference` with `screen_factor` 1 and `depth_factor` 1, since ADM's flag is
   all or nothing. The reference screen of Annex B.2.1.3 (`audioProgrammeReferenceScreen`, sized by a
   `ref_screen_ratio` the OAMD syntax does not carry) is not read or written; the renderer's screen applies.
@@ -183,7 +183,7 @@ horizontal presets at once — keeps whatever part did map, and is reported in `
 the two directions. `write()` emits the zone of every OAMD update as a `zoneExclusion`, with both
 label and bounds, so a reader using either recognises it. Table B.19 prints `ZM3_SideRight`'s `minX` as
 `0.5611`; the mirrored `ZM3_SideLeft` has `-0.51611` and every other pair is symmetric, so `0.51611` is
-written (see `src/adm/ERRATA.md`).
+written (see `libs/adm/ERRATA.md`).
 
 Zone and elevation are discrete decisions, so a path holds the earlier block's value until the next
 block's keyframe, as it does for `snap`.
@@ -405,7 +405,7 @@ not carry at all — `build()` deliberately does not invent defaults for them; c
 
 ## Tests
 
-`tests/adm/test_adm_bridge.cpp` covers coordinate conversion (against BS.2076-2 §8's cardinal points
+`libs/adm/tests/test_adm_bridge.cpp` covers coordinate conversion (against BS.2076-2 §8's cardinal points
 and this project's own existing ring constants), `build_channel_path`'s full §10.3 state machine
 (single block, continuous-glide blocks, instant-jump blocks, ramp-then-hold blocks, the
 first-block-always-holds override, the LFE override), `build()`'s graph-walking error paths
@@ -415,7 +415,7 @@ real byte-level BW64 fixture (two DirectSpeakers bed channels plus one Objects c
 at one ring position and then jumps to another), parses it with the real `iclforge::adm::parse_bw64()`,
 bridges it, and drives a real `iclforge::ac3::oba::AtmosEncoder`/`iclforge::ac3::Eac3Decoder` round trip — confirming
 the decoded bitstream's channel energy actually lands where the authored ADM positions and hold/
-jump timing say it should, the same standard `tests/ac3/oba/test_atmos_motion.cpp`'s own flagship test
+jump timing say it should, the same standard `libs/ac3/tests/oba/test_atmos_motion.cpp`'s own flagship test
 holds itself to.
 
 `tests/cli/test_cli_atmos_adm.cpp` covers the same fixture shape one level up: it runs the
@@ -426,7 +426,7 @@ just the library API in isolation — plus two error-path cases (`BridgeError::k
 malformed/non-RIFF file) confirming `describe()` reaches the terminal rather than an opaque crash
 or exit code.
 
-`tests/adm/test_iab_bridge.cpp` covers `iab_position_to_room`'s cardinal points, the Table 19
+`libs/adm/tests/test_iab_bridge.cpp` covers `iab_position_to_room`'s cardinal points, the Table 19
 → `BedLabel` mapping (both the codes that resolve and the ones `build_iab()` refuses), MetaID
 cross-frame identity (the same MetaID+ChannelID across several frames is one channel, not several;
 an absent frame silence-fills rather than shrinking the channel count), sub-block keyframe timing

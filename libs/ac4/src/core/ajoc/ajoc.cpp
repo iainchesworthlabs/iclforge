@@ -193,7 +193,7 @@ void Reconstruction<Real>::configure(const FrameParameters& p) {
 template <typename Real>
 typename Reconstruction<Real>::Schedule Reconstruction<Real>::schedule(const FrameParameters& p,
                                                                        int num_ts) {
-    // Pseudocode 18's counter, once per slot (src/ac4/ERRATA.md, "A-JOC's
+    // Pseudocode 18's counter, once per slot (libs/ac4/ERRATA.md, "A-JOC's
     // ramp"): the ramp moves while the counter is below its length, and a data
     // point starting at the slot restarts it after the slot.
     Schedule s;
@@ -240,7 +240,7 @@ void Reconstruction<Real>::reconstruct(const FrameParameters& p, int num_ts,
 
     // The decorrelation input matrix's parameters, D = |C_wet^T| C_dry per data
     // point, from the coefficients before dialogue enhancement; subband by
-    // subband, each object's coefficients at its own band (src/ac4/
+    // subband, each object's coefficients at its own band (libs/ac4/
     // ERRATA.md, "The decorrelation input matrix").
     pre_param_.assign(at(p.num_dpoints) * at(kSubbands) * kMaxDecorrelators * at(m), 0.0);
     for (int dp = 0; dp < p.num_dpoints; ++dp) {
@@ -380,7 +380,7 @@ void Reconstruction<Real>::enhance_core(const FrameParameters& p, int num_ts,
         return;
     }
     // H'_M by upmix object: the dialogue objects' downmix coefficients, 0
-    // for the others (src/ac4/ERRATA.md, "Core decoding's H_M").
+    // for the others (libs/ac4/ERRATA.md, "Core decoding's H_M").
     std::ranges::fill(h_m_, Real{0});
     int dlg = 0;
     for (int o = 0; o < n && at(o) < dialogue.size(); ++o) {
@@ -440,7 +440,7 @@ void Reconstruction<Real>::enhance_core(const FrameParameters& p, int num_ts,
 }
 
 template class Reconstruction<Real>;
-// The A-JOC encoder (src/ac4/src/encoder/ajoc/ajoc_encoder.cpp) drives this at
+// The A-JOC encoder (libs/ac4/src/encoder/ajoc/ajoc_encoder.cpp) drives this at
 // double regardless of the decoder's scalar, to measure its candidate
 // parameters as a decoder will reconstruct them (see this target's
 // CMakeLists.txt, ICLFORGE_AC4_ALSO_AT_DOUBLE).

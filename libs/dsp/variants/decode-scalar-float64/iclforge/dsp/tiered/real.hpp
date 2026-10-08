@@ -1,9 +1,9 @@
 #pragma once
 
-// The type the tiered kernels (src/dsp/src/tiered) and AC-4's own (src/ac4/src/core) are
+// The type the tiered kernels (libs/dsp/src/tiered) and AC-4's own (libs/ac4/src/core) are
 // explicitly instantiated at - the `template class Foo<Real>;` lines - in its DOUBLE variant. The
 // float and fixed-point variants are the identically-pathed headers beside this directory;
-// src/ac4/CMakeLists.txt, which builds the kernels, picks the directory from
+// libs/ac4/CMakeLists.txt, which builds the kernels, picks the directory from
 // ICLFORGE_DECODE_SCALAR, the root's one option for every codec, so no source file asks which it
 // is with a preprocessor conditional (tools/checks/check_platform_macros.ps1's rule).
 //
@@ -11,7 +11,7 @@
 // as a concrete type, throughout AC-3's decoder; these kernels stay templated on `Real`, and
 // `Real` here is the unqualified name every explicit-instantiation line resolves through
 // ordinary enclosing-namespace lookup inside iclforge::dsp::tiered (iclforge::ac4::detail names
-// it too, src/ac4/src/iclforge/ac4/detail/real.hpp).
+// it too, libs/ac4/src/iclforge/ac4/detail/real.hpp).
 //
 // double: every build outside the ESP32 boards, and the reference every other tier is measured
 // against (planning/arithmetic-tiers.md).
@@ -23,7 +23,7 @@ using Real = double;
 }  // namespace iclforge::dsp::tiered
 
 // Explicit instantiations a translation unit adds at double beside its
-// `template class Foo<Real>;` when Real is not double: the AC-4 encoder (src/ac4/src/encoder)
+// `template class Foo<Real>;` when Real is not double: the AC-4 encoder (libs/ac4/src/encoder)
 // always runs at double, decision 34 (planning/ac4.md), and the kernels
 // are one set of objects the decoder and the encoder both call, so each one the encoder calls is
 // instantiated at both. Here Real is double, so the line above is already that

@@ -45,7 +45,7 @@ void put_payload_config(BitWriter& w, int groupid) {
 
 }  // namespace
 
-// Table H.2.1's variable_bits, which BitWriter writes (src/base): values below 2^n take one
+// Table H.2.1's variable_bits, which BitWriter writes (libs/base): values below 2^n take one
 // group, the next 2^2n two, and so on.
 void put_variable_bits(BitWriter& w, std::uint32_t value, int group_bits) {
     assert(group_bits > 0 && group_bits <= 11);
@@ -68,7 +68,7 @@ std::uint32_t read_variable_bits(BitReader& r, int group_bits) {
 
 // §H.2.2.1.1: the container's position depends on how many bits the audio
 // took, so it is found by scanning rather than at a fixed offset. Mirrors
-// tests/ac3/emdf/test_emdf.cpp's own find_emdf_sync, promoted here because production
+// libs/ac3/tests/emdf/test_emdf.cpp's own find_emdf_sync, promoted here because production
 // decode needs the same search, not just a test helper for one.
 constexpr std::size_t kSyncNotFound = static_cast<std::size_t>(-1);
 

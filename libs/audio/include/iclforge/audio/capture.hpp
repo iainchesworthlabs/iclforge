@@ -89,7 +89,7 @@ enum class ProcessLoopbackMode : std::uint8_t {
 // sample_rate its tap does not already deliver rather than resampling to it -
 // which is how start_process_loopback()'s "at exactly `format`" below stays
 // true there. See docs/platforms/macos.md, and
-// src/audio/src/backend/macos/capture.cpp's own header comment, for the rest
+// libs/audio/src/backend/macos/capture.cpp's own header comment, for the rest
 // of that platform's narrower contract.
 struct ProcessLoopbackFormat {
     std::uint32_t sample_rate = 48000;

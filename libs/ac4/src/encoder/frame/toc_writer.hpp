@@ -16,7 +16,7 @@
 // audio substreams, with their EMDF payload substreams, and the frame it heads.
 // The encoder writes its presentations with it (frame_writer.hpp), and the
 // decoder's tests build presentations of other encoders' substreams, and of
-// object audio substreams, with it (tests/ac4/decoder/mux.hpp).
+// object audio substreams, with it (libs/ac4/tests/decoder/mux.hpp).
 
 namespace iclforge::ac4::detail {
 

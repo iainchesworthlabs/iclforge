@@ -16,7 +16,7 @@
 // product, and every scale is zero. Their output is the bytes it was.
 //
 // At Fixed32 (Q7.24) the time domain and the QMF domain sit at fixed powers of two below the
-// double decoder's, whose full scale is 2^15 (src/ac4/src/decoder/pcm/substream_pcm.cpp): the time
+// double decoder's, whose full scale is 2^15 (libs/ac4/src/decoder/pcm/substream_pcm.cpp): the time
 // domain at 2^-12, where full scale is 8 and the committed streams' largest sample (0.55 of full
 // scale) is 4.4 of the format's 128, and the QMF domain at 2^-16, where their largest value (22
 // times full scale in the double decoder) is 11. A raw unit of the time domain is then 2^-27 of

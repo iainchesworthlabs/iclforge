@@ -49,7 +49,7 @@
 //   far ahead of the objects it goes with, so it goes through a delay line of
 //   that length first. The bass a small speaker hands to the LFE feed (below)
 //   is the objects' own and already late, so it is not held back again.
-//   tests/render/test_object_lfe_timing.cpp measures both, end to end.
+//   libs/render/tests/test_object_lfe_timing.cpp measures both, end to end.
 //
 // The gains are trigonometry in double, refreshed when the coded layout
 // changes (set_bed) and once per unit for the objects (set_objects, on the
@@ -65,8 +65,8 @@
 // comment records a boot loop from.
 //
 // Moved from the ESP-IDF component with layout.hpp, and tested on the host in
-// tests/render/test_layout.cpp: the geometry has its own tests under
-// tests/render/, so what is checked here is the indexing between coded
+// libs/render/tests/test_layout.cpp: the geometry has its own tests under
+// libs/render/tests/, so what is checked here is the indexing between coded
 // channels, objects and slots - the part where a swapped subscript is silent.
 //
 // Bass management. A slot marked ":small" (OutputLayout::listed()) cannot

@@ -106,7 +106,7 @@ TEST_CASE("sign_atmos_stream is a no-op without a key or a container", "[signing
 // was never right.
 //
 // This is a smoke test, not the reproducer - the exact byte pattern is
-// committed at fuzz/regressions/fuzz_signing_verify/, where fuzz-regress
+// committed at libs/ac3/fuzz/regressions/fuzz_signing_verify/, where fuzz-regress
 // replays it under ASan/UBSan, which is the only build that can see the
 // original defect at all. What this checks is the property that matters to
 // every caller: verification over arbitrary bytes returns, and returns an

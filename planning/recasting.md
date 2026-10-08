@@ -32,7 +32,7 @@
     named products: **the library**, **Forge** (the `ac3cli` and `ac3gui` tooling) and
     **Crucible** ([the Crucible guide](../docs/crucible/index.md)). Hearth became a fourth member
     on 2026-09-07 ([the appliance plan](player-appliance.md#which-member-it-belongs-to)), and
-    is built (`apps/hearth`, `src/sendspin`); the tables below have no column for it. Design
+    is built (`apps/hearth`, `libs/sendspin`); the tables below have no column for it. Design
     sections say what changes and why, each phase carries an exit criterion and says how it is
     verified, and [Decisions](#decisions) records the fifteen open questions and the option taken
     on each.
@@ -70,7 +70,7 @@ the program names are to change in phase N1 of the AC-4 plan (see the status blo
 
 **The library** keeps the family's identifiers, because every published thing already carries
 them: `ac3::forge`, `find_package(ac3forge)`, `ac3forge_c/ac3forge.h`, `import ac3forge`,
-`libac3forge0`. It is `src/ac3` and its siblings, the three bindings, the examples, the fuzz
+`libac3forge0`. It is `libs/ac3` and its siblings, the three bindings, the examples, the fuzz
 harnesses, the conformance vectors and the footprint probe.
 
 **Forge** is the tooling over the library: `ac3cli`, `ac3gui` and the `apps/common` sources
@@ -83,7 +83,7 @@ packages and paths stay as they are through 0.x.
 its packages, and by purpose the Windows null-sink driver in `apps/windows/driver`, which stays
 under its own name until attestation signing lands.
 
-**The shared floor** belongs to the family and to no member: `src/audio`, which is never
+**The shared floor** belongs to the family and to no member: `libs/audio`, which is never
 installed (`cmake/InstallLibrary.cmake:4-7`) and is linked by `ac3cli`, `ac3gui`,
 `ac3crucible_engine` and the Shield JNI; `tools/`; the single `ac3tests` binary; CI; the
 packaging tooling; the version line.
@@ -96,9 +96,9 @@ live demos, with the npm package listed among the library's bindings.
 
 | | The library | Forge | Crucible |
 |---|---|---|---|
-| Source | `src/ac3`, `src/signing`, `src/capi`, `src/containers/src/matroska`, `src/containers/src/mp4`, `src/containers/src/mpegts`, `src/iab`, `src/containers/src/iamf`, `src/adm`, `src/adm`, `src/ac4` (built, never exported); `python/`, `js/`, `rust/`; `examples/`, `fuzz/`, `apps/baremetal` | `apps/cli`, `apps/gui`, `apps/common` | `apps/crucible`; by purpose `apps/windows/driver` and `driver-vm` |
+| Source | `libs/ac3`, `src/signing`, `libs/capi`, `libs/containers/src/matroska`, `libs/containers/src/mp4`, `libs/containers/src/mpegts`, `libs/iab`, `libs/containers/src/iamf`, `libs/adm`, `libs/adm`, `libs/ac4` (built, never exported); `python/`, `js/`, `rust/`; `examples/`, `fuzz/`, `apps/baremetal` | `apps/cli`, `apps/gui`, `apps/common` | `apps/crucible`; by purpose `apps/windows/driver` and `driver-vm` |
 | Build identity | `ac3::forge`, `ac3::forge_c`, `ac3::signing`, `matroska::matroska`, `mp4::mp4`, `mpegts::mpegts`, `ac3iab::ac3iab`, `iamf::iamf`, `ac3adm::ac3adm`, `ac3::admbridge`; ten export sets and ten `.pc` files | targets `ac3cli`, `ac3gui`; QML URI `Ac3Forge`; options `AC3FORGE_BUILD_CLI`, `AC3FORGE_BUILD_GUI` | targets `ac3crucible`, `ac3crucible-run`, `ac3::crucible_engine`; QML URI `Ac3ForgeCrucible`; option `AC3FORGE_BUILD_CRUCIBLE`; root guard `WIN32 OR (UNIX AND NOT APPLE)` (`CMakeLists.txt:450`) |
-| Tests and checks | most of `ac3tests`; `tests/capi`, `python/tests`, `apps/wasm/tests`; coverage floors `src/*` (`tools/checks/coverage_report.sh:108-116`); abi-gate; fuzz.yml; interop.yml | `tests/cli`, `tests/gui`, `ac3gui_qmltests` (label `gui`); floor `apps/cli` (:117); `.clang-tidy:95` | `tests/crucible` (compiled into `ac3tests`, `tests/CMakeLists.txt:436-456`), `ac3crucible_qmltests`; labels `crucible`, `crucible-ui`; `tools/ci/check_crucible_package.py`; `tools/checks/coverage_crucible.ps1`, `crucible_platform_probe.cpp` |
+| Tests and checks | most of `ac3tests`; `libs/capi/tests`, `python/tests`, `apps/wasm/tests`; coverage floors `src/*` (`tools/checks/coverage_report.sh:108-116`); abi-gate; fuzz.yml; interop.yml | `tests/cli`, `tests/gui`, `ac3gui_qmltests` (label `gui`); floor `apps/cli` (:117); `.clang-tidy:95` | `tests/crucible` (compiled into `ac3tests`, `tests/CMakeLists.txt:436-456`), `ac3crucible_qmltests`; labels `crucible`, `crucible-ui`; `tools/ci/check_crucible_package.py`; `tools/checks/coverage_crucible.ps1`, `crucible_platform_probe.cpp` |
 | Docs | Library (22 pages), Concepts (4), Validation, Threat model, Conformance vectors, Performance & quality (6), `platforms/wasm.md`, the two WASM demo pages | CLI reference (3), GUI guide (12) | Crucible guide (5), `platforms/windows-demo.md` (the record), `platforms/windows-driver-acx.md` |
 | Packages | `ac3forge-dev-<full>-<sys>`; DEB `libac3forge0`, `libac3forge-dev`; RPM `libac3forge0`, `ac3forge-devel`; PyPI `ac3forge` (live); npm `ac3forge-wasm-decoder` (unpublished); crates `ac3forge`, `ac3forge-sys` (unpublished); vcpkg port and Conan recipe `ac3forge` (staged); `ac3forge-conformance-vectors-<ver>.tar.gz` | component `runtime`: `ac3forge-<M.m.p>-<sys>` zip/tgz, NSIS `.exe`, DEB/RPM `ac3forge`, `.dmg`; `ac3gui-*.AppImage`; winget `iainchesworthlabs.ac3forge` (4 versions staged); Homebrew formula `ac3forge` and cask `ac3gui` (live tap) | component `crucible`: `ac3forge-crucible-<full>-<sys>` zip/tgz, DEB/RPM `ac3forge-crucible` (no tag contains it yet) |
 | CI | all 11 matrix legs; `build-rust`, `build-wasm`, `build-footprint`; wheels.yml, npm.yml | legs with `gui: true` (Linux GCC/LLVM, both arm64, both macOS; Windows always); `linux-appimage`; ffmpeg-validate builds `ac3cli` | `crucible: true` on windows-msvc, windows-llvm, linux-llvm, linux-llvm-arm64 (`_build.yml:329,342,430,487`); `windows-driver` |
@@ -106,8 +106,8 @@ live demos, with the npm package listed among the library's bindings.
 
 Three things do not sit in one column and the plan says where they go.
 
-- **`src/audio`** stays private and is named, in the family docs, as the shared platform layer.
-  Crucible includes `src/audio/src/backend/pipewire` directly
+- **`libs/audio`** stays private and is named, in the family docs, as the shared platform layer.
+  Crucible includes `libs/audio/src/backend/pipewire` directly
   (`apps/crucible/CMakeLists.txt:81-82`); promoting those helpers to `ac3/audio/` headers is a
   follow-up outside this plan, and exporting the library is not proposed (it would put WASAPI,
   ALSA and PipeWire dependencies into a package that declares none).
@@ -119,7 +119,7 @@ Three things do not sit in one column and the plan says where they go.
 ## The name
 
 Two facts constrain the naming. The word "forge" already means the library in every
-consumer-facing identifier (`ac3::forge`, `src/ac3`, `forgeTargets.cmake`, `ac3::forge_c`,
+consumer-facing identifier (`ac3::forge`, `libs/ac3`, `forgeTargets.cmake`, `ac3::forge_c`,
 `ac3::forge_minimal`, `libac3forge`, `ac3forge.pc`, and 23 docs pages that say `ac3::forge`).
 And the family's spelling differs by surface: `ac3forge` in 5,016 sites, `AC3Forge` only inside
 "AC3Forge Crucible" (53 sites) and the NSIS ProgID `AC3Forge.Stream`, `Ac3Forge` in the QML
@@ -129,7 +129,7 @@ URIs, the driver and the npm exports.
 |---|---|---|---|---|---|---|---|
 | **S1, recommended** | `ac3forge` in identifiers, "AC3Forge" in prose | "the ac3forge library"; `ac3::forge` unchanged | the `ac3cli` + `ac3gui` pair; "Forge" in docs, nav, README, the About heading and the CLI banner, with the family named beneath | as now | unchanged | unchanged | about ten display sites, `lupdate`, recaptured screenshots, one sentence on two index pages; the word "forge" keeps two meanings |
 | S2, per-member package tokens | as S1 | as S1 | runtime archive `forge-<ver>-<sys>`, DEB/RPM `forge`, winget `iainchesworthlabs.Forge`, formula `forge` | `crucible-*`, DEB/RPM `crucible` | unchanged | renamed | deprecation paths for the NSIS installer, DEB/RPM `ac3forge`, the formula token and the winget identifier; availability checks for two generic words in seven namespaces; three tools' hardcoded asset patterns |
-| S3, Forge-branded binaries | as S1 | as S1 | `ac3forge`/`ac3forge-gui`, or `forge`/`forge-gui` | `crucible` for symmetry | renamed | as S1 or S2 | `ac3cli` in 252 files, four shells' completions, the man page, four winget manifest versions, the formula; `ac3forge.exe` beside `ac3forge.dll`/`.pdb` from `src/ac3/CMakeLists.txt:622`; every user's script |
+| S3, Forge-branded binaries | as S1 | as S1 | `ac3forge`/`ac3forge-gui`, or `forge`/`forge-gui` | `crucible` for symmetry | renamed | as S1 or S2 | `ac3cli` in 252 files, four shells' completions, the man page, four winget manifest versions, the formula; `ac3forge.exe` beside `ac3forge.dll`/`.pdb` from `libs/ac3/CMakeLists.txt:622`; every user's script |
 | S4, rename the library's identifiers | as S1 | `ac3::codec` or similar | Forge is unambiguous | as now | unchanged | `libac3forge0` and the `-dev` packages renamed | the C ABI, the ABI allowlists, every package config and registry, 683 files using `ac3::`, 245 using `AC3FORGE_`; a breaking release |
 | S5, a new umbrella name | new | `ac3forge` becomes a member name | Forge | Crucible | any | every published id | 331 files; the repository, Pages URL, PyPI trusted publisher, tap name and every verify snippet key on the literal `ac3forge` |
 
@@ -172,15 +172,15 @@ summary.
 `docs/`: on 2026-09-14 the CLI reference and the GUI guide went to `docs/forge/cli/` and
 `docs/forge/gui/`, Crucible's promotion record to `docs/crucible/design/`, and the flat
 bare-metal page was split into `docs/platforms/bare-metal/` (#674). The tree also gained
-`apps/hearth`, `src/sendspin`, `src/base` and the four AC-4 libraries, `src/ac4`,
-`src/ac4`. N1B ([layout.md](layout.md)) reopens the source
-layout: its recommended L2 renames `src/ac3` to `src/ac3` and takes five libraries that know
+`apps/hearth`, `libs/sendspin`, `libs/base` and the four AC-4 libraries, `libs/ac4`,
+`libs/ac4`. N1B ([layout.md](layout.md)) reopens the source
+layout: its recommended L2 renames `libs/ac3` to `libs/ac3` and takes five libraries that know
 no codec out of it, so that AC-4 sits beside AC-3 and E-AC-3. That study is a proposal, and
 its decisions are with the user.
 
 | Path | Today | After (recommended) | The move that was considered, and what it breaks |
 |---|---|---|---|
-| `src/ac3`, `src/*` | the library | unchanged | renaming to `src/ac3` frees the word for the tooling at the cost of 24 CMake files, wheels.yml and interop.yml triggers, `.clang-tidy:95`, the coverage floors, `cmake/InstallLibrary.cmake`'s header install paths, and 385 commits of directory history |
+| `libs/ac3`, `src/*` | the library | unchanged | renaming to `libs/ac3` frees the word for the tooling at the cost of 24 CMake files, wheels.yml and interop.yml triggers, `.clang-tidy:95`, the coverage floors, `cmake/InstallLibrary.cmake`'s header install paths, and 385 commits of directory history |
 | `apps/cli`, `apps/gui`, `apps/common` | Forge | unchanged | `apps/forge/{cli,gui,common}` breaks `CMakeLists.txt:437-441`, `.clang-tidy:95`, the `apps/cli` floor row, interop.yml's path filter, 14 `apps/gui` references in `apps/crucible/CMakeLists.txt` (icons, fonts, four QML files, `ac3gui.rc.in`, `system_theme`), `cmake/Packaging.cmake:58-59`, 34 workflow path lines, 17 tool and cmake files, 61 doc path mentions, and `git log -- apps/cli` (296 commits) |
 | `apps/crucible` | Crucible | unchanged | none proposed |
 | `apps/windows/driver`, `driver-vm` | Crucible's driver, frozen | unchanged until signing; optionally `apps/crucible/driver` in the signing-time change | breaks the `windows-driver` job's paths, `apps/crucible/CMakeLists.txt:372-376`, driver-vm's relative paths, and the signing session's checkout |
@@ -191,7 +191,7 @@ its decisions are with the user.
 | `docs/` | 73 pages | 73 pages plus `docs/forge/index.md`, `docs/family/recasting.md` (this page), and, under [decision 8](#decisions), `docs/library/capabilities.md` and a `docs/security.md` wrapper | see [The docs](#the-docs) |
 
 What does change on disk is small: the README's layout block gains member headings and the rows
-it is missing today (`src/capi`, `src/ac4`, `src/iab`, `src/containers/src/iamf`, `src/adm`,
+it is missing today (`libs/capi`, `libs/ac4`, `libs/iab`, `libs/containers/src/iamf`, `libs/adm`,
 `apps/wasm`, `apps/common`, `apps/baremetal`, `apps/windows`, `python/`, `js/`, `rust/`), and
 `CONTRIBUTING.md:50-51`'s consumer list `apps/{cli,gui,wasm,android}` names the tree as it is.
 
@@ -214,7 +214,7 @@ names are GitHub's, the repository name, the Pages address, release tags and ass
 | Identity | Member | Where | State | Under S2 | Deprecation path if ever renamed |
 |---|---|---|---|---|---|
 | `project(ac3forge)`, `CPACK_PACKAGE_NAME`, `find_package(ac3forge)` at `lib/cmake/ac3forge`, `ac3::` namespace, ten export sets, ten `.pc` files | family / library | `CMakeLists.txt:8`; `cmake/Packaging.cmake:24`; `cmake/InstallLibrary.cmake:425-522` | shipped; consumed by the vcpkg port (`portfile.cmake:56`), Conan (`conanfile.py`), 18 files | unchanged | a compatibility config shim; source-compatibility break |
-| `libac3forge.so`/`ac3forge.dll`/`ac3forge_static`, `ac3forge_c`, `ac3signing`; `AC3FORGE_EXPORT`; 215 `ac3forge_*` C symbols | library | `src/ac3/CMakeLists.txt:622-623`; `src/capi` | shipped; abi-gate allowlists keyed per basename; `rust/iclforge-sys` `links = "ac3forge_c"` | unchanged | an ABI break, a new allowlist set, a breaking release |
+| `libac3forge.so`/`ac3forge.dll`/`ac3forge_static`, `ac3forge_c`, `ac3signing`; `AC3FORGE_EXPORT`; 215 `ac3forge_*` C symbols | library | `libs/ac3/CMakeLists.txt:622-623`; `libs/capi` | shipped; abi-gate allowlists keyed per basename; `rust/iclforge-sys` `links = "ac3forge_c"` | unchanged | an ABI break, a new allowlist set, a breaking release |
 | PyPI `ac3forge` | library | `python/pyproject.toml:6`; wheels.yml publishes on `v*` through environment `pypi` | live | unchanged | a new project plus a stub release under the old name; never |
 | npm `ac3forge-wasm-decoder` | library | `js/package.json:2`; publish gated to `workflow_dispatch` (npm.yml:86) | unpublished | unchanged | free until first publish; the name is reserved on first publish |
 | crates `ac3forge`, `ac3forge-sys` | library | `rust/Cargo.toml` | unpublished | unchanged | free; `links` follows the C library's name |
@@ -755,7 +755,7 @@ decision, as the CI note above says.
 ## Deliberately not in scope
 
 *Several of these were overtaken: renaming the binaries, the package tokens and the library's
-identifiers is decided (see the status block), moving `src/ac3` is proposed by N1B, and pages
+identifiers is decided (see the status block), moving `libs/ac3` is proposed by N1B, and pages
 under `docs/` moved on 2026-09-14 (#674). The bullets are kept as the record of what this page
 decided on 2026-09-05.*
 
@@ -765,8 +765,8 @@ decided on 2026-09-05.*
   `libac3forge`, the `AC3FORGE_` prefix). A 1.0 question at the earliest.
 - **Renaming the binaries** or any package token, registry identifier, installer name or ProgID.
 - **Per-member tag prefixes** or version lines.
-- **Exporting `src/audio`** or splitting `ac3tests` per member.
-- **Moving `apps/cli`, `apps/gui`, `apps/common`, `src/ac3`, `apps/android`, `apps/wasm`,
+- **Exporting `libs/audio`** or splitting `ac3tests` per member.
+- **Moving `apps/cli`, `apps/gui`, `apps/common`, `libs/ac3`, `apps/android`, `apps/wasm`,
   `js/`, `python/` or `rust/`** on disk.
 - **Moving any page under `docs/`**, including `docs/cli`, `docs/gui`, `platforms/wasm.md`,
   `platforms/windows-demo.md` and `platforms/windows-driver-acx.md`.

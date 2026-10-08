@@ -24,7 +24,7 @@ namespace iclforge::crucible {
 namespace {
 
 // WAVEFORMATEXTENSIBLE speaker masks, spelled as the SPEAKER_* bits so this
-// file needs no ksmedia.h (src/audio's Windows backend does the same).
+// file needs no ksmedia.h (libs/audio's Windows backend does the same).
 constexpr std::uint32_t kMaskStereo = 0x3;
 constexpr std::uint32_t kMask51 = 0x3f;
 constexpr std::uint32_t kSpeakerLowFrequency = 0x8;

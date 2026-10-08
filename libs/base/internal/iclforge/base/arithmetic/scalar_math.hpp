@@ -8,8 +8,8 @@
 // The transcendentals the encoders' content analyses call, in the scalar of
 // the coefficient store (ac3/internal/encode_scalar.hpp), as one overload set.
 //
-// Header-only, in its own target (src/base) so that iclforge::ac3 and
-// src/ac4/src/core both use this one copy rather than each carrying their own
+// Header-only, in its own target (libs/base) so that iclforge::ac3 and
+// libs/ac4/src/core both use this one copy rather than each carrying their own
 // (planning/ac4.md, decision 31). It lived at src/forge/src/core/scalar_math.hpp
 // until AC-4's D14a moved it here; nothing about the functions changed in the
 // move.
@@ -34,7 +34,7 @@
 // flatness in [0, 1] that is then quantised to five bits or compared with a
 // threshold; choose_delta_segments rounds 128 * log2 |c| to an integer psd
 // unit (1/128 of one exponent step). A few float ulps of error in log2 move
-// none of those by a visible amount; tests/ac3/encoder/test_scalar_math.cpp pins
+// none of those by a visible amount; libs/ac3/tests/encoder/test_scalar_math.cpp pins
 // the bounds.
 
 namespace iclforge::internal {
@@ -134,7 +134,7 @@ inline double scalar_exp2(double x) { return std::exp2(x); }
 // (planning/ac4.md, "Arithmetic"): dB conversions in the QMF-domain high-band
 // generator, run at Real, need libm's log10/pow replaced with log2/exp2
 // through this pair, so two platforms' libm cannot disagree in a decoded
-// sample's last bit (src/ac4/src/core/aspx/hf_generator.cpp).
+// sample's last bit (libs/ac4/src/core/aspx/hf_generator.cpp).
 inline float scalar_exp2(float x) {
     if (x >= 128.0f) {  // 2^128 overflows; the largest float is just under it
         return 3.4028235e38f;

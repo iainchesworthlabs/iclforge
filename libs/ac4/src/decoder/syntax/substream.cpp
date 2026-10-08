@@ -11,7 +11,7 @@ namespace {
 
 // num_obj_info_blocks for an OAMD portion whose own oamd_timing_data() this
 // frame did not send: the group's OAMD substream's where the group has sent
-// one, else the portion's own from an earlier frame (src/ac4/ERRATA.md,
+// one, else the portion's own from an earlier frame (libs/ac4/ERRATA.md,
 // "Which oamd_timing_data() applies"). Nothing where neither exists.
 [[nodiscard]] std::optional<int> carried_blocks(const ObjectAudioContext& objects,
                                                 const std::optional<int>& own_before) noexcept {
@@ -43,7 +43,7 @@ namespace {
             n_fb_dmx >= 64 ? ~std::uint64_t{0} : (std::uint64_t{1} << n_fb_dmx) - 1U;
         if (ajoc.b_some_signals_inactive) {
             // dmx_active_signals_mask[] is one field, [0] its first bit
-            // (src/ac4/ERRATA.md, "Arrays read as one field").
+            // (libs/ac4/ERRATA.md, "Arrays read as one field").
             const std::size_t start = r.bit_position();
             std::uint64_t mask = 0;
             for (int s = 0; s < n_fb_dmx; ++s) {

@@ -20,9 +20,9 @@ TestCase {
     }
 
     readonly property url stereoUrl:
-        Qt.resolvedUrl("../../../../fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
+        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
     readonly property url surroundUrl:
-        Qt.resolvedUrl("../../../../fuzz/seeds/fuzz_wav_read/roundtrip-51.wav")
+        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-51.wav")
     readonly property url surroundOutUrl: Qt.resolvedUrl("_test_output/tst_ac4_encode_51.ac4")
     readonly property url refusedOutUrl: Qt.resolvedUrl("_test_output/tst_ac4_encode.mkv")
     readonly property url cliFolderUrl: Qt.resolvedUrl("_test_output/tst_ac4_encode_cli")

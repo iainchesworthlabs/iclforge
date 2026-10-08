@@ -10,12 +10,12 @@
 // The decoder's third scalar (planning/arithmetic-tiers.md): a signed 32-bit
 // integer read as Q7.24 - seven bits of headroom above unity, twenty-four
 // below. It is what `decode_scalar_t` names in the fixed-point build
-// (src/ac3/variants/decode-scalar-fixed32/), for parts with no floating-point
+// (libs/ac3/variants/decode-scalar-fixed32/), for parts with no floating-point
 // unit at all: an ESP32-C3 or a Cortex-M3, where even `float` is a compiled
 // subroutine and a 5.1 E-AC-3 frame is 12.9 M soft-float instructions.
 //
-// Header-only, in its own target (src/base) so that iclforge::ac3 and
-// src/ac4/src/core both use this one copy rather than each carrying their own
+// Header-only, in its own target (libs/base) so that iclforge::ac3 and
+// libs/ac4/src/core both use this one copy rather than each carrying their own
 // (planning/ac4.md, decision 31: "a copied Fixed32 would drift"). It lived at
 // src/forge/src/core/fixed32.hpp until AC-4's D14a moved it here; nothing
 // about the type changed in the move.

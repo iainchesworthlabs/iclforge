@@ -131,7 +131,7 @@ ParseResult parse_ajoc(BitReader& r, int num_dmx_signals, int num_umx_signals, A
         object.present = r.read_flag("ajoc_object_present");
     }
     // 6.2.5.4 ajoc_data_point_info(); 5.7.3.4 allows 0, 1 or 2 data points
-    // (src/ac4/ERRATA.md, "ajoc_num_dpoints of 3").
+    // (libs/ac4/ERRATA.md, "ajoc_num_dpoints of 3").
     out.num_dpoints = read_int(r, 2, "ajoc_num_dpoints");
     if (out.num_dpoints > kMaxAjocDataPoints) {
         return fail(DecodeError::kInvalidStream,
@@ -224,7 +224,7 @@ ParseResult parse_ajoc_dmx_de_data(BitReader& r, int num_dmx_signals, int num_um
         AjocDmxDeConfig config;
         config.de_max_gain = read_int(r, 2, "de_max_gain");
         // de_main_dlg_flag[] is one field, [0] its first bit, a flag per
-        // upmix object in their order (src/ac4/ERRATA.md, "Arrays read as
+        // upmix object in their order (libs/ac4/ERRATA.md, "Arrays read as
         // one field").
         const std::uint64_t flags = read_field(r, num_umx_signals, "de_main_dlg_flag");
         config.de_main_dlg_flag.assign(static_cast<std::size_t>(num_umx_signals), 0);

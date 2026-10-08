@@ -6,12 +6,12 @@
 // ---------------------------------------------------------------------------
 // The portable (no-SIMD) member of the arch seam.
 //
-// One of src/base/variants/{arch-generic,arch-x86_64,arch-aarch64}/ is put on
-// the include path by src/base/CMakeLists.txt (iclforge::base_headers's INTERFACE), so every
+// One of libs/base/variants/{arch-generic,arch-x86_64,arch-aarch64}/ is put on
+// the include path by libs/base/CMakeLists.txt (iclforge::base_headers's INTERFACE), so every
 // `#include "ac3/internal/arch/simd.hpp"` in the codec core resolves to
 // exactly one of these three identically-pathed headers - the mechanism
 // src/internal/profiling/tracy_{enabled,disabled}/ already uses for the
-// profiling seam, and src/audio's backend tree uses for the operating
+// profiling seam, and libs/audio's backend tree uses for the operating
 // system. No translation unit ever asks which architecture it is being
 // compiled for, which is what tools/checks/check_platform_macros.ps1
 // enforces (no preprocessor conditional anywhere in the first-party trees).
@@ -36,7 +36,7 @@
 // add/subtract/multiply (or a single exact integer operation) per lane, so
 // a kernel written against f64x2 performs exactly the operations, in
 // exactly the order, that the scalar loop it replaced performed -
-// tests/ac3/core/test_simd_kernels.cpp asserts that bit-for-bit for every
+// libs/ac3/tests/core/test_simd_kernels.cpp asserts that bit-for-bit for every
 // primitive here, and the kernels built from them inherit the guarantee
 // rather than needing their own bit-exact unit test (see that file's own
 // header comment). The FFT (iclforge/dsp/detail/fft_stockham.hpp)
@@ -58,7 +58,7 @@ namespace iclforge::internal::arch {
 
 // Reported by version_details() (`--version`) so a binary says which of the
 // three directories it was built from, and printed by
-// tests/ac3/core/test_simd_kernels.cpp so a CI log does too.
+// libs/ac3/tests/core/test_simd_kernels.cpp so a CI log does too.
 inline constexpr const char* kSimdName = "generic";
 
 // Two IEEE-754 doubles. Deliberately an aggregate of two named scalars
@@ -113,7 +113,7 @@ struct f64x2 {
 // This type carries no round_ties_away. f64x2 has one because exponents.cpp's
 // to_fixed25_block calls it; nothing on the float32 decode path rounds.
 // Adding one means adding its own tie ladder to
-// tests/ac3/core/test_simd_kernels.cpp - the f64x2 ladder pivots on 2^52 and says
+// libs/ac3/tests/core/test_simd_kernels.cpp - the f64x2 ladder pivots on 2^52 and says
 // nothing about a float's 2^23.
 struct f32x4 {
     float v0{};

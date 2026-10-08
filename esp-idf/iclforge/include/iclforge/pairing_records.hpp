@@ -11,7 +11,7 @@
 // A Sendspin player's pairing records in the order it last used them, and the
 // names of the servers they are with (pairing.md, Pairing Records). The board's
 // store (sendspin_store.hpp) keeps both in NVS; this is the part that decides
-// and encodes, free of ESP-IDF, so that tests/ac3/io/test_pairing_records.cpp
+// and encodes, free of ESP-IDF, so that libs/ac3/tests/io/test_pairing_records.cpp
 // checks it on the host.
 //
 // ORDER. The records run from the least to the most recently used: a pairing
@@ -39,7 +39,7 @@
 namespace iclforge {
 
 // A server's key or a PSK: iclforge::sendspin::crypto::Key32, which this header
-// names for itself so as to need nothing from src/sendspin.
+// names for itself so as to need nothing from libs/sendspin.
 using PairingKey = std::array<std::uint8_t, 32>;
 
 // Zeroes a key in a way the compiler keeps.

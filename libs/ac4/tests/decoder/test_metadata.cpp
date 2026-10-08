@@ -1,4 +1,4 @@
-// The AC-4 decoder's metadata syntax (src/ac4/src/decoder/syntax/metadata.cpp) on
+// The AC-4 decoder's metadata syntax (libs/ac4/src/decoder/syntax/metadata.cpp) on
 // hand-built bitstreams: metadata() with its basic and extended metadata at
 // both substream versions, further_loudness_info(), drc_frame(),
 // dialog_enhancement() and emdf_payloads_substream(). The committed DEE

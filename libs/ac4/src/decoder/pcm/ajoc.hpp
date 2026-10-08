@@ -27,7 +27,7 @@ namespace iclforge::ac4::detail {
 // Pseudocode 16's mtx_dry_q_prev and mtx_wet_q_prev per upmix object, with the
 // quantisation and band count they were decoded at; `centre` for an object
 // that was not present, whose values stand at the range's centre, which
-// dequantises to 0 (src/ac4/ERRATA.md, "A-JOC's differential decoding
+// dequantises to 0 (libs/ac4/ERRATA.md, "A-JOC's differential decoding
 // across frames").
 struct AjocQuantHistory {
     struct Object {

@@ -9,7 +9,7 @@
 // iclforge::containers::iamf::read_sequence (the standalone raw OBU stream) and read_isobmff (the
 // ISO-BMFF encapsulation, whole files and movie fragments) on the same bytes, then the paths that
 // consume what they return: writing the Sequence back out and decoding an Audio Element's PCM
-// (src/containers/src/iamf/sequence_read.cpp, container.cpp, iamf.cpp).
+// (libs/containers/src/iamf/sequence_read.cpp, container.cpp, iamf.cpp).
 //
 // Both readers exist to read files this project did not write, and both size almost everything from
 // numbers the file chose: leb128 OBU sizes, the counts of substreams, parameters, layouts, labels

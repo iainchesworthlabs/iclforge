@@ -590,8 +590,8 @@ double channel_energy(std::span<const float> samples) {
 }
 
 // A from-scratch MSB-first bit writer (§5.1), used only to build this test's own byte-level
-// fixture - independent of src/iab's own implementation, the same convention
-// tests/iab/test_ac3iab.cpp, examples/read_iab.cpp and examples/encode_iab.cpp already
+// fixture - independent of libs/iab's own implementation, the same convention
+// libs/iab/tests/test_ac3iab.cpp, examples/read_iab.cpp and examples/encode_iab.cpp already
 // establish.
 class BitWriter {
    public:

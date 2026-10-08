@@ -19,7 +19,7 @@
 // Pseudocode 59 is printed with a block that belongs to no branch: after the
 // sap_mode 1 and 2 branches, an `if (sap_used) ... else ...` pair that would
 // overwrite them, followed by the sap_mode 3 `else`. The block is read as a
-// stray copy of the one inside the sap_mode 3 branch (src/ac4/ERRATA.md,
+// stray copy of the one inside the sap_mode 3 branch (libs/ac4/ERRATA.md,
 // "Pseudocode 59's stray block").
 
 namespace iclforge::ac4::detail {
@@ -33,7 +33,7 @@ struct StereoParameters {
     // a, b, c, d for every band at or past get_max_sfb(g) and so outside what chparam_info()
     // covers: 1, 0, 0, 1, except in a substream at 96 or 192 kHz, whose HSF extension has bands
     // there that hold lines, where sap_mode 2 (Table 114: M/S in all scale factor bands) makes
-    // it M/S for a pair. Used on the lines of those bands (src/ac4/ERRATA.md, "Stereo
+    // it M/S for a pair. Used on the lines of those bands (libs/ac4/ERRATA.md, "Stereo
     // processing of the HSF extension's bands").
     std::array<Real, 4> uncovered = {Real{1}, Real{0}, Real{0}, Real{1}};
 };
@@ -43,7 +43,7 @@ struct StereoParameters {
 // which Table 20 applies as O1 = a'_j I0 + I1, the step (1, 0, a'_j, 1). a'_j is
 // the band's sap_gain where the chparam_info() is full SAP (sap_mode 3) and
 // sends the band's coefficient, and 0 in every other band and mode
-// (src/ac4/ERRATA.md, "Table 20's prediction gains").
+// (libs/ac4/ERRATA.md, "Table 20's prediction gains").
 enum class StereoUse : std::uint8_t { kPair, kPrediction };
 
 // Pseudocode 59 for one chparam_info() under the sf_info() it was read with,

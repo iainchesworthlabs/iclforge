@@ -117,7 +117,7 @@ class Bits {
 // value - a self-reference no real encoder would write, but a fuzzed stream
 // can, and out.contains()'s first-claim-wins in assign_v1() (decoder.cpp)
 // means the two transcriptions must resolve it identically. Shares its
-// TOC-level shape with tests/ac4/core/test_presentation_configs.cpp's
+// TOC-level shape with libs/ac4/tests/core/test_presentation_configs.cpp's
 // frame_with(), an independent bit writer proven against that suite.
 std::vector<std::byte> self_referencing_hsf_ext_frame() {
     Bits w;

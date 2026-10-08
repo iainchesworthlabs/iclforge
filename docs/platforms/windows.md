@@ -86,7 +86,7 @@ is explicit about the difference.
     let the ring buffer silently perform a partial write while reporting failure, and the live
     pipeline's Atmos metering step writing past the end of a buffer sized for the object count
     rather than the bed's fixed six channels. Both are fixed; see
-    `src/audio/src/backend/windows/monitor.cpp` and `run_live` in
+    `libs/audio/src/backend/windows/monitor.cpp` and `run_live` in
     `apps/cli/commands/live_audio.cpp`.
 
 !!! note "MonitorSink: a format refusal is told apart from a WASAPI failure, and any rate plays"
@@ -168,7 +168,7 @@ is explicit about the difference.
     for a real exclusive-mode bitstream client) and a stats bug where the per-callback
     "bursts rendered" counter truncated to zero almost every WASAPI callback, hanging the CLI's
     drain-wait loop forever after real playback had already finished. See
-    `src/audio/src/backend/windows/passthrough.cpp`.
+    `libs/audio/src/backend/windows/passthrough.cpp`.
 
     The AC-3 bursts are byte-exact against FFmpeg's `spdif` muxer, and the E-AC-3 burst framing
     (data type 0x15, the 24576-byte/4x-carrier-rate burst, multi-syncframe accumulation, `Pd`
@@ -251,7 +251,7 @@ and available to anything else that links it, both Windows-only in the backend t
     Through the raw WASAPI spike first (`apps/crucible/spikes/README.md`, S1: sixteen taps at
     once, exact separation, the mute and exclusive-mode hazards) and then through these library
     entry points themselves (`s1_library_tap`), on Windows 11 build 26200. Not yet exercised on
-    a hosted CI runner beyond the device-free contract in `tests/audio/test_audio_backend.cpp`,
+    a hosted CI runner beyond the device-free contract in `libs/audio/tests/test_audio_backend.cpp`,
     which does start and stop a real watcher wherever the backend exists.
 
 `MonitorSink::start` also takes a `low_latency` flag, added for the demo's one-block mode: it
@@ -371,7 +371,7 @@ end to end is still a manual, unautomated check.
 `hearth`'s mDNS browse for `_sendspin._tcp` players, and `hearth-testsink`'s own Sendspin
 listener and mDNS advertisement. Rather than leave this to Windows' own "these features have been
 blocked" prompt, `iclforge::sendspin::firewall::ensure_inbound_rule()`
-(`src/sendspin/include/iclforge/sendspin/firewall.hpp`) adds the rule itself, through the same
+(`libs/sendspin/include/iclforge/sendspin/firewall.hpp`) adds the rule itself, through the same
 `INetFwPolicy2` COM policy object the Settings app's firewall page edits, the first time it finds
 none already there for that executable and port.
 

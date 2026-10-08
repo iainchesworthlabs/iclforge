@@ -20,12 +20,12 @@
 // end-to-end command) is a separate, later task; this module is the mapping/bridge library only.
 //
 // iclforge::adm sits between two modules that otherwise know nothing about each other:
-// iclforge::adm (src/adm, codec-blind by design - see its own header comments) and
-// iclforge::ac3/iclforge::oba (src/ac3, always built, no dependency on the opt-in, Boost-requiring
+// iclforge::adm (libs/adm, codec-blind by design - see its own header comments) and
+// iclforge::ac3/iclforge::oba (libs/ac3, always built, no dependency on the opt-in, Boost-requiring
 // ac3adm). This module is the one place both are allowed to meet, and - like iclforge::adm
 // itself - it is gated behind ICLFORGE_BUILD_ADM: it is meaningless without ac3adm, and
 // iclforge::ac3 is unconditionally available regardless of whether this module is built at all. See
-// src/adm/CMakeLists.txt's own header comment for the full reasoning, including why this
+// libs/adm/CMakeLists.txt's own header comment for the full reasoning, including why this
 // is a new standalone module rather than folded into either side.
 //
 // a future DAMF reader (out of scope; was B2 `.atmos`/`.atmos.metadata`/`.atmos.audio` reader)

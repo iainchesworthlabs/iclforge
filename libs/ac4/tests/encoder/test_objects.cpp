@@ -594,7 +594,7 @@ TEST_CASE(
     "an object's depth exponent goes with a screen factor and the encoder refuses one without",
     "[ac4][encoder][objects]") {
     // Part 2 clause 6.2.8.7 sends object_screen_factor_code and object_depth_factor as one group of
-    // fields, and the factor, (code + 1) / 8, has no code for 0 (src/ac4/ERRATA.md, "The screen
+    // fields, and the factor, (code + 1) / 8, has no code for 0 (libs/ac4/ERRATA.md, "The screen
     // factor and the depth exponent"). An exponent other than 1 with a factor of 0 used to be
     // written with a factor of 1/8, which the decoder reported back.
     constexpr std::string_view kReason =

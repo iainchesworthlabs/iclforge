@@ -9,7 +9,7 @@
 
 #include "iclforge/sendspin/json.hpp"
 
-// iclforge::sendspin::json::Document::parse (src/sendspin/src/json.cpp) - the first
+// iclforge::sendspin::json::Document::parse (libs/sendspin/src/json.cpp) - the first
 // code a Sendspin peer's bytes reach: client/init and server/init before any
 // authentication, and every decrypted JSON message after it, on the server and on
 // a sink.

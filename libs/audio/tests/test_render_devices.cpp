@@ -13,7 +13,7 @@
 #include "iclforge/audio/render_devices.hpp"
 
 // iclforge::audio::RenderDeviceWatch against a fake enumeration
-// (src/audio/src/render_devices.cpp): a list that keeps itself current whether
+// (libs/audio/src/render_devices.cpp): a list that keeps itself current whether
 // or not the platform reports that something changed.
 //
 // No sound card and no platform watcher: `Sources` takes an enumeration of

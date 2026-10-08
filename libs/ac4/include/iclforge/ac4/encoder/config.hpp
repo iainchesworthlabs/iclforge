@@ -351,7 +351,7 @@ struct EmdfPayload {
 // gives a renderer, which the encoder writes as object audio metadata (clause
 // 6.2.8). The applications convert the scene descriptions they read into
 // these. Behind experimental.objects (planning/ac4.md, "What the encoder
-// writes by default"). src/ac4/ERRATA.md records the readings the writer
+// writes by default"). libs/ac4/ERRATA.md records the readings the writer
 // takes: the downmix, the metadata's timing and the md_compat objects need.
 
 // The loudspeaker a bed object plays from: Part 2 Table 66's
@@ -554,7 +554,7 @@ struct PresentationConfig {
     // Each of `substreams`' groups' gain (sg_gain, Part 2 Table 70): 0 to
     // -15.5 dB in steps of 0.25, or -infinity; empty for 0 dB throughout.
     // Configuration 1, and configuration 4's dialogue enhancement substream,
-    // take none (src/ac4/ERRATA.md, "Substream group gains").
+    // take none (libs/ac4/ERRATA.md, "Substream group gains").
     std::vector<double> gains_db{};
     std::optional<AssociatedMix> associated{};
     // Payloads in an EMDF payloads substream its emdf_info() names, in every

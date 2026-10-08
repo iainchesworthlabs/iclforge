@@ -15,7 +15,7 @@
 // This is the one piece of platform-specific code forge needs - see this
 // directory's CMakeLists.txt entry for the WIN32/else split that selects
 // between platform/windows/ and platform/posix/, the same shape iclforge::audio's
-// own platform tree uses (src/audio/CMakeLists.txt) scaled down to one
+// own platform tree uses (libs/audio/CMakeLists.txt) scaled down to one
 // function, so main.cpp itself never has to ask which OS it is running on.
 
 namespace iclforge::cli::platform {

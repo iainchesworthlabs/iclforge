@@ -10,12 +10,12 @@
 #include "tiered/tables/qmf_tables.hpp"
 
 // The QMF steps of dsp/qmf_kernels.hpp on the seam's 128-bit vector types
-// (src/base/variants: f64x2 at double, f32x4 at float), one step for one step.
+// (libs/base/variants: f64x2 at double, f32x4 at float), one step for one step.
 // Each is written to perform, in every lane, the operations its scalar
 // counterpart performs, in the same order: one IEEE add, subtract or multiply at a
 // time, no fused multiply-add (the build pins -ffp-contract=off, and the seam's
 // operators are single instructions), so a result equals the scalar loop's bit for
-// bit. tests/dsp/tiered/test_dsp.cpp holds each to that, on random data, at
+// bit. libs/dsp/tests/tiered/test_dsp.cpp holds each to that, on random data, at
 // both scalars.
 //
 // The planes make the lanes independent: a window's outputs, a transform pass's
@@ -47,7 +47,7 @@ struct Lanes<double> {
     [[nodiscard]] static V load_window(const float* p) noexcept {
         return V::set(static_cast<double>(p[0]), static_cast<double>(p[1]));
     }
-    // A window of double (JOC's, src/dsp/src/qmf.cpp).
+    // A window of double (JOC's, libs/dsp/src/qmf.cpp).
     [[nodiscard]] static V load_window(const double* p) noexcept { return V::load(p); }
 };
 

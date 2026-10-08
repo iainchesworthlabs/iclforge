@@ -12,7 +12,7 @@
 #include "iclforge/base/layout.hpp"
 
 // iclforge::audio::PcmOutput's two decisions, against fake device records
-// (src/audio/src/pcm_output.cpp): how wide to open the stream, and which
+// (libs/audio/src/pcm_output.cpp): how wide to open the stream, and which
 // output each rendered channel goes to.
 //
 // No device is opened here. Both decisions are made from a RenderDeviceInfo,
@@ -20,7 +20,7 @@
 // case - an 8-channel HDMI endpoint, a stereo jack, a backend that cannot say
 // how many channels it has - in front of the same code the real enumeration
 // feeds. The scatter itself belongs to iclforge::render::Routing and is tested in
-// tests/render/test_routing.cpp; playing through a real device is
+// libs/render/tests/test_routing.cpp; playing through a real device is
 // test_monitor_live.cpp's [.][monitor-live] case and the receiver.
 
 namespace {

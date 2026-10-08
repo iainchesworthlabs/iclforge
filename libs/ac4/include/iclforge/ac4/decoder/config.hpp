@@ -120,7 +120,7 @@ struct OutputConfig {
 // position, or else the one that best meets its preferences, in the order the
 // clause lists them, the first in the table of contents among equals. Where
 // the table of contents changes from one frame to the next, the choice is made
-// again. src/ac4/ERRATA.md ("Which presentations can be selected" and "The
+// again. libs/ac4/ERRATA.md ("Which presentations can be selected" and "The
 // order of the preferences") records the readings.
 
 // Part 1 Table 92's refinements of associated audio, which an associated
@@ -196,7 +196,7 @@ enum class ConcealmentPolicy : std::uint8_t {
 // element's core, 5.X.2, with those tools replaced or reduced, for
 // low-complexity platforms, and renders it to 5.X.2 or 5.X.0 alone (Part 2
 // Table 44). The Part 1 channel elements have no core (Part 2
-// Table 71) and decode alike in both (src/ac4/ERRATA.md, "Core decoding of
+// Table 71) and decode alike in both (libs/ac4/ERRATA.md, "Core decoding of
 // the Part 1 elements").
 enum class DecodingMode : std::uint8_t {
     kFull,

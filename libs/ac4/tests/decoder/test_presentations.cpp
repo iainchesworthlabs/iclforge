@@ -3,7 +3,7 @@
 // Selection: a table of tables of contents built for it, of version 1 and
 // version 0 presentations, each case a table of contents, a PresentationChoice
 // and a level, and the presentation Part 2 clause 4.8.2 and the readings of
-// src/ac4/ERRATA.md ("Which presentations can be selected", "The order of
+// libs/ac4/ERRATA.md ("Which presentations can be selected", "The order of
 // the preferences") select. The table is
 // committed as tests/golden/ac4/presentations/presentation-selection.tsv, which
 // tools/checks/test_ac4_presentation_selection.py holds the Python reference
@@ -881,7 +881,7 @@ TEST_CASE("the pan law meets Table 216 at its three angles", "[ac4][decoder][pre
 
 TEST_CASE("a pan into a 9.1.4 layout goes round the horizontal ring without the screen pair",
           "[ac4][decoder][presentations][fronts]") {
-    // src/ac4/ERRATA.md, "Mixing into a 9.X.4 substream": Lscr and Rscr are no points of the
+    // libs/ac4/ERRATA.md, "Mixing into a 9.X.4 substream": Lscr and Rscr are no points of the
     // ring, and the tops and the LFE are not either; the ring is the 7.X one, L, C, R, Rs, Rb, Lb,
     // Ls (the surrounds at the sides, 90 and 270 degrees, as the layout has a back pair).
     const std::array layout = {

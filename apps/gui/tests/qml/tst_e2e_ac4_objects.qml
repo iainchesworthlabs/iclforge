@@ -31,9 +31,9 @@ TestCase {
     }
 
     readonly property url stereoUrl:
-        Qt.resolvedUrl("../../../../fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
+        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
     readonly property url surroundUrl:
-        Qt.resolvedUrl("../../../../fuzz/seeds/fuzz_wav_read/roundtrip-51.wav")
+        Qt.resolvedUrl("../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-51.wav")
     readonly property url admUrl: Qt.resolvedUrl("../fixtures/adm-two-beds-one-object.wav")
     readonly property url rawOutUrl: Qt.resolvedUrl("_test_output/tst_e2e_ac4_objects.ac4")
     readonly property url mp4OutUrl: Qt.resolvedUrl("_test_output/tst_e2e_ac4_objects.mp4")
@@ -278,7 +278,7 @@ TestCase {
 
     // ---- I5's round trip, on the page ---------------------------------------
 
-    // The ring positions ADM's polar coordinates give (tests/ac3/oba/test_atmos_motion.cpp's
+    // The ring positions ADM's polar coordinates give (libs/ac3/tests/oba/test_atmos_motion.cpp's
     // kL and kSR, which iclforge::adm is checked against), and dead ahead.
     readonly property var admLeft: ({ x: 0.25, y: 0.066987, z: 0.0 })
     readonly property var admRight: ({ x: 0.75, y: 0.066987, z: 0.0 })

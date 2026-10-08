@@ -55,7 +55,7 @@ enum class OutputMode : std::uint8_t {
     // Decoded and rendered here, to a local device at the device's own width
     // (iclforge::audio::PcmOutput).
     kLocalPcm,
-    // Handed to Sendspin players as the group's source (src/sendspin).
+    // Handed to Sendspin players as the group's source (libs/sendspin).
     kNetworkGroup,
     // Nothing usable. The reason says what was in the way.
     kNone,

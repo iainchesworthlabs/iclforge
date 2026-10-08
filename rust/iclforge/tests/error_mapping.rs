@@ -12,7 +12,7 @@ use iclforge::stream;
 use iclforge::types::{Acmod, DecoderConfig};
 use iclforge::Error;
 
-/// Every named variant paired with the exact string `src/capi/src/common.cpp` gives its raw
+/// Every named variant paired with the exact string `libs/capi/src/common.cpp` gives its raw
 /// code. A mismatch here means `Error::raw()` sends the wrong discriminant across the boundary.
 const EXPECTED_MESSAGES: &[(Error, &str)] = &[
     (Error::InvalidArgument, "invalid argument"),

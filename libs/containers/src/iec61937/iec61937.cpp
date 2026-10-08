@@ -161,7 +161,7 @@ std::expected<std::vector<std::byte>, WrapError> wrap_stream(
 // AC-4 (IEC 61937-14:2017).
 //
 // The tables below are transcribed from Part 14 and checked against renders
-// of its pages; tests/containers/iec61937/test_iec61937_ac4.cpp holds a second
+// of its pages; libs/containers/tests/iec61937/test_iec61937_ac4.cpp holds a second
 // transcription of their cases, made separately, and checks the two against
 // each other and against what the standard's own arithmetic implies.
 //
@@ -390,7 +390,7 @@ enum class HeadRead : std::uint8_t { kHead, kNotAFrame, kNeedMore };
 }
 
 // The few fields of a table of contents the packer reads, through
-// iclforge::BitReader (src/base); nothing once the span runs out.
+// iclforge::BitReader (libs/base); nothing once the span runs out.
 class TocBits {
    public:
     explicit TocBits(std::span<const std::byte> bytes) : bits_(bytes) {}

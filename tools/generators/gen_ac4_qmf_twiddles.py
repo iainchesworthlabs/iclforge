@@ -26,7 +26,7 @@ from decimal import Decimal, getcontext
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-OUT = REPO / "src" / "dsp" / "src" / "tiered" / "tables" / "qmf_twiddles.hpp"
+OUT = REPO / "libs" / "dsp" / "src" / "tiered" / "tables" / "qmf_twiddles.hpp"
 
 STEPS = 256  # half the circle is 256 steps of pi / 256
 ENTRIES = STEPS // 2 + 1  # j = 0 to 128

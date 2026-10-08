@@ -54,9 +54,9 @@
 // the decoder to them; what these hold is that the engine's settings reach
 // the decoder as the page means them.
 //
-// Under the sanitizers (tests/sanitized.hpp) the first of them plays one
+// Under the sanitizers (tests/support/sanitized.hpp) the first of them plays one
 // committed stream of each kind, and of each its first frames
-// (tests/ac4_stream_kinds.hpp): it decodes each stream three times, and the
+// (tests/support/ac4_stream_kinds.hpp): it decodes each stream three times, and the
 // ASan leg runs ctest serially. The DRC modes' test plays the first frames of
 // its stream. A normal build plays every stream to its end.
 
@@ -100,7 +100,7 @@ fs::path baseline(std::string_view leg) {
 
 // Every committed AC-4 stream: DEE's, the constructed ones and the
 // multiplexed presentations with their sources - the set
-// tests/ac4/decoder/test_api.cpp decodes through the API.
+// libs/ac4/tests/decoder/test_api.cpp decodes through the API.
 std::vector<fs::path> committed_streams() {
     std::vector<fs::path> paths;
     for (const fs::path& root :
@@ -777,7 +777,7 @@ TEST_CASE("hearth ac4: a stereo or mono layout takes the downmix Part 1 clause 6
 
 namespace {
 
-// E6's committed broadcast stream (tests/ac4/encoder/test_presentations.cpp,
+// E6's committed broadcast stream (libs/ac4/tests/encoder/test_presentations.cpp,
 // broadcast()): a tone in each substream. Music and effects 5.1 (L 331, R 457,
 // C 613, LFE 47, Ls 787, Rs 953 Hz), English dialogue at 1 117 Hz, whose
 // dialogue may be raised 6 dB, German at 1 373, and audio description at 1

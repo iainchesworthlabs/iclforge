@@ -350,7 +350,7 @@ void write_ac4_single_sizeless_substream_index_table(BitWriter& w) {
 
 }  // namespace
 
-// Regression: found by fuzz/fuzz_ac4_parse.cpp on its first run over the
+// Regression: found by libs/ac4/fuzz/fuzz_ac4_parse.cpp on its first run over the
 // seed corpus, as a SEGV on address 0 inside parse_raw_frame(). Every
 // substream_index_table() this suite built before it set b_size_present = 1,
 // so the branch that omits the size table had never been parsed.
@@ -646,7 +646,7 @@ TEST_CASE("parse_substream_info_obj: dynamic objects with an LFE bed object", "[
     CHECK(obj.b_lfe);
     CHECK(obj.num_objects == 2);
     // The LFE is counted on top of the two dynamic objects, first
-    // (src/ac4/ERRATA.md, "n_objects_code and the LFE").
+    // (libs/ac4/ERRATA.md, "n_objects_code and the LFE").
     REQUIRE(obj.objects.size() == 3);
     CHECK(obj.objects[0].kind == iclforge::ac4::ObjectKind::kBed);
     CHECK(obj.objects[0].lfe);
@@ -710,13 +710,13 @@ TEST_CASE("parse_substream_info_obj: std bed flags include LFE, unlike bed_dyn_o
 
 // Regression: n_objects_code and both isf_config fields are 3 bits wide, and
 // each indexed a six-entry count table directly, so codes 6 and 7 read past
-// the end of it. Found by fuzz/fuzz_ac4_parse.cpp once ac4_objects was built
+// the end of it. Found by libs/ac4/fuzz/fuzz_ac4_parse.cpp once ac4_objects was built
 // with AddressSanitizer, as a stack-buffer-overflow on the committed
 // ac4-substream-size-not-transmitted regression input; the uninstrumented runs
 // before that read whatever followed the table and carried on. Each vector
 // ends in substream_index = 2, which only comes back if the parse stayed in
 // sync past the reserved code. Table 60 reserves n_objects_code 5 to 7, the
-// LFE with them (src/ac4/ERRATA.md, "n_objects_code and the LFE");
+// LFE with them (libs/ac4/ERRATA.md, "n_objects_code and the LFE");
 // isf_config's code 5 - the last entry its table has - pins that boundary.
 namespace {
 
@@ -1457,7 +1457,7 @@ TEST_CASE("put_variable_bits round-trips through the reader's own escapes", "[ac
 
 // Regression: presentation_config_ext_info() skipped `8 * n_skip_bytes` bits
 // with n_skip_bytes converted to int, and n_skip_bytes escapes through
-// variable_bits() to 2^32. Found by fuzz/fuzz_ac4_parse.cpp as a UBSan
+// variable_bits() to 2^32. Found by libs/ac4/fuzz/fuzz_ac4_parse.cpp as a UBSan
 // signed-overflow report once ac4_objects was built with sanitizers. The
 // count here is 2^29 + 1 bytes, whose 8x product (2^32 + 8) overflows int.
 // One byte and every field the rest of a v0 TOC needs follow it, so the
@@ -2488,7 +2488,7 @@ TEST_CASE("build_dac4 writes the dac4 DEE's muxer writes for an A-JOC stream", "
 
     // Objects are no channel mode, and an adaptive downmix no core: neither
     // is sent, where Table E.11's text would set b_presentation_core_differs
-    // for any A-JOC group (src/ac4/ERRATA.md).
+    // for any A-JOC group (libs/ac4/ERRATA.md).
     PresentationDsi p = presentation_of(toc);
     CHECK_FALSE(p.ch_mode.has_value());
     CHECK_FALSE(p.core.has_value());

@@ -23,20 +23,20 @@
 // Time runs along Q_low's slots, the QMF matrix delayed by ts_offset_hfgen
 // (5.7.6.3.2): QoutASPX is that delayed matrix below the crossover and the
 // assembled high band above it, and the part of an interval past the frame's
-// last slot waits for the next frame. src/ac4/ERRATA.md records the
+// last slot waits for the next frame. libs/ac4/ERRATA.md records the
 // readings taken, under "A-SPX".
 
 namespace iclforge::ac4::detail {
 
 // The core's own complex type (in place of std::complex<double>): the
 // decoder's QMF-domain reconstruction (this file and its neighbours in
-// pcm/) calls straight into src/ac4/src/core's A-SPX, A-CPL and A-JOC kernels,
+// pcm/) calls straight into libs/ac4/src/core's A-SPX, A-CPL and A-JOC kernels,
 // which take this type since D14a (planning/ac4.md), and a std::complex
 // buffer cannot be passed where one of those is asked for even at the same
 // underlying double representation - the two are unrelated types.
 //
 // `Real` (ac4/detail/real.hpp) is the same CMake-selected scalar
-// src/ac4/src/core's kernels are explicitly instantiated at, resolved by
+// libs/ac4/src/core's kernels are explicitly instantiated at, resolved by
 // ICLFORGE_DECODE_SCALAR (double or float): one concrete type per build,
 // used directly here rather than as a template parameter, the way
 // iclforge::ac3's own decode path uses iclforge::ac3::internal::decode_scalar_t (that

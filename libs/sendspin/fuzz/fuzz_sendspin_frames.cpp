@@ -11,11 +11,11 @@
 #include "iclforge/sendspin/stream_roles.hpp"
 
 // iclforge::sendspin::Reassembler, parse_player_chunk and parse_burst_chunk
-// (src/sendspin/src/frames.cpp, chunks.cpp) - everything a decrypted Sendspin
+// (libs/sendspin/src/frames.cpp, chunks.cpp) - everything a decrypted Sendspin
 // frame meets before a session looks at it: fragment reassembly in both the
 // specification's form and aiosendspin 9.1.1's, the two audio chunk parsers,
 // whose length fields a peer chooses, and the binary messages of artwork@v1,
-// visualizer@v1 and source@v1 (src/sendspin/src/stream_roles.cpp), each of which
+// visualizer@v1 and source@v1 (libs/sendspin/src/stream_roles.cpp), each of which
 // must write back to the bytes it was read from.
 //
 // The input is a sequence of frames, each preceded by a two-byte little-endian

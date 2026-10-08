@@ -50,7 +50,7 @@
 //     gamma3 = -gamma5 and gamma4 + gamma6 = 1, in the quantiser's steps. Each
 //     pair's module then works on Lo less the predicted centre, and beta3
 //     gives the centre the energy the prediction leaves out
-//     (src/ac4/ERRATA.md, "ASPX_ACPL_3's gammas");
+//     (libs/ac4/ERRATA.md, "ASPX_ACPL_3's gammas");
 //   the immersive element, ASPX_ACPL_1 and 2 (ETSI TS 103 190-2 V1.3.1
 //     clause 5.5.2, Pseudocode 2): four modules on the coupled pairs (Ls, Lb),
 //     (Rs, Rb), (Tfl, Tbl) and (Tfr, Tbr), each as the channel pair's on the

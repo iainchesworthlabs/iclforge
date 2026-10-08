@@ -2,12 +2,12 @@
 
 !!! note "Status as of 2026-09-30: built as written; Music Assistant not run"
     The first deliverable of [A4](hearth-reference-player.md#a4-sendspin): the conformance reading
-    of the Sendspin specification that `src/sendspin` implements, how Hearth works with Music
+    of the Sendspin specification that `libs/sendspin` implements, how Hearth works with Music
     Assistant where Music Assistant's implementation differs from that text, and the normative
     definition of the application-specific role that carries AC-3, E-AC-3 and AC-4 to Hearth
-    sinks. It was written as a draft on 2026-09-15 and is normative for `src/sendspin`, the test
+    sinks. It was written as a draft on 2026-09-15 and is normative for `libs/sendspin`, the test
     sink and `hearth_sink`, which were built to it. The role's objects are in
-    `src/sendspin/include/iclforge/sendspin/iclforge_player.hpp` and its burst chunk, ID 192, is in
+    `libs/sendspin/include/iclforge/sendspin/iclforge_player.hpp` and its burst chunk, ID 192, is in
     `chunks.hpp`; both halves and `ac3hearth`'s server use them. The scripts in `tools/sendspin`
     run aiosendspin 9.1.1's client and server against Hearth in CI (`hearth-validate`), and stand
     in for Music Assistant: no run has been made against Music Assistant itself. The
@@ -49,9 +49,9 @@
 | aiosendspin | 9.1.1, 2026-08-25, tag commit `5c024b42`, the version Music Assistant pins | [Music Assistant](#music-assistant-and-aiosendspin-911); the Python interoperability client |
 | Music Assistant `server` | `62bb0289`, 2026-09-15 | The settings Music Assistant runs aiosendspin with |
 | `sendspin` command-line player | 7.5.0, 2026-06-16, on aiosendspin 6.0.1 | Not used: it has no Noise and no CPace, so a conformant server cannot connect to it ([Decisions](#decisions), 2) |
-| Sendspin time filter, `github.com/Sendspin/time-filter` | `39dd3f4a`, C++, Apache-2.0 | Vendored into `src/sendspin` for the player half |
+| Sendspin time filter, `github.com/Sendspin/time-filter` | `39dd3f4a`, C++, Apache-2.0 | Vendored into `libs/sendspin` for the player half |
 | CPace, draft-irtf-cfrg-cpace-21 | Expires 2026-10-25 | The code-based pairing flows |
-| IEC 61937 bursts | `ac3::iec61937::wrap_frame`, `Eac3BurstPacker` and `Ac4BurstPacker` (`src/containers/include/iclforge/containers/iec61937/iec61937.hpp`); IEC 61937-14:2017 for AC-4 | What a burst chunk carries |
+| IEC 61937 bursts | `ac3::iec61937::wrap_frame`, `Eac3BurstPacker` and `Ac4BurstPacker` (`libs/containers/include/iclforge/containers/iec61937/iec61937.hpp`); IEC 61937-14:2017 for AC-4 | What a burst chunk carries |
 
 ## Conformance
 
@@ -64,7 +64,7 @@ MUST, in keeping with the decision to be fully conformant
 **M** is MUST or MUST NOT, **m** is a lowercase must treated as MUST, **S** is SHOULD, and **Y** is
 MAY.
 
-**Columns.** *Server* is `ac3hearth`'s engine. *Player* is the player half of `src/sendspin`,
+**Columns.** *Server* is `ac3hearth`'s engine. *Player* is the player half of `libs/sendspin`,
 used by `ac3hearth-testsink` and `hearth_sink`. A dash means the row does not apply to that side.
 
 ### Transport and discovery
@@ -482,14 +482,14 @@ Recorded here and not yet raised with the Sendspin project ([Decisions](#decisio
 | Q1 | Must a server implement every role, or may it leave roles out? `README`, Role Versioning says all servers "must implement all versions"; `messaging.md`, `server/activate` says servers MAY omit a role | `README`; `messaging.md` | Implements all seven and activates by policy |
 | Q2 | What a receiver does with an unknown JSON message `type` or an unknown binary message ID. Only unknown payload fields have a rule. The extension relies on a server sending ID 192 only to a client that listed the role | `messaging.md`, Communication | Sends ID 192 only on connections where the role is active; ignores unknown IDs and types on receive |
 | Q3 | Whether aiosendspin will move to the specification's text where they differ, or the text towards aiosendspin, and when. 9.1.1 was released on 2026-08-25, before the specification's changes of 2026-08-28 to 2026-09-12 ([Sources](#sources)) | aiosendspin 9.1.1 against the whole specification | Uses 9.1.1's forms with a peer it detects as 9.1.1, by two signals that describe 9.1.1 as released ([C1 to C38](#music-assistant-and-aiosendspin-911)) |
-| Q4 | How converged the time filter must be before `available: true`; the library has `get_error()` and no convergence test | `messaging.md`, Clock Synchronization | Reports `available: true` once the filter's own error estimate has stayed under 1 ms for eight consecutive updates, a threshold chosen here and measured in A4, and one more burst a second later has measured within 1 ms of that run's own last raw measurement. The second step was added because a run of exchanges taken right after a Wi-Fi reconnect can agree with each other and still be wrong (`ClockSync` in `src/sendspin/include/iclforge/sendspin/clock_sync.hpp`) |
+| Q4 | How converged the time filter must be before `available: true`; the library has `get_error()` and no convergence test | `messaging.md`, Clock Synchronization | Reports `available: true` once the filter's own error estimate has stayed under 1 ms for eight consecutive updates, a threshold chosen here and measured in A4, and one more burst a second later has measured within 1 ms of that run's own last raw measurement. The second step was added because a run of exchanges taken right after a Wi-Fi reconnect can agree with each other and still be wrong (`ClockSync` in `libs/sendspin/include/iclforge/sendspin/clock_sync.hpp`) |
 | Q5 | Whether `buffer_capacity` counts each chunk's 13-byte header, and how a server tracks what a player has consumed | `roles/player/v1.md`, support object and Server Audio Send Constraints | Counts whole plaintext messages; the server tracks consumption from timestamps |
 | Q6 | CPace's confirmation tags: the MAC inputs and order are left to the draft, which suggests HMAC or CMAC; no Sendspin test vectors exist, and the draft expires 2026-10-25 | `pairing.md`, PAKE | Follows draft-21 §10 with HMAC-SHA-512; tests against the draft's vectors and against aiosendspin 9.1.1 |
 | Q7 | Multichannel in `player@v1`: no channel order, layout or channel limit | `roles/player/v1.md` | Standard players get stereo; multichannel goes in this role |
 
 ## Test vectors
 
-`src/sendspin`'s tests hold these as fixed bytes:
+`libs/sendspin`'s tests hold these as fixed bytes:
 
 - The Sentinel PSK and its `psk_id`, from `connection.md`.
 - The two pairing-token examples in `pairing.md`.

@@ -11,7 +11,7 @@
 // A live object-position source over OSC (live OSC object positions): a UDP listener on
 // its own thread, feeding an iclforge::objects::oba::SceneCursor once per encoder frame.
 // This is the socket-and-thread half; the OSC 1.0 wire form itself
-// (iclforge::objects::oba::parse_osc_packet/apply, src/ac3) is pure and portable, and
+// (iclforge::objects::oba::parse_osc_packet/apply, libs/ac3) is pure and portable, and
 // lives in the distributed library instead - see that header's own comment
 // for why the split falls where it does.
 //

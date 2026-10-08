@@ -16,11 +16,11 @@
 // object_basic_info(), object_render_info() and add_per_object_md(); and the
 // OAMD substream, oamd_substream() (6.2.2.4), which carries a second
 // oamd_common_data() of its own. The table of contents' oamd_common_data()
-// (in ac4_substream_info_ajoc()) is the inspector's (src/ac4); this is the
+// (in ac4_substream_info_ajoc()) is the inspector's (libs/ac4); this is the
 // decoder's own transcription, for the substreams, with a record per element.
 //
 // Syntax only: fields hold the codes the bitstream sends. What they mean - a
-// position, a gain, when an update takes effect - is src/ac4/src/decoder/pcm/
+// position, a gain, when an update takes effect - is libs/ac4/src/decoder/pcm/
 // objects.cpp's, by clause 6.3.9 and Annex F.
 
 namespace iclforge::ac4::detail {
@@ -40,7 +40,7 @@ inline constexpr int kMaxOamdObjects = 64;
 enum class ObjType : std::uint8_t { kBed, kDyn, kIsf };
 
 // What the table of contents says of one object an OAMD portion describes, in
-// the order the portion lists them (src/ac4/ERRATA.md, "The objects of an
+// the order the portion lists them (libs/ac4/ERRATA.md, "The objects of an
 // A-JOC substream" and "The objects of a direct-coded substream").
 struct OamdObjectType {
     ObjType type = ObjType::kDyn;
@@ -263,7 +263,7 @@ struct OamdSubstreamContext {
 // What an object substream's OAMD needs besides its SubstreamContext: the
 // objects of each OAMD portion, as the table of contents describes them, and
 // the timing the substream group's OAMD substream sent, which applies where
-// the substream sends none (src/ac4/ERRATA.md, "Which oamd_timing_data()
+// the substream sends none (libs/ac4/ERRATA.md, "Which oamd_timing_data()
 // applies").
 struct ObjectAudioContext {
     OamdObjectList dmx;      // an A-JOC substream's first portion (b_static_dmx 0)

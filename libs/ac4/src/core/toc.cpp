@@ -27,7 +27,7 @@ std::string_view describe(Error error) {
 
 namespace {
 
-// The bit reader (iclforge::BitReader, src/base) with a sticky failure state:
+// The bit reader (iclforge::BitReader, libs/base) with a sticky failure state:
 // the explicit refusal condition (kUnsupportedBitstreamVersion) beside its
 // overflow, so every parse_* helper below can bail out with a plain early
 // return instead of threading std::expected through the whole call tree. Only
@@ -724,7 +724,7 @@ std::vector<ObjectEntry> parse_bed_dyn_obj_assignment(Reader& r, int n_signals) 
         // monolithic MSB-first r.bits(17) - position 16 is the LAST bit
         // transmitted, the LSB (bit 0). flag[j] therefore sits at bit
         // (16-j), i.e. flag[16-i] sits at bit i. Cross-checked against
-        // §6.3.2.10.8 EXAMPLE 2's worked value in tests/ac4/core/test_toc.cpp.
+        // §6.3.2.10.8 EXAMPLE 2's worked value in libs/ac4/tests/core/test_toc.cpp.
         const std::uint32_t flags = r.bits(17);
         for (int i = 0; i < 17; ++i) {
             if ((flags >> i) & 1) {  // flag[16-i]
@@ -1017,7 +1017,7 @@ ObjSubstreamInfo parse_substream_info_obj(Reader& r, int fs_index, int frame_rat
     // dynamic objects over that count with the LFE among them, where Table 60
     // and audio_data_objs(), whose mono_data(1) precedes an element of
     // n_objects channels, count it on top: the table is read, the LFE first
-    // (src/ac4/ERRATA.md, "n_objects_code and the LFE"). A reserved code
+    // (libs/ac4/ERRATA.md, "n_objects_code and the LFE"). A reserved code
     // names no objects; nothing after it depends on the count.
     constexpr std::array<int, 5> kNumObjects = {0, 1, 2, 3, 5};
     const std::uint32_t n_objects_code = r.bits(3);
@@ -1523,7 +1523,7 @@ std::expected<RawFrame, Error> parse_raw_frame(std::span<const std::byte> raw_ac
         // n_substreams was indexed straight into substream_sizes before
         // this, which read element 0 of an empty vector - a null dereference
         // on any stream that set b_size_present to 0. Found by
-        // fuzz/fuzz_ac4_parse.cpp on its first run; tests/ac4 had only ever
+        // libs/ac4/fuzz/fuzz_ac4_parse.cpp on its first run; tests/ac4 had only ever
         // built the b_size_present = 1 shape.
         const bool size_transmitted = !result.toc.substream_sizes.empty();
         const std::uint64_t size =
