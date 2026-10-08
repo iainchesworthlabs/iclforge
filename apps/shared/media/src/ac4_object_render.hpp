@@ -16,7 +16,7 @@
 // TS 103 190-2 Annex F) for an application to render; this is forge's
 // rendering, kept apart from apps/forge/cli/src so that a test holds it and so that
 // Hearth's engine can take it up when it decodes AC-4. Compiled straight into
-// forge and iclforge-tests, as stream_playback.cpp beside it is.
+// forge and iclforge-app-media-tests, as stream_playback.cpp beside it is.
 //
 // A dynamic object is panned from its position (X from the left wall to the
 // right, Y from the front wall to the back, Z from the floor through the

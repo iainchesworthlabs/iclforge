@@ -51,10 +51,10 @@
 // own rather than inside an accessibility pass.
 //
 // No Qt here, deliberately, for the same reason the Crucible's is Qt-free:
-// apps/forge/gui/tests/test_gui_diagnostics.cpp compiles this file straight into iclforge-tests,
+// apps/forge/gui/tests/test_gui_diagnostics.cpp compiles this file straight into iclforge-forge-gui-tests,
 // so the rule is checked on every CI leg including the ones that build no
 // window at all. That is also why the file carries a gui_ prefix inside a
-// directory already called gui: iclforge-tests compiles this module and the
+// directory already called gui: iclforge-forge-gui-tests compiles this module and the
 // Crucible's into one target with both directories on its include path, and
 // two headers named diagnostics.hpp would have a test resolve to whichever
 // -I came first.

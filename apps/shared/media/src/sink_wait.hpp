@@ -15,7 +15,7 @@
 //
 // Templates over the sink, since PassthroughSink, MonitorSink and PcmOutput
 // share the shape but no base class. Compiled straight into forge and
-// iclforge-tests, as stream_playback.hpp beside it is, so a test can hold both
+// iclforge-app-media-tests, as stream_playback.hpp beside it is, so a test can hold both
 // helpers against a sink that stops on cue: no command reaches its wait
 // without a render device, and no device can be pulled on a CI runner.
 

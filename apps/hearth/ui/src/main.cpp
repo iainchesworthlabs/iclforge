@@ -85,7 +85,7 @@ int main(int argc, char** argv) {
     iclforge::sendspin::firewall::maybe_run_as_firewall_helper_and_exit(argc, argv);
 
     // Once, for the process's whole life - never from HearthController's
-    // constructor, so iclforge-tests and the Qt Quick test binary (each their own
+    // constructor, so iclforge-hearth-tests and the Qt Quick test binary (each their own
     // main(), never this one) don't register it (native_log_sink.hpp's own
     // comment says why that matters).
     iclforge::hearth::install_native_log_sink();

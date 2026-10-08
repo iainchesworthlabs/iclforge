@@ -2,7 +2,7 @@
 # engine, with no Qt in it. The application's window (A5) will be a client of
 # this library rather than the place any of it lives, the same split
 # apps/crucible/{engine,ui} already keeps - and the same reason: everything
-# here can then be tested by iclforge-tests on every CI leg, including the legs
+# here can then be tested by iclforge-hearth-tests on every CI leg, including the legs
 # with no display and no sound card.
 add_library(hearth_engine STATIC
     src/ac3_transcoder.cpp
@@ -54,7 +54,7 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
     # A Hearth sink's firmware (planning/esp32-ota.md, O5): the board's own HTTP routes over
     # cpp-httplib, configured as libs/sendspin configures it, and the board's own headers for what
     # GET /firmware says and what an image must be (esp-idf/iclforge/include, free of ESP-IDF,
-    # as iclforge-tests already reads them), so that this app holds an image to the rules the board
+    # as iclforge-hearth-tests already reads them), so that this app holds an image to the rules the board
     # holds it to.
     target_sources(hearth_engine PRIVATE src/sink_firmware.cpp src/sink_firmware_view.cpp)
     target_include_directories(hearth_engine PUBLIC "${PROJECT_SOURCE_DIR}/esp-idf/iclforge/include")

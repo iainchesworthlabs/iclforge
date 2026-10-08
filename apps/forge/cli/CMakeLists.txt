@@ -9,7 +9,7 @@ add_executable(forge src/main.cpp src/support.cpp src/usage.cpp src/json.cpp src
 # apps/shared/media/src/recording_sink.hpp's own comment for why they sit there and not
 # in either app. Compiled straight in; apps/shared/media/src has no library target,
 # matching how tests/CMakeLists.txt already compiles the same files into
-# iclforge-tests. ../../shared/media/src/container_input.cpp (container readers (mkv/mp4/ts)) is the same shape,
+# iclforge-forge-cli-tests. ../../shared/media/src/container_input.cpp (container readers (mkv/mp4/ts)) is the same shape,
 # for turning a container file into an elementary stream instead, and so is
 # ../../shared/media/src/stream_playback.cpp, the decoder choice and end-of-stream flush
 # 'monitor' and 'spatial' play a stream with, ../../shared/media/src/ac4_encode_core.cpp,

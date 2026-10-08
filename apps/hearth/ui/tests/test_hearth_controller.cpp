@@ -41,7 +41,7 @@
 // namespace too.
 //
 // tests/CMakeLists.txt deliberately does NOT add hearth_controller.cpp to
-// iclforge-tests's own source list for this: iclforge-tests is Qt-free by design (see
+// iclforge-tests's own source list for this: iclforge-hearth-tests is Qt-free by design (see
 // its own comments on gui_diagnostics.cpp and the Crucible engine sources -
 // "exactly so its... contract can be held here... without a QML engine in
 // the room"), and hearth_controller.cpp needs QVariantMap/QString (Qt Core)

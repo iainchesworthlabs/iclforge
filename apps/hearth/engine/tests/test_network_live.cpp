@@ -42,7 +42,7 @@
 //                           the case is skipped without it
 //   ICLFORGE_HEARTH_LIVE_SECONDS  how long the programme plays (default 10)
 //
-// iclforge-tests has no firewall exception of its own: it asks mDNS for nothing a Windows firewall
+// iclforge-hearth-tests has no firewall exception of its own: it asks mDNS for nothing a Windows firewall
 // stops (NetworkSinks' browser's replies come back as replies to its own queries).
 
 namespace {

@@ -168,7 +168,7 @@ Gaps that remain inside covered rows:
 - The group volume slider and each member's mute checkbox are not driven. Only a member's volume slider is (row 77).
 - A stream whose object metadata is not read makes row 20's case skip, and no case plays an AC-4 item with objects through the window.
 - The Only-on-sink panel is rendered but its text is not read.
-- The Firmware tab's Update, Roll back and Restart are not driven: the test sink serves no firmware routes. The client behind them (`apps/hearth/engine/src/sink_firmware.hpp`) is tested in `iclforge-tests` against a stand-in board on loopback (`[sink-firmware]`), and against a real board by the hidden live case in `apps/hearth/engine/tests/test_sink_firmware_board.cpp`.
+- The Firmware tab's Update, Roll back and Restart are not driven: the test sink serves no firmware routes. The client behind them (`apps/hearth/engine/src/sink_firmware.hpp`) is tested in `iclforge-hearth-tests` against a stand-in board on loopback (`[sink-firmware]`), and against a real board by the hidden live case in `apps/hearth/engine/tests/test_sink_firmware_board.cpp`.
 
 ## UI bugs found (fixed)
 
@@ -213,7 +213,7 @@ present fifteenth suite, and have not been measured again:
 | `apps/hearth/engine` | 835 / 5184 lines, 16.1% (4 original suites) | 3105 / 5184 lines, 59.9% (14 suites) |
 
 - `apps/hearth/ui/*.cpp` (the controllers) is not instrumented in this tree, because `iclforge::coverage` is not applied to the Qt app or test targets. So the controllers have no gcov figure.
-- `/opt/gui-cov.sh` searches the whole repository for `.gcda` files, including other build trees. Its figure for `apps/hearth` (80%+) mostly comes from `iclforge-tests` runs elsewhere. To count only these suites, add `build/gui-cov/apps/hearth` as gcovr's search path.
+- `/opt/gui-cov.sh` searches the whole repository for `.gcda` files, including other build trees. Its figure for `apps/hearth` (80%+) mostly comes from `iclforge-hearth-tests` runs elsewhere. To count only these suites, add `build/gui-cov/apps/hearth` as gcovr's search path.
 
 ## Running
 

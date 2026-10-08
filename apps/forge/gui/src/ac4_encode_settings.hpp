@@ -12,7 +12,7 @@
 #include "iclforge/ac4/io/carriage.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 
-// The AC-4 page's choices, Qt-free so that iclforge-tests can hold them to the two
+// The AC-4 page's choices, Qt-free so that iclforge-forge-gui-tests can hold them to the two
 // things they must agree on: the iclforge::ac4::EncoderConfig the page encodes with and
 // the `forge ac4-encode` tokens it echoes, each spelled as forge's parser
 // reads it (apps/forge/cli/src/support.cpp). A choice at the command's own default

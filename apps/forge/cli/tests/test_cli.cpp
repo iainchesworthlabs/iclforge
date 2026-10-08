@@ -57,7 +57,7 @@ namespace {
 // leaf name differs between the copies.
 //
 // The leaf also carries this process's own PID. ICLFORGE_TEST_SCRATCH_DIR is
-// rooted in the build tree, not per process, so two iclforge-tests/forge processes
+// rooted in the build tree, not per process, so two iclforge-forge-cli-tests/forge processes
 // pointed at the same build tree at once (a concurrent re-run, or two sessions
 // sharing one tree) would otherwise race on this exact directory - one's
 // fs::remove_all/create_directories/file-open colliding with the other's

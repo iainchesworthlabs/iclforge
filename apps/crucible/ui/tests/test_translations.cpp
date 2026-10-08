@@ -15,7 +15,7 @@
 
 // The six Crucible translation catalogues (apps/crucible/ui/assets/translations/
 // crucible_<code>.ts), read as files rather than through Qt: these cases
-// ride the plain iclforge-tests binary, so they run on a developer's own ctest and
+// ride the plain iclforge-crucible-tests binary, so they run on a developer's own ctest and
 // on every CI leg, including the ones that build no Qt at all. What they
 // check is what a reader of the catalogue cannot see at a glance and what a
 // hand edit or a machine pass gets wrong: a dropped placeholder, a brand name

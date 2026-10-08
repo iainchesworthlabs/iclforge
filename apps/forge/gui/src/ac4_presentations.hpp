@@ -8,7 +8,7 @@
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 
-// What the AC-4 pages show of a stream's presentations, Qt-free so iclforge-tests
+// What the AC-4 pages show of a stream's presentations, Qt-free so iclforge-forge-gui-tests
 // holds it: each presentation of the table of contents, by its position,
 // which is what `forge ... presentation=` takes, and a label made of what the
 // decoder reports of it (its channels as coded, its language and its
