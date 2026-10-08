@@ -2493,7 +2493,7 @@ equal on x86, the Cortex-M3 and the C3; the `double` output and the `float` pins
   reaches 2^28, and the block's exponent carries every shift out to the PCM. A QMF analysis slot sums its window products in 64
   bits with a Q30 window and normalises its 128 values; a synthesis slot is normalised by the sum of its parts' magnitudes, which
   keeps the bits of a sparse slot that a normalisation by its largest part lost.
-- **Energies as a mantissa and a power of two.** `MantExp` (`src/base/include/iclforge/base/arithmetic/mant_exp.hpp`: a 30-bit
+- **Energies as a mantissa and a power of two.** `MantExp` (`src/base/internal/iclforge/base/arithmetic/mant_exp.hpp`: a 30-bit
   mantissa and an exponent, with integer `log2`, `exp2` and square root) holds A-SPX's envelopes, noise floors, gains, limiter and preflattening
   gains, the HF generator's covariances and its solve of Pseudocode 87, the A-CPL transient ducker's energies, companding's levels
   and gains and DRC's slot levels. A gain reaches a sample as one 64-bit product and a shift. At `double` and `float` the same

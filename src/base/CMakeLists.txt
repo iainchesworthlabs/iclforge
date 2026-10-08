@@ -127,12 +127,14 @@ endif()
 # include them, and the minimum-footprint profile and AC-4 link no iclforge::base, so they take the
 # include path from this target rather than from the library. One copy of Fixed32, which decision
 # 31 of planning/ac4.md asks for, without AC-4 linking the AC-3 codec to reach it. Not installed and
-# not exported, as iclforge::warnings is not: in-tree build plumbing, which the library's install
-# leaves out (cmake/InstallLibrary.cmake).
+# not exported, as iclforge::warnings is not: in-tree build plumbing. The arithmetic headers are in
+# internal/, which only this target puts on an include path, so the library installs its include/
+# whole (cmake/InstallLibrary.cmake).
 add_library(iclforge_base_headers INTERFACE)
 add_library(iclforge::base_headers ALIAS iclforge_base_headers)
 target_include_directories(iclforge_base_headers INTERFACE
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/internal>"
     "$<BUILD_INTERFACE:${ICLFORGE_ARCH_INCLUDE_DIR}>")
 target_compile_features(iclforge_base_headers INTERFACE cxx_std_23)
 
