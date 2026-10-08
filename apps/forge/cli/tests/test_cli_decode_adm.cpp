@@ -19,35 +19,39 @@
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/adm/ac3adm.hpp"
 
-// forge's 'decode ... adm_out=' path (the ADM write direction - apps/forge/cli/src/commands/decode.cpp's
-// accumulate_adm/run_decode_eac3). Real, subprocess-level integration test: the same "run the actual
-// built binary, inspect what it wrote" shape apps/forge/cli/tests/test_cli_atmos_adm.cpp (the read direction)
-// and apps/forge/cli/tests/test_cli.cpp's own atmos-encode tests use, and for the same reason - see
+// forge's 'decode ... adm_out=' path (the ADM write direction -
+// apps/forge/cli/src/commands/decode.cpp's accumulate_adm/run_decode_eac3). Real, subprocess-level
+// integration test: the same "run the actual built binary, inspect what it wrote" shape
+// apps/forge/cli/tests/test_cli_atmos_adm.cpp (the read direction) and
+// apps/forge/cli/tests/test_cli.cpp's own atmos-encode tests use, and for the same reason - see
 // test_cli_atmos_adm.cpp's own top comment on why decode.cpp's own logic cannot be linked into this
-// test binary and called directly. A separate file for the same two-part reason as that file's own top
-// comment: this only makes sense with ICLFORGE_BUILD_ADM AND forge both on - see apps/forge/cli/tests/CMakeLists.txt's
-// own gating comment on the block this file's source is added to.
+// test binary and called directly. A separate file for the same two-part reason as that file's own
+// top comment: this only makes sense with ICLFORGE_BUILD_ADM AND forge both on - see
+// apps/forge/cli/tests/CMakeLists.txt's own gating comment on the block this file's source is added
+// to.
 //
 // What this proves: a JOC-reconstructed object comes out of decode_access_unit
-// oba::joc::reconstruction_delay(domain) samples (576 under Domain::kQmf, the DecoderConfig default)
-// behind the bed it was pulled from (docs/library/decoding.md, "Atmos objects lag the bed";
-// libs/ac3/tests/decoder/test_latency.cpp measures it end to end). accumulate_adm appends each decoded unit's
-// object_audio and the bed's LFE channel side by side, unit by unit, into the ADM master - carrying
-// that same 576-sample gap straight into the exported file unless something delays the LFE to match.
+// oba::joc::reconstruction_delay(domain) samples (576 under Domain::kQmf, the DecoderConfig
+// default) behind the bed it was pulled from (docs/library/decoding.md, "Atmos objects lag the
+// bed"; libs/ac3/tests/decoder/test_latency.cpp measures it end to end). accumulate_adm appends
+// each decoded unit's object_audio and the bed's LFE channel side by side, unit by unit, into the
+// ADM master - carrying that same 576-sample gap straight into the exported file unless something
+// delays the LFE to match.
 //
-// Regression test: encode a real Atmos stream with one object sent entirely to the LFE (lfe_send=1.0,
-// via atmos-encode's own keyframes file - there is no lfe_send CLI flag, see run_atmos_encode's own
-// default placement in apps/forge/cli/src/commands/atmos.cpp), decode it with adm_out= set, read the BW64/ADM
-// master back and cross-correlate its LFE channel against its one object channel. Before the fix this
-// PR made, the object trails the LFE by 576 samples in the written file; fixed, they line up.
+// Regression test: encode a real Atmos stream with one object sent entirely to the LFE
+// (lfe_send=1.0, via atmos-encode's own keyframes file - there is no lfe_send CLI flag, see
+// run_atmos_encode's own default placement in apps/forge/cli/src/commands/atmos.cpp), decode it
+// with adm_out= set, read the BW64/ADM master back and cross-correlate its LFE channel against its
+// one object channel. Before the fix this PR made, the object trails the LFE by 576 samples in the
+// written file; fixed, they line up.
 
 namespace fs = std::filesystem;
 
 namespace {
 
-// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir for the reasoning this copy shares (this project's
-// established per-file test-helper convention - test_cli_atmos_adm.cpp's own top comment), including
-// the PID fold; the leaf name below is this file's own.
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir for the reasoning this copy shares (this
+// project's established per-file test-helper convention - test_cli_atmos_adm.cpp's own top
+// comment), including the PID fold; the leaf name below is this file's own.
 std::string scratch_pid_suffix() { return iclforge::test::platform::process_id(); }
 
 fs::path scratch_dir() {
@@ -180,8 +184,8 @@ TEST_CASE("decode's ADM master lines the bed's LFE up with the object it was pul
 
     // One static keyframe (ac3/oba/scene.hpp: "a single keyframe holds its placement everywhere")
     // sending the object entirely to the LFE - run_atmos_encode's own default placement is
-    // lfe_send=0.0 (apps/forge/cli/src/commands/atmos.cpp), and the only way to override it is this keyframes
-    // file (main.cpp's own 'atmos-encode' doc string names no lfe_send flag).
+    // lfe_send=0.0 (apps/forge/cli/src/commands/atmos.cpp), and the only way to override it is this
+    // keyframes file (main.cpp's own 'atmos-encode' doc string names no lfe_send flag).
     const auto paths_path = dir / "decode_adm_paths.txt";
     {
         std::ofstream paths{paths_path};
@@ -251,12 +255,12 @@ TEST_CASE("decode's ADM master lines the bed's LFE up with the object it was pul
     CHECK(lag == 0);
 }
 
-// Moved from apps/forge/cli/tests/test_cli_inspect_edges.cpp - see that file's own comment on its sibling,
-// plain-AC-3 case. decode.cpp's run_decode_eac3 checks forge_cli::adm_capability() up front, before
-// it can tell whether this specific programme has an object layer, so an E-AC-3 stream only reaches
-// these two warnings (rather than exiting 2 with "this build was not configured with
-// -DICLFORGE_BUILD_ADM=ON") when ADM support was actually built - which is exactly this file's own
-// gate (apps/forge/cli/tests/CMakeLists.txt's ICLFORGE_BUILD_ADM block).
+// Moved from apps/forge/cli/tests/test_cli_inspect_edges.cpp - see that file's own comment on its
+// sibling, plain-AC-3 case. decode.cpp's run_decode_eac3 checks forge_cli::adm_capability() up
+// front, before it can tell whether this specific programme has an object layer, so an E-AC-3
+// stream only reaches these two warnings (rather than exiting 2 with "this build was not configured
+// with -DICLFORGE_BUILD_ADM=ON") when ADM support was actually built - which is exactly this file's
+// own gate (apps/forge/cli/tests/CMakeLists.txt's ICLFORGE_BUILD_ADM block).
 TEST_CASE("decode warns when ADM output is asked of an E-AC-3 stream with no object layer",
           "[cli][decode]") {
     const auto dir = scratch_dir();

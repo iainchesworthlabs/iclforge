@@ -1043,9 +1043,9 @@ std::optional<DecodeRenderStats> decode_and_render(std::string_view in_path,
     // dependent bytes loaded.scan.access_units bundles in with it here. Route
     // it down the same path as plain E-AC-3, matching run_decode's own
     // dispatch (iclforge::ac3::stream_bsid(...) > 8 ||
-    // iclforge::ac3::has_eac3_extension_substreams(...), apps/forge/cli/src/commands/decode.cpp) and
-    // apps/shared/media/src/stream_playback.hpp's reads_as_access_units - both of which test the stream's
-    // content rather than trust a two-way read of this enum.
+    // iclforge::ac3::has_eac3_extension_substreams(...), apps/forge/cli/src/commands/decode.cpp)
+    // and apps/shared/media/src/stream_playback.hpp's reads_as_access_units - both of which test
+    // the stream's content rather than trust a two-way read of this enum.
     const bool eac3_source =
         loaded.scan.kind == iclforge::ac3::io::StreamKind::kEac3 ||
         loaded.scan.kind == iclforge::ac3::io::StreamKind::kAc3CoreEac3Extension;

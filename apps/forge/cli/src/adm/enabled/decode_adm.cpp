@@ -7,8 +7,8 @@
 #include "iclforge/adm/ac3adm.hpp"
 
 // Compiled only when ICLFORGE_BUILD_ADM turned iclforge::adm on (see
-// apps/forge/cli/CMakeLists.txt) - see ../decode_adm.hpp's own top comment for why this file, rather
-// than a preprocessor conditional inside decode.cpp, is the mechanism.
+// apps/forge/cli/CMakeLists.txt) - see ../decode_adm.hpp's own top comment for why this file,
+// rather than a preprocessor conditional inside decode.cpp, is the mechanism.
 
 namespace forge_cli {
 

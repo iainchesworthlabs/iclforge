@@ -166,7 +166,8 @@ bool decode_ac4_to_memory(const QString& path, std::span<const std::byte> stream
         // has_objects/object_count/object_audio fields the E-AC-3 path above fills, so
         // exportObjects() - already codec-agnostic - writes AC-4's objects the same way it
         // already writes E-AC-3 JOC's. A mid-stream count change is skipped, the same
-        // convention run_decode_eac3's own append_objects (apps/forge/cli/src/commands/decode.cpp) uses.
+        // convention run_decode_eac3's own append_objects (apps/forge/cli/src/commands/decode.cpp)
+        // uses.
         if (!pcm.objects.empty()) {
             result.has_objects = true;
             result.object_count = static_cast<int>(pcm.objects.size());

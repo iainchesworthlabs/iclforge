@@ -31,11 +31,11 @@
 // load_adm_atmos_source already establishes.
 namespace forge_cli {
 
-// Everything run_atmos_iab (apps/forge/cli/src/commands/atmos.cpp) needs from one parsed-and-bridged IAB
-// source, expressed purely in iclforge::oba terms - the same shape AdmAtmosSource (atmos_adm.hpp)
-// already uses for ADM, for the identical reason: main.cpp never needs iclforge::iab::IabError or
-// iclforge::adm::BridgeError, only text to print. `handle` owns whatever `pcm`'s spans
-// actually borrow from - for IAB this is the IabBridgeResult itself
+// Everything run_atmos_iab (apps/forge/cli/src/commands/atmos.cpp) needs from one
+// parsed-and-bridged IAB source, expressed purely in iclforge::oba terms - the same shape
+// AdmAtmosSource (atmos_adm.hpp) already uses for ADM, for the identical reason: main.cpp never
+// needs iclforge::iab::IabError or iclforge::adm::BridgeError, only text to print. `handle` owns
+// whatever `pcm`'s spans actually borrow from - for IAB this is the IabBridgeResult itself
 // (iclforge::adm::build_iab), since its own `pcm` is OWNED storage rather than a borrow from
 // a separate document object (see iclforge/adm/iab_bridge.hpp's own top comment on why); keep an
 // IabAtmosSource alive for exactly as long as its `pcm` spans are read.

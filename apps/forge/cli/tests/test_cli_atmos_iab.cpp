@@ -19,10 +19,10 @@
 #include "iclforge/ac3/decoder/decoder.hpp"
 
 // forge's 'atmos-iab' command (IAB reader phase 3 of 3 - 's "IAB (SMPTE ST 2098-2)
-// reader" entry; apps/forge/cli/src/commands/atmos.cpp's run_atmos_iab). Real, subprocess-level integration
-// tests, the same shape test_cli_atmos_adm.cpp already uses for 'atmos-adm' and for the identical
-// reason - main.cpp compiles everything into one binary with no library surface run_atmos_iab's
-// own logic could be linked into this test binary and called directly.
+// reader" entry; apps/forge/cli/src/commands/atmos.cpp's run_atmos_iab). Real, subprocess-level
+// integration tests, the same shape test_cli_atmos_adm.cpp already uses for 'atmos-adm' and for the
+// identical reason - main.cpp compiles everything into one binary with no library surface
+// run_atmos_iab's own logic could be linked into this test binary and called directly.
 //
 // A separate file rather than folded into test_cli.cpp, gated the same two-part way
 // test_cli_atmos_adm.cpp is (ICLFORGE_BUILD_ADM AND forge actually built) - see

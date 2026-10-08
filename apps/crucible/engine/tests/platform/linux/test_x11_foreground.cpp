@@ -29,8 +29,9 @@
 // same_image_ancestors(), the walk that lets a browser's window process
 // match its audio process and keeps a terminal from being its child.
 //
-// Linux only, by apps/crucible/engine/tests/CMakeLists.txt, the way libs/audio/tests/backend/pipewire rides
-// its backend: the files under test live in a platform directory.
+// Linux only, by apps/crucible/engine/tests/CMakeLists.txt, the way
+// libs/audio/tests/backend/pipewire rides its backend: the files under test live in a platform
+// directory.
 
 using namespace iclforge::crucible;
 

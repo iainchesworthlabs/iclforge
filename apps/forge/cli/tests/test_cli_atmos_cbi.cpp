@@ -20,14 +20,15 @@
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/objects/oamd.hpp"
 
-// forge's 'atmos-cbi' command (apps/forge/cli/src/commands/atmos.cpp's run_atmos_cbi): a channel-based-
-// immersive bed WAV straight to DD+ JOC E-AC-3 with program.bed != 0 and 0 dynamic objects. Same
-// subprocess-integration shape as apps/forge/cli/tests/test_cli.cpp's own atmos-encode coverage - see that
-// file's own top comment for why (main.cpp compiles everything into one anonymous-namespace
-// binary with no library surface run_atmos_cbi's own logic could be linked into this test binary
-// and called directly). This file's job is the CLI wiring (arg parsing, layout resolution, WAV
-// channel order -> AtmosEncoder::encode_bed_frame) - libs/ac3/tests/oba/test_atmos_cbi.cpp already proves
-// the reconstruction math itself against every bed channel's own tone.
+// forge's 'atmos-cbi' command (apps/forge/cli/src/commands/atmos.cpp's run_atmos_cbi): a
+// channel-based- immersive bed WAV straight to DD+ JOC E-AC-3 with program.bed != 0 and 0 dynamic
+// objects. Same subprocess-integration shape as apps/forge/cli/tests/test_cli.cpp's own
+// atmos-encode coverage - see that file's own top comment for why (main.cpp compiles everything
+// into one anonymous-namespace binary with no library surface run_atmos_cbi's own logic could be
+// linked into this test binary and called directly). This file's job is the CLI wiring (arg
+// parsing, layout resolution, WAV channel order -> AtmosEncoder::encode_bed_frame) -
+// libs/ac3/tests/oba/test_atmos_cbi.cpp already proves the reconstruction math itself against every
+// bed channel's own tone.
 
 namespace fs = std::filesystem;
 

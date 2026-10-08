@@ -31,13 +31,14 @@
 // E-AC-3 object tests use, encoded to AC-4 by atmos-adm and decoded with adm_out, gives objects
 // whose positions, gains and timing match the master within tolerances you pin." Real,
 // subprocess-level integration test, the same "run the actual built binary" shape
-// apps/forge/cli/tests/test_cli_atmos_adm.cpp and test_cli_decode_adm.cpp use, and for the same reason (their
-// own top comments: main.cpp compiles run_atmos_adm/run_decode_ac4 into one anonymous-namespace
-// binary this test binary cannot link directly). Separate file, same two-part
-// ICLFORGE_BUILD_ADM-and-forge gate as those two files (apps/forge/cli/tests/CMakeLists.txt); the fixture below
-// is a byte-identical copy of test_cli_atmos_adm.cpp's own (bed L/R at +-30 degrees, one object
-// held at azimuth -110 (SR) for 0.096s then jumping to dead ahead) - "the committed fixtures the
-// E-AC-3 object tests use", per the exit criterion's own wording, rather than a new one.
+// apps/forge/cli/tests/test_cli_atmos_adm.cpp and test_cli_decode_adm.cpp use, and for the same
+// reason (their own top comments: main.cpp compiles run_atmos_adm/run_decode_ac4 into one
+// anonymous-namespace binary this test binary cannot link directly). Separate file, same two-part
+// ICLFORGE_BUILD_ADM-and-forge gate as those two files (apps/forge/cli/tests/CMakeLists.txt); the
+// fixture below is a byte-identical copy of test_cli_atmos_adm.cpp's own (bed L/R at +-30 degrees,
+// one object held at azimuth -110 (SR) for 0.096s then jumping to dead ahead) - "the committed
+// fixtures the E-AC-3 object tests use", per the exit criterion's own wording, rather than a new
+// one.
 //
 // The round trip: atmos-adm codec=ac4 (A-JOC, this project's own writer) -> decode's objects_dir
 // (each object's raw PCM) and adm_out (a fresh ADM BWF master, iclforge::ac4::ObjectProperties

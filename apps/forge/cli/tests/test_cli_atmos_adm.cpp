@@ -20,29 +20,30 @@
 // forge's 'atmos-adm' command (ADM BWF reader, phase 3 of 3, feeding the JOC
 // encoder; apps/forge/cli/src/main.cpp's run_atmos_adm). Real, subprocess-level
 // integration tests: the same "run the actual built binary, inspect what it wrote" shape
-// apps/forge/cli/tests/test_cli.cpp's own atmos-encode test uses, and for the same reason - main.cpp compiles
-// everything into one anonymous-namespace binary with no library surface run_atmos_adm's own
-// logic could be linked into this test binary and called directly (see test_cli.cpp's own top
-// comment).
+// apps/forge/cli/tests/test_cli.cpp's own atmos-encode test uses, and for the same reason -
+// main.cpp compiles everything into one anonymous-namespace binary with no library surface
+// run_atmos_adm's own logic could be linked into this test binary and called directly (see
+// test_cli.cpp's own top comment).
 //
 // A separate file rather than folded into test_cli.cpp: this file's own tests only make sense
 // when ICLFORGE_BUILD_ADM turned on iclforge::adm AND forge was actually built
 // (so its own binary has the 'atmos-adm' command at all) - a narrower, two-part condition
-// test_cli.cpp's single TARGET-forge gate does not express. See apps/forge/cli/tests/CMakeLists.txt's own
-// gating comment for exactly how both conditions are checked before this file is even compiled.
+// test_cli.cpp's single TARGET-forge gate does not express. See
+// apps/forge/cli/tests/CMakeLists.txt's own gating comment for exactly how both conditions are
+// checked before this file is even compiled.
 //
-// ICLFORGE_CLI_EXE is supplied the same way as test_cli.cpp's own (see apps/forge/cli/tests/CMakeLists.txt);
-// run_cli below is a trimmed copy of test_cli.cpp's own helper of the same name (same reasoning for
-// the double-quote wrapping on Windows - see that file's own comment on std::system() and cmd.exe's
-// quoting), and the byte-level BW64/ADM fixture helpers are a copy of
-// libs/adm/tests/test_adm_bridge.cpp's own flagship-test fixture (same bed L/R + SR-then-centre
-// moving object, same known-good ring positions and hold/jump timing) - duplicated per this
-// project's own established per-file test-helper convention (see that file's own comment on this)
-// rather than shared, and deliberately kept byte-identical to that fixture rather than inventing a
-// new one: this file's own job is checking that the real forge binary wires parse_bw64 ->
-// adm::build -> AtmosEncoder together correctly end to end, not re-proving the ADM bridge's own
-// BS.2076-2 §10.3 state machine or coordinate conversion, which libs/adm/tests/test_adm_bridge.cpp
-// already does directly against the library API.
+// ICLFORGE_CLI_EXE is supplied the same way as test_cli.cpp's own (see
+// apps/forge/cli/tests/CMakeLists.txt); run_cli below is a trimmed copy of test_cli.cpp's own
+// helper of the same name (same reasoning for the double-quote wrapping on Windows - see that
+// file's own comment on std::system() and cmd.exe's quoting), and the byte-level BW64/ADM fixture
+// helpers are a copy of libs/adm/tests/test_adm_bridge.cpp's own flagship-test fixture (same bed
+// L/R + SR-then-centre moving object, same known-good ring positions and hold/jump timing) -
+// duplicated per this project's own established per-file test-helper convention (see that file's
+// own comment on this) rather than shared, and deliberately kept byte-identical to that fixture
+// rather than inventing a new one: this file's own job is checking that the real forge binary wires
+// parse_bw64 -> adm::build -> AtmosEncoder together correctly end to end, not re-proving the ADM
+// bridge's own BS.2076-2 §10.3 state machine or coordinate conversion, which
+// libs/adm/tests/test_adm_bridge.cpp already does directly against the library API.
 
 namespace fs = std::filesystem;
 

@@ -28,11 +28,11 @@
 // is split out of its own: that file includes <CoreAudio/CoreAudio.h> and
 // nothing in it compiles anywhere but a Mac, while this needs only libproc,
 // which is part of libSystem and needs no link line of its own. Unlike the
-// Linux file, no test drives this yet - apps/crucible/engine/tests/CMakeLists.txt has an `if(LINUX)`
-// block for that platform's pure halves and no `if(APPLE)` one, and adding a
-// case here that has never been run on a Mac would only assert what this file
-// already says. The split is what makes writing one cheap when somebody has a
-// machine; bundle_facts.hpp beside it is the part with rules worth asserting.
+// Linux file, no test drives this yet - apps/crucible/engine/tests/CMakeLists.txt has an
+// `if(LINUX)` block for that platform's pure halves and no `if(APPLE)` one, and adding a case here
+// that has never been run on a Mac would only assert what this file already says. The split is what
+// makes writing one cheap when somebody has a machine; bundle_facts.hpp beside it is the part with
+// rules worth asserting.
 //
 // The one read here is the executable path, because macOS gives no other
 // answer this application needs:

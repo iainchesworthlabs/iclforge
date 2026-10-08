@@ -5,8 +5,9 @@
 // to 5.X, headphones, the syntax trace, and what decode says about options the
 // other format reads; and phase D10's objects, rendered to speakers; and the constructed streams
 // at 96 and 192 kHz (tests/golden/ac4-hsf/), written at their own rate.
-// apps/forge/cli/tests/test_cli_containers.cpp has the first of them (output-level=, presentation-id=,
-// language=, dialogue-gain=, dialogue-enhancement=, channels=2 and 1, downmix=loro, conceal=).
+// apps/forge/cli/tests/test_cli_containers.cpp has the first of them (output-level=,
+// presentation-id=, language=, dialogue-gain=, dialogue-enhancement=, channels=2 and 1,
+// downmix=loro, conceal=).
 
 #include <catch2/catch_test_macros.hpp>
 

@@ -379,11 +379,11 @@ TEST_CASE("decode refuses an output, census or object directory it cannot write"
 }
 
 // E-AC-3's own version of this same warning (adm_out= against a programme with no object layer)
-// lives in apps/forge/cli/tests/test_cli_decode_adm.cpp, not here: decode.cpp's run_decode_eac3 checks
-// forge_cli::adm_capability() before it can even tell whether the programme has an object layer, so
-// that path only reaches these warnings (rather than exiting 2 with "this build was not configured
-// with -DICLFORGE_BUILD_ADM=ON") when ADM support was actually built. Plain AC-3 has no such
-// check - it cannot have an object layer at all, on any build - so it stays here.
+// lives in apps/forge/cli/tests/test_cli_decode_adm.cpp, not here: decode.cpp's run_decode_eac3
+// checks forge_cli::adm_capability() before it can even tell whether the programme has an object
+// layer, so that path only reaches these warnings (rather than exiting 2 with "this build was not
+// configured with -DICLFORGE_BUILD_ADM=ON") when ADM support was actually built. Plain AC-3 has no
+// such check - it cannot have an object layer at all, on any build - so it stays here.
 TEST_CASE("decode warns when object or ADM output is asked of a stream with no object layer",
           "[cli][decode]") {
     const auto dir = scratch_dir();

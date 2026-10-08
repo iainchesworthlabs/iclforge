@@ -25,11 +25,11 @@
 // directory's own test_adm_bridge.cpp flagship test, and driven the same real way: a real
 // AtmosEncoder/Eac3Decoder round trip, not a mocked one. Where that file starts from a
 // byte-level ADM fixture and ends at a decoded bitstream, this one starts from a decoded
-// bitstream (exactly what apps/forge/cli/src/commands/decode.cpp's own accumulate_adm lambda consumes)
-// and ends at a real file on disk, read back through the identical iclforge::adm::parse_bw64 ->
-// iclforge::adm::build -> AtmosEncoder/Eac3Decoder chain that file's own flagship test
-// already proves correct - so if THIS test's second half passes, the whole write -> read round trip
-// really works, not just "write_bw64 didn't throw".
+// bitstream (exactly what apps/forge/cli/src/commands/decode.cpp's own accumulate_adm lambda
+// consumes) and ends at a real file on disk, read back through the identical
+// iclforge::adm::parse_bw64 -> iclforge::adm::build -> AtmosEncoder/Eac3Decoder chain that file's
+// own flagship test already proves correct - so if THIS test's second half passes, the whole write
+// -> read round trip really works, not just "write_bw64 didn't throw".
 
 namespace fs = std::filesystem;
 
@@ -53,8 +53,8 @@ double channel_energy(std::span<const float> samples) {
 
 // Mirrors decode.cpp's own accumulate_adm lambda, simplified for a single dynamic object (this
 // test's own AtmosEncoder is always constructed with exactly one) - see
-// apps/forge/cli/tests/test_cli_atmos_adm.cpp's own top comment for why this project's own tests duplicate
-// a CLI-local helper rather than exporting one just to share it with a test.
+// apps/forge/cli/tests/test_cli_atmos_adm.cpp's own top comment for why this project's own tests
+// duplicate a CLI-local helper rather than exporting one just to share it with a test.
 struct AdmAccumulator {
     std::uint64_t samples_emitted = 0;
     std::vector<float> object_pcm;
@@ -111,7 +111,8 @@ TEST_CASE("a real decoded Atmos programme survives write_bw64 -> parse_bw64 -> b
     AdmAccumulator accumulator;
 
     // A real, distinct, non-silent tone - never silence/frame-0 (this project's own standing
-    // lesson: those give false passes, see e.g. apps/forge/cli/tests/test_cli_atmos_adm.cpp's own fixture).
+    // lesson: those give false passes, see e.g. apps/forge/cli/tests/test_cli_atmos_adm.cpp's own
+    // fixture).
     std::vector<float> tone(static_cast<std::size_t>(kTotalFrames * kFrame));
     for (std::size_t i = 0; i < tone.size(); ++i) {
         const double t = static_cast<double>(i) / kSampleRate;

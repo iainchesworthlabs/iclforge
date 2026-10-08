@@ -4,9 +4,10 @@
 #include <string_view>
 
 // Compiled only when ICLFORGE_BUILD_ADM did NOT turn iclforge::iab/iclforge::adm's IAB
-// mapping on (see apps/forge/cli/CMakeLists.txt) - see ../atmos_iab.hpp's own top comment for why this
-// file, rather than a preprocessor conditional inside main.cpp, is the mechanism. This translation
-// unit links neither iclforge::adm nor its IAB mapping and includes neither of their headers.
+// mapping on (see apps/forge/cli/CMakeLists.txt) - see ../atmos_iab.hpp's own top comment for why
+// this file, rather than a preprocessor conditional inside main.cpp, is the mechanism. This
+// translation unit links neither iclforge::adm nor its IAB mapping and includes neither of their
+// headers.
 
 namespace forge_cli {
 

@@ -207,8 +207,8 @@ TEST_CASE("the encoder takes the 64 objects the page and the command allow, and 
 
 TEST_CASE("a scene of slots encodes to a stream that decodes to its objects, one update a frame",
           "[gui][ac4]") {
-    // The ADM fixture's shape (apps/forge/cli/tests/test_cli_atmos_adm.cpp): two channels held at the
-    // speakers' places and one dynamic object held at the rear right for 0.096 s, then at the
+    // The ADM fixture's shape (apps/forge/cli/tests/test_cli_atmos_adm.cpp): two channels held at
+    // the speakers' places and one dynamic object held at the rear right for 0.096 s, then at the
     // front. Three tones, 0.192 s.
     constexpr std::size_t kSamples = 6 * 1536;
     const std::vector<std::vector<float>> flat{
