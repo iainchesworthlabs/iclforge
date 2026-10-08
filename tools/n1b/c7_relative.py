@@ -129,7 +129,10 @@ def main() -> int:
                         continue
                     toks.append((t, n))
         for tok, n in toks:
-            t = tok.replace("\\", "/").rstrip("/.,;:'\"`)")
+            t = tok.replace("\\", "/").rstrip(",;:'\"`)")
+            if t.endswith(".") and not t.endswith(".."):
+                t = t[:-1]
+            t = t.rstrip("/")
             while t.startswith("./"):
                 t = t[2:]
             if not t or any(c in t for c in "${}*"):

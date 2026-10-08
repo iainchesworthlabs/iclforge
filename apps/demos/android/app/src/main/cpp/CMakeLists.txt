@@ -13,8 +13,8 @@
 #     links those two libraries plus this app's own native sources.
 #
 # See docs/platforms/android.md for the full architecture writeup and
-# ../../../../../../../CMakeLists.txt (the repo root, six directories up: cpp ->
-# main -> src -> app -> android -> apps -> repo root) for what
+# ../../../../../../../CMakeLists.txt (the repo root, seven directories up: cpp ->
+# main -> src -> app -> android -> demos -> apps -> repo root) for what
 # add_subdirectory() below actually configures.
 # ---------------------------------------------------------------------------
 cmake_minimum_required(VERSION 3.28...4.3)
@@ -87,7 +87,7 @@ set(ICLFORGE_BUILD_MPEGTS OFF CACHE BOOL "" FORCE)
 # a source directory this far outside CMAKE_SOURCE_DIR (the wrapper's own
 # directory, per project() above), CMake cannot derive a binary dir by
 # mirroring the relative path the way it does for an in-tree subdirectory.
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../../../../.." iclforge_build)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../.." iclforge_build)
 
 add_library(iclforge_jni SHARED
     jni_entry.cpp
