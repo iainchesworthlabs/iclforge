@@ -330,7 +330,7 @@ else()
     # apps/forge/gui/CMakeLists.txt's own comment on its identical include() explains why that
     # distinction is load-bearing for AUTOMOC's metatypes JSON handoff to qmltyperegistrar.
     if(ICLFORGE_BUILD_TESTS)
-        include(apps/hearth/ui/tests/CMakeLists.txt)
+        include(tests/CMakeLists.txt)
     endif()
 
     # ---------------------------------------------------------------------
