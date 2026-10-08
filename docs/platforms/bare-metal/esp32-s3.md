@@ -1380,7 +1380,7 @@ pointer, and `.tbss` from 32,784 bytes to 24.
 wider than anything downstream can use, and memory was the binding constraint: the per-block
 `coeffs` store was 100,352 bytes and the AHT's own buffer 86,016 (an AHT stream now decodes into
 the per-block store, as [Objects](#objects) says).
-`src/ac3/variants/decode-scalar-{float32,float64}/` carries `decode_scalar_t` — `float` under the
+`libs/ac3/variants/decode-scalar-{float32,float64}/` carries `decode_scalar_t` — `float` under the
 minimum-footprint profile, `double` by default elsewhere, and selectable in any build with
 `-DICLFORGE_DECODE_SCALAR=float`. Which profile a build is and which scalar its decoder carries
 are independent CMake axes. The option's third value, `fixed`, is the tier for a part with no FPU

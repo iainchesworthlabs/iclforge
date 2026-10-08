@@ -1,6 +1,6 @@
 # A monorepo of self-contained projects (C7): a study
 
-!!! note "Status as of 2026-10-08: a study; nothing moved; the decisions below are open"
+!!! note "Status as of 2026-10-08: decisions 1 to 15 taken; C7-1 run and proved; C7-2 to C7-5 not begun"
     Asked for by the user on 2026-10-08: "turn this repository into a monorepo of self-contained
     projects". It follows [consolidation.md](consolidation.md), whose C0 to C6, the three merges its
     decision 14 left (M1 to M3) and the two items C3 and C6 left are run and proved on the local
@@ -8,8 +8,12 @@
     ([what the runs found](consolidation.md#what-the-runs-found-that-the-plan-did-not)). It takes up
     the step [layout.md](layout.md) left open, L3 ("Pitchfork `libs/`, tests beside the code",
     [(d)](layout.md#l3-pitchfork-libs-tests-beside-the-code)), and extends it from the libraries to
-    the products, the bindings and the firmware. Counts are of the tree at `b77e67246` (3,185 tracked
-    files), measured by a dry run that maps every tracked file to its new path.
+    the products, the bindings and the firmware. Counts are of the tree at `33cec0856` (3,185 tracked
+    files), measured by a dry run that maps every tracked file to its new path. The user took
+    decisions 1 to 15 on 2026-10-08, every one (a). C7-1 ran on the local branch
+    `chore/monorepo-c7-1`: the libraries, their tests and fuzz targets, the test-support helpers and
+    the vendored time filter moved, and it changed no output byte, no exported name and no test name
+    ([what the runs found](#what-the-runs-found-that-the-study-did-not)). Nothing is pushed.
 
 ## In brief
 
@@ -379,3 +383,131 @@ testdata/            was tests/golden
 tools/fuzz/          the fuzz scripts
 examples/ tools/ docs/ planning/ packaging/ cmake/ requirements/ assets/
 ```
+
+## How C7 is run
+
+The stages run as C0 to C3 did ([how C0 to C3 are run](consolidation.md#how-c0-to-c3-are-run),
+[tools/n1b/README.md](../tools/n1b/README.md)): one local branch each, `chore/monorepo-c7-<n>`, each
+made from the one before. Within a stage the commits come in N1B's order, each script in a commit of
+its own before the commit it makes: the moves alone (`git mv`, every rename `R100`), the include
+spellings, the build files and the paths in text, then what is done by hand. The moves are data in
+`consoldef.py` (`c7_1_new`); `consol_apply.py`, `consol_cmake.py` and `consol_paths.py` run them.
+
+What C7 adds to the proof, and the scripts that give it (all in `tools/n1b`):
+
+| script | what it shows |
+|---|---|
+| `c7_record.sh` | configures, builds and records the three host trees (GCC 16 and Clang 22, Release; Clang 22 shared, Debug): ctest's names, `baseline.py`'s pinned hashes, CLI corpus, installed tree and exported symbols |
+| `c7_run.sh ctest` / `probes` | the whole ctest of both static trees with JUnit output, and the bare-metal probes under QEMU (decoder, encoder, AC-4 in float and fixed point, stage timers), each `--icount`, before and after |
+| `flags_diff.py` | the flags each unit compiles with in two configured trees, minutes before a build; it renames a directory only when it moved whole |
+| `ir_compare.py` | the LLVM IR of every unit, old tree against new, with the tree's path read alike |
+| `c7_pathonly.py` | every change to a C or C++ file since the parent is a comment, an `#include`, layout or a path |
+| `c7_planner_equiv.py` | the CI planners choose the same jobs for every tracked file, and for a sample of past commits |
+| `c7_leftovers.py` | what still names a root C7 moved: a root built from parts, a regular expression, a glob, a directory a build writes into |
+
+The stage's parent is built in `build/wt/c7-before` (detached) and the stage in `build/wt/merge`; the
+two are recorded and compared with `baseline.py compare`. A stage that shows a difference in output
+bytes, exported symbols or test names stops, and the user is told before the next begins.
+
+## What the runs found that the study did not
+
+### C7-1, 2026-10-08 (`chore/monorepo-c7-1`)
+
+**What moved.** 1,199 renames in one commit, every one `R100`: the libraries with their tests and fuzz
+targets (1,179 files: `ac3` 350, `ac4` 260, `sendspin` 160, `audio` 97, `containers` 57, `dsp` 54,
+`base` 53, `objects` 48, `adm` 35, `iab` 26, `capi` 20, `render` 19), `tests/support` 8,
+`external/time-filter` 6, `tools/fuzz` 5 and `cmake/IclforgeFuzz.cmake` 1. The study counted 1,186
+moves for the libraries, tests and fuzz targets; the rest are decisions 14's and the support
+library's. Then 15 include respellings in 14 files (`consol_apply.py`), the paths in the build files
+and scripts, and the paths in text; all in all 1,581 files changed (1,198 renamed, 352 modified, 30 added, 1 deleted).
+The tree: `libs/<lib>/{CMakeLists.txt, include/iclforge/<lib>/, src/, variants/, tests/, fuzz/}`,
+`tests/{support, cli, gui, hearth, crucible, performance, golden}`, `external/time-filter`,
+`tools/fuzz`, `cmake/{IclforgeTests, IclforgeFuzz, External}.cmake`.
+
+**A binary per library.** `iclforge_add_test_binary()` makes `iclforge-<lib>-tests` for each of the 12
+libraries and labels its tests with the project: `ctest -L ac3` selects 1,071 tests, `-L ac4` 736,
+and the 12 labels together 2,785; the 681 others are the products', which stay in
+`iclforge-apps-tests` until C7-2. The old tag labels still combine (`-L resampler` 20, `-L ac4 -L
+decoder` 313). The umbrella `iclforge-tests` builds them all. The names are the before-names: 3,466
+on each static tree.
+
+**What the dry run could not see** (each found by a build, a check or a comparison, and fixed by hand):
+
+1. **A binary per library gives each unit only what its own library needs.** The monolith gave every
+   unit the union of every include directory and definition, so the first build of the split failed on
+   three: the `golden/*.hpp` tables (an include root of `tests/`), the CLI's ADM and IAB tests (no
+   link to either), and `-Wno-null-dereference` on two Hearth test files (a per-source property the
+   cut dropped). `flags_diff.py` over 832 units found the lost options and definitions before the
+   fixes were read; its rule that renamed `tests/` because `tests/sanitized.hpp` moved was wrong, and
+   now applies to a directory that moved whole.
+2. **A path built from parts is not a path.** `${PROJECT_SOURCE_DIR}/src/dsp/variants/decode-scalar-${TIER}`
+   (AC-4 stopped compiling), `${CMAKE_BINARY_DIR}/src/ac3/generated` (the installed export header),
+   the ESP-IDF component's probe for `lib/src/ac3`, the ABI steps' `find build/…/src -name '*.so'`,
+   Rust's `repo_root.join("src")`, `.clang-tidy`'s alternation `src/(ac3|base|…)/`, SonarCloud's keys.
+   `c7_leftovers.py` lists them. The build tree's `build/<preset>/src/<lib>` is `libs/<lib>` now;
+   the ABI steps look in whichever of the two a build has, since the comparison point is older.
+3. **A check that passes because it reads nothing.** `check_doc_paths.py` read the literals starting
+   `docs/`, `apps/`, `src/` and `tools/`, so "0 missing" meant nothing about `libs/`; with `libs/`
+   and `external/` added, about 880 more literals are checked (6,489 at the stage's last code commit,
+   against 5,607) and four were stale.
+   `baseline.py`'s header record was empty under `libs/`, and `check_layering.py` and
+   `check_namespaces.py` failed for want of files under `src/`. All three now read `libs/`.
+4. **A library's `tests/` and `fuzz/` are inside the directory its code is in.** Each consumer of
+   "the library" had to be told they are not it: the coverage filter (`--exclude`), the compare job
+   and the ESP lane of the planners, the ESP packer (which would have shipped every library's tests
+   and fuzz seeds in the component), `check_layering.py`, `.clang-tidy`'s header filter and
+   SonarCloud (`sonar.test.inclusions`, with `libs` in both `sonar.sources` and `sonar.tests`).
+5. **The planners.** `external/` was an unknown top-level directory: its C++ files lit everything, and
+   its pages only the docs lane, where `src/` had made them core's. Taught `external/`, the planners
+   give the same answers for all 3,185 tracked files and for the last 120 commits.
+6. **What the packed ESP-IDF component holds.** It keeps the repository's layout under `lib/`, so
+   `lib/src/ac3` is `lib/libs/ac3`; its file list is otherwise the before-list, with three more
+   CMake modules (`External`, `IclforgeFuzz`, `IclforgeTests`) in `lib/cmake` that the root includes
+   only when tests or fuzzers are asked for.
+7. **Fuzz corpus and crash artifacts** are written under `build/` (`build/fuzz-corpus`,
+   `build/fuzz-artifacts`), not in a tracked directory; `fuzz/` no longer exists.
+
+**Found, and not C7's.** The shared Debug tree fails to link `iclforge-iab-tests`
+(`iclforge::iab::DlcAudio::normalized()` is not exported); it failed before as the whole test binary,
+and is now one binary. The fuzz build has failed to compile `fuzz_iec61937_unwrap` (it does not find
+`iclforge/containers/iec61937/iec61937.hpp`) since C3, in the before-tree as in this one, so the
+nightly fuzz job's build stops there. The CI step that binds `iclforge-tests` to the shared libraries named
+`src/iec61937/libiclforge_containers.so`, a path C3 left; `esp-component.yml` and `wheels.yml`
+filtered on `src/iec61937/**`, which has matched nothing since C3 (the lines are removed; the
+wheel build is not triggered by a change to `libs/containers`, a decision for the user). The AC-4
+fixed-point probe's stack is 22,712 bytes against a ceiling of 21,500, so its runner exits 1 before
+and after. `tools/n1b/baselines/headers.json` predates C0. The path pass lengthened 14 C++ lines past
+100 columns and about forty Python ones (`ruff check .` is a CI gate, `ruff format` is not);
+`n1b_reflow.py` wrapped the C++ ones (clang-format 22.1.2) and the Python ones were wrapped by hand.
+
+**The proof,** on this machine (WSL2, GCC 16 and Clang 22; `c7-before` is the commit before the stage):
+
+| proof | result |
+|---|---|
+| builds, `-Werror`, every default target | GCC and Clang clean; the shared Debug tree has the one failure it had before |
+| the whole ctest, GCC and Clang | 3,466 of 3,466 pass in each, before and after; the same 5 skipped; per-test outcomes identical by name. One run failed `group: a paired test sink decodes AC-4 sent over the extension role` (`0 == 256`) while other checks were loading the machine; it passes 25 times in a row on each tree and in a rerun of the whole ctest on an idle machine |
+| ctest's names | identical to the before-names, a label added |
+| pinned bitstream hashes, CLI corpus (44 commands) | identical, both compilers |
+| exported names of every shared library | identical |
+| installed tree | the same 213 files (203 regular, 10 symlinks) in both. Built with `git describe` pinned (a `git` that answers the stamping queries alike in both trees): the 12 ELF files have identical `.text` (5 are byte-identical), and so has every member of the 9 static archives; the 47 text files differ in comments only, 39 by a respelled path. Unpinned, `forge`, `hearth` and `libiclforge_base.so` differ, because `version_details()` folds the commit's `git describe` into code |
+| IR of every unit (840, tests included) | 502 identical, 244 identical but for the whitespace of an assertion's text, 94 differing, none in code: the test units' strings that hold a directory (the scratch directory moved by design; the golden directories read the same but for the length of the worktree's name) and the `std::filesystem::path` instantiations named by those lengths; `git describe` in `version.cpp` and the units that print it; Hearth's generated Qt units (the resource tables, and 28 QML cache units, which regenerated in the before-tree equal the after-tree's once the tree path is normalised: 22 of the before-tree's copies were stale) |
+| C and C++ edits since the parent | 1,009 of 1,010 files differ in comments, includes, layout and paths only; the other in a diagnostic string that now names `tools/fuzz/README.md` |
+| public headers | the same 174, the same names; the `#include` lines of the 189 files edited are identical |
+| bare-metal probes (QEMU, `--icount`) | five variants, the probes' own output (instructions per frame, heap, stack) identical byte for byte |
+| libFuzzer harnesses (Clang, `ICLFORGE_BUILD_FUZZERS`) | the same 23 build and the same one does not (below); the 21 that are not differential replay the same 258 seed and regression inputs and exit 0 in both trees |
+| `check_layering.py`, `check_namespaces.py`, `check_pages.py`, `check_doc_paths.py` | 228 edges in 21 pairs, 172 headers and 4 known debts, 0 problems, 0 missing: all as before |
+| `precheck.py --unit`, `mkdocs build --strict`, `ruff check .` | pass; ruff has no finding the before-tree did not |
+| the CI planners | the same answers for 3,185 files and 120 commits |
+| `check_platform_macros.ps1` | not run (no PowerShell); its scan, redone in Python, covers the same 1,329 files and finds the same 2 lines |
+| the ESP-IDF packer's staging (`stage()`, with and without `--with-ac4`) | the before-list of files (394 and 504), with the three CMake modules under `lib/cmake`; `lib/src/<lib>` is `lib/libs/<lib>` |
+
+**Not run here, and recorded rather than skipped:** MSVC `/W4 /WX` and clang-cl; macOS; the Android
+build; ESP-IDF `pack_esp_component.py --verify` and the boards (the staging was compared, the build
+was not); the Python, Rust and WASM test suites (`pybind11`, `cargo` and `emcc` are not installed);
+SonarCloud and CodeQL; the workflows themselves (their paths, filters and caches are read, not run).
+
+**What C7-1 leaves.** `tests/{cli,gui,hearth,crucible}` and `iclforge-apps-tests` (C7-2);
+`apps/common`; `tests/golden` and the `golden/…` include root of the four `ac3` tests that read the
+generated tables (C7-4); `layering.json` and its debt files, still the libraries' alone (C7-5);
+`.git-blame-ignore-revs`, which the consolidation stages did not extend either, gets the rewrite
+commits of C0 to C7 when they land on `main`.

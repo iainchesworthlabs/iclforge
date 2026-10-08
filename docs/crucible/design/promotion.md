@@ -967,7 +967,7 @@ compiling and linking is done; the universal merge has not run. The application 
 run by anyone here**; see below.
 
 !!! note "Written 2026-09-06: both halves exist and compile; almost none of it has run"
-    `src/audio/src/backend/macos/process_tap.{hpp,mm}`,
+    `libs/audio/src/backend/macos/process_tap.{hpp,mm}`,
     `apps/crucible/engine/platform/macos/` and `apps/crucible/ui/platform/macos/` are all
     written, and the root guard in `CMakeLists.txt` is now `WIN32 OR APPLE OR LINUX` — macOS is a
     supported platform rather than an excluded one.
@@ -1735,7 +1735,7 @@ compiled on CI, and its device-free logic can be unit tested, and none of that e
 it works. The demo page's discipline applies: what is claimed is what was checked.
 
 **Both halves of Phase 5 were written on 2026-09-06, and the same day something ran them.** The
-library gained the Core Audio process tap (`src/audio/src/backend/macos/process_tap.{hpp,mm}`);
+library gained the Core Audio process tap (`libs/audio/src/backend/macos/process_tap.{hpp,mm}`);
 there is a `macos` directory under both `apps/crucible/engine/platform/` and
 `apps/crucible/ui/platform/`; and macOS is a supported platform in the root `CMakeLists.txt`
 rather than an excluded one. Both legs compile and link all of it, after a first attempt that

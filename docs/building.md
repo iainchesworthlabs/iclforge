@@ -614,7 +614,7 @@ Both runners gate it at 1,024 — deliberately tight, because nothing here grows
 the scratch is handed back or it is not, and the difference is five figures.
 [The ESP32-S3 page](platforms/bare-metal/esp32-s3.md#objects) has what it unblocked.
 
-**A float32-only path — met for the decode path.** `src/ac3/variants/decode-scalar-{float32,float64}/`'s
+**A float32-only path — met for the decode path.** `libs/ac3/variants/decode-scalar-{float32,float64}/`'s
 seam carries `decode_scalar_t`: `float` under this profile, `double` by default in every other
 build, and selectable there with `-DICLFORGE_DECODE_SCALAR=float`. Both
 decoders' coefficient stores, transform scratch and overlap-add history follow it, and
@@ -688,7 +688,7 @@ the fixed one. The plan, phases, and measurements are in
 [`planning/arithmetic-tiers.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/arithmetic-tiers.md).
 
 **And the encoders' analysis front end, on its own axis.**
-`src/ac3/variants/encode-scalar-{float64,float32}/` carries `encode_scalar_t`: the type
+`libs/ac3/variants/encode-scalar-{float64,float32}/` carries `encode_scalar_t`: the type
 the two encoders run in, from transient detection and the forward transform through the
 coefficient store, the coupling, spectral-extension and enhanced-coupling analyses and fits, the
 dither and delta-segment decisions and the fixed-point conversion - `double` by default, `float`
@@ -1274,7 +1274,7 @@ a directory CMake chooses — never from an `#ifdef`. `libs/base/variants/` hold
 `iclforge/base/detail/simd.hpp`; `libs/base/CMakeLists.txt` puts exactly one of them on
 `iclforge::base_headers`'s include path, which `iclforge_ac3_objects` and `libs/ac4/src/core` link, so every `#include "iclforge/base/detail/simd.hpp"` in the
 core resolves to it and no translation unit ever asks what it is being compiled for. This is the
-same mechanism `src/base/variants/profiling-tracy_{enabled,disabled}/` uses for the
+same mechanism `libs/base/variants/profiling-tracy_{enabled,disabled}/` uses for the
 profiling seam and `libs/audio/src/backend/<backend>/` uses for the operating system, and it is what
 `tools/checks/check_platform_macros.ps1` exists to keep true (no preprocessor conditional anywhere
 in `src/`, `apps/`, `tests/`, `fuzz/`, `examples/`, `tools/` or `python/`).

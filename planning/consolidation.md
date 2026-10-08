@@ -1006,7 +1006,7 @@ Not run here: as for C6, and the ESP32 boards' own timings, which the Cortex-M3 
 
 ### What C3 and C6 left, closed 2026-10-08 (`chore/src-consolidation-reflow`, `-exclude`)
 
-- **C3's reflow.** `n1b_reflow.py --base 9bc5a540e --until-stable` with clang-format 22.1.2 (the S3
+- **C3's reflow.** `n1b_reflow.py --base 8c89f8c73 --until-stable` with clang-format 22.1.2 (the S3
   run's, installed from PyPI by hash into `build/`): 642 lines in 164 files that C3's passes and the
   later ones pushed past 100 columns, the second pass stable. Every changed file is the same code and
   the same comment words once comments and white space are set aside; the build, the 3,466 tests, the
