@@ -71,7 +71,7 @@ class PlatformOnlyChangeTest(unittest.TestCase):
 
 
 class SharedDesktopAppTest(unittest.TestCase):
-    """apps/forge/cli/src, apps/forge/gui, apps/shared/media/src, apps/crucible, apps/hearth: one program on three OSes."""
+    """The forge programs, apps/shared, apps/crucible and apps/hearth: one program on three OSes."""
 
     def test_shared_cli_change_lights_all_three_desktop_platforms_only(self):
         hits = gate.classify(["apps/forge/cli/src/commands/audio_io.cpp"])

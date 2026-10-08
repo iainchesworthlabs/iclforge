@@ -112,7 +112,9 @@ def respell(text: str, rs, known: set[str], dirs: set[str]) -> tuple[str, int, l
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--root", default=".")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()

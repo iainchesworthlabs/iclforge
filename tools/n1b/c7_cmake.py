@@ -19,9 +19,11 @@ not move but whose build file did, writes it again in the same form from the fil
 
 from __future__ import annotations
 
+import argparse
 import json
 import posixpath
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -158,7 +160,8 @@ def rewrite_cmake(text: str, f_old: str, f_new: str, tree: Tree, listed: list[st
                 listed.append(f"{f_new}: a split directory: {tok} ({p_old})")
             return tok
         base_new = own_new if var == "CMAKE_CURRENT_LIST_DIR" else new_cur
-        if new_target == p_old and base_new == (own_old if var == "CMAKE_CURRENT_LIST_DIR" else base_cur):
+        old_base = own_old if var == "CMAKE_CURRENT_LIST_DIR" else base_cur
+        if new_target == p_old and base_new == old_base:
             return tok
         if form == "rel" and "/" not in tok and kind == "file" and new_target == p_old:
             return tok
@@ -190,8 +193,6 @@ def main() -> int:
     root = Path(a.root)
     plan = json.loads(Path(a.plan).read_text(encoding="utf-8"))
     moves = plan["moves"]
-    import subprocess
-
     now = subprocess.run(["git", "-C", str(root), "ls-files"], capture_output=True, text=True,
                          check=True).stdout.splitlines()
     old_of = {new: old for old, new in moves.items()}
@@ -219,7 +220,8 @@ def main() -> int:
             changed += 1
             if not a.dry_run:
                 p.write_bytes(out.encode("utf-8"))
-    print(f"{'would change' if a.dry_run else 'changed'} {changed} files; catalogue locations {ts_stats}")
+    verb = "would change" if a.dry_run else "changed"
+    print(f"{verb} {changed} files; catalogue locations {ts_stats}")
     if a.report:
         Path(a.report).write_text("\n".join(sorted(set(listed))) + "\n", encoding="utf-8")
     for line in sorted(set(listed))[:60]:
@@ -228,9 +230,9 @@ def main() -> int:
 
 
 def argparse_parser():
-    import argparse
-
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--root", default=".")
     ap.add_argument("--plan", required=True)
     ap.add_argument("--dry-run", action="store_true")

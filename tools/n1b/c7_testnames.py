@@ -3,10 +3,10 @@
 
     c7_testnames.py [--root <worktree>] [--dry-run]
 
-`iclforge-tests` was the one Catch2 binary of every test (planning/monorepo.md, (e)); since C7-1 it is
-the umbrella target that builds the per-project binaries, and since C7-2 the products' tests are
-beside the programs. A comment under apps/ that says a thing "is held by iclforge-tests", "rides
-iclforge-tests" or "compiles into iclforge-tests" means the binary of the program it is in:
+`iclforge-tests` was the one Catch2 binary of every test (planning/monorepo.md, (e)); since C7-1
+it is the umbrella target that builds the per-project binaries, and since C7-2 the products' tests
+are beside the programs. A comment under apps/ that says a thing "is held by iclforge-tests",
+"rides iclforge-tests" or "compiles into iclforge-tests" means the binary of the program it is in:
 
     apps/forge/cli                            iclforge-forge-cli-tests
     apps/forge/gui                            iclforge-forge-gui-tests
@@ -15,8 +15,8 @@ iclforge-tests" or "compiles into iclforge-tests" means the binary of the progra
     apps/hearth                               iclforge-hearth-tests
     apps/crucible                             iclforge-crucible-tests
 
-A quoted `"iclforge-tests"` is a string the program or its test reads (the Qt Quick harness sets it as
-the organisation name) and is left, and so is a file outside apps/.
+A quoted `"iclforge-tests"` is a string the program or its test reads (the Qt Quick harness sets
+it as the organisation name) and is left, and so is a file outside apps/.
 
 A bare `tests/CMakeLists.txt` in a comment meant the one build file of every test; the file that
 holds the thing the comment is about is the tests/ CMakeLists.txt beside the project (a library's, a
@@ -48,8 +48,14 @@ GUI_QML = re.compile(r"(?<![A-Za-z0-9_-])apps/forge/gui/tests/CMakeLists\.txt")
 # The tests/CMakeLists.txt a bare mention means, by the file that makes it (first prefix that fits).
 TESTS_FILE = (
     ("apps/hearth/ui/tests/test_hearth_controller.cpp", "apps/hearth/engine/tests/CMakeLists.txt"),
-    ("apps/crucible/ui/tests/test_desktop_entries.cpp", "apps/crucible/engine/tests/CMakeLists.txt"),
-    ("apps/crucible/ui/tests/test_translations.cpp", "apps/crucible/engine/tests/CMakeLists.txt"),
+    (
+        "apps/crucible/ui/tests/test_desktop_entries.cpp",
+        "apps/crucible/engine/tests/CMakeLists.txt",
+    ),
+    (
+        "apps/crucible/ui/tests/test_translations.cpp",
+        "apps/crucible/engine/tests/CMakeLists.txt",
+    ),
     ("apps/crucible/CMakeLists.txt", "apps/crucible/engine/tests/CMakeLists.txt"),
     ("apps/crucible/engine/", "apps/crucible/engine/tests/CMakeLists.txt"),
     ("apps/crucible/ui/", "apps/crucible/ui/tests/CMakeLists.txt"),
@@ -64,7 +70,9 @@ LIBRARY = re.compile(r"^libs/([^/]+)/")
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--root", default=".")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()

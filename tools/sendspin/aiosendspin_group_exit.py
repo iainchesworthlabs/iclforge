@@ -6,9 +6,10 @@ reference Python player plays one programme" - read against A4's own exit and Ve
 doc), which always means a real aiosendspin process by that phrase, never a second in-process test
 double (aiosendspin_exit.py's own docstring is the A4 case this mirrors).
 
-Starts the scripted player in aiosendspin_player.py on a loopback port, runs iclforge-hearth-tests's hidden
-[aiosendspin-group] case (apps/hearth/engine/tests/test_aiosendspin_group.cpp) with the player's URL, token and
-a directory, and checks what the player took against programme.wav, the case's own local decode and
+Starts the scripted player in aiosendspin_player.py on a loopback port, runs iclforge-hearth-tests's
+hidden [aiosendspin-group] case (apps/hearth/engine/tests/test_aiosendspin_group.cpp) with the
+player's URL, token and a directory, and checks what the player took against programme.wav, the
+case's own local decode and
 render of the programme, carried through the same full-scale-to-16-bit rescale
 NetworkGroupSink::submit_pcm() and Group::rescaled() apply before a PCM member's encoder ever sees a
 sample (that file's own header comment has the detail) - one PCM stream, ended, decoding sample for

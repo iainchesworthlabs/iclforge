@@ -60,7 +60,9 @@ KINDS: dict[str, re.Pattern[str]] = {
         r"(?![A-Za-z0-9_-])"
     ),
     "tests-prod": re.compile(
-        START + r"tests/(?:cli|gui|hearth|crucible)(?:/|\b)|\}/tests/(?:cli|gui|hearth|crucible)(?:/|\b)"
+        START
+        + r"tests/(?:cli|gui|hearth|crucible)(?:/|\b)"
+        + r"|\}/tests/(?:cli|gui|hearth|crucible)(?:/|\b)"
     ),
     "prog-files": re.compile(
         r"apps/(?:hearth|crucible)/(?:engine|ui|render|testsink|testserver|runner)/"

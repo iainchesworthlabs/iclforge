@@ -152,8 +152,9 @@ TONES_HZ = (440.0, 620.0, 800.0, 90.0, 1030.0, 1270.0)
 TOP_TONES_HZ = (1490.0, 1730.0, 1970.0, 2210.0)
 ENCODER_SECONDS = 4
 # --engine: the layout of a stream's own channels, in the order forge decode writes them. The
-# heights take the locations Hearth's engine places them at (apps/hearth/engine/src/stream_decoder.cpp):
-# Tfl and Tfr at Vhl and Vhr, Tbl and Tbr at Lts and Rts, and an immersive layout's Lb and Rb at
+# heights take the locations Hearth's engine places them at
+# (apps/hearth/engine/src/stream_decoder.cpp): Tfl and Tfr at Vhl and Vhr, Tbl and Tbr at Lts and
+# Rts, and an immersive layout's Lb and Rb at
 # Lrs and Rrs. Eight channels are left out, being 7.1 or 5.1.2 by the count alone.
 ENGINE_LAYOUTS = {
     1: "1.0",

@@ -3,9 +3,9 @@
     c7_moves.py --root <worktree> --commit <hash> --json <plan.json>
 
 consol_apply.py resolves a stage's plan on the tree as it was before the moves, so it cannot be run
-again once they are made. consol_cmake.py, consol_paths.py and c7_cmake.py need the map (`moves`: old
-path -> new path); the commit that holds the renames alone (every rename R100) has it. Writes the same
-`{"moves": {...}}` shape and fails if the commit holds anything but R100 renames.
+again once they are made. consol_cmake.py, consol_paths.py and c7_cmake.py need the map (`moves`:
+old path -> new path); the commit that holds the renames alone (every rename R100) has it. Writes
+the same `{"moves": {...}}` shape and fails if the commit holds anything but R100 renames.
 """
 
 from __future__ import annotations
@@ -32,7 +32,9 @@ def moves_of(root: str, commit: str) -> dict[str, str]:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--root", default=".")
     ap.add_argument("--commit", required=True, help="the commit of the renames alone")
     ap.add_argument("--json", required=True)

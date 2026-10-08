@@ -193,7 +193,8 @@ what that forge's probe and decode made of the stream. G0's streams get their MP
 DIR/mp4/<leg>/. With --cli, the objects group builds its ADM BWF masters with that forge
 (DIR/masters/<name>/, atmos-encode then decode's adm_out) and checks them with atmos_info.
 Every AC-4 leg's syntax digest goes to <scratch>/census/, for the census comparison:
-AC4_GOLDEN_DIR=<scratch>/census AC4_STREAM_DIR=DIR/streams iclforge-ac4-tests "[ac4][decoder][syntax]".
+AC4_GOLDEN_DIR=<scratch>/census AC4_STREAM_DIR=DIR/streams
+iclforge-ac4-tests "[ac4][decoder][syntax]".
 
 What DEE 6.5.4 could not be made to write (G1's audit, recorded in the manifest's g1_dee_cannot):
 7.1 AC-4 (eight channels in come out as 5.1), 7.1.4 or 9.1.6 AC-4, any frame rate but index 13
@@ -333,8 +334,8 @@ _DRC_AND_LTRT = ("drc_profile=film_standard:drc_profile_portable_hp=speech:"
 # walk that disagrees stops main() before anything in the tree changes.
 LEGS = [
     # libs/ac4/tests/core/test_toc.cpp pins this stream's frame count and its MediaInfo-checked TOC
-    # fields; apps/forge/cli/tests and tools/fuzz/generate-seeds.sh read it too. "pinned": main() refuses to
-    # replace it with different bytes, so it keeps DEE's defaults.
+    # fields; apps/forge/cli/tests and tools/fuzz/generate-seeds.sh read it too. "pinned": main()
+    # refuses to replace it with different bytes, so it keeps DEE's defaults.
     {"name": "ac4-stereo-64", "encoder": AC4, "source": "reference_stereo", "layout": "stereo",
      "kbps": 64, "options": [], "pinned": True,
      "expect": {"frame_rate_index": 13, "codec_mode": "ASPX"}},

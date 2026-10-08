@@ -155,7 +155,9 @@ PROSE_PATHS_UNCHECKED = {
     "docs/crucible/design/promotion.md": (
         "phase record; names the layout from before Crucible's promotion"
     ),
-    "docs/platforms/windows-demo.md": "phase record; names the layout from before Crucible's promotion",
+    "docs/platforms/windows-demo.md": (
+        "phase record; names the layout from before Crucible's promotion"
+    ),
     "CHANGELOG.md": "released entries are an immutable record of the tree as it was",
 }
 
