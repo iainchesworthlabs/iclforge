@@ -338,3 +338,39 @@ scoring venv was).
 13. **The scripts afterwards.** (a) **retire `tools/n1b` and the consolidation scripts once C7 is
     proved** (recommended), keeping `adapt_branch.ps1` and the move maps until the open branches are
     adapted; (b) keep them.
+
+Raised by the sample tree the user gave with decision 2 (`libs/<lib>/{include,src,tests}`,
+`apps/<app>/{src,assets}`, `external/`):
+
+14. **Third-party code.** (a) **`external/<name>/`** for what the tree carries (today one vendored
+    library, `src/sendspin/third_party/time-filter`, 6 files with its `LICENSE` and `VENDORED.md`),
+    and the FetchContent declarations (fmt, Catch2, libadm and libbw64) in `cmake/External.cmake`
+    pointing at it or fetching into the build tree, as now (recommended: vcpkg stays the manager for
+    what it provides); (b) `external/` holds FetchContent's sources as git submodules too; (c) the
+    vendored library stays inside `sendspin`, the project that uses it.
+15. **A program's directory.** (a) **`apps/<product>/<program>/{CMakeLists.txt, src/, assets/,
+    tests/}`** (recommended): sources in `src/`, Qt resources (fonts, icons, QML, translations) in
+    `assets/`; about 270 more moves inside the products, `.qrc` and `qt_add_qml_module` paths
+    rewritten. (b) A program's sources at its directory's root, as now.
+
+**Taken on 2026-10-08:** 1 (a) `libs/`; 2 (a) separate `include/iclforge/<lib>/` and `src/`, the
+user's sample tree with each library's `include/`, `src/`, `tests/` and `CMakeLists.txt`; 3 (a)
+tests and fuzz beside each project; 4 (a) apps by product.
+
+Raised by the sample tree the user gave with decision 2 (`libs/<lib>/{include,src,tests}`,
+`apps/<app>/{src,assets}`, `external/`):
+
+14. **Third-party code.** (a) **`external/<name>/`** for what the tree carries (today one vendored
+    library, `src/sendspin/third_party/time-filter`, 6 files with its `LICENSE` and `VENDORED.md`),
+    and the FetchContent declarations (fmt, Catch2, libadm and libbw64) in `cmake/External.cmake`
+    pointing at it or fetching into the build tree, as now (recommended: vcpkg stays the manager for
+    what it provides); (b) `external/` holds FetchContent's sources as git submodules too; (c) the
+    vendored library stays inside `sendspin`, the project that uses it.
+15. **A program's directory.** (a) **`apps/<product>/<program>/{CMakeLists.txt, src/, assets/,
+    tests/}`** (recommended): sources in `src/`, Qt resources (fonts, icons, QML, translations) in
+    `assets/`; about 270 more moves inside the products, `.qrc` and `qt_add_qml_module` paths
+    rewritten. (b) A program's sources at its directory's root, as now.
+
+**Taken on 2026-10-08:** 1 (a) `libs/`; 2 (a) separate `include/iclforge/<lib>/` and `src/`, the
+user's sample tree with each library's `include/`, `src/`, `tests/` and `CMakeLists.txt`; 3 (a)
+tests and fuzz beside each project; 4 (a) apps by product.
