@@ -71,8 +71,9 @@ bool claim_temp_path(const std::string& path) {
 
 // A from-scratch MSB-first bit writer (SMPTE ST 2098-2:2022 §5.1), used only to build this
 // fixture - independent of libs/iab's own reader, the same "independent fixture" convention
-// libs/iab/tests/test_ac3iab.cpp and examples/read_iab.cpp already establish (a third copy is within
-// this project's own established limit - see encode_adm.cpp's identical note for its ADM fixture).
+// libs/iab/tests/test_ac3iab.cpp and examples/read_iab.cpp already establish (a third copy is
+// within this project's own established limit - see encode_adm.cpp's identical note for its ADM
+// fixture).
 class BitWriter {
    public:
     void push_bits(std::uint64_t value, unsigned width) {

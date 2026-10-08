@@ -25,9 +25,9 @@
 // build-pw/src/<library>/libiclforge_<library>_static.a.
 //
 //   g++ -std=c++23 -O1 -o /tmp/ptprobe tools/checks/passthrough_probe.cpp
-//       -Isrc/audio/include -Isrc/ac3/include -Ibuild-pw/src/ac3/generated
+//       -Ilibs/audio/include -Ilibs/ac3/include -Ibuild-pw/libs/ac3/generated
 //       $(pkg-config --cflags libpipewire-0.3) -DICLFORGE_AC3_STATIC_DEFINE
-//       build-pw/src/audio/libiclforge_audio.a build-pw/src/ac3/libiclforge_ac3_static.a
+//       build-pw/libs/audio/libiclforge_audio.a build-pw/libs/ac3/libiclforge_ac3_static.a
 //       build-pw/vcpkg_installed/arm64-linux/lib/libfmt.a
 //       $(pkg-config --libs libpipewire-0.3) -lpthread
 //

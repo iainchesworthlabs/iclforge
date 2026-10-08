@@ -1067,9 +1067,9 @@ TEST_CASE("a fmt whose block alignment overflows 16 bits is refused outright", "
 // <fmt > chunk, which is what made the old find_chunk() walk past <data> instead of stopping at
 // the chunk it was looking for. Kept as a regression against the code that replaced it: this
 // exact fixture (and the one the fuzzer produced, past a mutated "fmp ",
-// libs/adm/fuzz/regressions/fuzz_adm_parse/chunk-size-wraps-the-walk) now reaches libbw64's own reader
-// instead, missing its mandatory <fmt > chunk, and should fail cleanly rather than hang either
-// way.
+// libs/adm/fuzz/regressions/fuzz_adm_parse/chunk-size-wraps-the-walk) now reaches libbw64's own
+// reader instead, missing its mandatory <fmt > chunk, and should fail cleanly rather than hang
+// either way.
 TEST_CASE("a chunk size that once wrapped the retired float-detection walk still parses cleanly",
           "[adm]") {
     Bytes body;

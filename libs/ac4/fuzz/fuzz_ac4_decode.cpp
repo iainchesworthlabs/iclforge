@@ -7,8 +7,8 @@
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 
-// iclforge::ac4::Decoder::parse and iclforge::ac4::Decoder::decode (libs/ac4/src/decoder) - the AC-4
-// decoder's syntax layer, and the reconstruction to PCM behind decode().
+// iclforge::ac4::Decoder::parse and iclforge::ac4::Decoder::decode (libs/ac4/src/decoder) - the
+// AC-4 decoder's syntax layer, and the reconstruction to PCM behind decode().
 //
 // Below the table of contents that fuzz_ac4_parse presses, every substream is
 // a run of counts the stream chooses: section lengths and escapes, Huffman

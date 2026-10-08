@@ -281,7 +281,7 @@ void Mdct<Real>::forward(std::span<const Real> in, std::span<Real> spectrum) {
 
 template class Imdct<Real>;
 template class Mdct<Real>;
-// The encoder's forward transform (src/ac4/src/encoder/frame/analysis.cpp,
+// The encoder's forward transform (libs/ac4/src/encoder/frame/analysis.cpp,
 // psycho.cpp) calls Mdct at double regardless of the decoder's scalar, and
 // the core's own tests (libs/dsp/tests/tiered/test_dsp.cpp) exercise both
 // Mdct and Imdct at double directly, alongside Real, to check the pseudocode

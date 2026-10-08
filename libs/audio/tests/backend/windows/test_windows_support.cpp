@@ -17,8 +17,8 @@
 //
 // CMake adds this file to the suite only when it selected the windows/
 // platform directory, and puts that directory on the include path - the same
-// selection libs/audio/tests/backend/alsa, libs/audio/tests/backend/android and libs/audio/tests/backend/macos
-// already use for their own backend's internal header.
+// selection libs/audio/tests/backend/alsa, libs/audio/tests/backend/android and
+// libs/audio/tests/backend/macos already use for their own backend's internal header.
 
 using iclforge::windows_audio::stream_gone;
 

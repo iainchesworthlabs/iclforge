@@ -341,12 +341,13 @@ inline CompareResult compare_pcm(const std::vector<std::vector<float>>& ours,
 // clang-tidy assert/NDEBUG blindspot this project has already been bitten
 // by once), so an assert() here would silently compile out.
 [[noreturn]] inline void report_divergence(const char* codec_label, double worst_channel_snr_db) {
-    std::fprintf(stderr,
-                 "iclforge differential fuzzer: %s decode diverges from FFmpeg's own decode of "
-                 "the SAME bitstream (worst-channel agreement %.2f dB, floor %.2f dB) - both "
-                 "decoders accepted this input as valid. See tools/fuzz/README.md's \"when a fuzzer "
-                 "finds something\" section.\n",
-                 codec_label, worst_channel_snr_db, kMinAgreementDb);
+    std::fprintf(
+        stderr,
+        "iclforge differential fuzzer: %s decode diverges from FFmpeg's own decode of "
+        "the SAME bitstream (worst-channel agreement %.2f dB, floor %.2f dB) - both "
+        "decoders accepted this input as valid. See tools/fuzz/README.md's \"when a fuzzer "
+        "finds something\" section.\n",
+        codec_label, worst_channel_snr_db, kMinAgreementDb);
     std::fflush(stderr);
     std::abort();
 }

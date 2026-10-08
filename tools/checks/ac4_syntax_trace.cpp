@@ -23,14 +23,14 @@
 // build tree in <b>:
 //
 //   cl /nologo /std:c++latest /EHsc /utf-8 /MD /O2 /DICLFORGE_AC4_STATIC_DEFINE
-//      /Isrc/ac4/include /I<b>/src/ac4/generated tools/checks/ac4_syntax_trace.cpp
-//      /link <b>/src/ac4/iclforge_ac4_static.lib
+//      /Ilibs/ac4/include /I<b>/libs/ac4/generated tools/checks/ac4_syntax_trace.cpp
+//      /link <b>/libs/ac4/iclforge_ac4_static.lib
 //
 // With GCC or Clang:
 //
 //   g++ -std=c++23 -O2 -o ac4_syntax_trace tools/checks/ac4_syntax_trace.cpp
-//      -DICLFORGE_AC4_STATIC_DEFINE -Isrc/ac4/include -I<b>/src/ac4/generated
-//      <b>/src/ac4/libiclforge_ac4_static.a
+//      -DICLFORGE_AC4_STATIC_DEFINE -Ilibs/ac4/include -I<b>/libs/ac4/generated
+//      <b>/libs/ac4/libiclforge_ac4_static.a
 
 #include <cstddef>
 #include <cstdio>

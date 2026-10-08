@@ -104,14 +104,14 @@ constexpr int kFrames = 8;
 constexpr int kPulseAt = 3 * iclforge::ac3::kSamplesPerFrame + 512;
 
 // The object's whole-clip audio: a decaying tone burst riding a quiet noise floor. The floor is not
-// decoration - JOC's reconstruction matrix is solved per frame from the object's own energy that frame
-// (TS 103 420 §6.6.5 interpolates each frame's from the one before), so a pulse arriving out of true
-// silence comes back through a matrix still ramping up across it, smearing exactly the peak a
-// correlation is trying to locate. Flat, low-level energy in every frame keeps the matrix settled -
-// libs/render/tests/test_object_lfe_timing.cpp's own programme() makes the identical argument for the
-// header-only renderer's regression test. The burst itself, not a steady tone, for the reason
-// libs/ac3/tests/decoder/test_latency.cpp's own burst() gives: a sinusoid correlates with itself a period away
-// almost as well as at zero lag, which would make a lag search meaningless.
+// decoration - JOC's reconstruction matrix is solved per frame from the object's own energy that
+// frame (TS 103 420 §6.6.5 interpolates each frame's from the one before), so a pulse arriving out
+// of true silence comes back through a matrix still ramping up across it, smearing exactly the peak
+// a correlation is trying to locate. Flat, low-level energy in every frame keeps the matrix settled
+// - libs/render/tests/test_object_lfe_timing.cpp's own programme() makes the identical argument for
+// the header-only renderer's regression test. The burst itself, not a steady tone, for the reason
+// libs/ac3/tests/decoder/test_latency.cpp's own burst() gives: a sinusoid correlates with itself a
+// period away almost as well as at zero lag, which would make a lag search meaningless.
 std::vector<float> object_pulse_with_floor(int samples, int at) {
     std::vector<float> pcm(static_cast<std::size_t>(samples), 0.0F);
     std::uint32_t state = 0x9E3779B9U;

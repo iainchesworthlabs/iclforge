@@ -159,8 +159,8 @@ Bytes build_pcm16_3ch(int frames) {
     return data;
 }
 
-// Byte-identical to libs/adm/tests/test_adm_bridge.cpp's own kBridgeTestAdmXml: two DirectSpeakers bed
-// channels pinned at the 5.1 ring's L (+30) and R (-30); one Objects channel that holds at SR
+// Byte-identical to libs/adm/tests/test_adm_bridge.cpp's own kBridgeTestAdmXml: two DirectSpeakers
+// bed channels pinned at the 5.1 ring's L (+30) and R (-30); one Objects channel that holds at SR
 // (-110, this project's own kSR ring constant) for 3 frames (0.096s), then jumps (jumpPosition=1,
 // no interpolationLength) to dead ahead (0 degrees / centre) and holds.
 constexpr std::string_view kAdmXml = R"(<?xml version="1.0" encoding="UTF-8"?>

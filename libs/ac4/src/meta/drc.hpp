@@ -10,7 +10,8 @@
 //
 // Levels and gains are in dB2 (Part 1 clause 3.4: 6 dB2 is a factor of 2), as the control points
 // (4.3.13.4.1) and the transmitted gains (5.7.9.3.2) are; the curve's conversion that clause
-// 5.7.9.3.1.2 prints as 10^(G/20) is taken as 2^(G/6) with them (libs/ac4/ERRATA.md, "DRC's units").
+// 5.7.9.3.1.2 prints as 10^(G/20) is taken as 2^(G/6) with them (libs/ac4/ERRATA.md, "DRC's
+// units").
 //
 // The level detector, which clause 5.7.9.3.1.1 leaves to the implementation, is ITU-R BS.1770's
 // K-weighted power of the channels with its channel weights (1 for the front channels, 1.41 for

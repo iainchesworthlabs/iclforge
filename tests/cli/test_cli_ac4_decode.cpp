@@ -385,8 +385,8 @@ fs::path hsf_stream(const std::string& name) {
 
 TEST_CASE("decode writes AC-4 at 96 and 192 kHz at the rate it decodes at", "[cli][ac4][hsf]") {
     const auto log = scratch_dir() / "ac4_hsf.log";
-    // libs/ac4/tests/decoder/hsf.cpp's constructed streams: the tone of each channel is above 24 kHz
-    // (the right channel of the first, the only one of the second), so it is in the output only
+    // libs/ac4/tests/decoder/hsf.cpp's constructed streams: the tone of each channel is above 24
+    // kHz (the right channel of the first, the only one of the second), so it is in the output only
     // where the HSF extension was decoded into a transform of 2 or 4 times the base length.
     struct Leg {
         const char* name;

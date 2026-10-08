@@ -47,8 +47,8 @@ namespace {
 // A real Dirac/instantaneous jump has no representation in KeyframePath's piecewise-linear model
 // (two keyframes cannot share one time_s - see
 // iclforge::objects::oba::PathError::kDuplicateTimestamp). This is the same resolution
-// libs/ac3/tests/oba/test_atmos_motion.cpp's own make_holds() helper relies on implicitly: every caller
-// in this codebase samples ObjectPath::evaluate() once per encoded frame
+// libs/ac3/tests/oba/test_atmos_motion.cpp's own make_holds() helper relies on implicitly: every
+// caller in this codebase samples ObjectPath::evaluate() once per encoded frame
 // (iclforge::ac3::kSamplesPerFrame = 1536 samples, 32 ms at 48 kHz - see
 // iclforge::ac3::oba::AtmosEncoder:: encode_frame's own doc comment, "one placement per frame"), so
 // any transition faster than one frame period is already indistinguishable from instantaneous at

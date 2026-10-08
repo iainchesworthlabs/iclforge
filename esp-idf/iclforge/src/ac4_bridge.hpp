@@ -5,12 +5,12 @@
 // this only when CONFIG_ICLFORGE_AC4 is on, and with it off none of this is in
 // the build.
 //
-// The decoder itself is libs/ac4/src/decoder's iclforge::ac4::Decoder, in the float scalar, built as
-// a static archive with the minimum-footprint profile's compile options
-// (ICLFORGE_MINIMAL_AC4, root CMakeLists.txt). It is asked for what a player
-// asks of the AC-3 and E-AC-3 decoders: blocks of 256 samples a channel, handed
-// to a callback as the decoder completes them (iclforge::ac4::Decoder::decode_by_block),
-// so the player holds one block of the audio and not a frame's worth.
+// The decoder itself is libs/ac4/src/decoder's iclforge::ac4::Decoder, in the float scalar, built
+// as a static archive with the minimum-footprint profile's compile options (ICLFORGE_MINIMAL_AC4,
+// root CMakeLists.txt). It is asked for what a player asks of the AC-3 and E-AC-3 decoders: blocks
+// of 256 samples a channel, handed to a callback as the decoder completes them
+// (iclforge::ac4::Decoder::decode_by_block), so the player holds one block of the audio and not a
+// frame's worth.
 
 #include <bit>
 #include <cstddef>

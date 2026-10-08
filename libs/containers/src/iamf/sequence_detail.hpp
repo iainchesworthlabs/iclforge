@@ -11,7 +11,8 @@
 #include "obu_io.hpp"
 
 // Shared by the OBU writer (sequence_write.cpp) and reader (sequence_read.cpp): the OBU header
-// fields, parameter definition coding and the parameter index. Internal to libs/containers/src/iamf.
+// fields, parameter definition coding and the parameter index. Internal to
+// libs/containers/src/iamf.
 
 namespace iclforge::containers::iamf::detail {
 
