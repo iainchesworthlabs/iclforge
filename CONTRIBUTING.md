@@ -37,7 +37,7 @@ PRs target `main`. To merge, a PR must pass the required checks: `Branch Name`, 
 aggregate and the `Scan dependency diff` dependency review. `CI Status` is the pull-request gate
 (`pr-gate.yml`): the static checks, then a Linux GCC build with every test and the gold-reference
 gate. A merge queue serializes landing when several PRs are ready at once, and runs the gate on
-the merged tree with the Qt GUI built, plus Windows MSVC and, for a change under `src/`, a speed
+the merged tree with the Qt GUI built, plus Windows MSVC and, for a change to a library's code (`libs/`, outside its `tests/` and `fuzz/`), a speed
 and a heap-churn comparison against the commit the entry is queued on: a workload that takes
 twice as long, or whose heap churn at least doubles, fails the entry unless the PR carries
 `perf-regression-approved` or `memory-regression-approved`. The rest runs after the merge: the
@@ -77,10 +77,13 @@ If you cannot cite where something came from, it does not go in.
 
 ## Repository layout
 
-**`src/` is the installable library; `apps/` consumes it, never the reverse.** `src/` holds 12
+**`libs/` is the installable library; `apps/` consumes it, never the reverse.** `libs/` holds 12
 libraries. Each is a directory with its own CMake target (`iclforge::<name>`), its own public
-headers (`iclforge/<name>/`) and its own row in `tools/checks/layering.json`, which lists the
-libraries it may include from; `check_layering.py` fails an include its row does not list. A
+headers (`iclforge/<name>/`, under `include/`), its sources (`src/`), its tests (`tests/`, a binary
+of their own: `ctest -L <name>`), its libFuzzer harnesses (`fuzz/`, with their seeds and the inputs
+that once broke them) and its own row in `tools/checks/layering.json`, which lists the libraries it
+may include from; `check_layering.py` fails an include its row does not list, and reads neither
+`tests/` nor `fuzz/`, which consume libraries. A
 library's public headers declare into the namespace named for it under the family's root, and
 `check_namespaces.py` (its table is `tools/checks/namespaces.json`) fails a header that declares
 into another library's namespace, or into `iclforge` itself.
@@ -97,12 +100,12 @@ packing, and the Matroska, MP4, MPEG-TS and IAMF writers and readers, each in a 
 use the AC-3, E-AC-3 and Atmos codec only), and `apps/common` is shared application code,
 compiled directly into its consumers. `apps/windows` holds Crucible's separately licensed
 null-sink driver and its guest VM, `apps/linux` a scripted guest for Crucible's Linux tray, and
-`apps/notices` the licence notices Forge's packages install. Nothing under `src/` may depend on
+`apps/notices` the licence notices Forge's packages install. Nothing under `libs/` may depend on
 anything under `apps/`.
 
-**The tree holds four products, and the directories say which is which.** `src/`
+**The tree holds four products, and the directories say which is which.** `libs/`
 other than `libs/audio` and `libs/sendspin`, the bindings under `python/`, `js/` and `rust/`, and
-`examples/`, `fuzz/` and `apps/baremetal` are **the library**; `iclforge` names it, and names its
+`examples/` and `apps/baremetal` are **the library**; `iclforge` names it, and names its
 packages too. `apps/cli`, `apps/gui` and `apps/common` are **Forge**, the tooling pair, built and
 packaged as one thing. `apps/crucible`, with the driver in `apps/windows`, is **Crucible**.
 `apps/hearth`, `libs/sendspin` and the `hearth_sink` example are **Hearth**. `apps/android` and
@@ -141,7 +144,7 @@ header.
 **One subdirectory per platform audio backend, selected by CMake, never `#ifdef`.**
 `libs/audio/src/backend/{alsa,pipewire,android,macos,posix,windows}` — adding a backend means a
 new directory and a new CMake guard, not a new preprocessor branch. There are no
-preprocessor conditionals in `src/`, `apps/`, `tests/` or `python/` (the C API header's
+preprocessor conditionals in `libs/`, `apps/`, `tests/`, `external/` or `python/` (the C API header's
 `#ifdef __cplusplus` pair is the one exemption, and `esp-idf/` uses Kconfig's `#if CONFIG_*`);
 CI's platform check fails on a new one. Keep it that way.
 
