@@ -22,13 +22,13 @@
 #include <utility>
 #include <vector>
 
-#include "../../../gui/language_manager.hpp"
+#include "../../../shared/preferences/src/language_manager.hpp"
 #include "default_device.hpp"
 #include "session_monitor.hpp"
 #include "slots.hpp"
 #include "virtual_device.hpp"
-#include "../app_icon_provider.hpp"
-#include "../crucible_controller.hpp"
+#include "../src/app_icon_provider.hpp"
+#include "../src/crucible_controller.hpp"
 #include "fake_devices.hpp"
 #include "fake_services.hpp"
 
