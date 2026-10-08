@@ -156,7 +156,7 @@ comes from.
 
 | Lane | Paths that light it directly | Also lit by |
 |---|---|---|
-| `core` | `src/`, `tests/`, `fuzz/`, `cmake/`, `tools/checks/`, `tools/ci/`, `requirements/`, root `CMakeLists.txt`/`CMakePresets.json`/`vcpkg.json` | - |
+| `core` | `libs/`, `external/`, `tests/`, `tools/fuzz/`, `cmake/`, `tools/checks/`, `tools/ci/`, `requirements/`, the programs' Catch2 tests (below), root `CMakeLists.txt`/`CMakePresets.json`/`vcpkg.json` | - |
 | `windows` | `apps/crucible/windows/`, `notices/forge/platform/windows/`, `packaging/winget/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
 | `linux` | `apps/crucible/linux/`, `notices/forge/platform/linux/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
 | `macos` | `notices/forge/platform/macos/`, `packaging/homebrew/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
@@ -169,10 +169,22 @@ comes from.
 | `ci_self` | `.github/workflows/`, `.github/actions/`, `.github/toolchain/` | - |
 | `docs` | `docs/`, any `*.md`, `LICENSE`, `mkdocs.yml` | - |
 
-`apps/forge/cli/src/`, `apps/forge/gui/`, `apps/shared/media/src/`, `apps/crucible/` and `apps/hearth/` light `windows`,
-`linux` and `macos` directly - they are one desktop program built and tested on all three, not
-three separate programs, so they are not written as "core, therefore fanned out" but as a direct
-hit on each of the three lanes.
+`apps/forge/cli/`, `apps/forge/gui/`, `apps/shared/`, `apps/crucible/`, `apps/hearth/` and the
+notices of the products (`notices/crucible/`, `notices/hearth/`, `notices/fragments/`,
+`notices/licences/`) light `windows`, `linux` and `macos` directly - they are one desktop program
+built and tested on all three, not three separate programs, so they are not written as "core,
+therefore fanned out" but as a direct hit on each of the three lanes. Crucible's Windows driver and
+its Linux tray VM, which sit under `apps/crucible/`, light their own platform's lane only; five
+of Forge's notice fragments (`forge-*` and `qt-linux`, `qt-macos`, `qt-windows`) light every lane,
+as they did when no lane named their tree.
+
+A program's tests are beside it (`apps/<product>/<program>/tests/`), and the Catch2 binaries among
+them are `core`'s, as the `tests/` they were in is: `apps/forge/cli/tests/`,
+`apps/shared/{media,preferences}/tests/`, `apps/hearth/engine/tests/`,
+`apps/crucible/engine/tests/`, and the files named `test_*` in a window's `tests/` directory
+(`apps/forge/gui/tests/`, `apps/hearth/ui/tests/`, `apps/crucible/ui/tests/`). The Qt Quick suites
+beside them stay with the program. The PR gate's planner (`tools/ci/plan_gate.py`) draws the same
+lines for the Qt build.
 
 `tools/packaging/` holds only `pack_esp_component.py`, which `esp-component.yml`'s own path filter
 names, and `examples/python/` is named by `wheels.yml`'s; neither belongs to a lane through its
