@@ -71,13 +71,13 @@ apps/android/app/src/main/assets/signing.key
 # branch. Ignoring it here means it cannot be staged by accident; a CI "no
 # quarantine on main" check backs this up.
 src/quarantine/
+libs/quarantine/
 
-# Grown fuzzing corpus and crash artifacts (tools/fuzz/run.sh): reproducible from
-# fuzz/seeds/ plus a mutation budget, and can grow large. What must survive a
-# fix - the minimized input that proved a bug - lives in fuzz/regressions/
+# Grown fuzzing corpus and crash artifacts (tools/fuzz/run.sh) are written under build/
+# (build/fuzz-corpus, build/fuzz-artifacts), which is ignored above: reproducible from
+# libs/<lib>/fuzz/seeds/ plus a mutation budget, and can grow large. What must survive a
+# fix - the minimized input that proved a bug - lives in libs/<lib>/fuzz/regressions/
 # instead, which IS tracked.
-fuzz/corpus/
-fuzz/artifacts/
 
 # Failing cases kept by tools/ci/fuzz_encoder_space.py. Same reasoning as above,
 # one step stronger: every one of these is regenerable from the single case

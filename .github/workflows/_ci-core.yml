@@ -746,11 +746,13 @@ jobs:
           cmake --build build/config-linux-llvm-shared -- -k 0
           popd >/dev/null
 
-      # Both steps below discover libraries dynamically - `find .../src -name '*.so'` - rather
+      # Both steps below discover libraries dynamically - `find .../libs -name '*.so'` - rather
       # than a hardcoded `for lib in ...` list: this project's own SHARED targets each produce a
       # bare, unversioned libFOO.so symlink (alongside the real, version-suffixed libFOO.so.X.Y.Z)
-      # directly in the build tree under src/<component>/, with no install step needed to see it.
-      # Scoped to .../src specifically - not the whole build tree - so a FetchContent'd
+      # directly in the build tree under libs/<component>/, with no install step needed to see it.
+      # (src/<component>/ before planning/monorepo.md's C7-1, which is what a comparison point older
+      # than that has, so each build is searched in whichever of the two it has.)
+      # Scoped to those directories specifically - not the whole build tree - so a FetchContent'd
       # third-party dependency's own .so (e.g. a hypothetical libadm.so, if ICLFORGE_BUILD_ADM
       # were ever turned on for this preset) is never picked up: those build under .../_deps/,
       # a disjoint subtree, and this project never install()s them in their own right regardless.
@@ -781,13 +783,21 @@ jobs:
           errors=0
           incompatible=0
           changed=0
+          # find_so <build dir> <find arguments>: the library directories of one build.
+          find_so() {
+            local build="$1" dir
+            shift
+            for dir in libs src; do
+              [ -d "$build/$dir" ] && find "$build/$dir" "$@"
+            done
+          }
           mapfile -t libs < <(
-            { find build/config-linux-llvm-shared/src -name '*.so' -exec basename {} \;
-              find ../abi-base/build/config-linux-llvm-shared/src -name '*.so' -exec basename {} \;
+            { find_so build/config-linux-llvm-shared -name '*.so' -exec basename {} \;
+              find_so ../abi-base/build/config-linux-llvm-shared -name '*.so' -exec basename {} \;
             } 2>/dev/null | sort -u)
           for lib in "${libs[@]}"; do
-            head_lib="$(find build/config-linux-llvm-shared/src -name "$lib" -print -quit)"
-            base_lib="$(find ../abi-base/build/config-linux-llvm-shared/src -name "$lib" -print -quit)"
+            head_lib="$(find_so build/config-linux-llvm-shared -name "$lib" -print | head -n 1)"
+            base_lib="$(find_so ../abi-base/build/config-linux-llvm-shared -name "$lib" -print | head -n 1)"
             if [ -z "$head_lib" ]; then
               echo "### $lib" >> "$GITHUB_STEP_SUMMARY"
               echo "(not built at HEAD)" >> "$GITHUB_STEP_SUMMARY"
@@ -857,7 +867,7 @@ jobs:
           libs=()
           while IFS= read -r found; do
             libs+=(--lib "$found")
-          done < <(find build/config-linux-llvm-shared/src -name '*.so' | sort)
+          done < <(find build/config-linux-llvm-shared/libs -name '*.so' | sort)
           if [ "${#libs[@]}" -eq 0 ]; then
             echo "::error title=ABI gate::No shared libraries were built - nothing to check."
             exit 1

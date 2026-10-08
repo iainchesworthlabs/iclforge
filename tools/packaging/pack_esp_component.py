@@ -59,8 +59,9 @@ COMPONENT = REPO / "esp-idf" / "iclforge"
 # carry the part that builds for this chip.
 STAGED_TREES = (
     # The AC-3 codec and the four libraries it is built from: the minimum-footprint profile is
-    # one archive of files from all five (libs/ac3/minimal.cmake). libs/base also holds the header-only
-    # Fixed32 and scalar functions libs/ac3 and libs/ac4 both include (planning/ac4.md decision 31).
+    # one archive of files from all five (libs/ac3/minimal.cmake). libs/base also holds the
+    # header-only Fixed32 and scalar functions libs/ac3 and libs/ac4 both include (planning/ac4.md
+    # decision 31).
     "libs/ac3",
     "libs/base",
     "libs/dsp",
@@ -85,6 +86,11 @@ AC4_PRUNE = (
     "libs/ac4/src/encoder",
 )
 
+# A library keeps its tests and its fuzz harnesses beside its code (planning/monorepo.md, C7-1), in
+# libs/<lib>/tests and libs/<lib>/fuzz. They were outside the trees above, in tests/ and fuzz/, and
+# are not part of a component archive, so staging leaves them out of every staged tree.
+CONSUMER_DIRS = ("tests", "fuzz")
+
 # Individual files the root build needs before it reaches libs/ac3.
 STAGED_FILES = (
     "CMakeLists.txt",
@@ -106,6 +112,17 @@ PRUNE = (
     "libs/ac3/src/internal/avx2/mdct_avx2.cpp",
     "libs/ac3/src/internal/avx2/avx2_probe.cpp",
 )
+
+
+def _without_consumers(tree: pathlib.Path):
+    """A copytree `ignore` that drops tests/ and fuzz/ directly under a staged tree."""
+
+    def ignore(directory: str, names: list[str]) -> list[str]:
+        if pathlib.Path(directory) == tree:
+            return [name for name in names if name in CONSUMER_DIRS]
+        return []
+
+    return ignore
 
 
 def stage(destination: pathlib.Path, with_ac4: bool = False) -> None:
@@ -130,7 +147,7 @@ def stage(destination: pathlib.Path, with_ac4: bool = False) -> None:
         src = REPO / tree
         if not src.is_dir():
             raise SystemExit(f"missing staged tree: {src}")
-        shutil.copytree(src, library / tree, dirs_exist_ok=True)
+        shutil.copytree(src, library / tree, dirs_exist_ok=True, ignore=_without_consumers(src))
 
     for name in STAGED_FILES:
         src = REPO / name
@@ -178,7 +195,7 @@ def describe(archive: pathlib.Path) -> tuple[int, int]:
     """Returns (entries, forge source files) - the second is what matters."""
     with tarfile.open(archive) as tar:
         names = tar.getnames()
-    sources = [n for n in names if "/lib/src/ac3/src/" in n and n.endswith(".cpp")]
+    sources = [n for n in names if "/lib/libs/ac3/src/" in n and n.endswith(".cpp")]
     return len(names), len(sources)
 
 

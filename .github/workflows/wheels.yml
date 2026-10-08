@@ -31,7 +31,6 @@ on:
       - "libs/dsp/**"
       - "libs/objects/**"
       - "libs/render/**"
-      - "src/iec61937/**"
       - "examples/python/**"
       - "CMakeLists.txt"
       - ".github/workflows/wheels.yml"

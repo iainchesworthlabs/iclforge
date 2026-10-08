@@ -156,7 +156,7 @@ endif()
 # Tested for rather than configured, because the answer is a property of the
 # tree this file finds itself in and a consumer should not have to know which
 # kind they have.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/src/ac3/CMakeLists.txt")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/libs/ac3/CMakeLists.txt")
     set(ICLFORGE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/lib")
 else()
     get_filename_component(ICLFORGE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)

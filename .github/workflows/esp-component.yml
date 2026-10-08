@@ -29,7 +29,6 @@ on:
       - "libs/dsp/**"
       - "libs/objects/**"
       - "libs/render/**"
-      - "src/iec61937/**"
       - "cmake/**"
       - "CMakeLists.txt"
       - "tools/packaging/pack_esp_component.py"

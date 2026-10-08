@@ -239,8 +239,8 @@ jobs:
           g++ -std=c++23 --coverage -o "${BUILD_DIR}/ac4_syntax_trace" \
             tools/checks/ac4_syntax_trace.cpp \
             -DICLFORGE_AC4_STATIC_DEFINE \
-            -Isrc/ac4/include -I"${BUILD_DIR}/src/ac4/generated" \
-            "${BUILD_DIR}/src/ac4/libiclforge_ac4_static.a"
+            -Ilibs/ac4/include -I"${BUILD_DIR}/libs/ac4/generated" \
+            "${BUILD_DIR}/libs/ac4/libiclforge_ac4_static.a"
           python3 tools/checks/ac4_syntax_differential.py \
             --trace-tool "${BUILD_DIR}/ac4_syntax_trace" \
             --work-dir "${BUILD_DIR}/ac4-differential" \

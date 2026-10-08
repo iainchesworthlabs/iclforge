@@ -161,7 +161,7 @@ jobs:
         run: |
           "run-clang-tidy-${LLVM_VERSION}" -j "$(nproc)" -p build/config-linux-llvm-debug \
             -warnings-as-errors='*' \
-            '(src/(ac3|base|objects|render)/src/.*|libs/dsp/src/[^/]*|libs/containers/src/(iec61937|matroska|mp4|mpegts)/.*|apps/cli/.*)\.cpp'
+            '(libs/(ac3|base|objects|render)/src/.*|libs/dsp/src/[^/]*|libs/containers/src/(iec61937|matroska|mp4|mpegts)/.*|apps/cli/.*)\.cpp'
 
   # A finding (or a broken build) is handed to the shared
   # report-nightly-failure action, which opens - or comments on - the one

@@ -68,7 +68,7 @@ fn main() {
     let dst = config.build();
     let build_dir = dst.join("build");
 
-    let source_include_dir = repo_root.join("src").join("capi").join("include");
+    let source_include_dir = repo_root.join("libs").join("capi").join("include");
     let header = source_include_dir.join("iclforge_c").join("iclforge.h");
     assert!(
         header.is_file(),

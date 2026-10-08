@@ -105,7 +105,7 @@ jobs:
       # is here rather than left out is that its ABSENCE is not a build
       # failure: libs/audio/CMakeLists.txt would fall back to the no-op
       # posix/ directory and CI would go green having compiled none of
-      # src/audio/src/backend/alsa/. The alsa_fallback step at the end covers
+      # libs/audio/src/backend/alsa/. The alsa_fallback step at the end covers
       # the other half of that switch on purpose.
       #
       # The update/install pair is retried: three attempts, 30 s apart, and
@@ -493,7 +493,7 @@ jobs:
           python3 tools/checks/check_probe_hashes.py --expected tests/golden/ac4-fixed-probe-pcm-hashes.json "$RUNNER_TEMP/ac4-fixed-host.txt"
 
       # The same two questions for the ENCODE path's scalar. ICLFORGE_ENCODE_SCALAR
-      # (src/ac3/variants/encode-scalar-{float64,float32}/) is the axis the minimum-footprint
+      # (libs/ac3/variants/encode-scalar-{float64,float32}/) is the axis the minimum-footprint
       # profile encodes on for the ESP32-S3, and a float encoder is a different
       # thing from a float decoder: it makes its own decisions at its own
       # thresholds and rounds its own coefficients, so it produces a different,
@@ -1077,12 +1077,12 @@ jobs:
           ctest --preset test-linux-llvm-shared -LE Performance
           bash tools/checks/check_shared_forge_binding.sh \
             build/config-linux-llvm-shared/bin/iclforge-tests \
-            build/config-linux-llvm-shared/src/ac3/libiclforge_ac3.so \
-            build/config-linux-llvm-shared/src/base/libiclforge_base.so \
-            build/config-linux-llvm-shared/src/dsp/libiclforge_dsp.so \
-            build/config-linux-llvm-shared/src/objects/libiclforge_objects.so \
-            build/config-linux-llvm-shared/src/render/libiclforge_render.so \
-            build/config-linux-llvm-shared/src/iec61937/libiclforge_containers.so
+            build/config-linux-llvm-shared/libs/ac3/libiclforge_ac3.so \
+            build/config-linux-llvm-shared/libs/base/libiclforge_base.so \
+            build/config-linux-llvm-shared/libs/dsp/libiclforge_dsp.so \
+            build/config-linux-llvm-shared/libs/objects/libiclforge_objects.so \
+            build/config-linux-llvm-shared/libs/render/libiclforge_render.so \
+            build/config-linux-llvm-shared/libs/containers/libiclforge_containers.so
 
       # A build tree is not an installed package. libs/capi/tests and the C examples compile against
       # the build tree, where every generated header is already on the include path whether or

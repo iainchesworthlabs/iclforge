@@ -51,13 +51,14 @@ jobs:
       # reach a public remote (it embeds a key extracted from Dolby's binary). The
       # .gitignore keeps it from being staged; this makes doubly sure by failing if
       # the directory ever appears in a tracked tree on main.
-      - name: Assert src/quarantine is absent
+      - name: Assert the quarantine directory is absent
         if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -euo pipefail
-          if git ls-files --error-unmatch src/quarantine >/dev/null 2>&1; then
-            echo "::error::src/quarantine is tracked here; it must never leave its local branch."
+          # src/quarantine before planning/monorepo.md's C7-1, libs/quarantine since.
+          if [ -n "$(git ls-files src/quarantine libs/quarantine)" ]; then
+            echo "::error::the quarantine directory is tracked here; it must never leave its local branch."
             exit 1
           fi
           echo "No quarantined signer in the tree."

@@ -1,10 +1,10 @@
 # iclforge fuzzing. Six jobs. Five of them share the libFuzzer harnesses in
-# fuzz/, and all but fuzz-adm-nightly mutate an ALREADY-ENCODED bitstream -
+# libs/<lib>/fuzz/, and all but fuzz-adm-nightly mutate an ALREADY-ENCODED bitstream -
 # they ask whether the DECODER survives corrupt input. The sixth
 # (encoder-space-nightly) asks the opposite question, about the ENCODER, and
 # shares none of that machinery; see its own comment below.
 #
-#   fuzz-regress       Replays fuzz/seeds/ and fuzz/regressions/ with -runs=0
+#   fuzz-regress       Replays libs/<lib>/fuzz/seeds/ and .../regressions/ with -runs=0
 #                      (no mutation) - a correctness gate: every regression
 #                      corpus entry must still not crash. Seconds, not
 #                      minutes; runs on every push/PR to main and is
@@ -34,7 +34,7 @@
 #                      harnesses at the same deeper budget (they stay out of
 #                      the base BASE_TARGETS list run.sh drives here, same as
 #                      fuzz-differential above, so they get their own ffmpeg
-#                      install and regression replay). fuzz/corpus/ persists
+#                      install and regression replay). build/fuzz-corpus/ persists
 #                      across runs via actions/cache instead of restarting
 #                      from the seed corpus every night - see the job's own
 #                      cache step for the growing-key pattern this needs
@@ -111,7 +111,7 @@
 # cause (a box using ISOBMFF's 64-bit largesize escape could make
 # iclforge::containers::mp4::Reader's parse position wrap past its sliding window, underflowing the
 # next offset computation) - fixed in the same PR that promoted this job,
-# with the crash minimised into fuzz/regressions/fuzz_mp4_demux/. Promote a
+# with the crash minimised into libs/containers/fuzz/regressions/fuzz_mp4_demux/. Promote a
 # job again the same way: delete its `continue-on-error: true` line.
 #
 # fuzz-differential additionally installs `ffmpeg` - the same package the
@@ -266,7 +266,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fuzz-short-artifacts
-          path: fuzz/artifacts/
+          path: build/fuzz-artifacts/
           if-no-files-found: ignore
 
   fuzz-differential:
@@ -316,7 +316,7 @@ jobs:
           done
 
       # Cheap correctness gate first, same shape as fuzz-regress above: any
-      # divergence a past run minimized into fuzz/regressions/ must still
+      # divergence a past run minimized into libs/ac3/fuzz/regressions/ must still
       # not reproduce before spending the mutation budget below.
       - name: Replay differential regression corpus (no mutation)
         run: bash tools/fuzz/run.sh regress fuzz_differential_ac3_decode fuzz_differential_eac3_decode
@@ -329,7 +329,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fuzz-differential-artifacts
-          path: fuzz/artifacts/
+          path: build/fuzz-artifacts/
           if-no-files-found: ignore
 
   fuzz-nightly:
@@ -377,7 +377,7 @@ jobs:
             sleep 30
           done
 
-      # fuzz/corpus/ is gitignored and, without this, starts empty on every
+      # build/fuzz-corpus/ is gitignored and, without this, starts empty on every
       # run - promoted fuzz jobs: a cache entry is immutable once written, so
       # there is no "update the existing one", only "restore the newest
       # prior one, then always write a new one keyed by this run". The
@@ -387,7 +387,7 @@ jobs:
       - name: Restore grown fuzz corpus
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: fuzz/corpus
+          path: build/fuzz-corpus
           key: fuzz-corpus-nightly-${{ github.run_id }}
           restore-keys: |
             fuzz-corpus-nightly-
@@ -410,7 +410,7 @@ jobs:
         if: always()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: fuzz/corpus
+          path: build/fuzz-corpus
           key: fuzz-corpus-nightly-${{ github.run_id }}
 
       - name: Upload crashing inputs
@@ -418,7 +418,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fuzz-nightly-artifacts
-          path: fuzz/artifacts/
+          path: build/fuzz-artifacts/
           if-no-files-found: ignore
 
   # fuzz_adm_parse on its own - see this file's header for why it is not
@@ -485,7 +485,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fuzz-adm-nightly-artifacts
-          path: fuzz/artifacts/
+          path: build/fuzz-artifacts/
           if-no-files-found: ignore
 
   # The deeper half of the encoder input-space search - see this file's header
