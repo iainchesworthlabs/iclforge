@@ -53,9 +53,9 @@
 # ---------------------------------------------------------------------------
 cmake_minimum_required(VERSION 3.28)
 
-# The iclforge component lives at the repo root, beside the other bindings, not
-# under this project. Four directories up: esp32p4 -> platform -> baremetal ->
-# apps -> root, then esp-idf. IDF wants the directory CONTAINING components.
+# The iclforge component lives under firmware/, beside the probes, not under this
+# project. Three directories up: esp32p4 -> platform -> baremetal -> firmware, then
+# esp-idf. IDF wants the directory CONTAINING components.
 #
 # This is the same line an integrator writes in their own project, which is the
 # reason the component moved out: if the published shape breaks, this build -

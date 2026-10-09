@@ -73,7 +73,7 @@ is the profile packaged as a component. A project outside this repository
 builds against it in two lines, without vendoring the source list:
 
 ```cmake
-set(EXTRA_COMPONENT_DIRS "/path/to/iclforge/esp-idf")
+set(EXTRA_COMPONENT_DIRS "/path/to/iclforge/firmware/esp-idf")
 set(ICLFORGE_ESP_PROFILE "decoder")   # or "encoder"
 ```
 
@@ -128,7 +128,8 @@ does not apply.
 
 ## Examples
 
-Both live under `firmware/esp-idf/iclforge/examples/` and are built by CI.
+`i2s_player` lives under `firmware/esp-idf/iclforge/examples/` and the Hearth sink is a project of its own,
+`firmware/hearth-sink/`; CI builds both.
 
 ### I2S player
 

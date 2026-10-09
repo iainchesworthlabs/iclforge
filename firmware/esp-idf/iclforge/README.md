@@ -67,7 +67,7 @@ Two lines in a project's top-level `CMakeLists.txt`, both **before** the include
 `project.cmake`, because the component is read during IDF's component scan:
 
 ```cmake
-set(EXTRA_COMPONENT_DIRS "/path/to/iclforge/esp-idf")   # the directory CONTAINING components
+set(EXTRA_COMPONENT_DIRS "/path/to/iclforge/firmware/esp-idf")   # the directory CONTAINING components
 set(ICLFORGE_ESP_PROFILE "decoder")                      # or "encoder"
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 ```
@@ -88,7 +88,7 @@ fixed-point tier on one without, and lets the player read a stream that opens wi
 renderer and sinks, and `iclforge::ac4::SyncFrameSplitter` and `iclforge::ac4::Decoder` in place of the AC-3 and
 E-AC-3 framer and decoders. With it off the component builds as it always did. It needs PSRAM,
 since the decoder alone peaks at 286 KB of heap at 2.0 and 1.50 MB at 5.1.4 on the footprint
-probe's streams, and a decode task with a stack of 40 KB, which `examples/hearth_sink/sdkconfig.ac4`
+probe's streams, and a decode task with a stack of 40 KB, which `firmware/hearth-sink/sdkconfig.ac4`
 sets: the decoder uses 19 to 30 KB of it. The [ESP32-P4 page](../../../docs/platforms/bare-metal/esp32-p4.md#ac-4) has what a stream of
 each kind held and how fast it decoded on a board: 2.0 and 5.1 streams in SIMPLE, A-SPX and A-CPL mode 2
 in real time, A-CPL mode 3 and 5.1.4 slower. On the ESP32-S3 an AC-4 play puts the decoder's state in
@@ -107,7 +107,7 @@ sources only when it was packed with `pack_esp_component.py --with-ac4`.
 | Example | What it shows |
 |---|---|
 | [`examples/i2s_player`](examples/i2s_player/README.md) | Decodes a fixture linked into the image and plays it out of an I2S DAC, printing per-lap timing from the DAC's own clock. The measurement anyone with a board can repeat. |
-| [`examples/hearth_sink`](../../hearth-sink/README.md) | Bytes from a flash partition, an SD card, a FAT volume in flash or an HTTP body over WiFi, through the incremental framer, rendered onto a configured layout - stereo, 5.1, 7.1.4 with the objects placed - to an I2S or TDM DAC; a `capture` sink for CI. With `sdkconfig.sendspin` it is a Sendspin player that takes updates over its network. How a real player gets its audio. |
+| [`firmware/hearth-sink`](../../hearth-sink/README.md), beside the component and naming it as its dependency | Bytes from a flash partition, an SD card, a FAT volume in flash or an HTTP body over WiFi, through the incremental framer, rendered onto a configured layout - stereo, 5.1, 7.1.4 with the objects placed - to an I2S or TDM DAC; a `capture` sink for CI. With `sdkconfig.sendspin` it is a Sendspin player that takes updates over its network. How a real player gets its audio. |
 
 Both are built by CI under `espressif/idf:v6.1`, in the `esp` lane of `ci.yml`, which runs after a
 merge to main that changes the ESP32 trees or a tree its component ships, and nightly

@@ -4,7 +4,7 @@
     python3 tools/checks/footprint_report.py \\
         --probe /tmp/footprint.txt \\
         --elf build/config-arm-none-eabi-minimal/bin/iclforge-probe \\
-        --map build/config-arm-none-eabi-minimal/apps/baremetal/iclforge-probe.map \\
+        --map build/config-arm-none-eabi-minimal/firmware/baremetal/iclforge-probe.map \\
         --markdown
 
 Three inputs, because no one of them answers the whole question:

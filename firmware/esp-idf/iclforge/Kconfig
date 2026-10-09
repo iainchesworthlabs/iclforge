@@ -52,7 +52,7 @@ config ICLFORGE_AC4
         beside WiFi with WiFi's code in flash, above the 236 KB of
         ESP-IDF's default configuration, and below the 383 KB free with
         no network. Its decode task uses 20 to 24 KB of
-        stack, and examples/hearth_sink/sdkconfig.ac4 gives it 40 KB.
+        stack, and firmware/hearth-sink/sdkconfig.ac4 gives it 40 KB.
         docs/platforms/bare-metal/esp32-p4.md has what a stream of each
         kind held on an ESP32-P4, and how fast it decoded,
         docs/platforms/bare-metal/esp32-c6.md what the fixed-point tier

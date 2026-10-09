@@ -2036,7 +2036,7 @@ jobs:
           # the upload step could not then find. The build directory is the one
           # place both agree on, it is gitignored already, and it puts the
           # summary beside the map it belongs with.
-          ICLFORGE_ESP32S3_SUMMARY: apps/baremetal/platform/esp32s3/build/esp32s3-probe.txt
+          ICLFORGE_ESP32S3_SUMMARY: firmware/baremetal/platform/esp32s3/build/esp32s3-probe.txt
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
@@ -2060,7 +2060,7 @@ jobs:
       # it.
       - name: Build and run the ENCODE probe under QEMU
         env:
-          ICLFORGE_ESP32S3_SUMMARY: apps/baremetal/platform/esp32s3/build/esp32s3-encode-probe.txt
+          ICLFORGE_ESP32S3_SUMMARY: firmware/baremetal/platform/esp32s3/build/esp32s3-encode-probe.txt
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
@@ -2076,7 +2076,7 @@ jobs:
       # figures. The run itself takes under a minute of QEMU.
       - name: Build and run the AC-4 probe under QEMU
         env:
-          ICLFORGE_ESP32S3_SUMMARY: apps/baremetal/platform/esp32s3/build/esp32s3-ac4-probe.txt
+          ICLFORGE_ESP32S3_SUMMARY: firmware/baremetal/platform/esp32s3/build/esp32s3-ac4-probe.txt
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
@@ -2767,7 +2767,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          www="$GITHUB_WORKSPACE/esp-idf/iclforge/examples/hearth_sink/www"
+          www="$GITHUB_WORKSPACE/firmware/hearth-sink/www"
           python3 -m http.server 8000 --bind 0.0.0.0 --directory "$www" >/dev/null 2>&1 &
           server=$!
           trap 'kill "$server" 2>/dev/null || true' EXIT
@@ -3050,10 +3050,10 @@ jobs:
         with:
           name: footprint-esp32s3
           path: |
-            apps/baremetal/platform/esp32s3/build/iclforge_probe_esp32s3.map
-            apps/baremetal/platform/esp32s3/build/esp32s3-probe.txt
-            apps/baremetal/platform/esp32s3/build/esp32s3-encode-probe.txt
-            apps/baremetal/platform/esp32s3/build/esp32s3-ac4-probe.txt
+            firmware/baremetal/platform/esp32s3/build/iclforge_probe_esp32s3.map
+            firmware/baremetal/platform/esp32s3/build/esp32s3-probe.txt
+            firmware/baremetal/platform/esp32s3/build/esp32s3-encode-probe.txt
+            firmware/baremetal/platform/esp32s3/build/esp32s3-ac4-probe.txt
             firmware/hearth-sink/qemu-stream.txt
             firmware/hearth-sink/qemu-capture.txt
             firmware/hearth-sink/qemu-capture16.txt
@@ -3627,7 +3627,7 @@ jobs:
         if: always()
         run: |
           set -eu
-          python3 tools/checks/footprint_report.py             --probe "${{ runner.temp }}/footprint.txt"             --elf build/config-arm-none-eabi-minimal/bin/iclforge-probe             --map build/config-arm-none-eabi-minimal/apps/baremetal/iclforge-probe.map             --markdown >> "$GITHUB_STEP_SUMMARY"
+          python3 tools/checks/footprint_report.py             --probe "${{ runner.temp }}/footprint.txt"             --elf build/config-arm-none-eabi-minimal/bin/iclforge-probe             --map build/config-arm-none-eabi-minimal/firmware/baremetal/iclforge-probe.map             --markdown >> "$GITHUB_STEP_SUMMARY"
           if [ -f "build/config-arm-none-eabi-minimal/icount.txt" ]; then
             {
               echo '### Instructions per frame (QEMU -icount)'
@@ -3654,7 +3654,7 @@ jobs:
           name: footprint-arm-none-eabi
           path: |
             ${{ runner.temp }}/footprint.txt
-            build/config-arm-none-eabi-minimal/apps/baremetal/iclforge-probe.map
+            build/config-arm-none-eabi-minimal/firmware/baremetal/iclforge-probe.map
           if-no-files-found: warn
 
   # Persists this run's gold-reference SNR numbers (docs/quality-trend.md) so

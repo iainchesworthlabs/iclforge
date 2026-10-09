@@ -28,7 +28,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PROJECT="$REPO/apps/baremetal/platform/esp32c3"
+PROJECT="$REPO/firmware/baremetal/platform/esp32c3"
 PINS="$REPO/tests/golden/fixed-probe-pcm-hashes.json"
 
 # The decode arithmetic. `fixed` is the project's own default and the reason

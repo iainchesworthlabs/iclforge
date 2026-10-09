@@ -40,7 +40,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PROJECT="$REPO/apps/baremetal/platform/esp32s3"
+PROJECT="$REPO/firmware/baremetal/platform/esp32s3"
 
 # Which direction. The two profiles are mutually exclusive - measured on this
 # part, no two of decode / AC-3 encode / E-AC-3 encode fit in internal SRAM at
