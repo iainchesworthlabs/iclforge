@@ -162,7 +162,7 @@ comes from.
 | `macos` | `notices/forge/platform/macos/`, `packaging/homebrew/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
 | `android` | `apps/demos/android/` | `core` (not after a merge) |
 | `wasm` | `apps/demos/wasm/`, `bindings/js/` (its E2E demo) | `core` (not after a merge) |
-| `esp` | `firmware/esp-idf/`, `firmware/esphome/`, `firmware/baremetal/`, `tools/packaging/`, and the trees its component ships: `libs/ac3/`, `libs/base/`, `cmake/`, root `CMakeLists.txt` | `core` (not after a merge) |
+| `esp` | `firmware/esp-idf/`, `firmware/esphome/`, `firmware/baremetal/`, `firmware/hearth-sink/`, `tools/packaging/`, and the trees its component ships: `libs/ac3/`, `libs/base/`, `cmake/`, root `CMakeLists.txt` | `core` (not after a merge) |
 | `rust` | `bindings/rust/` | `core` (not after a merge) |
 | `python` | `bindings/python/`, `examples/python/` | `core` (not after a merge) |
 | `npm` | `bindings/js/` (the package's own unit tests) | nothing - see below |
