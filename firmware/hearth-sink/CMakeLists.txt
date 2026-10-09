@@ -30,8 +30,9 @@
 # ---------------------------------------------------------------------------
 cmake_minimum_required(VERSION 3.28)
 
-get_filename_component(ICLFORGE_ESP_COMPONENTS "${CMAKE_CURRENT_SOURCE_DIR}/../esp-idf" ABSOLUTE)
-set(EXTRA_COMPONENT_DIRS "${ICLFORGE_ESP_COMPONENTS}")
+# The iclforge component is this project's dependency, named in main/idf_component.yml with a
+# path into this checkout (firmware/esp-idf/iclforge): the sink is Hearth's firmware and the
+# component is the library's, so the one reaches the other as any project would.
 set(ICLFORGE_ESP_PROFILE "decoder" CACHE STRING "")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
