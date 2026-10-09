@@ -1,6 +1,6 @@
 # A monorepo of self-contained projects (C7): a study
 
-!!! note "Status as of 2026-10-09: decisions 1 to 15 taken; C7-1 to C7-3 run and proved; C7-4 and C7-5 not begun"
+!!! note "Status as of 2026-10-09: decisions 1 to 15 taken; C7-1 to C7-4 run and proved; C7-5 not begun"
     Asked for by the user on 2026-10-08: "turn this repository into a monorepo of self-contained
     projects". It follows [consolidation.md](consolidation.md), whose C0 to C6, the three merges its
     decision 14 left (M1 to M3) and the two items C3 and C6 left are run and proved on the local
@@ -19,7 +19,9 @@
     one difference it leaves in a program is the order of the functions of its generated Qt code. C7-3
     ran on `chore/monorepo-c7-3`: the bindings and the firmware moved, Hearth's sink became a project of
     its own beside the ESP-IDF component, and the code of every image, extension and package it was
-    compared on is the code it was. Nothing is pushed.
+    compared on is the code it was. C7-4 ran on `chore/monorepo-c7-4`: the golden data moved to
+    `testdata/`, and the one thing that differs in what the programs print is the name of a golden file
+    they were given. Nothing is pushed.
 
 ## In brief
 
@@ -804,3 +806,96 @@ Node 22; the parent is `chore/monorepo-c7-2` at `f034941d1`, built in `build/wt/
 
 **What C7-3 leaves.** `tests/golden` (C7-4); `layering.json` and the check of the whole tree, which has
 to know the bindings and the firmware as projects (C7-5).
+
+### C7-4, 2026-10-09 (`chore/monorepo-c7-4`)
+
+**What moved.** 201 renames in one commit, every one `R100`: `tests/golden` is `testdata/`, with the
+layout it had below it ({ac4 141, external-baseline 35, audio 8, ac4-hsf 8, object-fixture 1} and eight
+files at the top: the three generated C++ tables the ac3 tests include and five pin files). Then
+`c7_cmake.py --stage c7-4` (3 CMake files), `consol_paths.py` (129 files, 478 lines), `c7_golden.py` (28
+files, 49 mentions) and by hand the include root and the four includes of the golden tables, the test
+support library's definitions, README's layout block, the test case that names the directory, the planners
+and the fixture whose bytes the corpus pins. All in all the stage changed 357 files since its parent.
+
+**What the dry run could not see** (each found by a configure, a build, a check or a comparison):
+
+1. **The golden tables are C++, and they have an include root.** The four ac3 tests that include them
+   spell `"golden/<name>_goldens.hpp"` against `tests/` as the root; `testdata/` has no `golden/` below
+   it. They are `"<name>_goldens.hpp"` now, against `testdata/` (`libs/ac3/tests/CMakeLists.txt`), which
+   leaves `tests/` no longer an include root of that binary. The 85 units of that binary are the only
+   ones whose flags differ.
+2. **The golden directories were computed, not spelled.** `tests/support/CMakeLists.txt` made
+   `ICLFORGE_GOLDEN_AUDIO_DIR`, `_OBJECT_DIR`, `_EXTERNAL_BASELINE_DIR` and `AC4_GOLDEN_DIR` from its own
+   directory's sibling (`cmake_path(GET ... PARENT_PATH)`, then `APPEND "golden"`), which a path pass
+   cannot see. They are `${PROJECT_SOURCE_DIR}/testdata/...` now.
+3. **Data that names a path, and a fixture that is hashed.** The passes rewrite what is in `testdata/`
+   too: the scalar-agreement pins are keyed by the stream's path (146 lines in two files), the
+   manifests record `source_wav`, and the pinned-hash file's comment names the WAV. That is right for
+   the first two (the consumers build the same keys from the new paths) and it changes the third's git
+   blob (`baseline.py`'s `pins_blob`, the one field of the hashes that differs). It was wrong for
+   `reference_objects.paths`: the corpus manifest holds this fixture's SHA-256, and the comment in it that
+   named `tests/golden/audio/reference_objects.wav` was changed by the pass; `check_corpus.py` failed
+   ("every published trend series is measured against these bytes"). The comment keeps the old path.
+4. **A test case's name names the directory.** `chunks: a burst chunk for the first syncframe of
+   tests/golden's AC-3 5.1 fixture` is the one title in the tree that does. The pass changed it;
+   `c7_pathonly.py` listed it before any build, and ctest's names must not change, so it keeps its
+   spelling and its comment follows the move.
+5. **The path boundary again.** `consol_paths.py` takes a path after a separator, a quote, `${VAR}/` or
+   `../`, not after a shell variable (`"$REPO/tests/golden/..."`, in a dozen scripts), in a string that
+   goes on (`ICLFORGE_SOURCE_DIR "/tests/golden/..."`), with a brace expansion or in a comment that names
+   the directory. `tests/golden` being one string with one meaning, `c7_golden.py` respells it at a path
+   component wherever a live file has it (28 files, 49 mentions), and not in the plans or the history.
+6. **A new top-level directory is an unknown one.** The planners light every lane for a path they do not
+   know; `testdata/` is core's (the classifier) and a tree the Linux gate builds without Qt (the gate), as
+   `tests/` was. `c7_planner_equiv.py` found it: the first run differed for the golden files.
+7. **The proof's own tools read the golden data.** `baseline.py` (the WAV it encodes from, the pin file's
+   blob) and `cli_bytes.py` (the corpus's root) are the live ones of `tools/n1b`, so the passes leave them
+   and `c7_golden.py` does not; each tree records itself with its own copy. `check_pages.py` skips
+   `testdata/` where it skipped `tests/golden/`, and the AC-4 reference's `stream_label` looks for
+   `/testdata/` in a stream's absolute path (the labels it writes, the path after that directory, are the
+   same).
+8. **The CLI prints the name it was given.** The corpus passes `testdata/...` instead of `tests/golden/...`,
+   and `probe`, `levels`, `loudness`, `qc`, `cut` and `normalize` echo it: 15 of the 44 commands differ in
+   stdout and in nothing they write. The comparison is `cli_stdout.py`, which runs each tree's own corpus
+   with its own forge, in the same scratch directory (stdout also names the output file), and reads the old
+   directory's name as the new one.
+
+**Found, and not C7's.** The generators of the three C++ tables need the standard's text
+(`spec/A52-2018.txt`), which is not in the repository, and `gen_baremetal_fixture.py` does not write the
+committed `fixture.hpp` back with this tree's encoder, as before. The shared Debug tree still fails to
+link `iclforge-iab-tests`, and `fuzz_iec61937_unwrap` does not compile (since C3).
+
+**The proof,** on this machine (WSL2 on Windows 11, GCC 16 and Clang 22, Qt 6.10; the parent is
+`chore/monorepo-c7-3` at `1b26fcb95`, built in `build/wt/c73`; the stage's tree in `build/wt/c74` at
+`3f0e11b67`; the commits after it are the planners' and the record):
+
+| proof | result |
+|---|---|
+| builds, `-Werror`, every default target, the GUI on and off | GCC 16 and Clang 22 clean in both; the shared Debug tree has the one failure it had before (`iclforge-iab-tests` does not link) |
+| the whole ctest, GCC and Clang (GUI on) | 3,582 of 3,582 pass in each, before and after; the same 5 skipped; the outcome of each test, by name, identical (JUnit) |
+| ctest's names | identical on the five trees: 3,582 (GUI on, GCC and Clang), 3,546 (GUI off), 3,189 (shared Debug) |
+| pinned bitstream hashes | identical for the three streams in both modes with both compilers; the one field that differs is `pins_blob`, the git blob of the pin file, whose comment names the source WAV (finding 3) |
+| CLI corpus (44 commands) | every file each command writes is identical; 15 commands print the path of the file they were given and so differ in stdout as printed, and in none once `tests/golden` is read as `testdata` in the old text (`cli_stdout.py`: 44 commands run in each tree with its own forge) |
+| exported names of the shared libraries | identical |
+| installed tree | the same files; one public header differs in a comment (`ac3/core/mdct.hpp` names the golden table's directory) |
+| `.text` of the installed binaries (`git describe` pinned, both compilers) | all 13 ELF files have identical `.text` (5 byte-identical) and so has every member of the 9 static archives (171) |
+| flags of every unit (`flags_diff.py`, 913) | all 913 pair; the 85 units of `iclforge-ac3-tests` compile with `-I testdata` where they had `-I tests`, and none differs in any other flag |
+| IR of every unit (tests included, Clang 22, two source trees whose paths are as long as each other) | 798 units: 755 identical, 8 identical but for the white space of an assertion's text, 35 differing. In 31 of those the difference is a string that holds the golden directory (the macros of the test-support library: `<root>/tests/golden/ac4` and `<root>/testdata/ac4`) and, in one, the `std::filesystem::path` constructors instantiated over the strings' lengths; the other 3 are `git describe` (`version.cpp` and the two Hearth units that embed it) |
+| C and C++ edits since the parent (`c7_pathonly.py`) | 40 files; all differ in comments, includes, layout and paths only (the four includes of the golden tables, one string literal, `tests/performance/real_audio.hpp`'s path of the reference WAV) |
+| public headers | the same 174, none moved; one differs in a comment |
+| bare-metal probes (QEMU, `--icount`), which read `testdata/ac4-probe-ceilings.json` and the PCM pins | five variants: the probes' own key=value lines identical; the fixed-point AC-4 probe exits 1 in both trees, over its stack ceiling, as before |
+| libFuzzer harnesses (Clang, `ICLFORGE_BUILD_FUZZERS`) | the same 20 of 21 build and the same one does not (`fuzz_iec61937_unwrap`, since C3); 18 replay their inputs and exit 0 in both; two have none |
+| the generators | `gen_gold_reference_wav.py` and `gen_stereo_reference_wav.py` write `testdata/audio/reference_51.wav` and `reference_stereo.wav` byte for byte as they are; the three table generators' `--check` pass; the others need inputs this machine lacks (the standard's text, a Dolby encoder) |
+| `check_corpus.py`, `check_cross_platform_hash.py`'s pins, the scalar-agreement pins | all 7 fixtures match the corpus manifest; the pin files are read at their new place (the unit tests of `tools/checks` pass) |
+| `check_layering.py`, `check_namespaces.py`, `check_pages.py`, `check_doc_paths.py` | 12 libraries, 228 edges, 0 failures; 172 public headers, 0 failures, 4 known debts; 0 problems; 0 missing of 6,504 checked |
+| the static job's other checks and the unit tests of `tools/` | `check_packaging_versions.sh`, `check_platform_matrix.py`, `check_esp_efuse_free.py`, `check_android_jni.py`, `generate_support_matrices.py --check` and the AC-4 table generators pass; `tools/checks` 432, `tools/ci` 586, `tools/hearth` 102, `tools/n1b` 495 tests pass |
+| `precheck.py --unit`, `mkdocs build --strict`, `ruff check .` | pass; ruff finds what it found in the parent |
+| `c7_relative.py` | no relative path resolved before and not now |
+| the CI planners | the same answers for 3,226 files and for the last 60 commits (finding 6) |
+
+**Not run here, and recorded rather than skipped:** MSVC `/W4 /WX` and clang-cl; macOS; the Android build;
+the Windows and macOS halves of the notices; the ESP-IDF images and the boards (no file of theirs reads the
+golden data but the probe runners, which ran under QEMU above); the Python, Rust, npm and ESPHome suites (the
+bindings read no golden data); SonarCloud and CodeQL; the workflows themselves.
+
+**What C7-4 leaves.** `layering.json` and the check of the whole tree (C7-5).
