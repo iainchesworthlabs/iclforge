@@ -1,6 +1,6 @@
 # A monorepo of self-contained projects (C7): a study
 
-!!! note "Status as of 2026-10-09: decisions 1 to 15 taken; C7-1 and C7-2 run and proved; C7-3 to C7-5 not begun"
+!!! note "Status as of 2026-10-09: decisions 1 to 15 taken; C7-1 to C7-3 run and proved; C7-4 and C7-5 not begun"
     Asked for by the user on 2026-10-08: "turn this repository into a monorepo of self-contained
     projects". It follows [consolidation.md](consolidation.md), whose C0 to C6, the three merges its
     decision 14 left (M1 to M3) and the two items C3 and C6 left are run and proved on the local
@@ -16,8 +16,10 @@
     ([what the runs found](#what-the-runs-found-that-the-study-did-not)). C7-2 ran on
     `chore/monorepo-c7-2`: the products, the code they share, the demos and the notices moved, each
     program's tests went beside it, and it changed no output byte, no exported name and no test name; the
-    one difference it leaves in a program is the order of the functions of its generated Qt code. Nothing
-    is pushed.
+    one difference it leaves in a program is the order of the functions of its generated Qt code. C7-3
+    ran on `chore/monorepo-c7-3`: the bindings and the firmware moved, Hearth's sink became a project of
+    its own beside the ESP-IDF component, and the code of every image, extension and package it was
+    compared on is the code it was. Nothing is pushed.
 
 ## In brief
 
@@ -408,6 +410,7 @@ What C7 adds to the proof, and the scripts that give it (all in `tools/n1b`):
 | `c7_pathonly.py` | every change to a C or C++ file since the parent is a comment, an `#include`, layout or a path |
 | `c7_planner_equiv.py` | the CI planners choose the same jobs for every tracked file, and for a sample of past commits |
 | `c7_leftovers.py` | what still names a root C7 moved: a root built from parts, a regular expression, a glob, a directory a build writes into |
+| `c7_cmake.py`, `c7_dirs.py`, `c7_roots.py`, `c7_relative.py` | the path passes after `consol_paths.py`: a build file's relative paths, a directory named whole, a root that is an ordinary word (python, rust, js), and the relative paths a move broke (`--fix` writes them again) |
 
 The stage's parent is built in `build/wt/c7-before` (detached) and the stage in `build/wt/merge`; the
 two are recorded and compared with `baseline.py compare`. A stage that shows a difference in output
@@ -674,3 +677,130 @@ library's test to a program's code (finding 4). SonarCloud's mixed source and te
 (`apps/*/tests` is now in `sonar.tests` and the sources) is unverified. Two things are the user's to
 check: the third shared directory (finding 1), and the difference in the order of the generated Qt code
 of two binaries (finding 11).
+
+### C7-3, 2026-10-09 (`chore/monorepo-c7-3`)
+
+**What moved.** 290 renames in one commit, every one `R100`: the bindings 92 (`bindings/python` 30,
+`bindings/rust` 31, `bindings/js` 31), the ESP-IDF component 51 (`firmware/esp-idf/iclforge`, with its one
+example, `i2s_player`), the ESPHome component 5 (`firmware/esphome`), the bare-metal probes 46
+(`firmware/baremetal`, was `apps/baremetal`) and Hearth's sink 96 (`firmware/hearth-sink`, was
+`esp-idf/iclforge/examples/hearth_sink`). Then `c7_cmake.py --stage c7-3` (11 CMake files),
+`consol_paths.py` (183 files, 460 lines), `c7_roots.py` (63 files, 204 mentions: the roots named alone),
+`c7_relative.py --fix` (47 relative links in 5 files) and by hand the rest the bare names (28 places), the three files that reach the repository root one level further, the planners and their tests, the checks and tools that name a root as a path component, the packer, the sink's `override_path`, README's layout block, the sink's `OTA_PY`, the packaging version check and the Python lines the longer paths pushed past 100 columns. All in all the stage
+changed 421 files since its parent. The tree: `bindings/{python,rust,js}`,
+`firmware/{esp-idf,hearth-sink,esphome,baremetal}`; a binding or a firmware project keeps the layout of
+its ecosystem (a wheel's `src/`, a Cargo workspace, an npm package, an ESP-IDF project's `main/`).
+
+**Hearth's sink is a project of its own.** `firmware/hearth-sink/main/idf_component.yml` names
+`iclforge` with an `override_path` into `firmware/esp-idf/iclforge`, and the project's `CMakeLists.txt`
+no longer adds the component's directory to `EXTRA_COMPONENT_DIRS`. The component keeps one example,
+`i2s_player`, which is what the registry now ships, so the packed archive is the before-archive without
+the sink's 56 files (the `www/` stream set was already left out of it): `pack_esp_component.py` no longer
+removes a directory that is not there.
+
+**What the dry run could not see** (each found by a configure, a build, a check or a comparison):
+
+1. **Five of the six roots are ordinary words.** `python`, `rust`, `js`, `esp-idf` and `esphome` are
+   also what a command, a YAML tag and ESPHome's own tree are called. The path pass derives a directory
+   rule from the moves and applies it to the bare name, which would have made `python tools/ci/x.py` in a
+   workflow `bindings/python tools/ci/x.py`. So `consol_paths.py --stage c7-3` drops the rules of one
+   component and rewrites a full path and a directory named below a root; `c7_roots.py` respells a root
+   alone only where a slash follows it or a link into the repository ends at it, looks the rest up in the
+   tree, and lists what is not there (`python/name` of a YAML tag, `esphome/core/log.h`, which is
+   ESPHome's tree, `esp-idf/ac3forge/...`, a path from before a rename); `c7_cmake.py --stage c7-3`
+   respells a one-word token only as the argument of `add_subdirectory()`. What is left is the roots in
+   a path position without a slash: a `working-directory`, dependabot's `directory`, `package-dir`,
+   `repository.directory`, `pip install ./python` and `cd js`, 28 places, found by a grep of those
+   positions and edited by hand.
+2. **A directory that went two ways is no rule.** `esp-idf/` was the component (51 files) and the sink
+   (96), so `esp-idf`, `esp-idf/iclforge` and `esp-idf/iclforge/examples` have no one new place and
+   `dir_rules` leaves all three to a person; `c7_roots.py` takes `esp-idf` to `firmware/esp-idf` and
+   the sink's own directory to `firmware/hearth-sink`. `c7_relative.py` had the same fault the other
+   way: it took `apps/` to be `firmware/` because `apps/baremetal` went there, and listed 91 paths, 37
+   of them wrong. A directory is moved "whole" now only if every file under it went to the one place.
+   It also writes the paths again (`--fix`): 47 relative links of the component's, the sink's and
+   ESPHome's READMEs, which were the real ones.
+3. **Three more levels, each by hand and each found by a check.** The wheel's `cmake.source-dir` and the
+   version provider's `root` (`".."` to `"../.."`), `iclforge-sys/build.rs`'s two `parent()` calls (a
+   third, and its message), and the component's `ICLFORGE_ROOT` (`../..` to `../../..`). The sink and the
+   probes reach the component and each other by relative paths `c7_cmake.py` respelled
+   (`${CMAKE_CURRENT_SOURCE_DIR}/../../baremetal`, the directory `EXTRA_COMPONENT_DIRS` wants).
+4. **`sdkconfig.ac4` is not text to the path pass.** `.ac4` is a bitstream extension (`BINARY_EXT` of
+   `n1b_paths.py`), so the probe's fragment and the sink's, which are Kconfig files, kept `apps/baremetal`
+   and `examples/hearth_sink`.
+5. **The build tree follows the source tree.** `build/<preset>/apps/baremetal/iclforge-probe.map` is
+   `firmware/baremetal/` now, and so are the artefact paths of the ESP-IDF probe's summaries and the
+   probe runners' `PROJECT=` (9 lines of `_build.yml`, `footprint_report.py`,
+   `run_esp32{c3,s3}_probe.sh`).
+6. **A planner answers for a path.** The sink was under `esp-idf/`, which is the `esp` lane's and which
+   the Linux gate does not build; `firmware/hearth-sink/` is a prefix neither planner knew, and an unknown
+   one lights every lane. Both name it. `c7_planner_equiv.py` found it: 3,227 files and the last 60
+   commits (55 touching files of the old tree) get the same answers.
+7. **The sink leaves the component's archive.** That is decision 8. `pack_esp_component.py` staged the
+   component's directory whole, `examples/hearth_sink` with it, and removed its `www/` stream set; the
+   sink being elsewhere, the 56 files that archive held of it are gone and the line that removed `www/`
+   with them. Everything else the packer stages is the before-list (397 files; 507 with `--with-ac4`), 24
+   of them with a respelled path in a comment, and `ICLFORGE_ROOT` of the wrapper, which the archive does
+   not use (it carries its own `lib/`).
+8. **A check that scans a root names it.** `check_platform_macros.ps1` scanned `apps` (which held the
+   probes) and `python`; it scans `firmware/baremetal` and `bindings/python` now, the same files (the
+   ESP-IDF trees are not scanned, as they were not). `check_esp_efuse_free.py` reads
+   `firmware/{esp-idf,hearth-sink,baremetal}`, `check_pages.py` takes the component's headers from
+   `firmware/esp-idf/iclforge/include`, `rewrite_roadmap_comments.py` and three test files built their
+   paths from components (`ROOT / "python" / ...`), and `sonar.sources` listed `js,python` by bare name.
+9. **ESPHome's component names the IDF component by its place in the repository** (`COMPONENT_PATH`) and
+   clones the repository at `version:` (default `main`). `firmware/esp-idf/iclforge` exists from this
+   stage on, so a `version:` has to name a ref after it. Unpublished, so nobody is pinned to an older one;
+   recorded for the day somebody is.
+10. **The npm package's error message names a path.** "... see bindings/js/README.md": the one string
+    of `dist/` that differs. Without comments and source maps, which carry the source's text and its
+    positions, the compiled package is identical.
+11. **Two paths no scan read.** `os.path.join("..", "..", "..", "..", "tools", "hearth", "ota.py")` in
+    the sink's `idf.py` extension (a relative path of components, which `c7_relative.py` does not
+    tokenise; found by the one failing test of `tools/hearth`) and `"$root/python/pyproject.toml"` in
+    `check_packaging_versions.sh` (after `$root/`, which no pass takes for the start of a path; found
+    by the check failing at its first run on the stage). Both are fixed, and a grep of the quoted-component
+    and variable-prefixed forms finds no third.
+12. **The proof's own tooling.** `c7_run.sh` takes the trees and the output directory (`C7_WORK`,
+    `BEFORE_WT`, `AFTER_WT`); the pinned-`.text` comparison names its two trees; the ESP-IDF images are
+    built from trees whose names are as long as each other (`old-tree`, `new-tree`), because the
+    `__FILE__` of an assert is in the image, and what they differ in is then the version string, the
+    build time, the tree's name in ten strings and the two SHA-256 digests those change.
+
+**Found, and not C7's.** The Rust crates do not build under MSVC 19.51 here, in the parent as in the stage: `iclforge-sys` builds the shared C library with `/WX` and C4275 (`base::LevelMeter` and `base::LoudnessMeter`, not dll-interface, as the bases of `ac3::analysis::LevelMeter` and `ac3::meta::LoudnessMeter`, `libs/ac3/include/iclforge/ac3/{analysis/levels,meta/loudness}.hpp`) stops it; `build-rust` has a Windows leg in CI, whose compiler is not this one. `gen_baremetal_fixture.py` does not write the committed `fixture.hpp` back with this tree's encoder (the bitstream bytes are those of an older one), as before. The shared Debug tree still fails to link `iclforge-iab-tests`, and `fuzz_iec61937_unwrap` does not compile (since C3).
+
+**The proof,** on this machine (WSL2 on Windows 11, GCC 16 and Clang 22, Qt 6.10, ESP-IDF v6.1, Rust 1.98,
+Node 22; the parent is `chore/monorepo-c7-2` at `f034941d1`, built in `build/wt/merge`; the stage's tree in
+`build/wt/c73` at `bacd09416`):
+
+| proof | result |
+|---|---|
+| builds, `-Werror`, every default target, the GUI on and off | GCC 16 and Clang 22 clean in both; the shared Debug tree has the one failure it had before (`iclforge-iab-tests` does not link) |
+| the whole ctest, GCC and Clang (GUI on) | 3,582 of 3,582 pass in each, before and after; the same 5 skipped; the outcome of each test, by name, identical (JUnit) |
+| ctest's names | identical on the five trees: 3,582 (GUI on, GCC and Clang), 3,546 (GUI off), 3,189 (shared Debug) |
+| pinned bitstream hashes, CLI corpus | identical, both compilers |
+| exported names of the shared libraries | identical |
+| installed tree | the same files; two public headers differ in a comment that names a moved path (`trace_export.hpp`, `render.hpp`) |
+| `.text` of the installed binaries (`git describe` pinned, both compilers) | all 13 ELF files have identical `.text` (5 byte-identical) and so has every member of the 9 static archives (171); `forge-gui` and `hearth` too, since no Qt source moved and the moc files keep their directories' names |
+| flags of every unit (`flags_diff.py`, 913) | all 913 pair and none compiles with other flags |
+| IR of every unit (798, tests included, Clang 22, two source trees whose paths are as long as each other) | 795 identical; 3 differ in the `git describe` string alone (`version.cpp` and the two Hearth units that embed it) |
+| C and C++ edits since the parent (`c7_pathonly.py`) | 111 files; all differ in comments, includes, layout and paths only |
+| public headers | the same 174, none moved; three differ in a comment (`trace_export.hpp`, `render.hpp`, `sendspin/player_session.hpp`) |
+| bare-metal probes (QEMU, `--icount`), `firmware/baremetal` configured at its new place | five variants: the probes' own key=value lines identical; the fixed-point AC-4 probe exits 1 in both trees, over its stack ceiling, as before |
+| libFuzzer harnesses (Clang, `ICLFORGE_BUILD_FUZZERS`) | the same 20 of 21 build and the same one does not (`fuzz_iec61937_unwrap`, since C3); 18 replay their inputs and exit 0 in both; two have none |
+| ESP-IDF v6.1 images, built in both trees (`old-tree` and `new-tree`, names as long as each other) | the Hearth sink for the S3 in the shape CI runs under QEMU (610,608 bytes), for the P4 with Sendspin and AC-4 (2,474,544), for the C6 with 16 MB flash and Sendspin (1,681,152); `i2s_player` (267,088); the S3 probe (519,840). Each pair is the same size and differs in 89 to 111 bytes, every one in the version string, the build time, the tree's name in ten assert strings (`old` and `new`), the two SHA-256 digests those change, and, in the sink's FAT image, the volume serial (4 bytes) |
+| the ESP-IDF packer (`stage()`, then `pack_esp_component.py --verify`) | 397 files staged before (507 with `--with-ac4`), 341 (451) after: the sink's 56 are gone, 24 of the others differ in a path in a comment and none in any other way. `--verify` passes in both trees (ESP32-S3 and ESP32-C3; ESP32-P4 with AC-4); the archives are 1,502,798 and 2,020,618 bytes before, 1,337,045 and 1,854,732 after |
+| the Python extension, built with the wheel's CMake definitions (pybind11 3.1.0), then its pytest suite | built in both trees; the files a wheel carries are the same 4, `_iclforge` byte-identical and `__init__.pyi` differing in one comment path; 128 tests pass in each |
+| the npm package (`npm ci`, `npm run build`, `npm test`) | 102 of 102 in both. `dist/` is identical but for comments and source maps, which carry the source's text and positions, and one error string ("see bindings/js/README.md") |
+| the Cargo workspace (`cargo metadata --locked`) | the same 29 packages with the same targets and dependencies, `Cargo.lock` valid where it is now; the crates do not build here (below) |
+| `check_layering.py`, `check_namespaces.py`, `check_pages.py`, `check_doc_paths.py` | 12 libraries, 228 edges, 0 failures; 172 public headers, 0 failures, 4 known debts; 0 problems; 0 missing of 6,504 checked |
+| the static job's other checks | `check_packaging_versions.sh`, `check_corpus.py`, `check_platform_matrix.py`, `check_esp_efuse_free.py` (28 fragments, as before), `check_android_jni.py`, `generate_support_matrices.py --check` and the three AC-4 table generators' `--check` pass |
+| unit tests of `tools/` | `tools/checks` 432, `tools/ci` 585, `tools/hearth` 102, `tools/n1b` 495 pass |
+| `precheck.py --unit`, `mkdocs build --strict`, `ruff check .` | pass; ruff finds the 25 it found in the parent, one of them in the file's new place |
+| `c7_relative.py` | of 16,508 relative paths, 24 are listed after the fixes, and none is a break: the fixed links themselves (the new spelling is a tail of the old one) and the probes' `../../../esp-idf` |
+| the CI planners | the same answers for 3,227 files and for the 55 commits, of the last 60, that touch files of the old tree |
+
+**Not run here, and recorded rather than skipped:** MSVC `/W4 /WX` and clang-cl; macOS; the Android build; the Windows and macOS halves of the notices; the Rust crates (above); the wheel itself (`scikit-build-core` and `setuptools_scm` are not installed; the CMake definitions it passes and the extension were built, and `root` and `cmake.source-dir` were read, not run); `esphome config` and the component's Python (`esphome` is not installed); the ESP32 images on a board or under QEMU (they are the same code, and the differences between them are named above); SonarCloud and CodeQL; the workflows themselves (their paths, filters, caches and the binaries they run are read, not run).
+
+**What C7-3 leaves.** `tests/golden` (C7-4); `layering.json` and the check of the whole tree, which has
+to know the bindings and the firmware as projects (C7-5).
