@@ -11,6 +11,10 @@ The sibling of [`i2s_player`](../esp-idf/iclforge/examples/i2s_player), differin
 audio comes from. That one decodes a bitstream linked into its own image, which
 proves the codec works and is not how anything real gets its audio.
 
+This is a project of its own, beside the component and not an example inside it: Hearth's firmware
+names the library's component as its dependency (`main/idf_component.yml`, by a path into this
+checkout), and the component's archive does not carry it.
+
 ## What it demonstrates
 
 **An input path.** `iclforge::ac3::split_frames` and `iclforge::ac3::split_access_units` take a span
