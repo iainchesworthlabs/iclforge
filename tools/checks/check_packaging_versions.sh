@@ -189,7 +189,7 @@ fi
 # said GPL-3.0-or-later, unnoticed until it was checked by hand). ---
 vcpkg_json="$root/packaging/vcpkg-port/iclforge/vcpkg.json"
 conanfile="$root/packaging/conan/conanfile.py"
-pyproject="$root/python/pyproject.toml"
+pyproject="$root/bindings/python/pyproject.toml"
 if [[ -f "$vcpkg_json" ]] && [[ -f "$conanfile" ]] && [[ -f "$formula" ]] && [[ -f "$pyproject" ]]; then
     vcpkg_license="$(grep -m1 '"license"' "$vcpkg_json" | sed -E 's/.*"license":[[:space:]]*"([^"]*)".*/\1/')"
     conan_license="$(grep -m1 '^[[:space:]]*license = ' "$conanfile" | sed -E 's/^[[:space:]]*license = "([^"]*)".*/\1/')"
