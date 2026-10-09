@@ -14,10 +14,9 @@ A tests.
 
 ```sh
 cmake --preset config-linux-gcc && cmake --build --preset build-linux-gcc
-ctest --preset test-linux-gcc -L tests
 ```
 
-All the projects are in the one CMake build; `ctest -L` runs this project's tests alone.
+All the projects are in the one CMake build.
 
 The table of projects, what each uses and the rules it is held to:
 [`tools/checks/projects.json`](../tools/checks/projects.json) and the
