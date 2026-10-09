@@ -1680,6 +1680,12 @@ constexpr std::array<double, 64> kTable42 = {
     0.98733, 0.989935, 0.992874, 0.994955, 0.996817, 0.99821, 0.998993, 1.0,
 };
 
+// The entry of Table 42 nearest `target`: what a divergence of `target` is coded as.
+double nearest_in_table_42(double target) {
+    return *std::ranges::min_element(kTable42, {},
+                                     [target](double v) { return std::abs(v - target); });
+}
+
 iclforge::objects::oba::DynamicObject with_divergence(double divergence) {
     return {.position = {.x = 0.5, .y = 0.5, .z = 0.0}, .divergence = divergence};
 }
@@ -1829,8 +1835,7 @@ TEST_CASE("OAMD reads divergence modes and carries a repeated value across block
     CHECK(decoded->blocks[1].objects[0].divergence == 0.608529);  // mode 1
     CHECK(decoded->blocks[2].objects[0].divergence == 0.0);
     CHECK(decoded->blocks[0].objects[1].divergence == 0.0);
-    CHECK(decoded->blocks[1].objects[1].divergence == kTable42[std::distance(
-              kTable42.begin(), std::ranges::min_element(kTable42, {}, [](double v) { return std::abs(v - 0.3); }))]);
+    CHECK(decoded->blocks[1].objects[1].divergence == nearest_in_table_42(0.3));
     CHECK(decoded->blocks[2].objects[1].divergence == decoded->blocks[1].objects[1].divergence);
 }
 
@@ -1846,8 +1851,7 @@ TEST_CASE("OAMD sends no divergence for an inactive object", "[oba][oamd][diverg
     REQUIRE(decoded.has_value());
     CHECK_FALSE(decoded->objects[0].active);
     CHECK(decoded->objects[0].divergence == 0.0);
-    CHECK(decoded->objects[1].divergence == kTable42[std::distance(
-              kTable42.begin(), std::ranges::min_element(kTable42, {}, [](double v) { return std::abs(v - 0.5); }))]);
+    CHECK(decoded->objects[1].divergence == nearest_in_table_42(0.5));
 }
 
 TEST_CASE("OAMD round-trips the screen reference and its two factors", "[oba][oamd][screen]") {

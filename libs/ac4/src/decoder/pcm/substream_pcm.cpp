@@ -57,7 +57,7 @@ constexpr int kQmfPairDelay = 577;
 // At Fixed32 the time domain's full scale is a power of two, which the float
 // takes exactly.
 template <typename R>
-[[nodiscard]] float time_to_output(R value) noexcept {
+[[maybe_unused]] [[nodiscard]] float time_to_output(R value) noexcept {
     constexpr float kScale = 1.0F / static_cast<float>(std::int32_t{1} << (15 + dsp::tiered::kTimeShift<R>));
     return static_cast<float>(value) * kScale;
 }
