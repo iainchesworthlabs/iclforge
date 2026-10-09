@@ -461,8 +461,9 @@ def c7_2_new(path: str) -> str | None:
 # --- C7-3 (planning/monorepo.md) ------------------------------------------------------------------
 # The bindings and the firmware get a root of their own (decisions 6 and 8): python, rust and js
 # under bindings/, the ESP-IDF component, the ESPHome component and the bare-metal probes under
-# firmware/, and Hearth's sink firmware, which was an example inside the component, a firmware project
-# of its own beside them (firmware/hearth-sink). Every file keeps its place inside its project.
+# firmware/, and Hearth's sink firmware, which was an example inside the component, a firmware
+# project of its own beside them (firmware/hearth-sink). Every file keeps its place inside its
+# project.
 C7_3_SINK = "esp-idf/iclforge/examples/hearth_sink/"
 
 

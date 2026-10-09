@@ -12,13 +12,13 @@ where it ends a link into the repository (`tree/main/js`):
     esphome -> firmware/esphome    esp-idf -> firmware/esp-idf
     esp-idf/iclforge/examples/hearth_sink -> firmware/hearth-sink
 
-What follows the root is looked up in the tree. A name that is a tracked path or a directory of one is
-respelled; so is a glob and a build output the roots are known to write (`js/dist`, `js/node_modules`,
-`python/dist`, `rust/target`, `hearth_sink/qemu-*.txt`). Anything else the tree does not have
-(`esp-idf/components`, which is Espressif's own tree, `esp-idf/ac3forge/...`, a path from before a
-rename, `python/name:` in a YAML tag) is left and listed. The documents that name the paths before
-and after on purpose (KEEP_OLD_PATHS of n1b_paths.py and the two plans), this package's own scripts,
-the golden data and the changelog are left.
+What follows the root is looked up in the tree. A name that is a tracked path or a directory of
+one is respelled; so is a glob and a build output the roots are known to write (`js/dist`,
+`js/node_modules`, `python/dist`, `rust/target`, `hearth_sink/qemu-*.txt`). Anything else the tree
+does not have (`esp-idf/components`, which is Espressif's own tree, `esp-idf/ac3forge/...`, a path
+from before a rename, `python/name:` in a YAML tag) is left and listed. The documents that name
+the paths before and after on purpose (KEEP_OLD_PATHS of n1b_paths.py and the two plans), this
+package's own scripts, the golden data and the changelog are left.
 """
 
 from __future__ import annotations

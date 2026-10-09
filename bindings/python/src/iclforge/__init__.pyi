@@ -773,7 +773,8 @@ class meta:
 
 # AC-4 decode/encode (plan phase I4) - iclforge::ac4::Decoder/iclforge::ac4::Encoder. Same
 # submodule-as-class convention. A subset of both C++ headers - see
-# bindings/python/src/iclforge_ext/ac4/present/ac4_module.cpp's own header comment for what is left out.
+# bindings/python/src/iclforge_ext/ac4/present/ac4_module.cpp's own header comment for what is
+# left out.
 class ac4:
     class Speaker(Enum):
         kLeft = ...

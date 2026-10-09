@@ -1,7 +1,8 @@
 """The moved paths in the CMake files and Qt translation catalogues of C7-2 and C7-3
 (planning/monorepo.md).
 
-    c7_cmake.py --root <worktree> --plan <plan.json> [--stage c7-2|c7-3] [--dry-run] [--report <file>]
+    c7_cmake.py --root <worktree> --plan <plan.json> [--stage c7-2|c7-3] [--dry-run]
+                [--report <file>]
 
 consol_cmake.py rewrites a path a build file spells in full. The products' build files spell most
 of theirs the way CMake reads them: relative to the file (`commands/probe.cpp`, `../common/x.cpp`),
@@ -14,9 +15,10 @@ not move but whose build file did, writes it again in the same form from the fil
 - A token that names a directory the stage split or one DIRECTORIES does not hold is listed.
 - A build file that another one include()s is read from the includer's directory, as CMake does
   (INCLUDED_FROM).
-- C7-3 moves directories whose names are ordinary words (python, rust, js): a token of one name, with
-  no slash, is respelled only as the argument of add_subdirectory(), and a directory that moved whole
-  needs no entry in DIRECTORIES (the one place all its files went to is read from the plan).
+- C7-3 moves directories whose names are ordinary words (python, rust, js): a token of one name,
+  with no slash, is respelled only as the argument of add_subdirectory(), and a directory that
+  moved whole needs no entry in DIRECTORIES (the one place all its files went to is read from the
+  plan).
 - A Qt catalogue's `<location filename="...">` is relative to the catalogue; the same rule applies,
   and a location that names no file is left.
 """
