@@ -59,7 +59,7 @@ message(STATUS "C API consumers of the installed package, each linked and run: $
 
 option(ICLFORGE_EXPECT_AC4 "The package was built with ICLFORGE_BUILD_AC4=ON" OFF)
 cmake_path(ABSOLUTE_PATH CMAKE_CURRENT_SOURCE_DIR NORMALIZE OUTPUT_VARIABLE here)
-cmake_path(APPEND here .. .. .. tests golden external-baseline ac4-51-film-96 dee.ac4
+cmake_path(APPEND here .. .. .. testdata external-baseline ac4-51-film-96 dee.ac4
     OUTPUT_VARIABLE ac4_stream)
 cmake_path(NORMAL_PATH ac4_stream)
 
