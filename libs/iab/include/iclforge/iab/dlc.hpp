@@ -31,7 +31,7 @@ struct DlcAudio {
     std::vector<std::int32_t> samples;
 
     // The same samples as normalized floats in [-1, 1), the convention AudioDataPcm uses.
-    [[nodiscard]] std::vector<float> normalized() const;
+    [[nodiscard]] ICLFORGE_IAB_EXPORT std::vector<float> normalized() const;
 };
 
 struct DlcDecodeOptions {
