@@ -1,6 +1,6 @@
 # A monorepo of self-contained projects (C7): a study
 
-!!! note "Status as of 2026-10-09: decisions 1 to 15 taken; C7-1 to C7-5 run and proved"
+!!! note "Status as of 2026-10-09: decisions 1 to 15 taken; C7-1 to C7-6 run and proved"
     Asked for by the user on 2026-10-08: "turn this repository into a monorepo of self-contained
     projects". It follows [consolidation.md](consolidation.md), whose C0 to C6, the three merges its
     decision 14 left (M1 to M3) and the two items C3 and C6 left are run and proved on the local
@@ -22,7 +22,10 @@
     compared on is the code it was. C7-4 ran on `chore/monorepo-c7-4`: the golden data moved to
     `testdata/`, and the one thing that differs in what the programs print is the name of a golden file
     they were given. C7-5 ran on `chore/monorepo-c7-5`: `tools/checks/projects.json` and `check_layering.py`
-    hold the whole tree to the project graph, and nothing the build reads changed. Nothing is pushed.
+    hold the whole tree to the project graph, and nothing the build reads changed. C7-6 ran on
+    `chore/monorepo-c7-6`: the CI planners read the rows of `projects.json` instead of directory
+    lists, and a header of the ESP-IDF component that a library's tests include is built by the
+    gate now. Nothing is pushed.
 
 ## In brief
 
@@ -1007,9 +1010,87 @@ ESPHome suites and the packages (nothing they read changed); SonarCloud and Code
 the static job's included (its steps ran one by one).
 
 **What C7-5 leaves, and with it C7.** Three things, each by its decision and none the user's to take again:
-the planner reads `projects.json` instead of prefixes (decision 12: `classify_changes.py` and `plan_gate.py`
-answer as they did, and the manifest and the check they need are here); the scripts of `tools/n1b/` are
+the planner reads `projects.json` instead of prefixes (decision 12: done in C7-6); the scripts of `tools/n1b/` are
 retired once the user has done with them (decision 13: `adapt_branch.ps1` and the move maps stay); and
 `.git-blame-ignore-revs`, which the consolidation stages did not extend either, has no entry for the move
 commits of C7 (`43ecd2401`, `9aa9bfdfb`, `94c3bd8d6`, `030af657f` and `8a0d74baf`). The five exceptions are
 the table's own debts.
+
+### C7-6, 2026-10-09 (`chore/monorepo-c7-6`)
+
+**What this is.** Decision 12 (a): the CI planners leave directory prefixes for the project graph, as a
+stage of their own with its own proof. No path moves and nothing the build reads changes: the stage is
+`tools/`, the gate's sparse checkout, three pages and this record.
+
+**What changed.**
+
+1. `tools/checks/project_graph.py` is the table, once. The classes and the loader that were in
+   `check_layering.py` live there, and the planners read the table through them. It adds what the planners
+   ask: the project of a path (the longest `path` above it), the projects an excused edge reaches a file
+   from (`reached_from`), every project that uses one, transitively (`dependents`), and the projects a
+   change reaches (`affected`). `python3 tools/checks/project_graph.py affected <path>...` prints them.
+2. `projects.json` says what the planners need to know of a row. A top-level `lanes` lists the CI lanes;
+   each project names the lanes its tree lights (`["core"]` for a library, the three desktop platforms
+   for a program and for `apps/shared/`, `["wasm", "npm"]` for the npm package, and so on); the ESP-IDF
+   component names the libraries it `ships` as source; and an exception names, in `to_paths`, the files
+   its excused edge reaches (the 15 headers of the component that `libs/ac3/tests` includes, the two
+   that Hearth's engine includes, the media code the AC-4 tests compile, the bare-metal fixture).
+3. `check_layering.py` holds those to the tree: a project that lights no lane, a lane the list lacks, a
+   `ships` that is not a library of a firmware project, a `to_paths` outside its target or with no file
+   under it, an excused include whose file is not named, and an entry that no excused include names any
+   more all fail. Its tests are 40, the graph's 13.
+4. `classify_changes.py` and `plan_gate.py` build their tables from the rows. What is left in them is what
+   no project holds (the products' notices and packaging, the tools, the build files, the golden data) and
+   the refinements inside a project (the Catch2 tests among a program's files, Crucible's Windows driver
+   and Linux tray VM, the Python examples, Forge's CLI against its GUI). The projects the Linux gate does
+   not build are the ones whose rows name neither `core` nor `linux`; the comparisons are the kinds
+   `library` and `vendored`.
+5. `tools/ci/compare_planners.py` replays every tracked file and the last 150 merged pull requests through
+   two versions of the planners and says in which direction they differ (it is a permanent tool: the next
+   change to a planner is held to its predecessor the same way).
+6. `pr-gate.yml`'s `plan` job checks out `plan_gate.py` alone; it checks out the module and the table with it.
+
+**What the dry run could not see** (each found by the comparison, a test or running the gate's checkout):
+
+1. **The gate had a false skip.** `libs/ac3/tests` includes 15 headers of the ESP-IDF component and Hearth's
+   engine two, which is why the table has those exceptions; and the gate planned the component's whole
+   tree as "nothing a Linux C++ build reads". A change to `block_ring.hpp` or `firmware_image.hpp` built
+   nothing in a pull request, though the tests that include it are built there. They build now (and, for the
+   two Hearth includes, with Qt), and so do the lanes of ac3 and Hearth after a merge. Three of the last 199
+   pull requests touched one of these files.
+2. **`examples/` was an unknown tree.** Only `examples/python/` was named, so a change to a C++ example lit
+   every lane, `ci_self` and `docs` among them. It is a project now, core's, and the 34 cases of the
+   comparison that are narrower for it are all under `examples/`.
+3. **The first `to_paths` named directories, and over-lit.** `firmware/esp-idf/iclforge/include/` holds
+   headers nothing on the host includes. The entries are files now, and the check that fails when an
+   excused include is not named (and when a name has no include) keeps the list true.
+4. **The gate does not check the repository out.** It sparse-checks one file, and the planner now reads
+   a module and a table. The three files are named in `pr-gate.yml`, and the planner runs from a directory
+   that holds only them.
+5. **What the graph can say is less than it looks.** Of the last 199 pull requests, 72 touch no code. Of the
+   other 127, 29 reach fewer than 6 of the 30 projects and 55 fewer than 21; 67 reach all of them, through
+   the codec-blind libraries, `cmake/`, the golden data or the test support. Choosing the tests of the
+   affected projects (`ctest -L <project>`, as the study imagined) would save the gate most of its work for
+   a quarter of the pull requests that change code and nothing for half of them. It is not part of this
+   stage.
+
+**The proof,** against the stage's parent (`chore/monorepo-c7-5`, built in `build/wt/c75`; the stage changes
+no file the build reads, so the builds, the ctest, the hashes and the `.text` of C7-5 are this stage's too):
+
+| proof | result |
+|---|---|
+| the planners old and new (`compare_planners.py`, every tracked file and the last 199 merged pull requests) | 3,229 one-file changes and 199 pull requests: 3,374 answer the same; 20 are supersets (the 15 headers, the two files of the media code the AC-4 tests compile, three pull requests); 34 are narrower, all under `examples/` (finding 2); none is narrower otherwise |
+| the planners' own tests | the classifier's 44 and the gate's 41 existing tests pass unchanged, and so do the 12 new ones (findings 1 and 2, and the table); `tools/ci` is 598 tests |
+| the gate from its sparse checkout | the planner runs from a directory holding `plan_gate.py`, `project_graph.py` and `projects.json` alone, and answers |
+| `check_layering.py` | 30 projects, 1,949 edges, 45 excused by 5 exceptions, 0 failures; 40 tests; `tools/checks` 465 tests pass |
+| the static job's other checks | `check_namespaces.py`, `check_pages.py`, `check_doc_paths.py` (6,502 checked), `check_packaging_versions.sh` and the unit tests of `tools/hearth` (102) and `tools/n1b` (495) pass; `precheck.py --unit`, `mkdocs build --strict` and `ruff check .` pass, ruff finding what it found in the parent (29) |
+
+**Not run here, and recorded rather than skipped:** the workflows themselves. `pr-gate.yml`'s sparse
+checkout is read and its planner run from the same three files, not run by GitHub: a dispatch of
+`pr-gate.yml` on the branch is the first run.
+
+**What C7-6 leaves.** The graph does not yet choose what to build and test: the planners light the same
+lanes as before, plus the files the table says an excused edge reaches. Choosing by the affected projects
+(`ctest -L`), or lighting the satellites that use a changed library in the run after a merge, is a change to
+what CI costs and not to how it is organised (finding 5 has the numbers). `layering.json` is gone from every
+tool that read it; the history keeps naming it.
