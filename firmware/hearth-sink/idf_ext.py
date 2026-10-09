@@ -24,9 +24,9 @@ import subprocess
 import sys
 from typing import Any
 
-# The example is firmware/hearth-sink, four levels below the
+# The sink is firmware/hearth-sink, two levels below the
 # repository root.
-OTA_PY = os.path.join("..", "..", "..", "..", "tools", "hearth", "ota.py")
+OTA_PY = os.path.join("..", "..", "tools", "hearth", "ota.py")
 
 # ota.py's exit statuses, for the line idf.py prints when one is not 0.
 OUTCOMES = {
