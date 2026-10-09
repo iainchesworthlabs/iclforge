@@ -13,7 +13,7 @@ history:
     version header the build generates;
   - each backticked `iclforge::<name>` that names a library (`iclforge::dsp`,
     `iclforge::ac3_static`) is a target a CMake file makes;
-  - every library of tools/checks/layering.json has a header directory, and the library index
+  - every library of tools/checks/projects.json has a header directory, and the library index
     (docs/library/index.md) names its target.
 
     python tools/n1b/check_pages.py [--root <worktree>]
@@ -60,8 +60,8 @@ def tracked(root: Path) -> list[str]:
 
 
 def libraries(root: Path) -> list[str]:
-    table = json.loads((root / "tools/checks/layering.json").read_text(encoding="utf-8"))
-    return sorted(table["libraries"])
+    table = json.loads((root / "tools/checks/projects.json").read_text(encoding="utf-8"))
+    return sorted(name for name, row in table["projects"].items() if row["kind"] == "library")
 
 
 def headers_of(files: list[str]) -> set[str]:

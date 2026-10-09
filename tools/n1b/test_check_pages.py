@@ -13,8 +13,15 @@ import check_pages as C
 from n1b_lib import DEFAULT_ROOT
 
 FILES = {
-    "tools/checks/layering.json": json.dumps(
-        {"libraries": {"base": [], "dsp": ["base"], "capi": ["base"]}}
+    "tools/checks/projects.json": json.dumps(
+        {
+            "projects": {
+                "base": {"kind": "library", "path": "src/base", "may_use": []},
+                "dsp": {"kind": "library", "path": "src/dsp", "may_use": ["base"]},
+                "capi": {"kind": "library", "path": "src/capi", "may_use": ["base"]},
+                "forge": {"kind": "app", "path": "apps/forge", "may_use": ["base"]},
+            }
+        }
     ),
     "src/base/include/iclforge/base/layout.hpp": "// a header\n",
     "src/dsp/include/iclforge/dsp/fft.hpp": "// a header\n",

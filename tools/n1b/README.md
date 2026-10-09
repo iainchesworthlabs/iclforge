@@ -669,8 +669,8 @@ changes how many it carries. The union of every library's names is compared in a
 `check_pages.py` holds every header spelling (`iclforge/base/layout.hpp`) and library target (`iclforge::dsp`) a page
 names to the tree, which `check_doc_paths.py` cannot do since neither is a path.
 
-`tools/checks/check_layering.py` fails an include that crosses from one library into another its row of
-`tools/checks/layering.json` does not list. The includes a pending cut still removes are listed in
+`tools/checks/check_layering.py` fails an include or a link line that crosses from one project of the tree into
+another its row of `tools/checks/projects.json` does not list. The includes a pending cut still removes are listed in
 `tools/checks/layering_debt/`, one file per cut, and the change that makes the cut deletes its file.
 
 ## The census

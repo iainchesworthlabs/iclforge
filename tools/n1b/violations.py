@@ -1,6 +1,6 @@
 """The includes that stop src/forge from splitting: those the dependency table forbids.
 
-    violations.py --graph <include_graph.json> [--table tools/checks/layering.json] [--out <file>]
+    violations.py --graph <include_graph.json> [--table tools/checks/projects.json] [--out <file>]
 
 Reads the include graph include_graph.py wrote (every include of every C/C++ file, resolved) and
 lists, per pair of libraries, the include directives that go from a library into one its row of the
@@ -19,7 +19,14 @@ from pathlib import Path
 from layoutdef import library_of
 from n1b_lib import base_parser, emit
 
-DEFAULT_TABLE = Path(__file__).resolve().parents[1] / "checks" / "layering.json"
+DEFAULT_TABLE = Path(__file__).resolve().parents[1] / "checks" / "projects.json"
+
+
+def allowed_of(table: dict) -> dict[str, list[str]]:
+    """What each library may use, from projects.json or from the table before it."""
+    if "projects" in table:
+        return {n: r["may_use"] for n, r in table["projects"].items() if r["kind"] == "library"}
+    return table["libraries"]
 
 
 def violations(graph: dict, allowed: dict[str, list[str]]) -> list[tuple[str, str, str, str, str]]:
@@ -43,7 +50,7 @@ def main() -> None:
     ap.add_argument("--table", default=str(DEFAULT_TABLE), help="the dependency table")
     a = ap.parse_args()
     graph = json.loads(Path(a.graph).read_text(encoding="utf-8"))
-    table = json.loads(Path(a.table).read_text(encoding="utf-8"))["libraries"]
+    table = allowed_of(json.loads(Path(a.table).read_text(encoding="utf-8")))
     found = violations(graph, table)
     by_pair: dict[tuple[str, str], list[tuple[str, str, str]]] = defaultdict(list)
     for a_lib, b_lib, f, t, spelling in found:

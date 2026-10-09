@@ -3,7 +3,7 @@
 stdlib `unittest`, and no test reads the real tree: the cases are paths written out here, so a file
 added to main cannot fail one. They pin the rules stage S2 will run: where each library's files go,
 what the flattened variant trees are called, which spelling reaches a header before and after, and
-that the assignment of src/forge files to libraries equals the one tools/checks/layering.json gives
+that the assignment of src/forge files to libraries equals the one tools/checks/projects.json gives
 the dependency check.
 """
 
@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import layoutdef
 
-LAYERING = Path(__file__).resolve().parents[1] / "checks" / "layering.json"
+LAYERING = Path(__file__).resolve().parents[1] / "checks" / "projects.json"
 
 SRC_MOVES = {
     "src/forge/include/ac3/core/bitreader.hpp": "src/base/include/iclforge/base/bitreader.hpp",
@@ -160,7 +160,7 @@ class LibraryOf(unittest.TestCase):
         self.assertIsNone(layoutdef.library_of("tests/core/test_bits.cpp"))
 
     def test_the_dependency_checks_assignment_equals_the_movers(self) -> None:
-        """tools/checks/layering.json splits src/forge the way FORGE_RULES does, for every path."""
+        """tools/checks/projects.json splits src/forge the way FORGE_RULES does, for every path."""
         raw = json.loads(LAYERING.read_text(encoding="utf-8")).get("layout")
         if raw is None:
             self.skipTest("src/forge is split: n1b_cmake.py retired these rules with the move")
