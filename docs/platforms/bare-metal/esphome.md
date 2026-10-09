@@ -25,13 +25,16 @@ esp32:
     type: esp-idf
 
 iclforge:
-  version: v0.10.0-beta.1   # a git ref of iclforge itself
+  version: main   # a git ref of iclforge itself that has firmware/esp-idf/iclforge
   buffer_size: 16384
 ```
 
 Two refs are in play: `external_components`' `ref` picks the version of the ESPHome component,
 and `iclforge:`'s `version:` picks the version of the library it fetches. Pin both for anything
-meant to keep working.
+meant to keep working. The library's ESP-IDF component is at `firmware/esp-idf/iclforge` since the
+repository was re-laid out, and a tag made before that (v0.10.0-beta.1 is one) has it at
+`esp-idf/iclforge`: `version:` has to name a ref after the change, `main` or the first release made
+from it.
 
 `buffer_size` is the framer's working buffer, floored at 4,160 bytes — one syncframe plus the
 next header, which is what deciding where an access unit ends requires. 16 KB holds an independent

@@ -33,7 +33,7 @@ esp32:
     type: esp-idf
 
 iclforge:
-  version: v0.10.0-beta.1   # a git ref of iclforge itself
+  version: main   # a git ref of iclforge itself that has firmware/esp-idf/iclforge
   buffer_size: 16384
 ```
 
@@ -41,6 +41,11 @@ Two refs are in play and they are not the same thing. The `external_components`
 `ref` picks the version of *this ESPHome component*; `iclforge:`'s `version:`
 picks the version of *the library* it fetches. Pin both to tags for anything you
 intend to keep working.
+
+The component fetches the ESP-IDF component from `firmware/esp-idf/iclforge`, where the
+repository has it since the layout of planning/monorepo.md. A tag made before then keeps it at
+`esp-idf/iclforge` (v0.10.0-beta.1 does), so `version:` has to name a ref after the change: `main`,
+or the first release made from it.
 
 `buffer_size` is the framer's working buffer. The floor of 4,160 bytes is one
 syncframe plus the header of the next, which is what deciding where an access
