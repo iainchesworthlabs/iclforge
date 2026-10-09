@@ -197,6 +197,7 @@ FOLDED = {
     "c7-1": {},
     "c7-2": {},
     "c7-3": {},
+    "c7-4": {},
 }
 
 # --- C4's names -------------------------------------------------------------------------------
@@ -480,10 +481,22 @@ def c7_3_new(path: str) -> str | None:
     return None
 
 
+# --- C7-4 (planning/monorepo.md) ------------------------------------------------------------------
+# The golden data (decision 7): data a dozen projects share is no project's tests, so tests/golden is
+# testdata/, with the layout it had below it. The three generated C++ tables the ac3 tests include
+# (mdct_goldens.hpp, drc_goldens.hpp, bitalloc_goldens.hpp) are in it, as they were.
+
+
+def c7_4_new(path: str) -> str | None:
+    if path.startswith("tests/golden/"):
+        return "testdata/" + path[len("tests/golden/"):]
+    return None
+
+
 STAGES = {"c1": c1_new, "c2": c2_new, "c3": c3_new, "c4n": c4n_new, "c4": c4_new, "c5": c5_new,
-          "c6": c6_new, "c7-1": c7_1_new, "c7-2": c7_2_new, "c7-3": c7_3_new}
+          "c6": c6_new, "c7-1": c7_1_new, "c7-2": c7_2_new, "c7-3": c7_3_new, "c7-4": c7_4_new}
 REMOVED = {"c1": C1_REMOVED, "c2": C2_REMOVED, "c3": C3_REMOVED, "c4n": (), "c4": (), "c5": (),
-           "c6": (), "c7-1": (), "c7-2": (), "c7-3": ()}
+           "c6": (), "c7-1": (), "c7-2": (), "c7-3": (), "c7-4": ()}
 
 # The libraries each stage merges, old -> new: what a target, an export macro, an export header, a
 # pkg-config name or an ABI allowlist follows (consol_apply.py, export_diff.py --map,
@@ -499,13 +512,14 @@ LIBRARY_MAP = {
     "c7-1": {},
     "c7-2": {},
     "c7-3": {},
+    "c7-4": {},
 }
 
 # The libraries a stage divides, old -> every library its files went to: signing's key, hash and
 # MAC are base's and its signer ac3's, so the exports of signing, ac3 and base are compared as one
 # group (export_diff.py, abi_compare.py). C6 gives part of ac3 to base.
 SPLITS = {"c1": {}, "c2": {"signing": ("ac3", "base")}, "c3": {}, "c4n": {}, "c4": {}, "c5": {},
-          "c6": {"ac3": ("ac3", "base")}, "c7-1": {}, "c7-2": {}, "c7-3": {}}
+          "c6": {"ac3": ("ac3", "base")}, "c7-1": {}, "c7-2": {}, "c7-3": {}, "c7-4": {}}
 
 # The names C6 gives base: what was iclforge::ac3::io's of WAV, iclforge::ac3::analysis's and
 # iclforge::ac3::meta's of the meters but their acmod and channel-map constructors, and the version.
