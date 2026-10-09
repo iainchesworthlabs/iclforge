@@ -14,9 +14,23 @@ constexpr int kSubbands = 64;
 // The QMF domain works at the inverse transform's scale, full scale 2^15
 // (substream_pcm.cpp, kQmfFullScale), and at Fixed32 at 2^-3, below the double
 // decoder's by dsp::tiered::kQmfShift (dsp/scalar_traits.hpp).
+// 2^n exactly, at compile time. It is not a shift of one: the branch below that the double decoder
+// discards is not a template's, so a count of -(15 + 0) in it is diagnosed all the same, and
+// Apple's Clang makes that an error (-Wshift-count-negative, drc.cpp on macOS Intel).
+[[maybe_unused]] [[nodiscard]] constexpr double exp2_int(int n) noexcept {
+    double value = 1.0;
+    for (; n > 0; --n) {
+        value *= 2.0;
+    }
+    for (; n < 0; ++n) {
+        value *= 0.5;
+    }
+    return value;
+}
+
 constexpr double kFullScalePower = [] {
     if constexpr (dsp::tiered::kFixed<Real>) {
-        const double full_scale = 1.0 / static_cast<double>(std::int64_t{1} << -(15 + dsp::tiered::kQmfShift<Real>));
+        const double full_scale = exp2_int(15 + dsp::tiered::kQmfShift<Real>);
         return full_scale * full_scale;
     } else {
         return 32768.0 * 32768.0;
