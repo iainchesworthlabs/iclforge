@@ -202,6 +202,15 @@ function(iclforge_add_library name)
             SOVERSION "${PROJECT_VERSION}"
             OUTPUT_NAME "iclforge_${stem}"
             EXPORT_NAME "${stem}_shared")
+        # A shared library needs the ones it links (ac4 needs base) from the directory it is in,
+        # whatever the prefix. An executable's own run path does not reach them: with DT_RUNPATH,
+        # the default of GNU ld, it is not searched for a library's dependencies, so a program
+        # linked with `pkg-config --libs iclforge-ac4` found libiclforge_ac4 and not libiclforge_base.
+        if(APPLE)
+            set_target_properties(${shared} PROPERTIES INSTALL_RPATH "@loader_path")
+        elseif(UNIX)
+            set_target_properties(${shared} PROPERTIES INSTALL_RPATH "\$ORIGIN")
+        endif()
     endif()
     set_target_properties(${static} PROPERTIES
         OUTPUT_NAME "iclforge_${stem}_static"
