@@ -349,6 +349,42 @@ class LayeringCheck(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("base names the lane mars", out)
 
+    def test_a_firmware_project_may_use_the_firmware_library_it_is_built_on(self) -> None:
+        _write(self.root, "fw/component/c.cpp", "int c() { return 0; }\n")
+        _write(self.root, "fw/board/main.cpp", "int main() { return 0; }\n")
+        component = {
+            "kind": "firmware-library",
+            "path": "fw/component",
+            "may_use": ["base"],
+            "ships": ["base"],
+        }
+        board = {"kind": "firmware", "path": "fw/board", "may_use": ["base", "component"]}
+        code, out = self.run_check(
+            {"base": BASE, "codec": CODEC, "component": component, "board": board}
+        )
+        self.assertEqual(code, 0, out)
+
+    def test_only_firmware_uses_a_firmware_library_and_never_another_firmware(self) -> None:
+        _write(self.root, "fw/component/c.cpp", "int c() { return 0; }\n")
+        _write(self.root, "fw/board/main.cpp", "int main() { return 0; }\n")
+        _write(self.root, "fw/other/main.cpp", "int main() { return 0; }\n")
+        component = {"kind": "firmware-library", "path": "fw/component", "may_use": ["base"]}
+        board = {"kind": "firmware", "path": "fw/board", "may_use": ["base"]}
+        other = {"kind": "firmware", "path": "fw/other", "may_use": ["board"]}
+        code, out = self.run_check(
+            {
+                "base": BASE,
+                "codec": {**CODEC, "may_use": ["base", "component"]},
+                "component": {**component, "may_use": ["base", "board"]},
+                "board": board,
+                "other": other,
+            }
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("codec (library) may use component (firmware-library)", out)
+        self.assertIn("component (firmware-library) may use board (firmware)", out)
+        self.assertIn("other (firmware) may use board (firmware)", out)
+
     def test_only_firmware_ships_libraries_and_only_libraries(self) -> None:
         board = {"kind": "firmware", "path": "fw/board", "may_use": ["base"], "lanes": ["linux"]}
         _write(self.root, "fw/board/main.cpp", "int main() { return 0; }\n")
