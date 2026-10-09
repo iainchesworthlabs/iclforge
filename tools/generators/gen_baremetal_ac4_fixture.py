@@ -53,7 +53,7 @@ sys.path.insert(0, str(HERE))
 from gen_baremetal_fixture import channel_rms, hex_array, run  # noqa: E402
 
 REPO = HERE.parents[1]
-OUTPUT = REPO / "apps" / "baremetal" / "ac4_fixture.hpp"
+OUTPUT = REPO / "firmware" / "baremetal" / "ac4_fixture.hpp"
 
 
 class Layout(typing.NamedTuple):

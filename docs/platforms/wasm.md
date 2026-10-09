@@ -151,7 +151,7 @@ only knows how to copy its own static files, so this is a plain shell step, the 
 `.github/workflows/_build.yml`'s `build-wasm` job runs:
 
 ```bash
-cd js && npm ci && npm run build && cd ..
+cd bindings/js && npm ci && npm run build && cd ../..
 mkdir -p build/config-wasm-emscripten/bin/wasm_decode_demo/package
 cp -r bindings/js/dist/. build/config-wasm-emscripten/bin/wasm_decode_demo/package/
 ```
@@ -291,7 +291,7 @@ Actions artefact; the `publish` job below it runs only on a manual `workflow_dis
 `v*` tag. No date is set for that changing.
 
 Until it does, the way to use the package is to build it from source:
-`cd js && npm ci && npm run build` — the same install and build the `build-wasm` job runs, which
+`cd bindings/js && npm ci && npm run build` — the same install and build the `build-wasm` job runs, which
 follows them with `npm test` — then depend on the resulting `bindings/js/dist/`. The package embeds no
 `.wasm` of its own, so a consumer also needs the decoder module from `apps/demos/wasm/` (see Build and
 run above). A reader who only wants to see the decoder work needs neither: the [live decode

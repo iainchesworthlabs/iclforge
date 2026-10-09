@@ -2212,7 +2212,7 @@
       "artifact": "Python wheel, built by CI",
       "action": "Open PyPI",
       "url": "https://pypi.org/project/ac3forge/",
-      "note": "CI builds this wheel, but no release has carried it and PyPI has none for Linux on aarch64. Build from a checkout with pip install ./python. The pre-releases are the project ac3forge; the project iclforge starts with a release made after the rename."
+      "note": "CI builds this wheel, but no release has carried it and PyPI has none for Linux on aarch64. Build from a checkout with pip install ./bindings/python. The pre-releases are the project ac3forge; the project iclforge starts with a release made after the rename."
     },
     {
       "product": "Python package",
@@ -2232,7 +2232,7 @@
       "artifact": "Python wheel, built by CI",
       "action": "Open PyPI",
       "url": "https://pypi.org/project/ac3forge/",
-      "note": "CI builds this wheel, but no release has carried it and PyPI has none for macOS on Intel. Build from a checkout with pip install ./python. The pre-releases are the project ac3forge; the project iclforge starts with a release made after the rename."
+      "note": "CI builds this wheel, but no release has carried it and PyPI has none for macOS on Intel. Build from a checkout with pip install ./bindings/python. The pre-releases are the project ac3forge; the project iclforge starts with a release made after the rename."
     },
     {
       "product": "Browser demos",

@@ -51,7 +51,7 @@ import package_firmware
 import sink_build_fixture
 
 HERE = Path(__file__).resolve().parent
-EXAMPLE = HERE.parents[1] / "esp-idf" / "iclforge" / "examples" / "hearth_sink"
+EXAMPLE = HERE.parents[1] / "firmware" / "hearth-sink"
 
 OLD_ELF = hashlib.sha256(b"the image the board runs").digest()
 NEW_ELF = hashlib.sha256(b"the image pushed").digest()

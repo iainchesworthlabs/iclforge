@@ -185,8 +185,9 @@ class SatellitesDirectTest(unittest.TestCase):
         for path, lane in (
             ("apps/demos/android/app/build.gradle.kts", "android"),
             ("firmware/esp-idf/iclforge/CMakeLists.txt", "esp"),
+            ("firmware/hearth-sink/main/hearth_sink.cpp", "esp"),
             ("bindings/rust/iclforge/src/lib.rs", "rust"),
-            ("python/iclforge/__init__.py", "python"),
+            ("bindings/python/src/iclforge/__init__.py", "python"),
             ("apps/demos/wasm/src/main.cpp", "wasm"),
         ):
             with self.subTest(path=path):

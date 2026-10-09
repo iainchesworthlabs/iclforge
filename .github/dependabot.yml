@@ -63,7 +63,7 @@ updates:
 
   # WASM demo TypeScript toolchain (bindings/js/) and browser test deps (apps/demos/wasm/tests/).
   - package-ecosystem: "npm"
-    directory: "/js"
+    directory: "/bindings/js"
     target-branch: "main"
     schedule:
       interval: "weekly"
@@ -88,7 +88,7 @@ updates:
 
   # Rust bindings build tooling (bindgen, etc.) - not a shipped artifact.
   - package-ecosystem: "cargo"
-    directory: "/rust"
+    directory: "/bindings/rust"
     target-branch: "main"
     schedule:
       interval: "weekly"

@@ -136,7 +136,7 @@ class EfuseFreeCheck(unittest.TestCase):
         self.assertIn("file=firmware/baremetal/platform/esp32c6/sdkconfig.defaults,line=1", out)
 
     def test_no_fragments_fails_rather_than_passing_vacuously(self) -> None:
-        (self.root / "esp-idf").mkdir()
+        (self.root / "firmware" / "esp-idf").mkdir(parents=True)
         code, out = self._run()
         self.assertEqual(code, 1)
         self.assertIn("no sdkconfig fragments found", out)

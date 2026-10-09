@@ -265,15 +265,25 @@ libs/audio/     iclforge::audio — the platform audio backends: WASAPI, ALSA, P
                 Android, null fallback; linked by the programs, not installed
 external/       third-party code the tree carries: the Sendspin time filter, vendored unmodified
                 (external/time-filter/VENDORED.md)
-bindings/python/         the iclforge Python package — pybind11 bindings straight onto iclforge::ac3 and the
-                AC-4 library
-bindings/js/             iclforge-wasm-decoder — the npm streaming decoder package (AudioWorklet + Worker),
-                with a typed wrapper for the AC-4 WebAssembly module
-bindings/rust/           iclforge-sys and iclforge — Rust crates over the C API in libs/capi
 examples/       the programs docs/library/ is written from
-firmware/baremetal/ iclforge-probe — the minimum-footprint probes (AC-3 and E-AC-3 decode, the encoders,
-                the AC-4 decoder), cross-compiled for arm-none-eabi and run under QEMU, or built
-                natively on the host
+
+# The language bindings, each a package of its own ecosystem (wheel, crates, npm package)
+bindings/python/  the iclforge Python package — pybind11 bindings straight onto iclforge::ac3 and the
+                  AC-4 library
+bindings/js/      iclforge-wasm-decoder — the npm streaming decoder package (AudioWorklet + Worker),
+                  with a typed wrapper for the AC-4 WebAssembly module
+bindings/rust/    iclforge-sys and iclforge — Rust crates over the C API in libs/capi
+
+# Firmware, each project built by its chip's own toolchain
+firmware/esp-idf/       the ESP-IDF component (iclforge) and its example (i2s_player): the player, the
+                        control surface and the conversion every sink shares, over the minimum-footprint
+                        library
+firmware/hearth-sink/   Hearth's ESP32 Sendspin sink: an ESP-IDF project that names the component as
+                        its dependency
+firmware/esphome/       ESPHome external component wrapping the ESP32-S3 decoder; not a media_player yet
+firmware/baremetal/     iclforge-probe — the minimum-footprint probes (AC-3 and E-AC-3 decode, the
+                        encoders, the AC-4 decoder), cross-compiled for arm-none-eabi and run under
+                        QEMU, or built natively on the host
 
 # A product's programs are directories of their own: <program>/{CMakeLists.txt, src/, assets/,
 # tests/}, with the program's Catch2 binary and Qt Quick tests beside it (ctest -L <name>)
@@ -308,8 +318,6 @@ apps/crucible/linux/     the Linux-only tooling of Crucible: a scripted VM guest
 
 # Hearth — desktop player and ESP32 Sendspin sinks
 apps/hearth/    hearth engine, window (ui/), hearth-testsink, hearth-testserver, hearth-render
-firmware/esp-idf/        ESP-IDF component and examples: hearth_sink (Sendspin player) and i2s_player
-firmware/esphome/        ESPHome external component wrapping the ESP32-S3 decoder; not a media_player yet
 
 # beside those — demonstrations of the library, not products of their own
 apps/demos/android/   Shield Atmos Demo — Android TV app, live Atmos object motion over HDMI

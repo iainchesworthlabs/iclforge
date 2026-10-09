@@ -74,7 +74,7 @@ first.
 
 So what a reader can do today is one of two things. Use the demo above, which runs the decoder in
 your browser with nothing to install. Or build the package from source: clone the repository, then
-`cd js && npm ci && npm run build` — the same install and build CI runs in `bindings/js/` on every pull
+`cd bindings/js && npm ci && npm run build` — the same install and build CI runs in `bindings/js/` on every pull
 request that touches it — and point your project at the resulting `bindings/js/dist/`. The package ships no
 compiled `.wasm` of its own: `decodeFile()` and `PushDecoder` take the instantiated Embind module
 as their first argument, and `IclForgeDecoderNode` takes a `wasmGlueUrl` pointing at the Emscripten

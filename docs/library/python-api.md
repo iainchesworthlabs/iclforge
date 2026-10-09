@@ -16,7 +16,7 @@ The two pre-releases on PyPI, 0.9.0b1 and 0.10.0b1, are the project `ac3forge` w
 against the same CMake tree everything else here uses:
 
 ```bash
-pip install ./python
+pip install ./bindings/python
 ```
 
 A wheel built from a release that predates the AC-4 module has no `iclforge.ac4`: the wheels for
@@ -24,7 +24,7 @@ A wheel built from a release that predates the AC-4 module has no `iclforge.ac4`
 0.10.0b1's wheels, as the project `ac3forge`, for Windows x64, Linux x86_64 and macOS on Apple Silicon,
 for Python 3.10 to 3.14.
 `wheels.yml` also builds Linux aarch64 and macOS Intel wheels, which no release has carried, and
-PyPI has no source archive, so on those two `pip install ./python` from a checkout is the way in.
+PyPI has no source archive, so on those two `pip install ./bindings/python` from a checkout is the way in.
 
 The package's own readme — layout, build notes and examples not duplicated here — lives at
 [`bindings/python/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/bindings/python/README.md).

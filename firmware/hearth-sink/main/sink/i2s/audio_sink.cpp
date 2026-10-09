@@ -3,7 +3,7 @@
 //
 // Selected by default. See ../../audio_sink.hpp for why this is a directory
 // CMake picks rather than a branch in the player, and
-// ../../../../include/iclforge/sink_plan.hpp for the mode/slot-count
+// ../../../../esp-idf/iclforge/include/iclforge/sink_plan.hpp for the mode/slot-count
 // arithmetic this file only calls, and for why a second line has to share
 // line 0's bit clock and word select rather than free-run on its own.
 //

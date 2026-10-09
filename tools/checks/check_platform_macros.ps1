@@ -28,8 +28,9 @@
 # (bindings/python/src/iclforge_ext/{signing,containers}/{present,absent}/), so every
 # tree here starts at zero rather than being grandfathered in with a waiver list.
 #
-# NOT scanned, deliberately: firmware/esp-idf/. That tree is an ESP-IDF component built
-# by idf.py, not by this repository's CMake, and its `#if CONFIG_*` guards are
+# NOT scanned, deliberately: firmware/esp-idf/ and firmware/hearth-sink/. Those trees are an
+# ESP-IDF component and a project built
+# by idf.py, not by this repository's CMake, and their `#if CONFIG_*` guards are
 # Kconfig symbols -- the documented IDF idiom, and in the CONFIG_SPIRAM case
 # load-bearing in a way a directory split would not reproduce: on a target with
 # no PSRAM bus, esp_psram_get_size() is never exposed to the linker at all
@@ -88,7 +89,7 @@ $scanRoots = @($srcRoot)
 # them. A library's own tests and fuzz targets are in libs/<lib>/ (planning/monorepo.md, C7-1),
 # so libs/ holds what libs/, tests/ and fuzz/ held; external/ is the vendored code that was in
 # the sendspin library.
-foreach ($name in @('apps', 'tests', 'external', 'examples', 'tools', 'python')) {
+foreach ($name in @('apps', 'firmware/baremetal', 'tests', 'external', 'examples', 'tools', 'bindings/python')) {
     $candidate = Join-Path $Root $name
     if (Test-Path $candidate) {
         $scanRoots += $candidate
@@ -218,7 +219,7 @@ if ($violations.Count -gt 0) {
     exit 1
 }
 
-$summary = "OK: no preprocessor conditionals in libs/, apps/, tests/, external/, examples/, tools/ or bindings/python/ ($($files.Count) files scanned"
+$summary = "OK: no preprocessor conditionals in libs/, apps/, tests/, external/, examples/, tools/, firmware/baremetal/ or bindings/python/ ($($files.Count) files scanned"
 if ($excludedCount -gt 0) {
     # Printed rather than left implicit: this filter turning the check
     # green for the wrong reason - by excluding real source - is the one

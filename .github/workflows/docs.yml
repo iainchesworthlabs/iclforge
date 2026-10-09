@@ -194,7 +194,7 @@ jobs:
           cache-dependency-path: bindings/js/package-lock.json
 
       - name: Build iclforge-wasm-decoder package
-        working-directory: js
+        working-directory: bindings/js
         run: |
           set -euo pipefail
           npm ci

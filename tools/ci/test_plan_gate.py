@@ -86,12 +86,13 @@ class NotBuiltByTheLinuxGate(unittest.TestCase):
     def test_platform_and_language_trees(self):
         for path in (
             "firmware/esp-idf/iclforge/component.c",
-            "esphome/x.yaml",
+            "firmware/esphome/x.yaml",
+            "firmware/hearth-sink/main/hearth_sink.cpp",
             "apps/demos/android/app/build.gradle.kts",
             "apps/demos/wasm/main.cpp",
             "firmware/baremetal/probe.cpp",
-            "python/iclforge/__init__.py",
-            "rust/src/lib.rs",
+            "bindings/python/src/iclforge/__init__.py",
+            "bindings/rust/iclforge/src/lib.rs",
             "bindings/js/package.json",
             "packaging/conan/conanfile.py",
             "requirements/requirements-lint.txt",
@@ -163,7 +164,7 @@ class Machinery(unittest.TestCase):
             "libs/ac3/src/x.cpp",
             "docs/a.md",
             ".github/workflows/fuzz.yml",
-            "python/x.py",
+            "bindings/python/x.py",
         ):
             with self.subTest(path=path):
                 self.assertEqual(plan(path)["machinery"], "false")
@@ -207,7 +208,7 @@ class QueueMode(unittest.TestCase):
     def test_a_change_that_does_not_build_stays_off(self):
         got = gate.plan(["docs/a.md"], gui_on_build=True)
         self.assertEqual((got["build"], got["gui"]), ("false", "false"))
-        got = gate.plan(["python/x.py"], gui_on_build=True)
+        got = gate.plan(["bindings/python/x.py"], gui_on_build=True)
         self.assertEqual((got["build"], got["gui"]), ("false", "false"))
 
 
@@ -242,7 +243,7 @@ class Compare(unittest.TestCase):
             "cmake/Compiler.cmake",
             "CMakeLists.txt",
             "tools/checks/x.py",
-            "python/x.py",
+            "bindings/python/x.py",
         ):
             with self.subTest(path=path):
                 self.assertEqual(plan(path)["compare"], "false")

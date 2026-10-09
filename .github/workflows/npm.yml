@@ -54,7 +54,7 @@ jobs:
           cache-dependency-path: bindings/js/package-lock.json
 
       - name: Install, build, test
-        working-directory: js
+        working-directory: bindings/js
         run: |
           set -euo pipefail
           npm ci
@@ -65,7 +65,7 @@ jobs:
       # `npm pack` runs the same "files" allowlist `npm publish` would, catching an accidentally-
       # missing dist/ entry before it ever reaches a real publish.
       - name: Pack
-        working-directory: js
+        working-directory: bindings/js
         run: npm pack
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -108,7 +108,7 @@ jobs:
         run: npm install -g npm@latest
 
       - name: Install
-        working-directory: js
+        working-directory: bindings/js
         run: npm ci
 
       # After npm ci, not before: package-lock.json still says 0.0.0-dev at
@@ -116,13 +116,13 @@ jobs:
       # bumping the version first risks npm ci rejecting the now-mismatched
       # lockfile.
       - name: Stamp the release version
-        working-directory: js
+        working-directory: bindings/js
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
 
       - name: Build
-        working-directory: js
+        working-directory: bindings/js
         run: npm run build
 
       - name: Publish to npm
-        working-directory: js
+        working-directory: bindings/js
         run: npm publish

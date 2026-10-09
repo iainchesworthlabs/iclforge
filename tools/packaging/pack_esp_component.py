@@ -45,7 +45,7 @@ import tarfile
 import tempfile
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-COMPONENT = REPO / "esp-idf" / "iclforge"
+COMPONENT = REPO / "firmware" / "esp-idf" / "iclforge"
 
 # Whole directories copied verbatim. Directories rather than a file list on
 # purpose: libs/ac3/minimal.cmake names its own sources and changes without
@@ -137,10 +137,6 @@ def stage(destination: pathlib.Path, with_ac4: bool = False) -> None:
     shutil.copytree(COMPONENT, destination, dirs_exist_ok=True)
     # A previous run's output, if the component directory was packed in place.
     shutil.rmtree(destination / "dist", ignore_errors=True)
-    # The streaming example's stream set - the repository's streams for a
-    # device to fetch, some 2.7 MB (planning/esp32-stream-set.md) - is not part
-    # of the component. The example's own stream/ stays.
-    shutil.rmtree(destination / "examples" / "hearth_sink" / "www", ignore_errors=True)
 
     library = destination / "lib"
     for tree in STAGED_TREES + (STAGED_AC4_TREES if with_ac4 else ()):
@@ -313,7 +309,7 @@ def manifest_targets() -> list[str]:
     default - silently verifying nothing is how a target ends up claimed and
     unbuilt.
     """
-    manifest = (REPO / "esp-idf" / "iclforge" / "idf_component.yml").read_text(encoding="utf-8")
+    manifest = (COMPONENT / "idf_component.yml").read_text(encoding="utf-8")
     targets: list[str] = []
     inside = False
     for line in manifest.splitlines():

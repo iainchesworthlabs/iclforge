@@ -12,8 +12,8 @@
 # copies of a source list drift, and the drift is silent until a link error on
 # a target nobody builds locally.
 #
-# PLACEMENT. Top level, beside bindings/python/, bindings/rust/ and bindings/js/ - the repo's existing
-# convention of one directory per binding, and an ESP-IDF component is one.
+# PLACEMENT. Under firmware/, beside the ESPHome component and the probes - the repo's convention
+# of one directory per project, and an ESP-IDF component is one.
 # It used to live inside firmware/baremetal/platform/esp32s3/, which made it the
 # probe's private business; an integrator running `idf.py add-dependency`, or an
 # ESPHome external component calling add_idf_component(), needs it somewhere it
@@ -22,7 +22,7 @@
 # Consumers add the DIRECTORY ABOVE this one to EXTRA_COMPONENT_DIRS - IDF wants
 # the directory that CONTAINS components, not the component itself:
 #
-#     set(EXTRA_COMPONENT_DIRS "/path/to/iclforge/esp-idf")
+#     set(EXTRA_COMPONENT_DIRS "/path/to/iclforge/firmware/esp-idf")
 #
 # The probe application under firmware/baremetal/platform/esp32s3/ is now just
 # another consumer of this, which is the point: if it stops working the way an
@@ -55,7 +55,7 @@
 # does not matter - and set when the sources are compiled. REQUIRES does not
 # wait for it: mbedtls and nvs_flash are listed for every project, since a
 # REQUIRES that depended on the configuration would resolve in the pass that
-# cannot see it (../../hearth-sink/main/CMakeLists.txt found the same).
+# cannot see it (firmware/hearth-sink/main/CMakeLists.txt found the same).
 #
 # src/tcp_arrivals.cpp is built whatever the configuration: it defines the
 # lwIP hook a project installs from lwip_hooks/iclforge_lwip_hooks.h, which
@@ -141,8 +141,8 @@ endif()
 # Where the library's own CMake lives, which depends on how this component was
 # obtained.
 #
-#   IN THE REPO, at firmware/esp-idf/iclforge/, the root is two up: iclforge -> esp-idf
-#   -> root. This is the case the probe app and both examples build.
+#   IN THE REPO, at firmware/esp-idf/iclforge/, the root is three up: iclforge -> esp-idf
+#   -> firmware -> root. This is the case the probe app, the example and the sink build.
 #
 #   PACKED, as an archive from the component registry, the library sits in lib/
 #   INSIDE this directory: a component tarball is rooted here and cannot
@@ -159,7 +159,7 @@ endif()
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/libs/ac3/CMakeLists.txt")
     set(ICLFORGE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/lib")
 else()
-    get_filename_component(ICLFORGE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+    get_filename_component(ICLFORGE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
 endif()
 if(NOT EXISTS "${ICLFORGE_ROOT}/libs/ac3/CMakeLists.txt")
     message(FATAL_ERROR

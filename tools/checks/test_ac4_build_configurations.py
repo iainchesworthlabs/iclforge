@@ -33,13 +33,13 @@ ROOT = Path(__file__).resolve().parents[2]
 
 ANDROID = ROOT / "apps" / "demos" / "android" / "app" / "src" / "main" / "cpp" / "CMakeLists.txt"
 ROOT_CMAKE = ROOT / "CMakeLists.txt"
-BAREMETAL_CMAKE = ROOT / "apps" / "baremetal" / "CMakeLists.txt"
+BAREMETAL_CMAKE = ROOT / "firmware" / "baremetal" / "CMakeLists.txt"
 AC4_CMAKE = ROOT / "libs" / "ac4" / "CMakeLists.txt"
 AC4_MINIMAL = ROOT / "libs" / "ac4" / "minimal.cmake"
 WASM_CMAKE = ROOT / "apps" / "demos" / "wasm" / "CMakeLists.txt"
-PYTHON_CMAKE = ROOT / "python" / "CMakeLists.txt"
+PYTHON_CMAKE = ROOT / "bindings" / "python" / "CMakeLists.txt"
 PRESETS = ROOT / "CMakePresets.json"
-PYPROJECT = ROOT / "python" / "pyproject.toml"
+PYPROJECT = ROOT / "bindings" / "python" / "pyproject.toml"
 
 
 def _ac4_referenced(path: Path) -> bool:

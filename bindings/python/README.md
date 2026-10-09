@@ -6,7 +6,7 @@ the Atmos-in-DD+ object layer (OAMD + JOC). The AC-4 (ETSI TS 103 190) decoder a
 included, are in the `iclforge.ac4` submodule.
 
 ```bash
-pip install iclforge      # or, from a checkout of the repository: pip install ./python
+pip install iclforge      # or, from a checkout of the repository: pip install ./bindings/python
 ```
 
 The two pre-releases on PyPI, 0.9.0b1 and 0.10.0b1, are the project `ac3forge`, with the module `ac3forge`.
@@ -26,7 +26,7 @@ print(decoded.channels[0].shape)  # (1536,)
 ```
 
 `iclforge.ac4` is in a wheel built from a release that has it; the wheels for 0.10.0b1 and earlier
-predate it, and `pip install ./python` from a checkout builds it. PyPI carries 0.10.0b1's wheels, as the
+predate it, and `pip install ./bindings/python` from a checkout builds it. PyPI carries 0.10.0b1's wheels, as the
 project `ac3forge`, for Windows x64, Linux x86_64 and macOS on Apple Silicon; on Linux aarch64 and macOS
 Intel, where no release has carried a wheel, install from a checkout.
 

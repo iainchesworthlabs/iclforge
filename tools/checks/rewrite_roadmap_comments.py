@@ -12,13 +12,15 @@ ROOT = Path(__file__).resolve().parents[2]
 SCAN_DIRS = (
     "libs",
     "apps",
+    "firmware/baremetal",
     "tests",
     "cmake",
     "examples",
     "external",
-    "python",
+    "bindings/python",
     ".github",
-    "esp-idf",
+    "firmware/esp-idf",
+    "firmware/hearth-sink",
     "tools",
 )
 
@@ -289,8 +291,8 @@ def iter_files() -> list[Path]:
         ROOT / "CMakeLists.txt",
         ROOT / "CMakePresets.json",
         ROOT / "ruff.toml",
-        ROOT / "python" / "pyproject.toml",
-        ROOT / "rust" / "README.md",
+        ROOT / "bindings" / "python" / "pyproject.toml",
+        ROOT / "bindings" / "rust" / "README.md",
     ):
         if extra.exists():
             out.append(extra)

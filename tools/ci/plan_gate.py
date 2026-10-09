@@ -87,6 +87,7 @@ NOT_BUILT = (
     "apps/demos/android/",
     "apps/demos/wasm/",
     "firmware/baremetal/",
+    "firmware/hearth-sink/",
     "apps/crucible/linux/",
     "examples/python/",
 )

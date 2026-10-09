@@ -351,7 +351,7 @@ STREAMS = (
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 AUDIO = REPO / "tests" / "golden" / "audio"
-OUTPUT = REPO / "apps" / "baremetal" / "fixture.hpp"
+OUTPUT = REPO / "firmware" / "baremetal" / "fixture.hpp"
 
 
 def trim_wav(source: pathlib.Path, destination: pathlib.Path, frames: int) -> int:

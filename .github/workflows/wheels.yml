@@ -1,7 +1,7 @@
 # Python wheels for the iclforge PyPI package (Python on PyPI, bindings/python/) - separate from
 # _build.yml/ci.yml's C++ matrix, which knows nothing about Python packaging. Builds via
 # cibuildwheel, configured from bindings/python/pyproject.toml's own [tool.cibuildwheel] table so a local
-# `cibuildwheel python` run matches this workflow exactly rather than drifting from workflow-only
+# `cibuildwheel bindings/python` run matches this workflow exactly rather than drifting from workflow-only
 # YAML settings.
 #
 # The build job runs continuously (every push/PR touching bindings/python/**, called from ci.yml's `python`
@@ -152,7 +152,7 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@e090b81e30c4d855ea63bf4b6e59204c09a101ae # v4.2.1
         with:
-          package-dir: python
+          package-dir: bindings/python
         env:
           CIBW_ARCHS: ${{ matrix.cibw_archs }}
 

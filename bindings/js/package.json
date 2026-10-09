@@ -21,7 +21,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/iainchesworthlabs/iclforge.git",
-    "directory": "js"
+    "directory": "bindings/js"
   },
   "bugs": "https://github.com/iainchesworthlabs/iclforge/issues",
   "author": "iclforge contributors",

@@ -148,8 +148,9 @@ header.
 **One subdirectory per platform audio backend, selected by CMake, never `#ifdef`.**
 `libs/audio/src/backend/{alsa,pipewire,android,macos,posix,windows}` — adding a backend means a
 new directory and a new CMake guard, not a new preprocessor branch. There are no
-preprocessor conditionals in `libs/`, `apps/`, `tests/`, `external/` or `bindings/python/` (the C API header's
-`#ifdef __cplusplus` pair is the one exemption, and `firmware/esp-idf/` uses Kconfig's `#if CONFIG_*`);
+preprocessor conditionals in `libs/`, `apps/`, `tests/`, `external/`, `firmware/baremetal/` or
+`bindings/python/` (the C API header's
+`#ifdef __cplusplus` pair is the one exemption, and `firmware/esp-idf/` and `firmware/hearth-sink/` use Kconfig's `#if CONFIG_*`);
 CI's platform check fails on a new one. Keep it that way.
 
 **A leading underscore on a workflow file means "reusable, not directly triggered."**

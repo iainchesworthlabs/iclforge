@@ -472,7 +472,7 @@ into a GitHub secret** — trusted publishing exists specifically so that never 
 The one-time setup this needs (a maintainer, directly on npmjs.com and on GitHub — not something
 an agent should do, the same rule as PyPI's setup above):
 
-1. Publish the very first `iclforge-wasm-decoder` release by hand (`cd js && npm publish` with a
+1. Publish the very first `iclforge-wasm-decoder` release by hand (`cd bindings/js && npm publish` with a
    temporary, scoped token deleted immediately after) to create the project on npmjs.com — npm's
    trusted-publishing setup, unlike PyPI's, needs the package to already exist; there is no
    "pending publisher" pre-registration mechanism for a name that doesn't exist yet.

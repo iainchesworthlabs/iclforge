@@ -88,7 +88,8 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
     # 2026-09-29). The AC-4 trees are staged only for `--with-ac4` and stay
     # with the nightly run.
     "esp": (
-        "firmware/esp-idf/", "firmware/esphome/", "firmware/baremetal/", "tools/packaging/",
+        "firmware/esp-idf/", "firmware/esphome/", "firmware/baremetal/",
+        "firmware/hearth-sink/", "tools/packaging/",
         "libs/ac3/", "libs/base/", "libs/dsp/", "libs/objects/", "libs/render/", "cmake/",
     ),
     "rust": ("bindings/rust/",),

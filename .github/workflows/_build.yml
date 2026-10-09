@@ -1640,7 +1640,7 @@ jobs:
             apps/demos/wasm/tests/package-lock.json
 
       - name: Build iclforge-wasm-decoder package
-        working-directory: js
+        working-directory: bindings/js
         run: |
           set -euo pipefail
           npm ci
@@ -1818,25 +1818,25 @@ jobs:
           fetch-depth: ${{ inputs.fetch_depth }}
 
       - name: Install pinned Rust toolchain
-        working-directory: rust
+        working-directory: bindings/rust
         run: rustup show
 
       - name: cargo build
-        working-directory: rust
+        working-directory: bindings/rust
         run: cargo build --workspace --locked
 
       - name: cargo test
-        working-directory: rust
+        working-directory: bindings/rust
         run: cargo test --workspace --locked
 
       - name: cargo clippy
-        working-directory: rust
+        working-directory: bindings/rust
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       # Mirrors iclforge::warnings' project-wide "warnings are errors" stance (clippy above) and
       # .clang-format's "checked in, run it" rule (rustfmt here).
       - name: cargo fmt --check
-        working-directory: rust
+        working-directory: bindings/rust
         run: cargo fmt --check
 
   # The Crucible's null-sink driver (apps/crucible/windows/driver, roadmap
