@@ -66,18 +66,27 @@ debt file takes.
 from __future__ import annotations
 
 import argparse
-import json
 import posixpath
 import re
 import subprocess
 import sys
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-CONSUMER_DIRS = ("tests", "fuzz")
-DEFAULT_TABLE = HERE / "projects.json"
+sys.path.insert(0, str(HERE))
+
+from project_graph import (  # noqa: E402
+    CONSUMER_DIRS,
+    DEFAULT_TABLE,
+    Exception_,
+    Project,
+    Table,
+    load_table,
+)
+
+__all__ = ["CONSUMER_DIRS", "DEFAULT_TABLE", "Exception_", "Project", "Table", "load_table"]
 DEFAULT_DEBT = HERE / "layering_debt"
 
 # What a kind may use. A row of the table that lists more is a problem of the table.
@@ -142,45 +151,6 @@ LIBRARY_LINK_KEYWORDS = {"DEPENDS", "EMBEDS", "LINK_PUBLIC", "LINK_PRIVATE", "LI
 
 
 @dataclass(frozen=True)
-class Project:
-    name: str
-    kind: str
-    path: str
-    internal: bool
-    may_use: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class Exception_:
-    source: str
-    target: str
-    paths: tuple[str, ...]
-    why: str
-
-
-@dataclass(frozen=True)
-class Table:
-    projects: dict[str, Project]
-    exceptions: tuple[Exception_, ...]
-    install_files: tuple[str, ...]
-    by_length: tuple[Project, ...] = field(default=(), compare=False)
-
-    def project_of(self, path: str) -> Project | None:
-        for project in self.by_length:
-            if path == project.path or path.startswith(project.path + "/"):
-                return project
-        return None
-
-    def is_consumer(self, path: str) -> bool:
-        """Whether a file is in a project's tests/ or fuzz/ (or the top-level tests/)."""
-        project = self.project_of(path)
-        if project is None:
-            return False
-        rest = path[len(project.path) :].lstrip("/").split("/")
-        return project.kind == "tests" or any(part in CONSUMER_DIRS for part in rest[:-1])
-
-
-@dataclass(frozen=True)
 class Edge:
     file: str
     line: int
@@ -189,26 +159,6 @@ class Edge:
     source: str
     destination: str
     via: str  # "include" or "link"
-
-
-def load_table(path: Path) -> Table:
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    projects = {
-        name: Project(
-            name=name,
-            kind=row["kind"],
-            path=row["path"].rstrip("/"),
-            internal=bool(row.get("internal", False)),
-            may_use=tuple(row.get("may_use", [])),
-        )
-        for name, row in raw["projects"].items()
-    }
-    exceptions = tuple(
-        Exception_(e["from"], e["to"], tuple(e.get("paths", [])), e.get("why", ""))
-        for e in raw.get("exceptions", [])
-    )
-    ordered = tuple(sorted(projects.values(), key=lambda p: -len(p.path)))
-    return Table(projects, exceptions, tuple(raw.get("install_files", [])), ordered)
 
 
 def tracked_files(root: Path) -> list[str]:
@@ -428,6 +378,7 @@ def excused_by(table: Table, edge: Edge) -> int | None:
             e.source == edge.source
             and e.target == edge.destination
             and (not e.paths or edge.file.startswith(e.paths))
+            and (not e.to_paths or edge.via != "include" or edge.target.startswith(e.to_paths))
         ):
             return i
     return None
@@ -486,8 +437,47 @@ def table_problems(table: Table, files: list[str]) -> list[str]:
                 problems.append(f"an exception names {end}, which is not a project of the table")
         if not e.why:
             problems.append(f"the exception {e.source} -> {e.target} gives no reason")
+        target = table.projects.get(e.target)
+        for prefix in e.to_paths:
+            if target is not None and not (prefix + "/").startswith(target.path + "/"):
+                problems.append(
+                    f"the exception {e.source} -> {e.target} reaches {prefix}, which is not in "
+                    f"{target.path}"
+                )
+            elif not any(f.startswith(prefix) for f in files):
+                problems.append(
+                    f"the exception {e.source} -> {e.target} reaches {prefix}, which nothing "
+                    "is filed under"
+                )
+    problems.extend(lane_problems(table))
     graph = {name: list(p.may_use) for name, p in table.projects.items()}
     problems.extend(f"cycle in the table: {' -> '.join(c)}" for c in cycles(graph))
+    return problems
+
+
+def lane_problems(table: Table) -> list[str]:
+    """The CI lanes of the rows: every project names some, from the table's own list, and a
+    firmware project's `ships` are libraries."""
+    problems: list[str] = []
+    if not table.lanes:
+        return [
+            "the table lists no lanes: the CI planners read them (tools/ci/classify_changes.py)"
+        ]
+    for project in table.projects.values():
+        if not project.lanes:
+            problems.append(f'{project.name} lights no lane: say which (the table\'s "lanes")')
+        problems.extend(
+            f"{project.name} names the lane {lane}, which is not one of {list(table.lanes)}"
+            for lane in project.lanes
+            if lane not in table.lanes
+        )
+        if project.ships and project.kind != "firmware":
+            problems.append(f"{project.name} ships libraries, and only firmware does")
+        problems.extend(
+            f"{project.name} ships {name}, which is not a library of the table"
+            for name in project.ships
+            if name not in table.projects or table.projects[name].kind != "library"
+        )
     return problems
 
 
@@ -627,6 +617,7 @@ def main(argv: list[str] | None = None) -> int:
     debt = load_debt(args.debt)
     seen_debt: set[tuple[str, str]] = set()
     used_exceptions: set[int] = set()
+    used_reach: set[tuple[int, str]] = set()
     known = excused = 0
     for e in edges:
         if not forbidden(e):
@@ -635,6 +626,12 @@ def main(argv: list[str] | None = None) -> int:
         if index is not None:
             used_exceptions.add(index)
             excused += 1
+            if e.via == "include":
+                used_reach.update(
+                    (index, prefix)
+                    for prefix in table.exceptions[index].to_paths
+                    if e.target.startswith(prefix)
+                )
             continue
         key = (e.file, e.what)
         if e.via == "include" and key in debt:
@@ -655,6 +652,14 @@ def main(argv: list[str] | None = None) -> int:
                 "any more: delete it"
             )
             failures += 1
+    for i, e in enumerate(table.exceptions):
+        for prefix in e.to_paths:
+            if i in used_exceptions and (i, prefix) not in used_reach:
+                print(
+                    f"::error::check_layering: the exception {e.source} -> {e.target} reaches "
+                    f"{prefix}, which no excused include names any more: delete it"
+                )
+                failures += 1
     for (path, spelling), origin in sorted(debt.items()):
         if (path, spelling) not in seen_debt:
             print(

@@ -1,54 +1,77 @@
 {
-  "_comment": "The projects of the tree: the kind of each, where it is, and the projects it may use. check_layering.py reads every #include and every target_link_libraries() of the tree and fails a use this table does not list (a project's own tests/ and fuzz/ may use any library besides), a row that breaks the rules of its kind, an exception or a debt that no longer applies, an installed header that includes an internal project's, and an install() that names one. Kinds: library (libs/), app-library (apps/shared/: internal, compiled into programs), app (a product's programs), binding, firmware, example, tests (tests/support and tests/performance), vendored (external/). planning/monorepo.md, (d).",
+  "_comment": "The projects of the tree: the kind of each, where it is, the projects it may use and the CI lanes its tree lights. check_layering.py reads every #include and every target_link_libraries() of the tree and fails a use this table does not list (a project's own tests/ and fuzz/ may use any library besides), a row that breaks the rules of its kind, an exception or a debt that no longer applies, an installed header that includes an internal project's, and an install() that names one. The CI planners (tools/ci/classify_changes.py, plan_gate.py) read the same rows: a path belongs to the project with the longest path above it, its lanes are the row's, and an exception's to_paths are the files an excused edge reaches, so that a change to one lights the project that includes it. Kinds: library (libs/), app-library (apps/shared/: internal, compiled into programs), app (a product's programs), binding, firmware, example, tests (tests/support and tests/performance), vendored (external/). Lanes: tools/ci/classify_changes.py. planning/monorepo.md, (d).",
+  "lanes": ["core", "windows", "linux", "macos", "android", "wasm", "esp", "rust", "python", "npm"],
   "projects": {
-    "base":       {"kind": "library", "path": "libs/base", "may_use": []},
-    "dsp":        {"kind": "library", "path": "libs/dsp", "may_use": ["base"]},
-    "objects":    {"kind": "library", "path": "libs/objects", "may_use": ["base", "dsp"]},
-    "render":     {"kind": "library", "path": "libs/render", "may_use": ["base", "objects"]},
-    "containers": {"kind": "library", "path": "libs/containers", "may_use": ["base"]},
-    "ac3":        {"kind": "library", "path": "libs/ac3", "may_use": ["base", "dsp", "objects", "render"]},
-    "ac4":        {"kind": "library", "path": "libs/ac4", "may_use": ["base", "dsp", "objects", "render"]},
-    "iab":        {"kind": "library", "path": "libs/iab", "may_use": ["base"]},
-    "adm":        {"kind": "library", "path": "libs/adm", "may_use": ["iab", "objects"]},
-    "capi":       {"kind": "library", "path": "libs/capi", "may_use": ["ac3", "ac4"]},
-    "audio":      {"kind": "library", "path": "libs/audio", "internal": true, "may_use": ["base", "render", "containers", "objects"]},
-    "sendspin":   {"kind": "library", "path": "libs/sendspin", "internal": true, "may_use": ["time-filter"]},
-    "time-filter": {"kind": "vendored", "path": "external/time-filter", "may_use": []},
+    "base":       {"kind": "library", "path": "libs/base", "may_use": [], "lanes": ["core"]},
+    "dsp":        {"kind": "library", "path": "libs/dsp", "may_use": ["base"], "lanes": ["core"]},
+    "objects":    {"kind": "library", "path": "libs/objects", "may_use": ["base", "dsp"], "lanes": ["core"]},
+    "render":     {"kind": "library", "path": "libs/render", "may_use": ["base", "objects"], "lanes": ["core"]},
+    "containers": {"kind": "library", "path": "libs/containers", "may_use": ["base"], "lanes": ["core"]},
+    "ac3":        {"kind": "library", "path": "libs/ac3", "may_use": ["base", "dsp", "objects", "render"], "lanes": ["core"]},
+    "ac4":        {"kind": "library", "path": "libs/ac4", "may_use": ["base", "dsp", "objects", "render"], "lanes": ["core"]},
+    "iab":        {"kind": "library", "path": "libs/iab", "may_use": ["base"], "lanes": ["core"]},
+    "adm":        {"kind": "library", "path": "libs/adm", "may_use": ["iab", "objects"], "lanes": ["core"]},
+    "capi":       {"kind": "library", "path": "libs/capi", "may_use": ["ac3", "ac4"], "lanes": ["core"]},
+    "audio":      {"kind": "library", "path": "libs/audio", "internal": true, "may_use": ["base", "render", "containers", "objects"], "lanes": ["core"]},
+    "sendspin":   {"kind": "library", "path": "libs/sendspin", "internal": true, "may_use": ["time-filter"], "lanes": ["core"]},
+    "time-filter": {"kind": "vendored", "path": "external/time-filter", "may_use": [], "lanes": ["core"]},
 
-    "app-media":       {"kind": "app-library", "path": "apps/shared/media", "internal": true, "may_use": ["ac3", "ac4", "containers", "objects", "render"]},
-    "app-theme":       {"kind": "app-library", "path": "apps/shared/theme", "internal": true, "may_use": []},
-    "app-preferences": {"kind": "app-library", "path": "apps/shared/preferences", "internal": true, "may_use": []},
+    "app-media":       {"kind": "app-library", "path": "apps/shared/media", "internal": true, "may_use": ["ac3", "ac4", "containers", "objects", "render"], "lanes": ["windows", "linux", "macos"]},
+    "app-theme":       {"kind": "app-library", "path": "apps/shared/theme", "internal": true, "may_use": [], "lanes": ["windows", "linux", "macos"]},
+    "app-preferences": {"kind": "app-library", "path": "apps/shared/preferences", "internal": true, "may_use": [], "lanes": ["windows", "linux", "macos"]},
 
-    "forge":    {"kind": "app", "path": "apps/forge", "may_use": ["ac3", "ac4", "adm", "audio", "base", "containers", "dsp", "iab", "objects", "render", "app-media", "app-preferences", "app-theme"]},
-    "hearth":   {"kind": "app", "path": "apps/hearth", "may_use": ["ac3", "ac4", "audio", "base", "containers", "objects", "render", "sendspin", "app-media", "app-preferences", "app-theme"]},
-    "crucible": {"kind": "app", "path": "apps/crucible", "may_use": ["ac3", "ac4", "audio", "base", "containers", "objects", "app-preferences", "app-theme"]},
-    "demo-android": {"kind": "app", "path": "apps/demos/android", "may_use": ["ac3", "audio", "base", "containers"]},
-    "demo-wasm":    {"kind": "app", "path": "apps/demos/wasm", "may_use": ["ac3", "ac4", "objects"]},
+    "forge":    {"kind": "app", "path": "apps/forge", "may_use": ["ac3", "ac4", "adm", "audio", "base", "containers", "dsp", "iab", "objects", "render", "app-media", "app-preferences", "app-theme"], "lanes": ["windows", "linux", "macos"]},
+    "hearth":   {"kind": "app", "path": "apps/hearth", "may_use": ["ac3", "ac4", "audio", "base", "containers", "objects", "render", "sendspin", "app-media", "app-preferences", "app-theme"], "lanes": ["windows", "linux", "macos"]},
+    "crucible": {"kind": "app", "path": "apps/crucible", "may_use": ["ac3", "ac4", "audio", "base", "containers", "objects", "app-preferences", "app-theme"], "lanes": ["windows", "linux", "macos"]},
+    "demo-android": {"kind": "app", "path": "apps/demos/android", "may_use": ["ac3", "audio", "base", "containers"], "lanes": ["android"]},
+    "demo-wasm":    {"kind": "app", "path": "apps/demos/wasm", "may_use": ["ac3", "ac4", "objects"], "lanes": ["wasm"]},
 
-    "python": {"kind": "binding", "path": "bindings/python", "may_use": ["ac3", "ac4", "base", "containers", "objects"]},
-    "rust":   {"kind": "binding", "path": "bindings/rust", "may_use": ["capi"]},
-    "js":     {"kind": "binding", "path": "bindings/js", "may_use": []},
+    "python": {"kind": "binding", "path": "bindings/python", "may_use": ["ac3", "ac4", "base", "containers", "objects"], "lanes": ["python"]},
+    "rust":   {"kind": "binding", "path": "bindings/rust", "may_use": ["capi"], "lanes": ["rust"]},
+    "js":     {"kind": "binding", "path": "bindings/js", "may_use": [], "lanes": ["wasm", "npm"]},
 
-    "esp-idf":     {"kind": "firmware", "path": "firmware/esp-idf", "may_use": ["ac3", "ac4", "base", "dsp", "objects", "render", "sendspin"]},
-    "hearth-sink": {"kind": "firmware", "path": "firmware/hearth-sink", "may_use": ["ac3", "render", "sendspin"]},
-    "esphome":     {"kind": "firmware", "path": "firmware/esphome", "may_use": ["ac3"]},
-    "baremetal":   {"kind": "firmware", "path": "firmware/baremetal", "may_use": ["ac3", "ac4", "base", "dsp", "objects", "render"]},
+    "esp-idf":     {"kind": "firmware", "path": "firmware/esp-idf", "may_use": ["ac3", "ac4", "base", "dsp", "objects", "render", "sendspin"], "lanes": ["esp"], "ships": ["ac3", "base", "dsp", "objects", "render"]},
+    "hearth-sink": {"kind": "firmware", "path": "firmware/hearth-sink", "may_use": ["ac3", "render", "sendspin"], "lanes": ["esp"]},
+    "esphome":     {"kind": "firmware", "path": "firmware/esphome", "may_use": ["ac3"], "lanes": ["esp"]},
+    "baremetal":   {"kind": "firmware", "path": "firmware/baremetal", "may_use": ["ac3", "ac4", "base", "dsp", "objects", "render"], "lanes": ["esp"]},
 
-    "examples": {"kind": "example", "path": "examples", "may_use": ["ac3", "ac4", "adm", "base", "capi", "containers", "iab", "objects", "render"]},
+    "examples": {"kind": "example", "path": "examples", "may_use": ["ac3", "ac4", "adm", "base", "capi", "containers", "iab", "objects", "render"], "lanes": ["core"]},
 
-    "tests": {"kind": "tests", "path": "tests", "may_use": ["ac3", "ac4", "dsp"]}
+    "tests": {"kind": "tests", "path": "tests", "may_use": ["ac3", "ac4", "dsp"], "lanes": ["core"]}
   },
   "exceptions": [
     {
       "from": "ac4", "to": "app-media", "paths": ["libs/ac4/tests/decoder/test_object_render.cpp"],
+      "to_paths": ["apps/shared/media/src/ac4_object_render."],
       "why": "The one test of the object renderer builds its streams with the AC-4 tests' own helper (decoder/objects.hpp, which includes the encoder's private headers), so it stays in libs/ac4/tests and compiles apps/shared/media/src/ac4_object_render.cpp into ac4's test binary: a library's test using an app-library (planning/monorepo.md, C7-2, finding 4)."
     },
     {
       "from": "ac3", "to": "esp-idf", "paths": ["libs/ac3/tests/"],
+      "to_paths": [
+        "firmware/esp-idf/iclforge/conversion/bits/iclforge/slot_conversion.hpp",
+        "firmware/esp-idf/iclforge/include/iclforge/block_ring.hpp",
+        "firmware/esp-idf/iclforge/include/iclforge/dac_queue_model.hpp",
+        "firmware/esp-idf/iclforge/include/iclforge/firmware_image.hpp",
+        "firmware/esp-idf/iclforge/include/iclforge/firmware_status.hpp",
+        "firmware/esp-idf/iclforge/include/iclforge/firmware_trial.hpp",
+        "firmware/esp-idf/iclforge/include/iclforge/hardware_info.hpp",
+        "firmware/esp-idf/iclforge/include/iclforge/improv.hpp",
+        "firmware/esp-idf/iclforge/include/iclforge/interleave.hpp",
+        "firmware/esp-idf/iclforge/include/iclforge/log_ring.hpp",
+        "firmware/esp-idf/iclforge/include/iclforge/pairing_records.hpp",
+        "firmware/esp-idf/iclforge/include/iclforge/playout.hpp",
+        "firmware/esp-idf/iclforge/include/iclforge/sink_plan.hpp",
+        "firmware/esp-idf/iclforge/include/iclforge/tcp_arrivals.hpp",
+        "firmware/esp-idf/iclforge/include/iclforge/unit_hold.hpp"
+      ],
       "why": "The component's host-portable headers (interleave.hpp, block_ring.hpp, dac_queue_model.hpp, sink_plan.hpp, playout.hpp and their kin) are free of ESP-IDF and are tested on the host, in ac3's test binary, with the component's include directory on its path: library tests using firmware headers."
     },
     {
       "from": "hearth", "to": "esp-idf", "paths": ["apps/hearth/engine/"],
+      "to_paths": [
+        "firmware/esp-idf/iclforge/include/iclforge/firmware_image.hpp",
+        "firmware/esp-idf/iclforge/include/iclforge/firmware_status.hpp"
+      ],
       "why": "Hearth's engine speaks to a sink about its firmware (GET /firmware, the image's header, its status) with the component's host-portable headers, firmware_image.hpp and firmware_status.hpp, so that the board and the server agree by construction: a program using firmware headers."
     },
     {
@@ -57,6 +80,7 @@
     },
     {
       "from": "esp-idf", "to": "baremetal", "paths": ["firmware/esp-idf/iclforge/examples/i2s_player/"],
+      "to_paths": ["firmware/baremetal/fixture.hpp"],
       "why": "The i2s_player example decodes the 5.1 fixture the bare-metal probe carries (fixture.hpp) rather than a copy of it: one firmware project using another's file."
     }
   ],
