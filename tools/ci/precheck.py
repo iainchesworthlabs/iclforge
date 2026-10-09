@@ -138,6 +138,7 @@ def main(argv: list[str]) -> int:
     results.append(
         run([py, "tools/checks/generate_project_pages.py", "--check"], name="project pages")
     )
+    results.append(run([py, "tools/checks/check_sonar_scope.py"], name="sonar scope"))
     results.append(run([py, "tools/checks/check_namespaces.py"], name="library namespaces"))
     results.append(
         run([py, "tools/checks/check_esp_efuse_free.py"], name="esp efuse-free settings")

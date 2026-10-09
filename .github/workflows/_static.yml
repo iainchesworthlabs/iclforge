@@ -234,6 +234,15 @@ jobs:
         shell: bash
         run: python3 tools/checks/generate_project_pages.py --check
 
+      # sonar-project.properties divides the tree three ways with patterns, and a move of files
+      # changes which side one falls on without a word from anyone: a pattern that matches nothing
+      # (an issue-ignore rule for a file that moved stops applying, silently) and a test scanned as
+      # source both fail here. Its own suite runs in the Oracle unit tests step above.
+      - name: Sonar scope
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: python3 tools/checks/check_sonar_scope.py
+
       # A library's public headers declare into the namespace named for it under
       # the family's root (iclforge::ac3, iclforge::ac4, iclforge::containers::mp4), so that
       # the codecs are peers and a name says which library it belongs to.
