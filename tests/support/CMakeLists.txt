@@ -66,8 +66,7 @@ endif()
 # libs/ac4/tests/core/test_toc.cpp reads (tools/generators/gen_ac4_baseline.py). AC4_GOLDEN_DIR:
 # libs/ac4/tests/decoder/test_syntax.cpp holds the AC-4 decoder's syntax trace to the digests
 # tools/references/ac4_syntax.py wrote for the same streams.
-cmake_path(GET CMAKE_CURRENT_SOURCE_DIR PARENT_PATH _iclforge_golden)
-cmake_path(APPEND _iclforge_golden "golden")
+set(_iclforge_golden "${PROJECT_SOURCE_DIR}/testdata")
 target_compile_definitions(iclforge_test_support PUBLIC
     "ICLFORGE_GOLDEN_AUDIO_DIR=\"${_iclforge_golden}/audio\""
     "ICLFORGE_GOLDEN_OBJECT_DIR=\"${_iclforge_golden}/object-fixture\""

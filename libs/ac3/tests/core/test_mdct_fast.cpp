@@ -10,7 +10,7 @@
 #include <span>
 
 #include "iclforge/ac3/core/mdct.hpp"
-#include "golden/mdct_goldens.hpp"
+#include "mdct_goldens.hpp"
 
 // Phase 4 of the performance-observability programme: the opt-in §7.9.4
 // fast N/4-FFT MDCT (mdct.cpp's mdct_forward_fast_core, reached via

@@ -23,7 +23,7 @@
 #include "iclforge/ac3/meta/drc.hpp"
 #include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
-#include "golden/drc_goldens.hpp"
+#include "drc_goldens.hpp"
 
 namespace {
 

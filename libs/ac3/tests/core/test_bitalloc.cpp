@@ -9,7 +9,7 @@
 
 #include "iclforge/ac3/core/bitalloc.hpp"
 #include "iclforge/ac3/core/exponents.hpp"
-#include "golden/bitalloc_goldens.hpp"
+#include "bitalloc_goldens.hpp"
 
 TEST_CASE("bit allocation matches the independent Python reference bit-exactly", "[bitalloc]") {
     for (const auto& c : iclforge::golden::kBitAllocCases) {

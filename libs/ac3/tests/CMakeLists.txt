@@ -284,9 +284,8 @@ endif()
 target_include_directories(iclforge-ac3-tests PRIVATE "${_ac3_root}/fuzz")
 
 # core/test_bitalloc.cpp, test_mdct.cpp, test_mdct_fast.cpp and meta/test_drc.cpp include the golden
-# tables as "golden/<name>_goldens.hpp", relative to the tests/ directory that holds golden/
-# (tools/generators writes them there).
-target_include_directories(iclforge-ac3-tests PRIVATE "${PROJECT_SOURCE_DIR}/tests")
+# tables as "<name>_goldens.hpp", from testdata/ (tools/generators writes them there).
+target_include_directories(iclforge-ac3-tests PRIVATE "${PROJECT_SOURCE_DIR}/testdata")
 
 # core/test_fixed32_ecpl.cpp calls the fixed-point tier's enhanced-coupling
 # functions, which are internal to the library: declared under libs/ac3/src/
