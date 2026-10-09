@@ -131,7 +131,7 @@ struct MxfWriteOptions {
     // to the IAB frame rate for the rates that are also picture rates (24, 25, 30 and 24000/1001)
     // and is left out for the others. The alignment level is in dBFS.
     std::optional<std::pair<std::int32_t, std::int32_t>> reference_image_edit_rate;
-    std::optional<std::int8_t> reference_audio_alignment_level = -20;
+    std::optional<std::int8_t> reference_audio_alignment_level = std::int8_t{-20};
 
     // false leaves out the IAB Channel SubDescriptors (Annex E; "should").
     bool channel_sub_descriptors = true;
