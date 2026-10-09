@@ -1,7 +1,7 @@
-"""The moved paths in the CMake files and Qt translation catalogues of C7-2 and C7-3
+"""The moved paths in the CMake files and Qt translation catalogues of C7-2 to C7-4
 (planning/monorepo.md).
 
-    c7_cmake.py --root <worktree> --plan <plan.json> [--stage c7-2|c7-3] [--dry-run]
+    c7_cmake.py --root <worktree> --plan <plan.json> [--stage c7-2|c7-3|c7-4] [--dry-run]
                 [--report <file>]
 
 consol_cmake.py rewrites a path a build file spells in full. The products' build files spell most
@@ -91,12 +91,19 @@ C7_3_DIRECTORIES = {
 C7_3_MOVED_ROOTS = ("python", "rust", "js", "esp-idf", "esphome", "apps/baremetal")
 C7_3_COMPOSED = re.compile(r"(?<![\w/.\-])(python|rust|js|esp-idf|esphome)/|apps/baremetal\b")
 
+# C7-4: tests/golden is testdata/, whole.
+C7_4_MOVED_ROOTS = ("tests/golden",)
+C7_4_COMPOSED = re.compile(r"tests/golden\b")
+
 
 def use_stage(stage: str) -> None:
     global DIRECTORIES, INCLUDED_FROM, INCLUDER_NEW, MOVED_ROOTS, COMPOSED, WHOLE_DIRS
     if stage == "c7-3":
         DIRECTORIES, INCLUDED_FROM, INCLUDER_NEW = C7_3_DIRECTORIES, {}, {}
         MOVED_ROOTS, COMPOSED, WHOLE_DIRS = C7_3_MOVED_ROOTS, C7_3_COMPOSED, True
+    elif stage == "c7-4":
+        DIRECTORIES, INCLUDED_FROM, INCLUDER_NEW = {}, {}, {}
+        MOVED_ROOTS, COMPOSED, WHOLE_DIRS = C7_4_MOVED_ROOTS, C7_4_COMPOSED, True
 
 
 VARS_SOURCE = ("CMAKE_CURRENT_SOURCE_DIR", "CMAKE_CURRENT_LIST_DIR")
@@ -284,7 +291,7 @@ def argparse_parser():
     ap.add_argument("--plan", required=True)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--report", default=None)
-    ap.add_argument("--stage", default="c7-2", choices=("c7-2", "c7-3"))
+    ap.add_argument("--stage", default="c7-2", choices=("c7-2", "c7-3", "c7-4"))
     return ap
 
 
