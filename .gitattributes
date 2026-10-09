@@ -46,3 +46,7 @@ cmake/vcpkg/ports/** text eol=lf
 # decoder's syntax digests are taken over.
 *.ac4 -text
 
+# The object scene's placements are text, and their SHA-256 is pinned (testdata/audio/corpus.json,
+# tools/checks/check_corpus.py): a Windows checkout with core.autocrlf would write CRLF and fail the
+# fixture check for a file nobody changed.
+testdata/audio/*.paths text eol=lf
