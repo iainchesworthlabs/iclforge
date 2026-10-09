@@ -70,7 +70,7 @@ def headers_of(files: list[str]) -> set[str]:
         if not f.endswith((".hpp", ".h", ".in")):
             continue
         m = re.match(r"(?:libs|src)/[^/]+/(?:include|variants/[^/]+)/(iclforge(?:_c)?/.+)$", f)
-        m = m or re.match(r"esp-idf/iclforge/include/(iclforge/.+)$", f)
+        m = m or re.match(r"firmware/esp-idf/iclforge/include/(iclforge/.+)$", f)
         if m:
             found.add(m.group(1).removesuffix(".in"))
     return found
