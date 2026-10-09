@@ -10,6 +10,7 @@ iclforge_add_test_binary(iclforge-ac4-tests PROJECT ac4 SOURCES
     core/test_acpl_exact.cpp
     core/test_ajoc.cpp
     core/test_aspx.cpp
+    core/test_aspx_exact.cpp
     core/test_mant_exp.cpp
     decoder/test_api.cpp
     decoder/test_decoder.cpp

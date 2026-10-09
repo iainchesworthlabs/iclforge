@@ -1,5 +1,0 @@
-# libs/dsp/tests/tiered/test_dsp_exact.cpp holds dsp's tiered kernels to AC-4's SBR high-frequency
-# generator, and includes the generator's header from libs/ac4/src/core/aspx/, which is private to
-# ac4: a test of the lower library reaching into the higher one's implementation. The comparison
-# belongs in libs/ac4/tests, where the header is the library's own; moving it deletes this line.
-libs/dsp/tests/tiered/test_dsp_exact.cpp core/aspx/hf_generator.hpp
