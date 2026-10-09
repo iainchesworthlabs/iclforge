@@ -48,10 +48,13 @@ include that is no longer in the tree fails. With the cuts landed no file is lef
 directory's README.md keeps it in the tree (git has no empty directory) and says how a debt is
 listed.
 
-Five things fail the check, each with a line that names the file and the line of the include (or the
+Six things fail the check, each with a line that names the file and the line of the include (or the
 CMake command) where there is one:
 
   - a use of a project the table does not list for the user, and no exception excuses;
+  - an include of a header of another project that is private to it: a header is public when it is
+    under the project's include/ or under a directory its row `exposes` (what it shares on purpose
+    and does not install), and any other header of a project is its implementation;
   - a file in no project of the table that holds C/C++ or CMake, under a tree the table covers;
   - a table whose row breaks the rules of the kinds, names an unknown project, has a cycle, or
     names a path nothing is filed under;
@@ -425,6 +428,11 @@ def table_problems(table: Table, files: list[str]) -> list[str]:
                 )
         if project.name in project.may_use:
             problems.append(f"{project.name} lists itself")
+        for prefix in project.exposes:
+            if not prefix.startswith(project.path + "/"):
+                problems.append(f"{project.name} exposes {prefix}, which is not in {project.path}")
+            elif not any(f.startswith(prefix) for f in files):
+                problems.append(f"{project.name} exposes {prefix}, which nothing is filed under")
         if project.kind == "app-library" and not project.internal:
             problems.append(f"{project.name} is an app-library and so internal: say so")
         if not any(f == project.path or f.startswith(project.path + "/") for f in files):
@@ -597,9 +605,12 @@ def main(argv: list[str] | None = None) -> int:
     def forbidden(e: Edge) -> bool:
         return e.destination not in allowed_for(table, e.file, e.source)
 
+    def private(e: Edge) -> bool:
+        return e.via == "include" and not table.published(e.destination, e.target)
+
     if args.debt_lines:
         for e in edges:
-            if e.via == "include" and forbidden(e) and excused_by(table, e) is None:
+            if e.via == "include" and (forbidden(e) or private(e)) and excused_by(table, e) is None:
                 print(f"{e.file} {e.what}  # {e.source} -> {e.destination}")
         return 0
 
@@ -620,7 +631,7 @@ def main(argv: list[str] | None = None) -> int:
     used_reach: set[tuple[int, str]] = set()
     known = excused = 0
     for e in edges:
-        if not forbidden(e):
+        if not (forbidden(e) or private(e)):
             continue
         index = excused_by(table, e)
         if index is not None:
@@ -637,6 +648,15 @@ def main(argv: list[str] | None = None) -> int:
         if e.via == "include" and key in debt:
             seen_debt.add(key)
             known += 1
+            continue
+        if not forbidden(e):
+            print(
+                f"::error file={e.file},line={e.line}::check_layering: {e.source} includes "
+                f"{e.what}, a header of {e.destination} that is private to it ({e.target} is not "
+                f"under {table.projects[e.destination].path}/include/ or a directory its row "
+                "exposes)"
+            )
+            failures += 1
             continue
         row = ", ".join(table.projects[e.source].may_use) or "nothing"
         verb = "include" if e.via == "include" else "link"
@@ -664,7 +684,8 @@ def main(argv: list[str] | None = None) -> int:
         if (path, spelling) not in seen_debt:
             print(
                 f"::error::check_layering: {origin} lists {path} including {spelling}, which is "
-                f"no longer a forbidden include: delete that line (and the file when it is empty)"
+                "no longer a forbidden or private include: delete that line (and the file when "
+                "it is empty)"
             )
             failures += 1
 

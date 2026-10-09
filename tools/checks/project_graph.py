@@ -39,6 +39,10 @@ class Project:
     # Firmware only: the libraries its package ships as source (pack_esp_component.py), whose
     # change lights the project's lanes after a merge as well as in the nightly run.
     ships: tuple[str, ...] = ()
+    # The directories, besides include/, that other projects may include from: the headers a
+    # project shares on purpose and does not install (base's internal/, the source of an
+    # app-library, which is compiled into its programs). Any other header is private.
+    exposes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -73,6 +77,11 @@ class Table:
             return False
         rest = path[len(project.path) :].lstrip("/").split("/")
         return project.kind == "tests" or any(part in CONSUMER_DIRS for part in rest[:-1])
+
+    def published(self, name: str, path: str) -> bool:
+        """Whether another project may include `path`, a header of the project `name`."""
+        project = self.projects[name]
+        return path.startswith((project.path + "/include/", *project.exposes))
 
     def reached_from(self, path: str) -> list[Project]:
         """The projects an excused edge reaches `path` from: the ones whose files include it.
@@ -135,6 +144,7 @@ def load_table(path: Path = DEFAULT_TABLE) -> Table:
             may_use=tuple(row.get("may_use", [])),
             lanes=tuple(row.get("lanes", [])),
             ships=tuple(row.get("ships", [])),
+            exposes=tuple(row.get("exposes", [])),
         )
         for name, row in raw["projects"].items()
     }
