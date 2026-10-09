@@ -54,7 +54,7 @@ class Pages(unittest.TestCase):
         (self.root / "tools" / "checks" / "projects.json").write_text(
             json.dumps(TABLE), encoding="utf-8"
         )
-        for d in ("libs/base", "libs/dsp", "apps/player"):
+        for d in ("libs/base/tests", "libs/dsp", "apps/player"):
             (self.root / d).mkdir(parents=True)
         self.table = project_graph.load_table(self.root / "tools" / "checks" / "projects.json")
 
@@ -93,6 +93,10 @@ class Pages(unittest.TestCase):
         self.assertIn(G.MARKER, readme)
         self.assertIn("**Used by:** `dsp`, `player`", readme)
         self.assertIn("ctest --preset test-linux-gcc -L base", readme)
+        # a project with no tests/ directory has no ctest line to offer
+        self.assertNotIn(
+            "ctest", (self.root / "apps" / "player" / "README.md").read_text(encoding="utf-8")
+        )
         self.assertIn("(../../tools/checks/projects.json)", readme)
         self.assertEqual(
             (self.root / "libs" / "dsp" / "README.md").read_text(encoding="utf-8"),

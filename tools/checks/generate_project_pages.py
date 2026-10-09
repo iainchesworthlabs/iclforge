@@ -115,7 +115,7 @@ def page(table: Table) -> str:
     return "\n".join(out)
 
 
-def readme(table: Table, p: Project) -> str:
+def readme(table: Table, p: Project, has_tests: bool) -> str:
     kind = p.kind.replace("-", " ")
     out = [
         MARKER,
@@ -141,16 +141,14 @@ def readme(table: Table, p: Project) -> str:
             "- `tests/`: its tests, one binary",
             "- `fuzz/`: its libFuzzer harnesses, with their seeds and regressions",
         ]
+    out += ["", "## Build and test", "", "```sh"]
+    out += ["cmake --preset config-linux-gcc && cmake --build --preset build-linux-gcc"]
+    if has_tests:
+        out += [f"ctest --preset test-linux-gcc -L {p.name}"]
+    out += ["```", ""]
     out += [
-        "",
-        "## Build and test",
-        "",
-        "```sh",
-        "cmake --preset config-linux-gcc && cmake --build --preset build-linux-gcc",
-        f"ctest --preset test-linux-gcc -L {p.name}",
-        "```",
-        "",
-        "All the projects are in the one CMake build; `ctest -L` runs this project's tests alone.",
+        "All the projects are in the one CMake build"
+        + ("; `ctest -L` runs this project's tests alone." if has_tests else "."),
         "",
         "The table of projects, what each uses and the rules it is held to:",
         "[`tools/checks/projects.json`](../../tools/checks/projects.json) and the",
@@ -177,7 +175,13 @@ def outputs(root: Path, table: Table) -> dict[str, str]:
         existing = root / target
         if existing.is_file() and MARKER not in existing.read_text(encoding="utf-8"):
             continue  # somebody's own
-        files[target] = relink(target, readme(table, p))
+        # ctest labels a project's tests with its name: a library's, an app-library's and a
+        # product's, not a demo's (its tests are Playwright's) or a project that has none.
+        ctest = p.kind in ("library", "app-library") or (
+            p.kind == "app" and not p.path.startswith("apps/demos/")
+        )
+        has_tests = ctest and any(d.is_dir() for d in (root / p.path).glob("**/tests"))
+        files[target] = relink(target, readme(table, p, has_tests))
     return files
 
 
