@@ -1,6 +1,7 @@
-"""The moved paths in the CMake files and Qt translation catalogues of C7-2 (planning/monorepo.md).
+"""The moved paths in the CMake files and Qt translation catalogues of C7-2 and C7-3
+(planning/monorepo.md).
 
-    c7_cmake.py --root <worktree> --plan <plan.json> [--dry-run] [--report <file>]
+    c7_cmake.py --root <worktree> --plan <plan.json> [--stage c7-2|c7-3] [--dry-run] [--report <file>]
 
 consol_cmake.py rewrites a path a build file spells in full. The products' build files spell most
 of theirs the way CMake reads them: relative to the file (`commands/probe.cpp`, `../common/x.cpp`),
@@ -13,6 +14,9 @@ not move but whose build file did, writes it again in the same form from the fil
 - A token that names a directory the stage split or one DIRECTORIES does not hold is listed.
 - A build file that another one include()s is read from the includer's directory, as CMake does
   (INCLUDED_FROM).
+- C7-3 moves directories whose names are ordinary words (python, rust, js): a token of one name, with
+  no slash, is respelled only as the argument of add_subdirectory(), and a directory that moved whole
+  needs no entry in DIRECTORIES (the one place all its files went to is read from the plan).
 - A Qt catalogue's `<location filename="...">` is relative to the catalogue; the same rule applies,
   and a location that names no file is left.
 """
@@ -70,6 +74,29 @@ INCLUDER_NEW = {"apps/gui": "apps/forge/gui", "apps/hearth/ui": "apps/hearth/ui"
 MOVED_ROOTS = ("apps/cli", "apps/gui", "apps/common", "apps/notices", "apps/windows", "apps/linux",
                "apps/crucible", "apps/hearth", "tests/cli", "tests/gui", "tests/hearth",
                "tests/crucible")
+COMPOSED = re.compile(
+    r"apps/(cli|gui|common|notices|windows|linux|android|wasm)\b|tests/(cli|gui|hearth|crucible)\b"
+)
+WHOLE_DIRS = False
+
+# C7-3: the bindings and the firmware. The three directories that were split need an entry; the rest
+# moved whole.
+C7_3_DIRECTORIES = {
+    "esp-idf": "firmware/esp-idf",
+    "esp-idf/iclforge": "firmware/esp-idf/iclforge",
+    "esp-idf/iclforge/examples": "firmware/esp-idf/iclforge/examples",
+}
+C7_3_MOVED_ROOTS = ("python", "rust", "js", "esp-idf", "esphome", "apps/baremetal")
+C7_3_COMPOSED = re.compile(r"(?<![\w/.\-])(python|rust|js|esp-idf|esphome)/|apps/baremetal\b")
+
+
+def use_stage(stage: str) -> None:
+    global DIRECTORIES, INCLUDED_FROM, INCLUDER_NEW, MOVED_ROOTS, COMPOSED, WHOLE_DIRS
+    if stage == "c7-3":
+        DIRECTORIES, INCLUDED_FROM, INCLUDER_NEW = C7_3_DIRECTORIES, {}, {}
+        MOVED_ROOTS, COMPOSED, WHOLE_DIRS = C7_3_MOVED_ROOTS, C7_3_COMPOSED, True
+
+
 VARS_SOURCE = ("CMAKE_CURRENT_SOURCE_DIR", "CMAKE_CURRENT_LIST_DIR")
 VARS_ROOT = ("CMAKE_SOURCE_DIR", "PROJECT_SOURCE_DIR")
 RUN = re.compile(r"[A-Za-z0-9_.\-+@/${}]+")
@@ -101,8 +128,23 @@ class Tree:
             moved = {self.moves[f] for f in self.files if f.startswith(p + "/") and f in self.moves}
             if not moved:
                 return p, "dir"
+            if WHOLE_DIRS:
+                whole = self.whole(p)
+                if whole:
+                    return whole, "dir"
             return None, "dir"  # a directory some of whose files moved, and not in DIRECTORIES
         return None, "none"
+
+    def whole(self, d: str) -> str | None:
+        """The one directory every file under d went to, with the same layout below it."""
+        found = set()
+        for f in self.files:
+            if f.startswith(d + "/"):
+                new, rest = self.moves.get(f, f), f[len(d):]
+                if not new.endswith(rest):
+                    return None
+                found.add(new[: len(new) - len(rest)])
+        return found.pop() if len(found) == 1 else None
 
 
 def resolve_token(tok: str, base_cur: str) -> tuple[str, str, str] | None:
@@ -145,8 +187,7 @@ def rewrite_cmake(text: str, f_old: str, f_new: str, tree: Tree, listed: list[st
             return tok
         r = resolve_token(tok, base_cur)
         if r is None:
-            if re.search(r"apps/(cli|gui|common|notices|windows|linux|android|wasm)\b", tok) \
-                    or re.search(r"tests/(cli|gui|hearth|crucible)\b", tok):
+            if COMPOSED.search(tok):
                 listed.append(f"{f_new}: composed or unresolvable: {tok}")
             return tok
         p_old, form, var = r
@@ -155,6 +196,9 @@ def rewrite_cmake(text: str, f_old: str, f_new: str, tree: Tree, listed: list[st
         new_target, kind = tree.target(p_old)
         if kind == "none":
             return tok
+        if WHOLE_DIRS and "/" not in tok and kind == "dir" and form == "rel" \
+                and not text[: m.start()].endswith("add_subdirectory("):
+            return tok  # a word that is also the name of a directory
         if new_target is None:
             if tok not in (".", "..") and p_old.startswith(MOVED_ROOTS):
                 listed.append(f"{f_new}: a split directory: {tok} ({p_old})")
@@ -190,6 +234,7 @@ def rewrite_ts(text: str, f_old: str, f_new: str, tree: Tree, stats: dict[str, i
 def main() -> int:
     ap = argparse_parser()
     a = ap.parse_args()
+    use_stage(a.stage)
     root = Path(a.root)
     plan = json.loads(Path(a.plan).read_text(encoding="utf-8"))
     moves = plan["moves"]
@@ -237,6 +282,7 @@ def argparse_parser():
     ap.add_argument("--plan", required=True)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--report", default=None)
+    ap.add_argument("--stage", default="c7-2", choices=("c7-2", "c7-3"))
     return ap
 
 
