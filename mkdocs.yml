@@ -84,6 +84,7 @@ nav:
       - Building from source: building.md
   - Library:
       - Overview: library/index.md
+      - The projects of the tree: projects.md
       - Capabilities: library/capabilities.md
       - Development status: library/development-status.md
       - Application coverage: library/application-coverage.md

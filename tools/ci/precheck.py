@@ -135,6 +135,9 @@ def main(argv: list[str]) -> int:
     results.append(run([py, "tools/checks/check_platform_matrix.py"], name="platform matrix"))
     results.append(run([py, "tools/checks/check_layering.py"], name="project layering"))
     results.append(run([py, "tools/checks/check_workflow_paths.py"], name="workflow path filters"))
+    results.append(
+        run([py, "tools/checks/generate_project_pages.py", "--check"], name="project pages")
+    )
     results.append(run([py, "tools/checks/check_namespaces.py"], name="library namespaces"))
     results.append(
         run([py, "tools/checks/check_esp_efuse_free.py"], name="esp efuse-free settings")
