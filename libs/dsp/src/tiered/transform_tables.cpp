@@ -9,9 +9,14 @@
 namespace iclforge::dsp::tiered {
 namespace {
 
+// What follows is used by the tiers that have fixed-point tables; a build whose scalar is double
+// instantiates none of it, and the compilers that count an uninstantiated template as unused
+// (-Wunused-template: Apple's and Homebrew's Clang, Emscripten's) stop on it under -Werror.
+
 // {re, im} pairs narrowed as Fft and Imdct narrow theirs: each double cast to the scalar once.
 template <typename R, std::size_t M>
-constexpr std::array<Complex<R>, M / 2> complexes(const std::array<double, M>& values) {
+[[maybe_unused]] constexpr std::array<Complex<R>, M / 2> complexes(
+    const std::array<double, M>& values) {
     std::array<Complex<R>, M / 2> out{};
     for (std::size_t i = 0; i < M / 2; ++i) {
         out[i] = Complex<R>(static_cast<R>(values[2 * i]), static_cast<R>(values[2 * i + 1]));
@@ -22,7 +27,8 @@ constexpr std::array<Complex<R>, M / 2> complexes(const std::array<double, M>& v
 // Imdct's post-twiddle at Fixed32: the pre-twiddle's doubles times 2^post_shift / N, with
 // 2^(post_shift + 1) the least power of two not below N, then narrowed.
 template <typename R, std::size_t N, std::size_t M>
-constexpr std::array<Complex<R>, M / 2> post_twiddles(const std::array<double, M>& pre) {
+[[maybe_unused]] constexpr std::array<Complex<R>, M / 2> post_twiddles(
+    const std::array<double, M>& pre) {
     unsigned shift = 0;
     while ((std::size_t{1} << shift) < N) {
         ++shift;
@@ -37,7 +43,7 @@ constexpr std::array<Complex<R>, M / 2> post_twiddles(const std::array<double, M
 }
 
 template <typename R, std::size_t N>
-constexpr std::array<R, N> reals(const std::array<double, N>& values) {
+[[maybe_unused]] constexpr std::array<R, N> reals(const std::array<double, N>& values) {
     std::array<R, N> out{};
     for (std::size_t i = 0; i < N; ++i) {
         out[i] = static_cast<R>(values[i]);
@@ -59,9 +65,9 @@ struct Built {
 };
 
 template <typename R, std::size_t N, std::size_t Roots, std::size_t Pre>
-constexpr Built<R, N, Roots, Pre> build(const std::array<double, Roots>& roots,
-                                        const std::array<double, Pre>& pre,
-                                        const std::array<double, N>& kbd) {
+[[maybe_unused]] constexpr Built<R, N, Roots, Pre> build(const std::array<double, Roots>& roots,
+                                                         const std::array<double, Pre>& pre,
+                                                         const std::array<double, N>& kbd) {
     Built<R, N, Roots, Pre> out{complexes<R>(roots), complexes<R>(pre), {}, reals<R>(kbd)};
     if constexpr (Built<R, N, Roots, Pre>::kFixed) {
         out.post = post_twiddles<R, N>(pre);
@@ -72,7 +78,7 @@ constexpr Built<R, N, Roots, Pre> build(const std::array<double, Roots>& roots,
 // Function-local constexpr, so a build whose scalar is double, which never calls this,
 // neither evaluates nor links any of it. Constant-initialised: no guard.
 template <typename R>
-const TransformTable<R>* lookup(std::size_t length) noexcept {
+[[maybe_unused]] const TransformTable<R>* lookup(std::size_t length) noexcept {
     static constexpr auto k2048 = build<R>(iclforge::dsp::tiered::tables::kFftRoots2048,
                                            iclforge::dsp::tiered::tables::kPreTwiddle2048,
                                            iclforge::dsp::tiered::tables::kKbdLeft2048);
