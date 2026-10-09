@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Which relative paths did a move break?
 
-    c7_relative.py --old-rev <rev> [--root <worktree>] [--plan <plan.json>] [--show N]
+    c7_relative.py --old-rev <rev> [--root <worktree>] [--plan <plan.json>] [--show N] [--fix]
 
 The path passes rewrite a path written from the repository root. A path written from the file that
 holds it (`../../docs/x.md` in a README, `'..\\..\\..'` in a PowerShell script, a Markdown link to a
@@ -15,6 +15,10 @@ not text. A token the stage's own scripts rewrote is skipped too (its old spelli
 file any more). What is listed is for a person to read: a path relative to something else than the
 file (a Qt kit's `../plugins/platforms/qoffscreen`, the published site's `../../wasm-demo/`) is
 listed and is not a break.
+
+With --fix a path that named a file or directory of <rev> that is in the tree now (where it was or
+where the plan sent it) is written again from the file's place; a path to something untracked, a
+path with a backslash and a path whose target is gone are only listed.
 """
 
 from __future__ import annotations
@@ -58,6 +62,7 @@ def main() -> int:
     ap.add_argument("--root", default=".")
     ap.add_argument("--plan")
     ap.add_argument("--show", type=int, default=400)
+    ap.add_argument("--fix", action="store_true")
     a = ap.parse_args()
     root = Path(a.root)
     moves = json.loads(Path(a.plan).read_text())["moves"] if a.plan else {}
@@ -72,14 +77,21 @@ def main() -> int:
         if parts[0].startswith("R") and len(parts) == 3:
             new_of.setdefault(parts[1], parts[2])
             old_of.setdefault(parts[2], parts[1])
-    # a directory that moved whole: old dir -> new dir
-    dir_new: dict[str, str] = {}
+    # a directory that moved whole: old dir -> new dir. Every file under it moved, and all to the
+    # one place (apps/ is not "firmware/" because apps/baremetal went there, and esp-idf/ is two
+    # places)
+    votes: dict[str, set[str]] = {}
     for o, n in new_of.items():
         po, pn = o.split("/"), n.split("/")
         for i in range(1, len(po)):
             tail = po[i:]
             if len(pn) > len(tail) and pn[len(pn) - len(tail):] == tail:
-                dir_new.setdefault("/".join(po[:i]), "/".join(pn[: len(pn) - len(tail)]))
+                votes.setdefault("/".join(po[:i]), set()).add("/".join(pn[: len(pn) - len(tail)]))
+    dir_new = {
+        d: next(iter(v))
+        for d, v in votes.items()
+        if len(v) == 1 and all(f in new_of for f in old_files if f.startswith(d + "/"))
+    }
 
     def exists_old(p: str) -> bool:
         return p in old_files or p in old_dirs
@@ -88,6 +100,7 @@ def main() -> int:
         return p in new_files or p in new_dirs
 
     broken: list[str] = []
+    fixes: dict[str, list[tuple[int, str, str]]] = {}
     seen = 0
     for f in sorted(new_files):
         if f.endswith(BINARY) or f.startswith(SKIP):
@@ -160,8 +173,34 @@ def main() -> int:
                 continue
             went = new_of.get(old_target) or dir_new.get(old_target) or ""
             hint = posixpath.relpath(went, ndir) if went else "?"
+            target = went or old_target
+            if "\\" not in tok and exists_new(target) and untouched(tok):
+                core = tok.rstrip(",;:'\"`)")
+                if core.endswith(".") and not core.endswith(".."):
+                    core = core[:-1]
+                slash = "/" if core.endswith("/") else ""
+                fixes.setdefault(f, []).append(
+                    (n, tok, posixpath.relpath(target, ndir) + slash + tok[len(core):])
+                )
+                continue
             report(n, tok, old_target + (f" -> {went}; from here {hint}" if went else ""))
-    print(f"{seen} relative paths read; {len(broken)} resolved before the stage and do not now")
+    fixed = sum(len(v) for v in fixes.values())
+    if a.fix:
+        for f, edits in fixes.items():
+            p = root / f
+            lines = p.read_bytes().decode("utf-8").split("\n")
+            for n, tok, repl in edits:
+                lines[n - 1] = lines[n - 1].replace(tok, repl, 1)
+            p.write_bytes("\n".join(lines).encode("utf-8"))
+    else:
+        for f, edits in fixes.items():
+            for n, tok, repl in edits:
+                broken.append(f"{f}:{n}: {tok}  (would be {repl})")
+    verb = "written again" if a.fix else "to write again"
+    print(
+        f"{seen} relative paths read; {len(broken)} resolved before the stage and do not now"
+        f"{f'; {fixed} {verb} in {len(fixes)} files' if fixes else ''}"
+    )
     for b in broken[: a.show]:
         print(" ", b)
     return 0
