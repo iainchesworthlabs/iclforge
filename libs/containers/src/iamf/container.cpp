@@ -385,7 +385,10 @@ std::expected<Bytes, Error> write_isobmff(const Sequence& sequence, const Isobmf
     }
 
     Bytes file;
-    file.reserve(ftyp.size() + moov.size() + 8 + payload_bytes);
+    // The sum is 64-bit; a vector on a 32-bit target (WebAssembly) cannot hold more than
+    // max_size() whatever the file says, and the reservation is only a hint.
+    const std::uint64_t file_bytes = ftyp.size() + moov.size() + 8 + payload_bytes;
+    file.reserve(static_cast<std::size_t>(std::min<std::uint64_t>(file_bytes, file.max_size())));
     append(file, ftyp);
     append(file, moov);
     Out mdat_header;

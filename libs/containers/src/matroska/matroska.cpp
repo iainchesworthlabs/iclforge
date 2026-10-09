@@ -215,7 +215,7 @@ std::expected<std::vector<std::byte>, MuxError> mux(
                 break;
             }
             const auto& frame = frames[index];
-            if (frame.size() > (1ULL << 40)) {
+            if (static_cast<std::uint64_t>(frame.size()) > (1ULL << 40)) {
                 return std::unexpected(MuxError::kFrameTooLarge);
             }
             // SimpleBlock: track number as a vint, a signed 16-bit timestamp
@@ -289,7 +289,7 @@ std::vector<std::byte> Writer::close_cluster() {
 }
 
 std::expected<std::vector<std::byte>, MuxError> Writer::push(std::span<const std::byte> frame) {
-    if (frame.size() > (1ULL << 40)) {
+    if (static_cast<std::uint64_t>(frame.size()) > (1ULL << 40)) {
         return std::unexpected(MuxError::kFrameTooLarge);
     }
     const auto abs_ms = stamp_ms(index_);
