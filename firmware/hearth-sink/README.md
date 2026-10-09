@@ -721,7 +721,7 @@ once they are paired, which happens one of two ways:
 The board keeps eight pairings in NVS, each with the name its server's hello
 gave, the most recently used first. A ninth pairing replaces the least
 recently used one that no open connection rests on
-([`pairing_records.hpp`](../esp-idf/iclforge/include/iclforge/pairing_records.hpp)). `pair
+([`pairing_records.hpp`](../../libs/device/include/iclforge/pairing_records.hpp)). `pair
 list` prints them, and the page's Sendspin section lists them from `GET
 /pairing`, with a *Forget* for each. `pair forget` and a server's ID - its
 server_id, or the first eight or more characters of it that `pair list`
@@ -759,7 +759,7 @@ chunk's local time is worked out when it arrives, which may be seconds before
 it plays, and it is moved by as much as the clock has moved by the time it
 does. The I2S sink says when each buffer it is given will play, from the
 channel's own end-of-frame interrupts
-([`iclforge/playout.hpp`](../esp-idf/iclforge/include/iclforge/playout.hpp)). The player
+([`iclforge/playout.hpp`](../../libs/device/include/iclforge/playout.hpp)). The player
 pads the start of a stream with silence, or leaves out the frames already
 late, so that its first frame plays when the server asked; after that it
 drops or repeats one frame in 256 while the smoothed error is outside
@@ -1232,7 +1232,7 @@ reason the QEMU shape runs an 8 KB ring.
 standard I2S for one or two channels and TDM for three or more, reconfiguring
 between them as the layout in force changes, rather than a build fixing one
 shape and staying there
-([`iclforge/sink_plan.hpp`](../esp-idf/iclforge/include/iclforge/sink_plan.hpp) decides
+([`iclforge/sink_plan.hpp`](../../libs/device/include/iclforge/sink_plan.hpp) decides
 which). `PUT /layout` takes effect this way at the very next play: no rebuild,
 no reflash, just whatever the new layout needs. A TDM line always runs its full
 frame, four 32-bit slots or eight 16-bit ones, with the slots past the layout's
@@ -1347,13 +1347,13 @@ component rename or a driver API change is caught there, but nothing under
 QEMU runs it. The exceptions are the parts worth testing without a board at
 all, free of
 ESP-IDF and unit-tested on the host:
-[`iclforge/interleave.hpp`](../esp-idf/iclforge/include/iclforge/interleave.hpp)
-(`libs/ac3/tests/io/test_interleave.cpp`), because planar-to-interleaved indexing with
+[`iclforge/interleave.hpp`](../../libs/device/include/iclforge/interleave.hpp)
+(`libs/device/tests/test_interleave.cpp`), because planar-to-interleaved indexing with
 slot padding is where the bugs are; the mode/slot-count arithmetic itself,
-[`iclforge/sink_plan.hpp`](../esp-idf/iclforge/include/iclforge/sink_plan.hpp)
-(`libs/ac3/tests/io/test_sink_plan.cpp`); and the queue model behind the `sink.*` line,
-[`iclforge/dac_queue_model.hpp`](../esp-idf/iclforge/include/iclforge/dac_queue_model.hpp)
-(`libs/ac3/tests/io/test_dac_queue_model.cpp`), which runs there against a simulated
+[`iclforge/sink_plan.hpp`](../../libs/device/include/iclforge/sink_plan.hpp)
+(`libs/device/tests/test_sink_plan.cpp`); and the queue model behind the `sink.*` line,
+[`iclforge/dac_queue_model.hpp`](../../libs/device/include/iclforge/dac_queue_model.hpp)
+(`libs/device/tests/test_dac_queue_model.cpp`), which runs there against a simulated
 DMA. The rest of this sink is peripheral setup that either works on a board or
 does not.
 

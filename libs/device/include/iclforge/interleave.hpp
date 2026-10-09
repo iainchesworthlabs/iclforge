@@ -15,7 +15,7 @@
 // part of a sink that can be TESTED. Everything else in one is peripheral setup
 // and a blocking write, neither of which does anything without a DAC on the
 // other end; this is arithmetic and indexing, and indexing is where the bugs
-// are. libs/ac3/tests/io/test_interleave.cpp builds it on the host.
+// are. libs/device/tests/test_interleave.cpp builds it on the host.
 //
 // It is library code with a temporary home: planning/esp32-player.md hands it
 // over to libs/ac3 as iclforge::ac3::io::interleave, and this copy goes when that lands.

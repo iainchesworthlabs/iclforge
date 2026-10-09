@@ -62,7 +62,7 @@ DACs are driven and at what width — same firmware family, same analogue front 
 ```
 
 Same `hearth_sink` family, same `SinkFrame::fixed` ES9080 contract
-([`sink_plan.hpp`](../firmware/esp-idf/iclforge/include/iclforge/sink_plan.hpp)), same Sendspin /
+([`sink_plan.hpp`](../libs/device/include/iclforge/sink_plan.hpp)), same Sendspin /
 Improv / page surface where the part allows. The tier is a **module choice on one PCB**,
 not four products.
 
@@ -85,7 +85,7 @@ the DACs do not.
   `GET /hardware` says so on such a board ([the device page's plan](esp32-device-ui.md#what-hardware-adds)).
 - **The ES9080 pair:** no PCB exists, no ES9080 is wired to any board, and no firmware programs
   one over I2C. What `SinkFrame::fixed` gives such a DAC, a fixed frame with the unused slots
-  zeroed, is tested on the host (`libs/ac3/tests/io/test_sink_plan.cpp`) and not against a DAC.
+  zeroed, is tested on the host (`libs/device/tests/test_sink_plan.cpp`) and not against a DAC.
 
 ### Why the wiring differs
 

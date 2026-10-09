@@ -3,7 +3,7 @@
 //
 // Selected by default. See ../../audio_sink.hpp for why this is a directory
 // CMake picks rather than a branch in the player, and
-// ../../../../esp-idf/iclforge/include/iclforge/sink_plan.hpp for the mode/slot-count
+// ../../../../../libs/device/include/iclforge/sink_plan.hpp for the mode/slot-count
 // arithmetic this file only calls, and for why a second line has to share
 // line 0's bit clock and word select rather than free-run on its own.
 //
@@ -109,7 +109,7 @@ constexpr iclforge::SinkFrame kFrame = CONFIG_ICLFORGE_EXAMPLE_I2S_FIXED_FRAME !
 // a requested layout against before any of this runs. Eight at 32 bits with a
 // second line wired, sixteen at 16 - I2S_LL_SLOT_FRAME_BIT_MAX (128 on this
 // part) passed explicitly, since sink_plan.hpp no longer assumes any one
-// target's frame width; see firmware/esp-idf/iclforge/include/iclforge/sink_plan.hpp.
+// target's frame width; see libs/device/include/iclforge/sink_plan.hpp.
 [[nodiscard]] std::size_t ceiling() {
     return iclforge::sink_ceiling(g_slot_bits, second_line_wired(), I2S_LL_SLOT_FRAME_BIT_MAX);
 }

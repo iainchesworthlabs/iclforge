@@ -6,6 +6,7 @@
     "dsp":        {"kind": "library", "path": "libs/dsp", "may_use": ["base"], "lanes": ["core"], "exposes": ["libs/dsp/src/tiered/", "libs/dsp/variants/"], "purpose": "The signal processing more than one library uses: the FFT, the QMF bank, the offline sample-rate converter and filter sections, and the tiered (float and fixed-point) kernels AC-4 builds at its decode tier."},
     "objects":    {"kind": "library", "path": "libs/objects", "may_use": ["base", "dsp"], "lanes": ["core"], "purpose": "The object-audio model: an object's position and path over time, the placement an encoder is handed each frame, and the Object Audio Metadata payload of ETSI TS 103 420 with the EMDF container it travels in."},
     "render":     {"kind": "library", "path": "libs/render", "may_use": ["base", "objects"], "lanes": ["core"], "purpose": "From what a decoder produced to what the speakers want: layouts and their text form, routing, per-output trim and delay, the bed and object renderer and the panning under it."},
+    "device":     {"kind": "library", "path": "libs/device", "internal": true, "may_use": [], "lanes": ["core"], "purpose": "The device-side logic of the ESP32 sinks and players that needs no SDK, so that the host tests it: the interleave and the slot conversion, the playout and DAC queue models, the sink planner, the Improv provisioning protocol, the pairing records and the firmware image rules. Header-only. Internal; never installed."},
     "containers": {"kind": "library", "path": "libs/containers", "may_use": ["base"], "lanes": ["core"], "purpose": "The codec-blind carriage: IEC 61937 burst packing and detection, the Matroska, MP4 and MPEG-TS writers and readers, and IAMF reading and writing."},
     "ac3":        {"kind": "library", "path": "libs/ac3", "may_use": ["base", "dsp", "objects", "render"], "lanes": ["core"], "purpose": "The AC-3 and E-AC-3 codec, including Joint Object Coding (Atmos objects) and EMDF object signing, with loudness metering, level analysis and quality measurement."},
     "ac4":        {"kind": "library", "path": "libs/ac4", "may_use": ["base", "dsp", "objects", "render"], "lanes": ["core"], "purpose": "The AC-4 decoder and encoder, with the sync frames, table of contents and presentations both work through."},
@@ -21,7 +22,7 @@
     "app-preferences": {"kind": "app-library", "path": "apps/shared/preferences", "internal": true, "may_use": [], "lanes": ["windows", "linux", "macos"], "exposes": ["apps/shared/preferences/src/"], "purpose": "The settings store and its migration, shared by the desktop programs. Internal; compiled into the programs."},
 
     "forge":    {"kind": "app", "path": "apps/forge", "may_use": ["ac3", "ac4", "adm", "audio", "base", "containers", "dsp", "iab", "objects", "render", "app-media", "app-preferences", "app-theme"], "lanes": ["windows", "linux", "macos"], "purpose": "Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4."},
-    "hearth":   {"kind": "app", "path": "apps/hearth", "may_use": ["ac3", "ac4", "audio", "base", "containers", "objects", "render", "sendspin", "app-media", "app-preferences", "app-theme"], "lanes": ["windows", "linux", "macos"], "purpose": "Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server."},
+    "hearth":   {"kind": "app", "path": "apps/hearth", "may_use": ["ac3", "ac4", "audio", "base", "containers", "device", "objects", "render", "sendspin", "app-media", "app-preferences", "app-theme"], "lanes": ["windows", "linux", "macos"], "purpose": "Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server."},
     "crucible": {"kind": "app", "path": "apps/crucible", "may_use": ["ac3", "ac4", "audio", "base", "containers", "objects", "app-preferences", "app-theme"], "lanes": ["windows", "linux", "macos"], "purpose": "Crucible: the Atmos monitoring bed and its virtual output device, for Windows, Linux and macOS."},
     "demo-android": {"kind": "app", "path": "apps/demos/android", "may_use": ["ac3", "audio", "base", "containers"], "lanes": ["android"], "purpose": "The Android (Shield) demo application."},
     "demo-wasm":    {"kind": "app", "path": "apps/demos/wasm", "may_use": ["ac3", "ac4", "objects"], "lanes": ["wasm"], "purpose": "The browser demos, built with Emscripten."},
@@ -30,8 +31,8 @@
     "rust":   {"kind": "binding", "path": "bindings/rust", "may_use": ["capi"], "lanes": ["rust"], "purpose": "The Rust crates: iclforge and iclforge-sys over the C API."},
     "js":     {"kind": "binding", "path": "bindings/js", "may_use": [], "lanes": ["wasm", "npm"], "purpose": "The npm package over the WebAssembly build."},
 
-    "esp-idf":     {"kind": "firmware", "path": "firmware/esp-idf", "may_use": ["ac3", "ac4", "base", "dsp", "objects", "render", "sendspin"], "lanes": ["esp"], "ships": ["ac3", "base", "dsp", "objects", "render"], "exposes": ["firmware/esp-idf/iclforge/include/", "firmware/esp-idf/iclforge/conversion/"], "purpose": "The ESP-IDF component: the codec and player for the ESP32-S3, C3, C6 and P4, with its examples."},
-    "hearth-sink": {"kind": "firmware", "path": "firmware/hearth-sink", "may_use": ["ac3", "render", "sendspin"], "lanes": ["esp"], "purpose": "Hearth's sink firmware for the ESP32 boards, a Sendspin player built on the ESP-IDF component."},
+    "esp-idf":     {"kind": "firmware", "path": "firmware/esp-idf", "may_use": ["ac3", "ac4", "base", "device", "dsp", "objects", "render", "sendspin"], "lanes": ["esp"], "ships": ["ac3", "base", "device", "dsp", "objects", "render"], "exposes": ["firmware/esp-idf/iclforge/include/"], "purpose": "The ESP-IDF component: the codec and player for the ESP32-S3, C3, C6 and P4, with its examples."},
+    "hearth-sink": {"kind": "firmware", "path": "firmware/hearth-sink", "may_use": ["ac3", "device", "render", "sendspin"], "lanes": ["esp"], "purpose": "Hearth's sink firmware for the ESP32 boards, a Sendspin player built on the ESP-IDF component."},
     "esphome":     {"kind": "firmware", "path": "firmware/esphome", "may_use": ["ac3"], "lanes": ["esp"], "purpose": "The ESPHome external component that brings the ESP-IDF component into an ESPHome build."},
     "baremetal":   {"kind": "firmware", "path": "firmware/baremetal", "may_use": ["ac3", "ac4", "base", "dsp", "objects", "render"], "lanes": ["esp"], "exposes": ["firmware/baremetal/fixture.hpp"], "purpose": "The minimum-footprint probes: the Cortex-M3 build under QEMU, the ESP32 images and the fixtures they decode."},
 
@@ -44,35 +45,6 @@
       "from": "ac4", "to": "app-media", "paths": ["libs/ac4/tests/decoder/test_object_render.cpp"],
       "to_paths": ["apps/shared/media/src/ac4_object_render."],
       "why": "The one test of the object renderer builds its streams with the AC-4 tests' own helper (decoder/objects.hpp, which includes the encoder's private headers), so it stays in libs/ac4/tests and compiles apps/shared/media/src/ac4_object_render.cpp into ac4's test binary: a library's test using an app-library (planning/monorepo.md, C7-2, finding 4)."
-    },
-    {
-      "from": "ac3", "to": "esp-idf", "paths": ["libs/ac3/tests/"],
-      "to_paths": [
-        "firmware/esp-idf/iclforge/conversion/bits/iclforge/slot_conversion.hpp",
-        "firmware/esp-idf/iclforge/include/iclforge/block_ring.hpp",
-        "firmware/esp-idf/iclforge/include/iclforge/dac_queue_model.hpp",
-        "firmware/esp-idf/iclforge/include/iclforge/firmware_image.hpp",
-        "firmware/esp-idf/iclforge/include/iclforge/firmware_status.hpp",
-        "firmware/esp-idf/iclforge/include/iclforge/firmware_trial.hpp",
-        "firmware/esp-idf/iclforge/include/iclforge/hardware_info.hpp",
-        "firmware/esp-idf/iclforge/include/iclforge/improv.hpp",
-        "firmware/esp-idf/iclforge/include/iclforge/interleave.hpp",
-        "firmware/esp-idf/iclforge/include/iclforge/log_ring.hpp",
-        "firmware/esp-idf/iclforge/include/iclforge/pairing_records.hpp",
-        "firmware/esp-idf/iclforge/include/iclforge/playout.hpp",
-        "firmware/esp-idf/iclforge/include/iclforge/sink_plan.hpp",
-        "firmware/esp-idf/iclforge/include/iclforge/tcp_arrivals.hpp",
-        "firmware/esp-idf/iclforge/include/iclforge/unit_hold.hpp"
-      ],
-      "why": "The component's host-portable headers (interleave.hpp, block_ring.hpp, dac_queue_model.hpp, sink_plan.hpp, playout.hpp and their kin) are free of ESP-IDF and are tested on the host, in ac3's test binary, with the component's include directory on its path: library tests using firmware headers."
-    },
-    {
-      "from": "hearth", "to": "esp-idf", "paths": ["apps/hearth/engine/"],
-      "to_paths": [
-        "firmware/esp-idf/iclforge/include/iclforge/firmware_image.hpp",
-        "firmware/esp-idf/iclforge/include/iclforge/firmware_status.hpp"
-      ],
-      "why": "Hearth's engine speaks to a sink about its firmware (GET /firmware, the image's header, its status) with the component's host-portable headers, firmware_image.hpp and firmware_status.hpp, so that the board and the server agree by construction: a program using firmware headers."
     },
     {
       "from": "hearth-sink", "to": "esp-idf",

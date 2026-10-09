@@ -58,12 +58,17 @@ COMPONENT = REPO / "firmware" / "esp-idf" / "iclforge"
 # language binding, and none of the container muxers. A component archive should
 # carry the part that builds for this chip.
 STAGED_TREES = (
+    # libs/device is the host-portable headers the component itself includes (interleave.hpp, the
+    # sink planner, the playout model, the firmware image rules): header-only, and the
+    # component's CMake puts its include directory on the component's path.
+    #
     # The AC-3 codec and the four libraries it is built from: the minimum-footprint profile is
     # one archive of files from all five (libs/ac3/minimal.cmake). libs/base also holds the
     # header-only Fixed32 and scalar functions libs/ac3 and libs/ac4 both include (planning/ac4.md
     # decision 31).
     "libs/ac3",
     "libs/base",
+    "libs/device",
     "libs/dsp",
     "libs/objects",
     "libs/render",

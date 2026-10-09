@@ -27,6 +27,7 @@ project's tests are beside it, and `ctest -L <project>` runs them.
 | `base` | `libs/base/` | What every codec and service builds on and none owns: the bit reader and writer, the speaker vocabulary, the level and loudness meters, WAV reading and writing, the CPU probe, the signing key with SHA-256 and HMAC-SHA-256, the scalar building blocks of the arithmetic tiers and the build version. | nothing | `ac3`, `ac4`, `audio`, `baremetal`, `containers`, `crucible`, `demo-android`, `dsp`, `esp-idf`, `examples`, `forge`, `hearth`, `iab`, `objects`, `python`, `render` | core |
 | `capi` | `libs/capi/` | The C API over the AC-3 and AC-4 libraries: plain C11, opaque handles and POD structs, for bindings and callers that cannot link C++23. | `ac3`, `ac4` | `examples`, `rust` | core |
 | `containers` | `libs/containers/` | The codec-blind carriage: IEC 61937 burst packing and detection, the Matroska, MP4 and MPEG-TS writers and readers, and IAMF reading and writing. | `base` | `app-media`, `audio`, `crucible`, `demo-android`, `examples`, `forge`, `hearth`, `python` | core |
+| `device` (internal) | `libs/device/` | The device-side logic of the ESP32 sinks and players that needs no SDK, so that the host tests it: the interleave and the slot conversion, the playout and DAC queue models, the sink planner, the Improv provisioning protocol, the pairing records and the firmware image rules. Header-only. Internal; never installed. | nothing | `esp-idf`, `hearth`, `hearth-sink` | core |
 | `dsp` | `libs/dsp/` | The signal processing more than one library uses: the FFT, the QMF bank, the offline sample-rate converter and filter sections, and the tiered (float and fixed-point) kernels AC-4 builds at its decode tier. | `base` | `ac3`, `ac4`, `baremetal`, `esp-idf`, `forge`, `objects`, `tests` | core |
 | `iab` | `libs/iab/` | SMPTE ST 2098-2 Immersive Audio Bitstream reading and writing, as bare bitstreams and in MXF. | `base` | `adm`, `examples`, `forge` | core |
 | `objects` | `libs/objects/` | The object-audio model: an object's position and path over time, the placement an encoder is handed each frame, and the Object Audio Metadata payload of ETSI TS 103 420 with the EMDF container it travels in. | `base`, `dsp` | `ac3`, `ac4`, `adm`, `app-media`, `audio`, `baremetal`, `crucible`, `demo-wasm`, `esp-idf`, `examples`, `forge`, `hearth`, `python`, `render` | core |
@@ -55,7 +56,7 @@ project's tests are beside it, and `ctest -L <project>` runs them.
 | `demo-android` | `apps/demos/android/` | The Android (Shield) demo application. | `ac3`, `audio`, `base`, `containers` | nothing | android |
 | `demo-wasm` | `apps/demos/wasm/` | The browser demos, built with Emscripten. | `ac3`, `ac4`, `objects` | nothing | wasm |
 | `forge` | `apps/forge/` | Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4. | `ac3`, `ac4`, `adm`, `audio`, `base`, `containers`, `dsp`, `iab`, `objects`, `render`, `app-media`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
-| `hearth` | `apps/hearth/` | Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server. | `ac3`, `ac4`, `audio`, `base`, `containers`, `objects`, `render`, `sendspin`, `app-media`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
+| `hearth` | `apps/hearth/` | Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server. | `ac3`, `ac4`, `audio`, `base`, `containers`, `device`, `objects`, `render`, `sendspin`, `app-media`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
 
 ## Bindings
 
@@ -70,9 +71,9 @@ project's tests are beside it, and `ctest -L <project>` runs them.
 | Project | Path | What it is | Uses | Used by | CI lanes |
 |---|---|---|---|---|---|
 | `baremetal` | `firmware/baremetal/` | The minimum-footprint probes: the Cortex-M3 build under QEMU, the ESP32 images and the fixtures they decode. | `ac3`, `ac4`, `base`, `dsp`, `objects`, `render` | nothing | esp |
-| `esp-idf` | `firmware/esp-idf/` | The ESP-IDF component: the codec and player for the ESP32-S3, C3, C6 and P4, with its examples. | `ac3`, `ac4`, `base`, `dsp`, `objects`, `render`, `sendspin` | nothing | esp |
+| `esp-idf` | `firmware/esp-idf/` | The ESP-IDF component: the codec and player for the ESP32-S3, C3, C6 and P4, with its examples. | `ac3`, `ac4`, `base`, `device`, `dsp`, `objects`, `render`, `sendspin` | nothing | esp |
 | `esphome` | `firmware/esphome/` | The ESPHome external component that brings the ESP-IDF component into an ESPHome build. | `ac3` | nothing | esp |
-| `hearth-sink` | `firmware/hearth-sink/` | Hearth's sink firmware for the ESP32 boards, a Sendspin player built on the ESP-IDF component. | `ac3`, `render`, `sendspin` | nothing | esp |
+| `hearth-sink` | `firmware/hearth-sink/` | Hearth's sink firmware for the ESP32 boards, a Sendspin player built on the ESP-IDF component. | `ac3`, `device`, `render`, `sendspin` | nothing | esp |
 
 ## Examples
 
@@ -97,6 +98,7 @@ flowchart LR
     base["base"]
     capi["capi"]
     containers["containers"]
+    device(["device"])
     dsp["dsp"]
     iab["iab"]
     objects["objects"]
@@ -139,8 +141,6 @@ excuses nothing fails the check.
 | From | To | Where | Why |
 |---|---|---|---|
 | `ac4` | `app-media` | `libs/ac4/tests/decoder/test_object_render.cpp` | The one test of the object renderer builds its streams with the AC-4 tests' own helper (decoder/objects.hpp, which includes the encoder's private headers), so it stays in libs/ac4/tests and compiles apps/shared/media/src/ac4_object_render.cpp into ac4's test binary: a library's test using an app-library (planning/monorepo.md, C7-2, finding 4). |
-| `ac3` | `esp-idf` | `libs/ac3/tests/` | The component's host-portable headers (interleave.hpp, block_ring.hpp, dac_queue_model.hpp, sink_plan.hpp, playout.hpp and their kin) are free of ESP-IDF and are tested on the host, in ac3's test binary, with the component's include directory on its path: library tests using firmware headers. |
-| `hearth` | `esp-idf` | `apps/hearth/engine/` | Hearth's engine speaks to a sink about its firmware (GET /firmware, the image's header, its status) with the component's host-portable headers, firmware_image.hpp and firmware_status.hpp, so that the board and the server agree by construction: a program using firmware headers. |
 | `hearth-sink` | `esp-idf` | any file | The sink is Hearth's firmware and the component is its dependency (main/idf_component.yml, override_path): the player, the control surface and the sinks' common code are the component's. A firmware project using another. |
 | `esp-idf` | `baremetal` | `firmware/esp-idf/iclforge/examples/i2s_player/` | The i2s_player example decodes the 5.1 fixture the bare-metal probe carries (fixture.hpp) rather than a copy of it: one firmware project using another's file. |
 

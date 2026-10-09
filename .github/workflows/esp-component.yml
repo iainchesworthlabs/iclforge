@@ -26,6 +26,7 @@ on:
       - "firmware/esp-idf/**"
       - "libs/ac3/**"
       - "libs/base/**"
+      - "libs/device/**"
       - "libs/dsp/**"
       - "libs/objects/**"
       - "libs/render/**"

@@ -429,7 +429,7 @@ changed that blob's layout, a rollback would silently lose every pairing.
 The rule from O1 on: a new image never changes the meaning or the layout of a key it did not add.
 A new layout goes under a new key, and the old key stays readable. O1 adds a host test that loads
 blobs written by the previous layout of each store; for the pairing records it is in
-`libs/ac3/tests/io/test_pairing_records.cpp`.
+`libs/device/tests/test_pairing_records.cpp`.
 
 ## Integrity
 
@@ -514,7 +514,7 @@ signed with its key. That includes one sent by a hostile web page ([Routes](#rou
 ## Routes
 
 **Status, 2026-09-30: built.** `control.cpp` registers each route below, and
-`libs/ac3/tests/io/test_firmware_status.cpp` pins `GET /firmware`'s body.
+`libs/device/tests/test_firmware_status.cpp` pins `GET /firmware`'s body.
 
 | Route | What it does | Replies |
 |---|---|---|
@@ -1215,7 +1215,7 @@ the network, the upload would pass through the chip being rewritten.
 
 ## Tests
 
-**On the host.** The logic that needs no ESP-IDF goes in `firmware/esp-idf/iclforge/include/iclforge/firmware_image.hpp`,
+**On the host.** The logic that needs no ESP-IDF goes in `libs/device/include/iclforge/firmware_image.hpp`,
 the way `hardware_info.hpp` is kept free of it:
 
 - parsing an image header;
@@ -1226,7 +1226,7 @@ the way `hardware_info.hpp` is kept free of it:
   comes back, which restarts the 30 s;
 - `GET /firmware`'s JSON.
 
-`libs/ac3/tests/io/test_firmware_image.cpp` checks all of it from synthetic headers, including a P4 image
+`libs/device/tests/test_firmware_image.cpp` checks all of it from synthetic headers, including a P4 image
 that needs v3.1 on a v1.3 chip, and `test_firmware_trial.cpp` and `test_firmware_status.cpp` cover
 the trial and the status body. The settings rule has its test of old blobs.
 `tools/hearth/test_ota.py` runs the tool against a stand-in board built on `http.server`: the

@@ -132,9 +132,9 @@ Seven, and five of them exist. The order is the order bytes take.
 3. **The output stage.** `ac3::OutputConfig`: the §7.8 fold and §7.7 operating mode, applied in the
    decoder's own storage before it returns. Exists.
 4. **Sample format.** Planar float to interleaved 16-bit, or 24-in-32 with slot padding for TDM.
-   Exists as [`ac3forge/interleave.hpp`](../firmware/esp-idf/iclforge/include/iclforge/interleave.hpp),
+   Exists as [`ac3forge/interleave.hpp`](../libs/device/include/iclforge/interleave.hpp),
    moved on 2026-09-10 from inside the streaming example into the component, free of ESP-IDF, and
-   tested on the host by `libs/ac3/tests/io/test_interleave.cpp`. It is library code with a temporary home.
+   tested on the host by `libs/device/tests/test_interleave.cpp`. It is library code with a temporary home.
 5. **Bytes to PCM.** The loop over 1 to 4: feed bytes, take frames, with hold-back (§3.7) and
    end-of-stream handled once. Written three times, as above. Library code with no home.
 6. **Buffering and tasks.** A fetch task filling a ring buffer, a decode task draining it and
@@ -651,7 +651,7 @@ the slave role played against a SigmaDSP as master; a 7.1.4 stream decoded and r
 the player on the board with its per-frame cost recorded beside the probe's 0.90x for the
 decode alone.
 
-**Verified by:** `libs/ac3/tests/io/test_interleave.cpp` for the layout and the probe's render row for the
+**Verified by:** `libs/device/tests/test_interleave.cpp` for the layout and the probe's render row for the
 levels; hardware for the role and the timing, which have no substitute.
 
 **Built 2026-09-10, everything but what needs a board.** (Both headers and their tests have since
@@ -787,7 +787,7 @@ that tree.
    the comment above the two decoders in `player.hpp` still says `Eac3Decoder` does not survive a
    fold.
 2. `ac3::io::interleave`, moved from the example with its host tests. **Status: not done.**
-   `ac3forge/interleave.hpp` is still the component's, with `libs/ac3/tests/io/test_interleave.cpp`.
+   `ac3forge/interleave.hpp` is still the component's, with `libs/device/tests/test_interleave.cpp`.
 3. `ac3::io::StreamDecoder` over the accumulator, both decoders and the output stage, with
    `feed()` and `next()` into caller-owned spans, tested over both generations. The component's
    copy goes when it lands. **Status: not done.** The library has no `StreamDecoder`.

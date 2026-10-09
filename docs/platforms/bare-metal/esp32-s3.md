@@ -175,7 +175,7 @@ with the dependents that extend it (§E3.8.2).
 CI runs the example under QEMU in seven shapes, each a step of `build-esp32s3` in
 `.github/workflows/_build.yml` with its own overlay on `sdkconfig.defaults`. All seven write to the
 `capture` sink, since QEMU has no I2S peripheral. The capture sink calls the same conversion
-functions as the `i2s` sink (`firmware/esp-idf/iclforge/include/iclforge/interleave.hpp`) and checks what
+functions as the `i2s` sink (`libs/device/include/iclforge/interleave.hpp`) and checks what
 they produce:
 
 - `sdkconfig.ci`: the `partition` source and the AC-3 5.1 sample, folded to Lo/Ro. Two passes, so
@@ -210,13 +210,13 @@ Another step, *Build every sink and source combination*, builds `i2s`, `sd`, `ht
 one build each, and runs none of them. The `i2s` sink drives the I2S peripheral and `sd` the SDMMC
 host, and `http` is built with WiFi (`main/net/wifi/`); QEMU emulates none of the
 three. The conversion the `i2s` sink hands the peripheral is the one the capture sink checks, and it
-is unit-tested on the host (`libs/ac3/tests/io/test_interleave.cpp`), because planar-to-interleaved indexing
+is unit-tested on the host (`libs/device/tests/test_interleave.cpp`), because planar-to-interleaved indexing
 with slot padding is where the bugs are; so is the arithmetic that picks standard or TDM mode and
-the slot count from the layout (`libs/ac3/tests/io/test_sink_plan.cpp`). A 5.1 programme on an 8-slot bus leaves two
+the slot count from the layout (`libs/device/tests/test_sink_plan.cpp`). A 5.1 programme on an 8-slot bus leaves two
 slots that must be written as zeros rather than skipped: the DMA buffer is reused, so whatever the
 previous block left is what the DAC clocks out. The queue model the `i2s` sink keeps for its
-`sink.*` line (`firmware/esp-idf/iclforge/include/iclforge/dac_queue_model.hpp`) is unit-tested on the host
-as well (`libs/ac3/tests/io/test_dac_queue_model.cpp`), against a simulated DMA. The sink itself has run on
+`sink.*` line (`libs/device/include/iclforge/dac_queue_model.hpp`) is unit-tested on the host
+as well (`libs/device/tests/test_dac_queue_model.cpp`), against a simulated DMA. The sink itself has run on
 two S3 boards, in standard mode and in TDM on eight 16-bit slots, with no DAC on the pins
 ([On two boards](https://github.com/iainchesworthlabs/iclforge/blob/main/firmware/hearth-sink/README.md#on-two-boards)).
 
@@ -255,8 +255,8 @@ Wi-Fi ([the Hearth plan](https://github.com/iainchesworthlabs/iclforge/blob/main
 [An ESP32-S3 sink](../../hearth/sink-esp32-s3.md) sets a board up.
 
 The player schedules each block against the I2S channel's end-of-frame interrupts. It works from a
-model of ESP-IDF v6.1's DMA ring (`firmware/esp-idf/iclforge/include/iclforge/playout.hpp`), which
-`libs/ac3/tests/io/test_playout.cpp` tests on the host against a simulated ring. It corrects its error in
+model of ESP-IDF v6.1's DMA ring (`libs/device/include/iclforge/playout.hpp`), which
+`libs/device/tests/test_playout.cpp` tests on the host against a simulated ring. It corrects its error in
 the decoded PCM, by dropping or repeating one frame in 256.
 
 On 2026-09-16 two ESP32-S3-DevKitC-1-N16R8 boards on the same Wi-Fi, with no DAC wired, played the
