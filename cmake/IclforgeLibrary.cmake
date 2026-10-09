@@ -161,9 +161,16 @@ function(iclforge_add_library name)
         CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN ON)
     # C4251 fires for private STL members of exported classes; it is a consequence of exporting,
-    # and it fires in every translation unit that parses the decorated class.
+    # and it fires in every translation unit that parses the decorated class. C4275 is its
+    # sibling for a base class: a shared library embeds the libraries it uses (EMBEDS, and
+    # base's objects in every one), so in its translation units a class of base is not
+    # dll-interface, and an exported class that derives from one (iclforge::ac3's LevelMeter and
+    # LoudnessMeter, from base's) draws C4275 for it. The consumers call the base class's
+    # members through the derived class's exports or link base themselves.
     if(NOT ARG_NO_C4251_SUPPRESSION)
-        target_compile_options(${objects} PUBLIC "$<$<CXX_COMPILER_ID:MSVC>:/wd4251>")
+        target_compile_options(${objects} PUBLIC
+            "$<$<CXX_COMPILER_ID:MSVC>:/wd4251>"
+            "$<$<CXX_COMPILER_ID:MSVC>:/wd4275>")
     endif()
 
     set(custom "")
