@@ -29,7 +29,10 @@
     adapting an open branch needs left in `tools/adapt/`, and the mechanical commits of the stages are in
     `.git-blame-ignore-revs`. The branches are on `github`; no pull request is open. The first runs of
     GitHub's own gates on the stack found 19 defects, none of them a moved byte, each fixed on a branch merged
-    into `chore/monorepo-c7-7` ([After C7-7](#after-c7-7-2026-10-09-choremonorepo-c7-7-with-the-branches-merged-into-it)).
+    into `chore/monorepo-c7-7` ([After C7-7](#after-c7-7-2026-10-09-choremonorepo-c7-7-with-the-branches-merged-into-it)),
+    and what that section left on purpose (five exceptions and a debt, a narrowing, a test name, two
+    Windows tests, the Sonar scope) is remediated: one exception remains, by the owner's choice
+    ([what was left](#what-was-left-and-its-remediation-2026-10-09-choremonorepo-c7-7-with-the-branches-merged-into-it)).
 
 ## In brief
 
@@ -1238,3 +1241,55 @@ locally once the first was fixed. The rest were `main`'s, or the platforms': a 3
 no longer exists, a test registered for a program that is not built. The method that found them is the one to
 keep: dispatch the legs that differ, read every red to its first error, fix it on a branch of its own, and run
 what can be run here before a second dispatch.
+
+### What was left, and its remediation, 2026-10-09 (`chore/monorepo-c7-7`, with the branches merged into it)
+
+**What this is.** The section above ends with what was left on purpose: five whole-tree exceptions in
+`projects.json` and one known layering debt, a 64-to-32-bit narrowing in `libs/adm`, a test name and a
+fixture comment that still said `tests/golden`, two `tools/checks` tests that failed on a Windows machine,
+and a Sonar scope that nothing had read. All are done, each on a branch of its own merged into
+`chore/monorepo-c7-7`. Two were the owner's to decide and were decided: the one exception that remains stays,
+and the fixture's hash may change.
+
+| what was left | what is there now | the branch |
+|---|---|---|
+| the debt: `libs/dsp/tests/tiered/test_dsp_exact.cpp` includes AC-4's SBR generator header, private to `ac4` | the pre-flattening comparison (the verbatim reference, its helper and its two test cases) is `libs/ac4/tests/core/test_aspx_exact.cpp`, beside `test_acpl_exact.cpp`; no test case changes its name or body; dsp's tests put AC-4's private root on their include path only for the sources a shared build compiles in | `feature/aspx-preflattening-test-moves-to-ac4`, `bugfix/dsp-tests-name-ac4-private-root-only-where-needed` |
+| exceptions `ac3` and `hearth` to `esp-idf` (28 edges): a library's tests and a program using the ESP-IDF component's host-portable headers | **`libs/device`**, an internal header-only library with the 14 headers that need no ESP-IDF (the interleave and its slot conversion, the block ring, the unit hold, the DAC queue model, the sink planner, the playout model, the firmware image, status and trial rules, Improv, the pairing records, the log ring, the TCP arrival log, the hardware report) under the names they always had, and their 14 tests as `iclforge-device-tests` (`ctest -L device`). The component puts `libs/device` on its own include path (the conversion directory by `CONFIG_SOC_CPU_HAS_FPU`, as before), the packer stages it, Hearth's engine links `iclforge::device`, and the ESP component workflow builds on a change to it | `feature/device-library` (30 renames, every one R100, then the rest) |
+| exception `hearth-sink` to `esp-idf`: a firmware project using another | **the kind `firmware-library`**: a component several firmware projects build on. It may use libraries; a firmware project may use libraries and firmware libraries and never another firmware project; nothing else may use a firmware library. `esp-idf` is the first and `hearth-sink` lists it | `feature/firmware-library-kind` |
+| exception `esp-idf` to `baremetal`: the `i2s_player` example includes the probes' `fixture.hpp` | `firmware/baremetal/fixture.hpp` is `testdata/baremetal/fixture.hpp`, beside the other generated headers of `testdata/`; the probes of four chips, the hosted build and the example find it there, and the generator writes it there | `feature/baremetal-fixture-in-testdata` |
+| `libs/adm/src/adm.cpp:178` and `:181`, `-Wshorten-64-to-32` | the frame count is converted once to the vector's size type, after it is bounded by the file's size; the 32-bit pass over `libs/adm` is clean | `bugfix/adm-frame-counts-as-size-t` |
+| the first line of `testdata/audio/reference_objects.paths`, which the generator no longer writes that way | the generator's own output again (`write_paths()` alone, the WAV untouched): one comment line, 714 bytes to 710, and the entry's `sha256` and `bytes` in `corpus.json`. The placements the object-quality series are measured against are the same lines, so `corpus_version` stays 1 (it marks a change of the material, and this is a change of one comment); `check_corpus.py` passes | `bugfix/reference-objects-paths-comment-names-testdata` |
+| the one test case whose title carried `tests/golden` | `chunks: a burst chunk for the first syncframe of testdata's AC-3 5.1 fixture`. It is the one ctest name this work changes, and nothing else names it | `bugfix/sendspin-chunk-test-names-testdata` |
+| two `tools/checks` tests that failed on Windows (the paths of a dry-run listing, a literal `/usr/bin/ffmpeg`) | `rewrite_roadmap_comments.py` prints its paths with forward slashes; the test compares with `str(Path(...))`. The four suites pass on Windows (484, 602, 102 and 85 tests, one skipped) | `bugfix/tools-tests-pass-on-windows` |
+| the Sonar scope, read by nobody | `tools/checks/check_sonar_scope.py` (13 tests, the static job and `precheck.py`): a root that is not in the tree, a pattern that matches no tracked file, a test scanned as source and a test `sonar.exclusions` does not take out of the sources all fail. It found two rules that had silently stopped applying, `e80` (the `cppsecurity:S2083` ignore rule for `wav_stream_writer.cpp`, which is in `libs/base/src` since the consolidation, so its finding would have come back on the next scan) and the copy-paste exclusion `tables*.cpp`, which matched nothing | `feature/sonar-scope-check` |
+
+**Where the table stands.** 31 projects, 1,945 edges (1,806 includes, 139 link lines), **one exception and no
+debt** (from five and one), 0 failures. The one is `ac4` to `app-media`: `libs/ac4/tests/decoder/test_object_render.cpp`
+compiles the media code's AC-4 object renderer into AC-4's test binary, because the streams it renders are
+built by the AC-4 tests' own helper (`decoder/objects.hpp`, which includes the encoder's private headers).
+Three ways to remove it were set out: a test that renders committed streams (a generator and fixtures, and
+the helper's own coverage of moving objects goes); the renderer as a public part of `libs/ac4` (a new API and
+a new set of exports, so the allowlist moves); or leaving the one named, test-only edge. **The owner kept
+it**, and it stays with its reason in the table.
+
+**What the remediation could not see, and the proof.**
+
+| proof | result |
+|---|---|
+| ctest, the LLVM tree | 3,546 cases registered before and after the moves, their names the Catch2 cases' and unchanged but the one renamed; 3,531 run and pass, 0 fail (the other 15 are Hearth's QML suites, which need a display) |
+| `precheck.py --unit` | every step passes (branch name, doc and script paths, platform matrix, project layering, workflow path filters, project pages, Sonar scope, library namespaces, ESP efuse-free settings, fixture corpus, support matrices, patch attribution, ruff and the four suites); `platform macros` is skipped without `pwsh` |
+| `check_layering.py`, `generate_project_pages.py --check`, `check_workflow_paths.py`, `check_doc_paths.py`, `check_sonar_scope.py`, `mkdocs build --strict`, `ruff check .` | 0 failures, 26 pages current, 0 problems, 0 missing of 6,556 checked, 0 problems, pass, pass |
+| unit suites | `tools/checks` 486 (+13 for Sonar), `tools/ci` 602, `tools/adapt` 85 |
+| the bare-metal probes (`run_baremetal_probe.sh --host`, then `--icount` under QEMU) | both pass with the fixture in `testdata/`, with the same key=value lines and ceilings |
+| ESP-IDF v6.1 images built in the tree before and in the final tree (names as long as each other): the Hearth sink for the S3 (610,592 bytes), for the C6 with 16 MB flash and Sendspin (1,681,120), `i2s_player` (267,088), and the four bare-metal probes: S3 (519,840), C3 (543,200), C6 (584,848), P4 (541,856) | each pair is the same size, and once the two trees' names are made the same, 75 to 79 bytes differ, every one in the app descriptor (the version string, the build time and date, the ELF's SHA-256) or the 33-byte trailer: the code and data are the same. The C6 and C3 are parts without an FPU, so they build `libs/device/conversion/bits`, the S3 and P4 the float one |
+
+**A mistake the proof caught.** The `i2s_player` example reached the moved fixture from five directories up, which
+was `firmware/` (where it had been) and not the repository root: `fixture.hpp: No such file or directory`, in the
+final tree's build and in no other check. Fixed on the same branch (`139e43582`); the example's image is in the
+table above.
+
+**Not run here, and recorded rather than skipped:** SonarCloud itself (the analysis; the check reads only the
+file), the shared-library configuration of the dsp tests (the one branch of `libs/dsp/tests/CMakeLists.txt` that was
+kept as it was), the QEMU runs of the ESP images (their code and data are the same as the tree before's), and the
+MSVC and macOS builds of the new test binary. The pull-request gate, the ESP component workflow (which builds the
+packed archive, `libs/device` in it, for four parts) and one build leg per system are dispatched after the push.
