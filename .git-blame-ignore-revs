@@ -54,3 +54,82 @@ ff7ea00f4fe8872158ec97fc3418f2bedc5d637f  # S5: wrap the eight Python lines the 
 37f0c179db705baf33a91885fb4522158894b2e9  # S6: the library says which half of a shared namespace it means
 634beb7d11b5e32c0d8e1648c0d42dedf0e8d1c5  # S6: lupdate restamps the locations of the Forge GUI's and Hearth's catalogues
 4de9f7433238bf3d10f99a7b3a4cf4e0810b0967  # S6: the ABI allowlist of libiclforge_ac3.so, written again from the shared tree
+
+# Consolidation stage C1, AC-4's four libraries as one: what consol_apply.py, consol_cmake.py, consol_paths.py
+# and consol_text.py give on their parents (the hand-written commits and the cut of the public headers are not listed)
+096fe9e6f501dc9f18237e0fbad3a745b8a5fcd6  # C1: include spellings follow the moves
+6c2e1c667f26cb1cabf100b54958390c7cb149f5  # C1: build files, names and paths in text follow the merged library
+b058d0f4ded789e410f63cd9792d665c322e5376  # C1: what named an AC-4 library's directory names where its files went
+e830a8b24dcbb5164736363c16d25343cbd1ecbd  # C1: the plans' paths, and the include spellings pages and comments name, follow the tree
+890c9f8a50409909ae8626f76cdc68d08f2be5ee  # C1: the core's variant directories, and a directory named with its slash, follow the tree
+3a8cb545407a073a1af20346f30301146892a0b1  # C1: the syntax digests name their streams under tests/golden/ac4 (consol_text.py --stage c1, dige...
+47c1fe44d27858a56151259a30e4cb683b813e99  # C1: consol_text.py --stage c1 again: the core's private spellings, tests/golden/ac4 and N1B's sho...
+
+# Consolidation stage C2, arithmetic and the bridge's library, the signer: the scripts' commits
+29368af24ed1b003373cfd22b525d06c70ee7fa6  # C2: include spellings follow the moves
+de9163a64e1b28d081adcf24a8e57906164992d1  # C2: build files and paths in text follow the moves (consol_cmake.py, consol_paths.py --stage c2)
+7e2e4d487db8e7cb25516a7b085bac2a01be2d4a  # C2: names, targets, files and pkg-config names follow the merges (consol_text.py --stage c2)
+a9bddfc5bdd0589b402fb9a95b6607a91b1e4d4a  # C2: what named arithmetic's or admbridge's directory, or arithmetic's target, names base's and ad...
+bd294e39511dc4dd14cabf800273d5d18ee511c2  # C2: a page or a comment that names the bridge's library names adm's, and the signer's its namespa...
+1e97e658b71653927a2ff61e97caccba3a7dddef  # C2: what named arithmetic's SIMD directories names base's (consol_text.py --stage c2)
+
+# Consolidation stage C3, the containers: the scripts' commits
+d76e1df3094a8a89a70347bf3baa960169e9e730  # C3: include spellings follow the moves
+59fe974dc87cbf88c437ddca777b6762562857cb  # C3: build files and paths in text follow the moves (consol_cmake.py, consol_paths.py --stage c3)
+1f49c35dd78414a5b8ddc1cfcc6210f33fae6789  # C3: the containers' namespaces, targets, files and pkg-config names follow the merge (consol_text...
+
+# Consolidation stage C4 (the bit reader and writer, and the tests' names): the scripts' commits
+b82916ebb60ee7a1990cff455acb399b6d2dc084  # C4: include spellings follow the moves
+39e19c4c14ef65631ce80685012559362e15487f  # C4: build files and paths in text follow the moves (consol_paths.py --stage c4; src/ac4/CMakeList...
+1b816ecb0a771ba27f74c96155baf679a288e3a5  # C4: AC-4's code includes base's bit reader and writer and calls them by their names (consol_text....
+3d340d167d977bc41d5c14fc57d9d8f1f7c73bcb  # C4: base's header-only target is iclforge::base_headers (consol_text.py --stage c4b)
+86be1f171caafe308150050fd56e43b6eb87ce71  # C4: AC-4's code and tests name the reader and writer as iclforge's (consol_text.py --stage c4b)
+fda4e35d214219cae0815987a7331e0297cef53a  # C4: AC-4's syntax functions record through the reader's record() (consol_text.py --stage c4b)
+80dd777b72d609c55b47ac411e452ebdf922580c  # C4 names: include spellings follow the moves
+95115d13d68b9d235a81f0eb2b8d042dc2272967  # C4 names: build files and paths in text follow the moves (consol_cmake.py, consol_paths.py --stag...
+4a9d2b6462fc42f86bd697671faf65c82558466e  # C4 names: the merged libraries' tags, the tests' environment variables, the scalar tier's macro a...
+b49772216915c4c0aab36c25eddcf39e88c67079  # C4 names: the test files named without their directory, and the tests' namespaces, follow decisio...
+
+# Consolidation stage C5, AC-4's kernels in iclforge::dsp::tiered: the scripts' commits
+a40a59423496d80176bbcf315398f7bcb8263f2e  # C5: include spellings follow the moves
+2422a3a7e28d99832e4d0dc560e72964e6edee9d  # C5: build files and paths in text follow the moves (consol_cmake.py, consol_paths.py --stage c5;...
+49111bf763c34ac428eb927526ec03c758ca9edf  # C5: AC-4's kernels and their tables are in iclforge::dsp::tiered, and AC-4's code names them ther...
+2d5a8b957f776b64507ab7a10558e4d69459e6bc  # C5: AC-4's encoder names the converters and the bank in iclforge::dsp::tiered (consol_text.py --s...
+3a1c2173e967deab1511b288afe2b44325cee20b  # C5: the tests name the tiered kernels and their scalar in full (consol_text.py --stage c5)
+
+# Consolidation stage C6, iclforge::objects::oba and ::emdf, and the merge M3: the scripts' commits
+40e64fda33c3d14c6fd9c50b0cea9e654acd6c91  # C6: objects declares into iclforge::objects::oba and iclforge::objects::emdf, and the tree names...
+8d21a2332c125e3dc9fcc1a8e8c565195074ed93  # M3: the include spellings of the moved complex type and Stockham passes (by script)
+
+# The lines the consolidation passes pushed past 100 columns, wrapped by n1b_reflow.py
+fe83b8c46165f2a839b8d92a0471953b8e7096a6  # Reflow the lines C3's passes and later ones pushed past .clang-format's 100 columns (n1b_reflow.p...
+
+# Monorepo stage C7-1, the libraries to libs/: the respelled test helpers, the build files and the paths in text
+# (the commit of renames before them is not listed)
+21c1cf1ba18720bdca6d7cbeeeaa30dd99196185  # C7-1: respell the test helpers' includes from their new roots (by consol_apply.py)
+d6228ae63d62425fe061da4d6266171bc82e9ebe  # C7-1: the moved paths in the build files and scripts (by consol_cmake.py)
+0a95901fd3c4ec37d36797030e630f617abba913  # C7-1: the moved paths in the docs, the planning notes and every other text (by consol_paths.py)
+14aa12098faef70c8e7c3932936360f96a14e058  # C7-1: the spellings the path pass left in C++ comments and messages, and the lines it pushed past...
+
+# Monorepo stage C7-2, the products to apps/: the build files, the paths in text, the directories named whole, the
+# comments that name a test binary, the lines pushed past 100 columns and the relative paths a deeper directory broke
+db2208e08d3b726b7b13c5c7475b9aa185abe017  # C7-2: the paths the products' CMake files and Qt catalogues spell, by c7_cmake.py
+0f2a909830649a59f6a5d0a22ebf6a047d213bbe  # C7-2: the moved paths in every other text, by consol_paths.py
+bfd74163d9f049b7043010b33391b68e07c59d45  # C7-2: the directories that moved whole, in the texts that name a directory, by c7_dirs.py
+7f8807562380153e48a26523694561f1829ef91c  # C7-2: the comments of the products name the test binary of their program, by c7_testnames.py
+83f753244692708420fbb0e2525858eabcd5d1ea  # C7-2: the comments name the tests/ build file they mean, by c7_testnames.py
+d910dc235171d2be5f0604846faf0fc67cced724  # C7-2: the lines the longer paths pushed past 100 columns, by n1b_reflow.py (clang-format 22.1.2)
+acba3f98601ecde58cd897f55e313ad09efc2ef6  # C7-2: a program's directories as its own comments name them, by c7_dirs.py
+17c08bbcecc0e2d6db8baba57d56aca16e5c81d9  # C7-2: the relative paths that a deeper directory broke
+
+# Monorepo stage C7-3, the bindings and the firmware: the build files, the paths in text, the roots named alone
+# and the relative paths a move broke
+5145dcc6326116a2c1b1a2b350b753e3da476f90  # C7-3: the paths the CMake files spell, by c7_cmake.py
+2b1a42aa59d82ca5c740830bb8ff085244e8d4c0  # C7-3: the moved paths in every other text, by consol_paths.py
+59de4ee0bae2642f737fec7ca7b678b1702959c5  # C7-3: the roots named alone, by c7_roots.py
+7db12c548c118445a78fbb97b6b64964199bcc9c  # C7-3: the relative paths that a move broke, by c7_relative.py --fix
+
+# Monorepo stage C7-4, tests/golden to testdata/: the build files, the paths in text and the paths the first pass left
+6e1dbcf4c21448e03755dd477e1feb29229d4faa  # C7-4: the golden directory the CMake files spell in full, by c7_cmake.py
+c47226e6611f662663e738e0f9aa7d3a0939f67c  # C7-4: the golden paths in every other text, by consol_paths.py
+25c4f0b024d0221545fda7048a214b7eef40f3fc  # C7-4: the golden paths the first pass left, by c7_golden.py
