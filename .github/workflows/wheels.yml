@@ -27,11 +27,14 @@ on:
     paths:
       - "bindings/python/**"
       - "libs/ac3/**"
+      - "libs/ac4/**"
       - "libs/base/**"
+      - "libs/containers/**"
       - "libs/dsp/**"
       - "libs/objects/**"
       - "libs/render/**"
       - "examples/python/**"
+      - "cmake/**"
       - "CMakeLists.txt"
       - ".github/workflows/wheels.yml"
     tags:

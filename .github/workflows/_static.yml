@@ -214,6 +214,17 @@ jobs:
         shell: bash
         run: python3 tools/checks/check_layering.py
 
+      # A workflow that triggers on a push with `paths:` runs for those paths and no others. The
+      # filters of the workflows that build a project (the wheel, the npm package, the ESP-IDF
+      # component) must name the project's tree and the tree of every library it is built from, as
+      # tools/checks/projects.json has them, and every pattern of every filter must still match a
+      # file: a directory that moved leaves a filter that never fires. Its own suite runs in the
+      # Oracle unit tests step above.
+      - name: Workflow path filters
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: python3 tools/checks/check_workflow_paths.py
+
       # A library's public headers declare into the namespace named for it under
       # the family's root (iclforge::ac3, iclforge::ac4, iclforge::containers::mp4), so that
       # the codecs are peers and a name says which library it belongs to.
