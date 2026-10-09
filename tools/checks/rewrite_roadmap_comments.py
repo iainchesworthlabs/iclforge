@@ -322,7 +322,7 @@ def main() -> int:
                 path.write_text(updated, encoding="utf-8", newline="\n")
     print(f"{'Wrote' if write else 'Would change'} {len(changed)} files")
     for path in changed:
-        print(path.relative_to(ROOT))
+        print(path.relative_to(ROOT).as_posix())
     return 0
 
 
