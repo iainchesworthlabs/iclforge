@@ -19,7 +19,7 @@
     AC-4's output and the pinned bitstreams unchanged, AC-3's decoded PCM moved by rounding, the
     fixed tier's and the size profile's encode pins re-pinned
     ([the merges](#the-merges-decision-14-left-2026-10-08-choredsp-merge-1-resampler-to-3-fft)).
-    Nothing is pushed.
+    The commits of those branches are in `chore/monorepo-c7-1` on `github`; no pull request is open.
 
 ## In brief
 

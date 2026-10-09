@@ -27,7 +27,7 @@
     lists, and a header of the ESP-IDF component that a library's tests include is built by the
     gate now. C7-7 ran on `chore/monorepo-c7-7`: the scripts of `tools/n1b/` are retired, with what
     adapting an open branch needs left in `tools/adapt/`, and the mechanical commits of the stages are in
-    `.git-blame-ignore-revs`. Nothing is pushed.
+    `.git-blame-ignore-revs`. The branches are on `github`; no pull request is open.
 
 ## In brief
 
