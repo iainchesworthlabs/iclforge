@@ -1,4 +1,5 @@
 # tools/fuzz/harnesses.sh - sourced by run.sh and generate-seeds.sh: where a harness lives.
+# shellcheck shell=bash
 #
 # Each harness is its library's (planning/monorepo.md, C7-1): libs/<lib>/fuzz/<harness>.cpp, with its
 # seeds in libs/<lib>/fuzz/seeds/<harness>/ and the inputs that once broke it in

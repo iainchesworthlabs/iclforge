@@ -27,8 +27,8 @@ and an MP4 file, and:
 
 Phase E6's presentations: the encoder's streams of several substreams and presentations under
 testdata/ac4/presentations/ (encoder-*.ac4, which libs/ac4/tests/encoder/test_presentations.cpp
-writes with AC4_ENCODER_WRITE_PRESENTATIONS, beside the configuration each was made from as JSON), whose
-MediaInfo reading (`--Output=JSON`) lists every presentation with the configured
+writes with AC4_ENCODER_WRITE_PRESENTATIONS, beside the configuration each was made from as
+JSON), whose MediaInfo reading (`--Output=JSON`) lists every presentation with the configured
 presentation_config, presentation_id, md_compat (MediaInfo's "PresentationLevel"), groups,
 dialnorm and language (its dialogue substream's, else its main substream's; MediaInfo names a Part 1
 Table 92 code rather than printing it), and every group with its content classifier and language;
