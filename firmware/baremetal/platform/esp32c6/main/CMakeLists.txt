@@ -38,8 +38,11 @@ idf_component_register(
     REQUIRES iclforge esp_timer esp_hw_support esp_rom freertos
              esp_wifi esp_netif esp_event nvs_flash lwip)
 
+# fixture.hpp is testdata/baremetal's (the i2s_player example plays the same stream); the rest
+# of the probes' headers sit beside them.
 target_include_directories(${COMPONENT_LIB} PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../..")
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../.."
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../testdata/baremetal")
 
 # What this part can give the decode, from main/Kconfig.projbuild. Zero, the
 # default, attempts every fixture; a run that aborts on an allocation says which

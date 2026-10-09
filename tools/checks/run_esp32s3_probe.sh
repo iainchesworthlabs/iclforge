@@ -22,7 +22,7 @@
 # WHAT THIS GATES, and what it deliberately does not:
 #
 #   - The probe's own verdict. Decoding: every fixture in
-#     firmware/baremetal/fixture.hpp decoded, every channel's level checked.
+#     testdata/baremetal/fixture.hpp decoded, every channel's level checked.
 #     Encoding: six frames of synthesised 5.1 through each of the two encoders,
 #     byte count and FNV-1a hash checked against firmware/baremetal/encode_fixture.hpp.
 #     Either way, result=pass - a failure means the codec is wrong on Xtensa.

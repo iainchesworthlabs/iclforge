@@ -435,7 +435,7 @@ The E-AC-3 rows are 5.1 (384 kbit/s, AHT + spx + standard coupling) and its Lo/R
 with §E3.5 enhanced coupling (`cpl+ecpl`, which `tools=all` does not select), 2/0, a 5.1 stream
 with dynrng words and dialnorm 24 in line mode, 7.1.4 (a bed and two dependent substreams) and its
 fold, and three Atmos rows: the bed alone, the objects reconstructed, and the objects placed onto
-7.1.4. It compares every channel's level against `firmware/baremetal/fixture.hpp`, and prints
+7.1.4. It compares every channel's level against `testdata/baremetal/fixture.hpp`, and prints
 `key=value` lines that `tools/checks/run_baremetal_probe.sh` gates on. It is not a unit test — the profile requires
 `ICLFORGE_BUILD_TESTS=OFF`, since nothing under `tests/` builds against a decode-only archive —
 and it answers three questions a test could not: does the archive link with everything else

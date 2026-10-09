@@ -13,7 +13,7 @@
 //      function cannot paper over one.
 //
 //   2. Does it produce the right audio? Every frame of every fixture in
-//      firmware/baremetal/fixture.hpp is decoded and each channel's RMS compared
+//      testdata/baremetal/fixture.hpp is decoded and each channel's RMS compared
 //      against what the same library produced on the host.
 //
 //   3. What does it actually cost? Peak heap in bytes, allocation counts split

@@ -2,7 +2,7 @@
 # stream's objects.
 #
 # stream/height.ec3 is the footprint probe's eac3_atmos_height fixture - the
-# same bytes as firmware/baremetal/fixture.hpp's kEac3AtmosHeightStream, written out
+# same bytes as testdata/baremetal/fixture.hpp's kEac3AtmosHeightStream, written out
 # by hand from that array - five objects over a 5.1 bed, three of them raised to
 # the ceiling and one half way (tools/generators/atmos_height_scene.txt). Played
 # onto 7.1.4 through the player, block by block, it should land on the twelve

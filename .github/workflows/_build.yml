@@ -1950,7 +1950,7 @@ jobs:
   # steps assume).
   #
   # What it gates on, in tools/checks/run_baremetal_probe.sh: the probe's own
-  # verdict (every channel's level against firmware/baremetal/fixture.hpp), the
+  # verdict (every channel's level against testdata/baremetal/fixture.hpp), the
   # linked image size, peak heap, and steady-state allocations per frame. The
   # last of those is a distance-from-zero the profile has not closed - see
   # docs/building.md's gap note - and the ceiling is there so it cannot grow

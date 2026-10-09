@@ -13,7 +13,7 @@ target and the first with hardware floating point.
 
 | | |
 |---|---|
-| AC-3 decode | Correct. Mono, stereo and 5.1, and 5.1 folded to Lo/Ro stereo in line mode by the §7.8 output stage, every channel level exact against `firmware/baremetal/fixture.hpp` |
+| AC-3 decode | Correct. Mono, stereo and 5.1, and 5.1 folded to Lo/Ro stereo in line mode by the §7.8 output stage, every channel level exact against `testdata/baremetal/fixture.hpp` |
 | E-AC-3 decode | Correct. 5.1, 2/0 and 7.1.4 (a bed and two dependent substreams), including AHT, spectral extension and §7.5.4 rematrixing; 5.1 and 7.1.4 folded to Lo/Ro stereo in line mode; and 5.1 in line mode from a stream carrying dynrng words and dialnorm 24 |
 | E-AC-3 §E3.5 enhanced coupling | Correct, on its own fixture |
 | Atmos bed and objects | Correct. Objects reconstruct here, and are placed onto 7.1.4 by their positions (`eac3_atmos_render`, through the block form's object views); the flat newlib heap makes it easier than on the [ESP32-S3](esp32-s3.md#objects) |
@@ -82,7 +82,7 @@ list if any component needing the full library is still switched on.
 ## The probe
 
 `firmware/baremetal/probe.cpp` links the archive, decodes six frames each of fourteen fixtures, compares
-every channel's level against `firmware/baremetal/fixture.hpp`, and prints `key=value` lines the
+every channel's level against `testdata/baremetal/fixture.hpp`, and prints `key=value` lines the
 runner gates on: the levels, image size, peak heap, retained bytes and allocations per frame.
 `encode_probe.cpp` is its counterpart, checking a byte count and FNV-1a hash against
 `encode_fixture.hpp`, and `ac4_probe.cpp` the AC-4 decoder's, decoding six streams through

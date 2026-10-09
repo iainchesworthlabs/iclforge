@@ -1,7 +1,7 @@
 // Decode AC-3 and play it out of an I2S DAC.
 //
 // The smallest thing that is actually a player rather than a measurement: it
-// takes the 5.1 fixture firmware/baremetal/fixture.hpp already carries, folds it to
+// takes the 5.1 fixture testdata/baremetal/fixture.hpp already carries, folds it to
 // stereo with the decoder's own §7.8 output stage, and writes 16-bit frames to
 // an I2S peripheral in a loop. Flash it at a MAX98357A, a PCM5102 or any other
 // I2S DAC and it makes a noise.

@@ -2,7 +2,7 @@
 
 Decodes AC-3 on an ESP32-S3 and plays it out of an I2S DAC.
 
-The 5.1 fixture from `firmware/baremetal/fixture.hpp` — the same stream the
+The 5.1 fixture from `testdata/baremetal/fixture.hpp` — the same stream the
 footprint probe checks against known levels — folded to stereo by the decoder's
 own §7.8 output stage and written to I2S at 48 kHz, 16-bit, on a loop.
 
