@@ -247,7 +247,7 @@ its files, and the crypto is in `base`, which has no dependency. What changes is
 ## (e) Stages
 
 Each stage is one pull request, or a few, on a freeze of `main` for the files it moves, in the manner of
-N1B ([tools/n1b/README.md](../tools/n1b/README.md)): the moves in a commit of their own (`git mv` alone,
+N1B ([tools/n1b/README.md](https://github.com/iainchesworthlabs/iclforge/blob/8d2507bae/tools/n1b/README.md)): the moves in a commit of their own (`git mv` alone,
 every rename `R100`), then the include spellings, then the build files, then what is done by hand. The
 scripts of N1B are the starting point: `layoutdef.py` as the plan, `n1b_apply.py`, `n1b_cmake.py` and
 `n1b_paths.py` for the moves, the includes, the CMake and the paths in text, and `baseline.py` for the
@@ -377,7 +377,7 @@ When a stage lands, `ac4.md` and `layout.md` say so in their status blocks, and 
 
 ## How C0 to C3 are run
 
-The stages run as N1B's did ([tools/n1b/README.md](../tools/n1b/README.md)), one local branch each, each
+The stages run as N1B's did ([tools/n1b/README.md](https://github.com/iainchesworthlabs/iclforge/blob/8d2507bae/tools/n1b/README.md)), one local branch each, each
 made from the one before: `chore/src-consolidation-c0` from the branch this page was written on, then
 `-c1`, `-c2`, `-c3`. Within a stage the commits come in N1B's order, each script in a commit of its own
 before the commit it makes: the cuts (C1 only), the moves alone (`git mv`, every rename `R100`), the

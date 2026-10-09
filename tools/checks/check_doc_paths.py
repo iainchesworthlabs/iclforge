@@ -128,12 +128,12 @@ PLANNED_PATHS = {
     ),
 }
 
-# Script trees whose literals are not references into this tree. tools/n1b holds the rewrite rules
-# of the re-layout in planning/layout.md: every rule names a path of the tree it reads and a path
-# of the tree it writes, and the second exists only once the scripts have run. Printed on every
-# run, like the two tables above; it goes when the scripts do.
+# Script trees whose literals are not references into this tree. tools/adapt holds the rewrite
+# rules of the re-layout in planning/layout.md, for adapting a branch to it: every rule names a
+# path of the tree it reads and a path of the tree it writes, and the first is the tree before the
+# re-layout. Printed on every run, like the two tables above; it goes when the scripts do.
 UNCHECKED_LITERAL_TREES = {
-    "tools/n1b/": "the layout scripts name the paths of the tree they write, not yet there",
+    "tools/adapt/": "the layout scripts name the paths of the tree as it was before the re-layout",
 }
 
 # Markdown pages whose prose deliberately names paths that do not exist: a plan

@@ -46,6 +46,3 @@ cmake/vcpkg/ports/** text eol=lf
 # decoder's syntax digests are taken over.
 *.ac4 -text
 
-# The hand-written part of stage S2 (tools/n1b/README.md), applied with git apply --3way: a patch that a
-# Windows checkout had turned to CRLF would not apply to the LF blobs it was made from.
-tools/n1b/s2-hand.patch text eol=lf

@@ -26,8 +26,8 @@
 //
 // This is data preservation and not a compatibility shim: the old names are not accepted anywhere,
 // the program reads only the new store, and nothing is copied after the first start. The old
-// organisation and application names are written here and nowhere else (n1b_programs.py leaves this
-// file as it is on purpose).
+// organisation and application names are written here and nowhere else (N1A's rename of the
+// programs left this file as it is on purpose).
 //
 // Qt's QSettings has a fallback from an application's store to its organisation's: the old store
 // is read without it (only the application's own keys are copied), and so is the new store when it

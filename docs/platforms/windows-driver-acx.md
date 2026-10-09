@@ -372,8 +372,8 @@ the scripts that build, install, remove, analyse and verify it, and the artifact
 uploads, `iclforge-nullsink-driver-testsigned`. The device description, and so the endpoint, went
 from "Desktop Atmos" to "Crucible Silent Output". The INF's provider and manufacturer read "ICL
 Forge"; N1A had recorded them as changed, and its pass had not read the `.inx`, which is UTF-16
-with a byte-order mark. `tools/n1b/n1d_driver_names.py` makes the change from three tables of
-names, so a later change of a name is one row and one run. The code of the driver is the same: the
+with a byte-order mark. A script, `n1d_driver_names.py`, made the change from three tables of
+names in one run (it is in the history before C7-7, with the tables). The code of the driver is the same: the
 sections that hold it (`.text`, `.data`, `INIT`, `.reloc`) match the old build byte for byte,
 `PAGE` differs by four bytes of name literals, and the data sections differ by the names, the PDB
 path and the version resource.

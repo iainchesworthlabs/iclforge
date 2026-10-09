@@ -27,9 +27,10 @@ station that, and a device of the same name would stand beside it.
 The driver took these names on 2026-10-01 (change N1D of the re-layout), from `Ac3ForgeNullSink`
 and "Desktop Atmos", which used a trademark of Dolby's to name a system-wide device. It had never
 been signed and had been installed nowhere but the test guest, so no installed copy was orphaned
-and no attestation package holds the old names. Changing a name again is one run of
-`tools/n1b/n1d_driver_names.py` (its tables of names) over a tree that does not yet use the new
-one; the endpoint's name is also one constant in Crucible, `kWindowsSilentDeviceName` in
+and no attestation package holds the old names. Changing a name again is a change to every place
+that holds it (the INF, the scripts, the CI job's artifact and the tests; `n1d_driver_names.py`, in
+the history before C7-7, had a table of them and made it in one run); the endpoint's name is also
+one constant in Crucible, `kWindowsSilentDeviceName` in
 `apps/crucible/engine/src/virtual_device.hpp`.
 
 ## Licence: separate from the rest of the repository

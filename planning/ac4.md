@@ -3572,7 +3572,8 @@ accepts AC-4 ([decision 20](#decisions-for-the-encoder-and-the-applications)).
 ends with the S5 pull request. The study (#1122, 2026-09-29) moved no source file; the user took its
 recommendation on each of its 14 decisions on 2026-09-30 (L2, the root `iclforge`, flat
 `src/<library>`), and the stages ran from [its plan](layout.md#f-the-migration-plan), each in a pull
-request of its own with its scripts under `tools/n1b/`:
+request of its own with its scripts under tools/n1b/ (retired in C7-7; they are in the history at
+`8d2507bae`):
 
 | stage | pull requests | what it did |
 |---|---|---|
@@ -3583,7 +3584,7 @@ request of its own with its scripts under `tools/n1b/`:
 | N1A | #1164 | `ac3cli`, `ac3gui`, `ac3hearth` and `ac3crucible` became `forge`, `forge-gui`, `hearth` and `crucible`, with what they register |
 | S5 | #1165 | the pages, the addresses, the build and tool text and the install routes follow the names; [Renamed](../docs/renamed.md) is the page that puts each old name beside its new one |
 | N1D | the pull request that carries this text | the Windows null-sink driver became `IclForgeNullSink` and its endpoint "Crucible Silent Output", on the owner's decision of 2026-10-01 (the driver had never been signed or installed outside the test guest); [the driver's page](../docs/platforms/windows-driver-acx.md#the-rename-2026-10-01) has the record |
-| S6 | the pull request that carries this text | the AC-3 codec's C++ names are in `iclforge::ac3`, a peer of `iclforge::ac4`, and the root `iclforge` holds one namespace per library; [the library index](../docs/library/index.md) and [Renamed](../docs/renamed.md) say how, and `tools/n1b/README.md` has the recipe |
+| S6 | the pull request that carries this text | the AC-3 codec's C++ names are in `iclforge::ac3`, a peer of `iclforge::ac4`, and the root `iclforge` holds one namespace per library; [the library index](../docs/library/index.md) and [Renamed](../docs/renamed.md) say how, and the README of tools/n1b (in the history at `8d2507bae`) has the recipe |
 
 [What the runs found](layout.md#what-the-runs-found-that-the-plan-did-not) gives the counts that
 differed from the study's and the hazards it did not name. **Left:** the owner renames the

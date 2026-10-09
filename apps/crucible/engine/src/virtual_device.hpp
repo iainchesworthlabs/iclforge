@@ -40,8 +40,8 @@ namespace iclforge::crucible {
 // apps/crucible/windows/driver (IclForgeNullSink.inx, `DeviceDesc`), which Windows shows as
 // "Speakers (<name>)". The engine's and the output stage's default filter and the Windows
 // VirtualDevice all read this one constant. The INF's strings, the guest scripts and the Crucible
-// tests carry the same words, and tools/n1b/n1d_driver_names.py changes every one of them in a
-// single run. The name is not just "Crucible": the signal path calls its second station that, and a
+// tests carry the same words, and a change of the name is a change to every one of them. The name
+// is not just "Crucible": the signal path calls its second station that, and a
 // device with the same name would stand beside the application it feeds.
 inline constexpr std::string_view kWindowsSilentDeviceName = "Crucible Silent Output";
 
