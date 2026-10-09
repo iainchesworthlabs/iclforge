@@ -71,8 +71,8 @@
     {
       "fixture": "reference_objects.paths",
       "kind": "bitstream",
-      "sha256": "f922ba1ead31ade900a73705a5a05b157cac204f053bda211397af86006939db",
-      "bytes": 714,
+      "sha256": "9f46c8d3a7e75cebe327f1616eef67fe809caf9474e2112f226f7ef974fa0905",
+      "bytes": 710,
       "note": "Not a coded stream: atmos-path's plain-text keyframe-column format, placing gen_object_scene_wav.py's five reference_objects.wav objects (SYNTHETIC above) in the room at unit gain. kind stays \"bitstream\" because that is check_corpus.py's only hash-only, no-audio-parameters category, not because this file is one - see this list's own header comment and gen_object_scene_wav.py's module docstring."
     },
     {
