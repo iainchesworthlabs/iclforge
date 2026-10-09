@@ -27,7 +27,9 @@
     lists, and a header of the ESP-IDF component that a library's tests include is built by the
     gate now. C7-7 ran on `chore/monorepo-c7-7`: the scripts of `tools/n1b/` are retired, with what
     adapting an open branch needs left in `tools/adapt/`, and the mechanical commits of the stages are in
-    `.git-blame-ignore-revs`. The branches are on `github`; no pull request is open.
+    `.git-blame-ignore-revs`. The branches are on `github`; no pull request is open. The first runs of
+    GitHub's own gates on the stack found 19 defects, none of them a moved byte, each fixed on a branch merged
+    into `chore/monorepo-c7-7` ([After C7-7](#after-c7-7-2026-10-09-choremonorepo-c7-7-with-the-branches-merged-into-it)).
 
 ## In brief
 
@@ -1163,3 +1165,76 @@ suites run one by one).
 --no-merged`) are adapted by their owners with the README of `tools/adapt/`, and the part of the programme
 that is not this one's is in the pull requests: `.git-blame-ignore-revs` names commits, which stay where they
 are only if the stages merge with merge commits, as the queue does.
+
+### After C7-7, 2026-10-09 (`chore/monorepo-c7-7`, with the branches merged into it)
+
+**What this is.** C7-1 to C7-7 were proved on one machine: GCC 16 and Clang 22 on Linux, the bare-metal
+probes under QEMU, six ESP-IDF images, and one MSVC build. The branches were pushed on 2026-10-09 and GitHub's
+own gates ran on them for the first time: `pr-gate.yml`, then `ci.yml` (the legs of the platforms that
+differ, then once in full), `wheels.yml`, `esp-component.yml` and `npm.yml`, each dispatched on
+`chore/monorepo-c7-7`. They found what a Linux machine could not, and the defects of the nightly run on `main`
+that the stack had not already fixed. Each is a branch off `chore/monorepo-c7-7`, merged back into it with a
+merge commit, so that the history says what found what.
+
+| found by | the defect | the branch |
+|---|---|---|
+| the static job (ruff, shellcheck) | two comments past 100 columns that the longer paths of C7 had made; `tools/fuzz/harnesses.sh`, sourced and with no shell named, was in `git ls-files '*.sh'` once the fuzz scripts moved under `tools/` | `bugfix/lint-after-the-moves` |
+| the gate's Linux job | "Check translations are up to date": the `<location line=...>` of the Forge GUI's and Hearth's catalogues, nine lines off after the path pass wrapped `encoder_controller.cpp` | `bugfix/forge-gui-catalogue-locations` |
+| the gate's Windows job (MSVC) | C4275, an exported `ac3::LevelMeter` and `LoudnessMeter` deriving from `base`'s, which C6 moved and a shared library embeds | `bugfix/msvc-c4275-exported-classes-derived-from-base` |
+| the fuzz build | `fuzz_iec61937_unwrap` named no library since C3 moved IEC 61937 to `containers` | `bugfix/fuzz-iec61937-unwrap-links-containers` |
+| the shared Debug build | `iab::DlcAudio::normalized()` defined in the library and exported by nothing; its ABI allowlist | `bugfix/iab-dlc-audio-normalized-export` |
+| main's nightly (ESP32-S3, QEMU) | the AC-4 probe image, 0x107330 bytes, in the 1 MB app partition of the default table | `bugfix/esp32s3-ac4-probe-app-partition` |
+| main's nightly (Python wheels, macOS Intel) | `-Wshift-count-negative` in a discarded `if constexpr` branch of `drc.cpp` | `bugfix/ac4-drc-negative-shift-in-a-discarded-branch` |
+| main's nightly (WASM), then this branch's macOS and clang-cl legs | `-Wunused-template` on the fixed-point table builders and `time_to_output`; `-Wsign-conversion` on `kTable42[std::distance(...)]` | `bugfix/unused-templates-and-a-signed-table-index` |
+| main's nightly and this branch's Windows wheel | C4244 for `std::optional<std::int8_t> = -20` in `iab/mxf.hpp` | `bugfix/iab-alignment-level-is-an-int8` |
+| reading the workflows | `wheels.yml` ignored `libs/ac4`, `libs/containers` and `cmake/`, which the wheel is built from; and a filter that matches nothing is silent | `bugfix/workflow-path-filters-follow-the-graph` (`check_workflow_paths.py`) |
+| reading the ESPHome page | its examples named `version: v0.10.0-beta.1`, a tag with the component at `esp-idf/iclforge` | `bugfix/esphome-example-names-a-ref-with-the-new-layout` |
+| the full `ci.yml` run (WASM) | Emscripten's `size_t` is 32 bits: the IAMF writer reserved a 64-bit total in a vector (`-Wshorten-64-to-32`) and the Matroska writer compared a frame size with `1 << 40`, twice (`-Wtautological-constant-out-of-range-compare`) | `bugfix/iamf-container-reserve-on-a-32-bit-size-type` |
+| the full run (Windows MSVC arm64) | the gold-reference ffmpeg was pinned to a daily autobuild tag, and BtbN keeps ten or so daily tags: the download was a 404; the pin is a month-end tag now, which they keep | `bugfix/winarm64-ffmpeg-pin-a-tag-that-is-kept` |
+| the full run (ABI gate) | C7-1's own: `find_so` ended with `[ -d ... ] && find ...`, so for a build with no `src/` it returned 1 and the step, under `bash -e`, ended at the first assignment from it with no output and no finding | `bugfix/abi-gate-find-so-survives-a-missing-directory` (with `tools/ci/test_abi_find_so.py`) |
+| the full run (Linux GCC, the float32 suite) | 43 cases named programs the directory did not build (28 `example.*`, 15 `hearth_qml_tests_*`): `ctest` says Not Run, and the step failed; the same 43 failed on main's nightly | `bugfix/float32-suite-leaves-out-unbuilt-example-and-qml-tests` |
+| the full run (Linux LLVM, the install-consumer check) | C7-4's: `install_consumer/CMakeLists.txt` built the stream path with `cmake_path(APPEND ... tests golden ...)` from separate words, which no path rewrite reads | `bugfix/install-consumer-reads-the-stream-from-testdata` |
+| the same check, run on the LLVM tree | a program linked with `pkg-config --libs iclforge-ac4` found `libiclforge_ac4` and not `libiclforge_base` it needs: its run path is `DT_RUNPATH`, which is not searched for a library's dependencies, and the libraries had none; they have `$ORIGIN` now | `bugfix/installed-shared-libraries-find-each-other` |
+| reading `git ls-files -s` | three Python tools and one test that C7 added were mode 0755, and nearly all of the other 200 are 0644 | `bugfix/file-modes-of-the-new-tools` |
+
+Two improvements to the structure came with them, as `feature/` branches: `feature/private-headers-are-private`
+(`check_layering.py` holds what a project may *include* as well as what it may use: a header is public under the
+project's `include/` or a directory its row `exposes`; the tree has one reach into another's implementation,
+`libs/dsp/tests/tiered/test_dsp_exact.cpp` into AC-4's SBR generator, listed as a debt) and
+`feature/project-pages-from-the-table` (`docs/projects.md` and a README for each of the 24 projects without one,
+generated from `projects.json` and checked fresh by the static job).
+
+**Where the CI stands.** The full run (`ci.yml`, 2026-10-09, on `04d2ec986`) had 40 jobs pass, 9 skipped (the
+publishing jobs) and 6 fail: WASM, the ABI gate, Windows MSVC arm64, Linux GCC, Linux LLVM, and the aggregate
+`Verify Status`. Everything that was red on `main`'s nightly and is not in that list passed on the branch:
+Android, the Rust crates on three systems, the five wheels, ESP32-S3 and C3 under QEMU, the coverage job,
+both macOS legs, Windows MSVC and clang-cl, the AppImage. The five jobs were fixed by the rows of the table from the full run down
+to the run path, and re-run where a dispatch can: Linux GCC, Linux LLVM and Windows MSVC arm64 (`ci.yml -f legs=...`, run
+37908516861, on `5887799ce`) all pass. The other two, which a `legs=` dispatch does not run, are checked
+by what can be run here, and are the one thing a second full dispatch would settle:
+
+- **WASM:** built here with Emscripten 6.0.6, the version the job pins, on the whole preset (197 steps, `-Werror`).
+  The job's Node and browser tests are not affected by a C++ change of this size and were not run.
+- **The ABI gate:** the step's own script, taken from the workflow, run against a `libs/` tree and a `src/`
+  tree of real shared libraries with the real `abidiff`: it ended with no output before the fix, as in CI, and
+  walks the libraries after it. The comparison against `v0.10.0-beta.1` itself is not reproduced.
+
+**Not defects of the stack, and left.** The AC-4 fixed-point probe's stack, 22,712 bytes against a ceiling of
+21,500 with this machine's `arm-none-eabi-gcc`, is the same on `main` and passes in CI's job there. Sonar's mixed
+source and test scope (`sonar.sources` and `sonar.tests` both name `libs` and `apps`, the tests picked out by
+`sonar.test.inclusions`) is the documented way and is read, not run: the first pull request's analysis is its
+test. Two things the 32-bit pass and the move of the golden data leave on purpose: `libs/adm/src/adm.cpp:178` and
+`:181` narrow a 64-bit count in a vector size and nothing builds ADM for a 32-bit target, and a test case of
+`libs/sendspin` and a comment of `testdata/audio/reference_objects.paths` still say `tests/golden`, the first
+being a test name, which does not change, and the second a data file whose bytes are read. The code needs no
+modernising for C++23: the tree already uses `std::expected` (884 lines), `std::span`, `std::ranges`,
+`constexpr`, `[[nodiscard]]`, concepts and `std::jthread`, has no `using namespace std` in a header, and its
+`malloc`, `NULL` and `typedef` are the C API, a libxcb reply and a memory probe.
+
+**What the run teaches about the stages.** Two of the six reds were the stack's own and not visible to a
+dry run: a shell function that is only wrong under `bash -e` with a layout that only HEAD has, and a path built
+from words. A third (the run path) was a mistake no job had been able to reach, found by running the next check
+locally once the first was fixed. The rest were `main`'s, or the platforms': a 32-bit `size_t`, a download that
+no longer exists, a test registered for a program that is not built. The method that found them is the one to
+keep: dispatch the legs that differ, read every red to its first error, fix it on a branch of its own, and run
+what can be run here before a second dispatch.
