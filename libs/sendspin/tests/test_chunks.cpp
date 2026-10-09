@@ -262,7 +262,7 @@ TEST_CASE("chunks: an E-AC-3 burst chunk carries Eac3BurstPacker's six blocks",
     CHECK(chunk->chunk.data.size() == payload.size());
 }
 
-TEST_CASE("chunks: a burst chunk for the first syncframe of tests/golden's AC-3 5.1 fixture",
+TEST_CASE("chunks: a burst chunk for the first syncframe of testdata's AC-3 5.1 fixture",
           "[sendspin][chunks]") {
     const std::vector<std::byte> stream = read_file(ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR "/ac3-51-448/ffmpeg.ac3");
     const auto frames = iclforge::ac3::split_frames(stream);
