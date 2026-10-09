@@ -51,8 +51,11 @@ idf_component_register(
     REQUIRES iclforge esp_timer esp_hw_support esp_rom freertos)
 
 # probe.hpp and the two fixture headers all sit beside the probes.
+# fixture.hpp is testdata/baremetal's (the i2s_player example plays the same stream); the rest
+# of the probes' headers sit beside them.
 target_include_directories(${COMPONENT_LIB} PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../..")
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../.."
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../testdata/baremetal")
 
 # The encode probe's 7.1 measurement switch, the same option and default as
 # firmware/baremetal/CMakeLists.txt gives the hosted shapes and the S3 and C3

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate firmware/baremetal/fixture.hpp - the bitstreams the minimum-footprint
+"""Generate testdata/baremetal/fixture.hpp - the bitstreams the minimum-footprint
 decoder probe decodes, and the per-channel levels it checks them against
 (minimum-footprint decoder profile).
 
@@ -351,7 +351,7 @@ STREAMS = (
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 AUDIO = REPO / "testdata" / "audio"
-OUTPUT = REPO / "firmware" / "baremetal" / "fixture.hpp"
+OUTPUT = REPO / "testdata" / "baremetal" / "fixture.hpp"
 
 
 def trim_wav(source: pathlib.Path, destination: pathlib.Path, frames: int) -> int:

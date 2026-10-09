@@ -16,8 +16,11 @@ idf_component_register(
     INCLUDE_DIRS ""
     REQUIRES iclforge esp_timer esp_hw_support esp_rom freertos)
 
+# fixture.hpp is testdata/baremetal's (the i2s_player example plays the same stream); the rest
+# of the probes' headers sit beside them.
 target_include_directories(${COMPONENT_LIB} PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../..")
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../.."
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../testdata/baremetal")
 
 # What this part can actually give the decode. The allocator reports 249,180
 # bytes free, and that is NOT the number: this heap is regioned, its largest

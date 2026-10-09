@@ -11,7 +11,7 @@
 # Two things are checked, and they fail for different reasons:
 #
 #   1. The probe's own verdict. It decodes every fixture, compares every
-#      channel's level against firmware/baremetal/fixture.hpp, and prints
+#      channel's level against testdata/baremetal/fixture.hpp, and prints
 #      result=pass or result=fail (see firmware/baremetal/probe.cpp). A failure
 #      here means the decode is wrong on this target.
 #

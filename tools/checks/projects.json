@@ -34,7 +34,7 @@
     "esp-idf":     {"kind": "firmware-library", "path": "firmware/esp-idf", "may_use": ["ac3", "ac4", "base", "device", "dsp", "objects", "render", "sendspin"], "lanes": ["esp"], "ships": ["ac3", "base", "device", "dsp", "objects", "render"], "exposes": ["firmware/esp-idf/iclforge/include/"], "purpose": "The ESP-IDF component: the codec and player for the ESP32-S3, C3, C6 and P4, with its examples."},
     "hearth-sink": {"kind": "firmware", "path": "firmware/hearth-sink", "may_use": ["ac3", "device", "esp-idf", "render", "sendspin"], "lanes": ["esp"], "purpose": "Hearth's sink firmware for the ESP32 boards, a Sendspin player built on the ESP-IDF component."},
     "esphome":     {"kind": "firmware", "path": "firmware/esphome", "may_use": ["ac3"], "lanes": ["esp"], "purpose": "The ESPHome external component that brings the ESP-IDF component into an ESPHome build."},
-    "baremetal":   {"kind": "firmware", "path": "firmware/baremetal", "may_use": ["ac3", "ac4", "base", "dsp", "objects", "render"], "lanes": ["esp"], "exposes": ["firmware/baremetal/fixture.hpp"], "purpose": "The minimum-footprint probes: the Cortex-M3 build under QEMU, the ESP32 images and the fixtures they decode."},
+    "baremetal":   {"kind": "firmware", "path": "firmware/baremetal", "may_use": ["ac3", "ac4", "base", "dsp", "objects", "render"], "lanes": ["esp"], "purpose": "The minimum-footprint probes: the Cortex-M3 build under QEMU, the ESP32 images and the fixtures they decode."},
 
     "examples": {"kind": "example", "path": "examples", "may_use": ["ac3", "ac4", "adm", "base", "capi", "containers", "iab", "objects", "render"], "lanes": ["core"], "purpose": "The library's example programs, in C++ and Python."},
 
@@ -45,11 +45,6 @@
       "from": "ac4", "to": "app-media", "paths": ["libs/ac4/tests/decoder/test_object_render.cpp"],
       "to_paths": ["apps/shared/media/src/ac4_object_render."],
       "why": "The one test of the object renderer builds its streams with the AC-4 tests' own helper (decoder/objects.hpp, which includes the encoder's private headers), so it stays in libs/ac4/tests and compiles apps/shared/media/src/ac4_object_render.cpp into ac4's test binary: a library's test using an app-library (planning/monorepo.md, C7-2, finding 4)."
-    },
-    {
-      "from": "esp-idf", "to": "baremetal", "paths": ["firmware/esp-idf/iclforge/examples/i2s_player/"],
-      "to_paths": ["firmware/baremetal/fixture.hpp"],
-      "why": "The i2s_player example decodes the 5.1 fixture the bare-metal probe carries (fixture.hpp) rather than a copy of it: one firmware project using another's file."
     }
   ],
   "install_files": ["cmake/InstallLibrary.cmake"]

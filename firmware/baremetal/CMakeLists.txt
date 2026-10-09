@@ -156,9 +156,12 @@ option(ICLFORGE_PROBE_SEVEN_ONE
 target_compile_definitions(iclforge-probe PRIVATE
     "ICLFORGE_PROBE_SEVEN_ONE=$<BOOL:${ICLFORGE_PROBE_SEVEN_ONE}>")
 
-# fixture.hpp sits beside probe.cpp; the generated ac3/export.hpp comes with
-# the library target.
-target_include_directories(iclforge-probe PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+# fixture.hpp, the 5.1 and other streams probe.cpp decodes, is testdata/baremetal's: the ESP-IDF
+# component's i2s_player example plays the same stream. The other fixture headers sit beside
+# probe.cpp; the generated ac3/export.hpp comes with the library target.
+target_include_directories(iclforge-probe PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${PROJECT_SOURCE_DIR}/testdata/baremetal")
 
 if(ICLFORGE_BAREMETAL_PLATFORM STREQUAL "baremetal")
     target_sources(iclforge-probe PRIVATE

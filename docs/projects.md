@@ -147,5 +147,4 @@ excuses nothing fails the check.
 | From | To | Where | Why |
 |---|---|---|---|
 | `ac4` | `app-media` | `libs/ac4/tests/decoder/test_object_render.cpp` | The one test of the object renderer builds its streams with the AC-4 tests' own helper (decoder/objects.hpp, which includes the encoder's private headers), so it stays in libs/ac4/tests and compiles apps/shared/media/src/ac4_object_render.cpp into ac4's test binary: a library's test using an app-library (planning/monorepo.md, C7-2, finding 4). |
-| `esp-idf` | `baremetal` | `firmware/esp-idf/iclforge/examples/i2s_player/` | The i2s_player example decodes the 5.1 fixture the bare-metal probe carries (fixture.hpp) rather than a copy of it: one firmware project using another's file. |
 
