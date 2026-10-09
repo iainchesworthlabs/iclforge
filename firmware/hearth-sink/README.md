@@ -7,7 +7,7 @@ it decodes AC-4 as well ([AC-4](#ac-4)). It reads the stream a piece at a time,
 through a ring between the player's fetch and decode tasks (32 KB by default) and
 a 16 KB framing buffer.
 
-The sibling of [`i2s_player`](../i2s_player), differing in one thing: where the
+The sibling of [`i2s_player`](../esp-idf/iclforge/examples/i2s_player), differing in one thing: where the
 audio comes from. That one decodes a bitstream linked into its own image, which
 proves the codec works and is not how anything real gets its audio.
 
@@ -49,7 +49,7 @@ See [`main/byte_source.hpp`](main/byte_source.hpp) and
 
 **Two tasks and a ring, which are the component's.** Since 2026-09-10 the loop
 lives in `firmware/esp-idf/iclforge` as `iclforge::Player`
-([`include/iclforge/player.hpp`](../../include/iclforge/player.hpp)): a fetch
+([`include/iclforge/player.hpp`](../esp-idf/iclforge/include/iclforge/player.hpp)): a fetch
 task on core 0, beside WiFi and TCP/IP, reads the source into a ring buffer; a
 decode task on core 1 drains the ring through the accumulator, decodes, and
 writes to the sink. A source that blocks — a socket waiting on the network —
@@ -95,7 +95,7 @@ On a DevKitC-1 reached through its **native USB connector** rather than the
 UART bridge, build with `SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw"`
 so the console comes out of the same cable. The reset esptool performs after
 flashing can leave the chip in `boot:0x0 (DOWNLOAD)`; its watchdog reset boots
-the application instead, as [`i2s_player`](../i2s_player/README.md#running)
+the application instead, as [`i2s_player`](../esp-idf/iclforge/examples/i2s_player/README.md#running)
 shows, and failing that it is the board's RESET button and
 `idf.py monitor --no-reset`. The port re-enumerates on every reset, so a
 terminal that does not reopen it misses the first lines. Building more than one
@@ -138,7 +138,7 @@ bootloader is built with `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`
 (`sdkconfig.defaults`). An image an update writes into the other slot boots on
 trial, and a reset before that image accepts itself boots the previous one
 again. Updates over the network, in the next section, build on this
-([planning/esp32-ota.md](../../../../planning/esp32-ota.md)).
+([planning/esp32-ota.md](../../planning/esp32-ota.md)).
 
 A USB flash - `idf.py flash`, or `esptool write-flash @flash_args` from the
 build directory - writes these:
@@ -210,7 +210,7 @@ The firmware PUTs answer only requests addressed to the board's IP address or
 its own `.local` name, which keeps a web page elsewhere from sending them
 through a browser on this network. Images are not signed while the boards are
 in development: anyone on the network can update a board, as anyone with a USB
-cable can. [planning/esp32-ota.md](../../../../planning/esp32-ota.md) has the
+cable can. [planning/esp32-ota.md](../../planning/esp32-ota.md) has the
 reasons, and what later phases add.
 
 ### Without a cable
@@ -367,7 +367,7 @@ loop run at real time; the null sink runs flat out. Under QEMU it means less tha
 nothing — the emulator is not cycle-accurate and reports a CPU clock that
 disagrees with its own boot log. Real-time decode on this part is measured on a
 board, not here: an E-AC-3 5.1 frame decodes in 11.0 ms of its 32 at 240 MHz — see
-[`docs/platforms/bare-metal/esp32-s3.md`](../../../../docs/platforms/bare-metal/esp32-s3.md#timing). The
+[`docs/platforms/bare-metal/esp32-s3.md`](../../docs/platforms/bare-metal/esp32-s3.md#timing). The
 player's own figures from a board are below.
 
 ## On the board
@@ -574,14 +574,14 @@ QEMU's Ethernet stand-in, and with WiFi up the decoder does not fit beside it.
 ## Playing from a Sendspin server
 
 `sdkconfig.sendspin` makes the board a Sendspin player
-([planning/hearth-reference-player.md](../../../../planning/hearth-reference-player.md),
+([planning/hearth-reference-player.md](../../planning/hearth-reference-player.md),
 B3), on WiFi with the page on port 80:
 
 ```bash
 SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin" idf.py build
 ```
 
-[An ESP32-S3 sink](../../../../docs/hearth/sink-esp32-s3.md) takes a board
+[An ESP32-S3 sink](../../docs/hearth/sink-esp32-s3.md) takes a board
 through this step by step: flashing, joining a network, pairing, groups,
 wiring and slot widths.
 
@@ -590,7 +590,7 @@ board advertises `_sendspin._tcp` under its name, and a server that finds it
 dials it. Two roles are offered:
 
 - `_iclforge_player@v1`
-  ([planning/hearth-sendspin-extension.md](../../../../planning/hearth-sendspin-extension.md)):
+  ([planning/hearth-sendspin-extension.md](../../planning/hearth-sendspin-extension.md)):
   AC-3 or E-AC-3 in IEC 61937 bursts, decoded on the board, rendered onto its
   layout, then routed, trimmed and delayed as the server's settings say. The
   server can also set the layout, the crossover and the decoder's settings
@@ -717,7 +717,7 @@ once they are paired, which happens one of two ways:
 The board keeps eight pairings in NVS, each with the name its server's hello
 gave, the most recently used first. A ninth pairing replaces the least
 recently used one that no open connection rests on
-([`pairing_records.hpp`](../../include/iclforge/pairing_records.hpp)). `pair
+([`pairing_records.hpp`](../esp-idf/iclforge/include/iclforge/pairing_records.hpp)). `pair
 list` prints them, and the page's Sendspin section lists them from `GET
 /pairing`, with a *Forget* for each. `pair forget` and a server's ID - its
 server_id, or the first eight or more characters of it that `pair list`
@@ -738,7 +738,7 @@ its own operator approves the board.
 A server stamps each chunk with the time its first sample should play, on
 its own clock, and the player follows that clock with Sendspin's time
 filter
-([`clock_sync.hpp`](../../../../libs/sendspin/include/iclforge/sendspin/clock_sync.hpp)):
+([`clock_sync.hpp`](../../libs/sendspin/include/iclforge/sendspin/clock_sync.hpp)):
 bursts of eight exchanges, one after another until the filter has converged,
 then thirty a second apart, then one every ten seconds. Convergence itself is
 confirmed rather than taken on trust: once a run of bursts reads as converged,
@@ -755,7 +755,7 @@ chunk's local time is worked out when it arrives, which may be seconds before
 it plays, and it is moved by as much as the clock has moved by the time it
 does. The I2S sink says when each buffer it is given will play, from the
 channel's own end-of-frame interrupts
-([`iclforge/playout.hpp`](../../include/iclforge/playout.hpp)). The player
+([`iclforge/playout.hpp`](../esp-idf/iclforge/include/iclforge/playout.hpp)). The player
 pads the start of a stream with silence, or leaves out the frames already
 late, so that its first frame plays when the server asked; after that it
 drops or repeats one frame in 256 while the smoothed error is outside
@@ -939,7 +939,7 @@ any run in this section.
 AC-3 and E-AC-3 5.1 do not fit this player's memory budget once the ring,
 the WebSocket server and WiFi's own buffers are all resident, though both
 decode in real time on the part with none of that overhead (see
-[Real time, with WiFi and a stream](../../../../docs/platforms/bare-metal/esp32-c6.md#status)
+[Real time, with WiFi and a stream](../../docs/platforms/bare-metal/esp32-c6.md#status)
 on the platform page). That was measured on 2026-09-22. The fixed tier's E-AC-3 5.1 peak has
 fallen since, from 164,066 to 109,806 bytes, and this player has not been run on a board again,
 so E-AC-3 may fit now. Before this was a Kconfig setting, playing either
@@ -992,7 +992,7 @@ and was running an earlier image, which left it `hearth` with no MAC to report, 
 new name, and so the new `.local` address, at its next start.
 
 Brought up on a DFRobot FireBeetle 2 ESP32-P4, pre-production silicon (chip revision
-v1.3 - see [ESP32-P4](../../../../docs/platforms/bare-metal/esp32-p4.md) for that
+v1.3 - see [ESP32-P4](../../docs/platforms/bare-metal/esp32-p4.md) for that
 board's own chip-revision and clock findings from the bare-metal probe). Three more
 board-only boot crashes found bringing this example itself up, all fixed in
 `sdkconfig.p4` and none hit by the smaller probe:
@@ -1078,13 +1078,13 @@ and the second restarts in a loop.
 `sdkconfig.ac4` builds the component's AC-4 decoder into the example (`CONFIG_ICLFORGE_AC4`,
 in practice on a part with PSRAM). A stream that opens with an AC-4 sync word then plays as an
 AC-3 or E-AC-3 one does, from any source.
-[The ESP32-P4 page](../../../../docs/platforms/bare-metal/esp32-p4.md#ac-4) has what a stream of
+[The ESP32-P4 page](../../docs/platforms/bare-metal/esp32-p4.md#ac-4) has what a stream of
 each kind takes. Only the ESP32-P4 has played it on a board. On the ESP32-S3 it builds with
 `sdkconfig.psram` and `sdkconfig.ac4`, and an AC-4 play keeps its decoder's state in PSRAM
-(`CONFIG_ICLFORGE_AC4_INTERNAL_BELOW`, 512 bytes on that part: [ESP32-S3](../../../../docs/platforms/bare-metal/esp32-s3.md#ac-4));
+(`CONFIG_ICLFORGE_AC4_INTERNAL_BELOW`, 512 bytes on that part: [ESP32-S3](../../docs/platforms/bare-metal/esp32-s3.md#ac-4));
 it has been checked under QEMU with the footprint probe and not played on a board (phase D14c of
 `planning/ac4.md`). On an ESP32-C6 the decoder builds in the fixed-point tier and does not fit beside WiFi
-([the C6 page](../../../../docs/platforms/bare-metal/esp32-c6.md#ac-4)). The Sendspin player advertises `ac3` and `eac3` as its
+([the C6 page](../../docs/platforms/bare-metal/esp32-c6.md#ac-4)). The Sendspin player advertises `ac3` and `eac3` as its
 data types and not `ac4` (`main/sendspin/player/sendspin.cpp`), so no AC-4 stream reaches a board
 from a Sendspin group (phase I6). The measurements were made with `POST /play` and a URL.
 
@@ -1096,11 +1096,11 @@ The decode task needs 40 KB of stack, which `sdkconfig.ac4` sets: today's decode
 of it. `sdkconfig.p4` reads the flash in quad I/O, which takes 6 to 7 ms off a 5.1 frame and is
 the second stage bootloader's mode: an update over the network keeps the bootloader on the board,
 so a board flashed before keeps DIO until it is flashed again over USB with its bootloader
-(`idf.py flash`; [the page's Flash mode](../../../../docs/platforms/bare-metal/esp32-p4.md#flash-mode)
+(`idf.py flash`; [the page's Flash mode](../../docs/platforms/bare-metal/esp32-p4.md#flash-mode)
 has the figures). The I2S queue is 64 ms there (12 descriptors of 256 frames) and not the default 21 ms: the
 sink's write returns when a frame is in the queue, so a queue shorter than a frame's decode runs dry in every
 frame (`sink.underruns` and `sink.dry_ms` in a play's last lines count it;
-[Paced output](../../../../docs/platforms/bare-metal/esp32-p4.md#paced-output) has the plays). A play ends
+[Paced output](../../docs/platforms/bare-metal/esp32-p4.md#paced-output) has the plays). A play ends
 with the lines the page's figures come from: `ac4.lap` (frames, samples, the
 decoder's time, the worst frame's and the PCM hash), `ac4.heap` (what the play took of internal
 RAM and PSRAM) and, with `ICLFORGE_STAGE_TIMERS=ON`, a `play.stage[...]` line for each part of the
@@ -1145,7 +1145,7 @@ VBR, DRC words, other encoders' streams and objects. `www/streams.json` says
 what each one is and the level each slot of a 7.1.4 output should get from it,
 and CI plays the set under QEMU onto 7.1.4 (`sdkconfig.ci-http714`) and holds
 every slot to it.
-[`planning/esp32-stream-set.md`](../../../../planning/esp32-stream-set.md) has
+[`planning/esp32-stream-set.md`](../../planning/esp32-stream-set.md) has
 what was measured - which streams a network shape without PSRAM can play, and
 which need a board with it.
 
@@ -1171,7 +1171,7 @@ as a name — `2.0` (the default), `5.1`, `7.1`, `5.1.4`, `7.1.4`, `9.2.4`,
 `L,R,C,LFE,Ls,Rs` for a 5.1 DAC wired in WAV order, `30/0,-30/0,lfe` by angles,
 `-` for a slot nothing is on. A name is Table E2.5's order with the LFE last, so
 `5.1` is L C R Ls Rs LFE; a list is whatever order the board is wired in. The
-grammar is [`iclforge/render/layout.hpp`](../../../../libs/render/include/iclforge/render/layout.hpp)'s and
+grammar is [`iclforge/render/layout.hpp`](../../libs/render/include/iclforge/render/layout.hpp)'s and
 `PUT /layout` on the control surface takes the same text for the next play.
 
 What happens to a stream depends on the layout, not the stream:
@@ -1203,10 +1203,10 @@ output stage now folds 256 samples at a time: its scratch fits a shape without
 PSRAM, and on the board the same 7.1.4 play decodes in 30 ms a frame, level
 with real time. The same stream decodes and renders onto twelve slots in about
 30 ms. See
-[`planning/esp32-stream-set.md`](../../../../planning/esp32-stream-set.md#on-a-board)
-and [Folded to stereo](../../../../docs/platforms/bare-metal/esp32-s3.md#folded-to-stereo).
+[`planning/esp32-stream-set.md`](../../planning/esp32-stream-set.md#on-a-board)
+and [Folded to stereo](../../docs/platforms/bare-metal/esp32-s3.md#folded-to-stereo).
 
-All of it is [`iclforge/render/render.hpp`](../../../../libs/render/include/iclforge/render/render.hpp),
+All of it is [`iclforge/render/render.hpp`](../../libs/render/include/iclforge/render/render.hpp),
 one 256-sample block at a time, which is why a 7.1.4 layout costs the player 12 KB
 of block storage rather than 72 KB of frame. The geometry is the library's
 (`libs/render/tests/`); what the header adds is indexing between coded channels,
@@ -1228,7 +1228,7 @@ reason the QEMU shape runs an 8 KB ring.
 standard I2S for one or two channels and TDM for three or more, reconfiguring
 between them as the layout in force changes, rather than a build fixing one
 shape and staying there
-([`iclforge/sink_plan.hpp`](../../include/iclforge/sink_plan.hpp) decides
+([`iclforge/sink_plan.hpp`](../esp-idf/iclforge/include/iclforge/sink_plan.hpp) decides
 which). `PUT /layout` takes effect this way at the very next play: no rebuild,
 no reflash, just whatever the new layout needs. A TDM line always runs its full
 frame, four 32-bit slots or eight 16-bit ones, with the slots past the layout's
@@ -1298,7 +1298,7 @@ descriptor at 4,092 bytes and quietly shortens one that asks for more, and
 each descriptor divides the player's 256-frame block - 128 frames for stereo,
 64 for a twelve-slot layout at capture - because ESP-IDF v6.1's
 `i2s_channel_write` abandons a partly written buffer whenever two or more sent
-ones are waiting, and the rest of it goes out as silence. [`i2s_player`](../i2s_player/README.md)
+ones are waiting, and the rest of it goes out as silence. [`i2s_player`](../esp-idf/iclforge/examples/i2s_player/README.md)
 measured what that costs a player that writes across descriptors: 3 ms in
 every 35. Whether keeping the DMA depth constant across a reconfigure also
 keeps ESP-IDF from reallocating the buffers under it, rather than just saving
@@ -1343,12 +1343,12 @@ component rename or a driver API change is caught there, but nothing under
 QEMU runs it. The exceptions are the parts worth testing without a board at
 all, free of
 ESP-IDF and unit-tested on the host:
-[`iclforge/interleave.hpp`](../../include/iclforge/interleave.hpp)
+[`iclforge/interleave.hpp`](../esp-idf/iclforge/include/iclforge/interleave.hpp)
 (`libs/ac3/tests/io/test_interleave.cpp`), because planar-to-interleaved indexing with
 slot padding is where the bugs are; the mode/slot-count arithmetic itself,
-[`iclforge/sink_plan.hpp`](../../include/iclforge/sink_plan.hpp)
+[`iclforge/sink_plan.hpp`](../esp-idf/iclforge/include/iclforge/sink_plan.hpp)
 (`libs/ac3/tests/io/test_sink_plan.cpp`); and the queue model behind the `sink.*` line,
-[`iclforge/dac_queue_model.hpp`](../../include/iclforge/dac_queue_model.hpp)
+[`iclforge/dac_queue_model.hpp`](../esp-idf/iclforge/include/iclforge/dac_queue_model.hpp)
 (`libs/ac3/tests/io/test_dac_queue_model.cpp`), which runs there against a simulated
 DMA. The rest of this sink is peripheral setup that either works on a board or
 does not.

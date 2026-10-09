@@ -57,7 +57,7 @@ component has been run on another part. What it wraps is the ESP-IDF
 component, whose manifest lists the ESP32-S3, ESP32-C3, ESP32-C6 and ESP32-P4:
 the decode arithmetic follows the part, `float` on the S3 and the P4 and fixed
 point on the C3 and C6
-([`docs/platforms/bare-metal/esp32-s3.md`](../docs/platforms/bare-metal/esp32-s3.md#the-esp-idf-component)).
+([`docs/platforms/bare-metal/esp32-s3.md`](../../docs/platforms/bare-metal/esp32-s3.md#the-esp-idf-component)).
 The original ESP32 and the S2 are not in the manifest.
 
 ## Memory
@@ -70,13 +70,13 @@ having on a board that will also run WiFi — the library does not require it,
 but ESPHome is not the only thing on the part.
 
 The S3 decodes AC-3 5.1 in real time on a board (0.31x of a frame in the probe's
-timing runs of 2026-09-09 to 2026-09-11; [the S3 page](../docs/platforms/bare-metal/esp32-s3.md#timing)
+timing runs of 2026-09-09 to 2026-09-11; [the S3 page](../../docs/platforms/bare-metal/esp32-s3.md#timing)
 has the table). It has not been timed through this component.
 
 ## Why a git dependency and not the registry
 
 ICL Forge is not published to the ESP Component Registry yet — see
-[`.github/workflows/esp-component.yml`](../.github/workflows/esp-component.yml)
+[`.github/workflows/esp-component.yml`](../../.github/workflows/esp-component.yml)
 for why that publish job is deliberately not armed. ESPHome's
 `add_idf_component` writes `git:`, `version:` and `path:` straight into the
 generated `idf_component.yml`, which is the form the IDF component manager wants

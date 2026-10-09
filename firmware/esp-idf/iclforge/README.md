@@ -32,7 +32,7 @@ live in the library because it is made of FreeRTOS:
   through the same server. `GET /` is a web page for the routes, and the only client they need:
   the state, the stream, the layout, the volume and the decode's timing, and the four actions,
   from two files in [`ui/`](ui) sent from flash as they are
-  ([`planning/esp32-device-ui.md`](../../planning/esp32-device-ui.md)). `GET /api` lists the
+  ([`planning/esp32-device-ui.md`](../../../planning/esp32-device-ui.md)). `GET /api` lists the
   routes.
 - **`iclforge/interleave.hpp`**: planar float to interleaved 16-bit or 24-in-32 with slot padding,
   free of ESP-IDF and tested on the host. Library code with a temporary home; see the plan below.
@@ -47,11 +47,11 @@ live in the library because it is made of FreeRTOS:
 
 The player renders through the library's `iclforge::render` headers, which began in this component
 and moved to `libs/render/include/iclforge/render/` so that the desktop player and its test sink render
-with the same code ([`planning/hearth-reference-player.md`](../../planning/hearth-reference-player.md)).
+with the same code ([`planning/hearth-reference-player.md`](../../../planning/hearth-reference-player.md)).
 **`iclforge::render::OutputLayout`**
-([`layout.hpp`](../../libs/render/include/iclforge/render/layout.hpp)) is the speakers a player has, one
+([`layout.hpp`](../../../libs/render/include/iclforge/render/layout.hpp)) is the speakers a player has, one
 per slot, from a name (`2.0`, `5.1`, `7.1.4`, `9.2.4`) or a speaker list (`L,R,C,LFE,Ls,Rs`, or
-angles). **`iclforge::render::LayoutRenderer`** ([`render.hpp`](../../libs/render/include/iclforge/render/render.hpp))
+angles). **`iclforge::render::LayoutRenderer`** ([`render.hpp`](../../../libs/render/include/iclforge/render/render.hpp))
 turns the decoder's block - the coded channels and, when the stream has them, the objects with
 their positions - into one block per slot: a stereo or mono layout is the decoder's own §7.8
 fold; anything else has the bed placed channel by channel through `iclforge::spatial::pan_direction`,
@@ -59,7 +59,7 @@ and a layout with height speakers has the objects placed by their own positions 
 are tested on the host (`libs/render/tests/test_layout.cpp`).
 
 `idf_component.yml` is the registry manifest, and it is not published yet — see
-[the CI workflow](../../.github/workflows/esp-component.yml) for why the publish job is gated.
+[the CI workflow](../../../.github/workflows/esp-component.yml) for why the publish job is gated.
 
 ## Using it
 
@@ -77,7 +77,7 @@ this part's internal SRAM at once. Switching needs `idf.py fullclean` first, sin
 reaches the library as CMake cache variables a warm build directory has already resolved.
 
 Packed for the component registry, the archive carries `libs/ac3` and `cmake` inside this
-directory, staged by [`tools/packaging/pack_esp_component.py`](../../tools/packaging/pack_esp_component.py);
+directory, staged by [`tools/packaging/pack_esp_component.py`](../../../tools/packaging/pack_esp_component.py);
 the component's own CMake finds the library either way.
 
 ## AC-4
@@ -89,16 +89,16 @@ renderer and sinks, and `iclforge::ac4::SyncFrameSplitter` and `iclforge::ac4::D
 E-AC-3 framer and decoders. With it off the component builds as it always did. It needs PSRAM,
 since the decoder alone peaks at 286 KB of heap at 2.0 and 1.50 MB at 5.1.4 on the footprint
 probe's streams, and a decode task with a stack of 40 KB, which `examples/hearth_sink/sdkconfig.ac4`
-sets: the decoder uses 19 to 30 KB of it. The [ESP32-P4 page](../../docs/platforms/bare-metal/esp32-p4.md#ac-4) has what a stream of
+sets: the decoder uses 19 to 30 KB of it. The [ESP32-P4 page](../../../docs/platforms/bare-metal/esp32-p4.md#ac-4) has what a stream of
 each kind held and how fast it decoded on a board: 2.0 and 5.1 streams in SIMPLE, A-SPX and A-CPL mode 2
 in real time, A-CPL mode 3 and 5.1.4 slower. On the ESP32-S3 an AC-4 play puts the decoder's state in
 PSRAM: `CONFIG_ICLFORGE_AC4_INTERNAL_BELOW`, 512 bytes on that part and ESP-IDF's own limit on any
 other, is the size below which its allocations try internal RAM first, and the player sets it for the
 length of the play only. The S3 decodes the footprint probe's streams under QEMU with the PCM equal to
 the pins, and has not been timed on a board
-([ESP32-S3](../../docs/platforms/bare-metal/esp32-s3.md#ac-4)). It builds for the ESP32-C6 and the ESP32-C3,
+([ESP32-S3](../../../docs/platforms/bare-metal/esp32-s3.md#ac-4)). It builds for the ESP32-C6 and the ESP32-C3,
 which have no PSRAM; 2.0 is level with what a C6 has free beside WiFi with WiFi's code in flash
-([ESP32-C6](../../docs/platforms/bare-metal/esp32-c6.md#ac-4)), and more than a C3 has. No sink built on the
+([ESP32-C6](../../../docs/platforms/bare-metal/esp32-c6.md#ac-4)), and more than a C3 has. No sink built on the
 component takes AC-4 in a Sendspin group. A component archive carries the AC-4
 sources only when it was packed with `pack_esp_component.py --with-ac4`.
 
@@ -107,11 +107,11 @@ sources only when it was packed with `pack_esp_component.py --with-ac4`.
 | Example | What it shows |
 |---|---|
 | [`examples/i2s_player`](examples/i2s_player/README.md) | Decodes a fixture linked into the image and plays it out of an I2S DAC, printing per-lap timing from the DAC's own clock. The measurement anyone with a board can repeat. |
-| [`examples/hearth_sink`](examples/hearth_sink/README.md) | Bytes from a flash partition, an SD card, a FAT volume in flash or an HTTP body over WiFi, through the incremental framer, rendered onto a configured layout - stereo, 5.1, 7.1.4 with the objects placed - to an I2S or TDM DAC; a `capture` sink for CI. With `sdkconfig.sendspin` it is a Sendspin player that takes updates over its network. How a real player gets its audio. |
+| [`examples/hearth_sink`](../../hearth-sink/README.md) | Bytes from a flash partition, an SD card, a FAT volume in flash or an HTTP body over WiFi, through the incremental framer, rendered onto a configured layout - stereo, 5.1, 7.1.4 with the objects placed - to an I2S or TDM DAC; a `capture` sink for CI. With `sdkconfig.sendspin` it is a Sendspin player that takes updates over its network. How a real player gets its audio. |
 
 Both are built by CI under `espressif/idf:v6.1`, in the `esp` lane of `ci.yml`, which runs after a
 merge to main that changes the ESP32 trees or a tree its component ships, and nightly
-([the lane table](../../docs/ci-lanes.md#lane-table)). `hearth_sink` runs under QEMU there in seven
+([the lane table](../../../docs/ci-lanes.md#lane-table)). `hearth_sink` runs under QEMU there in seven
 shapes, one of which renders a height-object stream onto 7.1.4 and checks every slot's level
 against the footprint probe's. Timing figures come only from a board: QEMU is not cycle-accurate.
 
@@ -128,8 +128,8 @@ one machine, give each its own build directory and its own `-DSDKCONFIG=<build d
 
 ## Where this is going
 
-[`planning/esp32-player.md`](../../planning/esp32-player.md) is the plan for what the component
+[`planning/esp32-player.md`](../../../planning/esp32-player.md) is the plan for what the component
 should carry beyond the library for a player — buffering and tasks, the source and sink seams,
 a control surface — and for the ESPHome component that sits on it. The platform page,
-[`docs/platforms/bare-metal/esp32-s3.md`](../../docs/platforms/bare-metal/esp32-s3.md), has the footprint and timing figures
+[`docs/platforms/bare-metal/esp32-s3.md`](../../../docs/platforms/bare-metal/esp32-s3.md), has the footprint and timing figures
 and what the port required from the library.

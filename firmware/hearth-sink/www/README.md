@@ -4,7 +4,7 @@ Streams for the streaming example's `http` source to fetch: 7.1.4 streams that r
 twelve slots of a 7.1.4 output, and beside them a range across the layouts the player renders
 onto, both codecs, dependent substreams, two programmes, dual mono, the Annex E coding tools,
 short frames, VBR, DRC words, other encoders' streams and object audio.
-[planning/esp32-stream-set.md](../../../../../planning/esp32-stream-set.md) has what each one
+[planning/esp32-stream-set.md](../../../planning/esp32-stream-set.md) has what each one
 is, what was measured, and why the set is as it is. `streams.json` has the same for each
 stream, with the level each slot of a 7.1.4 output should get from it.
 
