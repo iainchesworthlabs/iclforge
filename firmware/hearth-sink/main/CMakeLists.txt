@@ -85,7 +85,7 @@ endif()
 # sdmmc_host.h in the latter. fatfs carries esp_vfs_fat.h. esp_eth for the
 # QEMU network under the HTTP source, listed for every build for the reason
 # above.
-# The stage-timer backend the bare-metal probe links (apps/baremetal/
+# The stage-timer backend the bare-metal probe links (firmware/baremetal/
 # stage_timers.cpp), when the repository is here to provide it. With the
 # library built with ICLFORGE_STAGE_TIMERS it gives each play a
 # play.stage[<zone>] line per decoder stage - `idf.py -DICLFORGE_STAGE_TIMERS=ON

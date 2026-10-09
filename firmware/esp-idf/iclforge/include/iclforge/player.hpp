@@ -137,7 +137,7 @@ struct PlayerConfig {
     UBaseType_t decode_priority = 6;
     // The decode task's stack. 32 KB is what the probe measured a decode
     // needing about 21 KB of, with an overflow that surfaced as a panic on the
-    // other core when it was smaller (apps/baremetal/platform/esp32s3/
+    // other core when it was smaller (firmware/baremetal/platform/esp32s3/
     // sdkconfig.defaults). PlayerStats::decode_stack_free says what a run used.
     std::uint32_t decode_stack_bytes = 32768;
     std::uint32_t fetch_stack_bytes = 8192;

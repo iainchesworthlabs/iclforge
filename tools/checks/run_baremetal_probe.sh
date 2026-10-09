@@ -11,8 +11,8 @@
 # Two things are checked, and they fail for different reasons:
 #
 #   1. The probe's own verdict. It decodes every fixture, compares every
-#      channel's level against apps/baremetal/fixture.hpp, and prints
-#      result=pass or result=fail (see apps/baremetal/probe.cpp). A failure
+#      channel's level against firmware/baremetal/fixture.hpp, and prints
+#      result=pass or result=fail (see firmware/baremetal/probe.cpp). A failure
 #      here means the decode is wrong on this target.
 #
 #   2. The footprint ceilings below. These are not aspirations - they are the
@@ -34,7 +34,7 @@ HOST=0
 # this picks a preset rather than adding a fixture.
 DIRECTION=decoder
 # --ac4: the third profile, the AC-4 decoder (planning/ac4.md, D14a) in float, with its own
-# probe (apps/baremetal/ac4_probe.cpp) and its own presets, since AC-4 shares nothing with
+# probe (firmware/baremetal/ac4_probe.cpp) and its own presets, since AC-4 shares nothing with
 # iclforge::ac3 and an image carries one probe. --ac4 --scalar=fixed is the same probe on the
 # decoder's fixed-point tier (D14d), with ceilings of its own.
 # --stage-timers: build the library with ICLFORGE_STAGE_TIMERS, so the probe
@@ -48,7 +48,7 @@ DIRECTION=decoder
 STAGE_TIMERS=OFF
 # --icount: the one timing figure on this leg that means anything. The probe
 # is built with its clock on the mps2-an385's 25 MHz CMSDK timer
-# (ICLFORGE_BAREMETAL_CLOCK=timer, apps/baremetal/platform/baremetal/
+# (ICLFORGE_BAREMETAL_CLOCK=timer, firmware/baremetal/platform/baremetal/
 # clock_timer.cpp) and QEMU runs with -icount shift=0, under which the guest
 # clock advances one nanosecond per executed instruction. Every microsecond
 # the probe prints is then a thousand Thumb-2 instructions, deterministic on
@@ -410,7 +410,7 @@ if (( retained > ICLFORGE_MAX_RETAINED_BYTES )); then
 fi
 
 # The AC-4 probe's own rows: the stack a decode used (read by painting, see
-# apps/baremetal/ac4_probe.cpp) and each fixture's peak heap against its own ceiling.
+# firmware/baremetal/ac4_probe.cpp) and each fixture's peak heap against its own ceiling.
 if [[ "$DIRECTION" == "ac4" ]]; then
     stack=$(sed -n 's/.*stack\.peak_bytes=\([0-9]*\).*/\1/p' "$OUTPUT" | head -1)
     if [[ -z "$stack" ]]; then
@@ -429,7 +429,7 @@ fi
 # requirement and a regression in any of them is the same kind of news.
 #
 # The fixture names come from the probe's own output rather than from a list
-# kept here, so adding one (apps/baremetal/probe.cpp's kEac3Fixtures and
+# kept here, so adding one (firmware/baremetal/probe.cpp's kEac3Fixtures and
 # tools/generators/gen_baremetal_fixture.py's STREAMS) does not also mean
 # remembering to widen a gate in two runner scripts. A hardcoded list still
 # PASSES when a fixture is added and left off it, and the fixture nobody

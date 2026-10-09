@@ -281,7 +281,7 @@ both non-double scalars.
 
 **Phase D - the part. Correctness done 2026-09-10; the C3's timing needs a board, and a C6's was
 measured on 2026-09-15.**
-`apps/baremetal/platform/esp32c3/` is the probe's third target: an ESP-IDF project like the S3's,
+`firmware/baremetal/platform/esp32c3/` is the probe's third target: an ESP-IDF project like the S3's,
 defaulting to `-DAC3FORGE_DECODE_SCALAR=fixed` because the part has no floating-point unit.
 `qemu-riscv32` is installed beside the Xtensa one, `tools/checks/run_esp32c3_probe.sh` drives the
 leg, and the component's manifest lists `esp32c3` beside `esp32s3` - with the packaging check now

@@ -15,7 +15,7 @@
 # stream a piece at a time, through a ring between the player's fetch and
 # decode tasks (32 KB by default, CONFIG_ICLFORGE_EXAMPLE_RING_BYTES) and a
 # 16 KB framing buffer. See main/hearth_sink.cpp and
-# esp-idf/iclforge/include/iclforge/player.hpp.
+# firmware/esp-idf/iclforge/include/iclforge/player.hpp.
 #
 # WITHOUT A BOARD:
 #

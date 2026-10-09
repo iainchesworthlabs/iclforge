@@ -3,7 +3,7 @@
 #include <array>
 #include <cstdint>
 
-// What apps/baremetal/probe.cpp's eac3_atmos_render row expects: the
+// What firmware/baremetal/probe.cpp's eac3_atmos_render row expects: the
 // eac3_atmos_height stream's objects (fixture.hpp; three of them raised to the
 // ceiling and one half way, tools/generators/atmos_height_scene.txt) rendered
 // onto 7.1.4 by their own OAMD positions, one level per output slot.

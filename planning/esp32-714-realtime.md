@@ -68,7 +68,7 @@ by `POST /play`.
 The instruments were applied to a throwaway worktree and not committed:
 
 - **The library's stage timers** (`AC3FORGE_STAGE_TIMERS`), routed to
-  `apps/baremetal/stage_timers.cpp` linked into the example, reset as each play starts and
+  `firmware/baremetal/stage_timers.cpp` linked into the example, reset as each play starts and
   reported as it ends. An enter/leave pair costs 2.36 µs and a 7.1.4 frame opens about 160 pairs,
   so every stage-timed figure below includes about 0.4 ms of timer.
 - **ESP-IDF's heap hooks** (`CONFIG_HEAP_USE_HOOKS`), counting the decode task's allocations by
@@ -79,7 +79,7 @@ The instruments were applied to a throwaway worktree and not committed:
 - **The twelve-slot conversion** (`ac3forge::interleave_24in32`), timed per block inside the null
   sink.
 
-The bare-metal probe (`apps/baremetal/platform/esp32s3`) was stage-timed on the same board. It
+The bare-metal probe (`firmware/baremetal/platform/esp32s3`) was stage-timed on the same board. It
 gained a scratch `eac3_714_fold` row: the probe's 7.1.4 fixture folded to Lo/Ro in line mode, with
 reference levels 62,837 and 61,994 from `ac3cli decode ... downmix=loro drcmode=line`. The board
 matched both.

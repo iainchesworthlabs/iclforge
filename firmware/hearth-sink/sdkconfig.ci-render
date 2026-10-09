@@ -2,12 +2,12 @@
 # stream's objects.
 #
 # stream/height.ec3 is the footprint probe's eac3_atmos_height fixture - the
-# same bytes as apps/baremetal/fixture.hpp's kEac3AtmosHeightStream, written out
+# same bytes as firmware/baremetal/fixture.hpp's kEac3AtmosHeightStream, written out
 # by hand from that array - five objects over a 5.1 bed, three of them raised to
 # the ceiling and one half way (tools/generators/atmos_height_scene.txt). Played
 # onto 7.1.4 through the player, block by block, it should land on the twelve
 # slots at exactly the levels the probe's eac3_atmos_render row records in
-# apps/baremetal/render_fixture.hpp: the same objects, the same panner, the same
+# firmware/baremetal/render_fixture.hpp: the same objects, the same panner, the same
 # arithmetic in the same order. CI checks that it does, slot by slot. That the
 # levels are RIGHT is libs/render/tests/'s business on the host; what this
 # establishes is that the player places the objects exactly as the probe does,

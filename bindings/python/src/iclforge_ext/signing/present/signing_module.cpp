@@ -10,7 +10,7 @@
 // This is the body that used to sit inside bindings.cpp's PYBIND11_MODULE
 // behind `#ifdef ICLFORGE_PY_HAVE_SIGNING`, moved verbatim. See
 // optional_modules.hpp for why it is a translation unit now, and
-// python/CMakeLists.txt for the selection that picks this file over the
+// bindings/python/CMakeLists.txt for the selection that picks this file over the
 // absent/ one beside it.
 
 namespace iclforge::python {

@@ -8,7 +8,7 @@
 //
 // The startup files that DO differ between host and bare metal - the reset
 // vector, the TLS shim, the linker script - are already selected per platform
-// by apps/baremetal/CMakeLists.txt, and none of them is an entry point.
+// by firmware/baremetal/CMakeLists.txt, and none of them is an entry point.
 
 #include "probe.hpp"
 

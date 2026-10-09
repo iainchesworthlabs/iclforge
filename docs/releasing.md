@@ -454,7 +454,7 @@ release-workflow fix, as `v0.10.0-beta.1` needed) does not fail on files PyPI al
 The browser decoder package (`js/`, see
 [docs/platforms/wasm.md](platforms/wasm.md)) is meant to be the
 `iclforge-wasm-decoder` npm package.
-Versioning mirrors the PyPI package above rather than reinventing it: `js/package.json` carries a
+Versioning mirrors the PyPI package above rather than reinventing it: `bindings/js/package.json` carries a
 `0.0.0-dev` placeholder in the tree (the same untagged-build fallback CMake's own
 `GitVersionDerivation.cmake` uses), and `npm.yml`'s `publish` job stamps the real,
 resolved version (`npm version <version> --no-git-tag-version`) immediately before `npm publish`

@@ -79,7 +79,7 @@ request that touches it — and point your project at the resulting `js/dist/`. 
 compiled `.wasm` of its own: `decodeFile()` and `PushDecoder` take the instantiated Embind module
 as their first argument, and `IclForgeDecoderNode` takes a `wasmGlueUrl` pointing at the Emscripten
 glue, so you also need the module built from `apps/demos/wasm/`; [WebAssembly](platforms/wasm.md) covers
-that build. The [README](https://github.com/iainchesworthlabs/iclforge/blob/main/js/README.md) is
+that build. The [README](https://github.com/iainchesworthlabs/iclforge/blob/main/bindings/js/README.md) is
 the package's own API documentation. The package exists at all because a browser cannot be
 relied on to decode EC-3: [Chrome reports a decoder error](https://github.com/videojs/http-streaming/issues/1297)
 when an EC-3 track turns up in an MPD, in a report that has been open since 2023.

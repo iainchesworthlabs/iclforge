@@ -1,12 +1,12 @@
 // Decode AC-3 and play it out of an I2S DAC.
 //
 // The smallest thing that is actually a player rather than a measurement: it
-// takes the 5.1 fixture apps/baremetal/fixture.hpp already carries, folds it to
+// takes the 5.1 fixture firmware/baremetal/fixture.hpp already carries, folds it to
 // stereo with the decoder's own §7.8 output stage, and writes 16-bit frames to
 // an I2S peripheral in a loop. Flash it at a MAX98357A, a PCM5102 or any other
 // I2S DAC and it makes a noise.
 //
-// WHY THIS IS AN EXAMPLE AND NOT PART OF THE PROBE. apps/baremetal/probe.cpp is
+// WHY THIS IS AN EXAMPLE AND NOT PART OF THE PROBE. firmware/baremetal/probe.cpp is
 // a measuring instrument whose numbers CI holds to ceilings; adding a
 // peripheral, a DMA buffer and a playback loop to it would move every one of
 // those numbers and measure something nobody asked about. This is the other

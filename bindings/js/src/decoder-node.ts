@@ -76,7 +76,7 @@ export class IclForgeDecoderNode extends EventTarget {
     if (!crossOriginIsolated) {
       throw new Error(
         "IclForgeDecoderNode requires cross-origin isolation (COOP: same-origin, COEP: " +
-          "require-corp) for SharedArrayBuffer - see js/README.md.",
+          "require-corp) for SharedArrayBuffer - see bindings/js/README.md.",
       );
     }
     const channelCount = resolveChannelCount(options);

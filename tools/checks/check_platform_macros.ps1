@@ -25,7 +25,7 @@
 # assertions. Each is now the same directory-selected shape the rest of the
 # tree uses -- tests/support/platform/<os>/, libs/ac3/tests/core/avx2/{present,absent}/,
 # libs/render/tests/abi/{msvc,unknown}/ -- and python/ likewise
-# (python/src/iclforge_ext/{signing,containers}/{present,absent}/), so every
+# (bindings/python/src/iclforge_ext/{signing,containers}/{present,absent}/), so every
 # tree here starts at zero rather than being grandfathered in with a waiver list.
 #
 # NOT scanned, deliberately: esp-idf/. That tree is an ESP-IDF component built
@@ -33,7 +33,7 @@
 # Kconfig symbols -- the documented IDF idiom, and in the CONFIG_SPIRAM case
 # load-bearing in a way a directory split would not reproduce: on a target with
 # no PSRAM bus, esp_psram_get_size() is never exposed to the linker at all
-# (see esp-idf/iclforge/src/control.cpp's own comment). Holding this rule over
+# (see firmware/esp-idf/iclforge/src/control.cpp's own comment). Holding this rule over
 # somebody else's build system, with no toolchain here to verify against, would
 # be a change made blind.
 #
@@ -118,7 +118,7 @@ $driverRoot = Join-Path (Join-Path $Root 'apps') 'crucible\windows\driver'
 $files = @($files | Where-Object { -not $_.FullName.StartsWith($driverRoot, [System.StringComparison]::OrdinalIgnoreCase) })
 
 # Build output is not source, and a build configured INSIDE the tree puts some
-# of it under apps/: apps/baremetal/platform/esp32s3 is built in place by
+# of it under apps/: firmware/baremetal/platform/esp32s3 is built in place by
 # idf.py (docs/platforms/bare-metal/esp32-s3.md), and CMake's generated ac3/export.hpp is a
 # conditional-compilation header by its very nature. One such build produced
 # 658 "violations", every one of them generated and none of them anybody's

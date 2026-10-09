@@ -1,6 +1,6 @@
 // Exercises installMediaSourceShim's contract against a minimal fake
 // `MediaSource` global - no real hls.js, no browser, no live HLS stream (see
-// js/README.md's "what's verified" section for that real gap). This proves
+// bindings/js/README.md's "what's verified" section for that real gap). This proves
 // the shim mechanics: unmatched mimetypes pass through untouched, matched
 // ones get a fake buffer whose appendBuffer/updateend timing and buffered
 // reporting behave the way hls.js's BufferController expects.

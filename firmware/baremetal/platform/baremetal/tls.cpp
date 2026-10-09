@@ -24,7 +24,7 @@
 //     would need its image copied in here, and nothing does that - so the
 //     assert refuses the build rather than letting one start life as garbage.
 //
-// This file exists only in the bare-metal build (apps/baremetal/CMakeLists.txt
+// This file exists only in the bare-metal build (firmware/baremetal/CMakeLists.txt
 // adds this directory only when cross-compiling); the hosted build's C library
 // provides the real thing.
 

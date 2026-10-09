@@ -86,7 +86,7 @@ NOT_BUILT = (
     "esphome/",
     "apps/demos/android/",
     "apps/demos/wasm/",
-    "apps/baremetal/",
+    "firmware/baremetal/",
     "apps/crucible/linux/",
     "examples/python/",
 )

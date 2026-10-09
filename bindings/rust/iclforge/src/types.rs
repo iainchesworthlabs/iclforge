@@ -294,7 +294,7 @@ impl DecoderConfig {
 
 impl Default for DecoderConfig {
     /// Calls `iclforge_decoder_config_init()` rather than hand-mirroring its defaults — see
-    /// `rust/README.md` on why every config type in this crate goes through its raw `_init()`
+    /// `bindings/rust/README.md` on why every config type in this crate goes through its raw `_init()`
     /// first (the `_config_init` growth convention `iclforge.h` documents).
     fn default() -> Self {
         let mut raw = unsafe { std::mem::zeroed() };

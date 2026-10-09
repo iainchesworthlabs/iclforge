@@ -44,7 +44,7 @@
 // stops catching them; each carries the C++ error enumerator as `.error`.
 //
 // See optional_modules.hpp for why this is a translation unit rather than an
-// #ifdef, and python/CMakeLists.txt for the selection that picks this file
+// #ifdef, and bindings/python/CMakeLists.txt for the selection that picks this file
 // over the absent/ one beside it.
 
 namespace {

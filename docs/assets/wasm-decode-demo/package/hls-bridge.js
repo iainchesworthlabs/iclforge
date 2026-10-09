@@ -18,7 +18,7 @@
 // Known limitation, stated plainly rather than left to be discovered: A/V
 // sync here is `syncTo()`'s clock alignment against the host media element,
 // an approximation - not sample-accurate mux-level sync - and this has not
-// been soak-tested against a real HLS server/live stream (see js/README.md's
+// been soak-tested against a real HLS server/live stream (see bindings/js/README.md's
 // own "what's verified" section). Treat it as a working mechanism that needs
 // real-stream hardening, not a finished integration.
 import { extractFragments, parseInitSegment } from "./fmp4.js";

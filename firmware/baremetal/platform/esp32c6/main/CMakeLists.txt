@@ -1,5 +1,5 @@
 # The ESP32-C6 application: IDF's app_main plus its clock, the REAL probe -
-# apps/baremetal/probe.cpp or encode_probe.cpp, the same files every other leg
+# firmware/baremetal/probe.cpp or encode_probe.cpp, the same files every other leg
 # builds - and the network load main/Kconfig.projbuild chooses. The esp32s3
 # sibling's copy of this file carries the reasoning for the first two.
 if(ICLFORGE_ESP_PROFILE STREQUAL "encoder")

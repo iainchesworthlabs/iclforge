@@ -6,7 +6,7 @@
 #
 # Included from the root CMakeLists.txt only when ICLFORGE_BUILD_PYTHON is ON
 # (default OFF, see that option's own comment) - normally driven by
-# python/pyproject.toml's cmake.define when scikit-build-core configures this
+# bindings/python/pyproject.toml's cmake.define when scikit-build-core configures this
 # tree for `pip install`/cibuildwheel, not by a developer's ordinary build.
 # ---------------------------------------------------------------------------
 
@@ -30,7 +30,7 @@ target_include_directories(_iclforge PRIVATE src/iclforge_ext)
 # Python bindings completeness's completeness surface. Both groups are conditional on the same
 # configure that built (or skipped) the libraries, so a trimmed dev build -
 # codec only - still produces a working extension without them; the wheel
-# build (python/pyproject.toml) turns every one of these targets ON, so a
+# build (bindings/python/pyproject.toml) turns every one of these targets ON, so a
 # published wheel always carries the full surface.
 #
 # Each group used to be a compile definition (ICLFORGE_PY_HAVE_CONTAINERS /
@@ -60,9 +60,9 @@ else()
     target_sources(_iclforge PRIVATE src/iclforge_ext/ac4/absent/ac4_module.cpp)
 endif()
 
-# scikit-build-core's wheel.install-dir (see python/pyproject.toml) is the
+# scikit-build-core's wheel.install-dir (see bindings/python/pyproject.toml) is the
 # package root, so a relative DESTINATION here lands the compiled extension
-# next to python/src/iclforge/__init__.py inside the wheel.
+# next to bindings/python/src/iclforge/__init__.py inside the wheel.
 #
 # COMPONENT python, paired with pyproject.toml's install.components = ["python"]: the root
 # CMakeLists.txt's include(InstallLibrary) always installs the full iclforge::ac3 SDK (headers,

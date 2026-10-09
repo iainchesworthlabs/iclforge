@@ -12,7 +12,7 @@
 # defect-finding rules over style ones.
 
 line-length = 100  # .clang-format's ColumnLimit, so both languages read alike.
-target-version = "py310"  # python/pyproject.toml's requires-python floor.
+target-version = "py310"  # bindings/python/pyproject.toml's requires-python floor.
 
 exclude = [
     "build",

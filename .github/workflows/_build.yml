@@ -115,8 +115,8 @@ on:
           Build/test build-esp32s3, hearth-esp32s3, build-esp32c3, package-esp32-firmware (the sink images
           those two build, published with a release) and build-footprint. The last one runs on a
           Linux-fleet runner and cross-compiles arm-none-eabi rather than ESP-IDF, but it shares
-          apps/baremetal/'s probe and fixtures with the other two (see its own "sibling" comment)
-          and classify_changes.py's LANE_PREFIXES puts apps/baremetal/ in `esp`, not `linux` - the
+          firmware/baremetal/'s probe and fixtures with the other two (see its own "sibling" comment)
+          and classify_changes.py's LANE_PREFIXES puts firmware/baremetal/ in `esp`, not `linux` - the
           lane a source path maps to, not the runner OS a job happens to execute on.
         type: boolean
         default: true
@@ -1636,7 +1636,7 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: |
-            js/package-lock.json
+            bindings/js/package-lock.json
             apps/demos/wasm/tests/package-lock.json
 
       - name: Build iclforge-wasm-decoder package
@@ -1722,7 +1722,7 @@ jobs:
           CI: "1"
         run: npm test
 
-  # The ESP32 player's web page (esp-idf/iclforge/ui/, planning/esp32-device-ui.md)
+  # The ESP32 player's web page (firmware/esp-idf/iclforge/ui/, planning/esp32-device-ui.md)
   # in Chromium, against a stand-in for the firmware's REST routes that each test
   # starts for itself: every action and its error paths, the polling, the status
   # payloads recorded from the emulated board, accessibility and the flash
@@ -1779,10 +1779,10 @@ jobs:
           if-no-files-found: warn
 
   # The Rust bindings (rust/): a Cargo workspace living in-tree but deliberately
-  # never add_subdirectory()'d from the root CMakeLists.txt - see rust/README.md's "why this
+  # never add_subdirectory()'d from the root CMakeLists.txt - see bindings/rust/README.md's "why this
   # lives in-tree" section. Its own job for the same reason build-wasm/build-footprint are: none
   # of the desktop workflows' steps apply (no ctest suite, no cpack package, no gold-reference
-  # gate) - rust/iclforge-sys/build.rs drives its own trimmed CMake configure of just
+  # gate) - bindings/rust/iclforge-sys/build.rs drives its own trimmed CMake configure of just
   # iclforge::c_shared rather than reusing a desktop preset.
   #
   # All three desktop OSes, one job each (the Rust bindings' completeness pass): the
@@ -1792,7 +1792,7 @@ jobs:
   # which is exactly the class of finding a matrix exists to keep finding.
   #
   # No toolchain-selection step: rustup (preinstalled on this runner image) auto-detects and
-  # installs rust/rust-toolchain.toml's pinned channel plus its clippy/rustfmt components the
+  # installs bindings/rust/rust-toolchain.toml's pinned channel plus its clippy/rustfmt components the
   # moment `cargo`/`rustup` is invoked from inside rust/ - one canonical version pin, not one
   # duplicated into this file too, the same "no second copy of a version string" reasoning
   # _toolchain-versions.yml's own header states for the C/C++ toolchains.
@@ -1950,7 +1950,7 @@ jobs:
   # steps assume).
   #
   # What it gates on, in tools/checks/run_baremetal_probe.sh: the probe's own
-  # verdict (every channel's level against apps/baremetal/fixture.hpp), the
+  # verdict (every channel's level against firmware/baremetal/fixture.hpp), the
   # linked image size, peak heap, and steady-state allocations per frame. The
   # last of those is a distance-from-zero the profile has not closed - see
   # docs/building.md's gap note - and the ceiling is there so it cannot grow
@@ -2098,7 +2098,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/i2s_player
+          cd firmware/esp-idf/iclforge/examples/i2s_player
           idf.py set-target esp32s3
           idf.py build
           idf.py size | tee "$GITHUB_STEP_SUMMARY"
@@ -2124,7 +2124,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           idf.py set-target esp32s3
           idf.py build
           idf.py size | tee -a "$GITHUB_STEP_SUMMARY"
@@ -2196,7 +2196,7 @@ jobs:
           # 106647 - 0.41% and 0.39% out, which is the float32 decode path
           # against the host's float64 and not a defect.
           #
-          # Tolerance is apps/baremetal/probe.cpp's own convention, expected/20
+          # Tolerance is firmware/baremetal/probe.cpp's own convention, expected/20
           # + 200, for the same reason: it absorbs the scalar-width difference
           # and nothing larger. A channel that came back silent, or at the wrong
           # level, is several times outside it.
@@ -2240,7 +2240,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2323,7 +2323,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2393,7 +2393,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2462,7 +2462,7 @@ jobs:
       # player - decode_access_unit_by_block, the objects reconstructed and
       # placed by iclforge::spatial::pan_direction, the bed's LFE passed through -
       # into the twelve-slot TDM conversion. The reference is the probe's own
-      # eac3_atmos_render row (apps/baremetal/render_fixture.hpp): same
+      # eac3_atmos_render row (firmware/baremetal/render_fixture.hpp): same
       # objects, same panner, same float arithmetic in the same order, so the
       # levels agree to the digit and the tolerance below is one unit of
       # rounding. sdkconfig.ci-render says why one lap and why the MDCT-band
@@ -2473,7 +2473,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2567,7 +2567,7 @@ jobs:
           python3 -m http.server 8000 --bind 0.0.0.0 --directory apps/demos/wasm/assets >/dev/null 2>&1 &
           server=$!
           trap 'kill "$server" 2>/dev/null || true' EXIT
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2683,7 +2683,7 @@ jobs:
           python3 -m http.server 8000 --bind 0.0.0.0 --directory apps/demos/wasm/assets >/dev/null 2>&1 &
           server=$!
           trap 'kill "$server" 2>/dev/null || true' EXIT
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           if [ ! -f build/qemu_flash.bin ] || [ ! -f build/qemu_efuse.bin ]; then
             echo "::error title=ESP32-S3 web page::the HTTP step's QEMU images are not in build/" >&2
             exit 1
@@ -2750,7 +2750,7 @@ jobs:
           python3 "$console" --title "ESP32-S3 web page" qemu-ui.txt
           kill "$qemu" 2>/dev/null || true
 
-      # The stream set (esp-idf/iclforge/examples/hearth_sink/www/,
+      # The stream set (firmware/hearth-sink/www/,
       # planning/esp32-stream-set.md) over the HTTP source, rendered onto
       # 7.1.4: sdkconfig.ci-http714 is the HTTP shape with the capture sink's
       # twelve-slot TDM conversion, levels as coded and objects as their bed,
@@ -2771,7 +2771,7 @@ jobs:
           python3 -m http.server 8000 --bind 0.0.0.0 --directory "$www" >/dev/null 2>&1 &
           server=$!
           trap 'kill "$server" 2>/dev/null || true' EXIT
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2880,7 +2880,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           for combo in \
             "i2s:CONFIG_ICLFORGE_EXAMPLE_SINK_I2S=y" \
             "sd:CONFIG_ICLFORGE_EXAMPLE_SOURCE_SD=y" \
@@ -2922,7 +2922,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           dir="$RUNNER_TEMP/hearth-sink-esp32s3"
           version="${VERSION_TAG:-$(git -c safe.directory='*' -C "$GITHUB_WORKSPACE" describe --tags --always)}"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32s3 \
@@ -2952,7 +2952,7 @@ jobs:
           . "$IDF_PATH/export.sh"
           image="$GITHUB_WORKSPACE/sendspin-qemu-image"
           mkdir -p "$image"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2973,7 +2973,7 @@ jobs:
           . "$IDF_PATH/export.sh"
           image="$GITHUB_WORKSPACE/sendspin-qemu-image/wifi"
           mkdir -p "$image"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2999,7 +2999,7 @@ jobs:
           . "$IDF_PATH/export.sh"
           images="$GITHUB_WORKSPACE/ota-qemu-images"
           mkdir -p "$images"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           # name:PROJECT_VER:ICLFORGE_FIRMWARE_TEST
@@ -3283,7 +3283,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd apps/baremetal/platform/esp32c6
+          cd firmware/baremetal/platform/esp32c6
           for load in none wifi; do
             dir="$RUNNER_TEMP/esp32c6-$load"
             defaults="sdkconfig.defaults"
@@ -3294,7 +3294,7 @@ jobs:
 
       # hearth_sink's actual Sendspin player, not the baremetal probe above - built and not
       # run, same reason: no qemu-riscv32 machine for esp32c6. The config combination is the
-      # one esp-idf/iclforge/examples/hearth_sink/sdkconfig.c6 and sdkconfig.sendspin-c6 each
+      # one firmware/hearth-sink/sdkconfig.c6 and sdkconfig.sendspin-c6 each
       # name in their own header comments, and the one docs/hearth/index.md's "Where it runs"
       # table has flagged as "no C6 Sendspin CI job" - a board has built, run and measured
       # this combination (the README's "On the ESP32-C6" section, including a ten-minute
@@ -3311,7 +3311,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           dir="$RUNNER_TEMP/hearth_sink-c6-sendspin"
           version="${VERSION_TAG:-$(git -c safe.directory='*' -C "$GITHUB_WORKSPACE" describe --tags --always)}"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32c6 \
@@ -3332,7 +3332,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           dir="$RUNNER_TEMP/hearth_sink-c6-16mb-sendspin"
           version="${VERSION_TAG:-$(git -c safe.directory='*' -C "$GITHUB_WORKSPACE" describe --tags --always)}"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32c6 \
@@ -3358,7 +3358,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           dir="$RUNNER_TEMP/hearth_sink-p4-sendspin"
           version="${VERSION_TAG:-$(git -c safe.directory='*' -C "$GITHUB_WORKSPACE" describe --tags --always)}"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32p4 \
@@ -3379,7 +3379,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           dir="$RUNNER_TEMP/hearth_sink-p4-ac4"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32p4 \
             "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin;sdkconfig.ac4" \
@@ -3405,7 +3405,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd apps/baremetal/platform/esp32p4
+          cd firmware/baremetal/platform/esp32p4
           dir="$RUNNER_TEMP/esp32p4"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32p4 build
 

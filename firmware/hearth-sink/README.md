@@ -347,7 +347,7 @@ second play on it runs ahead of `sink.writes`. The `capture` sink's line starts
 again with each play too, as the `stream.rms` levels always have.
 
 `stream.rms[n]` is the RMS of what was sent to slot `n` of the layout, scaled by
-1e6 — the same form `apps/baremetal/probe.cpp` reports its own levels in. The
+1e6 — the same form `firmware/baremetal/probe.cpp` reports its own levels in. The
 player reports it and does not judge it: what the levels *should* be is a
 property of the stream and the layout, so CI holds the expectation.
 

@@ -64,7 +64,7 @@
 // iclforge::ac3::kSamplesPerBlock (256) samples or fewer, six times a frame. A block
 // rather than a frame because that is what the decoder's block form hands
 // over and what keeps a sixteen-slot layout's storage at 16 KB rather than
-// 96 KB - see esp-idf/iclforge/include/iclforge/player.hpp.
+// 96 KB - see firmware/esp-idf/iclforge/include/iclforge/player.hpp.
 //
 // --- NOTES THE REAL SINK'S TDM MODE WAS WRITTEN FROM -------------------------
 //

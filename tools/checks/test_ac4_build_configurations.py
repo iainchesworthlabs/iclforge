@@ -16,7 +16,7 @@ wheel. Phase I4 binds AC-4 into the C API, Python, Rust and WebAssembly:
 
 D14 gives the minimum-footprint decode profile the AC-4 decoder, through an option of its own,
 ICLFORGE_MINIMAL_AC4: the ESP-IDF component's Kconfig sets it, and so do the bare-metal probe's
-AC-4 presets (apps/baremetal/ac4_probe.cpp, tools/checks/run_baremetal_probe.sh --ac4).
+AC-4 presets (firmware/baremetal/ac4_probe.cpp, tools/checks/run_baremetal_probe.sh --ac4).
 ICLFORGE_BUILD_AC4 stays off in every minimal preset, since it also builds the encoder, the
 applications and the tests. The hidden minimal-decoder and minimal-encoder presets and the ordinary
 minimal ones leave ICLFORGE_MINIMAL_AC4 off, and the three config-*-minimal-ac4 presets turn it

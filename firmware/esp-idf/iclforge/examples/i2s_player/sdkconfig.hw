@@ -1,6 +1,6 @@
 # Overlay for a board reached through the S3's NATIVE USB connector rather than
 # the UART bridge - the same file, for the same reason, as
-# apps/baremetal/platform/esp32s3/sdkconfig.hw.
+# firmware/baremetal/platform/esp32s3/sdkconfig.hw.
 #
 #   SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw" idf.py build
 #

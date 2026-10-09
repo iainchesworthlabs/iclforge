@@ -3,7 +3,7 @@ profile/heavy-compression value types, the per-programme metadata (dialnorm2, bl
 the framing helpers and their error paths, read_frame_header's and scan()'s descriptor fields,
 access-unit timing conversions, LatencyBudget.milliseconds and the QC presets.
 
-Same discipline as the rest of python/tests: real tones, several frames, specific exception types.
+Same discipline as the rest of bindings/python/tests: real tones, several frames, specific exception types.
 """
 
 import math

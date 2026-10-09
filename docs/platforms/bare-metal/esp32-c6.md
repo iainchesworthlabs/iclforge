@@ -49,7 +49,7 @@ In the float tier, with the network up, mono is the only row in real time (0.52x
 ### 2/0, 5.1 and 7.1 from one generator
 
 The probe has no 7.1 fixture, so the stream set's three layout streams,
-`esp-idf/iclforge/examples/hearth_sink/www/layout-20.ec3`, `layout-51.ec3` and `layout-71.ec3`,
+`firmware/hearth-sink/www/layout-20.ec3`, `layout-51.ec3` and `layout-71.ec3`,
 were decoded on the same board by a copy of the probe with them added as rows. They come from one
 generator, use no Annex E tools and hold 32 access units each; 2/0 and 5.1 are 192 kbit/s, and
 7.1, a 5.1 substream and a dependent one, is 288 kbit/s. That copy measured time and heap, and did
@@ -205,7 +205,7 @@ same bytes whatever else runs:
 
 ### The network load
 
-`CONFIG_ICLFORGE_PROBE_NETWORK_WIFI` (`apps/baremetal/platform/esp32c6/main/net/wifi/`) joins the
+`CONFIG_ICLFORGE_PROBE_NETWORK_WIFI` (`firmware/baremetal/platform/esp32c6/main/net/wifi/`) joins the
 access point, turns modem sleep off, listens on TCP port 4953 and reads what arrives from a task
 at priority 5: above the decode on the main task at priority 1, below WiFi and lwIP. That is the
 load a Sendspin player carries, since the Sendspin server connects to the player. The probe
@@ -271,7 +271,7 @@ not part of this measurement.
 
 Getting samples onto those slots costs time here too. The decoder hands a sink planar `float`
 blocks, and the component's interleaves
-(`esp-idf/iclforge/include/iclforge/interleave.hpp`) turn each sample into a slot. Scaling,
+(`firmware/esp-idf/iclforge/include/iclforge/interleave.hpp`) turn each sample into a slot. Scaling,
 clipping and converting one in `float` is four calls into the software floating-point routines
 on a part with no FPU, so the component computes the same integers from the sample's IEEE-754
 bits wherever `CONFIG_SOC_CPU_HAS_FPU` is unset, which is this part. Both forms are timed below.
@@ -361,11 +361,11 @@ the board.
 
 ## Building
 
-`apps/baremetal/platform/esp32c6/` is the probe target:
+`firmware/baremetal/platform/esp32c6/` is the probe target:
 
 ```bash
 . $IDF_PATH/export.sh
-cd apps/baremetal/platform/esp32c6
+cd firmware/baremetal/platform/esp32c6
 idf.py set-target esp32c6
 idf.py build                                  # fixed-point tier, no network
 idf.py -DICLFORGE_DECODE_SCALAR=float build   # the float tier
@@ -409,7 +409,7 @@ with socket.create_connection((host, port)) as s:
 
 Playback (I2S, a DMA queue, underruns) and a second board are outside this probe's own scope, but
 both are covered on the part now: `hearth_sink`'s Sendspin player runs on this board, and its
-[README, "On the ESP32-C6"](https://github.com/iainchesworthlabs/iclforge/blob/main/esp-idf/iclforge/examples/hearth_sink/README.md#on-the-esp32-c6)
+[README, "On the ESP32-C6"](https://github.com/iainchesworthlabs/iclforge/blob/main/firmware/hearth-sink/README.md#on-the-esp32-c6)
 has the clock, memory and two-board figures.
 
 ## Where to go next

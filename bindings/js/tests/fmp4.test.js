@@ -1,6 +1,6 @@
 // Verifies the fMP4 box walker against a real fixture: apps/demos/wasm/assets/demo.ec3
 // remuxed with `ffmpeg -c copy -frag_duration 500000 -movflags default_base_moof`
-// (js/tests/fixtures/demo.fmp4, regenerate with that exact command if this ever
+// (bindings/js/tests/fixtures/demo.fmp4, regenerate with that exact command if this ever
 // needs updating). No browser needed - this is pure box-offset arithmetic.
 
 import { test } from "node:test";

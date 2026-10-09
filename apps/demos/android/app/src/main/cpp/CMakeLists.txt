@@ -44,7 +44,7 @@ set(ICLFORGE_BUILD_FUZZERS OFF CACHE BOOL "" FORCE)
 # Defaults ON (root CMakeLists.txt) and add_subdirectory()s libs/sendspin, which hard-requires
 # MbedTLS/httplib/FLAC/Opus/mdns via find_package(... REQUIRED) - packages that exist nowhere
 # in an NDK cross-compile (no vcpkg toolchain here, see setup-vcpkg's own desktop-only scope).
-# Same gap python/pyproject.toml and rust/iclforge-sys/build.rs had for the same reason.
+# Same gap bindings/python/pyproject.toml and bindings/rust/iclforge-sys/build.rs had for the same reason.
 set(ICLFORGE_BUILD_HEARTH OFF CACHE BOOL "" FORCE)
 
 # iclforge_jni's own target_link_libraries below is iclforge::ac3/iclforge::audio only

@@ -1,6 +1,6 @@
 # Python bindings
 
-A pybind11 module (`python/src/iclforge_ext/bindings.cpp`) bound straight onto
+A pybind11 module (`bindings/python/src/iclforge_ext/bindings.cpp`) bound straight onto
 `iclforge::ac3::FrameEncoder`, `iclforge::ac3::FrameDecoder`, `iclforge::ac3::Eac3Decoder`, `iclforge::ac3::eac3::FrameEncoder`,
 `iclforge::ac3::eac3::AccessUnitEncoder` and `iclforge::ac3::oba::AtmosEncoder`, and, in the `iclforge.ac4` submodule,
 `iclforge::ac4::Decoder` and `iclforge::ac4::Encoder` — pybind11-direct, not layered on a separate C API. From the
@@ -27,7 +27,7 @@ for Python 3.10 to 3.14.
 PyPI has no source archive, so on those two `pip install ./python` from a checkout is the way in.
 
 The package's own readme — layout, build notes and examples not duplicated here — lives at
-[`python/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/python/README.md).
+[`bindings/python/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/bindings/python/README.md).
 
 `iclforge.__version__` reports the installed package's own PEP 440 version string, derived from
 the nearest `git describe` tag the same way `PROJECT_VERSION_FULL` is on the C++ side (see
@@ -487,7 +487,7 @@ for `create()` the refusal reason, as its message. They sit beside `Ac3Error` an
 it, since `Ac3Error` derives from `RuntimeError`. An argument the binding cannot read (a channel
 that is not a 1-D array) stays a plain `ValueError`.
 
-Test coverage: `python/tests/test_ac4_roundtrip.py` (stereo and 5.1 round trips checked by
+Test coverage: `bindings/python/tests/test_ac4_roundtrip.py` (stereo and 5.1 round trips checked by
 correlation, presentation/delay agreement with the encoder, the channel-count refusal above, and
 `ac4.sync_frame`'s sync word); `test_ac4_objects.py` (an A-JOC scene and a direct-coded one, each
 configured by keywords and by attributes with the two streams the same bytes, and read back within

@@ -35,7 +35,7 @@ import tempfile
 import numpy as np
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-OUT = REPO / "esp-idf/iclforge/examples/hearth_sink/www"
+OUT = REPO / "firmware/hearth-sink/www"
 RATE = 48000
 
 # The output layout the levels are for: "7.1.4" in the player's slot order
@@ -198,7 +198,7 @@ SET = [
         "file": "height.ec3",
         "what": "the footprint probe's height fixture: five objects, three on the ceiling, "
         "MDCT-band domain",
-        "copy": "esp-idf/iclforge/examples/hearth_sink/stream/height.ec3",
+        "copy": "firmware/hearth-sink/stream/height.ec3",
     },
     # Every coded layout the encoder names, a tone per speaker.
     {

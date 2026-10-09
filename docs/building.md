@@ -346,10 +346,10 @@ the failures of the last run; add `--output-on-failure` to any run to see a fail
 | `ICLFORGE_BUILD_IAMF` | `ON` | Build `iclforge::containers::iamf` (`libs/containers/src/iamf`), the standalone IAMF v1.1 OBU and ISOBMFF writer. Same zero-third-party-dependency shape as `iclforge::iab`, and like it linked by nothing in `apps/` (`examples/mux_iamf.cpp` builds when this is on). The vcpkg port's `iamf` feature and the Conan recipe's `iamf` option install it, off by default. |
 | `ICLFORGE_BUILD_AC4` | `ON` | Build the AC-4 codec `iclforge::ac4` (`libs/ac4`): the inspector, the decoder and the encoder, one library, with the tables and transforms the decoder and the encoder share inside it (`libs/ac4/src/core`) — see [AC-4](library/ac4.md). It is installed and exported as `iclforge::ac4_static` and `iclforge::ac4_shared`. `OFF` needs the CLI, the GUI and the tests off too, and Hearth unless it is the ESP-IDF player half (the root `CMakeLists.txt` guards), since they link them. The Python wheel binds them (`iclforge.ac4`), the WebAssembly preset builds them for the `iclforge_wasm_ac4` module, and the Android app builds them without linking them yet; the ESP-IDF component and the minimum-footprint presets turn the option off and take the decoder alone through `ICLFORGE_MINIMAL_AC4`. The vcpkg port's `ac4` feature and the Conan recipe's `ac4` option install them, off by default. |
 | `ICLFORGE_BUILD_CAPI` | `ON` | Build `iclforge::c` (`libs/capi`), the C API over the encode/decode core — see [C API](library/c-api.md). Depends on nothing but `iclforge::ac3_static`, so unlike `ICLFORGE_BUILD_ADM` there is no extra dependency footprint to opt out of. |
-| `ICLFORGE_BUILD_PYTHON` | `OFF` | Build the pybind11 extension module (`python/`). Off by default for the same reason as `ICLFORGE_BUILD_ADM`: nothing under `src/`, `apps/`, `tests/` or `examples/` links it, so a normal C++ build is unaffected either way. `python/pyproject.toml` turns it on itself via scikit-build-core when `pip install`/cibuildwheel drives the configure. |
+| `ICLFORGE_BUILD_PYTHON` | `OFF` | Build the pybind11 extension module (`python/`). Off by default for the same reason as `ICLFORGE_BUILD_ADM`: nothing under `src/`, `apps/`, `tests/` or `examples/` links it, so a normal C++ build is unaffected either way. `bindings/python/pyproject.toml` turns it on itself via scikit-build-core when `pip install`/cibuildwheel drives the configure. |
 | `ICLFORGE_BUILD_ADM` | `OFF` | Build `iclforge::adm` (`libs/adm`), the standalone BW64/RF64 + ADM parser — see [ADM / BW64 reading](library/adm.md). Off by default, unlike every other library component: it vendors libbw64/libadm via `FetchContent`, and libadm needs several Boost header libraries, resolved separately via `-DVCPKG_MANIFEST_FEATURES=adm` (`vcpkg.json`'s `adm` feature) — turning this `ON` without also selecting that feature fails with a clear configure-time message rather than a bare "Boost not found". |
 | `ICLFORGE_BUILD_CRUCIBLE` | `OFF` | Build the Crucible engine, console runner, and desktop window. Linux requires PipeWire; see [Crucible installation](crucible/install.md#linux). |
-| `ICLFORGE_BUILD_HEARTH` | `ON` | Build `iclforge::sendspin`, the Hearth engine, `hearth` (the desktop window, Windows/macOS/Linux with a Qt 6.8+ kit), `hearth-testsink`, `hearth-testserver`, and `hearth-render` (an item through the engine into a WAV file, for the checks). Qt not found skips just `hearth` with a configure warning rather than failing; the engine and its tests still build. Every CI leg has built and tested it since A7, so this defaults on the same way — a plain preset configure needs no extra flag any more. The vcpkg side follows: `CMakePresets.json`'s `core` fragment selects the root manifest's `hearth` feature by default too, for its network, pairing, FLAC, and Opus dependencies. A few presets that cannot build Hearth turn both back off explicitly — the minimum-footprint decoder/encoder profiles (no OS), the Emscripten/WASM demo (no vcpkg toolchain), and the Windows LLVM coverage leg (deliberately Crucible-only) — see their own entries in `CMakePresets.json`. The ESP-IDF component builds only `libs/sendspin`'s player half, behind `CONFIG_ICLFORGE_SENDSPIN` (`esp-idf/iclforge/Kconfig`). The vcpkg port and the Conan recipe (`packaging/`) pin it off: they build the library only. See [Hearth](hearth/index.md). |
+| `ICLFORGE_BUILD_HEARTH` | `ON` | Build `iclforge::sendspin`, the Hearth engine, `hearth` (the desktop window, Windows/macOS/Linux with a Qt 6.8+ kit), `hearth-testsink`, `hearth-testserver`, and `hearth-render` (an item through the engine into a WAV file, for the checks). Qt not found skips just `hearth` with a configure warning rather than failing; the engine and its tests still build. Every CI leg has built and tested it since A7, so this defaults on the same way — a plain preset configure needs no extra flag any more. The vcpkg side follows: `CMakePresets.json`'s `core` fragment selects the root manifest's `hearth` feature by default too, for its network, pairing, FLAC, and Opus dependencies. A few presets that cannot build Hearth turn both back off explicitly — the minimum-footprint decoder/encoder profiles (no OS), the Emscripten/WASM demo (no vcpkg toolchain), and the Windows LLVM coverage leg (deliberately Crucible-only) — see their own entries in `CMakePresets.json`. The ESP-IDF component builds only `libs/sendspin`'s player half, behind `CONFIG_ICLFORGE_SENDSPIN` (`firmware/esp-idf/iclforge/Kconfig`). The vcpkg port and the Conan recipe (`packaging/`) pin it off: they build the library only. See [Hearth](hearth/index.md). |
 | `ICLFORGE_WITH_ALSA` | `AUTO` | Linux only. `AUTO` builds the ALSA audio backend when libasound's headers are present; `ON` requires them; `OFF` never builds it. Takes precedence over `ICLFORGE_WITH_PIPEWIRE` when both are found — see [Linux audio](#linux-audio). |
 | `ICLFORGE_WITH_PIPEWIRE` | `AUTO` | Linux only. `AUTO` builds the PipeWire audio backend when libpipewire-0.3's headers are present *and* ALSA was not selected; `ON` requires the headers (independently of ALSA); `OFF` never builds it. See [Linux audio](#linux-audio). |
 | `ICLFORGE_CRUCIBLE_X11` | `AUTO` | Linux only, with `ICLFORGE_BUILD_CRUCIBLE`. `AUTO` compiles Crucible's X11 full-screen check over libxcb when `libxcb1-dev` is present; `ON` requires it; `OFF` never builds it. Without it the rule is off at runtime and the Room page says so. The configure summary prints `Crucible X11   : xcb` or `none`. |
@@ -368,7 +368,7 @@ the failures of the last run; add `--output-on-failure` to any run to see a fail
 | `ICLFORGE_INSTALL_BOTH_LINKAGES` | `ON` | Install and export both the static and the shared variant of each library. `OFF` installs only the one `BUILD_SHARED_LIBS` selects, which is what the vcpkg port and the Conan recipe pass. See `cmake/InstallLibrary.cmake` and [Releasing](releasing.md#vcpkg-port). |
 | `ICLFORGE_QT_ROOT` | empty | Path to a Qt kit or a Qt install root, searched before the default install roots `cmake/FindQt6.cmake` looks in; a value that yields no kit is an error. The `ICLFORGE_QT_ROOT`, `QT_ROOT_DIR` and `QTDIR` environment variables work the same way (a stale `QT_ROOT_DIR` or `QTDIR` falls through to the defaults instead), and `-DCMAKE_PREFIX_PATH` and `-DQt6_DIR` take priority over all of them. See [Qt](#qt). |
 
-The ESP-IDF component and the bare-metal probes read further variables and Kconfig symbols (`ICLFORGE_ESP_PROFILE`, `ICLFORGE_MINIMAL_HOT_O2`, `ICLFORGE_BAREMETAL_CLOCK`, `CONFIG_ICLFORGE_AC4`, `CONFIG_ICLFORGE_SENDSPIN`, and others); the Kconfig symbols are in `esp-idf/iclforge/Kconfig`, and the rest are described in [`esp-idf/iclforge/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/esp-idf/iclforge/README.md) and on the [ESP32-S3](platforms/bare-metal/esp32-s3.md), [ESP32-P4](platforms/bare-metal/esp32-p4.md) and [Cortex-M3](platforms/bare-metal/cortex-m3.md) pages.
+The ESP-IDF component and the bare-metal probes read further variables and Kconfig symbols (`ICLFORGE_ESP_PROFILE`, `ICLFORGE_MINIMAL_HOT_O2`, `ICLFORGE_BAREMETAL_CLOCK`, `CONFIG_ICLFORGE_AC4`, `CONFIG_ICLFORGE_SENDSPIN`, and others); the Kconfig symbols are in `firmware/esp-idf/iclforge/Kconfig`, and the rest are described in [`firmware/esp-idf/iclforge/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/firmware/esp-idf/iclforge/README.md) and on the [ESP32-S3](platforms/bare-metal/esp32-s3.md), [ESP32-P4](platforms/bare-metal/esp32-p4.md) and [Cortex-M3](platforms/bare-metal/cortex-m3.md) pages.
 
 Building the library and CLI alone, with neither Qt nor vcpkg's extra features involved:
 
@@ -428,14 +428,14 @@ writes down, and substituting a different arithmetic would defeat its only purpo
 
 ### The probe
 
-`apps/baremetal/probe.cpp` links the archive and decodes six frames of each of fourteen rows, four
+`firmware/baremetal/probe.cpp` links the archive and decodes six frames of each of fourteen rows, four
 AC-3 and ten E-AC-3, built from ten committed streams. The AC-3 rows are 5.1 (448 kbit/s,
 coupling) and its Lo/Ro fold, 2/0 (192 kbit/s, the layout §7.5.4 rematrixing exists in) and 1/0.
 The E-AC-3 rows are 5.1 (384 kbit/s, AHT + spx + standard coupling) and its Lo/Ro fold, the same
 with §E3.5 enhanced coupling (`cpl+ecpl`, which `tools=all` does not select), 2/0, a 5.1 stream
 with dynrng words and dialnorm 24 in line mode, 7.1.4 (a bed and two dependent substreams) and its
 fold, and three Atmos rows: the bed alone, the objects reconstructed, and the objects placed onto
-7.1.4. It compares every channel's level against `apps/baremetal/fixture.hpp`, and prints
+7.1.4. It compares every channel's level against `firmware/baremetal/fixture.hpp`, and prints
 `key=value` lines that `tools/checks/run_baremetal_probe.sh` gates on. It is not a unit test — the profile requires
 `ICLFORGE_BUILD_TESTS=OFF`, since nothing under `tests/` builds against a decode-only archive —
 and it answers three questions a test could not: does the archive link with everything else
@@ -457,7 +457,7 @@ produced it.
 ### The encode direction
 
 The same profile pointed the other way. `ICLFORGE_MINIMAL_ENCODER` builds an encode-only
-`iclforge::ac3_minimal` carrying both codecs, and `apps/baremetal/encode_probe.cpp` is its probe:
+`iclforge::ac3_minimal` carrying both codecs, and `firmware/baremetal/encode_probe.cpp` is its probe:
 
 ```bash
 tools/checks/run_baremetal_probe.sh --encoder          # arm-none-eabi under QEMU
@@ -563,7 +563,7 @@ AC-4 shares no bitstream syntax with AC-3 and E-AC-3, so the profile carries it 
 own, with a probe of its own. `ICLFORGE_MINIMAL_AC4=ON`, which needs
 `ICLFORGE_MINIMAL_DECODER`, builds `iclforge::ac4`'s decode-only archive (the inspector, the core
 and the decoder, `libs/ac4/minimal.cmake`) without exceptions or RTTI, in `float` (`ICLFORGE_DECODE_SCALAR`),
-and `apps/baremetal/ac4_probe.cpp` in place of the AC-3 and E-AC-3 probe. The AC-4 encoder is not
+and `firmware/baremetal/ac4_probe.cpp` in place of the AC-3 and E-AC-3 probe. The AC-4 encoder is not
 built, and `ICLFORGE_BUILD_AC4` stays off in every minimal preset (it also builds the encoder, the
 applications and the tests).
 
@@ -714,7 +714,7 @@ the x86 host, the Cortex-M3 leg and the ESP32-S3 and three C libraries' `logf` d
 their last bit; the `double` overloads are libm's, called as before. Every `<double>`
 instantiation is the function the ordinary build always called, so
 `tests/golden/bitstream-hashes.json` holds; the profile's own fixtures
-(`apps/baremetal/encode_fixture.hpp`) are the float encoder's streams, identical on the x86
+(`firmware/baremetal/encode_fixture.hpp`) are the float encoder's streams, identical on the x86
 host, the Cortex-M3 leg and the ESP32-S3 - and the same bytes the float front end alone had
 produced, so converting everything behind it moved no fixture's hash.
 

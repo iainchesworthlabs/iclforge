@@ -213,7 +213,7 @@ Measured under `idf.py qemu` and landed in
 on.
 
 - **AC-3 *and* E-AC-3 5.1 both decode correctly on an ESP32-S3.** Six frames each, all twelve
-  channel levels exact against `apps/baremetal/fixture.hpp`. It **fits internal SRAM with no
+  channel levels exact against `firmware/baremetal/fixture.hpp`. It **fits internal SRAM with no
   PSRAM**: the allocator reports 280,792 bytes free against a 236,391-byte peak heap.
 - **float32 closed it, and closed PF7's float32 gap with it.** A profile-selected
   `decode_scalar_t`, validated at roughly 139 dB against the double decode on four real streams
@@ -261,7 +261,7 @@ because the population of possible sinks is no longer "a Pi or a PC".
 | A third-party AV receiver | sink | IEC 61937 | not ours; **cannot be synchronised** |
 | The playback appliance | sink | local files today; HTTP client is the new work | [plan](player-appliance.md), replaced on 2026-09-15 by Hearth: a desktop app and Sendspin sinks, with no daemon and no HTTP client |
 | An ESP32-S3 node | sink | HTTP client, then Sendspin | a Sendspin player (`hearth_sink`); it also fetches a stream from a URL for debugging (`POST /play`). Both codecs decode and fit internal SRAM ([#546](https://github.com/iainchesworthlabs/ac3forge/pull/546)), and every decode fixture runs in real time on a board |
-| The WASM decode page | sink | a file today; could be an HLS client for free | shipped as a file page; the JS package has an hls.js bridge (`js/src/hls-bridge.ts`) with no live-server soak test |
+| The WASM decode page | sink | a file today; could be an HLS client for free | shipped as a file page; the JS package has an hls.js bridge (`bindings/js/src/hls-bridge.ts`) with no live-server soak test |
 | A DAW **metering** plugin | **neither** — an instrument, not a node | n/a | what [the study](host-plugin.md)'s Part 2 actually plans; no capability blocker |
 | The delivery-QC report | **neither** — an instrument, not a node | n/a | [plan](qc-report.md); belongs under Forge, and this page is why |
 
@@ -348,7 +348,7 @@ path (`ci.yml:314`) classifies each PR as docs-only.
 ### Phase 2: one source, one sink, over HTTP
 
 **Status: not built.** Nothing serves an `Fmp4FolderWriter` folder and no code follows an HLS
-playlist. `mp4::reader` exists, and `js/src/hls-bridge.ts` feeds an hls.js player's fragments to
+playlist. `mp4::reader` exists, and `bindings/js/src/hls-bridge.ts` feeds an hls.js player's fragments to
 the WebAssembly decoder, which is a different client with no soak test behind it
 ([WebAssembly](../docs/platforms/wasm.md)). For Hearth the phase was replaced by Sendspin.
 
@@ -506,7 +506,7 @@ figures.*
    embedded node; (c) the ESP32 node is a demo of the library, the way the Shield app is.
    **Recommend (a)**: it is one decoder, one client and one protocol, differing only in size,
    and the platform tree already expresses that split
-   (`apps/baremetal/platform/{baremetal,host,esp32s3}`). Cost: one member's CI has to build for
+   (`firmware/baremetal/platform/{baremetal,host,esp32s3}`). Cost: one member's CI has to build for
    Xtensa, which nothing in the repository does today. *Taken in effect: Hearth is one member
    with the desktop player and the ESP32 sinks as its two forms, and CI builds the sink for
    Xtensa and RISC-V (`build-esp32s3`, `hearth-esp32s3`, `build-esp32c3`).*

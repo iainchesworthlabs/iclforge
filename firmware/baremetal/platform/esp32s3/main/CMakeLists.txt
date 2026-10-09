@@ -1,5 +1,5 @@
 # The ESP32-S3 application: IDF's app_main plus its clock, and the REAL probe -
-# apps/baremetal/probe.cpp or encode_probe.cpp, the same files the host and
+# firmware/baremetal/probe.cpp or encode_probe.cpp, the same files the host and
 # arm-none-eabi shapes build, checking the same fixtures against the same
 # levels and the same hashes.
 #
@@ -12,7 +12,7 @@
 # WHICH probe follows ICLFORGE_ESP_PROFILE, set by the project above this and
 # read by the iclforge component to build the matching half of the library.
 # Both define iclforge_probe::run() rather than main(), so main.cpp calls whichever
-# was built without knowing which it is - the same seam apps/baremetal's own
+# was built without knowing which it is - the same seam firmware/baremetal's own
 # CMakeLists.txt uses for the two hosted shapes.
 #
 # The AC-4 decoder's probe (ac4_probe.cpp) where the configuration turns the component's
@@ -42,7 +42,7 @@ endif()
 # - and removing any one of them should break the build rather than silently
 # widen it.
 # stage_timers.cpp is the application half of the ICLFORGE_STAGE_TIMERS zone
-# backend, present in every build for the reason apps/baremetal/CMakeLists.txt
+# backend, present in every build for the reason firmware/baremetal/CMakeLists.txt
 # gives beside its own copy of this line: without the option the library
 # never calls it and the linker drops it, so a timed build and a plain one
 # differ only in the library's include path. Build one with
@@ -62,7 +62,7 @@ target_include_directories(${COMPONENT_LIB} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../../..")
 
 # The encode probe's 7.1 measurement switch, the same option and default as
-# apps/baremetal/CMakeLists.txt gives the hosted shapes - see the comment
+# firmware/baremetal/CMakeLists.txt gives the hosted shapes - see the comment
 # there. Measured 2026-09-10 under QEMU with this part's memory map: the
 # fixture dies on a 73,728-byte request, so a build with it ON is a
 # measurement and never what CI runs. idf.py -DICLFORGE_PROBE_SEVEN_ONE=ON build
@@ -80,7 +80,7 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
     ICLFORGE_PROBE_HEAP_BUDGET_BYTES=0)
 
 # The stack the AC-4 probe paints below its frame and reads back after a decode
-# (apps/baremetal/CMakeLists.txt has why). It has to fit the main task's stack with the
+# (firmware/baremetal/CMakeLists.txt has why). It has to fit the main task's stack with the
 # probe's own frames above it: sdkconfig.ac4 gives the task 49,152 bytes, and a decode used
 # 18 to 20 KB on the Cortex-M3 leg. Unused by the other two probes.
 target_compile_definitions(${COMPONENT_LIB} PRIVATE

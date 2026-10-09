@@ -2,7 +2,7 @@
 
 // The variant of the `ac3.signing` submodule compiled when this configure did
 // not build iclforge::ac3::signing - see optional_modules.hpp for the pair, and
-// python/CMakeLists.txt for the selection.
+// bindings/python/CMakeLists.txt for the selection.
 //
 // Registers nothing, deliberately. `ac3.signing` is simply absent from the
 // module, so a caller reaching for it gets Python's own AttributeError, which

@@ -24,7 +24,7 @@ external_components:
       type: git
       url: https://github.com/iainchesworthlabs/iclforge
       ref: main
-      path: esphome/components
+      path: firmware/esphome/components
     components: [iclforge]
 
 esp32:

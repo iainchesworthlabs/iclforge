@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-// What apps/baremetal/encode_probe.cpp expects its own encode to produce
+// What firmware/baremetal/encode_probe.cpp expects its own encode to produce
 // (minimum-footprint decoder profile).
 //
 // Unlike the decode side's fixture.hpp this is not generated from a committed

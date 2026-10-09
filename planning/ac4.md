@@ -252,7 +252,7 @@ AC-4, and the player exports its objects. A live session under AC-4 is refused.
 
 **The C API and the bindings (I4, I4b).** `ac3forge_ac4_*` decoder and encoder functions, a Rust
 `ac3forge::ac4` module, a Python `ac4` submodule, and a WebAssembly module with a JavaScript wrapper
-(`js/src/ac4.ts`, the package's `./ac4` export), each covering channel-based and channel-based
+(`bindings/js/src/ac4.ts`, the package's `./ac4` export), each covering channel-based and channel-based
 immersive content and the encoder's object substream. Android's CMake builds the AC-4 libraries and
 nothing in that app links them.
 
@@ -2036,11 +2036,11 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   by length as before. Every syntax digest is unchanged, and the two transcriptions agree over
   600 streams.
 
-  The probe (`apps/baremetal/ac4_probe.cpp`) is a third probe beside the AC-3 and E-AC-3 decoder's
+  The probe (`firmware/baremetal/ac4_probe.cpp`) is a third probe beside the AC-3 and E-AC-3 decoder's
   and the encoders': the AC-4 libraries build in the decode profile (static, without exceptions,
   the encoder not built), and `run_baremetal_probe.sh --ac4` decodes five committed streams (2.0
   and 5.1, with and without A-CPL, and DEE's 5.1.4 tones) through `Decoder::decode_by_block`,
-  checking each channel's level against `apps/baremetal/ac4_fixture.hpp`. On the Cortex-M3 leg,
+  checking each channel's level against `firmware/baremetal/ac4_fixture.hpp`. On the Cortex-M3 leg,
   in `float`, with GCC 14.2.1 at `-Os`:
 
   | Fixture | Frames | Instructions a frame | Peak heap | Allocations a frame, steady | Stack |
@@ -2149,7 +2149,7 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   S3 decoder's state goes in PSRAM, which replaces decision 29's 2.0 in internal RAM: a 2.0 decode
   peaks at 413,611 to 601,504 bytes, where the S3 has 347,051 free and a largest block of 249,856.
 
-  **Built in D14c.** The S3 probe's AC-4 shape (`apps/baremetal/platform/esp32s3/sdkconfig.ac4`):
+  **Built in D14c.** The S3 probe's AC-4 shape (`firmware/baremetal/platform/esp32s3/sdkconfig.ac4`):
   the component's AC-4 decoder, `ac4_probe.cpp` in place of the AC-3 and E-AC-3 probe, octal PSRAM,
   and `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` at 512 bytes. ESP-IDF v6.1's QEMU emulates the S3's
   PSRAM (the S3 page and the probe's configuration said it could not, after espressif/qemu#129), so
@@ -2345,7 +2345,7 @@ configuration.
   addresses, one channel's history was at 0x50108364 and the output vector the channels share at 0x5010ad6c, and the
   converter took 93.6 ms a frame; the same image built without the region had both in PSRAM and the converter took 11.9.
   At the most 25.3 to 31.5 KB of the SRAM was in use in each of the four converter plays.
-- **The fix.** `CONFIG_ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP=n` in `esp-idf/iclforge/examples/hearth_sink/sdkconfig.p4`, with
+- **The fix.** `CONFIG_ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP=n` in `firmware/hearth-sink/sdkconfig.p4`, with
   the reasons in a comment beside it. The heap is 32,640 bytes smaller, what spilled into the SRAM goes to PSRAM behind the
   cache, and the allocation policy stays ESP-IDF's default. Nothing in the component asks for `MALLOC_CAP_RTCRAM`, so the
   option is the only way a buffer reached that memory.
@@ -2594,7 +2594,7 @@ probe, and the larger redesigns decided once the smaller ones had shown where th
 generator; `Fft`, `Imdct` and `TransformSet` reading the tables; A-JOC's inputs as spans. In `libs/ac4/src/decoder`, `pcm/aspx.cpp`,
 `pcm/stereo.{hpp,cpp}`, `pcm/acpl.{hpp,cpp}`, `pcm/substream_pcm.{hpp,cpp}` (`Channel::out()`, the shared transform buffer,
 the history's move, the tracks' release), `syntax/asf.{hpp,cpp}`, `decoder.cpp` and `QmfMatrix` through A-JCC, A-JOC, dialogue
-enhancement, DRC, the downmix and mixing. The probe's peak attribution (`apps/baremetal/ac4_probe.cpp`, `stage_timers.cpp`)
+enhancement, DRC, the downmix and mixing. The probe's peak attribution (`firmware/baremetal/ac4_probe.cpp`, `stage_timers.cpp`)
 and its ceilings, and `run_baremetal_probe.sh --ac4 --stage-timers`.
 
 **Exit, as measured.** (a) The PCM did not move: the probe's six hashes at `float` and fixed on the x86-64 host, the Cortex-M3
@@ -3229,12 +3229,12 @@ Android NDK build were not built on the machine that made it, and are checked by
 - WebAssembly's `ac3forge_wasm_ac4` (`apps/demos/wasm/ac4_bindings.cpp`) is one combined decode-and-encode
   Embind module, unlike the AC-3 side's decode/encode split — AC-4's decoder and encoder share one
   table-of-contents/framing library regardless, so a second executable had less to gain here.
-  `js/src/ac4.ts` is a plain ES module wrapping `Ac4Decoder`/`Ac4Encoder` directly, not a Worker
+  `bindings/js/src/ac4.ts` is a plain ES module wrapping `Ac4Decoder`/`Ac4Encoder` directly, not a Worker
   wrapper like `decoder-worker.ts`'s realtime pipeline: nothing about that protocol's shape (built
   for one decode-only class with a channels-vs-fold output choice) fits a module that covers both
   decode and encode with a wider decoder surface. There is no `ac4` directory under `apps/demos/wasm` and
   no demo page — optional polish this phase left to a later pass — so the compiled module lands in
-  its own output directory (`bin/wasm_ac4_demo`) with nothing to serve it yet; `js/src/ac4.ts` compiles
+  its own output directory (`bin/wasm_ac4_demo`) with nothing to serve it yet; `bindings/js/src/ac4.ts` compiles
   into `js/dist/ac4.js`, which I4b added to `package.json`'s `exports` map.
 - Android's CMake wrapper (`apps/demos/android/app/src/main/cpp/CMakeLists.txt`) no longer forces
   `AC3FORGE_BUILD_AC4` off: the libraries depend on nothing outside this tree and cross-compile
@@ -3258,8 +3258,8 @@ the package checks pass. Met: the C API's `libs/capi/tests/test_capi.cpp` adds 8
 assertions, MSVC-built and passing); Rust's `tests/ac4_roundtrip.rs` adds 6 integration tests,
 passing alongside the crate's full existing suite with no regressions, `clippy -D warnings` clean;
 Python's `test_ac4_roundtrip.py` adds 6 round-trip tests, passing alongside the full 115-test
-`python/tests/` suite in an isolated venv, `ruff`-clean and `stubtest`-clean against the hand-written
-`ac4` stubs; WebAssembly's `js/tests/ac4.test.js` passes under Node against a fake Embind module —
+`bindings/python/tests/` suite in an isolated venv, `ruff`-clean and `stubtest`-clean against the hand-written
+`ac4` stubs; WebAssembly's `bindings/js/tests/ac4.test.js` passes under Node against a fake Embind module —
 the C++ Embind side itself is unverified locally, since Emscripten is not installed in this
 environment, and stays CI-only until `build-wasm` confirms it.
 
@@ -3268,7 +3268,7 @@ environment, and stays CI-only until `build-wasm` confirms it.
 Left for later phases when I4 merged: E9's objects needed matching encoder-side C API and binding
 work, since every binding here followed the C++ encoder's own scope (phase I4b, below); and the
 WebAssembly module needs a real Emscripten build, in CI or otherwise, to confirm the C++ Embind
-side beyond what `js/tests/ac4.test.js`'s fake-module harness can reach. The first was I4b's; the
+side beyond what `bindings/js/tests/ac4.test.js`'s fake-module harness can reach. The first was I4b's; the
 second stands.
 
 #### I4b: the object encoder in the C API, Python, Rust and WebAssembly
@@ -3281,7 +3281,7 @@ paragraph left E9's objects to a later phase; I5 then drove them from the comman
 
 - The C API, Rust, Python and WebAssembly encoders take E9's object substream: the objects and
   their metadata, A-JOC or direct-coded, and the metadata updates given with the input.
-- I4's leftovers: `js/src/ac4.ts` in the package's `exports`, typed exceptions for AC-4 in Python,
+- I4's leftovers: `bindings/js/src/ac4.ts` in the package's `exports`, typed exceptions for AC-4 in Python,
   the encoder configuration widened to the fields that cost one field and one test, and the
   decoder's update ramps in every binding.
 
@@ -3324,7 +3324,7 @@ under it, each carrying the C++ enumerator as `.error`; the three are exported a
 eight positional arguments cannot hold a list of objects; a field it leaves out keeps the C++
 default, so `ac4.ts` no longer repeats them, an enumerator the C++ header does not define is
 refused at construction, and `constructionError()` says why a configuration made no encoder.
-`./ac4` is in `package.json`'s `exports`; `js/tests/package-exports.test.js` holds the map to the
+`./ac4` is in `package.json`'s `exports`; `bindings/js/tests/package-exports.test.js` holds the map to the
 files the build writes, imports the subpath through the package's own name and finds the
 wrapper's exports in its declarations, which `npm run build` type-checks in the package's strict
 settings.

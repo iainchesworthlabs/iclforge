@@ -15,10 +15,10 @@ below) — see [AC-4](ac4.md) for the wider C++ library both mirror a subset of.
 Cargo is not part of the root CMake build, the same arrangement as `apps/demos/android` and Gradle. CI
 builds and tests the workspace on Linux, Windows and macOS (`build-rust` in
 `.github/workflows/_build.yml`: `cargo build`, `cargo test`, `cargo clippy -D warnings`,
-`cargo fmt --check`), against the toolchain pinned in `rust/rust-toolchain.toml`. Build
+`cargo fmt --check`), against the toolchain pinned in `bindings/rust/rust-toolchain.toml`. Build
 prerequisites (CMake, a C++23 compiler, libclang) and how the shared library is found at run time
 are in
-[`rust/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/rust/README.md).
+[`bindings/rust/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/bindings/rust/README.md).
 
 ```toml
 [dependencies]
@@ -43,8 +43,8 @@ let mut encoder = Encoder::new(&config).expect("failed to create AC-3 encoder");
 ```
 
 That excerpt is from
-[`rust/iclforge/examples/encode_decode_ac3.rs`](https://github.com/iainchesworthlabs/iclforge/blob/main/rust/iclforge/examples/encode_decode_ac3.rs);
-[`encode_decode_eac3.rs`](https://github.com/iainchesworthlabs/iclforge/blob/main/rust/iclforge/examples/encode_decode_eac3.rs)
+[`bindings/rust/iclforge/examples/encode_decode_ac3.rs`](https://github.com/iainchesworthlabs/iclforge/blob/main/bindings/rust/iclforge/examples/encode_decode_ac3.rs);
+[`encode_decode_eac3.rs`](https://github.com/iainchesworthlabs/iclforge/blob/main/bindings/rust/iclforge/examples/encode_decode_eac3.rs)
 is the E-AC-3 counterpart. Both run with `cargo run --example <name> -p iclforge`.
 
 ## Decoding
@@ -93,8 +93,8 @@ for frame in encoder.encode(&channels).unwrap() {  // any equal-length spans, on
 }
 ```
 
-That shape is [`rust/iclforge/tests/ac4_roundtrip.rs`](https://github.com/iainchesworthlabs/iclforge/blob/main/rust/iclforge/tests/ac4_roundtrip.rs)'s; no
-`rust/iclforge/examples/` program covers AC-4. `Encoder::encode` takes any equal-length slices (the
+That shape is [`bindings/rust/iclforge/tests/ac4_roundtrip.rs`](https://github.com/iainchesworthlabs/iclforge/blob/main/bindings/rust/iclforge/tests/ac4_roundtrip.rs)'s; no
+`bindings/rust/iclforge/examples/` program covers AC-4. `Encoder::encode` takes any equal-length slices (the
 encoder buffers input to its own frame length internally, unlike `iclforge::Encoder::encode`'s fixed
 frame), and `Encoder::flush` pads to the end of the last frame and returns whatever the delay still
 held. `Encoder::toc()` returns a `Toc` — `build_dac4()`, `dac4_refusal()`, `media_timing()` and
@@ -183,8 +183,8 @@ off its range is `Ac4EncodeInvalidInput`. The decoder reports the objects in its
 encoder's: the LFE first, then the bed objects, then the dynamic objects, each group in the order
 the configuration lists it.
 
-Tests are in [`rust/iclforge/tests/ac4_roundtrip.rs`](https://github.com/iainchesworthlabs/iclforge/blob/main/rust/iclforge/tests/ac4_roundtrip.rs)
-and [`ac4_objects.rs`](https://github.com/iainchesworthlabs/iclforge/blob/main/rust/iclforge/tests/ac4_objects.rs):
+Tests are in [`bindings/rust/iclforge/tests/ac4_roundtrip.rs`](https://github.com/iainchesworthlabs/iclforge/blob/main/bindings/rust/iclforge/tests/ac4_roundtrip.rs)
+and [`ac4_objects.rs`](https://github.com/iainchesworthlabs/iclforge/blob/main/bindings/rust/iclforge/tests/ac4_objects.rs):
 stereo and 5.1 round trips against real synthesized tones (checked for signal level, not silence),
 the 5.1 speaker order, a corrupted frame's decode failure, `Toc`/`build_dac4`/`media_timing`,
 `sync_frame`'s sync word and CRC byte, and the channel-count refusal above; and an A-JOC scene and
@@ -210,7 +210,7 @@ crate does not know, so a newer library cannot make it panic or report the wrong
 variants for the scan errors (`ICLFORGE_ERROR_SCAN_*`); a failed `stream::scan` reports
 `Error::Other` with the raw code.
 
-Tests are in `rust/iclforge/tests/`: round trips for every `acmod`/LFE combination, a wide-layout
+Tests are in `bindings/rust/iclforge/tests/`: round trips for every `acmod`/LFE combination, a wide-layout
 5.1.2 encode and decode, Atmos objects round-tripped with their positions and audio, and the
 stream and meter helpers.
 
@@ -238,7 +238,7 @@ The E-AC-3 config leaves out what the C struct leaves out, listed under
 
 ## Notes for the next binding
 
-Building this crate turned up four things about the C header, recorded in `rust/README.md`:
+Building this crate turned up four things about the C header, recorded in `bindings/rust/README.md`:
 
 - `iclforge_object_placement_t` had no `_init()`, unlike every other config struct, so a
   zero-initialized one encoded a muted object (`gain` 0.0) rather than the documented unity gain.

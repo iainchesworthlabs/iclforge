@@ -1,5 +1,5 @@
 // package.json's `exports` map: every entry names files `npm run build` writes, and `./ac4` (the
-// AC-4 wrapper, js/src/ac4.ts) is reachable through the package's own name the way a consumer
+// AC-4 wrapper, bindings/js/src/ac4.ts) is reachable through the package's own name the way a consumer
 // reaches it, with declarations that name what it exports.
 
 import { test } from "node:test";

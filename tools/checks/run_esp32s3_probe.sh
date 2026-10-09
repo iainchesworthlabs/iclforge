@@ -11,7 +11,7 @@
 #   tools/checks/run_esp32s3_probe.sh --ac4            # the AC-4 decoder, its state in PSRAM
 #
 # --ac4 builds the decode profile with the component's AC-4 decoder and the AC-4 probe
-# (apps/baremetal/ac4_probe.cpp) over sdkconfig.ac4, which turns on the board's octal PSRAM
+# (firmware/baremetal/ac4_probe.cpp) over sdkconfig.ac4, which turns on the board's octal PSRAM
 # and sends the decoder's allocations of 512 bytes and more there (planning/ac4.md, D14c).
 # QEMU emulates that PSRAM. It gates what the other two directions gate, with the AC-4
 # probe's own ceilings, and two things more: every fixture's PCM hash against the pins the
@@ -22,9 +22,9 @@
 # WHAT THIS GATES, and what it deliberately does not:
 #
 #   - The probe's own verdict. Decoding: every fixture in
-#     apps/baremetal/fixture.hpp decoded, every channel's level checked.
+#     firmware/baremetal/fixture.hpp decoded, every channel's level checked.
 #     Encoding: six frames of synthesised 5.1 through each of the two encoders,
-#     byte count and FNV-1a hash checked against apps/baremetal/encode_fixture.hpp.
+#     byte count and FNV-1a hash checked against firmware/baremetal/encode_fixture.hpp.
 #     Either way, result=pass - a failure means the codec is wrong on Xtensa.
 #   - Internal SRAM. The ESP32-S3 has 341,760 bytes of DIRAM and this profile
 #     has to fit its static data AND its peak heap inside it. That is the
@@ -229,7 +229,7 @@ trap 'rm -f "$OUTPUT"' EXIT
 
 # fullclean between directions, not for tidiness: ICLFORGE_ESP_PROFILE reaches
 # the library as CMake cache variables (ICLFORGE_MINIMAL_DECODER /
-# ICLFORGE_MINIMAL_ENCODER, FORCEd by esp-idf/iclforge/CMakeLists.txt), and a
+# ICLFORGE_MINIMAL_ENCODER, FORCEd by firmware/esp-idf/iclforge/CMakeLists.txt), and a
 # warm build directory has already resolved them. Reconfiguring over the top
 # silently keeps the previous direction's archive - which links, runs, and
 # reports the wrong profile's numbers under this one's ceilings.
@@ -392,7 +392,7 @@ fi
 # requirement and a regression in any of them is the same kind of news.
 #
 # The fixture names come from the probe's own output rather than from a list
-# kept here, so adding one (apps/baremetal/probe.cpp's kEac3Fixtures and
+# kept here, so adding one (firmware/baremetal/probe.cpp's kEac3Fixtures and
 # tools/generators/gen_baremetal_fixture.py's STREAMS) does not also mean
 # remembering to widen a gate in two runner scripts. A hardcoded list still
 # PASSES when a fixture is added and left off it, and the fixture nobody

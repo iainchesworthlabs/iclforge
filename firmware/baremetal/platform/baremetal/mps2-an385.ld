@@ -118,4 +118,4 @@ SECTIONS
 ASSERT(SIZEOF(.tdata) == 0,
     "the bare-metal TLS stub only supports zero-initialised thread_local storage; something in this build has a non-zero initialiser whose image nothing copies in")
 ASSERT(SIZEOF(.tdata) + SIZEOF(.tbss) + 8 <= 4 * 1024,
-    "the thread_local image no longer fits apps/baremetal/platform/baremetal/tls.cpp's 4 KiB block - grow kTlsBlockBytes and this assert together")
+    "the thread_local image no longer fits firmware/baremetal/platform/baremetal/tls.cpp's 4 KiB block - grow kTlsBlockBytes and this assert together")

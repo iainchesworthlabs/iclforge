@@ -23,7 +23,7 @@ below. A fourth piece, the [AC-4 module](#ac-4-module), wraps the AC-4 decoder a
 the `iclforge::ac4` libraries rather than `iclforge::ac3`; it has no demo page, and the package exports its
 typed wrapper as `./ac4`.
 The decode demo consumes the package (see "What's reused, what's new" below) rather than
-reimplementing it — see [js/README.md](https://github.com/iainchesworthlabs/iclforge/blob/main/js/README.md)
+reimplementing it — see [bindings/js/README.md](https://github.com/iainchesworthlabs/iclforge/blob/main/bindings/js/README.md)
 for the package's own API docs. The demos exist to prove the codec runs correctly outside a
 native process and to give the documentation site live demos (see
 [Live decode demo](../wasm-demo.md) and [Live encode demo](../wasm-encode-demo.md)); they are
@@ -107,7 +107,7 @@ the changes to the objects' metadata beside the PCM, as `{object, sample, rampSa
 properties}` entries, and the decoder returns the objects in its own order: the LFE first, then
 the bed objects, then the dynamic objects, each group in the order the encoder lists it.
 
-`js/src/ac4.ts` is the typed JS wrapper, exporting `Ac4Decoder`/`Ac4Encoder` classes directly
+`bindings/js/src/ac4.ts` is the typed JS wrapper, exporting `Ac4Decoder`/`Ac4Encoder` classes directly
 rather than through a Worker protocol: unlike `decoder-worker.ts`'s realtime AudioWorklet
 pipeline, there is no existing realtime precedent to extend on the AC-4 side, and this module
 covers both decode and encode with a wider decoder surface (presentations, concealment, object
@@ -121,13 +121,13 @@ the build produces the compiled module in its own `bin/wasm_ac4_demo/` output di
 nothing to serve it. It builds in the same CI job
 (`build-wasm`, one `cmake --build` over the whole preset) as the decode and encode modules, but
 has no Playwright coverage of its own since there is no page to drive it.
-`js/tests/ac4.test.js` tests the JS wrapper under Node against a fake Embind module — the same
+`bindings/js/tests/ac4.test.js` tests the JS wrapper under Node against a fake Embind module — the same
 harness `decoder-worker.test.js` uses for the decode side. The fake records what the native
 encoder is handed (the options, the updates) and, in a loopback codec model that quantises each
 property to the steps its code has, round-trips an A-JOC scene and a direct-coded one through the
 wrapper with their metadata within the codec's tolerance; it holds the wrapper's traffic with the
 native module, not the codec, which the C API's, Rust's and Python's tests hold to `iclforge::ac4::Encoder`.
-`js/tests/package-exports.test.js` holds the `exports` map to the files the build writes and
+`bindings/js/tests/package-exports.test.js` holds the `exports` map to the files the build writes and
 imports `./ac4` through the package's own name. `ac4_bindings.cpp` itself is built by `build-wasm`
 in CI: the run on `main` of 2026-09-29 linked `bin/wasm_ac4_demo/iclforge_ac4.js`, and the
 package's suite passed 102 tests. No test runs the compiled module, so what the wrapper does with
@@ -200,7 +200,7 @@ reused copy of the just-decoded channels, so both the coded channels and the fol
 from one decode - see `decoder_bindings.cpp`'s own `apply_fold()` comment for why it can't be done
 in place. Everything the OLD whole-file Embind `Decoder` class used to accumulate itself (per-file
 channel/energy buffers, object position/audio bookkeeping, the stereo fold) now lives in
-`js/src/decode-file.ts`, built on top of `PushDecoder` rather than duplicating it.
+`bindings/js/src/decode-file.ts`, built on top of `PushDecoder` rather than duplicating it.
 
 `js/` is the package itself (not published — see [Publishing](#publishing) below):
 `push-decoder.ts` (the typed wrapper over the Embind class above), `decode-file.ts` (the
@@ -209,7 +209,7 @@ whole-file convenience helper the demo's scrub/solo experience needs),
 AudioWorklet pipeline - decode runs in a Worker, since `AudioWorkletGlobalScope` has neither
 `fetch()` nor `TextDecoder`, both of which the Emscripten glue needs; only a lock-free
 `SharedArrayBuffer` ring-buffer drain runs on the audio thread itself), and `fmp4.ts`/
-`hls-bridge.ts` (the hls.js/MSE bridge - see [js/README.md](https://github.com/iainchesworthlabs/iclforge/blob/main/js/README.md)
+`hls-bridge.ts` (the hls.js/MSE bridge - see [bindings/js/README.md](https://github.com/iainchesworthlabs/iclforge/blob/main/bindings/js/README.md)
 for what that bridge does and does not cover). The package embeds no compiled `.wasm`/`.js`
 binary of its own; every API takes the `createIclForgeModule` factory (or a URL to it) as a
 parameter, so a consumer controls their own hosting/CORS story for the binary this page's build
@@ -299,7 +299,7 @@ demo](../wasm-demo.md) runs it in the browser with nothing installed.
 
 The versioning machinery is in place for the day publishing is turned on: the package would
 version from the same release tag the `iclforge` PyPI package uses (see
-[docs/releasing.md](../releasing.md#publishing-to-npm)) — `js/package.json` carries a
+[docs/releasing.md](../releasing.md#publishing-to-npm)) — `bindings/js/package.json` carries a
 `0.0.0-dev` placeholder in the tree, and `npm.yml`'s `publish` job stamps the release version
 immediately before publishing, mirroring CMake's own untagged-build fallback.
 
@@ -429,11 +429,11 @@ would never trigger a redeploy at all, and the live demo would silently drift fr
     authoring page's encode session is CI-tested through its own UI via the deterministic orbit
     animation, but dragging an object dot by pointer remains manual verification only.
 
-    **The hls.js/MSE bridge** (`js/src/hls-bridge.ts`) has no live-HLS-server soak test behind
+    **The hls.js/MSE bridge** (`bindings/js/src/hls-bridge.ts`) has no live-HLS-server soak test behind
     it — its `MediaSource` shim mechanics and its fMP4 sample extraction are each unit-tested in
     isolation (see the note above), but the full integration against a real hls.js instance
     playing a real EC-3 HLS stream has not been attempted. See
-    [js/README.md](https://github.com/iainchesworthlabs/iclforge/blob/main/js/README.md#whats-verified)
+    [bindings/js/README.md](https://github.com/iainchesworthlabs/iclforge/blob/main/bindings/js/README.md#whats-verified)
     for the same gap stated from the package's own side, including the A/V-sync approximation
     it ships with.
 

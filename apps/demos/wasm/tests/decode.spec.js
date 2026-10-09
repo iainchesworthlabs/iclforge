@@ -8,7 +8,7 @@ const { test, expect } = require('@playwright/test');
 // timestamps" as manual-only verification, because build-wasm only proves
 // the module compiles. WASM streaming decoder package replaced the demo's own bespoke Embind
 // Decoder class with the published iclforge-wasm-decoder package
-// (js/src/decode-file.ts's decodeFile(), built on PushDecoder) - this test
+// (bindings/js/src/decode-file.ts's decodeFile(), built on PushDecoder) - this test
 // now drives THAT, the same call apps/demos/wasm/demo.js itself makes, against the
 // bundled 8-second, 3-object Atmos-in-DD+ fixture, and asserts the same real
 // values a human previously checked by eye.
@@ -46,7 +46,7 @@ test('decodes the bundled Atmos-in-DD+ fixture with real, moving object position
         // [x, y, z, gain_db, width, depth, height] - decode-file.ts's own
         // fixed stride - copied out with Array.from immediately since
         // Float32Array views into decoder state are only valid until the
-        // next push()/flush() call (js/src/push-decoder.ts's own contract);
+        // next push()/flush() call (bindings/js/src/push-decoder.ts's own contract);
         // decodeFile() has already finished, but its returned arrays are
         // plain copies either way.
         const stride = 7;

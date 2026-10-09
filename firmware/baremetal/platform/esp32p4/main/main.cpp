@@ -1,6 +1,6 @@
 // The probe's entry point and clock on ESP32-P4.
 //
-// ESP-IDF calls app_main() rather than main(), which is why apps/baremetal
+// ESP-IDF calls app_main() rather than main(), which is why firmware/baremetal
 // exposes iclforge_probe::run() through probe.hpp instead of defining main() itself.
 // Everything the probe checks - every fixture in fixture.hpp against its levels, the
 // allocation counts, the heap peak, the refusal of the direct-form transform -

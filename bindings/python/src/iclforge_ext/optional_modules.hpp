@@ -9,9 +9,9 @@
 // `ac3.signing`, `ac3.containers` and `ac3.ac4` exist only when the configure
 // that built this extension also built the libraries behind them - iclforge::ac3::signing,
 // the matroska/mp4/mpegts trio, and iclforge::ac4 (see
-// python/CMakeLists.txt, and the options' comments in the root CMakeLists.txt).
+// bindings/python/CMakeLists.txt, and the options' comments in the root CMakeLists.txt).
 // A trimmed developer build - codec only - still produces a working extension
-// without them; the wheel build (python/pyproject.toml) turns every one of
+// without them; the wheel build (bindings/python/pyproject.toml) turns every one of
 // those targets ON, so a published wheel always carries the full surface.
 //
 // That used to be two `#ifdef ICLFORGE_PY_HAVE_*` blocks, about three hundred

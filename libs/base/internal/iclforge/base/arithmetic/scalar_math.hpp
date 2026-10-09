@@ -23,7 +23,7 @@
 // newlib's logf is a large multiple of the polynomial below - but for a
 // property libm cannot give: the same float out of the same float in on every
 // platform. The minimum-footprint profile's encode fixtures
-// (apps/baremetal/encode_fixture.hpp) pin one hash per stream and check it on
+// (firmware/baremetal/encode_fixture.hpp) pin one hash per stream and check it on
 // the x86 host, the Cortex-M3 leg under QEMU and the ESP32-S3, and three C
 // libraries' logf differ in their last bit on some inputs. The bit-level
 // decomposition and the short series below are plain float multiplies and

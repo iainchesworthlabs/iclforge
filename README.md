@@ -271,7 +271,7 @@ js/             iclforge-wasm-decoder — the npm streaming decoder package (Aud
                 with a typed wrapper for the AC-4 WebAssembly module
 rust/           iclforge-sys and iclforge — Rust crates over the C API in libs/capi
 examples/       the programs docs/library/ is written from
-apps/baremetal/ iclforge-probe — the minimum-footprint probes (AC-3 and E-AC-3 decode, the encoders,
+firmware/baremetal/ iclforge-probe — the minimum-footprint probes (AC-3 and E-AC-3 decode, the encoders,
                 the AC-4 decoder), cross-compiled for arm-none-eabi and run under QEMU, or built
                 natively on the host
 

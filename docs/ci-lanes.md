@@ -162,7 +162,7 @@ comes from.
 | `macos` | `notices/forge/platform/macos/`, `packaging/homebrew/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
 | `android` | `apps/demos/android/` | `core` (not after a merge) |
 | `wasm` | `apps/demos/wasm/`, `js/` (its E2E demo) | `core` (not after a merge) |
-| `esp` | `esp-idf/`, `esphome/`, `apps/baremetal/`, `tools/packaging/`, and the trees its component ships: `libs/ac3/`, `libs/base/`, `cmake/`, root `CMakeLists.txt` | `core` (not after a merge) |
+| `esp` | `esp-idf/`, `esphome/`, `firmware/baremetal/`, `tools/packaging/`, and the trees its component ships: `libs/ac3/`, `libs/base/`, `cmake/`, root `CMakeLists.txt` | `core` (not after a merge) |
 | `rust` | `rust/` | `core` (not after a merge) |
 | `python` | `python/`, `examples/python/` | `core` (not after a merge) |
 | `npm` | `js/` (the package's own unit tests) | nothing - see below |
@@ -323,11 +323,11 @@ performance jobs also start only once `Build & Test` finishes.
 - `_build.yml`'s `build-footprint` job is gated by `run_esp`, not `run_linux`, even though it runs
   on a Linux-fleet runner and its own comments describe it as "Leg 5 of check-runners' Linux
   fan-out". A lane is which *source paths* a job builds, not which runner OS it happens to execute
-  on: `build-footprint` cross-compiles `apps/baremetal/`'s probe for `arm-none-eabi` under QEMU,
+  on: `build-footprint` cross-compiles `firmware/baremetal/`'s probe for `arm-none-eabi` under QEMU,
   the same source tree `build-esp32s3`/`build-esp32c3` build for their own Xtensa/RISC-V targets
-  (all three share "the same probe, same fixtures" per their own comments), and `apps/baremetal/`
+  (all three share "the same probe, same fixtures" per their own comments), and `firmware/baremetal/`
   is `esp` in the lane table above. Gating it by `run_linux` instead would make an
-  `apps/baremetal/`-only change skip it - a false skip, exactly what the conservative-default rule
+  `firmware/baremetal/`-only change skip it - a false skip, exactly what the conservative-default rule
   above exists to prevent.
 
 ## Where the logic lives

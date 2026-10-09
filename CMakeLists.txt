@@ -417,7 +417,7 @@ option(ICLFORGE_BUILD_CAPI "Build the C API over the encode/decode core (libs/ca
 # above, and for the same reason: nothing under src/, apps/forge/cli/src, apps/forge/gui, tests/ or examples/ links
 # it or is affected by it either way. A normal C++ build (and every existing CI leg) is unchanged
 # with this OFF. Turned ON by bindings/python/pyproject.toml's own cmake.define when scikit-build-core
-# drives the configure for `pip install`/cibuildwheel - see python/CMakeLists.txt.
+# drives the configure for `pip install`/cibuildwheel - see bindings/python/CMakeLists.txt.
 option(ICLFORGE_BUILD_PYTHON "Build the pybind11 Python extension module (python/)" OFF)
 
 # Hearth, the desktop reference player (planning/hearth-reference-player.md): libs/sendspin and

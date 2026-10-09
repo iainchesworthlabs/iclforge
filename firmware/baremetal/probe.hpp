@@ -13,8 +13,8 @@
 //
 // So probe.cpp now defines run(), and something small calls it:
 //
-// apps/baremetal/main.cpp int main() - host and arm-none-eabi
-// apps/baremetal/platform/esp32s3/main/ void app_main() - ESP-IDF
+// firmware/baremetal/main.cpp int main() - host and arm-none-eabi
+// firmware/baremetal/platform/esp32s3/main/ void app_main() - ESP-IDF
 //
 // The two hosted targets share one main.cpp rather than getting a directory
 // each, because they do not actually differ: the split here is "a C runtime

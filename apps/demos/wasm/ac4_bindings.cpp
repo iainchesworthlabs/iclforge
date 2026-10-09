@@ -41,7 +41,7 @@
 //     objects (an emscripten::val), because the object substream is a list of
 //     objects each with its own metadata and no flat parameter list holds
 //     that. A field the object lacks, or holds undefined or null, keeps the
-//     C++ struct's default, so the defaults live here in one place: js/src/
+//     C++ struct's default, so the defaults live here in one place: bindings/js/src/
 //     ac4.ts passes the caller's options as given. An enumerator the C++
 //     header does not define is refused at construction (constructionError()
 //     says so), as iclforge_ac4_encoder_create() refuses one.

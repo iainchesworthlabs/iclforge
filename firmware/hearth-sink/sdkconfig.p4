@@ -38,7 +38,7 @@ CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360=y
 # feature allocates from is not separate memory - components/heap/port/
 # esp32p4/memory_layout.c carves it from the same low-DRAM range the app's
 # own .data/.bss reserves out of, so a bigger image leaves less of it free
-# than a small one does. The apps/baremetal probe (small, no WiFi/FAT/SDMMC)
+# than a small one does. The firmware/baremetal probe (small, no WiFi/FAT/SDMMC)
 # never came close to exhausting it; hearth_sink's real footprint does. Fix
 # is upstream of that arithmetic entirely: esp_pm's own Kconfig help says
 # PM_SLEEP_CLK_ICG_ENABLE exists only to keep specific peripheral clocks

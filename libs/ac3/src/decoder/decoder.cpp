@@ -279,7 +279,7 @@ struct FrameDecoder::Impl {
     // frame scope, which stopped twenty-odd allocations per BLOCK - and this is
     // the same move again, from frame scope onto the decoder, which stops
     // roughly forty per FRAME. Measured on the bare-metal probe
-    // (apps/baremetal/probe.cpp), where AC-3 5.1 was 47 allocations a frame and
+    // (firmware/baremetal/probe.cpp), where AC-3 5.1 was 47 allocations a frame and
     // this cluster was most of it.
     //
     // WHAT MAKES IT SAFE. A local is fresh every call; a member carries the

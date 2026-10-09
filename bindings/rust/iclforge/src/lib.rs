@@ -1,5 +1,5 @@
 //! Safe, idiomatic Rust bindings for [`iclforge_c`](https://docs.rs/iclforge-sys), iclforge's C
-//! API — AC-3, E-AC-3 and AC-4 encode and decode. See `rust/README.md` for build prerequisites, what
+//! API — AC-3, E-AC-3 and AC-4 encode and decode. See `bindings/rust/README.md` for build prerequisites, what
 //! this crate covers versus what's explicitly deferred, and the real header defects found while
 //! building it.
 //!
@@ -38,5 +38,5 @@ pub use version::{version, Version};
 /// One audio block is always 256 samples (A/52 §4.1); one syncframe is always six blocks —
 /// `ICLFORGE_SAMPLES_PER_FRAME`. Both codecs' single-substream encode/decode paths in this crate
 /// use this fixed frame size (`numblkscod`/short syncframes aren't exposed by the C API's
-/// `_frame_config_t` structs today — see `rust/README.md`).
+/// `_frame_config_t` structs today — see `bindings/rust/README.md`).
 pub const SAMPLES_PER_FRAME: usize = iclforge_sys::ICLFORGE_SAMPLES_PER_FRAME as usize;

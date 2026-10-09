@@ -1,5 +1,5 @@
 # fixture.hpp is reached by relative path rather than copied: five directories
-# up to the repo root, then apps/baremetal. It is the same 5.1 AC-3 stream the
+# up to the repo root, then firmware/baremetal. It is the same 5.1 AC-3 stream the
 # probe checks against known levels, so if this example plays the wrong thing
 # the probe says so first.
 get_filename_component(ICLFORGE_FIXTURE_DIR

@@ -34,7 +34,7 @@
 // used to be `#ifdef ICLFORGE_PY_HAVE_SIGNING` / `ICLFORGE_PY_HAVE_CONTAINERS`
 // blocks inside the same PYBIND11_MODULE body, and so had these to hand. They
 // are now their own directory-selected translation units (see
-// optional_modules.hpp and python/CMakeLists.txt), which is what makes this a
+// optional_modules.hpp and bindings/python/CMakeLists.txt), which is what makes this a
 // header rather than a detail of one .cpp.
 
 namespace iclforge::python::detail {

@@ -6,7 +6,7 @@
 // the buffer itself is set up.
 //
 // Requires cross-origin isolation (COOP: same-origin, COEP: require-corp) -
-// SharedArrayBuffer is unavailable otherwise. See js/README.md.
+// SharedArrayBuffer is unavailable otherwise. See bindings/js/README.md.
 
 const WRITE_INDEX = 0;
 const READ_INDEX = 1;

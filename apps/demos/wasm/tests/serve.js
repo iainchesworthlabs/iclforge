@@ -50,8 +50,8 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, {
             'Content-Type': mimeTypes[path.extname(resolved)] || 'application/octet-stream',
             // Cross-origin isolation, required for SharedArrayBuffer - the
-            // AudioWorklet pipeline's ring buffer (js/src/ring-buffer.ts)
-            // needs it, and js/README.md documents this as a real deployment
+            // AudioWorklet pipeline's ring buffer (bindings/js/src/ring-buffer.ts)
+            // needs it, and bindings/js/README.md documents this as a real deployment
             // requirement for anyone embedding the package, not just a test
             // fixture of this harness.
             'Cross-Origin-Opener-Policy': 'same-origin',

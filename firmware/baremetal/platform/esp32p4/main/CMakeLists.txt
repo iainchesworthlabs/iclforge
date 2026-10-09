@@ -1,5 +1,5 @@
 # The ESP32-P4 application: IDF's app_main plus its clock, and the REAL probe -
-# apps/baremetal/probe.cpp or encode_probe.cpp, the same files the host and
+# firmware/baremetal/probe.cpp or encode_probe.cpp, the same files the host and
 # arm-none-eabi shapes build, checking the same fixtures against the same
 # levels and the same hashes.
 #
@@ -12,7 +12,7 @@
 # WHICH probe follows ICLFORGE_ESP_PROFILE, set by the project above this and
 # read by the iclforge component to build the matching half of the library.
 # Both define iclforge_probe::run() rather than main(), so main.cpp calls whichever
-# was built without knowing which it is - the same seam apps/baremetal's own
+# was built without knowing which it is - the same seam firmware/baremetal's own
 # CMakeLists.txt uses for the two hosted shapes.
 if(ICLFORGE_ESP_PROFILE STREQUAL "encoder")
     set(ICLFORGE_ESP_PROBE_SRC "../../../encode_probe.cpp")
@@ -35,7 +35,7 @@ endif()
 # - and removing any one of them should break the build rather than silently
 # widen it.
 # stage_timers.cpp is the application half of the ICLFORGE_STAGE_TIMERS zone
-# backend, present in every build for the reason apps/baremetal/CMakeLists.txt
+# backend, present in every build for the reason firmware/baremetal/CMakeLists.txt
 # gives beside its own copy of this line: without the option the library
 # never calls it and the linker drops it, so a timed build and a plain one
 # differ only in the library's include path. Build one with
@@ -55,7 +55,7 @@ target_include_directories(${COMPONENT_LIB} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../../..")
 
 # The encode probe's 7.1 measurement switch, the same option and default as
-# apps/baremetal/CMakeLists.txt gives the hosted shapes and the S3 and C3
+# firmware/baremetal/CMakeLists.txt gives the hosted shapes and the S3 and C3
 # projects beside this one - see their comments.
 # idf.py -DICLFORGE_PROBE_SEVEN_ONE=ON build
 set(ICLFORGE_PROBE_SEVEN_ONE OFF CACHE BOOL

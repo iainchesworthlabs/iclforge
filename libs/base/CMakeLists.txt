@@ -20,7 +20,7 @@
 # Apple platforms is NOT the same thing as the machine the compiler is asked to
 # emit code for: CMAKE_OSX_ARCHITECTURES overrides it per compile line. An
 # Intel Mac cross-building an arm64 wheel (cibuildwheel does exactly this - see
-# python/pyproject.toml and .github/workflows/wheels.yml) still reports
+# bindings/python/pyproject.toml and .github/workflows/wheels.yml) still reports
 # CMAKE_SYSTEM_PROCESSOR=x86_64 while every compile line carries `-arch arm64`,
 # so anything keyed on the raw variable - the SIMD directory and the AVX2 tier
 # below both are - silently picks the HOST's answer and hands the compiler an

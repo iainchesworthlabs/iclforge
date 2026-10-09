@@ -118,7 +118,7 @@ export function makeFakeModule({ script = [], flushEntries = [], flushed = [], s
 
 export const pcm = (...values) => Float32Array.from(values);
 
-// --- AC-4 (js/src/ac4.ts) ---------------------------------------------------
+// --- AC-4 (bindings/js/src/ac4.ts) ---------------------------------------------------
 //
 // A scripted stand-in for the Embind module apps/demos/wasm/ac4_bindings.cpp
 // builds, so ac4.ts can be tested in Node without an Emscripten build - the

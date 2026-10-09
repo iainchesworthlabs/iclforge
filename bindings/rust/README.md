@@ -30,7 +30,7 @@ You need, on `PATH`: **CMake** (the same minimum this project already requires â
 `LIBCLANG_PATH` if it isn't auto-detected; on Windows it ships next to `clang.exe` in an LLVM
 install). No vcpkg toolchain file is needed: `build.rs` configures with `ICLFORGE_BUILD_CAPI` on,
 the CLI, GUI, tests, examples, fuzzers, ADM bridge, container writers and Hearth off, and the rest at
-their defaults, AC-4 included (a trimmed set like the one `python/pyproject.toml` uses for its own
+their defaults, AC-4 included (a trimmed set like the one `bindings/python/pyproject.toml` uses for its own
 extension-module build), and the one dependency that survives that ({fmt}) resolves via
 `find_package(CONFIG)` with a `FetchContent` fallback (`cmake/Fmt.cmake`).
 

@@ -30,7 +30,7 @@ Changelog = "https://github.com/iainchesworthlabs/iclforge/blob/main/CHANGELOG.m
 test = ["pytest>=7"]
 
 [tool.scikit-build]
-# The repo root, not this directory - python/CMakeLists.txt is add_subdirectory()'d from there
+# The repo root, not this directory - bindings/python/CMakeLists.txt is add_subdirectory()'d from there
 # (see the root CMakeLists.txt's ICLFORGE_BUILD_PYTHON block) the same way every other optional
 # component is, rather than standing up a second, independent top-level CMake project that would
 # have to re-derive the version/compiler-warnings/sanitizer setup the real root already owns.
@@ -39,7 +39,7 @@ cmake.build-type = "Release"
 wheel.packages = ["src/iclforge"]
 minimum-version = "0.10"
 build-dir = "build/{wheel_tag}"
-# Restricts `cmake --install` to python/CMakeLists.txt's own COMPONENT python - see that file's
+# Restricts `cmake --install` to bindings/python/CMakeLists.txt's own COMPONENT python - see that file's
 # comment on install(TARGETS _iclforge ...) for why this is needed at all: without it, the
 # unconditional SDK install() rules in cmake/InstallLibrary.cmake (headers, .lib/.dll, CMake
 # package config) ride along into the wheel too.
@@ -63,7 +63,7 @@ ICLFORGE_BUILD_ADM = "OFF"
 ICLFORGE_BUILD_HEARTH = "OFF"
 # The AC-4 library (libs/ac4) defaults ON - ON here too since
 # plan phase I4 binds them (planning/ac4.md): the wheel carries iclforge.ac4 (iclforge::ac4::Decoder/
-# iclforge::ac4::Encoder bound directly, python/src/iclforge_ext/ac4/present/ac4_module.cpp), the same
+# iclforge::ac4::Encoder bound directly, bindings/python/src/iclforge_ext/ac4/present/ac4_module.cpp), the same
 # "wheel always carries the full surface" reasoning as the matroska/mp4/mpegts/signing targets
 # below.
 ICLFORGE_BUILD_AC4 = "ON"
@@ -74,7 +74,7 @@ ICLFORGE_BUILD_MATROSKA = "ON"
 ICLFORGE_BUILD_MP4 = "ON"
 ICLFORGE_BUILD_MPEGTS = "ON"
 # One self-contained extension module in the wheel, no side-by-side iclforge_ac3.dll/.so to
-# redistribute - see python/CMakeLists.txt's own comment on iclforge::ac3 resolving to iclforge_ac3_static.
+# redistribute - see bindings/python/CMakeLists.txt's own comment on iclforge::ac3 resolving to iclforge_ac3_static.
 BUILD_SHARED_LIBS = "OFF"
 
 [tool.scikit-build.metadata.version]
@@ -101,7 +101,7 @@ skip = "*-musllinux* pp*"
 test-extras = ["test"]
 # {project} is the repo ROOT (this repo's top-level tests/ is the unrelated C++ Catch2 suite,
 # which is why this must be {package} - confirmed the hard way: {project}/tests collected 0 items
-# in CI against that directory instead of python/tests/). {package} is package-dir (python/,
+# in CI against that directory instead of bindings/python/tests/). {package} is package-dir (python/,
 # wheels.yml's own pypa/cibuildwheel step), so {package}/tests is python/tests/.
 test-command = "pytest {package}/tests"
 manylinux-x86_64-image = "manylinux_2_28"

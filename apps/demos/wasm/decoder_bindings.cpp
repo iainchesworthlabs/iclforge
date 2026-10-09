@@ -1,6 +1,6 @@
 // Embind wrapper around iclforge::ac3's decode path, for the reusable push-frame
 // package (WASM streaming decoder package, js/) and the docs demo built on top of it
-// (apps/demos/wasm/index.html - see js/src/decode-file.ts for the whole-file
+// (apps/demos/wasm/index.html - see bindings/js/src/decode-file.ts for the whole-file
 // convenience helper the demo actually calls).
 //
 // Two entry points:
@@ -11,7 +11,7 @@
 //   - PushDecoder: one iclforge::ac3::Eac3Decoder per instance, decoding one access
 //     unit per call through decode_access_unit_into's caller-buffer form -
 //     the PCM buffers are allocated ONCE at construction and reused for
-//     every call (apps/baremetal/probe.cpp established the same
+//     every call (firmware/baremetal/probe.cpp established the same
 //     caller-buffer pattern for the bare-metal minimum-footprint profile), so the hot path
 //     never allocates on the C++ side. Eac3Decoder alone is enough for every
 //     iclforge::ac3::io::StreamKind - decode_access_unit's own doc comment: a plain
@@ -44,7 +44,7 @@
 
 namespace {
 
-// §E3.8.2's cap - the same bound apps/baremetal/probe.cpp's g_pcm/g_pcm_spans use.
+// §E3.8.2's cap - the same bound firmware/baremetal/probe.cpp's g_pcm/g_pcm_spans use.
 constexpr std::size_t kMaxChannels = 16;
 // x, y, z, gain_db, then §5.6.1.2's width/depth/height.
 constexpr std::size_t kPositionStride = 7;
@@ -89,7 +89,7 @@ emscripten::val make_error(const std::string& message) {
 
 // Splits a whole elementary-stream byte blob into the access units
 // PushDecoder::pushAccessUnit expects, one call per entry - used by the
-// whole-file convenience helper (js/src/decode-file.ts) and available to any
+// whole-file convenience helper (bindings/js/src/decode-file.ts) and available to any
 // consumer that already has a complete file rather than a live push feed
 // (an hls.js/MSE bridge instead slices its own container samples and never
 // needs this). Reuses iclforge::ac3::io::scan rather than re-walking syncframes here.
@@ -266,7 +266,7 @@ class PushDecoder {
 
     // This frame's [x, y, z, gain_db, width, depth, height] for `object` -
     // one snapshot per pushAccessUnit() call, not accumulated across calls
-    // (that bookkeeping is js/src/decode-file.ts's job now, for whichever
+    // (that bookkeeping is bindings/js/src/decode-file.ts's job now, for whichever
     // consumer wants a whole-file timeline rather than a live one).
     [[nodiscard]] emscripten::val objectPosition(int object) const {
         if (object < 0 || static_cast<std::size_t>(object) >= object_positions_.size()) {

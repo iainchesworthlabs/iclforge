@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import check_esp_efuse_free
 
-HEARTH = "esp-idf/iclforge/examples/hearth_sink"
+HEARTH = "firmware/hearth-sink"
 
 
 def _write(root: Path, relative: str, text: str) -> Path:
@@ -128,12 +128,12 @@ class EfuseFreeCheck(unittest.TestCase):
         _write(self.root, f"{HEARTH}/sdkconfig.defaults", "CONFIG_FREERTOS_HZ=1000\n")
         _write(
             self.root,
-            "apps/baremetal/platform/esp32c6/sdkconfig.defaults",
+            "firmware/baremetal/platform/esp32c6/sdkconfig.defaults",
             "CONFIG_SECURE_DISABLE_ROM_DL_MODE=y\n",
         )
         code, out = self._run()
         self.assertEqual(code, 1)
-        self.assertIn("file=apps/baremetal/platform/esp32c6/sdkconfig.defaults,line=1", out)
+        self.assertIn("file=firmware/baremetal/platform/esp32c6/sdkconfig.defaults,line=1", out)
 
     def test_no_fragments_fails_rather_than_passing_vacuously(self) -> None:
         (self.root / "esp-idf").mkdir()

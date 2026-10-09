@@ -18,7 +18,7 @@
 // ESP-IDF, semihosting under QEMU, std::chrono on a host) and the probe
 // already owns that seam as iclforge_probe::now_us().
 //
-// apps/baremetal/stage_timers.cpp is the one implementation today: a stack
+// firmware/baremetal/stage_timers.cpp is the one implementation today: a stack
 // of open zones and a per-name accumulator, reported per fixture as
 // `<codec>.stage[<name>]` lines beside the decode timing the probe already
 // prints. Any other application linking a library built with this variant

@@ -18,7 +18,7 @@
 #     encoder, the WAV/container I/O, the analysis and QC layers and the
 #     object ENCODER are all absent, and the sources that remain are exactly
 #     what a decode reaches. This is checked, not asserted: the archive is
-#     linked into apps/baremetal's probe with --gc-sections and any missing
+#     linked into firmware/baremetal's probe with --gc-sections and any missing
 #     symbol is a link error.
 #
 #   - src/core/transform/stub/ instead of src/core/transform/reference/, and
@@ -38,7 +38,7 @@ add_library(iclforge::ac3_minimal ALIAS iclforge_ac3_minimal)
 # Which "iclforge/base/detail/profiling.hpp" the profile's sources see. Off, the
 # markers expand to nothing (tracy_disabled/); with ICLFORGE_STAGE_TIMERS they
 # become calls into whatever application links this archive
-# (stage_timers/, and apps/baremetal/stage_timers.cpp for the probe). A
+# (stage_timers/, and firmware/baremetal/stage_timers.cpp for the probe). A
 # directory choice rather than a define, per the platform-tree rule
 # (tools/checks/check_platform_macros.ps1), and the root CMakeLists.txt has
 # already refused the option outside this profile.
@@ -241,7 +241,7 @@ target_compile_features(iclforge_ac3_minimal PUBLIC cxx_std_23)
 # size-optimised build. Off by default: this profile's subject is size, and
 # the arm-none-eabi leg's image figure is only comparable across builds that
 # optimise for the same thing. A target that has to keep up with real time
-# and has flash to spare turns it on - apps/baremetal/platform/esp32s3 does,
+# and has flash to spare turns it on - firmware/baremetal/platform/esp32s3 does,
 # and docs/platforms/bare-metal/esp32-s3.md's Timing section has the measurement behind
 # the list below.
 #

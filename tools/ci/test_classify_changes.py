@@ -45,7 +45,7 @@ class PlatformOnlyChangeTest(unittest.TestCase):
         self.assertEqual(lit(hits, *ALL_LANES), {"android"})
 
     def test_esp_only_change_lights_only_esp(self):
-        hits = gate.classify(["esp-idf/iclforge/CMakeLists.txt"])
+        hits = gate.classify(["firmware/esp-idf/iclforge/CMakeLists.txt"])
         self.assertEqual(lit(hits, *ALL_LANES), {"esp"})
 
     def test_esp_component_packaging_script_lights_only_esp(self):
@@ -61,7 +61,7 @@ class PlatformOnlyChangeTest(unittest.TestCase):
         self.assertEqual(lit(hits, *ALL_LANES), {"python"})
 
     def test_rust_only_change_lights_only_rust(self):
-        hits = gate.classify(["rust/iclforge/src/lib.rs"])
+        hits = gate.classify(["bindings/rust/iclforge/src/lib.rs"])
         self.assertEqual(lit(hits, *ALL_LANES), {"rust"})
 
     def test_windows_driver_change_does_not_light_other_platforms(self):
@@ -163,7 +163,7 @@ class NpmAndWasmSplitTest(unittest.TestCase):
     """js/ backs both the wasm E2E demo and the npm package's own tests."""
 
     def test_js_change_lights_both_npm_and_wasm_but_nothing_else(self):
-        hits = gate.classify(["js/src/index.ts"])
+        hits = gate.classify(["bindings/js/src/index.ts"])
         self.assertEqual(lit(hits, *ALL_LANES), {"npm", "wasm"})
 
 
@@ -184,8 +184,8 @@ class SatellitesDirectTest(unittest.TestCase):
     def test_a_satellites_own_tree_still_lights_it(self):
         for path, lane in (
             ("apps/demos/android/app/build.gradle.kts", "android"),
-            ("esp-idf/iclforge/CMakeLists.txt", "esp"),
-            ("rust/iclforge/src/lib.rs", "rust"),
+            ("firmware/esp-idf/iclforge/CMakeLists.txt", "esp"),
+            ("bindings/rust/iclforge/src/lib.rs", "rust"),
             ("python/iclforge/__init__.py", "python"),
             ("apps/demos/wasm/src/main.cpp", "wasm"),
         ):
@@ -193,7 +193,7 @@ class SatellitesDirectTest(unittest.TestCase):
                 self.assertEqual(lit(self.classify(path), *ALL_LANES), {lane})
 
     def test_a_core_change_and_a_satellite_change_together_light_both(self):
-        hits = self.classify("libs/ac4/src/x.cpp", "rust/iclforge/src/lib.rs")
+        hits = self.classify("libs/ac4/src/x.cpp", "bindings/rust/iclforge/src/lib.rs")
         self.assertEqual(lit(hits, *ALL_LANES), {"core", "windows", "linux", "macos", "rust"})
 
     def test_a_path_only_a_platform_owns_is_unchanged(self):

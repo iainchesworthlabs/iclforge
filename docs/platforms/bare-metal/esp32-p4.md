@@ -38,7 +38,7 @@ and display, GPIO headers along both edges, no separate UART bridge chip). It ca
 - An ESP32-C6-MINI-1 module wired to the P4 over SDIO (`GPIO14`-`GPIO19`) for Wi-Fi 6 and
   Bluetooth LE, per DFRobot's documentation. This probe does not touch it. `hearth_sink` does: it
   reaches Wi-Fi through `esp_hosted` over that link ([the example's
-  README](https://github.com/iainchesworthlabs/iclforge/blob/main/esp-idf/iclforge/examples/hearth_sink/README.md#on-the-esp32-p4)),
+  README](https://github.com/iainchesworthlabs/iclforge/blob/main/firmware/hearth-sink/README.md#on-the-esp32-p4)),
   and the [AC-4](#ac-4) figures were measured that way.
 - **Two USB-C connectors**, wired to two different on-die USB peripherals, not one connector
   shared between them: one silkscreened "USB 2.0 OTG", reaching the part's native high-speed
@@ -900,7 +900,7 @@ idf.py -DIDF_TARGET=esp32p4 \
   -DICLFORGE_STAGE_TIMERS=ON build
 ```
 
-from `esp-idf/iclforge/examples/hearth_sink/`. `sdkconfig.ac4` turns on `CONFIG_ICLFORGE_AC4` and a
+from `firmware/hearth-sink/`. `sdkconfig.ac4` turns on `CONFIG_ICLFORGE_AC4` and a
 40 KB decode stack. The measurement image adds `ICLFORGE_EXAMPLE_SINK_NULL`,
 `ICLFORGE_EXAMPLE_AC4_PCM_HASH`, `ESP_TASK_WDT_INIT=n`, a 64 KB stack and the network's credentials,
 and goes to the board with `tools/hearth/ota.py push`, which replaces the application and keeps the bootloader on
@@ -926,17 +926,17 @@ runs nothing, and every figure on this page comes from the board.
 
 ## Building
 
-`apps/baremetal/platform/esp32p4/` is the probe target:
+`firmware/baremetal/platform/esp32p4/` is the probe target:
 
 ```bash
 . $IDF_PATH/export.sh
-cd apps/baremetal/platform/esp32p4
+cd firmware/baremetal/platform/esp32p4
 idf.py set-target esp32p4
 idf.py build                                  # -DICLFORGE_ESP_PROFILE=decoder by default
 ```
 
 The decode arithmetic needs no override: the component
-(`esp-idf/iclforge/CMakeLists.txt`) picks `float` from `SOC_CPU_HAS_FPU`, which this part has, the
+(`firmware/esp-idf/iclforge/CMakeLists.txt`) picks `float` from `SOC_CPU_HAS_FPU`, which this part has, the
 same as the S3 — see [ESP32-S3 → The ESP-IDF component](esp32-s3.md#the-esp-idf-component).
 
 On a board reached over its OTG connector held in the ROM's manual download mode (see

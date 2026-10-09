@@ -6,7 +6,7 @@ use std::fmt;
 ///
 /// A plain C `enum` crossing an FFI boundary is an open set in a way a Rust `enum` normally
 /// isn't: nothing in `iclforge_c/iclforge.h` documents whether a future minor version may add a
-/// new status code (see `rust/README.md`'s "header defects found" section, item 3), and this
+/// new status code (see `bindings/rust/README.md`'s "header defects found" section, item 3), and this
 /// crate has no way to tell "the library I linked added a code I don't know about" apart from
 /// "something is badly wrong" if it tried to force every raw value into a fixed set of variants.
 /// [`Error::Other`] keeps that distinction representable instead of silently mapping an unknown

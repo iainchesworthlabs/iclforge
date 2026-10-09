@@ -1517,7 +1517,7 @@ every build. What is checked:
   ([CI lane partitions](ci-lanes.md)) and the nightly run lights always): six committed streams
   (2.0 from DEE with A-SPX, 2.0 constructed in A-CPL, 5.1 from DEE, 5.1
   constructed in A-CPL, DEE's 5.1.4 tones and DEE's 2.0 at 48 kbit/s with companding;
-  `apps/baremetal/ac4_fixture.hpp`, made by
+  `firmware/baremetal/ac4_fixture.hpp`, made by
   `tools/generators/gen_baremetal_ac4_fixture.py`) decode in float on the Cortex-M3 leg under QEMU
   with each channel's level checked, and the image, the peak heap, the allocations a frame, the
   stack and the bytes retained after teardown are held to ceilings about a tenth over the measured

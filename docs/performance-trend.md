@@ -741,7 +741,7 @@ soft float, no OS), `ICLFORGE_MINIMAL_DECODER=ON`, `CMAKE_BUILD_TYPE=MinSizeRel`
 [Building → Minimum-footprint decoder profile](building.md#minimum-footprint-decoder-profile)
 for what the profile changes and why.
 
-`apps/baremetal/probe.cpp` decodes six frames each of ten real streams — 5.1 AC-3 (448 kbit/s,
+`firmware/baremetal/probe.cpp` decodes six frames each of ten real streams — 5.1 AC-3 (448 kbit/s,
 coupling), 2/0 AC-3 (192 kbit/s) and 1/0 AC-3 (128 kbit/s); 5.1 E-AC-3 (384 kbit/s, AHT + spx +
 standard coupling), 5.1 E-AC-3 with §E3.5 enhanced coupling (384 kbit/s, `cpl+ecpl`), E-AC-3
 Atmos (448 kbit/s, six objects over a 5.1 bed) and 2/0 E-AC-3 (192 kbit/s, which is the only
@@ -880,7 +880,7 @@ against 8.4 KiB actually linked). `footprint_report.py` has skipped that block s
 columns reconcile with `arm-none-eabi-size`'s own totals.
 
 `tls.cpp.obj`'s 4 KiB is the single-thread `__aeabi_read_tp` stub's static block
-(`apps/baremetal/platform/baremetal/tls.cpp`), checked by two `ASSERT()`s in the linker script
+(`firmware/baremetal/platform/baremetal/tls.cpp`), checked by two `ASSERT()`s in the linker script
 rather than trusted.
 
 It was 64 KiB, sized against `ecpl_channel_spectrum`'s `thread_local` scratch. That scratch is no
@@ -1161,7 +1161,7 @@ has what the encode direction cannot fit on an ESP32-S3, with the host profile's
 (`ICLFORGE_MINIMAL_AC4=ON`, `ICLFORGE_DECODE_SCALAR=float`; the presets `config-arm-none-eabi-minimal-ac4`
 and its `-icount` and `config-linux-gcc-minimal-ac4`) and the AC-4 probe in place of the AC-3 and
 E-AC-3 one: AC-4 shares nothing with `iclforge::ac3`, so it is a build of its own. It decodes six
-committed streams (`apps/baremetal/ac4_fixture.hpp`, made by
+committed streams (`firmware/baremetal/ac4_fixture.hpp`, made by
 `tools/generators/gen_baremetal_ac4_fixture.py`): 2.0 from DEE with A-SPX, 2.0 constructed in
 A-CPL, 5.1 from DEE, 5.1 constructed in A-CPL, DEE's 5.1.4 tones, and DEE's 2.0 at 48 kbit/s,
 whose A-SPX runs companding (added by D14a4, the one fixture that reaches float `pow` and `exp2`),

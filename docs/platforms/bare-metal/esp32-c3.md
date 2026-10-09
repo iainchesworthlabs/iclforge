@@ -12,7 +12,7 @@ target and the arithmetic tier differ.
 
 | | |
 |---|---|
-| Decode | **Correct, and that is all this row claims.** `apps/baremetal/platform/esp32c3/` is a probe target CI runs under `qemu-riscv32`: twelve of the fourteen fixtures decode, every one producing PCM **identical to the x86 host's and the Cortex-M3 leg's** — three architectures, three compilers, one pinned set of hashes (`tests/golden/fixed-probe-pcm-hashes.json`) |
+| Decode | **Correct, and that is all this row claims.** `firmware/baremetal/platform/esp32c3/` is a probe target CI runs under `qemu-riscv32`: twelve of the fourteen fixtures decode, every one producing PCM **identical to the x86 host's and the Cortex-M3 leg's** — three architectures, three compilers, one pinned set of hashes (`tests/golden/fixed-probe-pcm-hashes.json`) |
 | Memory | Peaks at 195,505 bytes of heap across the twelve fixtures that run (`eac3_atmos_render`). The part reports 246,332 bytes free before a decode in a heap whose largest block is 114,688, so the total is not a budget. The probe skips the two 7.1.4 rows on a budget of 230,000 bytes, against 238,094 and 244,502 recorded for them when the decoder used more memory; the Cortex-M3 leg's fixed tier now peaks at 174,850 and 181,258 bytes on them, and this leg still skips them, so whether they fit here now has not been run |
 | Speed | **Unmeasured.** QEMU is not cycle-accurate and no C3 board has run this. On the [Cortex-M3 leg](../../performance-trend.md#instructions-per-frame-fixed-point-tier) an E-AC-3 5.1 frame is 4.2 M integer instructions against 12.9 M soft-float, AC-3 5.1 3.7 M, AC-3 2/0 1.2 M and mono 0.61 M — against 5.12 M cycles per frame at 160 MHz, but instructions are not cycles and no leg models this part's 16 KB flash cache. The [ESP32-C6](esp32-c6.md), a 160 MHz RISC-V core with no FPU in the same tier, has been timed on a board: AC-3 5.1 at 0.64x a frame, E-AC-3 5.1 at 0.75x, stereo 0.20x and 0.32x, with no network |
 | Encode | Not validated here at all: both encoders are floating-point, which on a part with no FPU means software floating point |
@@ -76,13 +76,13 @@ worth reading before flashing one.
 ## Building
 
 Uses the same `esp-idf/iclforge/` component and `EXTRA_COMPONENT_DIRS` setup as
-[ESP32-S3 → The ESP-IDF component](esp32-s3.md#the-esp-idf-component). `apps/baremetal/platform/esp32c3/`
+[ESP32-S3 → The ESP-IDF component](esp32-s3.md#the-esp-idf-component). `firmware/baremetal/platform/esp32c3/`
 is the probe target:
 
 ```bash
 . $IDF_PATH/export.sh
 python "$IDF_PATH/tools/idf_tools.py" install qemu-riscv32   # once
-cd apps/baremetal/platform/esp32c3
+cd firmware/baremetal/platform/esp32c3
 idf.py set-target esp32c3
 idf.py build                                  # -DICLFORGE_DECODE_SCALAR=fixed by default
 idf.py qemu

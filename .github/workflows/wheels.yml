@@ -1,6 +1,6 @@
 # Python wheels for the iclforge PyPI package (Python on PyPI, python/) - separate from
 # _build.yml/ci.yml's C++ matrix, which knows nothing about Python packaging. Builds via
-# cibuildwheel, configured from python/pyproject.toml's own [tool.cibuildwheel] table so a local
+# cibuildwheel, configured from bindings/python/pyproject.toml's own [tool.cibuildwheel] table so a local
 # `cibuildwheel python` run matches this workflow exactly rather than drifting from workflow-only
 # YAML settings.
 #
@@ -111,7 +111,7 @@ jobs:
       matrix:
         include:
           # Every row names its archs explicitly (CIBW_ARCHS below): the
-          # per-platform tables in python/pyproject.toml describe the ORIGINAL
+          # per-platform tables in bindings/python/pyproject.toml describe the ORIGINAL
           # three runners, and a platform now appears here on two different
           # architectures - the intel-mac row must not inherit the arm table
           # and cross-compile (clang rejects -mavx2 under -arch arm64, and a
@@ -143,7 +143,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # setuptools_scm (python/pyproject.toml's version provider) needs real tag history to
+          # setuptools_scm (bindings/python/pyproject.toml's version provider) needs real tag history to
           # derive a real version the same way cmake/GitVersionDerivation.cmake's own `git
           # describe` does on the C++ side - a shallow clone here would build every wheel as an
           # indistinguishable 0.0.0 rather than a real per-commit dev version.
@@ -172,9 +172,9 @@ jobs:
   # ubuntu wheel, installed and measured once, is the whole signal.
   #
   # What this does and does not measure, stated plainly because the number
-  # looks better than it is. python/src/iclforge/__init__.py is a re-export
+  # looks better than it is. bindings/python/src/iclforge/__init__.py is a re-export
   # shim: an import block, a version lookup, and __all__. Nearly all of the
-  # binding surface is C++ (python/src/iclforge_ext/bindings.cpp), which
+  # binding surface is C++ (bindings/python/src/iclforge_ext/bindings.cpp), which
   # coverage.py cannot see at all - so a high percentage here means "the
   # package imports and its Python-level surface executes", not "the bindings
   # are tested". That is still worth gating: a name dropped from the import
@@ -258,7 +258,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          .pyvenv/bin/python -m pytest python/tests \
+          .pyvenv/bin/python -m pytest bindings/python/tests \
             --cov=iclforge --cov-report=term-missing --cov-fail-under=85
 
       # The hand-written .pyi against the wheel's actual runtime surface
@@ -273,7 +273,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          .pyvenv/bin/python -m mypy.stubtest iclforge             --allowlist python/tests/stubtest-allowlist.txt
+          .pyvenv/bin/python -m mypy.stubtest iclforge             --allowlist bindings/python/tests/stubtest-allowlist.txt
 
   # Publishes via PyPI trusted publishing (OIDC) against the `pypi` GitHub environment - both are
   # provisioned; see docs/releasing.md's "Publishing to PyPI". Gated on a v* tag push, same as

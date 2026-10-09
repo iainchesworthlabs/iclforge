@@ -11,7 +11,7 @@
 // `iclforge_decode.js` (loaded as a plain classic <script> in index.html,
 // exactly as before) supplies the `createIclForgeModule` factory the bindings
 // itself takes as a parameter rather than embedding a compiled binary of its
-// own - see js/README.md's "Loading the WASM module" section.
+// own - see bindings/js/README.md's "Loading the WASM module" section.
 
 import { decodeFile, DownmixTarget, IclForgeDecoderNode, scanStream } from './package/index.js';
 
@@ -39,7 +39,7 @@ let playStartCtxTime = 0;
 let playStartOffset = 0;
 let playing = false;
 
-let decoded = null; // DecodedProgram, see js/src/decode-file.ts
+let decoded = null; // DecodedProgram, see bindings/js/src/decode-file.ts
 
 const el = (id) => document.getElementById(id);
 
@@ -482,7 +482,7 @@ function loadFile(file) {
 // stream, fed one access unit at a time (as a live source would) through
 // PushDecoder's own Embind class, decoded in a Worker, and played through a
 // real AudioWorkletNode - not the whole-file decodeFile() path above. Needs
-// cross-origin isolation for SharedArrayBuffer (see js/README.md); the
+// cross-origin isolation for SharedArrayBuffer (see bindings/js/README.md); the
 // button stays disabled and says why when that's not available (a plain
 // `python3 -m http.server` does not send the required headers - see
 // docs/platforms/wasm.md).
@@ -546,7 +546,7 @@ async function startRealtime() {
         // copy: a browser throttles setTimeout heavily in a backgrounded
         // tab, which can starve this loop while the (unthrottled) audio
         // graph keeps consuming - a real client instead pushes units as its
-        // own transport delivers them (see the hls.js bridge, js/src/
+        // own transport delivers them (see the hls.js bridge, bindings/js/src/
         // hls-bridge.ts), which isn't driven by a synthetic per-frame timer
         // at all.
         const pushNext = () => {

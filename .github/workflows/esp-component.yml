@@ -121,7 +121,7 @@ jobs:
           path: dist/esp-component/*.tgz
           if-no-files-found: error
 
-  # The ESPHome external component (esphome/components/iclforge/). Its own job
+  # The ESPHome external component (firmware/esphome/components/iclforge/). Its own job
   # rather than a step in the one above: it needs ESPHome from PyPI and nothing
   # from ESP-IDF, so it runs on a plain runner while the pack job sits in
   # Espressif's container.
@@ -166,7 +166,7 @@ jobs:
       # the git one the docs show - a git source would validate whatever is on
       # the default branch and pass regardless of what this PR changed.
       - name: Validate the component
-        run: esphome config esphome/tests/iclforge-test.yaml
+        run: esphome config firmware/esphome/tests/iclforge-test.yaml
 
       # The schema's bounds are only worth having if they reject. A buffer
       # below one syncframe cannot ever assemble an access unit, so the
@@ -175,7 +175,7 @@ jobs:
       - name: Reject a buffer that cannot work
         run: |
           set -eu
-          sed 's/buffer_size: 16384/buffer_size: 512/' esphome/tests/iclforge-test.yaml \
+          sed 's/buffer_size: 16384/buffer_size: 512/' firmware/esphome/tests/iclforge-test.yaml \
             > esphome/tests/too-small.yaml
           if esphome config esphome/tests/too-small.yaml > /dev/null 2>&1; then
             echo "::error title=ESPHome schema::buffer_size: 512 was accepted, but no access unit fits in it" >&2

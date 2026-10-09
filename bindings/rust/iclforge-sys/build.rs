@@ -3,14 +3,14 @@ use std::path::{Path, PathBuf};
 
 fn main() {
     // This crate lives at <repo>/rust/iclforge-sys, so two levels up is the CMake source
-    // directory that owns libs/capi/ - see rust/README.md for why this crate builds the C
+    // directory that owns libs/capi/ - see bindings/rust/README.md for why this crate builds the C
     // library itself (bindgen against a header that was NOT built into the library it links
     // is exactly the drift AP9 exists to catch, so there is no "assume it's preinstalled" path).
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let repo_root = manifest_dir
         .parent()
         .and_then(Path::parent)
-        .expect("rust/iclforge-sys must live two directories below the repo root")
+        .expect("bindings/rust/iclforge-sys must live two directories below the repo root")
         .to_path_buf();
 
     for rel in [
@@ -26,7 +26,7 @@ fn main() {
         println!("cargo:rerun-if-changed={}", repo_root.join(rel).display());
     }
 
-    // Same trimmed option set python/pyproject.toml already uses for its own extension-module
+    // Same trimmed option set bindings/python/pyproject.toml already uses for its own extension-module
     // build: nothing outside iclforge::c and the codec core it embeds is relevant to this
     // binding, and turning the rest off keeps this build fast. {fmt} - the one dependency the
     // codec core itself has - resolves via find_package(CONFIG) with a FetchContent fallback
@@ -136,7 +136,7 @@ fn main() {
 
 /// Copies the built shared library next to this build's Cargo output so `cargo test`/`cargo run
 /// --example` find it without the caller hand-managing LD_LIBRARY_PATH/PATH. This is a
-/// local-dev/CI convenience, not a deployment story - see rust/README.md.
+/// local-dev/CI convenience, not a deployment story - see bindings/rust/README.md.
 fn copy_runtime_library(src_lib: &Path, runtime_name: &str) {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     // OUT_DIR is target/<profile>/build/<pkg>-<hash>/out; three levels up is target/<profile>/,

@@ -1781,7 +1781,7 @@ PYBIND11_MODULE(_iclforge, m) {
         "box can describe.");
 
     // The three optional submodules - see optional_modules.hpp. Each is its own
-    // translation unit, picked by python/CMakeLists.txt from a {present,absent}
+    // translation unit, picked by bindings/python/CMakeLists.txt from a {present,absent}
     // pair on exactly the condition that used to set a compile definition here.
     iclforge::python::register_signing(m);
 

@@ -2,7 +2,7 @@
 
 // The variant of the `ac3.ac4` submodule compiled when this configure did not
 // build iclforge::ac4 - see optional_modules.hpp for the
-// pair, and python/CMakeLists.txt for the selection.
+// pair, and bindings/python/CMakeLists.txt for the selection.
 //
 // Registers nothing, deliberately, on the same reasoning as the signing and
 // containers absent/ variants beside it. `ac3.ac4` is simply absent from the

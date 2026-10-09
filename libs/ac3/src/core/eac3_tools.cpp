@@ -647,7 +647,7 @@ struct EcplSpectrumScratch : EcplTables<Scalar> {
 // thread that actually decodes enhanced coupling. std::unique_ptr rather than a
 // raw pointer so it is released at thread exit where there is one.
 //
-// On a bare-metal target there is not one. apps/baremetal's probe measured
+// On a bare-metal target there is not one. firmware/baremetal's probe measured
 // 34,232 bytes still live when it finished - the double scratch's 32,768, a
 // 1,440-byte bin-angle vector that has since become a stack array, and the
 // __cxa_thread_atexit registrations for them - because the only thread never

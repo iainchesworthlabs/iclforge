@@ -31,7 +31,7 @@ from pathlib import Path
 
 LINE = re.compile(r"^([a-z0-9_]+)\.pcm_hash=([0-9a-f]{16})\s*$")
 # A fixture the probe declined to decode, and why - today only the per-target
-# heap budget (apps/baremetal/probe.cpp's over_budget). A run that says so is
+# heap budget (firmware/baremetal/probe.cpp's over_budget). A run that says so is
 # not a run that is missing a fixture: an ESP32-C3 has 400 KB of internal SRAM
 # and the two 7.1.4 rows peak at 238,094 and 244,502 bytes, so that leg decodes
 # twelve of the fourteen and states which two it did not. Absence WITHOUT one of these

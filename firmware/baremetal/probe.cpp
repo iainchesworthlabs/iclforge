@@ -13,7 +13,7 @@
 //      function cannot paper over one.
 //
 //   2. Does it produce the right audio? Every frame of every fixture in
-//      apps/baremetal/fixture.hpp is decoded and each channel's RMS compared
+//      firmware/baremetal/fixture.hpp is decoded and each channel's RMS compared
 //      against what the same library produced on the host.
 //
 //   3. What does it actually cost? Peak heap in bytes, allocation counts split
@@ -293,7 +293,7 @@ void report_hash(const char* codec, const PcmHash& hash) {
 //
 // The value arrives from CMake and is never defaulted here: every shape that
 // builds this file sets it, the hosted and arm-none-eabi ones through
-// apps/baremetal/CMakeLists.txt's cache variable and each ESP-IDF app through
+// firmware/baremetal/CMakeLists.txt's cache variable and each ESP-IDF app through
 // its own main/CMakeLists.txt. A conditional would put the platform back in
 // the translation unit, which is the rule Platform Macros enforces.
 constexpr std::size_t kHeapBudgetBytes = ICLFORGE_PROBE_HEAP_BUDGET_BYTES;

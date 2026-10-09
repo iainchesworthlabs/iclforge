@@ -53,7 +53,7 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
                                             src/network_group_sink.cpp)
     # A Hearth sink's firmware (planning/esp32-ota.md, O5): the board's own HTTP routes over
     # cpp-httplib, configured as libs/sendspin configures it, and the board's own headers for what
-    # GET /firmware says and what an image must be (esp-idf/iclforge/include, free of ESP-IDF,
+    # GET /firmware says and what an image must be (firmware/esp-idf/iclforge/include, free of ESP-IDF,
     # as iclforge-hearth-tests already reads them), so that this app holds an image to the rules the board
     # holds it to.
     target_sources(hearth_engine PRIVATE src/sink_firmware.cpp src/sink_firmware_view.cpp)

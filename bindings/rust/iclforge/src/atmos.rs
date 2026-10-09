@@ -71,7 +71,7 @@ impl AtmosConfig {
 ///
 /// [`ObjectPlacement::default`] calls the raw `iclforge_object_placement_init()` — room centre,
 /// unity gain, no LFE send. That C initializer exists because this crate's first pass found a
-/// zero-initialized placement silently encoding a MUTED object (`rust/README.md`, header
+/// zero-initialized placement silently encoding a MUTED object (`bindings/rust/README.md`, header
 /// defects, item 1); deriving `Default` from zeroes here would reintroduce exactly that bug in
 /// Rust, so it is implemented by calling the C fix instead.
 #[derive(Debug, Clone, Copy, PartialEq)]

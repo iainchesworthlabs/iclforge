@@ -199,7 +199,7 @@ if [[ -f "$vcpkg_json" ]] && [[ -f "$conanfile" ]] && [[ -f "$formula" ]] && [[ 
     if [[ -n "$vcpkg_license" ]]; then
         [[ "$conan_license" = "$vcpkg_license" ]] || note "licence drift: packaging/conan/conanfile.py says '$conan_license', vcpkg.json says '$vcpkg_license'"
         [[ "$formula_license" = "$vcpkg_license" ]] || note "licence drift: packaging/homebrew/Formula/iclforge.rb says '$formula_license', vcpkg.json says '$vcpkg_license'"
-        [[ "$pyproject_license" = "$vcpkg_license" ]] || note "licence drift: python/pyproject.toml says '$pyproject_license', vcpkg.json says '$vcpkg_license'"
+        [[ "$pyproject_license" = "$vcpkg_license" ]] || note "licence drift: bindings/python/pyproject.toml says '$pyproject_license', vcpkg.json says '$vcpkg_license'"
     else
         note "licence check: could not extract vcpkg.json's \"license\" field"
     fi

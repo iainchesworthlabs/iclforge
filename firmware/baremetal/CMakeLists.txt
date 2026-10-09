@@ -38,7 +38,7 @@
 # the failure would have surfaced as an undefined-symbol error a long way from
 # its cause.
 #
-# The esp32s3 value is set by esp-idf/iclforge/CMakeLists.txt before it
+# The esp32s3 value is set by firmware/esp-idf/iclforge/CMakeLists.txt before it
 # add_subdirectory()s the root, so it is already in the cache when this runs.
 if(NOT DEFINED ICLFORGE_BAREMETAL_PLATFORM)
     if(CMAKE_SYSTEM_NAME STREQUAL "Generic")
@@ -54,13 +54,13 @@ if(ICLFORGE_BAREMETAL_PLATFORM STREQUAL "esp32s3")
     # file to add, and an add_executable() here would produce a second binary
     # IDF has no way to flash.
     message(STATUS "  Footprint probe: ESP-IDF owns the application "
-                   "(apps/baremetal/platform/esp32s3)")
+                   "(firmware/baremetal/platform/esp32s3)")
     return()
 endif()
 
 # main.cpp is the entry point both hosted shapes share; probe.cpp is the probe
 # itself, which defines iclforge_probe::run() rather than main() so that ESP-IDF (which
-# calls app_main) can run the same code. See apps/baremetal/probe.hpp.
+# calls app_main) can run the same code. See firmware/baremetal/probe.hpp.
 # One probe of three, never more than one: the profiles are mutually exclusive
 # at the root (no two of decode / AC-3 encode / E-AC-3 encode fit in an
 # ESP32-S3's internal SRAM at once), and the AC-4 decoder is a third shape of the

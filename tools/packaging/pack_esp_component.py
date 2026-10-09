@@ -305,7 +305,7 @@ def main_source(with_ac4: bool) -> str:
 
 
 def manifest_targets() -> list[str]:
-    """The `targets:` list from esp-idf/iclforge/idf_component.yml.
+    """The `targets:` list from firmware/esp-idf/iclforge/idf_component.yml.
 
     Read rather than restated, and parsed by hand rather than with PyYAML: this
     script has no third-party dependency and the block it needs is a flat list
@@ -327,7 +327,7 @@ def manifest_targets() -> list[str]:
             elif stripped and not stripped.startswith("#"):
                 break
     if not targets:
-        raise SystemExit("no targets: block in esp-idf/iclforge/idf_component.yml")
+        raise SystemExit("no targets: block in firmware/esp-idf/iclforge/idf_component.yml")
     return targets
 
 

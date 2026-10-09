@@ -191,7 +191,7 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: js/package-lock.json
+          cache-dependency-path: bindings/js/package-lock.json
 
       - name: Build iclforge-wasm-decoder package
         working-directory: js

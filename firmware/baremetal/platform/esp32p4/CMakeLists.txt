@@ -77,7 +77,7 @@ set(ICLFORGE_MINIMAL_HOT_O2 ON CACHE BOOL
 
 # No ICLFORGE_DECODE_SCALAR override here, deliberately - unlike the C3 and C6
 # projects beside this one. The component
-# (esp-idf/iclforge/CMakeLists.txt) picks float where
+# (firmware/esp-idf/iclforge/CMakeLists.txt) picks float where
 # ESP-IDF's SOC_CPU_HAS_FPU capability says the part has a floating-point
 # unit, which this one does, the same reasoning the S3 project leaves
 # unstated too - see docs/platforms/bare-metal/esp32-s3.md, "Building -> The

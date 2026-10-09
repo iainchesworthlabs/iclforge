@@ -14,7 +14,7 @@
 #
 # PLACEMENT. Top level, beside python/, rust/ and js/ - the repo's existing
 # convention of one directory per binding, and an ESP-IDF component is one.
-# It used to live inside apps/baremetal/platform/esp32s3/, which made it the
+# It used to live inside firmware/baremetal/platform/esp32s3/, which made it the
 # probe's private business; an integrator running `idf.py add-dependency`, or an
 # ESPHome external component calling add_idf_component(), needs it somewhere it
 # can be pointed at without dragging a test application along.
@@ -24,7 +24,7 @@
 #
 #     set(EXTRA_COMPONENT_DIRS "/path/to/iclforge/esp-idf")
 #
-# The probe application under apps/baremetal/platform/esp32s3/ is now just
+# The probe application under firmware/baremetal/platform/esp32s3/ is now just
 # another consumer of this, which is the point: if it stops working the way an
 # integrator's project would, its own build says so.
 # ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ else()
 endif()
 
 # The decode-critical sources at -O2. libs/ac3/minimal.cmake lists them, with
-# what each one measured, and the probe under apps/baremetal/platform/esp32s3/
+# what each one measured, and the probe under firmware/baremetal/platform/esp32s3/
 # has always been built this way - so the timing docs/platforms/bare-metal/esp32-s3.md
 # quotes is this build, and a player built from this component without it
 # decodes slower than those figures. The cost is flash, not SRAM. Not FORCEd:
@@ -293,7 +293,7 @@ endif()
 # ESP32, S3, P4, H4 and S31 set it, and no other target does.
 #
 # Not FORCEd, and skipped entirely when the project has chosen already - above
-# its project(), as apps/baremetal/platform/esp32c3/ does, or on the command
+# its project(), as firmware/baremetal/platform/esp32c3/ does, or on the command
 # line:
 #
 #     idf.py -DICLFORGE_DECODE_SCALAR=float build
@@ -315,7 +315,7 @@ if(NOT DEFINED ICLFORGE_DECODE_SCALAR)
     set_property(CACHE ICLFORGE_DECODE_SCALAR PROPERTY STRINGS fixed float)
 endif()
 
-# Tells apps/baremetal/CMakeLists.txt that an external build system owns the
+# Tells firmware/baremetal/CMakeLists.txt that an external build system owns the
 # application. Without it that file would see CMAKE_SYSTEM_NAME "Generic" -
 # which ESP-IDF's own toolchain.cmake sets, exactly as the arm-none-eabi one
 # does - and build the Cortex-M3 probe: its reset vector, its __aeabi_read_tp

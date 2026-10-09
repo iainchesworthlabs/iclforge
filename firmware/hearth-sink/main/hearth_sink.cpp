@@ -13,7 +13,7 @@
 // configured layout and writes it to the sink.
 //
 // Both tasks, the ring and the decoders are the component's
-// (esp-idf/iclforge/include/iclforge/player.hpp), and so is the control surface
+// (firmware/esp-idf/iclforge/include/iclforge/player.hpp), and so is the control surface
 // (control.hpp) that lets something on the network say what to play and onto
 // what; the layout and the renderer are the library's
 // (libs/render/include/iclforge/render/layout.hpp, render.hpp). What is left here is
@@ -73,7 +73,7 @@
 #include "settings.hpp"
 
 // The example's half of the stage timers. main/CMakeLists.txt links the
-// bare-metal probe's backend (apps/baremetal/stage_timers.cpp) when the
+// bare-metal probe's backend (firmware/baremetal/stage_timers.cpp) when the
 // repository is there to provide it; it reads this clock, and its report
 // replaces the stand-ins below, which are what links in a component archive
 // that carries no apps/. Built with ICLFORGE_STAGE_TIMERS, each play ends with a
@@ -132,7 +132,7 @@ class SeamSource final : public iclforge::ByteSource {
 // The meter is what turns result=pass from "some units decoded without
 // returning an error" - which a stream decoding to silence satisfies - into an
 // end-to-end check: the RMS of what was actually sent, per slot, scaled by 1e6
-// the way apps/baremetal/probe.cpp reports levels. The player reports it and
+// the way firmware/baremetal/probe.cpp reports levels. The player reports it and
 // does not judge it; what the levels should be is a property of the stream and
 // the layout, so CI holds the expectation. Written from the decode task, read
 // from app_main after the run has ended.

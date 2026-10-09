@@ -96,7 +96,7 @@ the CPU probe, the signing key, SHA-256 and HMAC-SHA-256, and, header-only and n
 than one library uses), `libs/objects` (the object-audio model and the Object Audio Metadata
 payload), `libs/render` (layouts, routing and the renderer) and `libs/containers` (IEC 61937 burst
 packing, and the Matroska, MP4, MPEG-TS and IAMF writers and readers, each in a part of its own).
-`apps/{forge,crucible,hearth,demos}` and `apps/baremetal` consume them (Crucible and the Shield app
+`apps/{forge,crucible,hearth,demos}` and `firmware/baremetal` consume them (Crucible and the Shield app
 use the AC-3, E-AC-3 and Atmos codec only), and `apps/shared/{media,theme,preferences}` is application
 code that more than one program compiles in directly, with no library target of its own. A product is
 a directory of programs (`apps/forge/{cli,gui}`, `apps/hearth/{engine,ui,render,testsink,testserver}`,
@@ -109,7 +109,7 @@ licence notices each product's packages install. Nothing under `libs/` may depen
 
 **The tree holds four products, and the directories say which is which.** `libs/`
 other than `libs/audio` and `libs/sendspin`, the bindings under `python/`, `js/` and `rust/`, and
-`examples/` and `apps/baremetal` are **the library**; `iclforge` names it, and names its
+`examples/` and `firmware/baremetal` are **the library**; `iclforge` names it, and names its
 packages too. `apps/forge` is **Forge**, the tooling pair (`forge` and `forge-gui`), built and
 packaged as one thing. `apps/crucible`, with the driver in `apps/crucible/windows`, is **Crucible**.
 `apps/hearth`, `libs/sendspin` and the `hearth_sink` example are **Hearth**. `apps/demos/android` and

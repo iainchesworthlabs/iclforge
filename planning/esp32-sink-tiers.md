@@ -62,7 +62,7 @@ DACs are driven and at what width — same firmware family, same analogue front 
 ```
 
 Same `hearth_sink` family, same `SinkFrame::fixed` ES9080 contract
-([`sink_plan.hpp`](../esp-idf/iclforge/include/iclforge/sink_plan.hpp)), same Sendspin /
+([`sink_plan.hpp`](../firmware/esp-idf/iclforge/include/iclforge/sink_plan.hpp)), same Sendspin /
 Improv / page surface where the part allows. The tier is a **module choice on one PCB**,
 not four products.
 
@@ -81,7 +81,7 @@ the DACs do not.
   at the 512-bit frame (`sdkconfig.p4`). On the FireBeetle 2 it opens standard I2S and nothing
   wider. Its revision v1.3 chip has no PLL clock source for I2S, and the audio PLL it falls back
   to is too slow for a 512-bit frame; a v3.0 or newer chip has the 160 MHz PLL that clears it
-  ([the example's README](../esp-idf/iclforge/examples/hearth_sink/README.md#on-the-esp32-p4)).
+  ([the example's README](../firmware/hearth-sink/README.md#on-the-esp32-p4)).
   `GET /hardware` says so on such a board ([the device page's plan](esp32-device-ui.md#what-hardware-adds)).
 - **The ES9080 pair:** no PCB exists, no ES9080 is wired to any board, and no firmware programs
   one over I2C. What `SinkFrame::fixed` gives such a DAC, a fixed frame with the unused slots
@@ -221,7 +221,7 @@ and the three streams above have not been played through it.
      **Built, 2026-09-23 (PR #941):** `hearth_sink` runs on the P4 over this link. A clean boot,
      a Wi-Fi join and a paired Sendspin play from `ac3hearth-testserver` played an Atmos E-AC-3
      fixture onto 2.0, 315 of 315 bursts with no underrun
-     ([the example's README](../esp-idf/iclforge/examples/hearth_sink/README.md#on-the-esp32-p4)).
+     ([the example's README](../firmware/hearth-sink/README.md#on-the-esp32-p4)).
      **Not done:** a report of the SDIO and remote Wi-Fi cost against the same streams, and a
      group with an S3 or C6 board. The one comparison on record is the decoder time per frame
      through the player with the network up, against the probe with none
@@ -250,9 +250,9 @@ and the three streams above have not been played through it.
 | Phase | Work | Size | Depends on | Status |
 |---|---|---|---|---|
 | **P0** | This page + roadmap Proposed line; correct the old “P4 closed” wording to “closed as S3 replacement” | S | — | Done |
-| **C61-P1** | `esp32c61` probe under `apps/baremetal/platform/` + component target; board timing table (no network), mirroring the C6 probe | L | C61 board | Not started |
+| **C61-P1** | `esp32c61` probe under `firmware/baremetal/platform/` + component target; board timing table (no network), mirroring the C6 probe | L | C61 board | Not started |
 | **C61-P2** | Sendspin sink shape: `sdkconfig.sendspin-c61`, PSRAM-routed scratch, memory and DMA-queue measurement per "What 'good' must prove" | L | C61-P1 | Not started |
-| **P1** | `esp32p4` probe under `apps/baremetal/platform/` + component target; board timing table (no network) | L | P4 board | **Done, 2026-09-23** — real time on every fixture and every stream-set `714-*` file, at 360 MHz (this board's chip-revision ceiling, not the part's 400 MHz maximum) |
+| **P1** | `esp32p4` probe under `firmware/baremetal/platform/` + component target; board timing table (no network) | L | P4 board | **Done, 2026-09-23** — real time on every fixture and every stream-set `714-*` file, at 360 MHz (this board's chip-revision ceiling, not the part's 400 MHz maximum) |
 | **P2** | Ethernet player shape: stream set + tools rows onto 12/16 slots (capture, then TDM to one or both ES9080s) | L | P1; ES9080 hardware | **N/A on the DFRobot FireBeetle 2 (compact SKU)** — no Ethernet PHY on this board. Still the right path on a board that has one (e.g. the Function-EV board) |
 | **P3** | Hosted C6 Wi-Fi shape | L | P1; the onboard C6 | **Built, 2026-09-23 (PR #941).** `hearth_sink` for the P4 runs over `esp_wifi_remote`/`esp_hosted` on SDIO: a Wi-Fi join, mDNS and a paired Sendspin play onto 2.0 (exit criterion 5). TDM to the ES9080 pair is not (criterion 3) |
 | **P4** | `hearth_sink` target + guide; advertise tier capabilities on the modular PCB | XL | P2 (and P3 if Wi-Fi best) | **Partly built.** The P4 target exists (`sdkconfig.p4`, the `i2s_wide` sink), CI packages it as `hearth-sink-esp32p4-rev1`, it takes updates over the network, and `GET /hardware` reports its capabilities and its limits. There is no P4 sink guide page (the S3 and C6 have one), and no modular PCB |

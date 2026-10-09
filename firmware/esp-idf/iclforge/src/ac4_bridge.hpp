@@ -147,7 +147,7 @@ namespace iclforge::ac4bridge {
 }
 
 // Every delivered sample's bit pattern, in delivery order, through FNV-1a: the
-// probe's own hash (apps/baremetal/probe.cpp's PcmHash), so a value printed
+// probe's own hash (firmware/baremetal/probe.cpp's PcmHash), so a value printed
 // here is comparable with one printed there. Decision 26 of planning/ac4.md
 // promises the float tier's output identical on the host, the Cortex-M3 leg and
 // the ESP32s, and this is what says whether it is.

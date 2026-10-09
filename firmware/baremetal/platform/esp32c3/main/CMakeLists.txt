@@ -1,5 +1,5 @@
 # The ESP32-C3 application: IDF's app_main plus its clock, and the REAL probe -
-# apps/baremetal/probe.cpp or encode_probe.cpp, the same files the host, the
+# firmware/baremetal/probe.cpp or encode_probe.cpp, the same files the host, the
 # arm-none-eabi leg and the S3 build, checking the same fixtures against the
 # same levels and the same hashes. The esp32s3 sibling's copy of this file
 # carries the reasoning; only the paths and the target differ.

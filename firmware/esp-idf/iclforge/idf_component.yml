@@ -41,7 +41,7 @@ license: "GPL-3.0-or-later"  # matches LICENSE at the repo root
 #     property of integer arithmetic rather than of this part.
 #   - The ESP32-C6 is the same kind of core in the same tier, with 512 KB of
 #     SRAM against the C3's 400 KB and WiFi 6. It is listed since its probe
-#     (apps/baremetal/platform/esp32c6/) was built and timed on a board, with
+#     (firmware/baremetal/platform/esp32c6/) was built and timed on a board, with
 #     and without a network running (docs/platforms/bare-metal/esp32-c6.md).
 #     QEMU does not emulate it, so CI builds it and runs nothing on it.
 #   - The original ESP32 and the S2 have no FPU worth the name for this (the S2

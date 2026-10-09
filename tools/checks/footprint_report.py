@@ -9,7 +9,7 @@
 
 Three inputs, because no one of them answers the whole question:
 
-  --probe  The key=value lines apps/baremetal/probe.cpp printed while running:
+  --probe  The key=value lines firmware/baremetal/probe.cpp printed while running:
            peak heap, allocations per frame, the per-instance decoder sizes.
            Runtime cost, observed rather than derived.
   --elf    arm-none-eabi-size over the linked image: text, data, bss. Static

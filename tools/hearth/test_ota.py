@@ -1656,7 +1656,7 @@ class CommandLine(Case):
 
 
 class IdfExtension(unittest.TestCase):
-    """esp-idf/iclforge/examples/hearth_sink/idf_ext.py, as idf.py loads it."""
+    """firmware/hearth-sink/idf_ext.py, as idf.py loads it."""
 
     def load(self) -> types.ModuleType:
         spec = importlib.util.spec_from_file_location("idf_ext_hearth_sink", EXAMPLE / "idf_ext.py")

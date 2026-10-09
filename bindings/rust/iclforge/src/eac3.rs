@@ -403,7 +403,7 @@ impl DecodedSubstream {
     ///
     /// The header does not document this pointer's lifetime the way
     /// `iclforge_decoded_frame_channel_samples()` does for the AC-3 side (see
-    /// `rust/README.md`'s "header defects found" section, item 2) — this crate assumes the same
+    /// `bindings/rust/README.md`'s "header defects found" section, item 2) — this crate assumes the same
     /// "valid until the owner is destroyed" convention every other handle in the header follows,
     /// and ties the returned slice to `&self`'s lifetime regardless, so a wrong assumption here
     /// would show up as a borrow-checker error in this crate, never as a use-after-free in a
