@@ -28,7 +28,7 @@ manager wants for a component living in a subdirectory of a repository.
         components: [iclforge]
 
     iclforge:
-      version: v0.10.0-beta.1
+      version: main   # a ref that has firmware/esp-idf/iclforge
 """
 
 import esphome.codegen as cg
