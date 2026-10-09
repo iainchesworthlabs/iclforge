@@ -51,7 +51,12 @@ def main() -> None:
 
     def dir_rules(moves):
         rules, split = derive(moves)
-        return kept_dirs_out(rules, known), split
+        rules = kept_dirs_out(rules, known)
+        if stage == "c7-3":
+            # python, rust, js, esp-idf and esphome are ordinary words: only a path that goes on
+            # below one of them is rewritten here, and c7_roots.py respells the rest
+            rules = [r for r in rules if "/" in r[0]]
+        return rules, split
 
     n1b_paths.dir_rules = dir_rules
     sys.argv = [sys.argv[0], *argv]
