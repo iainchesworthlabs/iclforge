@@ -389,10 +389,10 @@ jobs:
         run: |
           set -euo pipefail
           workdir="$(mktemp -d)"
-          "build/config-${MATRIX_PRESET}/bin/forge" encode               tests/golden/audio/reference_51.wav "$workdir/gold.ac3" 448 51 dither=off >/dev/null
-          "build/config-${MATRIX_PRESET}/bin/forge" eac3-encode               tests/golden/audio/reference_51.wav "$workdir/gold.ec3" 256 nodither 51 >/dev/null
-          "build/config-${MATRIX_PRESET}/bin/forge" eac3-encode               tests/golden/audio/reference_51.wav "$workdir/gold_cpl.ec3" 256 cpl+nodither 51 >/dev/null
-          "build/config-${MATRIX_PRESET}/bin/forge" eac3-encode               tests/golden/audio/reference_51.wav "$workdir/gold_ecpl.ec3" 384 cpl+ecpl+nodither 51 >/dev/null
+          "build/config-${MATRIX_PRESET}/bin/forge" encode               testdata/audio/reference_51.wav "$workdir/gold.ac3" 448 51 dither=off >/dev/null
+          "build/config-${MATRIX_PRESET}/bin/forge" eac3-encode               testdata/audio/reference_51.wav "$workdir/gold.ec3" 256 nodither 51 >/dev/null
+          "build/config-${MATRIX_PRESET}/bin/forge" eac3-encode               testdata/audio/reference_51.wav "$workdir/gold_cpl.ec3" 256 cpl+nodither 51 >/dev/null
+          "build/config-${MATRIX_PRESET}/bin/forge" eac3-encode               testdata/audio/reference_51.wav "$workdir/gold_ecpl.ec3" 384 cpl+ecpl+nodither 51 >/dev/null
           python3 tools/checks/check_decode_scalar_snr.py               --double-cli "build/config-${MATRIX_PRESET}/bin/forge"               --float-cli build/decode-scalar-float/bin/forge               --workdir "$workdir"
         env:
           MATRIX_PRESET: ${{ matrix.preset }}
@@ -447,17 +447,17 @@ jobs:
         run: |
           set -euo pipefail
           workdir="$(mktemp -d)"
-          "build/config-${MATRIX_PRESET}/bin/forge" encode tests/golden/audio/reference_51.wav "$workdir/gold.ac3" 448 51 dither=off >/dev/null
-          "build/config-${MATRIX_PRESET}/bin/forge" eac3-encode tests/golden/audio/reference_51.wav "$workdir/gold.ec3" 256 nodither 51 >/dev/null
-          "build/config-${MATRIX_PRESET}/bin/forge" eac3-encode tests/golden/audio/reference_51.wav "$workdir/gold_cpl.ec3" 256 cpl+nodither 51 >/dev/null
-          "build/config-${MATRIX_PRESET}/bin/forge" eac3-encode tests/golden/audio/reference_51.wav "$workdir/gold_ecpl.ec3" 384 cpl+ecpl+nodither 51 >/dev/null
+          "build/config-${MATRIX_PRESET}/bin/forge" encode testdata/audio/reference_51.wav "$workdir/gold.ac3" 448 51 dither=off >/dev/null
+          "build/config-${MATRIX_PRESET}/bin/forge" eac3-encode testdata/audio/reference_51.wav "$workdir/gold.ec3" 256 nodither 51 >/dev/null
+          "build/config-${MATRIX_PRESET}/bin/forge" eac3-encode testdata/audio/reference_51.wav "$workdir/gold_cpl.ec3" 256 cpl+nodither 51 >/dev/null
+          "build/config-${MATRIX_PRESET}/bin/forge" eac3-encode testdata/audio/reference_51.wav "$workdir/gold_ecpl.ec3" 384 cpl+ecpl+nodither 51 >/dev/null
           python3 tools/checks/check_decode_scalar_snr.py --double-cli "build/config-${MATRIX_PRESET}/bin/forge" --float-cli build/decode-scalar-fixed/bin/forge --workdir "$workdir" --min-snr-db 110
         env:
           MATRIX_PRESET: ${{ matrix.preset }}
 
       # The tier's own gate, natively: the same fourteen fixtures the bare-metal
       # leg decodes under QEMU, decoded here on x86, their PCM hashes held to
-      # the pinned ones (tests/golden/fixed-probe-pcm-hashes.json). Two
+      # the pinned ones (testdata/fixed-probe-pcm-hashes.json). Two
       # architectures, two compilers, one set of hashes - integer arithmetic
       # has nothing to differ by, and this is what says so every run.
       - name: Fixed-point probe natively, hashes against the pinned ones
@@ -466,11 +466,11 @@ jobs:
         run: |
           set -euo pipefail
           ./tools/checks/run_baremetal_probe.sh --host --scalar=fixed | tee "$RUNNER_TEMP/fixed-host.txt"
-          python3 tools/checks/check_probe_hashes.py --expected tests/golden/fixed-probe-pcm-hashes.json "$RUNNER_TEMP/fixed-host.txt"
+          python3 tools/checks/check_probe_hashes.py --expected testdata/fixed-probe-pcm-hashes.json "$RUNNER_TEMP/fixed-host.txt"
 
       # The AC-4 decoder's probe natively, in float (planning/ac4.md, D14a): the
       # same five streams the bare-metal leg decodes under QEMU, their PCM hashes
-      # held to the same pinned ones (tests/golden/ac4-probe-pcm-hashes.json) - two
+      # held to the same pinned ones (testdata/ac4-probe-pcm-hashes.json) - two
       # architectures, two compilers, one set of hashes, decision 26's claim -
       # and the heap, allocation and stack ceilings on the host's own figures.
       - name: AC-4 probe natively, hashes against the pinned ones
@@ -479,10 +479,10 @@ jobs:
         run: |
           set -euo pipefail
           ./tools/checks/run_baremetal_probe.sh --ac4 --host | tee "$RUNNER_TEMP/ac4-host.txt"
-          python3 tools/checks/check_probe_hashes.py --expected tests/golden/ac4-probe-pcm-hashes.json "$RUNNER_TEMP/ac4-host.txt"
+          python3 tools/checks/check_probe_hashes.py --expected testdata/ac4-probe-pcm-hashes.json "$RUNNER_TEMP/ac4-host.txt"
 
       # The same probe at the AC-4 decoder's fixed-point tier (planning/ac4.md, D14d),
-      # held to the tier's own pins (tests/golden/ac4-fixed-probe-pcm-hashes.json),
+      # held to the tier's own pins (testdata/ac4-fixed-probe-pcm-hashes.json),
       # which the Cortex-M3 leg is held to as well.
       - name: Fixed-point AC-4 probe natively, hashes against the pinned ones
         if: matrix.gold_reference && matrix.preset == 'linux-gcc'
@@ -490,7 +490,7 @@ jobs:
         run: |
           set -euo pipefail
           ./tools/checks/run_baremetal_probe.sh --ac4 --host --scalar=fixed | tee "$RUNNER_TEMP/ac4-fixed-host.txt"
-          python3 tools/checks/check_probe_hashes.py --expected tests/golden/ac4-fixed-probe-pcm-hashes.json "$RUNNER_TEMP/ac4-fixed-host.txt"
+          python3 tools/checks/check_probe_hashes.py --expected testdata/ac4-fixed-probe-pcm-hashes.json "$RUNNER_TEMP/ac4-fixed-host.txt"
 
       # The same two questions for the ENCODE path's scalar. ICLFORGE_ENCODE_SCALAR
       # (libs/ac3/variants/encode-scalar-{float64,float32}/) is the axis the minimum-footprint

@@ -1,4 +1,4 @@
-"""Do the committed fixtures still match tests/golden/audio/corpus.json?
+"""Do the committed fixtures still match testdata/audio/corpus.json?
 
 The fixture corpus is the one input every published quality number in this
 project is measured against - docs/landscape.md, docs/quality-trend.md and
@@ -30,7 +30,7 @@ import wave
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-AUDIO = REPO / "tests" / "golden" / "audio"
+AUDIO = REPO / "testdata" / "audio"
 MANIFEST = AUDIO / "corpus.json"
 
 
@@ -131,7 +131,7 @@ def main() -> int:
             continue
         if path.name not in listed:
             failures.append(
-                f"{path.name}: present in tests/golden/audio/ but not in the corpus manifest. "
+                f"{path.name}: present in testdata/audio/ but not in the corpus manifest. "
                 "Register it in tools/generators/gen_programme_fixtures.py (SOURCES, SYNTHETIC "
                 "or BITSTREAMS) and rerun that script.")
 

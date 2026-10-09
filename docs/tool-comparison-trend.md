@@ -30,7 +30,7 @@ It carries `vs_ffmpeg`/`vs_dee` columns —
 the delta against the committed baseline's numbers for the *same* leg — that
 the other rows don't, since only `landscape` has a matching external number
 to compare against. A leg whose DEE score is marked unverified in
-[`tests/golden/external-baseline/manifest.json`](https://github.com/iainchesworthlabs/iclforge/blob/main/tests/golden/external-baseline/manifest.json)
+[`testdata/external-baseline/manifest.json`](https://github.com/iainchesworthlabs/iclforge/blob/main/testdata/external-baseline/manifest.json)
 (see that file's own header) shows no `vs_dee` value rather than one
 computed against a number that was never real. At baseline version 2 that is the two
 64 kbit/s stereo legs, where DEE's stereo range starts at 96 kbit/s, and rows recorded
@@ -551,7 +551,7 @@ release.
 **vs FFmpeg** / **vs DEE** are only populated on `landscape` rows — the
 delta between this build's own `auto`-tools E-AC-3 encode (or AC-3's
 automatic-everything encode) and the corresponding tool's number in the
-checked-in [external baseline](https://github.com/iainchesworthlabs/iclforge/blob/main/tests/golden/external-baseline/manifest.json)
+checked-in [external baseline](https://github.com/iainchesworthlabs/iclforge/blob/main/testdata/external-baseline/manifest.json)
 for that same leg, at the `baseline_version` recorded alongside it. A blank
 `vs DEE` cell on a `landscape` row means that leg's DEE score is marked
 unverified in the baseline manifest, not that the delta was zero — at

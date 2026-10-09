@@ -9,7 +9,7 @@
 // it a block at a time as a network client would, and decodes every frame with
 // iclforge::ac4::Decoder, then reads the presentations and the metadata back: the calls a player
 // makes, each across the boundary of the library that defines it. The stream is a committed DEE one
-// (tests/golden/external-baseline/ac4-51-film-96/dee.ac4, 5.1 at 48 kHz) whose every frame
+// (testdata/external-baseline/ac4-51-film-96/dee.ac4, 5.1 at 48 kHz) whose every frame
 // decodes.
 
 #include <cstddef>

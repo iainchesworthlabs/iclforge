@@ -114,7 +114,7 @@ class ProbeCeilings(unittest.TestCase):
         self.assertIn("title=ESP32-S3 footprint regression", e.getvalue())
 
     def test_the_committed_table_has_every_metric_for_every_fixture(self):
-        table = Path(__file__).resolve().parents[2] / "tests" / "golden" / "ac4-probe-ceilings.json"
+        table = Path(__file__).resolve().parents[2] / "testdata" / "ac4-probe-ceilings.json"
         fixtures = json.loads(table.read_text())["fixtures"]
         self.assertEqual(len(fixtures), 6)
         for name, entry in fixtures.items():

@@ -8,7 +8,7 @@
 //
 // The bitstreams firmware/baremetal/probe.cpp decodes and the per-channel levels it
 // checks them against (minimum-footprint decoder profile). Every stream is this project's own encoder
-// over the first 6 frames of a file under tests/golden/audio/ (named per
+// over the first 6 frames of a file under testdata/audio/ (named per
 // layout by LAYOUTS in the generator); the expected levels are that encoder's
 // output decoded by this project's own decoder, so they are a REGRESSION reference
 // (has this build changed?), not an independent oracle - the FFmpeg and Dolby

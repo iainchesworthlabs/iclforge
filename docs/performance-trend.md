@@ -72,7 +72,7 @@ shared transforms: `ac4_mdct512_forward`, `ac4_imdct512_inverse`, `ac4_fft512_fo
 `ac4_qmf_analysis64` and `ac4_qmf_synthesis64`. AC-4 decode quality has its own series on
 [Quality trend](quality-trend.md#ac-4-decode-quality).
 
-Every workload is fed real programme material (`tests/golden/audio/reference_51.wav`,
+Every workload is fed real programme material (`testdata/audio/reference_51.wav`,
 through `tests/performance/real_audio.hpp`), not the 440 Hz tone `iclforge-bench` and
 `iclforge-perf` ran on before PF1. A single stationary tone is not a cheaper version of
 programme material, it is a different workload: its spectrum is one bin wide, so the
@@ -1120,7 +1120,7 @@ transform's tables and kernel beside the float ones the object path still
 needs - and the peak heap 244,502 on this leg, the 7.1.4 fold (238,094 for
 7.1.4 as coded). The `pcm_hash` lines
 are identical on this leg and on the x86 host for all fourteen fixtures and are
-pinned in `tests/golden/fixed-probe-pcm-hashes.json`
+pinned in `testdata/fixed-probe-pcm-hashes.json`
 (`tools/checks/check_probe_hashes.py`); with the scalar's conversions from
 `float` and `double` written as floating expressions the two legs had differed
 by a raw unit on a few AC-3 samples, and writing them on the value's bits
@@ -1208,18 +1208,18 @@ before D14a5, 196,464 of them the converter's tables), the ceiling 750,000; the
 stack ceiling is 21,500 here and 28,500 on the host, whose frames are larger (24.7 to 26.0 KB read
 there); retained bytes after teardown 0, the ceiling 1,024. The ceilings are the runner's
 (`ICOUNT_CEILING_AC4` in `run_baremetal_probe.sh`, and the peaks and the allocations a frame in
-`tests/golden/ac4-probe-ceilings.json`), each a tenth or so over its figure
+`testdata/ac4-probe-ceilings.json`), each a tenth or so over its figure
 with the same rule as the tables above. On the x86-64 host (GCC 16, 64-bit pointers) the peaks
 are 442,193, 634,088, 1,024,014, 1,235,048, 1,954,304 and, for the companding fixture, 474,083.
 The PCM of every fixture is bit-identical on the two legs, and the hashes are pinned in
-`tests/golden/ac4-probe-pcm-hashes.json`. The companding fixture is what holds that for the
+`testdata/ac4-probe-pcm-hashes.json`. The companding fixture is what holds that for the
 streams with companding: before D14a4 the C libraries' `powf` and `exp2f` gave the Cortex-M3 leg,
 the host and the board a PCM each for such a stream, and no fixture had companding to say so.
 
 The fixed-point tier (D14d, 2026-10-02, the same leg, `run_baremetal_probe.sh --ac4 --scalar=fixed
 --icount`) decodes the same six fixtures with integer arithmetic where the `float` tier's is software
 floating point, and its PCM hashes are the same on this leg, on the x86-64 host and on RV32IMC
-(`tests/golden/ac4-fixed-probe-pcm-hashes.json`). Its instruction ceilings are the runner's
+(`testdata/ac4-fixed-probe-pcm-hashes.json`). Its instruction ceilings are the runner's
 `ICOUNT_CEILING_AC4_FIXED`; the peaks, allocations and stack share the `float` tier's ceilings:
 
 | Fixture | Instructions per frame | Ceiling | Peak heap | Allocations per frame | Stack |

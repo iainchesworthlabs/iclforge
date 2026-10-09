@@ -14,7 +14,7 @@
       "codec": "ac3",
       "layout": "5.1",
       "bitrate_kbps": 448,
-      "source_wav": "tests/golden/audio/reference_51.wav",
+      "source_wav": "testdata/audio/reference_51.wav",
       "scores": {
         "ffmpeg": {
           "snr_db": 39.00494384765625,
@@ -46,7 +46,7 @@
       "codec": "eac3",
       "layout": "stereo",
       "bitrate_kbps": 192,
-      "source_wav": "tests/golden/audio/reference_stereo.wav",
+      "source_wav": "testdata/audio/reference_stereo.wav",
       "scores": {
         "ffmpeg": {
           "snr_db": 32.810523986816406,
@@ -79,7 +79,7 @@
       "codec": "eac3",
       "layout": "5.1",
       "bitrate_kbps": 256,
-      "source_wav": "tests/golden/audio/reference_51.wav",
+      "source_wav": "testdata/audio/reference_51.wav",
       "scores": {
         "ffmpeg": {
           "snr_db": 31.14073944091797,
@@ -111,7 +111,7 @@
       "codec": "eac3",
       "layout": "stereo",
       "bitrate_kbps": 96,
-      "source_wav": "tests/golden/audio/reference_stereo.wav",
+      "source_wav": "testdata/audio/reference_stereo.wav",
       "scores": {
         "ffmpeg": {
           "snr_db": 5.627847194671631,
@@ -143,7 +143,7 @@
       "codec": "eac3",
       "layout": "stereo",
       "bitrate_kbps": 64,
-      "source_wav": "tests/golden/audio/reference_stereo.wav",
+      "source_wav": "testdata/audio/reference_stereo.wav",
       "scores": {
         "ffmpeg": {
           "snr_db": 5.6088690757751465,

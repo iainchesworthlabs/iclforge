@@ -49,7 +49,7 @@ header). Run from the repo root:
       [--inputs DIR ...]
 
 --streams adds every *.ac4 under each directory (the local census, say) to the
-committed streams under tests/golden/external-baseline/ and tests/golden/ac4-hsf/.
+committed streams under testdata/external-baseline/ and tests/golden/ac4-hsf/.
 --inputs compares the files under each directory instead, every frame of each: a corpus
 tools/fuzz/run.sh grew for fuzz_ac4_decode reaches syntax random streams do not.
 """
@@ -178,7 +178,7 @@ def synthetic(rng):
     # An HSF extension (Part 1 Table 12 and 4.2.4.3): the substream is at 96 or
     # 192 kHz and a substream beside it holds the lines beyond 24 kHz. Only for
     # the Part 1 channel elements, and for a single instance: the committed
-    # constructed streams (tests/golden/ac4-hsf/) are the ones that read to
+    # constructed streams (testdata/ac4-hsf/) are the ones that read to
     # their end, and mutations of them reach the extension's syntax; these
     # reach its refusals and its first bits.
     hsf = (factor == 1 and code not in IMMERSIVE_CODES and code != 0b111111110
@@ -641,9 +641,9 @@ def main():
             (cases / f"i{n:06d}.ac4").write_bytes(f.read_bytes())
         print(f"{len(inputs)} inputs copied to {cases}")
     else:
-        streams = sorted((REPO / "tests" / "golden" / "external-baseline").glob("ac4-*/*.ac4"))
+        streams = sorted((REPO / "testdata" / "external-baseline").glob("ac4-*/*.ac4"))
         # The constructed streams at 96 and 192 kHz, whose extension substreams the mutations reach.
-        streams += sorted((REPO / "tests" / "golden" / "ac4-hsf").glob("*.ac4"))
+        streams += sorted((REPO / "testdata" / "ac4-hsf").glob("*.ac4"))
         for directory in args.streams:
             streams += sorted(directory.rglob("*.ac4"))
         count = generate(streams, cases, args.mutations, args.synthetic, args.seed)

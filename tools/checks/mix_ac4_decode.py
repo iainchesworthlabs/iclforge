@@ -1,7 +1,7 @@
 """Check the mixes of forge's AC-4 presentations against Part 1's and Part 2's formulas.
 
 For each presentation of several substreams in the multiplexed streams under
-tests/golden/ac4/presentations/ (planning/ac4.md, phase D7; libs/ac4/tests/decoder/mux.hpp builds
+testdata/ac4/presentations/ (planning/ac4.md, phase D7; libs/ac4/tests/decoder/mux.hpp builds
 them from DEE's tone legs and the encoder's tone streams), this decodes the presentation with
 `forge decode presentation-id=`, and each of its substreams alone through the single-group
 presentations the streams also carry, and holds the mix to the matrix the texts give. The
@@ -63,7 +63,7 @@ import ac4_presentations  # noqa: E402
 import ac4_tables  # noqa: E402
 from score_ac4_decode import read_wav  # noqa: E402
 
-STREAMS = REPO / "tests" / "golden" / "ac4" / "presentations"
+STREAMS = REPO / "testdata" / "ac4" / "presentations"
 TOLERANCE_DB = 0.01
 ABSENT_DB = -60.0
 RESIDUAL_DB = -80.0

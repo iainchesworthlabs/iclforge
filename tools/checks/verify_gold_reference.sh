@@ -2,7 +2,7 @@
 #
 # The gold-reference correctness gate: proves forge's own decoder agrees
 # with an independent decoder (FFmpeg) on the same encoded bitstream, using a
-# fixed, checked-in 5.1 WAV (tests/golden/audio/reference_51.wav - see
+# fixed, checked-in 5.1 WAV (testdata/audio/reference_51.wav - see
 # tools/generators/gen_gold_reference_wav.py) as the input material. This is
 # the original validation pyramid's L3 ("FFmpeg oracle, every commit"; the
 # design now lives in docs/verification.md as "FFmpeg as an external oracle")
@@ -400,9 +400,9 @@ check_one "eac3_cpl" "$WORKDIR/gold_cpl.ec3" "eac3" 256 "$MIN_SNR_DB" "$EAC3_CPL
 # gold.ec3 above (this project's own encoder) cannot stand in for that, so
 # this checks a real FFmpeg-encoded fixture directly instead of an
 # forge-produced one:
-#   tests/golden/audio/reference_51_eac3_448k_cplbndstrce0.ec3
-#     ffmpeg -y -i tests/golden/audio/reference_51.wav -c:a eac3 -b:a 448k \
-#         tests/golden/audio/reference_51_eac3_448k_cplbndstrce0.ec3
+#   testdata/audio/reference_51_eac3_448k_cplbndstrce0.ec3
+#     ffmpeg -y -i testdata/audio/reference_51.wav -c:a eac3 -b:a 448k \
+#         testdata/audio/reference_51_eac3_448k_cplbndstrce0.ec3
 # Confirmed (ffmpeg 8.0.1) to set cplbndstrce == 0 with cplbegf == 12 in
 # every block - cplbegf != 0 matters: an indexing bug that reads the default
 # table relative to cplbegf instead of absolutely from it would still pass
@@ -435,7 +435,7 @@ check_one "eac3_cplbndstrce0" "$CPLBNDSTRCE0_EC3" "eac3" 448 \
 # Encoding Engine 6.5.4 and FFmpeg 8.0.1 - across three legs: ac3-51-448,
 # eac3-51-256 and eac3-stereo-192, each in a dee/ and an ffmpeg/ copy (see
 # tools/generators/gen_external_baseline.py, which produced them, and
-# tests/golden/external-baseline/manifest.json for the versions). Six is what
+# testdata/external-baseline/manifest.json for the versions). Six is what
 # this check GATES, which is no longer what that directory HOLDS - legs have
 # been added since for other consumers, and it is now nine leg directories and
 # fifteen bitstreams. Adding one there does not gate it here: a leg is gated
@@ -606,7 +606,7 @@ check_against_source "ext_eac3_transient_stereo_128_dee_source" "$TPN_DIR/dee.ec
 # legs measure against x86 on this same gate is exactly that kind of
 # divergence. This pins it instead: SHA-256 of the three streams this
 # project's own encoder just produced above (gold.ac3/gold.ec3/gold_cpl.ec3),
-# checked against tests/golden/bitstream-hashes.json. See
+# checked against testdata/bitstream-hashes.json. See
 # tools/checks/check_cross_platform_hash.py's own header for what a
 # not-yet-pinned kernel/mode key does (reported, not failed) versus a real
 # mismatch (failed, same as every other bit-exactness gate here).

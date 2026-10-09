@@ -15,7 +15,7 @@
 # and sends the decoder's allocations of 512 bytes and more there (planning/ac4.md, D14c).
 # QEMU emulates that PSRAM. It gates what the other two directions gate, with the AC-4
 # probe's own ceilings, and two things more: every fixture's PCM hash against the pins the
-# Cortex-M3 leg and the host are held to (tests/golden/ac4-probe-pcm-hashes.json, decision
+# Cortex-M3 leg and the host are held to (testdata/ac4-probe-pcm-hashes.json, decision
 # 26), and the internal RAM each fixture took at its worst moment, which is what Wi-Fi and
 # lwIP share with the decoder on a board.
 #
@@ -220,7 +220,7 @@ if [[ "$DIRECTION" == "ac4" ]]; then
     ICLFORGE_ESP32S3_MAX_STEADY_ALLOCS_PER_FRAME=${ICLFORGE_ESP32S3_MAX_STEADY_ALLOCS_PER_FRAME_AC4:-210}
     ICLFORGE_ESP32S3_MAX_AC4_STACK_BYTES=${ICLFORGE_ESP32S3_MAX_AC4_STACK_BYTES:-24000}
     # Each fixture's peak heap, steady-state allocations a frame and internal RAM ceilings are in
-    # tests/golden/ac4-probe-ceilings.json, which run_baremetal_probe.sh --ac4 reads as well.
+    # testdata/ac4-probe-ceilings.json, which run_baremetal_probe.sh --ac4 reads as well.
     AC4_CEILINGS="$REPO/tests/golden/ac4-probe-ceilings.json"
 fi
 

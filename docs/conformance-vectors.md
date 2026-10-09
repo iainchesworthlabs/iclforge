@@ -83,7 +83,7 @@ is stated as one.
   makes the set redistributable, and it exercises every coding tool, but it is not real programme
   material: a defect that only shows on speech or music is not something these vectors can find.
   Redistributable CC0 speech and music now exist in the tree, added as
-  `tests/golden/audio/programme_speech_stereo.flac` and `programme_music_stereo.flac` — but this
+  `testdata/audio/programme_speech_stereo.flac` and `programme_music_stereo.flac` — but this
   set was never wired to them: `tools/generators/gen_conformance_vectors.py` still synthesizes
   every source from first principles, and its own comment marks the spot where those files would
   join. Pointing the generator at them is outstanding work.
@@ -98,7 +98,7 @@ is stated as one.
   E-AC-3 only. ETSI publishes no AC-4 conformance bitstreams and no reference decode, so an AC-4
   implementer has the same gap an AC-3 one had. The AC-4 decoder and encoder are checked against
   streams from Dolby Encoding Engine and from the encoder itself; the ones committed under
-  `tests/golden/` are test inputs and are not attached to a release. [Validation](verification.md#ac-4)
+  `testdata/` are test inputs and are not attached to a release. [Validation](verification.md#ac-4)
   lists the checks.
 
 ## Hashes are per-toolchain
@@ -114,7 +114,7 @@ Compare a regenerated bundle's hashes only against a bundle built the same way.
   measurements, and [Validation](verification.md#why-arm64-and-x86-64-disagree) the analysis).
 - The encoded bytes are pinned across toolchains for three streams and no more.
   `tools/checks/check_cross_platform_hash.py` holds one SHA-256 for each of the gold-reference
-  AC-3, E-AC-3 and E-AC-3 coupling encodes in `tests/golden/bitstream-hashes.json`, and every
+  AC-3, E-AC-3 and E-AC-3 coupling encodes in `testdata/bitstream-hashes.json`, and every
   kernel line those pins name (x86-64 SSE2, arm64 NEON, generic) produces the same bytes for
   them. Nothing pins the bundle's own encodes across compilers and architectures, so a different
   compiler or architecture may change the hash of one.
@@ -166,7 +166,7 @@ under a signed name. No key ships with this project and none is invented by the 
 
 Every stream in the set is this project's own encoder output, encoded from source PCM this
 project generated — the checked-in gate fixtures at 48 kHz, and synthesis by the generator itself
-at the other rates. Nothing from `tests/golden/external-baseline/` (Dolby Media Encoder and
+at the other rates. Nothing from `testdata/external-baseline/` (Dolby Media Encoder and
 FFmpeg output, kept for comparison only) is ever included. The bundle carries the project's own
 licence.
 

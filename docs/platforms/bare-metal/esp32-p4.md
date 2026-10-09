@@ -823,7 +823,7 @@ time), and with D14e's decoder and the flash in QIO mode it takes 10.8 and 14.1 
 
 [Decision 26](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-09-25)
 promises identical `float` output everywhere, and the probe's six AC-4 fixtures pin it
-(`tests/golden/ac4-probe-pcm-hashes.json`, held on the x86-64 host and on the Cortex-M3 under QEMU).
+(`testdata/ac4-probe-pcm-hashes.json`, held on the x86-64 host and on the Cortex-M3 under QEMU).
 The board's PCM hash (FNV-1a over the sample bit patterns in the order the player delivered them, the
 probe's own) equals all six, played from the same committed streams: `ac4_20_music`
 `f860e51f602ae753`, `ac4_20_acpl` `e8b8cfa716dd0e1c`, `ac4_51_music` `6d36d7d2e8a070e9`,

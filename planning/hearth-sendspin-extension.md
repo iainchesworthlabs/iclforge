@@ -494,7 +494,7 @@ Recorded here and not yet raised with the Sendspin project ([Decisions](#decisio
 - The Sentinel PSK and its `psk_id`, from `connection.md`.
 - The two pairing-token examples in `pairing.md`.
 - CPace draft-21 Appendix B.1 (X25519, SHA-512).
-- For this role: a burst chunk from `wrap_frame` for `tests/golden`'s AC-3 fixture and one from
+- For this role: a burst chunk from `wrap_frame` for `testdata`'s AC-3 fixture and one from
   `Eac3BurstPacker` for an E-AC-3 fixture with fewer than six blocks per syncframe, checked field by
   field against the table above; and AC-4, AC-4 HBR4 and AC-4 HBR16 chunks from `Ac4BurstPacker`.
 

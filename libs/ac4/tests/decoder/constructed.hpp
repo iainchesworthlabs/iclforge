@@ -122,7 +122,7 @@ struct BuiltStream {
 [[nodiscard]] std::vector<std::vector<iclforge::ac4::Speaker>> aspx_elements(int ch_mode,
                                                                              int codec_mode = 1);
 
-// The cases committed as tests/golden/ac4/constructed/<name>.ac4, with
+// The cases committed as testdata/ac4/constructed/<name>.ac4, with
 // kCommittedFrames frames each, whose digests tools/references/ac4_syntax.py
 // wrote beside the other digests in tests/golden/ac4/.
 inline constexpr int kCommittedFrames = 4;

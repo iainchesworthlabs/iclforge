@@ -2,11 +2,11 @@
 
 Produces two checked-in files that together define one fixed Atmos scene:
 
-  tests/golden/audio/reference_objects.wav    5 mono essences, one per object,
+  testdata/audio/reference_objects.wav    5 mono essences, one per object,
                                               as the channels of a 48 kHz PCM16
                                               WAV (`forge atmos-encode` makes
                                               each source channel an object)
-  tests/golden/audio/reference_objects.paths  where each of those objects sits
+  testdata/audio/reference_objects.paths  where each of those objects sits
                                               in the room, in atmos-path's own
                                               keyframe format
 
@@ -71,7 +71,7 @@ import wave
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-AUDIO_DIR = REPO / "tests" / "golden" / "audio"
+AUDIO_DIR = REPO / "testdata" / "audio"
 WAV_OUT = AUDIO_DIR / "reference_objects.wav"
 PATHS_OUT = AUDIO_DIR / "reference_objects.paths"
 
@@ -214,7 +214,7 @@ def write_wav(objects: list[list[float]]) -> None:
 
 def write_paths() -> None:
     lines = [
-        "# The fixed placement of tests/golden/audio/reference_objects.wav's",
+        "# The fixed placement of testdata/audio/reference_objects.wav's",
         "# objects, in atmos-path's keyframe format:",
         "#",
         "#   object time_s x y z gain lfe_send",

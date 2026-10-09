@@ -668,7 +668,7 @@ std::vector<std::byte> read_bytes(const std::filesystem::path& path) {
 
 TEST_CASE("media_ac4_to_map: a DEE stream's frame rate, I-frames, presentation and metadata",
           "[hearth][hearth-controller]") {
-    // Its manifest entry (tests/golden/external-baseline/ac4-manifest.json):
+    // Its manifest entry (testdata/external-baseline/ac4-manifest.json):
     // 5.1 at 192 kbit/s, 120 frames at frame_rate_index 13, Lt/Rt preferred.
     const std::vector<std::byte> bytes =
         read_bytes(std::filesystem::path{ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR} /

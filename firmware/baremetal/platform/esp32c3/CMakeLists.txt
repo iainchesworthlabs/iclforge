@@ -24,7 +24,7 @@
 #
 # The RISC-V leg is also the tier's third architecture. Its `pcm_hash` lines
 # are checked against the same pinned values the x86 host and the Cortex-M3
-# leg are held to (tests/golden/fixed-probe-pcm-hashes.json), which is what
+# leg are held to (testdata/fixed-probe-pcm-hashes.json), which is what
 # "bit-identical by construction" has to mean if it means anything.
 # ---------------------------------------------------------------------------
 cmake_minimum_required(VERSION 3.28)

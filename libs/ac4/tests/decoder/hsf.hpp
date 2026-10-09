@@ -97,9 +97,9 @@ struct HsfStream {
 // A stream's frames, sync-framed with a CRC (Part 1 Annex G), as a file holds them.
 [[nodiscard]] std::vector<std::byte> hsf_sync_framed(const HsfStream& stream);
 
-// The cases committed as tests/golden/ac4-hsf/<name>.ac4, with kHsfCommittedFrames frames each,
+// The cases committed as testdata/ac4-hsf/<name>.ac4, with kHsfCommittedFrames frames each,
 // whose digests tools/references/ac4_syntax.py wrote beside the other digests in
-// tests/golden/ac4/ (hsf-<name>.tsv): the second transcription's reading of the HSF syntax.
+// testdata/ac4/ (hsf-<name>.tsv): the second transcription's reading of the HSF syntax.
 inline constexpr int kHsfCommittedFrames = 4;
 [[nodiscard]] std::vector<HsfCase> committed_hsf_cases();
 

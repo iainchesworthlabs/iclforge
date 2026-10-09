@@ -52,9 +52,9 @@ TestCase {
         verify(TestServices.useFakeRoom(), "the fake device room could not be installed");
         HearthController.firstRunSeen = true;
         HearthController.start();
-        shortAc3 = TestServices.stageFixture(repo + "tests/golden/external-baseline/ac3-51-448/dee.ac3",
+        shortAc3 = TestServices.stageFixture(repo + "testdata/external-baseline/ac3-51-448/dee.ac3",
                                              "Short 5.1.ac3");
-        longEac3 = TestServices.stageFixture(repo + "tests/golden/external-baseline/eac3-music-stereo-96/dee.ec3",
+        longEac3 = TestServices.stageFixture(repo + "testdata/external-baseline/eac3-music-stereo-96/dee.ec3",
                                              "Long stereo.ec3");
         // Plain text under an audio file's name: probing it is what marks it
         // unplayable, and the queue row has to say so.

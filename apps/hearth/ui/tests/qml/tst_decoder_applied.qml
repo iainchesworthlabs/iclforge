@@ -37,7 +37,7 @@ TestCase {
         HearthController.start();
         tryVerify(function() { return Object.keys(HearthController.decoderSettings).length > 0; }, 15000,
                   "decoderSettings was never populated");
-        shortAc3 = TestServices.stageFixture(repo + "tests/golden/external-baseline/ac3-51-448/dee.ac3",
+        shortAc3 = TestServices.stageFixture(repo + "testdata/external-baseline/ac3-51-448/dee.ac3",
                                              "Short 5.1.ac3");
         verify(shortAc3.length > 0);
     }

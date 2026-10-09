@@ -5,11 +5,11 @@
 // and a level, and the presentation Part 2 clause 4.8.2 and the readings of
 // libs/ac4/ERRATA.md ("Which presentations can be selected", "The order of
 // the preferences") select. The table is
-// committed as tests/golden/ac4/presentations/presentation-selection.tsv, which
+// committed as testdata/ac4/presentations/presentation-selection.tsv, which
 // tools/checks/test_ac4_presentation_selection.py holds the Python reference
 // parser's selection to.
 //
-// Mixing: the streams under tests/golden/ac4/presentations/ are the test
+// Mixing: the streams under testdata/ac4/presentations/ are the test
 // multiplexer's (mux.hpp) over DEE's tone legs and the encoder's
 // sources beside them, byte for byte, and hold presentations of several
 // substreams: music and effects with dialogue, main with associated audio,

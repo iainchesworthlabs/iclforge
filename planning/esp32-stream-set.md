@@ -65,8 +65,8 @@ reports differ, and a test on a board needs something to point a device at.
 | The WASM page's demo | `apps/demos/wasm/assets/demo.ec3` | E-AC-3 5.1, JOC objects in the QMF domain, 8 s. What CI's HTTP step serves. |
 | The example's own | `firmware/hearth-sink/stream/` | `sample.ac3` (AC-3 5.1, six frames), flashed to a partition; `height.ec3` (the probe's height fixture: five objects over a 5.1 bed, three on the ceiling, MDCT-band domain, six access units), which `sdkconfig.ci-render` plays from FAT onto 7.1.4 |
 | The fuzz seeds | `libs/ac3/fuzz/seeds/fuzz_eac3_decode/` | One-second streams from `tools/fuzz/generate-seeds.sh`: a tone per speaker at every layout the encoder names, the Annex E tool combinations at 5.1 and 7.1.4, objects, two external streams |
-| The external baseline | `tests/golden/external-baseline/` | Dolby Encoding Engine and FFmpeg streams: AC-3 and E-AC-3, stereo and 5.1, music and speech |
-| A licensed encoder's objects | `tests/golden/object-fixture/dee_joc_514.ec3` | 5.1.4 carried as JOC objects, QMF domain |
+| The external baseline | `testdata/external-baseline/` | Dolby Encoding Engine and FFmpeg streams: AC-3 and E-AC-3, stereo and 5.1, music and speech |
+| A licensed encoder's objects | `testdata/object-fixture/dee_joc_514.ec3` | 5.1.4 carried as JOC objects, QMF domain |
 
 Two things the checking found. The seeds named `eac3-encode-*-714` are encoded from a 5.1
 source, so four of their twelve channels - three heights and the LFE - are silent: they serve

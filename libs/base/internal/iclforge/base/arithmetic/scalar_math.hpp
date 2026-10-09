@@ -16,7 +16,7 @@
 //
 // The double overloads are libm's own functions, called exactly as the
 // encoders called them before this header existed, so the default build's
-// fifteen bitstream hashes (tests/golden/bitstream-hashes.json) hold.
+// fifteen bitstream hashes (testdata/bitstream-hashes.json) hold.
 //
 // The float overloads are the project's own. Not for speed alone - though on
 // the one platform whose encode scalar is float, the ESP32-S3, a call into

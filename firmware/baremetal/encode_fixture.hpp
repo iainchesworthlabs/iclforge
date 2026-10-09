@@ -28,7 +28,7 @@
 // recipe as the ordinary build's with float rounding, a different and equally
 // valid stream. The host shape of the profile is the same float build, which
 // is what keeps "regenerate on the host" true; the ordinary double build's
-// streams are pinned elsewhere, by tests/golden/bitstream-hashes.json.
+// streams are pinned elsewhere, by testdata/bitstream-hashes.json.
 //
 // Re-pinned 2026-10-08 for planning/consolidation.md decision 20: the forward transform
 // runs on the family's one FFT, whose float rounding differs from the radix-4/2 kernel's, and
@@ -36,7 +36,7 @@
 //
 // What a hash match establishes and what it does not: it says the target's
 // encoder produced the same bitstream the host's did from the same input. It
-// does NOT say either is correct - tests/golden/bitstream-hashes.json and the
+// does NOT say either is correct - testdata/bitstream-hashes.json and the
 // FFmpeg/Dolby comparisons in tools/ci/ are what say that, on the host where
 // there is something to compare against. This is a REGRESSION reference, the
 // same standing fixture.hpp has on the decode side.

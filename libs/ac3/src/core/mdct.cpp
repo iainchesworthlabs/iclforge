@@ -349,7 +349,7 @@ void mdct512_forward(std::span<const double, 512> windowed, std::span<double, 25
 // object reconstruction in src/oba/joc.cpp - which runs a FORWARD transform in
 // a decode, analysing the bed it is about to un-mix (PF8). Every other forward
 // caller is the encoder, and the encoder stays double: the fifteen bitstream
-// hashes in tests/golden/bitstream-hashes.json pin its output and nothing here
+// hashes in testdata/bitstream-hashes.json pin its output and nothing here
 // is on its path.
 //
 // No `fast` parameter, the same as the float32 inverse already declared in

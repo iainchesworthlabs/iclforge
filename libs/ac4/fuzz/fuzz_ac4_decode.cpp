@@ -35,12 +35,12 @@
 // mixing gains from the byte before it, so that the selection among the
 // presentations a table of contents offers and the mixing of the substreams
 // they name are pressed as well (the seeds include the multiplexed streams
-// of tests/golden/ac4/presentations/). The byte before that chooses core
+// of testdata/ac4/presentations/). The byte before that chooses core
 // decoding and any of the layouts Part 2's channel renderer takes the
 // immersive element to, so that the core's paths and the renderer are pressed
 // too (the seeds include DEE's 5.1.4 legs, and the fuzz script replays the
-// constructed immersive streams of tests/golden/ac4/constructed/ and the
-// object streams of tests/golden/ac4/objects/, which A-JOC, the object
+// constructed immersive streams of testdata/ac4/constructed/ and the
+// object streams of testdata/ac4/objects/, which A-JOC, the object
 // audio metadata and the intermediate spatial format renderer decode). Half
 // way through the stream, that decoder's output processing and presentation
 // change as a player's settings do (set_output(), set_presentation()), and

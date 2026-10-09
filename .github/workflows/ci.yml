@@ -80,7 +80,7 @@
 # called for L3 (FFmpeg-oracle strict decode, every commit) and L4
 # (perceptual SNR) from the start; neither was ever wired into any CI leg
 # until now. tools/checks/verify_gold_reference.sh
-# encodes a fixed checked-in 5.1 WAV (tests/golden/audio/reference_51.wav),
+# encodes a fixed checked-in 5.1 WAV (testdata/audio/reference_51.wav),
 # strict-decodes it with FFmpeg, decodes it with forge's own decoder, and
 # asserts they agree via tools/checks/compare_wav.py's delay-compensated SNR (>=
 # 30 dB gate). Runs on every leg except linux-llvm-asan-ubsan (diagnostic-

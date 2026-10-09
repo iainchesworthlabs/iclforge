@@ -12,7 +12,7 @@
 # Scheduled rather than per-commit because it is the widest, slowest and least
 # self-contained of the interop checks: it reaches the network, and the
 # per-commit half of the same question - the six committed
-# tests/golden/external-baseline bitstreams - already runs on every
+# testdata/external-baseline bitstreams - already runs on every
 # gold-reference leg of _build.yml, on every push and pull request, with no
 # network access at all.
 #
@@ -22,7 +22,7 @@
 #
 # That second half was added after a decoder defect sat on main for ten days
 # (PR #508). The reasoning it replaces was that a decoder change is already
-# covered per-commit by tests/golden/external-baseline, and for the streams in
+# covered per-commit by testdata/external-baseline, and for the streams in
 # that corpus it is. But every leg in it is a plain elementary stream - stereo
 # or 5.1, AC-3 or E-AC-3, generated from this repository's own source material
 # - so the substream layer had no per-commit coverage at all: no dependent

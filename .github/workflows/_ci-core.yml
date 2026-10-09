@@ -1103,7 +1103,7 @@ jobs:
       # again with a decoder built ICLFORGE_DECODE_SCALAR=float, at the same pins,
       # and the float decode against the double one on every committed stream,
       # below and above A-SPX's crossover, at the floors pinned in
-      # tests/golden/ac4/scalar-agreement.json. The AC-4 encoder is double in
+      # testdata/ac4/scalar-agreement.json. The AC-4 encoder is double in
       # every build (decision 34); its streams are decoded by the float decoder.
       - name: Build a float32 forge
         run: |
@@ -1124,7 +1124,7 @@ jobs:
 
       # The AC-4 decoder's fixed-point tier (planning/ac4.md, D14d), the same three
       # questions: the scorers at the same pins, and the fixed decode against the
-      # double one at the floors in tests/golden/ac4/scalar-agreement-fixed.json.
+      # double one at the floors in testdata/ac4/scalar-agreement-fixed.json.
       - name: Build a fixed-point forge
         run: |
           cmake --preset config-linux-llvm -B build/decode-scalar-fixed -DICLFORGE_DECODE_SCALAR=fixed
@@ -1300,7 +1300,7 @@ jobs:
           path: results/spectrograms
 
       # Compute-only, same as the landscape trend above: encodes the
-      # committed five-object scene (tests/golden/audio/reference_objects.wav
+      # committed five-object scene (testdata/audio/reference_objects.wav
       # plus its .paths placements) with this build's `atmos-encode`, decodes
       # it back to per-object WAVs with this build's `decode`, and scores each
       # object against the channel it came from. No external tool is involved
@@ -1356,7 +1356,7 @@ jobs:
   # producer job rather than a per-leg matrix, so this is one commit per CI
   # run, not a race between several. Needs neither a container nor a build:
   # tools/ci/append_external_comparison_history.py is stdlib-only, and
-  # tests/golden/external-baseline/manifest.json (the FFmpeg/DEE numbers to
+  # testdata/external-baseline/manifest.json (the FFmpeg/DEE numbers to
   # diff against) is a committed file the checkout below already has.
   persist-external-comparison-trend:
     name: Publish external-encoder landscape trend
@@ -1432,7 +1432,7 @@ jobs:
           commit_date="$(git show -s --format=%cI "$COMMIT_SHA")"
           python3 tools/ci/append_external_comparison_history.py \
             --trend-json results/trend.json \
-            --manifest-json tests/golden/external-baseline/manifest.json \
+            --manifest-json testdata/external-baseline/manifest.json \
             --history-dir history \
             --branch "$BRANCH" \
             --commit "$COMMIT_SHA" \

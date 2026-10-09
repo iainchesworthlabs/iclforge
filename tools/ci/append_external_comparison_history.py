@@ -11,7 +11,7 @@ failed the run).
 Reads tools/ci/quality_race.py's `trend` mode JSON output (one row per
 (leg, variant) for THIS build, scored entirely through forge's own
 decoder - see race_trend's docstring) plus the checked-in
-tests/golden/external-baseline/manifest.json (the FFmpeg/DEE numbers from
+testdata/external-baseline/manifest.json (the FFmpeg/DEE numbers from
 tools/generators/gen_external_baseline.py's last local run), and appends one JSONL
 record per row to <history-dir>/external-comparison-<branch>.jsonl. Only
 "landscape" rows (E-AC-3's "auto"/AC-3's automatic tools - the number

@@ -542,7 +542,7 @@ Two things about the probe differ from the decode one, and both follow from the 
   says the target produced what the host produced from the same input. Measured, the two agree
   exactly — so this project's encoder is bit-exact between x86_64 hardware doubles and
   `arm-none-eabi` soft float, which extends what
-  `tests/golden/bitstream-hashes.json` already pins across x86_64 and aarch64 to a target with no
+  `testdata/bitstream-hashes.json` already pins across x86_64 and aarch64 to a target with no
   FPU at all.
 
 Steady-state churn is **34 to 87 allocations per frame on the 2/0 rows, 67 for AC-3 5.1 and 173
@@ -686,7 +686,7 @@ double one, and its encoder - `encode_scalar_t` is a separate axis - writes the 
 byte for byte. The tier's own gate is a different kind: integer arithmetic is the same on every
 machine, so the bare-metal probe's `<codec>.pcm_hash` lines are identical on the x86 host and
 the Cortex-M3 leg, and CI holds both to the pinned ones in
-`tests/golden/fixed-probe-pcm-hashes.json` (`tools/checks/check_probe_hashes.py`). The
+`testdata/fixed-probe-pcm-hashes.json` (`tools/checks/check_probe_hashes.py`). The
 Catch2 suite is not one of its gates: two of the encoder's mirror self-checks compare the
 encoder's model against a real decode at a tolerance set for the double decoder, and fail under
 the fixed one. The plan, phases, and measurements are in
@@ -713,7 +713,7 @@ Cody-Waite reduction and a short series), because the profile's fixture hashes a
 the x86 host, the Cortex-M3 leg and the ESP32-S3 and three C libraries' `logf` do not agree in
 their last bit; the `double` overloads are libm's, called as before. Every `<double>`
 instantiation is the function the ordinary build always called, so
-`tests/golden/bitstream-hashes.json` holds; the profile's own fixtures
+`testdata/bitstream-hashes.json` holds; the profile's own fixtures
 (`firmware/baremetal/encode_fixture.hpp`) are the float encoder's streams, identical on the x86
 host, the Cortex-M3 leg and the ESP32-S3 - and the same bytes the float front end alone had
 produced, so converting everything behind it moved no fixture's hash.
@@ -729,7 +729,7 @@ is the integer search. CI's `linux-gcc` leg builds this scalar's full CLI beside
 decoder's to run its streams through the gold-reference gate and
 `tools/checks/check_encode_scalar_quality.py`, which holds the float encoder's worst channel to
 within 0.5 dB of the double encoder's on five gold streams (they are identical to the hundredth
-of a decibel), and `tests/golden/bitstream-hashes.json` pins its three streams on x86-64 under
+of a decibel), and `testdata/bitstream-hashes.json` pins its three streams on x86-64 under
 the `encfloat` mode.
 
 No gold-reference number moved, because the choice is per-profile rather than global. The
@@ -767,7 +767,7 @@ gold-reference gate against each, beside their comparisons with the double build
 Two things it does not cover:
 
 - The **encoder**. This gate compares decodes. The encoder's `float` front end has its own,
-  `tools/checks/check_encode_scalar_quality.py` (above), and `tests/golden/bitstream-hashes.json`
+  `tools/checks/check_encode_scalar_quality.py` (above), and `testdata/bitstream-hashes.json`
   pins the encoder's bitstreams per kernel and transform mode: the `x86_64-sse2`, `aarch64-neon`
   and `generic` kernels with the fast transform, the two that have a reference transform, and the
   float front end on x86-64 (`encfloat`).
@@ -1591,7 +1591,7 @@ its AC-3 decoder and therefore runs different code on x86-64 (SSE/AVX) than on a
 FFmpeg's NEON decode differed from its SSE decode by a last bit, that alone would move the measured
 agreement and nothing in this project would be at fault.
 
-It does not. Decoding `tests/golden/external-baseline/ac3-51-448/dee.ac3` twice on the same x86-64
+It does not. Decoding `testdata/external-baseline/ac3-51-448/dee.ac3` twice on the same x86-64
 host, once normally and once with `ffmpeg -cpuflags 0` forcing its plain-C reference path, gives
 two WAVs that are *not* byte-identical — FFmpeg's kernel choice does change its output — but the
 difference sits at **100–117 dB** per channel. That is 30 dB or more below the ~88 dB level at
@@ -1628,7 +1628,7 @@ That mystery therefore stays open — both hypotheses proposed for it are now cl
 by direct measurement rather than by argument — but it is no longer *unwatched*: a cross-platform
 bitstream-hash gate (`tools/checks/check_cross_platform_hash.py`, wired into
 [the gold-reference gate](#gold-reference-correctness-gate)) pins a SHA-256 of the actual encoded
-bytes per `(kernel, transform mode)` pair in `tests/golden/bitstream-hashes.json`, so this specific
+bytes per `(kernel, transform mode)` pair in `testdata/bitstream-hashes.json`, so this specific
 divergence — resolved or not — cannot silently change size without a CI failure pointing straight
 at it. `x86_64-sse2` and `generic` were pinned from the measurements above, and `aarch64-neon` is now
 pinned too — from the real arm64 CI legs rather than the qemu cross-build this file declined to
@@ -1658,7 +1658,7 @@ path on real arm64 silicon — which is also the one thing no emulated run has r
 which stays diagnostic-only) is the first real implementation of the project's original
 validation-pyramid design (now [docs/verification.md](verification.md)), which had never been
 wired into CI before this: encode a fixed, checked-in 5.1 WAV
-(`tests/golden/audio/reference_51.wav`, synthesized once by `tools/generators/gen_gold_reference_wav.py` —
+(`testdata/audio/reference_51.wav`, synthesized once by `tools/generators/gen_gold_reference_wav.py` —
 independent of this codec's own encoder/decoder, not bootstrapped from one of our own encodes),
 strict-decode the result with FFmpeg (`-err_detect crccheck+bitstream+buffer+explode`, checked
 via stderr content rather than exit code — confirmed locally that ffmpeg's own process exits 0

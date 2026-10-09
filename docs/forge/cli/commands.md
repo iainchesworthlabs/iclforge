@@ -839,7 +839,7 @@ the real decoder with the inverse transform switched off, which is where the `dy
 the EMDF payload ids, the object layer and the per-block tool usage come from. A syncframe the
 parse tier declines is counted and reported (`parse errors` in the table, `parse_failures` in the
 JSON); the header tier's answers for it stand. On a stream the decoder reads throughout, such as
-`tests/golden/external-baseline/eac3-51-256/dee.ec3`, the parse tier accepts every syncframe and
+`testdata/external-baseline/eac3-51-256/dee.ec3`, the parse tier accepts every syncframe and
 the tool lines show what the encoder used: coupling, spectral extension and AHT there.
 
 **Exit code** is 0 only when every syncframe passed its CRC *and* the parser accepted it, so
@@ -985,13 +985,13 @@ decode. There is no `detail=frames`/`detail=blocks` equivalent (see
 cover, including the narrower evidence behind the A-JOC/object/OAMD path).
 
 ```bash
-forge probe tests/golden/external-baseline/ac4-51-film-96/dee.ac4
+forge probe testdata/external-baseline/ac4-51-film-96/dee.ac4
 ```
 
 That is a stream DEE encoded, committed with the tests:
 
 ```text
-file            tests/golden/external-baseline/ac4-51-film-96/dee.ac4
+file            testdata/external-baseline/ac4-51-film-96/dee.ac4
 codec           AC-4
 access units    120 (120 sync frame(s)), 62160 bytes
 CRC             120 of 120 valid

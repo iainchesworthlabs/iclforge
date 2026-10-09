@@ -59,9 +59,9 @@ Modes:
                (original/iclforge/FFmpeg/DEE spectrograms) via
                render_spectrograms() - this part DOES need an `ffmpeg`
                binary, only ever to decode the already-committed
-               tests/golden/external-baseline/ bitstreams, never to encode.
+               testdata/external-baseline/ bitstreams, never to encode.
   objects    - object-reconstruction quality: the committed five-object
-               scene (tests/golden/audio/reference_objects.wav plus its
+               scene (testdata/audio/reference_objects.wav plus its
                .paths placements) encoded with `atmos-encode` and decoded
                back to per-object WAVs, one SNR/LSD/MOS row per object per
                rate. Compute-only, no gate; see race_objects(). There is no
@@ -327,7 +327,7 @@ def align(original, decoded, skip=RATE, probe_len=32768, window_extra=65536):
     Defaults (skip 1s, 32768-sample probe, +65536 search window) match
     make_material()'s ~10s synthesized material, the only length this was
     originally written against. Committed fixtures used elsewhere (e.g.
-    tests/golden/audio/reference_51.wav at 2.5s) are far shorter than
+    testdata/audio/reference_51.wav at 2.5s) are far shorter than
     2*skip + probe_len - the trimmed overlap below would come out empty or
     inverted - so callers scoring those pass smaller values explicitly
     rather than this function guessing a length-appropriate scale itself.
@@ -1483,7 +1483,7 @@ def race_ci(original, source, original_51, source_51, original_tr, source_tr):
 # race_ci) - this file must never import that one, since it is explicitly
 # the local-only, never-in-CI script and this mode is the opposite: CI-only,
 # no external encoder ever invoked.
-AUDIO_DIR = REPO / "tests" / "golden" / "audio"
+AUDIO_DIR = REPO / "testdata" / "audio"
 
 
 # The programme fixtures ship as FLAC (tools/generators/gen_programme_fixtures.py's
@@ -1668,7 +1668,7 @@ def race_trend(json_out=None):
 # own per-leg loop: it re-reads what that loop already wrote to BUILD rather
 # than threading image state through the scoring path, and it never invokes
 # FFmpeg's or DEE's own encoders - only decodes the committed
-# tests/golden/external-baseline/<leg>/*.{ac3,ec3} bitstreams, the same
+# testdata/external-baseline/<leg>/*.{ac3,ec3} bitstreams, the same
 # never-runs-in-CI boundary docs/landscape.md documents for the numbers.
 
 
@@ -1705,7 +1705,7 @@ def render_spectrograms(out_dir):
     already produced BUILD/trend_<leg>_landscape.wav - this reads that file
     rather than re-encoding.
 
-    DEE's row is skipped per-leg when tests/golden/external-baseline/
+    DEE's row is skipped per-leg when testdata/external-baseline/
     manifest.json marks that leg's DEE score "unverified" (currently both
     5.1 legs, DEE's own Ls-channel-drop bug - see that file) - showing a
     spectrogram next to numbers the project itself doesn't trust would be
@@ -1719,7 +1719,7 @@ def render_spectrograms(out_dir):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt  # noqa: PLC0415 - must follow the use("Agg") call
 
-    baseline_root = REPO / "tests" / "golden" / "external-baseline"
+    baseline_root = REPO / "testdata" / "external-baseline"
     manifest = json.loads((baseline_root / "manifest.json").read_text())
     ext = {"ac3": "ac3", "eac3": "ec3"}
     baseline_dir = baseline_root
@@ -1795,7 +1795,7 @@ def render_spectrograms(out_dir):
 # measured, so a 10-20 dB JOC regression passed CI and appeared on no page.
 #
 # The loop is the one that unit test runs, moved out to the CLI and to a
-# committed scene: encode tests/golden/audio/reference_objects.wav (five mono
+# committed scene: encode testdata/audio/reference_objects.wav (five mono
 # object essences as WAV channels) with `atmos-encode`, driven by the
 # committed placements in reference_objects.paths, then decode with
 # `decode <stream> <bed> <objects_dir>` and score each exported object_NN.wav

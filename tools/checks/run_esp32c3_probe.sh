@@ -16,7 +16,7 @@
 # arithmetic having no rounding mode, no fused multiply-add and no C library's
 # last bit to differ by. Two architectures agreeing is a coincidence a third
 # can break, so this leg holds the probe's <codec>.pcm_hash lines to the same
-# pinned values (tests/golden/fixed-probe-pcm-hashes.json) the host and the
+# pinned values (testdata/fixed-probe-pcm-hashes.json) the host and the
 # Cortex-M3 leg are held to. That check is this leg's reason for existing; the
 # footprint ceilings below are the ordinary ones every probe leg carries.
 #

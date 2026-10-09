@@ -5,7 +5,7 @@
     "ac4-stereo-64": {
       "encoder": "dee_ac4_encoder",
       "source": "reference_stereo.wav: the committed 3.0 s synthetic stereo reference",
-      "source_wav": "tests/golden/audio/reference_stereo.wav",
+      "source_wav": "testdata/audio/reference_stereo.wav",
       "output_channel_layout": "stereo",
       "bitrate_kbps": 64,
       "options": [],

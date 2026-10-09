@@ -4,7 +4,7 @@ libs/ac4/tests/decoder/test_presentations.cpp builds a table of tables of conten
 choice (presentation_id, position, language, associated audio, headphones), a decoder level and
 the presentation ETSI TS 103 190-2 clause 4.8.2 and libs/ac4/ERRATA.md's readings select, and
 holds the decoder to it; the table is committed as
-tests/golden/ac4/presentations/presentation-selection.tsv. This test holds
+testdata/ac4/presentations/presentation-selection.tsv. This test holds
 tools/references/ac4_presentations.py, the selection transcribed separately in Python over
 ac4_parse.py's reading of each table of contents, to the same table, so neither can change a
 reading alone.
@@ -19,7 +19,7 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-TABLE = REPO / "tests" / "golden" / "ac4" / "presentations" / "presentation-selection.tsv"
+TABLE = REPO / "testdata" / "ac4" / "presentations" / "presentation-selection.tsv"
 
 sys.path.insert(0, str(REPO / "tools" / "references"))
 

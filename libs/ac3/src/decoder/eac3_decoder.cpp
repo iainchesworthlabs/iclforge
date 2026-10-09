@@ -602,7 +602,7 @@ std::expected<AudFrm, DecodeError> parse_audfrm(BitReader& r, const Bsi& bsi, in
         // it resends the coupling channel's exponents mid-frame, so
         // ncplregs > 1, cplahtinu is absent, and reading it anyway put every
         // field after it one bit out - which is what
-        // tests/golden/external-baseline/eac3-51-256/dee.ec3 and the
+        // testdata/external-baseline/eac3-51-256/dee.ec3 and the
         // third-party interop checks in tools/checks/verify_gold_reference.sh
         // exist to catch.
         const auto blocks = static_cast<std::size_t>(nblks);
@@ -1981,7 +1981,7 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
     // encoder or FFmpeg's produces reaches it - both send the geometry once,
     // in block 0, and never resend it - while a Dolby Encoding Engine 6.5.4
     // stream resends coupling geometry mid-frame with cplbndstrce clear; see
-    // tests/golden/external-baseline/eac3-51-256/dee.ec3 and the third-party
+    // testdata/external-baseline/eac3-51-256/dee.ec3 and the third-party
     // interop checks in tools/checks/verify_gold_reference.sh.
     bool spx_structure_set = false;
     bool cpl_structure_set = false;
@@ -2734,7 +2734,7 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
                 // Still unverified against a real stream, deliberately
                 // flagged as such: nothing in reach emits snroffststr != 0 at
                 // all. Neither FFmpeg 8.0.1's encoder nor Dolby's DEE 6.5.4
-                // ever does (checked over tests/golden/external-baseline/,
+                // ever does (checked over testdata/external-baseline/,
                 // every frame of both E-AC-3 legs), and when this project's
                 // own encoder was made to emit strategies 0x1 and 0x2 to the
                 // reading above, FFmpeg's decoder refused both - with and

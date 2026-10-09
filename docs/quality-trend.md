@@ -37,7 +37,7 @@ trend` job in `_build.yml`, surfaced through `ci.yml`'s `build-and-test` call;
 it is not one of `_ci-core.yml`'s trend jobs. See `REGRESSION_DROP_DB` and
 `HARD_REGRESSION_DROP_DB` in `tools/ci/append_quality_history.py`.
 
-Every point the chart plots is measured against `tests/golden/audio/reference_51.wav`,
+Every point the chart plots is measured against `testdata/audio/reference_51.wav`,
 which is **synthesized** — `sin()`, pseudo-random noise and FIR smoothing,
 2.5 s long (the table also lists checks on other fixtures, marked below). That is the right choice for this page, which asks "did the
 round trip change" and needs the material to be identical across years of

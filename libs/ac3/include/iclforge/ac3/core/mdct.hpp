@@ -56,7 +56,7 @@ ICLFORGE_AC3_EXPORT void mdct512_forward(std::span<const double, 512> windowed,
 // is oba::joc's object reconstruction, which runs a forward transform inside a
 // DECODE - it analyses the bed before un-mixing it (PF8). The encoder's own
 // forward path stays double and is untouched: the fifteen bitstream hashes in
-// tests/golden/bitstream-hashes.json pin its output.
+// testdata/bitstream-hashes.json pin its output.
 //
 // No `fast` parameter, for the same reason the float32 inverse below has none:
 // the direct evaluation is the spec's own and the oracle the fast path is

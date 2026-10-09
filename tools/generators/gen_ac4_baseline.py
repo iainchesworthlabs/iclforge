@@ -238,9 +238,9 @@ import ac4_parse
 import ac4_syntax
 
 REPO = Path(__file__).resolve().parent.parent.parent
-AUDIO = REPO / "tests" / "golden" / "audio"
-OUT = REPO / "tests" / "golden" / "external-baseline"
-DIGESTS = REPO / "tests" / "golden" / "ac4"
+AUDIO = REPO / "testdata" / "audio"
+OUT = REPO / "testdata" / "external-baseline"
+DIGESTS = REPO / "testdata" / "ac4"
 SCRATCH = REPO / "build" / "ac4_baseline_scratch"
 
 DEE_DIR = Path(r"C:\Program Files\Dolby\Dolby Media Encoder\resources\dee-dir")
@@ -263,7 +263,7 @@ DDPJOC = "dee_ddpjoc_encoder"
 # 3: planning/ac4.md's phase G0. Every leg but ac4-stereo-64 is made again from 5 s sources
 #    with loudness measured and not corrected, so a decode can be scored against its source;
 #    two one-tone-per-channel legs; source_sha256; walked values computed by ac4_syntax.py;
-#    the digests under tests/golden/ac4/ written here; the gold set.
+#    the digests under testdata/ac4/ written here; the gold set.
 # 4: phase G1. Three committed 5.1.4 legs, one tone per channel in each immersive codec mode,
 #    without digests until D9; the gold set's g1_legs (the module docstring's "Phase G1"),
 #    with G0's legs, sources and files left as they were.

@@ -26,7 +26,7 @@ and an MP4 file, and:
              the muxer leaves out (libs/ac4/ERRATA.md, "The 3/2/2 layout's top front pair").
 
 Phase E6's presentations: the encoder's streams of several substreams and presentations under
-tests/golden/ac4/presentations/ (encoder-*.ac4, which libs/ac4/tests/encoder/test_presentations.cpp
+testdata/ac4/presentations/ (encoder-*.ac4, which libs/ac4/tests/encoder/test_presentations.cpp
 writes with AC4_ENCODER_WRITE_PRESENTATIONS, beside the configuration each was made from as JSON), whose
 MediaInfo reading (`--Output=JSON`) lists every presentation with the configured
 presentation_config, presentation_id, md_compat (MediaInfo's "PresentationLevel"), groups,
@@ -39,7 +39,7 @@ reads there, which libs/ac4/tests/encoder/test_presentations.cpp holds equal to 
 MediaInfo reads no substream after a presentation_config 6 (EMDF-only) presentation, so the
 encoder's streams list that presentation last.
 
-Phase E9's objects: the encoder's object streams under tests/golden/ac4/objects/ (encoder-*.ac4,
+Phase E9's objects: the encoder's object streams under testdata/ac4/objects/ (encoder-*.ac4,
 which libs/ac4/tests/encoder/test_objects.cpp writes with AC4_ENCODER_WRITE_OBJECTS), whose
 MediaInfo
 reading (`--Output=JSON`) gives the count of the objects the stream was configured with, in the
@@ -433,7 +433,7 @@ def dac4(path):
 
 # --- Phase E6: the encoder's presentations ------------------------------------------------
 
-PRESENTATION_STREAMS = REPO / "tests" / "golden" / "ac4" / "presentations"
+PRESENTATION_STREAMS = REPO / "testdata" / "ac4" / "presentations"
 # MediaInfo's names for Part 2 Table 53's presentation_config and Part 1 Table 91's
 # content_classifier.
 CONFIG_NAMES = {0: "Music and Effects + Dialogue", 1: "Main + Dialogue Enhancement",
@@ -600,7 +600,7 @@ def check_presentations(mediainfo, cli, work):
 
 # --- Phase E9: the encoder's objects --------------------------------------------------------------
 
-OBJECT_STREAMS = REPO / "tests" / "golden" / "ac4" / "objects"
+OBJECT_STREAMS = REPO / "testdata" / "ac4" / "objects"
 # Each committed stream's objects, the LFE among them, its bed objects and whether its downmix is a
 # static bed, as libs/ac4/tests/encoder/test_objects.cpp configures them.
 OBJECT_CONFIGURATIONS = {

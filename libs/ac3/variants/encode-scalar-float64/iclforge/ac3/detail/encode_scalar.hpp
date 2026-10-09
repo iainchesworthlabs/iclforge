@@ -16,7 +16,7 @@
 // minimum-footprint profile picks float32 for both, unconditionally.
 //
 // double is the default because the fifteen bitstream hashes in
-// tests/golden/bitstream-hashes.json, the quality trend and every encoder
+// testdata/bitstream-hashes.json, the quality trend and every encoder
 // oracle are stated in terms of this arithmetic. The float variant produces a
 // different, equally valid bitstream: the same recipe with float rounding,
 // which moves a transient decision or a quantised coefficient now and then.

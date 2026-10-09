@@ -3,7 +3,7 @@
 Phase D7 of planning/ac4.md builds presentations of several substreams (music and effects with
 dialogue, main with associated audio, main with a dialogue enhancement substream) from the
 substreams of separate streams: the main and music and effects substreams from DEE's committed
-tone legs (tests/golden/external-baseline/ac4-51-tones-384 and ac4-20-tones-192), and the
+tone legs (testdata/external-baseline/ac4-51-tones-384 and ac4-20-tones-192), and the
 dialogue, associated and dialogue enhancement substreams from these, which `forge ac4-encode`
 writes, since DEE writes no mono. Each carries a tone of its own at -20 dBFS, so that a mix can
 be measured tone by tone:
@@ -17,7 +17,7 @@ be measured tone by tone:
   de-mono.ac4             mono        64  977 Hz
 
 All SIMPLE, at frame_rate_index 13, FRAMES frames long. They are committed under
-tests/golden/ac4/presentations/sources/, and libs/ac4/tests/decoder/test_presentations.cpp
+testdata/ac4/presentations/sources/, and libs/ac4/tests/decoder/test_presentations.cpp
 multiplexes them, byte for byte, into the streams committed beside them; the encoder's bytes are
 not promised across toolchains, so the test takes the committed sources rather than encoding
 them again. Run this after a change to the encoder that should reach them, then the test with
@@ -38,7 +38,7 @@ import wave
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-OUT = REPO / "tests" / "golden" / "ac4" / "presentations" / "sources"
+OUT = REPO / "testdata" / "ac4" / "presentations" / "sources"
 RATE = 48000
 FRAMES = 24
 SECONDS = 2.0

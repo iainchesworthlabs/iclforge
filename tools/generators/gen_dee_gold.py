@@ -3,9 +3,9 @@ local set, never committed, beside the AC-4 gold set.
 
 Why. DEE's licence here ends on 2026-11-06 and is not renewed, and after that date no DEE stream
 of any kind can be made. What the tree takes from DEE today is small: the eight legs of
-gen_external_baseline.py (tests/golden/external-baseline/, six of them DEE streams at 2.0 and 5.1),
+gen_external_baseline.py (testdata/external-baseline/, six of them DEE streams at 2.0 and 5.1),
 which quality_race.py's trend and verify_gold_reference.sh's third-party legs read, and the one
-DD+ JOC fixture of gen_object_fixture.py (tests/golden/object-fixture/dee_joc_514.ec3), which the
+DD+ JOC fixture of gen_object_fixture.py (testdata/object-fixture/dee_joc_514.ec3), which the
 object layer's tests, Hearth and the ESP32 sink runs play. This set makes, while DEE runs, every
 stream a later piece of work could want from it: each layout and data rate the AC-3, E-AC-3,
 Blu-ray E-AC-3, E-AC-3 JOC and TrueHD encoders allow, their metadata, 60 s and 300 s programmes,
@@ -97,7 +97,7 @@ from pathlib import Path
 import numpy as np
 
 REPO = Path(__file__).resolve().parent.parent.parent
-AUDIO = REPO / "tests" / "golden" / "audio"
+AUDIO = REPO / "testdata" / "audio"
 
 DEE_DIR = Path(r"C:\Program Files\Dolby\Dolby Media Encoder\resources\dee-dir")
 MEDIAINFO = DEE_DIR / "MediaInfo.exe"

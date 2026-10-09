@@ -56,7 +56,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ci"))
 import quality_race as qr  # CLI path, WAV IO, alignment
 
 REPO = Path(__file__).resolve().parent.parent.parent
-SOURCE = REPO / "tests" / "golden" / "audio" / "reference_51.wav"
+SOURCE = REPO / "testdata" / "audio" / "reference_51.wav"
 # reference_51.wav's channel order, for labelling only.
 CHANNELS = ["L", "R", "C", "LFE", "Ls", "Rs"]
 

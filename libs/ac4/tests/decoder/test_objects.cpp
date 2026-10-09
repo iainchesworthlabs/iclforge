@@ -4,8 +4,8 @@
 // their object audio metadata. Each stream reads with the writer's trace,
 // record for record, every substream to its end.
 //
-// The streams under tests/golden/ac4/objects/ are the committed cases, byte
-// for byte, and tests/golden/ac4/ holds tools/references/ac4_syntax.py's
+// The streams under testdata/ac4/objects/ are the committed cases, byte
+// for byte, and testdata/ac4/ holds tools/references/ac4_syntax.py's
 // digests of them, which test_syntax.cpp holds the decoder to. With
 // AC4_DECODER_WRITE_OBJECTS set to a directory, this writes the committed cases
 // there instead of comparing them, to commit after a change to the builder.

@@ -3217,7 +3217,7 @@ jobs:
     # Cortex-M3 leg already agree, and two architectures agreeing is a
     # coincidence a third can break. The runner holds this leg's
     # <codec>.pcm_hash lines to the same pinned values
-    # (tests/golden/fixed-probe-pcm-hashes.json).
+    # (testdata/fixed-probe-pcm-hashes.json).
     #
     # espressif/idf is Espressif's own image and carries ESP-IDF, its
     # toolchains AND both emulators, so this needs no composite action and no
@@ -3575,7 +3575,7 @@ jobs:
       # kept: the tier is integer arithmetic, so those hashes are the same on
       # this leg, on the host and on a RISC-V part by construction, and the
       # step below holds this leg's to the pinned ones
-      # (tests/golden/fixed-probe-pcm-hashes.json), as the gold leg holds its
+      # (testdata/fixed-probe-pcm-hashes.json), as the gold leg holds its
       # native run's.
       - name: Build and run the FIXED-POINT probe under QEMU
         # Into the FLOAT build directory, which the first step of this job
@@ -3586,7 +3586,7 @@ jobs:
         run: ./tools/checks/run_baremetal_probe.sh --scalar=fixed | tee "build/config-arm-none-eabi-minimal/fixed-arm.txt"
 
       - name: Fixed-point hashes against the pinned ones
-        run: python3 tools/checks/check_probe_hashes.py --expected tests/golden/fixed-probe-pcm-hashes.json "build/config-arm-none-eabi-minimal/fixed-arm.txt"
+        run: python3 tools/checks/check_probe_hashes.py --expected testdata/fixed-probe-pcm-hashes.json "build/config-arm-none-eabi-minimal/fixed-arm.txt"
 
       - name: Fixed-point instructions per frame under QEMU -icount
         run: ./tools/checks/run_baremetal_probe.sh --scalar=fixed --icount | tee "build/config-arm-none-eabi-minimal/icount-fixed.txt"
@@ -3604,7 +3604,7 @@ jobs:
       # decision 26: the float PCM is the same on the host, the Cortex-M3 and the
       # P4. The host's run is _ci-linux.yml's, held to the same pinned hashes.
       - name: AC-4 hashes against the pinned ones
-        run: python3 tools/checks/check_probe_hashes.py --expected tests/golden/ac4-probe-pcm-hashes.json "build/config-arm-none-eabi-minimal/ac4-arm.txt"
+        run: python3 tools/checks/check_probe_hashes.py --expected testdata/ac4-probe-pcm-hashes.json "build/config-arm-none-eabi-minimal/ac4-arm.txt"
 
       - name: AC-4 instructions per frame under QEMU -icount
         run: ./tools/checks/run_baremetal_probe.sh --ac4 --icount | tee "build/config-arm-none-eabi-minimal/icount-ac4.txt"
@@ -3612,13 +3612,13 @@ jobs:
       # The AC-4 decoder's fixed-point tier on the same leg (planning/ac4.md, D14d):
       # integer arithmetic, so its hashes are the same here, on the host and on
       # RV32IMC, and are held to their own pins
-      # (tests/golden/ac4-fixed-probe-pcm-hashes.json). The -icount run gates the
+      # (testdata/ac4-fixed-probe-pcm-hashes.json). The -icount run gates the
       # tier's own instruction ceilings (ICOUNT_CEILING_AC4_FIXED in the runner).
       - name: Build and run the fixed-point AC-4 probe under QEMU -icount
         run: ./tools/checks/run_baremetal_probe.sh --ac4 --scalar=fixed --icount | tee "build/config-arm-none-eabi-minimal/icount-ac4-fixed.txt"
 
       - name: Fixed-point AC-4 hashes against the pinned ones
-        run: python3 tools/checks/check_probe_hashes.py --expected tests/golden/ac4-fixed-probe-pcm-hashes.json "build/config-arm-none-eabi-minimal/icount-ac4-fixed.txt"
+        run: python3 tools/checks/check_probe_hashes.py --expected testdata/ac4-fixed-probe-pcm-hashes.json "build/config-arm-none-eabi-minimal/icount-ac4-fixed.txt"
 
       # The footprint table in docs/performance-trend.md is written by hand
       # from these numbers, so keep the run's own copy: a table nobody can

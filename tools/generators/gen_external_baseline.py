@@ -69,8 +69,8 @@ stereo output to near-total garbage while FFmpeg decoded the identical file
 to a sane score. That has since been run down and it is not a decode defect
 at all - see "Resolved" below.)
 
-Writes tests/golden/external-baseline/<leg>/{ffmpeg,dee}.<ac3|ec3> (the raw
-bitstreams, committed) and one tests/golden/external-baseline/manifest.json
+Writes testdata/external-baseline/<leg>/{ffmpeg,dee}.<ac3|ec3> (the raw
+bitstreams, committed) and one testdata/external-baseline/manifest.json
 (the numbers CI reads). Bump BASELINE_VERSION by hand before rerunning this
 to regenerate the baseline against a new DEE/FFmpeg release - it is the
 only marker distinguishing one baseline generation from the next in a PR
@@ -186,9 +186,9 @@ from quality_race import (
 )
 
 REPO = Path(__file__).resolve().parent.parent.parent
-AUDIO = REPO / "tests" / "golden" / "audio"
+AUDIO = REPO / "testdata" / "audio"
 REFERENCE_STEREO_WAV = AUDIO / "reference_stereo.wav"
-OUT = REPO / "tests" / "golden" / "external-baseline"
+OUT = REPO / "testdata" / "external-baseline"
 SCRATCH = REPO / "build" / "external_baseline_scratch"
 
 DEE = Path(r"C:\Program Files\Dolby\Dolby Media Encoder\resources\dee-dir\dee_ddp_encoder.exe")

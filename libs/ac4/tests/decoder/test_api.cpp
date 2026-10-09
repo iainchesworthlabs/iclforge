@@ -680,7 +680,7 @@ std::vector<std::uint8_t> hex_bytes(std::string_view hex) {
 
 TEST_CASE("presentations() names an alternative presentation as its chunks arrive",
           "[ac4][decoder][api]") {
-    // tests/golden/ac4/presentations/presentation-names.tsv: each case a sequence of
+    // testdata/ac4/presentations/presentation-names.tsv: each case a sequence of
     // frames' presentation_name bytes, or "-" for a frame without one, and the
     // name after the last. tools/checks/test_ac4_presentation_names.py holds
     // the Python reference to the same table (libs/ac4/ERRATA.md, "A

@@ -12,7 +12,7 @@ over all 256 codes, against the encoder's frexp-based closed form.
 
 Run from the repo root:
     python tools/references/drc_ref.py            # self-check, print a summary
-    python tools/references/drc_ref.py --emit     # write tests/golden/drc_goldens.hpp
+    python tools/references/drc_ref.py --emit     # write testdata/drc_goldens.hpp
 """
 
 import argparse
@@ -20,7 +20,7 @@ import math
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-OUT = REPO / "tests" / "golden" / "drc_goldens.hpp"
+OUT = REPO / "testdata" / "drc_goldens.hpp"
 
 # Table 7.29, "Arithmetic Shifts" column: left shifts positive, right negative.
 # Keyed by the raw 3-bit X field exactly as transmitted (X0 first).

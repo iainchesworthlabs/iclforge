@@ -1,6 +1,6 @@
 """The AC-4 reference's presentation names against the committed name table.
 
-tests/golden/ac4/presentations/presentation-names.tsv lists sequences of frames'
+testdata/ac4/presentations/presentation-names.tsv lists sequences of frames'
 presentation_name bytes and the name each leaves (ETSI TS 103 190-2 clause 6.3.3.1.4, read as
 libs/ac4/ERRATA.md's "A presentation name in chunks" reads it).
 libs/ac4/tests/decoder/test_api.cpp decodes each sequence through the decoder in hand-built frames;
@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-TABLE = REPO / "tests" / "golden" / "ac4" / "presentations" / "presentation-names.tsv"
+TABLE = REPO / "testdata" / "ac4" / "presentations" / "presentation-names.tsv"
 
 sys.path.insert(0, str(REPO / "tools" / "references"))
 

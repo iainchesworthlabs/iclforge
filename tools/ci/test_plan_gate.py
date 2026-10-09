@@ -63,7 +63,7 @@ class BuildRelevant(unittest.TestCase):
 
     def test_fixtures_and_gate_scripts_build(self):
         for path in (
-            "tests/golden/audio/reference_51.wav",
+            "testdata/audio/reference_51.wav",
             "tools/checks/compare_wav.py",
             "libs/ac3/fuzz/seeds/fuzz_scan/x.bin",
             "tools/fuzz/run.sh",

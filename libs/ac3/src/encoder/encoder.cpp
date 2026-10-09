@@ -1239,7 +1239,7 @@ std::expected<std::vector<std::byte>, FrameError> FrameEncoder::encode_frame(
         // six blocks is a set chosen by the loudest of them, and every quieter
         // block is then quantized against a scale meant for something louder.
         //
-        // On tests/golden/audio/reference_51.wav the LFE moves 10-16 dB inside
+        // On testdata/audio/reference_51.wav the LFE moves 10-16 dB inside
         // a single frame, and the cost of pinning it to the loudest block was
         // 12 dB of channel SNR against FFmpeg - on a channel carrying a third
         // of that fixture's signal power, which made it 56% of the whole

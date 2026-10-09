@@ -31,7 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "generators"))
 from gen_bitalloc_tables import parse_tables
 
 REPO = Path(__file__).resolve().parent.parent.parent
-OUT = REPO / "tests" / "golden" / "bitalloc_goldens.hpp"
+OUT = REPO / "testdata" / "bitalloc_goldens.hpp"
 
 T = parse_tables()
 

@@ -820,7 +820,7 @@ The player's buffers, stacks, lead and ring are under *Sendspin player* in
 
 On 2026-09-16 two ESP32-S3-DevKitC-1-N16R8 boards on the same Wi-Fi, with no
 DAC wired, played the E-AC-3 JOC fixture
-(`tests/golden/object-fixture/dee_joc_514.ec3`) for ten minutes as one group
+(`testdata/object-fixture/dee_joc_514.ec3`) for ten minutes as one group
 from `hearth-testserver`, beside a test sink of its own. One played 2.0 on
 32-bit standard I2S, the other 5.1 on eight 16-bit TDM slots
 (`CONFIG_ICLFORGE_EXAMPLE_I2S_SLOT_BITS=16`: one line carries four 32-bit
@@ -1019,7 +1019,7 @@ plus real `ICLFORGE_EXAMPLE_WIFI_SSID`/`_PASSWORD`: SDIO up, the ESP32-C6 identi
 real access point joined and a DHCP lease taken, mDNS advertising `_sendspin._tcp`, the
 REST control surface up on port 80 - all through this example's own code, not a
 standalone test. `hearth-testserver` then paired by token and played an Atmos/JOC
-E-AC-3 fixture (`tests/golden/object-fixture/dee_joc_514.ec3`, acmod=7, 11 objects) five
+E-AC-3 fixture (`testdata/object-fixture/dee_joc_514.ec3`, acmod=7, 11 objects) five
 times through over ten seconds onto the 2.0 layout: 315 of 315 bursts played, 0
 underruns, 0 late, 0 dropped, 0 invalid, `/status` polled throughout with a worst
 timing error of 419 µs, result `pass` - the decode, the burst player and the WiFi/

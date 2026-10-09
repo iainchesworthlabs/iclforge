@@ -40,7 +40,7 @@ In rough order of strength:
    output, and metadata flag arrays transmitted index-0-first.
 
    One DEE-produced stream is **committed** rather than only diffed against:
-   `tests/golden/object-fixture/dee_joc_514.ec3`, a DD+ JOC encode of a synthetic 5.1.4 tone bed
+   `testdata/object-fixture/dee_joc_514.ec3`, a DD+ JOC encode of a synthetic 5.1.4 tone bed
    (`tools/generators/gen_object_fixture.py`, local-only — DEE is licensed and never runs in CI).
    It is the only Atmos stream here this project's own encoder did not make, and every part of
    the object layer it exercises was refused outright before it existed: a bed programme with a
@@ -192,7 +192,7 @@ Unlike the trend pages beside it, this table is a point measurement rather than 
 no CI run repeats it, so nothing would notice these four numbers drifting. The nearest series is
 [Tool comparison trend](tool-comparison-trend.md), which scores this encoder on fixed legs and
 reports its difference from FFmpeg's and Dolby's encodes of the same legs, made once and
-committed under `tests/golden/external-baseline/`.
+committed under `testdata/external-baseline/`.
 SNR on synthetic material is a narrow metric — it says the waveform is closer, not that it
 sounds better, and no *subjective* listening test has been run. `quality_race.py`'s tables (and
 [Tool comparison trend](tool-comparison-trend.md)/[Landscape](landscape.md)) also carry an
@@ -208,7 +208,7 @@ the trend pages carry real MOS numbers. It stays optional for a *local* run — 
 still shows `-`, never a failure — which is why the one-off snapshot above has no MOS column.
 
 Both the table above and everything the trend pages plot come from the **fixture corpus** in
-`tests/golden/audio/`, which is versioned and hash-checked as a unit
+`testdata/audio/`, which is versioned and hash-checked as a unit
 (`tools/checks/check_corpus.py`). Two of those fixtures are synthesized from `sin()`,
 pseudo-random noise and FIR smoothing, and two are 30 s CC0 recordings of real speech and music.
 Both kinds are kept, and the distinction matters when reading any number on this page: the
@@ -470,7 +470,7 @@ attached to it, not a conformance suite.
 
 Two tiers, both gated in CI:
 
-- **Committed** — `tests/golden/external-baseline/` holds 14 AC-3 and E-AC-3 streams from Dolby
+- **Committed** — `testdata/external-baseline/` holds 14 AC-3 and E-AC-3 streams from Dolby
   Encoding Engine 6.5.4 and FFmpeg 8.0.1 across 8 codec/layout/bitrate legs (`manifest.json`,
   `baseline_version` 2), each encoded from this repository's own source WAVs (see
   `tools/generators/gen_external_baseline.py`) and each carrying the DEE, FFmpeg and
@@ -987,7 +987,7 @@ extended (`audio_size_value` and its `variable_bits(7)`) is two records.
 **Digests, in CI.** For each frame and substream with records, one line: frame, substream, kind
 (`presentation`, `audio` or `emdf_payloads`), record count, the bit where the last record ends, and
 zlib's CRC-32 over the records packed as `struct.pack('<IHQ', offset, width, value)`.
-`tests/golden/ac4/` holds the Python parser's digests of the committed DEE streams: SIMPLE, ASPX,
+`testdata/ac4/` holds the Python parser's digests of the committed DEE streams: SIMPLE, ASPX,
 ASPX_ACPL_2 and ASPX_ACPL_3 at 2.0 and 5.1, one tone per channel at 2.0 and 5.1, DRC curves with an
 Lt/Rt downmix, immersive stereo at three frame rates, and 5.1.4, one tone per channel in each
 immersive codec mode DEE writes. `libs/ac4/tests/decoder/test_syntax.cpp` requires
@@ -1242,14 +1242,14 @@ reading is in `libs/ac4/ERRATA.md`, under "Presentations".
 - **The selection** (`libs/ac4/tests/decoder/test_presentations.cpp`,
   `tools/checks/test_ac4_presentation_selection.py`): a table of 30 cases, each a constructed table of
   contents of version 0 or version 1 presentations, a system's choice and a level, committed as
-  `tests/golden/ac4/presentations/presentation-selection.tsv`; the decoder and the Python reference
+  `testdata/ac4/presentations/presentation-selection.tsv`; the decoder and the Python reference
   (`tools/references/ac4_presentations.py`, written from the text separately) select as the table says.
-- **The multiplexed streams** (`tests/golden/ac4/presentations/`): music and effects with dialogue,
+- **The multiplexed streams** (`testdata/ac4/presentations/`): music and effects with dialogue,
   main with associated audio, both, by content classifier and at every pan; main substreams whose
   dialogue enhancement is a hybrid method, with their dialogue enhancement substream; and version 0
   presentations, whose substreams carry their own dialnorms. The committed bytes are the builder's,
   both transcriptions read every frame to its end, and the Python parser's digests are beside the
-  others in `tests/golden/ac4/`. MediaInfo reads their tables of contents, 17, 9 and 10
+  others in `testdata/ac4/`. MediaInfo reads their tables of contents, 17, 9 and 10
   presentations, and flags `tools_metadata` where a substream sends the Mid's one parameter set (the
   errata register, "de_ms_proc_flag leaves one parameter set").
 - **The mixes**: in the decoder's tests each substream's tones come out of each mix at their formula's
@@ -1370,7 +1370,7 @@ what a stream carries through it, and installs the inspector, the decoder and th
 named otherwise.
 
 - **Through the public API alone**: a test standing in for Hearth's engine decodes every committed
-  AC-4 stream (those under `tests/golden/external-baseline/ac4-*` and `tests/golden/ac4/`: 66
+  AC-4 stream (those under `tests/golden/external-baseline/ac4-*` and `testdata/ac4/`: 66
   today) by block through `iclforge/ac4/decoder/decoder.hpp` alone, placing each block's channels by their
   speakers and changing the output level and dialogue enhancement half way through. No frame is
   refused, only a frame before a stream's first I-frame comes out empty, a stream ends in one short
@@ -1395,7 +1395,7 @@ named otherwise.
   names the flat panel TV mode as the one applied; `latency_samples()` equals the delay the encoder
   counts on at every frame rate, 1 313 samples at index 13.
 - **A presentation name in chunks** (Part 2 clause 6.3.3.1.4): 14 cases of frames' name bytes and
-  the name they give, committed as `tests/golden/ac4/presentations/presentation-names.tsv`,
+  the name they give, committed as `testdata/ac4/presentations/presentation-names.tsv`,
   which the decoder and `tools/references/ac4_presentations.py` both reproduce
   (`tools/checks/test_ac4_presentation_names.py`); the reading is in `libs/ac4/ERRATA.md`, "A
   presentation name in chunks".
@@ -1494,7 +1494,7 @@ transforms, QMF banks and the A-SPX, A-CPL, A-JCC and A-JOC kernels of `libs/ac4
 every build. What is checked:
 
 - **The float decode against the double one** (`tools/checks/check_ac4_decode_scalar_snr.py`, in
-  FFmpeg Validate; the floors are in `tests/golden/ac4/scalar-agreement.json`): every committed
+  FFmpeg Validate; the floors are in `testdata/ac4/scalar-agreement.json`): every committed
   AC-4 stream, 67 with the GUI's fixture, is decoded by a float CLI and a double CLI, and the float
   decode is held to the double one in two regions, below the lowest A-SPX crossover and above the
   highest, by the worst channel's SNR over half-overlapped Hann frames of 2 048 samples. When the
@@ -1508,7 +1508,7 @@ every build. What is checked:
 - **The scorers with a float CLI**: FFmpeg Validate runs `score_ac4_decode.py` and
   `score_ac4_encode.py` again with a float CLI, at the same pins, and the encoder's streams are
   decoded by the float decoder.
-- **What the scalar work moved**: 61 of the 66 streams under `tests/golden` decode with a few
+- **What the scalar work moved**: 61 of the 66 streams under `testdata` decode with a few
   samples different in the float32 output, by at most 2.3e-10 (about −193 dBFS), and the
   encoder's output is byte-identical on the five encodes checked, so nothing of the encoder's was
   re-pinned.
@@ -1523,16 +1523,16 @@ every build. What is checked:
   stack and the bytes retained after teardown are held to ceilings about a tenth over the measured
   figures; `--icount` counts instructions a frame the same way. The PCM of every fixture is
   bit-identical between the x86-64 host (GCC 16, SSE) and the Cortex-M3 (soft float, the generic
-  seam), and the hashes are pinned in `tests/golden/ac4-probe-pcm-hashes.json`
+  seam), and the hashes are pinned in `testdata/ac4-probe-pcm-hashes.json`
   (`tools/checks/check_probe_hashes.py`). The `linux-gcc` leg also runs the probe natively on
   x86-64 after a merge and in the nightly run, and holds its hashes to the same pins. The rows are
   in [Performance trend](performance-trend.md#the-ac-4-decoder).
 - **The fixed-point tier** (phase D14d): FFmpeg Validate builds a fixed CLI, runs both scorers with
   it at their pins, and holds its decode to the double one as above, at the floors in
-  `tests/golden/ac4/scalar-agreement-fixed.json`. When they were pinned the two agreed to 105.7
+  `testdata/ac4/scalar-agreement-fixed.json`. When they were pinned the two agreed to 105.7
   to 132.1 dB below the crossover and 34.2 to 97.2 dB above it where a stream has A-SPX. The probe
   runs at the tier on the Cortex-M3 leg with `--icount` and natively on the `linux-gcc` leg, and
-  both are held to `tests/golden/ac4-fixed-probe-pcm-hashes.json`; integer arithmetic, so the
+  both are held to `testdata/ac4-fixed-probe-pcm-hashes.json`; integer arithmetic, so the
   hashes are the same on every architecture, RV32IMC included, where they were checked by hand.
 - **On the ESP32-P4** (phase D14b, `CONFIG_ICLFORGE_AC4`): no QEMU runs the P4, so CI builds
   `hearth_sink` with AC-4 in it and does not run it, and the checks are on a board. Twenty plays
@@ -1693,7 +1693,7 @@ paragraph on the objects follows them:
   beside a stereo one; and, experimental, 3.0 dialogue with 5.1 music and effects, and a 5.1 main's
   hybrid waveform in 3.0. Their tables of contents hold the configuration in every frame, both
   transcriptions read every frame with the encoder's trace, and the Python parser's digests are with
-  the others in `tests/golden/ac4/`. Through D7's selection and mixing, with one tone per
+  the others in `testdata/ac4/`. Through D7's selection and mixing, with one tone per
   substream, each presentation is selected as configured, by `presentation_id`, language, associated
   audio and level, and every mix comes out at its formula's gains to 0.01 dB: g_dialog against each
   dialogue's cap, pans, group gains, the main audio's scaling under associated audio, and each hybrid

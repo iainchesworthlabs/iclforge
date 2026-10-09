@@ -819,7 +819,7 @@ constexpr int kToolOff = -1;
 // four fifths. The more channels, the longer it keeps earning its place.
 //
 // Measured on both checked-in fixtures across a bitrate sweep, as the
-// marginal gain of adding coupling to an AHT encode (tests/golden/audio/
+// marginal gain of adding coupling to an AHT encode (testdata/audio/
 // reference_stereo.wav and reference_51.wav, scored through this project's
 // own decoder):
 //
@@ -3446,7 +3446,7 @@ std::expected<std::vector<std::byte>, FrameError> FrameEncoder::encode_frame(
             // 6 (bin 109, 10.2 kHz), spxbegf 4 derives cplendf 2, and the old
             // std::min moved coupling to sub-band 4 - bin 85, 8.0 kHz. Every
             // coefficient above 8.0 kHz then became parametric (coupling to
-            // 9.1 kHz, synthesis above), which on tests/golden/audio/
+            // 9.1 kHz, synthesis above), which on testdata/audio/
             // reference_stereo.wav bounds waveform SNR near 23 dB whatever
             // the quantizer does. Measured on that file: 21.6 dB coupled-and-
             // extended against 28.4 dB for spectral extension alone.

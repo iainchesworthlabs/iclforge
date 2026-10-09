@@ -35,7 +35,7 @@ TestCase {
     function initTestCase() {
         verify(TestServices.useFakeRoom(), "the fake device room could not be installed");
         HearthController.start();
-        const path = TestServices.stageFixture(repo + "tests/golden/external-baseline/eac3-music-stereo-96/dee.ec3",
+        const path = TestServices.stageFixture(repo + "testdata/external-baseline/eac3-music-stereo-96/dee.ec3",
                                                "Long stereo.ec3");
         verify(path.length > 0);
         HearthController.addFiles([path]);

@@ -20,7 +20,7 @@ again, so the memory and fit figures below are those of 2026-09-15.
 
 | | |
 |---|---|
-| Decode | Correct: all fourteen fixtures, every channel's level within the probe's tolerance, and every fixed-tier PCM hash equal to the values the x86-64 host, the Cortex-M3 leg and the ESP32-C3 leg are held to (`tests/golden/fixed-probe-pcm-hashes.json`). A fourth architecture on one set of hashes |
+| Decode | Correct: all fourteen fixtures, every channel's level within the probe's tolerance, and every fixed-tier PCM hash equal to the values the x86-64 host, the Cortex-M3 leg and the ESP32-C3 leg are held to (`testdata/fixed-probe-pcm-hashes.json`). A fourth architecture on one set of hashes |
 | Real time, no network | AC-3 5.1 (0.64x), E-AC-3 5.1 with AHT, spectral extension and coupling (0.75x), an Atmos stream's bed (0.59x), E-AC-3 7.1 (0.87x), and every stereo and mono row. Not the folds to stereo (1.03x and 1.62x), E-AC-3 line mode (1.15x), enhanced coupling (1.71x), 7.1.4 (1.88x) or the Atmos objects rows |
 | Real time, with WiFi and a stream | AC-3 5.1 (0.82x), E-AC-3 5.1 with AHT, spectral extension and coupling (0.96x), the Atmos bed (0.71x), a 192 kbit/s E-AC-3 5.1 stream (0.64x), and stereo and mono (0.17x to 0.41x). Not E-AC-3 7.1 (1.09x), the folds, line mode, enhanced coupling or the Atmos objects rows |
 | Memory, no network | Every fixture fits: 383,416 bytes free before the decode, largest block 352,256, against a largest peak of 234,070 (7.1.4 folded to stereo) |
@@ -139,7 +139,7 @@ added a 64-bit division (`__divdi3`) for each AHT mantissa and about six (`__udi
 square root of a spectral extension band.
 
 Each change below leaves the fixed-point tier's PCM identical on every fixture: the pinned hashes
-(`tests/golden/fixed-probe-pcm-hashes.json`) do not move, and `libs/ac3/tests/core/test_fixed32.cpp`,
+(`testdata/fixed-probe-pcm-hashes.json`) do not move, and `libs/ac3/tests/core/test_fixed32.cpp`,
 `libs/ac3/tests/core/test_mdct_fixed.cpp` and `libs/ac3/tests/decoder/test_block_norm.cpp` hold each new form to
 the arithmetic it replaces. Microseconds per frame, no network, two runs of each build, which
 agreed within 3 microseconds; each row includes the ones above it:
@@ -350,7 +350,7 @@ parsed tracks, 31,168 bytes, so the largest free block is not what limits it. Th
 WebSocket server and WiFi buffers leave less than the probe's network image does, so a C6 sink
 takes AC-4 programmes from Hearth as PCM (`planning/ac4.md`, decision 32) until a board run says
 otherwise. The fixed tier's PCM hashes are those of the x86-64 host and the Cortex-M3 leg
-(`tests/golden/ac4-fixed-probe-pcm-hashes.json`).
+(`testdata/ac4-fixed-probe-pcm-hashes.json`).
 
 ## QEMU
 

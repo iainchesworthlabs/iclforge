@@ -197,7 +197,7 @@ depends on the same reading.
   17. The lines are the inverse MDCT's input in the scale of the audio spectral frontend's, and a granule's
       blocks (768, or 4 of 192, and so on) are the transform blocks Table 187 lists.
 - **Evidence:** Text. No stream here uses the tool: not DEE's, not the census's, not the third-party ones.
-  `tests/golden/ac4/ssf/ssf-vectors.txt` is 128 frames of random bytes through the reference
+  `testdata/ac4/ssf/ssf-vectors.txt` is 128 frames of random bytes through the reference
   (`python tools/references/ssf_ref.py vectors --seed 1 --cases 32 --frames 4`), which the decoder matches
   on the bits ssf_data() took, every granule's stride and band count, and every line to 1e-9; five
   deliberate changes (the rounding of f_rfu, the predictor's sign, a dB table's shift, the termination
@@ -418,7 +418,7 @@ depends on the same reading.
   `asf_scalefac_data()` and `asf_snf_data()` (Tables 40 to 42) are unaffected: their own `get_max_sfb(g)`
   and `min(get_max_sfb(g), num_sfb_48(...))` calls keep the core-only reading, which is what makes a
   channel with no active extension unaffected byte for byte by touching the section loop at all.
-- **Evidence:** The constructed streams under `tests/golden/ac4-hsf/` (`mono-96-long` and the rest,
+- **Evidence:** The constructed streams under `testdata/ac4-hsf/` (`mono-96-long` and the rest,
   built by `libs/ac4/tests/decoder/hsf.cpp` from the text) read the extension's sections to `get_max_sfb_hsf(g)`
   in both transcriptions, and their tones come back at 96 and 192 kHz only through that reading
   (`libs/ac4/tests/decoder/test_hsf.cpp`); no stream from another encoder uses the mode.
@@ -1855,7 +1855,7 @@ capable of these rates "shall read the additional data up to either twice the or
 four times the block length and sampling rate"; "streams containing high sampling frequency data do not
 employ any of the QMF domain tools"; and decoding the extension needs the SAP tool and the IMDCT, and
 "no QMF domain processing". The readings below fill in what that leaves. No stream at these rates was
-available to read or to decode: the streams under `tests/golden/ac4-hsf/` and
+available to read or to decode: the streams under `testdata/ac4-hsf/` and
 `libs/ac4/tests/decoder/test_hsf.cpp`'s are built from the text alone (`libs/ac4/tests/decoder/hsf.hpp` says
 how), the evidence for a reading is that the second transcription reads them alike and that the
 decoder's output is the tones they were made from.
@@ -2183,7 +2183,7 @@ Which presentation the decoder decodes (Part 2 4.8.2), and how it mixes a presen
 `libs/ac4/src/decoder/decoder.cpp`; the Python one, written from the text separately, is
 `tools/references/ac4_presentations.py` for the selection and `tools/checks/mix_ac4_decode.py` for the
 mixes. The streams that reach these readings are built for them: the selection table
-(`tests/golden/ac4/presentations/presentation-selection.tsv`) and the test multiplexer's streams beside
+(`testdata/ac4/presentations/presentation-selection.tsv`) and the test multiplexer's streams beside
 it, whose substreams carry a tone each (`libs/ac4/tests/decoder/test_presentations.cpp`).
 
 #### Which presentations can be selected
@@ -2682,7 +2682,7 @@ formulas of 6.3.9.8.4 and 5.9.2, and their intermediate spatial format to Annex 
   with zeros gives the name before them. The last name received stays until another replaces it or the
   source changes.
 - **Evidence:** Text; no stream here names a presentation. The 14 cases of
-  `tests/golden/ac4/presentations/presentation-names.tsv` hold the decoder, through hand-built frames
+  `testdata/ac4/presentations/presentation-names.tsv` hold the decoder, through hand-built frames
   (`libs/ac4/tests/decoder/test_api.cpp`), and the Python reference (`tools/references/ac4_presentations.py`,
   `tools/checks/test_ac4_presentation_names.py`) to the same names.
 
@@ -2724,13 +2724,13 @@ Decisions about what a record holds, which both transcriptions share (the full c
 No stream of DEE's reaches most of the syntax: noise fill, VARVAR framing, time-interleaved A-SPX, the
 mono, 3.0 and 7.X elements, ASPX_ACPL_1 and A-CPL in a channel pair, transmitted DRC gains, dialogue
 enhancement methods 1 to 3 and alternative presentations among it. The constructed streams under
-`tests/golden/ac4/constructed/` reach the 3.0 and 7.X elements and every A-CPL mode, and both
+`testdata/ac4/constructed/` reach the 3.0 and 7.X elements and every A-CPL mode, and both
 transcriptions read them alike. To compare the two transcriptions on the rest, both read streams made for
 the purpose: DEE frames with one substream altered (a random tail from a random bit, a few flipped bits,
 or a random codec mode), and tables of contents built for the channel modes no encoder here writes, over
 random payloads, a quarter of them for a group of A-JOC and direct-coded object substreams, and a third
 of the single-instance Part 1 modes at 96 or 192 kHz with an HSF extension substream; the constructed
-streams under `tests/golden/ac4-hsf/` are among those mutated. Wherever
+streams under `testdata/ac4-hsf/` are among those mutated. Wherever
 both read a substream to its end their traces must agree record for record, and where either stops they must agree up to that point. The two transcriptions still stop at different
 elements on some corrupt input, since each checks some values at a different point, which the check
 reports separately. The script is `tools/checks/ac4_syntax_differential.py`, which the nightly
@@ -3502,7 +3502,7 @@ these:
   as dialogue beside a complete main, is refused. The 3.0 element is experimental
   (`experimental=three-zero`): no DEE stream has one.
 - **Evidence:** Readers. The decoder and the Python parser read the committed 3.0 stream
-  (`tests/golden/ac4/presentations/encoder-three-zero.ac4`) as the encoder wrote it, MediaInfo lists
+  (`testdata/ac4/presentations/encoder-three-zero.ac4`) as the encoder wrote it, MediaInfo lists
   it as configured, and the decoder mixes the dialogue channel to channel into the music and effects'
   L, R and C.
 

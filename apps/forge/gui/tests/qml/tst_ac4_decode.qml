@@ -4,7 +4,7 @@ import QtTest
 import ForgeGui
 
 // The AC-4 decode pages over a committed stream of eight presentations
-// (tests/golden/ac4/presentations/encoder-hybrid.ac4: presentation 0 is
+// (testdata/ac4/presentations/encoder-hybrid.ac4: presentation 0 is
 // 5.1 and what the decoder takes with no preference, presentation 2 is
 // stereo). Each page is opened from the header's own button, the file comes
 // through the page's own picker, and the presentation through the page's own
@@ -21,7 +21,7 @@ TestCase {
     }
 
     readonly property url streamUrl:
-        Qt.resolvedUrl("../../../../../tests/golden/ac4/presentations/encoder-hybrid.ac4")
+        Qt.resolvedUrl("../../../../../testdata/ac4/presentations/encoder-hybrid.ac4")
 
     // Every test ends with the pickers back at the decoder's own choice, and
     // setting the index reads the open file again on a worker. That has to be

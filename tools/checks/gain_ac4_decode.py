@@ -45,7 +45,7 @@ immersive stereo at 24 and 25 fps sends a dialnorm of -24 dBFS in its last frame
 dialogue enhancement's gains are held on known input by libs/ac4/tests/decoder/test_drc.cpp and
 test_de.cpp; this script reads the gains from the stream, as those tests cannot.
 
-The committed legs (tests/golden/external-baseline/) are checked by default. --gold DIR checks
+The committed legs (testdata/external-baseline/) are checked by default. --gold DIR checks
 phase G0's local gold set in DIR (DIR/streams/<leg>/dee.ac4, DIR/gold-manifest.json), which never
 runs in CI, and with --g1 the G1 legs G1_LEGS names besides. --encoder checks streams
 `forge ac4-encode` writes from tones here, a leg for each metadata option the output processing

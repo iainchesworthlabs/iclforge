@@ -192,7 +192,7 @@ SET = [
     {
         "file": "514-joc-dee.ec3",
         "what": "Dolby Encoding Engine: 5.1.4 carried as objects, JOC in the QMF domain",
-        "copy": "tests/golden/object-fixture/dee_joc_514.ec3",
+        "copy": "testdata/object-fixture/dee_joc_514.ec3",
     },
     {
         "file": "height.ec3",
@@ -384,22 +384,22 @@ SET = [
     {
         "file": "dee-eac3-51.ec3",
         "what": "Dolby Encoding Engine, E-AC-3 5.1 at 256 kbit/s",
-        "copy": "tests/golden/external-baseline/eac3-51-256/dee.ec3",
+        "copy": "testdata/external-baseline/eac3-51-256/dee.ec3",
     },
     {
         "file": "ffmpeg-eac3-51.ec3",
         "what": "FFmpeg, E-AC-3 5.1 at 256 kbit/s",
-        "copy": "tests/golden/external-baseline/eac3-51-256/ffmpeg.ec3",
+        "copy": "testdata/external-baseline/eac3-51-256/ffmpeg.ec3",
     },
     {
         "file": "dee-ac3-51.ac3",
         "what": "Dolby Encoding Engine, AC-3 5.1 at 448 kbit/s",
-        "copy": "tests/golden/external-baseline/ac3-51-448/dee.ac3",
+        "copy": "testdata/external-baseline/ac3-51-448/dee.ac3",
     },
     {
         "file": "dee-eac3-music.ec3",
         "what": "Dolby Encoding Engine, E-AC-3 2/0 music at 96 kbit/s",
-        "copy": "tests/golden/external-baseline/eac3-music-stereo-96/dee.ec3",
+        "copy": "testdata/external-baseline/eac3-music-stereo-96/dee.ec3",
     },
 ]
 

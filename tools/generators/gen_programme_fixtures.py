@@ -42,7 +42,7 @@ Both fixtures below are stereo. This project has no redistributable native
 stereo recording would put derived, correlated content in the surrounds and
 say more about the upmix than about the encoder.
 
-Sources (see tests/golden/audio/corpus.json for the machine-readable copy,
+Sources (see testdata/audio/corpus.json for the machine-readable copy,
 and tools/generators/README.md for the human-readable licence record):
 
   programme_speech_stereo.flac
@@ -91,7 +91,7 @@ import wave
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-OUT = REPO / "tests" / "golden" / "audio"
+OUT = REPO / "testdata" / "audio"
 MANIFEST = OUT / "corpus.json"
 
 RATE = 48000
@@ -111,7 +111,7 @@ NORMALISE_PEAK = 0.7079
 
 # Bump when any fixture's committed bytes change - a different source file, a
 # different excerpt window, a different normalisation, a regenerated synthetic
-# fixture, a recaptured bitstream. tests/golden/audio/corpus.json carries this,
+# fixture, a recaptured bitstream. testdata/audio/corpus.json carries this,
 # tools/checks/check_corpus.py enforces the hashes under it, and a PR diff that
 # moves it is saying "the fixtures themselves changed", which is a different
 # kind of review from "the encoder changed".
@@ -158,7 +158,7 @@ SOURCES = [
 # The synthetic fixtures are listed in the manifest too. They are not produced
 # here (gen_gold_reference_wav.py, gen_stereo_reference_wav.py and
 # gen_object_scene_wav.py own them), but a corpus that only describes half of
-# what tests/golden/audio holds is not a corpus - and check_corpus.py hashing
+# what testdata/audio holds is not a corpus - and check_corpus.py hashing
 # them is what stops one being regenerated with a different RNG and quietly
 # shifting every historical trend number out from under the series it
 # belongs to.
@@ -204,7 +204,7 @@ SYNTHETIC = [
 BITSTREAMS = [
     {"fixture": "reference_51_eac3_448k_cplbndstrce0.ec3", "kind": "bitstream",
      "note": "FFmpeg-encoded from reference_51.wav: `ffmpeg -y -i "
-             "tests/golden/audio/reference_51.wav -c:a eac3 -b:a 448k <out>` "
+             "testdata/audio/reference_51.wav -c:a eac3 -b:a 448k <out>` "
              "(ffmpeg 8.0.1). Confirmed to set cplbndstrce == 0 with cplbegf == 12 "
              "in every block - see tools/checks/verify_gold_reference.sh for why "
              "cplbegf != 0 matters here."},

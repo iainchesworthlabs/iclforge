@@ -167,7 +167,7 @@ declare -A ICOUNT_CEILING_AC4_FIXED=(
     [ac4_20_companding]=9200000
 )
 # Each fixture's peak heap and steady-state allocations a frame, on either leg and at either
-# tier, are in tests/golden/ac4-probe-ceilings.json, which tools/checks/check_probe_ceilings.py
+# tier, are in testdata/ac4-probe-ceilings.json, which tools/checks/check_probe_ceilings.py
 # reads here and in run_esp32s3_probe.sh --ac4: a figure is stated once, with what it was measured
 # at, and a fixture with no entry fails.
 AC4_CEILINGS="$REPO/tests/golden/ac4-probe-ceilings.json"

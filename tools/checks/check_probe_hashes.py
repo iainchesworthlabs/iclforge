@@ -8,7 +8,7 @@ the same on every leg - the x86 host, the Cortex-M3 under QEMU, a RISC-V
 part - and that identity is the tier's own gate: a hash that differs between
 legs is arithmetic that is not integer somewhere, or a platform difference the
 tier was built to have none of. The pinned values in
-tests/golden/fixed-probe-pcm-hashes.json are what both CI legs are held to;
+testdata/fixed-probe-pcm-hashes.json are what both CI legs are held to;
 re-pin them when the tier's arithmetic changes on purpose. For the floating
 tiers the hashes vary with the compiler and this check has nothing to say.
 

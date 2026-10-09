@@ -81,13 +81,13 @@ jobs:
         shell: bash
         run: bash tools/checks/check_packaging_versions.sh -r "$PWD"
 
-      # Every published quality series is measured against tests/golden/audio/,
+      # Every published quality series is measured against testdata/audio/,
       # and its points are only comparable to each other because the material
       # under them never moved. A regenerated fixture is close to invisible - it
       # still decodes, still has the right duration and channel count, still
       # produces a plausible SNR - and simply puts a step in every series that
       # reads as an encoder change. This hashes each fixture against
-      # tests/golden/audio/corpus.json so that becomes a failing check instead of
+      # testdata/audio/corpus.json so that becomes a failing check instead of
       # a mystery on a trend page months later.
       #
       # Its own job rather than a step on ffmpeg-validate: stdlib-only, no build,

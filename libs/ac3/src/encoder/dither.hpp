@@ -37,7 +37,7 @@
 // real coefficient behind it is scaled by the same coordinate, so the two
 // sides of the comparison move together and the coordinate cancels.
 //
-// Two reference encoders were read out of tests/golden/external-baseline/ to
+// Two reference encoders were read out of testdata/external-baseline/ to
 // check this against something other than a metric (both AC-3 5.1 at
 // 448 kbit/s, 79 frames each). FFmpeg 8.0.1 sets every dithflag in every
 // frame. Dolby's own DEE 6.5.4 sets dithflag to exactly the inverse of that

@@ -188,7 +188,7 @@ decoder phases added to it, and what the decoder and the encoder meet in it now:
 
 The Python reference parser `tools/references/ac4_parse.py` reads the same framing, transcribed
 independently; CI runs it through `ac4_syntax.py`'s digest test. `libs/ac4/tests/core/test_toc.cpp` checks one
-committed DEE stream, `tests/golden/external-baseline/ac4-stereo-64/dee.ac4`, against MediaInfo's
+committed DEE stream, `testdata/external-baseline/ac4-stereo-64/dee.ac4`, against MediaInfo's
 reading of it; fifteen more committed DEE streams sit beside it (G0 and G1 added the later ones).
 
 ### The decoder after D1
@@ -207,7 +207,7 @@ have the 9.X.4 modes (in full and core decoding), and the rest it still refuses;
 its evidence.
 
 The syntax is transcribed twice, in C++ and in `tools/references/ac4_syntax.py`, and the two traces
-must agree record for record: `tests/golden/ac4/*.tsv` holds the Python parser's digests of the
+must agree record for record: `testdata/ac4/*.tsv` holds the Python parser's digests of the
 committed streams, `libs/ac4/tests/decoder/test_syntax.cpp` holds the decoder to them in `ac3tests`,
 which every build leg runs, and `tools/checks/test_ac4_syntax_digests.py` holds the Python parser
 to the same files. Over the local census (107 DEE streams, 50,728 frames) and 6,670 frames of
@@ -1275,13 +1275,13 @@ that proves most to the one that proves least:
    input (silence, DC, full-scale square waves, clipped signals, and non-finite samples, which are
    refused); the sanitizer legs; and the same bytes from the same input and configuration on one
    toolchain. As built, that is held for the committed streams the encoder wrote, which the tests
-   rebuild and compare byte for byte; `tests/golden/bitstream-hashes.json` has no AC-4 entries.
+   rebuild and compare byte for byte; `testdata/bitstream-hashes.json` has no AC-4 entries.
 
-**What goes in the tree.** Short DEE streams (about five seconds each) under `tests/golden/`, with a
+**What goes in the tree.** Short DEE streams (about five seconds each) under `testdata/`, with a
 generator that makes them from committed sources as `tools/generators/gen_ac4_baseline.py` does,
 and never runs in CI. As built, each stream's manifest entry records its source's SHA-256 and the
 properties its trace shows, and the scorers pin the scores. The encoder's streams are committed
-only as cases for syntax that no DEE stream reaches (`tests/golden/ac4/constructed`,
+only as cases for syntax that no DEE stream reaches (`testdata/ac4/constructed`,
 `presentations` and `objects`, with the Python parser's digests), which the tests rebuild byte for
 byte; CI makes the rest, and no hashes of them are pinned. The full census, the gold set (G0, G1)
 and librempeg's outputs stay local on `D:`, and so do the third-party streams: none is committed.
@@ -1387,7 +1387,7 @@ generator is `tools/generators/gen_ac4_baseline.py`, extended; it runs locally a
 
 The committed streams (about five seconds each) are the scoring legs D2 to D6 use, replacing or
 beside the eleven made with DEE's default loudness correction; changed streams take new digests in
-`tests/golden/ac4/`, from the Python parser.
+`testdata/ac4/`, from the Python parser.
 
 **Exit:** every stream in the manifest is on `D:` with its source rebuildable, both transcriptions
 read each one to the end of every substream (5.1.4's audio refused, as now), and MediaInfo's trace
@@ -2054,7 +2054,7 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   The image is 486,192 bytes and nothing is retained after the decoders are destroyed. The PCM of
   each fixture is bit-identical between the x86-64 host (GCC 16, SSE seam) and the Cortex-M3
   (soft float, generic seam), so decision 26's claim holds for these five, and the hashes are pinned
-  (`tests/golden/ac4-probe-pcm-hashes.json`). The peak is what D14c meets: 2.0 needs 432 KB where the
+  (`testdata/ac4-probe-pcm-hashes.json`). The peak is what D14c meets: 2.0 needs 432 KB where the
   S3's probe allows 245,000, so 2.0 in internal RAM on the S3 needs the decoder's allocations halved
   again, or PSRAM.
 
@@ -2072,11 +2072,11 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   the energy of a full-scale sine, the loudest channel's difference is no louder than -149.1 dBFS
   on DEE's streams, -143.9 on the object streams and -96.8 on the loudest constructed one.
   MSVC, GCC 16 and Clang 22 agree to 0.1 dB;
-  the floors are pinned in `tests/golden/ac4/scalar-agreement.json`, 3 dB under the figures.
+  the floors are pinned in `testdata/ac4/scalar-agreement.json`, 3 dB under the figures.
   (b) `score_ac4_decode.py` and `score_ac4_encode.py` hold their pins with a `float` CLI and with a
   `double` one, on the committed legs and, with `--gold`, on the local gold set. (c) The probe's rows above are pinned in
   `run_baremetal_probe.sh`, each about a tenth over its figure. (d) The `double` output moves:
-  61 of the 66 streams under `tests/golden` decode with a few samples different in the float32
+  61 of the 66 streams under `testdata` decode with a few samples different in the float32
   output, by at most 2.3e-10 (about -193 dBFS); the encoder's output is byte-identical on the five
   encodes checked, so nothing of the encoder's is re-pinned, and both scorers hold at `double`.
 
@@ -2522,10 +2522,10 @@ D14a measured the `float` one: below the lowest crossover 105.7 to 132.1 dB (111
 to 97.2 dB where a stream has A-SPX (39.2 to 97.2 on DEE's, 35.0 to 96.9 on the object streams, 34.2 to 43.1 on the constructed
 ones). `float` measured 109.4 to 136.0 and 37.5 to 102.1. The loudest channel's difference against a full-scale sine is no louder
 than -139.4 dBFS on DEE's streams, -134.1 on the object streams and -92.3 on the constructed ones. The floors are pinned in
-`tests/golden/ac4/scalar-agreement-fixed.json`, 3 dB under the figures, and `score_ac4_decode.py` (15 legs) and
+`testdata/ac4/scalar-agreement-fixed.json`, 3 dB under the figures, and `score_ac4_decode.py` (15 legs) and
 `score_ac4_encode.py` (72) hold their pins with a fixed CLI. (b) The probe's six fixtures give the same PCM hash on the x86-64 host
 (GCC 14), the Cortex-M3 under QEMU (GCC 14.2.1) and RV32IMC, the C3's instruction set, built by its compiler (GCC 15.2.0,
-`riscv32-esp-elf`) and run on QEMU's `virt` board; they are pinned in `tests/golden/ac4-fixed-probe-pcm-hashes.json`. The C3
+`riscv32-esp-elf`) and run on QEMU's `virt` board; they are pinned in `testdata/ac4-fixed-probe-pcm-hashes.json`. The C3
 machine of Espressif's QEMU has 400 KB of SRAM and no PSRAM, less than the smallest fixture's peak of 429,667 bytes, so the RV32
 run was made by hand with the toolchain's semihosting library and is not in CI. (c) On the Cortex-M3 leg the tier takes 38.2 M,
 34.2 M, 55.6 M, 52.5 M, 90.4 M and 39.9 M instructions a frame for the six fixtures, 0.43 to 0.70 of the `float` tier's; the peaks

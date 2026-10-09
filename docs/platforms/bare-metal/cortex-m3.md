@@ -17,9 +17,9 @@ target and the first with hardware floating point.
 | E-AC-3 decode | Correct. 5.1, 2/0 and 7.1.4 (a bed and two dependent substreams), including AHT, spectral extension and §7.5.4 rematrixing; 5.1 and 7.1.4 folded to Lo/Ro stereo in line mode; and 5.1 in line mode from a stream carrying dynrng words and dialnorm 24 |
 | E-AC-3 §E3.5 enhanced coupling | Correct, on its own fixture |
 | Atmos bed and objects | Correct. Objects reconstruct here, and are placed onto 7.1.4 by their positions (`eac3_atmos_render`, through the block form's object views); the flat newlib heap makes it easier than on the [ESP32-S3](esp32-s3.md#objects) |
-| Fixed-point decode | `-DICLFORGE_DECODE_SCALAR=fixed` builds every decode row above in Q7.24 integers under a per-block exponent, for a part with no FPU at all - the plan is [arithmetic-tiers.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/arithmetic-tiers.md). CI runs the probe twice on this leg, and the fixed build's PCM is identical to the x86 host's and to an ESP32-C3's under `qemu-riscv32` - three architectures, one pinned set of hashes (`tests/golden/fixed-probe-pcm-hashes.json`). It costs 0.33x the instructions the default build spends on the same frame: `eac3.instructions_per_frame=4241000` against 12,942,000, integer arithmetic where that one's is software floating point |
+| Fixed-point decode | `-DICLFORGE_DECODE_SCALAR=fixed` builds every decode row above in Q7.24 integers under a per-block exponent, for a part with no FPU at all - the plan is [arithmetic-tiers.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/arithmetic-tiers.md). CI runs the probe twice on this leg, and the fixed build's PCM is identical to the x86 host's and to an ESP32-C3's under `qemu-riscv32` - three architectures, one pinned set of hashes (`testdata/fixed-probe-pcm-hashes.json`). It costs 0.33x the instructions the default build spends on the same frame: `eac3.instructions_per_frame=4241000` against 12,942,000, integer arithmetic where that one's is software floating point |
 | Encode | A separate encode-only profile, `ICLFORGE_MINIMAL_ENCODER`: six rows (5.1 and 2/0 through each encoder, 2/0 with coupling, spectral extension and AHT, 2/0 §E3.5), each hashed against `encode_fixture.hpp` with its peak and its time per frame; 226,780-byte image, 158,911 peak, 9.1 M to 48.2 M instructions a frame under `--encoder --icount` - see [Building](../../building.md#what-the-encode-direction-costs) |
-| AC-4 decode | A third probe, `run_baremetal_probe.sh --ac4`, for the AC-4 decoder in `float` (`iclforge::ac4` with its inspector and core, static, without exceptions; the encoder is not built): six committed streams, 2.0 and 5.1 with and without A-CPL, 5.1.4 and 2.0 with companding, each channel's level exact against `firmware/baremetal/ac4_fixture.hpp`, and the PCM bit-identical to the x86-64 host's (`tests/golden/ac4-probe-pcm-hashes.json`). 750,276-byte image (196 KB of it the sample rate converter's tables and 53 KB the inverse transform's), 286 KB to 1.49 MB peak heap by fixture, 48 to 202 allocations a frame, 19.5 KB of stack, 25.2 M to 161.8 M instructions a frame under `--ac4 --icount` (planning/ac4.md, D14f) - see [the AC-4 rows](#the-ac-4-probe) |
+| AC-4 decode | A third probe, `run_baremetal_probe.sh --ac4`, for the AC-4 decoder in `float` (`iclforge::ac4` with its inspector and core, static, without exceptions; the encoder is not built): six committed streams, 2.0 and 5.1 with and without A-CPL, 5.1.4 and 2.0 with companding, each channel's level exact against `firmware/baremetal/ac4_fixture.hpp`, and the PCM bit-identical to the x86-64 host's (`testdata/ac4-probe-pcm-hashes.json`). 750,276-byte image (196 KB of it the sample rate converter's tables and 53 KB the inverse transform's), 286 KB to 1.49 MB peak heap by fixture, 48 to 202 allocations a frame, 19.5 KB of stack, 25.2 M to 161.8 M instructions a frame under `--ac4 --icount` (planning/ac4.md, D14f) - see [the AC-4 rows](#the-ac-4-probe) |
 | Image size | 355,709 bytes — 293,092 `.text`, 400 `.data`, 62,217 `.bss` |
 | Peak heap | 195,025 bytes, the height-object fixture placed onto 7.1.4 (`eac3_atmos_render`); 194,655 with Atmos objects reconstructed, 173,794 for the 7.1.4 fixture folded to stereo, 167,386 as coded |
 | Retained after teardown | 12 bytes, one `__cxa_thread_atexit` record; the enhanced-coupling scratch (23,552 bytes while §E3.5 is in use) is handed back between fixtures |
@@ -123,17 +123,17 @@ image 8,448 bytes larger):
 These are D14e's figures. D14f lowered the peaks and the instruction counts and raised the image
 ([the performance trend](../../performance-trend.md) has the table). The runner holds each column to
 a ceiling about a tenth above the figure (`ICOUNT_CEILING_AC4` in `tools/checks/run_baremetal_probe.sh`;
-the peaks and the allocations a frame in `tests/golden/ac4-probe-ceilings.json`, which the ESP32-S3's
+the peaks and the allocations a frame in `testdata/ac4-probe-ceilings.json`, which the ESP32-S3's
 QEMU leg reads as well), and the image and the stack have ceilings of their own, set in the runner. Nothing
 is retained after the decoders are destroyed. The stack is read by painting a window of it below
 the probe's frame before each fixture and finding how far the decode reached. The PCM of each
-fixture hashes to the value `tests/golden/ac4-probe-pcm-hashes.json` pins, on this leg and on the
+fixture hashes to the value `testdata/ac4-probe-pcm-hashes.json` pins, on this leg and on the
 x86-64 host, and an ESP32-P4 board's hash equals the same six
 ([ESP32-P4](esp32-p4.md#float-output-on-the-host-the-cortex-m3-leg-and-the-board)). Instructions
 are not cycles: the [P4 page](esp32-p4.md#what-it-decodes-in-real-time) has what the decoder takes on
 a part with an FPU. In the fixed-point tier (`--ac4 --scalar=fixed`) the six fixtures take 6.7 M
 to 43.0 M instructions a frame on this leg, 0.27 to 0.30 of the `float` tier's (planning/ac4.md, D14f), and hash to the
-values `tests/golden/ac4-fixed-probe-pcm-hashes.json` pins, on this leg, on the x86-64 host and on
+values `testdata/ac4-fixed-probe-pcm-hashes.json` pins, on this leg, on the x86-64 host and on
 RV32IMC ([the performance trend](../../performance-trend.md#the-ac-4-decoder) has the table). No
 board has run AC-4 in the fixed-point tier.
 

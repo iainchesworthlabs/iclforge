@@ -867,7 +867,7 @@ output and are built by `tools/fuzz/metadata-seeds.py`, which `generate-seeds.sh
   plus an RF64 whose `<data>` size resolves through `<ds64>` and a file with
   no `<axml>` at all.
 - `fuzz_iec61937_unwrap` - `metadata-seeds.py ac4-carrier` packs the first four
-  frames of DEE's stereo stream (`tests/golden/external-baseline/ac4-stereo-64/dee.ac4`)
+  frames of DEE's stereo stream (`testdata/external-baseline/ac4-stereo-64/dee.ac4`)
   into IEC 61937-14 bursts, `spdif-ac4-20.wav`, beside the AC-3 and E-AC-3
   files `forge spdif` writes.
 

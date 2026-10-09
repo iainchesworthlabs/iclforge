@@ -5,7 +5,7 @@ decoder probe decodes, and the per-channel levels it checks them against
 
 The probe runs on a target with no filesystem, so its input has to be linked
 in. Everything here is derived from committed inputs by committed tools:
-tests/golden/audio/reference_51.wav (real programme material, per
+testdata/audio/reference_51.wav (real programme material, per
 CONTRIBUTING.md's own rule that silence and single tones make weak fixtures)
 encoded by this project's own forge, then decoded by the same forge to
 produce the expected levels. Re-running this script on an unchanged tree
@@ -91,7 +91,7 @@ FRAMES = 6
 
 class Layout(typing.NamedTuple):
     cli_name: str  # what forge's [layout] positional calls it
-    source: str  # programme material under tests/golden/audio/
+    source: str  # programme material under testdata/audio/
     wav_position: tuple[int, ...]
     coded_order: str  # the channel names in coded order, for the emitted comment
     # How the trimmed source is made from `source`: trim_wav below by default,
@@ -105,7 +105,7 @@ def derive_714(source: pathlib.Path, destination: pathlib.Path, frames: int) -> 
     rears and the four heights the surrounds and fronts again at distinct gains,
     so a channel landing in the wrong slot shows in its level. Derived rather
     than a committed twelve-channel file, since none exists under
-    tests/golden/audio/ and 2.5 seconds of one would be 2.9 MB; still real
+    testdata/audio/ and 2.5 seconds of one would be 2.9 MB; still real
     programme material, and reproducible from the file the 5.1 rows use."""
     with wave.open(str(source), "rb") as src:
         if src.getnchannels() != 6 or src.getsampwidth() != 2:
@@ -163,7 +163,7 @@ LAYOUTS = {
     # One channel, so the permutation is the one-element identity.
     #
     # The SOURCE is the stereo file: there is no mono programme under
-    # tests/golden/audio/ and adding one would be a third reference file to keep
+    # testdata/audio/ and adding one would be a third reference file to keep
     # in step for a single channel. forge's encode folds a stereo source down
     # to 1/0 itself (plan.cpp's mono_downmix), which is also the more honest
     # fixture - a mono stream that real material was folded into, rather than
@@ -350,7 +350,7 @@ STREAMS = (
 )
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-AUDIO = REPO / "tests" / "golden" / "audio"
+AUDIO = REPO / "testdata" / "audio"
 OUTPUT = REPO / "firmware" / "baremetal" / "fixture.hpp"
 
 
@@ -512,7 +512,7 @@ def main() -> int:
         "// The bitstreams firmware/baremetal/probe.cpp decodes and the per-channel levels it",
         "// checks them against (minimum-footprint decoder profile). Every stream is this",
         f"// project's own encoder over the first {FRAMES} frames of a file under",
-        "// tests/golden/audio/ (named per layout by LAYOUTS in the generator); the expected",
+        "// testdata/audio/ (named per layout by LAYOUTS in the generator); the expected",
         "// levels are that encoder's",
         "// output decoded by this project's own decoder, so they are a REGRESSION reference",
         "// (has this build changed?), not an independent oracle - the FFmpeg and Dolby",

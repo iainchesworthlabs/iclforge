@@ -84,7 +84,7 @@ a history to show here ([Validation: AC-4](verification.md#the-encoder)).
 
   async function fetchManifest() {
     try {
-      const resp = await fetch(rawUrl(BRANCH, "tests/golden/external-baseline/manifest.json"));
+      const resp = await fetch(rawUrl(BRANCH, "testdata/external-baseline/manifest.json"));
       if (!resp.ok) return null;
       return await resp.json();
     } catch (e) {
@@ -294,7 +294,7 @@ current snapshot. They come from the same `quality-history` branch
 mechanism as the table's own numbers (see "Where the data lives" below) —
 generated in CI by `tools/ci/quality_race.py`'s `render_spectrograms()`
 (`trend --spectrogram-dir`), decoding this build's own encode plus the
-committed `tests/golden/external-baseline/` FFmpeg/DEE bitstreams — never
+committed `testdata/external-baseline/` FFmpeg/DEE bitstreams — never
 invoking FFmpeg's or DEE's own encoder, same boundary as the numbers.
 
 ## Reading it
@@ -446,7 +446,7 @@ went through its own decoder, the panel would be scoring encoder-and-decoder
 pairs and no result could be attributed to either. One decoder makes the
 decoder a constant, and FFmpeg is the one all three encoders have in common.
 Neither FFmpeg's nor DEE's *encoder* is ever run — the external arms are the
-committed `tests/golden/external-baseline/` bitstreams, the same boundary the
+committed `testdata/external-baseline/` bitstreams, the same boundary the
 numbers above observe.
 
 **Alignment and level.** Codec delay is removed by cross-correlation and every

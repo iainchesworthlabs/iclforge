@@ -611,7 +611,7 @@ class Spectrograms(QrTestCase):
     def setUp(self):
         super().setUp()
         self.repo = Path(self._tmp.name) / "repo"
-        self.baseline = self.repo / "tests" / "golden" / "external-baseline"
+        self.baseline = self.repo / "testdata" / "external-baseline"
         (self.baseline / "leg-a").mkdir(parents=True)
         (self.baseline / "leg-a" / "ffmpeg.ec3").write_bytes(b"x")
         (self.baseline / "leg-a" / "dee.ec3").write_bytes(b"x")

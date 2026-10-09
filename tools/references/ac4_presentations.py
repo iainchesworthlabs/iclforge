@@ -3,7 +3,7 @@ clause 4.8.2), transcribed from the text and libs/ac4/ERRATA.md's readings ("Whi
 can be selected", "The order of the preferences") separately from the decoder's
 libs/ac4/src/decoder/presentations.cpp, over the tables of
 contents ac4_parse.py reads. tools/checks/test_ac4_presentation_selection.py holds it to the
-table tests/golden/ac4/presentations/presentation-selection.tsv, which the decoder's test
+table testdata/ac4/presentations/presentation-selection.tsv, which the decoder's test
 builds and holds the decoder to.
 
 A presentation can be selected when the decoder can decode it: every substream it names is a

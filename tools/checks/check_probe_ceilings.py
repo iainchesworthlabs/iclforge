@@ -1,5 +1,5 @@
 """Hold the AC-4 footprint probe's per-fixture figures to their ceilings
-(tests/golden/ac4-probe-ceilings.json).
+(testdata/ac4-probe-ceilings.json).
 
 The probe prints each figure as `<fixture>.<key>=<bytes or count>`. This reads one
 metric from a run and compares every fixture's value with the table's ceiling for that

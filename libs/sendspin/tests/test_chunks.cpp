@@ -20,7 +20,7 @@
 
 // The audio chunks, including planning/hearth-sendspin-extension.md's test
 // vectors for _iclforge_player@v1: a burst chunk from wrap_frame for
-// tests/golden's AC-3 5.1 fixture and one from Eac3BurstPacker for the
+// testdata's AC-3 5.1 fixture and one from Eac3BurstPacker for the
 // encoder's E-AC-3 syncframes of two blocks, checked field by field against the
 // burst the library packs for a receiver, beside the same checks on a silent
 // frame and on hand-made one-block syncframes.
@@ -262,7 +262,7 @@ TEST_CASE("chunks: an E-AC-3 burst chunk carries Eac3BurstPacker's six blocks",
     CHECK(chunk->chunk.data.size() == payload.size());
 }
 
-TEST_CASE("chunks: a burst chunk for the first syncframe of tests/golden's AC-3 5.1 fixture",
+TEST_CASE("chunks: a burst chunk for the first syncframe of testdata's AC-3 5.1 fixture",
           "[sendspin][chunks]") {
     const std::vector<std::byte> stream = read_file(ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR "/ac3-51-448/ffmpeg.ac3");
     const auto frames = iclforge::ac3::split_frames(stream);

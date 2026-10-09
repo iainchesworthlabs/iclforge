@@ -63,7 +63,7 @@ aspx_xover_subband_offset of each aspx_data element in that frame, a channel's b
 Part 1 Table 213 gives it, read from `forge decode ... syntax-trace=`, through Part 1
 Pseudocodes 67 to 69.
 
-The committed legs (tests/golden/external-baseline/) made with loudness measured only are scored
+The committed legs (testdata/external-baseline/) made with loudness measured only are scored
 by default; their sources are rebuilt by tools/generators/gen_ac4_baseline.py from the committed
 FLAC fixtures, which needs ffmpeg on PATH. --gold DIR scores phase G0's local gold set in DIR
 instead (DIR/streams/<leg>/dee.ac4, DIR/sources/<source>.wav, DIR/gold-manifest.json), which never
@@ -92,7 +92,7 @@ sys.path.insert(0, str(REPO / "tools" / "ci"))
 import gen_ac4_baseline as baseline  # noqa: E402
 import quality_race  # noqa: E402
 
-BASELINE_DIR = REPO / "tests" / "golden" / "external-baseline"
+BASELINE_DIR = REPO / "testdata" / "external-baseline"
 RATE = 48000
 
 # DEE's encoder and this decoder together, at frame_rate_index 13, by DEE encoder: 3 072 samples
@@ -177,7 +177,7 @@ G1_LEGS = tuple(f"514-{content}-{kbps}"
 
 # Per leg: (SNR floor per channel in dB, LSD ceiling in dB, tile ceiling in dB or None for
 # SIMPLE, MOS floor or None where ViSQOL was not installed), the first measurement less (plus) the
-# margins above. The committed legs by their directory under tests/golden/external-baseline/, the
+# margins above. The committed legs by their directory under testdata/external-baseline/, the
 # gold legs by their name in gold-manifest.json. Measured 2026-09-25: the SIMPLE legs with the
 # decoder of phase D3, the ASPX and 5.1 legs with phase D4's, whose reading of pre-flattening
 # (libs/ac4/ERRATA.md, "Pre-flattening's direction") moved the ASPX legs' tiles, LSD and MOS.

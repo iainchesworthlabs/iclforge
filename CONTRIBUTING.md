@@ -316,7 +316,7 @@ Ranked by how much they prove. Prefer the strongest one available for what you a
    Reading a stream *nobody here produced* is a different question, and the one that found five
    Annex E parsing defects in a single sitting once anything actually asked it. Two tiers, both
    automated: `tools/checks/verify_gold_reference.sh` decodes the six committed Dolby Encoding
-   Engine and FFmpeg streams in `tests/golden/external-baseline/` on every gold-reference leg,
+   Engine and FFmpeg streams in `testdata/external-baseline/` on every gold-reference leg,
    and the nightly `Interop` workflow runs `tools/checks/verify_fate_interop.py` over eight
    SHA-256-pinned commercial-encoder excerpts fetched from FFmpeg's FATE archive. Reach for this
    one whenever you touch decoder syntax the encoder here never emits — and read

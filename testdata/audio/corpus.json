@@ -66,7 +66,7 @@
       "kind": "bitstream",
       "sha256": "b51ae0859ff59bc2f5940e7322e7babe57ae7aa94f5bc5b3c6a2b3928307554b",
       "bytes": 141568,
-      "note": "FFmpeg-encoded from reference_51.wav: `ffmpeg -y -i tests/golden/audio/reference_51.wav -c:a eac3 -b:a 448k <out>` (ffmpeg 8.0.1). Confirmed to set cplbndstrce == 0 with cplbegf == 12 in every block - see tools/checks/verify_gold_reference.sh for why cplbegf != 0 matters here."
+      "note": "FFmpeg-encoded from reference_51.wav: `ffmpeg -y -i testdata/audio/reference_51.wav -c:a eac3 -b:a 448k <out>` (ffmpeg 8.0.1). Confirmed to set cplbndstrce == 0 with cplbegf == 12 in every block - see tools/checks/verify_gold_reference.sh for why cplbegf != 0 matters here."
     },
     {
       "fixture": "reference_objects.paths",

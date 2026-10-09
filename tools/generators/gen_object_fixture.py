@@ -1,6 +1,6 @@
 """Local-only generator for the committed third-party Dolby Atmos fixture.
 
-`tests/golden/object-fixture/dee_joc_514.ec3` is a DD+ JOC bitstream produced
+`testdata/object-fixture/dee_joc_514.ec3` is a DD+ JOC bitstream produced
 by the Dolby Encoding Engine (bundled in "Dolby Media Encoder") from the
 synthetic 5.1.4 tone bed this script also writes. It is the ONLY Atmos stream
 in this repository that this project's own encoder did not make, and so the
@@ -45,7 +45,7 @@ from pathlib import Path
 import numpy as np
 
 REPO = Path(__file__).resolve().parent.parent.parent
-OUT_DIR = REPO / "tests" / "golden" / "object-fixture"
+OUT_DIR = REPO / "testdata" / "object-fixture"
 DEE = Path(r"C:\Program Files\Dolby\Dolby Media Encoder\resources\dee-dir"
            r"\dee_ddpjoc_encoder.exe")
 

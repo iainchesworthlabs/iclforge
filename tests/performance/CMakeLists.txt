@@ -22,7 +22,7 @@ target_link_libraries(iclforge-perf
 
 target_include_directories(iclforge-perf PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-# real_audio.hpp resolves tests/golden/audio's fixtures through this, so the
+# real_audio.hpp resolves testdata/audio's fixtures through this, so the
 # gate reads real programme material whatever directory ctest launches it
 # from - see that header for why a synthetic tone is not an acceptable
 # substitute for it.
@@ -138,7 +138,7 @@ target_include_directories(iclforge-kernelbench PRIVATE
 
 target_include_directories(iclforge-kernelbench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-# So the binary can find tests/golden/audio's real-audio fixtures regardless
+# So the binary can find testdata/audio's real-audio fixtures regardless
 # of the working directory it is launched from - kernel inputs synthesized
 # from silence or a single tone give misleadingly tidy bit-allocation/
 # mantissa-cost numbers real program material never produces.

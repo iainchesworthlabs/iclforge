@@ -31,7 +31,7 @@ TestCase {
         Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.ac3")
     readonly property url atmosStreamUrl: Qt.resolvedUrl("../fixtures/atmos-objects.ec3")
     // A dedicated fixture (like atmos-objects.ec3 above, rather than a fuzz/robustness corpus
-    // file or one of tests/golden/ac4's own short, sparse-I-frame decoder-unit-test streams):
+    // file or one of testdata/ac4's own short, sparse-I-frame decoder-unit-test streams):
     // two A-JOC dynamic objects over reference_stereo.wav, `ac4-encode objects=` (E9's own scene
     // grammar) - planning/ac4.md, I5.
     readonly property url ac4ObjectStreamUrl: Qt.resolvedUrl("../fixtures/ac4-objects.ac4")

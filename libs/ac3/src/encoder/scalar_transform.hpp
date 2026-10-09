@@ -19,7 +19,7 @@
 // The double overloads are what every ordinary build calls, and they call
 // exactly what the encoders called before this header existed - the same
 // functions with the same arguments, so the fifteen bitstream hashes in
-// tests/golden/bitstream-hashes.json do not move.
+// testdata/bitstream-hashes.json do not move.
 //
 // The float overloads ignore `fast`. The direct-form transform is double only
 // (its four (k, n) tables are 1.9 MB), and under the minimum-footprint profile,
