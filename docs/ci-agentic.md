@@ -62,6 +62,16 @@ reads the changed files and decides:
 - **The gate's own files** (`pr-gate.yml`, `_static.yml`, `.github/actions/`, the toolchain
   scripts) build everything, because they are proven by running.
 
+The planner knows the projects of the tree from the rows of
+[`tools/checks/projects.json`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/checks/projects.json),
+the table `check_layering.py` holds the tree to, and not from directory lists of its own: the
+projects no Linux lane builds (the bindings, the firmware, the Android and WASM demos) are the ones
+whose rows name neither the `core` nor the `linux` lane, the comparisons are asked for by the
+kinds `library` and `vendored`, and a new project is known to the planner when it is a row. The
+table also names the files an excused edge reaches: a header of the ESP-IDF component that a
+library's tests or Hearth's engine include is built, though the component is not, because the
+files that include it are.
+
 The static checks are one job, [`_static.yml`](https://github.com/iainchesworthlabs/iclforge/blob/main/.github/workflows/_static.yml):
 ruff, shellcheck, actionlint, the unit tests of the oracle scripts, the documentation path check,
 the platform-matrix and generated-support-matrix checks, packaging consistency, the fixture
@@ -195,6 +205,10 @@ is a cheap way to see what that run will cost a change.
 The leg and job placement is a decision, and it is in three places: `tier` and `deep_only` in
 `.github/ci/legs.jsonc`, the `inputs.tier` conditions in `_ci-core.yml` and `_build.yml`, and the
 satellite rule in `classify_changes.py`. Moving something between tiers is a change to one of them.
+A change to either planner is held to what it replaces by `tools/ci/compare_planners.py`, which
+replays every tracked file and the last pull requests merged through the old and the new version
+and says where the answers differ, and in which direction ([Changing a
+planner](ci-lanes.md#changing-a-planner)).
 
 ## The legs
 

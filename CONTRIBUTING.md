@@ -146,6 +146,9 @@ firmware project and an example use libraries (a program also the shared code) a
 program; an internal project is never installed and no installed header includes one.
 `check_layering.py` reads the includes and the link lines of the whole tree. The few uses it allows
 by name are the table's `exceptions`, each with its reason, and one that excuses nothing fails.
+The CI planners read the same rows: a project names the lanes its tree lights (`lanes`), so a new
+project is a row with its lanes (`check_layering.py` fails one without), and the files an
+exception's excused include reaches are its `to_paths`.
 
 The one deliberate exception to the header root is `capi`: it installs under
 `include/iclforge_c/`, not `iclforge/`, even though it depends on the codecs directly (it wraps

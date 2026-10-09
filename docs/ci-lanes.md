@@ -330,6 +330,38 @@ performance jobs also start only once `Build & Test` finishes.
   `firmware/baremetal/`-only change skip it - a false skip, exactly what the conservative-default rule
   above exists to prevent.
 
+## The lanes of a project
+
+A project is a row of
+[`tools/checks/projects.json`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/checks/projects.json),
+and the row says which lanes its own tree lights (`lanes`), so that the lane table above is not
+written twice: the trees of the projects are the table's, and what is left in
+`classify_changes.py` is what is no project's (the notices and packaging of the products, the
+build files, the tools, the golden data) and the refinements inside a project (the Catch2 tests
+among a program's files, Crucible's Windows driver and Linux tray VM, the Python examples). A
+firmware project's `ships` are the libraries its package stages as source: they light its lanes in
+the run after a merge too, and `test_classify_changes.py` reads the packer's list against them. An
+exception's `to_paths` are the files an excused edge reaches: a change to one lights the lanes of
+the project that includes it (a header of the ESP-IDF component that `libs/ac3/tests` includes
+builds core and the three desktop platforms as well as the component's own lane), and
+`check_layering.py` fails an entry that no excused include names any more.
+
+`check_layering.py` fails a project that names no lane, or a lane the table's own `lanes` list does
+not have. A path that no project holds, and that no table here recognises, is an unknown path: it
+lights every lane.
+
+## Changing a planner
+
+`python3 tools/ci/compare_planners.py --old <a worktree of the version to compare with>` asks both
+versions everything the workflows ask (the gate's plan with and without the queue's mode, the lanes
+with and without `--satellites-direct`) for every tracked file as a one-file change and for the
+last 150 pull requests merged to the base branch, each as its file list followed to where its
+paths are now. A difference is a superset when the new version runs everything the old one ran and
+more, and narrower when it skips something the old one ran. `--allow-narrower <prefix>` excuses
+the narrower answers for paths the new version knows and the old one did not (the old answer was
+the unknown-path fallback); anything else narrower fails the run, so a change meant to be a pure
+refactoring is shown to be one.
+
 ## Where the logic lives
 
 `tools/ci/classify_changes.py` is the single source of truth for the table above - see its own
