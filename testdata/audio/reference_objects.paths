@@ -1,4 +1,4 @@
-# The fixed placement of tests/golden/audio/reference_objects.wav's
+# The fixed placement of testdata/audio/reference_objects.wav's
 # objects, in atmos-path's keyframe format:
 #
 #   object time_s x y z gain lfe_send
