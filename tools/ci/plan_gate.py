@@ -41,6 +41,16 @@ import argparse
 import re
 import sys
 from collections.abc import Iterable
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "checks"))
+
+import project_graph
+
+# The projects of the tree and the lanes they are built in: tools/checks/projects.json.
+TABLE = project_graph.load_table()
+# The lanes a Linux C++ build gate has something to say about.
+BUILT_LANES = frozenset(("core", "linux"))
 
 DOCS_PREFIXES = ("docs/", "docs-snippets/", "planning/", "overrides/", "assets/")
 DOCS_ROOT_FILES = ("LICENSE", "mkdocs.yml")
@@ -58,19 +68,20 @@ GATE_MACHINERY = (
     ".github/toolchain-versions.json",
 )
 
-# The trees whose change can alter how fast the encoder runs or how much it allocates:
-# the library. Tests, apps and build files are not here on purpose, since the comparison
-# measures the library's own benchmarks, at two builds a job. A library's own tests/ and
-# fuzz/ are beside its code (planning/monorepo.md) and are tests all the same.
-# external/ is the vendored code that was inside the sendspin library, and is held to what the
-# libraries are.
-COMPARE_PREFIXES = ("libs/", "external/")
+# The projects whose change can alter how fast the encoder runs or how much it allocates:
+# the libraries and the vendored code that was inside the sendspin library. Tests, apps and
+# build files are not here on purpose, since the comparison measures the library's own
+# benchmarks, at two builds a job. A library's own tests/ and fuzz/ are beside its code
+# (planning/monorepo.md) and are tests all the same.
+COMPARE_KINDS = ("library", "vendored")
 LIBRARY_CONSUMERS = re.compile(r"^libs/[^/]+/(?:tests|fuzz)/")
 
 # Trees a Linux C++ build has nothing to say about. Their own lanes run in the
 # post-merge verification (docs/ci-agentic.md), and the static checks already
 # lint and unit-test the scripts among them. Checked after GATE_MACHINERY, so the
 # rest of .github/ (the other workflows) lands here and is linted, not built.
+# The projects no Linux lane builds (the bindings, the firmware, the Android and WASM demos) are
+# not listed: the table says so, in the lanes of their rows.
 NOT_BUILT = (
     ".github/",
     "tools/ci/",
@@ -79,15 +90,6 @@ NOT_BUILT = (
     "tools/release/",
     "requirements/",
     "packaging/",
-    "bindings/python/",
-    "bindings/rust/",
-    "bindings/js/",
-    "firmware/esp-idf/",
-    "firmware/esphome/",
-    "apps/demos/android/",
-    "apps/demos/wasm/",
-    "firmware/baremetal/",
-    "firmware/hearth-sink/",
     "apps/crucible/linux/",
     "examples/python/",
 )
@@ -133,14 +135,11 @@ GUI_EXCEPTIONS = (
 )
 GUI_ROOT_FILES = ("CMakeLists.txt", "CMakePresets.json", "vcpkg.json")
 
-# Built by the Linux gate, and known not to need Qt.
+# Built by the Linux gate, and known not to need Qt: these, and the libraries, the vendored code,
+# the examples and the cross-project tests (NON_GUI_KINDS).
 KNOWN_NON_GUI = (
-    "libs/",
-    "external/",
-    "tests/",
     "testdata/",
     "tools/fuzz/",
-    "examples/",
     "apps/forge/cli/",
     "notices/",
     "tools/checks/",
@@ -149,6 +148,8 @@ KNOWN_NON_GUI = (
     "tools/listening/",
     "tools/sendspin/",
 )
+
+NON_GUI_KINDS = ("library", "vendored", "tests", "example")
 
 
 def _is_docs(path: str) -> bool:
@@ -201,18 +202,37 @@ def plan(
             build_reason = build_reason or f"{path} (the gate's own machinery)"
             gui_reason = gui_reason or f"{path} (the gate's own machinery)"
             continue
-        if path.startswith(NOT_BUILT) or ("/" not in path and path in NOT_BUILT_ROOT_FILES):
+        project = TABLE.project_of(path)
+        # A header of the ESP-IDF component that a library's tests include is built by the
+        # gate through them, though the component is not: the table names the edge.
+        includers = [i for i in TABLE.reached_from(path) if BUILT_LANES & set(i.lanes)]
+        not_built = (
+            path.startswith(NOT_BUILT)
+            or ("/" not in path and path in NOT_BUILT_ROOT_FILES)
+            or (project is not None and not BUILT_LANES & set(project.lanes))
+        )
+        if not_built and not includers:
             continue
 
         build_reason = build_reason or path
         compare = compare or (
-            path.startswith(COMPARE_PREFIXES) and not LIBRARY_CONSUMERS.match(path)
+            project is not None
+            and project.kind in COMPARE_KINDS
+            and not LIBRARY_CONSUMERS.match(path)
         )
+        for includer in includers:
+            if (includer.path + "/").startswith(GUI_PREFIXES):
+                gui_reason = gui_reason or f"{path} (included by {includer.name})"
+        if not_built:
+            continue
         if path.startswith(GUI_EXCEPTIONS):
             pass
         elif path.startswith(GUI_PREFIXES) or ("/" not in path and path in GUI_ROOT_FILES):
             gui_reason = gui_reason or path
-        elif not path.startswith(KNOWN_NON_GUI):
+        elif not (
+            path.startswith(KNOWN_NON_GUI)
+            or (project is not None and project.kind in NON_GUI_KINDS)
+        ):
             gui_reason = gui_reason or f"{path} (not a path this planner recognises)"
 
     if not seen:

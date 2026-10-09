@@ -308,6 +308,44 @@ class EspComponentStagingTest(unittest.TestCase):
                 self.assertTrue(gate.classify([name], satellites_direct=True)["esp"])
 
 
+class ProjectTableTest(unittest.TestCase):
+    """The lanes come from the rows of tools/checks/projects.json (planning/monorepo.md, C7-6)."""
+
+    def test_the_lanes_are_the_tables_and_the_two_that_gate_nothing(self):
+        self.assertEqual(gate.LANES, (*gate.TABLE.lanes, "ci_self", "docs"))
+
+    def test_a_projects_tree_lights_the_lanes_of_its_row(self):
+        for project in gate.TABLE.projects.values():
+            for lane in project.lanes:
+                with self.subTest(project=project.name, lane=lane):
+                    self.assertIn(project.path + "/", gate.LANE_PREFIXES[lane])
+
+    def test_what_a_project_ships_lights_its_lanes_too(self):
+        esp = gate.TABLE.projects["esp-idf"]
+        for name in esp.ships:
+            with self.subTest(library=name):
+                self.assertIn(gate.TABLE.projects[name].path + "/", gate.LANE_PREFIXES["esp"])
+
+    def test_examples_are_core_s_and_not_an_unknown_tree(self):
+        hits = gate.classify(["examples/mux_mp4.cpp"])
+        self.assertEqual(
+            lit(hits, *ALL_LANES),
+            {"core", "windows", "linux", "macos", "android", "wasm", "esp", "rust", "python"},
+        )
+        direct = gate.classify(["examples/mux_mp4.cpp"], satellites_direct=True)
+        self.assertEqual(lit(direct, *ALL_LANES), {"core", "windows", "linux", "macos"})
+
+    def test_a_header_an_excused_edge_reaches_lights_the_projects_that_include_it(self):
+        # ac3's tests and Hearth's engine include these (the table's exceptions, with their files).
+        reached = "firmware/esp-idf/iclforge/include/iclforge/block_ring.hpp"
+        direct = gate.classify([reached], satellites_direct=True)
+        self.assertEqual(lit(direct, *ALL_LANES), {"esp", "core", "windows", "linux", "macos"})
+
+    def test_a_header_no_excused_edge_reaches_lights_the_component_only(self):
+        other = "firmware/esp-idf/iclforge/include/iclforge/access_units.hpp"
+        self.assertEqual(lit(gate.classify([other]), *ALL_LANES), {"esp"})
+
+
 class MainTest(unittest.TestCase):
     """main() reads paths from stdin and writes lane=true|false lines that the
     workflow feeds to $GITHUB_OUTPUT."""

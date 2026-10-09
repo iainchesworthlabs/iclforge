@@ -92,7 +92,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          sparse-checkout: tools/ci/plan_gate.py
+          sparse-checkout: |
+            tools/ci/plan_gate.py
+            tools/checks/project_graph.py
+            tools/checks/projects.json
           sparse-checkout-cone-mode: false
 
       # A pull request is planned from its own file list, a queue entry from the

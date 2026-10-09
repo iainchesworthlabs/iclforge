@@ -266,6 +266,53 @@ class Compare(unittest.TestCase):
         )
 
 
+class ProjectTable(unittest.TestCase):
+    """What the gate builds follows the rows of tools/checks/projects.json (C7-6)."""
+
+    def test_the_projects_no_linux_lane_builds_are_the_bindings_the_firmware_and_the_demos(self):
+        not_built = {
+            p.name for p in gate.TABLE.projects.values() if not gate.BUILT_LANES & set(p.lanes)
+        }
+        self.assertEqual(
+            not_built,
+            {
+                "demo-android",
+                "demo-wasm",
+                "python",
+                "rust",
+                "js",
+                "esp-idf",
+                "hearth-sink",
+                "esphome",
+                "baremetal",
+            },
+        )
+
+    def test_a_header_the_librarys_tests_include_is_built_though_the_component_is_not(self):
+        got = plan("firmware/esp-idf/iclforge/include/iclforge/block_ring.hpp")
+        self.assertEqual((got["build"], got["gui"], got["compare"]), ("true", "false", "false"))
+
+    def test_a_header_hearths_engine_includes_pulls_qt_in_too(self):
+        got = plan("firmware/esp-idf/iclforge/include/iclforge/firmware_image.hpp")
+        self.assertEqual((got["build"], got["gui"]), ("true", "true"))
+        self.assertIn("included by hearth", got["gui_reason"])
+
+    def test_a_header_no_excused_edge_reaches_stays_unbuilt(self):
+        got = plan("firmware/esp-idf/iclforge/include/iclforge/access_units.hpp")
+        self.assertEqual((got["build"], got["gui"]), ("false", "false"))
+
+    def test_the_examples_and_the_cross_project_tests_build_without_qt(self):
+        for path in ("examples/mux_mp4.cpp", "tests/support/helpers.cpp"):
+            with self.subTest(path=path):
+                got = plan(path)
+                self.assertEqual((got["build"], got["gui"]), ("true", "false"))
+
+    def test_the_library_kinds_ask_for_the_comparisons(self):
+        self.assertEqual(plan("libs/ac4/src/decoder/decoder.cpp")["compare"], "true")
+        self.assertEqual(plan("external/time-filter/filter.cpp")["compare"], "true")
+        self.assertEqual(plan("apps/forge/cli/src/main.cpp")["compare"], "false")
+
+
 class Reason(unittest.TestCase):
     def test_names_the_first_path_that_forced_the_build(self):
         got = plan("docs/a.md", "libs/ac3/src/x.cpp", "libs/ac3/src/y.cpp")
