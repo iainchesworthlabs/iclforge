@@ -27,6 +27,15 @@ C7-2 (the products) adds:
   apps-parts   a product root built from parts: `"apps", "gui"`, `Path("apps") / "cli"`,
                `apps/${name}`
 
+C7-3 (the bindings and the firmware) adds:
+
+  binding-roots   `python/`, `rust/`, `js/` (they are bindings/{python,rust,js}), and one of them
+                  named alone as a working directory, a package directory or a `cd`
+  firmware-roots  `esp-idf/`, `esphome/`, `apps/baremetal`, `examples/hearth_sink` (they are
+                  firmware/{esp-idf,esphome,baremetal} and firmware/hearth-sink)
+  firmware-parts  a root built from parts: `REPO / "esp-idf"`, `"apps", "baremetal"`,
+                  `$GITHUB_WORKSPACE/esp-idf`
+
     c7_leftovers.py [--root <worktree>] [--kind K] [--exclude PREFIX ...] [--show N]
 
 Nothing here fails a build: a hit is a line to read. The first run of C7-1 found, this way, the
@@ -72,6 +81,20 @@ KINDS: dict[str, re.Pattern[str]] = {
     "apps-parts": re.compile(
         r"""["']apps["']\s*[,/]\s*["'](?:cli|gui|common|notices|windows|linux|android|wasm)["']"""
         r"|apps/\$\{|apps/\{"
+    ),
+    "binding-roots": re.compile(
+        r"(?<![A-Za-z0-9_.-])(?<![A-Za-z0-9_.-]/)\.?/?(?:python|rust|js)/"
+        r"|(?:working-directory|directory|package-dir|cwd|source-dir)[\"']?\s*[:=]\s*[\"']?/?"
+        r"(?:python|rust|js)\b[\"']?\s*$|\bcd (?:python|rust|js)\b"
+    ),
+    "firmware-roots": re.compile(
+        r"(?<![A-Za-z0-9_.-])(?<![A-Za-z0-9_.-]/)\.?/?(?:esp-idf|esphome)/"
+        r"|apps/baremetal|examples/hearth_sink|[$}]/esp-idf"
+    ),
+    "firmware-parts": re.compile(
+        r"""/\s*["'](?:python|rust|js|esp-idf|esphome|baremetal)["']"""
+        r"""|["']apps["']\s*[,/]\s*["']baremetal["']"""
+        r"""|["']esp-idf["']\s*,"""
     ),
 }
 BINARY = (
