@@ -2321,7 +2321,7 @@ TEST_CASE("build_dac4 describes each configuration's substream groups in its spe
 
 TEST_CASE("build_dac4 describes every presentation of the encoder's committed presentation streams",
           "[ac4][carriage]") {
-    // Phase E6's streams, tests/golden/ac4/presentations/encoder-*.ac4: the
+    // Phase E6's streams, testdata/ac4/presentations/encoder-*.ac4: the
     // broadcast stream's fifteen presentations of configurations 0, 2, 3 and 5
     // and single groups, one alternative among them; configurations 1 and 4;
     // an EMDF-only one; and 3.0 dialogue.

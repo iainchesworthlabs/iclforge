@@ -221,7 +221,7 @@ if [[ "$DIRECTION" == "ac4" ]]; then
     ICLFORGE_ESP32S3_MAX_AC4_STACK_BYTES=${ICLFORGE_ESP32S3_MAX_AC4_STACK_BYTES:-24000}
     # Each fixture's peak heap, steady-state allocations a frame and internal RAM ceilings are in
     # testdata/ac4-probe-ceilings.json, which run_baremetal_probe.sh --ac4 reads as well.
-    AC4_CEILINGS="$REPO/tests/golden/ac4-probe-ceilings.json"
+    AC4_CEILINGS="$REPO/testdata/ac4-probe-ceilings.json"
 fi
 
 OUTPUT="$(mktemp)"
@@ -418,7 +418,7 @@ done <<< "$CHURN"
 if [[ "$DIRECTION" == "ac4" ]]; then
     # The float PCM, the same bits as the Cortex-M3 leg's and the host's (decision 26).
     python3 "$REPO/tools/checks/check_probe_hashes.py" \
-        --expected "$REPO/tests/golden/ac4-probe-pcm-hashes.json" "$OUTPUT"
+        --expected "$REPO/testdata/ac4-probe-pcm-hashes.json" "$OUTPUT"
 
     stack=$(sed -n 's/^stack\.peak_bytes=\([0-9]*\).*/\1/p' "$OUTPUT" | head -1)
     if [[ -z "$stack" ]]; then

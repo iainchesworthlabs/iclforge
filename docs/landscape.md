@@ -483,7 +483,7 @@ mode and baseline version, so a session's own limits travel with its numbers.
 
 Both have since landed: two 30 s CC0
 fixtures, full-band speech and music, are committed as
-`tests/golden/audio/programme_{speech,music}_stereo.flac` and carry three legs
+`testdata/audio/programme_{speech,music}_stereo.flac` and carry three legs
 of their own in the external-baseline manifest — `ac3-music-stereo-192`,
 `eac3-music-stereo-96` and `eac3-speech-stereo-64`. `gen_listening_stimuli.py`
 walks every leg in that manifest, so those three already get a stimulus set

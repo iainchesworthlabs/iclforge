@@ -24,7 +24,7 @@ mkdir -p "$WORKDIR"
 # Resolved from this script's own location, not the caller's cwd, so it works
 # the same whether invoked from the repo root (as CI does) or anywhere else.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-GOLD_WAV="$REPO_ROOT/tests/golden/audio/reference_51.wav"
+GOLD_WAV="$REPO_ROOT/testdata/audio/reference_51.wav"
 COMPARE="$REPO_ROOT/tools/checks/compare_wav.py"
 
 # Pin drc_scale to 0 on both sides so a dynamic-range-compression default
@@ -422,7 +422,7 @@ check_one "eac3_cpl" "$WORKDIR/gold_cpl.ec3" "eac3" 256 "$MIN_SNR_DB" "$EAC3_CPL
 # rather than merely losing fidelity).
 CPLBNDSTRCE0_MIN_SNR_DB=15
 CPLBNDSTRCE0_FLOORS="50,65,56,81,21,21"
-CPLBNDSTRCE0_EC3="$REPO_ROOT/tests/golden/audio/reference_51_eac3_448k_cplbndstrce0.ec3"
+CPLBNDSTRCE0_EC3="$REPO_ROOT/testdata/audio/reference_51_eac3_448k_cplbndstrce0.ec3"
 if [[ ! -f "$CPLBNDSTRCE0_EC3" ]]; then
     echo "::error::fixture missing: $CPLBNDSTRCE0_EC3" >&2
     exit 1
@@ -486,7 +486,7 @@ check_one "eac3_cplbndstrce0" "$CPLBNDSTRCE0_EC3" "eac3" 448 \
 # concentrated in the surrounds; the front channels and the LFE stay in that
 # 50-90 dB band. A single floor low enough for the former left the latter
 # ungated by 30-70 dB - see "Per-channel floors" at the top of this file.
-EXTERNAL_BASELINE_DIR="$REPO_ROOT/tests/golden/external-baseline"
+EXTERNAL_BASELINE_DIR="$REPO_ROOT/testdata/external-baseline"
 if [[ ! -d "$EXTERNAL_BASELINE_DIR" ]]; then
     echo "::error::external-baseline fixtures missing: $EXTERNAL_BASELINE_DIR" >&2
     exit 1
@@ -556,7 +556,7 @@ done
 # gen_external_baseline.py's module docstring, which records the whole
 # analysis.
 DEE_STEREO_EC3="$EXTERNAL_BASELINE_DIR/eac3-stereo-192/dee.ec3"
-STEREO_WAV="$REPO_ROOT/tests/golden/audio/reference_stereo.wav"
+STEREO_WAV="$REPO_ROOT/testdata/audio/reference_stereo.wav"
 for required in "$DEE_STEREO_EC3" "$STEREO_WAV"; do
     if [[ ! -f "$required" ]]; then
         echo "::error::fixture missing: $required" >&2

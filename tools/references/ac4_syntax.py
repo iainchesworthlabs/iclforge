@@ -3741,10 +3741,10 @@ def stream_label(path):
     streams, when inside testdata/ (the constructed streams under testdata/ac4/ take
     a leading ../); else the file name."""
     p = Path(path).resolve().as_posix()
-    marker = '/tests/golden/external-baseline/'
+    marker = '/testdata/external-baseline/'
     if marker in p:
         return p.split(marker, 1)[1]
-    golden = '/tests/golden/'
+    golden = '/testdata/'
     if golden in p:
         return '../' + p.split(golden, 1)[1]
     return Path(path).name

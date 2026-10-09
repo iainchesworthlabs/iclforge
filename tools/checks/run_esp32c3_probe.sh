@@ -29,7 +29,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PROJECT="$REPO/firmware/baremetal/platform/esp32c3"
-PINS="$REPO/tests/golden/fixed-probe-pcm-hashes.json"
+PINS="$REPO/testdata/fixed-probe-pcm-hashes.json"
 
 # The decode arithmetic. `fixed` is the project's own default and the reason
 # this target exists; `float` builds the same part with the S3's tier, which is

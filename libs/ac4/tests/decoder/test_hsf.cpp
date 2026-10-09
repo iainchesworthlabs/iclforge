@@ -487,7 +487,7 @@ std::vector<std::byte> read_file(const std::filesystem::path& path) {
 
 TEST_CASE("the committed streams at 96 and 192 kHz are the builder's", "[ac4][decoder][hsf]") {
     // testdata/ac4-hsf/*.ac4 are these cases' streams byte for byte, and
-    // tools/references/ac4_syntax.py's digests of them, tests/golden/ac4/hsf-*.tsv, are what
+    // tools/references/ac4_syntax.py's digests of them, testdata/ac4/hsf-*.tsv, are what
     // test_syntax.cpp holds the decoder's trace to. They are not under testdata/ac4/
     // with the other constructed streams, which the tests and checks that play every committed
     // stream at 48 kHz take in. With AC4_DECODER_WRITE_HSF set to a directory the streams are

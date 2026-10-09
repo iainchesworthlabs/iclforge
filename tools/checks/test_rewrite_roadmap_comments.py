@@ -72,7 +72,7 @@ class Main(unittest.TestCase):
             "libs/mention.cpp": "// ROADMAP.md only\n",
             "tools/build/b.py": "# roadmap PF5\n",            # skipped dir part
             "tools/rewrite_roadmap_comments.py": "# roadmap PF5\n",  # skipped file
-            "tests/golden/x.json": '"roadmap PF5"\n',         # suffix not scanned
+            "testdata/x.json": '"roadmap PF5"\n',         # suffix not scanned
             "tests/c.bin": "roadmap PF5\n",
             "CMakeLists.txt": "# roadmap item F1\n",
         }
@@ -105,7 +105,7 @@ class Main(unittest.TestCase):
         self.assertEqual((self.root / "libs/a.cpp").read_text(), "// SIMD kernels kernel\n")
         self.assertEqual((self.root / "CMakeLists.txt").read_text(), "# C API\n")
         for untouched in ("tools/build/b.py", "tools/rewrite_roadmap_comments.py",
-                          "tests/golden/x.json", "tests/c.bin", "libs/mention.cpp"):
+                          "testdata/x.json", "tests/c.bin", "libs/mention.cpp"):
             self.assertEqual((self.root / untouched).read_text(), self.files[untouched])
 
 

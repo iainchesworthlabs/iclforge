@@ -36,7 +36,7 @@ HISTORY = (
     "planning/",
     "CHANGELOG.md",
     "tools/n1b/",
-    "tests/golden/",
+    "testdata/",
     "docs/history.md",
     "docs/renamed.md",
 )

@@ -807,7 +807,7 @@ coupling / transient pre-noise processing.
 
 Two limits are worth stating on this page rather than only in the bundle: the source material is
 synthetic, and the hashes are per-toolchain. On the first, the CC0
-speech and music fixtures are committed (`tests/golden/audio/programme_{speech,music}_stereo.flac`),
+speech and music fixtures are committed (`testdata/audio/programme_{speech,music}_stereo.flac`),
 but the vector generator was never pointed at them: `tools/generators/gen_conformance_vectors.py`
 still synthesizes its own sources and marks the spot where those files would join the set. Wiring
 this bundle to that material is outstanding work. On the second, the decoded-PCM hashes differ
@@ -856,7 +856,7 @@ Encoding Engine 6.5.4, whose install here also carries `dee_ac4_encoder.exe` (2.
 channel-based-immersive; 7.1 input is written as 5.1), `dee_ac4ims_encoder.exe` (immersive stereo,
 which stays channel-coded) and `dee_ac4ajoc_encoder.exe` (A-JOC, which takes only an Atmos master
 no master this project writes satisfies — see below). `tools/generators/gen_ac4_baseline.py`
-generates `tests/golden/external-baseline/ac4-*/dee.ac4` from it, the same local-generation,
+generates `testdata/external-baseline/ac4-*/dee.ac4` from it, the same local-generation,
 committed-output pattern `gen_external_baseline.py` uses.
 
 **What the inspector's framing is checked against**, in the same "how much does this prove"
@@ -1274,12 +1274,12 @@ reading is in `libs/ac4/ERRATA.md`, under "Presentations".
 ### The decoder's 9.X.4 modes
 
 The 9.X.4 modes (Part 2 6.2.4.1 with `b_5fronts`) have no oracle outside the project. Five constructed
-streams (`tests/golden/ac4/constructed/9_*.ac4`) carry a distinct tone per channel; both transcriptions
+streams (`testdata/ac4/constructed/9_*.ac4`) carry a distinct tone per channel; both transcriptions
 of the syntax read them to the same digests, and the decoder puts each tone on its channel in full and core
 decoding. The differential check compares the transcriptions on 600 streams. Unit tests hold S-CPL, A-SPX
 gains, A-CPL's six modules, the core dialogue enhancement interpolation, the renderer's 9.X rows (a second
 transcription, as printed) and DRC's groups, and each was mutation-checked. The float and fixed-point
-agreement floors are in `tests/golden/ac4/scalar-agreement*.json`. These show the decoder does what the
+agreement floors are in `testdata/ac4/scalar-agreement*.json`. These show the decoder does what the
 readings in `libs/ac4/ERRATA.md` ("The 9.X.4 element") say, not that they are what an encoder meant.
 
 ### The decoder's 22.2 element
@@ -1370,7 +1370,7 @@ what a stream carries through it, and installs the inspector, the decoder and th
 named otherwise.
 
 - **Through the public API alone**: a test standing in for Hearth's engine decodes every committed
-  AC-4 stream (those under `tests/golden/external-baseline/ac4-*` and `testdata/ac4/`: 66
+  AC-4 stream (those under `testdata/external-baseline/ac4-*` and `testdata/ac4/`: 66
   today) by block through `iclforge/ac4/decoder/decoder.hpp` alone, placing each block's channels by their
   speakers and changing the output level and dialogue enhancement half way through. No frame is
   refused, only a frame before a stream's first I-frame comes out empty, a stream ends in one short
@@ -1684,7 +1684,7 @@ paragraph on the objects follows them:
   interval, which takes stereo at 48 kHz in the ASPX mode from 8 kbps to 9.
 - **Presentations and several substreams** (phase E6, `libs/ac4/tests/encoder/test_presentations.cpp`).
   Four committed streams, each with its configuration beside it as JSON
-  (`tests/golden/ac4/presentations/encoder-*.ac4`): a broadcast of 5.1 music and effects, English
+  (`testdata/ac4/presentations/encoder-*.ac4`): a broadcast of 5.1 music and effects, English
   and German mono dialogue, a mono audio description, a stereo commentary and stereo French dialogue,
   in 15 presentations of configurations 0, 2, 3 and 5, with an alternative presentation and its name,
   each substream alone, and one presentation disabled and pre-virtualized; hybrid dialogue enhancement
@@ -1821,7 +1821,7 @@ floors at the first measurement less 1 dB and 0.02 are pinned. Core decoding giv
 the sum of its group, at 71 to 75 dB SNR and at its group's centre. A moving object's updates come out
 at the sample their input samples do, to within 32 samples, in both codings; a second encode is byte
 for byte the first; and the encoder's trace, the decoder's and the Python parser's agree on the four
-committed streams (`tests/golden/ac4/objects/encoder-*.ac4`, with their digests) and on the
+committed streams (`testdata/ac4/objects/encoder-*.ac4`, with their digests) and on the
 encoder-space harness's object draws. MediaInfo's reading of the object count and the bed
 (`tools/checks/check_ac4_encode_readers.py --only objects`) needs DEE's install. Whether the objects
 move as their metadata says is the listener's to hear, from the streams the test writes with

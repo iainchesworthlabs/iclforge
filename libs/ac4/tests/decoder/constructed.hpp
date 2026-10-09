@@ -124,7 +124,7 @@ struct BuiltStream {
 
 // The cases committed as testdata/ac4/constructed/<name>.ac4, with
 // kCommittedFrames frames each, whose digests tools/references/ac4_syntax.py
-// wrote beside the other digests in tests/golden/ac4/.
+// wrote beside the other digests in testdata/ac4/.
 inline constexpr int kCommittedFrames = 4;
 [[nodiscard]] std::vector<ElementCase> committed_cases();
 

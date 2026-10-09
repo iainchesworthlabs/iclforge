@@ -58,7 +58,7 @@ add_seed() {
 # encoder, and a better starting corpus than anything this repo could
 # synthesise for a format it only reads.
 echo "==> AC-4: the checked-in DEE baseline, as a parser seed"
-add_seed "fuzz_ac4_parse" "$REPO_ROOT/tests/golden/external-baseline/ac4-stereo-64/dee.ac4"
+add_seed "fuzz_ac4_parse" "$REPO_ROOT/testdata/external-baseline/ac4-stereo-64/dee.ac4"
 
 # The IAB seed comes from examples/encode_iab.cpp's own --write-fixture mode,
 # the one tools/ci/run_codec_matrix.sh drives, so it needs that example built -
@@ -146,7 +146,7 @@ echo "    (Dolby Encoding Engine 6.5.4 and FFmpeg 8.0.1 - third-party decode int
 # found while wiring up tools/checks/verify_gold_reference.sh's interop
 # checks. Seeding from these puts the fuzzers' mutations in that neighbourhood
 # too.
-EXTERNAL_BASELINE="$REPO_ROOT/tests/golden/external-baseline"
+EXTERNAL_BASELINE="$REPO_ROOT/testdata/external-baseline"
 for leg in ac3-51-448 eac3-51-256 eac3-stereo-192; do
     case "$leg" in
         ac3-*) ext=ac3; targets="fuzz_scan,fuzz_ac3_decode" ;;
@@ -250,7 +250,7 @@ add_seed "fuzz_iec61937_unwrap" "$WORK/carrier-not.wav"
 # are as long as its frames. 'forge spdif' does not pack AC-4 yet
 # (planning/ac4.md, I1), so the seed script packs its first four frames.
 python3 "$SCRIPT_DIR/metadata-seeds.py" ac4-carrier "$OUT" \
-    "$REPO_ROOT/tests/golden/external-baseline/ac4-stereo-64/dee.ac4"
+    "$REPO_ROOT/testdata/external-baseline/ac4-stereo-64/dee.ac4"
 
 echo "==> done:"
 for d in "$OUT"/fuzz_*; do

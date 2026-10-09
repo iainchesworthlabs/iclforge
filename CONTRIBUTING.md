@@ -331,7 +331,7 @@ Ranked by how much they prove. Prefer the strongest one available for what you a
 **AC-4 has a ladder of its own**, set out in [docs/verification.md](https://iainchesworthlabs.github.io/iclforge/verification/#ac-4)
 and in `planning/ac4.md`. FFmpeg reads AC-4's framing and its MP4 track and has no AC-4 decoder, so
 it does not check audio. The decoder is scored against the streams Dolby Encoding Engine (DEE)
-makes from known sources, the committed ones in `tests/golden/external-baseline/ac4-*` and a larger
+makes from known sources, the committed ones in `testdata/external-baseline/ac4-*` and a larger
 gold set kept locally (DEE's licence ends on 2026-11-06 and is not renewed), by
 `tools/checks/score_ac4_decode.py`; its gains and mixing are held to the standard's formulas by
 `gain_ac4_decode.py` and `mix_ac4_decode.py`; librempeg's decoder is a second opinion wherever it

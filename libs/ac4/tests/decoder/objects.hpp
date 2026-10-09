@@ -111,7 +111,7 @@ struct BuiltObjectStream {
 
 // The cases committed as testdata/ac4/objects/<name>.ac4 with
 // kCommittedObjectFrames frames each, whose digests tools/references/
-// ac4_syntax.py wrote beside the others in tests/golden/ac4/.
+// ac4_syntax.py wrote beside the others in testdata/ac4/.
 inline constexpr int kCommittedObjectFrames = 8;
 [[nodiscard]] std::vector<ObjectCase> committed_object_cases();
 

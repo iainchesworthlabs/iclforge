@@ -49,7 +49,7 @@ header). Run from the repo root:
       [--inputs DIR ...]
 
 --streams adds every *.ac4 under each directory (the local census, say) to the
-committed streams under testdata/external-baseline/ and tests/golden/ac4-hsf/.
+committed streams under testdata/external-baseline/ and testdata/ac4-hsf/.
 --inputs compares the files under each directory instead, every frame of each: a corpus
 tools/fuzz/run.sh grew for fuzz_ac4_decode reaches syntax random streams do not.
 """

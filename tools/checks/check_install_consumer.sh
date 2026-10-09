@@ -181,7 +181,7 @@ pkg_config_check() {
                 return 1
             fi
         done
-        "$work/pc_consumer_ac4" "$root/tests/golden/external-baseline/ac4-51-film-96/dee.ac4"
+        "$work/pc_consumer_ac4" "$root/testdata/external-baseline/ac4-51-film-96/dee.ac4"
         "$work/pc_consumer_ac4_encoder"
     fi
 

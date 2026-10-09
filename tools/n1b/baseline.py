@@ -16,9 +16,9 @@ A stage that changes names and paths must change nothing else. Four things stand
            the moves each one must exist at the place the move plan sends it (`check-moves`), and
            after the pure `git mv` commit with the same blob id (`--pure`): a header cannot be
            lost or edited by a move. It is read from git, so it needs no build.
-  hashes   the three streams the pinned-hash gate encodes from tests/golden/audio/reference_51.wav,
+  hashes   the three streams the pinned-hash gate encodes from testdata/audio/reference_51.wav,
            in fast and reference mode, and what tools/checks/check_cross_platform_hash.py says of
-           them against tests/golden/bitstream-hashes.json, which S1 to S6 leave unchanged.
+           them against testdata/bitstream-hashes.json, which S1 to S6 leave unchanged.
   symbols  the names each shared library exports, undecorated (MSVC: dumpbin /exports and undname;
            an ELF tree: nm -D --defined-only -C, keyed by the unversioned file name),
            so that the union of the libraries a library was split into can be compared with what
@@ -63,7 +63,7 @@ DEFAULT_BASELINE = HERE / "baselines"
 KINDS = ("headers", "hashes", "symbols", "cli", "install")
 SCHEMA = 1
 IGNORED_KEYS = ("measured_at", "tools")
-GOLD_WAV = "tests/golden/audio/reference_51.wav"
+GOLD_WAV = "testdata/audio/reference_51.wav"
 HEADER_EXT = {".hpp", ".h", ".hh", ".hxx", ".inl", ".ipp"}
 
 
@@ -144,7 +144,7 @@ def record_headers(root: Path) -> dict:
 def record_hashes(root: Path, cli: Path, work: Path) -> dict:
     """Encode the pinned gate's streams in both modes and run the gate itself over them."""
     result: dict = {
-        "pins_blob": git(root, "rev-parse", "HEAD:tests/golden/bitstream-hashes.json").strip()
+        "pins_blob": git(root, "rev-parse", "HEAD:testdata/bitstream-hashes.json").strip()
     }
     wav = str(root / GOLD_WAV)
     for mode, extra, suffix in (("fast", [], ""), ("reference", ["mode=reference"], "_reference")):
