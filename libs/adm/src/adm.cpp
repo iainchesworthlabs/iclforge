@@ -171,15 +171,17 @@ PcmAudio read_pcm(bw64::Bw64Reader& reader, std::uint64_t file_bytes) {
     // rather than from a field inside them. A well-formed file is unaffected:
     // its declared size is at most its real one, so the clamp never binds.
     const auto frame_count = std::min(reader.numberOfFrames(), file_bytes / block_align);
-    std::vector<float> interleaved(static_cast<std::size_t>(frame_count) * channel_count);
+    // Held as the vector's own size type from here on: a 64-bit count cannot index, or size,
+    // a vector on a target whose size_t is 32 bits.
+    const auto frames = static_cast<std::size_t>(frame_count);
+    std::vector<float> interleaved(frames * channel_count);
     reader.seek(0);
     reader.read(interleaved.data(), frame_count);
 
-    audio.channels.assign(channel_count, std::vector<float>(frame_count));
-    for (std::uint64_t frame = 0; frame < frame_count; ++frame) {
+    audio.channels.assign(channel_count, std::vector<float>(frames));
+    for (std::size_t frame = 0; frame < frames; ++frame) {
         for (std::uint16_t channel = 0; channel < channel_count; ++channel) {
-            audio.channels[channel][frame] =
-                interleaved[static_cast<std::size_t>(frame) * channel_count + channel];
+            audio.channels[channel][frame] = interleaved[frame * channel_count + channel];
         }
     }
     return audio;
