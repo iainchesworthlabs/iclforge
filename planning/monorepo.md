@@ -1,6 +1,6 @@
 # A monorepo of self-contained projects (C7): a study
 
-!!! note "Status as of 2026-10-08: decisions 1 to 15 taken; C7-1 run and proved; C7-2 to C7-5 not begun"
+!!! note "Status as of 2026-10-09: decisions 1 to 15 taken; C7-1 and C7-2 run and proved; C7-3 to C7-5 not begun"
     Asked for by the user on 2026-10-08: "turn this repository into a monorepo of self-contained
     projects". It follows [consolidation.md](consolidation.md), whose C0 to C6, the three merges its
     decision 14 left (M1 to M3) and the two items C3 and C6 left are run and proved on the local
@@ -13,7 +13,11 @@
     decisions 1 to 15 on 2026-10-08, every one (a). C7-1 ran on the local branch
     `chore/monorepo-c7-1`: the libraries, their tests and fuzz targets, the test-support helpers and
     the vendored time filter moved, and it changed no output byte, no exported name and no test name
-    ([what the runs found](#what-the-runs-found-that-the-study-did-not)). Nothing is pushed.
+    ([what the runs found](#what-the-runs-found-that-the-study-did-not)). C7-2 ran on
+    `chore/monorepo-c7-2`: the products, the code they share, the demos and the notices moved, each
+    program's tests went beside it, and it changed no output byte, no exported name and no test name; the
+    one difference it leaves in a program is the order of the functions of its generated Qt code. Nothing
+    is pushed.
 
 ## In brief
 
@@ -511,3 +515,162 @@ SonarCloud and CodeQL; the workflows themselves (their paths, filters and caches
 generated tables (C7-4); `layering.json` and its debt files, still the libraries' alone (C7-5);
 `.git-blame-ignore-revs`, which the consolidation stages did not extend either, gets the rewrite
 commits of C0 to C7 when they land on `main`.
+
+### C7-2, 2026-10-09 (`chore/monorepo-c7-2`)
+
+**What moved.** 682 renames in one commit, every one `R100`: Forge's CLI 70 (`apps/forge/cli`) and GUI
+91 (`apps/forge/gui`), Hearth's engine 96, window 48, test sink 9, test server 3 and `hearth-render` 1,
+Crucible's engine 65, window 43 and runner 1, its driver and VM 34 and tray VM 13
+(`apps/crucible/{windows,linux}`), the demos 105 (`apps/demos/android` 51, `apps/demos/wasm` 54), the
+shared code 62 (`apps/shared/theme` 32, `media` 25, `preferences` 5) and the notices 41 (`notices/`).
+Then four relative includes, `c7_cmake.py` (22 CMake files, 18 Qt catalogues, whose `<location>` lines
+changed and whose messages did not), `consol_paths.py` (401 files), `c7_dirs.py` (the directories
+named whole: 20 files, then a program's own names for its directories: 20 more), `c7_testnames.py`
+(the comments that name a test binary or the `tests/` build file: 28 and 52 files), the reflow of 49 lines
+in 33 files, and by hand a CMake file for each program's tests, the planners, the workflows and the
+checks, README's and CONTRIBUTING's layout blocks and the pages that ran the one test binary. All in all
+the stage changed 934 files since its parent (680 renames git still pairs after the edits, 14 added, 2 deleted,
+238 modified). The tree: `apps/forge/{cli,gui}`, `apps/hearth/{engine,ui,render,testsink,testserver}`,
+`apps/crucible/{engine,ui,runner,spikes,windows,linux}`, `apps/demos/{android,wasm}`,
+`apps/shared/{media,theme,preferences}`, `notices/{fragments,licences,forge,crucible,hearth}`, each
+program `{CMakeLists.txt, src/, assets/, tests/}`.
+
+**A binary per program.** `iclforge-apps-tests` is gone. `iclforge-forge-cli-tests` (327 tests, label
+`forge-cli`), `iclforge-forge-gui-tests` (14, `forge-gui`), `iclforge-app-media-tests` (55, `app-media`),
+`iclforge-hearth-tests` (400, `hearth`) and `iclforge-crucible-tests` (158, `crucible`) are built from the
+`tests/` beside each program and added to the umbrella `iclforge-tests`; `iclforge-settings-tests`
+(19, `app-preferences`) and `hearth_controller_tests` stay the two small Qt binaries, and
+`iclforge-perf` is the one thing `tests/` still builds beside `support/`. The names are the
+before-names: 3,582 on the GUI-on trees of GCC 16 and Clang 22, 3,546 on the GUI-off ones, 3,189 on the
+shared Debug tree. `ctest -L ac3` is 1,055 tests now, not 1,071: sixteen moved with the media code
+they test. A project's label is also on the cases that carry no Catch2 tag for it.
+
+**What the dry run could not see** (each found by a configure, a build, a check or a comparison):
+
+1. **Three shared directories, not two (this extends decision 5).** The study found Hearth's and
+   Crucible's programs taking `system_theme.*` from Forge's GUI. The run found that they take more:
+   `language_manager.*` and `settings_migration.*` (all three programs run them at start-up), the typefaces
+   and the icons, `forge-gui.rc.in`, and the thirteen "family" QML components
+   (`cmake/SharedFamilyQml.cmake`'s list). So `apps/shared/preferences` is a third, beside
+   `apps/shared/media` (was `apps/common`) and `apps/shared/theme`. None of the three has a CMake
+   target: the programs compile the sources in as they did, so no object changes. The user is asked to
+   check this extension.
+2. **Qt names a QML cache unit by the path from the directory, and a path that climbs out of it loses
+   the target.** Forge GUI's thirteen shared components are `apps/shared/theme/assets/qml` and no
+   longer under the program's directory; `qt_add_qml_module` writes `${target}_<relative path>.cpp`, so
+   `forge-gui` and `forge_gui_qmltests` (one directory scope, as Qt requires) named the same
+   `.rcc/qmlcache/...` output twice ("already has a custom rule"). Hearth and Crucible had avoided it by
+   staging copies into their own tree; forge-gui stages them too (`assets/qml/shared`, ignored by git),
+   with the module's own URI, so the copies are the sources byte for byte. The resources are the same:
+   the 18 `.qrc` lists (prefix, alias and order) and the 19 compiled `.qm` files are identical.
+3. **Forge GUI's Qt Quick suite and its Catch2 cases share a directory,** and the first is `include()`d
+   into the program's directory scope. The suite's file is `tests/qml.cmake` now and `tests/CMakeLists.txt`
+   is the Qt-free binary that every CI leg builds, as it was in the monolith.
+4. **Splitting the binary shows what each test needs.** The monolith compiled the shared sources once
+   for everyone. The CLI's binary compiles `ac4_encode_core.cpp` and `ac4_objects_core.cpp` (it calls them),
+   Hearth's compiles `container_input.cpp` (`hearth_engine` does not, by design), and the media binary
+   compiles the six it holds. `libs/ac4/tests/decoder/test_object_render.cpp` stays in `libs/ac4` because it
+   includes that directory's private `objects.hpp`, so ac4's binary still compiles
+   `apps/shared/media/src/ac4_object_render.cpp`: a library-test to app edge, to be allowed by name in
+   C7-5's check. The three tests of the media code that were in `libs/ac3/tests` and `libs/audio/tests`
+   moved to `apps/shared/media/tests`.
+5. **C7-1 left the workflows that ran the monolith by name,** and nothing noticed because they are not
+   run here: Hearth's Sendspin job (`iclforge-tests "[sendspin],[hearth]"` and the two aiosendspin scripts),
+   the Crucible pass, the shared-library binding check, the Windows coverage script, the generators'
+   and race scripts' usage text, and some forty pages and comments. They name the binary that holds what
+   they meant now (`iclforge-sendspin-tests`, `iclforge-hearth-tests`, `iclforge-crucible-tests`,
+   `iclforge-audio-tests`, `iclforge-ac3-tests`: the binding check binds 382 symbols to the six
+   libraries). Six stale literals that `check_doc_paths.py` already reported at C7-1 are fixed.
+6. **A planner answers for a path, not for a project.** Moving a program's tests beside it changes
+   which prefix a test file has: `tests/cli/` was core's and `apps/forge/cli/tests/` is under the program's
+   prefix. `classify_changes.py` and `plan_gate.py` now name a program's Catch2 tests as core's (a window's
+   `test_*` files by name, its Qt Quick suites staying with the program), keep Crucible's driver and tray
+   VM to their own platform's lane, and give the notice fragments the lanes their old directories had.
+   `c7_planner_equiv.py` found each of these: 3,213 files and the last 60 commits (48 touching files of
+   the old tree) get the same answers.
+7. **The text pass leaves what is not a file path.** A directory named whole (`apps/wasm/tests`), a
+   program's directories as its own comments call them (`engine/platform`, `ui/qml`), a path written
+   with backslashes (`$env:GITHUB_WORKSPACE\apps\windows\driver`, in a workflow and four READMEs), and
+   every path written from the file that holds it. The first two are `c7_dirs.py`. The last is
+   `c7_relative.py`, which reads the 16,425 relative paths of the tree and lists those that resolved
+   from where a file was and do not from where it is: 55, of which the real ones were the Qt Quick
+   tests of forge-gui (their input files, `../../../../libs/...`, five levels now), the WASM board tests
+   and the Playwright configuration (`esp-idf/` and the build tree one level further), the tray VM's
+   `Sync-Source.ps1` (the repository root, three levels up and four now), the Android app's native build
+   (`add_subdirectory` of the root: six and seven), and the READMEs' links. The first run of it dropped
+   a path made of nothing but `../`, which is how the Android one was found.
+8. **A script that respells a name in a comment respelled a line of code.** `c7_testnames.py` took
+   `include(tests/CMakeLists.txt)` in Hearth's window for a comment; the proof's configure of the
+   stage's own tree stopped on it. The script leaves an `include()` and an `add_subdirectory()` alone.
+9. **`flags_diff.py` could not see the stage until it learned two things:** a rename is made in one pass
+   (`tests/crucible` to `apps/crucible/engine/tests` and the directory rule
+   `apps/crucible/engine` to `apps/crucible/engine/src` applied one after the other turned the first
+   into `apps/crucible/engine/src/tests`), and the build tree of a generated Qt directory has its own
+   names (`--rename`, `--rename-re`). With them every one of the 913 units pairs, and what differs
+   is, in the programs, the include roots (`src/`) and one definition, `QT_TESTCASE_SOURCEDIR`, which
+   names the program's directory; in the test binaries, what the split removed.
+10. **The proof's own scripts.** `c7_record.sh` takes extra configure arguments (the GUI on), and the IR
+    comparison needs two source trees whose paths are as long as each other, because a string that holds a
+    path has a length in its type: with `c7-before` and `merge` as the roots, 75 units differed by it. A
+    QEMU started from a background job stops on its first read of the terminal, so the probes run with
+    their input from `/dev/null`; the fuzz replay needs `REPO_ROOT` set to find a harness's seeds; and
+    `forge-gui --smoke` is `--smoke <in.wav> <out.ac3>`, not a flag that opens the window.
+11. **Moving a Qt program changes the order of its generated code, and nothing else.** `forge-gui` and
+    `hearth` are the two installed binaries whose `.text` is not identical across the stage, with both
+    compilers, and in one object each: AUTOMOC puts each moc file in a directory named by a hash of its
+    source's path and includes them from `mocs_compilation.cpp` in that order, so a moved source moves its
+    functions (Hearth's `LanguageManager`, which moved from `apps/gui` to `apps/shared/preferences`, was
+    first and is last). The two objects hold the same 105 and 39 functions with the same symbols and sizes,
+    and the bodies read alike but for the offsets into `.rodata` and the name a jump inside the object is
+    printed against. Hearth's object has 9 bytes more `.text` (17,547 against 17,538), the padding that
+    the new order needs between functions as far as can be told; Forge GUI's is the same size (41,186).
+    No behaviour differs (the smoke encode and the Qt Quick tests are the same),
+    but it is a difference in an installed binary and the user is told of it rather than it being passed
+    over. C7-1 had the same kind of difference in Hearth's generated Qt units.
+
+**Found, and not C7's.** The shared Debug tree still fails to link `iclforge-iab-tests`, as it did before.
+`fuzz_iec61937_unwrap` does not compile (since C3), and the fixed-point AC-4 probe exits 1 in both trees,
+over its stack ceiling.
+`tests/golden/ac4/scalar-agreement*.json` key their pins by the GUI fixture's path, which follows the file
+(the golden data is C7-4's otherwise). `.git-blame-ignore-revs` is not extended. The Windows coverage
+script named a binary that had not existed since C7-1.
+
+**The proof,** on this machine (WSL2 on Windows 11, GCC 16 and Clang 22, Qt 6.10; the parent is
+`chore/monorepo-c7-1` at `21d1b2215`, built in `build/wt/c7-before`; the stage's tree in `build/wt/merge`,
+at `d9a28c0fe`: the commits after it change a page of docs, `sonar-project.properties` and this record):
+
+| proof | result |
+|---|---|
+| builds, `-Werror`, every default target, the GUI on and off | GCC 16 and Clang 22 clean in both; the shared Debug tree has the one failure it had before (`iclforge-iab-tests` does not link) |
+| the whole ctest, GCC and Clang (GUI on) | 3,582 of 3,582 pass in each, before and after; the same 5 skipped (they read a stream the environment names); the outcome of each test, by name, identical (JUnit). The GUI-off trees and the shared Debug tree are compared by name |
+| ctest's names | identical to the before-names on all five trees: 3,582 (GUI on, GCC and Clang), 3,546 (GUI off), 3,189 (shared Debug); a label added, and sixteen tests that moved with their code still named as they were |
+| pinned bitstream hashes, CLI corpus | identical, both compilers |
+| exported names of the shared libraries | identical |
+| installed tree | the same 219 files. Three public headers differ, in a comment that names a moved path (`probe.hpp`, `bridge.hpp`, `render.hpp`). `NOTICES.txt` of Forge (which Forge GUI shares) and of Hearth: byte-identical in the installs of both compilers; Crucible's, configured with the stub, byte-identical (3,559 bytes) |
+| `.text` of the installed binaries (`git describe` pinned, both compilers) | 11 ELF files have identical `.text` (5 byte-identical) and so has every member of the 9 static archives (171). Two differ, `forge-gui` and `hearth`, each in one object only, its `mocs_compilation.cpp.o`: the same functions (105 and 39), the same symbols and sizes, in another order (finding 11) |
+| Qt resources | the 18 `.qrc` lists (prefix, alias, order) and the 19 compiled `.qm` files identical |
+| flags of every unit (`flags_diff.py`, 913) | all 913 pair. 447 compile with other flags: in the programs the include roots (`src/`) and one definition, `QT_TESTCASE_SOURCEDIR`, which names the program's directory; in the test binaries the include roots and the sources the split took out (5 media units left `iclforge-ac3-tests`). Crucible's units, configured with the stub, differ in include roots alone |
+| IR of every unit (728, tests included, Clang 22, two source trees whose paths are as long as each other) | 643 identical, 50 identical but for the whitespace of an assertion's text, 35 differing. In 33 the difference is a string that holds a path (and the `std::filesystem::path` constructors instantiated over the strings' lengths); the others are `version.cpp` (`git describe`) and `test_group.cpp`, where one of those constructors is no longer instantiated because two lengths have become equal |
+| C and C++ edits since the parent (`c7_pathonly.py`) | 393 files; all differ in comments, includes, layout and paths only |
+| public headers | the same 174, none missing, none changed (`baseline.py check-moves`) |
+| `forge-gui --smoke`, Qt Quick tests | `--smoke` (offscreen) encodes the same 24,576-byte `.ac3` in both trees and with both compilers; Forge GUI's 14 Qt Quick suites and Hearth's are in the ctest above |
+| bare-metal probes (QEMU, `--icount`) | five variants (decoder, encoder, AC-4 float and fixed, decoder with stage timers): the probes' own key=value lines identical; the fixed-point AC-4 probe exits 1 in both trees, over its stack ceiling, as before |
+| libFuzzer harnesses (Clang, `ICLFORGE_BUILD_FUZZERS`) | the same 20 of 21 build and the same one does not (`fuzz_iec61937_unwrap`, since C3); 18 replay their seed and regression inputs (the same 237 files, and `fuzz_ac4_decode` those of `fuzz_ac4_parse`) and exit 0 in both; two have no inputs |
+| `check_layering.py`, `check_namespaces.py`, `check_pages.py`, `check_doc_paths.py` | 12 libraries, 228 edges, 0 failures; 172 public headers in 11 libraries, 0 failures, 4 known debts; 0 problems; 0 missing of 6,589 checked |
+| `precheck.py --unit`, `mkdocs build --strict`, `ruff check .` | pass; ruff finds the 25 it found in the parent, none new |
+| `c7_relative.py` | of 16,471 relative paths, 7 resolved before and do not now, and none is the repository's: they name Qt's installation (`${Qt6_DIR}/../../../bin`), a deployed site's page, or a build directory |
+| the CI planners | the same answers for 3,213 files and for the 48 commits, of the last 60, that touch files of the old tree |
+
+**Not run here, and recorded rather than skipped:** MSVC `/W4 /WX` and clang-cl; macOS; the Android
+build; the Windows and macOS halves of the notices (`components.cmake` and the packages themselves);
+Crucible's units that need PipeWire (configured with a stub `libpipewire-0.3.pc`, so that its flags and
+NOTICES.txt could be compared); the ESP-IDF build and the boards; the Python, Rust and WASM test suites
+(`pybind11`, `cargo` and `emcc` are not installed); SonarCloud and CodeQL; the workflows themselves
+(their paths, filters and the binaries they run are read, not run).
+
+**What C7-2 leaves.** `apps/baremetal` and the other firmware and bindings (C7-3); `tests/golden` (C7-4);
+`layering.json` and the check of the whole tree (C7-5), which is to allow by name the one edge from a
+library's test to a program's code (finding 4). SonarCloud's mixed source and test configuration
+(`apps/*/tests` is now in `sonar.tests` and the sources) is unverified. Two things are the user's to
+check: the third shared directory (finding 1), and the difference in the order of the generated Qt code
+of two binaries (finding 11).
