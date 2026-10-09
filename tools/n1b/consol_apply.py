@@ -134,7 +134,7 @@ def plan(repo: Repo, stage: str, index) -> dict:
             still = posixpath.normpath(posixpath.join(posixpath.dirname(f_new), sp))
             if here == target and still == t_new:
                 continue  # beside its header before and after
-            if stage == "c7-2":
+            if stage in ("c7-2", "c7-3"):
                 if here == target:
                     if "/" not in sp and posixpath.dirname(f_new) != posixpath.dirname(t_new):
                         # a bare name found beside the includer, now in another directory: the

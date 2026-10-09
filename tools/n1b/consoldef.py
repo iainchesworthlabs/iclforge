@@ -196,6 +196,7 @@ FOLDED = {
     "c6": {},
     "c7-1": {},
     "c7-2": {},
+    "c7-3": {},
 }
 
 # --- C4's names -------------------------------------------------------------------------------
@@ -457,10 +458,31 @@ def c7_2_new(path: str) -> str | None:
     return None
 
 
+# --- C7-3 (planning/monorepo.md) ------------------------------------------------------------------
+# The bindings and the firmware get a root of their own (decisions 6 and 8): python, rust and js
+# under bindings/, the ESP-IDF component, the ESPHome component and the bare-metal probes under
+# firmware/, and Hearth's sink firmware, which was an example inside the component, a firmware project
+# of its own beside them (firmware/hearth-sink). Every file keeps its place inside its project.
+C7_3_SINK = "esp-idf/iclforge/examples/hearth_sink/"
+
+
+def c7_3_new(path: str) -> str | None:
+    p = path.split("/")
+    if p[0] in ("python", "rust", "js") and len(p) > 1:
+        return f"bindings/{path}"
+    if path.startswith(C7_3_SINK):
+        return "firmware/hearth-sink/" + path[len(C7_3_SINK):]
+    if p[0] in ("esp-idf", "esphome") and len(p) > 1:
+        return f"firmware/{path}"
+    if path.startswith("apps/baremetal/"):
+        return "firmware/baremetal/" + path[len("apps/baremetal/"):]
+    return None
+
+
 STAGES = {"c1": c1_new, "c2": c2_new, "c3": c3_new, "c4n": c4n_new, "c4": c4_new, "c5": c5_new,
-          "c6": c6_new, "c7-1": c7_1_new, "c7-2": c7_2_new}
+          "c6": c6_new, "c7-1": c7_1_new, "c7-2": c7_2_new, "c7-3": c7_3_new}
 REMOVED = {"c1": C1_REMOVED, "c2": C2_REMOVED, "c3": C3_REMOVED, "c4n": (), "c4": (), "c5": (),
-           "c6": (), "c7-1": (), "c7-2": ()}
+           "c6": (), "c7-1": (), "c7-2": (), "c7-3": ()}
 
 # The libraries each stage merges, old -> new: what a target, an export macro, an export header, a
 # pkg-config name or an ABI allowlist follows (consol_apply.py, export_diff.py --map,
@@ -475,13 +497,14 @@ LIBRARY_MAP = {
     "c6": {},
     "c7-1": {},
     "c7-2": {},
+    "c7-3": {},
 }
 
 # The libraries a stage divides, old -> every library its files went to: signing's key, hash and
 # MAC are base's and its signer ac3's, so the exports of signing, ac3 and base are compared as one
 # group (export_diff.py, abi_compare.py). C6 gives part of ac3 to base.
 SPLITS = {"c1": {}, "c2": {"signing": ("ac3", "base")}, "c3": {}, "c4n": {}, "c4": {}, "c5": {},
-          "c6": {"ac3": ("ac3", "base")}, "c7-1": {}, "c7-2": {}}
+          "c6": {"ac3": ("ac3", "base")}, "c7-1": {}, "c7-2": {}, "c7-3": {}}
 
 # The names C6 gives base: what was iclforge::ac3::io's of WAV, iclforge::ac3::analysis's and
 # iclforge::ac3::meta's of the meters but their acmod and channel-map constructors, and the version.
