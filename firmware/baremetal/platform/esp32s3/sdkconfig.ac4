@@ -8,6 +8,12 @@
 # channel's level and the PCM hash the Cortex-M3 leg and the host pin.
 CONFIG_ICLFORGE_AC4=y
 
+# The image with the decoder and the six fixtures is 1,078,064 bytes, over the 1 MB app
+# partition of ESP-IDF's default single-app table, which the nightly run stopped on
+# (app_check_size: "app partition is too small"). The large single-app table has 1.5 MB,
+# and the module's flash is 16 MB (sdkconfig.defaults).
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
 # The decoder's state in PSRAM. It holds 0.4 to 0.6 MB at 2.0 and up to 1.8 MB at 5.1.4,
 # where this part has 347 KB of internal RAM free, so it goes to the board's 8 MB of octal
 # PSRAM. A request of 512 bytes or more tries PSRAM first and a smaller one internal RAM
