@@ -75,7 +75,7 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
         "notices/crucible/", "notices/hearth/", "notices/fragments/", "notices/licences/",
     ),
     "android": ("apps/demos/android/",),
-    "wasm": ("apps/demos/wasm/", "js/"),
+    "wasm": ("apps/demos/wasm/", "bindings/js/"),
     # tools/packaging/ holds only pack_esp_component.py (the ESP-IDF
     # component/ESPHome workflow's own packaging step) - see docs/ci-lanes.md.
     # libs/ac3/, libs/base/, libs/dsp/, libs/objects/, libs/render/ and cmake/ are the trees that
@@ -88,17 +88,17 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
     # 2026-09-29). The AC-4 trees are staged only for `--with-ac4` and stay
     # with the nightly run.
     "esp": (
-        "esp-idf/", "esphome/", "firmware/baremetal/", "tools/packaging/",
+        "firmware/esp-idf/", "firmware/esphome/", "firmware/baremetal/", "tools/packaging/",
         "libs/ac3/", "libs/base/", "libs/dsp/", "libs/objects/", "libs/render/", "cmake/",
     ),
-    "rust": ("rust/",),
-    # examples/python/ alongside python/ itself - the rest of examples/ is
+    "rust": ("bindings/rust/",),
+    # examples/python/ alongside bindings/python/ itself - the rest of examples/ is
     # plain C++, already core's concern via its own build, not this lane's.
-    "python": ("python/", "examples/python/"),
-    # js/ package unit tests, not the wasm E2E demo - see wasm above. Left out
+    "python": ("bindings/python/", "examples/python/"),
+    # bindings/js/ package unit tests, not the wasm E2E demo - see wasm above. Left out
     # of CORE_FANOUT below on purpose: a core-only change does not need the
     # npm package's own tests run, only the platforms that embed core.
-    "npm": ("js/",),
+    "npm": ("bindings/js/",),
     "ci_self": (".github/workflows/", ".github/actions/", ".github/toolchain/"),
     "docs": ("docs/",),
 }

@@ -12,7 +12,7 @@
 
 # rustfmt normalises to LF regardless of platform; pin the blob the same way so
 # a Windows checkout's autocrlf can't disagree with what `cargo fmt --check`
-# (rust/, roadmap AP9) expects in CI.
+# (bindings/rust/, roadmap AP9) expects in CI.
 *.rs text eol=lf
 
 # The three products' notice fragments, licence texts and platform files (notices/) are read at

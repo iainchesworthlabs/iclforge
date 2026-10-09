@@ -1,11 +1,11 @@
 // iclforge WASM decode demo - a consumer of the bundled iclforge-wasm-decoder
-// bindings from js/. This file owns the page
+// bindings from bindings/js/. This file owns the page
 // (Web Audio playback of already-decoded PCM, the Canvas visualizations ported
 // from apps/forge/gui/assets/qml/SoundfieldView.qml and Main.qml's Objects tab, scrub/solo
 // controls) - decoding, the §7.8 fold and the realtime AudioWorklet pipeline
 // all come from those bindings.
 //
-// `./package/` is `js/dist/` copied in alongside the
+// `./package/` is `bindings/js/dist/` copied in alongside the
 // Emscripten build output (see apps/demos/wasm/CMakeLists.txt's build docs in
 // docs/platforms/wasm.md) - a self-contained servable directory needs both.
 // `iclforge_decode.js` (loaded as a plain classic <script> in index.html,

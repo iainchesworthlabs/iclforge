@@ -96,7 +96,7 @@ live demos, with the npm package listed among the library's bindings.
 
 | | The library | Forge | Crucible |
 |---|---|---|---|
-| Source | `libs/ac3`, `src/signing`, `libs/capi`, `libs/containers/src/matroska`, `libs/containers/src/mp4`, `libs/containers/src/mpegts`, `libs/iab`, `libs/containers/src/iamf`, `libs/adm`, `libs/adm`, `libs/ac4` (built, never exported); `python/`, `js/`, `rust/`; `examples/`, `fuzz/`, `firmware/baremetal` | `apps/forge/cli/src`, `apps/forge/gui`, `apps/shared/media/src` | `apps/crucible`; by purpose `apps/crucible/windows/driver` and `driver-vm` |
+| Source | `libs/ac3`, `src/signing`, `libs/capi`, `libs/containers/src/matroska`, `libs/containers/src/mp4`, `libs/containers/src/mpegts`, `libs/iab`, `libs/containers/src/iamf`, `libs/adm`, `libs/adm`, `libs/ac4` (built, never exported); `bindings/python/`, `bindings/js/`, `bindings/rust/`; `examples/`, `fuzz/`, `firmware/baremetal` | `apps/forge/cli/src`, `apps/forge/gui`, `apps/shared/media/src` | `apps/crucible`; by purpose `apps/crucible/windows/driver` and `driver-vm` |
 | Build identity | `ac3::forge`, `ac3::forge_c`, `ac3::signing`, `matroska::matroska`, `mp4::mp4`, `mpegts::mpegts`, `ac3iab::ac3iab`, `iamf::iamf`, `ac3adm::ac3adm`, `ac3::admbridge`; ten export sets and ten `.pc` files | targets `ac3cli`, `ac3gui`; QML URI `Ac3Forge`; options `AC3FORGE_BUILD_CLI`, `AC3FORGE_BUILD_GUI` | targets `ac3crucible`, `ac3crucible-run`, `ac3::crucible_engine`; QML URI `Ac3ForgeCrucible`; option `AC3FORGE_BUILD_CRUCIBLE`; root guard `WIN32 OR (UNIX AND NOT APPLE)` (`CMakeLists.txt:450`) |
 | Tests and checks | most of `ac3tests`; `libs/capi/tests`, `bindings/python/tests`, `apps/demos/wasm/tests`; coverage floors `src/*` (`tools/checks/coverage_report.sh:108-116`); abi-gate; fuzz.yml; interop.yml | `apps/forge/cli/tests`, `apps/forge/gui/tests`, `ac3gui_qmltests` (label `gui`); floor `apps/forge/cli/src` (:117); `.clang-tidy:95` | `apps/crucible/engine/tests` (compiled into `ac3tests`, `tests/CMakeLists.txt:436-456`), `ac3crucible_qmltests`; labels `crucible`, `crucible-ui`; `tools/ci/check_crucible_package.py`; `tools/checks/coverage_crucible.ps1`, `crucible_platform_probe.cpp` |
 | Docs | Library (22 pages), Concepts (4), Validation, Threat model, Conformance vectors, Performance & quality (6), `platforms/wasm.md`, the two WASM demo pages | CLI reference (3), GUI guide (12) | Crucible guide (5), `platforms/windows-demo.md` (the record), `platforms/windows-driver-acx.md` |
@@ -113,7 +113,7 @@ Three things do not sit in one column and the plan says where they go.
   ALSA and PipeWire dependencies into a package that declares none).
 - **The Shield app** keeps `com.ac3forge.shield` and its `.apk`; its display name is
   [decision 10](#decisions).
-- **`apps/demos/wasm` and `js/`** are library documentation and a library binding
+- **`apps/demos/wasm` and `bindings/js/`** are library documentation and a library binding
   ([decision 11](#decisions)); nothing moves.
 
 ## The name
@@ -185,14 +185,14 @@ its decisions are with the user.
 | `apps/crucible` | Crucible | unchanged | none proposed |
 | `apps/crucible/windows/driver`, `driver-vm` | Crucible's driver, frozen | unchanged until signing; optionally `apps/crucible/driver` in the signing-time change | breaks the `windows-driver` job's paths, `apps/crucible/CMakeLists.txt:372-376`, driver-vm's relative paths, and the signing session's checkout |
 | `apps/demos/android` | the Shield demo | unchanged | a `demos/` parent breaks the depth-sensitive `add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../../../../..")` (`apps/demos/android/app/src/main/cpp/CMakeLists.txt:66`), the Android and CodeQL job paths |
-| `apps/demos/wasm`, `js/` | library demos and binding | unchanged | a `web/` parent breaks docs.yml's and npm.yml's path triggers, `build-wasm`'s working directory, `bindings/js/package.json:23` `directory: "js"`, and the relative loads inside the checked-in `docs/assets/wasm-*-demo` bundles |
-| `python/`, `rust/` | bindings | unchanged | `pyproject.toml:37` `cmake.source-dir = ".."` and `:77` `root = ".."`, wheels.yml `package-dir`, `bindings/rust/iclforge-sys/build.rs:9-13` (asserts it lives two directories below the root) |
+| `apps/demos/wasm`, `bindings/js/` | library demos and binding | unchanged | a `web/` parent breaks docs.yml's and npm.yml's path triggers, `build-wasm`'s working directory, `bindings/js/package.json:23` `directory: "js"`, and the relative loads inside the checked-in `docs/assets/wasm-*-demo` bundles |
+| `bindings/python/`, `bindings/rust/` | bindings | unchanged | `pyproject.toml:37` `cmake.source-dir = ".."` and `:77` `root = ".."`, wheels.yml `package-dir`, `bindings/rust/iclforge-sys/build.rs:9-13` (asserts it lives two directories below the root) |
 | `tests/` | one `ac3tests` | unchanged | a per-member binary duplicates `tests/CMakeLists.txt`'s backend, ADM and IAB conditionals for no gate that does not already key on source paths |
 | `docs/` | 73 pages | 73 pages plus `docs/forge/index.md`, `docs/family/recasting.md` (this page), and, under [decision 8](#decisions), `docs/library/capabilities.md` and a `docs/security.md` wrapper | see [The docs](#the-docs) |
 
 What does change on disk is small: the README's layout block gains member headings and the rows
 it is missing today (`libs/capi`, `libs/ac4`, `libs/iab`, `libs/containers/src/iamf`, `libs/adm`,
-`apps/demos/wasm`, `apps/shared/media/src`, `firmware/baremetal`, `apps/crucible/windows`, `python/`, `js/`, `rust/`), and
+`apps/demos/wasm`, `apps/shared/media/src`, `firmware/baremetal`, `apps/crucible/windows`, `bindings/python/`, `bindings/js/`, `bindings/rust/`), and
 `CONTRIBUTING.md:50-51`'s consumer list `apps/{cli,gui,wasm,android}` names the tree as it is.
 
 ## Packaging and release identities
@@ -767,7 +767,7 @@ decided on 2026-09-05.*
 - **Per-member tag prefixes** or version lines.
 - **Exporting `libs/audio`** or splitting `ac3tests` per member.
 - **Moving `apps/forge/cli/src`, `apps/forge/gui`, `apps/shared/media/src`, `libs/ac3`, `apps/demos/android`, `apps/demos/wasm`,
-  `js/`, `python/` or `rust/`** on disk.
+  `bindings/js/`, `bindings/python/` or `bindings/rust/`** on disk.
 - **Moving any page under `docs/`**, including `docs/cli`, `docs/gui`, `platforms/wasm.md`,
   `platforms/windows-demo.md` and `platforms/windows-driver-acx.md`.
 - **Changing the Android applicationId** or the GUI's and Crucible's QSettings organisation and

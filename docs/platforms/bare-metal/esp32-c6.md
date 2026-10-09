@@ -3,7 +3,7 @@
 The minimum-footprint decoder on an Espressif ESP32-C6: one 160 MHz RISC-V core (RV32IMAC) with
 no floating-point unit, 512 KB of SRAM shared with WiFi 6, Bluetooth LE and 802.15.4, and no
 external PSRAM, which ESP-IDF does not support on this part. It decodes in the fixed-point tier,
-as the [ESP32-C3](esp32-c3.md) does, from the same `esp-idf/iclforge/` component, whose manifest
+as the [ESP32-C3](esp32-c3.md) does, from the same `firmware/esp-idf/iclforge/` component, whose manifest
 lists `esp32c6` beside `esp32s3`, `esp32c3` and `esp32p4`.
 
 Every figure on this page was measured on a board on 2026-09-15, with no network and again with

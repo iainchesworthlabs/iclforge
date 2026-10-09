@@ -30,7 +30,7 @@
 # built, so what the build compiles is what the C++ leg scans.
 #
 # The other two legs (non-C++ lint and scan) cover code the C++ leg never saw: ~30
-# Python files (the oracles and CI gates under tools/, plus the python/
+# Python files (the oracles and CI gates under tools/, plus the bindings/python/
 # binding package) and apps/demos/wasm/demo.js. They take build-mode: none -
 # nothing needs compiling for CodeQL to extract them - and so run straight on
 # the hosted runner without this workflow's container, GCC install or vcpkg
@@ -220,7 +220,7 @@ jobs:
           vcpkg-commit: ${{ needs.toolchain-versions.outputs.vcpkg_commit }}
 
       # CodeQL's TypeScript extraction shells out to `node` (first needed
-      # when js/'s .ts sources landed). The GitHub-hosted image
+      # when bindings/js/'s .ts sources landed). The GitHub-hosted image
       # ships Node; the self-hosted fleet image does not - and since #466
       # this leg runs bare on whichever pool check-runner picks, so pin
       # Node explicitly on the one leg that needs it rather than routing

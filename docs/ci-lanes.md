@@ -161,11 +161,11 @@ comes from.
 | `linux` | `apps/crucible/linux/`, `notices/forge/platform/linux/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
 | `macos` | `notices/forge/platform/macos/`, `packaging/homebrew/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
 | `android` | `apps/demos/android/` | `core` (not after a merge) |
-| `wasm` | `apps/demos/wasm/`, `js/` (its E2E demo) | `core` (not after a merge) |
-| `esp` | `esp-idf/`, `esphome/`, `firmware/baremetal/`, `tools/packaging/`, and the trees its component ships: `libs/ac3/`, `libs/base/`, `cmake/`, root `CMakeLists.txt` | `core` (not after a merge) |
-| `rust` | `rust/` | `core` (not after a merge) |
-| `python` | `python/`, `examples/python/` | `core` (not after a merge) |
-| `npm` | `js/` (the package's own unit tests) | nothing - see below |
+| `wasm` | `apps/demos/wasm/`, `bindings/js/` (its E2E demo) | `core` (not after a merge) |
+| `esp` | `firmware/esp-idf/`, `firmware/esphome/`, `firmware/baremetal/`, `tools/packaging/`, and the trees its component ships: `libs/ac3/`, `libs/base/`, `cmake/`, root `CMakeLists.txt` | `core` (not after a merge) |
+| `rust` | `bindings/rust/` | `core` (not after a merge) |
+| `python` | `bindings/python/`, `examples/python/` | `core` (not after a merge) |
+| `npm` | `bindings/js/` (the package's own unit tests) | nothing - see below |
 | `ci_self` | `.github/workflows/`, `.github/actions/`, `.github/toolchain/` | - |
 | `docs` | `docs/`, any `*.md`, `LICENSE`, `mkdocs.yml` | - |
 
@@ -199,7 +199,7 @@ leg has no way to discover on its own that it also depends on `src/`. The satell
 dispatch, but not in the run after a merge, which classifies with `--satellites-direct`: there a
 satellite lane lights only for a change in its own tree, and a change to the core library reaches
 the satellites in the nightly run. `npm` is deliberately excluded from the fan-out in every mode -
-`js/`'s package unit tests only need to run when `js/` itself changes; the platform that embeds
+`bindings/js/`'s package unit tests only need to run when `bindings/js/` itself changes; the platform that embeds
 core via WASM is the `wasm` lane.
 
 `ci_self` fans out to every lane, including itself and `docs`: a workflow, action or

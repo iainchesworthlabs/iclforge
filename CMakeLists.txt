@@ -413,12 +413,12 @@ option(ICLFORGE_BUILD_ADM "Build the standalone BW64/RF64 + ADM parser (libs/adm
 # matroska/mp4/mpegts above, not ADM.
 option(ICLFORGE_BUILD_CAPI "Build the C API over the encode/decode core (libs/capi)" ON)
 
-# Python on PyPI: the pybind11 extension module (python/) - off by default like ICLFORGE_BUILD_ADM
+# Python on PyPI: the pybind11 extension module (bindings/python/) - off by default like ICLFORGE_BUILD_ADM
 # above, and for the same reason: nothing under src/, apps/forge/cli/src, apps/forge/gui, tests/ or examples/ links
 # it or is affected by it either way. A normal C++ build (and every existing CI leg) is unchanged
 # with this OFF. Turned ON by bindings/python/pyproject.toml's own cmake.define when scikit-build-core
 # drives the configure for `pip install`/cibuildwheel - see bindings/python/CMakeLists.txt.
-option(ICLFORGE_BUILD_PYTHON "Build the pybind11 Python extension module (python/)" OFF)
+option(ICLFORGE_BUILD_PYTHON "Build the pybind11 Python extension module (bindings/python/)" OFF)
 
 # Hearth, the desktop reference player (planning/hearth-reference-player.md): libs/sendspin and
 # apps/hearth (the engine, the window, the test sink and server). ON by default: every leg of

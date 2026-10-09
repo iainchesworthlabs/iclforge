@@ -85,7 +85,7 @@ class NotBuiltByTheLinuxGate(unittest.TestCase):
 
     def test_platform_and_language_trees(self):
         for path in (
-            "esp-idf/iclforge/component.c",
+            "firmware/esp-idf/iclforge/component.c",
             "esphome/x.yaml",
             "apps/demos/android/app/build.gradle.kts",
             "apps/demos/wasm/main.cpp",

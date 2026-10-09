@@ -223,7 +223,7 @@ ctest --preset test-linux-gcc-coverage -LE Performance
 `apps/forge/gui` is deliberately absent from that report: instrumenting its C++ needs a Qt kit on the
 coverage job, which installs none (CI puts Qt only on the plain `gui` build legs, which are not
 instrumented). Its interactive surfaces are covered by `apps/forge/gui/tests`' own Qt Quick suite, and
-its one Qt-free class (`RecordingSink`) is already in `iclforge-app-media-tests`. `python/` has its own floor
+its one Qt-free class (`RecordingSink`) is already in `iclforge-app-media-tests`. `bindings/python/` has its own floor
 instead, in `.github/workflows/wheels.yml`'s `python-coverage` job — `pytest --cov` against the
 built wheel; see that job's own comment for what a Python percentage does and does not measure
 when nearly all of the binding surface is C++.
@@ -346,7 +346,7 @@ the failures of the last run; add `--output-on-failure` to any run to see a fail
 | `ICLFORGE_BUILD_IAMF` | `ON` | Build `iclforge::containers::iamf` (`libs/containers/src/iamf`), the standalone IAMF v1.1 OBU and ISOBMFF writer. Same zero-third-party-dependency shape as `iclforge::iab`, and like it linked by nothing in `apps/` (`examples/mux_iamf.cpp` builds when this is on). The vcpkg port's `iamf` feature and the Conan recipe's `iamf` option install it, off by default. |
 | `ICLFORGE_BUILD_AC4` | `ON` | Build the AC-4 codec `iclforge::ac4` (`libs/ac4`): the inspector, the decoder and the encoder, one library, with the tables and transforms the decoder and the encoder share inside it (`libs/ac4/src/core`) — see [AC-4](library/ac4.md). It is installed and exported as `iclforge::ac4_static` and `iclforge::ac4_shared`. `OFF` needs the CLI, the GUI and the tests off too, and Hearth unless it is the ESP-IDF player half (the root `CMakeLists.txt` guards), since they link them. The Python wheel binds them (`iclforge.ac4`), the WebAssembly preset builds them for the `iclforge_wasm_ac4` module, and the Android app builds them without linking them yet; the ESP-IDF component and the minimum-footprint presets turn the option off and take the decoder alone through `ICLFORGE_MINIMAL_AC4`. The vcpkg port's `ac4` feature and the Conan recipe's `ac4` option install them, off by default. |
 | `ICLFORGE_BUILD_CAPI` | `ON` | Build `iclforge::c` (`libs/capi`), the C API over the encode/decode core — see [C API](library/c-api.md). Depends on nothing but `iclforge::ac3_static`, so unlike `ICLFORGE_BUILD_ADM` there is no extra dependency footprint to opt out of. |
-| `ICLFORGE_BUILD_PYTHON` | `OFF` | Build the pybind11 extension module (`python/`). Off by default for the same reason as `ICLFORGE_BUILD_ADM`: nothing under `src/`, `apps/`, `tests/` or `examples/` links it, so a normal C++ build is unaffected either way. `bindings/python/pyproject.toml` turns it on itself via scikit-build-core when `pip install`/cibuildwheel drives the configure. |
+| `ICLFORGE_BUILD_PYTHON` | `OFF` | Build the pybind11 extension module (`bindings/python/`). Off by default for the same reason as `ICLFORGE_BUILD_ADM`: nothing under `src/`, `apps/`, `tests/` or `examples/` links it, so a normal C++ build is unaffected either way. `bindings/python/pyproject.toml` turns it on itself via scikit-build-core when `pip install`/cibuildwheel drives the configure. |
 | `ICLFORGE_BUILD_ADM` | `OFF` | Build `iclforge::adm` (`libs/adm`), the standalone BW64/RF64 + ADM parser — see [ADM / BW64 reading](library/adm.md). Off by default, unlike every other library component: it vendors libbw64/libadm via `FetchContent`, and libadm needs several Boost header libraries, resolved separately via `-DVCPKG_MANIFEST_FEATURES=adm` (`vcpkg.json`'s `adm` feature) — turning this `ON` without also selecting that feature fails with a clear configure-time message rather than a bare "Boost not found". |
 | `ICLFORGE_BUILD_CRUCIBLE` | `OFF` | Build the Crucible engine, console runner, and desktop window. Linux requires PipeWire; see [Crucible installation](crucible/install.md#linux). |
 | `ICLFORGE_BUILD_HEARTH` | `ON` | Build `iclforge::sendspin`, the Hearth engine, `hearth` (the desktop window, Windows/macOS/Linux with a Qt 6.8+ kit), `hearth-testsink`, `hearth-testserver`, and `hearth-render` (an item through the engine into a WAV file, for the checks). Qt not found skips just `hearth` with a configure warning rather than failing; the engine and its tests still build. Every CI leg has built and tested it since A7, so this defaults on the same way — a plain preset configure needs no extra flag any more. The vcpkg side follows: `CMakePresets.json`'s `core` fragment selects the root manifest's `hearth` feature by default too, for its network, pairing, FLAC, and Opus dependencies. A few presets that cannot build Hearth turn both back off explicitly — the minimum-footprint decoder/encoder profiles (no OS), the Emscripten/WASM demo (no vcpkg toolchain), and the Windows LLVM coverage leg (deliberately Crucible-only) — see their own entries in `CMakePresets.json`. The ESP-IDF component builds only `libs/sendspin`'s player half, behind `CONFIG_ICLFORGE_SENDSPIN` (`firmware/esp-idf/iclforge/Kconfig`). The vcpkg port and the Conan recipe (`packaging/`) pin it off: they build the library only. See [Hearth](hearth/index.md). |
@@ -648,7 +648,7 @@ encoder's - and with it the last of the decode path is in `decode_scalar_t`.
 bits and rounded once, sums wrapping, conversions saturating. It is the tier for an ESP32-C3 or
 a Cortex-M3, where even `float` is a compiled subroutine, and the minimum-footprint profile
 honours it (every other value of the option is `float` there). The ESP-IDF component
-(`esp-idf/iclforge/`) sets it for a part with no FPU when a project has not set the option
+(`firmware/esp-idf/iclforge/`) sets it for a part with no FPU when a project has not set the option
 itself, and `float` for a part with one. What the tier does, in the order
 the decode runs: dequantisation, dither, coordinates and decoupling in `Fixed32`; a coupling
 or spectral extension coordinate kept as its mantissa and its power of two, so the product with
@@ -1282,7 +1282,7 @@ core resolves to it and no translation unit ever asks what it is being compiled 
 same mechanism `libs/base/variants/profiling-tracy_{enabled,disabled}/` uses for the
 profiling seam and `libs/audio/src/backend/<backend>/` uses for the operating system, and it is what
 `tools/checks/check_platform_macros.ps1` exists to keep true (no preprocessor conditional anywhere
-in `src/`, `apps/`, `tests/`, `fuzz/`, `examples/`, `tools/` or `python/`).
+in `src/`, `apps/`, `tests/`, `fuzz/`, `examples/`, `tools/` or `bindings/python/`).
 
 `ICLFORGE_SIMD` forces a directory; `auto` (the default) resolves `x86_64` on x86-64, `aarch64` on
 arm64, and `generic` on everything else — 32-bit x86, WebAssembly, anything unrecognised.

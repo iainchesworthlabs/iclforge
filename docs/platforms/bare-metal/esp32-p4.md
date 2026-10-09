@@ -2,7 +2,7 @@
 
 The minimum-footprint decoder on an Espressif ESP32-P4: a dual-core RISC-V (RV32IMAFC) with a
 single-precision FPU, 768 KB of L2MEM, and no radio of its own. It decodes in the float tier, as
-the [ESP32-S3](esp32-s3.md) does, from the same `esp-idf/iclforge/` component, whose manifest
+the [ESP32-S3](esp32-s3.md) does, from the same `firmware/esp-idf/iclforge/` component, whose manifest
 lists `esp32p4` beside `esp32s3`, `esp32c3` and `esp32c6`.
 
 It is the "best" tier of the shared C6/S3/P4 sink family
@@ -211,7 +211,7 @@ is 357,368 bytes, inside a 1 MB partition with half free.
 
 The fourteen fixtures above are six-frame clips built for this probe alone. The sink-tiers plan's
 exit criterion also asks for the actual stream-set files a real player streams -
-`esp-idf/iclforge/examples/hearth_sink/www/714-*.ec3`, eleven files, each isolating one Annex E
+`firmware/hearth-sink/www/714-*.ec3`, eleven files, each isolating one Annex E
 coding-tool combination at 7.1.4 (`planning/esp32-stream-set.md` has the full manifest). These
 were wrapped bit for bit into a scratch copy of the probe - not re-encoded, since the point is to
 decode what a player actually receives - the same shape the ESP32-C6 page's "2/0, 5.1 and 7.1

@@ -14,7 +14,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 # Three directories up: i2s_player -> examples -> iclforge, then one more to
-# esp-idf/, which is the directory CONTAINING components. An integrator who has
+# firmware/esp-idf/, which is the directory CONTAINING components. An integrator who has
 # pulled this in with `idf.py add-dependency` does not need this line - the
 # managed component is already on the path - and would write their project
 # without it.

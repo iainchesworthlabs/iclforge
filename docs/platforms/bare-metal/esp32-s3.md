@@ -68,7 +68,7 @@ ICL Forge preset for this target and no entry in `cmake/toolchains/`.
 
 ### The ESP-IDF component
 
-[`esp-idf/iclforge/`](https://github.com/iainchesworthlabs/iclforge/blob/main/firmware/esp-idf/iclforge/README.md)
+[`firmware/esp-idf/iclforge/`](https://github.com/iainchesworthlabs/iclforge/blob/main/firmware/esp-idf/iclforge/README.md)
 is the profile packaged as a component. A project outside this repository
 builds against it in two lines, without vendoring the source list:
 
@@ -102,7 +102,7 @@ also carries the AC-4 decoder's sources, for `CONFIG_ICLFORGE_AC4`
 ### The probes
 
 `firmware/baremetal/platform/esp32s3/` is the footprint harness, and points `EXTRA_COMPONENT_DIRS` at
-`esp-idf/`:
+`firmware/esp-idf/`:
 
 ```bash
 . $IDF_PATH/export.sh
@@ -128,7 +128,7 @@ does not apply.
 
 ## Examples
 
-Both live under `esp-idf/iclforge/examples/` and are built by CI.
+Both live under `firmware/esp-idf/iclforge/examples/` and are built by CI.
 
 ### I2S player
 

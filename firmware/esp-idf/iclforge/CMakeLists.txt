@@ -12,7 +12,7 @@
 # copies of a source list drift, and the drift is silent until a link error on
 # a target nobody builds locally.
 #
-# PLACEMENT. Top level, beside python/, rust/ and js/ - the repo's existing
+# PLACEMENT. Top level, beside bindings/python/, bindings/rust/ and bindings/js/ - the repo's existing
 # convention of one directory per binding, and an ESP-IDF component is one.
 # It used to live inside firmware/baremetal/platform/esp32s3/, which made it the
 # probe's private business; an integrator running `idf.py add-dependency`, or an
@@ -141,7 +141,7 @@ endif()
 # Where the library's own CMake lives, which depends on how this component was
 # obtained.
 #
-#   IN THE REPO, at esp-idf/iclforge/, the root is two up: iclforge -> esp-idf
+#   IN THE REPO, at firmware/esp-idf/iclforge/, the root is two up: iclforge -> esp-idf
 #   -> root. This is the case the probe app and both examples build.
 #
 #   PACKED, as an archive from the component registry, the library sits in lib/
@@ -164,7 +164,7 @@ endif()
 if(NOT EXISTS "${ICLFORGE_ROOT}/libs/ac3/CMakeLists.txt")
     message(FATAL_ERROR
         "iclforge: no library sources at '${ICLFORGE_ROOT}'. In a checkout this component "
-        "lives at esp-idf/iclforge/; packed, it carries its own lib/ - see "
+        "lives at firmware/esp-idf/iclforge/; packed, it carries its own lib/ - see "
         "tools/packaging/pack_esp_component.py.")
 endif()
 

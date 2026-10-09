@@ -454,7 +454,7 @@ in the S3, C6 and P4 images of 2026-09-24. The checks build on that:
 
 Two build settings would switch the boot-time check off: `CONFIG_BOOTLOADER_SKIP_VALIDATE_ON_POWER_ON`
 and `_ALWAYS`. Both default to off. A new check, `tools/checks/check_esp_efuse_free.py`, fails CI
-if any `sdkconfig` fragment under `esp-idf/` or `firmware/baremetal/` turns either on (the
+if any `sdkconfig` fragment under `firmware/esp-idf/` or `firmware/baremetal/` turns either on (the
 script-lint job's step "ESP-IDF settings that would stop USB recovery"). The same check refuses
 the options that burn eFuses: hardware secure boot, flash encryption, anti-rollback, and a
 disabled or secure ROM download mode. Each of those would take away some way of recovering a

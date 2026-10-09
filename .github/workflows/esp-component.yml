@@ -1,4 +1,4 @@
-# iclforge as an ESP-IDF component (esp-idf/iclforge/) - packing it, and one day
+# iclforge as an ESP-IDF component (firmware/esp-idf/iclforge/) - packing it, and one day
 # publishing it to the ESP Component Registry.
 #
 # The same shape as npm.yml: a validate job that runs continuously, and a
@@ -23,7 +23,7 @@ on:
   # with ci.yml's call.
   push:
     paths:
-      - "esp-idf/**"
+      - "firmware/esp-idf/**"
       - "libs/ac3/**"
       - "libs/base/**"
       - "libs/dsp/**"
@@ -32,7 +32,7 @@ on:
       - "cmake/**"
       - "CMakeLists.txt"
       - "tools/packaging/pack_esp_component.py"
-      - "esphome/**"
+      - "firmware/esphome/**"
       - ".github/workflows/esp-component.yml"
     tags:
       - "v*"
@@ -82,7 +82,7 @@ jobs:
       # The manifest's own schema. Cheap, and it fails on things the pack below
       # would happily accept - a bad SPDX licence string, an unknown key.
       - name: Lint the manifest
-        working-directory: esp-idf/iclforge
+        working-directory: firmware/esp-idf/iclforge
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
@@ -176,8 +176,8 @@ jobs:
         run: |
           set -eu
           sed 's/buffer_size: 16384/buffer_size: 512/' firmware/esphome/tests/iclforge-test.yaml \
-            > esphome/tests/too-small.yaml
-          if esphome config esphome/tests/too-small.yaml > /dev/null 2>&1; then
+            > firmware/esphome/tests/too-small.yaml
+          if esphome config firmware/esphome/tests/too-small.yaml > /dev/null 2>&1; then
             echo "::error title=ESPHome schema::buffer_size: 512 was accepted, but no access unit fits in it" >&2
             exit 1
           fi

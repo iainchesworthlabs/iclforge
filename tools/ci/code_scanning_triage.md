@@ -10,7 +10,7 @@ count open alerts by tool and rule before and after the bump PR lands.
 | OSV-Scanner | `catch2`, `tracy` | vcpkg test/tooling only; neither is linked into a release binary |
 | OSV-Scanner | `fmt` | Compiled into the codec libraries and the applications at 12.2.0; dismiss an advisory only when 12.2.0 is outside its range or the tree never calls the code it names (see fmt below) |
 | OSV-Scanner | `requirements-*` Python packages | CI/docs/lint/coverage tooling, not embedded in releases |
-| OSV-Scanner | `js/` and `apps/demos/wasm/tests/` npm | Dev-only WASM demo and browser tests |
+| OSV-Scanner | `bindings/js/` and `apps/demos/wasm/tests/` npm | Dev-only WASM demo and browser tests |
 | OSV-Scanner | Android `androidTest*` / UTP transitives | Test harness only; release APK uses forced Netty/protobuf/commons-io pins |
 | OSV-Scanner | Duplicate CVE across lockfiles | Same advisory on the same pinned version in two manifests |
 | SonarQube Cloud | `CODE_SMELL` (if any reach Code scanning) | Maintainability; triage on sonarcloud.io, not Security |
@@ -60,8 +60,8 @@ its own.
 | vcpkg | `vcpkg.json` `builtin-baseline`; overlay ports under `cmake/vcpkg/ports/` |
 | PyPI | `requirements/*.in` then `pip-compile` |
 | Maven | `apps/demos/android/app/build.gradle.kts` then `./gradlew --write-locks` |
-| npm | `npm update` in `js/` and `apps/demos/wasm/tests/` |
-| crates.io | `cargo update` in `rust/` |
+| npm | `npm update` in `bindings/js/` and `apps/demos/wasm/tests/` |
+| crates.io | `cargo update` in `bindings/rust/` |
 | GitHub Actions | Dependabot PRs (`.github/dependabot.yml`) |
 
 Close related `nightly-analysis` issues once CodeQL/PREfast/clang-tidy/Sonar

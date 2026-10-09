@@ -20,7 +20,7 @@ workflow publishes and where:
 | `release.yml` | builds and tests everything `_build.yml` builds (`tier: all`) with packaging on, checks the package list, signs with GPG, writes an SBOM, attests build provenance, creates the GitHub Release from the CHANGELOG section, uploads the assets and redeploys the documentation site | a GitHub Release on this repository, marked a prerelease when the tag has a suffix |
 | `manifest-bump.yml`, called by `release.yml` once the release is up | rewrites the four staged packaging manifests to the new tag and opens a pull request on this repository; with `HOMEBREW_TAP_TOKEN` it also opens a pull request on the Homebrew tap | the Homebrew tap, once a person merges its pull request; the pull request on this repository publishes nothing |
 | `wheels.yml` | builds the Python wheels; its `publish` job uploads them to PyPI through trusted publishing | PyPI, package `iclforge`; the pre-releases went to the project `ac3forge` |
-| `npm.yml` | builds and tests `js/` and packs the tarball; its `publish` job runs only from a manual dispatch on a tag | nothing |
+| `npm.yml` | builds and tests `bindings/js/` and packs the tarball; its `publish` job runs only from a manual dispatch on a tag | nothing |
 | `esp-component.yml` | packs and verifies the ESP-IDF component; its `publish` job runs only from a manual dispatch on a tag, and needs an `esp-component` environment and token that do not exist | nothing |
 
 What had been published on 2026-10-01, from each registry's own listing and from GitHub. The names are
@@ -67,7 +67,7 @@ what the first release made after the rename calls them:
 - **Conan:** not in ConanCenter. No pull request on `conan-center-index` names the recipe.
 - **npm:** nothing. Neither `iclforge-wasm-decoder` nor `iclforge` exists on npmjs.com, and
   `npm.yml`'s `publish` job cannot run from a tag.
-- **crates.io:** nothing. The crates under `rust/` (`iclforge` and `iclforge-sys`) have no publish
+- **crates.io:** nothing. The crates under `bindings/rust/` (`iclforge` and `iclforge-sys`) have no publish
   step, and neither name exists on crates.io.
 - **ESP Component Registry:** nothing. The registry has no component named `iclforge` and no
   `iainchesworthlabs` namespace, and `esp-component.yml`'s `publish` job cannot run from a tag.
@@ -402,14 +402,14 @@ that scratch copy, and discard it once validated - never commit that substitutio
 
 ## Publishing to PyPI
 
-The Python bindings (`python/`, see
+The Python bindings (`bindings/python/`, see
 [docs/library/python-api.md](library/python-api.md)) are the `iclforge` package, with wheels
 for Windows (x64), macOS (arm64 and Intel) and Linux (x86_64 and aarch64) built by
 `.github/workflows/wheels.yml` via `cibuildwheel`, one wheel per CPython from 3.10 to 3.14. The
 releases up to `v0.10.0-beta.1` published them to PyPI as the project `ac3forge`; a release made
 after the rename publishes the project `iclforge`. That
 workflow's `build` job runs in `ci.yml`'s own `wheels` job, on the `python` lane ([CI lane
-partitions](ci-lanes.md)): after a merge that touches `python/` or `examples/python/`, and in the
+partitions](ci-lanes.md)): after a merge that touches `bindings/python/` or `examples/python/`, and in the
 nightly run, and not on pull requests. It always uploads the wheels it builds as a workflow
 artifact.
 
@@ -430,7 +430,7 @@ provisioned the project `ac3forge`. The project `iclforge` does not exist on PyP
 publisher names its project and its repository, so the first release made after the rename needs
 steps 1 and 2 done again for `iclforge`; step 3 is in place already:
 
-1. On PyPI, either publish the very first `iclforge` release by hand (`python -m build python/`
+1. On PyPI, either publish the very first `iclforge` release by hand (`python -m build bindings/python/`
    then `twine upload`, using a temporary scoped token deleted immediately after) to create the
    project, or use PyPI's **pending publisher** mechanism (Your projects → Publishing →
    "Add a pending publisher") to pre-register the trusted publisher for a project name that does
@@ -451,7 +451,7 @@ release-workflow fix, as `v0.10.0-beta.1` needed) does not fail on files PyPI al
 
 ## Publishing to npm
 
-The browser decoder package (`js/`, see
+The browser decoder package (`bindings/js/`, see
 [docs/platforms/wasm.md](platforms/wasm.md)) is meant to be the
 `iclforge-wasm-decoder` npm package.
 Versioning mirrors the PyPI package above rather than reinventing it: `bindings/js/package.json` carries a
@@ -491,9 +491,9 @@ an agent should do, the same rule as PyPI's setup above):
    tag has been seen to publish successfully — until then the job is intentionally inert.
 
 Once all five steps are done, pushing a `v*` tag triggers `npm.yml`'s `publish` job for that tag,
-which requests an OIDC token against the `npm` environment and runs `npm publish` from `js/` — no
+which requests an OIDC token against the `npm` environment and runs `npm publish` from `bindings/js/` — no
 `--provenance` flag needed, npm attaches provenance attestations automatically for a
-trusted-published package. Until step 5, a tag push builds and tests `js/` and stops there.
+trusted-published package. Until step 5, a tag push builds and tests `bindings/js/` and stops there.
 
 ## Homebrew formula and cask
 

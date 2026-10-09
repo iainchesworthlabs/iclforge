@@ -2,7 +2,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 
 fn main() {
-    // This crate lives at <repo>/rust/iclforge-sys, so two levels up is the CMake source
+    // This crate lives at <repo>/bindings/rust/iclforge-sys, so two levels up is the CMake source
     // directory that owns libs/capi/ - see bindings/rust/README.md for why this crate builds the C
     // library itself (bindgen against a header that was NOT built into the library it links
     // is exactly the drift AP9 exists to catch, so there is no "assume it's preinstalled" path).

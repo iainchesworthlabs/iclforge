@@ -61,7 +61,7 @@ rebuilds this embed fresh from source on every deploy to `main`; see
 [Release / CI](platforms/wasm.md#release-ci).
 
 This page is a consumer of `iclforge-wasm-decoder`
-(source: [`js/`](https://github.com/iainchesworthlabs/iclforge/tree/main/js)) rather
+(source: [`bindings/js/`](https://github.com/iainchesworthlabs/iclforge/tree/main/js)) rather
 than a parallel implementation of its own: the decode, the §7.8 fold and (in the demo's realtime
 section further down) the AudioWorklet playback pipeline all come from that package.
 
@@ -74,8 +74,8 @@ first.
 
 So what a reader can do today is one of two things. Use the demo above, which runs the decoder in
 your browser with nothing to install. Or build the package from source: clone the repository, then
-`cd js && npm ci && npm run build` — the same install and build CI runs in `js/` on every pull
-request that touches it — and point your project at the resulting `js/dist/`. The package ships no
+`cd js && npm ci && npm run build` — the same install and build CI runs in `bindings/js/` on every pull
+request that touches it — and point your project at the resulting `bindings/js/dist/`. The package ships no
 compiled `.wasm` of its own: `decodeFile()` and `PushDecoder` take the instantiated Embind module
 as their first argument, and `IclForgeDecoderNode` takes a `wasmGlueUrl` pointing at the Emscripten
 glue, so you also need the module built from `apps/demos/wasm/`; [WebAssembly](platforms/wasm.md) covers

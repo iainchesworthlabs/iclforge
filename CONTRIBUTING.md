@@ -108,7 +108,7 @@ licence notices each product's packages install. Nothing under `libs/` may depen
 (`libs/ac4/tests`, `decoder/test_object_render.cpp`).
 
 **The tree holds four products, and the directories say which is which.** `libs/`
-other than `libs/audio` and `libs/sendspin`, the bindings under `python/`, `js/` and `rust/`, and
+other than `libs/audio` and `libs/sendspin`, the bindings under `bindings/python/`, `bindings/js/` and `bindings/rust/`, and
 `examples/` and `firmware/baremetal` are **the library**; `iclforge` names it, and names its
 packages too. `apps/forge` is **Forge**, the tooling pair (`forge` and `forge-gui`), built and
 packaged as one thing. `apps/crucible`, with the driver in `apps/crucible/windows`, is **Crucible**.
@@ -148,8 +148,8 @@ header.
 **One subdirectory per platform audio backend, selected by CMake, never `#ifdef`.**
 `libs/audio/src/backend/{alsa,pipewire,android,macos,posix,windows}` — adding a backend means a
 new directory and a new CMake guard, not a new preprocessor branch. There are no
-preprocessor conditionals in `libs/`, `apps/`, `tests/`, `external/` or `python/` (the C API header's
-`#ifdef __cplusplus` pair is the one exemption, and `esp-idf/` uses Kconfig's `#if CONFIG_*`);
+preprocessor conditionals in `libs/`, `apps/`, `tests/`, `external/` or `bindings/python/` (the C API header's
+`#ifdef __cplusplus` pair is the one exemption, and `firmware/esp-idf/` uses Kconfig's `#if CONFIG_*`);
 CI's platform check fails on a new one. Keep it that way.
 
 **A leading underscore on a workflow file means "reusable, not directly triggered."**

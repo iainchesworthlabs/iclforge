@@ -1626,7 +1626,7 @@ jobs:
 
       # Moved ahead of the CMake build (unlike the setup-node this job used
       # to do only for the Playwright harness below): WASM streaming decoder package's
-      # iclforge-wasm-decoder package (js/) has to be built before the
+      # iclforge-wasm-decoder package (bindings/js/) has to be built before the
       # "Assemble" step further down can copy its dist/ into the servable
       # wasm_decode_demo/ directory - the demo is a consumer of the package
       # (see docs/platforms/wasm.md), not a parallel implementation, so its
@@ -1668,7 +1668,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/config-wasm-emscripten/bin/wasm_decode_demo/package
-          cp -r js/dist/. build/config-wasm-emscripten/bin/wasm_decode_demo/package/
+          cp -r bindings/js/dist/. build/config-wasm-emscripten/bin/wasm_decode_demo/package/
 
       # Not consumed by docs.yml (see this job's own header) - uploaded
       # purely so a failed/successful build's actual output is inspectable
@@ -1695,7 +1695,7 @@ jobs:
       # re-checked by eye every time either demo changed. apps/demos/wasm/tests'
       # Playwright harness (two projects, one per demo - see
       # playwright.config.js) asserts real values on both sides: the decode
-      # project drives the real published package (js/) - the same calls
+      # project drives the real published package (bindings/js/) - the same calls
       # apps/demos/wasm/demo.js itself makes - checking channel count, sample
       # rate, object count, duration, a moving object position, and the
       # AudioWorklet pipeline's own non-silent decoded output; the encode
@@ -1778,7 +1778,7 @@ jobs:
           path: apps/demos/wasm/tests/test-results/device-ui-coverage
           if-no-files-found: warn
 
-  # The Rust bindings (rust/): a Cargo workspace living in-tree but deliberately
+  # The Rust bindings (bindings/rust/): a Cargo workspace living in-tree but deliberately
   # never add_subdirectory()'d from the root CMakeLists.txt - see bindings/rust/README.md's "why this
   # lives in-tree" section. Its own job for the same reason build-wasm/build-footprint are: none
   # of the desktop workflows' steps apply (no ctest suite, no cpack package, no gold-reference
@@ -1793,7 +1793,7 @@ jobs:
   #
   # No toolchain-selection step: rustup (preinstalled on this runner image) auto-detects and
   # installs bindings/rust/rust-toolchain.toml's pinned channel plus its clippy/rustfmt components the
-  # moment `cargo`/`rustup` is invoked from inside rust/ - one canonical version pin, not one
+  # moment `cargo`/`rustup` is invoked from inside bindings/rust/ - one canonical version pin, not one
   # duplicated into this file too, the same "no second copy of a version string" reasoning
   # _toolchain-versions.yml's own header states for the C/C++ toolchains.
   build-rust:
@@ -2054,7 +2054,7 @@ jobs:
       #
       # This is also the leg that exercises the RELOCATED component the way an
       # integrator reaches it: the project points EXTRA_COMPONENT_DIRS at
-      # esp-idf/ and selects a profile through ICLFORGE_ESP_PROFILE, which is
+      # firmware/esp-idf/ and selects a profile through ICLFORGE_ESP_PROFILE, which is
       # exactly the two lines a consuming project writes. If the published shape
       # breaks, this goes red rather than the break waiting for someone to try
       # it.
@@ -3054,13 +3054,13 @@ jobs:
             apps/baremetal/platform/esp32s3/build/esp32s3-probe.txt
             apps/baremetal/platform/esp32s3/build/esp32s3-encode-probe.txt
             apps/baremetal/platform/esp32s3/build/esp32s3-ac4-probe.txt
-            esp-idf/iclforge/examples/hearth_sink/qemu-stream.txt
-            esp-idf/iclforge/examples/hearth_sink/qemu-capture.txt
-            esp-idf/iclforge/examples/hearth_sink/qemu-capture16.txt
-            esp-idf/iclforge/examples/hearth_sink/qemu-capture916.txt
-            esp-idf/iclforge/examples/hearth_sink/qemu-render.txt
-            esp-idf/iclforge/examples/hearth_sink/qemu-http.txt
-            esp-idf/iclforge/examples/hearth_sink/qemu-set.txt
+            firmware/hearth-sink/qemu-stream.txt
+            firmware/hearth-sink/qemu-capture.txt
+            firmware/hearth-sink/qemu-capture16.txt
+            firmware/hearth-sink/qemu-capture916.txt
+            firmware/hearth-sink/qemu-render.txt
+            firmware/hearth-sink/qemu-http.txt
+            firmware/hearth-sink/qemu-set.txt
           # error, not warn: this artifact is the only way to read what the
           # probe measured without re-running the leg, and it silently uploaded
           # just the map the first time. A missing file here should say so.

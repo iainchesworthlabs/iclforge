@@ -23,10 +23,10 @@ on:
       # needs the demo republished goes through apps/demos/wasm/ (or one of
       # the paths below) too.
       - "apps/demos/wasm/**"
-      # iclforge-wasm-decoder (WASM streaming decoder package) - the demo embeds js/dist/
+      # iclforge-wasm-decoder (WASM streaming decoder package) - the demo embeds bindings/js/dist/
       # alongside the compiled decoder, so a package-only change also has
       # to trigger a redeploy, same reasoning as apps/demos/wasm/** above.
-      - "js/**"
+      - "bindings/js/**"
       - "CMakeLists.txt"
       - "CMakePresets.json"
       - "cmake/toolchains/wasm.emscripten.toolchain.cmake"
@@ -45,10 +45,10 @@ on:
       - "CONTRIBUTING.md"
       - "ROADMAP.md"
       - "apps/demos/wasm/**"
-      # iclforge-wasm-decoder (WASM streaming decoder package) - the demo embeds js/dist/
+      # iclforge-wasm-decoder (WASM streaming decoder package) - the demo embeds bindings/js/dist/
       # alongside the compiled decoder, so a package-only change also has
       # to trigger a redeploy, same reasoning as apps/demos/wasm/** above.
-      - "js/**"
+      - "bindings/js/**"
       - "CMakeLists.txt"
       - "CMakePresets.json"
       - "cmake/toolchains/wasm.emscripten.toolchain.cmake"
@@ -182,8 +182,8 @@ jobs:
 
       - uses: ./.github/actions/setup-emscripten
 
-      # iclforge-wasm-decoder (WASM streaming decoder package, js/) has to be built before the
-      # Emscripten rebuild below, which copies js/dist/ alongside the
+      # iclforge-wasm-decoder (WASM streaming decoder package, bindings/js/) has to be built before the
+      # Emscripten rebuild below, which copies bindings/js/dist/ alongside the
       # compiled decoder into the directory that overwrites docs/assets/
       # wasm-decode-demo/ - the demo is a consumer of the package (see
       # docs/platforms/wasm.md), so its build output has to exist first.
@@ -206,7 +206,7 @@ jobs:
           cmake --preset config-wasm-emscripten
           cmake --build build/config-wasm-emscripten
           mkdir -p build/config-wasm-emscripten/bin/wasm_decode_demo/package
-          cp -r js/dist/. build/config-wasm-emscripten/bin/wasm_decode_demo/package/
+          cp -r bindings/js/dist/. build/config-wasm-emscripten/bin/wasm_decode_demo/package/
           rm -rf docs/assets/wasm-decode-demo docs/assets/wasm-encode-demo
           mkdir -p docs/assets/wasm-decode-demo docs/assets/wasm-encode-demo
           cp -r build/config-wasm-emscripten/bin/wasm_decode_demo/. docs/assets/wasm-decode-demo/

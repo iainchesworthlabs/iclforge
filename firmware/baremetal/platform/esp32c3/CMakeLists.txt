@@ -4,7 +4,7 @@
 #
 # An ESP-IDF project driven by idf.py, the same shape as the esp32s3 sibling
 # beside it and for the same reasons - that file carries the arguments this one
-# does not repeat: why the component is reached through esp-idf/ rather than a
+# does not repeat: why the component is reached through firmware/esp-idf/ rather than a
 # private path, why the two profiles are mutually exclusive, and why a build
 # directory has to be cleaned between them.
 #

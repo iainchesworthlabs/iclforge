@@ -5,7 +5,7 @@ receive from it.
 
     python tools/generators/gen_device_streams.py --forge <path to forge>
 
-writes esp-idf/iclforge/examples/hearth_sink/www/. The set covers the
+writes firmware/hearth-sink/www/. The set covers the
 output layouts the player renders onto, both codecs, dependent substreams,
 two programmes in one stream, dual mono, the Annex E coding tools, short
 frames, VBR, DRC metadata, other encoders' streams and object audio. Most of

@@ -2,7 +2,7 @@
 """Stage and pack iclforge as a self-contained ESP-IDF component archive.
 
 WHY THIS EXISTS. `compote component pack` roots its archive at the component
-directory and cannot reach above it. iclforge's component at esp-idf/iclforge/
+directory and cannot reach above it. iclforge's component at firmware/esp-idf/iclforge/
 is a thin wrapper that add_subdirectory()s the repo root, so packing it directly
 produces an archive of three files - CMakeLists.txt, idf_component.yml and the
 directory entry - which installs happily and then fails to configure, because

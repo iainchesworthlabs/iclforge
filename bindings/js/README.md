@@ -235,7 +235,7 @@ image, so it is worth stating plainly.
 ## Versioning and publishing
 
 **Not published to npm.** The package name `iclforge-wasm-decoder` is not on the registry;
-consume it from source (`js/`, see [Install](#install)). When publishing is enabled its version will track the
+consume it from source (`bindings/js/`, see [Install](#install)). When publishing is enabled its version will track the
 main repository's own release
 tags exactly the way the `iclforge` PyPI package does (see
 [docs/releasing.md](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/releasing.md)) -

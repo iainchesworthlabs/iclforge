@@ -24,11 +24,11 @@
 # bodies a non-x86_64 leg never even parsed, and an MSVC-only pair of ABI size
 # assertions. Each is now the same directory-selected shape the rest of the
 # tree uses -- tests/support/platform/<os>/, libs/ac3/tests/core/avx2/{present,absent}/,
-# libs/render/tests/abi/{msvc,unknown}/ -- and python/ likewise
+# libs/render/tests/abi/{msvc,unknown}/ -- and bindings/python/ likewise
 # (bindings/python/src/iclforge_ext/{signing,containers}/{present,absent}/), so every
 # tree here starts at zero rather than being grandfathered in with a waiver list.
 #
-# NOT scanned, deliberately: esp-idf/. That tree is an ESP-IDF component built
+# NOT scanned, deliberately: firmware/esp-idf/. That tree is an ESP-IDF component built
 # by idf.py, not by this repository's CMake, and its `#if CONFIG_*` guards are
 # Kconfig symbols -- the documented IDF idiom, and in the CONFIG_SPIRAM case
 # load-bearing in a way a directory split would not reproduce: on a target with
@@ -84,7 +84,7 @@ $scanRoots = @($srcRoot)
 # same reason apps/ is: a checkout mid-way through a reorganisation, or of an
 # older tag from before one of these existed, still has a valid libs/ to scan.
 # examples/ and tools/ were already clean when they were added here on
-# 2026-09-23 and cost nothing to hold; tests/ and python/ were cleaned to join
+# 2026-09-23 and cost nothing to hold; tests/ and bindings/python/ were cleaned to join
 # them. A library's own tests and fuzz targets are in libs/<lib>/ (planning/monorepo.md, C7-1),
 # so libs/ holds what libs/, tests/ and fuzz/ held; external/ is the vendored code that was in
 # the sendspin library.
@@ -218,7 +218,7 @@ if ($violations.Count -gt 0) {
     exit 1
 }
 
-$summary = "OK: no preprocessor conditionals in libs/, apps/, tests/, external/, examples/, tools/ or python/ ($($files.Count) files scanned"
+$summary = "OK: no preprocessor conditionals in libs/, apps/, tests/, external/, examples/, tools/ or bindings/python/ ($($files.Count) files scanned"
 if ($excludedCount -gt 0) {
     # Printed rather than left implicit: this filter turning the check
     # green for the wrong reason - by excluding real source - is the one

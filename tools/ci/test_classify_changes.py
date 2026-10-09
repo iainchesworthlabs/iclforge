@@ -160,7 +160,7 @@ class DocsOnlyChangeTest(unittest.TestCase):
 
 
 class NpmAndWasmSplitTest(unittest.TestCase):
-    """js/ backs both the wasm E2E demo and the npm package's own tests."""
+    """bindings/js/ backs both the wasm E2E demo and the npm package's own tests."""
 
     def test_js_change_lights_both_npm_and_wasm_but_nothing_else(self):
         hits = gate.classify(["bindings/js/src/index.ts"])

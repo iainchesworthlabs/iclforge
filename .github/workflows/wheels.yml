@@ -1,10 +1,10 @@
-# Python wheels for the iclforge PyPI package (Python on PyPI, python/) - separate from
+# Python wheels for the iclforge PyPI package (Python on PyPI, bindings/python/) - separate from
 # _build.yml/ci.yml's C++ matrix, which knows nothing about Python packaging. Builds via
 # cibuildwheel, configured from bindings/python/pyproject.toml's own [tool.cibuildwheel] table so a local
 # `cibuildwheel python` run matches this workflow exactly rather than drifting from workflow-only
 # YAML settings.
 #
-# The build job runs continuously (every push/PR touching python/**, called from ci.yml's `python`
+# The build job runs continuously (every push/PR touching bindings/python/**, called from ci.yml's `python`
 # lane since the CI lane partitions split - docs/ci-lanes.md) and always uploads wheels as an
 # artifact - "buildable and testable" is checked the same way _build.yml's continuous windows-msvc
 # packaging smoke test checks "packageable". Publishing to PyPI is a second job, gated on a v* tag
@@ -25,7 +25,7 @@ on:
   # and this `push`'s own `branches: [main]` were removed.
   push:
     paths:
-      - "python/**"
+      - "bindings/python/**"
       - "libs/ac3/**"
       - "libs/base/**"
       - "libs/dsp/**"
@@ -163,7 +163,7 @@ jobs:
           path: wheelhouse/*.whl
           if-no-files-found: error
 
-  # A coverage floor for python/ (coverage floors), the Python-side counterpart to
+  # A coverage floor for bindings/python/ (coverage floors), the Python-side counterpart to
   # ci.yml's per-component gcov gate.
   #
   # Its own job rather than folding --cov into [tool.cibuildwheel]'s
@@ -252,7 +252,7 @@ jobs:
       # --cov-fail-under is the gate. The floor is deliberately well under the
       # measurement for the same reason every floor in
       # tools/checks/coverage_report.sh is: it should trip on a real
-      # regression, not on ordinary churn. Raise it as python/ grows real
+      # regression, not on ordinary churn. Raise it as bindings/python/ grows real
       # Python code rather than leaving the headroom in place indefinitely.
       - name: pytest with a coverage floor
         shell: bash

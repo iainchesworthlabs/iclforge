@@ -1,5 +1,5 @@
 // Embind wrapper around iclforge::ac3's decode path, for the reusable push-frame
-// package (WASM streaming decoder package, js/) and the docs demo built on top of it
+// package (WASM streaming decoder package, bindings/js/) and the docs demo built on top of it
 // (apps/demos/wasm/index.html - see bindings/js/src/decode-file.ts for the whole-file
 // convenience helper the demo actually calls).
 //

@@ -73,7 +73,7 @@ one that comes later, the HLS client, all sit on the same code.
 
 | Path | What it is | State |
 |---|---|---|
-| `esp-idf/iclforge/` | The ESP-IDF component: a wrapper that `add_subdirectory()`s the repo root and links `ac3::forge_minimal`. No sources of its own. | Builds in CI under `espressif/idf:v6.1`; packs and verifies through `tools/packaging/pack_esp_component.py`. |
+| `firmware/esp-idf/iclforge/` | The ESP-IDF component: a wrapper that `add_subdirectory()`s the repo root and links `ac3::forge_minimal`. No sources of its own. | Builds in CI under `espressif/idf:v6.1`; packs and verifies through `tools/packaging/pack_esp_component.py`. |
 | `firmware/esp-idf/iclforge/examples/i2s_player/` | Decodes a flash-resident AC-3 fixture to an I2S DAC and prints per-lap timing. | Measured on a board 2026-09-10: 9.9 ms of every 32 for AC-3 5.1 folded to stereo, paced at exactly 32 ms a frame. |
 | `firmware/hearth-sink/` | Bytes from a `partition`, `sd`, `fatfs` or `http` source through `ac3::io::AccessUnitAccumulator` to an `i2s`, `tdm`, `capture` or `null` sink. One loop, on the main task. | CI runs `partition` and `fatfs` under QEMU with the `capture` sink. Phase 0 runs `http` to `i2s` on a board. |
 | `firmware/esphome/components/iclforge/` | An ESPHome external component: a decoder and the framer, fed bytes by another component. | `esphome config` in CI. Never compiled into firmware by CI. |
@@ -171,7 +171,7 @@ such, and the day they land is the day the copies are deleted. **As built,** nei
 renderer did move into the library, as `ac3::render` (`libs/render/include/iclforge/render/`, tests in
 `libs/render/tests/`), for Hearth.
 
-**The component, `esp-idf/iclforge/`.** Layer 6, and the seams for 7. The component registered no
+**The component, `firmware/esp-idf/iclforge/`.** Layer 6, and the seams for 7. The component registered no
 sources when this was written; it gains `firmware/esp-idf/iclforge/include/iclforge/player.hpp` and
 `firmware/esp-idf/iclforge/src/player.cpp`, registered as component sources beside the interface link it
 already has. Two abstract seams, mirroring the example's `byte_source.hpp` and `audio_sink.hpp`,
@@ -278,7 +278,7 @@ decoder would see it. Two routes:
   nothing from its pipeline. Cost: a second pipeline in the configuration for anyone who also
   wants FLAC or MP3 on the same speaker, and a component that has to be compiled into firmware
   to be tested at all, which CI does not do today.
-- **(b) Upstream.** Add `AudioFileType::EAC3` (and `AC3`) to `esphome/components/audio`, a
+- **(b) Upstream.** Add `AudioFileType::EAC3` (and `AC3`) to `firmware/esphome/components/audio`, a
   `request_eac3_support()` that adds this repository's component by git the way `micro-flac` is
   added, a `decode_eac3_()` in `AudioDecoder` over the library's `StreamDecoder`, `audio/eac3` and
   `.eac3`/`.ec3` in the type detection, and `"EAC3": "eac3"` in the media player's format map.
@@ -614,7 +614,7 @@ QEMU through the changed player.
 
 **Status, 2026-09-30: built, and its exit met on 2026-09-10.**
 
-`ac3forge::Player`, `ByteSource` and `PcmSink` in `esp-idf/iclforge/`; the streaming example's
+`ac3forge::Player`, `ByteSource` and `PcmSink` in `firmware/esp-idf/iclforge/`; the streaming example's
 sources and sinks become implementations; `hearth_sink.cpp` becomes the wiring. The fetch task
 on core 0, the decode task on core 1, the ring sized in seconds of stream. The REST surface from
 [Control](#control) beside it, mounted by the example.

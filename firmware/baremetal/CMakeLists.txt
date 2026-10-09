@@ -19,7 +19,7 @@
 # CMake adds, per the platform-tree rule (tools/checks/check_platform_macros.ps1).
 #
 # A third target, ESP32-S3, is driven from outside: platform/esp32s3/ is an
-# ESP-IDF project that points EXTRA_COMPONENT_DIRS at esp-idf/, whose iclforge
+# ESP-IDF project that points EXTRA_COMPONENT_DIRS at firmware/esp-idf/, whose iclforge
 # component add_subdirectory()s the repo root - the way apps/demos/android's Gradle
 # build does. It owns its own application, so this file must NOT also build
 # one - see the platform resolution below.

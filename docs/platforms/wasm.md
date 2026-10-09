@@ -12,13 +12,13 @@ verdict against five delivery presets, and a round-trip preview through the deco
 subdirectory of the same demo (`apps/demos/wasm/atmos/`) is an **Atmos object-authoring page** — drag
 audio objects around a room canvas while the page encodes, each drag becoming that frame's OAMD
 placement in an E-AC-3 + JOC stream. The third surface is
-**[`js/`](https://github.com/iainchesworthlabs/iclforge/tree/main/js)**, the
+**[`bindings/js/`](https://github.com/iainchesworthlabs/iclforge/tree/main/js)**, the
 `iclforge-wasm-decoder` npm package that turns the same decode path into a
 push-frame API, a realtime AudioWorklet pipeline, and an hls.js/MSE bridge, answering the fact
 that a browser cannot be relied on to decode EC-3: [Chrome reports a decoder error](https://github.com/videojs/http-streaming/issues/1297)
 when an EC-3 track turns up in an MPD, in a report that has been open since 2023.
 That package is named but **not published**: this repository has never released it to npm, so
-building it from `js/` is the only way to get it — see [Publishing](#publishing)
+building it from `bindings/js/` is the only way to get it — see [Publishing](#publishing)
 below. A fourth piece, the [AC-4 module](#ac-4-module), wraps the AC-4 decoder and encoder over
 the `iclforge::ac4` libraries rather than `iclforge::ac3`; it has no demo page, and the package exports its
 typed wrapper as `./ac4`.
@@ -38,7 +38,7 @@ pages in this section.
 | What runs here | The decode and encode modules over `iclforge::ac3` compiled to WebAssembly |
 | Decode demo | Built and [published live](../wasm-demo.md) |
 | Encode demo, and the Atmos authoring page | Built and [published live](../wasm-encode-demo.md) |
-| `iclforge-wasm-decoder` npm package | **Never released to npm.** Building it from `js/` is the only way to get it |
+| `iclforge-wasm-decoder` npm package | **Never released to npm.** Building it from `bindings/js/` is the only way to get it |
 | AC-4 module | Decodes and encodes AC-4, objects included. Built in the same CI job as the two modules above, and the package's Node tests drive its wrapper against a fake module; no test runs the compiled module, and there is no demo page yet |
 | Why the package exists | A browser cannot be relied on to decode EC-3 |
 | Correctness | CI asserts stream properties and known-signal measurements (channel count, sample rate, object count and movement, non-silent output, a 997 Hz tone's true peak, a decode round trip). It does not compare the WebAssembly decoder's samples with the native decoder's |
@@ -111,7 +111,7 @@ the bed objects, then the dynamic objects, each group in the order the encoder l
 rather than through a Worker protocol: unlike `decoder-worker.ts`'s realtime AudioWorklet
 pipeline, there is no existing realtime precedent to extend on the AC-4 side, and this module
 covers both decode and encode with a wider decoder surface (presentations, concealment, object
-audio) that does not fit that pipeline's shape. It compiles into `js/dist/ac4.js`, and
+audio) that does not fit that pipeline's shape. It compiles into `bindings/js/dist/ac4.js`, and
 `package.json`'s `exports` map has it as `./ac4` (`import { Ac4Encoder } from
 "iclforge-wasm-decoder/ac4"`), with its declarations.
 
@@ -146,14 +146,14 @@ cmake --preset config-wasm-emscripten
 cmake --build build/config-wasm-emscripten
 ```
 
-Then build `js/` and assemble it alongside the Emscripten output — `apps/demos/wasm/CMakeLists.txt`
+Then build `bindings/js/` and assemble it alongside the Emscripten output — `apps/demos/wasm/CMakeLists.txt`
 only knows how to copy its own static files, so this is a plain shell step, the same one
 `.github/workflows/_build.yml`'s `build-wasm` job runs:
 
 ```bash
 cd js && npm ci && npm run build && cd ..
 mkdir -p build/config-wasm-emscripten/bin/wasm_decode_demo/package
-cp -r js/dist/. build/config-wasm-emscripten/bin/wasm_decode_demo/package/
+cp -r bindings/js/dist/. build/config-wasm-emscripten/bin/wasm_decode_demo/package/
 ```
 
 The decode demo's realtime section (AudioWorklet playback) needs `SharedArrayBuffer`, which needs
@@ -202,7 +202,7 @@ in place. Everything the OLD whole-file Embind `Decoder` class used to accumulat
 channel/energy buffers, object position/audio bookkeeping, the stereo fold) now lives in
 `bindings/js/src/decode-file.ts`, built on top of `PushDecoder` rather than duplicating it.
 
-`js/` is the package itself (not published — see [Publishing](#publishing) below):
+`bindings/js/` is the package itself (not published — see [Publishing](#publishing) below):
 `push-decoder.ts` (the typed wrapper over the Embind class above), `decode-file.ts` (the
 whole-file convenience helper the demo's scrub/solo experience needs),
 `ring-buffer.ts`/`decoder-worker.ts`/`worklet-processor.ts`/`decoder-node.ts` (the realtime
@@ -217,7 +217,7 @@ step produces.
 
 `index.html`/`demo.js` (the page, Web Audio playback of already-decoded PCM, the Canvas
 visualizations ported from `apps/forge/gui/assets/qml/SoundfieldView.qml` and Main.qml's Objects tab) are the
-one remaining piece specific to the demo, and are now a *consumer* of `js/` - they hold no decode
+one remaining piece specific to the demo, and are now a *consumer* of `bindings/js/` - they hold no decode
 logic, no WASM-module loading, and no hand-rolled fold. The object visualization/audio is a thin
 JS-facing surface over `Eac3Decoder`'s own real `object_metadata` (OAMD positions/gain,
 `iclforge#168`) and `object_audio` (JOC-reconstructed per-object audio, `iclforge#169`) fields,
@@ -228,7 +228,7 @@ independent Embind wrapper (its own `add_executable`, its own `EMSCRIPTEN_BINDIN
 `EXPORT_NAME` so the two modules can load on one page without colliding), linking `iclforge::ac3`
 **unmodified** the same way the decode target does — no fork, no `#ifdef`, confirming the "encoders
 are already proven platform-free" premise this depended on (the same `iclforge::ac3` target already
-links unmodified into `apps/demos/android`'s NDK build and `python/`'s pybind11 module). `apps/demos/wasm/encode/`
+links unmodified into `apps/demos/android`'s NDK build and `bindings/python/`'s pybind11 module). `apps/demos/wasm/encode/`
 (`index.html`/`app.js`) is the page: a drop zone and file picker, format (AC-3/E-AC-3)/sample-rate/
 bitrate controls (the channel layout is derived from the dropped WAV itself), a
 record-from-microphone card, the QC verdict table, and the round-trip preview. It reorders a
@@ -258,7 +258,7 @@ speaker its label names, with that label on its solo button. Each object's per-f
 carries TS 103 420 §5.6.1.2's extent, so a sized object draws bigger than a point source.
 
 One wrinkle worth knowing when previewing locally: `docs/assets/wasm-decode-demo/` holds a
-*committed* `iclforge_decode.wasm` (and a committed `package/`, `js/dist`'s own copy) that only the
+*committed* `iclforge_decode.wasm` (and a committed `package/`, `bindings/js/dist`'s own copy) that only the
 docs deploy job rebuilds, so a local `mkdocs serve` can be running an older module/package pair
 than the checked-in `demo.js`. Both sides of that pairing are rebuilt and committed together by
 whoever last refreshed this directory, precisely so they stay a matched pair rather than drifting
@@ -286,13 +286,13 @@ pin against yet; whatever `$EMSDK` resolves to is what gets used. CI pins it in
 `iclforge-wasm-decoder` has **never been published to npm**, so there is no release of it to
 install; the two things holding that are set out at the end of this section. What the CI does
 today is build, test and `npm pack` the tarball (the `npm` job of `ci.yml`, not on a pull request)
-in the run after a merge to `main` that touches `js/` and in the nightly run, and upload it as an
+in the run after a merge to `main` that touches `bindings/js/` and in the nightly run, and upload it as an
 Actions artefact; the `publish` job below it runs only on a manual `workflow_dispatch` against a
 `v*` tag. No date is set for that changing.
 
 Until it does, the way to use the package is to build it from source:
 `cd js && npm ci && npm run build` — the same install and build the `build-wasm` job runs, which
-follows them with `npm test` — then depend on the resulting `js/dist/`. The package embeds no
+follows them with `npm test` — then depend on the resulting `bindings/js/dist/`. The package embeds no
 `.wasm` of its own, so a consumer also needs the decoder module from `apps/demos/wasm/` (see Build and
 run above). A reader who only wants to see the decoder work needs neither: the [live decode
 demo](../wasm-demo.md) runs it in the browser with nothing installed.
@@ -317,14 +317,14 @@ manual dispatch has been seen to work.
 The demos build alongside the desktop packages rather than only ever being hand-built locally:
 `.github/workflows/_build.yml`'s `build-wasm` job configures and builds both (one `cmake --build`
 over the whole preset) in every run in which the WASM lane runs — the nightly run, and the run
-after a merge that changes `apps/demos/wasm/` or `js/`, the same smoke-test role `build-android` plays —
+after a merge that changes `apps/demos/wasm/` or `bindings/js/`, the same smoke-test role `build-android` plays —
 proving the Emscripten toolchain and every file it touches still build.
 Like `build-android`, it's its own job rather than a `build` matrix entry: this leg has no ctest
 suite, no cpack package and no gold-reference gate, so folding it into that matrix would mean
 threading new `if:` exclusions through most of that job's steps for no benefit. The same job also
-builds and tests `js/` (`npm ci && npm run build && npm test`) *before* the Emscripten build, since
-the decode demo's servable directory needs `js/dist/` copied in alongside the compiled decoder (see
-Build and run above) — `js/`'s own `node:test` suite (the fMP4 box walker against a real fixture,
+builds and tests `bindings/js/` (`npm ci && npm run build && npm test`) *before* the Emscripten build, since
+the decode demo's servable directory needs `bindings/js/dist/` copied in alongside the compiled decoder (see
+Build and run above) — `bindings/js/`'s own `node:test` suite (the fMP4 box walker against a real fixture,
 the ring buffer, the `MediaSource` shim) runs there too.
 
 **The published demos are rebuilt fresh, not shipped from committed copies.** `docs/assets/wasm-decode-demo/`
@@ -392,7 +392,7 @@ would never trigger a redeploy at all, and the live demo would silently drift fr
     after the demo artifact uploads: two projects, one per demo, each serving its own just-built
     directory (seven tests in the run of 2026-09-29).
     `decode.spec.js` loads `index.html` in a headless Chromium and drives the packaged decoder
-    (`js/`'s `decodeFile()` and `IclForgeDecoderNode` — the same calls `demo.js` itself
+    (`bindings/js/`'s `decodeFile()` and `IclForgeDecoderNode` — the same calls `demo.js` itself
     makes) to decode the bundled fixture and assert on its values — `48000 Hz, 6 channels,
     3 Atmos objects, 8.0s`, that the same object's decoded position differs between its
     first and last frame, and that the AudioWorklet pipeline (a Worker
@@ -408,12 +408,12 @@ would never trigger a redeploy at all, and the live demo would silently drift fr
     `decoder_bindings.cpp`'s rewrite (the old whole-file `Decoder` class replaced by
     `scanStream()`/`PushDecoder`) was built and linked clean, and both decode Playwright specs
     (the whole-file `decodeFile()` path and the new AudioWorklet pipeline) passed against that
-    build. `js/`'s own `node:test` suite — the fMP4 box
+    build. `bindings/js/`'s own `node:test` suite — the fMP4 box
     walker against an ffmpeg-remuxed fixture (every extracted sample landing exactly on an
     AC-3/E-AC-3 syncword), the ring buffer's wraparound/underrun/overrun arithmetic, and the
     `MediaSource`/`addSourceBuffer` shim's mechanics against a fake `MediaSource` stub — passed
     as well. None of this was CI at the time (local verification during development);
-    `build-wasm` now runs the same Playwright specs and `js/` test suite as its own CI leg.
+    `build-wasm` now runs the same Playwright specs and `bindings/js/` test suite as its own CI leg.
 
 !!! warning "Not yet verified"
     Built and tested on a Windows host only — the toolchain file itself makes no Windows-specific

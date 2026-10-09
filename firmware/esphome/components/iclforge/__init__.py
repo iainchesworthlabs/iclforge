@@ -52,7 +52,7 @@ IclForgeComponent = iclforge_ns.class_("IclForgeComponent", cg.Component)
 # inside it. Both are here rather than in the schema because a user overriding
 # them is forking, not configuring - and a fork edits this file.
 REPO = "https://github.com/iainchesworthlabs/iclforge"
-COMPONENT_PATH = "esp-idf/iclforge"
+COMPONENT_PATH = "firmware/esp-idf/iclforge"
 
 # Bounds rather than a free integer. The floor is one syncframe plus the header
 # of the next, which is what deciding where an access unit ends requires; below

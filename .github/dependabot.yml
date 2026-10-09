@@ -61,7 +61,7 @@ updates:
     commit-message:
       prefix: "build"
 
-  # WASM demo TypeScript toolchain (js/) and browser test deps (apps/demos/wasm/tests/).
+  # WASM demo TypeScript toolchain (bindings/js/) and browser test deps (apps/demos/wasm/tests/).
   - package-ecosystem: "npm"
     directory: "/js"
     target-branch: "main"

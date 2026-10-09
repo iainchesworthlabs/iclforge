@@ -24,7 +24,7 @@ test('decodes the bundled Atmos-in-DD+ fixture with real, moving object position
     await page.goto('index.html');
 
     const result = await page.evaluate(async () => {
-        // @ts-ignore - ./package/ is js/dist/, copied in alongside the
+        // @ts-ignore - ./package/ is bindings/js/dist/, copied in alongside the
         // Emscripten build output (see this repo's build-wasm CI job).
         const { decodeFile, DownmixTarget } = await import('./package/index.js');
         // @ts-ignore - createIclForgeModule is the Emscripten MODULARIZE

@@ -44,7 +44,7 @@
 // every other consumer a dependency they have no use for. `append_trace_csv`
 // or `append_trace_json_lines`, read into a DataFrame
 // (`pandas.read_csv`/`pandas.read_json(lines=True)`), then `.to_parquet()` is
-// how "reachable from Python" is met - see python/ for the binding that hands
+// how "reachable from Python" is met - see bindings/python/ for the binding that hands
 // a caller these same strings without a C++ toolchain at all.
 //
 // Each function APPENDS (never clears `out` first), so a caller walking a

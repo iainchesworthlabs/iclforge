@@ -3235,7 +3235,7 @@ Android NDK build were not built on the machine that made it, and are checked by
   decode and encode with a wider decoder surface. There is no `ac4` directory under `apps/demos/wasm` and
   no demo page — optional polish this phase left to a later pass — so the compiled module lands in
   its own output directory (`bin/wasm_ac4_demo`) with nothing to serve it yet; `bindings/js/src/ac4.ts` compiles
-  into `js/dist/ac4.js`, which I4b added to `package.json`'s `exports` map.
+  into `bindings/js/dist/ac4.js`, which I4b added to `package.json`'s `exports` map.
 - Android's CMake wrapper (`apps/demos/android/app/src/main/cpp/CMakeLists.txt`) no longer forces
   `AC3FORGE_BUILD_AC4` off: the libraries depend on nothing outside this tree and cross-compile
   cleanly under the NDK, unlike the third-party dependencies (MbedTLS, httplib, FLAC, Opus, mdns)
@@ -4375,7 +4375,7 @@ outright, with no compatibility shim.
   `tools/ci/classify_changes.py`, `CHANGELOG.md`, `docs/verification.md`,
   `tools/checks/check_doc_paths.py`, `tools/ci/run_codec_matrix.sh`, `.github/workflows/_ci-core.yml`
   (FFmpeg Validate), `apps/forge/cli/src/main.cpp`'s command table, `ac3::plan::Codec`,
-  `docs/assets/data/support-catalogue.json`, `libs/capi/`, `python/`, `rust/` and `apps/demos/wasm/`.
+  `docs/assets/data/support-catalogue.json`, `libs/capi/`, `bindings/python/`, `bindings/rust/` and `apps/demos/wasm/`.
 - `tools/ci/classify_changes.py` has no lane of its own for AC-4 (`libs/ac4*` is in the core lane),
   and `tools/generators/` and `tools/references/` match no lane, so every lane runs when they
   change. No phase gave AC-4 a lane. The ESP32 lane lights after a merge for `libs/ac3/`,
