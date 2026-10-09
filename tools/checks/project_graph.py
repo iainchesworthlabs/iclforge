@@ -43,6 +43,8 @@ class Project:
     # project shares on purpose and does not install (base's internal/, the source of an
     # app-library, which is compiled into its programs). Any other header is private.
     exposes: tuple[str, ...] = ()
+    # One sentence on what the project is, for the pages generated from the table.
+    purpose: str = ""
 
 
 @dataclass(frozen=True)
@@ -145,6 +147,7 @@ def load_table(path: Path = DEFAULT_TABLE) -> Table:
             lanes=tuple(row.get("lanes", [])),
             ships=tuple(row.get("ships", [])),
             exposes=tuple(row.get("exposes", [])),
+            purpose=row.get("purpose", ""),
         )
         for name, row in raw["projects"].items()
     }
