@@ -232,8 +232,8 @@ and where the raw-pointer boundaries are, the per-access-unit resource limits, a
 # the libraries — libs/ is installable (audio and sendspin are built and linked, never installed),
 # apps/ consumes it and never the reverse. Each libs/<name>/ is the CMake target iclforge::<name>, the
 # headers iclforge/<name>/ and the library iclforge_<name>, with its tests in libs/<name>/tests and
-# its libFuzzer harnesses in libs/<name>/fuzz; tools/checks/layering.json says which library may
-# include which
+# its libFuzzer harnesses in libs/<name>/fuzz; tools/checks/projects.json says which project may
+# use which
 libs/base/       iclforge::base — bit I/O, the speaker vocabulary, the CPU probe and the profiling
                 hooks every library shares, the signing key with SHA-256 and HMAC-SHA-256, and,
                 header-only and not installed, Fixed32, the project's own float functions and the

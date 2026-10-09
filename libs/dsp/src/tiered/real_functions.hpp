@@ -18,7 +18,7 @@
 // last bit on some inputs. In the fixed-point tier they take a MantExp, a mantissa and a power of
 // two (dsp/scalar_traits.hpp's Energy), and are that type's integer log2 and exp2. They live in
 // this target, and not in the decoder's, because libs/ac4/src/decoder includes from libs/ac4/src/core and
-// libs/ac4/src/core from libs/base (tools/checks/layering.json).
+// libs/ac4/src/core from libs/base (tools/checks/projects.json).
 
 namespace iclforge::dsp::tiered {
 

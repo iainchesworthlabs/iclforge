@@ -92,8 +92,8 @@ if(NOT BUILD_SHARED_LIBS)
         encoder/test_writer.cpp
         # decoder/test_object_render.cpp's subject is the shared media code in apps/shared/media,
         # compiled in as source. It stays here, not in that code's own tests (C7-2), because it
-        # includes this directory's private test helper decoder/objects.hpp; check_layering.py
-        # names the edge.
+        # includes this directory's private test helper decoder/objects.hpp; the edge is an
+        # exception of tools/checks/projects.json.
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src/ac4_object_render.cpp")
     target_include_directories(iclforge-ac4-tests PRIVATE "${PROJECT_SOURCE_DIR}/apps/shared/media/src")
     target_link_libraries(iclforge-ac4-tests PRIVATE iclforge::objects iclforge::render)

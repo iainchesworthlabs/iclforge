@@ -1,17 +1,64 @@
 {
-  "_comment": "The dependency table of the libraries under libs/. libraries: each library and the libraries it may include from, in dependency order; check_layering.py fails an include that is not listed.",
-  "libraries": {
-    "base": [],
-    "dsp": ["base"],
-    "objects": ["base", "dsp"],
-    "render": ["base", "objects"],
-    "containers": ["base"],
-    "ac3": ["base", "dsp", "objects", "render"],
-    "ac4": ["base", "dsp", "objects", "render"],
-    "iab": ["base"],
-    "adm": ["iab", "objects"],
-    "audio": ["base", "render", "containers", "objects"],
-    "sendspin": [],
-    "capi": ["ac3", "ac4"]
-  }
+  "_comment": "The projects of the tree: the kind of each, where it is, and the projects it may use. check_layering.py reads every #include and every target_link_libraries() of the tree and fails a use this table does not list (a project's own tests/ and fuzz/ may use any library besides), a row that breaks the rules of its kind, an exception or a debt that no longer applies, an installed header that includes an internal project's, and an install() that names one. Kinds: library (libs/), app-library (apps/shared/: internal, compiled into programs), app (a product's programs), binding, firmware, example, tests (tests/support and tests/performance), vendored (external/). planning/monorepo.md, (d).",
+  "projects": {
+    "base":       {"kind": "library", "path": "libs/base", "may_use": []},
+    "dsp":        {"kind": "library", "path": "libs/dsp", "may_use": ["base"]},
+    "objects":    {"kind": "library", "path": "libs/objects", "may_use": ["base", "dsp"]},
+    "render":     {"kind": "library", "path": "libs/render", "may_use": ["base", "objects"]},
+    "containers": {"kind": "library", "path": "libs/containers", "may_use": ["base"]},
+    "ac3":        {"kind": "library", "path": "libs/ac3", "may_use": ["base", "dsp", "objects", "render"]},
+    "ac4":        {"kind": "library", "path": "libs/ac4", "may_use": ["base", "dsp", "objects", "render"]},
+    "iab":        {"kind": "library", "path": "libs/iab", "may_use": ["base"]},
+    "adm":        {"kind": "library", "path": "libs/adm", "may_use": ["iab", "objects"]},
+    "capi":       {"kind": "library", "path": "libs/capi", "may_use": ["ac3", "ac4"]},
+    "audio":      {"kind": "library", "path": "libs/audio", "internal": true, "may_use": ["base", "render", "containers", "objects"]},
+    "sendspin":   {"kind": "library", "path": "libs/sendspin", "internal": true, "may_use": ["time-filter"]},
+    "time-filter": {"kind": "vendored", "path": "external/time-filter", "may_use": []},
+
+    "app-media":       {"kind": "app-library", "path": "apps/shared/media", "internal": true, "may_use": ["ac3", "ac4", "containers", "objects", "render"]},
+    "app-theme":       {"kind": "app-library", "path": "apps/shared/theme", "internal": true, "may_use": []},
+    "app-preferences": {"kind": "app-library", "path": "apps/shared/preferences", "internal": true, "may_use": []},
+
+    "forge":    {"kind": "app", "path": "apps/forge", "may_use": ["ac3", "ac4", "adm", "audio", "base", "containers", "dsp", "iab", "objects", "render", "app-media", "app-preferences", "app-theme"]},
+    "hearth":   {"kind": "app", "path": "apps/hearth", "may_use": ["ac3", "ac4", "audio", "base", "containers", "objects", "render", "sendspin", "app-media", "app-preferences", "app-theme"]},
+    "crucible": {"kind": "app", "path": "apps/crucible", "may_use": ["ac3", "ac4", "audio", "base", "containers", "objects", "app-preferences", "app-theme"]},
+    "demo-android": {"kind": "app", "path": "apps/demos/android", "may_use": ["ac3", "audio", "base", "containers"]},
+    "demo-wasm":    {"kind": "app", "path": "apps/demos/wasm", "may_use": ["ac3", "ac4", "objects"]},
+
+    "python": {"kind": "binding", "path": "bindings/python", "may_use": ["ac3", "ac4", "base", "containers", "objects"]},
+    "rust":   {"kind": "binding", "path": "bindings/rust", "may_use": ["capi"]},
+    "js":     {"kind": "binding", "path": "bindings/js", "may_use": []},
+
+    "esp-idf":     {"kind": "firmware", "path": "firmware/esp-idf", "may_use": ["ac3", "ac4", "base", "dsp", "objects", "render", "sendspin"]},
+    "hearth-sink": {"kind": "firmware", "path": "firmware/hearth-sink", "may_use": ["ac3", "render", "sendspin"]},
+    "esphome":     {"kind": "firmware", "path": "firmware/esphome", "may_use": ["ac3"]},
+    "baremetal":   {"kind": "firmware", "path": "firmware/baremetal", "may_use": ["ac3", "ac4", "base", "dsp", "objects", "render"]},
+
+    "examples": {"kind": "example", "path": "examples", "may_use": ["ac3", "ac4", "adm", "base", "capi", "containers", "iab", "objects", "render"]},
+
+    "tests": {"kind": "tests", "path": "tests", "may_use": ["ac3", "ac4", "dsp"]}
+  },
+  "exceptions": [
+    {
+      "from": "ac4", "to": "app-media", "paths": ["libs/ac4/tests/decoder/test_object_render.cpp"],
+      "why": "The one test of the object renderer builds its streams with the AC-4 tests' own helper (decoder/objects.hpp, which includes the encoder's private headers), so it stays in libs/ac4/tests and compiles apps/shared/media/src/ac4_object_render.cpp into ac4's test binary: a library's test using an app-library (planning/monorepo.md, C7-2, finding 4)."
+    },
+    {
+      "from": "ac3", "to": "esp-idf", "paths": ["libs/ac3/tests/"],
+      "why": "The component's host-portable headers (interleave.hpp, block_ring.hpp, dac_queue_model.hpp, sink_plan.hpp, playout.hpp and their kin) are free of ESP-IDF and are tested on the host, in ac3's test binary, with the component's include directory on its path: library tests using firmware headers."
+    },
+    {
+      "from": "hearth", "to": "esp-idf", "paths": ["apps/hearth/engine/"],
+      "why": "Hearth's engine speaks to a sink about its firmware (GET /firmware, the image's header, its status) with the component's host-portable headers, firmware_image.hpp and firmware_status.hpp, so that the board and the server agree by construction: a program using firmware headers."
+    },
+    {
+      "from": "hearth-sink", "to": "esp-idf",
+      "why": "The sink is Hearth's firmware and the component is its dependency (main/idf_component.yml, override_path): the player, the control surface and the sinks' common code are the component's. A firmware project using another."
+    },
+    {
+      "from": "esp-idf", "to": "baremetal", "paths": ["firmware/esp-idf/iclforge/examples/i2s_player/"],
+      "why": "The i2s_player example decodes the 5.1 fixture the bare-metal probe carries (fixture.hpp) rather than a copy of it: one firmware project using another's file."
+    }
+  ],
+  "install_files": ["cmake/InstallLibrary.cmake"]
 }

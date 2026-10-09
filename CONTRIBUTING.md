@@ -81,9 +81,9 @@ If you cannot cite where something came from, it does not go in.
 libraries. Each is a directory with its own CMake target (`iclforge::<name>`), its own public
 headers (`iclforge/<name>/`, under `include/`), its sources (`src/`), its tests (`tests/`, a binary
 of their own: `ctest -L <name>`), its libFuzzer harnesses (`fuzz/`, with their seeds and the inputs
-that once broke them) and its own row in `tools/checks/layering.json`, which lists the libraries it
-may include from; `check_layering.py` fails an include its row does not list, and reads neither
-`tests/` nor `fuzz/`, which consume libraries. A
+that once broke them) and its own row in `tools/checks/projects.json`, which lists the libraries it
+may use; `check_layering.py` fails an include or a link line its row does not list (its `tests/` and
+`fuzz/` consume libraries, and may use any, but no program). A
 library's public headers declare into the namespace named for it under the family's root, and
 `check_namespaces.py` (its table is `tools/checks/namespaces.json`) fails a header that declares
 into another library's namespace, or into `iclforge` itself.
@@ -133,11 +133,19 @@ the Homebrew formula's test asserts it.
 component of an include path says which library a header belongs to: `iclforge/ac3/decoder/decoder.hpp`
 is in `libs/ac3/include/iclforge/ac3/decoder/`, `iclforge/render/layout.hpp` in
 `libs/render/include/iclforge/render/`. A library includes headers only of the libraries its row of
-`layering.json` lists. `base`, `dsp`, `objects`, `render` and `containers` list no codec, nor do the
+`projects.json` lists. `base`, `dsp`, `objects`, `render` and `containers` list no codec, nor do the
 readers (`adm`, `iab`): none of them knows
 AC-3, E-AC-3 or Atmos exist, and they should stay that way. The AC-4 library lists none of
 `ac3`'s: a separate codec that shares no bitstream syntax with it. Its core (`libs/ac4/src/core`) is
 what the decoder and the encoder share, and has no public headers.
+
+**Every project of the tree is a row of that table, whatever its kind:** the libraries of `libs/`, the
+code programs share under `apps/shared/` (internal, never installed), the programs of `apps/`, the
+bindings, the firmware and the examples. A library uses only libraries; a program, a binding, a
+firmware project and an example use libraries (a program also the shared code) and never another
+program; an internal project is never installed and no installed header includes one.
+`check_layering.py` reads the includes and the link lines of the whole tree. The few uses it allows
+by name are the table's `exceptions`, each with its reason, and one that excuses nothing fails.
 
 The one deliberate exception to the header root is `capi`: it installs under
 `include/iclforge_c/`, not `iclforge/`, even though it depends on the codecs directly (it wraps
