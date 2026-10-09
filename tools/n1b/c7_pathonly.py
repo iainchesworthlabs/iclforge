@@ -28,6 +28,7 @@ RULES = [
     (re.compile(r"\btests/(sanitized\.hpp|ac4_stream_kinds\.hpp)"), r"tests/support/\1"),
     (re.compile(r"\btests/audio/alsa_null_device\.hpp"), "tests/support/alsa_null_device.hpp"),
     (re.compile(r"\bfuzz/fuzz_([a-z0-9_]+)"), r"libs/@FUZZ@/fuzz/fuzz_\1"),
+    (re.compile(r"\btests/golden\b(?!')"), "testdata"),  # C7-4; a test's name keeps its spelling
 ]
 
 TOKEN = re.compile(r'(//[^\n]*|/\*.*?\*/)|("(?:\\.|[^"\\\n])*")', re.S)
