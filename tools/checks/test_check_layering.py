@@ -151,9 +151,9 @@ class LayeringCheck(unittest.TestCase):
         self.assertIn("other may not include prog", out)
 
     def test_tests_and_fuzz_may_use_any_library_but_no_program(self) -> None:
-        _write(self.root, "libs/base/tests/test_bits.cpp", '#include "decode.hpp"\n')
-        _write(self.root, "libs/codec/src/decode.hpp", "#pragma once\n")
-        _write(self.root, "libs/base/fuzz/fuzz_bits.cpp", '#include "decode.hpp"\n')
+        _write(self.root, "libs/base/tests/test_bits.cpp", '#include "x/codec/decode.hpp"\n')
+        _write(self.root, "libs/codec/include/x/codec/decode.hpp", "#pragma once\n")
+        _write(self.root, "libs/base/fuzz/fuzz_bits.cpp", '#include "x/codec/decode.hpp"\n')
         code, out = self.run_check({"base": BASE, "codec": CODEC})
         self.assertEqual(code, 0, out)
         _write(self.root, "apps/prog/src/api.hpp", "#pragma once\n")
@@ -166,9 +166,9 @@ class LayeringCheck(unittest.TestCase):
         _write(
             self.root,
             "apps/prog/cli/tests/test_it.cpp",
-            '#include "x/base/bits.hpp"\n#include "decode.hpp"\n',
+            '#include "x/base/bits.hpp"\n#include "x/codec/decode.hpp"\n',
         )
-        _write(self.root, "libs/codec/src/decode.hpp", "#pragma once\n")
+        _write(self.root, "libs/codec/include/x/codec/decode.hpp", "#pragma once\n")
         code, out = self.run_check(
             {"base": BASE, "codec": {**CODEC}, "prog": {**PROGRAM, "may_use": []}}
         )
@@ -438,6 +438,40 @@ class LayeringCheck(unittest.TestCase):
             "reaches libs/base/src/gone.hpp, which no excused include names any more", out
         )
         self.assertNotIn("reaches libs/base/src/detail/tables.hpp", out)
+
+    def test_an_include_of_a_private_header_of_another_project_fails(self) -> None:
+        _write(self.root, "libs/base/src/detail/tables.hpp", "#pragma once\n")
+        _write(self.root, "libs/codec/src/use.cpp", '#include "detail/tables.hpp"\n')
+        code, out = self.run_check({"base": BASE, "codec": CODEC})
+        self.assertEqual(code, 1)
+        self.assertIn("file=libs/codec/src/use.cpp,line=1", out)
+        self.assertIn("a header of base that is private to it", out)
+
+    def test_a_directory_the_row_exposes_may_be_included(self) -> None:
+        _write(self.root, "libs/base/src/detail/tables.hpp", "#pragma once\n")
+        _write(self.root, "libs/codec/src/use.cpp", '#include "detail/tables.hpp"\n')
+        shared = {**BASE, "exposes": ["libs/base/src/detail/"]}
+        code, out = self.run_check({"base": shared, "codec": CODEC})
+        self.assertEqual(code, 0, out)
+
+    def test_a_private_include_can_be_a_known_debt_and_a_gone_one_fails(self) -> None:
+        _write(self.root, "libs/base/src/detail/tables.hpp", "#pragma once\n")
+        _write(self.root, "libs/codec/src/use.cpp", '#include "detail/tables.hpp"\n')
+        _write(self.root, "debt/c1.txt", "libs/codec/src/use.cpp detail/tables.hpp\n")
+        code, out = self.run_check({"base": BASE, "codec": CODEC}, debt="debt")
+        self.assertEqual(code, 0, out)
+        self.assertIn("1 known debts", out)
+        _write(self.root, "libs/codec/src/use.cpp", "// no include any more\n")
+        code, out = self.run_check({"base": BASE, "codec": CODEC}, debt="debt")
+        self.assertEqual(code, 1)
+        self.assertIn("no longer a forbidden or private include", out)
+
+    def test_what_a_project_exposes_is_in_it_and_holds_files(self) -> None:
+        shared = {**BASE, "exposes": ["libs/codec/src/", "libs/base/nothing/"]}
+        code, out = self.run_check({"base": shared, "codec": CODEC})
+        self.assertEqual(code, 1)
+        self.assertIn("base exposes libs/codec/src/, which is not in libs/base", out)
+        self.assertIn("base exposes libs/base/nothing/, which nothing is filed under", out)
 
 
 class RealTable(unittest.TestCase):

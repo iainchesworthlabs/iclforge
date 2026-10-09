@@ -146,6 +146,10 @@ firmware project and an example use libraries (a program also the shared code) a
 program; an internal project is never installed and no installed header includes one.
 `check_layering.py` reads the includes and the link lines of the whole tree. The few uses it allows
 by name are the table's `exceptions`, each with its reason, and one that excuses nothing fails.
+A header another project includes is under the library's `include/` or under a directory its row
+`exposes` (what it shares on purpose and does not install: `libs/base/internal/`, an app-library's
+`src/`); any other header of a project is its implementation, and an include of it fails, or is a
+debt in `tools/checks/layering_debt/` until the cut that removes it lands.
 The CI planners read the same rows: a project names the lanes its tree lights (`lanes`), so a new
 project is a row with its lanes (`check_layering.py` fails one without), and the files an
 exception's excused include reaches are its `to_paths`.
