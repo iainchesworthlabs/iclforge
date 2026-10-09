@@ -787,11 +787,17 @@ jobs:
           incompatible=0
           changed=0
           # find_so <build dir> <find arguments>: the library directories of one build.
+          # An absent directory is not a failure: the step runs under bash -e, and a
+          # `[ -d ] && find` that ends the function with the test's status 1 would end the
+          # step at the first assignment from it (HEAD has libs/ and no src/, the base the
+          # other way round). tools/ci/test_abi_find_so.py runs this function.
           find_so() {
             local build="$1" dir
             shift
             for dir in libs src; do
-              [ -d "$build/$dir" ] && find "$build/$dir" "$@"
+              if [ -d "$build/$dir" ]; then
+                find "$build/$dir" "$@"
+              fi
             done
           }
           mapfile -t libs < <(
