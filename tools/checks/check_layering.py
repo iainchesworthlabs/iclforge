@@ -18,8 +18,8 @@ not allow. Stdlib-only, run from _static.yml's static job and runnable the same 
 
 A project is the directory its row names; a file belongs to the project with the longest such
 path above it. A project's tests/ and fuzz/ directories (and the top-level tests/) are its
-consumers:
-they are read, and may use every library besides what the project's own row lists, but nothing else.
+consumers: they are read, and may use every library besides what the project's own row
+lists, but nothing else.
 
 The kinds, and what each may use (the table is held to this as well as the tree):
 
@@ -34,11 +34,10 @@ The kinds, and what each may use (the table is held to this as well as the tree)
 An `internal` project is never installed, and no installed header (a header under a non-internal
 library's include/) includes one: cmake/InstallLibrary.cmake names none of them.
 
-Named exceptions. An edge the kinds forbid but the tree has, and that is deliberate, is listed in
-the
-table's "exceptions" with the files it is in (or all of the project's files) and why. An exception
-that no longer excuses an edge fails, which is what makes the change that removes the edge delete
-it.
+Named exceptions. An edge the kinds forbid but the tree has, and that is deliberate, is listed
+in the table's "exceptions" with the files it is in (or all of the project's files) and why.
+An exception that no longer excuses an edge fails, which is what makes the change that
+removes the edge delete it.
 
 Known debts. A cut that removes an include the table forbids lands as its own change, and the
 include is there until it does. Each such include is listed in a file of
