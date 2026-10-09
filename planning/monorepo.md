@@ -1,6 +1,6 @@
 # A monorepo of self-contained projects (C7): a study
 
-!!! note "Status as of 2026-10-09: decisions 1 to 15 taken; C7-1 to C7-6 run and proved"
+!!! note "Status as of 2026-10-09: decisions 1 to 15 taken and carried out; C7-1 to C7-7 run and proved"
     Asked for by the user on 2026-10-08: "turn this repository into a monorepo of self-contained
     projects". It follows [consolidation.md](consolidation.md), whose C0 to C6, the three merges its
     decision 14 left (M1 to M3) and the two items C3 and C6 left are run and proved on the local
@@ -25,7 +25,9 @@
     hold the whole tree to the project graph, and nothing the build reads changed. C7-6 ran on
     `chore/monorepo-c7-6`: the CI planners read the rows of `projects.json` instead of directory
     lists, and a header of the ESP-IDF component that a library's tests include is built by the
-    gate now. Nothing is pushed.
+    gate now. C7-7 ran on `chore/monorepo-c7-7`: the scripts of `tools/n1b/` are retired, with what
+    adapting an open branch needs left in `tools/adapt/`, and the mechanical commits of the stages are in
+    `.git-blame-ignore-revs`. Nothing is pushed.
 
 ## In brief
 
@@ -399,13 +401,14 @@ examples/ tools/ docs/ planning/ packaging/ cmake/ requirements/ assets/
 ## How C7 is run
 
 The stages run as C0 to C3 did ([how C0 to C3 are run](consolidation.md#how-c0-to-c3-are-run),
-[tools/n1b/README.md](../tools/n1b/README.md)): one local branch each, `chore/monorepo-c7-<n>`, each
+[tools/n1b/README.md](https://github.com/iainchesworthlabs/iclforge/blob/8d2507bae/tools/n1b/README.md)): one local branch each, `chore/monorepo-c7-<n>`, each
 made from the one before. Within a stage the commits come in N1B's order, each script in a commit of
 its own before the commit it makes: the moves alone (`git mv`, every rename `R100`), the include
 spellings, the build files and the paths in text, then what is done by hand. The moves are data in
 `consoldef.py` (`c7_1_new`); `consol_apply.py`, `consol_cmake.py` and `consol_paths.py` run them.
 
-What C7 adds to the proof, and the scripts that give it (all in `tools/n1b`):
+What C7 adds to the proof, and the scripts that give it (all in `tools/n1b`, which C7-7 retired: they
+are in the history at `8d2507bae`, and `tools/ci/compare_planners.py` is the planner one's successor):
 
 | script | what it shows |
 |---|---|
@@ -1094,3 +1097,69 @@ lanes as before, plus the files the table says an excused edge reaches. Choosing
 (`ctest -L`), or lighting the satellites that use a changed library in the run after a merge, is a change to
 what CI costs and not to how it is organised (finding 5 has the numbers). `layering.json` is gone from every
 tool that read it; the history keeps naming it.
+
+### C7-7, 2026-10-09 (`chore/monorepo-c7-7`)
+
+**What this is.** Decision 13 (a): `tools/n1b/` and the consolidation scripts are retired now that C7 is
+proved, keeping `adapt_branch.ps1` and the move maps for the branches that are still open; and the
+mechanical commits of the stages go into `.git-blame-ignore-revs`. Nothing the build reads changes (two C++
+comments name a script that is gone).
+
+**What changed.**
+
+1. **The moves, alone:** `adapt_branch.ps1`, the seven modules it needs and their four tests go from
+   `tools/n1b/` to `tools/adapt/`, 12 renames, every one `R100`.
+2. **The retirement:** the rest of `tools/n1b/` is deleted, 82 files and 32,117 lines: the N1B, consolidation
+   and C7 scripts, their 15 test files, the baselines, the README and the S2 patch. They are in the history,
+   last at `8d2507bae`.
+3. **What the survivors need:** `tools/adapt/README.md` says what is there and how to adapt a branch;
+   `moves.py <commit>` prints a stage's move map back from the commit of its renames (the commits are in the
+   README, with their rename counts) and has 4 tests, so the maps are data in git and not a second copy
+   of it; the static job and `precheck.py` run `tools/adapt`'s tests where they ran `tools/n1b`'s.
+4. **The names of the scripts that were left in the tree:** `.gitattributes` (the S2 patch's line), the
+   documentation-paths check (`tools/adapt/` is its tree of old-layout literals now), three pages and two
+   comments that named `n1d_driver_names.py`, and five links of the planning pages that went to
+   `tools/n1b/README.md` (they go to the commit that has it).
+5. **`.git-blame-ignore-revs`** lists 53 more commits: what the scripts of C1 to C7-4 gave on their parents.
+
+**What the dry run could not see:**
+
+1. **Keeping `adapt_branch.ps1` is keeping seven modules.** It runs `n1b_apply.py`, `n1b_cmake.py`,
+   `n1b_paths.py` and `n1b_names.py`, and those import `include_graph.py`, `layoutdef.py` (S2's move map) and
+   `n1b_lib.py`: 75 KB of the 958 KB of Python in the directory. The other 55 modules and 15 test files go.
+   `adapt_branch.ps1` itself adapts a branch to stages S2 and S3 only, as its header says; for the stages
+   after them the README says to merge, with directory renames on, and to read the move map of the commit.
+2. **The ignore file does not list renames,** by its own header: git blame follows a rename by itself. The
+   move commits of C7 are not missing from it, as the summary of C7-5 said; the commits that rewrite
+   text are, and they are the 53. Entries for commits that are not in a repository's history are
+   ignored by `git blame`, so the file is safe to carry before the commits are where it says.
+3. **A suite whose directory is gone is a failure, not a skip.** The static job and `precheck.py` loop over
+   directories and `unittest discover` stops on one that does not exist; the documentation-paths check
+   would have read `tools/adapt/`'s old-layout literals as stale paths without its entry.
+4. **What the retirement costs.** `baseline.py`, `flags_diff.py`, `ir_compare.py` and `cli_bytes.py` were not
+   only the layout scripts' tests: they are the proof that a change moved no output byte, no flag and no
+   instruction, and every stage of C7 was proved with them. They are in the history and the next refactoring
+   that has to be proved the same way takes them from there; `tools/ci/compare_planners.py` is the planner
+   one's permanent successor (C7-6).
+5. **Ruff.** The 27 findings of the tree were all in the retired directory; two are left, outside it.
+
+**The proof,** against the stage's parent (`chore/monorepo-c7-6`; no file the build reads changed but two C++
+comments, so the builds, the ctest, the hashes and the `.text` of C7-5 are this stage's too):
+
+| proof | result |
+|---|---|
+| the suites | `tools/checks` 465, `tools/ci` 598, `tools/hearth` 102 and `tools/adapt` 85 tests pass (`tools/n1b`'s 495 went with the scripts: 81 of the 85 are the survivors', the 4 new are `moves.py`'s) |
+| the move maps | `moves.py` reads each of the 17 commits of the README as renames alone, and fails on a commit that is not |
+| the C++ edits | two files, `apps/crucible/engine/src/virtual_device.hpp` and `apps/shared/preferences/src/settings_migration.hpp`, 4 lines each, all comments |
+| `.git-blame-ignore-revs` | 53 commits, each an ancestor of the branch and none a commit of renames alone (the script that wrote the list checks both); `git blame --ignore-revs-file` runs with it |
+| `check_doc_paths.py`, `mkdocs build --strict`, `precheck.py --unit` | 0 missing of 6,496; pass; pass |
+| `ruff check .` | 29 findings in the parent, 2 now, none new |
+| `check_layering.py` and the other checks of the static job | unchanged: 30 projects, 1,949 edges, 0 failures |
+
+**Not run here, and recorded rather than skipped:** the workflows (the static job's loop is read and its
+suites run one by one).
+
+**What C7-7 leaves.** The decisions are all carried out. The branches that are still open (`git branch -r
+--no-merged`) are adapted by their owners with the README of `tools/adapt/`, and the part of the programme
+that is not this one's is in the pull requests: `.git-blame-ignore-revs` names commits, which stay where they
+are only if the stages merge with merge commits, as the queue does.
