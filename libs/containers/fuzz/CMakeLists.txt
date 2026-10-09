@@ -30,4 +30,4 @@ endif()
 # forge's 'unspdif' drives it (libs/containers/src/iec61937/iec61937.cpp). The one
 # entry point here whose input is by definition off a wire - an S/PDIF or
 # HDMI capture - and whose Pd word is an attacker-chosen length.
-iclforge_add_fuzzer(fuzz_iec61937_unwrap)
+iclforge_add_fuzzer(fuzz_iec61937_unwrap iclforge::containers)
