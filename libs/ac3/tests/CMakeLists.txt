@@ -30,20 +30,6 @@ iclforge_add_test_binary(iclforge-ac3-tests PROJECT ac3 SOURCES
     decoder/test_eac3_transient_prenoise.cpp
     io/test_elementary.cpp
     io/test_stream_accumulator.cpp
-    io/test_firmware_image.cpp
-    io/test_firmware_status.cpp
-    io/test_firmware_trial.cpp
-    io/test_hardware_info.cpp
-    io/test_log_ring.cpp
-    io/test_improv.cpp
-    io/test_interleave.cpp
-    io/test_pairing_records.cpp
-    io/test_sink_plan.cpp
-    io/test_tcp_arrivals.cpp
-    io/test_block_ring.cpp
-    io/test_unit_hold.cpp
-    io/test_dac_queue_model.cpp
-    io/test_playout.cpp
     io/test_metadata_edit.cpp
     io/test_probe.cpp
     emdf/test_emdf.cpp
@@ -138,30 +124,6 @@ target_include_directories(iclforge-ac3-tests PRIVATE "${_ac3_root}/src/decoder"
 # one - same white-box arrangement as libs/ac3/src/encoder just above and the
 # ALSA backend's internal header in libs/audio/tests.
 target_include_directories(iclforge-ac3-tests PRIVATE "${ICLFORGE_ARCH_INCLUDE_DIR}")
-
-# The interleave and the DMA queue model from the ESP-IDF component
-# (iclforge/interleave.hpp, iclforge/dac_queue_model.hpp). Reaching into the
-# component is deliberate: they are the parts of an I2S or TDM sink that can be
-# checked without a DAC on the other end - the rest is peripheral setup and a
-# blocking write - and they are the parts with the indexing and the arithmetic
-# in them. test_block_ring.cpp and test_unit_hold.cpp build the component's
-# block_ring.hpp and unit_hold.hpp through the same path, and
-# test_pairing_records.cpp the Sendspin player's record order and eviction
-# (pairing_records.hpp), which the board keeps in NVS. None of these headers
-# includes anything from ESP-IDF, which is what makes building them here
-# possible and is worth keeping true. (The layout and the renderer were here
-# too, and moved into the library as ac3/render/ with render/test_layout.cpp.)
-#
-# interleave.hpp also needs iclforge/slot_conversion.hpp, which the component
-# takes from conversion/float/ or conversion/bits/ by whether the part has a
-# floating-point unit. A host has one, so the float directory; the tests name
-# both conversions explicitly wherever the choice matters.
-#
-# Their subject is the component's, not this library's; they move to it with the firmware
-# (planning/monorepo.md, C7-3).
-target_include_directories(iclforge-ac3-tests PRIVATE
-    "${PROJECT_SOURCE_DIR}/firmware/esp-idf/iclforge/include"
-    "${PROJECT_SOURCE_DIR}/firmware/esp-idf/iclforge/conversion/float")
 
 # test_simd_kernels.cpp's CPU-feature-detection cases (the runtime AVX2
 # dispatch) need cpu_features.cpp compiled a SECOND time,

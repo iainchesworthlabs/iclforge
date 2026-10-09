@@ -271,7 +271,7 @@ not part of this measurement.
 
 Getting samples onto those slots costs time here too. The decoder hands a sink planar `float`
 blocks, and the component's interleaves
-(`firmware/esp-idf/iclforge/include/iclforge/interleave.hpp`) turn each sample into a slot. Scaling,
+(`libs/device/include/iclforge/interleave.hpp`) turn each sample into a slot. Scaling,
 clipping and converting one in `float` is four calls into the software floating-point routines
 on a part with no FPU, so the component computes the same integers from the sample's IEEE-754
 bits wherever `CONFIG_SOC_CPU_HAS_FPU` is unset, which is this part. Both forms are timed below.

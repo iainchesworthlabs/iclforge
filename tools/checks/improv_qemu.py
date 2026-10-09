@@ -5,7 +5,7 @@ planning/hearth-reference-player.md, B2. A board with no network listens for
 Improv Wi-Fi (https://www.improv-wifi.com/serial/) on its console, and a
 client there gives it an SSID and a passphrase:
 firmware/hearth-sink/main/provision.cpp answers, in the
-packet format of firmware/esp-idf/iclforge/include/iclforge/improv.hpp. QEMU has no
+packet format of libs/device/include/iclforge/improv.hpp. QEMU has no
 radio, so tools/checks/run_improv_qemu.sh boots two images, one for each of
 these scenarios:
 

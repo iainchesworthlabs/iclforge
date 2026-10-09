@@ -288,14 +288,19 @@ class ProjectTable(unittest.TestCase):
             },
         )
 
-    def test_a_header_the_librarys_tests_include_is_built_though_the_component_is_not(self):
-        got = plan("firmware/esp-idf/iclforge/include/iclforge/block_ring.hpp")
-        self.assertEqual((got["build"], got["gui"], got["compare"]), ("true", "false", "false"))
+    def test_a_header_of_the_device_library_is_built_without_the_gui(self):
+        # libs/device is a library the ESP component, Hearth's engine and its own tests use: it
+        # builds on the desktop lanes and is held to the comparisons, as the other libraries are.
+        for name in ("block_ring", "firmware_image"):
+            with self.subTest(header=name):
+                got = plan(f"libs/device/include/iclforge/{name}.hpp")
+                wanted = ("true", "false", "true")
+                self.assertEqual((got["build"], got["gui"], got["compare"]), wanted)
 
-    def test_a_header_hearths_engine_includes_pulls_qt_in_too(self):
-        got = plan("firmware/esp-idf/iclforge/include/iclforge/firmware_image.hpp")
+    def test_the_media_code_ac4s_tests_compile_in_is_built_with_the_gui(self):
+        # The table's one exception: a file it reaches is in a GUI tree on its own account.
+        got = plan("apps/shared/media/src/ac4_object_render.hpp")
         self.assertEqual((got["build"], got["gui"]), ("true", "true"))
-        self.assertIn("included by hearth", got["gui_reason"])
 
     def test_a_header_no_excused_edge_reaches_stays_unbuilt(self):
         got = plan("firmware/esp-idf/iclforge/include/iclforge/access_units.hpp")

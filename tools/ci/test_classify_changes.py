@@ -336,9 +336,17 @@ class ProjectTableTest(unittest.TestCase):
         self.assertEqual(lit(direct, *ALL_LANES), {"core", "windows", "linux", "macos"})
 
     def test_a_header_an_excused_edge_reaches_lights_the_projects_that_include_it(self):
-        # ac3's tests and Hearth's engine include these (the table's exceptions, with their files).
-        reached = "firmware/esp-idf/iclforge/include/iclforge/block_ring.hpp"
+        # ac4's object-render test compiles the media code's renderer in (the table's one exception,
+        # with its file): a change to the renderer lights ac4 as well as the programs.
+        reached = "apps/shared/media/src/ac4_object_render.hpp"
         direct = gate.classify([reached], satellites_direct=True)
+        self.assertEqual(lit(direct, *ALL_LANES), {"core", "windows", "linux", "macos"})
+
+    def test_a_header_of_the_device_library_lights_what_uses_it(self):
+        # The ESP component and the Hearth sink (esp), Hearth's engine (the desktop lanes) and the
+        # library's own tests (core).
+        header = "libs/device/include/iclforge/block_ring.hpp"
+        direct = gate.classify([header], satellites_direct=True)
         self.assertEqual(lit(direct, *ALL_LANES), {"esp", "core", "windows", "linux", "macos"})
 
     def test_a_header_no_excused_edge_reaches_lights_the_component_only(self):

@@ -35,15 +35,18 @@ live in the library because it is made of FreeRTOS:
   ([`planning/esp32-device-ui.md`](../../../planning/esp32-device-ui.md)). `GET /api` lists the
   routes.
 - **`iclforge/interleave.hpp`**: planar float to interleaved 16-bit or 24-in-32 with slot padding,
-  free of ESP-IDF and tested on the host. Library code with a temporary home; see the plan below.
+  free of ESP-IDF and tested on the host. It and the other headers of the component that need no
+  ESP-IDF (the sink planner, the playout and DAC queue models, the firmware image rules, Improv,
+  the pairing records) are the host-portable library [`libs/device`](../../../libs/device); this
+  component puts its include directory on its own, so they are included by the names they always had.
 - **`iclforge::DacQueueModel`**
-  ([`include/iclforge/dac_queue_model.hpp`](include/iclforge/dac_queue_model.hpp)): what an I2S
+  ([`iclforge/dac_queue_model.hpp`](../../../libs/device/include/iclforge/dac_queue_model.hpp)): what an I2S
   DAC heard, worked out from the one fact the hardware guarantees - its DMA drains at exactly
   the sample rate. A sink tells it when each block arrives and when its write has returned, by a
   clock the sink passes in, and it counts, per play, the blocks that arrived to an empty queue,
   how long the queue was dry, and the least that was left. The streaming example's `i2s` and
   `i2s_wide` sinks keep one each for their `sink.*` line. Free of ESP-IDF and tested on the host
-  against a simulated DMA (`libs/ac3/tests/io/test_dac_queue_model.cpp`).
+  against a simulated DMA (`libs/device/tests/test_dac_queue_model.cpp`).
 
 The player renders through the library's `iclforge::render` headers, which began in this component
 and moved to `libs/render/include/iclforge/render/` so that the desktop player and its test sink render

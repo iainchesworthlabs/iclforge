@@ -464,6 +464,9 @@ add_subdirectory(libs/base)
 add_subdirectory(libs/dsp)
 add_subdirectory(libs/objects)
 add_subdirectory(libs/render)
+# The device-side logic of the ESP32 sinks and players that needs no SDK: headers the ESP-IDF
+# component, Hearth's engine and their tests share (libs/device/CMakeLists.txt).
+add_subdirectory(libs/device)
 add_subdirectory(libs/ac3)
 
 # The containers, codec-blind and one library: IEC 61937 burst packing, always, and the Matroska,
@@ -620,7 +623,7 @@ if(ICLFORGE_BUILD_TESTS)
         add_subdirectory(apps/hearth/engine/tests)
     endif()
     add_subdirectory(apps/crucible/engine/tests)
-    foreach(_iclforge_lib IN ITEMS base dsp objects render ac3 containers audio ac4 iab adm capi sendspin)
+    foreach(_iclforge_lib IN ITEMS base dsp objects render device ac3 containers audio ac4 iab adm capi sendspin)
         set(_iclforge_lib_target "iclforge::${_iclforge_lib}")
         if(_iclforge_lib STREQUAL "capi")
             set(_iclforge_lib_target "iclforge::c")

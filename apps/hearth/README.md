@@ -6,7 +6,7 @@ Hearth: the reference player: its engine (the queue, the transport, the output d
 
 A app.
 
-- **Uses:** `ac3`, `ac4`, `audio`, `base`, `containers`, `objects`, `render`, `sendspin`, `app-media`, `app-preferences`, `app-theme`
+- **Uses:** `ac3`, `ac4`, `audio`, `base`, `containers`, `device`, `objects`, `render`, `sendspin`, `app-media`, `app-preferences`, `app-theme`
 - **Used by:** nothing
 - **CI lanes:** windows, linux, macos
 

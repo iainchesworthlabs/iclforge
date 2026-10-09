@@ -8,7 +8,7 @@
 //
 // See ../../audio_sink.hpp for why this is a directory CMake picks rather
 // than a branch in the player, and
-// ../../../../esp-idf/iclforge/include/iclforge/sink_plan.hpp for the mode/slot-count
+// ../../../../../libs/device/include/iclforge/sink_plan.hpp for the mode/slot-count
 // arithmetic this file only calls.
 //
 // ONE LINE, DELIBERATELY, NOT A PARAMETERIZED COPY OF sink/i2s. That file's

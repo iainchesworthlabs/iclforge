@@ -4,7 +4,7 @@
 // are the whole of the interoperability: a checksum computed over the wrong
 // span, or a length byte read from the wrong place, is a board that ignores
 // every browser that tries to provision it. So the packets are built and
-// taken apart here, byte by byte, the way libs/ac3/tests/io/test_interleave.cpp does
+// taken apart here, byte by byte, the way libs/device/tests/test_interleave.cpp does
 // for the slot conversions.
 
 #include <array>

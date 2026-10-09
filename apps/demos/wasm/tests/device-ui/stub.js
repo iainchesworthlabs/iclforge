@@ -358,7 +358,7 @@ function pairedServer(fields) {
 }
 
 // One of GET /firmware's slots, as append_slot writes it
-// (firmware/esp-idf/iclforge/include/iclforge/firmware_status.hpp).
+// (libs/device/include/iclforge/firmware_status.hpp).
 function firmwareSlot(fields) {
     return {
         label: 'ota_0',

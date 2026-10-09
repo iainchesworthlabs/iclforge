@@ -38,8 +38,7 @@
 # (include/iclforge/player.hpp, src/player.cpp - a fetch task, a decode task and
 # the ring between them, over a source seam and a sink seam) and the
 # planar-to-interleaved conversion every sink shares (iclforge/interleave.hpp,
-# tested on the host by libs/ac3/tests/io/test_interleave.cpp, and on its way into the
-# library - see planning/esp32-player.md). freertos, esp_timer and heap are what
+# libs/device's, tested on the host by libs/device/tests/test_interleave.cpp). freertos, esp_timer and heap are what
 # the player's own sources include.
 #
 # The control surface (include/iclforge/control.hpp, src/control.cpp) is here
@@ -112,32 +111,6 @@ idf_component_register(
 # a hook, once installed, needs to find.
 target_link_options(${COMPONENT_LIB} INTERFACE "-Wl,--undefined=iclforge_lwip_ip4_input")
 
-# How the interleave converts a float sample to an integer slot is chosen by
-# part, as a header directory: conversion/float/ where the CPU has a
-# floating-point unit, conversion/bits/ where it does not. Each holds
-# iclforge/slot_conversion.hpp, naming the conversion interleave.hpp's
-# interleaves default to. On a part without an FPU each float operation is a
-# call into the software floating-point routines, four a sample, and the bits
-# form computes the same integers with integer operations; on a part with one,
-# the float form is the few instructions it looks like. The choice is read from
-# CONFIG_SOC_CPU_HAS_FPU, the capability ESP-IDF's own soc component picks the
-# RISC-V float ABI by.
-#
-# Below the registration rather than in its INCLUDE_DIRS. IDF's requirements
-# pass also runs this file, before any sdkconfig exists, and its
-# idf_component_register returns: everything above the registration runs there
-# with the flag unset on every part, so the directory it recorded for the
-# component would be conversion/bits/ on an ESP32-S3 too. Nothing below the
-# registration runs in that pass. PUBLIC, as INCLUDE_DIRS would be, because
-# interleave.hpp is a header the sinks in a consuming project include.
-if(CONFIG_SOC_CPU_HAS_FPU)
-    target_include_directories(${COMPONENT_LIB} PUBLIC
-        "${CMAKE_CURRENT_SOURCE_DIR}/conversion/float")
-else()
-    target_include_directories(${COMPONENT_LIB} PUBLIC
-        "${CMAKE_CURRENT_SOURCE_DIR}/conversion/bits")
-endif()
-
 # Where the library's own CMake lives, which depends on how this component was
 # obtained.
 #
@@ -166,6 +139,43 @@ if(NOT EXISTS "${ICLFORGE_ROOT}/libs/ac3/CMakeLists.txt")
         "iclforge: no library sources at '${ICLFORGE_ROOT}'. In a checkout this component "
         "lives at firmware/esp-idf/iclforge/; packed, it carries its own lib/ - see "
         "tools/packaging/pack_esp_component.py.")
+endif()
+
+# THE HOST-PORTABLE HEADERS. The headers that need no ESP-IDF - interleave.hpp, block_ring.hpp,
+# playout.hpp, sink_plan.hpp, dac_queue_model.hpp, tcp_arrivals.hpp, the firmware image, status and
+# trial rules, improv.hpp, pairing_records.hpp, log_ring.hpp, hardware_info.hpp and unit_hold.hpp -
+# are libs/device's, tested on the host by libs/device/tests. They keep the names a project
+# includes them by, and this component puts the directory on its include path, PUBLIC, because the
+# sinks of a consuming project include them. Packed, libs/device sits under lib/ with the rest
+# (tools/packaging/pack_esp_component.py).
+#
+# How the interleave converts a float sample to an integer slot is chosen by part, as a header
+# directory: conversion/float/ where the CPU has a floating-point unit, conversion/bits/ where it
+# does not. Each holds iclforge/slot_conversion.hpp, naming the conversion interleave.hpp's
+# interleaves default to. On a part without an FPU each float operation is a call into the software
+# floating-point routines, four a sample, and the bits form computes the same integers with integer
+# operations; on a part with one, the float form is the few instructions it looks like. The choice is
+# read from CONFIG_SOC_CPU_HAS_FPU, the capability ESP-IDF's own soc component picks the RISC-V float
+# ABI by.
+#
+# Below the registration rather than in its INCLUDE_DIRS. IDF's requirements pass also runs this
+# file, before any sdkconfig exists, and its idf_component_register returns: everything above the
+# registration runs there with the flag unset on every part, so the directory it recorded for the
+# component would be conversion/bits/ on an ESP32-S3 too. Nothing below the registration runs in
+# that pass.
+if(NOT EXISTS "${ICLFORGE_ROOT}/libs/device/include/iclforge/interleave.hpp")
+    message(FATAL_ERROR
+        "iclforge: no libs/device at '${ICLFORGE_ROOT}'. In a checkout this component lives at "
+        "firmware/esp-idf/iclforge/; packed, it carries its own lib/ - see "
+        "tools/packaging/pack_esp_component.py.")
+endif()
+target_include_directories(${COMPONENT_LIB} PUBLIC "${ICLFORGE_ROOT}/libs/device/include")
+if(CONFIG_SOC_CPU_HAS_FPU)
+    target_include_directories(${COMPONENT_LIB} PUBLIC
+        "${ICLFORGE_ROOT}/libs/device/conversion/float")
+else()
+    target_include_directories(${COMPONENT_LIB} PUBLIC
+        "${ICLFORGE_ROOT}/libs/device/conversion/bits")
 endif()
 
 # WHICH DIRECTION. Decode by default - that is what a player wants, and what
