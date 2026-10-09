@@ -4,6 +4,7 @@
 #
 #   tools/n1b/c7_run.sh ctest                 # gcc and llvm, JUnit files in build/work/c7/{before,after}/
 #   TREES=gcc tools/n1b/c7_run.sh ctest
+#   C7_WORK=<dir> BEFORE_WT=<wt> AFTER_WT=<wt> tools/n1b/c7_run.sh ...   # other trees and another output directory
 #   tools/n1b/c7_run.sh probes                # run_baremetal_probe.sh: decoder, encoder, AC-4 float and
 #                                             # fixed, and the decoder with stage timers, each --icount
 #
@@ -13,7 +14,7 @@ set -u
 REPO=$(cd "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")" && pwd)
 [ -f "$REPO/build/env.sh" ] && source "$REPO/build/env.sh"
 W=$REPO/build/wt
-O=$REPO/build/work/c7
+O=${C7_WORK:-$REPO/build/work/c7}
 BEFORE=${BEFORE_WT:-c7-before}
 AFTER=${AFTER_WT:-merge}
 
