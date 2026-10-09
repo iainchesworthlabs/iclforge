@@ -1,6 +1,6 @@
 # A monorepo of self-contained projects (C7): a study
 
-!!! note "Status as of 2026-10-09: decisions 1 to 15 taken; C7-1 to C7-4 run and proved; C7-5 not begun"
+!!! note "Status as of 2026-10-09: decisions 1 to 15 taken; C7-1 to C7-5 run and proved"
     Asked for by the user on 2026-10-08: "turn this repository into a monorepo of self-contained
     projects". It follows [consolidation.md](consolidation.md), whose C0 to C6, the three merges its
     decision 14 left (M1 to M3) and the two items C3 and C6 left are run and proved on the local
@@ -21,7 +21,8 @@
     its own beside the ESP-IDF component, and the code of every image, extension and package it was
     compared on is the code it was. C7-4 ran on `chore/monorepo-c7-4`: the golden data moved to
     `testdata/`, and the one thing that differs in what the programs print is the name of a golden file
-    they were given. Nothing is pushed.
+    they were given. C7-5 ran on `chore/monorepo-c7-5`: `tools/checks/projects.json` and `check_layering.py`
+    hold the whole tree to the project graph, and nothing the build reads changed. Nothing is pushed.
 
 ## In brief
 
@@ -899,3 +900,116 @@ golden data but the probe runners, which ran under QEMU above); the Python, Rust
 bindings read no golden data); SonarCloud and CodeQL; the workflows themselves.
 
 **What C7-4 leaves.** `layering.json` and the check of the whole tree (C7-5).
+
+### C7-5, 2026-10-09 (`chore/monorepo-c7-5`)
+
+**What moved.** One rename, `R100` and alone: `tools/checks/layering.json` is `tools/checks/projects.json`.
+Nothing else moves, and no path the build reads changes. Then by hand: the table (30 projects and five
+named exceptions), `check_layering.py` (rewritten, with its 33 tests), the debt directory's README,
+`CONTRIBUTING.md`, `README.md`, the static job's step (now "Project layering"), `precheck.py`, two comments
+that named the old file (one in `libs/dsp`, one in `libs/ac4/tests/CMakeLists.txt`) and, found by the static
+checks, the tools of `tools/n1b/` that read the old table (finding 5). All in all the stage
+changed 18 files since its parent.
+
+**What the check does.** `projects.json` lists every project of the tree with its kind, its path and the
+projects it may use; a file belongs to the project with the longest path above it, and a project's `tests/`
+and `fuzz/` (and the top-level `tests/`, which is a project of its own) are its consumers. The kinds are the
+rules the table is held to as well as the tree:
+
+| kind | where | may use |
+|---|---|---|
+| `library` | `libs/<name>` | other libraries and the vendored code |
+| `app-library` | `apps/shared/<name>`, internal | libraries |
+| `app` | a product: `apps/forge`, `hearth`, `crucible`, `demos/android`, `demos/wasm` | libraries and app-libraries, never another app |
+| `binding` | `bindings/{python,rust,js}` | libraries |
+| `firmware` | `firmware/{esp-idf,hearth-sink,esphome,baremetal}` | libraries |
+| `example` | `examples/` | libraries |
+| `tests` | `tests/support`, `tests/performance` | libraries and app-libraries |
+| `vendored` | `external/time-filter` | nothing |
+
+The edges are read from the tree: every `#include` of every C and C++ file, resolved as the compiler would
+(relative to the including file, then by the spelling a header is reached by), and every
+`target_link_libraries()`, `add_library()` and `iclforge_add_library()` (its `DEPENDS`, `EMBEDS` and `LINK_*`)
+of every CMake file, a target found again under its alias. An `internal` project (`audio`, `sendspin`,
+`app-media`, `app-theme`, `app-preferences`) is never installed: no installed header (one under a library's
+`include/`) includes one, and `cmake/InstallLibrary.cmake` names none. The check fails a use the row does not
+list, a C, C++ or CMake file in a tree the table covers that no project holds, a row that breaks the rules of
+its kind or names a project that is not there or makes a cycle, an exception or a known debt that excuses
+nothing any more, and an installed header or an `install()` that reaches an internal project. The debts
+(`layering_debt/`, one file per cut) are the mechanism the libraries had; none is listed.
+
+**What the dry run could not see** (each found by running the check on the tree, or the checks beside it):
+
+1. **There are five whole-tree exceptions, where the study expected one.** `ac4` to `app-media`
+   (`libs/ac4/tests/decoder/test_object_render.cpp`, finding 4 of C7-2: a library's test compiling an
+   app-library); `ac3` to `esp-idf` (`libs/ac3/tests/`: the component's host-portable headers, `interleave.hpp`,
+   `block_ring.hpp`, `sink_plan.hpp` and their kin, are tested on the host in ac3's test binary); `hearth` to
+   `esp-idf` (`apps/hearth/engine/`: the engine speaks to a sink about its firmware with `firmware_image.hpp` and
+   `firmware_status.hpp`, so that the board and the server agree by construction); `hearth-sink` to `esp-idf`
+   (the sink is Hearth's firmware and the component is its dependency, `override_path`); `esp-idf` to
+   `baremetal` (the `i2s_player` example decodes the fixture the bare-metal probe carries rather than a copy).
+   They excuse 45 edges. Each has its reason in the table, and each is a cut a later change can make: the
+   check then fails until the row is deleted.
+2. **Consumers are a rule of their own.** A library's tests and fuzz targets use any library besides what its
+   row lists, and the test support, never an app: `libs/ac3/tests` includes `containers` (its MP4, fMP4 and
+   MPEG-TS tests), and without the rule every library would list what its tests need and the table would
+   say nothing about the library. The top-level `tests/` is a project of its own, the support library and
+   the performance tests, and uses `ac3`, `ac4` and `dsp`.
+3. **The libraries' own 228 edges are 228 here.** Counting the include edges between two libraries outside
+   consumers gives the number the old check printed; the other 1,721 edges of the 1,949 are the new ones
+   (1,811 includes and 138 link lines in all): the programs' uses of libraries, the bindings', the
+   firmware's, the examples' and the consumers'.
+4. **A violation put into the tree fails the check.** On the real table, one at a time:
+   a library including a library its row lacks, a program including another program's header, a library
+   including an app-library, an installed header including an internal library, a library linking a library
+   its row lacks or a program's target, an app-library including a library its row lacks, C++ in a tree no
+   project holds, an exception whose edge is gone, and an `install()` naming an internal library's target or
+   directory (eleven cases; each exits 1 with the line that names what is wrong, the clean tree exits 0).
+5. **The checks beside it found what still read the old table.** `tools/n1b/check_pages.py`, one of the
+   checks every stage runs, opened `layering.json` and failed on the first run, and so did a test of
+   `test_layoutdef.py`; `violations.py` and the README of `tools/n1b` named it too. They read `projects.json`
+   now (the libraries are the projects of the kind `library`). The history of the consolidation
+   (`planning/consolidation.md`, `planning/layout*.md`) keeps naming `layering.json`, as it should: it is what
+   the table was.
+
+**Found, and not C7's.** The shared Debug tree still fails to link `iclforge-iab-tests`, `fuzz_iec61937_unwrap`
+does not compile (since C3), and the fixed-point AC-4 probe exits 1 in both trees, over its stack ceiling.
+
+**The proof,** on this machine (WSL2 on Windows 11, GCC 16 and Clang 22, Qt 6.10; the parent is
+`chore/monorepo-c7-4` at `2a41e3223`, whose code is `3f0e11b67`'s, built in `build/wt/c74`; the stage's tree in
+`build/wt/c75` at `f28611215`; the commits after it are a docstring's wrapping, the `tools/n1b` readers of the
+table and this record):
+
+| proof | result |
+|---|---|
+| builds, `-Werror`, every default target, the GUI on and off | GCC 16 and Clang 22 clean in both; the shared Debug tree has the one failure it had before (`iclforge-iab-tests` does not link) |
+| the whole ctest, GCC and Clang (GUI on) | 3,582 of 3,582 pass in each; 3,580 test cases in the JUnit files, 3,575 pass and 5 skip in each, and the outcome of each, by name, is identical to the parent's |
+| ctest's names | identical on the five trees: 3,582 (GUI on, GCC and Clang), 3,546 (GUI off), 3,189 (shared Debug) |
+| pinned bitstream hashes, CLI corpus (44 commands), exported names of the shared libraries, installed tree, public headers | identical, including `pins_blob` and what every command prints |
+| `.text` of the installed binaries (`git describe` pinned, both compilers) | all 13 ELF files have identical `.text` (5 byte-identical) and so has every member of the 9 static archives (171) |
+| flags of every unit (`flags_diff.py`) and of every archive and link step (`--links`) | all 913 units (GCC and Clang) and 803 (shared) pair, and 88, 72 and 68 link steps; none differs in any flag |
+| IR of every unit (tests included, Clang 22, two source trees whose paths are as long as each other) | 798 units: 795 identical and 3 differing, in the strings that hold `git describe` (the commit count and the two hashes, in `libs/base/src/version.cpp` and in two variants of Hearth's network controller); the new tree is `622720b80`'s |
+| C and C++ edits since the parent (`c7_pathonly.py`) | 1 file, `libs/dsp/src/tiered/real_functions.hpp`, which differs in a comment (it names `projects.json`) |
+| bare-metal probes (QEMU, `--icount`) | five variants: the probes' own key=value lines identical; the fixed-point AC-4 probe exits 1 in both trees, over its stack ceiling, as before |
+| libFuzzer harnesses (Clang, `ICLFORGE_BUILD_FUZZERS`) | the same 20 of 21 build and the same one does not (`fuzz_iec61937_unwrap`, since C3); 18 replay their inputs and exit 0 in both; two have none |
+| `check_layering.py`, `check_namespaces.py`, `check_pages.py`, `check_doc_paths.py` | 30 projects, 1,949 edges between them (1,811 includes, 138 link lines), 45 excused by 5 exceptions, 0 known debts, 0 failures; 172 public headers, 0 failures, 4 known debts; 0 problems; 0 missing of 6,508 checked |
+| the check on the real table with a violation put in | eleven cases (finding 4): each exits 1 with the expected message; the clean tree exits 0 |
+| the static job's other checks and the unit tests of `tools/` | `check_corpus.py`, `check_packaging_versions.sh`, `check_platform_matrix.py`, `check_esp_efuse_free.py`, `check_android_jni.py`, `generate_support_matrices.py --check` and the AC-4 table generators pass; `tools/checks` 445, `tools/ci` 586, `tools/hearth` 102, `tools/n1b` 495 tests pass |
+| `precheck.py --unit`, `mkdocs build --strict`, `ruff check .` | pass; ruff finds what it found in the parent (29 findings in each) |
+| the CI planners | the same answers for 3,228 files and for the last 60 commits |
+
+No file the images, extensions or packages read is among the stage's: its changes are the table and the tools
+that read it, the pages that describe them, the static job's step and two comments.
+
+**Not run here, and recorded rather than skipped:** MSVC `/W4 /WX` and clang-cl; macOS; the Android build;
+the Windows and macOS halves of the notices; the ESP-IDF images and the boards, the Python, Rust, npm and
+ESPHome suites and the packages (nothing they read changed); SonarCloud and CodeQL; the workflows themselves,
+the static job's included (its steps ran one by one).
+
+**What C7-5 leaves, and with it C7.** Three things, each by its decision and none the user's to take again:
+the planner reads `projects.json` instead of prefixes (decision 12: `classify_changes.py` and `plan_gate.py`
+answer as they did, and the manifest and the check they need are here); the scripts of `tools/n1b/` are
+retired once the user has done with them (decision 13: `adapt_branch.ps1` and the move maps stay); and
+`.git-blame-ignore-revs`, which the consolidation stages did not extend either, has no entry for the move
+commits of C7 (`43ecd2401`, `9aa9bfdfb`, `94c3bd8d6`, `030af657f` and `8a0d74baf`). The five exceptions are
+the table's own debts.
