@@ -138,6 +138,7 @@ KNOWN_NON_GUI = (
     "libs/",
     "external/",
     "tests/",
+    "testdata/",
     "tools/fuzz/",
     "examples/",
     "apps/forge/cli/",

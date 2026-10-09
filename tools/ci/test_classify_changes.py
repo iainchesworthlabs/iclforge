@@ -193,6 +193,13 @@ class SatellitesDirectTest(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertEqual(lit(self.classify(path), *ALL_LANES), {lane})
 
+    def test_the_golden_data_is_core_s_and_a_known_tree(self):
+        # testdata/ was tests/golden: a top-level directory the classifier does not know lights
+        # every lane.
+        hits = self.classify("testdata/audio/reference_51.wav")
+        self.assertTrue(hits["core"])
+        self.assertFalse(hits["docs"] or hits["ci_self"] or hits["npm"])
+
     def test_a_core_change_and_a_satellite_change_together_light_both(self):
         hits = self.classify("libs/ac4/src/x.cpp", "bindings/rust/iclforge/src/lib.rs")
         self.assertEqual(lit(hits, *ALL_LANES), {"core", "windows", "linux", "macos", "rust"})

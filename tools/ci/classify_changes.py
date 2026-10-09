@@ -53,8 +53,8 @@ APP_TESTS = (
 )
 LANE_PREFIXES: dict[str, tuple[str, ...]] = {
     "core": (
-        "libs/", "external/", "tests/", "tools/fuzz/", "cmake/", "tools/checks/", "tools/ci/",
-        "requirements/", *APP_TESTS,
+        "libs/", "external/", "tests/", "testdata/", "tools/fuzz/", "cmake/", "tools/checks/",
+        "tools/ci/", "requirements/", *APP_TESTS,
     ),
     "windows": (
         "notices/forge/platform/windows/", "packaging/winget/",
