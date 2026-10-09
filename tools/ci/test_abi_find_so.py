@@ -5,6 +5,7 @@ has libs/ and no src/ (HEAD), or src/ and no libs/ (the base release), or neithe
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
@@ -20,7 +21,9 @@ def find_so_source() -> str:
     return textwrap.dedent(match.group(0))
 
 
-@unittest.skipUnless(shutil.which("bash"), "needs bash")
+# On Windows `bash` on the PATH is usually the WSL launcher, not a shell this test can run; the
+# step it covers runs on the Linux job.
+@unittest.skipUnless(sys.platform != "win32" and shutil.which("bash"), "needs a POSIX bash")
 class FindSo(unittest.TestCase):
     def run_in(self, tree: dict[str, str], build: str = "build") -> subprocess.CompletedProcess:
         with tempfile.TemporaryDirectory() as tmp:
