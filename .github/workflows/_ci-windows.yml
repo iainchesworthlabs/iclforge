@@ -504,10 +504,17 @@ jobs:
       # failed identically, on unrelated branches, with forge's own 2,183
       # tests all passing and the gate's FFmpeg step ([2] ac3: FFmpeg strict
       # decode) dying on a segfault (exit 139). Nothing in this repository
-      # changed the download; the file behind the URL did. autobuild-2026-09-
-      # 20-13-11 is the build "latest" resolved to when this leg last passed.
-      # A dated tag's asset is immutable, so this can only change by editing
-      # this line - which is the point.
+      # changed the download; the file behind the URL did.
+      #
+      # The tag is a MONTH-END autobuild, not a daily one. BtbN keeps roughly
+      # the last ten daily tags and deletes the rest, and the daily tag this
+      # step first pinned (autobuild-2026-09-20-13-11) was gone by 2026-10-09:
+      # the download answered 404 and the leg died before it built anything.
+      # The month-end tags (2026-03-31, -04-30 ... -08-31) are the ones left
+      # standing. autobuild-2026-08-31-13-27 predates the 2026-09-22 builds
+      # that segfaulted. When a newer month-end tag is wanted, edit this line
+      # and check that the tag is listed by
+      #   gh api repos/BtbN/FFmpeg-Builds/releases --paginate --jq '.[].tag_name'
       - name: Install ffmpeg (Windows ARM64)
         if: matrix.gold_reference && matrix.preset == 'windows-msvc-arm64'
         shell: powershell
@@ -519,7 +526,7 @@ jobs:
           $ProgressPreference = 'SilentlyContinue'
           $zip = Join-Path $env:RUNNER_TEMP 'ffmpeg-winarm64.zip'
           $dest = Join-Path $env:RUNNER_TEMP 'ffmpeg-winarm64'
-          Invoke-WebRequest -Uri 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-20-13-11/ffmpeg-n8.1.2-267-gb2f422d306-winarm64-gpl-8.1.zip' -OutFile $zip
+          Invoke-WebRequest -Uri 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-31-13-27/ffmpeg-n8.1.2-50-g1a748fe2cd-winarm64-gpl-8.1.zip' -OutFile $zip
           Expand-Archive -Path $zip -DestinationPath $dest
           $exe = Get-ChildItem -Path $dest -Recurse -Filter 'ffmpeg.exe' | Select-Object -First 1
           if (-not $exe) {
