@@ -10,7 +10,7 @@ that spends it. tools/listening/score_listening_test.py turns the responses
 back into the table there.
 
 It measures the same three legs as the landscape comparison, read from
-tests/golden/external-baseline/manifest.json so the two never drift apart:
+testdata/external-baseline/manifest.json so the two never drift apart:
 
   ac3-51-448       AC-3,   5.1,    448 kbit/s
   eac3-stereo-192  E-AC-3, stereo, 192 kbit/s
@@ -20,7 +20,7 @@ and, per leg, these conditions:
 
   reference    the source WAV itself, presented as the hidden reference
   iclforge     this build's encode (forge, run here)
-  ffmpeg       the committed tests/golden/external-baseline/<leg>/ffmpeg.*
+  ffmpeg       the committed testdata/external-baseline/<leg>/ffmpeg.*
   dee          the committed .../dee.* - only where the manifest carries a
                real score for it. DEE's own two 5.1 legs are marked
                unverified there (that build drops the Ls channel; see
@@ -101,7 +101,7 @@ from quality_race import (  # noqa: E402
     write_wav_f32,
 )
 
-BASELINE_DIR = REPO / "tests" / "golden" / "external-baseline"
+BASELINE_DIR = REPO / "testdata" / "external-baseline"
 MANIFEST = BASELINE_DIR / "manifest.json"
 
 # BS.1534-3 §5.2: the 3.5 kHz low-pass anchor is mandatory, the 7 kHz one

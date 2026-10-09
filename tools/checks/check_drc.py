@@ -390,7 +390,7 @@ def check_eac3(cli: str, tmp: Path) -> None:
     print("  note  E-AC-3 compr is unverifiable here: ffmpeg's Annex E header")
     print("        parser skips the compression word, so -heavy_compr is inert.")
     print("        Covered instead by tools/references/eac3_parse.py and "
-          "tests/ac3/meta/test_drc.cpp.")
+          "libs/ac3/tests/meta/test_drc.cpp.")
 
 
 def main() -> None:

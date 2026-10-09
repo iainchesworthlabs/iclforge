@@ -133,10 +133,10 @@ folder they were opened from. The status messages the log carries name files the
 message somebody adds later, which is the other reason the file is written where you choose,
 yours to read, rather than sent.
 
-The rule lives in `apps/gui/gui_diagnostics.hpp` and is held in two places: structurally, because
+The rule lives in `apps/forge/gui/src/gui_diagnostics.hpp` and is held in two places: structurally, because
 the report is composed from named fields and there is no field for a key or for sample data; and by
 a final pass that replaces every spelling of the two signing values with `<withheld>`.
-`tests/gui/test_gui_diagnostics.cpp` holds it on every CI leg, including the ones that build no
+`apps/forge/gui/tests/test_gui_diagnostics.cpp` holds it on every CI leg, including the ones that build no
 window, and `tst_diagnostics.qml` holds the other half — that the controller fills those fields
 from what the window is actually showing.
 
@@ -173,7 +173,7 @@ the tier the window opens in.
 Most of what this page describes is checked by reading the code. The Qt Quick suites hold a named,
 countable part of it, and that part is a good deal smaller than **What can be done without a mouse**
 and **What a screen reader is told** above. They are built where the window is built with
-`ICLFORGE_BUILD_TESTS` on, one ctest entry per `tst_*.qml` (`apps/gui/tests/CMakeLists.txt`), and
+`ICLFORGE_BUILD_TESTS` on, one ctest entry per `tst_*.qml` (`apps/forge/gui/tests/qml.cmake`), and
 they run under the offscreen platform, which has no accessibility bridge, so they read the
 properties a bridge would read and leave what a screen reader does with them untested.
 

@@ -1,3 +1,34 @@
+iclforge::ac4::Decoder::Decoder()
+iclforge::ac4::Decoder::Decoder(iclforge::ac4::Decoder&&)
+iclforge::ac4::Decoder::Decoder(iclforge::ac4::DecoderConfig const&)
+iclforge::ac4::Decoder::decode(std::span<std::byte const, 18446744073709551615ul>)
+iclforge::ac4::Decoder::decode_by_block(std::span<std::byte const, 18446744073709551615ul>, iclforge::ac4::BlockSink)
+iclforge::ac4::Decoder::flush(iclforge::ac4::BlockSink)
+iclforge::ac4::Decoder::latency_samples() const
+iclforge::ac4::Decoder::metadata() const
+iclforge::ac4::Decoder::operator=(iclforge::ac4::Decoder&&)
+iclforge::ac4::Decoder::output() const
+iclforge::ac4::Decoder::parse(std::span<std::byte const, 18446744073709551615ul>)
+iclforge::ac4::Decoder::presentations() const
+iclforge::ac4::Decoder::refusal_reason() const
+iclforge::ac4::Decoder::reset()
+iclforge::ac4::Decoder::set_output(iclforge::ac4::OutputConfig const&)
+iclforge::ac4::Decoder::set_presentation(iclforge::ac4::PresentationChoice const&)
+iclforge::ac4::Decoder::~Decoder()
+iclforge::ac4::Encoder::Encoder(iclforge::ac4::Encoder&&)
+iclforge::ac4::Encoder::Encoder(std::unique_ptr<iclforge::ac4::Encoder::Impl, std::default_delete<iclforge::ac4::Encoder::Impl> >)
+iclforge::ac4::Encoder::codec_mode() const
+iclforge::ac4::Encoder::create(iclforge::ac4::EncoderConfig const&)
+iclforge::ac4::Encoder::decoder_delay_samples() const
+iclforge::ac4::Encoder::delay_samples() const
+iclforge::ac4::Encoder::encode(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>)
+iclforge::ac4::Encoder::encode(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>, std::span<iclforge::ac4::ObjectMetadataUpdate const, 18446744073709551615ul>)
+iclforge::ac4::Encoder::encode(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>, std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>)
+iclforge::ac4::Encoder::flush()
+iclforge::ac4::Encoder::operator=(iclforge::ac4::Encoder&&)
+iclforge::ac4::Encoder::refusal_reason(iclforge::ac4::EncoderConfig const&)
+iclforge::ac4::Encoder::toc() const
+iclforge::ac4::Encoder::~Encoder()
 iclforge::ac4::SyncFrameSplitter::commit(unsigned long)
 iclforge::ac4::SyncFrameSplitter::consume(unsigned long)
 iclforge::ac4::SyncFrameSplitter::next()
@@ -8,7 +39,14 @@ iclforge::ac4::configuration_difference(iclforge::ac4::Toc const&, iclforge::ac4
 iclforge::ac4::dac4_refusal(iclforge::ac4::Toc const&)
 iclforge::ac4::dash_channel_configuration(iclforge::ac4::Toc const&)
 iclforge::ac4::dash_supplemental_properties(iclforge::ac4::Toc const&)
+iclforge::ac4::describe(iclforge::ac4::DecodeError)
+iclforge::ac4::describe(iclforge::ac4::DecodingMode)
+iclforge::ac4::describe(iclforge::ac4::DownmixTarget)
+iclforge::ac4::describe(iclforge::ac4::DrcMode)
+iclforge::ac4::describe(iclforge::ac4::EncodeError)
 iclforge::ac4::describe(iclforge::ac4::Error)
+iclforge::ac4::describe(iclforge::ac4::SubstreamRole)
+iclforge::ac4::describe(iclforge::base::Speaker)
 iclforge::ac4::frame_rate(iclforge::ac4::Toc const&)
 iclforge::ac4::media_timing(iclforge::ac4::Toc const&)
 iclforge::ac4::parse_raw_frame(std::span<std::byte const, 18446744073709551615ul>)
@@ -16,4 +54,7 @@ iclforge::ac4::presentation_channel_count(iclforge::ac4::Toc const&)
 iclforge::ac4::rfc6381_codec_string[abi:cxx11](iclforge::ac4::Toc const&)
 iclforge::ac4::samples_per_frame(iclforge::ac4::Toc const&)
 iclforge::ac4::scan(std::span<std::byte const, 18446744073709551615ul>)
+iclforge::ac4::select_presentation(iclforge::ac4::Toc const&, iclforge::ac4::PresentationChoice const&, int)
 iclforge::ac4::signalled_presentation(iclforge::ac4::Toc const&)
+iclforge::ac4::sync_frame(std::span<std::byte const, 18446744073709551615ul>, bool)
+std::_Sp_make_shared_tag::_S_ti()::__tag

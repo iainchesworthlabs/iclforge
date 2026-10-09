@@ -32,61 +32,102 @@ rather than none of them.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from collections.abc import Iterable
+from pathlib import Path
 
-# Directory prefixes that put a changed path in a lane. A path can land in
-# more than one lane - apps/cli/ is windows AND linux AND macos, because it
-# is one desktop CLI built and tested on all three, not three separate
-# programs. Every prefix ends in "/" so a differently-named sibling directory
-# that merely starts with the same characters cannot accidentally match.
-LANE_PREFIXES: dict[str, tuple[str, ...]] = {
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "checks"))
+
+import project_graph
+
+# The projects of the tree, their lanes and what they ship: tools/checks/projects.json.
+TABLE = project_graph.load_table()
+
+# A project's tree lights the lanes its row of tools/checks/projects.json names. A path can land in
+# more than one lane - apps/forge/ is windows AND linux AND macos, because it is one desktop
+# program built and tested on all three, not three separate programs. A project that ships
+# libraries as source (the ESP-IDF component's `ships`) lights its lanes for those too. What the
+# table does not hold - the notices and packaging of the products, the tools and the build files -
+# is listed here. Every prefix ends in "/" so that a differently-named sibling directory that
+# merely starts with the same characters cannot accidentally match.
+# A program's tests are beside it (planning/monorepo.md), and the Catch2 binaries among them are
+# core's still, as they were in tests/: the Qt Quick suites that sat next to the windows stay with
+# the program. A directory that holds both kinds names its Catch2 files by their test_ prefix.
+APP_TESTS = (
+    "apps/forge/cli/tests/", "apps/shared/media/tests/", "apps/shared/preferences/tests/",
+    "apps/hearth/engine/tests/", "apps/crucible/engine/tests/",
+    "apps/forge/gui/tests/test_", "apps/hearth/ui/tests/test_hearth_controller.cpp",
+    "apps/crucible/ui/tests/test_desktop_entries.cpp",
+    "apps/crucible/ui/tests/test_translations.cpp",
+)
+EXTRA_PREFIXES: dict[str, tuple[str, ...]] = {
     "core": (
-        "src/", "tests/", "fuzz/", "cmake/", "tools/checks/", "tools/ci/", "requirements/",
+        "testdata/", "tools/fuzz/", "cmake/", "tools/checks/", "tools/ci/", "requirements/",
+        *APP_TESTS,
     ),
     "windows": (
-        "apps/windows/", "apps/notices/platform/windows/", "packaging/winget/",
+        "notices/forge/platform/windows/", "packaging/winget/",
         "packaging/conan/", "packaging/vcpkg-port/",
-        "apps/cli/", "apps/gui/", "apps/common/", "apps/crucible/", "apps/hearth/",
+        "notices/crucible/", "notices/hearth/", "notices/fragments/", "notices/licences/",
     ),
     "linux": (
-        "apps/linux/", "apps/notices/platform/linux/",
+        "notices/forge/platform/linux/",
         "packaging/conan/", "packaging/vcpkg-port/",
-        "apps/cli/", "apps/gui/", "apps/common/", "apps/crucible/", "apps/hearth/",
+        "notices/crucible/", "notices/hearth/", "notices/fragments/", "notices/licences/",
     ),
     "macos": (
-        "apps/notices/platform/macos/", "packaging/homebrew/",
+        "notices/forge/platform/macos/", "packaging/homebrew/",
         "packaging/conan/", "packaging/vcpkg-port/",
-        "apps/cli/", "apps/gui/", "apps/common/", "apps/crucible/", "apps/hearth/",
+        "notices/crucible/", "notices/hearth/", "notices/fragments/", "notices/licences/",
     ),
-    "android": ("apps/android/",),
-    "wasm": ("apps/wasm/", "js/"),
     # tools/packaging/ holds only pack_esp_component.py (the ESP-IDF
     # component/ESPHome workflow's own packaging step) - see docs/ci-lanes.md.
-    # src/ac3/, src/base/, src/dsp/, src/objects/, src/render/, src/iec61937/,
-    # src/arithmetic/ and cmake/ are the trees that script stages
-    # into the component (its STAGED_TREES, and the root CMakeLists.txt in
-    # ESP_ROOT_FILES below): the run after a merge leaves a core change to the
-    # nightly run for every other satellite, and these are the exception,
-    # because a change there is what breaks the package and the QEMU images
-    # (a new tree missing from the pack list stopped the ESP-IDF configure on
-    # 2026-09-29). The AC-4 trees are staged only for `--with-ac4` and stay
-    # with the nightly run.
-    "esp": (
-        "esp-idf/", "esphome/", "apps/baremetal/", "tools/packaging/",
-        "src/ac3/", "src/base/", "src/dsp/", "src/objects/", "src/render/",
-        "src/iec61937/", "src/arithmetic/", "cmake/",
-    ),
-    "rust": ("rust/",),
-    # examples/python/ alongside python/ itself - the rest of examples/ is
-    # plain C++, already core's concern via its own build, not this lane's.
-    "python": ("python/", "examples/python/"),
-    # js/ package unit tests, not the wasm E2E demo - see wasm above. Left out
-    # of CORE_FANOUT below on purpose: a core-only change does not need the
-    # npm package's own tests run, only the platforms that embed core.
-    "npm": ("js/",),
+    # The libraries that script stages into the component (its STAGED_TREES) are the component's
+    # `ships` in the table, and cmake/ and the root CMakeLists.txt (ESP_ROOT_FILES below) are
+    # staged too: the run after a merge leaves a core change to the nightly run for every other
+    # satellite, and these are the exception, because a change there is what breaks the package
+    # and the QEMU images (a new tree missing from the pack list stopped the ESP-IDF configure on
+    # 2026-09-29). The AC-4 trees are staged only for `--with-ac4` and stay with the nightly run.
+    "esp": ("tools/packaging/", "cmake/"),
+    # examples/python/ alongside bindings/python/ itself - the rest of examples/ is
+    # plain C++, built by core, not this lane.
+    "python": ("examples/python/",),
     "ci_self": (".github/workflows/", ".github/actions/", ".github/toolchain/"),
     "docs": ("docs/",),
+}
+
+
+def _lane_prefixes() -> dict[str, tuple[str, ...]]:
+    prefixes: dict[str, list[str]] = {
+        lane: list(EXTRA_PREFIXES.get(lane, ())) for lane in (*TABLE.lanes, "ci_self", "docs")
+    }
+    for project in TABLE.projects.values():
+        trees = [project.path + "/", *(TABLE.projects[name].path + "/" for name in project.ships)]
+        for lane in project.lanes:
+            prefixes[lane].extend(trees)
+    return {lane: tuple(found) for lane, found in prefixes.items()}
+
+
+LANE_PREFIXES: dict[str, tuple[str, ...]] = _lane_prefixes()
+
+# A library keeps its tests and fuzz targets beside its code (planning/monorepo.md):
+# libs/<lib>/tests/ and libs/<lib>/fuzz/. They were outside src/, in tests/ and fuzz/, so a lane
+# that names a library's own tree does not take them: a test-only change does not light the
+# ESP-IDF lane.
+LIBRARY_CONSUMERS = re.compile(r"^libs/[^/]+/(?:tests|fuzz)/")
+# Crucible's Windows driver and Linux tray VM sit in apps/crucible/, which the three desktop lanes
+# take whole; each is one platform's only (they were top-level trees of their own). Forge's five
+# notice fragments were in a tree no lane named, so a change to one lit every lane, and still does:
+# they are named here, among the fragments the desktop lanes take, to be left out of all three.
+FORGE_FRAGMENTS = r"notices/fragments/(?:forge-|qt-linux|qt-macos|qt-windows)"
+LANE_EXCLUDES: dict[str, re.Pattern[str]] = {
+    # the Python examples are the python lane's, though the table puts examples/ in core
+    "core": re.compile(r"^examples/python/"),
+    "esp": LIBRARY_CONSUMERS,
+    "windows": re.compile(rf"^(?:apps/crucible/linux/|{FORGE_FRAGMENTS})"),
+    "linux": re.compile(rf"^(?:apps/crucible/windows/|{FORGE_FRAGMENTS})"),
+    "macos": re.compile(rf"^(?:apps/crucible/(?:windows|linux)/|{FORGE_FRAGMENTS})"),
 }
 
 # Root-level files matched by exact name, not a directory prefix - a nested
@@ -142,9 +183,15 @@ def classify(
         saw_path = True
         matched = False
         for lane, prefixes in LANE_PREFIXES.items():
-            if path.startswith(prefixes):
+            excluded = LANE_EXCLUDES.get(lane)
+            if path.startswith(prefixes) and not (excluded and excluded.match(path)):
                 hits[lane] = True
                 matched = True
+        # A file an excused edge reaches (a header of the ESP-IDF component that a library's tests
+        # include) is also a change to the project that includes it.
+        for includer in TABLE.reached_from(path):
+            for lane in includer.lanes:
+                hits[lane] = True
         if "/" not in path and path in CORE_ROOT_FILES:
             hits["core"] = True
             matched = True

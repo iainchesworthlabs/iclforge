@@ -2,7 +2,7 @@
 
 This project's AC-3 encoder scores about 3 dB below FFmpeg's at matched
 bitrate on the landscape leg (`ac3-51-448`). Two structural explanations are
-visible in src/ac3/src/encoder/encoder.cpp, and they are not distinguishable
+visible in libs/ac3/src/encoder/encoder.cpp, and they are not distinguishable
 from a single overall SNR number:
 
   shared fine SNR offset   Every channel is written the same `fsnroffst`
@@ -56,7 +56,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ci"))
 import quality_race as qr  # CLI path, WAV IO, alignment
 
 REPO = Path(__file__).resolve().parent.parent.parent
-SOURCE = REPO / "tests" / "golden" / "audio" / "reference_51.wav"
+SOURCE = REPO / "testdata" / "audio" / "reference_51.wav"
 # reference_51.wav's channel order, for labelling only.
 CHANNELS = ["L", "R", "C", "LFE", "Ls", "Rs"]
 

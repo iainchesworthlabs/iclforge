@@ -10,7 +10,7 @@ starts being made, and tracks the mechanical pieces that exist versus the ones s
 
 `docs/library/header-map.md` lists the headers a caller normally reaches for, but stops short of
 saying which of them a `v1.0.0` compatibility promise actually covers. It doesn't cover all of
-them equally: a chunk of what's under `src/ac3/include/iclforge/ac3/` is bitstream/DSP machinery the
+them equally: a chunk of what's under `libs/ac3/include/iclforge/ac3/` is bitstream/DSP machinery the
 encoder and decoder share internally, installed today because splitting the install set is more
 CMake complexity than the problem has earned so far, not because a caller is expected to include
 it directly. Four tiers, assigned per header below:
@@ -30,7 +30,7 @@ it directly. Four tiers, assigned per header below:
 
 | Header(s) | Tier |
 |---|---|
-| `iclforge/ac3/core/tables.hpp` | Public — `SampleRate`, `Acmod` and the frame constants appear directly in public function signatures everywhere. |
+| `iclforge/ac3/core/types.hpp`, `tables.hpp` | Public — `SampleRate`, `Acmod` and the frame constants appear directly in public function signatures everywhere, and `silent_frame.hpp` sizes a syncframe by Table 5.18. |
 | `iclforge/ac3/core/eac3_tables.hpp` | Public — `chanmap` and `ChannelPlan` are likewise part of `plan.hpp`'s own public surface. |
 | `iclforge/base/layout.hpp`, `downmix_target.hpp` | Public — `Location`, `Layout` and `DownmixTarget` appear in public signatures (`plan.hpp`, the output stage, the renderer) and keep the tier of the headers they left. |
 | `iclforge/base/bitreader.hpp`, `bitwriter.hpp` | Internal — bitstream I/O primitives, never called directly by a caller using the encoder/decoder API. |
@@ -49,35 +49,37 @@ it directly. Four tiers, assigned per header below:
 | `iclforge/ac3/meta/bsi.hpp`, `drc.hpp`, `loudness.hpp`, `mixing.hpp`, `qc.hpp` | Public. |
 | `iclforge/render/spatial.hpp` | Public. |
 | `iclforge/render/layout.hpp`, `render.hpp`, `routing.hpp`, `trim_delay.hpp`, `identify.hpp`, `float_biquad.hpp` | **Experimental** — the output layout, renderer and speaker management the ESP32 player and Hearth share ([Hearth reference-player plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-reference-player.md)), outside the `v1.0.0` freeze while Hearth's phases settle their shape; see [Experimental modules](#experimental-modules). |
-| `iclforge/ac3/oba/atmos.hpp`, `joc.hpp`, `oamd.hpp`, `motion.hpp`, `scene.hpp`, `scene_osc.hpp` | Public — `iclforge::oba::joc` included, now that AP2 folded it into `iclforge::oba` proper. |
+| `iclforge/ac3/oba/atmos.hpp`, `joc.hpp`, `oamd.hpp`, `motion.hpp`, `scene.hpp`, `scene_osc.hpp` | Public — `iclforge::objects::oba::joc` included, now that AP2 folded it into `iclforge::oba` proper. |
 | `iclforge/objects/joc_domain.hpp` | Public — `joc::Domain` is selected through `AtmosConfig` and `reconstruct()`, as it was in `joc.hpp`. |
 | `iclforge/objects/emdf.hpp` | Public. |
-| `iclforge/ac3/emdf/frame_layout.hpp` | Internal — the bit-accurate frame walk `strip_objects` and `iclforge::signing` share; a caller uses them, not it. |
+| `iclforge/ac3/emdf/frame_layout.hpp` | Internal — the bit-accurate frame walk `strip_objects` and `iclforge::ac3::signing` share; a caller uses them, not it. |
 | `iclforge/objects/placement.hpp` | Public — `ObjectPlacement` is what `AtmosEncoder::encode_frame` takes, as it was when `atmos.hpp` declared it. |
-| `iclforge/iec61937/iec61937.hpp` | Public. |
+| `iclforge/containers/iec61937/iec61937.hpp` | Public. |
 | `iclforge/dsp/qmf.hpp` | Public — `oba::joc::Domain::kQmf` is selected through public `AtmosConfig`. |
 | `iclforge/dsp/biquad.hpp`, `resampler.hpp` | Public — `dsp::resample`/`resample_planar` is a documented multi-source-rate-conversion utility, not purely an implementation detail (see `header-map.md`). |
-| `iclforge/ac3/analysis/levels.hpp` | Public. |
+| `iclforge/ac3/analysis/levels.hpp`, `iclforge/base/levels.hpp`, `iclforge/base/loudness.hpp` | Public — the base meters keep the tier of the AC-3 headers they left, whose names stay as aliases for a release. |
 | `iclforge/ac3/quality/distortion.hpp`, `perceptual.hpp` | Public. |
 | `iclforge/ac3/latency.hpp` | Public. |
 | `iclforge/ac3/verify/mirror.hpp`, `selfcheck.hpp`, `eac3_mirror.hpp`, `eac3_selfcheck.hpp`, `trace_export.hpp`, `bap_census.hpp` | Diagnostic. |
 | `ac3/audio/*` | In-tree only (unchanged). |
 | `matroska/`, `mp4/`, `mpegts/` mux + demux headers | Public — each is its own installed target with its own `SOVERSION`. |
 | `iclforge/adm/ac3adm.hpp`, `model.hpp` | Public within its own opt-in module (`-DICLFORGE_BUILD_ADM=ON`); see [Experimental modules](#experimental-modules) for why this is not the same as "frozen." |
-| `iclforge/admbridge/bridge.hpp`, `iab_bridge.hpp`, `coordinates.hpp` | Public, same opt-in caveat. |
+| `iclforge/adm/bridge.hpp`, `iab_bridge.hpp`, `coordinates.hpp` | Public, same opt-in caveat. |
 | `iclforge/iab/ac3iab.hpp`, `model.hpp`, `mxf.hpp` | **Experimental** — see below; not part of the `v1.0.0` freeze despite being installed and default-on today. |
-| `iclforge/iamf/iamf.hpp` | **Experimental** — a new module, which starts there (see below); installed and default-on. |
-| `iclforge/ac4/ac4.hpp`, `iclforge/ac4dec/decoder.hpp`, `iclforge/ac4enc/encoder.hpp` | **Experimental** — the AC-4 inspector, decoder and encoder, installed and default-on; see below. |
-| `iclforge/ac4/syntax.hpp` | Diagnostic — the AC-4 syntax trace the decoder and encoder write, as `iclforge/ac3/decoder/syntax_trace.hpp` is for AC-3 and E-AC-3. |
+| `iclforge/containers/iamf/iamf.hpp` | **Experimental** — a new module, which starts there (see below); installed and default-on. |
+| `iclforge/ac4/core/toc.hpp`, `iclforge/ac4/decoder/decoder.hpp`, `iclforge/ac4/encoder/encoder.hpp` | **Experimental** — the AC-4 inspector, decoder and encoder, installed and default-on; see below. |
+| `iclforge/ac4/core/syntax.hpp` | Diagnostic — the AC-4 syntax trace the decoder and encoder write, as `iclforge/ac3/decoder/syntax_trace.hpp` is for AC-3 and E-AC-3. |
 | `iclforge_c/iclforge.h` | Public — its own narrower promise, see [C API](c-api.md). |
-| `iclforge/signing/signing_key.hpp`, `emdf_atmos_signer.hpp` | Public. |
+| `iclforge/base/crypto/signing_key.hpp`, `iclforge/ac3/signing/emdf_atmos_signer.hpp` | Public. |
+| `iclforge/base/crypto/sha256.hpp`, `hmac_sha256.hpp` | Internal — the hash and the MAC the signer computes its tag with, installed with `iclforge::base`; a caller signs and verifies through `emdf_atmos_signer.hpp`. |
 
 **The `detail` namespace convention is unaffected by a header's tier.** Five public headers
 (`silent_frame.hpp`, `meta/drc.hpp`, `core/tables.hpp`, `core/window.hpp`, `core/crc16.hpp`)
 declare a `namespace detail` alongside their public surface, rather than splitting a private
 helper into its own file. That split already means what this page needs it to mean: nothing
 inside `namespace detail`, in any header at any tier, is covered by any compatibility promise —
-codifying an existing convention as policy, not introducing a new one.
+codifying an existing convention as policy, not introducing a new one. A `detail/` directory
+is the other spelling of the same thing, and is not installed.
 
 ## SemVer and deprecation policy
 
@@ -88,7 +90,7 @@ permitted, and per-header ABI compatibility only holds within a major version (s
 anything, and has (this is what "all releases are prereleases" means to the vcpkg registry
 reviewer's maturity rule).
 
-`ICLFORGE_DEPRECATED` (and each module's own equivalent — `ICLFORGE_MATROSKA_DEPRECATED`,
+`ICLFORGE_DEPRECATED` (and each module's own equivalent — `ICLFORGE_CONTAINERS_DEPRECATED`,
 `ICLFORGE_ADM_DEPRECATED`, and so on, all `generate_export_header()` output) exists in every generated
 export header already, but `DEFINE_NO_DEPRECATED` is passed everywhere it's generated, which
 disables it unconditionally. That's correct for right now: there is no stable symbol yet for
@@ -98,9 +100,9 @@ anything to deprecate *from*. The policy going forward:
   in `CHANGELOG.md` like any other change — a deprecation cycle promises a grace period this
   project isn't promising yet.
 - **At and after `v1.0.0`:** drop `DEFINE_NO_DEPRECATED` from every `generate_export_header()`
-  call (eighteen libraries — `base`, `dsp`, `objects`, `render`, `iec61937`, `ac3`, `capi`,
-  `matroska`, `mp4`, `mpegts`, `adm`, `iab`, `admbridge`, `signing`, `iamf`, `ac4`, `ac4dec`,
-  `ac4enc`; `iclforge::ac3_minimal` has no `SOVERSION` promise to protect and can keep it).
+  call (ten libraries — `base`, `dsp`, `objects`, `render`, `containers`, `ac3`, `capi`, `adm`,
+  `iab` and `ac4`;
+  `iclforge::ac3_minimal` has no `SOVERSION` promise to protect and can keep it).
   A symbol scheduled for removal gets `ICLFORGE_DEPRECATED` (or its module's equivalent) in the
   same minor release its replacement ships, stays for at least one further minor release, and is
   only removed in a major release. No symbol needs this yet, so no macro use is being added by
@@ -108,7 +110,7 @@ anything to deprecate *from*. The policy going forward:
 
 ## SOVERSION
 
-**Deferred**, not decided against. `src/ac3/CMakeLists.txt` (and the other twelve libraries)
+**Deferred**, not decided against. `libs/ac3/CMakeLists.txt` (and the other twelve libraries)
 pin `SOVERSION` to the full `PROJECT_VERSION` today, with the comment already explaining why:
 pre-1.0, no ABI-compatibility promise holds across any two releases, so there is no meaningful
 "compatible" range narrower than an exact match. Flipping every library's `SOVERSION` to just the
@@ -144,7 +146,7 @@ at the C++ symbol level) and share the same "not yet meaningful" argument for st
 ## C API compile-time version
 
 `iclforge_c/iclforge.h` exposes the runtime `iclforge_version()` — what actually got linked.
-`iclforge_c/version.h` (generated from `version.h.in` by `src/capi/CMakeLists.txt`, included from
+`iclforge_c/version.h` (generated from `version.h.in` by `libs/capi/CMakeLists.txt`, included from
 `iclforge.h`) adds `ICLFORGE_C_VERSION_MAJOR`/`MINOR`/`PATCH` and a combined `ICLFORGE_C_VERSION`
 integer, usable in `#if` — the SDK version a translation unit compiled against, which a caller may
 need to gate on before it can even call `iclforge_version()` to check the other one. It also
@@ -168,7 +170,7 @@ already covers the same case without it.
 
 Not every installed, default-on module is part of the `v1.0.0` freeze. `iclforge::iab` (the
 SMPTE ST 2098-2 IAB reader) is real, tested, and default-built (`ICLFORGE_BUILD_IAB`).
-`forge atmos-iab` consumes it through the opt-in `iclforge::admbridge` module, while the GUI does
+`forge atmos-iab` consumes it through the opt-in `iclforge::adm` module, while the GUI does
 not. Its own model is still being built out (the MXF track-file wrapping is read but not written —
 see [Header map](header-map.md)). It is **Experimental**: installed,
 versioned, and functional, but explicitly outside the compatibility promise `v1.0.0` makes for
@@ -182,14 +184,14 @@ decision on this page, the same way `iclforge::iab` will. `iclforge::render` is 
 the ESP32 player and serves the desktop player as well, it has been a library of its own since the
 re-layout, and its speaker management is new with it.
 
-The AC-4 inspector, decoder and encoder (`iclforge::ac4`, `iclforge::ac4dec`, `iclforge::ac4enc`,
-[AC-4](ac4.md)) are Experimental too. Their API has the form
+The AC-4 codec, its inspector, decoder and encoder (`iclforge::ac4`,
+[AC-4](ac4.md)), is Experimental too. Their API has the form
 [planning/ac4.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md) set, and
 the immersive layouts, core decoding and objects came as fields after the ones channel-based
-streams needed. The shared core, `iclforge::ac4core`, has no headers and so no tier. `iclforge::iamf`, the
+streams needed. The core its decoder and encoder share has private headers and so no tier. `iclforge::containers::iamf`, the
 IAMF reader and writer, is Experimental as a new module.
 
-`iclforge::adm` and `iclforge::admbridge` are a different case: also opt-in
+`iclforge::adm` are a different case: also opt-in
 (`-DICLFORGE_BUILD_ADM=ON`), but consumed for real by the ADM→Atmos bridging path and stable in
 shape since the ADM writer and the scene timeline landed. They're Public, not Experimental — opt-in build gating and API maturity
 are independent axes, and conflating "off by default" with "not yet stable" would understate how

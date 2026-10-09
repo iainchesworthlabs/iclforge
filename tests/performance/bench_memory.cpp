@@ -35,8 +35,8 @@
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
 #include "ac4_bench.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 #include "mem_probe.hpp"
 
 namespace {
@@ -331,7 +331,8 @@ Result bench_atmos_4obj_encode(std::vector<std::byte>& stream_out) {
     constexpr int kObjects = 4;
     const Channels channels = make_channels(kObjects);
     const auto views = make_views(channels);
-    std::vector<iclforge::oba::ObjectPlacement> placement(static_cast<std::size_t>(kObjects));
+    std::vector<iclforge::objects::oba::ObjectPlacement> placement(
+        static_cast<std::size_t>(kObjects));
     for (int obj = 0; obj < kObjects; ++obj) {
         placement[static_cast<std::size_t>(obj)] = {
             .position = {.x = 0.2 + 0.2 * obj, .y = 0.5, .z = 0.0}, .gain = 1.0};

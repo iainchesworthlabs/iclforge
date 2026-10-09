@@ -171,7 +171,7 @@ LEGS = {
 # SIMPLE, MOS floor), the first measurement less 1 dB, plus 0.5 dB, plus 0.5 dB and less 0.1.
 # Measured 2026-09-25 with the encoder of phase E2 and the decoder of phase D4, whose QMF banks
 # every decode passes through: they reconstruct to about 78 dB, which bounds the sweeps' SNR.
-# Phase D4's reading of pre-flattening (src/ac4dec/ERRATA.md, "Pre-flattening's direction") moved
+# Phase D4's reading of pre-flattening (libs/ac4/ERRATA.md, "Pre-flattening's direction") moved
 # the ASPX legs' pins from those phase E2 took. The 5.0 and 5.1 legs, measured with the encoder of
 # phase E3, are scored per channel below its own crossover, and a 5.1 leg's LFE over its whole band,
 # where the 140.6 Hz the LFE is coded to (three scale factor bands, as DEE's) leaves the source's
@@ -598,7 +598,7 @@ IMMERSIVE_EXTRA = {
 # of the envelope whatever the patch holds (Part 1 Pseudocodes 94 and 95): the band came back 30
 # to 68 dB under the sweep's energy where DEE's floors, 2^-1 to 2^-11, bring it to 15 to 17 dB
 # under, the tiles landed 4 to 14 dB further from the source's energy than DEE's, and ViSQOL 0.03
-# to 0.18 under DEE's from 256 to 512 kbps. With the floors of src/ac4enc/ERRATA.md's "A noise
+# to 0.18 under DEE's from 256 to 512 kbps. With the floors of libs/ac4/ERRATA.md's "A noise
 # floor for a group whose patch holds nothing" the tiles land 3.5 to 5.7 dB nearer than DEE's,
 # ViSQOL is 0.13 to 0.66 over DEE's in full decoding and 0.05 to 0.65 in core decoding at every
 # A-SPX rate, and the log-spectral distance, still 0.8 to 1.3 dB under DEE's, is 0.4 to 0.7 dB

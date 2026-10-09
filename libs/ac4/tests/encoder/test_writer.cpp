@@ -1,0 +1,389 @@
+// The AC-4 encoder's syntax writer (libs/ac4/src/encoder), each piece read back by
+// what reads AC-4 here: variable_bits() and every Huffman codeword by the
+// decoder's bit reader, the sync frame and its CRC by the inspector's scan,
+// and a whole frame by the inspector and the decoder, whose trace must equal
+// the writer's record for record.
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <utility>
+#include <vector>
+
+#include <catch2/catch_test_macros.hpp>
+
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/core/syntax.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
+#include "encoder/asf/layout.hpp"
+#include "iclforge/base/bitreader.hpp"
+#include "iclforge/base/bitwriter.hpp"
+#include "encoder/frame/drc_gains.hpp"
+#include "encoder/frame/frame_writer.hpp"
+#include "encoder/frame/metadata.hpp"
+#include "decoder/huffman.hpp"
+#include "decoder/pcm/drc.hpp"
+#include "core/tables/huffman_codes.hpp"
+#include "core/tables/huffman_tables.hpp"
+
+namespace {
+
+using iclforge::BitReader;
+using iclforge::BitWriter;
+
+std::vector<iclforge::ac4::SyntaxRecord> records_of(
+    std::span<const iclforge::ac4::SyntaxRecord> all, int substream) {
+    std::vector<iclforge::ac4::SyntaxRecord> out;
+    for (const iclforge::ac4::SyntaxRecord& r : all) {
+        if (r.substream == substream) {
+            out.push_back(r);
+        }
+    }
+    return out;
+}
+
+void require_same(std::span<const iclforge::ac4::SyntaxRecord> written, std::span<const iclforge::ac4::SyntaxRecord> read) {
+    REQUIRE(written.size() == read.size());
+    for (std::size_t i = 0; i < written.size(); ++i) {
+        CAPTURE(i, written[i].name, read[i].name);
+        CHECK(written[i].bit_offset == read[i].bit_offset);
+        CHECK(written[i].bits == read[i].bits);
+        CHECK(written[i].value == read[i].value);
+    }
+}
+
+}  // namespace
+
+TEST_CASE("variable_bits written by the encoder reads back through the decoder's reader", "[ac4][encoder][writer]") {
+    for (const unsigned n : {2U, 3U, 5U, 7U}) {
+        for (std::uint64_t value = 0; value < 3000; value += (value < 300 ? 1 : 37)) {
+            CAPTURE(n, value);
+            BitWriter w;
+            w.write_variable_bits(n, value, "v");
+            w.write(3, 5, "tail");
+            CHECK(w.bit_count() == iclforge::variable_bits_width(n, value) + 3);
+            BitReader r(w.bytes(), 0, {});
+            CHECK(r.variable_bits(static_cast<int>(n), "v") == value);
+            CHECK(r.read(3, "tail") == 5U);
+            CHECK_FALSE(r.overflowed());
+        }
+    }
+}
+
+TEST_CASE("every codeword of every spectral and scale factor codebook reads back as its index",
+          "[ac4][encoder][writer]") {
+    const auto check_book = [](const iclforge::ac4::detail::Codebook& book, std::span<const iclforge::ac4::detail::HuffCode> codes) {
+        CAPTURE(book.name);
+        REQUIRE(codes.size() == book.codebook_length);
+        BitWriter w;
+        for (std::size_t index = 0; index < codes.size(); ++index) {
+            write_codeword(w, codes, index, "cw");
+        }
+        BitReader r(w.bytes(), 0, {});
+        for (std::size_t index = 0; index < codes.size(); ++index) {
+            CHECK(iclforge::ac4::detail::huff_decode(r, book, "cw") == static_cast<int>(index));
+        }
+    };
+    for (std::size_t cb = 1; cb <= 11; ++cb) {
+        check_book(*iclforge::ac4::detail::tables::kAsfSpectrumCodebooks[cb], iclforge::ac4::detail::tables::kAsfSpectrumCodes[cb]);
+    }
+    check_book(iclforge::ac4::detail::tables::kAsfHcbScalefac,
+               iclforge::ac4::detail::tables::kAsfHcbScalefacCodes);
+}
+
+TEST_CASE("a buffered writer's records land where its bits do", "[ac4][encoder][writer]") {
+    std::vector<iclforge::ac4::SyntaxRecord> records;
+    const auto sink = [&](const iclforge::ac4::SyntaxRecord& r) { records.push_back(r); };
+    BitWriter inner = BitWriter::buffered();
+    inner.write(4, 9, "a");
+    inner.write(0, 0, "empty");  // a zero-width element is not recorded
+    inner.write(7, 100, "b");
+    BitWriter outer(3, sink);
+    outer.write(5, 17, "head");
+    outer.append(inner);
+    REQUIRE(records.size() == 3);
+    CHECK(records[1].bit_offset == 5);
+    CHECK(records[1].substream == 3);
+    CHECK(records[2].bit_offset == 9);
+    CHECK(records[2].value == 100);
+    BitReader r(outer.bytes(), 0, {});
+    CHECK(r.read(5, "") == 17U);
+    CHECK(r.read(4, "") == 9U);
+    CHECK(r.read(7, "") == 100U);
+}
+
+TEST_CASE("sync frames carry the raw frame and, with 0xAC41, a CRC the inspector accepts", "[ac4][encoder][writer]") {
+    std::vector<std::byte> raw(300);
+    for (std::size_t i = 0; i < raw.size(); ++i) {
+        raw[i] = static_cast<std::byte>(i * 37 + 11);
+    }
+    for (const bool crc : {false, true}) {
+        CAPTURE(crc);
+        std::vector<std::byte> stream = iclforge::ac4::sync_frame(raw, crc);
+        const std::vector<std::byte> second = iclforge::ac4::sync_frame(raw, crc);
+        stream.insert(stream.end(), second.begin(), second.end());
+        const iclforge::ac4::ScanResult scan = iclforge::ac4::scan(stream);
+        REQUIRE(scan.frames.size() == 2);
+        CHECK_FALSE(scan.stopped_at.has_value());
+        for (const iclforge::ac4::SyncFrame& frame : scan.frames) {
+            CHECK(frame.sync_word == (crc ? 0xAC41 : 0xAC40));
+            CHECK(std::equal(frame.raw_ac4_frame.begin(), frame.raw_ac4_frame.end(), raw.begin(), raw.end()));
+            if (crc) {
+                REQUIRE(frame.crc_ok.has_value());
+                CHECK(*frame.crc_ok);
+            } else {
+                CHECK_FALSE(frame.crc_ok.has_value());
+            }
+        }
+    }
+    // A frame past 0xFFFF bytes takes the 24-bit frame_size.
+    const std::vector<std::byte> big(70000, std::byte{0x5A});
+    const iclforge::ac4::ScanResult scan =
+        iclforge::ac4::scan(iclforge::ac4::sync_frame(big, true));
+    REQUIRE(scan.frames.size() == 1);
+    CHECK(scan.frames[0].raw_ac4_frame.size() == big.size());
+    CHECK(scan.frames[0].crc_ok.value_or(false));
+}
+
+TEST_CASE("a frame of the writer's reads to the end of every substream, with the writer's trace",
+          "[ac4][encoder][writer]") {
+    for (const bool stereo : {true, false}) {
+        for (const std::size_t frame_bytes : {std::size_t{0}, std::size_t{400}, std::size_t{1029}}) {
+            CAPTURE(stereo, frame_bytes);
+            iclforge::ac4::detail::FrameFields fields;
+            fields.ch_mode = stereo ? 1 : 0;
+            fields.sequence_counter = 17;
+            fields.dialnorm_bits = 96;
+            // An element that codes nothing: a long frame with no bands.
+            BitWriter audio = BitWriter::buffered();
+            if (stereo) {
+                audio.write(2, 0, "stereo_codec_mode");
+                audio.write(1, 0, "b_enable_mdct_stereo_proc");
+                for (int track = 0; track < 2; ++track) {
+                    audio.write(1, 0, "spec_frontend");
+                    audio.write(1, 1, "b_long_frame");
+                    audio.write(6, 0, "max_sfb");
+                }
+            } else {
+                audio.write(1, 0, "mono_codec_mode");
+                audio.write(1, 0, "spec_frontend");
+                audio.write(1, 1, "b_long_frame");
+                audio.write(6, 0, "max_sfb");
+            }
+            for (int track = 0; track < (stereo ? 2 : 1); ++track) {
+                audio.write(8, 0, "reference_scale_factor");
+                audio.write(1, 0, "b_snf_data_exists");
+            }
+            std::vector<iclforge::ac4::SyntaxRecord> written;
+            const auto sink = [&](const iclforge::ac4::SyntaxRecord& r) { written.push_back(r); };
+            const auto frame = iclforge::ac4::detail::write_frame(fields, audio, frame_bytes, sink);
+            REQUIRE(frame.has_value());
+            if (frame_bytes > 0) {
+                CHECK(frame->size() == frame_bytes);
+            }
+
+            const auto parsed = iclforge::ac4::parse_raw_frame(*frame);
+            REQUIRE(parsed.has_value());
+            CHECK(parsed->toc.bitstream_version == 2);
+            CHECK(parsed->toc.sequence_counter == 17);
+            CHECK(parsed->toc.frame_rate_index == 13);
+            CHECK(parsed->toc.wait_frames == 0);
+            REQUIRE(parsed->toc.substream_groups.size() == 1);
+            const auto& chan = parsed->toc.substream_groups[0].substreams.at(0).chan;
+            REQUIRE(chan.has_value());
+            CHECK(chan->ch_mode == (stereo ? 1 : 0));
+
+            std::vector<iclforge::ac4::SyntaxRecord> read;
+            const auto reader_sink = [&](const iclforge::ac4::SyntaxRecord& r) {
+                read.push_back(r);
+            };
+            iclforge::ac4::DecoderConfig config;
+            config.syntax = reader_sink;
+            iclforge::ac4::Decoder decoder(config);
+            const auto report = decoder.parse(*frame);
+            REQUIRE(report.has_value());
+            for (const iclforge::ac4::SubstreamReport& substream : report->substreams) {
+                CAPTURE(substream.index, substream.refused_reason);
+                CHECK_FALSE(substream.refused.has_value());
+                CHECK(substream.bits_read == substream.size_bits);
+            }
+            require_same(records_of(written, 0), records_of(read, 0));
+            require_same(records_of(written, 1), records_of(read, 1));
+        }
+    }
+}
+
+TEST_CASE("Table 109's grouping bit counts are what the layouts write", "[ac4][encoder][writer]") {
+    for (int a = 0; a < 4; ++a) {
+        for (int b = 0; b < 4; ++b) {
+            CAPTURE(a, b);
+            const iclforge::ac4::detail::FrameLayout layout = iclforge::ac4::detail::split_layout(2048, {a, b}, {-1, -1});
+            CHECK(static_cast<int>(layout.grouping_bits.size()) == iclforge::ac4::detail::grouping_bit_count({a, b}));
+            int total = 0;
+            for (const int length : layout.window_length) {
+                total += length;
+            }
+            CHECK(total == 2048);
+        }
+    }
+}
+
+TEST_CASE("a DRC profile sent as a curve is the profile the decoder's Table 162 gives",
+          "[ac4][encoder][writer][drc]") {
+    // The writer's Table 162 in Table 166's terms, read back through the
+    // decoder's Table 166, against the decoder's own Table 162: two
+    // transcriptions of each table meeting.
+    using P = iclforge::ac4::DrcProfile;
+    for (const P profile :
+         {P::kFilmStandard, P::kFilmLight, P::kMusicStandard, P::kMusicLight, P::kSpeech}) {
+        CAPTURE(static_cast<int>(profile));
+        const iclforge::ac4::detail::CurveCodes c = iclforge::ac4::detail::curve_codes(profile);
+        const iclforge::ac4::detail::DrcCurve sent = iclforge::ac4::detail::drc_curve(
+            iclforge::ac4::detail::DrcCompressionCurve{.drc_lev_nullband_low = c.lev_nullband_low,
+                                             .drc_lev_nullband_high = c.lev_nullband_high,
+                                             .drc_gain_max_boost = c.gain_max_boost,
+                                             .drc_lev_max_boost = c.lev_max_boost,
+                                             .drc_nr_boost_sections = c.nr_boost_sections,
+                                             .drc_gain_section_boost = c.gain_section_boost,
+                                             .drc_lev_section_boost = c.lev_section_boost,
+                                             .drc_gain_max_cut = c.gain_max_cut,
+                                             .drc_lev_max_cut = c.lev_max_cut,
+                                             .drc_nr_cut_sections = c.nr_cut_sections,
+                                             .drc_gain_section_cut = c.gain_section_cut,
+                                             .drc_lev_section_cut = c.lev_section_cut,
+                                             .drc_tc_default_flag = c.tc_default,
+                                             .drc_tc_attack = c.tc_attack,
+                                             .drc_tc_release = c.tc_release,
+                                             .drc_tc_attack_fast = c.tc_attack_fast,
+                                             .drc_tc_release_fast = c.tc_release_fast,
+                                             .drc_adaptive_smoothing_flag = c.adaptive_smoothing,
+                                             .drc_attack_threshold = c.attack_threshold,
+                                             .drc_release_threshold = c.release_threshold});
+        const std::optional<iclforge::ac4::detail::DrcCurve> table =
+            iclforge::ac4::detail::drc_default_curve(static_cast<int>(profile));
+        REQUIRE(table.has_value());
+        // The curves agree at every level, from far below the null band to
+        // far above.
+        for (int level = -60; level <= 50; ++level) {
+            CAPTURE(level);
+            CHECK(sent.gain(level) == table->gain(level));
+        }
+        CHECK(sent.attack_ms == table->attack_ms);
+        CHECK(sent.release_ms == table->release_ms);
+        CHECK(sent.attack_fast_ms == table->attack_fast_ms);
+        CHECK(sent.release_fast_ms == table->release_fast_ms);
+        CHECK(sent.adaptive == table->adaptive);
+        CHECK(sent.attack_threshold == table->attack_threshold);
+        CHECK(sent.release_threshold == table->release_threshold);
+
+        // The encoder's own reading of Table 166, which its transmitted gains
+        // are computed with, gives the same curve.
+        const iclforge::ac4::detail::DrcCurve own = iclforge::ac4::detail::drc_gain_curve(c);
+        for (int level = -60; level <= 50; ++level) {
+            CAPTURE(level);
+            CHECK(own.gain(level) == table->gain(level));
+        }
+        CHECK(own.attack_ms == table->attack_ms);
+        CHECK(own.release_ms == table->release_ms);
+        CHECK(own.attack_fast_ms == table->attack_fast_ms);
+        CHECK(own.release_fast_ms == table->release_fast_ms);
+        CHECK(own.adaptive == table->adaptive);
+        CHECK(own.attack_threshold == table->attack_threshold);
+        CHECK(own.release_threshold == table->release_threshold);
+    }
+}
+
+TEST_CASE(
+    "dialogue enhancement data of a later frame with no frame before it is coded against zeros",
+    "[ac4][encoder][writer]") {
+    // Before any parameters were sent a stream starts from 0 in every band (the encoder's
+    // least_parameters() reads it so). Writing a frame that is not an I-frame with no previous
+    // frame must give the bits that writing it against zeros gives, and not read through a null
+    // pointer.
+    using iclforge::ac4::detail::DeConfigCodes;
+    using iclforge::ac4::detail::DeFrameParameters;
+    const DeConfigCodes config{
+        .method = 0, .max_gain = 2, .channel_config = 1, .mid = false, .signal_contribution = 0};
+    DeFrameParameters frame;
+    frame.par[0] = {3, 2, 1, 0, 1, 2, 3, 2};
+    const DeFrameParameters zeros;
+
+    BitWriter without = BitWriter::buffered();
+    iclforge::ac4::detail::write_dialog_enhancement(without, &config, &frame, nullptr, false);
+    BitWriter against_zeros = BitWriter::buffered();
+    iclforge::ac4::detail::write_dialog_enhancement(against_zeros, &config, &frame, &zeros, false);
+    CHECK(without.bit_count() == against_zeros.bit_count());
+    CHECK(without.bytes() == against_zeros.bytes());
+    CHECK(without.bit_count() >
+          3);  // b_de_data_present, b_de_config_flag, de_keep_data_flag, the codes
+}
+TEST_CASE("the table of contents writer codes the 9.X.4 and 22.2 channel modes of Part 2 Table 56",
+          "[ac4][encoder][writer][fronts]") {
+    // 9.0.4 and 9.1.4 are nine-bit codes 0b111111100 and 0b111111101 and name the channels their
+    // source has (clause 6.2.1.8); 22.2 is 0b111111110 and names none.
+    const std::array<std::pair<int, const char*>, 5> modes = {{{11, "7.0.4"}, {12, "7.1.4"}, {13, "9.0.4"},
+                                                               {14, "9.1.4"}, {15, "22.2"}}};
+    for (const auto& [mode, name] : modes) {
+        for (const int tops : {1, 2, 3}) {
+            CAPTURE(mode, name, tops);
+            iclforge::ac4::detail::FrameFields fields;
+            fields.ch_mode = mode;
+            fields.top_channels_present = tops;
+            fields.b_4_back_channels_present = tops != 2;
+            fields.b_centre_present = tops != 1;
+            BitWriter audio = BitWriter::buffered();
+            audio.write(8, 0, "padding");
+            const auto sink = [](const iclforge::ac4::SyntaxRecord&) {};
+            const auto frame = iclforge::ac4::detail::write_frame(fields, audio, 0, sink);
+            REQUIRE(frame.has_value());
+            const auto parsed = iclforge::ac4::parse_raw_frame(*frame);
+            REQUIRE(parsed.has_value());
+            const auto& chan = parsed->toc.substream_groups.at(0).substreams.at(0).chan;
+            REQUIRE(chan.has_value());
+            CHECK(chan->ch_mode == mode);
+            CHECK(chan->channel_mode_name == name);
+            CHECK(chan->channel_mode == (mode == 15 ? 0b111111110 : mode >= 13 ? 0b111111100 + (mode - 13) : 0b11111100 + (mode - 11)));
+            if (mode != 15) {
+                REQUIRE(chan->original_content.has_value());
+                CHECK(chan->original_content->top_channels_present == tops);
+                CHECK(chan->original_content->b_4_back_channels_present == (tops != 2));
+                CHECK(chan->original_content->b_centre_present == (tops != 1));
+            }
+        }
+    }
+}
+
+TEST_CASE("dialogue enhancement of the 9.X.4 modes sends b_de_simulcast and a second de_data()",
+          "[ac4][encoder][writer][fronts]") {
+    // Part 2 clause 6.2.7.5: after de_data(), ch_mode 13 and 14 send b_de_simulcast, and with it
+    // a second de_data() for core decoding; the other modes send neither.
+    using iclforge::ac4::detail::DeConfigCodes;
+    using iclforge::ac4::detail::DeFrameParameters;
+    const DeConfigCodes config{
+        .method = 0, .max_gain = 2, .channel_config = 1, .mid = false, .signal_contribution = 0};
+    DeFrameParameters frame;
+    frame.par[0] = {3, 2, 1, 0, 1, 2, 3, 2};
+    DeFrameParameters core;
+    core.par[0] = {5, 5, 4, 4, 3, 3, 2, 2};
+    const auto bits = [&](int ch_mode, const DeFrameParameters* second) {
+        BitWriter w = BitWriter::buffered();
+        iclforge::ac4::detail::write_dialog_enhancement(w, &config, &frame, nullptr, true, ch_mode, second);
+        return w.bit_count();
+    };
+    const std::size_t plain = bits(12, nullptr);
+    CHECK(bits(12, &core) == plain);                // 7.X.4 has no b_de_simulcast
+    CHECK(bits(13, nullptr) == plain + 1);          // 9.0.4: the flag alone
+    CHECK(bits(14, nullptr) == plain + 1);
+    CHECK(bits(13, &core) > plain + 1);             // and the second de_data()
+    // With no channel to enhance the flag is still sent.
+    const DeConfigCodes none{.method = 0, .max_gain = 2, .channel_config = 0};
+    BitWriter w = BitWriter::buffered();
+    iclforge::ac4::detail::write_dialog_enhancement(w, &none, &frame, nullptr, true, 14, nullptr);
+    BitWriter without = BitWriter::buffered();
+    iclforge::ac4::detail::write_dialog_enhancement(without, &none, &frame, nullptr, true, 12, nullptr);
+    CHECK(w.bit_count() == without.bit_count() + 1);
+}

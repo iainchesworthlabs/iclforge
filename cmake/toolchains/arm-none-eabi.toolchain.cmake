@@ -76,9 +76,9 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
-# Read by apps/baremetal/CMakeLists.txt to decide it has a target to build
+# Read by firmware/baremetal/CMakeLists.txt to decide it has a target to build
 # for, and by the root CMakeLists.txt's own reporting. A plain variable rather
 # than a compile definition: no source file branches on it - the platform
-# split is a directory (apps/baremetal/platform/) as everywhere else here.
+# split is a directory (firmware/baremetal/platform/) as everywhere else here.
 set(ICLFORGE_BAREMETAL_TARGET "mps2-an385" CACHE STRING
     "QEMU machine this bare-metal build targets" FORCE)

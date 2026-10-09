@@ -3,7 +3,7 @@
 The minimum-footprint decoder on an Espressif ESP32-C6: one 160 MHz RISC-V core (RV32IMAC) with
 no floating-point unit, 512 KB of SRAM shared with WiFi 6, Bluetooth LE and 802.15.4, and no
 external PSRAM, which ESP-IDF does not support on this part. It decodes in the fixed-point tier,
-as the [ESP32-C3](esp32-c3.md) does, from the same `esp-idf/iclforge/` component, whose manifest
+as the [ESP32-C3](esp32-c3.md) does, from the same `firmware/esp-idf/iclforge/` component, whose manifest
 lists `esp32c6` beside `esp32s3`, `esp32c3` and `esp32p4`.
 
 Every figure on this page was measured on a board on 2026-09-15, with no network and again with
@@ -20,7 +20,7 @@ again, so the memory and fit figures below are those of 2026-09-15.
 
 | | |
 |---|---|
-| Decode | Correct: all fourteen fixtures, every channel's level within the probe's tolerance, and every fixed-tier PCM hash equal to the values the x86-64 host, the Cortex-M3 leg and the ESP32-C3 leg are held to (`tests/golden/fixed-probe-pcm-hashes.json`). A fourth architecture on one set of hashes |
+| Decode | Correct: all fourteen fixtures, every channel's level within the probe's tolerance, and every fixed-tier PCM hash equal to the values the x86-64 host, the Cortex-M3 leg and the ESP32-C3 leg are held to (`testdata/fixed-probe-pcm-hashes.json`). A fourth architecture on one set of hashes |
 | Real time, no network | AC-3 5.1 (0.64x), E-AC-3 5.1 with AHT, spectral extension and coupling (0.75x), an Atmos stream's bed (0.59x), E-AC-3 7.1 (0.87x), and every stereo and mono row. Not the folds to stereo (1.03x and 1.62x), E-AC-3 line mode (1.15x), enhanced coupling (1.71x), 7.1.4 (1.88x) or the Atmos objects rows |
 | Real time, with WiFi and a stream | AC-3 5.1 (0.82x), E-AC-3 5.1 with AHT, spectral extension and coupling (0.96x), the Atmos bed (0.71x), a 192 kbit/s E-AC-3 5.1 stream (0.64x), and stereo and mono (0.17x to 0.41x). Not E-AC-3 7.1 (1.09x), the folds, line mode, enhanced coupling or the Atmos objects rows |
 | Memory, no network | Every fixture fits: 383,416 bytes free before the decode, largest block 352,256, against a largest peak of 234,070 (7.1.4 folded to stereo) |
@@ -49,7 +49,7 @@ In the float tier, with the network up, mono is the only row in real time (0.52x
 ### 2/0, 5.1 and 7.1 from one generator
 
 The probe has no 7.1 fixture, so the stream set's three layout streams,
-`esp-idf/iclforge/examples/hearth_sink/www/layout-20.ec3`, `layout-51.ec3` and `layout-71.ec3`,
+`firmware/hearth-sink/www/layout-20.ec3`, `layout-51.ec3` and `layout-71.ec3`,
 were decoded on the same board by a copy of the probe with them added as rows. They come from one
 generator, use no Annex E tools and hold 32 access units each; 2/0 and 5.1 are 192 kbit/s, and
 7.1, a 5.1 substream and a dependent one, is 288 kbit/s. That copy measured time and heap, and did
@@ -139,8 +139,8 @@ added a 64-bit division (`__divdi3`) for each AHT mantissa and about six (`__udi
 square root of a spectral extension band.
 
 Each change below leaves the fixed-point tier's PCM identical on every fixture: the pinned hashes
-(`tests/golden/fixed-probe-pcm-hashes.json`) do not move, and `tests/ac3/core/test_fixed32.cpp`,
-`tests/ac3/core/test_mdct_fixed.cpp` and `tests/ac3/decoder/test_block_norm.cpp` hold each new form to
+(`testdata/fixed-probe-pcm-hashes.json`) do not move, and `libs/ac3/tests/core/test_fixed32.cpp`,
+`libs/ac3/tests/core/test_mdct_fixed.cpp` and `libs/ac3/tests/decoder/test_block_norm.cpp` hold each new form to
 the arithmetic it replaces. Microseconds per frame, no network, two runs of each build, which
 agreed within 3 microseconds; each row includes the ones above it:
 
@@ -205,14 +205,14 @@ same bytes whatever else runs:
 
 ### The network load
 
-`CONFIG_ICLFORGE_PROBE_NETWORK_WIFI` (`apps/baremetal/platform/esp32c6/main/net/wifi/`) joins the
+`CONFIG_ICLFORGE_PROBE_NETWORK_WIFI` (`firmware/baremetal/platform/esp32c6/main/net/wifi/`) joins the
 access point, turns modem sleep off, listens on TCP port 4953 and reads what arrives from a task
 at priority 5: above the decode on the main task at priority 1, below WiFi and lwIP. That is the
 load a Sendspin player carries, since the Sendspin server connects to the player. The probe
 starts once 32,768 bytes have arrived, and the bytes are counted and dropped.
 
 A host sent 1,536 kbit/s in 32 ms chunks, the rate of 48 kHz 16-bit stereo PCM, cycling the bytes
-of `apps/wasm/assets/demo.ec3`. During the decode the part received 1,500 to 1,537 kbit/s, and
+of `apps/demos/wasm/assets/demo.ec3`. During the decode the part received 1,500 to 1,537 kbit/s, and
 the longest gap between two reads was 81 to 114 ms. The access point negotiated 802.11n on
 channel 1 at -61 dBm, so the part's WiFi 6 was not exercised.
 
@@ -271,7 +271,7 @@ not part of this measurement.
 
 Getting samples onto those slots costs time here too. The decoder hands a sink planar `float`
 blocks, and the component's interleaves
-(`esp-idf/iclforge/include/iclforge/interleave.hpp`) turn each sample into a slot. Scaling,
+(`libs/device/include/iclforge/interleave.hpp`) turn each sample into a slot. Scaling,
 clipping and converting one in `float` is four calls into the software floating-point routines
 on a part with no FPU, so the component computes the same integers from the sample's IEEE-754
 bits wherever `CONFIG_SOC_CPU_HAS_FPU` is unset, which is this part. Both forms are timed below.
@@ -350,7 +350,7 @@ parsed tracks, 31,168 bytes, so the largest free block is not what limits it. Th
 WebSocket server and WiFi buffers leave less than the probe's network image does, so a C6 sink
 takes AC-4 programmes from Hearth as PCM (`planning/ac4.md`, decision 32) until a board run says
 otherwise. The fixed tier's PCM hashes are those of the x86-64 host and the Cortex-M3 leg
-(`tests/golden/ac4-fixed-probe-pcm-hashes.json`).
+(`testdata/ac4-fixed-probe-pcm-hashes.json`).
 
 ## QEMU
 
@@ -361,11 +361,11 @@ the board.
 
 ## Building
 
-`apps/baremetal/platform/esp32c6/` is the probe target:
+`firmware/baremetal/platform/esp32c6/` is the probe target:
 
 ```bash
 . $IDF_PATH/export.sh
-cd apps/baremetal/platform/esp32c6
+cd firmware/baremetal/platform/esp32c6
 idf.py set-target esp32c6
 idf.py build                                  # fixed-point tier, no network
 idf.py -DICLFORGE_DECODE_SCALAR=float build   # the float tier
@@ -409,7 +409,7 @@ with socket.create_connection((host, port)) as s:
 
 Playback (I2S, a DMA queue, underruns) and a second board are outside this probe's own scope, but
 both are covered on the part now: `hearth_sink`'s Sendspin player runs on this board, and its
-[README, "On the ESP32-C6"](https://github.com/iainchesworthlabs/iclforge/blob/main/esp-idf/iclforge/examples/hearth_sink/README.md#on-the-esp32-c6)
+[README, "On the ESP32-C6"](https://github.com/iainchesworthlabs/iclforge/blob/main/firmware/hearth-sink/README.md#on-the-esp32-c6)
 has the clock, memory and two-board figures.
 
 ## Where to go next

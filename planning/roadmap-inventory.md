@@ -70,11 +70,11 @@ no AC-4 decode entry.
 
 | Plain-English name | Doc sources | Code anchors | Done | Not done | Status | Doc accuracy | New roadmap line |
 |---|---|---|---|---|---|---|---|
-| **Hearth desktop window** | `hearth-reference-player.md` A5; `docs/hearth/index.md` | No `apps/hearth/ui/`; engine in `apps/hearth/engine/`; 17 `tests/hearth/*.cpp` files | Engine, transport, gapless, passthrough, meters, settings model, diagnostics | Qt window, drag/drop queue UI, A6 network UI, A7 packaging, A8 user guide | **In progress** | **Missing** (planning only) | Desktop player engine is in CI; the application window and packaging are not started. |
-| **Hearth Sendspin server in app** | `hearth-reference-player.md` A4 | `pairing_store.*` in engine; `src/sendspin/`; `tests/hearth/test_group.cpp` uses `ServerHost` directly; `apps/hearth/engine/CMakeLists.txt`: "ac3::sendspin joins when the network output lands" | Protocol library, testserver, testsink, group/pairing tests, aiosendspin CI exit | `ServerHost` wired into `ac3hearth_engine` for network output | **Partial** | **Misleading** if A4 read as fully merged in app | Sendspin library and test tools work; the desktop app does not host a server yet. |
+| **Hearth desktop window** | `hearth-reference-player.md` A5; `docs/hearth/index.md` | No `apps/hearth/ui/`; engine in `apps/hearth/engine/`; 17 `apps/hearth/engine/tests/*.cpp` files | Engine, transport, gapless, passthrough, meters, settings model, diagnostics | Qt window, drag/drop queue UI, A6 network UI, A7 packaging, A8 user guide | **In progress** | **Missing** (planning only) | Desktop player engine is in CI; the application window and packaging are not started. |
+| **Hearth Sendspin server in app** | `hearth-reference-player.md` A4 | `pairing_store.*` in engine; `libs/sendspin/`; `apps/hearth/engine/tests/test_group.cpp` uses `ServerHost` directly; `apps/hearth/engine/CMakeLists.txt`: "ac3::sendspin joins when the network output lands" | Protocol library, testserver, testsink, group/pairing tests, aiosendspin CI exit | `ServerHost` wired into `ac3hearth_engine` for network output | **Partial** | **Misleading** if A4 read as fully merged in app | Sendspin library and test tools work; the desktop app does not host a server yet. |
 | **Hearth UI design (A0)** | `hearth-reference-player.md` A0 | No signed design record in repo | Decision log in planning page | Published design round sign-off before A5 | **Proposed** | **Missing** | UI design must be signed off before the window phase starts. |
-| **Hearth ESP32-C6 sink** | `hearth-reference-player.md` C3 | C6 decoder/build (`esp-idf/…`); no C6 sink guide; no Sendspin CI for C6 | C1–C2 bring-up | Sendspin sink firmware and guide (follows S3 sink) | **Not started** | **Missing** | C6 Sendspin sink follows the S3 sink pattern. |
-| **AC-4 audio decode** | Chip D in hearth plan; IM4 (inspect only) | `src/ac4/` inspect; `src/ac4dec/` syntax trace (`decoder.hpp`: "produces no audio yet"); `tests/ac4dec/`, `tests/golden/ac4dec/*.tsv` | TOC/framing (shared with inspect); channel-coded syntax transcription; DRC metadata parsing in syntax layer | PCM output; speech frontend; object/immersive substreams; 96/192 kHz; dialogue enhancement decode | **Partial** | **Misleading** (IM4 "complete" reads as full AC-4) | AC-4 container inspect is shipped; audio decode is syntax-only so far. |
+| **Hearth ESP32-C6 sink** | `hearth-reference-player.md` C3 | C6 decoder/build (`firmware/esp-idf/…`); no C6 sink guide; no Sendspin CI for C6 | C1–C2 bring-up | Sendspin sink firmware and guide (follows S3 sink) | **Not started** | **Missing** | C6 Sendspin sink follows the S3 sink pattern. |
+| **AC-4 audio decode** | Chip D in hearth plan; IM4 (inspect only) | `libs/ac4/` inspect; `libs/ac4/src/decoder/` syntax trace (`decoder.hpp`: "produces no audio yet"); `libs/ac4/tests/decoder/`, `testdata/ac4/*.tsv` | TOC/framing (shared with inspect); channel-coded syntax transcription; DRC metadata parsing in syntax layer | PCM output; speech frontend; object/immersive substreams; 96/192 kHz; dialogue enhancement decode | **Partial** | **Misleading** (IM4 "complete" reads as full AC-4) | AC-4 container inspect is shipped; audio decode is syntax-only so far. |
 | **QC delivery report file** | `planning/qc-report.md`; `planning/README.md` | `ac3cli qc` prints to stdout only | QC analysis in CLI/GUI | File-shaped delivery report on disk | **Proposed** | **Missing** | A file export for QC results is proposed, not started. |
 | **DAW/NLE host plugin study** | `planning/host-plugin.md` | No plugin code | Feasibility study | Any product decision or implementation | **Proposed** | **Missing** (AP10 is GStreamer/FFmpeg only) | Whether a host plugin is worth building is an open study. |
 | **Topology / transport roles** | `planning/topology.md` | Decision 1 taken; no transport implementation | Source/transport/sink vocabulary | HLS/CMAF transport for non-Hearth members (Hearth uses Sendspin) | **Proposed / mostly superseded** | **Missing** | Shared transport vocabulary is decided; Hearth sinks use Sendspin instead of HLS. |
@@ -89,10 +89,10 @@ no AC-4 decode entry.
 |---|---|---|---|---|---|---|---|
 | **IM5** | TrueHD experimental module | No `AC3FORGE_BUILD_MLP` on `main`; work on `feature/truehd-atmos-support` branch per ROADMAP | Internal codec on branch | Rebase, gate as `ac3::mlp`, label output, merge to `main`; authenticity = Evolution frame HMAC (not EMDF) — see ROADMAP IM5 note / object-signing sibling | **In progress** (off main) | Accurate | Land TrueHD/MLP as an experimental, accurately labelled module from its long-lived branch. |
 | **VX9** | Listening test session | `tools/listening/`; `tools/listening/responses/README.md`: "No listening session has been run yet" | Blind stimulus generator, scorer, protocol on `docs/landscape.md` | Human MUSHRA/ABX session over real programme material | **Partial** | Accurate | Listening-test apparatus is merged; the session itself has not been run. |
-| **VX12** | Cross-toolchain bitstream reproducibility | ROADMAP self-labels PARTIAL; `tests/ac3/encoder/test_coupling.cpp` (`ilogb` fix); `tests/ac3/encoder/test_transient.cpp` all six rates | Audit complete; one libm fix landed; transient detector proven bit-identical on five toolchain legs | Fixed-point transient port; re-validation of coupling-fit/AHT/rematrix thresholds; cross-leg gold gate blocked on VX11 arm64 root cause | **Partial** | Accurate | Encoder bit-cost decisions are mostly audited; perceptual re-validation and a few FP comparisons remain open. |
+| **VX12** | Cross-toolchain bitstream reproducibility | ROADMAP self-labels PARTIAL; `libs/ac3/tests/encoder/test_coupling.cpp` (`ilogb` fix); `libs/ac3/tests/encoder/test_transient.cpp` all six rates | Audit complete; one libm fix landed; transient detector proven bit-identical on five toolchain legs | Fixed-point transient port; re-validation of coupling-fit/AHT/rematrix thresholds; cross-leg gold gate blocked on VX11 arm64 root cause | **Partial** | Accurate | Encoder bit-cost decisions are mostly audited; perceptual re-validation and a few FP comparisons remain open. |
 | **AP1** | API freeze → v1.0.0 | `docs/library/api-stability.md`; version macros in `ac3forge.h`; `.github/workflows/_ci-core.yml` `ABI_ENFORCE: 'false'`; `SOVERSION "${PROJECT_VERSION}"` in library CMake | Tiering doc, SemVer policy, release criteria, C version macros | Flip `SOVERSION` to major; `inline namespace v1`; make ABI gate **required** | **In progress** | Accurate | v1.0 policy is written; SOVERSION and a enforcing ABI gate wait for the v1.0.0 cut. |
 | **UX12** | Crucible promotion | `apps/crucible/`; CI `crucible: true` on Windows/Linux legs; `docs/crucible/index.md` | Rename; Windows + Linux verified on hardware (Pi); engine, window, packages on Linux; macOS platform code | macOS interactive run; native-speaker translation review (→ CR1); attestation-signed Windows driver | **Partial** | **Stale** in ROADMAP summary (see below) | Crucible ships on Windows and Linux; macOS compiles in CI but has never run with audio on a Mac. |
-| **UX7** | macOS process tap | `src/audio/src/backend/macos/process_tap.mm`; `audio_backend.cpp` refuses `process_loopback` unless `AC3FORGE_MACOS_PROCESS_TAP` | Tap code compiles; device watcher registers; opt-in env var | `AudioDeviceCreateIOProcID` hang; path disabled by default; no successful capture on Mac | **Partial** | Accurate (2026-09-06 update) | macOS process tap code exists but is refused by default until the HAL hang is resolved. |
+| **UX7** | macOS process tap | `libs/audio/src/backend/macos/process_tap.mm`; `audio_backend.cpp` refuses `process_loopback` unless `AC3FORGE_MACOS_PROCESS_TAP` | Tap code compiles; device watcher registers; opt-in env var | `AudioDeviceCreateIOProcID` hang; path disabled by default; no successful capture on Mac | **Partial** | Accurate (2026-09-06 update) | macOS process tap code exists but is refused by default until the HAL hang is resolved. |
 | **DR9** | Hardware confirmation per backend | `docs/platforms/raspberry-pi.md`, `windows.md`; `docs/crucible/design/promotion.md` | Linux/ALSA passthrough; PipeWire on Pi; Windows WASAPI exclusive to Onkyo AVR | CoreAudio tap on real Mac; Crucible on Mac; Pi 5; second Android TV | **Partial** | Accurate | ALSA, PipeWire and WASAPI passthrough are confirmed; CoreAudio and desktop Mac runs are not. |
 
 #### UX12 stale text (must fix when rewriting)
@@ -128,8 +128,8 @@ as active roadmap rows; the new roadmap may mention them only in a legacy index 
 
 | Topic | ROADMAP | Code / docs truth | Inventory note |
 |---|---|---|---|
-| **AC-4 inspect** | IM4 Shipped | `src/ac4/include/iclforge/ac4/ac4.hpp`: "INSPECTOR, not a decoder"; `capabilities.md` AC-4 row | Shipped scope = parse/inspect + carriage in MP4/TS |
-| **AC-4 decode** | *(absent)* | `src/ac4dec/`: syntax only | **Partial** — separate row in section A |
+| **AC-4 inspect** | IM4 Shipped | `libs/ac4/include/iclforge/ac4/core/toc.hpp`: "INSPECTOR, not a decoder"; `capabilities.md` AC-4 row | Shipped scope = parse/inspect + carriage in MP4/TS |
+| **AC-4 decode** | *(absent)* | `libs/ac4/src/decoder/`: syntax only | **Partial** — separate row in section A |
 | **IAMF** | IM3 Shipped | `iamf/`: v2.0 reader and writer, object elements, Parameter Blocks, trimming, raw OBU and fragments | Shipped = IAMF v2.0 reader and writer; codec encoders and layer reconstruction open |
 | **IAB** | IM1 Shipped | `iab`: reader, `dlc.hpp` decode, `writer.hpp` write and `encode_dlc` | Shipped = elementary IABitstream read and write, and `write_mxf_iab` for the ST 2067-201 Track File; an IMF validator run on it is the open follow-on |
 | **Multi-programme E-AC-3** | *(capabilities wording)* | `encode.cpp` generalizes `programme2=`..`programme8=`, each with its own `bsmod`/full `mixmdate` via `programmeN-<field>=`; `capabilities.md` L24 updated | **Shipped** — authoring complete for all eight §E2.3.1.2 substreams; receiver-side use of the metadata during mixdown remains a separate, open follow-on |
@@ -144,8 +144,8 @@ From `planning/hearth-reference-player.md` status block, verified against `main`
 | Chip | Planning claim | Tree check | Inventory status |
 |---|---|---|---|
 | **A0** | Design round published, awaits review | No standalone design doc in repo | **Proposed** — gate for A5 |
-| **A1** | Merged | `src/render/include/iclforge/render/*` (Experimental tier in api-stability) | **Shipped** |
-| **A2** | Merged | `src/audio/` backends, routing, device watch | **Shipped** (hardware identify tone checks still open per plan) |
+| **A1** | Merged | `libs/render/include/iclforge/render/*` (Experimental tier in api-stability) | **Shipped** |
+| **A2** | Merged | `libs/audio/` backends, routing, device watch | **Shipped** (hardware identify tone checks still open per plan) |
 | **A3** | Merged | `apps/hearth/engine/*`, 17 hearth test files | **Shipped** |
 | **A4** | Merged | Sendspin lib + testserver + tests; **engine lacks ServerHost** | **Partial** |
 | **A5** | Not started | No `apps/hearth/ui/` | **Not started** |
@@ -153,7 +153,7 @@ From `planning/hearth-reference-player.md` status block, verified against `main`
 | **B1–B5** | Merged | `hearth_sink` example, Sendspin CI (`hearth-esp32s3` job) | **Partial** — firmware done; TDM DAC + Music Assistant on real MA open |
 | **C1–C2** | Merged | ESP32-C6 fixed-point path | **Shipped** |
 | **C3** | Follows B | No C6 sink guide/CI | **Not started** |
-| **D** | First code merged | `src/ac4dec` syntax only | **Partial** — see section A |
+| **D** | First code merged | `libs/ac4/src/decoder` syntax only | **Partial** — see section A |
 
 **Open hardware exits** (called out in planning, not in ROADMAP): Onkyo identify tone and
 passthrough tests for A2/A3; TDM DAC boards for sinks; Music Assistant compatibility on real MA
@@ -176,12 +176,12 @@ passthrough tests for A2/A3; TDM DAC boards for sinks; Music Assistant compatibi
 
 | Flag / job | Path | Default | Roadmap relevance |
 |---|---|---|---|
-| `AC3FORGE_BUILD_AC4` | `src/ac4`, `src/ac4dec` | ON | AC-4 inspect + syntax decoder |
-| `AC3FORGE_BUILD_HEARTH` | `src/sendspin`, `apps/hearth` | OFF | Hearth engine/tests when ON |
+| `AC3FORGE_BUILD_AC4` | `libs/ac4` | ON | AC-4 inspect + syntax decoder |
+| `AC3FORGE_BUILD_HEARTH` | `libs/sendspin`, `apps/hearth` | OFF | Hearth engine/tests when ON |
 | `AC3FORGE_BUILD_CRUCIBLE` | `apps/crucible` | OFF | UX12; CI sets ON on selected legs |
-| `AC3FORGE_BUILD_IAMF` | `src/iamf` | ON | IM3 phase 1 |
-| `AC3FORGE_BUILD_IAB` | `src/iab` | ON | IM1 |
-| `AC3FORGE_BUILD_ADM` | `src/adm`, `src/admbridge` | OFF | ADM/JOC bridge optional |
+| `AC3FORGE_BUILD_IAMF` | `libs/containers/src/iamf` | ON | IM3 phase 1 |
+| `AC3FORGE_BUILD_IAB` | `libs/iab` | ON | IM1 |
+| `AC3FORGE_BUILD_ADM` | `libs/adm`, `libs/adm` | OFF | ADM/JOC bridge optional |
 | `hearth-esp32s3` CI job | `.github/workflows/_build.yml` | — | B-chip sink verification |
 | `ABI_ENFORCE` | `_ci-core.yml` | `false` | AP1 deferred gate |
 

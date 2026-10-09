@@ -1,6 +1,6 @@
 // The AC-4 consumer of an installed package, built by tools/checks/check_install_consumer.sh twice
 // over: through find_package(iclforge) for each exported decoder target (CMakeLists.txt here), and
-// through `pkg-config --cflags --libs iclforge-ac4dec` alone. It sees the installed headers and
+// through `pkg-config --cflags --libs iclforge-ac4` alone. It sees the installed headers and
 // libraries and nothing of the build tree, so a header the decoder's includes and the install
 // leave out, an archive a static decoder calls into and the package does not name, or a symbol
 // the shared libraries do not export stops it here.
@@ -9,7 +9,7 @@
 // it a block at a time as a network client would, and decodes every frame with
 // iclforge::ac4::Decoder, then reads the presentations and the metadata back: the calls a player
 // makes, each across the boundary of the library that defines it. The stream is a committed DEE one
-// (tests/golden/external-baseline/ac4-51-film-96/dee.ac4, 5.1 at 48 kHz) whose every frame
+// (testdata/external-baseline/ac4-51-film-96/dee.ac4, 5.1 at 48 kHz) whose every frame
 // decodes.
 
 #include <cstddef>
@@ -20,8 +20,8 @@
 #include <string_view>
 #include <vector>
 
-#include <iclforge/ac4/ac4.hpp>
-#include <iclforge/ac4dec/decoder.hpp>
+#include <iclforge/ac4/decoder/decoder.hpp>
+#include <iclforge/ac4/io/elementary.hpp>
 
 namespace {
 

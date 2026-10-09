@@ -38,7 +38,7 @@ if(ICLFORGE_SPIKES_WITH_LIBRARY)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../.." iclforge_build)
     add_executable(s4_throughput s4_throughput/s4_throughput.cpp)
     target_compile_options(s4_throughput PRIVATE /W4 /EHsc /permissive- /utf-8)
-    target_link_libraries(s4_throughput PRIVATE iclforge::ac3)
+    target_link_libraries(s4_throughput PRIVATE iclforge::ac3 iclforge::containers)
 endif()
 
 # S1 part two: the same tap through the library's own Capture/DeviceWatcher.

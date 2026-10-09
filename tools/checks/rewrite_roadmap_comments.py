@@ -10,15 +10,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 SCAN_DIRS = (
-    "src",
+    "libs",
     "apps",
+    "firmware/baremetal",
     "tests",
     "cmake",
     "examples",
-    "fuzz",
-    "python",
+    "external",
+    "bindings/python",
     ".github",
-    "esp-idf",
+    "firmware/esp-idf",
+    "firmware/hearth-sink",
     "tools",
 )
 
@@ -289,8 +291,8 @@ def iter_files() -> list[Path]:
         ROOT / "CMakeLists.txt",
         ROOT / "CMakePresets.json",
         ROOT / "ruff.toml",
-        ROOT / "python" / "pyproject.toml",
-        ROOT / "rust" / "README.md",
+        ROOT / "bindings" / "python" / "pyproject.toml",
+        ROOT / "bindings" / "rust" / "README.md",
     ):
         if extra.exists():
             out.append(extra)
@@ -320,7 +322,7 @@ def main() -> int:
                 path.write_text(updated, encoding="utf-8", newline="\n")
     print(f"{'Wrote' if write else 'Would change'} {len(changed)} files")
     for path in changed:
-        print(path.relative_to(ROOT))
+        print(path.relative_to(ROOT).as_posix())
     return 0
 
 

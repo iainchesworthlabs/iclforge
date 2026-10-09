@@ -1,16 +1,16 @@
 // A real Immersive Audio Bitstream, all the way to a Dolby Atmos E-AC-3 (DD+ JOC) elementary
 // stream.
 //
-// Roadmap item IM1 phase 3 of 3 (the last piece - phase 1 is iclforge::iab, src/iab; phase 2
-// is iclforge::iab::parse_mxf_iab, src/iab/src/mxf_reader.cpp). This is a minimal, standalone
+// Roadmap item IM1 phase 3 of 3 (the last piece - phase 1 is iclforge::iab, libs/iab; phase 2
+// is iclforge::iab::parse_mxf_iab, libs/iab/src/mxf_reader.cpp). This is a minimal, standalone
 // illustration of the same pipeline forge's 'atmos-iab' command drives for real:
-// iclforge::iab::parse_iabitstream() reads the frame sequence, iclforge::admbridge::build_iab()
+// iclforge::iab::parse_iabitstream() reads the frame sequence, iclforge::adm::build_iab()
 // maps it onto iclforge::ac3::oba::AtmosEncoder's flat object-list input shape (one bed channel
 // pinned in place, one dynamic object panned by its own authored motion), and a plain per-frame
-// loop calls iclforge::oba::evaluate_placements() plus AtmosEncoder::encode_frame() the same way
-// every other Atmos example in this directory does. The CLI command and this example deliberately
-// share nothing but that library API - see docs/library/adm-bridge.md's own note on why no separate
-// "driving loop" abstraction exists (the same reasoning applies here).
+// loop calls iclforge::objects::oba::evaluate_placements() plus AtmosEncoder::encode_frame() the
+// same way every other Atmos example in this directory does. The CLI command and this example
+// deliberately share nothing but that library API - see docs/library/adm-bridge.md's own note on
+// why no separate "driving loop" abstraction exists (the same reasoning applies here).
 //
 // Like examples/read_iab.cpp, this writes its own tiny-but-valid elementary IABitstream fixture to
 // a temp file first, rather than shipping a real Dolby Atmos cinema master this project has no
@@ -18,7 +18,7 @@
 // half of the clip and then jumps hard left for the second half - the same "visibly tracks the
 // authored automation" shape encode_adm.cpp's own fixture uses, adapted to what IAB's per-frame
 // (not whole-file audioBlockFormat) automation model can actually express - see
-// ac3/admbridge/iab_bridge.hpp's own top comment on why a Bed/Object's position is one value per
+// iclforge/adm/iab_bridge.hpp's own top comment on why a Bed/Object's position is one value per
 // IAFrame here, not a file-length keyframe sequence.
 //
 // Run with `--write-fixture <path>` to just write that same fixture to a real file and exit,
@@ -42,7 +42,7 @@
 #include <string_view>
 #include <vector>
 
-#include "iclforge/admbridge/iab_bridge.hpp"
+#include "iclforge/adm/iab_bridge.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
 #include "iclforge/objects/motion.hpp"
@@ -70,9 +70,10 @@ bool claim_temp_path(const std::string& path) {
 }
 
 // A from-scratch MSB-first bit writer (SMPTE ST 2098-2:2022 §5.1), used only to build this
-// fixture - independent of src/iab's own reader, the same "independent fixture" convention
-// tests/iab/test_ac3iab.cpp and examples/read_iab.cpp already establish (a third copy is within
-// this project's own established limit - see encode_adm.cpp's identical note for its ADM fixture).
+// fixture - independent of libs/iab's own reader, the same "independent fixture" convention
+// libs/iab/tests/test_ac3iab.cpp and examples/read_iab.cpp already establish (a third copy is
+// within this project's own established limit - see encode_adm.cpp's identical note for its ADM
+// fixture).
 class BitWriter {
    public:
     void push_bits(std::uint64_t value, unsigned width) {
@@ -317,13 +318,13 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Step 2: iclforge::admbridge (phase 3) - Bed/Object identity, coordinate conversion, and the
+    // Step 2: iclforge::adm (phase 3) - Bed/Object identity, coordinate conversion, and the
     // per-IAFrame position/gain timeline, mapped onto AtmosEncoder's flat object-list input shape.
-    const auto bridged = iclforge::admbridge::build_iab(*frames);
+    const auto bridged = iclforge::adm::build_iab(*frames);
     if (!bridged) {
         fmt::printf("build_iab failed: %.*s\n",
-                    static_cast<int>(iclforge::admbridge::describe(bridged.error()).size()),
-                    iclforge::admbridge::describe(bridged.error()).data());
+                    static_cast<int>(iclforge::adm::describe(bridged.error()).size()),
+                    iclforge::adm::describe(bridged.error()).data());
         return 1;
     }
 
@@ -334,9 +335,10 @@ int main(int argc, char** argv) {
                     bridged->is_bed[i] ? "bed channel" : "dynamic object");
     }
 
-    // Step 3: drive AtmosEncoder::encode_frame() in a loop - iclforge::oba::evaluate_placements()
-    // reads each channel's iclforge::oba::ObjectPath at the frame's own end time, the same pattern
-    // every other Atmos example in this directory uses.
+    // Step 3: drive AtmosEncoder::encode_frame() in a loop -
+    // iclforge::objects::oba::evaluate_placements() reads each channel's
+    // iclforge::objects::oba::ObjectPath at the frame's own end time, the same pattern every other
+    // Atmos example in this directory uses.
     const auto objects = static_cast<int>(bridged->channel_count());
     iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, objects};
 
@@ -356,7 +358,7 @@ int main(int argc, char** argv) {
         const double t =
             static_cast<double>(start + static_cast<std::size_t>(iclforge::ac3::kSamplesPerFrame)) /
             static_cast<double>(kSampleRate);
-        const auto placement = iclforge::oba::evaluate_placements(bridged->paths, t);
+        const auto placement = iclforge::objects::oba::evaluate_placements(bridged->paths, t);
 
         const auto unit = encoder.encode_frame(views, placement);
         if (!unit) {

@@ -14,9 +14,9 @@ script-lint job and runnable the same way locally:
     python3 tools/checks/check_esp_efuse_free.py [--root <repo>]
 
 It reads every sdkconfig fragment under the ESP-IDF projects the repository
-holds (esp-idf/ and apps/baremetal/): files named sdkconfig.defaults or
-sdkconfig.<anything>, but not sdkconfig itself or sdkconfig.old, which are a
-build's own output. Directories a build or the component manager writes
+holds (firmware/esp-idf/, firmware/hearth-sink/ and firmware/baremetal/): files
+named sdkconfig.defaults or sdkconfig.<anything>, but not sdkconfig itself or
+sdkconfig.old, which are a build's own output. Directories a build or the component manager writes
 (build*, managed_components) are skipped, so a local tree with builds in it
 checks the same as CI's clean checkout.
 
@@ -35,7 +35,7 @@ import sys
 from pathlib import Path
 
 # Where the repository's ESP-IDF projects live.
-PROJECT_ROOTS = ("esp-idf", "apps/baremetal")
+PROJECT_ROOTS = ("firmware/esp-idf", "firmware/hearth-sink", "firmware/baremetal")
 
 # Directory names whose contents are a build's or the component manager's,
 # not the repository's: `build`, the `build-<shape>` and `build_<shape>` forms

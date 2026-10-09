@@ -3,18 +3,20 @@ iclforge provides CMake targets via find_package(iclforge):
     find_package(iclforge CONFIG REQUIRED)
     target_link_libraries(main PRIVATE iclforge::ac3)
 
+iclforge::containers is always installed, with IEC 61937 burst packing; the matroska, mp4, mpegts
+and iamf features add those parts of it (namespaces iclforge::containers::matroska and so on).
 Every other library is a separate, opt-in feature - none installed by default, since each adds its
 own public API, CMake targets and binaries. When present, their own targets are also available:
 
-    matroska  ->  iclforge::matroska                                 (Matroska/.mkv)
-    mp4       ->  iclforge::mp4                                      (MP4/ISOBMFF, plus fMP4/CMAF + HLS/DASH)
-    mpegts    ->  iclforge::mpegts                                   (MPEG-2 Transport Stream)
-    capi      ->  iclforge::c                                        (C11 API over the codecs; AC-4 too with the ac4 feature)
-    ac4       ->  iclforge::ac4dec, iclforge::ac4enc, iclforge::ac4  (AC-4 decoding, encoding and reading)
-    iab       ->  iclforge::iab                                      (SMPTE ST 2098-2 Immersive Audio Bitstream reading)
-    iamf      ->  iclforge::iamf                                     (IAMF writing)
+    matroska  ->  iclforge::containers   (Matroska/.mkv)
+    mp4       ->  iclforge::containers   (MP4/ISOBMFF, plus fMP4/CMAF + HLS/DASH)
+    mpegts    ->  iclforge::containers   (MPEG-2 Transport Stream)
+    iamf      ->  iclforge::containers   (IAMF writing)
+    capi      ->  iclforge::c            (C11 API over the codecs; AC-4 too with the ac4 feature)
+    ac4       ->  iclforge::ac4          (AC-4 decoding, encoding and reading)
+    iab       ->  iclforge::iab          (SMPTE ST 2098-2 Immersive Audio Bitstream reading)
 
-    target_link_libraries(main PRIVATE iclforge::matroska iclforge::mp4 iclforge::mpegts)
+    target_link_libraries(main PRIVATE iclforge::containers)
 
 To install the three container writers alongside the codec:
 

@@ -1,0 +1,53 @@
+#include "iclforge/audio/audio_backend.hpp"
+
+// This is now reachable only as iclforge::audio's Linux fallback, when
+// libasound's development headers are not present (see the ICLFORGE_WITH_ALSA
+// AUTO/ON/OFF block in libs/audio/CMakeLists.txt) - macOS gets a real
+// CoreAudio backend of its own, libs/audio/src/backend/macos/, unconditionally.
+//
+// None of the three capabilities exist here, and on a Linux host without
+// ALSA that is a real absence rather than an oversight: live capture would
+// add no coverage the WAV path does not already give, exclusive-mode IEC
+// 61937 is the expensive half (it needs a device that will accept a
+// non-PCM format under exclusive access, unverifiable without hardware on
+// the other end of an optical or HDMI cable), and shared-mode monitor
+// playback needs the same ALSA/PipeWire integration capture does.
+//
+// 'forge spdif' is the substitute and needs no backend anywhere: it wraps
+// frames into the same IEC 61937 bursts and writes them as a PCM16 WAV, which
+// any player will push through a passthrough-capable output bit-exactly.
+//
+// These strings are printed verbatim when a caller is turned away, so they
+// name what is missing rather than merely reporting that something is.
+
+namespace iclforge::audio {
+
+const AudioBackend& audio_backend() {
+    static constexpr AudioBackend kBackend{
+        .capture = {.available = false,
+                    .reason = "this build has no capture backend: install libasound2-dev "
+                              "(Debian/Ubuntu) or alsa-lib-devel (Fedora) and reconfigure"},
+        .passthrough = {.available = false,
+                        .reason = "this build has no passthrough backend: exclusive-mode "
+                                  "IEC 61937 needs direct ALSA hw: access, which needs "
+                                  "libasound2-dev (Debian/Ubuntu) or alsa-lib-devel (Fedora)"},
+        .monitor = {.available = false,
+                   .reason = "this build has no monitor backend: shared-mode PCM playback "
+                             "needs ALSA/PipeWire, which needs libasound2-dev (Debian/Ubuntu) "
+                             "or alsa-lib-devel (Fedora)"},
+        .spatial = {.available = false,
+                   .reason = "this build has no spatial backend: "
+                             "ISpatialAudioObjectRenderStream is a Windows-only API"},
+        .process_loopback = {.available = false,
+                             .reason = "per-process loopback capture needs a per-application tap "
+                                       "this backend does not have. The PipeWire backend links "
+                                       "a capture stream to one application node; Windows uses "
+                                       "AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK; macOS has "
+                                       "had Core Audio process taps since 14.2"},
+                .device_watch = {.available = false,
+                         .reason = "no device-notification backend in this build: endpoint arrival, removal and default-change events are IMMNotificationClient on Windows only so far"},
+    };
+    return kBackend;
+}
+
+}  // namespace iclforge::audio

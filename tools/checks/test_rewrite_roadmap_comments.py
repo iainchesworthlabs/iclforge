@@ -67,12 +67,12 @@ class Main(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.root = Path(self._tmp.name)
         self.files = {
-            "src/a.cpp": "// roadmap PF5 kernel\n",
-            "src/plain.cpp": "// nothing to see\n",
-            "src/mention.cpp": "// ROADMAP.md only\n",
+            "libs/a.cpp": "// roadmap PF5 kernel\n",
+            "libs/plain.cpp": "// nothing to see\n",
+            "libs/mention.cpp": "// ROADMAP.md only\n",
             "tools/build/b.py": "# roadmap PF5\n",            # skipped dir part
             "tools/rewrite_roadmap_comments.py": "# roadmap PF5\n",  # skipped file
-            "tests/golden/x.json": '"roadmap PF5"\n',         # suffix not scanned
+            "testdata/x.json": '"roadmap PF5"\n',         # suffix not scanned
             "tests/c.bin": "roadmap PF5\n",
             "CMakeLists.txt": "# roadmap item F1\n",
         }
@@ -95,17 +95,17 @@ class Main(unittest.TestCase):
         rc, out = self.run_main()
         self.assertEqual(rc, 0)
         self.assertIn("Would change 2 files", out)
-        self.assertIn("src/a.cpp", out)
+        self.assertIn("libs/a.cpp", out)
         self.assertIn("CMakeLists.txt", out)
-        self.assertEqual((self.root / "src/a.cpp").read_text(), self.files["src/a.cpp"])
+        self.assertEqual((self.root / "libs/a.cpp").read_text(), self.files["libs/a.cpp"])
 
     def test_write_rewrites_only_matching_files(self):
         _rc, out = self.run_main("--write")
         self.assertIn("Wrote 2 files", out)
-        self.assertEqual((self.root / "src/a.cpp").read_text(), "// SIMD kernels kernel\n")
+        self.assertEqual((self.root / "libs/a.cpp").read_text(), "// SIMD kernels kernel\n")
         self.assertEqual((self.root / "CMakeLists.txt").read_text(), "# C API\n")
         for untouched in ("tools/build/b.py", "tools/rewrite_roadmap_comments.py",
-                          "tests/golden/x.json", "tests/c.bin", "src/mention.cpp"):
+                          "testdata/x.json", "tests/c.bin", "libs/mention.cpp"):
             self.assertEqual((self.root / untouched).read_text(), self.files[untouched])
 
 

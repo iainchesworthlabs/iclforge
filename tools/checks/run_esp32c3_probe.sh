@@ -16,7 +16,7 @@
 # arithmetic having no rounding mode, no fused multiply-add and no C library's
 # last bit to differ by. Two architectures agreeing is a coincidence a third
 # can break, so this leg holds the probe's <codec>.pcm_hash lines to the same
-# pinned values (tests/golden/fixed-probe-pcm-hashes.json) the host and the
+# pinned values (testdata/fixed-probe-pcm-hashes.json) the host and the
 # Cortex-M3 leg are held to. That check is this leg's reason for existing; the
 # footprint ceilings below are the ordinary ones every probe leg carries.
 #
@@ -28,8 +28,8 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PROJECT="$REPO/apps/baremetal/platform/esp32c3"
-PINS="$REPO/tests/golden/fixed-probe-pcm-hashes.json"
+PROJECT="$REPO/firmware/baremetal/platform/esp32c3"
+PINS="$REPO/testdata/fixed-probe-pcm-hashes.json"
 
 # The decode arithmetic. `fixed` is the project's own default and the reason
 # this target exists; `float` builds the same part with the S3's tier, which is

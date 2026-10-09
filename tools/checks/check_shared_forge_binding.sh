@@ -68,7 +68,7 @@ fi
 { nm -D --defined-only "$exe"; nm --defined-only "$exe" 2>/dev/null || true; } | names > "$work/defined"
 awk 'NR == FNR { defined[$1] = 1; next } ($2 in defined) { print $2 }' \
     "$work/defined" "$work/exports" | sort -u > "$work/linked_in"
-# One definition is meant to be there twice. iclforge-tests compiles src/base/src/cpu_features.cpp a
+# One definition is meant to be there twice. iclforge-tests compiles libs/base/src/cpu_features.cpp a
 # second time on purpose (tests/CMakeLists.txt) to test the dispatch against the probe directory the
 # build chose, and iclforge_base exports has_avx2() since the libraries were split.
 { grep -v -E '^_ZN8iclforge8internal3cpu8has_avx2Ev$' "$work/linked_in" || true; } > "$work/kept"

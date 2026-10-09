@@ -189,7 +189,7 @@ fi
 # said GPL-3.0-or-later, unnoticed until it was checked by hand). ---
 vcpkg_json="$root/packaging/vcpkg-port/iclforge/vcpkg.json"
 conanfile="$root/packaging/conan/conanfile.py"
-pyproject="$root/python/pyproject.toml"
+pyproject="$root/bindings/python/pyproject.toml"
 if [[ -f "$vcpkg_json" ]] && [[ -f "$conanfile" ]] && [[ -f "$formula" ]] && [[ -f "$pyproject" ]]; then
     vcpkg_license="$(grep -m1 '"license"' "$vcpkg_json" | sed -E 's/.*"license":[[:space:]]*"([^"]*)".*/\1/')"
     conan_license="$(grep -m1 '^[[:space:]]*license = ' "$conanfile" | sed -E 's/^[[:space:]]*license = "([^"]*)".*/\1/')"
@@ -199,7 +199,7 @@ if [[ -f "$vcpkg_json" ]] && [[ -f "$conanfile" ]] && [[ -f "$formula" ]] && [[ 
     if [[ -n "$vcpkg_license" ]]; then
         [[ "$conan_license" = "$vcpkg_license" ]] || note "licence drift: packaging/conan/conanfile.py says '$conan_license', vcpkg.json says '$vcpkg_license'"
         [[ "$formula_license" = "$vcpkg_license" ]] || note "licence drift: packaging/homebrew/Formula/iclforge.rb says '$formula_license', vcpkg.json says '$vcpkg_license'"
-        [[ "$pyproject_license" = "$vcpkg_license" ]] || note "licence drift: python/pyproject.toml says '$pyproject_license', vcpkg.json says '$vcpkg_license'"
+        [[ "$pyproject_license" = "$vcpkg_license" ]] || note "licence drift: bindings/python/pyproject.toml says '$pyproject_license', vcpkg.json says '$vcpkg_license'"
     else
         note "licence check: could not extract vcpkg.json's \"license\" field"
     fi
@@ -274,8 +274,8 @@ fi
 # --- Every ICLFORGE_BUILD_<NAME> option the root CMakeLists.txt defaults ON (each is declared on
 # one line) is, in each recipe, either a component it offers or pinned OFF. One that a recipe
 # neither offers nor pins gets built by it, with whatever it needs: ICLFORGE_BUILD_HEARTH, which
-# defaults ON, had both recipes configure src/sendspin, which stops at a dependency neither
-# declares, and, with the AC-4 libraries off, at upstream's refusal of Hearth without them. ---
+# defaults ON, had both recipes configure libs/sendspin, which stops at a dependency neither
+# declares, and, with the AC-4 library off, at upstream's refusal of Hearth without it. ---
 cmakelists="$root/CMakeLists.txt"
 if [[ -f "$cmakelists" ]] && [[ -f "$portfile" ]] && [[ -f "$conanfile" ]]; then
     upstream_on="$( { grep -E '^[[:space:]]*option\(ICLFORGE_BUILD_[A-Z0-9_]+[[:space:]].*[[:space:]]ON\)[[:space:]]*(#.*)?$' "$cmakelists" || true; } \

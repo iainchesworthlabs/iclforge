@@ -1,1 +1,79 @@
+iclforge::base::ChannelSummary::peak_db() const
+iclforge::base::ChannelSummary::rms() const
+iclforge::base::ChannelSummary::rms_db() const
+iclforge::base::LevelMeter::LevelMeter(iclforge::base::LevelMeter&&)
+iclforge::base::LevelMeter::LevelMeter(int, unsigned int, iclforge::base::MeterBallistics const&)
+iclforge::base::LevelMeter::LevelMeter(std::span<iclforge::base::Speaker const, 18446744073709551615ul>, unsigned int, iclforge::base::MeterBallistics const&)
+iclforge::base::LevelMeter::advance(unsigned long, double, double, double)
+iclforge::base::LevelMeter::channel_count() const
+iclforge::base::LevelMeter::levels() const
+iclforge::base::LevelMeter::operator=(iclforge::base::LevelMeter&&)
+iclforge::base::LevelMeter::process(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>)
+iclforge::base::LevelMeter::process_interleaved(std::span<float const, 18446744073709551615ul>, unsigned long)
+iclforge::base::LevelMeter::reset()
+iclforge::base::LevelMeter::sample_rate() const
+iclforge::base::LevelMeter::summary() const
+iclforge::base::LevelMeter::~LevelMeter()
+iclforge::base::LoudnessMeter::LoudnessMeter(iclforge::base::LoudnessMeter&&)
+iclforge::base::LoudnessMeter::LoudnessMeter(unsigned int, std::span<iclforge::base::Speaker const, 18446744073709551615ul>)
+iclforge::base::LoudnessMeter::LoudnessMeter(unsigned int, std::span<std::optional<double> const, 18446744073709551615ul>)
+iclforge::base::LoudnessMeter::channel_count() const
+iclforge::base::LoudnessMeter::integrated_lkfs() const
+iclforge::base::LoudnessMeter::loudness_range() const
+iclforge::base::LoudnessMeter::momentary_lkfs() const
+iclforge::base::LoudnessMeter::operator=(iclforge::base::LoudnessMeter&&)
+iclforge::base::LoudnessMeter::push(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>)
+iclforge::base::LoudnessMeter::push_block()
+iclforge::base::LoudnessMeter::push_true_peak(int, float)
+iclforge::base::LoudnessMeter::short_term_lkfs() const
+iclforge::base::LoudnessMeter::true_peak_dbtp() const
+iclforge::base::LoudnessMeter::~LoudnessMeter()
+iclforge::base::WavPcm16StreamWriter::WavPcm16StreamWriter()
+iclforge::base::WavPcm16StreamWriter::WavPcm16StreamWriter(iclforge::base::WavPcm16StreamWriter&&)
+iclforge::base::WavPcm16StreamWriter::bytes_written() const
+iclforge::base::WavPcm16StreamWriter::close()
+iclforge::base::WavPcm16StreamWriter::flush_header()
+iclforge::base::WavPcm16StreamWriter::is_open() const
+iclforge::base::WavPcm16StreamWriter::open(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, unsigned int, unsigned short)
+iclforge::base::WavPcm16StreamWriter::operator=(iclforge::base::WavPcm16StreamWriter&&)
+iclforge::base::WavPcm16StreamWriter::write(std::span<std::byte const, 18446744073709551615ul>)
+iclforge::base::WavPcm16StreamWriter::~WavPcm16StreamWriter()
+iclforge::base::WavStreamReader::WavStreamReader()
+iclforge::base::WavStreamReader::WavStreamReader(iclforge::base::WavStreamReader&&)
+iclforge::base::WavStreamReader::channels() const
+iclforge::base::WavStreamReader::close()
+iclforge::base::WavStreamReader::frame_count() const
+iclforge::base::WavStreamReader::is_open() const
+iclforge::base::WavStreamReader::open(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+iclforge::base::WavStreamReader::operator=(iclforge::base::WavStreamReader&&)
+iclforge::base::WavStreamReader::read_planar(std::span<std::span<float, 18446744073709551615ul> const, 18446744073709551615ul>, unsigned long)
+iclforge::base::WavStreamReader::sample_rate() const
+iclforge::base::WavStreamReader::~WavStreamReader()
+iclforge::base::WavStreamWriter::WavStreamWriter()
+iclforge::base::WavStreamWriter::WavStreamWriter(iclforge::base::WavStreamWriter&&)
+iclforge::base::WavStreamWriter::channels() const
+iclforge::base::WavStreamWriter::close()
+iclforge::base::WavStreamWriter::flush_header()
+iclforge::base::WavStreamWriter::frames_written() const
+iclforge::base::WavStreamWriter::is_open() const
+iclforge::base::WavStreamWriter::open(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, unsigned int, unsigned short)
+iclforge::base::WavStreamWriter::operator=(iclforge::base::WavStreamWriter&&)
+iclforge::base::WavStreamWriter::write(std::span<float const, 18446744073709551615ul>)
+iclforge::base::WavStreamWriter::~WavStreamWriter()
+iclforge::base::crypto::SigningKey::SigningKey(std::vector<std::byte, std::allocator<std::byte> >)
+iclforge::base::crypto::SigningKey::~SigningKey()
+iclforge::base::crypto::decode_signing_key(std::span<std::byte const, 18446744073709551615ul>)
+iclforge::base::crypto::hmac_sha256(std::span<std::byte const, 18446744073709551615ul>, std::span<std::byte const, 18446744073709551615ul>)
+iclforge::base::crypto::load_signing_key(std::basic_string_view<char, std::char_traits<char> >)
+iclforge::base::crypto::sha256(std::span<std::byte const, 18446744073709551615ul>)
+iclforge::base::describe(iclforge::base::WavError)
+iclforge::base::energy_vector(std::span<iclforge::base::ChannelLevel const, 18446744073709551615ul>, std::span<std::optional<double> const, 18446744073709551615ul>)
+iclforge::base::position_weight(iclforge::base::Speaker)
+iclforge::base::read_wav(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+iclforge::base::read_wav(std::basic_istream<char, std::char_traits<char> >&)
+iclforge::base::to_dbfs(double)
+iclforge::base::version_details[abi:cxx11]()
+iclforge::base::write_wav_f32(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::span<std::vector<float, std::allocator<float> > const, 18446744073709551615ul>, unsigned int, std::span<unsigned long const, 18446744073709551615ul>)
+iclforge::base::write_wav_f32(std::basic_ostream<char, std::char_traits<char> >&, std::span<std::vector<float, std::allocator<float> > const, 18446744073709551615ul>, unsigned int, std::span<unsigned long const, 18446744073709551615ul>)
+iclforge::base::write_wav_pcm16_raw(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::span<std::byte const, 18446744073709551615ul>, unsigned int, unsigned short)
 iclforge::internal::cpu::has_avx2()

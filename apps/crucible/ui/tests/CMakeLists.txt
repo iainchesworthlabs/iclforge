@@ -1,11 +1,11 @@
 # ---------------------------------------------------------------------------
 # crucible_qmltests - Qt Quick Test coverage for the Crucible's
-# window (ui/qml), driving the real CrucibleController the way forge_gui_qmltests
-# drives the real EncoderController (apps/gui/tests/CMakeLists.txt, whose
+# window (ui/assets/qml), driving the real CrucibleController the way forge_gui_qmltests
+# drives the real EncoderController (apps/forge/gui/tests/qml.cmake, whose
 # reasoning this file follows and does not repeat).
 #
 # include()d from ../../CMakeLists.txt inside its Qt6_FOUND block, after
-# crucible is defined, so paths are relative to apps/windows and the
+# crucible is defined, so paths are relative to apps/crucible/windows and the
 # ICLFORGE_CRUCIBLE_QML_FILES / ICLFORGE_CRUCIBLE_TS_FILES lists are the ones crucible itself
 # embeds: the two targets cannot list different files without both being
 # edited. Second, independent embedding of the Crucible module, not a
@@ -15,36 +15,36 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS QuickTest)
 
 qt_add_executable(crucible_qmltests
     ui/tests/qml_test_main.cpp
-    ui/crucible_controller.cpp
-    ui/crucible_controller.hpp
-    ui/app_entry.hpp
-    ui/app_icon_provider.hpp
-    ui/tray_support.hpp
-    ../gui/system_theme.cpp
-    ../gui/system_theme.hpp
-    ../gui/language_manager.cpp
-    ../gui/language_manager.hpp)
+    ui/src/crucible_controller.cpp
+    ui/src/crucible_controller.hpp
+    ui/src/app_entry.hpp
+    ui/src/app_icon_provider.hpp
+    ui/src/tray_support.hpp
+    ../shared/theme/src/system_theme.cpp
+    ../shared/theme/src/system_theme.hpp
+    ../shared/preferences/src/language_manager.cpp
+    ../shared/preferences/src/language_manager.hpp)
 # The icon provider and the tray answer are per platform, the same way the
 # window's own target selects them (apps/crucible/CMakeLists.txt): this target
 # embeds the same sources and has to make the same choice. Every file listed
-# under ui/platform/ there belongs here too - the controller is compiled into
+# under ui/src/platform/ there belongs here too - the controller is compiled into
 # this binary, so a seam this target does not choose is an unresolved symbol
 # at link time and nothing sooner.
 #
 # The macOS arm carries the OBJCXX standard and the AppKit link with it, for
-# the same reason the window's does: ui/platform/macos/app_icon_provider.mm is
+# the same reason the window's does: ui/src/platform/macos/app_icon_provider.mm is
 # Objective-C++, and this is a second, independent embedding rather than a
 # shared library, so nothing is inherited from the other target.
 if(WIN32)
-    target_sources(crucible_qmltests PRIVATE ui/platform/windows/app_icon_provider.cpp
-                                                ui/platform/windows/tray_support.cpp)
+    target_sources(crucible_qmltests PRIVATE ui/src/platform/windows/app_icon_provider.cpp
+                                                ui/src/platform/windows/tray_support.cpp)
 elseif(LINUX)
-    target_sources(crucible_qmltests PRIVATE ui/platform/linux/app_icon_provider.cpp
-                                                ui/platform/linux/tray_support.cpp)
-    target_sources(crucible_qmltests PRIVATE ui/desktop_entries.cpp ui/desktop_entries.hpp)
+    target_sources(crucible_qmltests PRIVATE ui/src/platform/linux/app_icon_provider.cpp
+                                                ui/src/platform/linux/tray_support.cpp)
+    target_sources(crucible_qmltests PRIVATE ui/src/desktop_entries.cpp ui/src/desktop_entries.hpp)
 elseif(APPLE)
-    target_sources(crucible_qmltests PRIVATE ui/platform/macos/app_icon_provider.mm
-                                                ui/platform/macos/tray_support.cpp)
+    target_sources(crucible_qmltests PRIVATE ui/src/platform/macos/app_icon_provider.mm
+                                                ui/src/platform/macos/tray_support.cpp)
     set_target_properties(crucible_qmltests PROPERTIES
         OBJCXX_STANDARD 23
         OBJCXX_STANDARD_REQUIRED ON
@@ -62,7 +62,7 @@ qt_add_qml_module(crucible_qmltests
     VERSION 1.0
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests/Crucible"
     QML_FILES ${ICLFORGE_CRUCIBLE_QML_FILES}
-    RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml/tray.svg")
+    RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/tray.svg")
 
 # The notices resource too: CrucibleController::licenceNotices() reads
 # :/notices/NOTICES.txt, and tst_about.qml asserts what this build's copy
@@ -73,15 +73,16 @@ qt6_add_resources(crucible_qmltests "crucible_qmltests_notices"
     BASE "${CMAKE_CURRENT_BINARY_DIR}/notices"
     FILES "${ICLFORGE_CRUCIBLE_NOTICES_FILE}")
 
-# tests/crucible for the header-only fakes the scripted-machine singleton
+# apps/crucible/engine/tests for the header-only fakes the scripted-machine singleton
 # builds (ui/tests/qml_test_main.cpp, TestServices): the same
-# FakeSessionMonitor/FakeDevices the engine's Catch2 cases use, so the two
+# FakeSessionMonitor/FakeDevices the engine/src's Catch2 cases use, so the two
 # suites cannot disagree about what a scripted machine is.
 target_include_directories(crucible_qmltests PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/ui" "${CMAKE_CURRENT_SOURCE_DIR}/../gui"
-    "${CMAKE_SOURCE_DIR}/tests/crucible")
+    "${CMAKE_CURRENT_SOURCE_DIR}/ui/src" "${CMAKE_CURRENT_SOURCE_DIR}/../shared/preferences/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../shared/theme/src"
+    "${CMAKE_SOURCE_DIR}/apps/crucible/engine/tests")
 target_compile_definitions(crucible_qmltests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX
-    ICLFORGE_CRUCIBLE_DRIVER_SOURCE_DIR="${CMAKE_SOURCE_DIR}/apps/windows/driver"
+    ICLFORGE_CRUCIBLE_DRIVER_SOURCE_DIR="${CMAKE_SOURCE_DIR}/apps/crucible/windows/driver"
     ICLFORGE_CRUCIBLE_QUICK3D=${ICLFORGE_CRUCIBLE_QUICK3D}
     QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/ui/tests/qml")
 target_link_libraries(crucible_qmltests PRIVATE
@@ -104,12 +105,12 @@ add_dependencies(crucible_qmltests crucible)
 if(ICLFORGE_CRUCIBLE_WINDEPLOYQT)
     add_custom_command(TARGET crucible_qmltests POST_BUILD
         COMMAND "${ICLFORGE_CRUCIBLE_WINDEPLOYQT}"
-            --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/ui/qml"
+            --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml"
             --qmldir "${ICLFORGE_CRUCIBLE_SHARED_DIR}"
             --no-compiler-runtime
             "$<TARGET_FILE:crucible_qmltests>"
         # windeployqt deploys the windows platform plugin only; the suites
-        # run under offscreen (apps/gui/tests does the same copy). Without
+        # run under offscreen (apps/forge/gui/tests does the same copy). Without
         # it Qt reports the plugin missing and then waits on a message box.
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "${ICLFORGE_CRUCIBLE_QT_BIN_DIR}/../plugins/platforms/qoffscreen$<$<CONFIG:Debug>:d>.dll"
@@ -117,7 +118,7 @@ if(ICLFORGE_CRUCIBLE_WINDEPLOYQT)
         COMMENT "Deploying Qt runtime dependencies for crucible_qmltests")
 endif()
 
-# The translations, compiled a second time into this binary (lrelease only;
+# The ui/assets/translations, compiled a second time into this binary (lrelease only;
 # lupdate already ran for crucible over the identical QML list), under their
 # own output location so Ninja does not see two rules for one .qm.
 set_source_files_properties(${ICLFORGE_CRUCIBLE_TS_FILES} PROPERTIES
@@ -137,7 +138,7 @@ qt6_add_resources(crucible_qmltests "crucible_qmltests_translations"
 # label written below, so renaming it here means editing that script's
 # -Labels default and CMakePresets.json's test-windows-llvm-coverage filter
 # with it. QT_FORCE_STDERR_LOGGING
-# for the reason apps/gui/tests gives: without it Qt on Windows routes the
+# for the reason apps/forge/gui/tests gives: without it Qt on Windows routes the
 # PASS/FAIL lines away from stderr when it decides no console is attached.
 file(GLOB ICLFORGE_CRUCIBLE_QML_TEST_FILES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/ui/tests/qml/tst_*.qml")
@@ -160,7 +161,7 @@ foreach(test_file IN LISTS ICLFORGE_CRUCIBLE_QML_TEST_FILES)
     # It did NOT clear the Apple Silicon leg, and that is worth keeping here
     # so nobody reaches for a render-loop setting next time. The same three
     # suites kept timing out with the software backend in place, for an
-    # unrelated reason found by sampling the stuck process: the engine's
+    # unrelated reason found by sampling the stuck process: the engine/src's
     # frame thread was inside AudioDeviceCreateIOProcID on a Core Audio
     # process tap that never returned, and the window's own thread was
     # blocked behind it. Two hangs, one symptom. See

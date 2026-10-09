@@ -3,8 +3,9 @@
 DEE writes one presentation of one substream, so its side of the race is phase D7's test
 multiplexer over the gold set's legs of music and effects, dialogue and associated audio, each a
 DEE encode of its own source at its own rate (phases G0 and G1); the encoder's side encodes the same
-sources into the same presentations, each substream at its leg's rate. `iclforge-tests "[.race]"`
-(tests/ac4enc/test_ac4enc_presentations_race.cpp) writes both streams of each race; this decodes
+sources into the same presentations, each substream at its leg's rate.
+`iclforge-ac4-tests "[.race]"` (libs/ac4/tests/encoder/test_presentations_race.cpp) writes both
+streams of each race; this decodes
 every presentation of both with `forge decode presentation-id=`, and scores each against its
 sources' mix, the plain sum the presentations' default mixing values give: music and effects with
 dialogue (presentation 1), with associated audio as well (2), and each substream alone (10 to 12).
@@ -18,7 +19,7 @@ presentation's first substream alone: its output is scored against the music and
 It reads DEE's gold set, so it runs locally, never in CI; nothing it measures is checked.
 
 Usage:
-    python tools/checks/race_ac4_presentations.py --cli forge.exe --tests iclforge-tests.exe
+    python tools/checks/race_ac4_presentations.py --cli forge.exe --tests iclforge-ac4-tests.exe
         --gold D:/ac3bld/ac4-gold [--librempeg /mnt/d/ac3bld/librempeg/install/bin/ffmpeg]
         [--work DIR]
 """
@@ -133,7 +134,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--cli", required=True, type=Path)
     parser.add_argument("--tests", required=True, type=Path,
-                        help="iclforge-tests, which writes the streams")
+                        help="iclforge-ac4-tests, which writes the streams")
     parser.add_argument("--gold", required=True, type=Path)
     parser.add_argument("--librempeg", help="librempeg's ffmpeg, a WSL path on Windows")
     parser.add_argument("--work", type=Path)

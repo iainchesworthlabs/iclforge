@@ -9,7 +9,7 @@ contraction" section for what has been ruled out and what has not).
 
 This does not explain that gap - it pins it, so a change to any leg's output,
 in either direction, is caught immediately instead of silently reshaping an
-already-mysterious number. `tests/golden/bitstream-hashes.json` records one
+already-mysterious number. `testdata/bitstream-hashes.json` records one
 SHA-256 per (kernel, transform mode) pair, over the three streams this
 project's OWN encoder produces from the gold-reference WAV inside
 verify_gold_reference.sh (gold.ac3, gold.ec3, gold_cpl.ec3 - the external
@@ -20,7 +20,7 @@ A key with no pinned entry is reported, not failed: this file cannot be
 hand-updated for a leg nobody has run it on. Run this once on a leg, read the
 hash it prints, add it to the JSON, and the NEXT run on that leg is a real
 gate. A key whose pinned hash does not match is a hard failure - every other
-bit-exactness gate in this project (tests/ac3/core/test_simd_kernels.cpp, the
+bit-exactness gate in this project (libs/ac3/tests/core/test_simd_kernels.cpp, the
 codec matrix's byte-identical checks) works the same way for the same
 reason: a silent change to a number nobody is watching is worse than a loud,
 possibly-still-mysterious one.
@@ -40,7 +40,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-DEFAULT_PINS = REPO_ROOT / "tests" / "golden" / "bitstream-hashes.json"
+DEFAULT_PINS = REPO_ROOT / "testdata" / "bitstream-hashes.json"
 
 # label -> the file verify_gold_reference.sh's own encode step wrote it as.
 # Only this project's own encoder output: the external-baseline fixtures

@@ -1,0 +1,166 @@
+#include "iclforge/containers/mp4/hls.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <fmt/format.h>
+#include <span>
+#include <string>
+#include <string_view>
+
+#include "manifest_detail.hpp"
+#include "iclforge/containers/mp4/mp4.hpp"
+
+namespace iclforge::containers::mp4 {
+
+namespace {
+
+using manifest_detail::estimate_bandwidth_bps;
+using manifest_detail::segment_infos;
+using manifest_detail::segment_seconds;
+
+// Substitutes the FIRST "{}" in `pattern` with `number` - HlsOptions'
+// documented placeholder convention. A pattern without one is returned
+// verbatim (see HlsOptions::segment_uri_pattern's own comment).
+[[nodiscard]] std::string apply_sequence_number(std::string_view pattern, std::uint32_t number) {
+    const auto pos = pattern.find("{}");
+    if (pos == std::string_view::npos) {
+        return std::string{pattern};
+    }
+    return fmt::format("{}{}{}", pattern.substr(0, pos), number, pattern.substr(pos + 2));
+}
+
+}  // namespace
+
+std::string_view hls_codec_string(const AudioTrack& track) {
+    // kCodecAc3/kCodecEac3 ("ac-3"/"ec-3") ARE RFC 6381's own codec string
+    // for either format unmodified - see mp4.hpp's citation on those
+    // constants and this header's own comment on hls_codec_string. The one
+    // codec whose string is NOT its fourcc (AC-4, Annex E.13's dotted
+    // version fields) supplies it through AudioTrack::rfc6381 instead, so
+    // this module never has to parse a configuration box to render a
+    // manifest.
+    return track.rfc6381.empty() ? std::string_view{track.codec_id}
+                                 : std::string_view{track.rfc6381};
+}
+
+std::string build_hls_media_playlist(const AudioTrack& track,
+                                     std::span<const SegmentInfo> segments,
+                                     const HlsOptions& options) {
+    const std::uint32_t timescale = timescale_of(track);
+    double max_seconds = 0.0;
+    for (const auto& segment : segments) {
+        max_seconds = std::max(max_seconds, segment_seconds(segment, timescale));
+    }
+    // RFC 8216 §4.3.3.1: an integer number of seconds, "MUST be less than
+    // or equal to the target duration" for every segment - rounding UP
+    // (rather than to nearest) is what keeps that true when a segment's
+    // exact duration is not itself an integer.
+    const auto target_duration = static_cast<std::uint64_t>(std::ceil(max_seconds));
+
+    std::string out;
+    out += "#EXTM3U\n";
+    out += fmt::format("#EXT-X-VERSION:{}\n", options.version);
+    out += fmt::format("#EXT-X-TARGETDURATION:{}\n", target_duration);
+    if (!segments.empty()) {
+        out += fmt::format("#EXT-X-MEDIA-SEQUENCE:{}\n", segments.front().sequence_number);
+    }
+    if (options.vod) {
+        out += "#EXT-X-PLAYLIST-TYPE:VOD\n";
+    }
+    out += fmt::format("#EXT-X-MAP:URI=\"{}\"\n", options.init_segment_uri);
+    for (const auto& segment : segments) {
+        out += fmt::format("#EXTINF:{:.5f},\n", segment_seconds(segment, timescale));
+        out += apply_sequence_number(options.segment_uri_pattern, segment.sequence_number);
+        out += "\n";
+    }
+    if (options.vod) {
+        out += "#EXT-X-ENDLIST\n";
+    }
+    return out;
+}
+
+std::string build_hls_media_playlist(const AudioTrack& track,
+                                     std::span<const MediaSegment> segments,
+                                     const HlsOptions& options) {
+    return build_hls_media_playlist(track, segment_infos(segments), options);
+}
+
+std::string build_hls_master_playlist(std::span<const HlsRendition> renditions,
+                                      const HlsOptions& options) {
+    if (renditions.empty()) {
+        return {};
+    }
+    // The variant follows whichever rendition claims DEFAULT=YES; with none
+    // claiming it, the first listed stands in, so a caller that forgot the
+    // flag still gets a playable master rather than a variant pointing
+    // nowhere.
+    std::size_t default_index = 0;
+    for (std::size_t i = 0; i < renditions.size(); ++i) {
+        if (renditions[i].is_default) {
+            default_index = i;
+            break;
+        }
+    }
+    std::uint64_t bandwidth = 0;
+    for (const auto& rendition : renditions) {
+        bandwidth = std::max(
+            bandwidth, estimate_bandwidth_bps(rendition.segments, timescale_of(rendition.track)));
+    }
+
+    std::string out;
+    out += "#EXTM3U\n";
+    out += fmt::format("#EXT-X-VERSION:{}\n", options.version);
+    // RFC 8216 §4.3.5.1: every Media Segment is guaranteed to carry the
+    // whole of any sample it starts (true of every AC-3/E-AC-3 access unit
+    // this module ever writes - see mp4.hpp), so this asset qualifies. So
+    // does an AC-4 track's, whose fragments start at a sync sample
+    // (FragmentOptions::sync_samples).
+    out += "#EXT-X-INDEPENDENT-SEGMENTS\n";
+    for (std::size_t i = 0; i < renditions.size(); ++i) {
+        const auto& rendition = renditions[i];
+        const std::string channels = rendition.channels_attribute.empty()
+                                         ? fmt::format("{}", rendition.track.channels)
+                                         : rendition.channels_attribute;
+        // AUTOSELECT=YES on every rendition, DEFAULT on exactly one: RFC 8216
+        // §4.3.4.1 lets a client pick a non-default rendition on its own when
+        // AUTOSELECT is set, which is precisely what a client that cannot
+        // render the object layer has to do to reach the 5.1 companion.
+        out += fmt::format(
+            "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio\",NAME=\"{}\",DEFAULT={},AUTOSELECT=YES,"
+            "CHANNELS=\"{}\",URI=\"{}\"\n",
+            rendition.name, i == default_index ? "YES" : "NO", channels,
+            rendition.media_playlist_uri);
+    }
+    // Audio-only content has no separate video rendition for the variant to
+    // point at, so the #EXT-X-STREAM-INF URI below is the SAME media
+    // playlist the default #EXT-X-MEDIA line names - real audio-only HLS
+    // assets (podcasts, music) use exactly this self-referencing pattern.
+    out += fmt::format("#EXT-X-STREAM-INF:BANDWIDTH={},CODECS=\"{}\",AUDIO=\"audio\"\n", bandwidth,
+                       hls_codec_string(renditions[default_index].track));
+    out += fmt::format("{}\n", renditions[default_index].media_playlist_uri);
+    return out;
+}
+
+std::string build_hls_master_playlist(const AudioTrack& track,
+                                      std::span<const SegmentInfo> segments,
+                                      std::string_view media_playlist_uri,
+                                      const HlsOptions& options) {
+    const HlsRendition only{.track = track,
+                            .segments = segments,
+                            .media_playlist_uri = std::string{media_playlist_uri},
+                            .name = "Audio",
+                            .channels_attribute = options.channels_attribute,
+                            .is_default = true};
+    return build_hls_master_playlist(std::span{&only, 1}, options);
+}
+
+std::string build_hls_master_playlist(const AudioTrack& track,
+                                      std::span<const MediaSegment> segments,
+                                      std::string_view media_playlist_uri,
+                                      const HlsOptions& options) {
+    return build_hls_master_playlist(track, segment_infos(segments), media_playlist_uri, options);
+}
+
+}  // namespace iclforge::containers::mp4

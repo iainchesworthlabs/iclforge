@@ -1,6 +1,6 @@
 // Wrap an elementary stream in an MPEG-2 Transport Stream.
 //
-// iclforge::mpegts links nothing from iclforge::ac3 beyond the AC-3/E-AC-3 choice
+// iclforge::containers::mpegts links nothing from iclforge::ac3 beyond the AC-3/E-AC-3 choice
 // it is told — it takes access units as opaque bytes. Pairing it with
 // iclforge::ac3::io::scan is what keeps the PMT descriptor honest: which codec, and
 // where each access unit begins, come off the bitstream rather than from the
@@ -16,7 +16,7 @@
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
-#include "iclforge/mpegts/mpegts.hpp"
+#include "iclforge/containers/mpegts/mpegts.hpp"
 
 int main() {
     // Some AC-3 to wrap.
@@ -58,20 +58,20 @@ int main() {
         frames.emplace_back(unit.begin(), unit.end());
     }
 
-    const iclforge::mpegts::AudioTrack track{
+    const iclforge::containers::mpegts::AudioTrack track{
         .codec = scanned->kind == iclforge::ac3::io::StreamKind::kAc3
-                     ? iclforge::mpegts::AudioCodec::kAc3
-                     : iclforge::mpegts::AudioCodec::kEac3,
+                     ? iclforge::containers::mpegts::AudioCodec::kAc3
+                     : iclforge::containers::mpegts::AudioCodec::kEac3,
         .sample_rate = iclforge::ac3::sample_rate_hz(scanned->sample_rate),
         .channels = scanned->channels,
         .samples_per_frame = iclforge::ac3::kSamplesPerFrame,
     };
 
-    const auto file = iclforge::mpegts::mux(track, frames);
+    const auto file = iclforge::containers::mpegts::mux(track, frames);
     if (!file) {
         fmt::printf("mux failed: %.*s\n",
-                    static_cast<int>(iclforge::mpegts::describe(file.error()).size()),
-                    iclforge::mpegts::describe(file.error()).data());
+                    static_cast<int>(iclforge::containers::mpegts::describe(file.error()).size()),
+                    iclforge::containers::mpegts::describe(file.error()).data());
         return 1;
     }
 

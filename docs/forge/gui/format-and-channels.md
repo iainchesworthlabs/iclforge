@@ -65,7 +65,7 @@ which is legal and expected, if unusual for a plain PCM16 file.
 
 Of the four containers above, only **fragmented MP4/CMAF** carries over to a **live session** the
 way Matroska does: `EncoderController::openLiveOutputWriters` wires exactly two incremental
-writers, `iclforge::matroska::Writer` and `iclforge::mp4::FragmentWriter`, and **MP4**, **S/PDIF** and **MPEG-TS** all
+writers, `iclforge::containers::matroska::Writer` and `iclforge::containers::mp4::FragmentWriter`, and **MP4**, **S/PDIF** and **MPEG-TS** all
 fall through to writing the plain elementary stream when a live session starts — the same file
 Elementary stream itself would produce live. That is a limit of the live path, not of the
 containers: a **recording** (the Record button's capture-to-file take) goes through
@@ -237,7 +237,7 @@ The command bar echoes one command, `forge ac4-encode <source> out.ac4 <kbps> <o
 `out.mp4` for MP4, since `ac4-encode` writes the MP4 file itself. Run where the source is, it
 writes the same bytes the page writes; the Qt Quick Tests hold a raw stream, an MP4 file and a
 5.1 downmix to that. The page and the command share their channel order, loudness measurement
-and packaging (`apps/common/ac4_encode_core.hpp`).
+and packaging (`apps/shared/media/src/ac4_encode_core.hpp`).
 
 `aspx-acpl-1` is on the Codec mode list, but `ac4-encode` takes it only with `experimental=acpl`,
 which the page never sets, so choosing it ends in the encoder's refusal.

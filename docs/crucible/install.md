@@ -34,7 +34,7 @@ beside it says there is no built driver package in the driver folder. Turning te
 will not change that, so leave both security settings where they are unless you have built the
 driver yourself.
 
-Building it takes a checkout and the WDK: `apps/windows/driver` holds the sources, the solution
+Building it takes a checkout and the WDK: `apps/crucible/windows/driver` holds the sources, the solution
 and the install and remove scripts, and the build writes its package underneath. Crucible run
 from that same checkout already looks there; a packaged copy has to be pointed at it under
 Settings → Advanced → Driver folder. With a package in that folder, **Install driver** un-greys

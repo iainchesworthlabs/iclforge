@@ -1,6 +1,6 @@
 """Local-only generator for the committed transient pre-noise fixture.
 
-`tests/golden/external-baseline/eac3-transient-stereo-128/` holds the first five
+`testdata/external-baseline/eac3-transient-stereo-128/` holds the first five
 seconds of one leg of the Dolby Encoding Engine golden-master set (the `dee-gold`
 set, D:/ac3bld/dee-gold by default, made by PR #1054's generator): `dee.ec3`, the
 leg's first 156 syncframes, and `source.wav`, the first five seconds of the WAV
@@ -41,7 +41,7 @@ import wave
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-OUT = REPO / "tests" / "golden" / "external-baseline" / "eac3-transient-stereo-128"
+OUT = REPO / "testdata" / "external-baseline" / "eac3-transient-stereo-128"
 LEG = "ddp-20-transient-128"
 SOURCE = "transient_20.wav"
 SYNCFRAMES = 156  # 156 x 1536 samples, 4.99 s

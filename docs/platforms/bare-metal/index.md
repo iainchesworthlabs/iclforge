@@ -6,7 +6,7 @@ transform tables. What differs between the targets is the part and, on parts wit
 floating-point unit, the arithmetic tier the decoder runs in
 ([the plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/arithmetic-tiers.md)).
 
-AC-4 is built from its own libraries (`src/ac4`, `src/ac4core`, `src/ac4dec`), the decoder only:
+AC-4 is built from its own libraries (`libs/ac4`), the decoder only:
 no bare-metal build has the AC-4 encoder. The [Cortex-M3](cortex-m3.md#status) leg probes it, and the
 [ESP32-P4](esp32-p4.md#ac-4) decodes it behind `CONFIG_ICLFORGE_AC4`. The
 [ESP32-S3](esp32-s3.md#ac-4) decodes it under QEMU in CI with its state in PSRAM and has not run it

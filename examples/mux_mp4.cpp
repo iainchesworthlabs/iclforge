@@ -1,6 +1,6 @@
 // Wrap an elementary stream in MP4.
 //
-// iclforge::mp4 links nothing from iclforge::ac3 — it takes frames, and the codec's
+// iclforge::containers::mp4 links nothing from iclforge::ac3 — it takes frames, and the codec's
 // sample-entry configuration box, as opaque bytes. Pairing it with
 // iclforge::ac3::io::scan and iclforge::ac3::io::build_codec_config_box is what keeps the dec3
 // box honest: fscod/bsid/bsmod/acmod/lfeon and the Dolby Atmos extension
@@ -19,7 +19,7 @@
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/io/dec3.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
-#include "iclforge/mp4/mp4.hpp"
+#include "iclforge/containers/mp4/mp4.hpp"
 
 int main() {
     // Some AC-3 to wrap.
@@ -61,24 +61,24 @@ int main() {
         frames.emplace_back(unit.begin(), unit.end());
     }
 
-    const iclforge::mp4::AudioTrack track{
+    const iclforge::containers::mp4::AudioTrack track{
         .codec_id = std::string{scanned->kind == iclforge::ac3::io::StreamKind::kAc3
-                                    ? iclforge::mp4::kCodecAc3
-                                    : iclforge::mp4::kCodecEac3},
+                                    ? iclforge::containers::mp4::kCodecAc3
+                                    : iclforge::containers::mp4::kCodecEac3},
         .sample_rate = iclforge::ac3::sample_rate_hz(scanned->sample_rate),
         .channels = scanned->channels,
         .samples_per_frame = iclforge::ac3::kSamplesPerFrame,
         // The dac3/dec3 sample-entry box, built from the same scan result -
         // see ac3/io/dec3.hpp for why this lives in iclforge::ac3::io rather than in
-        // iclforge::mp4 itself.
+        // iclforge::containers::mp4 itself.
         .codec_config = iclforge::ac3::io::build_codec_config_box(*scanned),
     };
 
-    const auto file = iclforge::mp4::mux(track, frames);
+    const auto file = iclforge::containers::mp4::mux(track, frames);
     if (!file) {
         fmt::printf("mux failed: %.*s\n",
-                    static_cast<int>(iclforge::mp4::describe(file.error()).size()),
-                    iclforge::mp4::describe(file.error()).data());
+                    static_cast<int>(iclforge::containers::mp4::describe(file.error()).size()),
+                    iclforge::containers::mp4::describe(file.error()).data());
         return 1;
     }
 

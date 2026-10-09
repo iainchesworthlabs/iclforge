@@ -6,7 +6,7 @@
 |---|---|
 | Decode demo | **Live**<br>built and tested in CI<br>AC-3, E-AC-3 and Atmos objects |
 | Encode demo | **Live**<br>built and tested in CI<br>AC-3, E-AC-3 and Atmos authoring |
-| JavaScript decoder package | **Source**<br>built and tested in CI<br>build from js/; unpublished on npm |
+| JavaScript decoder package | **Source**<br>built and tested in CI<br>build from bindings/js/; unpublished on npm |
 | C++ WebAssembly modules | **Source**<br>built and tested in CI<br>decode and encode |
 | AC-4 WebAssembly module | **Source**<br>built and tested in CI<br>decode and encode, objects included; no demo page |
 | Forge, Crucible and Hearth apps | **Unavailable**<br>not browser applications |

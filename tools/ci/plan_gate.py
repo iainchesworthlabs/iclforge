@@ -38,8 +38,19 @@ have no single PR diff to read.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from collections.abc import Iterable
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "checks"))
+
+import project_graph
+
+# The projects of the tree and the lanes they are built in: tools/checks/projects.json.
+TABLE = project_graph.load_table()
+# The lanes a Linux C++ build gate has something to say about.
+BUILT_LANES = frozenset(("core", "linux"))
 
 DOCS_PREFIXES = ("docs/", "docs-snippets/", "planning/", "overrides/", "assets/")
 DOCS_ROOT_FILES = ("LICENSE", "mkdocs.yml")
@@ -57,15 +68,20 @@ GATE_MACHINERY = (
     ".github/toolchain-versions.json",
 )
 
-# The trees whose change can alter how fast the encoder runs or how much it allocates:
-# the library. Tests, apps and build files are not here on purpose, since the comparison
-# measures the library's own benchmarks, at two builds a job.
-COMPARE_PREFIXES = ("src/",)
+# The projects whose change can alter how fast the encoder runs or how much it allocates:
+# the libraries and the vendored code that was inside the sendspin library. Tests, apps and
+# build files are not here on purpose, since the comparison measures the library's own
+# benchmarks, at two builds a job. A library's own tests/ and fuzz/ are beside its code
+# (planning/monorepo.md) and are tests all the same.
+COMPARE_KINDS = ("library", "vendored")
+LIBRARY_CONSUMERS = re.compile(r"^libs/[^/]+/(?:tests|fuzz)/")
 
 # Trees a Linux C++ build has nothing to say about. Their own lanes run in the
 # post-merge verification (docs/ci-agentic.md), and the static checks already
 # lint and unit-test the scripts among them. Checked after GATE_MACHINERY, so the
 # rest of .github/ (the other workflows) lands here and is linted, not built.
+# The projects no Linux lane builds (the bindings, the firmware, the Android and WASM demos) are
+# not listed: the table says so, in the lanes of their rows.
 NOT_BUILT = (
     ".github/",
     "tools/ci/",
@@ -74,15 +90,7 @@ NOT_BUILT = (
     "tools/release/",
     "requirements/",
     "packaging/",
-    "python/",
-    "rust/",
-    "js/",
-    "esp-idf/",
-    "esphome/",
-    "apps/android/",
-    "apps/wasm/",
-    "apps/baremetal/",
-    "apps/linux/",
+    "apps/crucible/linux/",
     "examples/python/",
 )
 
@@ -102,32 +110,46 @@ NOT_BUILT_ROOT_FILES = (
 # Trees the Qt build reads. Anything the C++ build reads that is NOT here and
 # NOT in KNOWN_NON_GUI is unrecognised, and unrecognised means Qt too.
 GUI_PREFIXES = (
-    "apps/gui/",
+    "apps/forge/gui/",
     "apps/hearth/",
     "apps/crucible/",
-    "apps/common/",
-    "tests/gui/",
-    "tests/hearth/",
-    "tests/crucible/",
+    "apps/shared/",
+    "notices/crucible/",
+    "notices/hearth/",
+    "notices/fragments/",
+    "notices/licences/",
     "cmake/",
+)
+# Inside those trees, and built by the Linux gate without Qt: Crucible's Windows driver (it was a
+# top-level tree of its own), the three tests of the shared media code that were in libs/ac3/tests
+# and libs/audio/tests, and Forge's five notice fragments (they were Forge's own, not Crucible's).
+GUI_EXCEPTIONS = (
+    "apps/crucible/windows/",
+    "apps/shared/media/tests/test_container_input.cpp",
+    "apps/shared/media/tests/test_stream_playback.cpp",
+    "apps/shared/media/tests/test_sink_wait.cpp",
+    "notices/fragments/forge-",
+    "notices/fragments/qt-linux.txt",
+    "notices/fragments/qt-macos.txt",
+    "notices/fragments/qt-windows.txt",
 )
 GUI_ROOT_FILES = ("CMakeLists.txt", "CMakePresets.json", "vcpkg.json")
 
-# Built by the Linux gate, and known not to need Qt.
+# Built by the Linux gate, and known not to need Qt: these, and the libraries, the vendored code,
+# the examples and the cross-project tests (NON_GUI_KINDS).
 KNOWN_NON_GUI = (
-    "src/",
-    "tests/",
-    "fuzz/",
-    "examples/",
-    "apps/cli/",
-    "apps/notices/",
-    "apps/windows/",
+    "testdata/",
+    "tools/fuzz/",
+    "apps/forge/cli/",
+    "notices/",
     "tools/checks/",
     "tools/generators/",
     "tools/references/",
     "tools/listening/",
     "tools/sendspin/",
 )
+
+NON_GUI_KINDS = ("library", "vendored", "tests", "example")
 
 
 def _is_docs(path: str) -> bool:
@@ -180,14 +202,37 @@ def plan(
             build_reason = build_reason or f"{path} (the gate's own machinery)"
             gui_reason = gui_reason or f"{path} (the gate's own machinery)"
             continue
-        if path.startswith(NOT_BUILT) or ("/" not in path and path in NOT_BUILT_ROOT_FILES):
+        project = TABLE.project_of(path)
+        # A header of the ESP-IDF component that a library's tests include is built by the
+        # gate through them, though the component is not: the table names the edge.
+        includers = [i for i in TABLE.reached_from(path) if BUILT_LANES & set(i.lanes)]
+        not_built = (
+            path.startswith(NOT_BUILT)
+            or ("/" not in path and path in NOT_BUILT_ROOT_FILES)
+            or (project is not None and not BUILT_LANES & set(project.lanes))
+        )
+        if not_built and not includers:
             continue
 
         build_reason = build_reason or path
-        compare = compare or path.startswith(COMPARE_PREFIXES)
-        if path.startswith(GUI_PREFIXES) or ("/" not in path and path in GUI_ROOT_FILES):
+        compare = compare or (
+            project is not None
+            and project.kind in COMPARE_KINDS
+            and not LIBRARY_CONSUMERS.match(path)
+        )
+        for includer in includers:
+            if (includer.path + "/").startswith(GUI_PREFIXES):
+                gui_reason = gui_reason or f"{path} (included by {includer.name})"
+        if not_built:
+            continue
+        if path.startswith(GUI_EXCEPTIONS):
+            pass
+        elif path.startswith(GUI_PREFIXES) or ("/" not in path and path in GUI_ROOT_FILES):
             gui_reason = gui_reason or path
-        elif not path.startswith(KNOWN_NON_GUI):
+        elif not (
+            path.startswith(KNOWN_NON_GUI)
+            or (project is not None and project.kind in NON_GUI_KINDS)
+        ):
             gui_reason = gui_reason or f"{path} (not a path this planner recognises)"
 
     if not seen:

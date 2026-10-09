@@ -34,7 +34,7 @@ TestCase {
         // Seen already, so the first-run dialog does not sit over the
         // window; tst_dialogs.qml is where it is exercised.
         HearthController.firstRunSeen = true;
-        longEac3 = TestServices.stageFixture(repo + "tests/golden/external-baseline/eac3-music-stereo-96/dee.ec3",
+        longEac3 = TestServices.stageFixture(repo + "testdata/external-baseline/eac3-music-stereo-96/dee.ec3",
                                              "Long stereo.ec3");
         verify(longEac3.length > 0);
     }

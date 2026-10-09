@@ -37,7 +37,7 @@ PRs target `main`. To merge, a PR must pass the required checks: `Branch Name`, 
 aggregate and the `Scan dependency diff` dependency review. `CI Status` is the pull-request gate
 (`pr-gate.yml`): the static checks, then a Linux GCC build with every test and the gold-reference
 gate. A merge queue serializes landing when several PRs are ready at once, and runs the gate on
-the merged tree with the Qt GUI built, plus Windows MSVC and, for a change under `src/`, a speed
+the merged tree with the Qt GUI built, plus Windows MSVC and, for a change to a library's code (`libs/`, outside its `tests/` and `fuzz/`), a speed
 and a heap-churn comparison against the commit the entry is queued on: a workload that takes
 twice as long, or whose heap churn at least doubles, fails the entry unless the PR carries
 `perf-regression-approved` or `memory-regression-approved`. The rest runs after the merge: the
@@ -71,42 +71,50 @@ This is the constraint the whole project rests on. Breaking it makes the code un
   and the A-JOC and A-JCC codebooks the same way. Those files are the standard, not an
   implementation of it.
 - Where a standard is ambiguous or contradicts itself, the reading taken and its evidence go in
-  an `ERRATA.md` beside the code (`src/ac4dec/ERRATA.md`, `src/ac4enc/ERRATA.md`).
+  an `ERRATA.md` beside the code (`libs/ac4/ERRATA.md`, `libs/ac4/ERRATA.md`).
 
 If you cannot cite where something came from, it does not go in.
 
 ## Repository layout
 
-**`src/` is the installable library; `apps/` consumes it, never the reverse.** `src/` holds 22
+**`libs/` is the installable library; `apps/` consumes it, never the reverse.** `libs/` holds 12
 libraries. Each is a directory with its own CMake target (`iclforge::<name>`), its own public
-headers (`iclforge/<name>/`) and its own row in `tools/checks/layering.json`, which lists the
-libraries it may include from; `check_layering.py` fails an include its row does not list. A
+headers (`iclforge/<name>/`, under `include/`), its sources (`src/`), its tests (`tests/`, a binary
+of their own: `ctest -L <name>`), its libFuzzer harnesses (`fuzz/`, with their seeds and the inputs
+that once broke them) and its own row in `tools/checks/projects.json`, which lists the libraries it
+may use; `check_layering.py` fails an include or a link line its row does not list (its `tests/` and
+`fuzz/` consume libraries, and may use any, but no program). A
 library's public headers declare into the namespace named for it under the family's root, and
 `check_namespaces.py` (its table is `tools/checks/namespaces.json`) fails a header that declares
 into another library's namespace, or into `iclforge` itself.
-`src/ac3` is the AC-3, E-AC-3 and Atmos codec, in namespace `iclforge::ac3`. `src/ac4`,
-`src/ac4core`, `src/ac4dec` and `src/ac4enc` are the AC-4 codec, in namespace `iclforge::ac4`,
-and link nothing from `src/ac3`.
-The two codecs stand on libraries that know no codec: `src/base` (bit I/O, the speaker
-vocabulary, the CPU probe), `src/arithmetic` (header-only: `Fixed32`, the project's own float
-functions and the SIMD seam; it is not installed), `src/dsp` (the transforms more than one
-library uses), `src/objects` (the object-audio model and the Object Audio Metadata payload),
-`src/render` (layouts, routing and the renderer) and `src/iec61937` (burst packing).
-`apps/{cli,gui,crucible,hearth,android,wasm,baremetal}` consume them (Crucible and the Shield app
-use the AC-3, E-AC-3 and Atmos codec only), and `apps/common` is shared application code,
-compiled directly into its consumers. `apps/windows` holds Crucible's separately licensed
-null-sink driver and its guest VM, `apps/linux` a scripted guest for Crucible's Linux tray, and
-`apps/notices` the licence notices Forge's packages install. Nothing under `src/` may depend on
-anything under `apps/`.
+`libs/ac3` is the AC-3, E-AC-3 and Atmos codec, in namespace `iclforge::ac3`. `libs/ac4` is the
+AC-4 codec, in namespace `iclforge::ac4`, laid out by the same areas (`core`, `io`, `decoder`,
+`encoder`), and links nothing from `libs/ac3`.
+The two codecs stand on libraries that know no codec: `libs/base` (bit I/O, the speaker vocabulary,
+the CPU probe, the signing key, SHA-256 and HMAC-SHA-256, and, header-only and not installed,
+`Fixed32`, the project's own float functions and the SIMD seam), `libs/dsp` (the transforms more
+than one library uses), `libs/objects` (the object-audio model and the Object Audio Metadata
+payload), `libs/render` (layouts, routing and the renderer) and `libs/containers` (IEC 61937 burst
+packing, and the Matroska, MP4, MPEG-TS and IAMF writers and readers, each in a part of its own).
+`apps/{forge,crucible,hearth,demos}` and `firmware/baremetal` consume them (Crucible and the Shield app
+use the AC-3, E-AC-3 and Atmos codec only), and `apps/shared/{media,theme,preferences}` is application
+code that more than one program compiles in directly, with no library target of its own. A product is
+a directory of programs (`apps/forge/{cli,gui}`, `apps/hearth/{engine,ui,render,testsink,testserver}`,
+`apps/crucible/{engine,ui,runner}`), each with its `src/`, its `assets/` where it has Qt resources
+and its `tests/`. `apps/crucible/windows` holds Crucible's separately licensed null-sink driver and
+its guest VM, `apps/crucible/linux` a scripted guest for Crucible's Linux tray, and `notices` the
+licence notices each product's packages install. Nothing under `libs/` may depend on anything under
+`apps/` but the one test that compiles shared application code into its library's binary
+(`libs/ac4/tests`, `decoder/test_object_render.cpp`).
 
-**The tree holds four products, and the directories say which is which.** `src/`
-other than `src/audio` and `src/sendspin`, the bindings under `python/`, `js/` and `rust/`, and
-`examples/`, `fuzz/` and `apps/baremetal` are **the library**; `iclforge` names it, and names its
-packages too. `apps/cli`, `apps/gui` and `apps/common` are **Forge**, the tooling pair, built and
-packaged as one thing. `apps/crucible`, with the driver in `apps/windows`, is **Crucible**.
-`apps/hearth`, `src/sendspin` and the `hearth_sink` example are **Hearth**. `apps/android` and
-`apps/wasm` are library demonstrations. `src/audio`, `tests/`, `tools/`, `cmake/`, `packaging/`
-and the version line are shared and owned by no one product.
+**The tree holds four products, and the directories say which is which.** `libs/`
+other than `libs/audio` and `libs/sendspin`, the bindings under `bindings/python/`, `bindings/js/` and `bindings/rust/`, and
+`examples/` and `firmware/baremetal` are **the library**; `iclforge` names it, and names its
+packages too. `apps/forge` is **Forge**, the tooling pair (`forge` and `forge-gui`), built and
+packaged as one thing. `apps/crucible`, with the driver in `apps/crucible/windows`, is **Crucible**.
+`apps/hearth`, `libs/sendspin` and the `hearth_sink` example are **Hearth**. `apps/demos/android` and
+`apps/demos/wasm` are library demonstrations. `libs/audio`, `apps/shared`, `notices/`, `tests/`,
+`tools/`, `cmake/`, `packaging/` and the version line are shared and owned by no one product.
 [The naming and scope plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/recasting.md)
 records what each member owns, down to the targets, packages and CI legs, under the names it was
 written with; [Renamed](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/renamed.md) maps them
@@ -118,30 +126,46 @@ as themselves, and "ICL Forge Forge" is never written. In code, `iclforge` names
 the family's identifiers: the CMake package, the packages of each language, the namespace root,
 the header root and the C symbol prefix (`iclforge_`), with `ICLFORGE_` for macros, options and
 environment variables. Every identifier stays lowercase but those. `forge --version` prints
-`iclforge <version>` (`src/ac3/src/version.cpp`), because that is the library's version line and
+`iclforge <version>` (`libs/base/src/version.cpp`), because that is the library's version line and
 the Homebrew formula's test asserts it.
 
 **A library's headers are `include/iclforge/<name>/`, and the name is the library.** The second
 component of an include path says which library a header belongs to: `iclforge/ac3/decoder/decoder.hpp`
-is in `src/ac3/include/iclforge/ac3/decoder/`, `iclforge/render/layout.hpp` in
-`src/render/include/iclforge/render/`. A library includes headers only of the libraries its row of
-`layering.json` lists. `base`, `dsp`, `objects`, `render` and `iec61937` list no codec, nor do the
-containers (`matroska`, `mp4`, `mpegts`, `iamf`) and the readers (`adm`, `iab`): none of them knows
-AC-3, E-AC-3 or Atmos exist, and they should stay that way. The AC-4 libraries list none of
-`ac3`'s: a separate codec that shares no bitstream syntax with it. `ac4core` is the static library
-the decoder and the encoder share, and has no public headers.
+is in `libs/ac3/include/iclforge/ac3/decoder/`, `iclforge/render/layout.hpp` in
+`libs/render/include/iclforge/render/`. A library includes headers only of the libraries its row of
+`projects.json` lists. `base`, `dsp`, `objects`, `render` and `containers` list no codec, nor do the
+readers (`adm`, `iab`): none of them knows
+AC-3, E-AC-3 or Atmos exist, and they should stay that way. The AC-4 library lists none of
+`ac3`'s: a separate codec that shares no bitstream syntax with it. Its core (`libs/ac4/src/core`) is
+what the decoder and the encoder share, and has no public headers.
+
+**Every project of the tree is a row of that table, whatever its kind:** the libraries of `libs/`, the
+code programs share under `apps/shared/` (internal, never installed), the programs of `apps/`, the
+bindings, the firmware and the examples. A library uses only libraries; a program, a binding, a
+firmware project and an example use libraries (a program also the shared code) and never another
+program; an internal project is never installed and no installed header includes one.
+`check_layering.py` reads the includes and the link lines of the whole tree. The few uses it allows
+by name are the table's `exceptions`, each with its reason, and one that excuses nothing fails.
+A header another project includes is under the library's `include/` or under a directory its row
+`exposes` (what it shares on purpose and does not install: `libs/base/internal/`, an app-library's
+`src/`); any other header of a project is its implementation, and an include of it fails, or is a
+debt in `tools/checks/layering_debt/` until the cut that removes it lands.
+The CI planners read the same rows: a project names the lanes its tree lights (`lanes`), so a new
+project is a row with its lanes (`check_layering.py` fails one without), and the files an
+exception's excused include reaches are its `to_paths`.
 
 The one deliberate exception to the header root is `capi`: it installs under
 `include/iclforge_c/`, not `iclforge/`, even though it depends on the codecs directly (it wraps
-`iclforge::ac3_static` and the AC-4 libraries). The `iclforge/` tree is C++; `capi` is a C-callable
+`iclforge::ac3_static` and the AC-4 library). The `iclforge/` tree is C++; `capi` is a C-callable
 surface, and a C or non-C++ consumer has no reason to see, or accidentally `#include`, a C++
 header.
 
 **One subdirectory per platform audio backend, selected by CMake, never `#ifdef`.**
-`src/audio/src/backend/{alsa,pipewire,android,macos,posix,windows}` — adding a backend means a
+`libs/audio/src/backend/{alsa,pipewire,android,macos,posix,windows}` — adding a backend means a
 new directory and a new CMake guard, not a new preprocessor branch. There are no
-preprocessor conditionals in `src/`, `apps/`, `tests/` or `python/` (the C API header's
-`#ifdef __cplusplus` pair is the one exemption, and `esp-idf/` uses Kconfig's `#if CONFIG_*`);
+preprocessor conditionals in `libs/`, `apps/`, `tests/`, `external/`, `firmware/baremetal/` or
+`bindings/python/` (the C API header's
+`#ifdef __cplusplus` pair is the one exemption, and `firmware/esp-idf/` and `firmware/hearth-sink/` use Kconfig's `#if CONFIG_*`);
 CI's platform check fails on a new one. Keep it that way.
 
 **A leading underscore on a workflow file means "reusable, not directly triggered."**
@@ -170,8 +194,8 @@ window tables and several spec-table self-checks are
 `from_chars` is unavailable both on the NDK's bundled libc++ and at the macOS wheel's deployment
 target (`'from_chars' is unavailable: introduced in macOS 26.0`) — the **integer** overloads are
 fine everywhere and are used directly. Code that has to parse a decimal from user- or
-file-supplied text therefore goes through `strtod` instead (`src/ac3/src/encoder/plan.cpp`,
-`encoder/assignment.cpp`, `src/objects/src/scene_text.hpp`). Neither gap shows up on a Windows,
+file-supplied text therefore goes through `strtod` instead (`libs/ac3/src/encoder/plan.cpp`,
+`encoder/assignment.cpp`, `libs/objects/src/scene_text.hpp`). Neither gap shows up on a Windows,
 Linux or Homebrew-macOS build, so the CI legs that catch it are Android (Shield) and Build wheels
 (macos-latest).
 
@@ -215,7 +239,7 @@ Not useful:
 ```
 
 Where behaviour is deliberately narrower than the standard, say so and say why — see the
-opening comment of `src/ac4dec/include/iclforge/ac4dec/decoder.hpp` for the pattern: what the decoder
+opening comment of `libs/ac4/include/iclforge/ac4/decoder/decoder.hpp` for the pattern: what the decoder
 does, then what it refuses, by name and with a reason. A clean refusal is a design statement;
 a silent gap is a bug waiting to be found by someone else.
 
@@ -307,7 +331,7 @@ Ranked by how much they prove. Prefer the strongest one available for what you a
    Reading a stream *nobody here produced* is a different question, and the one that found five
    Annex E parsing defects in a single sitting once anything actually asked it. Two tiers, both
    automated: `tools/checks/verify_gold_reference.sh` decodes the six committed Dolby Encoding
-   Engine and FFmpeg streams in `tests/golden/external-baseline/` on every gold-reference leg,
+   Engine and FFmpeg streams in `testdata/external-baseline/` on every gold-reference leg,
    and the nightly `Interop` workflow runs `tools/checks/verify_fate_interop.py` over eight
    SHA-256-pinned commercial-encoder excerpts fetched from FFmpeg's FATE archive. Reach for this
    one whenever you touch decoder syntax the encoder here never emits — and read
@@ -322,7 +346,7 @@ Ranked by how much they prove. Prefer the strongest one available for what you a
 **AC-4 has a ladder of its own**, set out in [docs/verification.md](https://iainchesworthlabs.github.io/iclforge/verification/#ac-4)
 and in `planning/ac4.md`. FFmpeg reads AC-4's framing and its MP4 track and has no AC-4 decoder, so
 it does not check audio. The decoder is scored against the streams Dolby Encoding Engine (DEE)
-makes from known sources, the committed ones in `tests/golden/external-baseline/ac4-*` and a larger
+makes from known sources, the committed ones in `testdata/external-baseline/ac4-*` and a larger
 gold set kept locally (DEE's licence ends on 2026-11-06 and is not renewed), by
 `tools/checks/score_ac4_decode.py`; its gains and mixing are held to the standard's formulas by
 `gain_ac4_decode.py` and `mix_ac4_decode.py`; librempeg's decoder is a second opinion wherever it
@@ -343,7 +367,7 @@ independent object decode of an ICL Forge stream. What exists instead is a self-
 series with real resolution — `tools/ci/quality_race.py`'s `objects` mode scores a committed
 five-object scene per object per rate in the nightly run, trended at [Object quality
 trend](https://iainchesworthlabs.github.io/iclforge/object-quality-trend/). If you are changing
-`iclforge::oba::joc` or `iclforge::oba`, run it before and after and put both numbers in the commit message;
+`iclforge::objects::oba::joc` or `iclforge::oba`, run it before and after and put both numbers in the commit message;
 it takes seconds and it is the only quality signal that layer has.
 
 Neither decoder covers everything, and the gaps do not overlap: see the [verification-gap

@@ -119,9 +119,9 @@ endif()
 # OS 13/Trixie, whose apt archive tops out at GCC 14.2.0 - the toolchain
 # files' find_program fallback (see cmake/toolchains/linux.gcc.toolchain.cmake)
 # picks it up correctly, so this is a real, reachable configuration, not a
-# hypothetical one. Two genuine repros: tests/cli/test_cli.cpp's read_log()
+# hypothetical one. Two genuine repros: apps/forge/cli/tests/test_cli.cpp's read_log()
 # istreambuf_iterator-based std::string construction flags a "null pointer
-# dereference" inside <streambuf>'s gptr()/egptr(), and apps/cli/main.cpp's
+# dereference" inside <streambuf>'s gptr()/egptr(), and apps/forge/cli/src/main.cpp's
 # load_sources() std::vector<std::size_t>::resize() flags one inside
 # <bits/stl_construct.h> - both after GCC inlines several layers deep into
 # code this project does not own and cannot edit. This is GCC's own
@@ -169,7 +169,7 @@ endif()
 # loses provenance across a chain of optimizer-introduced moves and flags a
 # path that never actually executes uninitialized. Eac3Decoder::
 # decode_substream's transient pre-noise hold-back path
-# (src/ac3/src/decoder/eac3_decoder.cpp,
+# (libs/ac3/src/decoder/eac3_decoder.cpp,
 # `DecodedSubstream ready = std::move(*pending_slot);`) move-constructs a
 # DecodedSubstream - which nests a std::optional<oba::DecodedProgram>
 # holding a std::vector<oba::DynamicObject> - from an already-engaged
@@ -193,11 +193,11 @@ endif()
 # into the build tree and add it to our own target, where it inherits
 # iclforge::warnings - so a warning in a file nobody here wrote becomes a build
 # failure under -Werror. It is not ours to fix, so it is not ours to warn
-# about: see how apps/gui/CMakeLists.txt applies this to the generated sources.
+# about: see how apps/forge/gui/CMakeLists.txt applies this to the generated sources.
 #
 # Not "/w" on real MSVC, deliberately. cl has very little to say about this
 # generated code under /W4 to begin with (unlike clang-cl and GCC, which
-# reject more of it - see apps/gui/CMakeLists.txt for the specific warning),
+# reject more of it - see apps/forge/gui/CMakeLists.txt for the specific warning),
 # so adding /w on top of the target's own /W4 would achieve nothing except a
 # "D9025: overriding '/W4' with '/w'" on every generated file - a warning
 # about the build, appearing on every build, to suppress warnings that were

@@ -9,7 +9,7 @@
 # omission of -fsanitize=integer already follow.
 #
 # The first run of this leg was clean: clang 21, `ctest -L concurrency`, 36
-# cases over tests/audio/ and tests/cli/test_cli_live.cpp, no reports. So
+# cases over libs/audio/tests/ and apps/forge/cli/tests/test_cli_live.cpp, no reports. So
 # nothing below is suppressing anything today. The one entry that exists is
 # for third-party runtime code this project does not own and cannot fix, kept
 # as a documented landing spot rather than added reactively under time

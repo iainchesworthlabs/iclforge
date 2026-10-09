@@ -58,9 +58,9 @@ them.
 |---|---|---|
 | [`wav_roundtrip`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/wav_roundtrip.cpp) | Real WAV in → encode → decode → WAV out, crossing the WAV↔A/52 channel order both ways. | [File I/O](file-io.md) |
 | [`read_adm`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/read_adm.cpp) | Open an ADM BW64 file and print the parsed graph — needs `-DICLFORGE_BUILD_ADM=ON`. | [ADM / BW64 reading](adm.md) |
-| [`encode_adm`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/encode_adm.cpp) | The whole read direction end to end: `parse_bw64` → `admbridge::build` → `AtmosEncoder`, an ADM BWF master out to a DD+ JOC elementary stream. The one example needing `iclforge::ac3` and the ADM modules together — needs `-DICLFORGE_BUILD_ADM=ON`. | [ADM → Atmos bridging](adm-bridge.md) |
+| [`encode_adm`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/encode_adm.cpp) | The whole read direction end to end: `parse_bw64` → `adm::build` → `AtmosEncoder`, an ADM BWF master out to a DD+ JOC elementary stream. The one example needing `iclforge::ac3` and the ADM modules together — needs `-DICLFORGE_BUILD_ADM=ON`. | [ADM → Atmos bridging](adm-bridge.md) |
 | [`read_iab`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/read_iab.cpp) | Parse a bare IAB stream and inspect its frame and element graph. | [IAB reading](iab.md) |
-| [`encode_iab`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/encode_iab.cpp) | Map an IAB master through `admbridge::build_iab` and encode it as DD+ JOC — needs `-DICLFORGE_BUILD_ADM=ON`. | [ADM → Atmos bridging](adm-bridge.md#bridging-iab) |
+| [`encode_iab`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/encode_iab.cpp) | Map an IAB master through `adm::build_iab` and encode it as DD+ JOC — needs `-DICLFORGE_BUILD_ADM=ON`. | [ADM → Atmos bridging](adm-bridge.md#bridging-iab) |
 
 ## C API
 

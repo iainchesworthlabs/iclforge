@@ -18,7 +18,7 @@
 # NOT enabled, on purpose:
 #   modernize-*, readability-*, google-*, llvm-*, hicpp-*, fuchsia-*, etc. -
 #   stylistic/opinionated groups that would relitigate this codebase's own
-#   deliberate conventions (see src/ac3/'s comment-voice and
+#   deliberate conventions (see libs/ac3/'s comment-voice and
 #   abstraction-avoidance patterns) rather than find defects.
 # Three checks excluded from their otherwise-enabled groups, each verified
 # against this codebase's actual output rather than excluded a priori:
@@ -94,7 +94,8 @@ Checks: >
 
 WarningsAsErrors: '*'
 # The headers of the code static-analysis.yml analyses: the library (one directory, forge, until the
-# 2026-09-30 re-layout, now ac3, objects, base, dsp, render, arithmetic and iec61937), Matroska and
-# the CLI. include/ or src/ after the library's name keeps src/ac4core/src/dsp out of src/dsp's pattern.
-HeaderFilterRegex: '(src/(ac3|arithmetic|base|dsp|iec61937|matroska|objects|render)/(include|src)|apps/cli)/.*'
+# 2026-09-30 re-layout, now ac3, objects, base, dsp and render), IEC 61937 and Matroska (parts of
+# libs/containers since planning/consolidation.md's C3) and the CLI. dsp's own files are in scope
+# and its tiered kernels (libs/dsp/src/tiered, AC-4's until C5) are not, as AC-4's code is not.
+HeaderFilterRegex: '(libs/(ac3|base|objects|render)/(include|src)/.*|libs/dsp/include/.*|libs/dsp/src/[^/]*|libs/containers/(include/iclforge/containers|src)/(iec61937|matroska)/.*|apps/forge/cli/src/.*)'
 FormatStyle: none

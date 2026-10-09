@@ -1,45 +1,45 @@
-iclforge::emdf::build_container(std::span<iclforge::emdf::Payload const, 18446744073709551615ul>, int)
-iclforge::emdf::parse_container(std::span<std::byte const, 18446744073709551615ul>)
-iclforge::emdf::put_variable_bits(iclforge::BitWriter&, unsigned int, int)
-iclforge::emdf::variable_bits_size(unsigned int, int)
-iclforge::oba::KeyframePath::create(std::vector<iclforge::oba::Keyframe, std::allocator<iclforge::oba::Keyframe> >)
-iclforge::oba::KeyframePath::evaluate(double) const
-iclforge::oba::ObjectPath::evaluate(double) const
-iclforge::oba::ObjectScene::create(std::vector<iclforge::oba::SceneObject, std::allocator<iclforge::oba::SceneObject> >, iclforge::oba::Orientation const&)
-iclforge::oba::ObjectScene::duration_s() const
-iclforge::oba::ObjectScene::evaluate(double) const
-iclforge::oba::ObjectScene::evaluate(unsigned long, double) const
-iclforge::oba::ObjectScene::evaluate_into(double, std::span<iclforge::oba::ObjectPlacement, 18446744073709551615ul>) const
-iclforge::oba::OrbitPath::OrbitPath(double, double, double, double, double)
-iclforge::oba::OrbitPath::evaluate(double) const
-iclforge::oba::SceneCursor::SceneCursor(iclforge::oba::ObjectScene)
-iclforge::oba::SceneCursor::is_live(unsigned long) const
-iclforge::oba::SceneCursor::push(iclforge::oba::SceneUpdate const&)
-iclforge::oba::SceneCursor::release(unsigned long)
-iclforge::oba::SceneCursor::release_all()
-iclforge::oba::SceneCursor::sample(double) const
-iclforge::oba::SceneCursor::sample_into(double, std::span<iclforge::oba::ObjectPlacement, 18446744073709551615ul>) const
-iclforge::oba::apply(iclforge::oba::SceneOscUpdate const&, iclforge::oba::ObjectPlacement const&)
-iclforge::oba::bed_label_position(iclforge::oba::BedLabel)
-iclforge::oba::bed_labels(unsigned short)
-iclforge::oba::build_payload(iclforge::oba::Program const&, std::span<iclforge::oba::DynamicObject const, 18446744073709551615ul>, int)
-iclforge::oba::build_payload_updates(iclforge::oba::Program const&, std::span<iclforge::oba::ObjectUpdate const, 18446744073709551615ul>)
-iclforge::oba::describe(iclforge::oba::BedLabel)
-iclforge::oba::describe_objects(iclforge::oba::DecodedProgram const&, unsigned long)
-iclforge::oba::evaluate_placements(std::span<iclforge::oba::ObjectPath const, 18446744073709551615ul>, double)
-iclforge::oba::joc_object_indices(iclforge::oba::Program const&)
-iclforge::oba::make_orbit_path(double, double, double, double, double)
-iclforge::oba::orientation_from_degrees(double, double, double)
-iclforge::oba::parse_osc_packet(std::span<std::byte const, 18446744073709551615ul>, iclforge::oba::OscParseStats*)
-iclforge::oba::parse_osc_packet_into(std::span<std::byte const, 18446744073709551615ul>, std::span<iclforge::oba::SceneOscUpdate, 18446744073709551615ul>, iclforge::oba::OscParseStats*)
-iclforge::oba::parse_payload(std::span<std::byte const, 18446744073709551615ul>)
-iclforge::oba::read_scene(std::basic_string_view<char, std::char_traits<char> >)
-iclforge::oba::read_scene_json(std::basic_string_view<char, std::char_traits<char> >)
-iclforge::oba::rotate(iclforge::oba::Position const&, iclforge::oba::Orientation const&)
-iclforge::oba::scene_from_json(std::basic_string_view<char, std::char_traits<char> >)
-iclforge::oba::scene_from_text(std::basic_string_view<char, std::char_traits<char> >, iclforge::oba::ObjectPlacement const&)
-iclforge::oba::scene_objects_from_keyframe_text(std::basic_string_view<char, std::char_traits<char> >)
-iclforge::oba::to_json[abi:cxx11](iclforge::oba::ObjectScene const&)
-iclforge::oba::to_keyframe_text[abi:cxx11](iclforge::oba::ObjectScene const&)
-iclforge::oba::to_keyframe_text[abi:cxx11](std::span<iclforge::oba::SceneObject const, 18446744073709551615ul>)
+iclforge::objects::emdf::build_container(std::span<iclforge::objects::emdf::Payload const, 18446744073709551615ul>, int)
+iclforge::objects::emdf::parse_container(std::span<std::byte const, 18446744073709551615ul>)
+iclforge::objects::emdf::put_variable_bits(iclforge::BitWriter&, unsigned int, int)
+iclforge::objects::emdf::variable_bits_size(unsigned int, int)
+iclforge::objects::oba::KeyframePath::create(std::vector<iclforge::objects::oba::Keyframe, std::allocator<iclforge::objects::oba::Keyframe> >)
+iclforge::objects::oba::KeyframePath::evaluate(double) const
+iclforge::objects::oba::ObjectPath::evaluate(double) const
+iclforge::objects::oba::ObjectScene::create(std::vector<iclforge::objects::oba::SceneObject, std::allocator<iclforge::objects::oba::SceneObject> >, iclforge::objects::oba::Orientation const&)
+iclforge::objects::oba::ObjectScene::duration_s() const
+iclforge::objects::oba::ObjectScene::evaluate(double) const
+iclforge::objects::oba::ObjectScene::evaluate(unsigned long, double) const
+iclforge::objects::oba::ObjectScene::evaluate_into(double, std::span<iclforge::objects::oba::ObjectPlacement, 18446744073709551615ul>) const
+iclforge::objects::oba::OrbitPath::OrbitPath(double, double, double, double, double)
+iclforge::objects::oba::OrbitPath::evaluate(double) const
+iclforge::objects::oba::SceneCursor::SceneCursor(iclforge::objects::oba::ObjectScene)
+iclforge::objects::oba::SceneCursor::is_live(unsigned long) const
+iclforge::objects::oba::SceneCursor::push(iclforge::objects::oba::SceneUpdate const&)
+iclforge::objects::oba::SceneCursor::release(unsigned long)
+iclforge::objects::oba::SceneCursor::release_all()
+iclforge::objects::oba::SceneCursor::sample(double) const
+iclforge::objects::oba::SceneCursor::sample_into(double, std::span<iclforge::objects::oba::ObjectPlacement, 18446744073709551615ul>) const
+iclforge::objects::oba::apply(iclforge::objects::oba::SceneOscUpdate const&, iclforge::objects::oba::ObjectPlacement const&)
+iclforge::objects::oba::bed_label_position(iclforge::objects::oba::BedLabel)
+iclforge::objects::oba::bed_labels(unsigned short)
+iclforge::objects::oba::build_payload(iclforge::objects::oba::Program const&, std::span<iclforge::objects::oba::DynamicObject const, 18446744073709551615ul>, int)
+iclforge::objects::oba::build_payload_updates(iclforge::objects::oba::Program const&, std::span<iclforge::objects::oba::ObjectUpdate const, 18446744073709551615ul>)
+iclforge::objects::oba::describe(iclforge::objects::oba::BedLabel)
+iclforge::objects::oba::describe_objects(iclforge::objects::oba::DecodedProgram const&, unsigned long)
+iclforge::objects::oba::evaluate_placements(std::span<iclforge::objects::oba::ObjectPath const, 18446744073709551615ul>, double)
+iclforge::objects::oba::joc_object_indices(iclforge::objects::oba::Program const&)
+iclforge::objects::oba::make_orbit_path(double, double, double, double, double)
+iclforge::objects::oba::orientation_from_degrees(double, double, double)
+iclforge::objects::oba::parse_osc_packet(std::span<std::byte const, 18446744073709551615ul>, iclforge::objects::oba::OscParseStats*)
+iclforge::objects::oba::parse_osc_packet_into(std::span<std::byte const, 18446744073709551615ul>, std::span<iclforge::objects::oba::SceneOscUpdate, 18446744073709551615ul>, iclforge::objects::oba::OscParseStats*)
+iclforge::objects::oba::parse_payload(std::span<std::byte const, 18446744073709551615ul>)
+iclforge::objects::oba::read_scene(std::basic_string_view<char, std::char_traits<char> >)
+iclforge::objects::oba::read_scene_json(std::basic_string_view<char, std::char_traits<char> >)
+iclforge::objects::oba::rotate(iclforge::objects::oba::Position const&, iclforge::objects::oba::Orientation const&)
+iclforge::objects::oba::scene_from_json(std::basic_string_view<char, std::char_traits<char> >)
+iclforge::objects::oba::scene_from_text(std::basic_string_view<char, std::char_traits<char> >, iclforge::objects::oba::ObjectPlacement const&)
+iclforge::objects::oba::scene_objects_from_keyframe_text(std::basic_string_view<char, std::char_traits<char> >)
+iclforge::objects::oba::to_json[abi:cxx11](iclforge::objects::oba::ObjectScene const&)
+iclforge::objects::oba::to_keyframe_text[abi:cxx11](iclforge::objects::oba::ObjectScene const&)
+iclforge::objects::oba::to_keyframe_text[abi:cxx11](std::span<iclforge::objects::oba::SceneObject const, 18446744073709551615ul>)
 std::__throw_bad_variant_access(unsigned int)::__reasons

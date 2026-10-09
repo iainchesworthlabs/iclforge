@@ -1,16 +1,17 @@
-# Copies the family's shared QML components (apps/gui/qml/*.qml: Theme, Card,
+# Copies the family's shared QML components (apps/shared/theme/assets/qml/*.qml: Theme, Card,
 # SectionHeader, StatTile, AppButton, AppCheckBox, IconButton, AppSlider, AppTextField, AppComboBox, RailBlock,
 # SegmentedControl, FocusRing) into a Qt
-# application's own qml/shared/ directory, rewriting `import ForgeGui` to that
-# application's own module URI - generated INTO the source tree (ignored by
+# application's own assets/qml/shared/ directory, rewriting `import ForgeGui` to that
+# application's own module URI (Forge GUI's own is ForgeGui, so its copies are the sources byte
+# for byte) - generated INTO the source tree (ignored by
 # git) rather than the
 # build tree, because the QML ahead-of-time compiler names its cache files
 # after the path relative to the source directory, and a build-tree path
 # produces an unusable name with a drive letter in the middle of it.
 #
-# apps/crucible/CMakeLists.txt and apps/hearth/ui/CMakeLists.txt both call
-# this instead of each running its own copy of the loop, which is how this
-# file came to exist: each used to compute its own source path
+# apps/crucible/CMakeLists.txt, apps/hearth/ui/CMakeLists.txt and apps/forge/gui/CMakeLists.txt
+# all call this instead of each running its own copy of the loop, which is how this
+# file came to exist: Crucible and Hearth each used to compute their own source path
 # (${CMAKE_CURRENT_SOURCE_DIR}/../gui/qml/<name> and .../../../gui/qml/<name>
 # respectively) and register it via set_property(DIRECTORY APPEND PROPERTY
 # CMAKE_CONFIGURE_DEPENDS ...) in its own directory scope. Both spellings
@@ -35,7 +36,7 @@
 # directory's scope it was registered from.
 #
 # module_uri:    this application's `import <uri>` replacement, e.g. Crucible
-# out_dir:       where the rewritten copies are written, e.g. .../ui/qml/shared
+# out_dir:       where the rewritten copies are written, e.g. .../ui/assets/qml/shared
 # out_files_var: name of a variable (in the caller's scope) to receive the
 #                list of generated file paths
 function(iclforge_stage_shared_qml module_uri out_dir out_files_var)
@@ -45,7 +46,7 @@ function(iclforge_stage_shared_qml module_uri out_dir out_files_var)
     get_property(tracked GLOBAL PROPERTY ICLFORGE_SHARED_QML_CONFIGURE_DEPENDS)
     set(generated)
     foreach(name IN LISTS names)
-        set(src "${CMAKE_SOURCE_DIR}/apps/gui/qml/${name}")
+        set(src "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/qml/${name}")
         set(dst "${out_dir}/${name}")
         file(READ "${src}" contents)
         string(REPLACE "import ForgeGui\n" "import ${module_uri}\n" contents "${contents}")

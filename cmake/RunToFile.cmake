@@ -7,7 +7,7 @@
 # portable stand-in: execute_process()'s own OUTPUT_FILE does the redirect,
 # and `cmake -P` is available by definition wherever CMake is.
 #
-# Used by apps/cli/CMakeLists.txt to generate the man page and the four shell
+# Used by apps/forge/cli/CMakeLists.txt to generate the man page and the four shell
 # completion scripts from `forge man` / `forge completions <shell>`.
 #
 #   cmake -DAC3_RUN_COMMAND=<exe>;<arg>... -DAC3_RUN_OUTPUT=<path>

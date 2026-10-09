@@ -22,8 +22,8 @@ them.
 
 ## The fixture corpus
 
-`tests/golden/audio/` is versioned as a single corpus, described by
-`tests/golden/audio/corpus.json` and enforced by `tools/checks/check_corpus.py`.
+`testdata/audio/` is versioned as a single corpus, described by
+`testdata/audio/corpus.json` and enforced by `tools/checks/check_corpus.py`.
 The manifest carries, per fixture: channels, sample rate, bit depth, duration,
 SHA-256, and — for the programme fixtures — the upstream source, its own
 SHA-256, its licence, and the exact excerpt window taken from it.
@@ -59,7 +59,7 @@ default coupling band structure, which nothing this project's own encoder
 emits ever does, and which a real decoder bug hid behind until FFmpeg's output
 was first tried against it. Its bytes matter for the same reason the audio
 fixtures' do, so it is hashed in the manifest too, with no audio parameters to
-check. `check_corpus.py` also fails on any file in `tests/golden/audio/` that
+check. `check_corpus.py` also fails on any file in `testdata/audio/` that
 the manifest does not list, so a new fixture cannot arrive unregistered.
 
 ### Synthetic and programme material are both kept, on purpose
@@ -86,7 +86,7 @@ bandwidth default was swept against the synthetic fixtures and narrowing
 looked like a **2.1 dB SNR win** at 448 kbit/s — because discarding the top
 9 kHz of a flat noise plateau costs almost nothing, while doing the same to
 real material throws away real energy. The comment recording that trap is in
-[`src/ac3/src/encoder/encoder.cpp`](../../src/ac3/src/encoder/encoder.cpp)
+[`libs/ac3/src/encoder/encoder.cpp`](../../libs/ac3/src/encoder/encoder.cpp)
 above `chbwcod`.
 
 The synthetic fixtures are **not** retired, for a different reason: the
@@ -139,30 +139,30 @@ All of these are run from the repo root.
 
 | Script | Produces | Notes |
 | --- | --- | --- |
-| `gen_gold_reference_wav.py` | `tests/golden/audio/reference_51.wav` | stdlib only |
-| `gen_stereo_reference_wav.py` | `tests/golden/audio/reference_stereo.wav` | stdlib only |
-| `gen_object_scene_wav.py` | `tests/golden/audio/reference_objects.wav` and `reference_objects.paths`, the five-object scene the object-quality leg encodes | stdlib only |
-| `gen_gui_resample_test_wav.py` | `fuzz/seeds/fuzz_wav_read/resample-44100.wav`, which the GUI's resample-on-load QML test also loads | stdlib only |
+| `gen_gold_reference_wav.py` | `testdata/audio/reference_51.wav` | stdlib only |
+| `gen_stereo_reference_wav.py` | `testdata/audio/reference_stereo.wav` | stdlib only |
+| `gen_object_scene_wav.py` | `testdata/audio/reference_objects.wav` and `reference_objects.paths`, the five-object scene the object-quality leg encodes | stdlib only |
+| `gen_gui_resample_test_wav.py` | `libs/base/fuzz/seeds/fuzz_wav_read/resample-44100.wav`, which the GUI's resample-on-load QML test also loads | stdlib only |
 | `gen_programme_fixtures.py` | both programme fixtures + `corpus.json` | needs `--source-dir` and `ffmpeg` |
-| `gen_external_baseline.py` | `tests/golden/external-baseline/` | needs **Dolby DEE**, `ffmpeg`, a built `forge` |
+| `gen_external_baseline.py` | `testdata/external-baseline/` | needs **Dolby DEE**, `ffmpeg`, a built `forge` |
 | `gen_dee_gold.py` | a local set of DEE's AC-3, E-AC-3, E-AC-3 JOC and TrueHD streams, never committed | needs **Dolby DEE**, `ffmpeg`; `--cli` records a built `forge`'s reading |
-| `gen_dee_tpn_fixture.py` | `tests/golden/external-baseline/eac3-transient-stereo-128/` | needs the local DEE golden-master set (`--gold`) |
-| `gen_object_fixture.py` | `tests/golden/object-fixture/dee_joc_514.ec3`, a DD+ JOC stream that DEE makes from the synthetic 5.1.4 tone bed this script also writes | needs **Dolby DEE** and numpy |
-| `gen_ac4_baseline.py` | the committed AC-4 set: `tests/golden/external-baseline/ac4-*/dee.ac4`, `ac4-manifest.json` and the syntax digests under `tests/golden/ac4dec/`. With `--gold-set DIR`, a local set that is never committed | needs **Dolby DEE** (its licence ends 2026-11-06), numpy, `ffmpeg` and a built `forge` (`--cli`) |
-| `gen_ac4_presentation_sources.py` | the six encoder-made substreams under `tests/golden/ac4dec/presentations/sources/` that the presentation tests multiplex | needs a built `forge` (`--cli`) |
-| `gen_aht_tables.py`, `gen_bitalloc_tables.py`, `gen_joc_tables.py` | `aht_tables.hpp` and `bitalloc_tables.hpp` in `src/ac3/include/iclforge/ac3/core/`, `joc_tables.hpp` in `src/ac3/include/iclforge/ac3/oba/` | read spec text (and JOC's tables attachment), not committed |
-| `gen_ac4_tables.py` | the AC-4 tables under `src/ac4core/include/iclforge/ac4core/tables/`: Huffman codebooks, scale factor bands, noise and QMF tables, the ISF rendering matrices | reads the TS 103 190-1 and -2 text and companion archives from `--spec-dir` (default `spec/`) |
+| `gen_dee_tpn_fixture.py` | `testdata/external-baseline/eac3-transient-stereo-128/` | needs the local DEE golden-master set (`--gold`) |
+| `gen_object_fixture.py` | `testdata/object-fixture/dee_joc_514.ec3`, a DD+ JOC stream that DEE makes from the synthetic 5.1.4 tone bed this script also writes | needs **Dolby DEE** and numpy |
+| `gen_ac4_baseline.py` | the committed AC-4 set: `testdata/external-baseline/ac4-*/dee.ac4`, `ac4-manifest.json` and the syntax digests under `testdata/ac4/`. With `--gold-set DIR`, a local set that is never committed | needs **Dolby DEE** (its licence ends 2026-11-06), numpy, `ffmpeg` and a built `forge` (`--cli`) |
+| `gen_ac4_presentation_sources.py` | the six encoder-made substreams under `testdata/ac4/presentations/sources/` that the presentation tests multiplex | needs a built `forge` (`--cli`) |
+| `gen_aht_tables.py`, `gen_bitalloc_tables.py`, `gen_joc_tables.py` | `aht_tables.hpp` and `bitalloc_tables.hpp` in `libs/ac3/include/iclforge/ac3/core/`, `joc_tables.hpp` in `libs/ac3/include/iclforge/ac3/oba/` | read spec text (and JOC's tables attachment), not committed |
+| `gen_ac4_tables.py` | the AC-4 tables under `libs/ac4/src/core/tables/`: Huffman codebooks, scale factor bands, noise and QMF tables, the ISF rendering matrices | reads the TS 103 190-1 and -2 text and companion archives from `--spec-dir` (default `spec/`) |
 | `gen_ac4_reference_tables.py` | `tools/references/ac4_tables.py`, the tables of the Python AC-4 syntax transcription | written separately from `gen_ac4_tables.py` so that a table misread in one shows as a trace difference against the other; takes the same `--spec-dir` |
-| `gen_mdct_goldens.py` | `tests/golden/mdct_goldens.hpp`, the analysis filterbank's golden vectors | needs numpy |
-| `gen_qmf_prototype.py` | `src/dsp/src/qmf_prototype.hpp`, the prototype filter of JOC's 64-band QMF (this project's own design) | needs numpy |
-| `gen_ac4_qmf_twiddles.py` | `src/ac4core/include/iclforge/ac4core/tables/qmf_twiddles.hpp`, the cosines the AC-4 QMF banks' twiddle factors are built from | stdlib only; `--check` compares the committed header |
-| `gen_ac4_fixed_tables.py` | `src/ac4core/include/iclforge/ac4core/tables/qmf_tables_fixed.hpp`, QWIN in Q1.30 and A-SPX's noise table in Fixed32's Q7.24, rounded from the committed float tables | stdlib only; `--check` compares the committed header |
-| `gen_ac4_transform_tables.py` | `src/ac4core/include/iclforge/ac4core/tables/transform_tables.hpp`, the inverse transform's roots, pre-twiddles and KBD windows in `double` for a 2048-sample frame, which the float and fixed-point tiers keep in flash | stdlib only; `--check` compares the committed header; uses the host C library's `cos` and `sin`, as the decoder does, so run it on the platform the header was written on |
-| `gen_baremetal_fixture.py` | `apps/baremetal/fixture.hpp`, the AC-3 and E-AC-3 streams the minimum-footprint probe decodes and their per-channel levels | needs a built `forge` (`--forge`); `atmos_height_scene.txt`, beside it, is the object placement it gives `atmos-encode` for the render row |
-| `gen_baremetal_ac4_fixture.py` | `apps/baremetal/ac4_fixture.hpp`, the committed AC-4 streams the bare-metal AC-4 probe decodes and their per-channel levels | needs a built `forge` (`--forge`) |
-| `gen_device_streams.py` | `esp-idf/iclforge/examples/hearth_sink/www/`: the ESP32 player's stream set and its `streams.json` | needs a built `forge` (`--forge`) and numpy; `tools/checks/check_stream_set.py` checks the committed set |
+| `gen_mdct_goldens.py` | `testdata/mdct_goldens.hpp`, the analysis filterbank's golden vectors | needs numpy |
+| `gen_qmf_prototype.py` | `libs/dsp/src/qmf_prototype.hpp`, the prototype filter of JOC's 64-band QMF (this project's own design) | needs numpy |
+| `gen_ac4_qmf_twiddles.py` | `libs/dsp/src/tiered/tables/qmf_twiddles.hpp`, the cosines the AC-4 QMF banks' twiddle factors are built from | stdlib only; `--check` compares the committed header |
+| `gen_ac4_fixed_tables.py` | `libs/dsp/src/tiered/tables/qmf_tables_fixed.hpp`, QWIN in Q1.30 and A-SPX's noise table in Fixed32's Q7.24, rounded from the committed float tables | stdlib only; `--check` compares the committed header |
+| `gen_ac4_transform_tables.py` | `libs/dsp/src/tiered/tables/transform_tables.hpp`, the inverse transform's roots, pre-twiddles and KBD windows in `double` for a 2048-sample frame, which the float and fixed-point tiers keep in flash | stdlib only; `--check` compares the committed header; uses the host C library's `cos` and `sin`, as the decoder does, so run it on the platform the header was written on |
+| `gen_baremetal_fixture.py` | `testdata/baremetal/fixture.hpp`, the AC-3 and E-AC-3 streams the minimum-footprint probe decodes and their per-channel levels | needs a built `forge` (`--forge`); `atmos_height_scene.txt`, beside it, is the object placement it gives `atmos-encode` for the render row |
+| `gen_baremetal_ac4_fixture.py` | `firmware/baremetal/ac4_fixture.hpp`, the committed AC-4 streams the bare-metal AC-4 probe decodes and their per-channel levels | needs a built `forge` (`--forge`) |
+| `gen_device_streams.py` | `firmware/hearth-sink/www/`: the ESP32 player's stream set and its `streams.json` | needs a built `forge` (`--forge`) and numpy; `tools/checks/check_stream_set.py` checks the committed set |
 | `gen_conformance_vectors.py` | the conformance vector bundle under `--out`, and with `--archive` its `.tar.gz` | needs a built `forge` (`--cli`); the one script CI runs, see above |
-| `gen_pseudo_locale.py` | `apps/gui/translations/forge_gui_xx.ts`, the GUI's pseudo-locale, made from `forge_gui_fr.ts` | stdlib only |
+| `gen_pseudo_locale.py` | `apps/forge/gui/assets/translations/forge_gui_xx.ts`, the GUI's pseudo-locale, made from `forge_gui_fr.ts` | stdlib only |
 
 Regenerating a programme fixture:
 
@@ -187,4 +187,4 @@ masters for AC-3, E-AC-3, E-AC-3 JOC and TrueHD while DEE's licence runs (it end
 on 2026-11-06), a set of about 1,100 streams kept on a local disk with a
 manifest, each rebuildable from the committed programme fixtures.
 `gen_ac4_baseline.py --gold-set` does the same for AC-4; without `--gold-set` it
-writes the short streams under `tests/golden/external-baseline/` that CI reads.
+writes the short streams under `testdata/external-baseline/` that CI reads.

@@ -93,7 +93,7 @@ add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 #  - It is invisible. Nothing in the source says a contraction happened, so
 #    the difference cannot be reviewed, only measured after the fact.
 #  - It would break the SIMD seam's correctness argument outright.
-#    src/arithmetic/arch/*/ac3/internal/arch/simd.hpp maps every
+#    libs/base/variants/arch-*/iclforge/base/detail/simd.hpp maps every
 #    operation to exactly one IEEE-754 add/subtract/multiply so that a
 #    vectorised kernel is bit-identical to the scalar loop it replaced. That
 #    holds only if the scalar loop is not silently getting a fused form the
@@ -143,50 +143,51 @@ option(ICLFORGE_BUILD_GUI "Build the Qt6 Quick GUI application" ON)
 option(ICLFORGE_BUILD_CRUCIBLE "Build Crucible (Windows, Linux and macOS)" OFF)
 option(ICLFORGE_BUILD_TESTS "Build the unit test suite" ON)
 # Catch2 is the only build-time dependency. Turn this off to insist it comes
-# from a package manager instead of the network (see tests/CMakeLists.txt).
+# from a package manager instead of the network (see cmake/External.cmake).
 option(ICLFORGE_FETCH_CATCH2 "Download Catch2 when no local copy is found" ON)
 option(ICLFORGE_BUILD_EXAMPLES "Build the documented library examples" ON)
-# libFuzzer harnesses over iclforge::ac3's untrusted-input entry points (see
-# fuzz/). Off by default: it needs upstream Clang (GCC and MSVC do not ship
+# libFuzzer harnesses over the libraries' untrusted-input entry points (see
+# libs/<lib>/fuzz/ and tools/fuzz/). Off by default: it needs upstream Clang (GCC and MSVC do not ship
 # libFuzzer) and instruments iclforge itself with ASan+UBSan, which no other
-# configuration wants paid for. Use fuzz/run.sh rather than this option
+# configuration wants paid for. Use tools/fuzz/run.sh rather than this option
 # directly - it configures a dedicated build/fuzz directory with the right
 # compiler.
-option(ICLFORGE_BUILD_FUZZERS "Build libFuzzer harnesses (Clang only; see fuzz/)" OFF)
-# Every other library component (iclforge::matroska, iclforge::mp4, iclforge::mpegts, and the AC-4,
+option(ICLFORGE_BUILD_FUZZERS "Build libFuzzer harnesses (Clang only; see tools/fuzz/)" OFF)
+# Every other library component (iclforge::containers, and the AC-4,
 # IAB and IAMF libraries below) gets its own ICLFORGE_BUILD_<NAME> option, defaulting ON so
 # nothing changes for today's direct/CPack builds. This is what lets the vcpkg port and the Conan
 # recipe (packaging/) expose each as an opt-in feature or option, off unless asked for - see
 # cmake/InstallLibrary.cmake's matching install()/export() gate.
-option(ICLFORGE_BUILD_MATROSKA "Build the standalone Matroska container writer (src/matroska)" ON)
-option(ICLFORGE_BUILD_MP4 "Build the standalone MP4/ISOBMFF container writer (src/mp4)" ON)
-option(ICLFORGE_BUILD_MPEGTS "Build the standalone MPEG-TS container writer (src/mpegts)" ON)
-# AC-4 bitstream inspector: the AC-4 sync-frame/TOC/presentation/substream-group bitstream
-# inspector (src/ac4). Same "own option, defaults ON" treatment as the three
-# above - apps/cli's `probe` command links it unconditionally.
-option(ICLFORGE_BUILD_AC4 "Build the standalone AC-4 bitstream inspector, decoder and encoder (src/ac4, src/ac4core, src/ac4dec, src/ac4enc)" ON)
+option(ICLFORGE_BUILD_MATROSKA "Build the standalone Matroska container writer (libs/containers/src/matroska)" ON)
+option(ICLFORGE_BUILD_MP4 "Build the standalone MP4/ISOBMFF container writer (libs/containers/src/mp4)" ON)
+option(ICLFORGE_BUILD_MPEGTS "Build the standalone MPEG-TS container writer (libs/containers/src/mpegts)" ON)
+# The AC-4 codec (libs/ac4): the sync-frame/TOC/presentation/substream-group
+# inspector, the decoder and the encoder, one library. Same "own option,
+# defaults ON" treatment as the three above - apps/forge/cli/src's `probe` command links
+# it unconditionally.
+option(ICLFORGE_BUILD_AC4 "Build the AC-4 codec: the bitstream inspector, the decoder and the encoder (libs/ac4)" ON)
 
-# iclforge::iab (src/iab) - IAB reader, phase 1: a standalone reader for SMPTE
+# iclforge::iab (libs/iab) - IAB reader, phase 1: a standalone reader for SMPTE
 # ST 2098-2's Immersive Audio Bitstream. Like the three container writers above, it needs no
 # opt-in third-party library (unlike iclforge::adm, see its own option() below), so it defaults ON the
-# same way; unlike them, nothing in apps/cli, apps/gui or examples/ links it yet (IAB reader's
+# same way; unlike them, nothing in apps/forge/cli/src, apps/forge/gui or examples/ links it yet (IAB reader's
 # phase 3 is what will eventually give it a consumer), so there is no matching FATAL_ERROR
 # guard here - tests/CMakeLists.txt only adds iclforge::iab's own test file and links iclforge::iab
 # when this option is on, the same conditional shape it already uses for iclforge::adm/
 # ICLFORGE_BUILD_ADM.
-option(ICLFORGE_BUILD_IAB "Build the standalone Immersive Audio Bitstream reader (src/iab)" ON)
+option(ICLFORGE_BUILD_IAB "Build the standalone Immersive Audio Bitstream reader (libs/iab)" ON)
 
-# iclforge::iamf (src/iamf) - IAMF writer, phase 1: a standalone OBU/ISOBMFF writer for AOM's
+# iclforge::containers (libs/containers/src/iamf) - IAMF writer, phase 1: a standalone OBU/ISOBMFF writer for AOM's
 # IAMF (Immersive Audio Model and Formats) v1.1.0, emitting `ipcm` substreams for a channel-based
 # 7.1.4 element. Same zero-third-party-dependency shape as iclforge::iab immediately above (unlike
 # iclforge::adm, see its own option() below), so it defaults ON the same way and for the same reason;
-# also like iclforge::iab, nothing in apps/cli, apps/gui or examples/ links it unconditionally yet (only
-# examples/mux_iamf.cpp does, guarded on this option) - see src/iamf/CMakeLists.txt's own header
+# also like iclforge::iab, nothing in apps/forge/cli/src, apps/forge/gui or examples/ links it unconditionally yet (only
+# examples/mux_iamf.cpp does, guarded on this option) - see libs/containers/CMakeLists.txt's own header
 # comment.
-option(ICLFORGE_BUILD_IAMF "Build the standalone IAMF OBU/ISOBMFF reader and writer (src/iamf)" ON)
+option(ICLFORGE_BUILD_IAMF "Build the standalone IAMF OBU/ISOBMFF reader and writer (libs/containers/src/iamf)" ON)
 
 # The minimum-footprint decoder profile. Not a "build X too"
-# option like the ones above - it REPLACES what src/ac3 builds with a single
+# option like the ones above - it REPLACES what libs/ac3 builds with a single
 # decode-only static library for a target with a few hundred kilobytes of RAM
 # and no operating system (see cmake/MinimalDecoder.cmake and
 # docs/building.md). Off by default, and the guard below refuses it alongside
@@ -226,13 +227,13 @@ if(ICLFORGE_MINIMAL_DECODER AND ICLFORGE_MINIMAL_ENCODER)
 endif()
 
 # The AC-4 decoder inside the same profile (planning/ac4.md, D14b): the
-# inspector (src/ac4), the core (src/ac4core) and the decoder (src/ac4dec) as
-# static archives built with the profile's own compile options, and no encoder -
+# library's decode-only archive (libs/ac4/minimal.cmake: the inspector, the core
+# and the decoder) built with the profile's own compile options, and no encoder -
 # the encoder is built for no ESP32 part (decision 34). It is an option of its
 # own rather than a use of ICLFORGE_BUILD_AC4, which the guard below refuses in
-# the profile because it also builds src/ac4enc, the applications and the
+# the profile because it also builds the encoder, the applications and the
 # tests. Off by default, and when off the profile builds exactly what it did
-# before: esp-idf/iclforge/CMakeLists.txt sets it from CONFIG_ICLFORGE_AC4.
+# before: firmware/esp-idf/iclforge/CMakeLists.txt sets it from CONFIG_ICLFORGE_AC4.
 option(ICLFORGE_MINIMAL_AC4
     "Minimum-footprint decoder profile only: also build the AC-4 inspector, core and decoder (no encoder)"
     OFF)
@@ -245,10 +246,10 @@ endif()
 # Where a frame's time goes, on a target that cannot run Tracy. Routes the
 # library's ICLFORGE_ZONE_SCOPED_N() markers - the same ones ICLFORGE_ENABLE_TRACY
 # turns into Tracy zones - to two functions the APPLICATION supplies (see
-# src/base/variants/profiling-stage_timers/), so a bare-metal probe can
+# libs/base/variants/profiling-stage_timers/), so a bare-metal probe can
 # report per-stage microseconds beside its per-frame ones. Minimum-footprint
 # profile only: it is that profile's targets that have no other profiler, and
-# apps/baremetal/stage_timers.cpp is the one implementation of the two
+# firmware/baremetal/stage_timers.cpp is the one implementation of the two
 # functions. Off by default, and when off the markers compile to nothing
 # exactly as before, so a timed build and a plain one differ only in the
 # library's include path.
@@ -262,8 +263,29 @@ if(ICLFORGE_STAGE_TIMERS AND NOT (ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_E
         "this, and nothing in it defines the two functions the stage-timer backend calls.")
 endif()
 
-# apps/cli, apps/gui, tests/ and examples/ all link iclforge::matroska, iclforge::mp4 and
-# iclforge::mpegts unconditionally - none of them are written to cope with any of the three being
+# The scalar the decoders carry their coefficients in, for every codec: double is the default and
+# stays it for every ordinary build (the gold references, the quality trend and the cross-platform
+# bitstream hashes are all stated in that arithmetic); float is the single-precision-FPU parts';
+# fixed is iclforge::internal::Fixed32, Q7.24 in an int32, for parts with no FPU
+# (planning/arithmetic-tiers.md). Each codec takes its decode-scalar-<tier>/ variant directory from
+# ICLFORGE_DECODE_SCALAR_TIER, so the three spellings are float64, float32 and fixed32 everywhere.
+# A CACHE variable, so an ESP-IDF project or a preset that set it first keeps its value.
+set(ICLFORGE_DECODE_SCALAR "double" CACHE STRING
+    "Scalar the decoder carries coefficients in: double (default), float, or fixed (Q7.24 in an int32, for parts with no FPU)")
+set_property(CACHE ICLFORGE_DECODE_SCALAR PROPERTY STRINGS double float fixed)
+if(ICLFORGE_DECODE_SCALAR STREQUAL "double")
+    set(ICLFORGE_DECODE_SCALAR_TIER "float64")
+elseif(ICLFORGE_DECODE_SCALAR STREQUAL "float")
+    set(ICLFORGE_DECODE_SCALAR_TIER "float32")
+elseif(ICLFORGE_DECODE_SCALAR STREQUAL "fixed")
+    set(ICLFORGE_DECODE_SCALAR_TIER "fixed32")
+else()
+    message(FATAL_ERROR
+        "ICLFORGE_DECODE_SCALAR is 'double', 'float' or 'fixed' (got '${ICLFORGE_DECODE_SCALAR}')")
+endif()
+
+# apps/forge/cli/src, apps/forge/gui, tests/ and examples/ all link iclforge::containers and
+# iclforge::containers unconditionally - none of them are written to cope with any of the three being
 # absent. ICLFORGE_BUILD_MATROSKA=OFF, ICLFORGE_BUILD_MP4=OFF or ICLFORGE_BUILD_MPEGTS=OFF only
 # make sense with all four also OFF (this is the shape a vcpkg or Conan build without the
 # matching feature or option actually uses, see cmake/InstallLibrary.cmake and packaging/);
@@ -273,26 +295,26 @@ endif()
 if(NOT ICLFORGE_BUILD_MATROSKA AND (ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR ICLFORGE_BUILD_TESTS OR ICLFORGE_BUILD_EXAMPLES))
     message(FATAL_ERROR "ICLFORGE_BUILD_MATROSKA=OFF requires ICLFORGE_BUILD_CLI, "
         "ICLFORGE_BUILD_GUI, ICLFORGE_BUILD_TESTS and ICLFORGE_BUILD_EXAMPLES to all be OFF too - "
-        "they all link iclforge::matroska unconditionally.")
+        "they all link iclforge::containers unconditionally.")
 endif()
 if(NOT ICLFORGE_BUILD_MP4 AND (ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR ICLFORGE_BUILD_TESTS OR ICLFORGE_BUILD_EXAMPLES))
     message(FATAL_ERROR "ICLFORGE_BUILD_MP4=OFF requires ICLFORGE_BUILD_CLI, "
         "ICLFORGE_BUILD_GUI, ICLFORGE_BUILD_TESTS and ICLFORGE_BUILD_EXAMPLES to all be OFF too - "
-        "they all link iclforge::mp4 unconditionally.")
+        "they all link iclforge::containers unconditionally.")
 endif()
 if(NOT ICLFORGE_BUILD_MPEGTS AND (ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR
                                   ICLFORGE_BUILD_TESTS OR ICLFORGE_BUILD_EXAMPLES))
     message(FATAL_ERROR "ICLFORGE_BUILD_MPEGTS=OFF requires ICLFORGE_BUILD_CLI, "
         "ICLFORGE_BUILD_GUI, ICLFORGE_BUILD_TESTS and ICLFORGE_BUILD_EXAMPLES to all be OFF too - "
-        "they all link iclforge::mpegts unconditionally.")
+        "they all link iclforge::containers unconditionally.")
 endif()
 if(NOT ICLFORGE_BUILD_AC4 AND (ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR ICLFORGE_BUILD_TESTS))
     message(FATAL_ERROR "ICLFORGE_BUILD_AC4=OFF requires ICLFORGE_BUILD_CLI, "
         "ICLFORGE_BUILD_GUI and ICLFORGE_BUILD_TESTS to all be OFF too - they all link iclforge::ac4 "
         "unconditionally.")
 endif()
-# Hearth's applications, which a board's build leaves out: a board takes src/sendspin's player
-# half alone (ICLFORGE_SENDSPIN_PLAYER_ONLY, set by esp-idf/iclforge/CMakeLists.txt, with the
+# Hearth's applications, which a board's build leaves out: a board takes libs/sendspin's player
+# half alone (ICLFORGE_SENDSPIN_PLAYER_ONLY, set by firmware/esp-idf/iclforge/CMakeLists.txt, with the
 # minimum-footprint profile and no AC-4), and the two guards below are about the applications.
 if(ICLFORGE_BUILD_HEARTH AND NOT ICLFORGE_SENDSPIN_PLAYER_ONLY)
     set(_ac3_hearth_apps ON)
@@ -302,7 +324,7 @@ endif()
 if(NOT ICLFORGE_BUILD_AC4 AND _ac3_hearth_apps)
     message(FATAL_ERROR "ICLFORGE_BUILD_AC4=OFF requires ICLFORGE_BUILD_HEARTH to be OFF too, "
         "unless ICLFORGE_SENDSPIN_PLAYER_ONLY is set - Hearth's engine reads an AC-4 item's table "
-        "of contents with iclforge::ac4, and its presentations and metadata with iclforge::ac4dec.")
+        "of contents with iclforge::ac4, and its presentations and metadata with iclforge::ac4.")
 endif()
 
 # ICLFORGE_MINIMAL_DECODER's own version of the three guards above. Everything listed here
@@ -350,8 +372,8 @@ include(MinimalDecoder)
 # never opt-in, unlike Tracy above.
 #
 # NOT for the minimum-footprint profile, which links it nowhere: no source in
-# src/ac3/minimal.cmake's list mentions fmt, and neither iclforge_ac3_minimal nor
-# apps/baremetal's probe lists iclforge::fmt among its libraries. The profile is in
+# libs/ac3/minimal.cmake's list mentions fmt, and neither iclforge_ac3_minimal nor
+# firmware/baremetal's probe lists iclforge::fmt among its libraries. The profile is in
 # fact built to avoid it - src/internal/cpu/minimal/cpu_features.cpp exists as
 # a whole separate translation unit rather than a branch precisely because the
 # shared one reports through fmt, "which this profile does not carry and whose
@@ -373,32 +395,32 @@ if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
     include(Fmt)
 endif()
 
-# iclforge::adm (src/adm) is a READER, not a writer like the three container modules above -
+# iclforge::adm (libs/adm) is a READER, not a writer like the three container modules above -
 # ADM BWF reader, phase 1, parsing
 # BW64/RF64 + the Audio Definition Model rather than muxing a container. Unlike
 # matroska/mp4/mpegts, it defaults OFF rather than ON and is genuinely additive: nothing in
-# apps/cli, apps/gui, tests/ or examples/ links it unconditionally, so every one of those builds
+# apps/forge/cli/src, apps/forge/gui, tests/ or examples/ links it unconditionally, so every one of those builds
 # identically whether this is on or off. The reason for the different default is its
-# dependency footprint - see src/adm/CMakeLists.txt's own header comment - libadm needs
+# dependency footprint - see libs/adm/CMakeLists.txt's own header comment - libadm needs
 # several Boost header libraries, resolved through a dedicated opt-in vcpkg feature
 # (-DVCPKG_MANIFEST_FEATURES=adm, see vcpkg.json) that a normal build never pulls in.
-option(ICLFORGE_BUILD_ADM "Build the standalone BW64/RF64 + ADM parser (src/adm) - needs Boost, see vcpkg.json's \"adm\" feature" OFF)
+option(ICLFORGE_BUILD_ADM "Build the standalone BW64/RF64 + ADM parser (libs/adm) - needs Boost, see vcpkg.json's \"adm\" feature" OFF)
 
-# iclforge_c (src/capi) - the C API over iclforge::ac3's encode/decode core. Depends
-# on nothing but iclforge::ac3_static (see src/capi/CMakeLists.txt's own header comment on why it
+# iclforge_c (libs/capi) - the C API over iclforge::ac3's encode/decode core. Depends
+# on nothing but iclforge::ac3_static (see libs/capi/CMakeLists.txt's own header comment on why it
 # always embeds the static codec rather than tracking BUILD_SHARED_LIBS), so - unlike
 # ICLFORGE_BUILD_ADM - there is no extra dependency footprint to opt out of; default ON matches
 # matroska/mp4/mpegts above, not ADM.
-option(ICLFORGE_BUILD_CAPI "Build the C API over the encode/decode core (src/capi)" ON)
+option(ICLFORGE_BUILD_CAPI "Build the C API over the encode/decode core (libs/capi)" ON)
 
-# Python on PyPI: the pybind11 extension module (python/) - off by default like ICLFORGE_BUILD_ADM
-# above, and for the same reason: nothing under src/, apps/cli, apps/gui, tests/ or examples/ links
+# Python on PyPI: the pybind11 extension module (bindings/python/) - off by default like ICLFORGE_BUILD_ADM
+# above, and for the same reason: nothing under src/, apps/forge/cli/src, apps/forge/gui, tests/ or examples/ links
 # it or is affected by it either way. A normal C++ build (and every existing CI leg) is unchanged
-# with this OFF. Turned ON by python/pyproject.toml's own cmake.define when scikit-build-core
-# drives the configure for `pip install`/cibuildwheel - see python/CMakeLists.txt.
-option(ICLFORGE_BUILD_PYTHON "Build the pybind11 Python extension module (python/)" OFF)
+# with this OFF. Turned ON by bindings/python/pyproject.toml's own cmake.define when scikit-build-core
+# drives the configure for `pip install`/cibuildwheel - see bindings/python/CMakeLists.txt.
+option(ICLFORGE_BUILD_PYTHON "Build the pybind11 Python extension module (bindings/python/)" OFF)
 
-# Hearth, the desktop reference player (planning/hearth-reference-player.md): src/sendspin and
+# Hearth, the desktop reference player (planning/hearth-reference-player.md): libs/sendspin and
 # apps/hearth (the engine, the window, the test sink and server). ON by default: every leg of
 # build-and-test's own matrix (_build.yml) has built and tested it since A7, so a plain local
 # configure now matches what CI already proves rather than needing -DICLFORGE_BUILD_HEARTH=ON by
@@ -413,14 +435,14 @@ option(ICLFORGE_BUILD_PYTHON "Build the pybind11 Python extension module (python
 # _ci-core.yml's own standalone jobs are not part of that matrix and do not all request the
 # "hearth" vcpkg feature, so a leg that narrows VCPKG_MANIFEST_FEATURES away from it (adm-validate's
 # own "adm"-only feature list is the one example found so far) needs this same explicit OFF or its
-# plain add_subdirectory(src/sendspin) below fails resolving mbedTLS/cpp-httplib/libFLAC/Opus/mdns
+# plain add_subdirectory(libs/sendspin) below fails resolving mbedTLS/cpp-httplib/libFLAC/Opus/mdns
 # that were never installed - found the hard way once this option's default flipped to ON.
-option(ICLFORGE_BUILD_HEARTH "Build Hearth: src/sendspin and apps/hearth - see vcpkg.json's \"hearth\" feature, selected by default via CMakePresets.json's core fragment" ON)
+option(ICLFORGE_BUILD_HEARTH "Build Hearth: libs/sendspin and apps/hearth - see vcpkg.json's \"hearth\" feature, selected by default via CMakePresets.json's core fragment" ON)
 
 # enable_testing() has to run before ANY add_subdirectory() that might contain
 # an add_test() call, not merely before tests/ itself - CTest silently drops
 # an add_test() registered from a directory processed earlier in the same
-# configure pass (confirmed the hard way: apps/gui/tests/'s forge_gui_qml_tests_*
+# configure pass (confirmed the hard way: apps/forge/gui/tests/'s forge_gui_qml_tests_*
 # entries were invisible to `ctest -N` until this moved here). Calling it unconditionally
 # is harmless when ICLFORGE_BUILD_TESTS is OFF - nothing calls add_test() then.
 if(ICLFORGE_BUILD_TESTS)
@@ -430,31 +452,39 @@ endif()
 # ---------------------------------------------------------------------------
 # Targets
 # ---------------------------------------------------------------------------
-# The scalar building blocks iclforge::ac3 and src/ac4core (below) both use -
-# Fixed32 and the cross-platform-identical float transcendentals
-# (planning/ac4.md, decision 31). Header-only and dependency-free, so it goes
-# first; both consumers link it PRIVATE.
 include(IclforgeLibrary)
-add_subdirectory(src/arithmetic)
 
 # The codec-blind libraries the AC-3 codec builds on, each linking only the ones above it:
-# base (bit I/O, the speaker vocabulary, the kernels' build variants), dsp, objects (the object model
-# and the OAMD payload), render and iec61937. Then the codec, which links all of them. None of the
-# five links a codec; AC-4 (src/ac4*) links none of them yet.
-add_subdirectory(src/base)
-add_subdirectory(src/dsp)
-add_subdirectory(src/objects)
-add_subdirectory(src/render)
-add_subdirectory(src/iec61937)
-add_subdirectory(src/ac3)
+# base (bit I/O, the speaker vocabulary, the scalar arithmetic, the signing key and its hash and MAC,
+# the kernels' build variants), dsp, objects (the object model and the OAMD payload) and render.
+# Then the codec, which links all four and holds the EMDF Atmos signer. None of them links a codec;
+# AC-4 (libs/ac4) takes base's profiling directory and its arithmetic headers and links none of them
+# yet.
+add_subdirectory(libs/base)
+add_subdirectory(libs/dsp)
+add_subdirectory(libs/objects)
+add_subdirectory(libs/render)
+# The device-side logic of the ESP32 sinks and players that needs no SDK: headers the ESP-IDF
+# component, Hearth's engine and their tests share (libs/device/CMakeLists.txt).
+add_subdirectory(libs/device)
+add_subdirectory(libs/ac3)
+
+# The containers, codec-blind and one library: IEC 61937 burst packing, always, and the Matroska,
+# MP4/ISOBMFF, MPEG-2 TS and IAMF writers and readers, each selected by its own option
+# (ICLFORGE_BUILD_MATROSKA, _MP4, _MPEGTS and _IAMF, default ON), which a vcpkg feature or a Conan
+# option of the same name switches - see libs/containers/CMakeLists.txt. The minimum-footprint
+# profile carries no container.
+if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
+    add_subdirectory(libs/containers)
+endif()
 
 # Live capture, monitor playback and IEC 61937 passthrough - the only
-# platform-specific code in the project. After src/ac3 (PRIVATE-links
-# iclforge::ac3 for the IEC 61937 framer); before apps/cli/apps/gui/tests, which
+# platform-specific code in the project. After libs/ac3 and libs/containers (it links
+# the codec, and the containers' IEC 61937 framer); before apps/forge/cli, apps/forge/gui and the tests, which
 # link it alongside iclforge::ac3 for their live-audio commands/features. Not
 # linked by examples/ - none of them touch live audio.
 #
-# Skipped entirely under Emscripten: src/audio/CMakeLists.txt hard-fails
+# Skipped entirely under Emscripten: libs/audio/CMakeLists.txt hard-fails
 # configure when none of WIN32/LINUX/APPLE/ANDROID is set (it has no browser
 # platform directory, and never will - a WASM build gets live audio from the
 # Web Audio API in JS instead, not from this library), and nothing a WASM
@@ -466,140 +496,66 @@ add_subdirectory(src/ac3)
 # device, no backend directory would match it, and the profile's whole point
 # is that nothing outside the decode path is compiled.
 if(NOT EMSCRIPTEN AND NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
-    add_subdirectory(src/audio)
+    add_subdirectory(libs/audio)
 endif()
 
-# The EMDF Atmos object signer (iclforge::signing). Clean-room and dependency-free:
-# the HMAC construction and authenticated-region layout are in-tree, and the
-# only secret - the key - is supplied by the operator at runtime, never
-# embedded, so unlike the old quarantine overlay this is committed and built by
-# default. After src/ac3 so it can reuse the codec's parsing primitives; before
-# apps/cli so forge can link it.
-# Not under ICLFORGE_MINIMAL_DECODER: object SIGNING is a production-side
-# concern, and verification is opt-in even in a full build - neither is on a
-# decode path a set-top box has to run.
-if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
-    add_subdirectory(src/signing)
+# The AC-4 codec, a peer of iclforge::ac3 that links nothing of it: the
+# inspector, the decoder and the encoder, one library (libs/ac4). Gated by
+# ICLFORGE_BUILD_AC4 (default ON, see the option() and its FATAL_ERROR guard
+# above), or in the minimum-footprint profile by ICLFORGE_MINIMAL_AC4, where
+# libs/ac4/minimal.cmake builds what a decode reads and no encoder.
+if(ICLFORGE_BUILD_AC4 OR ICLFORGE_MINIMAL_AC4)
+    add_subdirectory(libs/ac4)
 endif()
 
-# A standalone container writer, kept apart from the codec on purpose: it
-# depends on nothing of iclforge::ac3 and knows nothing about AC-3. Gated by
-# ICLFORGE_BUILD_MATROSKA (default ON) so it can be opted out of - a vcpkg
-# port maps this straight to its own "matroska" feature.
-if(ICLFORGE_BUILD_MATROSKA)
-    add_subdirectory(src/matroska)
-endif()
-
-# A second standalone container writer, same shape and same reasoning as
-# src/matroska above - see src/mp4/CMakeLists.txt's own header. Gated by
-# ICLFORGE_BUILD_MP4 (default ON, see the FATAL_ERROR guard above).
-if(ICLFORGE_BUILD_MP4)
-    add_subdirectory(src/mp4)
-endif()
-
-# A third standalone container writer, same shape as src/matroska above but
-# for MPEG-2 Transport Stream rather than Matroska. Gated by ICLFORGE_BUILD_MPEGTS
-# (default ON, see the option() and its FATAL_ERROR guard above) so it can be
-# opted out of the same way matroska is expected to become opt-out-able too.
-if(ICLFORGE_BUILD_MPEGTS)
-    add_subdirectory(src/mpegts)
-endif()
-
-# A fourth standalone module, same "depends on nothing of iclforge::ac3" shape
-# as the three container writers above - the AC-4 bitstream inspector, and the
-# AC-4 decoder beside it, which links the inspector and
-# nothing of iclforge::ac3 either, and the AC-4 encoder (src/ac4enc). src/ac4core
-# is what the decoder and the encoder compute alike (tables and transforms),
-# linked privately by both.
-# Gated together by ICLFORGE_BUILD_AC4 (default ON, see the option() and its
-# FATAL_ERROR guard above).
-if(ICLFORGE_BUILD_AC4)
-    add_subdirectory(src/ac4)
-    add_subdirectory(src/ac4core)
-    add_subdirectory(src/ac4dec)
-    add_subdirectory(src/ac4enc)
-elseif(ICLFORGE_MINIMAL_AC4)
-    # The minimum-footprint profile's share of the above: what a decode reads
-    # and no encoder (ICLFORGE_MINIMAL_AC4, beside the profile's options). The
-    # three directories check ICLFORGE_MINIMAL_DECODER themselves for what a
-    # bare-metal archive cannot have: a shared library, position-independent
-    # code, and exceptions.
-    add_subdirectory(src/ac4)
-    add_subdirectory(src/ac4core)
-    add_subdirectory(src/ac4dec)
-    # -Wno-psabi: GCC's arm-none-eabi says, once a translation unit and for every
-    # std::span passed by value, that its passing changed in GCC 7.1. A note about an
-    # ABI nothing here links against, hundreds of them in the log of a leg whose
-    # output is the numbers.
-    foreach(_ac3_ac4_target IN ITEMS iclforge_ac4_objects iclforge_ac4core iclforge_ac4dec_objects)
-        target_compile_options(${_ac3_ac4_target} PRIVATE "$<$<CXX_COMPILER_ID:GNU>:-Wno-psabi>")
-    endforeach()
-    unset(_ac3_ac4_target)
-endif()
-
-# A standalone reader, not a writer like the three container modules above - roadmap item IM1
+# A standalone reader - roadmap item IM1
 # phase 1 ("IAB (SMPTE ST 2098-2) reader"). Gated by ICLFORGE_BUILD_IAB
 # (default ON, see the option() above).
 if(ICLFORGE_BUILD_IAB)
-    add_subdirectory(src/iab)
-endif()
-
-# A standalone writer, not a reader like iab above - IAMF writer, phase 1 (an IAMF
-# OBU/ISOBMFF writer). Gated by ICLFORGE_BUILD_IAMF (default ON, see the option()
-# above).
-if(ICLFORGE_BUILD_IAMF)
-    add_subdirectory(src/iamf)
+    add_subdirectory(libs/iab)
 endif()
 
 # A standalone BW64/RF64 + Audio Definition Model parser - reader, not writer, but the same
-# "depends on nothing of iclforge::ac3" shape as the three container writers above. Gated by
+# "depends on nothing of iclforge::ac3" shape as the containers above. Gated by
 # ICLFORGE_BUILD_ADM (default OFF, unlike the three above - see the option() itself for why).
 if(ICLFORGE_BUILD_ADM)
-    # IAB reader bridge, phase 3: iclforge::admbridge's own IAB mapping (src/admbridge/src/iab_bridge.cpp)
-    # names iclforge::iab::IABitstreamFrame in a public header, so it needs the src/iab add_subdirectory()
+    # IAB reader bridge, phase 3: iclforge::adm's own IAB mapping (libs/adm/src/iab_bridge.cpp)
+    # names iclforge::iab::IABitstreamFrame in a public header, so it needs the libs/iab add_subdirectory()
     # above to have actually run. ICLFORGE_BUILD_IAB defaults ON, unlike ICLFORGE_BUILD_ADM, so this
     # is the one combination that can silently fail to configure without an explicit guard - every
     # other ICLFORGE_BUILD_ADM consequence below only ever depends on flags that are already
     # unconditionally true (iclforge::ac3) or already checked by this same if() (iclforge::adm).
     if(NOT ICLFORGE_BUILD_IAB)
         message(FATAL_ERROR "ICLFORGE_BUILD_ADM=ON requires ICLFORGE_BUILD_IAB=ON (default ON) - "
-                             "iclforge::admbridge's IAB mapping (IAB reader phase 3) depends on iclforge::iab")
+                             "iclforge::adm's IAB mapping (IAB reader phase 3) depends on iclforge::iab")
     endif()
 
-    add_subdirectory(src/adm)
-
-    # iclforge::admbridge - ADM BWF → JOC bridge, phase 2: maps iclforge::adm's parsed ADM graph onto
-    # iclforge::ac3::oba::AtmosEncoder. Depends on iclforge::ac3 (added above), iclforge::adm (just added) and
-    # (IAB reader phase 3) iclforge::iab (added earlier, guarded above), so it is meaningless
-    # without ICLFORGE_BUILD_ADM - gated by the same flag rather than a new option of its own; see
-    # src/admbridge/CMakeLists.txt's own header comment for the full reasoning, including why this
-    # is a separate module from every side it bridges.
-    add_subdirectory(src/admbridge)
+    add_subdirectory(libs/adm)
 endif()
 
-# iclforge_c (C API) - after src/ac3 so iclforge::ac3_static exists to embed, gated by its own
+# iclforge_c (C API) - after libs/ac3 so iclforge::ac3_static exists to embed, gated by its own
 # ICLFORGE_BUILD_CAPI option (see the option() above) the same way matroska/mp4/mpegts are gated by
 # theirs.
 if(ICLFORGE_BUILD_CAPI)
-    add_subdirectory(src/capi)
+    add_subdirectory(libs/capi)
 endif()
 
 # iclforge::sendspin (planning/hearth-sendspin-extension.md) - gated by ICLFORGE_BUILD_HEARTH, the
 # option above. Never installed or exported, like iclforge::audio.
 if(ICLFORGE_BUILD_HEARTH)
-    add_subdirectory(src/sendspin)
+    add_subdirectory(libs/sendspin)
 endif()
 
-# install()/find_package(iclforge) support for iclforge::ac3, iclforge::matroska,
-# iclforge::mp4 and iclforge::mpegts - after every add_subdirectory() call above (needs their targets to
+# install()/find_package(iclforge) support for iclforge::ac3, iclforge::containers,
+# iclforge::containers - after every add_subdirectory() call above (needs their targets to
 # exist), before include(Packaging) (CPack's library component packages exactly what gets
 # install()'d here). Deliberately not iclforge::audio - see cmake/InstallLibrary.cmake's own header
-# comment for why. iclforge::adm and iclforge::admbridge ARE installed/exported here (ICLFORGE_BUILD_ADM
+# comment for why. iclforge::adm ARE installed/exported here (ICLFORGE_BUILD_ADM
 # block) but SHARED ONLY, unlike every other component - iclforge::adm PRIVATE-embeds the third-party
 # libbw64/libadm (FetchContent'd, never installed/exported by this project in their own right,
-# see src/adm/CMakeLists.txt's header comment), which only a self-contained SHARED library can
+# see libs/adm/CMakeLists.txt's header comment), which only a self-contained SHARED library can
 # absorb without either re-exporting them or shipping a STATIC archive with genuinely unresolved
-# symbols. admbridge follows suit since it transitively depends on iclforge::adm_shared.
+# symbols. The ADM bridge, a part of it, follows suit.
 # Not under ICLFORGE_MINIMAL_DECODER: the exported package describes
 # iclforge::ac3_static/iclforge::ac3_shared, neither of which exists in that
 # profile, and an embedded integrator consumes iclforge::ac3_minimal from an
@@ -613,20 +569,20 @@ endif()
 # examples and isn't consumed via find_package(iclforge), so it doesn't need to come before or
 # after InstallLibrary for any reason other than "iclforge::ac3 must already be a target".
 if(ICLFORGE_BUILD_PYTHON)
-    add_subdirectory(python)
+    add_subdirectory(bindings/python)
 endif()
 
 if(ICLFORGE_BUILD_CLI)
-    add_subdirectory(apps/cli)
+    add_subdirectory(apps/forge/cli)
 endif()
 
 if(ICLFORGE_BUILD_GUI)
-    add_subdirectory(apps/gui)
+    add_subdirectory(apps/forge/gui)
 endif()
 
 # Hearth's applications, the test sink so far (planning/hearth-reference-player.md). Not in a
-# board's build, which takes src/sendspin's player half alone (ICLFORGE_SENDSPIN_PLAYER_ONLY,
-# set by esp-idf/iclforge/CMakeLists.txt) and has no iclforge::ac3 for the applications to link.
+# board's build, which takes libs/sendspin's player half alone (ICLFORGE_SENDSPIN_PLAYER_ONLY,
+# set by firmware/esp-idf/iclforge/CMakeLists.txt) and has no iclforge::ac3 for the applications to link.
 if(ICLFORGE_BUILD_HEARTH AND NOT ICLFORGE_SENDSPIN_PLAYER_ONLY)
     add_subdirectory(apps/hearth)
 endif()
@@ -634,7 +590,7 @@ endif()
 # Crucible (docs/crucible/design/promotion.md).
 # In-tree like the GUI rather than wrapping the root the way the Android app
 # does, because it shares this toolchain. All three desktop platforms now have
-# a half under apps/crucible/engine/platform/ and apps/crucible/ui/platform/,
+# a half under apps/crucible/engine/src/platform/ and apps/crucible/ui/src/platform/,
 # so all three are allowed in; the guard names them rather than being dropped,
 # because a platform with no arm in apps/crucible/CMakeLists.txt would
 # configure and then fail to link, which is what this list has always been for.
@@ -643,13 +599,41 @@ endif()
 # of the code compiling and nothing more: no Mac has run any part of this
 # application, and docs/crucible/design/promotion.md's "What cannot be verified, and
 # why" table still says so. The engine core is tested everywhere regardless
-# (tests/crucible).
+# (apps/crucible/engine/tests).
 if(ICLFORGE_BUILD_CRUCIBLE AND (WIN32 OR APPLE OR LINUX))
     add_subdirectory(apps/crucible)
 endif()
 
+# The tests, a binary per project (planning/monorepo.md, (e)): tests/ first, for the test-support
+# library every binary links, then the tests/ beside each program and each library, after every
+# target they link. `cmake --build ... --target iclforge-tests` builds them all.
 if(ICLFORGE_BUILD_TESTS)
+    include(External)
+    iclforge_find_catch2()
     add_subdirectory(tests)
+    # The products', beside the programs they test. Forge's command line is run as a subprocess, so
+    # its tests need the target; the shared code and the GUI's Qt-free part are held on every leg.
+    if(TARGET forge)
+        add_subdirectory(apps/forge/cli/tests)
+    endif()
+    add_subdirectory(apps/shared/media/tests)
+    add_subdirectory(apps/shared/preferences/tests)
+    add_subdirectory(apps/forge/gui/tests)
+    if(ICLFORGE_BUILD_HEARTH)
+        add_subdirectory(apps/hearth/engine/tests)
+    endif()
+    add_subdirectory(apps/crucible/engine/tests)
+    foreach(_iclforge_lib IN ITEMS base dsp objects render device ac3 containers audio ac4 iab adm capi sendspin)
+        set(_iclforge_lib_target "iclforge::${_iclforge_lib}")
+        if(_iclforge_lib STREQUAL "capi")
+            set(_iclforge_lib_target "iclforge::c")
+        endif()
+        if(TARGET ${_iclforge_lib_target})
+            add_subdirectory(libs/${_iclforge_lib}/tests)
+        endif()
+    endforeach()
+    unset(_iclforge_lib)
+    unset(_iclforge_lib_target)
 endif()
 
 # After the tests block: the examples register themselves as tests, which needs
@@ -658,15 +642,21 @@ if(ICLFORGE_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
+# Each library's libFuzzer harnesses (libs/<lib>/fuzz), over what cmake/IclforgeFuzz.cmake
+# instruments; each file guards its harnesses on the option that builds their library.
 if(ICLFORGE_BUILD_FUZZERS)
-    add_subdirectory(fuzz)
+    include(IclforgeFuzz)
+    foreach(_iclforge_lib IN ITEMS ac3 base containers iab objects ac4 adm sendspin)
+        add_subdirectory(libs/${_iclforge_lib}/fuzz)
+    endforeach()
+    unset(_iclforge_lib)
 endif()
 
 # The browser decode demo (docs/platforms/wasm.md) - a platform
-# app, same shape and reasoning as apps/android/'s Shield app: a small
+# app, same shape and reasoning as apps/demos/android/'s Shield app: a small
 # demo consuming iclforge::ac3 unmodified, kept out of both src/ (not library
 # code) and examples/ (not a single-API-call snippet backing a
-# docs/library/*.md page, see CONTRIBUTING.md). Unlike apps/android/,
+# docs/library/*.md page, see CONTRIBUTING.md). Unlike apps/demos/android/,
 # which is a wholly separate Gradle/NDK build reached from the other
 # direction, this platform has no non-CMake build system to work around, so
 # it is a normal add_subdirectory() gated on EMSCRIPTEN (set by
@@ -674,12 +664,12 @@ endif()
 # ICLFORGE_BUILD_* option - there is nothing to opt in or out of on a host
 # that isn't targeting WASM in the first place.
 if(EMSCRIPTEN)
-    add_subdirectory(apps/wasm)
+    add_subdirectory(apps/demos/wasm)
 endif()
 
 # The minimum-footprint probe, decoder or encoder (docs/building.md). Gated on
 # the profile rather than on an option of its own, for the same reason
-# apps/wasm is gated on EMSCRIPTEN: outside that profile there is no
+# apps/demos/wasm is gated on EMSCRIPTEN: outside that profile there is no
 # iclforge::ac3_minimal for it to link, so there is nothing to opt in or out of.
 if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
     # Guarded on existence because this tree is also PACKED, as the ESP-IDF
@@ -687,13 +677,13 @@ if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
     # archive carries the library without the probe that measures it - a
     # consumer wants the decoder, not a footprint harness. In a checkout the
     # directory is always there and this is a no-op.
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/apps/baremetal/CMakeLists.txt")
-        add_subdirectory(apps/baremetal)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/firmware/baremetal/CMakeLists.txt")
+        add_subdirectory(firmware/baremetal)
     endif()
 endif()
 
 # Forge's own LICENSE.txt and NOTICES.txt, and the install() rules that put
-# them in the `runtime` component (apps/notices/notices.cmake). After both
+# them in the `runtime` component (notices/forge/notices.cmake). After both
 # application subdirectories, because it needs ICLFORGE_BUILD_GUI settled and
 # ICLFORGE_GUI_QT_VERSION exported; before include(Packaging), because CPack
 # packages the install rules it declares. Gated on the two applications
@@ -701,16 +691,16 @@ endif()
 # would otherwise generate a notice naming binaries its packages do not
 # contain. The library components want notices of their own too - {fmt} is
 # compiled into the library as well as into the applications
-# (src/ac3/CMakeLists.txt compiles it in through iclforge::fmt_private, which
+# (libs/ac3/CMakeLists.txt compiles it in through iclforge::fmt_private, which
 # puts it in the static archive as well as the shared library), so
 # libiclforge0 and libiclforge-dev still have the missing-copyright gap the
 # runtime package had until now - and that is separate work, over install
 # rules in cmake/InstallLibrary.cmake rather than these, not started here.
 if(ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI)
-    include("${CMAKE_CURRENT_SOURCE_DIR}/apps/notices/notices.cmake")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/notices/forge/notices.cmake")
 endif()
 
-# After every target's install() rules (apps/cli, apps/gui) have been declared.
+# After every target's install() rules (apps/forge/cli/src, apps/forge/gui) have been declared.
 # Nothing to package under ICLFORGE_MINIMAL_DECODER - no application is built
 # and nothing is installed (see include(InstallLibrary) above).
 if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
@@ -723,11 +713,11 @@ message(STATUS "  Build GUI      : ${ICLFORGE_BUILD_GUI}")
 message(STATUS "  Build tests    : ${ICLFORGE_BUILD_TESTS}")
 message(STATUS "  Build examples : ${ICLFORGE_BUILD_EXAMPLES}")
 message(STATUS "  Build Python   : ${ICLFORGE_BUILD_PYTHON}")
-# Which src/audio/src/backend/ directory was compiled, and so whether 'record'
+# Which libs/audio/src/backend/ directory was compiled, and so whether 'record'
 # and 'play' work in this build at all - see the platform tree in
-# src/audio/CMakeLists.txt. 'posix' is the one that means no.
+# libs/audio/CMakeLists.txt. 'posix' is the one that means no.
 message(STATUS "  Audio backend  : ${ICLFORGE_AUDIO_BACKEND}")
-# Which of apps/crucible/engine/platform/linux/'s two X11 readers Crucible
+# Which of apps/crucible/engine/src/platform/linux/'s two X11 readers Crucible
 # compiled (docs/crucible/design/promotion.md, "X11 full-screen detection"): 'xcb'
 # reads the active window through libxcb; 'none' says so at runtime and
 # leaves the full-screen rule off. Linux only, since only Linux has the
@@ -735,7 +725,7 @@ message(STATUS "  Audio backend  : ${ICLFORGE_AUDIO_BACKEND}")
 if(ICLFORGE_BUILD_CRUCIBLE AND LINUX)
     message(STATUS "  Crucible X11   : ${ICLFORGE_CRUCIBLE_X11_BACKEND}")
 endif()
-# Which src/arithmetic/arch/ directory the codec's vector kernels
+# Which libs/base/variants/ directory the codec's vector kernels
 # were compiled from (SIMD kernels). 'generic' is the portable scalar
 # reference; -DICLFORGE_SIMD=generic forces it anywhere.
 message(STATUS "  SIMD kernels   : ${ICLFORGE_SIMD_RESOLVED}")

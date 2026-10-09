@@ -2,16 +2,17 @@
 
 Two sets, from the same legs and sources:
 
-- The committed set: tests/golden/external-baseline/ac4-*/dee.ac4, ac4-manifest.json beside
-  them, and each stream's syntax digest under tests/golden/ac4dec/. Short streams that CI reads.
+- The committed set: testdata/external-baseline/ac4-*/dee.ac4, ac4-manifest.json beside
+  them, and each stream's syntax digest under testdata/ac4/. Short streams that CI reads.
 - The gold set (--gold-set DIR): every stream the phases of planning/ac4.md need, kept on a
   local disk and never committed. Phase G0 of that plan made it and phase G1 added to it, both
   while the local DEE licence ran (it ends on 2026-11-06 and is not renewed, so no DEE stream
   can be made after that date).
 
-What the streams are for. The decoder in src/ac4dec is checked against them: first its syntax,
+What the streams are for. The decoder in libs/ac4/src/decoder is checked against them: first its
+syntax,
 read by two transcriptions whose traces must agree (tools/references/ac4_syntax.py writes the
-committed digests; tests/ac4dec/test_ac4dec_syntax.cpp holds the decoder to them), then, from
+committed digests; libs/ac4/tests/decoder/test_syntax.cpp holds the decoder to them), then, from
 phase D2 on, its PCM, scored against each stream's source. The encoder phases race against the
 same streams. So every leg except ac4-stereo-64 is made with loudness measured and not
 corrected: DEE's default (measure_and_correct) normalises to -24 LKFS and runs a -2 dBFS
@@ -54,7 +55,7 @@ data in the I-frames of the IMS legs.
 Every IMS stream signals presentation_version 2 with channel_mode code 0b1111000, which TS
 103 190-2 Table 56 maps to 7.0, and codes a channel_pair_element: walked as 7.0, 5.0 or 5.1, at
 least every I-frame fails its substream size checks; walked as stereo, every frame ends
-exactly (src/ac4dec/ERRATA.md, "presentation_version 2 is read as immersive stereo").
+exactly (libs/ac4/ERRATA.md, "presentation_version 2 is read as immersive stereo").
 
 The three 5.1.4 legs (phase G1) are one tone per channel in each immersive codec mode DEE
 writes, for the phases from D9 on. Both transcriptions read immersive_channel_element() since
@@ -192,7 +193,8 @@ what that forge's probe and decode made of the stream. G0's streams get their MP
 DIR/mp4/<leg>/. With --cli, the objects group builds its ADM BWF masters with that forge
 (DIR/masters/<name>/, atmos-encode then decode's adm_out) and checks them with atmos_info.
 Every AC-4 leg's syntax digest goes to <scratch>/census/, for the census comparison:
-AC4DEC_GOLDEN_DIR=<scratch>/census AC4DEC_STREAM_DIR=DIR/streams iclforge-tests "[ac4dec][syntax]".
+AC4_GOLDEN_DIR=<scratch>/census AC4_STREAM_DIR=DIR/streams
+iclforge-ac4-tests "[ac4][decoder][syntax]".
 
 What DEE 6.5.4 could not be made to write (G1's audit, recorded in the manifest's g1_dee_cannot):
 7.1 AC-4 (eight channels in come out as 5.1), 7.1.4 or 9.1.6 AC-4, any frame rate but index 13
@@ -236,9 +238,9 @@ import ac4_parse
 import ac4_syntax
 
 REPO = Path(__file__).resolve().parent.parent.parent
-AUDIO = REPO / "tests" / "golden" / "audio"
-OUT = REPO / "tests" / "golden" / "external-baseline"
-DIGESTS = REPO / "tests" / "golden" / "ac4dec"
+AUDIO = REPO / "testdata" / "audio"
+OUT = REPO / "testdata" / "external-baseline"
+DIGESTS = REPO / "testdata" / "ac4"
 SCRATCH = REPO / "build" / "ac4_baseline_scratch"
 
 DEE_DIR = Path(r"C:\Program Files\Dolby\Dolby Media Encoder\resources\dee-dir")
@@ -261,7 +263,7 @@ DDPJOC = "dee_ddpjoc_encoder"
 # 3: planning/ac4.md's phase G0. Every leg but ac4-stereo-64 is made again from 5 s sources
 #    with loudness measured and not corrected, so a decode can be scored against its source;
 #    two one-tone-per-channel legs; source_sha256; walked values computed by ac4_syntax.py;
-#    the digests under tests/golden/ac4dec/ written here; the gold set.
+#    the digests under testdata/ac4/ written here; the gold set.
 # 4: phase G1. Three committed 5.1.4 legs, one tone per channel in each immersive codec mode,
 #    without digests until D9; the gold set's g1_legs (the module docstring's "Phase G1"),
 #    with G0's legs, sources and files left as they were.
@@ -331,9 +333,9 @@ _DRC_AND_LTRT = ("drc_profile=film_standard:drc_profile_portable_hp=speech:"
 # The committed legs. "expect" holds what the layout, the rate and the options must give; a
 # walk that disagrees stops main() before anything in the tree changes.
 LEGS = [
-    # tests/ac4/test_ac4.cpp pins this stream's frame count and its MediaInfo-checked TOC
-    # fields; tests/cli and fuzz/generate-seeds.sh read it too. "pinned": main() refuses to
-    # replace it with different bytes, so it keeps DEE's defaults.
+    # libs/ac4/tests/core/test_toc.cpp pins this stream's frame count and its MediaInfo-checked TOC
+    # fields; apps/forge/cli/tests and tools/fuzz/generate-seeds.sh read it too. "pinned": main()
+    # refuses to replace it with different bytes, so it keeps DEE's defaults.
     {"name": "ac4-stereo-64", "encoder": AC4, "source": "reference_stereo", "layout": "stereo",
      "kbps": 64, "options": [], "pinned": True,
      "expect": {"frame_rate_index": 13, "codec_mode": "ASPX"}},
@@ -2100,8 +2102,8 @@ def gold_run(args, version):
     for label, names in (("failed", failed), ("leveled", leveled), ("walk failures", walk_failed)):
         if names:
             print(f"  {label}: {names}")
-    print(f"census digests in {census}: AC4DEC_GOLDEN_DIR={census} "
-          f"AC4DEC_STREAM_DIR={streams} iclforge-tests \"[ac4dec][syntax]\"")
+    print(f"census digests in {census}: AC4_GOLDEN_DIR={census} "
+          f"AC4_STREAM_DIR={streams} iclforge-ac4-tests \"[ac4][decoder][syntax]\"")
     if failed:
         raise SystemExit(1)
 

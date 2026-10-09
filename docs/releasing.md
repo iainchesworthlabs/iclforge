@@ -20,7 +20,7 @@ workflow publishes and where:
 | `release.yml` | builds and tests everything `_build.yml` builds (`tier: all`) with packaging on, checks the package list, signs with GPG, writes an SBOM, attests build provenance, creates the GitHub Release from the CHANGELOG section, uploads the assets and redeploys the documentation site | a GitHub Release on this repository, marked a prerelease when the tag has a suffix |
 | `manifest-bump.yml`, called by `release.yml` once the release is up | rewrites the four staged packaging manifests to the new tag and opens a pull request on this repository; with `HOMEBREW_TAP_TOKEN` it also opens a pull request on the Homebrew tap | the Homebrew tap, once a person merges its pull request; the pull request on this repository publishes nothing |
 | `wheels.yml` | builds the Python wheels; its `publish` job uploads them to PyPI through trusted publishing | PyPI, package `iclforge`; the pre-releases went to the project `ac3forge` |
-| `npm.yml` | builds and tests `js/` and packs the tarball; its `publish` job runs only from a manual dispatch on a tag | nothing |
+| `npm.yml` | builds and tests `bindings/js/` and packs the tarball; its `publish` job runs only from a manual dispatch on a tag | nothing |
 | `esp-component.yml` | packs and verifies the ESP-IDF component; its `publish` job runs only from a manual dispatch on a tag, and needs an `esp-component` environment and token that do not exist | nothing |
 
 What had been published on 2026-10-01, from each registry's own listing and from GitHub. The names are
@@ -67,7 +67,7 @@ what the first release made after the rename calls them:
 - **Conan:** not in ConanCenter. No pull request on `conan-center-index` names the recipe.
 - **npm:** nothing. Neither `iclforge-wasm-decoder` nor `iclforge` exists on npmjs.com, and
   `npm.yml`'s `publish` job cannot run from a tag.
-- **crates.io:** nothing. The crates under `rust/` (`iclforge` and `iclforge-sys`) have no publish
+- **crates.io:** nothing. The crates under `bindings/rust/` (`iclforge` and `iclforge-sys`) have no publish
   step, and neither name exists on crates.io.
 - **ESP Component Registry:** nothing. The registry has no component named `iclforge` and no
   `iainchesworthlabs` namespace, and `esp-component.yml`'s `publish` job cannot run from a tag.
@@ -295,14 +295,14 @@ A vcpkg port for `iclforge` is staged in-tree at
 as pull request #53470 under the name `ac3forge`, which is a draft with changes requested (last
 updated 2026-08-19) - see
 [docs/library/index.md](library/index.md) for how a consumer uses it either way. It installs the
-library only (`iclforge::ac3`, plus `iclforge::matroska`/`iclforge::mp4`/
-`iclforge::mpegts` behind their own `matroska`/`mp4`/`mpegts` features, `iclforge::c` behind
-`capi` (see the note below), the AC-4 libraries behind `ac4`, `iclforge::iab` behind `iab` and
-`iclforge::iamf` behind `iamf` - see `cmake/InstallLibrary.cmake`'s `ICLFORGE_BUILD_<NAME>` and
+library only (`iclforge::ac3`, plus `iclforge::containers::matroska`/`iclforge::containers::mp4`/
+`iclforge::containers::mpegts` behind their own `matroska`/`mp4`/`mpegts` features, `iclforge::c` behind
+`capi` (see the note below), the AC-4 library behind `ac4`, `iclforge::iab` behind `iab` and
+`iclforge::containers::iamf` behind `iamf` - see `cmake/InstallLibrary.cmake`'s `ICLFORGE_BUILD_<NAME>` and
 `ICLFORGE_INSTALL_BOTH_LINKAGES` options), never the CLI/GUI/Hearth/tests/examples/fuzzers.
-`iclforge::adm` (the ADM/BW64 reader) and `iclforge::admbridge` have no vcpkg feature
-either - they do install/export via `find_package(iclforge)` now (shared-only), but embed
-third-party libbw64/libadm and so deliberately carry no vcpkg/Conan feature of their own for
+`iclforge::adm` (the ADM/BW64 reader and its bridge) has no vcpkg feature
+either - it does install/export via `find_package(iclforge)` now (shared-only), but embeds
+third-party libbw64/libadm and so deliberately carries no vcpkg/Conan feature of its own for
 now - see the recipe note further down and [docs/library/index.md](library/index.md).
 
 None of the features is on by default: a curated-registry port's `default-features` may only
@@ -323,7 +323,7 @@ as uncontrolled: `ICLFORGE_BUILD_ADM`/`ICLFORGE_ENABLE_TRACY` explicitly OFF (al
 project's own default, pinned so a future default change can't silently pull an undeclared
 dependency into this port), and `ICLFORGE_WITH_ALSA`/`ICLFORGE_WITH_PIPEWIRE` explicitly OFF -
 without that, this library-only build still probes the build machine's ambient ALSA/PipeWire
-installs (`src/audio/` is `add_subdirectory()`'d unconditionally outside Emscripten, not gated
+installs (`libs/audio/` is `add_subdirectory()`'d unconditionally outside Emscripten, not gated
 on `ICLFORGE_BUILD_CLI`/`ICLFORGE_BUILD_GUI`) even though `iclforge::audio` is never installed or
 exported. `vcpkg.json` also declares `"supports": "!(android & !arm64)"` - only `arm64-v8a`
 Android is a real target (see [docs/platforms/android.md](platforms/android.md)); other Android
@@ -349,7 +349,7 @@ feature to `packaging/vcpkg-port/iclforge/vcpkg.json` and one line to `portfile.
 `packaging/conan/conanfile.py` with its `tc.variables` line (the parity check above fails the
 recipes until both have it), and the component to `tools/checks/check_install_consumer.sh`'s
 list - unless the component pulls in a real third-party link dependency
-of its own, the way `iclforge::adm`/`iclforge::admbridge` do (see
+of its own, the way `iclforge::adm` does (see
 [ADM / BW64 reading](library/adm.md#why-opt-in)): those still install/export (shared-only, to
 stay self-contained without re-exporting the third party), but deliberately have no vcpkg/Conan
 feature of their own for now.
@@ -384,8 +384,8 @@ vcpkg install iclforge[matroska,mp4,mpegts,capi,ac4,iab,iamf] --classic --overla
 `--classic` is required from inside this repo - the root `vcpkg.json` (manifest mode, for this
 project's *own* build-time dependencies) would otherwise shadow the package-name argument.
 Check for a clean post-build lint (no "not used"/"missing usage" warnings) and that the bare
-`iclforge` install excludes every feature's library (`iclforge::matroska`/`iclforge::mp4`/
-`iclforge::mpegts`/`iclforge::c`, the AC-4 libraries, `iclforge::iab`, `iclforge::iamf`) - not just
+`iclforge` install excludes every feature's library (`iclforge::containers::matroska`/`iclforge::containers::mp4`/
+`iclforge::containers::mpegts`/`iclforge::c`, the AC-4 library, `iclforge::iab`, `iclforge::containers::iamf`) - not just
 unlinked, no matching files anywhere in the install tree - while
 `iclforge[matroska,mp4,mpegts,capi,ac4,iab,iamf]` installs all seven.
 `tools/checks/check_install_consumer.sh` makes the same check of any build tree it installs: a
@@ -402,14 +402,14 @@ that scratch copy, and discard it once validated - never commit that substitutio
 
 ## Publishing to PyPI
 
-The Python bindings (`python/`, see
+The Python bindings (`bindings/python/`, see
 [docs/library/python-api.md](library/python-api.md)) are the `iclforge` package, with wheels
 for Windows (x64), macOS (arm64 and Intel) and Linux (x86_64 and aarch64) built by
 `.github/workflows/wheels.yml` via `cibuildwheel`, one wheel per CPython from 3.10 to 3.14. The
 releases up to `v0.10.0-beta.1` published them to PyPI as the project `ac3forge`; a release made
 after the rename publishes the project `iclforge`. That
 workflow's `build` job runs in `ci.yml`'s own `wheels` job, on the `python` lane ([CI lane
-partitions](ci-lanes.md)): after a merge that touches `python/` or `examples/python/`, and in the
+partitions](ci-lanes.md)): after a merge that touches `bindings/python/` or `examples/python/`, and in the
 nightly run, and not on pull requests. It always uploads the wheels it builds as a workflow
 artifact.
 
@@ -430,7 +430,7 @@ provisioned the project `ac3forge`. The project `iclforge` does not exist on PyP
 publisher names its project and its repository, so the first release made after the rename needs
 steps 1 and 2 done again for `iclforge`; step 3 is in place already:
 
-1. On PyPI, either publish the very first `iclforge` release by hand (`python -m build python/`
+1. On PyPI, either publish the very first `iclforge` release by hand (`python -m build bindings/python/`
    then `twine upload`, using a temporary scoped token deleted immediately after) to create the
    project, or use PyPI's **pending publisher** mechanism (Your projects → Publishing →
    "Add a pending publisher") to pre-register the trusted publisher for a project name that does
@@ -451,10 +451,10 @@ release-workflow fix, as `v0.10.0-beta.1` needed) does not fail on files PyPI al
 
 ## Publishing to npm
 
-The browser decoder package (`js/`, see
+The browser decoder package (`bindings/js/`, see
 [docs/platforms/wasm.md](platforms/wasm.md)) is meant to be the
 `iclforge-wasm-decoder` npm package.
-Versioning mirrors the PyPI package above rather than reinventing it: `js/package.json` carries a
+Versioning mirrors the PyPI package above rather than reinventing it: `bindings/js/package.json` carries a
 `0.0.0-dev` placeholder in the tree (the same untagged-build fallback CMake's own
 `GitVersionDerivation.cmake` uses), and `npm.yml`'s `publish` job stamps the real,
 resolved version (`npm version <version> --no-git-tag-version`) immediately before `npm publish`
@@ -472,7 +472,7 @@ into a GitHub secret** — trusted publishing exists specifically so that never 
 The one-time setup this needs (a maintainer, directly on npmjs.com and on GitHub — not something
 an agent should do, the same rule as PyPI's setup above):
 
-1. Publish the very first `iclforge-wasm-decoder` release by hand (`cd js && npm publish` with a
+1. Publish the very first `iclforge-wasm-decoder` release by hand (`cd bindings/js && npm publish` with a
    temporary, scoped token deleted immediately after) to create the project on npmjs.com — npm's
    trusted-publishing setup, unlike PyPI's, needs the package to already exist; there is no
    "pending publisher" pre-registration mechanism for a name that doesn't exist yet.
@@ -491,9 +491,9 @@ an agent should do, the same rule as PyPI's setup above):
    tag has been seen to publish successfully — until then the job is intentionally inert.
 
 Once all five steps are done, pushing a `v*` tag triggers `npm.yml`'s `publish` job for that tag,
-which requests an OIDC token against the `npm` environment and runs `npm publish` from `js/` — no
+which requests an OIDC token against the `npm` environment and runs `npm publish` from `bindings/js/` — no
 `--provenance` flag needed, npm attaches provenance attestations automatically for a
-trusted-published package. Until step 5, a tag push builds and tests `js/` and stops there.
+trusted-published package. Until step 5, a tag push builds and tests `bindings/js/` and stops there.
 
 ## Homebrew formula and cask
 
@@ -641,9 +641,9 @@ A Conan (2.x) recipe for `iclforge` is staged in-tree at
 [`packaging/conan/`](https://github.com/iainchesworthlabs/iclforge/tree/main/packaging/conan)
 (`conanfile.py`, `conandata.yml`, `test_package/`) and has not been submitted to ConanCenter
 (`conan-center-index`), where no pull request names it. Scoped the same as the vcpkg port - the library only (`iclforge::ac3`,
-plus `iclforge::matroska`/`iclforge::mp4`/`iclforge::mpegts` behind their own default-on `matroska`/
-`mp4`/`mpegts` options, and `iclforge::c`, the AC-4 libraries, `iclforge::iab` and
-`iclforge::iamf` behind default-off `capi`/`ac4`/`iab`/`iamf` options), never the
+plus `iclforge::containers::matroska`/`iclforge::containers::mp4`/`iclforge::containers::mpegts` behind their own default-on `matroska`/
+`mp4`/`mpegts` options, and `iclforge::c`, the AC-4 library, `iclforge::iab` and
+`iclforge::containers::iamf` behind default-off `capi`/`ac4`/`iab`/`iamf` options), never the
 CLI/GUI/Hearth/tests/examples/fuzzers - with one Conan option per `ICLFORGE_BUILD_<NAME>` CMake option,
 the same pattern the vcpkg port's `vcpkg_check_features()` call already establishes, and the same
 options as the port's features, which `tools/checks/check_packaging_versions.sh` checks. The
@@ -749,7 +749,7 @@ Windows x64 additionally ships Crucible as its own
 `iclforge-crucible-*-win64.zip` ([the Crucible guide](crucible/index.md)): the
 `crucible` CPack component - `crucible.exe`, the `crucible-run` runner, the driver's
 install/remove scripts, a Qt runtime of its own, and `NOTICES.txt` beside `LICENSE.txt` at the
-archive root (the third-party notices, generated per platform from `apps/crucible/notices/` at
+archive root (the third-party notices, generated per platform from `notices/` at
 configure time) - packaged by the same `windows-msvc` leg as the first row, uploaded inside that
 leg's own `packages-windows-msvc` artifact and attached to the release with everything else in it.
 It is a separate download rather than part of the `runtime` component, and deliberately absent
@@ -808,7 +808,7 @@ exists and how it's built.
 
 The end-user packages are `forge`/`forge-gui` (CPack's `runtime` component) on desktop, or the
 Shield app's `.apk` on Android. The library packages are a second, independent download for a
-third party consuming `iclforge::ac3`/`iclforge::matroska` via `find_package(iclforge)` (see
+third party consuming `iclforge::ac3`/`iclforge::containers::matroska` via `find_package(iclforge)` (see
 [docs/library/index.md](library/index.md)) - headers, static and shared libraries, and the
 CMake package config, but neither `forge`/`forge-gui` nor `iclforge::audio` (live capture/monitor/
 passthrough stays a CLI/GUI-internal detail, not part of what's installed here).

@@ -11,7 +11,7 @@ described in [CI for many agents](ci-agentic.md), and `ci.yml` has no `pull_requ
 `merge_group` trigger. `ci.yml` runs on every push to main (one run at a time), on the nightly
 schedule, and on a dispatch, and it uses the lanes on this page to decide what to run: a lane is a
 set of source paths and the jobs that build or test them. The `changes` job classifies the files a
-run has to answer for, and a change confined to `apps/android/` runs the Android build and none
+run has to answer for, and a change confined to `apps/demos/android/` runs the Android build and none
 of the other platforms. This page describes the classification, what it gates, and what it does not
 gate.
 
@@ -66,7 +66,7 @@ tiers](ci-agentic.md#the-tiers)), and some jobs are nightly only: `linux-appimag
 `core` jobs `coverage`, `abi-gate` and `ffmpeg-validate` do not run in the run after a merge
 (`inputs.tier != 't2'`).
 
-A change confined to `apps/android/` runs `build-android` after a merge and skips `build-wasm`,
+A change confined to `apps/demos/android/` runs `build-android` after a merge and skips `build-wasm`,
 `build-esp32s3`/`hearth-esp32s3`/`c3`, `build-footprint`, `build-rust`, `build-windows`,
 `windows-driver`, `build-linux`, `linux-appimage`, `build-macos` and `package-macos-universal`.
 
@@ -156,23 +156,35 @@ comes from.
 
 | Lane | Paths that light it directly | Also lit by |
 |---|---|---|
-| `core` | `src/`, `tests/`, `fuzz/`, `cmake/`, `tools/checks/`, `tools/ci/`, `requirements/`, root `CMakeLists.txt`/`CMakePresets.json`/`vcpkg.json` | - |
-| `windows` | `apps/windows/`, `apps/notices/platform/windows/`, `packaging/winget/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
-| `linux` | `apps/linux/`, `apps/notices/platform/linux/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
-| `macos` | `apps/notices/platform/macos/`, `packaging/homebrew/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
-| `android` | `apps/android/` | `core` (not after a merge) |
-| `wasm` | `apps/wasm/`, `js/` (its E2E demo) | `core` (not after a merge) |
-| `esp` | `esp-idf/`, `esphome/`, `apps/baremetal/`, `tools/packaging/`, and the trees its component ships: `src/ac3/`, `src/arithmetic/`, `cmake/`, root `CMakeLists.txt` | `core` (not after a merge) |
-| `rust` | `rust/` | `core` (not after a merge) |
-| `python` | `python/`, `examples/python/` | `core` (not after a merge) |
-| `npm` | `js/` (the package's own unit tests) | nothing - see below |
+| `core` | `libs/`, `external/`, `tests/`, `tools/fuzz/`, `cmake/`, `tools/checks/`, `tools/ci/`, `requirements/`, the programs' Catch2 tests (below), root `CMakeLists.txt`/`CMakePresets.json`/`vcpkg.json` | - |
+| `windows` | `apps/crucible/windows/`, `notices/forge/platform/windows/`, `packaging/winget/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
+| `linux` | `apps/crucible/linux/`, `notices/forge/platform/linux/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
+| `macos` | `notices/forge/platform/macos/`, `packaging/homebrew/`, `packaging/conan/`, `packaging/vcpkg-port/` | `core`; shared desktop apps below |
+| `android` | `apps/demos/android/` | `core` (not after a merge) |
+| `wasm` | `apps/demos/wasm/`, `bindings/js/` (its E2E demo) | `core` (not after a merge) |
+| `esp` | `firmware/esp-idf/`, `firmware/esphome/`, `firmware/baremetal/`, `firmware/hearth-sink/`, `tools/packaging/`, and the trees its component ships: `libs/ac3/`, `libs/base/`, `cmake/`, root `CMakeLists.txt` | `core` (not after a merge) |
+| `rust` | `bindings/rust/` | `core` (not after a merge) |
+| `python` | `bindings/python/`, `examples/python/` | `core` (not after a merge) |
+| `npm` | `bindings/js/` (the package's own unit tests) | nothing - see below |
 | `ci_self` | `.github/workflows/`, `.github/actions/`, `.github/toolchain/` | - |
 | `docs` | `docs/`, any `*.md`, `LICENSE`, `mkdocs.yml` | - |
 
-`apps/cli/`, `apps/gui/`, `apps/common/`, `apps/crucible/` and `apps/hearth/` light `windows`,
-`linux` and `macos` directly - they are one desktop program built and tested on all three, not
-three separate programs, so they are not written as "core, therefore fanned out" but as a direct
-hit on each of the three lanes.
+`apps/forge/cli/`, `apps/forge/gui/`, `apps/shared/`, `apps/crucible/`, `apps/hearth/` and the
+notices of the products (`notices/crucible/`, `notices/hearth/`, `notices/fragments/`,
+`notices/licences/`) light `windows`, `linux` and `macos` directly - they are one desktop program
+built and tested on all three, not three separate programs, so they are not written as "core,
+therefore fanned out" but as a direct hit on each of the three lanes. Crucible's Windows driver and
+its Linux tray VM, which sit under `apps/crucible/`, light their own platform's lane only; five
+of Forge's notice fragments (`forge-*` and `qt-linux`, `qt-macos`, `qt-windows`) light every lane,
+as they did when no lane named their tree.
+
+A program's tests are beside it (`apps/<product>/<program>/tests/`), and the Catch2 binaries among
+them are `core`'s, as the `tests/` they were in is: `apps/forge/cli/tests/`,
+`apps/shared/{media,preferences}/tests/`, `apps/hearth/engine/tests/`,
+`apps/crucible/engine/tests/`, and the files named `test_*` in a window's `tests/` directory
+(`apps/forge/gui/tests/`, `apps/hearth/ui/tests/`, `apps/crucible/ui/tests/`). The Qt Quick suites
+beside them stay with the program. The PR gate's planner (`tools/ci/plan_gate.py`) draws the same
+lines for the Qt build.
 
 `tools/packaging/` holds only `pack_esp_component.py`, which `esp-component.yml`'s own path filter
 names, and `examples/python/` is named by `wheels.yml`'s; neither belongs to a lane through its
@@ -187,7 +199,7 @@ leg has no way to discover on its own that it also depends on `src/`. The satell
 dispatch, but not in the run after a merge, which classifies with `--satellites-direct`: there a
 satellite lane lights only for a change in its own tree, and a change to the core library reaches
 the satellites in the nightly run. `npm` is deliberately excluded from the fan-out in every mode -
-`js/`'s package unit tests only need to run when `js/` itself changes; the platform that embeds
+`bindings/js/`'s package unit tests only need to run when `bindings/js/` itself changes; the platform that embeds
 core via WASM is the `wasm` lane.
 
 `ci_self` fans out to every lane, including itself and `docs`: a workflow, action or
@@ -216,8 +228,8 @@ A `push` to `main` is classified with `--satellites-direct`, from the files merg
 `verified` ref.
 
 The ESP-IDF lane has one more way to light: the trees its component ships. They are the ones
-`tools/packaging/pack_esp_component.py` stages (`STAGED_TREES` and `STAGED_FILES`): `src/ac3/`,
-`src/arithmetic/`, `cmake/` and the root `CMakeLists.txt`. A change there is what breaks the package
+`tools/packaging/pack_esp_component.py` stages (`STAGED_TREES` and `STAGED_FILES`): `libs/ac3/`,
+`libs/base/`, `cmake/` and the root `CMakeLists.txt`. A change there is what breaks the package
 and the QEMU images, so it does not wait for the nightly run. The AC-4 trees, staged only for
 `--with-ac4`, do wait. `test_classify_changes.py` reads the packer's list, so a tree added to it
 without the lane learning about it fails a test.
@@ -311,12 +323,44 @@ performance jobs also start only once `Build & Test` finishes.
 - `_build.yml`'s `build-footprint` job is gated by `run_esp`, not `run_linux`, even though it runs
   on a Linux-fleet runner and its own comments describe it as "Leg 5 of check-runners' Linux
   fan-out". A lane is which *source paths* a job builds, not which runner OS it happens to execute
-  on: `build-footprint` cross-compiles `apps/baremetal/`'s probe for `arm-none-eabi` under QEMU,
+  on: `build-footprint` cross-compiles `firmware/baremetal/`'s probe for `arm-none-eabi` under QEMU,
   the same source tree `build-esp32s3`/`build-esp32c3` build for their own Xtensa/RISC-V targets
-  (all three share "the same probe, same fixtures" per their own comments), and `apps/baremetal/`
+  (all three share "the same probe, same fixtures" per their own comments), and `firmware/baremetal/`
   is `esp` in the lane table above. Gating it by `run_linux` instead would make an
-  `apps/baremetal/`-only change skip it - a false skip, exactly what the conservative-default rule
+  `firmware/baremetal/`-only change skip it - a false skip, exactly what the conservative-default rule
   above exists to prevent.
+
+## The lanes of a project
+
+A project is a row of
+[`tools/checks/projects.json`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/checks/projects.json),
+and the row says which lanes its own tree lights (`lanes`), so that the lane table above is not
+written twice: the trees of the projects are the table's, and what is left in
+`classify_changes.py` is what is no project's (the notices and packaging of the products, the
+build files, the tools, the golden data) and the refinements inside a project (the Catch2 tests
+among a program's files, Crucible's Windows driver and Linux tray VM, the Python examples). A
+firmware project's `ships` are the libraries its package stages as source: they light its lanes in
+the run after a merge too, and `test_classify_changes.py` reads the packer's list against them. An
+exception's `to_paths` are the files an excused edge reaches: a change to one lights the lanes of
+the project that includes it (a header of the ESP-IDF component that `libs/ac3/tests` includes
+builds core and the three desktop platforms as well as the component's own lane), and
+`check_layering.py` fails an entry that no excused include names any more.
+
+`check_layering.py` fails a project that names no lane, or a lane the table's own `lanes` list does
+not have. A path that no project holds, and that no table here recognises, is an unknown path: it
+lights every lane.
+
+## Changing a planner
+
+`python3 tools/ci/compare_planners.py --old <a worktree of the version to compare with>` asks both
+versions everything the workflows ask (the gate's plan with and without the queue's mode, the lanes
+with and without `--satellites-direct`) for every tracked file as a one-file change and for the
+last 150 pull requests merged to the base branch, each as its file list followed to where its
+paths are now. A difference is a superset when the new version runs everything the old one ran and
+more, and narrower when it skips something the old one ran. `--allow-narrower <prefix>` excuses
+the narrower answers for paths the new version knows and the old one did not (the old answer was
+the unknown-path fallback); anything else narrower fails the run, so a change meant to be a pure
+refactoring is shown to be one.
 
 ## Where the logic lives
 

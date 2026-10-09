@@ -1,0 +1,19 @@
+{
+  "_comment": "The fixed-point decode tier's PCM hashes (planning/arithmetic-tiers.md): FNV-1a over every sample the bare-metal probe delivers for each fixture, as <codec>.pcm_hash prints them. Integer arithmetic, so the same on every platform by construction; measured 2026-09-10 on the x86 host and the Cortex-M3 leg, identical. Re-pin when the tier's arithmetic changes on purpose (tools/checks/check_probe_hashes.py --expected). Re-pinned 2026-10-08 for planning/consolidation.md decision 20: the inverse transform runs on the family's one FFT, a Stockham autosort, whose rounding differs from the radix-4/2 kernel's; the x86 host and the Cortex-M3 leg agree on every fixture.",
+  "hashes": {
+    "ac3": "92e5cab83f3a6de5",
+    "ac3_fold": "ba764ebe62f5e518",
+    "ac3_mono": "046519bfb9393b45",
+    "ac3_stereo": "a73eb8ecdec7eb2e",
+    "eac3": "f371674e25705425",
+    "eac3_714": "ff452d8a813ab23a",
+    "eac3_714_fold": "ec355ba7a85759d2",
+    "eac3_atmos_bed": "43eb313d6379de31",
+    "eac3_atmos_objects": "43eb313d6379de31",
+    "eac3_atmos_render": "c17ca7087732833b",
+    "eac3_ecpl": "3ac41cca5610e5d5",
+    "eac3_fold": "55402808947f2a9d",
+    "eac3_line": "1ad705489074a09b",
+    "eac3_stereo": "fb5fc88b44a4bf4c"
+  }
+}

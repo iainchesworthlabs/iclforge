@@ -148,7 +148,7 @@ authored keeps the preset's name in the object table until a hand edit makes it 
 **Export paths…** writes every dynamic object's current motion — or, for a path-less object, its
 static position as a single time-0 keyframe — to a file `forge atmos-path` and `atmos-encode`
 read. Which form depends on the name you save under: a `.json` name writes the
-`iclforge::oba::ObjectScene` form (named objects, per-segment interpolation, a scene orientation — see
+`iclforge::objects::oba::ObjectScene` form (named objects, per-segment interpolation, a scene orientation — see
 [Spatial & Atmos objects](../../library/spatial-and-atmos.md#the-serialised-form)), and anything else
 writes the keyframe columns this export has always produced (`object_index time_s x y z gain
 lfe_send`, one line per keyframe, addressed by each object's flat WAV channel index). `forge`
@@ -245,7 +245,7 @@ it writes the same bytes the page writes. The Qt Quick Tests hold a raw stream, 
 run of two sources with an assignment, an offset, a trim, a fold, a speaker and an LFE to that.
 The page and the command share which channels become which objects and where a pinned channel
 sits, the audio each object carries, the metadata updates and the call into the writer
-(`apps/common/ac4_objects_core.hpp`).
+(`apps/shared/media/src/ac4_objects_core.hpp`).
 
 **What it leaves out.** A live session encodes AC-3 or E-AC-3 only, so a live session is refused
 under AC-4, and Guided's Movement step writes E-AC-3 objects. **Preview** plays the objects

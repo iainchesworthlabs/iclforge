@@ -1,29 +1,28 @@
 # ---------------------------------------------------------------------------
 # iclforge-perf - real-time throughput regression guards (hard pass/fail). See
-# test_performance.cpp for why this is a separate target from iclforge-tests, and
+# test_performance.cpp for why this is a separate target from the test binaries, and
 # why the whole thing exists at all (a ~28x, zero-test-coverage regression in
 # the forward MDCT, found profiling the Shield Android app with Tracy).
 #
-# Catch2 is already resolved by the parent tests/CMakeLists.txt before this
+# Catch2 is already resolved by the root CMakeLists.txt (cmake/External.cmake) before this
 # subdirectory is added, so this file only defines the target.
 # ---------------------------------------------------------------------------
 add_executable(iclforge-perf test_performance.cpp)
 
 # The AC-4 cases need no guard: the root CMakeLists.txt refuses
-# ICLFORGE_BUILD_TESTS without ICLFORGE_BUILD_AC4, so the AC-4 libraries exist
+# ICLFORGE_BUILD_TESTS without ICLFORGE_BUILD_AC4, so the AC-4 library exists
 # wherever this directory is built. The same holds for the three targets below.
 target_link_libraries(iclforge-perf
     PRIVATE
         iclforge::ac3
-        iclforge::ac4enc
-        iclforge::ac4dec
+        iclforge::ac4
         iclforge::warnings
         iclforge::fmt
         Catch2::Catch2WithMain)
 
 target_include_directories(iclforge-perf PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-# real_audio.hpp resolves tests/golden/audio's fixtures through this, so the
+# real_audio.hpp resolves testdata/audio's fixtures through this, so the
 # gate reads real programme material whatever directory ctest launches it
 # from - see that header for why a synthetic tone is not an acceptable
 # substitute for it.
@@ -50,7 +49,7 @@ catch_discover_tests(iclforge-perf
 # ---------------------------------------------------------------------------
 add_executable(iclforge-bench bench_encoder.cpp)
 
-target_link_libraries(iclforge-bench PRIVATE iclforge::ac3 iclforge::ac4enc iclforge::ac4dec iclforge::warnings iclforge::fmt)
+target_link_libraries(iclforge-bench PRIVATE iclforge::ac3 iclforge::ac4 iclforge::warnings iclforge::fmt)
 
 target_include_directories(iclforge-bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -102,10 +101,10 @@ if((WIN32 OR LINUX) AND NOT ICLFORGE_SANITIZERS MATCHES "thread")
 
     target_include_directories(iclforge-membench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-    # The AC-4 libraries' static builds, for the same reason as
+    # The AC-4 library's static build, for the same reason as
     # iclforge::ac3_static: a DLL's allocations would not reach the counters.
     target_link_libraries(iclforge-membench PRIVATE
-        iclforge::ac3_static iclforge::ac4enc_static iclforge::ac4dec_static iclforge::warnings iclforge::fmt)
+        iclforge::ac3_static iclforge::ac4_static iclforge::warnings iclforge::fmt)
 
     # The AC-4 workloads read the real-audio fixture (real_audio.hpp).
     target_compile_definitions(iclforge-membench PRIVATE
@@ -126,13 +125,20 @@ endif()
 # ---------------------------------------------------------------------------
 add_executable(iclforge-kernelbench kernel_bench.cpp)
 
-# iclforge::ac4core (static in every build) brings src/ac4core/include/iclforge/ac4core's transform headers,
-# as it does for tests/ac4core.
-target_link_libraries(iclforge-kernelbench PRIVATE iclforge::ac3 iclforge::ac4core iclforge::warnings iclforge::fmt)
+# The AC-4 kernels it times are private to iclforge::ac4 (libs/ac4/src/core, and dsp's tiered
+# kernels it builds, libs/dsp/src/tiered), so it
+# links the static library in every build and takes the library's private and
+# scalar-tier directories, as libs/ac4/tests/CMakeLists.txt does for its core/ tests.
+target_link_libraries(iclforge-kernelbench PRIVATE iclforge::ac3 iclforge::ac4_static iclforge::warnings iclforge::fmt)
+target_include_directories(iclforge-kernelbench PRIVATE
+    "${CMAKE_SOURCE_DIR}/libs/ac4/src"
+    "${CMAKE_SOURCE_DIR}/libs/dsp/include"
+    "${CMAKE_SOURCE_DIR}/libs/dsp/src"
+    "${CMAKE_SOURCE_DIR}/libs/dsp/variants/decode-scalar-${ICLFORGE_DECODE_SCALAR_TIER}")
 
 target_include_directories(iclforge-kernelbench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-# So the binary can find tests/golden/audio's real-audio fixtures regardless
+# So the binary can find testdata/audio's real-audio fixtures regardless
 # of the working directory it is launched from - kernel inputs synthesized
 # from silence or a single tone give misleadingly tidy bit-allocation/
 # mantissa-cost numbers real program material never produces.

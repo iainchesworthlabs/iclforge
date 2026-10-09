@@ -2,8 +2,8 @@
 #
 # Installed-package consumer check for iclforge's C API and its AC-4 decoder and encoder.
 #
-# tests/capi and the C examples compile against the build tree, where the generated headers sit
-# under <build>/src/capi/generated whether or not an install rule copies them. That is how
+# libs/capi/tests and the C examples compile against the build tree, where the generated headers sit
+# under <build>/libs/capi/generated whether or not an install rule copies them. That is how
 # `cmake --install` shipped an iclforge_c/iclforge.h nobody could include: it #includes
 # iclforge_c/version.h, which is generated, and only the source include/ directory and export.h
 # were installed. This is the check that was missing. For each build directory given it installs
@@ -28,7 +28,7 @@
 # API target is linked and run, static and shared; install_consumer/CMakeLists.txt says how. So is
 # every exported AC-4 decoder target, in a C++ program that decodes a committed stream
 # (install_consumer/consumer_ac4.cpp), and every exported AC-4 encoder target, in one that encodes
-# a tone and reads it back with the inspector (install_consumer/consumer_ac4enc.cpp); a tree built
+# a tone and reads it back with the inspector (install_consumer/consumer_ac4_encoder.cpp); a tree built
 # with ICLFORGE_BUILD_AC4=ON whose package exports none of either fails.
 #
 # The same prefix is then used the way a Makefile, Meson or autotools build uses it, through its
@@ -41,15 +41,14 @@
 # it drops an -lm that comes before the archive calling it, so a .pc that lists its libraries in
 # the wrong order fails under either compiler. Each .pc that names an archive is also linked whole
 # into an empty C program on its own, which finds what one component's file lacks even when no
-# consumer reaches that archive. The AC-4 programs are built the same way from iclforge-ac4dec.pc and
-# iclforge-ac4enc.pc, by the C++ compiler that configured the tree, where the package has them; a package
-# with the decoder's file and not the encoder's fails. It needs pkg-config, or whatever $PKG_CONFIG
-# names.
+# consumer reaches that archive. The two AC-4 programs are built the same way from iclforge-ac4.pc,
+# by the C++ compiler that configured the tree, where the package has it. It needs pkg-config, or
+# whatever $PKG_CONFIG names.
 #
 # Each optional library a tree was configured with (its ICLFORGE_BUILD_<NAME> option ON) installs
 # its CMake export and its .pc file, and each it was configured without installs no file at all:
 # the vcpkg port's features and the Conan recipe's options (packaging/) switch those same options,
-# and a default install of either, without the container writers, the AC-4 libraries, IAB or IAMF,
+# and a default install of either, without the container writers, the AC-4 library, IAB or IAMF,
 # must carry none of their headers, libraries or targets. A tree configured with the AC-4
 # libraries, IAB and IAMF off is that shape.
 #
@@ -80,13 +79,14 @@ cache_value() {
 
 # Each optional library: its ICLFORGE_BUILD_<NAME> option, its CMake export file (without
 # .cmake), the stem of its .pc files, the stem of its library files and its include directory
-# below include/.
+# below include/. A part of iclforge::containers, which is installed whatever its options say, has
+# `-` for the stem of its library files: its option decides its headers alone.
 components=(
-    "ICLFORGE_BUILD_MATROSKA matroskaTargets iclforge-matroska iclforge_matroska iclforge/matroska"
-    "ICLFORGE_BUILD_MP4 mp4Targets iclforge-mp4 iclforge_mp4 iclforge/mp4"
-    "ICLFORGE_BUILD_MPEGTS mpegtsTargets iclforge-mpegts iclforge_mpegts iclforge/mpegts"
+    "ICLFORGE_BUILD_MATROSKA containersTargets iclforge-containers - iclforge/containers/matroska"
+    "ICLFORGE_BUILD_MP4 containersTargets iclforge-containers - iclforge/containers/mp4"
+    "ICLFORGE_BUILD_MPEGTS containersTargets iclforge-containers - iclforge/containers/mpegts"
     "ICLFORGE_BUILD_IAB iabTargets iclforge-iab iclforge_iab iclforge/iab"
-    "ICLFORGE_BUILD_IAMF iamfTargets iclforge-iamf iclforge_iamf iclforge/iamf"
+    "ICLFORGE_BUILD_IAMF containersTargets iclforge-containers - iclforge/containers/iamf"
     "ICLFORGE_BUILD_AC4 ac4Targets iclforge-ac4 iclforge_ac4 iclforge/ac4"
 )
 
@@ -101,15 +101,20 @@ check_components() {
         case "${value^^}" in
             ON|TRUE|1|YES|Y)
                 if [[ -z "$(find "$prefix" -name "$targets.cmake" -print -quit)" ]] ||
-                        [[ -z "$(find "$prefix" -name "$stem.pc" -print -quit)" ]]; then
-                    echo "::error::$build has $option=ON and installed no $targets.cmake or $stem.pc - see cmake/InstallLibrary.cmake" >&2
+                        [[ -z "$(find "$prefix" -name "$stem.pc" -print -quit)" ]] ||
+                        [[ ! -d "$prefix/include/$incdir" ]]; then
+                    echo "::error::$build has $option=ON and installed no $targets.cmake, $stem.pc or include/$incdir - see cmake/InstallLibrary.cmake" >&2
                     return 1
                 fi
-                echo "--- $option=ON: $targets.cmake and $stem.pc installed"
+                echo "--- $option=ON: $targets.cmake, $stem.pc and include/$incdir installed"
                 ;;
             *)
-                found="$(find "$prefix" \( -name "$targets*.cmake" -o -name "lib$libstem*" -o -name "$stem*.pc" \
-                    -o -path "$prefix/include/$incdir*" \) -print -quit)"
+                if [[ "$libstem" == "-" ]]; then
+                    found="$(find "$prefix" -path "$prefix/include/$incdir*" -print -quit)"
+                else
+                    found="$(find "$prefix" \( -name "$targets*.cmake" -o -name "lib$libstem*" -o -name "$stem*.pc" \
+                        -o -path "$prefix/include/$incdir*" \) -print -quit)"
+                fi
                 if [[ -n "$found" ]]; then
                     echo "::error::$build has $option=${value:-unset} and installed a file of it anyway: $found - see cmake/InstallLibrary.cmake" >&2
                     return 1
@@ -158,46 +163,26 @@ pkg_config_check() {
     fi
     "$work/pc_consumer"
 
-    # The AC-4 decoder through iclforge-ac4dec.pc, where the package has one, in the same way. Its Requires
-    # line brings iclforge-ac4.pc, and a static-only install's Requires.private the core's archive.
-    if [[ -f "$pc_dir/iclforge-ac4dec.pc" ]]; then
-        case " $(pc --libs-only-l iclforge-ac4dec) " in
-            *" -liclforge_ac4dec_static "*) iclforge_ac4_static=(--static) ;;
+    # The AC-4 decoder and the encoder through iclforge-ac4.pc, where the package has one, in the
+    # same way: one library, so one set of flags for both programs.
+    if [[ -f "$pc_dir/iclforge-ac4.pc" ]]; then
+        case " $(pc --libs-only-l iclforge-ac4) " in
+            *" -liclforge_ac4_static "*) iclforge_ac4_static=(--static) ;;
             *) ;;
         esac
-        libdir="$(pc --variable=libdir iclforge-ac4dec)"
-        read -r -a flags <<< "$(pc ${iclforge_ac4_static[@]+"${iclforge_ac4_static[@]}"} --cflags --libs iclforge-ac4dec)"
-        echo "--- $cxx consumer_ac4.cpp, flags from: pkg-config ${iclforge_ac4_static[*]:+${iclforge_ac4_static[*]} }--cflags --libs iclforge-ac4dec"
-        echo "    ${flags[*]}"
-        if ! "$cxx" -std=c++23 "$root/tools/checks/install_consumer/consumer_ac4.cpp" \
-                -o "$work/pc_consumer_ac4" -Wl,--as-needed -Wl,-rpath,"$libdir" "${flags[@]}"; then
-            echo "::error::the flags pkg-config prints for iclforge-ac4dec do not link the AC-4 consumer (the linker's complaint is above) - see cmake/PkgConfig.cmake" >&2
-            return 1
-        fi
-        "$work/pc_consumer_ac4" "$root/tests/golden/external-baseline/ac4-51-film-96/dee.ac4"
-    fi
-
-    # The AC-4 encoder through iclforge-ac4enc.pc, in the same way. The switch that installs the decoder
-    # installs the encoder too.
-    if [[ -f "$pc_dir/iclforge-ac4enc.pc" ]]; then
-        iclforge_ac4_static=()
-        case " $(pc --libs-only-l iclforge-ac4enc) " in
-            *" -liclforge_ac4enc_static "*) iclforge_ac4_static=(--static) ;;
-            *) ;;
-        esac
-        libdir="$(pc --variable=libdir iclforge-ac4enc)"
-        read -r -a flags <<< "$(pc ${iclforge_ac4_static[@]+"${iclforge_ac4_static[@]}"} --cflags --libs iclforge-ac4enc)"
-        echo "--- $cxx consumer_ac4enc.cpp, flags from: pkg-config ${iclforge_ac4_static[*]:+${iclforge_ac4_static[*]} }--cflags --libs iclforge-ac4enc"
-        echo "    ${flags[*]}"
-        if ! "$cxx" -std=c++23 "$root/tools/checks/install_consumer/consumer_ac4enc.cpp" \
-                -o "$work/pc_consumer_ac4enc" -Wl,--as-needed -Wl,-rpath,"$libdir" "${flags[@]}"; then
-            echo "::error::the flags pkg-config prints for iclforge-ac4enc do not link the AC-4 encoder's consumer (the linker's complaint is above) - see cmake/PkgConfig.cmake" >&2
-            return 1
-        fi
-        "$work/pc_consumer_ac4enc"
-    elif [[ -f "$pc_dir/iclforge-ac4dec.pc" ]]; then
-        echo "::error::$prefix installed iclforge-ac4dec.pc and no iclforge-ac4enc.pc - see cmake/InstallLibrary.cmake" >&2
-        return 1
+        libdir="$(pc --variable=libdir iclforge-ac4)"
+        read -r -a flags <<< "$(pc ${iclforge_ac4_static[@]+"${iclforge_ac4_static[@]}"} --cflags --libs iclforge-ac4)"
+        for program in consumer_ac4 consumer_ac4_encoder; do
+            echo "--- $cxx $program.cpp, flags from: pkg-config ${iclforge_ac4_static[*]:+${iclforge_ac4_static[*]} }--cflags --libs iclforge-ac4"
+            echo "    ${flags[*]}"
+            if ! "$cxx" -std=c++23 "$root/tools/checks/install_consumer/$program.cpp" \
+                    -o "$work/pc_$program" -Wl,--as-needed -Wl,-rpath,"$libdir" "${flags[@]}"; then
+                echo "::error::the flags pkg-config prints for iclforge-ac4 do not link $program (the linker's complaint is above) - see cmake/PkgConfig.cmake" >&2
+                return 1
+            fi
+        done
+        "$work/pc_consumer_ac4" "$root/testdata/external-baseline/ac4-51-film-96/dee.ac4"
+        "$work/pc_consumer_ac4_encoder"
     fi
 
     # One .pc at a time, every archive it names linked whole into a program that calls nothing.
@@ -266,7 +251,7 @@ for build in "$@"; do
         compilers+=("-DCMAKE_CXX_COMPILER=$cxx_compiler")
     fi
 
-    # ICLFORGE_EXPECT_AC4: a tree that built the AC-4 libraries has to have installed them.
+    # ICLFORGE_EXPECT_AC4: a tree that built the AC-4 library has to have installed it.
     expect_ac4="$(cache_value "$build" ICLFORGE_BUILD_AC4)"
     cmake -S "$root/tools/checks/install_consumer" -B "$consumer_build" \
         -DCMAKE_PREFIX_PATH="$prefix" \

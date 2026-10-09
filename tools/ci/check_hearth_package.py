@@ -25,7 +25,7 @@ hearth.app itself (Contents/Frameworks/, Contents/PlugIns/ and
 Contents/Resources/qml/).
 
 The second thing it checks is the content of NOTICES.txt
-(apps/hearth/notices/notices.cmake). Hearth's notices are simpler than
+(notices/hearth/notices.cmake). Hearth's notices are simpler than
 Crucible's - no driver, no Quick 3D room, no platform that gets its own
 extra third-party library - but carry the same failure mode: a file whose Qt
 section is missing where the platform bundles Qt (Windows, macOS - a Qt
@@ -128,8 +128,8 @@ FORBIDDEN_MACOS_QT_TEST_QML = "hearth.app/Contents/Resources/qml/QtTest/"
 FORBIDDEN_MACOS_QT_TEST_FILES = ("libquicktestplugin.dylib",)
 FORBIDDEN_MACOS_QT_TEST_FRAMEWORKS = ("QtTest.framework/", "QtQuickTest.framework/")
 
-# What NOTICES.txt has to say everywhere: apps/hearth/notices/notices.cmake
-# includes these fragments (apps/hearth/notices/fragments/) on every
+# What NOTICES.txt has to say everywhere: notices/hearth/notices.cmake
+# includes these fragments (notices/fragments/) on every
 # platform alike - cpp-httplib, Mbed TLS, mdns, libFLAC and Opus each carry a
 # version token read from vcpkg's SPDX record, and Sendspin's time filter
 # carries none (it is pinned to a source commit, not a port version), so it
@@ -148,13 +148,13 @@ THIRDPARTY_VERSIONED = (
 )
 TIME_FILTER_MARKER = "Sendspin time filter"
 
-# The Qt section (apps/hearth/notices/fragments's qt-bundled entry comes
-# from apps/crucible/notices/fragments/qt-bundled.txt, shared rather than
+# The Qt section (notices/fragments's qt-bundled entry comes
+# from notices/fragments/qt-bundled.txt, shared rather than
 # copied - that file's own header says why): present with a filled version
 # and a source URL exactly where the package bundles Qt (Windows, macOS -
 # PR #816 fixed this section going missing there), and absent on Linux,
 # which links the system's Qt and ships none
-# (apps/hearth/notices/notices.cmake's own `if(... AND (WIN32 OR APPLE))`
+# (notices/hearth/notices.cmake's own `if(... AND (WIN32 OR APPLE))`
 # guard on inserting the qt-bundled fragment - mirrored here as the
 # `qt_bundled` parameter below so the two cannot silently drift apart).
 NOTICES_QT_REQUIRED = ("GNU LESSER GENERAL PUBLIC LICENSE", "download.qt.io/archive/qt/")
@@ -193,7 +193,7 @@ def check_notices(text: str, qt_bundled: bool) -> list[str]:
         if QT_VERSION_PATTERN.search(text):
             problems.append(
                 "NOTICES.txt names a Qt 6.x version, but this platform's package bundles no Qt - "
-                "apps/hearth/notices/notices.cmake should not have inserted the qt-bundled "
+                "notices/hearth/notices.cmake should not have inserted the qt-bundled "
                 "fragment here"
             )
     return problems

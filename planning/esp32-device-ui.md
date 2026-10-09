@@ -105,7 +105,7 @@ adds no state of its own to the firmware.
 
 | Part | What it is |
 |---|---|
-| [`ac3forge::Control`](../esp-idf/iclforge/include/iclforge/control.hpp) (`esp-idf/iclforge/src/control.cpp`) | A REST surface on `esp_http_server`: `GET /` (a text list of the routes, before this work), `GET /status` (JSON), `POST /play` (a URL or a path as the body; `202 Accepted`), `POST /stop`, `POST /volume` (0.0 to 1.0), `GET` and `PUT /layout` (a name such as `7.1.4` or a speaker list such as `L,R,C,LFE,Ls,Rs`). JSON written by hand: IDF v6.1's core has no cJSON. |
+| [`ac3forge::Control`](../firmware/esp-idf/iclforge/include/iclforge/control.hpp) (`firmware/esp-idf/iclforge/src/control.cpp`) | A REST surface on `esp_http_server`: `GET /` (a text list of the routes, before this work), `GET /status` (JSON), `POST /play` (a URL or a path as the body; `202 Accepted`), `POST /stop`, `POST /volume` (0.0 to 1.0), `GET` and `PUT /layout` (a name such as `7.1.4` or a speaker list such as `L,R,C,LFE,Ls,Rs`). JSON written by hand: IDF v6.1's core has no cJSON. |
 | Its server | `max_uri_handlers` 7, exactly the routes; `max_open_sockets` 3, with the least recently used closed when a fourth arrives. Everything else is IDF's default: one task, a 4,096-byte stack from internal RAM, priority 5, either core. Every handler runs on that one task, one request at a time. |
 | The owner's side | Control never touches a player. `POST` routes put a command on a queue that `app_main` empties every 100 ms (`examples/hearth_sink/main/hearth_sink.cpp`, four commands deep); `GET /status` reads a snapshot under a mutex. |
 | `GET /status` | `state`, `location`, `source`, `sink`, `layout`, `volume`, `stream{codec, acmod, channels, substreams, dialnorm, objects, objects_rendered, slots}`, `frames`, `held`, `us_per_frame`, `worst_frame_us`, `render_us_per_frame`, `sink_us_per_frame`, `realtime_permille`, `resync_bytes`, `fetched_bytes`, `ring_low`, `passes`, `layout_mismatches`, `finished`, `failed`, `why`, `error`. A handler the owner leaves empty drops its field (`control.hpp`); `stream` is `null` before the first access unit and `ring_low` is `null` until measured. |
@@ -122,7 +122,7 @@ fields the sections below add. The rest of this section is what the design start
 shape (`sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram` plus an http overlay): with WiFi up and a
 stream playing, 14 to 16 KB of internal heap stays free. One boot that started the HTTP server
 after the decoder found the largest free block at 3,328 bytes and came up with no server
-([On the board](../esp-idf/iclforge/examples/hearth_sink/README.md#on-the-board)). Anything this
+([On the board](../firmware/hearth-sink/README.md#on-the-board)). Anything this
 page adds to the firmware is weighed against those figures.
 
 ## What the comparable does
@@ -243,8 +243,8 @@ device's answers rather than work out the player's rules in the script.
 
 ### What a layout does
 
-From the code - `esp-idf/iclforge/src/player.cpp`, `src/render/include/iclforge/render/render.hpp` and the
-decoder's output stage, `src/ac3/src/decoder/output.cpp` - and checked under QEMU with the
+From the code - `firmware/esp-idf/iclforge/src/player.cpp`, `libs/render/include/iclforge/render/render.hpp` and the
+decoder's output stage, `libs/ac3/src/decoder/output.cpp` - and checked under QEMU with the
 [stream set](esp32-stream-set.md):
 
 | The layout | What the player does, whatever the stream |
@@ -638,8 +638,8 @@ what `curl http://<board>/` was ([decision 4](#decisions)).
 ## Where the files live
 
 In the component, beside Control, because Control is what serves them and any firmware that
-mounts it gets the page: [`esp-idf/iclforge/ui/iclforge_ui.html`](../esp-idf/iclforge/ui/iclforge_ui.html)
-and [`ac3forge_ui.js`](../esp-idf/iclforge/ui/iclforge_ui.js), listed as `EMBED_FILES` in the
+mounts it gets the page: [`firmware/esp-idf/iclforge/ui/iclforge_ui.html`](../firmware/esp-idf/iclforge/ui/iclforge_ui.html)
+and [`ac3forge_ui.js`](../firmware/esp-idf/iclforge/ui/iclforge_ui.js), listed as `EMBED_FILES` in the
 component's `idf_component_register`. ESP-IDF places embedded files in `.rodata.embedded`, which
 is flash, and names their symbols after the file's base name (`_binary_ac3forge_ui_html_start`);
 the prefix is there because a firmware that embeds its own `index.html` would otherwise fail to
@@ -653,7 +653,7 @@ either file is copied to the heap by this code.
 The embedded data sits in the component's archive and is linked only into a firmware that
 references it, which is one that uses Control. The packing script copies the component
 directory whole, so `ui/` goes into the registry archive with it. A `.gitattributes` line pins
-`esp-idf/iclforge/ui/**` to LF, so the bytes in flash, the size budget and the coverage offsets
+`firmware/esp-idf/iclforge/ui/**` to LF, so the bytes in flash, the size budget and the coverage offsets
 are the same on every checkout, Windows included.
 
 Plain HTML, CSS and JavaScript with no build step: the files in the tree are the files the board
@@ -793,14 +793,14 @@ WCAG 2.2 AA is the target.
 ## Tests
 
 **On the host.** Playwright, from the WASM demo's harness: its package, its lockfile and its
-Chromium install in `apps/wasm/tests`, with a second configuration for the device page
+Chromium install in `apps/demos/wasm/tests`, with a second configuration for the device page
 (`device-ui.config.js`), so there is one browser-test stack in the repository. A small Node
 server stands in for the device (`device-ui/stub.js`), one per test: it serves the page and the
 script with the headers Control sends, and implements the REST contract - routes, methods, status
 codes, reply texts, content types, and the state a play goes through. `contract.spec.js` compares
 its reply texts, headers and routes with the literals in `control.cpp`, and checks that every
 request the script makes is to a route the firmware registers. The host suite (nine spec files
-under `apps/wasm/tests/device-ui/`) drives every action
+under `apps/demos/wasm/tests/device-ui/`) drives every action
 through the page and asserts on the requests the stand-in received; every error path (`400` and
 `409` replies, a connection closed unanswered, a device that does not answer, a malformed or
 partial `/status`); the polling rules on Playwright's clock (one request in flight, none while
@@ -945,7 +945,7 @@ run as root, so Playwright can install Chromium's system libraries).
    of (a): a page on another site, opened by someone on the same network, can drive the player,
    as it can today. Cost of (b): every existing `curl` command changes.
 
-10. **Where the host tests live.** (a) **a second Playwright configuration in `apps/wasm/tests`,
+10. **Where the host tests live.** (a) **a second Playwright configuration in `apps/demos/wasm/tests`,
     sharing its package, lockfile and browser**; (b) a package of their own beside the page.
     **Recommend (a)**, which is one browser-test stack. Cost: tests for a device page under a
     directory named for the WASM demos. **Taken, (a).**
@@ -1025,7 +1025,7 @@ run as root, so Playwright can install Chromium's system libraries).
     factory partition. What changed is that a settings page is a form per setting, and each of
     the four costs a label, a control and a sentence saying what it does. Sending 20 KB rather
     than 16 costs one more lwIP send buffer's worth of turns on a load that happens when
-    somebody opens the page, not while anything plays. `apps/wasm/tests/device-ui/budget.spec.js`
+    somebody opens the page, not while anything plays. `apps/demos/wasm/tests/device-ui/budget.spec.js`
     holds the new figure.
 
     **Re-derived 2026-09-16 (Hearth B3): 28,672 bytes.** The Sendspin player's section took the
@@ -1045,7 +1045,7 @@ run as root, so Playwright can install Chromium's system libraries).
     while the board runs, so (b) would resend the same bytes once a second forever for no reason
     - the exact waste decision 1 already chose polling over WebSockets to avoid elsewhere on this
     page - and would grow `/status`'s own key-order contract test
-    (`apps/wasm/tests/device-ui/contract.spec.js`) with a second hand-maintained nested-object
+    (`apps/demos/wasm/tests/device-ui/contract.spec.js`) with a second hand-maintained nested-object
     special case beside `sendspin`'s. (c) puts exactly the fact a board misbehaving in the field
     needs - "I am an ESP32-P4, revision 1.3, no PSRAM" - somewhere a phone browser on the same
     network cannot reach, which is the debugging path this exists to shorten. Cost of (a): a
@@ -1116,7 +1116,7 @@ run as root, so Playwright can install Chromium's system libraries).
     list, the S3 board's image is 1,428,624 bytes of its 1,572,864-byte factory partition
     (144,240 free), the C6's 1,591,344 of 2,097,152, the P4's 1,473,744 of 4,194,304, and the CI
     shape's 1,065,344. The page is 3% of the S3 board's image. The new figure is in
-    `apps/wasm/tests/device-ui/budget.spec.js`.
+    `apps/demos/wasm/tests/device-ui/budget.spec.js`.
 
     **Re-derived again 2026-09-25: 57,344 bytes.** The firmware section (decision 29) took the
     page to 55,454: the section, the upload and its checks on the image's head, and the dialog

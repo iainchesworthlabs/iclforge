@@ -8,7 +8,7 @@ Two things are worth holding down here. The first is the gate's whole point:
 an archive that looks complete - the binary is there, the licence is there -
 and carries none of the five generated files still has to fail, because that
 is exactly the shape every Linux and macOS package had while the guard in
-apps/cli/CMakeLists.txt tested CMAKE_CROSSCOMPILING (see the script header).
+apps/forge/cli/CMakeLists.txt tested CMAKE_CROSSCOMPILING (see the script header).
 The second is the top-level-directory normalisation, which is where the
 equivalent Crucible gate had a real bug: a correct archive was reported as
 entirely missing. Both archive shapes are built here, with and without a
@@ -106,7 +106,7 @@ class MissingFilesTest(unittest.TestCase):
                 self.assertIn(f"missing {name}", out)
             # The failure says where the files come from, not only that they
             # are absent - the guard is the thing a reader has to look at.
-            self.assertIn("apps/cli/CMakeLists.txt", out)
+            self.assertIn("apps/forge/cli/CMakeLists.txt", out)
 
     def test_one_missing_completion_fails(self):
         # The man page alone passing is the regression this would otherwise

@@ -55,7 +55,7 @@ class Summary(unittest.TestCase):
 
 class Plan(unittest.TestCase):
     def test_plan_line_reads_the_diff(self):
-        line = precheck.plan_line(["src/ac4dec/x.cpp"])
+        line = precheck.plan_line(["libs/ac4/src/decoder/x.cpp"])
         self.assertIn("build=true", line)
         self.assertIn("gui=false", line)
 

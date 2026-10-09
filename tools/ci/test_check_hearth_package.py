@@ -43,8 +43,8 @@ import check_hearth_package as gate
 # fragments carry, each with a filled version where the section has one.
 # Windows and macOS check identically here (qt_bundled=True on both) -
 # unlike Crucible, Hearth has no driver and no platform-only library, so
-# apps/hearth/notices/notices.cmake's Qt section is the same text on both
-# (apps/crucible/notices/fragments/qt-bundled.txt, shared rather than
+# notices/hearth/notices.cmake's Qt section is the same text on both
+# (notices/fragments/qt-bundled.txt, shared rather than
 # copied, only its {{QT_PAYLOAD}}/{{QT_LOOKUP}} prose differs between them,
 # and this gate does not check that prose) - one shared fixture stands in
 # for both.

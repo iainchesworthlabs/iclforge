@@ -3,7 +3,7 @@
 #
 # Run with install(SCRIPT) immediately AFTER the qt_generate_deploy_qml_app_script()
 # script of the target it belongs to (apps/crucible/CMakeLists.txt,
-# apps/gui/CMakeLists.txt), so it deletes what that script has just written.
+# apps/forge/gui/CMakeLists.txt), so it deletes what that script has just written.
 #
 # WHY THIS EXISTS
 #
@@ -23,7 +23,7 @@
 # keyword, property or variable to change it, and the target's SOURCE_DIR is
 # read-only). That root is scanned RECURSIVELY for .qml files - so it also
 # reads the Qt Quick Test suites that live under the same application
-# directory (apps/crucible/ui/tests/qml/tst_*.qml, apps/gui/tests/qml/), every
+# directory (apps/crucible/ui/tests/qml/tst_*.qml, apps/forge/gui/tests/qml/), every
 # one of which opens with `import QtTest`. The scanner cannot tell an
 # application's QML from its tests': they are both .qml under the root it was
 # given. Confirmed in the generated files themselves - both
@@ -60,7 +60,7 @@
 # Crucible zip in CI, so this staying wired is checked rather than assumed.
 #
 # Windows AND macOS: both platforms' packages carry their own Qt (Linux finds
-# the system's, so this file never runs there - apps/gui's and apps/crucible's
+# the system's, so this file never runs there - apps/forge/gui's and apps/crucible's
 # install(SCRIPT) calls each sit inside a WIN32 OR APPLE deploy block). A
 # macOS .app keeps its deployed Qt inside the bundle rather than beside the
 # executable - Contents/PlugIns/ for QML plugins, Contents/Resources/qml/ for
@@ -99,7 +99,7 @@
 # immediately before install(SCRIPT): CMake concatenates every install() rule
 # from one directory into a single per-directory cmake_install.cmake,
 # executed top to bottom as one script, so a set() from that install(CODE)
-# is still visible when this file's include() runs a moment later. apps/gui
+# is still visible when this file's include() runs a moment later. apps/forge/gui
 # and apps/crucible each do exactly that - install(CODE "set(_ac3_macos_
 # bundle_name \"forge-gui\")") (or "crucible") right before their own
 # install(SCRIPT .../StripQtTestDeployment.cmake ...) - with the SAME
@@ -211,7 +211,7 @@ endif()
 # top-level cmake_install.cmake down through every subdirectory's own, in
 # add_subdirectory() order - unlike the CONFIGURE step, include() opens no
 # new scope. A full (non-component-scoped) install, or any CPack generator
-# that installs every component in one pass, walks apps/gui's directory and
+# that installs every component in one pass, walks apps/forge/gui's directory and
 # apps/crucible's in that one process: without this unset, forge-gui's bundle
 # name would still be sitting in this variable when apps/crucible's own
 # install(CODE) set() has not run yet for whatever reason, or when a third

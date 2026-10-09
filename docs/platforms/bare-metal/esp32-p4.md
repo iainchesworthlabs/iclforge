@@ -2,7 +2,7 @@
 
 The minimum-footprint decoder on an Espressif ESP32-P4: a dual-core RISC-V (RV32IMAFC) with a
 single-precision FPU, 768 KB of L2MEM, and no radio of its own. It decodes in the float tier, as
-the [ESP32-S3](esp32-s3.md) does, from the same `esp-idf/iclforge/` component, whose manifest
+the [ESP32-S3](esp32-s3.md) does, from the same `firmware/esp-idf/iclforge/` component, whose manifest
 lists `esp32p4` beside `esp32s3`, `esp32c3` and `esp32c6`.
 
 It is the "best" tier of the shared C6/S3/P4 sink family
@@ -38,7 +38,7 @@ and display, GPIO headers along both edges, no separate UART bridge chip). It ca
 - An ESP32-C6-MINI-1 module wired to the P4 over SDIO (`GPIO14`-`GPIO19`) for Wi-Fi 6 and
   Bluetooth LE, per DFRobot's documentation. This probe does not touch it. `hearth_sink` does: it
   reaches Wi-Fi through `esp_hosted` over that link ([the example's
-  README](https://github.com/iainchesworthlabs/iclforge/blob/main/esp-idf/iclforge/examples/hearth_sink/README.md#on-the-esp32-p4)),
+  README](https://github.com/iainchesworthlabs/iclforge/blob/main/firmware/hearth-sink/README.md#on-the-esp32-p4)),
   and the [AC-4](#ac-4) figures were measured that way.
 - **Two USB-C connectors**, wired to two different on-die USB peripherals, not one connector
   shared between them: one silkscreened "USB 2.0 OTG", reaching the part's native high-speed
@@ -211,7 +211,7 @@ is 357,368 bytes, inside a 1 MB partition with half free.
 
 The fourteen fixtures above are six-frame clips built for this probe alone. The sink-tiers plan's
 exit criterion also asks for the actual stream-set files a real player streams -
-`esp-idf/iclforge/examples/hearth_sink/www/714-*.ec3`, eleven files, each isolating one Annex E
+`firmware/hearth-sink/www/714-*.ec3`, eleven files, each isolating one Annex E
 coding-tool combination at 7.1.4 (`planning/esp32-stream-set.md` has the full manifest). These
 were wrapped bit for bit into a scratch copy of the probe - not re-encoded, since the point is to
 decode what a player actually receives - the same shape the ESP32-C6 page's "2/0, 5.1 and 7.1
@@ -253,7 +253,7 @@ This closes the sink-tiers plan's exit criterion 1 in full: fourteen fixtures an
 ## AC-4
 
 `CONFIG_ICLFORGE_AC4` (off by default, and offered only on a part with a floating-point unit)
-builds the AC-4 inspector, core and decoder of `src/ac4`, `src/ac4core` and `src/ac4dec` into the
+builds the AC-4 inspector, core and decoder of `libs/ac4` into the
 component, in single precision and in the minimum-footprint profile (`ICLFORGE_MINIMAL_AC4`), and
 lets the player read a stream that opens with an AC-4 sync word. It takes the ring, the renderer
 and the sinks an AC-3 or E-AC-3 stream takes, with `iclforge::ac4::SyncFrameSplitter` and `iclforge::ac4::Decoder` in
@@ -496,10 +496,10 @@ reserved and not moved 63 times a frame; and the two or four lines of a Huffman 
 made a call into ROM's `memcpy` for 8 or 16 bytes. The reconstruction takes 8.1 ms a 5.1 SIMPLE frame from 15.7 with these,
 and parse 11.2 from 13.7.
 
-**The compiler.** `src/ac4core`'s kernels (the FFT, the inverse transform, the QMF banks, the converter, the synthesis, A-SPX's
+**The compiler.** `libs/ac4/src/core`'s kernels (the FFT, the inverse transform, the QMF banks, the converter, the synthesis, A-SPX's
 generator and A-CPL) are built at `-O3` under `ICLFORGE_MINIMAL_HOT_O2` from `-O2`, which unrolls their loops and interleaves
 the independent multiplies that a rolled loop leaves waiting on the FPU of an in-order core: 2.7 to 2.9 ms a 5.1 frame for
-9 KB of flash. Thirteen of `src/ac4dec`'s translation units (the Huffman and scale factor reading, the reconstruction, the
+9 KB of flash. Thirteen of `libs/ac4/src/decoder`'s translation units (the Huffman and scale factor reading, the reconstruction, the
 stereo and downmix passes) are built at `-O2` where they stayed at `-Os`: 1.6 to 3.8 ms a 5.1 frame for 71 KB of flash, and
 1.8 KB more of the decode task's stack. `-O3` on those files gained nothing over `-O2` and cost 73 KB more.
 
@@ -823,7 +823,7 @@ time), and with D14e's decoder and the flash in QIO mode it takes 10.8 and 14.1 
 
 [Decision 26](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-09-25)
 promises identical `float` output everywhere, and the probe's six AC-4 fixtures pin it
-(`tests/golden/ac4-probe-pcm-hashes.json`, held on the x86-64 host and on the Cortex-M3 under QEMU).
+(`testdata/ac4-probe-pcm-hashes.json`, held on the x86-64 host and on the Cortex-M3 under QEMU).
 The board's PCM hash (FNV-1a over the sample bit patterns in the order the player delivered them, the
 probe's own) equals all six, played from the same committed streams: `ac4_20_music`
 `f860e51f602ae753`, `ac4_20_acpl` `e8b8cfa716dd0e1c`, `ac4_51_music` `6d36d7d2e8a070e9`,
@@ -900,7 +900,7 @@ idf.py -DIDF_TARGET=esp32p4 \
   -DICLFORGE_STAGE_TIMERS=ON build
 ```
 
-from `esp-idf/iclforge/examples/hearth_sink/`. `sdkconfig.ac4` turns on `CONFIG_ICLFORGE_AC4` and a
+from `firmware/hearth-sink/`. `sdkconfig.ac4` turns on `CONFIG_ICLFORGE_AC4` and a
 40 KB decode stack. The measurement image adds `ICLFORGE_EXAMPLE_SINK_NULL`,
 `ICLFORGE_EXAMPLE_AC4_PCM_HASH`, `ESP_TASK_WDT_INIT=n`, a 64 KB stack and the network's credentials,
 and goes to the board with `tools/hearth/ota.py push`, which replaces the application and keeps the bootloader on
@@ -914,8 +914,8 @@ the manifest's parts, with the decoder switched on and constructed (in the fixed
 parts with no floating-point unit).
 CI narrows that to the ESP32-P4, the ESP32-C3 and the ESP32-C6 with `--verify-targets esp32p4,esp32c3,esp32c6`:
 the `float` tier and the fixed-point tier on the two parts with no floating-point unit. A `float` build evaluates the
-converter's tables while it compiles `src/ac4core/src/dsp/resampler.cpp`, which takes ESP-IDF's
-RISC-V GCC 15.2 8.4 s where it took 1.5, and `src/ac4core/CMakeLists.txt` raises the compiler's limit
+converter's tables while it compiles `libs/dsp/src/tiered/resampler.cpp`, which takes ESP-IDF's
+RISC-V GCC 15.2 8.4 s where it took 1.5, and `libs/ac4/CMakeLists.txt` raises the compiler's limit
 on constant evaluation for that file (`-fconstexpr-ops-limit`).
 
 ## QEMU
@@ -926,17 +926,17 @@ runs nothing, and every figure on this page comes from the board.
 
 ## Building
 
-`apps/baremetal/platform/esp32p4/` is the probe target:
+`firmware/baremetal/platform/esp32p4/` is the probe target:
 
 ```bash
 . $IDF_PATH/export.sh
-cd apps/baremetal/platform/esp32p4
+cd firmware/baremetal/platform/esp32p4
 idf.py set-target esp32p4
 idf.py build                                  # -DICLFORGE_ESP_PROFILE=decoder by default
 ```
 
 The decode arithmetic needs no override: the component
-(`esp-idf/iclforge/CMakeLists.txt`) picks `float` from `SOC_CPU_HAS_FPU`, which this part has, the
+(`firmware/esp-idf/iclforge/CMakeLists.txt`) picks `float` from `SOC_CPU_HAS_FPU`, which this part has, the
 same as the S3 — see [ESP32-S3 → The ESP-IDF component](esp32-s3.md#the-esp-idf-component).
 
 On a board reached over its OTG connector held in the ROM's manual download mode (see

@@ -14,14 +14,14 @@
 # tests/CMakeLists.txt, whose find-then-FetchContent-fallback shape this
 # mirrors). Desktop builds get it from vcpkg (see vcpkg.json's base
 # "dependencies"); the Android app build never wires vcpkg's toolchain in at
-# all (apps/android/app/src/main/cpp/CMakeLists.txt has no vcpkg/VCPKG
+# all (apps/demos/android/app/src/main/cpp/CMakeLists.txt has no vcpkg/VCPKG
 # reference anywhere), so it silently takes the FetchContent fallback below -
 # {fmt} is a plain CMake/C++ library and builds cleanly under the NDK
 # toolchain with no further plumbing needed, unlike bolting vcpkg's own
 # Android triplet chainloading on for this one dependency.
 #
 # A second target, iclforge::fmt_private, is defined at the end of this file. The
-# libraries installed as static archives (iclforge::ac3, iclforge::mp4) link it in place
+# libraries installed as static archives (iclforge::ac3, iclforge::containers) link it in place
 # of iclforge::fmt.
 # ---------------------------------------------------------------------------
 
@@ -33,8 +33,8 @@
 set(ICLFORGE_FMT_VERSION 12.2.0)
 
 # The oldest {fmt} a local copy may be. fmt/base.h, which cpu_features.cpp and
-# most of apps/cli include, first shipped in 11.0.0, but no 11.0.x release
-# builds this tree with Clang 22: apps/common/fmp4_folder_writer.cpp formats a
+# most of apps/forge/cli/src include, first shipped in 11.0.0, but no 11.0.x release
+# builds this tree with Clang 22: apps/shared/media/src/fmp4_folder_writer.cpp formats a
 # system_clock time_point with "{:%FT%TZ}", and write_floating_seconds() in
 # 11.0.x's fmt/chrono.h then fails with "call to consteval function
 # 'fmt::basic_format_string<...>' ... is not a constant expression". 11.1.0 is
@@ -46,8 +46,8 @@ option(ICLFORGE_FETCH_FMT "Fetch {fmt} from source via FetchContent when no loca
 # Without a version, find_package() takes whatever {fmt} it finds, and an older
 # one fails the build at the first #include <fmt/base.h> instead of here.
 # Ubuntu 26.04's libfmt-dev is 10.1.1 (its CMake package reports 10.1.0); a
-# fuzz/run.sh configure on a machine with it installed picked it up and stopped
-# compiling src/base/src/cpu_features.cpp. With the minimum,
+# tools/fuzz/run.sh configure on a machine with it installed picked it up and stopped
+# compiling libs/base/src/cpu_features.cpp. With the minimum,
 # find_package() passes over a copy like that, including one an existing build
 # directory has already cached in fmt_DIR, and the fallback below applies.
 #
@@ -102,7 +102,7 @@ if(NOT fmt_FOUND)
     # fmt's own CMakeLists does not set POSITION_INDEPENDENT_CODE on its
     # `fmt` target, and a plain FetchContent build defaults to whatever the
     # ambient (unset) value is - fine for a static-only consumer, but
-    # iclforge_ac3_shared (src/ac3/CMakeLists.txt) links every dependency,
+    # iclforge_ac3_shared (libs/ac3/CMakeLists.txt) links every dependency,
     # including this one, into a real .so/.dll. Confirmed the hard way: the
     # WASM leg and the manylinux wheel build (neither wires vcpkg's toolchain
     # in, so both take this fallback) both failed linking libiclforge_ac3.so with
@@ -143,8 +143,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 endif()
 
 # iclforge::fmt_private - a private copy of {fmt}, compiled into the object files of a library that is
-# installed as a static archive: iclforge::ac3 (src/ac3/CMakeLists.txt) and iclforge::mp4
-# (src/mp4/CMakeLists.txt).
+# installed as a static archive: iclforge::ac3 (libs/ac3/CMakeLists.txt) and iclforge::containers
+# (libs/containers/CMakeLists.txt).
 #
 # An archive is not linked. Each function its objects call without defining stays an undefined
 # reference until a consumer's own link, and the installed package names no {fmt} for that link to

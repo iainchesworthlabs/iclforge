@@ -25,8 +25,8 @@ labelled unrun wherever no Pi 5 has supplied evidence.
 
 ## Why there's no Raspberry Pi-specific code
 
-The project's backend tree (`src/audio/src/backend/{windows,alsa,pipewire,posix,macos,android}/`,
-selected by `src/audio/CMakeLists.txt`, never by `#ifdef` -
+The project's backend tree (`libs/audio/src/backend/{windows,alsa,pipewire,posix,macos,android}/`,
+selected by `libs/audio/CMakeLists.txt`, never by `#ifdef` -
 `tools/checks/check_platform_macros.ps1` enforces this in CI)
 branches on **operating system**, not architecture or device. A Raspberry Pi running Raspberry Pi OS
 hits exactly the same `if(LINUX)` branch, the same ALSA backend, and the same
@@ -111,7 +111,7 @@ select by default.
 
 The Pi's only audio-capable HDMI path is its VideoCore HDMI ALSA card, normally exposed under a name
 like `vc4-hdmi` (`bcm2835` on older firmware/kernel combinations). ICL Forge doesn't special-case
-this name - `src/audio/src/backend/alsa/device_names.hpp`'s `classify_digital_output()` already
+this name - `libs/audio/src/backend/alsa/device_names.hpp`'s `classify_digital_output()` already
 recognizes any ALSA PCM whose name contains `hdmi` and builds the IEC 60958 channel-status device
 string generically. Find the name on a given Pi with:
 

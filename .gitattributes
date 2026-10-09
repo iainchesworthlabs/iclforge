@@ -12,26 +12,21 @@
 
 # rustfmt normalises to LF regardless of platform; pin the blob the same way so
 # a Windows checkout's autocrlf can't disagree with what `cargo fmt --check`
-# (rust/, roadmap AP9) expects in CI.
+# (bindings/rust/, roadmap AP9) expects in CI.
 *.rs text eol=lf
 
-# The Crucible's notice fragments and licence texts are read at configure
-# time and concatenated into the package's NOTICES.txt (cmake/Notices.cmake);
-# the generator normalises line endings, and pinning the blobs to LF keeps
-# the checked-in bytes the same on every platform too.
-apps/crucible/notices/** text eol=lf
-
-# Forge's own notice fragments and platform files, read the same way by the
-# same generator (apps/notices/notices.cmake), pinned for the same reason.
-# Without this the tree above is LF on every checkout and this one is CRLF
-# on a Windows one, for two sets of files that are concatenated together.
-apps/notices/** text eol=lf
+# The three products' notice fragments, licence texts and platform files (notices/) are read at
+# configure time and concatenated into each package's NOTICES.txt (cmake/Notices.cmake); the
+# generator normalises line endings, and pinning the blobs to LF keeps the checked-in bytes the same
+# on every platform too. Without it a Windows checkout would be CRLF for files that are
+# concatenated together.
+notices/** text eol=lf
 
 # The ESP32 player's web page. The component embeds these files in firmware
-# byte for byte (esp-idf/iclforge/CMakeLists.txt, EMBED_FILES), and the host
+# byte for byte (firmware/esp-idf/iclforge/CMakeLists.txt, EMBED_FILES), and the host
 # tests hold them to a size budget and map coverage onto their offsets, so all
 # three need the same bytes on every checkout.
-esp-idf/iclforge/ui/** text eol=lf
+firmware/esp-idf/iclforge/ui/** text eol=lf
 
 # vcpkg overlay ports. vcpkg applies a port's patches to upstream's sources, which have
 # LF endings, so a patch that a Windows checkout had turned to CRLF would add stray
@@ -44,13 +39,14 @@ cmake/vcpkg/ports/** text eol=lf
 # already on a text fixture.
 *.ac3 -text
 # And E-AC-3, for the same reason: the streaming example's stream set
-# (esp-idf/iclforge/examples/hearth_sink/www/) is several dozen of them.
+# (firmware/hearth-sink/www/) is several dozen of them.
 *.ec3 -text
 *.ec3 -text
-# And AC-4: the DEE streams under tests/golden/external-baseline/ that the
+# And AC-4: the DEE streams under testdata/external-baseline/ that the
 # decoder's syntax digests are taken over.
 *.ac4 -text
 
-# The hand-written part of stage S2 (tools/n1b/README.md), applied with git apply --3way: a patch that a
-# Windows checkout had turned to CRLF would not apply to the LF blobs it was made from.
-tools/n1b/s2-hand.patch text eol=lf
+# The object scene's placements are text, and their SHA-256 is pinned (testdata/audio/corpus.json,
+# tools/checks/check_corpus.py): a Windows checkout with core.autocrlf would write CRLF and fail the
+# fixture check for a file nobody changed.
+testdata/audio/*.paths text eol=lf

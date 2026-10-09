@@ -46,7 +46,7 @@
 # ICLFORGE_CROSS_TIER_CHECK=1 switches this script into a different mode: run
 # the entire matrix below TWICE from the SAME binary, once with
 # ICLFORGE_SIMD_TIER=sse2 and once with =avx2 (see
-# src/base/include/iclforge/base/detail/cpu_features.hpp), then byte-diff the two output
+# libs/base/include/iclforge/base/detail/cpu_features.hpp), then byte-diff the two output
 # trees. This is the runtime-dispatch analogue of the -DICLFORGE_SIMD=generic
 # cross-build check documented above: that one proves two different binaries
 # (SIMD tier baked in at compile time) agree bit-for-bit; this one proves the
@@ -114,7 +114,7 @@ fi
 # after the `cd "$WORKDIR"` on the next lines. Resolve them now, from this
 # script's own location rather than $PWD, so it does not matter where the
 # script was invoked from.
-FIXTURES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../tests/golden/audio" && pwd)"
+FIXTURES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../testdata/audio" && pwd)"
 
 WORKDIR="${2:-$(mktemp -d)}"
 mkdir -p "$WORKDIR"
@@ -186,7 +186,7 @@ done
 # --- The §7.8 output stage and §7.10 concealment (decoder output stage and concealment) ---------
 # Every new decode token, over a real 5.1 stream rather than silence, because
 # a fold of silence is silence whatever the matrix says. The unit suite
-# (tests/ac3/decoder/test_output_stage.cpp) is what checks the coefficients
+# (libs/ac3/tests/decoder/test_output_stage.cpp) is what checks the coefficients
 # themselves; what these rows cover is the thing a unit test cannot - that the
 # CLI plumbs each token through to a WAV that actually gets written, at the
 # channel count and channel order the sink was opened for. A fold changes both
@@ -333,7 +333,7 @@ run decode eac3_1+1.ec3 dc1_eac3_dualmono.wav channels=2
 run decode eac3_51.ec3 dc2_eac3_repeat.wav conceal=repeat
 
 # "atten:N" and "noatten" alone tune spectral extension's notch but do not,
-# by themselves, turn spx on (see parse_tools in src/ac3/src/encoder/plan.cpp)
+# by themselves, turn spx on (see parse_tools in libs/ac3/src/encoder/plan.cpp)
 # - so they round-trip like "none". "nofastmdct" and "nodither" are the same
 # shape one step further: neither is a coding tool at all - nofastmdct only
 # changes the forward transform's rounding, nodither only pins §7.3.4's
@@ -719,7 +719,7 @@ run_ffmpeg_check atmos_enc.ec3
 # atmos-path: a tiny hand-authored keyframe file, proving the file-driven
 # object path round-trips too, not just the built-in synthetic orbit 'atmos'
 # uses. Format is 'object time_s x y z gain lfe_send' per run_atmos_path's
-# parser (apps/cli/main.cpp).
+# parser (apps/forge/cli/src/main.cpp).
 cat > atmos_paths.txt <<'PATHSEOF'
 0 0.0 0.1 0.5 0.0 0.7 0.0
 0 2.0 0.9 0.5 1.0 0.7 0.0
@@ -731,7 +731,7 @@ run decode atmos_path.ec3 atmos_path.wav
 run_ffmpeg_check atmos_path.ec3
 
 # atmos-adm (ADM BWF reader): only exercised for real when THIS build actually has it.
-# iclforge::adm/iclforge::admbridge are this project's one opt-in, non-default library
+# iclforge::adm are this project's one opt-in, non-default library
 # (ICLFORGE_BUILD_ADM, default off - see the root CMakeLists.txt's own option()), and it needs
 # Boost plus a dedicated vcpkg feature neither of this script's two CI callers (the ASan+UBSan
 # leg, the FFmpeg-oracle leg this file's own header describes) pulls in - both build the plain
@@ -753,7 +753,7 @@ run_ffmpeg_check atmos_path.ec3
 # flat bin/ directory regardless of which source subdirectory built it.
 ADM_FIXTURE_TOOL="$(dirname "$CLI")/encode_adm"
 if "$CLI" 2>&1 | grep -E '^  forge atmos-adm[[:space:]]' | grep -q 'UNAVAILABLE HERE'; then
-    echo "    [skip] atmos-adm: this forge build has no -DICLFORGE_BUILD_ADM=ON (apps/cli/adm/atmos_adm.hpp) - covered instead by the adm-validate CI job and tests/cli/test_cli_atmos_adm.cpp, which do build with it"
+    echo "    [skip] atmos-adm: this forge build has no -DICLFORGE_BUILD_ADM=ON (apps/forge/cli/src/adm/atmos_adm.hpp) - covered instead by the adm-validate CI job and apps/forge/cli/tests/test_cli_atmos_adm.cpp, which do build with it"
 elif [[ ! -x "$ADM_FIXTURE_TOOL" ]]; then
     echo "    [skip] atmos-adm: examples/encode_adm was not built alongside this forge (ICLFORGE_BUILD_EXAMPLES=OFF?), so its --write-fixture mode is unavailable to generate a real ADM file"
 else
@@ -766,23 +766,23 @@ else
     # trip the phase's exit criterion names. Neither ffprobe (no AC-4 decoder) nor
     # run_ac4_frames_check (defined later in this file, in the plain-AC-4 section below) is
     # available this early, so 'decode' reading the file back to PCM and to an ADM master without
-    # error is this leg's own coverage; tests/cli/test_cli_atmos_adm.cpp pins the numbers
+    # error is this leg's own coverage; apps/forge/cli/tests/test_cli_atmos_adm.cpp pins the numbers
     # (positions, gains, timing) this smoke coverage does not.
     run atmos-adm atmos_adm_fixture.wav atmos_adm.ac4 256 "" codec=ac4
     run decode atmos_adm.ac4 atmos_adm_ac4.wav atmos_adm_ac4_objects atmos_adm_ac4_roundtrip.wav
 fi
 
 # atmos-iab (IAB reader phase 3): the identical conditional-command shape atmos-adm above uses,
-# and for the same reason - it needs iclforge::admbridge's own IAB mapping, gated by the same
-# ICLFORGE_BUILD_ADM flag (see apps/cli/adm/atmos_iab.hpp's own header comment: iclforge::iab
-# itself is on by default, but build_iab() only exists once admbridge is). Detected the same
+# and for the same reason - it needs iclforge::adm's own IAB mapping, gated by the same
+# ICLFORGE_BUILD_ADM flag (see apps/forge/cli/src/adm/atmos_iab.hpp's own header comment: iclforge::iab
+# itself is on by default, but build_iab() only exists once iclforge::adm is). Detected the same
 # "ask the real usage listing" way, not guessed from a preset name. examples/encode_iab's own
 # --write-fixture mode produces a real elementary IAB file on disk, so this is driven through a
 # real file the same way every other command in this matrix is. Same flat bin/ directory as $CLI
 # itself - see ADM_FIXTURE_TOOL's own comment above for why.
 IAB_FIXTURE_TOOL="$(dirname "$CLI")/encode_iab"
 if "$CLI" 2>&1 | grep -E '^  forge atmos-iab[[:space:]]' | grep -q 'UNAVAILABLE HERE'; then
-    echo "    [skip] atmos-iab: this forge build has no -DICLFORGE_BUILD_ADM=ON (apps/cli/adm/atmos_iab.hpp) - covered instead by tests/cli/test_cli_atmos_iab.cpp, which does build with it"
+    echo "    [skip] atmos-iab: this forge build has no -DICLFORGE_BUILD_ADM=ON (apps/forge/cli/src/adm/atmos_iab.hpp) - covered instead by apps/forge/cli/tests/test_cli_atmos_iab.cpp, which does build with it"
 elif [[ ! -x "$IAB_FIXTURE_TOOL" ]]; then
     echo "    [skip] atmos-iab: examples/encode_iab was not built alongside this forge (ICLFORGE_BUILD_EXAMPLES=OFF?), so its --write-fixture mode is unavailable to generate a real IAB file"
 else
@@ -806,8 +806,8 @@ fi
 # chanmap convention the decoder writes, not atmos-cbi's own DEE cbi_wav/
 # Table 12 order, but a channel COUNT match is all this smoke-coverage script
 # needs - the per-channel semantic labeling (which physical channel lands as
-# which OAMD bed label) is what tests/ac3/oba/test_atmos_cbi.cpp and
-# tests/cli/test_cli_atmos_cbi.cpp prove, with a distinct tone per channel
+# which OAMD bed label) is what libs/ac3/tests/oba/test_atmos_cbi.cpp and
+# apps/forge/cli/tests/test_cli_atmos_cbi.cpp prove, with a distinct tone per channel
 # identified after JOC reconstruction, which this script does not repeat.
 # Always a 5.1 bed physically (OAMD+JOC ride in the same independent
 # substream, same as every other Atmos command above), so FFmpeg reads it and
@@ -953,7 +953,7 @@ run mp4 eac3enc_none.ec3 eac3enc_none.mp4
 run mp4 atmos_4.ec3 atmos_4.mp4
 # fmp4 writes a directory (init segment + media segments + HLS/DASH
 # manifests) rather than one file - atmos_4.ec3 in particular exercises the
-# HLS CHANNELS="<N>/JOC" path (iclforge/mp4/hls.hpp), since that stream carries Dolby
+# HLS CHANNELS="<N>/JOC" path (iclforge/containers/mp4/hls.hpp), since that stream carries Dolby
 # Atmos objects. Concatenating the init segment with every media segment and
 # strict-decoding the result, and strict-decoding the HLS media playlist
 # directly, both through FFmpeg's own demuxers, is a stronger check than the
@@ -1193,7 +1193,7 @@ run_ac4_frames_check ac4_514_256.ac4 -f ac4
 run decode ac4_514_256.ac4 i5_ac4_514.wav
 run probe ac4_514_256.ac4
 # Objects (planning/ac4.md, phase I5): experimental=objects/objects=<scene>, E9's own CLI surface
-# (apps/cli/commands/ac4_encode_objects.cpp), A-JOC by default and direct-coded as the explicit
+# (apps/forge/cli/src/commands/ac4_encode_objects.cpp), A-JOC by default and direct-coded as the explicit
 # second leg - then back through decode's objects_dir, unconditionally available (unlike adm_out,
 # which needs -DICLFORGE_BUILD_ADM=ON and is covered by the atmos-adm/atmos-iab AC-4 legs above).
 cat > ac4_objects_scene.txt <<'SCENE'

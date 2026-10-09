@@ -157,7 +157,7 @@ FSCOD2_RATES = [24000, 22050, 16000]
 # refusal in a release build, an abort in any build with assertions live, at
 # every layout. Fixed in the change that added this file; REFUSALS' "frmsiz
 # ceiling" entry is what that fix now reports, --check-envelope gates it, and
-# tests/cli/test_cli.cpp's "[frmsiz]" case pins the message.
+# apps/forge/cli/tests/test_cli.cpp's "[frmsiz]" case pins the message.
 #
 # Rates above the ceiling are still DRAWN, deliberately: they are legal input
 # to a CLI that has to refuse them cleanly, and that refusal is exactly what
@@ -1027,7 +1027,7 @@ ENVELOPE_PROBES = ["steady", "chaotic", "cliff", "spectral_jump", "transient", "
 # has no equivalent of. The Annex E tools are side information competing for
 # the same frame the mantissas are in, so a floor measured with tools off is
 # not the floor: `all` over a 5.1 bed at 64 kbit/s cannot hold the side
-# information at all, and tests/cli/test_cli.cpp already relies on that.
+# information at all, and apps/forge/cli/tests/test_cli.cpp already relies on that.
 ENVELOPE_TOOLS = ["none", "all", "auto", "cpl+ecpl", "tpn"]
 
 

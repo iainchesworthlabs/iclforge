@@ -51,19 +51,19 @@ if(WIN32)
         list(APPEND CPACK_GENERATOR "NSIS")
         set(CPACK_NSIS_PACKAGE_NAME "${CPACK_PACKAGE_NAME}")
         set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-        # Same source forge-gui's own .rc uses (apps/gui/CMakeLists.txt) - the
+        # Same source forge-gui's own .rc uses (apps/forge/gui/CMakeLists.txt) - the
         # installer/uninstaller windows and shortcut both otherwise default
         # to NSIS's own generic icon. NSIS wants a Windows .ico specifically
         # for both variables, which generate_icons.py already produces.
-        set(CPACK_NSIS_MUI_ICON "${PROJECT_SOURCE_DIR}/apps/gui/icons/iclforge.ico")
-        set(CPACK_NSIS_MUI_UNIICON "${PROJECT_SOURCE_DIR}/apps/gui/icons/iclforge.ico")
+        set(CPACK_NSIS_MUI_ICON "${PROJECT_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge.ico")
+        set(CPACK_NSIS_MUI_UNIICON "${PROJECT_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge.ico")
 
         # Start Menu entries. Until this, the installer laid forge.exe and
         # forge-gui.exe down under $INSTDIR\bin and created nothing anywhere a
         # user looks - the Start Menu folder CPack always makes held nothing
         # but the Uninstall shortcut, so an installed copy was reachable only
         # by browsing to the folder it went into. The Linux .deb has had a
-        # menu entry (apps/gui/packaging/linux/forge-gui.desktop);
+        # menu entry (apps/forge/gui/packaging/linux/forge-gui.desktop);
         # Windows had never been given the same thing.
         #
         # CPACK_PACKAGE_EXECUTABLES is the shape CPack's NSIS generator wants:
@@ -249,7 +249,7 @@ elseif(UNIX)
         #   without them installs cleanly and then dies at the first import
         #   - which is what the released .deb has been doing.
         #
-        # The list is forge-gui's own imports, read off apps/gui/qml/*.qml, not
+        # The list is forge-gui's own imports, read off apps/forge/gui/assets/qml/*.qml, not
         # copied from the Crucible pass in .github/workflows/_build.yml: the
         # two windows import different things. forge-gui imports QtQuick,
         # QtQuick.Controls, QtQuick.Dialogs, QtQuick.Layouts, QtQuick.Window
@@ -362,7 +362,7 @@ a PipeWire node Crucible creates while it runs.")
         # The -dev package's headers/static-archives are useless without a
         # matching runtime .so to actually link and load - and since this
         # project makes no ABI-compatibility promise pre-1.0 (see
-        # src/ac3/CMakeLists.txt's SOVERSION comment), the pin has to be
+        # libs/ac3/CMakeLists.txt's SOVERSION comment), the pin has to be
         # exact, not a >= floor. libiclforge0 itself declares no such
         # dependency the other way: it is a plain .so with no headers or
         # symlink of its own, valid to have installed alone.
@@ -393,8 +393,8 @@ Sendspin network sinks. AC-3 and E-AC-3 streams can also be sent to a
 receiver over HDMI or S/PDIF as a bitstream. In a group, the ESP32 sinks take
 AC-3 and E-AC-3 only.")
             # The QML modules THIS window's own qml/*.qml files import today
-            # (apps/hearth/ui/qml/, plus the shared family components it
-            # copies from apps/gui/qml/) - the same shlibdeps gap and the
+            # (apps/hearth/ui/assets/qml/, plus the shared family components it
+            # copies from apps/shared/theme/assets/qml/) - the same shlibdeps gap and the
             # same reasoning as CPACK_DEBIAN_RUNTIME_PACKAGE_DEPENDS's own
             # comment above: a QML import is invisible to a library-level
             # scan in every case, distro kit or not, so this states what the
@@ -503,7 +503,7 @@ endif()
 # ---------------------------------------------------------------------------
 # Library component(s): a second, separate download alongside the existing
 # forge/forge-gui package - headers + .lib/.dll/.a/.so + CMake package config
-# for a third party consuming iclforge::ac3/iclforge::matroska via
+# for a third party consuming iclforge::ac3/iclforge::containers via
 # find_package(iclforge) (see cmake/InstallLibrary.cmake). Everything
 # install()'d without an explicit COMPONENT falls into CPack's own
 # "Unspecified" component, which is why forge/forge-gui and every
@@ -539,7 +539,7 @@ endif()
 # The `runtime` component is forge/forge-gui plus the
 # generated forge.1 man page and the bash/zsh/fish/PowerShell completion
 # scripts - all install()'d with COMPONENT runtime from
-# apps/cli/CMakeLists.txt, so every generator below picks them up with the
+# apps/forge/cli/CMakeLists.txt, so every generator below picks them up with the
 # binary rather than needing a component of their own. They are absent only
 # from a package built where the host cannot run the target's binary - they are
 # produced by running the freshly built forge - which is a host/target

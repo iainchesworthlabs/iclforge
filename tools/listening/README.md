@@ -13,7 +13,7 @@ been run, and ViSQOL's MOS-LQO — the closest thing here to a perceptual score
 
 | | |
 |---|---|
-| `gen_listening_stimuli.py` | builds the stimulus set for every leg of `tests/golden/external-baseline/manifest.json`: encodes with `forge`, decodes everything with FFmpeg, aligns, blinds, and writes the trials key. Needs numpy and an `ffmpeg` binary. |
+| `gen_listening_stimuli.py` | builds the stimulus set for every leg of `testdata/external-baseline/manifest.json`: encodes with `forge`, decodes everything with FFmpeg, aligns, blinds, and writes the trials key. Needs numpy and an `ffmpeg` binary. |
 | `score_listening_test.py` | reads the key plus one response CSV per listener and prints the results table with confidence intervals. Stdlib-only — no build, no numpy, no FFmpeg. |
 | `responses/` | where filled-in response CSVs go. See its own README for the schema and for what has been run so far. |
 

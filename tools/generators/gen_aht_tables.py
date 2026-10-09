@@ -1,6 +1,6 @@
 """Extract the Annex E adaptive hybrid transform tables from the spec text.
 
-Emits src/ac3/include/iclforge/ac3/core/aht_tables.hpp: the high-efficiency bit
+Emits libs/ac3/include/iclforge/ac3/core/aht_tables.hpp: the high-efficiency bit
 allocation pointers (Table E3.1) and the seven vector quantisation codebooks
 (Tables E4.1-E4.7, 956 six-dimensional vectors between them).
 
@@ -20,7 +20,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
 SPEC_TXT = REPO / "spec" / "A52-2018.txt"
-OUT = REPO / "src" / "ac3" / "include" / "iclforge" / "ac3" / "core" / "aht_tables.hpp"
+OUT = REPO / "libs" / "ac3" / "include" / "iclforge" / "ac3" / "core" / "aht_tables.hpp"
 
 # Table E3.2: bits in the VQ index for hebap 1-7, which fixes each
 # codebook's size.

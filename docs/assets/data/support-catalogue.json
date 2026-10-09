@@ -1441,7 +1441,7 @@
           [
             "source",
             "build",
-            "the NDK build compiles the AC-4 libraries; the Shield demo links none of them"
+            "the NDK build compiles the AC-4 library; the Shield demo links none of it"
           ]
         ],
         [
@@ -1489,7 +1489,7 @@
           [
             "source",
             "ci",
-            "build from js/; unpublished on npm"
+            "build from bindings/js/; unpublished on npm"
           ]
         ],
         [
@@ -2212,7 +2212,7 @@
       "artifact": "Python wheel, built by CI",
       "action": "Open PyPI",
       "url": "https://pypi.org/project/ac3forge/",
-      "note": "CI builds this wheel, but no release has carried it and PyPI has none for Linux on aarch64. Build from a checkout with pip install ./python. The pre-releases are the project ac3forge; the project iclforge starts with a release made after the rename."
+      "note": "CI builds this wheel, but no release has carried it and PyPI has none for Linux on aarch64. Build from a checkout with pip install ./bindings/python. The pre-releases are the project ac3forge; the project iclforge starts with a release made after the rename."
     },
     {
       "product": "Python package",
@@ -2232,7 +2232,7 @@
       "artifact": "Python wheel, built by CI",
       "action": "Open PyPI",
       "url": "https://pypi.org/project/ac3forge/",
-      "note": "CI builds this wheel, but no release has carried it and PyPI has none for macOS on Intel. Build from a checkout with pip install ./python. The pre-releases are the project ac3forge; the project iclforge starts with a release made after the rename."
+      "note": "CI builds this wheel, but no release has carried it and PyPI has none for macOS on Intel. Build from a checkout with pip install ./bindings/python. The pre-releases are the project ac3forge; the project iclforge starts with a release made after the rename."
     },
     {
       "product": "Browser demos",
@@ -2249,7 +2249,7 @@
       "platform": "Browser",
       "variant": "WebAssembly",
       "state": "source",
-      "artifact": "Source package under js/",
+      "artifact": "Source package under bindings/js/",
       "action": "Read the browser package guide",
       "url": "platforms/wasm/",
       "note": "iclforge-wasm-decoder has not been published to npm."

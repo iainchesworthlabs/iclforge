@@ -1,3 +1,4 @@
+iclforge::iab::DlcAudio::normalized() const
 iclforge::iab::decode_audio(iclforge::iab::IaFrame const&)
 iclforge::iab::decode_dlc(iclforge::iab::AudioDataDlc const&, unsigned char, iclforge::iab::DlcDecodeOptions const&)
 iclforge::iab::describe(iclforge::iab::IabError)

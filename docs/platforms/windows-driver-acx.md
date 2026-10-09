@@ -11,7 +11,7 @@ after a review of the options (recorded under
 
 | | |
 |---|---|
-| Driver | An ACX driver on KMDF in `apps/windows/driver/`; [its README](https://github.com/iainchesworthlabs/iclforge/blob/main/apps/windows/driver/README.md) says what each file does |
+| Driver | An ACX driver on KMDF in `apps/crucible/windows/driver/`; [its README](https://github.com/iainchesworthlabs/iclforge/blob/main/apps/crucible/windows/driver/README.md) says what each file does |
 | Names | `IclForgeNullSink` (the hardware id `ROOT\IclForgeNullSink`, the service, the file names) and the endpoint "Speakers (Crucible Silent Output)", since 2026-10-01; `Ac3ForgeNullSink` and "Speakers (Desktop Atmos)" before. [The rename](#the-rename-2026-10-01) |
 | Signing | **Test-signed only.** It loads with test signing on and memory integrity off. The EV certificate and the attestation submission are not done |
 | CI | The `windows-driver` job builds and test-signs the package, runs Code Analysis at the driver rule set and uploads the package as `iclforge-nullsink-driver-testsigned`. It installs nothing. A `ci.yml` dispatch with `-f legs=windows-driver` runs it alone |
@@ -44,8 +44,8 @@ exactly as they are, and the port is not done until each is confirmed unchanged:
 
 - The hardware id `ROOT\Ac3ForgeNullSink`, the service name `Ac3ForgeNullSink`, the device
   description "Desktop Atmos" and so the endpoint name "Speakers (Desktop Atmos)", which the
-  demo's default silent-device filter matches. Every script under `apps/windows/driver/` and
-  `apps/windows/driver-vm/` keys on these names.
+  demo's default silent-device filter matches. Every script under `apps/crucible/windows/driver/` and
+  `apps/crucible/windows/driver-vm/` keys on these names.
 - The one device format: 8 channels, 48 kHz, 16-bit, `KSAUDIO_SPEAKER_7POINT1_SURROUND`, so a
   game that can render surround reaches the demo's bed intact.
 - The behaviour: rendered data is discarded and the position advances at the nominal rate,
@@ -57,7 +57,7 @@ exactly as they are, and the port is not done until each is confirmed unchanged:
   `Test-Driver.ps1`, `Verify-Driver.ps1`, `Deploy-Desk.ps1` and the Settings page's install
   and remove buttons work without edits.
 - The licence: the ACX samples carry the same MS-PL as the Simple Audio Sample, so
-  `apps/windows/driver/LICENSE` and the separate-work reasoning in its README stand.
+  `apps/crucible/windows/driver/LICENSE` and the separate-work reasoning in its README stand.
 - The build: the EWDK already used (kit 10.0.28000) carries the ACX headers and
   `acxstub.lib` under `km\acx\km\1.0\`; nothing new is installed.
 
@@ -121,7 +121,7 @@ has.
    it the same way. `devcon` is a WDK sample tool and awkward to redistribute; the packaged
    demo's `bin/driver/` then carries scripts that need nothing beyond Windows. Exit:
    `install.ps1` and `remove.ps1` work on a machine with no WDK.
-5. **Switch-over** (half a day). The ACX tree replaces `apps/windows/driver/Source`; the
+5. **Switch-over** (half a day). The ACX tree replaces `apps/crucible/windows/driver/Source`; the
    README rewritten as "what was cut from the ACX sample"; the plan page's driver sections
    and the CHANGELOG updated; the PortCls driver lives on in history, not beside the new one.
    Exit: `Test-Driver.ps1`, `Verify-Driver.ps1 -Kasan` and `Deploy-Desk.ps1` all pass from a
@@ -214,7 +214,7 @@ starts where the current driver ended rather than rediscovering them.
   record notes that the timing simulation is the one piece of the driver that is ours and that
   it could be tested in user mode behind a seam. The port is the moment to do that: the
   position and timing simulation goes into a header with no kernel dependencies, the stream
-  engine calls it, and a `tests/crucible` case drives it with synthetic QPC values and checks the
+  engine calls it, and a `apps/crucible/engine/tests` case drives it with synthetic QPC values and checks the
   position advances at the nominal rate and never runs backwards. That is the one addition to
   scope this section makes.
 - **Harness lessons stand.** `runScriptInGuest` never returns when the guest bugchecks under
@@ -260,7 +260,7 @@ one is history. What each step found, in the order the plan gave them:
 2. **Parity.** The timing simulation was not carried across verbatim but lifted out: the
    PortCls stream's `GetPosition`/`UpdatePosition` (a QPC delta scaled to bytes per second
    at the nominal rate) is `PositionClock` in `position.h`, with no kernel dependencies, and
-   `tests/crucible/test_nullsink_position.cpp` pins it (nine cases: nothing moves before run,
+   `apps/crucible/engine/tests/test_nullsink_position.cpp` pins it (nine cases: nothing moves before run,
    exactly the nominal rate, never backwards, pause and resume continuous, stop to zero,
    completions as packets pass, a late timer owes each missed packet once without sliding
    the schedule, completions after a pause line up, an unconfigured packet size owes
@@ -372,8 +372,8 @@ the scripts that build, install, remove, analyse and verify it, and the artifact
 uploads, `iclforge-nullsink-driver-testsigned`. The device description, and so the endpoint, went
 from "Desktop Atmos" to "Crucible Silent Output". The INF's provider and manufacturer read "ICL
 Forge"; N1A had recorded them as changed, and its pass had not read the `.inx`, which is UTF-16
-with a byte-order mark. `tools/n1b/n1d_driver_names.py` makes the change from three tables of
-names, so a later change of a name is one row and one run. The code of the driver is the same: the
+with a byte-order mark. A script, `n1d_driver_names.py`, made the change from three tables of
+names in one run (it is in the history before C7-7, with the tables). The code of the driver is the same: the
 sections that hold it (`.text`, `.data`, `INIT`, `.reloc`) match the old build byte for byte,
 `PAGE` differs by four bytes of name literals, and the data sections differ by the names, the PDB
 path and the version resource.
@@ -392,7 +392,7 @@ has three stations. The first is titled with the endpoint, the second is the app
 CRUCIBLE") and the third is the device you hear. With the bare word the first two would carry the
 same name, and the first-run dialog would say that the default output becomes "Crucible". The name
 is one constant in the application (`kWindowsSilentDeviceName`,
-`apps/crucible/engine/virtual_device.hpp`) and one string in the INF. A test pins that the
+`apps/crucible/engine/src/virtual_device.hpp`) and one string in the INF. A test pins that the
 engine's and the output stage's defaults are that constant, that it begins with "Crucible", is not
 the bare word and has no "Atmos" in it. The cost is on the Room page, whose narrow rail elides the
 station's title ("Speakers (Crucible Silent Outp..."). The full name is in the line under it.

@@ -11,7 +11,7 @@ this page's own live-audio commands get when the platform can't run them either 
 library documented under [Library](../../library/index.md); every codec and format decision lives in
 the library, and the CLI keeps only small local helpers of its own (the DASH MPD document wrapper
 `fmp4` writes; the scene files behind `atmos-path`/`atmos-encode` are parsed by the library's
-own `iclforge::oba::read_scene`).
+own `iclforge::objects::oba::read_scene`).
 
 Run it with no arguments for the full usage text — the command list in [Commands](commands.md)
 is transcribed from it by hand. Nothing in the build compares the two, so the binary is the
@@ -57,7 +57,7 @@ iclforge 0.10.0-beta.1+2637
 The headline carries the commits past the tag as semver build metadata: `+2637` is 2 637 commits
 past `v0.10.0-beta.1` (the `release:` line carries git's own describe of it), so a build from
 between releases is not mistaken for the tagged one. `kernels:` is `generic`, `x86_64-sse2` or
-`aarch64-neon`, the `arch-*` directory of `src/arithmetic/variants/` the binary was built from. A tree with
+`aarch64-neon`, the `arch-*` directory of `libs/base/variants/` the binary was built from. A tree with
 uncommitted changes adds a `state:   dirty (uncommitted changes)` line.
 
 `--version` (or its `-v` alias) is a flag, not one of the 44 commands — it's handled

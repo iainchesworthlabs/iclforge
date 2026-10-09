@@ -44,14 +44,14 @@ list(REMOVE_DUPLICATES _ICLFORGE_PC_CXX_RUNTIME_LIBS)
 unset(_iclforge_pc_lib)
 
 # NAME: pkg-config name, e.g. `pkg-config --libs iclforge-ac3`: iclforge-<library>, the library's
-# file name (iclforge_<library>, see e.g. src/ac3/CMakeLists.txt) with a hyphen, which is also
+# file name (iclforge_<library>, see e.g. libs/ac3/CMakeLists.txt) with a hyphen, which is also
 # the on-disk library basename whenever the shared variant is what's actually installed.
 # LIBNAME: the `-l<LIBNAME>` this component's install actually provides - see
 # iclforge_pkgconfig_libname() below for how callers derive this correctly for whichever
 # linkage(s) got installed.
 # REQUIRES: other .pc names this one's Requires: line should chain to (space-separated), for a
-# genuine PUBLIC/usage-requirement dependency - e.g. iclforge::signing requires iclforge because
-# iclforge_signing_static/signing_shared PUBLIC-link iclforge::ac3_static/iclforge::ac3_shared.
+# genuine PUBLIC/usage-requirement dependency - e.g. iclforge-adm requires iclforge-iab because
+# iclforge_adm_shared PUBLIC-links iclforge::iab, whose types the bridge's headers name.
 # STATIC_REQUIRES: .pc names a static archive of this component calls into, for a dependency that
 # is PRIVATE in CMake - iclforge_c, whose libiclforge_c_static.a holds calls into
 # libiclforge_ac3_static.a. An archive is not linked when it is built, so nothing in it records that
@@ -59,7 +59,7 @@ unset(_iclforge_pc_lib)
 # pkg-config follows for the link line only with --static, and only when LIBNAME is a static
 # archive. A Requires: line would make every consumer of the shared libiclforge_c.so depend on
 # libiclforge_ac3.so as well, although that library embeds the codec so that it is the one library to
-# load (src/capi/CMakeLists.txt).
+# load (libs/capi/CMakeLists.txt).
 #
 # A .pc that names a static archive (its LIBNAME ends in _static, the name that
 # iclforge_pkgconfig_libname() below picks) also gets Libs.private with the C++ runtime and libm,

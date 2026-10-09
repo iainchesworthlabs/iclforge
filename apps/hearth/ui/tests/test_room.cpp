@@ -25,7 +25,7 @@
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/routing.hpp"
 #include "iclforge/sendspin/discovery.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 #include "network_sinks.hpp"
 #include "output_selector.hpp"
 #include "pcm_sink.hpp"
@@ -40,7 +40,7 @@ namespace iclforge::hearth::uitest {
 // way DeviceSink wraps one iclforge::audio::PcmOutput. Everything is under one
 // lock: the engine thread submits and reads the position, the clock thread
 // plays, and the GUI thread reads the totals a suite asserts on. The shape is
-// tests/hearth/test_engine.cpp's ClockedDevice, plus what the Speakers page
+// apps/hearth/engine/tests/test_engine.cpp's ClockedDevice, plus what the Speakers page
 // and the output picker read off a real device (routing, name, id, mask).
 class FakeRoom {
 public:

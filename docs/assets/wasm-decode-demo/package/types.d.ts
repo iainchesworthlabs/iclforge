@@ -46,7 +46,7 @@ export interface FlushEntry {
 }
 export interface ObjectFrame {
     label: string;
-    /** [x, y, z, gain_db, width, depth, height] - see iclforge::oba::DisplayObject's own comment. */
+    /** [x, y, z, gain_db, width, depth, height] - see iclforge::objects::oba::DisplayObject's own comment. */
     position: Float32Array;
 }
 export type ScanOutcome = {
@@ -61,7 +61,7 @@ export type ScanOutcome = {
     ok: false;
     error: string;
 };
-/** The Embind class iclforge::ac3's WASM build exposes (apps/wasm/decoder_bindings.cpp's `PushDecoder`). */
+/** The Embind class iclforge::ac3's WASM build exposes (apps/demos/wasm/decoder_bindings.cpp's `PushDecoder`). */
 export interface NativePushDecoder {
     pushAccessUnit(bytes: Uint8Array): RawPushResult;
     flush(): RawFlushEntry[];
@@ -109,11 +109,11 @@ export interface RawScanResult {
         length: number;
     }[];
 }
-/** The Embind module `apps/wasm/decoder_bindings.cpp` builds - what `createIclForgeModule()` resolves to. */
+/** The Embind module `apps/demos/wasm/decoder_bindings.cpp` builds - what `createIclForgeModule()` resolves to. */
 export interface IclForgeEmbindModule {
     PushDecoder: new (foldTarget: number, foldApplyDialnorm: boolean, foldMixLfe: boolean) => NativePushDecoder;
     scanStream(bytes: Uint8Array): RawScanResult;
 }
-/** The MODULARIZE factory Emscripten attaches as `createIclForgeModule` - see apps/wasm/CMakeLists.txt's link options. */
+/** The MODULARIZE factory Emscripten attaches as `createIclForgeModule` - see apps/demos/wasm/CMakeLists.txt's link options. */
 export type IclForgeModuleFactory = (moduleOverrides?: Record<string, unknown>) => Promise<IclForgeEmbindModule>;
 //# sourceMappingURL=types.d.ts.map

@@ -1,7 +1,7 @@
 """Decode pinned FFmpeg FATE AC-3/E-AC-3 samples and hold them against FFmpeg.
 
 Third-party decode interop, step two. The first step decodes
-tests/golden/external-baseline/ - six streams from Dolby's Encoding Engine and
+testdata/external-baseline/ - six streams from Dolby's Encoding Engine and
 FFmpeg's own encoder, produced from this repository's own source material -
 with the in-repo decoder on every gold-reference leg. That is real third-party
 structure, and it found five real Annex E decoder defects the moment it ran.
@@ -142,7 +142,7 @@ SAMPLES = [
         "path": "eac3/matrix2_commentary1_stereo_192_small.eac3",
         "sha256": "ea095d557bd6787266f4b7276a2be818a7fbc924997748be89d9ead962a3391c",
         "note": "E-AC-3 2/0 @ 192 kbit/s, a director's-commentary track - speech "
-                "over a wide dynamic range, unlike every fixture in tests/golden",
+                "over a wide dynamic range, unlike every fixture in testdata",
         "min_snr_db": 32.0,       # measured 41.52 dB worst channel
     },
     {
@@ -166,7 +166,7 @@ SAMPLES = [
                 "appears anywhere in the file. FFmpeg reports this as "
                 "\"Dolby Digital Plus + Dolby Atmos\", but the OAMD payload the "
                 "dependent's block skip field carries does not decode here: "
-                "iclforge::oba::parse_payload refuses several object_element fields "
+                "iclforge::objects::oba::parse_payload refuses several object_element fields "
                 "(num_obj_info_blocks, sample_offset_code, b_object_not_active "
                 "among them) to exactly the shape this project's own encoder "
                 "emits, and Dolby's commercial encoder does not produce that "

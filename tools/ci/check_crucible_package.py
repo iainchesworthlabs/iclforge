@@ -22,7 +22,7 @@ crucible.app itself (Contents/Frameworks/, Contents/PlugIns/ and
 Contents/Resources/qml/), the same bundle layout forge-gui.app already uses.
 
 The second thing it checks is the content of NOTICES.txt, the third-party
-notices apps/crucible/notices/ generates per platform at configure time. A
+notices notices/ generates per platform at configure time. A
 notices file is easy to get subtly wrong without any name going missing: one
 written for the other platform (a PipeWire section in the Windows zip, the
 driver's MS-PL text in a .deb), or one whose Qt Quick 3D section disagrees
@@ -78,9 +78,9 @@ REQUIRED = (
 #
 #   - docs/crucible/install.md, which tells a reader not to turn test signing
 #     on or memory integrity off for a driver that is not there;
-#   - the Settings page's driver note (apps/crucible/ui/qml/SettingsPage.qml);
+#   - the Settings page's driver note (apps/crucible/ui/assets/qml/SettingsPage.qml);
 #   - package_complete() in
-#     apps/crucible/engine/platform/windows/driver_tools.cpp, which requires
+#     apps/crucible/engine/src/platform/windows/driver_tools.cpp, which requires
 #     IclForgeNullSink.inf and so greys Install driver on every packaged copy.
 #
 # They had drifted before this check existed: driverDir() finds the packaged
@@ -148,7 +148,7 @@ FORBIDDEN_LINUX = ("driver/install.ps1", "driver/remove.ps1", "driver/NullSinkDe
 # The macOS archive is a bundle rather than a folder of DLLs: no qt.conf, no
 # plugins/ beside bin/ - Qt is deployed inside crucible.app itself
 # (Contents/Frameworks/, Contents/PlugIns/ and Contents/Resources/qml/, the
-# same layout forge-gui.app already uses - see apps/notices/notices.cmake).
+# same layout forge-gui.app already uses - see notices/forge/notices.cmake).
 # crucible-run is not part of the bundle: it is a plain executable,
 # installed beside it at the archive root, the same "bin/" GNUInstallDirs
 # gives every platform and the same place forge sits beside forge-gui.app in
@@ -179,7 +179,7 @@ FORBIDDEN_MACOS = ("driver/install.ps1", "driver/remove.ps1", "driver/NullSinkDe
 # qmlimportscanner recurses into ui/tests/qml/tst_*.qml - but through two
 # different deploy mechanisms, so the shapes differ. Both are measured, not
 # guessed: forge-gui.app already carries all three in a real downloaded
-# packages-macos-llvm artifact, because apps/gui's own call to
+# packages-macos-llvm artifact, because apps/forge/gui's own call to
 # cmake/StripQtTestDeployment.cmake stays WIN32-only (that script's own header
 # says why) while apps/crucible's now reaches macOS.
 #   - qml/QtTest/{qmldir,libquicktestplugin.dylib}, the QML module itself,
@@ -198,7 +198,7 @@ FORBIDDEN_MACOS_QT_TEST_FILES = ("libquicktestplugin.dylib",)
 FORBIDDEN_MACOS_QT_TEST_FRAMEWORKS = ("QtTest.framework/", "QtQuickTest.framework/")
 
 # What NOTICES.txt has to say on each platform, and what it must not: the
-# phrases are the ones each fragment under apps/crucible/notices/fragments/
+# phrases are the ones each fragment under notices/fragments/
 # carries and no other fragment does. The Windows zip conveys Qt, so it must
 # reproduce the LGPL and say where Qt's source is; it carries the driver's
 # scripts, so it must reproduce the MS-PL; it must not credit a library only
@@ -215,11 +215,11 @@ NOTICES_NOT_WINDOWS = ("libpipewire",)
 NOTICES_LINUX = ("libpipewire", "{fmt}", "SIL OPEN FONT LICENSE")
 NOTICES_NOT_LINUX = ("Microsoft Public License", "GNU LESSER GENERAL PUBLIC LICENSE")
 # macOS bundles Qt the same way Windows does (so the same LGPL heading and Qt
-# source URL apply - apps/crucible/notices/fragments/qt-bundled.txt is shared,
+# source URL apply - notices/fragments/qt-bundled.txt is shared,
 # unchanged, between the two platforms' ICLFORGE_CRUCIBLE_NOTICE_FRAGMENTS lists),
 # but carries no driver and no PipeWire, the same two absences as
 # NOTICES_NOT_WINDOWS and NOTICES_NOT_LINUX put together
-# (apps/crucible/notices/platform/macos/components.cmake says why: no driver
+# (notices/crucible/platform/macos/components.cmake says why: no driver
 # section because there is no silent device to credit, no pipewire section
 # because that library is Linux's).
 NOTICES_MACOS = (

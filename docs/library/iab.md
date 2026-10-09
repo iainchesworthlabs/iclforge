@@ -3,12 +3,12 @@
 `iclforge/iab/ac3iab.hpp`, `iclforge/iab/mxf.hpp`, library `iclforge::iab`. A standalone reader for the
 Immersive Audio Bitstream (IAB, SMPTE ST 2098-2:2022) — the format Dolby Atmos cinema masters
 carry, and that Netflix's IMF pipeline (SMPTE ST 2067-201) delivers inside MXF track files. Like
-`iclforge::adm`, `iclforge::matroska`, `iclforge::mp4` and `iclforge::mpegts`, it links nothing from
+`iclforge::adm`, `iclforge::containers::matroska`, `iclforge::containers::mp4` and `iclforge::containers::mpegts`, it links nothing from
 `iclforge::ac3` — it has no idea AC-3, E-AC-3 or the JOC/Atmos object layer exist.
 
 The bitstream reader is `ac3iab.hpp` and the MXF Track File extraction is `mxf.hpp`, both covered
 here. Mapping the parsed bed/object graph onto `iclforge::ac3::oba::AtmosEncoder` is a separate module,
-`iclforge::admbridge`'s `build_iab()` — see [ADM → Atmos bridging](adm-bridge.md#bridging-iab) — driven
+`iclforge::adm`'s `build_iab()` — see [ADM → Atmos bridging](adm-bridge.md#bridging-iab) — driven
 end to end by `forge atmos-iab` (see [Commands](../forge/cli/commands.md)).
 
 ```cpp
@@ -32,7 +32,7 @@ Track File, parses both, and prints that they agree.
 
 **Defaults on**, unlike `iclforge::adm`. `ICLFORGE_BUILD_IAB` defaults **ON** — IAB's own
 Plex(n)-coded bitstream and its MXF/KLV wrapper both need nothing beyond this module's own bit
-reader (`src/iab/src/bitreader.hpp`), no third-party dependency at all, so it builds the same
+reader (`libs/iab/src/bitreader.hpp`), no third-party dependency at all, so it builds the same
 way the three container writers do:
 
 ```bash
@@ -43,7 +43,7 @@ The vcpkg port and the Conan recipe install it where asked for, off by default:
 `vcpkg install iclforge[iab]`, or `-o "iclforge/*:iab=True"` (see
 [Using the libraries](index.md)).
 
-`forge atmos-iab` (needs `-DICLFORGE_BUILD_ADM=ON` — the same flag `iclforge::admbridge` itself rides,
+`forge atmos-iab` (needs `-DICLFORGE_BUILD_ADM=ON` — the same flag `iclforge::adm` itself rides,
 since that is the module with a consumer for this graph) is this module's own real-world driver,
 writing E-AC-3 or, with `codec=ac4`, AC-4 objects; nothing else in this build (`forge-gui`, the other
 examples) consumes it.
@@ -56,7 +56,7 @@ examples) consumes it.
   `AuthoringToolInfo` and `UserData`. Positions (§5.4's `DistanceXY`/`DistanceZ` formulas), gains
   and spreads (§5.5) are resolved to their final linear/physical values on the way in, the same
   "plain aggregate, already-resolved" shape [`iclforge/adm/model.hpp`](adm.md) uses for ADM — see
-  [`iclforge/iab/model.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/iab/include/iclforge/iab/model.hpp)
+  [`iclforge/iab/model.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/iab/include/iclforge/iab/model.hpp)
   for the full struct-by-struct citation trail.
 - **`AudioDataDLC`** (§9.6/§10.7, Annex B) is kept as its coded bytes by the reader and decoded by
   `decode_dlc()` (`dlc.hpp`): the lattice predictor and its Rice/Golomb or direct-PCM residual,
@@ -65,7 +65,7 @@ examples) consumes it.
   with the element's `ShiftBits` applied, or normalized floats through `DlcAudio::normalized()`. A
   96 kHz element can be decoded to its base layer alone (`DlcDecodeOptions::base_layer_only`).
   `decode_audio()` returns a frame's `AudioDataPCM` and `AudioDataDLC` essence together as
-  `AudioDataPcm`, which is what `build_iab()` uses. `src/iab/ERRATA.md` records the one reading
+  `AudioDataPcm`, which is what `build_iab()` uses. `libs/iab/ERRATA.md` records the one reading
   taken where Table 10's 96 kHz Rice branch is braced differently from its 48 kHz one.
 - **The MXF wrapping** (`mxf.hpp`) — SMPTE ST 2098-2 itself has no MXF content at all; the
   wrapping is a separate, much shorter standard, **SMPTE ST 2067-201:2021** ("IMF — Immersive Audio
@@ -83,7 +83,7 @@ examples) consumes it.
   skips everything that is not a match by that KLV's own declared Length, and hands the one KLV
   whose Key matches ST 2067-201 Table 4.2's registered value straight to `parse_iabitstream`'s
   `std::istream` overload, unmodified. See
-  [`src/iab/src/mxf_reader.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/iab/src/mxf_reader.cpp)'s
+  [`libs/iab/src/mxf_reader.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/iab/src/mxf_reader.cpp)'s
   own header comment for the full clause-by-clause trail, including why Header Metadata's
   Preface/ContentStorage/Package object graph is never parsed at all (locating essence is a
   KLV-Key matter, not an object-graph one).
@@ -119,7 +119,7 @@ const auto written = iclforge::iab::write_mxf_iab("feature_iab.mxf", frames, opt
 `MxfWriteOptions` also sets the Identification strings, the ST 2067-2 Annex E items (reference image edit
 rate and audio alignment level, which default to the frame rate and -20 dBFS), whether the Channel
 SubDescriptors are written, the timestamp, and a seed for the UUIDs and package identifier so the same
-input gives the same bytes. `src/iab/ERRATA.md` records the readings the writer takes. The writer's output
+input gives the same bytes. `libs/iab/ERRATA.md` records the readings the writer takes. The writer's output
 parses in `parse_mxf_iab()`, and FFmpeg's MXF demuxer reads its partitions, Header Metadata, timecode and
 duration; FFmpeg does not know the IAB Essence Descriptor, so it reports the audio stream as unsupported.
 
@@ -213,11 +213,11 @@ encoder's own choices.
 
 ## Bridging to Atmos
 
-`iclforge::admbridge`'s `build_iab()` maps this module's parsed graph onto `iclforge::ac3::oba::AtmosEncoder`'s
-input shape — one `iclforge::oba::ObjectPath` plus one mono PCM buffer per Bed channel or Object, ready
-to drive `encode_frame()` in a loop, the same destination shape `iclforge::admbridge::build()` produces
+`iclforge::adm`'s `build_iab()` maps this module's parsed graph onto `iclforge::ac3::oba::AtmosEncoder`'s
+input shape — one `iclforge::objects::oba::ObjectPath` plus one mono PCM buffer per Bed channel or Object, ready
+to drive `encode_frame()` in a loop, the same destination shape `iclforge::adm::build()` produces
 for ADM. See [ADM → Atmos bridging](adm-bridge.md#bridging-iab) for what gets
-mapped (Table 19 → `iclforge::oba::BedLabel`, position conversion, MetaID-based cross-frame identity)
+mapped (Table 19 → `iclforge::objects::oba::BedLabel`, position conversion, MetaID-based cross-frame identity)
 and what is carried as metadata only (spread as object size, zone control as a zone constraint).
 [`examples/encode_iab.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/encode_iab.cpp)
 is the full read → bridge → encode pipeline; `forge atmos-iab` drives the identical pipeline from
@@ -225,6 +225,6 @@ the command line.
 
 ---
 
-See also: [ADM → Atmos bridging](adm-bridge.md) — `iclforge::admbridge`, which maps this graph onto
+See also: [ADM → Atmos bridging](adm-bridge.md) — `iclforge::adm`, which maps this graph onto
 `iclforge::ac3::oba::AtmosEncoder`; [ADM / BW64 reading](adm.md) — the sibling codec-blind reader this
 module's shape and documentation follow.

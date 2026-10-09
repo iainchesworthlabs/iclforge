@@ -1,6 +1,6 @@
 # Hearth window: feature coverage from the UI
 
-Every user-facing feature of `apps/hearth/ui/qml` and the
+Every user-facing feature of `apps/hearth/ui/assets/qml` and the
 `HearthController`/`NetworkController` surface it drives, mapped to the Qt
 Quick Test cases (`apps/hearth/ui/tests/qml/tst_*.qml`) that exercise it.
 Case names are `Suite::test_function` (the suite is the TestCase `name`).
@@ -14,7 +14,7 @@ Status:
 
 ## How the suites stand in for hardware
 
-- **Audio device**: `TestServices.useFakeRoom()` (`tests/test_room.cpp`) hands `HearthController` a fake room of three endpoints ("Test speakers" 6 ch default, "Test headphones" 2 ch, "Test receiver" 8 ch with AC-3/E-AC-3 passthrough) through `HearthController::set_test_outputs()` - a seam of the same shape as `CrucibleController::set_test_services()`. The REAL engine decodes real golden streams (`tests/golden/external-baseline/...`, `esp-idf/.../objects-mdct.ec3`) into it, and the AC-4 page's suite plays tones that `TestServices.writeAc4Stream()` encodes with `iclforge::ac4::Encoder`; the fake device has its own clock and records frames heard, peak level, the endpoint opened and how many times. So "it plays" is asserted on what the device received.
+- **Audio device**: `TestServices.useFakeRoom()` (`tests/test_room.cpp`) hands `HearthController` a fake room of three endpoints ("Test speakers" 6 ch default, "Test headphones" 2 ch, "Test receiver" 8 ch with AC-3/E-AC-3 passthrough) through `HearthController::set_test_outputs()` - a seam of the same shape as `CrucibleController::set_test_services()`. The REAL engine decodes real golden streams (`testdata/external-baseline/...`, `firmware/hearth-sink/www/objects-mdct.ec3`) into it, and the AC-4 page's suite plays tones that `TestServices.writeAc4Stream()` encodes with `iclforge::ac4::Encoder`; the fake device has its own clock and records frames heard, peak level, the endpoint opened and how many times. So "it plays" is asserted on what the device received.
 - **Network sink**: `TestServices.startTestSink()` runs `apps/hearth/testsink`'s real `Sink` in-process on loopback and hands it to `NetworkController`'s own `NetworkSinks` as a found service (`NetworkController::sinks_for_test()` + `NetworkSinks::on_found()`), which is the one step mDNS multicast would otherwise do. After that it is real: WebSocket dial, pairing with the code the sink prints, groups, player commands.
 - **File dialogs**: under `-platform offscreen`, QtQuick.Dialogs shows its non-native dialog. The suites click the page's own button, which opens it, and then `accept()` it. The file is set as the dialog's selection before it opens, because the non-native dialog drops a selection made after it has opened.
 - **Drag and drop**: `TestServices.dropFiles()` sends real DragEnter/DragMove/Drop events that carry file URLs to the window, so the page's own DropArea receives them.
@@ -128,9 +128,9 @@ Status:
 | 102 | Media | AC-4 item: Stream, Presentations and Metadata cards, and it plays | none | UI | MediaPage::test_ac4ItemIsDescribedAndPlays |
 | 103 | Play | Signal-path hint when a sink is paired but no group is chosen as the output (with or without a group existing yet) | none | UI | NetworkPairing::test_playPageHintsAboutAPairedSinkNotInThePlayingGroup |
 | 104 | Network | Post-pairing group prompt: create a group (named after the sink) or add to an existing one, gone once the sink is actually a member, "Not now" dismisses it | none | UI | NetworkPairing::test_networkPageOffersToGroupAJustPairedSink |
-| 105 | Decoder | AC-4 Immersive and objects card: Layout (As coded, 5.1, 5.1.2, 5.1.4, 7.1, 7.1.2, 7.1.4) and Core decoding | none | none | No QML case drives the card. The settings reach the decoder in `[hearth][decoder-settings]` (`tests/hearth/test_decoder_settings.cpp`) and the layout fold in `[hearth][ac4]` (`tests/hearth/test_ac4_engine.cpp`), and neither goes through the page. `HearthController`'s map round-trip case does not carry these two keys, and its name mapping has none for the 5.1 segment |
+| 105 | Decoder | AC-4 Immersive and objects card: Layout (As coded, 5.1, 5.1.2, 5.1.4, 7.1, 7.1.2, 7.1.4) and Core decoding | none | none | No QML case drives the card. The settings reach the decoder in `[hearth][decoder-settings]` (`apps/hearth/engine/tests/test_decoder_settings.cpp`) and the layout fold in `[hearth][ac4]` (`apps/hearth/engine/tests/test_ac4_engine.cpp`), and neither goes through the page. `HearthController`'s map round-trip case does not carry these two keys, and its name mapping has none for the 5.1 segment |
 | 106 | Settings | Diagnostics "View live…" dialog (the report, refreshed every 500 ms while open) | none | none | Not opened by any case. The report it shows is the one the Copy case reads back |
-| 107 | Settings | Diagnostics HTTP endpoint (`ICLFORGE_HEARTH_DIAGNOSTICS_PORT`) | none | none | Not a window feature, so no QML case. `DiagnosticsHttpServer` is tested over a real loopback socket by `tests/hearth/test_diagnostics_server.cpp` (`[hearth][diagnostics]`, in `iclforge_tests_diagnostics_server`); the controller reading the variable is not tested |
+| 107 | Settings | Diagnostics HTTP endpoint (`ICLFORGE_HEARTH_DIAGNOSTICS_PORT`) | none | none | Not a window feature, so no QML case. `DiagnosticsHttpServer` is tested over a real loopback socket by `apps/hearth/engine/tests/test_diagnostics_server.cpp` (`[hearth][diagnostics]`, in `iclforge_tests_diagnostics_server`); the controller reading the variable is not tested |
 
 ### Totals
 
@@ -168,7 +168,7 @@ Gaps that remain inside covered rows:
 - The group volume slider and each member's mute checkbox are not driven. Only a member's volume slider is (row 77).
 - A stream whose object metadata is not read makes row 20's case skip, and no case plays an AC-4 item with objects through the window.
 - The Only-on-sink panel is rendered but its text is not read.
-- The Firmware tab's Update, Roll back and Restart are not driven: the test sink serves no firmware routes. The client behind them (`apps/hearth/engine/sink_firmware.hpp`) is tested in `iclforge-tests` against a stand-in board on loopback (`[sink-firmware]`), and against a real board by the hidden live case in `tests/hearth/test_sink_firmware_board.cpp`.
+- The Firmware tab's Update, Roll back and Restart are not driven: the test sink serves no firmware routes. The client behind them (`apps/hearth/engine/src/sink_firmware.hpp`) is tested in `iclforge-hearth-tests` against a stand-in board on loopback (`[sink-firmware]`), and against a real board by the hidden live case in `apps/hearth/engine/tests/test_sink_firmware_board.cpp`.
 
 ## UI bugs found (fixed)
 
@@ -178,7 +178,7 @@ Each was first shown failing on the unfixed code, then fixed.
    - Cause: `Network.qml`'s `Loader.sourceComponent` read members off a local (`const group = NetworkController.selectedGroup; if (group && group.id ...)`). qmlcachegen compiled that as a value-type lookup on QVariant, passing `QMetaType::fromName("QVariant").metaObject()` (null) to `AOTCompiledContext::initGetValueLookup()`, which dereferenced it.
    - Fix: the binding reads `NetworkController.selectedGroup.id`, `.selectedSink.id` and `.selectedSink.badge` straight off the singleton. The generated `Network_qml.cpp` now has no QVariant value lookups. The behaviour is unchanged, because an empty map's `.id` is undefined. A comment at the binding says why it must not be "simplified" back.
    - Check: `QT_QPA_PLATFORM=offscreen build/gui-cov/bin/hearth` under `timeout 5` now exits 124 (still running); before the fix it exited 139.
-   - The `QML_DISABLE_DISK_CACHE=1` workaround is gone from `tests/CMakeLists.txt`, so every suite runs the compiled QML.
+   - The `QML_DISABLE_DISK_CACHE=1` workaround is gone from `apps/hearth/ui/tests/CMakeLists.txt`, so every suite runs the compiled QML.
    - Regression: `NetworkPageAot::test_networkPageBuildsWithNothingSelected` and `test_networkPageBuildsWithAGroupSelected` (unskipped; both segfaulted before the fix, as did `shell`).
 2. **Speakers "Clear" did nothing while a device was open.**
    - Cause: `HearthController::clearRouting()` posted a patch sized for zero outputs, which `PcmOutput::set_routing()` refuses.
@@ -213,7 +213,7 @@ present fifteenth suite, and have not been measured again:
 | `apps/hearth/engine` | 835 / 5184 lines, 16.1% (4 original suites) | 3105 / 5184 lines, 59.9% (14 suites) |
 
 - `apps/hearth/ui/*.cpp` (the controllers) is not instrumented in this tree, because `iclforge::coverage` is not applied to the Qt app or test targets. So the controllers have no gcov figure.
-- `/opt/gui-cov.sh` searches the whole repository for `.gcda` files, including other build trees. Its figure for `apps/hearth` (80%+) mostly comes from `iclforge-tests` runs elsewhere. To count only these suites, add `build/gui-cov/apps/hearth` as gcovr's search path.
+- `/opt/gui-cov.sh` searches the whole repository for `.gcda` files, including other build trees. Its figure for `apps/hearth` (80%+) mostly comes from `iclforge-hearth-tests` runs elsewhere. To count only these suites, add `build/gui-cov/apps/hearth` as gcovr's search path.
 
 ## Running
 

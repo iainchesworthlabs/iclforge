@@ -41,11 +41,11 @@ class PlatformOnlyChangeTest(unittest.TestCase):
     """The reason this classifier exists: a platform-only PR skips the rest."""
 
     def test_android_only_change_lights_only_android(self):
-        hits = gate.classify(["apps/android/app/build.gradle.kts"])
+        hits = gate.classify(["apps/demos/android/app/build.gradle.kts"])
         self.assertEqual(lit(hits, *ALL_LANES), {"android"})
 
     def test_esp_only_change_lights_only_esp(self):
-        hits = gate.classify(["esp-idf/iclforge/CMakeLists.txt"])
+        hits = gate.classify(["firmware/esp-idf/iclforge/CMakeLists.txt"])
         self.assertEqual(lit(hits, *ALL_LANES), {"esp"})
 
     def test_esp_component_packaging_script_lights_only_esp(self):
@@ -61,36 +61,36 @@ class PlatformOnlyChangeTest(unittest.TestCase):
         self.assertEqual(lit(hits, *ALL_LANES), {"python"})
 
     def test_rust_only_change_lights_only_rust(self):
-        hits = gate.classify(["rust/iclforge/src/lib.rs"])
+        hits = gate.classify(["bindings/rust/iclforge/src/lib.rs"])
         self.assertEqual(lit(hits, *ALL_LANES), {"rust"})
 
     def test_windows_driver_change_does_not_light_other_platforms(self):
-        hits = gate.classify(["apps/windows/driver/ac3sink.inf"])
+        hits = gate.classify(["apps/crucible/windows/driver/ac3sink.inf"])
         self.assertEqual(lit(hits, *ALL_LANES), {"windows"})
         self.assertFalse(hits["core"])
 
 
 class SharedDesktopAppTest(unittest.TestCase):
-    """apps/cli, apps/gui, apps/common, apps/crucible, apps/hearth: one program on three OSes."""
+    """The forge programs, apps/shared, apps/crucible and apps/hearth: one program on three OSes."""
 
     def test_shared_cli_change_lights_all_three_desktop_platforms_only(self):
-        hits = gate.classify(["apps/cli/commands/audio_io.cpp"])
+        hits = gate.classify(["apps/forge/cli/src/commands/audio_io.cpp"])
         self.assertEqual(lit(hits, *ALL_LANES), {"windows", "linux", "macos"})
 
     def test_crucible_change_lights_all_three_desktop_platforms_only(self):
-        hits = gate.classify(["apps/crucible/engine/engine.cpp"])
+        hits = gate.classify(["apps/crucible/engine/src/engine.cpp"])
         self.assertEqual(lit(hits, *ALL_LANES), {"windows", "linux", "macos"})
 
     def test_hearth_change_lights_all_three_desktop_platforms_only(self):
-        hits = gate.classify(["apps/hearth/engine/player.cpp"])
+        hits = gate.classify(["apps/hearth/engine/src/player.cpp"])
         self.assertEqual(lit(hits, *ALL_LANES), {"windows", "linux", "macos"})
 
 
 class CoreFanoutTest(unittest.TestCase):
     """A library change has to be validated everywhere it is built."""
 
-    def test_src_change_fans_out_to_every_platform_and_language_lane(self):
-        hits = gate.classify(["src/coder/eac3_encoder.cpp"])
+    def test_libs_change_fans_out_to_every_platform_and_language_lane(self):
+        hits = gate.classify(["libs/ac4/src/encoder/encoder.cpp"])
         self.assertEqual(
             lit(hits, *ALL_LANES),
             {"core", "windows", "linux", "macos", "android", "wasm", "esp", "rust", "python"},
@@ -100,7 +100,7 @@ class CoreFanoutTest(unittest.TestCase):
 
     def test_root_cmakelists_counts_as_core_but_a_nested_one_does_not(self):
         self.assertTrue(gate.classify(["CMakeLists.txt"])["core"])
-        hits = gate.classify(["apps/wasm/CMakeLists.txt"])
+        hits = gate.classify(["apps/demos/wasm/CMakeLists.txt"])
         self.assertFalse(hits["core"])
         self.assertEqual(lit(hits, *ALL_LANES), {"wasm"})
 
@@ -127,11 +127,11 @@ class ConservativeDefaultTest(unittest.TestCase):
         # A mostly-recognisable PR with one path this script has no rule for
         # must not fall back to "only what matched" - the unmapped path is
         # exactly the case the fallback exists for.
-        hits = gate.classify(["apps/android/app/build.gradle.kts", "planning/notes.txt"])
+        hits = gate.classify(["apps/demos/android/app/build.gradle.kts", "planning/notes.txt"])
         self.assertEqual(hits, dict.fromkeys(gate.LANES, True))
 
     def test_force_all_ignores_the_path_list_entirely(self):
-        hits = gate.classify(["apps/android/app/build.gradle.kts"], force_all=True)
+        hits = gate.classify(["apps/demos/android/app/build.gradle.kts"], force_all=True)
         self.assertEqual(hits, dict.fromkeys(gate.LANES, True))
 
     def test_ci_self_change_lights_every_lane(self):
@@ -160,10 +160,10 @@ class DocsOnlyChangeTest(unittest.TestCase):
 
 
 class NpmAndWasmSplitTest(unittest.TestCase):
-    """js/ backs both the wasm E2E demo and the npm package's own tests."""
+    """bindings/js/ backs both the wasm E2E demo and the npm package's own tests."""
 
     def test_js_change_lights_both_npm_and_wasm_but_nothing_else(self):
-        hits = gate.classify(["js/src/index.ts"])
+        hits = gate.classify(["bindings/js/src/index.ts"])
         self.assertEqual(lit(hits, *ALL_LANES), {"npm", "wasm"})
 
 
@@ -174,30 +174,38 @@ class SatellitesDirectTest(unittest.TestCase):
         return gate.classify(list(paths), satellites_direct=True)
 
     def test_a_core_change_reaches_the_platforms_and_no_satellite(self):
-        hits = self.classify("src/coder/eac3_encoder.cpp")
+        hits = self.classify("libs/ac4/src/encoder/encoder.cpp")
         self.assertEqual(lit(hits, *ALL_LANES), {"core", "windows", "linux", "macos"})
 
     def test_the_nightly_still_fans_a_core_change_out_to_every_satellite(self):
-        hits = gate.classify(["src/coder/eac3_encoder.cpp"])
+        hits = gate.classify(["libs/ac4/src/encoder/encoder.cpp"])
         self.assertTrue(all(hits[lane] for lane in gate.SATELLITES if lane != "npm"))
 
     def test_a_satellites_own_tree_still_lights_it(self):
         for path, lane in (
-            ("apps/android/app/build.gradle.kts", "android"),
-            ("esp-idf/iclforge/CMakeLists.txt", "esp"),
-            ("rust/iclforge/src/lib.rs", "rust"),
-            ("python/iclforge/__init__.py", "python"),
-            ("apps/wasm/src/main.cpp", "wasm"),
+            ("apps/demos/android/app/build.gradle.kts", "android"),
+            ("firmware/esp-idf/iclforge/CMakeLists.txt", "esp"),
+            ("firmware/hearth-sink/main/hearth_sink.cpp", "esp"),
+            ("bindings/rust/iclforge/src/lib.rs", "rust"),
+            ("bindings/python/src/iclforge/__init__.py", "python"),
+            ("apps/demos/wasm/src/main.cpp", "wasm"),
         ):
             with self.subTest(path=path):
                 self.assertEqual(lit(self.classify(path), *ALL_LANES), {lane})
 
+    def test_the_golden_data_is_core_s_and_a_known_tree(self):
+        # testdata/ was tests/golden: a top-level directory the classifier does not know lights
+        # every lane.
+        hits = self.classify("testdata/audio/reference_51.wav")
+        self.assertTrue(hits["core"])
+        self.assertFalse(hits["docs"] or hits["ci_self"] or hits["npm"])
+
     def test_a_core_change_and_a_satellite_change_together_light_both(self):
-        hits = self.classify("src/coder/x.cpp", "rust/iclforge/src/lib.rs")
+        hits = self.classify("libs/ac4/src/x.cpp", "bindings/rust/iclforge/src/lib.rs")
         self.assertEqual(lit(hits, *ALL_LANES), {"core", "windows", "linux", "macos", "rust"})
 
     def test_a_path_only_a_platform_owns_is_unchanged(self):
-        hits = self.classify("apps/cli/commands/audio_io.cpp")
+        hits = self.classify("apps/forge/cli/src/commands/audio_io.cpp")
         self.assertEqual(lit(hits, *ALL_LANES), {"windows", "linux", "macos"})
 
     def test_the_conservative_cases_still_light_everything(self):
@@ -216,9 +224,9 @@ class SatellitesDirectTest(unittest.TestCase):
 
     def test_the_trees_the_esp_component_ships_light_the_esp_lane_too(self):
         for path in (
-            "src/ac3/coder/eac3_encoder.cpp",
-            "src/base/detail/cpu_features.cpp",
-            "src/arithmetic/fixed32.hpp",
+            "libs/ac3/src/encoder/eac3_encoder.cpp",
+            "libs/base/src/cpu_features.cpp",
+            "libs/base/internal/iclforge/base/arithmetic/fixed32.hpp",
             "cmake/Compiler.cmake",
             "CMakeLists.txt",
         ):
@@ -228,8 +236,33 @@ class SatellitesDirectTest(unittest.TestCase):
                 self.assertEqual(lit(hits, *gate.SATELLITES), {"esp"})
                 self.assertTrue(hits["core"])
 
+    def test_a_librarys_own_tests_and_fuzz_do_not_light_the_esp_lane(self):
+        # libs/<lib>/tests and libs/<lib>/fuzz were tests/<lib> and fuzz/: core's, never the
+        # component's.
+        for path in (
+            "libs/ac3/tests/core/test_bitalloc.cpp",
+            "libs/base/tests/test_bits.cpp",
+            "libs/ac3/fuzz/fuzz_scan.cpp",
+            "libs/ac3/fuzz/seeds/fuzz_scan/x.bin",
+        ):
+            with self.subTest(path=path):
+                hits = self.classify(path)
+                self.assertFalse(hits["esp"])
+                self.assertTrue(hits["core"])
+
+    def test_vendored_code_and_its_pages_are_core_s(self):
+        # external/ holds what src/sendspin/third_party held, and src/ made a page there core's too.
+        hits = self.classify("external/time-filter/sendspin_time_filter.cpp")
+        self.assertEqual(lit(hits, *ALL_LANES), {"core", "windows", "linux", "macos"})
+        hits = self.classify("external/time-filter/README.md")
+        self.assertEqual(lit(hits, *ALL_LANES), {"core", "windows", "linux", "macos", "docs"})
+
+    def test_the_fuzz_scripts_are_core_s(self):
+        hits = self.classify("tools/fuzz/run.sh")
+        self.assertEqual(lit(hits, *ALL_LANES), {"core", "windows", "linux", "macos"})
+
     def test_the_ac4_trees_leave_the_esp_lane_to_the_nightly_run(self):
-        hits = self.classify("src/ac4dec/src/decoder.cpp")
+        hits = self.classify("libs/ac4/src/decoder/decoder.cpp")
         self.assertEqual(lit(hits, *ALL_LANES), {"core", "windows", "linux", "macos"})
 
     def test_a_root_file_the_component_does_not_ship_does_not_light_it(self):
@@ -275,6 +308,52 @@ class EspComponentStagingTest(unittest.TestCase):
                 self.assertTrue(gate.classify([name], satellites_direct=True)["esp"])
 
 
+class ProjectTableTest(unittest.TestCase):
+    """The lanes come from the rows of tools/checks/projects.json (planning/monorepo.md, C7-6)."""
+
+    def test_the_lanes_are_the_tables_and_the_two_that_gate_nothing(self):
+        self.assertEqual(gate.LANES, (*gate.TABLE.lanes, "ci_self", "docs"))
+
+    def test_a_projects_tree_lights_the_lanes_of_its_row(self):
+        for project in gate.TABLE.projects.values():
+            for lane in project.lanes:
+                with self.subTest(project=project.name, lane=lane):
+                    self.assertIn(project.path + "/", gate.LANE_PREFIXES[lane])
+
+    def test_what_a_project_ships_lights_its_lanes_too(self):
+        esp = gate.TABLE.projects["esp-idf"]
+        for name in esp.ships:
+            with self.subTest(library=name):
+                self.assertIn(gate.TABLE.projects[name].path + "/", gate.LANE_PREFIXES["esp"])
+
+    def test_examples_are_core_s_and_not_an_unknown_tree(self):
+        hits = gate.classify(["examples/mux_mp4.cpp"])
+        self.assertEqual(
+            lit(hits, *ALL_LANES),
+            {"core", "windows", "linux", "macos", "android", "wasm", "esp", "rust", "python"},
+        )
+        direct = gate.classify(["examples/mux_mp4.cpp"], satellites_direct=True)
+        self.assertEqual(lit(direct, *ALL_LANES), {"core", "windows", "linux", "macos"})
+
+    def test_a_header_an_excused_edge_reaches_lights_the_projects_that_include_it(self):
+        # ac4's object-render test compiles the media code's renderer in (the table's one exception,
+        # with its file): a change to the renderer lights ac4 as well as the programs.
+        reached = "apps/shared/media/src/ac4_object_render.hpp"
+        direct = gate.classify([reached], satellites_direct=True)
+        self.assertEqual(lit(direct, *ALL_LANES), {"core", "windows", "linux", "macos"})
+
+    def test_a_header_of_the_device_library_lights_what_uses_it(self):
+        # The ESP component and the Hearth sink (esp), Hearth's engine (the desktop lanes) and the
+        # library's own tests (core).
+        header = "libs/device/include/iclforge/block_ring.hpp"
+        direct = gate.classify([header], satellites_direct=True)
+        self.assertEqual(lit(direct, *ALL_LANES), {"esp", "core", "windows", "linux", "macos"})
+
+    def test_a_header_no_excused_edge_reaches_lights_the_component_only(self):
+        other = "firmware/esp-idf/iclforge/include/iclforge/access_units.hpp"
+        self.assertEqual(lit(gate.classify([other]), *ALL_LANES), {"esp"})
+
+
 class MainTest(unittest.TestCase):
     """main() reads paths from stdin and writes lane=true|false lines that the
     workflow feeds to $GITHUB_OUTPUT."""
@@ -294,13 +373,13 @@ class MainTest(unittest.TestCase):
         self.assertTrue(all(v == "true" for v in lanes.values()))
 
     def test_stdin_paths_are_classified(self):
-        rc, lanes = self.run_main(["x"], stdin="apps/android/app/build.gradle.kts\n\n")
+        rc, lanes = self.run_main(["x"], stdin="apps/demos/android/app/build.gradle.kts\n\n")
         self.assertEqual(rc, 0)
         self.assertEqual(lanes["android"], "true")
         self.assertIn("false", lanes.values())
 
     def test_satellites_direct_flag_holds_the_fanout_back(self):
-        _, lanes = self.run_main(["x", "--satellites-direct"], stdin="src/coder/x.cpp\n")
+        _, lanes = self.run_main(["x", "--satellites-direct"], stdin="libs/ac4/src/x.cpp\n")
         self.assertEqual((lanes["core"], lanes["linux"]), ("true", "true"))
         self.assertEqual(
             {lanes[s] for s in ("android", "wasm", "esp", "rust", "python", "npm")}, {"false"}

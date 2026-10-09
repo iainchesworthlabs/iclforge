@@ -33,13 +33,13 @@ TestCase {
     function initTestCase() {
         verify(TestServices.useFakeRoom(), "the fake device room could not be installed");
         HearthController.start();
-        shortAc3 = TestServices.stageFixture(repo + "tests/golden/external-baseline/ac3-51-448/dee.ac3",
+        shortAc3 = TestServices.stageFixture(repo + "testdata/external-baseline/ac3-51-448/dee.ac3",
                                              "Short 5.1.ac3");
-        longEac3 = TestServices.stageFixture(repo + "tests/golden/external-baseline/eac3-music-stereo-96/dee.ec3",
+        longEac3 = TestServices.stageFixture(repo + "testdata/external-baseline/eac3-music-stereo-96/dee.ec3",
                                              "Long stereo.ec3");
-        objectsEac3 = TestServices.stageFixture(repo + "esp-idf/iclforge/examples/hearth_sink/www/objects-mdct.ec3",
+        objectsEac3 = TestServices.stageFixture(repo + "firmware/hearth-sink/www/objects-mdct.ec3",
                                                 "Objects.ec3");
-        filmAc4 = TestServices.stageFixture(repo + "tests/golden/external-baseline/ac4-51-drc-ltrt-192/dee.ac4",
+        filmAc4 = TestServices.stageFixture(repo + "testdata/external-baseline/ac4-51-drc-ltrt-192/dee.ac4",
                                             "Film 5.1.ac4");
         verify(shortAc3.length > 0 && longEac3.length > 0 && objectsEac3.length > 0 && filmAc4.length > 0,
                "fixtures were not staged");

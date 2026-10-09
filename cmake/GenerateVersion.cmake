@@ -11,7 +11,7 @@
 #   ICLFORGE_VERSION       - the semver string, e.g. "0.2.0" (see GitVersionDerivation.cmake)
 #   ICLFORGE_VERSION_FULL  - the same, plus any prerelease suffix, e.g. "0.2.0-beta.1"
 #   ICLFORGE_BUILD_TARGET  - "<OS> <arch> (<compiler> <version>)", computed by
-#                            src/ac3/CMakeLists.txt from CMAKE_SYSTEM_NAME/
+#                            libs/ac3/CMakeLists.txt from CMAKE_SYSTEM_NAME/
 #                            CMAKE_SYSTEM_PROCESSOR/CMAKE_CXX_COMPILER_ID,
 #                            which this script (run standalone via `cmake -P`
 #                            for the build-time restamp) has no access to.

@@ -1,10 +1,10 @@
 # ---------------------------------------------------------------------------
-# hearth_qmltests - Qt Quick Test coverage for the Hearth window (ui/qml),
+# hearth_qmltests - Qt Quick Test coverage for the Hearth window (ui/assets/qml),
 # driving the real HearthController the way crucible_qmltests drives the
 # real CrucibleController and forge_gui_qmltests drives the real
 # EncoderController (apps/crucible/ui/tests/CMakeLists.txt's own header,
 # whose reasoning this file follows and does not repeat) - closer template
-# than apps/gui/tests/CMakeLists.txt since Hearth, like Crucible, keeps its
+# than apps/forge/gui/tests/qml.cmake since Hearth, like Crucible, keeps its
 # window under its own ui/ subdirectory rather than inline in the app's
 # top-level CMakeLists.txt. apps/hearth/ui/CMakeLists.txt's own comment, next
 # to the windeployqt chain (search "A5's exit"), has anticipated this file's
@@ -19,18 +19,18 @@
 #
 # Unlike crucible_qmltests, this target carries no tray, no icon provider
 # and no per-platform sources: apps/hearth/ui/CMakeLists.txt's own qt_add_executable(hearth ...)
-# lists only main.cpp, hearth_controller.cpp/.hpp, item_loader.cpp/.hpp,
-# network_controller.cpp/.hpp and apps/common/container_input.cpp/.hpp - this
-# target embeds the same controller/loader sources (main.cpp is excluded: it
+# lists only src/main.cpp, hearth_controller.cpp/.hpp, item_loader.cpp/.hpp,
+# network_controller.cpp/.hpp and apps/shared/media/src/container_input.cpp/.hpp - this
+# target embeds the same controller/loader sources (src/main.cpp is excluded: it
 # is hearth's own entry point, and qml_test_main.cpp is this target's).
 # network_controller.cpp/.hpp are included from tst_network_sink_settings.qml
 # onwards (issue #875): NetworkController is a second QML_SINGLETON, and
 # without its own sources here QML fails at runtime with "NetworkController
 # is not defined" rather than at configure or compile time - moc/qmltyperegistrar
 # only register a QML_ELEMENT class that is actually part of the target it runs
-# against. apps/gui/language_manager.cpp/.hpp is the third, for the same
+# against. apps/shared/preferences/src/language_manager.cpp/.hpp is the third, for the same
 # reason: Settings.qml imports HearthLanguage, whose LanguageManager
-# main.cpp registers as a singleton instance.
+# src/main.cpp registers as a singleton instance.
 # ---------------------------------------------------------------------------
 find_package(Qt6 6.8 REQUIRED COMPONENTS QuickTest Test)
 
@@ -43,20 +43,20 @@ qt_add_executable(hearth_qmltests
     # reason test_room.hpp gives.
     tests/test_room.cpp
     tests/test_room.hpp
-    test_outputs.hpp
-    hearth_controller.cpp
-    hearth_controller.hpp
-    item_loader.cpp
-    item_loader.hpp
-    network_controller.cpp
-    network_controller.hpp
+    src/test_outputs.hpp
+    src/hearth_controller.cpp
+    src/hearth_controller.hpp
+    src/item_loader.cpp
+    src/item_loader.hpp
+    src/network_controller.cpp
+    src/network_controller.hpp
     # Settings.qml imports HearthLanguage now, so the suite needs the
     # same LanguageManager hearth itself compiles in - a third singleton,
     # registered the same way and failing the same way without its sources.
-    "${PROJECT_SOURCE_DIR}/apps/gui/language_manager.cpp"
-    "${PROJECT_SOURCE_DIR}/apps/gui/language_manager.hpp"
-    "${PROJECT_SOURCE_DIR}/apps/common/container_input.cpp"
-    "${PROJECT_SOURCE_DIR}/apps/common/container_input.hpp")
+    "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/language_manager.cpp"
+    "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/language_manager.hpp"
+    "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.cpp"
+    "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.hpp")
 
 qt_add_qml_module(hearth_qmltests
     URI Hearth
@@ -68,7 +68,7 @@ qt_add_qml_module(hearth_qmltests
     QML_FILES ${ICLFORGE_HEARTH_QML_FILES})
 
 # Forces this target's own POST_BUILD windeployqt step (below) to run only
-# after hearth's has finished - apps/gui/tests/CMakeLists.txt's own
+# after hearth's has finished - apps/forge/gui/tests/qml.cmake's own
 # add_dependencies(forge_gui_qmltests forge-gui) comment explains why: two
 # windeployqt passes racing to write the same shared bin/ fails with "Cannot
 # create a file when that file already exists" on a real "build everything"
@@ -76,27 +76,27 @@ qt_add_qml_module(hearth_qmltests
 add_dependencies(hearth_qmltests hearth)
 
 target_include_directories(hearth_qmltests PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}"
-    "${CMAKE_SOURCE_DIR}/apps/gui"
-    "${CMAKE_SOURCE_DIR}/apps/common")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/apps/shared/preferences/src"
+    "${CMAKE_SOURCE_DIR}/apps/shared/media/src")
 target_compile_definitions(hearth_qmltests PRIVATE
     QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/qml")
 target_link_libraries(hearth_qmltests PRIVATE
     hearth_engine
     # apps/hearth/testsink's library, for TestServices.startTestSink() - the
-    # same in-process Sink tests/hearth/test_testsink.cpp pairs over loopback.
+    # same in-process Sink apps/hearth/engine/tests/test_testsink.cpp pairs over loopback.
     hearth_testsink
     # The AC-4 encoder, for TestServices.writeAc4Stream(): the AC-4 decoder
     # page's suite plays tones it writes (planning/ac4.md, I2).
-    iclforge::ac4enc
-    iclforge::matroska iclforge::mp4 iclforge::mpegts
+    iclforge::ac4
+    iclforge::containers
     iclforge::warnings iclforge::fmt
     Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::QuickTest
     # QTest::keyClick() on a QWindow, for TestServices.keyClick() (see
     # qml_test_main.cpp).
     Qt6::Test)
 
-# Same rationale as apps/gui/tests/CMakeLists.txt's identical loop: Qt's
+# Same rationale as apps/forge/gui/tests/qml.cmake's identical loop: Qt's
 # generated moc/rcc/qmlcachegen output for THIS target compiles under the
 # strict warning set unless excluded, and qmlcachegen is known to emit at
 # least one warning clang-cl/GCC's -Wconversion rejects.
@@ -129,7 +129,7 @@ if(WIN32)
     if(ICLFORGE_HEARTH_QMLTEST_WINDEPLOYQT)
         add_custom_command(TARGET hearth_qmltests POST_BUILD
             COMMAND "${ICLFORGE_HEARTH_QMLTEST_WINDEPLOYQT}"
-                --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/qml"
+                --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml"
                 --qmldir "${ICLFORGE_HEARTH_SHARED_DIR}"
                 --no-compiler-runtime
                 "$<TARGET_FILE:hearth_qmltests>"
@@ -144,7 +144,7 @@ if(WIN32)
 endif()
 
 # One ctest entry per tst_*.qml suite, each its own process and its own fresh
-# HearthController singleton - apps/gui/tests/CMakeLists.txt's own comment on
+# HearthController singleton - apps/forge/gui/tests/qml.cmake's own comment on
 # why (failure isolation, tighter per-suite isolation than one shared
 # process) applies unchanged. QT_QPA_PLATFORM=offscreen and
 # QT_FORCE_STDERR_LOGGING=1 for the reasons both existing suites give:

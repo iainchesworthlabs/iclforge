@@ -4,7 +4,7 @@
 # (docs/ci-lanes.md). Moved out of ci.yml so `run_core`/the `core` lane
 # finally gates something: none of these jobs test anything platform-specific
 # (see each one's own header, carried over unchanged below), so a PR confined
-# to a single platform lane (`apps/android/`, `apps/windows/driver/`, ...)
+# to a single platform lane (`apps/demos/android/`, `apps/crucible/windows/driver/`, ...)
 # no longer pays for any of them.
 #
 # The performance and memory comparisons and their gates used to be here, on
@@ -80,13 +80,13 @@ permissions:
   contents: read
 
 jobs:
-  # iclforge-tests coverage over every library component: src/ac3 plus audio,
+  # iclforge-tests coverage over every library component: libs/ac3 plus audio,
   # signing, matroska, mp4, mpegts, capi, and - via the coverage preset's
   # ICLFORGE_BUILD_ADM=ON with vcpkg's 'adm' feature, the same pair
-  # adm-validate passes by hand - iclforge::adm/admbridge. Originally src/ac3 only
+  # adm-validate passes by hand - iclforge::adm/admbridge. Originally libs/ac3 only
   # ("the library is what was asked for"); extended once the rest of the
   # library surface existed and was already being EXERCISED by this same
-  # suite, just uninstrumented and unreported. apps/cli and apps/gui stay out
+  # suite, just uninstrumented and unreported. apps/forge/cli/src and apps/forge/gui stay out
   # of scope: they are applications, not the library, and the coverage
   # preset builds neither.
   #
@@ -101,7 +101,7 @@ jobs:
   # The gate is PER COMPONENT - a line floor and a branch floor per
   # src/<dir>, not one blended number a small component's regression could
   # hide inside - and lives in tools/checks/coverage_report.sh alongside the
-  # measured baseline each floor was calibrated against. src/ac3's original
+  # measured baseline each floor was calibrated against. libs/ac3's original
   # 80/70 floor (set a few points under its first hosted run's 81.3/72.0,
   # measured 2026-08-09 while block switching, delta bit allocation, half
   # sample rate and dual mono were still landing) is now 88/78: the suite
@@ -203,7 +203,7 @@ jobs:
       # mdct.cpp suspicious-hits gcov-bug workaround this step used to carry
       # inline moved there with the rest of the gcovr flags.
       #
-      # The gate covers apps/cli as well as the nine library components since
+      # The gate covers apps/forge/cli/src as well as the nine library components since
       # coverage floors - which is why config-linux-gcc-coverage now builds the
       # CLI, and why the Test step above takes longer than it used to. That
       # table also prints a per-command breakdown below the gate, so a
@@ -212,14 +212,14 @@ jobs:
         shell: bash
         run: bash tools/checks/coverage_report.sh -g gcov-16
 
-      # apps/gui is the one first-party tree with no coverage number at all,
+      # apps/forge/gui is the one first-party tree with no coverage number at all,
       # and deliberately so (coverage floors called it out as a separate
       # decision): instrumenting its C++ needs a Qt kit on THIS job, and no
       # Linux leg installs one - _build.yml puts Qt only on its `gui: true`
       # matrix entries, which are plain builds. Adding it means either putting
       # Qt on this container or standing up a second instrumented leg, both of
       # which cost real runner time for a tree whose interactive surfaces are
-      # already covered by apps/gui/tests' own Qt Quick suite and whose one
+      # already covered by apps/forge/gui/tests' own Qt Quick suite and whose one
       # Qt-free class (RecordingSink) is already in iclforge-tests. See
       # tools/checks/coverage_report.sh's header for the same note beside the
       # threshold table.
@@ -263,15 +263,15 @@ jobs:
         env:
           STATUS: ${{ job.status }}
         run: echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-  # iclforge::adm (src/adm) is opt-in - ICLFORGE_BUILD_ADM defaults OFF, unlike every other
-  # library component (see the root CMakeLists.txt's own option() and src/adm/CMakeLists.txt's
+  # iclforge::adm (libs/adm) is opt-in - ICLFORGE_BUILD_ADM defaults OFF, unlike every other
+  # library component (see the root CMakeLists.txt's own option() and libs/adm/CMakeLists.txt's
   # header comment for why: libadm needs Boost header libraries, a third-party dependency that
   # only -DVCPKG_MANIFEST_FEATURES=adm resolves). No leg in
   # build-and-test's matrix (_build.yml) ever passes -DICLFORGE_BUILD_ADM=ON; besides this job,
   # the only other build with it on is the coverage job's instrumented Debug preset, which turns
   # the CLI and examples OFF - so without this job, ADM BWF reader phase 3's CLI command and example
   # (see below) would still have zero CI builds, and a change to the module or to its vendored
-  # libbw64/libadm pins (src/adm/CMakeLists.txt's GIT_TAG values) would never be exercised at
+  # libbw64/libadm pins (libs/adm/CMakeLists.txt's GIT_TAG values) would never be exercised at
   # -O2 or under the full default configuration anybody actually installs.
   #
   # A dedicated job rather than an extra pass inside an existing Linux leg (the shape
@@ -292,14 +292,14 @@ jobs:
   #
   # -DICLFORGE_BUILD_HEARTH=OFF: that option now defaults ON (CMakeLists.txt's own comment),
   # and without this override this job's plain "adm" manifest feature never installs mbedTLS/
-  # cpp-httplib/libFLAC/Opus/mdns, so add_subdirectory(src/sendspin) failed configuring at
+  # cpp-httplib/libFLAC/Opus/mdns, so add_subdirectory(libs/sendspin) failed configuring at
   # find_package(MbedTLS) - a real regression this job hit on main, not something this job's
   # own change caused; the root CMakeLists.txt's own comment on ICLFORGE_BUILD_HEARTH's default
   # named three legs that needed this same override and missed this one.
   #
   # ICLFORGE_BUILD_CLI/EXAMPLES stay at their preset default (ON): ADM BWF reader phase 3 (the
-  # 'atmos-adm' forge command, apps/cli/main.cpp's run_atmos_adm, and examples/encode_adm.cpp) is
-  # the first code outside tests/ to link iclforge::adm/iclforge::admbridge at all, so unlike phases 1
+  # 'atmos-adm' forge command, apps/forge/cli/src/main.cpp's run_atmos_adm, and examples/encode_adm.cpp) is
+  # the first code outside tests/ to link iclforge::adm at all, so unlike phases 1
   # and 2 (when neither the CLI nor the examples touched this module, hence this job originally
   # turning both off), this job now has to build and run both too or the CLI command and example
   # get zero CI coverage - the same gap this job's own header comment above already exists to close
@@ -370,7 +370,7 @@ jobs:
       # (config-linux-gcc's own "core" preset fragment sets VCPKG_MANIFEST_
       # FEATURES to "hearth" to match), but this job's own -D above replaces
       # that with "adm" alone rather than adding to it - so without turning
-      # the option off explicitly, src/sendspin still configures and calls
+      # the option off explicitly, libs/sendspin still configures and calls
       # find_package(MbedTLS), which was never installed for this job's
       # narrower feature set. Same reasoning as CMakePresets.json's own
       # minimal-decoder/minimal-encoder/wasm-emscripten/config-windows-llvm-
@@ -384,7 +384,7 @@ jobs:
             # defaults ON now (root CMakeLists.txt), but -DVCPKG_MANIFEST_FEATURES=adm above
             # REPLACES CMakePresets.json's own default ("hearth") rather than extending it, so
             # vcpkg never installs Hearth's ports here while CMakeLists.txt would still try to
-            # configure against them - src/sendspin/CMakeLists.txt's find_package(MbedTLS)
+            # configure against them - libs/sendspin/CMakeLists.txt's find_package(MbedTLS)
             # failing outright. This job has nothing to do with Hearth either way (see this
             # file's own header comment above ADM Module), so turning it off is also just
             # correct scope, the same way minimal-decoder/minimal-encoder/wasm-emscripten/
@@ -444,7 +444,7 @@ jobs:
         env:
           STATUS: ${{ job.status }}
         run: echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-  # iclforge::sendspin (src/sendspin, planning/hearth-reference-player.md A4): ICLFORGE_BUILD_HEARTH
+  # iclforge::sendspin (libs/sendspin, planning/hearth-reference-player.md A4): ICLFORGE_BUILD_HEARTH
   # defaults ON (root CMakeLists.txt), with vcpkg's "hearth" feature - cpp-httplib, mdns, mbedTLS,
   # libFLAC and Opus - selected by default too, via CMakePresets.json's "core" fragment. Every
   # build-and-test leg builds and tests it without being asked, so the [sendspin] and [hearth]
@@ -513,7 +513,10 @@ jobs:
 
       - name: Test
         shell: bash
-        run: ./build/config-linux-gcc/bin/iclforge-tests "[sendspin],[hearth]"
+        run: |
+          set -eu
+          ./build/config-linux-gcc/bin/iclforge-sendspin-tests "[sendspin]"
+          ./build/config-linux-gcc/bin/iclforge-hearth-tests "[hearth]"
 
       # A4's exit with the stand-in for Sendspin's reference player
       # (planning/hearth-sendspin-extension.md, Decisions): a host pairs with a scripted
@@ -528,7 +531,7 @@ jobs:
           /tmp/aiosendspin-venv/bin/pip install --no-cache-dir --only-binary=:all: \
             -r tools/sendspin/requirements.txt
           /tmp/aiosendspin-venv/bin/python tools/sendspin/aiosendspin_exit.py \
-            --iclforge-tests ./build/config-linux-gcc/bin/iclforge-tests
+            --iclforge-tests ./build/config-linux-gcc/bin/iclforge-hearth-tests
 
       # A6's own exit (same planning doc): the scripted player as one member of a group alongside
       # a burst-taking test sink, played from the app's own iclforge::hearth::Engine - not just Group
@@ -538,7 +541,7 @@ jobs:
         run: |
           set -eu
           /tmp/aiosendspin-venv/bin/python tools/sendspin/aiosendspin_group_exit.py \
-            --iclforge-tests ./build/config-linux-gcc/bin/iclforge-tests
+            --iclforge-tests ./build/config-linux-gcc/bin/iclforge-hearth-tests
 
       # Music Assistant's side of the same exit, rehearsed: aiosendspin 9.1.1's server, which Music
       # Assistant runs, pairs with the test sink by its token and by its dynamic code, and plays it
@@ -746,11 +749,13 @@ jobs:
           cmake --build build/config-linux-llvm-shared -- -k 0
           popd >/dev/null
 
-      # Both steps below discover libraries dynamically - `find .../src -name '*.so'` - rather
+      # Both steps below discover libraries dynamically - `find .../libs -name '*.so'` - rather
       # than a hardcoded `for lib in ...` list: this project's own SHARED targets each produce a
       # bare, unversioned libFOO.so symlink (alongside the real, version-suffixed libFOO.so.X.Y.Z)
-      # directly in the build tree under src/<component>/, with no install step needed to see it.
-      # Scoped to .../src specifically - not the whole build tree - so a FetchContent'd
+      # directly in the build tree under libs/<component>/, with no install step needed to see it.
+      # (src/<component>/ before planning/monorepo.md's C7-1, which is what a comparison point older
+      # than that has, so each build is searched in whichever of the two it has.)
+      # Scoped to those directories specifically - not the whole build tree - so a FetchContent'd
       # third-party dependency's own .so (e.g. a hypothetical libadm.so, if ICLFORGE_BUILD_ADM
       # were ever turned on for this preset) is never picked up: those build under .../_deps/,
       # a disjoint subtree, and this project never install()s them in their own right regardless.
@@ -781,13 +786,27 @@ jobs:
           errors=0
           incompatible=0
           changed=0
+          # find_so <build dir> <find arguments>: the library directories of one build.
+          # An absent directory is not a failure: the step runs under bash -e, and a
+          # `[ -d ] && find` that ends the function with the test's status 1 would end the
+          # step at the first assignment from it (HEAD has libs/ and no src/, the base the
+          # other way round). tools/ci/test_abi_find_so.py runs this function.
+          find_so() {
+            local build="$1" dir
+            shift
+            for dir in libs src; do
+              if [ -d "$build/$dir" ]; then
+                find "$build/$dir" "$@"
+              fi
+            done
+          }
           mapfile -t libs < <(
-            { find build/config-linux-llvm-shared/src -name '*.so' -exec basename {} \;
-              find ../abi-base/build/config-linux-llvm-shared/src -name '*.so' -exec basename {} \;
+            { find_so build/config-linux-llvm-shared -name '*.so' -exec basename {} \;
+              find_so ../abi-base/build/config-linux-llvm-shared -name '*.so' -exec basename {} \;
             } 2>/dev/null | sort -u)
           for lib in "${libs[@]}"; do
-            head_lib="$(find build/config-linux-llvm-shared/src -name "$lib" -print -quit)"
-            base_lib="$(find ../abi-base/build/config-linux-llvm-shared/src -name "$lib" -print -quit)"
+            head_lib="$(find_so build/config-linux-llvm-shared -name "$lib" -print | head -n 1)"
+            base_lib="$(find_so ../abi-base/build/config-linux-llvm-shared -name "$lib" -print | head -n 1)"
             if [ -z "$head_lib" ]; then
               echo "### $lib" >> "$GITHUB_STEP_SUMMARY"
               echo "(not built at HEAD)" >> "$GITHUB_STEP_SUMMARY"
@@ -857,7 +876,7 @@ jobs:
           libs=()
           while IFS= read -r found; do
             libs+=(--lib "$found")
-          done < <(find build/config-linux-llvm-shared/src -name '*.so' | sort)
+          done < <(find build/config-linux-llvm-shared/libs -name '*.so' | sort)
           if [ "${#libs[@]}" -eq 0 ]; then
             echo "::error title=ABI gate::No shared libraries were built - nothing to check."
             exit 1
@@ -1090,7 +1109,7 @@ jobs:
       # again with a decoder built ICLFORGE_DECODE_SCALAR=float, at the same pins,
       # and the float decode against the double one on every committed stream,
       # below and above A-SPX's crossover, at the floors pinned in
-      # tests/golden/ac4dec/scalar-agreement.json. The AC-4 encoder is double in
+      # testdata/ac4/scalar-agreement.json. The AC-4 encoder is double in
       # every build (decision 34); its streams are decoded by the float decoder.
       - name: Build a float32 forge
         run: |
@@ -1111,7 +1130,7 @@ jobs:
 
       # The AC-4 decoder's fixed-point tier (planning/ac4.md, D14d), the same three
       # questions: the scorers at the same pins, and the fixed decode against the
-      # double one at the floors in tests/golden/ac4dec/scalar-agreement-fixed.json.
+      # double one at the floors in testdata/ac4/scalar-agreement-fixed.json.
       - name: Build a fixed-point forge
         run: |
           cmake --preset config-linux-llvm -B build/decode-scalar-fixed -DICLFORGE_DECODE_SCALAR=fixed
@@ -1287,7 +1306,7 @@ jobs:
           path: results/spectrograms
 
       # Compute-only, same as the landscape trend above: encodes the
-      # committed five-object scene (tests/golden/audio/reference_objects.wav
+      # committed five-object scene (testdata/audio/reference_objects.wav
       # plus its .paths placements) with this build's `atmos-encode`, decodes
       # it back to per-object WAVs with this build's `decode`, and scores each
       # object against the channel it came from. No external tool is involved
@@ -1343,7 +1362,7 @@ jobs:
   # producer job rather than a per-leg matrix, so this is one commit per CI
   # run, not a race between several. Needs neither a container nor a build:
   # tools/ci/append_external_comparison_history.py is stdlib-only, and
-  # tests/golden/external-baseline/manifest.json (the FFmpeg/DEE numbers to
+  # testdata/external-baseline/manifest.json (the FFmpeg/DEE numbers to
   # diff against) is a committed file the checkout below already has.
   persist-external-comparison-trend:
     name: Publish external-encoder landscape trend
@@ -1419,7 +1438,7 @@ jobs:
           commit_date="$(git show -s --format=%cI "$COMMIT_SHA")"
           python3 tools/ci/append_external_comparison_history.py \
             --trend-json results/trend.json \
-            --manifest-json tests/golden/external-baseline/manifest.json \
+            --manifest-json testdata/external-baseline/manifest.json \
             --history-dir history \
             --branch "$BRANCH" \
             --commit "$COMMIT_SHA" \

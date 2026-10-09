@@ -3,7 +3,7 @@
 // Track File (iclforge::iab::write_mxf_iab, then iclforge::iab::parse_mxf_iab), printing what each
 // found to show the two agree - the point being that SMPTE ST 2067-201 clip-wraps the whole
 // IABitstream as a single Generic Container KLV Value, so a Track File's essence really is the
-// identical byte sequence an elementary `.iab` file already has (see src/iab/src/mxf_reader.cpp's
+// identical byte sequence an elementary `.iab` file already has (see libs/iab/src/mxf_reader.cpp's
 // own header comment for the full citation trail).
 //
 // iclforge::iab is codec-blind - this program does not either, it only proves both parsed graphs

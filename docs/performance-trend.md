@@ -72,7 +72,7 @@ shared transforms: `ac4_mdct512_forward`, `ac4_imdct512_inverse`, `ac4_fft512_fo
 `ac4_qmf_analysis64` and `ac4_qmf_synthesis64`. AC-4 decode quality has its own series on
 [Quality trend](quality-trend.md#ac-4-decode-quality).
 
-Every workload is fed real programme material (`tests/golden/audio/reference_51.wav`,
+Every workload is fed real programme material (`testdata/audio/reference_51.wav`,
 through `tests/performance/real_audio.hpp`), not the 440 Hz tone `iclforge-bench` and
 `iclforge-perf` ran on before PF1. A single stationary tone is not a cheaper version of
 programme material, it is a different workload: its spectrum is one bin wide, so the
@@ -118,7 +118,7 @@ Symbol self-time attributes inlined header code to whoever inlined it, so an
 accidentally-quadratic accessor appears as arithmetic in its caller. When a symbol
 looks hot, confirm *which lines* before designing a fix. A `RelWithDebInfo` build with
 `-O3 -g` is enough; on this repo it also needs `-Wno-error=null-dereference` for a GCC
-false positive in `apps/cli/commands/audio_io.cpp` that the Release preset does not trip.
+false positive in `apps/forge/cli/src/commands/audio_io.cpp` that the Release preset does not trip.
 
 The same method found the second-largest win: `aht_bin_gaq_bits` fully quantising six
 mantissas per candidate gain to read one integer width off each result — 43% of an
@@ -696,7 +696,7 @@ exponent runs through its own encoder.
 
 The extra churn was a defect rather than the planner's intended cost, and was
 tracked as [#544](https://github.com/iainchesworthlabs/iclforge/issues/544).
-`encode_run` in `src/ac3/src/encoder/eac3_frame.cpp` assigned the by-value
+`encode_run` in `libs/ac3/src/encoder/eac3_frame.cpp` assigned the by-value
 return of `iclforge::ac3::encode_exponents`, which owns a `std::vector`, so each run
 reallocated that buffer on every frame; the planner multiplied the number of
 runs from one per channel to one per run per channel. The bench's own columns
@@ -741,7 +741,7 @@ soft float, no OS), `ICLFORGE_MINIMAL_DECODER=ON`, `CMAKE_BUILD_TYPE=MinSizeRel`
 [Building → Minimum-footprint decoder profile](building.md#minimum-footprint-decoder-profile)
 for what the profile changes and why.
 
-`apps/baremetal/probe.cpp` decodes six frames each of ten real streams — 5.1 AC-3 (448 kbit/s,
+`firmware/baremetal/probe.cpp` decodes six frames each of ten real streams — 5.1 AC-3 (448 kbit/s,
 coupling), 2/0 AC-3 (192 kbit/s) and 1/0 AC-3 (128 kbit/s); 5.1 E-AC-3 (384 kbit/s, AHT + spx +
 standard coupling), 5.1 E-AC-3 with §E3.5 enhanced coupling (384 kbit/s, `cpl+ecpl`), E-AC-3
 Atmos (448 kbit/s, six objects over a 5.1 bed) and 2/0 E-AC-3 (192 kbit/s, which is the only
@@ -762,15 +762,15 @@ trees ([CI lane partitions](ci-lanes.md)) and in every nightly run, and
 The table below was first measured early in the bare-metal probe's own feature branch (PR #351). Several
 `develop` merges landed on that branch afterwards but before it merged to `main` — most
 significantly DC10's QMF-domain JOC reconstruction, which the decode path needs
-(`src/dsp/src/qmf.cpp` and `src/ac3/src/verify/eac3_mirror.cpp`, both correctly added to
-`src/ac3/minimal.cmake`'s source list at the time, per that merge's own commit message), plus
+(`libs/dsp/src/qmf.cpp` and `libs/ac3/src/verify/eac3_mirror.cpp`, both correctly added to
+`libs/ac3/minimal.cmake`'s source list at the time, per that merge's own commit message), plus
 the FFT/IMDCT rewrite and the decoder output stage — and nobody re-measured the table
 or the ceiling before merging. The image had already reached 412,516 bytes by then.
 
 The same thing happened a second time. The largest movement in that re-measurement was a
 relocation rather than growth. The Pimpl sweep (`ee5ff91e`) gave both decoders a
 `struct Impl; std::unique_ptr<Impl> impl_;`
-(both in `src/ac3/include/iclforge/ac3/decoder/decoder.hpp`), so `sizeof(iclforge::ac3::FrameDecoder)` and
+(both in `libs/ac3/include/iclforge/ac3/decoder/decoder.hpp`), so `sizeof(iclforge::ac3::FrameDecoder)` and
 `sizeof(iclforge::ac3::Eac3Decoder)` fell from 12,952 and 27,408 bytes to a single 4-byte pointer each, and
 the state they used to hold in place now lives on the heap. That state came out of automatic
 storage: both decoders are locals in `decode_ac3()` and `decode_eac3()`, and `.bss` was unchanged
@@ -810,7 +810,7 @@ instantiation.
 `fixture.hpp` is `constexpr` `std::array` data linked into `probe.cpp.obj`'s read-only section.
 It held 19,968 bytes of stream before the enhanced-coupling and 2/0 fixtures, 33,792 with them,
 and 52,224 now across seven streams. None of the tools those fixtures reach added code —
-`eac3_tools.cpp`, `fft.cpp`, `joc.cpp` and `oamd.cpp` were already in `src/ac3/minimal.cmake`'s
+`eac3_tools.cpp`, `fft.cpp`, `joc.cpp` and `oamd.cpp` were already in `libs/ac3/minimal.cmake`'s
 source list and already linked, which is the point: what the fixtures added was execution, not
 size.
 
@@ -880,7 +880,7 @@ against 8.4 KiB actually linked). `footprint_report.py` has skipped that block s
 columns reconcile with `arm-none-eabi-size`'s own totals.
 
 `tls.cpp.obj`'s 4 KiB is the single-thread `__aeabi_read_tp` stub's static block
-(`apps/baremetal/platform/baremetal/tls.cpp`), checked by two `ASSERT()`s in the linker script
+(`firmware/baremetal/platform/baremetal/tls.cpp`), checked by two `ASSERT()`s in the linker script
 rather than trusted.
 
 It was 64 KiB, sized against `ecpl_channel_spectrum`'s `thread_local` scratch. That scratch is no
@@ -1120,7 +1120,7 @@ transform's tables and kernel beside the float ones the object path still
 needs - and the peak heap 244,502 on this leg, the 7.1.4 fold (238,094 for
 7.1.4 as coded). The `pcm_hash` lines
 are identical on this leg and on the x86 host for all fourteen fixtures and are
-pinned in `tests/golden/fixed-probe-pcm-hashes.json`
+pinned in `testdata/fixed-probe-pcm-hashes.json`
 (`tools/checks/check_probe_hashes.py`); with the scalar's conversions from
 `float` and `double` written as floating expressions the two legs had differed
 by a raw unit on a few AC-3 samples, and writing them on the value's bits
@@ -1161,7 +1161,7 @@ has what the encode direction cannot fit on an ESP32-S3, with the host profile's
 (`ICLFORGE_MINIMAL_AC4=ON`, `ICLFORGE_DECODE_SCALAR=float`; the presets `config-arm-none-eabi-minimal-ac4`
 and its `-icount` and `config-linux-gcc-minimal-ac4`) and the AC-4 probe in place of the AC-3 and
 E-AC-3 one: AC-4 shares nothing with `iclforge::ac3`, so it is a build of its own. It decodes six
-committed streams (`apps/baremetal/ac4_fixture.hpp`, made by
+committed streams (`firmware/baremetal/ac4_fixture.hpp`, made by
 `tools/generators/gen_baremetal_ac4_fixture.py`): 2.0 from DEE with A-SPX, 2.0 constructed in
 A-CPL, 5.1 from DEE, 5.1 constructed in A-CPL, DEE's 5.1.4 tones, and DEE's 2.0 at 48 kbit/s,
 whose A-SPX runs companding (added by D14a4, the one fixture that reaches float `pow` and `exp2`),
@@ -1208,18 +1208,18 @@ before D14a5, 196,464 of them the converter's tables), the ceiling 750,000; the
 stack ceiling is 21,500 here and 28,500 on the host, whose frames are larger (24.7 to 26.0 KB read
 there); retained bytes after teardown 0, the ceiling 1,024. The ceilings are the runner's
 (`ICOUNT_CEILING_AC4` in `run_baremetal_probe.sh`, and the peaks and the allocations a frame in
-`tests/golden/ac4-probe-ceilings.json`), each a tenth or so over its figure
+`testdata/ac4-probe-ceilings.json`), each a tenth or so over its figure
 with the same rule as the tables above. On the x86-64 host (GCC 16, 64-bit pointers) the peaks
 are 442,193, 634,088, 1,024,014, 1,235,048, 1,954,304 and, for the companding fixture, 474,083.
 The PCM of every fixture is bit-identical on the two legs, and the hashes are pinned in
-`tests/golden/ac4-probe-pcm-hashes.json`. The companding fixture is what holds that for the
+`testdata/ac4-probe-pcm-hashes.json`. The companding fixture is what holds that for the
 streams with companding: before D14a4 the C libraries' `powf` and `exp2f` gave the Cortex-M3 leg,
 the host and the board a PCM each for such a stream, and no fixture had companding to say so.
 
 The fixed-point tier (D14d, 2026-10-02, the same leg, `run_baremetal_probe.sh --ac4 --scalar=fixed
 --icount`) decodes the same six fixtures with integer arithmetic where the `float` tier's is software
 floating point, and its PCM hashes are the same on this leg, on the x86-64 host and on RV32IMC
-(`tests/golden/ac4-fixed-probe-pcm-hashes.json`). Its instruction ceilings are the runner's
+(`testdata/ac4-fixed-probe-pcm-hashes.json`). Its instruction ceilings are the runner's
 `ICOUNT_CEILING_AC4_FIXED`; the peaks, allocations and stack share the `float` tier's ceilings:
 
 | Fixture | Instructions per frame | Ceiling | Peak heap | Allocations per frame | Stack |

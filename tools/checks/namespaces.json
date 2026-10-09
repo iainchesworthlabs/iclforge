@@ -3,37 +3,31 @@
   "libraries": {
     "ac3": ["ac3"],
     "ac4": ["ac4"],
-    "ac4core": ["ac4"],
-    "ac4dec": ["ac4"],
-    "ac4enc": ["ac4"],
     "adm": ["adm"],
-    "admbridge": ["admbridge"],
-    "arithmetic": ["internal"],
     "audio": ["audio"],
     "base": ["base", "internal"],
+    "containers": ["containers"],
     "dsp": ["dsp", "internal"],
     "iab": ["iab"],
-    "iamf": ["iamf"],
-    "iec61937": ["iec61937"],
-    "matroska": ["matroska"],
-    "mp4": ["mp4"],
-    "mpegts": ["mpegts"],
-    "objects": ["emdf", "oba"],
+    "objects": ["objects"],
     "render": ["render", "spatial"],
-    "sendspin": ["sendspin"],
-    "signing": ["signing"]
+    "sendspin": ["sendspin"]
   },
   "debts": [
     {
-      "file": "src/base/include/iclforge/base/bitreader.hpp",
+      "file": "libs/objects/include/iclforge/objects/aliases.hpp",
+      "reason": "iclforge::oba and iclforge::emdf, aliases of iclforge::objects::oba and iclforge::objects::emdf for a release (planning/consolidation.md, decision 19): the release after C6 deletes the file and this row"
+    },
+    {
+      "file": "libs/base/include/iclforge/base/bitreader.hpp",
       "reason": "BitReader is declared in iclforge itself, and every reader of a bitstream names it iclforge::BitReader: iclforge::base::BitReader is a change to each of them, and S6 changes the AC-3 library's names only"
     },
     {
-      "file": "src/base/include/iclforge/base/bitwriter.hpp",
+      "file": "libs/base/include/iclforge/base/bitwriter.hpp",
       "reason": "BitWriter is declared in iclforge itself, as BitReader is: moving it into iclforge::base changes each of its users"
     },
     {
-      "file": "src/dsp/include/iclforge/dsp/fft.hpp",
+      "file": "libs/dsp/include/iclforge/dsp/fft.hpp",
       "reason": "dft512 and kDftLength are declared in iclforge itself, and the AC-3 transforms name them iclforge::dft512: moving them into iclforge::dsp is a change to each of those"
     }
   ]

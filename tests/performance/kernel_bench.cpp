@@ -48,9 +48,9 @@
 #include "iclforge/ac3/oba/atmos.hpp"
 #include "iclforge/ac3/oba/joc.hpp"
 #include "iclforge/ac3/oba/joc_tables.hpp"
-#include "iclforge/ac4core/dsp/fft.hpp"
-#include "iclforge/ac4core/dsp/mdct.hpp"
-#include "iclforge/ac4core/dsp/qmf.hpp"
+#include "tiered/fft.hpp"
+#include "tiered/mdct.hpp"
+#include "tiered/qmf.hpp"
 #include "real_audio.hpp"
 
 namespace {
@@ -454,9 +454,9 @@ int main(int argc, char** argv) {
         }
         results.push_back(time_kernel("joc_reconstruct_mdct_4obj", [&] {
             static iclforge::ac3::oba::joc::ReconstructionState state;
-            const auto out =
-                iclforge::ac3::oba::joc::reconstruct(bed, params, state, /*fast_mdct=*/true,
-                                      /*fast_imdct=*/true, iclforge::oba::joc::Domain::kMdctBand);
+            const auto out = iclforge::ac3::oba::joc::reconstruct(
+                bed, params, state, /*fast_mdct=*/true,
+                /*fast_imdct=*/true, iclforge::objects::oba::joc::Domain::kMdctBand);
             g_sink += static_cast<double>(out[0][128]);
         }));
         // PF8: bed analysis' own forward transform, isolated from the object
@@ -465,16 +465,16 @@ int main(int argc, char** argv) {
         // switches, against the direct §8.2.3.2 form it replaced.
         results.push_back(time_kernel("joc_reconstruct_mdct_4obj_direct", [&] {
             static iclforge::ac3::oba::joc::ReconstructionState state;
-            const auto out =
-                iclforge::ac3::oba::joc::reconstruct(bed, params, state, /*fast_mdct=*/false,
-                                      /*fast_imdct=*/true, iclforge::oba::joc::Domain::kMdctBand);
+            const auto out = iclforge::ac3::oba::joc::reconstruct(
+                bed, params, state, /*fast_mdct=*/false,
+                /*fast_imdct=*/true, iclforge::objects::oba::joc::Domain::kMdctBand);
             g_sink += static_cast<double>(out[0][128]);
         }));
         results.push_back(time_kernel("joc_reconstruct_qmf_4obj", [&] {
             static iclforge::ac3::oba::joc::ReconstructionState state;
-            const auto out =
-                iclforge::ac3::oba::joc::reconstruct(bed, params, state, /*fast_mdct=*/true,
-                                      /*fast_imdct=*/true, iclforge::oba::joc::Domain::kQmf);
+            const auto out = iclforge::ac3::oba::joc::reconstruct(
+                bed, params, state, /*fast_mdct=*/true,
+                /*fast_imdct=*/true, iclforge::objects::oba::joc::Domain::kQmf);
             g_sink += static_cast<double>(out[0][128]);
         }));
 
@@ -509,26 +509,26 @@ int main(int argc, char** argv) {
                 static iclforge::ac3::oba::joc::ReconstructionState state;
                 const auto out = iclforge::ac3::oba::joc::reconstruct(
                     bed, wide, state, /*fast_mdct=*/true,
-                    /*fast_imdct=*/true, iclforge::oba::joc::Domain::kMdctBand);
+                    /*fast_imdct=*/true, iclforge::objects::oba::joc::Domain::kMdctBand);
                 g_sink += static_cast<double>(out[0][128]);
             }));
             results.push_back(time_kernel("joc_reconstruct_qmf_12obj", [&] {
                 static iclforge::ac3::oba::joc::ReconstructionState state;
-                const auto out =
-                    iclforge::ac3::oba::joc::reconstruct(bed, wide, state, /*fast_mdct=*/true,
-                                          /*fast_imdct=*/true, iclforge::oba::joc::Domain::kQmf);
+                const auto out = iclforge::ac3::oba::joc::reconstruct(
+                    bed, wide, state, /*fast_mdct=*/true,
+                    /*fast_imdct=*/true, iclforge::objects::oba::joc::Domain::kQmf);
                 g_sink += static_cast<double>(out[0][128]);
             }));
         }
     }
 
-    // --- AC-4's shared transforms (src/ac4core) ------------------------------
+    // --- AC-4's shared transforms (libs/ac4/src/core) ------------------------------
     // The transforms the AC-4 decoder and encoder share, at 512 bins, one of
     // the transform lengths the 2 048-sample frame divides into, and one
     // 64-subband slot of the QMF analysis bank (Pseudocode 65) behind A-SPX and
     // A-CPL. Real audio in, same as every kernel above.
     {
-        namespace dsp = iclforge::ac4::detail::dsp;
+        namespace dsp = iclforge::dsp::tiered;
         const std::span<const float> ch0 = audio.channel(0);
         std::vector<double> mdct_in(1024);
         for (std::size_t i = 0; i < mdct_in.size(); ++i) {
@@ -548,7 +548,7 @@ int main(int argc, char** argv) {
             g_sink += imdct_out[256];
         }));
 
-        // The project's own complex type (src/ac4core/include/iclforge/ac4core/dsp/complex.hpp), which
+        // The project's own complex type (libs/dsp/src/tiered/complex.hpp), which
         // the AC-4 transforms take since D14a in place of std::complex.
         std::vector<dsp::Complex<double>> fft_source(512);
         for (std::size_t i = 0; i < fft_source.size(); ++i) {
@@ -589,8 +589,8 @@ int main(int argc, char** argv) {
             }));
         };
         bench_qmf(std::type_identity<double>{}, "");
-        if constexpr (!std::is_same_v<iclforge::ac4::detail::Real, double>) {
-            bench_qmf(std::type_identity<iclforge::ac4::detail::Real>{}, "_real");
+        if constexpr (!std::is_same_v<iclforge::dsp::tiered::Real, double>) {
+            bench_qmf(std::type_identity<iclforge::dsp::tiered::Real>{}, "_real");
         }
     }
 

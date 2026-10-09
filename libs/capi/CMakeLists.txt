@@ -1,0 +1,131 @@
+# ---------------------------------------------------------------------------
+# iclforge_c - C API: a stable, minimal C-callable surface over
+# iclforge::ac3's encode/decode core (AC-3, E-AC-3, Atmos/OAMD/JOC), for bindings
+# and embedding by callers that cannot or do not want to link C++23. The
+# public header (include/iclforge_c/iclforge.h) is plain C11 - no C++ type
+# ever crosses it, only opaque handles and POD structs - so this is the one
+# target in the tree meant to be consumed by a non-C++ toolchain directly.
+#
+# Built and installed as both a static and a shared library, same OBJECT-
+# library-plus-two-thin-wrappers shape as iclforge::ac3 itself - see
+# libs/ac3/CMakeLists.txt's header comment for the full reasoning.
+#
+# Unlike iclforge_ac3_static/iclforge_ac3_shared, BOTH variants here statically embed
+# iclforge::ac3_static (PRIVATE - forge's own types never appear in this
+# target's public header, so nothing about that leaks to a consumer's
+# include path) rather than tracking BUILD_SHARED_LIBS. A binding or embedder
+# reaching for a C ABI wants exactly one library to load (dlopen/ctypes/
+# ffi.dlopen all expect a single self-contained module) - making
+# iclforge_c_shared's own linkage depend on a separately-shipped
+# libiclforge_ac3.so would defeat that. iclforge_ac3_static's objects are already built
+# PIC (libs/ac3/CMakeLists.txt), so embedding them in a shared library is
+# safe on every platform this project targets.
+#
+# The embedded codec has to stay private to this library, or a program that
+# links iclforge::ac3_shared and this library together can run the C++ API on the
+# copy inside this one. Two things keep it private:
+#  - linking iclforge::c_shared must not put libiclforge_ac3_static.a on the
+#    consumer's link line, where it beats a libiclforge_ac3.so listed after it
+#    (iclforge_capi_objects, below);
+#  - libiclforge_c.so exports the C API and nothing else (the end of this file).
+# Without them iclforge-tests in the BUILD_SHARED_LIBS=ON pass bound none of its
+# iclforge:: symbols to libiclforge_ac3.so; tools/checks/check_shared_forge_binding.sh
+# checks that it does.
+# ---------------------------------------------------------------------------
+
+# Made by iclforge_add_library() (cmake/IclforgeLibrary.cmake) under the stem
+# `c`: the aliases iclforge::c, iclforge::c_static and iclforge::c_shared, the
+# files libiclforge_c and libiclforge_c_static, and the export header
+# iclforge_c/export.h with ICLFORGE_C_EXPORT. The raw targets keep the
+# directory's name, iclforge_capi_*.
+#
+# The codecs are EMBEDS: iclforge_capi_objects takes only iclforge::ac3_static's
+# usage requirements (include path, ICLFORGE_AC3_STATIC_DEFINE, C++23),
+# compile-only. It must not link it: an OBJECT library has no link step to hide
+# a PRIVATE dependency behind, so the dependency lands in its
+# INTERFACE_LINK_LIBRARIES, and both libraries link iclforge_capi_objects PUBLIC
+# for its include path. Linked PRIVATE there, iclforge::ac3_static reached every
+# consumer of iclforge::c_shared, and iclforge-tests' link line carried
+# libiclforge_ac3_static.a ahead of libiclforge_ac3.so, so the archive supplied
+# the symbols the tests call. The two libraries link it themselves instead,
+# where PRIVATE means what it says: a shared library keeps it to itself, and a
+# static one passes it on to its consumers as a link-only dependency, which they
+# need.
+#
+# AC-4 (decision 21, planning/ac4.md phase I4): embedded the same way
+# iclforge::ac3_static is - see EMBEDS below - so a
+# caller loading this one library gets AC-4 too. iclforge.h's AC-4 section is
+# declared either way (that header's own comment: this codebase selects a
+# variant by CMake, never by preprocessor conditional - see
+# tools/checks/check_platform_macros.ps1), so the choice below is which
+# translation unit answers those 76 functions, not whether they exist:
+# ac4.cpp/ac4_encoder.cpp with ICLFORGE_BUILD_AC4 on, ac4_absent.cpp (which
+# names no ac4:: C++ type, so it needs neither the AC-4 headers nor the
+# static libraries embedded below) with it off.
+#
+# AC-4's static library is embedded the same way, iclforge::ac4_static: the
+# inspector, the decoder and the encoder, with the tables and transforms they
+# share inside it.
+set(_capi_sources
+    src/atmos.cpp
+    src/common.cpp
+    src/decoder.cpp
+    src/eac3.cpp
+    src/eac3_encoder.cpp
+    src/encoder.cpp
+    src/levels.cpp
+    src/loudness.cpp
+    src/qc.cpp
+    src/scan.cpp)
+set(_capi_embeds iclforge::ac3_static)
+if(ICLFORGE_BUILD_AC4)
+    list(APPEND _capi_sources src/ac4.cpp src/ac4_encoder.cpp)
+    list(APPEND _capi_embeds iclforge::ac4_static)
+else()
+    list(APPEND _capi_sources src/ac4_absent.cpp)
+endif()
+
+iclforge_add_library(capi
+    NO_C4251_SUPPRESSION
+    STEM c
+    EXPORT_BASE ICLFORGE_C
+    EXPORT_HEADER iclforge_c/export.h
+    SOURCES ${_capi_sources}
+    EMBEDS ${_capi_embeds})
+
+# generate_export_header() emits a C++-flavoured export.h ("#ifdef __cplusplus
+# extern \"C\" {") by default only for the dllexport/dllimport attribute
+# syntax itself, which is fine - the macro it defines (ICLFORGE_C_EXPORT) is a
+# plain object-like #define either way, usable from a .c translation unit
+# exactly like from a .cpp one. iclforge.h's own extern "C" block (guarded on
+# __cplusplus) is what actually matters for C linkage, not this header.
+
+# Compile-time version macros (AP1) - a plain configure_file rather than
+# GenerateVersion.cmake's restamp-every-build machinery, since PROJECT_VERSION
+# only changes on a reconfigure anyway (unlike the git provenance
+# iclforge/ac3/version.hpp also carries, which this header does not need).
+string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" ICLFORGE_C_VERSION_MATCH "${PROJECT_VERSION}")
+set(ICLFORGE_C_VERSION_MAJOR "${CMAKE_MATCH_1}")
+set(ICLFORGE_C_VERSION_MINOR "${CMAKE_MATCH_2}")
+set(ICLFORGE_C_VERSION_PATCH "${CMAKE_MATCH_3}")
+# Feeds version.h.in's #cmakedefine ICLFORGE_HAS_AC4 - see that file's comment.
+set(ICLFORGE_HAS_AC4 ${ICLFORGE_BUILD_AC4})
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/iclforge_c/version.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/iclforge_c/version.h"
+    @ONLY)
+
+# libiclforge_c.so exports the C API and nothing else. iclforge_ac3_static's objects are
+# compiled once, for iclforge_ac3_shared as well, with ICLFORGE_AC3_EXPORT marking the C++
+# API for export, so without --exclude-libs the linker exports every one of them
+# that the embedded copy pulled in: 346 of the 562 lines of this library's ABI
+# allowlist were codec symbols, beside its 216 C functions. A process that then
+# loaded libiclforge_ac3.so had the C++ API, and libiclforge_ac3.so's own calls to
+# itself, bound to the copy in this library. --exclude-libs makes the linker
+# treat every symbol it takes from an archive as local; libs/adm/CMakeLists.txt
+# does the same for the same reason. ELF linkers only (GNU ld, gold, lld, mold):
+# Mach-O's has no such option and MSVC's link.exe exports what an object marks
+# dllexport, so macOS and Windows are left as they were.
+if(LINUX)
+    target_link_options(iclforge_capi_shared PRIVATE "LINKER:--exclude-libs,ALL")
+endif()

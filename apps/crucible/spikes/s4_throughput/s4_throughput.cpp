@@ -21,7 +21,7 @@
 
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/encoder/silent_frame.hpp"  // describe(FrameError)
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
 
 namespace {
@@ -69,10 +69,10 @@ Result run(int numblkscod, unsigned bitrate_kbps, int seconds) {
     std::vector<std::vector<float>> tap_pcm(kTaps);
     std::vector<std::vector<float>> objects(kObjects, std::vector<float>(frames_per, 0.0f));
     std::vector<std::span<const float>> views(kObjects);
-    std::vector<iclforge::oba::ObjectPlacement> placement(kObjects);
+    std::vector<iclforge::objects::oba::ObjectPlacement> placement(kObjects);
 
     // Bed slots: pinned to speakers, snapped.
-    const iclforge::oba::Position bed_pos[kBedSlots] = {
+    const iclforge::objects::oba::Position bed_pos[kBedSlots] = {
         {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.5, 0.0, 0.0}, {0.0, 1.0, 0.0}, {1.0, 1.0, 0.0}};
     for (int b = 0; b < kBedSlots; ++b) {
         placement[kPositioned + b].position = bed_pos[b];
@@ -84,7 +84,7 @@ Result run(int numblkscod, unsigned bitrate_kbps, int seconds) {
     std::vector<double> times;
     times.reserve(static_cast<std::size_t>(total_frames));
     std::size_t bytes = 0;
-    iclforge::iec61937::Eac3BurstPacker packer;
+    iclforge::containers::iec61937::Eac3BurstPacker packer;
     double t = 0.0;
 
     for (int f = 0; f < total_frames; ++f) {

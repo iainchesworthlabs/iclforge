@@ -77,7 +77,7 @@ the **master**; the second, when present, the **slave**.
 single-device session. The slave is an independent capture, and there is no shared hardware
 clock between two WASAPI shared-mode endpoints, even nominally identical ones on the same PC:
 left alone, the slave's stream drifts against the master's a sample at a time. Two small,
-Qt-free, allocation-free library pieces (`src/audio/include/iclforge/audio/resampler.hpp`) correct
+Qt-free, allocation-free library pieces (`libs/audio/include/iclforge/audio/resampler.hpp`) correct
 that:
 
 - **`iclforge::audio::DriftResampler`** — a streaming linear-interpolation fractional resampler.
@@ -258,7 +258,7 @@ chosen destination — there is no separate spool file for any of them:
   on — a crash leaves exactly what was captured, playable up to that point.
 - **Matroska** (`.mkv`): batch muxing needs the whole frame list to compute anything, which a
   live session never has until it decides to stop — so this container instead pushes each unit
-  into an incremental Matroska writer (`iclforge::matroska::Writer`, `src/matroska`) built for exactly this
+  into an incremental Matroska writer (`iclforge::containers::matroska::Writer`, `libs/containers/src/matroska`) built for exactly this
   case. Segment is written with EBML's reserved "unknown size" pattern, the standard way a
   streamed Matroska declares a length it cannot know yet, and Duration is omitted for the same
   reason — real players handle both the way they handle any other live-streamed Matroska. The
@@ -271,7 +271,7 @@ chosen destination — there is no separate spool file for any of them:
   "playable up to where it stopped" guarantee the elementary-stream path gives, not a companion
   file to fold in by hand afterward.
 - **Fragmented MP4/CMAF**: a folder, not a file, and the only container here whose *manifests*
-  change as the take runs. Each unit goes into `iclforge::mp4::FragmentWriter` (`src/mp4`), the incremental
+  change as the take runs. Each unit goes into `iclforge::containers::mp4::FragmentWriter` (`libs/containers/src/mp4`), the incremental
   fragmenter built for exactly this case, which hands back a complete CMAF media segment every
   time a fragment closes (48 access units, about 1.5 s); that segment is written as
   `segment<N>.m4s` and `audio.m3u8`/`master.m3u8`/`manifest.mpd` are rewritten beside it. While
@@ -296,7 +296,7 @@ into. S/PDIF and MPEG-TS both *do* have streaming writers, and a *recording* —
 button's capture-to-file take — uses them through `RecordingSink`; `forge live` reaches them too,
 with `container=spdif` and `container=ts`. The gap is on this side:
 `EncoderController::openLiveOutputWriters` special-cases exactly two incremental writers,
-`iclforge::matroska::Writer` and `iclforge::mp4::FragmentWriter`, and everything else falls through to the plain
+`iclforge::containers::matroska::Writer` and `iclforge::containers::mp4::FragmentWriter`, and everything else falls through to the plain
 write. So a live session with one of those three selected keeps writing the plain stream, exactly
 the file it would write with the combo left on Elementary stream; the container only changes what
 a *file* encode wraps it as afterward (see
@@ -423,7 +423,7 @@ capabilities this page describes, through the same code where the code is sharea
 - **Container choice**, and **take durability** with it. Both commands take
   `container=raw|mkv|ts|spdif|fmp4` (`cmaf` is an accepted alias for the last; see
   [CLI → Options & grammars](../cli/metadata-options.md#container)) and write through
-  `RecordingSink` — literally the same class, moved to `apps/common/` and compiled into both
+  `RecordingSink` — literally the same class, moved to `apps/shared/media/src/` and compiled into both
   front ends — so a CLI take and a GUI take of the same container are the same bytes produced
   the same way, with the same bounded memory and the same
   [mid-session crash safety](#take-durability).

@@ -24,18 +24,18 @@ this repository that must not crash, read out of bounds, or loop unboundedly on 
 | AC-4 elementary streams: sync frames and the table of contents | `iclforge::ac4::scan`, `iclforge::ac4::SyncFrameSplitter`, `iclforge::ac4::parse_raw_frame` | yes — `fuzz_ac4_parse` |
 | AC-4 substreams: the syntax layer and the reconstruction to PCM | `iclforge::ac4::Decoder::parse`, `iclforge::ac4::Decoder::decode`, `decode_by_block` | yes — `fuzz_ac4_decode` |
 | Format sniffing before any decoder commits | `iclforge::ac3::io::scan` | yes |
-| EMDF containers in a skip field (§H.2.2) | `iclforge::emdf::parse_container` | yes — `fuzz_emdf_parse`, plus indirectly through the E-AC-3 harnesses |
-| OAMD object metadata (TS 103 420 §5.5) | `iclforge::oba::parse_payload` | yes — `fuzz_oamd_parse`, plus indirectly through the E-AC-3 harnesses |
+| EMDF containers in a skip field (§H.2.2) | `iclforge::objects::emdf::parse_container` | yes — `fuzz_emdf_parse`, plus indirectly through the E-AC-3 harnesses |
+| OAMD object metadata (TS 103 420 §5.5) | `iclforge::objects::oba::parse_payload` | yes — `fuzz_oamd_parse`, plus indirectly through the E-AC-3 harnesses |
 | JOC payloads (TS 103 420 §6) | `iclforge::ac3::oba::joc::parse_payload` | yes — `fuzz_joc_parse`, plus indirectly through the E-AC-3 harnesses |
 | WAV / RIFF headers and PCM | `iclforge::ac3::io::read_wav`, `iclforge::ac3::io::WavStreamReader` | yes |
 | IAB (SMPTE ST 2098-2) elementary streams and MXF track files | `iclforge::iab::parse_iabitstream`, `iclforge::iab::parse_mxf_iab`, `iclforge::iab::parse_iaframe` | yes — `fuzz_iab_parse` |
-| IEC 61937 bursts off an S/PDIF or HDMI capture, AC-4's included, and the AC-4 sync frames the AC-4 packer reads | `iclforge::iec61937::BurstReader`, `iclforge::iec61937::read_ac4_sync_frame` | yes — `fuzz_iec61937_unwrap` |
+| IEC 61937 bursts off an S/PDIF or HDMI capture, AC-4's included, and the AC-4 sync frames the AC-4 packer reads | `iclforge::containers::iec61937::BurstReader`, `iclforge::containers::iec61937::read_ac4_sync_frame` | yes — `fuzz_iec61937_unwrap` |
 | ADM XML + BW64/RF64 (opt-in build) | `iclforge::adm::parse_bw64`, via vendored libadm/libbw64 | **opt-in only** — `fuzz_adm_parse` exists but is built only under `ICLFORGE_BUILD_ADM`; see [ADM](#adm-xml-and-bw64) |
-| Object authenticity tags | `iclforge::signing::verify_atmos_frame` | yes — `fuzz_signing_verify` (the key is part of the fuzzed input) |
-| Matroska/WebM containers | `iclforge::matroska::demux`, `iclforge::matroska::Reader` | yes |
-| MP4/ISOBMFF containers | `iclforge::mp4::demux`, `iclforge::mp4::Reader` | yes |
-| MPEG-TS containers | `iclforge::mpegts::demux`, `iclforge::mpegts::Reader` | yes |
-| OSC control packets (UDP), a live object-position source | `iclforge::oba::parse_osc_packet` | yes — `fuzz_osc_parse`, part of `fuzz/run.sh`'s default target list alongside the other object/metadata-layer harnesses |
+| Object authenticity tags | `iclforge::ac3::signing::verify_atmos_frame` | yes — `fuzz_signing_verify` (the key is part of the fuzzed input) |
+| Matroska/WebM containers | `iclforge::containers::matroska::demux`, `iclforge::containers::matroska::Reader` | yes |
+| MP4/ISOBMFF containers | `iclforge::containers::mp4::demux`, `iclforge::containers::mp4::Reader` | yes |
+| MPEG-TS containers | `iclforge::containers::mpegts::demux`, `iclforge::containers::mpegts::Reader` | yes |
+| OSC control packets (UDP), a live object-position source | `iclforge::objects::oba::parse_osc_packet` | yes — `fuzz_osc_parse`, part of `tools/fuzz/run.sh`'s default target list alongside the other object/metadata-layer harnesses |
 | Sendspin's handshake messages from a network peer (Hearth build) | `iclforge::sendspin::handshake` | yes — `fuzz_sendspin_handshake` |
 | Sendspin's messages after the handshake, JSON included (Hearth build) | `iclforge::sendspin::json::Document::parse`, the readers in `iclforge::sendspin::messages`, `pairing_messages`, `iclforge` and the other roles' namespaces | yes — `fuzz_sendspin_json`, `fuzz_sendspin_messages` |
 | Sendspin's fragments and binary messages: `player@v1`'s audio chunks, `_iclforge_player@v1`'s bursts, and the artwork, visualizer and source messages (Hearth build) | `iclforge::sendspin::Reassembler`, `parse_player_chunk`, `parse_burst_chunk`, `artwork::parse_message`, `visualizer::parse_frame`, `source::parse_chunk` | yes — `fuzz_sendspin_frames` |
@@ -52,7 +52,7 @@ caller, not an attack:
 - PCM handed to the encoder. Any float is legal audio; nothing about it can reach a decision the
   bitstream syntax does not already bound.
 - The signing key, if an operator supplies one. It is never generated, logged or written to disk
-  by this code (`iclforge::signing::SigningKey` zeroizes on destruction).
+  by this code (`iclforge::base::crypto::SigningKey` zeroizes on destruction).
 - File paths, output destinations, and the caller-owned spans the `_into` decode forms write
   through — see [Raw-pointer boundaries](#raw-pointer-boundaries).
 
@@ -97,8 +97,8 @@ guarantee:
 
 What runs against it:
 
-- **Twenty-four libFuzzer harnesses** under [`fuzz/`](https://github.com/iainchesworthlabs/iclforge/blob/main/fuzz/README.md),
-  built with ASan + UBSan and `-fno-sanitize-recover=all`. Twenty-one are in `fuzz/run.sh`'s
+- **Twenty-four libFuzzer harnesses** under [`fuzz/`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/fuzz/README.md),
+  built with ASan + UBSan and `-fno-sanitize-recover=all`. Twenty-one are in `tools/fuzz/run.sh`'s
   default list and drive the entry points in the table above for crashes and undefined
   behaviour — format sniffing (`fuzz_scan`), the three container demuxers (`fuzz_matroska_demux`,
   `fuzz_mp4_demux`, `fuzz_mpegts_demux`), the AC-3 and E-AC-3 decoders (`fuzz_ac3_decode`,
@@ -127,8 +127,8 @@ What runs against it:
   race there — the two runtimes are also mutually exclusive, so it is a separate leg
   (`Linux LLVM TSan`, a `deep`-tier leg in `.github/ci/legs.jsonc`, so it runs in the nightly run;
   preset `linux-llvm-tsan`) rather than more entries on the one above. It runs the `concurrency`
-  ctest label only — the audio layer's tests (`tests/audio/`), `forge live`'s
-  (`tests/cli/test_cli_live.cpp`) and the Hearth tests that carry the tag —
+  ctest label only — the audio layer's tests (`libs/audio/tests/`), `forge live`'s
+  (`apps/forge/cli/tests/test_cli_live.cpp`) and the Hearth tests that carry the tag —
   because TSan's shadow memory makes everything several times slower and the rest of the suite is
   single-threaded codec maths. `tsan.supp` at the repository root holds the suppressions and is
   near-empty.
@@ -196,7 +196,7 @@ floats. Use the allocating forms if the sizes are not statically obvious.
 
 ### The WASM bindings and the JNI bridge
 
-The WASM decoder (`apps/wasm/decoder_bindings.cpp`) copies the JavaScript byte array into a
+The WASM decoder (`apps/demos/wasm/decoder_bindings.cpp`) copies the JavaScript byte array into a
 `std::vector` before parsing, so the decode itself never reads JS-owned memory. What it hands
 *back* is a zero-copy `typed_memory_view` into the decoder instance's own buffers: those views
 are invalidated by the next `decode()` call or by the instance's destruction, and JavaScript
@@ -204,12 +204,12 @@ holding one past that point reads freed WASM heap. The module is built with
 `ALLOW_MEMORY_GROWTH` under a 1 GiB `MAXIMUM_MEMORY` ceiling, which turns heap exhaustion into a
 catchable `std::bad_alloc` and a readable refusal instead of a dead tab.
 
-The AC-4 bindings (`apps/wasm/ac4_bindings.cpp`) have the same shape. The decoder copies the
+The AC-4 bindings (`apps/demos/wasm/ac4_bindings.cpp`) have the same shape. The decoder copies the
 JavaScript byte array before parsing and returns each frame's channels and object samples as
 `typed_memory_view`s, valid until that instance's next call. The encoder copies every frame it
 returns into a `Uint8Array` of its own, because one call can return several.
 
-The Android JNI bridge (`apps/android/app/src/main/cpp/`) is demo-app scope: it returns strings
+The Android JNI bridge (`apps/demos/android/app/src/main/cpp/`) is demo-app scope: it returns strings
 through `NewStringUTF` and does not take byte arrays across the boundary, so it has no
 `GetByteArrayElements`-style pinned-buffer contract to get wrong. It is not part of the library's
 supported surface.
@@ -335,11 +335,11 @@ libadm and libbw64, plus Boost headers. That means:
 
 - **The fuzz harness that covers this path is opt-in, not continuous.** `fuzz_adm_parse` drives
   `iclforge::adm::parse_bw64` over BW64 chunks plus an arbitrary XML document, but it is built only when
-  `ICLFORGE_BUILD_ADM` is on (`fuzz/run.sh` turns that on via `ICLFORGE_FUZZ_ADM=1`), and the one
+  `ICLFORGE_BUILD_ADM` is on (`tools/fuzz/run.sh` turns that on via `ICLFORGE_FUZZ_ADM=1`), and the one
   CI job that runs it — `Fuzz ADM Nightly` — is schedule/dispatch-only and `continue-on-error`,
   because a vcpkg restore plus the libbw64/libadm `FetchContent` pulls cost more than the mutation
   budget and most of what the harness reaches is third-party code. It is not one of the
-  twenty-one harnesses in `fuzz/run.sh`'s default list, which run on every push. The resource
+  twenty-one harnesses in `tools/fuzz/run.sh`'s default list, which run on every push. The resource
   limits above do not apply here either way: there
   is no document-size cap, no entity-expansion limit and no element-count limit; an enormous or
   deeply nested ADM document is bounded by nothing this project controls.
@@ -349,7 +349,7 @@ libadm and libbw64, plus Boost headers. That means:
   number of buffer overruns, integer overflows, and uses of uninitialised data which may be
   triggered by reading malformed files", but has tagged no release containing them. This module
   pinned `0.10.0` at first and patched around the gap
-  (`src/adm/patch_libbw64.cmake`, `adm.cpp`'s own pre-check) as `fuzz_adm_parse` and an audit
+  (`libs/adm/patch_libbw64.cmake`, `adm.cpp`'s own pre-check) as `fuzz_adm_parse` and an audit
   of libbw64 for the same pattern found an unbounded allocation, an unbounded loop, a read of
   uninitialised stack and a `<ds64>` table that could resize a chunk other than `<data>` to
   whatever it liked. `github.com/pwnified/libbw64`, an active single-maintainer fork, carries the
@@ -357,7 +357,7 @@ libadm and libbw64, plus Boost headers. That means:
   crafted input from that investigation clean, not just by reading its source — plus real
   hardening of its own; `docs/library/adm.md`'s "Built on the EBU's own reference implementations"
   section has the reasoning for depending on a fork rather than the EBU directly, and
-  `fuzz/README.md`'s ADM section has the measurements. The fork's own commit is pinned (not a
+  `tools/fuzz/README.md`'s ADM section has the measurements. The fork's own commit is pinned (not a
   branch), the same way the tag used to be. Two small patches remain against it, for behaviours
   this module's tests need that the fork does not have by default: a truncated recording still
   parsing, and 64-bit float actually reaching the decode the fork's own utilities already
@@ -367,7 +367,7 @@ libadm and libbw64, plus Boost headers. That means:
 - The whole `axml` chunk is materialised as a string and re-parsed from an `istringstream`, so
   memory is O(document).
 - Parse and graph-resolution failures do surface as real diagnostics (`iclforge::adm::AdmError`,
-  `iclforge::admbridge::BridgeError`, each with its own `describe()`) rather than a crash or a bare
+  `iclforge::adm::BridgeError`, each with its own `describe()`) rather than a crash or a bare
   non-zero exit.
 
 **Do not enable the ADM build for untrusted input.** It exists to ingest professional master
@@ -377,7 +377,7 @@ advisory job, and deciding a document-size policy; neither has been done.
 
 ### Object signing is authentication, not integrity of the stream
 
-`iclforge::signing::verify_atmos_frame`/`verify_atmos_stream` check an HMAC tag over the EMDF object
+`iclforge::ac3::signing::verify_atmos_frame`/`verify_atmos_stream` check an HMAC tag over the EMDF object
 container. This tells you the object metadata came from someone holding the key. It does **not**
 authenticate the audio, the bed, or anything outside the container, and a stream with no
 container at all has nothing to verify — see
@@ -401,8 +401,8 @@ surface on top of opt-in surface: a session listens for OSC at all only when `po
 the GUI toggle) is explicitly used, and listens on every interface only when that is explicitly
 widened too.
 
-What a successful spoof or injection buys an attacker is narrow. `iclforge::oba::apply`
-(`src/objects/src/scene_osc.cpp`) merges only position, gain and `lfe_send` onto an object's
+What a successful spoof or injection buys an attacker is narrow. `iclforge::objects::oba::apply`
+(`libs/objects/src/scene_osc.cpp`) merges only position, gain and `lfe_send` onto an object's
 existing placement, or releases it back to its authored automation (`/object/<n>/release`) —
 there is no path from this input to encoder configuration, to the filesystem, or to anything
 outside the object placements themselves. The blast radius of a successful attack is "objects
@@ -410,7 +410,7 @@ move to wherever the packet says," never a compromised process.
 
 ### Sendspin: Hearth's server and its sinks
 
-`src/sendspin`, built only with `ICLFORGE_BUILD_HEARTH`, listens on the local network. A sink
+`libs/sendspin`, built only with `ICLFORGE_BUILD_HEARTH`, listens on the local network. A sink
 (`hearth-testsink` on a computer, or `hearth_sink` on an ESP32-S3, ESP32-C6 or ESP32-P4 board)
 accepts WebSocket connections on port 8928 and advertises `_sendspin._tcp`; Hearth's server
 listens on 8927, advertises `_sendspin-server._tcp`, and dials the players it finds. Anyone on the
@@ -453,7 +453,7 @@ goes out. A browser remembers at most 64 instances and hosts, and reads packets 
 bytes.
 
 **Not fuzzed.** The mDNS packet reader and cpp-httplib's WebSocket framing sit outside
-`fuzz/run.sh`'s build, which keeps the Sendspin library's core free of vcpkg dependencies. The
+`tools/fuzz/run.sh`'s build, which keeps the Sendspin library's core free of vcpkg dependencies. The
 packet reader has unit tests over packets that end early and names that point at themselves; the
 WebSocket framing is cpp-httplib's own code.
 
@@ -558,6 +558,6 @@ what you hit is already fixed.
 
 - [Validation](verification.md) — how output correctness is checked, and where the oracles run out
 - [Conformance vectors](conformance-vectors.md) — the published stream set, and what it does and does not prove
-- [`fuzz/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/fuzz/README.md) — the harnesses, the differential oracle and its agreement floor
+- [`tools/fuzz/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/fuzz/README.md) — the harnesses, the differential oracle and its agreement floor
 - [Decoding](library/decoding.md) — the decode API this page describes the boundaries of
 - [C API](library/c-api.md) — the ownership and error conventions in full

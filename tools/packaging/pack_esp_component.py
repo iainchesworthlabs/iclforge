@@ -2,7 +2,7 @@
 """Stage and pack iclforge as a self-contained ESP-IDF component archive.
 
 WHY THIS EXISTS. `compote component pack` roots its archive at the component
-directory and cannot reach above it. iclforge's component at esp-idf/iclforge/
+directory and cannot reach above it. iclforge's component at firmware/esp-idf/iclforge/
 is a thin wrapper that add_subdirectory()s the repo root, so packing it directly
 produces an archive of three files - CMakeLists.txt, idf_component.yml and the
 directory entry - which installs happily and then fails to configure, because
@@ -10,7 +10,7 @@ ICLFORGE_ROOT points outside the installed tree. That was the state of the
 manifest until this script existed, and nothing said so: the pack SUCCEEDS.
 
 So the sources are staged INTO a copy of the component first. The staged tree is
-generated, never committed: a second copy of src/ac3/ in the repository is
+generated, never committed: a second copy of libs/ac3/ in the repository is
 exactly the drift this project avoids everywhere else.
 
 WHAT GOES IN is the minimum the minimum-footprint profile compiles, worked out
@@ -26,7 +26,7 @@ STAGED_TREES below for what that means and where it stops.
 archive, which is the only check that actually establishes the thing this script
 is for. Needs an exported IDF environment; without one it says so and stops.
 
---with-ac4 also stages the AC-4 inspector, core and decoder, for a project that
+--with-ac4 also stages the AC-4 library without its encoder, for a project that
 turns on CONFIG_ICLFORGE_AC4 (planning/ac4.md, D14b). Without it the archive is
 what it was before that option existed: the option is off by default, and a
 project that turns it on against an archive packed without the AC-4 sources is
@@ -45,10 +45,10 @@ import tarfile
 import tempfile
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-COMPONENT = REPO / "esp-idf" / "iclforge"
+COMPONENT = REPO / "firmware" / "esp-idf" / "iclforge"
 
 # Whole directories copied verbatim. Directories rather than a file list on
-# purpose: src/ac3/minimal.cmake names its own sources and changes without
+# purpose: libs/ac3/minimal.cmake names its own sources and changes without
 # telling this script, so anything narrower would need keeping in step with it -
 # which is the failure this repo has hit before (the bare-metal fixture, 131
 # encoder commits stale). Copying the tree costs archive size and cannot go
@@ -58,35 +58,45 @@ COMPONENT = REPO / "esp-idf" / "iclforge"
 # language binding, and none of the container muxers. A component archive should
 # carry the part that builds for this chip.
 STAGED_TREES = (
-    # The AC-3 codec and the five libraries it is built from: the minimum-footprint profile is
-    # one archive of files from all six (src/ac3/minimal.cmake).
-    "src/ac3",
-    "src/base",
-    "src/dsp",
-    "src/objects",
-    "src/render",
-    "src/iec61937",
-    # The header-only Fixed32 / scalar-function target src/ac3 and src/ac4core
-    # both link (planning/ac4.md decision 31); the root CMakeLists.txt adds it
-    # with add_subdirectory before it reaches src/ac3, so a staged tree
-    # without it stops the configure with "source src/arithmetic ... is not an
-    # existing directory" - the failure this list produced when D14a added it.
-    "src/arithmetic",
+    # libs/device is the host-portable headers the component itself includes (interleave.hpp, the
+    # sink planner, the playout model, the firmware image rules): header-only, and the
+    # component's CMake puts its include directory on the component's path.
+    #
+    # The AC-3 codec and the four libraries it is built from: the minimum-footprint profile is
+    # one archive of files from all five (libs/ac3/minimal.cmake). libs/base also holds the
+    # header-only Fixed32 and scalar functions libs/ac3 and libs/ac4 both include (planning/ac4.md
+    # decision 31).
+    "libs/ac3",
+    "libs/base",
+    "libs/device",
+    "libs/dsp",
+    "libs/objects",
+    "libs/render",
     "cmake",
 )
 
-# What --with-ac4 adds: the AC-4 inspector, the core both AC-4 libraries link and
-# the decoder, whole, as the trees above are. Not src/ac4enc, which no ESP32 part
-# builds (planning/ac4.md, decision 34); the root adds it only under
-# ICLFORGE_BUILD_AC4, which the component keeps off. Off by default, so an
-# archive packed without the flag holds exactly the trees it always did.
-STAGED_AC4_TREES = (
-    "src/ac4",
-    "src/ac4core",
-    "src/ac4dec",
+# What --with-ac4 adds: the AC-4 library, whose minimum-footprint archive
+# (libs/ac4/minimal.cmake) is the inspector, the core and the decoder. Not the
+# encoder, which no ESP32 part builds (planning/ac4.md, decision 34) and which
+# the profile compiles none of: AC4_PRUNE drops its files from the staged
+# copy. Off by default, so an archive packed without the flag holds exactly the
+# trees it always did.
+STAGED_AC4_TREES = ("libs/ac4",)
+
+# The encoder's files, which the profile's archive does not list, dropped from
+# an archive packed --with-ac4. Directories as well as files; a stale entry
+# stops the pack, as PRUNE's does.
+AC4_PRUNE = (
+    "libs/ac4/include/iclforge/ac4/encoder",
+    "libs/ac4/src/encoder",
 )
 
-# Individual files the root build needs before it reaches src/ac3.
+# A library keeps its tests and its fuzz harnesses beside its code (planning/monorepo.md, C7-1), in
+# libs/<lib>/tests and libs/<lib>/fuzz. They were outside the trees above, in tests/ and fuzz/, and
+# are not part of a component archive, so staging leaves them out of every staged tree.
+CONSUMER_DIRS = ("tests", "fuzz")
+
+# Individual files the root build needs before it reaches libs/ac3.
 STAGED_FILES = (
     "CMakeLists.txt",
     "LICENSE",
@@ -94,19 +104,30 @@ STAGED_FILES = (
 )
 
 # Dropped from the staged copy. Both are excluded from the minimum-footprint
-# profile already (src/ac3/minimal.cmake), so removing them changes nothing
+# profile already (libs/ac3/minimal.cmake), so removing them changes nothing
 # that builds - they are here because an archive carrying AVX2 kernels for a
 # part with no AVX2 is just bigger.
 #
 # Repo-relative, and applied against the staged tree unchanged, because the
-# staging preserves the layout. Written the other way - relative to src/ac3 -
+# staging preserves the layout. Written the other way - relative to libs/ac3 -
 # they still worked, and tools/checks/check_doc_paths.py rightly called them
 # paths that do not exist: a reader cannot tell a wrong path from one that is
 # merely relative to something else.
 PRUNE = (
-    "src/ac3/src/internal/avx2/mdct_avx2.cpp",
-    "src/ac3/src/internal/avx2/avx2_probe.cpp",
+    "libs/ac3/src/internal/avx2/mdct_avx2.cpp",
+    "libs/ac3/src/internal/avx2/avx2_probe.cpp",
 )
+
+
+def _without_consumers(tree: pathlib.Path):
+    """A copytree `ignore` that drops tests/ and fuzz/ directly under a staged tree."""
+
+    def ignore(directory: str, names: list[str]) -> list[str]:
+        if pathlib.Path(directory) == tree:
+            return [name for name in names if name in CONSUMER_DIRS]
+        return []
+
+    return ignore
 
 
 def stage(destination: pathlib.Path, with_ac4: bool = False) -> None:
@@ -121,17 +142,13 @@ def stage(destination: pathlib.Path, with_ac4: bool = False) -> None:
     shutil.copytree(COMPONENT, destination, dirs_exist_ok=True)
     # A previous run's output, if the component directory was packed in place.
     shutil.rmtree(destination / "dist", ignore_errors=True)
-    # The streaming example's stream set - the repository's streams for a
-    # device to fetch, some 2.7 MB (planning/esp32-stream-set.md) - is not part
-    # of the component. The example's own stream/ stays.
-    shutil.rmtree(destination / "examples" / "hearth_sink" / "www", ignore_errors=True)
 
     library = destination / "lib"
     for tree in STAGED_TREES + (STAGED_AC4_TREES if with_ac4 else ()):
         src = REPO / tree
         if not src.is_dir():
             raise SystemExit(f"missing staged tree: {src}")
-        shutil.copytree(src, library / tree, dirs_exist_ok=True)
+        shutil.copytree(src, library / tree, dirs_exist_ok=True, ignore=_without_consumers(src))
 
     for name in STAGED_FILES:
         src = REPO / name
@@ -139,6 +156,15 @@ def stage(destination: pathlib.Path, with_ac4: bool = False) -> None:
             raise SystemExit(f"missing staged file: {src}")
         (library).mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, library / name)
+
+    for relative in AC4_PRUNE if with_ac4 else ():
+        target = library / relative
+        if target.is_dir():
+            shutil.rmtree(target)
+        elif target.is_file():
+            target.unlink()
+        else:
+            raise SystemExit(f"prune list is stale, no such file or directory: {relative}")
 
     for relative in PRUNE:
         target = library / relative
@@ -170,7 +196,7 @@ def describe(archive: pathlib.Path) -> tuple[int, int]:
     """Returns (entries, forge source files) - the second is what matters."""
     with tarfile.open(archive) as tar:
         names = tar.getnames()
-    sources = [n for n in names if "/lib/src/ac3/src/" in n and n.endswith(".cpp")]
+    sources = [n for n in names if "/lib/libs/ac3/src/" in n and n.endswith(".cpp")]
     return len(names), len(sources)
 
 
@@ -253,7 +279,7 @@ def main_source(with_ac4: bool) -> str:
         '#include "iclforge/ac3/decoder/output.hpp"',
     ]
     if with_ac4:
-        lines.append('#include "iclforge/ac4dec/decoder.hpp"')
+        lines.append('#include "iclforge/ac4/decoder/decoder.hpp"')
     lines += [
         "#include <array>",
         "#include <span>",
@@ -280,7 +306,7 @@ def main_source(with_ac4: bool) -> str:
 
 
 def manifest_targets() -> list[str]:
-    """The `targets:` list from esp-idf/iclforge/idf_component.yml.
+    """The `targets:` list from firmware/esp-idf/iclforge/idf_component.yml.
 
     Read rather than restated, and parsed by hand rather than with PyYAML: this
     script has no third-party dependency and the block it needs is a flat list
@@ -288,7 +314,7 @@ def manifest_targets() -> list[str]:
     default - silently verifying nothing is how a target ends up claimed and
     unbuilt.
     """
-    manifest = (REPO / "esp-idf" / "iclforge" / "idf_component.yml").read_text(encoding="utf-8")
+    manifest = (COMPONENT / "idf_component.yml").read_text(encoding="utf-8")
     targets: list[str] = []
     inside = False
     for line in manifest.splitlines():
@@ -302,7 +328,7 @@ def manifest_targets() -> list[str]:
             elif stripped and not stripped.startswith("#"):
                 break
     if not targets:
-        raise SystemExit("no targets: block in esp-idf/iclforge/idf_component.yml")
+        raise SystemExit("no targets: block in firmware/esp-idf/iclforge/idf_component.yml")
     return targets
 
 
@@ -340,7 +366,7 @@ def main() -> int:
 
     print(f"packed {final}")
     print(f"  entries: {entries}")
-    print(f"  src/ac3 sources: {sources}")
+    print(f"  libs/ac3 sources: {sources}")
     if args.with_ac4:
         print("  with the AC-4 inspector, core and decoder")
     # The number that would have caught the original three-file archive. A

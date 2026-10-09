@@ -32,20 +32,20 @@ class DocsOnly(unittest.TestCase):
 
 class BuildRelevant(unittest.TestCase):
     def test_library_change_builds_without_the_gui(self):
-        got = plan("src/ac4dec/decoder.cpp", "tests/ac4dec/test_decoder.cpp")
+        got = plan("libs/ac4/src/decoder/decoder.cpp", "libs/ac4/tests/decoder/test_decoder.cpp")
         self.assertEqual((got["build"], got["gui"], got["docs_only"]), ("true", "false", "false"))
 
     def test_cli_change_builds_without_the_gui(self):
-        got = plan("apps/cli/commands/decode.cpp")
+        got = plan("apps/forge/cli/src/commands/decode.cpp")
         self.assertEqual((got["build"], got["gui"]), ("true", "false"))
 
     def test_gui_trees_pull_qt_in(self):
         for path in (
-            "apps/gui/qml/Main.qml",
-            "apps/hearth/ui/qml/Main.qml",
+            "apps/forge/gui/assets/qml/Main.qml",
+            "apps/hearth/ui/assets/qml/Main.qml",
             "apps/crucible/src/engine.cpp",
-            "apps/common/settings.cpp",
-            "tests/hearth/test_engine.cpp",
+            "apps/shared/media/src/settings.cpp",
+            "apps/hearth/engine/tests/test_engine.cpp",
             "cmake/FindQt6.cmake",
         ):
             with self.subTest(path=path):
@@ -63,9 +63,10 @@ class BuildRelevant(unittest.TestCase):
 
     def test_fixtures_and_gate_scripts_build(self):
         for path in (
-            "tests/golden/audio/reference_51.wav",
+            "testdata/audio/reference_51.wav",
             "tools/checks/compare_wav.py",
-            "fuzz/seeds/x.bin",
+            "libs/ac3/fuzz/seeds/fuzz_scan/x.bin",
+            "tools/fuzz/run.sh",
         ):
             with self.subTest(path=path):
                 self.assertEqual(plan(path)["build"], "true")
@@ -75,7 +76,7 @@ class BuildRelevant(unittest.TestCase):
         self.assertEqual(plan("examples/python/encode.py")["build"], "false")
 
     def test_mixed_docs_and_code_builds(self):
-        got = plan("docs/library/index.md", "src/forge/x.cpp")
+        got = plan("docs/library/index.md", "libs/ac3/src/x.cpp")
         self.assertEqual((got["build"], got["docs_only"]), ("true", "false"))
 
 
@@ -84,17 +85,18 @@ class NotBuiltByTheLinuxGate(unittest.TestCase):
 
     def test_platform_and_language_trees(self):
         for path in (
-            "esp-idf/iclforge/component.c",
-            "esphome/x.yaml",
-            "apps/android/app/build.gradle.kts",
-            "apps/wasm/main.cpp",
-            "apps/baremetal/probe.cpp",
-            "python/iclforge/__init__.py",
-            "rust/src/lib.rs",
-            "js/package.json",
+            "firmware/esp-idf/iclforge/component.c",
+            "firmware/esphome/x.yaml",
+            "firmware/hearth-sink/main/hearth_sink.cpp",
+            "apps/demos/android/app/build.gradle.kts",
+            "apps/demos/wasm/main.cpp",
+            "firmware/baremetal/probe.cpp",
+            "bindings/python/src/iclforge/__init__.py",
+            "bindings/rust/iclforge/src/lib.rs",
+            "bindings/js/package.json",
             "packaging/conan/conanfile.py",
             "requirements/requirements-lint.txt",
-            "apps/linux/tray-vm/guest/provision.sh",
+            "apps/crucible/linux/tray-vm/guest/provision.sh",
         ):
             with self.subTest(path=path):
                 got = plan(path)
@@ -158,12 +160,17 @@ class Machinery(unittest.TestCase):
                 self.assertEqual(plan(path)["machinery"], "true")
 
     def test_ordinary_changes_do_not(self):
-        for path in ("src/forge/x.cpp", "docs/a.md", ".github/workflows/fuzz.yml", "python/x.py"):
+        for path in (
+            "libs/ac3/src/x.cpp",
+            "docs/a.md",
+            ".github/workflows/fuzz.yml",
+            "bindings/python/x.py",
+        ):
             with self.subTest(path=path):
                 self.assertEqual(plan(path)["machinery"], "false")
 
     def test_one_gate_file_among_others_is_enough(self):
-        got = plan("src/forge/x.cpp", ".github/workflows/_static.yml")
+        got = plan("libs/ac3/src/x.cpp", ".github/workflows/_static.yml")
         self.assertEqual(got["machinery"], "true")
 
     def test_full_runs_do_not_need_it(self):
@@ -194,65 +201,131 @@ class Conservative(unittest.TestCase):
 
 class QueueMode(unittest.TestCase):
     def test_a_library_change_builds_qt_in_the_queue(self):
-        got = gate.plan(["src/forge/x.cpp"], gui_on_build=True)
+        got = gate.plan(["libs/ac3/src/x.cpp"], gui_on_build=True)
         self.assertEqual((got["build"], got["gui"]), ("true", "true"))
         self.assertIn("merge queue", got["gui_reason"])
 
     def test_a_change_that_does_not_build_stays_off(self):
         got = gate.plan(["docs/a.md"], gui_on_build=True)
         self.assertEqual((got["build"], got["gui"]), ("false", "false"))
-        got = gate.plan(["python/x.py"], gui_on_build=True)
+        got = gate.plan(["bindings/python/x.py"], gui_on_build=True)
         self.assertEqual((got["build"], got["gui"]), ("false", "false"))
 
 
 class Compare(unittest.TestCase):
     """Whether a queue entry also runs the performance and memory comparisons."""
 
-    def test_a_change_under_src_asks_for_them(self):
-        for path in ("src/forge/x.cpp", "src/ac4dec/decoder.cpp", "src/audio/y.hpp"):
+    def test_a_change_under_libs_asks_for_them(self):
+        for path in (
+            "libs/ac3/src/x.cpp",
+            "libs/ac4/src/decoder/decoder.cpp",
+            "libs/audio/include/y.hpp",
+        ):
             with self.subTest(path=path):
                 self.assertEqual(plan(path)["compare"], "true")
 
-    def test_one_src_path_among_others_is_enough(self):
-        self.assertEqual(plan("docs/a.md", "apps/cli/x.cpp", "src/forge/x.cpp")["compare"], "true")
+    def test_vendored_code_is_held_to_what_src_was(self):
+        got = plan("external/time-filter/sendspin_time_filter.cpp")
+        self.assertEqual((got["build"], got["gui"], got["compare"]), ("true", "false", "true"))
+
+    def test_one_library_path_among_others_is_enough(self):
+        got = plan("docs/a.md", "apps/forge/cli/src/x.cpp", "libs/ac3/src/x.cpp")
+        self.assertEqual(got["compare"], "true")
 
     def test_changes_that_cannot_alter_the_library_do_not(self):
         for path in (
             "tests/forge/test_x.cpp",
-            "apps/cli/commands/decode.cpp",
-            "apps/gui/qml/Main.qml",
+            "libs/ac3/tests/core/test_x.cpp",
+            "libs/ac3/fuzz/fuzz_scan.cpp",
+            "libs/ac3/fuzz/CMakeLists.txt",
+            "apps/forge/cli/src/commands/decode.cpp",
+            "apps/forge/gui/assets/qml/Main.qml",
             "cmake/Compiler.cmake",
             "CMakeLists.txt",
             "tools/checks/x.py",
-            "python/x.py",
+            "bindings/python/x.py",
         ):
             with self.subTest(path=path):
                 self.assertEqual(plan(path)["compare"], "false")
 
     def test_documentation_under_src_is_still_documentation(self):
-        got = plan("src/ac4dec/ERRATA.md")
+        got = plan("libs/ac4/ERRATA.md")
         self.assertEqual((got["docs_only"], got["compare"]), ("true", "false"))
 
     def test_the_gates_own_machinery_does_not(self):
         self.assertEqual(plan(".github/workflows/pr-gate.yml")["compare"], "false")
 
     def test_a_full_run_and_an_empty_list_do_not(self):
-        self.assertEqual(gate.plan(["src/forge/x.cpp"], force_all=True)["compare"], "false")
+        self.assertEqual(gate.plan(["libs/ac3/src/x.cpp"], force_all=True)["compare"], "false")
         self.assertEqual(gate.plan([])["compare"], "false")
 
     def test_the_queue_mode_asks_the_same_question(self):
-        self.assertEqual(gate.plan(["src/forge/x.cpp"], gui_on_build=True)["compare"], "true")
-        self.assertEqual(gate.plan(["apps/cli/x.cpp"], gui_on_build=True)["compare"], "false")
+        self.assertEqual(gate.plan(["libs/ac3/src/x.cpp"], gui_on_build=True)["compare"], "true")
+        self.assertEqual(
+            gate.plan(["apps/forge/cli/src/x.cpp"], gui_on_build=True)["compare"], "false"
+        )
+
+
+class ProjectTable(unittest.TestCase):
+    """What the gate builds follows the rows of tools/checks/projects.json (C7-6)."""
+
+    def test_the_projects_no_linux_lane_builds_are_the_bindings_the_firmware_and_the_demos(self):
+        not_built = {
+            p.name for p in gate.TABLE.projects.values() if not gate.BUILT_LANES & set(p.lanes)
+        }
+        self.assertEqual(
+            not_built,
+            {
+                "demo-android",
+                "demo-wasm",
+                "python",
+                "rust",
+                "js",
+                "esp-idf",
+                "hearth-sink",
+                "esphome",
+                "baremetal",
+            },
+        )
+
+    def test_a_header_of_the_device_library_is_built_without_the_gui(self):
+        # libs/device is a library the ESP component, Hearth's engine and its own tests use: it
+        # builds on the desktop lanes and is held to the comparisons, as the other libraries are.
+        for name in ("block_ring", "firmware_image"):
+            with self.subTest(header=name):
+                got = plan(f"libs/device/include/iclforge/{name}.hpp")
+                wanted = ("true", "false", "true")
+                self.assertEqual((got["build"], got["gui"], got["compare"]), wanted)
+
+    def test_the_media_code_ac4s_tests_compile_in_is_built_with_the_gui(self):
+        # The table's one exception: a file it reaches is in a GUI tree on its own account.
+        got = plan("apps/shared/media/src/ac4_object_render.hpp")
+        self.assertEqual((got["build"], got["gui"]), ("true", "true"))
+
+    def test_a_header_no_excused_edge_reaches_stays_unbuilt(self):
+        got = plan("firmware/esp-idf/iclforge/include/iclforge/access_units.hpp")
+        self.assertEqual((got["build"], got["gui"]), ("false", "false"))
+
+    def test_the_examples_and_the_cross_project_tests_build_without_qt(self):
+        for path in ("examples/mux_mp4.cpp", "tests/support/helpers.cpp"):
+            with self.subTest(path=path):
+                got = plan(path)
+                self.assertEqual((got["build"], got["gui"]), ("true", "false"))
+
+    def test_the_library_kinds_ask_for_the_comparisons(self):
+        self.assertEqual(plan("libs/ac4/src/decoder/decoder.cpp")["compare"], "true")
+        self.assertEqual(plan("external/time-filter/filter.cpp")["compare"], "true")
+        self.assertEqual(plan("apps/forge/cli/src/main.cpp")["compare"], "false")
 
 
 class Reason(unittest.TestCase):
     def test_names_the_first_path_that_forced_the_build(self):
-        got = plan("docs/a.md", "src/forge/x.cpp", "src/forge/y.cpp")
-        self.assertIn("src/forge/x.cpp", got["reason"])
+        got = plan("docs/a.md", "libs/ac3/src/x.cpp", "libs/ac3/src/y.cpp")
+        self.assertIn("libs/ac3/src/x.cpp", got["reason"])
 
     def test_names_the_path_that_pulled_qt_in(self):
-        got = plan("src/forge/x.cpp", "apps/gui/qml/Main.qml")
-        self.assertIn("apps/gui/qml/Main.qml", got["gui_reason"])
+        got = plan("libs/ac3/src/x.cpp", "apps/forge/gui/assets/qml/Main.qml")
+        self.assertIn("apps/forge/gui/assets/qml/Main.qml", got["gui_reason"])
 
     def test_docs_only_reason(self):
         self.assertIn("documentation", plan("docs/a.md")["reason"])
@@ -271,7 +344,7 @@ class Cli(unittest.TestCase):
         return rc, out.getvalue(), err.getvalue()
 
     def test_prints_github_output_lines(self):
-        rc, out, _ = self.run_main([], "src/forge/x.cpp\n")
+        rc, out, _ = self.run_main([], "libs/ac3/src/x.cpp\n")
         self.assertEqual(rc, 0)
         lines = dict(line.split("=", 1) for line in out.splitlines())
         self.assertEqual(lines["build"], "true")
@@ -280,7 +353,7 @@ class Cli(unittest.TestCase):
 
     def test_every_output_line_is_a_key_value_pair(self):
         # $GITHUB_OUTPUT is line-oriented: a stray line would be a parse error.
-        _, out, _ = self.run_main([], "src/forge/x.cpp\nbrand-new-dir/thing.bin\n")
+        _, out, _ = self.run_main([], "libs/ac3/src/x.cpp\nbrand-new-dir/thing.bin\n")
         keys = [line.split("=", 1)[0] for line in out.splitlines()]
         self.assertEqual(
             keys, ["build", "gui", "docs_only", "machinery", "compare", "reason", "gui_reason"]

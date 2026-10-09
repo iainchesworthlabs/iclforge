@@ -103,7 +103,7 @@ Three lookups go with it:
 | `uniform_access_unit_samples` | The one length every unit shares, or nothing when they differ |
 
 That last one is exactly the question a fixed-duration container track can answer and a variable
-one cannot: `iclforge::mp4::AudioTrack`, `iclforge::mpegts::AudioTrack` and `iclforge::matroska::AudioTrack` each hold a single
+one cannot: `iclforge::containers::mp4::AudioTrack`, `iclforge::containers::mpegts::AudioTrack` and `iclforge::containers::matroska::AudioTrack` each hold a single
 `samples_per_frame`, so a stream it returns nothing for cannot be described to them without
 per-sample durations they do not model. `forge`'s `mkv`/`mp4`/`fmp4`/`ts` take the figure from
 here and refuse such a stream rather than muxing it to a silently wrong timeline.
@@ -131,7 +131,7 @@ A/52 §7.10.1 puts it **before** the region it protects and requires the registe
 once the first 5/8 of the syncframe has been shifted through, so it has to be *solved* rather
 than computed — `iclforge::ac3::solve_leading_crc` (`iclforge/ac3/core/crc16.hpp`) does that with a GF(2)
 polynomial inverse, and is the same function the encoder itself uses. `restamp_crc` is public
-for a caller doing its own bsi surgery (`iclforge::signing::sign_atmos_frame` is the in-project
+for a caller doing its own bsi surgery (`iclforge::ac3::signing::sign_atmos_frame` is the in-project
 precedent) so nobody has to reimplement that solve.
 
 Stated as limits rather than left to be discovered:
@@ -158,7 +158,7 @@ re-derive: `bsid`, `bsmod` (with `bsmod_present`, since Annex E carries it only 
 `infomdate`), `bit_rate_code`, `dsurmod`, `mix_metadata`, `oba_complexity_index`, and — for
 E-AC-3 — `independent_substreams` plus a `SubstreamService` for substreams 1–3. Those feed
 `iclforge::ac3::io::build_codec_config_box`'s `dac3`/`dec3` payload and the MPEG-TS PMT descriptors of
-both broadcast profiles (see [Muxing & sinks](muxing-and-sinks.md#muxing-iclforgempegtsmux)).
+both broadcast profiles (see [Muxing & sinks](muxing-and-sinks.md#muxing-iclforgecontainersmpegtsmux)).
 `independent_substreams` is an *observation* of which substream ids appear; it deliberately does
 not change how `scan` groups access units, which stays one-programme.
 
@@ -209,7 +209,7 @@ rather than passed through, because passing it through would hand back a stream 
 the objects this function promises to remove. An AC-3 stream is refused outright
 (`kNotEac3`): Annex E is where substreams and skip fields live.
 
-This is the inverse of `iclforge::signing`'s in-place EMDF rewrite and, like it, needs no key —
+This is the inverse of `iclforge::ac3::signing`'s in-place EMDF rewrite and, like it, needs no key —
 taking a container out is not authenticating one. Both share one bit-accurate frame walk
 (`iclforge::ac3::emdf::walk_frame`) so the two cannot drift apart.
 
@@ -795,13 +795,13 @@ filterbank's own `dsp::kQmfDelay` (576 samples) on top of the bed's 256, for 832
 in the same `DecodedAccessUnit` still lags by 256, so **objects and bed are not aligned with each
 other** — anything mixing the two has to delay the bed by 576 samples. `oba::AtmosEncoder::latency()`
 reports the object path's budget and `bed_latency()` the bed's; the 832 is measured end to end in
-[`tests/ac3/decoder/test_latency.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/tests/ac3/decoder/test_latency.cpp).
+[`libs/ac3/tests/decoder/test_latency.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/ac3/tests/decoder/test_latency.cpp).
 
 With `DecoderConfig::joc_domain` set to `kMdctBand`, the reconstruction costs 256 samples rather
 than 576, so objects lag their input by 512 and the bed has to be delayed by 256.
 `iclforge::render::LayoutRenderer` does this delaying for the one bed channel it plays beside placed
 objects, the LFE, once `set_joc_domain()` has told it the decoder's domain;
-[`tests/render/test_object_lfe_timing.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/tests/render/test_object_lfe_timing.cpp)
+[`libs/render/tests/test_object_lfe_timing.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/render/tests/test_object_lfe_timing.cpp)
 measures the rendered feeds.
 
 ## Streams with more than one programme
@@ -872,6 +872,6 @@ manifest of what each exercises, for checking an independent implementation.
 
 See also: [Encoding AC-3](encoding-ac3.md) and [Encoding E-AC-3](encoding-eac3.md) — what
 `decode_frame`/`decode_access_unit` are undoing, and the full latency budget;
-[Muxing & sinks](muxing-and-sinks.md) — pairing `iclforge::ac3::io::scan` with `iclforge::matroska::mux` is what
+[Muxing & sinks](muxing-and-sinks.md) — pairing `iclforge::ac3::io::scan` with `iclforge::containers::matroska::mux` is what
 keeps a container's track header accurate; [Building](../building.md) — the minimum-footprint
 decoder profile for set-top and DSP targets.

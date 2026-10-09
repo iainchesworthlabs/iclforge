@@ -18,25 +18,25 @@
   ],
   "features": {
     "matroska": {
-      "description": "Standalone Matroska (.mkv) container writer (iclforge::matroska) - depends on nothing in iclforge::ac3"
+      "description": "Standalone Matroska (.mkv) container writer (iclforge::containers::matroska) - depends on nothing in iclforge::ac3"
     },
     "mp4": {
-      "description": "Standalone MP4/ISOBMFF container writer, plus fMP4/CMAF segmenting and HLS/DASH signaling (iclforge::mp4) - depends on nothing in iclforge::ac3"
+      "description": "Standalone MP4/ISOBMFF container writer, plus fMP4/CMAF segmenting and HLS/DASH signaling (iclforge::containers::mp4) - depends on nothing in iclforge::ac3"
     },
     "mpegts": {
-      "description": "Standalone MPEG-2 Transport Stream container writer (iclforge::mpegts) - depends on nothing in iclforge::ac3"
+      "description": "Standalone MPEG-2 Transport Stream container writer (iclforge::containers::mpegts) - depends on nothing in iclforge::ac3"
     },
     "capi": {
       "description": "Stable, minimal C11 API over the AC-3 and E-AC-3 encode/decode core, and over AC-4 when the ac4 feature is also on (iclforge::c) - for bindings and embedding by callers that cannot or do not want to link C++23"
     },
     "ac4": {
-      "description": "AC-4 (ETSI TS 103 190) sync frame and table of contents reader, decoder and encoder (iclforge::ac4, iclforge::ac4dec, iclforge::ac4enc) - depends on nothing in iclforge::ac3"
+      "description": "AC-4 (ETSI TS 103 190) sync frame and table of contents reader, decoder and encoder (iclforge::ac4) - depends on nothing in iclforge::ac3"
     },
     "iab": {
       "description": "Standalone SMPTE ST 2098-2 Immersive Audio Bitstream reader (iclforge::iab) - depends on nothing in iclforge::ac3"
     },
     "iamf": {
-      "description": "Standalone IAMF v1.1 OBU and ISOBMFF writer (iclforge::iamf) - depends on nothing in iclforge::ac3"
+      "description": "Standalone IAMF v1.1 OBU and ISOBMFF writer (iclforge::containers::iamf) - depends on nothing in iclforge::ac3"
     }
   }
 }

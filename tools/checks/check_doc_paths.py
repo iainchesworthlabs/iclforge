@@ -41,7 +41,7 @@ runnable the same way locally:
     and CHANGELOG.md, whose released entries are immutable. Their links are
     still checked; only their prose is exempt.
 
-(c) Every path literal starting docs/, apps/, src/ or tools/ inside
+(c) Every path literal starting docs/, apps/, libs/, external/, notices/, src/ or tools/ inside
     .github/workflows/*.yml, cmake/**/*.cmake, CMakePresets.json and
     tools/**/*.{py,sh,ps1} names something that exists. Conservative on
     purpose. A token has to start at a word boundary, contain a slash and end
@@ -95,7 +95,9 @@ LITERAL_GLOBS = (
     "tools/**/*.ps1",
 )
 # The prefixes the literal check treats as a repo-relative path.
-LITERAL_PREFIXES = ("docs", "apps", "src", "tools")
+# "src" stays: there is no top-level src/ since planning/monorepo.md's C7-1, so a literal that
+# starts with it is a path nothing moved, and is reported unless FOREIGN_PATHS says whose it is.
+LITERAL_PREFIXES = ("docs", "apps", "libs", "external", "notices", "src", "tools")
 
 # Tokens that read as repo-relative paths but are not. Each is a deliberate
 # exception with its reason, printed on every run so the list stays under the
@@ -118,20 +120,20 @@ FOREIGN_PATHS = {
 # deleted from here, which is what makes the plan's own prose fall due. Only a page that is not in
 # PROSE_PATHS_UNCHECKED needs an entry: that table already excuses the prose of the other plans.
 PLANNED_PATHS = {
-    "src/ac3/include/iclforge/ac3/decoder/associated_service.hpp": (
+    "libs/ac3/include/iclforge/ac3/decoder/associated_service.hpp": (
         "proposed by the programme-mixing-metadata plan's Phase 5, not created yet"
     ),
-    "src/ac3/src/decoder/associated_service.cpp": (
+    "libs/ac3/src/decoder/associated_service.cpp": (
         "proposed by the programme-mixing-metadata plan's Phase 5, not created yet"
     ),
 }
 
-# Script trees whose literals are not references into this tree. tools/n1b holds the rewrite rules
-# of the re-layout in planning/layout.md: every rule names a path of the tree it reads and a path
-# of the tree it writes, and the second exists only once the scripts have run. Printed on every
-# run, like the two tables above; it goes when the scripts do.
+# Script trees whose literals are not references into this tree. tools/adapt holds the rewrite
+# rules of the re-layout in planning/layout.md, for adapting a branch to it: every rule names a
+# path of the tree it reads and a path of the tree it writes, and the first is the tree before the
+# re-layout. Printed on every run, like the two tables above; it goes when the scripts do.
 UNCHECKED_LITERAL_TREES = {
-    "tools/n1b/": "the layout scripts name the paths of the tree they write, not yet there",
+    "tools/adapt/": "the layout scripts name the paths of the tree as it was before the re-layout",
 }
 
 # Markdown pages whose prose deliberately names paths that do not exist: a plan
@@ -145,13 +147,17 @@ PROSE_PATHS_UNCHECKED = {
     "planning/host-plugin.md": "study; proposes an Assay component and its own docs tree",
     "planning/qc-report.md": "plan; proposes source files it would add",
     "planning/layout.md": "study; proposes a layout, paths and names that do not exist yet",
+    "planning/consolidation.md": "plan; proposes merged libraries and paths that do not exist yet",
+    "planning/monorepo.md": "study; proposes a layout, projects and paths that do not exist yet",
     "planning/layout-inventory.md": (
         "inventory; a dated snapshot of the tree, naming the paths the proposed layout moves"
     ),
     "docs/crucible/design/promotion.md": (
-        "phase record; names the pre-promotion apps/windows layout"
+        "phase record; names the layout from before Crucible's promotion"
     ),
-    "docs/platforms/windows-demo.md": "phase record; names the pre-promotion apps/windows layout",
+    "docs/platforms/windows-demo.md": (
+        "phase record; names the layout from before Crucible's promotion"
+    ),
     "CHANGELOG.md": "released entries are an immutable record of the tree as it was",
 }
 

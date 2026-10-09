@@ -4,13 +4,13 @@ A stable, minimal C-callable surface over `iclforge::ac3`'s encode/decode core �
 AC-3, E-AC-3 and Atmos (OAMD + JOC) — and over the AC-4 decoder and encoder ([AC-4](#ac-4)), for
 bindings and embedding by callers that cannot or do not want to link C++23. The whole surface is
 one header,
-[`iclforge_c/iclforge.h`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/capi/include/iclforge_c/iclforge.h),
+[`iclforge_c/iclforge.h`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/capi/include/iclforge_c/iclforge.h),
 plain C11 with no C++ type crossing it anywhere — only opaque handles and POD structs. It is a
 separate library from `iclforge::ac3`: link `iclforge::c` instead, not both.
 
 [`examples/capi_encode_decode.c`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/capi_encode_decode.c)
 is a complete, buildable program (compiled as C, not C++, so the build itself proves the header
-is C-usable) — the excerpts below are drawn from it. `tests/capi/test_capi.cpp` covers the
+is C-usable) — the excerpts below are drawn from it. `libs/capi/tests/test_capi.cpp` covers the
 rest of the surface, including Atmos encode/decode and the error paths, from Catch2.
 
 ```cmake
@@ -21,10 +21,10 @@ target_link_libraries(your_target PRIVATE iclforge::c)
 `BUILD_SHARED_LIBS` asks for, same as `iclforge::ac3`; an installed package exports both variants
 explicitly as `iclforge::c_static`/`iclforge::c_shared` — see [Using the libraries](index.md) for
 the equivalent `iclforge::ac3` linking recipe. Unlike `iclforge::ac3`, **both** `iclforge_c` variants
-statically embed the codec core, and the AC-4 libraries where `ICLFORGE_BUILD_AC4` is on,
+statically embed the codec core, and the AC-4 library where `ICLFORGE_BUILD_AC4` is on,
 regardless of `BUILD_SHARED_LIBS`: a binding or embedder reaching
 for a C ABI wants exactly one library to `dlopen`/`ctypes`/`ffi.dlopen`, not a second
-`libiclforge_ac3.so` to also track down and ship — see `src/capi/CMakeLists.txt`'s header comment. On
+`libiclforge_ac3.so` to also track down and ship — see `libs/capi/CMakeLists.txt`'s header comment. On
 Linux the shared library exports the C API and nothing else, so a program that links it beside
 `libiclforge_ac3.so` still calls the C++ API in `libiclforge_ac3.so`; the copy of the codec inside
 `libiclforge_c.so` serves the C API alone.
@@ -196,8 +196,8 @@ iclforge_atmos_encoder_destroy(encoder);
 
 Positions use the room-anchored coordinates described under
 [Spatial & Atmos objects](spatial-and-atmos.md): `x` and `y` are in `[0,1]`, and `z` is in
-`[-1,1]`. The C API emits unsigned object containers. Object signing remains the separate
-`iclforge::signing` C++ library or the CLI workflow documented under [Object signing](signing.md).
+`[-1,1]`. The C API emits unsigned object containers. Object signing remains the C++ API of
+`iclforge::ac3::signing` or the CLI workflow documented under [Object signing](signing.md).
 
 ## Decoding
 
@@ -277,7 +277,7 @@ position and gain (`..._dynamic_object`), and JOC's reconstructed per-object aud
 (`..._object_audio`/`..._object_audio_count`). Those audio entries are index-parallel to the
 dynamic objects for the dynamic-object-only programme this project's own encoder writes; for a
 bed programme they are its bed channels instead, and the C++ surface
-(`DecodedSubstream::object_indices`, `iclforge::oba::joc_object_indices`) is what says which. See
+(`DecodedSubstream::object_indices`, `iclforge::objects::oba::joc_object_indices`) is what says which. See
 [Spatial & Atmos objects](spatial-and-atmos.md) for what the position/gain values mean and how
 `iclforge_atmos_encoder_t` (the C counterpart to `iclforge::ac3::oba::AtmosEncoder`) produces them.
 
@@ -390,7 +390,7 @@ application layer, which composes the same three the way a caller of this API wo
 `iclforge_ac4_decoder_t` and `iclforge_ac4_encoder_t` mirror `iclforge::ac4::Decoder`/`iclforge::ac4::Encoder`
 (ETSI TS 103 190-1 V1.4.1, TS 103 190-2 V1.3.1) behind the same opaque-handle, `_config_init()`
 and out-parameter conventions as the rest of this header — see
-[`iclforge_c/iclforge.h`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/capi/include/iclforge_c/iclforge.h)'s
+[`iclforge_c/iclforge.h`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/capi/include/iclforge_c/iclforge.h)'s
 own AC-4 section for the full surface. The section is declared whether or not this library was
 configured with `ICLFORGE_BUILD_AC4` (on by default): built without it, every fallible function
 returns `ICLFORGE_ERROR_UNSUPPORTED` (4), a `_create()` leaves its out-parameter `NULL`, and
@@ -578,7 +578,7 @@ and `_update`: the output sample each takes effect at, the ramp a renderer takes
 the properties). The objects come in the decoder's order, not the encoder's: the LFE first, then
 the bed objects, then the dynamic objects, each group in the order the configuration lists it.
 
-The AC-4 cases of `tests/capi/test_capi.cpp` cover the rest. An A-JOC scene and a direct-coded one are encoded
+The AC-4 cases of `libs/capi/tests/test_capi.cpp` cover the rest. An A-JOC scene and a direct-coded one are encoded
 through the C API and through `iclforge::ac4::Encoder` itself, and the two streams are the same bytes; the
 C API's decoder reads each object back within what each field's code can hold, with its own tone
 and a metadata update at the sample its input sample comes out. Its other cases hold the limits
@@ -622,8 +622,8 @@ metadata beyond the loudness values (the DRC, dialogue enhancement and downmix i
 `iclforge_ac4_encoder_toc()` and the functions that take its result cover what a container muxer
 needs from the encoder's own stream.
 
-`iclforge::oba::ObjectScene` (the object-scene timeline behind `forge atmos-path` and the GUI's
-export - see [Spatial & Atmos objects](spatial-and-atmos.md#the-scene-iclforgeobaobjectscene)) is not
+`iclforge::objects::oba::ObjectScene` (the object-scene timeline behind `forge atmos-path` and the GUI's
+export - see [Spatial & Atmos objects](spatial-and-atmos.md#the-scene-iclforgeobjectsobaobjectscene)) is not
 here either. Its shape has settled: `SceneCursor` is the seam a live position source plugs into,
 and the OSC wire form ([`iclforge/objects/scene_osc.hpp`](spatial-and-atmos.md#the-osc-wire-form)), a
 sibling header, changed nothing about `scene.hpp`. It is left out because this surface is a

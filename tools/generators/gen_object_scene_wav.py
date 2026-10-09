@@ -2,11 +2,11 @@
 
 Produces two checked-in files that together define one fixed Atmos scene:
 
-  tests/golden/audio/reference_objects.wav    5 mono essences, one per object,
+  testdata/audio/reference_objects.wav    5 mono essences, one per object,
                                               as the channels of a 48 kHz PCM16
                                               WAV (`forge atmos-encode` makes
                                               each source channel an object)
-  tests/golden/audio/reference_objects.paths  where each of those objects sits
+  testdata/audio/reference_objects.paths  where each of those objects sits
                                               in the room, in atmos-path's own
                                               keyframe format
 
@@ -71,7 +71,7 @@ import wave
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-AUDIO_DIR = REPO / "tests" / "golden" / "audio"
+AUDIO_DIR = REPO / "testdata" / "audio"
 WAV_OUT = AUDIO_DIR / "reference_objects.wav"
 PATHS_OUT = AUDIO_DIR / "reference_objects.paths"
 
@@ -177,7 +177,7 @@ def make_objects() -> list[list[float]]:
 
 
 # "object time_s x y z gain lfe_send" rows, in atmos-path's own format (see
-# parse_path_file in apps/cli/commands/atmos.cpp). x/y/z are room coordinates
+# parse_path_file in apps/forge/cli/src/commands/atmos.cpp). x/y/z are room coordinates
 # in [0,1]: x runs left(0) to right(1), y front(0) to back(1), z floor(0) to
 # ceiling(1). Every gain is 1.0 on purpose - see the module docstring.
 PLACEMENTS: list[tuple[int, list[tuple[float, float, float, float]]]] = [
@@ -214,7 +214,7 @@ def write_wav(objects: list[list[float]]) -> None:
 
 def write_paths() -> None:
     lines = [
-        "# The fixed placement of tests/golden/audio/reference_objects.wav's",
+        "# The fixed placement of testdata/audio/reference_objects.wav's",
         "# objects, in atmos-path's keyframe format:",
         "#",
         "#   object time_s x y z gain lfe_send",

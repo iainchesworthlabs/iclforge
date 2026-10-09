@@ -2,12 +2,12 @@
 #
 # The engine is unconditional: it is the player itself - the queue, the
 # transport, a session per item, the output decision - and it needs nothing
-# from src/sendspin's player half, so a core-only build still builds and
+# from libs/sendspin's player half, so a core-only build still builds and
 # tests it, less its pairing records. The test sink, the test server and the
 # window all need more than that core (the window needs Qt and, once
 # packaged, notices for what it bundles; A7's packaging targets neither a
 # fuzz build nor ICLFORGE_SENDSPIN_CORE_ONLY has ever meant to reach), so an
-# ICLFORGE_SENDSPIN_CORE_ONLY build (fuzz/run.sh, the only thing that sets it)
+# ICLFORGE_SENDSPIN_CORE_ONLY build (tools/fuzz/run.sh, the only thing that sets it)
 # leaves all three out, along with the notices for what they link, and
 # hearth-render with them: it needs only the engine, but it is a tool for
 # the checks, which a fuzz build does not run.
@@ -52,5 +52,5 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
     add_subdirectory(testsink)
     add_subdirectory(testserver)
     add_subdirectory(render)
-    include("${CMAKE_CURRENT_SOURCE_DIR}/notices/notices.cmake")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/../../notices/hearth/notices.cmake")
 endif()

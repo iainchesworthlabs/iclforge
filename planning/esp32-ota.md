@@ -73,12 +73,12 @@ what a board is:
 
 - its name, network, slot width and wiring (namespace `hearth_sink`, `main/settings.cpp`);
 - its Sendspin identity and pairing records (namespace `sendspin`,
-  `esp-idf/iclforge/src/sendspin_store.cpp`).
+  `firmware/esp-idf/iclforge/src/sendspin_store.cpp`).
 
 A USB flash leaves NVS alone, because `flash_args` has no region there. The migration below keeps
 it that way.
 
-The control surface ([control.hpp](../esp-idf/iclforge/include/iclforge/control.hpp)) is
+The control surface ([control.hpp](../firmware/esp-idf/iclforge/include/iclforge/control.hpp)) is
 `esp_http_server` on port 80:
 
 - three sockets, least-recently-used purge, a 6,144-byte task stack;
@@ -429,7 +429,7 @@ changed that blob's layout, a rollback would silently lose every pairing.
 The rule from O1 on: a new image never changes the meaning or the layout of a key it did not add.
 A new layout goes under a new key, and the old key stays readable. O1 adds a host test that loads
 blobs written by the previous layout of each store; for the pairing records it is in
-`tests/ac3/io/test_pairing_records.cpp`.
+`libs/device/tests/test_pairing_records.cpp`.
 
 ## Integrity
 
@@ -454,7 +454,7 @@ in the S3, C6 and P4 images of 2026-09-24. The checks build on that:
 
 Two build settings would switch the boot-time check off: `CONFIG_BOOTLOADER_SKIP_VALIDATE_ON_POWER_ON`
 and `_ALWAYS`. Both default to off. A new check, `tools/checks/check_esp_efuse_free.py`, fails CI
-if any `sdkconfig` fragment under `esp-idf/` or `apps/baremetal/` turns either on (the
+if any `sdkconfig` fragment under `firmware/esp-idf/` or `firmware/baremetal/` turns either on (the
 script-lint job's step "ESP-IDF settings that would stop USB recovery"). The same check refuses
 the options that burn eFuses: hardware secure boot, flash encryption, anti-rollback, and a
 disabled or secure ROM download mode. Each of those would take away some way of recovering a
@@ -514,7 +514,7 @@ signed with its key. That includes one sent by a hostile web page ([Routes](#rou
 ## Routes
 
 **Status, 2026-09-30: built.** `control.cpp` registers each route below, and
-`tests/ac3/io/test_firmware_status.cpp` pins `GET /firmware`'s body.
+`libs/device/tests/test_firmware_status.cpp` pins `GET /firmware`'s body.
 
 | Route | What it does | Replies |
 |---|---|---|
@@ -768,7 +768,7 @@ Speakers and Decoder tabs. O5 adds a third tab, **Firmware** ([decision 19](#dec
   browser.
 
 **How it works** ([decision 21](#decisions)). `ac3::hearth::SinkFirmware`
-(`apps/hearth/engine/sink_firmware.hpp`) is `ota.py push` in C++, on a thread of its own for each
+(`apps/hearth/engine/src/sink_firmware.hpp`) is `ota.py push` in C++, on a thread of its own for each
 sink:
 
 - It talks to the board's web server on port 80, at the address mDNS gave for the sink. Nothing
@@ -776,7 +776,7 @@ sink:
   Sendspin.
 - It reads GET /firmware into `ac3forge::FirmwareStatus`, the struct the board renders it from, and
   holds an image to the board's own rules in `firmware_image.hpp`. Both headers are in
-  `esp-idf/iclforge/include` and have no ESP-IDF in them. So the app reads what the board writes,
+  `firmware/esp-idf/iclforge/include` and have no ESP-IDF in them. So the app reads what the board writes,
   and refuses what the board would refuse.
 - Its checks before an upload are `ota.py`'s for a bare image:
   - the file is an application image, and its checksum and appended SHA-256 check out;
@@ -1215,7 +1215,7 @@ the network, the upload would pass through the chip being rewritten.
 
 ## Tests
 
-**On the host.** The logic that needs no ESP-IDF goes in `esp-idf/iclforge/include/iclforge/firmware_image.hpp`,
+**On the host.** The logic that needs no ESP-IDF goes in `libs/device/include/iclforge/firmware_image.hpp`,
 the way `hardware_info.hpp` is kept free of it:
 
 - parsing an image header;
@@ -1226,7 +1226,7 @@ the way `hardware_info.hpp` is kept free of it:
   comes back, which restarts the 30 s;
 - `GET /firmware`'s JSON.
 
-`tests/ac3/io/test_firmware_image.cpp` checks all of it from synthetic headers, including a P4 image
+`libs/device/tests/test_firmware_image.cpp` checks all of it from synthetic headers, including a P4 image
 that needs v3.1 on a v1.3 chip, and `test_firmware_trial.cpp` and `test_firmware_status.cpp` cover
 the trial and the status body. The settings rule has its test of old blobs.
 `tools/hearth/test_ota.py` runs the tool against a stand-in board built on `http.server`: the

@@ -25,9 +25,9 @@
 // build-pw/src/<library>/libiclforge_<library>_static.a.
 //
 //   g++ -std=c++23 -O1 -o /tmp/ptprobe tools/checks/passthrough_probe.cpp
-//       -Isrc/audio/include -Isrc/ac3/include -Ibuild-pw/src/ac3/generated
+//       -Ilibs/audio/include -Ilibs/ac3/include -Ibuild-pw/libs/ac3/generated
 //       $(pkg-config --cflags libpipewire-0.3) -DICLFORGE_AC3_STATIC_DEFINE
-//       build-pw/src/audio/libiclforge_audio.a build-pw/src/ac3/libiclforge_ac3_static.a
+//       build-pw/libs/audio/libiclforge_audio.a build-pw/libs/ac3/libiclforge_ac3_static.a
 //       build-pw/vcpkg_installed/arm64-linux/lib/libfmt.a
 //       $(pkg-config --libs libpipewire-0.3) -lpthread
 //
@@ -48,7 +48,7 @@
 
 #include "iclforge/audio/passthrough.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
-#include "iclforge/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 
 namespace {
 
@@ -131,7 +131,7 @@ int main(int argc, char** argv) {
         return 3;
     }
 
-    iclforge::iec61937::Eac3BurstPacker packer;
+    iclforge::containers::iec61937::Eac3BurstPacker packer;
     const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
     std::size_t bursts = 0;
     std::size_t loops = 0;
@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
                 }
                 taking = submit_paced(sink, **burst, until);
             } else {
-                const auto burst = iclforge::iec61937::wrap_frame(unit);
+                const auto burst = iclforge::containers::iec61937::wrap_frame(unit);
                 if (!burst) {
                     std::printf("wrap_frame refused a syncframe\n");
                     sink.stop();

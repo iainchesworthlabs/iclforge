@@ -5,7 +5,7 @@ receive from it.
 
     python tools/generators/gen_device_streams.py --forge <path to forge>
 
-writes esp-idf/iclforge/examples/hearth_sink/www/. The set covers the
+writes firmware/hearth-sink/www/. The set covers the
 output layouts the player renders onto, both codecs, dependent substreams,
 two programmes in one stream, dual mono, the Annex E coding tools, short
 frames, VBR, DRC metadata, other encoders' streams and object audio. Most of
@@ -35,11 +35,11 @@ import tempfile
 import numpy as np
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-OUT = REPO / "esp-idf/iclforge/examples/hearth_sink/www"
+OUT = REPO / "firmware/hearth-sink/www"
 RATE = 48000
 
 # The output layout the levels are for: "7.1.4" in the player's slot order
-# (src/render/include/iclforge/render/layout.hpp - ring, heights, LFE).
+# (libs/render/include/iclforge/render/layout.hpp - ring, heights, LFE).
 LAYOUT_714 = ["L", "C", "R", "Ls", "Rs", "Lrs", "Rrs", "Vhl", "Vhr", "Lts", "Rts", "LFE"]
 
 # One tone per speaker, a third of an octave apart, so that each slot can be
@@ -187,54 +187,54 @@ SET = [
     {
         "file": "demo.ec3",
         "what": "the WASM page's demo: 5.1 with objects, JOC in the QMF domain",
-        "copy": "apps/wasm/assets/demo.ec3",
+        "copy": "apps/demos/wasm/assets/demo.ec3",
     },
     {
         "file": "514-joc-dee.ec3",
         "what": "Dolby Encoding Engine: 5.1.4 carried as objects, JOC in the QMF domain",
-        "copy": "tests/golden/object-fixture/dee_joc_514.ec3",
+        "copy": "testdata/object-fixture/dee_joc_514.ec3",
     },
     {
         "file": "height.ec3",
         "what": "the footprint probe's height fixture: five objects, three on the ceiling, "
         "MDCT-band domain",
-        "copy": "esp-idf/iclforge/examples/hearth_sink/stream/height.ec3",
+        "copy": "firmware/hearth-sink/stream/height.ec3",
     },
     # Every coded layout the encoder names, a tone per speaker.
     {
         "file": "layout-10.ec3",
         "what": "E-AC-3 1/0",
-        "copy": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-mono.ec3",
+        "copy": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-mono.ec3",
     },
     {
         "file": "layout-20.ec3",
         "what": "E-AC-3 2/0",
-        "copy": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-stereo.ec3",
+        "copy": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-stereo.ec3",
     },
     {
         "file": "layout-51.ec3",
         "what": "E-AC-3 5.1",
-        "copy": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-51.ec3",
+        "copy": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-51.ec3",
     },
     {
         "file": "layout-71.ec3",
         "what": "E-AC-3 7.1: 5.1 and a dependent substream",
-        "copy": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-71.ec3",
+        "copy": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-71.ec3",
     },
     {
         "file": "layout-512.ec3",
         "what": "E-AC-3 5.1.2: 5.1 and a dependent substream",
-        "copy": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-512.ec3",
+        "copy": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-512.ec3",
     },
     {
         "file": "layout-514.ec3",
         "what": "E-AC-3 5.1.4: 5.1 and a dependent substream",
-        "copy": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-514.ec3",
+        "copy": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-514.ec3",
     },
     {
         "file": "layout-714.ec3",
         "what": "E-AC-3 7.1.4: 5.1 and two dependent substreams",
-        "copy": "fuzz/seeds/fuzz_eac3_decode/eac3-sine-714.ec3",
+        "copy": "libs/ac3/fuzz/seeds/fuzz_eac3_decode/eac3-sine-714.ec3",
     },
     # The Annex E coding tools, at 7.1.4 so every substream carries them.
     {
@@ -384,22 +384,22 @@ SET = [
     {
         "file": "dee-eac3-51.ec3",
         "what": "Dolby Encoding Engine, E-AC-3 5.1 at 256 kbit/s",
-        "copy": "tests/golden/external-baseline/eac3-51-256/dee.ec3",
+        "copy": "testdata/external-baseline/eac3-51-256/dee.ec3",
     },
     {
         "file": "ffmpeg-eac3-51.ec3",
         "what": "FFmpeg, E-AC-3 5.1 at 256 kbit/s",
-        "copy": "tests/golden/external-baseline/eac3-51-256/ffmpeg.ec3",
+        "copy": "testdata/external-baseline/eac3-51-256/ffmpeg.ec3",
     },
     {
         "file": "dee-ac3-51.ac3",
         "what": "Dolby Encoding Engine, AC-3 5.1 at 448 kbit/s",
-        "copy": "tests/golden/external-baseline/ac3-51-448/dee.ac3",
+        "copy": "testdata/external-baseline/ac3-51-448/dee.ac3",
     },
     {
         "file": "dee-eac3-music.ec3",
         "what": "Dolby Encoding Engine, E-AC-3 2/0 music at 96 kbit/s",
-        "copy": "tests/golden/external-baseline/eac3-music-stereo-96/dee.ec3",
+        "copy": "testdata/external-baseline/eac3-music-stereo-96/dee.ec3",
     },
 ]
 

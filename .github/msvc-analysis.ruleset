@@ -8,8 +8,8 @@
   the FILE PATH, so a false positive is not dismissed once: every file
   move re-mints the alert with a fresh ID and the dismissal (a manual API
   call, 280-character comment limit) has to be repeated - exactly what
-  happened when PR #291 extracted apps/cli/commands/analysis.cpp out of
-  apps/cli/main.cpp and alerts #83-94 resurrected findings already
+  happened when PR #291 extracted apps/forge/cli/src/commands/analysis.cpp out of
+  apps/forge/cli/src/main.cpp and alerts #83-94 resurrected findings already
   documented and dismissed under #70/#71/#8/#11/#22. Neither rule has a
   portable in-source suppression (#pragma warning(suppress:) breaks
   -Werror on GCC/clang, and [[gsl::suppress]] only covers C26xxx and
@@ -28,17 +28,17 @@
 
     C28020 (expression not satisfied in this call) - 2 alerts, both false
       positives on index arithmetic the surrounding code bounds (see
-      src/ac3/src/oba/atmos.cpp's own comment). Bounds errors stay
+      libs/ac3/src/oba/atmos.cpp's own comment). Bounds errors stay
       covered by the linux-llvm-asan-ubsan leg (precise, at runtime) and
       CodeQL's dataflow queries.
 
     C26495 (uninitialized member variable) - 1750 alerts opened in a single
       burst on 2026-09-17, 100% under
-      build/config-windows-msvc/apps/gui/.rcc/qmlcache/forge_gui_qmltests_qml/:
+      build/config-windows-msvc/apps/forge/gui/.rcc/qmlcache/forge_gui_qmltests_assets/:
       qmlcachegen's generated glue for the GUI's QML tests, one
       compiler-synthesized Storage struct per QML binding closure, not
       project source (see issue #718). forge_gui_qmltests is include()'d into
-      apps/gui's own CMake directory scope (apps/gui/CMakeLists.txt has the
+      apps/forge/gui's own CMake directory scope (apps/forge/gui/CMakeLists.txt has the
       comment explaining why), so this action's directory-scoped
       ignoredTargetPaths can't cleanly separate the test target from the
       production forge-gui target without also blinding analysis to real GUI
@@ -53,7 +53,7 @@
   equivalent - a genuine finding there gets FIXED, not dismissed, so the
   path-move problem never applies to it. The one kind that is dismissed is a
   constexpr function only the compiler runs: the table builder in
-  src/ac4dec/src/pcm/pow43.hpp reports the 64 KiB table it returns as stack,
+  libs/ac4/src/decoder/pcm/pow43.hpp reports the 64 KiB table it returns as stack,
   and no code for it exists at run time.
 
   Consumed by .github/workflows/msvc-analysis.yml. The Include below

@@ -102,7 +102,7 @@ overloads keep the stdin/pipe case, and the `fmt ` and `data` chunk headers must
 first 64 KiB of the file, or `open` refuses it with `kNotRiffWave` (`read_wav` still reads such a
 file).
 
-`tests/ac3/io/test_wav_stream_reader.cpp` exercises the reader, including the depths above.
+`libs/ac3/tests/io/test_wav_stream_reader.cpp` exercises the reader, including the depths above.
 
 ---
 

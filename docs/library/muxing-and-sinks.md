@@ -1,8 +1,8 @@
 # Muxing & sinks
 
-## Muxing: `iclforge::matroska::mux`
+## Muxing: `iclforge::containers::matroska::mux`
 
-`iclforge/matroska/matroska.hpp`, library `iclforge::matroska`. It links nothing from `iclforge::ac3` and
+`iclforge/containers/matroska/matroska.hpp`, `iclforge::containers::matroska`, a part of `iclforge::containers`. It links nothing from `iclforge::ac3` and
 takes frames as opaque bytes. Pairing it with `iclforge::ac3::io::scan` is what keeps the track header
 accurate.
 
@@ -15,16 +15,16 @@ for (const auto unit : scanned->access_units) {
     frames.emplace_back(unit.begin(), unit.end());
 }
 
-const iclforge::matroska::AudioTrack track{
+const iclforge::containers::matroska::AudioTrack track{
     .codec_id = std::string{scanned->kind == iclforge::ac3::io::StreamKind::kAc3
-                                ? iclforge::matroska::kCodecAc3
-                                : iclforge::matroska::kCodecEac3},
+                                ? iclforge::containers::matroska::kCodecAc3
+                                : iclforge::containers::matroska::kCodecEac3},
     .sample_rate = iclforge::ac3::sample_rate_hz(scanned->sample_rate),
     .channels = scanned->channels,
     .samples_per_frame = iclforge::ac3::kSamplesPerFrame,
 };
 
-const auto file = iclforge::matroska::mux(track, frames);
+const auto file = iclforge::containers::matroska::mux(track, frames);
 ```
 
 Full program: [`examples/mux_mkv.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/mux_mkv.cpp).
@@ -36,7 +36,7 @@ matter for seeking in large files, not for playing back what this project produc
 registers no `CodecID` for AC-4, so this module has no constant for one and `forge mkv` refuses an
 AC-4 stream.
 
-### Incremental muxing: `iclforge::matroska::Writer`
+### Incremental muxing: `iclforge::containers::matroska::Writer`
 
 Same header. The incremental counterpart to `mux`, for a session whose length is not known up
 front — a live capture, where `mux` cannot help: it needs every frame before it can compute
@@ -49,9 +49,9 @@ which real players already handle. No more than one cluster's worth of frames is
 a caller streaming the returned bytes to disk keeps memory bounded for a session of any length.
 This is what the GUI's live session records through.
 
-### Demuxing: `iclforge::matroska::demux`, `iclforge::matroska::Reader`
+### Demuxing: `iclforge::containers::matroska::demux`, `iclforge::containers::matroska::Reader`
 
-`iclforge/matroska/reader.hpp`, same library. The read side of the two above, and codec-blind in exactly
+`iclforge/containers/matroska/reader.hpp`, same library. The read side of the two above, and codec-blind in exactly
 the same way: it walks EBML, finds a track, and hands each frame back as opaque bytes. The one
 place it names a codec is auto-selection, which takes the first audio `TrackEntry` whose
 `CodecID` is `A_EAC3` or `A_AC3`; `ReadOptions::track_number` names any other track explicitly
@@ -62,21 +62,21 @@ it returns are spans into the buffer you passed it, the way `iclforge::ac3::io::
 access units:
 
 ```cpp
-const auto out = iclforge::matroska::demux(file_bytes);
+const auto out = iclforge::containers::matroska::demux(file_bytes);
 if (!out) {
-    std::println(stderr, "{}", iclforge::matroska::describe(out.error()));
+    std::println(stderr, "{}", iclforge::containers::matroska::describe(out.error()));
     return 1;
 }
 // out->frames are views into file_bytes, which must outlive them.
 const auto scanned = iclforge::ac3::io::scan(/* the elementary stream you write them to */);
 ```
 
-`Reader` is the incremental one — `iclforge::matroska::Writer`'s mirror image, for a file too big to hold.
+`Reader` is the incremental one — `iclforge::containers::matroska::Writer`'s mirror image, for a file too big to hold.
 Frames arrive through a callback rather than a return value, so nothing accumulates: peak memory
 is one chunk plus one frame, never the file.
 
 ```cpp
-iclforge::matroska::Reader reader{};
+iclforge::containers::matroska::Reader reader{};
 const auto on_frame = [&](std::span<const std::byte> frame) { sink.push(frame); };
 for (auto chunk = read_next_chunk(); !chunk.empty(); chunk = read_next_chunk()) {
     if (!reader.push(chunk, on_frame)) { /* ... */ }
@@ -99,21 +99,21 @@ a rip, a capture or a download rather than from this project's own writer. `Read
 the element size the reader will hold (16 MiB by default; anything larger that it does not need
 is skipped without ever being buffered), the frames one laced block may carry, the number of
 `TrackEntry` elements, and how deep masters may nest — the walker is iterative, so nothing an
-input declares can exhaust the call stack. `fuzz/fuzz_matroska_demux.cpp` drives both entry
+input declares can exhaust the call stack. `libs/containers/fuzz/fuzz_matroska_demux.cpp` drives both entry
 points with arbitrary bytes under ASan/UBSan.
 
-## Muxing: `iclforge::mp4::mux`
+## Muxing: `iclforge::containers::mp4::mux`
 
-`iclforge/mp4/mp4.hpp`, library `iclforge::mp4`. Same shape as `iclforge::matroska`: it links nothing from
+`iclforge/containers/mp4/mp4.hpp`, `iclforge::containers::mp4`, a part of `iclforge::containers`. Same shape as `iclforge::containers::matroska`: it links nothing from
 `iclforge::ac3` and takes frames as opaque bytes. The one place MP4 needs codec-specific bytes that
 Matroska's plain CodecID string does not is the sample entry's `dac3`/`dec3` configuration box
-(ETSI TS 102 366 Annex F) — so `iclforge::mp4::AudioTrack::codec_config` carries that box's payload as
+(ETSI TS 102 366 Annex F) — so `iclforge::containers::mp4::AudioTrack::codec_config` carries that box's payload as
 opaque bytes too, built by `iclforge::ac3::io::build_codec_config_box` (`iclforge/ac3/io/dec3.hpp`) straight off
 whatever `iclforge::ac3::io::scan` read out of the bitstream, fscod/bsid/bsmod/acmod/lfeon and, when the
 stream carries Dolby Atmos objects, the `flag_ec3_extension_type_a`/`complexity_index_type_a`
 extension (TS 103 420 §8.3.1/§8.3.2.2) alike.
 
-The same codec-blind contract carries **AC-4**: `codec_id = iclforge::mp4::kCodecAc4`
+The same codec-blind contract carries **AC-4**: `codec_id = iclforge::containers::mp4::kCodecAc4`
 selects TS 103 190-2 Annex E.4's `ac-4` sample entry with a `dac4` configuration box, whose
 payload comes from `iclforge::ac4::build_dac4()` off the stream's own parsed TOC — the AC-4 twin of
 `build_codec_config_box`, in `iclforge::ac4` where the codec knowledge lives. An ISOBMFF `ac-4`
@@ -126,7 +126,7 @@ RFC 6381 string is not
 its fourcc, `AudioTrack::rfc6381` carries `iclforge::ac4::rfc6381_codec_string()`'s dotted form
 (`ac-4.02.01.00`) for the HLS/DASH manifests. MPEG-TS carriage is DVB-only — EN 300 468
 Annex D.7's extension descriptor `0x7F/0x15`, with an ISO 13818-1 §2.6.8 registration
-descriptor (`AC-4`) beside it for interop — and `iclforge::mpegts::AudioCodec::kAc4` under the ATSC
+descriptor (`AC-4`) beside it for interop — and `iclforge::containers::mpegts::AudioCodec::kAc4` under the ATSC
 profile is refused rather than given an invented stream_type (A/342-2 is ATSC 3.0's
 ROUTE/MMT, not 13818-1).
 
@@ -140,24 +140,24 @@ for (const auto unit : scanned->access_units) {
     frames.emplace_back(unit.begin(), unit.end());
 }
 
-const iclforge::mp4::AudioTrack track{
-    .codec_id = std::string{scanned->kind == iclforge::ac3::io::StreamKind::kAc3 ? iclforge::mp4::kCodecAc3
-                                                                        : iclforge::mp4::kCodecEac3},
+const iclforge::containers::mp4::AudioTrack track{
+    .codec_id = std::string{scanned->kind == iclforge::ac3::io::StreamKind::kAc3 ? iclforge::containers::mp4::kCodecAc3
+                                                                        : iclforge::containers::mp4::kCodecEac3},
     .sample_rate = iclforge::ac3::sample_rate_hz(scanned->sample_rate),
     .channels = scanned->channels,
     .samples_per_frame = iclforge::ac3::kSamplesPerFrame,
     // The dac3/dec3 sample-entry box, built from the same scan result -
     // see iclforge/ac3/io/dec3.hpp for why this lives in iclforge::ac3::io rather than in
-    // iclforge::mp4 itself.
+    // iclforge::containers::mp4 itself.
     .codec_config = iclforge::ac3::io::build_codec_config_box(*scanned),
 };
 
-const auto file = iclforge::mp4::mux(track, frames);
+const auto file = iclforge::containers::mp4::mux(track, frames);
 ```
 
 Full program: [`examples/mux_mp4.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/mux_mp4.cpp).
 
-`mux` returns the whole file as bytes and does no file I/O, the same as `iclforge::matroska::mux`. It
+`mux` returns the whole file as bytes and does no file I/O, the same as `iclforge::containers::matroska::mux`. It
 writes `ftyp`/`moov`/`mdat` for one audio track, one sample per chunk, `stts`/`stsz`/`stco` built
 straight off the frame sizes handed in. No multiple tracks: those matter for multi-track muxing,
 not for playing back what this project produces.
@@ -176,9 +176,9 @@ to silently drop or mis-signal the Atmos extension
 what this module avoided that bug by construction rather than by patching it after the fact, and
 still does for any FFmpeg build older than the fix.
 
-### Demuxing: `iclforge::mp4::demux`, `iclforge::mp4::Reader`
+### Demuxing: `iclforge::containers::mp4::demux`, `iclforge::containers::mp4::Reader`
 
-`iclforge/mp4/reader.hpp`, same library. The read side of both writers above, and the same shape the
+`iclforge/containers/mp4/reader.hpp`, same library. The read side of both writers above, and the same shape the
 Matroska reader has: `demux` is batch and zero-copy (samples are spans into your buffer),
 `Reader` is incremental (samples arrive through a callback, peak memory is one chunk plus one
 sample).
@@ -197,7 +197,7 @@ file for "faststart"; `mux()` and `fragment()` both write `moov` first, as does 
 file.
 
 **The `dec3`/`dac3` box comes back parsed.** `ReadTrack::codec_config` is a `CodecConfig`, the read
-twin of [`iclforge::ac3::io::build_codec_config_box`](#muxing-iclforgemp4mux): `fscod`, `bsid`, `bsmod`, `acmod`,
+twin of [`iclforge::ac3::io::build_codec_config_box`](#muxing-iclforgecontainersmp4mux): `fscod`, `bsid`, `bsmod`, `acmod`,
 `lfeon`, `bit_rate_code` or `data_rate_kbps`, `num_ind_sub`/`num_dep_sub`/`chan_loc`, and —
 crucially — TS 103 420's `flag_ec3_extension_type_a`/`complexity_index_type_a` as an
 `optional<int>`. That last field is the Atmos/JOC marker an FFmpeg remux is known to drop, and
@@ -215,7 +215,7 @@ TS 103 420 simply has nothing to say about it.
 order (version 0 or 1), each with its `segment_duration` in the movie's timescale,
 `ReadTrack::movie_timescale` from `mvhd`, and its `media_time` in the track's own timescale, where
 -1 marks an empty edit. Nothing here applies them, because what a media time means depends on
-the codec. `apps/common/container_input.hpp` turns the shape an audio encoder writes into a
+the codec. `apps/shared/media/src/container_input.hpp` turns the shape an audio encoder writes into a
 `StreamTrim`: any empty edits, then one edit at normal speed. The trim is the samples to skip and
 the samples to play, and Hearth's player plays only that part. Any other shape leaves the stream
 whole, with a note saying why. `forge` and the GUI do not apply the trim. Neither `elst`
@@ -229,11 +229,11 @@ touched. `ReadOptions` bounds the box size the reader will hold, the sample and 
 (`max_samples` defaults to about 35 hours of access units), and the nesting depth; the walk is
 iterative. A chunk offset pointing past the end of the file drops that sample rather than
 failing the file — a truncated download is ordinary, and the samples that *are* present are all
-real. `fuzz/fuzz_mp4_demux.cpp` drives both entry points with arbitrary bytes.
+real. `libs/containers/fuzz/fuzz_mp4_demux.cpp` drives both entry points with arbitrary bytes.
 
-## Muxing: `iclforge::mpegts::mux`
+## Muxing: `iclforge::containers::mpegts::mux`
 
-`iclforge/mpegts/mpegts.hpp`, library `iclforge::mpegts`. Same shape as `iclforge::matroska::mux` above — it links
+`iclforge/containers/mpegts/mpegts.hpp`, `iclforge::containers::mpegts`, a part of `iclforge::containers`. Same shape as `iclforge::containers::matroska::mux` above — it links
 nothing from `iclforge::ac3` beyond the AC-3, E-AC-3 or AC-4 choice it is told, and takes access
 units as opaque bytes.
 
@@ -247,9 +247,9 @@ for (const auto unit : scanned->access_units) {
     frames.emplace_back(unit.begin(), unit.end());
 }
 
-const iclforge::mpegts::AudioTrack track{
-    .codec = scanned->kind == iclforge::ac3::io::StreamKind::kAc3 ? iclforge::mpegts::AudioCodec::kAc3
-                                                         : iclforge::mpegts::AudioCodec::kEac3,
+const iclforge::containers::mpegts::AudioTrack track{
+    .codec = scanned->kind == iclforge::ac3::io::StreamKind::kAc3 ? iclforge::containers::mpegts::AudioCodec::kAc3
+                                                         : iclforge::containers::mpegts::AudioCodec::kEac3,
     .sample_rate = iclforge::ac3::sample_rate_hz(scanned->sample_rate),
     .channels = scanned->channels,
     .samples_per_frame = iclforge::ac3::kSamplesPerFrame,
@@ -268,14 +268,14 @@ const iclforge::mpegts::AudioTrack track{
                 .independent_substreams = scanned->independent_substreams},
 };
 
-const auto file = iclforge::mpegts::mux(track, frames,
-                              {.profile = iclforge::mpegts::BroadcastProfile::kAtsc});
+const auto file = iclforge::containers::mpegts::mux(track, frames,
+                              {.profile = iclforge::containers::mpegts::BroadcastProfile::kAtsc});
 ```
 
 Full program: [`examples/mux_ts.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/mux_ts.cpp).
 
 `mux` returns the whole 188-byte-aligned Transport Stream as bytes, no file I/O, same testability
-reasoning as `iclforge::matroska::mux`. It writes a single program — one PAT, one PMT (repeated
+reasoning as `iclforge::containers::matroska::mux`. It writes a single program — one PAT, one PMT (repeated
 periodically so a receiver tuning in mid-stream doesn't wait for byte zero), and one PES-wrapped
 elementary stream carrying PCR every access unit. No video, no other elementary streams, no PID
 remapping: a general-purpose multiplexer is out of scope, this is enough for a player or
@@ -294,11 +294,11 @@ never a bit of each. `MuxOptions::profile` picks which:
 | What identifies the stream | the descriptor tag — DVB registers no `stream_type` of its own | the `stream_type` — ATSC treats the descriptor as configuration detail |
 
 Both descriptors describe the same service in different bit layouts, so a caller supplies the
-underlying A/52 field values once, as `iclforge::mpegts::ServiceInfo`, and the module maps them onto
+underlying A/52 field values once, as `iclforge::containers::mpegts::ServiceInfo`, and the module maps them onto
 whichever registry's tables the profile calls for — EN 300 468 Tables D.1–D.8, A/52 Tables
 A4.2–A4.6 and G.2–G.6. That mapping is descriptor syntax, which is this module's job; reading
 those values off the bitstream is `iclforge::ac3::io::scan`'s, which is why `ServiceInfo` is plain
-integers and `iclforge::mpegts` still links nothing from `iclforge::ac3`.
+integers and `iclforge::containers::mpegts` still links nothing from `iclforge::ac3`.
 
 `iclforge::ac3::io::ScannedStream` supplies every one of them: `bsmod` (with `bsmod_present`, since
 Annex E only carries it inside `infomdate`), `acmod`, `lfe`, the rendered `channels`, `bsid`,
@@ -320,22 +320,22 @@ the field is omitted rather than approximated: A/52 Table G.5 reserves complete-
 emergency as *substream* service types, and Table G.6 reserves 1+1 as a substream channel mode,
 so an ATSC `substream1`–`3` field for such a substream is left out with its flag clear.
 
-### Demuxing: `iclforge::mpegts::demux`, `iclforge::mpegts::Reader`
+### Demuxing: `iclforge::containers::mpegts::demux`, `iclforge::containers::mpegts::Reader`
 
-`iclforge/mpegts/reader.hpp`, same library. The read side of `iclforge::mpegts::mux`/`Writer`, codec-blind in the
+`iclforge/containers/mpegts/reader.hpp`, same library. The read side of `iclforge::containers::mpegts::mux`/`Writer`, codec-blind in the
 same sense: it locks to the packet grid, follows PAT to PMT to an elementary PID, reassembles
 PES, and hands the payloads back as opaque bytes.
 
 **What comes back is not the same shape as the sibling readers.** A Matroska `SimpleBlock` and an
-MP4 sample each hold exactly one access unit, so `iclforge::matroska::demux`/`iclforge::mp4::demux` hand back access
+MP4 sample each hold exactly one access unit, so `iclforge::containers::matroska::demux`/`iclforge::containers::mp4::demux` hand back access
 units. A PES packet makes no such promise — it may carry one, several, or (with the unbounded
 `PES_packet_length` form broadcast uses) a run ending only when the next one starts. So this
 reader hands back **PES payloads**, and what they concatenate to is the elementary stream:
 
 ```cpp
-const auto out = iclforge::mpegts::demux(file_bytes);
+const auto out = iclforge::containers::mpegts::demux(file_bytes);
 if (!out) {
-    fmt::println(stderr, "{}", iclforge::mpegts::describe(out.error()));
+    fmt::println(stderr, "{}", iclforge::containers::mpegts::describe(out.error()));
     return 1;
 }
 std::vector<std::byte> elementary_stream;
@@ -351,7 +351,7 @@ AC-3 syncframe is.
 
 **The PMT's own service descriptor comes back too**, as `ReadStream::service` (a
 `std::optional<ServiceInfo>`, `std::nullopt` when the signalling carried no such descriptor to
-read — `kRegistrationDescriptor` and AC-4 never do). `iclforge::mpegts::parse_service_descriptor` is the
+read — `kRegistrationDescriptor` and AC-4 never do). `iclforge::containers::mpegts::parse_service_descriptor` is the
 literal inverse of the four descriptor builders above, so a transport stream this module wrote
 reads back byte-for-byte what `mux`'s caller supplied — `bsmod`, `full_service`, `mainid`,
 `asvc`, `bsid`, `mix_metadata` and the `substream1`–`3` bytes alike. Not everything survives the
@@ -379,7 +379,7 @@ that — which also means a capture that starts mid-packet (the normal way a tra
 acquired: wherever the tuner happened to be) still locks on.
 
 ```cpp
-iclforge::mpegts::Reader reader{};
+iclforge::containers::mpegts::Reader reader{};
 const auto on_payload = [&](std::span<const std::byte> payload) {
     elementary_stream.insert(elementary_stream.end(), payload.begin(), payload.end());
 };
@@ -401,65 +401,65 @@ self-checked against the standard test vector) is verified before the PAT/PMT it
 believed — a bit-damaged PMT is thrown away rather than locking onto a wrong PID for the rest of
 the file. `ReadOptions` bounds the PES and PSI section sizes the reader will assemble (the
 unbounded PES form has no ceiling of its own otherwise) and how far it will search for the packet
-grid. `fuzz/fuzz_mpegts_demux.cpp` drives both entry points with arbitrary bytes — this is also
+grid. `libs/containers/fuzz/fuzz_mpegts_demux.cpp` drives both entry points with arbitrary bytes — this is also
 the container reader most likely to find a hang rather than a crash, since the sync
 search, section reassembly and PES reassembly are all loops a hostile stream can try to stall.
 
-## Fragmented MP4/CMAF + HLS/DASH: `iclforge::mp4::fragment`, `iclforge/mp4/hls.hpp`, `iclforge/mp4/dash.hpp`
+## Fragmented MP4/CMAF + HLS/DASH: `iclforge::containers::mp4::fragment`, `iclforge/containers/mp4/hls.hpp`, `iclforge/containers/mp4/dash.hpp`
 
-The streaming-delivery follow-up `iclforge::mp4::mux`'s own header deliberately left for
-later: `iclforge::mp4::fragment` lays out the same track and frames as `mux`, but as a fragmented movie
+The streaming-delivery follow-up `iclforge::containers::mp4::mux`'s own header deliberately left for
+later: `iclforge::containers::mp4::fragment` lays out the same track and frames as `mux`, but as a fragmented movie
 (ISO/IEC 14496-12 §8.8's `moof`/`mfhd`/`traf`/`tfhd`/`tfdt`/`trun`) split into CMAF-shaped pieces
 (ISO/IEC 23000-19) — an initialization segment (`ftyp`+`moov`, whose one `trak` carries
 `mvex`/`trex` instead of a populated sample table, since a fragmented track's own `stbl`
 describes zero samples) plus one or more media segments (`styp`+`moof`+`mdat`, one per fragment).
 Same batch shape as `mux`: every frame is known up front, so real durations/timestamps are
 filled in throughout, including the track's total duration in `mvhd`/`tkhd`/`mdhd`.
-[`iclforge::mp4::FragmentWriter`](#incremental-fragmenting-iclforgemp4fragmentwriter) below is the incremental form
+[`iclforge::containers::mp4::FragmentWriter`](#incremental-fragmenting-iclforgecontainersmp4fragmentwriter) below is the incremental form
 for a live session, and that total duration is the one thing the two disagree about.
 
 ```cpp
 const auto fragmented =
-    iclforge::mp4::fragment(track, frames, iclforge::mp4::FragmentOptions{.frames_per_fragment = 8});
+    iclforge::containers::mp4::fragment(track, frames, iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = 8});
 ```
 
 `FragmentedOutput::init_segment` and `::media_segments` are exactly the files a packager or CDN
 origin wants (`init.mp4` plus `segment1.m4s`, `segment2.m4s`, ...) — see `forge fmp4`, which
 writes them out that way alongside the manifests below.
 
-`iclforge/mp4/hls.hpp` and `iclforge/mp4/dash.hpp` build HLS/DASH signaling for those same segments — one CMAF
+`iclforge/containers/mp4/hls.hpp` and `iclforge/containers/mp4/dash.hpp` build HLS/DASH signaling for those same segments — one CMAF
 segment format, two manifest flavors, the entire point of CMAF:
 
 ```cpp
 const auto media_playlist =
-    iclforge::mp4::build_hls_media_playlist(track, fragmented->media_segments, iclforge::mp4::HlsOptions{});
-const auto master_playlist = iclforge::mp4::build_hls_master_playlist(
-    track, fragmented->media_segments, "audio.m3u8", iclforge::mp4::HlsOptions{});
-const auto dash_snippet = iclforge::mp4::build_dash_adaptation_set(track, fragmented->media_segments);
-const auto mpd = iclforge::mp4::build_dash_mpd(track, fragmented->media_segments, dash_snippet);
+    iclforge::containers::mp4::build_hls_media_playlist(track, fragmented->media_segments, iclforge::containers::mp4::HlsOptions{});
+const auto master_playlist = iclforge::containers::mp4::build_hls_master_playlist(
+    track, fragmented->media_segments, "audio.m3u8", iclforge::containers::mp4::HlsOptions{});
+const auto dash_snippet = iclforge::containers::mp4::build_dash_adaptation_set(track, fragmented->media_segments);
+const auto mpd = iclforge::containers::mp4::build_dash_mpd(track, fragmented->media_segments, dash_snippet);
 ```
 
 A master playlist can carry more than one audio rendition in the same `#EXT-X-MEDIA` group,
 which is what an Atmos asset needs (see the paired-rendition note below):
 
 ```cpp
-const std::array<iclforge::mp4::HlsRendition, 2> renditions{
-    iclforge::mp4::HlsRendition{.track = joc_track,
+const std::array<iclforge::containers::mp4::HlsRendition, 2> renditions{
+    iclforge::containers::mp4::HlsRendition{.track = joc_track,
                       .segments = joc.media_segments,
                       .media_playlist_uri = "audio.m3u8",
                       .name = "Dolby Atmos",
                       .channels_attribute = "12/JOC",
                       .is_default = true},
-    iclforge::mp4::HlsRendition{.track = bed_track,
+    iclforge::containers::mp4::HlsRendition{.track = bed_track,
                       .segments = bed.media_segments,
                       .media_playlist_uri = "bed51/audio.m3u8",
                       .name = "5.1"}};
-const auto master_playlist = iclforge::mp4::build_hls_master_playlist(renditions);
+const auto master_playlist = iclforge::containers::mp4::build_hls_master_playlist(renditions);
 ```
 
 Full program: [`examples/mux_fmp4.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/mux_fmp4.cpp).
 
-Both manifest flavors get the `CODECS`/`codecs` attribute right: `iclforge::mp4::hls_codec_string` (and
+Both manifest flavors get the `CODECS`/`codecs` attribute right: `iclforge::containers::mp4::hls_codec_string` (and
 `build_dash_adaptation_set` internally) use the bare `ac-3`/`ec-3` sample-entry fourcc unmodified
 as the RFC 6381 `'Codecs'` parameter — neither AC-3 nor E-AC-3 registers any of the
 dot-separated profile/level fields RFC 6381 §3 makes room for (unlike e.g. `avc1.640028`), which
@@ -474,7 +474,7 @@ media rendition instead of a plain channel count, where N is the decodable objec
 documentation](https://ott.dolby.com/OnDelKits/DDP/Dolby_Digital_Plus_Online_Delivery_Kit_v1.5/Documentation/Content_Creation/SDM/help_files/topics/hls_c_hls_signal_atmos_ddp.html)
 and shown verbatim in a real manifest (`CODECS="avc1.64001f,ec-3"` / `CHANNELS="12/JOC"`) by
 [AWS MediaLive's own HLS+Atmos
-documentation](https://docs.aws.amazon.com/medialive/latest/ug/feature-dolbyatmos.html). `iclforge::mp4`
+documentation](https://docs.aws.amazon.com/medialive/latest/ug/feature-dolbyatmos.html). `iclforge::containers::mp4`
 itself never reads that TS 103 420 object-layer syntax — `HlsOptions::channels_attribute` is
 opaque to it, the same way `AudioTrack::codec_config` is; `forge fmp4` is the caller that
 already has `oba_complexity_index` (it read it to build the `dec3` box) and supplies the string.
@@ -497,7 +497,7 @@ possibly shorter final one, and a flat nominal duration is exactly what let a re
 
 ### Atmos/JOC signalling: `ceao`, and the DASH descriptors
 
-`iclforge/mp4/dash.hpp` used to say there was no established DASH convention to point at for JOC, unlike
+`iclforge/containers/mp4/dash.hpp` used to say there was no established DASH convention to point at for JOC, unlike
 HLS's `CHANNELS="<N>/JOC"`. There is: DASH-IF IOP Part 8 v5.0.0 §5.3.2 names, for E-AC-3
 carrying JOC, the two SupplementalProperty descriptors
 [ETSI TS 103 420](https://www.etsi.org/deliver/etsi_ts/103400_103499/103420/01.02.01_60/ts_103420v010201p.pdf)
@@ -523,14 +523,14 @@ stream carries is `acmod`/`lfeon`/`chanmap` syntax, and a manifest writer has no
 re-deriving AC-3 semantics. `forge fmp4`, the GUI and the live paths all supply it.
 
 `FragmentOptions::object_audio_brand` and `DashOptions::joc_complexity_index` are caller-supplied
-for the same reason `HlsOptions::channels_attribute` is — `iclforge::mp4` never reads TS 103 420's object
+for the same reason `HlsOptions::channels_attribute` is — `iclforge::containers::mp4` never reads TS 103 420's object
 layer, and the caller that scanned `oba_complexity_index` off the bitstream to build the `dec3`
 box already has it.
 
 ### AC-4 fragments: sync samples, a time scale of its own, brands and descriptors
 
-An AC-4 track (`iclforge::mp4::kCodecAc4`, its `dac4` from `iclforge::ac4::build_dac4()`) fragments with four things an
-AC-3 or E-AC-3 track never needs, each supplied by the caller, since `iclforge::mp4` reads no AC-4 syntax:
+An AC-4 track (`iclforge::containers::mp4::kCodecAc4`, its `dac4` from `iclforge::ac4::build_dac4()`) fragments with four things an
+AC-3 or E-AC-3 track never needs, each supplied by the caller, since `iclforge::containers::mp4` reads no AC-4 syntax:
 
 - **Sync samples.** Only an I-frame decodes on its own, and ETSI TS 103 190-2 Annex E.2 and E.3
   make the I-frames the sync samples and start every fragment at one.
@@ -541,14 +541,14 @@ AC-3 or E-AC-3 track never needs, each supplied by the caller, since `iclforge::
   §8.8.3.1). `FragmentWriter::push(frame, sync)` takes the same flag frame by frame. A first frame
   that is not a sync sample is `kInvalidOptions`.
 - **The time scale.** `AudioTrack::timescale` sets `mdhd`'s, which the decode times, the segment
-  durations and both manifests' timelines count in (`iclforge::mp4::timescale_of()`): Table E.1's 240 000 at
+  durations and both manifests' timelines count in (`iclforge::containers::mp4::timescale_of()`): Table E.1's 240 000 at
   29.97, 59.94 and 119.88 fps, whose frames alternate in length at 48 000 Hz, and the sample rate
   elsewhere (`iclforge::ac4::media_timing()` gives both).
 - **Brands.** `FragmentOptions::brands` lists a CMAF media profile's brands after `iso6` and `cmfc`
   in the `ftyp` and every `styp`: Annex H's `ca4m` and `ca4s` for an AC-4 track.
 - **DASH descriptors.** `DashOptions::channel_configuration` replaces the Representation's
   AudioChannelConfiguration, and `DashOptions::supplemental_properties` adds SupplementalProperty
-  descriptors, each a `iclforge::mp4::Descriptor{scheme_id_uri, value}` with its attributes escaped:
+  descriptors, each a `iclforge::containers::mp4::Descriptor{scheme_id_uri, value}` with its attributes escaped:
   `iclforge::ac4::dash_channel_configuration()` gives Annex G's (Table G.1's CICP value, or the Dolby 2015
   scheme's word for a layout the table lacks) and `iclforge::ac4::dash_supplemental_properties()` the frame
   rate and a pre-virtualized presentation's signal (Annex G.3).
@@ -557,9 +557,9 @@ AC-3 or E-AC-3 track never needs, each supplied by the caller, since `iclforge::
 `iclforge::ac4::cmaf_refusal()` and `iclforge::ac4::configuration_difference()` say which streams Annex H.1.2 keeps out
 of a CMAF track.
 
-### Incremental fragmenting: `iclforge::mp4::FragmentWriter`
+### Incremental fragmenting: `iclforge::containers::mp4::FragmentWriter`
 
-Same header as `fragment`. The live counterpart, and `iclforge::matroska::Writer`/`iclforge::mpegts::Writer`'s
+Same header as `fragment`. The live counterpart, and `iclforge::containers::matroska::Writer`/`iclforge::containers::mpegts::Writer`'s
 sibling: `create(track, options)` validates exactly what `fragment` validates and leaves
 `init_segment()` ready to write once; each `push(frame)` buffers into the current fragment and
 returns the media segment that just *closed* (so one comes back every
@@ -568,30 +568,30 @@ partial fragment. `tfdt` comes from a running decode time held on the writer, wh
 per-fragment state `fragment`'s own loop carries. Nothing beyond one fragment's frames and the
 playlist window is ever held.
 
-**The contract is byte-equality with the batch form**, the same one `iclforge::mpegts::Writer` holds itself
+**The contract is byte-equality with the batch form**, the same one `iclforge::containers::mpegts::Writer` holds itself
 to: for the same track, options and frames, the media segments this hands back are byte for byte
 the ones `fragment` would have built. The initialization segment differs in exactly one respect —
 `mvhd`/`tkhd`/`mdhd` carry duration 0, since a live session does not know its total (ISO/IEC
 14496-12 §8.8.2 provides `mehd` for the fragmented movie that *does*). That is the same
-concession `iclforge::matroska::Writer` makes with EBML's unknown-size Segment and its omitted Duration.
-Both halves are asserted in `tests/ac3/test_fmp4.cpp`, the init segment by patching the
+concession `iclforge::containers::matroska::Writer` makes with EBML's unknown-size Segment and its omitted Duration.
+Both halves are asserted in `libs/ac3/tests/test_fmp4.cpp`, the init segment by patching the
 three duration fields back and then requiring full byte equality.
 
 ```cpp
-auto writer = iclforge::mp4::FragmentWriter::create(
-    track, iclforge::mp4::FragmentOptions{.playlist_window_segments = 20});
+auto writer = iclforge::containers::mp4::FragmentWriter::create(
+    track, iclforge::containers::mp4::FragmentOptions{.playlist_window_segments = 20});
 write("init.mp4", writer->init_segment());
 for (const auto& frame : frames) {
     const auto closed = writer->push(frame);          // std::optional<MediaSegment>
     if (*closed) {
         write(std::format("segment{}.m4s", (*closed)->sequence_number), (*closed)->bytes);
         // Rebuild the manifests from the rolling window each time a segment closes.
-        write("audio.m3u8", iclforge::mp4::build_hls_media_playlist(track, writer->window(),
-                                                          iclforge::mp4::HlsOptions{.vod = false}));
+        write("audio.m3u8", iclforge::containers::mp4::build_hls_media_playlist(track, writer->window(),
+                                                          iclforge::containers::mp4::HlsOptions{.vod = false}));
         write("manifest.mpd",
-              iclforge::mp4::build_dash_mpd(track, writer->window(),
-                                  iclforge::mp4::build_dash_adaptation_set(track, writer->window()),
-                                  iclforge::mp4::MpdOptions{.is_static = false,
+              iclforge::containers::mp4::build_dash_mpd(track, writer->window(),
+                                  iclforge::containers::mp4::build_dash_adaptation_set(track, writer->window()),
+                                  iclforge::containers::mp4::MpdOptions{.is_static = false,
                                                   .availability_start_time = now_iso8601()}));
     }
 }
@@ -611,18 +611,18 @@ false` writes `type="dynamic"` with `availabilityStartTime`, `minimumUpdatePerio
 `timeShiftBufferDepth` and no `mediaPresentationDuration` — the attribute set TS 103 420 §D.2.3's
 own example MPD carries — and the SegmentTemplate's `@startNumber` and the SegmentTimeline's
 first `<S t="…">` both come from the window rather than being assumed to be the start of the
-track. `iclforge::mp4` has no clock (no file I/O, no time), so the caller supplies the timestamp strings;
+track. `iclforge::containers::mp4` has no clock (no file I/O, no time), so the caller supplies the timestamp strings;
 that is also what keeps the manifests deterministic under test.
 
 This is what `forge record`/`forge live` with `container=fmp4` and the GUI's live session with
 **fragmented MP4/CMAF** selected write through: the directory is a servable live origin while the
-session runs, and a closed VOD one afterwards. `Fmp4FolderWriter` (`apps/common`) scans an AC-3 or
+session runs, and a closed VOD one afterwards. `Fmp4FolderWriter` (`apps/shared/media/src`) scans an AC-3 or
 E-AC-3 take's first frame for its track, and takes an AC-4 take's track, brands and manifest values
 from its caller (`Fmp4FolderWriter::Track`), with each frame's sync flag.
 
 ### External validation
 
-`iclforge::mp4::fragment`'s ISOBMFF output and the HLS media playlist round-trip cleanly through FFmpeg's
+`iclforge::containers::mp4::fragment`'s ISOBMFF output and the HLS media playlist round-trip cleanly through FFmpeg's
 own strict decode (`ffmpeg -v error -xerror -err_detect crccheck+bitstream+buffer+explode`) —
 both the fragmented file (init segment concatenated with every media segment) and `audio.m3u8`
 read back the exact original frame count and duration. The same holds for what `FragmentWriter`
@@ -636,9 +636,9 @@ with its own `describe()`:
 
 | Enum | Values |
 |---|---|
-| `iclforge::matroska::MuxError` | `kNoFrames`; `kInvalidTrack` (zero/negative channels or sample rate, or an empty codec id); `kFrameTooLarge` (a single frame beyond what one SimpleBlock can carry). |
-| `iclforge::mp4::MuxError` | `kNoFrames`; `kInvalidTrack` (here: an unrecognised codec id — only `ac-3`/`ec-3`/`ac-4` are legal — or no `codec_config` payload, besides the zero-channel/rate cases); `kFileTooLarge` — `mdat` would need a 64-bit chunk offset (`co64`), which this module doesn't write, so whole-file offsets are 32-bit; `kInvalidOptions` (e.g. `FragmentOptions::frames_per_fragment == 0`, `sync_samples` of another length than the frames or whose first frame is not a sync sample, a brand that is not four characters, or `FragmentWriter::push` given a first frame that is not a sync sample). `iclforge::mp4::FragmentWriter::create` returns the same two refusals as `fragment`, but never `kNoFrames`: a live writer stopped before its first frame simply has nothing to flush. |
-| `iclforge::mpegts::MuxError` | `kNoFrames` and `kInvalidTrack` as above; `kInvalidOptions` (PID collisions); `kFrameTooLarge` — one access unit too large for a PES packet's 16-bit length field. |
+| `iclforge::containers::matroska::MuxError` | `kNoFrames`; `kInvalidTrack` (zero/negative channels or sample rate, or an empty codec id); `kFrameTooLarge` (a single frame beyond what one SimpleBlock can carry). |
+| `iclforge::containers::mp4::MuxError` | `kNoFrames`; `kInvalidTrack` (here: an unrecognised codec id — only `ac-3`/`ec-3`/`ac-4` are legal — or no `codec_config` payload, besides the zero-channel/rate cases); `kFileTooLarge` — `mdat` would need a 64-bit chunk offset (`co64`), which this module doesn't write, so whole-file offsets are 32-bit; `kInvalidOptions` (e.g. `FragmentOptions::frames_per_fragment == 0`, `sync_samples` of another length than the frames or whose first frame is not a sync sample, a brand that is not four characters, or `FragmentWriter::push` given a first frame that is not a sync sample). `iclforge::containers::mp4::FragmentWriter::create` returns the same two refusals as `fragment`, but never `kNoFrames`: a live writer stopped before its first frame simply has nothing to flush. |
+| `iclforge::containers::mpegts::MuxError` | `kNoFrames` and `kInvalidTrack` as above; `kInvalidOptions` (PID collisions); `kFrameTooLarge` — one access unit too large for a PES packet's 16-bit length field. |
 
 ## Demuxer errors
 
@@ -647,9 +647,9 @@ its own `describe()` overload beside `MuxError`'s:
 
 | Enum | Values |
 |---|---|
-| `iclforge::mp4::DemuxError` | `kNotIsobmff`; `kTruncated`; `kMalformed` (a box, sample table or fragment layout that cannot be parsed); `kNoAudioTrack`; `kLimitExceeded`; `kMoovAfterMdat` (`Reader` only — the sample table follows the data it indexes; use `demux`). |
-| `iclforge::matroska::DemuxError` | `kNotMatroska` (no EBML header where one has to be); `kTruncated` (the input ends before any track was described — a cut *after* one is not an error, see above); `kMalformed` (a vint, element or block layout that cannot be parsed, including a lace whose declared sizes overrun its block); `kNoAudioTrack` (Tracks held nothing selectable, or the requested `track_number` is absent); `kLimitExceeded` (an element size or nesting depth beyond `ReadOptions`). |
-| `iclforge::mpegts::DemuxError` | `kNotTransportStream` (no 188/192/204-byte sync grid found within `ReadOptions::max_sync_search_bytes`); `kNoProgramme` (no PAT, or no PMT for the programme it named — including one whose CRC failed); `kNoAudioStream` (the PMT held no AC-3, E-AC-3 or AC-4 elementary stream under any of the four signalling forms); `kMalformed` (a PES or section layout that cannot be parsed); `kLimitExceeded` (a PES packet or PSI section beyond `ReadOptions`). |
+| `iclforge::containers::mp4::DemuxError` | `kNotIsobmff`; `kTruncated`; `kMalformed` (a box, sample table or fragment layout that cannot be parsed); `kNoAudioTrack`; `kLimitExceeded`; `kMoovAfterMdat` (`Reader` only — the sample table follows the data it indexes; use `demux`). |
+| `iclforge::containers::matroska::DemuxError` | `kNotMatroska` (no EBML header where one has to be); `kTruncated` (the input ends before any track was described — a cut *after* one is not an error, see above); `kMalformed` (a vint, element or block layout that cannot be parsed, including a lace whose declared sizes overrun its block); `kNoAudioTrack` (Tracks held nothing selectable, or the requested `track_number` is absent); `kLimitExceeded` (an element size or nesting depth beyond `ReadOptions`). |
+| `iclforge::containers::mpegts::DemuxError` | `kNotTransportStream` (no 188/192/204-byte sync grid found within `ReadOptions::max_sync_search_bytes`); `kNoProgramme` (no PAT, or no PMT for the programme it named — including one whose CRC failed); `kNoAudioStream` (the PMT held no AC-3, E-AC-3 or AC-4 elementary stream under any of the four signalling forms); `kMalformed` (a PES or section layout that cannot be parsed); `kLimitExceeded` (a PES packet or PSI section beyond `ReadOptions`). |
 
 ## Bitstream sinks (`iclforge::audio`)
 
@@ -662,9 +662,9 @@ passthrough are available on this build's platform, and why not when they aren't
 the CLI's `UNAVAILABLE HERE` messaging for `devices`, `record`, `monitor`, `live`, `outputs`
 and `play`.
 
-### `iclforge::iec61937` — S/PDIF burst packing and de-framing
+### `iclforge::containers::iec61937` — S/PDIF burst packing and de-framing
 
-`iclforge/iec61937/iec61937.hpp`. Packs AC-3 or E-AC-3 elementary-stream frames into IEC 61937 burst
+`iclforge/containers/iec61937/iec61937.hpp`. Packs AC-3 or E-AC-3 elementary-stream frames into IEC 61937 burst
 framing — the wrapper a compressed bitstream needs over PCM-shaped hardware/interfaces (S/PDIF,
 HDMI) so a receiver recognizes it as AC-3/E-AC-3 rather than treating it as noisy PCM. AC-3
 burst packing is byte-exact against FFmpeg's `spdif` muxer. E-AC-3 packing (`Eac3BurstPacker`)
@@ -683,7 +683,7 @@ sets the link: the content rate for AC-4 and AC-4 LD (48 kHz only), four times i
 sixteen times it on eight channels for HBR16. `ac4_burst_type_for()` picks the smallest type a
 stream's largest frame fits. After each burst, `last()` reports its `Pc`, `Pd`, period, place in
 its sequence and link rate; `wrap_ac4_stream` is the batch form. The packer is written from the
-standard's text, and `iclforge-tests` checks its periods, sequences and `Pc` codes against a second
+standard's text, and `iclforge-containers-tests` checks its periods, sequences and `Pc` codes against a second
 transcription of the tables. No device here accepts AC-4.
 
 Part 14 leaves two choices, and the header says which reading the packer takes. It numbers the
@@ -707,7 +707,7 @@ The input is by definition untrusted — a burst carrier comes off a wire or out
 device — so nothing taken from `Pd` is believed past its data type's repetition period, and a
 preamble not backed by a syncframe (`0x0B77`, or AC-4's `0xAC40` or `0xAC41`) is treated as a false
 match to resync past rather than a fatal error. An AC-4 burst's `Pd` also has to agree with the
-length its sync frame states. `fuzz/fuzz_iec61937_unwrap.cpp` keeps that accurate, and feeds the
+length its sync frame states. `libs/containers/fuzz/fuzz_iec61937_unwrap.cpp` keeps that accurate, and feeds the
 same bytes to the AC-4 packer.
 
 This is also what closes the loop on the wrap side: bursts written by this project *and* by
@@ -752,7 +752,7 @@ disabled), the sink stops itself. `running()` turns false, `position()` reports 
 `submit()` and `can_submit()` refuse, `flush()` returns at once, and `pause()` and `resume()`
 refuse with `kNotRunning`. A caller that retries `submit()` while the queue is full has to check
 `running()` as well, because waiting does not bring a lost device back. `start()` can be called
-again without a `stop()` first. The hidden `[passthrough-unplug]` case in `iclforge-tests` takes a
+again without a `stop()` first. The hidden `[passthrough-unplug]` case in `iclforge-audio-tests` takes a
 person through this on real hardware.
 
 Stated plainly, because this project's docs don't soften verification gaps: of the desktop
@@ -826,7 +826,7 @@ hardware in real time, and a live microphone capture → encode → monitor sess
 end-to-end. Building this path against real hardware surfaced two bugs that neither
 unit tests nor silent/synthetic input would have caught — see
 [Windows](../platforms/windows.md#audio-backend-wasapi) for the details, and
-`src/audio/src/backend/windows/monitor.cpp` for the fixes.
+`libs/audio/src/backend/windows/monitor.cpp` for the fixes.
 
 ## Capture: `iclforge::audio`
 
@@ -907,6 +907,6 @@ LFE has no direction to contribute, and a subwoofer's level would otherwise swam
 
 ---
 
-See also: [Decoding](decoding.md) — `iclforge::ac3::io::scan` is what feeds both `iclforge::matroska::mux` and the
+See also: [Decoding](decoding.md) — `iclforge::ac3::io::scan` is what feeds both `iclforge::containers::matroska::mux` and the
 sinks above their access units; [Header map](header-map.md) — every header referenced on this
 page in one table.

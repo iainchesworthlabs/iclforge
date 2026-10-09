@@ -151,7 +151,7 @@ else
     server_status=0
     "$server" \
         --state "$dir/server-state" \
-        --play "$root/tests/golden/object-fixture/dee_joc_514.ec3" --seconds 10 --timeout 180 \
+        --play "$root/testdata/object-fixture/dee_joc_514.ec3" --seconds 10 --timeout 180 \
         --player ws://127.0.0.1:28928/sendspin --label board --token "$token" --layout 2.0 \
         --status http://127.0.0.1:28080/status \
         --sink "$dir/reference" --sink-layout 2.0 \

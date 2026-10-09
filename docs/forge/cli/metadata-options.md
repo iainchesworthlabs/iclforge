@@ -552,7 +552,7 @@ record/live options (record, live; any order, after the positional arguments):
 ### `container=`
 
 All five values write the take **incrementally, as it is captured** — the same `RecordingSink`
-the GUI's own takes go through (`apps/common/recording_sink.hpp`), shared verbatim between the two
+the GUI's own takes go through (`apps/shared/media/src/recording_sink.hpp`), shared verbatim between the two
 front ends rather than reimplemented. Two consequences worth stating: a take of any length costs
 one frame of memory rather than the whole session, and a crash an hour in leaves an hour of
 playable file rather than nothing.
@@ -560,10 +560,10 @@ playable file rather than nothing.
 | Value | What it writes | Byte-identical to |
 |---|---|---|
 | `raw` (default) | The bare `.ac3`/`.ec3` elementary stream, or an `.ac4` one's sync frames with their CRC | the frames, concatenated |
-| `mkv` (alias `matroska`) | Matroska, via `iclforge::matroska::Writer`'s unknown-size Segment | `mkv` over the same frames, modulo the streaming Segment header |
+| `mkv` (alias `matroska`) | Matroska, via `iclforge::containers::matroska::Writer`'s unknown-size Segment | `mkv` over the same frames, modulo the streaming Segment header |
 | `ts` (alias `mpegts`) | MPEG-2 Transport Stream, DVB profile | `ts` over the same frames |
 | `spdif` | IEC 61937 bursts inside a PCM16 WAV carrier | `spdif` over the same frames |
-| `fmp4` (alias `cmaf`) | A directory of fragmented MP4/CMAF segments plus HLS/DASH manifests, via `Fmp4FolderWriter` (`apps/common/fmp4_folder_writer.hpp`) | see below |
+| `fmp4` (alias `cmaf`) | A directory of fragmented MP4/CMAF segments plus HLS/DASH manifests, via `Fmp4FolderWriter` (`apps/shared/media/src/fmp4_folder_writer.hpp`) | see below |
 
 Plain `mp4` is deliberately absent: `moov`/`stco` need every frame's final offset and the
 `dac3`/`dec3` box needs a bitstream scan, so it cannot be written before the take ends — the
@@ -1036,7 +1036,7 @@ qc options (qc; any order, after the positional arguments):
 reporting it; `preset=all` checks every one below in a single run. Each preset states a target integrated
 loudness, a symmetric tolerance around it (in LU) and a true-peak ceiling (a one-sided limit, never exceeded —
 not a tolerance band). The numbers are defined in `iclforge::ac3::meta::qc_preset()`
-([`iclforge/ac3/meta/qc.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/src/ac3/include/iclforge/ac3/meta/qc.hpp)), each
+([`iclforge/ac3/meta/qc.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/ac3/include/iclforge/ac3/meta/qc.hpp)), each
 read directly from its own primary source rather than recalled from memory:
 
 | Preset | Loudness | Max true peak | Source (version, date) |
@@ -1306,10 +1306,10 @@ Optional positional arguments, when omitted:
   `fastmdct` tool token — the opt-in spellings from when this defaulted off — still parse and now
   name what already happens.
 - **`fast-imdct=off`**: the decode-side mirror. `decode` runs §7.9.4 step 3 — the inverse
-  transform's one O(N²) part — through an FFT by default. The kernel
-  (`src/dsp/include/iclforge/dsp/detail/fft_kernel.hpp`) is radix-4 throughout, ending on a single radix-2 stage
-  only where log2(P) is odd — P = 128 and P = 512, not P = 64. The quality evidence that made it
-  the default: 7.8e-14 max peak-normalized relative error against the direct evaluation at the
+  transform's one O(N²) part — through an FFT by default. The FFT
+  (`libs/dsp/include/iclforge/dsp/detail/fft_stockham.hpp`, the family's one) is radix-4 throughout, ending on a
+  single radix-2 pass only where log2(P) is odd — P = 128 and P = 512, not P = 64. The quality
+  evidence that made the fast path the default, measured on the radix-4/2 kernel it replaced: 7.8e-14 max peak-normalized relative error against the direct evaluation at the
   transform level, and over 180-second real-material decodes 214.9 dB SNR agreement for AC-3 /
   284.7 dB for E-AC-3, with decodes 4.5–4.7× faster. `fast-imdct=off` forces the pseudocode's
   own direct sum — the reference form, and the oracle the fast path's tests validate against.

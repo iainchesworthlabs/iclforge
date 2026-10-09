@@ -10,13 +10,13 @@ run).
 
 Reads tools/ci/quality_race.py's `objects` mode JSON output - one row per
 (leg, object) plus a `scene` row per leg, every number produced by encoding
-the committed tests/golden/audio/reference_objects.wav scene with this build
+the committed testdata/audio/reference_objects.wav scene with this build
 and decoding it back with this build - and appends one JSONL record per row
 to <history-dir>/object-quality-<branch>.jsonl.
 
 There is no external-baseline half here, and there cannot be one. The three
 codec legs append_external_comparison_history.py handles carry vs_ffmpeg/
-vs_dee deltas against tests/golden/external-baseline/manifest.json; object
+vs_dee deltas against testdata/external-baseline/manifest.json; object
 decode has no external oracle at all - FFmpeg implements no JOC
 reconstruction, and Dolby's own decoder gates object decoding on a keyed
 authenticity tag this project ships no key for, so it renders these streams

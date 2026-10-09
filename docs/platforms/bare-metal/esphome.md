@@ -1,6 +1,6 @@
 # ESPHome
 
-`esphome/components/iclforge/` is an ESPHome external component. It is the plumbing:
+`firmware/esphome/components/iclforge/` is an ESPHome external component. It is the plumbing:
 `IclForgeComponent` owns an `iclforge::ac3::FrameDecoder` and an `iclforge::ac3::io::AccessUnitAccumulator`, takes
 bytes and hands back planar float PCM. It is **not** a `media_player` or a `speaker` source —
 ESPHome's `speaker` platform is ESP-IDF-only, so that is the obvious next step rather than a
@@ -16,7 +16,7 @@ external_components:
       type: git
       url: https://github.com/iainchesworthlabs/iclforge
       ref: main
-      path: esphome/components
+      path: firmware/esphome/components
     components: [iclforge]
 
 esp32:
@@ -25,13 +25,16 @@ esp32:
     type: esp-idf
 
 iclforge:
-  version: v0.10.0-beta.1   # a git ref of iclforge itself
+  version: main   # a git ref of iclforge itself that has firmware/esp-idf/iclforge
   buffer_size: 16384
 ```
 
 Two refs are in play: `external_components`' `ref` picks the version of the ESPHome component,
 and `iclforge:`'s `version:` picks the version of the library it fetches. Pin both for anything
-meant to keep working.
+meant to keep working. The library's ESP-IDF component is at `firmware/esp-idf/iclforge` since the
+repository was re-laid out, and a tag made before that (v0.10.0-beta.1 is one) has it at
+`esp-idf/iclforge`: `version:` has to name a ref after the change, `main` or the first release made
+from it.
 
 `buffer_size` is the framer's working buffer, floored at 4,160 bytes — one syncframe plus the
 next header, which is what deciding where an access unit ends requires. 16 KB holds an independent
@@ -43,7 +46,7 @@ The component reaches the library by git reference rather than the registry:
 `idf_component.yml`, which is the form the IDF component manager wants for a component in a
 subdirectory. Nothing here is blocked on [publishing](esp32-s3.md#the-esp-idf-component).
 
-CI runs `esphome config` over `esphome/tests/iclforge-test.yaml` against a local source pointing
+CI runs `esphome config` over `firmware/esphome/tests/iclforge-test.yaml` against a local source pointing
 at the working tree, which exercises the schema and `to_code` including the `add_idf_component`
 call, and asserts that a `buffer_size` no access unit fits in is rejected. It does **not** compile
 the firmware: that would clone ICL Forge at the configured ref and build the whole IDF project,
@@ -52,7 +55,7 @@ job is the `esp-component` call in the `esp` lane of `ci.yml`, which runs after 
 changes the ESP32 trees or a tree its component ships, and nightly ([the lane table](../../ci-lanes.md#lane-table),
 [CI for many agents](../../ci-agentic.md#the-tiers)).
 
-[`esphome/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/esphome/README.md)
+[`firmware/esphome/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/firmware/esphome/README.md)
 has the rest, including why PSRAM is worth having on a board that also runs WiFi.
 
 ## Where to go next

@@ -106,16 +106,16 @@ installed or packaged.*
 
 - One or more items: files, a folder, or a drop onto the window, held in a queue with play,
   pause, stop, next, previous and seek.
-- Containers through `apps/common/container_input.hpp`, which sniffs Matroska, MP4 and MPEG-TS
+- Containers through `apps/shared/media/src/container_input.hpp`, which sniffs Matroska, MP4 and MPEG-TS
   and joins the first track: raw `.ac3`/`.ec3`, `.mp4`/`.m4a`, `.mkv`, `.ts`. The container
   readers return neither timestamps nor a track list, `mp4::Reader` needs `moov` before `mdat`,
   and MPEG-TS yields PES payloads that have to be re-split. WAV carrying IEC 61937 is readable
   through `BurstReader` but is not sniffed.
-- AC-4 (`.ac4`, and AC-4 in MP4 or TS) is listed with its bitstream information from `src/ac4`
+- AC-4 (`.ac4`, and AC-4 in MP4 or TS) is listed with its bitstream information from `libs/ac4`
   and marked as not playable until [chip D](#chip-d-the-ac-4-decoder) delivers a decoder.
   *As built, chip D delivered it and AC-4 plays.*
 - Duration and seek come from each stream's samples per access unit. The GUI's stream player
-  assumes 1,536 (`ac3::kSamplesPerFrame` in `apps/gui/stream_player_controller.cpp`), which is
+  assumes 1,536 (`ac3::kSamplesPerFrame` in `apps/forge/gui/src/stream_player_controller.cpp`), which is
   wrong for E-AC-3 with fewer than six blocks per frame.
 
 ### Playback configuration
@@ -123,7 +123,7 @@ installed or packaged.*
 - **Output**, one of: a local PCM device; a passthrough-capable device (IEC 61937 to HDMI or
   S/PDIF); a Sendspin group of sinks and players ([Groups](#groups)).
 - **Speaker layout**, in the renderer's grammar (`esp-idf/ac3forge/include/ac3forge/layout.hpp`
-  on 2026-09-15; A1 moved it to `src/render/include/iclforge/render/layout.hpp`): a named `F.L.H` layout
+  on 2026-09-15; A1 moved it to `libs/render/include/iclforge/render/layout.hpp`): a named `F.L.H` layout
   of up to sixteen speakers or a per-speaker list of locations and
   angles, with `:small`, `:height`, `:top` and `:upfiring`. A coded channel whose location is in
   the layout goes to that speaker, other channels are panned, objects are panned by position, and
@@ -136,8 +136,8 @@ What the controls map to, and what each needs:
 
 | Control | In the library today | Work |
 |---|---|---|
-| Operating mode: line, RF, custom | `OperatingMode` (`src/ac3/include/iclforge/ac3/decoder/output.hpp:57`) and `rf_ceiling` | none |
-| DRC scale | `DecoderConfig::drc_scale`, one exponent for cut and boost | separate cut and boost scale factors, in `src/ac3` |
+| Operating mode: line, RF, custom | `OperatingMode` (`libs/ac3/include/iclforge/ac3/decoder/output.hpp:57`) and `rf_ceiling` | none |
+| DRC scale | `DecoderConfig::drc_scale`, one exponent for cut and boost | separate cut and boost scale factors, in `libs/ac3` |
 | Heavy compression | `DecoderConfig::heavy_compression` (`decoder.hpp:168`) | none |
 | Dialogue normalisation | `OutputConfig::apply_dialnorm` (`output.hpp:76`), a fixed −31 target that only attenuates | none unless the design keeps a target control |
 | Stereo downmix | `DownmixTarget` as coded, Lo/Ro, Lt/Rt, mono (`output.hpp:46`), `ltrt_phase_shift`, `mix_lfe` | none |
@@ -156,9 +156,9 @@ The AC-4 controls are designed in [A0](#a0-design-rounds) and disabled until the
 presentation (from the table of contents: presentations, language, channel mode), main and
 associated with a mix level, dialogue enhancement level, DRC decoder mode and profile, and the
 downmix modes. Where an AC-4 control and an E-AC-3 control are the same idea, such as DRC mode
-or downmix target, the app shows one control. `src/ac4` is an inspector
-(`src/ac4/include/iclforge/ac4/ac4.hpp:22`) and does not parse the dialogue enhancement or DRC payloads
-yet, which is part of chip D. *As built, the decoder in `src/ac4dec` reads those payloads, and the
+or downmix target, the app shows one control. `libs/ac4` is an inspector
+(`libs/ac4/include/iclforge/ac4/core/toc.hpp:22`) and does not parse the dialogue enhancement or DRC payloads
+yet, which is part of chip D. *As built, the decoder in `libs/ac4/src/decoder` reads those payloads, and the
 controls are live on the Decoder page's AC-4 tab: presentation, language, dialogue enhancement,
 dynamic range, downmix, the immersive layout, full or core decoding and the output level.*
 
@@ -166,8 +166,8 @@ dynamic range, downmix, the immersive layout, full or core decoding and the outp
 
 - One meter per output channel, labelled with the speaker the routing put there: peak, hold, RMS
   and clip latch from `ac3::analysis::LevelMeter`
-  (`src/ac3/include/iclforge/ac3/analysis/levels.hpp`).
-- Loudness from `ac3::meta::LoudnessMeter` (`src/ac3/include/iclforge/ac3/meta/loudness.hpp`):
+  (`libs/ac3/include/iclforge/ac3/analysis/levels.hpp`).
+- Loudness from `ac3::meta::LoudnessMeter` (`libs/ac3/include/iclforge/ac3/meta/loudness.hpp`):
   momentary, short-term, integrated, loudness range and true peak. On 2026-09-15 only QC used it;
   the engine's `play_meters` now does too.
 - Meter snapshots are released at their play time. The GUI's player meters each chunk before it
@@ -181,15 +181,15 @@ dynamic range, downmix, the immersive layout, full or core decoding and the outp
 ### Speaker setup and routing
 
 - **Routing**: each rendered channel to one output of the device, or one slot of a sink, with
-  outputs allowed to stay unassigned. `src/audio` has no routing today and assumes the
+  outputs allowed to stay unassigned. `libs/audio` has no routing today and assumes the
   WAVE_FORMAT_EXTENSIBLE channel order. On the ESP32 a per-speaker layout list already expresses
   a patch, and duplicates are refused.
-  *As built, A1 added the routing patch to the renderer and A2 made `src/audio` place channels by it.*
+  *As built, A1 added the routing patch to the renderer and A2 made `libs/audio` place channels by it.*
 - **Identify tone**, one channel at a time.
 - **Per-output trim** in dB and **per-output delay** in milliseconds.
 - **Bass management**: small speakers crossed over into the LFE. The renderer takes a crossover
   frequency (`esp-idf/ac3forge/include/ac3forge/render.hpp:95-107`, now
-  `src/render/include/iclforge/render/render.hpp`) and the player passes the 80 Hz default; the app
+  `libs/render/include/iclforge/render/render.hpp`) and the player passes the 80 Hz default; the app
   makes it a setting.
 - Saved per output device, and on each sink for that sink's own wiring.
 
@@ -208,12 +208,12 @@ stands as written.
   metadata ranges, EMDF payload ids, OAMD and JOC, CRC, coding tools). `ac3cli probe json=1`
   (schema `ac3forge.probe/1`) is the precedent and reads raw streams only. *As built, `probe` reads
   Matroska, MP4 and MPEG-TS as well, and AC-4; Hearth's own media information JSON, schema
-  `ac3forge.hearth.media/1`, shares the probe's JSON writer through `apps/common`.*
+  `ac3forge.hearth.media/1`, shares the probe's JSON writer through `apps/shared/media/src`.*
 - **Objects**: OAMD object metadata; whether an authenticity tag is present
   (`has_authenticity_tag`; verification needs a key and checks only this project's own tag).
 - **Container**: codec configuration box (`dac3`, `dec3`), track, duration.
 - **AC-4**: table of contents, presentations, substream groups, channel modes, bitrates, language
-  and A-JOC information from `src/ac4`.
+  and A-JOC information from `libs/ac4`.
 - Copyable, and exportable as JSON.
 
 ### Passthrough
@@ -241,7 +241,7 @@ local decode. Every stream shape, signed Atmos included, has locked on a receive
 ### Documentation
 
 A `docs/hearth/` guide with screenshots generated by `ac3hearth --shot`, following Crucible's
-`--shot` and `--page` options (`apps/crucible/ui/main.cpp`), and a script under `tools/` that
+`--shot` and `--page` options (`apps/crucible/ui/src/main.cpp`), and a script under `tools/` that
 regenerates them so the pictures follow the interface.
 
 *Not built as of 2026-09-30 (phase A8). `ac3hearth` has the `--shot` and `--page` options, but on
@@ -253,30 +253,30 @@ design mockups. `docs/hearth/` holds the overview, the sink guides and a design 
 
 | Layer | Path | Target | Qt | Used by |
 |---|---|---|---|---|
-| Renderer and speaker management | `src/render/include/iclforge/render/` (moved from `esp-idf/iclforge/include/iclforge/{layout,render}.hpp`) | part of `ac3::forge` | no | engine, test sink, `hearth_sink` |
-| Sendspin | `src/sendspin/` | a static library beside `mp4` and `mpegts` | no | engine (server half), test sink and `hearth_sink` (player half) |
-| Output devices | `src/audio/` | `ac3::audio` | no | engine, test sink |
+| Renderer and speaker management | `libs/render/include/iclforge/render/` (moved from `firmware/esp-idf/iclforge/include/iclforge/{layout,render}.hpp`) | part of `ac3::forge` | no | engine, test sink, `hearth_sink` |
+| Sendspin | `libs/sendspin/` | a static library beside `mp4` and `mpegts` | no | engine (server half), test sink and `hearth_sink` (player half) |
+| Output devices | `libs/audio/` | `ac3::audio` | no | engine, test sink |
 | Engine | `apps/hearth/engine/` | `ac3hearth_engine` | no | app, test sink |
 | Application | `apps/hearth/ui/` | `ac3hearth` | yes | |
 | Test sink | `apps/hearth/testsink/` | `ac3hearth-testsink` | no | CI, contributors |
-| Firmware | `esp-idf/iclforge/examples/hearth_sink/` | ESP-IDF project | no | S3, C6 |
+| Firmware | `firmware/hearth-sink/` | ESP-IDF project | no | S3, C6 |
 
 *Every path in the table exists as written. The firmware directory builds the S3, C6 and P4
-images, and the engine's platform seams are under `apps/hearth/engine/platform`.*
+images, and the engine's platform seams are under `apps/hearth/engine/src/platform`.*
 
 The engine follows Crucible's split: a Qt-free engine with thread-safe commands and a status
 snapshot, a controller that polls it (Crucible's is 60 ms), platform seams as directories under
 the no-`#if` rule that `tools/checks/check_platform_macros.ps1` enforces, and fakes that let the
 engine run in `ac3tests` on every leg.
 
-**Constraints on `src/sendspin`'s player half**, so chip B does not rewrite it: it builds with
+**Constraints on `libs/sendspin`'s player half**, so chip B does not rewrite it: it builds with
 ESP-IDF's toolchain; no `thread_local` above 4 KiB (FreeRTOS carves thread-local storage out of
 every task stack); no large stack frames (the HTTP server's tasks run on 6,144 bytes); bounded,
 measurable allocations (the S3 heap is regioned and the C6 has no PSRAM); sockets, crypto, clock
 and randomness behind seams, backed by cpp-httplib, mbedTLS and the OS on a computer and by
 `esp_http_server`, ESP-IDF's mbedTLS, `esp_timer` and the hardware RNG on a board. JSON is written
 in-tree: the only JSON reader in the tree is private to `ac3::oba`
-(`src/objects/src/scene_json.cpp`).
+(`libs/objects/src/scene_json.cpp`).
 
 **Dependencies**, behind a vcpkg manifest feature `hearth` so that a library-only build pulls
 none of them: cpp-httplib (MIT), mjansson's `mdns` (public domain), mbedTLS (Apache-2.0), libFLAC
@@ -352,7 +352,7 @@ phase D11 of the AC-4 plan, `"ac4"`.*
   renders it to its own layout; each standard player receives the app's stereo.
 - Members in v1: Hearth sinks, test sinks and standard Sendspin players.
 - Not members in v1: the computer's own output, which is not a Sendspin player and whose play
-  position `src/audio` does not report yet (an in-process player in the app is the later step).
+  position `libs/audio` does not report yet (an in-process player in the app is the later step).
   A receiver fed a bitstream is never a member, because it reports no decode latency.
 - One speaker layout split across several boards is out of scope: it needs alignment well inside
   1 ms.
@@ -377,13 +377,13 @@ phase D11 of the AC-4 plan, `"ac4"`.*
   memory and time allow, measured; `_ac3forge_player@v1` for the bitstream; the Noise responder;
   pairing codes on the serial console and the page; `_sendspin._tcp` through the `espressif/mdns`
   component.
-- The player comes from `src/sendspin`, over `esp_http_server`'s WebSocket and ESP-IDF's mbedTLS.
+- The player comes from `libs/sendspin`, over `esp_http_server`'s WebSocket and ESP-IDF's mbedTLS.
   `sendspin-cpp` was the earlier recommendation ([esp32-player.md decision 11](esp32-player.md#decisions)).
   B3 measured both on 2026-09-16, each as a minimal player app for the S3 built at `-Os` with
   GCC 15.2 and run under QEMU with no PSRAM, paired and played 24-bit PCM by aiosendspin 9.1.1's
   server:
 
-  | | `src/sendspin` | `sendspin-cpp` 696e75ff |
+  | | `libs/sendspin` | `sendspin-cpp` 696e75ff |
   |---|---|---|
   | Image | 521,780 bytes | 695,384 bytes |
   | Internal heap free when idle | 333,916 bytes | 307,676 bytes |
@@ -396,13 +396,13 @@ phase D11 of the AC-4 plan, `"ac4"`.*
   29,460 bytes; the 0.1.30 its manifest resolves to accepts only the NNpsk0 pattern on ESP-IDF.
   It links its Opus and FLAC decoders into a PCM-only player (109,050 bytes of flash), and it has
   no decoder interface and no hook for a custom role, so carrying the extension through it means
-  a fork. `src/sendspin` was chosen. In `hearth_sink` on a board, starting the player (the Noise
+  a fork. `libs/sendspin` was chosen. In `hearth_sink` on a board, starting the player (the Noise
   keys are made then) used 7,272 bytes of stack, more than the main task has to spare, so it
   starts on a 16 KB task of its own.
 - Slot width is a setting. At 16 bits: 16 channels on the S3 (two lines of eight), 8 on the C6
   (one line). At 32 bits: 8 on the S3, 4 on the C6. The sink advertises the count for its current
   setting. On 2026-09-15 a 16-bit slot width was standard I2S only, because TDM at 16 bits needs
-  an interleave that was not written (`esp-idf/iclforge/include/iclforge/sink_plan.hpp:17-26`), so
+  an interleave that was not written (`firmware/esp-idf/iclforge/include/iclforge/sink_plan.hpp:17-26`), so
   a board output at most eight channels and only the capture sink reached twelve. *As built, the
   interleave exists (`interleave_16in16` in `interleave.hpp`), the slot width is a setting on the
   S3, and a 16-bit line carries eight channels, sixteen with a second line
@@ -430,7 +430,7 @@ phase D11 of the AC-4 plan, `"ac4"`.*
   network leaves: 23 and 139 bytes at the least on two boards over ten minutes, with nothing
   failing. The decode task used about 18.9 KB of its 32 KB stack, the WebSocket server's task
   5.2 KB of 8 KB, and starting the player 7.3 KB of the 16 KB it is given
-  ([the sink's README](../esp-idf/iclforge/examples/hearth_sink/README.md#on-two-boards)).
+  ([the sink's README](../firmware/hearth-sink/README.md#on-two-boards)).
 - **ESP32-C6**: no PSRAM (ESP-IDF has no external-RAM support for the part), 512 KB of SRAM shared
   with WiFi, and one 160 MHz core with no FPU, so the fixed-point tier. On the C3 the tier's
   largest fixture that fit peaked at 225,038 bytes and the 7.1.4 fixtures did not fit
@@ -443,10 +443,10 @@ phase D11 of the AC-4 plan, `"ac4"`.*
 
 ## The test sink
 
-- `ac3hearth-testsink` is `src/sendspin`'s player half with the extension role, decoding with the
+- `ac3hearth-testsink` is `libs/sendspin`'s player half with the extension role, decoding with the
   library and the moved renderer, so below the transport it runs the boards' code paths.
 - Outputs: a multichannel WAV per stream with a log of play times; a local device through
-  `src/audio` with A2's routing; a null output with counters. It can emulate a board's slot count
+  `libs/audio` with A2's routing; a null output with counters. It can emulate a board's slot count
   and slot width.
 - Several instances on one host, with distinct names and ports, form a group. They share one
   clock, so their logged play times measure the group's alignment without a capture interface.
@@ -461,10 +461,10 @@ package.*
 - Between queue items with the same sample rate and output layout, the output stays open and no
   silence is inserted. In a group, the Sendspin stream continues and its timestamps run on.
 - No container field about encoder delay or padding is read today. `mp4.hpp` says "No edit lists,
-  no multiple tracks" (`src/mp4/include/iclforge/mp4/mp4.hpp:35`) and nothing reads `iTunSMPB`. A3 adds
+  no multiple tracks" (`libs/containers/include/iclforge/containers/mp4/mp4.hpp:35`) and nothing reads `iTunSMPB`. A3 adds
   `elst` reading to `mp4::Reader` and trims what it states. A raw elementary stream carries no
   such field, so at each join up to a frame of padding remains, plus the transform delay, which
-  is 256 samples for this project's encoder (`src/ac3/include/iclforge/ac3/latency.hpp:29-37`).
+  is 256 samples for this project's encoder (`libs/ac3/include/iclforge/ac3/latency.hpp:29-37`).
 - Each item gets a new decoder; neither decoder has a `reset()`. A continuous stream that has been
   split into files is not detected.
 - Where the sample rate or layout changes, the output reopens and the app says so.
@@ -495,7 +495,7 @@ E-AC-3 JOC and AC-4; the network pages (discovery, pairing, a sink in use by Mus
 group editing, a sink's settings, reported levels beside the local decode's); settings, first
 run, and About with licences. Light and dark, with keyboard focus states. Drawn from the family's
 existing QML components (Theme, Card, RailBlock, SegmentedControl, FocusRing, which Crucible
-copies from `apps/gui` at configure time) so what is drawn can be built.
+copies from `apps/forge/gui` at configure time) so what is drawn can be built.
 
 At most two review rounds with the user, each round's feedback and changes recorded.
 
@@ -506,12 +506,12 @@ At most two review rounds with the user, each round's feedback and changes recor
 
 ### A1: the renderer moves into the library
 
-**Status: built.** `src/render/include/iclforge/render/` holds the layout, the renderer, the routing
+**Status: built.** `libs/render/include/iclforge/render/` holds the layout, the renderer, the routing
 patch, per-output trim and delay, the identify tone and the serving policy, in namespace
 `ac3::render`; the ESP-IDF component includes them from there.
 
-`layout.hpp` and `render.hpp` move from `esp-idf/iclforge/include/iclforge/` into the library
-(proposed `src/render/include/iclforge/render/`, namespace `ac3::render`), and the ESP-IDF component
+`layout.hpp` and `render.hpp` move from `firmware/esp-idf/iclforge/include/iclforge/` into the library
+(proposed `libs/render/include/iclforge/render/`, namespace `ac3::render`), and the ESP-IDF component
 includes them from there. Added beside them: a routing patch from rendered channel to output
 index with unassigned outputs allowed, per-output trim and delay, an identify-tone generator, and
 the crossover frequency as a setting. Their host tests move with them and grow.
@@ -523,7 +523,7 @@ included.
 **Verified by:** the QEMU steps of the ESP32-S3 job on the pull request (the partition, TDM,
 render and 7.1.4 HTTP shapes and the stream set) and `ac3tests` on every leg.
 
-### A2: output devices in `src/audio`
+### A2: output devices in `libs/audio`
 
 **Status: built, one hardware exit open.** `ac3cli outputs` lists each endpoint's channel count,
 speakers and rates; `MonitorSink` reports playback position and latency and has pause and flush.
@@ -556,7 +556,7 @@ speaker; the Pi for ALSA and PipeWire; macOS compiled and unit-tested in CI only
 `mp4::Reader`, the decoder settings model with the separate boost scale, a pure output decision
 and selector, meters released at play time, media information and diagnostics. The six
 sink-following gaps were closed in the engine (`output_decision.cpp`, `output_selector.cpp`,
-`Player::refollow()`), and the PipeWire capability read exists in `src/audio`. `ac3cli play` has
+`Player::refollow()`), and the PipeWire capability read exists in `libs/audio`. `ac3cli play` has
 two of the six, that read and a note saying why a descriptor could not be read; it still takes the
 default endpoint at its word, reads a sink's capabilities once and never re-follows, and
 transcodes through a temp file (see [Coordination](#coordination)).
@@ -567,7 +567,7 @@ transcodes through a temp file (see [Coordination](#coordination)).
 - A session per item: container input, access units, decoder, renderer, speaker management,
   output.
 - The decoder settings model over `DecoderConfig` and `OutputConfig`, with separate cut and boost
-  scale factors added in `src/ac3`, mix-level overrides, and dual-mono selection in the engine.
+  scale factors added in `libs/ac3`, mix-level overrides, and dual-mono selection in the engine.
 - Gapless playback, including `elst` in `mp4::Reader`.
 - Passthrough, reusing `PassthroughSink` and a pure output decision in the shape of Crucible's
   `output_policy` (a mode, an endpoint and a reason), with the six sink-following gaps checked and
@@ -580,12 +580,12 @@ threads tagged `[concurrency]`); the output decision's case table runs with no s
 queue of mixed containers plays to a fake device gaplessly, with the expected sample count at
 every join.
 
-**Verified by:** `ac3tests` on every leg; the gain tests in `src/ac3` for the cut and boost
+**Verified by:** `ac3tests` on every leg; the gain tests in `libs/ac3` for the cut and boost
 split.
 
 ### A4: Sendspin
 
-**Status: built, one exit open.** `src/sendspin` has the JSON reader, the messages, the WebSocket
+**Status: built, one exit open.** `libs/sendspin` has the JSON reader, the messages, the WebSocket
 transport over cpp-httplib, mDNS discovery, Noise over mbedTLS, CPace pairing, the vendored time
 filter, both halves and the extension role, and `ac3hearth-testsink` exists. The four fuzz
 targets (`fuzz_sendspin_json`, `_messages`, `_frames` and `_handshake`), the threat-model
@@ -600,7 +600,7 @@ Music Assistant run, which has not been made against Music Assistant itself.
    whether a server must implement every role or may leave some unactivated, the question goes
    to the Sendspin project.
 2. **`planning/hearth-sendspin-extension.md`**, the normative `_ac3forge_player@v1`.
-3. **`src/sendspin/`**: JSON; messages; WebSocket over cpp-httplib behind a transport seam; mDNS
+3. **`libs/sendspin/`**: JSON; messages; WebSocket over cpp-httplib behind a transport seam; mDNS
    behind a discovery seam; Noise over mbedTLS behind a crypto seam; CPace pairing; the time
    filter; the server half (discover, connect, pair, group, schedule chunks, `player@v1` with
    PCM, FLAC and Opus, and the other roles the conformance table requires); the player half
@@ -629,7 +629,7 @@ their configured budget.
 **Status: built, with two gaps against the exit.** The window has the Play, Media, Speakers,
 Decoder, Network and Settings pages and the first-run, About, Licences and shortcuts dialogs, the
 `--shot` and `--page` options, six languages and the `ac3hearth_qmltests` suites. There is no
-`xx` pseudo-locale (`apps/hearth/ui/translations/` has the six languages only), and no
+`xx` pseudo-locale (`apps/hearth/ui/assets/translations/` has the six languages only), and no
 screenshot of the running app exists, so "every artboard of the design exists as a page with a
 `--shot` image" has not been met.
 
@@ -675,16 +675,16 @@ NSIS installer and a zip on Windows, a zip on macOS (there is no Hearth `.dmg`),
 tar.gz on Linux. The NSIS installer adds a Start Menu entry, and `.ac3` and `.ec3` open in
 `ac3hearth` when it is built (they opened in `ac3gui` before), which was the decision the last
 bullet left to A7. `apps/hearth/` is in the classifier's Windows, Linux and macOS lanes, and
-`src/` (`src/sendspin` with it) is in its core lane. The exit's release dry run and the Pi
+`src/` (`libs/sendspin` with it) is in its core lane. The exit's release dry run and the Pi
 install are not recorded: no tag has been cut since the component landed.
 
 - A CPack component `hearth` on Windows (NSIS and zip), macOS (DMG) and Linux (DEB, RPM and TGZ,
   package `ac3forge-hearth`), with notices. Hearth becomes the first member after the library
   and Forge with a macOS package; Crucible's component exists on Windows and Linux only. The test
   sink is not in any package.
-- `tools/ci/classify_changes.py` gains prefixes for `apps/hearth/` and `src/sendspin/`; an
+- `tools/ci/classify_changes.py` gains prefixes for `apps/hearth/` and `libs/sendspin/`; an
   unmapped path lights every lane.
-- The CI legs that build Qt applications build Hearth; the engine and `src/sendspin` join
+- The CI legs that build Qt applications build Hearth; the engine and `libs/sendspin` join
   `ac3tests` on every leg; the loopback group test runs; a package check in the shape of
   `tools/ci/check_crucible_package.py`.
 - The Windows `windeployqt` passes, which are ordered with `add_dependencies`, gain the third
@@ -721,7 +721,7 @@ sound from a local device using that page alone.
 
 ## Chip B: the ESP32-S3 sink
 
-Starts once A4 has landed on main: the extension page reviewed, `src/sendspin` and the test sink
+Starts once A4 has landed on main: the extension page reviewed, `libs/sendspin` and the test sink
 merged. Proven on the S3 development boards. No DAC is wired to either of them: the ES9080 design
 is on paper, and the boards clock their audio out with nothing listening. So each phase's exit
 below is met as far as reported levels, timing and counters go, and the parts that need a DAC
@@ -770,7 +770,7 @@ status and sink-owned settings, with its budget re-derived and its Playwright su
 
 ### B3: the Sendspin player on the board
 
-**Status: built, the Music Assistant exit open.** `src/sendspin` was chosen over `sendspin-cpp` on
+**Status: built, the Music Assistant exit open.** `libs/sendspin` was chosen over `sendspin-cpp` on
 the measurements in the table above. The player half, the extension role, pairing codes on the
 console and the page, the time filter, decoder settings at runtime and per-slot levels are in
 `hearth_sink`. Two S3 boards on a home Wi-Fi network played as a group for ten minutes with no
@@ -779,8 +779,8 @@ the software scheduled, and no DAC output was measured ([the S3 sink
 guide](../docs/hearth/sink-esp32-s3.md#groups)). The same boards have not played from Music
 Assistant itself.
 
-First the choice between `src/sendspin`'s player half and `sendspin-cpp`, measured and recorded
-([The firmware](#the-firmware): `src/sendspin`). Then: the Noise responder, pairing codes on serial and the page, the time filter, playout
+First the choice between `libs/sendspin`'s player half and `sendspin-cpp`, measured and recorded
+([The firmware](#the-firmware): `libs/sendspin`). Then: the Noise responder, pairing codes on serial and the page, the time filter, playout
 scheduled against the DAC with corrections applied to decoded PCM, `player@v1` with PCM for Music
 Assistant (FLAC and Opus by measurement), the extension role feeding the component's decoder,
 renderer, speaker management and sink, decoder settings at runtime, and per-slot levels and
@@ -810,7 +810,7 @@ it.
 **As built:** `hearth-esp32s3` in `.github/workflows/_build.yml`, a job of its own that runs
 after the ESP32-S3 job and takes that job's QEMU image as an artifact. The server is a host build
 with GCC 16 and vcpkg's `hearth` feature, and Espressif's image carries neither. The engine had
-no Sendspin server when this was written, so `ac3hearth-testserver`, on `src/sendspin`'s
+no Sendspin server when this was written, so `ac3hearth-testserver`, on `libs/sendspin`'s
 `ServerHost`, played in its place; the engine has one now (A6), and the job still uses the test
 server. `tools/checks/run_sendspin_qemu.sh` runs the step, and its `--board-trim-db` option makes
 the deliberate mismatch.
@@ -850,11 +850,11 @@ C1 and C2 start at once; the board arrived on 2026-09-15. C3 follows chip B.
 ### C1: bring-up and measurement
 
 **Status: built.** `esp32c6` is in the component manifest, the probe is
-`apps/baremetal/platform/esp32c6`, and the board's figures, taken on 2026-09-15 in both tiers with
+`firmware/baremetal/platform/esp32c6`, and the board's figures, taken on 2026-09-15 in both tiers with
 and without WiFi, are on [the C6 page](../docs/platforms/bare-metal/esp32-c6.md). QEMU does not
 emulate the C6 (`idf.py qemu` refuses `esp32c6`), so CI builds the image and nothing runs it.
 
-`esp32c6` in the component manifest, and a probe project beside `apps/baremetal/platform/esp32c3/`.
+`esp32c6` in the component manifest, and a probe project beside `firmware/baremetal/platform/esp32c3/`.
 Decode time per fixture at 160 MHz in the fixed-point tier (the default) and the float tier; peak
 heap per fixture; the same again with WiFi connected and a TCP stream arriving. Recorded as
 numbers on a new `docs/platforms/bare-metal/` page for the part before any sink work.
@@ -928,7 +928,7 @@ the fixed-point tier and has not run it on a board (D14b, D14c and D14d).
   `dlbac4dec` produced no samples when it was tried for the AC-4 inspector (IM4). The Dolby
   Encoding Engine install encodes AC-4 from known WAV sources, so decoded output can be scored
   against the source. Whether decoder conformance streams are published is checked.
-- What `src/ac4` has to grow: dialogue enhancement and DRC payloads, object substream groups.
+- What `libs/ac4` has to grow: dialogue enhancement and DRC payloads, object substream groups.
 - The fixed-point tier and the ESP32 question.
 - The decisions.
 
@@ -966,11 +966,11 @@ burst types.*
   joins `PROSE_PATHS_UNCHECKED`.
 - The appliance plan's Phase 1, the sink-following gaps in `ac3cli play`, is done inside A3.
   *As built, A3 closed the gaps in the engine's output decision and selector, and the CLI got only
-  the two that live in `src/audio`: `ac3cli play` still takes the default endpoint at its word
-  (`apps/cli/commands/audio_io.cpp`, "play/monitor follow mode"), reads capabilities once and
+  the two that live in `libs/audio`: `ac3cli play` still takes the default endpoint at its word
+  (`apps/forge/cli/src/commands/audio_io.cpp`, "play/monitor follow mode"), reads capabilities once and
   never re-follows, and its transcode leg goes through a temp file, so gaps 1, 3, 4 and 5 stay
   open there.*
-- Unaffected: driver signing under `apps/windows/`, Crucible, the ESPHome component.
+- Unaffected: driver signing under `apps/crucible/windows/`, Crucible, the ESPHome component.
 
 ## Deliberately not in scope
 

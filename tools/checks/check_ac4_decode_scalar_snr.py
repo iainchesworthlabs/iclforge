@@ -2,7 +2,7 @@
 committed stream (planning/ac4.md, D14a and D14d).
 
 `ICLFORGE_DECODE_SCALAR=float` builds the decoder's QMF banks, transforms, A-SPX, A-CPL and
-the rest of src/ac4dec/src/pcm in `float`, and `ICLFORGE_DECODE_SCALAR=fixed` in Q7.24 with
+the rest of libs/ac4/src/decoder/pcm in `float`, and `ICLFORGE_DECODE_SCALAR=fixed` in Q7.24 with
 block exponents; the default builds them in `double`. This decodes each committed AC-4 stream
 with the double CLI and the other tier's and holds the second decode to the first, in two
 regions of each channel's spectrum:
@@ -21,8 +21,8 @@ frames of 2 048 samples, in dB, and the figure of a stream is its worst channel'
 with less than MIN_ENERGY_PER_FRAME in a region is not scored there (the LFE above a crossover).
 The error's level in dBFS, the energy of a full-scale sine in a frame being 0 dB, is printed
 beside them. What is gated is each figure against the pin of
-tests/golden/ac4dec/scalar-agreement.json for the float tier, or of
-tests/golden/ac4dec/scalar-agreement-fixed.json for the fixed-point one, which hold floors: the
+testdata/ac4/scalar-agreement.json for the float tier, or of
+testdata/ac4/scalar-agreement-fixed.json for the fixed-point one, which hold floors: the
 figure measured with the double CLI as the reference, less a margin.
 
 What it does not answer is whether either decode is RIGHT: the scorers do that, with a float
@@ -50,15 +50,15 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-PINS = REPO_ROOT / "tests" / "golden" / "ac4dec" / "scalar-agreement.json"
-FIXED_PINS = REPO_ROOT / "tests" / "golden" / "ac4dec" / "scalar-agreement-fixed.json"
+PINS = REPO_ROOT / "testdata" / "ac4" / "scalar-agreement.json"
+FIXED_PINS = REPO_ROOT / "testdata" / "ac4" / "scalar-agreement-fixed.json"
 # The streams: DEE's, the constructed and object streams the decoder's tests decode, the
 # presentation streams and the GUI's fixture. The decoder fuzz seeds are the first frames of
 # streams already here.
 STREAM_GLOBS = (
-    "tests/golden/external-baseline/*/dee.ac4",
-    "tests/golden/ac4dec/**/*.ac4",
-    "apps/gui/tests/fixtures/*.ac4",
+    "testdata/external-baseline/*/dee.ac4",
+    "testdata/ac4/**/*.ac4",
+    "apps/forge/gui/tests/fixtures/*.ac4",
 )
 # Below this the error is at the level of the double decode's own rounding to float in the
 # output WAV, and a figure is not a measurement of the float build.

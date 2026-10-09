@@ -1,6 +1,6 @@
 """Stereo reference WAV generator for the external-encoder landscape comparison.
 
-Produces tests/golden/audio/reference_stereo.wav: a fixed, checked-in stereo
+Produces testdata/audio/reference_stereo.wav: a fixed, checked-in stereo
 PCM16 WAV, sibling to gen_gold_reference_wav.py's reference_51.wav and built
 the same way - from first principles (sin()/pseudo-random noise/simple FIR
 smoothing), not bootstrapped by decoding one of our own encodes. Stereo is
@@ -44,7 +44,7 @@ import wave
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-OUT = REPO / "tests" / "golden" / "audio" / "reference_stereo.wav"
+OUT = REPO / "testdata" / "audio" / "reference_stereo.wav"
 
 RATE = 48000
 SEGMENT_S = 0.6

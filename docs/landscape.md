@@ -84,7 +84,7 @@ a history to show here ([Validation: AC-4](verification.md#the-encoder)).
 
   async function fetchManifest() {
     try {
-      const resp = await fetch(rawUrl(BRANCH, "tests/golden/external-baseline/manifest.json"));
+      const resp = await fetch(rawUrl(BRANCH, "testdata/external-baseline/manifest.json"));
       if (!resp.ok) return null;
       return await resp.json();
     } catch (e) {
@@ -294,7 +294,7 @@ current snapshot. They come from the same `quality-history` branch
 mechanism as the table's own numbers (see "Where the data lives" below) —
 generated in CI by `tools/ci/quality_race.py`'s `render_spectrograms()`
 (`trend --spectrogram-dir`), decoding this build's own encode plus the
-committed `tests/golden/external-baseline/` FFmpeg/DEE bitstreams — never
+committed `testdata/external-baseline/` FFmpeg/DEE bitstreams — never
 invoking FFmpeg's or DEE's own encoder, same boundary as the numbers.
 
 ## Reading it
@@ -322,7 +322,7 @@ The five added at version 2 close two different gaps.
 
 **Rates where the Annex E tools run.** ICL Forge's `auto` decides per frame,
 from the rate and the frame's own content
-(`src/ac3/src/encoder/eac3_frame.cpp`): coupling starts below about
+(`libs/ac3/src/encoder/eac3_frame.cpp`): coupling starts below about
 12 + 14n kbit/s per channel for n channels, and spectral extension below a
 ceiling of 55 to 110 kbit/s per channel, higher the emptier the frame's top
 end. The
@@ -446,7 +446,7 @@ went through its own decoder, the panel would be scoring encoder-and-decoder
 pairs and no result could be attributed to either. One decoder makes the
 decoder a constant, and FFmpeg is the one all three encoders have in common.
 Neither FFmpeg's nor DEE's *encoder* is ever run — the external arms are the
-committed `tests/golden/external-baseline/` bitstreams, the same boundary the
+committed `testdata/external-baseline/` bitstreams, the same boundary the
 numbers above observe.
 
 **Alignment and level.** Codec delay is removed by cross-correlation and every
@@ -483,7 +483,7 @@ mode and baseline version, so a session's own limits travel with its numbers.
 
 Both have since landed: two 30 s CC0
 fixtures, full-band speech and music, are committed as
-`tests/golden/audio/programme_{speech,music}_stereo.flac` and carry three legs
+`testdata/audio/programme_{speech,music}_stereo.flac` and carry three legs
 of their own in the external-baseline manifest — `ac3-music-stereo-192`,
 `eac3-music-stereo-96` and `eac3-speech-stereo-64`. `gen_listening_stimuli.py`
 walks every leg in that manifest, so those three already get a stimulus set

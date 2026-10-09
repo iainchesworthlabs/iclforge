@@ -107,7 +107,7 @@ on:
         type: boolean
         default: true
       run_wasm:
-        description: "Build/test build-wasm and device-ui (apps/wasm/tests, the device web page harness)."
+        description: "Build/test build-wasm and device-ui (apps/demos/wasm/tests, the device web page harness)."
         type: boolean
         default: true
       run_esp:
@@ -115,8 +115,8 @@ on:
           Build/test build-esp32s3, hearth-esp32s3, build-esp32c3, package-esp32-firmware (the sink images
           those two build, published with a release) and build-footprint. The last one runs on a
           Linux-fleet runner and cross-compiles arm-none-eabi rather than ESP-IDF, but it shares
-          apps/baremetal/'s probe and fixtures with the other two (see its own "sibling" comment)
-          and classify_changes.py's LANE_PREFIXES puts apps/baremetal/ in `esp`, not `linux` - the
+          firmware/baremetal/'s probe and fixtures with the other two (see its own "sibling" comment)
+          and classify_changes.py's LANE_PREFIXES puts firmware/baremetal/ in `esp`, not `linux` - the
           lane a source path maps to, not the runner OS a job happens to execute on.
         type: boolean
         default: true
@@ -957,7 +957,7 @@ jobs:
       - name: Test
         run: ctest --preset test-linux-gcc
 
-      # apps/gui/CMakeLists.txt's `if(LINUX)` block already install()s the
+      # apps/forge/gui/CMakeLists.txt's `if(LINUX)` block already install()s the
       # whole XDG/AppDir-shaped layout (.desktop, metainfo, mime, hicolor
       # icons) under COMPONENT runtime - this IS an AppDir the moment it
       # lands under AppDir/usr, no extra CMake work needed.
@@ -1100,7 +1100,7 @@ jobs:
       #
       # QML_SOURCES_PATHS - same story again, confirmed necessary against a
       # real failure ("module QtQuick.Controls plugin qtquickcontrols2plugin
-      # not found") rather than added preemptively. apps/gui/CMakeLists.txt's
+      # not found") rather than added preemptively. apps/forge/gui/CMakeLists.txt's
       # Windows windeployqt step already documents exactly this class of
       # problem and passes --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/qml" for
       # the same underlying reason: forge-gui's QML is AOT-compiled into the Qt
@@ -1115,11 +1115,12 @@ jobs:
       # guessed from windeployqt's differently-named flag) is linuxdeploy-
       # plugin-qt's equivalent of windeployqt's --qmldir: extra paths added
       # to (not replacing) that default AppDir scan, so pointing it at the
-      # real source tree's apps/gui/qml - the same directory the Windows
-      # step already uses - lets the scanner see the actual `import
+      # real source tree's apps/forge/gui/assets/qml - the same directory the Windows
+      # step already uses - and the family components' apps/shared/theme/assets/qml
+      # lets the scanner see the actual `import
       # QtQuick.Controls` statements and bundle the plugin they need.
       #
-      # QQuickStyle::setStyle("Fusion") (apps/gui/main.cpp) is a runtime C++
+      # QQuickStyle::setStyle("Fusion") (apps/forge/gui/src/main.cpp) is a runtime C++
       # call no static QML scan can ever see either, the same gap
       # windeployqt's own comment in that CMakeLists.txt documents - watch
       # for a Fusion-specific missing-style failure surfacing next, the same
@@ -1133,7 +1134,7 @@ jobs:
           export VERSION="$version"
           export APPIMAGE_EXTRACT_AND_RUN=1
           export EXTRA_PLATFORM_PLUGINS=libqoffscreen.so
-          export QML_SOURCES_PATHS="$PWD/apps/gui/qml"
+          export QML_SOURCES_PATHS="$PWD/apps/forge/gui/assets/qml:$PWD/apps/shared/theme/assets/qml"
           libstdcxx="/usr/lib/x86_64-linux-gnu/libstdc++.so.6"
           libgcc_s="/usr/lib/x86_64-linux-gnu/libgcc_s.so.1"
           for f in "$libstdcxx" "$libgcc_s"; do
@@ -1273,7 +1274,7 @@ jobs:
           appimage="$(ls forge-gui-*.AppImage)"
           chmod +x "$appimage"
           echo "pwd: $PWD"
-          ls -la "$appimage" fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav
+          ls -la "$appimage" libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav
 
           runtime_deps="libasound2 fontconfig libdrm2 libegl1 libfontconfig1 libfreetype6 \
             libglib2.0-0 libglx0 libharfbuzz0b libice6 libinput10 libjpeg62-turbo libmd4c0 \
@@ -1300,7 +1301,7 @@ jobs:
               exec /forge-gui.AppImage --appimage-extract-and-run --smoke \
                 /roundtrip-stereo.wav /forge-gui-smoke.ac3 /forge-gui-smoke.png')"
           docker cp "$appimage" "${cid}:/forge-gui.AppImage"
-          docker cp fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav "${cid}:/roundtrip-stereo.wav"
+          docker cp libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav "${cid}:/roundtrip-stereo.wav"
           # `|| true`: `docker start --attach` propagates the CONTAINER's own
           # exit code as its own (confirmed locally - a nonzero exit here
           # otherwise trips `set -e` immediately, before the exit-code check
@@ -1318,7 +1319,7 @@ jobs:
           fi
           echo "forge-gui ran clean on debian:12-slim, which never had Qt installed and only gained ALSA/graphics-stack libraries as normal runtime dependencies"
 
-  # The Shield app (apps/android): a Gradle/NDK build, not a CMake preset
+  # The Shield app (apps/demos/android): a Gradle/NDK build, not a CMake preset
   # leg, so it is its own job outside the split platform workflows - there is
   # no config-android/build-android/pack-android preset to reuse, and trying
   # to force this into the same matrix shape as the CMake legs above would
@@ -1382,7 +1383,7 @@ jobs:
           persist-credentials: false
           fetch-depth: ${{ inputs.fetch_depth }}
 
-      # apps/android/gradle/wrapper/gradle-wrapper.jar is a committed
+      # apps/demos/android/gradle/wrapper/gradle-wrapper.jar is a committed
       # binary (OpenSSF Scorecard's Binary-Artifacts check, alert #65) - it
       # can't be dropped since gradlew needs it, so this verifies its
       # checksum against Gradle's own known-good release hashes instead.
@@ -1430,7 +1431,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          asset_dir="apps/android/app/src/main/assets"
+          asset_dir="apps/demos/android/app/src/main/assets"
           mkdir -p "$asset_dir"
           printf '%s' "$ATMOS_SIGNING_KEY" > "$asset_dir/signing.key"
           echo "Wrote $asset_dir/signing.key ($(wc -c < "$asset_dir/signing.key") base64 chars) - object signing enabled."
@@ -1442,7 +1443,7 @@ jobs:
       # check, and a CodeQL failure failed this job, build-and-test and then
       # CI Status. The APK build and the emulator tests below stay.
       - name: Build debug APK
-        working-directory: apps/android
+        working-directory: apps/demos/android
         shell: bash
         run: |
           set -euo pipefail
@@ -1450,7 +1451,7 @@ jobs:
           ./gradlew :app:assembleDebug --console=plain
 
       # WASM/mobile headless coverage(b): device-free instrumented coverage for
-      # NativeBridge/PassthroughBridge (apps/android/app/src/androidTest/) -
+      # NativeBridge/PassthroughBridge (apps/demos/android/app/src/androidTest/) -
       # nothing before this ran ANY Kotlin-level test, only the C++-side
       # pure logic on the desktop ctest suite (docs/platforms/android.md).
       # GitHub-hosted Linux runners only have KVM acceleration for x86/
@@ -1471,7 +1472,7 @@ jobs:
           api-level: 30
           target: google_apis
           arch: x86_64
-          working-directory: apps/android
+          working-directory: apps/demos/android
           disable-animations: true
           # -noaudio: no host audio device to bridge to inside this
           # container/runner anyway, and it makes isDirectPlaybackSupported
@@ -1499,7 +1500,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -f apps/android/app/src/main/assets/signing.key
+          rm -f apps/demos/android/app/src/main/assets/signing.key
           echo "Object-signing key asset removed - the release APK will be unsigned bed51."
 
       # Only meaningful for a release build with a keystore actually
@@ -1536,7 +1537,7 @@ jobs:
 
       - name: Build release APK
         if: inputs.do_package
-        working-directory: apps/android
+        working-directory: apps/demos/android
         shell: bash
         run: |
           set -euo pipefail
@@ -1555,7 +1556,7 @@ jobs:
           set -euo pipefail
           version="${VERSION_TAG_INPUT:-0.0.0-dev}"
           mkdir -p packages
-          cp apps/android/app/build/outputs/apk/release/app-release.apk \
+          cp apps/demos/android/app/build/outputs/apk/release/app-release.apk \
              "packages/iclforge-shield-${version}.apk"
           ( cd packages && sha512sum "iclforge-shield-${version}.apk" > "iclforge-shield-${version}.apk.sha512" )
 
@@ -1592,7 +1593,7 @@ jobs:
             packages/*.apk.sha512
           if-no-files-found: error
 
-  # The WASM browser decode demo (apps/wasm, WASM browser demo): a real CMake
+  # The WASM browser decode demo (apps/demos/wasm, WASM browser demo): a real CMake
   # preset (config-wasm-emscripten) unlike build-android above, but still its
   # own job outside the split platform workflows, for the same reason
   # build-android's own header gives - this leg has none of the shape that
@@ -1625,7 +1626,7 @@ jobs:
 
       # Moved ahead of the CMake build (unlike the setup-node this job used
       # to do only for the Playwright harness below): WASM streaming decoder package's
-      # iclforge-wasm-decoder package (js/) has to be built before the
+      # iclforge-wasm-decoder package (bindings/js/) has to be built before the
       # "Assemble" step further down can copy its dist/ into the servable
       # wasm_decode_demo/ directory - the demo is a consumer of the package
       # (see docs/platforms/wasm.md), not a parallel implementation, so its
@@ -1635,11 +1636,11 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: |
-            js/package-lock.json
-            apps/wasm/tests/package-lock.json
+            bindings/js/package-lock.json
+            apps/demos/wasm/tests/package-lock.json
 
       - name: Build iclforge-wasm-decoder package
-        working-directory: js
+        working-directory: bindings/js
         run: |
           set -euo pipefail
           npm ci
@@ -1650,14 +1651,14 @@ jobs:
         run: cmake --preset config-wasm-emscripten
 
       # Builds both demos - iclforge_wasm_encode depends on iclforge_wasm_decode
-      # (apps/wasm/CMakeLists.txt's add_dependencies, so its round-trip preview's
+      # (apps/demos/wasm/CMakeLists.txt's add_dependencies, so its round-trip preview's
       # copy of the decode module is always available), so one `cmake --build`
       # over the whole preset orders them correctly with no --target list to
       # keep in sync here as targets are added.
       - name: Build
         run: cmake --build build/config-wasm-emscripten
 
-      # apps/wasm/CMakeLists.txt only knows how to assemble ITS OWN static
+      # apps/demos/wasm/CMakeLists.txt only knows how to assemble ITS OWN static
       # files (index.html/demo.js/favicons/the demo bitstream) plus whatever
       # RUNTIME_OUTPUT_DIRECTORY put there (iclforge_decode.js/.wasm) - it
       # has no reason to learn about npm. This step is the same idea
@@ -1667,7 +1668,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/config-wasm-emscripten/bin/wasm_decode_demo/package
-          cp -r js/dist/. build/config-wasm-emscripten/bin/wasm_decode_demo/package/
+          cp -r bindings/js/dist/. build/config-wasm-emscripten/bin/wasm_decode_demo/package/
 
       # Not consumed by docs.yml (see this job's own header) - uploaded
       # purely so a failed/successful build's actual output is inspectable
@@ -1691,11 +1692,11 @@ jobs:
       # WASM/mobile headless coverage(a): until this, "it compiles" was the only thing any CI
       # leg checked - docs/platforms/wasm.md's "Not yet verified" section
       # recorded decode/playback/render correctness as manual-only,
-      # re-checked by eye every time either demo changed. apps/wasm/tests'
+      # re-checked by eye every time either demo changed. apps/demos/wasm/tests'
       # Playwright harness (two projects, one per demo - see
       # playwright.config.js) asserts real values on both sides: the decode
-      # project drives the real published package (js/) - the same calls
-      # apps/wasm/demo.js itself makes - checking channel count, sample
+      # project drives the real published package (bindings/js/) - the same calls
+      # apps/demos/wasm/demo.js itself makes - checking channel count, sample
       # rate, object count, duration, a moving object position, and the
       # AudioWorklet pipeline's own non-silent decoded output; the encode
       # project drives the Embind API directly, checking the real encoded
@@ -1705,28 +1706,28 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: apps/wasm/tests/package-lock.json
+          cache-dependency-path: apps/demos/wasm/tests/package-lock.json
       - name: Install Playwright harness
-        working-directory: apps/wasm/tests
+        working-directory: apps/demos/wasm/tests
         run: |
           set -euo pipefail
           npm ci
           npx playwright install --with-deps chromium
 
       - name: Headless-browser demo tests
-        working-directory: apps/wasm/tests
+        working-directory: apps/demos/wasm/tests
         env:
           WASM_DEMO_DIR: ${{ github.workspace }}/build/config-wasm-emscripten/bin/wasm_decode_demo
           WASM_ENCODE_DEMO_DIR: ${{ github.workspace }}/build/config-wasm-emscripten/bin/wasm_encode_demo
           CI: "1"
         run: npm test
 
-  # The ESP32 player's web page (esp-idf/iclforge/ui/, planning/esp32-device-ui.md)
+  # The ESP32 player's web page (firmware/esp-idf/iclforge/ui/, planning/esp32-device-ui.md)
   # in Chromium, against a stand-in for the firmware's REST routes that each test
   # starts for itself: every action and its error paths, the polling, the status
   # payloads recorded from the emulated board, accessibility and the flash
   # budget, with coverage of the page's script held to the thresholds in
-  # apps/wasm/tests/package.json. The WASM demos' Playwright harness - its
+  # apps/demos/wasm/tests/package.json. The WASM demos' Playwright harness - its
   # package, lockfile and browser - with a configuration of its own
   # (device-ui.config.js). A job of its own because it needs nothing built;
   # build-esp32s3 runs the same page against the emulated board.
@@ -1750,23 +1751,23 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: apps/wasm/tests/package-lock.json
+          cache-dependency-path: apps/demos/wasm/tests/package-lock.json
 
       - name: Install Playwright harness
-        working-directory: apps/wasm/tests
+        working-directory: apps/demos/wasm/tests
         run: |
           set -euo pipefail
           npm ci
           npx playwright install --with-deps --only-shell chromium
 
       - name: Web page against a stand-in device
-        working-directory: apps/wasm/tests
+        working-directory: apps/demos/wasm/tests
         env:
           CI: "1"
         run: npm run test:device-ui
 
       - name: Coverage of the page's script
-        working-directory: apps/wasm/tests
+        working-directory: apps/demos/wasm/tests
         run: npm run coverage:device-ui
 
       - name: Upload the coverage report
@@ -1774,14 +1775,14 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: device-ui-coverage
-          path: apps/wasm/tests/test-results/device-ui-coverage
+          path: apps/demos/wasm/tests/test-results/device-ui-coverage
           if-no-files-found: warn
 
-  # The Rust bindings (rust/): a Cargo workspace living in-tree but deliberately
-  # never add_subdirectory()'d from the root CMakeLists.txt - see rust/README.md's "why this
+  # The Rust bindings (bindings/rust/): a Cargo workspace living in-tree but deliberately
+  # never add_subdirectory()'d from the root CMakeLists.txt - see bindings/rust/README.md's "why this
   # lives in-tree" section. Its own job for the same reason build-wasm/build-footprint are: none
   # of the desktop workflows' steps apply (no ctest suite, no cpack package, no gold-reference
-  # gate) - rust/iclforge-sys/build.rs drives its own trimmed CMake configure of just
+  # gate) - bindings/rust/iclforge-sys/build.rs drives its own trimmed CMake configure of just
   # iclforge::c_shared rather than reusing a desktop preset.
   #
   # All three desktop OSes, one job each (the Rust bindings' completeness pass): the
@@ -1791,8 +1792,8 @@ jobs:
   # which is exactly the class of finding a matrix exists to keep finding.
   #
   # No toolchain-selection step: rustup (preinstalled on this runner image) auto-detects and
-  # installs rust/rust-toolchain.toml's pinned channel plus its clippy/rustfmt components the
-  # moment `cargo`/`rustup` is invoked from inside rust/ - one canonical version pin, not one
+  # installs bindings/rust/rust-toolchain.toml's pinned channel plus its clippy/rustfmt components the
+  # moment `cargo`/`rustup` is invoked from inside bindings/rust/ - one canonical version pin, not one
   # duplicated into this file too, the same "no second copy of a version string" reasoning
   # _toolchain-versions.yml's own header states for the C/C++ toolchains.
   build-rust:
@@ -1817,31 +1818,31 @@ jobs:
           fetch-depth: ${{ inputs.fetch_depth }}
 
       - name: Install pinned Rust toolchain
-        working-directory: rust
+        working-directory: bindings/rust
         run: rustup show
 
       - name: cargo build
-        working-directory: rust
+        working-directory: bindings/rust
         run: cargo build --workspace --locked
 
       - name: cargo test
-        working-directory: rust
+        working-directory: bindings/rust
         run: cargo test --workspace --locked
 
       - name: cargo clippy
-        working-directory: rust
+        working-directory: bindings/rust
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       # Mirrors iclforge::warnings' project-wide "warnings are errors" stance (clippy above) and
       # .clang-format's "checked in, run it" rule (rustfmt here).
       - name: cargo fmt --check
-        working-directory: rust
+        working-directory: bindings/rust
         run: cargo fmt --check
 
-  # The Crucible's null-sink driver (apps/windows/driver, roadmap
+  # The Crucible's null-sink driver (apps/crucible/windows/driver, roadmap
   # UX11): an ACX/KMDF kernel driver, built and test-signed the way Microsoft's
   # own driver-samples CI builds theirs - the WDK and SDK as NuGet packages
-  # (apps/windows/driver/packages.config) restored into the tree, MSBuild from
+  # (apps/crucible/windows/driver/packages.config) restored into the tree, MSBuild from
   # the image's Visual Studio developer shell. GitHub's windows-latest image
   # carries what the packages do not: the "Windows Driver Kit" VS component
   # (the WindowsKernelModeDriver10.0 toolset) and the Spectre-mitigated
@@ -1852,10 +1853,10 @@ jobs:
   # What it gates on: the package builds (sys, stamped inf, cat, and the
   # build's own test certificate beside it), and Code Analysis at the WDK's
   # driver rule set reports zero defects - the static tier of
-  # apps/windows/driver/Analyze-Driver.ps1 minus CodeQL and the DVL, which
+  # apps/crucible/windows/driver/Analyze-Driver.ps1 minus CodeQL and the DVL, which
   # need the CodeQL CLI and the windows-drivers pack. The dynamic tier (Driver
   # Verifier, KASAN) needs the throwaway guest and stays local
-  # (apps/windows/driver-vm). The package is uploaded as an artifact and is
+  # (apps/crucible/windows/driver-vm). The package is uploaded as an artifact and is
   # NOT a release asset: it is test-signed, so it loads only with test
   # signing on, and shipping it waits on the EV certificate (Phase 6).
   windows-driver:
@@ -1875,7 +1876,7 @@ jobs:
     defaults:
       run:
         shell: pwsh
-        working-directory: apps/windows/driver
+        working-directory: apps/crucible/windows/driver
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1892,7 +1893,7 @@ jobs:
           if (-not $vs) { throw 'no Visual Studio with the C++ tools on this runner' }
           Import-Module "$vs\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
           Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
-          Set-Location "$env:GITHUB_WORKSPACE\apps\windows\driver"
+          Set-Location "$env:GITHUB_WORKSPACE\apps\crucible\windows\driver"
           Write-Host "Visual Studio: $vs"
           Write-Host "MSVC toolset:  $env:VCToolsVersion"
           msbuild .\IclForgeNullSink.sln /p:Configuration=Release /p:Platform=x64 /t:Rebuild /m /v:m /nologo
@@ -1918,7 +1919,7 @@ jobs:
           $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
           Import-Module "$vs\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
           Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
-          Set-Location "$env:GITHUB_WORKSPACE\apps\windows\driver"
+          Set-Location "$env:GITHUB_WORKSPACE\apps\crucible\windows\driver"
           $ruleset = (Get-ChildItem .\packages -Recurse -Filter 'DriverRecommendedRules.ruleset' | Select-Object -First 1).FullName
           if (-not $ruleset) { throw 'DriverRecommendedRules.ruleset not found in the WDK package' }
           Get-ChildItem .\Source -Recurse -Filter '*.nativecodeanalysis.xml' | Remove-Item -Force
@@ -1949,7 +1950,7 @@ jobs:
   # steps assume).
   #
   # What it gates on, in tools/checks/run_baremetal_probe.sh: the probe's own
-  # verdict (every channel's level against apps/baremetal/fixture.hpp), the
+  # verdict (every channel's level against testdata/baremetal/fixture.hpp), the
   # linked image size, peak heap, and steady-state allocations per frame. The
   # last of those is a distance-from-zero the profile has not closed - see
   # docs/building.md's gap note - and the ceiling is there so it cannot grow
@@ -2035,7 +2036,7 @@ jobs:
           # the upload step could not then find. The build directory is the one
           # place both agree on, it is gitignored already, and it puts the
           # summary beside the map it belongs with.
-          ICLFORGE_ESP32S3_SUMMARY: apps/baremetal/platform/esp32s3/build/esp32s3-probe.txt
+          ICLFORGE_ESP32S3_SUMMARY: firmware/baremetal/platform/esp32s3/build/esp32s3-probe.txt
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
@@ -2053,13 +2054,13 @@ jobs:
       #
       # This is also the leg that exercises the RELOCATED component the way an
       # integrator reaches it: the project points EXTRA_COMPONENT_DIRS at
-      # esp-idf/ and selects a profile through ICLFORGE_ESP_PROFILE, which is
+      # firmware/esp-idf/ and selects a profile through ICLFORGE_ESP_PROFILE, which is
       # exactly the two lines a consuming project writes. If the published shape
       # breaks, this goes red rather than the break waiting for someone to try
       # it.
       - name: Build and run the ENCODE probe under QEMU
         env:
-          ICLFORGE_ESP32S3_SUMMARY: apps/baremetal/platform/esp32s3/build/esp32s3-encode-probe.txt
+          ICLFORGE_ESP32S3_SUMMARY: firmware/baremetal/platform/esp32s3/build/esp32s3-encode-probe.txt
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
@@ -2075,7 +2076,7 @@ jobs:
       # figures. The run itself takes under a minute of QEMU.
       - name: Build and run the AC-4 probe under QEMU
         env:
-          ICLFORGE_ESP32S3_SUMMARY: apps/baremetal/platform/esp32s3/build/esp32s3-ac4-probe.txt
+          ICLFORGE_ESP32S3_SUMMARY: firmware/baremetal/platform/esp32s3/build/esp32s3-ac4-probe.txt
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
@@ -2097,7 +2098,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/i2s_player
+          cd firmware/esp-idf/iclforge/examples/i2s_player
           idf.py set-target esp32s3
           idf.py build
           idf.py size | tee "$GITHUB_STEP_SUMMARY"
@@ -2123,7 +2124,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           idf.py set-target esp32s3
           idf.py build
           idf.py size | tee -a "$GITHUB_STEP_SUMMARY"
@@ -2195,7 +2196,7 @@ jobs:
           # 106647 - 0.41% and 0.39% out, which is the float32 decode path
           # against the host's float64 and not a defect.
           #
-          # Tolerance is apps/baremetal/probe.cpp's own convention, expected/20
+          # Tolerance is firmware/baremetal/probe.cpp's own convention, expected/20
           # + 200, for the same reason: it absorbs the scalar-width difference
           # and nothing larger. A channel that came back silent, or at the wrong
           # level, is several times outside it.
@@ -2239,7 +2240,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2322,7 +2323,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2392,7 +2393,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2461,7 +2462,7 @@ jobs:
       # player - decode_access_unit_by_block, the objects reconstructed and
       # placed by iclforge::spatial::pan_direction, the bed's LFE passed through -
       # into the twelve-slot TDM conversion. The reference is the probe's own
-      # eac3_atmos_render row (apps/baremetal/render_fixture.hpp): same
+      # eac3_atmos_render row (firmware/baremetal/render_fixture.hpp): same
       # objects, same panner, same float arithmetic in the same order, so the
       # levels agree to the digit and the tolerance below is one unit of
       # rounding. sdkconfig.ci-render says why one lap and why the MDCT-band
@@ -2472,7 +2473,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2543,14 +2544,14 @@ jobs:
       # has no WiFi, but `idf.py qemu` attaches an OpenCores Ethernet MAC to
       # the host's network, so the source's own network seam picks net/openeth/
       # (main/source/http/network.hpp, selected by sdkconfig.ci-http) and a
-      # python http.server on the runner serves apps/wasm/assets/ - the same
+      # python http.server on the runner serves apps/demos/wasm/assets/ - the same
       # E-AC-3 demo the WASM page plays: 5.1 with JOC objects, 448 kbit/s, 250
       # access units. The guest reaches the host at 10.0.2.2. Everything above
       # the radio runs as it does on a board: the HTTP client, the framer, the
       # E-AC-3 decode; only WiFi itself is left for hardware.
       #
       # The levels are held against the host's
-      #   forge decode apps/wasm/assets/demo.ec3 out.wav downmix=loro drcmode=line
+      #   forge decode apps/demos/wasm/assets/demo.ec3 out.wav downmix=loro drcmode=line
       # 56,673 and 47,346 (x 1e6), which the float32 target reproduced to the
       # digit on 2026-09-10. Same tolerance as the steps above.
       #
@@ -2563,10 +2564,10 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          python3 -m http.server 8000 --bind 0.0.0.0 --directory apps/wasm/assets >/dev/null 2>&1 &
+          python3 -m http.server 8000 --bind 0.0.0.0 --directory apps/demos/wasm/assets >/dev/null 2>&1 &
           server=$!
           trap 'kill "$server" 2>/dev/null || true' EXIT
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2666,23 +2667,23 @@ jobs:
       # and the page the firmware serves driven by Playwright - the only place
       # CI runs the routes iclforge::Control serves it on. A step of its own so
       # the one above stays as it is. The WASM demos' Playwright harness
-      # (apps/wasm/tests, device-ui.config.js's board project) comes into this
+      # (apps/demos/wasm/tests, device-ui.config.js's board project) comes into this
       # container with Node, which the IDF image does not carry.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: apps/wasm/tests/package-lock.json
+          cache-dependency-path: apps/demos/wasm/tests/package-lock.json
 
       - name: Drive the web page on the emulated board
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          (cd apps/wasm/tests && npm ci && npx playwright install --with-deps --only-shell chromium)
-          python3 -m http.server 8000 --bind 0.0.0.0 --directory apps/wasm/assets >/dev/null 2>&1 &
+          (cd apps/demos/wasm/tests && npm ci && npx playwright install --with-deps --only-shell chromium)
+          python3 -m http.server 8000 --bind 0.0.0.0 --directory apps/demos/wasm/assets >/dev/null 2>&1 &
           server=$!
           trap 'kill "$server" 2>/dev/null || true' EXIT
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           if [ ! -f build/qemu_flash.bin ] || [ ! -f build/qemu_efuse.bin ]; then
             echo "::error title=ESP32-S3 web page::the HTTP step's QEMU images are not in build/" >&2
             exit 1
@@ -2728,7 +2729,7 @@ jobs:
           # over REST reads back, and a play started over REST finishes at it;
           # Stop reads back as stopped, on the page too.
           # device-ui/board/smoke.spec.js has the details.
-          (cd "$GITHUB_WORKSPACE/apps/wasm/tests" && ICLFORGE_DEVICE_URL=http://127.0.0.1:8080/ CI=1 npm run test:board) || fail "the page did not drive the board (Playwright's output is above)"
+          (cd "$GITHUB_WORKSPACE/apps/demos/wasm/tests" && ICLFORGE_DEVICE_URL=http://127.0.0.1:8080/ CI=1 npm run test:board) || fail "the page did not drive the board (Playwright's output is above)"
 
           # The play the test started, at the volume it set: a quarter of the
           # boot play's levels, 56,673 and 47,346.
@@ -2749,7 +2750,7 @@ jobs:
           python3 "$console" --title "ESP32-S3 web page" qemu-ui.txt
           kill "$qemu" 2>/dev/null || true
 
-      # The stream set (esp-idf/iclforge/examples/hearth_sink/www/,
+      # The stream set (firmware/hearth-sink/www/,
       # planning/esp32-stream-set.md) over the HTTP source, rendered onto
       # 7.1.4: sdkconfig.ci-http714 is the HTTP shape with the capture sink's
       # twelve-slot TDM conversion, levels as coded and objects as their bed,
@@ -2766,11 +2767,11 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          www="$GITHUB_WORKSPACE/esp-idf/iclforge/examples/hearth_sink/www"
+          www="$GITHUB_WORKSPACE/firmware/hearth-sink/www"
           python3 -m http.server 8000 --bind 0.0.0.0 --directory "$www" >/dev/null 2>&1 &
           server=$!
           trap 'kill "$server" 2>/dev/null || true' EXIT
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2809,7 +2810,7 @@ jobs:
 
           # What the page says each output layout does with each stream, on
           # this board: device-ui/board/layouts.spec.js.
-          (cd "$GITHUB_WORKSPACE/apps/wasm/tests" && ICLFORGE_DEVICE_URL=http://127.0.0.1:8080/ ICLFORGE_STREAM_BASE=http://10.0.2.2:8000 CI=1 npm run test:board-layouts) || fail "the page did not report the layouts (Playwright's output is above)"
+          (cd "$GITHUB_WORKSPACE/apps/demos/wasm/tests" && ICLFORGE_DEVICE_URL=http://127.0.0.1:8080/ ICLFORGE_STREAM_BASE=http://10.0.2.2:8000 CI=1 npm run test:board-layouts) || fail "the page did not report the layouts (Playwright's output is above)"
 
           # Then the console, once the page's last play has ended.
           settled=
@@ -2851,13 +2852,13 @@ jobs:
       #     each. The conversion it calls (iclforge/interleave.hpp) runs
       #     through the capture sink - stereo in the streaming and HTTP steps,
       #     8 and 12 TDM slots in the capture and render steps - and is
-      #     unit-tested on the host (tests/ac3/io/test_interleave.cpp). The model
+      #     unit-tested on the host (libs/device/tests/test_interleave.cpp). The model
       #     of the DMA queue it keeps for its sink.* line
       #     (iclforge/dac_queue_model.hpp) runs in no QEMU step, since the
       #     capture sink has no DMA, and is unit-tested on the host as well
-      #     (tests/ac3/io/test_dac_queue_model.cpp). The mode/slot-count
+      #     (libs/device/tests/test_dac_queue_model.cpp). The mode/slot-count
       #     arithmetic itself (iclforge/sink_plan.hpp) is unit-tested on the
-      #     host too (tests/ac3/io/test_sink_plan.cpp).
+      #     host too (libs/device/tests/test_sink_plan.cpp).
       #   * sd drives the SDMMC host. The file layer it shares with the
       #     flash-backed FAT source (main/source/file_common.hpp) runs in the
       #     capture and render steps.
@@ -2879,7 +2880,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           for combo in \
             "i2s:CONFIG_ICLFORGE_EXAMPLE_SINK_I2S=y" \
             "sd:CONFIG_ICLFORGE_EXAMPLE_SOURCE_SD=y" \
@@ -2921,7 +2922,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           dir="$RUNNER_TEMP/hearth-sink-esp32s3"
           version="${VERSION_TAG:-$(git -c safe.directory='*' -C "$GITHUB_WORKSPACE" describe --tags --always)}"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32s3 \
@@ -2951,7 +2952,7 @@ jobs:
           . "$IDF_PATH/export.sh"
           image="$GITHUB_WORKSPACE/sendspin-qemu-image"
           mkdir -p "$image"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2972,7 +2973,7 @@ jobs:
           . "$IDF_PATH/export.sh"
           image="$GITHUB_WORKSPACE/sendspin-qemu-image/wifi"
           mkdir -p "$image"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           idf.py build
@@ -2998,7 +2999,7 @@ jobs:
           . "$IDF_PATH/export.sh"
           images="$GITHUB_WORKSPACE/ota-qemu-images"
           mkdir -p "$images"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           rm -rf build sdkconfig
           idf.py set-target esp32s3
           # name:PROJECT_VER:ICLFORGE_FIRMWARE_TEST
@@ -3049,17 +3050,17 @@ jobs:
         with:
           name: footprint-esp32s3
           path: |
-            apps/baremetal/platform/esp32s3/build/iclforge_probe_esp32s3.map
-            apps/baremetal/platform/esp32s3/build/esp32s3-probe.txt
-            apps/baremetal/platform/esp32s3/build/esp32s3-encode-probe.txt
-            apps/baremetal/platform/esp32s3/build/esp32s3-ac4-probe.txt
-            esp-idf/iclforge/examples/hearth_sink/qemu-stream.txt
-            esp-idf/iclforge/examples/hearth_sink/qemu-capture.txt
-            esp-idf/iclforge/examples/hearth_sink/qemu-capture16.txt
-            esp-idf/iclforge/examples/hearth_sink/qemu-capture916.txt
-            esp-idf/iclforge/examples/hearth_sink/qemu-render.txt
-            esp-idf/iclforge/examples/hearth_sink/qemu-http.txt
-            esp-idf/iclforge/examples/hearth_sink/qemu-set.txt
+            firmware/baremetal/platform/esp32s3/build/iclforge_probe_esp32s3.map
+            firmware/baremetal/platform/esp32s3/build/esp32s3-probe.txt
+            firmware/baremetal/platform/esp32s3/build/esp32s3-encode-probe.txt
+            firmware/baremetal/platform/esp32s3/build/esp32s3-ac4-probe.txt
+            firmware/hearth-sink/qemu-stream.txt
+            firmware/hearth-sink/qemu-capture.txt
+            firmware/hearth-sink/qemu-capture16.txt
+            firmware/hearth-sink/qemu-capture916.txt
+            firmware/hearth-sink/qemu-render.txt
+            firmware/hearth-sink/qemu-http.txt
+            firmware/hearth-sink/qemu-set.txt
           # error, not warn: this artifact is the only way to read what the
           # probe measured without re-running the leg, and it silently uploaded
           # just the map the first time. A missing file here should say so.
@@ -3216,7 +3217,7 @@ jobs:
     # Cortex-M3 leg already agree, and two architectures agreeing is a
     # coincidence a third can break. The runner holds this leg's
     # <codec>.pcm_hash lines to the same pinned values
-    # (tests/golden/fixed-probe-pcm-hashes.json).
+    # (testdata/fixed-probe-pcm-hashes.json).
     #
     # espressif/idf is Espressif's own image and carries ESP-IDF, its
     # toolchains AND both emulators, so this needs no composite action and no
@@ -3282,7 +3283,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd apps/baremetal/platform/esp32c6
+          cd firmware/baremetal/platform/esp32c6
           for load in none wifi; do
             dir="$RUNNER_TEMP/esp32c6-$load"
             defaults="sdkconfig.defaults"
@@ -3293,7 +3294,7 @@ jobs:
 
       # hearth_sink's actual Sendspin player, not the baremetal probe above - built and not
       # run, same reason: no qemu-riscv32 machine for esp32c6. The config combination is the
-      # one esp-idf/iclforge/examples/hearth_sink/sdkconfig.c6 and sdkconfig.sendspin-c6 each
+      # one firmware/hearth-sink/sdkconfig.c6 and sdkconfig.sendspin-c6 each
       # name in their own header comments, and the one docs/hearth/index.md's "Where it runs"
       # table has flagged as "no C6 Sendspin CI job" - a board has built, run and measured
       # this combination (the README's "On the ESP32-C6" section, including a ten-minute
@@ -3310,7 +3311,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           dir="$RUNNER_TEMP/hearth_sink-c6-sendspin"
           version="${VERSION_TAG:-$(git -c safe.directory='*' -C "$GITHUB_WORKSPACE" describe --tags --always)}"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32c6 \
@@ -3331,7 +3332,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           dir="$RUNNER_TEMP/hearth_sink-c6-16mb-sendspin"
           version="${VERSION_TAG:-$(git -c safe.directory='*' -C "$GITHUB_WORKSPACE" describe --tags --always)}"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32c6 \
@@ -3357,7 +3358,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           dir="$RUNNER_TEMP/hearth_sink-p4-sendspin"
           version="${VERSION_TAG:-$(git -c safe.directory='*' -C "$GITHUB_WORKSPACE" describe --tags --always)}"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32p4 \
@@ -3378,7 +3379,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd esp-idf/iclforge/examples/hearth_sink
+          cd firmware/hearth-sink
           dir="$RUNNER_TEMP/hearth_sink-p4-ac4"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32p4 \
             "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin;sdkconfig.ac4" \
@@ -3404,7 +3405,7 @@ jobs:
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
-          cd apps/baremetal/platform/esp32p4
+          cd firmware/baremetal/platform/esp32p4
           dir="$RUNNER_TEMP/esp32p4"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32p4 build
 
@@ -3574,7 +3575,7 @@ jobs:
       # kept: the tier is integer arithmetic, so those hashes are the same on
       # this leg, on the host and on a RISC-V part by construction, and the
       # step below holds this leg's to the pinned ones
-      # (tests/golden/fixed-probe-pcm-hashes.json), as the gold leg holds its
+      # (testdata/fixed-probe-pcm-hashes.json), as the gold leg holds its
       # native run's.
       - name: Build and run the FIXED-POINT probe under QEMU
         # Into the FLOAT build directory, which the first step of this job
@@ -3585,7 +3586,7 @@ jobs:
         run: ./tools/checks/run_baremetal_probe.sh --scalar=fixed | tee "build/config-arm-none-eabi-minimal/fixed-arm.txt"
 
       - name: Fixed-point hashes against the pinned ones
-        run: python3 tools/checks/check_probe_hashes.py --expected tests/golden/fixed-probe-pcm-hashes.json "build/config-arm-none-eabi-minimal/fixed-arm.txt"
+        run: python3 tools/checks/check_probe_hashes.py --expected testdata/fixed-probe-pcm-hashes.json "build/config-arm-none-eabi-minimal/fixed-arm.txt"
 
       - name: Fixed-point instructions per frame under QEMU -icount
         run: ./tools/checks/run_baremetal_probe.sh --scalar=fixed --icount | tee "build/config-arm-none-eabi-minimal/icount-fixed.txt"
@@ -3603,7 +3604,7 @@ jobs:
       # decision 26: the float PCM is the same on the host, the Cortex-M3 and the
       # P4. The host's run is _ci-linux.yml's, held to the same pinned hashes.
       - name: AC-4 hashes against the pinned ones
-        run: python3 tools/checks/check_probe_hashes.py --expected tests/golden/ac4-probe-pcm-hashes.json "build/config-arm-none-eabi-minimal/ac4-arm.txt"
+        run: python3 tools/checks/check_probe_hashes.py --expected testdata/ac4-probe-pcm-hashes.json "build/config-arm-none-eabi-minimal/ac4-arm.txt"
 
       - name: AC-4 instructions per frame under QEMU -icount
         run: ./tools/checks/run_baremetal_probe.sh --ac4 --icount | tee "build/config-arm-none-eabi-minimal/icount-ac4.txt"
@@ -3611,13 +3612,13 @@ jobs:
       # The AC-4 decoder's fixed-point tier on the same leg (planning/ac4.md, D14d):
       # integer arithmetic, so its hashes are the same here, on the host and on
       # RV32IMC, and are held to their own pins
-      # (tests/golden/ac4-fixed-probe-pcm-hashes.json). The -icount run gates the
+      # (testdata/ac4-fixed-probe-pcm-hashes.json). The -icount run gates the
       # tier's own instruction ceilings (ICOUNT_CEILING_AC4_FIXED in the runner).
       - name: Build and run the fixed-point AC-4 probe under QEMU -icount
         run: ./tools/checks/run_baremetal_probe.sh --ac4 --scalar=fixed --icount | tee "build/config-arm-none-eabi-minimal/icount-ac4-fixed.txt"
 
       - name: Fixed-point AC-4 hashes against the pinned ones
-        run: python3 tools/checks/check_probe_hashes.py --expected tests/golden/ac4-fixed-probe-pcm-hashes.json "build/config-arm-none-eabi-minimal/icount-ac4-fixed.txt"
+        run: python3 tools/checks/check_probe_hashes.py --expected testdata/ac4-fixed-probe-pcm-hashes.json "build/config-arm-none-eabi-minimal/icount-ac4-fixed.txt"
 
       # The footprint table in docs/performance-trend.md is written by hand
       # from these numbers, so keep the run's own copy: a table nobody can
@@ -3626,7 +3627,7 @@ jobs:
         if: always()
         run: |
           set -eu
-          python3 tools/checks/footprint_report.py             --probe "${{ runner.temp }}/footprint.txt"             --elf build/config-arm-none-eabi-minimal/bin/iclforge-probe             --map build/config-arm-none-eabi-minimal/apps/baremetal/iclforge-probe.map             --markdown >> "$GITHUB_STEP_SUMMARY"
+          python3 tools/checks/footprint_report.py             --probe "${{ runner.temp }}/footprint.txt"             --elf build/config-arm-none-eabi-minimal/bin/iclforge-probe             --map build/config-arm-none-eabi-minimal/firmware/baremetal/iclforge-probe.map             --markdown >> "$GITHUB_STEP_SUMMARY"
           if [ -f "build/config-arm-none-eabi-minimal/icount.txt" ]; then
             {
               echo '### Instructions per frame (QEMU -icount)'
@@ -3653,7 +3654,7 @@ jobs:
           name: footprint-arm-none-eabi
           path: |
             ${{ runner.temp }}/footprint.txt
-            build/config-arm-none-eabi-minimal/apps/baremetal/iclforge-probe.map
+            build/config-arm-none-eabi-minimal/firmware/baremetal/iclforge-probe.map
           if-no-files-found: warn
 
   # Persists this run's gold-reference SNR numbers (docs/quality-trend.md) so

@@ -4,7 +4,7 @@ ICL Forge builds and is tested on Linux on both GCC and Clang, CLI and GUI alike
 every pull request, and the other legs in the run after a merge to main or the nightly run (see
 [CI for many agents](../ci-agentic.md)). This page covers what is specific to Linux; for the full
 preset reference, options list and troubleshooting, see [Building from source](../building.md). Crucible's Linux-only host tooling
-(live under [`apps/linux/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/apps/linux/README.md))
+(live under [`apps/crucible/linux/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/apps/crucible/linux/README.md))
 is separate from the application in `apps/crucible/`.
 
 ## Status
@@ -119,7 +119,7 @@ frame, so the sink queues bursts of different lengths at the 1000/1001 frame rat
 names the codec instead, and its IEC 958 codec list (`spa/param/audio/iec958.h`, 1.6) has no
 AC-4, so the PipeWire backend refuses AC-4 with `kUnsupportedFormat`. Both refuse AC-4 HBR16,
 which needs the eight-channel high-bit-rate link neither opens. The ALSA path is tested against
-ALSA's `null` device (`tests/audio/test_alsa_null_backend.cpp`); no receiver found so far accepts
+ALSA's `null` device (`libs/audio/tests/test_alsa_null_backend.cpp`); no receiver found so far accepts
 AC-4, so none has been tried.
 
 So `forge play` decodes an AC-4 stream and plays it as PCM, the way `monitor` does, and `forge
@@ -177,7 +177,7 @@ the HD-audio kernel driver populates
 already decoded into text fields, for every HDMI/DisplayPort output — a documented, stable
 kernel interface, not a private one this project reaches around. `iclforge::audio::read_sink_capabilities()`
 locates the right card/device the same way `enumerate_render_devices()` already does
-(`src/audio/src/backend/alsa/candidates.hpp`, shared between the two) and reads that file.
+(`libs/audio/src/backend/alsa/candidates.hpp`, shared between the two) and reads that file.
 
 On PipeWire the read is the session manager's: WirePlumber sets `iec958.codecs` on an HDMI or
 S/PDIF node from the sink's ELD, and `read_sink_capabilities()` reports the codecs that property
@@ -188,7 +188,7 @@ stable across PipeWire versions and session managers. `play` falls back to the l
 `outputs` already uses wherever no descriptor can be read.
 
 **Not verified on hardware.** Like the passthrough gap above, the parser
-(`parse_eld_proc_text`, `tests/audio/backend/alsa/test_alsa_eld_parsing.cpp`) is unit-tested against
+(`parse_eld_proc_text`, `libs/audio/tests/backend/alsa/test_alsa_eld_parsing.cpp`) is unit-tested against
 synthesized fixture text matching `/proc/asound` output found in the wild, but this
 development loop has no Linux box with an HDMI/DisplayPort sink attached to confirm the file
 path resolution and field parsing against. It is also not yet taught to disambiguate multiple
@@ -260,8 +260,8 @@ and the x86_64 AppImage; the Hearth and Crucible packages are in no release yet.
 
 A GUI-enabled package also installs `forge-gui.desktop` (`Exec=forge-gui %F`), an AppStream metainfo
 file, and a shared-mime-info fragment declaring the two media types (`audio/ac3` and
-`audio/eac3`) against `*.ac3`/`*.ec3` — `apps/gui/packaging/linux/`, wired into `install()`
-behind `if(LINUX)` in `apps/gui/CMakeLists.txt`. `forge-gui.desktop` claims no media type, because
+`audio/eac3`) against `*.ac3`/`*.ec3` — `apps/forge/gui/packaging/linux/`, wired into `install()`
+behind `if(LINUX)` in `apps/forge/gui/CMakeLists.txt`. `forge-gui.desktop` claims no media type, because
 Hearth is the default handler: `hearth.desktop` in the `iclforge-hearth` package
 (`apps/hearth/ui/packaging/linux/`) carries `MimeType=audio/ac3;audio/eac3;`. Nothing declares or
 claims AC-4. Configure/build-verified only: nobody has installed the resulting `.deb`/`.rpm` on a
@@ -304,7 +304,7 @@ linuxdeploy-x86_64.AppImage --appdir AppDir \
   --plugin qt --output appimage
 ```
 
-The `apps/gui/CMakeLists.txt` `if(LINUX)` block described above already installs exactly the
+The `apps/forge/gui/CMakeLists.txt` `if(LINUX)` block described above already installs exactly the
 XDG-shaped layout [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy) expects for an
 AppDir — the `--install --component runtime` line is the whole of the CMake side of this, no
 extra packaging target needed.
@@ -365,7 +365,7 @@ The pull-request gate builds and tests `linux-gcc`, and the run after a merge to
 Each of those installs a Qt6 kit and builds and smoke-tests `forge-gui` in addition to the CLI. The
 nightly run adds the rest. Two sanitizer legs, `linux-llvm-asan-ubsan` (AddressSanitizer +
 UndefinedBehaviorSanitizer) and `linux-llvm-tsan` (ThreadSanitizer, over the `concurrency` ctest
-label only — `tests/audio/` plus `tests/cli/test_cli_live.cpp`), run only in the nightly run, and
+label only — `libs/audio/tests/` plus `apps/forge/cli/tests/test_cli_live.cpp`), run only in the nightly run, and
 both stay **CLI-only on purpose**, to keep a Qt kit out of the sanitizer legs' install time. They
 are separate presets because the two runtimes are mutually exclusive: Clang refuses
 `-fsanitize=address,thread`. Some slow passes inside the plain legs are nightly-only too: the
@@ -385,8 +385,8 @@ A separate job, `linux-appimage`, is nightly-only as well: an `ubuntu:22.04` con
 a second container that never had Qt installed at all — see [AppImage](#appimage) above for what
 it builds and why.
 
-The ALSA backend has tests of its own (`tests/audio/backend/alsa/`, `tests/audio/test_alsa_null_backend.cpp`
-and `tests/cli/test_cli_live_alsa.cpp`) on top of the base suite, and they run only in a build that
+The ALSA backend has tests of its own (`libs/audio/tests/backend/alsa/`, `libs/audio/tests/test_alsa_null_backend.cpp`
+and `apps/forge/cli/tests/test_cli_live_alsa.cpp`) on top of the base suite, and they run only in a build that
 selected ALSA: a Linux build with the GUI on and `libasound2-dev` absent runs the same suite as
 Windows without them. `ctest --preset test-linux-gcc-debug` (or whichever preset matches your
 build) runs the full suite. See [Verified configuration](../building.md#verified-configuration)

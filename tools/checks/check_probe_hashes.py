@@ -8,7 +8,7 @@ the same on every leg - the x86 host, the Cortex-M3 under QEMU, a RISC-V
 part - and that identity is the tier's own gate: a hash that differs between
 legs is arithmetic that is not integer somewhere, or a platform difference the
 tier was built to have none of. The pinned values in
-tests/golden/fixed-probe-pcm-hashes.json are what both CI legs are held to;
+testdata/fixed-probe-pcm-hashes.json are what both CI legs are held to;
 re-pin them when the tier's arithmetic changes on purpose. For the floating
 tiers the hashes vary with the compiler and this check has nothing to say.
 
@@ -31,7 +31,7 @@ from pathlib import Path
 
 LINE = re.compile(r"^([a-z0-9_]+)\.pcm_hash=([0-9a-f]{16})\s*$")
 # A fixture the probe declined to decode, and why - today only the per-target
-# heap budget (apps/baremetal/probe.cpp's over_budget). A run that says so is
+# heap budget (firmware/baremetal/probe.cpp's over_budget). A run that says so is
 # not a run that is missing a fixture: an ESP32-C3 has 400 KB of internal SRAM
 # and the two 7.1.4 rows peak at 238,094 and 244,502 bytes, so that leg decodes
 # twelve of the fourteen and states which two it did not. Absence WITHOUT one of these

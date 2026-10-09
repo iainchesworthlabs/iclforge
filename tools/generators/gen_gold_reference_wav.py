@@ -1,6 +1,6 @@
 """Gold-reference WAV generator for the CI correctness gate.
 
-Produces tests/golden/audio/reference_51.wav: a fixed, checked-in 5.1 PCM16
+Produces testdata/audio/reference_51.wav: a fixed, checked-in 5.1 PCM16
 WAV, independent of iclforge's own encoder/decoder (it is built here from
 first principles - sin()/pseudo-random noise/simple FIR smoothing - not
 bootstrapped by decoding one of our own encodes the way
@@ -28,7 +28,7 @@ import wave
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-OUT = REPO / "tests" / "golden" / "audio" / "reference_51.wav"
+OUT = REPO / "testdata" / "audio" / "reference_51.wav"
 
 RATE = 48000
 DURATION_S = 2.5

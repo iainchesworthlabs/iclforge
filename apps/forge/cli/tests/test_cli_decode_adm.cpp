@@ -1,0 +1,282 @@
+#include <catch2/catch_test_macros.hpp>
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <numbers>
+#include <span>
+#include <string>
+#include <vector>
+
+#include "platform/process.hpp"
+
+#include "iclforge/adm/bridge.hpp"
+#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/io/wav.hpp"
+#include "iclforge/adm/ac3adm.hpp"
+
+// forge's 'decode ... adm_out=' path (the ADM write direction -
+// apps/forge/cli/src/commands/decode.cpp's accumulate_adm/run_decode_eac3). Real, subprocess-level
+// integration test: the same "run the actual built binary, inspect what it wrote" shape
+// apps/forge/cli/tests/test_cli_atmos_adm.cpp (the read direction) and
+// apps/forge/cli/tests/test_cli.cpp's own atmos-encode tests use, and for the same reason - see
+// test_cli_atmos_adm.cpp's own top comment on why decode.cpp's own logic cannot be linked into this
+// test binary and called directly. A separate file for the same two-part reason as that file's own
+// top comment: this only makes sense with ICLFORGE_BUILD_ADM AND forge both on - see
+// apps/forge/cli/tests/CMakeLists.txt's own gating comment on the block this file's source is added
+// to.
+//
+// What this proves: a JOC-reconstructed object comes out of decode_access_unit
+// oba::joc::reconstruction_delay(domain) samples (576 under Domain::kQmf, the DecoderConfig
+// default) behind the bed it was pulled from (docs/library/decoding.md, "Atmos objects lag the
+// bed"; libs/ac3/tests/decoder/test_latency.cpp measures it end to end). accumulate_adm appends
+// each decoded unit's object_audio and the bed's LFE channel side by side, unit by unit, into the
+// ADM master - carrying that same 576-sample gap straight into the exported file unless something
+// delays the LFE to match.
+//
+// Regression test: encode a real Atmos stream with one object sent entirely to the LFE
+// (lfe_send=1.0, via atmos-encode's own keyframes file - there is no lfe_send CLI flag, see
+// run_atmos_encode's own default placement in apps/forge/cli/src/commands/atmos.cpp), decode it
+// with adm_out= set, read the BW64/ADM master back and cross-correlate its LFE channel against its
+// one object channel. Before the fix this PR made, the object trails the LFE by 576 samples in the
+// written file; fixed, they line up.
+
+namespace fs = std::filesystem;
+
+namespace {
+
+// See apps/forge/cli/tests/test_cli.cpp's own scratch_dir for the reasoning this copy shares (this
+// project's established per-file test-helper convention - test_cli_atmos_adm.cpp's own top
+// comment), including the PID fold; the leaf name below is this file's own.
+std::string scratch_pid_suffix() { return iclforge::test::platform::process_id(); }
+
+fs::path scratch_dir() {
+    auto dir = fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("cli_decode_adm_" + scratch_pid_suffix());
+    fs::create_directories(dir);
+    return dir;
+}
+
+// Runs `forge <args>` with both streams redirected to `log`. The platform
+// differences - cmd.exe's quoting and std::system()'s two return-value
+// shapes - live in tests/support/platform/process.hpp's run_shell, not here.
+int run_cli(const std::string& args, const fs::path& log) {
+    const std::string command =
+        "\"" + std::string(ICLFORGE_CLI_EXE) + "\" " + args + " > \"" + log.string() + "\" 2>&1";
+    return iclforge::test::platform::run_shell(command);
+}
+
+std::string read_log(const fs::path& log) {
+    std::ifstream in{log, std::ios::binary};
+    return {std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+}
+
+std::string quoted(const fs::path& path) { return "\"" + path.string() + "\""; }
+
+// Makes `path` with one forge run - `command` and `path`, then `rest` -
+// once per test process. Same trimmed copy as test_cli_inspect_edges.cpp's own.
+fs::path generated(const fs::path& path, std::string_view command, std::string_view rest) {
+    if (!fs::exists(path)) {
+        const auto log = fs::path{path}.replace_extension(".gen.log");
+        REQUIRE(run_cli(std::string{command} + " " + quoted(path) + " " + std::string{rest}, log) ==
+                0);
+    }
+    return path;
+}
+
+// Runs `args`, checks the exit code, and returns everything it printed.
+std::string run_expecting(const std::string& args, const fs::path& log, int exit_code) {
+    const auto rc = run_cli(args, log);
+    auto text = read_log(log);
+    INFO(text);
+    CHECK(rc == exit_code);
+    return text;
+}
+
+bool contains(const std::string& text, std::string_view needle) {
+    return text.find(needle) != std::string::npos;
+}
+
+constexpr int kFrames = 8;
+// Frame 3, as libs/ac3/tests/decoder/test_latency.cpp and libs/render/tests/test_object_lfe_timing.cpp (the header-
+// only renderer's own regression test for this same class of bug) both place their own marker: past
+// every encoder's/decoder's own priming, early enough that reconstruction_delay(kQmf)'s 576 samples
+// still leave it well inside an 8-frame stream.
+constexpr int kPulseAt = 3 * iclforge::ac3::kSamplesPerFrame + 512;
+
+// The object's whole-clip audio: a decaying tone burst riding a quiet noise floor. The floor is not
+// decoration - JOC's reconstruction matrix is solved per frame from the object's own energy that
+// frame (TS 103 420 §6.6.5 interpolates each frame's from the one before), so a pulse arriving out
+// of true silence comes back through a matrix still ramping up across it, smearing exactly the peak
+// a correlation is trying to locate. Flat, low-level energy in every frame keeps the matrix settled
+// - libs/render/tests/test_object_lfe_timing.cpp's own programme() makes the identical argument for
+// the header-only renderer's regression test. The burst itself, not a steady tone, for the reason
+// libs/ac3/tests/decoder/test_latency.cpp's own burst() gives: a sinusoid correlates with itself a
+// period away almost as well as at zero lag, which would make a lag search meaningless.
+std::vector<float> object_pulse_with_floor(int samples, int at) {
+    std::vector<float> pcm(static_cast<std::size_t>(samples), 0.0F);
+    std::uint32_t state = 0x9E3779B9U;
+    for (float& sample : pcm) {
+        state = (state * 1664525U) + 1013904223U;
+        const double white = (static_cast<double>(state >> 8U) / 8388608.0) - 1.0;
+        sample = static_cast<float>(0.02 * white);
+    }
+    for (int n = 0; n < 700; ++n) {
+        const int index = at + n;
+        if (index >= samples) {
+            break;
+        }
+        const double t = static_cast<double>(n) / 48000.0;
+        const double envelope = std::exp(-t * 90.0);
+        pcm[static_cast<std::size_t>(index)] +=
+            static_cast<float>(0.6 * envelope * std::sin(2.0 * std::numbers::pi * 120.0 * t));
+    }
+    return pcm;
+}
+
+float peak(std::span<const float> pcm) {
+    float out = 0.0F;
+    for (const float sample : pcm) {
+        out = std::max(out, std::abs(sample));
+    }
+    return out;
+}
+
+// The lag (later[n + lag] against earlier[n]) maximising their correlation over a window around the
+// pulse - libs/ac3/tests/decoder/test_latency.cpp's own best_lag, searched both directions since this test,
+// unlike that one, does not already know which of the two channels leads.
+int best_lag(std::span<const float> earlier, std::span<const float> later, int min_lag, int max_lag) {
+    const int from = std::max(0, kPulseAt - 2048);
+    const int to = std::min(static_cast<int>(earlier.size()), kPulseAt + 4096);
+    int best = min_lag;
+    double best_score = -1.0;
+    for (int lag = min_lag; lag <= max_lag; ++lag) {
+        double score = 0.0;
+        for (int n = from; n < to; ++n) {
+            const int m = n + lag;
+            if (m < 0 || m >= static_cast<int>(later.size())) {
+                continue;
+            }
+            score += static_cast<double>(earlier[static_cast<std::size_t>(n)]) *
+                     static_cast<double>(later[static_cast<std::size_t>(m)]);
+        }
+        if (score > best_score) {
+            best_score = score;
+            best = lag;
+        }
+    }
+    return best;
+}
+
+}  // namespace
+
+TEST_CASE("decode's ADM master lines the bed's LFE up with the object it was pulled beside",
+          "[cli][decode][adm]") {
+    const auto dir = scratch_dir();
+
+    const auto wav_path = dir / "decode_adm_in.wav";
+    const std::vector<std::vector<float>> channels{
+        object_pulse_with_floor(kFrames * iclforge::ac3::kSamplesPerFrame, kPulseAt)};
+    REQUIRE(iclforge::ac3::io::write_wav_f32(wav_path.string(), channels, 48000).has_value());
+
+    // One static keyframe (ac3/oba/scene.hpp: "a single keyframe holds its placement everywhere")
+    // sending the object entirely to the LFE - run_atmos_encode's own default placement is
+    // lfe_send=0.0 (apps/forge/cli/src/commands/atmos.cpp), and the only way to override it is this
+    // keyframes file (main.cpp's own 'atmos-encode' doc string names no lfe_send flag).
+    const auto paths_path = dir / "decode_adm_paths.txt";
+    {
+        std::ofstream paths{paths_path};
+        REQUIRE(paths.is_open());
+        paths << "0 0.0 0.5 0.5 0.0 1.0 1.0\n";
+    }
+
+    const auto ec3_path = dir / "decode_adm_in.ec3";
+    const auto encode_log = dir / "decode_adm_encode.log";
+    const auto encode_rc = run_cli("atmos-encode \"" + wav_path.string() + "\" \"" +
+                                        ec3_path.string() + "\" 448 1 \"" + paths_path.string() + "\"",
+                                    encode_log);
+    INFO(read_log(encode_log));
+    REQUIRE(encode_rc == 0);
+
+    const auto out_wav = dir / "decode_adm_out.wav";
+    const auto adm_out = dir / "decode_adm_master.wav";
+    const auto decode_log = dir / "decode_adm_decode.log";
+    // Positional 3 (objects_dir) skipped with an explicit empty argument so positional 4 (adm_out)
+    // still lands correctly - apps/forge/cli/tests/test_cli_stream_tools.cpp's own transcode test uses the same
+    // trick for a skipped middle positional.
+    const auto decode_rc =
+        run_cli("decode \"" + ec3_path.string() + "\" \"" + out_wav.string() + "\" \"\" \"" +
+                    adm_out.string() + "\"",
+                decode_log);
+    INFO(read_log(decode_log));
+    REQUIRE(decode_rc == 0);
+    REQUIRE(fs::exists(adm_out));
+
+    const auto parsed = iclforge::adm::parse_bw64(adm_out.string());
+    REQUIRE(parsed.has_value());
+    const auto bridged = iclforge::adm::build(*parsed);
+    REQUIRE(bridged.has_value());
+    REQUIRE(bridged->channel_count() == 2);
+
+    // accumulate_adm always writes the dynamic object(s) first, the bed's LFE last
+    // (AdmMasterInput::channels.resize(object_audio.size() + (have_lfe ? 1 : 0)), decode.cpp) - but
+    // looked up here by is_bed/is_lfe rather than trusted by position, so a change to that order fails
+    // the REQUIREs below rather than silently comparing the wrong channels.
+    std::size_t object_i = bridged->channel_count();
+    std::size_t lfe_i = bridged->channel_count();
+    for (std::size_t i = 0; i < bridged->channel_count(); ++i) {
+        if (bridged->is_bed[i] && bridged->is_lfe[i]) {
+            lfe_i = i;
+        } else if (!bridged->is_bed[i]) {
+            object_i = i;
+        }
+    }
+    REQUIRE(object_i < bridged->channel_count());
+    REQUIRE(lfe_i < bridged->channel_count());
+
+    const auto object_pcm = bridged->pcm[object_i];
+    const auto lfe_pcm = bridged->pcm[lfe_i];
+    REQUIRE(object_pcm.size() == lfe_pcm.size());
+
+    // Both channels must actually carry the burst, or the lag search below measures noise.
+    REQUIRE(peak(object_pcm) > 0.05F);
+    REQUIRE(peak(lfe_pcm) > 0.05F);
+
+    const int lag = best_lag(lfe_pcm, object_pcm, -2 * iclforge::ac3::kSamplesPerFrame,
+                             2 * iclforge::ac3::kSamplesPerFrame);
+    CAPTURE(lag);
+    // Before this fix: the LFE channel was written straight from the decoded bed, undelayed, while
+    // the object channel is JOC-reconstructed and so already reconstruction_delay(kQmf) samples (576)
+    // behind it - the object trailed the LFE by 576 in the unfixed file (measured on this exact
+    // fixture while confirming the bug - see the PR description). Fixed, the two line up.
+    CHECK(lag == 0);
+}
+
+// Moved from apps/forge/cli/tests/test_cli_inspect_edges.cpp - see that file's own comment on its
+// sibling, plain-AC-3 case. decode.cpp's run_decode_eac3 checks forge_cli::adm_capability() up
+// front, before it can tell whether this specific programme has an object layer, so an E-AC-3
+// stream only reaches these two warnings (rather than exiting 2 with "this build was not configured
+// with -DICLFORGE_BUILD_ADM=ON") when ADM support was actually built - which is exactly this file's
+// own gate (apps/forge/cli/tests/CMakeLists.txt's ICLFORGE_BUILD_ADM block).
+TEST_CASE("decode warns when ADM output is asked of an E-AC-3 stream with no object layer",
+          "[cli][decode]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "decode_no_objects_eac3.log";
+    const auto objects_dir = dir / "unused_objects";
+    const auto adm = dir / "unused_adm.wav";
+
+    const auto ec3_in = generated(dir / "clean.ec3", "eac3-silence", "1 192 stereo");
+    const auto text = run_expecting("decode " + quoted(ec3_in) + " " +
+                                         quoted(dir / "plain_ec3.wav") + " " + quoted(objects_dir) +
+                                         " " + quoted(adm),
+                                     log, 0);
+    CHECK(contains(text, "warning: " + adm.string() +
+                             " given but no dynamic-object-only Atmos programme was decoded"));
+    CHECK(contains(text,
+                   "warning: objects_dir given but there is no reconstructed object audio to "
+                   "export"));
+    CHECK_FALSE(fs::exists(adm));
+}

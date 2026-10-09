@@ -109,7 +109,7 @@ class Gate(unittest.TestCase):
         fake = FakeRun()
         rc, out, _ = self.run_main(fake, which="/usr/bin/ffmpeg")
         self.assertEqual(rc, 0)
-        self.assertTrue(any(c[0] == "/usr/bin/ffmpeg" for c in fake.commands))
+        self.assertTrue(any(c[0] == str(Path("/usr/bin/ffmpeg")) for c in fake.commands))
         self.assertIn("40.00 dB", out)
 
     def test_failures_abort(self):

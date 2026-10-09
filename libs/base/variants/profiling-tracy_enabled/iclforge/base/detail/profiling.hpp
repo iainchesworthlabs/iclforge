@@ -1,0 +1,35 @@
+#pragma once
+
+// Zone macros for Tracy instrumentation, real-Tracy variant - selected by
+// CMake (libs/ac3/CMakeLists.txt adds this directory, not the tracy_disabled
+// sibling, to forge_objects's private include path when ICLFORGE_ENABLE_TRACY
+// is on - see cmake/Tracy.cmake) rather than an #ifdef, per the project's
+// platform/feature-isolation rule (tools/checks/check_platform_macros.ps1):
+// exactly one of this file and tracy_disabled/ac3/internal/profiling.hpp is
+// ever compiled, both at this same "ac3/internal/profiling.hpp" relative
+// path, so every call site's #include "ac3/internal/profiling.hpp" and every
+// ICLFORGE_ZONE_SCOPED()/ICLFORGE_ZONE_SCOPED_N() use compiles unchanged either way.
+//
+// Internal, not installed: this is a build-diagnostics tool, not part of the
+// library's public interface - hence living under src/, not include/.
+
+#include <tracy/Tracy.hpp>
+#include <tracy/TracyC.h>
+
+#define ICLFORGE_ZONE_SCOPED() ZoneScoped
+#define ICLFORGE_ZONE_SCOPED_N(name) ZoneScopedN(name)
+// Manual (non-lexically-scoped) begin/end pair, for marking a span that does
+// not correspond to a single C++ scope - e.g. one numbered "section" inside
+// an existing, already-large function this profiling pass does not want to
+// restructure into nested blocks just to give each section its own scope.
+// `var` names the TracyCZoneCtx local these two calls share.
+#define ICLFORGE_ZONE_BEGIN(var, name) TracyCZoneN(var, name, true)
+#define ICLFORGE_ZONE_END(var) TracyCZoneEnd(var)
+// One per real-time frame, for the frame view.
+#define ICLFORGE_FRAME_MARK() FrameMark
+// A second, independent frame view alongside the default one - for a
+// real-time cadence that is not "the" main loop (e.g. Qt Quick's render
+// frames in an app whose own primary loop, like Crucible's audio frame,
+// already marks the default/unnamed set - two unrelated cadences on one
+// frame set would interleave into a single meaningless graph).
+#define ICLFORGE_FRAME_MARK_NAMED(name) FrameMarkNamed(name)

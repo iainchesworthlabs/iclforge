@@ -1,15 +1,16 @@
-# Object signing: `iclforge::signing`
+# Object signing: `iclforge::ac3::signing`
 
-`iclforge/signing/emdf_atmos_signer.hpp`, `signing_key.hpp` — a separate library, `iclforge::signing`, not
-part of `iclforge::ac3`: signing is an optional step a front end applies to already-encoded frames, so
-the codec itself has no dependency on it. See [Object signing](../concepts/object-signing.md) for
+`iclforge/ac3/signing/emdf_atmos_signer.hpp` (the signer, a part of `iclforge::ac3`) and
+`iclforge/base/crypto/signing_key.hpp` (the operator's key, `iclforge::base`'s). Signing is an
+optional step a front end applies to already-encoded frames: no encoder or decoder source calls the
+signer, and the minimum-footprint archives leave it out. See [Object signing](../concepts/object-signing.md) for
 what this is *for* — a licensed decoder treats the EMDF container's `emdf_protection` field as a
 commitment to object decoding and refuses the whole stream if the tag does not check out; this
 computes the keyed tag that satisfies it.
 
 ```cpp
-const iclforge::signing::SigningKey key{key_bytes};   // the operator's own, at runtime
-const int signed_count = iclforge::signing::sign_atmos_stream(stream, key);
+const iclforge::base::crypto::SigningKey key{key_bytes};   // the operator's own, at runtime
+const int signed_count = iclforge::ac3::signing::sign_atmos_stream(stream, key);
 ```
 
 Full program: [`examples/object_signing.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/object_signing.cpp)

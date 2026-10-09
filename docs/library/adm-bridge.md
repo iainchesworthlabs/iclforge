@@ -1,10 +1,10 @@
-# ADM ↔ Atmos bridging: `iclforge::admbridge`
+# ADM ↔ Atmos bridging: `iclforge::adm`
 
-`iclforge/admbridge/bridge.hpp`, `iclforge/admbridge/coordinates.hpp`, library `iclforge::admbridge`. Two
-directions live here:
+`iclforge/adm/bridge.hpp`, `iclforge/adm/coordinates.hpp`, `iclforge/adm/iab_bridge.hpp`, a part of
+`iclforge::adm`. Two directions live here:
 
 - **Read**: maps the ADM object graph [`iclforge::adm`](adm.md) parses from a BW64/ADM master onto
-  [`iclforge::ac3::oba::AtmosEncoder`](spatial-and-atmos.md)'s input shape — one `iclforge::oba::ObjectPath` plus
+  [`iclforge::ac3::oba::AtmosEncoder`](spatial-and-atmos.md)'s input shape — one `iclforge::objects::oba::ObjectPath` plus
   one mono PCM span per bed speaker feed or dynamic object, ready to drive `encode_frame()` in a
   loop. Driven end to end by `forge atmos-adm` and
   [`examples/encode_adm.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/encode_adm.cpp).
@@ -19,44 +19,38 @@ directions live here:
 Both directions are the same "one place `iclforge::adm` and `iclforge::ac3`/`iclforge::oba` are allowed to meet"
 seam this module has always been, see [Commands](../forge/cli/commands.md) for both commands.
 
-**Opt-in, gated by the same flag as `iclforge::adm`.** `iclforge::admbridge` depends on both
-`iclforge::adm` and `iclforge::ac3`, so it is meaningless without `ICLFORGE_BUILD_ADM=ON` and is
-built as part of the same `add_subdirectory` block — no separate `ICLFORGE_BUILD_ADMBRIDGE` option
-exists. See [ADM / BW64 reading](adm.md) for the exact CMake invocation.
+**Opt-in, with the parser.** The bridge is built with the rest of `iclforge::adm` when
+`ICLFORGE_BUILD_ADM=ON`; there is no option of its own. See [ADM / BW64 reading](adm.md) for the
+exact CMake invocation.
 
 ```cpp
 const auto document = iclforge::adm::parse_bw64(path);
 if (!document) { /* ... */ }
 
-const auto bridged = iclforge::admbridge::build(*document);
+const auto bridged = iclforge::adm::build(*document);
 if (!bridged) {
     fmt::printf("build failed: %.*s\n",
-                static_cast<int>(iclforge::admbridge::describe(bridged.error()).size()),
-                iclforge::admbridge::describe(bridged.error()).data());
+                static_cast<int>(iclforge::adm::describe(bridged.error()).size()),
+                iclforge::adm::describe(bridged.error()).data());
     return 1;
 }
 
 iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, static_cast<int>(bridged->channel_count())};
 // Per frame: slice bridged->pcm[i] to the frame's sample range, evaluate
-// iclforge::oba::evaluate_placements(bridged->paths, t), call encoder.encode_frame(...).
+// iclforge::objects::oba::evaluate_placements(bridged->paths, t), call encoder.encode_frame(...).
 ```
 
-## Why a new, standalone module
+## Where it lives
 
-Two hard constraints rule out folding this into either side it bridges:
-
-- `iclforge::adm` is documentedly codec-blind — its own header comments and this project's design
-  keep it with zero dependency on `iclforge::ac3`/`iclforge::oba`, and that does not change here.
-- `src/ac3` (`iclforge::ac3`, `iclforge::ac3::oba::AtmosEncoder`) is always built, unconditionally, by every
-  configuration of this project. It cannot gain a dependency on the opt-in, Boost-requiring
-  `iclforge::adm` without breaking every default build.
-
-`iclforge::admbridge` is therefore its own module (`src/admbridge/`), PUBLIC-linking both — the same
-shape `iclforge::signing` uses for its own `iclforge::ac3` dependency. Like `iclforge::adm` itself
-(see [ADM / BW64 reading](adm.md)), it IS part of the installed `find_package(iclforge)` package,
-but shared-only: `iclforge::admbridge_shared`/the bare `iclforge::admbridge` alias, no `_static` variant.
-`build_iab()` (`iclforge/admbridge/iab_bridge.hpp`) maps a whole parsed `iclforge::iab::IABitstreamFrame`
-sequence — from either of `iclforge::iab`'s two readers (`src/iab`: a bare elementary `.iab`
+The bridge is a part of `iclforge::adm` (`libs/adm/`), which stays codec-blind: its headers name the
+object model's types (`iclforge::objects::oba::ObjectPath`, from `iclforge::objects`) and the IAB reader's
+(`iclforge::iab`), and `iclforge::adm` links both publicly, never `iclforge::ac3`. `libs/ac3` is built
+by every configuration and cannot depend on the opt-in, Boost-requiring `iclforge::adm`, which is why
+the bridge stops at the object model the Atmos encoder takes. Like the rest of `iclforge::adm` (see
+[ADM / BW64 reading](adm.md)), it is part of the installed `find_package(iclforge)` package, shared
+only: `iclforge::adm_shared` and the bare `iclforge::adm` alias, no `_static` variant.
+`build_iab()` (`iclforge/adm/iab_bridge.hpp`) maps a whole parsed `iclforge::iab::IABitstreamFrame`
+sequence — from either of `iclforge::iab`'s two readers (`libs/iab`: a bare elementary `.iab`
 file or a real MXF Track File) — onto this same `ObjectPath` layer, driven end to end by `forge
 atmos-iab` (see [Commands](../forge/cli/commands.md)). `iclforge::adm::AdmDocument` and `iclforge::iab::
 IABitstreamFrame` are therefore both input shapes here, sharing the coordinate-conversion and
@@ -81,7 +75,7 @@ parsing — see "Bridging IAB" below for exactly what differs between the two.
   (BS.2076-2 Table 12: `LFE`, `LFE1`, `LFE2`) is routed at gain 0 / `lfe_send` 1 instead of panned
   — objects never reach the LFE by panning.
 - **Position/gain automation** — `build_channel_path()` walks a channel's `audioBlockFormat`
-  sequence into one `iclforge::oba::ObjectPath`, implementing BS.2076-2 §10.3's `jumpPosition`/
+  sequence into one `iclforge::objects::oba::ObjectPath`, implementing BS.2076-2 §10.3's `jumpPosition`/
   `interpolationLength` state machine: `jumpPosition = 0` interpolates continuously across a
   block's *entire* duration; `jumpPosition = 1` jumps (or ramps over `interpolationLength`, when
   given) at the block's *start* and then holds for the rest of it; the first block in a sequence
@@ -92,9 +86,9 @@ parsing — see "Bridging IAB" below for exactly what differs between the two.
 - **Coordinate conversion** (`coordinates.hpp`) — BS.2076-2 §8's polar (azimuth/elevation/distance,
   positive azimuth to the left, positive elevation up) and Cartesian (X right-positive, Y
   front-positive, Z top-positive, `[-1, 1]` unit cube) conventions, both converted to
-  `iclforge::oba::Position`'s room-anchored `[0, 1]`/`[0, 1]`/`[-1, 1]` one. Checked against the
+  `iclforge::objects::oba::Position`'s room-anchored `[0, 1]`/`[0, 1]`/`[-1, 1]` one. Checked against the
   standard's own axis-direction text at the cardinal points, and empirically against this
-  project's own existing ring-position constants (`tests/ac3/oba/test_atmos_motion.cpp`'s `kL`/`kR`/`kSR`)
+  project's own existing ring-position constants (`libs/ac3/tests/oba/test_atmos_motion.cpp`'s `kL`/`kR`/`kSR`)
   — the BS.2076-2 `M+030`/`M-030`/`M-110` speaker-label azimuths reproduce those exact values
   through this conversion.
 - **Absolute timeline time** for a channel's automation is `object.start_s + block.rtime_s` — two
@@ -110,7 +104,7 @@ parsing — see "Bridging IAB" below for exactly what differs between the two.
 
 ## Object extent and channel lock
 
-`width`/`height`/`depth` map straight through to `iclforge::oba::ObjectSize` on every keyframe this
+`width`/`height`/`depth` map straight through to `iclforge::objects::oba::ObjectSize` on every keyframe this
 bridge produces. BS.2076-2 Table 15/16/17's extents and TS 103 420 §5.6.1.2's
 `object_width`/`object_depth`/`object_height` are the same normalized `[0, 1]` quantity on the
 same three axes, so this is a rename rather than a conversion, and §10.3's interpolation of them
@@ -160,7 +154,7 @@ not act on either, as for size and zones.
   (`object_div_mode` 2) otherwise. A value that rounds to no divergence sends `b_object_divergence` 0.
   TS 103 420 Annex B has no row for it, so the correspondence is a reading: ADM's value and OAMD's
   `object_divergence` are both the share of the energy moved into two spread objects (§5.2.7).
-  `src/admbridge/ERRATA.md` records it.
+  `libs/adm/ERRATA.md` records it.
 - **`screenRef`** becomes `screen_reference` with `screen_factor` 1 and `depth_factor` 1, since ADM's flag is
   all or nothing. The reference screen of Annex B.2.1.3 (`audioProgrammeReferenceScreen`, sized by a
   `ref_screen_ratio` the OAMD syntax does not carry) is not read or written; the renderer's screen applies.
@@ -189,7 +183,7 @@ horizontal presets at once — keeps whatever part did map, and is reported in `
 the two directions. `write()` emits the zone of every OAMD update as a `zoneExclusion`, with both
 label and bounds, so a reader using either recognises it. Table B.19 prints `ZM3_SideRight`'s `minX` as
 `0.5611`; the mirrored `ZM3_SideLeft` has `-0.51611` and every other pair is symmetric, so `0.51611` is
-written (see `src/admbridge/ERRATA.md`).
+written (see `libs/adm/ERRATA.md`).
 
 Zone and elevation are discrete decisions, so a path holds the earlier block's value until the next
 block's keyframe, as it does for `snap`.
@@ -203,7 +197,7 @@ at their defaults.
 `build_iab(std::span<const iclforge::iab::IABitstreamFrame> frames)` maps a whole parsed Immersive Audio
 Bitstream sequence — `iclforge::iab::parse_iabitstream()` or `iclforge::iab::parse_mxf_iab()`'s own return value,
 unmodified — onto the identical destination shape `build()` produces for ADM, in a new header,
-`iclforge/admbridge/iab_bridge.hpp`.
+`iclforge/adm/iab_bridge.hpp`.
 
 IAB has no whole-file object graph the way ADM's `audioProgramme → audioContent → audioObject` tree
 does — it is a flat sequence of self-contained `IaFrame`s, each carrying its own Bed/Object metadata
@@ -226,13 +220,13 @@ content this bridge selects one of.
 
 **Bed channels have no per-block position data at all** (unlike ADM's `audioBlockFormat` sequence)
 — a Bed channel's own ChannelID (§10.3.5 Table 19) is a closed, physical-position vocabulary
-resolved once via `iclforge::oba::bed_label_position()`, the same pinned-placement convention bed
+resolved once via `iclforge::objects::oba::bed_label_position()`, the same pinned-placement convention bed
 channels already get from ADM's `speakerLabel`; only `ChannelGain` (§10.3.8) can legitimately vary
 frame to frame, so a Bed channel's timeline is one keyframe per frame it is present in. An LFE Bed
 channel (ChannelID `0xD`, or `0x86`/`0x87`'s BS.2051-2 `LFE1`/`LFE2` aliases) routes at gain 0 /
 `lfe_send` 1, the same convention `build_channel_path()` documents for ADM.
 
-**Table 19's cinema channel vocabulary is richer than `iclforge::oba::BedLabel`'s own consumer-layout
+**Table 19's cinema channel vocabulary is richer than `iclforge::objects::oba::BedLabel`'s own consumer-layout
 one in exactly one place**: it names three distinct surround zones per side (Side Surround,
 Surround, Rear Surround) where `BedLabel` has only two slots (`kLs`/`kRs`, `kLb`/`kRb`).
 "Surround" (`0x6`/`0xA`) maps to `kLs`/`kRs` (the canonical 5.1 pair) and "Rear Surround"
@@ -246,7 +240,7 @@ deliberately, rather than guessed at without the external documents Table 19 its
 
 **Position conversion needs no formula at all.** `iab_position_to_room()` (`coordinates.hpp`) is a
 direct passthrough: §11.1's `x`/`y` (0 left/front wall to 1 right/back wall) already match
-`iclforge::oba::Position`'s own convention exactly, and its `z` — "0 corresponds to a horizontal plane
+`iclforge::objects::oba::Position`'s own convention exactly, and its `z` — "0 corresponds to a horizontal plane
 at... the height of the main screen Loudspeakers... 1 corresponds to the ceiling" — anchors its
 zero at the same screen/ear-height reference `oba::Position`'s own `z = 0` does, just never
 expressing anything below it (IAB's `[0, 1]` is the upper half of `oba::Position::z`'s own
@@ -296,7 +290,7 @@ from once `build_iab()` returns.
 `write()` takes a `WriteInput` — a sample rate plus one `WriteChannel` per channel to place in the
 master, in any order — and returns an `iclforge::adm::AdmDocument` ready for `iclforge::adm::write_bw64()`. A
 channel is either a bed channel (`bed_label` set — written as a static `DirectSpeakers` channel
-pinned at `iclforge::oba::bed_label_position()`, `updates` unused) or a dynamic object (`bed_label`
+pinned at `iclforge::objects::oba::bed_label_position()`, `updates` unused) or a dynamic object (`bed_label`
 empty — written as an `Objects` channel whose `audioBlockFormat` sequence comes from `updates`).
 Each `audioTrackUID` carries the input's `sampleRate` and a `bitDepth` of `iclforge::adm::kWriteBitDepth`,
 the width `write_bw64()` stores the PCM at, and `audio.bits_per_sample` holds the same width, so
@@ -340,7 +334,7 @@ enum class BridgeError : std::uint8_t {
 };
 std::string_view describe(BridgeError error);
 
-std::expected<iclforge::oba::ObjectPath, BridgeError> build_channel_path(
+std::expected<iclforge::objects::oba::ObjectPath, BridgeError> build_channel_path(
     const iclforge::adm::AudioChannelFormat& channel, double object_start_s, bool force_lfe);
 
 struct BridgeResult {
@@ -348,7 +342,7 @@ struct BridgeResult {
     std::vector<std::vector<std::string>> unmapped;  // per channel: ADM features not carried
     std::vector<bool> is_bed;
     std::vector<bool> is_lfe;
-    std::vector<iclforge::oba::ObjectPath> paths;   // pass directly to evaluate_placements
+    std::vector<iclforge::objects::oba::ObjectPath> paths;   // pass directly to evaluate_placements
     std::vector<std::span<const float>> pcm;   // borrowed from the AdmDocument passed to build()
     std::uint32_t sample_rate = 0;
 };
@@ -356,19 +350,19 @@ std::expected<BridgeResult, BridgeError> build(const iclforge::adm::AdmDocument&
                                                std::string_view programme_id = {});
 
 iclforge::adm::CartesianPosition polar_to_adm_cartesian(const iclforge::adm::PolarPosition& polar);
-iclforge::oba::Position adm_cartesian_to_room(const iclforge::adm::CartesianPosition& cartesian);
-iclforge::oba::Position adm_position_to_room(const iclforge::adm::Position& position);
-iclforge::adm::CartesianPosition room_to_adm_cartesian(const iclforge::oba::Position& room);
+iclforge::objects::oba::Position adm_cartesian_to_room(const iclforge::adm::CartesianPosition& cartesian);
+iclforge::objects::oba::Position adm_position_to_room(const iclforge::adm::Position& position);
+iclforge::adm::CartesianPosition room_to_adm_cartesian(const iclforge::objects::oba::Position& room);
 AdmZoneMapping adm_zone_exclusion_to_constraint(std::span<const iclforge::adm::ExclusionZone> zones);
 std::vector<iclforge::adm::ExclusionZone> constraint_to_adm_zone_exclusion(
-    iclforge::oba::ZoneConstraint zone, bool enable_elevation);
-iclforge::oba::Position iab_position_to_room(const iclforge::iab::Position& position);  // direct passthrough
+    iclforge::objects::oba::ZoneConstraint zone, bool enable_elevation);
+iclforge::objects::oba::Position iab_position_to_room(const iclforge::iab::Position& position);  // direct passthrough
 
 struct IabBridgeResult {
     std::vector<std::string> channel_ids;
     std::vector<bool> is_bed;
     std::vector<bool> is_lfe;
-    std::vector<iclforge::oba::ObjectPath> paths;
+    std::vector<iclforge::objects::oba::ObjectPath> paths;
     std::vector<std::vector<float>> pcm;       // OWNED - see "Bridging IAB" above
     std::uint32_t sample_rate = 0;
 };
@@ -377,13 +371,13 @@ std::expected<IabBridgeResult, BridgeError> build_iab(
 
 struct WriteObjectUpdate {
     std::uint64_t sample_offset = 0;
-    int ramp_duration_samples = 0;             // iclforge::oba::UpdateBlock::ramp_duration verbatim
-    iclforge::oba::DynamicObject state;
+    int ramp_duration_samples = 0;             // iclforge::objects::oba::UpdateBlock::ramp_duration verbatim
+    iclforge::objects::oba::DynamicObject state;
 };
 struct WriteChannel {
     std::string name;
     std::span<const float> pcm;
-    std::optional<iclforge::oba::BedLabel> bed_label{};    // set: bed/LFE; empty: dynamic object
+    std::optional<iclforge::objects::oba::BedLabel> bed_label{};    // set: bed/LFE; empty: dynamic object
     std::span<const WriteObjectUpdate> updates{};     // dynamic objects only
 };
 struct WriteInput {
@@ -394,7 +388,7 @@ std::expected<iclforge::adm::AdmDocument, BridgeError> write(const WriteInput& i
 ```
 
 `BridgeResult` is deliberately struct-of-arrays, not one struct per channel — `paths` is directly
-usable as the `std::span<const iclforge::oba::ObjectPath>` `iclforge::oba::evaluate_placements` wants, with
+usable as the `std::span<const iclforge::objects::oba::ObjectPath>` `iclforge::objects::oba::evaluate_placements` wants, with
 no projection step. `channel_count() <= 15`: `AtmosEncoder`'s own constructor `objects` parameter
 is dynamic objects only, with the bed's own LFE bookkeeping as an implicit, always-present 16th
 (TS 103 420 §8.3.2.2 caps the total at 16) — the same cap `forge`'s `run_atmos_encode`/
@@ -411,7 +405,7 @@ not carry at all — `build()` deliberately does not invent defaults for them; c
 
 ## Tests
 
-`tests/admbridge/test_adm_bridge.cpp` covers coordinate conversion (against BS.2076-2 §8's cardinal points
+`libs/adm/tests/test_adm_bridge.cpp` covers coordinate conversion (against BS.2076-2 §8's cardinal points
 and this project's own existing ring constants), `build_channel_path`'s full §10.3 state machine
 (single block, continuous-glide blocks, instant-jump blocks, ramp-then-hold blocks, the
 first-block-always-holds override, the LFE override), `build()`'s graph-walking error paths
@@ -421,10 +415,10 @@ real byte-level BW64 fixture (two DirectSpeakers bed channels plus one Objects c
 at one ring position and then jumps to another), parses it with the real `iclforge::adm::parse_bw64()`,
 bridges it, and drives a real `iclforge::ac3::oba::AtmosEncoder`/`iclforge::ac3::Eac3Decoder` round trip — confirming
 the decoded bitstream's channel energy actually lands where the authored ADM positions and hold/
-jump timing say it should, the same standard `tests/ac3/oba/test_atmos_motion.cpp`'s own flagship test
+jump timing say it should, the same standard `libs/ac3/tests/oba/test_atmos_motion.cpp`'s own flagship test
 holds itself to.
 
-`tests/cli/test_cli_atmos_adm.cpp` covers the same fixture shape one level up: it runs the
+`apps/forge/cli/tests/test_cli_atmos_adm.cpp` covers the same fixture shape one level up: it runs the
 real, built `forge` binary's `atmos-adm` command as a subprocess against a real ADM BWF file on
 disk, then decodes what that binary actually wrote and checks the same channel-energy assertions —
 proving the CLI's own argument parsing and its `parse_bw64` → `build` → `AtmosEncoder` wiring, not
@@ -432,7 +426,7 @@ just the library API in isolation — plus two error-path cases (`BridgeError::k
 malformed/non-RIFF file) confirming `describe()` reaches the terminal rather than an opaque crash
 or exit code.
 
-`tests/admbridge/test_iab_bridge.cpp` covers `iab_position_to_room`'s cardinal points, the Table 19
+`libs/adm/tests/test_iab_bridge.cpp` covers `iab_position_to_room`'s cardinal points, the Table 19
 → `BedLabel` mapping (both the codes that resolve and the ones `build_iab()` refuses), MetaID
 cross-frame identity (the same MetaID+ChannelID across several frames is one channel, not several;
 an absent frame silence-fills rather than shrinking the channel count), sub-block keyframe timing
@@ -441,13 +435,13 @@ start), and one flagship test with the identical rigor `test_adm_bridge.cpp`'s o
 — a real byte-level IAB fixture (one Bed Center channel, one Object holding hard right then
 jumping hard left), parsed with the real `iclforge::iab::parse_iabitstream()`, bridged, and driven through
 a real `AtmosEncoder`/`Eac3Decoder` round trip confirming decoded channel energy lands where
-authored. `tests/cli/test_cli_atmos_iab.cpp` covers the same fixture shape one level up, the same
+authored. `apps/forge/cli/tests/test_cli_atmos_iab.cpp` covers the same fixture shape one level up, the same
 way `test_cli_atmos_adm.cpp` does for `atmos-adm`.
 
 ---
 
 See also: [ADM / BW64 reading](adm.md) — the phase-1 parser this module consumes; [IAB
 reading](iab.md) — `iclforge::iab`, the other parser this module consumes (phases 1-2); [Spatial &
-Atmos objects](spatial-and-atmos.md) — `iclforge::ac3::oba::AtmosEncoder`, `iclforge::oba::motion`, and
-`iclforge::oba::Position`'s own room-anchored coordinate convention this module's `coordinates.hpp`
+Atmos objects](spatial-and-atmos.md) — `iclforge::ac3::oba::AtmosEncoder`, `iclforge::objects::oba::motion`, and
+`iclforge::objects::oba::Position`'s own room-anchored coordinate convention this module's `coordinates.hpp`
 converts into.

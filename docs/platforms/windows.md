@@ -5,7 +5,7 @@ alike: Windows MSVC in the merge queue, and both in the run after a merge to mai
 [CI for many agents](../ci-agentic.md)). This page covers what is specific to Windows; for the
 full preset reference, options list and troubleshooting, see [Building from source](../building.md).
 Crucible's kernel driver and driver VM live under
-[`apps/windows/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/apps/windows/README.md),
+[`apps/crucible/windows/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/apps/crucible/windows/README.md),
 separate from the application in `apps/crucible/`.
 
 ## Status
@@ -45,7 +45,7 @@ for the mechanics.
 On Windows, the five pieces that touch sound hardware are all implemented over **WASAPI**:
 
 - **`iclforge::audio`** — live input/loopback capture through a lock-free SPSC ring.
-- **`iclforge::iec61937::PassthroughDetector`** — recognising, from that same capture, that the
+- **`iclforge::containers::iec61937::PassthroughDetector`** — recognising, from that same capture, that the
   endpoint is handing over IEC 61937 bursts (AC-3, E-AC-3 or AC-4) rather than PCM.
 - **`iclforge::audio::PassthroughSink`** — exclusive-mode/direct bitstream output, for both AC-3 and
   E-AC-3 burst framing (IEC 61937). AC-4 (IEC 61937-14) is refused here with
@@ -86,14 +86,14 @@ is explicit about the difference.
     let the ring buffer silently perform a partial write while reporting failure, and the live
     pipeline's Atmos metering step writing past the end of a buffer sized for the object count
     rather than the bed's fixed six channels. Both are fixed; see
-    `src/audio/src/backend/windows/monitor.cpp` and `run_live` in
-    `apps/cli/commands/live_audio.cpp`.
+    `libs/audio/src/backend/windows/monitor.cpp` and `run_live` in
+    `apps/forge/cli/src/commands/live_audio.cpp`.
 
 !!! note "MonitorSink: a format refusal is told apart from a WASAPI failure, and any rate plays"
     `MonitorSink::start()` reports `MonitorError::kFormatRejected` for `AUDCLNT_E_UNSUPPORTED_FORMAT`
     (`0x88890008`), checked on both the `IAudioClient3` low-latency path and the ordinary
     fallback; every other failure in `start()` still reports `kComFailure`. That was added on
-    2026-09-22, debugging why `iclforge-tests "[monitor-unplug]"` would not open the "AV Receiver
+    2026-09-22, debugging why `iclforge-audio-tests "[monitor-unplug]"` would not open the "AV Receiver
     (NVIDIA High Definition Audio)" HDMI endpoint the exclusive-mode passthrough confirmation
     below used: `start()` had no way to say why beyond "a Windows audio (WASAPI/COM) call
     failed", and a standalone WASAPI probe written outside this codebase found the refusal at
@@ -121,7 +121,7 @@ is explicit about the difference.
 
 !!! note "Playback position, pause and flush are confirmed; a multichannel patch is not"
     `MonitorSink`'s playback position, `pause()`/`resume()` and `flush()` have been exercised
-    against the default Realtek endpoint by `iclforge-tests "[monitor-live]"` — a hidden case, since it
+    against the default Realtek endpoint by `iclforge-audio-tests "[monitor-live]"` — a hidden case, since it
     needs a sound card and makes a noise: the position advances with the device's own clock, a
     pause holds it while the queue goes on taking frames, a flush drops both buffers and the
     count restarts, and playback resumes from the next submit. `forge identify` walked the tone
@@ -168,7 +168,7 @@ is explicit about the difference.
     for a real exclusive-mode bitstream client) and a stats bug where the per-callback
     "bursts rendered" counter truncated to zero almost every WASAPI callback, hanging the CLI's
     drain-wait loop forever after real playback had already finished. See
-    `src/audio/src/backend/windows/passthrough.cpp`.
+    `libs/audio/src/backend/windows/passthrough.cpp`.
 
     The AC-3 bursts are byte-exact against FFmpeg's `spdif` muxer, and the E-AC-3 burst framing
     (data type 0x15, the 24576-byte/4x-carrier-rate burst, multi-syncframe accumulation, `Pd`
@@ -182,7 +182,7 @@ is explicit about the difference.
     stops signalling the event it waits on, so a wait that times out asks the endpoint for its
     padding rather than waiting again. Either answer stops the sink — `running()` turns false,
     `position()` reports nothing, `submit()` refuses — and `start()` opens again with no
-    `stop()` first, on the same endpoint once it is back. `iclforge-tests "[passthrough-unplug]"` and
+    `stop()` first, on the same endpoint once it is back. `iclforge-audio-tests "[passthrough-unplug]"` and
     `"[monitor-unplug]"` are hidden cases that take a person through it.
 
     **`[passthrough-unplug]` is confirmed**, against the same AV Receiver endpoint the exclusive-
@@ -202,7 +202,7 @@ is explicit about the difference.
     the stream's own `GetAvailableDynamicObjectCount`: Microsoft's reference for that call says
     not to use it once streaming has started, since `BeginUpdatingAudioObjects` already provides
     the same count from then on - the client-level call carries no such restriction.
-    `iclforge-tests "[spatial-unplug]"` is its own hidden case, not yet run against real hardware.
+    `iclforge-audio-tests "[spatial-unplug]"` is its own hidden case, not yet run against real hardware.
 
 !!! note "No EDID/ELD backend on Windows"
     `forge play` asks a chosen sink what it actually accepts before committing to a format —
@@ -251,7 +251,7 @@ and available to anything else that links it, both Windows-only in the backend t
     Through the raw WASAPI spike first (`apps/crucible/spikes/README.md`, S1: sixteen taps at
     once, exact separation, the mute and exclusive-mode hazards) and then through these library
     entry points themselves (`s1_library_tap`), on Windows 11 build 26200. Not yet exercised on
-    a hosted CI runner beyond the device-free contract in `tests/audio/test_audio_backend.cpp`,
+    a hosted CI runner beyond the device-free contract in `libs/audio/tests/test_audio_backend.cpp`,
     which does start and stop a real watcher wherever the backend exists.
 
 `MonitorSink::start` also takes a `low_latency` flag, added for the demo's one-block mode: it
@@ -273,7 +273,7 @@ playing into it is bitstreaming — is the same framing read backwards, and the 
 it. The bursts arrive as ordinary PCM16 samples: `IAudioClient` has no way to say "this is
 Dolby Digital", and `Capture` converts them to float by dividing by 32768, which loses nothing.
 
-`iclforge::iec61937::PassthroughDetector` recognises the framing from those floats — a `Pa`/`Pb`
+`iclforge::containers::iec61937::PassthroughDetector` recognises the framing from those floats — a `Pa`/`Pb`
 preamble at a repetition period with a syncframe behind it (`0x0B77` for AC-3 and E-AC-3, the
 AC-4 sync word for AC-4) — and `forge record`
 switches to writing the elementary stream instead of encoding the bursts as audio; `forge
@@ -371,7 +371,7 @@ end to end is still a manual, unautomated check.
 `hearth`'s mDNS browse for `_sendspin._tcp` players, and `hearth-testsink`'s own Sendspin
 listener and mDNS advertisement. Rather than leave this to Windows' own "these features have been
 blocked" prompt, `iclforge::sendspin::firewall::ensure_inbound_rule()`
-(`src/sendspin/include/iclforge/sendspin/firewall.hpp`) adds the rule itself, through the same
+(`libs/sendspin/include/iclforge/sendspin/firewall.hpp`) adds the rule itself, through the same
 `INetFwPolicy2` COM policy object the Settings app's firewall page edits, the first time it finds
 none already there for that executable and port.
 
@@ -387,7 +387,7 @@ to a different program.
 
 A loopback-only bind needs none of this - Windows does not gate loopback traffic - and is skipped
 before `ensure_inbound_rule()` is ever called. `hearth-testserver`'s own `ServerHost` and
-reference sink are loopback-only today and so never reach it; `iclforge-tests`' own `ServerHost`
+reference sink are loopback-only today and so never reach it; the Sendspin and Hearth test binaries' own `ServerHost`
 fixtures are the same. Linux and macOS build a no-op implementation of the same two functions and
 never show a prompt of any kind.
 

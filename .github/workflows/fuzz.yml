@@ -1,10 +1,10 @@
 # iclforge fuzzing. Six jobs. Five of them share the libFuzzer harnesses in
-# fuzz/, and all but fuzz-adm-nightly mutate an ALREADY-ENCODED bitstream -
+# libs/<lib>/fuzz/, and all but fuzz-adm-nightly mutate an ALREADY-ENCODED bitstream -
 # they ask whether the DECODER survives corrupt input. The sixth
 # (encoder-space-nightly) asks the opposite question, about the ENCODER, and
 # shares none of that machinery; see its own comment below.
 #
-#   fuzz-regress       Replays fuzz/seeds/ and fuzz/regressions/ with -runs=0
+#   fuzz-regress       Replays libs/<lib>/fuzz/seeds/ and .../regressions/ with -runs=0
 #                      (no mutation) - a correctness gate: every regression
 #                      corpus entry must still not crash. Seconds, not
 #                      minutes; runs on every push/PR to main and is
@@ -20,7 +20,7 @@
 #                      each mutated frame with BOTH iclforge's own decoder
 #                      and FFmpeg, and diffs the PCM, instead of only
 #                      checking for a crash. Push only, its own 60s/target
-#                      budget - see fuzz/differential_oracle.hpp for what
+#                      budget - see libs/ac3/fuzz/differential_oracle.hpp for what
 #                      counts as a reportable divergence versus expected
 #                      disagreement on a malformed frame, and why this job is
 #                      separate rather than folded into fuzz-short (it needs
@@ -34,7 +34,7 @@
 #                      harnesses at the same deeper budget (they stay out of
 #                      the base BASE_TARGETS list run.sh drives here, same as
 #                      fuzz-differential above, so they get their own ffmpeg
-#                      install and regression replay). fuzz/corpus/ persists
+#                      install and regression replay). build/fuzz-corpus/ persists
 #                      across runs via actions/cache instead of restarting
 #                      from the seed corpus every night - see the job's own
 #                      cache step for the growing-key pattern this needs
@@ -63,7 +63,7 @@
 #                      dependent substream, enhanced coupling, transient
 #                      pre-noise or fscod2 audio, and holds those cells
 #                      against ffprobe's syncframe walk instead.
-#                      Not a libFuzzer target and not part of fuzz/run.sh - it
+#                      Not a libFuzzer target and not part of tools/fuzz/run.sh - it
 #                      drives the real forge, so it builds the CLI the way
 #                      _ci-core.yml's ffmpeg-validate job (called from
 #                      ci.yml) does rather than the
@@ -78,10 +78,10 @@
 #                      no hand-written matrix would enumerate.
 #
 # This is a bounded, time-boxed run, not continuous (OSS-Fuzz-style) fuzzing
-# infrastructure - see fuzz/README.md.
+# infrastructure - see tools/fuzz/README.md.
 #
 # fuzz-regress, fuzz-short and fuzz-nightly cover every harness in
-# fuzz/run.sh's default list, which is fifteen: the four original entry
+# tools/fuzz/run.sh's default list, which is fifteen: the four original entry
 # points, fuzz_iec61937_unwrap (IEC 61937 de-framing), fuzz_emdf_parse,
 # fuzz_oamd_parse, fuzz_joc_parse, fuzz_signing_verify over the object and
 # metadata layer, fuzz_osc_parse over the live object-position listener's
@@ -92,7 +92,7 @@
 # wiring - run.sh owns the list, and a new entry there is picked up by all
 # three at once. Instrumentation needs none either: which libraries are
 # built with ASan, UBSan and coverage counters is decided in
-# fuzz/CMakeLists.txt, and a harness whose library is not listed there still
+# cmake/IclforgeFuzz.cmake, and a harness whose library is not listed there still
 # builds and runs, with no sanitizer checks or coverage inside that library.
 #
 # All five run in the same ubuntu:26.04 + LLVM 22 container ci.yml's
@@ -109,9 +109,9 @@
 # fuzz-short's history over the same window was NOT clean - five real
 # UndefinedBehaviorSanitizer reports in fuzz_mp4_demux, all the same root
 # cause (a box using ISOBMFF's 64-bit largesize escape could make
-# iclforge::mp4::Reader's parse position wrap past its sliding window, underflowing the
+# iclforge::containers::mp4::Reader's parse position wrap past its sliding window, underflowing the
 # next offset computation) - fixed in the same PR that promoted this job,
-# with the crash minimised into fuzz/regressions/fuzz_mp4_demux/. Promote a
+# with the crash minimised into libs/containers/fuzz/regressions/fuzz_mp4_demux/. Promote a
 # job again the same way: delete its `continue-on-error: true` line.
 #
 # fuzz-differential additionally installs `ffmpeg` - the same package the
@@ -119,11 +119,11 @@
 # install on Linux, and for the same reason (an independent decode oracle).
 # fuzz-adm-nightly additionally sets up vcpkg. The other three jobs have no
 # such dependency: their harnesses only ever call into iclforge::ac3,
-# iclforge::signing, the three container libraries, iclforge::iab and ac4, all of which
+# iclforge::ac3::signing, the three container libraries, iclforge::iab and ac4, all of which
 # are in-tree and take no third-party library but {fmt}, which cmake/Fmt.cmake
 # finds installed or builds from source.
 #
-# VCPKG_ROOT: fuzz/run.sh reads it directly to place the toolchain file (see
+# VCPKG_ROOT: tools/fuzz/run.sh reads it directly to place the toolchain file (see
 # its configure_and_build), rather than going through a CMake preset the way
 # encoder-space-nightly does - setup-vcpkg exports it, so nothing extra is
 # needed here beyond that action.
@@ -225,7 +225,7 @@ jobs:
         run: bash .github/toolchain/03-llvm-toolchain.sh
 
       - name: Replay seeds + regression corpus (no mutation)
-        run: bash fuzz/run.sh regress
+        run: bash tools/fuzz/run.sh regress
 
   fuzz-short:
     name: Fuzz Short (bounded mutation, push only)
@@ -259,14 +259,14 @@ jobs:
         run: bash .github/toolchain/03-llvm-toolchain.sh
 
       - name: Fuzz (bounded mutation budget)
-        run: bash fuzz/run.sh run
+        run: bash tools/fuzz/run.sh run
 
       - name: Upload crashing inputs
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fuzz-short-artifacts
-          path: fuzz/artifacts/
+          path: build/fuzz-artifacts/
           if-no-files-found: ignore
 
   fuzz-differential:
@@ -300,7 +300,7 @@ jobs:
       - name: Install LLVM 22
         run: bash .github/toolchain/03-llvm-toolchain.sh
 
-      # The differential harnesses' own oracle (fuzz/differential_oracle.hpp
+      # The differential harnesses' own oracle (libs/ac3/fuzz/differential_oracle.hpp
       # shells out to it at run time) - the same package
       # .github/workflows/_build.yml's gold_reference/sanitizer legs already
       # install on Linux, for the same reason.
@@ -316,20 +316,20 @@ jobs:
           done
 
       # Cheap correctness gate first, same shape as fuzz-regress above: any
-      # divergence a past run minimized into fuzz/regressions/ must still
+      # divergence a past run minimized into libs/ac3/fuzz/regressions/ must still
       # not reproduce before spending the mutation budget below.
       - name: Replay differential regression corpus (no mutation)
-        run: bash fuzz/run.sh regress fuzz_differential_ac3_decode fuzz_differential_eac3_decode
+        run: bash tools/fuzz/run.sh regress fuzz_differential_ac3_decode fuzz_differential_eac3_decode
 
       - name: Fuzz differential (bounded mutation budget)
-        run: bash fuzz/run.sh run fuzz_differential_ac3_decode fuzz_differential_eac3_decode
+        run: bash tools/fuzz/run.sh run fuzz_differential_ac3_decode fuzz_differential_eac3_decode
 
       - name: Upload divergent/crashing inputs
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fuzz-differential-artifacts
-          path: fuzz/artifacts/
+          path: build/fuzz-artifacts/
           if-no-files-found: ignore
 
   fuzz-nightly:
@@ -377,7 +377,7 @@ jobs:
             sleep 30
           done
 
-      # fuzz/corpus/ is gitignored and, without this, starts empty on every
+      # build/fuzz-corpus/ is gitignored and, without this, starts empty on every
       # run - promoted fuzz jobs: a cache entry is immutable once written, so
       # there is no "update the existing one", only "restore the newest
       # prior one, then always write a new one keyed by this run". The
@@ -387,21 +387,21 @@ jobs:
       - name: Restore grown fuzz corpus
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: fuzz/corpus
+          path: build/fuzz-corpus
           key: fuzz-corpus-nightly-${{ github.run_id }}
           restore-keys: |
             fuzz-corpus-nightly-
 
       - name: Fuzz (deeper bounded mutation budget)
-        run: bash fuzz/run.sh run
+        run: bash tools/fuzz/run.sh run
 
       # Its own regression replay first, same shape as fuzz-differential -
       # not part of BASE_TARGETS, so fuzz-regress above never covers it.
       - name: Replay differential regression corpus (no mutation)
-        run: bash fuzz/run.sh regress fuzz_differential_ac3_decode fuzz_differential_eac3_decode
+        run: bash tools/fuzz/run.sh regress fuzz_differential_ac3_decode fuzz_differential_eac3_decode
 
       - name: Fuzz differential (deeper bounded mutation budget)
-        run: bash fuzz/run.sh run fuzz_differential_ac3_decode fuzz_differential_eac3_decode
+        run: bash tools/fuzz/run.sh run fuzz_differential_ac3_decode fuzz_differential_eac3_decode
 
       # Runs whether or not a target crashed above - a night that found a
       # crash still grew the corpus for every OTHER target, and losing that
@@ -410,7 +410,7 @@ jobs:
         if: always()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: fuzz/corpus
+          path: build/fuzz-corpus
           key: fuzz-corpus-nightly-${{ github.run_id }}
 
       - name: Upload crashing inputs
@@ -418,14 +418,14 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fuzz-nightly-artifacts
-          path: fuzz/artifacts/
+          path: build/fuzz-artifacts/
           if-no-files-found: ignore
 
   # fuzz_adm_parse on its own - see this file's header for why it is not
   # folded into fuzz-short/fuzz-nightly. Toolchain-wise it is those jobs plus
   # vcpkg: the same ubuntu:26.04 + LLVM 22 + sanitizer runtime archives, with
   # the vcpkg pin encoder-space-nightly already uses added so libadm's Boost
-  # headers resolve. ICLFORGE_FUZZ_ADM makes fuzz/run.sh turn
+  # headers resolve. ICLFORGE_FUZZ_ADM makes tools/fuzz/run.sh turn
   # ICLFORGE_BUILD_ADM and -DVCPKG_MANIFEST_FEATURES=adm on and append the
   # harness to its default list; naming the harness explicitly here as well
   # keeps this job to that one target regardless.
@@ -433,7 +433,7 @@ jobs:
   # Scheduled/dispatch only, not on push: a vcpkg restore plus the
   # FetchContent pulls of libbw64 and libadm cost more than the mutation
   # budget itself, and unlike the other harnesses most of what this one
-  # reaches is third-party code (see fuzz/README.md's "The ADM harness is
+  # reaches is third-party code (see tools/fuzz/README.md's "The ADM harness is
   # opt-in").
   fuzz-adm-nightly:
     name: Fuzz ADM Nightly (BW64 container + ADM XML)
@@ -475,17 +475,17 @@ jobs:
       # Cheap correctness gate first, same shape as fuzz-regress: the seed and
       # regression corpora must replay clean before any budget is spent.
       - name: Replay ADM seeds + regression corpus (no mutation)
-        run: bash fuzz/run.sh regress fuzz_adm_parse
+        run: bash tools/fuzz/run.sh regress fuzz_adm_parse
 
       - name: Fuzz ADM (bounded mutation budget)
-        run: bash fuzz/run.sh run fuzz_adm_parse
+        run: bash tools/fuzz/run.sh run fuzz_adm_parse
 
       - name: Upload crashing inputs
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fuzz-adm-nightly-artifacts
-          path: fuzz/artifacts/
+          path: build/fuzz-artifacts/
           if-no-files-found: ignore
 
   # The deeper half of the encoder input-space search - see this file's header
@@ -495,7 +495,7 @@ jobs:
   #
   # Toolchain-wise this is ffmpeg-validate, not a fuzzing job: LLVM plus vcpkg
   # plus a pinned ffmpeg, building the plain linux-llvm preset. No sanitizer
-  # runtime archives, no libFuzzer, no fuzz/run.sh - the search happens in
+  # runtime archives, no libFuzzer, no tools/fuzz/run.sh - the search happens in
   # Python, against the real CLI, and the failure signal is a decoder refusing
   # a stream rather than a sanitizer report.
   #

@@ -93,11 +93,11 @@ set(CMAKE_CXX_FLAGS_INIT "-arch ${_MACOS_ARCH}")
 # gained Objective-C++ at all.
 #
 # Two directories enable the language and three .mm files exist:
-# src/audio/CMakeLists.txt's APPLE block, for the Core Audio process tap's
-# seam (src/audio/src/backend/macos/process_tap.mm - CATapDescription has no C
+# libs/audio/CMakeLists.txt's APPLE block, for the Core Audio process tap's
+# seam (libs/audio/src/backend/macos/process_tap.mm - CATapDescription has no C
 # entry point), and apps/crucible/CMakeLists.txt's APPLE arm, for Crucible's
-# two AppKit seams (engine/platform/macos/foreground.mm and
-# ui/platform/macos/app_icon_provider.mm - NSWorkspace and NSImage have none
+# two AppKit seams (engine/src/platform/macos/foreground.mm and
+# ui/src/platform/macos/app_icon_provider.mm - NSWorkspace and NSImage have none
 # either).
 #
 # CMake applies CMAKE_CXX_FLAGS to CXX sources only, so without this line

@@ -83,7 +83,7 @@ neither Hearth nor Crucible. v0.10.0-beta.1 (2026-09-01) is the first release bu
 
 ## Audio backend: CoreAudio
 
-`src/audio/CMakeLists.txt` selects a real CoreAudio backend on macOS, `src/audio/src/backend/macos/`
+`libs/audio/CMakeLists.txt` selects a real CoreAudio backend on macOS, `libs/audio/src/backend/macos/`
 — capture, monitor playback and IEC 61937 passthrough are built on the Audio HAL
 (`AudioObjectID`/`AudioDeviceIOProc`), the same layer WASAPI and ALSA occupy on their own
 platforms, rather than the no-backend stub that used to fall back to here. Its passthrough
@@ -91,7 +91,7 @@ mechanism differs from both: CoreAudio has no per-open bitstream flag the way
 WASAPI's exclusive-mode subformat or ALSA's channel-status device name are, so bitstreaming means
 taking hog mode on a digital output and retuning its *physical* stream format
 (`kAudioStreamPropertyPhysicalFormat`) to `kAudioFormat60958AC3` for AC-3 — see
-`src/audio/src/backend/macos/passthrough.cpp`'s own header for the full mechanism, cross-checked
+`libs/audio/src/backend/macos/passthrough.cpp`'s own header for the full mechanism, cross-checked
 against three independent real-world implementations of the same thing (MythTV, mpv, VLC) while
 writing it, since there was no Mac available locally to try it on directly. For E-AC-3, the same
 walk additionally probes a stream's available physical formats for `kAudioFormatEnhancedAC3`:
@@ -107,7 +107,7 @@ with `kUnsupportedFormat`, and `supports_ac4_passthrough` is false on every devi
 
 Passthrough **capture** — an input carrying somebody else's bitstream — needs none of that
 machinery, on macOS or anywhere else: IEC 61937 bursts arrive as ordinary PCM samples, and
-recognising them is `iclforge::iec61937::PassthroughDetector`, which works off whatever interleaved
+recognising them is `iclforge::containers::iec61937::PassthroughDetector`, which works off whatever interleaved
 floats the backend delivers rather than off any HAL property. `forge record` uses it to write
 the elementary stream instead of encoding the bursts as audio, `forge live` to stop rather than
 encode a session of noise, and `forge unspdif` does the same job on a capture already saved to
@@ -115,7 +115,7 @@ disk. That part is platform-independent and shares the verification the framing 
 [Windows](windows.md#passthrough-capture) for what is and is not confirmed.
 
 The backend is CI-verified only: the parts that need no live device — enumeration on a machine
-with none, format matching, sample conversion — run under `iclforge-tests` on the hosted runner, same
+with none, format matching, sample conversion — run under `iclforge-audio-tests` on the hosted runner, same
 as everywhere else without hardware, but no Mac has ever run this code against a digital
 output, and no receiver has been asked to lock onto its output.
 
@@ -141,14 +141,14 @@ What macOS 14.2 (Sonoma) added instead is the per-*process* tap, and
 `Capture::start_process_loopback(pid, mode, format)` is built on it:
 `AudioHardwareCreateProcessTap` over a `CATapDescription`, carried by a private aggregate device
 whose `AudioDeviceIOProcID` reads the way an input device's does. Because `CATapDescription` is an
-Objective-C class with no C entry point, `src/audio/src/backend/macos/process_tap.mm` is the
+Objective-C class with no C entry point, `libs/audio/src/backend/macos/process_tap.mm` is the
 library's one Objective-C++ translation unit, behind the plain-C++ header `process_tap.hpp` that
-the rest of the backend includes; `src/audio/CMakeLists.txt`'s `APPLE` block enables `OBJCXX` for
+the rest of the backend includes; `libs/audio/CMakeLists.txt`'s `APPLE` block enables `OBJCXX` for
 that one file.
 
 The tree holds **three `.mm` files and two directories that enable `OBJCXX`**. The other two are
-Crucible's, for AppKit rather than Core Audio — `apps/crucible/engine/platform/macos/foreground.mm`
-(NSWorkspace) and `apps/crucible/ui/platform/macos/app_icon_provider.mm` (NSWorkspace and NSImage)
+Crucible's, for AppKit rather than Core Audio — `apps/crucible/engine/src/platform/macos/foreground.mm`
+(NSWorkspace) and `apps/crucible/ui/src/platform/macos/app_icon_provider.mm` (NSWorkspace and NSImage)
 — and `apps/crucible/CMakeLists.txt`'s `APPLE` arm makes its own `enable_language(OBJCXX)` call
 rather than relying on this one. Both call sites pin `CMAKE_OBJCXX_COMPILER` to the C++ compiler
 the toolchain file chose, and `cmake/toolchains/macos.llvm.toolchain.cmake` sets
@@ -164,7 +164,7 @@ quit.
 
 It also makes an open tap something Crucible has to be careful about holding. Its engine opens no
 tap while its output stage has no endpoint, and releases any it holds when one goes away
-(`Impl::sync_taps()` in `apps/crucible/engine/engine.cpp`), so a Mac where the output policy finds
+(`Impl::sync_taps()` in `apps/crucible/engine/src/engine.cpp`), so a Mac where the output policy finds
 nothing usable is not one where every application it listed falls silent. The same code runs on
 Windows and Linux, where a tap mutes nothing and the rule costs nothing.
 
@@ -203,7 +203,7 @@ the same answer with the matching reason — both go through
 
 The first is the OS version. The floor is pinned in one place —
 `iclforge::coreaudio::kSystemAudioTapMinimumOs` in
-`src/audio/src/backend/macos/coreaudio_names.hpp` — and it is **14.2** rather than the 14.4 some
+`libs/audio/src/backend/macos/coreaudio_names.hpp` — and it is **14.2** rather than the 14.4 some
 third-party write-ups require. Apple's SDK annotates the API `API_AVAILABLE(macos(14.2))`, which
 is what `@available` and the weak-linked symbols are keyed to, and taking 14.4 would mean
 refusing a machine whose own operating system declares the API present, on the strength of a
@@ -249,7 +249,7 @@ The first macOS CI attempt at any of it never reached a compiler: it stopped dur
 an `install(TARGETS crucible)` rule that named no `BUNDLE DESTINATION` for a target with
 `MACOSX_BUNDLE` on. With that fixed, both legs compiled `process_tap.mm` and linked it into
 `iclforge_audio`. Their `ctest` runs cover the version gate
-(`tests/audio/backend/macos/test_macos_support.cpp`, the one place the `__builtin_available` lowering
+(`libs/audio/tests/backend/macos/test_macos_support.cpp`, the one place the `__builtin_available` lowering
 is executed rather than merely compiled), the agreement between the capability report and
 `process_loopback_available()` and their shared refusal sentence, and — since the Crucible Qt
 Quick suites run there — the engine driving the platform seams and being told no by the tap.
@@ -279,7 +279,7 @@ carries a deprecation annotation in recent SDKs that nobody here can check again
 build. If it turns out notifications do not reach a run-loop-less process, that property is the
 lever to pull. Registration itself needs no device and no
 session, so `audio_backend().device_watch` reports available on any Mac, and the contract case in
-`tests/audio/test_audio_backend.cpp` exercises that on the runners: it starts a watcher, checks it
+`libs/audio/tests/test_audio_backend.cpp` exercises that on the runners: it starts a watcher, checks it
 is running, checks a second start is refused, stops it, starts it again and stops it again. That
 case passed on both macOS legs, so this is the one part of the backend that has run on a Mac. It
 is also the least of it. No callback has ever been seen to arrive, because a hosted runner's
@@ -310,7 +310,7 @@ presets select, and Boost and Tracy only if you opt into the `adm`/`profiling` f
 same reason the Linux presets do (see [GUI on Linux](../building.md#gui-on-linux)): a Qt kit
 isn't assumed present on every Mac, not because `forge-gui` cannot be built here. `cmake/FindQt6.cmake`
 already searches both Homebrew prefixes (`/opt/homebrew/opt/qt`/`/opt/homebrew/opt/qt6` on Apple
-Silicon, `/usr/local/opt/qt`/`/usr/local/opt/qt6` on Intel), and `apps/gui/CMakeLists.txt`'s
+Silicon, `/usr/local/opt/qt`/`/usr/local/opt/qt6` on Intel), and `apps/forge/gui/CMakeLists.txt`'s
 `APPLE` branch — `MACOSX_BUNDLE`, the `.icns` bundle icon, and `qt_generate_deploy_qml_app_script()`
 for packaging — was written for this from the start; it was never exercised until the
 `macos-llvm` CI leg turned the option on. Opt in explicitly once Qt is installed:
@@ -373,7 +373,7 @@ Neither route has been run end to end on a Mac.
 `.ec3` — a custom `Info.plist.in` (`apps/hearth/ui/`) rather than CMake's default template, since
 neither extension is a system-known UTI and each needs its own `UTTypeConformsTo: public.audio`
 declaration tying it to `audio/ac3`/`audio/eac3` — and claims them with `LSHandlerRank Owner`.
-`apps/gui/Info.plist.in` no longer does either, because a UTI with two owners leaves Launch
+`apps/forge/gui/packaging/macos/Info.plist.in` no longer does either, because a UTI with two owners leaves Launch
 Services to pick one. The release `.dmg` carries `forge-gui.app` and not Hearth, so it registers no
 `.ac3` or `.ec3` handler today, and nothing on macOS declares `.ac4`. Configure/build-verified
 only, like the rest of this file's GUI coverage below — nobody has opened an `.ac3` file from
@@ -389,7 +389,7 @@ confirmed clean on a second push after two fixes, 582 ctest entries all passed, 
 took 39.74 s of a 56.81 s total run. The fixes were `QSG_RENDER_LOOP=basic` for a Qt Quick
 render-loop deadlock, and forcing the `Fusion` style in the test binary for a
 native-`ComboBox`-under-offscreen hang (see [GUI on macOS](#gui-on-macos) above and
-`apps/gui/tests/CMakeLists.txt` and `qml_test_main.cpp` for the detail).
+`apps/forge/gui/tests/qml.cmake` and `qml_test_main.cpp` for the detail).
 
 The SNR numbers from the run that first proved the gold-reference gate on macOS were 61.81 and
 61.82 dB, against 67.84 and 67.82 dB on Linux and Windows for the same material. This page and
@@ -408,7 +408,7 @@ value ([One floor per
 channel](../verification.md#one-floor-per-channel-not-one-per-file)).
 
 **Crucible on macOS, as of 2026-09-06.** Both legs build it — every `.mm`, every file under
-`apps/crucible/engine/platform/macos/`, and `bin/crucible.app/Contents/MacOS/crucible` —
+`apps/crucible/engine/src/platform/macos/`, and `bin/crucible.app/Contents/MacOS/crucible` —
 and both run its Qt Quick suites: eleven on that date, and sixteen `tst_*.qml` files are in the
 tree on 2026-09-30. Of the eleven, eight drive the macOS platform seams themselves rather than
 fakes: `Main.qml` starts the engine whenever the window is built, so the session monitor, the
@@ -426,7 +426,7 @@ it and for the gate that now refuses that path. The three suites run green on bo
 
 Worth separating from that, because the two hangs on this runner have different causes and the
 same symptom. `macos-llvm`'s first-ever GUI run deadlocked in the threaded Qt Quick render loop,
-which is why `apps/gui/tests/CMakeLists.txt` sets `QSG_RENDER_LOOP=basic` on `APPLE` (see
+which is why `apps/forge/gui/tests/qml.cmake` sets `QSG_RENDER_LOOP=basic` on `APPLE` (see
 [GUI on macOS](#gui-on-macos)), and Crucible's suites set `QT_QUICK_BACKEND=software` beside
 `offscreen` for the same family of reason. Those are rendering. This one was Core Audio, and no
 amount of render-loop configuration would have moved it.

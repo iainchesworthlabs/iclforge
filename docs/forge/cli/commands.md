@@ -81,7 +81,7 @@ so either works wherever the other does:
   columns `object_index time_s x y z gain lfe_send`; `#` starts a comment and blank lines are
   skipped. Unchanged, including its diagnostics. It is still what the GUI's timeline exports by
   default — see [GUI → Objects & motion](../gui/objects-and-motion.md).
-- **An object scene in JSON**, the `iclforge::oba::ObjectScene` form: named objects, a bed
+- **An object scene in JSON**, the `iclforge::objects::oba::ObjectScene` form: named objects, a bed
   assignment, per-segment interpolation (`hold`, `linear`, `smooth`) and a scene orientation,
   none of which the columns have anywhere to put. Documented in
   [Library → Spatial & Atmos](../../library/spatial-and-atmos.md#the-serialised-form); the GUI
@@ -150,7 +150,7 @@ The status text these commands normally print (frame count, routing, per-channel
 forge atmos-cbi bed_714.wav out.ec3 448 7.1.4
 ```
 
-`bed_714.wav`'s 12 channels are read in `iclforge::oba::bed_labels()`'s own Table 12 order — L, R, C,
+`bed_714.wav`'s 12 channels are read in `iclforge::objects::oba::bed_labels()`'s own Table 12 order — L, R, C,
 LFE, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr for 7.1.4 — which is also Dolby's own `cbi_wav` channel
 order (confirmed against a real DEE-produced 5.1.4 stream; 7.1.4/9.1.6 extend it by the same
 Table 12 rule, unverified against DEE itself). `[layout]` is one of `5.1.4`, `7.1.4`, `9.1.6` and
@@ -339,7 +339,7 @@ forge ac4-encode me_51.wav out.mp4 448 substream1-content=music-and-effects \
 row as `UNAVAILABLE HERE` instead of the description below, and running it prints a clear reason
 (`forge atmos-adm ...` → `error: 'atmos-adm' is unavailable on this platform: this build was not
 configured with -DICLFORGE_BUILD_ADM=ON ...`) rather than "unknown command". Three things in the
-tool need `iclforge::adm`/`iclforge::admbridge`, this project's sole opt-in, Boost-requiring module
+tool need `iclforge::adm`, this project's sole opt-in, Boost-requiring module
 (default **off** — see [ADM / BW64 reading](../../library/adm.md#why-opt-in)): this command,
 `atmos-iab` below, and `decode`'s optional `adm_out` argument. Everything else builds and works
 identically whether that flag is on or off. What the row looks like in a build configured
@@ -352,7 +352,7 @@ this row instead reads `UNAVAILABLE HERE`):
 
 | Command | What it does |
 |---|---|
-| `atmos-adm` | A real ADM BWF master (professional delivery format Netflix's and Apple's own Atmos ingest pipelines require) straight to DD+ JOC E-AC-3 — no WAV, no hand-authored keyframe file: [`iclforge::admbridge::build`](../../library/adm-bridge.md) classifies every channel as a bed speaker feed or a dynamic object and builds its own `iclforge::oba::ObjectPath` straight from the file's authored BS.2076-2 §10.3 position/gain automation, driven frame by frame the same way `atmos-encode` drives an authored `[paths.txt]`. With `codec=ac4` (planning/ac4.md, I5), every bed/object channel becomes an AC-4 dynamic object instead (A-JOC by default, `coding=direct` for direct-coded object substreams), its position sampled once a frame (frame_rate_index 13 is the object substream's only rate) |
+| `atmos-adm` | A real ADM BWF master (professional delivery format Netflix's and Apple's own Atmos ingest pipelines require) straight to DD+ JOC E-AC-3 — no WAV, no hand-authored keyframe file: [`iclforge::adm::build`](../../library/adm-bridge.md) classifies every channel as a bed speaker feed or a dynamic object and builds its own `iclforge::objects::oba::ObjectPath` straight from the file's authored BS.2076-2 §10.3 position/gain automation, driven frame by frame the same way `atmos-encode` drives an authored `[paths.txt]`. With `codec=ac4` (planning/ac4.md, I5), every bed/object channel becomes an AC-4 dynamic object instead (A-JOC by default, `coding=direct` for direct-coded object substreams), its position sampled once a frame (frame_rate_index 13 is the object substream's only rate) |
 
 ```bash
 forge atmos-adm master.wav out.ec3 448
@@ -419,7 +419,7 @@ channels have no single fixed layout to measure loudness against the way `atmos-
 input does, so `atmos-adm` refuses it with a clear error rather than silently keeping the default.
 
 Every failure — a container/XML parse error (`iclforge::adm::AdmError`) or a graph-resolution error
-(`iclforge::admbridge::BridgeError`, e.g. no `audioProgramme`, an unresolved reference, an unsupported
+(`iclforge::adm::BridgeError`, e.g. no `audioProgramme`, an unresolved reference, an unsupported
 pack type) — prints a real diagnosis via that error's own `describe()`, never an opaque crash or a
 bare non-zero exit.
 
@@ -433,7 +433,7 @@ for the same pipeline as a minimal, standalone, self-fixturing program.
 **Only *runnable* in a build with `-DICLFORGE_BUILD_ADM=ON`** — the identical gate and the same
 `UNAVAILABLE HERE`/clear-error treatment `atmos-adm` above gets, and for the same underlying
 reason even though `iclforge::iab` itself is on by default: this command needs
-[`iclforge::admbridge`'s own IAB mapping](../../library/adm-bridge.md#bridging-iab)
+[`iclforge::adm`'s own IAB mapping](../../library/adm-bridge.md#bridging-iab)
 (`build_iab()`), and that whole module rides `ICLFORGE_BUILD_ADM` (see
 [ADM / BW64 reading](../../library/adm.md#why-opt-in)) since it PUBLIC-links `iclforge::adm`
 alongside `iclforge::iab`. What the row looks like in a build configured with the flag on (the
@@ -446,7 +446,7 @@ usage block at the top of this page is from a *default* build, where this row in
 
 | Command | What it does |
 |---|---|
-| `atmos-iab` | A real Immersive Audio Bitstream (SMPTE ST 2098-2) master — a bare elementary `.iab` file or a real MXF Track File alike, sniffed automatically by its first byte — straight to DD+ JOC E-AC-3: [`iclforge::admbridge::build_iab`](../../library/adm-bridge.md#bridging-iab) classifies every Bed channel/Object and builds its own `iclforge::oba::ObjectPath` from the file's own per-frame panning, driven frame by frame the same way `atmos-adm` drives an ADM master. `codec=ac4`/`coding=` work exactly as `atmos-adm`'s own do (planning/ac4.md, I5) |
+| `atmos-iab` | A real Immersive Audio Bitstream (SMPTE ST 2098-2) master — a bare elementary `.iab` file or a real MXF Track File alike, sniffed automatically by its first byte — straight to DD+ JOC E-AC-3: [`iclforge::adm::build_iab`](../../library/adm-bridge.md#bridging-iab) classifies every Bed channel/Object and builds its own `iclforge::objects::oba::ObjectPath` from the file's own per-frame panning, driven frame by frame the same way `atmos-adm` drives an ADM master. `codec=ac4`/`coding=` work exactly as `atmos-adm`'s own do (planning/ac4.md, I5) |
 
 ```bash
 forge atmos-iab master.iab out.ec3 448
@@ -468,7 +468,7 @@ channels have no single fixed layout to measure loudness against the way `atmos-
 input does, so `atmos-iab` refuses it with a clear error rather than silently keeping the default.
 
 Every failure — a bitstream/MXF parse error (`iclforge::iab::IabError`) or a graph-resolution error
-(`iclforge::admbridge::BridgeError`, e.g. a Table 19 `ChannelID` with no `BedLabel` equivalent, or
+(`iclforge::adm::BridgeError`, e.g. a Table 19 `ChannelID` with no `BedLabel` equivalent, or
 essence that never resolved) — prints a real diagnosis via that error's own `describe()`, never an
 opaque crash or a bare non-zero exit.
 
@@ -839,7 +839,7 @@ the real decoder with the inverse transform switched off, which is where the `dy
 the EMDF payload ids, the object layer and the per-block tool usage come from. A syncframe the
 parse tier declines is counted and reported (`parse errors` in the table, `parse_failures` in the
 JSON); the header tier's answers for it stand. On a stream the decoder reads throughout, such as
-`tests/golden/external-baseline/eac3-51-256/dee.ec3`, the parse tier accepts every syncframe and
+`testdata/external-baseline/eac3-51-256/dee.ec3`, the parse tier accepts every syncframe and
 the tool lines show what the encoder used: coupling, spectral extension and AHT there.
 
 **Exit code** is 0 only when every syncframe passed its CRC *and* the parser accepted it, so
@@ -978,20 +978,20 @@ coded channel, LFE last) and `coupling_exponent_strategy`.
 E-AC-3's `0x0B` — so `forge probe stream.ac4` needs no extra flag, and works on `-` (stdin) the
 same way. It reads the sync frame, table of contents, presentation and substream-group framing —
 channel-coded, A-JOC-coded, direct-coded-object and OAMD substream groups alike — and has every
-frame read by the decoder (`iclforge::ac4dec`) without decoding its audio, for what only the
+frame read by the decoder (`iclforge::ac4`) without decoding its audio, for what only the
 substreams carry: each presentation as the decoder sees it, and the metadata of the one it would
 decode. There is no `detail=frames`/`detail=blocks` equivalent (see
 [Verification](../../verification.md#ac-4) for what the inspector's reading does and does not
 cover, including the narrower evidence behind the A-JOC/object/OAMD path).
 
 ```bash
-forge probe tests/golden/external-baseline/ac4-51-film-96/dee.ac4
+forge probe testdata/external-baseline/ac4-51-film-96/dee.ac4
 ```
 
 That is a stream DEE encoded, committed with the tests:
 
 ```text
-file            tests/golden/external-baseline/ac4-51-film-96/dee.ac4
+file            testdata/external-baseline/ac4-51-film-96/dee.ac4
 codec           AC-4
 access units    120 (120 sync frame(s)), 62160 bytes
 CRC             120 of 120 valid
@@ -1205,7 +1205,7 @@ An AC-4 source becomes one programme: the presentation `presentation=`, `present
 chooses one, its substreams mixed at `dialogue-gain=` and `associated-gain=`. It is decoded as
 coded, with no output level and so no DRC, because ETSI TS 103 190-1 clause 5.7.9.4 asks a
 transcoder to apply none and to hand the AC-3 or E-AC-3 encoder the DRC profile the stream names
-for it instead (`drc_eac3_profile`; `src/ac4dec/ERRATA.md` records why that is the field the
+for it instead (`drc_eac3_profile`; `libs/ac4/ERRATA.md` records why that is the field the
 clause means). What carries:
 
 - **`dialnorm`**, to the dB: AC-4 sends it in steps of 0.25 dB, AC-3 and E-AC-3 in whole dB, so
@@ -1322,8 +1322,8 @@ descriptor that quietly says the wrong thing.
 forge ts commentary.ac3 commentary.ts atsc asvc=0,2
 ```
 
-Reading a `.ts` back out (`iclforge::mpegts::demux`/`Reader`) decodes the same descriptor into
-`ReadStream::service` — see [muxing-and-sinks.md](../../library/muxing-and-sinks.md#demuxing-iclforgempegtsdemux-iclforgempegtsreader)
+Reading a `.ts` back out (`iclforge::containers::mpegts::demux`/`Reader`) decodes the same descriptor into
+`ReadStream::service` — see [muxing-and-sinks.md](../../library/muxing-and-sinks.md#demuxing-iclforgecontainersmpegtsdemux-iclforgecontainersmpegtsreader)
 for what does and does not survive the round trip.
 
 ### Live & hardware
@@ -1428,7 +1428,7 @@ yet addressing some of its objects therefore degrades gracefully: those objects 
 audible, never silent, never snapped to room centre.
 
 Status lines at session start and end report what actually happened (the text is in
-`apps/cli/commands/live_audio.cpp`, searchable as `"positions:"`):
+`apps/forge/cli/src/commands/live_audio.cpp`, searchable as `"positions:"`):
 
 ```text
 positions: OSC on 127.0.0.1:9000, objects 0-3 (/object/<n>/xyz|gain|lfe|release)
@@ -1505,8 +1505,8 @@ of folding the objects into a bed first. On Windows that renderer is
 `ISpatialAudioObjectRenderStream`, reached through `iclforge::audio::SpatialObjectSink`; no other
 backend in the tree implements one, so on Linux, macOS and Android the command is listed and
 reports itself unavailable — the same treatment the capture and passthrough commands get where
-their backends are missing (`Needs::kSpatial` in `apps/cli/main.cpp`, answered by
-`src/audio/src/backend/<os>/audio_backend.cpp`).
+their backends are missing (`Needs::kSpatial` in `apps/forge/cli/src/main.cpp`, answered by
+`libs/audio/src/backend/<os>/audio_backend.cpp`).
 
 ```bash
 forge spatial programme.ec3       # the default endpoint
@@ -1526,7 +1526,7 @@ Every dynamic object goes out at its own position, converted from TS 103 420 §4
 room-anchored cube to the renderer's listener-relative metres; the bed's LFE goes out as a static
 object, which is the only shape it can take (§6.3.2.2 never makes the LFE a JOC output, so it is
 only ever a coded channel). The axis correspondence is exact. The metre scale is not: OAMD's cube
-carries no absolute size, so the room half-extents in `apps/cli/commands/live_audio.cpp` — 2 m to
+carries no absolute size, so the room half-extents in `apps/forge/cli/src/commands/live_audio.cpp` — 2 m to
 each side wall, 2 m front and back, 1 m to ceiling and floor — are a plausible small room rather
 than a measured one. Moving an object moves it in the right direction by the right proportion, at
 an approximate absolute distance. The session prints its object count and endpoint at the start,

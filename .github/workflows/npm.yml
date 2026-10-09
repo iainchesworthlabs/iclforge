@@ -1,12 +1,12 @@
-# iclforge-wasm-decoder, the browser streaming decoder package (WASM streaming decoder package, js/) - separate
+# iclforge-wasm-decoder, the browser streaming decoder package (WASM streaming decoder package, bindings/js/) - separate
 # from _build.yml/ci.yml's C++ matrix and from build-wasm's Emscripten build, neither of which
-# this needs: js/'s own build (tsc) and test suite (node:test - the fMP4 box walker against a
+# this needs: bindings/js/'s own build (tsc) and test suite (node:test - the fMP4 box walker against a
 # committed fixture, the ring buffer, the MediaSource shim) are pure TypeScript/JavaScript with
-# no WASM binary dependency. build-wasm (in _build.yml) is the leg that builds js/ ALONGSIDE the
+# no WASM binary dependency. build-wasm (in _build.yml) is the leg that builds bindings/js/ ALONGSIDE the
 # actual Emscripten output and exercises the whole demo end-to-end in a browser; this workflow
 # only needs to know that the package itself builds and its own unit tests pass.
 #
-# The build job runs continuously (every push/PR touching js/**, called from ci.yml's `npm` lane
+# The build job runs continuously (every push/PR touching bindings/js/**, called from ci.yml's `npm` lane
 # since the CI lane partitions split - docs/ci-lanes.md) and always packs the tarball as an
 # artifact - "buildable and testable" is checked the same way wheels.yml's own build job checks
 # the Python side continuously. Publishing to npm is a second job, gated on a v* tag push - see
@@ -22,7 +22,7 @@ on:
   # the only direct trigger left and why it cannot overlap with ci.yml's call.
   push:
     paths:
-      - "js/**"
+      - "bindings/js/**"
       - ".github/workflows/npm.yml"
     tags:
       - "v*"
@@ -51,10 +51,10 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: js/package-lock.json
+          cache-dependency-path: bindings/js/package-lock.json
 
       - name: Install, build, test
-        working-directory: js
+        working-directory: bindings/js
         run: |
           set -euo pipefail
           npm ci
@@ -65,13 +65,13 @@ jobs:
       # `npm pack` runs the same "files" allowlist `npm publish` would, catching an accidentally-
       # missing dist/ entry before it ever reaches a real publish.
       - name: Pack
-        working-directory: js
+        working-directory: bindings/js
         run: npm pack
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: npm-package
-          path: js/*.tgz
+          path: bindings/js/*.tgz
           if-no-files-found: error
 
   # Publishes via npm trusted publishing (OIDC) against the `npm` GitHub environment - neither is
@@ -108,7 +108,7 @@ jobs:
         run: npm install -g npm@latest
 
       - name: Install
-        working-directory: js
+        working-directory: bindings/js
         run: npm ci
 
       # After npm ci, not before: package-lock.json still says 0.0.0-dev at
@@ -116,13 +116,13 @@ jobs:
       # bumping the version first risks npm ci rejecting the now-mismatched
       # lockfile.
       - name: Stamp the release version
-        working-directory: js
+        working-directory: bindings/js
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
 
       - name: Build
-        working-directory: js
+        working-directory: bindings/js
         run: npm run build
 
       - name: Publish to npm
-        working-directory: js
+        working-directory: bindings/js
         run: npm publish

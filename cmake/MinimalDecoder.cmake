@@ -2,7 +2,7 @@
 # MinimalDecoder.cmake
 #
 # The minimum-footprint decoder profile. ICLFORGE_MINIMAL_DECODER
-# turns src/ac3 into a single decode-only static library
+# turns libs/ac3 into a single decode-only static library
 # (iclforge::ac3_minimal) built for a target that has a few hundred kilobytes of
 # RAM and no operating system - a set-top box, a receiver, a DSP port.
 #
@@ -13,9 +13,9 @@
 #     it is reachable from a decode; leaving it out of the archive is the
 #     largest single code-size win and needs no cleverness.
 #
-#   - No direct-form transform tables. src/ac3/src/core/transform/stub/ is
+#   - No direct-form transform tables. libs/ac3/src/core/transform/stub/ is
 #     compiled in place of .../reference/, removing 1,900,544 bytes of .bss -
-#     see src/ac3/src/core/reference_transform.hpp for the per-table
+#     see libs/ac3/src/core/reference_transform.hpp for the per-table
 #     measurements. This is the one change with a visible behavioural
 #     consequence: DecoderConfig::fast_imdct == false is refused
 #     (DecodeError::kNoReferenceTransform) rather than silently served by the fast path.

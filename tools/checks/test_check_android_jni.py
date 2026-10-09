@@ -54,15 +54,15 @@ class Fixture(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.root = Path(self._tmp.name)
         self.addCleanup(self._tmp.cleanup)
-        self.put("apps/android/app/build.gradle.kts", GRADLE)
-        self.put("apps/android/app/src/main/java/com/example/shield/NativeBridge.kt", BRIDGE)
+        self.put("apps/demos/android/app/build.gradle.kts", GRADLE)
+        self.put("apps/demos/android/app/src/main/java/com/example/shield/NativeBridge.kt", BRIDGE)
         self.put(
-            "apps/android/app/src/main/java/com/example/shield/Main.kt",
+            "apps/demos/android/app/src/main/java/com/example/shield/Main.kt",
             "package com.example.shield\n\nclass Main\n",
         )
-        self.put("apps/android/app/src/main/cpp/jni.cpp", NATIVE)
-        self.put("apps/android/app/src/main/cpp/CMakeLists.txt", CMAKE)
-        self.put("apps/android/app/proguard-rules.pro", PROGUARD)
+        self.put("apps/demos/android/app/src/main/cpp/jni.cpp", NATIVE)
+        self.put("apps/demos/android/app/src/main/cpp/CMakeLists.txt", CMAKE)
+        self.put("apps/demos/android/app/proguard-rules.pro", PROGUARD)
 
     def put(self, rel: str, text: str) -> None:
         path = self.root / rel
@@ -88,7 +88,7 @@ class Agreement(Fixture):
 class Package(Fixture):
     def test_an_application_id_that_is_not_the_namespace(self) -> None:
         self.put(
-            "apps/android/app/build.gradle.kts",
+            "apps/demos/android/app/build.gradle.kts",
             GRADLE.replace(
                 'applicationId = "com.example.shield"', 'applicationId = "com.other.shield"'
             ),
@@ -97,14 +97,14 @@ class Package(Fixture):
 
     def test_a_source_in_the_old_package(self) -> None:
         self.put(
-            "apps/android/app/src/main/java/com/example/shield/Main.kt",
+            "apps/demos/android/app/src/main/java/com/example/shield/Main.kt",
             "package com.old.shield\n\nclass Main\n",
         )
         self.assertTrue(any('declares package "com.old.shield"' in m for m in self.messages()))
 
     def test_a_source_in_the_wrong_directory(self) -> None:
         self.put(
-            "apps/android/app/src/main/java/com/old/shield/Late.kt",
+            "apps/demos/android/app/src/main/java/com/old/shield/Late.kt",
             "package com.example.shield\n\nclass Late\n",
         )
         self.assertTrue(
@@ -113,7 +113,7 @@ class Package(Fixture):
 
     def test_the_instrumented_tests_are_held_to_the_same_package(self) -> None:
         self.put(
-            "apps/android/app/src/androidTest/java/com/old/shield/T.kt",
+            "apps/demos/android/app/src/androidTest/java/com/old/shield/T.kt",
             "package com.old.shield\n\nclass T\n",
         )
         self.assertTrue(any("declares package" in m for m in self.messages()))
@@ -122,7 +122,7 @@ class Package(Fixture):
 class Native(Fixture):
     def test_an_external_function_with_no_definition(self) -> None:
         self.put(
-            "apps/android/app/src/main/cpp/jni.cpp",
+            "apps/demos/android/app/src/main/cpp/jni.cpp",
             NATIVE.replace("nativeSetScene", "nativeSetSceneX"),
         )
         found = self.messages()
@@ -133,7 +133,7 @@ class Native(Fixture):
 
     def test_a_definition_in_the_old_package(self) -> None:
         self.put(
-            "apps/android/app/src/main/cpp/jni.cpp",
+            "apps/demos/android/app/src/main/cpp/jni.cpp",
             NATIVE.replace("Java_com_example_shield", "Java_com_old_shield", 1),
         )
         found = self.messages()
@@ -144,18 +144,18 @@ class Native(Fixture):
 
     def test_a_comment_that_names_a_function_is_not_a_definition(self) -> None:
         self.put(
-            "apps/android/app/src/main/cpp/jni.cpp",
+            "apps/demos/android/app/src/main/cpp/jni.cpp",
             NATIVE + "// Java_com_old_shield_NativeBridge_gone(JNIEnv*) was here\n",
         )
         self.assertEqual(self.messages(), [])
 
     def test_a_definition_outside_the_app_directory_counts(self) -> None:
         self.put(
-            "apps/android/app/src/main/cpp/jni.cpp",
+            "apps/demos/android/app/src/main/cpp/jni.cpp",
             NATIVE.replace("nativeVersion", "nativeVersionGone"),
         )
         self.put(
-            "src/audio/src/backend/android/passthrough.cpp",
+            "libs/audio/src/backend/android/passthrough.cpp",
             'extern "C" void Java_com_example_shield_NativeBridge_nativeVersion(JNIEnv*, jclass)'
             " {}\n",
         )
@@ -168,7 +168,7 @@ class Native(Fixture):
 class Library(Fixture):
     def test_a_library_the_build_does_not_make(self) -> None:
         self.put(
-            "apps/android/app/src/main/cpp/CMakeLists.txt",
+            "apps/demos/android/app/src/main/cpp/CMakeLists.txt",
             CMAKE.replace("example_jni SHARED", "other_jni SHARED"),
         )
         self.assertTrue(any('loads library "example_jni"' in m for m in self.messages()))
@@ -177,28 +177,28 @@ class Library(Fixture):
 class ClassPaths(Fixture):
     def test_find_class_of_a_class_that_exists(self) -> None:
         self.put(
-            "apps/android/app/src/main/cpp/jni.cpp",
+            "apps/demos/android/app/src/main/cpp/jni.cpp",
             NATIVE + 'auto c = env->FindClass("com/example/shield/Main");\n',
         )
         self.assertEqual(self.messages(), [])
 
     def test_find_class_of_a_class_that_does_not(self) -> None:
         self.put(
-            "apps/android/app/src/main/cpp/jni.cpp",
+            "apps/demos/android/app/src/main/cpp/jni.cpp",
             NATIVE + 'auto c = env->FindClass("com/example/shield/Missing");\n',
         )
         self.assertTrue(any("names no class of the Kotlin sources" in m for m in self.messages()))
 
     def test_find_class_in_the_old_package(self) -> None:
         self.put(
-            "apps/android/app/src/main/cpp/jni.cpp",
+            "apps/demos/android/app/src/main/cpp/jni.cpp",
             NATIVE + 'auto c = env->FindClass("com/ac3forge/shield/Main");\n',
         )
         self.assertTrue(any("is not in package com.example.shield" in m for m in self.messages()))
 
     def test_a_proguard_rule_for_a_class_that_does_not_exist(self) -> None:
         self.put(
-            "apps/android/app/proguard-rules.pro",
+            "apps/demos/android/app/proguard-rules.pro",
             PROGUARD + "-keep class com.example.shield.Missing { *; }\n",
         )
         self.assertTrue(
@@ -210,7 +210,7 @@ class ClassPaths(Fixture):
 
     def test_a_proguard_rule_for_the_old_package(self) -> None:
         self.put(
-            "apps/android/app/proguard-rules.pro",
+            "apps/demos/android/app/proguard-rules.pro",
             PROGUARD + "-keep class com.ac3forge.shield.Main { *; }\n",
         )
         self.assertTrue(any("is not in package com.example.shield" in m for m in self.messages()))
@@ -220,7 +220,7 @@ class TheTree(unittest.TestCase):
     def test_the_repository_agrees(self) -> None:
         root = Path(__file__).resolve().parents[2]
         if not (root / C.APP).is_dir():
-            self.skipTest("no apps/android in this tree")
+            self.skipTest("no apps/demos/android in this tree")
         self.assertEqual([str(p) for p in C.check(root)], [])
 
 

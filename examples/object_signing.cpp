@@ -1,6 +1,6 @@
 // Sign an Atmos stream's EMDF object container.
 //
-// iclforge::signing computes the keyed EMDF-protection tag a licensed decoder
+// iclforge::ac3::signing computes the keyed EMDF-protection tag a licensed decoder
 // checks before it will decode a stream's OAMD/JOC container - see
 // docs/concepts/object-signing.md. The key is always the operator's own to
 // provision at runtime (an environment variable or a signing-key=<path> file
@@ -18,8 +18,8 @@
 
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
-#include "iclforge/signing/emdf_atmos_signer.hpp"
-#include "iclforge/signing/signing_key.hpp"
+#include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
+#include "iclforge/base/crypto/signing_key.hpp"
 
 namespace {
 
@@ -46,7 +46,7 @@ int main() {
     for (const auto& source : sources) {
         views.emplace_back(source);
     }
-    const std::array<iclforge::oba::ObjectPlacement, kObjects> placement{{
+    const std::array<iclforge::objects::oba::ObjectPlacement, kObjects> placement{{
         {.position = {.x = 0.3, .y = 0.5, .z = 0.0}, .gain = 0.8},
         {.position = {.x = 0.7, .y = 0.5, .z = 0.0}, .gain = 0.8},
     }};
@@ -61,8 +61,8 @@ int main() {
         stream.insert(stream.end(), unit->bytes.begin(), unit->bytes.end());
     }
 
-    const iclforge::signing::SigningKey key{as_bytes("ac3forge-example-key-DO-NOT-USE")};
-    const int signed_count = iclforge::signing::sign_atmos_stream(stream, key);
+    const iclforge::base::crypto::SigningKey key{as_bytes("ac3forge-example-key-DO-NOT-USE")};
+    const int signed_count = iclforge::ac3::signing::sign_atmos_stream(stream, key);
 
     fmt::printf("signed %d of %d frames (%zu bytes)\n", signed_count, kFrames, stream.size());
     return signed_count == kFrames ? 0 : 1;

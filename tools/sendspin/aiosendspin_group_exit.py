@@ -6,9 +6,10 @@ reference Python player plays one programme" - read against A4's own exit and Ve
 doc), which always means a real aiosendspin process by that phrase, never a second in-process test
 double (aiosendspin_exit.py's own docstring is the A4 case this mirrors).
 
-Starts the scripted player in aiosendspin_player.py on a loopback port, runs iclforge-tests's hidden
-[aiosendspin-group] case (tests/hearth/test_aiosendspin_group.cpp) with the player's URL, token and
-a directory, and checks what the player took against programme.wav, the case's own local decode and
+Starts the scripted player in aiosendspin_player.py on a loopback port, runs iclforge-hearth-tests's
+hidden [aiosendspin-group] case (apps/hearth/engine/tests/test_aiosendspin_group.cpp) with the
+player's URL, token and a directory, and checks what the player took against programme.wav, the
+case's own local decode and
 render of the programme, carried through the same full-scale-to-16-bit rescale
 NetworkGroupSink::submit_pcm() and Group::rescaled() apply before a PCM member's encoder ever sees a
 sample (that file's own header comment has the detail) - one PCM stream, ended, decoding sample for
@@ -103,7 +104,7 @@ async def exercise(iclforge_tests: Path, directory: Path) -> list[str]:
         process.kill()
         await process.wait()
         await player.stop()
-        return ["iclforge-tests did not finish within 240 s"]
+        return ["iclforge-hearth-tests did not finish within 240 s"]
     with contextlib.suppress(TimeoutError):
         await asyncio.wait_for(player.closed.wait(), timeout=10)
     await player.stop()
@@ -128,7 +129,7 @@ async def run(iclforge_tests: Path, out: Path) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
-        "--iclforge-tests", required=True, type=Path, help="the iclforge-tests binary"
+        "--iclforge-tests", required=True, type=Path, help="the iclforge-hearth-tests binary"
     )
     parser.add_argument(
         "--out", type=Path, help="where the run's files go; a temporary directory otherwise"

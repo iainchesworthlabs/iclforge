@@ -95,7 +95,7 @@ class Corpus(unittest.TestCase):
         rc, out = self.run_main()
         self.assertEqual(rc, 1)
         self.assertIn("tone.wav: named in the manifest but not in the tree", out)
-        self.assertIn("renamed.wav: present in tests/golden/audio/ but not in the corpus", out)
+        self.assertIn("renamed.wav: present in testdata/audio/ but not in the corpus", out)
 
     def test_structural_mismatches_are_named(self):
         self.entries[1].update(channels=6, sample_rate=44100, bits=24, duration_s=3.0)

@@ -7,9 +7,9 @@ from Kotlin throws UnsatisfiedLinkError at run time. The package has been rename
 com.ac3forge.shield to com.iclforge.shield), and the Java_... names of about forty native functions
 are that package written into the C++. This reads the files and checks, without a device:
 
-  (a) apps/android/app/build.gradle.kts gives one name to `namespace` and to `applicationId`, every
-      Kotlin source of the app's main and androidTest source sets declares that package, and sits
-      in the directory the package names;
+  (a) apps/demos/android/app/build.gradle.kts gives one name to `namespace` and to
+      `applicationId`, every Kotlin source of the app's main and androidTest source sets declares
+      that package, and sits in the directory the package names;
   (b) every `external fun` of a Kotlin class has a native definition whose name is the mangled
       package, class and function (Java_com_iclforge_shield_NativeBridge_nativeGetScene), and every
       native definition of that class has an `external fun`: a function on one side only is the
@@ -32,8 +32,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-APP = "apps/android/app"
-NATIVE_DIRS = ("apps/android/app/src/main/cpp", "src/audio/src/backend/android")
+APP = "apps/demos/android/app"
+NATIVE_DIRS = ("apps/demos/android/app/src/main/cpp", "libs/audio/src/backend/android")
 # the app's Gradle source sets, under <app>/src: their Kotlin and the native code of `main`
 SOURCE_SETS = ("main", "androidTest")
 KOTLIN_DIRS = tuple("/".join(("src", name, "java")) for name in SOURCE_SETS)

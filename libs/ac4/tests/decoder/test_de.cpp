@@ -1,0 +1,528 @@
+// Dialogue enhancement (libs/ac4/src/decoder/pcm/de.hpp, ETSI TS 103 190-1 V1.4.1
+// clause 5.7.8): Tables 209, 210 and 172 and the rendering vector; at 0 dB the
+// tool leaves the matrices as bypassing it would; at its cap it applies the
+// gains its parameters give to 0.01 dB, measured on known input, in each
+// method; the matrices interpolate from frame to frame; and through
+// iclforge::ac4::Decoder, DEE's parameters leave the output alone at 0 dB and raise it
+// at the cap.
+
+#include <array>
+#include <cmath>
+#include <complex>
+#include <cstddef>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <limits>
+#include <random>
+#include <span>
+#include <string>
+#include <vector>
+
+#include <catch2/catch_test_macros.hpp>
+
+#include "units.hpp"
+
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "decoder/pcm/de.hpp"
+
+namespace {
+
+namespace detail = iclforge::ac4::detail;
+using QmfMatrix = detail::QmfMatrix;
+using QmfValue = detail::QmfValue;
+using Real = detail::Real;
+
+constexpr int kSlots = 32;
+constexpr std::size_t kValues = kSlots * 64;
+// Table 173's first subband of each band, and one past the last.
+constexpr std::array<int, 9> kBandStart = {0, 1, 2, 4, 7, 11, 17, 27, 41};
+
+// A ratio or difference of a handful of QMF values (Real, possibly float)
+// holds this closely to the matrix Pseudocode 111 and this file's own hand
+// worked sums print; double-only comparisons (de_parameter, de_rendering,
+// both fixed at double regardless of the decoder's scalar) keep 1e-12.
+const double kTolerance = 1e4 * ac4_units::relative_epsilon();
+
+int band_of(int subband) {
+    for (int band = 0; band < 8; ++band) {
+        if (subband < kBandStart[static_cast<std::size_t>(band + 1)]) {
+            return band;
+        }
+    }
+    return -1;
+}
+
+std::vector<QmfValue> random_matrix(unsigned seed) {
+    std::mt19937 rng(seed);
+    std::normal_distribution<double> normal;
+    std::vector<QmfValue> m(kValues);
+    for (QmfValue& v : m) {
+        v = QmfValue(static_cast<iclforge::ac4::detail::Real>(normal(rng)),
+                    static_cast<iclforge::ac4::detail::Real>(normal(rng)));
+    }
+    return m;
+}
+
+// 5.1's speakers, in the decoder's order.
+constexpr std::array<iclforge::ac4::Speaker, 6> kFiveOne = {
+    iclforge::ac4::Speaker::kLeft,         iclforge::ac4::Speaker::kRight,
+    iclforge::ac4::Speaker::kCentre,       iclforge::ac4::Speaker::kLfe,
+    iclforge::ac4::Speaker::kLeftSurround, iclforge::ac4::Speaker::kRightSurround};
+
+// A frame of channel-independent parameters: a value per channel and band.
+detail::DeFrameValues channel_independent(std::array<bool, 3> processed, double max_gain) {
+    detail::DeFrameValues values;
+    values.active = true;
+    values.method = 0;
+    values.max_gain_db = max_gain;
+    values.processed = processed;
+    for (std::size_t i = 0; i < 3; ++i) {
+        for (std::size_t band = 0; band < 8; ++band) {
+            values.p[i][band] =
+                0.25 + 0.1 * static_cast<double>(band) + 0.3 * static_cast<double>(i);
+        }
+    }
+    return values;
+}
+
+struct Channels {
+    std::vector<std::vector<QmfValue>> data;
+    std::vector<QmfMatrix> pointers;
+
+    explicit Channels(std::size_t count, unsigned seed) : data(count) {
+        for (std::size_t c = 0; c < count; ++c) {
+            data[c] = random_matrix(seed + static_cast<unsigned>(c));
+            pointers.push_back(data[c]);
+        }
+    }
+    // `pointers` views `data`: a copy would view this one's.
+    Channels(const Channels&) = delete;
+    Channels& operator=(const Channels&) = delete;
+};
+
+std::vector<std::byte> read_stream(const std::string& leg) {
+    const std::filesystem::path path =
+        std::filesystem::path{ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR} / leg / "dee.ac4";
+    std::ifstream in(path, std::ios::binary);
+    const std::vector<char> raw((std::istreambuf_iterator<char>(in)),
+                                std::istreambuf_iterator<char>());
+    std::vector<std::byte> bytes(raw.size());
+    for (std::size_t i = 0; i < raw.size(); ++i) {
+        bytes[i] = static_cast<std::byte>(raw[i]);
+    }
+    return bytes;
+}
+
+std::vector<std::vector<float>> decode_all(std::span<const std::byte> stream,
+                                           double enhancement_db) {
+    const iclforge::ac4::ScanResult scan = iclforge::ac4::scan(stream);
+    REQUIRE_FALSE(scan.frames.empty());
+    iclforge::ac4::DecoderConfig config;
+    config.output.dialogue_enhancement_db = enhancement_db;
+    iclforge::ac4::Decoder decoder(config);
+    std::vector<std::vector<float>> out;
+    for (const iclforge::ac4::SyncFrame& frame : scan.frames) {
+        const auto decoded = decoder.decode(frame.raw_ac4_frame);
+        INFO(decoder.refusal_reason());
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->has_value());
+        const iclforge::ac4::DecodedFrame& pcm = **decoded;
+        out.resize(pcm.channels.size());
+        for (std::size_t c = 0; c < pcm.channels.size(); ++c) {
+            out[c].insert(out[c].end(), pcm.channels[c].begin(), pcm.channels[c].end());
+        }
+    }
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("Tables 209, 210 and 172 dequantise dialogue enhancement's parameters",
+          "[ac4][decoder][de]") {
+    CHECK(detail::de_parameter(0, false) == 0.0);
+    CHECK(std::abs(detail::de_parameter(10, false) - 1.0) < 1e-12);
+    CHECK(std::abs(detail::de_parameter(15, false) - 1.5) < 1e-12);
+    CHECK(detail::de_parameter(16, false) == 1.75);
+    CHECK(detail::de_parameter(17, false) == 2.0);
+    CHECK(detail::de_parameter(18, false) == 2.5);
+    CHECK(detail::de_parameter(31, false) == 9.0);
+    CHECK(std::abs(detail::de_parameter(-30, true) + 3.0) < 1e-12);
+    CHECK(std::abs(detail::de_parameter(-1, true) + 0.1) < 1e-12);
+    CHECK(std::abs(detail::de_parameter(30, true) - 3.0) < 1e-12);
+    CHECK(detail::de_mix_coefficient(0) == 0.0);
+    CHECK(detail::de_mix_coefficient(16) == 0.7071);
+    CHECK(detail::de_mix_coefficient(31) == 1.0);
+    // Clause 5.7.8.5: the last coefficient keeps the vector's energy.
+    const auto two = detail::de_rendering(2, 0.6, 0.0);
+    CHECK(std::abs(two[0] * two[0] + two[1] * two[1] - 1.0) < 1e-12);
+    const auto three = detail::de_rendering(3, 0.6, 0.5);
+    CHECK(std::abs(three[0] * three[0] + three[1] * three[1] + three[2] * three[2] - 1.0) < 1e-12);
+    CHECK(detail::de_rendering(3, 0.9, 0.9)[2] == 0.0);
+    CHECK(detail::de_rendering(1, 0.3, 0.3)[0] == 1.0);
+}
+
+TEST_CASE("dialogue enhancement at 0 dB leaves the matrices as the tool bypassed would",
+          "[ac4][decoder][de]") {
+    detail::DeStage stage;
+    stage.configure(kSlots, kFiveOne);
+    const detail::DeFrameValues values = channel_independent({true, true, true}, 9.0);
+    for (unsigned frame = 0; frame < 4; ++frame) {
+        Channels channels(kFiveOne.size(), 100 + 10 * frame);
+        const auto before = channels.data;
+        CHECK_FALSE(stage.active(0.0, values));
+        stage.process(0.0, values, channels.pointers);
+        CHECK(channels.data == before);
+    }
+}
+
+TEST_CASE("at its cap, dialogue enhancement applies the gains its parameters give, to 0.01 dB",
+          "[ac4][decoder][de]") {
+    detail::DeStage stage;
+    stage.configure(kSlots, kFiveOne);
+    // L and C, capped at 9 dB and asked for 12: g = 10^(9/20) - 1.
+    const detail::DeFrameValues values = channel_independent({true, false, true}, 9.0);
+    const double g = std::pow(10.0, 9.0 / 20.0) - 1.0;
+    // The first frame fades in from the identity; the second holds.
+    Channels first(kFiveOne.size(), 7);
+    stage.process(12.0, values, first.pointers);
+    Channels channels(kFiveOne.size(), 11);
+    const auto before = channels.data;
+    stage.process(12.0, values, channels.pointers);
+    for (std::size_t c = 0; c < kFiveOne.size(); ++c) {
+        for (int slot = 0; slot < kSlots; ++slot) {
+            for (int k = 0; k < 64; ++k) {
+                const std::size_t at = static_cast<std::size_t>(slot * 64 + k);
+                const int band = band_of(k);
+                double expected = 1.0;
+                if (band >= 0 && c == 0) {
+                    expected = 1.0 + g * values.p[0][static_cast<std::size_t>(band)];
+                } else if (band >= 0 && c == 2) {
+                    expected = 1.0 + g * values.p[1][static_cast<std::size_t>(band)];
+                }
+                const auto got =
+                    static_cast<double>(abs(channels.data[c][at]) / abs(before[c][at]));
+                if (std::abs(20.0 * std::log10(got / expected)) >= 0.01) {
+                    FAIL("channel " << c << " slot " << slot << " subband " << k << ": " << got
+                                    << ", expected " << expected);
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("with de_ms_proc_flag, dialogue enhancement raises the Mid and leaves the Side",
+          "[ac4][decoder][de]") {
+    const std::array<iclforge::ac4::Speaker, 2> stereo = {iclforge::ac4::Speaker::kLeft,
+                                                          iclforge::ac4::Speaker::kRight};
+    detail::DeStage stage;
+    stage.configure(kSlots, stereo);
+    detail::DeFrameValues values = channel_independent({true, true, false}, 6.0);
+    values.ms = true;
+    const double g = std::pow(10.0, 6.0 / 20.0) - 1.0;
+    for (int pass = 0; pass < 2; ++pass) {
+        // Mid in the first half of the subbands, Side in the second.
+        std::vector<QmfValue> left(kValues);
+        std::vector<QmfValue> right(kValues);
+        for (std::size_t i = 0; i < kValues; ++i) {
+            const bool mid = i % 64 < 32;
+            left[i] = {Real{1}, Real{0.5}};
+            right[i] = mid ? left[i] : -left[i];
+        }
+        std::array<QmfMatrix, 2> matrices = {left, right};
+        stage.process(6.0, values, matrices);
+        if (pass == 0) {
+            continue;  // the fade in
+        }
+        for (std::size_t i = 0; i < kValues; ++i) {
+            const int k = static_cast<int>(i % 64);
+            const int band = band_of(k);
+            const double expected =
+                (k < 32 && band >= 0) ? 1.0 + g * values.p[0][static_cast<std::size_t>(band)] : 1.0;
+            CHECK(std::abs(static_cast<double>(abs(left[i]) / abs(QmfValue{Real{1}, Real{0.5}})) - expected) <
+                  kTolerance);
+            CHECK(std::abs(static_cast<double>(abs(right[i]) / abs(QmfValue{Real{1}, Real{0.5}})) -
+                           expected) < kTolerance);
+        }
+    }
+}
+
+TEST_CASE("cross-channel dialogue enhancement adds g r p^T m to the processed channels",
+          "[ac4][decoder][de]") {
+    detail::DeStage stage;
+    stage.configure(kSlots, kFiveOne);
+    detail::DeFrameValues values;
+    values.active = true;
+    values.method = 1;
+    values.max_gain_db = 12.0;
+    values.processed = {true, true, true};
+    values.r = detail::de_rendering(3, 0.6, 0.5);
+    for (std::size_t band = 0; band < 8; ++band) {
+        values.p[0][band] = 0.3;
+        values.p[1][band] = -0.2;
+        values.p[2][band] = 0.1 * static_cast<double>(band);
+    }
+    const auto g = static_cast<iclforge::ac4::detail::Real>(std::pow(10.0, 12.0 / 20.0) - 1.0);
+    Channels first(kFiveOne.size(), 3);
+    stage.process(12.0, values, first.pointers);
+    Channels channels(kFiveOne.size(), 5);
+    const auto m = channels.data;
+    stage.process(12.0, values, channels.pointers);
+    // L, R and C are the decoder's channels 0, 1 and 2.
+    for (std::size_t at = 0; at < kValues; ++at) {
+        const int band = band_of(static_cast<int>(at % 64));
+        for (std::size_t i = 0; i < 3; ++i) {
+            QmfValue expected = m[i][at];
+            if (band >= 0) {
+                QmfValue dialogue{};
+                for (std::size_t j = 0; j < 3; ++j) {
+                    const auto p = static_cast<iclforge::ac4::detail::Real>(values.p[j][static_cast<std::size_t>(band)]);
+                    dialogue += p * m[j][at];
+                }
+                expected += g * static_cast<iclforge::ac4::detail::Real>(values.r[i]) * dialogue;
+            }
+            CHECK(std::abs(static_cast<double>(abs(channels.data[i][at] - expected))) <
+                  1e4 * ac4_units::relative_epsilon());
+        }
+        // The LFE and the surrounds take no part.
+        CHECK(channels.data[3][at] == m[3][at]);
+        CHECK(channels.data[5][at] == m[5][at]);
+    }
+}
+
+TEST_CASE("dialogue enhancement moves from one frame's matrix to the next slot by slot",
+          "[ac4][decoder][de]") {
+    const std::array<iclforge::ac4::Speaker, 1> mono = {iclforge::ac4::Speaker::kCentre};
+    detail::DeStage stage;
+    stage.configure(kSlots, mono);
+    const detail::DeFrameValues values = channel_independent({false, false, true}, 12.0);
+    const double g = std::pow(10.0, 12.0 / 20.0) - 1.0;
+    std::vector<QmfValue> centre(kValues, QmfValue{Real{1}, Real{0}});
+    std::array<QmfMatrix, 1> matrices = {centre};
+    // From the identity: slot n takes (n + 1/2) / 32 of this frame's matrix.
+    stage.process(12.0, values, matrices);
+    for (int slot = 0; slot < kSlots; ++slot) {
+        const double w = (slot + 0.5) / kSlots;
+        const double expected = 1.0 + w * g * values.p[0][3];
+        CHECK(std::abs(static_cast<double>(centre[static_cast<std::size_t>(slot * 64 + 5)].real()) -
+                       expected) < kTolerance);  // band 3
+    }
+}
+
+TEST_CASE("DEE's dialogue enhancement leaves the output alone at 0 dB and raises it at its cap",
+          "[ac4][decoder][de]") {
+    // Speech: DEE sends channel-independent parameters for the pair it
+    // detects dialogue in, capped at 9 dB.
+    const std::vector<std::byte> stream = read_stream("ac4-20-speech-128");
+    const auto plain = decode_all(stream, 0.0);
+    iclforge::ac4::Decoder bypassed;
+    const auto enhanced = decode_all(stream, 9.0);
+    REQUIRE(enhanced.size() == plain.size());
+    // At 0 dB the output is the default decode's, sample for sample.
+    const iclforge::ac4::ScanResult scan = iclforge::ac4::scan(stream);
+    std::vector<float> reference;
+    for (const iclforge::ac4::SyncFrame& frame : scan.frames) {
+        const auto decoded = bypassed.decode(frame.raw_ac4_frame);
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->has_value());
+        reference.insert(reference.end(), (**decoded).channels[0].begin(),
+                         (**decoded).channels[0].end());
+    }
+    CHECK(plain[0] == reference);
+    // At the cap the speech comes out louder.
+    const auto energy = [](const std::vector<float>& x) {
+        double sum = 0.0;
+        for (const float v : x) {
+            sum += static_cast<double>(v) * static_cast<double>(v);
+        }
+        return sum;
+    };
+    CHECK(10.0 * std::log10(energy(enhanced[0]) / energy(plain[0])) > 1.0);
+}
+
+// --- 9.X.4: Table 15's channels and the core tools of clauses 5.8.2.1 and 5.8.2.2 ------------
+
+namespace {
+
+constexpr std::array<iclforge::ac4::Speaker, 5> kScreenFront = {
+    iclforge::ac4::Speaker::kLeft, iclforge::ac4::Speaker::kRight, iclforge::ac4::Speaker::kCentre,
+    iclforge::ac4::Speaker::kLeftScreen, iclforge::ac4::Speaker::kRightScreen};
+
+detail::DeCoreCoefficients core_coefficients(double c_left, double c_right, int bands = 15) {
+    detail::DeCoreCoefficients out;
+    out.num_bands = bands;
+    for (auto& set : out.values[0]) {
+        set.fill(c_left);
+    }
+    for (auto& set : out.values[1]) {
+        set.fill(c_right);
+    }
+    return out;
+}
+
+struct CoreRun {
+    std::array<std::vector<QmfValue>, 3> m;
+    std::array<std::vector<QmfValue>, 3> delta;
+    std::array<QmfMatrix, 3> m_views;
+    std::array<std::span<QmfValue>, 3> delta_views;
+
+    explicit CoreRun(unsigned seed) {
+        for (std::size_t c = 0; c < 3; ++c) {
+            m[c] = random_matrix(seed + static_cast<unsigned>(c));
+            delta[c].assign(kValues, QmfValue{});
+            m_views[c] = m[c];
+            delta_views[c] = delta[c];
+        }
+    }
+    CoreRun(const CoreRun&) = delete;
+    CoreRun& operator=(const CoreRun&) = delete;
+};
+
+double ratio_at(const CoreRun& run, std::size_t out, std::size_t in, int slot, int subband) {
+    const auto at = static_cast<std::size_t>(slot * 64 + subband);
+    return static_cast<double>(run.delta[out][at].real()) /
+           static_cast<double>(run.m[in][at].real());
+}
+
+}  // namespace
+
+TEST_CASE("9.X.4's dialogue enhancement channels are Lscr, Rscr and C", "[ac4][decoder][de]") {
+    // Part 2 Table 15: with the screen pair present, L and R are not the dialogue's channels.
+    detail::DeStage stage;
+    stage.configure(kSlots, kScreenFront);
+    const detail::DeFrameValues values = channel_independent({true, true, true}, 9.0);
+    const double g = std::pow(10.0, 9.0 / 20.0) - 1.0;
+    Channels first(kScreenFront.size(), 3);
+    stage.process(12.0, values, first.pointers);
+    Channels channels(kScreenFront.size(), 5);
+    const auto before = channels.data;
+    stage.process(12.0, values, channels.pointers);
+    // L and R (channels 0, 1) pass; C (2) takes the third parameter set, Lscr (3) the first, Rscr
+    // (4) the second.
+    const std::array<int, 5> parameter = {-1, -1, 2, 0, 1};
+    for (std::size_t c = 0; c < kScreenFront.size(); ++c) {
+        for (int slot = 0; slot < kSlots; slot += 7) {
+            const auto at = static_cast<std::size_t>(slot * 64 + 5);  // band 3
+            const double got = static_cast<double>(abs(channels.data[c][at]) / abs(before[c][at]));
+            const double expected =
+                parameter[c] < 0 ? 1.0
+                                 : 1.0 + g * values.p[static_cast<std::size_t>(parameter[c])][3];
+            INFO("channel " << c);
+            CHECK(std::abs(got - expected) < kTolerance);
+        }
+    }
+}
+
+TEST_CASE("core decoding takes the second de_data() when b_de_simulcast says so",
+          "[ac4][decoder][de]") {
+    // Part 2 clause 4.8.3.15.
+    detail::DialogEnhancement de;
+    de.b_de_data_present = true;
+    de.de_nr_channels = 1;
+    de.config.de_channel_config = 1;
+    de.config.de_max_gain = 2;
+    de.data.de_par[0].fill(10);       // 1.0
+    de.core_data.de_par[0].fill(20);  // 3.0 (Table 209)
+    CHECK(detail::de_frame_values(de, false).p[0][0] == 1.0);
+    CHECK(detail::de_frame_values(de, true).p[0][0] == 1.0);  // no simulcast: the one set
+    de.b_de_simulcast = true;
+    CHECK(detail::de_frame_values(de, false).p[0][0] == 1.0);
+    CHECK(detail::de_frame_values(de, true).p[0][0] == detail::de_parameter(20, false));
+    CHECK(detail::de_frame_values(de, true).p[0][0] != 1.0);
+}
+
+TEST_CASE("the core tool's C input ramps one smooth set by (ts + 1) / N from nothing, then holds",
+          "[ac4][decoder][de]") {
+    // Pseudocode 20, ch2 = 2 (the constant 1): no A-CPL or A-JCC set in the way.
+    detail::DeCoreStage stage;
+    stage.configure(kSlots);
+    const detail::DeFrameValues values = channel_independent({false, false, true}, 9.0);
+    const double g = std::pow(10.0, 9.0 / 20.0) - 1.0;
+    const detail::DeCoreCoefficients coefficients = core_coefficients(0.5, 0.25);
+    CHECK(stage.active(9.0, values));
+    CoreRun first(21);
+    stage.process(9.0, values, coefficients, first.m_views, first.delta_views);
+    for (int slot = 0; slot < kSlots; ++slot) {
+        const double expected = (slot + 1.0) / kSlots * g * values.p[0][3];
+        CHECK(std::abs(ratio_at(first, 2, 2, slot, 5) - expected) < kTolerance);  // band 3
+        // L and R get nothing: they are not enhanced, and C's input does not feed them.
+        CHECK(first.delta[0][static_cast<std::size_t>(slot * 64 + 5)] == QmfValue{});
+        CHECK(first.delta[1][static_cast<std::size_t>(slot * 64 + 5)] == QmfValue{});
+    }
+    // Subbands above the 41st have no parameters.
+    CHECK(first.delta[2][static_cast<std::size_t>(5 * 64 + 50)] == QmfValue{});
+    CoreRun second(31);
+    stage.process(9.0, values, coefficients, second.m_views, second.delta_views);
+    for (int slot = 0; slot < kSlots; ++slot) {
+        CHECK(std::abs(ratio_at(second, 2, 2, slot, 5) - g * values.p[0][3]) < kTolerance);
+    }
+    // Gain 0 ramps back down to nothing and then the stage is idle.
+    CoreRun third(41);
+    stage.process(0.0, values, coefficients, third.m_views, third.delta_views);
+    CHECK(std::abs(ratio_at(third, 2, 2, kSlots - 1, 5)) < kTolerance);
+    CHECK(std::abs(ratio_at(third, 2, 2, 0, 5) - (1.0 - 1.0 / kSlots) * g * values.p[0][3]) <
+          kTolerance);
+    CHECK_FALSE(stage.active(0.0, values));
+}
+
+TEST_CASE("the core tool's A'' and B'' inputs carry C_L and C_R, smooth over two sets",
+          "[ac4][decoder][de]") {
+    // Pseudocode 20, two smooth sets: to the first set's matrix at the first half's end, then on to
+    // the frame's.
+    detail::DeCoreStage stage;
+    stage.configure(kSlots);
+    const detail::DeFrameValues values = channel_independent({true, true, false}, 9.0);
+    const double g = std::pow(10.0, 9.0 / 20.0) - 1.0;
+    detail::DeCoreCoefficients coefficients = core_coefficients(0.0, 0.0);
+    coefficients.framing[0].num_param_sets = 2;
+    coefficients.framing[1].num_param_sets = 1;
+    for (std::size_t b = 0; b < 15; ++b) {
+        coefficients.values[0][0][b] = 0.5;
+        coefficients.values[0][1][b] = 1.0;
+        coefficients.values[1][0][b] = 0.25;  // one set: only [0] is read
+    }
+    CoreRun run(51);
+    stage.process(9.0, values, coefficients, run.m_views, run.delta_views);
+    const double de_l = g * values.p[0][3];
+    const double de_r = g * values.p[1][3];
+    // A'' feeds L; slot 15 ends the first half, where the enhancement has reached 16 / 32 of the
+    // frame's, times the first set's 0.5; slot 31 the frame's end, times the second set's 1.
+    CHECK(std::abs(ratio_at(run, 0, 0, 15, 5) - 16.0 / 32.0 * de_l * 0.5) < kTolerance);
+    CHECK(std::abs(ratio_at(run, 0, 0, 31, 5) - de_l) < kTolerance);
+    CHECK(std::abs(ratio_at(run, 0, 0, 7, 5) - 8.0 / 16.0 * (16.0 / 32.0 * de_l * 0.5)) <
+          kTolerance);
+    CHECK(std::abs(ratio_at(run, 0, 0, 23, 5) -
+                   (16.0 / 32.0 * de_l * 0.5 + 8.0 / 16.0 * (de_l - 16.0 / 32.0 * de_l * 0.5))) <
+          kTolerance);
+    // B'' feeds R with its own framing: the one set, end to end.
+    CHECK(std::abs(ratio_at(run, 1, 1, 31, 5) - de_r * 0.25) < kTolerance);
+    CHECK(std::abs(ratio_at(run, 1, 1, 15, 5) - 16.0 / 32.0 * de_r * 0.25) < kTolerance);
+}
+
+TEST_CASE("the core tool's steep interpolation switches coefficient at its parameter timeslots",
+          "[ac4][decoder][de]") {
+    detail::DeCoreStage stage;
+    stage.configure(kSlots);
+    const detail::DeFrameValues values = channel_independent({true, false, false}, 9.0);
+    const double g = std::pow(10.0, 9.0 / 20.0) - 1.0;
+    detail::DeCoreCoefficients coefficients = core_coefficients(0.0, 0.0);
+    coefficients.framing[0] = {.steep = true, .num_param_sets = 2, .param_timeslot = {8, 20}};
+    for (std::size_t b = 0; b < 15; ++b) {
+        coefficients.values[0][0][b] = 0.5;
+        coefficients.values[0][1][b] = 1.0;
+    }
+    CoreRun run(61);
+    stage.process(9.0, values, coefficients, run.m_views, run.delta_views);
+    const double de = g * values.p[0][3];
+    // Before the first timeslot the coefficient of the frame before, 0, holds; at the timeslot the
+    // new coefficient takes the enhancement the slot has; the last slot has the frame's.
+    for (int slot = 0; slot < 8; ++slot) {
+        CHECK(std::abs(ratio_at(run, 0, 0, slot, 5)) < kTolerance);
+    }
+    CHECK(std::abs(ratio_at(run, 0, 0, 8, 5) - 9.0 / 32.0 * de * 0.5) < kTolerance);
+    CHECK(std::abs(ratio_at(run, 0, 0, 20, 5) - 21.0 / 32.0 * de * 1.0) < kTolerance);
+    CHECK(std::abs(ratio_at(run, 0, 0, 31, 5) - de) < kTolerance);
+    // The last slot before the second timeslot is on its way to the first set's value there.
+    CHECK(std::abs(ratio_at(run, 0, 0, 19, 5) - 20.0 / 32.0 * de * 0.5) < kTolerance);
+}

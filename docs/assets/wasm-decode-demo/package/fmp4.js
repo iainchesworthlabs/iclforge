@@ -8,9 +8,9 @@
 // this is wired to a real hls.js instance.
 //
 // Verified against a real fixture: `ffmpeg -c copy -frag_duration 2000000
-// -movflags default_base_moof` remuxing apps/wasm/assets/demo.ec3 into
-// fragmented MP4 (js/tests/fixtures/, generated once and committed - see
-// js/tests/fmp4.test.js) - hex-inspected by hand to confirm this file's
+// -movflags default_base_moof` remuxing apps/demos/wasm/assets/demo.ec3 into
+// fragmented MP4 (bindings/js/tests/fixtures/, generated once and committed - see
+// bindings/js/tests/fmp4.test.js) - hex-inspected by hand to confirm this file's
 // field offsets/flag bits against that real muxer's output before writing
 // the general-purpose walk below.
 const BOX_HEADER_MIN_LENGTH = 8;

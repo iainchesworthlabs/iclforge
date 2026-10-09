@@ -11,20 +11,20 @@
 #   tools/checks/run_esp32s3_probe.sh --ac4            # the AC-4 decoder, its state in PSRAM
 #
 # --ac4 builds the decode profile with the component's AC-4 decoder and the AC-4 probe
-# (apps/baremetal/ac4_probe.cpp) over sdkconfig.ac4, which turns on the board's octal PSRAM
+# (firmware/baremetal/ac4_probe.cpp) over sdkconfig.ac4, which turns on the board's octal PSRAM
 # and sends the decoder's allocations of 512 bytes and more there (planning/ac4.md, D14c).
 # QEMU emulates that PSRAM. It gates what the other two directions gate, with the AC-4
 # probe's own ceilings, and two things more: every fixture's PCM hash against the pins the
-# Cortex-M3 leg and the host are held to (tests/golden/ac4-probe-pcm-hashes.json, decision
+# Cortex-M3 leg and the host are held to (testdata/ac4-probe-pcm-hashes.json, decision
 # 26), and the internal RAM each fixture took at its worst moment, which is what Wi-Fi and
 # lwIP share with the decoder on a board.
 #
 # WHAT THIS GATES, and what it deliberately does not:
 #
 #   - The probe's own verdict. Decoding: every fixture in
-#     apps/baremetal/fixture.hpp decoded, every channel's level checked.
+#     testdata/baremetal/fixture.hpp decoded, every channel's level checked.
 #     Encoding: six frames of synthesised 5.1 through each of the two encoders,
-#     byte count and FNV-1a hash checked against apps/baremetal/encode_fixture.hpp.
+#     byte count and FNV-1a hash checked against firmware/baremetal/encode_fixture.hpp.
 #     Either way, result=pass - a failure means the codec is wrong on Xtensa.
 #   - Internal SRAM. The ESP32-S3 has 341,760 bytes of DIRAM and this profile
 #     has to fit its static data AND its peak heap inside it. That is the
@@ -40,7 +40,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PROJECT="$REPO/apps/baremetal/platform/esp32s3"
+PROJECT="$REPO/firmware/baremetal/platform/esp32s3"
 
 # Which direction. The two profiles are mutually exclusive - measured on this
 # part, no two of decode / AC-3 encode / E-AC-3 encode fit in internal SRAM at
@@ -220,8 +220,8 @@ if [[ "$DIRECTION" == "ac4" ]]; then
     ICLFORGE_ESP32S3_MAX_STEADY_ALLOCS_PER_FRAME=${ICLFORGE_ESP32S3_MAX_STEADY_ALLOCS_PER_FRAME_AC4:-210}
     ICLFORGE_ESP32S3_MAX_AC4_STACK_BYTES=${ICLFORGE_ESP32S3_MAX_AC4_STACK_BYTES:-24000}
     # Each fixture's peak heap, steady-state allocations a frame and internal RAM ceilings are in
-    # tests/golden/ac4-probe-ceilings.json, which run_baremetal_probe.sh --ac4 reads as well.
-    AC4_CEILINGS="$REPO/tests/golden/ac4-probe-ceilings.json"
+    # testdata/ac4-probe-ceilings.json, which run_baremetal_probe.sh --ac4 reads as well.
+    AC4_CEILINGS="$REPO/testdata/ac4-probe-ceilings.json"
 fi
 
 OUTPUT="$(mktemp)"
@@ -229,7 +229,7 @@ trap 'rm -f "$OUTPUT"' EXIT
 
 # fullclean between directions, not for tidiness: ICLFORGE_ESP_PROFILE reaches
 # the library as CMake cache variables (ICLFORGE_MINIMAL_DECODER /
-# ICLFORGE_MINIMAL_ENCODER, FORCEd by esp-idf/iclforge/CMakeLists.txt), and a
+# ICLFORGE_MINIMAL_ENCODER, FORCEd by firmware/esp-idf/iclforge/CMakeLists.txt), and a
 # warm build directory has already resolved them. Reconfiguring over the top
 # silently keeps the previous direction's archive - which links, runs, and
 # reports the wrong profile's numbers under this one's ceilings.
@@ -392,7 +392,7 @@ fi
 # requirement and a regression in any of them is the same kind of news.
 #
 # The fixture names come from the probe's own output rather than from a list
-# kept here, so adding one (apps/baremetal/probe.cpp's kEac3Fixtures and
+# kept here, so adding one (firmware/baremetal/probe.cpp's kEac3Fixtures and
 # tools/generators/gen_baremetal_fixture.py's STREAMS) does not also mean
 # remembering to widen a gate in two runner scripts. A hardcoded list still
 # PASSES when a fixture is added and left off it, and the fixture nobody
@@ -418,7 +418,7 @@ done <<< "$CHURN"
 if [[ "$DIRECTION" == "ac4" ]]; then
     # The float PCM, the same bits as the Cortex-M3 leg's and the host's (decision 26).
     python3 "$REPO/tools/checks/check_probe_hashes.py" \
-        --expected "$REPO/tests/golden/ac4-probe-pcm-hashes.json" "$OUTPUT"
+        --expected "$REPO/testdata/ac4-probe-pcm-hashes.json" "$OUTPUT"
 
     stack=$(sed -n 's/^stack\.peak_bytes=\([0-9]*\).*/\1/p' "$OUTPUT" | head -1)
     if [[ -z "$stack" ]]; then

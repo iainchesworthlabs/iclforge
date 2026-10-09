@@ -1,6 +1,6 @@
 """Local-only generator for the committed third-party Dolby Atmos fixture.
 
-`tests/golden/object-fixture/dee_joc_514.ec3` is a DD+ JOC bitstream produced
+`testdata/object-fixture/dee_joc_514.ec3` is a DD+ JOC bitstream produced
 by the Dolby Encoding Engine (bundled in "Dolby Media Encoder") from the
 synthetic 5.1.4 tone bed this script also writes. It is the ONLY Atmos stream
 in this repository that this project's own encoder did not make, and so the
@@ -27,7 +27,7 @@ accepts BWF ADM, but its reader gates on content provenance ("Content was not
 authored with Dolby tools") and refuses a master this project authors, so the
 `cbi_wav` path is the only one available here. That is why the fixture has no
 dynamic objects and therefore no object size, zone or snap on the wire - the
-encode-side round trip in tests/ac3/oba/test_oba.cpp covers those instead.
+encode-side round trip in libs/ac3/tests/oba/test_oba.cpp covers those instead.
 
 DEE is licensed commercial software and must never run in CI, exactly as
 gen_external_baseline.py says of the same binary - hence the same
@@ -45,7 +45,7 @@ from pathlib import Path
 import numpy as np
 
 REPO = Path(__file__).resolve().parent.parent.parent
-OUT_DIR = REPO / "tests" / "golden" / "object-fixture"
+OUT_DIR = REPO / "testdata" / "object-fixture"
 DEE = Path(r"C:\Program Files\Dolby\Dolby Media Encoder\resources\dee-dir"
            r"\dee_ddpjoc_encoder.exe")
 
@@ -57,7 +57,7 @@ DATA_RATE_KBPS = 448
 # L/C/R/Ls/Rs/LFE "SMPTE order" its 5.1 dee_ddp_encoder path documents. That is
 # not stated in `--morehelp input-format`; it was measured, by encoding a file
 # with one distinct tone per channel and identifying each reconstructed JOC
-# object by which tone dominates it (tests/ac3/oba/test_dee_joc_fixture.cpp runs
+# object by which tone dominates it (libs/ac3/tests/oba/test_dee_joc_fixture.cpp runs
 # the same identification over the committed fixture as a regression check).
 CHANNELS = [
     ("L", 220.0),

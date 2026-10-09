@@ -1,6 +1,6 @@
 # Python bindings
 
-A pybind11 module (`python/src/iclforge_ext/bindings.cpp`) bound straight onto
+A pybind11 module (`bindings/python/src/iclforge_ext/bindings.cpp`) bound straight onto
 `iclforge::ac3::FrameEncoder`, `iclforge::ac3::FrameDecoder`, `iclforge::ac3::Eac3Decoder`, `iclforge::ac3::eac3::FrameEncoder`,
 `iclforge::ac3::eac3::AccessUnitEncoder` and `iclforge::ac3::oba::AtmosEncoder`, and, in the `iclforge.ac4` submodule,
 `iclforge::ac4::Decoder` and `iclforge::ac4::Encoder` — pybind11-direct, not layered on a separate C API. From the
@@ -16,7 +16,7 @@ The two pre-releases on PyPI, 0.9.0b1 and 0.10.0b1, are the project `ac3forge` w
 against the same CMake tree everything else here uses:
 
 ```bash
-pip install ./python
+pip install ./bindings/python
 ```
 
 A wheel built from a release that predates the AC-4 module has no `iclforge.ac4`: the wheels for
@@ -24,10 +24,10 @@ A wheel built from a release that predates the AC-4 module has no `iclforge.ac4`
 0.10.0b1's wheels, as the project `ac3forge`, for Windows x64, Linux x86_64 and macOS on Apple Silicon,
 for Python 3.10 to 3.14.
 `wheels.yml` also builds Linux aarch64 and macOS Intel wheels, which no release has carried, and
-PyPI has no source archive, so on those two `pip install ./python` from a checkout is the way in.
+PyPI has no source archive, so on those two `pip install ./bindings/python` from a checkout is the way in.
 
 The package's own readme — layout, build notes and examples not duplicated here — lives at
-[`python/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/python/README.md).
+[`bindings/python/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/bindings/python/README.md).
 
 `iclforge.__version__` reports the installed package's own PEP 440 version string, derived from
 the nearest `git describe` tag the same way `PROJECT_VERSION_FULL` is on the C++ side (see
@@ -360,7 +360,7 @@ wraps, and a context manager:
   `ac4.Encoder.toc.build_dac4()`; `demux_mp4` and `demux_mpegts` read AC-4 tracks back. `Mp4Track`
   has no `timescale` and `mux_mp4` no sync-sample list, so every sample is marked a sync sample and
   a frame rate whose frames alternate in length (29.97, 59.94 and 119.88 fps) has no
-  `samples_per_frame` to give; `forge` or the C++ `iclforge::mp4::mux` writes those. The incremental
+  `samples_per_frame` to give; `forge` or the C++ `iclforge::containers::mp4::mux` writes those. The incremental
   `Reader`/`Writer` classes and the fragmented-MP4/HLS/DASH surface are C++-only, by design.
 - **`iclforge.meta`** — `LoudnessMeter` (BS.1770; every gated measurement is `None` until it
   can mean anything), the cited `qc_preset()` table, and `evaluate_qc_gate()` — `forge qc`'s
@@ -487,7 +487,7 @@ for `create()` the refusal reason, as its message. They sit beside `Ac3Error` an
 it, since `Ac3Error` derives from `RuntimeError`. An argument the binding cannot read (a channel
 that is not a 1-D array) stays a plain `ValueError`.
 
-Test coverage: `python/tests/test_ac4_roundtrip.py` (stereo and 5.1 round trips checked by
+Test coverage: `bindings/python/tests/test_ac4_roundtrip.py` (stereo and 5.1 round trips checked by
 correlation, presentation/delay agreement with the encoder, the channel-count refusal above, and
 `ac4.sync_frame`'s sync word); `test_ac4_objects.py` (an A-JOC scene and a direct-coded one, each
 configured by keywords and by attributes with the two streams the same bytes, and read back within
@@ -526,8 +526,8 @@ caller-buffer form, because that is the only pair `iclforge::ac3::FrameDecoder`/
 themselves expose one for (see [Zero-copy numpy](#zero-copy-numpy-and-buffer-reuse) above); a
 single substream's own PCM is always freshly allocated.
 
-`iclforge::oba::ObjectScene` (the object-scene timeline behind `forge atmos-path` and the GUI's
-export - see [Spatial & Atmos objects](spatial-and-atmos.md#the-scene-iclforgeobaobjectscene)) is not
+`iclforge::objects::oba::ObjectScene` (the object-scene timeline behind `forge atmos-path` and the GUI's
+export - see [Spatial & Atmos objects](spatial-and-atmos.md#the-scene-iclforgeobjectsobaobjectscene)) is not
 here either. Its shape has settled: `SceneCursor` is the seam a live position source plugs into,
 and the OSC wire form ([`iclforge/objects/scene_osc.hpp`](spatial-and-atmos.md#the-osc-wire-form)), a
 sibling header, changed nothing about `scene.hpp`. It is left out because this surface is a

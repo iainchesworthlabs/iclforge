@@ -70,12 +70,12 @@ difference 1.1e-5.
 
 ## Milestones 8–9 — space, and getting it to a receiver
 
-The spatial layer (`src/render/src/`) places mono objects on the ITU 5.1 ring by
+The spatial layer (`libs/render/src/`) places mono objects on the ITU 5.1 ring by
 energy-normalized 2D VBAP with per-block gain ramps and explicit LFE sends. `ac3cli orbit`
 renders a tone circling the listener into 5.1 AC-3. An end-to-end test parks the object at
 each speaker in turn and asserts the decoded energy follows it: C → L → SL → SR → R.
 
-The IEC 61937 packer (`src/iec61937/src/`) wraps frames into S/PDIF bursts byte-exact against
+The IEC 61937 packer (`libs/containers/src/iec61937/`) wraps frames into S/PDIF bursts byte-exact against
 FFmpeg's `spdif` muxer. `ac3cli spdif` emits them as a PCM16 WAV; played bit-exactly through a
 passthrough output, a receiver locks on and lights its Dolby Digital indicator.
 
@@ -259,8 +259,8 @@ the submitted/rendered counters from what was actually queued. `ac3cli live --at
 wrote a bed-metering step into the same `views` vector the encoder read object essences from,
 sized to the object count (as few as one) rather than the bed's fixed six channels — an
 out-of-bounds heap write, surfacing as a crash partway through an otherwise-successful session.
-Both are fixed (see `MonitorSink::submit` in `src/audio/src/backend/windows/monitor.cpp` and
-`run_live`'s `bed_views` in `apps/cli/commands/live_audio.cpp`).
+Both are fixed (see `MonitorSink::submit` in `libs/audio/src/backend/windows/monitor.cpp` and
+`run_live`'s `bed_views` in `apps/forge/cli/src/commands/live_audio.cpp`).
 
 What that hardware testing did and did not confirm, precisely: `MonitorSink` played real
 microphone capture and real decoded AC-3/E-AC-3 (including an Atmos stream's 5.1 bed) through
@@ -275,8 +275,8 @@ account.
 ## The ALSA backend
 
 Live capture, monitor playback and IEC 61937 passthrough had been WASAPI-only, gated behind
-`WIN32` with a no-backend stub everywhere else. `src/audio/src/backend/alsa/` gives Linux a real
-implementation of all three, selected by `src/audio/CMakeLists.txt` when libasound's headers are
+`WIN32` with a no-backend stub everywhere else. `libs/audio/src/backend/alsa/` gives Linux a real
+implementation of all three, selected by `libs/audio/CMakeLists.txt` when libasound's headers are
 present (`AC3FORGE_WITH_ALSA=AUTO` by default; `ON` makes their absence a configure error, `OFF`
 forces the no-backend fallback) — optional and detected, not a hard new dependency. Capture and
 monitor playback are ordinary PCM and any Linux audio API could do them; passthrough is why ALSA
@@ -319,7 +319,7 @@ than a separate system — `ac3::plan::channel_plan_for(id)` is a one-line looku
 
 ## Since
 
-- The Matroska muxer (`src/matroska/`), deliberately independent of `ac3::forge`.
+- The Matroska muxer (`libs/containers/src/matroska/`), deliberately independent of `ac3::forge`.
 - `ac3::io::scan`, so a muxer derives format, packet boundaries, sample rate and channel count
   from the bitstream rather than being told.
 - `ac3cli` dispatch moved to a single command table, so an argv index cannot be quietly wrong.
@@ -332,7 +332,7 @@ than a separate system — `ac3::plan::channel_plan_for(id)` is a one-line looku
 - libFuzzer harnesses (`fuzz/`) over every untrusted-input entry point — `scan`, both decoders,
   WAV reading, and later AC-4, the containers and the Sendspin messages — Clang-only and off by
   default (`AC3FORGE_BUILD_FUZZERS`); see
-  [`fuzz/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/fuzz/README.md). Runs on every push (`fuzz-regress`, seed/regression
+  [`tools/fuzz/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/fuzz/README.md). Runs on every push (`fuzz-regress`, seed/regression
   replay only) and nightly (`fuzz-nightly`, bounded mutation).
 - Dual mono (`acmod` 0, "1+1"): two independent single-channel programmes sharing one
   syncframe rather than a channel layout, on both encoders and both decoders, with their own
@@ -384,7 +384,7 @@ than a separate system — `ac3::plan::channel_plan_for(id)` is a one-line looku
   restored around the session instead), a warning appears before Start if VBR is on (a live
   session always drops it), and the window title reflects an active session the same way it
   already did for a plain recording.
-- `ac3gui --smoke-shot` (`apps/gui/main.cpp`): grabs a window screenshot without encoding
+- `ac3gui --smoke-shot` (`apps/forge/gui/src/main.cpp`): grabs a window screenshot without encoding
   anything, for documentation screenshots where a specific UI state matters and a completed run
   in the strip would be noise. The existing `--smoke`/`--smoke-record`/`--smoke-live` property
   mechanism gained two special-cased tokens alongside it — `preset=` (invokes
@@ -430,14 +430,14 @@ Neither tool has any external decode oracle — FFmpeg's own Annex E parser has 
 one's syntax, which is weaker than 7.1.4's situation (a syntax it reads but rejects on one field):
 it has no model of the bits at all, so strict-decoding a stream that uses either tool isn't merely
 unavailable, it would reject a correctly-formed stream on syntax it doesn't recognise. Verification
-is self-consistency only: round-trip unit tests in `tests/ac3/decoder/test_eac3_decoder.cpp`, and
+is self-consistency only: round-trip unit tests in `libs/ac3/tests/decoder/test_eac3_decoder.cpp`, and
 `tools/ci/quality_race.py`'s CI gate, extended with a `decode_scores_ours` path that decodes through
 this project's own `ac3cli decode` instead of FFmpeg for exactly these two tools, with SNR/LSD
 floors sized off a measured run rather than guessed.
 
 ## Enhanced coupling's real angle/chaos fit
 
-The amplitude-only MVP above was closed by `fit_ecpl_band` (`src/ac3/src/encoder/eac3_frame.cpp`):
+The amplitude-only MVP above was closed by `fit_ecpl_band` (`libs/ac3/src/encoder/eac3_frame.cpp`):
 §3.5.5.4's reconstruction turns out to be linear in the complex gain a band's (amplitude, angle)
 pair expresses — the same shared coupling channel folded through unity gain at angle 0 and at
 angle 0.5 (a quarter-turn) spans every gain a single coordinate pair could ever produce, so fitting
@@ -475,7 +475,7 @@ infrastructure, and both decoders' own independent copies of the same four range
 it too, closing a three-way literal duplication risk that predated this work rather than adding a
 new one.
 
-Two existing bit-placement tests (`tests/ac3/encoder/test_eac3.cpp`) had hardcoded `rematflg` at zero,
+Two existing bit-placement tests (`libs/ac3/tests/encoder/test_eac3.cpp`) had hardcoded `rematflg` at zero,
 true only because the encoder never set it before; both now assert engagement (at least one
 band fires) for their already-correlated test material instead, catching the field's PRESENCE
 without pinning a value that is legitimately content-dependent. The existing stereo round-trip
@@ -486,7 +486,7 @@ clang-21 and MSVC builds, plus clang-tidy, before landing.
 ## AC-4
 
 AC-4 (ETSI TS 103 190) was built in the phases [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md)
-sets out, from the standard's two parts alone. The inspector came first (`src/ac4`): sync frames,
+sets out, from the standard's two parts alone. The inspector came first (`libs/ac4`): sync frames,
 the table of contents, presentations and substream framing, checked against Annex G's CRC-16 over
 every sync frame of the committed Dolby Encoding Engine (DEE) streams, MediaInfo's reading of them,
 and a Python transcription (`tools/references/ac4_parse.py`) that caught three of its bugs. Fuzzing
@@ -503,14 +503,14 @@ frame rate with the output level, DRC, dialogue enhancement and the downmix, pre
 immersive element and A-JOC objects) was scored against the sources DEE encoded, by SNR,
 log-spectral distance, ViSQOL and each A-SPX tile's energy, and against librempeg's decoder where it
 reads the stream. About seventy places where the standard's pseudocode, a formula and a table
-disagree are kept in `src/ac4dec/ERRATA.md` with the reading taken and its evidence. Two of them
+disagree are kept in `libs/ac4/ERRATA.md` with the reading taken and its evidence. Two of them
 changed the output: the QMF synthesis modulation offset, where only Pseudocode 66's 255 reconstructs
 (78 dB, against 43 dB for the formula's 257), and A-SPX's pre-flattening, which the standard prints
 as the inverse of the gain it needs and which left the top of DEE's 5.1 film centre 4.6 dB under the
 source at 256 kbps.
 
-The encoder (`src/ac4enc`) followed each decoder phase that reads what it writes, sharing
-`src/ac4core`'s transforms, and was raced against DEE's streams of the same sources. In stereo in
+The encoder (`libs/ac4/src/encoder`) followed each decoder phase that reads what it writes, sharing
+`libs/ac4/src/core`'s transforms, and was raced against DEE's streams of the same sources. In stereo in
 the SIMPLE mode at 192 kbps its SNR was 5.6 dB above DEE's on music and 14.9 dB on speech, with
 ViSQOL within 0.02. The races also found that a tone sweeping above A-SPX's crossover left the band
 empty in the encoder's streams, which phase E10 fixed by measuring the share of each noise group's

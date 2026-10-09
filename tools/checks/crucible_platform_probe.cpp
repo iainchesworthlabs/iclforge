@@ -22,13 +22,13 @@
 // build-pw/src/<library>/libiclforge_<library>_static.a.
 //
 //   g++ -std=c++23 -O1 -o /tmp/probe tools/checks/crucible_platform_probe.cpp
-//       -Isrc/audio/include -Isrc/ac3/include -Ibuild-pw/src/ac3/generated
+//       -Ilibs/audio/include -Ilibs/ac3/include -Ibuild-pw/libs/ac3/generated
 //       -Isrc/signing/include -Ibuild-pw/src/signing/generated
 //       -Iapps/crucible/engine $(pkg-config --cflags libpipewire-0.3)
 //       -DICLFORGE_AC3_STATIC_DEFINE -DICLFORGE_SIGNING_STATIC_DEFINE
 //       build-pw/apps/crucible/libcrucible_engine.a
-//       build-pw/src/audio/libiclforge_audio.a build-pw/src/ac3/libiclforge_ac3_static.a
-//       build-pw/src/signing/libiclforge_signing_static.a
+//       build-pw/libs/audio/libiclforge_audio.a build-pw/libs/ac3/libiclforge_ac3_static.a
+//       build-pw/src/signing/libiclforge_ac3_static.a
 //       $(pkg-config --libs libpipewire-0.3) $(pkg-config --libs xcb) -lpthread
 //
 //   ($(pkg-config --libs xcb) is for an engine built with libxcb, the X11

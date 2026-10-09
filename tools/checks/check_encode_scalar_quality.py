@@ -39,13 +39,13 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 COMPARE = REPO_ROOT / "tools" / "checks" / "compare_wav.py"
-AUDIO = REPO_ROOT / "tests" / "golden" / "audio"
+AUDIO = REPO_ROOT / "testdata" / "audio"
 
 
 @dataclass(frozen=True)
 class Stream:
     label: str
-    source: str          # under tests/golden/audio
+    source: str          # under testdata/audio
     command: str         # forge subcommand
     args: tuple[str, ...]  # after <in> <out>
     suffix: str

@@ -1430,7 +1430,7 @@ class WormholeShimmer {
 };
 
 // ---------------------------------------------------------------------------
-// The scene: ten named objects in one iclforge::oba::ObjectScene, each with its own
+// The scene: ten named objects in one iclforge::objects::oba::ObjectScene, each with its own
 // authored automation - the same type forge's atmos-path reads from a file and
 // the GUI's timeline edits, so this cue sheet could equally have been loaded
 // from JSON rather than written here. Positions are
@@ -1457,7 +1457,8 @@ enum Object : std::size_t {
 // with linear automation - the default, and what this cue sheet was written
 // against. Names come from kObjectNames, keyed by the enum above, so the enum
 // stays the single place an object is introduced.
-iclforge::oba::SceneObject make_object(std::vector<iclforge::oba::AutomationPoint> automation) {
+iclforge::objects::oba::SceneObject make_object(
+    std::vector<iclforge::objects::oba::AutomationPoint> automation) {
     return {.name = {}, .bed = 0, .automation = std::move(automation)};
 }
 
@@ -1465,8 +1466,8 @@ constexpr std::array<const char*, kObjectCount> kObjectNames{
     "broadcast",  "comet",    "jalopy_engine", "jalopy_radio", "runabout_a",
     "runabout_b", "work_pod", "wormhole_core", "shimmer_l",    "shimmer_r"};
 
-iclforge::oba::ObjectScene build_scene() {
-    std::vector<iclforge::oba::SceneObject> paths;
+iclforge::objects::oba::ObjectScene build_scene() {
+    std::vector<iclforge::objects::oba::SceneObject> paths;
     paths.reserve(kObjectCount);
 
     // kBroadcast: nailed to the station, far front-centre. Its gain arc IS
@@ -1586,7 +1587,7 @@ iclforge::oba::ObjectScene build_scene() {
     for (std::size_t i = 0; i < paths.size(); ++i) {
         paths[i].name = kObjectNames[i];
     }
-    auto scene = iclforge::oba::ObjectScene::create(std::move(paths));
+    auto scene = iclforge::objects::oba::ObjectScene::create(std::move(paths));
     if (!scene.has_value()) {
         std::fputs("internal error: bad keyframe table\n", stderr);
         std::exit(1);
@@ -1596,7 +1597,7 @@ iclforge::oba::ObjectScene build_scene() {
 
 // Radial velocity toward the listener (room centre), for Doppler. The room
 // is nominally 30 m square and 8 m tall - cinematic, not architectural.
-double listener_distance_m(const iclforge::oba::Position& p) {
+double listener_distance_m(const iclforge::objects::oba::Position& p) {
     const double dx = (p.x - 0.5) * 30.0;
     const double dy = (p.y - 0.5) * 30.0;
     const double dz = p.z * 8.0;
@@ -1766,7 +1767,7 @@ int main(int argc, char** argv) {
     bool doppler_primed = false;
 
     // Refilled in place each frame by the scene rather than reallocated.
-    std::vector<iclforge::oba::ObjectPlacement> placement(kObjectCount);
+    std::vector<iclforge::objects::oba::ObjectPlacement> placement(kObjectCount);
 
     std::size_t next_cue = 0;
     std::uint64_t n0 = 0;

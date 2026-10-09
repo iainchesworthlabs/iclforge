@@ -59,9 +59,9 @@ Modes:
                (original/iclforge/FFmpeg/DEE spectrograms) via
                render_spectrograms() - this part DOES need an `ffmpeg`
                binary, only ever to decode the already-committed
-               tests/golden/external-baseline/ bitstreams, never to encode.
+               testdata/external-baseline/ bitstreams, never to encode.
   objects    - object-reconstruction quality: the committed five-object
-               scene (tests/golden/audio/reference_objects.wav plus its
+               scene (testdata/audio/reference_objects.wav plus its
                .paths placements) encoded with `atmos-encode` and decoded
                back to per-object WAVs, one SNR/LSD/MOS row per object per
                rate. Compute-only, no gate; see race_objects(). There is no
@@ -327,7 +327,7 @@ def align(original, decoded, skip=RATE, probe_len=32768, window_extra=65536):
     Defaults (skip 1s, 32768-sample probe, +65536 search window) match
     make_material()'s ~10s synthesized material, the only length this was
     originally written against. Committed fixtures used elsewhere (e.g.
-    tests/golden/audio/reference_51.wav at 2.5s) are far shorter than
+    testdata/audio/reference_51.wav at 2.5s) are far shorter than
     2*skip + probe_len - the trimmed overlap below would come out empty or
     inverted - so callers scoring those pass smaller values explicitly
     rather than this function guessing a length-appropriate scale itself.
@@ -452,7 +452,7 @@ def spectral_scores(o, d):
 # confirming the number actually moves with quality rather than being a
 # stub.
 #
-# Optional exactly like ICLFORGE_WITH_ALSA (src/audio/CMakeLists.txt): a
+# Optional exactly like ICLFORGE_WITH_ALSA (libs/audio/CMakeLists.txt): a
 # missing `visqol-python` install skips this column with one clear message,
 # printed once, and never fails the run. Nobody running a quality race
 # locally should be forced to install it, and CI does not either - see
@@ -754,7 +754,7 @@ FGAINCOD_WINDOWS = 5
 
 
 def rate_adaptive_fgaincod(kbps, nfchans):
-    """iclforge::ac3::rate_adaptive_fgaincod (src/ac3/src/core/bitalloc.cpp), mirrored.
+    """iclforge::ac3::rate_adaptive_fgaincod (libs/ac3/src/core/bitalloc.cpp), mirrored.
 
     Deliberately a second copy of the line rather than a number typed per
     row: this mode exists to pin the code the ENCODER would have chosen, so
@@ -1265,7 +1265,7 @@ CI_AC3_51_MIN_SNR_DB = 15.0
 # ecpl+tpn); 5.1/256kbps scored 8.7-8.8 dB SNR / 7.5 dB LSD (ecpl, ecpl+tpn)
 # and 13.8 dB SNR / 9.1 dB LSD (tpn). tpn's material here is the same tone-
 # burst-heavy mix every other row uses, not audio shaped around a single
-# clean onset the way tests/ac3/decoder/test_eac3_decoder.cpp's dedicated unit test is -
+# clean onset the way libs/ac3/tests/decoder/test_eac3_decoder.cpp's dedicated unit test is -
 # that is why its own floor sits well below ecpl's despite the tool working
 # correctly; see that test for a tighter, onset-specific assertion.
 CI_EAC3_SELF_THRESHOLDS = {
@@ -1289,7 +1289,7 @@ def gate(name, ok, detail):
 
 # search= (EQ13), exercised THROUGH THE CLI.
 #
-# The gap this closes is not that the search is untested - tests/ac3/quality's
+# The gap this closes is not that the search is untested - libs/ac3/tests/quality's
 # test_search.cpp and test_eac3_search.cpp cover it well, including that it
 # lowers decoded error, that it is deterministic, that it changes the emitted
 # parameters, and that it stays inert under VBR. It is that every one of those
@@ -1483,7 +1483,7 @@ def race_ci(original, source, original_51, source_51, original_tr, source_tr):
 # race_ci) - this file must never import that one, since it is explicitly
 # the local-only, never-in-CI script and this mode is the opposite: CI-only,
 # no external encoder ever invoked.
-AUDIO_DIR = REPO / "tests" / "golden" / "audio"
+AUDIO_DIR = REPO / "testdata" / "audio"
 
 
 # The programme fixtures ship as FLAC (tools/generators/gen_programme_fixtures.py's
@@ -1668,7 +1668,7 @@ def race_trend(json_out=None):
 # own per-leg loop: it re-reads what that loop already wrote to BUILD rather
 # than threading image state through the scoring path, and it never invokes
 # FFmpeg's or DEE's own encoders - only decodes the committed
-# tests/golden/external-baseline/<leg>/*.{ac3,ec3} bitstreams, the same
+# testdata/external-baseline/<leg>/*.{ac3,ec3} bitstreams, the same
 # never-runs-in-CI boundary docs/landscape.md documents for the numbers.
 
 
@@ -1705,7 +1705,7 @@ def render_spectrograms(out_dir):
     already produced BUILD/trend_<leg>_landscape.wav - this reads that file
     rather than re-encoding.
 
-    DEE's row is skipped per-leg when tests/golden/external-baseline/
+    DEE's row is skipped per-leg when testdata/external-baseline/
     manifest.json marks that leg's DEE score "unverified" (currently both
     5.1 legs, DEE's own Ls-channel-drop bug - see that file) - showing a
     spectrogram next to numbers the project itself doesn't trust would be
@@ -1719,7 +1719,7 @@ def render_spectrograms(out_dir):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt  # noqa: PLC0415 - must follow the use("Agg") call
 
-    baseline_root = REPO / "tests" / "golden" / "external-baseline"
+    baseline_root = REPO / "testdata" / "external-baseline"
     manifest = json.loads((baseline_root / "manifest.json").read_text())
     ext = {"ac3": "ac3", "eac3": "ec3"}
     baseline_dir = baseline_root
@@ -1791,11 +1791,11 @@ def render_spectrograms(out_dir):
 # The only quality series this project has for its OBJECT layer. Every codec
 # layer beside it - AC-3, E-AC-3, and each Annex E tool - has a per-commit
 # trend row; object reconstruction had exactly one measurement anywhere in
-# the tree, tests/ac3/oba/test_atmos.cpp's `snr_db > 10.0` against 18-35 dB
+# the tree, libs/ac3/tests/oba/test_atmos.cpp's `snr_db > 10.0` against 18-35 dB
 # measured, so a 10-20 dB JOC regression passed CI and appeared on no page.
 #
 # The loop is the one that unit test runs, moved out to the CLI and to a
-# committed scene: encode tests/golden/audio/reference_objects.wav (five mono
+# committed scene: encode testdata/audio/reference_objects.wav (five mono
 # object essences as WAV channels) with `atmos-encode`, driven by the
 # committed placements in reference_objects.paths, then decode with
 # `decode <stream> <bed> <objects_dir>` and score each exported object_NN.wav
@@ -1838,12 +1838,12 @@ OBJECT_LEGS = [
 # the bed itself, plus reconstruct()'s own pass over that decoded bed. That
 # second delay depends on the domain reconstruct() runs in, and these legs
 # exercise the CLI's default (AtmosConfig::joc_domain / DecoderConfig::
-# joc_domain = iclforge::oba::joc::Domain::kQmf, apps/cli/support.hpp), which is
-# iclforge::dsp::kQmfDelay = kQmfTaps - kQmfHop = 576 samples (src/ac3/include/
+# joc_domain = iclforge::objects::oba::joc::Domain::kQmf, apps/forge/cli/src/support.hpp), which is
+# iclforge::dsp::kQmfDelay = kQmfTaps - kQmfHop = 576 samples (libs/ac3/include/
 # iclforge/dsp/qmf.hpp), not the 256-sample MDCT round trip the older
 # Domain::kMdctBand path used. 256 + 576 = 832.
-# iclforge::oba::joc::reconstruction_delay(domain) is the single place either number
-# is derived (src/ac3/include/iclforge/ac3/oba/joc.hpp); tests/ac3/oba/test_atmos.cpp
+# iclforge::objects::oba::joc::reconstruction_delay(domain) is the single place either number
+# is derived (libs/ac3/include/iclforge/ac3/oba/joc.hpp); libs/ac3/tests/oba/test_atmos.cpp
 # calls it rather than hard-coding a figure, and its comment carries the
 # full reasoning. Fixed here rather than searched for by cross-correlation
 # the way align() does for the codec legs: the delay is a known property of
@@ -2279,7 +2279,7 @@ def race_fast_mdct(source, original):
     owner asked for before making fast the default, kept as the standing
     check that the two paths still agree. mdct512_forward's fast path is
     already verified bit-close (~1e-15 absolute error) against the direct
-    form in isolation (tests/ac3/core/test_mdct_fast.cpp); what this measures is
+    form in isolation (libs/ac3/tests/core/test_mdct_fast.cpp); what this measures is
     whether that residual ever flips a bap/exponent DECISION enough to show
     up against an independent oracle, at real bitrates, on real (if
     synthetic) material.
@@ -2318,7 +2318,7 @@ def race_fast_mdct(source, original):
 # been caught by once: a bit-allocation or bandwidth policy that looks like a
 # win on the synthetic fixtures needs re-measuring on material that is not
 # band-limited like they are, and before this there was nowhere to do that
-# except by hand (see src/ac3/src/encoder/encoder.cpp's chbwcod comment, and
+# except by hand (see libs/ac3/src/encoder/encoder.cpp's chbwcod comment, and
 # tools/generators/gen_programme_fixtures.py for the measured spectra).
 MATERIALS = {"speech": SPEECH_FIXTURE, "music": MUSIC_FIXTURE}
 

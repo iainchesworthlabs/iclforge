@@ -133,7 +133,12 @@ def main(argv: list[str]) -> int:
     results = [check_branch()]
     results.append(run([py, "tools/checks/check_doc_paths.py"], name="doc and script paths"))
     results.append(run([py, "tools/checks/check_platform_matrix.py"], name="platform matrix"))
-    results.append(run([py, "tools/checks/check_layering.py"], name="library layering"))
+    results.append(run([py, "tools/checks/check_layering.py"], name="project layering"))
+    results.append(run([py, "tools/checks/check_workflow_paths.py"], name="workflow path filters"))
+    results.append(
+        run([py, "tools/checks/generate_project_pages.py", "--check"], name="project pages")
+    )
+    results.append(run([py, "tools/checks/check_sonar_scope.py"], name="sonar scope"))
     results.append(run([py, "tools/checks/check_namespaces.py"], name="library namespaces"))
     results.append(
         run([py, "tools/checks/check_esp_efuse_free.py"], name="esp efuse-free settings")
@@ -186,7 +191,7 @@ def main(argv: list[str]) -> int:
         )
 
     if args.unit:
-        for suite in ("tools/checks", "tools/ci", "tools/hearth", "tools/n1b"):
+        for suite in ("tools/checks", "tools/ci", "tools/hearth", "tools/adapt"):
             results.append(
                 run(
                     [

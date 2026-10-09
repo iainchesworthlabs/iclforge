@@ -97,15 +97,15 @@ already shipped and nobody had connected it to this problem.
 **What exists.** Roadmap IO4 built the streaming fMP4/CMAF fragmenter and IO5 added the DASH JOC
 signalling:
 
-- `src/mp4/include/iclforge/mp4/mp4.hpp` — `FragmentWriter`, `MediaSegment`, `SegmentInfo`,
+- `libs/containers/include/iclforge/containers/mp4/mp4.hpp` — `FragmentWriter`, `MediaSegment`, `SegmentInfo`,
   `FragmentOptions`.
-- `src/mp4/include/iclforge/mp4/hls.hpp` — `build_hls_master_playlist`, `build_hls_media_playlist`,
+- `libs/containers/include/iclforge/containers/mp4/hls.hpp` — `build_hls_master_playlist`, `build_hls_media_playlist`,
   `hls_codec_string`.
-- `src/mp4/include/iclforge/mp4/dash.hpp` — the dynamic MPD, with TS 103 420 D.2's supplemental
+- `libs/containers/include/iclforge/containers/mp4/dash.hpp` — the dynamic MPD, with TS 103 420 D.2's supplemental
   properties and the `ceao` compatibility brand.
-- `src/mp4/include/iclforge/mp4/reader.hpp` — **the read direction**, so a sink can pull an access unit
+- `libs/containers/include/iclforge/containers/mp4/reader.hpp` — **the read direction**, so a sink can pull an access unit
   back out of a segment without new demuxing code.
-- `apps/common/fmp4_folder_writer.hpp` — and this is the piece that matters most. It writes
+- `apps/shared/media/src/fmp4_folder_writer.hpp` — and this is the piece that matters most. It writes
   `init.mp4`, one `segment<N>.m4s` per closed fragment, and `audio.m3u8`, `master.m3u8` and
   `manifest.mpd` rewritten beside them on every close. Its own header says what that makes it:
   *"Live-shaped while the take runs — no `#EXT-X-ENDLIST`, a `type="dynamic"` MPD with an
@@ -131,7 +131,7 @@ signalling:
 fragment is 1.536 s segments; a player holding three of them is roughly 5 s behind live. That is
 fine for music in another room and wrong for anything watched. Low-Latency HLS is **not**
 implemented — `#EXT-X-PART` appears nowhere, and the only tag beyond the basics is
-`#EXT-X-INDEPENDENT-SEGMENTS` (in `src/mp4/src/hls.cpp`).
+`#EXT-X-INDEPENDENT-SEGMENTS` (in `libs/containers/src/mp4/hls.cpp`).
 
 It may not be needed. `FragmentOptions`' own comment records the property that makes segment
 length free: *"Every AC-3/E-AC-3 access unit this project produces is independently decodable
@@ -213,7 +213,7 @@ Measured under `idf.py qemu` and landed in
 on.
 
 - **AC-3 *and* E-AC-3 5.1 both decode correctly on an ESP32-S3.** Six frames each, all twelve
-  channel levels exact against `apps/baremetal/fixture.hpp`. It **fits internal SRAM with no
+  channel levels exact against `firmware/baremetal/fixture.hpp`. It **fits internal SRAM with no
   PSRAM**: the allocator reports 280,792 bytes free against a 236,391-byte peak heap.
 - **float32 closed it, and closed PF7's float32 gap with it.** A profile-selected
   `decode_scalar_t`, validated at roughly 139 dB against the double decode on four real streams
@@ -261,7 +261,7 @@ because the population of possible sinks is no longer "a Pi or a PC".
 | A third-party AV receiver | sink | IEC 61937 | not ours; **cannot be synchronised** |
 | The playback appliance | sink | local files today; HTTP client is the new work | [plan](player-appliance.md), replaced on 2026-09-15 by Hearth: a desktop app and Sendspin sinks, with no daemon and no HTTP client |
 | An ESP32-S3 node | sink | HTTP client, then Sendspin | a Sendspin player (`hearth_sink`); it also fetches a stream from a URL for debugging (`POST /play`). Both codecs decode and fit internal SRAM ([#546](https://github.com/iainchesworthlabs/ac3forge/pull/546)), and every decode fixture runs in real time on a board |
-| The WASM decode page | sink | a file today; could be an HLS client for free | shipped as a file page; the JS package has an hls.js bridge (`js/src/hls-bridge.ts`) with no live-server soak test |
+| The WASM decode page | sink | a file today; could be an HLS client for free | shipped as a file page; the JS package has an hls.js bridge (`bindings/js/src/hls-bridge.ts`) with no live-server soak test |
 | A DAW **metering** plugin | **neither** — an instrument, not a node | n/a | what [the study](host-plugin.md)'s Part 2 actually plans; no capability blocker |
 | The delivery-QC report | **neither** — an instrument, not a node | n/a | [plan](qc-report.md); belongs under Forge, and this page is why |
 
@@ -348,7 +348,7 @@ path (`ci.yml:314`) classifies each PR as docs-only.
 ### Phase 2: one source, one sink, over HTTP
 
 **Status: not built.** Nothing serves an `Fmp4FolderWriter` folder and no code follows an HLS
-playlist. `mp4::reader` exists, and `js/src/hls-bridge.ts` feeds an hls.js player's fragments to
+playlist. `mp4::reader` exists, and `bindings/js/src/hls-bridge.ts` feeds an hls.js player's fragments to
 the WebAssembly decoder, which is a different client with no soak test behind it
 ([WebAssembly](../docs/platforms/wasm.md)). For Hearth the phase was replaced by Sendspin.
 
@@ -367,7 +367,7 @@ two-machine run. Latency measured, not assumed, at 48, 16, 8 and 4 frames per fr
 
 **Status: not built.** No segment-length measurement exists, `frames_per_fragment` still defaults to
 48 and `playlist_window_segments` to 0, and Low-Latency HLS is still absent (`#EXT-X-PART` appears
-nowhere in `src/mp4/src/hls.cpp`). One constraint the phase would meet has changed: an AC-4
+nowhere in `libs/containers/src/mp4/hls.cpp`). One constraint the phase would meet has changed: an AC-4
 frame is decodable alone only where its table of contents sets `b_iframe_global`, so an AC-4
 fragment holds at least `frames_per_fragment` frames and closes on the next sync sample, and
 cannot be shorter than the interval between the stream's I-frames (`FragmentOptions` in
@@ -385,7 +385,7 @@ them over Wi-Fi rather than Ethernet.
 
 ### Phase 4: discovery, and more than one sink
 
-**Status: built over Sendspin, not HTTP.** `src/sendspin` discovers players by mDNS and
+**Status: built over Sendspin, not HTTP.** `libs/sendspin` discovers players by mDNS and
 `ac3hearth` plays one programme to a group of sinks, each aligned in the PCM domain. The number
 the exit asks for exists in software terms: on a home Wi-Fi network two boards' reported play
 times stayed within 549 µs of each other over ten minutes, and nobody has measured two DAC outputs
@@ -506,7 +506,7 @@ figures.*
    embedded node; (c) the ESP32 node is a demo of the library, the way the Shield app is.
    **Recommend (a)**: it is one decoder, one client and one protocol, differing only in size,
    and the platform tree already expresses that split
-   (`apps/baremetal/platform/{baremetal,host,esp32s3}`). Cost: one member's CI has to build for
+   (`firmware/baremetal/platform/{baremetal,host,esp32s3}`). Cost: one member's CI has to build for
    Xtensa, which nothing in the repository does today. *Taken in effect: Hearth is one member
    with the desktop player and the ESP32 sinks as its two forms, and CI builds the sink for
    Xtensa and RISC-V (`build-esp32s3`, `hearth-esp32s3`, `build-esp32c3`).*

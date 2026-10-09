@@ -1,9 +1,9 @@
-# AC-4 (ETSI TS 103 190): `iclforge::ac4dec` and `iclforge::ac4enc`
+# AC-4 (ETSI TS 103 190): `iclforge::ac4`
 
-`iclforge/ac4dec/decoder.hpp`, library `iclforge::ac4dec`, and `iclforge/ac4enc/encoder.hpp`, library `iclforge::ac4enc`,
-with the inspector both work through, `iclforge/ac4/ac4.hpp` in library `iclforge::ac4`. An AC-4 decoder and
+`iclforge/ac4/decoder/decoder.hpp` and `iclforge/ac4/encoder/encoder.hpp`, with the table of contents
+both work through, `iclforge/ac4/core/toc.hpp`, all in the library `iclforge::ac4`. An AC-4 decoder and
 encoder written from ETSI TS 103 190-1 V1.4.1 (channel-based coding) and TS 103 190-2 V1.3.1
-(immersive and personalized audio). The libraries are in namespace `ac4` and link nothing from
+(immersive and personalized audio). The library is in namespace `iclforge::ac4` and links nothing from
 `iclforge::ac3`: AC-4 shares no bitstream syntax with AC-3 or E-AC-3. The encoder is described under
 [Encoding a stream](#encoding-a-stream), and the [AC-4 concepts page](../concepts/ac4.md)
 explains the format.
@@ -126,7 +126,7 @@ the element as full decoding only (Table 8). So the decoder delivers 22.2 as cod
 `downmix` but `kAsCoded` and `decoding = kCore` with `kUnsupported` and a reason that names 22.2, and
 dialogue enhancement acts on L, R and C. DRC groups the channels by Part 2 Table 69. No stream of this
 element and no other decoder is available to check it against; the readings are in
-`src/ac4dec/ERRATA.md` under "The 22.2 element", and the streams its tests decode are built from the
+`libs/ac4/ERRATA.md` under "The 22.2 element", and the streams its tests decode are built from the
 standard's tables ([Validation](../verification.md#the-decoders-222-element)).
 
 ### 9.X.4 channel elements
@@ -145,7 +145,7 @@ never a target. Dialogue enhancement acts on Lscr, Rscr and C in full decoding (
 the A-JCC and A-CPL modes in core decoding, by the extension tools of clauses 5.8.2.1 and 5.8.2.2;
 `b_de_simulcast` selects the second `de_data()` for core decoding. DRC groups Lscr and Rscr with L and
 R (Table 69). No stream of these modes and no other decoder is available to check them against; the
-readings are in `src/ac4dec/ERRATA.md` under "The 9.X.4 element", and the streams their tests decode
+readings are in `libs/ac4/ERRATA.md` under "The 9.X.4 element", and the streams their tests decode
 are built from the standard's tables.
 
 `DecoderConfig` holds the rest: `output`, `presentation` (below), `concealment`, `level` (the
@@ -185,9 +185,9 @@ for a gain, and the compression of DRC (`DrcMode::kOff` keeps the output level).
 with no extension substream linked is refused too: the text does not say what rate it is at.
 
 No stream at these rates was available, and no other decoder: the tests decode streams built from the
-text (`tests/golden/ac4-hsf/` and `tests/ac4dec/ac4dec_hsf.hpp`), each channel a tone above 24 kHz where the
+text (`testdata/ac4-hsf/` and `libs/ac4/tests/decoder/hsf.hpp`), each channel a tone above 24 kHz where the
 base rate has none, and hold the output to its frequency, level and waveform. The readings the text left open
-are in `src/ac4dec/ERRATA.md` under "96 and 192 kHz".
+are in `libs/ac4/ERRATA.md` under "96 and 192 kHz".
 
 ## Choosing a presentation
 
@@ -209,7 +209,7 @@ needs no I-frame; its signal starts from silence.
 Of the presentations this decoder can decode, the stream has not disabled and whose `md_compat` is
 within the decoder's level, the one that meets the choice is decoded, the first in the table of
 contents among equals. `iclforge::ac4::select_presentation(toc, choice, level)` makes the same choice from a
-table of contents alone. Where the text leaves the choice open, `src/ac4dec/ERRATA.md` records the
+table of contents alone. Where the text leaves the choice open, `libs/ac4/ERRATA.md` records the
 reading taken. `forge decode` takes the choice as `presentation=` (the position),
 `presentation-id=`, `language=`, `associated=` and `headphones`.
 
@@ -273,7 +273,7 @@ of objects takes them from `decode()`.
 
 `forge decode` renders a presentation with objects to speakers through the layout renderer Hearth
 plays E-AC-3's objects with (`iclforge::render::LayoutRenderer`, by way of
-`apps/common/ac4_object_render.hpp`): each object panned from its position at its gain, moving to
+`apps/shared/media/src/ac4_object_render.hpp`): each object panned from its position at its gain, moving to
 each update over its ramp, to the layout `speakers=`, `channels=` or `downmix=` names, 7.1.4
 without them. Width, divergence, zones and the screen factor are not rendered.
 
@@ -358,15 +358,15 @@ config.presentations = {
 presentation gets the least `md_compat` its tracks need and a `presentation_id` of its own unless it
 sets them, and its own dialnorm, loudness, DRC and downmix where it sets them. The substreams take
 shares of the rate in proportion to their full-band channels unless they set their own. What the
-encoder refuses there, and why, is in the header and `src/ac4enc/ERRATA.md`.
+encoder refuses there, and why, is in the header and `libs/ac4/ERRATA.md`.
 
 ### Encoding objects
 
 With `experimental.objects`, a substream codes objects in place of channels: each object's PCM, one
 input channel each, and its metadata over time in the `ObjectProperties` the decoder reports
-(`iclforge/ac4/ac4.hpp`). The applications convert object scenes, ADM BWF and IAB masters into these
+(`iclforge/ac4/core/toc.hpp`). The applications convert object scenes, ADM BWF and IAB masters into these
 (`forge atmos-encode`, `atmos-adm` and `atmos-iab` with `codec=ac4`, and the Forge GUI's encoder
-page, through `apps/common/ac4_objects_core.hpp`); the library reads no scene format.
+page, through `apps/shared/media/src/ac4_objects_core.hpp`); the library reads no scene format.
 
 ```cpp
 iclforge::ac4::EncoderConfig config{.bitrate_kbps = 256};
@@ -420,7 +420,7 @@ a CMAF track carries.
 MPEG-TS carries AC-4 under the DVB profile only, and Matroska registers no codec ID for it, so
 `forge mkv` refuses an AC-4 stream. `forge ac4-encode` spells each setting as an option, raw or
 MP4 by the output's name: see [Commands](../forge/cli/commands.md#ac4-encode); `forge mp4`, `ts`
-and `fmp4` package a stream that already exists, and [Muxing & sinks](muxing-and-sinks.md#muxing-iclforgemp4mux)
+and `fmp4` package a stream that already exists, and [Muxing & sinks](muxing-and-sinks.md#muxing-iclforgecontainersmp4mux)
 has the library's side.
 
 ## The inspector
@@ -450,7 +450,7 @@ probe:
   G.1, or the Dolby 2015 scheme's word); and `iclforge::ac4::dash_supplemental_properties(toc)` the frame
   rate and a pre-virtualized presentation's descriptors (G.3). `iclforge::ac4::configuration_difference(a,
   b)` names the Annex H.1.2.4 parameter in which two tables of contents differ, empty where every
-  sample of a CMAF track may carry both. `src/ac4enc/ERRATA.md` ("Manifests and CMAF tracks") has
+  sample of a CMAF track may carry both. `libs/ac4/ERRATA.md` ("Manifests and CMAF tracks") has
   the readings these take.
 
 ## Errors
@@ -468,38 +468,32 @@ namespace tells them apart. A decoder or an encoder that refuses says why in wor
 **In-tree:**
 
 ```cmake
-target_link_libraries(your_target PRIVATE iclforge::ac4dec)   # brings iclforge::ac4 with it
-target_link_libraries(your_target PRIVATE iclforge::ac4enc)   # likewise
+target_link_libraries(your_target PRIVATE iclforge::ac4)
 ```
 
 **Installed package** (`find_package(iclforge)`, see [Using the libraries](index.md)):
 
 ```cmake
 find_package(iclforge REQUIRED)
-target_link_libraries(your_target PRIVATE iclforge::ac4dec_static)   # or iclforge::ac4dec_shared
-target_link_libraries(your_target PRIVATE iclforge::ac4enc_static)   # or iclforge::ac4enc_shared
+target_link_libraries(your_target PRIVATE iclforge::ac4_static)   # or iclforge::ac4_shared
 ```
 
-Each decoder and encoder library links the inspector of its own kind, `iclforge::ac4_static` or
-`iclforge::ac4_shared`. A package installed with one linkage, as a vcpkg or Conan one is, also defines
-the bare `iclforge::ac4dec`, `iclforge::ac4enc` and `iclforge::ac4`. The static decoder and encoder call into
-`iclforge::ac4core`, a static archive of the tables and transforms the two share (`libac4core_static.a`,
-no headers), which their exported targets name as a link-only dependency; each shared library
-carries the part of it that it uses. Through pkg-config the decoder is `ac4dec` and the encoder
-`ac4enc`, each of which requires `ac4`, and whose static-only forms require `ac4core` privately:
+The inspector, the decoder and the encoder are one library, and the tables and transforms the
+decoder and the encoder share are inside it, with private headers. A package installed with one
+linkage, as a vcpkg or Conan one is, also defines the bare `iclforge::ac4`. Through pkg-config it is
+`iclforge-ac4`:
 
 ```bash
-c++ -std=c++23 player.cpp $(pkg-config --cflags --libs ac4dec)
-c++ -std=c++23 packager.cpp $(pkg-config --cflags --libs ac4enc)
+c++ -std=c++23 player.cpp $(pkg-config --cflags --libs iclforge-ac4)
 ```
 
-`ICLFORGE_BUILD_AC4`, on by default, builds the AC-4 libraries. The vcpkg port and the Conan
-recipe install them where asked for, off by default: `vcpkg install iclforge[ac4]`, or
+`ICLFORGE_BUILD_AC4`, on by default, builds the AC-4 library. The vcpkg port and the Conan
+recipe install it where asked for, off by default: `vcpkg install iclforge[ac4]`, or
 `-o "iclforge/*:ac4=True"` (see [Using the libraries](index.md)). The C API, Python, Rust and
 WebAssembly bindings wrap the decoder and the encoder, the object encoder included ([C
 API](c-api.md#ac-4), [Python API](python-api.md#ac-4), [Rust API](rust-api.md#ac-4) and
-[WebAssembly](../platforms/wasm.md#ac-4-module)). Android's CMake build compiles the libraries and
-links them into nothing in the app. The ESP-IDF component builds the inspector, core and decoder
+[WebAssembly](../platforms/wasm.md#ac-4-module)). Android's CMake build compiles the library and
+links it into nothing in the app. The ESP-IDF component builds the inspector, core and decoder
 behind `CONFIG_ICLFORGE_AC4`, off by default, in single precision on parts with a floating-point
 unit and in the fixed-point tier on the ESP32-C3 and ESP32-C6, and never the encoder
 ([ESP32-P4](../platforms/bare-metal/esp32-p4.md#ac-4), [ESP32-S3](../platforms/bare-metal/esp32-s3.md#ac-4),

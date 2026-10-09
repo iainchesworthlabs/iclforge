@@ -1,0 +1,375 @@
+#pragma once
+
+#include <CoreAudio/CoreAudio.h>
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+
+#include "iclforge/audio/passthrough.hpp"
+
+// The macOS backend's pure half: everything here is ordinary arithmetic and
+// struct inspection over types <CoreAudio/CoreAudio.h> defines, with no
+// AudioObjectGetPropertyData/AudioObjectSetPropertyData call - or any other
+// live round-trip to the HAL - anywhere in the file. The include itself is
+// the full umbrella header rather than the narrower <CoreAudio/CoreAudioTypes.h>
+// only because AudioStreamRangedDescription (find_physical_format's own
+// currency) is declared in AudioHardwareBase.h, not CoreAudioTypes.h - a
+// function-declarations-only header is not a live device the way an actual
+// AudioObjectGetPropertyData call would be, so this file's claim to being
+// "pure" is about behaviour (nothing here ever touches a device), not about
+// which sub-header a type happens to live in.
+//
+// Unlike platform/alsa/device_names.hpp, whose whole point is testability on
+// a machine that might not have libasound installed, what this file is pure
+// OF is a live HAL round-trip, not a library that might be missing:
+// CoreAudio.framework's headers ship with every macOS SDK, so there is no
+// "not installed" story here to design around. libs/audio/tests/backend/macos/
+// test_macos_support.cpp covers this file directly, on real macOS CI, the
+// same role libs/audio/tests/backend/alsa/test_alsa_device_names.cpp plays for
+// device_names.hpp.
+//
+// coreaudio_support.hpp next door is the impure half: property fetching,
+// device enumeration, hog mode, and the async wait a physical-format or
+// nominal-rate change needs before it can be trusted.
+//
+// The process-tap version floor below is a third kind of "pure": it never
+// touches CoreAudio.framework at all, just the OS version - but that makes it
+// no less pure by this file's own definition (no live round-trip to a
+// device), so it lives here rather than earning its own header for two
+// constants and a function. See capture.cpp's own "Loopback" section, and
+// process_tap.hpp, for what it is for.
+
+namespace iclforge::coreaudio {
+
+// Mirrors platform/alsa/device_names.hpp's carrier_rate and
+// libs/audio/src/backend/android/android_support.hpp's copy of the same logic (the same
+// physical fact each time, not a coincidence of naming): a Dolby Digital
+// Plus burst is four times the size of an AC-3 one and covers the same span
+// of time, so the digital link has to clock four times as fast to deliver
+// it - Microsoft's "Representing Formats for IEC 61937 Transmissions"
+// states it as a general IEC 61937 fact, not a WASAPI-specific one, and
+// CoreAudio's kAudioStreamPropertyPhysicalFormat mSampleRate field describes
+// the wire in exactly the sense WASAPI's WAVEFORMATEXTENSIBLE and ALSA's
+// device-name rate both do.
+[[nodiscard]] constexpr std::uint32_t carrier_rate(audio::BitstreamFormat format,
+                                                    std::uint32_t content_rate) {
+    return content_rate * audio::carrier_ratio(format);
+}
+
+// The physical-format fourCC a digital output stream is asked for.
+//
+// kAudioFormat60958AC3 ('cac3') is long-documented and exercised by every
+// real-world CoreAudio passthrough implementation surveyed while writing
+// this backend (MythTV's audiooutputca.cpp, mpv's ao_coreaudio_exclusive.c
+// and VLC's auhal.c all probe for it the same way, via
+// kAudioStreamPropertyAvailablePhysicalFormats). kAudioFormatEnhancedAC3
+// ('ec-3') has no comparably long history as a *physical* (IEC 60958-wrapped)
+// stream format the way kAudioFormat60958AC3 does - it is the same fourCC
+// iclforge::ac3::io::build_codec_config_box uses for a raw E-AC-3 *elementary* stream
+// in an MP4 sample entry, not a documented S/PDIF/HDMI wire format. Apple's
+// own support documentation confirms Dolby Digital Plus/Atmos HDMI
+// passthrough exists on Apple Silicon Macs without documenting the HAL
+// mechanism behind it, so this backend probes for kAudioFormatEnhancedAC3
+// exactly as it does kAudioFormat60958AC3; on hardware or macOS versions
+// where the driver does not publish it, supports_eac3_passthrough simply
+// comes back false, the honest answer under the same "a platform can gain
+// one and not the other" contract iclforge::audio::RenderDeviceInfo already documents.
+//
+// Nothing for AC-4: CoreAudioBaseTypes.h defines no AC-4 format ID at all, so
+// there is nothing to look for among a stream's physical formats or to retune
+// one to, and start() refuses AC-4 with kUnsupportedFormat.
+[[nodiscard]] constexpr std::optional<AudioFormatID> physical_format_id(
+    audio::BitstreamFormat format) {
+    switch (format) {
+        case audio::BitstreamFormat::kAc3:
+            return kAudioFormat60958AC3;
+        case audio::BitstreamFormat::kEac3:
+            return kAudioFormatEnhancedAC3;
+        case audio::BitstreamFormat::kAc4:
+        case audio::BitstreamFormat::kAc4Hbr4:
+        case audio::BitstreamFormat::kAc4Hbr16:
+            break;
+    }
+    return std::nullopt;
+}
+
+// Whether `formats` (as kAudioStreamPropertyAvailablePhysicalFormats returns
+// them) includes `format_id` at `carrier_hz`, and if so, the exact
+// AudioStreamBasicDescription the driver published for it.
+//
+// Returning the driver's own descriptor rather than hand-building one (the
+// way platform/windows/passthrough.cpp's make_ac3_format/make_eac3_format
+// construct a WAVEFORMATEXTENSIBLE_IEC61937 field by field) matters here
+// specifically: WASAPI's IEC 61937 subformat GUID is a fixed, Microsoft-
+// documented layout, but a physical AudioStreamBasicDescription is whatever
+// the driver decided to publish - mBytesPerPacket/mFramesPerPacket/
+// mBitsPerChannel can legitimately differ between drivers for the same
+// compressed format (some report them as 0, "not meaningful for a non-PCM
+// stream"). Handing kAudioStreamPropertyPhysicalFormat back exactly what
+// kAudioStreamPropertyAvailablePhysicalFormats offered is the only way to be
+// sure the fields a fussier driver does check survive intact.
+//
+// A small tolerance on the rate match, not exact equality: mSampleRateRange
+// is a Float64 range and some drivers report it as [carrier, carrier] with
+// the double arithmetic not landing on an exact bit pattern.
+[[nodiscard]] inline std::optional<AudioStreamBasicDescription> find_physical_format(
+    std::span<const AudioStreamRangedDescription> formats, AudioFormatID format_id,
+    Float64 carrier_hz) {
+    constexpr Float64 kTolerance = 1.0;
+    for (const auto& candidate : formats) {
+        if (candidate.mFormat.mFormatID != format_id) {
+            continue;
+        }
+        if (carrier_hz >= candidate.mSampleRateRange.mMinimum - kTolerance &&
+            carrier_hz <= candidate.mSampleRateRange.mMaximum + kTolerance) {
+            return candidate.mFormat;
+        }
+    }
+    return std::nullopt;
+}
+
+// A display name that is never empty, matching the Windows/ALSA backends'
+// own fallback discipline (endpoint_display_name / the "default" entry) so
+// a blank row in a device list is always a rendering bug rather than data
+// this backend produced.
+[[nodiscard]] inline std::string fallback_name(const std::string& uid) {
+    return uid.empty() ? std::string{"Unnamed audio endpoint"} : "Unnamed endpoint " + uid;
+}
+
+// ---------------------------------------------------------------------------
+// The process-tap version floor
+// ---------------------------------------------------------------------------
+// Core Audio's process/system audio tap - AudioHardwareCreateProcessTap paired
+// with a CATapDescription - is what capture.cpp's start_process_loopback()
+// is built on, through process_tap.mm (CATapDescription has no C entry point,
+// so that one translation unit is Objective-C++; see process_tap.hpp).
+//
+// What is written down once here is the ARGUMENT for the number, and the one
+// sentence a refused caller is shown. The number itself is not, and cannot
+// be: three of the four places that name it - system_audio_tap_api_available()
+// below, process_tap.mm's @available guard, and the API_AVAILABLE annotations
+// on the functions behind it - spell the version as a token the compiler
+// reads at parse time, not as a value it can take from a constant. The fourth
+// is the refusal sentence, which has to read as English and so carries the
+// version as text. So the number appears in four places by necessity, and
+// what holds them together is a check rather than a definition:
+// libs/audio/tests/backend/macos/test_macos_support.cpp asserts that the refusal
+// sentence names the version kSystemAudioTapMinimumOs does, and that the two
+// reports of the refusal are the same string. Neither of those can catch an
+// @available guard left behind at an older version - that one has to be moved
+// by hand, and the list above is here so that whoever moves the floor knows
+// how many places to look.
+//
+// 14.2, not 14.4, and the choice is worth recording because both figures are
+// in circulation. Apple's SDK annotates the tap API API_AVAILABLE(macos(14.2)),
+// which is the version __builtin_available and @available compile against and
+// the version the weak-linked symbols are keyed to - so 14.2 is where the API
+// is present by the operating system's own account. Several third-party
+// write-ups, and at least one widely-copied sample project, require 14.4
+// instead, on reports of taps misbehaving on 14.2 and 14.3. Taking 14.4 here
+// would mean refusing a machine whose OS declares the API present, on the
+// strength of a report nobody on this project can check: no Mac has ever run
+// this backend (ROADMAP.md DR9), and neither figure has been observed to be
+// right or wrong here. So the floor follows the SDK, and this comment records
+// the other number rather than losing it. If a 14.2 or 14.3 machine is ever
+// found to misbehave, this is the constant to move, and the four places
+// listed above move with it. Chosen 2026-09-06.
+inline constexpr std::string_view kSystemAudioTapMinimumOs = "macOS 14.2";
+
+// One of the two sentences a refused caller is shown - this one where the
+// machine is older than the floor. Both reports of a refusal go through
+// system_audio_tap_refusal() below (capture.cpp's
+// describe(kProcessLoopbackUnavailable) and audio_backend.cpp's
+// process_loopback reason), so the two reports of one fact cannot drift
+// apart. It names the version a person needs, which is the only part of THIS
+// refusal they can act on - and it names it in the same words
+// kSystemAudioTapMinimumOs uses, which is what lets a test hold the two
+// against each other.
+inline constexpr std::string_view kSystemAudioTapVersionRefusal =
+    "per-process loopback capture needs Core Audio's process-tap API "
+    "(AudioHardwareCreateProcessTap), which arrived in macOS 14.2; this machine is older";
+
+// The sentence for the second gate below. It says what was seen rather than
+// what is forbidden, because that is all anyone here knows: the call that
+// hung is the one that registers an IOProc on the tap's aggregate device, and
+// it hung on a machine that satisfied every documented precondition for it.
+inline constexpr std::string_view kSystemAudioTapUnverifiedRefusal =
+    "per-process loopback capture is off on macOS: the one machine that has run it "
+    "(macOS 26.6.2) never returned from AudioDeviceCreateIOProcID on the tap's aggregate "
+    "device and took the rest of this process's Core Audio with it, so the path is not "
+    "entered until a Mac has been seen to complete it; set ICLFORGE_MACOS_PROCESS_TAP to "
+    "try it";
+
+// Whether this OS build is new enough to expose that API. A version gate
+// only: it requests no permission, creates no tap and touches no device, so
+// unlike the tap itself it needs no real hardware to write or trust -
+// __builtin_available compiles the same runtime check @available uses in
+// Objective-C, and (per Clang's own restriction) may only appear as an
+// if-condition, which is why this wraps it instead of returning the
+// expression directly. The version cannot be spelled with the constant above:
+// __builtin_available takes a version token at parse time, not a value, which
+// is why the two sit adjacent and the argument for the number lives on the
+// constant.
+[[nodiscard]] inline bool system_audio_tap_api_available() {
+    if (__builtin_available(macOS 14.2, *)) {
+        return true;
+    }
+    return false;
+}
+
+// The SECOND gate, and the reason it exists is an observation rather than a
+// version number.
+//
+// On 2026-09-06 the tap path ran for the first time anywhere, on the Apple
+// Silicon macOS CI leg (macOS 26.6.2). Creating the tap succeeded, creating
+// the private aggregate device succeeded, reading the tap's format succeeded
+// - and then AudioDeviceCreateIOProcID on that aggregate never returned.
+// `sample` caught it three times in three separate processes, in every case
+// parked in mach_msg2_trap inside
+// HALC_ProxyIOContext::_TellServerAboutStreamUsage, waiting on a reply from
+// coreaudiod that did not come within ctest's 300-second limit. Worse than
+// the tap simply not working: while that request was outstanding the whole
+// process's HAL client was unusable, so an ordinary
+// AudioObjectGetPropertyData on ANOTHER thread - Crucible's window, asking
+// for the device list - blocked behind it, and the application froze rather
+// than reporting that a tap had failed.
+//
+// So this backend does not make that call by default. Nothing above it can
+// bound a synchronous HAL round trip, and there is no property to ask first:
+// every precondition the API documents was satisfied on the machine where it
+// hung. What CAN be said honestly is that no machine has been seen to
+// complete it, and a capability report that says "available" on the strength
+// of a version test alone was the thing that turned out to be wrong.
+//
+// The macOS 15.7.9 Intel leg ran the same code without hanging on the same
+// day, which is why this is not written as "macOS cannot do this": what is
+// known is that one host wedged and no host has ever produced a sample
+// through a tap. Two variables separate those legs, the OS version and the
+// architecture, and nothing here can say which matters.
+//
+// ICLFORGE_MACOS_PROCESS_TAP in the environment turns the path back on for
+// whoever has a Mac to settle it on. Read once, at first use, because
+// audio_backend()'s table is built once per process; it is a decision about
+// the run, not a setting to toggle inside one. Whoever gets a tap to deliver
+// samples on real hardware should delete this gate and the paragraph above
+// rather than leave the opt-in in place.
+[[nodiscard]] inline bool system_audio_tap_enabled() {
+    return std::getenv("ICLFORGE_MACOS_PROCESS_TAP") != nullptr;
+}
+
+// Which of the two gates is turning a caller away, as the sentence to print.
+// Both reports of the refusal go through here - capture.cpp's
+// describe(kProcessLoopbackUnavailable) and audio_backend.cpp's
+// process_loopback reason - so they cannot say different things, which is the
+// property libs/audio/tests/backend/macos/test_macos_support.cpp holds.
+[[nodiscard]] inline std::string_view system_audio_tap_refusal() {
+    return system_audio_tap_api_available() ? kSystemAudioTapUnverifiedRefusal
+                                            : kSystemAudioTapVersionRefusal;
+}
+
+// ---------------------------------------------------------------------------
+// Ordinary (non-compressed) PCM: what capture.cpp reads and monitor.cpp
+// writes.
+//
+// A HAL device's *virtual* format (kAudioDevicePropertyStreamFormat) is
+// almost always 32-bit float on modern macOS, but the 16/32-bit integer
+// cases are supported for the same reason the Windows/ALSA backends' own
+// classify()/convert() pairs support them: a device that reports something
+// else is a real, if rare, machine this should still work on rather than
+// silently misread.
+// ---------------------------------------------------------------------------
+
+enum class SampleFormat : std::uint8_t { kFloat32, kPcm16, kPcm32, kUnsupported };
+
+[[nodiscard]] constexpr std::size_t bytes_per_sample(SampleFormat format) {
+    switch (format) {
+        case SampleFormat::kFloat32: return 4;
+        case SampleFormat::kPcm16: return 2;
+        case SampleFormat::kPcm32: return 4;
+        case SampleFormat::kUnsupported: return 0;
+    }
+    return 0;
+}
+
+[[nodiscard]] inline SampleFormat classify_pcm(const AudioStreamBasicDescription& asbd) {
+    if (asbd.mFormatID != kAudioFormatLinearPCM) {
+        return SampleFormat::kUnsupported;
+    }
+    const bool is_float = (asbd.mFormatFlags & kAudioFormatFlagIsFloat) != 0;
+    const bool is_signed_int = (asbd.mFormatFlags & kAudioFormatFlagIsSignedInteger) != 0;
+    if (is_float && asbd.mBitsPerChannel == 32) {
+        return SampleFormat::kFloat32;
+    }
+    if (is_signed_int && asbd.mBitsPerChannel == 16) {
+        return SampleFormat::kPcm16;
+    }
+    if (is_signed_int && asbd.mBitsPerChannel == 32) {
+        return SampleFormat::kPcm32;
+    }
+    return SampleFormat::kUnsupported;
+}
+
+// Raw device samples turned into normalised float - the read side of the
+// pair, mirroring platform/alsa/capture.cpp's own convert().
+inline void samples_to_float(const std::byte* data, std::size_t count, SampleFormat format,
+                             std::span<float> out) {
+    switch (format) {
+        case SampleFormat::kFloat32:
+            std::memcpy(out.data(), data, count * sizeof(float));
+            break;
+        case SampleFormat::kPcm16:
+            for (std::size_t i = 0; i < count; ++i) {
+                std::int16_t value = 0;
+                std::memcpy(&value, data + i * 2, sizeof(value));
+                out[i] = static_cast<float>(value) / 32768.0f;
+            }
+            break;
+        case SampleFormat::kPcm32:
+            for (std::size_t i = 0; i < count; ++i) {
+                std::int32_t value = 0;
+                std::memcpy(&value, data + i * 4, sizeof(value));
+                out[i] = static_cast<float>(value) / 2147483648.0f;
+            }
+            break;
+        case SampleFormat::kUnsupported:
+            std::ranges::fill(out, 0.0f);
+            break;
+    }
+}
+
+// Normalised float turned into raw device samples - the write side of the
+// pair, mirroring platform/alsa/monitor.cpp's own convert(). Clamped for the
+// same reason that one is: a decoded sample slightly outside [-1, 1] should
+// sound loud, not wrap around to the opposite polarity and click.
+inline void float_to_samples(std::span<const float> in, SampleFormat format, std::byte* out) {
+    switch (format) {
+        case SampleFormat::kFloat32:
+            std::memcpy(out, in.data(), in.size() * sizeof(float));
+            break;
+        case SampleFormat::kPcm16:
+            for (std::size_t i = 0; i < in.size(); ++i) {
+                const float clamped = std::clamp(in[i], -1.0f, 1.0f);
+                const auto value = static_cast<std::int16_t>(clamped * 32767.0f);
+                std::memcpy(out + i * 2, &value, sizeof(value));
+            }
+            break;
+        case SampleFormat::kPcm32:
+            for (std::size_t i = 0; i < in.size(); ++i) {
+                const float clamped = std::clamp(in[i], -1.0f, 1.0f);
+                const auto value = static_cast<std::int32_t>(clamped * 2147483520.0f);
+                std::memcpy(out + i * 4, &value, sizeof(value));
+            }
+            break;
+        case SampleFormat::kUnsupported:
+            break;
+    }
+}
+
+}  // namespace iclforge::coreaudio

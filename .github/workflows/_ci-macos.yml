@@ -98,7 +98,7 @@ jobs:
       # noise investigation below). Homebrew's Qt6 stages its QML plugins
       # (Contents/PlugIns/*.dylib under forge-gui.app/crucible.app, every
       # QtQuick.Controls style among them - Fusion, which
-      # apps/gui/main.cpp's QQuickStyle::setStyle("Fusion") actually uses,
+      # apps/forge/gui/src/main.cpp's QQuickStyle::setStyle("Fusion") actually uses,
       # included) as symlinks back into its own Cellar, computed as if the
       # app were being installed under /usr/local. It isn't - cpack stages it
       # under the runner's workspace - so every one of those symlinks is
@@ -315,7 +315,7 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
           MATRIX_PRESET: ${{ matrix.preset }}
-        # apps/gui/CMakeLists.txt sets MACOSX_BUNDLE ON unconditionally, but it
+        # apps/forge/gui/CMakeLists.txt sets MACOSX_BUNDLE ON unconditionally, but it
         # is a no-op everywhere except APPLE, where it moves the built
         # executable to bin/forge-gui.app/Contents/MacOS/forge-gui instead of plain
         # bin/forge-gui - the property Linux never sets and Windows doesn't need
@@ -324,7 +324,7 @@ jobs:
         #
         # QSG_RENDER_LOOP=basic and the perl-alarm wrapper are both macOS-only
         # and both about the same hang the "Test" step hit on this leg's
-        # first-ever GUI run (see apps/gui/tests/CMakeLists.txt's identical
+        # first-ever GUI run (see apps/forge/gui/tests/qml.cmake's identical
         # QSG_RENDER_LOOP comment for the render-loop-deadlock hypothesis).
         # forge-gui --smoke drives the same QQmlApplicationEngine/QQuickWindow
         # path forge_gui_qmltests does, so it is at equal risk and had no bound
@@ -340,7 +340,7 @@ jobs:
             export QSG_RENDER_LOOP=basic
           fi
           smoke_args=(--smoke
-            fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav
+            libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav
             "${RUNNER_TEMP}/forge-gui-smoke.ac3"
             "${RUNNER_TEMP}/forge-gui-smoke.png")
           if [ "$RUNNER_OS" = "macOS" ]; then
@@ -449,7 +449,7 @@ jobs:
 
       # The counterpart to the two Windows asserts above, for the files that
       # had no assertion at all: forge's generated man page and its four
-      # shell completions (apps/cli/CMakeLists.txt, CLI shell completions). Those are
+      # shell completions (apps/forge/cli/CMakeLists.txt, CLI shell completions). Those are
       # produced by running the freshly built forge, so a cross build skips
       # them - and until #527 that test was CMAKE_CROSSCOMPILING, which is
       # TRUE on every native Linux and macOS build here (each
@@ -551,7 +551,7 @@ jobs:
       # pass on top of the one ctest already exercised against this same
       # build tree.
       #
-      # apps/gui/CMakeLists.txt's qt_generate_deploy_qml_app_script()
+      # apps/forge/gui/CMakeLists.txt's qt_generate_deploy_qml_app_script()
       # install(SCRIPT) needed an explicit COMPONENT runtime added for this
       # to actually pick up Qt's own copied Frameworks/PlugIns/QML - an
       # install(SCRIPT) with no COMPONENT only runs during a FULL install,

@@ -1,7 +1,7 @@
 """Compare the two AC-4 syntax transcriptions where no encoded stream reaches.
 
 The committed DEE streams, and the local census, exercise only part of the
-syntax the decoder in src/ac4dec and tools/references/ac4_syntax.py read. This
+syntax the decoder in libs/ac4/src/decoder and tools/references/ac4_syntax.py read. This
 script makes streams that reach the rest, reads each through both
 transcriptions and compares their traces.
 
@@ -31,7 +31,7 @@ before it are DEE's own, which the digest tests already compare. Findings:
   STOP      one stopped with an error where the other read on - the two check
             some values at different elements, so this is reported and does
             not fail the run;
-  TOC       the two tables of contents (src/ac4's and ac4_parse.py's) disagree
+  TOC       the two tables of contents (libs/ac4's and ac4_parse.py's) disagree
             on whether the frame parses or where its substreams are, so that
             frame's substreams are not compared, and only the first such frame
             of a case is reported. A frame both sides refuse is no finding, and
@@ -49,9 +49,9 @@ header). Run from the repo root:
       [--inputs DIR ...]
 
 --streams adds every *.ac4 under each directory (the local census, say) to the
-committed streams under tests/golden/external-baseline/ and tests/golden/ac4-hsf/.
+committed streams under testdata/external-baseline/ and testdata/ac4-hsf/.
 --inputs compares the files under each directory instead, every frame of each: a corpus
-fuzz/run.sh grew for fuzz_ac4_decode reaches syntax random streams do not.
+tools/fuzz/run.sh grew for fuzz_ac4_decode reaches syntax random streams do not.
 """
 
 import argparse
@@ -178,7 +178,7 @@ def synthetic(rng):
     # An HSF extension (Part 1 Table 12 and 4.2.4.3): the substream is at 96 or
     # 192 kHz and a substream beside it holds the lines beyond 24 kHz. Only for
     # the Part 1 channel elements, and for a single instance: the committed
-    # constructed streams (tests/golden/ac4-hsf/) are the ones that read to
+    # constructed streams (testdata/ac4-hsf/) are the ones that read to
     # their end, and mutations of them reach the extension's syntax; these
     # reach its refusals and its first bits.
     hsf = (factor == 1 and code not in IMMERSIVE_CODES and code != 0b111111110
@@ -641,9 +641,9 @@ def main():
             (cases / f"i{n:06d}.ac4").write_bytes(f.read_bytes())
         print(f"{len(inputs)} inputs copied to {cases}")
     else:
-        streams = sorted((REPO / "tests" / "golden" / "external-baseline").glob("ac4-*/*.ac4"))
+        streams = sorted((REPO / "testdata" / "external-baseline").glob("ac4-*/*.ac4"))
         # The constructed streams at 96 and 192 kHz, whose extension substreams the mutations reach.
-        streams += sorted((REPO / "tests" / "golden" / "ac4-hsf").glob("*.ac4"))
+        streams += sorted((REPO / "testdata" / "ac4-hsf").glob("*.ac4"))
         for directory in args.streams:
             streams += sorted(directory.rglob("*.ac4"))
         count = generate(streams, cases, args.mutations, args.synthetic, args.seed)

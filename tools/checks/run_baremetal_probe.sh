@@ -11,8 +11,8 @@
 # Two things are checked, and they fail for different reasons:
 #
 #   1. The probe's own verdict. It decodes every fixture, compares every
-#      channel's level against apps/baremetal/fixture.hpp, and prints
-#      result=pass or result=fail (see apps/baremetal/probe.cpp). A failure
+#      channel's level against testdata/baremetal/fixture.hpp, and prints
+#      result=pass or result=fail (see firmware/baremetal/probe.cpp). A failure
 #      here means the decode is wrong on this target.
 #
 #   2. The footprint ceilings below. These are not aspirations - they are the
@@ -34,7 +34,7 @@ HOST=0
 # this picks a preset rather than adding a fixture.
 DIRECTION=decoder
 # --ac4: the third profile, the AC-4 decoder (planning/ac4.md, D14a) in float, with its own
-# probe (apps/baremetal/ac4_probe.cpp) and its own presets, since AC-4 shares nothing with
+# probe (firmware/baremetal/ac4_probe.cpp) and its own presets, since AC-4 shares nothing with
 # iclforge::ac3 and an image carries one probe. --ac4 --scalar=fixed is the same probe on the
 # decoder's fixed-point tier (D14d), with ceilings of its own.
 # --stage-timers: build the library with ICLFORGE_STAGE_TIMERS, so the probe
@@ -48,7 +48,7 @@ DIRECTION=decoder
 STAGE_TIMERS=OFF
 # --icount: the one timing figure on this leg that means anything. The probe
 # is built with its clock on the mps2-an385's 25 MHz CMSDK timer
-# (ICLFORGE_BAREMETAL_CLOCK=timer, apps/baremetal/platform/baremetal/
+# (ICLFORGE_BAREMETAL_CLOCK=timer, firmware/baremetal/platform/baremetal/
 # clock_timer.cpp) and QEMU runs with -icount shift=0, under which the guest
 # clock advances one nanosecond per executed instruction. Every microsecond
 # the probe prints is then a thousand Thumb-2 instructions, deterministic on
@@ -167,10 +167,10 @@ declare -A ICOUNT_CEILING_AC4_FIXED=(
     [ac4_20_companding]=9200000
 )
 # Each fixture's peak heap and steady-state allocations a frame, on either leg and at either
-# tier, are in tests/golden/ac4-probe-ceilings.json, which tools/checks/check_probe_ceilings.py
+# tier, are in testdata/ac4-probe-ceilings.json, which tools/checks/check_probe_ceilings.py
 # reads here and in run_esp32s3_probe.sh --ac4: a figure is stated once, with what it was measured
 # at, and a fixture with no entry fails.
-AC4_CEILINGS="$REPO/tests/golden/ac4-probe-ceilings.json"
+AC4_CEILINGS="$REPO/testdata/ac4-probe-ceilings.json"
 
 # --- ceilings --------------------------------------------------------------
 # Bytes. text+data+bss of the linked probe on the bare-metal target, and the
@@ -180,9 +180,9 @@ AC4_CEILINGS="$REPO/tests/golden/ac4-probe-ceilings.json"
 # ICLFORGE_MAX_IMAGE_BYTES was re-based from 400,000 to 465,000 after the profile's own
 # feature branch (PR #351) picked up several mid-flight merges
 # from `develop` - most significantly DC10's QMF-domain JOC reconstruction,
-# which the decode path now needs (src/dsp/src/qmf.cpp and
-# src/ac3/src/verify/eac3_mirror.cpp, both correctly added to
-# src/ac3/minimal.cmake's source list) - between when 354,060/400,000 were
+# which the decode path now needs (libs/dsp/src/qmf.cpp and
+# libs/ac3/src/verify/eac3_mirror.cpp, both correctly added to
+# libs/ac3/minimal.cmake's source list) - between when 354,060/400,000 were
 # first measured and when the PR actually merged. The image had already
 # reached 412,516 bytes at that point; nobody re-measured before merging.
 # See docs/performance-trend.md's footprint table for the current breakdown.
@@ -295,7 +295,11 @@ if [[ "$DIRECTION" == "ac4" ]]; then
     # the inverse transform's float tables for the five block lengths of a 2048-sample frame in
     # flash where they were built on the heap (dsp/transform_tables.hpp), and 2,400 bytes of
     # .bss the probe's own stage-timer tables hold now that it names the stage at a peak.
-    ICLFORGE_MAX_IMAGE_BYTES=${ICLFORGE_MAX_IMAGE_BYTES_AC4:-825000}
+    #
+    # 830,000 since planning/consolidation.md's C4 (decision 15): one bit reader for every codec
+    # put base's CRC-16 table (512 bytes) and its windowed reads in the inspector, and the
+    # stage-timer build reached 825,596 bytes, which C3 had left 700 under the old 825,000.
+    ICLFORGE_MAX_IMAGE_BYTES=${ICLFORGE_MAX_IMAGE_BYTES_AC4:-830000}
     # The fixed-point tier's image: 727,656 bytes at D14d (725,004 .text), 801,812 on
     # 2026-10-03 with the transform tables (Q7.24, and the post-twiddles the tier has besides)
     # in flash. Its converter tables are Q1.30 integers built by the compiler, the 1001/960 one
@@ -406,7 +410,7 @@ if (( retained > ICLFORGE_MAX_RETAINED_BYTES )); then
 fi
 
 # The AC-4 probe's own rows: the stack a decode used (read by painting, see
-# apps/baremetal/ac4_probe.cpp) and each fixture's peak heap against its own ceiling.
+# firmware/baremetal/ac4_probe.cpp) and each fixture's peak heap against its own ceiling.
 if [[ "$DIRECTION" == "ac4" ]]; then
     stack=$(sed -n 's/.*stack\.peak_bytes=\([0-9]*\).*/\1/p' "$OUTPUT" | head -1)
     if [[ -z "$stack" ]]; then
@@ -425,7 +429,7 @@ fi
 # requirement and a regression in any of them is the same kind of news.
 #
 # The fixture names come from the probe's own output rather than from a list
-# kept here, so adding one (apps/baremetal/probe.cpp's kEac3Fixtures and
+# kept here, so adding one (firmware/baremetal/probe.cpp's kEac3Fixtures and
 # tools/generators/gen_baremetal_fixture.py's STREAMS) does not also mean
 # remembering to widen a gate in two runner scripts. A hardcoded list still
 # PASSES when a fixture is added and left off it, and the fixture nobody

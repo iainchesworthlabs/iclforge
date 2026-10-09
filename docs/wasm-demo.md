@@ -46,7 +46,7 @@ The module this page loads carries more than `iclforge::ac3`. It statically link
 (`cmake/Fmt.cmake` pins 12.2.0, and the committed `iclforge_decode.wasm` carries
 `fmt::v12::format_error`'s mangled RTTI name), which is distributed under the MIT licence, whose
 text is in this repository at
-[`apps/crucible/notices/licences/MIT-fmt.txt`](https://github.com/iainchesworthlabs/iclforge/blob/main/apps/crucible/notices/licences/MIT-fmt.txt).
+[`notices/licences/MIT-fmt.txt`](https://github.com/iainchesworthlabs/iclforge/blob/main/notices/licences/MIT-fmt.txt).
 The module also carries the Emscripten runtime and the C++ standard library that toolchain
 supplies, each under its own licence.
 
@@ -55,13 +55,13 @@ does not yet, so this section stands in for one.
 
 ## Source and how it's built
 
-Source: [`apps/wasm/`](https://github.com/iainchesworthlabs/iclforge/tree/main/apps/wasm) —
+Source: [`apps/demos/wasm/`](https://github.com/iainchesworthlabs/iclforge/tree/main/apps/demos/wasm) —
 see [WebAssembly](platforms/wasm.md) for the build/toolchain details and what's reused vs. new. CI
 rebuilds this embed fresh from source on every deploy to `main`; see
 [Release / CI](platforms/wasm.md#release-ci).
 
 This page is a consumer of `iclforge-wasm-decoder`
-(source: [`js/`](https://github.com/iainchesworthlabs/iclforge/tree/main/js)) rather
+(source: [`bindings/js/`](https://github.com/iainchesworthlabs/iclforge/tree/main/js)) rather
 than a parallel implementation of its own: the decode, the §7.8 fold and (in the demo's realtime
 section further down) the AudioWorklet playback pipeline all come from that package.
 
@@ -74,12 +74,12 @@ first.
 
 So what a reader can do today is one of two things. Use the demo above, which runs the decoder in
 your browser with nothing to install. Or build the package from source: clone the repository, then
-`cd js && npm ci && npm run build` — the same install and build CI runs in `js/` on every pull
-request that touches it — and point your project at the resulting `js/dist/`. The package ships no
+`cd bindings/js && npm ci && npm run build` — the same install and build CI runs in `bindings/js/` on every pull
+request that touches it — and point your project at the resulting `bindings/js/dist/`. The package ships no
 compiled `.wasm` of its own: `decodeFile()` and `PushDecoder` take the instantiated Embind module
 as their first argument, and `IclForgeDecoderNode` takes a `wasmGlueUrl` pointing at the Emscripten
-glue, so you also need the module built from `apps/wasm/`; [WebAssembly](platforms/wasm.md) covers
-that build. The [README](https://github.com/iainchesworthlabs/iclforge/blob/main/js/README.md) is
+glue, so you also need the module built from `apps/demos/wasm/`; [WebAssembly](platforms/wasm.md) covers
+that build. The [README](https://github.com/iainchesworthlabs/iclforge/blob/main/bindings/js/README.md) is
 the package's own API documentation. The package exists at all because a browser cannot be
 relied on to decode EC-3: [Chrome reports a decoder error](https://github.com/videojs/http-streaming/issues/1297)
 when an EC-3 track turns up in an MPD, in a report that has been open since 2023.

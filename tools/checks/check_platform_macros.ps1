@@ -3,7 +3,7 @@
 # Platform-isolation guard.
 #
 # iclforge branches on the operating system in CMake, never in the preprocessor:
-# src/audio/CMakeLists.txt picks one src/audio/src/backend/<backend>/ directory
+# libs/audio/CMakeLists.txt picks one libs/audio/src/backend/<backend>/ directory
 # (alsa/android/macos/pipewire/posix/windows) for the target OS, so exactly one
 # audio_backend.cpp/capture.cpp/monitor.cpp/passthrough.cpp set is ever
 # compiled. That only stays true if nobody reaches for an #ifdef, and an #ifdef
@@ -15,7 +15,7 @@
 # check costs nothing to keep at zero, and zero is a far easier line to hold
 # than "only the justified ones". Header-configuration defines that a platform
 # header genuinely requires (WIN32_LEAN_AND_MEAN, NOMINMAX) belong in
-# target_compile_definitions -- see the WIN32 block in src/audio/CMakeLists.txt
+# target_compile_definitions -- see the WIN32 block in libs/audio/CMakeLists.txt
 # for the worked example.
 #
 # The scan covered src/ and apps/ only until 2026-09-23, and tests/ had quietly
@@ -23,23 +23,24 @@
 # getpid() branch, eight of a cmd.exe quoting one, eleven AVX2 cases whose
 # bodies a non-x86_64 leg never even parsed, and an MSVC-only pair of ABI size
 # assertions. Each is now the same directory-selected shape the rest of the
-# tree uses -- tests/platform/<os>/, tests/ac3/core/avx2/{present,absent}/,
-# tests/render/abi/{msvc,unknown}/ -- and python/ likewise
-# (python/src/iclforge_ext/{signing,containers}/{present,absent}/), so every
+# tree uses -- tests/support/platform/<os>/, libs/ac3/tests/core/avx2/{present,absent}/,
+# libs/render/tests/abi/{msvc,unknown}/ -- and bindings/python/ likewise
+# (bindings/python/src/iclforge_ext/{signing,containers}/{present,absent}/), so every
 # tree here starts at zero rather than being grandfathered in with a waiver list.
 #
-# NOT scanned, deliberately: esp-idf/. That tree is an ESP-IDF component built
-# by idf.py, not by this repository's CMake, and its `#if CONFIG_*` guards are
+# NOT scanned, deliberately: firmware/esp-idf/ and firmware/hearth-sink/. Those trees are an
+# ESP-IDF component and a project built
+# by idf.py, not by this repository's CMake, and their `#if CONFIG_*` guards are
 # Kconfig symbols -- the documented IDF idiom, and in the CONFIG_SPIRAM case
 # load-bearing in a way a directory split would not reproduce: on a target with
 # no PSRAM bus, esp_psram_get_size() is never exposed to the linker at all
-# (see esp-idf/iclforge/src/control.cpp's own comment). Holding this rule over
+# (see firmware/esp-idf/iclforge/src/control.cpp's own comment). Holding this rule over
 # somebody else's build system, with no toolchain here to verify against, would
 # be a change made blind.
 #
 # Include guards are not affected: the codebase uses #pragma once.
 #
-# One other narrow exception, added for src/capi/include/iclforge_c/iclforge.h
+# One other narrow exception, added for libs/capi/include/iclforge_c/iclforge.h
 # (C API): `#ifdef __cplusplus` / `extern "C" {` / `#endif` is the
 # standard idiom that lets one header be included from both a C and a C++
 # translation unit, which a C-callable public header genuinely needs -
@@ -67,26 +68,28 @@ $ErrorActionPreference = 'Stop'
 $directivePattern = '^\s*#\s*(if|ifdef|ifndef|elif|elifdef|elifndef|else|endif)\b'
 $cplusplusGuardPattern = '^\s*#\s*ifdef\s+__cplusplus\b'
 
-$srcRoot = Join-Path $Root 'src'
+$srcRoot = Join-Path $Root 'libs'
 if (-not (Test-Path $srcRoot)) {
-    Write-Error "No src/ directory under '$Root'. Pass -Root <repo-root>."
+    Write-Error "No libs/ directory under '$Root'. Pass -Root <repo-root>."
     exit 2
 }
 
 # apps/ (the runnable-application tree - forge, forge-gui, the Android and WASM
-# demos) carries the same rule and is scanned alongside src/ once it exists.
+# demos) carries the same rule and is scanned alongside libs/ once it exists.
 # Optional rather than required: a repo state mid-way through the src/->apps/
 # consolidation (or a checkout of an older tag, before apps/ existed at all)
-# still has a valid src/ to scan even with no apps/ yet.
+# still has a valid libs/ to scan even with no apps/ yet.
 $scanRoots = @($srcRoot)
 
 # Every other first-party C++ tree, each optional in the same way and for the
 # same reason apps/ is: a checkout mid-way through a reorganisation, or of an
-# older tag from before one of these existed, still has a valid src/ to scan.
-# fuzz/, examples/ and tools/ were already clean when they were added here on
-# 2026-09-23 and cost nothing to hold; tests/ and python/ were cleaned to join
-# them.
-foreach ($name in @('apps', 'tests', 'fuzz', 'examples', 'tools', 'python')) {
+# older tag from before one of these existed, still has a valid libs/ to scan.
+# examples/ and tools/ were already clean when they were added here on
+# 2026-09-23 and cost nothing to hold; tests/ and bindings/python/ were cleaned to join
+# them. A library's own tests and fuzz targets are in libs/<lib>/ (planning/monorepo.md, C7-1),
+# so libs/ holds what libs/, tests/ and fuzz/ held; external/ is the vendored code that was in
+# the sendspin library.
+foreach ($name in @('apps', 'firmware/baremetal', 'tests', 'external', 'examples', 'tools', 'bindings/python')) {
     $candidate = Join-Path $Root $name
     if (Test-Path $candidate) {
         $scanRoots += $candidate
@@ -94,7 +97,7 @@ foreach ($name in @('apps', 'tests', 'fuzz', 'examples', 'tools', 'python')) {
 }
 
 # '*.mm' was added on 2026-09-06 with the first Objective-C++ in the tree:
-# src/audio/src/backend/macos/process_tap.mm, the seam for Core Audio's
+# libs/audio/src/backend/macos/process_tap.mm, the seam for Core Audio's
 # process tap, and apps/crucible's foreground.mm and app_icon_provider.mm.
 # Those files say in their own headers that this check holds the no-#ifdef
 # rule over them, and that was not true while the extension list stopped at
@@ -106,21 +109,21 @@ foreach ($name in @('apps', 'tests', 'fuzz', 'examples', 'tools', 'python')) {
 # match the directive pattern.
 $files = Get-ChildItem -Path $scanRoots -Recurse -File -Include '*.h', '*.hpp', '*.cpp', '*.cc', '*.cxx', '*.inl', '*.mm'
 
-# apps/windows/driver/ is Microsoft's Simple Audio Sample under its own MS-PL
+# apps/crucible/windows/driver/ is Microsoft's Simple Audio Sample under its own MS-PL
 # licence (see its README): a separate kernel-mode work that shares no code
 # with the rest of the tree, kept as close to the sample as possible so its
 # cuts read as a diff. It is written the way Windows drivers are written,
 # include guards and all, and the rule this check holds is about iclforge's
 # own code selecting platforms in CMake - so the sample is left out.
-$driverRoot = Join-Path (Join-Path $Root 'apps') 'windows\driver'
+$driverRoot = Join-Path (Join-Path $Root 'apps') 'crucible\windows\driver'
 $files = @($files | Where-Object { -not $_.FullName.StartsWith($driverRoot, [System.StringComparison]::OrdinalIgnoreCase) })
 
 # Build output is not source, and a build configured INSIDE the tree puts some
-# of it under apps/: apps/baremetal/platform/esp32s3 is built in place by
+# of it under apps/: firmware/baremetal/platform/esp32s3 is built in place by
 # idf.py (docs/platforms/bare-metal/esp32-s3.md), and CMake's generated ac3/export.hpp is a
 # conditional-compilation header by its very nature. One such build produced
 # 658 "violations", every one of them generated and none of them anybody's
-# code. src/quarantine/ was the same story waiting to happen on the src/ side.
+# code. src/quarantine/ was the same story waiting to happen on the libs/ side.
 #
 # Ask git which files are source rather than pattern-matching directory names
 # here: .gitignore already carries that answer and stays the single place it is
@@ -203,7 +206,7 @@ foreach ($file in $files) {
 if ($violations.Count -gt 0) {
     Write-Host ''
     Write-Host 'Platform-isolation violation: preprocessor conditional in a scanned tree.' -ForegroundColor Red
-    Write-Host 'Per-OS code is selected by CMake (see the WIN32 block in src/audio/CMakeLists.txt),'
+    Write-Host 'Per-OS code is selected by CMake (see the WIN32 block in libs/audio/CMakeLists.txt),'
     Write-Host 'so it belongs in its own translation unit, not behind an #ifdef.'
     Write-Host ''
     foreach ($v in $violations) {
@@ -216,7 +219,7 @@ if ($violations.Count -gt 0) {
     exit 1
 }
 
-$summary = "OK: no preprocessor conditionals in src/, apps/, tests/, fuzz/, examples/, tools/ or python/ ($($files.Count) files scanned"
+$summary = "OK: no preprocessor conditionals in libs/, apps/, tests/, external/, examples/, tools/, firmware/baremetal/ or bindings/python/ ($($files.Count) files scanned"
 if ($excludedCount -gt 0) {
     # Printed rather than left implicit: this filter turning the check
     # green for the wrong reason - by excluding real source - is the one

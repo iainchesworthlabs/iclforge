@@ -1,13 +1,13 @@
 # Conan (2.x) recipe for iclforge - installs the library only (iclforge::ac3,
-# iclforge::matroska/iclforge::mp4/iclforge::mpegts behind their own default-on options, and
-# iclforge::c, the AC-4 libraries, iclforge::iab and iclforge::iamf behind default-off "capi",
+# the Matroska, MP4 and MPEG-TS parts of iclforge::containers behind their own default-on options,
+# and iclforge::c, the AC-4 library, iclforge::iab and the IAMF part behind default-off "capi",
 # "ac4", "iab" and "iamf" options), never the CLI, GUI, Hearth, tests, examples or fuzz
 # harnesses. Same scope as the vcpkg port (packaging/vcpkg-port/iclforge/) - one Conan option
 # <-> one ICLFORGE_BUILD_<NAME> CMake option, same pattern that port's vcpkg_check_features()
 # call already establishes, and tools/checks/check_packaging_versions.sh holds the two recipes to
-# the same components and options. iclforge::adm/iclforge::admbridge (the ADM/BW64
-# reader and its Atmos bridge) are deliberately NOT options here even though upstream now
-# installs/exports both (shared-only - see cmake/InstallLibrary.cmake's ICLFORGE_BUILD_ADM
+# the same components and options. iclforge::adm (the ADM/BW64 reader and its Atmos
+# bridge) is deliberately NOT an option here even though upstream now installs/exports
+# it (shared-only - see cmake/InstallLibrary.cmake's ICLFORGE_BUILD_ADM
 # block): iclforge::adm needs Boost, and out-of-scope-for-now applies here the same way it does
 # for the vcpkg port's own missing "adm" feature.
 #
@@ -65,7 +65,7 @@ class IclforgeConan(ConanFile):
         "mpegts": True,
         # Off by default, same reasoning as the vcpkg port's own features of the same names: each
         # adds whole new installed libraries and public targets (iclforge::c; iclforge::ac4,
-        # iclforge::ac4dec and iclforge::ac4enc; iclforge::iab; iclforge::iamf), not a behavior
+        # iclforge::ac4; iclforge::iab; iclforge::containers::iamf), not a behavior
         # toggle on an already-installed one - opt in explicitly with -o "&:ac4=True" and the like.
         "capi": False,
         "ac4": False,
@@ -108,7 +108,7 @@ class IclforgeConan(ConanFile):
         # vcpkg_cmake_configure() call.
         tc.variables["ICLFORGE_BUILD_CLI"] = False
         tc.variables["ICLFORGE_BUILD_GUI"] = False
-        # Hearth, an application (apps/hearth) and a library nothing installs (src/sendspin), needs
+        # Hearth, an application (apps/hearth) and a library nothing installs (libs/sendspin), needs
         # dependencies this recipe does not declare; upstream also refuses it beside
         # ICLFORGE_BUILD_AC4=OFF.
         tc.variables["ICLFORGE_BUILD_HEARTH"] = False
@@ -167,8 +167,7 @@ class IclforgeConan(ConanFile):
         # of the way; builddirs puts the package's own installed config on
         # CMAKE_PREFIX_PATH so a consumer's plain
         # find_package(iclforge CONFIG REQUIRED) resolves it directly -
-        # same find_package() call and iclforge::ac3/iclforge::matroska/
-        # iclforge::mp4/iclforge::mpegts targets as any other consumer in
-        # docs/library/index.md, Conan or not.
+        # same find_package() call and iclforge::ac3/iclforge::containers targets as any other
+        # consumer in docs/library/index.md, Conan or not.
         self.cpp_info.set_property("cmake_find_mode", "none")
         self.cpp_info.builddirs = [os.path.join("lib", "cmake", "iclforge")]

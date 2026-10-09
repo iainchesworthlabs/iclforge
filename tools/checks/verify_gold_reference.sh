@@ -2,7 +2,7 @@
 #
 # The gold-reference correctness gate: proves forge's own decoder agrees
 # with an independent decoder (FFmpeg) on the same encoded bitstream, using a
-# fixed, checked-in 5.1 WAV (tests/golden/audio/reference_51.wav - see
+# fixed, checked-in 5.1 WAV (testdata/audio/reference_51.wav - see
 # tools/generators/gen_gold_reference_wav.py) as the input material. This is
 # the original validation pyramid's L3 ("FFmpeg oracle, every commit"; the
 # design now lives in docs/verification.md as "FFmpeg as an external oracle")
@@ -24,12 +24,12 @@ mkdir -p "$WORKDIR"
 # Resolved from this script's own location, not the caller's cwd, so it works
 # the same whether invoked from the repo root (as CI does) or anywhere else.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-GOLD_WAV="$REPO_ROOT/tests/golden/audio/reference_51.wav"
+GOLD_WAV="$REPO_ROOT/testdata/audio/reference_51.wav"
 COMPARE="$REPO_ROOT/tools/checks/compare_wav.py"
 
 # Pin drc_scale to 0 on both sides so a dynamic-range-compression default
 # mismatch between FFmpeg and forge's own decoder (which also defaults
-# drc_scale to 0 - see apps/cli/support.hpp's Options, and the drc_scale row
+# drc_scale to 0 - see apps/forge/cli/src/support.hpp's Options, and the drc_scale row
 # of docs/library/decoding.md for why) can never masquerade as a fidelity
 # loss.
 #
@@ -152,7 +152,7 @@ fi
 # The same idea for a difference the CLI cannot be asked for at RUN time.
 # ICLFORGE_DECODE_SCALAR=float is a build option - it decides whether the
 # decoder carries its coefficients as float or double
-# (src/ac3/variants/) - so a float32 run means a second BINARY
+# (libs/ac3/variants/) - so a float32 run means a second BINARY
 # rather than a second token, and the caller passes that binary as $1 and
 # names it here.
 #
@@ -400,9 +400,9 @@ check_one "eac3_cpl" "$WORKDIR/gold_cpl.ec3" "eac3" 256 "$MIN_SNR_DB" "$EAC3_CPL
 # gold.ec3 above (this project's own encoder) cannot stand in for that, so
 # this checks a real FFmpeg-encoded fixture directly instead of an
 # forge-produced one:
-#   tests/golden/audio/reference_51_eac3_448k_cplbndstrce0.ec3
-#     ffmpeg -y -i tests/golden/audio/reference_51.wav -c:a eac3 -b:a 448k \
-#         tests/golden/audio/reference_51_eac3_448k_cplbndstrce0.ec3
+#   testdata/audio/reference_51_eac3_448k_cplbndstrce0.ec3
+#     ffmpeg -y -i testdata/audio/reference_51.wav -c:a eac3 -b:a 448k \
+#         testdata/audio/reference_51_eac3_448k_cplbndstrce0.ec3
 # Confirmed (ffmpeg 8.0.1) to set cplbndstrce == 0 with cplbegf == 12 in
 # every block - cplbegf != 0 matters: an indexing bug that reads the default
 # table relative to cplbegf instead of absolutely from it would still pass
@@ -422,7 +422,7 @@ check_one "eac3_cpl" "$WORKDIR/gold_cpl.ec3" "eac3" 256 "$MIN_SNR_DB" "$EAC3_CPL
 # rather than merely losing fidelity).
 CPLBNDSTRCE0_MIN_SNR_DB=15
 CPLBNDSTRCE0_FLOORS="50,65,56,81,21,21"
-CPLBNDSTRCE0_EC3="$REPO_ROOT/tests/golden/audio/reference_51_eac3_448k_cplbndstrce0.ec3"
+CPLBNDSTRCE0_EC3="$REPO_ROOT/testdata/audio/reference_51_eac3_448k_cplbndstrce0.ec3"
 if [[ ! -f "$CPLBNDSTRCE0_EC3" ]]; then
     echo "::error::fixture missing: $CPLBNDSTRCE0_EC3" >&2
     exit 1
@@ -435,7 +435,7 @@ check_one "eac3_cplbndstrce0" "$CPLBNDSTRCE0_EC3" "eac3" 448 \
 # Encoding Engine 6.5.4 and FFmpeg 8.0.1 - across three legs: ac3-51-448,
 # eac3-51-256 and eac3-stereo-192, each in a dee/ and an ffmpeg/ copy (see
 # tools/generators/gen_external_baseline.py, which produced them, and
-# tests/golden/external-baseline/manifest.json for the versions). Six is what
+# testdata/external-baseline/manifest.json for the versions). Six is what
 # this check GATES, which is no longer what that directory HOLDS - legs have
 # been added since for other consumers, and it is now nine leg directories and
 # fifteen bitstreams. Adding one there does not gate it here: a leg is gated
@@ -454,7 +454,7 @@ check_one "eac3_cplbndstrce0" "$CPLBNDSTRCE0_EC3" "eac3" 448 \
 # five separate Annex E decoder defects, all of them syntax this project's own
 # encoder and FFmpeg's both happen never to produce and DEE's routinely does
 # (each one is documented at its own site in
-# src/ac3/src/decoder/eac3_decoder.cpp):
+# libs/ac3/src/decoder/eac3_decoder.cpp):
 #   - cplahtinu/chahtinu[ch]/lfeahtinu read unconditionally, when §E2.2.3
 #     transmits each only where that stream's exponents are sent exactly once
 #     in the frame;
@@ -486,7 +486,7 @@ check_one "eac3_cplbndstrce0" "$CPLBNDSTRCE0_EC3" "eac3" 448 \
 # concentrated in the surrounds; the front channels and the LFE stay in that
 # 50-90 dB band. A single floor low enough for the former left the latter
 # ungated by 30-70 dB - see "Per-channel floors" at the top of this file.
-EXTERNAL_BASELINE_DIR="$REPO_ROOT/tests/golden/external-baseline"
+EXTERNAL_BASELINE_DIR="$REPO_ROOT/testdata/external-baseline"
 if [[ ! -d "$EXTERNAL_BASELINE_DIR" ]]; then
     echo "::error::external-baseline fixtures missing: $EXTERNAL_BASELINE_DIR" >&2
     exit 1
@@ -556,7 +556,7 @@ done
 # gen_external_baseline.py's module docstring, which records the whole
 # analysis.
 DEE_STEREO_EC3="$EXTERNAL_BASELINE_DIR/eac3-stereo-192/dee.ec3"
-STEREO_WAV="$REPO_ROOT/tests/golden/audio/reference_stereo.wav"
+STEREO_WAV="$REPO_ROOT/testdata/audio/reference_stereo.wav"
 for required in "$DEE_STEREO_EC3" "$STEREO_WAV"; do
     if [[ ! -f "$required" ]]; then
         echo "::error::fixture missing: $required" >&2
@@ -579,7 +579,7 @@ check_against_source "ext_eac3_stereo_192_dee" "$DEE_STEREO_EC3" "$STEREO_WAV" "
 # scored: noise bursts whose top band spectral extension synthesises keep every
 # decoder within a few dB of it - 2.27 and 2.03 dB here, 2.46 and 2.25 through
 # FFmpeg - so these floors, 1 dB, catch a lost channel or a shifted or dropped
-# frame; where the corrections land is tests/ac3/decoder/
+# frame; where the corrections land is libs/ac3/tests/decoder/
 # test_eac3_transient_prenoise.cpp's to check. And against FFmpeg's strict
 # decode, which reads the stream cleanly but does not apply the tool: 4.38 and
 # 4.65 dB, the spectral-extension noise each decoder synthesises for itself,
@@ -606,7 +606,7 @@ check_against_source "ext_eac3_transient_stereo_128_dee_source" "$TPN_DIR/dee.ec
 # legs measure against x86 on this same gate is exactly that kind of
 # divergence. This pins it instead: SHA-256 of the three streams this
 # project's own encoder just produced above (gold.ac3/gold.ec3/gold_cpl.ec3),
-# checked against tests/golden/bitstream-hashes.json. See
+# checked against testdata/bitstream-hashes.json. See
 # tools/checks/check_cross_platform_hash.py's own header for what a
 # not-yet-pinned kernel/mode key does (reported, not failed) versus a real
 # mismatch (failed, same as every other bit-exactness gate here).

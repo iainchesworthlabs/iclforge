@@ -57,29 +57,14 @@ iclforge::ac3::OutputStage::latency_samples() const
 iclforge::ac3::OutputStage::reset()
 iclforge::ac3::OutputStage::rf_protection_db() const
 iclforge::ac3::allocate_from_curve(std::span<unsigned char const, 18446744073709551615ul>, iclforge::ac3::MaskingCurve const&, iclforge::ac3::BitAllocCodes const&, int, int, std::span<unsigned char, 18446744073709551615ul>, iclforge::ac3::BitAllocRegion const&)
-iclforge::ac3::analysis::ChannelSummary::peak_db() const
-iclforge::ac3::analysis::ChannelSummary::rms() const
-iclforge::ac3::analysis::ChannelSummary::rms_db() const
-iclforge::ac3::analysis::LevelMeter::LevelMeter(iclforge::ac3::Acmod, bool, unsigned int, iclforge::ac3::analysis::MeterBallistics const&)
-iclforge::ac3::analysis::LevelMeter::LevelMeter(iclforge::ac3::Acmod, bool, unsigned int, int, iclforge::ac3::analysis::MeterBallistics const&)
-iclforge::ac3::analysis::LevelMeter::LevelMeter(iclforge::ac3::analysis::LevelMeter&&)
+iclforge::ac3::analysis::LevelMeter::LevelMeter(iclforge::ac3::Acmod, bool, unsigned int, iclforge::base::MeterBallistics const&)
+iclforge::ac3::analysis::LevelMeter::LevelMeter(iclforge::ac3::Acmod, bool, unsigned int, int, iclforge::base::MeterBallistics const&)
 iclforge::ac3::analysis::LevelMeter::acmod() const
-iclforge::ac3::analysis::LevelMeter::advance(unsigned long, double, double, double)
-iclforge::ac3::analysis::LevelMeter::channel_count() const
-iclforge::ac3::analysis::LevelMeter::levels() const
 iclforge::ac3::analysis::LevelMeter::lfe() const
-iclforge::ac3::analysis::LevelMeter::operator=(iclforge::ac3::analysis::LevelMeter&&)
-iclforge::ac3::analysis::LevelMeter::process(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>)
-iclforge::ac3::analysis::LevelMeter::process_interleaved(std::span<float const, 18446744073709551615ul>, unsigned long)
-iclforge::ac3::analysis::LevelMeter::reset()
-iclforge::ac3::analysis::LevelMeter::sample_rate() const
-iclforge::ac3::analysis::LevelMeter::summary() const
-iclforge::ac3::analysis::LevelMeter::~LevelMeter()
 iclforge::ac3::analysis::channel_azimuth_deg(iclforge::ac3::Acmod, bool, int)
 iclforge::ac3::analysis::channel_name(iclforge::ac3::Acmod, bool, int)
-iclforge::ac3::analysis::energy_vector(std::span<iclforge::ac3::analysis::ChannelLevel const, 18446744073709551615ul>, iclforge::ac3::Acmod)
+iclforge::ac3::analysis::energy_vector(std::span<iclforge::base::ChannelLevel const, 18446744073709551615ul>, iclforge::ac3::Acmod)
 iclforge::ac3::analysis::layout_name(iclforge::ac3::Acmod, bool)
-iclforge::ac3::analysis::to_dbfs(double)
 iclforge::ac3::apply_analysis_window(std::span<double const, 512ul>, std::span<double, 512ul>)
 iclforge::ac3::apply_analysis_window(std::span<float const, 512ul>, std::span<float, 512ul>)
 iclforge::ac3::apply_transient_prenoise(std::span<float, 18446744073709551615ul>, int, int)
@@ -194,38 +179,6 @@ iclforge::ac3::io::Prober::operator=(iclforge::ac3::io::Prober&&)
 iclforge::ac3::io::Prober::push(std::span<std::byte const, 18446744073709551615ul>)
 iclforge::ac3::io::Prober::report() const
 iclforge::ac3::io::Prober::~Prober()
-iclforge::ac3::io::WavPcm16StreamWriter::WavPcm16StreamWriter()
-iclforge::ac3::io::WavPcm16StreamWriter::WavPcm16StreamWriter(iclforge::ac3::io::WavPcm16StreamWriter&&)
-iclforge::ac3::io::WavPcm16StreamWriter::bytes_written() const
-iclforge::ac3::io::WavPcm16StreamWriter::close()
-iclforge::ac3::io::WavPcm16StreamWriter::flush_header()
-iclforge::ac3::io::WavPcm16StreamWriter::is_open() const
-iclforge::ac3::io::WavPcm16StreamWriter::open(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, unsigned int, unsigned short)
-iclforge::ac3::io::WavPcm16StreamWriter::operator=(iclforge::ac3::io::WavPcm16StreamWriter&&)
-iclforge::ac3::io::WavPcm16StreamWriter::write(std::span<std::byte const, 18446744073709551615ul>)
-iclforge::ac3::io::WavPcm16StreamWriter::~WavPcm16StreamWriter()
-iclforge::ac3::io::WavStreamReader::WavStreamReader()
-iclforge::ac3::io::WavStreamReader::WavStreamReader(iclforge::ac3::io::WavStreamReader&&)
-iclforge::ac3::io::WavStreamReader::channels() const
-iclforge::ac3::io::WavStreamReader::close()
-iclforge::ac3::io::WavStreamReader::frame_count() const
-iclforge::ac3::io::WavStreamReader::is_open() const
-iclforge::ac3::io::WavStreamReader::open(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
-iclforge::ac3::io::WavStreamReader::operator=(iclforge::ac3::io::WavStreamReader&&)
-iclforge::ac3::io::WavStreamReader::read_planar(std::span<std::span<float, 18446744073709551615ul> const, 18446744073709551615ul>, unsigned long)
-iclforge::ac3::io::WavStreamReader::sample_rate() const
-iclforge::ac3::io::WavStreamReader::~WavStreamReader()
-iclforge::ac3::io::WavStreamWriter::WavStreamWriter()
-iclforge::ac3::io::WavStreamWriter::WavStreamWriter(iclforge::ac3::io::WavStreamWriter&&)
-iclforge::ac3::io::WavStreamWriter::channels() const
-iclforge::ac3::io::WavStreamWriter::close()
-iclforge::ac3::io::WavStreamWriter::flush_header()
-iclforge::ac3::io::WavStreamWriter::frames_written() const
-iclforge::ac3::io::WavStreamWriter::is_open() const
-iclforge::ac3::io::WavStreamWriter::open(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, unsigned int, unsigned short)
-iclforge::ac3::io::WavStreamWriter::operator=(iclforge::ac3::io::WavStreamWriter&&)
-iclforge::ac3::io::WavStreamWriter::write(std::span<float const, 18446744073709551615ul>)
-iclforge::ac3::io::WavStreamWriter::~WavStreamWriter()
 iclforge::ac3::io::ac3_layout_for(unsigned long)
 iclforge::ac3::io::access_unit_at_sample(iclforge::ac3::io::ScannedStream const&, unsigned long)
 iclforge::ac3::io::access_unit_at_seconds(iclforge::ac3::io::ScannedStream const&, double)
@@ -235,14 +188,11 @@ iclforge::ac3::io::dash_channel_configuration[abi:cxx11](iclforge::ac3::io::Scan
 iclforge::ac3::io::describe(iclforge::ac3::io::EditError)
 iclforge::ac3::io::describe(iclforge::ac3::io::ScanError)
 iclforge::ac3::io::describe(iclforge::ac3::io::StripError)
-iclforge::ac3::io::describe(iclforge::ac3::io::WavError)
 iclforge::ac3::io::edit_frame_metadata(std::span<std::byte, 18446744073709551615ul>, iclforge::ac3::io::MetadataEdit const&)
 iclforge::ac3::io::edit_stream_metadata(std::span<std::byte, 18446744073709551615ul>, iclforge::ac3::io::MetadataEdit const&)
 iclforge::ac3::io::probe(std::span<std::byte const, 18446744073709551615ul>, iclforge::ac3::io::ProbeOptions const&)
 iclforge::ac3::io::read_frame_header(std::span<std::byte const, 18446744073709551615ul>)
 iclforge::ac3::io::read_frame_metadata(std::span<std::byte const, 18446744073709551615ul>)
-iclforge::ac3::io::read_wav(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
-iclforge::ac3::io::read_wav(std::basic_istream<char, std::char_traits<char> >&)
 iclforge::ac3::io::restamp_crc(std::span<std::byte, 18446744073709551615ul>)
 iclforge::ac3::io::scan(std::span<std::byte const, 18446744073709551615ul>)
 iclforge::ac3::io::stream_duration_samples(iclforge::ac3::io::ScannedStream const&)
@@ -250,9 +200,6 @@ iclforge::ac3::io::stream_duration_seconds(iclforge::ac3::io::ScannedStream cons
 iclforge::ac3::io::strip_objects(std::span<std::byte const, 18446744073709551615ul>)
 iclforge::ac3::io::uniform_access_unit_samples(iclforge::ac3::io::ScannedStream const&)
 iclforge::ac3::io::wav_channel_order(iclforge::ac3::Acmod, bool)
-iclforge::ac3::io::write_wav_f32(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::span<std::vector<float, std::allocator<float> > const, 18446744073709551615ul>, unsigned int, std::span<unsigned long const, 18446744073709551615ul>)
-iclforge::ac3::io::write_wav_f32(std::basic_ostream<char, std::char_traits<char> >&, std::span<std::vector<float, std::allocator<float> > const, 18446744073709551615ul>, unsigned int, std::span<unsigned long const, 18446744073709551615ul>)
-iclforge::ac3::io::write_wav_pcm16_raw(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::span<std::byte const, 18446744073709551615ul>, unsigned int, unsigned short)
 iclforge::ac3::mantissa_bits_per_block(std::span<std::span<unsigned char const, 18446744073709551615ul> const, 18446744073709551615ul>)
 iclforge::ac3::mdct256_forward_first(std::span<double const, 256ul>, std::span<double, 128ul>, bool)
 iclforge::ac3::mdct256_forward_first(std::span<float const, 256ul>, std::span<float, 128ul>)
@@ -270,19 +217,6 @@ iclforge::ac3::meta::HeavyCompressor::operator=(iclforge::ac3::meta::HeavyCompre
 iclforge::ac3::meta::HeavyCompressor::~HeavyCompressor()
 iclforge::ac3::meta::LoudnessMeter::LoudnessMeter(iclforge::ac3::SampleRate, iclforge::ac3::Acmod, bool)
 iclforge::ac3::meta::LoudnessMeter::LoudnessMeter(iclforge::ac3::SampleRate, iclforge::base::Layout const&)
-iclforge::ac3::meta::LoudnessMeter::LoudnessMeter(iclforge::ac3::meta::LoudnessMeter&&)
-iclforge::ac3::meta::LoudnessMeter::channel_count() const
-iclforge::ac3::meta::LoudnessMeter::init(iclforge::ac3::SampleRate, int, std::span<int const, 18446744073709551615ul>, std::span<double const, 18446744073709551615ul>)
-iclforge::ac3::meta::LoudnessMeter::integrated_lkfs() const
-iclforge::ac3::meta::LoudnessMeter::loudness_range() const
-iclforge::ac3::meta::LoudnessMeter::momentary_lkfs() const
-iclforge::ac3::meta::LoudnessMeter::operator=(iclforge::ac3::meta::LoudnessMeter&&)
-iclforge::ac3::meta::LoudnessMeter::push(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>)
-iclforge::ac3::meta::LoudnessMeter::push_block()
-iclforge::ac3::meta::LoudnessMeter::push_true_peak(int, float)
-iclforge::ac3::meta::LoudnessMeter::short_term_lkfs() const
-iclforge::ac3::meta::LoudnessMeter::true_peak_dbtp() const
-iclforge::ac3::meta::LoudnessMeter::~LoudnessMeter()
 iclforge::ac3::meta::RangeController::RangeController(iclforge::ac3::meta::Profile const&, iclforge::ac3::SampleRate)
 iclforge::ac3::meta::RangeController::RangeController(iclforge::ac3::meta::RangeController&&)
 iclforge::ac3::meta::RangeController::gain_db() const
@@ -339,7 +273,7 @@ iclforge::ac3::oba::AtmosEncoder::bed() const
 iclforge::ac3::oba::AtmosEncoder::bed_latency() const
 iclforge::ac3::oba::AtmosEncoder::dynamic_object_count() const
 iclforge::ac3::oba::AtmosEncoder::encode_bed_frame(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>)
-iclforge::ac3::oba::AtmosEncoder::encode_frame(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>, std::span<iclforge::oba::ObjectPlacement const, 18446744073709551615ul>)
+iclforge::ac3::oba::AtmosEncoder::encode_frame(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>, std::span<iclforge::objects::oba::ObjectPlacement const, 18446744073709551615ul>)
 iclforge::ac3::oba::AtmosEncoder::latency() const
 iclforge::ac3::oba::AtmosEncoder::operator=(iclforge::ac3::oba::AtmosEncoder&&)
 iclforge::ac3::oba::AtmosEncoder::parameters() const
@@ -350,7 +284,7 @@ iclforge::ac3::oba::joc::build_payload(iclforge::ac3::oba::joc::FrameParameters 
 iclforge::ac3::oba::joc::dequantize(int, bool)
 iclforge::ac3::oba::joc::parse_payload(std::span<std::byte const, 18446744073709551615ul>)
 iclforge::ac3::oba::joc::quantize(double, bool)
-iclforge::ac3::oba::joc::reconstruct(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>, iclforge::ac3::oba::joc::FrameParameters const&, iclforge::ac3::oba::joc::ReconstructionState&, bool, bool, iclforge::oba::joc::Domain)
+iclforge::ac3::oba::joc::reconstruct(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>, iclforge::ac3::oba::joc::FrameParameters const&, iclforge::ac3::oba::joc::ReconstructionState&, bool, bool, iclforge::objects::oba::joc::Domain)
 iclforge::ac3::oba::qmf_band_energy(std::span<float const, 18446744073709551615ul>, std::span<unsigned char const, 64ul>, std::span<double, 18446744073709551615ul>, iclforge::dsp::QmfAnalysis&)
 iclforge::ac3::output_channel_count(iclforge::ac3::OutputConfig const&, iclforge::ac3::Acmod, bool)
 iclforge::ac3::plan::Assignment::at(unsigned long, unsigned long) const
@@ -416,6 +350,11 @@ iclforge::ac3::quality::reconstruction_error(int, int, int)
 iclforge::ac3::quality::snr_db(iclforge::ac3::quality::BandNoise const&)
 iclforge::ac3::quantize_mantissa(int, int)
 iclforge::ac3::rate_adaptive_fgaincod(int, int)
+iclforge::ac3::signing::has_authenticity_tag(std::span<std::byte const, 18446744073709551615ul>)
+iclforge::ac3::signing::sign_atmos_frame(std::span<std::byte, 18446744073709551615ul>, iclforge::base::crypto::SigningKey const&)
+iclforge::ac3::signing::sign_atmos_stream(std::span<std::byte, 18446744073709551615ul>, iclforge::base::crypto::SigningKey const&)
+iclforge::ac3::signing::verify_atmos_frame(std::span<std::byte const, 18446744073709551615ul>, iclforge::base::crypto::SigningKey const&)
+iclforge::ac3::signing::verify_atmos_stream(std::span<std::byte const, 18446744073709551615ul>, iclforge::base::crypto::SigningKey const&)
 iclforge::ac3::slow_gain(int)
 iclforge::ac3::split_access_units(std::span<std::byte const, 18446744073709551615ul>)
 iclforge::ac3::split_access_units(std::span<std::byte const, 18446744073709551615ul>, int)
@@ -453,6 +392,5 @@ iclforge::ac3::verify::describe[abi:cxx11](iclforge::ac3::verify::Mismatch const
 iclforge::ac3::verify::report[abi:cxx11](std::span<iclforge::ac3::verify::Eac3Mismatch const, 18446744073709551615ul>, iclforge::ac3::verify::Eac3AccessUnitTrace const&)
 iclforge::ac3::verify::report[abi:cxx11](std::span<iclforge::ac3::verify::Mismatch const, 18446744073709551615ul>, int, int)
 iclforge::ac3::verify::trace_csv_header()
-iclforge::ac3::version_details[abi:cxx11]()
 void iclforge::ac3::quality::PerceptualModel::analyse_over<double>(int, std::span<double const, 18446744073709551615ul>, int, iclforge::ac3::quality::BlockAnalysis&)
 void iclforge::ac3::quality::PerceptualModel::analyse_over<float>(int, std::span<float const, 18446744073709551615ul>, int, iclforge::ac3::quality::BlockAnalysis&)

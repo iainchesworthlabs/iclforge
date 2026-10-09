@@ -1,22 +1,22 @@
 // A real ADM BWF master, all the way to a Dolby Atmos E-AC-3 (DD+ JOC) elementary stream.
 //
-// Roadmap item B1 phase 3 of 3 (the last piece - phase 1 is iclforge::adm, src/adm; phase 2 is
-// iclforge::admbridge, src/admbridge). This is a minimal, standalone illustration of the same
+// Roadmap item B1 phase 3 of 3 (the last piece - phase 1 is iclforge::adm, libs/adm; phase 2 is
+// iclforge::adm, libs/adm). This is a minimal, standalone illustration of the same
 // pipeline forge's 'atmos-adm' command drives for real: iclforge::adm::parse_bw64() reads the
-// container + ADM XML graph, iclforge::admbridge::build() maps it onto
+// container + ADM XML graph, iclforge::adm::build() maps it onto
 // iclforge::ac3::oba::AtmosEncoder's flat object-list input shape (one bed speaker feed pinned in
 // place, one dynamic object panned by its own authored motion), and a plain per-frame loop calls
-// iclforge::oba::evaluate_placements() plus AtmosEncoder::encode_frame() the same way every other
-// Atmos example in this directory does. The CLI command and this example deliberately share nothing
-// but that library API - see docs/library/adm-bridge.md's own note on why no separate "driving
-// loop" abstraction exists.
+// iclforge::objects::oba::evaluate_placements() plus AtmosEncoder::encode_frame() the same way
+// every other Atmos example in this directory does. The CLI command and this example deliberately
+// share nothing but that library API - see docs/library/adm-bridge.md's own note on why no separate
+// "driving loop" abstraction exists.
 //
 // Like examples/read_adm.cpp, this writes its own tiny-but-valid BW64/ADM fixture to a temp file
 // first, rather than shipping a real production master this project has no license to embed: one
 // DirectSpeakers bed channel pinned at the front-centre speaker, and one Objects channel that
 // holds hard right (azimuth -90 - BS.2076-2 Clause 8: positive azimuth is left, so negative is
 // right) for half the clip and then jumps hard left (azimuth +90) for the rest (§10.3's
-// jumpPosition=1 state machine - see iclforge::admbridge::build_channel_path's own comment for the
+// jumpPosition=1 state machine - see iclforge::adm::build_channel_path's own comment for the
 // full walkthrough), so the encoded stream's own channel balance visibly tracks the authored ADM
 // automation rather than staying static throughout.
 //
@@ -39,7 +39,7 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/admbridge/bridge.hpp"
+#include "iclforge/adm/bridge.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
 #include "iclforge/objects/motion.hpp"
@@ -53,7 +53,7 @@ using Bytes = std::string;
 // examples under its own `ctest` (examples/CMakeLists.txt registers each as a
 // test case), several checkouts commonly run at once, and they share a temp
 // directory - two runs on one fixed name read and delete each other's files.
-// Same ingredients as src/adm/src/adm.cpp's make_temp_path, same reason.
+// Same ingredients as libs/adm/src/adm.cpp's make_temp_path, same reason.
 // Only for the paths this example picks itself; --write-fixture's path comes
 // from the caller (tools/ci/run_codec_matrix.sh) and stays exactly as given.
 std::string scratch_path(std::string_view name) {
@@ -252,8 +252,8 @@ int main(int argc, char** argv) {
     // a real `forge atmos-adm` invocation against a real file on disk, rather than a fourth copy
     // of the same byte-level BW64/ADM chunk-writing logic already duplicated (per this project's
     // own established per-file test-fixture convention) across this file, examples/read_adm.cpp
-    // and tests/cli/test_cli_atmos_adm.cpp - three was already the considered limit; a shell script
-    // reimplementing RIFF chunk framing in bash was not a fourth worth having.
+    // and apps/forge/cli/tests/test_cli_atmos_adm.cpp - three was already the considered limit; a
+    // shell script reimplementing RIFF chunk framing in bash was not a fourth worth having.
     if (argc >= 3 && std::string_view{argv[1]} == "--write-fixture") {
         if (!write_fixture(argv[2])) {
             fmt::printf("could not write fixture file\n");
@@ -282,14 +282,14 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Step 2: iclforge::admbridge (phase 2) - bed/object classification, coordinate conversion, and
+    // Step 2: iclforge::adm (phase 2) - bed/object classification, coordinate conversion, and
     // §10.3 position/gain automation, mapped onto AtmosEncoder's flat object-list input shape.
-    const auto bridged = iclforge::admbridge::build(*document);
+    const auto bridged = iclforge::adm::build(*document);
     std::filesystem::remove(fixture_path);
     if (!bridged) {
-        fmt::printf("admbridge::build failed: %.*s\n",
-                    static_cast<int>(iclforge::admbridge::describe(bridged.error()).size()),
-                    iclforge::admbridge::describe(bridged.error()).data());
+        fmt::printf("adm::build failed: %.*s\n",
+                    static_cast<int>(iclforge::adm::describe(bridged.error()).size()),
+                    iclforge::adm::describe(bridged.error()).data());
         return 1;
     }
 
@@ -300,10 +300,11 @@ int main(int argc, char** argv) {
                     bridged->is_bed[i] ? "bed speaker feed" : "dynamic object");
     }
 
-    // Step 3: drive AtmosEncoder::encode_frame() in a loop - iclforge::oba::evaluate_placements()
-    // reads each channel's iclforge::oba::ObjectPath at the frame's own end time, exactly the
-    // pattern forge's own atmos-path/atmos-encode/atmos-adm commands and every other Atmos example
-    // in this directory use.
+    // Step 3: drive AtmosEncoder::encode_frame() in a loop -
+    // iclforge::objects::oba::evaluate_placements() reads each channel's
+    // iclforge::objects::oba::ObjectPath at the frame's own end time, exactly the pattern forge's
+    // own atmos-path/atmos-encode/atmos-adm commands and every other Atmos example in this
+    // directory use.
     const auto objects = static_cast<int>(bridged->channel_count());
     iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, objects};
 
@@ -318,7 +319,7 @@ int main(int argc, char** argv) {
             views[ch] = bridged->pcm[ch].subspan(start, static_cast<std::size_t>(kFrame));
         }
         const double t = static_cast<double>(start + static_cast<std::size_t>(kFrame)) / 48000.0;
-        const auto placement = iclforge::oba::evaluate_placements(bridged->paths, t);
+        const auto placement = iclforge::objects::oba::evaluate_placements(bridged->paths, t);
 
         // Step 4: write - the raw elementary E-AC-3 stream, same convention every Atmos-encode
         // path in this project uses (container wrapping, if wanted, is a separate later step via

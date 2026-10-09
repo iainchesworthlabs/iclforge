@@ -1,7 +1,7 @@
 # Android (NVIDIA Shield)
 
 Android support is a separate, small, Shield-specific demo app, **Shield Atmos Demo**
-(`apps/android/`), that plays an Atmos/JOC stream out through the Shield's HDMI passthrough
+(`apps/demos/android/`), that plays an Atmos/JOC stream out through the Shield's HDMI passthrough
 output to an AV receiver, with a controller or remote moving one of a few objects around the
 room live. Neither `forge` nor `forge-gui` is ported to Android. The app exists to show the
 encoder's object audio moving in 3D space on consumer hardware, and is not a general-purpose
@@ -16,9 +16,9 @@ platforms, see [Building from source](../building.md) and the other pages in thi
 | Live Atmos out HDMI passthrough | Confirmed on real 2017 Shield hardware, into an AV receiver |
 | Object motion from the controller | Confirmed moving; nobody has listened to check a flyover arrives overhead |
 | Capture | None. The app plays; it records nothing |
-| AC-4 | None. The app does not decode, encode or play AC-4. The NDK build compiles the AC-4 libraries and the app links none of them — see [AC-4](#ac-4) |
+| AC-4 | None. The app does not decode, encode or play AC-4. The NDK build compiles the AC-4 library and the app links none of it — see [AC-4](#ac-4) |
 | Distribution | Personal sideload via `adb install`, **never the Play Store**. A release carries the APK (every release since v0.3.0-beta.1 has one) |
-| CI | The `build-android` job builds it in the nightly run and in the run after a merge that changes `apps/android/`; the hardware behaviour is not reproducible in CI |
+| CI | The `build-android` job builds it in the nightly run and in the run after a merge that changes `apps/demos/android/`; the hardware behaviour is not reproducible in CI |
 
 --8<-- "docs-snippets/generated/platform-android.md"
 
@@ -34,7 +34,7 @@ An Android SDK with **NDK 26.1.10909125** and **CMake 3.31.6** installed (`local
 `sdk.dir`), plus a Shield TV reachable over the network or USB:
 
 ```bash
-cd apps/android
+cd apps/demos/android
 ./gradlew assembleDebug --no-daemon
 adb connect <shield-ip>:5555          # if not on USB
 adb -s <shield-ip>:5555 install -r app/build/outputs/apk/debug/app-debug.apk
@@ -45,18 +45,18 @@ adb -s <shield-ip>:5555 shell am start -n com.iclforge.shield/.MainActivity
 
 ## What's reused, what's new
 
-`iclforge::ac3` (`src/ac3/`) — the codec and `AtmosEncoder` — and the libraries it links, among them
-`iclforge::iec61937` for the IEC 61937 framing, are fully platform-independent and are linked into the app **unmodified**, via a thin wrapper
-`CMakeLists.txt` (`apps/android/app/src/main/cpp/CMakeLists.txt`) that `add_subdirectory()`s
-the real repo root rather than duplicating its target definitions. `iclforge::audio` (`src/audio/`)
-gains its own backend, `src/audio/src/backend/android/`, alongside `windows`/`alsa`/`pipewire`/
+`iclforge::ac3` (`libs/ac3/`) — the codec and `AtmosEncoder` — and the libraries it links, among them
+`iclforge::containers::iec61937` for the IEC 61937 framing, are fully platform-independent and are linked into the app **unmodified**, via a thin wrapper
+`CMakeLists.txt` (`apps/demos/android/app/src/main/cpp/CMakeLists.txt`) that `add_subdirectory()`s
+the real repo root rather than duplicating its target definitions. `iclforge::audio` (`libs/audio/`)
+gains its own backend, `libs/audio/src/backend/android/`, alongside `windows`/`alsa`/`pipewire`/
 `posix`/`macos`, selected by CMake's own `ANDROID` variable (set by the NDK toolchain file, a peer check
-to the existing `WIN32`/`LINUX`/`APPLE` blocks in `src/audio/CMakeLists.txt`) — no `#ifdef`
+to the existing `WIN32`/`LINUX`/`APPLE` blocks in `libs/audio/CMakeLists.txt`) — no `#ifdef`
 anywhere, per the project's
 [platform-tree convention](raspberry-pi.md#why-theres-no-raspberry-pi-specific-code).
 
 Everything else — the Gradle app shell, the JNI bridge, the live encode loop, input handling, the
-room visualization — is new and lives entirely under `apps/android/`, outside the CMake
+room visualization — is new and lives entirely under `apps/demos/android/`, outside the CMake
 project the desktop tools build from.
 
 ## Toolchain
@@ -75,15 +75,15 @@ this project's Android build passes. Rather than avoiding formatted output file 
 around that, the whole project uses [{fmt}](https://github.com/fmtlib/fmt) — `fmt::format`/
 `fmt::print` in place of `std::format`/`std::print` everywhere — since {fmt} has no
 such gap (see `cmake/Fmt.cmake` and `CONTRIBUTING.md`'s code-conventions section). That single
-choice is also what lets `iclforge::mp4`'s HLS/DASH signaling helpers build for Android at all; see the
-note in `apps/android/app/src/main/cpp/CMakeLists.txt` for why this app still doesn't link them
+choice is also what lets `iclforge::containers::mp4`'s HLS/DASH signaling helpers build for Android at all; see the
+note in `apps/demos/android/app/src/main/cpp/CMakeLists.txt` for why this app still doesn't link them
 regardless (it never muxes a file).
 
 The same libc++ implements only `<charconv>`'s **integer** `from_chars`, not its floating-point
 overloads — a gap {fmt} does not close, since {fmt} only formats text *out*, the same direction
 `std::format` goes. Library code that has to turn text *into* a `double` therefore uses `strtod`
-instead (`src/ac3/src/encoder/plan.cpp`, `encoder/assignment.cpp`,
-`src/objects/src/scene_text.hpp`, which also serves the object-scene file formats' parsing —
+instead (`libs/ac3/src/encoder/plan.cpp`, `encoder/assignment.cpp`,
+`libs/objects/src/scene_text.hpp`, which also serves the object-scene file formats' parsing —
 the write side of that same file goes through `fmt::format`, like everything else, once {fmt}
 made that safe). The macOS wheel's own deployment target has the identical `from_chars` gap
 (`'from_chars' is unavailable: introduced in macOS 26.0`) — {fmt}'s own vendored formatting avoids
@@ -146,10 +146,10 @@ So the backend is split, unlike the other three:
 
 ### AC-4
 
-**The app does nothing with AC-4.** Its native library, `iclforge_jni`, links `iclforge::ac3`,
-`iclforge::audio` and `iclforge::signing` and none of the AC-4 libraries (`src/ac4`, `src/ac4core`,
-`src/ac4dec`, `src/ac4enc`). The wrapper `CMakeLists.txt` leaves `ICLFORGE_BUILD_AC4` at its
-default, on, so the NDK build compiles those libraries and holds their sources to building under
+**The app does nothing with AC-4.** Its native library, `iclforge_jni`, links `iclforge::ac3` (with
+its object signer) and `iclforge::audio` and not the AC-4 library
+(`libs/ac4`). The wrapper `CMakeLists.txt` leaves `ICLFORGE_BUILD_AC4` at its
+default, on, so the NDK build compiles the library and holds its sources to building under
 NDK r26 (`tools/checks/test_ac4_build_configurations.py` holds it to that default), and nothing
 calls them. The live encode loop makes E-AC-3 only. The `play_file` diagnostic (below) replays
 E-AC-3 files only, and refuses a file that does not open with an AC-3 or E-AC-3 syncframe, an
@@ -168,7 +168,7 @@ been compiled but never run on a device.
 
 `am start ... --es play_file /sdcard/Download/<file>.ec3` skips the live cursor and the demo and
 streams that already-encoded E-AC-3 file through the same `PassthroughSink`
-(`apps/android/app/src/main/cpp/file_replay.cpp`). It exists to separate "is this app's
+(`apps/demos/android/app/src/main/cpp/file_replay.cpp`). It exists to separate "is this app's
 `AudioTrack` passthrough configuration right" from "is this project's own Atmos output right":
 a known-good commercial Dolby stream either lights the receiver's Atmos indicator through this
 code path or it does not. It groups access units by each frame's `bsid` rather than by
@@ -233,7 +233,7 @@ locked, audio never did). `app/build.gradle.kts`'s `debug` build type now overri
 profiling (`ICLFORGE_ENABLE_TRACY`) traced the rest of the gap to `mdct_forward_core`
 recomputing `std::cos()` fresh every iteration inside an O(N²) loop, while the *inverse*
 transform beside it already used a precomputed table; fixing the forward transform to match
-(`ForwardCosTable` in `src/ac3/src/core/mdct.cpp`) gave a further ~3.8x. This is a real
+(`ForwardCosTable` in `libs/ac3/src/core/mdct.cpp`) gave a further ~3.8x. This is a real
 library-level fix — bit-exact against the full test suite, benefiting every platform's Atmos
 encode path, not an Android-specific workaround. With both fixes the Shield holds an exact
 32.0 ms/frame cadence with zero underruns. See [Performance trend](../performance-trend.md) for
@@ -393,7 +393,7 @@ believing anything the panel says.
   NOT Dolby's. §7.1 fixes the filterbank's shape and does not publish its coefficients". A
   per-object SNR here would hold constant precisely the variable most likely to explain a
   disagreement with a real decoder, which is worse than useless: it would look like evidence.
-- **The decoded position is an algebraic identity, not a discovery.** `tests/ac3/oba/test_atmos.cpp`
+- **The decoded position is an algebraic identity, not a discovery.** `libs/ac3/tests/oba/test_atmos.cpp`
   asserts that the decoded position equals the encoder's own `quantize_xy`/`quantize_z` of the
   intended one, exactly. It cannot surprise unless the bitstream is broken.
 - **So what is it showing?** The **quantiser**. Height is sent as a sign bit plus four bits of
@@ -679,7 +679,7 @@ receiver into an on-screen accusation.
     audio: a real Dolby-licensed decoder gates JOC object decode on a keyed HMAC over the EMDF
     protection field. The algorithm that produces that tag is in-tree; the key it needs is not.
 
-The signer is `iclforge::signing` (`src/signing/`) — committed, clean-room and dependency-free, the
+The signer is `iclforge::ac3::signing` (`libs/ac3/src/signing/`) — committed, clean-room and dependency-free, the
 same library `forge` uses. Its full design (what's signed, why the algorithm is committable but
 the key isn't) is in [Object signing](../concepts/object-signing.md); this section covers only what
 is specific to the app. The app's seam is `shield_signing_hook.{hpp,cpp}`, one committed
@@ -693,7 +693,7 @@ env var, but this app signs on-device, so the key has to travel in the APK as an
 CI writes the base64 `ATMOS_SIGNING_KEY` secret verbatim into it (`.github/workflows/_build.yml`),
 or you drop one in by hand for a local signed build. `init_signing()` loads it once through the same
 `AAssetManager` the lead-voice asset uses and decodes it (base64 or raw) via the same
-`iclforge::signing::decode_signing_key()` the CLI applies.
+`iclforge::base::crypto::decode_signing_key()` the CLI applies.
 
 **Unsigned builds omit the object container entirely.** An unsigned
 but *present* EMDF container is not a safe degraded mode — per `AtmosConfig::emit_object_metadata`'s
@@ -721,7 +721,7 @@ To build a signed APK on your own machine, drop your own `signing.key` (base64 o
 ## Building and running
 
 ```bash
-cd apps/android
+cd apps/demos/android
 ./gradlew assembleDebug --no-daemon
 adb connect <shield-ip>:5555          # if not on USB
 adb -s <shield-ip>:5555 install -r app/build/outputs/apk/debug/app-debug.apk
@@ -738,7 +738,7 @@ build, also drop a `signing.key` asset into `app/src/main/assets/` as described 
 The app builds alongside the desktop packages rather than only ever being hand-built locally:
 `.github/workflows/_build.yml`'s `build-android` job builds the **debug** variant in every run in
 which the Android lane runs: the nightly run, and the run after a merge that changes
-`apps/android/` (no Android SDK/NDK setup beyond what `ubuntu-latest` ships plus an explicit
+`apps/demos/android/` (no Android SDK/NDK setup beyond what `ubuntu-latest` ships plus an explicit
 `sdkmanager` install of the exact NDK version, `26.1.10909125`, the same "don't trust whatever the
 image happens to cache" reasoning every other toolchain step in that workflow already follows) — a
 smoke test proving the Gradle/CMake/NDK toolchain and every native source file still build. A
@@ -813,12 +813,12 @@ like any other non-experimental job.
     green three consecutive times on GitHub's hosted runners — see [Release / CI](#release-ci) above.
 
 !!! note "Automated in CI"
-    `apps/android/app/src/androidTest/` adds `NativeBridgeInstrumentedTest` and
+    `apps/demos/android/app/src/androidTest/` adds `NativeBridgeInstrumentedTest` and
     `PassthroughBridgeInstrumentedTest`, which `build-android` runs on every build via
     `./gradlew :app:connectedDebugAndroidTest` against a GitHub-hosted API-30 x86_64 emulator
     (KVM acceleration is x86/x86_64-only on those runners, so the debug build type targets
     x86_64 alongside the real device's arm64-v8a; release stays arm64-v8a-only). Before this,
-    nothing ran any Kotlin-level test at all — only `tests/audio/backend/android/`'s C++-side
+    nothing ran any Kotlin-level test at all — only `libs/audio/tests/backend/android/`'s C++-side
     device-free logic (burst sizing, carrier rate, render-device construction) on the ordinary
     desktop-hosted CTest suite. Every emulator case is a **"no receiver attached" contract
     check**: the emulator runs `-noaudio`, which makes `isDirectPlaybackSupported` deterministically

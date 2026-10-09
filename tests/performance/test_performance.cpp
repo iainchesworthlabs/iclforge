@@ -13,8 +13,8 @@
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
 #include "ac4_bench.hpp"
-#include "iclforge/ac4dec/decoder.hpp"
-#include "iclforge/ac4enc/encoder.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
 #include "real_audio.hpp"
 
 // Real-time throughput regression guard.
@@ -24,7 +24,7 @@
 // platform backend) - traced with Tracy to the forward MDCT recomputing
 // std::cos() fresh inside an O(N^2) loop on every call, instead of using a
 // precomputed table the way the inverse transform right next to it already
-// did (see src/ac3/src/core/mdct.cpp's ForwardCosTable). Every other test in
+// did (see libs/ac3/src/core/mdct.cpp's ForwardCosTable). Every other test in
 // this suite asserts correctness, not throughput, so nothing would have
 // caught a regression like that - this file exists specifically to fail
 // loudly if the codec ever stops being faster than real time again.
@@ -83,8 +83,9 @@ const iclforge::ac3::io::WavData& fixture() {
     return audio;
 }
 
-std::vector<iclforge::oba::ObjectPlacement> object_placement(int objects) {
-    std::vector<iclforge::oba::ObjectPlacement> placement(static_cast<std::size_t>(objects));
+std::vector<iclforge::objects::oba::ObjectPlacement> object_placement(int objects) {
+    std::vector<iclforge::objects::oba::ObjectPlacement> placement(
+        static_cast<std::size_t>(objects));
     for (int obj = 0; obj < objects; ++obj) {
         placement[static_cast<std::size_t>(obj)] = {
             .position = {.x = 0.2 + 0.2 * obj, .y = 0.5, .z = 0.0}, .gain = 1.0};
