@@ -38,7 +38,7 @@ target_compile_definitions(iclforge-forge-cli-tests PRIVATE "ICLFORGE_CLI_EXE=\"
 # reason ICLFORGE_GOLDEN_AUDIO_DIR is: ctest runs the binary from the build
 # tree, nowhere near the fixtures.
 target_compile_definitions(iclforge-forge-cli-tests PRIVATE
-    "ICLFORGE_EXTERNAL_BASELINE_DIR=\"${CMAKE_SOURCE_DIR}/tests/golden/external-baseline\"")
+    "ICLFORGE_EXTERNAL_BASELINE_DIR=\"${CMAKE_SOURCE_DIR}/testdata/external-baseline\"")
 # test_cli.cpp decodes one fuzz seed under `quiet`: the DEE-encoded
 # E-AC-3 stream a quiet decode was first seen failing on, whose report
 # carries infomdat lines that FFmpeg's encode of the same programme does

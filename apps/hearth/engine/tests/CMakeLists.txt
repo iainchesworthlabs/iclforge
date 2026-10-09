@@ -94,7 +94,7 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
             "${CMAKE_SOURCE_DIR}/apps/shared/media/src")
         # A DEE AC-4 stream, for media_ac4_to_map()'s case.
         target_compile_definitions(hearth_controller_tests PRIVATE
-            "ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR=\"${CMAKE_SOURCE_DIR}/tests/golden/external-baseline\"")
+            "ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR=\"${CMAKE_SOURCE_DIR}/testdata/external-baseline\"")
         target_link_libraries(hearth_controller_tests PRIVATE
             hearth_engine
             iclforge::containers

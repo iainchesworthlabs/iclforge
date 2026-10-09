@@ -165,7 +165,7 @@ if(ICLFORGE_BUILD_AC4)
     set_target_properties(decode_ac4 PROPERTIES FOLDER examples)
     if(ICLFORGE_BUILD_TESTS)
         add_test(NAME "example.decode_ac4" COMMAND decode_ac4
-            "${PROJECT_SOURCE_DIR}/tests/golden/external-baseline/ac4-51-film-96/dee.ac4")
+            "${PROJECT_SOURCE_DIR}/testdata/external-baseline/ac4-51-film-96/dee.ac4")
     endif()
 endif()
 
