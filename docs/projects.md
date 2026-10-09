@@ -11,10 +11,11 @@ planners read the same rows to decide what a change builds ([CI lane partitions]
 This page is generated from it.
 
 A library uses only libraries. A program, a binding, a firmware project and an example use
-libraries (a program also the shared code) and never another program, and no library uses a
-program. An *internal* project is never installed, and no installed header includes one. A header
-another project includes is under the project's `include/` or a directory its row exposes. Each
-project's tests are beside it, and `ctest -L <project>` runs them.
+libraries (a program also the shared code, a firmware project also the firmware library it is
+built on) and never another program or firmware project, and no library uses a program. An
+*internal* project is never installed, and no installed header includes one. A header another
+project includes is under the project's `include/` or a directory its row exposes. Each project's
+tests are beside it, and `ctest -L <project>` runs them.
 
 ## Libraries
 
@@ -66,14 +67,19 @@ project's tests are beside it, and `ctest -L <project>` runs them.
 | `python` | `bindings/python/` | The Python binding: the iclforge wheel, built with scikit-build-core. | `ac3`, `ac4`, `base`, `containers`, `objects` | nothing | python |
 | `rust` | `bindings/rust/` | The Rust crates: iclforge and iclforge-sys over the C API. | `capi` | nothing | rust |
 
+## Firmware libraries
+
+| Project | Path | What it is | Uses | Used by | CI lanes |
+|---|---|---|---|---|---|
+| `esp-idf` | `firmware/esp-idf/` | The ESP-IDF component: the codec and player for the ESP32-S3, C3, C6 and P4, with its examples. | `ac3`, `ac4`, `base`, `device`, `dsp`, `objects`, `render`, `sendspin` | `hearth-sink` | esp |
+
 ## Firmware
 
 | Project | Path | What it is | Uses | Used by | CI lanes |
 |---|---|---|---|---|---|
 | `baremetal` | `firmware/baremetal/` | The minimum-footprint probes: the Cortex-M3 build under QEMU, the ESP32 images and the fixtures they decode. | `ac3`, `ac4`, `base`, `dsp`, `objects`, `render` | nothing | esp |
-| `esp-idf` | `firmware/esp-idf/` | The ESP-IDF component: the codec and player for the ESP32-S3, C3, C6 and P4, with its examples. | `ac3`, `ac4`, `base`, `device`, `dsp`, `objects`, `render`, `sendspin` | nothing | esp |
 | `esphome` | `firmware/esphome/` | The ESPHome external component that brings the ESP-IDF component into an ESPHome build. | `ac3` | nothing | esp |
-| `hearth-sink` | `firmware/hearth-sink/` | Hearth's sink firmware for the ESP32 boards, a Sendspin player built on the ESP-IDF component. | `ac3`, `device`, `render`, `sendspin` | nothing | esp |
+| `hearth-sink` | `firmware/hearth-sink/` | Hearth's sink firmware for the ESP32 boards, a Sendspin player built on the ESP-IDF component. | `ac3`, `device`, `esp-idf`, `render`, `sendspin` | nothing | esp |
 
 ## Examples
 
@@ -141,6 +147,5 @@ excuses nothing fails the check.
 | From | To | Where | Why |
 |---|---|---|---|
 | `ac4` | `app-media` | `libs/ac4/tests/decoder/test_object_render.cpp` | The one test of the object renderer builds its streams with the AC-4 tests' own helper (decoder/objects.hpp, which includes the encoder's private headers), so it stays in libs/ac4/tests and compiles apps/shared/media/src/ac4_object_render.cpp into ac4's test binary: a library's test using an app-library (planning/monorepo.md, C7-2, finding 4). |
-| `hearth-sink` | `esp-idf` | any file | The sink is Hearth's firmware and the component is its dependency (main/idf_component.yml, override_path): the player, the control surface and the sinks' common code are the component's. A firmware project using another. |
 | `esp-idf` | `baremetal` | `firmware/esp-idf/iclforge/examples/i2s_player/` | The i2s_player example decodes the 5.1 fixture the bare-metal probe carries (fixture.hpp) rather than a copy of it: one firmware project using another's file. |
 

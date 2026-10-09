@@ -27,7 +27,8 @@ The kinds, and what each may use (the table is held to this as well as the tree)
   app-library  libraries (apps/shared/<name>: code several programs compile in; internal)
   app          libraries and app-libraries (a program of a product); never another app
   binding      libraries
-  firmware     libraries
+  firmware-library  libraries (firmware/<name>: a component several firmware projects build on)
+  firmware     libraries and firmware-libraries; never another firmware project
   example      libraries
   tests        libraries and app-libraries (tests/support, tests/performance)
 
@@ -98,7 +99,8 @@ ALLOWED: dict[str, set[str]] = {
     "app-library": {"library", "vendored"},
     "app": {"library", "app-library", "vendored"},
     "binding": {"library", "vendored"},
-    "firmware": {"library", "vendored"},
+    "firmware-library": {"library", "vendored"},
+    "firmware": {"library", "firmware-library", "vendored"},
     "example": {"library", "vendored"},
     "tests": {"library", "app-library", "vendored"},
     "vendored": set(),
@@ -479,7 +481,7 @@ def lane_problems(table: Table) -> list[str]:
             for lane in project.lanes
             if lane not in table.lanes
         )
-        if project.ships and project.kind != "firmware":
+        if project.ships and project.kind not in ("firmware", "firmware-library"):
             problems.append(f"{project.name} ships libraries, and only firmware does")
         problems.extend(
             f"{project.name} ships {name}, which is not a library of the table"

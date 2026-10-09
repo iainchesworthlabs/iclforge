@@ -40,6 +40,7 @@ KIND_TITLE = {
     "app-library": "Shared code of the programs",
     "app": "Programs",
     "binding": "Bindings",
+    "firmware-library": "Firmware libraries",
     "firmware": "Firmware",
     "example": "Examples",
     "tests": "Tests",
@@ -55,10 +56,11 @@ planners read the same rows to decide what a change builds ([CI lane partitions]
 This page is generated from it.
 
 A library uses only libraries. A program, a binding, a firmware project and an example use
-libraries (a program also the shared code) and never another program, and no library uses a
-program. An *internal* project is never installed, and no installed header includes one. A header
-another project includes is under the project's `include/` or a directory its row exposes. Each
-project's tests are beside it, and `ctest -L <project>` runs them.
+libraries (a program also the shared code, a firmware project also the firmware library it is
+built on) and never another program or firmware project, and no library uses a program. An
+*internal* project is never installed, and no installed header includes one. A header another
+project includes is under the project's `include/` or a directory its row exposes. Each project's
+tests are beside it, and `ctest -L <project>` runs them.
 """
 
 
