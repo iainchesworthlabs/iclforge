@@ -160,8 +160,8 @@ target_include_directories(iclforge-ac3-tests PRIVATE "${ICLFORGE_ARCH_INCLUDE_D
 # Their subject is the component's, not this library's; they move to it with the firmware
 # (planning/monorepo.md, C7-3).
 target_include_directories(iclforge-ac3-tests PRIVATE
-    "${PROJECT_SOURCE_DIR}/esp-idf/iclforge/include"
-    "${PROJECT_SOURCE_DIR}/esp-idf/iclforge/conversion/float")
+    "${PROJECT_SOURCE_DIR}/firmware/esp-idf/iclforge/include"
+    "${PROJECT_SOURCE_DIR}/firmware/esp-idf/iclforge/conversion/float")
 
 # test_simd_kernels.cpp's CPU-feature-detection cases (the runtime AVX2
 # dispatch) need cpu_features.cpp compiled a SECOND time,

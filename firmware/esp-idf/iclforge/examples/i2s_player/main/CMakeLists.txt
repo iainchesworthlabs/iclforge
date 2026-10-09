@@ -3,7 +3,7 @@
 # probe checks against known levels, so if this example plays the wrong thing
 # the probe says so first.
 get_filename_component(ICLFORGE_FIXTURE_DIR
-                       "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../apps/baremetal" ABSOLUTE)
+                       "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../baremetal" ABSOLUTE)
 
 idf_component_register(
     SRCS "i2s_player.cpp"

@@ -62,7 +62,7 @@ cmake_minimum_required(VERSION 3.28)
 # the one CI runs - breaks with it, rather than continuing to work through a
 # private path no integrator has.
 get_filename_component(ICLFORGE_ESP_COMPONENTS
-                       "${CMAKE_CURRENT_SOURCE_DIR}/../../../../esp-idf" ABSOLUTE)
+                       "${CMAKE_CURRENT_SOURCE_DIR}/../../../esp-idf" ABSOLUTE)
 set(EXTRA_COMPONENT_DIRS "${ICLFORGE_ESP_COMPONENTS}")
 
 # Decode or encode. Declared here, before project(), because the component

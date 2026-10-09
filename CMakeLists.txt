@@ -233,7 +233,7 @@ endif()
 # own rather than a use of ICLFORGE_BUILD_AC4, which the guard below refuses in
 # the profile because it also builds the encoder, the applications and the
 # tests. Off by default, and when off the profile builds exactly what it did
-# before: esp-idf/iclforge/CMakeLists.txt sets it from CONFIG_ICLFORGE_AC4.
+# before: firmware/esp-idf/iclforge/CMakeLists.txt sets it from CONFIG_ICLFORGE_AC4.
 option(ICLFORGE_MINIMAL_AC4
     "Minimum-footprint decoder profile only: also build the AC-4 inspector, core and decoder (no encoder)"
     OFF)
@@ -249,7 +249,7 @@ endif()
 # libs/base/variants/profiling-stage_timers/), so a bare-metal probe can
 # report per-stage microseconds beside its per-frame ones. Minimum-footprint
 # profile only: it is that profile's targets that have no other profiler, and
-# apps/baremetal/stage_timers.cpp is the one implementation of the two
+# firmware/baremetal/stage_timers.cpp is the one implementation of the two
 # functions. Off by default, and when off the markers compile to nothing
 # exactly as before, so a timed build and a plain one differ only in the
 # library's include path.
@@ -314,7 +314,7 @@ if(NOT ICLFORGE_BUILD_AC4 AND (ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR ICLFO
         "unconditionally.")
 endif()
 # Hearth's applications, which a board's build leaves out: a board takes libs/sendspin's player
-# half alone (ICLFORGE_SENDSPIN_PLAYER_ONLY, set by esp-idf/iclforge/CMakeLists.txt, with the
+# half alone (ICLFORGE_SENDSPIN_PLAYER_ONLY, set by firmware/esp-idf/iclforge/CMakeLists.txt, with the
 # minimum-footprint profile and no AC-4), and the two guards below are about the applications.
 if(ICLFORGE_BUILD_HEARTH AND NOT ICLFORGE_SENDSPIN_PLAYER_ONLY)
     set(_ac3_hearth_apps ON)
@@ -373,7 +373,7 @@ include(MinimalDecoder)
 #
 # NOT for the minimum-footprint profile, which links it nowhere: no source in
 # libs/ac3/minimal.cmake's list mentions fmt, and neither iclforge_ac3_minimal nor
-# apps/baremetal's probe lists iclforge::fmt among its libraries. The profile is in
+# firmware/baremetal's probe lists iclforge::fmt among its libraries. The profile is in
 # fact built to avoid it - src/internal/cpu/minimal/cpu_features.cpp exists as
 # a whole separate translation unit rather than a branch precisely because the
 # shared one reports through fmt, "which this profile does not carry and whose
@@ -416,7 +416,7 @@ option(ICLFORGE_BUILD_CAPI "Build the C API over the encode/decode core (libs/ca
 # Python on PyPI: the pybind11 extension module (python/) - off by default like ICLFORGE_BUILD_ADM
 # above, and for the same reason: nothing under src/, apps/forge/cli/src, apps/forge/gui, tests/ or examples/ links
 # it or is affected by it either way. A normal C++ build (and every existing CI leg) is unchanged
-# with this OFF. Turned ON by python/pyproject.toml's own cmake.define when scikit-build-core
+# with this OFF. Turned ON by bindings/python/pyproject.toml's own cmake.define when scikit-build-core
 # drives the configure for `pip install`/cibuildwheel - see python/CMakeLists.txt.
 option(ICLFORGE_BUILD_PYTHON "Build the pybind11 Python extension module (python/)" OFF)
 
@@ -566,7 +566,7 @@ endif()
 # examples and isn't consumed via find_package(iclforge), so it doesn't need to come before or
 # after InstallLibrary for any reason other than "iclforge::ac3 must already be a target".
 if(ICLFORGE_BUILD_PYTHON)
-    add_subdirectory(python)
+    add_subdirectory(bindings/python)
 endif()
 
 if(ICLFORGE_BUILD_CLI)
@@ -579,7 +579,7 @@ endif()
 
 # Hearth's applications, the test sink so far (planning/hearth-reference-player.md). Not in a
 # board's build, which takes libs/sendspin's player half alone (ICLFORGE_SENDSPIN_PLAYER_ONLY,
-# set by esp-idf/iclforge/CMakeLists.txt) and has no iclforge::ac3 for the applications to link.
+# set by firmware/esp-idf/iclforge/CMakeLists.txt) and has no iclforge::ac3 for the applications to link.
 if(ICLFORGE_BUILD_HEARTH AND NOT ICLFORGE_SENDSPIN_PLAYER_ONLY)
     add_subdirectory(apps/hearth)
 endif()
@@ -674,8 +674,8 @@ if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
     # archive carries the library without the probe that measures it - a
     # consumer wants the decoder, not a footprint harness. In a checkout the
     # directory is always there and this is a no-op.
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/apps/baremetal/CMakeLists.txt")
-        add_subdirectory(apps/baremetal)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/firmware/baremetal/CMakeLists.txt")
+        add_subdirectory(firmware/baremetal)
     endif()
 endif()
 

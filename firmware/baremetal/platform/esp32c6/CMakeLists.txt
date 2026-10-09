@@ -36,7 +36,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 get_filename_component(ICLFORGE_ESP_COMPONENTS
-                       "${CMAKE_CURRENT_SOURCE_DIR}/../../../../esp-idf" ABSOLUTE)
+                       "${CMAKE_CURRENT_SOURCE_DIR}/../../../esp-idf" ABSOLUTE)
 set(EXTRA_COMPONENT_DIRS "${ICLFORGE_ESP_COMPONENTS}")
 
 set(ICLFORGE_ESP_PROFILE "decoder" CACHE STRING

@@ -57,7 +57,7 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
     # as iclforge-hearth-tests already reads them), so that this app holds an image to the rules the board
     # holds it to.
     target_sources(hearth_engine PRIVATE src/sink_firmware.cpp src/sink_firmware_view.cpp)
-    target_include_directories(hearth_engine PUBLIC "${PROJECT_SOURCE_DIR}/esp-idf/iclforge/include")
+    target_include_directories(hearth_engine PUBLIC "${PROJECT_SOURCE_DIR}/firmware/esp-idf/iclforge/include")
     # The opt-in loopback diagnostics endpoint (src/diagnostics_server.hpp): the
     # same httplib already linked in for src/sink_firmware.cpp above, so it adds
     # nothing new to a core-only build to leave out.

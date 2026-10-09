@@ -93,7 +93,7 @@ endif()
 # a plain build is unchanged. A component archive carries no apps/, and there
 # hearth_sink.cpp's own no-op stand-ins are what links.
 set(ICLFORGE_STAGE_TIMER_SRCS "")
-set(ICLFORGE_STAGE_TIMER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../apps/baremetal")
+set(ICLFORGE_STAGE_TIMER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../baremetal")
 if(EXISTS "${ICLFORGE_STAGE_TIMER_DIR}/stage_timers.cpp")
     set(ICLFORGE_STAGE_TIMER_SRCS "${ICLFORGE_STAGE_TIMER_DIR}/stage_timers.cpp")
 endif()

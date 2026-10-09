@@ -55,7 +55,7 @@
 # does not matter - and set when the sources are compiled. REQUIRES does not
 # wait for it: mbedtls and nvs_flash are listed for every project, since a
 # REQUIRES that depended on the configuration would resolve in the pass that
-# cannot see it (examples/hearth_sink/main/CMakeLists.txt found the same).
+# cannot see it (../../hearth-sink/main/CMakeLists.txt found the same).
 #
 # src/tcp_arrivals.cpp is built whatever the configuration: it defines the
 # lwIP hook a project installs from lwip_hooks/iclforge_lwip_hooks.h, which
