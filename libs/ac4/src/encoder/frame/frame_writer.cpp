@@ -30,7 +30,7 @@ constexpr int kAudioSubstream = 1;
     p.ch_mode = f.ch_mode;
     p.lfe = has_lfe(f.ch_mode);
     if (f.ch_mode >= 11 && f.ch_mode <= 14) {
-        p.ch_mode_core = f.ch_mode % 2 == 1 ? 5 : 6;
+        p.ch_mode_core = f.ch_mode % 2 != 0 ? 5 : 6;
         p.back = f.b_4_back_channels_present;
         p.top_channel_pairs =
             f.top_channels_present == 3 ? 2 : (f.top_channels_present == 0 ? 0 : 1);
