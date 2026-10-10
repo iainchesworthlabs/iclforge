@@ -89,6 +89,8 @@ struct StereoDmxCoeff {
     std::optional<int> ltrt_dmx_loud_corr;  // basic_metadata only
     std::optional<int> lfe_mixgain;         // b_lfe_mixinfo, for a mode with LFE
     int preferred_dmx_method = 0;
+
+    friend bool operator==(const StereoDmxCoeff&, const StereoDmxCoeff&) = default;
 };
 
 struct BasicMetadata {
