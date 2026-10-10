@@ -137,7 +137,7 @@ test("setOutput/setPresentation/reset forward their arguments to the native deco
   // fallbacks (distinct from the constructor's own, separately-covered
   // ones) takes its "unset" branch here.
   decoder.setOutput();
-  assert.deepEqual(fake.log.outputsSet[0], [NaN, Ac4DrcMode.Default, false, 0, Ac4DownmixTarget.AsCoded, true, 0, 0]);
+  assert.deepEqual(fake.log.outputsSet[0], [Number.NaN, Ac4DrcMode.Default, false, 0, Ac4DownmixTarget.AsCoded, true, 0, 0]);
   decoder.setPresentation();
   assert.deepEqual(fake.log.presentationsSet[0], [-1, -1, ""]);
 

@@ -478,7 +478,7 @@ export class Ac4Decoder {
   constructor(module: Ac4EmbindModule, options: Ac4DecoderOptions = DEFAULT_DECODER_OPTIONS) {
     const presentation = options.presentation ?? DEFAULT_PRESENTATION_CHOICE;
     this.#native = new module.Ac4Decoder(
-      options.outputLevelDbfs ?? NaN,
+      options.outputLevelDbfs ?? Number.NaN,
       options.drc ?? Ac4DrcMode.Default,
       options.downmix ?? Ac4DownmixTarget.AsCoded,
       options.decodingMode ?? Ac4DecodingMode.Full,
@@ -507,7 +507,7 @@ export class Ac4Decoder {
   /** Changes the output processing from the next frame (iclforge::ac4::Decoder::set_output()). */
   setOutput(options: Ac4OutputOptions = {}): void {
     this.#native.setOutput(
-      options.outputLevelDbfs ?? NaN,
+      options.outputLevelDbfs ?? Number.NaN,
       options.drc ?? Ac4DrcMode.Default,
       options.headphones ?? false,
       options.dialogueEnhancementDb ?? 0,

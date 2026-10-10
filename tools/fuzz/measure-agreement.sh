@@ -37,35 +37,35 @@ command -v ffmpeg >/dev/null 2>&1 || {
 measure() {
     local harness="$1" seeds_dir="$2"
     local binary="$BUILD_DIR/bin/$harness"
-    if [ ! -x "$binary" ]; then
+    if [[ ! -x "$binary" ]]; then
         echo "error: $binary not built - run: tools/fuzz/run.sh regress $harness" >&2
         exit 1
     fi
     echo "=== $harness (against $seeds_dir) ==="
     local worst_file="" worst_db=""
     for f in "$seeds_dir"/*; do
-        [ -f "$f" ] || continue
+        [[ -f "$f" ]] || continue
         local line
         line="$(ICLFORGE_DIFF_MEASURE_ONLY=1 "$binary" -runs=1 "$f" 2>&1 \
             | grep 'ICLFORGE_DIFF_MEASURE_ONLY' || true)"
-        if [ -z "$line" ]; then
+        if [[ -z "$line" ]]; then
             printf '  %-40s (our own decoder declined, or FFmpeg has no oracle here)\n' "$(basename "$f")"
             continue
         fi
         local comparable db
         comparable="$(sed -n 's/.*comparable=\([0-9]*\).*/\1/p' <<<"$line")"
         db="$(sed -n 's/.*worst_db=\(-\?[0-9.]*\).*/\1/p' <<<"$line")"
-        if [ "$comparable" != "1" ]; then
+        if [[ "$comparable" != "1" ]]; then
             printf '  %-40s (near-silent - skipped)\n' "$(basename "$f")"
             continue
         fi
         printf '  %-40s %s dB\n' "$(basename "$f")" "$db"
-        if [ -z "$worst_db" ] || awk -v a="$db" -v b="$worst_db" 'BEGIN{exit !(a<b)}'; then
+        if [[ -z "$worst_db" ]] || awk -v a="$db" -v b="$worst_db" 'BEGIN{exit !(a<b)}'; then
             worst_db="$db"
             worst_file="$(basename "$f")"
         fi
     done
-    if [ -n "$worst_file" ]; then
+    if [[ -n "$worst_file" ]]; then
         echo "  worst: $worst_file at $worst_db dB"
     fi
     echo
