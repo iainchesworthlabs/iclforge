@@ -1381,6 +1381,10 @@ ParseResult SubstreamPcm::render(const FrameInputs& frame_inputs,
     // another substream's decode mixes this one in and may measure it, and
     // where others are mixed into this one and a curve measures the mix.
     side_kept_ = (enhance && (drc.curve.has_value() || frame_inputs.qmf_only)) || (mixing && drc.curve.has_value());
+    // The downmix stage takes this frame's values before anything asks whether it passes the
+    // channels through: the corrections of Part 2 clauses 4.8.5.4 and 4.8.5.5 scale channels that
+    // come out as coded, and a stage that is not asked to process would never see them.
+    downmix_.update(downmix);
     // A frame that was passed through whole is read from `ext` by the synthesis where nothing else
     // takes its matrix: no dialogue enhancement, mixing, copy of the side chain, objects, DRC level
     // gain or downmix. The stages that run (DRC's bookkeeping) do not read it. Everywhere else the

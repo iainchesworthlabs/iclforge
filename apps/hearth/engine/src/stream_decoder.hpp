@@ -98,9 +98,15 @@ namespace iclforge::hearth {
 
 // Whether the layout renderer can place `speakers` as a bed: it takes sixteen coded channels, and
 // Table E2.5 has no location for 22.2's bottom channels or 9.X.4's screen pair. A frame of a wider
-// layout, 22.2's, or with one of those channels, a 9.X.4 mode's, is refused rather than placed on
-// some of its channels.
+// layout, 22.2's, or with one of those channels is refused rather than placed on some of its
+// channels. A 9.X.4 mode's frame never reaches this as coded: see ac4_codes_screen_pair().
 [[nodiscard]] bool ac4_placeable(std::span<const iclforge::ac4::Speaker> speakers);
+
+// Whether `speakers` hold 9.X.4's screen pair (Lscr, Rscr). The engine renders such a source to
+// 7.X.4 with the decoder's own channel renderer (ETSI TS 103 190-2 clause 5.10.2, the 9.X rows of
+// Tables 38 to 43 fold the pair into the fronts) where it has been asked for the channels as coded,
+// since Table E2.5 gives the pair no location.
+[[nodiscard]] bool ac4_codes_screen_pair(std::span<const iclforge::ac4::Speaker> speakers);
 
 // The A/52 audio coding mode with those speakers' front and surround channels,
 // which is how an AC-4 unit's layout reads where an acmod is asked for:
@@ -276,6 +282,13 @@ private:
     void place_ac4_frame(const iclforge::ac4::DecodedFrame& pcm, const BlockFn& deliver);
     // Hands `frames` of silence on every slot to `deliver`, a block at a time.
     void deliver_silence(std::size_t frames, const BlockFn& deliver);
+    // ac4_config_'s output processing, with a 9.X.4 source that was asked for as coded folded to
+    // 7.X.4. Every other target, a stereo or mono fold and the immersive layouts the listener
+    // chose, is the listener's and passes through.
+    [[nodiscard]] iclforge::ac4::OutputConfig ac4_output() const;
+    // Reads `raw`'s table of contents for the presentation ac4_config_ selects and whether it codes
+    // the screen pair. False, with the answer left unknown, where no presentation reads from it.
+    [[nodiscard]] bool probe_ac4_source(std::span<const std::byte> raw);
     // What decode_by_block() would still hold back - always nothing now that decode_ac4() reads
     // whole frames through decode() instead, kept so finish()'s call site needs no special case.
     void flush_ac4(const BlockFn& deliver);
@@ -316,6 +329,11 @@ private:
     iclforge::ac4::DecoderConfig ac4_config_{};
     std::optional<iclforge::ac4::Decoder> ac4_decoder_;
     std::vector<iclforge::ac4::Speaker> ac4_speakers_;
+    // The presentation the decoder plays codes 9.X.4's screen pair, as the first unit that read
+    // since a reset, a construction or a change of settings said; ac4_source_known_ is whether one
+    // has said. With the output asked for as coded, ac4_output() then asks the decoder for 7.X.4.
+    bool ac4_source_known_ = false;
+    bool ac4_screen_pair_ = false;
     // Objects (planning/ac4.md, I5): built the first time a presentation carries any, and rebuilt
     // whenever the configured layout or the stream's own rate changes under it - both tracked
     // alongside it since Ac4ObjectRenderer takes them at construction and reports neither back.

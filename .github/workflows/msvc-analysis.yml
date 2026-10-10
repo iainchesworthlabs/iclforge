@@ -93,10 +93,12 @@ jobs:
     runs-on: ${{ fromJSON(needs.check-runner.outputs.runner) }}
     # 35.1 min median / 36.1 max measured on the fleet (2026-09-04); there
     # was no bound before. A hung run would otherwise hold a Windows fleet
-    # slot into aqualink-automate's 04:00 window. Unmeasured on
-    # windows-latest (the fallback when no Windows runner is online) - raise
-    # this if a hosted run trips it.
-    timeout-minutes: 90
+    # slot into aqualink-automate's 04:00 window. A hosted windows-latest
+    # run (the fallback when no Windows runner is online) took 73.7 min on
+    # 2026-10-09 and a dispatched one was cancelled at the old 90-minute
+    # bound on 2026-10-10 with a busy queue, so the bound is 150: still a
+    # hang is caught, and an ordinary slow run is not reported as a failure.
+    timeout-minutes: 150
     permissions:
       actions: read
       contents: read
