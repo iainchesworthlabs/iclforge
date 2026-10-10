@@ -38,7 +38,7 @@ image=""
 server=""
 out="sendspin-qemu-run"
 trims=""
-while [ $# -gt 0 ]; do
+while [[ $# -gt 0 ]]; do
     case "$1" in
         --qemu) qemu="$2"; shift 2 ;;
         --image) image="$2"; shift 2 ;;
@@ -48,7 +48,7 @@ while [ $# -gt 0 ]; do
         *) echo "unknown option $1" >&2; exit 2 ;;
     esac
 done
-if [ -z "$qemu" ] || [ -z "$image" ] || [ -z "$server" ]; then
+if [[ -z "$qemu" ]] || [[ -z "$image" ]] || [[ -z "$server" ]]; then
     echo "usage: $0 --qemu QEMU --image DIR --server SERVER [--out DIR] [--board-trim-db LIST]" >&2
     exit 2
 fi
@@ -87,16 +87,16 @@ fail() {
 token=""
 for _ in $(seq 1 300); do
     token="$(grep -aoE 'pairing token SP:0[A-Za-z0-9_-]+' "$console" | head -1 | sed 's/^pairing token //')" || true
-    if [ -n "$token" ]; then
+    if [[ -n "$token" ]]; then
         break
     fi
     kill -0 "$qemu_pid" 2>/dev/null || fail "QEMU exited before the player printed its pairing token"
     sleep 1
 done
-[ -n "$token" ] || fail "the player printed no pairing token in 300 s"
+[[ -n "$token" ]] || fail "the player printed no pairing token in 300 s"
 
 board_trims=()
-if [ -n "$trims" ]; then
+if [[ -n "$trims" ]]; then
     board_trims=(--trim-db "$trims")
 fi
 server_status=0
@@ -108,7 +108,7 @@ server_status=0
     --sink "$out/reference" --sink-layout 2.0 \
     --report "$out/report.json" 2> "$out/server.txt" || server_status=$?
 cat "$out/server.txt"
-if [ "$server_status" -ne 0 ]; then
+if [[ "$server_status" -ne 0 ]]; then
     fail "the test server failed ($(tail -1 "$out/server.txt"))"
 fi
 
@@ -151,7 +151,7 @@ EOF
 kill "$qemu_pid" 2>/dev/null || true
 
 wav="$(find "$out/reference/out" -name 'bursts-*.wav' -print -quit 2>/dev/null)" || true
-[ -n "$wav" ] || fail "the test sink wrote no WAV file"
+[[ -n "$wav" ]] || fail "the test sink wrote no WAV file"
 python3 "$here/check_sendspin_levels.py" --title "$title" --console "$console" --wav "$wav" \
     || fail "the board's levels are not the test sink's (the lines above say which)"
 # The floor is the stream set's (.github/workflows/_build.yml): the widest
