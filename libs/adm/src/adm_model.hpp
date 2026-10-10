@@ -22,6 +22,7 @@ namespace adm {
 class Document;
 class AudioTrackUid;
 class AudioChannelFormat;
+class AudioPackFormat;
 }  // namespace adm
 
 namespace iclforge::adm::detail {
@@ -59,10 +60,32 @@ struct ZoneBlockSource {
     std::vector<std::vector<ExclusionZone>> zones_by_block;
 };
 
+// A Matrix channel. libadm's formatter writes each of its blocks as an empty element with only an
+// ID, rtime and duration, so write_bw64 expands them from `blocks` (the model's own, in order, so
+// blocks[i] belongs to the channel's i-th block) once reassignIds() has given them final IDs. The
+// references inside still use the model's correlation keys; they are translated through
+// BuiltDocument::channels_by_key at that point, when the final channel IDs exist.
+struct MatrixChannelSource {
+    std::shared_ptr<::adm::AudioChannelFormat> channel;
+    std::vector<AudioBlockFormat> blocks;
+};
+
+// A pack that carries something libadm cannot write: a Matrix pack's references to other packs, or
+// an HOA pack's defaults. `model` is the model's own pack, its references still in correlation
+// keys (BuiltDocument::packs_by_key translates them).
+struct PackSource {
+    std::shared_ptr<::adm::AudioPackFormat> pack;
+    AudioPackFormat model;
+};
+
 struct BuiltDocument {
     std::shared_ptr<::adm::Document> document;
     std::vector<ZoneBlockSource> zone_blocks;
+    std::vector<MatrixChannelSource> matrix_channels;
+    std::vector<PackSource> pack_sources;
     std::unordered_map<std::string, std::shared_ptr<::adm::AudioTrackUid>> track_uids_by_key;
+    std::unordered_map<std::string, std::shared_ptr<::adm::AudioChannelFormat>> channels_by_key;
+    std::unordered_map<std::string, std::shared_ptr<::adm::AudioPackFormat>> packs_by_key;
 };
 
 [[nodiscard]] std::expected<BuiltDocument, AdmWriteError> build_libadm_document(const AdmModel& model,

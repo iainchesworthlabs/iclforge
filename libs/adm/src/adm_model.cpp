@@ -326,6 +326,19 @@ AudioPackFormat convert(const std::shared_ptr<const ::adm::AudioPackFormat>& src
     pack_format.type = to_type_definition(src->get<::adm::TypeDescriptor>());
     pack_format.channel_format_refs = ids_of(src->getReferences<::adm::AudioChannelFormat>());
     pack_format.pack_format_refs = ids_of(src->getReferences<::adm::AudioPackFormat>());
+    // libadm reads an HOA pack's normalization, nfcRefDist and screenRef as XML attributes; the
+    // standard (BS.2076-3 Table A1-25) and the EBU's own renderer have them as sub-elements, which
+    // scan_pack_extras() reads and parse_axml() lays over this. Both spellings are accepted.
+    if (const auto hoa = std::dynamic_pointer_cast<const ::adm::AudioPackFormatHoa>(src)) {
+        if (!hoa->isDefault<::adm::Normalization>()) {
+            pack_format.hoa_normalization = hoa->get<::adm::Normalization>().get();
+        }
+        if (!hoa->isDefault<::adm::NfcRefDist>()) {
+            pack_format.has_nfc_ref_dist = true;
+            pack_format.nfc_ref_dist = to_double(hoa->get<::adm::NfcRefDist>().get());
+        }
+        pack_format.screen_ref = hoa->get<::adm::ScreenRef>().get();
+    }
     return pack_format;
 }
 
@@ -414,26 +427,83 @@ namespace {
     return ::adm::Time(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(seconds)));
 }
 
-::adm::AudioBlockFormatObjects to_libadm_block(const AudioBlockFormat& block) {
-    // The Dolby Atmos Master ADM Profile - and this writer's only caller, iclforge::adm's
-    // write-side (bridge.cpp) - always produces cartesian blocks; a caller handing this writer a
-    // polar one is a bug in that caller, which build_libadm_document() reports as
-    // AdmWriteError::kInvalidDocument before calling this, so `position` is cartesian here.
-    const auto& cartesian = std::get<CartesianPosition>(block.position);
-    ::adm::AudioBlockFormatObjects out{
-        ::adm::CartesianPosition(::adm::X(static_cast<float>(cartesian.x)), ::adm::Y(static_cast<float>(cartesian.y)),
-                               ::adm::Z(static_cast<float>(cartesian.z))),
-        ::adm::Rtime(seconds_to_time(block.rtime_s)),
-        ::adm::Gain::fromLinear(block.gain),
-        ::adm::Width(static_cast<float>(block.width)),
-        ::adm::Height(static_cast<float>(block.height)),
-        ::adm::Depth(static_cast<float>(block.depth)),
-    };
+// The libadm type descriptor a model TypeDefinition is written as. Nothing for kUnknown and
+// kUserCustom: libadm's TypeDescriptor holds the five defined types, so neither has an element to
+// become.
+bool to_libadm_type(TypeDefinition type, ::adm::TypeDescriptor& out) {
+    switch (type) {
+        case TypeDefinition::kDirectSpeakers:
+            out = ::adm::TypeDefinition::DIRECT_SPEAKERS;
+            return true;
+        case TypeDefinition::kMatrix:
+            out = ::adm::TypeDefinition::MATRIX;
+            return true;
+        case TypeDefinition::kObjects:
+            out = ::adm::TypeDefinition::OBJECTS;
+            return true;
+        case TypeDefinition::kHoa:
+            out = ::adm::TypeDefinition::HOA;
+            return true;
+        case TypeDefinition::kBinaural:
+            out = ::adm::TypeDefinition::BINAURAL;
+            return true;
+        case TypeDefinition::kUnknown:
+        case TypeDefinition::kUserCustom:
+            break;
+    }
+    return false;
+}
+
+// The parameters every block type shares (Table A1-8): duration, a gain other than unity and an
+// importance other than the schema's default. rtime is each block's own constructor argument.
+template <typename Block>
+void set_common(Block& out, const AudioBlockFormat& block) {
     if (block.has_duration) {
         out.set(::adm::Duration(seconds_to_time(block.duration_s)));
     }
+    if (block.gain != 1.0) {
+        out.set(::adm::Gain::fromLinear(block.gain));
+    }
+    if (block.has_importance && block.importance != 10) {
+        out.set(::adm::Importance(block.importance));
+    }
+}
+
+::adm::SphericalPosition to_libadm_spherical(const PolarPosition& polar) {
+    return ::adm::SphericalPosition(::adm::Azimuth(static_cast<float>(polar.azimuth_deg)),
+                                    ::adm::Elevation(static_cast<float>(polar.elevation_deg)),
+                                    ::adm::Distance(static_cast<float>(polar.distance)));
+}
+
+::adm::CartesianPosition to_libadm_cartesian(const CartesianPosition& cartesian) {
+    return ::adm::CartesianPosition(::adm::X(static_cast<float>(cartesian.x)),
+                                    ::adm::Y(static_cast<float>(cartesian.y)),
+                                    ::adm::Z(static_cast<float>(cartesian.z)));
+}
+
+::adm::AudioBlockFormatObjects to_libadm_block(const AudioBlockFormat& block) {
+    ::adm::AudioBlockFormatObjects out{to_libadm_cartesian({}),
+                                       ::adm::Rtime(seconds_to_time(block.rtime_s))};
+    // The variant, not the `cartesian` flag, is what says which position this block holds: the flag
+    // is for a reader and a hand-built block may leave it either way.
+    if (const auto* cartesian = std::get_if<CartesianPosition>(&block.position)) {
+        out.set(to_libadm_cartesian(*cartesian));
+    } else {
+        out.set(to_libadm_spherical(std::get<PolarPosition>(block.position)));
+    }
+    set_common(out, block);
+    out.set(::adm::Width(static_cast<float>(block.width)));
+    out.set(::adm::Height(static_cast<float>(block.height)));
+    out.set(::adm::Depth(static_cast<float>(block.depth)));
+    if (block.diffuse != 0.0) {
+        out.set(::adm::Diffuse(static_cast<float>(block.diffuse)));
+    }
     if (block.has_channel_lock) {
-        out.set(::adm::ChannelLock(::adm::ChannelLockFlag(block.channel_lock)));
+        ::adm::ChannelLock lock{::adm::ChannelLockFlag(block.channel_lock)};
+        if (block.has_channel_lock_max_distance) {
+            lock.set(::adm::MaxDistance(static_cast<float>(block.channel_lock_max_distance)));
+        }
+        out.set(lock);
     }
     if (block.has_object_divergence) {
         ::adm::ObjectDivergence divergence{::adm::Divergence(static_cast<float>(block.object_divergence.value))};
@@ -464,22 +534,74 @@ namespace {
 
 ::adm::AudioBlockFormatDirectSpeakers to_libadm_direct_speakers_block(
     const AudioBlockFormat& block) {
-    ::adm::AudioBlockFormatDirectSpeakers out{::adm::Rtime(seconds_to_time(block.rtime_s)), ::adm::Gain::fromLinear(block.gain)};
-    if (block.has_duration) {
-        out.set(::adm::Duration(seconds_to_time(block.duration_s)));
-    }
+    ::adm::AudioBlockFormatDirectSpeakers out{::adm::Rtime(seconds_to_time(block.rtime_s))};
     // set(), not the constructor's own named-arg list: SpeakerPosition's two alternatives
-    // (Cartesian/Spherical) are read off the same `position`/`cartesian` fields
-    // AudioBlockFormatObjects above reads, but AudioBlockFormatDirectSpeakers has no matching
-    // constructor overload for either - see audio_block_format_direct_speakers.hpp's own
-    // set(CartesianSpeakerPosition)/set(SphericalSpeakerPosition). Cartesian only, as for
-    // to_libadm_block() above: build_libadm_document() has already refused a polar block.
-    const auto& cartesian = std::get<CartesianPosition>(block.position);
-    out.set(::adm::CartesianSpeakerPosition(::adm::X(static_cast<float>(cartesian.x)), ::adm::Y(static_cast<float>(cartesian.y)),
-                                          ::adm::Z(static_cast<float>(cartesian.z))));
+    // (Cartesian/Spherical) are read off the same `position` variant AudioBlockFormatObjects
+    // above reads, but AudioBlockFormatDirectSpeakers has no matching constructor overload for
+    // either - see audio_block_format_direct_speakers.hpp's own set(CartesianSpeakerPosition)/
+    // set(SphericalSpeakerPosition).
+    if (const auto* cartesian = std::get_if<CartesianPosition>(&block.position)) {
+        out.set(::adm::CartesianSpeakerPosition(::adm::X(static_cast<float>(cartesian->x)),
+                                                ::adm::Y(static_cast<float>(cartesian->y)),
+                                                ::adm::Z(static_cast<float>(cartesian->z))));
+    } else {
+        const auto& polar = std::get<PolarPosition>(block.position);
+        out.set(::adm::SphericalSpeakerPosition(
+            ::adm::Azimuth(static_cast<float>(polar.azimuth_deg)),
+            ::adm::Elevation(static_cast<float>(polar.elevation_deg)),
+            ::adm::Distance(static_cast<float>(polar.distance))));
+    }
+    set_common(out, block);
     for (const auto& label : block.speaker_labels) {
         out.add(::adm::SpeakerLabel(label));
     }
+    if (block.head_locked) {
+        out.set(::adm::HeadLocked(true));
+    }
+    return out;
+}
+
+// BS.2076-3 §5.4.3.4: order and degree identify the component and are required, so a block that
+// never had them is not a document this writer can describe.
+std::expected<::adm::AudioBlockFormatHoa, AdmWriteError> to_libadm_hoa_block(
+    const AudioBlockFormat& block) {
+    if (!block.has_hoa_order || !block.has_hoa_degree) {
+        return std::unexpected(AdmWriteError::kInvalidDocument);
+    }
+    ::adm::AudioBlockFormatHoa out{::adm::Order(block.hoa_order), ::adm::Degree(block.hoa_degree),
+                                   ::adm::Rtime(seconds_to_time(block.rtime_s))};
+    set_common(out, block);
+    if (!block.hoa_normalization.empty()) {
+        out.set(::adm::Normalization(block.hoa_normalization));
+    }
+    if (block.has_nfc_ref_dist) {
+        out.set(::adm::NfcRefDist(static_cast<float>(block.nfc_ref_dist)));
+    }
+    if (!block.hoa_equation.empty()) {
+        out.set(::adm::Equation(block.hoa_equation));
+    }
+    if (block.screen_ref) {
+        out.set(::adm::ScreenRef(true));
+    }
+    if (block.head_locked) {
+        out.set(::adm::HeadLocked(true));
+    }
+    return out;
+}
+
+::adm::AudioBlockFormatBinaural to_libadm_binaural_block(const AudioBlockFormat& block) {
+    ::adm::AudioBlockFormatBinaural out{::adm::Rtime(seconds_to_time(block.rtime_s))};
+    set_common(out, block);
+    return out;
+}
+
+// libadm's Matrix block has parameters for rtime, duration, gain and importance only, and its
+// formatter writes just the first two; the matrix itself is added to the text afterwards (see
+// inject_matrix_extras). The block still goes into the channel so reassignIds() numbers it and
+// the formatter writes the element for the text to expand.
+::adm::AudioBlockFormatMatrix to_libadm_matrix_block(const AudioBlockFormat& block) {
+    ::adm::AudioBlockFormatMatrix out{::adm::Rtime(seconds_to_time(block.rtime_s))};
+    set_common(out, block);
     return out;
 }
 
@@ -497,37 +619,104 @@ std::expected<std::reference_wrapper<const std::shared_ptr<Value>>, AdmWriteErro
     return std::cref(it->second);
 }
 
-}  // namespace
+// True when following `refs_of` from some element comes back to an element already on the path.
+// libadm refuses to add a reference that closes a loop (BS.2076-3 §5.6.7 and §5.5 forbid one) by
+// throwing, which would leave write_bw64() as an exception, so the model's own graph is checked
+// first. Iterative: a nested model is as deep as its caller made it, and recursion could not say
+// how deep that is. References that name nothing are skipped here; resolving them is the loops'
+// own job.
+template <typename Element, typename RefsOf>
+bool has_reference_cycle(const std::vector<Element>& elements, RefsOf refs_of) {
+    std::unordered_map<std::string, std::size_t> index;
+    for (std::size_t i = 0; i < elements.size(); ++i) {
+        index.emplace(elements[i].id, i);
+    }
+    enum : char { kNew, kOnPath, kDone };
+    std::vector<char> state(elements.size(), kNew);
+    struct Frame {
+        std::size_t element;
+        std::size_t next_ref;
+    };
+    std::vector<Frame> stack;
+    for (std::size_t root = 0; root < elements.size(); ++root) {
+        if (state[root] != kNew) {
+            continue;
+        }
+        state[root] = kOnPath;
+        stack.push_back({root, 0});
+        while (!stack.empty()) {
+            const auto frame = stack.back();
+            const auto& refs = refs_of(elements[frame.element]);
+            if (frame.next_ref == refs.size()) {
+                state[frame.element] = kDone;
+                stack.pop_back();
+                continue;
+            }
+            ++stack.back().next_ref;
+            const auto it = index.find(refs[frame.next_ref]);
+            if (it == index.end()) {
+                continue;
+            }
+            if (state[it->second] == kOnPath) {
+                return true;
+            }
+            if (state[it->second] == kNew) {
+                state[it->second] = kOnPath;
+                stack.push_back({it->second, 0});
+            }
+        }
+    }
+    return false;
+}
 
-std::expected<BuiltDocument, AdmWriteError> build_libadm_document(const AdmModel& model, std::uint16_t bit_depth) {
+std::expected<BuiltDocument, AdmWriteError> build_libadm_document_unchecked(
+    const AdmModel& model, std::uint16_t bit_depth) {
+    if (has_reference_cycle(model.objects,
+                            [](const AudioObject& o) -> const std::vector<std::string>& {
+                                return o.object_refs;
+                            }) ||
+        has_reference_cycle(model.pack_formats,
+                            [](const AudioPackFormat& p) -> const std::vector<std::string>& {
+                                return p.pack_format_refs;
+                            })) {
+        return std::unexpected(AdmWriteError::kInvalidDocument);
+    }
+
     auto document = ::adm::Document::create();
+    BuiltDocument built;
 
-    std::vector<ZoneBlockSource> zone_blocks;
     std::unordered_map<std::string, std::shared_ptr<::adm::AudioChannelFormat>> channel_formats_by_id;
     for (const auto& channel_format : model.channel_formats) {
         ::adm::TypeDescriptor type;
-        if (channel_format.type == TypeDefinition::kObjects) {
-            type = ::adm::TypeDefinition::OBJECTS;
-        } else if (channel_format.type == TypeDefinition::kDirectSpeakers) {
-            type = ::adm::TypeDefinition::DIRECT_SPEAKERS;
-        } else {
-            // Matrix/HOA/Binaural/User Custom/Unknown - out of this writer's scope, same
-            // boundary iclforge::adm's own read-side classify_object() draws (bridge.cpp).
+        if (!to_libadm_type(channel_format.type, type)) {
             return std::unexpected(AdmWriteError::kInvalidDocument);
         }
         auto libadm_channel = ::adm::AudioChannelFormat::create(::adm::AudioChannelFormatName(channel_format.name), type);
         for (const auto& block : channel_format.block_formats) {
-            // Both converters below read `position` as a CartesianPosition. A polar one - which a
-            // default-constructed AudioBlockFormat has, as `position` starts as PolarPosition{} -
-            // is outside this writer's scope, and std::get would throw std::bad_variant_access
-            // out of write_bw64() instead of reporting it.
-            if (!std::holds_alternative<CartesianPosition>(block.position)) {
-                return std::unexpected(AdmWriteError::kInvalidDocument);
-            }
-            if (channel_format.type == TypeDefinition::kObjects) {
-                libadm_channel->add(to_libadm_block(block));
-            } else {
-                libadm_channel->add(to_libadm_direct_speakers_block(block));
+            switch (channel_format.type) {
+                case TypeDefinition::kObjects:
+                    libadm_channel->add(to_libadm_block(block));
+                    break;
+                case TypeDefinition::kDirectSpeakers:
+                    libadm_channel->add(to_libadm_direct_speakers_block(block));
+                    break;
+                case TypeDefinition::kHoa: {
+                    auto hoa = to_libadm_hoa_block(block);
+                    if (!hoa) {
+                        return std::unexpected(hoa.error());
+                    }
+                    libadm_channel->add(std::move(*hoa));
+                    break;
+                }
+                case TypeDefinition::kBinaural:
+                    libadm_channel->add(to_libadm_binaural_block(block));
+                    break;
+                case TypeDefinition::kMatrix:
+                    libadm_channel->add(to_libadm_matrix_block(block));
+                    break;
+                case TypeDefinition::kUnknown:
+                case TypeDefinition::kUserCustom:
+                    return std::unexpected(AdmWriteError::kInvalidDocument);
             }
         }
         if (channel_format.type == TypeDefinition::kObjects &&
@@ -537,27 +726,35 @@ std::expected<BuiltDocument, AdmWriteError> build_libadm_document(const AdmModel
             for (const auto& block : channel_format.block_formats) {
                 source.zones_by_block.push_back(block.zone_exclusion);
             }
-            zone_blocks.push_back(std::move(source));
+            built.zone_blocks.push_back(std::move(source));
+        }
+        if (channel_format.type == TypeDefinition::kMatrix) {
+            built.matrix_channels.push_back(
+                {.channel = libadm_channel, .blocks = channel_format.block_formats});
         }
         document->add(libadm_channel);
         channel_formats_by_id.emplace(channel_format.id, std::move(libadm_channel));
     }
 
+    // Two passes: a pack may nest one that comes later in the model, so every pack exists before
+    // any reference between packs is made.
     std::unordered_map<std::string, std::shared_ptr<::adm::AudioPackFormat>> pack_formats_by_id;
     for (const auto& pack_format : model.pack_formats) {
-        if (!pack_format.pack_format_refs.empty()) {
-            // Nested audioPackFormat - out of scope, same as the channel-format loop above.
-            return std::unexpected(AdmWriteError::kInvalidDocument);
-        }
         ::adm::TypeDescriptor type;
-        if (pack_format.type == TypeDefinition::kObjects) {
-            type = ::adm::TypeDefinition::OBJECTS;
-        } else if (pack_format.type == TypeDefinition::kDirectSpeakers) {
-            type = ::adm::TypeDefinition::DIRECT_SPEAKERS;
-        } else {
+        if (!to_libadm_type(pack_format.type, type)) {
             return std::unexpected(AdmWriteError::kInvalidDocument);
         }
-        auto libadm_pack = ::adm::AudioPackFormat::create(::adm::AudioPackFormatName(pack_format.name), type);
+        // libadm refuses AudioPackFormat::create() for the HOA type: its HOA pack is a subclass
+        // with parameters of its own (its parser reads them as attributes; the standard and
+        // this writer use sub-elements, see inject_matrix_extras).
+        std::shared_ptr<::adm::AudioPackFormat> libadm_pack;
+        if (pack_format.type == TypeDefinition::kHoa) {
+            libadm_pack =
+                ::adm::AudioPackFormatHoa::create(::adm::AudioPackFormatName(pack_format.name));
+        } else {
+            libadm_pack =
+                ::adm::AudioPackFormat::create(::adm::AudioPackFormatName(pack_format.name), type);
+        }
         for (const auto& ref : pack_format.channel_format_refs) {
             const auto resolved = resolve(channel_formats_by_id, ref);
             if (!resolved) {
@@ -566,7 +763,25 @@ std::expected<BuiltDocument, AdmWriteError> build_libadm_document(const AdmModel
             libadm_pack->addReference(resolved->get());
         }
         document->add(libadm_pack);
+        const bool has_matrix_refs = !pack_format.encode_pack_format_refs.empty() ||
+                                     !pack_format.decode_pack_format_refs.empty() ||
+                                     !pack_format.input_pack_format_ref.empty() ||
+                                     !pack_format.output_pack_format_ref.empty();
+        const bool has_hoa_defaults = !pack_format.hoa_normalization.empty() ||
+                                      pack_format.has_nfc_ref_dist || pack_format.screen_ref;
+        if (has_matrix_refs || has_hoa_defaults) {
+            built.pack_sources.push_back({.pack = libadm_pack, .model = pack_format});
+        }
         pack_formats_by_id.emplace(pack_format.id, std::move(libadm_pack));
+    }
+    for (const auto& pack_format : model.pack_formats) {
+        for (const auto& ref : pack_format.pack_format_refs) {
+            const auto resolved = resolve(pack_formats_by_id, ref);
+            if (!resolved) {
+                return std::unexpected(resolved.error());
+            }
+            pack_formats_by_id.at(pack_format.id)->addReference(resolved->get());
+        }
     }
 
     // §5.1/§5.2 are skipped in favour of BS.2076-2's plain-PCM shortcut (model.hpp's own
@@ -647,13 +862,10 @@ std::expected<BuiltDocument, AdmWriteError> build_libadm_document(const AdmModel
         track_uids_by_id.emplace(track_uid.uid, libadm_track_uid);
     }
 
+    // Two passes again: an audioObject may nest one that comes later in the model (§5.6:
+    // "audioObjects can be nested"), so each exists before any nesting reference is made.
     std::unordered_map<std::string, std::shared_ptr<::adm::AudioObject>> objects_by_id;
     for (const auto& object : model.objects) {
-        if (!object.object_refs.empty()) {
-            // Nested audioObject references - out of scope, same as iclforge::adm's own
-            // read-side collect_leaf_objects() only ever WALKS these, never expects to write them.
-            return std::unexpected(AdmWriteError::kInvalidDocument);
-        }
         auto libadm_object = ::adm::AudioObject::create(::adm::AudioObjectName(object.name));
         if (object.start_s != 0.0) {
             libadm_object->set(::adm::Start(seconds_to_time(object.start_s)));
@@ -674,6 +886,15 @@ std::expected<BuiltDocument, AdmWriteError> build_libadm_document(const AdmModel
         }
         document->add(libadm_object);
         objects_by_id.emplace(object.id, std::move(libadm_object));
+    }
+    for (const auto& object : model.objects) {
+        for (const auto& ref : object.object_refs) {
+            const auto resolved = resolve(objects_by_id, ref);
+            if (!resolved) {
+                return std::unexpected(resolved.error());
+            }
+            objects_by_id.at(object.id)->addReference(resolved->get());
+        }
     }
 
     std::unordered_map<std::string, std::shared_ptr<::adm::AudioContent>> contents_by_id;
@@ -702,9 +923,26 @@ std::expected<BuiltDocument, AdmWriteError> build_libadm_document(const AdmModel
         document->add(libadm_programme);
     }
 
-    return BuiltDocument{.document = std::move(document),
-                         .zone_blocks = std::move(zone_blocks),
-                         .track_uids_by_key = std::move(track_uids_by_id)};
+    built.document = std::move(document);
+    built.track_uids_by_key = std::move(track_uids_by_id);
+    built.channels_by_key = std::move(channel_formats_by_id);
+    built.packs_by_key = std::move(pack_formats_by_id);
+    return built;
+}
+
+}  // namespace
+
+std::expected<BuiltDocument, AdmWriteError> build_libadm_document(const AdmModel& model,
+                                                                  std::uint16_t bit_depth) {
+    // A value libadm's own types refuse (an azimuth past 180 degrees, an importance past 10, a
+    // negative width) throws from the constructor or setter that range-checks it. That is the
+    // model describing something the standard has no element for, so it is reported as one,
+    // rather than leaving write_bw64() as an exception.
+    try {
+        return build_libadm_document_unchecked(model, bit_depth);
+    } catch (const std::exception&) {
+        return std::unexpected(AdmWriteError::kInvalidDocument);
+    }
 }
 
 namespace {

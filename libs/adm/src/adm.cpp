@@ -10,11 +10,13 @@
 #include <fstream>
 #include <istream>
 #include <iterator>
+#include <optional>
 #include <random>
 #include <sstream>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <adm/adm.hpp>
 #include <adm/errors.hpp>
@@ -271,10 +273,16 @@ std::expected<AdmModel, AdmError> parse_axml(const std::string& xml) {
             pack.decode_pack_format_refs = extras.decode_pack_format_refs;
             pack.input_pack_format_ref = extras.input_pack_format_ref;
             pack.output_pack_format_ref = extras.output_pack_format_ref;
-            pack.hoa_normalization = extras.hoa_normalization;
-            pack.has_nfc_ref_dist = extras.has_nfc_ref_dist;
-            pack.nfc_ref_dist = extras.nfc_ref_dist;
-            pack.screen_ref = extras.screen_ref;
+            // The HOA defaults only where the sub-element was there: build_adm_model() has
+            // already taken libadm's attribute spelling of the same three.
+            if (!extras.hoa_normalization.empty()) {
+                pack.hoa_normalization = extras.hoa_normalization;
+            }
+            if (extras.has_nfc_ref_dist) {
+                pack.has_nfc_ref_dist = true;
+                pack.nfc_ref_dist = extras.nfc_ref_dist;
+            }
+            pack.screen_ref = pack.screen_ref || extras.screen_ref;
         }
     }
     return model;
@@ -650,6 +658,100 @@ std::expected<void, AdmWriteError> write_bw64(const std::string& path, const Adm
                 }
             }
             axml = detail::inject_zone_exclusions(axml, zones);
+        }
+        if (!built->matrix_channels.empty() || !built->pack_sources.empty()) {
+            // libadm's Matrix block has no matrix, and its pack has neither a Matrix pack's
+            // references nor an HOA pack's defaults (BS.2076-3 §5.4.3.2, §5.5.4, §5.5.5). The
+            // model's references name other elements by its own correlation keys; the final IDs
+            // exist only now, so each is translated here, and one that names nothing is the same
+            // unresolved reference every other loop reports.
+            const auto final_channel_id =
+                [&](const std::string& key) -> std::optional<std::string> {
+                const auto it = built->channels_by_key.find(key);
+                if (it == built->channels_by_key.end()) {
+                    return std::nullopt;
+                }
+                return ::adm::formatId(it->second->get<::adm::AudioChannelFormatId>());
+            };
+            const auto final_pack_id = [&](const std::string& key) -> std::optional<std::string> {
+                const auto it = built->packs_by_key.find(key);
+                if (it == built->packs_by_key.end()) {
+                    return std::nullopt;
+                }
+                return ::adm::formatId(it->second->get<::adm::AudioPackFormatId>());
+            };
+
+            detail::MatrixBlocksById matrix_blocks;
+            for (const auto& source : built->matrix_channels) {
+                std::size_t index = 0;
+                for (const auto& libadm_block :
+                     source.channel->getElements<::adm::AudioBlockFormatMatrix>()) {
+                    if (index >= source.blocks.size()) {
+                        break;
+                    }
+                    auto block = source.blocks[index++];
+                    if (!block.output_channel_format_ref.empty()) {
+                        const auto id = final_channel_id(block.output_channel_format_ref);
+                        if (!id) {
+                            return std::unexpected(AdmWriteError::kInvalidDocument);
+                        }
+                        block.output_channel_format_ref = *id;
+                    }
+                    for (auto& coefficient : block.matrix) {
+                        const auto id = final_channel_id(coefficient.input_channel_format_ref);
+                        if (!id) {
+                            return std::unexpected(AdmWriteError::kInvalidDocument);
+                        }
+                        coefficient.input_channel_format_ref = *id;
+                    }
+                    matrix_blocks.emplace(
+                        ::adm::formatId(libadm_block.get<::adm::AudioBlockFormatId>()),
+                        std::move(block));
+                }
+            }
+
+            detail::PackExtrasById pack_extras;
+            for (const auto& source : built->pack_sources) {
+                detail::PackExtras extras;
+                const auto translate_all = [&](const std::vector<std::string>& keys,
+                                               std::vector<std::string>& out) {
+                    return std::ranges::all_of(keys, [&](const std::string& key) {
+                        const auto id = final_pack_id(key);
+                        if (id) {
+                            out.push_back(*id);
+                        }
+                        return id.has_value();
+                    });
+                };
+                const auto translate_one = [&](const std::string& key, std::string& out) {
+                    if (key.empty()) {
+                        return true;
+                    }
+                    const auto id = final_pack_id(key);
+                    if (id) {
+                        out = *id;
+                    }
+                    return id.has_value();
+                };
+                const bool resolved = translate_all(source.model.encode_pack_format_refs,
+                                                    extras.encode_pack_format_refs) &&
+                                      translate_all(source.model.decode_pack_format_refs,
+                                                    extras.decode_pack_format_refs) &&
+                                      translate_one(source.model.input_pack_format_ref,
+                                                    extras.input_pack_format_ref) &&
+                                      translate_one(source.model.output_pack_format_ref,
+                                                    extras.output_pack_format_ref);
+                if (!resolved) {
+                    return std::unexpected(AdmWriteError::kInvalidDocument);
+                }
+                extras.hoa_normalization = source.model.hoa_normalization;
+                extras.has_nfc_ref_dist = source.model.has_nfc_ref_dist;
+                extras.nfc_ref_dist = source.model.nfc_ref_dist;
+                extras.screen_ref = source.model.screen_ref;
+                pack_extras.emplace(::adm::formatId(source.pack->get<::adm::AudioPackFormatId>()),
+                                    std::move(extras));
+            }
+            axml = detail::inject_matrix_extras(axml, matrix_blocks, pack_extras);
         }
         axml_chunk = std::make_shared<bw64::AxmlChunk>(axml);
     } catch (const std::exception&) {

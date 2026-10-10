@@ -113,13 +113,13 @@ struct ObjectDivergenceInfo {
 // its default and the name is held here, unresolved. `gain` is always linear: a gainUnit of "dB" is
 // converted once at parse time, as AudioBlockFormat::gain is.
 struct MatrixCoefficient {
-    std::string input_channel_format_ref;  // audioChannelFormatID of the channel this one reads
-    double gain = 1.0;                     // linear; negative inverts the signal
-    double phase_deg = 0.0;                // phase shift, degrees
-    double delay_ms = 0.0;                 // time delay, milliseconds
-    std::string gain_var;                  // empty: the constant above applies
-    std::string phase_var;
-    std::string delay_var;
+    std::string input_channel_format_ref{};  // audioChannelFormatID of the channel this one reads
+    double gain = 1.0;                       // linear; negative inverts the signal
+    double phase_deg = 0.0;                  // phase shift, degrees
+    double delay_ms = 0.0;                   // time delay, milliseconds
+    std::string gain_var{};                  // empty: the constant above applies
+    std::string phase_var{};
+    std::string delay_var{};
 };
 
 // BS.2076-2 §5.4: one audioBlockFormat, the unit that divides an

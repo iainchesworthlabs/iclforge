@@ -530,6 +530,142 @@ PackExtrasById scan_pack_extras(std::string_view xml) {
     return result;
 }
 
+namespace {
+
+[[nodiscard]] std::string matrix_block_xml(const AudioBlockFormat& block) {
+    std::string out;
+    if (!block.output_channel_format_ref.empty()) {
+        out += "<outputChannelFormatIDRef>" + escape(block.output_channel_format_ref) +
+               "</outputChannelFormatIDRef>";
+    }
+    if (block.has_jump_position) {
+        out += "<jumpPosition";
+        if (block.has_interpolation_length) {
+            out += " interpolationLength=\"" + format_number(block.interpolation_length_s) + "\"";
+        }
+        out += block.jump_position ? ">1</jumpPosition>" : ">0</jumpPosition>";
+    }
+    out += "<matrix>";
+    for (const auto& coefficient : block.matrix) {
+        out += "<coefficient";
+        // The standard allows a constant or a variable for each of the three, never both.
+        if (!coefficient.gain_var.empty()) {
+            out += " gainVar=\"" + escape(coefficient.gain_var) + "\"";
+        } else if (coefficient.gain != 1.0) {
+            out += " gain=\"" + format_number(coefficient.gain) + "\"";
+        }
+        if (!coefficient.phase_var.empty()) {
+            out += " phaseVar=\"" + escape(coefficient.phase_var) + "\"";
+        } else if (coefficient.phase_deg != 0.0) {
+            out += " phase=\"" + format_number(coefficient.phase_deg) + "\"";
+        }
+        if (!coefficient.delay_var.empty()) {
+            out += " delayVar=\"" + escape(coefficient.delay_var) + "\"";
+        } else if (coefficient.delay_ms != 0.0) {
+            out += " delay=\"" + format_number(coefficient.delay_ms) + "\"";
+        }
+        out += ">" + escape(coefficient.input_channel_format_ref) + "</coefficient>";
+    }
+    out += "</matrix>";
+    if (block.gain != 1.0) {
+        out += "<gain>" + format_number(block.gain) + "</gain>";
+    }
+    if (block.has_importance && block.importance != 10) {
+        out += "<importance>" + std::to_string(block.importance) + "</importance>";
+    }
+    return out;
+}
+
+[[nodiscard]] std::string pack_extras_xml(const PackExtras& pack) {
+    std::string out;
+    for (const auto& ref : pack.encode_pack_format_refs) {
+        out += "<encodePackFormatIDRef>" + escape(ref) + "</encodePackFormatIDRef>";
+    }
+    for (const auto& ref : pack.decode_pack_format_refs) {
+        out += "<decodePackFormatIDRef>" + escape(ref) + "</decodePackFormatIDRef>";
+    }
+    if (!pack.input_pack_format_ref.empty()) {
+        out += "<inputPackFormatIDRef>" + escape(pack.input_pack_format_ref) +
+               "</inputPackFormatIDRef>";
+    }
+    if (!pack.output_pack_format_ref.empty()) {
+        out += "<outputPackFormatIDRef>" + escape(pack.output_pack_format_ref) +
+               "</outputPackFormatIDRef>";
+    }
+    if (!pack.hoa_normalization.empty()) {
+        out += "<normalization>" + escape(pack.hoa_normalization) + "</normalization>";
+    }
+    if (pack.has_nfc_ref_dist) {
+        out += "<nfcRefDist>" + format_number(pack.nfc_ref_dist) + "</nfcRefDist>";
+    }
+    if (pack.screen_ref) {
+        out += "<screenRef>1</screenRef>";
+    }
+    return out;
+}
+
+}  // namespace
+
+std::string inject_matrix_extras(std::string_view xml, const MatrixBlocksById& blocks,
+                                 const PackExtrasById& packs) {
+    if (blocks.empty() && packs.empty()) {
+        return std::string(xml);
+    }
+
+    struct Edit {
+        std::size_t begin;
+        std::size_t end;  // [begin, end) is replaced; begin == end inserts
+        std::string text;
+    };
+    std::vector<Edit> edits;
+
+    std::size_t pos = 0;
+    XmlTag tag;
+    while (next_tag(xml, pos, tag)) {
+        if (tag.closing) {
+            continue;
+        }
+        std::string content;
+        if (tag.name == "audioBlockFormat") {
+            const auto it = blocks.find(upper_ascii(attribute_text(tag, "audioBlockFormatID")));
+            if (it != blocks.end()) {
+                content = matrix_block_xml(it->second);
+            }
+        } else if (tag.name == "audioPackFormat") {
+            const auto it = packs.find(upper_ascii(attribute_text(tag, "audioPackFormatID")));
+            if (it != packs.end()) {
+                content = pack_extras_xml(it->second);
+            }
+        }
+        if (content.empty()) {
+            continue;
+        }
+        if (tag.self_closing) {
+            // "<name attr=... />" becomes "<name attr=...>" + content + "</name>".
+            const auto raw = xml.substr(tag.begin, tag.end - tag.begin);
+            std::string open(raw.substr(0, raw.rfind('/')));
+            while (!open.empty() && is_space(open.back())) {
+                open.pop_back();
+            }
+            edits.push_back(
+                {tag.begin, tag.end, open + ">" + content + "</" + std::string(tag.name) + ">"});
+        } else {
+            edits.push_back({tag.end, tag.end, std::move(content)});
+        }
+    }
+
+    std::string out;
+    out.reserve(xml.size() + edits.size() * 160);
+    std::size_t copied = 0;
+    for (const auto& edit : edits) {
+        out.append(xml.substr(copied, edit.begin - copied));
+        out += edit.text;
+        copied = edit.end;
+    }
+    out.append(xml.substr(copied));
+    return out;
+}
+
 std::string inject_zone_exclusions(std::string_view xml, const ZonesByBlockId& zones) {
     if (zones.empty()) {
         return std::string(xml);

@@ -77,4 +77,23 @@ using PackExtrasById = std::unordered_map<std::string, PackExtras>;
 // nfcRefDist or screenRef, keyed by its audioPackFormatID.
 [[nodiscard]] PackExtrasById scan_pack_extras(std::string_view xml);
 
+// Matrix blocks to write, keyed by the final audioBlockFormatID libadm gave each. Their
+// output_channel_format_ref and every coefficient's input_channel_format_ref are final channel IDs
+// too: the caller translates them, since only it knows the final IDs.
+using MatrixBlocksById = std::unordered_map<std::string, AudioBlockFormat>;
+
+// Returns `xml` with what libadm cannot write added to its own output:
+//
+// - each audioBlockFormat named in `blocks` gets its outputChannelFormatIDRef, jumpPosition,
+//   `matrix`, and a gain or importance that is not the default, in that order (the order of the
+//   standard's own sample code, BS.2076-3 §5.4.3.2.1);
+// - each audioPackFormat named in `packs` (keyed by its final audioPackFormatID) gets its encode,
+//   decode, input and output references and then its HOA normalization, nfcRefDist and screenRef
+//   (§5.5.4.2, §5.5.5.1), as its first children.
+//
+// libadm prints an element with no children as a self-closing tag, which is what its Matrix block
+// always is; such an element is rewritten with a start and an end tag around the new content.
+[[nodiscard]] std::string inject_matrix_extras(std::string_view xml, const MatrixBlocksById& blocks,
+                                               const PackExtrasById& packs);
+
 }  // namespace iclforge::adm::detail
