@@ -205,6 +205,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     config.experimental.aspx_balance = (dialnorm & 0x80) != 0;
     config.experimental.aspx_interleave = (interval & 0x80) != 0;
     config.experimental.aspx_varvar = (dialnorm & 0x80) != 0 && (interval & 0x80) != 0;
+    config.experimental.noise_fill = ((dialnorm ^ interval) & 0x40) != 0;
     const std::size_t piece = 1 + static_cast<std::size_t>(take.byte()) * 37;
     // Phase E5. The timing byte: the frame rate in its low four bits (14 and
     // 15 reserved, and 44.1 kHz takes 13 alone, both refused), the rate mode

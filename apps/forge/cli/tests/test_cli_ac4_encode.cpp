@@ -461,6 +461,27 @@ TEST_CASE("ac4-encode's experimental tools each write their syntax", "[cli][ac4]
             run(wav_of("ac4_interleave.wav", {x, x}), "96 experimental=aspx-interleave");
         CHECK(count_of(records, "aspx_fic_present", 1) > 0U);
     }
+    SECTION("noise-fill sends a level for each band that quantises to zero") {
+        // A loud low-passed noise that takes the rate, and under it faint
+        // tones from 6 to 10 kHz that the rate loop leaves out.
+        std::vector<float> x(count, 0.0F);
+        std::uint32_t seed = 12345;
+        double low = 0.0;
+        for (std::size_t n = 0; n < count; ++n) {
+            seed = seed * 1664525U + 1013904223U;
+            low = 0.9 * low + 0.1 * (static_cast<double>(seed >> 8U) / 16777216.0 - 0.5);
+            double high = 0.0;
+            for (int k = 0; k < 40; ++k) {
+                high += std::sin(2.0 * std::numbers::pi * (6000.0 + 100.0 * k) *
+                                 static_cast<double>(n) / 48000.0);
+            }
+            x[n] = static_cast<float>(3.0 * low + 0.002 * high);
+        }
+        const auto wav = wav_of("ac4_noise_fill.wav", {x, x});
+        CHECK(count_of(run(wav, "24 codec-mode=simple"), "b_snf_data_exists", 1) == 0U);
+        const auto records = run(wav, "24 codec-mode=simple experimental=noise-fill");
+        CHECK(count_of(records, "b_snf_data_exists", 1) > 0U);
+    }
     SECTION("coding-configs chooses among the 5.X element's coding configurations") {
         // A second of independent tones, then one signal in L, R and C: half
         // of the signal each.

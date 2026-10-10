@@ -206,8 +206,11 @@ takes 13 and 14 channels as 9.0.4 and 9.1.4, the immersive element with the scre
 (SCPL, ASPX_SCPL and ASPX_ACPL_2 by the rate, and with `acpl` ASPX_ACPL_1; it refuses `ajcc`, dialogue
 enhancement and `height-downmix=`, and its thirteen tracks make the stream `md_compat` 7, which
 `decode` takes with `md-compat=7`); `three-zero`, which takes three channels, L R C, as 3.0, the
-dialogue of a music and effects presentation (below); and `objects`, which `objects=<scene file>`
-needs.
+dialogue of a music and effects presentation (below);
+`noise-fill`, which sends each scale factor band that quantises to zero a noise level (Part 1
+5.1.4: its own energy in 3 dB steps, from the level before it) that the decoder fills with noise,
+and so trades some SNR for a spectrum without holes at a low rate; and `objects`, which
+`objects=<scene file>` needs.
 
 **Objects.** With `experimental=objects`, `objects=<scene file>` takes the WAV file's channels as the
 objects of one object substream, written as a raw stream. The scene file is text, one directive a

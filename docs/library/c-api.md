@@ -613,7 +613,7 @@ every field this struct doesn't carry.
 The AC-4 surface is a subset in the same way. `iclforge_ac4_encoder_config_t` describes one
 substream in one presentation: the loudness, DRC, downmix and dialogue-enhancement metadata groups,
 several substreams and presentations, EMDF payloads, the syntax trace and the `drc_gains`,
-`three_zero` and `nine_x_4` experimental flags are not mirrored, so a configuration left at its defaults writes
+`three_zero`, `nine_x_4` and `noise_fill` experimental flags are not mirrored, so a configuration left at its defaults writes
 the shape DEE's streams have for its channel count. The decoder side leaves out the syntax trace,
 `Decoder::parse()` and its `FrameReport`, `decode_by_block()`, `select_presentation()` and the
 metadata beyond the loudness values (the DRC, dialogue enhancement and downmix information of

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <optional>
 #include <span>
 #include <utility>
@@ -38,8 +39,23 @@
 // persist from the frame that sends them until another does (6.2.17.0, Part
 // 2 clause 4.8.5.3). The gains are in dB, their linear values 10^(dB/20)
 // (libs/ac4/ERRATA.md, "The downmix gains").
+//
+// Two more corrections scale every channel that comes out, as coded or not,
+// and are the frame's own: an alternative presentation's target loudness
+// correction, by the category of the device the output plays on (Part 2
+// clause 4.8.5.4, Tables 17 and 67), and the real-time loudness correction
+// (clause 4.8.5.5). They are made in this stage, with the downmix's own
+// loudness correction (4.8.5.3), which is after DRC here. Part 2 puts loudness
+// correction before DRC, and the two orders differ only in what a compression
+// curve's level detector measures (libs/ac4/ERRATA.md, "Alternative and
+// real-time loudness correction").
 
 namespace iclforge::ac4::detail {
+
+// Part 2 clause 4.8.5.4: for each of Table 67's categories (TargetDevice's order), the
+// loud_corr_target code an alternative presentation gives it, a category no target specifies
+// taking the code of Table 17's first fallback that has one.
+using TargetCorrections = std::array<std::optional<int>, 4>;
 
 // What a frame's metadata gives the downmix, where it sends them.
 struct DownmixValues {
@@ -60,6 +76,16 @@ struct DownmixValues {
     std::optional<int> loud_corr_core_ltrt;
     // custom_dmx_data() where it sends custom downmix data (b_cdmx_data_present).
     std::optional<CustomDmxData> cdmx;
+    // The next three belong to the frame that sends them and do not persist: the targets of an
+    // alternative presentation are in each frame's presentation substream, and the real-time
+    // loudness correction is real-time data.
+    //
+    // Part 2 clause 4.8.5.5: rtll_comp, where the frame sends one.
+    std::optional<int> rtll_comp;
+    // Clause 4.8.5.4: an alternative presentation's target corrections (none for any other).
+    TargetCorrections target_corr{};
+    // OutputConfig::target_device: the category the output plays on, where the system says.
+    std::optional<TargetDevice> device;
 };
 
 // The values from the presentation substream (bitstream version 2), or else
@@ -79,8 +105,11 @@ class DownmixStage {
     void configure(std::span<const Speaker> speakers, bool add_ch_base, DownmixTarget target,
                    bool mix_lfe, const std::optional<ImmersiveLayout>& immersive = std::nullopt);
 
-    // Whether the channels come out as coded.
-    [[nodiscard]] bool passes_through() const noexcept { return pass_through_; }
+    // Whether the channels come out as coded: as the layout asks for, and at no correction of
+    // clause 4.8.5.4 or 4.8.5.5, which scale every channel.
+    [[nodiscard]] bool passes_through() const noexcept {
+        return pass_through_ && correction_gain_ == 1.0;
+    }
 
     // The layout that comes out.
     [[nodiscard]] std::span<const Speaker> speakers() const noexcept { return out_speakers_; }
@@ -108,9 +137,15 @@ class DownmixStage {
     // A combination of the input channels, one weight per channel.
     using Mix = std::vector<double>;
 
+    // The matrix of the layout, then the corrections of clauses 4.8.5.4 and 4.8.5.5 on every row.
     void rebuild();
+    void rebuild_matrix();
     // The immersive element's matrix, by render_matrix().
     void rebuild_immersive();
+    // The device category the output plays on: the system's, else Table 17's by the layout.
+    [[nodiscard]] std::optional<TargetDevice> playback_device() const;
+    // The scalar the corrections of clauses 4.8.5.4 and 4.8.5.5 make together, 1 for none.
+    [[nodiscard]] double corrections() const;
     // Step 2: Lo and Ro from the 5.X channels, each a combination of the
     // input channels, with the Lo/Ro or Lt/Rt correction given.
     [[nodiscard]] std::pair<Mix, Mix> two_channels(const Mix& l, const Mix& r, const Mix& c,
@@ -128,6 +163,11 @@ class DownmixStage {
     DownmixTarget target_ = DownmixTarget::kAsCoded;
     bool mix_lfe_ = true;
     bool pass_through_ = true;
+    // This frame's rtll_comp, targets and device (DownmixValues), and the scalar they make.
+    std::optional<int> rtll_comp_;
+    TargetCorrections target_corr_{};
+    std::optional<TargetDevice> device_;
+    double correction_gain_ = 1.0;
     std::optional<ImmersiveLayout> immersive_;
     RenderPlan plan_;  // the immersive element's
     // The values in force.

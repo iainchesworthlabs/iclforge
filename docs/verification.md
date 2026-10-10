@@ -1568,7 +1568,8 @@ configurations, chosen frame by frame by the bits they save, 7.0 and 7.1 in the 
 ASPX_ACPL_1 and A-CPL in stereo, and 7.0.4 and 7.1.4 with the back pair, 9.0.4 and 9.1.4 with the
 screen pair (`b_5fronts`, in every immersive mode but A-JCC), ASPX_ACPL_1 and A-JCC in the immersive
 element are experimental options. Objects, as an A-JOC substream or direct-coded, are
-an experimental option too (phase E9). It shares
+an experimental option too (phase E9), as is spectral noise fill, which gives each band that
+quantises to zero a level of its own (`experimental.noise_fill`). It shares
 `libs/ac4/src/core`'s transforms, windows, codebooks, QMF banks and A-SPX tables and high frequency
 generator with the decoder, and writes the syntax through a transcription of the tables of its own.
 `forge ac4-encode` writes it raw or in MP4, with an option for each setting. Ten checks stand

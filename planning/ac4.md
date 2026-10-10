@@ -1023,9 +1023,9 @@ balance, VARVAR framing and frequency-interleaved waveform coding in A-SPX (`asp
 7.0 and 7.1 (`seven_x`), ASPX_ACPL_1 and A-CPL in stereo (`acpl`), 7.0.4 and 7.1.4 (`back_pair`),
 A-JCC (`ajcc`), 9.0.4 and 9.1.4, the immersive element with `b_5fronts`, in SCPL, ASPX_SCPL, ASPX_ACPL_2
 and ASPX_ACPL_1 but not ASPX_AJCC (`nine_x_4`), transmitted DRC gains (`drc_gains`), a 3.0 substream
-(`three_zero`) and objects (`objects`). Mono, several presentations and substreams, and the Mid and
-cross-channel dialogue enhancement methods are options without the flag. Noise fill and
-time-interleaved waveform coding are not written at all.
+(`three_zero`), objects (`objects`) and spectral noise fill (`noise_fill`). Mono, several
+presentations and substreams, and the Mid and cross-channel dialogue enhancement methods are options
+without the flag. Time-interleaved waveform coding is not written at all.
 
 ### One control for both formats
 
