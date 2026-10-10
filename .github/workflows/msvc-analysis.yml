@@ -152,6 +152,31 @@ jobs:
         shell: bash
         run: cmake --build --preset build-windows-msvc -- -k 0
 
+      # ignoredPaths below takes whole directories, and the tests used to be one: the root tests/.
+      # The monorepo move put each beside the code it tests (libs/ac3/tests, apps/hearth/engine/
+      # tests, ...), so that one path matched nothing and the first analysis to finish afterwards
+      # reported 198 findings, about 160 of them in test code. The directories are read from the
+      # tree, so a library's new tests/ is left out without anyone remembering to add it here. An
+      # empty list fails the job: an exclusion that matches nothing is how this went unseen.
+      - name: List the test directories
+        id: test-dirs
+        shell: bash
+        run: |
+          set -euo pipefail
+          paths=
+          while IFS= read -r file; do
+            case "$file" in
+              tests/*|*/tests/*) paths="${paths:+$paths;}${file%/*}" ;;
+            esac
+          done < <(git ls-files -- '*CMakeLists.txt')
+          if [ -z "$paths" ]; then
+            echo "::error::no tests/ directory holds a CMakeLists.txt, so ignoredPaths would match nothing"
+            exit 1
+          fi
+          echo "paths=$paths" >> "$GITHUB_OUTPUT"
+          echo "Leaving out of the analysis:"
+          echo "$paths" | tr ';' '\n'
+
       # The repo-local rule set is NativeRecommendedRules minus the rules
       # whose entire alert history here is dismissed false positives - see
       # .github/msvc-analysis.ruleset's own header for the per-rule
@@ -163,7 +188,7 @@ jobs:
           cmakeBuildDirectory: ${{ github.workspace }}/build/config-windows-msvc
           buildConfiguration: Release
           ruleset: .github/msvc-analysis.ruleset
-          ignoredPaths: ${{ github.workspace }}/tests
+          ignoredPaths: ${{ steps.test-dirs.outputs.paths }}
 
       # No explicit category: the SARIF's own tool name (PREfast) is what the
       # alert history is keyed by, and it has been since the first upload.
