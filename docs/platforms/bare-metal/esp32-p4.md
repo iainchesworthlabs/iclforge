@@ -825,7 +825,7 @@ Mode 3 gains 14%, mode 2 2 to 3%, because mode 3 interpolates seventeen paramete
 that are over 1.0 stay over: 1.01 (S-CPL), 1.19 (A-SPX, A-CPL mode 2) and 1.21 (A-SPX, S-CPL), 1.02, 1.04 and 0.85 folded to 2.0.
 The S3 gives the same hash as the P4 for every one of the twenty plays, with the second core on and off: single precision add,
 subtract, multiply and divide are the same on a RISC-V FPU and an Xtensa one (the compiler does not fuse them), and the six
-probe fixtures' hashes, which have parameters that do not change, are the pins they were on the host and the Cortex-M3.
+probe fixtures' hashes did not move, on the host and on the Cortex-M3.
 
 ### Paced output
 

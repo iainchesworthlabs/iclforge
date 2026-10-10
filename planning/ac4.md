@@ -2737,7 +2737,7 @@ on the ESP32s' single precision FPUs (about 7 ms of a P4 5.1 A-CPL mode 3 frame 
   column; the products and sums of parameters stay `double`, once a frame and a band.
 - **What moves.** The `float` tier's PCM of a stream whose A-CPL parameters change; the `double` and fixed-point tiers' do not. The
   six `float` probe fixtures' PCM hashes (`testdata/ac4-probe-pcm-hashes.json`) are unchanged, on the host and the Cortex-M3 under
-  QEMU, since their parameters are constant from the second frame on; the float against double decode of every committed stream
+  QEMU; the float against double decode of every committed stream
   (`testdata/ac4/scalar-agreement.json`) stays at its floors, to the 0.1 dB the measure gives; 160 S3 and P4 plays' hashes are the same
   on the two boards and with the second core on and off, and different from D14g's for the three streams with A-CPL.
 - **Exit, as measured.** The P4's 5.1 A-CPL mode 3 frame takes 0.63 of its duration from 0.73 (0.59 from 0.69 folded to 2.0); mode 2
