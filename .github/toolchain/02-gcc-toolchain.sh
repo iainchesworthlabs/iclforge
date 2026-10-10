@@ -32,6 +32,24 @@ apt_retry() {
     done
 }
 
+# add-apt-repository -y ppa:..., in up to six attempts with a growing wait
+# (30, 60, 90, 120, 150 s: about seven and a half minutes). A ppa: shortcut is
+# resolved through Launchpad's API (lazr.restfulclient), a different service from
+# the archive the packages come from, and that API answers 503 for minutes at a
+# time now and then (2026-09-16: the AppImage leg, whose 22.04 base can only get
+# GCC 16 from this PPA, failed after a three-minute outage). apt_retry's three
+# attempts 30 s apart would not have reached the far side of one.
+ppa_retry() {
+    local attempt=1
+    until add-apt-repository -y "$1"
+    do
+        echo "::warning title=add-apt-repository::attempt $attempt of 6 failed for $1"
+        [ "$attempt" -lt 6 ] || return 1
+        sleep $((attempt * 30))
+        attempt=$((attempt + 1))
+    done
+}
+
 echo "==> Installing GCC ${GCC_VERSION} toolchain"
 
 # Ubuntu 26.04 LTS (Resolute Raccoon) ships gcc-16/g++-16, but in the
@@ -48,7 +66,7 @@ fi
 
 if ! apt-cache show "gcc-${GCC_VERSION}" >/dev/null 2>&1; then
     echo "==> gcc-${GCC_VERSION} still not found, adding ubuntu-toolchain-r PPA"
-    add-apt-repository -y ppa:ubuntu-toolchain-r/test
+    ppa_retry ppa:ubuntu-toolchain-r/test
 fi
 
 apt_retry \
