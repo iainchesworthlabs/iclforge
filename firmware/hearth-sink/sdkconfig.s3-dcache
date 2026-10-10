@@ -1,7 +1,7 @@
 # A 64 KB data cache on the ESP32-S3 (planning/ac4.md, D14g), on top of sdkconfig.s3-fast. The
-# S3 board's image is built with it (decision 43, 2026-10-11).
+# S3 images that carry the AC-4 decoder are built with it (decision 43, 2026-10-11).
 #
-#   SDKCONFIG_DEFAULTS="...;sdkconfig.s3-fast;sdkconfig.s3-dcache" idf.py build
+#   SDKCONFIG_DEFAULTS="...;sdkconfig.ac4;sdkconfig.s3-fast;sdkconfig.s3-dcache" idf.py build
 #
 # The decoder's working set (a channel's QMF matrix is 16 KB, an inverse transform's tables 56 KB)
 # is what the 32 KB cache cannot hold, and the part's internal RAM is what a 64 KB one is made
@@ -21,3 +21,9 @@
 # 2026-10-11 to spend that headroom (decision 43), and this stays a separate file so that a
 # build that needs the 32 KB back drops one line.
 CONFIG_ESP32S3_DATA_CACHE_64KB=y
+
+# Not for an image without the AC-4 decoder (the S3 board's release image). Measured on
+# 2026-10-11 on the release shape with this file: 31,871 bytes of internal RAM free at a play's
+# start, no room for the decode task's 32 KB stack, and with the stack in PSRAM 1,479 bytes free
+# at the least in an E-AC-3 7.1.4 play; and the cache bought AC-3 and E-AC-3 nothing (5.1 at
+# 0.32 and 0.33 of a frame without it, 0.29 and 0.33 with it; 7.1.4 at 0.75 either way).

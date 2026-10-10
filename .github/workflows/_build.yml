@@ -2901,10 +2901,12 @@ jobs:
           rm -rf build sdkconfig
 
       # The Sendspin player as the S3 board builds it (sdkconfig.sendspin, over
-      # the hardware and PSRAM overlays, with the flash and cache files of
+      # the hardware and PSRAM overlays, with sdkconfig.s3-fast of
       # planning/ac4.md D14g: QIO flash, 64-byte data-cache lines, the code and
-      # constants in PSRAM and a 64 KB data cache): WiFi, PSRAM and the I2S sink,
-      # none of which QEMU has, so it is built and not run. Its protocol, playout and
+      # constants in PSRAM): WiFi, PSRAM and the I2S sink, none of which QEMU
+      # has, so it is built and not run. Not sdkconfig.s3-dcache: with no AC-4
+      # decoder in this image its 32 KB came out of the heap an E-AC-3 7.1.4
+      # play runs in, which was down to 1.5 KB with it. Its protocol, playout and
       # levels run under QEMU in hearth-esp32s3, from the CI shape the step
       # after this one builds.
       #
@@ -2928,7 +2930,7 @@ jobs:
           dir="$RUNNER_TEMP/hearth-sink-esp32s3"
           version="${VERSION_TAG:-$(git -c safe.directory='*' -C "$GITHUB_WORKSPACE" describe --tags --always)}"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32s3 \
-            "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast;sdkconfig.s3-dcache" \
+            "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast" \
             "-DPROJECT_VER=$version" build >/dev/null
           python3 "$GITHUB_WORKSPACE/tools/hearth/package_firmware.py" package --build-dir "$dir" \
             --name hearth-sink-esp32s3 --out "$GITHUB_WORKSPACE/esp32-firmware"

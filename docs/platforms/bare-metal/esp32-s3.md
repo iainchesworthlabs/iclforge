@@ -1497,12 +1497,15 @@ column has; the second table has every configuration with them. What each is, an
   top of the three above with both cores. It is made of 32 KB of the heap: a play starts with 62 KB of internal RAM free instead of
   95 and its least is 31 to 49 KB where it was 64 to 81. Wi-Fi and lwIP cannot live on a few kilobytes
   ([The decode stack goes in PSRAM](#the-decode-stack-goes-in-psram)). The owner decided on 2026-10-11 to spend it
-([decision 43](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-10-10)), and it
-stays its own file so that a build that needs the 32 KB back drops one line.
+([decision 43](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-10-10)) in the
+images that carry the AC-4 decoder, and it stays its own file so that a build that needs the 32 KB back drops one line.
+An image without the decoder is no place for it: the release shape (E-AC-3 and AC-3, no AC-4) with the cache and the decode
+stack in PSRAM had 1,479 bytes of internal RAM free at the least in an E-AC-3 7.1.4 play, and the cache bought it nothing
+(0.32 and 0.33 of a frame for AC-3 and E-AC-3 5.1 and 0.75 for 7.1.4 without it, 0.29, 0.33 and 0.75 with it).
 
 `sdkconfig.s3-fast` has the first three (QIO, the lines, the code and constants in PSRAM) and `sdkconfig.s3-dcache` the fourth, each
-over `sdkconfig.psram` (and `sdkconfig.ac4` where the decoder is in); the second goes after the first. The S3 board's image, the one
-the releases publish, is built with both.
+over `sdkconfig.psram` (and `sdkconfig.ac4` where the decoder is in); the second goes after the first. The S3 board's release
+image, which has no AC-4 decoder, is built with the first; the second goes with `sdkconfig.ac4`.
 
 **The second core.** The decoder's stages that are per channel or per slot run on both cores (the player's worker task is on the core
 the decode task is not on): each channel's inverse transform and QMF analysis, A-SPX's elements, A-CPL's slots and its three

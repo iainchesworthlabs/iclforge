@@ -1,8 +1,9 @@
 # A board as a Sendspin sink (planning/hearth-reference-player.md, B3):
 #
-#   SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast;sdkconfig.s3-dcache" idf.py build
+#   SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast" idf.py build
 #
-#   (the last two are the S3 board's flash and cache settings, planning/ac4.md D14g; the C6 and the P4 build without them)
+#   (the last is the S3 board's flash and cache setting, planning/ac4.md D14g; the C6 and the P4 build without it. With the AC-4
+#   decoder, put sdkconfig.ac4 before it and sdkconfig.s3-dcache after it.)
 #
 # The Sendspin player on WiFi, with the page and the REST routes on port 80.
 # Nothing plays at boot: servers play to the board. POST /play with a URL still

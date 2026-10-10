@@ -2693,8 +2693,8 @@ without the second core, in each memory configuration, and the host's tests hold
   - The converter makes a call's outputs in the order of the table's rows (`Resampler::process()`, tables over 16 KB), the immersive
     element reserves its tracks, A-CPL's input copy is a resize and not an assign and a copy.
   - `sdkconfig.p4`: `CONFIG_SPIRAM_XIP_FROM_PSRAM`. New, for the S3: `sdkconfig.s3-fast` (QIO flash, 64-byte data-cache lines, the code and
-    constants in PSRAM) and `sdkconfig.s3-dcache` (a 64 KB data cache, 32 KB of the heap), both in the S3 board's image since 2026-10-11
-    (decision 43).
+    constants in PSRAM) and `sdkconfig.s3-dcache` (a 64 KB data cache, 32 KB of the heap). Since 2026-10-11 (decision 43) the S3 board's release image,
+    which has no AC-4 decoder, is built with the first, and the images that carry the decoder with both.
   - Zones for the sub-steps of a frame's reconstruction in the stage timers (`ac4_dequantise`, `ac4_matrix`, `ac4_history`,
     `ac4_channel`, `ac4_apply`, `ac4_materialise`, `ac4_downmix`, `ac4_output`, `ac4_aspx_tables`, `ac4_companding`).
 - **Exit, as measured** (the decoder's time over the frame's duration, Wi-Fi up, a null sink, the P4 at 360 MHz): the tables of
@@ -2716,9 +2716,11 @@ without the second core, in each memory configuration, and the host's tests hold
   the `float` pins that have A-CPL in them. (c) The downmix and the copy before it are a permutation in the 5.1.4 streams the
   harness plays (11 ms and 6 ms of an S3 frame at 5.1.4). (d) The S3 has no sampler: the one ported to Xtensa stopped the board.
   (e) The Huffman decoder's second step takes about a tenth of the codewords and under 0.5 ms a frame on the P4.
-- **Decisions** (the user, 2026-10-11): `sdkconfig.s3-fast` and `sdkconfig.s3-dcache` are in the S3 board's image, the second
+- **Decisions** (the user, 2026-10-11): `sdkconfig.s3-fast` and `sdkconfig.s3-dcache` are in the S3 images, the second
   taking 32 KB of the heap (an AC-4 play's least internal RAM free is 31 to 49 KB where it was 64 to 81) and the first needing one
-  USB flash with the bootloader a board; A-CPL's interpolation goes to `float` (D14h) and the next frame's parse is made ahead of
+  USB flash with the bootloader a board. Measured on the release shape before it went in: the cache is for the images that carry
+  the AC-4 decoder only (without it 1,479 bytes of internal RAM were free at the least in an E-AC-3 7.1.4 play, and AC-3 and
+  E-AC-3 gain nothing from it), so the release image, which has no AC-4, takes `sdkconfig.s3-fast` alone; A-CPL's interpolation goes to `float` (D14h) and the next frame's parse is made ahead of
   this frame's reconstruction (D14i). Those two are separate changes from this one: the first moves `float` pins and the second
   adds to `Decoder`'s API, which this phase's output, bit for bit as it was, does not.
 
@@ -4468,14 +4470,15 @@ were in ([the S3 page](../docs/platforms/bare-metal/esp32-s3.md#on-the-board),
     classes that were not in real time, the C6 parked). It does not undo decision 42's reading of the S3: what the S3 cannot
     decode in real time still reaches it as PCM from Hearth, and I6 still settles how a sink says what it decodes. What it moves is
     the line: [D14g](#d14g-ac-4-playback-speed-on-the-esp32-s3-and-the-esp32-p4). **Also taken, on the user's yes of
-    2026-10-11:** `sdkconfig.s3-fast` and `sdkconfig.s3-dcache` are in the S3 board's image (the 32 KB of heap is spent: an AC-4
-    play's least internal RAM free is 31 to 49 KB), and A-CPL's interpolation at `float` and a parse ahead of the reconstruction are
+    2026-10-11:** `sdkconfig.s3-fast` and `sdkconfig.s3-dcache` are in the S3 images, the second only where the AC-4 decoder is
+    (the 32 KB of heap is spent: an AC-4 play's least internal RAM free is 31 to 49 KB; the release image has no AC-4 and takes
+    `sdkconfig.s3-fast` alone), and A-CPL's interpolation at `float` and a parse ahead of the reconstruction are
     built, as D14h and D14i.
 
 | # | Question | **Taken** |
 |---|---|---|
 | 42 | What the S3 and the C6 decode of AC-4 | **(a), accepted: the S3 at 2.0 in SIMPLE mode and the C6 none, the rest as PCM from Hearth** |
-| 43 | Playback speed on the S3 and the P4 | **(a), improved: D14g; both S3 files in the S3 image; A-CPL at `float` (D14h) and the parse ahead (D14i) to follow** |
+| 43 | Playback speed on the S3 and the P4 | **(a), improved: D14g; `s3-fast` in the S3 release image and both files in the AC-4 images; A-CPL at `float` (D14h) and the parse ahead (D14i) to follow** |
 
 ## What cannot be verified, and why
 

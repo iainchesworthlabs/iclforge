@@ -1998,9 +1998,10 @@ The sections below contain the complete change list and fixes.
   play). The frame-rate converter reads its table a row at a time, and the immersive element reserves its tracks. The ESP32-P4's
   firmware runs from PSRAM (`CONFIG_SPIRAM_XIP_FROM_PSRAM`, in `sdkconfig.p4`). A 5.1 frame takes 0.42, 0.53, 0.59 and 0.73 of
   its duration in SIMPLE mode, A-SPX, A-SPX with A-CPL mode 2 and A-CPL mode 3, from 0.67, 0.83, 0.93 and 1.16; 5.1.4 takes 1.01
-  to 1.21, from 1.59 to 1.92; 2.0 and the converter's four frame rates take 0.15 to 0.38, from 0.29 to 0.72. The ESP32-S3's
-  image is built with two new files, `sdkconfig.s3-fast` (QIO flash, 64-byte data-cache lines, the code and constants in PSRAM) and
-  `sdkconfig.s3-dcache` (a 64 KB data cache, 32 KB of the heap): with both, and the second core, it takes 2.0 SIMPLE at 0.40 (from
+  to 1.21, from 1.59 to 1.92; 2.0 and the converter's four frame rates take 0.15 to 0.38, from 0.29 to 0.72. The ESP32-S3 has
+  two new files, `sdkconfig.s3-fast` (QIO flash, 64-byte data-cache lines, the code and constants in PSRAM; in its release image)
+  and `sdkconfig.s3-dcache` (a 64 KB data cache, 32 KB of the heap; for the images with the AC-4 decoder): with both, and the
+  second core, it takes 2.0 SIMPLE at 0.40 (from
   0.87) and A-SPX at 0.50 (from 1.09), the converter at every frame rate at 0.67 to 0.87 (from 1.32 to 1.86), E-AC-3 7.1.4 at 0.75
   (from 0.99) and 5.1 in SIMPLE mode at 0.99 (from 2.13); with the second core and neither file, 2.0 SIMPLE at 0.80 and A-SPX at 0.99. The PCM hash of
   every play is the one it was (40 plays in the P4's image and in each of four S3 images, with the second core on and off), and the

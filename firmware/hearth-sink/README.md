@@ -582,12 +582,13 @@ QEMU's Ethernet stand-in, and with WiFi up the decoder does not fit beside it.
 B3), on WiFi with the page on port 80:
 
 ```bash
-SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast;sdkconfig.s3-dcache" idf.py build
+SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast" idf.py build
 ```
 
-The last two files are the S3's flash and cache settings (QIO flash, 64-byte data-cache lines, the code and constants in PSRAM and a
-64 KB data cache, 32 KB of the heap; planning/ac4.md, D14g). QIO is the second stage bootloader's, so a board takes it with
-one USB flash that includes its bootloader (`idf.py flash`); a network update leaves the mode a board has.
+`sdkconfig.s3-fast` is the S3's flash and cache setting (QIO flash, 64-byte data-cache lines, the code and constants in PSRAM; planning/ac4.md,
+D14g). QIO is the second stage bootloader's, so a board takes it with one USB flash that includes its bootloader (`idf.py flash`); a
+network update leaves the mode a board has. `sdkconfig.s3-dcache` (a 64 KB data cache, 32 KB of the heap) goes with the AC-4 decoder
+and not here: an E-AC-3 7.1.4 play left 1.5 KB of internal RAM free with it, and the cache bought AC-3 and E-AC-3 nothing.
 
 [An ESP32-S3 sink](../../docs/hearth/sink-esp32-s3.md) takes a board
 through this step by step: flashing, joining a network, pairing, groups,

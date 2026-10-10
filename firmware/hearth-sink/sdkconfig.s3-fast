@@ -1,10 +1,10 @@
 # The ESP32-S3's flash and caches tuned for the decoder (planning/ac4.md, D14g). Adds to
-# sdkconfig.psram; costs no internal RAM. The S3 board's image is built with it
-# (decision 43, 2026-10-11).
+# sdkconfig.psram; costs about 1 KB of internal RAM. The S3 board's release image is built
+# with it (decision 43, 2026-10-11).
 #
-#   SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast;sdkconfig.s3-dcache" idf.py build
+#   SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast" idf.py build
 #
-# (add sdkconfig.ac4 before sdkconfig.s3-fast for the AC-4 decoder)
+# With the AC-4 decoder: sdkconfig.ac4 before sdkconfig.s3-fast and sdkconfig.s3-dcache after it.
 #
 # What each line bought, an AC-4 frame's time against its duration on a board with Wi-Fi up
 # (2026-10-10, hearth-eb2c64, a null sink; the same PCM in every column). One core, the decoder
