@@ -122,6 +122,9 @@ SubDescriptors are written, the timestamp, and a seed for the UUIDs and package 
 input gives the same bytes. `libs/iab/ERRATA.md` records the readings the writer takes. The writer's output
 parses in `parse_mxf_iab()`, and FFmpeg's MXF demuxer reads its partitions, Header Metadata, timecode and
 duration; FFmpeg does not know the IAB Essence Descriptor, so it reports the audio stream as unsupported.
+Netflix's Photon IMF validator (5.1.0-rc.3, which implements ST 2067-201:2026) opens a written file with no
+error; see [Validation](../verification.md#imf-iab-track-files) for what that covers. A file is a Track File
+only: this project writes no Composition Playlist, Packing List or Asset Map to put it in an IMP.
 
 ## Consulted, never copied
 

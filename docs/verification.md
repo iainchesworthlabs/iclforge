@@ -791,6 +791,41 @@ metadata is. It is covered bit-by-bit instead
 ([libs/ac3/tests/meta/test_drc.cpp](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/ac3/tests/meta/test_drc.cpp),
 [tools/references/eac3_parse.py](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/references/eac3_parse.py)).
 
+### IMF IAB Track Files
+
+`write_mxf_iab()` is checked three ways: by a reader written separately from ST 377-1 and the standards it
+cites (`libs/iab/tests/test_mxf_writer.cpp`), by FFmpeg's MXF demuxer (partitions, Header Metadata,
+timecode, duration; it does not know the IAB descriptor, so it reports the audio as unsupported), and by
+**Netflix Photon**, the open-source IMF validator Netflix publishes. Photon is the only outside tool this
+project has found that implements ST 2067-201 and ST 2067-2's Track File constraints, which makes it the
+one oracle that can say a Track File is wrong where the in-repo reader and FFmpeg both read it.
+
+It did, twice, on the first file it saw:
+
+- the File Package's Package UID had material type `09h` where ST 2067-2:2020 5.1.5 requires `0Fh`; and
+- `RFC5646SpokenLanguage` was written as UTF-16 where the SMPTE Elements register types it ISO7.
+
+Both are fixed and recorded in `libs/iab/ERRATA.md`; the writer's test asserts each. The corrected file
+gives no error from `IMPAnalyzer` and none from `IMFTrackFileReader` (which runs the IAB checks), with and
+without the IAB Channel SubDescriptors and with the optional MCA labels set. With them unset Photon warns,
+correctly, that MCA Content, MCA Use Class and MCA Title Version "should" be present.
+
+Photon's `IMFTrackFileCPLBuilder` also derives a Composition Playlist from the file: an `IABSequence`
+at edit rate 24/1 with a source duration of 48, which are the frame rate and frame count written, and the
+File Package's UUID as the track file ID. (That app then fails in its own closing dump of the reader's
+state when it shares one working directory with the reader it built; the standalone reader's identical
+dump succeeds on the same file, and no check named the file.)
+
+What this does not cover: Photon was given the Track File alone. No Composition Playlist, Packing List or
+Asset Map names one, because this project writes none, so the checks that run across an IMP (the CPL's
+`IABSequence`, the track file's place in an Application) have not run. Photon 5.1.0-rc.3 is a pre-release
+with no published binary; it was built from its tag with its own Gradle wrapper.
+
+```
+java -cp "<photon>/build/libs/*" com.netflix.imflibrary.app.IMPAnalyzer track.mxf
+java -cp "<photon>/build/libs/*" com.netflix.imflibrary.app.IMFTrackFileReader track.mxf <empty working dir>
+```
+
 ## Going the other way: published conformance vectors
 
 Everything above consumes someone else's streams as an oracle. Every release also publishes a

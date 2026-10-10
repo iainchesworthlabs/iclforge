@@ -44,6 +44,10 @@ The sections below contain the complete change list and fixes.
   a Random Index Pack, one Material and one File Package, the IAB Essence Descriptor with its Soundfield
   and Channel SubDescriptors, and a one-entry-per-frame Index Table. It refuses what ST 2067-201
   forbids (16-bit audio, `AudioDataDLC`, `BedRemap`, child elements, conditional elements).
+- **The Track File writer is checked by Netflix Photon, and two defects it found are fixed.** The File
+  Package's Package UID had material type `09h` where ST 2067-2 5.1.5 requires `0Fh`, and
+  `RFC5646SpokenLanguage` was written as UTF-16 where the SMPTE register types it ISO7. A written file
+  now gives no error from `IMPAnalyzer` or `IMFTrackFileReader`; see Validation.
 - **`parse_mxf_iab` accepts a real file's essence key.** It required the literal byte `CCh` where ST
   2067-201 Table 2 has a placeholder and ST 379-1 puts the essence element count, so no real file
   matched; byte 14 is now ignored.
