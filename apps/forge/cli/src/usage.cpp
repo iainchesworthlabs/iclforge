@@ -505,6 +505,8 @@ void print_ac4_encode_topic() {
     fmt::println("       A-CPL in stereo), 7x-back|7x-wide|7x-top-front for 7.0 and 7.1,");
     fmt::println("       back-pair for 7.0.4 and 7.1.4 (11 and 12 channels, with Lb and Rb),");
     fmt::println("       ajcc for codec-mode=aspx-ajcc, three-zero for 3.0 (L R C),");
+    fmt::println("       noise-fill (a level for each band that quantises to zero, which the");
+    fmt::println("       decoder fills with noise, ETSI TS 103 190-1 5.1.4),");
     fmt::println("       drc-gains-0 to drc-gains-3 (the DRC modes send gains, ETSI TS 103");
     fmt::println("       190-1 Table 163), and objects for objects=<scene file>: the WAV's");
     fmt::println("       channels as objects, a raw stream of one object substream. The");
