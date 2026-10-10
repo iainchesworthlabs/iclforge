@@ -11,7 +11,7 @@ import { extractFragments, iterateBoxes, parseInitSegment } from "../dist/fmp4.j
 
 const u32 = (v) => [(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff];
 const u64 = (v) => [...u32(Math.floor(v / 2 ** 32)), ...u32(v >>> 0)];
-const fourcc = (s) => Array.from(s, (c) => c.charCodeAt(0));
+const fourcc = (s) => Array.from(s, (c) => c.codePointAt(0));
 const box = (type, ...content) => {
   const body = content.flat();
   return [...u32(8 + body.length), ...fourcc(type), ...body];
