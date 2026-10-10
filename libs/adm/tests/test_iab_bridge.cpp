@@ -2,8 +2,9 @@
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
-#include <cassert>
+#include <algorithm>
 #include <array>
+#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <numbers>
@@ -159,9 +160,9 @@ TEST_CASE("iab_position_to_room is a direct passthrough", "[adm][bridge][iab][co
 }
 
 // ---------------------------------------------------------------------------
-// Table 19 ChannelID -> BedLabel mapping (indirect - see iab_bridge.cpp's own bed_label_for_
-// channel_id comment for the full cited mapping table; tested here through build_iab()'s public
-// behaviour, the smallest fixture that isolates it, rather than exposing that lookup itself)
+// Table 19 ChannelID -> placement (indirect - see iab_bridge.cpp's own placement_for_channel_id
+// comment for the full cited mapping table; tested here through build_iab()'s public behaviour,
+// the smallest fixture that isolates it, rather than exposing that lookup itself)
 // ---------------------------------------------------------------------------
 
 TEST_CASE("build_iab maps supported Table 19 ChannelIDs to the right BedLabel position",
@@ -199,18 +200,81 @@ TEST_CASE("build_iab maps supported Table 19 ChannelIDs to the right BedLabel po
     CHECK_THAT(placement.position.z, Catch::Matchers::WithinAbs(expected.z, 1e-9));
 }
 
-TEST_CASE("build_iab refuses a Table 19 ChannelID with no BedLabel equivalent",
+TEST_CASE("build_iab places the Table 19 codes that have no BedLabel from ST 2098-5 Annex B",
           "[adm][bridge][iab]") {
-    // 0x5 "Left Side Surround": a real Table 19 code, distinct from both "Left Surround" (0x6,
-    // mapped to kLs) and "Left Rear Surround" (0x7, mapped to kLb) - see iab_bridge.cpp's own
-    // comment on why this third surround zone specifically has no BedLabel slot.
-    const auto channel_id = GENERATE(0x5, 0x9, 0x1, 0x3, 0x10, 0x17, 0x7F);
+    struct Case {
+        std::uint32_t channel_id;
+        double x;
+        double y;
+        double z;
+    };
+    // x 0 left wall to 1 right, y 0 screen to 1 rear wall, z 0 ear height to 1 ceiling.
+    const auto test_case = GENERATE(Case{0x1, 0.25, 0.0, 0.0},        // Left Center
+                                    Case{0x3, 0.75, 0.0, 0.0},        // Right Center
+                                    Case{0x5, 0.0, 0.5, 0.0},         // Left Side Surround
+                                    Case{0x9, 1.0, 0.5, 0.0},         // Right Side Surround
+                                    Case{0xB, 0.25, 0.5, 1.0},        // Left Top Surround
+                                    Case{0xC, 0.75, 0.5, 1.0},        // Right Top Surround
+                                    Case{0x10, 0.5, 0.0, 1.0},        // Center Height
+                                    Case{0x11, 0.0, 2.0 / 3.0, 1.0},  // Left Surround Height
+                                    Case{0x12, 1.0, 2.0 / 3.0, 1.0},  // Right Surround Height
+                                    Case{0x13, 0.0, 0.5, 1.0},        // Left Side Surround Height
+                                    Case{0x14, 1.0, 0.5, 1.0},        // Right Side Surround Height
+                                    Case{0x15, 0.0, 1.0, 1.0},        // Left Rear Surround Height
+                                    Case{0x16, 1.0, 1.0, 1.0},        // Right Rear Surround Height
+                                    Case{0x17, 0.5, 0.5, 1.0});       // Top Surround
+    CAPTURE(test_case.channel_id);
+
+    auto frame = make_frame({make_bed(1, {make_bed_channel(test_case.channel_id)})});
+    const auto result = iclforge::adm::build_iab(std::span{&frame, 1});
+    REQUIRE(result.has_value());
+    REQUIRE(result->channel_count() == 1);
+    CHECK(result->is_bed[0]);
+    CHECK_FALSE(result->is_lfe[0]);
+
+    const auto placement = result->paths[0].evaluate(0.0);
+    CHECK_THAT(placement.position.x, Catch::Matchers::WithinAbs(test_case.x, 1e-9));
+    CHECK_THAT(placement.position.y, Catch::Matchers::WithinAbs(test_case.y, 1e-9));
+    CHECK_THAT(placement.position.z, Catch::Matchers::WithinAbs(test_case.z, 1e-9));
+}
+
+TEST_CASE(
+    "build_iab accepts every Table 19 code the standard defines and refuses the reserved ones",
+    "[adm][bridge][iab]") {
+    // 0x0-0x17 and 0x80-0x89 are defined; 0x18-0x7F are Reserved for D-Cinema and the rest are not
+    // in the table (§10.3.5).
+    const auto channel_id = GENERATE(0x0, 0x7, 0xA, 0xD, 0x17, 0x80, 0x89, 0x18, 0x7F, 0x8A, 0xFF);
     CAPTURE(channel_id);
+    const bool defined = channel_id <= 0x17 || (channel_id >= 0x80 && channel_id <= 0x89);
     auto frame =
         make_frame({make_bed(1, {make_bed_channel(static_cast<std::uint32_t>(channel_id))})});
     const auto result = iclforge::adm::build_iab(std::span{&frame, 1});
-    REQUIRE_FALSE(result.has_value());
-    CHECK(result.error() == iclforge::adm::BridgeError::kUnsupportedIabChannel);
+    CHECK(result.has_value() == defined);
+    if (!defined) {
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error() == iclforge::adm::BridgeError::kUnsupportedIabChannel);
+    }
+}
+
+TEST_CASE(
+    "build_iab bridges the Dolby Atmos cinema 9.1 bed: Lss, Rss, Lrs, Rrs and an overhead pair",
+    "[adm][bridge][iab]") {
+    // L C R Lss Rss Lrs Rrs LFE Lts Rts: the bed 9.1OH of ST 2098-5 Table 2 names. Every one of the
+    // side-surround and top-surround codes used to be refused, so a stream with the usual cinema
+    // bed could not be bridged at all.
+    auto frame = make_frame(
+        {make_bed(1, {make_bed_channel(0x0), make_bed_channel(0x2), make_bed_channel(0x4),
+                      make_bed_channel(0x5), make_bed_channel(0x9), make_bed_channel(0x7),
+                      make_bed_channel(0x8), make_bed_channel(0xD), make_bed_channel(0xB),
+                      make_bed_channel(0xC)})});
+    const auto result = iclforge::adm::build_iab(std::span{&frame, 1});
+    REQUIRE(result.has_value());
+    REQUIRE(result->channel_count() == 10);
+    CHECK(std::count(result->is_lfe.begin(), result->is_lfe.end(), true) == 1);
+    CHECK(result->unmapped.size() == 10);
+    for (const auto& notes : result->unmapped) {
+        CHECK(notes.empty());
+    }
 }
 
 TEST_CASE("build_iab routes an LFE bed channel at gain 0 / lfe_send 1", "[adm][bridge][iab]") {
@@ -398,10 +462,95 @@ TEST_CASE("iab_zones_to_constraint maps Table 24's include patterns onto Table 2
     }
 }
 
-TEST_CASE("iab_zones_to_constraint leaves a pattern with no preset unconstrained", "[adm][bridge][iab][zones]") {
-    // Screen left only: no Table 20 preset excludes exactly the other six zones.
+TEST_CASE("iab_zones_to_constraint takes the preset that covers a pattern no preset says exactly",
+          "[adm][bridge][iab][zones]") {
+    struct Row {
+        std::array<bool, 9> included;
+        ZoneConstraint zone;
+        bool elevation;
+    };
+    // The presets cannot say these exactly; each takes the preset that includes every zone the
+    // pattern does and lets the object into the nearest extra zones.
+    const std::vector<Row> rows{
+        // Screen left alone: the screen preset adds the centre and right screen zones.
+        {{true, false, false, false, false, false, false, true, true},
+         ZoneConstraint::kScreenOnly,
+         true},
+        // Screen centre alone.
+        {{false, true, false, false, false, false, false, false, false},
+         ZoneConstraint::kScreenOnly,
+         false},
+        // Left wall alone: surround only adds the right wall and the rear.
+        {{false, false, false, true, false, false, false, false, false},
+         ZoneConstraint::kSurroundOnly,
+         false},
+        // Both walls: surround only adds the rear pair, which is nearer than back excluded's
+        // screen.
+        {{false, false, false, true, true, false, false, false, false},
+         ZoneConstraint::kSurroundOnly,
+         false},
+        // Screen left and the left wall: back excluded adds the rest of the front and the right
+        // wall.
+        {{true, false, false, true, false, false, false, false, false},
+         ZoneConstraint::kBackExcluded,
+         false},
+        // The left screen and the rear: side excluded is the narrowest that holds both.
+        {{true, false, false, false, false, true, true, false, false},
+         ZoneConstraint::kSideExcluded,
+         false},
+    };
+    for (const auto& row : rows) {
+        CAPTURE(static_cast<int>(row.zone));
+        const auto mapping = iclforge::adm::iab_zones_to_constraint(nine_zones(row.included));
+        CHECK_FALSE(mapping.exact);
+        CHECK(mapping.zone == row.zone);
+        CHECK(mapping.enable_elevation == row.elevation);
+    }
+}
+
+TEST_CASE("iab_zones_to_constraint never excludes a zone the pattern includes",
+          "[adm][bridge][iab][zones]") {
+    // Every non-empty horizontal pattern: the preset it maps to includes every included zone, and
+    // the mapping is exact exactly for the six presets' own patterns.
+    const std::array<std::array<bool, 7>, 6> presets{{
+        {true, true, true, true, true, true, true},
+        {true, true, true, true, true, false, false},
+        {true, true, true, false, false, true, true},
+        {false, true, false, false, false, true, true},
+        {true, true, true, false, false, false, false},
+        {false, false, false, true, true, true, true},
+    }};
+    const std::array<ZoneConstraint, 6> constraints{
+        ZoneConstraint::kNone,         ZoneConstraint::kBackExcluded,
+        ZoneConstraint::kSideExcluded, ZoneConstraint::kCentreAndBackOnly,
+        ZoneConstraint::kScreenOnly,   ZoneConstraint::kSurroundOnly};
+    for (unsigned pattern = 1; pattern < 128; ++pattern) {
+        std::array<bool, 9> included{};
+        for (std::size_t zone = 0; zone < 7; ++zone) {
+            included[zone] = ((pattern >> zone) & 1U) != 0;
+        }
+        CAPTURE(pattern);
+        const auto mapping = iclforge::adm::iab_zones_to_constraint(nine_zones(included));
+        const auto chosen = static_cast<std::size_t>(
+            std::find(constraints.begin(), constraints.end(), mapping.zone) - constraints.begin());
+        REQUIRE(chosen < presets.size());
+        std::array<bool, 7> horizontal{};
+        std::copy_n(included.begin(), 7, horizontal.begin());
+        for (std::size_t zone = 0; zone < 7; ++zone) {
+            if (horizontal[zone]) {
+                CHECK(presets[chosen][zone]);
+            }
+        }
+        const bool is_preset =
+            std::find(presets.begin(), presets.end(), horizontal) != presets.end();
+        CHECK(mapping.exact == is_preset);
+    }
+}
+
+TEST_CASE("iab_zones_to_constraint with no zone included has nothing to cover",
+          "[adm][bridge][iab][zones]") {
     const auto mapping = iclforge::adm::iab_zones_to_constraint(
-        nine_zones({true, false, false, false, false, false, false, true, true}));
+        nine_zones({false, false, false, false, false, false, false, true, true}));
     CHECK_FALSE(mapping.exact);
     CHECK(mapping.zone == ZoneConstraint::kNone);
     CHECK(mapping.enable_elevation);
@@ -443,11 +592,20 @@ TEST_CASE("iab_zones19_to_constraint reads the base layer for the horizontal zon
     CHECK(mapping.zone == ZoneConstraint::kBackExcluded);
     CHECK(mapping.enable_elevation);
 
-    // Only part of the rear included: no preset.
+    // Only part of the rear included: no preset says it exactly, and every other zone is in.
     gains[7] = 1.0;
     mapping = iclforge::adm::iab_zones19_to_constraint(gains);
     CHECK_FALSE(mapping.exact);
     CHECK(mapping.zone == ZoneConstraint::kNone);
+
+    // The rear-left zone alone: the rear is one group in the presets, so it asks for all of it, and
+    // surround only is the nearest preset that has it.
+    gains.fill(0.0);
+    gains[6] = 1.0;
+    mapping = iclforge::adm::iab_zones19_to_constraint(gains);
+    CHECK_FALSE(mapping.exact);
+    CHECK(mapping.zone == ZoneConstraint::kSurroundOnly);
+    CHECK_FALSE(mapping.enable_elevation);
 }
 
 TEST_CASE("build_iab carries spread and zone control onto the keyframe", "[adm][bridge][iab][spread][zones]") {
@@ -477,6 +635,42 @@ TEST_CASE("build_iab without spread or zone control leaves the object a constrai
     CHECK(placement.size.is_point());
     CHECK(placement.zone == ZoneConstraint::kNone);
     CHECK(placement.enable_elevation);
+}
+
+TEST_CASE("build_iab lists what the Atmos encode carries only approximately",
+          "[adm][bridge][iab][zones]") {
+    auto block = make_sub_block(0.5, 0.5, 0.0);
+    // Screen left alone has no preset; its gain is not a whole one; the object has decorrelation
+    // and a snap tolerance tighter than the default.
+    block.zone_gains = nine_zones({true, false, false, false, false, false, false, false, false});
+    (*block.zone_gains)[0] = 0.6;
+    block.decorrelation = 0.3;
+    block.snap = true;
+    block.snap_tolerance = 0.2;
+    auto frame = make_frame({}, {make_object(2, {block})});
+
+    const auto result = iclforge::adm::build_iab(std::span{&frame, 1});
+    REQUIRE(result.has_value());
+    REQUIRE(result->unmapped.size() == 1);
+    const auto& notes = result->unmapped[0];
+    REQUIRE(notes.size() == 4);
+    CHECK(notes[0] == "zone control (matches no Table 20 preset; carried as screen only)");
+    CHECK(notes[1] == "zone gain between 0 and 1 (read as included from 0.5)");
+    CHECK(notes[2] == "decorrelation");
+    CHECK(notes[3] == "snap tolerance");
+    CHECK(result->paths[0].evaluate(0.0).zone == ZoneConstraint::kScreenOnly);
+}
+
+TEST_CASE("build_iab lists nothing for an object whose metadata is carried as written",
+          "[adm][bridge][iab][zones]") {
+    auto block = make_sub_block(0.5, 0.5, 0.0);
+    block.zone_gains = nine_zones({true, true, true, false, false, false, false, false, false});
+    block.snap = true;  // no tolerance: the default of 1.0, always snap
+    auto frame = make_frame({}, {make_object(2, {block})});
+    const auto result = iclforge::adm::build_iab(std::span{&frame, 1});
+    REQUIRE(result.has_value());
+    REQUIRE(result->unmapped.size() == 1);
+    CHECK(result->unmapped[0].empty());
 }
 
 TEST_CASE("build_iab lets ObjectZoneDefinition19 replace the nine-zone control", "[adm][bridge][iab][zones]") {

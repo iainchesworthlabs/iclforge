@@ -98,9 +98,10 @@ enum class BridgeError : std::uint8_t {
                              // channel's `updates` was empty (every channel needs at least one
                              // DynamicObject state to place it, even a static, never-moving one)
     kEmptyIabStream,         // build_iab() only: the frame span passed to it was empty
-    kUnsupportedIabChannel,  // build_iab() only: a BedDefinition used a Table 19 ChannelID with no
-                             // iclforge::objects::oba::BedLabel equivalent - see iab_bridge.cpp's
-                             // own comment on exactly which codes map and which are refused
+    kUnsupportedIabChannel,  // build_iab() only: a BedDefinition used a ChannelID Table 19 does
+                             // not define (0x18-0x7F are Reserved for D-Cinema, and 0x8A and above
+                             // are not in the table) - see iab_bridge.cpp's own comment on the
+                             // placement of each code it does define
     kNoIabEssenceForChannel,  // build_iab() only: a channel's non-zero AudioDataID (§10.3.6/Table
                               // 8's own field) never resolved to an AudioDataPCM or AudioDataDLC
                               // element in any frame it was active in. AudioDataID == 0 is

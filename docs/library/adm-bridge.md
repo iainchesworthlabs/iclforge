@@ -226,17 +226,27 @@ frame to frame, so a Bed channel's timeline is one keyframe per frame it is pres
 channel (ChannelID `0xD`, or `0x86`/`0x87`'s BS.2051-2 `LFE1`/`LFE2` aliases) routes at gain 0 /
 `lfe_send` 1, the same convention `build_channel_path()` documents for ADM.
 
-**Table 19's cinema channel vocabulary is richer than `iclforge::objects::oba::BedLabel`'s own consumer-layout
-one in exactly one place**: it names three distinct surround zones per side (Side Surround,
-Surround, Rear Surround) where `BedLabel` has only two slots (`kLs`/`kRs`, `kLb`/`kRb`).
-"Surround" (`0x6`/`0xA`) maps to `kLs`/`kRs` (the canonical 5.1 pair) and "Rear Surround"
-(`0x7`/`0x8`) to `kLb`/`kRb` (7.1's additional back pair, the closest conceptual match); "Side
-Surround" (`0x5`/`0x9`) has no equivalent and is refused — `BridgeError::kUnsupportedIabChannel`,
-not silently collapsed onto an existing slot. Several other Table 19 codes (Left/Right Center,
-Center Height, the `*Height` variants of Side/Rear Surround, Left/Right Top Surround, Top
-Surround, and the whole `0x18`-`0x7F` D-Cinema-reserved range) are refused the same way,
-deliberately, rather than guessed at without the external documents Table 19 itself defers to
-(SMPTE ST 428-12/ST 2098-5) for their exact geometry.
+**Every channel Table 19 defines has a position.** A bed channel reaches the encode as a pinned
+position, so what the bridge needs from its ChannelID is where that loudspeaker is. The codes with an
+`iclforge::objects::oba::BedLabel` take `bed_label_position()`; "Side Surround" (`0x5`/`0x9`) sits where
+"Surround" (`0x6`/`0xA`) does, since a bed has one or the other, which is what lets the usual cinema bed
+(L, C, R, Lss, Rss, Lrs, Rrs, LFE, Lts, Rts) through. The rest have no `BedLabel` and are placed from the
+typical locations ST 2098-5 Annex B describes. That annex is informative and a cinema's own layout
+varies, so these are this bridge's readings (`libs/adm/ERRATA.md`), the same status as the position
+conversion below:
+
+| ChannelID | Channel | Position (x, y, z) |
+|---|---|---|
+| `0x1` / `0x3` | Left / Right Center | (0.25, 0, 0) / (0.75, 0, 0): between the screen's left and centre loudspeakers, and centre and right |
+| `0xB` / `0xC` | Left / Right Top Surround | (0.25, 0.5, 1) / (0.75, 0.5, 1): the ceiling, laterally between the centre and left (right) screen loudspeakers |
+| `0x10` | Center Height | (0.5, 0, 1): behind the screen, above the centre loudspeaker |
+| `0x11` / `0x12` | Left / Right Surround Height | (0 or 1, 2/3, 1): the side and rear near the ceiling, from a third of the way back |
+| `0x13` / `0x14` | Left / Right Side Surround Height | (0 or 1, 0.5, 1): above the side surrounds |
+| `0x15` / `0x16` | Left / Right Rear Surround Height | (0 or 1, 1, 1): above the rear surrounds |
+| `0x17` | Top Surround | (0.5, 0.5, 1): the ceiling over the middle of the room |
+
+The reserved codes (`0x18`-`0x7F`, and everything above `0x89`) have no meaning and are refused,
+`BridgeError::kUnsupportedIabChannel`.
 
 **Position conversion needs no formula at all.** `iab_position_to_room()` (`coordinates.hpp`) is a
 direct passthrough: §11.1's `x`/`y` (0 left/front wall to 1 right/back wall) already match
@@ -270,14 +280,28 @@ preset's:
 | screen only | the three screen zones |
 | surround only | the two wall zones and the two rear zones |
 
-Any other pattern leaves the object unconstrained (`IabZoneMapping::exact` is false) rather than
-picking a preset that would exclude the wrong zones. The overhead zones set `b_enable_elevation`:
+Any other pattern cannot be said in OAMD, which has the six presets and nothing finer (a 3-bit
+`zone_constraints_idx` and `b_enable_elevation`), so it takes the preset that includes every zone the
+pattern includes and lets the object into the nearest extra zones, summed by distance in the room plan
+(`IabZoneMapping::exact` is false). The screen's left zone alone becomes screen only, the left wall alone
+becomes surround only, and the left screen with the left wall becomes back excluded. The preset never
+excludes a zone the author included: what it keeps the object out of, the author kept it out of; what it
+lets in beyond that is the approximation. The overhead zones set `b_enable_elevation`:
 on when either is included, or, for the 19-zone form, when any height-layer or ceiling zone is. A
 `zone19` update in a sub block with no pan information has no keyframe to ride on and takes effect
 at the next sub block that has one.
 
 Both reach the bitstream and stop there, as ADM's width and zone do: `AtmosEncoder` folds each
 object into the bed as a point.
+
+**What is carried only approximately** is listed per channel in `IabBridgeResult::unmapped`, and
+`forge atmos-iab` prints each as a warning, as `forge atmos-adm` does for ADM:
+
+- a zone control no Table 20 preset says exactly, with the preset it was carried as;
+- a zone gain strictly between 0 and 1, which Table 20 reads as included or excluded from 0.5;
+- `ObjectDecorCoef` and a bed channel's `ChannelDecorCoef` (§10.5.18, §10.3.10), which OAMD has no field
+  for, as it has none for ADM's `diffuse`;
+- an `ObjectSnapTolerance` below 1 (§10.5.9): OAMD's snap is the flag alone.
 
 `IabBridgeResult` is a **new** struct, not a reuse of `BridgeResult`: PCM is concatenated across
 many independently-parsed frames, so `IabBridgeResult::pcm` is **owned**
@@ -365,6 +389,7 @@ struct IabBridgeResult {
     std::vector<iclforge::objects::oba::ObjectPath> paths;
     std::vector<std::vector<float>> pcm;       // OWNED - see "Bridging IAB" above
     std::uint32_t sample_rate = 0;
+    std::vector<std::vector<std::string>> unmapped;  // per channel: carried approximately or not at all
 };
 std::expected<IabBridgeResult, BridgeError> build_iab(
     std::span<const iclforge::iab::IABitstreamFrame> frames);
@@ -427,7 +452,9 @@ malformed/non-RIFF file) confirming `describe()` reaches the terminal rather tha
 or exit code.
 
 `libs/adm/tests/test_iab_bridge.cpp` covers `iab_position_to_room`'s cardinal points, the Table 19
-→ `BedLabel` mapping (both the codes that resolve and the ones `build_iab()` refuses), MetaID
+→ position mapping (every defined code, the reserved ones `build_iab()` refuses, and the usual cinema
+9.1 bed), the zone mapping for every one of the 127 horizontal patterns (the preset never excludes an
+included zone, and is exact only for the six presets' own patterns), the `unmapped` notes, MetaID
 cross-frame identity (the same MetaID+ChannelID across several frames is one channel, not several;
 an absent frame silence-fills rather than shrinking the channel count), sub-block keyframe timing
 (a dedicated fixture proving each active sub block's keyframe lands at its own *end* time, not its

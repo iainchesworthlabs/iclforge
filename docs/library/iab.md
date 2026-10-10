@@ -217,8 +217,9 @@ encoder's own choices.
 input shape — one `iclforge::objects::oba::ObjectPath` plus one mono PCM buffer per Bed channel or Object, ready
 to drive `encode_frame()` in a loop, the same destination shape `iclforge::adm::build()` produces
 for ADM. See [ADM → Atmos bridging](adm-bridge.md#bridging-iab) for what gets
-mapped (Table 19 → `iclforge::objects::oba::BedLabel`, position conversion, MetaID-based cross-frame identity)
-and what is carried as metadata only (spread as object size, zone control as a zone constraint).
+mapped (every Table 19 channel to a position, position conversion, MetaID-based cross-frame identity)
+and what is carried as metadata only (spread as object size, zone control as a zone constraint, the
+tightest preset when the pattern is none of the six).
 [`examples/encode_iab.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/encode_iab.cpp)
 is the full read → bridge → encode pipeline; `forge atmos-iab` drives the identical pipeline from
 the command line.
