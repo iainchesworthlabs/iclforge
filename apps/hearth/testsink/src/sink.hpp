@@ -82,6 +82,10 @@ struct SinkOptions {
     // The IPv4 interfaces to advertise on; empty for every one.
     std::vector<std::string> mdns_interfaces;
     std::size_t max_connections = 4;
+    // The buffer the sink says it has, in bytes (player@v1's and the extension role's
+    // buffer_capacity): what a server may have sent that has not played yet. A board's is a
+    // few tens of KB.
+    std::uint64_t buffer_capacity = 32ULL * 1024 * 1024;
 };
 
 // What a sink reports, one line at a time, from any of its threads.

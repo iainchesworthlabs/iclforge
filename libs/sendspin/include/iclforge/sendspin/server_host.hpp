@@ -201,6 +201,19 @@ class ServerHost {
     // against its support object first (ServerSession::iclforge_command). False when the client is
     // not connected or the session refuses it.
     bool iclforge_command(const std::string& client_id, const player::CommandMessage& command);
+    // Plays a client that lists both _iclforge_player@v1 and player@v1 on player@v1's PCM, rather
+    // than on the extension role, or (use false) puts it back. A paired Hearth sink is otherwise
+    // always on the extension role, whose streams are bursts only: a stream it does not list is
+    // sent it nothing, where PCM from this host would play. A client that does not list player@v1
+    // stays on the extension role. The role moves on the live connection, as roles do at an
+    // activation; a play already under way keeps the role it started with, and the change is
+    // taken at the group's next start.
+    //
+    // `max_chunk_bytes` is the most audio one chunk to this client may carry, for a sink that
+    // takes small chunks (a board's message limit is a few KB); 0 leaves PCM at 20 ms a chunk.
+    // It counts the samples only: a chunk's header and its encryption tag come on top.
+    // False when the client is not connected.
+    bool use_pcm(const std::string& client_id, bool use, std::size_t max_chunk_bytes = 0);
     // Approves a client for unpaired access, or withdraws the approval.
     bool approve(const std::string& client_id, bool approved);
     bool unpair(const std::string& client_id);
