@@ -2046,6 +2046,15 @@ The sections below contain the complete change list and fixes.
   any quantised line is untouched. The syntax reads back with the trace the encoder recorded, and a
   test holds the restored band within 2 dB of its source. No stream from another encoder sets
   `b_snf_data_exists`, so this project's decoder is the only reader. Not mirrored in the C API.
+- **The AC-4 encoder writes the efficient high frame rate mode** (`EncoderConfig::experimental.frame_rate_fraction`
+  2 or 4, `forge ac4-encode experimental=hfr-2|hfr-4`; Part 2 5.1.3 and Table 18). At
+  `frame_rate_index` 5 to 12 (4 from 10) the codec runs at the audio frame rate the table gives, and
+  each codec frame goes out as that many `raw_ac4_frame()`s: the presentation substream whole in
+  the first and elided in the others, each audio substream cut into as many pieces, only the first an
+  I-frame, counters running on from a multiple of the fraction. A constant rate only. The decoder
+  reassembles each unit, and its output holds the plain stream's quality at the audio frame rate
+  (47.95 to 120 fps in halves and 100 to 120 fps in quarters, with the 29.97 fps cycle of 1 601 and
+  1 602 samples). No other encoder's stream or decoder has read the mode. Not mirrored in the C API.
 
 **AC-4 bindings: the C API, Python, Rust and WebAssembly**
 

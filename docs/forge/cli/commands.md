@@ -205,7 +205,10 @@ surrounds in SL and SR, 5/2/0's wide pair last, 3/2/2's top front pair in TFL an
 takes three channels, L R C, as 3.0, the dialogue of a music and effects presentation (below);
 `noise-fill`, which sends each scale factor band that quantises to zero a noise level (Part 1
 5.1.4: its own energy in 3 dB steps, from the level before it) that the decoder fills with noise,
-and so trades some SNR for a spectrum without holes at a low rate; and `objects`, which
+and so trades some SNR for a spectrum without holes at a low rate; `hfr-2` and `hfr-4`, the
+efficient high frame rate mode (Part 2 5.1.3): with `frame-rate=` 47.95 to 120 (`hfr-4` from 100)
+the encoder codes at half or a quarter of that rate (Table 18) and sends each frame as two or four
+transmission frames, which a decoder joins again; a constant rate only; and `objects`, which
 `objects=<scene file>` needs.
 
 **Objects.** With `experimental=objects`, `objects=<scene file>` takes the WAV file's channels as the
