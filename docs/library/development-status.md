@@ -268,11 +268,13 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | Multi-programme container mux (MP4, fMP4, MPEG-TS) | 🟢 | Medium | Optional | Every programme rides in each sample / PES payload with a `dec3` block each (TS 102 366 F.2, A/52 Annex G §3.3); `programme=N` writes one alone, renumbered as substream 0 |
 | | Multi-programme container mux (Matroska) | 🟡🔵 | Medium | Optional | One track, so the first programme with a warning, or the one `programme=N` picks (one file per programme). A track per programme is a muxer this project does not have, and `A_EAC3`'s text names single syncframes |
 | **Streaming** | HLS playlists | 🟡🔵 | Medium | Important | Atmos `CHANNELS="N/JOC"` + 5.1 fallback; read back through FFmpeg's `hls` demuxer at the exact access-unit count. Apple's validator is macOS-only and no player here reads the signalling, so the manifest's meaning has nothing to be measured against |
-| | DASH MPD + Dolby supplemental descriptors | 🟡🔵 | Medium | Important | Syntactically correct and read back through FFmpeg's `dash` demuxer, which ignores the descriptors; no MPD schema validator or JOC-aware player has been run |
+| | DASH MPD + Dolby supplemental descriptors | 🟡🔵 | Medium | Important | Valid against ISO/IEC 23009-1's schema (`verify_dash_schema.py`, in `interop.yml`) and read back through FFmpeg's `dash` demuxer, which ignores the descriptors; the descriptors' meaning has no JOC-aware player to be measured against |
 | **Transport** | IEC 61937 burst pack (AC-3 + E-AC-3) | 🟢 | High | Essential | vs FFmpeg / MS docs |
 | | IEC 61937 burst unpack (`unspdif`) | 🟢 | Medium | Optional | Inverse of pack |
 | | IEC 61937-14 AC-4 burst pack + unpack | 🟢 | Medium | Important | The four burst types, their periods and sequences at every frame rate from the standard's tables, checked against a second transcription; no device here accepts AC-4 |
-| **Edit** | In-place metadata rewrite | 🟡🔵 | Medium | Optional | Existing fields only. An insert moves every later bit into a frame of fixed size, so finding room takes a bit-accurate walk to the end of the audio (the project's frame walker covers its own Atmos encoder's shape only) and making it re-frames the syncframe: `encode` or `transcode` with the field on |
+| **Edit** | In-place metadata rewrite | 🟢 | Medium | Optional | `dialnorm`, `dialnorm2`, `compr`, `compr2`, `bsmod`, `dsurmod` on a field the stream transmits, CRCs re-stamped, audio bit-identical |
+| | Metadata insert (E-AC-3) | 🟢 | Medium | Optional | Adds `compr`, `compr2`, `bsmod`, `dsurmod` to every independent substream that lacks them: the frame grows by a word or two (`frmsiz`, `auxbits` padding, CRC); refused by name on block start information or auxiliary data. FFmpeg 8.0.1 decodes it to the same samples |
+| | Metadata insert (AC-3) | 🔴🔵 | Medium | Optional | AC-3's frame size is a code (`frmsizecod`) that fixes the bit rate, so there is nowhere to put the bits without walking all six audio blocks to where the audio ends - a walk the project has only for its Atmos encoder's frame shape. `encode` or `transcode` with the field on |
 | | Loudness QC vs delivery specs | 🟢 | Medium | Important | BS.1770-4 vs dialnorm / R 128 / A/85 / Netflix |
 | | Elementary scan / probe / split | 🟢 | High | Essential | Programme-aware access-unit walk |
 
@@ -374,7 +376,7 @@ this register is the checklist that those bounds appear here too.
 | ATSC A/342-2 | AC-4 ATSC TS profile: the standard has no MPEG-2 TS mapping | 🔴🔵 |
 | IEC 61937-14 | AC-4 to a device: no receiver accepts it, and HBR16's eight-channel link is not opened | 🟡🔵 |
 | ISO BMFF | `moov`-after-`mdat` demux from a pipe (a file path reads it) | 🔴🔵 |
-| Apple HLS / Dolby DASH | Player / schema validation of Atmos signalling | 🟡🔵 |
+| Apple HLS / Dolby DASH | Player validation of Atmos signalling (the MPD is schema-valid) | 🟡🔵 |
 | Multi-programme mux | Matroska: first programme only (one track) | 🟡🔵 |
 
 ### TrueHD / MLP

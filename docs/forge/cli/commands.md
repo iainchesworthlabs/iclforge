@@ -1161,7 +1161,7 @@ Everything above takes PCM. These five take an already-encoded AC-3/E-AC-3 eleme
 | Command | What it does |
 |---|---|
 | `transcode` | Decode and re-encode. The only one here that re-encodes, because DD+ and DD are different codecs and nothing else bridges them — the route to an optical link or an AC-3-only HDMI sink, which had no route at all before. It also goes between AC-4 and AC-3 or E-AC-3, either way — see [below](#transcode-and-ac-4) |
-| `metadata` | Rewrite `dialnorm`, `compr`, `bsmod`, `dsurmod` on an existing stream and re-stamp its CRCs. The audio bytes are copied through untouched |
+| `metadata` | Rewrite `dialnorm`, `compr`, `bsmod`, `dsurmod` on an existing stream and re-stamp its CRCs. The audio bytes are copied through untouched. A field the stream does not transmit is refused, naming `insert`; with `insert` an E-AC-3 stream gets the field added to every independent substream, and each syncframe that gains one grows by a word or two (the rate rises by about 16 bits a frame at most). An AC-3 stream cannot take it, nor can a frame with block start information or auxiliary data |
 | `normalize` | The measurement-driven case of the above: decode to measure BS.1770-4 integrated loudness, write the `dialnorm` ATSC A/85 §8 implies, change nothing else |
 | `cut` | Extract on access-unit boundaries |
 | `cat` | Join streams end to end |
