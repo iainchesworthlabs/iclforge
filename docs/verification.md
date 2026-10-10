@@ -784,8 +784,8 @@ SHA-256-pinned, never committed), writes the manifests `forge fmp4` produces - a
 E-AC-3 stereo, a Dolby Atmos JOC stream with and without the 5.1 fallback, and an AC-4 from the
 committed baseline - and validates each, with a deliberately corrupted copy that the same validator
 must reject (a validator that cannot fail proves nothing). Checked 2026-10-10 against commit
-`cc941bd` with .NET's XSD 1.0 validator on Windows: all five valid, the control rejected.
-`interop.yml` runs it with `xmllint`. That covers element order and nesting, attribute types, required
+`cc941bd` with .NET's XSD 1.0 validator on Windows, and in `interop.yml` with `xmllint` (libxml2)
+the same day: all five valid and the control rejected under each. That covers element order and nesting, attribute types, required
 attributes and the URI and duration patterns - the parts FFmpeg's demuxer, which takes what it
 needs and ignores the rest, never tests.
 
