@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <expected>
 #include <map>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -59,5 +60,16 @@ void put_animated(Out& out, std::uint32_t animation_type, const AnimatedValue& v
 [[nodiscard]] std::expected<AnimatedValue, Error> read_animated(Cursor& in, std::uint32_t animation_type,
                                                                 unsigned width, bool is_signed);
 [[nodiscard]] bool known_animation(std::uint32_t animation_type);
+
+// The sample rate a Codec Config's decoder_config declares (ipcm's sample_rate, Opus's fixed 48 kHz
+// for offsets, the AudioSpecificConfig's samplingFrequencyIndex, FLAC STREAMINFO's sample rate), or
+// nullopt for a codec this module does not know or a decoder_config too short to hold it.
+// Defined in reconstruct.cpp.
+[[nodiscard]] std::optional<std::uint32_t> codec_sample_rate(const CodecConfig& codec);
+
+// One Audio Frame's `ipcm` payload as planar float in [-1, 1): `channels` interleaved per sample.
+// kBadObu when the payload is not a whole number of samples. Defined in reconstruct.cpp.
+[[nodiscard]] std::expected<std::vector<std::vector<float>>, Error> decode_ipcm_frame(
+    std::span<const std::byte> data, const LpcmConfig& lpcm, std::size_t channels);
 
 }  // namespace iclforge::containers::iamf::detail

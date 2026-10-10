@@ -15,6 +15,7 @@
 #include "iclforge/containers/iamf/container.hpp"
 #include "iclforge/containers/iamf/model.hpp"
 #include "iclforge/containers/iamf/sequence.hpp"
+#include "sequence_detail.hpp"
 
 namespace iclforge::containers::iamf {
 
@@ -473,7 +474,64 @@ std::expected<std::vector<std::byte>, MuxError> mux_objects(const ObjectTrack& t
 
 // --- Reading PCM back ---------------------------------------------------------------------------
 
+namespace {
+
+// The `ipcm` Audio Substreams of a scalable channel element as reconstruct_channels() takes them:
+// one entry per substream, every frame of it concatenated and none of the trimming applied. A layer
+// codes its coupled substreams first (two channels each), then the mono ones.
+[[nodiscard]] std::expected<std::vector<SubstreamPcm>, Error> read_ipcm_substreams(const Sequence& sequence,
+                                                                                   const AudioElement& element,
+                                                                                   const CodecConfig& codec,
+                                                                                   const LpcmConfig& lpcm) {
+    std::vector<std::size_t> channel_counts;
+    for (const ChannelLayer& layer : element.layers) {
+        if (layer.coupled_substream_count > layer.substream_count) {
+            return std::unexpected(Error::kBadDescriptor);
+        }
+        for (std::size_t s = 0; s < layer.substream_count; ++s) {
+            channel_counts.push_back(s < layer.coupled_substream_count ? 2 : 1);
+        }
+    }
+    if (channel_counts.size() != element.audio_substream_ids.size()) {
+        return std::unexpected(Error::kBadDescriptor);
+    }
+    std::vector<SubstreamPcm> substreams(channel_counts.size());
+    for (std::size_t s = 0; s < substreams.size(); ++s) {
+        substreams[s].audio_substream_id = element.audio_substream_ids[s];
+        substreams[s].channels.resize(channel_counts[s]);
+    }
+    for (const TemporalUnit& unit : sequence.temporal_units) {
+        for (const AudioFrame& frame : unit.audio_frames) {
+            const auto it = std::find(element.audio_substream_ids.begin(), element.audio_substream_ids.end(),
+                                      frame.audio_substream_id);
+            if (it == element.audio_substream_ids.end()) {
+                continue;  // another Audio Element's substream
+            }
+            const auto s = static_cast<std::size_t>(it - element.audio_substream_ids.begin());
+            auto planar = detail::decode_ipcm_frame(frame.data, lpcm, channel_counts[s]);
+            if (!planar.has_value()) {
+                return std::unexpected(planar.error());
+            }
+            if ((*planar)[0].size() != codec.num_samples_per_frame) {
+                return std::unexpected(Error::kBadObu);  // the Codec Config's frame length is every frame's
+            }
+            for (std::size_t c = 0; c < channel_counts[s]; ++c) {
+                substreams[s].channels[c].insert(substreams[s].channels[c].end(), (*planar)[c].begin(),
+                                                 (*planar)[c].end());
+            }
+        }
+    }
+    return substreams;
+}
+
+}  // namespace
+
 std::expected<DecodedElement, Error> decode_pcm(const Sequence& sequence, std::uint32_t audio_element_id) {
+    return decode_pcm(sequence, audio_element_id, DecodeOptions{});
+}
+
+std::expected<DecodedElement, Error> decode_pcm(const Sequence& sequence, std::uint32_t audio_element_id,
+                                                const DecodeOptions& options) {
     const AudioElement* element = nullptr;
     for (const auto& candidate : sequence.audio_elements) {
         if (candidate.audio_element_id == audio_element_id) {
@@ -499,17 +557,29 @@ std::expected<DecodedElement, Error> decode_pcm(const Sequence& sequence, std::u
     if (lpcm.sample_size != 16 && lpcm.sample_size != 24 && lpcm.sample_size != 32) {
         return std::unexpected(Error::kBadDescriptor);
     }
-    const unsigned bytes_per_sample = lpcm.sample_size / 8U;
-    const bool little_endian = (lpcm.sample_format_flags & 1U) != 0;
 
     // What each substream carries: its channel names, in the order the channels are interleaved.
     std::vector<std::vector<std::string>> substream_channels;
     switch (element->type) {
         case ElementType::kChannelBased: {
-            if (element->layers.size() != 1) {
+            if (element->layers.empty()) {
                 return std::unexpected(Error::kUnsupported);
             }
-            const auto layout = layout_info(element->layers[0].loudspeaker_layout);
+            if (element->layers.size() > 1) {
+                // Scalable: read every substream whole and let the reconstruction pick the layer.
+                auto substreams = read_ipcm_substreams(sequence, *element, *codec, lpcm);
+                if (!substreams.has_value()) {
+                    return std::unexpected(substreams.error());
+                }
+                return reconstruct_channels(sequence, audio_element_id, *substreams, options);
+            }
+            if (options.layer.has_value() && *options.layer != 0) {
+                return std::unexpected(Error::kInvalidArgument);
+            }
+            const ChannelLayer& layer = element->layers[0];
+            const auto layout = layer.loudspeaker_layout == 15 && layer.expanded_loudspeaker_layout.has_value()
+                                    ? expanded_layout_info(*layer.expanded_loudspeaker_layout)
+                                    : layout_info(layer.loudspeaker_layout);
             if (!layout.has_value() || layout->substreams.size() != element->audio_substream_ids.size()) {
                 return std::unexpected(Error::kUnsupported);
             }
@@ -552,7 +622,6 @@ std::expected<DecodedElement, Error> decode_pcm(const Sequence& sequence, std::u
     for (std::size_t s = 0; s < substreams.size(); ++s) {
         substreams[s].resize(substream_channels[s].size());
     }
-    const double scale = 1.0 / static_cast<double>(std::uint64_t{1} << (lpcm.sample_size - 1));
 
     for (const TemporalUnit& unit : sequence.temporal_units) {
         for (const AudioFrame& frame : unit.audio_frames) {
@@ -563,28 +632,17 @@ std::expected<DecodedElement, Error> decode_pcm(const Sequence& sequence, std::u
             }
             const auto s = static_cast<std::size_t>(it - element->audio_substream_ids.begin());
             const std::size_t channels = substreams[s].size();
-            const std::size_t frame_bytes = static_cast<std::size_t>(bytes_per_sample) * channels;
-            if (frame_bytes == 0 || frame.data.size() % frame_bytes != 0) {
-                return std::unexpected(Error::kBadObu);
+            auto planar = detail::decode_ipcm_frame(frame.data, lpcm, channels);
+            if (!planar.has_value()) {
+                return std::unexpected(planar.error());
             }
-            const std::size_t samples = frame.data.size() / frame_bytes;
+            const std::size_t samples = (*planar)[0].size();
             const std::size_t trim_start = std::min<std::size_t>(frame.num_samples_to_trim_at_start, samples);
             const std::size_t trim_end = std::min<std::size_t>(frame.num_samples_to_trim_at_end, samples - trim_start);
-            for (std::size_t n = trim_start; n < samples - trim_end; ++n) {
-                for (std::size_t c = 0; c < channels; ++c) {
-                    std::uint32_t raw = 0;
-                    const std::size_t at = (n * channels + c) * bytes_per_sample;
-                    for (unsigned b = 0; b < bytes_per_sample; ++b) {
-                        const unsigned shift = 8U * (little_endian ? b : bytes_per_sample - 1 - b);
-                        raw |= std::to_integer<std::uint32_t>(frame.data[at + b]) << shift;
-                    }
-                    // Sign-extend the sample_size-bit two's complement value.
-                    const std::int64_t signed_value =
-                        static_cast<std::int64_t>(raw) - ((raw & (std::uint32_t{1} << (lpcm.sample_size - 1))) != 0
-                                                              ? (std::int64_t{1} << lpcm.sample_size)
-                                                              : 0);
-                    substreams[s][c].push_back(static_cast<float>(static_cast<double>(signed_value) * scale));
-                }
+            for (std::size_t c = 0; c < channels; ++c) {
+                substreams[s][c].insert(substreams[s][c].end(),
+                                        (*planar)[c].begin() + static_cast<std::ptrdiff_t>(trim_start),
+                                        (*planar)[c].end() - static_cast<std::ptrdiff_t>(trim_end));
             }
         }
     }
