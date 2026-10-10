@@ -770,13 +770,24 @@ std::expected<std::vector<std::byte>, EditError> grow_eac3(std::span<const std::
     }
 
     std::vector<Switch> switches;
+    // plan_insert() sets each flag only where the field is absent, the edit supplies it and the
+    // frame has the bit to set it at; a plan that says otherwise is not one to build a frame from.
     if (plan.compr) {
+        if (!ins.compre_bit.has_value() || !edit.compr.has_value()) {
+            return std::unexpected(EditError::kCannotInsert);
+        }
         switches.push_back({*ins.compre_bit, {{*edit.compr, 8}}});
     }
     if (plan.compr2) {
+        if (!ins.compr2e_bit.has_value() || !edit.compr2.has_value()) {
+            return std::unexpected(EditError::kCannotInsert);
+        }
         switches.push_back({*ins.compr2e_bit, {{*edit.compr2, 8}}});
     }
     if (plan.info) {
+        if (!ins.infomdate_bit.has_value()) {
+            return std::unexpected(EditError::kCannotInsert);
+        }
         // Table E1.2's infomdat group in the order it is read, with the
         // fields that were not asked for written as the encoder's defaults.
         const auto acmod = static_cast<int>(parsed.meta.acmod);
