@@ -538,7 +538,7 @@ function wireUp() {
     });
 }
 
-(async function main() {
+async function main() {
     wireUp();
     setStatus('Loading WASM modules...', false);
     try {
@@ -547,4 +547,7 @@ function wireUp() {
     } catch (error) {
         setStatus(`failed to load WASM modules: ${error.message || error}`, true);
     }
-})();
+}
+
+// The load is caught inside main; this catch is for the wiring above it.
+main().catch((error) => setStatus(String(error.message || error), true));

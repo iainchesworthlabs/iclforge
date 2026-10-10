@@ -103,9 +103,11 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       # npm trusted publishing needs npm CLI >= 11.5.1 - not trusting whatever version
-      # actions/setup-node's chosen Node release happens to bundle.
-      - name: Install npm >= 11.5.1
-        run: npm install -g npm@latest
+      # actions/setup-node's chosen Node release happens to bundle. An exact version,
+      # not `latest`: a publish step should not change under a new npm major (12.x
+      # exists) on the day a tag is pushed. Raise it by hand, on purpose.
+      - name: Install npm 11.21.0 (needs >= 11.5.1)
+        run: npm install -g npm@11.21.0
 
       - name: Install
         working-directory: bindings/js

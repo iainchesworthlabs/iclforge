@@ -343,7 +343,7 @@ async function previewRoundTrip() {
 
 // --- Wiring ----------------------------------------------------------------
 
-(async function main() {
+async function main() {
     wireRoom();
     renderObjectRows();
     el('objectCount').addEventListener('change', renderObjectRows);
@@ -364,4 +364,7 @@ async function previewRoundTrip() {
         el('startBtn').disabled = true;
         setStatus(`failed to load WASM modules: ${error.message || error}`, true);
     }
-})();
+}
+
+// The load is caught inside main; this catch is for the wiring above it.
+main().catch((error) => setStatus(String(error.message || error), true));
