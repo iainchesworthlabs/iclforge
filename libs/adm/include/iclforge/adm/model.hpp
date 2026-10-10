@@ -244,15 +244,15 @@ struct AudioPackFormat {
     // (input) and the decoding matrices that undo it; a decoding matrix names the pack it produces
     // (output) and the encoding matrices it undoes; a direct matrix names both packs. Empty when
     // absent. libadm has no model for any of the four, so they are read from the axml text.
-    std::vector<std::string> encode_pack_format_refs;
-    std::vector<std::string> decode_pack_format_refs;
-    std::string input_pack_format_ref;
-    std::string output_pack_format_ref;
+    std::vector<std::string> encode_pack_format_refs{};
+    std::vector<std::string> decode_pack_format_refs{};
+    std::string input_pack_format_ref{};
+    std::string output_pack_format_ref{};
 
     // HOA only (§5.5.5, Table A1-25): the defaults for the pack's HOA blocks, which a block's own
     // values override. `hoa_normalization` is empty when the pack does not say (the schema's
     // default is "SN3D"); nfc_ref_dist is in metres. Also read from the axml text.
-    std::string hoa_normalization;
+    std::string hoa_normalization{};
     bool has_nfc_ref_dist = false;
     double nfc_ref_dist = 0.0;
     bool screen_ref = false;
