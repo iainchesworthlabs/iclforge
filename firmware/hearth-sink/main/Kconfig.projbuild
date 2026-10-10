@@ -454,6 +454,19 @@ config ICLFORGE_EXAMPLE_AC4_CORE
         low-complexity platforms. The Part 1 channel elements - 2.0 and 5.1 -
         decode alike in both.
 
+config ICLFORGE_EXAMPLE_AC4_PARALLEL
+    int "AC-4: decode each frame's per-channel stages on both cores (1) or one (0)"
+    depends on ICLFORGE_AC4
+    default 0
+    range 0 1
+    help
+        On a part with two cores, with the decode task pinned to one of them
+        (ICLFORGE_EXAMPLE_DECODE_CORE), a worker task on the other takes half of a
+        frame's per-channel stages: each channel's inverse transform and QMF
+        analysis, each output's synthesis and sample rate converter. The PCM is
+        the same bit for bit. A play's location can say parallel=on or
+        parallel=off.
+
 config ICLFORGE_EXAMPLE_AC4_PCM_HASH
     int "AC-4: hash every decoded sample (1) or not (0)"
     depends on ICLFORGE_AC4

@@ -22,3 +22,15 @@ CONFIG_ICLFORGE_AC4=y
 # the example's default of 32 KB leaves under 10 KB in the widest mode and this takes
 # 40 KB. stream.decode_stack_free says what a play left.
 CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_BYTES=40960
+
+# Each frame's per-channel stages on both cores (planning/ac4.md, D14g). On a part with two
+# cores and the decode task pinned to one (CONFIG_ICLFORGE_EXAMPLE_DECODE_CORE, which
+# sdkconfig.sendspin sets), a worker task on the other core takes half of the inverse
+# transform, QMF analysis, A-SPX, A-CPL, synthesis and converter work of each frame, which
+# the decoder's stages do per channel and per slot and which share nothing. The PCM is the
+# same bit for bit (the board's hashes of 40 plays, on and off); the P4's 5.1 A-CPL mode 3
+# frame takes 0.74 of its duration from 1.00, its 5.1.4 plays 1.00 to 1.21 from 1.24 to 1.56,
+# the S3's 5.1 SIMPLE frame 1.38 from 1.61 with the flash in QIO mode. A part with one core
+# (the C6) has no second lane and decodes as it did. A play's location can say
+# ?parallel=off or ?parallel=on.
+CONFIG_ICLFORGE_EXAMPLE_AC4_PARALLEL=1

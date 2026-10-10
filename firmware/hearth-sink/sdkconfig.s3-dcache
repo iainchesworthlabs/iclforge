@@ -1,0 +1,23 @@
+# A 64 KB data cache on the ESP32-S3 (planning/ac4.md, D14g), on top of sdkconfig.s3-fast. The
+# S3 board's image is built with it (decision 43, 2026-10-11).
+#
+#   SDKCONFIG_DEFAULTS="...;sdkconfig.s3-fast;sdkconfig.s3-dcache" idf.py build
+#
+# The decoder's working set (a channel's QMF matrix is 16 KB, an inverse transform's tables 56 KB)
+# is what the 32 KB cache cannot hold, and the part's internal RAM is what a 64 KB one is made
+# from: 32 KB of the heap. An AC-4 play with Wi-Fi up and the Sendspin player idle starts with 62 KB
+# free instead of 95 and its least was 31 to 49 KB instead of 64 to 81. What it buys, with the
+# second lane on (an AC-4 frame's time against its duration):
+#
+#                     s3-fast   + this
+#   2.0 A-SPX            0.61     0.50
+#   5.1 SIMPLE           1.17     0.99
+#   5.1 A-SPX            1.49     1.25
+#   5.1 A-CPL mode 3     1.93     1.57
+#   5.1.4 S-CPL          2.67     2.28
+#   29.97 fps converter  1.13     0.87
+#
+# Wi-Fi and lwIP cannot live on a few kilobytes (planning/ac4.md, D14c); the owner decided on
+# 2026-10-11 to spend that headroom (decision 43), and this stays a separate file so that a
+# build that needs the 32 KB back drops one line.
+CONFIG_ESP32S3_DATA_CACHE_64KB=y

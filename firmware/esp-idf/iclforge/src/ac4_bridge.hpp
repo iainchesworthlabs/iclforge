@@ -12,17 +12,25 @@
 // (iclforge::ac4::Decoder::decode_by_block), so the player holds one block of the audio and not a
 // frame's worth.
 
+#include <atomic>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <optional>
 #include <span>
+
+#include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
+#include "freertos/task.h"
 
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/decoder/output.hpp"
 
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/decoder/executor.hpp"
 
 namespace iclforge::ac4bridge {
 
@@ -163,6 +171,146 @@ struct PcmHash {
             }
         }
     }
+};
+
+// The decoder's Executor over the part's other core: one worker task pinned there, woken by a
+// task notification when the decode task has a stage of per-channel work for it, which the two
+// then take a task at a time from one shared cursor until they are all done. The decode task
+// is lane 0 and the worker lane 1; where the worker does not start, lanes() is 1 and run() does
+// the work in order on the caller, as a decoder without an executor does.
+//
+// The cursor holds the run's generation, its task count and the next index in one word, so that
+// a worker woken late for a run that has finished meets the next run's cursor and takes its
+// tasks (it was woken for that one too) and never one of the run it was woken for, whose tasks
+// the other lane has done: a claim succeeds only on the cursor it read, and a run does not
+// begin until the last claim of the one before has returned.
+class TaskExecutor final : public iclforge::ac4::Executor {
+   public:
+    TaskExecutor() = default;
+    ~TaskExecutor() override { stop(); }
+
+    // Starts the worker on `core` at `priority`, with its stack in PSRAM where `stack_in_psram`
+    // asks for it and there is PSRAM to give (the decode task's is there, and the internal RAM
+    // of a part with Wi-Fi up is the scarce thing); false, and lanes() 1, if the task cannot be
+    // made.
+    bool start(BaseType_t core, UBaseType_t priority, std::uint32_t stack_bytes,
+               bool stack_in_psram) {
+        if (worker_ != nullptr) {
+            return true;
+        }
+        quit_.store(false);
+        exited_.store(false);
+        with_caps_ = false;
+        if (stack_in_psram && heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0) {
+            with_caps_ = xTaskCreatePinnedToCoreWithCaps(
+                             &TaskExecutor::entry, "ac4-lane", stack_bytes, this, priority,
+                             &worker_, core, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS;
+        }
+        stack_bytes_ = stack_bytes;
+        if (with_caps_) {
+            return true;
+        }
+        worker_ = nullptr;
+        return xTaskCreatePinnedToCore(&TaskExecutor::entry, "ac4-lane", stack_bytes, this,
+                                       priority, &worker_, core) == pdPASS;
+    }
+
+    // The worker's stack that was never used, in bytes, at its worst so far.
+    [[nodiscard]] std::size_t stack_free() const {
+        return worker_ != nullptr ? static_cast<std::size_t>(uxTaskGetStackHighWaterMark(worker_))
+                                  : 0;
+    }
+
+    void stop() {
+        if (worker_ == nullptr) {
+            return;
+        }
+        std::printf("player: AC-4 lane stack: %lu of %lu bytes never used\n",
+                    static_cast<unsigned long>(stack_free()),
+                    static_cast<unsigned long>(stack_bytes_));
+        quit_.store(true);
+        xTaskNotifyGive(worker_);
+        while (!exited_.load()) {
+            vTaskDelay(1);
+        }
+        // The task has parked itself: a task made with caps is deleted by another, with them.
+        if (with_caps_) {
+            vTaskDeleteWithCaps(worker_);
+        } else {
+            vTaskDelete(worker_);
+        }
+        worker_ = nullptr;
+    }
+
+    [[nodiscard]] std::size_t lanes() const noexcept override { return worker_ != nullptr ? 2 : 1; }
+
+    void run(std::size_t count, Task task, void* context) override {
+        if (worker_ == nullptr || count < 2 || count > 255) {
+            for (std::size_t i = 0; i < count; ++i) {
+                task(context, i, 0);
+            }
+            return;
+        }
+        task_ = task;
+        context_ = context;
+        done_.store(0, std::memory_order_relaxed);
+        generation_ = static_cast<std::uint16_t>(generation_ + 1);
+        cursor_.store((static_cast<std::uint32_t>(generation_) << 16) |
+                          (static_cast<std::uint32_t>(count) << 8),
+                      std::memory_order_release);
+        xTaskNotifyGive(worker_);
+        drain(0);
+        while (done_.load(std::memory_order_acquire) < count) {
+            taskYIELD();
+        }
+    }
+
+   private:
+    void drain(std::size_t lane) {
+        for (;;) {
+            std::uint32_t cursor = cursor_.load(std::memory_order_acquire);
+            std::uint32_t index = 0;
+            for (;;) {
+                index = cursor & 0xFFU;
+                if (index >= ((cursor >> 8) & 0xFFU)) {
+                    return;
+                }
+                if (cursor_.compare_exchange_weak(cursor, cursor + 1, std::memory_order_acq_rel,
+                                                  std::memory_order_acquire)) {
+                    break;
+                }
+            }
+            task_(context_, index, lane);
+            done_.fetch_add(1, std::memory_order_release);
+        }
+    }
+
+    static void entry(void* self) {
+        auto* executor = static_cast<TaskExecutor*>(self);
+        for (;;) {
+            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+            if (executor->quit_.load()) {
+                break;
+            }
+            executor->drain(1);
+        }
+        executor->exited_.store(true);
+        // Parked until stop() deletes it, which is the one that can free a stack made with caps.
+        for (;;) {
+            vTaskDelay(portMAX_DELAY);
+        }
+    }
+
+    TaskHandle_t worker_ = nullptr;
+    bool with_caps_ = false;
+    std::uint32_t stack_bytes_ = 0;
+    Task task_ = nullptr;
+    void* context_ = nullptr;
+    std::uint16_t generation_ = 0;
+    std::atomic<std::uint32_t> cursor_{0};
+    std::atomic<std::size_t> done_{0};
+    std::atomic<bool> quit_{false};
+    std::atomic<bool> exited_{false};
 };
 
 }  // namespace iclforge::ac4bridge
