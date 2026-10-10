@@ -319,7 +319,9 @@ std::size_t compare_ahead(const std::vector<std::vector<std::byte>>& frames,
             REQUIRE(one.error() == two.error());
         } else {
             REQUIRE(same_frame(*one, *two));
-            compared += one->has_value() ? 1 : 0;
+            if (one->has_value()) {
+                ++compared;
+            }
         }
         REQUIRE(signature(alone) == signature(told));
     }
