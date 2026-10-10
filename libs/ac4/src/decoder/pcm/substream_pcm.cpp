@@ -1,5 +1,7 @@
 #include "decoder/pcm/substream_pcm.hpp"
 
+#include "iclforge/base/detail/profiling.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -12,6 +14,7 @@
 #include "decoder/pcm/asf_reconstruct.hpp"
 #include "decoder/pcm/companding.hpp"
 #include "decoder/pcm/immersive.hpp"
+#include "decoder/pcm/lanes.hpp"
 #include "decoder/pcm/multichannel.hpp"
 #include "decoder/pcm/snf_random.hpp"
 #include "decoder/pcm/stereo.hpp"
@@ -483,20 +486,25 @@ void SubstreamPcm::materialize_out() {
     if (!out_in_ext_) {
         return;
     }
-    for (Channel& channel : channels_) {
+    ICLFORGE_ZONE_SCOPED_N("ac4_materialise");
+    // A copy of 16 KB a channel at 2048 samples, each channel's its own: on the second lane too.
+    run_lanes(executor_, channels_.size(), [this](std::size_t c, std::size_t) {
+        Channel& channel = channels_[c];
         const auto first =
             channel.ext.begin() + static_cast<std::ptrdiff_t>(at(aspx::kTsOffsetHfadj) * kSubbands);
         std::copy(first, first + static_cast<std::ptrdiff_t>(at(slots_) * kSubbands), channel.out().begin());
-    }
+    });
     out_in_ext_ = false;
 }
 
 void SubstreamPcm::shift_history() {
+    ICLFORGE_ZONE_SCOPED_N("ac4_history");
     const std::size_t history = at(aspx::kTsOffsetHfadj + hfgen_) * kSubbands;
-    for (Channel& channel : channels_) {
+    run_lanes(executor_, channels_.size(), [this, history](std::size_t c, std::size_t) {
+        Channel& channel = channels_[c];
         std::copy(channel.ext.end() - static_cast<std::ptrdiff_t>(history), channel.ext.end(),
                   channel.ext.begin());
-    }
+    });
 }
 
 SubstreamPcm::UnitIo SubstreamPcm::unit_io(const AspxUnit& unit, const Control& control, bool master_reset) {
@@ -581,17 +589,21 @@ void SubstreamPcm::apply(const Control& control) {
     std::array<UnitIo, kMaxUnits> units{};
     std::array<aspx::SubbandGroups, kMaxUnits> groups{};
     std::array<aspx::PatchTables, kMaxUnits> patches{};
-    for (std::size_t u = 0; u < units_.size(); ++u) {
-        units[u] = unit_io(units_[u], control, master_reset);
-        if (!aspx_tables(units[u].frame, groups[u], patches[u])) {
-            pass_through();  // check_control() refused this a frame ago
-            return;
+    {
+        ICLFORGE_ZONE_SCOPED_N("ac4_aspx_tables");
+        for (std::size_t u = 0; u < units_.size(); ++u) {
+            units[u] = unit_io(units_[u], control, master_reset);
+            if (!aspx_tables(units[u].frame, groups[u], patches[u])) {
+                pass_through();  // check_control() refused this a frame ago
+                return;
+            }
         }
     }
 
     // Companding first (Figure 6), over each channel's own crossover and
     // interval, in companding_control()'s order (Table 212).
     if (control.companding && !companded_.empty()) {
+        ICLFORGE_ZONE_SCOPED_N("ac4_companding");
         std::array<CompandingChannel, 5> companded{};
         for (std::size_t k = 0; k < companded_.size(); ++k) {
             for (std::size_t u = 0; u < units_.size(); ++u) {
@@ -621,13 +633,26 @@ void SubstreamPcm::apply(const Control& control) {
     // LFE, and the immersive element's residuals in ASPX_ACPL_1) passes
     // through.
     std::array<bool, kMaxChannels> carried{};
-    for (std::size_t u = 0; u < units_.size(); ++u) {
-        UnitIo& unit = units[u];
-        if (!aspx_scratch_) {
-            aspx_scratch_ = std::make_unique<AspxScratch>();
+    if (!aspx_scratch_) {
+        aspx_scratch_ = std::make_unique<AspxScratch>();
+    }
+    // The units are the aspx_data elements, each of one or two channels of its own (a ghost's
+    // included) and none shared: with an executor that has a second lane they run on both, a
+    // lane after the first in a scratch of its own.
+    const std::size_t aspx_lanes = executor_ != nullptr && units_.size() > 1
+                                       ? std::max<std::size_t>(executor_->lanes(), 1)
+                                       : 1;
+    prepare_lanes(aspx_lanes, at(full_length_));
+    for (std::size_t lane = 1; lane < aspx_lanes; ++lane) {
+        if (!lanes_[lane - 1].aspx) {
+            lanes_[lane - 1].aspx = std::make_unique<AspxScratch>();
         }
-        const bool decoded = static_cast<bool>(decode_aspx(
-            unit.frame, std::span<AspxChannelIo>(unit.io).first(unit.count), *aspx_scratch_));
+    }
+    run_lanes(executor_, units_.size(), [&](std::size_t u, std::size_t lane) {
+        UnitIo& unit = units[u];
+        AspxScratch& scratch = lane == 0 ? *aspx_scratch_ : *lanes_[lane - 1].aspx;
+        const bool decoded = static_cast<bool>(
+            decode_aspx(unit.frame, std::span<AspxChannelIo>(unit.io).first(unit.count), scratch));
         for (std::size_t c = 0; c < unit.count; ++c) {
             if (unit.channels[c] < 0) {
                 continue;  // a ghost
@@ -637,12 +662,13 @@ void SubstreamPcm::apply(const Control& control) {
                 pass_through(channels_[at(unit.channels[c])]);
             }
         }
-    }
-    for (std::size_t c = 0; c < channels_.size(); ++c) {
+    });
+    // What no aspx_data element carries is a copy of 16 KB a channel, each its own.
+    run_lanes(executor_, channels_.size(), [&](std::size_t c, std::size_t) {
         if (!carried[c]) {
             pass_through(channels_[c]);
         }
-    }
+    });
     if (control.kind == ElementKind::kImmersive) {
         apply_immersive_gains(control, std::span<const UnitIo>(units).first(units_.size()),
                               std::span<const aspx::SubbandGroups>(groups).first(units_.size()));
@@ -660,6 +686,7 @@ void SubstreamPcm::apply(const Control& control) {
         } else if (applied_mode_ != control.codec_mode) {
             acpl_->reset();
         }
+        acpl_->set_executor(executor_);
         matrices_.clear();
         for (Channel& channel : channels_) {
             matrices_.push_back(channel.out());
@@ -1142,6 +1169,7 @@ ParseResult SubstreamPcm::decode(const SubstreamContext& ctx, const AudioSubstre
     scaled_.resize(element.tracks.size());
     scaled_exponents_.assign(element.tracks.size(), 0);
     for (std::size_t t = 0; t < element.tracks.size(); ++t) {
+        ICLFORGE_ZONE_SCOPED_N("ac4_dequantise");
         const Track& track = element.tracks[t];
         const SfInfo& info = element.infos[static_cast<std::size_t>(track.info)];
         if (info.spec_frontend != 0) {
@@ -1157,7 +1185,12 @@ ParseResult SubstreamPcm::decode(const SubstreamContext& ctx, const AudioSubstre
             (*frame_inputs.release_tracks)[t].ssf.lines = {};
         }
     }
-    if (auto ok = matrix(pcm_ctx, element); !ok) {
+    if (auto ok =
+            [&] {
+                ICLFORGE_ZONE_SCOPED_N("ac4_matrix");
+                return matrix(pcm_ctx, element);
+            }();
+        !ok) {
         return ok;
     }
     // Nothing below reads the tracks: the spectra are spectra_ now, and the control data the
@@ -1258,15 +1291,36 @@ ParseResult SubstreamPcm::conceal(ConcealmentPolicy policy, const FrameInputs& f
     return render(frame_inputs, channels, speakers);
 }
 
-void SubstreamPcm::transform_channel(std::size_t c, std::span<Real> samples) {
+void SubstreamPcm::transform_channel(std::size_t c, std::span<Real> samples,
+                                     dsp::tiered::TransformScratch<Real>* scratch) {
     std::size_t offset = 0;
     for (const int length : lengths_[c]) {
         const auto n = static_cast<std::size_t>(length);
         // window_lengths() allows only lengths the transform set has.
-        (void)channels_[c].synthesis.block(*transforms_,
-                                           std::span<const Real>(spectra_[c]).subspan(offset, n),
-                                           spectra_exponents_[c], samples.subspan(offset, n));
+        const std::span<const Real> lines = std::span<const Real>(spectra_[c]).subspan(offset, n);
+        if (scratch != nullptr) {
+            (void)channels_[c].synthesis.block(*transforms_, lines, spectra_exponents_[c],
+                                               samples.subspan(offset, n), *scratch);
+        } else {
+            (void)channels_[c].synthesis.block(*transforms_, lines, spectra_exponents_[c],
+                                               samples.subspan(offset, n));
+        }
         offset += n;
+    }
+}
+
+void SubstreamPcm::prepare_lanes(std::size_t lane_count, std::size_t frame) {
+    if (lane_count < 2) {
+        return;
+    }
+    lanes_.resize(lane_count - 1);
+    for (Lane& lane : lanes_) {
+        lane.time.resize(frame);
+        lane.aligned.resize(frame);
+        lane.pcm.resize(frame);
+        if (lane.transform.block.size() != 2 * static_cast<std::size_t>(full_length_)) {
+            lane.transform.reserve_for(full_length_);
+        }
     }
 }
 
@@ -1303,6 +1357,8 @@ ParseResult SubstreamPcm::render(const FrameInputs& frame_inputs,
     const std::size_t channel_count = channels_.size();
     const auto frame = static_cast<std::size_t>(full_length_);
     const std::size_t history = at(aspx::kTsOffsetHfadj + hfgen_) * kSubbands;
+    // A-CPL's slots and decorrelators, in apply() below, take this lane too.
+    executor_ = frame_inputs.executor;
     // The last frame's last slots become this frame's history. Here and not at the last frame's
     // end: each channel's matrix is the front of its ext (Channel::out()), which the last frame's
     // stages, and the decode of a substream that mixed it in, read to the end of that frame.
@@ -1318,26 +1374,51 @@ ParseResult SubstreamPcm::render(const FrameInputs& frame_inputs,
     for (std::vector<Real>& samples : time_) {
         samples.resize(frame);
     }
-    const auto transform = [&](std::size_t c, std::vector<Real>& samples) {
-        transform_channel(c, samples);
+    // The stages below are per channel and read nothing of another's: with an executor that has
+    // a second lane they run on both, each task in the space of the lane it lands on.
+    Executor* const executor = frame_inputs.executor;
+    const std::size_t lane_count =
+        executor != nullptr && channel_count > 1 ? std::max<std::size_t>(executor->lanes(), 1) : 1;
+    prepare_lanes(lane_count, frame);
+    const auto lane_time = [&](std::size_t c, std::size_t lane) -> std::vector<Real>& {
+        if (across_channels) {
+            return time_[c];
+        }
+        return lane == 0 ? time_[0] : lanes_[lane - 1].time;
+    };
+    const auto lane_aligned = [&](std::size_t lane) -> std::vector<Real>& {
+        return lane == 0 ? aligned_ : lanes_[lane - 1].aligned;
+    };
+    const auto lane_qmf = [&](std::size_t lane) -> dsp::tiered::QmfScratch<Real>& {
+        return lane == 0 ? qmf_scratch_ : lanes_[lane - 1].qmf;
+    };
+    const auto lane_transform = [&](std::size_t lane) -> dsp::tiered::TransformScratch<Real>* {
+        return lane == 0 ? nullptr : &lanes_[lane - 1].transform;
     };
     if (across_channels) {
-        for (std::size_t c = 0; c < channel_count; ++c) {
-            transform(c, time_[c]);
-        }
+        run_lanes(executor, channel_count, [&](std::size_t c, std::size_t lane) {
+            transform_channel(c, time_[c], lane_transform(lane));
+        });
         // S-CPL on the inverse transform's output, the frame's own, before the frame alignment
         // and the analysis.
         apply_scpl(*scpl_mode_, decoding_, has_fronts(ch_mode_), speakers_, time_);
-    }
-    for (std::size_t c = 0; c < channel_count; ++c) {
-        if (!across_channels) {
-            transform(c, time_[0]);
-        }
-        const std::vector<Real>& samples = time_[across_channels ? c : 0];
-        align_channel(c, samples, aligned_);
-        // Clause 5.7.3: this frame's slots after the history.
-        channels_[c].analysis.process(
-            aligned_, std::span<QmfValue>(channels_[c].ext).subspan(history), qmf_scratch_);
+        run_lanes(executor, channel_count, [&](std::size_t c, std::size_t lane) {
+            std::vector<Real>& aligned = lane_aligned(lane);
+            align_channel(c, time_[c], aligned);
+            // Clause 5.7.3: this frame's slots after the history.
+            channels_[c].analysis.process(
+                aligned, std::span<QmfValue>(channels_[c].ext).subspan(history), lane_qmf(lane));
+        });
+    } else {
+        run_lanes(executor, channel_count, [&](std::size_t c, std::size_t lane) {
+            ICLFORGE_ZONE_SCOPED_N("ac4_channel");
+            std::vector<Real>& samples = lane_time(c, lane);
+            transform_channel(c, samples, lane_transform(lane));
+            std::vector<Real>& aligned = lane_aligned(lane);
+            align_channel(c, samples, aligned);
+            channels_[c].analysis.process(
+                aligned, std::span<QmfValue>(channels_[c].ext).subspan(history), lane_qmf(lane));
+        });
     }
 
     // Clause 5.7.2: this frame's control data waits d_ctrl frames; the
@@ -1354,6 +1435,7 @@ ParseResult SubstreamPcm::render(const FrameInputs& frame_inputs,
     de_core_mode_ = false;
     de_core_pending_ = false;
     if (held_.size() > static_cast<std::size_t>(control_delay_)) {
+        ICLFORGE_ZONE_SCOPED_N("ac4_apply");
         apply(held_.front());
         drc = held_.front().drc;
         de = held_.front().de;
@@ -1443,12 +1525,16 @@ ParseResult SubstreamPcm::render(const FrameInputs& frame_inputs,
     if (mixing) {
         mix_.mix(mix, speakers_, matrices_, side, side_kept_, frame_inputs.sources);
     }
-    drc_.process(frame_inputs.output, drc, matrices_, side);
+    {
+        ICLFORGE_ZONE_SCOPED_N("ac4_drc");
+        drc_.process(frame_inputs.output, drc, matrices_, side);
+    }
 
     // Clause 6.2.17: the downmix, and the channels that come out of it.
     std::span<const QmfMatrix> rendered = matrices_;
     if (!downmix_.passes_through()) {
-        downmix_.process(downmix, matrices_, mixed_);
+        ICLFORGE_ZONE_SCOPED_N("ac4_downmix");
+        downmix_.process(downmix, matrices_, mixed_, executor_);
         mixed_matrices_.clear();
         for (std::vector<QmfValue>& mixed : mixed_) {
             mixed_matrices_.push_back(mixed);
@@ -1463,29 +1549,36 @@ ParseResult SubstreamPcm::render(const FrameInputs& frame_inputs,
     const auto grid = static_cast<std::int64_t>(converter_phase) * full_length_;
     const bool jumped = converter_phase_ && converter_phase != (*converter_phase_ + 1) % 5;
     const std::size_t window = at(aspx::kTsOffsetHfadj) * kSubbands;
-    for (std::size_t o = 0; o < outputs_.size(); ++o) {
+    prepare_lanes(executor != nullptr && outputs_.size() > 1
+                      ? std::max<std::size_t>(executor->lanes(), 1)
+                      : 1,
+                  frame);
+    run_lanes(executor, outputs_.size(), [&](std::size_t o, std::size_t lane) {
+        ICLFORGE_ZONE_SCOPED_N("ac4_output");
         Output& output = outputs_[o];
+        std::vector<Real>& pcm = lane == 0 ? pcm_ : lanes_[lane - 1].pcm;
+        std::vector<Real>& converted = lane == 0 ? converted_ : lanes_[lane - 1].converted;
         output.synthesis.process(read_in_place ? std::span<const QmfValue>(channels_[o].ext)
                                                      .subspan(window, at(slots_) * kSubbands)
                                                : std::span<const QmfValue>(rendered[o]),
-                                 pcm_, qmf_scratch_);
-        std::span<const Real> produced = pcm_;
+                                 pcm, lane_qmf(lane));
+        std::span<const Real> produced = pcm;
         if (output.converter) {
             if (!converter_phase_) {
                 output.converter->reset(grid);
             } else if (jumped) {
                 output.converter->rephase(grid);
             }
-            converted_.clear();
-            output.converter->process(pcm_, converted_);
-            produced = converted_;
+            converted.clear();
+            output.converter->process(pcm, converted);
+            produced = converted;
         }
         std::vector<float>& out = channels[o];
         out.resize(produced.size());
         for (std::size_t n = 0; n < produced.size(); ++n) {
             out[n] = output_sample(produced[n]);
         }
-    }
+    });
     converter_phase_ = converter_phase;
     const std::span<const Speaker> out_speakers = downmix_.speakers();
     speakers.assign(out_speakers.begin(), out_speakers.end());

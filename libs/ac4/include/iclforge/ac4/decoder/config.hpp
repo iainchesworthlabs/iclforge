@@ -8,6 +8,7 @@
 
 #include "iclforge/ac4/core/syntax.hpp"
 #include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/decoder/executor.hpp"
 #include "iclforge/ac4/export.hpp"
 
 // What an AC-4 Decoder (iclforge/ac4/decoder/decoder.hpp) is configured by: the output
@@ -243,6 +244,10 @@ struct DecoderConfig {
     // Full or core decoding (Part 2 clause 4.7), after the fields the
     // decoder's API had without it.
     DecodingMode decoding = DecodingMode::kFull;
+    // Where the decoder may run a frame's independent per-channel work on another thread
+    // (iclforge/ac4/decoder/executor.hpp); null, the default, runs it all on the calling thread.
+    // Not owned: it must outlive the decoder. The PCM is the same either way.
+    Executor* executor = nullptr;
 };
 
 }  // namespace iclforge::ac4

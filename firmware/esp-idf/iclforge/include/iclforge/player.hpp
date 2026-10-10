@@ -199,6 +199,11 @@ struct PlayerConfig {
         // image, this is for one play, so that a board's timers can compare
         // limits without an image for each.
         int internal_below = -1;
+        // Spread each frame's per-channel stages (the inverse transform and QMF analysis of a
+        // channel, the synthesis and converter of an output) over this core and the other, on a
+        // part that has two and where the decode task is pinned to one
+        // (CONFIG_ICLFORGE_EXAMPLE_AC4_PARALLEL; the PCM is the same bit for bit).
+        bool parallel = false;
     };
     Ac4Options ac4;
 #endif

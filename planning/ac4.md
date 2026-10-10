@@ -90,6 +90,7 @@ checked. The table is of `main` at `5ef9eeafc`.
 | D14c | AC-4 on the ESP32-S3, its state in PSRAM | open, 2026-10-03; board phase run 2026-10-10 | exit met: the six fixtures' PCM equal to the pins under QEMU in CI, and on a board with Wi-Fi up all twenty of the P4's plays give the P4's hashes; real time at 2.0 in SIMPLE mode only (0.87), A-SPX at 2.0 1.03 to 1.09, 5.1 at 2.1 to 3.2, 5.1.4 at 4.4 to 5.6; the decode stack moved to PSRAM (no internal block over 31,744 bytes with Wi-Fi up, a 5.1 A-CPL play uses 32,560); the 512-byte limit kept |
 | D14d | the C6, fixed point | open, 2026-10-02; board run 2026-10-10 | exit met: the fixed decode within 105.7 to 132.1 dB of `double` below A-SPX's crossover and 34.2 to 97.2 above, the probe's hashes equal on x86-64, the Cortex-M3 and RV32IMC, `double` and `float` unchanged; on the board no stream fits beside the Hearth sink (117 KB of heap against a floor of 286,365 bytes) and a play is refused, not aborted; the C6 takes AC-4 as PCM from Hearth |
 | D14f | the decoder's memory | open, 2026-10-03 | measured: 2.0 peaks at 286,365 bytes on a 32-bit core from 429,667 (fixed) and 413,611 (`float`), 5.1 at 704,311, 5.1.4 at 1,502,903; every PCM pin unmoved and `double` byte-identical to `main` |
+| D14g | AC-4 playback speed on the S3 and the P4 | open, 2026-10-11 | measured: the P4 keeps up at 5.1 in all four codec modes (A-CPL mode 3 at 0.73, from 1.16) and takes 5.1.4 at 1.01 to 1.21, from 1.59 to 1.92; the S3, with QIO flash, 64-byte lines, the code in PSRAM, a 64 KB data cache and the second core, keeps up at 2.0 (0.40 and 0.50), through the converter at every rate and at E-AC-3 7.1.4, and takes 5.1 SIMPLE at 0.99; every PCM hash unmoved on 160 S3 plays and 40 P4 plays |
 | E1 | the encoder library, the frame writer, SIMPLE mono and stereo | #1011, 2026-09-25 | merged; exit met |
 | E2 | A-SPX and companding | #1013, 2026-09-25 | merged; exit met |
 | E3 | the 5.X element | #1025, 2026-09-25 | merged; exit met |
@@ -1113,8 +1114,8 @@ board phase, and D14d is built short of its board run.
 
 | Part | Arithmetic | AC-3 and E-AC-3 on the board, per 32 ms frame | AC-4's aim | Measured |
 |---|---|---|---|---|
-| **P4**: 2 × RV32 at 360 MHz on this board's v1.3 silicon, single-precision FPU, 768 KB SRAM, 32 MB PSRAM | `float` | every fixture in real time: E-AC-3 5.1 at 0.18 of real time, 7.1.4 at 0.43 | 2.0, 5.1 and 5.1.4 in full decoding in real time, first | D14b: 2.0 in real time (SIMPLE at 0.53 of a frame, A-SPX at 0.74); 5.1 at 1.4 to 4.1 and 5.1.4 in full decoding at 2.8 to 3.7 |
-| **S3**: 2 × LX7 at 240 MHz, single-precision FPU, 512 KB SRAM, 8 MB PSRAM | `float` | every fixture in real time: E-AC-3 5.1 at 0.34, 7.1.4 at 0.90 | 2.0 and 5.1; 5.1.4 measured, heard through core decoding or folded to 2.0 | D14c on a board with Wi-Fi up: every PCM hash the P4's; 2.0 SIMPLE at 0.87 of real time, A-SPX 1.09, 5.1 at 2.1 to 3.2, 5.1.4 at 4.4 to 5.6; the stack and state in PSRAM |
+| **P4**: 2 × RV32 at 360 MHz on this board's v1.3 silicon, single-precision FPU, 768 KB SRAM, 32 MB PSRAM | `float` | every fixture in real time: E-AC-3 5.1 at 0.18 of real time, 7.1.4 at 0.43 | 2.0, 5.1 and 5.1.4 in full decoding in real time, first | D14b: 2.0 in real time (SIMPLE at 0.53 of a frame, A-SPX at 0.74); 5.1 at 1.4 to 4.1 and 5.1.4 in full decoding at 2.8 to 3.7; D14e and D14g: 5.1 in real time in all four codec modes (0.42 to 0.73), 5.1.4 at 1.01 to 1.21, 2.0 and the converter at 0.15 to 0.38 |
+| **S3**: 2 × LX7 at 240 MHz, single-precision FPU, 512 KB SRAM, 8 MB PSRAM | `float` | every fixture in real time: E-AC-3 5.1 at 0.34, 7.1.4 at 0.90 | 2.0 and 5.1; 5.1.4 measured, heard through core decoding or folded to 2.0 | D14c on a board with Wi-Fi up: every PCM hash the P4's; 2.0 SIMPLE at 0.87 of real time, A-SPX 1.09, 5.1 at 2.1 to 3.2, 5.1.4 at 4.4 to 5.6; the stack and state in PSRAM; D14g, with the second core and `sdkconfig.s3-fast` and `s3-dcache`: 2.0 SIMPLE 0.40, A-SPX 0.50, the converter 0.67 to 0.87, E-AC-3 7.1.4 0.75, 5.1 SIMPLE 0.99, A-CPL mode 3 1.57, 5.1.4 2.28 to 2.73 |
 | **C6**: 1 × RV32 at 160 MHz, no FPU, 512 KB SRAM shared with WiFi, no PSRAM | fixed point | 5.1 with WiFi at 0.82 (AC-3) and 0.96 (E-AC-3); 7.1.4 misses, at 1.88 | 2.0 in core decoding if it keeps up with WiFi; otherwise Hearth sends it PCM | D14d and D14f: the decoder peaks at 286,365 bytes at 2.0 on a 32-bit core (429,667 at D14d), level with the about 285,000 free beside WiFi with WiFi's code in flash and below the 383,416 free with no network; on the board the Hearth sink leaves 117 KB, so the play is refused and Hearth sends PCM |
 
 - **The P4 here** is pre-production silicon: 400 MHz takes its CPLL down, and its I2S has no PLL
@@ -1334,7 +1335,7 @@ and, in the last column, where it stands; [State on 2026-09-30](#state-on-2026-0
 | 21 | [I5](#i5-immersive-and-object-content-in-the-applications) | immersive and object content in the applications | D10, E9 | merged, #1100 |
 | | [I4b](#i4b-the-object-encoder-in-the-c-api-python-rust-and-webassembly) | the object encoder in the bindings, and I4's leftovers | I4, E9 | merged, #1119 |
 | 21b | [I5b](#i5b-the-encoder-pages-ac-4-objects) | the encoder page's AC-4 objects | I3, I5 | merged, #1117 |
-| 22 | [D14](#d14-ac-4-on-the-esp32s) | AC-4 on the ESP32s: the P4 first, then the S3 and the C6 | D10 | D14a and D14b merged (#1096, #1102, #1123, #1118); D14c's board phase run 2026-10-10; D14d's board run made 2026-10-10 (refused for memory); D14f open |
+| 22 | [D14](#d14-ac-4-on-the-esp32s) | AC-4 on the ESP32s: the P4 first, then the S3 and the C6 | D10 | D14a and D14b merged (#1096, #1102, #1123, #1118); D14c's board phase run 2026-10-10; D14d's board run made 2026-10-10 (refused for memory); D14f open; D14g measured 2026-10-11 |
 | | [D14a4](#d14a4-libm-parity-and-the-converter-at-float) | libm parity and the frame-rate converter at `float`: what D14b's board work left in D14a's build | D14a, D14b | open |
 | 23 | [I6](#i6-the-esp32-sinks) | the ESP32 sinks | each part's D14 figures | not built |
 | 24 | [N1](#n1-the-names) | the names | I5 | built in the repository, 2026-09-30 and 2026-10-01 (#1160 to #1164, S5 and S6); the owner's renames are left |
@@ -2660,6 +2661,68 @@ in flash (the probe's network image) and below the 383,416 it had with no networ
 fixed every AC-4 test passes and only `main`'s AC-3 and E-AC-3 failures remain); at the end the Cortex-M3 legs (`--ac4`,
 `--ac4 --icount`, `--ac4 --scalar=fixed --icount`) against the new ceilings, RV32IMC, GCC 14 `-Werror` with the wheel's
 settings, and the packer's `--verify` for `esp32c6`.
+
+#### D14g: AC-4 playback speed on the ESP32-S3 and the ESP32-P4
+
+After D14c, D14e and D14f. The user asked for it on 2026-10-10: validate the boards' real-time figures after the FFT, the QMF banks
+and the other kernels were made the family's one (C5, M2, M3), and then improve the classes that were not in real time, the S3's
+everything past 2.0 SIMPLE and the P4's 5.1 A-CPL mode 3 and 5.1.4. The C6, whose limit is memory, and what a sink says it decodes
+(I6) were not part of it. Every change below leaves the PCM as it was, which the boards' hashes of the twenty plays, with and
+without the second core, in each memory configuration, and the host's tests hold it to.
+
+- **Validated.** `main` at `5a9a3ec74`, on the boards, with the harness of D14b and D14e: the P4's figures within 4% of D14e's
+  (the 5.1 A-CPL mode 3 stream 1.16 against 1.14, the 5.1.4 streams 1.59 to 1.92 against 1.57 to 1.90), the S3's exactly D14c's,
+  and every PCM hash the one 2026-10-02 gave. The consolidation moved neither the bits nor the time.
+- **Where the time was**, from the P4's program-counter sampler (a scratch component of the board images, not in the repository) and the stage timers:
+  - the S3's flash was read in DIO mode, and its inverse transform read 56 KB of tables a block through a 32 KB data cache: 5.7 times
+    the P4's time on a clock 1.5 times as fast;
+  - A-CPL mode 3's seventeen interpolations are double operations, 46,000 a frame, which at `float` are calls into software
+    floating point on the P4;
+  - a 5.1.4 frame spent 15 to 20% of its time moving and zeroing memory (a vector of 15 KB `Track`s grown one doubling at a time
+    and moved, a QMF matrix of 16 KB copied for each channel, the tracks zeroed);
+  - the frame-rate converter was 44 to 46% of its streams' time, 188 KB of table read a row at a time, 41 rows apart.
+- **Built** (all bit-exact):
+  - `iclforge::ac4::Executor` and `DecoderConfig::executor` (`libs/ac4/include/iclforge/ac4/decoder/executor.hpp`), and the stages
+    that use it (`libs/ac4/src/decoder/pcm/lanes.hpp`, `substream_pcm.cpp`, `acpl.cpp`, `downmix.cpp`): per-channel inverse transform
+    and QMF analysis in the lane's own scratch (`dsp::tiered::TransformScratch`, `ChannelSynthesis::block()`'s overload), A-SPX's
+    elements, A-CPL's slots and decorrelators, the history's shift, the matrices' copies, the downmix's outputs and each output's
+    synthesis and converter. A decoder without one runs the same calls in order.
+  - The player's executor, `ac4bridge::TaskExecutor`, a worker pinned to the core the decode task is not on, with `?parallel=on|off`
+    for a play and `CONFIG_ICLFORGE_EXAMPLE_AC4_PARALLEL` for an image (on in `sdkconfig.ac4`); the stage timers keep one task's table
+    (`iclforge_probe::thread_token()`).
+  - The converter makes a call's outputs in the order of the table's rows (`Resampler::process()`, tables over 16 KB), the immersive
+    element reserves its tracks, A-CPL's input copy is a resize and not an assign and a copy.
+  - `sdkconfig.p4`: `CONFIG_SPIRAM_XIP_FROM_PSRAM`. New, for the S3: `sdkconfig.s3-fast` (QIO flash, 64-byte data-cache lines, the code and
+    constants in PSRAM) and `sdkconfig.s3-dcache` (a 64 KB data cache, 32 KB of the heap). Since 2026-10-11 (decision 43) the S3 board's release image,
+    which has no AC-4 decoder, is built with the first, and the images that carry the decoder with both.
+  - Zones for the sub-steps of a frame's reconstruction in the stage timers (`ac4_dequantise`, `ac4_matrix`, `ac4_history`,
+    `ac4_channel`, `ac4_apply`, `ac4_materialise`, `ac4_downmix`, `ac4_output`, `ac4_aspx_tables`, `ac4_companding`).
+- **Exit, as measured** (the decoder's time over the frame's duration, Wi-Fi up, a null sink, the P4 at 360 MHz): the tables of
+  [the P4 page](../docs/platforms/bare-metal/esp32-p4.md#the-firmware-in-psram-and-the-second-core) and
+  [the S3 page](../docs/platforms/bare-metal/esp32-s3.md#playback-speed). The P4 keeps up at 2.0 and at 5.1 in all four codec modes
+  (A-CPL mode 3 at 0.73, from 1.16) and in every converter rate (0.31 to 0.38, from 0.53 to 0.72), and takes 5.1.4 at 1.01 to 1.21,
+  from 1.59 to 1.92. The S3 in its default image takes 2.0 in SIMPLE at 0.80 and A-SPX at 0.99; with the free changes (QIO and
+  64-byte lines) the converter at 24 and 25 fps too; with `sdkconfig.s3-fast` those at 0.47 and 0.61 and 0.78; and with
+  `sdkconfig.s3-dcache` after it, 2.0 at 0.40 and 0.50, the converter at all four rates (0.67 to 0.87, from 1.32 to 1.86), 5.1
+  SIMPLE (0.99, from 2.13) and E-AC-3 7.1.4 (0.75, from 0.99); the rest of 5.1 (1.25 to 1.57) and 5.1.4 (2.28 to 2.73) stay over.
+  Checked also: the executor test (`libs/ac4/tests/decoder/test_executor.cpp`) decodes every committed stream with and
+  without a second thread and compares the bits, clean under ThreadSanitizer; MSVC, GCC 16 and Clang 22 build with no warning and
+  pass the AC-4, DSP and AC-3 tests at `double` and `float`; the C6's image (fixed point, one core) builds; twelve plays started and
+  stopped at once on each board, and an update over the network under the new memory configurations, were as before.
+- **Not done, and why.** (a) The syntax's parse (4.6 to 9.4 ms a frame) and the dequantisation are one thread's: the next frame's
+  parse alongside this frame's reconstruction would take the P4's 5.1.4 frame to about 1.0 and the S3's 5.1 SIMPLE to 0.8, but what
+  `Decoder::metadata()` and `presentations()` report is the frame just decoded, and a parse ahead moves it; it needs an API of
+  its own. (b) A-CPL's interpolation at `float` would save about 7 ms of the P4's A-CPL mode 3 frame and 3 of its 5.1.4 one, and moves
+  the `float` pins that have A-CPL in them. (c) The downmix and the copy before it are a permutation in the 5.1.4 streams the
+  harness plays (11 ms and 6 ms of an S3 frame at 5.1.4). (d) The S3 has no sampler: the one ported to Xtensa stopped the board.
+  (e) The Huffman decoder's second step takes about a tenth of the codewords and under 0.5 ms a frame on the P4.
+- **Decisions** (the user, 2026-10-11): `sdkconfig.s3-fast` and `sdkconfig.s3-dcache` are in the S3 images, the second
+  taking 32 KB of the heap (an AC-4 play's least internal RAM free is 31 to 49 KB where it was 64 to 81) and the first needing one
+  USB flash with the bootloader a board. Measured on the release shape before it went in: the cache is for the images that carry
+  the AC-4 decoder only (without it 1,479 bytes of internal RAM were free at the least in an E-AC-3 7.1.4 play, and AC-3 and
+  E-AC-3 gain nothing from it), so the release image, which has no AC-4, takes `sdkconfig.s3-fast` alone; A-CPL's interpolation goes to `float` (D14h) and the next frame's parse is made ahead of
+  this frame's reconstruction (D14i). Those two are separate changes from this one: the first moves `float` pins and the second
+  adds to `Decoder`'s API, which this phase's output, bit for bit as it was, does not.
 
 ### Encoder phases
 
@@ -4398,9 +4461,24 @@ were in ([the S3 page](../docs/platforms/bare-metal/esp32-s3.md#on-the-board),
     what it decodes ([decision 39](#decisions-of-2026-09-30)); this decision is that no work on the
     S3's decoder or the C6's heap is planned to move these limits.
 
+43. **Playback speed on the S3 and the P4.**
+    - (a) **Improve it where it costs nothing the owner has not approved** (the executor, the converter's row order, the track
+      reserve and the memory fragments), and measure each on the boards.
+    - (b) Leave decision 42's limits as measured.
+
+    **Taken: (a), on the user's instruction of 2026-10-10** (validate the boards' figures after the consolidation and improve the
+    classes that were not in real time, the C6 parked). It does not undo decision 42's reading of the S3: what the S3 cannot
+    decode in real time still reaches it as PCM from Hearth, and I6 still settles how a sink says what it decodes. What it moves is
+    the line: [D14g](#d14g-ac-4-playback-speed-on-the-esp32-s3-and-the-esp32-p4). **Also taken, on the user's yes of
+    2026-10-11:** `sdkconfig.s3-fast` and `sdkconfig.s3-dcache` are in the S3 images, the second only where the AC-4 decoder is
+    (the 32 KB of heap is spent: an AC-4 play's least internal RAM free is 31 to 49 KB; the release image has no AC-4 and takes
+    `sdkconfig.s3-fast` alone), and A-CPL's interpolation at `float` and a parse ahead of the reconstruction are
+    built, as D14h and D14i.
+
 | # | Question | **Taken** |
 |---|---|---|
 | 42 | What the S3 and the C6 decode of AC-4 | **(a), accepted: the S3 at 2.0 in SIMPLE mode and the C6 none, the rest as PCM from Hearth** |
+| 43 | Playback speed on the S3 and the P4 | **(a), improved: D14g; `s3-fast` in the S3 release image and both files in the AC-4 images; A-CPL at `float` (D14h) and the parse ahead (D14i) to follow** |
 
 ## What cannot be verified, and why
 

@@ -168,3 +168,15 @@ CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y
 CONFIG_ICLFORGE_EXAMPLE_I2S_BCLK_GPIO=20
 CONFIG_ICLFORGE_EXAMPLE_I2S_WS_GPIO=21
 CONFIG_ICLFORGE_EXAMPLE_I2S_DOUT_GPIO=22
+
+# The firmware's code and constants in PSRAM (planning/ac4.md, D14g). The decoder's code and
+# the tables it reads (0.8 MB of .flash.rodata, among them the Huffman and QMF tables) are
+# larger than the caches, and a cache line comes from the flash at 4 bits a clock where the
+# PSRAM's hex bus takes it at 200 MHz. With the firmware copied into PSRAM at start-up and
+# executed from there, the same decoder took 14 to 36% less time a frame to the same PCM:
+# 5.1 A-CPL mode 3 1.00 from 1.16, 5.1.4 S-CPL 1.34 from 1.59, the converter's
+# streams 0.58 from 0.72 at 29.97 fps, E-AC-3 5.1 and 7.1.4 4 to 8%. It costs 14 KB of
+# image and none of the heap that matters (the firmware lands in the PSRAM's 32 MB), the
+# bootloader is the size it was, an update over the network works as before, and code that
+# must run while the flash is written needs no IRAM for it any more.
+CONFIG_SPIRAM_XIP_FROM_PSRAM=y

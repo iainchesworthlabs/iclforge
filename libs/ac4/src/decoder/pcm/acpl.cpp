@@ -10,6 +10,7 @@
 #include <numbers>
 
 #include "iclforge/base/detail/profiling.hpp"
+#include "decoder/pcm/lanes.hpp"
 #include "decoder/syntax/acpl.hpp"
 #include "decoder/syntax/reset.hpp"
 
@@ -319,7 +320,10 @@ void AcplStage::module(const AcplModuleValues& values, int index, int decorrelat
         columns_[at(run) * 2 + 1] =
             column_of(values.num_bands, values.beta, prev[1], runs.begin(run));
     }
-    for (int ts = 0; ts < num_ts; ++ts) {
+    // Each slot reads its own values of the inputs and the decorrelator's output and writes its
+    // own of z0 and z1: the slots may run on either lane.
+    run_lanes(executor_, at(num_ts), [&](std::size_t slot, std::size_t) {
+        const int ts = static_cast<int>(slot);
         for (int run = 0; run < runs.count; ++run) {
             // alpha and beta are the core's own double-precision interpolation (acpl::Interpolator
             // is not retemplated on Real; see this class's declaration), narrowed once for the run.
@@ -338,7 +342,7 @@ void AcplStage::module(const AcplModuleValues& values, int index, int decorrelat
                 }
             }
         }
-    }
+    });
     acpl::end_frame(values.framing, values.num_bands, values.alpha, prev[0]);
     acpl::end_frame(values.framing, values.num_bands, values.beta, prev[1]);
 }
@@ -441,7 +445,11 @@ void AcplStage::coupling(const AcplCouplingValues& values, std::span<const QmfVa
         }
     }
     coupling_coefficients_.resize(at(num_ts) * at(runs.count));
-    for (int ts = 0; ts < num_ts; ++ts) {
+    // The seventeen interpolations at a slot are double operations, which at float are calls
+    // into software: they take a fifth of a 5.1 A-CPL 3 frame on the ESP32-P4, and each slot's
+    // are independent of the others'.
+    run_lanes(executor_, at(num_ts), [&](std::size_t slot, std::size_t) {
+        const int ts = static_cast<int>(slot);
         for (int run = 0; run < runs.count; ++run) {
             const acpl::Interpolator::Column* columns =
                 &columns_[at(run) * kCouplingInterpolations];
@@ -474,14 +482,15 @@ void AcplStage::coupling(const AcplCouplingValues& values, std::span<const QmfVa
             c.y2_z3 = static_cast<Real>(ip[kIb3] - ip[kIb3a2]);
             c.y2_z4 = static_cast<Real>(ip[kIb3]);
         }
-    }
+    });
 
     // Transform() into the three decorrelators' inputs, then their outputs.
     std::array<std::vector<QmfValue>, 3>& v = transformed_;
     for (auto& matrix : v) {
         matrix.resize(n);
     }
-    for (int ts = 0; ts < num_ts; ++ts) {
+    run_lanes(executor_, at(num_ts), [&](std::size_t slot, std::size_t) {
+        const int ts = static_cast<int>(slot);
         for (int run = 0; run < runs.count; ++run) {
             const CouplingCoefficients& c =
                 coupling_coefficients_[at(ts) * at(runs.count) + at(run)];
@@ -492,17 +501,21 @@ void AcplStage::coupling(const AcplCouplingValues& values, std::span<const QmfVa
                 v[2][i] = x0in[i] * c.ig135 + x1in[i] * c.ig246;
             }
         }
-    }
+    });
     for (int d = 0; d < acpl::kDecorrelators; ++d) {
         decorrelated_[at(d)].resize(n);
-        decorrelate(d, v[at(d)], decorrelated_[at(d)], num_ts);
     }
+    // D0, D1 and D2 each have a history and a ducker of their own and read their own input.
+    run_lanes(executor_, at(acpl::kDecorrelators), [&](std::size_t d, std::size_t) {
+        decorrelate(static_cast<int>(d), v[d], decorrelated_[d], num_ts);
+    });
     const std::vector<QmfValue>& y0 = decorrelated_[0];
     const std::vector<QmfValue>& y1 = decorrelated_[1];
     const std::vector<QmfValue>& y2 = decorrelated_[2];
 
     const auto sqrt2 = static_cast<Real>(kSqrt2);
-    for (int ts = 0; ts < num_ts; ++ts) {
+    run_lanes(executor_, at(num_ts), [&](std::size_t slot, std::size_t) {
+        const int ts = static_cast<int>(slot);
         for (int run = 0; run < runs.count; ++run) {
             const CouplingCoefficients& c =
                 coupling_coefficients_[at(ts) * at(runs.count) + at(run)];
@@ -530,7 +543,7 @@ void AcplStage::coupling(const AcplCouplingValues& values, std::span<const QmfVa
                 z[4][i] = sqrt2 * z4;
             }
         }
-    }
+    });
 
     const std::array<const acpl::ParamSets*, 11> sets = {
         &values.alpha[0], &values.alpha[1], &values.beta[0],  &values.beta[1],  &values.beta3,    &values.gamma[0],
@@ -557,9 +570,13 @@ void AcplStage::apply(int ch_mode, bool add_ch_base, ElementKind kind, int codec
     const auto input = [&](std::size_t slot, Speaker speaker) -> std::span<const QmfValue> {
         const QmfMatrix matrix = matrix_of(speaker);
         std::vector<QmfValue>& copy = in_[slot];
-        copy.assign(n, QmfValue{});
         if (matrix.size() >= n) {
+            // The copy writes every value, so the vector is only made the right size: assign()
+            // of zeros first wrote 16 KB for the copy to write again.
+            copy.resize(n);
             std::copy_n(matrix.begin(), n, copy.begin());
+        } else {
+            copy.assign(n, QmfValue{});
         }
         return copy;
     };

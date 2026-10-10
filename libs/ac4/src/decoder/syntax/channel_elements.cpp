@@ -99,7 +99,14 @@ ParseResult ElementParser::begin(ElementKind kind, int mode, bool needs_aspx,
             out_.tracks.reserve(24);
             break;
         case ElementKind::kImmersive:
+            // 11 tracks, 13 with b_5fronts, and an LFE's mono_data(1) before them (6.2.4.1): at
+            // 5.1.4 the vector grew 1, 2, 4, 8, 16 and moved a 15 KB Track at each step
+            // (std::__relocate_a_1 was 5.7% of a 5.1.4 play's samples on the ESP32-P4).
+            out_.tracks.reserve(out_.b_5fronts ? 14 : 12);
+            break;
         case ElementKind::kVar:
+            out_.tracks.reserve(static_cast<std::size_t>(std::max(out_.var_signals, 0)) +
+                                (out_.var_lfe ? 1U : 0U));
             break;
     }
     const bool needs_config = needs_aspx || acpl_1ch.has_value() || acpl_2ch;

@@ -114,7 +114,14 @@ class AcplStage {
     void apply(int ch_mode, bool add_ch_base, ElementKind kind, int codec_mode, const AcplFrameValues& values,
                int num_ts, const AcplChannels& channels);
 
+    // Where a frame's slots, and the three decorrelators of ASPX_ACPL_3, may run on another thread
+    // (iclforge/ac4/decoder/executor.hpp); null, the default, runs them on the caller's. Each
+    // slot's interpolation and mixing, and each decorrelator, reads and writes what no other does.
+    void set_executor(Executor* executor) noexcept { executor_ = executor; }
+
    private:
+    Executor* executor_ = nullptr;
+
     // One interpolated parameter: its values in this frame and acpl_param_prev.
     struct Param {
         acpl::ParamSets values{};

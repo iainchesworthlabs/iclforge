@@ -1991,6 +1991,24 @@ The sections below contain the complete change list and fixes.
   floating point, so the Cortex-M3 probe's instructions a frame fall to 6.7 M to 43.0 M at fixed and 25.2 M to 161.8 M at `float`; the images grow
   by the tables, to 801,812 and 750,276 bytes. The AC-4 probe names the frame, the stage and the live size classes at each fixture's peak.
   [`planning/ac4.md`, D14f](planning/ac4.md#d14f-the-decoders-memory) has each step's figures.
+- **AC-4 plays faster on the ESP32-S3 and the ESP32-P4, with the PCM unchanged (phase D14g).** A decoder given an executor
+  (`DecoderConfig::executor`, `iclforge::ac4::Executor`) runs each channel's inverse transform and QMF analysis, A-SPX's elements,
+  A-CPL's slots and decorrelators, the downmix's outputs and each output's synthesis and converter on two threads; the ESP32 player's
+  is a task on the core the decode task is not on (`CONFIG_ICLFORGE_EXAMPLE_AC4_PARALLEL`, on in `sdkconfig.ac4`, `?parallel=` for a
+  play). The frame-rate converter reads its table a row at a time, and the immersive element reserves its tracks. The ESP32-P4's
+  firmware runs from PSRAM (`CONFIG_SPIRAM_XIP_FROM_PSRAM`, in `sdkconfig.p4`). A 5.1 frame takes 0.42, 0.53, 0.59 and 0.73 of
+  its duration in SIMPLE mode, A-SPX, A-SPX with A-CPL mode 2 and A-CPL mode 3, from 0.67, 0.83, 0.93 and 1.16; 5.1.4 takes 1.01
+  to 1.21, from 1.59 to 1.92; 2.0 and the converter's four frame rates take 0.15 to 0.38, from 0.29 to 0.72. The ESP32-S3 has
+  two new files, `sdkconfig.s3-fast` (QIO flash, 64-byte data-cache lines, the code and constants in PSRAM; in its release image)
+  and `sdkconfig.s3-dcache` (a 64 KB data cache, 32 KB of the heap; for the images with the AC-4 decoder): with both, and the
+  second core, it takes 2.0 SIMPLE at 0.40 (from
+  0.87) and A-SPX at 0.50 (from 1.09), the converter at every frame rate at 0.67 to 0.87 (from 1.32 to 1.86), E-AC-3 7.1.4 at 0.75
+  (from 0.99) and 5.1 in SIMPLE mode at 0.99 (from 2.13); with the second core and neither file, 2.0 SIMPLE at 0.80 and A-SPX at 0.99. The PCM hash of
+  every play is the one it was (40 plays in the P4's image and in each of four S3 images, with the second core on and off), and the
+  AC-4, DSP and AC-3 tests pass at `double` and `float` on MSVC, GCC 16 and Clang 22, with the executor's test clean under
+  ThreadSanitizer.
+  [ESP32-P4](docs/platforms/bare-metal/esp32-p4.md#the-firmware-in-psram-and-the-second-core) and
+  [ESP32-S3](docs/platforms/bare-metal/esp32-s3.md#playback-speed) have the figures.
 - **The ESP32-S3 decodes AC-4 under QEMU, with the decoder's state in PSRAM (phase D14c).** The S3 probe has an AC-4 shape
   (`sdkconfig.ac4`: the component's AC-4 decoder, the AC-4 probe and the board's octal PSRAM, which the QEMU of ESP-IDF v6.1 emulates), and CI runs it
   as `run_esp32s3_probe.sh --ac4`: the six fixtures' PCM equals the hashes the Cortex-M3 leg and the host are pinned to, and the internal RAM each takes

@@ -582,8 +582,13 @@ QEMU's Ethernet stand-in, and with WiFi up the decoder does not fit beside it.
 B3), on WiFi with the page on port 80:
 
 ```bash
-SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin" idf.py build
+SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast" idf.py build
 ```
+
+`sdkconfig.s3-fast` is the S3's flash and cache setting (QIO flash, 64-byte data-cache lines, the code and constants in PSRAM; planning/ac4.md,
+D14g). QIO is the second stage bootloader's, so a board takes it with one USB flash that includes its bootloader (`idf.py flash`); a
+network update leaves the mode a board has. `sdkconfig.s3-dcache` (a 64 KB data cache, 32 KB of the heap) goes with the AC-4 decoder
+and not here: an E-AC-3 7.1.4 play left 1.5 KB of internal RAM free with it, and the cache bought AC-3 and E-AC-3 nothing.
 
 [An ESP32-S3 sink](../../docs/hearth/sink-esp32-s3.md) takes a board
 through this step by step: flashing, joining a network, pairing, groups,
@@ -1083,11 +1088,11 @@ and the second restarts in a loop.
 in practice on a part with PSRAM). A stream that opens with an AC-4 sync word then plays as an
 AC-3 or E-AC-3 one does, from any source.
 [The ESP32-P4 page](../../docs/platforms/bare-metal/esp32-p4.md#ac-4) has what a stream of
-each kind takes. Only the ESP32-P4 has played it on a board. On the ESP32-S3 it builds with
-`sdkconfig.psram` and `sdkconfig.ac4`, and an AC-4 play keeps its decoder's state in PSRAM
-(`CONFIG_ICLFORGE_AC4_INTERNAL_BELOW`, 512 bytes on that part: [ESP32-S3](../../docs/platforms/bare-metal/esp32-s3.md#ac-4));
-it has been checked under QEMU with the footprint probe and not played on a board (phase D14c of
-`planning/ac4.md`). On an ESP32-C6 the decoder builds in the fixed-point tier and does not fit beside WiFi
+each kind takes. The ESP32-P4 and the ESP32-S3 have played it on a board. On the ESP32-S3 it builds with
+`sdkconfig.psram` and `sdkconfig.ac4`, with `sdkconfig.s3-fast` and `sdkconfig.s3-dcache` after them, and an AC-4 play keeps its
+decoder's state in PSRAM (`CONFIG_ICLFORGE_AC4_INTERNAL_BELOW`, 512 bytes on that part: [ESP32-S3](../../docs/platforms/bare-metal/esp32-s3.md#ac-4));
+it keeps up at 2.0 and, with the second core, through the converter and at E-AC-3 7.1.4 ([Playback speed](../../docs/platforms/bare-metal/esp32-s3.md#playback-speed);
+phases D14c and D14g of `planning/ac4.md`). On an ESP32-C6 the decoder builds in the fixed-point tier and does not fit beside WiFi
 ([the C6 page](../../docs/platforms/bare-metal/esp32-c6.md#ac-4)). The Sendspin player advertises `ac3` and `eac3` as its
 data types and not `ac4` (`main/sendspin/player/sendspin.cpp`), so no AC-4 stream reaches a board
 from a Sendspin group (phase I6). The measurements were made with `POST /play` and a URL.
@@ -1109,8 +1114,9 @@ with the lines the page's figures come from: `ac4.lap` (frames, samples, the
 decoder's time, the worst frame's and the PCM hash), `ac4.heap` (what the play took of internal
 RAM and PSRAM) and, with `ICLFORGE_STAGE_TIMERS=ON`, a `play.stage[...]` line for each part of the
 decode. `ICLFORGE_EXAMPLE_AC4_CORE` selects core decoding and `ICLFORGE_EXAMPLE_AC4_PCM_HASH` the
-hash of the samples, which costs 0.6 ms a frame at 2.0; a play's location overrides both, with
-`?decoding=core` and `?hash=off`. A measurement image adds `ICLFORGE_EXAMPLE_SINK_NULL=y` and plays
+hash of the samples, which costs 0.6 ms a frame at 2.0, and `ICLFORGE_EXAMPLE_AC4_PARALLEL` (on in `sdkconfig.ac4`) the decoder's
+second core, on a part with two; a play's location overrides all three, with `?decoding=core`, `?hash=off` and `?parallel=off` or
+`?parallel=on`. A measurement image adds `ICLFORGE_EXAMPLE_SINK_NULL=y` and plays
 with `POST /play` (a URL as the body) after `PUT /layout`.
 
 ## The sources

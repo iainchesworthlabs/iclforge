@@ -84,6 +84,22 @@ class TransformSet {
     std::vector<Complex> transform_;
 };
 
+// Working space for one thread's inverse transforms, of the size TransformSet's own is
+// (TransformSet::block_scratch(), transform_scratch()): a decoder that runs two channels' blocks
+// at once holds one of these for each thread beyond the first, and passes it to
+// ChannelSynthesis::block().
+template <typename Real>
+struct TransformScratch {
+    std::vector<Real> block;
+    std::vector<Complex<Real>> transform;
+
+    void reserve_for(int full_length) {
+        const auto n = static_cast<std::size_t>(full_length > 0 ? full_length : 0);
+        block.assign(2 * n, Real{});
+        transform.assign(n, Complex<Real>{});
+    }
+};
+
 // One channel's overlap buffer and the length of its last block.
 template <typename Real>
 class ChannelSynthesis {
@@ -101,12 +117,21 @@ class ChannelSynthesis {
     bool block(TransformSet<Real>& transforms, std::span<const Real> spectrum, int exponent,
                std::span<Real> pcm);
 
+    // The same in working space of the caller's, for a thread other than the one that uses the
+    // set's own: `scratch` is sized for the set's full length (TransformScratch::reserve_for()).
+    bool block(TransformSet<Real>& transforms, std::span<const Real> spectrum, int exponent,
+               std::span<Real> pcm, TransformScratch<Real>& scratch);
+
     // Silence in the overlap buffer, and a previous block of full length.
     void reset();
 
     [[nodiscard]] int previous_length() const noexcept { return previous_length_; }
 
    private:
+    bool block_in(TransformSet<Real>& transforms, std::span<const Real> spectrum, int exponent,
+                  std::span<Real> pcm, std::span<Real> block_scratch,
+                  std::span<Complex<Real>> transform_scratch);
+
     int full_length_ = 0;
     int previous_length_ = 0;
     std::vector<Real> overlap_;  // Nfull values, Pseudocode 64's overlap[]

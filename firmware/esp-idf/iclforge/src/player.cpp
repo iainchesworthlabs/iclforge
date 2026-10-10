@@ -19,6 +19,7 @@
 #include "freertos/idf_additions.h"
 #include "freertos/stream_buffer.h"
 #include "freertos/task.h"
+#include "soc/soc_caps.h"
 
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
@@ -196,6 +197,9 @@ struct Player::Impl {
     // The AC-4 decoder, constructed when the play's first bytes say the stream
     // is AC-4 (decode_loop), and what its blocks are placed by. A play is one
     // codec throughout.
+    // The decoder's second lane, when the play asked for one (Ac4Options::parallel). Before the
+    // decoder so that it is made first and goes last.
+    std::optional<ac4bridge::TaskExecutor> ac4_executor;
     std::optional<iclforge::ac4::Decoder> ac4_decoder;
     std::array<iclforge::ac4::Speaker, iclforge::ac3::eac3::chanmap::kMaxChannels> ac4_speakers{};
     std::size_t ac4_speaker_count = 0;
@@ -829,6 +833,34 @@ struct Player::Impl {
         iclforge::ac4::DecoderConfig decoder_config;
         decoder_config.output.downmix = ac4bridge::target(fold);
         decoder_config.decoding = config.ac4.core ? iclforge::ac4::DecodingMode::kCore : iclforge::ac4::DecodingMode::kFull;
+#if SOC_CPU_CORES_NUM > 1
+        // A second lane on the core the decode task is not on, at its priority: the decoder
+        // hands it a frame's per-channel stages (iclforge/ac4/decoder/executor.hpp).
+        if (config.ac4.parallel && (config.decode_core == 0 || config.decode_core == 1)) {
+            ac4_executor.emplace();
+            // 12 KB where the stack goes to PSRAM and 8 KB where it takes internal RAM: the
+            // lane's stages never used more than 5.7 KB of it on the boards (A-SPX's units).
+            const bool in_psram =
+                config.decode_stack_in_psram && heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
+            if (ac4_executor->start(1 - config.decode_core, config.decode_priority,
+                                    in_psram ? 12288 : 8192, in_psram)) {
+                decoder_config.executor = &*ac4_executor;
+                std::printf("player: AC-4 stages on cores %d and %d\n",
+                            static_cast<int>(config.decode_core),
+                            static_cast<int>(1 - config.decode_core));
+            } else {
+                std::printf("player: no second lane for AC-4, one core\n");
+                ac4_executor.reset();
+            }
+        }
+#endif
+        // The lane's task and its stack go back when this play's decode ends, not at the next
+        // play: the decoder is not used after the loop, and holds the pointer harmlessly.
+        struct LaneRelease {
+            std::optional<ac4bridge::TaskExecutor>& lane;
+            ~LaneRelease() { lane.reset(); }
+        };
+        const LaneRelease release_lane{ac4_executor};
         ac4_decoder.emplace(decoder_config);
         iclforge::ac4::SyncFrameSplitter splitter{std::span<std::byte>(framing)};
         std::uint64_t resync_before = 0;
