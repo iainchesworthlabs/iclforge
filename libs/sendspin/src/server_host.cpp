@@ -1488,16 +1488,19 @@ void ServerHost::State::member_changed(const std::string& client_id) {
 
 void ServerHost::State::controller_command(const std::string& client_id, const controller::CommandMessage& command) {
     for (const std::shared_ptr<Group::State>& group : live_groups()) {
-        std::unique_lock lock(group->mutex);
-        if (group->member_of(client_id) == nullptr) {
-            continue;
+        std::string group_id;
+        {
+            const std::scoped_lock lock(group->mutex);
+            if (group->member_of(client_id) == nullptr) {
+                continue;
+            }
+            if (command.command == controller::Command::kVolume || command.command == controller::Command::kMute) {
+                group->apply(command);
+                return;
+            }
+            group_id = group->id;
         }
-        if (command.command == controller::Command::kVolume || command.command == controller::Command::kMute) {
-            group->apply(command);
-            return;
-        }
-        const std::string group_id = group->id;
-        lock.unlock();
+        // The callback runs without the group's lock.
         events->on_controller_command(group_id, client_id, command);
         return;
     }
