@@ -55,7 +55,8 @@ constexpr std::string_view kPlayerRole = "player@v1";
 constexpr std::int64_t kReadAhead = 1'500'000;
 // The lead every group adds for the network, above what its players ask for.
 constexpr std::int64_t kNetworkLead = 100'000;
-// A unit's longest play time, which a group counts each queued unit as lasting.
+// A unit's longest play time, which a group counts each queued unit of a codec other than PCM
+// as lasting. A PCM unit is counted as lasting what its bytes make.
 constexpr std::int64_t kLongestUnit = 150'000;
 constexpr std::chrono::seconds kRedialAfter{10};
 
@@ -110,6 +111,9 @@ struct ServerHost::State {
     // The clients the operator has allowed source@v1, and every group made, which the host tells
     // of a member's changes.
     std::set<Key32> sources;
+    // The clients the host plays on player@v1's PCM although they offer the extension role
+    // (use_pcm()), each with the most audio a chunk to it may carry (0: no limit).
+    std::map<Key32, std::size_t> pcm_clients;
     std::vector<std::weak_ptr<Group::State>> groups;
 
     std::mutex posted_mutex;
@@ -311,11 +315,21 @@ class HostConnection final : public ServerListener, public std::enable_shared_fr
         }
         if (!activate.activities.empty() && activate.activities.front() == m::Activity::kPlayback) {
             std::vector<std::string> roles;
+            bool wants_pcm = false;
+            {
+                const std::lock_guard lock(host_->mutex);
+                wants_pcm = host_->pcm_clients.contains(client.client_key);
+            }
+            const bool offers_pcm =
+                client.player_support && contains(client.supported_roles, kPlayerRole);
             // The extension role only on a long-term PSK connection, and never beside player@v1
-            // (planning/hearth-sendspin-extension.md, The role _iclforge_player@v1).
-            if (client.psk == hs::PskCategory::kLongTerm && client.iclforge_support) {
+            // (planning/hearth-sendspin-extension.md, The role _iclforge_player@v1). A client the
+            // host was asked to play PCM to (use_pcm()) takes player@v1 instead, where it offers
+            // it.
+            if (client.psk == hs::PskCategory::kLongTerm && client.iclforge_support &&
+                !(wants_pcm && offers_pcm)) {
                 roles.emplace_back(player::kRole);
-            } else if (client.player_support && contains(client.supported_roles, kPlayerRole)) {
+            } else if (offers_pcm) {
                 roles.emplace_back(kPlayerRole);
             }
             // The other roles by policy (planning/hearth-sendspin-extension.md, Other roles).
@@ -907,6 +921,30 @@ bool ServerHost::allow_source(const std::string& client_id, bool allowed) {
     return true;
 }
 
+bool ServerHost::use_pcm(const std::string& client_id, bool use, std::size_t max_chunk_bytes) {
+    const std::shared_ptr<HostConnection> connection = state_->find(client_id);
+    if (!connection) {
+        return false;
+    }
+    {
+        const std::lock_guard lock(state_->mutex);
+        const Key32 key = connection->view().client_key;
+        if (use) {
+            state_->pcm_clients[key] = max_chunk_bytes;
+        } else {
+            state_->pcm_clients.erase(key);
+        }
+    }
+    State* state = state_.get();
+    const std::weak_ptr<HostConnection> weak = connection;
+    state->post([weak] {
+        if (const std::shared_ptr<HostConnection> held = weak.lock()) {
+            held->reconsider();
+        }
+    });
+    return true;
+}
+
 bool ServerHost::start_source(const std::string& client_id) {
     const std::shared_ptr<HostConnection> connection = state_->find(client_id);
     return connection &&
@@ -1327,7 +1365,26 @@ struct Group::State {
             if (chosen == client.player_support->supported_formats.end()) {
                 return;
             }
-            std::unique_ptr<codec::Encoder> encoder = codec::make_encoder(*chosen);
+            // A client the host was asked to play small chunks to (use_pcm()) gets PCM units of as
+            // many whole frames as fit its limit, where the default is 20 ms.
+            codec::EncoderOptions options;
+            if (chosen->codec == m::Codec::kPcm) {
+                std::size_t limit = 0;
+                {
+                    const std::lock_guard lock(host->mutex);
+                    if (const auto found = host->pcm_clients.find(client.client_key);
+                        found != host->pcm_clients.end()) {
+                        limit = found->second;
+                    }
+                }
+                const auto frame_bytes = static_cast<std::size_t>(chosen->channels) *
+                                         static_cast<std::size_t>(chosen->bit_depth / 8);
+                if (limit != 0 && frame_bytes != 0) {
+                    options.frames =
+                        static_cast<std::int32_t>(std::max<std::size_t>(1, limit / frame_bytes));
+                }
+            }
+            std::unique_ptr<codec::Encoder> encoder = codec::make_encoder(*chosen, options);
             if (!encoder) {
                 return;
             }
@@ -1705,7 +1762,23 @@ std::size_t Group::push(std::span<const std::int32_t> interleaved) {
             const std::int64_t timestamp =
                 state.time_of(member.joined_frame + unit.first_frame - member.encoder->delay_frames());
             if (connection->driver().call([&] { return connection->session().send_audio(timestamp, unit.bytes); })) {
-                member.queued.emplace_back(timestamp + kLongestUnit, unit.bytes.size());
+                // The sink holds a unit until its samples have played. A PCM unit lasts what its
+                // bytes make; another codec's is counted at the longest a unit lasts. Counting a
+                // PCM unit as kLongestUnit, as every codec's once was, filled a small sink's
+                // buffer with units that had already played, and the group then sent each
+                // chunk after its play time (a board's ring holds 125 ms of 24-bit stereo, which
+                // is less than that tail).
+                std::int64_t held_us = kLongestUnit;
+                if (member.format->codec == m::Codec::kPcm) {
+                    const std::int64_t frame_bytes =
+                        static_cast<std::int64_t>(member.format->channels) *
+                        (member.format->bit_depth / 8);
+                    if (frame_bytes > 0 && member.format->sample_rate > 0) {
+                        held_us = (static_cast<std::int64_t>(unit.bytes.size()) / frame_bytes) *
+                                  1'000'000 / member.format->sample_rate;
+                    }
+                }
+                member.queued.emplace_back(timestamp + held_us, unit.bytes.size());
                 member.queued_bytes += unit.bytes.size();
             }
         }
