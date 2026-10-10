@@ -171,10 +171,12 @@ struct Chain {
     std::vector<Group> groups;  // 3.6.2.2 and 3.6.2.3, written out
 };
 
-// Output gain: the flags a Channel Group names and the dB the encoder took off them.
+// Output gain: the flags a Channel Group carries, the dB the encoder took off and the channels it
+// took it off. (A real encoder takes it off the mixed channels the flags name; a test may differ.)
 struct Attenuation {
     std::uint8_t flags = 0;
     double db = 0.0;
+    std::vector<std::string> names = {};
 };
 
 struct Recon {
@@ -345,17 +347,12 @@ void put_pcm24(iamf::Bytes& out, double value) {
                 std::vector<Signal> values;
                 for (const std::string& name : names) {
                     Signal v = name == "L2" ? stereo.at("L") : layers[i].at(name);
-                    if (found != attenuation.end()) {
-                        // Output gain flags, MSB first: L, R, Ls, Rs, Ltf, Rtf.
-                        constexpr std::array<const char*, 6> kNames{"Rtf", "Ltf", "Rs",
-                                                                    "Ls",  "R",   "L"};
-                        for (std::size_t bit = 0; bit < kNames.size(); ++bit) {
-                            if (((found->second.flags >> bit) & 1U) != 0 && name == kNames[bit]) {
-                                const double factor = std::pow(10.0, -found->second.db / 20.0);
-                                for (double& x : v) {
-                                    x *= factor;
-                                }
-                            }
+                    if (found != attenuation.end() &&
+                        std::find(found->second.names.begin(), found->second.names.end(), name) !=
+                            found->second.names.end()) {
+                        const double factor = std::pow(10.0, -found->second.db / 20.0);
+                        for (double& x : v) {
+                            x *= factor;
                         }
                     }
                     values.push_back(std::move(v));
@@ -503,8 +500,49 @@ TEST_CASE("IAMF scalable reconstruction undoes the output gain on the mixed chan
     const auto all = chains();
     const Chain& chain = all[0].second;
     // Group 1 (L2, R2): both mixed, 4.5 dB off. Group 2 (Ltf3, Rtf3): 3 dB off.
-    const std::map<std::size_t, Attenuation> attenuation{{0, {0x30, 4.5}}, {1, {0x03, 3.0}}};
+    const std::map<std::size_t, Attenuation> attenuation{{0, {0x30, 4.5, {"L", "R"}}},
+                                                         {1, {0x03, 3.0, {"Ltf", "Rtf"}}}};
     const Built built = build(chain, 4, {4, 5, 0, 4}, attenuation);
+    const iamf::Sequence sequence = round_trip(built.sequence);
+    for (std::size_t layer = 0; layer < chain.layouts.size(); ++layer) {
+        auto decoded = iamf::decode_pcm(sequence, 0, {.layer = layer});
+        REQUIRE(decoded.has_value());
+        expect_layer(*decoded, chain.layouts[layer], built.truth[layer]);
+    }
+}
+
+TEST_CASE("IAMF scalable reconstruction undoes the output gain of Mono and of L2",
+          "[iamf][scalable]") {
+    // Mono / 2ch / 7.1.4: the Mono channel is L1 (flag bit 5 of the first group) and the second
+    // group holds L2, which bit 5 names there too.
+    const auto all = chains();
+    const Chain& chain = all[1].second;
+    const std::map<std::size_t, Attenuation> attenuation{{0, {0x20, 2.5, {"C"}}},
+                                                         {1, {0x20, 4.0, {"L2"}}}};
+    const Built built = build(chain, 3, {4, 5}, attenuation);
+    const iamf::Sequence sequence = round_trip(built.sequence);
+    for (std::size_t layer = 0; layer < chain.layouts.size(); ++layer) {
+        auto decoded = iamf::decode_pcm(sequence, 0, {.layer = layer});
+        REQUIRE(decoded.has_value());
+        expect_layer(*decoded, chain.layouts[layer], built.truth[layer]);
+    }
+}
+
+TEST_CASE("IAMF scalable reconstruction leaves a flagged original channel alone",
+          "[iamf][scalable]") {
+    // 5.1.2 / 7.1.4. The flags name L and R of the 5.1.2 group and the top pair of the 7.1.4 group,
+    // which are original channels there: output_gain applies to the mixed ones, so nothing is
+    // scaled, and the encoder here took nothing off.
+    const auto all = chains();
+    const Chain& chain = all[2].second;
+    Built built = build(chain, 3, {4});
+    auto& layers = built.sequence.audio_elements[0].layers;
+    layers[0].output_gain_is_present = true;
+    layers[0].output_gain_flags = 0x30;
+    layers[0].output_gain = iamf::double_to_q7_8(6.0);
+    layers[1].output_gain_is_present = true;
+    layers[1].output_gain_flags = 0x03;
+    layers[1].output_gain = iamf::double_to_q7_8(3.0);
     const iamf::Sequence sequence = round_trip(built.sequence);
     for (std::size_t layer = 0; layer < chain.layouts.size(); ++layer) {
         auto decoded = iamf::decode_pcm(sequence, 0, {.layer = layer});
@@ -538,8 +576,8 @@ TEST_CASE("IAMF scalable reconstruction smooths the recon gain over the frames",
     for (const char* name : {"L", "R", "C", "Lss", "Rss", "Ltf", "Rtf", "LFE"}) {
         CHECK(gained->channels[channel_index(name)] == plain->channels[channel_index(name)]);
     }
-    // MA_gain(k) = 0.25 * gain + 0.75 * MA_gain(k - 1) with MA_gain(0) = 1, and past the 64 sample
-    // overlap the frame holds MA_gain(k).
+    // MA_gain(k) = 0.25 * gain + 0.75 * MA_gain(k - 1) with MA_gain(0) = 1, and past the overlap
+    // the frame holds MA_gain(k).
     const auto ratio_at = [&](const char* name, std::size_t frame, std::size_t n) {
         const std::size_t i = channel_index(name);
         const std::size_t at = frame * kFrameSamples + n;
@@ -556,12 +594,14 @@ TEST_CASE("IAMF scalable reconstruction smooths the recon gain over the frames",
     CHECK(ratio_at("Ltb", 2, 150) == Catch::Approx(1.0).margin(1e-5));
     // Rtb: 100 / 255 settles lower than Lrs.
     CHECK(ratio_at("Rtb", 2, 150) < ratio_at("Lrs", 2, 150));
-    // Inside the overlap the previous frame's average falls out as the new one rises in: the first
-    // sample of frame 1 is (almost) MA_gain(1), the last of the 64 is (almost) MA_gain(2).
-    const double first = ratio_at("Lrs", 1, 0);
-    CHECK(first == Catch::Approx(ma1).margin(2e-3));
-    const double last_in_overlap = ratio_at("Lrs", 1, 63);
-    CHECK(last_in_overlap == Catch::Approx(ma2).margin(2e-3));
+    // Inside the overlap the previous frame's average falls out as the new one rises in. `ipcm` has
+    // no recommended overlap and libiamf uses 12 samples: the first sample of frame 1 is MA_gain(1)
+    // times hann(12) = 0.5 - 0.5 cos(2 pi 12 / 23), the twelfth MA_gain(2) times hann(11) (the same
+    // value, mirrored), and the thirteenth MA_gain(2) outright.
+    constexpr double kEdge = 0.99534;
+    CHECK(ratio_at("Lrs", 1, 0) == Catch::Approx(ma1 * kEdge).margin(1e-4));
+    CHECK(ratio_at("Lrs", 1, 11) == Catch::Approx(ma2 * kEdge).margin(1e-4));
+    CHECK(ratio_at("Lrs", 1, 12) == Catch::Approx(ma2).margin(1e-5));
 }
 
 TEST_CASE("IAMF reconstruct_channels takes externally decoded substreams", "[iamf][scalable]") {

@@ -27,10 +27,10 @@ the Conan recipe install it where asked for, off by default: `vcpkg install iclf
 
 | Header | What it holds |
 |---|---|
-| `iamf.hpp` | The short route: `mux()` for a 7.1.4 programme, `mux_objects()` for object elements, `build_sequence()` and `build_object_sequence()` for the `Sequence` either would write, `decode_pcm()` to read an element's audio back (with `DecodeOptions` to choose a layer of a scalable one), and `reconstruct_channels()` to rebuild a scalable element from substreams a caller's own codec decoded. |
+| `iamf.hpp` | The short route: `mux()` for a 7.1.4 programme, `mux_objects()` for object elements, `mux_coded()` for packets a caller's Opus, AAC-LC or FLAC encoder made (with `opus_decoder_config()`, `aac_lc_decoder_config()` and `flac_decoder_config()`), `build_sequence()`, `build_object_sequence()` and `build_coded_sequence()` for the `Sequence` each would write, `decode_pcm()` to read an element's audio back (with `DecodeOptions` to choose a layer of a scalable one), and `reconstruct_channels()` to rebuild a channel element from substreams a caller's own codec decoded. |
 | `model.hpp` | The element graph as plain data: `Sequence` (Descriptors and Temporal Units), `CodecConfig`, `AudioElement`, `MixPresentation`, parameter definitions and `ParameterBlock`, `AudioFrame` with its trimming, `Metadata`. Q7.8 gains and coded positions are kept as the bitstream carries them. |
 | `sequence.hpp` | OBU bytes: `write_descriptors()`, `write_temporal_unit()`, `write_sequence()` and their readers `read_descriptors()`, `read_temporal_unit()`, `read_sequence()`. `write_sequence()`/`read_sequence()` are the standalone raw OBU stream. `layout_info()` and `expanded_layout_info()` give the substream order of every loudspeaker layout and expanded layout. |
-| `container.hpp` | ISO-BMFF: `write_isobmff()`, `read_isobmff()` and `FragmentedWriter`. |
+| `container.hpp` | ISO-BMFF: `write_isobmff()`, `read_isobmff()` (the first IA track), `read_isobmff_tracks()` (every IA track of a file) and `FragmentedWriter`. |
 
 ```cpp
 iclforge::containers::iamf::AudioTrack track{.samples_per_frame = iclforge::ac3::kSamplesPerFrame};
@@ -88,9 +88,10 @@ transcribed from.
   (the profile whose first Mix Presentation references only object-based elements, at most 18 channels).
   `model.hpp` lets a caller set any profile.
 - **Codec Config OBU**: `ipcm` at 16, 24 or 32 bits and the sample rates the LPCM decoder config allows.
-  Other codecs (`Opus`, `mp4a`, `fLaC`) are carried as raw `decoder_config` bytes by the model, so a
-  Sequence read from a file that uses them reads back and writes again, but this module encodes none of
-  them and `decode_pcm()` reads only `ipcm`.
+  `Opus`, `mp4a` and `fLaC` are carried: the model keeps their `decoder_config` bytes, `mux_coded()`
+  builds them with their `audio_roll_distance` (see "Carrying Opus, AAC-LC and FLAC"), and a Sequence read
+  from a file that uses them reads back and writes again. This module encodes and decodes none of them,
+  so `decode_pcm()` reads only `ipcm`.
 - **Audio Element OBU**: channel-based (one or more layers), scene-based (mono and projection
   Ambisonics config), and object-based — one Audio Substream carrying one object, coded mono, or two,
   coded as a stereo pair. `mux()` writes one layer of 7.1.4ch: seven substreams, five coupled pairs, the
@@ -118,9 +119,11 @@ transcribed from.
   start trim longer than a frame fully trims the leading frames, as the specification requires), shorter
   IA Sample durations and an `edts`/`elst` box. A program whose length is not a whole number of frames is
   padded and the padding trimmed from the last frame.
-- **ISO-BMFF** (`write_isobmff()`): `iamf`-branded `ftyp`, one `trak` whose `stsd` carries an `iamf`
-  `IASampleEntry` wrapping an `iacb` box of the Descriptors, one IA Sample per Temporal Unit, an `stss`
-  box when a Temporal Unit is not a key frame, and 64-bit chunk offsets when the file needs them.
+- **ISO-BMFF** (`write_isobmff()`): `iamf`-branded `ftyp`, one `trak` (6.2.1 stores an IA Sequence as one
+  track) whose `stsd` carries an `iamf` `IASampleEntry` wrapping an `iacb` box of the Descriptors, one IA
+  Sample per Temporal Unit, an `stss` box when a Temporal Unit is not a key frame, the `roll` sample group
+  that 6.2.2 requires of Opus and AAC-LC, and 64-bit chunk offsets and a 64-bit `mdat` size when the file
+  needs them (`IsobmffOptions::large_mdat` asks for the long header on a small file).
 - **Fragments** (`FragmentedWriter`): an initialization segment (`ftyp` and a `moov` with an empty sample
   table and an `mvex`), then one `moof`/`mdat` per call, each fragment usable as soon as it is returned.
   Non-key Temporal Units carry `sample_is_non_sync_sample` in their sample flags.
@@ -131,8 +134,12 @@ transcribed from.
 
 `read_isobmff()` reads a file from this writer, from `FragmentedWriter`, or from another muxer that
 follows the encapsulation: sample tables or `moof`/`trun` fragments (with `default-base-is-moof`, explicit
-base offsets and per-sample or default sizes, durations and flags), `co64`, `stss`, `edts`/`elst` and the
-`mdhd` timescale. `read_sequence()` reads a raw OBU stream, splitting Temporal Units at Temporal
+base offsets and per-sample or default sizes, durations and flags), `co64`, `stss`, 32- and 64-bit `mdat`
+sizes, `edts`/`elst` and the `mdhd` timescale. It reads the first IA track; tracks that are not IA tracks
+and the fragments of other tracks (matched by `track_ID`) are skipped. `read_isobmff_tracks()` returns every
+IA track of a file as its own Sequence, for files that hold several. An IA track protected with Common
+Encryption (an `enca` entry whose original format is `iamf`) is recognised and refused as `kUnsupported`,
+not mistaken for a file with no IAMF in it. `read_sequence()` reads a raw OBU stream, splitting Temporal Units at Temporal
 Delimiters or, without them, where a substream repeats. Both skip redundant copies of the Descriptors,
 Reserved OBUs and bytes past the syntax an OBU defines, stop at a second IA Sequence, and fail with
 `Error::kTruncated`, `kBadLeb128` or `kBadObu` rather than read past their input; the readers'
@@ -159,22 +166,69 @@ layout when unset):
    substream order 3.6.2.3, so a layer list that breaks the generation rule of 3.6.2.1, or whose substream
    counts do not match its groups, is `kBadDescriptor`.
 3. **Recon Gain** (7.2.3): the `recon_gain` of the layer's channels flagged in `recon_gain_flags`, smoothed
-   with the moving average (N = 7) and the Hann overlap windows of the specification, 60 samples for
-   `Opus` and 64 otherwise (the recommended value for `mp4a`; `ipcm` and `fLaC` are lossless and normally
-   carry none). `DecodeOptions::apply_recon_gain = false` returns the plain de-mixer output.
+   with the moving average (N = 7) and the Hann overlap windows of the specification: 60 samples for
+   `Opus` and 64 for `mp4a`, the values it recommends, and 12 for `ipcm` and `fLaC`, which are lossless,
+   have no recommendation and normally carry no recon gain (12 is what AOM's libiamf measures as).
+   Channels no Parameter Block flags are left exactly as the de-mixer made them.
+   `DecodeOptions::apply_recon_gain = false` returns the plain de-mixer output.
+
+Against AOM's `libiamf` (its `iamfdec`, built without codecs, so `ipcm`), this module's output for ten
+layer chains, every `dmixp_mode`, output gain and recon gain matches to the 24-bit quantization at every
+sample except one: libiamf also runs the overlap window over de-mixed channels when the stream has no
+recon gain, which at unity gain still dips the first 12 samples of each frame by up to 6.8%. This module
+leaves a lossless reconstruction alone there.
 
 `decode_pcm()` reads the substreams itself, so it covers `ipcm` only. For Opus, AAC-LC and FLAC the caller
 decodes each Audio Substream with its own codec and hands the planar PCM (every frame, untrimmed) to
 `reconstruct_channels()`, which does the rest and returns the same `DecodedElement`.
 
+## Carrying Opus, AAC-LC and FLAC
+
+IAMF's lossy and lossless codecs are carried, not produced: this module links no codec (the same
+boundary `iclforge::containers::mp4` keeps), so the caller's encoder makes the packets and the module
+writes everything else.
+
+```cpp
+iclforge::containers::iamf::CodedTrack track;
+track.codec = iclforge::containers::iamf::CodedCodec::kOpus;
+track.loudspeaker_layout = 1;      // Stereo: one coupled Audio Substream
+track.trim_start_samples = 312;    // the encoder's pre-skip, also written into the Codec Config
+std::vector<iclforge::containers::iamf::CodedFrame> frames;
+// ... frames.push_back({{opus_packet_for_substream_0, ...}}) for each 20 ms ...
+const auto file = iclforge::containers::iamf::mux_coded(track, frames);
+```
+
+- **The Codec Config** is built from 3.13: Opus's ID Header without its magic signature and big-endian
+  (`opus_decoder_config()`), AAC-LC's DecoderConfigDescriptor with an AudioSpecificConfig of two channels
+  and 1024 line frames (`aac_lc_decoder_config()`), FLAC's STREAMINFO as the only metadata block with the
+  block size fixed (`flac_decoder_config()`). `audio_roll_distance` is -ceil(3840 / frame length) for Opus,
+  -1 for AAC-LC and 0 for FLAC, as 3.5 sets it, and the ISO-BMFF output carries the matching `roll`
+  sample group.
+- **One packet per Audio Substream** per Temporal Unit, in the order `layout_info()` lists the layout's
+  substreams (coupled pairs first). Packets are checked cheaply and not decoded: an Opus packet must hold
+  one frame of `samples_per_frame` samples (the TOC byte says), a FLAC frame must name the block size,
+  sample rate, depth and independent channel coding the STREAMINFO does, an AAC packet must not be empty.
+  A packet that breaks one is `kBadCodedPacket`.
+- **Single layer.** `build_coded_sequence()` writes one channel-based layer of `loudspeaker_layout` 0 to 8.
+  Scalable, Ambisonics and object elements with these codecs are assembled on the `Sequence` model
+  directly, as the readers return them.
+- **Reading back.** `read_isobmff()` returns the packets in `AudioFrame::data`. The caller decodes them and
+  passes the PCM of each substream to `reconstruct_channels()`; `examples/iamf_coded.cpp` does the whole
+  round trip with FLAC frames it packs itself. `codecs_string()` gives the RFC 6381 string of 6.4
+  (`iamf.000.000.Opus`, `iamf.000.000.mp4a.40.2`, ...).
+
 ## What it does not cover
 
-- **Encoding Opus, AAC-LC or FLAC.** They are carried and parsed as bytes, not produced.
+- **Encoding or decoding Opus, AAC-LC or FLAC.** Their packets are carried and the module links no codec;
+  `reconstruct_channels()` takes the PCM of the caller's own decoder. A known and accepted gap: encoding
+  is a codec's job, the boundary the container modules keep.
 - **Rendering.** Mix Presentations and animated parameters are data here; applying them (the Open Audio
   Renderer's job, which section 7.4 leaves to the OAR specification) is outside the module.
-- **Encryption** (Common Encryption) and the codecs parameter string.
-- **ISO-BMFF with more than one IA track**, and 64-bit `mdat` sizes: the first IA track is read, and one
-  `mdat` must stay under 4 GiB.
+- **Encryption** (Common Encryption, 6.3). A protected track is recognised and refused. Writing and
+  reading it needs AES, and this module, default-on, has no third-party dependency; 6.3 asks for whole-sample
+  encryption, so a packager can protect the file this module writes. A known and accepted gap.
+- **Writing more than one IA track.** 6.2.1 stores an IA Sequence as one track, so the writers write one;
+  `read_isobmff_tracks()` reads a file that has several.
 
 ## Checked against
 
@@ -187,6 +241,24 @@ parameters, the Mix Presentation's rendering config extension, `is_not_key_frame
 oracle here. They are covered by the tests in `libs/containers/tests/iamf/`, which assemble OBU bytes by hand from the
 syntax (the position fields' bit packing, trimming headers, delimiters) and round-trip a Sequence that
 uses every structure.
+
+Opus, AAC-LC and FLAC carriage was checked with FFmpeg 8.0.1: stereo and 5.1 programmes whose packets came
+from `libopus`, FFmpeg's AAC encoder and a verbatim-subframe FLAC packer, muxed by `mux_coded()`, decode
+through FFmpeg's IAMF demuxer to exactly the samples the encoders' own files decode to (FLAC bit for bit
+against the source), with the Opus pre-skip and the AAC priming trimmed by the Audio Frame trimming.
+FFmpeg's `-map 0:<n>` of one dependent substream decodes a single frame (an FFmpeg CLI behaviour, not the
+file's); mapping the stream group, `-map 0:g:0`, decodes them all.
+
+The scalable reconstruction was checked against AOM's reference decoder, `libiamf` (commit b276f43, built
+with `-DENABLE_BUILD_CODECS=OFF`, which leaves `ipcm`), by decoding the same raw OBU streams with
+`iamfdec -s<system> -disable_limiter` at the playback layout of each layer and comparing with this
+module's `decode_pcm()`. For ten chains of layers, one `dmixp_mode` per frame (all seven values), output
+gain on two groups and recon gain on the four channels the last layer de-mixes, every channel agrees to
+the 24-bit quantization at every sample outside the first 12 of each frame. In those 12, libiamf
+multiplies de-mixed channels by the overlap window even when the stream carries no recon gain (unity
+gain, so a dip of up to 6.8%); this module applies the window only to channels a Parameter Block flags,
+with the same 12 samples, so a lossless stream is reconstructed exactly. No other IAMF decoder was
+available to compare with (FFmpeg demuxes the substreams and does not de-mix).
 
 ---
 

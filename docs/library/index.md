@@ -234,7 +234,8 @@ re-synced by hand and can drift. Each page's "Full program" link is the canonica
   `iclforge::ac3::oba::AtmosEncoder` (same opt-in flag).
 - [IAMF](iamf.md) — `iclforge::containers::iamf`, a standalone reader and writer: a decoded 7.1.4 programme
   re-wrapped as a channel-based IAMF Audio Element, object-based Audio Elements with animated
-  positions, ISO-BMFF, raw OBU streams and fragments (on by default).
+  positions, Opus, AAC-LC and FLAC packets carried, scalable channel layers reconstructed, ISO-BMFF,
+  raw OBU streams and fragments (on by default).
 - [AC-4](ac4.md) — `iclforge::ac4`, the decoder, the encoder and the inspector both work through:
   the decoder's controls, the choice of presentation and what the decoder reports; the
   encoder's configuration, substreams and presentations; and linking (on by default).

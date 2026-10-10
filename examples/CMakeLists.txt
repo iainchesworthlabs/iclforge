@@ -61,6 +61,9 @@ if(ICLFORGE_BUILD_IAMF)
     # iamf_objects writes object-based IAMF (v2.0) as ISO-BMFF, a raw OBU stream and fragments, and
     # reads each back; it links iclforge::containers alone.
     list(APPEND ICLFORGE_EXAMPLES iamf_objects)
+    # iamf_coded carries FLAC packets in IAMF (mux_coded) and reads them back with
+    # reconstruct_channels; it links iclforge::containers alone, packing its own verbatim FLAC frames.
+    list(APPEND ICLFORGE_EXAMPLES iamf_coded)
 endif()
 
 # read_iab demonstrates iclforge::iab (libs/iab), IAB reader phases 1-2 - "standalone" meaning
@@ -85,7 +88,7 @@ foreach(example IN LISTS ICLFORGE_EXAMPLES)
                                                   iclforge::warnings iclforge::fmt)
     elseif(example STREQUAL "mux_iamf")
         target_link_libraries(${example} PRIVATE iclforge::ac3 iclforge::containers iclforge::warnings iclforge::fmt)
-    elseif(example STREQUAL "iamf_objects")
+    elseif(example STREQUAL "iamf_objects" OR example STREQUAL "iamf_coded")
         target_link_libraries(${example} PRIVATE iclforge::containers iclforge::warnings iclforge::fmt)
     elseif(example STREQUAL "read_iab")
         # No iclforge::ac3 here either - libs/iab is deliberately independent of it (see
