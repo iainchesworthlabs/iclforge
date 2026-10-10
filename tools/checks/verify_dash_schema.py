@@ -102,7 +102,7 @@ def fetch_schemas(cache: Path) -> Path:
     for name, url, pin in PINS:
         target = original / name
         if not target.exists() or sha256_of(target) != pin:
-            with urllib.request.urlopen(url, timeout=60) as response:  # noqa: S310 - fixed https URLs
+            with urllib.request.urlopen(url, timeout=60) as response:
                 target.write_bytes(response.read())
         got = sha256_of(target)
         if got != pin:
