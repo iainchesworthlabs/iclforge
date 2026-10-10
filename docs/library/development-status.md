@@ -17,7 +17,7 @@ bitstream surface this repository owns — the companion to
 Update those first; refresh the matching row here so the status table stays a summary rather than
 a second capability record.
 
-**Legend:** 🟢 Completed • 🟡 Partial / in progress • 🔴 Not started / refused / out of scope • 🔵 Known and accepted gap — follows 🟡 or 🔴 (🟡🔵, 🔴🔵) where the remainder will not be implemented, with the reason in the notes
+**Legend:** 🟢 Completed • 🟡 Partial / in progress • 🔴 Not started / refused / out of scope
 
 Statuses describe the *bitstream and API surface*, not application polish. A green row can still
 carry a note about an oracle gap, an intentional `auto` exclusion, or an interoperability caveat —
@@ -238,6 +238,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | Opus / AAC-LC / FLAC encode | 🔴 | Low | Nice-to-have | Carried and parsed, not produced |
 | | Scalable channel layer reconstruction | 🟢 | Low | Nice-to-have | Gain, De-mixer and Recon Gain of §7.2 for up to six layers, in `decode_pcm()` (`ipcm`) and `reconstruct_channels()` (substreams a caller decoded); no external oracle for the reconstruction |
 | | Expanded loudspeaker layouts (`loudspeaker_layout` 15) | 🟢 | Low | Nice-to-have | `expanded_layout_info()` and `decode_pcm()` for `expanded_loudspeaker_layout` 0–19 |
+| | Rendering an Audio Element to a playback layout, and mixing (§7.4) | 🔴🔵 | Low | Optional | The specification leaves the algorithms to the Open Audio Renderer; the module returns reconstructed channels, Parameter Blocks and Mix Presentations as data and renders nothing. Decision: the IAMF row of [Roadmap](../roadmap.md) |
 
 ---
 
@@ -350,7 +351,7 @@ this register is the checklist that those bounds appear here too.
 | Clause | Open item | Status |
 |---|---|---|
 | Codec Specific | Encoding Opus, AAC-LC and FLAC | 🔴 |
-| Processing | Rendering an Audio Element to a playback layout and mixing (§7.4: the Open Audio Renderer's algorithms) | 🔴🔵 |
+| Processing | Rendering to a playback layout and mixing (§7.4): the Open Audio Renderer's algorithms | 🔴🔵 |
 | ISO-BMFF | Common Encryption; more than one IA track | 🔴 |
 
 ### Carriage (Annex F, IEC 61937, MPEG-TS, HLS, DASH)
@@ -378,5 +379,4 @@ this register is the checklist that those bounds appear here too.
 
 - **🟡 Partial** means the feature exists with a documented bound (parser narrower than commercial streams, syntax without PCM, branch not merged, intentional `auto` exclusion called out elsewhere). The bound is the note; the prose is in [Capabilities](capabilities.md).
 - **🔴 Not started / refused / out of scope** means no implementation on `main` for that specification surface, or an explicit refuse. Roadmap IDs in the notes point at [Roadmap](../roadmap.md) where one exists.
-- **🔵 Known and accepted gap** is added to a 🟡 or 🔴 when the remainder is not going to be implemented: the owner has looked at it and decided the library stays as it is. 🟡🔵 is a partial feature whose missing part is accepted, 🔴🔵 a feature that is accepted as absent. The note says why (a boundary the library keeps, a dependency it will not take, a part of a specification that another component owns). Open 🟡 and 🔴 rows without it are still work to do.
 - Oracle and hardware gaps are **not** red features by themselves. A completed encoder whose only external decoder is this project's own is still 🟢, with the gap recorded under [Validation](../verification.md) and noted in the standards register where useful.
