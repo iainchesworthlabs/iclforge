@@ -58,8 +58,9 @@ config ICLFORGE_AC4
         docs/platforms/bare-metal/esp32-c6.md what the fixed-point tier
         measured, and docs/platforms/bare-metal/esp32-s3.md what it holds
         on an ESP32-S3, where its state goes to PSRAM
-        (ICLFORGE_AC4_INTERNAL_BELOW). Only the ESP32-P4 has run it on a
-        board; the ESP32-S3 has run it under QEMU (planning/ac4.md, D14c).
+        (ICLFORGE_AC4_INTERNAL_BELOW). The ESP32-P4 and the ESP32-S3 have run
+        it on a board; the ESP32-C6 builds it and refuses a play it has no
+        heap for (planning/ac4.md, D14c and D14d).
 
 # Where an AC-4 play's allocations go (planning/ac4.md, D14c). An int rather
 # than a choice, so it reaches C++ as a plain constant.

@@ -159,6 +159,8 @@ struct Player::Impl {
     bool ring_in_psram = false;
     TaskHandle_t fetch_task = nullptr;
     TaskHandle_t decode_task = nullptr;
+    // Made by xTaskCreatePinnedToCoreWithCaps, so stop() deletes it with caps.
+    bool decode_task_with_caps = false;
 
     // One block per slot of THIS play's layout, the spans the renderer writes
     // through, and the sink's view of them. Allocated at start(), reused for
@@ -342,6 +344,18 @@ struct Player::Impl {
     }
 
     static void fetch_entry(void* self) { static_cast<Impl*>(self)->fetch_loop(); }
+    // The decode task's last act. A stack made with caps (PlayerConfig::
+    // decode_stack_in_psram) is freed by vTaskDeleteWithCaps() and only from
+    // another task, so that task parks and stop() deletes it; for the usual
+    // stack the task deletes itself and the idle task frees it.
+    void end_decode_task() {
+        xEventGroupSetBits(events, kDecodeExited);
+        if (decode_task_with_caps) {
+            vTaskSuspend(nullptr);
+        }
+        vTaskDelete(nullptr);
+    }
+
     static void decode_entry(void* self) { static_cast<Impl*>(self)->decode_loop(); }
 
     [[nodiscard]] bool stopping() const { return (xEventGroupGetBits(events) & kStop) != 0; }
@@ -785,13 +799,33 @@ struct Player::Impl {
         // Kconfig has why). The heap keeps no other value to restore: the limit
         // is set only from configuration.
         struct InternalBelow {
-            InternalBelow() { heap_caps_malloc_extmem_enable(CONFIG_ICLFORGE_AC4_INTERNAL_BELOW); }
+            explicit InternalBelow(int below) {
+                heap_caps_malloc_extmem_enable(
+                    below >= 0 ? static_cast<std::size_t>(below)
+                               : static_cast<std::size_t>(CONFIG_ICLFORGE_AC4_INTERNAL_BELOW));
+            }
             ~InternalBelow() { heap_caps_malloc_extmem_enable(CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL); }
             InternalBelow(const InternalBelow&) = delete;
             InternalBelow& operator=(const InternalBelow&) = delete;
         };
-        const InternalBelow placement;
+        const InternalBelow placement{config.ac4.internal_below};
 #endif
+        // The least heap any AC-4 decode has asked for: the 2.0 fixtures' peak
+        // since D14f, 286,365 bytes (planning/ac4.md, D14f). A floor, not a
+        // fit: a wider or A-CPL stream asks for more, and a part under the
+        // floor cannot decode any. It is refused here, with the figures,
+        // where it would otherwise be met as an abort() inside a frame: an
+        // ESP32-C6 with Wi-Fi up has 117 KB (planning/ac4.md, D14d).
+        constexpr std::size_t kAc4FloorHeapBytes = 286365;
+        if (const std::size_t room = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+            room < kAc4FloorHeapBytes) {
+            std::printf("player: AC-4 needs at least %lu bytes of heap and %lu are free: "
+                        "refused\n",
+                        static_cast<unsigned long>(kAc4FloorHeapBytes),
+                        static_cast<unsigned long>(room));
+            finish("memory", true, static_cast<int>(room));
+            return;
+        }
         iclforge::ac4::DecoderConfig decoder_config;
         decoder_config.output.downmix = ac4bridge::target(fold);
         decoder_config.decoding = config.ac4.core ? iclforge::ac4::DecodingMode::kCore : iclforge::ac4::DecodingMode::kFull;
@@ -939,8 +973,7 @@ struct Player::Impl {
         }
         if (ac4bridge::is_ac4(std::span<const std::byte>(lead.data(), lead_bytes))) {
             decode_loop_ac4(std::span<const std::byte>(lead.data(), lead_bytes));
-            xEventGroupSetBits(events, kDecodeExited);
-            vTaskDelete(nullptr);
+            end_decode_task();
             return;
         }
         if (lead_bytes > 0) {
@@ -1067,8 +1100,7 @@ struct Player::Impl {
             frames_played.fetch_add(1);
             resync_bytes.store(resync_before + accumulator.resynchronised_bytes());
         }
-        xEventGroupSetBits(events, kDecodeExited);
-        vTaskDelete(nullptr);
+        end_decode_task();
     }
 };
 
@@ -1182,9 +1214,28 @@ bool Player::start() {
     }
 
     // The decoder first, so the ring never fills before anything can drain it.
-    if (xTaskCreatePinnedToCore(&Impl::decode_entry, "ac3-decode", im.config.decode_stack_bytes,
-                                &im, im.config.decode_priority, &im.decode_task,
-                                im.config.decode_core) != pdPASS) {
+    //
+    // The stack in PSRAM is asked for and checked for presence as the ring is,
+    // not learned from a failed allocation.
+    BaseType_t decode_created = pdFAIL;
+    if (im.config.decode_stack_in_psram && heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0) {
+        decode_created = xTaskCreatePinnedToCoreWithCaps(
+            &Impl::decode_entry, "ac3-decode", im.config.decode_stack_bytes, &im,
+            im.config.decode_priority, &im.decode_task, im.config.decode_core,
+            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        im.decode_task_with_caps = decode_created == pdPASS;
+        if (im.decode_task_with_caps) {
+            std::printf("player: decode stack %lu bytes in PSRAM\n",
+                        static_cast<unsigned long>(im.config.decode_stack_bytes));
+        }
+    }
+    if (decode_created != pdPASS) {
+        decode_created = xTaskCreatePinnedToCore(&Impl::decode_entry, "ac3-decode",
+                                                 im.config.decode_stack_bytes, &im,
+                                                 im.config.decode_priority, &im.decode_task,
+                                                 im.config.decode_core);
+    }
+    if (decode_created != pdPASS) {
         std::printf("player: could not start the decode task\n");
         return false;
     }
@@ -1222,6 +1273,10 @@ void Player::stop() {
             return;
         }
     }
+    if (im.decode_task_with_caps && im.decode_task != nullptr) {
+        vTaskDeleteWithCaps(im.decode_task);
+    }
+    im.decode_task_with_caps = false;
     im.fetch_task = nullptr;
     im.decode_task = nullptr;
     im.holding = false;
