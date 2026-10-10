@@ -167,9 +167,15 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     config.experimental.coding_configs = (layout & 0x20) != 0;
     config.experimental.acpl = (layout & 0x40) != 0;
     config.experimental.ajcc = (layout & 0x80) != 0;
-    // The sample rate byte's low bit; the two over it name the A-CPL mode.
+    // The sample rate byte's low bit; the two over it name the A-CPL mode, and
+    // its top bit widens an immersive layout to 9.0.4 or 9.1.4 with the screen
+    // pair (experimental.nine_x_4).
     const std::uint8_t rate = take.byte();
     config.sample_rate_hz = (rate & 1) != 0 ? 44100 : 48000;
+    if (config.channels >= 9 && config.channels <= 12 && (rate & 0x80) != 0) {
+        config.channels = lfe ? 14 : 13;
+        config.experimental.nine_x_4 = true;
+    }
     // 4 to 1024 kbps, so the refusals below 8 are reached too.
     config.bitrate_kbps = 4 + static_cast<int>(take.byte()) * 4;
     // The interval takes the low five bits of its byte and dialnorm seven of

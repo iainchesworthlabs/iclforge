@@ -36,6 +36,7 @@
 
 #include <array>
 #include <atomic>
+#include <charconv>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -432,6 +433,7 @@ bool begin_play(Session& session, const std::function<void()>& on_source_open = 
     config.fetch_core = core_from_kconfig(CONFIG_ICLFORGE_EXAMPLE_FETCH_CORE);
     config.decode_core = core_from_kconfig(CONFIG_ICLFORGE_EXAMPLE_DECODE_CORE);
     config.decode_stack_bytes = CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_BYTES;
+    config.decode_stack_in_psram = CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM != 0;
     config.hold_first_unit = CONFIG_ICLFORGE_EXAMPLE_HOLD_FIRST_UNIT != 0;
     config.max_passes = kMaxLaps;
     config.volume = g_volume.load();
@@ -446,6 +448,17 @@ bool begin_play(Session& session, const std::function<void()>& on_source_open = 
                       location.find("decoding=core") != std::string_view::npos;
     config.ac4.pcm_hash = CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH != 0 &&
                           location.find("hash=off") == std::string_view::npos;
+    // below=N is this play's allocation limit for internal RAM, so that one image
+    // compares limits (planning/ac4.md, D14c); without it the Kconfig's value holds.
+    if (const auto at = location.find("below="); at != std::string_view::npos) {
+        int below = 0;
+        const char* const first = location.data() + at + 6;
+        const char* const last = location.data() + location.size();
+        const auto parsed = std::from_chars(first, last, below);
+        if (parsed.ec == std::errc{} && below >= 0) {
+            config.ac4.internal_below = below;
+        }
+    }
     // The play's own demand on the heap, which report_end prints: what was free
     // as it began, and the least that was free from there to its end, read with
     // the heap monitor rather than sampled (planning/esp32-stream-set.md has why

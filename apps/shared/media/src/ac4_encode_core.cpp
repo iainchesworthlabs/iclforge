@@ -18,7 +18,8 @@ namespace iclforge::apps {
 
 std::vector<iclforge::ac4::Speaker> ac4_input_speakers(std::size_t count,
                                                        iclforge::ac4::AdditionalPair pair,
-                                                       bool three_zero, bool back_pair) {
+                                                       bool three_zero, bool back_pair,
+                                                       bool nine_x_4) {
     using S = iclforge::ac4::Speaker;
     const bool seven = count == 7 || count == 8;
     if (seven && pair == iclforge::ac4::AdditionalPair::kNone) {
@@ -26,6 +27,22 @@ std::vector<iclforge::ac4::Speaker> ac4_input_speakers(std::size_t count,
     }
     if ((count == 11 || count == 12) && !back_pair) {
         return {};
+    }
+    if (count == 13 || count == 14) {
+        if (!nine_x_4) {
+            return {};
+        }
+        // 9.0.4 and 9.1.4 in the decoder's order (Part 2 Table A.27): the LFE
+        // after the top channels, then the screen pair.
+        std::vector<iclforge::ac4::Speaker> nine = {
+            S::kLeft,          S::kRight,        S::kCentre,        S::kLeftSurround,
+            S::kRightSurround, S::kLeftBack,     S::kRightBack,     S::kTopFrontLeft,
+            S::kTopFrontRight, S::kTopBackLeft,  S::kTopBackRight};
+        if (count == 14) {
+            nine.push_back(S::kLfe);
+        }
+        nine.insert(nine.end(), {S::kLeftScreen, S::kRightScreen});
+        return nine;
     }
     switch (count) {
         case 1:
@@ -96,6 +113,10 @@ std::string_view ac4_layout_name(std::size_t count, iclforge::ac4::AdditionalPai
             return "7.0.4";
         case 12:
             return "7.1.4";
+        case 13:
+            return "9.0.4";
+        case 14:
+            return "9.1.4";
         default:
             break;
     }
@@ -124,9 +145,24 @@ std::optional<Ac4Measured> measure_ac4_programme(std::span<const std::span<const
     const std::size_t count = channels.size();
     // The bed: every channel up to 5.1, L R C Ls Rs and the LFE where there is
     // one past that; the pairs after it, the 7.X pair or the immersive
-    // layouts' back and top pairs, add their true peaks.
-    const bool lfe_after_five = count == 8 || count == 10 || count == 12;
+    // layouts' back and top pairs, add their true peaks. 9.1.4 comes in the
+    // decoder's order, with its LFE after the top channels, and its bed is
+    // those of 5.1 at the channels' places there.
+    const bool lfe_after_five = count == 8 || count == 10 || count == 12 || count == 14;
     const std::size_t bed = count <= 6 ? count : (lfe_after_five ? 6 : 5);
+    std::vector<std::size_t> bed_at(bed);
+    std::vector<std::size_t> pair_at;
+    if (count == 14) {
+        bed_at = {0, 1, 2, 11, 3, 4};
+        pair_at = {5, 7, 9, 12};
+    } else {
+        for (std::size_t k = 0; k < bed; ++k) {
+            bed_at[k] = k;
+        }
+        for (std::size_t k = bed; k + 1 < count; k += 2) {
+            pair_at.push_back(k);
+        }
+    }
     const bool lfe = bed == 6;
     const auto acmod = bed == 1 ? iclforge::ac3::Acmod::k1_0
                        : bed == 2
@@ -149,7 +185,7 @@ std::optional<Ac4Measured> measure_ac4_programme(std::span<const std::span<const
     }
     // Each pair's true peak after the bed, from a stereo meter of its own.
     std::vector<iclforge::ac3::meta::LoudnessMeter> pair_meters;
-    for (std::size_t k = bed; k + 1 < count; k += 2) {
+    for (std::size_t p = 0; p < pair_at.size(); ++p) {
         pair_meters.emplace_back(rate, iclforge::ac3::Acmod::k2_0, false);
     }
     Ac4Measured out;
@@ -160,12 +196,12 @@ std::optional<Ac4Measured> measure_ac4_programme(std::span<const std::span<const
     for (std::size_t at = 0; at < length; at += step) {
         const std::size_t n = std::min(step, length - at);
         for (std::size_t k = 0; k < bed; ++k) {
-            views[k] = channels[order[k]].subspan(at, n);
+            views[k] = channels[bed_at[order[k]]].subspan(at, n);
         }
         meter.push(views);
         for (std::size_t p = 0; p < pair_meters.size(); ++p) {
-            pair_views[0] = channels[bed + 2 * p].subspan(at, n);
-            pair_views[1] = channels[bed + 2 * p + 1].subspan(at, n);
+            pair_views[0] = channels[pair_at[p]].subspan(at, n);
+            pair_views[1] = channels[pair_at[p] + 1].subspan(at, n);
             pair_meters[p].push(pair_views);
         }
         const auto keep_max = [](std::optional<double>& max, std::optional<double> value) {

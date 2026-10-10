@@ -201,8 +201,12 @@ side's difference from its downmix to 3 kHz; with `aspx-acpl-1` or `aspx-acpl-2`
 Table 163); `7x-back`, `7x-wide` or `7x-top-front`, which takes seven or eight channels as 7.0 or
 7.1 in that 7.X layout, in the WAV order `decode` writes: 3/4/0's back pair in BL and BR and its
 surrounds in SL and SR, 5/2/0's wide pair last, 3/2/2's top front pair in TFL and TFR;
-`back-pair`, which takes 11 and 12 channels as 7.0.4 and 7.1.4, with Lb and Rb; `three-zero`, which
-takes three channels, L R C, as 3.0, the dialogue of a music and effects presentation (below);
+`back-pair`, which takes 11 and 12 channels as 7.0.4 and 7.1.4, with Lb and Rb; `nine-x-4`, which
+takes 13 and 14 channels as 9.0.4 and 9.1.4, the immersive element with the screen pair Lscr and Rscr
+(SCPL, ASPX_SCPL and ASPX_ACPL_2 by the rate, and with `acpl` ASPX_ACPL_1; it refuses `ajcc`, dialogue
+enhancement and `height-downmix=`, and its thirteen tracks make the stream `md_compat` 7, which
+`decode` takes with `md-compat=7`); `three-zero`, which takes three channels, L R C, as 3.0, the
+dialogue of a music and effects presentation (below);
 `noise-fill`, which sends each scale factor band that quantises to zero a noise level (Part 1
 5.1.4: its own energy in 3 dB steps, from the level before it) that the decoder fills with noise,
 and so trades some SNR for a spectrum without holes at a low rate; `hfr-2` and `hfr-4`, the

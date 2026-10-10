@@ -26,7 +26,7 @@ again, so the memory and fit figures below are those of 2026-09-15.
 | Memory, no network | Every fixture fits: 383,416 bytes free before the decode, largest block 352,256, against a largest peak of 234,070 (7.1.4 folded to stereo) |
 | Memory, with WiFi and a stream | About 236,000 bytes free before the decode, largest block 217,088 to 221,184. Everything up to the Atmos objects rows (212,253 bytes of peak) fits, and leaves 18,152 bytes free at the lowest; 7.1.4 (227,662) does not. With ESP-IDF's WiFi IRAM options off every fixture fits, 7.1.4 included, and the decode is slower |
 | Encode | Not measured. Both encoders are floating-point, which on this part is software floating point |
-| AC-4 | Builds, in the fixed-point tier (`CONFIG_ICLFORGE_AC4`). The decoder peaks at 286,365 bytes at 2.0, against about 236,000 free with WiFi up in ESP-IDF's default configuration and 285,408 with WiFi's code kept in flash, and 383,416 with no network. Not run on the board. See [AC-4](#ac-4). No ESP32 sink takes AC-4 in a Sendspin group |
+| AC-4 | Builds, in the fixed-point tier (`CONFIG_ICLFORGE_AC4`). The decoder peaks at 286,365 bytes at 2.0, against about 236,000 free with WiFi up in ESP-IDF's default configuration and 285,408 with WiFi's code kept in flash, and 383,416 with no network. On the board with WiFi and the Hearth sink up it has 117 KB of heap when a play starts and a play is refused, as it must be: no AC-4 stream decodes here beside the network. See [AC-4](#ac-4). No ESP32 sink takes AC-4 in a Sendspin group |
 | QEMU | Not emulated, see [QEMU](#qemu) |
 | CI | The component pack builds for `esp32c6` from its archive, and the `build-esp32c3` job builds this probe with both network loads and `hearth_sink` for the part with 4 MB and with 16 MB of flash. Nothing runs. Both are in the `esp` lane of `ci.yml`, which runs after a merge to main that changes the ESP32 trees or a tree its component ships (the [lane table](../../ci-lanes.md#lane-table) lists them), and nightly ([CI for many agents](../../ci-agentic.md#the-tiers)) |
 
@@ -318,7 +318,7 @@ The AC-4 decoder's fixed-point tier ([`planning/ac4.md`, D14d](https://github.co
 builds for this part from the same component, with `CONFIG_ICLFORGE_AC4`. Measured on 2026-10-03
 on the host and under QEMU, with the decoder's memory work of
 [D14f](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14f-the-decoders-memory)
-in; the board has not run it.
+in. The board ran it on 2026-10-10 (below).
 
 | | Fixed | Float |
 |---|---:|---:|
@@ -348,9 +348,36 @@ code kept in flash it had 285,408, level with 2.0's 286,365, and with no network
 holds 2.0 with about 97,000 bytes to spare. The largest single allocation at 2.0 is a frame's two
 parsed tracks, 31,168 bytes, so the largest free block is not what limits it. The Sendspin player's ring,
 WebSocket server and WiFi buffers leave less than the probe's network image does, so a C6 sink
-takes AC-4 programmes from Hearth as PCM (`planning/ac4.md`, decision 32) until a board run says
-otherwise. The fixed tier's PCM hashes are those of the x86-64 host and the Cortex-M3 leg
+takes AC-4 programmes from Hearth as PCM (`planning/ac4.md`, decision 32). The fixed tier's PCM
+hashes are those of the x86-64 host and the Cortex-M3 leg
 (`testdata/ac4-fixed-probe-pcm-hashes.json`).
+
+### On the board
+
+Run on 2026-10-10 on `hearth-db4c40` (ESP32-C6, 160 MHz, 16 MB of flash) with `hearth_sink` built from
+the tree of that day with `sdkconfig.ac4` and a 24 KB decode stack, WiFi up and the Sendspin player
+idle, a null sink, and DEE's 2.0 music streams (`20-music-192`, SIMPLE; `20-music-96`, A-SPX) served
+from a desktop over HTTP and played with `POST /play`.
+
+- **It does not fit.** A play starts with 117,328 bytes of heap free (largest block 96,256) and, with
+  the player's 32 KB ring and the decode task's stack taken, 26,420 when the decoder is made. The
+  decoder asked for a 27,264-byte block with 7,952 free and the board called `abort()` and restarted
+  (the console of the first play shows it). The first run's four plays, 2.0 SIMPLE and A-SPX and
+  core decoding of the SIMPLE stream and of a 5.1 one, each ended with a restarted board. The 2.0
+  SIMPLE stream needs at least 286,365 bytes of peak heap and the part has 117 KB beside the network,
+  so the 285,408 bytes above, which are with WiFi's code in flash, are not what the Hearth sink
+  leaves: its WebSocket server, player and WiFi buffers take the rest.
+- **It is refused, not aborted.** Before it makes a decoder the player now compares the heap it has
+  with the least any AC-4 stream has asked for (286,365 bytes, the 2.0 fixtures' peak since D14f)
+  and fails the play with `why: "memory"` and
+  `player: AC-4 needs at least 286365 bytes of heap and 26420 are free: refused`; the board keeps
+  running and an AC-3 or E-AC-3 play after it plays as before. The check is a floor, not a fit: a
+  wider stream asks for more.
+- **Not measured: time.** With no network the 2.0 decode would fit (383,416 bytes free), but a sink
+  without the network is not a product here, and a decode time against the 42.7 ms frame is not
+  measured. Nothing in this section says the part could keep up.
+
+AC-4 reaches a C6 sink as PCM from Hearth, which is decision 32's plan.
 
 ## QEMU
 

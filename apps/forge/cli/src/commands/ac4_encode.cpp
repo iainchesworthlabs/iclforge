@@ -147,20 +147,21 @@ struct Input {
 [[nodiscard]] std::optional<Input> read_input(std::string_view path, std::size_t number,
                                               const Options::Ac4Encode::Dialogue& dialogue,
                                               iclforge::ac4::AdditionalPair pair, bool three_zero,
-                                              bool back_pair) {
+                                              bool back_pair, bool nine_x_4) {
     auto wav = read_wav_arg(path);
     if (!wav.has_value()) {
         fmt::println(stderr, "error: {}: {}", path, iclforge::ac3::io::describe(wav.error()));
         return std::nullopt;
     }
     Input input;
-    input.speakers =
-        iclforge::apps::ac4_input_speakers(wav->channels.size(), pair, three_zero, back_pair);
+    input.speakers = iclforge::apps::ac4_input_speakers(wav->channels.size(), pair, three_zero,
+                                                        back_pair, nine_x_4);
     if (input.speakers.empty()) {
         fmt::println(stderr,
                      "error: {}: AC-4 encoding takes mono, stereo, 5.0, 5.1, 5.0.4 and 5.1.4, 7.0 "
                      "and 7.1 with experimental=7x-back, 7x-wide or 7x-top-front, 7.0.4 and 7.1.4 "
-                     "with experimental=back-pair, and 3.0 with experimental=three-zero; "
+                     "with experimental=back-pair, 9.0.4 and 9.1.4 with experimental=nine-x-4, "
+                     "and 3.0 with experimental=three-zero; "
                      "substream {} has {} channels",
                      path, number, wav->channels.size());
         return std::nullopt;
@@ -371,7 +372,7 @@ int run_ac4_encode(std::string_view in_path, std::string_view out_path, std::uin
         if (n == 0 || !substreams[n].path.empty()) {
             inputs[n] = read_input(n == 0 ? in_path : std::string_view{substreams[n].path}, n + 1,
                                    substreams[n].dialogue, pair, meta.ac4_experimental_three_zero,
-                                   meta.ac4_experimental_back_pair);
+                                   meta.ac4_experimental_back_pair, meta.ac4_experimental_nine_x_4);
             if (!inputs[n]) {
                 return kExitInput;
             }
@@ -421,7 +422,8 @@ int run_ac4_encode(std::string_view in_path, std::string_view out_path, std::uin
                      "give height-downmix=front, surround or front-and-surround");
         return kExitUsage;
     }
-    if (count == 1 && opts.height_downmix && !immersive) {
+    // 9.0.4 and 9.1.4 (13 and 14 channels) have no height downmix written.
+    if (count == 1 && opts.height_downmix && (!immersive || speakers.size() > 12)) {
         fmt::println(stderr,
                      "error: height-downmix= describes the top channels' downmix of 5.0.4, 5.1.4, "
                      "7.0.4 and 7.1.4; the source is {}",
@@ -467,6 +469,7 @@ int run_ac4_encode(std::string_view in_path, std::string_view out_path, std::uin
     config.experimental.three_zero = meta.ac4_experimental_three_zero;
     config.experimental.back_pair = meta.ac4_experimental_back_pair;
     config.experimental.ajcc = meta.ac4_experimental_ajcc;
+    config.experimental.nine_x_4 = meta.ac4_experimental_nine_x_4;
     config.experimental.noise_fill = meta.ac4_experimental_noise_fill;
     config.experimental.frame_rate_fraction = meta.ac4_experimental_frame_rate_fraction;
 

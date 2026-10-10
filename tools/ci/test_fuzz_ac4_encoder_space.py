@@ -118,8 +118,8 @@ class DrawCase(unittest.TestCase):
 
     def test_the_space_drawn(self):
         cases = channel_cases(2000)
-        self.assertEqual({c.channels for c in cases},
-                         set(fa4.CHANNELS) | set(fa4.IMMERSIVE_CHANNELS))
+        drawn = set(fa4.CHANNELS) | set(fa4.IMMERSIVE_CHANNELS) | set(fa4.NINE_X_4_CHANNELS)
+        self.assertEqual({c.channels for c in cases}, drawn)
         # Seven and eight channels always name a 7.X pair, and nothing else does; 5.X and 7.X
         # never draw a rate in range below their least.
         for case in cases:
@@ -200,7 +200,8 @@ class DrawCase(unittest.TestCase):
         immersive = [c for c in cases if c.channels > 8]
         # About one case in eight, in every layout and codec mode, with the height downmix.
         self.assertTrue(350 < len(immersive) < 650)
-        self.assertEqual({c.channels for c in immersive}, set(fa4.IMMERSIVE_CHANNELS))
+        self.assertEqual({c.channels for c in immersive},
+                         set(fa4.IMMERSIVE_CHANNELS) | set(fa4.NINE_X_4_CHANNELS))
         options = {o for c in immersive for o in c.options}
         self.assertTrue({f"codec-mode={m}" for m in fa4.IMMERSIVE_MODES} <= options)
         self.assertTrue(any(not any(o.startswith("codec-mode=") for o in c.options)
@@ -211,10 +212,11 @@ class DrawCase(unittest.TestCase):
             tools = [t for o in case.options if o.startswith("experimental=")
                      for t in o.split("=", 1)[1].split(",")]
             modes = [o.split("=", 1)[1] for o in case.options if o.startswith("codec-mode=")]
-            # The back pair with eleven and twelve channels alone; ASPX_ACPL_1 with
-            # experimental=acpl and ASPX_AJCC with experimental=ajcc; none of what the
-            # immersive element refuses.
-            self.assertEqual("back-pair" in tools, case.channels > 10)
+            # The back pair with eleven and twelve channels alone, and the screen pair with
+            # thirteen and fourteen; ASPX_ACPL_1 with experimental=acpl and ASPX_AJCC with
+            # experimental=ajcc; none of what the immersive element refuses.
+            self.assertEqual("back-pair" in tools, 10 < case.channels <= 12)
+            self.assertEqual("nine-x-4" in tools, case.channels > 12)
             self.assertEqual("acpl" in tools, modes == ["aspx-acpl-1"])
             self.assertEqual("ajcc" in tools, modes == ["aspx-ajcc"])
             self.assertFalse(any(t in tools for t in ("coding-configs", *fa4.SEVEN_X)))
@@ -224,11 +226,29 @@ class DrawCase(unittest.TestCase):
             if any(o.startswith("height-gain=") for o in case.options):
                 self.assertTrue(any(o.startswith("height-downmix=") for o in case.options))
             if case.in_range:
-                least = fa4.IMMERSIVE_LOWEST_KBPS[modes[0] if modes else "auto"]
-                self.assertGreaterEqual(case.bitrate, least)
+                table = (fa4.NINE_X_4_LOWEST_KBPS if case.channels > 12
+                         else fa4.IMMERSIVE_LOWEST_KBPS)
+                self.assertGreaterEqual(case.bitrate, table[modes[0] if modes else "auto"])
             # The LFE's downmix gain where there is an LFE.
             if any(o.startswith("lfemix=") for o in case.options):
-                self.assertIn(case.channels, (10, 12))
+                self.assertIn(case.channels, (10, 12, 14))
+            # What the 9.X.4 element refuses is not drawn for it: ASPX_AJCC, dialogue
+            # enhancement, the height downmix and further substreams.
+            if case.channels > 12:
+                self.assertNotIn("aspx-ajcc", modes)
+                self.assertFalse(any(o.startswith(("dialogue-", "height-")) for o in case.options))
+                self.assertEqual(case.substreams, [])
+                self.assertFalse(case.stem)
+
+    def test_the_nine_x_4_layouts(self):
+        cases = channel_cases(4000)
+        nine = [c for c in cases if c.channels > 12]
+        # About a sixth of the immersive cases, both layouts, in every codec mode but ASPX_AJCC.
+        self.assertTrue(40 < len(nine) < 180)
+        self.assertEqual({c.channels for c in nine}, set(fa4.NINE_X_4_CHANNELS))
+        options = {o for c in nine for o in c.options}
+        self.assertTrue({f"codec-mode={m}" for m in fa4.NINE_X_4_MODES} <= options)
+        self.assertFalse(any(c.scene for c in nine))
 
     def test_the_object_cases(self):
         cases = [fa4.draw_case(seed) for seed in range(2000)]
