@@ -447,7 +447,10 @@ TEST_CASE("a decoder at level 3 does not select a 22.2 presentation and one at l
     const std::vector<Channel> channels = layout();
     const Encoded encoded = encode(config_at(880, CodecMode::kAspx), tones(channels));
     REQUIRE_FALSE(encoded.frames.empty());
-    iclforge::ac4::Decoder level_three;
+    // The default level is 7 since #1241, so level 3 is asked for.
+    iclforge::ac4::DecoderConfig level_three_config;
+    level_three_config.level = 3;
+    iclforge::ac4::Decoder level_three(level_three_config);
     const auto refused = level_three.decode(encoded.frames.front().raw_ac4_frame);
     CHECK_FALSE(refused.has_value());
     CHECK(level_three.refusal_reason().find("select") != std::string_view::npos);
