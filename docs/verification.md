@@ -1600,8 +1600,9 @@ and 96 kbps: a downmix coded in the ASPX way and A-CPL's parameters, from which 
 the channels. 5.0 and 5.1 take the 5.X element in the one form DEE's streams have (`coding_config` 0
 and `2ch_mode` 0: L and R a pair, Ls and Rs a pair, C alone, the LFE); its other coding
 configurations, chosen frame by frame by the bits they save, 7.0 and 7.1 in the 7.X element,
-ASPX_ACPL_1 and A-CPL in stereo, and 7.0.4 and 7.1.4 with the back pair, ASPX_ACPL_1 and A-JCC in
-the immersive element are experimental options. Objects, as an A-JOC substream or direct-coded, are
+ASPX_ACPL_1 and A-CPL in stereo, and 7.0.4 and 7.1.4 with the back pair, 9.0.4 and 9.1.4 with the
+screen pair (`b_5fronts`, in every immersive mode but A-JCC), ASPX_ACPL_1 and A-JCC in the immersive
+element are experimental options. Objects, as an A-JOC substream or direct-coded, are
 an experimental option too (phase E9), as is spectral noise fill, which gives each band that
 quantises to zero a level of its own (`experimental.noise_fill`), and the efficient high frame rate
 mode, which sends each codec frame as two or four transmission frames
@@ -1654,7 +1655,12 @@ paragraph on the objects follows them:
   each channel's own parameter band comes back within 0.5 dB, 40 dB over every other tone, in
   ASPX_ACPL_1 to 3 and in stereo. A pair's level difference and correlation come back with it: for one
   noise at a 6 dB difference within 1 dB and above 0.9, and for two independent noises within 1 dB and
-  under 0.3.
+  under 0.3. A 9.0.4 and a 9.1.4 stream in SCPL, ASPX_SCPL, ASPX_ACPL_1 and ASPX_ACPL_2 decode with
+  each of the 13 or 14 tones on its own channel at unity (the A-CPL pairs by the same rule as above),
+  in Part 2 Table A.27's order, and the decoder's renderer folds them to 7.X.4, 5.X.4 and 5.X by the
+  9.X rows of Tables 38 to 43 (`test_nine_x_four.cpp`). `tools/checks/ac4_syntax_differential.py`
+  reads eight such streams (those four modes at both layouts, 28 frames each) through both
+  transcriptions with no finding; no stream of another encoder reaches the element.
 - **Readers outside the project.** FFmpeg's raw AC-4 demuxer finds every frame at the size written,
   and its mov demuxer reads the MP4 track (the harness and the codec matrix). Locally,
   `tools/checks/check_ac4_encode_readers.py` holds MediaInfo's frame-by-frame trace to the

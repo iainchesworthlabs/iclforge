@@ -151,6 +151,7 @@ struct Options {
     bool ac4_experimental_three_zero = false;
     bool ac4_experimental_back_pair = false;
     bool ac4_experimental_ajcc = false;
+    bool ac4_experimental_nine_x_4 = false;
     bool ac4_experimental_noise_fill = false;
     // experimental=hfr-2 or hfr-4: the efficient high frame rate mode's fraction, 1 for off
     int ac4_experimental_frame_rate_fraction = 1;

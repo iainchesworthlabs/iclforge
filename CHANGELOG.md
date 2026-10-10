@@ -1711,6 +1711,21 @@ The sections below contain the complete change list and fixes.
   decoding every channel's tone comes back on its own channel at unity, and in core decoding on the 5.X.2
   core's speaker at the core's gain. `src/ac4dec/ERRATA.md`'s evidence for Table 20's prediction gains is
   corrected: DEE's SCPL and ASPX_SCPL streams send them with `sap_mode` 3, not 0.
+- **The AC-4 encoder writes 9.0.4 and 9.1.4** (`EncoderConfig::experimental.nine_x_4`, `forge
+  ac4-encode experimental=nine-x-4`). Thirteen or fourteen input channels, in the order the decoder writes
+  them (L R C Ls Rs Lb Rb Tfl Tfr Tbl Tbr, the LFE of 9.1.4, then Lscr and Rscr), are coded in Part 2's
+  immersive channel element with `b_5fronts` 1 (clause 6.2.4.1) in SCPL, ASPX_SCPL and ASPX_ACPL_2 and,
+  with `experimental.acpl`, ASPX_ACPL_1. The screen pair is coded as A'' = (L + Lscr) / 2 and L'' = (L -
+  Lscr) / 2, and B'' and M'' alike for R, with L'' and M'' predicted from A'' and B'' band by band (Table
+  20's a'_4 and a'_5); A-SPX takes Table 8's seven units and A-CPL six modules. Every channel's tone
+  decodes on its own channel at unity in each mode and layout, the decoder's trace is the encoder's, the
+  decoder's renderer folds the stream to 7.X.4 and 5.X by Tables 38 to 43, and the differential check
+  reads eight such streams through both transcriptions without a finding. The table of contents names
+  channel mode 13 or 14 and `md_compat` 7, which a decoder selects at level 7 (`forge decode
+  md-compat=7`); its `dac4` is written. ASPX_AJCC with `b_5fronts`, dialogue enhancement and the height
+  downmix are refused, naming the element. No encoder outside this project writes the element, so the
+  readings are the text's alone (`libs/ac4/ERRATA.md`, "The 9.X.4 element" under the encoder). Not
+  mirrored in the C API.
 - **The AC-4 encoder's API in its final form, `ac3cli ac4-encode`'s options, and the encoder
   installed** (phase E7 of `planning/ac4.md`). `ac4::Encoder::refusal_reason()` names the rule a
   configuration `create()` refuses breaks, as a string literal such as "a rate outside 8 to 3 000
