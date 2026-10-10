@@ -185,7 +185,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | API, CLI and packaging | 🟢 | High | Essential | `EncoderConfig`, every field with a default for designated initializers, and `Encoder`, whose `refusal_reason()` names the rule a configuration breaks; `sync_frame()` for raw files and MPEG-2 TS; `forge ac4-encode` with an option for each setting, every option tested; installed and exported with the decoder (`iclforge::ac4_static`, `iclforge::ac4_shared`, pkg-config `iclforge-ac4`), and a program encodes through the installed package by CMake and by pkg-config |
 | | Forge GUI encode | 🟢 | Medium | Important | The AC-4 tab: one source in its own layout, mono to 5.1, to a raw stream or an MP4 file, with the frame rate, rate and codec modes, dialnorm and loudness, DRC, the stereo downmix, dialogue enhancement, the I-frame interval and the CRC; the page echoes the `forge ac4-encode` line, which writes the same bytes, raw and MP4, in the Qt Quick Tests (I3). With AC-4 chosen the Objects tab writes AC-4 objects, A-JOC by default or direct-coded, to a raw stream or an MP4 file (I5b): the page gives the writer's limits (frame_rate_index 13, 64 objects, one LFE) in its own text, names a request it cannot write before Encode is pressed, and greys out the controls that cannot apply; its echoed `forge atmos-encode … codec=ac4` line writes the same bytes, raw and MP4, in the Qt Quick Tests, the two running the object steps in `apps/shared/media/src`; an ADM master's two beds and one moving object, authored on the page, decode in the GUI's object decoding within I5's 0.06 a position axis and 2 dB. Substreams, presentations and the other layouts stay with the command line |
 | | Immersive layouts | 🟢 | High | Essential | 5.0.4 and 5.1.4 in the immersive element as DEE writes it, in SCPL, ASPX_SCPL and ASPX_ACPL_2 by the rate; 7.0.4 and 7.1.4, ASPX_ACPL_1 and A-JCC behind `experimental=`; the race against DEE's 5.1.4 from 192 to 768 kbps (phase E8) |
-| | Objects | 🟡 | Medium | Essential | Behind `experimental=objects` (phase E9): A-JOC substreams over a computed downmix or a static 5.0 or 5.1 bed, the matrices chosen by running the decoder's reconstruction, bed objects, the LFE and decorrelators; direct-coded dynamic objects; object audio metadata with each update at its sample. Each object decodes at 40 to 75 dB SNR against its source and core decoding gives the downmix at its metadata, pinned in CI; the three traces agree. No reader outside the project has checked it: DEE writes no A-JOC from this project's masters, librempeg refuses object coding, and MediaInfo's reading waits for a run where DEE is installed |
+| | Objects | 🟡🔵 | Medium | Essential | Behind `experimental=objects` (phase E9): A-JOC substreams over a computed downmix or a static 5.0 or 5.1 bed, the matrices chosen by running the decoder's reconstruction, bed objects, the LFE and decorrelators; direct-coded dynamic objects; object audio metadata with each update at its sample. Each object decodes at 40 to 75 dB SNR against its source and core decoding gives the downmix at its metadata, pinned in CI; the three traces agree. MediaInfo reads each committed stream's object count and static bed as configured (`check_ac4_encode_readers.py --only objects`). No reader outside the project decodes the audio, and none will: DEE refuses this project's object masters on provenance and its licence ends on 2026-11-06 without renewal, and librempeg refuses object coding. Accepted |
 
 ---
 
@@ -209,10 +209,12 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | `AudioDataPCM` | 🟢 | High | Essential | Full PCM |
 | | `AudioDataDLC` (Annex B) | 🟢 | Medium | Important | 48 and 96 kHz, bit exact; `decode_dlc`, used by `build_iab` |
 | | MXF Track File extract (ST 2067-201) | 🟢 | High | Essential | Minimal KLV walk |
-| **Bridge** | IAB → Atmos encode (positions / gains) | 🟢 | High | Essential | `adm::build_iab`; `forge atmos-iab` |
-| | Spread + `ObjectZoneControl` → JOC | 🟡 | Medium | Important | Spread → object size; zone control → zone constraint when it matches one of the six presets; otherwise unconstrained |
+| **Bridge** | IAB → Atmos encode (positions / gains) | 🟢 | High | Essential | `adm::build_iab`; `forge atmos-iab`; every Table 19 channel is placed, the Reserved codes are refused |
+| | Spread + `ObjectZoneControl` → JOC | 🟡🔵 | Medium | Important | Spread → object size; zone control → zone constraint: exact for the six presets, otherwise the tightest preset that includes every zone it includes, listed in `IabBridgeResult::unmapped` and warned by `forge atmos-iab`. Accepted: OAMD says six presets and an elevation bit, so no finer pattern and no zone gain can be carried |
+| | Decorrelation, snap tolerance | 🔴🔵 | Low | Nice-to-have | `ObjectDecorCoef`, a bed channel's decorrelation and `ObjectSnapTolerance` are read and not carried: OAMD has no field for them (as for ADM `diffuse`). Listed in `unmapped` and warned. Accepted: the target format has none |
+| | More than 15 bed channels and objects | 🔴 | High | Important | `build_iab` returns `kTooManyChannels`: TS 103 420 §8.3.2.2 caps the programme at 16 with the LFE, and nothing clusters a larger master down to fit. The ADM bridge has the same cap |
 | **Writer** | IAB encode | 🟢 | Low | Nice-to-have | `write_iaframe`, `write_iabitstream`; `encode_dlc` for lossless essence |
-| | MXF Track File write (ST 2067-201) | 🟢 | Low | Nice-to-have | `write_mxf_iab`; refuses what 2067-201 forbids (16-bit, DLC, `BedRemap`, child elements); checked by a separate reader and FFmpeg's demuxer, no IMF tool here has opened it |
+| | MXF Track File write (ST 2067-201) | 🟢 | Low | Nice-to-have | `write_mxf_iab`; refuses what 2067-201 forbids (16-bit, DLC, `BedRemap`, child elements); checked by a separate reader, FFmpeg's demuxer and Netflix Photon 5.1.0-rc.3, which finds no error in it ([Validation](../verification.md#imf-iab-track-files)) |
 
 ---
 
@@ -222,11 +224,12 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 |---|---|---|---|---|---|
 | **Reader** | BW64/RF64 container | 🟢 | High | Essential | Opt-in (`ICLFORGE_BUILD_ADM`); Boost |
 | | ADM XML — DirectSpeakers + Objects | 🟢 | High | Essential | Including `zoneExclusion`, `objectDivergence`, `screenRef`, `headLocked`; `zoneExclusion` is read from the axml text because libadm does not parse it |
-| | ADM XML — HOA / Binaural / Matrix blocks | 🟡 | Low | Nice-to-have | Parsed as blocks; a Matrix block's coefficients are not (libadm has no model); the bridge refuses all three |
+| | ADM XML — HOA / Binaural / Matrix blocks | 🟢 | Low | Nice-to-have | HOA order, degree, normalization, `nfcRefDist`, `equation`, `screenRef`, `headLocked` and a pack's defaults. A Matrix block whole (output channel, coefficients with gain, phase, delay and variables, `jumpPosition`) and a Matrix pack's encode / decode / input / output references, read from the axml text because libadm skips Matrix blocks. A Binaural block has nothing beyond the common fields. The bridge refuses all three (see Bridge) |
+| | ADM descriptive and interaction metadata | 🔴🔵 | Low | Optional | `audioProgramme` start, end and reference screen, loudness, dialogue, interaction ranges, labels, `headphoneVirtualise`, channel `frequency` and DirectSpeakers position bounds are not in the model, so they are neither read nor written; none reaches an Atmos or AC-4 encode. Recorded in [ADM / BW64 reading](adm.md#what-gets-parsed) |
 | | Common definitions (Annex A) | 🟢 | Medium | Important | Predefined formats merged |
-| **Writer** | BW64 write | 🟡 | Medium | Important | 16/24/32-bit integer or 32/64-bit float; shapes matching the bridge; `zoneExclusion` written |
-| | Decode → ADM BWF (Atmos master profile) | 🟡 | Medium | Important | Dynamic-object-only programmes; cartesian; zone constraints, divergence value and `screenRef` written |
-| **Bridge** | ADM → Atmos encode | 🟡 | High | Essential | Position, gain, size, snap, zone constraints, divergence value and `screenRef` carried; `headLocked`, `diffuse`, a divergence range and a conditioned `channelLock` listed in `BridgeResult::unmapped` and warned; Matrix / HOA / Binaural refused |
+| **Writer** | BW64 write | 🟢 | Medium | Important | 16/24/32-bit integer or 32/64-bit float; every type the reader produces (DirectSpeakers, Objects, HOA, Binaural, Matrix), polar or cartesian positions, nested `audioObject`s and `audioPackFormat`s, `zoneExclusion`. `kUnknown` and user-custom types have no element and are refused |
+| | Decode → ADM BWF (Atmos master profile) | 🟡🔵 | Medium | Important | E-AC-3 and AC-4: dynamic objects and channel-based-immersive bed programmes; cartesian; zone constraints, divergence value and `screenRef` written. An E-AC-3 programme with ISF objects, a second bed instance, a Table 13 bed assignment or an LFE2 is refused with a warning: each has a channel count and no label, and no stream in hand shows how a renderer places it. Recorded in [ADM ↔ Atmos bridging](adm-bridge.md#write-direction) |
+| **Bridge** | ADM → Atmos encode | 🟡🔵 | High | Essential | Position, gain, size, snap, zone constraints, divergence value and `screenRef` carried; `headLocked`, `diffuse`, a divergence range and a conditioned `channelLock` listed in `BridgeResult::unmapped` and warned, since OAMD has no field for any of them; Matrix / HOA / Binaural refused: none is a positioned mono object, and a matrix decode or an HOA decoder would be written without a file or reference to check it against. Recorded in `ROADMAP.md` (Out of scope) and [ADM ↔ Atmos bridging](adm-bridge.md#what-does-not-get-mapped) |
 
 ---
 
@@ -339,8 +342,12 @@ this register is the checklist that those bounds appear here too.
 | Part 2 5.1.3 | Efficient high frame rate mode (`frame_rate_fraction` 2 or 4): decoded from the text; no encoder's stream | 🟡🔵 |
 | §4.2.4.3 | HSF extension substream: syntax and PCM at 96 and 192 kHz in the SIMPLE mode, on constructed streams only; A-SPX, A-CPL, the speech frontend, immersive and 22.2, objects, mixing, dialogue enhancement and DRC compression are refused at those rates, where the text stops (5.4: no QMF domain tool) | 🟡🔵 |
 | Whole codec | 22.2 and 9.X.4: no stream and no other decoder, so their decode is checked against constructed streams alone; 22.2 has no renderer or core decoding (Part 2 gives none) | 🟡🔵 |
-| Whole codec | Encoding the speech frontend, the 9.X.4 and 22.2 elements and 96 or 192 kHz | 🔴 |
-| Whole codec | Encoder options no reader outside the project has checked: the `experimental=` tools, the 7.X layouts, 7.X.4 with the back pair, ASPX_AJCC, objects | 🟡 |
+| Whole codec | Encoding the speech frontend: an encoder for it contains its decoder, with the five defects `libs/ac4/ERRATA.md` records, and no stream or second decoder exists (plan decision 2) | 🔴🔵 |
+| Whole codec | Encoding 96 or 192 kHz (the HSF extension, in the SIMPLE mode of the mono to 7.X elements): no stream, product or second decoder uses it, and a 48 kHz decoder ignores the extension (Part 1 4.2.4.3 and 5.4) | 🔴🔵 |
+| Whole codec | Encoding the 9.X.4 and 22.2 elements | 🔴 |
+| Part 1 5.7.6.5 | The encoder choosing A-SPX time-interleaved waveform coding: its syntax writer exists and no frame sends it. A slot that uses it takes the core's waveform in every subband, so the frame's whole high band is waveform coded, which costs more than the rates A-SPX serves hold; the encoder meets attacks with block switching and VARVAR framing | 🔴🔵 |
+| Part 1 / 2 TOC legacy | The encoder writes `bitstream_version` 2 alone: no stream or decoder here needs 0 or 1 from it | 🔴🔵 |
+| Whole codec | Encoder options no reader outside the project has checked: the `experimental=` tools, the 7.X layouts, 7.X.4 with the back pair, ASPX_AJCC, objects. MediaInfo reads every table of contents and metadata field as written, and librempeg, the one other decoder, agrees on the default tools and not on these (`docs/verification.md`); none will read them further | 🟡🔵 |
 | §5.1.4 | Spectral noise fill: decoded, but no stream here sets it | 🟡🔵 |
 | Part 1 Table 168, Part 2 Table 69 | `nr_drc_channels` for a 3.0 element: not given, so transmitted channel-dependent DRC gains for one are refused by name | 🟡🔵 |
 | Part 2 6.2.2.5, Table 68 | Advanced dialogue enhancement compressor and `max_ducking_depth`: parameters given, processing not; read and not applied | 🔴🔵 |
@@ -350,15 +357,19 @@ this register is the checklist that those bounds appear here too.
 
 | Clause | Open item | Status |
 |---|---|---|
-| §5.5 / §10 zone control | A zone pattern that matches none of TS 103 420 Table 20's six presets is left unconstrained | 🟡 |
-| Writer | ST 2067-201 Track File: no IMF validator or packager has opened a file | 🟡 |
+| §5.5 / §10 zone control | A zone pattern outside TS 103 420 Table 20's six presets is carried as the tightest preset that includes every zone it includes; OAMD has no finer value | 🟡🔵 |
+| §10.3.5 Table 19 | The positions of the channels with no bed label are readings of ST 2098-5 Annex B's informative prose; neither it nor ST 2098-2 gives coordinates | 🟡🔵 |
+| §10.3.10, §10.5.9, §10.5.18 | Decorrelation and snap tolerance have no OAMD field | 🔴🔵 |
+| Writer | ST 2067-201 Track File: Photon 5.1.0-rc.3 opens a written file with no error (it found two defects, fixed); no IMF packager has wrapped one in an IMP, and this project writes no CPL, PKL or ASSETMAP | 🟡🔵 |
 
 ### ITU-R BS.2076 / BS.2088 (ADM / BW64)
 
 | Clause | Open item | Status |
 |---|---|---|
-| Pack types beyond DirectSpeakers + Objects | Matrix / HOA / Binaural: not representable in the Atmos bridge (refused by design); Matrix coefficients not parsed | 🟡 |
-| Writer / bridge | Narrowed Atmos-master subset; divergence and `screenRef` mapped by reading, since TS 103 420 Annex B has no row for them; no external decoder has rendered either | 🟡 |
+| Pack types beyond DirectSpeakers + Objects | Matrix / HOA / Binaural: read and written, refused by the Atmos bridge (not positioned mono objects); recorded in `ROADMAP.md` (Out of scope) | 🟡🔵 |
+| Matrix element shapes | Read from the standard's sample code (§5.4.3.2.1, §5.5.4.2) and EAR's parser; no ADM file with a Matrix pack from another tool, and no tool that applies one, has been run against them; recorded in `libs/adm/ERRATA.md` | 🟡🔵 |
+| Descriptive and interaction metadata | `audioProgramme` timing and reference screen, loudness, dialogue, interaction ranges, labels, `headphoneVirtualise`, channel `frequency`, DirectSpeakers position bounds: not in the model; recorded in [ADM / BW64 reading](adm.md#what-gets-parsed) | 🔴🔵 |
+| Writer / bridge | Narrowed Atmos-master subset; divergence and `screenRef` mapped by reading, since TS 103 420 Annex B has no row for them; no external decoder has rendered either | 🟡🔵 |
 
 ### AOM IAMF v2.0.0
 

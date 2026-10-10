@@ -1344,6 +1344,9 @@ int run_atmos_iab(std::string_view in_path, std::string_view out_path, std::uint
         fmt::println(stderr, "error: {}: {}", in_path, source.error());
         return kExitInput;
     }
+    for (const auto& warning : source->warnings) {
+        fmt::println(stderr, "warning: {}: {}", in_path, warning);
+    }
 
     // codec=ac4 (planning/ac4.md, I5): AC-4 as this command's output codec, the IAB file's
     // Bed/Object channels going into E9's object encoder rather than AtmosEncoder below.

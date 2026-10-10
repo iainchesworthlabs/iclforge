@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <numbers>
 #include <string>
 #include <string_view>
@@ -79,6 +80,52 @@ constexpr std::array<Preset, 6> kPresets{{
      {false, false, false, true, true, true, true}},
 }};
 
+// Where a horizontal zone sits in the room plan, as the loudspeaker it is named for (the same
+// positions bed_label_position() gives those labels). Only distances between zones are used.
+[[nodiscard]] iclforge::objects::oba::Position zone_centre(std::size_t zone) {
+    using iclforge::objects::oba::BedLabel;
+    constexpr std::array<BedLabel, 7> kLabels{BedLabel::kL,  BedLabel::kC,  BedLabel::kR,
+                                              BedLabel::kLs, BedLabel::kRs, BedLabel::kLb,
+                                              BedLabel::kRb};
+    return iclforge::objects::oba::bed_label_position(kLabels[zone]);
+}
+
+[[nodiscard]] bool covers(const HorizontalPattern& preset, const HorizontalPattern& wanted) {
+    for (std::size_t i = 0; i < wanted.size(); ++i) {
+        if (wanted[i] && !preset[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// How far a preset that covers `wanted` lets the object into zones the author excluded: for each
+// such zone, its distance to the nearest zone the author included.
+[[nodiscard]] double leak_distance(const HorizontalPattern& preset,
+                                   const HorizontalPattern& wanted) {
+    double total = 0.0;
+    for (std::size_t z = 0; z < preset.size(); ++z) {
+        if (!preset[z] || wanted[z]) {
+            continue;
+        }
+        const auto from = zone_centre(z);
+        double nearest = std::numeric_limits<double>::max();
+        for (std::size_t w = 0; w < wanted.size(); ++w) {
+            if (!wanted[w]) {
+                continue;
+            }
+            const auto to = zone_centre(w);
+            nearest = std::min(nearest, std::hypot(from.x - to.x, from.y - to.y));
+        }
+        total += nearest;
+    }
+    return total;
+}
+
+// A pattern that is exactly a preset maps to it. Any other pattern cannot be said in OAMD, which
+// has the six presets and nothing finer, so it maps to the preset that excludes only zones the
+// author excluded (it covers every included zone) and lets the object into the nearest extra zones;
+// `exact` is false. kNone covers every pattern, so one no other preset covers gets kNone.
 [[nodiscard]] IabZoneMapping match_preset(const HorizontalPattern& pattern, bool elevation) {
     IabZoneMapping mapping;
     mapping.enable_elevation = elevation;
@@ -89,6 +136,20 @@ constexpr std::array<Preset, 6> kPresets{{
         }
     }
     mapping.exact = false;
+    if (std::none_of(pattern.begin(), pattern.end(), [](bool included) { return included; })) {
+        return mapping;  // no zone included: there is nothing to cover
+    }
+    double best = std::numeric_limits<double>::max();
+    for (const auto& preset : kPresets) {
+        if (!covers(preset.pattern, pattern)) {
+            continue;
+        }
+        const double leak = leak_distance(preset.pattern, pattern);
+        if (leak < best) {
+            best = leak;
+            mapping.zone = preset.zone;
+        }
+    }
     return mapping;
 }
 
@@ -107,18 +168,23 @@ IabZoneMapping iab_zones_to_constraint(const std::array<double, iclforge::iab::k
 IabZoneMapping iab_zones19_to_constraint(const std::array<double, iclforge::iab::kZone19Count>& gains) {
     // Table 28 order: 0-2 base screen, 3-5 height screen, 6-8 base rear, 9-11 height rear, 12 base
     // left wall, 13 height left wall, 14 base right wall, 15 height right wall, 16-18 ceiling.
-    const bool rear = included(gains[6]) && included(gains[7]) && included(gains[8]);
-    HorizontalPattern pattern{included(gains[0]), included(gains[1]), included(gains[2]), included(gains[12]),
-                              included(gains[14]), rear, rear};
-    // A rear group with some zones in and some out matches no preset.
-    const bool rear_mixed = !rear && (included(gains[6]) || included(gains[7]) || included(gains[8]));
+    // The presets treat the rear as one group, so a rear with any zone included asks for all of it,
+    // and one with some zones in and some out cannot be said exactly.
+    const bool rear_all = included(gains[6]) && included(gains[7]) && included(gains[8]);
+    const bool rear_any = included(gains[6]) || included(gains[7]) || included(gains[8]);
+    HorizontalPattern pattern{included(gains[0]),
+                              included(gains[1]),
+                              included(gains[2]),
+                              included(gains[12]),
+                              included(gains[14]),
+                              rear_any,
+                              rear_any};
     bool elevation = false;
     for (const std::size_t index : {3U, 4U, 5U, 9U, 10U, 11U, 13U, 15U, 16U, 17U, 18U}) {
         elevation = elevation || included(gains[index]);
     }
     IabZoneMapping mapping = match_preset(pattern, elevation);
-    if (rear_mixed) {
-        mapping.zone = iclforge::objects::oba::ZoneConstraint::kNone;
+    if (rear_any && !rear_all) {
         mapping.exact = false;
     }
     return mapping;

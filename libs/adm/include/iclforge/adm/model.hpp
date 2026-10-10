@@ -102,6 +102,26 @@ struct ObjectDivergenceInfo {
     double position_range = 0.0;
 };
 
+// BS.2076-3 §5.4.3.2, Table A1-16: one `coefficient` of a Matrix block's `matrix` element - the
+// multiplication factor that one other audioChannelFormat contributes to the channel the block
+// describes ("Side = 0.5*Left - 0.5*Right" is two of these). The element's text is the other
+// channel's ID. Every block's coefficients are summed to give the channel.
+//
+// `gain`, `phase_deg` and `delay_ms` are the constant forms and keep the schema's defaults when the
+// attribute is absent. Each has a `*_var` form that names a variable for the renderer to resolve
+// instead (the standard allows one or the other for each, never both); the constant then stays at
+// its default and the name is held here, unresolved. `gain` is always linear: a gainUnit of "dB" is
+// converted once at parse time, as AudioBlockFormat::gain is.
+struct MatrixCoefficient {
+    std::string input_channel_format_ref{};  // audioChannelFormatID of the channel this one reads
+    double gain = 1.0;                       // linear; negative inverts the signal
+    double phase_deg = 0.0;                  // phase shift, degrees
+    double delay_ms = 0.0;                   // time delay, milliseconds
+    std::string gain_var{};                  // empty: the constant above applies
+    std::string phase_var{};
+    std::string delay_var{};
+};
+
 // BS.2076-2 §5.4: one audioBlockFormat, the unit that divides an
 // audioChannelFormat along the time axis (§5.4.1: a channel with a single
 // block is static; more than one means it is dynamic over time and both
@@ -119,8 +139,10 @@ struct ObjectDivergenceInfo {
 // screenRef and headLocked - since a consumer that drops them changes how the
 // object is rendered. libadm does not parse zoneExclusion at all (its parser
 // and writer both leave a TODO for it), so that one element is read from the
-// axml text by libs/adm/src/adm_xml_extras.cpp instead. Matrix blocks carry no
-// coefficients here: libadm has no model for them either.
+// axml text by libs/adm/src/adm_xml_extras.cpp instead. So are a Matrix block's
+// outputChannelFormatIDRef, `matrix` coefficients and jumpPosition (§5.4.3.2),
+// for which libadm's Matrix block has no parameter either. A Binaural block has
+// nothing of its own beyond the common fields (§5.4.3.5).
 struct AudioBlockFormat {
     std::string id;  // audioBlockFormatID, e.g. "AB_00031001_00000001"
 
@@ -183,6 +205,21 @@ struct AudioBlockFormat {
     bool has_hoa_degree = false;
     int hoa_degree = 0;
     std::string hoa_normalization;  // "N3D", "SN3D" (default) or "FuMa", §11.2
+    // §5.4.3.4, Table A1-17: the near-field-compensation reference distance of the loudspeaker
+    // setup, in metres. Absent, or 0, means no compensation is needed. `hoa_equation` is the
+    // optional free-text equation that describes the component; empty when absent. screen_ref and
+    // head_locked above are read for HOA blocks too, where the schema has them.
+    bool has_nfc_ref_dist = false;
+    double nfc_ref_dist = 0.0;
+    std::string hoa_equation;
+
+    // Matrix only (§5.4.3.2, Tables A1-15 and A1-16). `output_channel_format_ref` is the channel a
+    // decoding or direct matrix produces (empty for an encoding matrix, and when the file spelled
+    // it with the legacy `outputChannelIDRef`, which is read too). `matrix` is the list of
+    // coefficients; the channel is their sum. jumpPosition is read into has_jump_position,
+    // jump_position and interpolation_length_s above, as for an Objects block.
+    std::string output_channel_format_ref;
+    std::vector<MatrixCoefficient> matrix;
 };
 
 // BS.2076-2 §5.3: a single sequence of audio samples, subdivided in time by
@@ -202,6 +239,23 @@ struct AudioPackFormat {
     TypeDefinition type = TypeDefinition::kUnknown;
     std::vector<std::string> channel_format_refs;  // audioChannelFormatIDRef*
     std::vector<std::string> pack_format_refs;      // audioPackFormatIDRef* (nesting)
+
+    // Matrix only (§5.5.4, Table A1-24). An encoding matrix names the channel-based pack it reads
+    // (input) and the decoding matrices that undo it; a decoding matrix names the pack it produces
+    // (output) and the encoding matrices it undoes; a direct matrix names both packs. Empty when
+    // absent. libadm has no model for any of the four, so they are read from the axml text.
+    std::vector<std::string> encode_pack_format_refs;
+    std::vector<std::string> decode_pack_format_refs;
+    std::string input_pack_format_ref;
+    std::string output_pack_format_ref;
+
+    // HOA only (§5.5.5, Table A1-25): the defaults for the pack's HOA blocks, which a block's own
+    // values override. `hoa_normalization` is empty when the pack does not say (the schema's
+    // default is "SN3D"); nfc_ref_dist is in metres. Also read from the axml text.
+    std::string hoa_normalization;
+    bool has_nfc_ref_dist = false;
+    double nfc_ref_dist = 0.0;
+    bool screen_ref = false;
 };
 
 // BS.2076-2 §5.2: identifies the combination of audioTrackFormats needed to
