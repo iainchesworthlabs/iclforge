@@ -315,8 +315,9 @@ void interpolate_at(const Framing& framing, int num_param_bands, const ParamSets
         }
         run_band = pb;
         run_prev = p_bits;
-        const typename BasicInterpolator<R>::Column column = BasicInterpolator<R>::column(
-            static_cast<R>(p), static_cast<R>(values[0][at(pb)]), static_cast<R>(values[1][at(pb)]));
+        const typename BasicInterpolator<R>::Column column =
+            BasicInterpolator<R>::column(static_cast<R>(p), static_cast<R>(values[0][at(pb)]),
+                                         static_cast<R>(values[1][at(pb)]));
         for (int ts = 0; ts < num_ts; ++ts) {
             out[at(ts) * kSubbands + at(sb)] = interpolator.at(column, ts);
         }
@@ -325,13 +326,13 @@ void interpolate_at(const Framing& framing, int num_param_bands, const ParamSets
 
 }  // namespace
 
-void interpolate(const Framing& framing, int num_param_bands, const ParamSets& values, const ParamPrev& prev,
-                 int num_ts, std::span<double> out) noexcept {
+void interpolate(const Framing& framing, int num_param_bands, const ParamSets& values,
+                 const ParamPrev& prev, int num_ts, std::span<double> out) noexcept {
     interpolate_at<double>(framing, num_param_bands, values, prev, num_ts, out);
 }
 
-void interpolate(const Framing& framing, int num_param_bands, const ParamSets& values, const ParamPrev& prev,
-                 int num_ts, std::span<float> out) noexcept {
+void interpolate(const Framing& framing, int num_param_bands, const ParamSets& values,
+                 const ParamPrev& prev, int num_ts, std::span<float> out) noexcept {
     interpolate_at<float>(framing, num_param_bands, values, prev, num_ts, out);
 }
 

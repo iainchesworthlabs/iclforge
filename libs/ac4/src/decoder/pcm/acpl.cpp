@@ -185,9 +185,10 @@ struct Runs {
 
 // One parameter's interpolation column for the run that starts at subband `sb`, its values
 // narrowed to InterpReal once.
-[[nodiscard]] acpl::BasicInterpolator<InterpReal>::Column column_of(
-    int num_param_bands, const acpl::ParamSets& values, const acpl::ParamPrev& prev,
-    int sb) noexcept {
+[[nodiscard]] acpl::BasicInterpolator<InterpReal>::Column column_of(int num_param_bands,
+                                                                    const acpl::ParamSets& values,
+                                                                    const acpl::ParamPrev& prev,
+                                                                    int sb) noexcept {
     const auto pb = at(std::max(acpl::sb_to_pb(num_param_bands, sb), 0));
     return acpl::BasicInterpolator<InterpReal>::column(static_cast<InterpReal>(prev[at(sb)]),
                                                        static_cast<InterpReal>(values[0][pb]),

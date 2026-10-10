@@ -39,8 +39,8 @@ using iclforge::ac4::detail::AcplCouplingValues;
 using iclforge::ac4::detail::AcplFrameValues;
 using iclforge::ac4::detail::AcplModuleValues;
 using iclforge::ac4::detail::AcplStage;
-using iclforge::ac4::detail::InterpReal;
 using iclforge::ac4::detail::ElementKind;
+using iclforge::ac4::detail::InterpReal;
 using iclforge::ac4::detail::QmfMatrix;
 using iclforge::ac4::detail::QmfValue;
 using iclforge::ac4::detail::Real;
@@ -55,8 +55,8 @@ constexpr double kSqrt2 = 1.4142135623730951;
 // Pseudocode 109 is evaluated at InterpReal (planning/ac4.md, D14h: float at the float tier, double
 // elsewhere), by the core's acpl::interpolate() at that scalar, whole, as the stage's runs and
 // columns must equal it; the sums of interpolated values a coefficient takes are formed there too.
-// The stage as libs/ac4/src/decoder/pcm/acpl.cpp had it, for the elements the test builds: a pair, and
-// the 5.X element in ASPX_ACPL_1, 2 and 3.
+// The stage as libs/ac4/src/decoder/pcm/acpl.cpp had it, for the elements the test builds: a pair,
+// and the 5.X element in ASPX_ACPL_1, 2 and 3.
 namespace reference {
 
 struct Param {

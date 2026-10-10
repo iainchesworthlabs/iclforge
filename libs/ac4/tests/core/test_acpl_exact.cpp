@@ -320,7 +320,8 @@ TEST_CASE("interpolate at float gives the bits of Pseudocode 109 evaluated in si
                         }
                         std::vector<float> expected(at(num_ts) * acpl::kSubbands, -1.0F);
                         std::vector<float> actual(at(num_ts) * acpl::kSubbands, -2.0F);
-                        reference::interpolate_float(framing, bands, values, prev, num_ts, expected);
+                        reference::interpolate_float(framing, bands, values, prev, num_ts,
+                                                     expected);
                         acpl::interpolate(framing, bands, values, prev, num_ts, actual);
                         CAPTURE(steep, sets, bands, num_ts, round);
                         REQUIRE(same_bits(actual, expected));
