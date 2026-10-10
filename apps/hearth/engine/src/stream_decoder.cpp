@@ -79,6 +79,13 @@ bool ac4_placeable(std::span<const iclforge::ac4::Speaker> speakers) {
            std::ranges::none_of(speakers, unplaced);
 }
 
+bool ac4_codes_screen_pair(std::span<const iclforge::ac4::Speaker> speakers) {
+    return std::ranges::any_of(speakers, [](iclforge::ac4::Speaker speaker) {
+        return speaker == iclforge::ac4::Speaker::kLeftScreen ||
+               speaker == iclforge::ac4::Speaker::kRightScreen;
+    });
+}
+
 ac3::Acmod ac4_acmod(std::span<const iclforge::ac4::Speaker> speakers) {
     const auto has = [&speakers](iclforge::ac4::Speaker speaker) {
         return std::ranges::find(speakers, speaker) != speakers.end();
@@ -246,6 +253,12 @@ void StreamDecoder::reset() {
     }
     ac4_speakers_.clear();
     ac4_objects_.reset();
+    // The next stream's presentation may code the screen pair or not.
+    ac4_source_known_ = false;
+    ac4_screen_pair_ = false;
+    if (ac4_decoder_) {
+        ac4_decoder_->set_output(ac4_output());
+    }
     programme_.reset();
     beds_.clear();
     renderer_bed_.reset();
@@ -441,10 +454,48 @@ bool StreamDecoder::apply(const DecoderSettings& settings) {
     config_ = setup.config;
     renderer_.set_joc_domain(config_.joc_domain);
     ac4_config_ = setup.ac4;
+    // A new presentation choice may select one that codes the screen pair or one that does not:
+    // the next unit says.
+    ac4_source_known_ = false;
     if (ac4_decoder_) {
-        ac4_decoder_->set_output(ac4_config_.output);
+        ac4_decoder_->set_output(ac4_output());
         ac4_decoder_->set_presentation(ac4_config_.presentation);
     }
+    return true;
+}
+
+iclforge::ac4::OutputConfig StreamDecoder::ac4_output() const {
+    iclforge::ac4::OutputConfig output = ac4_config_.output;
+    // ETSI TS 103 190-2 clause 5.10.2: a 9.X.4 source renders to 7.X.4 by the 9.X rows of Tables 38
+    // to 43, which fold the screen pair into the fronts; Table E2.5 has nowhere to put the pair
+    // itself. Only the channels as coded are replaced.
+    if (ac4_screen_pair_ && output.downmix == iclforge::ac4::DownmixTarget::kAsCoded) {
+        output.downmix = iclforge::ac4::DownmixTarget::k7X4;
+    }
+    return output;
+}
+
+bool StreamDecoder::probe_ac4_source(std::span<const std::byte> raw) {
+    const auto frame = iclforge::ac4::parse_raw_frame(raw);
+    if (!frame) {
+        return false;
+    }
+    const std::optional<std::size_t> chosen =
+        iclforge::ac4::select_presentation(frame->toc, ac4_config_.presentation, ac4_config_.level);
+    if (!chosen) {
+        return false;
+    }
+    // The decoder's own reading of the table of contents gives the presentation's channels as
+    // coded; a throwaway decoder, so that nothing of the stream's state is read twice.
+    iclforge::ac4::Decoder reader;
+    if (!reader.parse(raw)) {
+        return false;
+    }
+    const std::span<const iclforge::ac4::PresentationInfo> presentations = reader.presentations();
+    if (*chosen >= presentations.size()) {
+        return false;
+    }
+    ac4_screen_pair_ = ac4_codes_screen_pair(presentations[*chosen].speakers);
     return true;
 }
 
@@ -457,8 +508,17 @@ std::expected<std::size_t, std::string> StreamDecoder::decode_ac4(std::span<cons
         flush_ac4(deliver);
         return std::unexpected(std::string{"An AC-4 unit is not one whole sync frame."});
     }
+    if (!ac4_source_known_) {
+        const bool was_folded = ac4_screen_pair_;
+        ac4_source_known_ = probe_ac4_source(raw);
+        if (ac4_decoder_ && ac4_screen_pair_ != was_folded) {
+            ac4_decoder_->set_output(ac4_output());
+        }
+    }
     if (!ac4_decoder_) {
-        ac4_decoder_.emplace(ac4_config_);
+        iclforge::ac4::DecoderConfig config = ac4_config_;
+        config.output = ac4_output();
+        ac4_decoder_.emplace(config);
     }
     const auto decoded = ac4_decoder_->decode(raw);
     if (!decoded) {

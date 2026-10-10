@@ -3409,6 +3409,15 @@ The sections below contain the complete change list and fixes.
 
 **Hearth**
 
+- **Hearth's engine plays a 9.X.4 presentation instead of refusing it.** The 9.0.4 and 9.1.4 modes'
+  screen pair (Lscr, Rscr) has no location in A/52 Table E2.5, so the engine refused every frame of
+  such a presentation when it was asked for the channels as coded. It now reads the selected
+  presentation's channels from the first unit's table of contents and, where it codes the screen
+  pair and no layout was chosen, has the decoder render to 7.X.4, whose 9.X rows (Part 2 Tables 38
+  to 43) fold the pair into the fronts. A layout the listener chose (`immersive_layout`) or a
+  stereo or mono fold is left as chosen, and 22.2, which Part 2 gives no renderer, is still refused.
+  The engine's output equals the decoder's own 7.X.4 render sample for sample on every committed
+  9.X.4 stream. The ESP32 player still refuses a 9.X.4 presentation.
 - **A `player@v1` stream that ended before the clock's first exchange completed lost
   every chunk it had ever carried, not just the ones still in flight.** `PlayerSession`
   holds an aiosendspin 9.1.1 server's early chunks until the clock's first reply arrives

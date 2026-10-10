@@ -144,7 +144,10 @@ C, at the custom downmix gains `gain_f1` and `gain_f2` (6.2.9.4), and the `downm
 never a target. Dialogue enhancement acts on Lscr, Rscr and C in full decoding (Table 15) and, for
 the A-JCC and A-CPL modes in core decoding, by the extension tools of clauses 5.8.2.1 and 5.8.2.2;
 `b_de_simulcast` selects the second `de_data()` for core decoding. DRC groups Lscr and Rscr with L and
-R (Table 69). No stream of these modes and no other decoder is available to check them against; the
+R (Table 69). Hearth's engine, which cannot place the screen pair (A/52 Table E2.5 has no location
+for it), asks the decoder for `k7X4` when it is given such a presentation and no layout of the
+listener's own, and plays that render; the ESP32 player refuses the presentation. No stream of these
+modes and no other decoder is available to check them against; the
 readings are in `libs/ac4/ERRATA.md` under "The 9.X.4 element", and the streams their tests decode
 are built from the standard's tables.
 
