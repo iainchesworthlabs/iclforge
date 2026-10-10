@@ -345,30 +345,145 @@ TEST_CASE("a second independent substream is a second programme, not more frames
               scanned->programmes[0].access_units.front().data());
     }
 
-    SECTION("the dec3 box describes the programme the track would carry") {
+    SECTION("the default dec3 box describes the lead programme, as ScannedStream::access_units is") {
         const auto scanned = iclforge::ac3::io::scan(stream);
         REQUIRE(scanned.has_value());
         const auto box = iclforge::ac3::io::build_codec_config_box(*scanned);
         REQUIRE(box.size() >= 4);
         // §F.6: data_rate(13) then num_ind_sub(3), counting one less than the
-        // substreams. ONE, because a container track carries one programme
-        // and ScannedStream::access_units - what a muxer puts in it - is the
-        // first programme's units alone. A box declaring two programmes over
-        // a track holding one would be worse than no signalling at all; see
-        // build_codec_config_box's own comment and MPEG-TS broadcast profiles.
+        // substreams. ONE here, because the caller pairing this box with
+        // ScannedStream::access_units holds the lead programme's units alone,
+        // and a box declaring two programmes over a track holding one is worse
+        // than no signalling at all.
         const auto low = std::to_integer<std::uint32_t>(box[1]);
         CHECK((low & 0x07) == 0);
-        // data_rate describes those same units - the first programme's own
-        // 448 kbit/s, not the 544 the whole stream spends.
+        // data_rate describes those same units - the lead's own 448 kbit/s,
+        // not the 544 the whole stream spends.
         const auto data_rate = (std::to_integer<std::uint32_t>(box[0]) << 5) | (low >> 3);
         CHECK(data_rate == 448);
-        // And the box is byte-for-byte the shape a single-programme stream of
-        // that same first programme produces: the second programme changes
-        // nothing a track carrying only the first should declare.
-        const auto single = iclforge::ac3::io::scan(
-            encode({.independent = bed(448, 27)}, 2, std::array<double, 1>{kMainTone}));
+        // And the box is byte-for-byte what a single-programme stream of that
+        // same lead programme produces.
+        const auto bytes =
+            encode({.independent = bed(448, 27)}, 2, std::array<double, 1>{kMainTone});
+        const auto single = iclforge::ac3::io::scan(bytes);
         REQUIRE(single.has_value());
         CHECK(box == iclforge::ac3::io::build_codec_config_box(*single));
+    }
+
+    SECTION("a box for every programme has one block each") {
+        const auto scanned = iclforge::ac3::io::scan(stream);
+        REQUIRE(scanned.has_value());
+        const auto box = iclforge::ac3::io::build_codec_config_box(
+            *scanned, iclforge::ac3::io::BoxProgrammes::kAll);
+        // §F.6.1: data_rate(13), num_ind_sub(3), then per independent
+        // substream fscod(2) bsid(5) reserved(1) asvc(1) bsmod(3) acmod(3)
+        // lfeon(1) reserved(3) num_dep_sub(4) and a 1-bit reserved where no
+        // dependent follows - 24 bits a block here.
+        REQUIRE(box.size() >= 2 + 3 + 3);
+        const auto bits = [&box](std::size_t at, std::size_t count) {
+            std::uint32_t value = 0;
+            for (std::size_t i = 0; i < count; ++i) {
+                const std::size_t pos = at + i;
+                const auto byte = std::to_integer<std::uint32_t>(box[pos / 8]);
+                value = (value << 1) | ((byte >> (7 - pos % 8)) & 1U);
+            }
+            return value;
+        };
+        // A track built from all_programme_access_units holds both
+        // programmes, so the box declares both: num_ind_sub counts one less
+        // than the substreams and data_rate is the sum of their rates - 448 +
+        // 96 kbit/s.
+        CHECK(bits(13, 3) == 1);
+        CHECK(bits(0, 13) == 544);
+        // Programme 0: 5.1 (3/2, LFE on), bsid 16, no dependents.
+        CHECK(bits(16 + 2, 5) == 16);
+        CHECK(bits(16 + 12, 3) == static_cast<std::uint32_t>(iclforge::ac3::Acmod::k3_2));
+        CHECK(bits(16 + 15, 1) == 1);
+        CHECK(bits(16 + 19, 4) == 0);
+        // Programme 1: mono commentary, bsid 16, own acmod and no LFE - the
+        // second block is its own, not the lead's repeated.
+        CHECK(bits(40 + 2, 5) == 16);
+        CHECK(bits(40 + 12, 3) == static_cast<std::uint32_t>(iclforge::ac3::Acmod::k1_0));
+        CHECK(bits(40 + 15, 1) == 0);
+        // Two blocks after the 16-bit header, then the one trailing byte that
+        // says no Atmos extension follows.
+        CHECK(box.size() == 2 + 3 + 3 + 1);
+    }
+
+    SECTION("all_programme_access_units hands back each frame period whole, in wire order") {
+        const auto scanned = iclforge::ac3::io::scan(stream);
+        REQUIRE(scanned.has_value());
+        const auto units = iclforge::ac3::io::all_programme_access_units(*scanned);
+        REQUIRE(units.has_value());
+        REQUIRE(units->size() == static_cast<std::size_t>(kFrames));
+        // One frame period is I0's 1792 bytes then I1's 384: the lead's
+        // access units alone would be 1792 and a muxer would lose the rest.
+        std::size_t covered = 0;
+        for (std::size_t n = 0; n < units->size(); ++n) {
+            CAPTURE(n);
+            const auto unit = (*units)[n];
+            CHECK(unit.size() == 1792 + 384);
+            CHECK(unit.data() == stream.data() + n * (1792 + 384));
+            CHECK(unit.data() == scanned->programmes[0].access_units[n].data());
+            covered += unit.size();
+        }
+        CHECK(covered == stream.size());
+    }
+
+    SECTION("extract_programme makes a programme a stream of its own, renumbered as substream 0") {
+        const auto scanned = iclforge::ac3::io::scan(stream);
+        REQUIRE(scanned.has_value());
+
+        // Programme 0 is the stream's own units, byte for byte.
+        const auto main_bytes = iclforge::ac3::io::extract_programme(*scanned, 0);
+        REQUIRE(main_bytes.has_value());
+        CHECK(main_bytes->size() == static_cast<std::size_t>(kFrames) * 1792);
+
+        const auto commentary_bytes = iclforge::ac3::io::extract_programme(*scanned, 1);
+        REQUIRE(commentary_bytes.has_value());
+        CHECK(commentary_bytes->size() == static_cast<std::size_t>(kFrames) * 384);
+
+        // It scans as one programme, and that programme is substream 0 - the
+        // one a player takes - with I1's own layout and dialnorm.
+        const auto again = iclforge::ac3::io::scan(*commentary_bytes);
+        REQUIRE(again.has_value());
+        REQUIRE(again->programmes.size() == 1);
+        CHECK(again->programmes[0].substreamid == 0);
+        CHECK(again->independent_substreams == 0b1);
+        CHECK(again->acmod == iclforge::ac3::Acmod::k1_0);
+        CHECK(again->access_units.size() == static_cast<std::size_t>(kFrames));
+
+        // And it is the same audio the decoder picks out of the full stream by
+        // asking for programme 1 - renumbering moved no coefficient.
+        const auto all = iclforge::ac3::split_access_units(stream);
+        REQUIRE(all.has_value());
+        const auto reference = decode_programme(*all, 1);
+        const auto own_units = iclforge::ac3::split_access_units(*commentary_bytes);
+        REQUIRE(own_units.has_value());
+        const auto extracted = decode_programme(*own_units, std::nullopt);
+        CHECK(extracted.programme == 0);
+        CHECK(extracted.dialnorm == reference.dialnorm);
+        REQUIRE(extracted.channels.size() == reference.channels.size());
+        for (std::size_t ch = 0; ch < reference.channels.size(); ++ch) {
+            CHECK(extracted.channels[ch] == reference.channels[ch]);
+        }
+
+        // A programme the stream does not carry is nothing, not an empty stream.
+        CHECK_FALSE(iclforge::ac3::io::extract_programme(*scanned, 5).has_value());
+    }
+
+    SECTION("a single-programme stream's units are its own") {
+        const auto bytes =
+            encode({.independent = bed(448, 27)}, 2, std::array<double, 1>{kMainTone});
+        const auto single = iclforge::ac3::io::scan(bytes);
+        REQUIRE(single.has_value());
+        const auto units = iclforge::ac3::io::all_programme_access_units(*single);
+        REQUIRE(units.has_value());
+        REQUIRE(units->size() == single->access_units.size());
+        for (std::size_t n = 0; n < units->size(); ++n) {
+            CHECK((*units)[n].data() == single->access_units[n].data());
+            CHECK((*units)[n].size() == single->access_units[n].size());
+        }
     }
 }
 

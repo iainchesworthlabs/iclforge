@@ -155,7 +155,9 @@ constexpr std::array<OptionToken, 102> kOptionTokens{{
     {"asvc=", "ts: the main service(s) this one is associated with (A/52 Annex A) - a raw "
              "0-255/0x00-0xFF mask, or a comma list of main-service numbers, e.g. asvc=0,2"},
     {"programme=", "decode/qc/levels: which independent substream (0..7) of a multi-programme "
-                   "stream"},
+                   "stream; mkv/mp4/fmp4/ts: carry that programme alone, renumbered as "
+                   "substream 0 (without it mp4, fmp4 and ts keep every programme and mkv the "
+                   "first)"},
     {"programme2=", "eac3-encode: another input file, encoded as its own independent substream "
                    "(§E2.3.1.2's I1); programme3= up to programme8= work the same way, for I2-I7"},
     {"programme2-layout=", "eac3-encode: that programme's own layout (default stereo; not 1+1) - "

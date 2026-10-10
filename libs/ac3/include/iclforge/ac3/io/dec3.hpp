@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -24,16 +25,33 @@
 
 namespace iclforge::ac3::io {
 
+// Which of a stream's programmes the box describes, which has to be the ones
+// the track holds. ScannedStream::access_units is the lead programme alone, so
+// the default describes that - the pairing every caller that muxes
+// `scanned.access_units` has always had. A track that carries every programme
+// (all_programme_access_units() is its samples) asks for kAll.
+enum class BoxProgrammes : std::uint8_t {
+    kLead,  // one independent-substream block: the lead programme
+    kAll,   // one block per independent substream, data_rate their sum
+};
+
 // Returns the box's PAYLOAD only - everything after its own 8-byte
 // size+FourCC header, which is the container muxer's job to write (it is the
 // one that knows the ISOBMFF box-nesting mechanics; see iclforge::containers::mp4::mux()). The
-// FourCC itself is implied by `stream.kind`: kAc3 -> 'dac3', kEac3 -> 'dec3'.
+// FourCC itself is implied by `stream.kind`: kAc3 -> 'dac3', kEac3 and
+// kAc3CoreEac3Extension -> 'dec3'.
 //
-// Empty for kAc3CoreEac3Extension, which has no box defined for it - see the
-// function's own comment. A caller that gets an empty vector must not mux the
-// stream; there is no header that would describe it truthfully.
+// kAc3CoreEac3Extension takes the 'dec3' box, in an 'ec-3' sample entry: A/52
+// §E2.3.1.2 makes its AC-3 frame independent substream 0 of an E-AC-3 stream,
+// and ETSI TS 102 366 F.6.2.5 sets the box's bsid to the independent
+// substream's own, so the core's 6 or 8 is what the box carries.
+//
+// With BoxProgrammes::kAll a stream with several programmes gets one block per
+// independent substream (num_ind_sub + 1 of them) and a data_rate that is
+// their sum; hand the muxer all_programme_access_units() then, not
+// ScannedStream::access_units, so the box and the samples say the same thing.
 [[nodiscard]] ICLFORGE_AC3_EXPORT std::vector<std::byte> build_codec_config_box(
-    const ScannedStream& stream);
+    const ScannedStream& stream, BoxProgrammes programmes = BoxProgrammes::kLead);
 
 // The DASH <AudioChannelConfiguration> @value for this stream on the Dolby
 // scheme DASH-IF IOP Part 8 v5.0.0 §5.3.2 offers for E-AC-3 -

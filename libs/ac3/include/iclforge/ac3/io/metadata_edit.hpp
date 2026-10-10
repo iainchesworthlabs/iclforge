@@ -35,10 +35,17 @@
 //
 //   * Only fields ALREADY ON THE WIRE can change. compr lives behind compre,
 //     bsmod and dsurmod behind E-AC-3's infomdate; a frame that did not
-//     transmit one has no bits to overwrite, and inserting them would move
-//     every bit after and re-frame the syncframe - which is a re-encode by
-//     another name. Asking for such a field is kFieldAbsent, and the answer
-//     is to encode (or transcode) the stream with it enabled.
+//     transmit one has no bits to overwrite. Inserting them moves every bit
+//     after, into a frame whose size is fixed (AC-3's frmsizecod) or that
+//     other fields depend on (E-AC-3's blkstrtinfo is as wide as frmsiz), so
+//     room has to be found or made. Finding it takes a bit-accurate walk of
+//     all six audio blocks to where the audio ends, which this project's frame
+//     walker (emdf/frame_layout.hpp) has only for the shape of its own Atmos
+//     encoder's frames; making it re-frames the syncframe and changes the
+//     stream's rate. Neither is in this module, and the gap is accepted
+//     (docs/library/development-status.md). Asking for such a field is
+//     kFieldAbsent, and the answer is to encode (or transcode) the stream with
+//     it enabled.
 //   * A DEPENDENT E-AC-3 substream reports no compr at all, whatever its
 //     compre bit says: §E3.8.5 repurposes compre there to mark the last
 //     dependent of the programme rather than to announce a compression word

@@ -29,6 +29,38 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Stream carriage: legacy cores, every programme, and moov-last MP4 files**
+
+- **An AC-3 core with E-AC-3 dependents is carried in MP4, fMP4 and MPEG-TS.** ETSI TS 102 366
+  F.1 asks for an `ec-3` entry for every E-AC-3 bit stream and F.6.2.5 sets the `dec3`'s `bsid` to
+  the independent substream's own, which §E2.3.1.2 makes the core's. `build_codec_config_box` used
+  to return nothing for it and `forge mp4`, `fmp4` and `ts` refused the stream; they write the
+  ordinary `dec3` now, with the core's `bsid`. Matroska still refuses it: `A_AC3` is `bsid` 10 and
+  below and `A_EAC3` is 11 to 16.
+- **A multi-programme stream keeps every programme in MP4, fMP4 and MPEG-TS.** They warned and
+  wrote the first. A sample or PES payload is the syncframes of every substream present (F.2, A/52
+  Annex G §3.3), so `build_codec_config_box(stream, BoxProgrammes::kAll)` writes a `dec3` block
+  for each independent substream with `data_rate` their sum (the default still describes the lead
+  programme, which is what `ScannedStream::access_units` holds), and the transport stream's
+  `substream1`-`substream3` descriptor fields describe what the payload holds.
+  `iclforge::ac3::io::all_programme_access_units()` returns the samples.
+  `programme=<0..7>` on `mkv`, `mp4`, `fmp4` and `ts` writes one programme alone, renumbered as
+  substream 0 (`iclforge::ac3::io::extract_programme()`), for a player that takes only the first;
+  without it `mkv` keeps the first programme with a warning. FFmpeg 8.0.1 cannot decode a
+  multi-programme stream in any container, raw included.
+- **`iclforge::containers::mp4::demux_seekable()` reads an MP4 from a source that can be read at
+  an offset**, jumping over `mdat` to find the sample table and then reading each sample where it
+  says, in bounded memory. `forge demux` uses it for a file path, so a file whose `moov` follows
+  its `mdat` reads instead of being refused; from a pipe it is still refused, with the reason.
+
+**Stream carriage: fixed**
+
+- **`dec3`'s `chan_loc` was always 0.** F.5.2 has a player ignore the sample entry's
+  `ChannelCount`, which leaves `chan_loc` and `acmod`/`lfeon` as the box's only description of the
+  layout; it is now read from the dependents' `chanmap` (Table F.6.1). No tool here reads the
+  field back: FFmpeg 8.0.1 gives the same layout with it zeroed, so it is checked against the
+  table's text alone.
+
 **IAMF: Opus, AAC-LC and FLAC carriage, every IA track, and a 64-bit `mdat`**
 
 - **`mux_coded()` carries the other IAMF codecs.** The module still links no codec: the caller's encoder
