@@ -1019,9 +1019,11 @@ balance, VARVAR framing and frequency-interleaved waveform coding in A-SPX (`asp
 `aspx_varvar`, `aspx_interleave`), the 5.X element's other coding configurations (`coding_configs`),
 7.0 and 7.1 (`seven_x`), ASPX_ACPL_1 and A-CPL in stereo (`acpl`), 7.0.4 and 7.1.4 (`back_pair`),
 A-JCC (`ajcc`), transmitted DRC gains (`drc_gains`), a 3.0 substream (`three_zero`), objects
-(`objects`) and spectral noise fill (`noise_fill`). Mono, several presentations and substreams, and
-the Mid and cross-channel dialogue enhancement methods are options without the flag.
-Time-interleaved waveform coding is not written at all.
+(`objects`), spectral noise fill (`noise_fill`) and the efficient high frame rate mode
+(`frame_rate_fraction` 2 or 4: each codec frame goes out as that many transmission frames, at a
+constant rate). Mono, several presentations and substreams, and the Mid and cross-channel dialogue
+enhancement methods are options without the flag. Time-interleaved waveform coding is not written
+at all.
 
 ### One control for both formats
 
@@ -4398,10 +4400,18 @@ outright, with no compatibility shim.
   ignore the extension, Part 1 4.2.4.3 and 5.4), and the encoder takes 48 and 44.1 kHz input alone.
 - 9.X.4's own streams: the modes are decoded, as 22.2 is, without one, and checked on constructed
   streams alone.
-- Presentations spread over several elementary streams (Part 2 5.1.2), and the efficient high frame
-  rate mode (Part 2 5.1.3), in either direction, until a stream uses them.
+- Presentations spread over several elementary streams (Part 2 5.1.2), in either direction, until a
+  stream uses them. The efficient high frame rate mode (Part 2 5.1.3) is decoded and, since the
+  encoder's experimental `frame_rate_fraction`, written at a constant rate: no other encoder's stream
+  or decoder has read it.
 - The speech spectral frontend: in the decoder until a stream uses it (decision 2); in the encoder
   at all, since an encoder for it contains its decoder, with the five defects decision 2 lists.
+- A-SPX time-interleaved waveform coding in the encoder: a time-interleaved slot takes the core's
+  decoded waveform in every subband (Part 1 5.7.6.5.3), so a frame that sends one codes the whole
+  high band as waveform, which costs more than the rates A-SPX serves hold, and attacks have block
+  switching and VARVAR framing. The writer of its syntax (`aspx_tic_used_in_slot`) exists.
+- Bitstream versions 0 and 1 in the encoder's table of contents: it writes version 2, the decoder
+  reads all three.
 - Writing immersive stereo (`presentation_version` 2): V1.3.1 names the version without defining it,
   so the encoder does not copy DEE's use of it, while the decoder reads it by the observed rule
   (decision 10).

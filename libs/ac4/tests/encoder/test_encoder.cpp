@@ -1564,3 +1564,135 @@ TEST_CASE("noise fill leaves a coded tone at unity gain", "[ac4][encoder][noisef
     CHECK(std::abs(s.gain_db) < 0.1);
     CHECK(s.snr_db > 30.0);
 }
+
+// --- The efficient high frame rate mode (Part 2 clause 5.1.3) --------------------
+
+namespace {
+
+// Decodes `frames` a frame at a time: the PCM of each unit, in order. A
+// fragment that is not a unit's last returns no frame.
+std::vector<std::vector<float>> decode_units(const std::vector<iclforge::ac4::EncodedFrame>& frames,
+                                             std::size_t& units) {
+    iclforge::ac4::Decoder decoder;
+    std::vector<std::vector<float>> out;
+    units = 0;
+    for (const iclforge::ac4::EncodedFrame& frame : frames) {
+        const auto decoded = decoder.decode(frame.raw_ac4_frame);
+        INFO(decoder.refusal_reason());
+        REQUIRE(decoded.has_value());
+        if (!decoded->has_value()) {
+            continue;
+        }
+        ++units;
+        const iclforge::ac4::DecodedFrame& pcm = **decoded;
+        out.resize(pcm.channels.size());
+        for (std::size_t c = 0; c < pcm.channels.size(); ++c) {
+            out[c].insert(out[c].end(), pcm.channels[c].begin(), pcm.channels[c].end());
+        }
+    }
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("the efficient high frame rate mode sends each codec frame as transmission frames",
+          "[ac4][encoder][ehfr]") {
+    struct Case {
+        int stream_index;  // Part 1 Table 83: the transmission rate
+        int fraction;
+        int audio_index;   // Part 2 Table 18: the codec's
+    };
+    // 120 fps in quarters, 60 fps in halves, and 119.88 fps in quarters, which
+    // the decoder's converter takes to 29.97 fps at 1 601 and 1 602 samples.
+    const std::array<Case, 3> cases = {{{12, 4, 4}, {9, 2, 4}, {11, 4, 3}}};
+    const std::size_t count = seconds(1.0, 0.5);
+    const std::vector<float> x = tone(440.0, 0.1, count, 48000);
+    for (const Case& c : cases) {
+        CAPTURE(c.stream_index, c.fraction, c.audio_index);
+        iclforge::ac4::EncoderConfig config;
+        config.bitrate_kbps = 192;
+        config.codec_mode = iclforge::ac4::CodecMode::kSimple;
+        config.frame_rate_index = c.audio_index;
+        const Encoded plain = encode(config, {x, x}, 4096);
+        config.frame_rate_index = c.stream_index;
+        config.experimental.frame_rate_fraction = c.fraction;
+        const Encoded cut = encode(config, {x, x}, 4096);
+        const auto fraction = static_cast<std::size_t>(c.fraction);
+        REQUIRE(cut.frames.size() == plain.frames.size() * fraction);
+
+        // Every transmission frame carries the stream's rate and the fraction;
+        // a unit starts where the counter is a multiple of it, the counters
+        // run on one by one, and only the first of a unit is an I-frame.
+        std::size_t samples = 0;
+        for (std::size_t i = 0; i < cut.frames.size(); ++i) {
+            const auto parsed = iclforge::ac4::parse_raw_frame(cut.frames[i].raw_ac4_frame);
+            REQUIRE(parsed.has_value());
+            CHECK(parsed->toc.frame_rate_index == c.stream_index);
+            REQUIRE(parsed->toc.presentations_v1.size() == 1);
+            CHECK(parsed->toc.presentations_v1[0].frame_rate_fraction == c.fraction);
+            CHECK(parsed->toc.sequence_counter == (i == 0 ? 0 : static_cast<int>((i - 1) % 1020) + 1));
+            if (i % fraction == 0) {
+                CHECK(parsed->toc.sequence_counter % c.fraction == 0);
+            }
+            CHECK(cut.frames[i].iframe == (i % fraction == 0 && plain.frames[i / fraction].iframe));
+            samples += static_cast<std::size_t>(cut.frames[i].samples);
+        }
+        std::size_t plain_samples = 0;
+        for (const auto& frame : plain.frames) {
+            plain_samples += static_cast<std::size_t>(frame.samples);
+        }
+        CHECK(samples == plain_samples);
+        check_frames_read_back(cut);
+
+        // The decoder reassembles each unit into the frame the codec coded: as
+        // many outputs as the plain stream has frames, of the plain stream's
+        // length and quality (the rate loop spends each frame's bytes on the
+        // audio, so the two differ by the bytes the extra tables of contents
+        // take, and not bit for bit).
+        std::size_t units = 0;
+        const auto pcm = decode_units(cut.frames, units);
+        CHECK(units == plain.frames.size());
+        const auto reference = decode(plain.frames);
+        REQUIRE(pcm.size() == reference.size());
+        iclforge::ac4::EncoderConfig plain_config = config;
+        plain_config.frame_rate_index = c.audio_index;
+        plain_config.experimental.frame_rate_fraction = 1;
+        const auto probe = iclforge::ac4::Encoder::create(plain_config);
+        REQUIRE(probe.has_value());
+        const auto lag = static_cast<std::size_t>(probe->delay_samples() + probe->decoder_delay_samples());
+        for (std::size_t ch = 0; ch < pcm.size(); ++ch) {
+            CHECK(pcm[ch].size() == reference[ch].size());
+            const Score cut_score = score(x, pcm[ch], lag);
+            const Score plain_score = score(x, reference[ch], lag);
+            CAPTURE(cut_score.gain_db, cut_score.snr_db, plain_score.snr_db);
+            CHECK(std::abs(cut_score.gain_db) < 0.1);
+            CHECK(cut_score.snr_db > 25.0);
+            CHECK(std::abs(cut_score.snr_db - plain_score.snr_db) < 6.0);
+        }
+    }
+}
+
+TEST_CASE("the efficient high frame rate mode refuses what Table 18 does not give",
+          "[ac4][encoder][ehfr]") {
+    iclforge::ac4::EncoderConfig config;
+    config.frame_rate_index = 12;
+    config.experimental.frame_rate_fraction = 4;
+    CHECK(iclforge::ac4::Encoder::refusal_reason(config).empty());
+    config.experimental.frame_rate_fraction = 3;
+    CHECK_FALSE(iclforge::ac4::Encoder::refusal_reason(config).empty());
+    // 4 from index 10, 2 from index 5, neither at 13 or below 5.
+    for (const auto& [index, fraction, accepted] :
+         std::vector<std::tuple<int, int, bool>>{{9, 4, false}, {10, 4, true}, {5, 2, true},
+                                                 {4, 2, false}, {13, 2, false}, {0, 4, false}}) {
+        CAPTURE(index, fraction);
+        iclforge::ac4::EncoderConfig c;
+        c.frame_rate_index = index;
+        c.experimental.frame_rate_fraction = fraction;
+        CHECK(iclforge::ac4::Encoder::refusal_reason(c).empty() == accepted);
+    }
+    // A constant rate, as every transmission frame is a share of the codec
+    // frame's.
+    config.experimental.frame_rate_fraction = 2;
+    config.rate_mode = iclforge::ac4::RateMode::kAverage;
+    CHECK_FALSE(iclforge::ac4::Encoder::refusal_reason(config).empty());
+}

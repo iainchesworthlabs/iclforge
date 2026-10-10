@@ -18,7 +18,8 @@
 // would.
 //
 // Writing a Sequence back checks what the reader produced is something the writer accepts or
-// refuses cleanly, and decode_pcm reaches the sample reader with sizes and trims the file chose.
+// refuses cleanly, and decode_pcm reaches the sample reader (and, for a scalable element, the
+// de-mixer and recon gain) with sizes and trims the file chose.
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
     namespace iamf = iclforge::containers::iamf;
     const std::span<const std::byte> bytes(reinterpret_cast<const std::byte*>(data), size);
@@ -33,6 +34,19 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         (void)iamf::write_isobmff(file->sequence);
         for (const auto& element : file->sequence.audio_elements) {
             (void)iamf::decode_pcm(file->sequence, element.audio_element_id);
+        }
+    }
+    // Every IA track of the file, each with its track_ID's fragments, and the paths that take what
+    // they return: the codecs string, a file written with the 64-bit mdat header, and the PCM of the
+    // base layer without recon gain (the scalable reconstruction's other branch).
+    if (auto tracks = iamf::read_isobmff_tracks(bytes); tracks.has_value()) {
+        for (const auto& track : *tracks) {
+            (void)iamf::codecs_string(track.sequence);
+            (void)iamf::write_isobmff(track.sequence, {.large_mdat = true});
+            for (const auto& element : track.sequence.audio_elements) {
+                (void)iamf::decode_pcm(track.sequence, element.audio_element_id,
+                                       {.layer = 0, .apply_recon_gain = false});
+            }
         }
     }
     return 0;

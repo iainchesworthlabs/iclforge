@@ -304,6 +304,76 @@ SPEAKER_ADM_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
 </audioFormatExtended>
 """
 
+# BS.2076-3 §5.4.3.2 and §5.5.4: a Mid/Side encode and decode pair, which libadm skips and
+# libs/adm/src/adm_xml_extras.cpp reads from the text, and an HOA pack carrying the §5.5.5 defaults
+# beside its channel. The shapes the text scan is known to accept: the legacy outputChannelIDRef, a
+# jumpPosition ahead of the matrix, coefficients in every attribute form, an ID with lower-case hex.
+MATRIX_ADM_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
+<audioFormatExtended version="ITU-R_BS.2076-3">
+  <audioPackFormat audioPackFormatID="AP_00029001" audioPackFormatName="MidSide_Encode" typeLabel="0002" typeDefinition="Matrix">
+    <decodePackFormatIDRef>AP_00029101</decodePackFormatIDRef>
+    <inputPackFormatIDRef>AP_00010002</inputPackFormatIDRef>
+    <audioChannelFormatIDRef>AC_00029001</audioChannelFormatIDRef>
+    <audioChannelFormatIDRef>AC_00029002</audioChannelFormatIDRef>
+  </audioPackFormat>
+  <audioPackFormat audioPackFormatID="AP_00029101" audioPackFormatName="MidSide_Decode" typeLabel="0002" typeDefinition="Matrix">
+    <encodePackFormatIDRef>AP_00029001</encodePackFormatIDRef>
+    <outputPackFormatIDRef>AP_00010002</outputPackFormatIDRef>
+    <audioChannelFormatIDRef>AC_00029101</audioChannelFormatIDRef>
+    <audioChannelFormatIDRef>AC_00029102</audioChannelFormatIDRef>
+  </audioPackFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00029001" audioChannelFormatName="Mid" typeLabel="0002" typeDefinition="Matrix">
+    <audioBlockFormat audioBlockFormatID="AB_00029001_00000001">
+      <matrix>
+        <coefficient gain="0.5">AC_00010001</coefficient>
+        <coefficient gain="0.5">AC_00010002</coefficient>
+      </matrix>
+    </audioBlockFormat>
+  </audioChannelFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00029002" audioChannelFormatName="Side" typeLabel="0002" typeDefinition="Matrix">
+    <audioBlockFormat audioBlockFormatID="AB_00029002_00000001">
+      <matrix>
+        <coefficient gain="0.5">AC_00010001</coefficient>
+        <coefficient gain="-0.5">AC_00010002</coefficient>
+      </matrix>
+    </audioBlockFormat>
+  </audioChannelFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00029101" audioChannelFormatName="Left" typeLabel="0002" typeDefinition="Matrix">
+    <audioBlockFormat audioBlockFormatID="AB_00029101_00000001" rtime="00:00:00.00000" duration="00:00:01.00000">
+      <outputChannelFormatIDRef>AC_00010001</outputChannelFormatIDRef>
+      <jumpPosition interpolationLength="0.5">1</jumpPosition>
+      <matrix>
+        <coefficient gain="1.0">AC_00029001</coefficient>
+        <coefficient gain="-6.0206" gainUnit="dB" phase="90" delay="10.5">ac_00029002</coefficient>
+        <coefficient gainVar="clev" phaseVar="ph" delayVar="del">AC_00029002</coefficient>
+      </matrix>
+    </audioBlockFormat>
+  </audioChannelFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00029102" audioChannelFormatName="Right" typeLabel="0002" typeDefinition="Matrix">
+    <audioBlockFormat audioBlockFormatID="AB_0002910a_00000001">
+      <outputChannelIDRef>AC_00010002</outputChannelIDRef>
+      <matrix/>
+    </audioBlockFormat>
+  </audioChannelFormat>
+  <audioPackFormat audioPackFormatID="AP_00049001" audioPackFormatName="Foa" typeLabel="0004" typeDefinition="HOA">
+    <audioChannelFormatIDRef>AC_00049002</audioChannelFormatIDRef>
+    <normalization>N3D</normalization>
+    <nfcRefDist>1.5</nfcRefDist>
+    <screenRef>1</screenRef>
+  </audioPackFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00049002" audioChannelFormatName="N3D_ACN_2" typeLabel="0004" typeDefinition="HOA">
+    <audioBlockFormat audioBlockFormatID="AB_00049002_00000001">
+      <order>1</order>
+      <degree>0</degree>
+      <normalization>N3D</normalization>
+      <nfcRefDist>2</nfcRefDist>
+      <screenRef>1</screenRef>
+      <equation>sqrt(3)*z</equation>
+    </audioBlockFormat>
+  </audioChannelFormat>
+</audioFormatExtended>
+"""
+
 
 def chunk(fourcc: bytes, content: bytes, declared: int | None = None) -> bytes:
     """BS.2088-1 §4: id, 32-bit size, content, pad byte when odd."""
@@ -358,6 +428,7 @@ def cmd_adm(out_root: pathlib.Path) -> int:
     fixtures = {
         "riff-objects.wav": build_riff(CAR_ADM_XML),
         "riff-speakers.wav": build_riff(SPEAKER_ADM_XML, with_chna=False),
+        "riff-matrix.wav": build_riff(MATRIX_ADM_XML, with_chna=False),
         "rf64-objects.wav": build_rf64(CAR_ADM_XML),
         # No <axml> at all: BS.2088-1 §9 rule 2 makes it optional, so this is
         # the container half of the reader with the XML half switched off -

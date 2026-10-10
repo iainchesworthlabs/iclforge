@@ -80,6 +80,14 @@ public:
             u16(static_cast<std::uint8_t>(c));
         }
     }
+    // ISO 7-bit character string (the register's ISO7 type): one byte a character, no terminator. A
+    // byte above 0x7F is not a 7-bit character and is written as '?'.
+    void iso7(std::string_view text) {
+        for (const char c : text) {
+            const auto byte = static_cast<std::uint8_t>(c);
+            u8(byte < 0x80 ? byte : static_cast<std::uint8_t>('?'));
+        }
+    }
     // ST 377-1 4.3 Rational: two Int32.
     void rational(std::int32_t num, std::int32_t den) {
         i32(num);
@@ -170,10 +178,12 @@ constexpr Ul kTimecodeDataDef = ul("060e2b3404010101" "0103020101000000");
 constexpr Ul kEssenceKey = ul("060e2b3401020101" "0d01030116010d01");
 // ST 379-1 7.3: the File Package track's Track Number is bytes 13 to 16 of the essence key.
 constexpr std::uint32_t kTrackNumber = 0x16010D01;
-// ST 330 Table 1 with material type 09h (audio components in one container) and the UUID/UL
-// number generation method (A.2) with no instance number method.
+// ST 2067-2:2020 5.1.5: a Track File's Package UID is a basic UMID whose byte 11 is 0Fh
+// (unidentified material type) and byte 12 is 20h (UUID/UL number generation method, A.2, with no
+// instance number method), its instance number zero: 060a2b34 01010105 01010f20 13000000. Both
+// packages use it.
 constexpr std::array<std::uint8_t, 12> kUmidPrefix = {0x06, 0x0A, 0x2B, 0x34, 0x01, 0x01,
-                                                      0x01, 0x05, 0x01, 0x01, 0x09, 0x20};
+                                                      0x01, 0x05, 0x01, 0x01, 0x0F, 0x20};
 
 constexpr std::uint32_t kBodySid = 1;
 constexpr std::uint32_t kIndexSid = 2;
@@ -343,6 +353,9 @@ public:
     }
     void add_string(const Prop& p, std::string_view text) {
         add(p, [&](Out& o) { o.utf16(text); });
+    }
+    void add_iso7_string(const Prop& p, std::string_view text) {
+        add(p, [&](Out& o) { o.iso7(text); });
     }
     void add_rational(const Prop& p, std::int32_t num, std::int32_t den) {
         add(p, [&](Out& o) { o.rational(num, den); });
@@ -817,7 +830,10 @@ std::expected<Bytes, MxfWriteError> build_header_metadata(const Analysis& a, con
             sf.add_uuid(kMcaLinkId, soundfield_link_id);
             sf.add_string(kMcaTagSymbol, "IAB");
             sf.add_string(kMcaTagName, "IAB");
-            if (options.spoken_language) sf.add_string(kRfc5646SpokenLanguage, *options.spoken_language);
+            // The register types RFC5646SpokenLanguage as ISO7, unlike the MCA strings beside it.
+            if (options.spoken_language) {
+                sf.add_iso7_string(kRfc5646SpokenLanguage, *options.spoken_language);
+            }
             if (options.title) sf.add_string(kMcaTitle, *options.title);
             if (options.title_version) sf.add_string(kMcaTitleVersion, *options.title_version);
             if (options.content) sf.add_string(kMcaContent, *options.content);

@@ -59,6 +59,29 @@ the same rule with a shorter length field.
 
 Evidence: **text** (ST 2067-201 5.7.2 and its example).
 
+## ST 2067-2: the Package UID's material type
+
+ST 2067-2:2020 5.1.5 constrains a Track File's Package UID: a basic UMID whose byte 11 is `0Fh`
+("unidentified material type"), byte 12 `20h` and instance number zero, so the first 16 bytes are
+`060a2b34 01010105 01010f20 13000000`. The writer first wrote `09h` in byte 11, reading ST 330's table for
+"audio components in one container" as the closest type, and an independent validator (Netflix Photon
+5.1.0-rc.3, `IMPAnalyzer`) rejected the file for it. Both packages now use `0Fh`; the Material Package's
+UMID has no constraint of its own, and one prefix is the simplest thing that satisfies the File
+Package's.
+
+Evidence: **text** (ST 2067-2:2020 5.1.5) and **tool**: Photon opens the corrected file with no error.
+
+## The type of `RFC5646SpokenLanguage`
+
+Ten of the writer's eleven string properties are `UTF16String` in the SMPTE Elements register
+(Identification strings, MCA Tag Symbol and Name, Title, Title Version, Content, Use Class, IAB Audio
+Description Text). `RFC5646SpokenLanguage` (ST 377-4, `060e2b34.0101010d.03010102.03150000`) is `ISO7`: one
+byte a character. It was written as UTF-16 with the others, which Photon read as a string of NULs and
+rejected as not RFC 5646 compliant. It is written as 7 bits now; a byte above 0x7F, which a tag never
+has, is written as `?`.
+
+Evidence: **register** (the published Elements and Types XML) and **tool**.
+
 ## Labels that are in the SMPTE registers and not in the standards read
 
 ST 377-1 B.8 leaves the Data Definition of a Sequence to the registry (ST 400), and ST 2067-201 Annex D

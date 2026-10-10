@@ -63,19 +63,41 @@ back and prints what it found.
   `audioContent` → `audioObject` → `audioPackFormat`/`audioChannelFormat` (with its
   `audioBlockFormat` time-divisions — position, gain, width/height/depth, `channelLock`,
   `jumpPosition`, `zoneExclusion`, `objectDivergence`, `screenRef`, `headLocked`, HOA
-  order/degree/normalization) → `audioStreamFormat`/`audioTrackFormat` →
-  `audioTrackUID`. See [`iclforge/adm/model.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/adm/include/iclforge/adm/model.hpp) for exactly which sub-elements are carried and which
-  are deliberately out of scope (the Matrix block's coefficients, which libadm has no model for,
-  the Binaural-specific sub-elements, and loudness metadata — `iclforge::ac3::meta::loudness`
-  already measures loudness independently).
+  order/degree/normalization/`nfcRefDist`/`equation`, a Matrix block's output channel and
+  coefficients) → `audioStreamFormat`/`audioTrackFormat` → `audioTrackUID`. See
+  [`iclforge/adm/model.hpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/adm/include/iclforge/adm/model.hpp)
+  for exactly which sub-elements are carried and which are deliberately out of scope: loudness
+  metadata (`iclforge::ac3::meta::loudness` already measures loudness independently), and the
+  descriptive and interaction metadata (`audioProgramme` timing and reference screen, dialogue,
+  interaction ranges, labels, `headphoneVirtualise`, channel `frequency`, DirectSpeakers position
+  bounds), which nothing in an Atmos or AC-4 encode reads.
 
-**`zoneExclusion` is read by this module, not by libadm.** libadm's parser and writer both leave a
-`TODO: zoneExclusion` where it would go, and its XML tokenizer is private. `parse_bw64` therefore
-scans the same `<axml>` text a second time for `<zoneExclusion>` elements and attaches each
-block's `zone` children (`label`, and the six Cartesian bounds when given) to
-`AudioBlockFormat::zone_exclusion`; `write_bw64` adds the element to libadm's output the same way.
-The scan runs only after libadm has accepted the document, so it does not validate anything. The
-other three elements are libadm's own.
+**Some elements are read by this module, not by libadm.** libadm's parser and writer both leave a
+`TODO: zoneExclusion` where it would go, its channel-format parser has the loop that would build
+a Matrix block commented out (so a Matrix channel arrives with no blocks at all), its Matrix
+block class has no parameter for the `matrix`, and its `AudioPackFormat` has no place for a Matrix
+pack's references; its XML tokenizer is private. `parse_bw64` therefore scans the same `<axml>`
+text a second time (`libs/adm/src/adm_xml_extras.cpp`) and attaches:
+
+- each block's `<zoneExclusion>` `zone` children (`label`, and the six Cartesian bounds when
+  given) to `AudioBlockFormat::zone_exclusion`;
+- every block of a Matrix channel (the `AC_0002xxxx` type label), whole: `rtime`, `duration`,
+  `gain` and its `gainUnit`, `importance`, `outputChannelFormatIDRef` (or the legacy
+  `outputChannelIDRef` BS.2076-3 Table A1-15 says a reader must also accept), `jumpPosition`, and
+  the `matrix`'s `coefficient`s to `AudioBlockFormat::matrix`. A coefficient's text is the
+  `audioChannelFormatID` it reads; `gain` is linear (converted from `gainUnit="dB"`), `phase` is in
+  degrees, `delay` in milliseconds, and each has a `*Var` form that names a variable for a renderer
+  to resolve and is held unresolved;
+- a pack's `encodePackFormatIDRef`, `decodePackFormatIDRef`, `inputPackFormatIDRef` and
+  `outputPackFormatIDRef` (Table A1-24) and an HOA pack's `normalization`, `nfcRefDist` and
+  `screenRef` (Table A1-25) to `AudioPackFormat`. libadm reads those three HOA defaults as XML
+  attributes; the standard and the EBU's own renderer have them as sub-elements, and both
+  spellings are accepted.
+
+`write_bw64` adds the same elements to libadm's output the same way. The scan runs only after
+libadm has accepted the document, so it does not validate anything, and a Matrix pack's references
+are carried as the IDs the file gave: nothing here applies a matrix (see
+[the bridge](adm-bridge.md#what-does-not-get-mapped)). The other elements are libadm's own.
 
 **`model` always includes BS.2076-2 Annex A's "common definitions".** libadm's own `parseXml()`
 starts every document from a copy already populated with the standard's ~940 predefined
@@ -143,24 +165,34 @@ from the model wherever `has_sample_rate` is set. On the read side both attribut
 (BS.2076-2 §5.9), and `parse_bw64` reports which were present through `has_sample_rate` and
 `has_bit_depth`.
 
-`write_bw64`'s own translator supports exactly the element shapes [ADM → Atmos bridging](adm-bridge.md)'s
-write direction (`iclforge::adm::write()`) produces: `audioProgramme` → `audioContent` →
-`audioObject` (no nesting) → `audioPackFormat` (`Objects` or `DirectSpeakers`, no nesting) →
-`audioChannelFormat` (cartesian `audioBlockFormat`s only) → `audioStreamFormat` → `audioTrackFormat`
-→ `audioTrackUID`. `iclforge::adm::write()` always populates the full `audioStreamFormat`/
-`audioTrackFormat` chain rather than BS.2076-2's plain-PCM shortcut (`audioTrackUID` referencing
+`write_bw64` writes everything the model carries: `audioProgramme` → `audioContent` →
+`audioObject` (which may nest others) → `audioPackFormat` (`DirectSpeakers`, `Objects`, `HOA`,
+`Binaural` or `Matrix`, which may nest others) → `audioChannelFormat` (polar or cartesian
+`audioBlockFormat`s; HOA's order, degree and extras; a Matrix block's output channel,
+`jumpPosition` and coefficients) → `audioStreamFormat` → `audioTrackFormat` → `audioTrackUID`.
+`iclforge::adm::write()` always populates the full `audioStreamFormat`/`audioTrackFormat` chain
+rather than BS.2076-2's plain-PCM shortcut (`audioTrackUID` referencing
 `audioPackFormat`/`audioChannelFormat` directly, with no stream/track format at all) — libadm's own
 `adm::reassignIds()` zeroes out any `audioChannelFormat` no `audioStreamFormat` references ("get an
 Id with the value zero and are thereby marked as ADM elements which should be ignored" -
 `adm/utilities/id_assignment.hpp`'s own doc comment), which the shortcut alone triggers; every
 channel this writer produced collapsed to the same `AC_00000000` id before this chain was added.
-`AdmWriteError::kInvalidDocument` covers every case outside that shape: an unresolved `*_refs`
-entry, Matrix/HOA/Binaural pack or channel types, nested references, an `audioTrackUID` that names
-both an `audioTrackFormat` and an `audioChannelFormat`, or a block whose position is polar rather
-than cartesian (a default-constructed `AudioBlockFormat` is one: its `position` starts as
-`PolarPosition{}`). An exception libadm or libbw64 throws once the document is built comes back as
-`kOther` — `adm::formatId()` throws for an ID field that overflows, such as a 256th
-`audioTrackFormat` on one `audioStreamFormat`.
+
+libadm formats a Matrix block as an element holding only its ID, `rtime` and `duration`, and an HOA
+pack through a subclass whose defaults it never writes. Both are completed in the text once
+`reassignIds()` has given every element its final ID, which is also when a Matrix coefficient's or
+pack reference's correlation key becomes the ID it names in the file. The matrix goes first in the
+block, as in the standard's sample code, then any `gain` or `importance` that is not the default.
+
+`AdmWriteError::kInvalidDocument` covers: an unresolved `*_refs` entry, Matrix coefficient or
+Matrix pack reference; `audioObject`s or `audioPackFormat`s that nest in a loop; a `kUnknown` or
+`kUserCustom` type, which has no element to become; an HOA block without its order or degree; a
+value libadm's own types refuse (an azimuth past 180 degrees, an importance past 10); and an
+`audioTrackUID` that names both an `audioTrackFormat` and an `audioChannelFormat`. A
+default-constructed `AudioBlockFormat` is not an error: its `position` starts as `PolarPosition{}`
+and is written as azimuth 0, elevation 0, distance 1. An exception libadm or libbw64 throws once the
+document is built comes back as `kOther` — `adm::formatId()` throws for an ID field that
+overflows, such as a 256th `audioTrackFormat` on one `audioStreamFormat`.
 
 ## Built on the EBU's own reference implementations
 

@@ -5,7 +5,9 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 #include <vector>
 
@@ -41,53 +43,116 @@ struct IabChannelKeyHash {
     }
 };
 
-// §10.3.5 Table 19's ChannelID/DestinationChannelID codes with a clean
-// iclforge::objects::oba::BedLabel equivalent - see iab_bridge.hpp's own top comment for the full
-// reasoning on the surround-zone collapse (0x6/0xA -> Ls/Rs, 0x7/0x8 -> Lb/Rb, 0x5/0x9 refused) and
-// why several other codes are deliberately left unmapped rather than guessed at. 0x80-0x89 are
+// Where a bed channel sits, and whether it is the LFE. A bed channel is a loudspeaker feed, so what
+// the encode needs from its ChannelID is the place that loudspeaker is: the same pinned position
+// ADM's speakerLabel gets.
+struct ChannelPlacement {
+    iclforge::objects::oba::Position position;
+    bool lfe = false;
+};
+
+[[nodiscard]] ChannelPlacement at_label(iclforge::objects::oba::BedLabel label) {
+    return {.position = iclforge::objects::oba::bed_label_position(label),
+            .lfe = label == iclforge::objects::oba::BedLabel::kLfe ||
+                   label == iclforge::objects::oba::BedLabel::kLfe2};
+}
+
+[[nodiscard]] ChannelPlacement at(double x, double y, double z) {
+    return {.position = {.x = x, .y = y, .z = z}, .lfe = false};
+}
+
+// §10.3.5 Table 19's ChannelID/DestinationChannelID codes: every code the table defines (0x0-0x17
+// from ST 428-12 and ST 2098-5, 0x80-0x89 from BS.2051-2) has a placement; 0x18-0x7F and the codes
+// above 0x89 are Reserved and refused.
+//
+// A code with a BedLabel is placed where bed_label_position() puts that label. 0x80-0x89 are
 // Table 19's own BS.2051-2-named alternative codes for a subset of the same physical positions
-// (heights, wide, dual-LFE); 0xE/0xF
-// ("Left/Right Height", unqualified - the same pattern 0x0/0x4 "Left"/"Right" alone use for the
-// front row, versus the explicitly-qualified "Surround Height"/"Side Surround Height"/"Rear
-// Surround Height" variants below 0x11) are the front-height pair, matching 0x80/0x81's own "Top
-// Front" naming for the identical position.
-[[nodiscard]] std::optional<iclforge::objects::oba::BedLabel> bed_label_for_channel_id(
-    std::uint32_t channel_id) {
+// (heights, wide, dual-LFE); 0xE/0xF ("Left/Right Height") are the front-height pair, matching
+// 0x80/0x81's "Top Front" naming for the identical position, and 0x5/0x9 "Side Surround" sit where
+// the "Surround" pair (0x6/0xA) does, since a bed has one or the other.
+//
+// A code with no BedLabel is placed from ST 2098-5 Annex B's description of where its loudspeaker
+// typically is (informative: a cinema's own layout varies), and from the room's own conventions
+// where it says only "above": see libs/adm/ERRATA.md. x is 0 at the left wall, y 0 at the screen, z
+// 1 at the ceiling.
+[[nodiscard]] std::optional<ChannelPlacement> placement_for_channel_id(std::uint32_t channel_id) {
+    using iclforge::objects::oba::BedLabel;
     switch (channel_id) {
-        case 0x0: return iclforge::objects::oba::BedLabel::kL;               // Left
-        case 0x2: return iclforge::objects::oba::BedLabel::kC;               // Center
-        case 0x4: return iclforge::objects::oba::BedLabel::kR;               // Right
-        case 0x6: return iclforge::objects::oba::BedLabel::kLs;              // Left Surround
-        case 0xA: return iclforge::objects::oba::BedLabel::kRs;              // Right Surround
-        case 0x7: return iclforge::objects::oba::BedLabel::kLb;              // Left Rear Surround
-        case 0x8: return iclforge::objects::oba::BedLabel::kRb;              // Right Rear Surround
-        case 0xD: return iclforge::objects::oba::BedLabel::kLfe;             // LFE
-        case 0xE: return iclforge::objects::oba::BedLabel::kTfl;             // Left Height
-        case 0xF: return iclforge::objects::oba::BedLabel::kTfr;             // Right Height
-        case 0x80: return iclforge::objects::oba::BedLabel::kTfl;            // Left Top Front / J
-        case 0x81: return iclforge::objects::oba::BedLabel::kTfr;            // Right Top Front / J
-        case 0x82: return iclforge::objects::oba::BedLabel::kTbl;            // Left Top Back / J
-        case 0x83: return iclforge::objects::oba::BedLabel::kTbr;            // Right Top Back / J
-        case 0x84: return iclforge::objects::oba::BedLabel::kTsl;            // Top side left / H
-        case 0x85: return iclforge::objects::oba::BedLabel::kTsr;            // Top side right / H
-        case 0x86: return iclforge::objects::oba::BedLabel::kLfe;            // LFE1 / H
-        case 0x87: return iclforge::objects::oba::BedLabel::kLfe2;           // LFE2 / H
+        case 0x0:
+            return at_label(BedLabel::kL);  // Left
+        case 0x1:
+            return at(0.25, 0.0, 0.0);  // Left Center: between L and C
+        case 0x2:
+            return at_label(BedLabel::kC);  // Center
+        case 0x3:
+            return at(0.75, 0.0, 0.0);  // Right Center: between C and R
+        case 0x4:
+            return at_label(BedLabel::kR);  // Right
+        case 0x5:
+            return at_label(BedLabel::kLs);  // Left Side Surround
+        case 0x6:
+            return at_label(BedLabel::kLs);  // Left Surround
+        case 0x7:
+            return at_label(BedLabel::kLb);  // Left Rear Surround
+        case 0x8:
+            return at_label(BedLabel::kRb);  // Right Rear Surround
+        case 0x9:
+            return at_label(BedLabel::kRs);  // Right Side Surround
+        case 0xA:
+            return at_label(BedLabel::kRs);  // Right Surround
+        case 0xB:
+            return at(0.25, 0.5, 1.0);  // Left Top Surround (Lts)
+        case 0xC:
+            return at(0.75, 0.5, 1.0);  // Right Top Surround (Rts)
+        case 0xD:
+            return at_label(BedLabel::kLfe);  // LFE
+        case 0xE:
+            return at_label(BedLabel::kTfl);  // Left Height (Lh)
+        case 0xF:
+            return at_label(BedLabel::kTfr);  // Right Height (Rh)
+        case 0x10:
+            return at(0.5, 0.0, 1.0);  // Center Height (Ch)
+        case 0x11:
+            return at(0.0, 2.0 / 3.0, 1.0);  // Left Surround Height (Lsh)
+        case 0x12:
+            return at(1.0, 2.0 / 3.0, 1.0);  // Right Surround Height (Rsh)
+        case 0x13:
+            return at(0.0, 0.5, 1.0);  // Left Side Surround Height (Lssh)
+        case 0x14:
+            return at(1.0, 0.5, 1.0);  // Right Side Surround Height (Rssh)
+        case 0x15:
+            return at(0.0, 1.0, 1.0);  // Left Rear Surround Height (Lrsh)
+        case 0x16:
+            return at(1.0, 1.0, 1.0);  // Right Rear Surround Height (Rrsh)
+        case 0x17:
+            return at(0.5, 0.5, 1.0);  // Top Surround (Ts)
+        case 0x80:
+            return at_label(BedLabel::kTfl);  // Left Top Front / J
+        case 0x81:
+            return at_label(BedLabel::kTfr);  // Right Top Front / J
+        case 0x82:
+            return at_label(BedLabel::kTbl);  // Left Top Back / J
+        case 0x83:
+            return at_label(BedLabel::kTbr);  // Right Top Back / J
+        case 0x84:
+            return at_label(BedLabel::kTsl);  // Top side left / H
+        case 0x85:
+            return at_label(BedLabel::kTsr);  // Top side right / H
+        case 0x86:
+            return at_label(BedLabel::kLfe);  // LFE1 / H
+        case 0x87:
+            return at_label(BedLabel::kLfe2);  // LFE2 / H
         case 0x88:
-            return iclforge::objects::oba::BedLabel::kLw;  // Front Left (Wide) / H
+            return at_label(BedLabel::kLw);  // Front Left (Wide) / H
         case 0x89:
-            return iclforge::objects::oba::BedLabel::kRw;  // Front Right (Wide) / H
+            return at_label(BedLabel::kRw);  // Front Right (Wide) / H
         default: return std::nullopt;
     }
 }
 
-[[nodiscard]] bool is_lfe_label(iclforge::objects::oba::BedLabel label) {
-    return label == iclforge::objects::oba::BedLabel::kLfe ||
-           label == iclforge::objects::oba::BedLabel::kLfe2;
-}
-
 struct ChannelIdentity {
     IabChannelKey key;
-    std::optional<iclforge::objects::oba::BedLabel> bed_label;  // set exactly when key.is_bed
+    std::optional<ChannelPlacement> bed_placement;  // set exactly when key.is_bed
 };
 
 // Pass 1: unions every unconditionally-Activated top-level Bed channel / Object across the whole
@@ -114,11 +179,11 @@ struct ChannelIdentity {
                 if (!seen.insert(key).second) {
                     continue;
                 }
-                const auto label = bed_label_for_channel_id(channel.channel_id);
-                if (!label) {
+                const auto placement = placement_for_channel_id(channel.channel_id);
+                if (!placement) {
                     return std::unexpected(BridgeError::kUnsupportedIabChannel);
                 }
-                order.push_back({.key = key, .bed_label = label});
+                order.push_back({.key = key, .bed_placement = placement});
             }
         }
         for (const auto& object : entry.frame.objects) {
@@ -129,7 +194,7 @@ struct ChannelIdentity {
             if (!seen.insert(key).second) {
                 continue;
             }
-            order.push_back({.key = key, .bed_label = std::nullopt});
+            order.push_back({.key = key, .bed_placement = std::nullopt});
         }
     }
     return order;
@@ -159,19 +224,58 @@ struct ChannelIdentity {
 // `sb` is the latest sub block at or before it that carried zone information (sub block 0 always
 // does). Without that child, the sub block's own ObjectZoneControl gains apply, and without them
 // the object is unconstrained (§10.5.12: "zone control is not used").
-[[nodiscard]] IabZoneMapping zone_mapping_at(const iclforge::iab::ObjectDefinition& object, std::size_t sb) {
+struct ZoneAt {
+    IabZoneMapping mapping;
+    bool partial_gain =
+        false;  // a zone gain strictly between 0 and 1, read as included or excluded
+};
+
+[[nodiscard]] bool has_partial_gain(std::span<const double> gains) {
+    return std::any_of(gains.begin(), gains.end(),
+                       [](double gain) { return gain > 0.0 && gain < 1.0; });
+}
+
+[[nodiscard]] ZoneAt zone_mapping_at(const iclforge::iab::ObjectDefinition& object,
+                                     std::size_t sb) {
     if (object.zone19.has_value() && !object.zone19->sub_blocks.empty()) {
         const auto& blocks = object.zone19->sub_blocks;
         std::size_t index = std::min(sb, blocks.size() - 1);
         while (index > 0 && !blocks[index].has_zone_info) {
             --index;
         }
-        return iab_zones19_to_constraint(blocks[index].zone_gains);
+        return {.mapping = iab_zones19_to_constraint(blocks[index].zone_gains),
+                .partial_gain = has_partial_gain(blocks[index].zone_gains)};
     }
     if (object.sub_blocks[sb].zone_gains.has_value()) {
-        return iab_zones_to_constraint(*object.sub_blocks[sb].zone_gains);
+        return {.mapping = iab_zones_to_constraint(*object.sub_blocks[sb].zone_gains),
+                .partial_gain = has_partial_gain(*object.sub_blocks[sb].zone_gains)};
     }
     return {};
+}
+
+[[nodiscard]] std::string_view preset_name(iclforge::objects::oba::ZoneConstraint zone) {
+    using iclforge::objects::oba::ZoneConstraint;
+    switch (zone) {
+        case ZoneConstraint::kNone:
+            return "none";
+        case ZoneConstraint::kBackExcluded:
+            return "back excluded";
+        case ZoneConstraint::kSideExcluded:
+            return "side excluded";
+        case ZoneConstraint::kCentreAndBackOnly:
+            return "centre and back";
+        case ZoneConstraint::kScreenOnly:
+            return "screen only";
+        case ZoneConstraint::kSurroundOnly:
+            return "surround only";
+    }
+    return "none";
+}
+
+void note(std::vector<std::string>& notes, std::string text) {
+    if (std::find(notes.begin(), notes.end(), text) == notes.end()) {
+        notes.push_back(std::move(text));
+    }
 }
 
 // TS 103 420 §8.3.2.2's own 16-channel cap, the same constant and reasoning bridge.cpp's own
@@ -198,6 +302,7 @@ std::expected<IabBridgeResult, BridgeError> build_iab(std::span<const iclforge::
     out.sample_rate = frames.front().frame.sample_rate;
     out.pcm.resize(identities->size());
     std::vector<std::vector<iclforge::objects::oba::Keyframe>> keyframes(identities->size());
+    out.unmapped.resize(identities->size());
 
     // Pass 2: walks every frame once, in order, building each channel's timeline and PCM together
     // - see iab_bridge.hpp's own top comment for why a Bed channel contributes at most one
@@ -245,14 +350,17 @@ std::expected<IabBridgeResult, BridgeError> build_iab(std::span<const iclforge::
                     }
                 }
 
-                const bool is_lfe = is_lfe_label(*identity.bed_label);
+                const bool is_lfe = identity.bed_placement->lfe;
                 if (channel != nullptr) {
                     keyframes[ch].push_back({
                         .time_s = time_s,
-                        .position = iclforge::objects::oba::bed_label_position(*identity.bed_label),
+                        .position = identity.bed_placement->position,
                         .gain = is_lfe ? 0.0 : channel->gain,
                         .lfe_send = is_lfe ? 1.0 : 0.0,
                     });
+                    if (channel->decorrelation.has_value() && *channel->decorrelation > 0.0) {
+                        note(out.unmapped[ch], "decorrelation");
+                    }
                     auto essence = resolve_essence(*essence_in_frame, channel->audio_data_id, *samples_per_frame);
                     if (!essence) {
                         return std::unexpected(essence.error());
@@ -276,7 +384,24 @@ std::expected<IabBridgeResult, BridgeError> build_iab(std::span<const iclforge::
                         if (!block.has_pan_info) {
                             continue;
                         }
-                        const IabZoneMapping zones = zone_mapping_at(*object, sb);
+                        const ZoneAt zone_at = zone_mapping_at(*object, sb);
+                        const IabZoneMapping& zones = zone_at.mapping;
+                        if (!zones.exact) {
+                            note(out.unmapped[ch],
+                                 "zone control (matches no Table 20 preset; carried as " +
+                                     std::string(preset_name(zones.zone)) + ")");
+                        }
+                        if (zone_at.partial_gain) {
+                            note(out.unmapped[ch],
+                                 "zone gain between 0 and 1 (read as included from 0.5)");
+                        }
+                        if (block.decorrelation > 0.0) {
+                            note(out.unmapped[ch], "decorrelation");
+                        }
+                        if (block.snap && block.snap_tolerance.has_value() &&
+                            *block.snap_tolerance < 1.0) {
+                            note(out.unmapped[ch], "snap tolerance");
+                        }
                         keyframes[ch].push_back({
                             .time_s = time_s + (static_cast<double>(sb) + 1.0) /
                                                     static_cast<double>(*sub_block_count) * frame_duration_s,
@@ -314,7 +439,7 @@ std::expected<IabBridgeResult, BridgeError> build_iab(std::span<const iclforge::
             return std::unexpected(BridgeError::kUnsupportedIabChannel);
         }
 
-        const bool is_lfe = identity.key.is_bed && is_lfe_label(*identity.bed_label);
+        const bool is_lfe = identity.key.is_bed && identity.bed_placement->lfe;
         out.channel_ids.push_back(identity.key.is_bed
                                        ? "bed:" + std::to_string(identity.key.meta_id) + ":" +
                                              std::to_string(identity.key.sub_channel_id)

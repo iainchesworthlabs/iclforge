@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -43,6 +44,35 @@ std::string_view describe(Error error) {
             return "a construct this module does not read or write";
     }
     return "unknown iclforge::iamf error";
+}
+
+std::optional<std::string> codecs_string(const Sequence& sequence) {
+    if (sequence.audio_elements.empty()) {
+        return std::nullopt;
+    }
+    const CodecConfig* codec = nullptr;
+    for (const CodecConfig& candidate : sequence.codec_configs) {
+        if (candidate.codec_config_id == sequence.audio_elements.front().codec_config_id) {
+            codec = &candidate;
+        }
+    }
+    if (codec == nullptr) {
+        return std::nullopt;
+    }
+    std::string name;
+    if (codec->codec_id == "Opus" || codec->codec_id == "fLaC" || codec->codec_id == "ipcm") {
+        name = codec->codec_id;
+    } else if (codec->codec_id == "mp4a") {
+        name = "mp4a.40.2";  // AAC-LC: the audio object type 2 of MPEG-4 Audio
+    } else {
+        return std::nullopt;
+    }
+    const auto three_digits = [](std::uint8_t value) {
+        std::string digits = std::to_string(value);
+        return std::string(3 - digits.size(), '0') + digits;
+    };
+    return "iamf." + three_digits(sequence.header.primary_profile) + "." +
+           three_digits(sequence.header.additional_profile) + "." + name;
 }
 
 std::int16_t double_to_q7_8(double value) {

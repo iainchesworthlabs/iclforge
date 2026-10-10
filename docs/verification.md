@@ -802,6 +802,41 @@ metadata is. It is covered bit-by-bit instead
 ([libs/ac3/tests/meta/test_drc.cpp](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/ac3/tests/meta/test_drc.cpp),
 [tools/references/eac3_parse.py](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/references/eac3_parse.py)).
 
+### IMF IAB Track Files
+
+`write_mxf_iab()` is checked three ways: by a reader written separately from ST 377-1 and the standards it
+cites (`libs/iab/tests/test_mxf_writer.cpp`), by FFmpeg's MXF demuxer (partitions, Header Metadata,
+timecode, duration; it does not know the IAB descriptor, so it reports the audio as unsupported), and by
+**Netflix Photon**, the open-source IMF validator Netflix publishes. Photon is the only outside tool this
+project has found that implements ST 2067-201 and ST 2067-2's Track File constraints, which makes it the
+one oracle that can say a Track File is wrong where the in-repo reader and FFmpeg both read it.
+
+It did, twice, on the first file it saw:
+
+- the File Package's Package UID had material type `09h` where ST 2067-2:2020 5.1.5 requires `0Fh`; and
+- `RFC5646SpokenLanguage` was written as UTF-16 where the SMPTE Elements register types it ISO7.
+
+Both are fixed and recorded in `libs/iab/ERRATA.md`; the writer's test asserts each. The corrected file
+gives no error from `IMPAnalyzer` and none from `IMFTrackFileReader` (which runs the IAB checks), with and
+without the IAB Channel SubDescriptors and with the optional MCA labels set. With them unset Photon warns,
+correctly, that MCA Content, MCA Use Class and MCA Title Version "should" be present.
+
+Photon's `IMFTrackFileCPLBuilder` also derives a Composition Playlist from the file: an `IABSequence`
+at edit rate 24/1 with a source duration of 48, which are the frame rate and frame count written, and the
+File Package's UUID as the track file ID. (That app then fails in its own closing dump of the reader's
+state when it shares one working directory with the reader it built; the standalone reader's identical
+dump succeeds on the same file, and no check named the file.)
+
+What this does not cover: Photon was given the Track File alone. No Composition Playlist, Packing List or
+Asset Map names one, because this project writes none, so the checks that run across an IMP (the CPL's
+`IABSequence`, the track file's place in an Application) have not run. Photon 5.1.0-rc.3 is a pre-release
+with no published binary; it was built from its tag with its own Gradle wrapper.
+
+```
+java -cp "<photon>/build/libs/*" com.netflix.imflibrary.app.IMPAnalyzer track.mxf
+java -cp "<photon>/build/libs/*" com.netflix.imflibrary.app.IMFTrackFileReader track.mxf <empty working dir>
+```
+
 ## Going the other way: published conformance vectors
 
 Everything above consumes someone else's streams as an oracle. Every release also publishes a
@@ -1579,7 +1614,11 @@ configurations, chosen frame by frame by the bits they save, 7.0 and 7.1 in the 
 ASPX_ACPL_1 and A-CPL in stereo, and 7.0.4 and 7.1.4 with the back pair, ASPX_ACPL_1 and A-JCC in
 the immersive element are experimental options. Objects, as an A-JOC substream or direct-coded, are
 an experimental option too (phase E9), as is spectral noise fill, which gives each band that
-quantises to zero a level of its own (`experimental.noise_fill`). It shares
+quantises to zero a level of its own (`experimental.noise_fill`), and the efficient high frame rate
+mode, which sends each codec frame as two or four transmission frames
+(`experimental.frame_rate_fraction`; a constant rate; the decoder reassembles each unit into the
+frame the codec coded, and a test holds its output to the plain stream's at the audio frame rate).
+It shares
 `libs/ac4/src/core`'s transforms, windows, codebooks, QMF banks and A-SPX tables and high frequency
 generator with the decoder, and writes the syntax through a transcription of the tables of its own.
 `forge ac4-encode` writes it raw or in MP4, with an option for each setting. Ten checks stand
@@ -1835,9 +1874,26 @@ at the sample their input samples do, to within 32 samples, in both codings; a s
 for byte the first; and the encoder's trace, the decoder's and the Python parser's agree on the four
 committed streams (`testdata/ac4/objects/encoder-*.ac4`, with their digests) and on the
 encoder-space harness's object draws. MediaInfo's reading of the object count and the bed
-(`tools/checks/check_ac4_encode_readers.py --only objects`) needs DEE's install. Whether the objects
+(`tools/checks/check_ac4_encode_readers.py --only objects`, which needs MediaInfo from DEE's
+install) reads the four committed streams as configured, run on 2026-10-10 against MediaInfoLib
+26.05: 8 objects for the A-JOC stream over a computed downmix, 7 with its static 5.1 bed named, 6
+with two bed objects, and 5 for the direct-coded stream. Whether the objects
 move as their metadata says is the listener's to hear, from the streams the test writes with
 `AC4_ENCODER_WRITE_LISTENING` set.
+
+The encoder's efficient high frame rate mode (`experimental.frame_rate_fraction`,
+`libs/ac4/tests/encoder/test_encoder.cpp`) is checked against the decoder's reassembly alone, which
+`libs/ac4/tests/decoder/test_ehfr.cpp` holds to DEE's streams cut into fragments by a test helper: at 120 fps in quarters, 60 fps in
+halves and 119.88 fps in quarters, every transmission frame carries the stream's index and the
+fraction, the counters run on from a multiple of it, only the first of a unit is an I-frame, the
+decoder's units are as many as the codec frames and hold the tone at unity gain and the plain
+stream's quality at the audio frame rate, and its syntax trace reads back as the encoder's. MediaInfo
+(MediaInfoLib 26.05, `--Details=1`) reads the table of contents of each frame of such a stream, the
+`frame_rate_index` 12 with `b_frame_rate_fraction` and `b_frame_rate_fraction_is_4`, and gives the
+frame rate as 120 fps of 400 samples; it details no audio. DEE's `dee_mp4muxer` muxes a plain 120 fps
+stream and crashes (a segmentation fault, exit 139) on both a 120 fps stream in quarters and a 60 fps
+stream in halves, so it does not take the mode's fragments (checked by hand on 2026-10-10, not by
+a script). No decoder other than this project's has read one.
 
 ### IEC 61937
 

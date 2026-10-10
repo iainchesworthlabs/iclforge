@@ -51,6 +51,7 @@ them.
 | [`mux_fmp4`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/mux_fmp4.cpp) | Fragment into CMAF and emit HLS/DASH manifests. | [Muxing & sinks](muxing-and-sinks.md) |
 | [`mux_ts`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/mux_ts.cpp) | Wrap in MPEG-2 TS with the right PMT descriptor. | [Muxing & sinks](muxing-and-sinks.md) |
 | [`mux_iamf`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/mux_iamf.cpp) | Write an IAMF temporal unit sequence and wrap it in ISOBMFF. | [IAMF writing](iamf.md) |
+| [`iamf_coded`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/iamf_coded.cpp) | Carry FLAC frames in IAMF with `mux_coded()`, then read them back and rebuild the channels with `reconstruct_channels()`. | [IAMF writing](iamf.md) |
 
 ## File I/O, ADM & IAB
 
