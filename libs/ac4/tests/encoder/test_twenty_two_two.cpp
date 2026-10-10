@@ -413,7 +413,7 @@ TEST_CASE("22.2 at 25 fps and at 44.1 kHz puts each channel's tone on its own ch
     }
 }
 
-TEST_CASE("22.2's table of contents, level and MP4 description", "[ac4][encoder][twenty-two-two]") {
+TEST_CASE("22.2's table of contents and MP4 description", "[ac4][encoder][twenty-two-two]") {
     for (const auto& [kbps, mode] :
          {std::pair{1536, CodecMode::kSimple}, std::pair{880, CodecMode::kAspx}}) {
         CAPTURE(kbps);
@@ -442,7 +442,7 @@ TEST_CASE("22.2's table of contents, level and MP4 description", "[ac4][encoder]
     }
 }
 
-TEST_CASE("a decoder at level 3 does not select a 22.2 presentation, and one at level 7 does",
+TEST_CASE("a decoder at level 3 does not select a 22.2 presentation and one at level 7 does",
           "[ac4][encoder][twenty-two-two]") {
     const std::vector<Channel> channels = layout();
     const Encoded encoded = encode(config_at(880, CodecMode::kAspx), tones(channels));
@@ -500,7 +500,7 @@ TEST_CASE("22.2 decodes with an SNR floor on each pair of Table 21",
     }
 }
 
-TEST_CASE("the rate must hold 22.2's least frame, and refusal_reason names a rate that does not",
+TEST_CASE("the rate must hold 22.2's least frame and refusal_reason names a rate that does not",
           "[ac4][encoder][twenty-two-two]") {
     // A silent I-frame of the element: sf_info() and chparam_info() for each
     // of eleven pairs and the two LFEs' max_sfb, and in ASPX eleven
@@ -638,7 +638,7 @@ TEST_CASE("22.2 is the music and effects of a presentation with a mono dialogue 
     }
     CHECK(level(full.channels[2], 1019.0) > 0.5);
 }
-TEST_CASE("22.2 carries the loudness, DRC and dialnorm metadata the other layouts do",
+TEST_CASE("22.2 carries the loudness and DRC and dialnorm metadata the other layouts do",
           "[ac4][encoder][twenty-two-two]") {
     // The presentation substream's fields do not depend on the layout but for
     // loud_corr() and custom_dmx_data(), which 22.2's channel mode reads as a

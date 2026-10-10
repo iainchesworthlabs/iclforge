@@ -351,7 +351,7 @@ The element has no companding, S-CPL or A-CPL data, so the A-CPL, S-CPL and A-JC
 refused by name, and so are dialogue enhancement, DRC gains and the stereo and height downmix values,
 which have no 22.2 definition to write. `kAuto` takes ASPX below 76.8 kbps a full-band channel (22 of
 them, so 1 690 kbps) and SIMPLE from there. The rate must hold the least frame, which the 24 tracks
-set at 17 kbps in SIMPLE and 49 in ASPX at the native frame rate (16 and 48 at 44.1 kHz), and more at
+set at 17 kbps in SIMPLE and 49 in ASPX at the native frame rate (15 and 45 at 44.1 kHz), and more at
 the higher frame rates: `refusal_reason()` names a rate that cannot hold it.
 
 A 22.2 presentation has 22 tracks, which only `md_compat` 7 (unrestricted) holds (Part 2 Table 55),

@@ -217,7 +217,7 @@ in: L R C LFE (FL FR FC LFE), Lb Rb Cb (BL BR BC), Ls Rs (SL SR), Tc Tfl Tsl Tfc
 ASPX below 76.8 kbps a full-band channel (1 690 kbps over the 22 of them) and SIMPLE from there. The
 A-CPL, S-CPL and A-JCC modes, the stereo and height downmix values, dialogue enhancement and DRC
 gains are refused for it. The rate must hold the element's least frame: 17 kbps in SIMPLE and 49 in
-ASPX at the native frame rate (16 and 48 at 44.1 kHz), more at the higher frame rates, and the
+ASPX at the native frame rate (15 and 45 at 44.1 kHz), more at the higher frame rates, and the
 encoder's refusal names a rate that cannot. A decoder takes the presentation at `md-compat=7`
 (22 tracks, Part 2 Table 55). An MP4 file carries it with a `dac4`.
 

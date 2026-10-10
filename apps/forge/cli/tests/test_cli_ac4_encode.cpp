@@ -534,7 +534,7 @@ TEST_CASE("ac4-encode's experimental tools each write their syntax", "[cli][ac4]
                       log) == 1);
         CHECK(read_log(log).find("experimental.ajcc") != std::string::npos);
     }
-    SECTION("twenty-two-two takes 24 channels as the 22.2 element, in SIMPLE and ASPX and in MP4") {
+    SECTION("twenty-two-two takes 24 channels as the 22.2 element in SIMPLE and ASPX and in MP4") {
         // A tone on each channel at its own frequency but for the two LFEs,
         // which `decode` writes at the WAV file's channels 3 and 18 and whose
         // tracks code to 120 Hz: 47 and 71 Hz there.
