@@ -83,6 +83,12 @@ constexpr std::array<Named<Concealment>, 3> kConcealments{{
 }};
 
 constexpr std::int32_t kMaxOutputDelay = 5000;
+// The largest chunk limit a sink may state: past AC-4's longest burst chunk (17 + 131,056 bytes)
+// and one WebSocket message's 65,518 (planning/hearth-sendspin-extension.md, Encryption).
+constexpr std::int32_t kMaxChunkBytes = 1 << 20;
+// The longest layout text a state may carry. A layout is a name or a speaker list, a few hundred
+// characters at the most.
+constexpr std::size_t kMaxLayoutText = 512;
 constexpr std::int64_t kMaxSampleRate = 768000;
 constexpr std::int64_t kMaxOutputs = 1024;
 constexpr std::int64_t kMaxInt32 = 2'147'483'647;
@@ -227,6 +233,9 @@ void write_support(json::Writer& w, const Support& support) {
     }
     w.end_array();
     w.key("buffer_capacity").unsigned_integer(support.buffer_capacity);
+    if (support.max_chunk_bytes != 0) {
+        w.key("max_chunk_bytes").unsigned_integer(support.max_chunk_bytes);
+    }
     w.end_object();
 }
 
@@ -310,6 +319,14 @@ std::optional<Support> read_support(json::Value value) {
         support.decoder_settings.push_back(std::move(*name));
     }
     support.buffer_capacity = *capacity;
+    // Optional: a sink from before the key does not send it, and 0 says it did not.
+    if (const json::Value limit = value["max_chunk_bytes"]; limit.exists()) {
+        const std::optional<std::int32_t> bytes = read_int32(limit, 1, kMaxChunkBytes);
+        if (!bytes) {
+            return std::nullopt;
+        }
+        support.max_chunk_bytes = static_cast<std::uint32_t>(*bytes);
+    }
     return support;
 }
 
@@ -371,6 +388,9 @@ void write_state(json::Writer& w, const State& state) {
     w.end_object();
     if (state.why) {
         w.member("why", std::string_view{*state.why});
+    }
+    if (state.layout) {
+        w.member("layout", std::string_view{*state.layout});
     }
     w.end_object();
 }
@@ -466,6 +486,12 @@ std::optional<State> read_state(json::Value value) {
     if (const json::Value why = value["why"]; why.exists()) {
         state.why = why.as_string();
         if (!state.why) {
+            return std::nullopt;
+        }
+    }
+    if (const json::Value layout = value["layout"]; layout.exists()) {
+        state.layout = layout.as_string();
+        if (!state.layout || state.layout->size() > kMaxLayoutText) {
             return std::nullopt;
         }
     }

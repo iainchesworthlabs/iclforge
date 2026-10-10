@@ -210,9 +210,11 @@ class ServerHost {
     // taken at the group's next start.
     //
     // `max_chunk_bytes` is the most audio one chunk to this client may carry, for a sink that
-    // takes small chunks (a board's message limit is a few KB); 0 leaves PCM at 20 ms a chunk.
-    // It counts the samples only: a chunk's header and its encryption tag come on top.
-    // False when the client is not connected.
+    // takes small chunks (a board's message limit is a few KB). It counts the samples only: a
+    // chunk's header and its encryption tag come on top. 0 leaves it to what the sink states in its
+    // support object (max_chunk_bytes there, header included), and to 20 ms a chunk where it
+    // states none. A figure given here wins over the sink's. False when the client is not
+    // connected.
     bool use_pcm(const std::string& client_id, bool use, std::size_t max_chunk_bytes = 0);
     // Approves a client for unpaired access, or withdraws the approval.
     bool approve(const std::string& client_id, bool approved);

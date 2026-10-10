@@ -305,6 +305,7 @@ is what a chunk carries, what the sink reports, and the settings the server can 
 | `management` | object | `routing`: boolean; `trim_db`: [minimum, maximum]; `delay_ms`: [0, maximum]; `crossover_hz`: [minimum, maximum]; `identify`: boolean |
 | `decoder_settings` | string[] | Names of the decoder settings the sink accepts ([Settings](#settings)) |
 | `buffer_capacity` | integer | Maximum bytes of burst chunks held and not yet played, counting each chunk's whole plaintext message |
+| `max_chunk_bytes?` | integer | 1 to 1,048,576: the most bytes one chunk to the sink may be, counted as `buffer_capacity` counts a chunk (the whole plaintext message, header included, the encryption's tag not). It bounds a burst chunk and a `player@v1` PCM chunk alike, so a server that plays this sink PCM sizes its units to it; absent when the sink does not say, and a server then sends what its codec allows |
 
 ### State object
 
@@ -325,6 +326,7 @@ the rest are this role's.
 | `levels?` | object[] | One `{output, peak_db, rms_db}` per output slot, `output` counted from 0; absent with no stream |
 | `counters` | object | Since the connection opened: `bursts_played`, `underruns`, `late_chunks`, `dropped_chunks`, `invalid_chunks` |
 | `why?` | string | A short sentence when the sink stopped playing for a reason of its own; absent otherwise |
+| `layout?` | string | The layout in force, in the grammar `layout_grammar` names, as the sink's page or the last settings made it; absent when the sink does not say. A server that renders for the sink reads it here, and not from what it last sent, since the page can change it |
 
 The sink sends `client/state` whenever a field other than `levels` changes, and while a stream
 plays it also sends one at most ten times a second with fresh `levels`. `levels` are measured on
@@ -469,7 +471,9 @@ continues in sync when the tone stops. `level_db` is inside `IdentifyTone`'s −
 
 The role is `v1` as defined here. Adding a value to `data_types` (AC-4 was added this way, by D11
 of [the AC-4 plan](ac4.md#d11-ac-4-over-iec-61937)) or a key to `decoder` settings does not change
-the version, because a server only sends what a sink listed.
+the version, because a server only sends what a sink listed. The same holds for an optional key in
+the support object or the state object: `max_chunk_bytes` and `layout` were added so, each absent
+from a sink that does not say, and a reader that does not know a key ignores it.
 Anything that changes a field's meaning or the chunk layout is `_ac3forge_player@v2`, and a sink may
 list both.
 

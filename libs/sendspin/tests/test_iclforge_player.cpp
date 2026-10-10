@@ -265,6 +265,73 @@ TEST_CASE("iclforge_player: the state object", "[sendspin][iclforge]") {
     CHECK_FALSE(read_text(timing + R"("supported_commands":"settings","settings_revision":0,)" + counters));
 }
 
+TEST_CASE("iclforge_player: the chunk limit a sink states", "[sendspin][iclforge]") {
+    // Written only when it is stated, so a sink that does not say writes what it always did.
+    ac::Support support = board_support();
+    CHECK(written(support, ac::write_support).find("max_chunk_bytes") == std::string::npos);
+
+    support.max_chunk_bytes = 4096;
+    const std::string text = written(support, ac::write_support);
+    CHECK(text.ends_with(R"("buffer_capacity":1048576,"max_chunk_bytes":4096})"));
+    const std::optional<ac::Support> read = ac::read_support(Parsed(text).root());
+    REQUIRE(read.has_value());
+    CHECK(read->max_chunk_bytes == 4096);
+    CHECK(read->buffer_capacity == 1048576);
+
+    // A sink from before the key sends none, and that reads as not stated.
+    const std::optional<ac::Support> before =
+        ac::read_support(Parsed(written(board_support(), ac::write_support)).root());
+    REQUIRE(before.has_value());
+    CHECK(before->max_chunk_bytes == 0);
+
+    // A limit that is not a size is refused with the object, as a bad buffer_capacity is.
+    const auto with_limit = [&](const std::string& value) {
+        std::string source = written(board_support(), ac::write_support);
+        source.pop_back();  // the closing brace
+        return ac::read_support(Parsed(source + R"(,"max_chunk_bytes":)" + value + "}").root());
+    };
+    CHECK(with_limit("1").has_value());
+    CHECK(with_limit("1048576").has_value());
+    CHECK_FALSE(with_limit("0"));
+    CHECK_FALSE(with_limit("-4096"));
+    CHECK_FALSE(with_limit("1048577"));
+    CHECK_FALSE(with_limit("40.5"));
+    CHECK_FALSE(with_limit(R"("4096")"));
+    CHECK_FALSE(with_limit("null"));
+}
+
+TEST_CASE("iclforge_player: the layout a sink states", "[sendspin][iclforge]") {
+    ac::State state;
+    state.supported_commands = {ac::Command::kVolume};
+    CHECK(written(state, ac::write_state).find("\"layout\"") == std::string::npos);
+
+    state.layout = "5.1";
+    const std::string text = written(state, ac::write_state);
+    CHECK(text.ends_with(
+        R"("counters":{"bursts_played":0,"underruns":0,"late_chunks":0,"dropped_chunks":0,"invalid_chunks":0},"layout":"5.1"})"));
+    const std::optional<ac::State> read = ac::read_state(Parsed(text).root());
+    REQUIRE(read.has_value());
+    CHECK(read->layout == "5.1");
+
+    // A sink that does not say has none, which is not the same as an empty layout.
+    state.layout.reset();
+    const std::optional<ac::State> silent =
+        ac::read_state(Parsed(written(state, ac::write_state)).root());
+    REQUIRE(silent.has_value());
+    CHECK_FALSE(silent->layout.has_value());
+
+    const auto with_layout = [&](const std::string& value) {
+        std::string source = written(state, ac::write_state);
+        source.pop_back();
+        return ac::read_state(Parsed(source + R"(,"layout":)" + value + "}").root());
+    };
+    CHECK(with_layout(R"("L,R,C,LFE,Ls,Rs")").has_value());
+    CHECK(with_layout(std::string("\"") + std::string(512, 'x') + "\"").has_value());
+    CHECK_FALSE(with_layout(std::string("\"") + std::string(513, 'x') + "\""));
+    CHECK_FALSE(with_layout("7"));
+    CHECK_FALSE(with_layout("null"));
+}
+
 TEST_CASE("iclforge_player: the stream/start object", "[sendspin][iclforge]") {
     const std::string text =
         written(ac::StreamStart{.data_type = ac::DataType::kEac3, .sample_rate = 48000}, ac::write_stream_start);
