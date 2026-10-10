@@ -222,11 +222,22 @@ with a fine-grained PAT (read-only, "Administration: read") added as a repo
 secret named `SCORECARD_READ_TOKEN`; without it, that one sub-check just
 degrades gracefully instead of failing.
 
-## Dependabot auto-merge
+## Dependabot pull requests
 
-`dependabot-auto-merge.yml` only flips the auto-merge bit on a Dependabot PR
-(non-major bumps only); GitHub still won't merge it until every required
-check above passes. It needs no extra configuration beyond the branch
-protection rule itself - once `Branch Name`, `CI Status` and
-`Scan dependency diff` are required on `main`, auto-merge is safe to
-enable repo-wide in **Settings → General → Pull Requests → Allow auto-merge**.
+A routine Dependabot pull request joins the merge queue by itself. `pr-gate.yml`'s
+`enqueue-dependabot` job calls `_dependabot-enqueue.yml` once `CI Status` has
+passed, for a pull request authored by Dependabot from this repository, and that
+workflow asks for the queue with `enqueuePullRequest`, pinned to the commit the
+gate tested. The queue then builds the merged tree and runs every required check
+above on it, so nothing merges without them.
+
+It leaves a pull request for a person when its head commit lists a
+`semver-major` update (a group is as major as its biggest member) or lists no
+`update-type` at all. A conflict is Dependabot's to rebase (`rebase-strategy`
+in `.github/dependabot.yml`), and the push runs the gate again.
+
+This replaces `dependabot-auto-merge.yml`, which only set the pull request's
+auto-merge bit: under the merge queue that bit never put a pull request in the
+queue, so green Dependabot pull requests sat unmerged. Nothing here needs
+**Allow auto-merge**; the job's token needs `contents: write` and
+`pull-requests: write`, which the call site grants it.

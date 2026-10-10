@@ -18,12 +18,11 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 10
-    # main's branch protection is strict (requires the PR branch to be
-    # up to date before merging - see .github/branch-protection.md), and
-    # dependabot-auto-merge.yml relies on Dependabot itself to rebase this
-    # PR whenever main moves ahead so the auto-merge it enables can
-    # actually land. "auto" is the default, made explicit here since
-    # correctness of the auto-merge workflow depends on it.
+    # pr-gate.yml's enqueue-dependabot job puts a PR in the merge queue when
+    # its gate passes, and relies on Dependabot itself to rebase this PR when
+    # main moves ahead and conflicts with it (the push runs the gate again,
+    # and the job asks for the queue again). "auto" is the default, made
+    # explicit here since the enqueue job depends on it.
     rebase-strategy: "auto"
     commit-message:
       prefix: "ci"

@@ -558,3 +558,21 @@ jobs:
             exit 1
           fi
           echo "Every required job passed, or was not needed for this change."
+
+  # A routine Dependabot bump joins the merge queue by itself once the gate is green.
+  # Auto-merge's own bit does not do that under the queue (nine green pull requests sat
+  # unmerged, some for six days, with it set), so this asks for the queue explicitly, and
+  # only after `CI Status`: a leaf, never part of the gate's own result. Majors and
+  # anything without Dependabot's metadata are left for a person; the queue still builds
+  # the merged tree and runs the required checks on it. See _dependabot-enqueue.yml.
+  enqueue-dependabot:
+    name: Enqueue Dependabot
+    needs: [ci-status]
+    if: ${{ needs.ci-status.result == 'success' && github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository }}
+    uses: ./.github/workflows/_dependabot-enqueue.yml
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+      head_sha: ${{ github.event.pull_request.head.sha }}

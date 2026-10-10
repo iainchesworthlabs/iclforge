@@ -3192,6 +3192,12 @@ The sections below contain the complete change list and fixes.
 
 **Tooling, packaging and release engineering**
 
+- **Green Dependabot pull requests never merged.** `dependabot-auto-merge.yml` only set the
+  pull request's auto-merge bit, and under the merge queue on `main` that bit never put a
+  pull request in the queue: nine sat green and unmerged, some for six days. The PR gate's
+  new `enqueue-dependabot` job (`_dependabot-enqueue.yml`) now asks for the queue itself once
+  `CI Status` has passed, pinned to the tested commit, and leaves a pull request with a
+  `semver-major` update, or without Dependabot's `update-type` metadata, for a person.
 - **Every Linux and macOS package shipped without the `ac3cli` man page or any of the
   four shell completions.** They were guarded by `if(CMAKE_CROSSCOMPILING)` on the
   mistaken assumption this meant only the arm64 cross legs — it's set whenever a

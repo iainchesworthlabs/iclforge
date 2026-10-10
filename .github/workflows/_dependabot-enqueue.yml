@@ -1,0 +1,114 @@
+# Adds a Dependabot pull request to the merge queue once the gate has passed, so a
+# routine bump lands on main without a person. pr-gate.yml calls this from its
+# `enqueue-dependabot` job, after `CI Status` succeeded, for a Dependabot pull request
+# only; see docs/ci-agentic.md for where the queue sits and .github/branch-protection.md
+# for the checks it still has to pass.
+#
+# Why this exists. `gh pr merge --auto` (what dependabot-auto-merge.yml used to run)
+# only sets the pull request's auto-merge bit. Under the merge queue on main that bit
+# never put a pull request in the queue: nine green Dependabot pull requests sat for
+# days, some for six, with it set. The queue is joined by asking for it, so this asks.
+#
+# What it will not do:
+#   - join a pull request whose update is, or may be, a semver-major one. Dependabot
+#     lists every dependency's `update-type` in the head commit's message, and a group
+#     is as major as its biggest member, so one major entry holds the whole group back
+#     for a person (the rule the auto-merge workflow had). A message with no such entry
+#     is treated the same way: unknown is not routine.
+#   - join anything but the exact commit the gate tested (`expectedHeadOid`).
+#   - merge. It only asks to join; the queue still builds the merged tree and runs the
+#     required checks on it, and refuses an entry that fails them.
+#
+# Trust: nothing from the pull request is run. It is a few API calls, and the commit
+# message is only grepped, never evaluated. The call site restricts it to a pull
+# request authored by Dependabot from this repository.
+name: Reusable Dependabot Enqueue
+
+on:
+  workflow_call:
+    inputs:
+      pr_number:
+        description: "The pull request, from pr-gate.yml's github.event.pull_request.number."
+        type: number
+        required: true
+      head_sha:
+        description: "The commit the gate ran on: github.event.pull_request.head.sha."
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  enqueue:
+    name: Enqueue
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write        # a queue entry is a merge
+      pull-requests: write
+    steps:
+      - name: Decide, then join the merge queue
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+        run: |
+          set -euo pipefail
+
+          # 1. Routine only. Dependabot's own metadata block, in the head commit.
+          message="$(gh api "repos/$REPO/commits/$HEAD_SHA" --jq '.commit.message')"
+          kinds="$(printf '%s\n' "$message" | sed -n 's/^[[:space:]]*update-type:[[:space:]]*//p')"
+          if [ -z "$kinds" ]; then
+            echo "::notice title=Not enqueued::#$PR_NUMBER's commit has no Dependabot update-type entries, so it is left for a person."
+            exit 0
+          fi
+          if printf '%s\n' "$kinds" | grep -q 'semver-major'; then
+            echo "::notice title=Not enqueued::#$PR_NUMBER has a semver-major update, so it is left for a person."
+            exit 0
+          fi
+          echo "Update types in #$PR_NUMBER:"
+          printf '%s\n' "$kinds" | sort | uniq -c
+
+          # 2. Mergeable, and still the commit the gate tested. GitHub works out
+          # mergeStateStatus lazily: UNKNOWN is "ask again", and a required check that
+          # another workflow reports (Scan dependency diff) may still be finishing.
+          read_pr="query(\$owner:String!,\$name:String!,\$number:Int!){repository(owner:\$owner,name:\$name){pullRequest(number:\$number){id state isDraft isInMergeQueue headRefOid mergeStateStatus}}}"
+          status=""
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            pr="$(gh api graphql -f query="$read_pr" -f owner="${REPO%/*}" -f name="${REPO#*/}" -F number="$PR_NUMBER" --jq '.data.repository.pullRequest')"
+            state="$(jq -r '.state' <<<"$pr")"
+            head="$(jq -r '.headRefOid' <<<"$pr")"
+            status="$(jq -r '.mergeStateStatus' <<<"$pr")"
+            echo "attempt $attempt: state=$state head=${head:0:8} merge=$status draft=$(jq -r '.isDraft' <<<"$pr") queued=$(jq -r '.isInMergeQueue' <<<"$pr")"
+            if [ "$state" != OPEN ] || [ "$head" != "$HEAD_SHA" ] || [ "$(jq -r '.isInMergeQueue' <<<"$pr")" = true ] || [ "$(jq -r '.isDraft' <<<"$pr")" = true ]; then
+              echo "::notice title=Not enqueued::#$PR_NUMBER is closed, queued already, a draft, or moved past ${HEAD_SHA:0:8}; nothing to do."
+              exit 0
+            fi
+            # CLEAN: every required check passed. UNSTABLE: they passed and a check
+            # that is not required did not - the visible-only scanners, which by their
+            # own headers never gate a pull request.
+            case "$status" in
+              CLEAN | UNSTABLE) break ;;
+              DIRTY | DRAFT)
+                echo "::notice title=Not enqueued::#$PR_NUMBER is $status; Dependabot rebases a conflict and the next run decides."
+                exit 0 ;;
+            esac
+            sleep 15
+          done
+          case "$status" in
+            CLEAN | UNSTABLE) ;;
+            *)
+              echo "::warning title=Not enqueued::#$PR_NUMBER is still $status after the wait; rerun this job, or queue it by hand."
+              exit 0 ;;
+          esac
+
+          # 3. Ask. A failure here is loud on purpose: it means this job cannot do
+          # what it is for, and the pull request would otherwise sit unmerged.
+          id="$(jq -r '.id' <<<"$pr")"
+          gh api graphql \
+            -f query="mutation(\$id:ID!,\$oid:GitObjectID!){enqueuePullRequest(input:{pullRequestId:\$id,expectedHeadOid:\$oid}){mergeQueueEntry{position state}}}" \
+            -f id="$id" -f oid="$HEAD_SHA"
+          echo "### Enqueued #$PR_NUMBER at ${HEAD_SHA:0:8}" >> "$GITHUB_STEP_SUMMARY"
