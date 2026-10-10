@@ -605,14 +605,14 @@ impl PresentationChoice {
 /// trace - an internal diagnostic hook with no C surface, same omission as
 /// `iclforge_ac4_decoder_config_t` itself). Construct with [`DecoderConfig::default`] (which
 /// calls the raw `iclforge_ac4_decoder_config_init()`, same "never derive a default with a
-/// non-zero/non-empty field" reasoning as [`OutputConfig`] - `level`'s real default is 3, which
+/// non-zero/non-empty field" reasoning as [`OutputConfig`] - `level`'s real default is 7, which
 /// a struct-level `#[derive(Default)]` would silently give as 0).
 #[derive(Debug, Clone, PartialEq)]
 pub struct DecoderConfig {
     pub output: OutputConfig,
     pub concealment: ConcealmentPolicy,
     pub presentation: PresentationChoice,
-    /// The `md_compat` ceiling (Part 2 Table 55); default 3.
+    /// The `md_compat` ceiling (Part 2 Table 55); default 7, unrestricted.
     pub level: i32,
     pub decoding: DecodingMode,
 }

@@ -84,7 +84,7 @@ test("Ac4Decoder's constructor defaults every option to the NaN/-1 'unset' senti
   assert.equal(ctor.presentationId, -1);
   assert.equal(ctor.presentationIndex, -1);
   assert.equal(ctor.language, "");
-  assert.equal(ctor.level, 3);
+  assert.equal(ctor.level, 7);
   decoder.close();
 });
 
