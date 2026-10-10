@@ -568,7 +568,10 @@ struct EncoderConfig {
     // C Ls Rs Tfl Tfr Tbl Tbr; 10, 5.1.4, L R C LFE Ls Rs Tfl Tfr Tbl Tbr; with
     // experimental.seven_x, 7 or 8, 7.0 or 7.1, L R C, the LFE of 7.1, Ls Rs
     // and the additional pair; and with experimental.back_pair, 11 or 12,
-    // 7.0.4 or 7.1.4, L R C, the LFE of 7.1.4, Ls Rs Lb Rb Tfl Tfr Tbl Tbr.
+    // 7.0.4 or 7.1.4, L R C, the LFE of 7.1.4, Ls Rs Lb Rb Tfl Tfr Tbl Tbr;
+    // and with experimental.twenty_two_two, 24, 22.2 in Part 2 Table A.27's
+    // order by speaker index: L R C Ls Rs Lb Rb Tfl Tfr Tbl Tbr LFE Tsl Tsr Tfc
+    // Tbc Tc LFE2 Bfl Bfr Bfc Cb Lw Rw.
     int channels = 2;
     int sample_rate_hz = 48000;    // 48 000, or 44 100
     // Part 1 Table 83 at 48 kHz: 0 23.976 fps, 1 24, 2 25, 3 29.97, 4 30, 5
@@ -661,6 +664,12 @@ struct EncoderConfig {
         // Object audio (SubstreamConfig::objects), which no reader outside
         // the project has read from this encoder.
         bool objects = false;
+        // The 22.2 channel element (Part 2 clause 6.2.4.3): 24 input channels
+        // in Table A.27's order, two LFE tracks and eleven channel pairs, in the
+        // SIMPLE and ASPX codec modes, which no stream and no reader outside the
+        // project has seen. Without it 24 channels are refused, and with it
+        // any other count is.
+        bool twenty_two_two = false;
     };
     Experimental experimental{};
 };

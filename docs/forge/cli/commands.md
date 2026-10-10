@@ -167,7 +167,7 @@ surrounds in BL and BR; 5.1.4 adds the top front pair (TFL TFR) and then the top
 TBR), and 5.0.4 is the same without the LFE. The layout is the channel count: 1 mono, 2 stereo, 5
 and 6 5.0 and 5.1, 9 and 10 5.0.4 and 5.1.4 (ETSI TS 103 190-2's immersive element with its back
 pair absent, which is how DEE writes 5.1.4). The experimental options below name the other layouts
-the encoder writes: 7.0 and 7.1, 7.0.4 and 7.1.4, and 3.0.
+the encoder writes: 7.0 and 7.1, 7.0.4 and 7.1.4, 3.0, and 22.2 (24 channels).
 
 **Codec mode.** Below 96 kbps a channel the ASPX codec mode: the spectral frontend up to a crossover
 of 7.5, 10.5 or 13.5 kHz by rate, A-SPX above it, and companding below 64 kbps a channel; in 5.X
@@ -202,8 +202,19 @@ Table 163); `7x-back`, `7x-wide` or `7x-top-front`, which takes seven or eight c
 7.1 in that 7.X layout, in the WAV order `decode` writes: 3/4/0's back pair in BL and BR and its
 surrounds in SL and SR, 5/2/0's wide pair last, 3/2/2's top front pair in TFL and TFR;
 `back-pair`, which takes 11 and 12 channels as 7.0.4 and 7.1.4, with Lb and Rb; `three-zero`, which
-takes three channels, L R C, as 3.0, the dialogue of a music and effects presentation (below); and
-`objects`, which `objects=<scene file>` needs.
+takes three channels, L R C, as 3.0, the dialogue of a music and effects presentation (below);
+`twenty-two-two`, which takes 24 channels as 22.2, the element of ETSI TS 103 190-2 clause 6.2.4.3
+(below); and `objects`, which `objects=<scene file>` needs.
+
+**22.2.** With `experimental=twenty-two-two`, a 24-channel WAV file is written as the 22.2 channel
+element: two LFE tracks and eleven channel pairs, in the SIMPLE and ASPX codec modes
+(`codec-mode=simple` or `aspx`). The channels are taken in the order `decode` writes a 22.2 stream
+in: L R C LFE (FL FR FC LFE), Lb Rb Cb (BL BR BC), Ls Rs (SL SR), Tc Tfl Tsl Tfc Tfr Tsr Tbl Tbc Tbr
+(TC TFL TSL TFC TFR TSR TBL TBC TBR), then LFE2, Bfl, Bfr, Bfc, Lw and Rw. The default codec mode is
+ASPX below 76.8 kbps a full-band channel (1 690 kbps over the 22 of them) and SIMPLE from there. The
+A-CPL, S-CPL and A-JCC modes, the stereo and height downmix values, dialogue enhancement and DRC
+gains are refused for it; the rate must be at least 8 kbps, and the least frame of the element
+needs the rate the encoder names where it refuses one. An MP4 file carries it with a `dac4`.
 
 **Objects.** With `experimental=objects`, `objects=<scene file>` takes the WAV file's channels as the
 objects of one object substream, written as a raw stream. The scene file is text, one directive a

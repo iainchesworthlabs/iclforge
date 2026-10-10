@@ -1567,7 +1567,8 @@ and `2ch_mode` 0: L and R a pair, Ls and Rs a pair, C alone, the LFE); its other
 configurations, chosen frame by frame by the bits they save, 7.0 and 7.1 in the 7.X element,
 ASPX_ACPL_1 and A-CPL in stereo, and 7.0.4 and 7.1.4 with the back pair, ASPX_ACPL_1 and A-JCC in
 the immersive element are experimental options. Objects, as an A-JOC substream or direct-coded, are
-an experimental option too (phase E9). It shares
+an experimental option too (phase E9), as is 22.2 (`experimental.twenty_two_two`), the 22_2_channel_element of
+Part 2 clause 6.2.4.3 in SIMPLE and ASPX. It shares
 `libs/ac4/src/core`'s transforms, windows, codebooks, QMF banks and A-SPX tables and high frequency
 generator with the decoder, and writes the syntax through a transcription of the tables of its own.
 `forge ac4-encode` writes it raw or in MP4, with an option for each setting. Ten checks stand
@@ -1584,7 +1585,8 @@ paragraph on the objects follows them:
   5.1 and the 7.X layouts, the codec mode the rate picks, SIMPLE or ASPX forced or an A-CPL mode
   forced, the experimental tools, every frame rate, the rate modes, the I-frame options and each
   metadata option, in a case in eight the immersive layouts in each of their codec modes, and in a
-  case in ten one to twelve objects, and its `--check-envelope` holds each A-CPL mode's least rate. A refusal of a rate
+  case in twenty 22.2, and in a case in ten one to twelve objects, and its `--check-envelope` holds each
+  A-CPL mode's least rate. A refusal of a rate
   as too low for the frame rate and metadata counts only for frames under 400 bytes, and only if the
   same case at 400 bytes a frame encodes.
   The fuzz target reaches every A-CPL mode too, and phase E6's substreams and presentations: each
@@ -1608,7 +1610,13 @@ paragraph on the objects follows them:
 - **One tone per channel.** Encoded and decoded, each channel's tone comes back at unity gain on its
   own channel, 60 dB or more over every other tone there, the LFE's 47 Hz included: 5.0 and 5.1 in
   SIMPLE and ASPX, and 7.0 and 7.1 in each of the three 7.X layouts (`test_encoder.cpp`, and
-  through `forge` in the WAV order `decode` writes). Noise above the crossover in one channel comes
+  through `forge` in the WAV order `decode` writes); and 22.2, 24 tones that are primes, none on
+  another's harmonic, in SIMPLE and ASPX at native, 25 and 50 fps and at 44.1 kHz, each at unity
+  gain within 0.2 dB and 60 dB over the 23 others (`test_twenty_two_two.cpp`), and through `forge
+  ac4-encode` and `decode` at `md-compat=7` in the WAV order. Music-like noise (a falling spectrum, each
+  pair sharing 0 to 100 % of its power) decodes in 22.2 with an SNR floor per pair of Table 21 of 11 to 12
+  dB in SIMPLE at 70 kbps a channel and 6 to 8 dB in ASPX at 40, and 32 and 25 dB for the LFEs, which
+  is where the 5.1 path lands on the same noise (11.8 to 12.9 dB at 70 kbps a channel). Noise above the crossover in one channel comes
   back in that channel alone, so each `aspx_data` element carries the channels Part 1 Table 213 gives
   it. In the A-CPL modes, whose parameters rebuild the channels band by band, a tone at the centre of
   each channel's own parameter band comes back within 0.5 dB, 40 dB over every other tone, in

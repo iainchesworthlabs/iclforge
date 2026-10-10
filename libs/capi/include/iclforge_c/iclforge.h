@@ -2026,7 +2026,7 @@ ICLFORGE_C_EXPORT void iclforge_ac4_objects_config_init(iclforge_ac4_objects_con
  * have read from this encoder, off unless asked for (planning/ac4.md, "What
  * the encoder writes by default"). Not mirrored: drc_gains and three_zero,
  * which need the DRC modes and the substream list this struct does not
- * carry. */
+ * carry, and twenty_two_two (the 22.2 element, 24 input channels). */
 typedef struct iclforge_ac4_experimental {
     int aspx_balance;    /* the ASPX mode's pairs as sum and balance where that is fewer bits */
     int aspx_varvar;     /* the ASPX mode's VARVAR framing */

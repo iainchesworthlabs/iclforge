@@ -119,7 +119,8 @@ class DrawCase(unittest.TestCase):
     def test_the_space_drawn(self):
         cases = channel_cases(2000)
         self.assertEqual({c.channels for c in cases},
-                         set(fa4.CHANNELS) | set(fa4.IMMERSIVE_CHANNELS))
+                         set(fa4.CHANNELS) | set(fa4.IMMERSIVE_CHANNELS)
+                         | {fa4.TWENTY_TWO_CHANNELS})
         # Seven and eight channels always name a 7.X pair, and nothing else does; 5.X and 7.X
         # never draw a rate in range below their least.
         for case in cases:
@@ -197,7 +198,7 @@ class DrawCase(unittest.TestCase):
 
     def test_the_immersive_layouts(self):
         cases = channel_cases(4000)
-        immersive = [c for c in cases if c.channels > 8]
+        immersive = [c for c in cases if 8 < c.channels < fa4.TWENTY_TWO_CHANNELS]
         # About one case in eight, in every layout and codec mode, with the height downmix.
         self.assertTrue(350 < len(immersive) < 650)
         self.assertEqual({c.channels for c in immersive}, set(fa4.IMMERSIVE_CHANNELS))
@@ -229,6 +230,35 @@ class DrawCase(unittest.TestCase):
             # The LFE's downmix gain where there is an LFE.
             if any(o.startswith("lfemix=") for o in case.options):
                 self.assertIn(case.channels, (10, 12))
+
+    def test_the_twenty_two_two_layout(self):
+        cases = channel_cases(4000)
+        twenty_two = [c for c in cases if c.channels == fa4.TWENTY_TWO_CHANNELS]
+        # About one case in twenty of those that are not immersive, in either codec mode or the
+        # rate's, with the option that lets 24 channels in.
+        self.assertTrue(100 < len(twenty_two) < 260)
+        modes = {o for c in twenty_two for o in c.options if o.startswith("codec-mode=")}
+        self.assertEqual(modes, {"codec-mode=simple", "codec-mode=aspx"})
+        self.assertTrue(any(not any(o.startswith("codec-mode=") for o in c.options)
+                            for c in twenty_two))
+        for case in twenty_two:
+            tools = [t for o in case.options if o.startswith("experimental=")
+                     for t in o.split("=", 1)[1].split(",")]
+            self.assertIn("twenty-two-two", tools)
+            # What the element refuses is not drawn for it: coding configurations, a 7.X pair, the
+            # back pair, A-CPL, DRC gains, the downmix values, dialogue enhancement, several
+            # substreams.
+            self.assertFalse(any(t in tools for t in ("coding-configs", "back-pair", "acpl", "ajcc",
+                                                      *fa4.SEVEN_X)))
+            self.assertFalse(any(t.startswith("drc-gains-") for t in tools))
+            self.assertFalse(any(o.startswith(("dialogue-", "lorocmixlev=", "lfemix=", "dmixmod=",
+                                               "height-downmix=", "substream"))
+                                 for o in case.options))
+            self.assertEqual(case.substreams, [])
+            forced = [o.split("=", 1)[1] for o in case.options if o.startswith("codec-mode=")]
+            if case.in_range:
+                self.assertGreaterEqual(case.bitrate,
+                                        fa4.TWENTY_TWO_LOWEST_KBPS[forced[0] if forced else "auto"])
 
     def test_the_object_cases(self):
         cases = [fa4.draw_case(seed) for seed in range(2000)]

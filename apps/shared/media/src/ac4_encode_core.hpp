@@ -28,10 +28,13 @@ namespace iclforge::apps {
 // channels need and the other counts leave to another substream, whether the
 // 3.0 element is asked for, and whether the immersive layouts' back pair is:
 // nine and ten channels are 5.0.4 and 5.1.4, eleven and twelve 7.0.4 and
-// 7.1.4. Empty for a count the encoder does not take so.
+// 7.1.4; and 24 channels are 22.2, in Part 2 Table A.27's order, where
+// `twenty_two_two` asks for them. Empty for a count the encoder does not take
+// so.
 [[nodiscard]] std::vector<iclforge::ac4::Speaker> ac4_input_speakers(std::size_t count,
                                                            iclforge::ac4::AdditionalPair pair,
-                                                           bool three_zero, bool back_pair);
+                                                           bool three_zero, bool back_pair,
+                                                           bool twenty_two_two = false);
 
 // The layout `ac4_input_speakers` makes of `count` channels, by name.
 [[nodiscard]] std::string_view ac4_layout_name(std::size_t count,

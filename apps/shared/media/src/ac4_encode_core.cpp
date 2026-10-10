@@ -18,8 +18,23 @@ namespace iclforge::apps {
 
 std::vector<iclforge::ac4::Speaker> ac4_input_speakers(std::size_t count,
                                                        iclforge::ac4::AdditionalPair pair,
-                                                       bool three_zero, bool back_pair) {
+                                                       bool three_zero, bool back_pair,
+                                                       bool twenty_two_two) {
     using S = iclforge::ac4::Speaker;
+    if (count == 24) {
+        // 22.2 in Part 2 Table A.27's order by speaker index, the order the
+        // decoder writes its channels in (and Table 21's tracks number
+        // their pairs from).
+        if (!twenty_two_two) {
+            return {};
+        }
+        return {S::kLeft,           S::kRight,          S::kCentre,          S::kLeftSurround,
+                S::kRightSurround,  S::kLeftBack,       S::kRightBack,       S::kTopFrontLeft,
+                S::kTopFrontRight,  S::kTopBackLeft,    S::kTopBackRight,    S::kLfe,
+                S::kTopSideLeft,    S::kTopSideRight,   S::kTopFrontCentre,  S::kTopBackCentre,
+                S::kTopCentre,      S::kLfe2,           S::kBottomFrontLeft, S::kBottomFrontRight,
+                S::kBottomFrontCentre, S::kCentreBack,  S::kLeftWide,        S::kRightWide};
+    }
     const bool seven = count == 7 || count == 8;
     if (seven && pair == iclforge::ac4::AdditionalPair::kNone) {
         return {};
@@ -96,6 +111,8 @@ std::string_view ac4_layout_name(std::size_t count, iclforge::ac4::AdditionalPai
             return "7.0.4";
         case 12:
             return "7.1.4";
+        case 24:
+            return "22.2";
         default:
             break;
     }
@@ -147,10 +164,13 @@ std::optional<Ac4Measured> measure_ac4_programme(std::span<const std::span<const
             order[k] = k;
         }
     }
-    // Each pair's true peak after the bed, from a stereo meter of its own.
+    // Each pair's true peak after the bed, from a stereo meter of its own, and
+    // a last channel alone (22.2's 24 are a bed of five and nineteen more) from
+    // a mono one.
     std::vector<iclforge::ac3::meta::LoudnessMeter> pair_meters;
-    for (std::size_t k = bed; k + 1 < count; k += 2) {
-        pair_meters.emplace_back(rate, iclforge::ac3::Acmod::k2_0, false);
+    for (std::size_t k = bed; k < count; k += 2) {
+        pair_meters.emplace_back(
+            rate, k + 1 < count ? iclforge::ac3::Acmod::k2_0 : iclforge::ac3::Acmod::k1_0, false);
     }
     Ac4Measured out;
     const std::size_t length = channels.empty() ? 0 : channels.front().size();
@@ -164,8 +184,12 @@ std::optional<Ac4Measured> measure_ac4_programme(std::span<const std::span<const
         }
         meter.push(views);
         for (std::size_t p = 0; p < pair_meters.size(); ++p) {
-            pair_views[0] = channels[bed + 2 * p].subspan(at, n);
-            pair_views[1] = channels[bed + 2 * p + 1].subspan(at, n);
+            const std::size_t first = bed + 2 * p;
+            pair_views.resize(first + 1 < count ? 2 : 1);
+            pair_views[0] = channels[first].subspan(at, n);
+            if (pair_views.size() > 1) {
+                pair_views[1] = channels[first + 1].subspan(at, n);
+            }
             pair_meters[p].push(pair_views);
         }
         const auto keep_max = [](std::optional<double>& max, std::optional<double> value) {
