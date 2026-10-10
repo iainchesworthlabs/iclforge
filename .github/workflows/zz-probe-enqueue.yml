@@ -33,7 +33,7 @@ jobs:
             out="$(gh api graphql -f query="$read_pr" -f o="${REPO%/*}" -f n="${REPO#*/}" -F p="$PR")"
             status="$(jq -r '.data.repository.pullRequest.mergeStateStatus' <<<"$out")"
             echo "attempt $i: $status"
-            if [ "$status" = CLEAN ]; then break; fi
+            case "$status" in CLEAN | UNSTABLE) break ;; esac
             sleep 30
           done
           id="$(jq -r '.data.repository.pullRequest.id' <<<"$out")"
