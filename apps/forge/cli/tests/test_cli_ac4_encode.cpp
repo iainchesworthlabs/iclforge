@@ -607,13 +607,13 @@ TEST_CASE("ac4-encode's experimental tools each write their syntax", "[cli][ac4]
             const std::size_t first = 6000;
             double re = 0.0;
             double im = 0.0;
-            std::size_t count = 0;
-            for (std::size_t n = first; n < x.size() && n < first + 6000; ++n, ++count) {
+            std::size_t counted = 0;
+            for (std::size_t n = first; n < x.size() && n < first + 6000; ++n, ++counted) {
                 const double phase = 2.0 * std::numbers::pi * hz * static_cast<double>(n) / kRate;
                 re += static_cast<double>(x[n]) * std::cos(phase);
                 im -= static_cast<double>(x[n]) * std::sin(phase);
             }
-            return 2.0 * std::hypot(re, im) / static_cast<double>(std::max<std::size_t>(count, 1));
+            return 2.0 * std::hypot(re, im) / static_cast<double>(std::max<std::size_t>(counted, 1));
         };
         for (std::size_t c = 0; c < 24; ++c) {
             CAPTURE(c);
