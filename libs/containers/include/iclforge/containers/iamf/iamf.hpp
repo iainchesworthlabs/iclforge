@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -173,11 +174,47 @@ struct DecodedElement {
     std::vector<std::vector<float>> channels;  // planar, with the trimming applied
 };
 
+// What decode_pcm() and reconstruct_channels() do with a scalable channel Audio Element.
+struct DecodeOptions {
+    // The layer to reconstruct: 0 is the first Channel Group (the base layer), the last the full
+    // layout. The last one when unset. Past the last is kInvalidArgument. Not consulted for
+    // object-based and scene-based elements.
+    std::optional<std::size_t> layer;
+    // Apply the Recon Gain Parameter Blocks to the channels the De-mixer rebuilds (7.2.3, with its
+    // smoothing). Switched off, those channels are the plain output of the De-mixer.
+    bool apply_recon_gain = true;
+};
+
 // Decodes the `ipcm` Audio Substreams of an Audio Element to float PCM in [-1, 1). Supports
-// channel-based elements with one layer in a layout layout_info() knows, object-based elements, and
-// scene-based elements in mono mode; any other element, and any codec but ipcm, is kUnsupported.
-// The Sequence is as read_sequence() or read_isobmff() returns it, or as build_sequence() does.
+// channel-based elements (the layouts layout_info() and expanded_layout_info() know, and scalable
+// ones of up to six layers, reconstructed with the Gain, De-mixer and Recon Gain steps of 7.2),
+// object-based elements, and scene-based elements in mono mode; any other element, and any codec
+// but ipcm, is kUnsupported. The Sequence is as read_sequence() or read_isobmff() returns it, or as
+// build_sequence() does.
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<DecodedElement, Error> decode_pcm(const Sequence& sequence,
                                                                                     std::uint32_t audio_element_id);
+
+// decode_pcm() with a choice of layer (DecodeOptions::layer) and of recon gain.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<DecodedElement, Error> decode_pcm(
+    const Sequence& sequence, std::uint32_t audio_element_id, const DecodeOptions& options);
+
+// One Audio Substream already decoded by a codec: planar float PCM per coded channel (one buffer
+// for a mono substream, two for a coupled one: left then right), whole frames of the Codec Config's
+// num_samples_per_frame for every Audio Frame OBU of the substream in Temporal Unit order, with
+// none of the trimming applied.
+struct SubstreamPcm {
+    std::uint32_t audio_substream_id = 0;
+    std::vector<std::vector<float>> channels;
+};
+
+// The reconstruction half of decode_pcm() for a codec this module does not decode: the caller
+// decodes each Audio Substream of a channel-based Audio Element (Opus, AAC-LC, FLAC with its own
+// decoder) and this applies the layout's channel assignment, the output gains, the De-mixer, the
+// recon gain and the trimming, and returns the channels of the chosen layer. `decoded` holds one
+// entry per Audio Substream of the element. Works for a single-layer element too, and for an
+// `ipcm` one (decode_pcm() is this after reading the samples).
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<DecodedElement, Error> reconstruct_channels(
+    const Sequence& sequence, std::uint32_t audio_element_id, std::span<const SubstreamPcm> decoded,
+    const DecodeOptions& options = {});
 
 }  // namespace iclforge::containers::iamf

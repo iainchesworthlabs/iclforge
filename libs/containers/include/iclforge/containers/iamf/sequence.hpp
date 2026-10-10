@@ -106,4 +106,11 @@ struct LayoutInfo {
 };
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::optional<LayoutInfo> layout_info(std::uint8_t loudspeaker_layout);
 
+// The same for an `expanded_loudspeaker_layout` value (a loudspeaker_layout of 15): the subset of a
+// larger layout the single Channel Group codes, with the spec's location names (FLc, TpSiL, BtFC, ...).
+// nullopt for the values the specification reserves. `sound_system` is 255 where no Layout()
+// sound_system value names the layout.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::optional<LayoutInfo> expanded_layout_info(
+    std::uint8_t expanded_loudspeaker_layout);
+
 }  // namespace iclforge::containers::iamf

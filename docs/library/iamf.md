@@ -27,9 +27,9 @@ the Conan recipe install it where asked for, off by default: `vcpkg install iclf
 
 | Header | What it holds |
 |---|---|
-| `iamf.hpp` | The short route: `mux()` for a 7.1.4 programme, `mux_objects()` for object elements, `build_sequence()` and `build_object_sequence()` for the `Sequence` either would write, and `decode_pcm()` to read an element's audio back. |
+| `iamf.hpp` | The short route: `mux()` for a 7.1.4 programme, `mux_objects()` for object elements, `build_sequence()` and `build_object_sequence()` for the `Sequence` either would write, `decode_pcm()` to read an element's audio back (with `DecodeOptions` to choose a layer of a scalable one), and `reconstruct_channels()` to rebuild a scalable element from substreams a caller's own codec decoded. |
 | `model.hpp` | The element graph as plain data: `Sequence` (Descriptors and Temporal Units), `CodecConfig`, `AudioElement`, `MixPresentation`, parameter definitions and `ParameterBlock`, `AudioFrame` with its trimming, `Metadata`. Q7.8 gains and coded positions are kept as the bitstream carries them. |
-| `sequence.hpp` | OBU bytes: `write_descriptors()`, `write_temporal_unit()`, `write_sequence()` and their readers `read_descriptors()`, `read_temporal_unit()`, `read_sequence()`. `write_sequence()`/`read_sequence()` are the standalone raw OBU stream. |
+| `sequence.hpp` | OBU bytes: `write_descriptors()`, `write_temporal_unit()`, `write_sequence()` and their readers `read_descriptors()`, `read_temporal_unit()`, `read_sequence()`. `write_sequence()`/`read_sequence()` are the standalone raw OBU stream. `layout_info()` and `expanded_layout_info()` give the substream order of every loudspeaker layout and expanded layout. |
 | `container.hpp` | ISO-BMFF: `write_isobmff()`, `read_isobmff()` and `FragmentedWriter`. |
 
 ```cpp
@@ -139,15 +139,39 @@ Reserved OBUs and bytes past the syntax an OBU defines, stop at a second IA Sequ
 allocations are bounded by the bytes that remain.
 
 `decode_pcm()` turns an `ipcm` Audio Element into planar float channels with the trimming applied:
-channel-based elements of one layer, object-based elements, and scene-based elements in mono mode.
+channel-based elements (a single layer in any layout `layout_info()` or `expanded_layout_info()` lists,
+or a scalable element of up to six layers, see below), object-based elements, and scene-based elements
+in mono mode.
+
+## Scalable channel audio
+
+An Audio Element with more than one layer codes a base layout and, in each further Channel Group, only
+what the next layout adds; the decoder rebuilds the rest. `decode_pcm()` and `reconstruct_channels()`
+apply the three steps of IAMF section 7.2 to the layer asked for (`DecodeOptions::layer`; the last, full
+layout when unset):
+
+1. **Gain** (7.2.1): each Channel Group's `output_gain` is applied, as 10^(output_gain / (20 x 256)), to the
+   mixed channels its `output_gain_flags` name.
+2. **De-mixer** (7.2.2): S1to2, S2to3, S3to5 and S5to7 for the surround channels, TF2toT2 and T2to4 for
+   the height channels, with alpha, beta, gamma and delta from the frame's `dmixp_mode` and
+   w(k) from the running `wIdx(k)`. A frame without a demixing Parameter Block uses the definition's
+   `default_dmixp_mode` and `default_w`. Which channels a Channel Group holds follows 3.6.2.2 and their
+   substream order 3.6.2.3, so a layer list that breaks the generation rule of 3.6.2.1, or whose substream
+   counts do not match its groups, is `kBadDescriptor`.
+3. **Recon Gain** (7.2.3): the `recon_gain` of the layer's channels flagged in `recon_gain_flags`, smoothed
+   with the moving average (N = 7) and the Hann overlap windows of the specification, 60 samples for
+   `Opus` and 64 otherwise (the recommended value for `mp4a`; `ipcm` and `fLaC` are lossless and normally
+   carry none). `DecodeOptions::apply_recon_gain = false` returns the plain de-mixer output.
+
+`decode_pcm()` reads the substreams itself, so it covers `ipcm` only. For Opus, AAC-LC and FLAC the caller
+decodes each Audio Substream with its own codec and hands the planar PCM (every frame, untrimmed) to
+`reconstruct_channels()`, which does the rest and returns the same `DecodedElement`.
 
 ## What it does not cover
 
 - **Encoding Opus, AAC-LC or FLAC.** They are carried and parsed as bytes, not produced.
-- **Scalable channel audio reconstruction.** A multi-layer Audio Element reads and writes, but
-  `decode_pcm()` does not apply the demixing and recon gain that rebuild its higher layers.
 - **Rendering.** Mix Presentations and animated parameters are data here; applying them (the Open Audio
-  Renderer's job) is outside the module.
+  Renderer's job, which section 7.4 leaves to the OAR specification) is outside the module.
 - **Encryption** (Common Encryption) and the codecs parameter string.
 - **ISO-BMFF with more than one IA track**, and 64-bit `mdat` sizes: the first IA track is read, and one
   `mdat` must stay under 4 GiB.
