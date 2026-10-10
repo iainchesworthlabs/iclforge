@@ -208,7 +208,7 @@ struct Options {
     // (DownmixTarget::k5X).
     bool ac4_mix_lfe = true;
     bool ac4_headphones = false;
-    int ac4_level = 3;
+    int ac4_level = 7;
     bool ac4_fold_5x = false;
     // 'decode' only: the options given that one format's decode reads and
     // the other's does not, so that decode says which it ignores for the

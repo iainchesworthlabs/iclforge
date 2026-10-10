@@ -62,7 +62,7 @@ void iclforge_ac4_decoder_config_init(iclforge_ac4_decoder_config_t* config) {
     iclforge_ac4_output_config_init(&config->output);
     config->concealment = ICLFORGE_AC4_CONCEALMENT_NONE;
     iclforge_ac4_presentation_choice_init(&config->presentation);
-    config->level = 3;
+    config->level = 7;
     config->decoding = ICLFORGE_AC4_DECODING_FULL;
 }
 

@@ -153,7 +153,8 @@ readings are in `libs/ac4/ERRATA.md` under "The 9.X.4 element", and the streams 
 are built from the standard's tables.
 
 `DecoderConfig` holds the rest: `output`, `presentation` (below), `concealment`, `level` (the
-`md_compat` level the decoder claims, 3 by default; presentations above it are not chosen),
+`md_compat` level the decoder claims, 7 by default, unrestricted; presentations above it are not
+chosen),
 `decoding` (full or core decoding, Part 2 clause 4.7, full by default), and `syntax`, a trace of
 every syntax element read. `syntax` is an `iclforge::ac4::SyntaxTrace`, a
 `std::function` the configuration owns, and the decoder keeps a copy of its own, so a lambda
@@ -352,7 +353,7 @@ ASPX_ACPL_2 by the rate and, with `experimental.acpl`, ASPX_ACPL_1. The channels
 `Decoder::decode()` writes them: L R C Ls Rs Lb Rb Tfl Tfr Tbl Tbr, the LFE of 9.1.4, then Lscr and
 Rscr. ASPX_AJCC with `b_5fronts`, dialogue enhancement and the height downmix are refused for them,
 naming the element. Their thirteen tracks are above Table 55's level 3, so the presentation carries
-`md_compat` 7 and a decoder selects it when `DecoderConfig::level` is 7.
+`md_compat` 7, which a decoder selects at its default level, 7, and not at level 3.
 
 A frame comes out when the input it needs has arrived: `encode()` returns the frames each call
 completes, and `flush()` pads the input with silence to the end of its last frame and returns the

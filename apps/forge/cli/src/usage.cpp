@@ -89,7 +89,7 @@ constexpr std::array<OptionToken, 103> kOptionTokens{{
     {"dialogue-gain=", "decode of AC-4: g_dialog, the dialogue against music and effects, dB"},
     {"associated-gain=", "decode of AC-4: g_assoc, the associated audio's level, 0 dB or less"},
     {"headphones", "decode of AC-4: a listener on headphones - their DRC mode, pre-virtualized presentations"},
-    {"md-compat=", "decode of AC-4: the md_compat level the decoder claims, 0 to 7 (default 3)"},
+    {"md-compat=", "decode of AC-4: the md_compat level the decoder claims, 0 to 7 (default 7)"},
     {"syntax-trace=", "ac4-encode, and decode of AC-4: write every syntax element written or read"},
     {"codec-mode=", "ac4-encode: simple, aspx, aspx-acpl-1 to 3, and for 5.1.4 scpl, aspx-scpl or aspx-ajcc"},
     {"experimental=", "ac4-encode: tools and layouts no outside reader has checked yet"},
@@ -452,7 +452,7 @@ void print_ac4_decode_topic() {
     fmt::println("       substreams are mixed (TS 103 190-1 6.2.16): dialogue-gain=<dB> sets the");
     fmt::println("       dialogue against the music and effects, up to the stream's maximum,");
     fmt::println("       and associated-gain=<dB>, 0 or less, the associated audio.");
-    fmt::println("       md-compat=<0..7> is the md_compat level the decoder claims (3 by default;");
+    fmt::println("       md-compat=<0..7> is the md_compat level the decoder claims (7 by default;");
     fmt::println("       a presentation above it is not selected). headphones says the listener");
     fmt::println("       is on headphones: the portable headphones DRC mode where the output");
     fmt::println("       level falls in the portable range, and a presentation rendered for");

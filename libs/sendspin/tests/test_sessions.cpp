@@ -981,6 +981,88 @@ TEST_CASE("sessions: _iclforge_player@v1 streams bursts on the player's clock", 
     CHECK(rig.player_events.burst_ends == 1);
 }
 
+// A board on the extension role takes one item as bursts, the next as PCM on player@v1 because it
+// does not list that stream, and the one after as bursts again, all on one connection. The server
+// moves the role by activating it; the test pins that each stream starts, carries and ends after
+// each move, and that a stream of the other role is refused while it is not the active one.
+TEST_CASE("sessions: a player moves from bursts to PCM and back on one connection per item",
+          "[sendspin][sessions][iclforge]") {
+    const std::int64_t offset = GENERATE(as<std::int64_t>{}, 0, -45'000'000);
+    Rig rig(extension_config(), offset, hs::sentinel_choice(), {});
+    REQUIRE(rig.run_until([&] { return !rig.server_events.hellos.empty(); }, 1'000'000));
+    REQUIRE(rig.server_events.hellos[0].iclforge_support.has_value());
+    REQUIRE(rig.server_events.hellos[0].player_support.has_value());
+
+    const auto state_of = [&](bool extension) {
+        const auto& states = rig.server_events.states;
+        return !states.empty() && states.back().available &&
+               (extension ? states.back().iclforge.has_value() : states.back().player.has_value());
+    };
+    const std::vector<std::uint8_t> pcm_chunk(480 * 4, 0x55);
+
+    // Item 1, a coded stream the sink lists: bursts on the extension role.
+    rig.send(rig.server.activate(extension_playback()));
+    REQUIRE(rig.run_until([&] { return state_of(true); }, 5'000'000));
+    rig.send(
+        rig.server.start_burst_stream({.data_type = ac::DataType::kEac3, .sample_rate = 48000}));
+    REQUIRE(rig.run_until([&] { return rig.player_events.burst_starts.size() == 1; }, 100'000));
+    const std::int64_t first = rig.now + 500'000;
+    for (int k = 0; k < 4; ++k) {
+        rig.send(rig.server.send_burst(first + (k * 32'000), 21, 1792,
+                                       eac3_payload(1792, static_cast<std::uint8_t>(k))));
+    }
+    REQUIRE(rig.run_until([&] { return rig.player_events.bursts.size() == 4; }, 100'000));
+    CHECK(refusal(rig.server.start_stream({.format = kPcm, .codec_header = {}})) ==
+          Refusal::kNoPlayerState);
+
+    // Item 2, one the sink does not list: the server moves the board to player@v1 and sends PCM.
+    rig.send(rig.server.activate(playback_activation()));
+    REQUIRE(rig.run_until([&] { return rig.player_events.burst_ends == 1; }, 100'000));
+    REQUIRE(rig.run_until([&] { return state_of(false); }, 5'000'000));
+    CHECK_FALSE(rig.server.burst_streaming());
+    CHECK(refusal(rig.server.start_burst_stream(
+              {.data_type = ac::DataType::kEac3, .sample_rate = 48000})) ==
+          Refusal::kNoPlayerState);
+    rig.send(rig.server.start_stream({.format = kPcm, .codec_header = {}}));
+    REQUIRE(rig.run_until([&] { return rig.player_events.starts.size() == 1; }, 100'000));
+    CHECK(rig.player_events.starts[0].format == kPcm);
+    const std::int64_t pcm_first = rig.now + 500'000;
+    for (int k = 0; k < 4; ++k) {
+        rig.send(rig.server.send_audio(pcm_first + (k * 10'000), pcm_chunk));
+    }
+    REQUIRE(rig.run_until([&] { return rig.player_events.audio.size() == 4; }, 100'000));
+    for (int k = 0; k < 4; ++k) {
+        // The chunk's server timestamp, on the player's clock, which the move did not disturb.
+        CHECK(std::llabs(rig.player_events.audio[static_cast<std::size_t>(k)].local_time -
+                         (pcm_first + (k * 10'000) + offset)) < 1'000);
+    }
+    rig.send(rig.server.end_stream());
+    REQUIRE(rig.run_until([&] { return rig.player_events.ends == 1; }, 100'000));
+
+    // Item 3, listed again: back to the extension role, and bursts.
+    rig.send(rig.server.activate(extension_playback()));
+    REQUIRE(rig.run_until([&] { return state_of(true); }, 5'000'000));
+    CHECK(refusal(rig.server.start_stream({.format = kPcm, .codec_header = {}})) ==
+          Refusal::kNoPlayerState);
+    rig.send(
+        rig.server.start_burst_stream({.data_type = ac::DataType::kEac3, .sample_rate = 48000}));
+    REQUIRE(rig.run_until([&] { return rig.player_events.burst_starts.size() == 2; }, 100'000));
+    const std::int64_t second = rig.now + 500'000;
+    for (int k = 0; k < 4; ++k) {
+        rig.send(rig.server.send_burst(second + (k * 32'000), 21, 1792,
+                                       eac3_payload(1792, static_cast<std::uint8_t>(16 + k))));
+    }
+    REQUIRE(rig.run_until([&] { return rig.player_events.bursts.size() == 8; }, 100'000));
+    for (int k = 0; k < 4; ++k) {
+        const PlayerEvents::Burst& burst =
+            rig.player_events.bursts[static_cast<std::size_t>(4 + k)];
+        CHECK(burst.payload == eac3_payload(1792, static_cast<std::uint8_t>(16 + k)));
+        CHECK(std::llabs(burst.local_time - (second + (k * 32'000) + offset)) < 1'000);
+    }
+    CHECK(rig.player_events.invalid_bursts == 0);
+    CHECK(rig.player_events.audio.size() == 4);
+}
+
 TEST_CASE("sessions: _iclforge_player@v1's commands and settings", "[sendspin][sessions][iclforge]") {
     Rig rig(extension_config(), 0, hs::sentinel_choice(), {});
     REQUIRE(rig.run_until([&] { return !rig.server_events.hellos.empty(); }, 1'000'000));

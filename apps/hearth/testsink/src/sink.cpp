@@ -515,7 +515,7 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
         }
     }
     config.player_support = {.supported_formats = std::move(formats),
-                             .buffer_capacity = 32 * 1024 * 1024,
+                             .buffer_capacity = options_.buffer_capacity,
                              .commands = {m::PlayerCommand::kVolume, m::PlayerCommand::kMute}};
     config.pair_methods = {{.method = m::PairMethod::kPairingPsk,
                             .locations = {m::SecretLocation::kOperator},
@@ -557,7 +557,7 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
         // Nothing the server can manage: no routing, trims, delays, settings or identify tone.
         support.management.crossover_hz = {render::LayoutRenderer::kMinCrossoverHz,
                                            render::LayoutRenderer::kMaxCrossoverHz};
-        support.buffer_capacity = 32 * 1024 * 1024;
+        support.buffer_capacity = options_.buffer_capacity;
         config.iclforge_support = std::move(support);
         config.iclforge_state.volume = 100;
         config.iclforge_state.muted = false;

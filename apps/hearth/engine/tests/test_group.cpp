@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -1092,6 +1093,236 @@ TEST_CASE("group: a mixed group delivers PCM and bursts to their own members at 
     kitchen_times.insert(kitchen_times.end(), lounge_times.begin(), lounge_times.end());
     const auto [earliest, latest] = std::minmax_element(kitchen_times.begin(), kitchen_times.end());
     CHECK(*latest - *earliest < 1000.0);
+}
+
+namespace {
+
+// The frames in the biggest chunk a test sink's WAV log shows.
+std::size_t largest_chunk_frames(const fs::path& times_csv) {
+    std::ifstream in(times_csv);
+    REQUIRE(in.good());
+    std::string line;
+    std::getline(in, line);  // the header
+    std::size_t largest = 0;
+    while (std::getline(in, line)) {
+        if (line.starts_with("clear")) {
+            continue;
+        }
+        const std::size_t last = line.rfind(',');
+        REQUIRE(last != std::string::npos);
+        largest = std::max(largest, static_cast<std::size_t>(std::stoul(line.substr(last + 1))));
+    }
+    return largest;
+}
+
+}  // namespace
+
+// A paired Hearth sink is on _iclforge_player@v1, whose streams are bursts only, so a stream it
+// does not list reaches it as nothing. ServerHost::use_pcm() moves it to player@v1 on the live
+// connection and sizes its chunks to its limit.
+TEST_CASE(
+    "group: a paired sink that offers both roles plays PCM in small chunks when the host asks",
+    "[hearth][group][websocket][iclforge]") {
+    namespace ss = iclforge::sendspin;
+    const fs::path scratch =
+        fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_group_use_pcm_" + scratch_pid_suffix());
+    fs::remove_all(scratch);
+    QuietLog log;
+    // The extension role is on by default, as a Hearth sink's is, and it is not given unpaired
+    // access.
+    const std::unique_ptr<testsink::Sink> board =
+        start_sink(scratch / "board", "Board", m::Codec::kPcm, log, false);
+
+    std::optional<ss::noise::KeyPair> identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    ss::MemoryServerStore store;
+    HostEvents events;
+    auto host = ss::ServerHost::start({.identity = *identity,
+                                       .name = "Test host",
+                                       .languages = {"en"},
+                                       .address = "127.0.0.1",
+                                       .port = std::nullopt,
+                                       .advertise = false,
+                                       .browse = false,
+                                       .mdns_interfaces = {}},
+                                      store, events);
+    REQUIRE(host.has_value());
+    REQUIRE((*host)->enter_pairing_token(board->pairing_token()));
+    (*host)->dial("ws://127.0.0.1:" + std::to_string(board->port()) + "/sendspin");
+
+    const std::string id = board->client_id();
+    const auto on_extension_role = [&](const auto& clients) {
+        const auto found = clients.find(id);
+        return found != clients.end() &&
+               found->second.psk == ss::handshake::PskCategory::kLongTerm && found->second.bursts &&
+               found->second.available && found->second.iclforge_state.has_value();
+    };
+    const auto on_pcm_role = [&](const auto& clients) {
+        const auto found = clients.find(id);
+        return found != clients.end() && found->second.playing && !found->second.bursts &&
+               found->second.available && found->second.player_state.has_value();
+    };
+    REQUIRE(events.wait(on_extension_role, 30s));
+
+    // 1000 bytes of audio a chunk is 250 frames of 16-bit stereo, where 20 ms would be 960.
+    constexpr std::size_t kMaxChunkBytes = 1000;
+    constexpr std::size_t kMaxChunkFrames = kMaxChunkBytes / 4;
+    REQUIRE((*host)->use_pcm(id, true, kMaxChunkBytes));
+    REQUIRE(events.wait(on_pcm_role, 30s));
+    // Asked of a client that is not there, it says so.
+    CHECK_FALSE((*host)->use_pcm("not-a-client", true));
+
+    std::vector<std::int32_t> programme;
+    for (int frame = 0; frame < 96000; ++frame) {
+        programme.push_back(
+            static_cast<std::int32_t>(std::lround(9000.0 * std::sin(frame * 0.0575))));
+        programme.push_back(
+            static_cast<std::int32_t>(std::lround(9000.0 * std::sin(frame * 0.131))));
+    }
+    std::shared_ptr<ss::Group> group = (*host)->make_group("Board only");
+    group->add(id);
+    const m::AudioFormat pcm_format{
+        .codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16};
+    REQUIRE(group->start({.pcm = pcm_format, .bursts = std::nullopt, .buffered = true}));
+    std::size_t offset = 0;
+    const auto deadline = std::chrono::steady_clock::now() + 30s;
+    while (offset < programme.size() && std::chrono::steady_clock::now() < deadline) {
+        const std::size_t block = std::min<std::size_t>(4800 * 2, programme.size() - offset);
+        const std::size_t taken =
+            group->push(std::span<const std::int32_t>(programme).subspan(offset, block));
+        if (taken > 0) {
+            offset += taken * 2;
+        } else {
+            std::this_thread::sleep_for(5ms);
+        }
+    }
+    REQUIRE(offset == programme.size());
+    CHECK(group->members_playing() == 1);
+    group->stop();
+
+    const auto until = std::chrono::steady_clock::now() + 15s;
+    while (board->totals().frames < 96000 && std::chrono::steady_clock::now() < until) {
+        std::this_thread::sleep_for(20ms);
+    }
+    CHECK(board->totals().frames == 96000);
+    CHECK(board->totals().bursts == 0);
+    // Whole chunks of at most the limit, so at least 384 of them for two seconds.
+    CHECK(board->totals().chunks >= 96000 / kMaxChunkFrames);
+    CHECK(largest_chunk_frames(only_file(scratch / "board" / "out", "stream-", ".times.csv")) <=
+          kMaxChunkFrames);
+
+    // And back: the host withdraws the request, and the sink is on the extension role again.
+    REQUIRE((*host)->use_pcm(id, false));
+    CHECK(events.wait(on_extension_role, 30s));
+    group.reset();
+    host->reset();
+}
+
+// A sink with a small buffer, as a board has: an ESP32-C6's ring is 48 KB, which is 167 ms of
+// 24-bit stereo. The group counts each unit it has sent as held until it has played; counting
+// every unit as lasting 150 ms, whatever it lasts, filled that model with units that had already
+// played. The group then sent at real time's rate but each chunk after its play time, by the
+// difference between that 150 ms and what the sink's buffer holds, and a board skips every chunk
+// that arrives late.
+TEST_CASE("group: a PCM sink with a small buffer is fed before play and not after",
+          "[hearth][group][websocket]") {
+    namespace ss = iclforge::sendspin;
+    const fs::path scratch =
+        fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_group_small_buffer_" + scratch_pid_suffix());
+    fs::remove_all(scratch);
+    QuietLog log;
+    testsink::SinkOptions options;
+    options.name = "Small buffer";
+    options.address = "127.0.0.1";
+    options.port = 0;
+    options.state_directory = scratch / "state";
+    options.output_directory = scratch / "out";
+    options.advertise = false;
+    options.unpaired_access = true;
+    options.codecs = {m::Codec::kPcm};
+    options.extension_role = false;
+    // 24 KB: three quarters of it, which the group fills to, is 96 ms of 16-bit stereo.
+    options.buffer_capacity = 24 * 1024;
+    auto started = testsink::Sink::start(options, log);
+    REQUIRE(started.has_value());
+    const std::unique_ptr<testsink::Sink> sink = std::move(*started);
+
+    std::optional<ss::noise::KeyPair> identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    ss::MemoryServerStore store;
+    HostEvents events;
+    auto host = ss::ServerHost::start({.identity = *identity,
+                                       .name = "Test host",
+                                       .languages = {"en"},
+                                       .address = "127.0.0.1",
+                                       .port = std::nullopt,
+                                       .advertise = false,
+                                       .browse = false,
+                                       .mdns_interfaces = {}},
+                                      store, events);
+    REQUIRE(host.has_value());
+    (*host)->dial("ws://127.0.0.1:" + std::to_string(sink->port()) + "/sendspin");
+    REQUIRE(
+        events.wait([&](const auto& clients) { return clients.contains(sink->client_id()); }, 15s));
+    REQUIRE((*host)->approve(sink->client_id(), true));
+    REQUIRE(events.wait(
+        [&](const auto& clients) {
+            const auto found = clients.find(sink->client_id());
+            return found != clients.end() && found->second.playing && found->second.available;
+        },
+        30s));
+
+    constexpr std::size_t kFrames = 4 * 48000;
+    std::vector<std::int32_t> programme;
+    for (std::size_t frame = 0; frame < kFrames; ++frame) {
+        const auto t = static_cast<double>(frame);
+        programme.push_back(static_cast<std::int32_t>(std::lround(9000.0 * std::sin(t * 0.0575))));
+        programme.push_back(static_cast<std::int32_t>(std::lround(9000.0 * std::sin(t * 0.131))));
+    }
+    std::shared_ptr<ss::Group> group = (*host)->make_group("Small buffer");
+    group->add(sink->client_id());
+    const m::AudioFormat pcm_format{
+        .codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16};
+    REQUIRE(group->start({.pcm = pcm_format, .bursts = std::nullopt, .buffered = true}));
+
+    // One unit (20 ms) a push, so that what a push finds is the lead of one chunk: how long before
+    // its play time it is handed to the sink. The group's clock is the steady clock.
+    constexpr std::size_t kUnitFrames = 960;
+    const ss::SteadyClock clock;
+    std::int64_t least_lead_us = std::numeric_limits<std::int64_t>::max();
+    const auto begun = std::chrono::steady_clock::now();
+    std::size_t offset = 0;
+    const auto deadline = begun + 30s;
+    while (offset < programme.size() && std::chrono::steady_clock::now() < deadline) {
+        const std::size_t block = std::min<std::size_t>(kUnitFrames * 2, programme.size() - offset);
+        const std::int64_t first_frame = static_cast<std::int64_t>(offset / 2);
+        const std::size_t taken =
+            group->push(std::span<const std::int32_t>(programme).subspan(offset, block));
+        if (taken > 0) {
+            // From the second second of audio on, once the first units' lead has gone.
+            if (const std::optional<std::int64_t> start = group->start_time();
+                start && first_frame >= 48000) {
+                const std::int64_t plays_us = *start + (first_frame * 1'000'000 / 48000);
+                least_lead_us = std::min(least_lead_us, plays_us - clock.now_us());
+            }
+            offset += taken * 2;
+        } else {
+            std::this_thread::sleep_for(1ms);
+        }
+    }
+    REQUIRE(offset == programme.size());
+    // The sink holds 96 ms, so a unit goes out about that long before it plays. Counted as lasting
+    // 150 ms past its start, each went out about 50 ms after it should already have played.
+    CHECK(least_lead_us > 20'000);
+    group->stop();
+
+    const auto until = std::chrono::steady_clock::now() + 15s;
+    while (sink->totals().frames < kFrames && std::chrono::steady_clock::now() < until) {
+        std::this_thread::sleep_for(20ms);
+    }
+    CHECK(sink->totals().frames == kFrames);
+    group.reset();
+    host->reset();
 }
 
 TEST_CASE("group: two paired test sinks play E-AC-3 JOC in step over the extension role",

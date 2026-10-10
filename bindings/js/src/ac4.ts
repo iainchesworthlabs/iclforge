@@ -179,7 +179,7 @@ export interface Ac4DecoderOptions {
   decodingMode?: Ac4DecodingMode;
   concealment?: Ac4ConcealmentPolicy;
   presentation?: Ac4PresentationChoice;
-  /** iclforge::ac4::DecoderConfig::level (md_compat); default 3, matching the C++ struct default. */
+  /** iclforge::ac4::DecoderConfig::level (md_compat); default 7, matching the C++ struct default. */
   mdCompatLevel?: number;
 }
 
@@ -478,7 +478,7 @@ export class Ac4Decoder {
   constructor(module: Ac4EmbindModule, options: Ac4DecoderOptions = DEFAULT_DECODER_OPTIONS) {
     const presentation = options.presentation ?? DEFAULT_PRESENTATION_CHOICE;
     this.#native = new module.Ac4Decoder(
-      options.outputLevelDbfs ?? NaN,
+      options.outputLevelDbfs ?? Number.NaN,
       options.drc ?? Ac4DrcMode.Default,
       options.downmix ?? Ac4DownmixTarget.AsCoded,
       options.decodingMode ?? Ac4DecodingMode.Full,
@@ -486,7 +486,7 @@ export class Ac4Decoder {
       presentation.presentationId ?? -1,
       presentation.index ?? -1,
       presentation.language ?? "",
-      options.mdCompatLevel ?? 3,
+      options.mdCompatLevel ?? 7,
     );
   }
 
@@ -507,7 +507,7 @@ export class Ac4Decoder {
   /** Changes the output processing from the next frame (iclforge::ac4::Decoder::set_output()). */
   setOutput(options: Ac4OutputOptions = {}): void {
     this.#native.setOutput(
-      options.outputLevelDbfs ?? NaN,
+      options.outputLevelDbfs ?? Number.NaN,
       options.drc ?? Ac4DrcMode.Default,
       options.headphones ?? false,
       options.dialogueEnhancementDb ?? 0,

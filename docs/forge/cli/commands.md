@@ -724,8 +724,9 @@ forge decode broadcast.ac4 out.wav presentation-id=3
 Table 91's associated audio), and Table 92's services: `audio-description`,
 `audio-description-subtitles`, `spoken-subtitles` and `emergency-information`.
 
-`md-compat=<0..7>` sets the compatibility level the decoder claims, 3 by default: a presentation
-whose `md_compat` is above it is not chosen (ETSI TS 103 190-2 Table 55).
+`md-compat=<0..7>` sets the compatibility level the decoder claims, 7 by default: a presentation
+whose `md_compat` is above it is not chosen (ETSI TS 103 190-2 Table 55). `md-compat=3` chooses as a
+receiver of DVB's and ATSC's floor level would.
 
 A presentation of several substreams is mixed as ETSI TS 103 190-1 clause 6.2.16 gives, with the
 stream's own gains and pans. `dialogue-gain=<dB>` sets the dialogue against the music and effects,

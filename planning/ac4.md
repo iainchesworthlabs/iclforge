@@ -570,7 +570,10 @@ which skips or simplifies those tools for low-complexity platforms (Part 2 4.7).
 (7.1.4 input allowed), 3 eleven, and 7 unrestricted (Part 2 Table 55; Part 1 Table 86 for version 0
 presentations). A decoder of level n shall not select a presentation above n. ATSC 3.0 requires a
 presentation of level 3 or below in every primary stream, and DVB's receiver guidelines require
-levels up to 3 and decoding of bitstream versions 0 and 2, dialogue enhancement and DRC.
+levels up to 3 and decoding of bitstream versions 0 and 2, dialogue enhancement and DRC. The
+library claims level 7 by default, decided on 2026-10-10 when the encoder began to write 9.X.4
+(thirteen tracks, `md_compat` 7): it decodes every presentation the tables define, and a system
+that wants a level 3 receiver's choice sets `DecoderConfig::level` or `md-compat=`.
 
 **Objects are rendered outside the specification.** Rendering dynamic and bed objects to
 loudspeakers is not normative. ETSI TS 103 448 (V1.1.1, 2016) is an informative reference, and
