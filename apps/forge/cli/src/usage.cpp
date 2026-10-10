@@ -515,6 +515,9 @@ void print_ac4_encode_topic() {
     fmt::println("       decoder fills with noise, ETSI TS 103 190-1 5.1.4), hfr-2 and hfr-4");
     fmt::println("       (the efficient high frame rate mode, TS 103 190-2 5.1.3: with");
     fmt::println("       frame-rate=47.95 to 120 each audio frame goes out as 2 or 4 frames),");
+    fmt::println("       twenty-two-two for 22.2 (24 channels, TS 103 190-2 6.2.4.3, in");
+    fmt::println("       codec-mode=simple|aspx, ASPX below 76.8 kbps a full-band channel by");
+    fmt::println("       default; the channels in the order decode writes them),");
     fmt::println("       drc-gains-0 to drc-gains-3 (the DRC modes send gains, ETSI TS 103");
     fmt::println("       190-1 Table 163), and objects for objects=<scene file>: the WAV's");
     fmt::println("       channels as objects, a raw stream of one object substream. The");

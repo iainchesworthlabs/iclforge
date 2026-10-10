@@ -284,7 +284,8 @@ without them. Width, divergence, zones and the screen factor are not rendered.
 ## Encoding a stream
 
 `iclforge::ac4::Encoder` writes mono, stereo, 5.0 and 5.1, and 5.0.4 and 5.1.4 in Part 2's immersive element
-(and, as experimental options, 7.0, 7.1, 7.0.4, 7.1.4, 9.0.4 and 9.1.4 and a 3.0 dialogue substream), at 48 kHz at
+(and, as experimental options, 7.0, 7.1, 7.0.4, 7.1.4, 9.0.4, 9.1.4, 22.2 and a 3.0 dialogue
+substream), at 48 kHz at
 every frame rate of Part 1 Table 83, or at 44.1 kHz in frames of 2 048 samples, in the SIMPLE, ASPX
 and A-CPL codec modes and, in the immersive layouts, S-CPL and A-SPX with S-CPL, at a constant,
 average or variable rate. It takes planar samples at full scale 1.0, in the order the decoder
@@ -323,14 +324,14 @@ rate its frames cannot hold, a presentation of the wrong number of substreams, a
 
 | `EncoderConfig` field | What it sets | Default |
 |---|---|---|
-| `channels`, `sample_rate_hz` | 1, 2, 5 or 6 channels; 9 or 10 (5.0.4 and 5.1.4); 7 or 8 with `experimental.seven_x`, 11 or 12 with `experimental.back_pair`, and 13 or 14 (9.0.4 and 9.1.4, with the screen pair Lscr and Rscr last, after the LFE) with `experimental.nine_x_4`; 48 000 or 44 100 Hz | 2, 48 000 |
+| `channels`, `sample_rate_hz` | 1, 2, 5 or 6 channels; 9 or 10 (5.0.4 and 5.1.4); 7 or 8 with `experimental.seven_x`, 11 or 12 with `experimental.back_pair`, 13 or 14 (9.0.4 and 9.1.4, with the screen pair Lscr and Rscr last, after the LFE) with `experimental.nine_x_4`, and 24 (22.2) with `experimental.twenty_two_two`; 48 000 or 44 100 Hz | 2, 48 000 |
 | `frame_rate_index`, `bitrate_kbps`, `rate_mode` | Part 1 Table 83's frame rate; the rate over whole frames, 8 to 3 000 kbps; `kConstant`, `kAverage` (within the decoder's buffer, Part 1 clause 6.2.4) or `kVariable` | 13, 192, `kConstant` |
 | `codec_mode` | `kAuto` (the rate's choice, as DEE's streams make it), `kSimple`, `kAspx`, an A-CPL mode, and in the immersive layouts `kScpl`, `kAspxScpl` and, behind `experimental.ajcc`, `kAspxAjcc` | `kAuto` |
 | `iframe_interval`, `iframes`, `fragment_starts` | An I-frame every so many frames, at named frames, and where a container's fragments start, which an MP4 lists as its sync samples | 24 |
 | `dialnorm_db`, `loudness` | The dialogue level, 0 to -31.75 dBFS, and Part 1's further loudness values | -31, none |
 | `drc`, `downmix`, `dialogue` | The DRC decoder modes on their profiles, the stereo downmix's values, and dialogue enhancement from marked channels or a stem | none |
 | `substreams`, `presentations` | Several substreams and the presentations of Part 2 Table 53 made of them (below) | one of each |
-| `trace`, `experimental` | A record of every syntax element written; the tools and layouts that no reader outside this project has been checked against, among them `noise_fill`, which sends each band that quantises to zero a noise level for the decoder to fill it with, and `frame_rate_fraction` 2 or 4, the efficient high frame rate mode: at `frame_rate_index` 5 to 12 (4 from 10) each frame the codec codes at Table 18's audio frame rate goes out as that many transmission frames, at a constant rate | none |
+| `trace`, `experimental` | A record of every syntax element written; the tools and layouts that no reader outside this project has been checked against, among them `noise_fill`, which sends each band that quantises to zero a noise level for the decoder to fill it with, and `frame_rate_fraction` 2 or 4, the efficient high frame rate mode: at `frame_rate_index` 5 to 12 (4 from 10) each frame the codec codes at Table 18's audio frame rate goes out as that many transmission frames, at a constant rate, and `twenty_two_two`, the 22.2 channel element (below) | none |
 
 9.0.4 and 9.1.4 (`experimental.nine_x_4`, 13 or 14 channels) take Part 2's immersive element with
 `b_5fronts`, which adds the screen pair Lscr and Rscr to the 7.X.4 channels, in SCPL, ASPX_SCPL and
@@ -346,6 +347,25 @@ rest. Each `EncodedFrame` holds the raw frame, the samples it decodes to and whe
 I-frame. `delay_samples()` and `decoder_delay_samples()` give where an input sample lands in the
 decoded output, which an MP4's edit list can skip; at `frame_rate_index` 13 the two are 3 072 and
 1 313 samples.
+
+### The 22.2 element
+
+With `experimental.twenty_two_two` and 24 channels `Encoder` writes Part 2's 22_2_channel_element()
+(clause 6.2.4.3): two LFE tracks and eleven channel pairs of Table 21, in the SIMPLE and ASPX codec
+modes. The input is Part 2 Table A.27's order by speaker index, which is the order the decoder writes
+the layout in: L R C Ls Rs Lb Rb Tfl Tfr Tbl Tbr LFE Tsl Tsr Tfc Tbc Tc LFE2 Bfl Bfr Bfc Cb Lw Rw. Each
+pair is a stereo pair as the 5.X element's L and R: it has its own transform layout, its own stereo
+processing and, in ASPX, its own `aspx_data_2ch()`; the LFEs are coded as the 5.1 LFE is, to 120 Hz.
+The element has no companding, S-CPL or A-CPL data, so the A-CPL, S-CPL and A-JCC codec modes are
+refused by name, and so are dialogue enhancement, DRC gains and the stereo and height downmix values,
+which have no 22.2 definition to write. `kAuto` takes ASPX below 76.8 kbps a full-band channel (22 of
+them, so 1 690 kbps) and SIMPLE from there. The rate must hold the least frame, which the 24 tracks
+set at 17 kbps in SIMPLE and 49 in ASPX at the native frame rate (15 and 45 at 44.1 kHz), and more at
+the higher frame rates: `refusal_reason()` names a rate that cannot hold it.
+
+A 22.2 presentation has 22 tracks, which only `md_compat` 7 (unrestricted) holds (Part 2 Table 55),
+so a decoder takes it at `DecoderConfig::level` 7: at the default level 3 `decode()` finds no
+presentation it can select.
 
 ### Substreams and presentations
 

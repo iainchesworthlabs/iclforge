@@ -2141,6 +2141,18 @@ The sections below contain the complete change list and fixes.
   reassembles each unit, and its output holds the plain stream's quality at the audio frame rate
   (47.95 to 120 fps in halves and 100 to 120 fps in quarters, with the 29.97 fps cycle of 1 601 and
   1 602 samples). No other encoder's stream or decoder has read the mode. Not mirrored in the C API.
+- **The AC-4 encoder writes the 22.2 channel element** (`EncoderConfig::experimental.twenty_two_two`,
+  `forge ac4-encode experimental=twenty-two-two`): 24 input channels in Part 2 Table A.27's order,
+  the order `decode` writes, as the two LFE tracks and eleven channel pairs of Table 21 (clause
+  6.2.4.3), in the SIMPLE and ASPX codec modes, each pair with its own transform layout, stereo
+  processing and `aspx_data_2ch()`. The element has no A-CPL or companding data, so those codec
+  modes are refused by name, as are dialogue enhancement, DRC gains and the downmix values for it. A
+  rate must hold the 24 tracks' least frame, 17 kbps in SIMPLE and 49 in ASPX at the native frame
+  rate, and `kAuto` takes ASPX below 76.8 kbps a full-band channel. A 22.2 presentation has 22
+  tracks, so its `md_compat` is 7 and a decoder takes it at `md-compat=7`. Each channel's tone
+  decodes on its own channel, the syntax reads back with the encoder's trace, and the Python
+  transcription reads the encoder's streams; no stream from another encoder and no other decoder
+  has read it. Not mirrored in the C API.
 
 **AC-4 bindings: the C API, Python, Rust and WebAssembly**
 

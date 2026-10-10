@@ -399,11 +399,12 @@ frame, and unchanged by the content tried):
 | `dee_ac4_encoder`, 5.1.4 | | | | | refused | ASPX_ACPL_2 | ASPX_ACPL_2 | ASPX_ACPL_2 | ASPX_ACPL_2 | ASPX_ACPL_2 | ASPX_ACPL_2 | ASPX_SCPL | SCPL |
 | `dee_ac4ims_encoder`, from 5.1 | | ASPX | ASPX | ASPX | ASPX | refused | ASPX | | ASPX | | | | |
 
-- **Never written:** ASPX_ACPL_1, A-JCC, the 7.X element, mono, 3.0, 22.2, 9.0.4 and 9.1.4, the HSF
-  extension, 44.1 kHz, more than one presentation, substream group or audio substream, and objects.
-  There is no 7.1: eight-channel input is downmixed to 5.1 without an error, and 7.1.4 input is
-  refused. (The project's own encoder writes 9.0.4 and 9.1.4 behind `experimental.nine_x_4`: the
-  readings are the text's alone, and the traces agree.)
+- **Never written** (by DEE; this project's encoder writes most of them behind
+  `EncoderConfig::experimental`, 22.2 and 9.0.4 and 9.1.4 among them): ASPX_ACPL_1, A-JCC, the 7.X
+  element, mono, 3.0, 22.2, 9.0.4 and 9.1.4, the HSF extension, 44.1 kHz, more than one
+  presentation, substream group or audio substream, and objects. There is no 7.1: eight-channel
+  input is downmixed to 5.1 without an error, and 7.1.4 input is refused. (The readings for 9.0.4
+  and 9.1.4 are the text's alone, and the traces agree.)
 - **5.1.4** is coded as 7.X.4 with the back pair absent and three top channels present, as Part 2
   requires.
 - **The speech frontend** never appears where it can be seen. Every 2.0 and IMS frame enables MDCT
@@ -969,10 +970,10 @@ As built, `Encoder::create()` returns a `std::expected` in place of a constructo
 `loudness`, `drc`, `downmix` and `dialogue`, its substreams are `SubstreamConfig`s, each
 `PresentationConfig` names one of Part 2 Table 53's configurations, and `experimental` is a struct of
 flags in place of `experimental_tools`: `aspx_balance`, `aspx_varvar`, `aspx_interleave`,
-`coding_configs`, `seven_x`, `acpl`, `back_pair`, `ajcc`, `nine_x_4`, `drc_gains`, `three_zero` and
-`objects`. The CRC is an argument of `sync_frame()`, `latency()` is `delay_samples()` and
-`decoder_delay_samples()`, and `encode()` has overloads for a dialogue stem and for the metadata
-updates of objects.
+`coding_configs`, `seven_x`, `acpl`, `back_pair`, `ajcc`, `nine_x_4`, `drc_gains`, `three_zero`,
+`objects` and `twenty_two_two`. The CRC is an argument of `sync_frame()`, `latency()` is
+`delay_samples()` and `decoder_delay_samples()`, and `encode()` has overloads for a dialogue stem
+and for the metadata updates of objects.
 
 ### Rate control and the psychoacoustic model
 
@@ -1024,11 +1025,12 @@ balance, VARVAR framing and frequency-interleaved waveform coding in A-SPX (`asp
 7.0 and 7.1 (`seven_x`), ASPX_ACPL_1 and A-CPL in stereo (`acpl`), 7.0.4 and 7.1.4 (`back_pair`),
 A-JCC (`ajcc`), 9.0.4 and 9.1.4, the immersive element with `b_5fronts`, in SCPL, ASPX_SCPL, ASPX_ACPL_2
 and ASPX_ACPL_1 but not ASPX_AJCC (`nine_x_4`), transmitted DRC gains (`drc_gains`), a 3.0 substream
-(`three_zero`), objects (`objects`), spectral noise fill (`noise_fill`) and the efficient high frame
+(`three_zero`), objects (`objects`), spectral noise fill (`noise_fill`), the efficient high frame
 rate mode (`frame_rate_fraction` 2 or 4: each codec frame goes out as that many transmission frames,
-at a constant rate). Mono, several presentations and substreams, and the Mid and cross-channel
-dialogue enhancement methods are options without the flag. Time-interleaved waveform coding is not
-written at all.
+at a constant rate) and the 22.2 element (`twenty_two_two`: 24 channels in SIMPLE and ASPX, with no
+A-CPL, downmix, dialogue enhancement or DRC gains for it). Mono, several presentations and
+substreams, and the Mid and cross-channel dialogue enhancement methods are options without the flag.
+Time-interleaved waveform coding is not written at all.
 
 ### One control for both formats
 
