@@ -819,10 +819,10 @@ struct Player::Impl {
         constexpr std::size_t kAc4FloorHeapBytes = 286365;
         if (const std::size_t room = heap_caps_get_free_size(MALLOC_CAP_8BIT);
             room < kAc4FloorHeapBytes) {
-            std::printf("player: AC-4 needs at least %lu bytes of heap and %lu are free: "
-                        "refused\n",
-                        static_cast<unsigned long>(kAc4FloorHeapBytes),
-                        static_cast<unsigned long>(room));
+            std::printf(
+                "player: AC-4 needs at least %lu bytes of heap and %lu are free: "
+                "refused\n",
+                static_cast<unsigned long>(kAc4FloorHeapBytes), static_cast<unsigned long>(room));
             finish("memory", true, static_cast<int>(room));
             return;
         }
@@ -1230,10 +1230,9 @@ bool Player::start() {
         }
     }
     if (decode_created != pdPASS) {
-        decode_created = xTaskCreatePinnedToCore(&Impl::decode_entry, "ac3-decode",
-                                                 im.config.decode_stack_bytes, &im,
-                                                 im.config.decode_priority, &im.decode_task,
-                                                 im.config.decode_core);
+        decode_created = xTaskCreatePinnedToCore(
+            &Impl::decode_entry, "ac3-decode", im.config.decode_stack_bytes, &im,
+            im.config.decode_priority, &im.decode_task, im.config.decode_core);
     }
     if (decode_created != pdPASS) {
         std::printf("player: could not start the decode task\n");
