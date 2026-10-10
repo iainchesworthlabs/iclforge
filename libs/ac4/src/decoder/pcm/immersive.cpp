@@ -63,12 +63,16 @@ void apply_scpl(int codec_mode, DecodingMode decoding, bool fronts,
     // Table 23, b_5fronts 0: L and R are c_gain times A'' and B''; with b_5fronts only C is c_gain
     // times its signal, and L, Lscr, R and Rscr come of the pairs (A'', L'') and (B'', M'')
     // below, which carry no c_gain.
-    constexpr std::array<S, 3> kFronts = {S::kLeft, S::kRight, S::kCentre};
-    for (std::size_t k = fronts ? 2 : 0; k < kFronts.size(); ++k) {
-        if (std::vector<Real>* samples = channel(speakers, time, kFronts[k])) {
+    const auto scale_front = [&](Speaker speaker) {
+        if (std::vector<Real>* samples = channel(speakers, time, speaker)) {
             scale(*samples, c_gain);
         }
+    };
+    if (!fronts) {
+        scale_front(S::kLeft);
+        scale_front(S::kRight);
     }
+    scale_front(S::kCentre);
     // gain x 2 x (1/2, 1/2; 1/2, -1/2).
     const auto couple = [&](Speaker first, Speaker second, Real gain) {
         std::vector<Real>* x = channel(speakers, time, first);

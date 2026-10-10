@@ -324,7 +324,6 @@ class FixedTrack {
     }
 
     [[nodiscard]] ParseResult walk(bool write, RandGenState& noise, std::vector<dsp::tiered::Fixed32>& scaled) {
-        const auto& pow43 = kPow43<MantExp>;
         const auto magnitude = [](std::int32_t q) {
             const std::int64_t wide = q;
             return static_cast<std::size_t>(std::min<std::uint64_t>(
@@ -351,14 +350,14 @@ class FixedTrack {
                 const std::int32_t q = quant(k);
                 const std::size_t m = magnitude(q);
                 largest_q = std::max(largest_q, m);
-                const MantExp value = sf_gain * pow43[m];
+                const MantExp value = sf_gain * kPow43<MantExp>[m];
                 sum += value * value;
                 if (write) {
                     scaled[k] = stored(q < 0 ? -value : value);
                 }
             }
             band_energy = sum;
-            note(sf_gain * pow43[largest_q]);
+            note(sf_gain * kPow43<MantExp>[largest_q]);
         };
         // The extension's scale factors carry on from the core's.
         int scale_factor = data_.reference_scale_factor;

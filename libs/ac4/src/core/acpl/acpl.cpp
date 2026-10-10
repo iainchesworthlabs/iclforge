@@ -456,7 +456,7 @@ void TransientDucker<Real>::process(std::span<Complex> inout, int num_ts) noexce
     const auto smoothing = static_cast<Energy>(kAlphaSmooth);
     const auto gamma = static_cast<Energy>(kGamma);
     // An energy of the double decoder's QMF domain, in the scalar's (dsp/scalar_traits.hpp).
-    const auto epsilon = dsp::tiered::qmf_energy<Real>(static_cast<Energy>(kEpsilon));
+    constexpr auto epsilon = dsp::tiered::qmf_energy<Real>(static_cast<Energy>(kEpsilon));
     for (std::size_t ts = 0; ts < n; ++ts) {
         // Pseudocode 113, then 112, then 114, for this slot.
         std::array<Energy, kMaxParamBands> energy{};

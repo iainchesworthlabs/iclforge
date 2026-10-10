@@ -316,9 +316,12 @@ void DeCoreStage::process(double gain_db, const DeFrameValues& values,
                             return;
                         }
                         const double end = de_at(stop - 1.0) * in_force;
-                        for (double s = t; s < stop; s += 1.0) {
-                            matrix[static_cast<std::size_t>(s)] =
-                                from + (s - t + 1.0) * (end - from) / steps;
+                        // t and stop are whole slot numbers (a parameter timeslot, or the frame's
+                        // length), so each slot is counted by its integer.
+                        const auto last = static_cast<std::size_t>(stop);
+                        for (auto s = static_cast<std::size_t>(t); s < last; ++s) {
+                            matrix[s] =
+                                from + (static_cast<double>(s) - t + 1.0) * (end - from) / steps;
                         }
                         from = end;
                         t = stop;

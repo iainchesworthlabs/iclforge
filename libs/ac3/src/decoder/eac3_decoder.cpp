@@ -3342,12 +3342,16 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
                     const eac3::AhtGaqDequantizer<Scalar> dequantize{mantissa_bits, g};
                     const int small_bits = dequantize.small_bits;
                     const int large_bits = dequantize.large_bits;
+                    // The raw pattern of the escape codeword, 1 << (small_bits - 1). small_bits is
+                    // 1 or more (mantissa_bits >= 3 above) and below 16, so the mask changes nothing;
+                    // it is what makes the shift provably less than 32.
+                    const std::uint32_t escape_raw =
+                        1u << (static_cast<unsigned>(small_bits - 1) & 31U);
                     for (std::size_t j = 0; j < kBlocksPerFrame; ++j) {
                         const auto raw = r.read(small_bits);
                         bool has_escape = false;
                         std::uint32_t escape = 0;
-                        // NOLINTNEXTLINE(clang-analyzer-core.BitwiseShift)
-                        if (g != 1 && raw == (1u << (small_bits - 1))) {
+                        if (g != 1 && raw == escape_raw) {
                             has_escape = true;
                             escape = r.read(large_bits);
                         }

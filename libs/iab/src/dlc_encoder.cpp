@@ -213,20 +213,24 @@ void put_layer(BitWriter& bw, const LayerPlan& plan, unsigned num_sub_blocks, un
         const SubBlockCoding coding = choose_sub_block_coding(block);
         bw.put_bits(coding.rice ? 1U : 0U, 1);
         bw.put_bits(coding.parameter, 5);
+        // The field above is five bits wide and predict_residual keeps every magnitude under
+        // 2^31, so the parameter is at most 31 and the mask changes nothing; it is what makes
+        // every shift below provably less than 64.
+        const unsigned parameter = coding.parameter & 31U;
         for (const std::int32_t r : block) {
             const std::uint64_t magnitude = r < 0 ? static_cast<std::uint64_t>(-static_cast<std::int64_t>(r))
                                                   : static_cast<std::uint64_t>(r);
             if (!coding.rice) {
-                if (coding.parameter != 0) {
-                    bw.put_bits(magnitude, coding.parameter);
+                if (parameter != 0) {
+                    bw.put_bits(magnitude, parameter);
                 }
             } else {
-                for (std::uint64_t q = 0; q < (magnitude >> coding.parameter); ++q) {
+                for (std::uint64_t q = 0; q < (magnitude >> parameter); ++q) {
                     bw.put_bits(1, 1);
                 }
                 bw.put_bits(0, 1);
-                if (coding.parameter != 0) {
-                    bw.put_bits(magnitude & ((std::uint64_t{1} << coding.parameter) - 1), coding.parameter);
+                if (parameter != 0) {
+                    bw.put_bits(magnitude & ((std::uint64_t{1} << parameter) - 1), parameter);
                 }
             }
             if (magnitude != 0) {

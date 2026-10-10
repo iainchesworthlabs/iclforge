@@ -204,8 +204,11 @@ private:
     std::uint8_t current_ = 0;
 };
 
-// Sign-extends the low `width` bits of `value`.
+// Sign-extends the low `width` bits of `value`; of no bits, 0.
 [[nodiscard]] inline std::int32_t sign_extend(std::uint64_t value, unsigned width) {
+    if (width == 0) {
+        return 0;
+    }
     const std::uint64_t sign = std::uint64_t{1} << (width - 1);
     return static_cast<std::int32_t>(static_cast<std::int64_t>((value ^ sign) - sign));
 }
