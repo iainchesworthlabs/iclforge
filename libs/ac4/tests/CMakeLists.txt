@@ -14,6 +14,7 @@ iclforge_add_test_binary(iclforge-ac4-tests PROJECT ac4 SOURCES
     core/test_mant_exp.cpp
     decoder/test_api.cpp
     decoder/test_decoder.cpp
+    decoder/test_executor.cpp
     decoder/test_frames.cpp
     decoder/test_syntax.cpp
     encoder/test_encoder.cpp

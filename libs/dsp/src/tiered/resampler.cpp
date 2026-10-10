@@ -202,17 +202,13 @@ void Resampler<Real>::process(std::span<const Real> in, std::vector<Real>& out) 
     const auto floor_div = [](std::int64_t a, std::int64_t b) {
         return a >= 0 ? a / b : -((-a + b - 1) / b);
     };
-    while ((outputs_ + 1) * down <= inputs_ * up) {
-        const std::int64_t position = (outputs_ + 1) * down;
-        const std::int64_t whole = floor_div(position, up);
-        const auto p = static_cast<int>(position - whole * up);
-        // The dot product in Real: at double the taps in order, as it always
-        // was; at float over four lanes (dsp/resampler_vector.hpp), a float
-        // multiply and add a tap, which is the whole of the converter's cost on
-        // a part whose FPU is single precision. A float phase the table keeps
-        // as the mirror of another is read backwards.
+    // The output sample for phase p whose taps start at samples[0]. The dot product in Real: at
+    // double the taps in order, as it always was; at float over four lanes
+    // (dsp/resampler_vector.hpp), a float multiply and add a tap, which is the whole of the
+    // converter's cost on a part whose FPU is single precision. A float phase the table keeps as
+    // the mirror of another is read backwards.
+    const auto dot = [this, taps](int p, const Real* samples) {
         const auto phase = filter_->phase(p);
-        const Real* samples = history_.data() + (whole - taps - first_);
         const auto count = static_cast<std::size_t>(taps);
         Real sum{};
         if constexpr (std::is_same_v<Real, iclforge::internal::Fixed32>) {
@@ -239,8 +235,56 @@ void Resampler<Real>::process(std::span<const Real> in, std::vector<Real>& out) 
                 sum += phase.coefficients[k] * samples[k];
             }
         }
-        out.push_back(sum);
-        ++outputs_;
+        return sum;
+    };
+    // The outputs this call completes: those m with (m + 1) * down <= inputs * up.
+    const std::int64_t completed = floor_div(inputs_ * up, down) - outputs_;
+    const auto made = static_cast<std::size_t>(std::max<std::int64_t>(completed, 0));
+    // A table that the cache cannot hold (1001/960's, 188 KB, against the ESP32-P4's 128 KB L2 and
+    // the S3's 64 KB) is read a row at a time in the order the outputs come, which hops 41 rows
+    // between one output and the next and takes a line from the PSRAM for each of a row's 6 to 12.
+    // A frame's outputs are more than the rows, so the outputs are made in the order of their
+    // rows: each row is read once, in turn, and for all the outputs that read it. Each output is
+    // the same sum of the same products as it was, so the converter's output is unchanged; only
+    // the order the sums are made in is.
+    constexpr std::size_t kSortedAbove = 16384;
+    if (made > 1 && filter_->table_bytes() > kSortedAbove) {
+        const auto rows = static_cast<std::size_t>(filter_->rows());
+        const std::size_t base = out.size();
+        out.resize(base + made);
+        start_.resize(made);
+        phase_.resize(made);
+        order_.resize(made);
+        bucket_.assign(rows + 1, 0U);
+        for (std::size_t i = 0; i < made; ++i) {
+            const std::int64_t position = (outputs_ + 1 + static_cast<std::int64_t>(i)) * down;
+            const std::int64_t whole = floor_div(position, up);
+            const auto p = static_cast<int>(position - whole * up);
+            start_[i] = static_cast<std::int32_t>(whole - taps - first_);
+            phase_[i] = static_cast<std::uint32_t>(p);
+            ++bucket_[static_cast<std::size_t>(filter_->row_of(p)) + 1];
+        }
+        for (std::size_t r = 0; r < rows; ++r) {
+            bucket_[r + 1] += bucket_[r];
+        }
+        for (std::size_t i = 0; i < made; ++i) {
+            const auto r = static_cast<std::size_t>(filter_->row_of(static_cast<int>(phase_[i])));
+            order_[bucket_[r]++] = static_cast<std::uint32_t>(i);
+        }
+        const Real* history = history_.data();
+        for (std::size_t k = 0; k < made; ++k) {
+            const std::size_t i = order_[k];
+            out[base + i] = dot(static_cast<int>(phase_[i]), history + start_[i]);
+        }
+        outputs_ += static_cast<std::int64_t>(made);
+    } else {
+        while ((outputs_ + 1) * down <= inputs_ * up) {
+            const std::int64_t position = (outputs_ + 1) * down;
+            const std::int64_t whole = floor_div(position, up);
+            const auto p = static_cast<int>(position - whole * up);
+            out.push_back(dot(p, history_.data() + (whole - taps - first_)));
+            ++outputs_;
+        }
     }
     // Keep what the next output's taps reach back to, and one sample more for
     // a grid that rephase() moves back by up to a sample.

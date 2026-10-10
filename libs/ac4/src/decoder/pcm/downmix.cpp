@@ -7,6 +7,8 @@
 #include <initializer_list>
 #include <utility>
 
+#include "decoder/pcm/lanes.hpp"
+
 namespace iclforge::ac4::detail {
 namespace {
 
@@ -533,11 +535,11 @@ void DownmixStage::update(const DownmixValues& values) {
 }
 
 void DownmixStage::process(const DownmixValues& values, std::span<const QmfMatrix> in,
-                           std::vector<std::vector<QmfValue>>& out) {
+                           std::vector<std::vector<QmfValue>>& out, Executor* executor) {
     update(values);
     const std::size_t length = in.empty() ? 0 : in.front().size();
     out.resize(matrix_.size());
-    for (std::size_t o = 0; o < matrix_.size(); ++o) {
+    run_lanes(executor, matrix_.size(), [&](std::size_t o, std::size_t) {
         out[o].assign(length, QmfValue{});
         for (std::size_t c = 0; c < in.size() && c < matrix_[o].size(); ++c) {
             const double w = matrix_[o][c];
@@ -554,7 +556,7 @@ void DownmixStage::process(const DownmixValues& values, std::span<const QmfMatri
                 out[o][i] += weight * source[i];
             }
         }
-    }
+    });
 }
 
 }  // namespace iclforge::ac4::detail

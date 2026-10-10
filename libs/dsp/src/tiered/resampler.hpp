@@ -123,6 +123,19 @@ class BasicResamplerFilter {
     };
     [[nodiscard]] PhaseRef phase(int p) const noexcept;
 
+    // The row of the table phase p is read from: p, or up() - p where the table keeps phases 0 to
+    // up() / 2 only; and how many rows there are. A converter that has many outputs to make
+    // visits the rows in order (Resampler::process).
+    [[nodiscard]] int row_of(int p) const noexcept { return halved_ && p > up_ / 2 ? up_ - p : p; }
+    [[nodiscard]] int rows() const noexcept { return halved_ ? up_ / 2 + 1 : up_; }
+
+    // The table's size in bytes: what a part with a cache smaller than it reads again from
+    // memory a phase at a time.
+    [[nodiscard]] std::size_t table_bytes() const noexcept {
+        return static_cast<std::size_t>(rows()) * static_cast<std::size_t>(taps_) *
+               sizeof(ResamplerStore<Coefficient>);
+    }
+
     // Coefficient k of phase p, however the table keeps it; 0 for a p or k out
     // of range.
     [[nodiscard]] Coefficient coefficient(int p, int k) const noexcept;
@@ -179,6 +192,13 @@ class Resampler {
     std::int64_t outputs_ = 0;  // output samples given, on the grid
     std::int64_t first_ = 0;    // the grid number of history_[0]
     std::vector<Real> history_;
+    // One call's outputs by the table row they read, for a table too large for the cache
+    // (process()): each output's first tap in history_ and phase, the rows' start in order_, and
+    // the outputs' indices in the order of their rows.
+    std::vector<std::int32_t> start_;
+    std::vector<std::uint32_t> phase_;
+    std::vector<std::uint32_t> bucket_;
+    std::vector<std::uint32_t> order_;
 };
 
 extern template class Resampler<Real>;

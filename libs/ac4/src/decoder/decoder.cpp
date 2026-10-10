@@ -1403,7 +1403,8 @@ std::expected<bool, DecodeError> Decoder::Impl::conceal_or(DecodeError error, De
                                .drc = {},
                                .de = {},
                                .downmix = {},
-                               .decoding = config.decoding};
+                               .decoding = config.decoding,
+                               .executor = config.executor};
     // The presentation's other substreams are concealed the same way, as far
     // as the QMF domain, and mixed in as the last good frame mixed them.
     detail::FrameInputs member_inputs = inputs;
@@ -2358,7 +2359,8 @@ std::expected<bool, DecodeError> Decoder::Impl::decode_into(
                                .drc = {},
                                .de = {},
                                .downmix = {},
-                               .decoding = d.config.decoding};
+                               .decoding = d.config.decoding,
+                               .executor = d.config.executor};
     std::optional<double> dialnorm;
     const detail::DrcState* drc_state = nullptr;
     const detail::DrcFrame* drc_frame = nullptr;
@@ -2438,6 +2440,7 @@ std::expected<bool, DecodeError> Decoder::Impl::decode_into(
                                           .new_source = d.new_source,
                                           .output = d.config.output,
                                           .drc = {}};
+        member_inputs.executor = d.config.executor;
         member_inputs.de = detail::de_frame_values(member.content.metadata.dialog_enhancement,
                                                    d.config.decoding == DecodingMode::kCore);
         member_inputs.decoding = d.config.decoding;
