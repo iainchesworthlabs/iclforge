@@ -22,7 +22,7 @@ Every figure on this page outside its [AC-4](#ac-4) section was measured on a bo
 | Real time, no network | **Every fixture and every stream-set file**, from 0.027x (`ac3_mono`) to 0.448x (`eac3_714_fold`, 7.1.4 folded to Lo/Ro) among the fixtures, up to 0.700x (`714-ecpl`) among the stream set — comfortably inside a 32 ms frame even at this chip's 360 MHz ceiling, not the part's 400 MHz datasheet maximum (see [The chip revision](#the-chip-revision-and-what-it-blocks)) |
 | Memory | 514,820 bytes free at boot, largest block 385,024; peak heap across every fixture 195,025 (`eac3_atmos_render`), leaving well over half the free total unused at the worst point measured |
 | AC-4 decode | Behind `CONFIG_ICLFORGE_AC4`, off by default. Twenty plays of DEE's streams (2.0, 5.1 and 5.1.4; SIMPLE, A-SPX, A-CPL and S-CPL; the converter's four frame rates) run from an HTTP source with the network up, and the probe's six fixtures decode to its pinned `float` PCM hashes exactly. The board's hash equals the host's (GCC 16, Clang 22 and MSVC) on all twenty plays and on all six core-decoding plays, and the Cortex-M3 leg's on the 24-frame cut of each, since D14a4 took the `float` calls whose last bit differs between C libraries out of libm, see [AC-4](#ac-4) |
-| AC-4 real time | Since D14g (the firmware in PSRAM and a second core, [The firmware in PSRAM and the second core](#the-firmware-in-psram-and-the-second-core)): 2.0 streams in SIMPLE mode take 0.15 of a frame, in A-SPX mode 0.21 and, through the converter, 0.31 to 0.38 at 23.976, 24, 25 and 29.97 fps; 5.1 to its own layout 0.42 in SIMPLE mode, 0.53 in A-SPX mode, 0.59 with A-CPL mode 2 and 0.73 with A-CPL mode 3 (0.40, 0.50, 0.55 and 0.69 folded to 2.0); and 5.1.4 in full decoding 1.01 to 1.21 (0.84 to 1.05 folded), which does not keep up yet. Before D14g, with D14e's figures: 2.0 streams in SIMPLE mode (0.28 of a frame), in A-SPX mode (0.37) and, through the converter, at 24 fps (0.51), 25 fps (0.53), 23.976 fps (0.68) and 29.97 fps (0.68), played to a 2.0 layout; and, since D14e, 5.1 to its own layout in SIMPLE mode (0.64), in A-SPX mode (0.83) and in A-SPX mode with A-CPL mode 2 (0.90), which folded to 2.0 take 0.60, 0.77 and 0.82. A-CPL mode 3 takes 1.13 at 5.1 (1.06 folded to 2.0), 5.1.4 in full decoding 1.55 to 1.89 (1.32 to 1.63 folded) and in core decoding 1.23 to 1.57 (1.04 to 1.38 folded). D14e took a 5.1 frame from 1.17, 1.52, 1.94 and 3.86 times its duration (SIMPLE, A-SPX, A-SPX with A-CPL mode 2 and 3) to those, with the decoder's transforms, A-CPL and output in fewer passes, the compiler's settings and the flash read in quad mode ([What D14e changed](#what-d14e-changed)). Before it D14a6 had taken the low-power SRAM out of the heap, D14a's third part had made a frame 1.1 to 2.5 times faster, D14a4's `float` converter and D14a5's tables had made the converter's streams run. AC-3 and E-AC-3 5.1 through the same image each take 0.18 (0.16 since D14g), and E-AC-3 7.1.4 0.36 (0.35) |
+| AC-4 real time | Since D14g (the firmware in PSRAM and a second core, [The firmware in PSRAM and the second core](#the-firmware-in-psram-and-the-second-core)): 2.0 streams in SIMPLE mode take 0.15 of a frame, in A-SPX mode 0.21 and, through the converter, 0.31 to 0.38 at 23.976, 24, 25 and 29.97 fps; 5.1 to its own layout 0.42 in SIMPLE mode, 0.53 in A-SPX mode, 0.58 with A-CPL mode 2 and 0.63 with A-CPL mode 3 (0.40, 0.50, 0.53 and 0.59 folded to 2.0; D14h's single precision A-CPL interpolation took the last two from 0.55 and 0.69, [A-CPL's interpolation in single precision](#a-cpls-interpolation-in-single-precision)); and 5.1.4 in full decoding 1.01 to 1.21 (0.85 to 1.04 folded), which does not keep up yet. Before D14g, with D14e's figures: 2.0 streams in SIMPLE mode (0.28 of a frame), in A-SPX mode (0.37) and, through the converter, at 24 fps (0.51), 25 fps (0.53), 23.976 fps (0.68) and 29.97 fps (0.68), played to a 2.0 layout; and, since D14e, 5.1 to its own layout in SIMPLE mode (0.64), in A-SPX mode (0.83) and in A-SPX mode with A-CPL mode 2 (0.90), which folded to 2.0 take 0.60, 0.77 and 0.82. A-CPL mode 3 takes 1.13 at 5.1 (1.06 folded to 2.0), 5.1.4 in full decoding 1.55 to 1.89 (1.32 to 1.63 folded) and in core decoding 1.23 to 1.57 (1.04 to 1.38 folded). D14e took a 5.1 frame from 1.17, 1.52, 1.94 and 3.86 times its duration (SIMPLE, A-SPX, A-SPX with A-CPL mode 2 and 3) to those, with the decoder's transforms, A-CPL and output in fewer passes, the compiler's settings and the flash read in quad mode ([What D14e changed](#what-d14e-changed)). Before it D14a6 had taken the low-power SRAM out of the heap, D14a's third part had made a frame 1.1 to 2.5 times faster, D14a4's `float` converter and D14a5's tables had made the converter's streams run. AC-3 and E-AC-3 5.1 through the same image each take 0.18 (0.16 since D14g), and E-AC-3 7.1.4 0.36 (0.35) |
 | AC-4 memory | A peak heap of 0.58 MB at 2.0 to 2.2 MB at 5.1.4, with internal RAM used up under ESP-IDF's default allocation policy (1 to 8 KB free at its least, of the 344 to 350 KB of main RAM a play starts with; the low-power SRAM has not been in the heap since D14a6). The decode task uses 19 to 30 KB of a 64 KB stack (30 KB in A-CPL mode 3), from 20 to 24 KB at D14a6 and 49 to 50 KB before D14a's third part |
 | Encode | Not measured. Both encoders are floating-point; nothing here rules it out |
 | QEMU | Not emulated, see [QEMU](#qemu) |
@@ -311,7 +311,7 @@ is within what a boot changes.
 ### What it decodes in real time
 
 Since D14g (2026-10-11) the figures below are one core with the firmware in flash, which is how D14e measured them: the
-firmware in PSRAM and the decoder's second core take 5.1 in A-CPL mode 3 to 0.73 and 5.1.4 to 1.01 to 1.21
+firmware in PSRAM and the decoder's second core take 5.1 in A-CPL mode 3 to 0.73 (0.63 with D14h's single precision interpolation) and 5.1.4 to 1.01 to 1.21
 ([The firmware in PSRAM and the second core](#the-firmware-in-psram-and-the-second-core)).
 
 At 360 MHz with the network up, the AC-4 decoder keeps up with real time, to a 2.0 layout, for 2.0
@@ -788,9 +788,9 @@ again).
 | `ims-music-64-25` | A-SPX, 25 fps | 2.0 | 0.54 | 0.42 | 16,954 | 0.31 | 12,385 | 22 |
 | `ims-music-64-2997` | A-SPX, 29.97 fps | 2.0 | 0.72 | 0.54 | 17,889 | 0.38 | 12,833 | 229 |
 
-Every play's PCM hash is the one the board gave on 2026-10-02 (40 plays, with the second core off and on). AC-3 and E-AC-3 through the same
+Every play's PCM hash is the one the board gave on 2026-10-02 (40 plays, with the second core off and on), until D14h, whose single precision A-CPL interpolation moves the three with A-CPL (below). AC-3 and E-AC-3 through the same
 image: 5.1 0.16 and 0.16 of a frame, 7.1.4 0.35. **What reads as real time now:** 2.0 and 5.1 in every codec mode (A-CPL mode 3
-at 0.73 at 5.1, from 1.16), the converter at all four frame rates (0.31 to 0.38, from 0.53 to 0.72) and the 2.0 fold of 5.1.4 in S-CPL
+at 0.73 at 5.1, from 1.16, and at 0.63 with D14h), the converter at all four frame rates (0.31 to 0.38, from 0.53 to 0.72) and the 2.0 fold of 5.1.4 in S-CPL
 (0.84). **Not yet:** 5.1.4, at 1.01 in S-CPL and 1.21 in A-SPX with A-CPL mode 2 or S-CPL (1.59 to 1.92 before), and the 2.0 fold of the
 A-SPX ones at 1.03 and 1.05. What took the 5.1.4 frame's time is in [Where a frame goes](#where-a-frame-goes) and the list below it.
 
@@ -798,8 +798,34 @@ A-SPX ones at 1.03 and 1.05. What took the 5.1.4 frame's time is in [Where a fra
 Huffman decoder reads a stream's bits in order, and the noise fill's random generator runs through the tracks in syntax order. Nothing
 hands a frame's parse to the second core while the first renders the frame before, which would take 4.6 to 9.2 ms off the 5.1.4 frame, and
 what `Decoder::decode()` reports (`metadata()`, `presentations()`) is the frame decoded, which a parse of the next frame would move.
-A-CPL's interpolation could be `float`, which would take about 3 ms off a 5.1.4 frame and 7 off a 5.1 A-CPL mode 3 one, and would move
-every `float` pin that has A-CPL in it, so it is not done.
+A-CPL's interpolation is single precision since D14h, which took 3.5 ms off a 5.1 A-CPL mode 3 frame on both cores
+(the section after this one).
+
+### A-CPL's interpolation in single precision
+
+D14h (2026-10-11). Pseudocode 109 of Part 1, the interpolation of A-CPL's parameters, was evaluated in `double` at every tier: at `float`
+on this part, whose FPU is single precision, that is a call into software for every operation, 46 thousand a frame at A-CPL mode 3
+(seventeen interpolations at each slot of each run of subbands, and the sums of them a coefficient takes). It is now evaluated in
+single precision at the `float` tier, the same expression operation for operation from values narrowed once
+(`acpl::BasicInterpolator<float>`); the `double` and fixed-point tiers keep the `double`. Single precision is not the `double`
+narrowed, so the PCM of a stream with A-CPL moves, by the interpolation's rounding (a few parts in 10<sup>7</sup> of a coefficient;
+the float decode against the double one stays at its pinned floors on every committed stream), and the PCM of every stream without
+A-CPL is the same bit for bit. The same board, the same twenty plays, the decoder's time over the frame's duration on both cores:
+
+| Stream | Codec mode | To | D14g | D14h | us/frame | PCM hash (S3's equal) |
+|---|---|---|---:|---:|---:|---|
+| `51-music-128` | A-SPX, A-CPL 2 | 2.0 | 0.55 | 0.53 | 22,820 | `2bc144823ea72fde` |
+| `51-music-128` | A-SPX, A-CPL 2 | 5.1 | 0.59 | 0.58 | 24,614 | `7c91e8b9828e38c0` |
+| `51-music-96` | A-SPX, A-CPL 3 | 2.0 | 0.69 | 0.59 | 24,973 | `620448a59e186f2d` |
+| `51-music-96` | A-SPX, A-CPL 3 | 5.1 | 0.73 | 0.63 | 26,756 | `e8d63b1359038f8e` |
+| `514-music-256` | A-SPX, A-CPL 2 | 2.0 | 1.05 | 1.02 | 43,630 | `cbae570067f556d9` |
+| `514-music-256` | A-SPX, A-CPL 2 | 5.1.4 | 1.21 | 1.19 | 50,810 | `1087ea4936a6478f` |
+
+Mode 3 gains 14%, mode 2 2 to 3%, because mode 3 interpolates seventeen parameters at each slot and mode 2 two (alpha and beta). The 5.1.4 streams
+that are over 1.0 stay over: 1.01 (S-CPL), 1.19 (A-SPX, A-CPL mode 2) and 1.21 (A-SPX, S-CPL), 1.02, 1.04 and 0.85 folded to 2.0.
+The S3 gives the same hash as the P4 for every one of the twenty plays, with the second core on and off: single precision add,
+subtract, multiply and divide are the same on a RISC-V FPU and an Xtensa one (the compiler does not fuse them), and the six
+probe fixtures' hashes, which have parameters that do not change, are the pins they were on the host and the Cortex-M3.
 
 ### Paced output
 

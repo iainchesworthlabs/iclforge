@@ -2009,6 +2009,12 @@ The sections below contain the complete change list and fixes.
   ThreadSanitizer.
   [ESP32-P4](docs/platforms/bare-metal/esp32-p4.md#the-firmware-in-psram-and-the-second-core) and
   [ESP32-S3](docs/platforms/bare-metal/esp32-s3.md#playback-speed) have the figures.
+- **A-CPL's interpolation runs in single precision at the AC-4 decoder's float tier (phase D14h).** Pseudocode 109's interpolation of
+  A-CPL's parameters, 46,000 `double` operations a 5.1 A-CPL mode 3 frame and calls into software on the ESP32s, is evaluated in
+  single precision there (`acpl::BasicInterpolator<float>`), operation for operation from values narrowed once; the `double` and
+  fixed-point tiers keep the `double`. The ESP32-P4's 5.1 A-CPL mode 3 frame takes 0.63 of its duration from 0.73 and the
+  ESP32-S3's 1.44 from 1.57. The PCM of a `float` stream whose A-CPL parameters change moves by that rounding (the six probe fixtures'
+  hashes and the float against double decode floors do not), and is the same on the two boards.
 - **The ESP32-S3 decodes AC-4 under QEMU, with the decoder's state in PSRAM (phase D14c).** The S3 probe has an AC-4 shape
   (`sdkconfig.ac4`: the component's AC-4 decoder, the AC-4 probe and the board's octal PSRAM, which the QEMU of ESP-IDF v6.1 emulates), and CI runs it
   as `run_esp32s3_probe.sh --ac4`: the six fixtures' PCM equals the hashes the Cortex-M3 leg and the host are pinned to, and the internal RAM each takes
