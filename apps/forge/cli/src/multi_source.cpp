@@ -13,12 +13,11 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/encoder/assignment.hpp"
 #include "iclforge/ac3/encoder/plan.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 #include "support.hpp"
-#include "iclforge/ac4/io/carriage.hpp"
 
 namespace forge_cli {
 

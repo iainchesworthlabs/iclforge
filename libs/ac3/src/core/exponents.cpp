@@ -7,7 +7,7 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/base/detail/simd.hpp"
 #include "iclforge/base/detail/profiling.hpp"
 

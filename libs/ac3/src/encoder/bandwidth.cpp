@@ -9,7 +9,7 @@
 #include "iclforge/ac3/core/bitalloc.hpp"
 #include "iclforge/ac3/core/bitalloc_tables.hpp"
 #include "iclforge/ac3/core/exponents.hpp"
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 
 namespace iclforge::ac3::encoder {
 

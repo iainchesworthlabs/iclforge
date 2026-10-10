@@ -22,7 +22,8 @@
 #include "iclforge/ac4/core/toc.hpp"
 #include "ac4_encode_core.hpp"
 #include "iclforge/ac4/core/syntax.hpp"
-#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/decoder/frame.hpp"
+#include "iclforge/ac4/encoder/config.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "encode.hpp"
 

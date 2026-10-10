@@ -2,7 +2,7 @@
 
 #include "iclforge/ac3/core/bitalloc.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include <cmath>
 #include <cstddef>
 #include <cstdint>

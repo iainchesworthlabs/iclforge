@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "iclforge/ac3/core/bitalloc.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/ac3/core/coupling.hpp"
 #include "iclforge/ac3/core/crc16.hpp"

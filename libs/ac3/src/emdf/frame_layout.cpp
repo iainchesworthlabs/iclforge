@@ -9,10 +9,10 @@
 #include <vector>
 
 #include "iclforge/ac3/core/bitalloc.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/ac3/core/eac3_tools.hpp"
 #include "iclforge/ac3/core/exponents.hpp"
-#include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/objects/emdf.hpp"
 
 namespace iclforge::ac3::emdf {

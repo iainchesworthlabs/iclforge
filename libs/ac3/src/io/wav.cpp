@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 
 namespace iclforge::ac3::io {
 

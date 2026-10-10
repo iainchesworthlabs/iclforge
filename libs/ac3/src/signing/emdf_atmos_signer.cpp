@@ -6,12 +6,12 @@
 #include <cstdint>
 #include <optional>
 #include <span>
-#include <utility>
 #include <vector>
 
 #include "iclforge/ac3/core/crc16.hpp"
 #include "iclforge/ac3/emdf/frame_layout.hpp"
 #include "iclforge/base/crypto/hmac_sha256.hpp"
+#include "iclforge/base/crypto/signing_key.hpp"
 
 namespace iclforge::ac3::signing {
 namespace {

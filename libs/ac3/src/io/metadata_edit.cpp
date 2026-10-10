@@ -9,6 +9,7 @@
 #include <string_view>
 #include <vector>
 
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/ac3/core/crc16.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"

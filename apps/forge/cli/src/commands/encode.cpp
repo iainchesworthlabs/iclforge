@@ -1,5 +1,5 @@
 #include "encode.hpp"
-#include "iclforge/ac4/io/carriage.hpp"
+#include "iclforge/ac3/core/types.hpp"
 
 #include <algorithm>
 #include <array>
@@ -22,7 +22,6 @@
 #include "../support.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
-#include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"

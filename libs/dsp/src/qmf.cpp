@@ -6,6 +6,7 @@
 
 #include "qmf_prototype.hpp"
 #include "iclforge/dsp/detail/complex.hpp"
+#include "tiered/qmf.hpp"
 #include "tiered/qmf_constants.hpp"
 #include "tiered/qmf_slot.hpp"
 

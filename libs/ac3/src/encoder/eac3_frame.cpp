@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "iclforge/ac3/core/bitalloc.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/ac3/core/coupling.hpp"
 #include "iclforge/ac3/core/crc16.hpp"
@@ -24,7 +25,6 @@
 #include "iclforge/ac3/core/exponents.hpp"
 #include "iclforge/ac3/core/mantissas.hpp"
 #include "iclforge/ac3/core/mdct.hpp"
-#include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/encoder/bandwidth.hpp"
 #include "iclforge/ac3/encoder/silent_frame.hpp"
 #include "iclforge/ac3/encoder/transient.hpp"

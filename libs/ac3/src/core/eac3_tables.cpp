@@ -1,7 +1,7 @@
 #include "iclforge/ac3/core/eac3_tables.hpp"
 
 #include <array>
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include <cstdint>
 #include <expected>
 #include <optional>

@@ -13,7 +13,7 @@
 #include <vector>
 
 #include "iclforge/ac3/core/mdct.hpp"
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/dsp/qmf.hpp"
 #include "iclforge/objects/emdf.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"  // blocks_per_syncframe

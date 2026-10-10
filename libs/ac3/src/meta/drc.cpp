@@ -3,12 +3,12 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include "iclforge/ac3/core/tables.hpp"
 #include <cstdint>
 #include <memory>
 #include <span>
 #include <string_view>
 
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"  // kReferenceDialnorm
 
 namespace iclforge::ac3::meta {

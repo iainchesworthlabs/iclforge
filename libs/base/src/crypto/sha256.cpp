@@ -1,7 +1,11 @@
 #include "iclforge/base/crypto/sha256.hpp"
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
+#include <span>
 
 namespace iclforge::base::crypto {
 namespace {

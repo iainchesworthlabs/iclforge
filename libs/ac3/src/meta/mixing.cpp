@@ -8,7 +8,7 @@
 #include <optional>
 #include <span>
 
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/meta/drc.hpp"  // to_db
 
 namespace iclforge::ac3::meta {

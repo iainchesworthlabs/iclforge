@@ -21,6 +21,7 @@
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/core/syntax.hpp"
+#include "iclforge/ac4/encoder/config.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "encode.hpp"
 

@@ -13,10 +13,10 @@
 #include <utility>
 #include <vector>
 
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/ac3/core/mdct.hpp"
-#include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/dsp/qmf.hpp"
 #include "iclforge/ac3/detail/decode_scalar.hpp"
 #include "iclforge/base/detail/profiling.hpp"
