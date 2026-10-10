@@ -1275,10 +1275,9 @@ TEST_CASE("group: a PCM sink with a small buffer is fed before play and not afte
     constexpr std::size_t kFrames = 4 * 48000;
     std::vector<std::int32_t> programme;
     for (std::size_t frame = 0; frame < kFrames; ++frame) {
-        programme.push_back(
-            static_cast<std::int32_t>(std::lround(9000.0 * std::sin(frame * 0.0575))));
-        programme.push_back(
-            static_cast<std::int32_t>(std::lround(9000.0 * std::sin(frame * 0.131))));
+        const auto t = static_cast<double>(frame);
+        programme.push_back(static_cast<std::int32_t>(std::lround(9000.0 * std::sin(t * 0.0575))));
+        programme.push_back(static_cast<std::int32_t>(std::lround(9000.0 * std::sin(t * 0.131))));
     }
     std::shared_ptr<ss::Group> group = (*host)->make_group("Small buffer");
     group->add(sink->client_id());
