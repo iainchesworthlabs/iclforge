@@ -1652,6 +1652,38 @@ With the encoder excluded by these hashes, FFmpeg's own kernels excluded by the 
 test above, and contraction and libm excluded before that, what remains open is the decode
 path on real arm64 silicon — which is also the one thing no emulated run has reproduced.
 
+### Real programme material in the hash gate
+
+Those three streams are one synthetic 5.1 file, and synthetic tones sit far from the encoder's
+thresholds: rematrixing, coupling's band fit, SPX's and AHT's choices, §7.2.2's closed-loop search and
+the VBR loop all decide on a signal's own statistics, and a toolchain that differs in one last bit
+only changes a stream where the signal puts one of them near its edge. The same check therefore
+pins sixteen more streams that `verify_gold_reference.sh` encodes for it alone (hash only, no
+decode and no score): the CC0 music and speech programmes of `testdata/audio` (30 s of 48 kHz
+stereo each, converted by ffmpeg, which is lossless) through AC-3 with and without coupling and with
+`search=distortion`, and through E-AC-3 with `auto`, `cpl`, `spx`, `aht`, `all`, enhanced coupling,
+`tpn` and VBR, and the synthetic 5.1 through `spx`, `aht` and `all`.
+
+**One of them found a real divergence, and it was not floating point.** The AC-3 encoder's
+2/0 coupling stream of the music clip (192 kbit/s) differed in one frame of 938 between the MSVC and
+clang-cl builds and the GCC and Clang ones (Linux): the frame's last block carried a delta bit
+allocation segment on one side and a skip field on the other. Every libm the table builders
+call was suspected first and cleared by replay: 22 of the 288 sin/cos table entries do differ in the
+last bit between UCRT and glibc, and giving the Linux build UCRT's values for them changed
+nothing. The cause was `std::ranges::nth_element` in `choose_delta_segments`, which keeps the eight
+largest corrections when more than eight qualify. A correction's magnitude takes four values
+(`|2·code − 7|` is 1, 3, 5 or 7), so the eight to keep are usually chosen among equals, and the
+standard leaves a selection among equal keys to the library: libstdc++'s and the MSVC STL's differ.
+The selection is now a stable sort by magnitude over runs already in band order, so ties go to the
+lower band. That is what the MSVC STL had chosen in this frame, so Windows output did not move and
+Linux now equals it; the three gold pins did not move either.
+
+What is still unpinned: `aarch64-neon` for the sixteen (no arm64 leg has run them), and the
+`encfloat` family. The float32 encoder's existing pins no longer match a fresh GCC 16 build of main
+(the same three hashes before and after this change), the nightly leg that checks them stops at
+its float32 decode suite before reaching them (the run of 2026-10-09), and that variant does not build
+with Clang 22 (`-Wdouble-promotion` in `eac3_frame.cpp`); neither was investigated here.
+
 ## Gold-reference correctness gate
 
 `tools/checks/verify_gold_reference.sh` (invoked in CI on every leg except linux-llvm-asan-ubsan,
