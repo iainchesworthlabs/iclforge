@@ -1444,8 +1444,9 @@ go. 512 stays.
   analysis 19, synthesis 23, A-CPL 41, parse 8, reconstruction 22 and A-SPX 7), and the PIE is
   integer where the decode is `float`, so decision 30's PIE kernel, which was to go where one kernel
   holds a stream back, has none to go to.
-- **What an S3 sink does with the rest is I6's.** Decision 32 made the call for the C6: Hearth sends
-  PCM.
+- **That is accepted.** What the S3 cannot decode in real time reaches it as PCM from Hearth, as
+  decision 32 had it for the C6 ([decision 42](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-10-10),
+  2026-10-10). How a sink says what it decodes is I6's.
 
 ### Running it
 

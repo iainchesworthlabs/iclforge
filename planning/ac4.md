@@ -2210,7 +2210,8 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
 
   **Exit and verified by:** as D14b for the S3, with the QEMU rows in CI and the board's half run:
   PCM equal to the pins on the board, the time per frame, the internal RAM beside Wi-Fi, the first
-  frame. What the S3 sink does with a stream it cannot keep up with is I6's.
+  frame. That the S3 keeps up at 2.0 in SIMPLE mode only is accepted ([decision 42](#decisions-of-2026-10-10));
+  how a sink says what it decodes is I6's.
 - **D14d, the C6.** Built on the host and under QEMU, and run on its board on 2026-10-10:
   [D14d](#d14d-the-c6-fixed-point) below, and the decoder's memory after it in
   [D14f](#d14f-the-decoders-memory). `Fixed32` with a block exponent per QMF slot and per transform
@@ -2231,8 +2232,8 @@ first; the S3 and the C6 follow in the phase's later parts. What AC-3 and E-AC-3
   bytes of heap free and 26,420 when the decoder is made; the decoder asked for a 27,264-byte block
   with 7,952 free and the board called `abort()` and restarted, on the 2.0 SIMPLE stream and on the
   three plays after it. The part cannot hold a 2.0 AC-4 decode (286,365 bytes at the least) beside the
-  sink's network stack and player, so decision 32 stands: a C6 sink takes AC-4 programmes as PCM from
-  Hearth. The player now refuses an AC-4 play when the heap it has is under the least any AC-4
+  sink's network stack and player, so decision 32 stands, and decision 42 accepts it: a C6 sink takes
+  AC-4 programmes as PCM from Hearth. The player now refuses an AC-4 play when the heap it has is under the least any AC-4
   stream has asked for (286,365 bytes), with the figures and `why: "memory"`, and the board runs on.
   No time per frame was measured: nothing fits to be timed beside the network.
 
@@ -4369,6 +4370,32 @@ outright, with no compatibility shim.
 |---|---|---|
 | 40 | The PyPI project | **`ac3forge` untouched; `iclforge` a new project, published after the repository rename** |
 | 41 | The Homebrew names | **Formula and cask `iclforge`, the old names mapped in the tap; the tap becomes `homebrew-iclforge`** |
+
+### Decisions of 2026-10-10
+
+Made after the S3's and the C6's board phases (D14c and D14d) had run on 2026-10-10 and their figures
+were in ([the S3 page](../docs/platforms/bare-metal/esp32-s3.md#on-the-board),
+[the C6 page](../docs/platforms/bare-metal/esp32-c6.md#on-the-board)).
+
+42. **What the S3 and the C6 decode of AC-4.**
+    - (a) **Accept what the boards measured.** The S3 decodes AC-4 on its own at 2.0 in SIMPLE mode
+      (0.87 of real time) and nothing wider or more coded in real time: 2.0 A-SPX 1.03 to 1.09,
+      5.1 2.1 to 3.2, 5.1.4 4.4 to 5.6. The C6 decodes none beside the Hearth sink: 117 KB of heap
+      against a floor of 286,365 bytes. What either cannot decode reaches it as PCM from Hearth, as
+      [decision 32](#decisions-of-2026-09-25) already has it for the C6.
+    - (b) Pursue more: a cheaper decode on the S3 (a fixed-point tier or fewer tools, since no one
+      kernel holds a stream back and the PIE is integer), or a C6 with the network stack's heap given
+      back.
+    - (c) Leave the rows open until I6.
+
+    **Taken: (a), on the user's instruction of 2026-10-10** ("mark the S3 and C6 limits as
+    accepted"). The status table's minimum-footprint row takes 🟡🔵. I6 still settles how a sink says
+    what it decodes ([decision 39](#decisions-of-2026-09-30)); this decision is that no work on the
+    S3's decoder or the C6's heap is planned to move these limits.
+
+| # | Question | **Taken** |
+|---|---|---|
+| 42 | What the S3 and the C6 decode of AC-4 | **(a), accepted: the S3 at 2.0 in SIMPLE mode and the C6 none, the rest as PCM from Hearth** |
 
 ## What cannot be verified, and why
 
