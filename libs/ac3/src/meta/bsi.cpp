@@ -7,7 +7,7 @@
 #include <string_view>
 #include <system_error>
 
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
 
 namespace iclforge::ac3::meta {

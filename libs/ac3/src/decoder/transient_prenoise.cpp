@@ -8,7 +8,7 @@
 #include <span>
 #include <vector>
 
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/detail/decode_scalar.hpp"
 #include "transient_prenoise_apply.hpp"
 

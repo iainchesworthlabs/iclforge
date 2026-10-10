@@ -1,6 +1,9 @@
 #include "iclforge/base/crypto/hmac_sha256.hpp"
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
+#include <span>
 
 #include "iclforge/base/crypto/sha256.hpp"
 

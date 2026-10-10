@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "iclforge/ac3/core/bitalloc_tables.hpp"
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/base/detail/profiling.hpp"
 #include "iclforge/ac3/quality/distortion.hpp"  // kBands, BandNoise
 

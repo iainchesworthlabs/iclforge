@@ -29,6 +29,7 @@
 // or replicate it. See docs/concepts/object-signing.md.
 
 #include <cstddef>
+#include <cstdint>
 #include <span>
 
 #include "iclforge/ac3/export.hpp"
@@ -73,7 +74,7 @@ namespace iclforge::ac3::signing {
 // there is nothing in it to check - so that case is its own outcome
 // (kNoContainer) rather than being folded into kMismatch, which would
 // misreport every plain/non-Atmos frame as a signature failure.
-enum class VerifyResult {
+enum class VerifyResult : std::uint8_t {
     kNoContainer,  // no EMDF object container - nothing to verify
     kValid,        // container present, tag matches `key`
     kMismatch,     // container present, tag does not match `key`

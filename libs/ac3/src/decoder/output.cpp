@@ -13,7 +13,7 @@
 #include <vector>
 
 #include "iclforge/ac3/core/eac3_tables.hpp"  // eac3::chanmap::Location/Layout
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/detail/decode_scalar.hpp"
 #include "iclforge/base/detail/profiling.hpp"
 #include "eac3_seat_fold.hpp"

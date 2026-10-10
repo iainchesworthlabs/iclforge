@@ -13,7 +13,7 @@
 
 #include "iclforge/ac3/core/aht_tables.hpp"
 #include "iclforge/ac3/core/bitalloc_tables.hpp"
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/base/detail/simd.hpp"
 #include "iclforge/base/detail/profiling.hpp"
 #include "bitalloc_internal.hpp"

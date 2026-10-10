@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"

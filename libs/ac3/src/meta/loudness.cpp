@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "iclforge/ac3/core/eac3_tables.hpp"
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/base/loudness.hpp"
 
 namespace iclforge::ac3::meta {

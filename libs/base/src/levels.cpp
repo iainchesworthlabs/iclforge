@@ -9,6 +9,7 @@
 #include <optional>
 #include <span>
 #include <vector>
+#include "iclforge/base/speaker.hpp"
 
 namespace iclforge::base {
 

@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/base/bitwriter.hpp"
-#include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
 

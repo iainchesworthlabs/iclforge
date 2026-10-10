@@ -1,5 +1,6 @@
 #include "atmos.hpp"
-#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/ac3/core/types.hpp"
+#include "iclforge/ac4/encoder/config.hpp"
 
 #include <algorithm>
 #include <array>
@@ -25,7 +26,6 @@
 #include "../multi_source.hpp"
 #include "../support.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"
-#include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/encoder/assignment.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"  // blocks_per_syncframe
 #include "iclforge/ac3/encoder/plan.hpp"

@@ -2,7 +2,6 @@
 
 #include <array>
 #include <cstddef>
-#include <cstdint>
 #include <span>
 
 #include "iclforge/ac3/core/window.hpp"

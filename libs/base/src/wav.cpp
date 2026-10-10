@@ -1,7 +1,6 @@
 #include "iclforge/base/wav.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -9,13 +8,11 @@
 #include <ios>
 #include <istream>
 #include <iterator>
-#include <numeric>
 #include <optional>
 #include <ostream>
 #include <span>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "wav_format.hpp"

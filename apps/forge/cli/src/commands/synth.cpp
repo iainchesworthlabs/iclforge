@@ -18,7 +18,7 @@
 #include "../exit_codes.hpp"
 #include "../support.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/encoder/plan.hpp"

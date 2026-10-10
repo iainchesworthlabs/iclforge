@@ -21,6 +21,9 @@
 
 #include "../exit_codes.hpp"
 #include "../support.hpp"
+#include "iclforge/ac3/core/types.hpp"
+#include "iclforge/ac4/decoder/config.hpp"
+#include "iclforge/ac4/decoder/frame.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"

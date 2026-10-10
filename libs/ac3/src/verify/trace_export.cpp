@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-#include "iclforge/ac3/core/tables.hpp"  // kBlocksPerFrame
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/verify/eac3_mirror.hpp"
 #include "iclforge/ac3/verify/mirror.hpp"
 

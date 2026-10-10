@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "isobmff_detail.hpp"
+#include "isobmff_writer.hpp"
 
 namespace iclforge::containers::mp4 {
 

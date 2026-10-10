@@ -19,11 +19,12 @@
 #include <vector>
 
 #include "iclforge/ac3/analysis/levels.hpp"
-#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/io/dec3.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/io/object_strip.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
+#include "iclforge/ac4/decoder/presentation.hpp"
 #include "iclforge/ac4/io/carriage.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/ac4/core/toc.hpp"
