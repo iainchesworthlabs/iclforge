@@ -50,6 +50,9 @@ enum class MuxError : std::uint8_t {
     kTooManyChannels,      // more than the 18 channels the object-based profiles allow
     kBadPositions,         // a position list that is neither empty nor one entry per frame
     kWriteFailed,          // the Sequence built could not be written; see the Error it came from
+    kInvalidLayout,        // a loudspeaker_layout the coded builders do not take (0 to 8, one layer)
+    kSubstreamCountMismatch,  // a CodedFrame without exactly one packet per Audio Substream of the layout
+    kBadCodedPacket,       // a packet the codec's own constraints in 3.13 refuse (see CodedTrack)
 };
 
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::string_view describe(MuxError error);
@@ -162,6 +165,70 @@ struct ObjectTrack {
 
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<std::vector<std::byte>, MuxError> mux_objects(
     const ObjectTrack& track, std::span<const ObjectElement> elements);
+
+// --- Carrying coded audio -----------------------------------------------------------------------
+
+// Opus, AAC-LC and FLAC Audio Substreams are carried, not produced: this module links no codec, so
+// the caller's encoder makes the packets and these functions put them in IAMF's Codec Config, Audio
+// Element and Mix Presentation (the Opus and AAC-LC `roll` sample group in ISO-BMFF included).
+// examples/iamf_coded.cpp writes FLAC this way.
+enum class CodedCodec : std::uint8_t { kOpus, kAacLc, kFlac };
+
+// DecoderConfig() for each codec, as 3.13.1 to 3.13.3 constrain it.
+//
+// Opus: the RFC 7845 ID Header without its magic signature, big-endian: version 1, two output
+// channels, `pre_skip` (which must equal the samples trimmed at the start), `input_sample_rate`
+// (informational), output gain 0 and channel mapping family 0.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT Bytes opus_decoder_config(std::uint16_t pre_skip,
+                                                                   std::uint32_t input_sample_rate = 48000);
+// AAC-LC: the DecoderConfigDescriptor of ISO/IEC 14496-1 with an AudioSpecificConfig of AAC-LC,
+// two channels and 1024 line frames. kInvalidTrack for a rate AAC has no index for.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<Bytes, MuxError> aac_lc_decoder_config(
+    std::uint32_t sample_rate, std::uint32_t max_bitrate = 0, std::uint32_t average_bitrate = 0);
+// FLAC: the STREAMINFO metadata block as the only, last block, with the block size fixed at
+// `samples_per_frame` and two channels. kInvalidTrack for a rate outside FLAC's common ones, a
+// depth other than 16, 24 or 32, or a block size outside 16 to 65535.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<Bytes, MuxError> flac_decoder_config(
+    std::uint32_t sample_rate, int bit_depth, std::uint32_t samples_per_frame);
+
+struct CodedTrack {
+    CodedCodec codec = CodedCodec::kOpus;
+    // Opus: 48000. AAC-LC: one of the 13 rates of MPEG-4 Audio (96000 to 7350). FLAC: 8000, 16000,
+    // 22050, 24000, 32000, 44100, 48000, 88200, 96000, 176400 or 192000.
+    std::uint32_t sample_rate = 48000;
+    // The frame length of every packet. Opus: the duration its TOC byte names, 120, 240, 480, 960,
+    // 1920 or 2880 samples; AAC-LC: 1024; FLAC: the block size, 16 to 65535.
+    std::uint32_t samples_per_frame = 960;
+    int bit_depth = 16;  // FLAC only: 16, 24 or 32
+    // One of loudspeaker_layout 0 to 8 (layout_info()), as a single layer.
+    std::uint8_t loudspeaker_layout = 7;
+    // Trimming, as for AudioTrack. Opus: the pre-skip, which is also written into the Codec Config.
+    std::uint32_t trim_start_samples = 0;
+    std::uint32_t trim_end_samples = 0;
+    LoudnessInfo stereo_loudness{};
+    LoudnessInfo layout_loudness{};
+    bool temporal_delimiters = false;
+    std::string writing_app{"iclforge"};
+};
+
+// One Temporal Unit: one coded packet per Audio Substream, in the order layout_info() lists the
+// layout's substreams (coupled pairs first). Each packet is one frame of mono or, for a coupled
+// substream, stereo audio (3.13): an Opus packet with a frame count code of 0, a raw_data_block()
+// of AAC, a FLAC frame with independent channel coding.
+struct CodedFrame {
+    std::vector<Bytes> substreams;
+};
+
+// The IA Sequence for a coded programme: one channel-based Audio Element of one layer, one Mix
+// Presentation with the Stereo loudness layout and the element's own, the Codec Config of the
+// codec with its audio_roll_distance (3.5) and decoder_config. Packets are checked against the
+// constraints above (kBadCodedPacket), cheaply: a packet is not decoded.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<Sequence, MuxError> build_coded_sequence(
+    const CodedTrack& track, std::span<const CodedFrame> frames);
+
+// build_coded_sequence() written as an ISO-BMFF file.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<std::vector<std::byte>, MuxError> mux_coded(
+    const CodedTrack& track, std::span<const CodedFrame> frames);
 
 // --- Reading PCM back ---------------------------------------------------------------------------
 

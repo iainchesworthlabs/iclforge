@@ -241,8 +241,11 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | Object-based audio elements (v2.0) | 🟢 | Low | Nice-to-have | One or two objects per element, polar and Cartesian positions; no external oracle yet |
 | | Raw OBU stream (§5) | 🟢 | Low | Nice-to-have | `write_sequence()` |
 | | Fragmented / live writer | 🟢 | Low | Nice-to-have | `FragmentedWriter` |
-| **Reader** | OBU / file reader | 🟢 | Low | Nice-to-have | `read_sequence()`, `read_isobmff()` (files and fragments), `decode_pcm()` for `ipcm` |
-| | Opus / AAC-LC / FLAC encode | 🔴 | Low | Nice-to-have | Carried and parsed, not produced |
+| | Opus / AAC-LC / FLAC carriage | 🟢 | Low | Nice-to-have | `mux_coded()` with the three `decoder_config` builders and the `roll` sample group; FFmpeg 8.0.1 decodes the Opus, AAC-LC and FLAC output of a 5.1 programme to the same samples as the encoders' own files |
+| | Opus / AAC-LC / FLAC encode and decode | 🔴🔵 | Low | Nice-to-have | The module links no codec, as the other container modules; packets come from the caller's encoder (`examples/iamf_coded.cpp`) and go to the caller's decoder (`reconstruct_channels()`). No AAC encoder exists in this repository or its vcpkg set. Decision: the IAMF row of [Roadmap](../roadmap.md) |
+| | More than one IA track in a file | 🟡🔵 | Low | Optional | `read_isobmff_tracks()` reads them all; the writers write one, as 6.2.1 stores an IA Sequence as one track |
+| | Common Encryption (§6.3) | 🔴🔵 | Low | Optional | A protected track is recognised and refused (`kUnsupported`). AES would be the module's first third-party dependency, and it is default-on without any; whole-sample encryption (6.3) lets a packager protect its output. Decision: the IAMF row of [Roadmap](../roadmap.md) |
+| **Reader** | OBU / file reader | 🟢 | Low | Nice-to-have | `read_sequence()`, `read_isobmff()` and `read_isobmff_tracks()` (files and fragments, 32- and 64-bit `mdat`), `decode_pcm()` for `ipcm`, `codecs_string()` |
 | | Scalable channel layer reconstruction | 🟢 | Low | Nice-to-have | Gain, De-mixer and Recon Gain of §7.2 for up to six layers, in `decode_pcm()` (`ipcm`) and `reconstruct_channels()` (substreams a caller decoded); no external oracle for the reconstruction |
 | | Expanded loudspeaker layouts (`loudspeaker_layout` 15) | 🟢 | Low | Nice-to-have | `expanded_layout_info()` and `decode_pcm()` for `expanded_loudspeaker_layout` 0–19 |
 | | Rendering an Audio Element to a playback layout, and mixing (§7.4) | 🔴🔵 | Low | Optional | The specification leaves the algorithms to the Open Audio Renderer; the module returns reconstructed channels, Parameter Blocks and Mix Presentations as data and renders nothing. Decision: the IAMF row of [Roadmap](../roadmap.md) |
@@ -360,9 +363,9 @@ this register is the checklist that those bounds appear here too.
 
 | Clause | Open item | Status |
 |---|---|---|
-| Codec Specific | Encoding Opus, AAC-LC and FLAC | 🔴 |
+| Codec Specific | Encoding and decoding Opus, AAC-LC and FLAC (carried as packets with their `decoder_config`) | 🔴🔵 |
 | Processing | Rendering to a playback layout and mixing (§7.4): the Open Audio Renderer's algorithms | 🔴🔵 |
-| ISO-BMFF | Common Encryption; more than one IA track | 🔴 |
+| ISO-BMFF | Common Encryption (§6.3) | 🔴🔵 |
 
 ### Carriage (Annex F, IEC 61937, MPEG-TS, HLS, DASH)
 

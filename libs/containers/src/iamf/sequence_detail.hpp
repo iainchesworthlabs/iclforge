@@ -67,6 +67,10 @@ void put_animated(Out& out, std::uint32_t animation_type, const AnimatedValue& v
 // Defined in reconstruct.cpp.
 [[nodiscard]] std::optional<std::uint32_t> codec_sample_rate(const CodecConfig& codec);
 
+// The samplingFrequencyIndex of an AAC sample rate (ISO/IEC 14496-3 Table 1.18): 0 for 96000 Hz
+// to 12 for 7350 Hz; nullopt for a rate that has no index. Defined in reconstruct.cpp.
+[[nodiscard]] std::optional<std::uint32_t> aac_sampling_frequency_index(std::uint32_t sample_rate);
+
 // One Audio Frame's `ipcm` payload as planar float in [-1, 1): `channels` interleaved per sample.
 // kBadObu when the payload is not a whole number of samples. Defined in reconstruct.cpp.
 [[nodiscard]] std::expected<std::vector<std::vector<float>>, Error> decode_ipcm_frame(

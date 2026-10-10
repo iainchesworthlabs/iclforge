@@ -94,6 +94,15 @@ constexpr std::array<std::uint32_t, 13> kAacSampleRates{
 
 }  // namespace
 
+std::optional<std::uint32_t> aac_sampling_frequency_index(std::uint32_t sample_rate) {
+    for (std::size_t i = 0; i < kAacSampleRates.size(); ++i) {
+        if (kAacSampleRates[i] == sample_rate) {
+            return static_cast<std::uint32_t>(i);
+        }
+    }
+    return std::nullopt;
+}
+
 std::optional<std::uint32_t> codec_sample_rate(const CodecConfig& codec) {
     if (codec.codec_id == "ipcm") {
         if (!codec.lpcm.has_value()) {
