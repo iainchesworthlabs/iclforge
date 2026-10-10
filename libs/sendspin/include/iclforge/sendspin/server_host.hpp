@@ -215,7 +215,14 @@ class ServerHost {
     // support object (max_chunk_bytes there, header included), and to 20 ms a chunk where it
     // states none. A figure given here wins over the sink's. False when the client is not
     // connected.
-    bool use_pcm(const std::string& client_id, bool use, std::size_t max_chunk_bytes = 0);
+    //
+    // `channels` is the width of PCM to play it, when a group's programme carries more than one
+    // (Group::Programme::more_pcm): the first format its player lists with that many channels,
+    // where 0 takes the first it lists that the programme can produce. A client held for PCM
+    // is not started on a burst stream while its role is still moving, so a group that has
+    // been told what each sink gets never sends one the other form.
+    bool use_pcm(const std::string& client_id, bool use, std::size_t max_chunk_bytes = 0,
+                 std::int32_t channels = 0);
     // Approves a client for unpaired access, or withdraws the approval.
     bool approve(const std::string& client_id, bool approved);
     bool unpair(const std::string& client_id);
@@ -281,6 +288,13 @@ class Group {
         // The PCM push() takes, for members playing player@v1: interleaved at its bit depth, in
         // 32 bits. Nothing for a programme only members playing _iclforge_player@v1 can play.
         std::optional<messages::AudioFormat> pcm;
+        // The same programme rendered to other widths, for members whose players take PCM of
+        // another channel count: each at `pcm`'s sample rate and depth, none at a width another
+        // has. push_variants() takes one block of each. A member gets the variant whose width its
+        // player lists and ServerHost::use_pcm() asked for, or, with none asked, the first of its
+        // listed formats any variant produces. Empty for a programme of one width, which push()
+        // takes. A member whose player lists none of the widths is not started.
+        std::vector<messages::AudioFormat> more_pcm{};
         // The coded stream push_burst() takes, for members playing _iclforge_player@v1.
         std::optional<player::StreamStart> bursts;
         // A source that can be read ahead, which may start with more lead.
@@ -293,6 +307,14 @@ class Group {
     // member's player holds enough, so a caller paces a buffered source by trying again shortly.
     // Returns the number of frames taken.
     [[nodiscard]] std::size_t push(std::span<const std::int32_t> interleaved);
+    // The same frames of every variant of the programme: `variants[0]` is `Programme::pcm`'s
+    // block and the rest follow `more_pcm`'s order, each interleaved at its own width. The frames
+    // taken are those every block holds, so one that is short holds the rest back. A call that
+    // does not give a block of every variant takes nothing, and so does push() on a programme that
+    // has more than one: a member would otherwise fall behind the group's timeline. On the terms
+    // of push() otherwise.
+    [[nodiscard]] std::size_t push_variants(
+        std::span<const std::span<const std::int32_t>> variants);
 
     struct Burst {
         // The burst's Pc and Pd as iclforge::containers::iec61937 writes them, and the

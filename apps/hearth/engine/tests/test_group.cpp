@@ -1435,6 +1435,294 @@ TEST_CASE("group: a PCM sink with a small buffer is fed before play and not afte
     host->reset();
 }
 
+// A group of sinks that render to different layouts is one programme at several widths. Each sink
+// is played the width the host asked for (ServerHost::use_pcm's channels), where it lists more than
+// one, and a sink whose player lists none of the widths is not started at all.
+TEST_CASE("group: one programme at two widths goes to each sink at the width asked for",
+          "[hearth][group][websocket][iclforge]") {
+    namespace ss = iclforge::sendspin;
+    const fs::path scratch =
+        fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_group_widths_" + scratch_pid_suffix());
+    fs::remove_all(scratch);
+    QuietLog log;
+    const auto make_sink = [&](const std::string& name, std::vector<std::int32_t> widths) {
+        testsink::SinkOptions options;
+        options.name = name;
+        options.address = "127.0.0.1";
+        options.port = 0;
+        options.state_directory = scratch / name / "state";
+        options.output_directory = scratch / name / "out";
+        options.advertise = false;
+        options.unpaired_access = false;
+        options.codecs = {m::Codec::kPcm};
+        options.pcm_channels = std::move(widths);
+        auto started = testsink::Sink::start(options, log);
+        REQUIRE(started.has_value());
+        return std::move(*started);
+    };
+    // Lists stereo only; lists 5.1 first and stereo after it, asked once for each; lists 7.1 only.
+    const std::unique_ptr<testsink::Sink> stereo = make_sink("stereo", {2});
+    const std::unique_ptr<testsink::Sink> wide = make_sink("wide", {6, 2});
+    const std::unique_ptr<testsink::Sink> narrowed = make_sink("narrowed", {6, 2});
+    const std::unique_ptr<testsink::Sink> unfit = make_sink("unfit", {8});
+    const std::array<const testsink::Sink*, 4> sinks{stereo.get(), wide.get(), narrowed.get(),
+                                                     unfit.get()};
+
+    std::optional<ss::noise::KeyPair> identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    ss::MemoryServerStore store;
+    HostEvents events;
+    auto host = ss::ServerHost::start({.identity = *identity,
+                                       .name = "Test host",
+                                       .languages = {"en"},
+                                       .address = "127.0.0.1",
+                                       .port = std::nullopt,
+                                       .advertise = false,
+                                       .browse = false,
+                                       .mdns_interfaces = {}},
+                                      store, events);
+    REQUIRE(host.has_value());
+    for (const testsink::Sink* sink : sinks) {
+        REQUIRE((*host)->enter_pairing_token(sink->pairing_token()));
+        (*host)->dial("ws://127.0.0.1:" + std::to_string(sink->port()) + "/sendspin");
+    }
+    REQUIRE(events.wait(
+        [&](const auto& clients) {
+            return std::all_of(sinks.begin(), sinks.end(), [&](const testsink::Sink* sink) {
+                const auto found = clients.find(sink->client_id());
+                return found != clients.end() && found->second.bursts && found->second.available &&
+                       found->second.iclforge_state.has_value();
+            });
+        },
+        30s));
+
+    REQUIRE((*host)->use_pcm(stereo->client_id(), true));
+    REQUIRE((*host)->use_pcm(wide->client_id(), true, 0, 6));
+    REQUIRE((*host)->use_pcm(narrowed->client_id(), true, 0, 2));
+    REQUIRE((*host)->use_pcm(unfit->client_id(), true));
+    REQUIRE(events.wait(
+        [&](const auto& clients) {
+            return std::all_of(sinks.begin(), sinks.end(), [&](const testsink::Sink* sink) {
+                const auto found = clients.find(sink->client_id());
+                return found != clients.end() && found->second.playing && !found->second.bursts &&
+                       found->second.available && found->second.player_state.has_value();
+            });
+        },
+        30s));
+
+    // The 5.1 render and the stereo render of one programme: every channel and frame of each has
+    // its own value, and the two renders do not share one.
+    constexpr std::size_t kFrames = 48000;
+    std::vector<std::int32_t> surround;
+    std::vector<std::int32_t> fold;
+    for (std::size_t frame = 0; frame < kFrames; ++frame) {
+        for (std::int32_t channel = 0; channel < 6; ++channel) {
+            surround.push_back(((channel + 1) * 1000) + static_cast<std::int32_t>(frame % 100));
+        }
+        for (std::int32_t channel = 0; channel < 2; ++channel) {
+            fold.push_back(-((channel + 1) * 3000) - static_cast<std::int32_t>(frame % 100));
+        }
+    }
+    std::shared_ptr<ss::Group> group = (*host)->make_group("Two widths");
+    for (const testsink::Sink* sink : sinks) {
+        group->add(sink->client_id());
+    }
+    const m::AudioFormat wide_format{
+        .codec = m::Codec::kPcm, .channels = 6, .sample_rate = 48000, .bit_depth = 16};
+    m::AudioFormat narrow_format = wide_format;
+    narrow_format.channels = 2;
+    // Two variants of one width, another rate, and variants with no primary are all refused.
+    CHECK_FALSE(
+        group->start({.pcm = wide_format, .more_pcm = {wide_format}, .bursts = std::nullopt}));
+    m::AudioFormat other_rate = narrow_format;
+    other_rate.sample_rate = 44100;
+    CHECK_FALSE(
+        group->start({.pcm = wide_format, .more_pcm = {other_rate}, .bursts = std::nullopt}));
+    CHECK_FALSE(
+        group->start({.pcm = std::nullopt, .more_pcm = {narrow_format}, .bursts = std::nullopt}));
+    REQUIRE(group->start({.pcm = wide_format,
+                          .more_pcm = {narrow_format},
+                          .bursts = std::nullopt,
+                          .buffered = true}));
+
+    // A call that does not give every width takes nothing, and neither does push() on this
+    // programme.
+    const std::span<const std::int32_t> surround_all(surround);
+    const std::span<const std::int32_t> fold_all(fold);
+    CHECK(group->push(surround_all.first(960 * 6)) == 0);
+    const std::array<std::span<const std::int32_t>, 1> only_wide{surround_all.first(960 * 6)};
+    CHECK(group->push_variants(only_wide) == 0);
+
+    std::size_t offset = 0;
+    const auto deadline = std::chrono::steady_clock::now() + 30s;
+    while (offset < kFrames && std::chrono::steady_clock::now() < deadline) {
+        const std::size_t block = std::min<std::size_t>(4800, kFrames - offset);
+        const std::array<std::span<const std::int32_t>, 2> both{
+            surround_all.subspan(offset * 6, block * 6), fold_all.subspan(offset * 2, block * 2)};
+        const std::size_t taken = group->push_variants(both);
+        if (taken > 0) {
+            offset += taken;
+        } else {
+            std::this_thread::sleep_for(5ms);
+        }
+    }
+    REQUIRE(offset == kFrames);
+    CHECK(group->members_playing() == 3);
+    group->stop();
+
+    const auto until = std::chrono::steady_clock::now() + 15s;
+    const auto all_played = [&] {
+        return stereo->totals().frames >= kFrames && wide->totals().frames >= kFrames &&
+               narrowed->totals().frames >= kFrames;
+    };
+    while (!all_played() && std::chrono::steady_clock::now() < until) {
+        std::this_thread::sleep_for(20ms);
+    }
+    CHECK(stereo->totals().frames == kFrames);
+    CHECK(wide->totals().frames == kFrames);
+    CHECK(narrowed->totals().frames == kFrames);
+    // The sink that lists no width the programme has is sent nothing.
+    CHECK(unfit->totals().frames == 0);
+    CHECK(unfit->totals().chunks == 0);
+    group.reset();
+    host->reset();
+
+    // What each sink wrote is the width it was given, and that width's own samples.
+    const auto matches = [&](const char* name, std::size_t channels,
+                             const std::vector<std::int32_t>& source) {
+        const auto wav = iclforge::ac3::io::read_wav(
+            only_file(scratch / name / "out", "stream-", ".wav").string());
+        REQUIRE(wav.has_value());
+        CHECK(wav->channels.size() == channels);
+        REQUIRE(wav->frame_count() == kFrames);
+        std::size_t different = 0;
+        for (std::size_t frame = 0; frame < kFrames; ++frame) {
+            for (std::size_t channel = 0; channel < channels; ++channel) {
+                const float wanted =
+                    static_cast<float>(source[(frame * channels) + channel]) / 32768.0F;
+                different += wav->channels[channel][frame] == wanted ? 0U : 1U;
+            }
+        }
+        CHECK(different == 0);
+    };
+    matches("stereo", 2, fold);
+    matches("wide", 6, surround);
+    // It lists 5.1 first and was asked for stereo: the first it lists would have been 5.1.
+    matches("narrowed", 2, fold);
+}
+
+// A sink the host has asked to play PCM is on the extension role until the role moves, which takes
+// a moment on the live connection. A programme that has bursts as well as PCM, as one for a mixed
+// group does, must not start that sink's burst stream in the meantime.
+TEST_CASE("group: a sink held for PCM is not started on bursts while its role moves",
+          "[hearth][group][websocket][iclforge]") {
+    namespace ss = iclforge::sendspin;
+    const fs::path scratch =
+        fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_group_held_for_pcm_" + scratch_pid_suffix());
+    fs::remove_all(scratch);
+    QuietLog log;
+    const std::unique_ptr<testsink::Sink> board =
+        start_sink(scratch / "board", "Board", m::Codec::kPcm, log, false);
+
+    std::optional<ss::noise::KeyPair> identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    ss::MemoryServerStore store;
+    HostEvents events;
+    auto host = ss::ServerHost::start({.identity = *identity,
+                                       .name = "Test host",
+                                       .languages = {"en"},
+                                       .address = "127.0.0.1",
+                                       .port = std::nullopt,
+                                       .advertise = false,
+                                       .browse = false,
+                                       .mdns_interfaces = {}},
+                                      store, events);
+    REQUIRE(host.has_value());
+    REQUIRE((*host)->enter_pairing_token(board->pairing_token()));
+    (*host)->dial("ws://127.0.0.1:" + std::to_string(board->port()) + "/sendspin");
+    const std::string id = board->client_id();
+    REQUIRE(events.wait(
+        [&](const auto& clients) {
+            const auto found = clients.find(id);
+            return found != clients.end() && found->second.bursts && found->second.available &&
+                   found->second.iclforge_state.has_value();
+        },
+        30s));
+
+    std::shared_ptr<ss::Group> group = (*host)->make_group("Held");
+    group->add(id);
+    const m::AudioFormat pcm_format{
+        .codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16};
+    const ss::Group::Programme programme_form{
+        .pcm = pcm_format,
+        .bursts =
+            ss::player::StreamStart{.data_type = ss::player::DataType::kEac3, .sample_rate = 48000},
+        .buffered = true};
+    const auto on_extension_role = [&](const auto& clients) {
+        const auto found = clients.find(id);
+        return found != clients.end() && found->second.bursts && found->second.available &&
+               found->second.iclforge_state.has_value();
+    };
+    const auto on_pcm_role = [&](const auto& clients) {
+        const auto found = clients.find(id);
+        return found != clients.end() && found->second.playing && !found->second.bursts &&
+               found->second.available && found->second.player_state.has_value();
+    };
+    const std::vector<std::uint8_t> payload(64, 0);
+    const std::vector<std::int32_t> block(960 * 2, 4000);
+
+    // The window is the time between use_pcm() returning and the host's own thread moving the role,
+    // so it is tried again and again: asked, the programme started and one burst and one block of
+    // PCM offered at once, then the sink put back on the extension role for the next time.
+    for (int attempt = 0; attempt < 40; ++attempt) {
+        REQUIRE((*host)->use_pcm(id, true));
+        REQUIRE(group->start(programme_form));
+        (void)group->push_burst({.pc = 21, .pd = 512, .payload = payload, .frame = 0});
+        (void)group->push(block);
+        group->stop();
+        REQUIRE(events.wait(on_pcm_role, 30s));
+        REQUIRE((*host)->use_pcm(id, false));
+        REQUIRE(events.wait(on_extension_role, 30s));
+    }
+    // It was never sent a burst stream while it was held for PCM.
+    CHECK(board->totals().burst_streams == 0);
+
+    // And a whole programme goes to it as PCM.
+    REQUIRE((*host)->use_pcm(id, true));
+    REQUIRE(group->start(programme_form));
+    constexpr std::size_t kFrames = 24000;
+    std::vector<std::int32_t> programme(kFrames * 2, 4000);
+    std::size_t offset = 0;
+    std::int64_t burst_frame = 0;
+    const auto deadline = std::chrono::steady_clock::now() + 30s;
+    while (offset < programme.size() && std::chrono::steady_clock::now() < deadline) {
+        (void)group->push_burst({.pc = 21, .pd = 512, .payload = payload, .frame = burst_frame});
+        burst_frame += 1536;
+        const std::size_t amount = std::min<std::size_t>(4800 * 2, programme.size() - offset);
+        const std::size_t taken =
+            group->push(std::span<const std::int32_t>(programme).subspan(offset, amount));
+        if (taken > 0) {
+            offset += taken * 2;
+        } else {
+            std::this_thread::sleep_for(2ms);
+        }
+    }
+    REQUIRE(offset == programme.size());
+    CHECK(group->members_playing() == 1);
+    group->stop();
+
+    const auto until = std::chrono::steady_clock::now() + 15s;
+    while (board->totals().frames < kFrames && std::chrono::steady_clock::now() < until) {
+        std::this_thread::sleep_for(20ms);
+    }
+    // It played the PCM, as asked, and was never sent a burst stream.
+    CHECK(board->totals().frames > 0);
+    CHECK(board->totals().burst_streams == 0);
+    CHECK(board->totals().bursts == 0);
+    group.reset();
+    host->reset();
+}
+
 TEST_CASE("group: two paired test sinks play E-AC-3 JOC in step over the extension role",
           "[hearth][group][websocket][iclforge]") {
     play_joc_programme(fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_group_joc_" + scratch_pid_suffix()), "7.1.4", 2);
