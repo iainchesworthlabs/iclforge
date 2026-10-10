@@ -210,6 +210,11 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     constexpr std::array<iclforge::ac4::RateMode, 4> kRateModes = {iclforge::ac4::RateMode::kConstant, iclforge::ac4::RateMode::kAverage,
                                                          iclforge::ac4::RateMode::kVariable, iclforge::ac4::RateMode::kConstant};
     config.rate_mode = kRateModes[static_cast<std::size_t>((timing >> 4) & 3)];
+    // The efficient high frame rate mode, where the index and the rate mode
+    // allow it (refused, and so skipped, where they do not).
+    if (((dialnorm ^ interval) & 0x20) != 0) {
+        config.experimental.frame_rate_fraction = (timing & 0x08) != 0 ? 4 : 2;
+    }
     if ((timing & 0x40) != 0) {
         config.iframes = {3, 1};
     }

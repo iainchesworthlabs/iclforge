@@ -2268,6 +2268,8 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                     out.ac4_experimental_objects = true;
                 } else if (tool == "noise-fill") {
                     out.ac4_experimental_noise_fill = true;
+                } else if (tool == "hfr-2" || tool == "hfr-4") {
+                    out.ac4_experimental_frame_rate_fraction = tool == "hfr-4" ? 4 : 2;
                 } else if (tool == "7x-back" || tool == "7x-wide" || tool == "7x-top-front") {
                     out.ac4_experimental_seven_x = std::string{tool.substr(3)};
                 } else if (tool.size() == 11 && tool.starts_with("drc-gains-") && tool[10] >= '0' &&
@@ -2279,7 +2281,8 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                     fmt::println(
                         stderr,
                         "error: experimental takes aspx-balance, aspx-varvar, aspx-interleave, "
-                        "coding-configs, acpl, three-zero, back-pair, ajcc, objects, noise-fill, one of "
+                        "coding-configs, acpl, three-zero, back-pair, ajcc, objects, noise-fill, hfr-2, "
+                        "hfr-4, one of "
                         "7x-back, 7x-wide and 7x-top-front, and one of drc-gains-0 to "
                         "drc-gains-3, comma-separated (got '{}')",
                         token);
