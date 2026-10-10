@@ -2807,6 +2807,7 @@ The sections below contain the complete change list and fixes.
 
 **Codec correctness**
 
+- **AC-4 applies an alternative presentation's target loudness correction and the real-time loudness correction.** Part 2 clauses 4.8.5.4 and 4.8.5.5 say a decoder "shall" apply both, and the decoder read `loud_corr_target` and `rtll_comp` and did nothing with them. An alternative presentation's output now takes 2^(target_corr_gain / 6) for the device category it plays on (Table 67, from the layout that comes out by Table 17, or `OutputConfig::target_device`, with Table 17's fallbacks for a category no target specifies), and a frame that sends `rtll_comp` takes 10^((rtll_comp - 128) / 80) of its output; both scale every channel, as coded or downmixed, and belong to the frame that sends them. The real-time value is reported as `LoudnessInfo::real_time_correction_db`. Every committed stream that sends `rtll_comp` (DEE's legs) sends 128, 0 dB, so none of their output changes; no committed stream sends a `loud_corr_target`, and the target correction is held to its formula in `libs/ac4/tests/decoder/test_downmix.cpp` (`libs/ac4/ERRATA.md`, "Alternative and real-time loudness correction").
 - **A float decode ignored `DecoderConfig::fast_imdct = false`.** A full build configured with
   `ICLFORGE_DECODE_SCALAR=float` ran the fast inverse transform whatever the setting, so the
   reference form (`mode=reference`) was not the one that ran, in the PCM reconstruction and in the

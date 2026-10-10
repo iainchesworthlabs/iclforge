@@ -111,6 +111,7 @@ to the next, and a new layout starts its channels' synthesis from silence.
 | `mix_lfe` | Whether a two-channel or mono downmix takes the LFE at the stream's `lfe_mixgain`, as Part 1 does | `true` |
 | `dialogue_gain_db` | g_dialog (clause 6.2.16.1): a presentation's dialogue against its music and effects, up to the stream's `g_dialog_max` | 0 |
 | `associated_gain_db` | g_assoc (clause 6.2.16.2), 0 or less: a presentation's associated audio | 0 |
+| `target_device` | The category of device the output plays on (Part 2 Table 67: `k1D`, `k2D`, `k3D`, `kPortable`), by which an alternative presentation's target loudness correction is chosen (clause 4.8.5.4) | unset: Table 17's by the layout that comes out, stereo 1D, 5.X and 7.X 2D, height channels 3D; never portable |
 
 ### 22.2 channel element
 
