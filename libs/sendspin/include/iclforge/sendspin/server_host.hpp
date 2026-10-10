@@ -163,6 +163,8 @@ class Group;
 
 class ServerHost {
    public:
+    // `store` and `events` are borrowed: both must outlive the host, whose destructor is the last
+    // thing to call into them.
     [[nodiscard]] static std::expected<std::unique_ptr<ServerHost>, std::string> start(ServerHostOptions options,
                                                                                        ServerStore& store,
                                                                                        ServerHostEvents& events);
