@@ -1,0 +1,44 @@
+# THROWAWAY PROBE - never merged. Asks one question: when a workflow adds a pull
+# request to the merge queue with the Actions GITHUB_TOKEN, does the queue run its
+# merge_group checks (so the entry can merge), or does the entry hang?
+# It acts only on the one branch named below, so it is inert anywhere else.
+name: Probe enqueue by the Actions token
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions: {}
+
+jobs:
+  probe:
+    name: Probe
+    if: github.event.pull_request.head.ref == 'chore/probe-enqueue-by-actions-token'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Wait for CLEAN, then enqueue with the Actions token
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          read_pr='query($o:String!,$n:String!,$p:Int!){repository(owner:$o,name:$n){pullRequest(number:$p){id mergeStateStatus headRefOid}}}'
+          for i in $(seq 1 50); do
+            out="$(gh api graphql -f query="$read_pr" -f o="${REPO%/*}" -f n="${REPO#*/}" -F p="$PR")"
+            status="$(jq -r '.data.repository.pullRequest.mergeStateStatus' <<<"$out")"
+            echo "attempt $i: $status"
+            if [ "$status" = CLEAN ]; then break; fi
+            sleep 30
+          done
+          id="$(jq -r '.data.repository.pullRequest.id' <<<"$out")"
+          oid="$(jq -r '.data.repository.pullRequest.headRefOid' <<<"$out")"
+          echo "enqueueing $id at $oid"
+          gh api graphql \
+            -f query='mutation($id:ID!,$oid:GitObjectID){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$oid}){mergeQueueEntry{position state}}}' \
+            -f id="$id" -f oid="$oid"
