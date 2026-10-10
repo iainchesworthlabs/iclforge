@@ -1,0 +1,65 @@
+# Advisories OSV-Scanner reports for a file in THIS directory that nothing in this repository can
+# fix today. OSV-Scanner reads an osv-scanner.toml only for manifests in the same directory (it does
+# not look in parents), which is why this file is here and not at the repository root.
+#
+# An entry is a decision to wait, not a judgement that the advisory is harmless: when the date
+# passes the alert comes back and the entry is renewed with a fresh check or removed. Do not add an
+# entry for something a pin bump fixes. Checked 2026-10-10.
+
+# requirements-esphome.txt: starlette 0.52.1.
+# starlette comes in through esphome -> platformio. esphome 2026.9.1 (the newest) pins
+# platformio==6.1.19 exactly, which caps starlette<0.53, and 0.52.1 is the newest release under that
+# cap. PlatformIO 6.2.0 allows starlette<2, but esphome has not adopted it, so the resolver rejects
+# any starlette bump (the longer account is in requirements-esphome.in). The file feeds
+# `esphome config` in esp-component.yml and nothing starts a web server from it.
+# Renew or remove when esphome moves to platformio >= 6.2.0. Each advisory is listed under both
+# identifiers the scanner prints for it (PYSEC and GHSA).
+[[IgnoredVulns]]
+id = "PYSEC-2026-249"
+ignoreUntil = 2027-01-08
+reason = "GHSA-82w8-qh3p-5jfq / CVE-2026-54283: starlette 0.52.1 is the newest esphome 2026.9.1's platformio==6.1.19 allows; esphome config never serves HTTP"
+
+[[IgnoredVulns]]
+id = "GHSA-82w8-qh3p-5jfq"
+ignoreUntil = 2027-01-08
+reason = "PYSEC-2026-249 / CVE-2026-54283: starlette 0.52.1 is the newest esphome 2026.9.1's platformio==6.1.19 allows; esphome config never serves HTTP"
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-248"
+ignoreUntil = 2027-01-08
+reason = "GHSA-jp82-jpqv-5vv3 / CVE-2026-54282: starlette 0.52.1 is the newest esphome 2026.9.1's platformio==6.1.19 allows; esphome config never serves HTTP"
+
+[[IgnoredVulns]]
+id = "GHSA-jp82-jpqv-5vv3"
+ignoreUntil = 2027-01-08
+reason = "PYSEC-2026-248 / CVE-2026-54282: starlette 0.52.1 is the newest esphome 2026.9.1's platformio==6.1.19 allows; esphome config never serves HTTP"
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-2281"
+ignoreUntil = 2027-01-08
+reason = "GHSA-wqp7-x3pw-xc5r / CVE-2026-48818: starlette 0.52.1 is the newest esphome 2026.9.1's platformio==6.1.19 allows; esphome config never serves HTTP"
+
+[[IgnoredVulns]]
+id = "GHSA-wqp7-x3pw-xc5r"
+ignoreUntil = 2027-01-08
+reason = "PYSEC-2026-2281 / CVE-2026-48818: starlette 0.52.1 is the newest esphome 2026.9.1's platformio==6.1.19 allows; esphome config never serves HTTP"
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-2280"
+ignoreUntil = 2027-01-08
+reason = "GHSA-x746-7m8f-x49c / CVE-2026-48817: starlette 0.52.1 is the newest esphome 2026.9.1's platformio==6.1.19 allows; esphome config never serves HTTP"
+
+[[IgnoredVulns]]
+id = "GHSA-x746-7m8f-x49c"
+ignoreUntil = 2027-01-08
+reason = "PYSEC-2026-2280 / CVE-2026-48817: starlette 0.52.1 is the newest esphome 2026.9.1's platformio==6.1.19 allows; esphome config never serves HTTP"
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-161"
+ignoreUntil = 2027-01-08
+reason = "GHSA-86qp-5c8j-p5mr / CVE-2026-48710: starlette 0.52.1 is the newest esphome 2026.9.1's platformio==6.1.19 allows; esphome config never serves HTTP"
+
+[[IgnoredVulns]]
+id = "GHSA-86qp-5c8j-p5mr"
+ignoreUntil = 2027-01-08
+reason = "PYSEC-2026-161 / CVE-2026-48710: starlette 0.52.1 is the newest esphome 2026.9.1's platformio==6.1.19 allows; esphome config never serves HTTP"
