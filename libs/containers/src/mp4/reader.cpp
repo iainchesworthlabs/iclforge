@@ -283,7 +283,8 @@ std::string_view describe(DemuxError error) {
             return "box size, sample count or nesting depth beyond the reader's limits";
         case DemuxError::kMoovAfterMdat:
             return "the sample table (moov) follows the media data it indexes: this layout "
-                   "cannot be read as a stream, use demux() on the whole file";
+                   "cannot be read as a stream; read it from a source that can be read at an "
+                   "offset (demux_seekable()) or hand demux() the whole file";
     }
     return "unknown error";
 }
@@ -1067,6 +1068,80 @@ std::expected<void, DemuxError> Reader::finish() {
         return std::unexpected(DemuxError::kMoovAfterMdat);
     }
     return finish_verdict(s);
+}
+
+std::expected<ReadTrack, DemuxError> demux_seekable(const ReadAtFn& read_at, std::uint64_t size,
+                                                    const TrackFn& on_track,
+                                                    const Reader::SampleFn& on_sample,
+                                                    const ReadOptions& options) {
+    detail::ReaderState s;
+    s.options = options;
+
+    // Pass one: the boxes. walk() steps over every box it does not need by
+    // arithmetic (mdat above all), so the window is only ever asked for at the
+    // parser's own position - the audio is not read to find the table that
+    // indexes it, whichever side of mdat that table is on.
+    constexpr std::uint64_t kWindow = 64U * 1024U;
+    // A leaf box worth reading has to be held whole, and ReadOptions bounds
+    // it; the window may grow to that and a header, never past it.
+    const std::uint64_t window_cap = options.max_box_bytes + kWindow;
+    std::uint64_t want = kWindow;
+    std::vector<std::byte> window;
+    while (s.parse_pos < size) {
+        const std::uint64_t at = s.parse_pos;
+        const std::uint64_t length = std::min(want, size - at);
+        window.resize(static_cast<std::size_t>(length));
+        const std::size_t got = read_at(at, window);
+        if (got == 0) {
+            break;  // the source ends before its own declared size
+        }
+        window.resize(got);
+        const auto walked = walk(s, window, at);
+        if (!walked.has_value()) {
+            return std::unexpected(walked.error());
+        }
+        if (s.parse_pos != at) {
+            want = kWindow;
+            continue;
+        }
+        // No progress: the box at `at` is not wholly in the window. A window
+        // that already reaches the end of the input means the file is cut
+        // short - the verdict below says what that amounts to; otherwise
+        // ask for more, up to the box bound.
+        if (length >= size - at || want >= window_cap) {
+            break;
+        }
+        want = std::min(want * 2, window_cap);
+    }
+
+    const auto verdict = finish_verdict(s);
+    if (!verdict.has_value()) {
+        return std::unexpected(verdict.error());
+    }
+    if (on_track) {
+        on_track(s.track);
+    }
+
+    // Pass two: each sample where the table says, one at a time. A sample
+    // whose range runs past the end of the input stops delivery, as demux()
+    // stops at the first one a truncated file does not hold: the samples
+    // before it are real, and a later one is not fabricated.
+    std::vector<std::byte> sample;
+    for (const auto& ref : s.samples) {
+        if (ref.offset > size || ref.size > size - ref.offset) {
+            break;
+        }
+        if (ref.size > options.max_box_bytes) {
+            return std::unexpected(DemuxError::kLimitExceeded);
+        }
+        sample.resize(ref.size);
+        if (read_at(ref.offset, sample) != ref.size) {
+            break;
+        }
+        on_sample(sample);
+        ++s.samples_read;
+    }
+    return s.track;
 }
 
 }  // namespace iclforge::containers::mp4

@@ -1549,15 +1549,43 @@ int run_metadata(std::string_view in_path, std::string_view out_path, const Opti
         return kExitUsage;
     }
 
-    const auto summary = iclforge::ac3::io::edit_stream_metadata(loaded->bytes, edit);
-    if (!summary.has_value()) {
-        fmt::println(stderr, "error: {}: {}", in_path,
-                     iclforge::ac3::io::describe(summary.error()));
-        return kExitUsage;
+    iclforge::ac3::io::EditSummary summary_value;
+    std::size_t grown_frames = 0;
+    std::size_t added_bytes = 0;
+    // 'insert' opts in to a rewrite that is not in place: the result is a new
+    // buffer, and it replaces the loaded bytes so everything after - the
+    // re-scan, the read-back, the write - is the same code either way.
+    std::vector<std::byte> inserted_bytes;
+    if (meta.insert_missing) {
+        auto inserted = iclforge::ac3::io::insert_stream_metadata(loaded->bytes, edit);
+        if (!inserted.has_value()) {
+            fmt::println(stderr, "error: {}: {}", in_path,
+                         iclforge::ac3::io::describe(inserted.error()));
+            return kExitUsage;
+        }
+        summary_value = inserted->summary;
+        grown_frames = inserted->grown;
+        added_bytes = inserted->added_bytes;
+        inserted_bytes = std::move(inserted->bytes);
+        loaded->bytes = std::move(inserted_bytes);
+    } else {
+        const auto in_place = iclforge::ac3::io::edit_stream_metadata(loaded->bytes, edit);
+        if (!in_place.has_value()) {
+            fmt::println(stderr, "error: {}: {}", in_path,
+                         iclforge::ac3::io::describe(in_place.error()));
+            if (in_place.error() == iclforge::ac3::io::EditError::kFieldAbsent) {
+                fmt::println(stderr,
+                             "       add 'insert' to put the field in (E-AC-3 only: the "
+                             "syncframes that gain it grow)");
+            }
+            return kExitUsage;
+        }
+        summary_value = *in_place;
     }
-    // Re-scanned rather than reusing the pre-edit spans: edit_stream_metadata
-    // rewrote the buffer those pointed into, and re-deriving the framing from
-    // the rewritten bytes is also a check that the rewrite left it walkable.
+    const auto* summary = &summary_value;
+    // Re-scanned rather than reusing the pre-edit spans: the rewrite replaced
+    // or rewrote the buffer those pointed into, and re-deriving the framing
+    // from the rewritten bytes is also a check that it left it walkable.
     const auto rescanned = iclforge::ac3::io::scan(loaded->bytes);
     if (!rescanned.has_value()) {
         fmt::println(stderr, "error: the rewritten stream no longer scans: {}",
@@ -1572,6 +1600,10 @@ int run_metadata(std::string_view in_path, std::string_view out_path, const Opti
     const auto after = iclforge::ac3::io::read_frame_metadata(loaded->bytes);
     status_println(status, "rewrote {} of {} {} syncframes -> {} (audio untouched)",
                    summary->changed, summary->syncframes, codec_label(loaded->scan.kind), out_path);
+    if (meta.insert_missing) {
+        status_println(status, "  {} syncframes gained a field; the stream is {} bytes longer",
+                       grown_frames, added_bytes);
+    }
     if (after.has_value()) {
         status_println(status, "  dialnorm {} -> {}", before->dialnorm, after->dialnorm);
         if (before->compr.has_value() && after->compr.has_value()) {

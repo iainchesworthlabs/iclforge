@@ -377,7 +377,8 @@ from a desktop over HTTP and played with `POST /play`.
   without the network is not a product here, and a decode time against the 42.7 ms frame is not
   measured. Nothing in this section says the part could keep up.
 
-AC-4 reaches a C6 sink as PCM from Hearth, which is decision 32's plan.
+AC-4 reaches a C6 sink as PCM from Hearth, which is decision 32's plan and, since the board run, an accepted
+limit ([decision 42](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-10-10)).
 
 ## QEMU
 

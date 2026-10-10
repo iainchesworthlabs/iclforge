@@ -24,6 +24,7 @@ this repository that must not crash, read out of bounds, or loop unboundedly on 
 | AC-4 elementary streams: sync frames and the table of contents | `iclforge::ac4::scan`, `iclforge::ac4::SyncFrameSplitter`, `iclforge::ac4::parse_raw_frame` | yes — `fuzz_ac4_parse` |
 | AC-4 substreams: the syntax layer and the reconstruction to PCM | `iclforge::ac4::Decoder::parse`, `iclforge::ac4::Decoder::decode`, `decode_by_block` | yes — `fuzz_ac4_decode` |
 | Format sniffing before any decoder commits | `iclforge::ac3::io::scan` | yes |
+| Metadata edit and insert, which read a syncframe's header and then write it | `iclforge::ac3::io::edit_stream_metadata`, `iclforge::ac3::io::insert_stream_metadata` | yes - driven by `fuzz_scan` on the same seeds |
 | EMDF containers in a skip field (§H.2.2) | `iclforge::objects::emdf::parse_container` | yes — `fuzz_emdf_parse`, plus indirectly through the E-AC-3 harnesses |
 | OAMD object metadata (TS 103 420 §5.5) | `iclforge::objects::oba::parse_payload` | yes — `fuzz_oamd_parse`, plus indirectly through the E-AC-3 harnesses |
 | JOC payloads (TS 103 420 §6) | `iclforge::ac3::oba::joc::parse_payload` | yes — `fuzz_joc_parse`, plus indirectly through the E-AC-3 harnesses |
@@ -33,7 +34,7 @@ this repository that must not crash, read out of bounds, or loop unboundedly on 
 | ADM XML + BW64/RF64 (opt-in build) | `iclforge::adm::parse_bw64`, via vendored libadm/libbw64 | **opt-in only** — `fuzz_adm_parse` exists but is built only under `ICLFORGE_BUILD_ADM`; see [ADM](#adm-xml-and-bw64) |
 | Object authenticity tags | `iclforge::ac3::signing::verify_atmos_frame` | yes — `fuzz_signing_verify` (the key is part of the fuzzed input) |
 | Matroska/WebM containers | `iclforge::containers::matroska::demux`, `iclforge::containers::matroska::Reader` | yes |
-| MP4/ISOBMFF containers | `iclforge::containers::mp4::demux`, `iclforge::containers::mp4::Reader` | yes |
+| MP4/ISOBMFF containers | `iclforge::containers::mp4::demux`, `iclforge::containers::mp4::Reader`, `iclforge::containers::mp4::demux_seekable` | yes |
 | MPEG-TS containers | `iclforge::containers::mpegts::demux`, `iclforge::containers::mpegts::Reader` | yes |
 | OSC control packets (UDP), a live object-position source | `iclforge::objects::oba::parse_osc_packet` | yes — `fuzz_osc_parse`, part of `tools/fuzz/run.sh`'s default target list alongside the other object/metadata-layer harnesses |
 | Sendspin's handshake messages from a network peer (Hearth build) | `iclforge::sendspin::handshake` | yes — `fuzz_sendspin_handshake` |
@@ -100,7 +101,7 @@ What runs against it:
 - **Twenty-four libFuzzer harnesses** under [`fuzz/`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/fuzz/README.md),
   built with ASan + UBSan and `-fno-sanitize-recover=all`. Twenty-one are in `tools/fuzz/run.sh`'s
   default list and drive the entry points in the table above for crashes and undefined
-  behaviour — format sniffing (`fuzz_scan`), the three container demuxers (`fuzz_matroska_demux`,
+  behaviour — format sniffing and the metadata edit and insert (`fuzz_scan`), the three container demuxers (`fuzz_matroska_demux`,
   `fuzz_mp4_demux`, `fuzz_mpegts_demux`), the AC-3 and E-AC-3 decoders (`fuzz_ac3_decode`,
   `fuzz_eac3_decode`), AC-4's inspector and decoder (`fuzz_ac4_parse`, `fuzz_ac4_decode`), WAV
   (`fuzz_wav_read`), IEC 61937 burst de-framing (`fuzz_iec61937_unwrap`), the IAB reader

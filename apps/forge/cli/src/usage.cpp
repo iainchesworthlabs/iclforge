@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 102> kOptionTokens{{
+constexpr std::array<OptionToken, 103> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -151,11 +151,16 @@ constexpr std::array<OptionToken, 102> kOptionTokens{{
     {"json=", "probe: emit the JSON document instead of the human table"},
     {"detail=", "probe: frames or blocks - add per-access-unit/per-block detail"},
     {"fallback-51", "fmp4: also write the object-stripped 5.1 companion rendition"},
+    {"insert", "metadata: add a field the stream does not carry (compr=, compr2=, bsmod=, "
+               "dsurmod=) instead of refusing it - E-AC-3 independent substreams only, and "
+               "every syncframe that gains one grows by a word or two"},
     {"mainid=", "ts: this service's A/52 Annex A main-service number"},
     {"asvc=", "ts: the main service(s) this one is associated with (A/52 Annex A) - a raw "
              "0-255/0x00-0xFF mask, or a comma list of main-service numbers, e.g. asvc=0,2"},
     {"programme=", "decode/qc/levels: which independent substream (0..7) of a multi-programme "
-                   "stream"},
+                   "stream; mkv/mp4/fmp4/ts: carry that programme alone, renumbered as "
+                   "substream 0 (without it mp4, fmp4 and ts keep every programme and mkv the "
+                   "first)"},
     {"programme2=", "eac3-encode: another input file, encoded as its own independent substream "
                    "(§E2.3.1.2's I1); programme3= up to programme8= work the same way, for I2-I7"},
     {"programme2-layout=", "eac3-encode: that programme's own layout (default stereo; not 1+1) - "
@@ -510,6 +515,9 @@ void print_ac4_encode_topic() {
     fmt::println("       decoder fills with noise, ETSI TS 103 190-1 5.1.4), hfr-2 and hfr-4");
     fmt::println("       (the efficient high frame rate mode, TS 103 190-2 5.1.3: with");
     fmt::println("       frame-rate=47.95 to 120 each audio frame goes out as 2 or 4 frames),");
+    fmt::println("       twenty-two-two for 22.2 (24 channels, TS 103 190-2 6.2.4.3, in");
+    fmt::println("       codec-mode=simple|aspx, ASPX below 76.8 kbps a full-band channel by");
+    fmt::println("       default; the channels in the order decode writes them),");
     fmt::println("       drc-gains-0 to drc-gains-3 (the DRC modes send gains, ETSI TS 103");
     fmt::println("       190-1 Table 163), and objects for objects=<scene file>: the WAV's");
     fmt::println("       channels as objects, a raw stream of one object substream. The");
@@ -671,6 +679,13 @@ void print_stream_tools_topic() {
     fmt::println("metadata/normalize rewrite bsi fields in place and re-stamp the CRCs, cut/cat");
     fmt::println("move whole access units. Convertible substreams (strmtyp 2) are out of scope");
     fmt::println("for all five, the same way 'validate' already refuses them.");
+    fmt::println("");
+    fmt::println("metadata can only overwrite a field the stream already transmits. A field it");
+    fmt::println("does not (compr behind a clear compre, bsmod and dsurmod behind a clear");
+    fmt::println("infomdate) is refused - unless the stream is E-AC-3 and 'insert' is given,");
+    fmt::println("which adds it to every independent substream and lengthens that syncframe by");
+    fmt::println("the field and the padding to a whole word. A frame that carries block start");
+    fmt::println("information or auxiliary data cannot be lengthened and is refused by name.");
 }
 
 void print_objects_topic() {

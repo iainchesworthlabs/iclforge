@@ -32,26 +32,25 @@ constexpr unsigned kRateCode48k = 0b1010;  // RFC 9639, 9.1.2
 constexpr unsigned kDepthCode16 = 0b100;   // RFC 9639, 9.1.4
 
 std::uint8_t crc8(const iamf::Bytes& data) {
-    std::uint8_t crc = 0;
+    unsigned crc = 0;
     for (const std::byte b : data) {
-        crc ^= std::to_integer<std::uint8_t>(b);
+        crc ^= std::to_integer<unsigned>(b);
         for (int bit = 0; bit < 8; ++bit) {
-            crc = static_cast<std::uint8_t>((crc & 0x80U) != 0 ? (crc << 1) ^ 0x07U : crc << 1);
+            crc = ((crc & 0x80U) != 0 ? (crc << 1) ^ 0x07U : crc << 1) & 0xFFU;
         }
     }
-    return crc;
+    return static_cast<std::uint8_t>(crc);
 }
 
 std::uint16_t crc16(const iamf::Bytes& data) {
-    std::uint16_t crc = 0;
+    unsigned crc = 0;
     for (const std::byte b : data) {
-        crc = static_cast<std::uint16_t>(crc ^ (std::to_integer<unsigned>(b) << 8));
+        crc ^= std::to_integer<unsigned>(b) << 8;
         for (int bit = 0; bit < 8; ++bit) {
-            crc =
-                static_cast<std::uint16_t>((crc & 0x8000U) != 0 ? (crc << 1) ^ 0x8005U : crc << 1);
+            crc = ((crc & 0x8000U) != 0 ? (crc << 1) ^ 0x8005U : crc << 1) & 0xFFFFU;
         }
     }
-    return crc;
+    return static_cast<std::uint16_t>(crc);
 }
 
 // One FLAC frame of a stereo block: the frame header (fixed block size, independent channels), then

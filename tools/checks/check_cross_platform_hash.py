@@ -11,10 +11,13 @@ This does not explain that gap - it pins it, so a change to any leg's output,
 in either direction, is caught immediately instead of silently reshaping an
 already-mysterious number. `testdata/bitstream-hashes.json` records one
 SHA-256 per (kernel, transform mode) pair, over the three streams this
-project's OWN encoder produces from the gold-reference WAV inside
-verify_gold_reference.sh (gold.ac3, gold.ec3, gold_cpl.ec3 - the external
+project's OWN encoder produces inside verify_gold_reference.sh: the gold-
+reference WAV through three tool sets (gold.ac3, gold.ec3, gold_cpl.ec3) and,
+since the encoder's floating-point decisions are taken on a signal's own
+statistics, the CC0 music and speech programmes through the tools and
+searches that have such a decision (the prog_* streams). The external
 third-party fixtures never change since this project does not re-encode
-them, so hashing them would only restate their own file's hash).
+them, so hashing them would only restate their own file's hash.
 
 A key with no pinned entry is reported, not failed: this file cannot be
 hand-updated for a leg nobody has run it on. Run this once on a leg, read the
@@ -50,6 +53,24 @@ STREAMS = {
     "ac3": "gold.ac3",
     "eac3": "gold.ec3",
     "eac3_cpl": "gold_cpl.ec3",
+    # The programme streams verify_gold_reference.sh encodes for this check
+    # alone (hash only; the block "Real programme material" in it has why).
+    "prog_ac3_music_192": "prog_ac3_music_192.ac3",
+    "prog_ac3_music_192_couple": "prog_ac3_music_192_couple.ac3",
+    "prog_ac3_music_192_distortion": "prog_ac3_music_192_distortion.ac3",
+    "prog_ac3_speech_128": "prog_ac3_speech_128.ac3",
+    "prog_eac3_music_128_auto": "prog_eac3_music_128_auto.ec3",
+    "prog_eac3_music_128_cpl": "prog_eac3_music_128_cpl.ec3",
+    "prog_eac3_music_128_spx": "prog_eac3_music_128_spx.ec3",
+    "prog_eac3_music_128_aht": "prog_eac3_music_128_aht.ec3",
+    "prog_eac3_music_128_all": "prog_eac3_music_128_all.ec3",
+    "prog_eac3_music_128_cpl_ecpl": "prog_eac3_music_128_cpl_ecpl.ec3",
+    "prog_eac3_music_128_tpn": "prog_eac3_music_128_tpn.ec3",
+    "prog_eac3_speech_96_auto": "prog_eac3_speech_96_auto.ec3",
+    "prog_eac3_music_128_vbr": "prog_eac3_music_128_vbr.ec3",
+    "prog_eac3_gold51_256_spx": "prog_eac3_gold51_256_spx.ec3",
+    "prog_eac3_gold51_256_aht": "prog_eac3_gold51_256_aht.ec3",
+    "prog_eac3_gold51_256_all": "prog_eac3_gold51_256_all.ec3",
 }
 
 

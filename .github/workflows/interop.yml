@@ -56,7 +56,12 @@ on:
     paths:
       - 'tools/checks/verify_fate_interop.py'
       - 'tools/checks/compare_wav.py'
+      - 'tools/checks/verify_dash_schema.py'
       - '.github/workflows/interop.yml'
+      # The manifests verify_dash_schema.py holds against the ISO/IEC 23009-1
+      # schema: the DASH writer and its header.
+      - 'libs/containers/src/mp4/dash.cpp'
+      - 'libs/containers/include/iclforge/containers/mp4/dash.hpp'
       # The decode path this gate drives. libs/ac3/src/decoder/ carries the
       # framing (split_frames/split_access_units), the AC-3 FrameDecoder and
       # the Annex E substream reader alike, so one pattern covers every layer
@@ -98,7 +103,7 @@ jobs:
           until apt-get update -qq && apt-get install -y -qq --no-install-recommends \
             build-essential ca-certificates cmake curl git gnupg lsb-release \
             ninja-build pkg-config python3 software-properties-common \
-            tar unzip wget zip \
+            tar unzip wget zip libxml2-utils \
             ffmpeg=7:8.0.1-3ubuntu2
           do
             echo "::warning title=apt-get::attempt $attempt of 3 failed"
@@ -167,3 +172,16 @@ jobs:
           ICLFORGE_CLI: build/config-linux-llvm/bin/forge
           FATE_CACHE_DIR: ${{ runner.temp }}/fate-samples
         run: python3 tools/checks/verify_fate_interop.py
+
+      # The DASH half of the same question. forge fmp4's manifests used to be
+      # read back through FFmpeg's dash demuxer and nothing else, and that
+      # demuxer takes what it needs and ignores the rest. This holds them
+      # against the schema ISO/IEC 23009-1 publishes (MPEGGroup/DASHSchema, at
+      # a pinned commit, fetched rather than committed - see the script's
+      # header), and fails if its validator accepts a manifest it was
+      # corrupted to reject. xmllint is libxml2's, from libxml2-utils above.
+      - name: Hold forge's DASH manifests against the ISO/IEC 23009-1 schema
+        env:
+          ICLFORGE_CLI: build/config-linux-llvm/bin/forge
+          DASH_SCHEMA_CACHE_DIR: ${{ runner.temp }}/dash-schema
+        run: python3 tools/checks/verify_dash_schema.py --require

@@ -261,23 +261,28 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 
 | Category | Feature | Status | Priority | Criticality | Notes |
 |---|---|---|---|---|---|
-| **Boxes** | `dac3` / `dec3` (incl. Atmos extension, Annex F) | 🟢 | High | Essential | Built from the bitstream, not the container claim |
-| | Legacy core+E-AC-3 extension sample entry | 🔴 | Medium | Important | Decode/scan via `kAc3CoreEac3Extension`; mux refuses rather than emit a contradictory box |
+| **Boxes** | `dac3` / `dec3` (incl. Atmos extension, Annex F) | 🟢 | High | Essential | Built from the bitstream, not the container claim; one `dec3` block per independent substream, `chan_loc` from the dependents' `chanmap` (Table F.6.1) |
+| | Legacy core+E-AC-3 extension sample entry | 🟢 | Medium | Important | An `ec-3` entry whose `dec3` carries the core's `bsid` (TS 102 366 F.6.2.5, §E2.3.1.2); MP4, fMP4 and MPEG-TS, both profiles. Matroska: see below |
 | | `dac4` + MPEG-TS DVB registration | 🟢 | Medium | Important | AC-4 carriage |
-| | MPEG-TS AC-4 ATSC profile (A/342-2) | 🔴 | Low | Optional | Explicitly refused; DVB path only |
+| | MPEG-TS AC-4 ATSC profile (A/342-2) | 🔴🔵 | Low | Optional | A/342-2 constrains TS 103 190-2 for ATSC 3.0, which carries audio as ISO BMFF segments (ROUTE/DASH, MMT): there is no MPEG-2 TS mapping to write. Explicitly refused; the DVB path carries AC-4 in TS and fMP4/DASH is the ATSC 3.0 shape |
 | **Mux** | MP4 / ISOBMFF | 🟢 | High | Essential | Mux + demux; AC-3 / E-AC-3 / AC-4 |
-| | MP4 `moov`-after-`mdat` streaming demux | 🔴 | Low | Optional | Refused with explanation |
+| | MP4 `moov`-after-`mdat` demux from a file | 🟢 | Low | Optional | `demux_seekable()`: the boxes are walked jumping over `mdat`, then each sample is read where the table says, in bounded memory; `forge demux` takes it for a path |
+| | MP4 `moov`-after-`mdat` demux from a pipe | 🔴🔵 | Low | Optional | A pipe cannot go back for the sample table, so the chunk-fed `Reader` refuses it with the reason (a file path, or the batch `demux()`, reads it) |
 | | Fragmented MP4 / CMAF | 🟢 | High | Essential | Init + media segments; AC-4 by TS 103 190-2 Annex H (fragments start at I-frames, `ca4m`/`ca4s` brands, Annex G's descriptors) |
 | | Matroska | 🟢 | Medium | Important | Mux + demux for AC-3 and E-AC-3 |
-| | Matroska AC-4 | 🔴 | Low | Out-of-scope | Refused: Matroska registers no codec ID for AC-4 |
+| | Matroska AC-4 | 🔴🔵 | Low | Out-of-scope | Refused: Matroska registers no codec ID for AC-4 (checked against the codec registry 2026-10-10) |
+| | Matroska AC-3 core + E-AC-3 extension | 🔴🔵 | Low | Optional | Refused: `A_AC3` is `bsid` 10 and below and `A_EAC3` is 11 to 16, and no ID names a stream that is both; an ID of our own is one no other reader could name. `forge decode` reads it, MP4 and MPEG-TS carry it |
 | | MPEG-TS (DVB + ATSC for AC-3/E-AC-3) | 🟢 | High | Essential | Mux + demux; descriptors from `scan` |
-| | Multi-programme container mux | 🟡 | Medium | Optional | CLI muxers warn and carry the first programme only |
-| **Streaming** | HLS playlists | 🟡 | Medium | Important | Atmos `CHANNELS="N/JOC"` + 5.1 fallback; manifest semantics not player-validated |
-| | DASH MPD + Dolby supplemental descriptors | 🟡 | Medium | Important | Syntactically correct; no schema / player validation |
+| | Multi-programme container mux (MP4, fMP4, MPEG-TS) | 🟢 | Medium | Optional | Every programme rides in each sample / PES payload with a `dec3` block each (TS 102 366 F.2, A/52 Annex G §3.3); `programme=N` writes one alone, renumbered as substream 0 |
+| | Multi-programme container mux (Matroska) | 🟡🔵 | Medium | Optional | One track, so the first programme with a warning, or the one `programme=N` picks (one file per programme). A track per programme is a muxer this project does not have, and `A_EAC3`'s text names single syncframes |
+| **Streaming** | HLS playlists | 🟡🔵 | Medium | Important | Atmos `CHANNELS="N/JOC"` + 5.1 fallback; read back through FFmpeg's `hls` demuxer at the exact access-unit count. Apple's validator is macOS-only and no player here reads the signalling, so the manifest's meaning has nothing to be measured against |
+| | DASH MPD + Dolby supplemental descriptors | 🟡🔵 | Medium | Important | Valid against ISO/IEC 23009-1's schema (`verify_dash_schema.py`, in `interop.yml`) and read back through FFmpeg's `dash` demuxer, which ignores the descriptors; the descriptors' meaning has no JOC-aware player to be measured against |
 | **Transport** | IEC 61937 burst pack (AC-3 + E-AC-3) | 🟢 | High | Essential | vs FFmpeg / MS docs |
 | | IEC 61937 burst unpack (`unspdif`) | 🟢 | Medium | Optional | Inverse of pack |
 | | IEC 61937-14 AC-4 burst pack + unpack | 🟢 | Medium | Important | The four burst types, their periods and sequences at every frame rate from the standard's tables, checked against a second transcription; no device here accepts AC-4 |
-| **Edit** | In-place metadata rewrite | 🟡 | Medium | Optional | Existing fields only; no insert |
+| **Edit** | In-place metadata rewrite | 🟢 | Medium | Optional | `dialnorm`, `dialnorm2`, `compr`, `compr2`, `bsmod`, `dsurmod` on a field the stream transmits, CRCs re-stamped, audio bit-identical |
+| | Metadata insert (E-AC-3) | 🟢 | Medium | Optional | Adds `compr`, `compr2`, `bsmod`, `dsurmod` to every independent substream that lacks them: the frame grows by a word or two (`frmsiz`, `auxbits` padding, CRC); refused by name on block start information or auxiliary data. FFmpeg 8.0.1 decodes it to the same samples |
+| | Metadata insert (AC-3) | 🔴🔵 | Medium | Optional | AC-3's frame size is a code (`frmsizecod`) that fixes the bit rate, so there is nowhere to put the bits without walking all six audio blocks to where the audio ends - a walk the project has only for its Atmos encoder's frame shape. `encode` or `transcode` with the field on |
 | | Loudness QC vs delivery specs | 🟢 | Medium | Important | BS.1770-4 vs dialnorm / R 128 / A/85 / Netflix |
 | | Elementary scan / probe / split | 🟢 | High | Essential | Programme-aware access-unit walk |
 
@@ -289,13 +294,13 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 |---|---|---|---|---|---|
 | **API** | C++23 `iclforge::ac3` | 🟢 | High | Essential | Encode / decode / inspect / measure |
 | | Minimum-footprint decoder (`iclforge::ac3_minimal`) | 🟢 | Medium | Important | Bare-metal / ESP32 profile |
-| | Minimum-footprint AC-4 decoder (`iclforge::ac4` in `float`) | 🟡 | Medium | Important | The decode profile carries the decoder, its inspector and core, static and without exceptions (`ICLFORGE_MINIMAL_AC4` with `ICLFORGE_MINIMAL_DECODER`); the Cortex-M3 probe decodes six committed streams (2.0, 5.1 and 5.1.4, one with companding) with the PCM bit-identical to the x86-64 host's, 432 KB to 1.93 MB of heap and 54.5 M to 205.8 M instructions a frame. On boards with Wi-Fi up: the ESP32-P4 keeps up at 2.0 and at 5.1 in SIMPLE, A-SPX and A-CPL mode 2 (D14b, D14e, [ESP32-P4](../platforms/bare-metal/esp32-p4.md#ac-4)); the ESP32-S3 gives the P4's PCM on all twenty plays and keeps up at 2.0 in SIMPLE mode only (0.87 of a frame; A-SPX at 2.0 1.03 to 1.09, 5.1 2.1 to 3.2, 5.1.4 4.4 to 5.6), with its stack and state in PSRAM because no internal block is over 31,744 bytes (D14c, 2026-10-10, [ESP32-S3](../platforms/bare-metal/esp32-s3.md#on-the-board)); the C6 builds it in the fixed-point tier and beside the Hearth sink has 117 KB of heap against a floor of 286,365, so a play is refused and Hearth sends PCM (D14d, decision 32, [ESP32-C6](../platforms/bare-metal/esp32-c6.md#on-the-board)). What an S3 sink does with a stream wider than 2.0 SIMPLE is I6's |
+| | Minimum-footprint AC-4 decoder (`iclforge::ac4` in `float`) | 🟡🔵 | Medium | Important | The decode profile carries the decoder, its inspector and core, static and without exceptions (`ICLFORGE_MINIMAL_AC4` with `ICLFORGE_MINIMAL_DECODER`); the Cortex-M3 probe decodes six committed streams (2.0, 5.1 and 5.1.4, one with companding) with the PCM bit-identical to the x86-64 host's, 432 KB to 1.93 MB of heap and 54.5 M to 205.8 M instructions a frame. On boards with Wi-Fi up: the ESP32-P4 keeps up at 2.0 and at 5.1 in SIMPLE, A-SPX and A-CPL mode 2 (D14b, D14e, [ESP32-P4](../platforms/bare-metal/esp32-p4.md#ac-4)); the ESP32-S3 gives the P4's PCM on all twenty plays and keeps up at 2.0 in SIMPLE mode only (0.87 of a frame; A-SPX at 2.0 1.03 to 1.09, 5.1 2.1 to 3.2, 5.1.4 4.4 to 5.6), with its stack and state in PSRAM because no internal block is over 31,744 bytes (D14c, 2026-10-10, [ESP32-S3](../platforms/bare-metal/esp32-s3.md#on-the-board)); the C6 builds it in the fixed-point tier and beside the Hearth sink has 117 KB of heap against a floor of 286,365, so a play is refused and Hearth sends PCM (D14d, decision 32, [ESP32-C6](../platforms/bare-metal/esp32-c6.md#on-the-board)). The S3's limit (2.0 in SIMPLE mode only) and the C6's (none) are accepted: what they cannot decode reaches them as PCM from Hearth ([decision 42](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-10-10), 2026-10-10, after decision 32) |
 | | C API (`iclforge::c`) | 🟢 | Medium | Important | Stable minimal surface; AC-4 added (phase I4), with the encoder's objects (phase I4b) |
 | | Python / Rust / WASM bindings | 🟢 | Medium | Important | AC-4 added to the C API, Python, Rust and WASM (phase I4), with the encoder's objects and the decoder's update ramps (phase I4b) and typed AC-4 exceptions in Python. The wheels on PyPI (0.10.0b1 and earlier) predate the AC-4 module, and the WASM package is not on npm |
 | **Verify** | Encoder/decoder mirror traces | 🟢 | High | Essential | AC-3 and E-AC-3 (`iclforge::ac3::verify`); AC-4 has a syntax trace of both directions (`iclforge/ac4/core/syntax.hpp`) |
 | | Research trace export (CSV / JSONL) | 🟢 | Low | Optional | `iclforge::ac3::verify` |
 | | Conformance / fuzz / quality gates | 🟢 | High | Essential | See [Validation](../verification.md) |
-| | Cross-toolchain encoder bit-identical output | 🟡 | Medium | Important | Audit + `ilogb` fix done; FP thresholds / cross-leg gate still open (VX12) |
+| | Cross-toolchain encoder bit-identical output | 🟡 | Medium | Important | Audit + `ilogb` fix done. The bitstream-hash gate pins three synthetic and sixteen real-programme streams (music and speech through coupling, SPX, AHT, `search=distortion`, enhanced coupling, `tpn` and VBR), identical on MSVC, clang-cl, GCC 16 and Clang 22 on the x86-64 and generic kernels, in fast and reference modes, and on a Linux arm64 leg, since the delta-segment selection stopped depending on `std::nth_element`'s choice among equal keys (libstdc++ and the MSVC STL differed in one frame of 938). Open: a run of the sixteen on the macOS (libc++) leg, which did not build that day; the float32 encoder's pins, which no longer match a fresh GCC build and are not reached by the nightly; the fixed-point transient port, optional (VX12) |
 | | Listening-test apparatus (MUSHRA/ABX) | 🟡 | Low | Optional | Blind stimulus generator, scorer and protocol in `tools/listening/` ([`responses/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/listening/responses/README.md)); what is open is a human MUSHRA or ABX session over real programme material, which no tool here can run (VX9) |
 | | Perceptual encoder criterion calibration | 🔴 | Medium | Optional | The criterion is implemented and selectable (`search=perceptual`, `quality::Criterion::kPerceptual`) and measured to lose at every rate tested, so it stays off; calibrating it against external metrics is proposed as EQ14 and not started |
 | **Audio I/O** | Capture / monitor / passthrough | 🟡 | Medium | Important | `iclforge::audio` in-tree only; every output backend stops itself on device loss. Hardware-confirmed: ALSA and PipeWire passthrough on a Raspberry Pi to an AVR, WASAPI exclusive on an Onkyo TX-RZ740 (and its unplug), Android. Not verified: CoreAudio, the macOS process tap (refused by default since it hung the HAL in a first run) and desktop-app capture on a Mac; a Pi 5 and a second Android TV are outstanding (DR9, UX7) |
@@ -318,7 +323,6 @@ this register is the checklist that those bounds appear here too.
 |---|---|---|
 | Table 5.8 acmods 3/0, 2/1, 3/1, 2/2 | Named-layout / CLI encode coverage | 🟡 |
 | Annex E §E2.3.1.1 `strmtyp` 2 | Convertible substreams | 🔴 |
-| Annex E §E2.3.1.2 + Annex F | Legacy core+extension `dac3`/`dec3` mux | 🔴 |
 | Annex E §E2.3.1.2 I0–I7 | Associated-service labelling; receiver mixer | 🟡 / 🔴 |
 | Annex E §E3.5 / §3.7 | In `auto`; external oracle; TPN EOF hold-back | 🟢 tools / 🟡 policy |
 | Annex E `fscod2` | External PCM oracle | 🟢 code / validation gap |
@@ -384,12 +388,12 @@ this register is the checklist that those bounds appear here too.
 
 | Spec | Open item | Status |
 |---|---|---|
-| TS 102 366 Annex F | Legacy core+extension sample entry | 🔴 |
-| ATSC A/342-2 | AC-4 ATSC TS profile | 🔴 |
-| IEC 61937-14 | AC-4 to a device: no receiver accepts it, and HBR16's eight-channel link is not opened | 🟡 |
-| ISO BMFF | `moov`-after-`mdat` demux | 🔴 |
-| Apple HLS / Dolby DASH | Player / schema validation of Atmos signalling | 🟡 |
-| Multi-programme mux | First programme only | 🟡 |
+| Matroska codec registry | AC-3 core with E-AC-3 dependents: no codec ID names it | 🔴🔵 |
+| ATSC A/342-2 | AC-4 ATSC TS profile: the standard has no MPEG-2 TS mapping | 🔴🔵 |
+| IEC 61937-14 | AC-4 to a device: no receiver accepts it, and HBR16's eight-channel link is not opened | 🟡🔵 |
+| ISO BMFF | `moov`-after-`mdat` demux from a pipe (a file path reads it) | 🔴🔵 |
+| Apple HLS / Dolby DASH | Player validation of Atmos signalling (the MPD is schema-valid) | 🟡🔵 |
+| Multi-programme mux | Matroska: first programme only (one track) | 🟡🔵 |
 
 ### TrueHD / MLP
 

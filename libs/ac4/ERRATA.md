@@ -1652,6 +1652,36 @@ does what the readings say, not that they are what an encoder meant.
   at the sides; the top, bottom and centre-back channels are not in the ring.
 - **Evidence:** Text; as for 7.X, no stream mixes into a 22.2 substream.
 
+#### The encoder's 22.2 input order and LFE tracks
+
+- **Where:** Part 2 5.2.4 and Table 21, p. 62; Table A.27, p. 214; 6.2.4.3, p. 130.
+- **Reading:** the encoder (`EncoderConfig::experimental.twenty_two_two`) takes its 24 input channels in
+  Table A.27's order by speaker index, the order the decoder writes them in ("The 22.2 element's
+  output"), so that a tone on input channel k decodes on output channel k. Table 21's tracks 0 and 1 are
+  the LFE (index 11) and LFE2 (index 17), each a `mono_data(1)` coded as the 5.1 LFE is: `sf_info_lfe()`
+  and the bands under 120 Hz, one long block. The eleven pairs follow in the table's order, [L, R] first
+  and [Lw, Rw] last, each a `two_channel_data()` with `b_enable_mdct_stereo_proc` 1, its own `sf_info()`
+  and `chparam_info()`, and in ASPX its own `aspx_data_2ch()`; `aspx_config()` is sent once, in an
+  I-frame, before the LFEs, and serves the eleven.
+- **Evidence:** Text; each channel's tone comes back on its own channel in both codec modes, and the
+  decoder's trace is the encoder's record for record (`libs/ac4/tests/encoder/test_twenty_two_two.cpp`).
+
+#### md_compat and the indicator of a 22.2 presentation
+
+- **Where:** Part 2 Table 55 and 6.3.2.2.3, p. 157: the levels hold at most 11 tracks, "with the
+  exception of LFE channels that have the b_lfe flag set in mono_data()", and a system "shall not
+  decode (i.e. select) presentations with md_compat > n"; 6.3.3.1.17a, p. 168:
+  `immersive_audio_indicator` says "whether this presentation contains immersive audio"; 6.2.1.8, p. 118
+  sends `b_4_back_channels_present`, `b_centre_present` and `top_channels_present` for 7.X.4 and 9.X.4
+  alone.
+- **Reading:** 22.2 has 22 tracks, the two LFEs not counted, which no level up to 3 holds (11 tracks, 7.1.4
+  at most) and 4 to 6 are reserved, so the least `md_compat` of a 22.2 presentation is 7, unrestricted. A
+  decoder claiming a lower level, 3 by default, does not select it (`DecoderConfig::level`, `forge decode
+  md-compat=7`). The presentation sends `immersive_audio_indicator` 1, 22.2 having top and bottom channels,
+  and derives no core, back pair or top pairs, its `channel_mode` naming none: `pres_ch_mode` 15, its
+  `b_pres_has_lfe` 1.
+- **Evidence:** Text.
+
 ### The 9.X.4 element
 
 Part 2's immersive_channel_element (6.2.4.1) with `b_5fronts` 1, which codes the channel modes 13 and 14,

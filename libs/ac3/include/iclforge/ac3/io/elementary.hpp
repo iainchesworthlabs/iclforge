@@ -129,6 +129,11 @@ struct ScannedProgramme {
     bool lfe = false;
     // Channels this PROGRAMME renders, folding in every dependent's chanmap.
     int channels = 0;
+    // The locations those channels sit at, as ScannedStream::channel_map
+    // spells them (A/52 Table E2.5, bit 0 in the most significant bit): the
+    // independent substream's own acmod/lfeon unioned with every dependent's
+    // chanmap. A dec3 box's per-substream chan_loc is read off this word.
+    std::uint16_t channel_map = 0;
     int bsid = 0;
     // §5.4.2.2's service type, 0 (not indicated) unless infomdate carried
     // one. This is what tells a receiver that a programme is a complete main
@@ -262,7 +267,8 @@ struct ScannedStream {
     // substream's units are a parallel sequence, not later entries here:
     // appending them would hand a muxer or a decoder two programmes spliced
     // into one timeline. Pick a programme out of `programmes` below to get
-    // at the others.
+    // at the others - or take all_programme_access_units(), which is what a
+    // container sample holds, each frame period's substreams in wire order.
     std::vector<std::span<const std::byte>> access_units{};
     // Samples each of those access units codes, parallel to `access_units` -
     // so also the FIRST PROGRAMME's alone. Always 1536 for AC-3 (§5.3.1: six
@@ -293,11 +299,10 @@ struct ScannedStream {
     // that fills in acmod/lfe/sample_rate above.
     //
     // For kAc3CoreEac3Extension all three describe the AC-3 CORE, since that
-    // is the independent substream. Neither codec-config box has a defined
-    // way to say "AC-3 core plus Annex E dependents", so
-    // build_codec_config_box() refuses that kind outright rather than emit an
-    // AC3SpecificBox that cannot mention the dependents or an EC3SpecificBox
-    // whose bsid field would claim a core frame is Annex E syntax.
+    // is the independent substream - and that is exactly what an
+    // EC3SpecificBox's bsid is asked to carry (ETSI TS 102 366 F.6.2.5: the
+    // independent substream's own value), so build_codec_config_box() writes
+    // the core's 6 or 8 there.
 
     // A/52 §5.4.1.3 / Annex E §E2.3.1.6.
     int bsid = 0;
@@ -396,6 +401,45 @@ struct ScannedStream {
 
 [[nodiscard]] ICLFORGE_AC3_EXPORT std::expected<ScannedStream, ScanError> scan(
     std::span<const std::byte> stream);
+
+// Every programme's access units as ONE sequence: entry n is the whole of
+// frame period n - the lead programme's independent substream and its
+// dependents, then the next programme's, and so on - exactly the bytes that sit
+// between the same two frame boundaries on the wire.
+//
+// This is what a container sample is. ETSI TS 102 366 Annex F §F.2 defines an
+// E-AC-3 sample as the syncframes needed "to deliver six blocks of audio data
+// from every substream present in the Enhanced AC-3 bit stream, beginning with
+// independent substream 0", and A/52 Annex G §3.3 asks the same of a PES
+// payload, so a track carrying a multi-programme stream holds all of them, in
+// stream order, with the sample entry's num_ind_sub saying how many there are.
+// ScannedStream::access_units, which is the lead programme alone, is what a
+// track holding one programme (or a stream that has only one) is built from.
+//
+// The spans point into the buffer scan() was given, like every other view
+// here. Returns the lead programme's own units unchanged for a stream with one
+// programme. std::nullopt when the programmes do not run in step - a different
+// number of frame periods each, or units that are not adjacent on the wire -
+// since splicing those would hand a player a sample that is not a frame period.
+[[nodiscard]] ICLFORGE_AC3_EXPORT std::optional<std::vector<std::span<const std::byte>>>
+all_programme_access_units(const ScannedStream& stream);
+
+// One programme of a multi-programme stream, as a stream of its own: the
+// independent substream with id `substreamid` and the dependents behind it,
+// every frame period, renumbered as independent substream 0 with its CRC
+// re-stamped.
+//
+// The renumbering is what makes it a stream. A/52 §E2.3.1.2 has every E-AC-3
+// bit stream open with independent substream 0, and a decoder (FFmpeg's
+// included) takes that one and ignores the rest, so carrying I1's frames
+// as they are would hand a player a stream with nothing it will play. The
+// audio and every other bsi field are untouched; substream 0 comes back
+// byte for byte what ScannedStream::access_units holds.
+//
+// std::nullopt when the stream has no such programme, or a frame in it does
+// not read. The result owns its bytes: scan() it again to describe it.
+[[nodiscard]] ICLFORGE_AC3_EXPORT std::optional<std::vector<std::byte>> extract_programme(
+    const ScannedStream& stream, int substreamid);
 
 // --- timing ------------------------------------------------------------------
 //

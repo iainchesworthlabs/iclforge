@@ -600,13 +600,55 @@ check_one "ext_eac3_transient_stereo_128_dee" "$TPN_DIR/dee.ec3" "eac3" 128 3 "3
 check_against_source "ext_eac3_transient_stereo_128_dee_source" "$TPN_DIR/dee.ec3" \
     "$TPN_DIR/source.wav" "eac3" 128 1 "1,1" "--probe-samples 60000"
 
+# --- Real programme material, for the bitstream-hash gate below ---------------------------
+# gold.ac3/gold.ec3/gold_cpl.ec3 are one synthetic 5.1 file through three tool
+# sets. The encoder's floating-point decisions - rematrixing, coupling's band
+# fit, SPX's and AHT's choices, §7.2.2's closed-loop search, the VBR loop - are
+# taken on the signal's own statistics, and a last-bit difference between two
+# toolchains flips one of them where the signal puts it near a threshold, which
+# synthetic tones seldom do. So these are hash-only: the CC0 programme fixtures
+# of testdata/audio (music and speech, 30 s of 48 kHz stereo each, converted by
+# ffmpeg, which is lossless and so the same PCM on every leg) and the same
+# synthetic 5.1 through the three Annex E tools the SNR checks leave out - no
+# decode, no score, and nothing here can fail but a hash. Their pins are the
+# bitstream-hash gate's, in testdata/bitstream-hashes.json.
+PROG_DIR="$WORKDIR/programme"
+mkdir -p "$PROG_DIR"
+ffmpeg -nostdin -v error -y -i "$REPO_ROOT/testdata/audio/programme_music_stereo.flac" \
+    -c:a pcm_s16le "$PROG_DIR/music.wav"
+ffmpeg -nostdin -v error -y -i "$REPO_ROOT/testdata/audio/programme_speech_stereo.flac" \
+    -c:a pcm_s16le "$PROG_DIR/speech.wav"
+
+# <command> <input> <output name in the workdir> [options]: the CLI's own order,
+# with run_cli's mode token (reference mode) after them.
+hash_encode_args() {
+    local command="$1" input="$2" output="$3"
+    shift 3
+    count=$((count + 1))
+    echo "[$count] encode (hash only): $output"
+    run_cli "$command" "$input" "$WORKDIR/$output" "$@" >/dev/null
+}
+hash_encode_args encode "$PROG_DIR/music.wav" prog_ac3_music_192.ac3 192 stereo
+hash_encode_args encode "$PROG_DIR/music.wav" prog_ac3_music_192_couple.ac3 192 stereo couple
+hash_encode_args encode "$PROG_DIR/music.wav" prog_ac3_music_192_distortion.ac3 192 stereo search=distortion
+hash_encode_args encode "$PROG_DIR/speech.wav" prog_ac3_speech_128.ac3 128 stereo
+for tools in auto cpl spx aht all cpl+ecpl tpn; do
+    hash_encode_args eac3-encode "$PROG_DIR/music.wav" "prog_eac3_music_128_${tools//+/_}.ec3" 128 "$tools" stereo
+done
+hash_encode_args eac3-encode "$PROG_DIR/speech.wav" prog_eac3_speech_96_auto.ec3 96 auto stereo
+hash_encode_args eac3-encode "$PROG_DIR/music.wav" prog_eac3_music_128_vbr.ec3 128 auto stereo q:0.4
+for tools in spx aht all; do
+    hash_encode_args eac3-encode "$GOLD_WAV" "prog_eac3_gold51_256_$tools.ec3" 256 "$tools+nodither" 51
+done
+
 # --- Cross-platform bitstream-hash gate (cross-platform bitstream reproducibility) ----------------------
 # Every check above compares two DECODES of the same bitstream, which cannot
 # see a divergence in the bitstream itself - the ~6.02 dB gap the arm64/macOS
 # legs measure against x86 on this same gate is exactly that kind of
-# divergence. This pins it instead: SHA-256 of the three streams this
-# project's own encoder just produced above (gold.ac3/gold.ec3/gold_cpl.ec3),
-# checked against testdata/bitstream-hashes.json. See
+# divergence. This pins it instead: SHA-256 of the streams this project's own
+# encoder just produced above (gold.ac3/gold.ec3/gold_cpl.ec3, and the
+# programme streams of the block before this one), checked against
+# testdata/bitstream-hashes.json. See
 # tools/checks/check_cross_platform_hash.py's own header for what a
 # not-yet-pinned kernel/mode key does (reported, not failed) versus a real
 # mismatch (failed, same as every other bit-exactness gate here).

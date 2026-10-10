@@ -903,10 +903,11 @@ only the second programme — see
 ## Programme options (`decode`, `qc`, `levels`): `programme=`
 
 ```text
-programme options (decode, qc, levels; any order, after the positional arguments):
+programme options (decode, qc, levels, mkv, mp4, fmp4, ts; any order, after the positional
+arguments):
   programme=<0..7>  which programme of a multi-programme stream to work on, by the §E2.3.1.2
                     substreamid of its independent substream; omitted takes the first the
-                    stream carries
+                    stream carries (mp4, fmp4 and ts omit it to carry every programme)
 ```
 
 The decode-side half of `programme2=` above. All three commands work on exactly one programme —
@@ -920,6 +921,11 @@ forge levels out.ec3 programme=1
 forge qc out.ec3 programme=1 preset=atsc-a85
 ```
 
+On `mkv`, `mp4`, `fmp4` and `ts` the chosen programme is written alone, renumbered as independent
+substream 0 with its CRC re-stamped (a player takes substream 0 and ignores the rest, so another
+programme's frames left as they are would be a track it will not play); the audio and every other
+field are untouched. Without it `mp4`, `fmp4` and `ts` carry every programme, as TS 102 366 F.2 and
+A/52 Annex G §3.3 define a sample or PES payload, and `mkv` keeps the first with a warning.
 Omitting it takes the first programme the stream carries. When there is more than one, each
 command says which it picked and what else was there (`programme 0 of 2 (0, 1)`), so a
 multi-programme stream is never handled silently. Asking for a programme the stream does not

@@ -549,8 +549,18 @@ DeltaSegments choose_delta_segments_over(std::span<const Scalar> coefficients,
     }
     // §5.4.3.54/E2.3.2.9: at most 8 segments (3-bit deltnseg field + 1). Keep
     // the largest-magnitude corrections when more runs qualify.
+    //
+    // Magnitude takes only four values (the codes either side of the middle
+    // pair are 1, 3, 5 and 7 steps from it), so the eight to keep often fall
+    // among runs of EQUAL magnitude. A stable sort on the magnitude, over runs
+    // that are already in band order, keeps the lowest bands among equals:
+    // the same eight on every platform. std::nth_element did not - the
+    // standard leaves its choice among equal keys to the library, and
+    // libstdc++'s and the MSVC STL's differ, which put a different delta
+    // segment in one frame of a 30 s stereo music clip between a Windows and a
+    // Linux build of the encoder (the cross-toolchain bitstream audit).
     if (runs.size() > 8) {
-        std::ranges::nth_element(runs, runs.begin() + 8, std::ranges::greater{},
+        std::ranges::stable_sort(runs, std::ranges::greater{},
                                  [](const DeltaRun& r) { return std::abs(2 * r.code - 7); });
         runs.resize(8);
         std::ranges::sort(runs, {}, &DeltaRun::band);
