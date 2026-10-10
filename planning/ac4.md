@@ -1022,10 +1022,10 @@ balance, VARVAR framing and frequency-interleaved waveform coding in A-SPX (`asp
 `aspx_varvar`, `aspx_interleave`), the 5.X element's other coding configurations (`coding_configs`),
 7.0 and 7.1 (`seven_x`), ASPX_ACPL_1 and A-CPL in stereo (`acpl`), 7.0.4 and 7.1.4 (`back_pair`),
 A-JCC (`ajcc`), transmitted DRC gains (`drc_gains`), a 3.0 substream (`three_zero`), objects
-(`objects`) and the 22.2 element (`twenty_two_two`: 24 channels in SIMPLE and ASPX, with no A-CPL,
-downmix, dialogue enhancement or DRC gains for it). Mono, several presentations and substreams, and
-the Mid and cross-channel dialogue enhancement methods are options without the flag. Noise fill and time-interleaved waveform coding
-are not written at all.
+(`objects`), spectral noise fill (`noise_fill`) and the 22.2 element (`twenty_two_two`: 24 channels in
+SIMPLE and ASPX, with no A-CPL, downmix, dialogue enhancement or DRC gains for it). Mono, several
+presentations and substreams, and the Mid and cross-channel dialogue enhancement methods are options
+without the flag. Time-interleaved waveform coding is not written at all.
 
 ### One control for both formats
 

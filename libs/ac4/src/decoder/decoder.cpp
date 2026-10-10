@@ -1055,6 +1055,9 @@ void report_loudness(const detail::FurtherLoudnessInfo& sent, LoudnessInfo& out)
     }
     keep(out.momentary_lufs, loudness_value(sent.loudmntry));
     keep(out.max_momentary_lufs, loudness_value(sent.max_loudmntry));
+    if (sent.rtll_comp) {
+        out.real_time_correction_db = (static_cast<double>(*sent.rtll_comp) - 128.0) / 4.0;
+    }
 }
 
 // drc_config()'s modes, as the stream carries them.
@@ -2028,6 +2031,8 @@ void Decoder::Impl::report_metadata() {
         out = PresentationMetadata{};
         out.presentation = plan.index;
     }
+    // Real-time data belongs to the frame that sends it (Part 2 clause 4.8.5.5), unlike the rest.
+    out.loudness.real_time_correction_db.reset();
     const auto downmix = [&out](const std::optional<detail::StereoDmxCoeff>& coeff,
                                 const std::optional<int>& loro, const std::optional<int>& ltrt) {
         if (coeff) {
@@ -2416,6 +2421,7 @@ std::expected<bool, DecodeError> Decoder::Impl::decode_into(
                                         d.config.decoding == DecodingMode::kCore);
     inputs.downmix =
         detail::downmix_values(capture.presentation_read ? &capture.presentation : nullptr, main.content.metadata);
+    inputs.downmix.device = d.config.output.target_device;
     inputs.mix = d.mix_values(plan, anchor, dialnorm);
     // The presentation's other substreams, each as far as the QMF domain,
     // after its own dialogue enhancement; the dialogue enhancement substream

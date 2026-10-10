@@ -203,8 +203,11 @@ Table 163); `7x-back`, `7x-wide` or `7x-top-front`, which takes seven or eight c
 surrounds in SL and SR, 5/2/0's wide pair last, 3/2/2's top front pair in TFL and TFR;
 `back-pair`, which takes 11 and 12 channels as 7.0.4 and 7.1.4, with Lb and Rb; `three-zero`, which
 takes three channels, L R C, as 3.0, the dialogue of a music and effects presentation (below);
-`twenty-two-two`, which takes 24 channels as 22.2, the element of ETSI TS 103 190-2 clause 6.2.4.3
-(below); and `objects`, which `objects=<scene file>` needs.
+`noise-fill`, which sends each scale factor band that quantises to zero a noise level (Part 1
+5.1.4: its own energy in 3 dB steps, from the level before it) that the decoder fills with noise,
+and so trades some SNR for a spectrum without holes at a low rate; `twenty-two-two`, which takes
+24 channels as 22.2, the element of ETSI TS 103 190-2 clause 6.2.4.3 (below); and `objects`, which
+`objects=<scene file>` needs.
 
 **22.2.** With `experimental=twenty-two-two`, a 24-channel WAV file is written as the 22.2 channel
 element: two LFE tracks and eleven channel pairs, in the SIMPLE and ASPX codec modes
@@ -213,8 +216,10 @@ in: L R C LFE (FL FR FC LFE), Lb Rb Cb (BL BR BC), Ls Rs (SL SR), Tc Tfl Tsl Tfc
 (TC TFL TSL TFC TFR TSR TBL TBC TBR), then LFE2, Bfl, Bfr, Bfc, Lw and Rw. The default codec mode is
 ASPX below 76.8 kbps a full-band channel (1 690 kbps over the 22 of them) and SIMPLE from there. The
 A-CPL, S-CPL and A-JCC modes, the stereo and height downmix values, dialogue enhancement and DRC
-gains are refused for it; the rate must be at least 8 kbps, and the least frame of the element
-needs the rate the encoder names where it refuses one. An MP4 file carries it with a `dac4`.
+gains are refused for it. The rate must hold the element's least frame: 17 kbps in SIMPLE and 49 in
+ASPX at the native frame rate (16 and 48 at 44.1 kHz), more at the higher frame rates, and the
+encoder's refusal names a rate that cannot. A decoder takes the presentation at `md-compat=7`
+(22 tracks, Part 2 Table 55). An MP4 file carries it with a `dac4`.
 
 **Objects.** With `experimental=objects`, `objects=<scene file>` takes the WAV file's channels as the
 objects of one object substream, written as a raw stream. The scene file is text, one directive a

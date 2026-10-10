@@ -151,6 +151,7 @@ struct Options {
     bool ac4_experimental_three_zero = false;
     bool ac4_experimental_back_pair = false;
     bool ac4_experimental_ajcc = false;
+    bool ac4_experimental_noise_fill = false;
     bool ac4_experimental_twenty_two_two = false;
     std::string ac4_experimental_seven_x;
     // 'ac4-encode' only: experimental=objects, and objects=, the path of a

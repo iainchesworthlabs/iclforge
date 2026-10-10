@@ -473,6 +473,7 @@ int run_ac4_encode(std::string_view in_path, std::string_view out_path, std::uin
     config.experimental.three_zero = meta.ac4_experimental_three_zero;
     config.experimental.back_pair = meta.ac4_experimental_back_pair;
     config.experimental.ajcc = meta.ac4_experimental_ajcc;
+    config.experimental.noise_fill = meta.ac4_experimental_noise_fill;
     config.experimental.twenty_two_two = meta.ac4_experimental_twenty_two_two;
 
     if (drc_named) {

@@ -2355,7 +2355,8 @@ struct SubstreamCoder {
         set_step(pull, step);
         std::size_t total = 0;
         for (const std::size_t c : pending.order) {
-            total += detail::code_track(pending.spectra[c].grouped, pending.sf[c], 0, layout_of(c))
+            total += detail::code_track(pending.spectra[c].grouped, pending.sf[c], 0, layout_of(c),
+                                      config.experimental.noise_fill)
                          .bits();
         }
         return total;
@@ -2404,7 +2405,8 @@ struct SubstreamCoder {
         const auto write_at = [&](bool pull, int step) {
             set_step(pull, step);
             for (const std::size_t c : p.order) {
-                f.tracks[c] = detail::code_track(p.spectra[c].grouped, p.sf[c], 0, layout_of(c));
+                f.tracks[c] = detail::code_track(p.spectra[c].grouped, p.sf[c], 0, layout_of(c),
+                                                     config.experimental.noise_fill);
             }
             return write();
         };

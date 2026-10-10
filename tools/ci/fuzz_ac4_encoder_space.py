@@ -485,6 +485,8 @@ def draw_case(seed):
                 ]
             )
         )
+    if rng.random() < 0.2:
+        tools.append("noise-fill")
     if acpl is not None and (channels == 2 or acpl == "aspx-acpl-1"):
         tools.append("acpl")
     if channels > 2 and acpl is None and rng.random() < 0.3 and not immersive and not twenty_two:

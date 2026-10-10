@@ -2266,6 +2266,8 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                     out.ac4_experimental_ajcc = true;
                 } else if (tool == "objects") {
                     out.ac4_experimental_objects = true;
+                } else if (tool == "noise-fill") {
+                    out.ac4_experimental_noise_fill = true;
                 } else if (tool == "twenty-two-two") {
                     out.ac4_experimental_twenty_two_two = true;
                 } else if (tool == "7x-back" || tool == "7x-wide" || tool == "7x-top-front") {
@@ -2280,7 +2282,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                         stderr,
                         "error: experimental takes aspx-balance, aspx-varvar, aspx-interleave, "
                         "coding-configs, acpl, three-zero, back-pair, ajcc, objects, "
-                        "twenty-two-two, one of "
+                        "noise-fill, twenty-two-two, one of "
                         "7x-back, 7x-wide and 7x-top-front, and one of drc-gains-0 to "
                         "drc-gains-3, comma-separated (got '{}')",
                         token);

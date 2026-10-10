@@ -664,6 +664,13 @@ struct EncoderConfig {
         // Object audio (SubstreamConfig::objects), which no reader outside
         // the project has read from this encoder.
         bool objects = false;
+        // Spectral noise fill (Part 1 clause 5.1.4): a scale factor band that
+        // quantises to zero sends the level of its own energy in 3 dB steps,
+        // from the level of the band before it, and the decoder fills it with
+        // noise of that level. Off, b_snf_data_exists is 0 throughout, which
+        // is what DEE's streams do. A band's noise adds to its error, so
+        // this trades SNR for a spectrum without holes at low rates.
+        bool noise_fill = false;
         // The 22.2 channel element (Part 2 clause 6.2.4.3): 24 input channels
         // in Table A.27's order, two LFE tracks and eleven channel pairs, in the
         // SIMPLE and ASPX codec modes, which no stream and no reader outside the

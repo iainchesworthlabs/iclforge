@@ -505,6 +505,8 @@ void print_ac4_encode_topic() {
     fmt::println("       A-CPL in stereo), 7x-back|7x-wide|7x-top-front for 7.0 and 7.1,");
     fmt::println("       back-pair for 7.0.4 and 7.1.4 (11 and 12 channels, with Lb and Rb),");
     fmt::println("       ajcc for codec-mode=aspx-ajcc, three-zero for 3.0 (L R C),");
+    fmt::println("       noise-fill (a level for each band that quantises to zero, which the");
+    fmt::println("       decoder fills with noise, ETSI TS 103 190-1 5.1.4),");
     fmt::println("       twenty-two-two for 22.2 (24 channels, TS 103 190-2 6.2.4.3, in");
     fmt::println("       codec-mode=simple|aspx, ASPX below 76.8 kbps a full-band channel by");
     fmt::println("       default; the channels in the order decode writes them),");
