@@ -244,23 +244,26 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 
 | Category | Feature | Status | Priority | Criticality | Notes |
 |---|---|---|---|---|---|
-| **Boxes** | `dac3` / `dec3` (incl. Atmos extension, Annex F) | 🟢 | High | Essential | Built from the bitstream, not the container claim |
-| | Legacy core+E-AC-3 extension sample entry | 🔴 | Medium | Important | Decode/scan via `kAc3CoreEac3Extension`; mux refuses rather than emit a contradictory box |
+| **Boxes** | `dac3` / `dec3` (incl. Atmos extension, Annex F) | 🟢 | High | Essential | Built from the bitstream, not the container claim; one `dec3` block per independent substream, `chan_loc` from the dependents' `chanmap` (Table F.6.1) |
+| | Legacy core+E-AC-3 extension sample entry | 🟢 | Medium | Important | An `ec-3` entry whose `dec3` carries the core's `bsid` (TS 102 366 F.6.2.5, §E2.3.1.2); MP4, fMP4 and MPEG-TS, both profiles. Matroska: see below |
 | | `dac4` + MPEG-TS DVB registration | 🟢 | Medium | Important | AC-4 carriage |
-| | MPEG-TS AC-4 ATSC profile (A/342-2) | 🔴 | Low | Optional | Explicitly refused; DVB path only |
+| | MPEG-TS AC-4 ATSC profile (A/342-2) | 🔴🔵 | Low | Optional | A/342-2 constrains TS 103 190-2 for ATSC 3.0, which carries audio as ISO BMFF segments (ROUTE/DASH, MMT): there is no MPEG-2 TS mapping to write. Explicitly refused; the DVB path carries AC-4 in TS and fMP4/DASH is the ATSC 3.0 shape |
 | **Mux** | MP4 / ISOBMFF | 🟢 | High | Essential | Mux + demux; AC-3 / E-AC-3 / AC-4 |
-| | MP4 `moov`-after-`mdat` streaming demux | 🔴 | Low | Optional | Refused with explanation |
+| | MP4 `moov`-after-`mdat` demux from a file | 🟢 | Low | Optional | `demux_seekable()`: the boxes are walked jumping over `mdat`, then each sample is read where the table says, in bounded memory; `forge demux` takes it for a path |
+| | MP4 `moov`-after-`mdat` demux from a pipe | 🔴🔵 | Low | Optional | A pipe cannot go back for the sample table, so the chunk-fed `Reader` refuses it with the reason (a file path, or the batch `demux()`, reads it) |
 | | Fragmented MP4 / CMAF | 🟢 | High | Essential | Init + media segments; AC-4 by TS 103 190-2 Annex H (fragments start at I-frames, `ca4m`/`ca4s` brands, Annex G's descriptors) |
 | | Matroska | 🟢 | Medium | Important | Mux + demux for AC-3 and E-AC-3 |
-| | Matroska AC-4 | 🔴 | Low | Out-of-scope | Refused: Matroska registers no codec ID for AC-4 |
+| | Matroska AC-4 | 🔴🔵 | Low | Out-of-scope | Refused: Matroska registers no codec ID for AC-4 (checked against the codec registry 2026-10-10) |
+| | Matroska AC-3 core + E-AC-3 extension | 🔴🔵 | Low | Optional | Refused: `A_AC3` is `bsid` 10 and below and `A_EAC3` is 11 to 16, and no ID names a stream that is both; an ID of our own is one no other reader could name. `forge decode` reads it, MP4 and MPEG-TS carry it |
 | | MPEG-TS (DVB + ATSC for AC-3/E-AC-3) | 🟢 | High | Essential | Mux + demux; descriptors from `scan` |
-| | Multi-programme container mux | 🟡 | Medium | Optional | CLI muxers warn and carry the first programme only |
-| **Streaming** | HLS playlists | 🟡 | Medium | Important | Atmos `CHANNELS="N/JOC"` + 5.1 fallback; manifest semantics not player-validated |
-| | DASH MPD + Dolby supplemental descriptors | 🟡 | Medium | Important | Syntactically correct; no schema / player validation |
+| | Multi-programme container mux (MP4, fMP4, MPEG-TS) | 🟢 | Medium | Optional | Every programme rides in each sample / PES payload with a `dec3` block each (TS 102 366 F.2, A/52 Annex G §3.3); `programme=N` writes one alone, renumbered as substream 0 |
+| | Multi-programme container mux (Matroska) | 🟡🔵 | Medium | Optional | One track, so the first programme with a warning, or the one `programme=N` picks (one file per programme). A track per programme is a muxer this project does not have, and `A_EAC3`'s text names single syncframes |
+| **Streaming** | HLS playlists | 🟡🔵 | Medium | Important | Atmos `CHANNELS="N/JOC"` + 5.1 fallback; read back through FFmpeg's `hls` demuxer at the exact access-unit count. Apple's validator is macOS-only and no player here reads the signalling, so the manifest's meaning has nothing to be measured against |
+| | DASH MPD + Dolby supplemental descriptors | 🟡🔵 | Medium | Important | Syntactically correct and read back through FFmpeg's `dash` demuxer, which ignores the descriptors; no MPD schema validator or JOC-aware player has been run |
 | **Transport** | IEC 61937 burst pack (AC-3 + E-AC-3) | 🟢 | High | Essential | vs FFmpeg / MS docs |
 | | IEC 61937 burst unpack (`unspdif`) | 🟢 | Medium | Optional | Inverse of pack |
 | | IEC 61937-14 AC-4 burst pack + unpack | 🟢 | Medium | Important | The four burst types, their periods and sequences at every frame rate from the standard's tables, checked against a second transcription; no device here accepts AC-4 |
-| **Edit** | In-place metadata rewrite | 🟡 | Medium | Optional | Existing fields only; no insert |
+| **Edit** | In-place metadata rewrite | 🟡🔵 | Medium | Optional | Existing fields only. An insert moves every later bit into a frame of fixed size, so finding room takes a bit-accurate walk to the end of the audio (the project's frame walker covers its own Atmos encoder's shape only) and making it re-frames the syncframe: `encode` or `transcode` with the field on |
 | | Loudness QC vs delivery specs | 🟢 | Medium | Important | BS.1770-4 vs dialnorm / R 128 / A/85 / Netflix |
 | | Elementary scan / probe / split | 🟢 | High | Essential | Programme-aware access-unit walk |
 
@@ -301,7 +304,6 @@ this register is the checklist that those bounds appear here too.
 |---|---|---|
 | Table 5.8 acmods 3/0, 2/1, 3/1, 2/2 | Named-layout / CLI encode coverage | 🟡 |
 | Annex E §E2.3.1.1 `strmtyp` 2 | Convertible substreams | 🔴 |
-| Annex E §E2.3.1.2 + Annex F | Legacy core+extension `dac3`/`dec3` mux | 🔴 |
 | Annex E §E2.3.1.2 I0–I7 | Associated-service labelling; receiver mixer | 🟡 / 🔴 |
 | Annex E §E3.5 / §3.7 | In `auto`; external oracle; TPN EOF hold-back | 🟢 tools / 🟡 policy |
 | Annex E `fscod2` | External PCM oracle | 🟢 code / validation gap |
@@ -356,12 +358,12 @@ this register is the checklist that those bounds appear here too.
 
 | Spec | Open item | Status |
 |---|---|---|
-| TS 102 366 Annex F | Legacy core+extension sample entry | 🔴 |
-| ATSC A/342-2 | AC-4 ATSC TS profile | 🔴 |
-| IEC 61937-14 | AC-4 to a device: no receiver accepts it, and HBR16's eight-channel link is not opened | 🟡 |
-| ISO BMFF | `moov`-after-`mdat` demux | 🔴 |
-| Apple HLS / Dolby DASH | Player / schema validation of Atmos signalling | 🟡 |
-| Multi-programme mux | First programme only | 🟡 |
+| Matroska codec registry | AC-3 core with E-AC-3 dependents: no codec ID names it | 🔴🔵 |
+| ATSC A/342-2 | AC-4 ATSC TS profile: the standard has no MPEG-2 TS mapping | 🔴🔵 |
+| IEC 61937-14 | AC-4 to a device: no receiver accepts it, and HBR16's eight-channel link is not opened | 🟡🔵 |
+| ISO BMFF | `moov`-after-`mdat` demux from a pipe (a file path reads it) | 🔴🔵 |
+| Apple HLS / Dolby DASH | Player / schema validation of Atmos signalling | 🟡🔵 |
+| Multi-programme mux | Matroska: first programme only (one track) | 🟡🔵 |
 
 ### TrueHD / MLP
 

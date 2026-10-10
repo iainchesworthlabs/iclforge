@@ -82,6 +82,15 @@ void write_bytes(const fs::path& path, std::span<const std::byte> bytes) {
 
 std::string quoted(const fs::path& path) { return "\"" + path.string() + "\""; }
 
+std::vector<std::byte> read_file(const fs::path& path) {
+    std::ifstream in{path, std::ios::binary};
+    REQUIRE(in.good());
+    std::vector<char> chars{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+    std::vector<std::byte> out(chars.size());
+    std::ranges::transform(chars, out.begin(), [](char c) { return static_cast<std::byte>(c); });
+    return out;
+}
+
 void append(std::vector<std::byte>& out, std::span<const std::byte> bytes) {
     out.insert(out.end(), bytes.begin(), bytes.end());
 }
@@ -153,6 +162,28 @@ std::vector<std::byte> non_uniform_stream() {
     return stream;
 }
 
+// A two-programme E-AC-3 stream through the real encoder CLI: a 5.1 main
+// programme and a mono commentary (I1), one source WAV each - see
+// docs/forge/cli/metadata-options.md's "Programme options" section for the
+// programme2=/-layout=/-bitrate= tokens this builds with.
+fs::path write_multi_programme_stream(const fs::path& dir, const fs::path& log) {
+    const auto primary_wav = dir / "programme0.wav";
+    const auto commentary_wav = dir / "programme1.wav";
+    const std::vector<std::vector<float>> primary(6, std::vector<float>(48000, 0.0F));
+    const std::vector<float> commentary(48000, 0.0F);
+    REQUIRE(iclforge::ac3::io::write_wav_f32(primary_wav.string(), primary, 48000).has_value());
+    REQUIRE(iclforge::ac3::io::write_wav_f32(commentary_wav.string(),
+                                             std::vector<std::vector<float>>{commentary}, 48000)
+                .has_value());
+
+    const auto multi = dir / "multi_programme.ec3";
+    REQUIRE(run_cli("eac3-encode " + quoted(primary_wav) + " " + quoted(multi) +
+                        " 448 none 51 off programme2=" + quoted(commentary_wav) +
+                        " programme2-layout=mono programme2-bitrate=96",
+                    log) == 0);
+    return multi;
+}
+
 }  // namespace
 
 TEST_CASE("mkv reports the access units, layout and bytes it wrote", "[cli][mkv]") {
@@ -189,23 +220,69 @@ TEST_CASE("mp4 names the Atmos complexity index only when one was encoded", "[cl
     CHECK(fs::file_size(atmos_out) > 0);
 }
 
-TEST_CASE("mkv, mp4 and ts refuse an AC-3 core with E-AC-3 extension substreams",
-          "[cli][mkv][mp4][ts]") {
+TEST_CASE("mkv refuses an AC-3 core with E-AC-3 extension substreams, naming the registry's gap",
+          "[cli][mkv]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "legacy_core_mkv.log";
+    const auto source = dir / "legacy_core_mkv.ec3";
+    write_bytes(source, legacy_core_stream());
+
+    // Matroska's codec registry has A_AC3 for bsid 10 and below and A_EAC3 for
+    // 11 to 16, and no ID for a stream that is both.
+    CHECK(run_cli("mkv " + quoted(source) + " " + quoted(dir / "legacy_core.mkv"), log) == 2);
+    const auto report = read_log(log);
+    CHECK(report.find("AC-3 core with E-AC-3 extension") != std::string::npos);
+    CHECK(report.find("A_EAC3") != std::string::npos);
+}
+
+TEST_CASE("mp4, fmp4 and ts carry an AC-3 core with E-AC-3 extension substreams",
+          "[cli][mp4][fmp4][ts]") {
     const auto dir = scratch_dir();
     const auto log = dir / "legacy_core.log";
     const auto source = dir / "legacy_core.ec3";
-    write_bytes(source, legacy_core_stream());
+    const auto original = legacy_core_stream();
+    write_bytes(source, original);
 
-    // iclforge::ac3::io::scan reads this kind off the first two syncframes regardless
-    // of which command asks - one shared fixture, three refusals.
-    CHECK(run_cli("mkv " + quoted(source) + " " + quoted(dir / "legacy_core.mkv"), log) == 2);
-    CHECK(read_log(log).find("AC-3 core with E-AC-3 extension") != std::string::npos);
+    // §E2.3.1.2 makes the AC-3 frame independent substream 0 of an E-AC-3
+    // stream, and ETSI TS 102 366 F.6.2.5 sets dec3's bsid to the independent
+    // substream's own, so it is an 'ec-3' entry holding bsid 6.
+    SECTION("MP4: an ec-3 entry, and every byte comes back out") {
+        const auto mp4 = dir / "legacy_core.mp4";
+        REQUIRE(run_cli("mp4 " + quoted(source) + " " + quoted(mp4), log) == 0);
+        const auto file = read_file(mp4);
+        const std::string text{reinterpret_cast<const char*>(file.data()), file.size()};
+        CHECK(text.find("ec-3") != std::string::npos);
+        CHECK(text.find("dec3") != std::string::npos);
+        CHECK(text.find("ac-3") == std::string::npos);
+        CHECK(text.find("dac3") == std::string::npos);
 
-    CHECK(run_cli("mp4 " + quoted(source) + " " + quoted(dir / "legacy_core.mp4"), log) == 2);
-    CHECK(read_log(log).find("AC-3 core with E-AC-3 extension") != std::string::npos);
+        const auto back = dir / "legacy_core_mp4.back";
+        REQUIRE(run_cli("demux " + quoted(mp4) + " " + quoted(back), log) == 0);
+        CHECK(read_file(back) == original);
+    }
 
-    CHECK(run_cli("ts " + quoted(source) + " " + quoted(dir / "legacy_core.ts"), log) == 2);
-    CHECK(read_log(log).find("AC-3 core with E-AC-3 extension") != std::string::npos);
+    SECTION("MPEG-TS, in both profiles: every byte comes back out") {
+        for (const std::string profile : {"dvb", "atsc"}) {
+            CAPTURE(profile);
+            const auto ts = dir / ("legacy_core_" + profile + ".ts");
+            REQUIRE(run_cli("ts " + quoted(source) + " " + quoted(ts) + " " + profile, log) == 0);
+            const auto back = dir / ("legacy_core_" + profile + "_ts.back");
+            REQUIRE(run_cli("demux " + quoted(ts) + " " + quoted(back), log) == 0);
+            CHECK(read_file(back) == original);
+        }
+    }
+
+    SECTION("fmp4 writes its init segment, media segments and manifests") {
+        const auto out_dir = dir / "legacy_core_fmp4";
+        fs::remove_all(out_dir);
+        REQUIRE(run_cli("fmp4 " + quoted(source) + " " + quoted(out_dir) + " 1", log) == 0);
+        CHECK(fs::exists(out_dir / "init.mp4"));
+        CHECK(fs::exists(out_dir / "segment1.m4s"));
+        CHECK(fs::exists(out_dir / "manifest.mpd"));
+        const auto init = read_file(out_dir / "init.mp4");
+        const std::string text{reinterpret_cast<const char*>(init.data()), init.size()};
+        CHECK(text.find("ec-3") != std::string::npos);
+    }
 }
 
 TEST_CASE("mkv, mp4 and ts refuse a stream whose access units differ in length",
@@ -256,23 +333,7 @@ TEST_CASE("mkv warns and keeps only the first programme a stream carries", "[cli
     const auto dir = scratch_dir();
     const auto log = dir / "multi_programme.log";
 
-    // eac3-encode needs real WAV sources, one per programme - see
-    // docs/forge/cli/metadata-options.md's "Programme options" section for the
-    // programme2=/-layout=/-bitrate= tokens this builds with.
-    const auto primary_wav = dir / "programme0.wav";
-    const auto commentary_wav = dir / "programme1.wav";
-    const std::vector<std::vector<float>> primary(6, std::vector<float>(48000, 0.0F));
-    const std::vector<float> commentary(48000, 0.0F);
-    REQUIRE(iclforge::ac3::io::write_wav_f32(primary_wav.string(), primary, 48000).has_value());
-    REQUIRE(iclforge::ac3::io::write_wav_f32(commentary_wav.string(),
-                                   std::vector<std::vector<float>>{commentary}, 48000)
-                .has_value());
-
-    const auto multi = dir / "multi_programme.ec3";
-    REQUIRE(run_cli("eac3-encode " + quoted(primary_wav) + " " + quoted(multi) +
-                        " 448 none 51 off programme2=" + quoted(commentary_wav) +
-                        " programme2-layout=mono programme2-bitrate=96",
-                    log) == 0);
+    const auto multi = write_multi_programme_stream(dir, log);
 
     const auto out = dir / "multi_programme.mkv";
     REQUIRE(run_cli("mkv " + quoted(multi) + " " + quoted(out), log) == 0);
@@ -280,6 +341,84 @@ TEST_CASE("mkv warns and keeps only the first programme a stream carries", "[cli
     CHECK(report.find("2 programmes") != std::string::npos);
     CHECK(report.find("only programme 0 is muxed") != std::string::npos);
     CHECK(fs::file_size(out) > 0);
+}
+
+TEST_CASE("mp4, fmp4 and ts carry every programme a stream has", "[cli][mp4][fmp4][ts]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "multi_programme_all.log";
+    const auto multi = write_multi_programme_stream(dir, dir / "multi_programme_encode.log");
+    const auto original = read_file(multi);
+
+    // ETSI TS 102 366 F.2 and A/52 Annex G §3.3 define a sample or a PES
+    // payload as the syncframes of EVERY substream present, so what comes back
+    // out of the container is the stream, not its first programme.
+    SECTION("MP4 holds both programmes, with a dec3 that says two") {
+        const auto mp4 = dir / "multi_programme_all.mp4";
+        REQUIRE(run_cli("mp4 " + quoted(multi) + " " + quoted(mp4), log) == 0);
+        const auto report = read_log(log);
+        CHECK(report.find("warning") == std::string::npos);
+        CHECK(report.find("2 programmes") != std::string::npos);
+
+        const auto back = dir / "multi_programme_all_mp4.back";
+        REQUIRE(run_cli("demux " + quoted(mp4) + " " + quoted(back), log) == 0);
+        CHECK(read_file(back) == original);
+    }
+
+    SECTION("MPEG-TS holds both programmes in each PES payload") {
+        for (const std::string profile : {"dvb", "atsc"}) {
+            CAPTURE(profile);
+            const auto ts = dir / ("multi_programme_all_" + profile + ".ts");
+            REQUIRE(run_cli("ts " + quoted(multi) + " " + quoted(ts) + " " + profile, log) == 0);
+            CHECK(read_log(log).find("warning") == std::string::npos);
+            const auto back = dir / ("multi_programme_all_" + profile + "_ts.back");
+            REQUIRE(run_cli("demux " + quoted(ts) + " " + quoted(back), log) == 0);
+            CHECK(read_file(back) == original);
+        }
+    }
+
+    // programme=N is the way to a single-programme track: the programme alone,
+    // renumbered as independent substream 0, which is what a player takes.
+    SECTION("programme=1 carries the commentary alone, as substream 0, in every container") {
+        struct Case {
+            const char* command;
+            const char* ext;
+        };
+        for (const Case c : {Case{"mp4", "mp4"}, Case{"mkv", "mkv"}, Case{"ts", "ts"}}) {
+            CAPTURE(c.command);
+            const auto out = dir / (std::string{"multi_programme_p1."} + c.ext);
+            REQUIRE(run_cli(std::string{c.command} + " " + quoted(multi) + " " + quoted(out) +
+                                " programme=1",
+                            log) == 0);
+            CHECK(read_log(log).find("warning") == std::string::npos);
+            const auto back = dir / (std::string{"multi_programme_p1_"} + c.ext + ".back");
+            REQUIRE(run_cli("demux " + quoted(out) + " " + quoted(back), log) == 0);
+            const auto bytes = read_file(back);
+            const auto scanned = iclforge::ac3::io::scan(bytes);
+            REQUIRE(scanned.has_value());
+            REQUIRE(scanned->programmes.size() == 1);
+            CHECK(scanned->programmes[0].substreamid == 0);
+            CHECK(scanned->acmod == iclforge::ac3::Acmod::k1_0);
+            CHECK(scanned->channels == 1);
+        }
+    }
+
+    SECTION("a programme the stream does not carry is named and refused") {
+        CHECK(run_cli("mp4 " + quoted(multi) + " " + quoted(dir / "multi_programme_p5.mp4") +
+                          " programme=5",
+                      log) != 0);
+        const auto report = read_log(log);
+        CHECK(report.find("no programme 5") != std::string::npos);
+        CHECK(report.find("it carries 0, 1") != std::string::npos);
+    }
+
+    SECTION("fmp4 writes its segments without dropping a programme") {
+        const auto out_dir = dir / "multi_programme_all_fmp4";
+        fs::remove_all(out_dir);
+        REQUIRE(run_cli("fmp4 " + quoted(multi) + " " + quoted(out_dir) + " 1", log) == 0);
+        CHECK(read_log(log).find("warning") == std::string::npos);
+        CHECK(fs::exists(out_dir / "init.mp4"));
+        CHECK(fs::exists(out_dir / "segment1.m4s"));
+    }
 }
 
 TEST_CASE("demux reports what each container told it, sample rate included or not",
@@ -318,6 +457,84 @@ TEST_CASE("demux reports what each container told it, sample rate included or no
     }
 }
 
+namespace {
+
+std::uint32_t be32(const std::vector<std::byte>& bytes, std::size_t at) {
+    return (std::to_integer<std::uint32_t>(bytes[at]) << 24) |
+           (std::to_integer<std::uint32_t>(bytes[at + 1]) << 16) |
+           (std::to_integer<std::uint32_t>(bytes[at + 2]) << 8) |
+           std::to_integer<std::uint32_t>(bytes[at + 3]);
+}
+
+void put_be32(std::vector<std::byte>& bytes, std::size_t at, std::uint32_t value) {
+    for (int i = 0; i < 4; ++i) {
+        bytes[at + static_cast<std::size_t>(i)] =
+            static_cast<std::byte>((value >> (8 * (3 - i))) & 0xFFU);
+    }
+}
+
+// Rearranges what `forge mp4` writes (ftyp, moov, mdat) into the layout a
+// muxer that did not rewrite its file for "faststart" leaves: ftyp, mdat, moov.
+// Every chunk offset in stco counts from the start of the file, so moving the
+// moov behind the mdat moves the mdat forward by the moov's size and each
+// offset has to follow it.
+std::vector<std::byte> moov_last(const std::vector<std::byte>& mp4) {
+    const auto ftyp_size = be32(mp4, 0);
+    const auto moov_size = be32(mp4, ftyp_size);
+    REQUIRE(mp4[ftyp_size + 4] == std::byte{'m'});  // "moov"
+    std::vector<std::byte> moov(mp4.begin() + ftyp_size, mp4.begin() + ftyp_size + moov_size);
+    const std::string needle = "stco";
+    const auto found = std::search(moov.begin(), moov.end(), needle.begin(), needle.end(),
+                                   [](std::byte a, char b) { return a == static_cast<std::byte>(b); });
+    REQUIRE(found != moov.end());
+    const auto at = static_cast<std::size_t>(found - moov.begin());
+    // size(4) "stco"(4) version+flags(4) entry_count(4) entries(4 each)
+    const auto count = be32(moov, at + 8);
+    for (std::uint32_t i = 0; i < count; ++i) {
+        const auto entry = at + 12 + 4 * static_cast<std::size_t>(i);
+        put_be32(moov, entry, be32(moov, entry) - moov_size);
+    }
+    std::vector<std::byte> out(mp4.begin(), mp4.begin() + ftyp_size);
+    out.insert(out.end(), mp4.begin() + ftyp_size + moov_size, mp4.end());  // mdat
+    out.insert(out.end(), moov.begin(), moov.end());
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("demux reads an MP4 whose moov follows its mdat from a file, not from a pipe",
+          "[cli][demux][mp4]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "moov_last.log";
+    const auto source = dir / "moov_last.ac3";
+    const auto mp4 = dir / "moov_last_first.mp4";
+    // Four seconds, about 224 KB: past one 64 KiB read, so by the time the moov
+    // arrives behind the mdat a pipe has already let the audio go.
+    REQUIRE(run_cli("sine " + quoted(source) + " 4 448 440 60 51", log) == 0);
+    REQUIRE(run_cli("mp4 " + quoted(source) + " " + quoted(mp4), log) == 0);
+    const auto last = dir / "moov_last.mp4";
+    write_bytes(last, moov_last(read_file(mp4)));
+
+    SECTION("a path: the sample table is found by jumping over mdat") {
+        const auto back = dir / "moov_last.back";
+        REQUIRE(run_cli("demux " + quoted(last) + " " + quoted(back), log) == 0);
+        CHECK(read_file(back) == read_file(source));
+        CHECK(read_log(log).find("access units") != std::string::npos);
+    }
+
+    SECTION("a path, the layout every other file here has") {
+        const auto back = dir / "moov_first.back";
+        REQUIRE(run_cli("demux " + quoted(mp4) + " " + quoted(back), log) == 0);
+        CHECK(read_file(back) == read_file(source));
+    }
+
+    SECTION("a pipe: refused, and told to pass the path") {
+        const auto back = dir / "moov_last_stdin.back";
+        CHECK(run_cli("demux - " + quoted(back) + " < " + quoted(last), log) != 0);
+        CHECK(read_log(log).find("give demux the file's path") != std::string::npos);
+    }
+}
+
 // --------------------------------------------------------------------------
 // AC-4 carriage (AC-4 bitstream inspector): the real DEE fixture through mp4 and ts, and
 // back out through demux.
@@ -327,14 +544,6 @@ fs::path ac4_fixture() {
     return fs::path{ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR} / "ac4-stereo-64" / "dee.ac4";
 }
 
-std::vector<std::byte> read_file(const fs::path& path) {
-    std::ifstream in{path, std::ios::binary};
-    REQUIRE(in.good());
-    std::vector<char> chars{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
-    std::vector<std::byte> out(chars.size());
-    std::ranges::transform(chars, out.begin(), [](char c) { return static_cast<std::byte>(c); });
-    return out;
-}
 
 // A committed AC-4 stream as a decode test takes it: whole, or under the
 // sanitizers its first 40 sync frames, written to `prefix`.

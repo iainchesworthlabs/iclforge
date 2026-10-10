@@ -550,10 +550,21 @@ an AC-3 frame through a private `iclforge::ac3::FrameDecoder` and presents the r
 (independent, 0), and `decode_access_unit_core`'s existing §E3.8.2 combining - unchanged - lays
 the dependent's channels over it exactly as it would a normal Annex E bed. Measured against
 FFmpeg's own decode of the real FATE sample: 41.69 dB on the worst of the eight rendered
-channels, in the same range as every other spectral-extension-free sample in this corpus. No
-codec-config box is defined for the arrangement (`build_codec_config_box` returns nothing for
-it), so container muxing refuses it explicitly rather than emit a `dac3`/`dec3` box that
-contradicts its own `mdat`; `forge decode` remains the way to read one.
+channels, in the same range as every other spectral-extension-free sample in this corpus.
+
+Carrying one in a container was refused at first, on the reading that no box could describe it: a
+`dac3` has no field for the dependents and a `dec3` would have to call the core Annex E syntax.
+ETSI TS 102 366 Annex F says otherwise on both counts. F.1 asks for an EC3SampleEntry for every
+E-AC-3 bit stream, F.6.2.5 sets the box's `bsid` to "the same value as the bsid field in the
+independent substream" without limiting it to 16, and §E2.3.1.2 makes the core that independent
+substream. So `build_codec_config_box` writes the ordinary `dec3` with the core's `bsid`, and `forge
+mp4`, `fmp4` and `ts` carry the arrangement. FFmpeg 8.0.1 opens the MP4 as `ec-3`, 7.1, 672
+kbit/s and the transport streams as E-AC-3 7.1 in both profiles; `forge demux` returns the
+stream's bytes unchanged from each. What FFmpeg does not do is read the box's `chan_loc` (the
+layout comes out the same with the field zeroed), so that field is held to Table F.6.1's text and the unit test alone. Matroska stays
+refused: its registry has `A_AC3` for `bsid` 10 and below and `A_EAC3` for 11 to 16 (checked
+2026-10-10 against the codec registry on the specification's main branch), and no ID for a stream
+that is both.
 
 One more divergence was found and fixed rather than recorded:
 
