@@ -94,6 +94,15 @@ struct Support {
     // which a sink that offers both roles takes at the same limit. 0 when the sink does not say,
     // as a sink from before the key reads, and a server then sends what the spec allows.
     std::uint32_t max_chunk_bytes = 0;
+    // Per data type, the most channels (full-bandwidth and LFE) the sink decodes of a stream of
+    // that type, indexed by DataType; 0 when it states none, which a server reads as "no limit
+    // stated" and not as "none". A sink that refuses a wider syncframe states the figure it refuses
+    // at, so a server can send that stream another way rather than find out one burst at a time.
+    std::array<std::uint8_t, 3> max_coded_channels{};
+
+    [[nodiscard]] std::uint8_t max_coded_channels_of(DataType type) const {
+        return max_coded_channels[static_cast<std::size_t>(type)];
+    }
 };
 
 void write_support(json::Writer& w, const Support& support);

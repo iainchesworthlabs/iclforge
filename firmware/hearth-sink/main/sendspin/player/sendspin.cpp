@@ -181,6 +181,14 @@ bool g_board_changed = false;
     // CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CHUNK_BYTES): a server chunks to it, for PCM over
     // player@v1 as well as for bursts.
     s.max_chunk_bytes = static_cast<std::uint32_t>(kMaxChunkBytes);
+    // The widest syncframe the player decodes (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS):
+    // past it a syncframe is refused, so a server is told the figure rather than finding out a
+    // burst at a time. 0 in the build states nothing.
+    if (kMaxCodedChannels != 0) {
+        for (const ac::DataType type : s.data_types) {
+            s.max_coded_channels[static_cast<std::size_t>(type)] = static_cast<std::uint8_t>(kMaxCodedChannels);
+        }
+    }
     return s;
 }
 

@@ -306,6 +306,7 @@ is what a chunk carries, what the sink reports, and the settings the server can 
 | `decoder_settings` | string[] | Names of the decoder settings the sink accepts ([Settings](#settings)) |
 | `buffer_capacity` | integer | Maximum bytes of burst chunks held and not yet played, counting each chunk's whole plaintext message |
 | `max_chunk_bytes?` | integer | 1 to 1,048,576: the most bytes one chunk to the sink may be, counted as `buffer_capacity` counts a chunk (the whole plaintext message, header included, the encryption's tag not). It bounds a burst chunk and a `player@v1` PCM chunk alike, so a server that plays this sink PCM sizes its units to it; absent when the sink does not say, and a server then sends what its codec allows |
+| `max_coded_channels?` | object | Per data type name (`"ac3"`, `"eac3"`, `"ac4"`), 1 to 64: the most channels, full-bandwidth and LFE, the sink decodes of a stream of that type. A syncframe wider than it is refused, so a server sends such a stream another way. A type the object does not name has no stated limit, which is not a limit of none; absent when the sink states none for any type. A name a reader does not know is skipped |
 
 ### State object
 
@@ -472,8 +473,8 @@ continues in sync when the tone stops. `level_db` is inside `IdentifyTone`'s −
 The role is `v1` as defined here. Adding a value to `data_types` (AC-4 was added this way, by D11
 of [the AC-4 plan](ac4.md#d11-ac-4-over-iec-61937)) or a key to `decoder` settings does not change
 the version, because a server only sends what a sink listed. The same holds for an optional key in
-the support object or the state object: `max_chunk_bytes` and `layout` were added so, each absent
-from a sink that does not say, and a reader that does not know a key ignores it.
+the support object or the state object: `max_chunk_bytes`, `max_coded_channels` and `layout` were
+added so, each absent from a sink that does not say, and a reader that does not know a key ignores it.
 Anything that changes a field's meaning or the chunk layout is `_ac3forge_player@v2`, and a sink may
 list both.
 

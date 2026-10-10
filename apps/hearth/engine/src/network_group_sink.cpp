@@ -10,6 +10,7 @@
 #include "iclforge/sendspin/messages.hpp"
 #include "iclforge/sendspin/server_host.hpp"
 #include "iclforge/sendspin/session_driver.hpp"
+#include "sink_form.hpp"
 
 // The NetworkGroupSink over a real iclforge::sendspin::Group: everything here is a
 // translation between the two interfaces, as passthrough_sink.cpp and
@@ -35,22 +36,6 @@ constexpr std::int32_t kBitDepth = 32;
 [[nodiscard]] std::int32_t to_sample(float value) {
     const double scaled = std::clamp(static_cast<double>(value), -1.0, 1.0) * 2147483647.0;
     return static_cast<std::int32_t>(std::lround(scaled));
-}
-
-// The role's data type for a stream's bursts: every AC-4 link is one AC-4
-// stream to the role, which drops the link along with the sync words.
-[[nodiscard]] sendspin::player::DataType data_type_of(audio::BitstreamFormat format) {
-    switch (format) {
-        case audio::BitstreamFormat::kAc3:
-            return sendspin::player::DataType::kAc3;
-        case audio::BitstreamFormat::kEac3:
-            return sendspin::player::DataType::kEac3;
-        case audio::BitstreamFormat::kAc4:
-        case audio::BitstreamFormat::kAc4Hbr4:
-        case audio::BitstreamFormat::kAc4Hbr16:
-            break;
-    }
-    return sendspin::player::DataType::kAc4;
 }
 
 class GroupSink final : public NetworkGroupSink {

@@ -86,6 +86,8 @@ constexpr std::int32_t kMaxOutputDelay = 5000;
 // The largest chunk limit a sink may state: past AC-4's longest burst chunk (17 + 131,056 bytes)
 // and one WebSocket message's 65,518 (planning/hearth-sendspin-extension.md, Encryption).
 constexpr std::int32_t kMaxChunkBytes = 1 << 20;
+// The most channels a sink may state it decodes: past AC-4's immersive beds and a few objects.
+constexpr std::int32_t kMaxCodedChannels = 64;
 // The longest layout text a state may carry. A layout is a name or a speaker list, a few hundred
 // characters at the most.
 constexpr std::size_t kMaxLayoutText = 512;
@@ -236,6 +238,17 @@ void write_support(json::Writer& w, const Support& support) {
     if (support.max_chunk_bytes != 0) {
         w.key("max_chunk_bytes").unsigned_integer(support.max_chunk_bytes);
     }
+    const bool any_channel_limit = std::ranges::any_of(
+        support.max_coded_channels, [](std::uint8_t limit) { return limit != 0; });
+    if (any_channel_limit) {
+        w.key("max_coded_channels").begin_object();
+        for (const Named<DataType>& entry : kDataTypes) {
+            if (const std::uint8_t limit = support.max_coded_channels_of(entry.value); limit != 0) {
+                w.member(entry.name, static_cast<std::int32_t>(limit));
+            }
+        }
+        w.end_object();
+    }
     w.end_object();
 }
 
@@ -326,6 +339,25 @@ std::optional<Support> read_support(json::Value value) {
             return std::nullopt;
         }
         support.max_chunk_bytes = static_cast<std::uint32_t>(*bytes);
+    }
+    // Optional too, an object of data type name to channel count. A name this reader does not know
+    // is skipped as any unknown key is; a count that is not a count refuses the object.
+    if (const json::Value limits = value["max_coded_channels"]; limits.exists()) {
+        if (!limits.is_object()) {
+            return std::nullopt;
+        }
+        for (const Named<DataType>& entry : kDataTypes) {
+            const json::Value limit = limits[entry.name];
+            if (!limit.exists()) {
+                continue;
+            }
+            const std::optional<std::int32_t> channels = read_int32(limit, 1, kMaxCodedChannels);
+            if (!channels) {
+                return std::nullopt;
+            }
+            support.max_coded_channels[static_cast<std::size_t>(entry.value)] =
+                static_cast<std::uint8_t>(*channels);
+        }
     }
     return support;
 }
