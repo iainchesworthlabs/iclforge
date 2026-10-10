@@ -179,7 +179,7 @@ struct DecodeOptions {
     // The layer to reconstruct: 0 is the first Channel Group (the base layer), the last the full
     // layout. The last one when unset. Past the last is kInvalidArgument. Not consulted for
     // object-based and scene-based elements.
-    std::optional<std::size_t> layer;
+    std::optional<std::size_t> layer = std::nullopt;
     // Apply the Recon Gain Parameter Blocks to the channels the De-mixer rebuilds (7.2.3, with its
     // smoothing). Switched off, those channels are the plain output of the De-mixer.
     bool apply_recon_gain = true;
