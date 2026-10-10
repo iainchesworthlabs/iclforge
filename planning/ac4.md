@@ -4402,6 +4402,12 @@ outright, with no compatibility shim.
   rate mode (Part 2 5.1.3), in either direction, until a stream uses them.
 - The speech spectral frontend: in the decoder until a stream uses it (decision 2); in the encoder
   at all, since an encoder for it contains its decoder, with the five defects decision 2 lists.
+- A-SPX time-interleaved waveform coding in the encoder: a time-interleaved slot takes the core's
+  decoded waveform in every subband (Part 1 5.7.6.5.3), so a frame that sends one codes the whole
+  high band as waveform, which costs more than the rates A-SPX serves hold, and attacks have block
+  switching and VARVAR framing. The writer of its syntax (`aspx_tic_used_in_slot`) exists.
+- Bitstream versions 0 and 1 in the encoder's table of contents: it writes version 2, the decoder
+  reads all three.
 - Writing immersive stereo (`presentation_version` 2): V1.3.1 names the version without defining it,
   so the encoder does not copy DEE's use of it, while the decoder reads it by the observed rule
   (decision 10).
