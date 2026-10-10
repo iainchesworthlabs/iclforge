@@ -118,8 +118,8 @@ class DrawCase(unittest.TestCase):
 
     def test_the_space_drawn(self):
         cases = channel_cases(2000)
-        self.assertEqual({c.channels for c in cases},
-                         set(fa4.CHANNELS) | set(fa4.IMMERSIVE_CHANNELS) | set(fa4.NINE_X_4_CHANNELS))
+        drawn = set(fa4.CHANNELS) | set(fa4.IMMERSIVE_CHANNELS) | set(fa4.NINE_X_4_CHANNELS)
+        self.assertEqual({c.channels for c in cases}, drawn)
         # Seven and eight channels always name a 7.X pair, and nothing else does; 5.X and 7.X
         # never draw a rate in range below their least.
         for case in cases:
