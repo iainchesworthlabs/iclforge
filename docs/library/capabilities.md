@@ -247,7 +247,8 @@ load-bearing enough to flag up front:
     192 kHz, everything but the SIMPLE codec mode with the output level and the downmix. It decodes
     the speech spectral frontend, the efficient high frame rate mode, the 9.X.4 modes and 96 and
     192 kHz from the text alone: no stream from outside the project uses any of them (the encoder
-    writes the efficient high frame rate mode, behind an experimental option). Object audio has no reference decode to compare with: librempeg
+    writes the efficient high frame rate mode, the 9.X.4 modes and 22.2, behind experimental
+    options). Object audio has no reference decode to compare with: librempeg
     refuses object coding, and DEE writes no A-JOC from this project's masters, so A-JOC is
     checked against constructed streams and one third-party file, Chromium's `ac4-ajoc.ac4`, which
     is kept out of the tree. The encoder's objects are experimental, and no reader outside the
