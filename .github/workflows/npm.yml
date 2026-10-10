@@ -102,12 +102,21 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
-      # npm trusted publishing needs npm CLI >= 11.5.1 - not trusting whatever version
-      # actions/setup-node's chosen Node release happens to bundle. An exact version,
-      # not `latest`: a publish step should not change under a new npm major (12.x
-      # exists) on the day a tag is pushed. Raise it by hand, on purpose.
-      - name: Install npm 11.21.0 (needs >= 11.5.1)
-        run: npm install -g npm@11.21.0
+      # npm trusted publishing needs npm CLI >= 11.5.1. The npm that setup-node's Node 24
+      # bundles is far past that, so this step does not install one (an `npm install -g`
+      # is an install outside any lockfile, which is what zizmor's adhoc-packages and
+      # Scorecard's pinned-dependencies both report). It checks the bundled one instead,
+      # and fails the run before anything is published if a Node release ever ships older.
+      - name: Require npm >= 11.5.1 (trusted publishing)
+        run: |
+          set -euo pipefail
+          have="$(npm --version)"
+          echo "npm ${have}"
+          oldest="$({ echo 11.5.1; echo "${have}"; } | sort -V | head -n 1)"
+          if [ "${oldest}" != "11.5.1" ]; then
+            echo "::error::npm ${have} is older than 11.5.1, which npm trusted publishing needs."
+            exit 1
+          fi
 
       - name: Install
         working-directory: bindings/js
