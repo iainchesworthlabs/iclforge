@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 102> kOptionTokens{{
+constexpr std::array<OptionToken, 103> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -151,6 +151,9 @@ constexpr std::array<OptionToken, 102> kOptionTokens{{
     {"json=", "probe: emit the JSON document instead of the human table"},
     {"detail=", "probe: frames or blocks - add per-access-unit/per-block detail"},
     {"fallback-51", "fmp4: also write the object-stripped 5.1 companion rendition"},
+    {"insert", "metadata: add a field the stream does not carry (compr=, compr2=, bsmod=, "
+               "dsurmod=) instead of refusing it - E-AC-3 independent substreams only, and "
+               "every syncframe that gains one grows by a word or two"},
     {"mainid=", "ts: this service's A/52 Annex A main-service number"},
     {"asvc=", "ts: the main service(s) this one is associated with (A/52 Annex A) - a raw "
              "0-255/0x00-0xFF mask, or a comma list of main-service numbers, e.g. asvc=0,2"},
@@ -673,6 +676,13 @@ void print_stream_tools_topic() {
     fmt::println("metadata/normalize rewrite bsi fields in place and re-stamp the CRCs, cut/cat");
     fmt::println("move whole access units. Convertible substreams (strmtyp 2) are out of scope");
     fmt::println("for all five, the same way 'validate' already refuses them.");
+    fmt::println("");
+    fmt::println("metadata can only overwrite a field the stream already transmits. A field it");
+    fmt::println("does not (compr behind a clear compre, bsmod and dsurmod behind a clear");
+    fmt::println("infomdate) is refused - unless the stream is E-AC-3 and 'insert' is given,");
+    fmt::println("which adds it to every independent substream and lengthens that syncframe by");
+    fmt::println("the field and the padding to a whole word. A frame that carries block start");
+    fmt::println("information or auxiliary data cannot be lengthened and is refused by name.");
 }
 
 void print_objects_topic() {

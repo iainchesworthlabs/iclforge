@@ -16,6 +16,7 @@
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/io/metadata_edit.hpp"
 #include "iclforge/ac3/meta/drc.hpp"
+#include "iclforge/base/bitwriter.hpp"
 
 // iclforge::ac3::io::edit_frame_metadata rewrites bsi fields in an already-encoded
 // stream and re-stamps its CRCs. Two claims are worth pinning, and they pull
@@ -685,13 +686,355 @@ TEST_CASE("reserved and foreign syncframe headers are refused before anything is
     refused({}, EditError::kTruncated);
 }
 
+
+// --- insert_*: adding a field an E-AC-3 independent substream lacks ---------
+//
+// What an insert must keep is the audio: every block is copied bit for bit, so
+// the decoder - which refuses a frame whose CRC is wrong - must produce the
+// same PCM as it did for the original. What it must change is the length, by
+// the field plus whatever padding makes up a whole 16-bit word.
+
+namespace {
+
+iclforge::ac3::eac3::AccessUnitConfig stereo_config() {
+    iclforge::ac3::eac3::AccessUnitConfig config;
+    config.independent = {.bitrate_kbps = 192, .acmod = iclforge::ac3::Acmod::k2_0};
+    return config;
+}
+
+// A syncframe built from Table E1.2 and E1.3 and nothing else - a header and
+// zeros for the audio - so a test can put a flag or a field exactly where the
+// syntax says and see whether an insert reads the frame the same way. Stereo,
+// six blocks, 128 bytes, an independent substream with no metadata groups.
+struct SyntheticFrame {
+    bool ahte = false;
+    // chexpstr[blk] for both channels, 2 bits each, when expstre is 1 (blocks 0..5).
+    std::array<int, 6> chexpstr = {1, 0, 0, 0, 0, 0};
+    bool blkstrtinfoe = false;
+    bool auxdatae = false;
+};
+
+std::vector<std::byte> build_synthetic(const SyntheticFrame& s) {
+    constexpr std::size_t kBytes = 128;
+    iclforge::BitWriter w;
+    w.put(0x0B77, 16);
+    w.put(0, 2);                  // strmtyp
+    w.put(0, 3);                  // substreamid
+    w.put(kBytes / 2 - 1, 11);    // frmsiz
+    w.put(0, 2);                  // fscod 48 kHz
+    w.put(3, 2);                  // numblkscod: six blocks
+    w.put(2, 3);                  // acmod 2/0
+    w.put(0, 1);                  // lfeon
+    w.put(16, 5);                 // bsid
+    w.put(27, 5);                 // dialnorm
+    w.put(0, 1);                  // compre
+    w.put(0, 1);                  // mixmdate
+    w.put(0, 1);                  // infomdate
+    w.put(0, 1);                  // addbsie
+    // audfrm
+    w.put(1, 1);                  // expstre
+    w.put(s.ahte ? 1 : 0, 1);     // ahte
+    w.put(0, 2);                  // snroffststr
+    w.put(0, 1);                  // transproce
+    w.put(0, 1);                  // blkswe
+    w.put(0, 1);                  // dithflage
+    w.put(0, 1);                  // bamode
+    w.put(0, 1);                  // frmfgaincode
+    w.put(0, 1);                  // dbaflde
+    w.put(0, 1);                  // skipflde
+    w.put(0, 1);                  // spxattene
+    w.put(0, 1);                  // cplinu[0]
+    for (int blk = 1; blk < 6; ++blk) {
+        w.put(0, 1);              // cplstre[blk]
+    }
+    for (int blk = 0; blk < 6; ++blk) {
+        for (int ch = 0; ch < 2; ++ch) {
+            w.put(static_cast<std::uint32_t>(s.chexpstr[static_cast<std::size_t>(blk)]), 2);
+        }
+    }
+    w.put(0, 5);                  // convexpstr[0]
+    w.put(0, 5);                  // convexpstr[1]
+    if (s.ahte) {
+        // §3.4.2: a channel whose exponents are sent once has a chahtinu flag.
+        for (int ch = 0; ch < 2; ++ch) {
+            int regs = 0;
+            for (int blk = 0; blk < 6; ++blk) {
+                regs += s.chexpstr[static_cast<std::size_t>(blk)] != 0 ? 1 : 0;
+            }
+            if (regs == 1) {
+                w.put(1, 1);      // chahtinu
+            }
+        }
+    }
+    w.put(0, 6);                  // frmcsnroffst
+    w.put(0, 4);                  // frmfsnroffst
+    w.put(s.blkstrtinfoe ? 1 : 0, 1);
+    while (w.bit_count() < kBytes * 8 - 18) {
+        w.put(0, 1);
+    }
+    w.put(s.auxdatae ? 1 : 0, 1);  // auxdatae
+    w.put(0, 1);                   // crcrsv
+    w.put(0, 16);                  // crc2, stamped below
+    auto frame = w.take();
+    REQUIRE(frame.size() == kBytes);
+    REQUIRE(iclforge::ac3::io::restamp_crc(frame).has_value());
+    return frame;
+}
+
+}  // namespace
+
+TEST_CASE("an insert adds compr to every independent substream and the audio does not move",
+          "[metadata-edit][insert]") {
+    const auto original = eac3_stream(stereo_config());
+    iclforge::ac3::DecodedAccessUnit before_meta{};
+    const auto before = decode_eac3(original, before_meta);
+
+    // The frames carry no compr, which is what an in-place edit refuses.
+    REQUIRE_FALSE(iclforge::ac3::io::read_frame_metadata(original)->compr.has_value());
+    auto in_place = original;
+    REQUIRE_FALSE(iclforge::ac3::io::edit_stream_metadata(in_place, {.compr = 0x40}).has_value());
+
+    const auto grown = iclforge::ac3::io::insert_stream_metadata(original, {.compr = 0x40});
+    REQUIRE(grown.has_value());
+    CHECK(grown->summary.syncframes == 3);
+    CHECK(grown->summary.changed == 3);
+    CHECK(grown->grown == 3);
+    // Eight bits of compr into a frame that was a whole number of words: the
+    // next whole word up, two bytes a frame.
+    CHECK(grown->added_bytes == 3 * 2);
+    CHECK(grown->bytes.size() == original.size() + grown->added_bytes);
+
+    const auto meta = iclforge::ac3::io::read_frame_metadata(grown->bytes);
+    REQUIRE(meta.has_value());
+    CHECK(meta->compr == std::optional<std::uint8_t>{0x40});
+    CHECK(meta->dialnorm == before_meta.dialnorm);
+
+    // The CRC held (the decoder would have refused the frame), the stream still
+    // frames, and not one sample differs.
+    const auto scanned = iclforge::ac3::io::scan(grown->bytes);
+    REQUIRE(scanned.has_value());
+    CHECK(scanned->access_units.size() == 3);
+    iclforge::ac3::DecodedAccessUnit after_meta{};
+    const auto after = decode_eac3(grown->bytes, after_meta);
+    REQUIRE(after.size() == before.size());
+    CHECK(after == before);
+}
+
+TEST_CASE("an insert adds bsmod and dsurmod together, and dsurmod is its own field",
+          "[metadata-edit][insert]") {
+    const auto original = eac3_stream(stereo_config());
+    iclforge::ac3::DecodedAccessUnit before_meta{};
+    const auto before = decode_eac3(original, before_meta);
+    REQUIRE_FALSE(iclforge::ac3::io::read_frame_metadata(original)->bsmod.has_value());
+
+    SECTION("both named") {
+        const auto grown =
+            iclforge::ac3::io::insert_stream_metadata(original, {.bsmod = 2, .dsurmod = 2});
+        REQUIRE(grown.has_value());
+        const auto meta = iclforge::ac3::io::read_frame_metadata(grown->bytes);
+        REQUIRE(meta.has_value());
+        CHECK(meta->bsmod == std::optional<int>{2});
+        CHECK(meta->dsurmod == std::optional<int>{2});
+        iclforge::ac3::DecodedAccessUnit after_meta{};
+        CHECK(decode_eac3(grown->bytes, after_meta) == before);
+    }
+
+    SECTION("only dsurmod: the service type defaults to complete main") {
+        const auto grown = iclforge::ac3::io::insert_stream_metadata(original, {.dsurmod = 1});
+        REQUIRE(grown.has_value());
+        const auto meta = iclforge::ac3::io::read_frame_metadata(grown->bytes);
+        REQUIRE(meta.has_value());
+        CHECK(meta->bsmod == std::optional<int>{0});
+        CHECK(meta->dsurmod == std::optional<int>{1});
+    }
+
+    SECTION("a second pass finds the fields present and overwrites them in place") {
+        const auto first = iclforge::ac3::io::insert_stream_metadata(original, {.bsmod = 2});
+        REQUIRE(first.has_value());
+        const auto second = iclforge::ac3::io::insert_stream_metadata(first->bytes, {.bsmod = 5});
+        REQUIRE(second.has_value());
+        CHECK(second->grown == 0);
+        CHECK(second->bytes.size() == first->bytes.size());
+        CHECK(iclforge::ac3::io::read_frame_metadata(second->bytes)->bsmod ==
+              std::optional<int>{5});
+    }
+}
+
+TEST_CASE("an insert grows an independent substream and leaves its dependents as they were",
+          "[metadata-edit][insert]") {
+    namespace cm = iclforge::ac3::eac3::chanmap;
+    iclforge::ac3::eac3::AccessUnitConfig config;
+    config.independent = {
+        .bitrate_kbps = 448, .acmod = iclforge::ac3::Acmod::k3_2, .lfe = true, .dialnorm = 25};
+    config.dependents.push_back(
+        {.bitrate_kbps = 192, .acmod = iclforge::ac3::Acmod::k2_0, .chanmap = cm::k512Height});
+    const auto original = eac3_stream(config);
+    iclforge::ac3::DecodedAccessUnit before_meta{};
+    const auto before = decode_eac3(original, before_meta);
+
+    const auto grown =
+        iclforge::ac3::io::insert_stream_metadata(original, {.compr = 0x30, .bsmod = 1});
+    REQUIRE(grown.has_value());
+    // Six syncframes, half of them dependents: only the three independent
+    // ones took a field, and a dependent's own bytes are what they were.
+    CHECK(grown->summary.syncframes == 6);
+    CHECK(grown->grown == 3);
+
+    const auto units = iclforge::ac3::split_access_units(grown->bytes);
+    REQUIRE(units.has_value());
+    REQUIRE(units->size() == 3);
+    iclforge::ac3::DecodedAccessUnit after_meta{};
+    const auto after = decode_eac3(grown->bytes, after_meta);
+    CHECK(after_meta.substream_count == 2);
+    REQUIRE(after.size() == before.size());
+    CHECK(after == before);
+}
+
+TEST_CASE("an insert survives the coding tools that make an audio frame header long",
+          "[metadata-edit][insert]") {
+    // Coupling, spectral extension and AHT each add fields ahead of the point
+    // where block start information would be. A walk that miscounted any of
+    // them would read blkstrtinfoe from the wrong bit, and half the time that
+    // reads as set - so a refusal here is the symptom.
+    struct Shape {
+        const char* name;
+        bool coupling;
+        bool spx;
+        bool aht;
+    };
+    for (const Shape shape : {Shape{"plain", false, false, false}, Shape{"coupling", true, false, false},
+                              Shape{"spx", false, true, false}, Shape{"aht", false, false, true},
+                              Shape{"all", true, true, true}}) {
+        CAPTURE(shape.name);
+        iclforge::ac3::eac3::AccessUnitConfig config;
+        config.independent = {.bitrate_kbps = 384,
+                              .acmod = iclforge::ac3::Acmod::k3_2,
+                              .lfe = true,
+                              .coupling = shape.coupling,
+                              .spx = shape.spx,
+                              .aht = shape.aht};
+        const auto original = eac3_stream(config, 4);
+        iclforge::ac3::DecodedAccessUnit before_meta{};
+        const auto before = decode_eac3(original, before_meta);
+
+        const auto grown = iclforge::ac3::io::insert_stream_metadata(original, {.compr = 0x22});
+        REQUIRE(grown.has_value());
+        CHECK(grown->grown == 4);
+        iclforge::ac3::DecodedAccessUnit after_meta{};
+        const auto after = decode_eac3(grown->bytes, after_meta);
+        REQUIRE(after.size() == before.size());
+        CHECK(after == before);
+    }
+}
+
+TEST_CASE("an insert refuses what it cannot move, and says why", "[metadata-edit][insert]") {
+    using iclforge::ac3::io::EditError;
+
+    SECTION("block start information") {
+        // blkstrtinfo holds each block's offset from the start of the frame.
+        // The same frame without the flag takes the insert.
+        const auto plain = build_synthetic({});
+        const auto ok = iclforge::ac3::io::insert_frame_metadata(plain, {.compr = 0x40});
+        REQUIRE(ok.has_value());
+        CHECK(ok->grew);
+
+        const auto flagged = build_synthetic({.blkstrtinfoe = true});
+        const auto refused = iclforge::ac3::io::insert_frame_metadata(flagged, {.compr = 0x40});
+        REQUIRE_FALSE(refused.has_value());
+        CHECK(refused.error() == EditError::kCannotInsert);
+    }
+
+    SECTION("block start information behind AHT's presence flags") {
+        // chexpstr sent once per channel puts a chahtinu flag in front of the
+        // field; sent twice it puts none. Either way the flag must be found.
+        for (const auto& pattern : {std::array<int, 6>{1, 0, 0, 0, 0, 0},
+                                    std::array<int, 6>{1, 0, 0, 1, 0, 0}}) {
+            CAPTURE(pattern);
+            const auto flagged =
+                build_synthetic({.ahte = true, .chexpstr = pattern, .blkstrtinfoe = true});
+            const auto refused = iclforge::ac3::io::insert_frame_metadata(flagged, {.compr = 0x40});
+            REQUIRE_FALSE(refused.has_value());
+            CHECK(refused.error() == EditError::kCannotInsert);
+
+            const auto clear = build_synthetic({.ahte = true, .chexpstr = pattern});
+            const auto taken = iclforge::ac3::io::insert_frame_metadata(clear, {.compr = 0x40});
+            REQUIRE(taken.has_value());
+            CHECK(taken->grew);
+        }
+    }
+
+    SECTION("auxiliary data against the tail") {
+        const auto frame = build_synthetic({.auxdatae = true});
+        const auto refused = iclforge::ac3::io::insert_frame_metadata(frame, {.compr = 0x40});
+        REQUIRE_FALSE(refused.has_value());
+        CHECK(refused.error() == EditError::kCannotInsert);
+    }
+
+    SECTION("an AC-3 frame has nowhere to put the bits") {
+        const auto stream = ac3_stream({.bitrate_kbps = 192, .acmod = iclforge::ac3::Acmod::k2_0});
+        const auto refused = iclforge::ac3::io::insert_stream_metadata(stream, {.compr = 0x40});
+        REQUIRE_FALSE(refused.has_value());
+        CHECK(refused.error() == EditError::kFieldAbsent);
+    }
+
+    SECTION("a field no frame of the stream can carry") {
+        const auto stream = eac3_stream(stereo_config());
+        // 2/0 has no dialnorm2, and a stereo frame has no compr2.
+        const auto no_ch2 = iclforge::ac3::io::insert_stream_metadata(stream, {.dialnorm2 = 12});
+        REQUIRE_FALSE(no_ch2.has_value());
+        CHECK(no_ch2.error() == EditError::kFieldAbsent);
+        const auto no_compr2 = iclforge::ac3::io::insert_stream_metadata(stream, {.compr2 = 1});
+        REQUIRE_FALSE(no_compr2.has_value());
+        CHECK(no_compr2.error() == EditError::kFieldAbsent);
+    }
+
+    SECTION("an out-of-range value, before anything is built") {
+        const auto stream = eac3_stream(stereo_config());
+        const auto bad = iclforge::ac3::io::insert_stream_metadata(stream, {.bsmod = 9});
+        REQUIRE_FALSE(bad.has_value());
+        CHECK(bad.error() == EditError::kOutOfRange);
+    }
+}
+
+TEST_CASE("an insert into a 1+1 stream adds compr2 behind its own flag", "[metadata-edit][insert]") {
+    iclforge::ac3::eac3::AccessUnitConfig config;
+    config.independent = {.bitrate_kbps = 192,
+                            .acmod = iclforge::ac3::Acmod::kDualMono,
+                            .dialnorm = 22,
+                            .dialnorm2 = 18};
+    const auto original = eac3_stream(config);
+    iclforge::ac3::DecodedAccessUnit before_meta{};
+    const auto before = decode_eac3(original, before_meta);
+
+    const auto grown = iclforge::ac3::io::insert_stream_metadata(original, {.compr = 0x41, .compr2 = 0x42});
+    REQUIRE(grown.has_value());
+    const auto meta = iclforge::ac3::io::read_frame_metadata(grown->bytes);
+    REQUIRE(meta.has_value());
+    CHECK(meta->compr == std::optional<std::uint8_t>{0x41});
+    CHECK(meta->compr2 == std::optional<std::uint8_t>{0x42});
+    iclforge::ac3::DecodedAccessUnit after_meta{};
+    CHECK(decode_eac3(grown->bytes, after_meta) == before);
+}
+
+TEST_CASE("insert_stream_metadata with nothing to add is edit_stream_metadata", "[metadata-edit][insert]") {
+    const auto original = eac3_stream(stereo_config());
+    auto in_place = original;
+    REQUIRE(iclforge::ac3::io::edit_stream_metadata(in_place, {.dialnorm = 11}).has_value());
+
+    const auto inserted = iclforge::ac3::io::insert_stream_metadata(original, {.dialnorm = 11});
+    REQUIRE(inserted.has_value());
+    CHECK(inserted->grown == 0);
+    CHECK(inserted->bytes == in_place);
+}
+
 TEST_CASE("describe() gives every EditError a distinct, non-empty message", "[metadata-edit]") {
     const iclforge::ac3::io::EditError all[] = {iclforge::ac3::io::EditError::kBadSyncWord,
                                                 iclforge::ac3::io::EditError::kTruncated,
                                                 iclforge::ac3::io::EditError::kUnsupportedBsid,
                                                 iclforge::ac3::io::EditError::kReservedValue,
                                                 iclforge::ac3::io::EditError::kFieldAbsent,
-                                                iclforge::ac3::io::EditError::kOutOfRange};
+                                                iclforge::ac3::io::EditError::kOutOfRange,
+                                                iclforge::ac3::io::EditError::kCannotInsert};
     for (std::size_t i = 0; i < std::size(all); ++i) {
         CHECK_FALSE(iclforge::ac3::io::describe(all[i]).empty());
         for (std::size_t j = i + 1; j < std::size(all); ++j) {

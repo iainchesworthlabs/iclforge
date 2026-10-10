@@ -373,6 +373,12 @@ struct Options {
     // writes exactly the single-rendition directory it always has, and a
     // stream with no object layer has no companion to write anyway.
     bool hls_fallback_51 = false;
+    // 'metadata' only: add a field the stream does not transmit instead of
+    // refusing it. Off by default because it is not an in-place edit - the
+    // syncframes that gain a field get longer (E-AC-3 independent substreams
+    // only; see iclforge::ac3::io::insert_stream_metadata), and a stream that
+    // was a constant rate no longer is.
+    bool insert_missing = false;
     // 'ts' only, both broadcast profiles: the identification values neither
     // registry's descriptor can read off the bitstream because they describe
     // how services in a multiplex RELATE, not what one elementary stream

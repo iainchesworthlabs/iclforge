@@ -126,6 +126,27 @@ const auto summary = iclforge::ac3::io::edit_stream_metadata(stream, {.dialnorm 
 group and AC-3's two `bsi` downmix levels — and which of the rewritable fields it transmits at
 all.
 
+**A field the stream does not transmit** (`compr` behind a clear `compre`, `bsmod` and `dsurmod`
+behind a clear `infomdate`) is `kFieldAbsent` to `edit_stream_metadata`, which only overwrites.
+`insert_stream_metadata` adds it, for E-AC-3:
+
+```cpp
+const auto grown = iclforge::ac3::io::insert_stream_metadata(stream, {.compr = 0x40, .bsmod = 2});
+// grown->bytes is a new stream; grown->grown syncframes got longer, by grown->added_bytes
+```
+
+Putting bits into the front of a syncframe moves every later bit, so the frame gets longer: E-AC-3's
+`frmsiz` is a free 11-bit length, and the padding that makes up the last whole 16-bit word is
+`auxbits` ahead of an `auxdatae` of zero, which is how the encoder pads. The audio blocks are
+copied bit for bit and the frame's CRC is re-stamped, so a decoder produces the same samples; what
+changes is each lengthened frame's size, by one or two words. Three things refuse the insert by
+name (`kCannotInsert`) rather than guess: block start information (`blkstrtinfo` holds each
+block's offset from the frame start, so every one would be wrong), auxiliary data (it is found by
+walking back from the tail, and padding must not come between the two), and a substream that is
+not independent. AC-3 cannot take it at all: its frame size is a code (`frmsizecod`) that fixes the
+bit rate, and room inside it would have to be found by walking all six audio blocks to where the
+audio ends. An AC-3 frame lacking the field stays `kFieldAbsent`.
+
 The CRCs are the part that is not obvious. `crc2` is an ordinary trailing CRC. `crc1` is not:
 A/52 §7.10.1 puts it **before** the region it protects and requires the register to read zero
 once the first 5/8 of the syncframe has been shifted through, so it has to be *solved* rather

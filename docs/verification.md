@@ -778,16 +778,28 @@ confirmed on a session written segment-by-segment by the streaming writer, not o
 form. The `ceao` compatibility brand is present in the `ftyp` and every `styp` of an
 object-audio track and does not disturb that decode.
 
-What has **not** been checked against anything external is the *meaning* of the DASH signalling.
+The manifests' *structure* is held to ISO/IEC 23009-1's own schema. `tools/checks/verify_dash_schema.py`
+fetches MPEG's `DASHSchema` at a pinned commit (with the two W3C schemas it imports, all
+SHA-256-pinned, never committed), writes the manifests `forge fmp4` produces - an AC-3 5.1, an
+E-AC-3 stereo, a Dolby Atmos JOC stream with and without the 5.1 fallback, and an AC-4 from the
+committed baseline - and validates each, with a deliberately corrupted copy that the same validator
+must reject (a validator that cannot fail proves nothing). Checked 2026-10-10 against commit
+`cc941bd` with .NET's XSD 1.0 validator on Windows, and in `interop.yml` with `xmllint` (libxml2)
+the same day: all five valid and the control rejected under each. That covers element order and nesting, attribute types, required
+attributes and the URI and duration patterns - the parts FFmpeg's demuxer, which takes what it
+needs and ignores the rest, never tests.
+
+What has **not** been checked against anything external is the *meaning* of the DASH signalling,
+which the schema cannot see: it leaves a descriptor's `schemeIdUri` and `value` as free strings.
 `EC3_ExtensionType`/`EC3_ExtensionComplexityIndex` and the Dolby
 `audio_channel_configuration:2011` `@value` are transcribed from ETSI TS 103 420 clause D.2 and
 TS 102 366 clause I.1.2.1 (via DASH-IF IOP Part 8 v5.0.0 §5.3.2–5.3.3) and asserted against those
 clause texts in `libs/ac3/tests/test_fmp4.cpp`, including the element order ISO/IEC 23009-1's
 `RepresentationBaseType` sequence requires — but FFmpeg's DASH demuxer ignores supplemental
 descriptors entirely, so it confirms only that the manifest still parses and plays, not that a
-JOC-aware player would read the right complexity index from it. No MPD schema validator and no
-real DASH player has been run against these manifests. The same gap applies to the HLS
-`CHANNELS="<N>/JOC"` attribute, which predates this work.
+JOC-aware player would read the right complexity index from it. No real DASH player has been run
+against these manifests. The same gap applies to the HLS `CHANNELS="<N>/JOC"` attribute, which
+predates this work.
 
 The incremental writers are held to a stronger in-repo standard instead: `iclforge::containers::mp4::FragmentWriter`'s
 media segments are asserted byte-identical to `iclforge::containers::mp4::fragment`'s over the same frames, and its

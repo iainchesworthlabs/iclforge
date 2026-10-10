@@ -53,6 +53,25 @@ The sections below contain the complete change list and fixes.
   says, in bounded memory. `forge demux` uses it for a file path, so a file whose `moov` follows
   its `mdat` reads instead of being refused; from a pipe it is still refused, with the reason.
 
+**Stream carriage: checked**
+
+- **`forge fmp4`'s DASH manifests are validated against ISO/IEC 23009-1's schema.**
+  `tools/checks/verify_dash_schema.py` fetches MPEG's `DASHSchema` at a pinned commit, writes an
+  AC-3, an E-AC-3, two Atmos JOC and an AC-4 manifest, and validates each with `xmllint` (or .NET's
+  XSD validator where there is none) beside a corrupted copy it must reject. It runs in
+  `interop.yml`. What a Dolby descriptor means is not something the schema can say.
+
+**Metadata: insert a field an E-AC-3 stream lacks**
+
+- **`forge metadata ... insert` and `insert_stream_metadata()`.** `compr`, `compr2`, `bsmod` and
+  `dsurmod` were refused on a stream that did not already transmit them, because putting the bits in
+  moves every later bit. E-AC-3's frame length is free, so the field is inserted into every
+  independent substream, the frame is padded to a whole word with `auxbits`, `frmsiz` follows and
+  the CRC is re-stamped; the audio blocks are copied bit for bit. The decoder and FFmpeg 8.0.1
+  (with `-err_detect crccheck+bitstream`) decode the grown stream to the same samples. Frames with
+  block start information or auxiliary data are refused by name, and AC-3 cannot take it (its frame
+  size is a code). `fuzz_scan` drives the edit and the insert.
+
 **Stream carriage: fixed**
 
 - **`dec3`'s `chan_loc` was always 0.** F.5.2 has a player ignore the sample entry's
