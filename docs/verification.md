@@ -1832,6 +1832,20 @@ encoder-space harness's object draws. MediaInfo's reading of the object count an
 move as their metadata says is the listener's to hear, from the streams the test writes with
 `AC4_ENCODER_WRITE_LISTENING` set.
 
+The encoder's efficient high frame rate mode (`experimental.frame_rate_fraction`,
+`libs/ac4/tests/encoder/test_encoder.cpp`) is checked against the decoder's reassembly alone, which
+`libs/ac4/tests/decoder/test_ehfr.cpp` holds to DEE's streams cut into fragments by a test helper: at 120 fps in quarters, 60 fps in
+halves and 119.88 fps in quarters, every transmission frame carries the stream's index and the
+fraction, the counters run on from a multiple of it, only the first of a unit is an I-frame, the
+decoder's units are as many as the codec frames and hold the tone at unity gain and the plain
+stream's quality at the audio frame rate, and its syntax trace reads back as the encoder's. MediaInfo
+(MediaInfoLib 26.05, `--Details=1`) reads the table of contents of each frame of such a stream, the
+`frame_rate_index` 12 with `b_frame_rate_fraction` and `b_frame_rate_fraction_is_4`, and gives the
+frame rate as 120 fps of 400 samples; it details no audio. DEE's `dee_mp4muxer` muxes a plain 120 fps
+stream and crashes (a segmentation fault, exit 139) on both a 120 fps stream in quarters and a 60 fps
+stream in halves, so it does not take the mode's fragments (checked by hand on 2026-10-10, not by
+a script). No decoder other than this project's has read one.
+
 ### IEC 61937
 
 AC-4's burst types (IEC 61937-14, phase D11) have no oracle: nothing else here writes or reads

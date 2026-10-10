@@ -4401,7 +4401,7 @@ outright, with no compatibility shim.
 - 9.X.4's own streams: the modes are decoded, as 22.2 is, without one, and checked on constructed
   streams alone.
 - Presentations spread over several elementary streams (Part 2 5.1.2), in either direction, until a
-  stream uses them. The efficient high frame rate mode (Part 2 5.1.3) is decoded (D6) and, since the
+  stream uses them. The efficient high frame rate mode (Part 2 5.1.3) is decoded and, since the
   encoder's experimental `frame_rate_fraction`, written at a constant rate: no other encoder's stream
   or decoder has read it.
 - The speech spectral frontend: in the decoder until a stream uses it (decision 2); in the encoder
