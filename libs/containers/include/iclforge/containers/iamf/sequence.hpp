@@ -5,6 +5,7 @@
 #include <expected>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -105,6 +106,12 @@ struct LayoutInfo {
     std::uint8_t sound_system = 0;  // the Layout() sound_system value for the same layout
 };
 [[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::optional<LayoutInfo> layout_info(std::uint8_t loudspeaker_layout);
+
+// The codecs parameter string of 6.4 (RFC 6381) for a Sequence: "iamf", the primary and additional
+// profile as three digits each, and the codec of the first Audio Element's Codec Config as its own
+// track would name it: `Opus`, `mp4a.40.2`, `fLaC` or `ipcm` (for example "iamf.000.000.Opus").
+// nullopt when the Sequence has no Audio Element or its codec_id is none of those.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::optional<std::string> codecs_string(const Sequence& sequence);
 
 // The same for an `expanded_loudspeaker_layout` value (a loudspeaker_layout of 15): the subset of a
 // larger layout the single Channel Group codes, with the spec's location names (FLc, TpSiL, BtFC, ...).

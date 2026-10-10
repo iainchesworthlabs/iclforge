@@ -6,6 +6,7 @@
 #include <optional>
 #include <span>
 #include <string_view>
+#include <vector>
 
 #include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/export.hpp"
@@ -33,12 +34,28 @@
 //
 // Scope, stated as limits rather than left to be discovered:
 //
-//   * Only fields ALREADY ON THE WIRE can change. compr lives behind compre,
-//     bsmod and dsurmod behind E-AC-3's infomdate; a frame that did not
-//     transmit one has no bits to overwrite, and inserting them would move
-//     every bit after and re-frame the syncframe - which is a re-encode by
-//     another name. Asking for such a field is kFieldAbsent, and the answer
-//     is to encode (or transcode) the stream with it enabled.
+//   * edit_frame_metadata and edit_stream_metadata change only fields ALREADY
+//     ON THE WIRE, in place: compr lives behind compre, bsmod and dsurmod
+//     behind E-AC-3's infomdate, and a frame that did not transmit one has no
+//     bits to overwrite. Asking for such a field is kFieldAbsent.
+//   * insert_frame_metadata and insert_stream_metadata go further for E-AC-3:
+//     the missing field is INSERTED, which moves every bit after it, so the
+//     syncframe grows. E-AC-3 can take that - frmsiz is a free 11-bit length,
+//     and the padding that makes up a whole 16-bit word is auxbits, which the
+//     encoder itself pads with - where AC-3 cannot: its frame size is a code
+//     (frmsizecod) that fixes the bit rate, and finding room inside it would
+//     take a bit-accurate walk of all six audio blocks to where the audio ends.
+//     An AC-3 frame lacking the field stays kFieldAbsent.
+//     An insert is refused (kCannotInsert) rather than guessed at on a frame
+//     that has block start information (blkstrtinfo holds block offsets from
+//     the frame start and is as wide as frmsiz, so every one would be wrong),
+//     that carries auxiliary data (it sits at the end and padding must not
+//     come between it and the tail), or that is not an independent substream
+//     (a dependent's compre is not a compression word, and mixing metadata is
+//     the independent substream's).
+//     The audio blocks are copied bit for bit; what changes is the length of
+//     the frames that gained a field, and so the stream's bit rate by about
+//     16 bits a frame at the most.
 //   * A DEPENDENT E-AC-3 substream reports no compr at all, whatever its
 //     compre bit says: §E3.8.5 repurposes compre there to mark the last
 //     dependent of the programme rather than to announce a compression word
@@ -58,6 +75,7 @@ enum class EditError : std::uint8_t {
     kReservedValue,    // a reserved fscod/frmsizecod, or strmtyp 2
     kFieldAbsent,      // asked to change a field this frame does not transmit
     kOutOfRange,       // a value the field cannot hold
+    kCannotInsert,     // insert_*: this frame cannot take the field without re-framing it
 };
 
 [[nodiscard]] ICLFORGE_AC3_EXPORT std::string_view describe(EditError error);
@@ -145,6 +163,27 @@ struct MetadataEdit {
 [[nodiscard]] ICLFORGE_AC3_EXPORT std::expected<FrameMetadata, EditError> edit_frame_metadata(
     std::span<std::byte> frame, const MetadataEdit& edit);
 
+// The result of an edit that may lengthen a syncframe.
+struct InsertedFrame {
+    std::vector<std::byte> bytes;  // the whole syncframe, as edited
+    FrameMetadata metadata;        // after the edit
+    bool grew = false;             // bytes.size() is not the frame's original size
+};
+
+// edit_frame_metadata for a caller that wants a field the frame lacks added
+// rather than refused. A field that is on the wire is overwritten as before; one
+// that is not is inserted if the frame can take it (an E-AC-3 independent
+// substream: compre/compr2e or infomdate cleared, no block start information,
+// no auxiliary data) and is kFieldAbsent where it cannot be asked of the frame
+// at all (a dependent's compr, dsurmod outside acmod 2/0, anything missing from
+// an AC-3 frame). Inserted fields take the values named; everything else
+// infomdate brings along is written as the encoder's own defaults - copyrightb
+// 0, origbs 1, dheadphonmod, dsurexmod and the audio production fields not
+// indicated - and bsmod, if only dsurmod was asked for, is 0 (complete main).
+// Fails without producing anything when any named field cannot be taken.
+[[nodiscard]] ICLFORGE_AC3_EXPORT std::expected<InsertedFrame, EditError> insert_frame_metadata(
+    std::span<const std::byte> frame, const MetadataEdit& edit);
+
 // Re-stamps crc1 (AC-3 only) and crc2 for one syncframe, for a caller that
 // changed bsi bits itself. edit_frame_metadata already does this; this is
 // exposed because the CRCs are the non-obvious half of any in-place rewrite
@@ -176,5 +215,24 @@ struct EditSummary {
 // silently did nothing is indistinguishable from one that does not work.
 [[nodiscard]] ICLFORGE_AC3_EXPORT std::expected<EditSummary, EditError> edit_stream_metadata(
     std::span<std::byte> stream, const MetadataEdit& edit);
+
+struct InsertedStream {
+    std::vector<std::byte> bytes;
+    EditSummary summary;
+    // Syncframes that gained bits, and the bytes the stream is longer by.
+    std::size_t grown = 0;
+    std::size_t added_bytes = 0;
+};
+
+// edit_stream_metadata for a stream that may need fields added: the same two
+// passes and the same per-substream narrowing (compr and compr2 are the
+// independent substream's alone, dsurmod belongs to acmod 2/0, and so on), with
+// each syncframe that should carry a named field and does not getting it
+// inserted by insert_frame_metadata. Only independent E-AC-3 substreams are
+// grown - a dependent that lacks a field is left as it is - and a field that no
+// frame of the stream can carry or take is kFieldAbsent, checked before
+// anything is written. Returns a new buffer; `stream` is not modified.
+[[nodiscard]] ICLFORGE_AC3_EXPORT std::expected<InsertedStream, EditError> insert_stream_metadata(
+    std::span<const std::byte> stream, const MetadataEdit& edit);
 
 }  // namespace iclforge::ac3::io

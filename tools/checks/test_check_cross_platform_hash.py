@@ -59,7 +59,7 @@ class CrossPlatformHash(unittest.TestCase):
                                          for k in cph.STREAMS}))
         rc, out, err = self.run_main("--label-suffix", "_reference")
         self.assertEqual(rc, 0, err)
-        self.assertEqual(out.count("[ok]"), 3)
+        self.assertEqual(out.count("[ok]"), len(cph.STREAMS))
         self.assertEqual(err, "")
 
     def test_mismatch_fails(self):
@@ -81,6 +81,22 @@ class CrossPlatformHash(unittest.TestCase):
         rc, _, err = self.run_main()
         self.assertEqual(rc, 1)
         self.assertIn("gold_cpl.ec3 missing", err)
+
+    def test_the_shipped_pins_cover_every_stream_on_the_x86_64_kernels(self):
+        # A stream added to STREAMS without its pins would be reported as
+        # unpinned on every leg and gate nothing. The encoder's output does not
+        # depend on the kernel or the transform mode (the file's own comment:
+        # bit-exact across architectures), so one stream has one hash in all
+        # four columns measured on x86-64.
+        pins = json.loads(cph.DEFAULT_PINS.read_text())
+        columns = [f"{kernel}/{mode}" for kernel in ("x86_64-sse2", "generic")
+                   for mode in ("fast", "reference")]
+        for label in cph.STREAMS:
+            with self.subTest(stream=label):
+                values = {pins.get(f"{column}/{label}") for column in columns}
+                self.assertNotIn(None, values, "a column has no pin")
+                self.assertEqual(len(values), 1, "the columns disagree")
+                self.assertRegex(values.pop(), r"^[0-9a-f]{64}$")
 
     def test_version_without_kernels_line_raises(self):
         with self.assertRaisesRegex(RuntimeError, "no 'kernels:' line"):

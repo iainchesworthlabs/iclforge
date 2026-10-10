@@ -140,6 +140,14 @@ struct PlayerConfig {
     // other core when it was smaller (firmware/baremetal/platform/esp32s3/
     // sdkconfig.defaults). PlayerStats::decode_stack_free says what a run used.
     std::uint32_t decode_stack_bytes = 32768;
+    // The decode task's stack in PSRAM, when the part has it, rather than in
+    // internal SRAM. For a part whose internal RAM is what Wi-Fi leaves it: an
+    // ESP32-S3 with Wi-Fi and the player up has no internal block over 31,744
+    // bytes, and an AC-4 5.1 play with A-CPL overflowed a stack of 28,672
+    // (planning/ac4.md, D14c). Needs CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM.
+    // The task parks at its end and stop() deletes it with
+    // vTaskDeleteWithCaps(), the only call that frees a stack made that way.
+    bool decode_stack_in_psram = false;
     std::uint32_t fetch_stack_bytes = 8192;
 
     // Holds each play's first access unit until the second has decoded, so
@@ -184,6 +192,13 @@ struct PlayerConfig {
         // (decision 26). It takes time, which is measured, so that
         // PlayerStats::ac4_hash_us can be taken back out of decode_us.
         bool pcm_hash = false;
+        // This play's allocation limit for internal RAM, in bytes: the size
+        // below which an allocation tries internal RAM first and at or above
+        // which it tries PSRAM first (CONFIG_ICLFORGE_AC4_INTERNAL_BELOW is
+        // what a negative value takes). Where the Kconfig's value is for the
+        // image, this is for one play, so that a board's timers can compare
+        // limits without an image for each.
+        int internal_below = -1;
     };
     Ac4Options ac4;
 #endif

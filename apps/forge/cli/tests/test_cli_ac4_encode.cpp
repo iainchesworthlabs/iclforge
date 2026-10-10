@@ -29,6 +29,7 @@
 #include "sanitized.hpp"
 
 #include "iclforge/ac3/io/wav.hpp"
+#include "iclforge/ac4/io/carriage.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 
@@ -547,6 +548,46 @@ TEST_CASE("ac4-encode's experimental tools each write their syntax", "[cli][ac4]
                                  "320 codec-mode=aspx-acpl-1 experimental=acpl");
         CHECK(first_frame(records, "immersive_codec_mode_code") == std::vector<std::uint64_t>{2});
     }
+    SECTION("nine-x-4 takes 9.1.4 and 9.0.4 with the screen pair, in the decoder's order") {
+        // Part 2 clause 6.2.4.1's immersive element with b_5fronts 1: channel
+        // modes 14 and 13 of Table 56, which name their back pair, centre and
+        // top pairs, and ASPX_SCPL by the rate.
+        const fs::path fourteen = short_tones_wav("ac4_914.wav", 14);
+        const auto records = run(fourteen, "800 experimental=nine-x-4");
+        CHECK(first_frame(records, "immersive_codec_mode_code") == std::vector<std::uint64_t>{1});
+        const std::vector<std::byte> bytes = read_bytes(out);
+        const iclforge::ac4::Toc toc = first_toc(bytes);
+        const auto& chan = toc.substream_groups.at(0).substreams.at(0).chan;
+        REQUIRE(chan.has_value());
+        CHECK(chan->ch_mode == 14);
+        CHECK(chan->channel_mode_name == "9.1.4");
+        REQUIRE(chan->original_content.has_value());
+        CHECK(chan->original_content->b_4_back_channels_present);
+        CHECK(chan->original_content->b_centre_present);
+        CHECK(chan->original_content->top_channels_present == 3);
+        // The thirteen-channel file is 9.0.4.
+        (void)run(short_tones_wav("ac4_904.wav", 13), "800 experimental=nine-x-4");
+        const std::vector<std::byte> nine = read_bytes(out);
+        const iclforge::ac4::Toc toc_nine = first_toc(nine);
+        REQUIRE(toc_nine.substream_groups.at(0).substreams.at(0).chan.has_value());
+        CHECK(toc_nine.substream_groups.at(0).substreams.at(0).chan->ch_mode == 13);
+        // An MP4 sample entry describes it: dac4_refusal() has nothing to say.
+        const fs::path mp4 = dir / "ac4_914.mp4";
+        CHECK(run_cli("ac4-encode " + quoted(fourteen) + " " + quoted(mp4) +
+                          " 800 experimental=nine-x-4",
+                      log) == 0);
+        CHECK(fs::exists(mp4));
+        CHECK(iclforge::ac4::dac4_refusal(toc).empty());
+        // Without the option, thirteen and fourteen channels are no layout the command
+        // takes; with it, ASPX_AJCC is refused naming the 9.X.4 element.
+        CHECK(run_cli("ac4-encode " + quoted(fourteen) + " " + quoted(out) + " 800", log) == 2);
+        CHECK(read_log(log).find("9.0.4 and 9.1.4 with experimental=nine-x-4") !=
+              std::string::npos);
+        CHECK(run_cli("ac4-encode " + quoted(fourteen) + " " + quoted(out) +
+                          " 800 codec-mode=aspx-ajcc experimental=ajcc,nine-x-4",
+                      log) == 1);
+        CHECK(read_log(log).find("ASPX_AJCC for 9.0.4 or 9.1.4") != std::string::npos);
+    }
     SECTION("ajcc takes the immersive ASPX_AJCC, which codec-mode= names") {
         const fs::path ten = short_tones_wav("ac4_514_ajcc.wav", 10);
         const auto records = run(ten, "256 codec-mode=aspx-ajcc experimental=ajcc");
@@ -558,6 +599,97 @@ TEST_CASE("ac4-encode's experimental tools each write their syntax", "[cli][ac4]
         CHECK(run_cli("ac4-encode " + quoted(ten) + " " + quoted(out) + " 256 codec-mode=aspx-ajcc",
                       log) == 1);
         CHECK(read_log(log).find("experimental.ajcc") != std::string::npos);
+    }
+    SECTION("twenty-two-two takes 24 channels as the 22.2 element in SIMPLE and ASPX and in MP4") {
+        // A tone on each channel at its own frequency but for the two LFEs,
+        // which `decode` writes at the WAV file's channels 3 and 18 and whose
+        // tracks code to 120 Hz: 47 and 71 Hz there.
+        const auto hz_of = [](std::size_t c) {
+            return c == 3 ? 47.0 : (c == 18 ? 71.0 : 331.0 + 157.0 * static_cast<double>(c));
+        };
+        std::vector<std::vector<float>> channels;
+        for (std::size_t c = 0; c < 24; ++c) {
+            channels.push_back(
+                tone(hz_of(c), kSanitized ? kSanitizedSamples : static_cast<std::size_t>(kRate / 4)));
+        }
+        const fs::path wav = wav_of("ac4_222.wav", channels);
+        auto records = run(wav, "1536 codec-mode=simple experimental=twenty-two-two");
+        // 22_2_codec_mode 0 and eleven two_channel_data() with stereo
+        // processing on, and Table 56's channel_mode 15.
+        CHECK(first_frame(records, "22_2_codec_mode") == std::vector<std::uint64_t>{0});
+        CHECK(first_frame(records, "b_enable_mdct_stereo_proc") ==
+              std::vector<std::uint64_t>(11, 1U));
+        CHECK(read_log(log).find("22.2, 1536 kbps") != std::string::npos);
+        CHECK(read_log(log).find("SIMPLE mode") != std::string::npos);
+        {
+            const std::vector<std::byte> bytes = read_bytes(out);
+            const iclforge::ac4::Toc toc = first_toc(bytes);
+            const auto& chan = toc.substream_groups.at(0).substreams.at(0).chan;
+            REQUIRE(chan.has_value());
+            CHECK(chan->ch_mode == 15);
+        }
+        records = run(wav, "880 codec-mode=aspx experimental=twenty-two-two");
+        CHECK(first_frame(records, "22_2_codec_mode") == std::vector<std::uint64_t>{1});
+        CHECK(first_frame(records, "aspx_quant_mode_env").size() == 1U);
+        // The default codec mode at 22 full-band channels: ASPX below 1 690 kbps.
+        (void)run(wav, "1024 experimental=twenty-two-two");
+        CHECK(read_log(log).find("ASPX mode") != std::string::npos);
+        // Without the option, 24 channels are no layout the command takes; with
+        // it, a codec mode the element lacks is the encoder's refusal.
+        CHECK(run_cli("ac4-encode " + quoted(wav) + " " + quoted(out) + " 1536", log) == 2);
+        CHECK(read_log(log).find("22.2, 24 channels, with experimental=twenty-two-two") !=
+              std::string::npos);
+        CHECK(run_cli("ac4-encode " + quoted(wav) + " " + quoted(out) +
+                          " 1536 codec-mode=aspx-acpl-2 experimental=twenty-two-two",
+                      log) == 1);
+        CHECK(read_log(log).find("22.2 element does not take") != std::string::npos);
+        // An MP4 carries it with a dac4 the carriage writer accepts, and the
+        // stream's level 7 shows in the codecs string.
+        const fs::path mp4 = dir / "ac4_222.mp4";
+        REQUIRE(run_cli("ac4-encode " + quoted(wav) + " " + quoted(mp4) +
+                            " 1536 codec-mode=simple experimental=twenty-two-two",
+                        log) == 0);
+        CHECK(read_log(log).find("ac-4.02.01.07") != std::string::npos);
+        const std::vector<std::byte> box = read_bytes(mp4);
+        const std::string_view dac4 = "dac4";
+        CHECK(std::ranges::search(box, dac4, [](std::byte b, char c) {
+                  return std::to_integer<int>(b) == static_cast<unsigned char>(c);
+              }).begin() != box.end());
+        if (kSanitized) {
+            return;
+        }
+        // decode writes the channels in the order the encoder took them: each
+        // tone comes back on its own channel of the WAV file, which is
+        // decoded at level 7 for 22.2's 22 tracks (Part 2 Table 55).
+        const fs::path decoded = dir / "ac4_222_decoded.wav";
+        REQUIRE(run_cli("ac4-encode " + quoted(wav) + " " + quoted(out) +
+                            " 1536 codec-mode=simple experimental=twenty-two-two",
+                        log) == 0);
+        REQUIRE(run_cli("decode " + quoted(out) + " " + quoted(decoded) + " md-compat=7", log) == 0);
+        const auto back = iclforge::ac3::io::read_wav(decoded.string());
+        REQUIRE(back.has_value());
+        REQUIRE(back->channels.size() == 24);
+        const auto amplitude = [](const std::vector<float>& x, double hz) {
+            const std::size_t first = 6000;
+            double re = 0.0;
+            double im = 0.0;
+            std::size_t counted = 0;
+            for (std::size_t n = first; n < x.size() && n < first + 6000; ++n, ++counted) {
+                const double phase = 2.0 * std::numbers::pi * hz * static_cast<double>(n) / kRate;
+                re += static_cast<double>(x[n]) * std::cos(phase);
+                im -= static_cast<double>(x[n]) * std::sin(phase);
+            }
+            return 2.0 * std::hypot(re, im) / static_cast<double>(std::max<std::size_t>(counted, 1));
+        };
+        for (std::size_t c = 0; c < 24; ++c) {
+            CAPTURE(c);
+            const double own = amplitude(back->channels[c], hz_of(c));
+            CHECK(own > 0.09);
+            CHECK(own < 0.11);
+            for (const std::size_t other : {(c + 1) % 24, (c + 23) % 24, (c + 12) % 24}) {
+                CHECK(amplitude(back->channels[c], hz_of(other)) < 0.01);
+            }
+        }
     }
     SECTION("7x-wide and 7x-top-front take the 7.X element's other pairs") {
         struct Layout {

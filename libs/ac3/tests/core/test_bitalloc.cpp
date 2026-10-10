@@ -74,6 +74,40 @@ TEST_CASE("choose_delta_segments finds a real vs. flat-model divergence", "[bita
     CHECK(segs.deltba[0] == 4);  // +6 dB
 }
 
+TEST_CASE("choose_delta_segments keeps the same eight runs among equals on every platform",
+          "[bitalloc]") {
+    // More than eight runs qualify, and most have the same magnitude: fourteen
+    // runs, thirteen of them +6 dB (code 4) and one +18 dB (code 6). The eight
+    // kept are the strongest and then the lowest bands among the equals. A
+    // selection that leaves ties to the standard library (std::nth_element)
+    // keeps a different seven on libstdc++ than on the MSVC STL, and with it
+    // a different bitstream from one encoder on two platforms.
+    constexpr int kExp = 10;
+    constexpr int kEnd = 28;  // the bands of one bin each, Table 7.12
+    const std::vector<std::uint8_t> exps(kEnd, kExp);
+    const double baseline = std::pow(2.0, -1.0 - kExp);
+    std::vector<double> coeffs(kEnd, baseline);
+    for (int bin = 0; bin < kEnd; bin += 2) {
+        coeffs[static_cast<std::size_t>(bin)] = baseline * (bin == 10 ? 8.0 : 2.0);
+    }
+    const auto segs = iclforge::ac3::choose_delta_segments(coeffs, exps, 0);
+    REQUIRE(segs.deltnseg == 8);
+    // The runs, as absolute bands: the cursor each segment moves on from.
+    std::vector<int> bands;
+    std::vector<int> codes;
+    int cursor = 0;
+    for (int i = 0; i < segs.deltnseg; ++i) {
+        const auto s = static_cast<std::size_t>(i);
+        const int band = cursor + segs.deltoffst[s];
+        CHECK(segs.deltlen[s] == 1);
+        bands.push_back(band);
+        codes.push_back(segs.deltba[s]);
+        cursor = band + segs.deltlen[s];
+    }
+    CHECK(bands == std::vector<int>{0, 2, 4, 6, 8, 10, 12, 14});
+    CHECK(codes == std::vector<int>{4, 4, 4, 4, 4, 6, 4, 4});
+}
+
 TEST_CASE("choose_delta_segments is silent when content matches its exponents",
          "[bitalloc]") {
     constexpr int kExp = 8;

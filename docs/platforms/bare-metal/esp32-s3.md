@@ -19,7 +19,7 @@ the float32 path worth having and real-time decode worth measuring.
 | Atmos bed | Correct, decoded bed-only via `DecoderConfig::skip_object_reconstruction`. 11 allocations per frame |
 | Atmos objects | **Correct, reconstructed on target.** 22 allocations per frame — see [Objects](#objects). **And placed**: the `eac3_atmos_render` row pans a height-object stream onto 7.1.4 through the block form, every level the host's — see [Placed on loudspeakers](#placed-on-loudspeakers) |
 | Encode | AC-3 and E-AC-3, six rows: 5.1 and 2/0 through each encoder, 2/0 with coupling, spectral extension and AHT, and 2/0 §E3.5 enhanced coupling - six frames of synthesised programme each, byte count and FNV-1a hash checked against `firmware/baremetal/encode_fixture.hpp`, peak heap per row. One substream at a time; see [Encoding](#encoding) for what does not fit |
-| AC-4 decode | **Correct under QEMU, with its state in PSRAM**: the six fixtures of the AC-4 probe (2.0, 5.1 and 5.1.4, with A-CPL and companding), every PCM hash equal to the pins the Cortex-M3 leg and the host are held to, in CI. The decoder's allocations of 512 bytes and more go to the board's octal PSRAM, which QEMU emulates; it keeps 3 to 5 KB of internal RAM at 2.0 and 9 to 14 KB at 5.1 and 5.1.4. **Not run on a board**: no time, Wi-Fi or first-frame figure exists for this part. See [AC-4](#ac-4) (phase D14c of [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14-ac-4-on-the-esp32s)). No ESP32 sink takes AC-4 in a Sendspin group |
+| AC-4 decode | **Correct on the board and under QEMU, with its state in PSRAM.** The six fixtures of the AC-4 probe (2.0, 5.1 and 5.1.4, with A-CPL and companding) equal the pins the Cortex-M3 leg and the host are held to in CI, and on a board with Wi-Fi up all twenty plays of the P4's table (2.0, 5.1, 5.1.4 and the four frame rates) give the P4's PCM hashes. **Real time only for 2.0 in SIMPLE mode** (0.87 of a frame); 2.0 in A-SPX mode takes 1.03 to 1.09, 5.1 takes 2.1 to 3.2 and 5.1.4 4.4 to 5.6. The decode task's stack is in PSRAM: with Wi-Fi up no internal block is over 31,744 bytes and a 5.1 A-CPL play uses 32,560. See [AC-4](#ac-4) (phase D14c of [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14-ac-4-on-the-esp32s)). No ESP32 sink takes AC-4 in a Sendspin group |
 | Standalone probe fits internal SRAM | Yes, without PSRAM. 195,025-byte peak heap (`eac3_atmos_render`; 194,655 with Atmos objects reconstructed, 173,794 for the 7.1.4 fixture folded to stereo, 167,386 as coded) against 304,680 free under QEMU on 2026-09-29. The board reported 316,196 free on 2026-09-11, when the peak was 237,206 — see [Memory](#memory) |
 | Retained after teardown | 12 bytes, one `__cxa_thread_atexit` record, the spectrum scratch's pointer; 23,552 bytes while §E3.5 is in use |
 | Audio output | Two examples drive real peripherals — see [Examples](#examples) |
@@ -59,7 +59,7 @@ this part. The x figures are fractions of a 32 ms frame.
 | The Atmos object encoder | No: about 300 KB, `double`, and not in the profile | Bench estimate, see [Encoding](#encoding) |
 | Decode and encode in one image | No: mutually exclusive builds | Measured, above |
 | The second core, PSRAM | Not used by the AC-3 and E-AC-3 probe. The AC-4 probe puts the decoder's state in PSRAM. The Hearth sink uses both: its decode runs on core 1 and its large allocations go to PSRAM | [In the Sendspin sink](#in-the-sendspin-sink); [AC-4](#ac-4); [What is left](#what-is-left-and-what-would-move-it) |
-| AC-4 decode, 2.0, 5.1 and 5.1.4 | Correct, with the decoder's state in PSRAM; time not measured | QEMU leg; `run_esp32s3_probe.sh --ac4`, [AC-4](#ac-4) |
+| AC-4 decode, 2.0, 5.1 and 5.1.4 | Correct, with the decoder's state and the decode task's stack in PSRAM; real time at 2.0 in SIMPLE mode only (0.87) | Board, `hearth_sink` with Wi-Fi up; QEMU leg, `run_esp32s3_probe.sh --ac4`; [AC-4](#ac-4) |
 
 ## Building
 
@@ -163,8 +163,8 @@ mode from the layout in force (`iclforge/sink_plan.hpp`) and reconfigures betwee
 `PUT /layout` needs no rebuild. One S3 line carries four 32-bit or eight 16-bit slots and a second
 line doubles that, to sixteen 16-bit slots ([Slot widths](../../hearth/sink-esp32-s3.md#slot-widths)).
 The example decodes AC-3 and E-AC-3 here; its AC-4 decoder is a `CONFIG_ICLFORGE_AC4` build that
-builds for this part with an AC-4 play's state in PSRAM ([AC-4](#ac-4)) and that only the
-[ESP32-P4](esp32-p4.md#ac-4) has played on a board.
+builds for this part with an AC-4 play's state and stack in PSRAM ([AC-4](#ac-4)) and that this
+part and the [ESP32-P4](esp32-p4.md#ac-4) have played on a board.
 
 It exists to exercise the incremental input path. `iclforge::ac3::split_frames` takes a span over a whole
 stream, which nothing streaming can produce; `iclforge::ac3::io::AccessUnitAccumulator` applies the same
@@ -1254,8 +1254,9 @@ requires the board's 8 MB of PSRAM.
 The component's AC-4 decoder (`CONFIG_ICLFORGE_AC4`, in `float`) builds for this part and decodes
 correctly under QEMU, with its state in PSRAM (phase D14c of
 [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14-ac-4-on-the-esp32s)).
-It has not run on a board, so this section has no time figure: the boards were not attached when
-it was built.
+It ran on a board on 2026-10-10 (D14c's board phase, [On the board](#on-the-board)): its PCM is the
+host's and the P4's on every stream, and it keeps up with real time at 2.0 in SIMPLE mode and at no
+wider or more coded stream.
 
 ### Where its memory goes
 
@@ -1304,10 +1305,11 @@ holds less. The CI row's ceilings (6,000 bytes of internal RAM at 2.0, 14,000 at
 
 ### What stays in internal RAM, and why
 
-- **The decode task's stack.** A decode used 18,448 to 21,568 bytes of it in the probe (19,480 at
-  most on the Cortex-M3, whose frames are smaller); `hearth_sink`'s `sdkconfig.ac4` gives the task
-  40 KB. FreeRTOS keeps task stacks in internal RAM here, and a stack is the working set every call
-  touches.
+- **The decode task's stack, in the probe.** A decode used 18,448 to 21,568 bytes of it in the probe
+  (19,480 at most on the Cortex-M3, whose frames are smaller), in internal RAM, where FreeRTOS keeps
+  a task's stack unless asked. `hearth_sink` is different: the stack is in PSRAM there, because with
+  Wi-Fi up no internal block holds the 32,560 bytes a 5.1 A-CPL play uses
+  ([The decode stack goes in PSRAM](#the-decode-stack-goes-in-psram)).
 - **Allocations under 512 bytes**, 3 to 14 KB at the worst moment: the decoder's small vectors and
   their bookkeeping, which the heap keeps internal.
 - **The image's own data**: 51,469 bytes of DIRAM for the AC-4 probe (`idf.py size`), 31,727 of it
@@ -1323,32 +1325,128 @@ holds less. The CI row's ceilings (6,000 bytes of internal RAM at 2.0, 14,000 at
   off. A flash write (an update, NVS) turns the cache off and pauses the other core, so a decode
   waits for it, as it would with its state in internal RAM, since its code is in flash either way.
 - **The hot kernels' working sets** (the QMF banks' delay lines and planes, the transform scratch)
-  are in PSRAM at 512 bytes, behind the 32 KB data cache. What that costs needs the board's stage
-  timers; on the P4 the 512-byte limit took 1.08 to 1.24 times as long over twenty plays (D14e), and
-  this part's octal PSRAM at 80 MHz is slower than the P4's. Moving a kernel's buffers back is for
-  the board to ask for.
+  are in PSRAM at 512 bytes, behind the 32 KB data cache. What that costs the board measured:
+  raising the limit to 4,096 bytes, which puts them in internal RAM, took 1 to 2% off a frame on
+  five streams ([The 512-byte limit stays](#the-512-byte-limit-stays)), where on the P4 the 512-byte
+  limit took 1.08 to 1.24 times as long over twenty plays (D14e).
 
 ### Against the ESP32-P4
 
-| | ESP32-S3 (QEMU, 512-byte limit for AC-4) | [ESP32-P4](esp32-p4.md#ac-4) (board, ESP-IDF's default) |
+| | ESP32-S3 (512-byte limit for AC-4; PCM and memory under QEMU, time on the board) | [ESP32-P4](esp32-p4.md#ac-4) (board, ESP-IDF's default) |
 |---|---|---|
 | PCM | the six fixtures' pinned hashes | the six fixtures' pinned hashes, and the host's on 52 plays |
 | Peak heap | 0.29 to 0.42 MB at 2.0, 0.70 to 0.86 MB at 5.1, 1.49 MB at 5.1.4 since D14f (the probe; 0.41 to 0.60, 0.95 to 1.15 and 1.80 MB when D14c measured it) | 0.58 MB at 2.0 to 2.2 MB at 5.1.4 (`hearth_sink`) |
 | Internal RAM at the worst moment | 3 to 14 KB used, 333 to 344 KB of 347 KB left | used up: 1 to 8 KB left of 344 to 350 KB |
 | Decode stack | 18 to 22 KB | 19 to 30 KB |
-| Real time | not measured | 2.0 at 0.28 and 0.37; 5.1 at 0.64, 0.83 and 0.90; 5.1.4 at 1.55 to 1.89 |
+| Real time | 2.0 SIMPLE at 0.87, A-SPX at 1.09; 5.1 at 2.1 to 3.2; 5.1.4 at 4.4 to 5.6 (board, Wi-Fi up) | 2.0 at 0.28 and 0.37; 5.1 at 0.64, 0.83 and 0.90; 5.1.4 at 1.55 to 1.89 |
 
-QEMU's times describe the emulator, as [Timing](#timing) says, so the S3's column has none. The
-P4 runs at 360 MHz on RISC-V with a 128 KB L2 cache and hex PSRAM at 200 MHz; this part runs at
-240 MHz with a 32 KB data cache and octal PSRAM at 80 MHz, so its figures will be its own.
+QEMU's times describe the emulator, as [Timing](#timing) says, so the time row is the board's, above.
+The P4 runs at 360 MHz on RISC-V with a 128 KB L2 cache and hex PSRAM at 200 MHz; this part runs at
+240 MHz with a 32 KB data cache and octal PSRAM at 80 MHz.
 
-### Not yet measured
+### On the board
 
-On a board, per fixture and with Wi-Fi playing at the same time: the time against real time at
-2.0 and 5.1 and, measured only (decision 28), 5.1.4; the internal RAM left at the worst moment
-beside Wi-Fi; PSRAM's use; and the first frame's latency. A PIE kernel waits for those timers
-(decision 30): it is integer, so it would be fixed point inside the `float` decode, and only where
-one kernel holds a stream back.
+Measured on 2026-10-10 on `hearth-eb2c64` (ESP32-S3 revision v0.2, 240 MHz, 8 MB of octal PSRAM at
+80 MHz, 16 MB of flash), `hearth_sink` from the tree of that day, built with `sdkconfig.defaults`,
+`sdkconfig.hw`, `sdkconfig.psram`, `sdkconfig.sendspin` and `sdkconfig.ac4` and the measurement
+fragments the P4's figures used (a null sink that takes a block and returns at once, the PCM hash on,
+`ICLFORGE_STAGE_TIMERS` on), Wi-Fi up, mDNS and the Sendspin player idle. The streams are DEE's
+music streams from the local gold set, ten seconds each, served from a desktop over HTTP and played
+with `POST /play` after `PUT /layout`, as [the P4's](esp32-p4.md#how-it-was-measured) were. The time
+is the decode task's less the sink's write, the placing and the hash, against the audio a frame
+carries (42.7 ms at 48 kHz); each figure is one play.
+
+| Stream | Codec mode | To | us/frame | x real time | P4 x real time | Worst frame ms | Stack left KB | Internal RAM least free KB | PSRAM peak MB |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `20-music-192` | SIMPLE | 2.0 | 37,167 | 0.87 | 0.28 | 70 | 18.9 | 80 | 0.40 |
+| `20-music-96` | A-SPX | 2.0 | 46,402 | 1.09 | 0.37 | 69 | 15.8 | 77 | 0.43 |
+| `51-music-384` | SIMPLE | 2.0 | 89,838 | 2.11 | 0.60 | 141 | 18.0 | 78 | 0.74 |
+| `51-music-384` | SIMPLE | 5.1 | 91,133 | 2.14 | 0.64 | 151 | 18.1 | 78 | 0.78 |
+| `51-music-192` | A-SPX | 2.0 | 104,216 | 2.44 | 0.76 | 156 | 15.6 | 72 | 0.77 |
+| `51-music-192` | A-SPX | 5.1 | 110,979 | 2.60 | 0.83 | 155 | 15.6 | 72 | 0.82 |
+| `51-music-128` | A-SPX, A-CPL 2 | 2.0 | 113,227 | 2.65 | 0.83 | 144 | 15.6 | 74 | 0.88 |
+| `51-music-128` | A-SPX, A-CPL 2 | 5.1 | 120,093 | 2.81 | 0.91 | 155 | 15.6 | 74 | 0.92 |
+| `51-music-96` | A-SPX, A-CPL 3 | 2.0 | 129,679 | 3.04 | 1.06 | 178 | 8.2 | 77 | 1.02 |
+| `51-music-96` | A-SPX, A-CPL 3 | 5.1 | 137,156 | 3.21 | 1.14 | 184 | 8.2 | 76 | 1.06 |
+| `514-music-256` | A-SPX, A-CPL 2 | 2.0 | 221,099 | 5.18 | 1.57 | 263 | 15.7 | 69 | 1.42 |
+| `514-music-256` | A-SPX, A-CPL 2 | 5.1.4 | 237,137 | 5.56 | 1.83 | 291 | 15.6 | 68 | 1.71 |
+| `514-music-512` | A-SPX, S-CPL | 2.0 | 213,617 | 5.01 | 1.66 | 268 | 15.7 | 64 | 1.49 |
+| `514-music-512` | A-SPX, S-CPL | 5.1.4 | 239,215 | 5.61 | 1.90 | 299 | 15.6 | 62 | 1.78 |
+| `514-music-768` | S-CPL | 2.0 | 185,744 | 4.35 | 1.34 | 249 | 17.0 | 77 | 1.54 |
+| `514-music-768` | S-CPL | 5.1.4 | 208,963 | 4.90 | 1.57 | 288 | 17.1 | 75 | 1.82 |
+| `ims-music-64-23976` | A-SPX, 23.976 fps | 2.0 | 78,295 | 1.88 | 0.68 | 564 | 15.7 | 76 | 0.69 |
+| `ims-music-64-24` | A-SPX, 24 fps | 2.0 | 54,804 | 1.32 | 0.51 | 520 | 15.7 | 77 | 0.51 |
+| `ims-music-64-25` | A-SPX, 25 fps | 2.0 | 56,553 | 1.41 | 0.53 | 84 | 15.8 | 78 | 0.46 |
+| `ims-music-64-2997` | A-SPX, 29.97 fps | 2.0 | 62,685 | 1.88 | 0.69 | 458 | 15.8 | 76 | 0.65 |
+
+- **The PCM is the P4's.** The hash of every play equals the hash the P4 gave the same stream, which
+  equals the host's: decision 26 holds on the S3's Xtensa build on a board, with the state and the
+  stack in PSRAM and Wi-Fi up.
+- **Real time at 2.0 in SIMPLE mode only.** `20-music-192` takes 0.87 of a frame. A-SPX at 2.0 takes
+  1.03 to 1.09 (the least from the placement sweep below, the most from the plays above), 5.1 takes
+  2.1 (SIMPLE) to 3.2 (A-SPX with A-CPL mode 3), 5.1.4 in full decoding (to 5.1.4 or folded to 2.0) 4.4 to 5.6,
+  and the converter's four frame rates 1.3 to 1.9. Against the P4 every play takes 2.6 to 3.5 times
+  as long, on a part at two thirds of its clock, with a quarter of its cache and a slower PSRAM. A
+  5.1 stream folded to 2.0 takes 1 to 7% less than the same stream played to 5.1.
+- **AC-3 and E-AC-3 through the same image**, network and server, decoder time as above:
+  `dee-ac3-51.ac3` at 5.1 takes 15,006 us a frame (0.47 of 32 ms), `dee-eac3-51.ec3` at 5.1 15,447
+  (0.48) and `714-walk.ec3` at 7.1.4 34,453 (1.08).
+- **The first frame** is the worst of a play: 69 to 70 ms at 2.0, 141 to 184 ms for the 5.1 streams
+  and 249 to 299 ms for the 5.1.4 ones. The converter's streams spend 0.46 to 0.56 s in theirs at
+  23.976, 24 and 29.97 fps and 84 ms at 25 fps, where the P4's are 0.24 to 0.30 s in all four; the
+  25 fps figure is not explained.
+
+#### The decode stack goes in PSRAM
+
+The first play on the board did not start. With Wi-Fi and the Sendspin player up the part has about
+95,000 bytes of internal RAM free and **no block over 31,744 bytes**, and the decode task's stack of
+40,960 bytes (`sdkconfig.ac4`, chosen for the P4) could not be made. At 28,672 bytes a 2.0 play ran
+with 3.7 KB to spare, and the 5.1 A-SPX with A-CPL mode 3 stream (`51-music-96`) overflowed it ("A
+stack overflow in task ac3-decode") and restarted the board: that stream uses 32,560 bytes. The QEMU
+rows have no Wi-Fi and met neither.
+
+`PlayerConfig::decode_stack_in_psram` (`CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM`, on by default
+for an ESP32-S3 image with AC-4 and PSRAM) makes the decode task with `xTaskCreatePinnedToCoreWithCaps`
+and a stack in PSRAM, where the 40,960 bytes fit with 8.2 KB to spare at the widest. It costs 4 to 5%
+of a 2.0 A-SPX frame (44.7 ms with the stack in internal RAM, 46.7 with it in PSRAM) and AC-3 and
+E-AC-3 frames the same within a boot's variation (15.1 ms against 14.3, 15.2 against 16.8, 34.5
+against 36.8), and it returns 28 KB of internal RAM: the least free during a play is 62 to 82 KB,
+where it was 38 to 55 KB.
+
+#### The 512-byte limit stays
+
+The first thing the board's timers were to decide: the allocation limit of 512 bytes
+(`CONFIG_ICLFORGE_AC4_INTERNAL_BELOW`) against larger ones, with the stack in PSRAM so that the
+internal RAM was there to be used. One image, each play's `?below=N` giving its limit
+(`PlayerConfig::Ac4Options::internal_below`); each cell is the decoder's us a frame, the multiple of
+real time, and the least internal RAM free during the play:
+
+| Stream | 512 | 2,048 | 4,096 | 8,192 | 16,384 |
+|---|---|---|---|---|---|
+| `20-music-192`, 2.0 SIMPLE | 37,542 (0.88), 79.7 KB | 37,124 (0.87), 60.3 KB | 37,182 (0.87), 54.0 KB | 33,988 (0.80), 1.6 KB | 36,341 (0.85), 2.1 KB |
+| `20-music-96`, 2.0 A-SPX | 46,637 (1.09), 76.8 KB | 46,173 (1.08), 54.4 KB | 46,143 (1.08), 53.7 KB | 43,824 (1.03), 4.9 KB | 45,267 (1.06), 4.2 KB |
+| `51-music-384`, 5.1 SIMPLE | 91,287 (2.14), 78.2 KB | 92,758 (2.17), 43.9 KB | 90,392 (2.12), 38.6 KB | 86,248 (2.02), 0.6 KB | 88,680 (2.08), 1.0 KB |
+| `51-music-96`, 5.1 A-CPL 3 | 138,150 (3.24), 76.2 KB | 135,222 (3.17), 44.4 KB | 135,631 (3.18), 34.6 KB | 132,858 (3.11), 1.4 KB | 133,563 (3.13), 1.2 KB |
+| `ims-music-64-2997`, 2.0 29.97 fps | 62,646 (1.88), 75.5 KB | 62,408 (1.87), 51.4 KB | 61,469 (1.84), 43.2 KB | 60,599 (1.82), 1.0 KB | 59,984 (1.80), 0.4 KB |
+
+Every play has the same PCM hash at every limit. Up to 4,096 bytes the limit buys 1 to 2% of a frame
+and spends 23 to 42 KB of internal RAM; from 8,192 up it buys 3 to 10% and leaves the part 0.4 to 5
+KB, which Wi-Fi and lwIP cannot live on. The time is in the work and not in where the allocations
+go. 512 stays.
+
+#### What the board's timers leave
+
+- **2.0 in SIMPLE mode keeps up; A-SPX at 2.0 is within 10% of it.** That is what an S3 decodes
+  on its own with Wi-Fi up.
+- **Nothing wider does.** 5.1 at 2.1 to 3.2 and 5.1.4 at 4.4 to 5.6 times real time are 2 to 5 times
+  out of reach, not the few per cent the allocation limit moves. The stage timers show the time
+  spread over the decode and not in one kernel (a 5.1 A-CPL mode 3 frame, in ms: transforms 27, QMF
+  analysis 19, synthesis 23, A-CPL 41, parse 8, reconstruction 22 and A-SPX 7), and the PIE is
+  integer where the decode is `float`, so decision 30's PIE kernel, which was to go where one kernel
+  holds a stream back, has none to go to.
+- **That is accepted.** What the S3 cannot decode in real time reaches it as PCM from Hearth, as
+  decision 32 had it for the C6 ([decision 42](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-10-10),
+  2026-10-10). How a sink says what it decodes is I6's.
 
 ### Running it
 
@@ -1366,6 +1464,12 @@ The runner holds each fixture's hash to its pin, the internal RAM each took to a
 ceilings. Each fixture prints `<fixture>.esp32s3.internal_peak_bytes`, `psram_peak_bytes` and
 `first_frame_us` beside the probe's other lines. For `hearth_sink`, add `sdkconfig.ac4` to the
 board's overlays ([the sink guide](../../hearth/sink-esp32-s3.md#build-and-flash)).
+
+On a board with Wi-Fi, `hearth_sink` with `sdkconfig.ac4` plays an AC-4 stream from an HTTP source
+(`POST /play` with the stream's address after `PUT /layout`) and ends the play with the `ac4.*` and
+`stream.*` lines the tables above come from, which `GET /log` returns. A play's location can carry
+`decoding=core`, `hash=off` and `below=<bytes>` (that play's internal-RAM allocation limit, in place
+of `CONFIG_ICLFORGE_AC4_INTERNAL_BELOW`). The stack in PSRAM is the default for this image.
 
 ## What the port required from the library
 

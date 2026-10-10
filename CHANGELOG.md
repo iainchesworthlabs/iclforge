@@ -29,6 +29,77 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Stream carriage: legacy cores, every programme, and moov-last MP4 files**
+
+- **An AC-3 core with E-AC-3 dependents is carried in MP4, fMP4 and MPEG-TS.** ETSI TS 102 366
+  F.1 asks for an `ec-3` entry for every E-AC-3 bit stream and F.6.2.5 sets the `dec3`'s `bsid` to
+  the independent substream's own, which §E2.3.1.2 makes the core's. `build_codec_config_box` used
+  to return nothing for it and `forge mp4`, `fmp4` and `ts` refused the stream; they write the
+  ordinary `dec3` now, with the core's `bsid`. Matroska still refuses it: `A_AC3` is `bsid` 10 and
+  below and `A_EAC3` is 11 to 16.
+- **A multi-programme stream keeps every programme in MP4, fMP4 and MPEG-TS.** They warned and
+  wrote the first. A sample or PES payload is the syncframes of every substream present (F.2, A/52
+  Annex G §3.3), so `build_codec_config_box(stream, BoxProgrammes::kAll)` writes a `dec3` block
+  for each independent substream with `data_rate` their sum (the default still describes the lead
+  programme, which is what `ScannedStream::access_units` holds), and the transport stream's
+  `substream1`-`substream3` descriptor fields describe what the payload holds.
+  `iclforge::ac3::io::all_programme_access_units()` returns the samples.
+  `programme=<0..7>` on `mkv`, `mp4`, `fmp4` and `ts` writes one programme alone, renumbered as
+  substream 0 (`iclforge::ac3::io::extract_programme()`), for a player that takes only the first;
+  without it `mkv` keeps the first programme with a warning. FFmpeg 8.0.1 cannot decode a
+  multi-programme stream in any container, raw included.
+- **`iclforge::containers::mp4::demux_seekable()` reads an MP4 from a source that can be read at
+  an offset**, jumping over `mdat` to find the sample table and then reading each sample where it
+  says, in bounded memory. `forge demux` uses it for a file path, so a file whose `moov` follows
+  its `mdat` reads instead of being refused; from a pipe it is still refused, with the reason.
+
+**Stream carriage: checked**
+
+- **`forge fmp4`'s DASH manifests are validated against ISO/IEC 23009-1's schema.**
+  `tools/checks/verify_dash_schema.py` fetches MPEG's `DASHSchema` at a pinned commit, writes an
+  AC-3, an E-AC-3, two Atmos JOC and an AC-4 manifest, and validates each with `xmllint` (or .NET's
+  XSD validator where there is none) beside a corrupted copy it must reject. It runs in
+  `interop.yml`. What a Dolby descriptor means is not something the schema can say.
+
+**Metadata: insert a field an E-AC-3 stream lacks**
+
+- **`forge metadata ... insert` and `insert_stream_metadata()`.** `compr`, `compr2`, `bsmod` and
+  `dsurmod` were refused on a stream that did not already transmit them, because putting the bits in
+  moves every later bit. E-AC-3's frame length is free, so the field is inserted into every
+  independent substream, the frame is padded to a whole word with `auxbits`, `frmsiz` follows and
+  the CRC is re-stamped; the audio blocks are copied bit for bit. The decoder and FFmpeg 8.0.1
+  (with `-err_detect crccheck+bitstream`) decode the grown stream to the same samples. Frames with
+  block start information or auxiliary data are refused by name, and AC-3 cannot take it (its frame
+  size is a code). `fuzz_scan` drives the edit and the insert.
+
+**Stream carriage: fixed**
+
+- **`dec3`'s `chan_loc` was always 0.** F.5.2 has a player ignore the sample entry's
+  `ChannelCount`, which leaves `chan_loc` and `acmod`/`lfeon` as the box's only description of the
+  layout; it is now read from the dependents' `chanmap` (Table F.6.1). No tool here reads the
+  field back: FFmpeg 8.0.1 gives the same layout with it zeroed, so it is checked against the
+  table's text alone.
+
+**IAMF: Opus, AAC-LC and FLAC carriage, every IA track, and a 64-bit `mdat`**
+
+- **`mux_coded()` carries the other IAMF codecs.** The module still links no codec: the caller's encoder
+  makes the packets and `mux_coded()` writes the Codec Config (`opus_decoder_config()`,
+  `aac_lc_decoder_config()` and `flac_decoder_config()` build the 3.13 `decoder_config` bytes, with the
+  `audio_roll_distance` of 3.5), one channel-based layer of loudspeaker layout 0 to 8, and the Mix
+  Presentation. Packets are checked against 3.13 without being decoded (`kBadCodedPacket`).
+  `examples/iamf_coded.cpp` round trips FLAC. FFmpeg 8.0.1 decodes the Opus, AAC-LC and FLAC files, 5.1
+  included, to the same samples as the encoders' own output.
+- **The `roll` sample group.** An Opus or AAC-LC track carries the sample group 6.2.2 requires, in files
+  and in each movie fragment.
+- **`codecs_string()`** gives the RFC 6381 codecs parameter string of 6.4 (`iamf.000.000.Opus`).
+- **`read_isobmff_tracks()`** returns every IA track of a file. `read_isobmff()` no longer folds the
+  `moof` fragments of other tracks into the first IA track's samples, matching `traf` to `track_ID`, and
+  an IA track protected with Common Encryption is `kUnsupported` instead of "not IAMF".
+- **A 64-bit `mdat`.** Media data that does not fit a 32-bit box size is written with the `largesize`
+  header (`IsobmffOptions::large_mdat` asks for it on a small file); it used to be refused.
+- **The timescale follows the codec.** An AAC-LC file takes its sample rate from the AudioSpecificConfig
+  and a FLAC file from STREAMINFO; every non-`ipcm` file used 48000 whatever its rate.
+
 **IAMF: scalable channel reconstruction and the expanded layouts**
 
 - **`decode_pcm()` rebuilds scalable channel audio.** An Audio Element of up to six layers is
@@ -1691,6 +1762,21 @@ The sections below contain the complete change list and fixes.
   decoding every channel's tone comes back on its own channel at unity, and in core decoding on the 5.X.2
   core's speaker at the core's gain. `src/ac4dec/ERRATA.md`'s evidence for Table 20's prediction gains is
   corrected: DEE's SCPL and ASPX_SCPL streams send them with `sap_mode` 3, not 0.
+- **The AC-4 encoder writes 9.0.4 and 9.1.4** (`EncoderConfig::experimental.nine_x_4`, `forge
+  ac4-encode experimental=nine-x-4`). Thirteen or fourteen input channels, in the order the decoder writes
+  them (L R C Ls Rs Lb Rb Tfl Tfr Tbl Tbr, the LFE of 9.1.4, then Lscr and Rscr), are coded in Part 2's
+  immersive channel element with `b_5fronts` 1 (clause 6.2.4.1) in SCPL, ASPX_SCPL and ASPX_ACPL_2 and,
+  with `experimental.acpl`, ASPX_ACPL_1. The screen pair is coded as A'' = (L + Lscr) / 2 and L'' = (L -
+  Lscr) / 2, and B'' and M'' alike for R, with L'' and M'' predicted from A'' and B'' band by band (Table
+  20's a'_4 and a'_5); A-SPX takes Table 8's seven units and A-CPL six modules. Every channel's tone
+  decodes on its own channel at unity in each mode and layout, the decoder's trace is the encoder's, the
+  decoder's renderer folds the stream to 7.X.4 and 5.X by Tables 38 to 43, and the differential check
+  reads eight such streams through both transcriptions without a finding. The table of contents names
+  channel mode 13 or 14 and `md_compat` 7, which a decoder selects at level 7 (`forge decode
+  md-compat=7`); its `dac4` is written. ASPX_AJCC with `b_5fronts`, dialogue enhancement and the height
+  downmix are refused, naming the element. No encoder outside this project writes the element, so the
+  readings are the text's alone (`libs/ac4/ERRATA.md`, "The 9.X.4 element" under the encoder). Not
+  mirrored in the C API.
 - **The AC-4 encoder's API in its final form, `ac3cli ac4-encode`'s options, and the encoder
   installed** (phase E7 of `planning/ac4.md`). `ac4::Encoder::refusal_reason()` names the rule a
   configuration `create()` refuses breaks, as a string literal such as "a rate outside 8 to 3 000
@@ -2055,6 +2141,18 @@ The sections below contain the complete change list and fixes.
   reassembles each unit, and its output holds the plain stream's quality at the audio frame rate
   (47.95 to 120 fps in halves and 100 to 120 fps in quarters, with the 29.97 fps cycle of 1 601 and
   1 602 samples). No other encoder's stream or decoder has read the mode. Not mirrored in the C API.
+- **The AC-4 encoder writes the 22.2 channel element** (`EncoderConfig::experimental.twenty_two_two`,
+  `forge ac4-encode experimental=twenty-two-two`): 24 input channels in Part 2 Table A.27's order,
+  the order `decode` writes, as the two LFE tracks and eleven channel pairs of Table 21 (clause
+  6.2.4.3), in the SIMPLE and ASPX codec modes, each pair with its own transform layout, stereo
+  processing and `aspx_data_2ch()`. The element has no A-CPL or companding data, so those codec
+  modes are refused by name, as are dialogue enhancement, DRC gains and the downmix values for it. A
+  rate must hold the 24 tracks' least frame, 17 kbps in SIMPLE and 49 in ASPX at the native frame
+  rate, and `kAuto` takes ASPX below 76.8 kbps a full-band channel. A 22.2 presentation has 22
+  tracks, so its `md_compat` is 7 and a decoder takes it at `md-compat=7`. Each channel's tone
+  decodes on its own channel, the syntax reads back with the encoder's trace, and the Python
+  transcription reads the encoder's streams; no stream from another encoder and no other decoder
+  has read it. Not mirrored in the C API.
 
 **AC-4 bindings: the C API, Python, Rust and WebAssembly**
 
@@ -2884,6 +2982,17 @@ The sections below contain the complete change list and fixes.
   receiver had no way to stop either; it now checks a flag the destructor sets.
 
 **Codec correctness**
+
+- **The AC-3 and E-AC-3 encoder chose different delta bit allocation segments on Windows and Linux.**
+  When more than eight runs of corrections qualified for a block, `choose_delta_segments` kept
+  the eight largest by `std::nth_element`; a correction's magnitude has four values, so the eight were
+  chosen among equals, and libstdc++ and the MSVC STL pick differently. One frame in 938 of a 30 s
+  stereo music clip (192 kbit/s, coupling on) came out different between the MSVC and clang-cl
+  builds and the GCC and Clang ones. It is now a stable sort by magnitude, so ties go to the lower
+  band: what the MSVC STL had chosen, so Windows output is unchanged. The bitstream-hash gate
+  pins sixteen more streams for it (the CC0 music and speech programmes through coupling, SPX, AHT,
+  `search=distortion`, enhanced coupling, transient pre-noise and VBR, and the synthetic 5.1
+  through SPX, AHT and `all`), identical on four toolchains.
 
 - **AC-4 applies an alternative presentation's target loudness correction and the real-time loudness correction.** Part 2 clauses 4.8.5.4 and 4.8.5.5 say a decoder "shall" apply both, and the decoder read `loud_corr_target` and `rtll_comp` and did nothing with them. An alternative presentation's output now takes 2^(target_corr_gain / 6) for the device category it plays on (Table 67, from the layout that comes out by Table 17, or `OutputConfig::target_device`, with Table 17's fallbacks for a category no target specifies), and a frame that sends `rtll_comp` takes 10^((rtll_comp - 128) / 80) of its output; both scale every channel, as coded or downmixed, and belong to the frame that sends them. The real-time value is reported as `LoudnessInfo::real_time_correction_db`. Every committed stream that sends `rtll_comp` (DEE's legs) sends 128, 0 dB, so none of their output changes; no committed stream sends a `loud_corr_target`, and the target correction is held to its formula in `libs/ac4/tests/decoder/test_downmix.cpp` (`libs/ac4/ERRATA.md`, "Alternative and real-time loudness correction").
 - **A float decode ignored `DecoderConfig::fast_imdct = false`.** A full build configured with

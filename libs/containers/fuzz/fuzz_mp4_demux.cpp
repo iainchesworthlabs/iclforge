@@ -1,18 +1,19 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <span>
 
 #include "iclforge/containers/mp4/reader.hpp"
 
-// iclforge::containers::mp4::demux and iclforge::containers::mp4::Reader over bytes nobody has
-// vetted. An MP4 is a harder target than the Matroska sibling for one reason: its sample table is
+// iclforge::containers::mp4::demux, iclforge::containers::mp4::Reader and
+// iclforge::containers::mp4::demux_seekable over bytes nobody has vetted. An MP4 is a harder target than the Matroska sibling for one reason: its sample table is
 // an INDEX rather than an in-line framing. stsc names chunks, stco names absolute file offsets and
 // stsz names sizes, all self-declared and all resolved against each other before a single byte of
 // audio is touched - so a hostile file gets to point a sample at an offset that does not exist,
 // claim four billion of them, or describe a chunk map that walks off the end
 // of the size table. None of that may do anything but return an error.
 //
-// Both entry points run on the same bytes, because they differ exactly where
+// All three entry points run on the same bytes, because they differ exactly where
 // the bugs would be: demux() can reach any offset and resolves the table
 // against the whole file, while Reader::push() carries parse state across
 // chunk edges and has to decide, per sample, whether the bytes it names have
@@ -36,8 +37,6 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         (void)complexity;
     }
 
-    const std::size_t chunk = size == 0 ? 1 : (static_cast<std::size_t>(data[0]) % 64) + 1;
-    iclforge::containers::mp4::Reader reader{};
     const auto sink = [](std::span<const std::byte> sample) {
         volatile std::byte last{};
         for (const auto b : sample) {
@@ -45,6 +44,27 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         }
         (void)last;
     };
+
+    // demux_seekable() reads the same bytes at offsets of its own choosing: the
+    // box walk jumps over mdat by its declared length, a window grows toward the
+    // box bound, and each sample is then read where the table says - so a window
+    // size, a box length and a sample range all come from the file. The source
+    // returns less than asked at its end, which is part of the contract.
+    {
+        const auto read_at = [bytes](std::uint64_t offset, std::span<std::byte> out) {
+            if (offset >= bytes.size()) {
+                return std::size_t{0};
+            }
+            const auto at = static_cast<std::size_t>(offset);
+            const auto take = std::min(out.size(), bytes.size() - at);
+            std::copy_n(bytes.begin() + static_cast<std::ptrdiff_t>(at), take, out.begin());
+            return take;
+        };
+        (void)iclforge::containers::mp4::demux_seekable(read_at, size, {}, sink);
+    }
+
+    const std::size_t chunk = size == 0 ? 1 : (static_cast<std::size_t>(data[0]) % 64) + 1;
+    iclforge::containers::mp4::Reader reader{};
     for (std::size_t offset = 0; offset < size; offset += chunk) {
         const auto take = chunk < size - offset ? chunk : size - offset;
         if (!reader.push(bytes.subspan(offset, take), sink)) {

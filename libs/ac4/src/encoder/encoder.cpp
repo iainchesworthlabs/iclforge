@@ -146,10 +146,38 @@ constexpr int kAspxAcpl2 = 3;
 constexpr int kAspxAjcc = 4;
 }  // namespace immersive_mode
 
-// The immersive layouts' input channel counts: 5.0.4 and 5.1.4, and with the
-// back pair 7.0.4 and 7.1.4.
+// The immersive layouts' input channel counts: 5.0.4 and 5.1.4, with the back
+// pair 7.0.4 and 7.1.4, and with the screen pair 9.0.4 and 9.1.4.
 [[nodiscard]] constexpr bool immersive_layout(int channels) noexcept {
-    return channels >= 9 && channels <= 12;
+    return channels >= 9 && channels <= 14;
+}
+
+// The 22.2 channel element's input channel count (Part 2 clause 6.2.4.3):
+// 24, with two LFEs of them, so 22 full-band channels.
+constexpr int kChannels22_2 = 24;
+constexpr int kFullBand22_2 = 22;
+
+// Table A.27's speaker indices of 22.2's channels that the element's tracks
+// are made of (Part 2 Table 21), which are also the input channels: the two
+// LFEs, and each pair in the syntax's order.
+constexpr int kLfe22_2 = 11;
+constexpr int kLfe2_22_2 = 17;
+constexpr std::array<std::array<int, 2>, 11> kPairs22_2 = {{
+    {0, 1},    // [L, R]
+    {2, 16},   // [C, Tc]
+    {3, 4},    // [Ls, Rs]
+    {5, 6},    // [Lb, Rb]
+    {7, 8},    // [Tfl, Tfr]
+    {9, 10},   // [Tbl, Tbr]
+    {12, 13},  // [Tsl, Tsr]
+    {14, 15},  // [Tfc, Tbc]
+    {18, 19},  // [Bfl, Bfr]
+    {20, 21},  // [Bfc, Cb]
+    {22, 23},  // [Lw, Rw]
+}};
+
+[[nodiscard]] constexpr bool twenty_two_layout(int channels) noexcept {
+    return channels == kChannels22_2;
 }
 
 // A channel element's codec modes that code only the immersive element.
@@ -225,8 +253,10 @@ constexpr double kLfeCutoffHz = 120.0;
         return config.codec_mode;
     }
     const bool lfe = config.channels == 6 || config.channels == 8 || config.channels == 10 ||
-                     config.channels == 12;
-    const int full = std::max(config.channels - (lfe ? 1 : 0), 1);
+                     config.channels == 12 || config.channels == 14;
+    const int full = twenty_two_layout(config.channels)
+                         ? kFullBand22_2
+                         : std::max(config.channels - (lfe ? 1 : 0), 1);
     const double kbps_per_channel = static_cast<double>(config.bitrate_kbps) / full;
     if (immersive_layout(config.channels)) {
         if (kbps_per_channel < kImmersiveAcpl2BelowKbps) {
@@ -281,7 +311,7 @@ struct Plan {
     std::vector<int> source{};
     int input_lfe = -1;
     std::vector<int> residuals{};
-    // The immersive element (Part 2 clause 6.2.4), ch_mode 11 or 12: its
+    // The immersive element (Part 2 clause 6.2.4), ch_mode 11 to 14: its
     // immersive_codec_mode (Table 73) and whether the source has the back pair
     // (b_4_back_channels_present). The coded channels hold the intermediate
     // signals A'' to K'' (Part 2 clause 5.2), each where the channel it becomes
@@ -289,17 +319,26 @@ struct Plan {
     // to K'' in the modes that send them. In SCPL and ASPX_SCPL each coupled
     // pair's two, (ls, h), (rs, i), (x1, j) and (x2, k), hold the pair's
     // channels over sqrt 2 until simple coupling's sum and difference are made
-    // of them (choose_coupled()); elsewhere they hold the signals. `input` is
-    // each input channel's index, L R C LFE Ls Rs Lb Rb Tfl Tfr Tbl Tbr, -1
-    // where the layout has none. `balance` says for each aspx_data element
-    // whether it may be a sum and balance pair.
+    // of them (choose_coupled()); elsewhere they hold the signals. The 9.X.4
+    // element (`fronts`, b_5fronts 1) adds the tracks L'' and M'', scr_l and
+    // scr_r, in the modes that send H'' to K'': with the screen pair A'' and
+    // B'' are the sums of (L, Lscr) and (R, Rscr) and L'' and M'' their
+    // differences, which in SCPL and ASPX_SCPL hold the channels themselves
+    // until choose_coupled() makes them (Part 2 Table 23; libs/ac4/ERRATA.md,
+    // "The 9.X.4 element's S-CPL channels"). `input` is each input channel's
+    // index, L R C LFE Ls Rs Lb Rb Tfl Tfr Tbl Tbr Lscr Rscr, -1 where the
+    // layout has none. `balance` says for each aspx_data element whether it may
+    // be a sum and balance pair.
     int immersive = -1;
     bool backs = false;
+    bool fronts = false;
     int h = -1;
     int i = -1;
     int j = -1;
     int k = -1;
-    std::array<int, 12> input{};
+    int scr_l = -1;
+    int scr_r = -1;
+    std::array<int, 14> input{};
     std::vector<bool> balance{};
     // Each layout group's coded band where it is not the substream's: in the
     // immersive element's ASPX_ACPL_1, H'' to K'' below acpl_qmf_band alone.
@@ -316,31 +355,54 @@ struct Plan {
     // mono_data(1) before the element (clause 6.2.3.2): its coded channel.
     bool var = false;
     int objs_lfe = -1;
+    // The 22.2 element (Part 2 clause 6.2.4.3), ch_mode 15: the coded channels
+    // are the input's, in Table A.27's order, `lfe` and `lfe2` its two
+    // mono_data(1) tracks and `groups` the eleven pairs of Table 21 after
+    // them; `aspx_elements` are the same pairs.
+    int lfe2 = -1;
 
     [[nodiscard]] bool five_x() const noexcept { return ch_mode == 3 || ch_mode == 4; }
     [[nodiscard]] bool seven_x() const noexcept { return ch_mode >= 5 && ch_mode <= 10; }
-    [[nodiscard]] bool immersive_element() const noexcept { return ch_mode == 11 || ch_mode == 12; }
+    [[nodiscard]] bool immersive_element() const noexcept { return ch_mode >= 11 && ch_mode <= 14; }
+    [[nodiscard]] bool twenty_two() const noexcept { return ch_mode == 15; }
     // The simple coupling modes, whose coupled pairs are coded as sum and
     // difference with Table 20's prediction.
     [[nodiscard]] bool coupled() const noexcept {
         return immersive == immersive_mode::kScpl || immersive == immersive_mode::kAspxScpl;
     }
     // The coupled pairs: the channel that holds D'' and the one that holds H'',
-    // and so on to G'' and K''.
-    [[nodiscard]] std::array<std::array<int, 2>, 4> coupled_pairs() const noexcept {
-        return {{{ls, h}, {rs, i}, {x1, j}, {x2, k}}};
+    // and so on to G'' and K''; with the screen pair, A'' with L'' and B'' with
+    // M'' after them.
+    [[nodiscard]] std::array<std::array<int, 2>, 6> coupled_pairs() const noexcept {
+        return {{{ls, h}, {rs, i}, {x1, j}, {x2, k}, {l, scr_l}, {r, scr_r}}};
     }
+    [[nodiscard]] std::size_t coupled_count() const noexcept { return fronts ? 6 : 4; }
 };
 
 // The input channels of an immersive layout: L R C, the LFE of 5.1.4 and
 // 7.1.4, Ls Rs, the back pair of 7.0.4 and 7.1.4, and Tfl Tfr Tbl Tbr, in
-// Plan::input's order.
-[[nodiscard]] std::array<int, 12> immersive_inputs(int channels) noexcept {
-    std::array<int, 12> input{};
+// Plan::input's order; 9.0.4 and 9.1.4 come in the decoder's order for them
+// (Part 2 Table A.27, as the 22.2 layout does): L R C Ls Rs Lb Rb Tfl Tfr Tbl
+// Tbr, the LFE, then the screen pair.
+[[nodiscard]] std::array<int, 14> immersive_inputs(int channels) noexcept {
+    std::array<int, 14> input{};
     input.fill(-1);
     const bool lfe = channels % 2 == 0;
     const bool backs = channels >= 11;
     int n = 0;
+    if (channels >= 13) {
+        for (const std::size_t at : {std::size_t{0}, std::size_t{1}, std::size_t{2}, std::size_t{4},
+                                     std::size_t{5}, std::size_t{6}, std::size_t{7}, std::size_t{8},
+                                     std::size_t{9}, std::size_t{10}, std::size_t{11}}) {
+            input[at] = n++;
+        }
+        if (lfe) {
+            input[3] = n++;
+        }
+        input[12] = n++;
+        input[13] = n++;
+        return input;
+    }
     for (const std::size_t at : {std::size_t{0}, std::size_t{1}, std::size_t{2}}) {
         input[at] = n++;
     }
@@ -370,13 +432,18 @@ struct Plan {
                                                           CodecMode mode) {
     Plan p;
     p.mode = mode;
+    p.fronts = config.channels >= 13;
     p.backs = config.channels >= 11;
-    if (p.backs && !config.experimental.back_pair) {
+    if (p.fronts && !config.experimental.nine_x_4) {
+        return std::unexpected(
+            "thirteen or fourteen channels, 9.0.4 or 9.1.4, without experimental.nine_x_4");
+    }
+    if (!p.fronts && p.backs && !config.experimental.back_pair) {
         return std::unexpected(
             "eleven or twelve channels, 7.0.4 or 7.1.4, without experimental.back_pair");
     }
     const bool lfe = config.channels % 2 == 0;
-    p.ch_mode = lfe ? 12 : 11;
+    p.ch_mode = (p.fronts ? 13 : 11) + (lfe ? 1 : 0);
     p.input = immersive_inputs(config.channels);
     switch (mode) {
         case CodecMode::kScpl:
@@ -395,6 +462,11 @@ struct Plan {
             }
             return std::unexpected("ASPX_ACPL_1 in an immersive layout without experimental.acpl");
         case CodecMode::kAspxAjcc:
+            if (p.fronts) {
+                return std::unexpected(
+                    "ASPX_AJCC for 9.0.4 or 9.1.4: the encoder writes no A-JCC with b_5fronts (four "
+                    "modules and twenty parameters)");
+            }
             if (config.experimental.ajcc) {
                 p.immersive = immersive_mode::kAspxAjcc;
                 break;
@@ -446,9 +518,18 @@ struct Plan {
         p.i = n++;
         p.j = n++;
         p.k = n++;
+        if (p.fronts) {
+            p.scr_l = n++;
+            p.scr_r = n++;
+        }
     }
     if (p.coupled()) {
+        // L'' and M'' are predicted from A'' and B'' (Table 20's a'_4 and
+        // a'_5), so they share those tracks' transform layouts.
         p.groups = {{p.l, p.r}, {p.ls, p.rs, p.h, p.i}, {p.c}, {p.x1, p.x2, p.j, p.k}};
+        if (p.fronts) {
+            p.groups.front().insert(p.groups.front().end(), {p.scr_l, p.scr_r});
+        }
     } else {
         p.groups = {{p.l, p.r}, {p.ls, p.rs}, {p.c}, {p.x1, p.x2}};
     }
@@ -466,6 +547,12 @@ struct Plan {
         p.groups.push_back({p.j, p.k});
         p.group_cutoff.insert(p.group_cutoff.end(), {-1.0, -1.0});
         p.group_follows.insert(p.group_follows.end(), {1, 3});
+        if (p.fronts) {
+            // L'' and M'' pair with A'' and B'' the same way: group 0's.
+            p.groups.push_back({p.scr_l, p.scr_r});
+            p.group_cutoff.push_back(-1.0);
+            p.group_follows.push_back(0);
+        }
     }
     if (lfe) {
         p.groups.push_back({p.lfe});
@@ -481,6 +568,14 @@ struct Plan {
             p.aspx_elements = {{p.ls, p.h}, {p.rs, p.i}, {p.c},
                                {p.l, p.r},  {p.x1, p.j}, {p.x2, p.k}};
             p.balance = {true, true, false, false, true, true};
+            if (p.fronts) {
+                // Table 8 with b_5fronts: (L, Lscr) and (R, Rscr) in the place
+                // of (L, R), the units in the syntax's order (libs/ac4/ERRATA.md,
+                // "The 9.X.4 element's A-SPX").
+                p.aspx_elements = {{p.ls, p.h},    {p.rs, p.i},    {p.c},         {p.l, p.scr_l},
+                                   {p.r, p.scr_r}, {p.x1, p.j},    {p.x2, p.k}};
+                p.balance = {true, true, false, true, true, true, true};
+            }
             break;
         case immersive_mode::kAspxAcpl1:
         case immersive_mode::kAspxAcpl2:
@@ -496,6 +591,11 @@ struct Plan {
         p.acpl = detail::AcplLayout::kImmersive;
         p.source = {p.input[4], p.input[6],  p.input[5], p.input[7],
                     p.input[8], p.input[10], p.input[9], p.input[11]};
+        if (p.fronts) {
+            // Two modules more, on (L, Lscr) and (R, Rscr).
+            p.acpl = detail::AcplLayout::kImmersiveFronts;
+            p.source.insert(p.source.end(), {p.input[0], p.input[12], p.input[1], p.input[13]});
+        }
         p.input_lfe = p.input[3];
     }
     return p;
@@ -557,7 +657,47 @@ struct Plan {
     return p;
 }
 
+// The 22.2 element (Part 2 clause 6.2.4.3) in SIMPLE or ASPX: the coded
+// channels are the input's, in Table A.27's order, and each is a pair of Table
+// 21 or one of the two LFEs, which are tracks of their own (mono_data(1)). Every
+// pair is a two_channel_data() with its own sf_info() and chparam_info(), so
+// it is a layout group and, in ASPX, an aspx_data_2ch() of its own; the
+// element sends no companding_control() and no A-CPL data (libs/ac4/ERRATA.md,
+// "No companding, S-CPL or A-CPL for 22.2").
+[[nodiscard]] std::expected<Plan, Refusal> plan_22_2(const EncoderConfig& config, CodecMode mode) {
+    if (!config.experimental.twenty_two_two) {
+        return std::unexpected("24 channels, 22.2, without experimental.twenty_two_two");
+    }
+    if (mode != CodecMode::kSimple && mode != CodecMode::kAspx) {
+        return std::unexpected(
+            "a codec mode the 22.2 element does not take: it has SIMPLE and ASPX alone, no A-CPL "
+            "or S-CPL mode (Part 2 clause 6.2.4.3)");
+    }
+    if (config.experimental.coding_configs) {
+        return std::unexpected("22.2 with experimental.coding_configs");
+    }
+    Plan p;
+    p.mode = mode;
+    p.ch_mode = 15;
+    p.coded = kChannels22_2;
+    p.lfe = kLfe22_2;
+    p.lfe2 = kLfe2_22_2;
+    p.groups = {{p.lfe}, {p.lfe2}};
+    for (const std::array<int, 2>& pair : kPairs22_2) {
+        p.groups.push_back({pair[0], pair[1]});
+        p.aspx_elements.push_back({pair[0], pair[1]});
+    }
+    p.balance.assign(p.aspx_elements.size(), false);
+    return p;
+}
+
 [[nodiscard]] std::expected<Plan, Refusal> plan_for(const EncoderConfig& config, CodecMode mode) {
+    if (twenty_two_layout(config.channels)) {
+        return plan_22_2(config, mode);
+    }
+    if (config.experimental.nine_x_4 && config.channels != 13 && config.channels != 14) {
+        return std::unexpected("experimental.nine_x_4 without thirteen or fourteen channels");
+    }
     if (immersive_layout(config.channels)) {
         if (config.experimental.seven_x != AdditionalPair::kNone) {
             return std::unexpected(
@@ -642,8 +782,8 @@ struct Plan {
             break;
         default:
             return std::unexpected(
-                "a channel count the encoder does not take: 1, 2, 5, 6, 9 or 10, and 3, 7, 8, 11 "
-                "or 12 as experimental layouts");
+                "a channel count the encoder does not take: 1, 2, 5, 6, 9 or 10, and 3, 7, 8, 11, "
+                "12 or 24 as experimental layouts");
     }
     const bool lfe = config.channels % 2 == 0;
     p.l = 0;
@@ -724,6 +864,7 @@ struct Plan {
     element.channels = objects;
     element.experimental.three_zero = true;
     element.experimental.coding_configs = false;
+    element.experimental.nine_x_4 = false;
     std::expected<Plan, Refusal> p = plan_for(element, mode);
     if (p && lfe) {
         p->objs_lfe = p->coded;
@@ -801,11 +942,22 @@ struct Structure {
         }
         return s;
     }
+    if (p.twenty_two()) {
+        // Part 2 clause 6.2.4.3: mono_data(1) twice, then the eleven
+        // two_channel_data() of Table 21, each with stereo processing on.
+        s.units.push_back({.kind = UnitKind::kLfe, .outputs = {p.lfe}});
+        s.units.push_back({.kind = UnitKind::kLfe, .outputs = {p.lfe2}});
+        for (const std::array<int, 2>& pair : kPairs22_2) {
+            s.units.push_back({.kind = UnitKind::kPair, .outputs = {pair[0], pair[1]}});
+        }
+        return s;
+    }
     if (p.immersive_element()) {
         // Part 2 clause 6.2.4.1 with core_5ch_grouping 0 and 2ch_mode 0: the
         // LFE, (A'', B''), (D'', E''), C'' and but in ASPX_AJCC (F'', G''), then
-        // (H'', I'') and (J'', K'') where the mode sends them. The writer puts
-        // the A-SPX, A-CPL and A-JCC data between.
+        // (H'', I'') and (J'', K'') where the mode sends them, and for the
+        // 9.X.4 modes (L'', M''). The writer puts the A-SPX, A-CPL and A-JCC
+        // data between.
         if (p.lfe >= 0) {
             s.units.push_back({.kind = UnitKind::kLfe, .outputs = {p.lfe}});
         }
@@ -819,6 +971,9 @@ struct Structure {
         if (p.h >= 0) {
             s.units.push_back({.kind = UnitKind::kPair, .outputs = {p.h, p.i}});
             s.units.push_back({.kind = UnitKind::kPair, .outputs = {p.j, p.k}});
+        }
+        if (p.scr_l >= 0) {
+            s.units.push_back({.kind = UnitKind::kPair, .outputs = {p.scr_l, p.scr_r}});
         }
         return s;
     }
@@ -1228,8 +1383,9 @@ struct SubstreamCoder {
         std::array<int, 2> residual_max_sfb{};
         int residual_master = 0;
         // The immersive element's Table 20 (Part 2 clause 5.2.3.2 step 5): the
-        // chparam_info() predicting H'' to K'' from D'' to G'', band by band.
-        std::array<detail::StereoChoice, 4> prediction{};
+        // chparam_info() predicting H'' to K'' from D'' to G'', band by band,
+        // and with the screen pair L'' and M'' from A'' and B''.
+        std::array<detail::StereoChoice, 6> prediction{};
         // An A-JOC substream's data around the downmix.
         std::optional<ObjectFrame> objects;
     };
@@ -1802,6 +1958,19 @@ struct SubstreamCoder {
             write_immersive_element(w, f, data);
             return;
         }
+        if (plan.twenty_two()) {
+            // Part 2 clause 6.2.4.3, 22_2_channel_element(b_iframe):
+            // 22_2_codec_mode, aspx_config() in an I-frame of the ASPX mode,
+            // the two LFEs' mono_data(1) and the eleven two_channel_data(),
+            // and in ASPX the eleven aspx_data_2ch().
+            w.write(1, with_aspx ? 1U : 0U, "22_2_codec_mode");
+            if (with_aspx && f.iframe) {
+                detail::write_aspx_config(w, aspx->config);
+            }
+            units([](const Unit&) { return true; });
+            tails();
+            return;
+        }
         if (plan.acpl) {
             write_acpl_element(w, f, data);
             return;
@@ -1919,14 +2088,15 @@ struct SubstreamCoder {
         }
     }
 
-    // Part 2 clause 6.2.4.1, immersive_channel_element(b_lfe, 0, b_iframe):
-    // immersive_codec_mode_code (Table 73), immers_cfg() in an I-frame, the LFE,
-    // in ASPX_AJCC companding_control(5), core_5ch_grouping 0 and 2ch_mode 0
-    // with (A'', B''), (D'', E'') and C'', but in ASPX_AJCC b_use_sap_add_ch 0
-    // and (F'', G''), the aspx_data elements of Table 8, in ASPX_AJCC
-    // ajcc_data(0), and then in SCPL, ASPX_SCPL and ASPX_ACPL_1 (H'', I''),
-    // (J'', K'') and Table 20's four chparam_info(), and in ASPX_ACPL_1 and 2
-    // the four acpl_data_1ch(). Without `data`, all of it but the sf_data()
+    // Part 2 clause 6.2.4.1, immersive_channel_element(b_lfe, b_5fronts,
+    // b_iframe): immersive_codec_mode_code (Table 73), immers_cfg() in an
+    // I-frame, the LFE, in ASPX_AJCC companding_control(5), core_5ch_grouping 0
+    // and 2ch_mode 0 with (A'', B''), (D'', E'') and C'', but in ASPX_AJCC
+    // b_use_sap_add_ch 0 and (F'', G''), the aspx_data elements of Table 8, in
+    // ASPX_AJCC ajcc_data(0), and then in SCPL, ASPX_SCPL and ASPX_ACPL_1 (H'',
+    // I''), (J'', K'') and Table 20's four chparam_info(), with b_5fronts also
+    // (L'', M'') and a'_4 and a'_5's two, and in ASPX_ACPL_1 and 2 the four
+    // acpl_data_1ch(), or six. Without `data`, all of it but the sf_data()
     // elements.
     void write_immersive_element(BitWriter& w, const Coding& f, bool data) const {
         const int mode = plan.immersive;
@@ -1976,8 +2146,14 @@ struct SubstreamCoder {
         if (plan.h >= 0) {
             unit();  // (H'', I'')
             unit();  // (J'', K'')
-            for (const detail::StereoChoice& prediction : f.prediction) {
-                detail::write_chparam_info(w, prediction);
+            for (std::size_t n = 0; n < 4; ++n) {
+                detail::write_chparam_info(w, f.prediction[n]);
+            }
+            if (plan.scr_l >= 0) {
+                unit();  // (L'', M'') and Table 20's a'_4 and a'_5
+                for (std::size_t n = 4; n < 6; ++n) {
+                    detail::write_chparam_info(w, f.prediction[n]);
+                }
             }
         }
         if (acpl_mode) {
@@ -2172,8 +2348,8 @@ struct SubstreamCoder {
             // its sum and difference, and Table 20 predicts the difference
             // from the sum band by band: the sum, D'' say, and H' = H'' - a
             // D'' are what the pairs' own stereo processing then takes.
-            const std::array<std::array<int, 2>, 4> pairs = plan.coupled_pairs();
-            for (std::size_t n = 0; n < pairs.size(); ++n) {
+            const std::array<std::array<int, 2>, 6> pairs = plan.coupled_pairs();
+            for (std::size_t n = 0; n < plan.coupled_count(); ++n) {
                 detail::Channel& sum = spectra[static_cast<std::size_t>(pairs[n][0])];
                 detail::Channel& difference = spectra[static_cast<std::size_t>(pairs[n][1])];
                 f.prediction[n] = detail::choose_coupled(sum.grouped, difference.grouped,
@@ -2659,7 +2835,9 @@ std::expected<std::unique_ptr<SubstreamCoder>, Refusal> SubstreamCoder::make(
     }
     const auto channels = static_cast<std::size_t>(plan->coded);
     const int full_channels =
-        std::max(config.channels - (plan->lfe >= 0 ? 1 : 0) - (plan->objs_lfe >= 0 ? 1 : 0), 1);
+        std::max(config.channels - (plan->lfe >= 0 ? 1 : 0) - (plan->lfe2 >= 0 ? 1 : 0) -
+                     (plan->objs_lfe >= 0 ? 1 : 0),
+                 1);
     const double kbps_per_channel = static_cast<double>(config.bitrate_kbps) / full_channels;
     const bool multichannel = plan->ch_mode >= 3 || (plan->var && full_channels >= 3);
     coder->cutoff = cutoff_hz(kbps_per_channel);
@@ -2668,6 +2846,7 @@ std::expected<std::unique_ptr<SubstreamCoder>, Refusal> SubstreamCoder::make(
         SubstreamCoder::Group group;
         group.channels = plan->groups[g];
         group.lfe = group.channels.size() == 1 && (group.channels.front() == plan->lfe ||
+                                                   group.channels.front() == plan->lfe2 ||
                                                    group.channels.front() == plan->objs_lfe);
         for (const int c : group.channels) {
             coder->group_of[static_cast<std::size_t>(c)] = g;
@@ -2729,7 +2908,8 @@ std::expected<std::unique_ptr<SubstreamCoder>, Refusal> SubstreamCoder::make(
     } else if (mode == CodecMode::kAspx) {
         coder->aspx =
             detail::aspx_setup_for(kbps_per_channel, config.sample_rate_hz, multichannel, *timing);
-        if (coder->aspx && plan->var) {
+        // The var and 22.2 elements send no companding_control().
+        if (coder->aspx && (plan->var || plan->twenty_two())) {
             coder->aspx->companding = false;
         }
     }
@@ -2765,7 +2945,17 @@ std::expected<std::unique_ptr<SubstreamCoder>, Refusal> SubstreamCoder::make(
 
     // Of the metadata, the substream carries its dialogue enhancement; the
     // rest is its presentations'.
+    if (config.dialogue && plan->fronts) {
+        return std::unexpected(
+            "dialogue enhancement for 9.0.4 or 9.1.4, whose channels are Lscr, Rscr and C (libs/ac4/"
+            "ERRATA.md, \"Dialogue enhancement's channels for 9.X.4\"), which the encoder does not "
+            "mark or take a stem for");
+    }
     if (config.dialogue) {
+        if (plan->twenty_two()) {
+            return std::unexpected(
+                "dialogue enhancement in a 22.2 substream, which this encoder does not write");
+        }
         coder->metadata.de = detail::resolve_dialogue(*config.dialogue, plan->ch_mode);
         if (!coder->metadata.de) {
             return std::unexpected(
@@ -2839,9 +3029,11 @@ constexpr std::uint32_t kTfl = 1U << 10U;
 constexpr std::uint32_t kTfr = 1U << 11U;
 constexpr std::uint32_t kTbl = 1U << 12U;
 constexpr std::uint32_t kTbr = 1U << 13U;
+constexpr std::uint32_t kLscr = 1U << 14U;
+constexpr std::uint32_t kRscr = 1U << 15U;
 constexpr std::uint32_t kFive = kL | kR | kC | kLs | kRs;
 constexpr std::uint32_t kTops = kTfl | kTfr | kTbl | kTbr;
-constexpr std::array<std::uint32_t, 13> kModeChannels = {
+constexpr std::array<std::uint32_t, 15> kModeChannels = {
     kC,                                // 0 mono
     kL | kR,                           // 1 stereo
     kL | kR | kC,                      // 2 3.0
@@ -2855,19 +3047,44 @@ constexpr std::array<std::uint32_t, 13> kModeChannels = {
     kFive | kTfl | kTfr | kLfe,        // 10 7.1 3/2/2.1
     kFive | kLb | kRb | kTops,         // 11 7.0.4 (Part 2 Table 56)
     kFive | kLb | kRb | kTops | kLfe,  // 12 7.1.4
+    kFive | kLb | kRb | kTops | kLscr | kRscr,         // 13 9.0.4
+    kFive | kLb | kRb | kTops | kLscr | kRscr | kLfe,  // 14 9.1.4
 };
+
+// 22.2 (channel mode 15): Table A.27's 22.2 column, the 7.1.4 channels, the
+// second LFE, the wides, the bottom channels and the top side, front centre,
+// back centre and centre pairs' channels; one bit each, as the decoder's own
+// set (libs/ac4/src/decoder/syntax/presentation.cpp) numbers them.
+constexpr std::uint32_t kLfe2 = 1U << 16U;
+constexpr std::uint32_t kTsl = 1U << 17U;
+constexpr std::uint32_t kTsr = 1U << 18U;
+constexpr std::uint32_t kTfc = 1U << 19U;
+constexpr std::uint32_t kTbc = 1U << 20U;
+constexpr std::uint32_t kTc = 1U << 21U;
+constexpr std::uint32_t kBfl = 1U << 22U;
+constexpr std::uint32_t kBfr = 1U << 23U;
+constexpr std::uint32_t kBfc = 1U << 24U;
+constexpr std::uint32_t kCb = 1U << 25U;
+constexpr int kMode22_2 = 15;
+constexpr std::uint32_t k22_2Channels = kFive | kLb | kRb | kTops | kLfe | kLfe2 | kLw | kRw | kBfl |
+                                        kBfr | kBfc | kCb | kTsl | kTsr | kTfc | kTbc | kTc;
+// The LFEs a track count leaves out (Part 2 Table 55).
+constexpr std::uint32_t kLfes = kLfe | kLfe2;
 
 // The channels a substream of channel mode `mode` holds: the mode's, less the
 // back pair where an immersive source lacks it (b_4_back_channels_present 0).
 [[nodiscard]] std::uint32_t held_channels(int mode, bool backs) noexcept {
+    if (mode == kMode22_2) {
+        return k22_2Channels;
+    }
     const std::uint32_t all = kModeChannels[static_cast<std::size_t>(mode)];
     return (mode == 11 || mode == 12) && !backs ? all & ~(kLb | kRb) : all;
 }
 
-// Part 2 clause 6.3.3.1.27's superset() over Table 88's channel modes and the
-// immersive ones: the lowest mode holding every channel of both, superset(0,
-// 1) being 1; -1 where none of 0 to 12 does, which the channel rule above
-// leaves no presentation of this encoder's.
+// Part 2 clause 6.3.3.1.27's superset() over Table 88's channel modes, the
+// immersive ones and 22.2: the lowest mode holding every channel of both,
+// superset(0, 1) being 1; -1 where none of 0 to 14 and 15 does, which the
+// channel rule above leaves no presentation of this encoder's.
 [[nodiscard]] int superset(int a, int b) noexcept {
     if (a < 0 || b < 0) {
         return a < 0 ? b : a;
@@ -2875,18 +3092,18 @@ constexpr std::array<std::uint32_t, 13> kModeChannels = {
     if ((a == 0 && b == 1) || (a == 1 && b == 0)) {
         return 1;
     }
-    const std::uint32_t wanted =
-        kModeChannels[static_cast<std::size_t>(a)] | kModeChannels[static_cast<std::size_t>(b)];
+    const std::uint32_t wanted = held_channels(a, true) | held_channels(b, true);
     for (std::size_t mode = 0; mode < kModeChannels.size(); ++mode) {
         if ((kModeChannels[mode] & wanted) == wanted) {
             return static_cast<int>(mode);
         }
     }
-    return -1;
+    return (k22_2Channels & wanted) == wanted ? kMode22_2 : -1;
 }
 
 [[nodiscard]] bool mode_has_lfe(int ch_mode) noexcept {
-    return ch_mode == 4 || ch_mode == 6 || ch_mode == 8 || ch_mode == 10 || ch_mode == 12;
+    return ch_mode == 4 || ch_mode == 6 || ch_mode == 8 || ch_mode == 10 || ch_mode == 12 ||
+           ch_mode == 14 || ch_mode == kMode22_2;
 }
 
 // Part 2 Table 55 at presentation_version 1: the least md_compat whose track
@@ -3016,6 +3233,20 @@ struct StreamPresentation {
     }
     if (channels == 2) {
         return {DrcChannel::kFront, DrcChannel::kFront};
+    }
+    if (channels >= 13 && channels <= 14) {
+        // 9.X.4 in the decoder's order: L R C Ls Rs Lb Rb, the four top
+        // channels, the LFE, and the screen pair, which weighs as the front
+        // channels do.
+        std::vector<DrcChannel> out = {DrcChannel::kFront, DrcChannel::kFront, DrcChannel::kCentre,
+                                       DrcChannel::kSide,  DrcChannel::kSide,  DrcChannel::kBack,
+                                       DrcChannel::kBack};
+        out.insert(out.end(), 4, DrcChannel::kFront);
+        if (channels == 14) {
+            out.push_back(DrcChannel::kLfe);
+        }
+        out.insert(out.end(), 2, DrcChannel::kFront);
+        return out;
     }
     if (immersive_layout(channels)) {
         // L R C, the LFE, Ls Rs, the back pair, and the four top channels,
@@ -4312,6 +4543,18 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
                 ch_modes[i] = *channels == 12 ? 12 : 11;
                 backs[i] = true;
                 break;
+            case 13:
+            case 14:
+                // 9.0.4 and 9.1.4: the back pair is always there (libs/ac4/
+                // ERRATA.md, "The 9.X.4 element's rendering").
+                if (!config.experimental.nine_x_4) {
+                    return invalid(
+                        "thirteen or fourteen channels, 9.0.4 or 9.1.4, without "
+                        "experimental.nine_x_4");
+                }
+                ch_modes[i] = *channels == 14 ? 14 : 13;
+                backs[i] = true;
+                break;
             case 1:
                 ch_modes[i] = 0;
                 break;
@@ -4339,10 +4582,17 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
                 ch_modes[i] = base + (*channels == 8 ? 1 : 0);
                 break;
             }
+            case kChannels22_2:
+                // 22.2, Part 2 clause 6.2.4.3, an experimental layout.
+                if (!config.experimental.twenty_two_two) {
+                    return invalid("24 channels, 22.2, without experimental.twenty_two_two");
+                }
+                ch_modes[i] = kMode22_2;
+                break;
             default:
                 return invalid(
                     "a substream of a channel count the encoder does not take: 1, 2, 5, 6, 9 or "
-                    "10, and 3, 7, 8, 11 or 12 as experimental layouts");
+                    "10, and 3, 7, 8, 11, 12, 13, 14 or 24 as experimental layouts");
         }
         const SubstreamConfig& s = subs[i];
         if (s.language.size() > 63) {
@@ -4359,6 +4609,16 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
     if (config.experimental.seven_x != AdditionalPair::kNone &&
         std::ranges::none_of(ch_modes, [](int mode) { return mode >= 5; })) {
         return invalid("experimental.seven_x's additional pair without seven or eight channels");
+    }
+    // The 9.X.4 element is a substream of thirteen or fourteen channels' own.
+    if (config.experimental.nine_x_4 &&
+        std::ranges::none_of(ch_modes, [](int mode) { return mode == 13 || mode == 14; })) {
+        return invalid("experimental.nine_x_4 without thirteen or fourteen channels");
+    }
+    // The 22.2 element is a substream of 24 channels' own.
+    if (config.experimental.twenty_two_two &&
+        std::ranges::none_of(ch_modes, [](int mode) { return mode == kMode22_2; })) {
+        return invalid("experimental.twenty_two_two without 24 channels");
     }
     // One waveform for each hybrid dialogue enhancement at most.
     for (std::size_t i = 0; i < n; ++i) {
@@ -4531,7 +4791,7 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
             }
             three_zero_dialogue[i] = three_zero_dialogue[i] || three_dialogue;
             associated = associated || roles[m] == Role::kAssociated;
-            tracks += static_cast<int>(std::popcount(own & ~kLfe));
+            tracks += static_cast<int>(std::popcount(own & ~kLfes));
             pres_ch_mode = superset(pres_ch_mode, mode);
         }
         if (pres_ch_mode < 0 && !objects) {
@@ -4544,11 +4804,18 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
         p.channels.ch_mode = pres_ch_mode;
         p.channels.lfe = mode_has_lfe(pres_ch_mode);
         for (const std::size_t i : p.members) {
-            if (ch_modes[i] == 11 || ch_modes[i] == 12) {
+            if (ch_modes[i] >= 11 && ch_modes[i] <= 14) {
+                // Table 71: 7.0.4 and 9.0.4 core 5.0.2, 7.1.4 and 9.1.4 5.1.2.
                 p.channels.ch_mode_core =
-                    std::max(p.channels.ch_mode_core, ch_modes[i] == 11 ? 5 : 6);
+                    std::max(p.channels.ch_mode_core, ch_modes[i] % 2 != 0 ? 5 : 6);
                 p.channels.back = p.channels.back || backs[i];
                 p.channels.top_channel_pairs = 2;
+                p.immersive = true;
+            }
+            if (ch_modes[i] == kMode22_2) {
+                // Top and bottom channels: immersive audio for the indicator,
+                // and no core, back pair or top pairs to derive (the table of
+                // contents names none for 22.2's channel mode).
                 p.immersive = true;
             }
         }
@@ -4627,7 +4894,13 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
         // The downmix's values go where the presentation's channel mode sends
         // them: set for one that does not, they are refused; the stream's
         // go to those that do.
-        if (pc.downmix || (config.downmix && pres_ch_mode >= 3)) {
+        if (pres_ch_mode == kMode22_2 && pc.downmix) {
+            // No table of Part 2 clause 5.10.2 has a 22.2 input to downmix.
+            return invalid(
+                "downmix values for a 22.2 presentation, which no downmix table takes as input "
+                "(Part 2 Tables 35 to 43)");
+        }
+        if (pc.downmix || (config.downmix && pres_ch_mode >= 3 && pres_ch_mode != kMode22_2)) {
             // The stream's height downmix goes to its immersive presentations
             // alone; a presentation's own to one that is not, it is refused.
             DownmixConfig downmix = pc.downmix ? *pc.downmix : *config.downmix;
@@ -4639,7 +4912,8 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
             if (!p.downmix) {
                 return invalid(
                     "downmix values for a presentation below 5.X, a height downmix for one that is "
-                    "not immersive, or a gain, an LFE gain or a correction off its table's steps");
+                    "not 5.X.4 or 7.X.4 (9.X.4's has no configuration written), or a gain, an LFE "
+                    "gain or a correction off its table's steps");
             }
             downmix_sent = downmix_sent || !pc.downmix;
         }
@@ -4761,7 +5035,7 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
     const auto full_channels = [&](std::size_t i) {
         return subs[i].objects
                    ? object_layout.fullband()
-                   : static_cast<int>(std::popcount(held_channels(ch_modes[i], backs[i]) & ~kLfe));
+                   : static_cast<int>(std::popcount(held_channels(ch_modes[i], backs[i]) & ~kLfes));
     };
     for (std::size_t i = 0; i < n; ++i) {
         const int full = full_channels(i);
@@ -4812,6 +5086,9 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
         // channels; the others code as they would alone.
         if (one.channels != 7 && one.channels != 8) {
             one.experimental.seven_x = AdditionalPair::kNone;
+        }
+        if (one.channels != 13 && one.channels != 14) {
+            one.experimental.nine_x_4 = false;
         }
         one.codec_mode = s.codec_mode;
         one.bitrate_kbps = std::max(1, static_cast<int>(std::lround(impl->substreams[i].weight)));
@@ -4901,6 +5178,11 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
             return invalid(
                 "DRC gains for a presentation whose main audio is a dialogue enhancement "
                 "substream");
+        }
+        if (anchor.plan.twenty_two()) {
+            return invalid(
+                "DRC gains for a 22.2 presentation: Part 2 Table 69's four channel groups are not "
+                "written");
         }
         const std::vector<detail::DrcChannel> drc_channels =
             drc_channels_of(anchor.config.channels, config.experimental.seven_x);
@@ -5247,20 +5529,43 @@ void SubstreamCoder::take(const std::vector<std::vector<double>>& programme_inpu
                 signal[static_cast<std::size_t>(c)].push_back(value);
             }
         };
-        std::array<double, 12> x{};
+        std::array<double, 14> x{};
         for (std::size_t n = 0; n < count; ++n) {
             for (std::size_t at = 0; at < x.size(); ++at) {
                 const int c = plan.input[at];
                 x[at] = c < 0 ? 0.0 : programme_input[static_cast<std::size_t>(c)][n];
             }
-            push(plan.l, 0.5 * x[0]);
-            push(plan.r, 0.5 * x[1]);
+            if (plan.fronts) {
+                // (L, Lscr) and (R, Rscr): in the simple coupling modes the
+                // channels themselves, which choose_coupled() makes the sum
+                // and difference of (L = A'' + L'' and Lscr = A'' - L'', as
+                // S-CPL's and A-SPX's gains of 1 leave them); in the A-CPL
+                // modes the sum, A'' = (L + Lscr) / 2, and in ASPX_ACPL_1 the
+                // difference below acpl_qmf_band.
+                const std::array<std::array<std::size_t, 2>, 2> screens = {{{0, 12}, {1, 13}}};
+                const std::array<std::array<int, 2>, 2> screen_slots = {
+                    {{plan.l, plan.scr_l}, {plan.r, plan.scr_r}}};
+                for (std::size_t m = 0; m < screens.size(); ++m) {
+                    const double front = x[screens[m][0]];
+                    const double screen = x[screens[m][1]];
+                    if (plan.coupled()) {
+                        push(screen_slots[m][0], front);
+                        push(screen_slots[m][1], screen);
+                    } else {
+                        push(screen_slots[m][0], 0.5 * (front + screen));
+                        push(screen_slots[m][1], 0.5 * (front - screen));
+                    }
+                }
+            } else {
+                push(plan.l, 0.5 * x[0]);
+                push(plan.r, 0.5 * x[1]);
+            }
             push(plan.c, 0.5 * x[2]);
             push(plan.lfe, x[3]);
             // (Ls, Lb), (Rs, Rb), (Tfl, Tbl) and (Tfr, Tbr).
             const std::array<std::array<std::size_t, 2>, 4> pairs = {
                 {{4, 6}, {5, 7}, {8, 10}, {9, 11}}};
-            const std::array<std::array<int, 2>, 4> slots = plan.coupled_pairs();
+            const std::array<std::array<int, 2>, 6> slots = plan.coupled_pairs();
             for (std::size_t m = 0; m < pairs.size(); ++m) {
                 const double first = x[pairs[m][0]];
                 const double second = x[pairs[m][1]];

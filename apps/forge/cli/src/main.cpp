@@ -450,11 +450,11 @@ constexpr std::array<Command, 44> kCommands{{
      "wrap as a playable Matroska file; AC-4 is refused, Matroska registering no codec ID for it",
      topic::kMkv,
      Needs::kNothing,
-     [](const Args& x) { return run_mkv(x.str(1), x.str(2)); }},
+     [](const Args& x) { return run_mkv(x.str(1), x.str(2), x.meta); }},
     {"mp4", 3, "<in.ac3|in.ec3|in.ac4> <out.mp4>",
      "wrap as playable MP4 with dac3/dec3 for AC-3/E-AC-3 or dac4 for AC-4", topic::kNone,
      Needs::kNothing,
-     [](const Args& x) { return run_mp4(x.str(1), x.str(2)); }},
+     [](const Args& x) { return run_mp4(x.str(1), x.str(2), x.meta); }},
     {"fmp4", 3, "<in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out_dir> [frames_per_fragment]",
      "fragmented MP4/CMAF + HLS/DASH manifests, ready for a packager; fallback-51 also writes "
      "an object-stripped 5.1 companion rendition. AC-4 as TS 103 190-2 Annex H has it: each "
@@ -671,7 +671,8 @@ int run_main(int argc, char** argv) {
                                token == "keep-partial" || token == "fast-mdct" ||
                                token == "fast-imdct" || token == "mix-lfe" ||
                                token == "headphones" ||
-                               token == "fallback-51" || token == "annexd" ||
+                               token == "fallback-51" || token == "insert" ||
+                               token == "annexd" ||
                                token == "infomdat" || token == "encinfo" ||
                                token == "langcod" || token == "langcod2" ||
                                token == "copyright" || token == "sourcefscod" ||

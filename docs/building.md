@@ -343,7 +343,7 @@ the failures of the last run; add `--output-on-failure` to any run to see a fail
 | `ICLFORGE_BUILD_MP4` | `ON` | Build `iclforge::containers::mp4` (`libs/containers/src/mp4`), the standalone MP4/ISOBMFF container writer. Same all-off constraint as `ICLFORGE_BUILD_MATROSKA`. |
 | `ICLFORGE_BUILD_MPEGTS` | `ON` | Build `iclforge::containers::mpegts` (`libs/containers/src/mpegts`), the standalone MPEG-TS container writer. Same all-off constraint as `ICLFORGE_BUILD_MATROSKA`. |
 | `ICLFORGE_BUILD_IAB` | `ON` | Build `iclforge::iab` (`libs/iab`), the standalone SMPTE ST 2098-2 Immersive Audio Bitstream reader. Like the three container writers above it needs no opt-in third-party library, so it defaults on the same way; unlike them nothing in `apps/` or `examples/` links it yet, so there is no all-off guard — `tests/CMakeLists.txt` simply adds its test file when this is on. |
-| `ICLFORGE_BUILD_IAMF` | `ON` | Build `iclforge::containers::iamf` (`libs/containers/src/iamf`), the standalone IAMF v1.1 OBU and ISOBMFF writer. Same zero-third-party-dependency shape as `iclforge::iab`, and like it linked by nothing in `apps/` (`examples/mux_iamf.cpp` builds when this is on). The vcpkg port's `iamf` feature and the Conan recipe's `iamf` option install it, off by default. |
+| `ICLFORGE_BUILD_IAMF` | `ON` | Build `iclforge::containers::iamf` (`libs/containers/src/iamf`), the standalone IAMF v2.0 OBU and ISO-BMFF reader and writer. Same zero-third-party-dependency shape as `iclforge::iab`, and like it linked by nothing in `apps/` (`examples/mux_iamf.cpp`, `examples/iamf_objects.cpp` and `examples/iamf_coded.cpp` build when this is on). The vcpkg port's `iamf` feature and the Conan recipe's `iamf` option install it, off by default. |
 | `ICLFORGE_BUILD_AC4` | `ON` | Build the AC-4 codec `iclforge::ac4` (`libs/ac4`): the inspector, the decoder and the encoder, one library, with the tables and transforms the decoder and the encoder share inside it (`libs/ac4/src/core`) — see [AC-4](library/ac4.md). It is installed and exported as `iclforge::ac4_static` and `iclforge::ac4_shared`. `OFF` needs the CLI, the GUI and the tests off too, and Hearth unless it is the ESP-IDF player half (the root `CMakeLists.txt` guards), since they link them. The Python wheel binds them (`iclforge.ac4`), the WebAssembly preset builds them for the `iclforge_wasm_ac4` module, and the Android app builds them without linking them yet; the ESP-IDF component and the minimum-footprint presets turn the option off and take the decoder alone through `ICLFORGE_MINIMAL_AC4`. The vcpkg port's `ac4` feature and the Conan recipe's `ac4` option install them, off by default. |
 | `ICLFORGE_BUILD_CAPI` | `ON` | Build `iclforge::c` (`libs/capi`), the C API over the encode/decode core — see [C API](library/c-api.md). Depends on nothing but `iclforge::ac3_static`, so unlike `ICLFORGE_BUILD_ADM` there is no extra dependency footprint to opt out of. |
 | `ICLFORGE_BUILD_PYTHON` | `OFF` | Build the pybind11 extension module (`bindings/python/`). Off by default for the same reason as `ICLFORGE_BUILD_ADM`: nothing under `src/`, `apps/`, `tests/` or `examples/` links it, so a normal C++ build is unaffected either way. `bindings/python/pyproject.toml` turns it on itself via scikit-build-core when `pip install`/cibuildwheel drives the configure. |
@@ -1651,6 +1651,40 @@ every channel except the LFE. One mechanism, two fixture populations.
 With the encoder excluded by these hashes, FFmpeg's own kernels excluded by the `-cpuflags 0`
 test above, and contraction and libm excluded before that, what remains open is the decode
 path on real arm64 silicon — which is also the one thing no emulated run has reproduced.
+
+### Real programme material in the hash gate
+
+Those three streams are one synthetic 5.1 file, and synthetic tones sit far from the encoder's
+thresholds: rematrixing, coupling's band fit, SPX's and AHT's choices, §7.2.2's closed-loop search and
+the VBR loop all decide on a signal's own statistics, and a toolchain that differs in one last bit
+only changes a stream where the signal puts one of them near its edge. The same check therefore
+pins sixteen more streams that `verify_gold_reference.sh` encodes for it alone (hash only, no
+decode and no score): the CC0 music and speech programmes of `testdata/audio` (30 s of 48 kHz
+stereo each, converted by ffmpeg, which is lossless) through AC-3 with and without coupling and with
+`search=distortion`, and through E-AC-3 with `auto`, `cpl`, `spx`, `aht`, `all`, enhanced coupling,
+`tpn` and VBR, and the synthetic 5.1 through `spx`, `aht` and `all`.
+
+**One of them found a real divergence, and it was not floating point.** The AC-3 encoder's
+2/0 coupling stream of the music clip (192 kbit/s) differed in one frame of 938 between the MSVC and
+clang-cl builds and the GCC and Clang ones (Linux): the frame's last block carried a delta bit
+allocation segment on one side and a skip field on the other. Every libm the table builders
+call was suspected first and cleared by replay: 22 of the 288 sin/cos table entries do differ in the
+last bit between UCRT and glibc, and giving the Linux build UCRT's values for them changed
+nothing. The cause was `std::ranges::nth_element` in `choose_delta_segments`, which keeps the eight
+largest corrections when more than eight qualify. A correction's magnitude takes four values
+(`|2·code − 7|` is 1, 3, 5 or 7), so the eight to keep are usually chosen among equals, and the
+standard leaves a selection among equal keys to the library: libstdc++'s and the MSVC STL's differ.
+The selection is now a stable sort by magnitude over runs already in band order, so ties go to the
+lower band. That is what the MSVC STL had chosen in this frame, so Windows output did not move and
+Linux now equals it; the three gold pins did not move either.
+
+The same sixteen on real arm64 hardware (the Linux GCC leg, libstdc++, CI run 38036705121) are
+byte-identical to the x86-64 ones, so `aarch64-neon/fast` is pinned too. What is still unpinned: the
+macOS leg's libc++ (it did not build that day, an `-Wsign-conversion` error in an IAMF example on
+main), and the `encfloat` family. The float32 encoder's existing pins no longer match a fresh GCC 16 build of main
+(the same three hashes before and after this change), the nightly leg that checks them stops at
+its float32 decode suite before reaching them (the run of 2026-10-09), and that variant does not build
+with Clang 22 (`-Wdouble-promotion` in `eac3_frame.cpp`); neither was investigated here.
 
 ## Gold-reference correctness gate
 

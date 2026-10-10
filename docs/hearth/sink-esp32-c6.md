@@ -14,8 +14,9 @@ has not been run again on a board to see whether the limit has moved.
 
 The C6 build does not decode AC-4. `CONFIG_ICLFORGE_AC4` builds the decoder for this part in the
 fixed-point tier, and the decoder does not fit beside WiFi: 2.0 peaks at 286,365 bytes, where the
-part has about 236,000 free with WiFi up ([ESP32-C6](../platforms/bare-metal/esp32-c6.md#ac-4)).
-A C6 sink takes AC-4 programmes from Hearth as PCM. No ESP32 sink takes AC-4 in a Sendspin
+part has about 236,000 free with WiFi up, and 117 KB with the sink and its player up
+([ESP32-C6](../platforms/bare-metal/esp32-c6.md#ac-4)). A play of an AC-4 stream on the board is
+refused (`why: "memory"`) and the board runs on. A C6 sink takes AC-4 programmes from Hearth as PCM. No ESP32 sink takes AC-4 in a Sendspin
 group; an ESP32-P4 built with `sdkconfig.ac4` decodes it from an HTTP source
 ([ESP32-P4](../platforms/bare-metal/esp32-p4.md#ac-4)).
 

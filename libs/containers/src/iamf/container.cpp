@@ -237,10 +237,63 @@ constexpr std::array<std::uint32_t, 9> kUnityMatrix{0x00010000, 0, 0, 0, 0x00010
     if (options.timescale != 0) {
         return options.timescale;
     }
-    if (!sequence.codec_configs.empty() && sequence.codec_configs.front().lpcm.has_value()) {
-        return sequence.codec_configs.front().lpcm->sample_rate;
+    if (!sequence.codec_configs.empty()) {
+        if (const auto rate = detail::codec_sample_rate(sequence.codec_configs.front()); rate.has_value()) {
+            return *rate;
+        }
     }
     return 48000;
+}
+
+// 6.2.2: with Opus or AAC-LC every IA Sample belongs to a `roll` sample group whose roll_distance
+// is the Codec Config's audio_roll_distance.
+[[nodiscard]] std::optional<std::int16_t> roll_distance(const Sequence& sequence) {
+    for (const CodecConfig& config : sequence.codec_configs) {
+        if (config.codec_id == "Opus" || config.codec_id == "mp4a") {
+            return config.audio_roll_distance;
+        }
+    }
+    return std::nullopt;
+}
+
+// SampleGroupDescriptionBox (version 1, so a default_length): one AudioRollRecoveryEntry.
+[[nodiscard]] Bytes roll_description_box(std::int16_t distance) {
+    Out body;
+    body.fourcc("roll");
+    body.u32(2);  // default_length: the size of an AudioRollRecoveryEntry
+    body.u32(1);  // entry_count
+    body.u16(static_cast<std::uint16_t>(distance));
+    return full_box("sgpd", 1, 0, body.data());
+}
+
+// SampleToGroupBox: all `samples` samples in group description 1.
+[[nodiscard]] Bytes roll_samples_box(std::uint32_t samples) {
+    Out body;
+    body.fourcc("roll");
+    body.u32(samples == 0 ? 0 : 1);  // entry_count
+    if (samples != 0) {
+        body.u32(samples);
+        body.u32(1);  // group_description_index
+    }
+    return full_box("sbgp", 0, 0, body.data());
+}
+
+// The `mdat` header: a 32-bit size, or the 64-bit largesize form (size 1).
+[[nodiscard]] Bytes mdat_header(std::uint64_t payload_bytes, bool large) {
+    Out out;
+    if (large) {
+        out.u32(1);
+        out.fourcc("mdat");
+        out.u64(16 + payload_bytes);
+    } else {
+        out.u32(static_cast<std::uint32_t>(8 + payload_bytes));
+        out.fourcc("mdat");
+    }
+    return out.take();
+}
+
+[[nodiscard]] bool needs_large_mdat(std::uint64_t payload_bytes, bool requested) {
+    return requested || payload_bytes + 8 > 0xFFFFFFF0ULL;
 }
 
 [[nodiscard]] std::uint32_t frame_samples(const Sequence& sequence) {
@@ -350,6 +403,10 @@ std::expected<Bytes, Error> write_isobmff(const Sequence& sequence, const Isobmf
         if (any_non_sync) {
             stbl.bytes(stss_box(sync_samples));
         }
+        if (const auto roll = roll_distance(sequence); roll.has_value()) {
+            stbl.bytes(roll_description_box(*roll));
+            stbl.bytes(roll_samples_box(static_cast<std::uint32_t>(samples.size())));
+        }
         Out moov;
         moov.bytes(mvhd_box(timescale, edit.has_value() ? edit->segment_duration : total));
         moov.bytes(track_box(box("stbl", stbl.data()), timescale, total, options.writing_app, edit));
@@ -362,14 +419,13 @@ std::expected<Bytes, Error> write_isobmff(const Sequence& sequence, const Isobmf
     for (const auto& sample : samples) {
         payload_bytes += sample.size();
     }
-    if (payload_bytes + 8 > 0xFFFFFFF0ULL) {
-        return std::unexpected(Error::kInvalidArgument);  // the mdat size field is 32 bits
-    }
+    const bool large = needs_large_mdat(payload_bytes, options.large_mdat);
+    const std::uint64_t header_bytes = large ? 16 : 8;
     std::vector<std::uint64_t> offsets(samples.size(), 0);
     bool wide = false;
     Bytes moov = build_moov(offsets, wide);
     for (int pass = 0; pass < 2; ++pass) {
-        std::uint64_t cursor = ftyp.size() + moov.size() + 8;
+        std::uint64_t cursor = ftyp.size() + moov.size() + header_bytes;
         for (std::size_t i = 0; i < samples.size(); ++i) {
             offsets[i] = cursor;
             cursor += samples[i].size();
@@ -387,14 +443,11 @@ std::expected<Bytes, Error> write_isobmff(const Sequence& sequence, const Isobmf
     Bytes file;
     // The sum is 64-bit; a vector on a 32-bit target (WebAssembly) cannot hold more than
     // max_size() whatever the file says, and the reservation is only a hint.
-    const std::uint64_t file_bytes = ftyp.size() + moov.size() + 8 + payload_bytes;
+    const std::uint64_t file_bytes = ftyp.size() + moov.size() + header_bytes + payload_bytes;
     file.reserve(static_cast<std::size_t>(std::min<std::uint64_t>(file_bytes, file.max_size())));
     append(file, ftyp);
     append(file, moov);
-    Out mdat_header;
-    mdat_header.u32(static_cast<std::uint32_t>(8 + payload_bytes));
-    mdat_header.fourcc("mdat");
-    file.insert(file.end(), mdat_header.data().begin(), mdat_header.data().end());
+    append(file, mdat_header(payload_bytes, large));
     for (const auto& sample : samples) {
         append(file, sample);
     }
@@ -413,6 +466,7 @@ std::expected<FragmentedWriter, Error> FragmentedWriter::create(const Sequence& 
     writer.descriptors_ = descriptors;
     writer.descriptors_.temporal_units.clear();
     writer.default_sample_duration_ = frame_samples(descriptors);
+    writer.large_mdat_ = options.large_mdat;
     const std::uint32_t timescale = resolve_timescale(descriptors, options);
 
     Out stbl;
@@ -421,6 +475,9 @@ std::expected<FragmentedWriter, Error> FragmentedWriter::create(const Sequence& 
     stbl.bytes(stsc_box(true));
     stbl.bytes(stsz_box({}));
     stbl.bytes(chunk_offset_box({}, false));
+    if (const auto roll = roll_distance(descriptors); roll.has_value()) {
+        stbl.bytes(roll_description_box(*roll));  // each fragment's traf maps its samples to it
+    }
 
     Out trex;
     trex.u32(1);  // track_ID
@@ -490,27 +547,25 @@ std::expected<Bytes, Error> FragmentedWriter::fragment(std::span<const TemporalU
         traf.bytes(tfhd_box);
         traf.bytes(tfdt_box);
         traf.bytes(trun_box);
+        if (roll_distance(descriptors_).has_value()) {
+            traf.bytes(roll_samples_box(static_cast<std::uint32_t>(samples.size())));
+        }
         Out moof;
         moof.bytes(full_box("mfhd", 0, 0, mfhd.data()));
         moof.bytes(box("traf", traf.data()));
         return box("moof", moof.data());
     };
 
-    const Bytes measured = build_moof(0);
-    const Bytes moof = build_moof(static_cast<std::uint32_t>(measured.size() + 8));
     std::uint64_t payload_bytes = 0;
     for (const auto& sample : samples) {
         payload_bytes += sample.size();
     }
-    if (payload_bytes + 8 > 0xFFFFFFF0ULL) {
-        return std::unexpected(Error::kInvalidArgument);
-    }
+    const bool large = needs_large_mdat(payload_bytes, large_mdat_);
+    const Bytes measured = build_moof(0);
+    const Bytes moof = build_moof(static_cast<std::uint32_t>(measured.size() + (large ? 16 : 8)));
 
     Bytes out = moof;
-    Out mdat_header;
-    mdat_header.u32(static_cast<std::uint32_t>(8 + payload_bytes));
-    mdat_header.fourcc("mdat");
-    out.insert(out.end(), mdat_header.data().begin(), mdat_header.data().end());
+    append(out, mdat_header(payload_bytes, large));
     for (const auto& sample : samples) {
         append(out, sample);
     }
@@ -598,6 +653,7 @@ struct SampleRange {
 
 struct TrackTables {
     Bytes config_obus;
+    std::uint32_t track_id = 0;
     std::uint32_t timescale = 0;
     std::uint64_t media_duration = 0;
     std::optional<EditList> edit;
@@ -622,8 +678,31 @@ struct FullHeader {
                       be32(data, b.body) & 0x00FFFFFFU, b.body + 4};
 }
 
+// 6.3: a protected IA track keeps its sample entry's original format ("iamf") in the frma box of
+// the sinf box of an `enca` entry. Its samples are encrypted, so this reader only notes it.
+[[nodiscard]] std::expected<bool, Error> is_protected_iamf_entry(std::span<const std::byte> data, const BoxView& entry) {
+    constexpr std::size_t kAudioSampleEntryBytes = 28;
+    if (entry.type != "enca" || entry.end - entry.body < kAudioSampleEntryBytes) {
+        return false;
+    }
+    auto children = list_boxes(data, entry.body + kAudioSampleEntryBytes, entry.end);
+    if (!children.has_value()) {
+        return std::unexpected(children.error());
+    }
+    const BoxView* sinf = find_box(*children, "sinf");
+    if (sinf == nullptr) {
+        return false;
+    }
+    auto protection = list_boxes(data, sinf->body, sinf->end);
+    if (!protection.has_value()) {
+        return std::unexpected(protection.error());
+    }
+    const BoxView* frma = find_box(*protection, "frma");
+    return frma != nullptr && frma->end - frma->body >= 4 && fourcc_at(data, frma->body) == "iamf";
+}
+
 [[nodiscard]] std::expected<void, Error> read_sample_entry(std::span<const std::byte> data, const BoxView& stsd,
-                                                           TrackTables& tables, bool& is_iamf) {
+                                                           TrackTables& tables, bool& is_iamf, bool& is_protected) {
     auto header = full_header(data, stsd);
     if (!header.has_value() || stsd.end - header->body < 4) {
         return std::unexpected(Error::kBadBox);
@@ -633,6 +712,14 @@ struct FullHeader {
         return std::unexpected(entries.error());
     }
     for (const BoxView& entry : *entries) {
+        if (entry.type == "enca") {
+            auto protected_entry = is_protected_iamf_entry(data, entry);
+            if (!protected_entry.has_value()) {
+                return std::unexpected(protected_entry.error());
+            }
+            is_protected = is_protected || *protected_entry;
+            continue;
+        }
         if (entry.type != "iamf") {
             continue;
         }
@@ -670,13 +757,13 @@ struct FullHeader {
 
 // The sample tables of a trak into byte ranges.
 [[nodiscard]] std::expected<void, Error> read_stbl(std::span<const std::byte> data, const BoxView& stbl,
-                                                   TrackTables& tables, bool& is_iamf) {
+                                                   TrackTables& tables, bool& is_iamf, bool& is_protected) {
     auto children = list_boxes(data, stbl.body, stbl.end);
     if (!children.has_value()) {
         return std::unexpected(children.error());
     }
     if (const BoxView* stsd = find_box(*children, "stsd"); stsd != nullptr) {
-        if (auto status = read_sample_entry(data, *stsd, tables, is_iamf); !status.has_value()) {
+        if (auto status = read_sample_entry(data, *stsd, tables, is_iamf, is_protected); !status.has_value()) {
             return std::unexpected(status.error());
         }
     }
@@ -800,7 +887,7 @@ struct FullHeader {
 }
 
 [[nodiscard]] std::expected<void, Error> read_trak(std::span<const std::byte> data, const BoxView& trak,
-                                                   TrackTables& tables, bool& is_iamf) {
+                                                   TrackTables& tables, bool& is_iamf, bool& is_protected) {
     auto children = list_boxes(data, trak.body, trak.end);
     if (!children.has_value()) {
         return std::unexpected(children.error());
@@ -827,14 +914,31 @@ struct FullHeader {
     }
     TrackTables local;
     bool local_iamf = false;
-    if (auto status = read_stbl(data, *stbl, local, local_iamf); !status.has_value()) {
+    bool local_protected = false;
+    if (auto status = read_stbl(data, *stbl, local, local_iamf, local_protected); !status.has_value()) {
         return std::unexpected(status.error());
+    }
+    if (local_protected) {
+        is_protected = true;
     }
     if (!local_iamf) {
         return {};
     }
     is_iamf = true;
     tables = std::move(local);
+
+    if (const BoxView* tkhd = find_box(*children, "tkhd"); tkhd != nullptr) {
+        auto header = full_header(data, *tkhd);
+        if (!header.has_value()) {
+            return std::unexpected(header.error());
+        }
+        // creation and modification times are 4 bytes each in version 0 and 8 in version 1.
+        const std::size_t id_at = header->body + (header->version == 1 ? 16 : 8);
+        if (tkhd->end < id_at + 4) {
+            return std::unexpected(Error::kBadBox);
+        }
+        tables.track_id = be32(data, id_at);
+    }
 
     if (const BoxView* mdhd = find_box(*media, "mdhd"); mdhd != nullptr) {
         auto header = full_header(data, *mdhd);
@@ -893,6 +997,15 @@ struct FullHeader {
         auto parts = list_boxes(data, traf.body, traf.end);
         if (!parts.has_value()) {
             return std::unexpected(parts.error());
+        }
+        if (const BoxView* tfhd = find_box(*parts, "tfhd"); tfhd != nullptr && tables.track_id != 0) {
+            auto header = full_header(data, *tfhd);
+            if (!header.has_value() || tfhd->end - header->body < 4) {
+                return std::unexpected(Error::kBadBox);
+            }
+            if (be32(data, header->body) != tables.track_id) {
+                continue;  // another track's fragment
+            }
         }
         std::uint64_t base = moof.start;
         std::uint32_t default_duration = tables.trex_duration;
@@ -1019,24 +1132,39 @@ struct FullHeader {
 
 }  // namespace
 
-std::expected<IsobmffFile, Error> read_isobmff(std::span<const std::byte> file) {
+namespace {
+
+// The `trex` defaults of one track.
+struct TrackDefaults {
+    std::uint32_t duration = 0;
+    std::uint32_t size = 0;
+    std::uint32_t flags = 0;
+};
+
+// 6.2.1 stores an IA Sequence as one track; a file with more than a few is not a real one, and each
+// track is matched against every movie fragment.
+constexpr std::size_t kMaxIaTracks = 64;
+
+[[nodiscard]] std::expected<std::vector<IsobmffFile>, Error> read_tracks(std::span<const std::byte> file,
+                                                                         bool first_only) {
     auto top = list_boxes(file, 0, file.size());
     if (!top.has_value() || top->empty() || (*top)[0].type != "ftyp") {
         return std::unexpected(top.has_value() ? Error::kNotIsobmff : top.error());
     }
 
-    IsobmffFile result;
+    IsobmffInfo shared;
     const BoxView& ftyp = (*top)[0];
     if (ftyp.end - ftyp.body >= 8) {
-        result.info.brands.push_back(fourcc_at(file, ftyp.body));
+        shared.brands.push_back(fourcc_at(file, ftyp.body));
         for (std::size_t at = ftyp.body + 8; at + 4 <= ftyp.end; at += 4) {
-            result.info.brands.push_back(fourcc_at(file, at));
+            shared.brands.push_back(fourcc_at(file, at));
         }
     }
 
-    TrackTables tables;
-    bool is_iamf = false;
+    std::vector<TrackTables> tracks;
+    std::map<std::uint32_t, TrackDefaults> defaults;
     bool have_moov = false;
+    bool any_protected = false;
     for (const BoxView& b : *top) {
         if (b.type != "moov") {
             continue;
@@ -1047,62 +1175,108 @@ std::expected<IsobmffFile, Error> read_isobmff(std::span<const std::byte> file) 
             return std::unexpected(children.error());
         }
         for (const BoxView& child : *children) {
-            if (child.type == "trak" && !is_iamf) {
-                if (auto status = read_trak(file, child, tables, is_iamf); !status.has_value()) {
+            if (child.type != "trak" || (first_only && !tracks.empty())) {
+                continue;
+            }
+            TrackTables tables;
+            bool is_iamf = false;
+            if (auto status = read_trak(file, child, tables, is_iamf, any_protected); !status.has_value()) {
+                return std::unexpected(status.error());
+            }
+            if (is_iamf) {
+                if (tracks.size() >= kMaxIaTracks) {
+                    return std::unexpected(Error::kUnsupported);
+                }
+                tracks.push_back(std::move(tables));
+            }
+        }
+        if (const BoxView* mvex = find_box(*children, "mvex"); mvex != nullptr) {
+            shared.fragmented = true;
+            auto entries = list_boxes(file, mvex->body, mvex->end);
+            if (!entries.has_value()) {
+                return std::unexpected(entries.error());
+            }
+            for (const BoxView& trex : *entries) {
+                if (trex.type == "trex" && trex.end - trex.body >= 24) {
+                    defaults[be32(file, trex.body + 4)] = {be32(file, trex.body + 12), be32(file, trex.body + 16),
+                                                           be32(file, trex.body + 20)};
+                }
+            }
+        }
+    }
+    if (!have_moov || tracks.empty()) {
+        // A file whose IA tracks are all protected is not "not IAMF": it needs a key this reader
+        // does not take (Common Encryption is not implemented).
+        return std::unexpected(any_protected && have_moov ? Error::kUnsupported : Error::kNotIamf);
+    }
+    if (std::find(shared.brands.begin(), shared.brands.end(), "iamf") == shared.brands.end()) {
+        return std::unexpected(Error::kNotIamf);
+    }
+
+    std::vector<IsobmffFile> result;
+    for (TrackTables& tables : tracks) {
+        if (const auto it = defaults.find(tables.track_id); it != defaults.end()) {
+            tables.trex_duration = it->second.duration;
+            tables.trex_size = it->second.size;
+            tables.trex_flags = it->second.flags;
+        } else if (defaults.size() == 1 && tables.track_id == 0) {
+            const TrackDefaults& only = defaults.begin()->second;
+            tables.trex_duration = only.duration;
+            tables.trex_size = only.size;
+            tables.trex_flags = only.flags;
+        }
+        for (const BoxView& b : *top) {
+            if (b.type == "moof") {
+                if (auto status = read_moof(file, b, tables); !status.has_value()) {
                     return std::unexpected(status.error());
                 }
             }
         }
-        if (const BoxView* mvex = find_box(*children, "mvex"); mvex != nullptr) {
-            result.info.fragmented = true;
-            auto defaults = list_boxes(file, mvex->body, mvex->end);
-            if (!defaults.has_value()) {
-                return std::unexpected(defaults.error());
-            }
-            if (const BoxView* trex = find_box(*defaults, "trex"); trex != nullptr && trex->end - trex->body >= 24) {
-                tables.trex_duration = be32(file, trex->body + 12);
-                tables.trex_size = be32(file, trex->body + 16);
-                tables.trex_flags = be32(file, trex->body + 20);
-            }
-        }
-    }
-    if (!have_moov || !is_iamf) {
-        return std::unexpected(Error::kNotIamf);
-    }
-    if (std::find(result.info.brands.begin(), result.info.brands.end(), "iamf") == result.info.brands.end()) {
-        return std::unexpected(Error::kNotIamf);
-    }
-    for (const BoxView& b : *top) {
-        if (b.type == "moof") {
-            if (auto status = read_moof(file, b, tables); !status.has_value()) {
-                return std::unexpected(status.error());
-            }
-        }
-    }
 
-    auto descriptors = read_descriptors(tables.config_obus);
-    if (!descriptors.has_value()) {
-        return std::unexpected(descriptors.error());
-    }
-    result.sequence = std::move(*descriptors);
-
-    result.info.timescale = tables.timescale;
-    result.info.edit = tables.edit;
-    for (const SampleRange& sample : tables.samples) {
-        if (sample.offset > file.size() || sample.size > file.size() - sample.offset) {
-            return std::unexpected(Error::kBadBox);
+        auto descriptors = read_descriptors(tables.config_obus);
+        if (!descriptors.has_value()) {
+            return std::unexpected(descriptors.error());
         }
-        auto unit = read_temporal_unit(result.sequence,
-                                       file.subspan(static_cast<std::size_t>(sample.offset), sample.size));
-        if (!unit.has_value()) {
-            return std::unexpected(unit.error());
+        IsobmffFile track;
+        track.sequence = std::move(*descriptors);
+        track.info = shared;
+        track.info.track_id = tables.track_id;
+        track.info.timescale = tables.timescale;
+        track.info.edit = tables.edit;
+        for (const SampleRange& sample : tables.samples) {
+            if (sample.offset > file.size() || sample.size > file.size() - sample.offset) {
+                return std::unexpected(Error::kBadBox);
+            }
+            auto unit = read_temporal_unit(track.sequence,
+                                           file.subspan(static_cast<std::size_t>(sample.offset), sample.size));
+            if (!unit.has_value()) {
+                return std::unexpected(unit.error());
+            }
+            unit->is_not_key_frame = sample.non_sync;
+            track.sequence.temporal_units.push_back(std::move(*unit));
+            track.info.sample_durations.push_back(sample.duration);
+            track.info.duration += sample.duration;
         }
-        unit->is_not_key_frame = sample.non_sync;
-        result.sequence.temporal_units.push_back(std::move(*unit));
-        result.info.sample_durations.push_back(sample.duration);
-        result.info.duration += sample.duration;
+        result.push_back(std::move(track));
+        if (first_only) {
+            break;
+        }
     }
     return result;
+}
+
+}  // namespace
+
+std::expected<IsobmffFile, Error> read_isobmff(std::span<const std::byte> file) {
+    auto tracks = read_tracks(file, true);
+    if (!tracks.has_value()) {
+        return std::unexpected(tracks.error());
+    }
+    return std::move(tracks->front());
+}
+
+std::expected<std::vector<IsobmffFile>, Error> read_isobmff_tracks(std::span<const std::byte> file) {
+    return read_tracks(file, false);
 }
 
 }  // namespace iclforge::containers::iamf

@@ -474,7 +474,8 @@ struct ObjectMetadataUpdate {
 struct SubstreamConfig {
     // Its input channels, in the order EncoderConfig::channels takes them: 1,
     // 2, 5, 6, 9 or 10; 7 or 8 with experimental.seven_x; 11 or 12 with
-    // experimental.back_pair; and 3, L R C, with experimental.three_zero, which
+    // experimental.back_pair; 13 or 14 with experimental.nine_x_4; 24, 22.2, with
+    // experimental.twenty_two_two; and 3, L R C, with experimental.three_zero, which
     // Part 1 clause 4.3.3.7.1 allows only for the dialogue of a music and
     // effects presentation.
     int channels = 2;
@@ -567,8 +568,14 @@ struct EncoderConfig {
     // stereo, L R; 5, 5.0, L R C Ls Rs; 6, 5.1, L R C LFE Ls Rs; 9, 5.0.4, L R
     // C Ls Rs Tfl Tfr Tbl Tbr; 10, 5.1.4, L R C LFE Ls Rs Tfl Tfr Tbl Tbr; with
     // experimental.seven_x, 7 or 8, 7.0 or 7.1, L R C, the LFE of 7.1, Ls Rs
-    // and the additional pair; and with experimental.back_pair, 11 or 12,
-    // 7.0.4 or 7.1.4, L R C, the LFE of 7.1.4, Ls Rs Lb Rb Tfl Tfr Tbl Tbr.
+    // and the additional pair; with experimental.back_pair, 11 or 12,
+    // 7.0.4 or 7.1.4, L R C, the LFE of 7.1.4, Ls Rs Lb Rb Tfl Tfr Tbl Tbr;
+    // with experimental.nine_x_4, 13 or 14, 9.0.4 or 9.1.4, in the order the
+    // decoder writes them (Part 2 Table A.27): L R C Ls Rs Lb Rb Tfl Tfr Tbl Tbr,
+    // the LFE of 9.1.4, then the screen pair Lscr Rscr; and with
+    // experimental.twenty_two_two, 24, 22.2 in Part 2 Table A.27's order by
+    // speaker index: L R C Ls Rs Lb Rb Tfl Tfr Tbl Tbr LFE Tsl Tsr Tfc Tbc Tc
+    // LFE2 Bfl Bfr Bfc Cb Lw Rw.
     int channels = 2;
     int sample_rate_hz = 48000;    // 48 000, or 44 100
     // Part 1 Table 83 at 48 kHz: 0 23.976 fps, 1 24, 2 25, 3 29.97, 4 30, 5
@@ -651,6 +658,12 @@ struct EncoderConfig {
         bool back_pair = false;
         // The immersive element's ASPX_AJCC, which codec_mode then takes.
         bool ajcc = false;
+        // 9.0.4 and 9.1.4, thirteen or fourteen input channels: the immersive
+        // element with b_5fronts 1 (Part 2 clause 6.2.4.1), which adds the
+        // screen pair, Lscr and Rscr, to the 7.X.4 channels, in SCPL,
+        // ASPX_SCPL and ASPX_ACPL_2 and, with experimental.acpl, ASPX_ACPL_1.
+        // ASPX_AJCC with b_5fronts is not written.
+        bool nine_x_4 = false;
         // DRC modes that send gains (DrcModeConfig::gains_config), which no
         // DEE stream has.
         bool drc_gains = false;
@@ -677,6 +690,12 @@ struct EncoderConfig {
         // each audio substream cut into as many pieces, which a decoder
         // reassembles after the last. Constant rate only; 1 is the mode off.
         int frame_rate_fraction = 1;
+        // The 22.2 channel element (Part 2 clause 6.2.4.3): 24 input channels
+        // in Table A.27's order, two LFE tracks and eleven channel pairs, in the
+        // SIMPLE and ASPX codec modes, which no stream and no reader outside the
+        // project has seen. Without it 24 channels are refused, and with it
+        // any other count is.
+        bool twenty_two_two = false;
     };
     Experimental experimental{};
 };
