@@ -28,7 +28,7 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          read_pr='query($o:String!,$n:String!,$p:Int!){repository(owner:$o,name:$n){pullRequest(number:$p){id mergeStateStatus headRefOid}}}'
+          read_pr="query(\$o:String!,\$n:String!,\$p:Int!){repository(owner:\$o,name:\$n){pullRequest(number:\$p){id mergeStateStatus headRefOid}}}"
           for i in $(seq 1 50); do
             out="$(gh api graphql -f query="$read_pr" -f o="${REPO%/*}" -f n="${REPO#*/}" -F p="$PR")"
             status="$(jq -r '.data.repository.pullRequest.mergeStateStatus' <<<"$out")"
@@ -40,5 +40,5 @@ jobs:
           oid="$(jq -r '.data.repository.pullRequest.headRefOid' <<<"$out")"
           echo "enqueueing $id at $oid"
           gh api graphql \
-            -f query='mutation($id:ID!,$oid:GitObjectID){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$oid}){mergeQueueEntry{position state}}}' \
+            -f query="mutation(\$id:ID!,\$oid:GitObjectID){enqueuePullRequest(input:{pullRequestId:\$id,expectedHeadOid:\$oid}){mergeQueueEntry{position state}}}" \
             -f id="$id" -f oid="$oid"
