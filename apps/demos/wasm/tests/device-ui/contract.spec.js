@@ -25,13 +25,16 @@ const {
 } = require('./stub');
 
 const COMPONENT = path.resolve(__dirname, '../../../../../firmware/esp-idf/iclforge');
+// The two firmware headers below are not the component's: they live in
+// libs/device, which the component and the host tests both compile.
+const LIBS_DEVICE = path.resolve(__dirname, '../../../../../libs/device/include/iclforge');
 const CONTROL = fs.readFileSync(path.join(COMPONENT, 'src/control.cpp'), 'utf8');
 // iclforge::Firmware answers the firmware routes that Control carries, and
 // firmware_image.hpp words a refused image; firmware_status.hpp writes
 // GET /firmware.
 const FIRMWARE_CPP = fs.readFileSync(path.join(COMPONENT, 'src/firmware.cpp'), 'utf8');
-const FIRMWARE_IMAGE = fs.readFileSync(path.join(COMPONENT, 'include/iclforge/firmware_image.hpp'), 'utf8');
-const FIRMWARE_STATUS = fs.readFileSync(path.join(COMPONENT, 'include/iclforge/firmware_status.hpp'), 'utf8');
+const FIRMWARE_IMAGE = fs.readFileSync(path.join(LIBS_DEVICE, 'firmware_image.hpp'), 'utf8');
+const FIRMWARE_STATUS = fs.readFileSync(path.join(LIBS_DEVICE, 'firmware_status.hpp'), 'utf8');
 const SCRIPT = fs.readFileSync(path.join(UI_DIR, 'iclforge_ui.js'), 'utf8');
 const PAGE = fs.readFileSync(path.join(UI_DIR, 'iclforge_ui.html'), 'utf8');
 
