@@ -1,6 +1,8 @@
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -10,14 +12,17 @@
 #include <numbers>
 #include <span>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "platform/process.hpp"
 
-#include "iclforge/adm/bridge.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/adm/ac3adm.hpp"
+#include "iclforge/adm/bridge.hpp"
+#include "iclforge/adm/coordinates.hpp"
+#include "iclforge/objects/oamd.hpp"
 
 // forge's 'decode ... adm_out=' path (the ADM write direction -
 // apps/forge/cli/src/commands/decode.cpp's accumulate_adm/run_decode_eac3). Real, subprocess-level
@@ -171,6 +176,38 @@ int best_lag(std::span<const float> earlier, std::span<const float> later, int m
     return best;
 }
 
+// DEE's own cbi_wav channel order for 5.1.4 (tools/generators/gen_object_fixture.py), the same
+// tones apps/forge/cli/tests/test_cli_atmos_cbi.cpp gives each bed channel so a channel is
+// identified by what it carries rather than by where it sits.
+struct BedChannel {
+    const char* label;
+    double frequency;
+};
+constexpr std::array<BedChannel, 10> kInput514 = {{
+    {"L", 220.0},
+    {"R", 277.2},
+    {"C", 330.0},
+    {"LFE", 55.0},
+    {"Ls", 554.4},
+    {"Rs", 660.0},
+    {"Tfl", 740.0},
+    {"Tfr", 831.6},
+    {"Tbl", 880.0},
+    {"Tbr", 1108.8},
+}};
+
+double tone_magnitude(std::span<const float> signal, double frequency, double sample_rate) {
+    double real = 0.0;
+    double imag = 0.0;
+    for (std::size_t n = 0; n < signal.size(); ++n) {
+        const double phase =
+            2.0 * std::numbers::pi * frequency * static_cast<double>(n) / sample_rate;
+        real += static_cast<double>(signal[n]) * std::cos(phase);
+        imag += static_cast<double>(signal[n]) * std::sin(phase);
+    }
+    return std::hypot(real, imag) / static_cast<double>(signal.size());
+}
+
 }  // namespace
 
 TEST_CASE("decode's ADM master lines the bed's LFE up with the object it was pulled beside",
@@ -274,9 +311,106 @@ TEST_CASE("decode warns when ADM output is asked of an E-AC-3 stream with no obj
                                          " " + quoted(adm),
                                      log, 0);
     CHECK(contains(text, "warning: " + adm.string() +
-                             " given but no dynamic-object-only Atmos programme was decoded"));
+                             " given but no Atmos programme with an object layer was decoded"));
     CHECK(contains(text,
                    "warning: objects_dir given but there is no reconstructed object audio to "
                    "export"));
     CHECK_FALSE(fs::exists(adm));
+}
+
+// A bed programme, not a dynamic-object-only one: `atmos-cbi` writes a 5.1.4 bed with no dynamic
+// objects, and decode's adm_out used to refuse any such stream with a warning. Each JOC output is a
+// bed channel named by its Table 12 label (nine of them: the LFE is bypassed by JOC and comes from
+// the decoded bed), and each is written as a DirectSpeakers channel at its label's room position.
+TEST_CASE("decode writes a channel-based-immersive bed programme as DirectSpeakers channels",
+          "[cli][decode][adm]") {
+    const auto dir = scratch_dir();
+    constexpr std::uint32_t kSampleRate = 48000;
+    const auto frames = static_cast<std::size_t>(8 * iclforge::ac3::kSamplesPerFrame);
+
+    std::vector<std::vector<float>> channels(kInput514.size(), std::vector<float>(frames));
+    for (std::size_t c = 0; c < kInput514.size(); ++c) {
+        for (std::size_t n = 0; n < frames; ++n) {
+            channels[c][n] = static_cast<float>(
+                0.3 * std::sin(2.0 * std::numbers::pi * kInput514[c].frequency *
+                               static_cast<double>(n) / static_cast<double>(kSampleRate)));
+        }
+    }
+    const auto wav_path = dir / "decode_adm_bed_in.wav";
+    REQUIRE(iclforge::ac3::io::write_wav_f32(wav_path.string(), channels, kSampleRate).has_value());
+
+    const auto ec3_path = dir / "decode_adm_bed_in.ec3";
+    const auto encode_log = dir / "decode_adm_bed_encode.log";
+    const auto encode_rc =
+        run_cli("atmos-cbi \"" + wav_path.string() + "\" \"" + ec3_path.string() + "\" 448 5.1.4",
+                encode_log);
+    INFO(read_log(encode_log));
+    REQUIRE(encode_rc == 0);
+
+    const auto out_wav = dir / "decode_adm_bed_out.wav";
+    const auto adm_out = dir / "decode_adm_bed_master.wav";
+    const auto decode_log = dir / "decode_adm_bed_decode.log";
+    const auto decode_rc = run_cli("decode \"" + ec3_path.string() + "\" \"" + out_wav.string() +
+                                       "\" \"\" \"" + adm_out.string() + "\"",
+                                   decode_log);
+    const auto decode_text = read_log(decode_log);
+    INFO(decode_text);
+    REQUIRE(decode_rc == 0);
+    CHECK_FALSE(contains(decode_text, "no ADM master written"));
+    REQUIRE(fs::exists(adm_out));
+
+    const auto parsed = iclforge::adm::parse_bw64(adm_out.string());
+    REQUIRE(parsed.has_value());
+    const auto bridged = iclforge::adm::build(*parsed);
+    REQUIRE(bridged.has_value());
+    // Nine JOC outputs and the LFE.
+    REQUIRE(bridged->channel_count() == 10);
+    CHECK(std::ranges::all_of(bridged->is_bed, [](bool bed) { return bed; }));
+    CHECK(std::ranges::count(bridged->is_lfe, true) == 1);
+
+    // The bed channels in joc_object_indices() order, then the LFE (decode.cpp's accumulate_adm
+    // appends it last). Each carries its own channel's tone and is pinned at its label's position.
+    constexpr std::array<const char*, 9> kExpected = {"L",   "R",   "C",   "Ls", "Rs",
+                                                      "Tfl", "Tfr", "Tbl", "Tbr"};
+    constexpr std::array<iclforge::objects::oba::BedLabel, 9> kLabels = {
+        iclforge::objects::oba::BedLabel::kL,   iclforge::objects::oba::BedLabel::kR,
+        iclforge::objects::oba::BedLabel::kC,   iclforge::objects::oba::BedLabel::kLs,
+        iclforge::objects::oba::BedLabel::kRs,  iclforge::objects::oba::BedLabel::kTfl,
+        iclforge::objects::oba::BedLabel::kTfr, iclforge::objects::oba::BedLabel::kTbl,
+        iclforge::objects::oba::BedLabel::kTbr};
+    for (std::size_t i = 0; i < kExpected.size(); ++i) {
+        INFO("bed channel " << i << " should be " << kExpected[i]);
+        CHECK_FALSE(bridged->is_lfe[i]);
+
+        const auto channel =
+            std::ranges::find(parsed->model.channel_formats, bridged->channel_ids[i],
+                              &iclforge::adm::AudioChannelFormat::id);
+        REQUIRE(channel != parsed->model.channel_formats.end());
+        CHECK(channel->type == iclforge::adm::TypeDefinition::kDirectSpeakers);
+        REQUIRE(channel->block_formats.size() == 1);
+        const auto& block = channel->block_formats.front();
+        CHECK(block.speaker_labels == std::vector<std::string>{kExpected[i]});
+        REQUIRE(std::holds_alternative<iclforge::adm::CartesianPosition>(block.position));
+        const auto expected_position = iclforge::adm::room_to_adm_cartesian(
+            iclforge::objects::oba::bed_label_position(kLabels[i]));
+        const auto& position = std::get<iclforge::adm::CartesianPosition>(block.position);
+        CHECK(position.x == Catch::Approx(expected_position.x));
+        CHECK(position.y == Catch::Approx(expected_position.y));
+        CHECK(position.z == Catch::Approx(expected_position.z));
+
+        // The channel carries its own tone, and not the next one's.
+        std::size_t strongest = 0;
+        double strongest_magnitude = -1.0;
+        for (std::size_t source = 0; source < kInput514.size(); ++source) {
+            const auto magnitude =
+                tone_magnitude(bridged->pcm[i], kInput514[source].frequency, kSampleRate);
+            if (magnitude > strongest_magnitude) {
+                strongest_magnitude = magnitude;
+                strongest = source;
+            }
+        }
+        CHECK(std::string{kInput514[strongest].label} == std::string{kExpected[i]});
+    }
+    CHECK(bridged->is_lfe[9]);
+    CHECK(tone_magnitude(bridged->pcm[9], 55.0, kSampleRate) > 0.05);
 }
