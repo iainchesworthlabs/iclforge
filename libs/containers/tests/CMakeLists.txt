@@ -16,7 +16,7 @@ target_link_libraries(iclforge-containers-tests PRIVATE iclforge::containers icl
 if(ICLFORGE_BUILD_IAMF)
     target_sources(iclforge-containers-tests PRIVATE
         iamf/test_iamf.cpp iamf/test_iamf_container.cpp iamf/test_iamf_objects.cpp
-        iamf/test_iamf_scalable.cpp iamf/test_iamf_sequence.cpp)
+        iamf/test_iamf_coded.cpp iamf/test_iamf_scalable.cpp iamf/test_iamf_sequence.cpp)
 endif()
 
 # iec61937/test_iec61937_ac4.cpp reads std::getenv, for the census directory it packs - the C4996

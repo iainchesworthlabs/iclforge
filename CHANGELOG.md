@@ -80,6 +80,26 @@ The sections below contain the complete change list and fixes.
   field back: FFmpeg 8.0.1 gives the same layout with it zeroed, so it is checked against the
   table's text alone.
 
+**IAMF: Opus, AAC-LC and FLAC carriage, every IA track, and a 64-bit `mdat`**
+
+- **`mux_coded()` carries the other IAMF codecs.** The module still links no codec: the caller's encoder
+  makes the packets and `mux_coded()` writes the Codec Config (`opus_decoder_config()`,
+  `aac_lc_decoder_config()` and `flac_decoder_config()` build the 3.13 `decoder_config` bytes, with the
+  `audio_roll_distance` of 3.5), one channel-based layer of loudspeaker layout 0 to 8, and the Mix
+  Presentation. Packets are checked against 3.13 without being decoded (`kBadCodedPacket`).
+  `examples/iamf_coded.cpp` round trips FLAC. FFmpeg 8.0.1 decodes the Opus, AAC-LC and FLAC files, 5.1
+  included, to the same samples as the encoders' own output.
+- **The `roll` sample group.** An Opus or AAC-LC track carries the sample group 6.2.2 requires, in files
+  and in each movie fragment.
+- **`codecs_string()`** gives the RFC 6381 codecs parameter string of 6.4 (`iamf.000.000.Opus`).
+- **`read_isobmff_tracks()`** returns every IA track of a file. `read_isobmff()` no longer folds the
+  `moof` fragments of other tracks into the first IA track's samples, matching `traf` to `track_ID`, and
+  an IA track protected with Common Encryption is `kUnsupported` instead of "not IAMF".
+- **A 64-bit `mdat`.** Media data that does not fit a 32-bit box size is written with the `largesize`
+  header (`IsobmffOptions::large_mdat` asks for it on a small file); it used to be refused.
+- **The timescale follows the codec.** An AAC-LC file takes its sample rate from the AudioSpecificConfig
+  and a FLAC file from STREAMINFO; every non-`ipcm` file used 48000 whatever its rate.
+
 **IAMF: scalable channel reconstruction and the expanded layouts**
 
 - **`decode_pcm()` rebuilds scalable channel audio.** An Audio Element of up to six layers is

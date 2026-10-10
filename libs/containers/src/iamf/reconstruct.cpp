@@ -94,6 +94,15 @@ constexpr std::array<std::uint32_t, 13> kAacSampleRates{
 
 }  // namespace
 
+std::optional<std::uint32_t> aac_sampling_frequency_index(std::uint32_t sample_rate) {
+    for (std::size_t i = 0; i < kAacSampleRates.size(); ++i) {
+        if (kAacSampleRates[i] == sample_rate) {
+            return static_cast<std::uint32_t>(i);
+        }
+    }
+    return std::nullopt;
+}
+
 std::optional<std::uint32_t> codec_sample_rate(const CodecConfig& codec) {
     if (codec.codec_id == "ipcm") {
         if (!codec.lpcm.has_value()) {
@@ -195,6 +204,10 @@ constexpr std::array<double, 11> kTopWeight{0.0,    0.0179, 0.0391, 0.0658, 0.10
 constexpr double kAverageLength = 7.0;
 constexpr std::size_t kOpusOverlap = 60;
 constexpr std::size_t kAacOverlap = 64;
+// 7.2.3 recommends nothing for the lossless codecs, which normally carry no recon gain. When a
+// stream does, AOM's libiamf smooths over 12 samples at every sample rate (measured: its gain curve
+// against the window formula), and so does this.
+constexpr std::size_t kLosslessOverlap = 12;
 
 // The Xi.Yi.Zi of a layout in the generation rule (3.6.2.1): surround, LFE and height channels,
 // with Mono as one surround channel.
@@ -452,9 +465,44 @@ constexpr std::array<ReconChannel, 12> kReconChannels{{{"L", ""},
                                                        {"Rtb", "Rtr"},
                                                        {"LFE", ""}}};
 
-// 3.6.1: output_gain_flags names the mixed channels the gain is applied to, MSB first.
-constexpr std::array<std::string_view, 6> kOutputGainChannels{"Rtf", "Ltf", "Rs",
-                                                              "Ls",  "R",   "L"};  // bit 0 .. 5
+// 3.6.1: output_gain_flags is six bits: L, R, Ls, Rs, Ltf, Rtf from the most significant.
+constexpr std::size_t kOutputGainBits = 6;
+
+// The channel of a Channel Group that bit `bit` of output_gain_flags names, when it is a mixed one
+// (7.2.1 applies the gain to "the mixed channels ... indicated by output_gain_flags"): in the base
+// group the L and R of Mono (L1), Stereo (L2, R2) and 3.1.2 (L3, R3), the Ls and Rs of the 5.x
+// layouts and the top pair of a x.1.2 layout; in a later group L2 (Mono growing to Stereo) and the
+// 3.1.2 top pair. A flag naming an original channel is not a gain to undo, and is ignored.
+[[nodiscard]] std::string_view mixed_channel(std::size_t bit, bool base_group, const Shape& shape) {
+    if (base_group) {
+        switch (bit) {
+            case 5:
+                return shape.surround == 1 ? "C" : (shape.surround <= 3 ? "L" : "");
+            case 4:
+                return shape.surround >= 2 && shape.surround <= 3 ? "R" : "";
+            case 3:
+                return shape.surround == 5 ? "Ls" : "";
+            case 2:
+                return shape.surround == 5 ? "Rs" : "";
+            case 1:
+                return shape.height == 2 ? "Ltf" : "";
+            default:
+                return shape.height == 2 ? "Rtf" : "";
+        }
+    }
+    switch (bit) {
+        case 5:
+            return shape.surround == 2
+                       ? "L2"
+                       : "";  // Mono growing to Stereo; libiamf ignores it beyond that
+        case 1:
+            return shape.surround == 3 ? "Ltf" : "";
+        case 0:
+            return shape.surround == 3 ? "Rtf" : "";
+        default:
+            return "";
+    }
+}
 
 [[nodiscard]] Plane* find_plane(Planes& planes, const ReconChannel& channel) {
     if (const auto it = planes.find(channel.name); it != planes.end()) {
@@ -662,7 +710,9 @@ std::expected<DecodedElement, Error> reconstruct_channels(const Sequence& sequen
     // of the previous frame's gain as the first half rises into this one.
     // Past the overlap the previous frame's share is 0 and this one's 1, so only the overlap itself
     // is tabulated (and the table never scales with the file's num_samples_per_frame).
-    const std::size_t full = codec->codec_id == "Opus" ? kOpusOverlap : kAacOverlap;
+    const std::size_t full = codec->codec_id == "Opus"   ? kOpusOverlap
+                             : codec->codec_id == "mp4a" ? kAacOverlap
+                                                         : kLosslessOverlap;
     const std::size_t overlap = std::min(full, frame_samples);
     std::vector<double> fall(overlap);
     std::vector<double> rise(overlap);
@@ -722,16 +772,12 @@ std::expected<DecodedElement, Error> reconstruct_channels(const Sequence& sequen
             }
             if (layers[j].output_gain_is_present) {
                 const double factor = output_gain_factor(j);
-                for (std::size_t bit = 0; bit < kOutputGainChannels.size(); ++bit) {
+                for (std::size_t bit = 0; bit < kOutputGainBits; ++bit) {
                     if (((layers[j].output_gain_flags >> bit) & 1U) == 0) {
                         continue;
                     }
-                    auto it = planes.find(kOutputGainChannels[bit]);
-                    if (it == planes.end() && bit == 5) {
-                        // The L channel of the group: L1 of a Mono layer, L2 of Mono growing to
-                        // Stereo.
-                        it = planes.find(j == 0 && shapes[0].surround == 1 ? "C" : "L2");
-                    }
+                    const std::string_view name = mixed_channel(bit, j == 0, shapes[j]);
+                    const auto it = name.empty() ? planes.end() : planes.find(name);
                     if (it != planes.end()) {
                         for (double& sample : it->second) {
                             sample *= factor;
