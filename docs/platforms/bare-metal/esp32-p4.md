@@ -22,7 +22,7 @@ Every figure on this page outside its [AC-4](#ac-4) section was measured on a bo
 | Real time, no network | **Every fixture and every stream-set file**, from 0.027x (`ac3_mono`) to 0.448x (`eac3_714_fold`, 7.1.4 folded to Lo/Ro) among the fixtures, up to 0.700x (`714-ecpl`) among the stream set — comfortably inside a 32 ms frame even at this chip's 360 MHz ceiling, not the part's 400 MHz datasheet maximum (see [The chip revision](#the-chip-revision-and-what-it-blocks)) |
 | Memory | 514,820 bytes free at boot, largest block 385,024; peak heap across every fixture 195,025 (`eac3_atmos_render`), leaving well over half the free total unused at the worst point measured |
 | AC-4 decode | Behind `CONFIG_ICLFORGE_AC4`, off by default. Twenty plays of DEE's streams (2.0, 5.1 and 5.1.4; SIMPLE, A-SPX, A-CPL and S-CPL; the converter's four frame rates) run from an HTTP source with the network up, and the probe's six fixtures decode to its pinned `float` PCM hashes exactly. The board's hash equals the host's (GCC 16, Clang 22 and MSVC) on all twenty plays and on all six core-decoding plays, and the Cortex-M3 leg's on the 24-frame cut of each, since D14a4 took the `float` calls whose last bit differs between C libraries out of libm, see [AC-4](#ac-4) |
-| AC-4 real time | 2.0 streams in SIMPLE mode (0.28 of a frame), in A-SPX mode (0.37) and, through the converter, at 24 fps (0.51), 25 fps (0.53), 23.976 fps (0.68) and 29.97 fps (0.68), played to a 2.0 layout; and, since D14e, 5.1 to its own layout in SIMPLE mode (0.64), in A-SPX mode (0.83) and in A-SPX mode with A-CPL mode 2 (0.90), which folded to 2.0 take 0.60, 0.77 and 0.82. A-CPL mode 3 takes 1.13 at 5.1 (1.06 folded to 2.0), 5.1.4 in full decoding 1.55 to 1.89 (1.32 to 1.63 folded) and in core decoding 1.23 to 1.57 (1.04 to 1.38 folded). D14e took a 5.1 frame from 1.17, 1.52, 1.94 and 3.86 times its duration (SIMPLE, A-SPX, A-SPX with A-CPL mode 2 and 3) to those, with the decoder's transforms, A-CPL and output in fewer passes, the compiler's settings and the flash read in quad mode ([What D14e changed](#what-d14e-changed)). Before it D14a6 had taken the low-power SRAM out of the heap, D14a's third part had made a frame 1.1 to 2.5 times faster, D14a4's `float` converter and D14a5's tables had made the converter's streams run. AC-3 and E-AC-3 5.1 through the same image each take 0.18, and E-AC-3 7.1.4 0.36 |
+| AC-4 real time | Since D14g (the firmware in PSRAM and a second core, [The firmware in PSRAM and the second core](#the-firmware-in-psram-and-the-second-core)): 2.0 streams in SIMPLE mode take 0.15 of a frame, in A-SPX mode 0.21 and, through the converter, 0.31 to 0.38 at 23.976, 24, 25 and 29.97 fps; 5.1 to its own layout 0.42 in SIMPLE mode, 0.53 in A-SPX mode, 0.59 with A-CPL mode 2 and 0.73 with A-CPL mode 3 (0.40, 0.50, 0.55 and 0.69 folded to 2.0); and 5.1.4 in full decoding 1.01 to 1.21 (0.84 to 1.05 folded), which does not keep up yet. Before D14g, with D14e's figures: 2.0 streams in SIMPLE mode (0.28 of a frame), in A-SPX mode (0.37) and, through the converter, at 24 fps (0.51), 25 fps (0.53), 23.976 fps (0.68) and 29.97 fps (0.68), played to a 2.0 layout; and, since D14e, 5.1 to its own layout in SIMPLE mode (0.64), in A-SPX mode (0.83) and in A-SPX mode with A-CPL mode 2 (0.90), which folded to 2.0 take 0.60, 0.77 and 0.82. A-CPL mode 3 takes 1.13 at 5.1 (1.06 folded to 2.0), 5.1.4 in full decoding 1.55 to 1.89 (1.32 to 1.63 folded) and in core decoding 1.23 to 1.57 (1.04 to 1.38 folded). D14e took a 5.1 frame from 1.17, 1.52, 1.94 and 3.86 times its duration (SIMPLE, A-SPX, A-SPX with A-CPL mode 2 and 3) to those, with the decoder's transforms, A-CPL and output in fewer passes, the compiler's settings and the flash read in quad mode ([What D14e changed](#what-d14e-changed)). Before it D14a6 had taken the low-power SRAM out of the heap, D14a's third part had made a frame 1.1 to 2.5 times faster, D14a4's `float` converter and D14a5's tables had made the converter's streams run. AC-3 and E-AC-3 5.1 through the same image each take 0.18 (0.16 since D14g), and E-AC-3 7.1.4 0.36 (0.35) |
 | AC-4 memory | A peak heap of 0.58 MB at 2.0 to 2.2 MB at 5.1.4, with internal RAM used up under ESP-IDF's default allocation policy (1 to 8 KB free at its least, of the 344 to 350 KB of main RAM a play starts with; the low-power SRAM has not been in the heap since D14a6). The decode task uses 19 to 30 KB of a 64 KB stack (30 KB in A-CPL mode 3), from 20 to 24 KB at D14a6 and 49 to 50 KB before D14a's third part |
 | Encode | Not measured. Both encoders are floating-point; nothing here rules it out |
 | QEMU | Not emulated, see [QEMU](#qemu) |
@@ -309,6 +309,10 @@ and 36.7 to 37.5 ms a frame (the play's average with its first frame), so a diff
 is within what a boot changes.
 
 ### What it decodes in real time
+
+Since D14g (2026-10-11) the figures below are one core with the firmware in flash, which is how D14e measured them: the
+firmware in PSRAM and the decoder's second core take 5.1 in A-CPL mode 3 to 0.73 and 5.1.4 to 1.01 to 1.21
+([The firmware in PSRAM and the second core](#the-firmware-in-psram-and-the-second-core)).
 
 At 360 MHz with the network up, the AC-4 decoder keeps up with real time, to a 2.0 layout, for 2.0
 streams in SIMPLE mode, which take 0.28 of a frame, in A-SPX mode, which take 0.37, and, through the
@@ -731,6 +735,72 @@ has the table). A bootloader that cannot set a flash chip's quad-enable bit stay
 says so), and a project whose flash has no quad mode sets `CONFIG_ESPTOOLPY_FLASHMODE_DIO=y` after `sdkconfig.p4`. Not measured: a flash
 clock of 120 MHz, which ESP-IDF offers this part only under `IDF_EXPERIMENTAL_FEATURES`, with the flash's high-performance mode.
 
+### The firmware in PSRAM and the second core
+
+Two changes of D14g (2026-10-11, the board as above, 360 MHz, Wi-Fi up, a null sink, the same twenty plays), neither of which moves a
+bit of the PCM: the firmware's code and constants run from PSRAM (`CONFIG_SPIRAM_XIP_FROM_PSRAM`, in `sdkconfig.p4`), and the decoder hands
+the stages of a frame that are per channel to a worker task on the core the decode task is not on (`CONFIG_ICLFORGE_EXAMPLE_AC4_PARALLEL`,
+in `sdkconfig.ac4`; `?parallel=off` and `?parallel=on` in a play's location choose one or the other for that play).
+
+**The firmware in PSRAM.** The decoder's code (1.4 MB of `.flash.text`) and its constants (0.8 MB of `.flash.rodata`) are far larger than the
+caches, and a line that is not in them comes from the flash, 4 bits a clock, where the PSRAM's hex bus at 200 MHz fills it faster. With the
+firmware copied into PSRAM as the part starts and executed there, one core took 14 to 36% less time a frame than from flash: 5.1 A-CPL
+mode 3 1.00 from 1.16, 5.1.4 in S-CPL 1.34 from 1.59, the 29.97 fps converter 0.58 from 0.72, 2.0 in SIMPLE mode 0.19 from 0.29; AC-3 and
+E-AC-3 5.1 7 to 8% (0.17 to 0.16) and 7.1.4 2% (0.36 to 0.35). It costs 14 KB of image and no internal RAM, the second stage bootloader is the size it was (24,368 bytes), an update over
+the network works as it did (checked on the board), and code that has to run while the flash is written no longer needs IRAM for it.
+
+**The second core.** `iclforge::ac4::Executor` (`libs/ac4/include/iclforge/ac4/decoder/executor.hpp`) is how a caller gives the decoder
+a second thread: `run(count, task, context)` calls `task(context, index, lane)` once for each index. The decoder runs through it each
+channel's inverse transform and QMF analysis, A-SPX's elements, A-CPL's slots (the seventeen interpolations of mode 3 are double
+operations, which at `float` are calls into software, 46 thousand of them a frame) and its three decorrelators, the history's move and
+the copy of a channel's matrix, the downmix's outputs, and each output's QMF synthesis and converter. No task reads what another writes,
+so the PCM is the same bit for bit (the board's hash of every play, with the lane on and off, equals 2026-10-02's), and without an executor
+the decoder runs the same calls in order on the calling thread. The player's executor is a task pinned to the core the decode task is
+not on, at its priority, with a 12 KB stack in PSRAM (the stages used 5.7 KB at the most), woken by a task notification; the two take
+tasks from one counter until they are done, so a worker the network has preempted costs the frame only what it had begun. It exists for
+the length of one play.
+
+The table: the decoder's microseconds a frame and times the frame's duration, D14e's figure re-measured on the tree of that day
+(`main` at `5a9a3ec74`, where the FFT and the QMF banks are the family's one), then this branch's decoder with the firmware in PSRAM
+on one core (the firmware's change above and D14g's changes to the converter and the tracks: 14 to 35% less), then on both (15 to 28% less
+again).
+
+| Stream | Codec mode | To | Before, x real time | One core, x real time | us/frame | Both cores, x real time | us/frame | Worst frame ms |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+| `20-music-192` | SIMPLE | 2.0 | 0.29 | 0.19 | 8,073 | 0.15 | 6,573 | 17 |
+| `20-music-96` | A-SPX | 2.0 | 0.36 | 0.24 | 10,434 | 0.21 | 8,771 | 17 |
+| `51-music-384` | SIMPLE | 2.0 | 0.61 | 0.48 | 20,398 | 0.40 | 17,192 | 30 |
+| `51-music-384` | SIMPLE | 5.1 | 0.67 | 0.53 | 22,671 | 0.42 | 17,931 | 31 |
+| `51-music-192` | A-SPX | 2.0 | 0.77 | 0.61 | 25,901 | 0.50 | 21,366 | 33 |
+| `51-music-192` | A-SPX | 5.1 | 0.83 | 0.68 | 28,802 | 0.53 | 22,567 | 36 |
+| `51-music-128` | A-SPX, A-CPL 2 | 2.0 | 0.85 | 0.68 | 29,178 | 0.55 | 23,566 | 30 |
+| `51-music-128` | A-SPX, A-CPL 2 | 5.1 | 0.93 | 0.76 | 32,468 | 0.59 | 25,371 | 34 |
+| `51-music-96` | A-SPX, A-CPL 3 | 2.0 | 1.09 | 0.93 | 39,566 | 0.69 | 29,309 | 36 |
+| `51-music-96` | A-SPX, A-CPL 3 | 5.1 | 1.16 | 1.00 | 42,466 | 0.73 | 30,949 | 39 |
+| `514-music-256` | A-SPX, A-CPL 2 | 2.0 | 1.58 | 1.31 | 55,958 | 1.05 | 44,616 | 56 |
+| `514-music-256` | A-SPX, A-CPL 2 | 5.1.4 | 1.83 | 1.55 | 66,302 | 1.21 | 51,631 | 66 |
+| `514-music-512` | A-SPX, S-CPL | 2.0 | 1.65 | 1.29 | 54,830 | 1.03 | 44,054 | 61 |
+| `514-music-512` | A-SPX, S-CPL | 5.1.4 | 1.92 | 1.53 | 65,290 | 1.21 | 51,688 | 74 |
+| `514-music-768` | S-CPL | 2.0 | 1.34 | 1.00 | 42,527 | 0.84 | 35,957 | 57 |
+| `514-music-768` | S-CPL | 5.1.4 | 1.59 | 1.25 | 53,179 | 1.01 | 43,302 | 69 |
+| `ims-music-64-23976` | A-SPX, 23.976 fps | 2.0 | 0.69 | 0.52 | 21,556 | 0.38 | 15,847 | 282 |
+| `ims-music-64-24` | A-SPX, 24 fps | 2.0 | 0.53 | 0.43 | 17,971 | 0.32 | 13,319 | 273 |
+| `ims-music-64-25` | A-SPX, 25 fps | 2.0 | 0.54 | 0.42 | 16,954 | 0.31 | 12,385 | 22 |
+| `ims-music-64-2997` | A-SPX, 29.97 fps | 2.0 | 0.72 | 0.54 | 17,889 | 0.38 | 12,833 | 229 |
+
+Every play's PCM hash is the one the board gave on 2026-10-02 (40 plays, with the second core off and on). AC-3 and E-AC-3 through the same
+image: 5.1 0.16 and 0.16 of a frame, 7.1.4 0.35. **What reads as real time now:** 2.0 and 5.1 in every codec mode (A-CPL mode 3
+at 0.73 at 5.1, from 1.16), the converter at all four frame rates (0.31 to 0.38, from 0.53 to 0.72) and the 2.0 fold of 5.1.4 in S-CPL
+(0.84). **Not yet:** 5.1.4, at 1.01 in S-CPL and 1.21 in A-SPX with A-CPL mode 2 or S-CPL (1.59 to 1.92 before), and the 2.0 fold of the
+A-SPX ones at 1.03 and 1.05. What took the 5.1.4 frame's time is in [Where a frame goes](#where-a-frame-goes) and the list below it.
+
+**What each stage does not yet hand over.** The syntax (4.6 to 9.2 ms a 5.1.4 frame) and the dequantisation are one thread's work: the
+Huffman decoder reads a stream's bits in order, and the noise fill's random generator runs through the tracks in syntax order. Nothing
+hands a frame's parse to the second core while the first renders the frame before, which would take 4.6 to 9.2 ms off the 5.1.4 frame, and
+what `Decoder::decode()` reports (`metadata()`, `presentations()`) is the frame decoded, which a parse of the next frame would move.
+A-CPL's interpolation could be `float`, which would take about 3 ms off a 5.1.4 frame and 7 off a 5.1 A-CPL mode 3 one, and would move
+every `float` pin that has A-CPL in it, so it is not done.
+
 ### Paced output
 
 The tables above use a null sink, which takes a block and returns at once. The example's I2S sink paces: its write returns when
@@ -906,7 +976,8 @@ from `firmware/hearth-sink/`. `sdkconfig.ac4` turns on `CONFIG_ICLFORGE_AC4` and
 and goes to the board with `tools/hearth/ota.py push`, which replaces the application and keeps the bootloader on
 the board: the flash reads in QIO mode (`sdkconfig.p4`) only on a board whose bootloader was built for it, which
 `idf.py flash` over USB puts there once ([Flash mode](#flash-mode)). A play's location can carry `?decoding=core`
-for core decoding and `?hash=off` for a play without the hash. A play ends with `ac4.lap` (frames,
+for core decoding, `?hash=off` for a play without the hash and `?parallel=off` for a play on one core (the default is the image's
+`CONFIG_ICLFORGE_EXAMPLE_AC4_PARALLEL`, on in `sdkconfig.ac4`). A play ends with `ac4.lap` (frames,
 samples, the decoder's time, the worst frame's, the hash), `ac4.heap` and one `play.stage[...]`
 line for each stage. The packer leaves the AC-4 sources out of the archive unless it is given
 `--with-ac4`; with `--verify` it then builds a throwaway project against the archive for each of

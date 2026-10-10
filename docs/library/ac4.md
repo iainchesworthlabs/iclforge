@@ -161,6 +161,19 @@ written in place, in a class's constructor for instance, stays valid; what it ca
 reference has to outlive the decoder. The records are described under
 [Validation](../verification.md#the-decoders-syntax).
 
+`DecoderConfig::executor` lets a caller with a second core spread a frame's per-channel work over
+two threads: each channel's inverse transform and QMF analysis, A-SPX's elements, A-CPL's slots and
+decorrelators, each output's QMF synthesis and sample rate converter. An
+`iclforge::ac4::Executor` (`iclforge/ac4/decoder/executor.hpp`) is two functions, `lanes()` and
+`run(count, task, context)`, which calls `task(context, index, lane)` once for each index and
+returns when all have; the tasks of one run read and write what no other task does, so the PCM is
+the same bit for bit whichever way they run, and a null executor, the default, runs them in order on
+the calling thread. The executor is the caller's and must outlive the decoder; only the thread
+that decodes calls it. The ESP32 player's is a task pinned to the core the decode task is not on
+(`CONFIG_ICLFORGE_EXAMPLE_AC4_PARALLEL`); the tests' is two threads and a lock
+(`libs/ac4/tests/decoder/test_executor.cpp`), which decodes every committed stream through it and
+compares the bits.
+
 `forge decode` spells each control as an option (`output-level=`, `drcmode=`, `headphones`,
 `dialogue-enhancement=`, `channels=`, `downmix=`, `speakers=`, `mix-lfe=`, `dialogue-gain=`,
 `associated-gain=`, `md-compat=`, `decoding=`, `conceal=`); see

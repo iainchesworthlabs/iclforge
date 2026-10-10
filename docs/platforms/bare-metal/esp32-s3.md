@@ -19,7 +19,7 @@ the float32 path worth having and real-time decode worth measuring.
 | Atmos bed | Correct, decoded bed-only via `DecoderConfig::skip_object_reconstruction`. 11 allocations per frame |
 | Atmos objects | **Correct, reconstructed on target.** 22 allocations per frame — see [Objects](#objects). **And placed**: the `eac3_atmos_render` row pans a height-object stream onto 7.1.4 through the block form, every level the host's — see [Placed on loudspeakers](#placed-on-loudspeakers) |
 | Encode | AC-3 and E-AC-3, six rows: 5.1 and 2/0 through each encoder, 2/0 with coupling, spectral extension and AHT, and 2/0 §E3.5 enhanced coupling - six frames of synthesised programme each, byte count and FNV-1a hash checked against `firmware/baremetal/encode_fixture.hpp`, peak heap per row. One substream at a time; see [Encoding](#encoding) for what does not fit |
-| AC-4 decode | **Correct on the board and under QEMU, with its state in PSRAM.** The six fixtures of the AC-4 probe (2.0, 5.1 and 5.1.4, with A-CPL and companding) equal the pins the Cortex-M3 leg and the host are held to in CI, and on a board with Wi-Fi up all twenty plays of the P4's table (2.0, 5.1, 5.1.4 and the four frame rates) give the P4's PCM hashes. **Real time only for 2.0 in SIMPLE mode** (0.87 of a frame); 2.0 in A-SPX mode takes 1.03 to 1.09, 5.1 takes 2.1 to 3.2 and 5.1.4 4.4 to 5.6. The decode task's stack is in PSRAM: with Wi-Fi up no internal block is over 31,744 bytes and a 5.1 A-CPL play uses 32,560. See [AC-4](#ac-4) (phase D14c of [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14-ac-4-on-the-esp32s)). No ESP32 sink takes AC-4 in a Sendspin group |
+| AC-4 decode | **Correct on the board and under QEMU, with its state in PSRAM.** The six fixtures of the AC-4 probe (2.0, 5.1 and 5.1.4, with A-CPL and companding) equal the pins the Cortex-M3 leg and the host are held to in CI, and on a board with Wi-Fi up all twenty plays of the P4's table (2.0, 5.1, 5.1.4 and the four frame rates) give the P4's PCM hashes. **Real time only for 2.0 in SIMPLE mode** (0.87 of a frame) as D14c measured it; 2.0 in A-SPX mode took 1.03 to 1.09, 5.1 2.1 to 3.2 and 5.1.4 4.4 to 5.6. Since D14g (2026-10-11) the decoder's second core, and QIO flash, 64-byte data-cache lines, the code in PSRAM and a 64 KB data cache (`sdkconfig.s3-fast`, `sdkconfig.s3-dcache`), take 2.0 to 0.40 (SIMPLE) and 0.50 (A-SPX), the converter at every frame rate to 0.67 to 0.87, E-AC-3 7.1.4 to 0.75 and 5.1 in SIMPLE mode to 0.99, with the PCM unchanged; in an image built without those two files, with the second core, 2.0 SIMPLE takes 0.80 and A-SPX 0.99 ([Playback speed](#playback-speed)). The decode task's stack is in PSRAM: with Wi-Fi up no internal block is over 31,744 bytes and a 5.1 A-CPL play uses 32,560. See [AC-4](#ac-4) (phase D14c of [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14-ac-4-on-the-esp32s)). No ESP32 sink takes AC-4 in a Sendspin group |
 | Standalone probe fits internal SRAM | Yes, without PSRAM. 195,025-byte peak heap (`eac3_atmos_render`; 194,655 with Atmos objects reconstructed, 173,794 for the 7.1.4 fixture folded to stereo, 167,386 as coded) against 304,680 free under QEMU on 2026-09-29. The board reported 316,196 free on 2026-09-11, when the peak was 237,206 — see [Memory](#memory) |
 | Retained after teardown | 12 bytes, one `__cxa_thread_atexit` record, the spectrum scratch's pointer; 23,552 bytes while §E3.5 is in use |
 | Audio output | Two examples drive real peripherals — see [Examples](#examples) |
@@ -59,7 +59,7 @@ this part. The x figures are fractions of a 32 ms frame.
 | The Atmos object encoder | No: about 300 KB, `double`, and not in the profile | Bench estimate, see [Encoding](#encoding) |
 | Decode and encode in one image | No: mutually exclusive builds | Measured, above |
 | The second core, PSRAM | Not used by the AC-3 and E-AC-3 probe. The AC-4 probe puts the decoder's state in PSRAM. The Hearth sink uses both: its decode runs on core 1 and its large allocations go to PSRAM | [In the Sendspin sink](#in-the-sendspin-sink); [AC-4](#ac-4); [What is left](#what-is-left-and-what-would-move-it) |
-| AC-4 decode, 2.0, 5.1 and 5.1.4 | Correct, with the decoder's state and the decode task's stack in PSRAM; real time at 2.0 in SIMPLE mode only (0.87) | Board, `hearth_sink` with Wi-Fi up; QEMU leg, `run_esp32s3_probe.sh --ac4`; [AC-4](#ac-4) |
+| AC-4 decode, 2.0, 5.1 and 5.1.4 | Correct, with the decoder's state and the decode task's stack in PSRAM; real time at 2.0 in SIMPLE mode only (0.87) as D14c measured it; D14g's second core and memory files (`sdkconfig.s3-fast`, `sdkconfig.s3-dcache`) add 2.0 A-SPX, the converter, E-AC-3 7.1.4 and 5.1 SIMPLE ([Playback speed](#playback-speed)) | Board, `hearth_sink` with Wi-Fi up; QEMU leg, `run_esp32s3_probe.sh --ac4`; [AC-4](#ac-4) |
 
 ## Building
 
@@ -1256,7 +1256,7 @@ correctly under QEMU, with its state in PSRAM (phase D14c of
 [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14-ac-4-on-the-esp32s)).
 It ran on a board on 2026-10-10 (D14c's board phase, [On the board](#on-the-board)): its PCM is the
 host's and the P4's on every stream, and it keeps up with real time at 2.0 in SIMPLE mode and at no
-wider or more coded stream.
+wider or more coded stream (D14g's [Playback speed](#playback-speed) moved that line).
 
 ### Where its memory goes
 
@@ -1338,13 +1338,16 @@ holds less. The CI row's ceilings (6,000 bytes of internal RAM at 2.0, 14,000 at
 | Peak heap | 0.29 to 0.42 MB at 2.0, 0.70 to 0.86 MB at 5.1, 1.49 MB at 5.1.4 since D14f (the probe; 0.41 to 0.60, 0.95 to 1.15 and 1.80 MB when D14c measured it) | 0.58 MB at 2.0 to 2.2 MB at 5.1.4 (`hearth_sink`) |
 | Internal RAM at the worst moment | 3 to 14 KB used, 333 to 344 KB of 347 KB left | used up: 1 to 8 KB left of 344 to 350 KB |
 | Decode stack | 18 to 22 KB | 19 to 30 KB |
-| Real time | 2.0 SIMPLE at 0.87, A-SPX at 1.09; 5.1 at 2.1 to 3.2; 5.1.4 at 4.4 to 5.6 (board, Wi-Fi up) | 2.0 at 0.28 and 0.37; 5.1 at 0.64, 0.83 and 0.90; 5.1.4 at 1.55 to 1.89 |
+| Real time | 2.0 SIMPLE at 0.87, A-SPX at 1.09; 5.1 at 2.1 to 3.2; 5.1.4 at 4.4 to 5.6 (board, Wi-Fi up; D14c; since D14g, with the memory fragments and the second core, 0.40, 0.50, 0.99 to 1.57 and 2.28 to 2.73) | 2.0 at 0.28 and 0.37; 5.1 at 0.64, 0.83 and 0.90; 5.1.4 at 1.55 to 1.89 (D14e; since D14g 0.15 and 0.21, 0.42 to 0.73 and 1.01 to 1.21) |
 
 QEMU's times describe the emulator, as [Timing](#timing) says, so the time row is the board's, above.
 The P4 runs at 360 MHz on RISC-V with a 128 KB L2 cache and hex PSRAM at 200 MHz; this part runs at
 240 MHz with a 32 KB data cache and octal PSRAM at 80 MHz.
 
 ### On the board
+
+The figures here are D14c's: `main`'s decoder on one core with the default memory configuration. [Playback speed](#playback-speed)
+has D14g's.
 
 Measured on 2026-10-10 on `hearth-eb2c64` (ESP32-S3 revision v0.2, 240 MHz, 8 MB of octal PSRAM at
 80 MHz, 16 MB of flash), `hearth_sink` from the tree of that day, built with `sdkconfig.defaults`,
@@ -1354,7 +1357,9 @@ fragments the P4's figures used (a null sink that takes a block and returns at o
 music streams from the local gold set, ten seconds each, served from a desktop over HTTP and played
 with `POST /play` after `PUT /layout`, as [the P4's](esp32-p4.md#how-it-was-measured) were. The time
 is the decode task's less the sink's write, the placing and the hash, against the audio a frame
-carries (42.7 ms at 48 kHz); each figure is one play.
+carries (42.7 ms at 48 kHz); each figure is one play. A play's location can carry `?parallel=off` for a play on one core
+(`CONFIG_ICLFORGE_EXAMPLE_AC4_PARALLEL`, on in `sdkconfig.ac4`, is the default) and `?hash=off` for a play without the hash;
+[Playback speed](#playback-speed) has what each of the memory fragments gives.
 
 | Stream | Codec mode | To | us/frame | x real time | P4 x real time | Worst frame ms | Stack left KB | Internal RAM least free KB | PSRAM peak MB |
 |---|---|---|---:|---:|---:|---:|---:|---:|---:|
@@ -1446,7 +1451,107 @@ go. 512 stays.
   holds a stream back, has none to go to.
 - **That is accepted.** What the S3 cannot decode in real time reaches it as PCM from Hearth, as
   decision 32 had it for the C6 ([decision 42](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-10-10),
-  2026-10-10). How a sink says what it decodes is I6's.
+  2026-10-10). How a sink says what it decodes is I6's. D14g's second core and memory fragments moved the line
+  ([Playback speed](#playback-speed), [decision 43](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-10-10)).
+
+### Playback speed
+
+Measured on 2026-10-10 and 11 on `hearth-eb2c64` (ESP32-S3 rev v0.2, 240 MHz, 8 MB octal PSRAM, 16 MB quad flash), `hearth_sink` as in
+[On the board](#on-the-board), Wi-Fi up, a null sink, the same plays. Every play of every configuration below, 40 for each of four images
+with the second core off and on, gives the PCM hash D14c's plays gave, which is the P4's and the host's. Phase D14g of
+[`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md): the decoder took 2.6 to 3.5 times the
+P4's time on a part at two thirds of its clock, and the board's stage timers had it spread over the decode.
+
+**Where the time was.** The inverse transform took 27.9 ms of a 5.1 A-CPL mode 3 frame here and 4.9 on the P4, 5.7 times, where the
+clocks are 1.5. It reads the roots of its FFT's passes, its twiddles and its window, 56 KB for a 2,048-line block, through a 32 KB
+data cache, and the flash was read in DIO mode: a 32-byte line came from the flash at 2 bits a clock, about 450 of the CPU's, against
+the P4's 64-byte lines from a 128 KB L2. The decoder's code and its tables (0.45 MB of `.rodata`) are larger than the caches, so
+every frame refilled them from the flash. A-CPL's interpolation, the other part that was out of proportion to the P4's, is the same
+double operations in software on both.
+
+**The memory the decoder runs from.** The decoder's time over a frame's duration on one core, each column adding to the one before it
+except where it says otherwise:
+
+| Stream | As before (DIO, 32-byte lines) | QIO flash | QIO, 64-byte lines | QIO, constants in PSRAM | QIO, code and constants in PSRAM | QIO, 64-byte lines, 64 KB cache | All of them |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `20-music-192`, 2.0 SIMPLE | 0.87 | 0.78 | 0.68 | 0.71 | 0.63 | 0.62 | 0.51 |
+| `20-music-96`, 2.0 A-SPX | 1.09 | 0.92 | 0.81 | 0.87 | 0.79 | 0.72 | 0.61 |
+| `51-music-384`, 5.1 SIMPLE | 2.13 | 1.85 | 1.60 | 1.70 | 1.63 | 1.46 | 1.30 |
+| `51-music-96`, 5.1 A-CPL mode 3 | 3.24 | 2.87 | 2.55 | 2.73 | 2.60 | 2.34 | 2.16 |
+| `514-music-768`, 5.1.4 S-CPL | 4.90 | 4.36 | 3.75 | 4.11 | 3.99 | 3.33 | 2.93 |
+| `ims-music-64-2997`, 29.97 fps | 1.86 | 1.71 | 1.45 | 1.68 | 1.59 | 1.32 | 1.12 |
+| E-AC-3 `714-walk`, 7.1.4 | 0.99 | 0.87 | 0.81 | 0.86 | 0.83 | 0.80 | 0.75 |
+
+The first six columns were measured before D14g's changes to the converter and to the immersive element's tracks, which the last
+column has; the second table has every configuration with them. What each is, and what it costs:
+
+- **QIO flash** (`CONFIG_ESPTOOLPY_FLASHMODE_QIO`): 8 to 15% of an AC-4 frame, 11 to 19% of an AC-3 or E-AC-3 one, for nothing but
+  the mode. The mode is the second stage bootloader's, so a board needs one USB flash with its bootloader (`idf.py flash`), and a
+  network update leaves the mode it was in (a QIO application under a DIO bootloader ran at the DIO figures). A bootloader that
+  cannot set a flash chip's quad-enable bit stays in DIO.
+- **64-byte data-cache lines** (`CONFIG_ESP32S3_DATA_CACHE_LINE_64B`): 11 to 15% more, and no internal RAM: the cache stays 32 KB.
+- **Constants and then code in PSRAM** (`CONFIG_SPIRAM_RODATA`, `CONFIG_SPIRAM_FETCH_INSTRUCTIONS`): 2 to 9% and then 3 to 13% more,
+  7 to 20% together, for 2.3 MB of the 8. An update over the network and a flash write work as before; the part runs on through the
+  write.
+- **A 64 KB data cache** (`CONFIG_ESP32S3_DATA_CACHE_64KB`): 8 to 11% more on one core with the lines and QIO, and 12 to 24% on
+  top of the three above with both cores. It is made of 32 KB of the heap: a play starts with 62 KB of internal RAM free instead of
+  95 and its least is 31 to 49 KB where it was 64 to 81. Wi-Fi and lwIP cannot live on a few kilobytes
+  ([The decode stack goes in PSRAM](#the-decode-stack-goes-in-psram)). The owner decided on 2026-10-11 to spend it
+([decision 43](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-10-10)), and it
+stays its own file so that a build that needs the 32 KB back drops one line.
+
+`sdkconfig.s3-fast` has the first three (QIO, the lines, the code and constants in PSRAM) and `sdkconfig.s3-dcache` the fourth, each
+over `sdkconfig.psram` (and `sdkconfig.ac4` where the decoder is in); the second goes after the first. The S3 board's image, the one
+the releases publish, is built with both.
+
+**The second core.** The decoder's stages that are per channel or per slot run on both cores (the player's worker task is on the core
+the decode task is not on): each channel's inverse transform and QMF analysis, A-SPX's elements, A-CPL's slots and its three
+decorrelators, the history's move and the copy of each channel's matrix, the downmix's outputs and each output's synthesis and
+converter (`CONFIG_ICLFORGE_EXAMPLE_AC4_PARALLEL`, in `sdkconfig.ac4`; `?parallel=off` and `?parallel=on` in a play's location choose
+for that play). The frame takes 8 to 27% less: the reconstruction, which is 76 to 95% of a one-core frame, runs 1.25 to 1.43 times as
+fast, and not twice, because the two cores share the caches and the bus and because the dequantisation, the matrix and the parse
+(5 to 22% of a one-core frame) stay on one. The converter's table is read in the order of its rows: each of 501 rows once for the 3.2
+outputs of a frame that read it, in place of 41 rows' hop between one output and the next.
+
+All twenty plays: the decoder's time over a frame's duration with `main`'s decoder, then with the second core on and the memory
+configuration of an image built without the two files, with QIO and the lines, with `sdkconfig.s3-fast` and with `sdkconfig.s3-dcache`
+after it (first on one core, then on two), the decoder's microseconds a frame and the worst frame there.
+
+| Stream | Codec mode | To | `main` | Without the files, two cores | QIO + lines | `s3-fast` | `s3-dcache`, one core | `s3-dcache`, two cores | us/frame | Worst frame ms |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `20-music-192` | SIMPLE | 2.0 | 0.87 | 0.80 | 0.56 | 0.47 | 0.50 | 0.40 | 16,928 | 36 |
+| `20-music-96` | A-SPX | 2.0 | 1.09 | 0.99 | 0.71 | 0.61 | 0.61 | 0.50 | 21,440 | 38 |
+| `51-music-384` | SIMPLE | 2.0 | 2.15 | 1.85 | 1.34 | 1.14 | 1.28 | 0.98 | 41,996 | 65 |
+| `51-music-384` | SIMPLE | 5.1 | 2.13 | 1.87 | 1.36 | 1.17 | 1.31 | 0.99 | 42,253 | 71 |
+| `51-music-192` | A-SPX | 2.0 | 2.43 | 2.23 | 1.62 | 1.40 | 1.44 | 1.17 | 49,909 | 70 |
+| `51-music-192` | A-SPX | 5.1 | 2.62 | 2.35 | 1.75 | 1.49 | 1.60 | 1.25 | 53,410 | 70 |
+| `51-music-128` | A-SPX, A-CPL 2 | 2.0 | 2.68 | 2.36 | 1.76 | 1.56 | 1.63 | 1.31 | 55,895 | 73 |
+| `51-music-128` | A-SPX, A-CPL 2 | 5.1 | 2.87 | 2.60 | 1.87 | 1.64 | 1.77 | 1.40 | 59,703 | 76 |
+| `51-music-96` | A-SPX, A-CPL 3 | 2.0 | 3.00 | 2.58 | 2.03 | 1.84 | 1.96 | 1.48 | 63,106 | 77 |
+| `51-music-96` | A-SPX, A-CPL 3 | 5.1 | 3.24 | 2.68 | 2.17 | 1.93 | 2.12 | 1.57 | 66,875 | 83 |
+| `514-music-256` | A-SPX, A-CPL 2 | 2.0 | 5.01 | 4.27 | 3.19 | 2.88 | 2.95 | 2.38 | 101,725 | 124 |
+| `514-music-256` | A-SPX, A-CPL 2 | 5.1.4 | 5.54 | 4.85 | 3.65 | 3.27 | 3.40 | 2.73 | 116,271 | 143 |
+| `514-music-512` | A-SPX, S-CPL | 2.0 | 5.02 | 4.35 | 3.25 | 2.88 | 2.84 | 2.36 | 100,736 | 131 |
+| `514-music-512` | A-SPX, S-CPL | 5.1.4 | 5.66 | 4.90 | 3.64 | 3.29 | 3.32 | 2.68 | 114,307 | 150 |
+| `514-music-768` | S-CPL | 2.0 | 4.30 | 3.53 | 2.67 | 2.24 | 2.49 | 1.96 | 83,446 | 121 |
+| `514-music-768` | S-CPL | 5.1.4 | 4.90 | 4.16 | 3.01 | 2.67 | 2.94 | 2.28 | 97,115 | 149 |
+| `ims-music-64-23976` | A-SPX, 23.976 fps | 2.0 | 1.83 | 1.52 | 1.25 | 1.15 | 1.09 | 0.87 | 36,289 | 502 |
+| `ims-music-64-24` | A-SPX, 24 fps | 2.0 | 1.32 | 1.17 | 0.96 | 0.78 | 0.93 | 0.69 | 28,721 | 488 |
+| `ims-music-64-25` | A-SPX, 25 fps | 2.0 | 1.42 | 1.20 | 0.91 | 0.78 | 0.92 | 0.67 | 26,870 | 45 |
+| `ims-music-64-2997` | A-SPX, 29.97 fps | 2.0 | 1.86 | 1.54 | 1.25 | 1.13 | 1.12 | 0.87 | 28,934 | 404 |
+
+AC-3 5.1, E-AC-3 5.1 and E-AC-3 7.1.4 through the same images (the second core is not in their path): 0.41, 0.46 and 0.99 of a frame
+on `main`; 0.42, 0.43 and 0.97 without the files; 0.35, 0.37 and 0.82 with QIO and the lines; 0.32, 0.33 and 0.75 with
+`sdkconfig.s3-fast`; 0.29, 0.33 and 0.75 with `sdkconfig.s3-dcache`.
+
+**What keeps up in real time.** Without the files, with the second core: 2.0 in SIMPLE mode (0.80) and in A-SPX mode (0.99, at the
+line). With QIO and the lines, which cost no RAM: those at 0.56 and 0.71, the converter at 24 and 25 fps (0.96 and 0.91) and E-AC-3
+7.1.4 at 0.82. With `sdkconfig.s3-fast`: 0.47 and 0.61, the converter at 24 and 25 fps (0.78), E-AC-3 7.1.4 at 0.75; 5.1 SIMPLE
+(1.17), 23.976 and 29.97 fps (1.15 and 1.13) stay over. With `sdkconfig.s3-dcache` as well: 2.0 at 0.40 and 0.50, the converter at all
+four frame rates (0.87, 0.69, 0.67 and 0.87), 5.1 SIMPLE (0.99, and 0.98 folded to 2.0), E-AC-3 7.1.4 (0.75). **What does not:** the
+rest of 5.1 (A-SPX 1.25, A-CPL mode 2 1.40, mode 3 1.57) and 5.1.4 (2.28 to 2.73; 1.96 to 2.38 folded), from 2.1 to 3.2 and 4.3 to 5.7 on `main`.
+This part has two thirds of the P4's clock, a quarter of its cache and a slower memory, and its second core is not twice a core when
+both share the caches and the bus.
 
 ### Running it
 
