@@ -405,6 +405,7 @@ MatrixBlocksByChannelId scan_matrix_blocks(std::string_view xml) {
             if (tag.closing) {
                 if (in_block) {
                     result[channel_id].push_back(std::move(block));
+                    block = MatrixBlockText{};
                 }
                 in_block = false;
                 in_matrix = false;
@@ -417,6 +418,7 @@ MatrixBlocksByChannelId scan_matrix_blocks(std::string_view xml) {
             block.duration = attribute_text(tag, "duration");
             if (tag.self_closing) {
                 result[channel_id].push_back(std::move(block));
+                block = MatrixBlockText{};
                 in_block = false;
             } else {
                 in_block = true;
@@ -647,8 +649,12 @@ std::string inject_matrix_extras(std::string_view xml, const MatrixBlocksById& b
             while (!open.empty() && is_space(open.back())) {
                 open.pop_back();
             }
-            edits.push_back(
-                {tag.begin, tag.end, open + ">" + content + "</" + std::string(tag.name) + ">"});
+            open += '>';
+            open += content;
+            open += "</";
+            open += tag.name;
+            open += '>';
+            edits.push_back({tag.begin, tag.end, std::move(open)});
         } else {
             edits.push_back({tag.end, tag.end, std::move(content)});
         }

@@ -1,5 +1,7 @@
 #include "decode.hpp"
 
+#include <fmt/base.h>
+#include <fmt/format.h>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -8,8 +10,6 @@
 #include <cstdio>
 #include <expected>
 #include <filesystem>
-#include <fmt/base.h>
-#include <fmt/format.h>
 #include <fstream>
 #include <ios>
 #include <optional>
@@ -17,6 +17,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 #include "../adm/atmos_adm.hpp"
