@@ -89,6 +89,11 @@ struct Support {
     Management management;
     std::vector<std::string> decoder_settings;
     std::uint64_t buffer_capacity = 0;
+    // The most bytes one chunk to this sink may be, from its type byte to its last byte of audio,
+    // header included and the encryption's tag not: a burst chunk, and a player@v1 PCM chunk too,
+    // which a sink that offers both roles takes at the same limit. 0 when the sink does not say,
+    // as a sink from before the key reads, and a server then sends what the spec allows.
+    std::uint32_t max_chunk_bytes = 0;
 };
 
 void write_support(json::Writer& w, const Support& support);
@@ -157,6 +162,10 @@ struct State {
     std::optional<std::vector<Level>> levels;
     Counters counters;
     std::optional<std::string> why;
+    // The layout in force, in the layout grammar (support.layout_grammar), as the sink's own page
+    // or the last settings command made it; absent when the sink does not say. A server that
+    // renders for a sink reads it here instead of keeping what it last sent.
+    std::optional<std::string> layout;
 };
 
 void write_state(json::Writer& w, const State& state);

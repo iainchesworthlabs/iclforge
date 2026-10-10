@@ -86,6 +86,9 @@ struct SinkOptions {
     // buffer_capacity): what a server may have sent that has not played yet. A board's is a
     // few tens of KB.
     std::uint64_t buffer_capacity = 32ULL * 1024 * 1024;
+    // The most bytes one chunk to the sink may be, which the extension role's support object
+    // states; 0 states none, as a sink from before the key does.
+    std::uint32_t max_chunk_bytes = 0;
 };
 
 // What a sink reports, one line at a time, from any of its threads.

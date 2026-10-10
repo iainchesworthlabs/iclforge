@@ -1377,6 +1377,14 @@ struct Group::State {
                         limit = found->second;
                     }
                 }
+                // Where use_pcm() gave none, the limit the sink states (support.max_chunk_bytes).
+                // That figure counts a chunk with its header; use_pcm()'s counts the audio alone.
+                if (limit == 0 && client.iclforge_support &&
+                    client.iclforge_support->max_chunk_bytes != 0) {
+                    const std::size_t header = audio_chunk_header_bytes(client.dialect);
+                    const std::size_t stated = client.iclforge_support->max_chunk_bytes;
+                    limit = stated > header ? stated - header : 1;
+                }
                 const auto frame_bytes = static_cast<std::size_t>(chosen->channels) *
                                          static_cast<std::size_t>(chosen->bit_depth / 8);
                 if (limit != 0 && frame_bytes != 0) {

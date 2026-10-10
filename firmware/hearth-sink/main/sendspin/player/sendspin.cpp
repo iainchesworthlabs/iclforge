@@ -177,6 +177,10 @@ bool g_board_changed = false;
     s.management.identify = true;
     s.decoder_settings = kDecoderSettings;
     s.buffer_capacity = player.buffer_capacity();
+    // The largest chunk the player's ring and receive buffer take (the build's
+    // CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CHUNK_BYTES): a server chunks to it, for PCM over
+    // player@v1 as well as for bursts.
+    s.max_chunk_bytes = static_cast<std::uint32_t>(kMaxChunkBytes);
     return s;
 }
 
@@ -208,9 +212,16 @@ bool g_board_changed = false;
     // PCM only: FLAC and Opus would need their decoders on the board, which
     // the player has not measured room for (planning/hearth-reference-player.md,
     // B3). Stereo at 48 kHz, which is the only rate the board plays.
+    // The depth of the sink's own slots first: a server sends the first format it can, and 24-bit
+    // PCM to a 16-bit slot is half as much again in the air, in the ring and through the player
+    // for the same audio (planning/esp32-sink-compatibility-matrix.md, the C6 PCM runs).
+    const m::AudioFormat pcm24{
+        .codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 24};
+    const m::AudioFormat pcm16{
+        .codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16};
     config.player_support = m::PlayerSupport{
-        .supported_formats = {{.codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 24},
-                              {.codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16}},
+        .supported_formats = sink_slot_bits() <= 16 ? std::vector<m::AudioFormat>{pcm16, pcm24}
+                                                    : std::vector<m::AudioFormat>{pcm24, pcm16},
         .buffer_capacity = capacity,
         .commands = {m::PlayerCommand::kVolume, m::PlayerCommand::kMute}};
     config.iclforge_support = support(player);
@@ -271,15 +282,22 @@ bool g_board_changed = false;
         s.levels = std::move(levels);
     }
     s.counters = status.counters;
+    // The layout in force, as the player holds it: set by the board's page or by the last settings
+    // command. A server that renders for this sink reads it here.
+    if (status.layout[0] != '\0') {
+        s.layout = std::string(status.layout.data());
+    }
     return s;
 }
 
 [[nodiscard]] bool same_report(const ac::State& a, const ac::State& b) {
-    return a.levels.has_value() == b.levels.has_value() && a.volume == b.volume && a.muted == b.muted &&
-           a.output_delay_ms == b.output_delay_ms &&
-           a.settings_revision == b.settings_revision && a.settings_error.has_value() == b.settings_error.has_value() &&
-           a.decoder == b.decoder && a.counters.bursts_played == b.counters.bursts_played &&
-           a.counters.underruns == b.counters.underruns && a.counters.late_chunks == b.counters.late_chunks &&
+    return a.levels.has_value() == b.levels.has_value() && a.volume == b.volume &&
+           a.muted == b.muted && a.output_delay_ms == b.output_delay_ms &&
+           a.settings_revision == b.settings_revision &&
+           a.settings_error.has_value() == b.settings_error.has_value() && a.decoder == b.decoder &&
+           a.layout == b.layout && a.counters.bursts_played == b.counters.bursts_played &&
+           a.counters.underruns == b.counters.underruns &&
+           a.counters.late_chunks == b.counters.late_chunks &&
            a.counters.dropped_chunks == b.counters.dropped_chunks &&
            a.counters.invalid_chunks == b.counters.invalid_chunks;
 }

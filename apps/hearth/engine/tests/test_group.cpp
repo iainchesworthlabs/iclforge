@@ -1218,6 +1218,116 @@ TEST_CASE(
     host->reset();
 }
 
+// A sink that says how large a chunk it takes (support.max_chunk_bytes, header included) is played
+// PCM inside that, with no limit given by the caller, and says what layout it renders to
+// (state.layout), which the host reads where it would otherwise keep what it last sent.
+TEST_CASE("group: a sink that states its chunk limit and layout is played PCM inside the limit",
+          "[hearth][group][websocket][iclforge]") {
+    namespace ss = iclforge::sendspin;
+    const fs::path scratch =
+        fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_group_stated_limit_" + scratch_pid_suffix());
+    fs::remove_all(scratch);
+    QuietLog log;
+    testsink::SinkOptions options;
+    options.name = "Limit";
+    options.address = "127.0.0.1";
+    options.port = 0;
+    options.state_directory = scratch / "state";
+    options.output_directory = scratch / "out";
+    options.advertise = false;
+    options.unpaired_access = false;
+    options.codecs = {m::Codec::kPcm};
+    options.layout = "5.1";
+    // 1,013 bytes with a 13-byte header is 1,000 bytes of audio: 250 frames of 16-bit stereo.
+    options.max_chunk_bytes = 1013;
+    auto started = testsink::Sink::start(options, log);
+    REQUIRE(started.has_value());
+    const std::unique_ptr<testsink::Sink> board = std::move(*started);
+
+    std::optional<ss::noise::KeyPair> identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    ss::MemoryServerStore store;
+    HostEvents events;
+    auto host = ss::ServerHost::start({.identity = *identity,
+                                       .name = "Test host",
+                                       .languages = {"en"},
+                                       .address = "127.0.0.1",
+                                       .port = std::nullopt,
+                                       .advertise = false,
+                                       .browse = false,
+                                       .mdns_interfaces = {}},
+                                      store, events);
+    REQUIRE(host.has_value());
+    REQUIRE((*host)->enter_pairing_token(board->pairing_token()));
+    (*host)->dial("ws://127.0.0.1:" + std::to_string(board->port()) + "/sendspin");
+
+    const std::string id = board->client_id();
+    std::optional<std::uint32_t> stated_limit;
+    std::optional<std::string> stated_layout;
+    REQUIRE(events.wait(
+        [&](const auto& clients) {
+            const auto found = clients.find(id);
+            if (found == clients.end() || !found->second.bursts || !found->second.available ||
+                !found->second.iclforge_state || !found->second.iclforge_support) {
+                return false;
+            }
+            stated_limit = found->second.iclforge_support->max_chunk_bytes;
+            stated_layout = found->second.iclforge_state->layout;
+            return true;
+        },
+        30s));
+    CHECK(stated_limit == 1013);
+    CHECK(stated_layout == "5.1");
+
+    // No limit given: the group takes the sink's own.
+    REQUIRE((*host)->use_pcm(id, true));
+    REQUIRE(events.wait(
+        [&](const auto& clients) {
+            const auto found = clients.find(id);
+            return found != clients.end() && found->second.playing && !found->second.bursts &&
+                   found->second.available && found->second.player_state.has_value();
+        },
+        30s));
+
+    std::vector<std::int32_t> programme;
+    for (int frame = 0; frame < 48000; ++frame) {
+        programme.push_back(
+            static_cast<std::int32_t>(std::lround(9000.0 * std::sin(frame * 0.0575))));
+        programme.push_back(
+            static_cast<std::int32_t>(std::lround(9000.0 * std::sin(frame * 0.131))));
+    }
+    std::shared_ptr<ss::Group> group = (*host)->make_group("Stated limit");
+    group->add(id);
+    const m::AudioFormat pcm_format{
+        .codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16};
+    REQUIRE(group->start({.pcm = pcm_format, .bursts = std::nullopt, .buffered = true}));
+    std::size_t offset = 0;
+    const auto deadline = std::chrono::steady_clock::now() + 30s;
+    while (offset < programme.size() && std::chrono::steady_clock::now() < deadline) {
+        const std::size_t block = std::min<std::size_t>(4800 * 2, programme.size() - offset);
+        const std::size_t taken =
+            group->push(std::span<const std::int32_t>(programme).subspan(offset, block));
+        if (taken > 0) {
+            offset += taken * 2;
+        } else {
+            std::this_thread::sleep_for(5ms);
+        }
+    }
+    REQUIRE(offset == programme.size());
+    group->stop();
+
+    const auto until = std::chrono::steady_clock::now() + 15s;
+    while (board->totals().frames < 48000 && std::chrono::steady_clock::now() < until) {
+        std::this_thread::sleep_for(20ms);
+    }
+    CHECK(board->totals().frames == 48000);
+    // 250 frames at most a chunk, so 192 of them or more for one second.
+    CHECK(board->totals().chunks >= 48000 / 250);
+    CHECK(largest_chunk_frames(only_file(scratch / "out", "stream-", ".times.csv")) <= 250);
+    group.reset();
+    host->reset();
+}
+
 // A sink with a small buffer, as a board has: an ESP32-C6's ring is 48 KB, which is 167 ms of
 // 24-bit stereo. The group counts each unit it has sent as held until it has played; counting
 // every unit as lasting 150 ms, whatever it lasts, filled that model with units that had already
