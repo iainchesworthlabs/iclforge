@@ -238,6 +238,108 @@ std::string_view kHoaAdmXml = R"(<?xml version="1.0" encoding="UTF-8"?>
 </audioFormatExtended>
 )";
 
+// A Mid/Side matrix pair, after the standard's own sample code (BS.2076-3 §5.4.3.2.1 and §5.5.4.2):
+// an encoding pack that reads the common stereo DirectSpeakers pack (AP_00010002, channels
+// AC_00010001 and AC_00010002) and a decoding pack that undoes it. libadm models none of the matrix
+// elements, so this is where the text scan in adm_xml_extras.cpp is exercised: the
+// outputChannelFormatIDRef and its legacy spelling, a jumpPosition ahead of the matrix,
+// coefficients in every form the schema has (a plain gain, a negative gain, gainUnit="dB", phase,
+// delay, and each *Var), an ID written with lower-case hexadecimal digits, and a Matrix pack's four
+// references. The channel IDs use "900x" counters for the same reason kDirectSpeakersAdmXml does.
+std::string_view kMatrixAdmXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<audioFormatExtended version="ITU-R_BS.2076-3">
+  <audioPackFormat audioPackFormatID="AP_00029001" audioPackFormatName="MidSide_Encode" typeLabel="0002" typeDefinition="Matrix">
+    <decodePackFormatIDRef>AP_00029101</decodePackFormatIDRef>
+    <inputPackFormatIDRef>AP_00010002</inputPackFormatIDRef>
+    <audioChannelFormatIDRef>AC_00029001</audioChannelFormatIDRef>
+    <audioChannelFormatIDRef>AC_00029002</audioChannelFormatIDRef>
+  </audioPackFormat>
+  <audioPackFormat audioPackFormatID="AP_00029101" audioPackFormatName="MidSide_Decode" typeLabel="0002" typeDefinition="Matrix">
+    <encodePackFormatIDRef>AP_00029001</encodePackFormatIDRef>
+    <encodePackFormatIDRef>AP_0002900a</encodePackFormatIDRef>
+    <outputPackFormatIDRef>AP_00010002</outputPackFormatIDRef>
+    <audioChannelFormatIDRef>AC_00029101</audioChannelFormatIDRef>
+    <audioChannelFormatIDRef>AC_00029102</audioChannelFormatIDRef>
+    <audioChannelFormatIDRef>AC_00029103</audioChannelFormatIDRef>
+  </audioPackFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00029001" audioChannelFormatName="Mid" typeLabel="0002" typeDefinition="Matrix">
+    <audioBlockFormat audioBlockFormatID="AB_00029001_00000001">
+      <matrix>
+        <coefficient gain="0.5">AC_00010001</coefficient>
+        <coefficient gain="0.5">AC_00010002</coefficient>
+      </matrix>
+    </audioBlockFormat>
+  </audioChannelFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00029002" audioChannelFormatName="Side" typeLabel="0002" typeDefinition="Matrix">
+    <audioBlockFormat audioBlockFormatID="AB_00029002_00000001">
+      <matrix>
+        <coefficient gain="0.5">AC_00010001</coefficient>
+        <coefficient gain="-0.5">AC_00010002</coefficient>
+      </matrix>
+    </audioBlockFormat>
+  </audioChannelFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00029101" audioChannelFormatName="Left" typeLabel="0002" typeDefinition="Matrix">
+    <audioBlockFormat audioBlockFormatID="AB_00029101_00000001">
+      <outputChannelFormatIDRef>AC_00010001</outputChannelFormatIDRef>
+      <jumpPosition interpolationLength="0.5">1</jumpPosition>
+      <matrix>
+        <coefficient gain="1.0">AC_00029001</coefficient>
+        <coefficient gain="1.0">AC_00029002</coefficient>
+      </matrix>
+    </audioBlockFormat>
+  </audioChannelFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00029102" audioChannelFormatName="Right" typeLabel="0002" typeDefinition="Matrix">
+    <audioBlockFormat audioBlockFormatID="AB_00029102_00000001">
+      <outputChannelIDRef>AC_00010002</outputChannelIDRef>
+      <matrix>
+        <coefficient gain="1.0">AC_00029001</coefficient>
+        <coefficient gain="-1.0">AC_00029002</coefficient>
+      </matrix>
+    </audioBlockFormat>
+  </audioChannelFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00029103" audioChannelFormatName="Odd" typeLabel="0002" typeDefinition="Matrix">
+    <audioBlockFormat audioBlockFormatID="AB_0002910a_00000001">
+      <matrix>
+        <coefficient gain="-6.0206" gainUnit="dB" phase="90" delay="10.5">ac_00029001</coefficient>
+        <coefficient gainVar="clev" phaseVar="ph" delayVar="del">AC_00029002</coefficient>
+        <coefficient>AC_00010001</coefficient>
+      </matrix>
+    </audioBlockFormat>
+  </audioChannelFormat>
+</audioFormatExtended>
+)";
+
+// An HOA channel and pack carrying the sub-elements libadm models for a block (nfcRefDist,
+// equation, screenRef, headLocked) and the three a pack may carry (§5.5.5, Table A1-25), which it
+// does not.
+std::string_view kHoaExtrasAdmXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<audioFormatExtended version="ITU-R_BS.2076-3">
+  <audioPackFormat audioPackFormatID="AP_00049001" audioPackFormatName="Foa" typeLabel="0004" typeDefinition="HOA">
+    <audioChannelFormatIDRef>AC_00049002</audioChannelFormatIDRef>
+    <normalization>N3D</normalization>
+    <nfcRefDist>1.5</nfcRefDist>
+    <screenRef>1</screenRef>
+  </audioPackFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00049002" audioChannelFormatName="N3D_ACN_2" typeLabel="0004" typeDefinition="HOA">
+    <audioBlockFormat audioBlockFormatID="AB_00049002_00000001">
+      <order>1</order>
+      <degree>0</degree>
+      <normalization>N3D</normalization>
+      <nfcRefDist>2</nfcRefDist>
+      <screenRef>1</screenRef>
+      <headLocked>1</headLocked>
+      <equation>sqrt(3)*z</equation>
+    </audioBlockFormat>
+  </audioChannelFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00049003" audioChannelFormatName="Plain" typeLabel="0004" typeDefinition="HOA">
+    <audioBlockFormat audioBlockFormatID="AB_00049003_00000001">
+      <order>0</order>
+      <degree>0</degree>
+    </audioBlockFormat>
+  </audioChannelFormat>
+</audioFormatExtended>
+)";
+
 // A Cartesian Objects channel (BS.2076-2 Table 16/17) with a jumpPosition
 // (§10.3) - exercises the cartesian branch of iclforge::adm::Position and the
 // channelLock/jumpPosition fields adm_model.cpp's convert() populates.
@@ -1112,6 +1214,152 @@ TEST_CASE("parses HOA order/degree/normalization", "[adm][model]") {
     REQUIRE(block.has_hoa_degree);
     CHECK(block.hoa_degree == 1);
     CHECK(block.hoa_normalization == "N3D");
+}
+
+TEST_CASE("parses a Matrix block's coefficients, output channel and jumpPosition", "[adm][model]") {
+    std::istringstream stream(wrap_axml_only(kMatrixAdmXml));
+    auto doc = iclforge::adm::parse_bw64(stream);
+    INFO("parse_bw64: " << (doc ? std::string{"ok"}
+                                : std::string(iclforge::adm::describe(doc.error()))));
+    REQUIRE(doc.has_value());
+
+    SECTION("an encoding matrix: coefficients over the input pack's channels, no output channel") {
+        const auto& side = find_by_id(doc->model.channel_formats, "AC_00029002");
+        CHECK(side.type == iclforge::adm::TypeDefinition::kMatrix);
+        REQUIRE(side.block_formats.size() == 1);
+        const auto& block = side.block_formats.front();
+        CHECK(block.output_channel_format_ref.empty());
+        REQUIRE(block.matrix.size() == 2);
+        CHECK(block.matrix[0].input_channel_format_ref == "AC_00010001");
+        CHECK(block.matrix[0].gain == Catch::Approx(0.5));
+        CHECK(block.matrix[1].input_channel_format_ref == "AC_00010002");
+        CHECK(block.matrix[1].gain == Catch::Approx(-0.5));  // a negative gain inverts the signal
+        CHECK(block.matrix[1].phase_deg == 0.0);
+        CHECK(block.matrix[1].delay_ms == 0.0);
+        CHECK(block.matrix[1].gain_var.empty());
+    }
+
+    SECTION("a decoding matrix: the output channel, a jumpPosition ahead of the matrix") {
+        const auto& left = find_by_id(doc->model.channel_formats, "AC_00029101");
+        REQUIRE(left.block_formats.size() == 1);
+        const auto& block = left.block_formats.front();
+        CHECK(block.output_channel_format_ref == "AC_00010001");
+        REQUIRE(block.has_jump_position);
+        CHECK(block.jump_position);
+        REQUIRE(block.has_interpolation_length);
+        CHECK(block.interpolation_length_s == Catch::Approx(0.5));
+        REQUIRE(block.matrix.size() == 2);
+        CHECK(block.matrix[0].input_channel_format_ref == "AC_00029001");
+        CHECK(block.matrix[1].input_channel_format_ref == "AC_00029002");
+        CHECK(block.matrix[1].gain == Catch::Approx(1.0));
+    }
+
+    SECTION("the legacy outputChannelIDRef spelling is read as the output channel") {
+        const auto& right = find_by_id(doc->model.channel_formats, "AC_00029102");
+        const auto& block = right.block_formats.front();
+        CHECK(block.output_channel_format_ref == "AC_00010002");
+        CHECK_FALSE(block.has_jump_position);
+        REQUIRE(block.matrix.size() == 2);
+        CHECK(block.matrix[1].gain == Catch::Approx(-1.0));
+    }
+
+    SECTION("dB gain is converted, phase and delay are kept, a variable is held by name") {
+        const auto& odd = find_by_id(doc->model.channel_formats, "AC_00029103");
+        const auto& block = odd.block_formats.front();
+        // The block ID was written with a lower-case hexadecimal digit; libadm prints it in
+        // upper case and the scan's key has to match that.
+        CHECK(block.id == "AB_0002910A_00000001");
+        REQUIRE(block.matrix.size() == 3);
+
+        const auto& converted = block.matrix[0];
+        CHECK(converted.input_channel_format_ref == "AC_00029001");
+        CHECK(converted.gain == Catch::Approx(0.5).epsilon(1e-4));  // -6.0206 dB
+        CHECK(converted.phase_deg == Catch::Approx(90.0));
+        CHECK(converted.delay_ms == Catch::Approx(10.5));
+
+        const auto& variable = block.matrix[1];
+        CHECK(variable.gain_var == "clev");
+        CHECK(variable.phase_var == "ph");
+        CHECK(variable.delay_var == "del");
+        CHECK(variable.gain == 1.0);  // the constant stays at its default
+
+        const auto& defaults = block.matrix[2];
+        CHECK(defaults.input_channel_format_ref == "AC_00010001");
+        CHECK(defaults.gain == 1.0);
+        CHECK(defaults.phase_deg == 0.0);
+        CHECK(defaults.delay_ms == 0.0);
+    }
+}
+
+TEST_CASE("parses a Matrix pack's encode, decode, input and output references", "[adm][model]") {
+    std::istringstream stream(wrap_axml_only(kMatrixAdmXml));
+    auto doc = iclforge::adm::parse_bw64(stream);
+    REQUIRE(doc.has_value());
+
+    const auto& encode = find_by_id(doc->model.pack_formats, "AP_00029001");
+    CHECK(encode.type == iclforge::adm::TypeDefinition::kMatrix);
+    CHECK(encode.input_pack_format_ref == "AP_00010002");
+    CHECK(encode.decode_pack_format_refs == std::vector<std::string>{"AP_00029101"});
+    CHECK(encode.encode_pack_format_refs.empty());
+    CHECK(encode.output_pack_format_ref.empty());
+    CHECK(encode.channel_format_refs == std::vector<std::string>{"AC_00029001", "AC_00029002"});
+
+    const auto& decode = find_by_id(doc->model.pack_formats, "AP_00029101");
+    CHECK(decode.output_pack_format_ref == "AP_00010002");
+    CHECK(decode.input_pack_format_ref.empty());
+    // 0..*, and an ID written with a lower-case digit is read in upper case.
+    CHECK(decode.encode_pack_format_refs == std::vector<std::string>{"AP_00029001", "AP_0002900A"});
+    CHECK(decode.decode_pack_format_refs.empty());
+}
+
+TEST_CASE("a block and pack that are not Matrix read back with no matrix content", "[adm][model]") {
+    std::istringstream stream(wrap_axml_only(kCarAdmXml));
+    auto doc = iclforge::adm::parse_bw64(stream);
+    REQUIRE(doc.has_value());
+    const auto& block = find_by_id(doc->model.channel_formats, "AC_00031001").block_formats.at(0);
+    CHECK(block.matrix.empty());
+    CHECK(block.output_channel_format_ref.empty());
+    const auto& pack = find_by_id(doc->model.pack_formats, "AP_00031001");
+    CHECK(pack.input_pack_format_ref.empty());
+    CHECK(pack.output_pack_format_ref.empty());
+    CHECK(pack.encode_pack_format_refs.empty());
+    CHECK(pack.decode_pack_format_refs.empty());
+    CHECK_FALSE(pack.has_nfc_ref_dist);
+    CHECK_FALSE(pack.screen_ref);
+}
+
+TEST_CASE(
+    "parses an HOA block's nfcRefDist, equation, screenRef and headLocked and a pack's defaults",
+    "[adm][model]") {
+    std::istringstream stream(wrap_axml_only(kHoaExtrasAdmXml));
+    auto doc = iclforge::adm::parse_bw64(stream);
+    INFO("parse_bw64: " << (doc ? std::string{"ok"}
+                                : std::string(iclforge::adm::describe(doc.error()))));
+    REQUIRE(doc.has_value());
+
+    const auto& block = find_by_id(doc->model.channel_formats, "AC_00049002").block_formats.at(0);
+    CHECK(block.hoa_order == 1);
+    CHECK(block.hoa_degree == 0);
+    CHECK(block.hoa_normalization == "N3D");
+    REQUIRE(block.has_nfc_ref_dist);
+    CHECK(block.nfc_ref_dist == Catch::Approx(2.0));
+    CHECK(block.hoa_equation == "sqrt(3)*z");
+    CHECK(block.screen_ref);
+    CHECK(block.head_locked);
+
+    const auto& plain = find_by_id(doc->model.channel_formats, "AC_00049003").block_formats.at(0);
+    CHECK_FALSE(plain.has_nfc_ref_dist);
+    CHECK(plain.hoa_equation.empty());
+    CHECK_FALSE(plain.screen_ref);
+    CHECK_FALSE(plain.head_locked);
+    CHECK(plain.hoa_normalization == "SN3D");  // the schema's default
+
+    const auto& pack = find_by_id(doc->model.pack_formats, "AP_00049001");
+    CHECK(pack.type == iclforge::adm::TypeDefinition::kHoa);
+    CHECK(pack.hoa_normalization == "N3D");
+    REQUIRE(pack.has_nfc_ref_dist);
+    CHECK(pack.nfc_ref_dist == Catch::Approx(1.5));
+    CHECK(pack.screen_ref);
 }
 
 TEST_CASE("parses Cartesian object positions and jumpPosition", "[adm][model]") {

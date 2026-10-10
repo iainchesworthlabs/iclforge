@@ -1,10 +1,14 @@
 #include "adm_model.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <chrono>
+#include <cmath>
 #include <expected>
 #include <functional>
+#include <optional>
 #include <string>
+#include <system_error>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -251,14 +255,26 @@ AudioBlockFormat convert(const ::adm::AudioBlockFormatHoa& src) {
     block.has_hoa_degree = true;
     block.hoa_degree = src.get<::adm::Degree>().get();
     block.hoa_normalization = src.get<::adm::Normalization>().get();
+    // nfcRefDist, screenRef and headLocked are DefaultParameters (has<>() is always true), so
+    // isDefault<>() says whether the file carried nfcRefDist; the two flags' defaults are false.
+    if (!src.isDefault<::adm::NfcRefDist>()) {
+        block.has_nfc_ref_dist = true;
+        block.nfc_ref_dist = to_double(src.get<::adm::NfcRefDist>().get());
+    }
+    if (src.has<::adm::Equation>()) {
+        block.hoa_equation = src.get<::adm::Equation>().get();
+    }
+    block.screen_ref = src.get<::adm::ScreenRef>().get();
+    block.head_locked = src.get<::adm::HeadLocked>().get();
     return block;
 }
 
 // Matrix and Binaural blocks (§5.4.3.2, §5.4.3.5) contribute only the common
-// id/rtime/duration/gain/importance fields set by convert_common() -
-// Matrix's own coefficient-matrix content and Binaural's near-absence of
-// content are both outside this phase's scope, per model.hpp's own header
-// comment.
+// id/rtime/duration/gain/importance fields set by convert_common(). A Binaural
+// block has nothing else (Table A1-18). A Matrix block's outputChannelFormatIDRef,
+// coefficients and jumpPosition are not libadm parameters at all, so
+// scan_matrix_blocks() (adm_xml_extras.cpp) reads them from the axml text and
+// parse_axml() attaches them to the block by ID.
 AudioBlockFormat convert(const ::adm::AudioBlockFormatMatrix& src) {
     return convert_common(
         ::adm::formatId(src.get<::adm::AudioBlockFormatId>()), src.get<::adm::Rtime>(),
@@ -689,6 +705,64 @@ std::expected<BuiltDocument, AdmWriteError> build_libadm_document(const AdmModel
     return BuiltDocument{.document = std::move(document),
                          .zone_blocks = std::move(zone_blocks),
                          .track_uids_by_key = std::move(track_uids_by_id)};
+}
+
+namespace {
+
+// The seconds a BS.2076 §5.13 timecode names, or nothing for text that is empty or not a timecode.
+std::optional<double> timecode_seconds(const std::string& text) {
+    if (text.empty()) {
+        return std::nullopt;
+    }
+    try {
+        return to_seconds(::adm::parseTimecode(text));
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
+std::optional<double> parse_number(const std::string& text) {
+    double value = 0.0;
+    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+    if (text.empty() || error != std::errc{} || end != text.data() + text.size() ||
+        !std::isfinite(value)) {
+        return std::nullopt;
+    }
+    return value;
+}
+
+}  // namespace
+
+std::vector<AudioBlockFormat> build_matrix_blocks(const std::vector<MatrixBlockText>& texts) {
+    std::vector<AudioBlockFormat> blocks;
+    blocks.reserve(texts.size());
+    for (const auto& text : texts) {
+        AudioBlockFormat block;
+        block.id = text.id;
+        if (const auto rtime = timecode_seconds(text.rtime)) {
+            block.rtime_s = *rtime;
+        }
+        if (const auto duration = timecode_seconds(text.duration)) {
+            block.has_duration = true;
+            block.duration_s = *duration;
+        }
+        if (const auto gain = parse_number(text.gain)) {
+            // §5.4.3: gainUnit "dB" or, by default, "linear"; the model always holds linear.
+            block.gain = text.gain_unit == "dB" ? std::pow(10.0, *gain / 20.0) : *gain;
+        }
+        block.has_importance = true;
+        if (const auto importance = parse_number(text.importance)) {
+            block.importance = static_cast<int>(std::clamp(*importance, 0.0, 10.0));
+        }
+        block.output_channel_format_ref = text.output_channel_format_ref;
+        block.matrix = text.matrix;
+        block.has_jump_position = text.has_jump_position;
+        block.jump_position = text.jump_position;
+        block.has_interpolation_length = text.has_interpolation_length;
+        block.interpolation_length_s = text.interpolation_length_s;
+        blocks.push_back(std::move(block));
+    }
+    return blocks;
 }
 
 AdmModel build_adm_model(const std::shared_ptr<::adm::Document>& document) {

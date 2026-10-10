@@ -239,11 +239,42 @@ std::expected<AdmModel, AdmError> parse_axml(const std::string& xml) {
     if (!zones.empty()) {
         for (auto& channel : model.channel_formats) {
             for (auto& block : channel.block_formats) {
-                const auto it = zones.find(block.id);
-                if (it != zones.end()) {
+                if (const auto it = zones.find(block.id); it != zones.end()) {
                     block.zone_exclusion = it->second;
                 }
             }
+        }
+    }
+    // libadm skips every block of a Matrix channel (§5.4.3.2), so they come from the text too, and
+    // so do a pack's own Matrix and HOA sub-elements (§5.5.4, §5.5.5), which it has no parameter
+    // for.
+    const auto matrix_blocks = scan_matrix_blocks(xml);
+    if (!matrix_blocks.empty()) {
+        for (auto& channel : model.channel_formats) {
+            if (channel.type != TypeDefinition::kMatrix) {
+                continue;
+            }
+            if (const auto it = matrix_blocks.find(channel.id); it != matrix_blocks.end()) {
+                channel.block_formats = build_matrix_blocks(it->second);
+            }
+        }
+    }
+    const auto pack_extras = scan_pack_extras(xml);
+    if (!pack_extras.empty()) {
+        for (auto& pack : model.pack_formats) {
+            const auto it = pack_extras.find(pack.id);
+            if (it == pack_extras.end()) {
+                continue;
+            }
+            const auto& extras = it->second;
+            pack.encode_pack_format_refs = extras.encode_pack_format_refs;
+            pack.decode_pack_format_refs = extras.decode_pack_format_refs;
+            pack.input_pack_format_ref = extras.input_pack_format_ref;
+            pack.output_pack_format_ref = extras.output_pack_format_ref;
+            pack.hoa_normalization = extras.hoa_normalization;
+            pack.has_nfc_ref_dist = extras.has_nfc_ref_dist;
+            pack.nfc_ref_dist = extras.nfc_ref_dist;
+            pack.screen_ref = extras.screen_ref;
         }
     }
     return model;

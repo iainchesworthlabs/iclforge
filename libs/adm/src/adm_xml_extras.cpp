@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cmath>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -223,6 +224,59 @@ struct XmlTag {
     return true;
 }
 
+// libadm prints an ID with its hexadecimal digits in upper case, and the model's IDs are what it
+// printed, so a key read out of the text has to match that spelling to find its block or pack.
+[[nodiscard]] std::string upper_ascii(std::string text) {
+    for (auto& c : text) {
+        if (c >= 'a' && c <= 'z') {
+            c = static_cast<char>(c - 'a' + 'A');
+        }
+    }
+    return text;
+}
+
+// A finite number from an attribute. from_chars accepts "inf" and "nan", which no field read here
+// can use, so those count as absent.
+[[nodiscard]] bool read_finite(const XmlTag& tag, std::string_view name, double& out) {
+    double value = 0.0;
+    if (!read_bound(tag, name, value) || !std::isfinite(value)) {
+        return false;
+    }
+    out = value;
+    return true;
+}
+
+[[nodiscard]] bool parse_finite(std::string_view text, double& out) {
+    text = trim(text);
+    double value = 0.0;
+    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+    if (error != std::errc{} || end != text.data() + text.size() || !std::isfinite(value)) {
+        return false;
+    }
+    out = value;
+    return true;
+}
+
+// The decoded, trimmed text between a start tag and the next '<'. Empty for a self-closing tag.
+[[nodiscard]] std::string element_text(std::string_view xml, const XmlTag& tag) {
+    if (tag.self_closing) {
+        return {};
+    }
+    const auto text_end = std::min(xml.find('<', tag.end), xml.size());
+    return decode_entities(trim(xml.substr(tag.end, text_end - tag.end)));
+}
+
+// An ADM boolean element: "1" or "true".
+[[nodiscard]] bool is_true(std::string_view text) {
+    text = trim(text);
+    return text == "1" || text == "true";
+}
+
+[[nodiscard]] std::string attribute_text(const XmlTag& tag, std::string_view name) {
+    const auto* raw = find_attribute(tag, name);
+    return raw == nullptr ? std::string{} : decode_entities(trim(*raw));
+}
+
 [[nodiscard]] std::string format_number(double value) {
     char buffer[64];
     const auto [end, error] = std::to_chars(buffer, buffer + sizeof(buffer), value);
@@ -271,7 +325,7 @@ ZonesByBlockId scan_zone_exclusions(std::string_view xml) {
                 in_exclusion = false;
             } else if (const auto* id = find_attribute(tag, "audioBlockFormatID")) {
                 in_block = true;
-                block_id = decode_entities(*id);
+                block_id = upper_ascii(decode_entities(*id));
             } else {
                 in_block = false;
             }
@@ -311,6 +365,167 @@ ZonesByBlockId scan_zone_exclusions(std::string_view xml) {
             zone.label = decode_entities(trim(xml.substr(tag.end, text_end - tag.end)));
         }
         result[block_id].push_back(std::move(zone));
+    }
+    return result;
+}
+
+MatrixBlocksByChannelId scan_matrix_blocks(std::string_view xml) {
+    MatrixBlocksByChannelId result;
+    std::string channel_id;
+    bool in_channel = false;  // inside an audioChannelFormat with the Matrix type label
+    bool in_block = false;
+    bool in_matrix = false;
+    MatrixBlockText block;
+
+    std::size_t pos = 0;
+    XmlTag tag;
+    while (next_tag(xml, pos, tag)) {
+        if (tag.name == "audioChannelFormat") {
+            in_channel = false;
+            in_block = false;
+            in_matrix = false;
+            if (!tag.closing && !tag.self_closing) {
+                if (const auto* id = find_attribute(tag, "audioChannelFormatID")) {
+                    auto key = upper_ascii(decode_entities(*id));
+                    // "AC_" and the four hexadecimal digits of the type label; 0002 is Matrix.
+                    if (key.starts_with("AC_0002")) {
+                        in_channel = true;
+                        channel_id = key;
+                        // A Matrix channel with no blocks is still seen: an empty entry.
+                        result.try_emplace(channel_id);
+                    }
+                }
+            }
+            continue;
+        }
+        if (!in_channel) {
+            continue;
+        }
+        if (tag.name == "audioBlockFormat") {
+            if (tag.closing) {
+                if (in_block) {
+                    result[channel_id].push_back(std::move(block));
+                }
+                in_block = false;
+                in_matrix = false;
+                continue;
+            }
+            in_matrix = false;
+            block = MatrixBlockText{};
+            block.id = upper_ascii(attribute_text(tag, "audioBlockFormatID"));
+            block.rtime = attribute_text(tag, "rtime");
+            block.duration = attribute_text(tag, "duration");
+            if (tag.self_closing) {
+                result[channel_id].push_back(std::move(block));
+                in_block = false;
+            } else {
+                in_block = true;
+            }
+            continue;
+        }
+        if (!in_block) {
+            continue;
+        }
+        if (tag.name == "matrix") {
+            in_matrix = !tag.closing && !tag.self_closing;
+            continue;
+        }
+        if (tag.closing) {
+            continue;
+        }
+        if (tag.name == "outputChannelFormatIDRef" || tag.name == "outputChannelIDRef") {
+            block.output_channel_format_ref = upper_ascii(element_text(xml, tag));
+        } else if (tag.name == "gain") {
+            block.gain = element_text(xml, tag);
+            block.gain_unit = attribute_text(tag, "gainUnit");
+        } else if (tag.name == "importance") {
+            block.importance = element_text(xml, tag);
+        } else if (tag.name == "jumpPosition") {
+            block.has_jump_position = true;
+            block.jump_position = is_true(element_text(xml, tag));
+            double length = 0.0;
+            if (read_finite(tag, "interpolationLength", length)) {
+                block.has_interpolation_length = true;
+                block.interpolation_length_s = length;
+            }
+        } else if (in_matrix && tag.name == "coefficient") {
+            MatrixCoefficient coefficient;
+            coefficient.input_channel_format_ref = upper_ascii(element_text(xml, tag));
+            double value = 0.0;
+            if (read_finite(tag, "gain", value)) {
+                // gainUnit "dB" (BS.2076-3 Table A1-16) is stored as linear, as a block's gain is.
+                coefficient.gain =
+                    attribute_text(tag, "gainUnit") == "dB" ? std::pow(10.0, value / 20.0) : value;
+            }
+            if (read_finite(tag, "phase", value)) {
+                coefficient.phase_deg = value;
+            }
+            if (read_finite(tag, "delay", value)) {
+                coefficient.delay_ms = value;
+            }
+            coefficient.gain_var = attribute_text(tag, "gainVar");
+            coefficient.phase_var = attribute_text(tag, "phaseVar");
+            coefficient.delay_var = attribute_text(tag, "delayVar");
+            block.matrix.push_back(std::move(coefficient));
+        }
+    }
+    return result;
+}
+
+PackExtrasById scan_pack_extras(std::string_view xml) {
+    PackExtrasById result;
+    std::string pack_id;
+    bool in_pack = false;
+    bool seen = false;
+    PackExtras pack;
+
+    std::size_t pos = 0;
+    XmlTag tag;
+    while (next_tag(xml, pos, tag)) {
+        if (tag.name == "audioPackFormat") {
+            if (in_pack && tag.closing && seen) {
+                result[pack_id] = std::move(pack);
+            }
+            in_pack = false;
+            seen = false;
+            pack = PackExtras{};
+            if (!tag.closing && !tag.self_closing) {
+                if (const auto* id = find_attribute(tag, "audioPackFormatID")) {
+                    in_pack = true;
+                    pack_id = upper_ascii(decode_entities(*id));
+                }
+            }
+            continue;
+        }
+        if (!in_pack || tag.closing) {
+            continue;
+        }
+        if (tag.name == "encodePackFormatIDRef") {
+            pack.encode_pack_format_refs.push_back(upper_ascii(element_text(xml, tag)));
+            seen = true;
+        } else if (tag.name == "decodePackFormatIDRef") {
+            pack.decode_pack_format_refs.push_back(upper_ascii(element_text(xml, tag)));
+            seen = true;
+        } else if (tag.name == "inputPackFormatIDRef") {
+            pack.input_pack_format_ref = upper_ascii(element_text(xml, tag));
+            seen = true;
+        } else if (tag.name == "outputPackFormatIDRef") {
+            pack.output_pack_format_ref = upper_ascii(element_text(xml, tag));
+            seen = true;
+        } else if (tag.name == "normalization") {
+            pack.hoa_normalization = element_text(xml, tag);
+            seen = true;
+        } else if (tag.name == "nfcRefDist") {
+            double distance = 0.0;
+            if (parse_finite(element_text(xml, tag), distance)) {
+                pack.has_nfc_ref_dist = true;
+                pack.nfc_ref_dist = distance;
+                seen = true;
+            }
+        } else if (tag.name == "screenRef") {
+            pack.screen_ref = is_true(element_text(xml, tag));
+            seen = true;
+        }
     }
     return result;
 }

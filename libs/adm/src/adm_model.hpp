@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "adm_xml_extras.hpp"
 #include "iclforge/adm/ac3adm.hpp"
 #include "iclforge/adm/model.hpp"
 
@@ -32,6 +33,13 @@ namespace iclforge::adm::detail {
 // function trusts a successfully-returned Document to have every Required
 // field present - it does not re-validate them.
 [[nodiscard]] AdmModel build_adm_model(const std::shared_ptr<::adm::Document>& document);
+
+// A Matrix channel's blocks, from the text scan (adm_xml_extras.hpp's MatrixBlockText): libadm
+// reads none of them. Times come out through libadm's own timecode parser, so the two time
+// formats BS.2076 §5.13 allows mean here what they mean everywhere else; gain and importance get
+// the schema's defaults (linear 1.0 and 10) when the text is absent or not a number.
+[[nodiscard]] std::vector<AudioBlockFormat> build_matrix_blocks(
+    const std::vector<MatrixBlockText>& texts);
 
 // The write-side inverse: builds a libadm `::adm::Document` from `model`, ready for
 // `::adm::reassignIds()` and `::adm::writeXml()` (both called by adm.cpp's write_bw64, not here -
