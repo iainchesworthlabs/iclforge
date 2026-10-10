@@ -198,7 +198,7 @@ dependencies {
     // gradle.lockfile had quietly been holding this back to 1.17.0 already; removing the
     // standalone Kotlin plugin (see build.gradle.kts's own plugins{} comment) let the
     // unlocked resolution try to honor 1.19.0 for real and hit checkDebugAarMetadata.
-    implementation("androidx.core:core-ktx:1.19.1")
+    implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.appcompat:appcompat:1.8.0")
 
     // WASM/mobile headless coverage(b): device-free instrumented coverage for
