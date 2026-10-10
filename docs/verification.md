@@ -1190,7 +1190,10 @@ measures its levels against full scale 1.0. Those and the other readings reconst
 `libs/ac4/ERRATA.md`, under "Reconstruction" and "The QMF domain". None of the streams here, from DEE
 or anyone else, sets `b_snf_data_exists`, so the noise fill is decoded from the text alone. A unit
 test (`libs/ac4/tests/decoder/test_noise_fill.cpp`) holds its levels, escape and draw order to
-Pseudocodes 22 and 23 on a hand-built track.
+Pseudocodes 22 and 23 on a hand-built track. The encoder's `experimental.noise_fill` writes it
+since, and the decoder brings back a band the rate quantised to zero to within 2 dB of the
+source's level and leaves a coded tone at unity gain (`libs/ac4/tests/encoder/test_encoder.cpp`),
+which checks the decoder against a writer built from the same reading, not an outside one.
 
 **Locally, over the census.** With `AC4_GOLDEN_DIR` and `AC4_STREAM_DIR` set, the same test
 compares the decoder with the Python parser's digests of any other set of streams. Over the 107 DEE
