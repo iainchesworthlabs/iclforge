@@ -15,6 +15,13 @@ constexpr int kCodebooks = 12;          // 0, and Tables A.2 to A.12's 1 to 11
 constexpr std::int32_t kMaxQuant = 8191; // what ext_code (Pseudocode 20) reaches
 constexpr int kEscape = 16;              // codebook 11's escape value
 constexpr int kMaxDelta = 60;            // Table A.1's deltas run -60 to 60
+// Noise fill (Part 1 5.1.4.2): 1.44269504 is the text's own rounding of 1/ln 2,
+// which the decoder measures its levels with; dpcm_snf is the delta plus 17,
+// 0 (delta -17) escapes, and Table A.13 has 22 indices.
+constexpr double kLog2E = 1.44269504;
+constexpr int kNoiseOffset = 17;
+constexpr int kNoiseDeltaMin = -16;
+constexpr int kNoiseDeltaMax = 4;
 // The quantiser's rounding offset: q = floor(|x/g|^(3/4) + kRounding). 0.5
 // would round in the |q| domain; less than that lowers the error in the line
 // domain, where the reconstruction's 4/3 power stretches the upper half of
@@ -161,6 +168,90 @@ struct ExtCode {
     return max_abs;
 }
 
+// A band's mean square as the decoder reconstructs it: sign(q) |q|^(4/3) at
+// the band's scale factor's gain (clause 5.1.3), the measure Pseudocodes 22 and
+// 23 take of scaled_spec.
+[[nodiscard]] double reconstructed_mean_square(std::span<const std::int32_t> q, int sf) {
+    const double gain = std::pow(2.0, 0.25 * static_cast<double>(sf - 100));
+    double sum = 0.0;
+    for (const std::int32_t x : q) {
+        const double line = std::pow(static_cast<double>(std::abs(x)), 4.0 / 3.0) * gain;
+        sum += line * line;
+    }
+    return sum / static_cast<double>(q.size());
+}
+
+// Pseudocodes 22 and 23 run forwards over a coded track: the codeword each
+// noise band sends, so that the decoder's noise comes out at the band's own
+// level to the nearest 3 dB step. The level the decoder tracks (previous_rms)
+// starts at that of the first band that has energy, moves to that of each band
+// that has some, and by the delta of each noise band that is not the escape.
+void plan_noise_fill(const Grouped& grouped, CodedTrack& t) {
+    const std::size_t groups = t.cb.size();
+    const auto has_energy = [&](std::size_t g, std::size_t b) { return t.cb[g][b] != 0 && t.max_abs[g][b] > 0; };
+    const auto level_of = [&](std::size_t g, std::size_t b) {
+        const std::size_t begin = t.offset[g][b];
+        const std::size_t end = t.offset[g][b + 1];
+        const std::span<const std::int32_t> q = std::span<const std::int32_t>(t.q).subspan(begin, end - begin);
+        return kLog2E * std::log(reconstructed_mean_square(q, t.sf[g][b]));
+    };
+
+    double previous = 0.0;
+    bool found = false;
+    for (std::size_t g = 0; g < groups && !found; ++g) {
+        for (std::size_t b = 0; b < t.cb[g].size(); ++b) {
+            if (has_energy(g, b)) {
+                previous = level_of(g, b);
+                found = true;
+                break;
+            }
+        }
+    }
+    t.dpcm_snf.assign(groups, {});
+    t.noise_fill = false;
+    t.noise_bits = 0;
+    if (!found) {
+        return;  // no level to be relative to: every band would send the escape
+    }
+    std::size_t bits = 0;
+    bool any = false;
+    for (std::size_t g = 0; g < groups; ++g) {
+        t.dpcm_snf[g].assign(t.cb[g].size(), -1);
+        for (std::size_t b = 0; b < t.cb[g].size(); ++b) {
+            if (has_energy(g, b)) {
+                previous = level_of(g, b);
+                continue;
+            }
+            int index = 0;  // the escape
+            const std::size_t begin = grouped.offset[g][b];
+            const std::size_t end = grouped.offset[g][b + 1];
+            double sum = 0.0;
+            for (std::size_t k = begin; k < end; ++k) {
+                sum += grouped.lines[k] * grouped.lines[k];
+            }
+            const double mean_square = sum / static_cast<double>(end - begin);
+            if (mean_square > 0.0) {
+                const double wanted = kLog2E * std::log(mean_square);
+                const long delta = std::lround(wanted - previous);
+                if (delta >= kNoiseDeltaMin) {
+                    const int step = static_cast<int>(std::min<long>(delta, kNoiseDeltaMax));
+                    index = step + kNoiseOffset;
+                    previous += static_cast<double>(step);
+                    any = true;
+                }
+            }
+            t.dpcm_snf[g][b] = index;
+            bits += tables::kAsfHcbSnfCodes[static_cast<std::size_t>(index)].bits;
+        }
+    }
+    if (any) {
+        t.noise_fill = true;
+        t.noise_bits = bits;
+    } else {
+        t.dpcm_snf.assign(groups, {});
+    }
+}
+
 }  // namespace
 
 std::span<const std::uint16_t> band_offsets(int transform_length) {
@@ -204,7 +295,7 @@ Grouped regroup(std::span<const double> spectrum, const FrameLayout& layout, std
 }
 
 CodedTrack code_track(const Grouped& grouped, const std::vector<std::vector<int>>& sf, int offset,
-                      const FrameLayout& layout) {
+                      const FrameLayout& layout, bool noise_fill) {
     CodedTrack t;
     t.q.assign(grouped.lines.size(), 0);
     t.offset = grouped.offset;
@@ -329,6 +420,9 @@ CodedTrack code_track(const Grouped& grouped, const std::vector<std::vector<int>
             found = true;
             last = t.sf[g][b];
         }
+    }
+    if (noise_fill) {
+        plan_noise_fill(grouped, t);
     }
     return t;
 }
@@ -469,8 +563,20 @@ void write_sf_data(BitWriter& w, const CodedTrack& track, const FrameLayout& lay
             last = track.sf[g][b];
         }
     }
-    // Table 42, without noise fill.
-    w.write(1, 0, "b_snf_data_exists");
+    // Table 42: b_snf_data_exists, then a codeword for each band that has no
+    // energy to send (codebook 0 or max_quant_idx 0), in the same order.
+    w.write(1, track.noise_fill ? 1U : 0U, "b_snf_data_exists");
+    if (!track.noise_fill) {
+        return;
+    }
+    for (std::size_t g = 0; g < groups; ++g) {
+        for (std::size_t b = 0; b < track.cb[g].size(); ++b) {
+            if (track.cb[g][b] == 0 || track.max_abs[g][b] == 0) {
+                write_codeword(w, tables::kAsfHcbSnfCodes, static_cast<std::size_t>(track.dpcm_snf[g][b]),
+                               "asf_snf_hcw");
+            }
+        }
+    }
 }
 
 }  // namespace iclforge::ac4::detail

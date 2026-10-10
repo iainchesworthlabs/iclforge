@@ -1982,6 +1982,14 @@ The sections below contain the complete change list and fixes.
   committed programme fixtures, with MediaInfo's trace, DEE's MP4 and what `ac3cli` and FFmpeg
   make of it. `ac3cli`'s decoder refuses the 23 streams that use transient pre-noise processing,
   whose correction reaches further back than it buffers.
+- **The AC-4 encoder writes spectral noise fill** (`EncoderConfig::experimental.noise_fill`,
+  `forge ac4-encode experimental=noise-fill`). Each scale factor band that quantises to zero sends
+  the level of its own energy, to the nearest 3 dB step, as a delta from the level the decoder
+  tracks (Part 1 clause 5.1.4, Pseudocodes 22 and 23 run forwards), and the decoder fills the band
+  with noise of that level; a band more than 16 steps under it sends the escape. A band that has
+  any quantised line is untouched. The syntax reads back with the trace the encoder recorded, and a
+  test holds the restored band within 2 dB of its source. No stream from another encoder sets
+  `b_snf_data_exists`, so this project's decoder is the only reader. Not mirrored in the C API.
 
 **AC-4 bindings: the C API, Python, Rust and WebAssembly**
 
