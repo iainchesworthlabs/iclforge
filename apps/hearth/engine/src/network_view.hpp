@@ -70,6 +70,16 @@ enum class SinkLink : std::uint8_t {
     kRetrying,
 };
 
+// One PCM format a sink lists in `player@v1_support` (the PCM entries of
+// `supported_formats`; FLAC and Opus are not PCM and are not here).
+struct PcmFormat {
+    std::uint16_t channels = 0;
+    std::uint32_t sample_rate = 0;
+    std::uint16_t bit_depth = 0;
+
+    friend bool operator==(const PcmFormat&, const PcmFormat&) = default;
+};
+
 // What NetworkSinks knows about one discovered player, gathered from mDNS and,
 // once dialled, `client/hello` and `_iclforge_player@v1_support`/
 // `player@v1_support`. A field the sink has not told this run about yet is
@@ -100,6 +110,10 @@ struct SinkFacts {
     // Codecs from whichever support object the sink offers, most preferred
     // first (`supported_formats`' own order).
     std::vector<std::string> codecs{};
+    // The PCM formats `player@v1_support` lists, in its order: what a server can
+    // send this sink as PCM when it cannot play it the stream as it is. Empty
+    // when the sink does not offer the role, or lists no PCM.
+    std::vector<PcmFormat> pcm_formats{};
     // `_iclforge_player@v1_support.outputs`, when the role is offered.
     std::optional<std::uint32_t> output_slots{};
     std::optional<std::uint32_t> output_bit_depth{};

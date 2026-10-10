@@ -23,6 +23,7 @@ add_library(hearth_engine STATIC
     src/queue.cpp
     src/session.cpp
     src/settings_model.cpp
+    src/sink_form.cpp
     src/stream_decoder.cpp
     src/transport.cpp
     src/unit_reports.cpp)

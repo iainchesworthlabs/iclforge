@@ -686,6 +686,13 @@ SinkFacts NetworkSinks::facts_locked(const std::string& instance, const Entry& e
             }
             for (const ss::messages::AudioFormat& format : client.player_support->supported_formats) {
                 facts.codecs.emplace_back(ss::messages::codec_name(format.codec));
+                if (format.codec == ss::messages::Codec::kPcm && format.channels > 0 &&
+                    format.sample_rate > 0 && format.bit_depth > 0) {
+                    facts.pcm_formats.push_back(
+                        {.channels = static_cast<std::uint16_t>(format.channels),
+                         .sample_rate = static_cast<std::uint32_t>(format.sample_rate),
+                         .bit_depth = static_cast<std::uint16_t>(format.bit_depth)});
+                }
             }
         }
         // hearth-testsink names itself in DeviceInfo::product_name;
