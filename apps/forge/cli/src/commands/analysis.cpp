@@ -815,14 +815,17 @@ Ac4Meter ac4_loudness_meter(const iclforge::ac4::DecodedFrame& pcm, bool rendere
             const auto location = ac4_location(s);
             return location ? static_cast<int>(*location) : 99;
         });
-        const auto located_end = std::ranges::find_if(
-            order, [&](std::size_t c) { return !ac4_location(speakers[c]).has_value(); });
-        const bool left_out = located_end != order.end();
-        order.erase(located_end, order.end());
         iclforge::ac3::eac3::chanmap::Layout layout{};
-        for (const std::size_t c : order) {
-            layout.items[static_cast<std::size_t>(layout.count++)] = *ac4_location(speakers[c]);
+        std::size_t located = 0;
+        for (; located < order.size(); ++located) {
+            const auto location = ac4_location(speakers[order[located]]);
+            if (!location.has_value()) {
+                break;
+            }
+            layout.items[static_cast<std::size_t>(layout.count++)] = *location;
         }
+        const bool left_out = located != order.size();
+        order.resize(located);
         return Ac4Meter{.meter = iclforge::ac3::meta::LoudnessMeter{rate, layout},
                         .order = std::move(order),
                         .label = rendered_layout_label(layout),

@@ -97,7 +97,8 @@ constexpr void design_phase(const ResamplerDesign& d, int p, double* row) noexce
     double sum = 0.0;
     for (int k = 0; k < d.taps; ++k) {
         // The distance from the output's position to the tap's input sample.
-        const double t = static_cast<double>(k - d.taps / 2 + 1) -
+        const int whole = k - d.taps / 2 + 1;
+        const double t = static_cast<double>(whole) -
                          static_cast<double>(p) / static_cast<double>(d.up);
         const double x = t / half_width;
         const double window =

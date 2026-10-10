@@ -256,9 +256,9 @@ LoudnessMeter::LoudnessMeter(std::uint32_t sample_rate,
     loudness_slots.reserve(channel_weights.size());
     weights.reserve(channel_weights.size());
     for (std::size_t slot = 0; slot < channel_weights.size(); ++slot) {
-        if (channel_weights[slot].has_value()) {
+        if (const std::optional<double>& weight = channel_weights[slot]; weight.has_value()) {
             loudness_slots.push_back(static_cast<int>(slot));
-            weights.push_back(*channel_weights[slot]);
+            weights.push_back(*weight);
         }
     }
     const int channels = static_cast<int>(channel_weights.size());

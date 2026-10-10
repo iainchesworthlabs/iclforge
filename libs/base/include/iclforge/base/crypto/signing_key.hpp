@@ -9,6 +9,7 @@
 // not baked into the binary.
 
 #include <cstddef>
+#include <cstdint>
 #include <expected>
 #include <optional>
 #include <span>
@@ -45,7 +46,7 @@ private:
 // offered by any source" - so the caller can tell "operator asked to sign but
 // gave no key" (hard error) apart from "no signing requested" (fine, leave the
 // stream unsigned). Anything else is an outright misconfiguration.
-enum class KeyErrorKind {
+enum class KeyErrorKind : std::uint8_t {
     kAbsent,      // no signing-key= path, no env var: nothing to load
     kUnreadable,  // a path was given but could not be opened/read
     kMalformed,   // non-empty contents that look like a botched hex/array
