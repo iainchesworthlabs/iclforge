@@ -220,11 +220,12 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 |---|---|---|---|---|---|
 | **Reader** | BW64/RF64 container | 🟢 | High | Essential | Opt-in (`ICLFORGE_BUILD_ADM`); Boost |
 | | ADM XML — DirectSpeakers + Objects | 🟢 | High | Essential | Including `zoneExclusion`, `objectDivergence`, `screenRef`, `headLocked`; `zoneExclusion` is read from the axml text because libadm does not parse it |
-| | ADM XML — HOA / Binaural / Matrix blocks | 🟡 | Low | Nice-to-have | Parsed as blocks; a Matrix block's coefficients are not (libadm has no model); the bridge refuses all three |
+| | ADM XML — HOA / Binaural / Matrix blocks | 🟢 | Low | Nice-to-have | HOA order, degree, normalization, `nfcRefDist`, `equation`, `screenRef`, `headLocked` and a pack's defaults. A Matrix block whole (output channel, coefficients with gain, phase, delay and variables, `jumpPosition`) and a Matrix pack's encode / decode / input / output references, read from the axml text because libadm skips Matrix blocks. A Binaural block has nothing beyond the common fields. The bridge refuses all three (see Bridge) |
+| | ADM descriptive and interaction metadata | 🔴🔵 | Low | Optional | `audioProgramme` start, end and reference screen, loudness, dialogue, interaction ranges, labels, `headphoneVirtualise`, channel `frequency` and DirectSpeakers position bounds are not in the model, so they are neither read nor written; none reaches an Atmos or AC-4 encode |
 | | Common definitions (Annex A) | 🟢 | Medium | Important | Predefined formats merged |
-| **Writer** | BW64 write | 🟡 | Medium | Important | 16/24/32-bit integer or 32/64-bit float; shapes matching the bridge; `zoneExclusion` written |
-| | Decode → ADM BWF (Atmos master profile) | 🟡 | Medium | Important | Dynamic-object-only programmes; cartesian; zone constraints, divergence value and `screenRef` written |
-| **Bridge** | ADM → Atmos encode | 🟡 | High | Essential | Position, gain, size, snap, zone constraints, divergence value and `screenRef` carried; `headLocked`, `diffuse`, a divergence range and a conditioned `channelLock` listed in `BridgeResult::unmapped` and warned; Matrix / HOA / Binaural refused |
+| **Writer** | BW64 write | 🟢 | Medium | Important | 16/24/32-bit integer or 32/64-bit float; every type the reader produces (DirectSpeakers, Objects, HOA, Binaural, Matrix), polar or cartesian positions, nested `audioObject`s and `audioPackFormat`s, `zoneExclusion`. `kUnknown` and user-custom types have no element and are refused |
+| | Decode → ADM BWF (Atmos master profile) | 🟡🔵 | Medium | Important | E-AC-3 and AC-4: dynamic objects and channel-based-immersive bed programmes; cartesian; zone constraints, divergence value and `screenRef` written. An E-AC-3 programme with ISF objects, a second bed instance, a Table 13 bed assignment or an LFE2 is refused with a warning: each has a channel count and no label, and no stream in hand shows how a renderer places it |
+| **Bridge** | ADM → Atmos encode | 🟡🔵 | High | Essential | Position, gain, size, snap, zone constraints, divergence value and `screenRef` carried; `headLocked`, `diffuse`, a divergence range and a conditioned `channelLock` listed in `BridgeResult::unmapped` and warned, since OAMD has no field for any of them; Matrix / HOA / Binaural refused: none is a positioned mono object, and a matrix decode or an HOA decoder would be written without a file or reference to check it against |
 
 ---
 
@@ -346,8 +347,10 @@ this register is the checklist that those bounds appear here too.
 
 | Clause | Open item | Status |
 |---|---|---|
-| Pack types beyond DirectSpeakers + Objects | Matrix / HOA / Binaural: not representable in the Atmos bridge (refused by design); Matrix coefficients not parsed | 🟡 |
-| Writer / bridge | Narrowed Atmos-master subset; divergence and `screenRef` mapped by reading, since TS 103 420 Annex B has no row for them; no external decoder has rendered either | 🟡 |
+| Pack types beyond DirectSpeakers + Objects | Matrix / HOA / Binaural: read and written, refused by the Atmos bridge (not positioned mono objects) | 🟡🔵 |
+| Matrix element shapes | Read from the standard's sample code (§5.4.3.2.1, §5.5.4.2) and EAR's parser; no ADM file with a Matrix pack from another tool, and no tool that applies one, has been run against them | 🟡🔵 |
+| Descriptive and interaction metadata | `audioProgramme` timing and reference screen, loudness, dialogue, interaction ranges, labels, `headphoneVirtualise`, channel `frequency`, DirectSpeakers position bounds: not in the model | 🔴🔵 |
+| Writer / bridge | Narrowed Atmos-master subset; divergence and `screenRef` mapped by reading, since TS 103 420 Annex B has no row for them; no external decoder has rendered either | 🟡🔵 |
 
 ### AOM IAMF v2.0.0
 

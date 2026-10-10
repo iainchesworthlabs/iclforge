@@ -97,6 +97,35 @@ The sections below contain the complete change list and fixes.
   repeats the previous block's value, and an inactive object no longer has divergence bits read for it.
 - Matrix, HOA and Binaural packs stay refused by the bridge; the documentation now says why.
 
+**ADM / BW64: Matrix, HOA and Binaural both ways, polar positions, nesting, and bed programmes from `decode`**
+
+- **A Matrix channel's blocks and its pack's references are read.** libadm's channel-format parser
+  has the loop that would build a Matrix block commented out, so a Matrix channel came back with no
+  blocks at all, not just no coefficients. `parse_bw64` now reads every block of a Matrix channel
+  whole from the `<axml>` text: the output channel (and the legacy `outputChannelIDRef`),
+  `jumpPosition`, and the `matrix`'s coefficients with gain (and `gainUnit`), phase in degrees,
+  delay in milliseconds and the `*Var` forms (BS.2076-3 Tables A1-15 and A1-16); and a Matrix
+  pack's encode, decode, input and output pack references (Table A1-24). New in `model.hpp`:
+  `MatrixCoefficient`, `AudioBlockFormat::matrix` and `output_channel_format_ref`, and the matching
+  `AudioPackFormat` fields.
+- **An HOA block's `nfcRefDist`, `equation`, `screenRef` and `headLocked`, and an HOA pack's
+  defaults, are read.** libadm reads the pack's three as attributes and the standard has them as
+  sub-elements; both are accepted.
+- **`write_bw64` writes what the reader reads.** Polar positions for Objects and DirectSpeakers
+  blocks; HOA, Binaural and Matrix channels and packs; `audioObject`s and `audioPackFormat`s that
+  nest (a loop is `kInvalidDocument`); and an Objects block's `diffuse`, `importance` and
+  `channelLock` distance, which were read and not written. A value libadm's types refuse (an
+  azimuth past 180 degrees) is `kInvalidDocument`, not an exception. `kUnknown` and user-custom
+  types are still refused. Matrix and HOA completions go into the text once libadm has numbered
+  every element, and the model's references are translated to those IDs.
+- **`forge decode ... adm_out` writes a channel-based-immersive bed programme.** It used to warn
+  and write nothing for any E-AC-3 programme that was not dynamic-object-only. Each bed channel is
+  a `DirectSpeakers` channel named by its Table 12 label at that label's position, the dynamic
+  objects keep their OAMD timelines, and the LFE comes from the decoded bed. ISF objects, a second
+  bed instance, a Table 13 assignment and an LFE2 are still refused, with a warning that says so.
+- The bridge still refuses Matrix, HOA and Binaural packs. Known and accepted gaps are marked in
+  the development status page.
+
 **Associated-service identification, both directions**
 
 - **MPEG-TS's `mainid`/`asvc` now read back, not just write.** `mpegts::demux`/`Reader` decode
@@ -2511,6 +2540,11 @@ The sections below contain the complete change list and fixes.
   installs no file of it and one built with it installs its export and `.pc` file.
 
 ### Fixed
+
+**ADM / BW64**
+
+- **`write_bw64` dropped an `audioObject`'s duration.** `AudioObject::duration` was read and never
+  written, so an object that ran for part of the programme was written as running for all of it.
 
 **Containers**
 
