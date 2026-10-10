@@ -1678,8 +1678,10 @@ The selection is now a stable sort by magnitude over runs already in band order,
 lower band. That is what the MSVC STL had chosen in this frame, so Windows output did not move and
 Linux now equals it; the three gold pins did not move either.
 
-What is still unpinned: `aarch64-neon` for the sixteen (no arm64 leg has run them), and the
-`encfloat` family. The float32 encoder's existing pins no longer match a fresh GCC 16 build of main
+The same sixteen on real arm64 hardware (the Linux GCC leg, libstdc++, CI run 38036705121) are
+byte-identical to the x86-64 ones, so `aarch64-neon/fast` is pinned too. What is still unpinned: the
+macOS leg's libc++ (it did not build that day, an `-Wsign-conversion` error in an IAMF example on
+main), and the `encfloat` family. The float32 encoder's existing pins no longer match a fresh GCC 16 build of main
 (the same three hashes before and after this change), the nightly leg that checks them stops at
 its float32 decode suite before reaching them (the run of 2026-10-09), and that variant does not build
 with Clang 22 (`-Wdouble-promotion` in `eac3_frame.cpp`); neither was investigated here.
