@@ -1614,6 +1614,10 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.hls_fallback_51 = true;
             continue;
         }
+        if (token == "insert") {
+            out.insert_missing = true;
+            continue;
+        }
         if (token == "couple" || token == "heavy" || token == "heavy2" || token == "mixmeta" ||
             token == "keep-partial" || token == "fast-mdct") {
             if (token == "heavy") {
