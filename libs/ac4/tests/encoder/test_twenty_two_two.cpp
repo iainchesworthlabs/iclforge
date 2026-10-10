@@ -486,14 +486,14 @@ TEST_CASE("22.2 decodes with an SNR floor on each pair of Table 21",
         check_frames_read_back(encoded);
         const Decoded full = decode(encoded.frames);
         REQUIRE(full.channels.size() == 24);
-        const std::array<double, 13>& floor =
+        const std::array<double, 13>& floor_db =
             mode == CodecMode::kSimple ? floors.simple : floors.aspx;
         for (std::size_t t = 0; t < all.size(); ++t) {
             CAPTURE(all[t].name);
             for (const std::size_t c : all[t].channels) {
                 const Score s = score(input[c], full.channels[c], kLag);
                 CAPTURE(c, s.snr_db, s.gain_db);
-                CHECK(s.snr_db > floor[t]);
+                CHECK(s.snr_db > floor_db[t]);
                 CHECK(std::abs(s.gain_db) < 1.5);
             }
         }
@@ -607,3 +607,55 @@ TEST_CASE("the encoder refuses the 22.2 configurations it does not write",
     }
 }
 
+
+TEST_CASE("22.2 is the music and effects of a presentation with a mono dialogue substream",
+          "[ac4][encoder][twenty-two-two]") {
+    // Part 2 Table 53's configuration 0: the 22.2 substream and a mono dialogue
+    // one, 23 tracks and the LFEs, so md_compat 7; the decoder mixes the dialogue
+    // into the 22.2 layout's centre.
+    const std::vector<Channel> channels = layout();
+    iclforge::ac4::EncoderConfig config = config_at(1536, CodecMode::kSimple);
+    config.channels = 24;
+    config.substreams = {
+        {.channels = 24, .content = iclforge::ac4::ContentClassifier::kMusicAndEffects},
+        {.channels = 1, .content = iclforge::ac4::ContentClassifier::kDialogue, .language = "en"},
+    };
+    config.presentations = {{.config = 0, .substreams = {0, 1}}};
+    std::vector<std::vector<float>> input = tones(channels);
+    input.push_back(tone(1019.0, kSamples));
+    const Encoded encoded = encode(config, input);
+    check_frames_read_back(encoded);
+    const Decoded full = decode(encoded.frames);
+    REQUIRE(full.channels.size() == 24);
+    // The 22.2 tones come back on their channels, 23 of them untouched by the
+    // dialogue: the centre carries it as well.
+    for (std::size_t c = 0; c < channels.size(); ++c) {
+        if (channels[c].speaker == Speaker::kCentre) {
+            continue;
+        }
+        CAPTURE(c);
+        CHECK(std::abs(db(level(full.channels[c], channels[c].hz))) < 0.2);
+    }
+    CHECK(level(full.channels[2], 1019.0) > 0.5);
+}
+TEST_CASE("22.2 carries the loudness, DRC and dialnorm metadata the other layouts do",
+          "[ac4][encoder][twenty-two-two]") {
+    // The presentation substream's fields do not depend on the layout but for
+    // loud_corr() and custom_dmx_data(), which 22.2's channel mode reads as a
+    // 5.X or larger one's (Part 2 Pseudocodes 25 and 26's pres_ch_mode 15).
+    iclforge::ac4::EncoderConfig config = config_at(1536, CodecMode::kSimple);
+    config.dialnorm_db = -24.0;
+    iclforge::ac4::FurtherLoudness loudness;
+    loudness.practice = iclforge::ac4::LoudnessPractice::kEbuR128;
+    loudness.integrated_lkfs = -23.0;
+    loudness.loudness_range_lu = 8.0;
+    loudness.max_true_peak_dbtp = -1.0;
+    config.loudness = loudness;
+    config.drc = iclforge::ac4::DrcConfig{.profile = iclforge::ac4::DrcProfile::kFilmStandard};
+    config.iframe_interval = 3;
+    const std::vector<Channel> channels = layout();
+    const Encoded encoded = encode(config, tones(channels));
+    check_frames_read_back(encoded);
+    CHECK(count_records(encoded, "dialnorm_bits", 96) > 0U);
+    check_routing(channels, decode(encoded.frames));
+}

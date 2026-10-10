@@ -474,9 +474,9 @@ struct ObjectMetadataUpdate {
 struct SubstreamConfig {
     // Its input channels, in the order EncoderConfig::channels takes them: 1,
     // 2, 5, 6, 9 or 10; 7 or 8 with experimental.seven_x; 11 or 12 with
-    // experimental.back_pair; and 3, L R C, with experimental.three_zero, which
-    // Part 1 clause 4.3.3.7.1 allows only for the dialogue of a music and
-    // effects presentation.
+    // experimental.back_pair; 24, 22.2, with experimental.twenty_two_two; and
+    // 3, L R C, with experimental.three_zero, which Part 1 clause 4.3.3.7.1
+    // allows only for the dialogue of a music and effects presentation.
     int channels = 2;
     // Its share of the stream's rate; unset shares what the set ones leave in
     // proportion to the full-band channels.
