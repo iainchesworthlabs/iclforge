@@ -222,11 +222,30 @@ with a fine-grained PAT (read-only, "Administration: read") added as a repo
 secret named `SCORECARD_READ_TOKEN`; without it, that one sub-check just
 degrades gracefully instead of failing.
 
-## Dependabot auto-merge
+## Dependabot pull requests
 
-`dependabot-auto-merge.yml` only flips the auto-merge bit on a Dependabot PR
-(non-major bumps only); GitHub still won't merge it until every required
-check above passes. It needs no extra configuration beyond the branch
-protection rule itself - once `Branch Name`, `CI Status` and
-`Scan dependency diff` are required on `main`, auto-merge is safe to
-enable repo-wide in **Settings → General → Pull Requests → Allow auto-merge**.
+`dependabot-auto-merge.yml` flips the auto-merge bit on a routine (non-major)
+Dependabot PR; GitHub then puts it in the merge queue once every required check
+above passes, and the queue runs them again on the merged tree. Auto-merge has to
+be allowed repo-wide in **Settings → General → Pull Requests → Allow auto-merge**.
+
+The bit has to be set with a person's token, not the Actions `GITHUB_TOKEN`.
+Set by `GITHUB_TOKEN` it is inert under the merge queue: green Dependabot PRs sat
+unmerged for days with it on. And a queue entry created with `GITHUB_TOKEN` gets
+no `merge_group` run, so it would hang until the 180-minute check timeout and
+hold up the entries behind it. The workflow therefore reads the secret
+`MERGE_QUEUE_TOKEN`:
+
+- Create a fine-grained personal access token for this repository only, with
+  **Contents** and **Pull requests** read and write, and an expiry you will
+  remember.
+- Store it under **Settings → Secrets and variables → Dependabot** as
+  `MERGE_QUEUE_TOKEN`. A Dependabot-triggered run reads that store, not the
+  Actions one.
+- Without it the job warns (`MERGE_QUEUE_TOKEN is not set`) and falls back to
+  `GITHUB_TOKEN`, so the PR stays unmerged. When the token expires the same
+  warning appears or `gh pr merge` fails: a run of Dependabot PRs that stop
+  merging means rotating it.
+
+A conflict is Dependabot's to rebase (`rebase-strategy` in
+`.github/dependabot.yml`), and the push runs the gate and this workflow again.

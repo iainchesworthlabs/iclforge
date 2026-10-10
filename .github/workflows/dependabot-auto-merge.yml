@@ -3,10 +3,24 @@
 # aqualink-automate's .github/workflows/dependabot-auto-merge.yml.
 #
 # How it works: this job only flips the PR's auto-merge bit - GitHub itself
-# then merges (squash) once every REQUIRED status check passes. The required
-# checks on main are "Branch Name" and "CI Status" (ci.yml) plus
+# then puts the PR in the merge queue once every REQUIRED status check passes,
+# and the queue merges it after running them again on the merged tree. The
+# required checks on main are "Branch Name" and "CI Status" (pr-gate.yml) plus
 # "Scan dependency diff" (dependency-review.yml) - see .github/branch-protection.md.
-# Nothing merges without the full build/test matrix going green.
+#
+# WHOSE token flips the bit matters, and it has to be a person's. The Actions
+# GITHUB_TOKEN sets the bit, but GitHub never takes the PR into the queue on
+# its strength: nine green Dependabot PRs sat unmerged, some for six days,
+# before anyone noticed. Adding a PR to the queue with that token yourself is
+# worse: GitHub starts no merge_group run for an entry a GITHUB_TOKEN created
+# (tested on #1212, 2026-10-10: the entry was created, PR Gate and Dependency
+# Review never started, and it would have waited out the 180-minute check
+# timeout with everything behind it). So the bit is set with MERGE_QUEUE_TOKEN,
+# a fine-grained personal access token for this repository only (Contents and
+# Pull requests: read and write), stored under Settings > Secrets and variables
+# > DEPENDABOT - a Dependabot-triggered run reads that store, not the Actions
+# one. Without it the job falls back to GITHUB_TOKEN and warns, which leaves
+# the PR unmerged, as before.
 #
 # osv-scanner.yml, zizmor.yml and scorecard.yml are all visible-only
 # (upload to Security > Code scanning, never gate a PR - see each workflow's
@@ -40,7 +54,20 @@ jobs:
 
       - name: Enable auto-merge (non-major updates only)
         if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        shell: bash
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr merge --auto --squash "$PR_URL"
+          # A person's token, so that GitHub queues the PR as that person: see the
+          # header. Both are passed in and the choice is made below, so that a
+          # missing secret is a warning instead of an empty GH_TOKEN.
+          MERGE_QUEUE_TOKEN: ${{ secrets.MERGE_QUEUE_TOKEN }}
+          ACTIONS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "$MERGE_QUEUE_TOKEN" ]; then
+            export GH_TOKEN="$MERGE_QUEUE_TOKEN"
+          else
+            echo "::warning title=MERGE_QUEUE_TOKEN is not set::Auto-merge is enabled with the Actions token, which the merge queue does not act on, so this pull request will not merge by itself. Add MERGE_QUEUE_TOKEN as a Dependabot secret; the header of this workflow says how."
+            export GH_TOKEN="$ACTIONS_TOKEN"
+          fi
+          gh pr merge --auto --squash "$PR_URL"
