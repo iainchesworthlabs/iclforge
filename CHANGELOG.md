@@ -29,6 +29,20 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**IAMF: scalable channel reconstruction and the expanded layouts**
+
+- **`decode_pcm()` rebuilds scalable channel audio.** An Audio Element of up to six layers is
+  reconstructed as section 7.2 describes: each Channel Group's output gain, the surround and height
+  de-mixers driven by the frame's `dmixp_mode` and `wIdx(k)` (or the definition's defaults), and the
+  recon gain with its moving average and Hann overlap. `DecodeOptions::layer` picks the layer (the full
+  layout when unset) and `apply_recon_gain` switches the recon gain off.
+- **`reconstruct_channels()` serves the other codecs.** Opus, AAC-LC and FLAC are still not decoded
+  here; a caller decodes each Audio Substream and hands the planar PCM over, and gets the same
+  reconstruction, trimming included.
+- **The expanded loudspeaker layouts read.** `expanded_layout_info()` lists the 20
+  `expanded_loudspeaker_layout` values (9.1.6ch, 10.2.9.3ch, 7.1.5.4ch and their subsets) with the
+  substream order of 3.6.2.3, and `decode_pcm()` decodes a single-layer element in any of them.
+
 **IAB (SMPTE ST 2098-2): lossless audio, a writer, and spread and zones in the bridge**
 
 - **`AudioDataDLC` decodes.** `iclforge::iab::decode_dlc()` implements Annex B: the lattice

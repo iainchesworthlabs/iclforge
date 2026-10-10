@@ -243,7 +243,9 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | Fragmented / live writer | 🟢 | Low | Nice-to-have | `FragmentedWriter` |
 | **Reader** | OBU / file reader | 🟢 | Low | Nice-to-have | `read_sequence()`, `read_isobmff()` (files and fragments), `decode_pcm()` for `ipcm` |
 | | Opus / AAC-LC / FLAC encode | 🔴 | Low | Nice-to-have | Carried and parsed, not produced |
-| | Scalable channel layer reconstruction | 🔴 | Low | Nice-to-have | Demixing and recon gain are not applied by `decode_pcm()` |
+| | Scalable channel layer reconstruction | 🟢 | Low | Nice-to-have | Gain, De-mixer and Recon Gain of §7.2 for up to six layers, in `decode_pcm()` (`ipcm`) and `reconstruct_channels()` (substreams a caller decoded); no external oracle for the reconstruction |
+| | Expanded loudspeaker layouts (`loudspeaker_layout` 15) | 🟢 | Low | Nice-to-have | `expanded_layout_info()` and `decode_pcm()` for `expanded_loudspeaker_layout` 0–19 |
+| | Rendering an Audio Element to a playback layout, and mixing (§7.4) | 🔴🔵 | Low | Optional | The specification leaves the algorithms to the Open Audio Renderer; the module returns reconstructed channels, Parameter Blocks and Mix Presentations as data and renders nothing. Decision: the IAMF row of [Roadmap](../roadmap.md) |
 
 ---
 
@@ -359,7 +361,7 @@ this register is the checklist that those bounds appear here too.
 | Clause | Open item | Status |
 |---|---|---|
 | Codec Specific | Encoding Opus, AAC-LC and FLAC | 🔴 |
-| Processing | Reconstruction of scalable channel layers and rendering | 🔴 |
+| Processing | Rendering to a playback layout and mixing (§7.4): the Open Audio Renderer's algorithms | 🔴🔵 |
 | ISO-BMFF | Common Encryption; more than one IA track | 🔴 |
 
 ### Carriage (Annex F, IEC 61937, MPEG-TS, HLS, DASH)
