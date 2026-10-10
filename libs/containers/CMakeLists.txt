@@ -44,6 +44,7 @@ if(ICLFORGE_BUILD_IAMF)
     list(APPEND _containers_sources
         src/iamf/container.cpp
         src/iamf/iamf.cpp
+        src/iamf/reconstruct.cpp
         src/iamf/sequence_common.cpp
         src/iamf/sequence_read.cpp
         src/iamf/sequence_write.cpp)
