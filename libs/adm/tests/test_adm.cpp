@@ -1882,6 +1882,33 @@ TEST_CASE("write_bw64 writes nested audioObjects and audioPackFormats", "[adm][w
     CHECK(it->pack_format_refs.size() == 1);
 }
 
+TEST_CASE("write_bw64 writes an audioObject's start and duration", "[adm][write]") {
+    auto document = objects_document({std::nullopt, std::nullopt});
+    document.model.objects[0].start_s = 1.5;
+    document.model.objects[0].has_duration = true;
+    document.model.objects[0].duration_s = 2.25;
+    // Object 1 has no duration: the schema's absent (the programme's own), not a duration of zero.
+    document.model.objects[1].start_s = 0.5;
+
+    const auto path = (write_scratch_dir("adm_write_object_time") / "time.wav").string();
+    REQUIRE(iclforge::adm::write_bw64(path, document).has_value());
+    const auto parsed = iclforge::adm::parse_bw64(path);
+    REQUIRE(parsed.has_value());
+    const auto object_named = [&](std::string_view name) -> const iclforge::adm::AudioObject& {
+        const auto it =
+            std::ranges::find(parsed->model.objects, name, &iclforge::adm::AudioObject::name);
+        REQUIRE(it != parsed->model.objects.end());
+        return *it;
+    };
+    const auto& first = object_named("Object 0");
+    CHECK(first.start_s == Catch::Approx(1.5));
+    REQUIRE(first.has_duration);
+    CHECK(first.duration_s == Catch::Approx(2.25));
+    const auto& second = object_named("Object 1");
+    CHECK(second.start_s == Catch::Approx(0.5));
+    CHECK_FALSE(second.has_duration);
+}
+
 TEST_CASE("write_bw64 refuses nesting that loops", "[adm][write]") {
     const auto objects = GENERATE(true, false);
     INFO((objects ? "audioObjects" : "audioPackFormats"));

@@ -870,6 +870,11 @@ std::expected<BuiltDocument, AdmWriteError> build_libadm_document_unchecked(
         if (object.start_s != 0.0) {
             libadm_object->set(::adm::Start(seconds_to_time(object.start_s)));
         }
+        // §5.6.1, Table A1-26: absent means the audioProgramme's own duration, which is not the
+        // same as a duration of zero, so only a duration the model carries is written.
+        if (object.has_duration) {
+            libadm_object->set(::adm::Duration(seconds_to_time(object.duration_s)));
+        }
         for (const auto& ref : object.pack_format_refs) {
             const auto resolved = resolve(pack_formats_by_id, ref);
             if (!resolved) {
