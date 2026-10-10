@@ -1863,7 +1863,10 @@ at the sample their input samples do, to within 32 samples, in both codings; a s
 for byte the first; and the encoder's trace, the decoder's and the Python parser's agree on the four
 committed streams (`testdata/ac4/objects/encoder-*.ac4`, with their digests) and on the
 encoder-space harness's object draws. MediaInfo's reading of the object count and the bed
-(`tools/checks/check_ac4_encode_readers.py --only objects`) needs DEE's install. Whether the objects
+(`tools/checks/check_ac4_encode_readers.py --only objects`, which needs MediaInfo from DEE's
+install) reads the four committed streams as configured, run on 2026-10-10 against MediaInfoLib
+26.05: 8 objects for the A-JOC stream over a computed downmix, 7 with its static 5.1 bed named, 6
+with two bed objects, and 5 for the direct-coded stream. Whether the objects
 move as their metadata says is the listener's to hear, from the streams the test writes with
 `AC4_ENCODER_WRITE_LISTENING` set.
 
