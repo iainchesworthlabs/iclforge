@@ -17,7 +17,12 @@ bitstream surface this repository owns — the companion to
 Update those first; refresh the matching row here so the status table stays a summary rather than
 a second capability record.
 
-**Legend:** 🟢 Completed • 🟡 Partial / in progress • 🔴 Not started / refused / out of scope
+**Legend:** 🟢 Completed • 🟡 Partial / in progress • 🔴 Not started / refused / out of scope •
+🔵 Known and accepted gap
+
+A 🔵 follows 🟡 or 🔴 where the rest of the row will not be implemented, and the note says why:
+🟡🔵 is a partial row whose remainder is accepted, 🔴🔵 a surface that is not implemented and
+will not be. A row with no 🔵 is open work.
 
 Statuses describe the *bitstream and API surface*, not application polish. A green row can still
 carry a note about an oracle gap, an intentional `auto` exclusion, or an interoperability caveat —
@@ -377,4 +382,5 @@ this register is the checklist that those bounds appear here too.
 
 - **🟡 Partial** means the feature exists with a documented bound (parser narrower than commercial streams, syntax without PCM, branch not merged, intentional `auto` exclusion called out elsewhere). The bound is the note; the prose is in [Capabilities](capabilities.md).
 - **🔴 Not started / refused / out of scope** means no implementation on `main` for that specification surface, or an explicit refuse. Roadmap IDs in the notes point at [Roadmap](../roadmap.md) where one exists.
+- **🔵 Known and accepted gap** is added to a 🟡 or 🔴 when the remainder will not be implemented: a decision recorded in the plan or the roadmap, a surface no stream or reader outside the project exercises, or a limit of the standard's own text. 🟡🔵 and 🔴🔵 rows are not work in progress; the note gives the reason and where the decision is recorded. Moving a 🔵 row back to open work means removing the 🔵 and the decision behind it.
 - Oracle and hardware gaps are **not** red features by themselves. A completed encoder whose only external decoder is this project's own is still 🟢, with the gap recorded under [Validation](../verification.md) and noted in the standards register where useful.
