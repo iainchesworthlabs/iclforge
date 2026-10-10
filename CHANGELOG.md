@@ -2920,6 +2920,17 @@ The sections below contain the complete change list and fixes.
 
 **Codec correctness**
 
+- **The AC-3 and E-AC-3 encoder chose different delta bit allocation segments on Windows and Linux.**
+  When more than eight runs of corrections qualified for a block, `choose_delta_segments` kept
+  the eight largest by `std::nth_element`; a correction's magnitude has four values, so the eight were
+  chosen among equals, and libstdc++ and the MSVC STL pick differently. One frame in 938 of a 30 s
+  stereo music clip (192 kbit/s, coupling on) came out different between the MSVC and clang-cl
+  builds and the GCC and Clang ones. It is now a stable sort by magnitude, so ties go to the lower
+  band: what the MSVC STL had chosen, so Windows output is unchanged. The bitstream-hash gate
+  pins sixteen more streams for it (the CC0 music and speech programmes through coupling, SPX, AHT,
+  `search=distortion`, enhanced coupling, transient pre-noise and VBR, and the synthetic 5.1
+  through SPX, AHT and `all`), identical on four toolchains.
+
 - **AC-4 applies an alternative presentation's target loudness correction and the real-time loudness correction.** Part 2 clauses 4.8.5.4 and 4.8.5.5 say a decoder "shall" apply both, and the decoder read `loud_corr_target` and `rtll_comp` and did nothing with them. An alternative presentation's output now takes 2^(target_corr_gain / 6) for the device category it plays on (Table 67, from the layout that comes out by Table 17, or `OutputConfig::target_device`, with Table 17's fallbacks for a category no target specifies), and a frame that sends `rtll_comp` takes 10^((rtll_comp - 128) / 80) of its output; both scale every channel, as coded or downmixed, and belong to the frame that sends them. The real-time value is reported as `LoudnessInfo::real_time_correction_db`. Every committed stream that sends `rtll_comp` (DEE's legs) sends 128, 0 dB, so none of their output changes; no committed stream sends a `loud_corr_target`, and the target correction is held to its formula in `libs/ac4/tests/decoder/test_downmix.cpp` (`libs/ac4/ERRATA.md`, "Alternative and real-time loudness correction").
 - **A float decode ignored `DecoderConfig::fast_imdct = false`.** A full build configured with
   `ICLFORGE_DECODE_SCALAR=float` ran the fast inverse transform whatever the setting, so the

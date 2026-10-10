@@ -154,7 +154,7 @@ scheduled workflows are separate.
 |---|---|---|
 | The Catch2 suites, the example programs and the Qt Quick tests (`ctest`); the AC-4 tests named in the AC-4 section are among them, apart from those that read local streams | AC-3, E-AC-3, AC-4 | Gate, queue, after a merge, nightly |
 | The unit tests of the oracle scripts (`tools/checks`, `tools/ci`), which include the AC-4 syntax digests and presentation tables | all | The gate's static job |
-| The gold-reference gate, `tools/checks/verify_gold_reference.sh`: our decode against FFmpeg's, per-channel floors, the committed DEE and FFmpeg streams, the cross-platform bitstream hashes | AC-3, E-AC-3 | Gate on Linux GCC, queue on Windows MSVC, up to six legs after a merge, nine nightly |
+| The gold-reference gate, `tools/checks/verify_gold_reference.sh`: our decode against FFmpeg's, per-channel floors, the committed DEE and FFmpeg streams, the cross-platform bitstream hashes (three gold streams and sixteen real-programme ones) | AC-3, E-AC-3 | Gate on Linux GCC, queue on Windows MSVC, up to six legs after a merge, nine nightly |
 | FFmpeg Validate: the codec matrix, the metadata and coupling checks, `quality_race.py ci`, the encoder-space searches, and the AC-4 scorers (`score_ac4_decode.py`, `score_ac4_encode.py`, `gain_ac4_decode.py`, `mix_ac4_decode.py`, `check_ac4_decode_scalar_snr.py`) | all | Nightly, and on request (the `ci:deep` label, `gh workflow run ci.yml`) |
 | Hearth's engine against the AC-4 gain formulas (`gain_ac4_decode.py --engine`) | AC-4 | After a merge, nightly |
 | The ASan + UBSan leg with the codec matrix, and the TSan leg | all | Nightly |
