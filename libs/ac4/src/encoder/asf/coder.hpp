@@ -50,18 +50,35 @@ struct CodedTrack {
     std::vector<std::vector<int>> sf;                 // per group and band; used where transmitted
     std::vector<std::vector<std::int32_t>> max_abs;   // max_quant_idx, per group and band
     std::vector<std::vector<Section>> sections;       // per group
+    // asf_snf_data() (Table 42): b_snf_data_exists, and per group and band the
+    // dpcm_snf codeword index (delta + 17, 0 the escape: no noise, the level
+    // not moved) of each band that has one (codebook 0 or max_quant_idx 0).
+    // `noise_fill` false leaves it a single zero bit.
+    bool noise_fill = false;
+    std::vector<std::vector<int>> dpcm_snf;           // per group and band
     std::size_t section_bits = 0;
     std::size_t spectral_bits = 0;
     std::size_t scalefac_bits = 0;
-    [[nodiscard]] std::size_t bits() const noexcept { return section_bits + spectral_bits + scalefac_bits + 1; }
+    std::size_t noise_bits = 0;                       // the dpcm_snf codewords
+    [[nodiscard]] std::size_t bits() const noexcept {
+        return section_bits + spectral_bits + scalefac_bits + noise_bits + 1;
+    }
 };
 
 // Quantises with each band's scale factor plus `offset`, clamped to 0 to 255
 // and to the deltas Table A.1 can send, and chooses codebooks and sections by
 // their exact cost. `sf` is per group and band. A band whose lines all
 // quantise to zero takes codebook 0 and sends no scale factor.
+//
+// With `noise_fill`, each such band (and each band of a codebook that quantised
+// to zeros) sends a noise level (Part 1 clause 5.1.4, Pseudocodes 22 and 23
+// run forwards): the band's own energy in the nearest 3 dB step, as a delta from
+// the level the decoder tracks, which is that of the last band with energy or
+// noise before it, or of the first band with energy for those that come
+// ahead of it. A band quieter than 16 steps under that level, or a track
+// with no band that has energy, sends the escape and no noise.
 [[nodiscard]] CodedTrack code_track(const Grouped& grouped, const std::vector<std::vector<int>>& sf, int offset,
-                                    const FrameLayout& layout);
+                                    const FrameLayout& layout, bool noise_fill = false);
 
 // asf_transform_info() and asf_psy_info(0, 0) (Tables 37 and 38).
 void write_sf_info(BitWriter& w, const FrameLayout& layout, std::array<int, 2> max_sfb);
@@ -75,7 +92,8 @@ void write_sf_info_dual(BitWriter& w, const FrameLayout& layout, std::array<int,
 [[nodiscard]] std::size_t sf_info_bits(const FrameLayout& layout, std::array<int, 2> max_sfb);
 
 // sf_data(ASF): asf_section_data(), asf_spectral_data(), asf_scalefac_data()
-// and asf_snf_data() without noise fill (Tables 36 and 39 to 42).
+// and asf_snf_data() (Tables 36 and 39 to 42), with the noise levels
+// CodedTrack::dpcm_snf holds where `noise_fill` is set.
 void write_sf_data(BitWriter& w, const CodedTrack& track, const FrameLayout& layout);
 
 }  // namespace iclforge::ac4::detail

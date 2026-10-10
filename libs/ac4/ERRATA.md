@@ -2438,6 +2438,35 @@ decoder takes them in `libs/ac4/src/decoder/pcm/renderer.cpp` and `downmix.cpp`,
 - **Evidence:** Text. DEE's legs send no correction for an immersive output (`b_corr_for_immersive_out`
   0).
 
+#### Alternative and real-time loudness correction
+
+- **Where:** Part 2 4.8.5.4, p. 52: when an alternative presentation is decoded, "a target-specific
+  loudness correction shall be applied", 2^(target_corr_gain / 6), with the factor "specified for the
+  target-device category (see table 67) that matches the playback device" and Table 17's fallbacks for
+  categories no target specifies; 6.3.3.1.12, p. 168, reads target_corr_gain from `loud_corr_target` as
+  (15 - x) / 2 dB2 and 31 as 0 dB2. 4.8.5.5, p. 52: "when real-time loudness correction data
+  rtll_comp_gain is present in the bitstream" it "shall be applied" as 10^(rtll_comp_gain / 20), and
+  6.3.8.2.2, p. 182, has rtll_comp_gain = (rtll_comp - 128) / 4 dB. The text does not say which device
+  "matches the playback device", which of several targets that name one category counts, whether either
+  value holds from frame to frame, or where either falls against DRC.
+- **Reading:** the device is the system's (`OutputConfig::target_device`) or, unset, Table 17's column
+  for the layout that comes out: stereo 1D, 5.X and 7.X 2D, and a layout with height channels 3D (9.X.4
+  as coded included); a mono output and any layout the table does not list, 22.2 included, take none, and
+  portable is only what the system says. A category takes the correction of the first target, in the
+  order they were sent, that names it and sends a `loud_corr_target`; one no target gives takes the
+  first of Table 17's fallbacks that has one (1D: 2D, 3D; 2D: 3D, 1D; 3D: 2D, 1D; portable none).
+  `loud_corr_target` 31 is a specified 0 dB2 and ends the search. Both corrections are the frame's own:
+  the presentation substream sends its targets and `b_further_loudness_info` in every frame, and
+  real-time data that a frame does not send is not in force, so the frame after one that sent them has
+  none, where the downmix's loudness corrections hold until updated. They scale every channel that comes
+  out, as coded or downmixed, and the downmix's own correction applies as well. They are made in the
+  downmix stage, which is after DRC here ("Where the downmix runs"); the text's order is before it, and
+  the two differ only in what a compression curve's level detector measures.
+- **Evidence:** Text; `libs/ac4/tests/decoder/test_downmix.cpp` holds each rule to its formula. DEE's
+  streams send `rtll_comp` 128, 0 dB, in every frame, so the correction changes none of them; no
+  committed stream sends a `loud_corr_target` (the encoder writes none), so no stream has checked the
+  target correction.
+
 #### The renderer's two-channel output
 
 - **Where:** Part 2 Table 34, p. 104, and Table 44, p. 107, render to 5.X.0 at the narrowest; Part 1

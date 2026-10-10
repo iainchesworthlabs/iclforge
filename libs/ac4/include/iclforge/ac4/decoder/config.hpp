@@ -73,6 +73,16 @@ enum class DrcMode : std::uint8_t {
 
 [[nodiscard]] ICLFORGE_AC4_EXPORT std::string_view describe(DrcMode mode);
 
+// Part 2 Table 67's target device categories, which an alternative
+// presentation's targets name and clause 4.8.5.4 chooses a loudness correction
+// by.
+enum class TargetDevice : std::uint8_t {
+    k1D,        // stereo speakers
+    k2D,        // 5.1 speakers
+    k3D,        // speakers with height channels
+    kPortable,  // portable speakers
+};
+
 // The controls of planning/ac4.md's "One control for both formats" that act on
 // the decoded channels. Decoder::set_output() changes them from the next frame.
 // Every field has a default, so a designated initializer names only the fields
@@ -109,6 +119,13 @@ struct OutputConfig {
     // g_assoc of Part 1 clause 6.2.16.2, in dB, 0 or less: the level of a
     // presentation's associated audio. Below -120 dB it is silent.
     double associated_gain_db = 0.0;
+    // The category of the device the output plays on (Part 2 Table 67), by
+    // which an alternative presentation's target loudness correction is
+    // chosen (clause 4.8.5.4). Unset takes Table 17's by the layout that comes
+    // out: stereo is 1D, 5.X and 7.X 2D, and a layout with height channels 3D.
+    // kPortable is never inferred, and a mono output or any layout Table 17
+    // does not list takes no correction.
+    std::optional<TargetDevice> target_device{};
 };
 
 // --- Presentations -----------------------------------------------------------

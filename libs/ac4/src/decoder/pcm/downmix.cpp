@@ -58,6 +58,39 @@ using Mix = std::vector<double>;
     return true;
 }
 
+// Part 2 Table 67: category t's bit in the four target_device_category bits, index 0 the first
+// bit read and so the high one (Table 67 order, TargetDevice's).
+constexpr std::array<int, 4> kCategoryBit = {0b1000, 0b0100, 0b0010, 0b0001};
+
+// Clause 4.8.5.4: each category's loud_corr_target from the targets, the first target that names
+// the category and sends one, and for a category none gives, Table 17's fallbacks in order
+// (1D: 2D, 3D; 2D: 3D, 1D; 3D: 2D, 1D; portable: none).
+[[nodiscard]] TargetCorrections target_corrections(std::span<const PresentationTarget> targets) {
+    TargetCorrections specified{};
+    for (std::size_t category = 0; category < kCategoryBit.size(); ++category) {
+        for (const PresentationTarget& target : targets) {
+            if ((target.target_device_category & kCategoryBit[category]) != 0 &&
+                target.loud_corr_target) {
+                specified[category] = target.loud_corr_target;
+                break;
+            }
+        }
+    }
+    constexpr std::array<std::array<std::size_t, 3>, 3> kFallback = {
+        {{0, 1, 2}, {1, 2, 0}, {2, 1, 0}}};
+    TargetCorrections out{};
+    out[3] = specified[3];
+    for (std::size_t category = 0; category < kFallback.size(); ++category) {
+        for (const std::size_t from : kFallback[category]) {
+            if (specified[from]) {
+                out[category] = specified[from];
+                break;
+            }
+        }
+    }
+    return out;
+}
+
 }  // namespace
 
 double centre_mix_gain(int code) noexcept {
@@ -98,10 +131,19 @@ DownmixValues downmix_values(const PresentationSubstream* presentation, const Me
         if (presentation->custom_dmx_data.b_cdmx_data_present) {
             values.cdmx = presentation->custom_dmx_data;
         }
-    } else if (metadata.basic.stereo_dmx_coeff) {
-        values.coeff = metadata.basic.stereo_dmx_coeff;
-        values.loro_loud_corr = metadata.basic.stereo_dmx_coeff->loro_dmx_loud_corr;
-        values.ltrt_loud_corr = metadata.basic.stereo_dmx_coeff->ltrt_dmx_loud_corr;
+        values.target_corr = target_corrections(presentation->targets);
+        if (presentation->further_loudness_info) {
+            values.rtll_comp = presentation->further_loudness_info->rtll_comp;
+        }
+    } else {
+        if (metadata.basic.stereo_dmx_coeff) {
+            values.coeff = metadata.basic.stereo_dmx_coeff;
+            values.loro_loud_corr = metadata.basic.stereo_dmx_coeff->loro_dmx_loud_corr;
+            values.ltrt_loud_corr = metadata.basic.stereo_dmx_coeff->ltrt_dmx_loud_corr;
+        }
+        if (metadata.basic.further_loudness_info) {
+            values.rtll_comp = metadata.basic.further_loudness_info->rtll_comp;
+        }
     }
     return values;
 }
@@ -197,7 +239,52 @@ void DownmixStage::reset() {
         value->reset();
     }
     cdmx_.reset();
+    rtll_comp_.reset();
+    target_corr_ = {};
     rebuild();
+}
+
+std::optional<TargetDevice> DownmixStage::playback_device() const {
+    if (device_) {
+        return device_;
+    }
+    // Table 17: stereo is 1D, 5.X and 7.X are 2D, and the layouts with height channels are 3D. The
+    // 22.2 layout's own channels, mono and every other layout are not listed.
+    const auto has = [this](Speaker s) {
+        return std::ranges::find(out_speakers_, s) != out_speakers_.end();
+    };
+    constexpr std::array<Speaker, 8> kTwentyTwoTwo = {
+        Speaker::kTopFrontCentre,    Speaker::kTopCentre,
+        Speaker::kTopBackCentre,     Speaker::kCentreBack,
+        Speaker::kBottomFrontLeft,   Speaker::kBottomFrontRight,
+        Speaker::kBottomFrontCentre, Speaker::kLfe2};
+    if (std::ranges::any_of(kTwentyTwoTwo, has)) {
+        return std::nullopt;
+    }
+    if (out_speakers_.size() == 2 && has(Speaker::kLeft) && has(Speaker::kRight)) {
+        return TargetDevice::k1D;
+    }
+    if (!has(Speaker::kLeft) || !has(Speaker::kRight) || !has(Speaker::kCentre) ||
+        !has(Speaker::kLeftSurround) || !has(Speaker::kRightSurround)) {
+        return std::nullopt;
+    }
+    constexpr std::array<Speaker, 6> kHeight = {Speaker::kTopFrontLeft, Speaker::kTopFrontRight,
+                                                Speaker::kTopBackLeft,  Speaker::kTopBackRight,
+                                                Speaker::kTopSideLeft,  Speaker::kTopSideRight};
+    return std::ranges::any_of(kHeight, has) ? TargetDevice::k3D : TargetDevice::k2D;
+}
+
+double DownmixStage::corrections() const {
+    double gain = 1.0;
+    if (const std::optional<TargetDevice> device = playback_device()) {
+        // Clause 4.8.5.4: 2^(target_corr_gain / 6), the code read as loud_corr_target is.
+        gain *= loud_corr_gain(target_corr_[static_cast<std::size_t>(*device)]);
+    }
+    if (rtll_comp_) {
+        // Clauses 6.3.8.2.2 and 4.8.5.5: rtll_comp_gain = (rtll_comp - 128) / 4 dB, 10^(g / 20).
+        gain *= from_db((static_cast<double>(*rtll_comp_) - 128.0) / 4.0);
+    }
+    return gain;
 }
 
 std::optional<int> DownmixStage::correction(LoudCorrOutput output) const noexcept {
@@ -225,6 +312,16 @@ std::optional<int> DownmixStage::correction(LoudCorrOutput output) const noexcep
 }
 
 void DownmixStage::rebuild() {
+    rebuild_matrix();
+    correction_gain_ = corrections();
+    if (correction_gain_ != 1.0) {
+        for (Mix& row : matrix_) {
+            row = scaled(std::move(row), correction_gain_);
+        }
+    }
+}
+
+void DownmixStage::rebuild_matrix() {
     const std::size_t count = in_speakers_.size();
     matrix_.clear();
     if (pass_through_) {
@@ -403,6 +500,14 @@ void DownmixStage::update(const DownmixValues& values) {
     }
     if (values.cdmx) {
         cdmx_ = values.cdmx;
+        changed = true;
+    }
+    // The frame's own: they replace the last frame's whether or not this one sends any.
+    if (values.rtll_comp != rtll_comp_ || values.target_corr != target_corr_ ||
+        values.device != device_) {
+        rtll_comp_ = values.rtll_comp;
+        target_corr_ = values.target_corr;
+        device_ = values.device;
         changed = true;
     }
     for (auto [from, to] : {std::pair{&values.loro_loud_corr, &loro_loud_corr_},

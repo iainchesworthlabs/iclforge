@@ -506,16 +506,18 @@ TEST_CASE(
     for (const fs::path& path : to_play) {
         INFO("stream " << path.string());
         // 22.2's 24 channels are more than the layout renderer's bed holds, and its bottom
-        // channels have no Table E2.5 location, nor have the 9.X.4 modes' screen pair: the engine
-        // refuses their frames (the tests below), so there is no decode to hold to a reference.
+        // channels have no Table E2.5 location: the engine refuses their frames (the test below),
+        // so there is no decode to hold to a reference.
         if (path.filename().string().starts_with("22_2-")) {
             ++refused["a 22.2 presentation, whose channels the layout renderer cannot place"];
             continue;
         }
+        // The 9.X.4 modes' screen pair has no Table E2.5 location either, so the engine asks the
+        // decoder for 7.X.4, which Part 2's 9.X rows fold it into (the 9.X.4 test below).
+        iclforge::ac4::DecoderConfig expected_config = config;
         if (path.filename().string().starts_with("9_0_4-") ||
             path.filename().string().starts_with("9_1_4-")) {
-            ++refused["a 9.X.4 presentation, whose screen pair the layout renderer cannot place"];
-            continue;
+            expected_config.output.downmix = iclforge::ac4::DownmixTarget::k7X4;
         }
         std::vector<std::byte> bytes = read_file(path);
         if (kSanitized) {
@@ -538,7 +540,7 @@ TEST_CASE(
         ++played_whole;
         const Played played = play_item(bytes, layout, settings);
         CHECK(played.errors.empty());
-        const std::vector<std::vector<float>> expected = reference(bytes, layout, config);
+        const std::vector<std::vector<float>> expected = reference(bytes, layout, expected_config);
         auto session = Session::open("item", loader_of({{"item", bytes}}));
         REQUIRE(session.has_value());
         CHECK(played.frames == session->total_samples());
@@ -590,25 +592,101 @@ TEST_CASE("hearth ac4: the engine refuses the frames of a 22.2 presentation and 
     CHECK_FALSE(iclforge::hearth::ac4_placeable(seventeen));
 }
 
-TEST_CASE("hearth ac4: the engine refuses the frames of a 9.X.4 presentation and says why",
-          "[hearth][ac4]") {
-    // The decoder decodes the 9.X.4 modes, whose Lscr and Rscr Table E2.5 has no location for: the
-    // layout renderer cannot place them, so the frame is refused and nothing is played.
+TEST_CASE("hearth ac4: the engine plays a 9.X.4 presentation as 7.X.4", "[hearth][ac4]") {
+    // The decoder decodes the 9.X.4 modes as coded, 13 or 14 channels whose Lscr and Rscr
+    // Table E2.5 has no location for. Asked for the channels as coded, the engine has the decoder
+    // render to 7.X.4, whose Tables 38 to 43 (their 9.X rows) fold the pair into the fronts; what
+    // it plays is that render, sample for sample, and not a refusal.
+    const iclforge::render::OutputLayout layout = layout_of(kEverySpeaker);
+    const DecoderSettings settings = as_coded();
+    iclforge::ac4::DecoderConfig folded = iclforge::hearth::decoder_setup(settings, layout).ac4;
+    REQUIRE(folded.output.downmix == iclforge::ac4::DownmixTarget::kAsCoded);
+    folded.output.downmix = iclforge::ac4::DownmixTarget::k7X4;
     for (const char* name :
          {"9_1_4-scpl-grouping1-matsel2-prediction.ac4", "9_0_4-acpl2-grouping2-second.ac4"}) {
         INFO(name);
         const std::vector<std::byte> bytes =
             read_file(fs::path{AC4_GOLDEN_DIR} / "constructed" / name);
-        const Played played = play_item(bytes, layout_of(kEverySpeaker), as_coded());
-        REQUIRE_FALSE(played.errors.empty());
-        for (const std::string& error : played.errors) {
-            CHECK(error.find("9.X.4") != std::string::npos);
+        const Played played = play_item(bytes, layout, settings);
+        CHECK(played.errors.empty());
+        auto session = Session::open("item", loader_of({{"item", bytes}}));
+        REQUIRE(session.has_value());
+        CHECK(played.frames == session->total_samples());
+        CHECK(played.frames > 0);
+        const std::vector<std::vector<float>> expected = reference(bytes, layout, folded);
+        REQUIRE(played.slots.size() == expected.size());
+        for (std::size_t slot = 0; slot < expected.size(); ++slot) {
+            INFO("slot " << slot);
+            CHECK(played.slots[slot] == expected[slot]);
         }
-        CHECK(played.frames == 0);
+        // A render of the pair and not silence: the constructed stream puts a tone on every
+        // channel, so the left front carries energy.
+        const int front = layout.index_of(iclforge::ac3::eac3::chanmap::Location::kLeft);
+        REQUIRE(front >= 0);
+        const std::vector<float>& left = played.slots[static_cast<std::size_t>(front)];
+        CHECK(std::ranges::any_of(left, [](float v) { return std::abs(v) > 1.0e-4F; }));
     }
+
+    // The listener's own choice of layout is not overridden: 5.X.4 stays 5.X.4.
+    DecoderSettings chosen = as_coded();
+    chosen.ac4.immersive_layout = iclforge::ac4::DownmixTarget::k5X4;
+    const iclforge::ac4::DecoderConfig five = iclforge::hearth::decoder_setup(chosen, layout).ac4;
+    REQUIRE(five.output.downmix == iclforge::ac4::DownmixTarget::k5X4);
+    {
+        const std::vector<std::byte> bytes =
+            read_file(fs::path{AC4_GOLDEN_DIR} / "constructed" /
+                      "9_1_4-scpl-grouping1-matsel2-prediction.ac4");
+        const Played played = play_item(bytes, layout, chosen);
+        CHECK(played.errors.empty());
+        const std::vector<std::vector<float>> expected = reference(bytes, layout, five);
+        REQUIRE(played.slots.size() == expected.size());
+        for (std::size_t slot = 0; slot < expected.size(); ++slot) {
+            INFO("slot " << slot);
+            CHECK(played.slots[slot] == expected[slot]);
+        }
+    }
+
     using iclforge::ac4::Speaker;
     const std::array<Speaker, 3> screen = {Speaker::kLeft, Speaker::kRight, Speaker::kLeftScreen};
     CHECK_FALSE(iclforge::hearth::ac4_placeable(screen));
+    CHECK(iclforge::hearth::ac4_codes_screen_pair(screen));
+    const std::array<Speaker, 3> fronts = {Speaker::kLeft, Speaker::kRight, Speaker::kCentre};
+    CHECK_FALSE(iclforge::hearth::ac4_codes_screen_pair(fronts));
+}
+
+TEST_CASE("hearth ac4: one decoder plays a 9.X.4 item and then an item that is not",
+          "[hearth][ac4]") {
+    // The fold is the source's: a decoder reset at the end of one item does not carry it to the
+    // next, whose channels come out as coded.
+    const iclforge::render::OutputLayout layout = layout_of(kEverySpeaker);
+    const DecoderSettings settings = as_coded();
+    const iclforge::ac4::DecoderConfig coded =
+        iclforge::hearth::decoder_setup(settings, layout).ac4;
+    iclforge::ac4::DecoderConfig folded = coded;
+    folded.output.downmix = iclforge::ac4::DownmixTarget::k7X4;
+    const std::vector<std::byte> nine = read_file(fs::path{AC4_GOLDEN_DIR} / "constructed" /
+                                                  "9_1_4-scpl-grouping1-matsel2-prediction.ac4");
+    const std::vector<std::byte> seven = read_file(fs::path{AC4_GOLDEN_DIR} / "constructed" /
+                                                   "7_1_4-scpl-grouping0-sap-prediction.ac4");
+    const auto choice = iclforge::hearth::presentation_choice(settings);
+    auto first = Session::open("item", loader_of({{"item", nine}}), std::nullopt, choice);
+    REQUIRE(first.has_value());
+    auto second = Session::open("item", loader_of({{"item", seven}}), std::nullopt, choice);
+    REQUIRE(second.has_value());
+    StreamDecoder decoder{layout, first->facts().sample_rate, settings};
+    const Played a = play(*first, decoder);
+    CHECK(a.errors.empty());
+    const Played b = play(*second, decoder);
+    CHECK(b.errors.empty());
+    const std::vector<std::vector<float>> expected_a = reference(nine, layout, folded);
+    const std::vector<std::vector<float>> expected_b = reference(seven, layout, coded);
+    REQUIRE(a.slots.size() == expected_a.size());
+    REQUIRE(b.slots.size() == expected_b.size());
+    for (std::size_t slot = 0; slot < expected_a.size(); ++slot) {
+        INFO("slot " << slot);
+        CHECK(a.slots[slot] == expected_a[slot]);
+        CHECK(b.slots[slot] == expected_b[slot]);
+    }
 }
 
 TEST_CASE("hearth ac4: the engine plays the streams of AC4_API_STREAM_DIR", "[hearth][ac4]") {
