@@ -74,7 +74,7 @@ Wi-Fi up has 31 KB of internal RAM left at its least, from 64; an image without 
 does not have it to give, and the cache does nothing for AC-3 and E-AC-3). With all of them the part
 decodes 2.0 in real time (SIMPLE mode at 0.40 of a frame's duration, A-SPX at 0.50, with the
 decoder's second core), the frame-rate converter at every rate (0.67 to 0.87) and E-AC-3 7.1.4
-(0.75), and 5.1 in SIMPLE mode at 0.99; the rest of 5.1 takes 1.25 to 1.57 and 5.1.4 2.28 to 2.73.
+(0.75), and 5.1 in SIMPLE mode at 0.99; the rest of 5.1 takes 1.25 to 1.44 and 5.1.4 2.28 to 2.69.
 The [ESP32-S3 page](../platforms/bare-metal/esp32-s3.md#playback-speed) has what each file bought.
 
 `idf.py set-target` writes a fresh `sdkconfig` from those files. After that, `idf.py menuconfig`
