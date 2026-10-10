@@ -117,6 +117,10 @@ struct LoudnessInfo {
     std::optional<int> loudness_range_practice;  // lra_prac_type
     std::optional<double> momentary_lufs;        // loudmntry
     std::optional<double> max_momentary_lufs;    // max_loudmntry
+    // rtll_comp_gain (Part 2 clause 6.3.8.2.2), (rtll_comp - 128) / 4 dB: the real-time loudness
+    // correction the last frame sent, which clause 4.8.5.5 has decode() apply to that frame's
+    // output; unset where the frame sent none.
+    std::optional<double> real_time_correction_db;
 };
 
 // One DRC decoder mode a stream carries (Part 1 clause 4.3.13.3).

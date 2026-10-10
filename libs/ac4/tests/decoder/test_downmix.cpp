@@ -3,8 +3,11 @@
 // 5.X by Table 219, 5.X and 3.0 to Lo/Ro, Lt/Rt and its Pro Logic II form by
 // Tables 217 and 218, with the LFE and the loudness corrections, and to mono -
 // against its formula with the stream's gains; the gains persisting between
-// the frames that send them; and through iclforge::ac4::Decoder, DEE's 5.1 tones, one
-// per channel, measured in each channel of the downmix to 0.01 dB.
+// the frames that send them; an alternative presentation's target loudness
+// correction by the device category (Part 2 clause 4.8.5.4, Tables 17 and 67)
+// and the real-time loudness correction (4.8.5.5), which are the frame's own;
+// and through iclforge::ac4::Decoder, DEE's 5.1 tones, one per channel,
+// measured in each channel of the downmix to 0.01 dB.
 
 #include <array>
 #include <cmath>
@@ -305,6 +308,163 @@ TEST_CASE("the downmix's gains hold from the frame that sends them until another
     stage.reset();
     stage.process({}, in, out);
     CHECK(std::abs(static_cast<double>(out[0][0].real()) - (1.0 + 2.0 * db(-3.0))) < kTolerance);
+}
+
+namespace {
+
+constexpr std::array<S, 10> kFiveOneFour = {
+    S::kLeft,          S::kRight,        S::kCentre,        S::kLfe,         S::kLeftSurround,
+    S::kRightSurround, S::kTopFrontLeft, S::kTopFrontRight, S::kTopBackLeft, S::kTopBackRight};
+constexpr std::array<S, 2> kStereoOut = {S::kLeft, S::kRight};
+constexpr std::array<S, 1> kMonoOut = {S::kCentre};
+
+// Table 67's four bits as target_device_category reads them: index 0 (1D) first, so the high bit.
+constexpr int k1D = 0b1000;
+constexpr int k2D = 0b0100;
+constexpr int k3D = 0b0010;
+constexpr int kPortable = 0b0001;
+
+// A target of an alternative presentation: the categories it names and its loud_corr_target.
+detail::PresentationTarget target(int categories, std::optional<int> loud_corr_target) {
+    detail::PresentationTarget t;
+    t.target_device_category = categories;
+    t.loud_corr_target = loud_corr_target;
+    return t;
+}
+
+// The values an alternative presentation's substream gives a frame.
+detail::DownmixValues alternative(std::vector<detail::PresentationTarget> targets,
+                                  std::optional<int> rtll_comp = std::nullopt) {
+    detail::PresentationSubstream presentation;
+    presentation.targets = std::move(targets);
+    if (rtll_comp) {
+        detail::FurtherLoudnessInfo loudness;
+        loudness.rtll_comp = rtll_comp;
+        presentation.further_loudness_info = loudness;
+    }
+    return detail::downmix_values(&presentation, detail::Metadata{});
+}
+
+// The gain the first channel of a stage that takes `values` gives it, where the channels come out
+// as coded: the matrix's first diagonal entry.
+double gain_of(std::span<const S> speakers, const detail::DownmixValues& values) {
+    const std::vector<Row> matrix =
+        matrix_for(speakers, false, iclforge::ac4::DownmixTarget::kAsCoded, values);
+    REQUIRE_FALSE(matrix.empty());
+    return matrix[0][0];
+}
+
+// 2^(x / 6): clause 4.8.5.4's and 4.8.5.3's factor for x in dB2.
+double dB2(double value) {
+    return std::exp2(value / 6.0);
+}
+
+}  // namespace
+
+TEST_CASE("an alternative presentation's target loudness correction follows the device category",
+          "[ac4][decoder][downmix]") {
+    // loud_corr_target 9 is (15 - 9) / 2 = 3 dB2 (clause 6.3.3.1.12).
+    const detail::DownmixValues for_2d = alternative({target(k2D, 9)});
+    // 5.1 as coded is 2D, which the target names; every channel takes it, the LFE's included.
+    const std::vector<Row> as_coded =
+        matrix_for(kFiveOne, false, iclforge::ac4::DownmixTarget::kAsCoded, for_2d);
+    REQUIRE(as_coded.size() == kFiveOne.size());
+    for (std::size_t c = 0; c < as_coded.size(); ++c) {
+        CAPTURE(c);
+        CHECK(std::abs(as_coded[c][c] - dB2(3.0)) < 1e-12);
+    }
+    // Stereo is 1D, which no target names: Table 17's first fallback is 2D.
+    const std::vector<Row> stereo =
+        matrix_for(kFiveOne, false, iclforge::ac4::DownmixTarget::kLoRo, for_2d);
+    const std::vector<Row> plain =
+        matrix_for(kFiveOne, false, iclforge::ac4::DownmixTarget::kLoRo, {});
+    REQUIRE(stereo.size() == 2);
+    for (std::size_t o = 0; o < 2; ++o) {
+        for (std::size_t c = 0; c < stereo[o].size(); ++c) {
+            CHECK(std::abs(stereo[o][c] - dB2(3.0) * plain[o][c]) < 1e-12);
+        }
+    }
+    // 5.1.4 is 3D: 2D is its first fallback.
+    CHECK(std::abs(gain_of(kFiveOneFour, for_2d) - dB2(3.0)) < 1e-12);
+    // Mono is not in Table 17, and takes none.
+    CHECK(gain_of(kMonoOut, for_2d) == 1.0);
+}
+
+TEST_CASE("an unspecified category takes Table 17's fallbacks in order, portable none",
+          "[ac4][decoder][downmix]") {
+    // Only 3D is specified: 1D falls back to 2D (none) then 3D, 2D to 3D; portable has none.
+    const detail::DownmixValues only_3d = alternative({target(k3D, 5)});
+    CHECK(std::abs(gain_of(kStereoOut, only_3d) - dB2(5.0)) < 1e-12);
+    CHECK(std::abs(gain_of(kFiveOne, only_3d) - dB2(5.0)) < 1e-12);
+    detail::DownmixValues portable = only_3d;
+    portable.device = iclforge::ac4::TargetDevice::kPortable;
+    CHECK(gain_of(kStereoOut, portable) == 1.0);
+    // Only 1D is specified: 3D falls back through 2D to 1D.
+    CHECK(std::abs(gain_of(kFiveOneFour, alternative({target(k1D, 14)})) - dB2(0.5)) < 1e-12);
+    // 1D and 2D specified: 3D takes 2D before 1D.
+    const detail::DownmixValues ones_and_twos = alternative({target(k1D, 14), target(k2D, 5)});
+    CHECK(std::abs(gain_of(kFiveOneFour, ones_and_twos) - dB2(5.0)) < 1e-12);
+    // The first target that names a category and sends a correction gives it; one that sends none
+    // leaves the category to the next.
+    const detail::DownmixValues ordered =
+        alternative({target(k1D, std::nullopt), target(k1D | k2D, 9), target(k1D, 14)});
+    CHECK(std::abs(gain_of(kStereoOut, ordered) - dB2(3.0)) < 1e-12);
+    // loud_corr_target 31 is 0 dB, and a specified one: no fallback, and no scaling.
+    const detail::DownmixValues zero = alternative({target(k1D, 31), target(k2D, 9)});
+    CHECK(gain_of(kStereoOut, zero) == 1.0);
+    // Targets that send no correction, and a presentation with no targets, correct nothing.
+    CHECK(gain_of(kFiveOne, alternative({})) == 1.0);
+    CHECK(gain_of(kFiveOne, alternative({target(k2D, std::nullopt)})) == 1.0);
+}
+
+TEST_CASE("the system's device category stands in for the layout's", "[ac4][decoder][downmix]") {
+    detail::DownmixValues values = alternative({target(kPortable, 0), target(k2D, 9)});
+    // Stereo is 1D by its layout, which falls back to 2D.
+    CHECK(std::abs(gain_of(kStereoOut, values) - dB2(3.0)) < 1e-12);
+    // A portable device takes its own: loud_corr_target 0 is 7.5 dB2.
+    values.device = iclforge::ac4::TargetDevice::kPortable;
+    CHECK(std::abs(gain_of(kStereoOut, values) - dB2(7.5)) < 1e-12);
+    // And a category the system gives applies to a layout Table 17 does not list.
+    values.device = iclforge::ac4::TargetDevice::k2D;
+    CHECK(std::abs(gain_of(kMonoOut, values) - dB2(3.0)) < 1e-12);
+}
+
+TEST_CASE("the real-time loudness correction is (rtll_comp - 128) / 4 dB, and the frame's own",
+          "[ac4][decoder][downmix]") {
+    // +2 dB, -32 dB and 0 dB.
+    CHECK(std::abs(gain_of(kFiveOne, alternative({}, 136)) - db(2.0)) < 1e-12);
+    CHECK(std::abs(gain_of(kFiveOne, alternative({}, 0)) - db(-32.0)) < 1e-12);
+    CHECK(gain_of(kFiveOne, alternative({}, 128)) == 1.0);
+    // With the target's: the product.
+    CHECK(std::abs(gain_of(kFiveOne, alternative({target(k2D, 9)}, 136)) - dB2(3.0) * db(2.0)) <
+          1e-12);
+    // With the downmix's own correction: the stereo downmix takes both.
+    detail::DownmixValues values = alternative({}, 136);
+    values.coeff = coefficients(2, 2, 2, 2, std::nullopt, 1);
+    values.loro_loud_corr = 9;  // 3 dB2
+    const std::vector<Row> corrected =
+        matrix_for(kFiveOne, false, iclforge::ac4::DownmixTarget::kLoRo, values);
+    detail::DownmixValues without = values;
+    without.rtll_comp.reset();
+    const std::vector<Row> base =
+        matrix_for(kFiveOne, false, iclforge::ac4::DownmixTarget::kLoRo, without);
+    REQUIRE(corrected.size() == base.size());
+    for (std::size_t o = 0; o < base.size(); ++o) {
+        for (std::size_t c = 0; c < base[o].size(); ++c) {
+            CHECK(std::abs(corrected[o][c] - db(2.0) * base[o][c]) < 1e-12);
+        }
+    }
+
+    // Both belong to the frame that sends them: the next frame, which sends none, has none.
+    detail::DownmixStage stage;
+    stage.configure(kFiveOne, false, iclforge::ac4::DownmixTarget::kAsCoded, true);
+    CHECK(stage.passes_through());
+    stage.update(alternative({target(k2D, 9)}, 136));
+    CHECK_FALSE(stage.passes_through());
+    CHECK(std::abs(stage.matrix()[0][0] - dB2(3.0) * db(2.0)) < 1e-12);
+    stage.update({});
+    CHECK(stage.passes_through());
+    CHECK(stage.matrix()[0][0] == 1.0);
 }
 
 TEST_CASE("DEE's 5.1 tones come out of each downmix at the stream's gains, to 0.01 dB",

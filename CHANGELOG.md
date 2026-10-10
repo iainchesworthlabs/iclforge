@@ -2815,6 +2815,7 @@ The sections below contain the complete change list and fixes.
 
 **Codec correctness**
 
+- **AC-4 applies an alternative presentation's target loudness correction and the real-time loudness correction.** Part 2 clauses 4.8.5.4 and 4.8.5.5 say a decoder "shall" apply both, and the decoder read `loud_corr_target` and `rtll_comp` and did nothing with them. An alternative presentation's output now takes 2^(target_corr_gain / 6) for the device category it plays on (Table 67, from the layout that comes out by Table 17, or `OutputConfig::target_device`, with Table 17's fallbacks for a category no target specifies), and a frame that sends `rtll_comp` takes 10^((rtll_comp - 128) / 80) of its output; both scale every channel, as coded or downmixed, and belong to the frame that sends them. The real-time value is reported as `LoudnessInfo::real_time_correction_db`. Every committed stream that sends `rtll_comp` (DEE's legs) sends 128, 0 dB, so none of their output changes; no committed stream sends a `loud_corr_target`, and the target correction is held to its formula in `libs/ac4/tests/decoder/test_downmix.cpp` (`libs/ac4/ERRATA.md`, "Alternative and real-time loudness correction").
 - **A float decode ignored `DecoderConfig::fast_imdct = false`.** A full build configured with
   `ICLFORGE_DECODE_SCALAR=float` ran the fast inverse transform whatever the setting, so the
   reference form (`mode=reference`) was not the one that ran, in the PCM reconstruction and in the
@@ -3417,6 +3418,15 @@ The sections below contain the complete change list and fixes.
 
 **Hearth**
 
+- **Hearth's engine plays a 9.X.4 presentation instead of refusing it.** The 9.0.4 and 9.1.4 modes'
+  screen pair (Lscr, Rscr) has no location in A/52 Table E2.5, so the engine refused every frame of
+  such a presentation when it was asked for the channels as coded. It now reads the selected
+  presentation's channels from the first unit's table of contents and, where it codes the screen
+  pair and no layout was chosen, has the decoder render to 7.X.4, whose 9.X rows (Part 2 Tables 38
+  to 43) fold the pair into the fronts. A layout the listener chose (`immersive_layout`) or a
+  stereo or mono fold is left as chosen, and 22.2, which Part 2 gives no renderer, is still refused.
+  The engine's output equals the decoder's own 7.X.4 render sample for sample on every committed
+  9.X.4 stream. The ESP32 player still refuses a 9.X.4 presentation.
 - **A `player@v1` stream that ended before the clock's first exchange completed lost
   every chunk it had ever carried, not just the ones still in flight.** `PlayerSession`
   holds an aiosendspin 9.1.1 server's early chunks until the clock's first reply arrives
