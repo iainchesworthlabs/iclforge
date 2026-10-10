@@ -11,10 +11,11 @@ The PCM comes from the AC-3 harness's generator, imported rather than copied:
 its per-block plan, the `cliff` profile and the correlation modes serve every
 codec. The configuration space is this encoder's: mono, stereo, 5.0 and 5.1,
 7.0 and 7.1 in the three 7.X layouts, and in a case in eight the immersive
-layouts, 5.0.4 and 5.1.4, and 7.0.4 and 7.1.4 with experimental=back-pair, in
-the codec mode the rate picks or SCPL, ASPX_SCPL, ASPX_ACPL_2, ASPX_ACPL_1
-(with experimental=acpl) or ASPX_AJCC (with experimental=ajcc) forced, with the
-height downmix now and then, and in a case in twenty 22.2, 24 channels with
+layouts, 5.0.4 and 5.1.4, 7.0.4 and 7.1.4 with experimental=back-pair, and 9.0.4
+and 9.1.4 with experimental=nine-x-4, in the codec mode the rate picks or SCPL,
+ASPX_SCPL, ASPX_ACPL_2, ASPX_ACPL_1 (with experimental=acpl) or ASPX_AJCC (with
+experimental=ajcc, but for 9.X.4) forced, with the height downmix now and then
+(but for 9.X.4), and in a case in twenty 22.2, 24 channels with
 experimental=twenty-two-two, in the SIMPLE or ASPX codec mode;
 48 kHz at every frame rate of Part 1
 Table 83 or 44.1 kHz at the native one, a rate from 8 kbps up (20 in 5.X and
@@ -149,9 +150,10 @@ CHANNELS = [1, 2, 2, 5, 6, 6, 7, 8]
 SEVEN_X = ["7x-back", "7x-wide", "7x-top-front"]
 # The immersive layouts (phase E8), a case in eight, drawn from a generator of their own so that
 # the other cases, the regression seeds' among them, draw as they did: 5.0.4 and 5.1.4, and 7.0.4
-# and 7.1.4 with experimental=back-pair; the codec modes a case may force besides the one the rate
-# picks, ASPX_ACPL_1 with experimental=acpl and ASPX_AJCC with experimental=ajcc; and the height
-# downmix's routes and gains. The least rate each codec mode holds, from silence at 48 kHz
+# and 7.1.4 with experimental=back-pair (and the 9.X.4 layouts below); the codec modes a case may
+# force besides the one the rate picks, ASPX_ACPL_1 with experimental=acpl and ASPX_AJCC with
+# experimental=ajcc; and the height downmix's routes and gains. The least rate each codec mode
+# holds, from silence at 48 kHz
 # (--check-envelope measures them), "auto" being ASPX_ACPL_2's, which the lowest rates take.
 IMMERSIVE_SHARE = 0.125
 IMMERSIVE_SALT = 0xE8E8E8E8E8E8E8E8
@@ -161,6 +163,17 @@ IMMERSIVE_LOWEST_KBPS = {"auto": 27, "scpl": 12, "aspx-scpl": 33, "aspx-acpl-2":
                          "aspx-acpl-1": 28, "aspx-ajcc": 24}
 # The experimental tool each immersive codec mode needs, where it needs one.
 IMMERSIVE_TOOLS = {"aspx-acpl-1": "acpl", "aspx-ajcc": "ajcc"}
+# 9.0.4 and 9.1.4 (experimental=nine-x-4, thirteen and fourteen channels), a case in six of the
+# immersive ones, again from a generator of its own: every immersive codec mode but ASPX_AJCC,
+# which the element does not write, and no dialogue enhancement, height downmix or further
+# substreams, which it refuses. Their thirteen tracks make the stream md_compat 7, which the
+# harness decodes at. The least rates at 48 kHz (--check-envelope measures them).
+NINE_X_4_SHARE = 1.0 / 6.0
+NINE_X_4_SALT = 0x9494949494949494
+NINE_X_4_CHANNELS = [13, 14]
+NINE_X_4_MODES = ["scpl", "aspx-scpl", "aspx-acpl-2", "aspx-acpl-1"]
+NINE_X_4_LOWEST_KBPS = {"auto": 29, "scpl": 13, "aspx-scpl": 38, "aspx-acpl-2": 29,
+                        "aspx-acpl-1": 30}
 # 22.2 (experimental=twenty-two-two, Part 2 clause 6.2.4.3), a case in twenty of those that are
 # not immersive, drawn from a generator of its own as the layouts above are: 24 channels in the
 # SIMPLE or ASPX codec mode the rate picks (ASPX below 76.8 kbps a full-band channel, 1 690 kbps)
@@ -353,8 +366,13 @@ def draw_case(seed):
     channels = rng.choice(CHANNELS)
     immersive_rng = random.Random(seed ^ IMMERSIVE_SALT)
     immersive = immersive_rng.random() < IMMERSIVE_SHARE
+    nine = False
     if immersive:
         channels = immersive_rng.choice(IMMERSIVE_CHANNELS)
+        nine_rng = random.Random(seed ^ NINE_X_4_SALT)
+        if nine_rng.random() < NINE_X_4_SHARE:
+            nine = True
+            channels = nine_rng.choice(NINE_X_4_CHANNELS)
     twenty_two = not immersive and random.Random(seed ^ TWENTY_TWO_SALT).random() < TWENTY_TWO_SHARE
     if twenty_two:
         channels = TWENTY_TWO_CHANNELS
@@ -432,7 +450,7 @@ def draw_case(seed):
     # Dialogue enhancement: marked channels, or a stem; the Mid of L and R, and a stem over two
     # or three channels cross-channel.
     stem = False
-    if rng.random() < 0.2 and not twenty_two:
+    if rng.random() < 0.2 and not nine and not twenty_two:
         available = {1: ["c"], 2: ["l", "r"]}.get(channels, ["l", "r", "c"])
         marked = [c for c in available if rng.random() < 0.6] or [rng.choice(available)]
         stem = rng.random() < 0.5
@@ -455,13 +473,14 @@ def draw_case(seed):
         # The immersive codec modes, and each one's least rate.
         mode = "auto"
         if immersive_rng.random() < 0.4:
-            mode = immersive_rng.choice(IMMERSIVE_MODES)
+            mode = immersive_rng.choice(NINE_X_4_MODES if nine else IMMERSIVE_MODES)
             options.append(f"codec-mode={mode}")
             if mode in IMMERSIVE_TOOLS:
                 tools.append(IMMERSIVE_TOOLS[mode])
-        if LOWEST_KBPS <= bitrate < IMMERSIVE_LOWEST_KBPS[mode]:
-            bitrate = IMMERSIVE_LOWEST_KBPS[mode]
-        if immersive_rng.random() < 0.3:
+        least = (NINE_X_4_LOWEST_KBPS if nine else IMMERSIVE_LOWEST_KBPS)[mode]
+        if LOWEST_KBPS <= bitrate < least:
+            bitrate = least
+        if immersive_rng.random() < 0.3 and not nine:
             options.append(f"height-downmix={immersive_rng.choice(HEIGHT_DOWNMIXES)}")
             if immersive_rng.random() < 0.7:
                 options.append(f"height-gain={immersive_rng.choice(HEIGHT_GAINS)}")
@@ -498,7 +517,9 @@ def draw_case(seed):
         if LOWEST_KBPS <= bitrate < least:
             bitrate = least
     elif immersive:
-        if channels > 10:
+        if nine:
+            tools.append("nine-x-4")
+        elif channels > 10:
             tools.append("back-pair")
     elif channels > 6:
         tools.append(rng.choice(SEVEN_X))
@@ -507,7 +528,7 @@ def draw_case(seed):
     # of FRAME_BYTES_CAP a substream in each frame, where the rate is in range.
     substreams = []
     presentation_rng = random.Random(seed ^ 0x9E3779B97F4A7C15)
-    if presentation_rng.random() < 0.2 and not twenty_two:
+    if presentation_rng.random() < 0.2 and not nine and not twenty_two:
         substreams, stem = draw_presentations(presentation_rng, channels, options, tools, stem)
         if LOWEST_KBPS <= bitrate <= HIGHEST_KBPS:
             per_frame = FRAME_RATES[frame_rate_index][1] if sample_rate == 48000 else FRAME
@@ -680,7 +701,7 @@ def draw_presentations(rng, channels, options, tools, stem):
     ids = rng.sample(range(512), len(audio)) if rng.random() < 0.5 else None
     associated_mono = any(c in ASSOCIATED and n == 1 for n, c in subs)
     # Each substream's tracks, its channels but an LFE (Part 2 Table 55): md_compat 3 holds 11.
-    tracks = {1: channels - (1 if channels in (6, 8, 10, 12) else 0)}
+    tracks = {1: channels - (1 if channels in (6, 8, 10, 12, 14) else 0)}
     for number, (sub_channels, content) in enumerate(subs, start=2):
         tracks[number] = waveform if content == "enhancement" else sub_channels
     for number, (members, config) in enumerate(presentations, start=1):
@@ -975,8 +996,9 @@ def _run_case(cli, ffprobe, case, tmp):
     # The three traces. With several substreams the decoder reads every one, and decodes the first
     # presentation, whose channels are the input's, at level 7, which takes any number of tracks.
     chosen = ["presentation=0", "md-compat=7"] if case.substreams else []
-    if case.channels == TWENTY_TWO_CHANNELS:
-        # 22 tracks, which only md_compat 7 holds (Part 2 Table 55).
+    if case.channels in (13, 14, TWENTY_TWO_CHANNELS):
+        # Thirteen tracks (9.X.4) or 22 (22.2): md_compat 7 (Part 2 Table 55), above the
+        # decoder's default level.
         chosen = ["md-compat=7"]
     if case.scene:
         # The objects, rendered to stereo, at level 7: more than eleven direct-coded objects or
@@ -1105,10 +1127,12 @@ def check_envelope(cli):
     for channels in (2, 5, 6):
         for mode in ACPL_MODES[channels > 2]:
             layouts.append((channels, [f"codec-mode={mode}", "experimental=acpl"]))
-    for channels in (9, 10, 11, 12):
+    for channels in (9, 10, 11, 12, 13, 14):
         for mode in IMMERSIVE_LOWEST_KBPS:
+            if channels > 12 and mode == "aspx-ajcc":
+                continue
             tools = ([IMMERSIVE_TOOLS[mode]] if mode in IMMERSIVE_TOOLS else []) + (
-                ["back-pair"] if channels > 10 else [])
+                ["nine-x-4"] if channels > 12 else (["back-pair"] if channels > 10 else []))
             layouts.append((channels, ([] if mode == "auto" else [f"codec-mode={mode}"])
                             + ([f"experimental={','.join(tools)}"] if tools else [])))
     for mode in TWENTY_TWO_LOWEST_KBPS:
@@ -1128,6 +1152,8 @@ def check_envelope(cli):
                     # The immersive layouts' modes (scpl among them) are only in their own table.
                     if channels == TWENTY_TWO_CHANNELS:
                         least = TWENTY_TWO_LOWEST_KBPS[forced[0] if forced else "auto"]
+                    elif channels > 12:
+                        least = NINE_X_4_LOWEST_KBPS[forced[0] if forced else "auto"]
                     elif channels > 8:
                         least = IMMERSIVE_LOWEST_KBPS[forced[0] if forced else "auto"]
                     else:

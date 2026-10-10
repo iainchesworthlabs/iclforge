@@ -51,30 +51,28 @@
 //     it is present in. An LFE bed channel (ChannelID 0xD, or 0x86/0x87's BS.2051-2 LFE1/LFE2
 //     aliases) is routed at gain 0 / lfe_send 1, the exact convention build_channel_path's own doc
 //     comment states for ADM ("Objects never reach the LFE by panning").
-//   - Table 19's cinema channel vocabulary is richer than iclforge::objects::oba::BedLabel's own
-//   consumer-layout
-//     one in exactly one place: it names THREE distinct surround zones per side (Side Surround,
-//     Surround, Rear Surround) where BedLabel has only two slots (kLs/kRs, kLb/kRb). "Surround"
-//     (0x6/0xA) maps to kLs/kRs (the canonical 5.1 pair) and "Rear Surround" (0x7/0x8) to kLb/kRb
-//     (7.1's additional back pair, the closest conceptual match); "Side Surround" (0x5/0x9) has no
-//     equivalent and is refused - BridgeError::kUnsupportedIabChannel, not silently collapsed onto
-//     an existing slot, the same "refuse clearly" precedent bridge.hpp's own top comment states for
-//     ADM's unsupported pack types. Several other Table 19 codes (Left/Right Center, Center Height,
-//     the *Height variants of Side/Rear Surround, Left/Right Top Surround, Top Surround, and the
-//     whole 0x18-0x7F D-Cinema-reserved range) are refused the same way, deliberately, rather than
-//     guessed at without the external documents Table 19 itself defers to (SMPTE ST 428-12/
-//     ST 2098-5) for their exact geometry - see iab_bridge.cpp's own mapping table for the full,
-//     cited list of what IS mapped.
+//   - Table 19's cinema channel vocabulary is richer than iclforge::objects::oba::BedLabel's
+//     consumer-layout one (three surround zones per side, Left/Right Center, a height layer of
+//     Center/Surround/Side Surround/Rear Surround Height, Top Surround), but a bed channel reaches
+//     the encode as a pinned position, not a label, so every code Table 19 defines has one:
+//     the ones with a BedLabel use bed_label_position(), and "Side Surround" (0x5/0x9) sits where
+//     "Surround" (0x6/0xA) does; the rest are placed from ST 2098-5 Annex B's description of where
+//     their loudspeaker typically is (informative, so a reading: libs/adm/ERRATA.md). The reserved
+//     codes (0x18-0x7F, and above 0x89) have no meaning and are refused,
+//     BridgeError::kUnsupportedIabChannel, the same "refuse clearly" precedent bridge.hpp's own top
+//     comment states for ADM's unsupported pack types.
 //   - ObjectSpread (§10.5.15-17) becomes the keyframe's ObjectSize (iab_spread_to_size()), and the
 //     object's zone control (the nine zones of §10.5.11-14, or the 19 of an ObjectZoneDefinition19
 //     child, which replaces them, §10.6) becomes its ZoneConstraint and b_enable_elevation
 //     (iab_zones_to_constraint(), iab_zones19_to_constraint()). Both are transmitted in OAMD and
 //     stop there, exactly as the ADM bridge's width, height and depth do: AtmosEncoder folds each
 //     object into its 5.1 bed as a point, because spreading it there would have the receiving
-//     renderer spread it a second time. A zone control maps only when its include/exclude pattern
-//     is exactly one of TS 103 420 Table 20's six presets; any other pattern leaves the object
-//     unconstrained. A zone19 update in a sub block with no pan information has no keyframe to
-//     ride on and takes effect at the next sub block that has one.
+//     renderer spread it a second time. A zone control maps exactly when its include/exclude
+//     pattern is one of TS 103 420 Table 20's six presets. OAMD has nothing finer, so any other
+//     pattern takes the preset that covers every zone it includes and admits the object to the
+//     nearest extra zones, and the channel's `unmapped` says so. A zone19 update in a sub block
+//     with no pan information has no keyframe to ride on and takes effect at the next sub block
+//     that has one.
 //   - PCM is concatenated across many independently-parsed frames, so IabBridgeResult::pcm is
 //     OWNED (std::vector<std::vector<float>>), not borrowed the way BridgeResult::pcm is from a
 //     single caller-owned AdmDocument - there is no equivalent single upstream object here to
@@ -98,6 +96,11 @@ struct IabBridgeResult {
     std::uint32_t sample_rate = 0;             // the first frame's own IaFrame::sample_rate,
                                                 // unconverted - same convention build()'s own
                                                 // BridgeResult::sample_rate documents
+    std::vector<std::vector<std::string>>
+        unmapped;  // per channel: IAB metadata the Atmos encode carries only approximately or not
+                   // at all - a zone control no Table 20 preset says exactly (and the preset it was
+                   // carried as), a zone gain strictly between 0 and 1, decorrelation, a snap
+                   // tolerance. Empty for a channel whose metadata is carried as written
 
     [[nodiscard]] std::size_t channel_count() const { return paths.size(); }
 };

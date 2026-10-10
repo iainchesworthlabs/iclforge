@@ -46,6 +46,8 @@ struct IabAtmosSource {
         paths;  // pass directly to iclforge::objects::oba::evaluate_placements
     std::vector<std::span<const float>> pcm;  // one mono span per channel; see `handle` above
     std::shared_ptr<void> handle;             // opaque - owns the bridged result, if any
+    std::vector<std::string> warnings;        // one line per channel whose IAB metadata the Atmos
+                                              // encode carries only approximately or not at all
 
     [[nodiscard]] std::size_t channel_count() const { return paths.size(); }
 };

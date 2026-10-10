@@ -43,6 +43,7 @@ the `AC3FORGE_` variables. The family is ICL Forge now, and its programs are `fo
 | Page | What it is | Roadmap |
 |---|---|---|
 | [topology.md](topology.md) | Source, transport, sink roles; HLS/CMAF transport | Hearth sinks use Sendspin instead ([SUPERSEDED.md](SUPERSEDED.md)); none of the HLS/CMAF transport is built, and its frame still applies elsewhere |
+| [iab-object-clustering.md](iab-object-clustering.md) | Fitting a master of more than 15 (E-AC-3) or 64 (AC-4) beds and objects into an encode: the cap following the codec, then clustering, with the decisions for the owner | Proposal, 2026-10-10: not started; [`kTooManyChannels`](../docs/library/development-status.md#iab-smpte-st-2098-2) in the IAB and ADM bridges |
 | [host-plugin.md](host-plugin.md) | DAW/NLE metering/QC plugin feasibility | [Proposed — DAW/NLE host plugin](../ROADMAP.md#proposed) |
 | [qc-report.md](qc-report.md) | Delivery-shaped QC report file | [Proposed — QC delivery report file](../ROADMAP.md#proposed) |
 | [consolidation.md](consolidation.md) | One shape for every codec (AC-3's), AC-4's four libraries as one, the copies of codec-blind code removed, and `src/` from 22 libraries to 12, in stages C0 to C6 | As of 2026-10-08: C0 to C6 and the merges M1 to M3 run and proved on local branches (`chore/src-consolidation-c0` to `-exclude`); decisions 1 to 23 taken; their commits are on the remote, in `chore/monorepo-c7-1`, and no pull request is open |

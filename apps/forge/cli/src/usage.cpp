@@ -504,9 +504,12 @@ void print_ac4_encode_topic() {
     fmt::println("       coding-configs, acpl (ASPX_ACPL_1 in 5.X and the immersive layouts,");
     fmt::println("       A-CPL in stereo), 7x-back|7x-wide|7x-top-front for 7.0 and 7.1,");
     fmt::println("       back-pair for 7.0.4 and 7.1.4 (11 and 12 channels, with Lb and Rb),");
+    fmt::println("       nine-x-4 for 9.0.4 and 9.1.4 (13 and 14 channels, with Lscr and Rscr),");
     fmt::println("       ajcc for codec-mode=aspx-ajcc, three-zero for 3.0 (L R C),");
     fmt::println("       noise-fill (a level for each band that quantises to zero, which the");
-    fmt::println("       decoder fills with noise, ETSI TS 103 190-1 5.1.4),");
+    fmt::println("       decoder fills with noise, ETSI TS 103 190-1 5.1.4), hfr-2 and hfr-4");
+    fmt::println("       (the efficient high frame rate mode, TS 103 190-2 5.1.3: with");
+    fmt::println("       frame-rate=47.95 to 120 each audio frame goes out as 2 or 4 frames),");
     fmt::println("       twenty-two-two for 22.2 (24 channels, TS 103 190-2 6.2.4.3, in");
     fmt::println("       codec-mode=simple|aspx, ASPX below 76.8 kbps a full-band channel by");
     fmt::println("       default; the channels in the order decode writes them),");

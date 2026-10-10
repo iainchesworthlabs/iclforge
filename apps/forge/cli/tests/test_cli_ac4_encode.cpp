@@ -29,6 +29,7 @@
 #include "sanitized.hpp"
 
 #include "iclforge/ac3/io/wav.hpp"
+#include "iclforge/ac4/io/carriage.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 
@@ -481,6 +482,31 @@ TEST_CASE("ac4-encode's experimental tools each write their syntax", "[cli][ac4]
         const auto records = run(wav, "24 codec-mode=simple experimental=noise-fill");
         CHECK(count_of(records, "b_snf_data_exists", 1) > 0U);
     }
+    SECTION("hfr-4 sends each audio frame as four transmission frames at 120 fps") {
+        const std::vector<float> x = tone(440.0, count);
+        const auto wav = wav_of("ac4_hfr.wav", {x, x});
+        REQUIRE(run_cli("ac4-encode " + quoted(wav) + " " + quoted(out) +
+                            " 192 frame-rate=120 experimental=hfr-4 codec-mode=simple",
+                        log) == 0);
+        const iclforge::ac4::Toc toc = first_toc(read_bytes(out));
+        CHECK(toc.frame_rate_index == 12);
+        REQUIRE(toc.presentations_v1.size() == 1);
+        CHECK(toc.presentations_v1[0].frame_rate_fraction == 4);
+        // In an MP4 file the transmission frames are the samples, and the
+        // decoder joins them.
+        const fs::path mp4 = dir / "ac4_hfr.mp4";
+        REQUIRE(run_cli("ac4-encode " + quoted(wav) + " " + quoted(mp4) +
+                            " 192 frame-rate=120 experimental=hfr-4 codec-mode=simple",
+                        log) == 0);
+        const fs::path decoded = dir / "ac4_hfr.wav";
+        REQUIRE(run_cli("decode " + quoted(mp4) + " " + quoted(decoded), log) == 0);
+        CHECK(fs::file_size(decoded) > static_cast<std::uintmax_t>(count));
+        // Without the option the same rate is 120 fps frames of their own.
+        REQUIRE(run_cli("ac4-encode " + quoted(wav) + " " + quoted(out) +
+                            " 192 frame-rate=120 codec-mode=simple",
+                        log) == 0);
+        CHECK(first_toc(read_bytes(out)).presentations_v1.at(0).frame_rate_fraction == 1);
+    }
     SECTION("coding-configs chooses among the 5.X element's coding configurations") {
         // A second of independent tones, then one signal in L, R and C: half
         // of the signal each.
@@ -521,6 +547,46 @@ TEST_CASE("ac4-encode's experimental tools each write their syntax", "[cli][ac4]
         const auto records = run(short_tones_wav("ac4_514_acpl1.wav", 10),
                                  "320 codec-mode=aspx-acpl-1 experimental=acpl");
         CHECK(first_frame(records, "immersive_codec_mode_code") == std::vector<std::uint64_t>{2});
+    }
+    SECTION("nine-x-4 takes 9.1.4 and 9.0.4 with the screen pair, in the decoder's order") {
+        // Part 2 clause 6.2.4.1's immersive element with b_5fronts 1: channel
+        // modes 14 and 13 of Table 56, which name their back pair, centre and
+        // top pairs, and ASPX_SCPL by the rate.
+        const fs::path fourteen = short_tones_wav("ac4_914.wav", 14);
+        const auto records = run(fourteen, "800 experimental=nine-x-4");
+        CHECK(first_frame(records, "immersive_codec_mode_code") == std::vector<std::uint64_t>{1});
+        const std::vector<std::byte> bytes = read_bytes(out);
+        const iclforge::ac4::Toc toc = first_toc(bytes);
+        const auto& chan = toc.substream_groups.at(0).substreams.at(0).chan;
+        REQUIRE(chan.has_value());
+        CHECK(chan->ch_mode == 14);
+        CHECK(chan->channel_mode_name == "9.1.4");
+        REQUIRE(chan->original_content.has_value());
+        CHECK(chan->original_content->b_4_back_channels_present);
+        CHECK(chan->original_content->b_centre_present);
+        CHECK(chan->original_content->top_channels_present == 3);
+        // The thirteen-channel file is 9.0.4.
+        (void)run(short_tones_wav("ac4_904.wav", 13), "800 experimental=nine-x-4");
+        const std::vector<std::byte> nine = read_bytes(out);
+        const iclforge::ac4::Toc toc_nine = first_toc(nine);
+        REQUIRE(toc_nine.substream_groups.at(0).substreams.at(0).chan.has_value());
+        CHECK(toc_nine.substream_groups.at(0).substreams.at(0).chan->ch_mode == 13);
+        // An MP4 sample entry describes it: dac4_refusal() has nothing to say.
+        const fs::path mp4 = dir / "ac4_914.mp4";
+        CHECK(run_cli("ac4-encode " + quoted(fourteen) + " " + quoted(mp4) +
+                          " 800 experimental=nine-x-4",
+                      log) == 0);
+        CHECK(fs::exists(mp4));
+        CHECK(iclforge::ac4::dac4_refusal(toc).empty());
+        // Without the option, thirteen and fourteen channels are no layout the command
+        // takes; with it, ASPX_AJCC is refused naming the 9.X.4 element.
+        CHECK(run_cli("ac4-encode " + quoted(fourteen) + " " + quoted(out) + " 800", log) == 2);
+        CHECK(read_log(log).find("9.0.4 and 9.1.4 with experimental=nine-x-4") !=
+              std::string::npos);
+        CHECK(run_cli("ac4-encode " + quoted(fourteen) + " " + quoted(out) +
+                          " 800 codec-mode=aspx-ajcc experimental=ajcc,nine-x-4",
+                      log) == 1);
+        CHECK(read_log(log).find("ASPX_AJCC for 9.0.4 or 9.1.4") != std::string::npos);
     }
     SECTION("ajcc takes the immersive ASPX_AJCC, which codec-mode= names") {
         const fs::path ten = short_tones_wav("ac4_514_ajcc.wav", 10);

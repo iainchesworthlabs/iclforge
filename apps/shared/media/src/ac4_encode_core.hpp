@@ -26,14 +26,16 @@ namespace iclforge::apps {
 // The encoder's input channels, in iclforge::ac4::Decoder's order, for a WAV file of
 // `count` channels, the 7.X element's additional pair, which seven or eight
 // channels need and the other counts leave to another substream, whether the
-// 3.0 element is asked for, and whether the immersive layouts' back pair is:
-// nine and ten channels are 5.0.4 and 5.1.4, eleven and twelve 7.0.4 and
-// 7.1.4; and 24 channels are 22.2, in Part 2 Table A.27's order, where
-// `twenty_two_two` asks for them. Empty for a count the encoder does not take
-// so.
+// 3.0 element is asked for, whether the immersive layouts' back pair is, and
+// their screen pair: nine and ten channels are 5.0.4 and 5.1.4, eleven and
+// twelve 7.0.4 and 7.1.4, thirteen and fourteen 9.0.4 and 9.1.4 (in the order
+// iclforge::ac4::Decoder writes them, the LFE after the top channels); and 24
+// channels are 22.2, in Part 2 Table A.27's order, where `twenty_two_two` asks
+// for them. Empty for a count the encoder does not take so.
 [[nodiscard]] std::vector<iclforge::ac4::Speaker> ac4_input_speakers(std::size_t count,
                                                            iclforge::ac4::AdditionalPair pair,
                                                            bool three_zero, bool back_pair,
+                                                           bool nine_x_4 = false,
                                                            bool twenty_two_two = false);
 
 // The layout `ac4_input_speakers` makes of `count` channels, by name.

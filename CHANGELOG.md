@@ -58,12 +58,25 @@ The sections below contain the complete change list and fixes.
   a Random Index Pack, one Material and one File Package, the IAB Essence Descriptor with its Soundfield
   and Channel SubDescriptors, and a one-entry-per-frame Index Table. It refuses what ST 2067-201
   forbids (16-bit audio, `AudioDataDLC`, `BedRemap`, child elements, conditional elements).
+- **The Track File writer is checked by Netflix Photon, and two defects it found are fixed.** The File
+  Package's Package UID had material type `09h` where ST 2067-2 5.1.5 requires `0Fh`, and
+  `RFC5646SpokenLanguage` was written as UTF-16 where the SMPTE register types it ISO7. A written file
+  now gives no error from `IMPAnalyzer` or `IMFTrackFileReader`; see Validation.
 - **`parse_mxf_iab` accepts a real file's essence key.** It required the literal byte `CCh` where ST
   2067-201 Table 2 has a placeholder and ST 379-1 puts the essence element count, so no real file
   matched; byte 14 is now ignored.
 - **`build_iab()` carries spread and zone control.** `ObjectSpread` becomes the object's size and
-  the nine-zone or 19-zone control becomes its zone constraint and elevation flag, where it matches
-  one of TS 103 420 Table 20's presets; other patterns leave the object unconstrained.
+  the nine-zone or 19-zone control becomes its zone constraint and elevation flag. A pattern one of
+  TS 103 420 Table 20's presets says exactly maps to it; any other takes the preset that includes every
+  zone it includes and admits the object to the nearest extra zones, so it never excludes a zone the
+  author included.
+- **`build_iab()` places every channel Table 19 defines.** The usual Dolby Atmos cinema bed (Lss, Rss,
+  Lrs, Rrs, an overhead pair) used to fail with `kUnsupportedIabChannel`, as did Left/Right Center,
+  Center Height, the surround height codes and Top Surround. Each now has a position, from
+  `bed_label_position()` or from ST 2098-5 Annex B's description; only the Reserved codes are refused.
+- **`IabBridgeResult::unmapped` and `forge atmos-iab` warnings.** A zone control no preset says exactly
+  (and the preset it was carried as), a zone gain between 0 and 1, decorrelation and a snap tolerance
+  are listed per channel and printed as warnings, as `forge atmos-adm` does for ADM.
 
 **IAMF v2.0: object elements, Parameter Blocks, a reader, raw OBU streams and fragments**
 
@@ -110,6 +123,35 @@ The sections below contain the complete change list and fixes.
   table and a linear 6-bit code, though Tables 41 and 42 are printed; `object_div_mode` 1 (reuse) now
   repeats the previous block's value, and an inactive object no longer has divergence bits read for it.
 - Matrix, HOA and Binaural packs stay refused by the bridge; the documentation now says why.
+
+**ADM / BW64: Matrix, HOA and Binaural both ways, polar positions, nesting, and bed programmes from `decode`**
+
+- **A Matrix channel's blocks and its pack's references are read.** libadm's channel-format parser
+  has the loop that would build a Matrix block commented out, so a Matrix channel came back with no
+  blocks at all, not just no coefficients. `parse_bw64` now reads every block of a Matrix channel
+  whole from the `<axml>` text: the output channel (and the legacy `outputChannelIDRef`),
+  `jumpPosition`, and the `matrix`'s coefficients with gain (and `gainUnit`), phase in degrees,
+  delay in milliseconds and the `*Var` forms (BS.2076-3 Tables A1-15 and A1-16); and a Matrix
+  pack's encode, decode, input and output pack references (Table A1-24). New in `model.hpp`:
+  `MatrixCoefficient`, `AudioBlockFormat::matrix` and `output_channel_format_ref`, and the matching
+  `AudioPackFormat` fields.
+- **An HOA block's `nfcRefDist`, `equation`, `screenRef` and `headLocked`, and an HOA pack's
+  defaults, are read.** libadm reads the pack's three as attributes and the standard has them as
+  sub-elements; both are accepted.
+- **`write_bw64` writes what the reader reads.** Polar positions for Objects and DirectSpeakers
+  blocks; HOA, Binaural and Matrix channels and packs; `audioObject`s and `audioPackFormat`s that
+  nest (a loop is `kInvalidDocument`); and an Objects block's `diffuse`, `importance` and
+  `channelLock` distance, which were read and not written. A value libadm's types refuse (an
+  azimuth past 180 degrees) is `kInvalidDocument`, not an exception. `kUnknown` and user-custom
+  types are still refused. Matrix and HOA completions go into the text once libadm has numbered
+  every element, and the model's references are translated to those IDs.
+- **`forge decode ... adm_out` writes a channel-based-immersive bed programme.** It used to warn
+  and write nothing for any E-AC-3 programme that was not dynamic-object-only. Each bed channel is
+  a `DirectSpeakers` channel named by its Table 12 label at that label's position, the dynamic
+  objects keep their OAMD timelines, and the LFE comes from the decoded bed. ISF objects, a second
+  bed instance, a Table 13 assignment and an LFE2 are still refused, with a warning that says so.
+- The bridge still refuses Matrix, HOA and Binaural packs. Known and accepted gaps are marked in
+  the development status page.
 
 **Associated-service identification, both directions**
 
@@ -1649,6 +1691,21 @@ The sections below contain the complete change list and fixes.
   decoding every channel's tone comes back on its own channel at unity, and in core decoding on the 5.X.2
   core's speaker at the core's gain. `src/ac4dec/ERRATA.md`'s evidence for Table 20's prediction gains is
   corrected: DEE's SCPL and ASPX_SCPL streams send them with `sap_mode` 3, not 0.
+- **The AC-4 encoder writes 9.0.4 and 9.1.4** (`EncoderConfig::experimental.nine_x_4`, `forge
+  ac4-encode experimental=nine-x-4`). Thirteen or fourteen input channels, in the order the decoder writes
+  them (L R C Ls Rs Lb Rb Tfl Tfr Tbl Tbr, the LFE of 9.1.4, then Lscr and Rscr), are coded in Part 2's
+  immersive channel element with `b_5fronts` 1 (clause 6.2.4.1) in SCPL, ASPX_SCPL and ASPX_ACPL_2 and,
+  with `experimental.acpl`, ASPX_ACPL_1. The screen pair is coded as A'' = (L + Lscr) / 2 and L'' = (L -
+  Lscr) / 2, and B'' and M'' alike for R, with L'' and M'' predicted from A'' and B'' band by band (Table
+  20's a'_4 and a'_5); A-SPX takes Table 8's seven units and A-CPL six modules. Every channel's tone
+  decodes on its own channel at unity in each mode and layout, the decoder's trace is the encoder's, the
+  decoder's renderer folds the stream to 7.X.4 and 5.X by Tables 38 to 43, and the differential check
+  reads eight such streams through both transcriptions without a finding. The table of contents names
+  channel mode 13 or 14 and `md_compat` 7, which a decoder selects at level 7 (`forge decode
+  md-compat=7`); its `dac4` is written. ASPX_AJCC with `b_5fronts`, dialogue enhancement and the height
+  downmix are refused, naming the element. No encoder outside this project writes the element, so the
+  readings are the text's alone (`libs/ac4/ERRATA.md`, "The 9.X.4 element" under the encoder). Not
+  mirrored in the C API.
 - **The AC-4 encoder's API in its final form, `ac3cli ac4-encode`'s options, and the encoder
   installed** (phase E7 of `planning/ac4.md`). `ac4::Encoder::refusal_reason()` names the rule a
   configuration `create()` refuses breaks, as a string literal such as "a rate outside 8 to 3 000
@@ -2004,6 +2061,15 @@ The sections below contain the complete change list and fixes.
   any quantised line is untouched. The syntax reads back with the trace the encoder recorded, and a
   test holds the restored band within 2 dB of its source. No stream from another encoder sets
   `b_snf_data_exists`, so this project's decoder is the only reader. Not mirrored in the C API.
+- **The AC-4 encoder writes the efficient high frame rate mode** (`EncoderConfig::experimental.frame_rate_fraction`
+  2 or 4, `forge ac4-encode experimental=hfr-2|hfr-4`; Part 2 5.1.3 and Table 18). At
+  `frame_rate_index` 5 to 12 (4 from 10) the codec runs at the audio frame rate the table gives, and
+  each codec frame goes out as that many `raw_ac4_frame()`s: the presentation substream whole in
+  the first and elided in the others, each audio substream cut into as many pieces, only the first an
+  I-frame, counters running on from a multiple of the fraction. A constant rate only. The decoder
+  reassembles each unit, and its output holds the plain stream's quality at the audio frame rate
+  (47.95 to 120 fps in halves and 100 to 120 fps in quarters, with the 29.97 fps cycle of 1 601 and
+  1 602 samples). No other encoder's stream or decoder has read the mode. Not mirrored in the C API.
 - **The AC-4 encoder writes the 22.2 channel element** (`EncoderConfig::experimental.twenty_two_two`,
   `forge ac4-encode experimental=twenty-two-two`): 24 input channels in Part 2 Table A.27's order,
   the order `decode` writes, as the two LFE tracks and eleven channel pairs of Table 21 (clause
@@ -2545,6 +2611,11 @@ The sections below contain the complete change list and fixes.
   installs no file of it and one built with it installs its export and `.pc` file.
 
 ### Fixed
+
+**ADM / BW64**
+
+- **`write_bw64` dropped an `audioObject`'s duration.** `AudioObject::duration` was read and never
+  written, so an object that ran for part of the programme was written as running for all of it.
 
 **Containers**
 

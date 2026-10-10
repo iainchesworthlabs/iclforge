@@ -399,10 +399,11 @@ frame, and unchanged by the content tried):
 | `dee_ac4ims_encoder`, from 5.1 | | ASPX | ASPX | ASPX | ASPX | refused | ASPX | | ASPX | | | | |
 
 - **Never written** (by DEE; this project's encoder writes most of them behind
-  `EncoderConfig::experimental`, 22.2 among them): ASPX_ACPL_1, A-JCC, the 7.X element, mono, 3.0,
-  22.2, the HSF extension, 44.1 kHz, more than one presentation, substream group or audio
-  substream, and objects. There is no 7.1: eight-channel input is downmixed to 5.1 without an
-  error, and 7.1.4 input is refused.
+  `EncoderConfig::experimental`, 22.2 and 9.0.4 and 9.1.4 among them): ASPX_ACPL_1, A-JCC, the 7.X
+  element, mono, 3.0, 22.2, 9.0.4 and 9.1.4, the HSF extension, 44.1 kHz, more than one
+  presentation, substream group or audio substream, and objects. There is no 7.1: eight-channel
+  input is downmixed to 5.1 without an error, and 7.1.4 input is refused. (The readings for 9.0.4
+  and 9.1.4 are the text's alone, and the traces agree.)
 - **5.1.4** is coded as 7.X.4 with the back pair absent and three top channels present, as Part 2
   requires.
 - **The speech frontend** never appears where it can be seen. Every 2.0 and IMS frame enables MDCT
@@ -968,10 +969,10 @@ As built, `Encoder::create()` returns a `std::expected` in place of a constructo
 `loudness`, `drc`, `downmix` and `dialogue`, its substreams are `SubstreamConfig`s, each
 `PresentationConfig` names one of Part 2 Table 53's configurations, and `experimental` is a struct of
 flags in place of `experimental_tools`: `aspx_balance`, `aspx_varvar`, `aspx_interleave`,
-`coding_configs`, `seven_x`, `acpl`, `back_pair`, `ajcc`, `drc_gains`, `three_zero`, `objects` and
-`twenty_two_two`. The
-CRC is an argument of `sync_frame()`, `latency()` is `delay_samples()` and `decoder_delay_samples()`,
-and `encode()` has overloads for a dialogue stem and for the metadata updates of objects.
+`coding_configs`, `seven_x`, `acpl`, `back_pair`, `ajcc`, `nine_x_4`, `drc_gains`, `three_zero`,
+`objects` and `twenty_two_two`. The CRC is an argument of `sync_frame()`, `latency()` is
+`delay_samples()` and `decoder_delay_samples()`, and `encode()` has overloads for a dialogue stem
+and for the metadata updates of objects.
 
 ### Rate control and the psychoacoustic model
 
@@ -1006,9 +1007,9 @@ MDCT stereo processing and block switching, companding, FIXFIX, FIXVAR and VARFI
 element, ASPX_ACPL_2 and ASPX_ACPL_3, 5.1.4 in SCPL, ASPX_SCPL and ASPX_ACPL_2, DRC profiles and
 curves, the channel-independent dialogue enhancement method, and one presentation. The second is the
 rest, which only this project's transcriptions have read: noise fill, VARVAR framing, interleaved
-waveform coding, ASPX_ACPL_1, A-CPL in a channel pair, the mono, 3.0 and 7.X elements, 7.1.4, A-JCC,
-transmitted DRC gains, the other dialogue enhancement methods, several presentations and substreams,
-and objects.
+waveform coding, ASPX_ACPL_1, A-CPL in a channel pair, the mono, 3.0 and 7.X elements, 7.1.4, 9.0.4
+and 9.1.4, A-JCC, transmitted DRC gains, the other dialogue enhancement methods, several presentations
+and substreams, and objects.
 
 By default the encoder writes the first set only. The second is available behind options that name
 it experimental, and each tool leaves that list when a reader independent of this project agrees
@@ -1021,11 +1022,14 @@ As built, the second set is `EncoderConfig::experimental` (`ac3cli ac4-encode ex
 balance, VARVAR framing and frequency-interleaved waveform coding in A-SPX (`aspx_balance`,
 `aspx_varvar`, `aspx_interleave`), the 5.X element's other coding configurations (`coding_configs`),
 7.0 and 7.1 (`seven_x`), ASPX_ACPL_1 and A-CPL in stereo (`acpl`), 7.0.4 and 7.1.4 (`back_pair`),
-A-JCC (`ajcc`), transmitted DRC gains (`drc_gains`), a 3.0 substream (`three_zero`), objects
-(`objects`), spectral noise fill (`noise_fill`) and the 22.2 element (`twenty_two_two`: 24 channels in
-SIMPLE and ASPX, with no A-CPL, downmix, dialogue enhancement or DRC gains for it). Mono, several
-presentations and substreams, and the Mid and cross-channel dialogue enhancement methods are options
-without the flag. Time-interleaved waveform coding is not written at all.
+A-JCC (`ajcc`), 9.0.4 and 9.1.4, the immersive element with `b_5fronts`, in SCPL, ASPX_SCPL, ASPX_ACPL_2
+and ASPX_ACPL_1 but not ASPX_AJCC (`nine_x_4`), transmitted DRC gains (`drc_gains`), a 3.0 substream
+(`three_zero`), objects (`objects`), spectral noise fill (`noise_fill`), the efficient high frame
+rate mode (`frame_rate_fraction` 2 or 4: each codec frame goes out as that many transmission frames,
+at a constant rate) and the 22.2 element (`twenty_two_two`: 24 channels in SIMPLE and ASPX, with no
+A-CPL, downmix, dialogue enhancement or DRC gains for it). Mono, several presentations and
+substreams, and the Mid and cross-channel dialogue enhancement methods are options without the flag.
+Time-interleaved waveform coding is not written at all.
 
 ### One control for both formats
 
@@ -4402,10 +4406,18 @@ outright, with no compatibility shim.
   ignore the extension, Part 1 4.2.4.3 and 5.4), and the encoder takes 48 and 44.1 kHz input alone.
 - 9.X.4's own streams: the modes are decoded, as 22.2 is, without one, and checked on constructed
   streams alone.
-- Presentations spread over several elementary streams (Part 2 5.1.2), and the efficient high frame
-  rate mode (Part 2 5.1.3), in either direction, until a stream uses them.
+- Presentations spread over several elementary streams (Part 2 5.1.2), in either direction, until a
+  stream uses them. The efficient high frame rate mode (Part 2 5.1.3) is decoded and, since the
+  encoder's experimental `frame_rate_fraction`, written at a constant rate: no other encoder's stream
+  or decoder has read it.
 - The speech spectral frontend: in the decoder until a stream uses it (decision 2); in the encoder
   at all, since an encoder for it contains its decoder, with the five defects decision 2 lists.
+- A-SPX time-interleaved waveform coding in the encoder: a time-interleaved slot takes the core's
+  decoded waveform in every subband (Part 1 5.7.6.5.3), so a frame that sends one codes the whole
+  high band as waveform, which costs more than the rates A-SPX serves hold, and attacks have block
+  switching and VARVAR framing. The writer of its syntax (`aspx_tic_used_in_slot`) exists.
+- Bitstream versions 0 and 1 in the encoder's table of contents: it writes version 2, the decoder
+  reads all three.
 - Writing immersive stereo (`presentation_version` 2): V1.3.1 names the version without defining it,
   so the encoder does not copy DEE's use of it, while the decoder reads it by the observed rule
   (decision 10).

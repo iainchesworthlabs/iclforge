@@ -21,6 +21,7 @@ iclforge_add_test_binary(iclforge-ac4-tests PROJECT ac4 SOURCES
     encoder/test_immersive.cpp
     encoder/test_twenty_two_two.cpp
     encoder/test_metadata.cpp
+    encoder/test_nine_x_four.cpp
     encoder/test_objects.cpp
     encoder/test_presentations.cpp
     encoder/test_rates.cpp)

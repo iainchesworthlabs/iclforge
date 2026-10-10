@@ -201,12 +201,20 @@ side's difference from its downmix to 3 kHz; with `aspx-acpl-1` or `aspx-acpl-2`
 Table 163); `7x-back`, `7x-wide` or `7x-top-front`, which takes seven or eight channels as 7.0 or
 7.1 in that 7.X layout, in the WAV order `decode` writes: 3/4/0's back pair in BL and BR and its
 surrounds in SL and SR, 5/2/0's wide pair last, 3/2/2's top front pair in TFL and TFR;
-`back-pair`, which takes 11 and 12 channels as 7.0.4 and 7.1.4, with Lb and Rb; `three-zero`, which
-takes three channels, L R C, as 3.0, the dialogue of a music and effects presentation (below);
+`back-pair`, which takes 11 and 12 channels as 7.0.4 and 7.1.4, with Lb and Rb; `nine-x-4`, which
+takes 13 and 14 channels as 9.0.4 and 9.1.4, the immersive element with the screen pair Lscr and Rscr
+(SCPL, ASPX_SCPL and ASPX_ACPL_2 by the rate, and with `acpl` ASPX_ACPL_1; it refuses `ajcc`, dialogue
+enhancement and `height-downmix=`, and its thirteen tracks make the stream `md_compat` 7, which
+`decode` takes with `md-compat=7`); `three-zero`, which takes three channels, L R C, as 3.0, the
+dialogue of a music and effects presentation (below);
 `noise-fill`, which sends each scale factor band that quantises to zero a noise level (Part 1
 5.1.4: its own energy in 3 dB steps, from the level before it) that the decoder fills with noise,
-and so trades some SNR for a spectrum without holes at a low rate; `twenty-two-two`, which takes
-24 channels as 22.2, the element of ETSI TS 103 190-2 clause 6.2.4.3 (below); and `objects`, which
+and so trades some SNR for a spectrum without holes at a low rate; `hfr-2` and `hfr-4`, the
+efficient high frame rate mode (Part 2 5.1.3): with `frame-rate=` 47.95 to 120 (`hfr-4` from 100)
+the encoder codes at half or a quarter of that rate (Table 18) and sends each frame as two or four
+transmission frames, which a decoder joins again; a constant rate only; `twenty-two-two`, which
+takes 24 channels as 22.2, the element of ETSI TS 103 190-2 clause 6.2.4.3 (below); and `objects`,
+which
 `objects=<scene file>` needs.
 
 **22.2.** With `experimental=twenty-two-two`, a 24-channel WAV file is written as the 22.2 channel
@@ -484,7 +492,7 @@ channels have no single fixed layout to measure loudness against the way `atmos-
 input does, so `atmos-iab` refuses it with a clear error rather than silently keeping the default.
 
 Every failure — a bitstream/MXF parse error (`iclforge::iab::IabError`) or a graph-resolution error
-(`iclforge::adm::BridgeError`, e.g. a Table 19 `ChannelID` with no `BedLabel` equivalent, or
+(`iclforge::adm::BridgeError`, e.g. a Table 19 `ChannelID` that is Reserved, or
 essence that never resolved) — prints a real diagnosis via that error's own `describe()`, never an
 opaque crash or a bare non-zero exit.
 
@@ -535,7 +543,7 @@ requirements ask for beside an Atmos one.
 
 | Command | What it does |
 |---|---|
-| `decode` | AC-3, E-AC-3 or AC-4 → WAV; the stream decides which decoder runs (for AC-4, mono, stereo, 3.0, 5.X and 7.X in the SIMPLE, ASPX and A-CPL codec modes, and 7.0.4 and 7.1.4 in every immersive codec mode, in [full or core decoding and to the layout `speakers=` names](#ac-4-immersive-speakers-and-decoding), written in WAV speaker order, and of a stream of several presentations the one [`presentation=`, `language=` and `associated=`](#ac-4-presentations-presentation-language-associated) choose, its substreams mixed; a presentation with A-JOC or direct-coded objects renders them to the output's speakers as coded, 7.1.4 by default). The input may be a Matroska/MP4/MPEG-TS container as well as a bare elementary stream, sniffed by content rather than by name — the same three readers `demux` uses. For an Atmos E-AC-3 stream or an AC-4 stream with objects, reports the object count found and, with `objects_dir`, exports each decoded object as its own `object_NN.wav` there — JOC-reconstructed for E-AC-3, D10's own decoded objects for AC-4. With `adm_out` (needs `-DICLFORGE_BUILD_ADM=ON`), also writes a Dolby Atmos Master ADM Profile BW64 there: for E-AC-3, the bed's LFE plus every dynamic object, positioned by its own decoded OAMD automation; for AC-4, every bed and dynamic object with its own decoded Annex F properties |
+| `decode` | AC-3, E-AC-3 or AC-4 → WAV; the stream decides which decoder runs (for AC-4, mono, stereo, 3.0, 5.X and 7.X in the SIMPLE, ASPX and A-CPL codec modes, and 7.0.4 and 7.1.4 in every immersive codec mode, in [full or core decoding and to the layout `speakers=` names](#ac-4-immersive-speakers-and-decoding), written in WAV speaker order, and of a stream of several presentations the one [`presentation=`, `language=` and `associated=`](#ac-4-presentations-presentation-language-associated) choose, its substreams mixed; a presentation with A-JOC or direct-coded objects renders them to the output's speakers as coded, 7.1.4 by default). The input may be a Matroska/MP4/MPEG-TS container as well as a bare elementary stream, sniffed by content rather than by name — the same three readers `demux` uses. For an Atmos E-AC-3 stream or an AC-4 stream with objects, reports the object count found and, with `objects_dir`, exports each decoded object as its own `object_NN.wav` there — JOC-reconstructed for E-AC-3, D10's own decoded objects for AC-4. With `adm_out` (needs `-DICLFORGE_BUILD_ADM=ON`), also writes a Dolby Atmos Master ADM Profile BW64 there: for E-AC-3, the bed's LFE plus every JOC-reconstructed channel (a channel-based-immersive bed's channels pinned to their speakers, a dynamic object positioned by its own decoded OAMD automation); for AC-4, every bed and dynamic object with its own decoded Annex F properties |
 | `probe` | What a stream *declares*, without rendering its audio: bsid, sample rate, layout, substream map, counts, duration, bit rate, metadata ranges, EMDF/OAMD/JOC, authenticity, per-frame CRC and coding-tool usage. Human table by default, or the `iclforge.probe/1` JSON document with `json=1`. An AC-4 stream gets its table of contents, frame rate, bit rate, I-frames and splices, and each presentation with the metadata the decoder reads of it. The input may be a Matroska, MP4 or MPEG-TS container, sniffed by content: the report then also says what the container declares of the track (codec ID, sample entry or descriptor, time scale, language), in the JSON document as `container`, which is `null` for a bare stream |
 | `levels` | Per-channel peak/RMS report — takes a WAV, a bare encoded stream, or a Matroska/MP4/MPEG-TS container carrying one; of an AC-4 stream, the presentation [`presentation=` and the rest](#ac-4-presentations-presentation-language-associated) choose, as coded |
 | `loudness` | BS.1770-4 gated loudness, reported as the `dialnorm` it implies: of a WAV; of an AC-3 or E-AC-3 stream's first programme, beside the `dialnorm` it carries; or of an AC-4 presentation as coded, in AC-4's steps of 0.25 dB, beside the stream's own. Bare or inside a container |
@@ -586,9 +594,12 @@ The object export works for a bed programme too, which is what channel-based-imm
 third-party content is: a 7.1.4 bed carried in a 5.1 downmix exports its eleven non-LFE channels
 (§6.3.2.2 never makes the LFE a JOC output), and the status report names them (`bed [L R C LFE Ls
 Rs Lb Rb Tfl Tfr Tbl Tbr] + 0 dynamic objects`) rather than just counting them. The ADM master
-does not: that writer covers dynamic-object-only programmes today, so a bed programme gets a
-warning saying so and no master file written, while the WAV and `objects_dir` outputs of the same
-run are unaffected. The report also names an OAMD trim element when one rides along, any `oa_element`
+holds a bed programme as well: each bed channel is a `DirectSpeakers` channel named by its Table 12
+label and pinned at that label's position, beside the dynamic objects' own timelines, and the LFE
+(which JOC bypasses) comes from the decoded bed. A programme with ISF objects, a second bed
+instance, a Table 13 bed assignment or an LFE2 has no label for some channel, so it gets a warning
+saying so and no master file written, while the WAV and `objects_dir` outputs of the same run are
+unaffected. The report also names an OAMD trim element when one rides along, any `oa_element`
 skipped because its id is unrecognised, and how many metadata update blocks a frame carries when
 it carries more than one.
 

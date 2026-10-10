@@ -167,18 +167,22 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     config.experimental.coding_configs = (layout & 0x20) != 0;
     config.experimental.acpl = (layout & 0x40) != 0;
     config.experimental.ajcc = (layout & 0x80) != 0;
-    // The sample rate byte's low bit; the two over it name the A-CPL mode;
-    // the three top bits together make the layout above 22.2's 24 channels
-    // (Part 2 clause 6.2.4.3), which experimental.twenty_two_two lets in when
-    // the bit under them is set, and that option set for another layout (one
-    // in eight) is the refusal that names it.
+    // The sample rate byte's low bit; the two over it name the A-CPL mode. The four bits over
+    // those together make the layout above 22.2's 24 channels (Part 2 clause 6.2.4.3), and the top
+    // bit then lets experimental.twenty_two_two in; set for another layout (one in eight, by
+    // the bits that name no layout) that option is the refusal that names it. The top bit of an
+    // immersive layout widens it to 9.0.4 or 9.1.4 with the screen pair
+    // (experimental.nine_x_4).
     const std::uint8_t rate = take.byte();
     config.sample_rate_hz = (rate & 1) != 0 ? 44100 : 48000;
-    const bool twenty_two = (rate & 0xE0) == 0xE0;
+    const bool twenty_two = (rate & 0x78) == 0x78;
     if (twenty_two) {
         config.channels = 24;
+    } else if (config.channels >= 9 && config.channels <= 12 && (rate & 0x80) != 0) {
+        config.channels = lfe ? 14 : 13;
+        config.experimental.nine_x_4 = true;
     }
-    config.experimental.twenty_two_two = twenty_two ? (rate & 0x10) != 0 : (rate & 0x1C) == 0x1C;
+    config.experimental.twenty_two_two = twenty_two ? (rate & 0x80) != 0 : (rate & 0x1C) == 0x1C;
     // 4 to 1024 kbps, so the refusals below 8 are reached too.
     config.bitrate_kbps = 4 + static_cast<int>(take.byte()) * 4;
     // The interval takes the low five bits of its byte and dialnorm seven of
@@ -219,6 +223,11 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     constexpr std::array<iclforge::ac4::RateMode, 4> kRateModes = {iclforge::ac4::RateMode::kConstant, iclforge::ac4::RateMode::kAverage,
                                                          iclforge::ac4::RateMode::kVariable, iclforge::ac4::RateMode::kConstant};
     config.rate_mode = kRateModes[static_cast<std::size_t>((timing >> 4) & 3)];
+    // The efficient high frame rate mode, where the index and the rate mode
+    // allow it (refused, and so skipped, where they do not).
+    if (((dialnorm ^ interval) & 0x20) != 0) {
+        config.experimental.frame_rate_fraction = (timing & 0x08) != 0 ? 4 : 2;
+    }
     if ((timing & 0x40) != 0) {
         config.iframes = {3, 1};
     }
