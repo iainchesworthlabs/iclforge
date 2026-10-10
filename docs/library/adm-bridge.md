@@ -135,8 +135,13 @@ an object in the downmix would have the receiving renderer spread it a second ti
 - **A `zoneExclusion` that is not a Table B.18 preset** (see below).
 - **Matrix, HOA, Binaural and User Custom packs** are refused with `BridgeError::kUnsupportedType`, by
   design rather than as a gap: `AtmosEncoder` takes mono objects with a position, and a Matrix pack
-  is a coefficient mix, HOA has no position, and Binaural is already rendered. libadm also has no
-  model for a Matrix block's coefficients, so they are not read.
+  is a coefficient mix, HOA has no position, and Binaural is already rendered. The parser reads all
+  three (a Matrix block's coefficients and its pack's encode/decode/input/output references
+  included, see [ADM / BW64 reading](adm.md)) and the writer writes them; the bridge does not apply
+  them. A Matrix decode would be the sum of each input channel times its coefficient, with phase
+  and delay and variables the standard leaves to the renderer, and HOA would need a loudspeaker
+  decoder chosen and tuned: both would be written without a file from another tool or a
+  reference renderer to check them against, so they are refused rather than guessed.
 
 `build()` does not drop these silently. `BridgeResult::unmapped[i]` lists, for channel `i`, each feature
 above that its blocks use, and `forge atmos-adm` prints one `warning:` line per such channel.
@@ -301,9 +306,13 @@ bed-instance programme (`Eac3Decoder` never emits ISF objects, several bed insta
 non-standard Table 13 assignments — see `oamd.hpp`'s own `Program` comment; an AC-4 presentation's
 objects come from `iclforge::ac4::DecodedFrame::objects`, which lists bed and dynamic objects and renders an
 intermediate spatial format into channels instead), no nested `audioObject`s, cartesian positions
-only. `forge decode`'s `adm_out` wiring (`decode.cpp`) additionally only attempts this for an
-E-AC-3 `dynamic_only` programme — a channel-based-immersive bed programme (third-party content) is
-warned about and skipped, not written incorrectly.
+only. `forge decode`'s `adm_out` wiring (`decode.cpp`) writes an E-AC-3 programme's dynamic objects
+and, for a channel-based-immersive bed programme (third-party content, and what `atmos-cbi`
+writes), its bed channels too: each JOC output is one payload object, `object_indices` says which,
+and one below the bed's channel count is written as a `bed_label` channel named by its Table 12
+label while a dynamic object keeps its OAMD update timeline. The LFE comes from the decoded bed. A
+programme with ISF objects, a second bed instance, a Table 13 assignment or an LFE2 is warned
+about and skipped, not written incorrectly: each has a channel count and no label.
 
 **`WriteObjectUpdate` is the write-direction input for one OAMD update**, timestamped in absolute
 samples from the start of the whole decode (not the access unit it arrived in) — a caller

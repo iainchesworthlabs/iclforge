@@ -91,13 +91,15 @@ enum class AdmError : std::uint8_t {
 // into a libadm ::adm::Document, ::adm::writeXml() to serialize it, and libbw64's Bw64Writer
 // (bw64::writeFile()) to write the BW64 container (<fmt >, <chna>, <axml>, <data>).
 enum class AdmWriteError : std::uint8_t {
-    kInvalidDocument,  // an AdmModel cross-reference (a *_refs entry, or an AdmDocument::chna
-                       // entry's uid) did not resolve to another element `document` itself
-                       // carries, or named an element type this writer does not support (Matrix/
-                       // HOA/Binaural channel/pack formats, nested audioObject/audioPackFormat
-                       // references, a block whose `position` is polar rather than cartesian -
-                       // this writer only emits the Dolby Atmos Master ADM Profile's cartesian
-                       // shape), or an AudioTrackUid named both an audioTrackFormat and an
+    kInvalidDocument,  // an AdmModel cross-reference (a *_refs entry, a Matrix coefficient's
+                       // input channel, a Matrix block's output channel, a Matrix pack's
+                       // encode/decode/input/output pack, or an AdmDocument::chna entry's uid) did
+                       // not resolve to another element `document` itself carries; audioObjects or
+                       // audioPackFormats that nest in a loop; an element of TypeDefinition
+                       // kUnknown or kUserCustom, which have no element to be written as; an HOA
+                       // block that never had its order or degree; a value libadm's own types
+                       // refuse (an azimuth past 180 degrees, an importance past 10); or an
+                       // AudioTrackUid that named both an audioTrackFormat and an
                        // audioChannelFormat (BS.2076-2 clause 5.9 allows one or the other). A
                        // caller bug, not a hostile-input case: unlike parse_bw64's AdmError,
                        // nothing here comes from an untrusted file.

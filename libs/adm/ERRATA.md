@@ -54,3 +54,36 @@ the other way, a factor of one half or more becomes `screenRef` 1. Annex B.2.1.3
 carry (it is in no clause of the standard but that row), so the bridge reads and writes no reference screen.
 
 Evidence: **text** (§5.5.11, §5.6.1.1.18 to .20, §5.2.1.3, Annex B.2.1.3).
+
+## ITU-R BS.2076-3 §5.4.3.2 and §5.5.4: Matrix blocks and packs
+
+libadm 0.14.0 does not read or write most of a Matrix. Its channel-format parser has the loop that
+would build a Matrix block commented out (`parseAudioChannelFormat`), so a Matrix channel arrives with
+no blocks; its formatter writes a Matrix block as an element holding only its ID, `rtime` and
+`duration` (`formatBlockFormatMatrix`: "TODO: add missing matrix attributes and elements"); and its
+Matrix block class lists `encodePackFormatIDRef`, `decodePackFormatIDRef`, `inputPackFormatIDRef` and
+`outputPackFormatIDRef` among its "unsupported parameters". `libs/adm/src/adm_xml_extras.cpp` reads
+and writes them on the `<axml>` text, as it does `zoneExclusion`. The shapes taken:
+
+- **A block**: `outputChannelFormatIDRef` (0 or 1; the file may spell it `outputChannelIDRef`, which
+  Table A1-15's footnote says a reader must also accept, and it is written as the former),
+  `jumpPosition`, and one `matrix` holding `coefficient` elements, then `gain` and `importance`
+  where they are not the defaults. That is the order of the standard's own sample code (§5.4.3.2.1).
+  The standard does not say whether the order is binding, and no schema was available to check.
+- **A coefficient**: the element's text is the `audioChannelFormatID` it reads; attributes `gain`
+  (default 1.0, with `gainUnit` `linear` or `dB`), `phase` (degrees, default 0), `delay`
+  (**milliseconds**, default 0) and a `*Var` form of each. The standard allows one of the constant and
+  the variable, never both; the writer follows that. A negative linear gain inverts the signal.
+- **A pack**: `encodePackFormatIDRef` and `decodePackFormatIDRef` (0 or more), `inputPackFormatIDRef`
+  and `outputPackFormatIDRef` (0 or 1), written first in the pack as in §5.5.4.2.
+
+**HOA pack defaults.** §5.5.5.1 Table A1-25 has `normalization`, `nfcRefDist` and `screenRef` as
+sub-elements of the pack, and so does EAR's parser. libadm's parser reads them as XML *attributes*
+of the same element and its formatter writes neither. Both spellings are read; sub-elements are
+written. A pack's values are defaults that a block's own override (§5.5.5).
+
+Evidence: **text** for every shape above (Tables A1-15, A1-16, A1-24, A1-25 and the sample code), and
+the **EBU's renderer read as code** (EAR `ear/fileio/adm/xml.py`: `coefficient` as `HandleText` with
+the `gain`, `phase`, `delay` and `*Var` attributes, `outputChannelFormatIDRef`, and the pack's
+references and HOA defaults as sub-elements). Nothing here has run EAR or any other tool over a
+file this module wrote, or written a Matrix pack of its own that another tool applied.
