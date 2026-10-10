@@ -120,7 +120,8 @@ struct MxfWriteOptions {
 
     // IAB Soundfield Label SubDescriptor (Annex C, Table 7). The strings are written as given; MCA
     // Content and MCA Use Class take the values of ST 377-41 Subclauses 5.4 and 5.5, which are not
-    // checked here. A spoken language is an RFC 5646 tag and is left out when empty.
+    // checked here. A spoken language is an RFC 5646 tag, written as the 7-bit character string the
+    // register types it as (the other strings are UTF-16), and is left out when empty.
     std::optional<std::string> title;
     std::optional<std::string> title_version;
     std::optional<std::string> spoken_language;

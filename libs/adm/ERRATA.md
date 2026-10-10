@@ -32,6 +32,56 @@ matches a preset and reports the rest as inexact (`AdmZoneMapping::exact`), whic
 - `ZU` without `ZB`, or `ZB` without `ZU`, leaves elevation enabled. The switch is one bit.
 - Two different horizontal presets at once map to no constraint.
 
+## ST 2098-2:2022 Table 19: where the channels with no bed label sit
+
+Table 19 names each `ChannelID` by its ST 428-12, ST 2098-5 or BS.2051-2 channel name and gives no
+coordinates. ST 2098-5 Annex B (informative) says in prose where each immersive loudspeaker is "typically"
+placed; ST 428-12, which holds the base layer's, could not be read here (pub.smpte.org answered 403).
+`build_iab()` carries a bed channel as a position, so each code that has no `BedLabel` is placed from that
+prose and from the conventions `bed_label_position()` already has (a surround pair halfway back, the rear pair
+at the rear wall, a height at the ceiling):
+
+| Code | Channel | x, y, z | From |
+|---|---|---|---|
+| `0x1` / `0x3` | Left / Right Center | 0.25 / 0.75, 0, 0 | The name: between Left and Center, Center and Right |
+| `0xB` / `0xC` | Left / Right Top Surround | 0.25 / 0.75, 0.5, 1 | "laterally between the Center screen Loudspeaker and the Left screen Loudspeaker", at the ceiling; the array's middle in depth |
+| `0x10` | Center Height | 0.5, 0, 1 | "directly above the Center Loudspeaker, at the top center of the screen" |
+| `0x11` / `0x12` | Left / Right Surround Height | 0 / 1, 2/3, 1 | "along the left side and left rear ... starting approximately 1/3 of the distance from the screen to the rear wall": the middle of that span |
+| `0x13` / `0x14` | Left / Right Side Surround Height | 0 / 1, 0.5, 1 | "directly above the Lss array", which sits where the surround pair does |
+| `0x15` / `0x16` | Left / Right Rear Surround Height | 0 / 1, 1, 1 | "directly above the Lrs Loudspeaker(s)" |
+| `0x17` | Top Surround | 0.5, 0.5, 1 | "on the ceiling over the center of the seating area", read as the middle of the room |
+
+`0x5` / `0x9` (Left / Right Side Surround) are placed where `0x6` / `0xA` (Left / Right Surround) are. A
+bed has one or the other, and the annex puts the Lss array on the side wall as the Ls array is.
+`0xE` / `0xF` (Left / Right Height) are the top front pair: "behind the screen directly above the Left
+Loudspeaker, at the left top corner of the screen".
+
+The usual cinema bed, L C R Lss Rss Lrs Rrs LFE Lts Rts (ST 2098-5 Table 2's 9.1OH), bridges as a result.
+The codes `0x18`-`0x7F` ("Reserved for D-Cinema") and everything above `0x89` are Reserved and refused.
+
+Evidence: **text** for the names and for the descriptions quoted, **reading** for every coordinate. No
+renderer has placed a stream's channels to compare them against.
+
+## ST 2098-2 §10.5.11-14 and TS 103 420 Table 20: a zone pattern that is not a preset
+
+ST 2098-2 gives each of nine zones (nineteen in `ObjectZoneDefinition19`) a gain from 0 to 1. TS 103 420
+Table 20 gives `zone_constraints_idx`, six presets, and `b_enable_elevation` beside it. Neither text says
+how to carry a pattern the presets lack. The bridge's reading:
+
+1. A gain of 0.5 or more counts as the zone being included, since a preset includes or excludes a zone.
+2. A horizontal pattern that is exactly a preset's maps to it.
+3. Any other pattern takes the preset that includes every zone the pattern includes, and among those the one
+   that lets the object into the nearest extra zones, summed by distance in the room plan between the
+   loudspeaker positions the zones are named for. The preset therefore never excludes a zone the author
+   included, and everything it excludes the author excluded. The rest is the approximation, listed in
+   `IabBridgeResult::unmapped`.
+4. The presets treat the rear as one group, so a `ObjectZoneDefinition19` rear with any zone included
+   asks for all of it, and a rear with some zones in and some out is never exact.
+5. A pattern with no horizontal zone included has nothing to cover and is left `kNone`.
+
+Evidence: **reading**. The earlier reading left such an object unconstrained, which also excludes no
+included zone but applies none of the author's exclusions. No renderer has been compared.
+
 ## ADM `objectDivergence` and `screenRef`
 
 TS 103 420 Annex B (the OAMD-to-ADM conversion) has no row for either.

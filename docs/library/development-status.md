@@ -209,10 +209,12 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | `AudioDataPCM` | 🟢 | High | Essential | Full PCM |
 | | `AudioDataDLC` (Annex B) | 🟢 | Medium | Important | 48 and 96 kHz, bit exact; `decode_dlc`, used by `build_iab` |
 | | MXF Track File extract (ST 2067-201) | 🟢 | High | Essential | Minimal KLV walk |
-| **Bridge** | IAB → Atmos encode (positions / gains) | 🟢 | High | Essential | `adm::build_iab`; `forge atmos-iab` |
-| | Spread + `ObjectZoneControl` → JOC | 🟡 | Medium | Important | Spread → object size; zone control → zone constraint when it matches one of the six presets; otherwise unconstrained |
+| **Bridge** | IAB → Atmos encode (positions / gains) | 🟢 | High | Essential | `adm::build_iab`; `forge atmos-iab`; every Table 19 channel is placed, the Reserved codes are refused |
+| | Spread + `ObjectZoneControl` → JOC | 🟡🔵 | Medium | Important | Spread → object size; zone control → zone constraint: exact for the six presets, otherwise the tightest preset that includes every zone it includes, listed in `IabBridgeResult::unmapped` and warned by `forge atmos-iab`. Accepted: OAMD says six presets and an elevation bit, so no finer pattern and no zone gain can be carried |
+| | Decorrelation, snap tolerance | 🔴🔵 | Low | Nice-to-have | `ObjectDecorCoef`, a bed channel's decorrelation and `ObjectSnapTolerance` are read and not carried: OAMD has no field for them (as for ADM `diffuse`). Listed in `unmapped` and warned. Accepted: the target format has none |
+| | More than 15 bed channels and objects | 🔴 | High | Important | `build_iab` returns `kTooManyChannels`: TS 103 420 §8.3.2.2 caps the programme at 16 with the LFE, and nothing clusters a larger master down to fit. The ADM bridge has the same cap |
 | **Writer** | IAB encode | 🟢 | Low | Nice-to-have | `write_iaframe`, `write_iabitstream`; `encode_dlc` for lossless essence |
-| | MXF Track File write (ST 2067-201) | 🟢 | Low | Nice-to-have | `write_mxf_iab`; refuses what 2067-201 forbids (16-bit, DLC, `BedRemap`, child elements); checked by a separate reader and FFmpeg's demuxer, no IMF tool here has opened it |
+| | MXF Track File write (ST 2067-201) | 🟢 | Low | Nice-to-have | `write_mxf_iab`; refuses what 2067-201 forbids (16-bit, DLC, `BedRemap`, child elements); checked by a separate reader, FFmpeg's demuxer and Netflix Photon 5.1.0-rc.3, which finds no error in it ([Validation](../verification.md#imf-iab-track-files)) |
 
 ---
 
@@ -347,8 +349,10 @@ this register is the checklist that those bounds appear here too.
 
 | Clause | Open item | Status |
 |---|---|---|
-| §5.5 / §10 zone control | A zone pattern that matches none of TS 103 420 Table 20's six presets is left unconstrained | 🟡 |
-| Writer | ST 2067-201 Track File: no IMF validator or packager has opened a file | 🟡 |
+| §5.5 / §10 zone control | A zone pattern outside TS 103 420 Table 20's six presets is carried as the tightest preset that includes every zone it includes; OAMD has no finer value | 🟡🔵 |
+| §10.3.5 Table 19 | The positions of the channels with no bed label are readings of ST 2098-5 Annex B's informative prose; neither it nor ST 2098-2 gives coordinates | 🟡🔵 |
+| §10.3.10, §10.5.9, §10.5.18 | Decorrelation and snap tolerance have no OAMD field | 🔴🔵 |
+| Writer | ST 2067-201 Track File: Photon 5.1.0-rc.3 opens a written file with no error (it found two defects, fixed); no IMF packager has wrapped one in an IMP, and this project writes no CPL, PKL or ASSETMAP | 🟡🔵 |
 
 ### ITU-R BS.2076 / BS.2088 (ADM / BW64)
 

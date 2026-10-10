@@ -128,8 +128,10 @@ namespace iclforge::adm {
 struct IabZoneMapping {
     iclforge::objects::oba::ZoneConstraint zone = iclforge::objects::oba::ZoneConstraint::kNone;
     bool enable_elevation = true;
-    // False when the gains matched none of Table 20's six presets, so `zone` is kNone: the object
-    // is left unconstrained rather than approximated by a preset that excludes the wrong zones.
+    // False when the gains are not exactly one of Table 20's six presets, which is all OAMD can
+    // say. `zone` is then the preset that covers every zone the gains include (so it excludes only
+    // zones the author excluded) and lets the object into the nearest extra zones; kNone when no
+    // other preset covers them, or when no zone is included at all.
     bool exact = true;
 };
 
@@ -139,23 +141,27 @@ inline constexpr double kIabZoneIncludeThreshold = 0.5;
 
 // ST 2098-2 §10.5.11-14 Table 24's nine zones (screen left/centre/right, left wall, right wall,
 // rear left, rear right, overhead left, overhead right) onto TS 103 420 §5.6.1.6 Table 20 and
-// Table 21. The horizontal zones map to a preset only when their include/exclude pattern is
-// exactly that preset's:
+// Table 21. The horizontal zones map exactly to a preset when their include/exclude pattern is
+// that preset's:
 //   none               every horizontal zone
 //   back excluded      all but the two rear zones
 //   side excluded      all but the two wall zones
 //   centre and back    screen centre and the two rear zones
 //   screen only        the three screen zones
 //   surround only      the two wall zones and the two rear zones
+// Any other pattern has no exact preset (`exact` is false) and takes the preset that includes
+// every zone the pattern includes and admits the object to the nearest extra zones, summed by
+// distance in the room plan: screen left alone gets screen only, the left wall alone gets surround
+// only. The preset therefore never excludes a zone the author included.
 // The overhead zones set b_enable_elevation: on when either is included.
 [[nodiscard]] ICLFORGE_ADM_EXPORT IabZoneMapping iab_zones_to_constraint(
     const std::array<double, iclforge::iab::kZoneCount>& gains);
 
 // The same mapping for ObjectZoneDefinition19's 19 zones (§10.6 Table 28), which replace the nine
 // zones when present. The base layer zones carry the horizontal pattern - screen from zones 0-2,
-// the left and right walls from 12 and 14, the rear from 6-8, a rear or screen group counting as
-// included only when all its zones are - and every height layer or ceiling zone feeds
-// b_enable_elevation.
+// the left and right walls from 12 and 14, the rear from 6-8 - and every height layer or ceiling
+// zone feeds b_enable_elevation. The presets treat the rear as one group, so a rear with any zone
+// included asks for all of it, and a rear with some zones in and some out is never `exact`.
 [[nodiscard]] ICLFORGE_ADM_EXPORT IabZoneMapping iab_zones19_to_constraint(
     const std::array<double, iclforge::iab::kZone19Count>& gains);
 

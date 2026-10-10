@@ -122,6 +122,9 @@ SubDescriptors are written, the timestamp, and a seed for the UUIDs and package 
 input gives the same bytes. `libs/iab/ERRATA.md` records the readings the writer takes. The writer's output
 parses in `parse_mxf_iab()`, and FFmpeg's MXF demuxer reads its partitions, Header Metadata, timecode and
 duration; FFmpeg does not know the IAB Essence Descriptor, so it reports the audio stream as unsupported.
+Netflix's Photon IMF validator (5.1.0-rc.3, which implements ST 2067-201:2026) opens a written file with no
+error; see [Validation](../verification.md#imf-iab-track-files) for what that covers. A file is a Track File
+only: this project writes no Composition Playlist, Packing List or Asset Map to put it in an IMP.
 
 ## Consulted, never copied
 
@@ -217,8 +220,9 @@ encoder's own choices.
 input shape — one `iclforge::objects::oba::ObjectPath` plus one mono PCM buffer per Bed channel or Object, ready
 to drive `encode_frame()` in a loop, the same destination shape `iclforge::adm::build()` produces
 for ADM. See [ADM → Atmos bridging](adm-bridge.md#bridging-iab) for what gets
-mapped (Table 19 → `iclforge::objects::oba::BedLabel`, position conversion, MetaID-based cross-frame identity)
-and what is carried as metadata only (spread as object size, zone control as a zone constraint).
+mapped (every Table 19 channel to a position, position conversion, MetaID-based cross-frame identity)
+and what is carried as metadata only (spread as object size, zone control as a zone constraint, the
+tightest preset when the pattern is none of the six).
 [`examples/encode_iab.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/examples/encode_iab.cpp)
 is the full read → bridge → encode pipeline; `forge atmos-iab` drives the identical pipeline from
 the command line.

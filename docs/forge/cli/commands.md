@@ -471,7 +471,7 @@ channels have no single fixed layout to measure loudness against the way `atmos-
 input does, so `atmos-iab` refuses it with a clear error rather than silently keeping the default.
 
 Every failure — a bitstream/MXF parse error (`iclforge::iab::IabError`) or a graph-resolution error
-(`iclforge::adm::BridgeError`, e.g. a Table 19 `ChannelID` with no `BedLabel` equivalent, or
+(`iclforge::adm::BridgeError`, e.g. a Table 19 `ChannelID` that is Reserved, or
 essence that never resolved) — prints a real diagnosis via that error's own `describe()`, never an
 opaque crash or a bare non-zero exit.
 
