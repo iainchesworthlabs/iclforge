@@ -112,9 +112,7 @@ jobs:
           set -euo pipefail
           have="$(npm --version)"
           echo "npm ${have}"
-          oldest="$(printf '%s
-%s
-' 11.5.1 "${have}" | sort -V | head -n 1)"
+          oldest="$({ echo 11.5.1; echo "${have}"; } | sort -V | head -n 1)"
           if [ "${oldest}" != "11.5.1" ]; then
             echo "::error::npm ${have} is older than 11.5.1, which npm trusted publishing needs."
             exit 1
