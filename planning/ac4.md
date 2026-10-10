@@ -92,6 +92,7 @@ checked. The table is of `main` at `5ef9eeafc`.
 | D14f | the decoder's memory | open, 2026-10-03 | measured: 2.0 peaks at 286,365 bytes on a 32-bit core from 429,667 (fixed) and 413,611 (`float`), 5.1 at 704,311, 5.1.4 at 1,502,903; every PCM pin unmoved and `double` byte-identical to `main` |
 | D14g | AC-4 playback speed on the S3 and the P4 | open, 2026-10-11 | measured: the P4 keeps up at 5.1 in all four codec modes (A-CPL mode 3 at 0.73, from 1.16) and takes 5.1.4 at 1.01 to 1.21, from 1.59 to 1.92; the S3, with QIO flash, 64-byte lines, the code in PSRAM, a 64 KB data cache and the second core, keeps up at 2.0 (0.40 and 0.50), through the converter at every rate and at E-AC-3 7.1.4, and takes 5.1 SIMPLE at 0.99; every PCM hash unmoved on 160 S3 plays and 40 P4 plays |
 | D14h | A-CPL's interpolation at single precision at the float tier | open, 2026-10-11 | measured: the P4's 5.1 A-CPL mode 3 frame takes 0.63 of its duration from 0.73, the S3's 1.44 from 1.57; the PCM of streams with A-CPL moves, the float probe's six hashes and the float against double floors do not; the P4's and S3's hashes are equal on all twenty plays |
+| D14i | the next frame's syntax read on the second core while this frame is reconstructed | open, 2026-10-11 | measured: the P4's 5.1.4 in S-CPL takes 0.94 of its duration from 1.01, with A-SPX 1.15 and 1.15 from 1.19 and 1.21; the hash of every play on both boards, the second core off and on, is D14h's |
 | E1 | the encoder library, the frame writer, SIMPLE mono and stereo | #1011, 2026-09-25 | merged; exit met |
 | E2 | A-SPX and companding | #1013, 2026-09-25 | merged; exit met |
 | E3 | the 5.X element | #1025, 2026-09-25 | merged; exit met |
@@ -2711,9 +2712,8 @@ without the second core, in each memory configuration, and the host's tests hold
   pass the AC-4, DSP and AC-3 tests at `double` and `float`; the C6's image (fixed point, one core) builds; twelve plays started and
   stopped at once on each board, and an update over the network under the new memory configurations, were as before.
 - **Not done, and why.** (a) The syntax's parse (4.6 to 9.4 ms a frame) and the dequantisation are one thread's: the next frame's
-  parse alongside this frame's reconstruction would take the P4's 5.1.4 frame to about 1.0 and the S3's 5.1 SIMPLE to 0.8, but what
-  `Decoder::metadata()` and `presentations()` report is the frame just decoded, and a parse ahead moves it; it needs an API of
-  its own. (b) A-CPL's interpolation at `float`, which would save about 7 ms of the P4's A-CPL mode 3 frame on one core and moves the
+  parse alongside this frame's reconstruction, which needs an API of its own because what `Decoder::metadata()` and `presentations()`
+  report is the frame just decoded: done in [D14i](#d14i-the-next-frames-syntax-is-read-while-this-frame-is-reconstructed). (b) A-CPL's interpolation at `float`, which would save about 7 ms of the P4's A-CPL mode 3 frame on one core and moves the
   PCM of streams with A-CPL: done in [D14h](#d14h-a-cpls-interpolation-in-single-precision-at-the-float-tier). (c) The downmix and the copy before it are a permutation in the 5.1.4 streams the
   harness plays (11 ms and 6 ms of an S3 frame at 5.1.4). (d) The S3 has no sampler: the one ported to Xtensa stopped the board.
   (e) The Huffman decoder's second step takes about a tenth of the codewords and under 0.5 ms a frame on the P4.
@@ -2746,6 +2746,25 @@ on the ESP32s' single precision FPUs (about 7 ms of a P4 5.1 A-CPL mode 3 frame 
 - **Held by.** `libs/ac4/tests/core/test_acpl_exact.cpp`: the `float` interpolation is the expression as written in single precision
   to the bit, and within 2e-6 of the `double`'s; `libs/ac4/tests/decoder/test_acpl_exact.cpp` holds the stage to the same at the
   decoder's scalar.
+
+#### D14i: the next frame's syntax is read while this frame is reconstructed
+
+After D14h, on the user's yes of 2026-10-11 to D14g's item (a). The syntax (4.6 to 9.4 ms a 5.1.4 frame) was one thread's, with the second
+core idle for much of the serial stages that follow it.
+
+- **Built.** `Decoder::decode(frame, next)` and `decode_by_block(frame, next, sink)` (`libs/ac4/include/iclforge/ac4/decoder/decoder.hpp`):
+  `Impl::read()` is `parse_frame()`, into a capture, plans and scratch of its own and with the frame's sequence counter noted aside, and the
+  reports (`report_presentations()`, `report_metadata()`), which are made when the frame is taken; `Executor::run_async()` and
+  `wait_async()` (a default that runs the task in place); the player (`firmware/esp-idf/iclforge/src/player.cpp`) decodes a frame when the
+  one after it has arrived; the lane task's stack is 32 KB (24 KB internal).
+- **What is not read ahead**, and so decodes as before: object audio, a frame that does not continue the stream (a change of source), the
+  efficient high frame rate mode, a syntax trace, a decoder with no executor of two lanes. A frame announced and not given is a change of
+  source; `set_presentation()` takes effect one frame later.
+- **Exit, as measured.** The P4's 5.1.4 in S-CPL takes 0.94 of its duration from 1.01 (0.76 from 0.85 folded); with A-SPX
+  1.15 and 1.15 from 1.19 and 1.21; 5.1 in SIMPLE mode 0.39 from 0.42; the S3's 5.1 in SIMPLE mode 0.94 from 0.98.
+  The hash of every play, the second core off and on, on both boards, is D14h's.
+- **Held by.** The executor test decodes every committed stream with and without `next`, and compares the samples, the presentations, the
+  metadata, the refusal and the latency after every call; a frame announced and not given is exercised; clean under ThreadSanitizer.
 
 ### Encoder phases
 

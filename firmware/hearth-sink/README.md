@@ -1116,7 +1116,8 @@ RAM and PSRAM) and, with `ICLFORGE_STAGE_TIMERS=ON`, a `play.stage[...]` line fo
 decode. `ICLFORGE_EXAMPLE_AC4_CORE` selects core decoding and `ICLFORGE_EXAMPLE_AC4_PCM_HASH` the
 hash of the samples, which costs 0.6 ms a frame at 2.0, and `ICLFORGE_EXAMPLE_AC4_PARALLEL` (on in `sdkconfig.ac4`) the decoder's
 second core, on a part with two; a play's location overrides all three, with `?decoding=core`, `?hash=off` and `?parallel=off` or
-`?parallel=on`. A measurement image adds `ICLFORGE_EXAMPLE_SINK_NULL=y` and plays
+`?parallel=on`. With the second core the player decodes a frame when the one after it has arrived, so that the decoder can read that
+frame's syntax while it reconstructs this one (`Decoder::decode(frame, next)`). A measurement image adds `ICLFORGE_EXAMPLE_SINK_NULL=y` and plays
 with `POST /play` (a URL as the body) after `PUT /layout`.
 
 ## The sources
