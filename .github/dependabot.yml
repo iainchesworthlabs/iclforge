@@ -113,3 +113,10 @@ updates:
     rebase-strategy: "auto"
     commit-message:
       prefix: "build"
+    ignore:
+      # core-ktx 1.19.x's AAR metadata requires compileSdk >= 37, and the SDK repository has
+      # no API 37 platform yet (compileSdk = 36 is the ceiling; see the comment above the
+      # dependency in apps/demos/android/app/build.gradle.kts). Patch releases of 1.17 still
+      # come through. Remove this when compileSdk can move to 37.
+      - dependency-name: "androidx.core:core-ktx"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
