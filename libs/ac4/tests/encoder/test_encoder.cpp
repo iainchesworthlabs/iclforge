@@ -1452,3 +1452,115 @@ TEST_CASE("at the least rate a frame between I-frames keeps a stem's last parame
     REQUIRE(frames->size() > 20);
     CHECK(decode(*frames).size() == 1);
 }
+
+namespace {
+
+// The RMS level of x's components from `low_hz` to `high_hz`, over the middle of
+// the signal: Hann-windowed blocks of 2 048 samples, summed bin by bin.
+double band_rms(std::span<const float> x, double low_hz, double high_hz, int rate) {
+    constexpr std::size_t kBlock = 2048;
+    const std::size_t first_bin = static_cast<std::size_t>(low_hz * kBlock / rate);
+    const std::size_t last_bin = static_cast<std::size_t>(high_hz * kBlock / rate);
+    std::vector<double> window(kBlock);
+    for (std::size_t n = 0; n < kBlock; ++n) {
+        window[n] = 0.5 - 0.5 * std::cos(2.0 * std::numbers::pi * (static_cast<double>(n) + 0.5) / kBlock);
+    }
+    double energy = 0.0;
+    std::size_t blocks = 0;
+    for (std::size_t start = 8192; start + kBlock + 8192 < x.size(); start += kBlock) {
+        for (std::size_t k = first_bin; k <= last_bin; ++k) {
+            double re = 0.0;
+            double im = 0.0;
+            for (std::size_t n = 0; n < kBlock; ++n) {
+                const double phase = 2.0 * std::numbers::pi * static_cast<double>(k * n % kBlock) / kBlock;
+                const double v = static_cast<double>(x[start + n]) * window[n];
+                re += v * std::cos(phase);
+                im -= v * std::sin(phase);
+            }
+            energy += re * re + im * im;
+        }
+        ++blocks;
+    }
+    return blocks > 0 ? std::sqrt(energy / static_cast<double>(blocks)) : 0.0;
+}
+
+}  // namespace
+
+TEST_CASE("noise fill gives the bands a low rate quantises to zero their own level", "[ac4][encoder][noisefill]") {
+    // A loud low-passed noise that takes the rate, and under it forty faint
+    // tones from 6 to 10 kHz, inside the 11 kHz the mode codes, that the rate
+    // loop leaves out: whole bands quantise to zero there.
+    const std::size_t count = seconds(2.0, 1.0);
+    std::vector<std::vector<float>> input(2, std::vector<float>(count));
+    std::uint32_t seed = 12345;
+    const auto uniform = [&seed] {
+        seed = seed * 1664525U + 1013904223U;
+        return static_cast<double>(seed >> 8) / 16777216.0 - 0.5;
+    };
+    for (auto& channel : input) {
+        std::vector<double> phases(40);
+        for (double& p : phases) {
+            p = 2.0 * std::numbers::pi * (uniform() + 0.5);
+        }
+        double low = 0.0;
+        for (std::size_t n = 0; n < count; ++n) {
+            low = 0.9 * low + 0.1 * uniform();
+            double high = 0.0;
+            for (std::size_t k = 0; k < phases.size(); ++k) {
+                high += std::sin(2.0 * std::numbers::pi * (6000.0 + 100.0 * static_cast<double>(k)) *
+                                     static_cast<double>(n) / 48000.0 +
+                                 phases[k]);
+            }
+            channel[n] = static_cast<float>(3.0 * low + 0.002 * high);
+        }
+    }
+    iclforge::ac4::EncoderConfig config;
+    config.bitrate_kbps = 24;
+    config.codec_mode = iclforge::ac4::CodecMode::kSimple;
+
+    const Encoded off = encode(config, input, 4096);
+    CHECK(count_records(off, "b_snf_data_exists", 1) == 0);
+    CHECK(std::ranges::none_of(off.trace, [](const iclforge::ac4::SyntaxRecord& r) { return r.name == "asf_snf_hcw"; }));
+
+    config.experimental.noise_fill = true;
+    const Encoded on = encode(config, input, 4096);
+    REQUIRE(on.frames.size() == off.frames.size());
+    // Most frames send levels, and each codeword is read back where it was
+    // written, at the bit it was written, by the decoder's syntax walk.
+    CHECK(count_records(on, "b_snf_data_exists", 1) * 2 >= on.frames.size());
+    CHECK(std::ranges::any_of(on.trace, [](const iclforge::ac4::SyntaxRecord& r) { return r.name == "asf_snf_hcw"; }));
+    check_frames_read_back(on);
+
+    const auto decoded_off = decode(off.frames);
+    const auto decoded_on = decode(on.frames);
+    for (std::size_t c = 0; c < 2; ++c) {
+        CAPTURE(c);
+        const double source = band_rms(input[c], 6200.0, 9800.0, 48000);
+        const double without = band_rms(decoded_off[c], 6200.0, 9800.0, 48000);
+        const double with = band_rms(decoded_on[c], 6200.0, 9800.0, 48000);
+        const double restored_db = 20.0 * std::log10(with / without);
+        const double against_source_db = 20.0 * std::log10(with / source);
+        CAPTURE(source, without, with, restored_db, against_source_db);
+        // Without noise fill the band is 4 dB under the source's: the bands
+        // that quantise to zero are empty. With it they come back, so that
+        // the whole band is within a step of the source's level (noise fill's
+        // steps are 3 dB, and the bands that were coded are not touched).
+        CHECK(without < source * 0.71);
+        CHECK(restored_db > 2.0);
+        CHECK(std::abs(against_source_db) < 2.0);
+    }
+}
+
+TEST_CASE("noise fill leaves a coded tone at unity gain", "[ac4][encoder][noisefill]") {
+    const std::size_t count = seconds(2.0, 1.0);
+    const std::vector<float> x = tone(1000.0, 0.1, count, 48000);
+    iclforge::ac4::EncoderConfig config;
+    config.bitrate_kbps = 192;
+    config.experimental.noise_fill = true;
+    const Encoded encoded = encode(config, {x, x}, 4096);
+    check_frames_read_back(encoded);
+    const auto decoded = decode(encoded.frames);
+    const Score s = score(x, decoded[0], 3072 + kDecoderDelay);
+    CHECK(std::abs(s.gain_db) < 0.1);
+    CHECK(s.snr_db > 30.0);
+}

@@ -202,8 +202,11 @@ Table 163); `7x-back`, `7x-wide` or `7x-top-front`, which takes seven or eight c
 7.1 in that 7.X layout, in the WAV order `decode` writes: 3/4/0's back pair in BL and BR and its
 surrounds in SL and SR, 5/2/0's wide pair last, 3/2/2's top front pair in TFL and TFR;
 `back-pair`, which takes 11 and 12 channels as 7.0.4 and 7.1.4, with Lb and Rb; `three-zero`, which
-takes three channels, L R C, as 3.0, the dialogue of a music and effects presentation (below); and
-`objects`, which `objects=<scene file>` needs.
+takes three channels, L R C, as 3.0, the dialogue of a music and effects presentation (below);
+`noise-fill`, which sends each scale factor band that quantises to zero a noise level (Part 1
+5.1.4: its own energy in 3 dB steps, from the level before it) that the decoder fills with noise,
+and so trades some SNR for a spectrum without holes at a low rate; and `objects`, which
+`objects=<scene file>` needs.
 
 **Objects.** With `experimental=objects`, `objects=<scene file>` takes the WAV file's channels as the
 objects of one object substream, written as a raw stream. The scene file is text, one directive a

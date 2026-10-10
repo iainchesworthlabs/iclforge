@@ -107,6 +107,83 @@ std::optional<LayoutInfo> layout_info(std::uint8_t loudspeaker_layout) {
     }
 }
 
+// The expanded layouts follow the same ordering rules: coupled substreams first (surround before
+// top before bottom, front before side before rear), then the mono ones (the centres in the same
+// order, then the LFEs). 3.6.2.3 gives 10.2.9.3ch and 7.1.5.4ch as examples, which fix the order of
+// the rest.
+std::optional<LayoutInfo> expanded_layout_info(std::uint8_t expanded_loudspeaker_layout) {
+    const auto make = [](std::string_view name, std::vector<SubstreamChannels> substreams, std::uint8_t sound_system) {
+        LayoutInfo info;
+        info.name = name;
+        info.sound_system = sound_system;
+        for (const auto& s : substreams) {
+            if (s.second.empty()) {
+                info.channel_count = static_cast<std::uint8_t>(info.channel_count + 1);
+            } else {
+                info.channel_count = static_cast<std::uint8_t>(info.channel_count + 2);
+                ++info.coupled_substream_count;
+            }
+        }
+        info.substreams = std::move(substreams);
+        return info;
+    };
+    constexpr std::uint8_t kNone = 255;
+    switch (expanded_loudspeaker_layout) {
+        case 0:
+            return make("LFE", {{"LFE", ""}}, kNone);
+        case 1:
+            return make("Stereo-S", {{"Ls", "Rs"}}, kNone);
+        case 2:
+            return make("Stereo-SS", {{"Lss", "Rss"}}, kNone);
+        case 3:
+            return make("Stereo-RS", {{"Lrs", "Rrs"}}, kNone);
+        case 4:
+            return make("Stereo-TF", {{"Ltf", "Rtf"}}, kNone);
+        case 5:
+            return make("Stereo-TB", {{"Ltb", "Rtb"}}, kNone);
+        case 6:
+            return make("Top-4ch", {{"Ltf", "Rtf"}, {"Ltb", "Rtb"}}, kNone);
+        case 7:
+            return make("3.0ch", {{"L", "R"}, {"C", ""}}, kNone);
+        case 8:
+            return make("9.1.6ch",
+                        {{"FLc", "FRc"}, {"FL", "FR"}, {"SiL", "SiR"}, {"BL", "BR"}, {"TpFL", "TpFR"},
+                         {"TpSiL", "TpSiR"}, {"TpBL", "TpBR"}, {"FC", ""}, {"LFE1", ""}},
+                        kNone);
+        case 9:
+            return make("Stereo-F", {{"FL", "FR"}}, kNone);
+        case 10:
+            return make("Stereo-Si", {{"SiL", "SiR"}}, kNone);
+        case 11:
+            return make("Stereo-TpSi", {{"TpSiL", "TpSiR"}}, kNone);
+        case 12:
+            return make("Top-6ch", {{"TpFL", "TpFR"}, {"TpSiL", "TpSiR"}, {"TpBL", "TpBR"}}, kNone);
+        case 13:
+            return make("10.2.9.3ch",
+                        {{"FLc", "FRc"}, {"FL", "FR"}, {"SiL", "SiR"}, {"BL", "BR"}, {"TpFL", "TpFR"},
+                         {"TpSiL", "TpSiR"}, {"TpBL", "TpBR"}, {"BtFL", "BtFR"}, {"FC", ""}, {"BC", ""},
+                         {"TpFC", ""}, {"TpC", ""}, {"TpBC", ""}, {"BtFC", ""}, {"LFE1", ""}, {"LFE2", ""}},
+                        7);  // Sound System H
+        case 14:
+            return make("LFE-Pair", {{"LFE1", ""}, {"LFE2", ""}}, kNone);
+        case 15:
+            return make("Bottom-3ch", {{"BtFL", "BtFR"}, {"BtFC", ""}}, kNone);
+        case 16:
+            return make("7.1.5.4ch",
+                        {{"L", "R"}, {"Lss", "Rss"}, {"Lrs", "Rrs"}, {"Ltf", "Rtf"}, {"Ltb", "Rtb"},
+                         {"BtFL", "BtFR"}, {"BtBL", "BtBR"}, {"C", ""}, {"TpC", ""}, {"LFE", ""}},
+                        kNone);
+        case 17:
+            return make("Bottom-4ch", {{"BtFL", "BtFR"}, {"BtBL", "BtBR"}}, kNone);
+        case 18:
+            return make("Top-1ch", {{"TpC", ""}}, kNone);
+        case 19:
+            return make("Top-5ch", {{"Ltf", "Rtf"}, {"Ltb", "Rtb"}, {"TpC", ""}}, kNone);
+        default:
+            return std::nullopt;
+    }
+}
+
 }  // namespace iclforge::containers::iamf
 
 namespace iclforge::containers::iamf::detail {
