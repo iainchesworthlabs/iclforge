@@ -166,9 +166,17 @@ layout when unset):
    substream order 3.6.2.3, so a layer list that breaks the generation rule of 3.6.2.1, or whose substream
    counts do not match its groups, is `kBadDescriptor`.
 3. **Recon Gain** (7.2.3): the `recon_gain` of the layer's channels flagged in `recon_gain_flags`, smoothed
-   with the moving average (N = 7) and the Hann overlap windows of the specification, 60 samples for
-   `Opus` and 64 otherwise (the recommended value for `mp4a`; `ipcm` and `fLaC` are lossless and normally
-   carry none). `DecodeOptions::apply_recon_gain = false` returns the plain de-mixer output.
+   with the moving average (N = 7) and the Hann overlap windows of the specification: 60 samples for
+   `Opus` and 64 for `mp4a`, the values it recommends, and 12 for `ipcm` and `fLaC`, which are lossless,
+   have no recommendation and normally carry no recon gain (12 is what AOM's libiamf measures as).
+   Channels no Parameter Block flags are left exactly as the de-mixer made them.
+   `DecodeOptions::apply_recon_gain = false` returns the plain de-mixer output.
+
+Against AOM's `libiamf` (its `iamfdec`, built without codecs, so `ipcm`), this module's output for ten
+layer chains, every `dmixp_mode`, output gain and recon gain matches to the 24-bit quantization at every
+sample except one: libiamf also runs the overlap window over de-mixed channels when the stream has no
+recon gain, which at unity gain still dips the first 12 samples of each frame by up to 6.8%. This module
+leaves a lossless reconstruction alone there.
 
 `decode_pcm()` reads the substreams itself, so it covers `ipcm` only. For Opus, AAC-LC and FLAC the caller
 decodes each Audio Substream with its own codec and hands the planar PCM (every frame, untrimmed) to
@@ -233,6 +241,24 @@ parameters, the Mix Presentation's rendering config extension, `is_not_key_frame
 oracle here. They are covered by the tests in `libs/containers/tests/iamf/`, which assemble OBU bytes by hand from the
 syntax (the position fields' bit packing, trimming headers, delimiters) and round-trip a Sequence that
 uses every structure.
+
+Opus, AAC-LC and FLAC carriage was checked with FFmpeg 8.0.1: stereo and 5.1 programmes whose packets came
+from `libopus`, FFmpeg's AAC encoder and a verbatim-subframe FLAC packer, muxed by `mux_coded()`, decode
+through FFmpeg's IAMF demuxer to exactly the samples the encoders' own files decode to (FLAC bit for bit
+against the source), with the Opus pre-skip and the AAC priming trimmed by the Audio Frame trimming.
+FFmpeg's `-map 0:<n>` of one dependent substream decodes a single frame (an FFmpeg CLI behaviour, not the
+file's); mapping the stream group, `-map 0:g:0`, decodes them all.
+
+The scalable reconstruction was checked against AOM's reference decoder, `libiamf` (commit b276f43, built
+with `-DENABLE_BUILD_CODECS=OFF`, which leaves `ipcm`), by decoding the same raw OBU streams with
+`iamfdec -s<system> -disable_limiter` at the playback layout of each layer and comparing with this
+module's `decode_pcm()`. For ten chains of layers, one `dmixp_mode` per frame (all seven values), output
+gain on two groups and recon gain on the four channels the last layer de-mixes, every channel agrees to
+the 24-bit quantization at every sample outside the first 12 of each frame. In those 12, libiamf
+multiplies de-mixed channels by the overlap window even when the stream carries no recon gain (unity
+gain, so a dip of up to 6.8%); this module applies the window only to channels a Parameter Block flags,
+with the same 12 samples, so a lossless stream is reconstructed exactly. No other IAMF decoder was
+available to compare with (FFmpeg demuxes the substreams and does not de-mix).
 
 ---
 
