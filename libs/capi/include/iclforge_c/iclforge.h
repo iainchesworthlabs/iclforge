@@ -1605,7 +1605,7 @@ typedef struct iclforge_ac4_decoder_config {
     iclforge_ac4_output_config_t output;
     iclforge_ac4_concealment_policy_t concealment;
     iclforge_ac4_presentation_choice_t presentation;
-    int level; /* md_compat ceiling, Part 2 Table 55; default 3 */
+    int level; /* md_compat ceiling, Part 2 Table 55; default 7, unrestricted */
     iclforge_ac4_decoding_mode_t decoding;
 } iclforge_ac4_decoder_config_t;
 

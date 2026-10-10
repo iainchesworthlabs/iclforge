@@ -2300,6 +2300,10 @@ The sections below contain the complete change list and fixes.
 
 ### Changed
 
+**AC-4 decoder**
+
+- **The AC-4 decoder claims `md_compat` level 7 by default, where it claimed 3.** Part 2 Table 55 calls `md_compat` 7 "unrestricted", above every level its tables define, so a decoder that claimed 3 did not select a presentation of more than eleven tracks, and the encoder's 9.0.4 and 9.1.4 streams (thirteen and fourteen tracks) needed `md-compat=7` to decode and were refused when Hearth opened them. The decoder takes every presentation the tables define, 9.X.4's tracks and 22.2's included, and refuses by name a frame it cannot decode, so it now claims what it does. `DecoderConfig::level` (and the C API's, Python's, Rust's and JavaScript's `level`, and `md-compat=` in `forge decode`) set it lower, `3` choosing as a receiver at the floor DVB and ATSC set would. No committed stream carries `md_compat` 7, so none of them changes (`libs/ac4/ERRATA.md`, "Which presentations can be selected").
+
 **Names and layout**
 
 - **The family is ICL Forge, and the programs, libraries, packages and addresses have new names**

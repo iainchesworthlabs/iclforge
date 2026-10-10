@@ -946,7 +946,7 @@ presentation the same way; the rest belong to the three that play or write the d
 | `associated=<service>` | all seven | `visually-impaired`, `audio-description`, `audio-description-subtitles`, `spoken-subtitles`, `emergency-information`, `hearing-impaired` or `commentary` |
 | `dialogue-gain=<dB>` | all seven | The dialogue against the music and effects, up to 12 dB and the stream's own maximum |
 | `associated-gain=<dB>` | all seven | The associated audio's gain, 0 dB or less |
-| `md-compat=<0..7>` | all seven | The `md_compat` level the decoder claims; 3 by default |
+| `md-compat=<0..7>` | all seven | The `md_compat` level the decoder claims; 7 by default |
 | `conceal=repeat\|mute\|off` | `decode`, `monitor` | What stands in for a frame that will not decode; `off` by default |
 | `output-level=<dBFS>` | `decode`, `monitor`, `play` | The level the stream's dialnorm is taken to, -60 to 0; unset leaves the coded level |
 | `drcmode=<mode>` | `decode`, `monitor`, `play` | `default`, `home-theatre`, `flat-panel-tv`, `portable-speakers`, `portable-headphones` or `off`; every one but `off` needs `output-level=` |

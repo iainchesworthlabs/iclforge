@@ -2202,8 +2202,11 @@ it, whose substreams carry a tone each (`libs/ac4/tests/decoder/test_presentatio
   presentation_config 0 to 5), and the decoder decodes all of it: every substream channel-coded, in a
   channel mode it renders, at 48 or 44.1 kHz, and none a fragment of the efficient high frame rate mode that
   was not assembled (a presentation of another fraction than the selected one's).
-  md_compat 7 is above every level Table 55 defines, so it is selected only by a decoder told its level
-  is 7. The default level is 3.
+  md_compat 7 is above every level Table 55 defines, so it is selected only by a decoder whose level is
+  7. The default level is 7: the decoder takes every presentation Table 55 and Table 86 define, 9.X.4's
+  thirteen tracks and 22.2's twenty-four included, and refuses by name a frame it cannot decode. A
+  system that wants the choice of a level 3 receiver, the floor DVB and ATSC set, lowers it
+  (`DecoderConfig::level`, `md-compat=`). It was 3 until 2026-10-10.
 - **Evidence:** Text; the selection table's cases, which both transcriptions take.
 
 #### The order of the preferences
@@ -3147,9 +3150,9 @@ project has the element, so each entry below rests on the text and on the decode
 
 - **Where:** Part 2 Table 55, p. 157, and 6.3.2.2.3.
 - **Reading:** a 9.0.4 or 9.1.4 presentation has thirteen tracks (the LFE not counted), more than the 11 of
-  md_compat 3, so the least level its tracks allow is 7, "unrestricted". A decoder is told to select it by
-  its level (`DecoderConfig::level`, whose default is 3; see "Which presentations can be selected"), so a
-  decoder at the default does not select a 9.X.4 stream, and the encoder's tests decode at level 7.
+  md_compat 3, so the least level its tracks allow is 7, "unrestricted". A decoder selects it by its
+  level (`DecoderConfig::level`, whose default is 7; see "Which presentations can be selected"), so a
+  decoder at the default selects a 9.X.4 stream and one told level 3 does not.
 - **Evidence:** Text; the encoder's table of contents carries 7 in every 9.X.4 presentation.
 
 #### What the 9.X.4 element does not write

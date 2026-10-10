@@ -179,7 +179,7 @@ export interface Ac4DecoderOptions {
   decodingMode?: Ac4DecodingMode;
   concealment?: Ac4ConcealmentPolicy;
   presentation?: Ac4PresentationChoice;
-  /** iclforge::ac4::DecoderConfig::level (md_compat); default 3, matching the C++ struct default. */
+  /** iclforge::ac4::DecoderConfig::level (md_compat); default 7, matching the C++ struct default. */
   mdCompatLevel?: number;
 }
 
@@ -486,7 +486,7 @@ export class Ac4Decoder {
       presentation.presentationId ?? -1,
       presentation.index ?? -1,
       presentation.language ?? "",
-      options.mdCompatLevel ?? 3,
+      options.mdCompatLevel ?? 7,
     );
   }
 
