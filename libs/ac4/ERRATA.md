@@ -1661,6 +1661,9 @@ reads one, so every reading below rests on the text. The constructed streams of
 `libs/ac4/tests/decoder/constructed.cpp` (`9_0_4-*` and `9_1_4-*`) carry a distinct tone on each channel and
 are read by both transcriptions of the syntax, and they show that the decoder does what the readings say,
 not that they are what an encoder meant.
+The encoder's streams (`experimental.nine_x_4`, "The 9.X.4 element" in the encoder's part below) are read
+by both as well; they take these readings, so they show that the encoder, the decoder and the Python
+transcription agree, and no more.
 
 #### The 9.X.4 element's tracks
 
@@ -3073,6 +3076,62 @@ reading of each of these, and the tests hold the three traces equal on every imm
   its wet values those whose decorrelated signals give what the quantised shares leave its covariance.
 - **Evidence:** Readers: one tone per channel decodes on its own channel in full decoding, and in core
   decoding at Pseudocode 14's gains (`libs/ac4/tests/encoder/test_immersive.cpp`).
+
+### The 9.X.4 element
+
+The readings the encoder takes for 9.0.4 and 9.1.4 (`experimental.nine_x_4`), the immersive element with
+`b_5fronts` 1, in SCPL, ASPX_SCPL and ASPX_ACPL_2 and, with `experimental.acpl`, ASPX_ACPL_1. The writer
+takes the decoder's reading of each of [The 9.X.4 element's
+tracks](#the-9x4-elements-tracks), [S-CPL's channels](#the-9x4-elements-s-cpl-channels),
+[A-SPX](#the-9x4-elements-a-spx), [A-CPL](#the-9x4-elements-a-cpl) and [the output
+order](#the-9x4-elements-output), and the tests hold the three traces equal on every 9.X.4 stream they
+write (`libs/ac4/tests/encoder/test_nine_x_four.cpp`). No stream of DEE's or of any encoder outside this
+project has the element, so each entry below rests on the text and on the decoder's reading of it.
+
+#### The screen pair's sum and difference
+
+- **Where:** Part 2 5.2.3.2 step 5 and Table 20, pp. 60 and 61; 5.3.3.1 and Table 23, p. 64.
+- **Reading:** a writer inverts the decoder's L = A'' + L'' and Lscr = A'' - L'' (and R = B'' + M'', Rscr =
+  B'' - M''): A'' = (L + Lscr) / 2 and L'' = (L - Lscr) / 2, with no gain of `c_gain`, which only C takes.
+  In SCPL and ASPX_SCPL the channels A-SPX and S-CPL see are L and Lscr themselves (the gains of Table 11
+  and of S-CPL are 1 for them), which the encoder's simple coupling makes the sum and difference of in the
+  spectral domain, as it does for each pair of the 7.X.4 element; L'' and M'' are then predicted from A''
+  and B'' by Table 20's a'_4 and a'_5, band by band, as H'' to K'' are from D'' to G'', and the two
+  tracks share A'' and B'''s transform layouts. In the A-CPL modes A'' = (L + Lscr) / 2 is coded as it is
+  and, in ASPX_ACPL_1, L'' = (L - Lscr) / 2 is the residual below `acpl_qmf_band`; the fifth and sixth
+  modules rebuild each pair as the channel pair's module does, with no square root of 2 (Pseudocode 2).
+- **Evidence:** Readers: every channel's tone decodes on its own channel at unity in each of the four modes,
+  for both layouts, and the decoder's renderer folds the stream to 7.X.4 and 5.X by Tables 38 to 43.
+
+#### The 9.X.4 input order and its A-SPX pairs
+
+- **Where:** Part 2 Table A.27, p. 214; Table 8, p. 46.
+- **Reading:** the input channels are in the order `Decoder::decode()` writes them, which the decoder's
+  entry for the element's output gives: L, R, C, Ls, Rs, Lb, Rb, Tfl, Tfr, Tbl, Tbr, the LFE of 9.1.4, then
+  Lscr and Rscr, so that the LFE comes after the top channels as in the 22.2 layout and not after C as in
+  the Part 1 modes and the 7.X.4 element. In ASPX_SCPL each of the seven aspx_data elements takes the
+  channels the decoder's entry names, in the syntax's order, and the writer may code (L, Lscr) and (R,
+  Rscr) as a sum and a balance, as it does the other coupled pairs.
+- **Evidence:** Readers.
+
+#### A 9.X.4 stream's md_compat
+
+- **Where:** Part 2 Table 55, p. 157, and 6.3.2.2.3.
+- **Reading:** a 9.0.4 or 9.1.4 presentation has thirteen tracks (the LFE not counted), more than the 11 of
+  md_compat 3, so the least level its tracks allow is 7, "unrestricted". A decoder is told to select it by
+  its level (`DecoderConfig::level`, whose default is 3; see "Which presentations can be selected"), so a
+  decoder at the default does not select a 9.X.4 stream, and the encoder's tests decode at level 7.
+- **Evidence:** Text; the encoder's table of contents carries 7 in every 9.X.4 presentation.
+
+#### What the 9.X.4 element does not write
+
+- **Where:** Part 2 6.2.6.1 (`ajcc_data(b_5fronts)`), Table 15, p. 49, 6.2.9.3 and Table 69, p. 170.
+- **Reading:** the encoder refuses, naming the element, ASPX_AJCC with `b_5fronts` (four modules and twenty
+  parameters, a second analysis of its own), dialogue enhancement (whose channels there are Lscr, Rscr and
+  C, which the input's marked channels and a stem's L, R and C do not name), and the height downmix, whose
+  `custom_dmx_data()` configurations for `bs_ch_config` 0 and 3 the writer does not send. DRC gains per
+  group are refused for every immersive presentation.
+- **Evidence:** the refusals have tests in `libs/ac4/tests/encoder/test_nine_x_four.cpp`.
 
 ### Objects
 

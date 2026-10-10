@@ -151,6 +151,7 @@ struct Options {
     bool ac4_experimental_three_zero = false;
     bool ac4_experimental_back_pair = false;
     bool ac4_experimental_ajcc = false;
+    bool ac4_experimental_nine_x_4 = false;
     std::string ac4_experimental_seven_x;
     // 'ac4-encode' only: experimental=objects, and objects=, the path of a
     // scene file that makes the WAV file's channels objects

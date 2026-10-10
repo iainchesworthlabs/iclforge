@@ -280,7 +280,7 @@ without them. Width, divergence, zones and the screen factor are not rendered.
 ## Encoding a stream
 
 `iclforge::ac4::Encoder` writes mono, stereo, 5.0 and 5.1, and 5.0.4 and 5.1.4 in Part 2's immersive element
-(and, as experimental options, 7.0, 7.1, 7.0.4, 7.1.4 and a 3.0 dialogue substream), at 48 kHz at
+(and, as experimental options, 7.0, 7.1, 7.0.4, 7.1.4, 9.0.4 and 9.1.4 and a 3.0 dialogue substream), at 48 kHz at
 every frame rate of Part 1 Table 83, or at 44.1 kHz in frames of 2 048 samples, in the SIMPLE, ASPX
 and A-CPL codec modes and, in the immersive layouts, S-CPL and A-SPX with S-CPL, at a constant,
 average or variable rate. It takes planar samples at full scale 1.0, in the order the decoder
@@ -319,7 +319,7 @@ rate its frames cannot hold, a presentation of the wrong number of substreams, a
 
 | `EncoderConfig` field | What it sets | Default |
 |---|---|---|
-| `channels`, `sample_rate_hz` | 1, 2, 5 or 6 channels; 9 or 10 (5.0.4 and 5.1.4); 7 or 8 with `experimental.seven_x`, and 11 or 12 with `experimental.back_pair`; 48 000 or 44 100 Hz | 2, 48 000 |
+| `channels`, `sample_rate_hz` | 1, 2, 5 or 6 channels; 9 or 10 (5.0.4 and 5.1.4); 7 or 8 with `experimental.seven_x`, 11 or 12 with `experimental.back_pair`, and 13 or 14 (9.0.4 and 9.1.4, with the screen pair Lscr and Rscr last, after the LFE) with `experimental.nine_x_4`; 48 000 or 44 100 Hz | 2, 48 000 |
 | `frame_rate_index`, `bitrate_kbps`, `rate_mode` | Part 1 Table 83's frame rate; the rate over whole frames, 8 to 3 000 kbps; `kConstant`, `kAverage` (within the decoder's buffer, Part 1 clause 6.2.4) or `kVariable` | 13, 192, `kConstant` |
 | `codec_mode` | `kAuto` (the rate's choice, as DEE's streams make it), `kSimple`, `kAspx`, an A-CPL mode, and in the immersive layouts `kScpl`, `kAspxScpl` and, behind `experimental.ajcc`, `kAspxAjcc` | `kAuto` |
 | `iframe_interval`, `iframes`, `fragment_starts` | An I-frame every so many frames, at named frames, and where a container's fragments start, which an MP4 lists as its sync samples | 24 |
@@ -327,6 +327,14 @@ rate its frames cannot hold, a presentation of the wrong number of substreams, a
 | `drc`, `downmix`, `dialogue` | The DRC decoder modes on their profiles, the stereo downmix's values, and dialogue enhancement from marked channels or a stem | none |
 | `substreams`, `presentations` | Several substreams and the presentations of Part 2 Table 53 made of them (below) | one of each |
 | `trace`, `experimental` | A record of every syntax element written; the tools and layouts that no reader outside this project has been checked against | none |
+
+9.0.4 and 9.1.4 (`experimental.nine_x_4`, 13 or 14 channels) take Part 2's immersive element with
+`b_5fronts`, which adds the screen pair Lscr and Rscr to the 7.X.4 channels, in SCPL, ASPX_SCPL and
+ASPX_ACPL_2 by the rate and, with `experimental.acpl`, ASPX_ACPL_1. The channels are in the order
+`Decoder::decode()` writes them: L R C Ls Rs Lb Rb Tfl Tfr Tbl Tbr, the LFE of 9.1.4, then Lscr and
+Rscr. ASPX_AJCC with `b_5fronts`, dialogue enhancement and the height downmix are refused for them,
+naming the element. Their thirteen tracks are above Table 55's level 3, so the presentation carries
+`md_compat` 7 and a decoder selects it when `DecoderConfig::level` is 7.
 
 A frame comes out when the input it needs has arrived: `encode()` returns the frames each call
 completes, and `flush()` pads the input with silence to the end of its last frame and returns the
