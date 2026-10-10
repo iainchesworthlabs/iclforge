@@ -194,6 +194,24 @@ constexpr double kLfeCutoffHz = 120.0;
     return bands_below(transform_length, cutoff, sample_rate, (1 << detail::max_sfb_bits(transform_length)) - 1);
 }
 
+// The audio frame rate index the efficient high frame rate mode codes at
+// (Part 2 Table 18): the stream's `frame_rate_index` 5 to 9 at a fraction of 2,
+// and 10 to 12 at 2 or 4; -1 for a pair the table does not have.
+[[nodiscard]] int audio_frame_rate_index(int stream_index, int fraction) noexcept {
+    constexpr std::array<int, 8> kHalf = {0, 1, 2, 3, 4, 7, 8, 9};  // from index 5 to 12
+    constexpr std::array<int, 3> kQuarter = {2, 3, 4};              // from index 10 to 12
+    if (stream_index < 5 || stream_index > 12) {
+        return -1;
+    }
+    if (fraction == 2) {
+        return kHalf[static_cast<std::size_t>(stream_index - 5)];
+    }
+    if (fraction == 4 && stream_index >= 10) {
+        return kQuarter[static_cast<std::size_t>(stream_index - 10)];
+    }
+    return -1;
+}
+
 // sequence_counter: 0 in the first frame (Part 1 Annex E.1), then 1 to 1020
 // and round again from 1 (Part 1 clause 4.3.3.2.2).
 [[nodiscard]] int sequence_counter(std::int64_t frame) {
@@ -3357,6 +3375,9 @@ struct Encoder::Impl {
     bool stem = false;
     std::int64_t input_samples = 0;  // at the internal rate
     std::int64_t frames_out = 0;
+    // The efficient high frame rate mode: transmission frames a codec frame
+    // goes out as, 1 where it is off.
+    int fraction = 1;
     bool flushed = false;
 
     // An object substream: the objects' metadata on the signal's axis, which
@@ -3420,7 +3441,9 @@ struct Encoder::Impl {
     [[nodiscard]] detail::TocLayout layout_for(std::int64_t frame, bool is_iframe,
                                                int wait_frames) const {
         detail::TocLayout out = layout;
-        out.sequence_counter = sequence_counter(frame);
+        // In the efficient high frame rate mode the codec frame's first
+        // transmission frame, whose counter is a multiple of the fraction.
+        out.sequence_counter = sequence_counter(frame * fraction);
         out.wait_frames = wait_frames;
         out.br_code =
             wait_frames > 0 ? br_codes[static_cast<std::size_t>(frame % std::ssize(br_codes))] : 0;
@@ -3580,7 +3603,18 @@ struct Encoder::Impl {
         return std::pair{std::move(sizes), *fit};
     }
 
-    [[nodiscard]] ICLFORGE_AC4_NO_EXPORT EncodedFrame encode_frame(std::int64_t frame);
+    // The efficient high frame rate mode's transmission frames of the codec
+    // frame `frame` (Part 2 clause 5.1.3, Figure 7): `fraction` raw_ac4_frame()s
+    // with the table of contents and each audio substream cut into as many
+    // pieces, in order, as equal as its bytes allow; the presentation, EMDF
+    // payload and OAMD substreams whole in the first, and elided (length 0) in
+    // the others, and payload_base with the first. Only the first is an
+    // I-frame. Empty where the table of contents cannot be written.
+    [[nodiscard]] ICLFORGE_AC4_NO_EXPORT std::vector<std::vector<std::byte>> fragments(
+        const detail::TocLayout& first, std::span<const BitWriter> written,
+        std::size_t payload_base, std::int64_t frame) const;
+
+    [[nodiscard]] ICLFORGE_AC4_NO_EXPORT std::vector<EncodedFrame> encode_frame(std::int64_t frame);
 
     // Takes the input, with a stem the dialogue in it and with objects the
     // changes to their metadata, and returns the frames it completes.
@@ -3849,7 +3883,42 @@ detail::TocGroup Encoder::Impl::object_group(const Impl& impl, const ObjectLayou
     return group;
 }
 
-EncodedFrame Encoder::Impl::encode_frame(std::int64_t frame) {
+std::vector<std::vector<std::byte>> Encoder::Impl::fragments(
+    const detail::TocLayout& first, std::span<const BitWriter> written, std::size_t payload_base,
+    std::int64_t frame) const {
+    std::vector<std::vector<std::byte>> out;
+    const auto parts = static_cast<std::size_t>(fraction);
+    for (std::size_t part = 0; part < parts; ++part) {
+        detail::TocLayout piece_layout = first;
+        piece_layout.sequence_counter =
+            sequence_counter(frame * fraction + static_cast<std::int64_t>(part));
+        piece_layout.iframe_global = first.iframe_global && part == 0;
+        std::vector<std::vector<std::byte>> pieces(written.size());
+        for (std::size_t index = 0; index < written.size(); ++index) {
+            const auto& whole = written[index].bytes();
+            const bool audio = index >= first_audio && index < first_audio + substreams.size();
+            if (!audio) {
+                if (part == 0) {
+                    pieces[index].assign(whole.begin(), whole.end());
+                }
+                continue;
+            }
+            const std::size_t begin = whole.size() * part / parts;
+            const std::size_t end = whole.size() * (part + 1) / parts;
+            pieces[index].assign(whole.begin() + static_cast<std::ptrdiff_t>(begin),
+                                 whole.begin() + static_cast<std::ptrdiff_t>(end));
+        }
+        std::optional<std::vector<std::byte>> sent =
+            detail::assemble_frame(piece_layout, pieces, part == 0 ? payload_base : 0);
+        if (!sent) {
+            return {};
+        }
+        out.push_back(std::move(*sent));
+    }
+    return out;
+}
+
+std::vector<EncodedFrame> Encoder::Impl::encode_frame(std::int64_t frame) {
     const bool is_iframe = iframe(frame);
     for (StreamSubstream& s : substreams) {
         s.coder->before_frame(frame);
@@ -3868,6 +3937,8 @@ EncodedFrame Encoder::Impl::encode_frame(std::int64_t frame) {
     std::vector<std::size_t> needs;
     int wait_frames = 0;
     std::optional<std::vector<std::byte>> raw;
+    // The efficient high frame rate mode's transmission frames of this one.
+    std::vector<std::vector<std::byte>> transmission;
     for (const bool least_gains : {false, true}) {
         // The presentation and EMDF payload substreams, fixed for the frame:
         // with DRC's gains, and where the audio does not fit beside them,
@@ -3921,7 +3992,18 @@ EncodedFrame Encoder::Impl::encode_frame(std::int64_t frame) {
             wait_frames = wait_frames_for(rate_level - static_cast<double>(frame_bytes) / share);
             frame_layout = layout_for(frame, is_iframe, wait_frames);
         }
-        const auto sized = sizes_for(frame_layout, fixed, frame_bytes, needs, least_sizes);
+        // Each further transmission frame repeats a table of contents of about the
+        // size of this one, listing a share of the substreams' sizes.
+        std::size_t extra_tocs = 0;
+        if (fraction > 1) {
+            const std::vector<std::size_t> share(fixed.size() + substreams.size(),
+                                                 frame_bytes / static_cast<std::size_t>(fraction));
+            extra_tocs = static_cast<std::size_t>(fraction - 1) *
+                         detail::toc_bytes(frame_layout, 0, share);
+        }
+        const auto sized = sizes_for(frame_layout, fixed,
+                                     frame_bytes > extra_tocs ? frame_bytes - extra_tocs : 0,
+                                     needs, least_sizes);
         if (!sized) {
             continue;
         }
@@ -3943,10 +4025,17 @@ EncodedFrame Encoder::Impl::encode_frame(std::int64_t frame) {
         if (!fits) {
             continue;
         }
-        raw = detail::assemble(frame_layout, written, fit.payload_base, {});
-        if (!raw || raw->size() != frame_bytes) {
-            raw.reset();
-            continue;
+        if (fraction > 1) {
+            transmission = fragments(frame_layout, written, fit.payload_base, frame);
+            if (transmission.empty()) {
+                continue;
+            }
+        } else {
+            raw = detail::assemble(frame_layout, written, fit.payload_base, {});
+            if (!raw || raw->size() != frame_bytes) {
+                raw.reset();
+                continue;
+            }
         }
         if (config.trace) {
             // In the order a reader reads them: a group's OAMD substream
@@ -3983,17 +4072,41 @@ EncodedFrame Encoder::Impl::encode_frame(std::int64_t frame) {
     if (timeline) {
         timeline->drop_before((frame + 1) * timing.frame_length);
     }
+    std::vector<EncodedFrame> out;
+    if (fraction > 1) {
+        // The transmission frames' tables of contents differ by a byte or two
+        // from the estimate the budget took: the carry holds the rate.
+        std::size_t total = 0;
+        for (const std::vector<std::byte>& part : transmission) {
+            total += part.size();
+        }
+        byte_carry = exact - static_cast<double>(total);
+        // The frame's output samples, shared among the transmission frames by
+        // the cumulative count, so that the unit's sum is the codec frame's.
+        const std::int64_t samples = timing.output_samples(frame);
+        const auto parts = static_cast<std::int64_t>(fraction);
+        for (std::int64_t part = 0; part < parts; ++part) {
+            EncodedFrame sent;
+            sent.raw_ac4_frame = std::move(transmission[static_cast<std::size_t>(part)]);
+            sent.samples =
+                static_cast<int>(samples * (part + 1) / parts - samples * part / parts);
+            sent.iframe = is_iframe && part == 0;
+            out.push_back(std::move(sent));
+        }
+        return out;
+    }
     if (config.rate_mode == RateMode::kConstant) {
         byte_carry = exact - static_cast<double>(frame_bytes);
     } else {
         rate_level += 1.0 - static_cast<double>(frame_bytes) / bytes_per_frame;
     }
-    EncodedFrame out;
+    EncodedFrame sent;
     // create() checks the rate holds the frame every substream falls back
     // to, so a frame always fits.
-    out.raw_ac4_frame = std::move(raw).value();
-    out.samples = timing.output_samples(frame);
-    out.iframe = is_iframe;
+    sent.raw_ac4_frame = std::move(raw).value();
+    sent.samples = timing.output_samples(frame);
+    sent.iframe = is_iframe;
+    out.push_back(std::move(sent));
     return out;
 }
 
@@ -4095,7 +4208,9 @@ std::vector<EncodedFrame> Encoder::Impl::drain() {
                 break;
             }
         }
-        frames.push_back(encode_frame(frame));
+        std::vector<EncodedFrame> sent = encode_frame(frame);
+        frames.insert(frames.end(), std::make_move_iterator(sent.begin()),
+                      std::make_move_iterator(sent.end()));
         ++frames_out;
         for (StreamSubstream& s : substreams) {
             s.coder->after_frame(frames_out);
@@ -4105,7 +4220,13 @@ std::vector<EncodedFrame> Encoder::Impl::drain() {
 }
 
 std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
-    const EncoderConfig& config) {
+    const EncoderConfig& given) {
+    // In the efficient high frame rate mode `config` is the codec's: its
+    // frame_rate_index the audio frame rate Table 18 gives, where `given`'s is
+    // the transmission rate.
+    EncoderConfig config = given;
+    const int fraction = given.experimental.frame_rate_fraction;
+    const int stream_frame_rate_index = given.frame_rate_index;
     const auto invalid = [](Refusal why) { return std::unexpected(why); };
     if (config.sample_rate_hz != 48000 && config.sample_rate_hz != 44100) {
         return invalid("a sample rate other than 48 kHz or 44.1 kHz");
@@ -4120,6 +4241,21 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
     if (!dialnorm_ok(config.dialnorm_db)) {
         return invalid("a dialnorm outside 0 to -31.75 dBFS");
     }
+    if (fraction != 1) {
+        if (fraction != 2 && fraction != 4) {
+            return invalid("experimental.frame_rate_fraction other than 1, 2 or 4");
+        }
+        const int audio_index = audio_frame_rate_index(stream_frame_rate_index, fraction);
+        if (audio_index < 0) {
+            return invalid(
+                "experimental.frame_rate_fraction 2 outside frame_rate_index 5 to 12, or 4 outside "
+                "10 to 12 (Part 2 Table 18)");
+        }
+        if (config.rate_mode != RateMode::kConstant) {
+            return invalid("experimental.frame_rate_fraction with an average or variable rate");
+        }
+        config.frame_rate_index = audio_index;
+    }
     const std::optional<detail::FrameTiming> timing =
         detail::frame_timing(config.frame_rate_index, config.sample_rate_hz);
     if (!timing) {
@@ -4129,6 +4265,7 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
     }
     auto impl = std::make_unique<Impl>();
     impl->config = config;
+    impl->fraction = fraction;
     impl->timing = *timing;
     impl->delay = timing->frame_length * 3 / 2;
     impl->fs_index = config.sample_rate_hz == 48000 ? 1 : 0;
@@ -4966,7 +5103,8 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
         }
     }
     impl->layout.fs_index = impl->fs_index;
-    impl->layout.frame_rate_index = timing->frame_rate_index;
+    impl->layout.frame_rate_index = stream_frame_rate_index;
+    impl->layout.frame_rate_fraction = fraction;
     for (const StreamPresentation& p : impl->presentations) {
         impl->layout.presentations.push_back(p.toc);
     }
@@ -5013,11 +5151,23 @@ std::expected<std::unique_ptr<Encoder::Impl>, Refusal> Encoder::Impl::make(
         detail::PortionFrame blocks;
         fixed.push_back(impl->oamd_substream(0, true, true, blocks));
     }
-    const auto frame_bytes = static_cast<std::size_t>(impl->bytes_per_frame);
+    auto frame_bytes = static_cast<std::size_t>(impl->bytes_per_frame);
     const int wait = config.rate_mode == RateMode::kConstant
                          ? 0
                          : (config.rate_mode == RateMode::kVariable ? 7 : 1);
     const detail::TocLayout least_layout = impl->layout_for(0, true, wait);
+    if (fraction > 1) {
+        // The codec frame's share of the rate holds `fraction` tables of
+        // contents, each listing a share of the substreams' sizes.
+        const std::vector<std::size_t> share(fixed.size() + coded,
+                                             frame_bytes / static_cast<std::size_t>(fraction));
+        const std::size_t extra =
+            static_cast<std::size_t>(fraction - 1) * detail::toc_bytes(least_layout, 0, share);
+        if (frame_bytes <= extra) {
+            return invalid("a rate that cannot hold a table of contents in each transmission frame");
+        }
+        frame_bytes -= extra;
+    }
     for (StreamSubstream& s : impl->substreams) {
         s.coder->pending.fields = s.coder->fields_for(true);
     }

@@ -678,6 +678,15 @@ struct EncoderConfig {
         // is what DEE's streams do. A band's noise adds to its error, so
         // this trades SNR for a spectrum without holes at low rates.
         bool noise_fill = false;
+        // The efficient high frame rate mode (Part 2 clause 5.1.3): 2, or 4
+        // from frame_rate_index 10, at frame_rate_index 5 to 12 (47.95 to
+        // 120 fps). `frame_rate_index` is then the transmission rate of the
+        // frames, and the codec runs at the audio frame rate Table 18 gives it
+        // (half, or a quarter, of it): each codec frame goes out as this many
+        // raw_ac4_frame()s, the presentation substream whole in the first and
+        // each audio substream cut into as many pieces, which a decoder
+        // reassembles after the last. Constant rate only; 1 is the mode off.
+        int frame_rate_fraction = 1;
     };
     Experimental experimental{};
 };

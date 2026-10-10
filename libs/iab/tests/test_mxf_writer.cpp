@@ -569,7 +569,7 @@ TEST_CASE("a track file's Header Metadata is the IMF IAB Track File Level 0 obje
     const auto material_umid = hex(material.get(item::kPackageUid), 0, 32);
     CHECK(source_umid != material_umid);
     for (const auto& umid : {source_umid, material_umid}) {
-        CHECK(umid.substr(0, 24) == "060a2b340101010501010920");
+        CHECK(umid.substr(0, 24) == "060a2b340101010501010f20");
         CHECK(umid.substr(24, 8) == "13000000");
         // RFC 4122: version 4 and the variant bits.
         CHECK(umid[32 + 12] == '4');
@@ -678,7 +678,12 @@ TEST_CASE("a track file's IAB Essence Descriptor carries what ST 2067-201 5.9 re
     CHECK_FALSE(sf.has(item::kMcaChannelId));  // Annex C.2
     CHECK(sf.has(item::kMcaLink));
     CHECK(text_of(sf.get(item::kMcaTitle)) == "Test Title");
-    CHECK(text_of(sf.get(item::kSpoken)) == "en-US");
+    // RFC5646SpokenLanguage is an ISO7 string in the register: one byte a character, not UTF-16.
+    {
+        const auto& spoken = sf.get(item::kSpoken);
+        const std::string as_text(reinterpret_cast<const char*>(spoken.data()), spoken.size());
+        CHECK(as_text == "en-US");
+    }
     for (const auto& s : p.sets) {
         CHECK_FALSE(s.key == "060e2b34025301010d01010101016b00");  // AudioChannelLabelSubDescriptor
         CHECK_FALSE(s.key == "060e2b34025301010d01010101016c00");  // SoundfieldGroupLabelSubDescriptor

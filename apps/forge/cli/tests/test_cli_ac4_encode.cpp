@@ -482,6 +482,31 @@ TEST_CASE("ac4-encode's experimental tools each write their syntax", "[cli][ac4]
         const auto records = run(wav, "24 codec-mode=simple experimental=noise-fill");
         CHECK(count_of(records, "b_snf_data_exists", 1) > 0U);
     }
+    SECTION("hfr-4 sends each audio frame as four transmission frames at 120 fps") {
+        const std::vector<float> x = tone(440.0, count);
+        const auto wav = wav_of("ac4_hfr.wav", {x, x});
+        REQUIRE(run_cli("ac4-encode " + quoted(wav) + " " + quoted(out) +
+                            " 192 frame-rate=120 experimental=hfr-4 codec-mode=simple",
+                        log) == 0);
+        const iclforge::ac4::Toc toc = first_toc(read_bytes(out));
+        CHECK(toc.frame_rate_index == 12);
+        REQUIRE(toc.presentations_v1.size() == 1);
+        CHECK(toc.presentations_v1[0].frame_rate_fraction == 4);
+        // In an MP4 file the transmission frames are the samples, and the
+        // decoder joins them.
+        const fs::path mp4 = dir / "ac4_hfr.mp4";
+        REQUIRE(run_cli("ac4-encode " + quoted(wav) + " " + quoted(mp4) +
+                            " 192 frame-rate=120 experimental=hfr-4 codec-mode=simple",
+                        log) == 0);
+        const fs::path decoded = dir / "ac4_hfr.wav";
+        REQUIRE(run_cli("decode " + quoted(mp4) + " " + quoted(decoded), log) == 0);
+        CHECK(fs::file_size(decoded) > static_cast<std::uintmax_t>(count));
+        // Without the option the same rate is 120 fps frames of their own.
+        REQUIRE(run_cli("ac4-encode " + quoted(wav) + " " + quoted(out) +
+                            " 192 frame-rate=120 codec-mode=simple",
+                        log) == 0);
+        CHECK(first_toc(read_bytes(out)).presentations_v1.at(0).frame_rate_fraction == 1);
+    }
     SECTION("coding-configs chooses among the 5.X element's coding configurations") {
         // A second of independent tones, then one signal in L, R and C: half
         // of the signal each.

@@ -1,5 +1,7 @@
 #include "decode.hpp"
 
+#include <fmt/base.h>
+#include <fmt/format.h>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -8,8 +10,6 @@
 #include <cstdio>
 #include <expected>
 #include <filesystem>
-#include <fmt/base.h>
-#include <fmt/format.h>
 #include <fstream>
 #include <ios>
 #include <optional>
@@ -17,6 +17,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 #include "../adm/atmos_adm.hpp"
@@ -954,75 +955,126 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     const bool have_adm_output = !adm_out.empty();
     forge_cli::AdmMasterInput adm_input;
     bool adm_input_ready = false;
-    bool adm_bed_warned = false;
+    bool adm_unwritable_warned = false;
+    // Where the bed's LFE channel sits in adm_input.channels, so the end of the decode can delay
+    // exactly that one; and, for each JOC output channel, which dynamic object it is (the index
+    // into UpdateBlock::objects) or nothing for a bed channel, whose position comes from its label.
+    std::optional<std::size_t> adm_lfe_index;
+    std::vector<std::optional<std::size_t>> adm_dynamic_index;
     std::uint64_t adm_samples_emitted = 0;
-    const auto accumulate_adm = [&](const std::vector<std::vector<float>>& object_audio,
-                                    const std::optional<iclforge::objects::oba::DecodedProgram>&
-                                        object_metadata,
-                                    std::span<const std::vector<float>> channels,
-                                    iclforge::ac3::eac3::chanmap::Layout layout,
-                                    std::uint32_t sample_rate) {
-        if (!have_adm_output || object_audio.empty() || !object_metadata) {
-            return;
-        }
-        const auto& program = object_metadata->program;
-        if (!program.dynamic_only) {
-            // A genuine bed program (third-party channel-based-immersive content, oamd.hpp's
-            // own Program comment) is out of this writer's current scope - see
-            // iclforge::adm::WriteInput's own doc comment. Warned once; the WAV/objects_dir
-            // outputs this decode already produces are unaffected.
-            if (!adm_bed_warned) {
-                fmt::println(stderr,
-                             "warning: {} only supports dynamic-object-only Atmos programmes "
-                             "today; this stream carries a bed program, no ADM master written",
-                             adm_out);
-                adm_bed_warned = true;
+    const auto accumulate_adm =
+        [&](const std::vector<std::vector<float>>& object_audio,
+            const std::vector<int>& object_indices,
+            const std::optional<iclforge::objects::oba::DecodedProgram>& object_metadata,
+            std::span<const std::vector<float>> channels,
+            iclforge::ac3::eac3::chanmap::Layout layout, std::uint32_t sample_rate) {
+            if (!have_adm_output || object_audio.empty() || !object_metadata) {
+                return;
             }
-            return;
-        }
-        const int lfe_slot = layout.index_of(iclforge::ac3::eac3::chanmap::Location::kLfe);
-        const bool have_lfe =
-            program.lfe && lfe_slot >= 0 && static_cast<std::size_t>(lfe_slot) < channels.size();
-        if (!adm_input_ready) {
-            adm_input.sample_rate = sample_rate;
-            adm_input.channels.resize(object_audio.size() + (have_lfe ? 1 : 0));
+            const auto warn_unwritable = [&]() {
+                // Warned once; the WAV/objects_dir outputs this decode already produces are
+                // unaffected.
+                if (!adm_unwritable_warned) {
+                    fmt::println(
+                        stderr,
+                        "warning: {} cannot hold this stream's intermediate-spatial-format "
+                        "objects, extra bed instances or non-standard bed assignment, or an "
+                        "LFE2 channel; no ADM master written",
+                        adm_out);
+                    adm_unwritable_warned = true;
+                }
+            };
+            const auto& program = object_metadata->program;
+            namespace oba = iclforge::objects::oba;
+            // What iclforge::adm::write() can place is a bed channel named by a Table 12 label and
+            // a dynamic object. An ISF object, a second bed instance and a Table 13 assignment have
+            // a channel count and no label (oamd.hpp's own Program comment), and an LFE2 is
+            // bypassed by JOC like the LFE but is not among the decoded channels the way the LFE
+            // is.
+            const bool writable =
+                program.dynamic_only || (program.nonstd_bed == 0 && program.extra_beds.empty() &&
+                                         program.extra_bed_channels == 0 && program.isf_idx < 0 &&
+                                         (program.bed & oba::bed::kLfe2) == 0);
+            if (!writable) {
+                warn_unwritable();
+                return;
+            }
+            const int lfe_slot = layout.index_of(iclforge::ac3::eac3::chanmap::Location::kLfe);
+            const bool have_lfe = oba::has_lfe(program) && lfe_slot >= 0 &&
+                                  static_cast<std::size_t>(lfe_slot) < channels.size();
+            if (!adm_input_ready) {
+                // Each JOC output is one payload object (§5.6.4.8: bed channels, then ISF, then
+                // dynamic objects), and object_indices says which. Those below `anchored` are bed
+                // channels, named by the first instance's labels; the rest are dynamic objects. For
+                // a dynamic-object-only program `anchored` is 0 or 1 (the LFE), so every output is
+                // a dynamic object - the identity this lambda used to assume.
+                const auto labels = oba::bed_labels(program.bed);
+                const int anchored = oba::object_count(program) - program.dynamic_objects;
+                std::vector<forge_cli::AdmMasterChannel> planned(object_audio.size() +
+                                                                 (have_lfe ? 1 : 0));
+                std::vector<std::optional<std::size_t>> dynamic_index(object_audio.size());
+                for (std::size_t i = 0; i < object_audio.size(); ++i) {
+                    const int index = object_indices.size() == object_audio.size()
+                                          ? object_indices[i]
+                                          : static_cast<int>(i) + anchored;
+                    if (index >= anchored) {
+                        const auto dynamic = static_cast<std::size_t>(index - anchored);
+                        dynamic_index[i] = dynamic;
+                        planned[i].name = fmt::format("Object {}", dynamic + 1);
+                    } else if (index >= 0 && static_cast<std::size_t>(index) < labels.size()) {
+                        const auto label = labels[static_cast<std::size_t>(index)];
+                        planned[i].bed_label = label;
+                        planned[i].name = std::string(oba::describe(label));
+                    } else {
+                        warn_unwritable();
+                        return;
+                    }
+                }
+                if (have_lfe) {
+                    planned.back().name = "LFE";
+                    planned.back().bed_label = oba::BedLabel::kLfe;
+                    adm_lfe_index = planned.size() - 1;
+                }
+                adm_input.sample_rate = sample_rate;
+                adm_input.channels = std::move(planned);
+                adm_dynamic_index = std::move(dynamic_index);
+                adm_input_ready = true;
+            }
+            if (object_audio.size() + (have_lfe ? 1 : 0) != adm_input.channels.size()) {
+                return;  // shape mismatch: skipped, same convention as append_objects above
+            }
             for (std::size_t i = 0; i < object_audio.size(); ++i) {
-                adm_input.channels[i].name = fmt::format("Object {}", i + 1);
+                auto& pcm = adm_input.channels[i].pcm;
+                pcm.insert(pcm.end(), object_audio[i].begin(), object_audio[i].end());
             }
             if (have_lfe) {
-                adm_input.channels.back().name = "LFE";
-                adm_input.channels.back().bed_label = iclforge::objects::oba::BedLabel::kLfe;
+                auto& pcm = adm_input.channels.back().pcm;
+                const auto& lfe_channel = channels[static_cast<std::size_t>(lfe_slot)];
+                pcm.insert(pcm.end(), lfe_channel.begin(), lfe_channel.end());
             }
-            adm_input_ready = true;
-        }
-        if (object_audio.size() + (have_lfe ? 1 : 0) != adm_input.channels.size()) {
-            return;  // shape mismatch: skipped, same convention as append_objects above
-        }
-        for (std::size_t i = 0; i < object_audio.size(); ++i) {
-            auto& pcm = adm_input.channels[i].pcm;
-            pcm.insert(pcm.end(), object_audio[i].begin(), object_audio[i].end());
-        }
-        if (have_lfe) {
-            auto& pcm = adm_input.channels.back().pcm;
-            const auto& lfe_channel = channels[static_cast<std::size_t>(lfe_slot)];
-            pcm.insert(pcm.end(), lfe_channel.begin(), lfe_channel.end());
-        }
-        // §5.6.2.1: sample_offset is already in samples from THIS access unit's own first
-        // sample - adm_samples_emitted (bumped at the bottom of this lambda by exactly the
-        // number of samples object_audio just contributed) turns it into an absolute offset
-        // from the start of the whole decode, which is what iclforge::adm::WriteObjectUpdate
-        // wants (bridge.hpp's own doc comment).
-        for (const auto& block : object_metadata->blocks) {
-            const auto sample_offset =
-                adm_samples_emitted + static_cast<std::uint64_t>(std::max(block.sample_offset, 0));
-            for (std::size_t i = 0; i < block.objects.size() && i < object_audio.size(); ++i) {
-                adm_input.channels[i].updates.push_back({.sample_offset = sample_offset,
-                                                          .ramp_duration_samples = block.ramp_duration,
-                                                          .state = block.objects[i]});
+            // §5.6.2.1: sample_offset is already in samples from THIS access unit's own first
+            // sample - adm_samples_emitted (bumped at the bottom of this lambda by exactly the
+            // number of samples object_audio just contributed) turns it into an absolute offset
+            // from the start of the whole decode, which is what iclforge::adm::WriteObjectUpdate
+            // wants (bridge.hpp's own doc comment). A bed channel has no updates: its position is
+            // its label's.
+            for (const auto& block : object_metadata->blocks) {
+                const auto sample_offset =
+                    adm_samples_emitted +
+                    static_cast<std::uint64_t>(std::max(block.sample_offset, 0));
+                for (std::size_t i = 0; i < object_audio.size(); ++i) {
+                    if (!adm_dynamic_index[i].has_value() ||
+                        *adm_dynamic_index[i] >= block.objects.size()) {
+                        continue;
+                    }
+                    adm_input.channels[i].updates.push_back(
+                        {.sample_offset = sample_offset,
+                         .ramp_duration_samples = block.ramp_duration,
+                         .state = block.objects[*adm_dynamic_index[i]]});
+                }
             }
-        }
-        adm_samples_emitted += object_audio.front().size();
-    };
+            adm_samples_emitted += object_audio.front().size();
+        };
     iclforge::ac3::DecodedAccessUnit first{};
     // The programme's layout, from the first unit decoded - the held-back
     // unit at end-of-stream is laid out against it (held_back_unit's own doc
@@ -1117,8 +1169,8 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
             abort_all();
             return kExitOutput;
         }
-        accumulate_adm(out.object_audio, out.object_metadata, out.channels, out.layout,
-                       sample_rate_hz(first.sample_rate));
+        accumulate_adm(out.object_audio, out.object_indices, out.object_metadata, out.channels,
+                       out.layout, sample_rate_hz(first.sample_rate));
     }
     // Whatever transient pre-noise processing was still holding back at
     // end-of-stream (§3.7). held_back_unit assembles the flushed substreams
@@ -1155,8 +1207,8 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
                 abort_all();
                 return kExitOutput;
             }
-            accumulate_adm(held->object_audio, held->object_metadata, held->channels,
-                           held->layout, sample_rate_hz(held->sample_rate));
+            accumulate_adm(held->object_audio, held->object_indices, held->object_metadata,
+                           held->channels, held->layout, sample_rate_hz(held->sample_rate));
         }
     }
     progress.finish();
@@ -1192,15 +1244,16 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     }
     if (have_adm_output) {
         if (!adm_input_ready) {
-            fmt::println(stderr, "warning: {} given but no dynamic-object-only Atmos programme was decoded",
-                         adm_out);
+            fmt::println(
+                stderr, "warning: {} given but no Atmos programme with an object layer was decoded",
+                adm_out);
         } else {
             // accumulate_adm's own comment: the LFE channel it built is still
             // reconstruction_delay(meta.joc_domain) samples ahead of the object
             // channels beside it - the one channel here with bed_label set, so
             // there is no need to have tracked which index it landed at above.
-            if (!adm_input.channels.empty() && adm_input.channels.back().bed_label.has_value()) {
-                auto& lfe = adm_input.channels.back().pcm;
+            if (adm_lfe_index.has_value()) {
+                auto& lfe = adm_input.channels[*adm_lfe_index].pcm;
                 lfe = delay_pcm(
                     lfe, static_cast<std::size_t>(
                              iclforge::objects::oba::joc::reconstruction_delay(meta.joc_domain)));

@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -17,6 +18,8 @@
 
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
+#include "iclforge/iab/model.hpp"
+#include "iclforge/iab/writer.hpp"
 
 // forge's 'atmos-iab' command (IAB reader phase 3 of 3 - 's "IAB (SMPTE ST 2098-2)
 // reader" entry; apps/forge/cli/src/commands/atmos.cpp's run_atmos_iab). Real, subprocess-level
@@ -327,4 +330,62 @@ TEST_CASE("forge atmos-iab reports a clear diagnosis for a file with no IAB esse
     // iclforge::iab::describe(IabError::...) - never a silent crash or an unlabeled non-zero exit.
     CHECK(log.find("error:") != std::string::npos);
     CHECK_FALSE(fs::exists(out_path));
+}
+
+TEST_CASE("forge atmos-iab warns about IAB metadata the Atmos encode carries only approximately",
+          "[cli][atmos-iab]") {
+    // Written with the library's own IAB writer: an object whose zone control is screen left alone,
+    // which none of TS 103 420 Table 20's presets says, so it is carried as screen only and the
+    // CLI says so on stderr.
+    constexpr std::uint8_t kFrameRate24 = 0x0;  // 8 pan sub blocks, 2000 samples at 48 kHz
+    constexpr std::size_t kSamples = 2000;
+    constexpr unsigned kFrames = 6;
+
+    std::vector<iclforge::iab::IABitstreamFrame> frames(kFrames);
+    for (unsigned n = 0; n < kFrames; ++n) {
+        auto& frame = frames[n].frame;
+        frame.version = 1;
+        frame.sample_rate = 48000;
+        frame.bit_depth = 24;
+        frame.frame_rate_code = kFrameRate24;
+
+        iclforge::iab::AudioDataPcm pcm;
+        pcm.audio_data_id = 1;
+        pcm.samples.resize(kSamples);
+        for (std::size_t i = 0; i < kSamples; ++i) {
+            pcm.samples[i] = 0.25F * static_cast<float>(
+                                         std::sin(2.0 * std::numbers::pi * 440.0 *
+                                                  static_cast<double>(n * kSamples + i) / 48000.0));
+        }
+        frame.audio_pcm.push_back(std::move(pcm));
+
+        iclforge::iab::ObjectDefinition object;
+        object.meta_id = 5;
+        object.audio_data_id = 1;
+        object.sub_blocks.resize(8);
+        object.sub_blocks[0].position = {.x = 0.25, .y = 0.5, .z = 0.0};
+        object.sub_blocks[0].zone_gains = std::array<double, iclforge::iab::kZoneCount>{
+            1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        for (std::size_t sb = 1; sb < object.sub_blocks.size(); ++sb) {
+            object.sub_blocks[sb].has_pan_info = false;
+        }
+        frame.objects.push_back(std::move(object));
+    }
+
+    const auto dir = scratch_dir();
+    const auto fixture_path = dir / "atmos_iab_zone_warning.iab";
+    const auto written = iclforge::iab::write_iabitstream(fixture_path.string(), frames);
+    REQUIRE(written.has_value());
+
+    const auto out_path = dir / "atmos_iab_zone_warning.ec3";
+    const auto log_path = dir / "atmos_iab_zone_warning.log";
+    const auto rc = run_cli(
+        "atmos-iab \"" + fixture_path.string() + "\" \"" + out_path.string() + "\" 448", log_path);
+    const auto log = read_log(log_path);
+    INFO(log);
+    CHECK(rc == 0);
+    CHECK(log.find("warning:") != std::string::npos);
+    CHECK(log.find("object:5") != std::string::npos);
+    CHECK(log.find("zone control (matches no Table 20 preset; carried as screen only)") !=
+          std::string::npos);
 }

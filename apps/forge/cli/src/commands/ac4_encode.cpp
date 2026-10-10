@@ -471,6 +471,7 @@ int run_ac4_encode(std::string_view in_path, std::string_view out_path, std::uin
     config.experimental.ajcc = meta.ac4_experimental_ajcc;
     config.experimental.nine_x_4 = meta.ac4_experimental_nine_x_4;
     config.experimental.noise_fill = meta.ac4_experimental_noise_fill;
+    config.experimental.frame_rate_fraction = meta.ac4_experimental_frame_rate_fraction;
 
     if (drc_named) {
         // Table 161's four modes on drc='s profile, and a mode named on a

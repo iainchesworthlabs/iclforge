@@ -82,6 +82,20 @@ std::expected<IabAtmosSource, std::string> load_iab_atmos_source(std::string_vie
     for (const auto& channel : bridged->pcm) {
         out.pcm.emplace_back(channel);
     }
+    for (std::size_t i = 0; i < bridged->unmapped.size(); ++i) {
+        if (bridged->unmapped[i].empty()) {
+            continue;
+        }
+        std::string line =
+            bridged->channel_ids[i] + ": carried approximately or not at all in the Atmos encode:";
+        for (const auto& feature : bridged->unmapped[i]) {
+            line += ' ';
+            line += feature;
+            line += ',';
+        }
+        line.pop_back();
+        out.warnings.push_back(std::move(line));
+    }
     out.handle = std::move(bridged);  // shared_ptr<IabBridgeResult> -> shared_ptr<void>
     return out;
 }

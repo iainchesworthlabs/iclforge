@@ -238,6 +238,108 @@ std::string_view kHoaAdmXml = R"(<?xml version="1.0" encoding="UTF-8"?>
 </audioFormatExtended>
 )";
 
+// A Mid/Side matrix pair, after the standard's own sample code (BS.2076-3 §5.4.3.2.1 and §5.5.4.2):
+// an encoding pack that reads the common stereo DirectSpeakers pack (AP_00010002, channels
+// AC_00010001 and AC_00010002) and a decoding pack that undoes it. libadm models none of the matrix
+// elements, so this is where the text scan in adm_xml_extras.cpp is exercised: the
+// outputChannelFormatIDRef and its legacy spelling, a jumpPosition ahead of the matrix,
+// coefficients in every form the schema has (a plain gain, a negative gain, gainUnit="dB", phase,
+// delay, and each *Var), an ID written with lower-case hexadecimal digits, and a Matrix pack's four
+// references. The channel IDs use "900x" counters for the same reason kDirectSpeakersAdmXml does.
+std::string_view kMatrixAdmXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<audioFormatExtended version="ITU-R_BS.2076-3">
+  <audioPackFormat audioPackFormatID="AP_00029001" audioPackFormatName="MidSide_Encode" typeLabel="0002" typeDefinition="Matrix">
+    <decodePackFormatIDRef>AP_00029101</decodePackFormatIDRef>
+    <inputPackFormatIDRef>AP_00010002</inputPackFormatIDRef>
+    <audioChannelFormatIDRef>AC_00029001</audioChannelFormatIDRef>
+    <audioChannelFormatIDRef>AC_00029002</audioChannelFormatIDRef>
+  </audioPackFormat>
+  <audioPackFormat audioPackFormatID="AP_00029101" audioPackFormatName="MidSide_Decode" typeLabel="0002" typeDefinition="Matrix">
+    <encodePackFormatIDRef>AP_00029001</encodePackFormatIDRef>
+    <encodePackFormatIDRef>AP_0002900a</encodePackFormatIDRef>
+    <outputPackFormatIDRef>AP_00010002</outputPackFormatIDRef>
+    <audioChannelFormatIDRef>AC_00029101</audioChannelFormatIDRef>
+    <audioChannelFormatIDRef>AC_00029102</audioChannelFormatIDRef>
+    <audioChannelFormatIDRef>AC_00029103</audioChannelFormatIDRef>
+  </audioPackFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00029001" audioChannelFormatName="Mid" typeLabel="0002" typeDefinition="Matrix">
+    <audioBlockFormat audioBlockFormatID="AB_00029001_00000001">
+      <matrix>
+        <coefficient gain="0.5">AC_00010001</coefficient>
+        <coefficient gain="0.5">AC_00010002</coefficient>
+      </matrix>
+    </audioBlockFormat>
+  </audioChannelFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00029002" audioChannelFormatName="Side" typeLabel="0002" typeDefinition="Matrix">
+    <audioBlockFormat audioBlockFormatID="AB_00029002_00000001">
+      <matrix>
+        <coefficient gain="0.5">AC_00010001</coefficient>
+        <coefficient gain="-0.5">AC_00010002</coefficient>
+      </matrix>
+    </audioBlockFormat>
+  </audioChannelFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00029101" audioChannelFormatName="Left" typeLabel="0002" typeDefinition="Matrix">
+    <audioBlockFormat audioBlockFormatID="AB_00029101_00000001">
+      <outputChannelFormatIDRef>AC_00010001</outputChannelFormatIDRef>
+      <jumpPosition interpolationLength="0.5">1</jumpPosition>
+      <matrix>
+        <coefficient gain="1.0">AC_00029001</coefficient>
+        <coefficient gain="1.0">AC_00029002</coefficient>
+      </matrix>
+    </audioBlockFormat>
+  </audioChannelFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00029102" audioChannelFormatName="Right" typeLabel="0002" typeDefinition="Matrix">
+    <audioBlockFormat audioBlockFormatID="AB_00029102_00000001">
+      <outputChannelIDRef>AC_00010002</outputChannelIDRef>
+      <matrix>
+        <coefficient gain="1.0">AC_00029001</coefficient>
+        <coefficient gain="-1.0">AC_00029002</coefficient>
+      </matrix>
+    </audioBlockFormat>
+  </audioChannelFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00029103" audioChannelFormatName="Odd" typeLabel="0002" typeDefinition="Matrix">
+    <audioBlockFormat audioBlockFormatID="AB_0002910a_00000001">
+      <matrix>
+        <coefficient gain="-6.0206" gainUnit="dB" phase="90" delay="10.5">ac_00029001</coefficient>
+        <coefficient gainVar="clev" phaseVar="ph" delayVar="del">AC_00029002</coefficient>
+        <coefficient>AC_00010001</coefficient>
+      </matrix>
+    </audioBlockFormat>
+  </audioChannelFormat>
+</audioFormatExtended>
+)";
+
+// An HOA channel and pack carrying the sub-elements libadm models for a block (nfcRefDist,
+// equation, screenRef, headLocked) and the three a pack may carry (§5.5.5, Table A1-25), which it
+// does not.
+std::string_view kHoaExtrasAdmXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<audioFormatExtended version="ITU-R_BS.2076-3">
+  <audioPackFormat audioPackFormatID="AP_00049001" audioPackFormatName="Foa" typeLabel="0004" typeDefinition="HOA">
+    <audioChannelFormatIDRef>AC_00049002</audioChannelFormatIDRef>
+    <normalization>N3D</normalization>
+    <nfcRefDist>1.5</nfcRefDist>
+    <screenRef>1</screenRef>
+  </audioPackFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00049002" audioChannelFormatName="N3D_ACN_2" typeLabel="0004" typeDefinition="HOA">
+    <audioBlockFormat audioBlockFormatID="AB_00049002_00000001">
+      <order>1</order>
+      <degree>0</degree>
+      <normalization>N3D</normalization>
+      <nfcRefDist>2</nfcRefDist>
+      <screenRef>1</screenRef>
+      <headLocked>1</headLocked>
+      <equation>sqrt(3)*z</equation>
+    </audioBlockFormat>
+  </audioChannelFormat>
+  <audioChannelFormat audioChannelFormatID="AC_00049003" audioChannelFormatName="Plain" typeLabel="0004" typeDefinition="HOA">
+    <audioBlockFormat audioBlockFormatID="AB_00049003_00000001">
+      <order>0</order>
+      <degree>0</degree>
+    </audioBlockFormat>
+  </audioChannelFormat>
+</audioFormatExtended>
+)";
+
 // A Cartesian Objects channel (BS.2076-2 Table 16/17) with a jumpPosition
 // (§10.3) - exercises the cartesian branch of iclforge::adm::Position and the
 // channelLock/jumpPosition fields adm_model.cpp's convert() populates.
@@ -1114,6 +1216,152 @@ TEST_CASE("parses HOA order/degree/normalization", "[adm][model]") {
     CHECK(block.hoa_normalization == "N3D");
 }
 
+TEST_CASE("parses a Matrix block's coefficients, output channel and jumpPosition", "[adm][model]") {
+    std::istringstream stream(wrap_axml_only(kMatrixAdmXml));
+    auto doc = iclforge::adm::parse_bw64(stream);
+    INFO("parse_bw64: " << (doc ? std::string{"ok"}
+                                : std::string(iclforge::adm::describe(doc.error()))));
+    REQUIRE(doc.has_value());
+
+    SECTION("an encoding matrix: coefficients over the input pack's channels, no output channel") {
+        const auto& side = find_by_id(doc->model.channel_formats, "AC_00029002");
+        CHECK(side.type == iclforge::adm::TypeDefinition::kMatrix);
+        REQUIRE(side.block_formats.size() == 1);
+        const auto& block = side.block_formats.front();
+        CHECK(block.output_channel_format_ref.empty());
+        REQUIRE(block.matrix.size() == 2);
+        CHECK(block.matrix[0].input_channel_format_ref == "AC_00010001");
+        CHECK(block.matrix[0].gain == Catch::Approx(0.5));
+        CHECK(block.matrix[1].input_channel_format_ref == "AC_00010002");
+        CHECK(block.matrix[1].gain == Catch::Approx(-0.5));  // a negative gain inverts the signal
+        CHECK(block.matrix[1].phase_deg == 0.0);
+        CHECK(block.matrix[1].delay_ms == 0.0);
+        CHECK(block.matrix[1].gain_var.empty());
+    }
+
+    SECTION("a decoding matrix: the output channel, a jumpPosition ahead of the matrix") {
+        const auto& left = find_by_id(doc->model.channel_formats, "AC_00029101");
+        REQUIRE(left.block_formats.size() == 1);
+        const auto& block = left.block_formats.front();
+        CHECK(block.output_channel_format_ref == "AC_00010001");
+        REQUIRE(block.has_jump_position);
+        CHECK(block.jump_position);
+        REQUIRE(block.has_interpolation_length);
+        CHECK(block.interpolation_length_s == Catch::Approx(0.5));
+        REQUIRE(block.matrix.size() == 2);
+        CHECK(block.matrix[0].input_channel_format_ref == "AC_00029001");
+        CHECK(block.matrix[1].input_channel_format_ref == "AC_00029002");
+        CHECK(block.matrix[1].gain == Catch::Approx(1.0));
+    }
+
+    SECTION("the legacy outputChannelIDRef spelling is read as the output channel") {
+        const auto& right = find_by_id(doc->model.channel_formats, "AC_00029102");
+        const auto& block = right.block_formats.front();
+        CHECK(block.output_channel_format_ref == "AC_00010002");
+        CHECK_FALSE(block.has_jump_position);
+        REQUIRE(block.matrix.size() == 2);
+        CHECK(block.matrix[1].gain == Catch::Approx(-1.0));
+    }
+
+    SECTION("dB gain is converted, phase and delay are kept, a variable is held by name") {
+        const auto& odd = find_by_id(doc->model.channel_formats, "AC_00029103");
+        const auto& block = odd.block_formats.front();
+        // The block ID was written with a lower-case hexadecimal digit; libadm prints it in
+        // upper case and the scan's key has to match that.
+        CHECK(block.id == "AB_0002910A_00000001");
+        REQUIRE(block.matrix.size() == 3);
+
+        const auto& converted = block.matrix[0];
+        CHECK(converted.input_channel_format_ref == "AC_00029001");
+        CHECK(converted.gain == Catch::Approx(0.5).epsilon(1e-4));  // -6.0206 dB
+        CHECK(converted.phase_deg == Catch::Approx(90.0));
+        CHECK(converted.delay_ms == Catch::Approx(10.5));
+
+        const auto& variable = block.matrix[1];
+        CHECK(variable.gain_var == "clev");
+        CHECK(variable.phase_var == "ph");
+        CHECK(variable.delay_var == "del");
+        CHECK(variable.gain == 1.0);  // the constant stays at its default
+
+        const auto& defaults = block.matrix[2];
+        CHECK(defaults.input_channel_format_ref == "AC_00010001");
+        CHECK(defaults.gain == 1.0);
+        CHECK(defaults.phase_deg == 0.0);
+        CHECK(defaults.delay_ms == 0.0);
+    }
+}
+
+TEST_CASE("parses a Matrix pack's encode, decode, input and output references", "[adm][model]") {
+    std::istringstream stream(wrap_axml_only(kMatrixAdmXml));
+    auto doc = iclforge::adm::parse_bw64(stream);
+    REQUIRE(doc.has_value());
+
+    const auto& encode = find_by_id(doc->model.pack_formats, "AP_00029001");
+    CHECK(encode.type == iclforge::adm::TypeDefinition::kMatrix);
+    CHECK(encode.input_pack_format_ref == "AP_00010002");
+    CHECK(encode.decode_pack_format_refs == std::vector<std::string>{"AP_00029101"});
+    CHECK(encode.encode_pack_format_refs.empty());
+    CHECK(encode.output_pack_format_ref.empty());
+    CHECK(encode.channel_format_refs == std::vector<std::string>{"AC_00029001", "AC_00029002"});
+
+    const auto& decode = find_by_id(doc->model.pack_formats, "AP_00029101");
+    CHECK(decode.output_pack_format_ref == "AP_00010002");
+    CHECK(decode.input_pack_format_ref.empty());
+    // 0..*, and an ID written with a lower-case digit is read in upper case.
+    CHECK(decode.encode_pack_format_refs == std::vector<std::string>{"AP_00029001", "AP_0002900A"});
+    CHECK(decode.decode_pack_format_refs.empty());
+}
+
+TEST_CASE("a block and pack that are not Matrix read back with no matrix content", "[adm][model]") {
+    std::istringstream stream(wrap_axml_only(kCarAdmXml));
+    auto doc = iclforge::adm::parse_bw64(stream);
+    REQUIRE(doc.has_value());
+    const auto& block = find_by_id(doc->model.channel_formats, "AC_00031001").block_formats.at(0);
+    CHECK(block.matrix.empty());
+    CHECK(block.output_channel_format_ref.empty());
+    const auto& pack = find_by_id(doc->model.pack_formats, "AP_00031001");
+    CHECK(pack.input_pack_format_ref.empty());
+    CHECK(pack.output_pack_format_ref.empty());
+    CHECK(pack.encode_pack_format_refs.empty());
+    CHECK(pack.decode_pack_format_refs.empty());
+    CHECK_FALSE(pack.has_nfc_ref_dist);
+    CHECK_FALSE(pack.screen_ref);
+}
+
+TEST_CASE(
+    "parses an HOA block's nfcRefDist, equation, screenRef and headLocked and a pack's defaults",
+    "[adm][model]") {
+    std::istringstream stream(wrap_axml_only(kHoaExtrasAdmXml));
+    auto doc = iclforge::adm::parse_bw64(stream);
+    INFO("parse_bw64: " << (doc ? std::string{"ok"}
+                                : std::string(iclforge::adm::describe(doc.error()))));
+    REQUIRE(doc.has_value());
+
+    const auto& block = find_by_id(doc->model.channel_formats, "AC_00049002").block_formats.at(0);
+    CHECK(block.hoa_order == 1);
+    CHECK(block.hoa_degree == 0);
+    CHECK(block.hoa_normalization == "N3D");
+    REQUIRE(block.has_nfc_ref_dist);
+    CHECK(block.nfc_ref_dist == Catch::Approx(2.0));
+    CHECK(block.hoa_equation == "sqrt(3)*z");
+    CHECK(block.screen_ref);
+    CHECK(block.head_locked);
+
+    const auto& plain = find_by_id(doc->model.channel_formats, "AC_00049003").block_formats.at(0);
+    CHECK_FALSE(plain.has_nfc_ref_dist);
+    CHECK(plain.hoa_equation.empty());
+    CHECK_FALSE(plain.screen_ref);
+    CHECK_FALSE(plain.head_locked);
+    CHECK(plain.hoa_normalization == "SN3D");  // the schema's default
+
+    const auto& pack = find_by_id(doc->model.pack_formats, "AP_00049001");
+    CHECK(pack.type == iclforge::adm::TypeDefinition::kHoa);
+    CHECK(pack.hoa_normalization == "N3D");
+    REQUIRE(pack.has_nfc_ref_dist);
+    CHECK(pack.nfc_ref_dist == Catch::Approx(1.5));
+    CHECK(pack.screen_ref);
+}
+
 TEST_CASE("parses Cartesian object positions and jumpPosition", "[adm][model]") {
     std::istringstream stream(wrap_axml_only(kCartesianObjectAdmXml));
     auto doc = iclforge::adm::parse_bw64(stream);
@@ -1220,44 +1468,475 @@ TEST_CASE("write_bw64 gives every audioTrackUID the bit depth of the fmt chunk",
     }
 }
 
-// AdmWriteError::kInvalidDocument's doc comment (ac3adm.hpp) names a block whose position is polar,
-// but the translator behind write_bw64() read every block's position with an unchecked
-// std::get<CartesianPosition>, so a polar block threw std::bad_variant_access out of a function
-// that returns std::expected - for both typeDefinitions the writer supports. A default-constructed
-// AudioBlockFormat is such a block: its position starts as PolarPosition{}. The channel is given a
-// second block and that is the one changed, so a check of each channel's first block alone would
-// not pass.
-TEST_CASE("write_bw64 reports a polar block as kInvalidDocument without throwing", "[adm][write]") {
+namespace {
+
+// The written channel called `name`. The parsed model also holds Annex A's common definitions,
+// merged ahead of the file's own elements, so position says nothing about which one is the file's.
+const iclforge::adm::AudioChannelFormat& channel_by_name(const iclforge::adm::AdmDocument& document,
+                                                         std::string_view name) {
+    const auto it = std::ranges::find(document.model.channel_formats, name,
+                                      &iclforge::adm::AudioChannelFormat::name);
+    REQUIRE(it != document.model.channel_formats.end());
+    return *it;
+}
+
+}  // namespace
+
+// A polar position is written as a polar position (BS.2076-3 Table A1-11 for Objects, Table A1-8
+// for DirectSpeakers), not refused: the writer once read every block's position with an unchecked
+// std::get<CartesianPosition> and reported a polar block as kInvalidDocument (or, before that,
+// threw std::bad_variant_access out of a function that returns std::expected). A
+// default-constructed AudioBlockFormat has a polar position too (PolarPosition{}: azimuth 0,
+// elevation 0, distance 1), so it now writes. The channel's second block is the one made polar, so
+// a check of each channel's first block alone would not pass.
+TEST_CASE("write_bw64 writes a polar block as polar and reads it back", "[adm][write]") {
     const auto type = GENERATE(iclforge::adm::TypeDefinition::kObjects,
                                iclforge::adm::TypeDefinition::kDirectSpeakers);
     INFO("typeDefinition " << (type == iclforge::adm::TypeDefinition::kObjects ? "Objects"
-                                                                        : "DirectSpeakers"));
+                                                                               : "DirectSpeakers"));
     const auto dir = write_scratch_dir("adm_write_polar");
     auto document = objects_document({std::nullopt}, type);
     auto& blocks = document.model.channel_formats.front().block_formats;
     auto second = blocks.front();
     second.rtime_s = 0.5;
+    second.has_duration = true;
+    second.duration_s = 0.5;
+    blocks.front().has_duration = true;
+    blocks.front().duration_s = 0.5;
+    second.cartesian = false;
+    second.position =
+        iclforge::adm::PolarPosition{.azimuth_deg = -110.0, .elevation_deg = 30.0, .distance = 0.5};
     blocks.push_back(second);
 
-    // Unchanged, the document writes, so what is refused below is refused for the block alone.
-    REQUIRE(iclforge::adm::write_bw64((dir / "cartesian.wav").string(), document).has_value());
+    const auto path = (dir / "polar.wav").string();
+    REQUIRE(iclforge::adm::write_bw64(path, document).has_value());
 
-    auto& block = blocks.back();
-    SECTION("a polar position") {
-        block.cartesian = false;
-        block.position = iclforge::adm::PolarPosition{
-            .azimuth_deg = 30.0, .elevation_deg = 0.0, .distance = 1.0};
-    }
-    SECTION("a default-constructed block") {
-        block = iclforge::adm::AudioBlockFormat{};
-    }
+    std::ifstream in(path, std::ios::binary);
+    REQUIRE(in);
+    const std::string file{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+    const auto axml = find_chunk(file, "axml");
+    REQUIRE(axml.has_value());
+    CHECK(axml->find("coordinate=\"azimuth\"") != std::string_view::npos);
 
-    const auto path = dir / "polar.wav";
+    const auto parsed = iclforge::adm::parse_bw64(path);
+    REQUIRE(parsed.has_value());
+    const auto& channel = channel_by_name(*parsed, "Object 0");
+    REQUIRE(channel.block_formats.size() == 2);
+    CHECK(channel.block_formats[0].cartesian);
+    REQUIRE(
+        std::holds_alternative<iclforge::adm::PolarPosition>(channel.block_formats[1].position));
+    const auto& polar = std::get<iclforge::adm::PolarPosition>(channel.block_formats[1].position);
+    CHECK_FALSE(channel.block_formats[1].cartesian);
+    CHECK(polar.azimuth_deg == Catch::Approx(-110.0));
+    CHECK(polar.elevation_deg == Catch::Approx(30.0));
+    CHECK(polar.distance == Catch::Approx(0.5));
+}
+
+TEST_CASE("write_bw64 writes a default-constructed block", "[adm][write]") {
+    const auto dir = write_scratch_dir("adm_write_default_block");
+    auto document = objects_document({std::nullopt});
+    document.model.channel_formats.front().block_formats.front() =
+        iclforge::adm::AudioBlockFormat{};
+    const auto path = (dir / "default.wav").string();
+    REQUIRE(iclforge::adm::write_bw64(path, document).has_value());
+    const auto parsed = iclforge::adm::parse_bw64(path);
+    REQUIRE(parsed.has_value());
+    const auto& block = channel_by_name(*parsed, "Object 0").block_formats.front();
+    REQUIRE(std::holds_alternative<iclforge::adm::PolarPosition>(block.position));
+    CHECK(std::get<iclforge::adm::PolarPosition>(block.position).distance == Catch::Approx(1.0));
+}
+
+TEST_CASE(
+    "write_bw64 reports a value the standard's types refuse as kInvalidDocument without throwing",
+    "[adm][write]") {
+    auto document = objects_document({std::nullopt});
+    auto& block = document.model.channel_formats.front().block_formats.front();
+    block.cartesian = false;
+    block.position =
+        iclforge::adm::PolarPosition{.azimuth_deg = 400.0, .elevation_deg = 0.0, .distance = 1.0};
+    const auto path = write_scratch_dir("adm_write_range") / "range.wav";
     std::filesystem::remove(path);
     const auto written = iclforge::adm::write_bw64(path.string(), document);
     REQUIRE_FALSE(written.has_value());
     CHECK(written.error() == iclforge::adm::AdmWriteError::kInvalidDocument);
     CHECK_FALSE(std::filesystem::exists(path));
+}
+
+TEST_CASE("write_bw64 writes an Objects block's diffuse, importance and channelLock distance",
+          "[adm][write]") {
+    auto document = objects_document({std::nullopt});
+    auto& block = document.model.channel_formats.front().block_formats.front();
+    block.diffuse = 0.25;
+    block.has_importance = true;
+    block.importance = 3;
+    block.has_channel_lock = true;
+    block.channel_lock = true;
+    block.has_channel_lock_max_distance = true;
+    block.channel_lock_max_distance = 0.75;
+    block.width = 0.5;
+    block.gain = 0.5;
+
+    const auto path = (write_scratch_dir("adm_write_object_extras") / "extras.wav").string();
+    REQUIRE(iclforge::adm::write_bw64(path, document).has_value());
+    const auto parsed = iclforge::adm::parse_bw64(path);
+    REQUIRE(parsed.has_value());
+    const auto& read = channel_by_name(*parsed, "Object 0").block_formats.front();
+    CHECK(read.diffuse == Catch::Approx(0.25));
+    CHECK(read.importance == 3);
+    REQUIRE(read.has_channel_lock);
+    CHECK(read.channel_lock);
+    REQUIRE(read.has_channel_lock_max_distance);
+    CHECK(read.channel_lock_max_distance == Catch::Approx(0.75));
+    CHECK(read.width == Catch::Approx(0.5));
+    CHECK(read.gain == Catch::Approx(0.5));
+}
+
+TEST_CASE("write_bw64 writes an HOA channel and pack and reads them back", "[adm][write][hoa]") {
+    auto document =
+        objects_document({std::nullopt, std::nullopt}, iclforge::adm::TypeDefinition::kHoa);
+    auto& first = document.model.channel_formats[0].block_formats.front();
+    first.has_hoa_order = true;
+    first.hoa_order = 1;
+    first.has_hoa_degree = true;
+    first.hoa_degree = -1;
+    first.hoa_normalization = "N3D";
+    first.has_nfc_ref_dist = true;
+    first.nfc_ref_dist = 2.0;
+    first.hoa_equation = "sqrt(3)*y";
+    first.screen_ref = true;
+    first.head_locked = true;
+    auto& second = document.model.channel_formats[1].block_formats.front();
+    second.has_hoa_order = true;
+    second.hoa_order = 0;
+    second.has_hoa_degree = true;
+    second.hoa_degree = 0;
+    auto& pack = document.model.pack_formats[0];
+    pack.hoa_normalization = "N3D";
+    pack.has_nfc_ref_dist = true;
+    pack.nfc_ref_dist = 1.5;
+    pack.screen_ref = true;
+
+    const auto path = (write_scratch_dir("adm_write_hoa") / "hoa.wav").string();
+    const auto written = iclforge::adm::write_bw64(path, document);
+    INFO("write_bw64: " << (written ? std::string{"ok"}
+                                    : std::string(iclforge::adm::describe(written.error()))));
+    REQUIRE(written.has_value());
+
+    const auto parsed = iclforge::adm::parse_bw64(path);
+    REQUIRE(parsed.has_value());
+    const iclforge::adm::AudioChannelFormat* zero = nullptr;
+    const iclforge::adm::AudioChannelFormat* one = nullptr;
+    for (const auto& channel : parsed->model.channel_formats) {
+        if (channel.name == "Object 0") {
+            zero = &channel;
+        } else if (channel.name == "Object 1") {
+            one = &channel;
+        }
+    }
+    REQUIRE(zero != nullptr);
+    REQUIRE(one != nullptr);
+    CHECK(zero->type == iclforge::adm::TypeDefinition::kHoa);
+    const auto& block = zero->block_formats.front();
+    CHECK(block.hoa_order == 1);
+    CHECK(block.hoa_degree == -1);
+    CHECK(block.hoa_normalization == "N3D");
+    REQUIRE(block.has_nfc_ref_dist);
+    CHECK(block.nfc_ref_dist == Catch::Approx(2.0));
+    CHECK(block.hoa_equation == "sqrt(3)*y");
+    CHECK(block.screen_ref);
+    CHECK(block.head_locked);
+    CHECK(one->block_formats.front().hoa_normalization == "SN3D");  // the schema's default
+
+    const iclforge::adm::AudioPackFormat* read_pack = nullptr;
+    for (const auto& candidate : parsed->model.pack_formats) {
+        if (candidate.name == "Object 0") {
+            read_pack = &candidate;
+        }
+    }
+    REQUIRE(read_pack != nullptr);
+    CHECK(read_pack->type == iclforge::adm::TypeDefinition::kHoa);
+    CHECK(read_pack->hoa_normalization == "N3D");
+    REQUIRE(read_pack->has_nfc_ref_dist);
+    CHECK(read_pack->nfc_ref_dist == Catch::Approx(1.5));
+    CHECK(read_pack->screen_ref);
+}
+
+TEST_CASE("write_bw64 refuses an HOA block that never had its order or degree",
+          "[adm][write][hoa]") {
+    auto document = objects_document({std::nullopt}, iclforge::adm::TypeDefinition::kHoa);
+    const auto path = write_scratch_dir("adm_write_hoa_missing") / "missing.wav";
+    std::filesystem::remove(path);
+    const auto written = iclforge::adm::write_bw64(path.string(), document);
+    REQUIRE_FALSE(written.has_value());
+    CHECK(written.error() == iclforge::adm::AdmWriteError::kInvalidDocument);
+    CHECK_FALSE(std::filesystem::exists(path));
+}
+
+TEST_CASE("write_bw64 writes a Binaural channel and pack and reads them back", "[adm][write]") {
+    auto document =
+        objects_document({std::nullopt, std::nullopt}, iclforge::adm::TypeDefinition::kBinaural);
+    auto& block = document.model.channel_formats.front().block_formats.front();
+    block.has_duration = true;
+    block.duration_s = 2.0;
+    block.gain = 0.5;
+    const auto path = (write_scratch_dir("adm_write_binaural") / "binaural.wav").string();
+    REQUIRE(iclforge::adm::write_bw64(path, document).has_value());
+
+    const auto parsed = iclforge::adm::parse_bw64(path);
+    REQUIRE(parsed.has_value());
+    // Annex A's common definitions carry Binaural channels of their own, so the written two are
+    // found by name.
+    for (const auto* name : {"Object 0", "Object 1"}) {
+        const auto& channel = channel_by_name(*parsed, name);
+        CHECK(channel.type == iclforge::adm::TypeDefinition::kBinaural);
+        REQUIRE(channel.block_formats.size() == 1);
+    }
+    const auto& first = channel_by_name(*parsed, "Object 0").block_formats.front();
+    CHECK(first.has_duration);
+    CHECK(first.duration_s == Catch::Approx(2.0));
+    CHECK(first.gain == Catch::Approx(0.5));
+}
+
+// An encoding and a decoding Matrix pack over a DirectSpeakers pair, as in the standard's own
+// Mid/Side example (BS.2076-3 §5.5.4.2). Built from objects_document()'s four single-channel packs:
+// 0 and 1 are Matrix (encode and decode), 2 is the DirectSpeakers pack holding channels 2 and 3.
+// Every reference is a correlation key ("chan2", "pack1"); what the file holds are the IDs libadm
+// gave them, found here by the element's name.
+TEST_CASE("write_bw64 writes Matrix blocks and packs and reads them back", "[adm][write][matrix]") {
+    auto document = objects_document({std::nullopt, std::nullopt, std::nullopt, std::nullopt},
+                                     iclforge::adm::TypeDefinition::kMatrix);
+    auto& model = document.model;
+    for (const std::size_t i : {2U, 3U}) {
+        model.channel_formats[i].type = iclforge::adm::TypeDefinition::kDirectSpeakers;
+    }
+    model.pack_formats[2].type = iclforge::adm::TypeDefinition::kDirectSpeakers;
+    model.pack_formats[2].channel_format_refs = {"chan2", "chan3"};
+    model.pack_formats[3].type = iclforge::adm::TypeDefinition::kDirectSpeakers;
+
+    model.pack_formats[0].name = "MidSide_Encode";
+    model.pack_formats[0].input_pack_format_ref = "pack2";
+    model.pack_formats[0].decode_pack_format_refs = {"pack1"};
+    model.pack_formats[1].name = "MidSide_Decode";
+    model.pack_formats[1].output_pack_format_ref = "pack2";
+    model.pack_formats[1].encode_pack_format_refs = {"pack0"};
+
+    auto& encode = model.channel_formats[0].block_formats.front();
+    encode.matrix = {
+        {.input_channel_format_ref = "chan2", .gain = 0.5},
+        {.input_channel_format_ref = "chan3", .gain = -0.5, .phase_deg = 90.0, .delay_ms = 10.5}};
+    encode.has_importance = true;
+    encode.importance = 7;
+    auto& decode = model.channel_formats[1].block_formats.front();
+    decode.output_channel_format_ref = "chan2";
+    decode.has_jump_position = true;
+    decode.jump_position = true;
+    decode.has_interpolation_length = true;
+    decode.interpolation_length_s = 0.5;
+    decode.gain = 0.25;
+    decode.matrix = {{.input_channel_format_ref = "chan0"},
+                     {.input_channel_format_ref = "chan0",
+                      .gain_var = "clev",
+                      .phase_var = "ph",
+                      .delay_var = "del"}};
+
+    const auto path = (write_scratch_dir("adm_write_matrix") / "matrix.wav").string();
+    const auto written = iclforge::adm::write_bw64(path, document);
+    INFO("write_bw64: " << (written ? std::string{"ok"}
+                                    : std::string(iclforge::adm::describe(written.error()))));
+    REQUIRE(written.has_value());
+
+    // The bytes first: libadm's own formatter writes an empty element for a Matrix block, and what
+    // is checked here is what this module put in it.
+    std::ifstream in(path, std::ios::binary);
+    REQUIRE(in);
+    const std::string file{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+    const auto axml = find_chunk(file, "axml");
+    REQUIRE(axml.has_value());
+    CHECK(axml->find("<matrix>") != std::string_view::npos);
+    CHECK(axml->find("<outputChannelFormatIDRef>") != std::string_view::npos);
+    CHECK(axml->find("<jumpPosition interpolationLength=\"0.5\">1</jumpPosition>") !=
+          std::string_view::npos);
+    CHECK(axml->find("<decodePackFormatIDRef>") != std::string_view::npos);
+    CHECK(axml->find("<inputPackFormatIDRef>") != std::string_view::npos);
+    CHECK(axml->find("<outputPackFormatIDRef>") != std::string_view::npos);
+    CHECK(axml->find("<encodePackFormatIDRef>") != std::string_view::npos);
+
+    const auto parsed = iclforge::adm::parse_bw64(path);
+    REQUIRE(parsed.has_value());
+    const auto channel_named =
+        [&](std::string_view name) -> const iclforge::adm::AudioChannelFormat& {
+        const auto it = std::ranges::find(parsed->model.channel_formats, name,
+                                          &iclforge::adm::AudioChannelFormat::name);
+        REQUIRE(it != parsed->model.channel_formats.end());
+        return *it;
+    };
+    const auto pack_named = [&](std::string_view name) -> const iclforge::adm::AudioPackFormat& {
+        const auto it = std::ranges::find(parsed->model.pack_formats, name,
+                                          &iclforge::adm::AudioPackFormat::name);
+        REQUIRE(it != parsed->model.pack_formats.end());
+        return *it;
+    };
+    const auto& left = channel_named("Object 2");
+    const auto& right = channel_named("Object 3");
+
+    const auto& mid = channel_named("Object 0");
+    CHECK(mid.type == iclforge::adm::TypeDefinition::kMatrix);
+    REQUIRE(mid.block_formats.size() == 1);
+    const auto& mid_block = mid.block_formats.front();
+    CHECK(mid_block.id.starts_with("AB_0002"));
+    CHECK(mid_block.output_channel_format_ref.empty());
+    CHECK(mid_block.importance == 7);
+    REQUIRE(mid_block.matrix.size() == 2);
+    CHECK(mid_block.matrix[0].input_channel_format_ref == left.id);
+    CHECK(mid_block.matrix[0].gain == Catch::Approx(0.5));
+    CHECK(mid_block.matrix[1].input_channel_format_ref == right.id);
+    CHECK(mid_block.matrix[1].gain == Catch::Approx(-0.5));
+    CHECK(mid_block.matrix[1].phase_deg == Catch::Approx(90.0));
+    CHECK(mid_block.matrix[1].delay_ms == Catch::Approx(10.5));
+
+    const auto& decode_channel = channel_named("Object 1");
+    REQUIRE(decode_channel.block_formats.size() == 1);
+    const auto& decode_block = decode_channel.block_formats.front();
+    CHECK(decode_block.output_channel_format_ref == left.id);
+    CHECK(decode_block.gain == Catch::Approx(0.25));
+    REQUIRE(decode_block.has_jump_position);
+    CHECK(decode_block.jump_position);
+    CHECK(decode_block.interpolation_length_s == Catch::Approx(0.5));
+    REQUIRE(decode_block.matrix.size() == 2);
+    CHECK(decode_block.matrix[0].input_channel_format_ref == mid.id);
+    CHECK(decode_block.matrix[0].gain == 1.0);
+    CHECK(decode_block.matrix[1].gain_var == "clev");
+    CHECK(decode_block.matrix[1].phase_var == "ph");
+    CHECK(decode_block.matrix[1].delay_var == "del");
+
+    const auto& encode_pack = pack_named("MidSide_Encode");
+    const auto& decode_pack = pack_named("MidSide_Decode");
+    const auto& direct_pack = pack_named("Object 2");
+    CHECK(encode_pack.input_pack_format_ref == direct_pack.id);
+    CHECK(encode_pack.decode_pack_format_refs == std::vector<std::string>{decode_pack.id});
+    CHECK(decode_pack.output_pack_format_ref == direct_pack.id);
+    CHECK(decode_pack.encode_pack_format_refs == std::vector<std::string>{encode_pack.id});
+}
+
+TEST_CASE("write_bw64 refuses a Matrix reference that names nothing", "[adm][write][matrix]") {
+    const auto where = GENERATE(0, 1, 2, 3);
+    INFO("reference " << where);
+    auto document = objects_document({std::nullopt}, iclforge::adm::TypeDefinition::kMatrix);
+    auto& model = document.model;
+    auto& block = model.channel_formats.front().block_formats.front();
+    block.matrix = {{.input_channel_format_ref = "chan0"}};
+    switch (where) {
+        case 0:
+            block.matrix.front().input_channel_format_ref = "nowhere";
+            break;
+        case 1:
+            block.output_channel_format_ref = "nowhere";
+            break;
+        case 2:
+            model.pack_formats.front().input_pack_format_ref = "nowhere";
+            break;
+        default:
+            model.pack_formats.front().encode_pack_format_refs = {"nowhere"};
+            break;
+    }
+    const auto path = write_scratch_dir("adm_write_matrix_refs") / "refs.wav";
+    std::filesystem::remove(path);
+    const auto written = iclforge::adm::write_bw64(path.string(), document);
+    REQUIRE_FALSE(written.has_value());
+    CHECK(written.error() == iclforge::adm::AdmWriteError::kInvalidDocument);
+    CHECK_FALSE(std::filesystem::exists(path));
+}
+
+TEST_CASE("write_bw64 writes nested audioObjects and audioPackFormats", "[adm][write]") {
+    auto document = objects_document({std::nullopt, std::nullopt, std::nullopt});
+    auto& model = document.model;
+    // The programme's content holds object 0 only; it nests objects 1 and 2 (the second declared
+    // before the first it is nested under, so a nesting reference has to wait for every object).
+    model.contents.front().object_refs = {"obj0"};
+    model.objects[0].object_refs = {"obj2", "obj1"};
+    model.pack_formats[0].pack_format_refs = {"pack2"};
+
+    const auto path = (write_scratch_dir("adm_write_nested") / "nested.wav").string();
+    const auto written = iclforge::adm::write_bw64(path, document);
+    INFO("write_bw64: " << (written ? std::string{"ok"}
+                                    : std::string(iclforge::adm::describe(written.error()))));
+    REQUIRE(written.has_value());
+
+    const auto parsed = iclforge::adm::parse_bw64(path);
+    REQUIRE(parsed.has_value());
+    const auto object_named = [&](std::string_view name) -> const iclforge::adm::AudioObject& {
+        const auto it =
+            std::ranges::find(parsed->model.objects, name, &iclforge::adm::AudioObject::name);
+        REQUIRE(it != parsed->model.objects.end());
+        return *it;
+    };
+    const auto& parent = object_named("Object 0");
+    REQUIRE(parent.object_refs.size() == 2);
+    CHECK(std::ranges::contains(parent.object_refs, object_named("Object 1").id));
+    CHECK(std::ranges::contains(parent.object_refs, object_named("Object 2").id));
+    CHECK(object_named("Object 1").object_refs.empty());
+
+    const auto it = std::ranges::find(parsed->model.pack_formats, std::string("Object 0"),
+                                      &iclforge::adm::AudioPackFormat::name);
+    REQUIRE(it != parsed->model.pack_formats.end());
+    CHECK(it->pack_format_refs.size() == 1);
+}
+
+TEST_CASE("write_bw64 writes an audioObject's start and duration", "[adm][write]") {
+    auto document = objects_document({std::nullopt, std::nullopt});
+    document.model.objects[0].start_s = 1.5;
+    document.model.objects[0].has_duration = true;
+    document.model.objects[0].duration_s = 2.25;
+    // Object 1 has no duration: the schema's absent (the programme's own), not a duration of zero.
+    document.model.objects[1].start_s = 0.5;
+
+    const auto path = (write_scratch_dir("adm_write_object_time") / "time.wav").string();
+    REQUIRE(iclforge::adm::write_bw64(path, document).has_value());
+    const auto parsed = iclforge::adm::parse_bw64(path);
+    REQUIRE(parsed.has_value());
+    const auto object_named = [&](std::string_view name) -> const iclforge::adm::AudioObject& {
+        const auto it =
+            std::ranges::find(parsed->model.objects, name, &iclforge::adm::AudioObject::name);
+        REQUIRE(it != parsed->model.objects.end());
+        return *it;
+    };
+    const auto& first = object_named("Object 0");
+    CHECK(first.start_s == Catch::Approx(1.5));
+    REQUIRE(first.has_duration);
+    CHECK(first.duration_s == Catch::Approx(2.25));
+    const auto& second = object_named("Object 1");
+    CHECK(second.start_s == Catch::Approx(0.5));
+    CHECK_FALSE(second.has_duration);
+}
+
+TEST_CASE("write_bw64 refuses nesting that loops", "[adm][write]") {
+    const auto objects = GENERATE(true, false);
+    INFO((objects ? "audioObjects" : "audioPackFormats"));
+    auto document = objects_document({std::nullopt, std::nullopt});
+    auto& model = document.model;
+    if (objects) {
+        model.objects[0].object_refs = {"obj1"};
+        model.objects[1].object_refs = {"obj0"};
+    } else {
+        model.pack_formats[0].pack_format_refs = {"pack0"};
+    }
+    const auto path = write_scratch_dir("adm_write_loop") / "loop.wav";
+    std::filesystem::remove(path);
+    const auto written = iclforge::adm::write_bw64(path.string(), document);
+    REQUIRE_FALSE(written.has_value());
+    CHECK(written.error() == iclforge::adm::AdmWriteError::kInvalidDocument);
+    CHECK_FALSE(std::filesystem::exists(path));
+}
+
+TEST_CASE("write_bw64 refuses a typeDefinition it has no element for", "[adm][write]") {
+    const auto type = GENERATE(iclforge::adm::TypeDefinition::kUnknown,
+                               iclforge::adm::TypeDefinition::kUserCustom);
+    auto document = objects_document({std::nullopt}, type);
+    const auto path = write_scratch_dir("adm_write_type") / "type.wav";
+    std::filesystem::remove(path);
+    const auto written = iclforge::adm::write_bw64(path.string(), document);
+    REQUIRE_FALSE(written.has_value());
+    CHECK(written.error() == iclforge::adm::AdmWriteError::kInvalidDocument);
 }
 
 // What write_bw64() does with the libadm document once it is built - reassignIds(), formatting

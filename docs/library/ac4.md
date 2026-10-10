@@ -330,7 +330,7 @@ rate its frames cannot hold, a presentation of the wrong number of substreams, a
 | `dialnorm_db`, `loudness` | The dialogue level, 0 to -31.75 dBFS, and Part 1's further loudness values | -31, none |
 | `drc`, `downmix`, `dialogue` | The DRC decoder modes on their profiles, the stereo downmix's values, and dialogue enhancement from marked channels or a stem | none |
 | `substreams`, `presentations` | Several substreams and the presentations of Part 2 Table 53 made of them (below) | one of each |
-| `trace`, `experimental` | A record of every syntax element written; the tools and layouts that no reader outside this project has been checked against, among them `noise_fill`, which sends each band that quantises to zero a noise level for the decoder to fill it with | none |
+| `trace`, `experimental` | A record of every syntax element written; the tools and layouts that no reader outside this project has been checked against, among them `noise_fill`, which sends each band that quantises to zero a noise level for the decoder to fill it with, and `frame_rate_fraction` 2 or 4, the efficient high frame rate mode: at `frame_rate_index` 5 to 12 (4 from 10) each frame the codec codes at Table 18's audio frame rate goes out as that many transmission frames, at a constant rate | none |
 
 9.0.4 and 9.1.4 (`experimental.nine_x_4`, 13 or 14 channels) take Part 2's immersive element with
 `b_5fronts`, which adds the screen pair Lscr and Rscr to the 7.X.4 channels, in SCPL, ASPX_SCPL and

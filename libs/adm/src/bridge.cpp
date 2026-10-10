@@ -33,7 +33,7 @@ std::string_view describe(BridgeError error) {
         case BridgeError::kEmptyInput: return "write() input had no channels, or a dynamic object had no updates";
         case BridgeError::kEmptyIabStream: return "build_iab() input had no frames";
         case BridgeError::kUnsupportedIabChannel:
-            return "a Bed ChannelID has no iclforge::oba::BedLabel equivalent";
+            return "a Bed ChannelID is not one ST 2098-2 Table 19 defines (0x0-0x17, 0x80-0x89)";
         case BridgeError::kNoIabEssenceForChannel:
             return "a channel's non-zero AudioDataID never resolved to AudioDataPCM or AudioDataDLC essence";
         case BridgeError::kBadIabAudio:
