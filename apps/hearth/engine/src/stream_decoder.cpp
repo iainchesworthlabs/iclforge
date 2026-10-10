@@ -1,12 +1,19 @@
 #include "stream_decoder.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <fmt/format.h>
+#include <optional>
+#include <span>
 #include <utility>
 #include <vector>
 
 #include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/decoder/config.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/decoder/presentation.hpp"
 #include "ac4_stream.hpp"
 
 // See stream_decoder.hpp. The decode path is apps/hearth/testsink/
