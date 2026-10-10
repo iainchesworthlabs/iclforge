@@ -39,6 +39,7 @@ using iclforge::ac4::detail::AcplCouplingValues;
 using iclforge::ac4::detail::AcplFrameValues;
 using iclforge::ac4::detail::AcplModuleValues;
 using iclforge::ac4::detail::AcplStage;
+using iclforge::ac4::detail::InterpReal;
 using iclforge::ac4::detail::ElementKind;
 using iclforge::ac4::detail::QmfMatrix;
 using iclforge::ac4::detail::QmfValue;
@@ -51,6 +52,9 @@ constexpr double kSqrt2 = 1.4142135623730951;
     return static_cast<std::size_t>(index);
 }
 
+// Pseudocode 109 is evaluated at InterpReal (planning/ac4.md, D14h: float at the float tier, double
+// elsewhere), by the core's acpl::interpolate() at that scalar, whole, as the stage's runs and
+// columns must equal it; the sums of interpolated values a coefficient takes are formed there too.
 // The stage as libs/ac4/src/decoder/pcm/acpl.cpp had it, for the elements the test builds: a pair, and
 // the 5.X element in ASPX_ACPL_1, 2 and 3.
 namespace reference {
@@ -136,7 +140,7 @@ class Stage {
 
    private:
     void interpolate(const acpl::Framing& framing, int num_bands, const Param& param, int num_ts,
-                     std::vector<double>& out) const {
+                     std::vector<InterpReal>& out) const {
         out.resize(at(num_ts) * kSubbands);
         acpl::interpolate(framing, num_bands, param.values, param.prev, num_ts, out);
     }
@@ -230,28 +234,28 @@ class Stage {
 
         std::size_t slots_used = 0;
         interp_scratch_.resize(kCouplingInterpolations);
-        const auto interp = [&](const Param& p) -> const std::vector<double>& {
-            std::vector<double>& out = interp_scratch_[slots_used++];
+        const auto interp = [&](const Param& p) -> const std::vector<InterpReal>& {
+            std::vector<InterpReal>& out = interp_scratch_[slots_used++];
             interpolate(values.framing, values.num_bands, p, num_ts, out);
             return out;
         };
-        const std::vector<double>& ig1 = interp(g[0]);
-        const std::vector<double>& ig2 = interp(g[1]);
-        const std::vector<double>& ig3 = interp(g[2]);
-        const std::vector<double>& ig4 = interp(g[3]);
-        const std::vector<double>& ig5 = interp(g[4]);
-        const std::vector<double>& ig6 = interp(g[5]);
-        const std::vector<double>& ig135 = interp(plus(plus(g[0], g[2]), g[4]));
-        const std::vector<double>& ig246 = interp(plus(plus(g[1], g[3]), g[5]));
-        const std::vector<double>& ig1a1 = interp(times(g[0], a1));
-        const std::vector<double>& ig2a1 = interp(times(g[1], a1));
-        const std::vector<double>& ig3a2 = interp(times(g[2], a2));
-        const std::vector<double>& ig4a2 = interp(times(g[3], a2));
-        const std::vector<double>& ib1 = interp(b1);
-        const std::vector<double>& ib2 = interp(b2);
-        const std::vector<double>& ib3 = interp(b3);
-        const std::vector<double>& ib3a1 = interp(times(b3, a1));
-        const std::vector<double>& ib3a2 = interp(times(b3, a2));
+        const std::vector<InterpReal>& ig1 = interp(g[0]);
+        const std::vector<InterpReal>& ig2 = interp(g[1]);
+        const std::vector<InterpReal>& ig3 = interp(g[2]);
+        const std::vector<InterpReal>& ig4 = interp(g[3]);
+        const std::vector<InterpReal>& ig5 = interp(g[4]);
+        const std::vector<InterpReal>& ig6 = interp(g[5]);
+        const std::vector<InterpReal>& ig135 = interp(plus(plus(g[0], g[2]), g[4]));
+        const std::vector<InterpReal>& ig246 = interp(plus(plus(g[1], g[3]), g[5]));
+        const std::vector<InterpReal>& ig1a1 = interp(times(g[0], a1));
+        const std::vector<InterpReal>& ig2a1 = interp(times(g[1], a1));
+        const std::vector<InterpReal>& ig3a2 = interp(times(g[2], a2));
+        const std::vector<InterpReal>& ig4a2 = interp(times(g[3], a2));
+        const std::vector<InterpReal>& ib1 = interp(b1);
+        const std::vector<InterpReal>& ib2 = interp(b2);
+        const std::vector<InterpReal>& ib3 = interp(b3);
+        const std::vector<InterpReal>& ib3a1 = interp(times(b3, a1));
+        const std::vector<InterpReal>& ib3a2 = interp(times(b3, a2));
 
         std::array<std::vector<QmfValue>, 3>& v = transformed_;
         for (auto& matrix : v) {
@@ -316,8 +320,8 @@ class Stage {
     std::array<std::vector<QmfValue>, 3> transformed_{};
     std::array<std::vector<QmfValue>, 5> decorrelated_{};
     std::vector<QmfValue> work_;
-    std::array<std::vector<double>, 2> interp_{};
-    std::vector<std::vector<double>> interp_scratch_;
+    std::array<std::vector<InterpReal>, 2> interp_{};
+    std::vector<std::vector<InterpReal>> interp_scratch_;
 };
 
 }  // namespace reference

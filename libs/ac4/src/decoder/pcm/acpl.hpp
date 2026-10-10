@@ -5,6 +5,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <type_traits>
 #include <vector>
 
 #include "iclforge/ac4/decoder/decoder.hpp"
@@ -41,6 +42,12 @@
 // "A-CPL".
 
 namespace iclforge::ac4::detail {
+
+// The scalar Pseudocode 109 runs at in this stage: float at the float tier, where the chip's FPU is
+// single precision and a double operation is a call into software (the interpolations were a fifth
+// of a 5.1 A-CPL mode 3 frame on the ESP32-P4: planning/ac4.md, D14h); double at the double tier,
+// which is the pseudocode's, and at Fixed32, whose pins D14h leaves where they are.
+using InterpReal = std::conditional_t<std::is_same_v<Real, float>, float, double>;
 
 // The most acpl_data_1ch() one element carries: the immersive element's four, six
 // with b_5fronts.
@@ -135,14 +142,13 @@ class AcplStage {
                 std::span<QmfValue> z1, int num_ts);
     void coupling(const AcplCouplingValues& values, std::span<const QmfValue> x0, std::span<const QmfValue> x1,
                   std::span<std::span<QmfValue>, 5> z, int num_ts);
-    // Pseudocode 109 is the core's own acpl::Interpolator (acpl/acpl.hpp), which is not
-    // retemplated on Real - its ParamSets/ParamPrev stay double, a handful of
-    // interpolated coefficients per slot rather than per-sample QMF data, in the
-    // same "computed in double, kept small" shape as a downmix or DRC gain
-    // matrix. module() and coupling() evaluate it once for each run of subbands
-    // that shares a parameter band and its acpl_param_prev, which is the same
-    // value to the bit in each, and narrow to Real there, once, where an
-    // interpolated value multiplies a QmfValue.
+    // Pseudocode 109 is the core's acpl::BasicInterpolator (acpl/acpl.hpp) at InterpReal: its
+    // ParamSets/ParamPrev stay double, a handful of values per band rather than per-sample QMF
+    // data, narrowed to InterpReal once for each column. module() and coupling() evaluate it
+    // once for each run of subbands that shares a parameter band and its acpl_param_prev, which
+    // is the same value to the bit in each, and the sums of its values that a coefficient takes
+    // are formed at InterpReal and narrowed to Real there, once, where a coefficient multiplies
+    // a QmfValue.
     void decorrelate(int decorrelator, std::span<const QmfValue> in, std::span<QmfValue> out, int num_ts);
 
     // D0, D1 and D2, then the second instances of D0 and D1 the immersive
@@ -183,7 +189,7 @@ class AcplStage {
     std::array<Param, 8> coupling_derived_{};
     // One interpolation column for each run of subbands and parameter, and the coefficients at
     // each slot of each run.
-    std::vector<acpl::Interpolator::Column> columns_;
+    std::vector<acpl::BasicInterpolator<InterpReal>::Column> columns_;
     std::vector<CouplingCoefficients> coupling_coefficients_;
 };
 

@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -57,6 +58,44 @@ void interpolate(const acpl::Framing& framing, int num_param_bands, const acpl::
                     value = p + (ts + 1) * (v0 - p) / ts_2;
                 } else {
                     value = v0 + (ts - ts_2 + 1) * (v1 - v0) / (num_ts - ts_2);
+                }
+            } else if (ts < framing.param_timeslot[0]) {
+                value = p;
+            } else if (!two || ts < framing.param_timeslot[1]) {
+                value = v0;
+            } else {
+                value = v1;
+            }
+            out[at(ts) * acpl::kSubbands + at(sb)] = value;
+        }
+    }
+}
+
+// Pseudocode 109 at every slot and subband, evaluated in single precision from the values narrowed
+// once (planning/ac4.md, D14h), the expression as written.
+void interpolate_float(const acpl::Framing& framing, int num_param_bands,
+                       const acpl::ParamSets& values, const acpl::ParamPrev& prev, int num_ts,
+                       std::span<float> out) {
+    if (num_ts <= 0 || out.size() < at(num_ts) * acpl::kSubbands) {
+        return;
+    }
+    const bool two = framing.num_param_sets == 2;
+    const int ts_2 = num_ts / 2;
+    for (int sb = 0; sb < acpl::kSubbands; ++sb) {
+        const int pb = std::max(acpl::sb_to_pb(num_param_bands, sb), 0);
+        const auto p = static_cast<float>(prev[at(sb)]);
+        const auto v0 = static_cast<float>(values[0][at(pb)]);
+        const auto v1 = static_cast<float>(values[1][at(pb)]);
+        for (int ts = 0; ts < num_ts; ++ts) {
+            float value = 0.0F;
+            if (!framing.steep) {
+                if (!two) {
+                    value = p + static_cast<float>(ts + 1) * (v0 - p) / static_cast<float>(num_ts);
+                } else if (ts < ts_2) {
+                    value = p + static_cast<float>(ts + 1) * (v0 - p) / static_cast<float>(ts_2);
+                } else {
+                    value = v0 + static_cast<float>(ts - ts_2 + 1) * (v1 - v0) /
+                                     static_cast<float>(num_ts - ts_2);
                 }
             } else if (ts < framing.param_timeslot[0]) {
                 value = p;
@@ -250,6 +289,50 @@ TEST_CASE("interpolate gives the bits of Pseudocode 109 evaluated at every subba
                         acpl::interpolate(framing, bands, values, prev, num_ts, actual);
                         CAPTURE(steep, sets, bands, num_ts, round);
                         REQUIRE(same_bits(actual, expected));
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("interpolate at float gives the bits of Pseudocode 109 evaluated in single precision",
+          "[ac4][core][acpl][exact]") {
+    Source source(20261011U);
+    for (const bool steep : {false, true}) {
+        for (const int sets : {1, 2}) {
+            for (const int bands : kBandCounts) {
+                for (const int num_ts : kSlotCounts) {
+                    for (int round = 0; round < 6; ++round) {
+                        acpl::Framing framing{
+                            .steep = steep, .num_param_sets = sets, .param_timeslot = {}};
+                        framing.param_timeslot[0] = source.below(num_ts + 1);
+                        framing.param_timeslot[1] =
+                            std::min(num_ts, framing.param_timeslot[0] + source.below(num_ts + 1));
+                        const acpl::ParamSets values = source.sets();
+                        acpl::ParamPrev prev{};
+                        if (round % 3 == 0) {
+                            acpl::end_frame(framing, bands, source.sets(), prev);
+                        } else if (round % 3 == 2) {
+                            for (double& p : prev) {
+                                p = source.value();
+                            }
+                        }
+                        std::vector<float> expected(at(num_ts) * acpl::kSubbands, -1.0F);
+                        std::vector<float> actual(at(num_ts) * acpl::kSubbands, -2.0F);
+                        reference::interpolate_float(framing, bands, values, prev, num_ts, expected);
+                        acpl::interpolate(framing, bands, values, prev, num_ts, actual);
+                        CAPTURE(steep, sets, bands, num_ts, round);
+                        REQUIRE(same_bits(actual, expected));
+
+                        // and the double's, to within what single precision holds: the values
+                        // are of order 1 to 4, a ramp adds two roundings to the narrowing.
+                        std::vector<double> wide(at(num_ts) * acpl::kSubbands, -3.0);
+                        acpl::interpolate(framing, bands, values, prev, num_ts, wide);
+                        for (std::size_t i = 0; i < wide.size(); ++i) {
+                            REQUIRE(std::abs(static_cast<double>(actual[i]) - wide[i]) <=
+                                    2.0e-6 * std::max(1.0, std::abs(wide[i])));
+                        }
                     }
                 }
             }

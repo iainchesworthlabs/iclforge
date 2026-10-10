@@ -183,12 +183,15 @@ struct Runs {
     return runs;
 }
 
-// One parameter's interpolation column for the run that starts at subband `sb`.
-[[nodiscard]] acpl::Interpolator::Column column_of(int num_param_bands,
-                                                   const acpl::ParamSets& values,
-                                                   const acpl::ParamPrev& prev, int sb) noexcept {
+// One parameter's interpolation column for the run that starts at subband `sb`, its values
+// narrowed to InterpReal once.
+[[nodiscard]] acpl::BasicInterpolator<InterpReal>::Column column_of(
+    int num_param_bands, const acpl::ParamSets& values, const acpl::ParamPrev& prev,
+    int sb) noexcept {
     const auto pb = at(std::max(acpl::sb_to_pb(num_param_bands, sb), 0));
-    return acpl::Interpolator::column(prev[at(sb)], values[0][pb], values[1][pb]);
+    return acpl::BasicInterpolator<InterpReal>::column(static_cast<InterpReal>(prev[at(sb)]),
+                                                       static_cast<InterpReal>(values[0][pb]),
+                                                       static_cast<InterpReal>(values[1][pb]));
 }
 
 }  // namespace
@@ -313,7 +316,7 @@ void AcplStage::module(const AcplModuleValues& values, int index, int decorrelat
     std::array<acpl::ParamPrev, 2>& prev = module_prev_[at(index)];
     const std::array<const acpl::ParamPrev*, 2> prevs = {&prev[0], &prev[1]};
     const Runs runs = runs_of(values.num_bands, prevs);
-    const acpl::Interpolator interpolator(values.framing, num_ts);
+    const acpl::BasicInterpolator<InterpReal> interpolator(values.framing, num_ts);
     columns_.resize(at(runs.count) * 2);
     for (int run = 0; run < runs.count; ++run) {
         columns_[at(run) * 2] = column_of(values.num_bands, values.alpha, prev[0], runs.begin(run));
@@ -325,8 +328,8 @@ void AcplStage::module(const AcplModuleValues& values, int index, int decorrelat
     run_lanes(executor_, at(num_ts), [&](std::size_t slot, std::size_t) {
         const int ts = static_cast<int>(slot);
         for (int run = 0; run < runs.count; ++run) {
-            // alpha and beta are the core's own double-precision interpolation (acpl::Interpolator
-            // is not retemplated on Real; see this class's declaration), narrowed once for the run.
+            // alpha and beta are the core's interpolation at InterpReal (see this class's
+            // declaration), narrowed to Real once for the run.
             const auto a = static_cast<Real>(interpolator.at(columns_[at(run) * 2], ts));
             const auto b = static_cast<Real>(interpolator.at(columns_[at(run) * 2 + 1], ts));
             for (int sb = runs.begin(run); sb < runs.end(run); ++sb) {
@@ -427,16 +430,16 @@ void AcplStage::coupling(const AcplCouplingValues& values, std::span<const QmfVa
 
     // Pseudocode 109 once for each run of subbands that shares a parameter band and every
     // parameter's acpl_param_prev, and at each slot: the coefficients the loops below multiply by.
-    // The core's interpolation is in double (see this class's declaration); each sum below is
-    // formed in that double precision, as the original single-scalar code computed it, and narrowed
-    // to Real once, at the multiply into a QmfValue - the double build stays bit-for-bit since
-    // narrowing a double to double is the identity.
+    // The core's interpolation runs at InterpReal (see this class's declaration); each sum below
+    // is formed at that scalar and narrowed to Real once, at the multiply into a QmfValue. At
+    // double that is the original single-scalar code's, bit for bit, since narrowing a double to a
+    // double is the identity; at float it is single precision throughout.
     std::array<const acpl::ParamPrev*, kCouplingInterpolations> prevs{};
     for (std::size_t k = 0; k < params.size(); ++k) {
         prevs[k] = &params[k]->prev;
     }
     const Runs runs = runs_of(values.num_bands, prevs);
-    const acpl::Interpolator interpolator(values.framing, num_ts);
+    const acpl::BasicInterpolator<InterpReal> interpolator(values.framing, num_ts);
     columns_.resize(at(runs.count) * kCouplingInterpolations);
     for (int run = 0; run < runs.count; ++run) {
         for (std::size_t k = 0; k < params.size(); ++k) {
@@ -445,15 +448,15 @@ void AcplStage::coupling(const AcplCouplingValues& values, std::span<const QmfVa
         }
     }
     coupling_coefficients_.resize(at(num_ts) * at(runs.count));
-    // The seventeen interpolations at a slot are double operations, which at float are calls
-    // into software: they take a fifth of a 5.1 A-CPL 3 frame on the ESP32-P4, and each slot's
-    // are independent of the others'.
+    // The seventeen interpolations at a slot: each slot's are independent of the others'. They
+    // were double operations at the float tier too, calls into software that took a fifth of a
+    // 5.1 A-CPL 3 frame on the ESP32-P4 (D14h).
     run_lanes(executor_, at(num_ts), [&](std::size_t slot, std::size_t) {
         const int ts = static_cast<int>(slot);
         for (int run = 0; run < runs.count; ++run) {
-            const acpl::Interpolator::Column* columns =
+            const acpl::BasicInterpolator<InterpReal>::Column* columns =
                 &columns_[at(run) * kCouplingInterpolations];
-            std::array<double, kCouplingInterpolations> ip{};
+            std::array<InterpReal, kCouplingInterpolations> ip{};
             for (std::size_t k = 0; k < ip.size(); ++k) {
                 ip[k] = interpolator.at(columns[k], ts);
             }
