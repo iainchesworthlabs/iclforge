@@ -1,0 +1,18 @@
+# Read by OSV-Scanner for the manifests in THIS directory only (it does not look in parents).
+#
+# One advisory the lockfile cannot be refreshed past without a device. An entry is a decision to
+# wait, not a judgement that the advisory is harmless: when the date passes the alert comes back and
+# the entry is renewed with a fresh check or removed.
+#
+# protobuf-kotlin 3.24.4 is locked only in the _internal-unified-test-platform-* configurations. AGP
+# creates those inside connectedDebugAndroidTest's own task action, behind a device check, so no
+# `--write-locks` or `--update-locks` run without a device reaches them (see the comment above the
+# resolutionStrategy block in build.gradle.kts). The build already forces protobuf-kotlin 4.36.2,
+# matched to the forced protobuf-java 4.36.2, so what a device run resolves is the patched version;
+# only the lock line is behind. Refresh it with `./gradlew :app:connectedDebugAndroidTest
+# --write-locks` against a device, then delete this file. Not in the APK: test tooling only.
+# Checked 2026-10-10.
+[[IgnoredVulns]]
+id = "GHSA-735f-pc8j-v9w8"
+ignoreUntil = 2027-01-08
+reason = "protobuf-kotlin 3.24.4 is locked only in AGP's unified-test-platform configurations, which resolve only inside connectedDebugAndroidTest; the build forces 4.36.2"

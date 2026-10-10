@@ -269,7 +269,20 @@ configurations.all {
             "io.netty:netty-transport:4.2.18.Final",
             "io.netty:netty-transport-native-unix-common:4.2.18.Final",
             "com.google.protobuf:protobuf-java:4.36.2",
-            "commons-io:commons-io:2.22.0"
+            // The same release train as protobuf-java above: protobuf-kotlin 4.36.2 depends on
+            // protobuf-java 4.36.2, so the pair stays matched (GHSA-735f-pc8j-v9w8).
+            "com.google.protobuf:protobuf-kotlin:4.36.2",
+            "commons-io:commons-io:2.22.0",
+            // The lint tool's own copies (androidLintTool). All four are build-time only, not in
+            // the APK, and each was reported by OSV-Scanner with the fixed version below.
+            "org.apache.commons:commons-lang3:3.18.0",       // GHSA-j288-q9x7-2f5v
+            "org.apache.httpcomponents:httpclient:4.5.13",   // GHSA-7r82-7xv7-xcpj
+            // One release of all three so the set stays matched; 1.85 is the highest fix of
+            // GHSA-9pwp-9qqc-pr26, GHSA-qp49-qgx5-5m26 and GHSA-c3fc-8qff-9hwx (bcprov) and
+            // is past GHSA-wg6q-6289-32hp (bcpkix, fixed in 1.84).
+            "org.bouncycastle:bcprov-jdk18on:1.85",
+            "org.bouncycastle:bcpkix-jdk18on:1.85",
+            "org.bouncycastle:bcutil-jdk18on:1.85"
         )
     }
 }
