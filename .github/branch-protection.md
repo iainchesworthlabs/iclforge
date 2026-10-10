@@ -224,20 +224,28 @@ degrades gracefully instead of failing.
 
 ## Dependabot pull requests
 
-A routine Dependabot pull request joins the merge queue by itself. `pr-gate.yml`'s
-`enqueue-dependabot` job calls `_dependabot-enqueue.yml` once `CI Status` has
-passed, for a pull request authored by Dependabot from this repository, and that
-workflow asks for the queue with `enqueuePullRequest`, pinned to the commit the
-gate tested. The queue then builds the merged tree and runs every required check
-above on it, so nothing merges without them.
+`dependabot-auto-merge.yml` flips the auto-merge bit on a routine (non-major)
+Dependabot PR; GitHub then puts it in the merge queue once every required check
+above passes, and the queue runs them again on the merged tree. Auto-merge has to
+be allowed repo-wide in **Settings → General → Pull Requests → Allow auto-merge**.
 
-It leaves a pull request for a person when its head commit lists a
-`semver-major` update (a group is as major as its biggest member) or lists no
-`update-type` at all. A conflict is Dependabot's to rebase (`rebase-strategy`
-in `.github/dependabot.yml`), and the push runs the gate again.
+The bit has to be set with a person's token, not the Actions `GITHUB_TOKEN`.
+Set by `GITHUB_TOKEN` it is inert under the merge queue: green Dependabot PRs sat
+unmerged for days with it on. And a queue entry created with `GITHUB_TOKEN` gets
+no `merge_group` run, so it would hang until the 180-minute check timeout and
+hold up the entries behind it. The workflow therefore reads the secret
+`MERGE_QUEUE_TOKEN`:
 
-This replaces `dependabot-auto-merge.yml`, which only set the pull request's
-auto-merge bit: under the merge queue that bit never put a pull request in the
-queue, so green Dependabot pull requests sat unmerged. Nothing here needs
-**Allow auto-merge**; the job's token needs `contents: write` and
-`pull-requests: write`, which the call site grants it.
+- Create a fine-grained personal access token for this repository only, with
+  **Contents** and **Pull requests** read and write, and an expiry you will
+  remember.
+- Store it under **Settings → Secrets and variables → Dependabot** as
+  `MERGE_QUEUE_TOKEN`. A Dependabot-triggered run reads that store, not the
+  Actions one.
+- Without it the job warns (`MERGE_QUEUE_TOKEN is not set`) and falls back to
+  `GITHUB_TOKEN`, so the PR stays unmerged. When the token expires the same
+  warning appears or `gh pr merge` fails: a run of Dependabot PRs that stop
+  merging means rotating it.
+
+A conflict is Dependabot's to rebase (`rebase-strategy` in
+`.github/dependabot.yml`), and the push runs the gate and this workflow again.
