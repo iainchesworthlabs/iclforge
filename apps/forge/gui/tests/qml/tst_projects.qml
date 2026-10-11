@@ -26,6 +26,10 @@ TestCase {
         Qt.resolvedUrl("../../../../../examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj")
     readonly property url exampleStream:
         Qt.resolvedUrl("../../../../../examples/karaoke/auld-lang-syne/auld-lang-syne.ac3")
+    readonly property url duetProject:
+        Qt.resolvedUrl("../../../../../examples/karaoke/leave-her-johnny/leave-her-johnny.forgeproj")
+    readonly property url duetStream:
+        Qt.resolvedUrl("../../../../../examples/karaoke/leave-her-johnny/leave-her-johnny.ac3")
 
     property int defaultCmix: 0
     property int defaultSurmix: 0
@@ -929,5 +933,36 @@ TestCase {
 
         verify(cliRunner.sameBytes(out, exampleStream),
                "the window wrote a different stream than the example ships");
+    }
+
+    // The duet example's project names its four parts and nothing of how they are laid out, so
+    // the window works the plan out from the parts and writes the stream the example ships.
+    function test_theDuetExampleProjectIsLaidOutByTheFlowAndTheWindowEncodesItsStream() {
+        const win = openWindow();
+        verify(win.openProjectFile(duetProject));
+        compare(win.tier, "karaoke");
+        const flow = findByName(win, "karaokeFlow");
+        compare(EncoderController.sourceModel.length, 4);
+        compare(flow.failedParts.length, 0);
+        compare(flow.plan.mode, "3/2");
+        compare(flow.plan.hasProblem, false);
+        compare(bedId(), "3/2");
+        compare(EncoderController.bsmodIndex, 7);
+        compare(EncoderController.bitrateKbps, 384);
+
+        flow.currentStepKey = "save";
+        const next = findByName(win, "karaokeNextButton");
+        tryCompare(next, "enabled", true, 5000);
+        mouseClick(next);
+        const dialog = findByName(win, "saveDialog");
+        tryCompare(dialog, "visible", true, 5000);
+        const out = Qt.resolvedUrl("_test_output/tst_projects_duet_example.ac3");
+        dialog.selectedFile = out;
+        dialog.accepted();
+        dialog.close();
+        tryCompare(EncoderController, "busy", false, 120000);
+
+        verify(cliRunner.sameBytes(out, duetStream),
+               "the window wrote a different stream than the duet example ships");
     }
 }

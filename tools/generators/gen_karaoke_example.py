@@ -37,19 +37,39 @@ Usage (repo root):
 from __future__ import annotations
 
 import argparse
-import array
 import json
 import pathlib
-import struct
 import subprocess
 import sys
 import tempfile
 
+# The synthesis (arithmetic, voices, WAV files) is shared with the other karaoke example. A test
+# loads this file by its path, so its folder is put on the path here and not left to the caller.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+from karaoke_synth import (
+    FRAME,
+    RATE,
+    half_life,
+    hz,
+    wav_bytes,
+)
+from karaoke_synth import (
+    add_partial as _add_partial,
+)
+from karaoke_synth import (
+    render_voice as _render_voice,
+)
+from karaoke_synth import (
+    scaled as _scaled,
+)
+from karaoke_synth import (
+    stamp as _stamp,
+)
+
 REPO = pathlib.Path(__file__).resolve().parents[2]
 DEFAULT_OUT = REPO / "examples" / "karaoke" / "auld-lang-syne"
 
-RATE = 48_000
-FRAME = 1536  # samples in one AC-3 frame
 BPM = 120
 BEAT = RATE * 60 // BPM  # 24000 samples
 EIGHTH = BEAT // 2
@@ -65,88 +85,6 @@ PART_FILES = {
     "vocal1": "parts/vocal-1-lead.wav",
     "vocal2": "parts/vocal-2-harmony.wav",
 }
-
-
-# --- arithmetic that is the same on every platform ---------------------------------------------
-
-
-def _sin_turns(x: float) -> float:
-    """sin(2 pi x), by Taylor series after reducing to a quarter turn. + - * / only."""
-    x -= int(x)  # (-1, 1)
-    if x > 0.5:
-        x -= 1.0
-    elif x < -0.5:
-        x += 1.0
-    if x > 0.25:
-        x = 0.5 - x
-    elif x < -0.25:
-        x = -0.5 - x
-    t = x * 6.283185307179586
-    t2 = t * t
-    term = t
-    total = t
-    for k in range(1, 12):
-        term = -term * t2 / ((2 * k) * (2 * k + 1))
-        total += term
-    return total
-
-
-def _cos_turns(x: float) -> float:
-    return _sin_turns(x + 0.25)
-
-
-def _exp_neg(x: float) -> float:
-    """exp(-x) for x >= 0, by halving until the series is short, then squaring back."""
-    halvings = 0
-    while x > 0.0625:
-        x *= 0.5
-        halvings += 1
-    term = 1.0
-    total = 1.0
-    for k in range(1, 14):
-        term = term * -x / k
-        total += term
-    for _ in range(halvings):
-        total *= total
-    return total
-
-
-def _ipow(base: float, exponent: int) -> float:
-    result = 1.0
-    while exponent > 0:
-        if exponent & 1:
-            result *= base
-        base *= base
-        exponent >>= 1
-    return result
-
-
-def _root(target: float, n: int) -> float:
-    """The n-th root of target (target in (0, 2]), by bisection on exact multiplications."""
-    lo, hi = 0.0, 2.0
-    for _ in range(100):
-        mid = (lo + hi) * 0.5
-        if _ipow(mid, n) < target:
-            lo = mid
-        else:
-            hi = mid
-    return (lo + hi) * 0.5
-
-
-_SEMITONE = _root(2.0, 12)
-
-
-def hz(midi: int) -> float:
-    """Equal temperament, A4 = 440 Hz = midi 69."""
-    f = 440.0
-    for _ in range(abs(midi - 69)):
-        f = f * _SEMITONE if midi > 69 else f / _SEMITONE
-    return f
-
-
-def half_life(samples: int) -> float:
-    """The per-sample factor that halves a level every `samples` samples."""
-    return _root(0.5, samples)
 
 
 # --- the score ----------------------------------------------------------------------------------
@@ -225,46 +163,6 @@ _STAB = {"F": (57, 60, 65), "Bb": (58, 62, 65), "C7": (58, 64, 67)}
 # --- the voices ----------------------------------------------------------------------------------
 
 
-def _add_partial(buf, start, count, freq, amp, decay=1.0, attack=0, release=0):
-    """Add amp * sin(2 pi freq t) * decay**t to buf[start:start + count].
-
-    The sine is the two-term recurrence y[n + 1] = 2 cos(w) y[n] - y[n - 1], three operations a
-    sample. The note starts from a zero crossing and rises over `attack` samples; its last
-    `release` samples fall linearly to nothing."""
-    count = min(count, len(buf) - start)
-    if count <= 0:
-        return
-    w = freq / RATE
-    k = 2.0 * _cos_turns(w)
-    y0 = 0.0
-    y1 = _sin_turns(w)
-    level = amp
-    attack = min(attack, count)
-    release = min(release, count - attack)
-    i = start
-    for j in range(attack):
-        buf[i] += level * y0 * ((j + 1) / attack)
-        y2 = k * y1 - y0
-        y0 = y1
-        y1 = y2
-        level *= decay
-        i += 1
-    for _ in range(count - attack - release):
-        buf[i] += level * y0
-        y2 = k * y1 - y0
-        y0 = y1
-        y1 = y2
-        level *= decay
-        i += 1
-    for j in range(release):
-        buf[i] += level * y0 * (1.0 - (j + 1) / release)
-        y2 = k * y1 - y0
-        y0 = y1
-        y1 = y2
-        level *= decay
-        i += 1
-
-
 def render_backing():
     """Left and right: a bass in the middle on beats one and three, a three-note chord on two
     and four with its lowest note left, its highest right and the middle one in both. A pluck is
@@ -326,78 +224,9 @@ def render_melody():
     return [out]
 
 
-# centre Hz, bandwidth Hz, weight: the three formants of each vowel.
-_VOWELS = {
-    "ah": ((700.0, 80.0, 1.0), (1150.0, 100.0, 0.55), (2650.0, 140.0, 0.25)),
-    "oo": ((320.0, 70.0, 1.0), (800.0, 90.0, 0.18), (2250.0, 130.0, 0.05)),
-}
-
-
-def _resonator(centre, bandwidth, weight):
-    """(gain, a1, a2) of y[n] = gain x[n] + a1 y[n-1] + a2 y[n-2], a two-pole resonance."""
-    r = _exp_neg(3.141592653589793 * bandwidth / RATE)
-    theta = centre / RATE
-    # The gain that makes the peak of the response about `weight`, whatever the centre.
-    return weight * (1.0 - r) * 2.0 * _sin_turns(theta), 2.0 * r * _cos_turns(theta), -r * r
-
-
 def render_voice(syllables, vowel, vibrato, breath, seed):
-    """A sung voice: a smooth pulse train through three formant resonators in parallel.
-
-    `syllables` holds, for each syllable, its notes as (midi, samples). The gate rises over
-    25 ms at each syllable and falls over the 60 ms before the next, so the words are separate;
-    a second note on a syllable only moves the pitch. The pitch glides to each note, the vibrato
-    is a slow sine on it, and the breath is integer pseudo-random noise added to the pulses."""
-    n = TOTAL
-    env = [0.0] * n
-    target = [0.0] * n
-    rise = 1200
-    fall = 2880
-    at = 0
-    for notes in syllables:
-        length = sum(count for _, count in notes)
-        env[at:at + rise] = [j / rise for j in range(rise)]
-        env[at + rise:at + length - fall] = [1.0] * (length - fall - rise)
-        env[at + length - fall:at + length] = [1.0 - j / fall for j in range(fall)]
-        position = at
-        for midi, count in notes:
-            target[position:position + count] = [hz(midi)] * count
-            position += count
-        at += length
-
-    (g1, a11, a12), (g2, a21, a22), (g3, a31, a32) = (_resonator(*v) for v in _VOWELS[vowel])
-    y11 = y12 = y21 = y22 = y31 = y32 = 0.0
-    out = [0.0] * n
-    inv_rate = 1.0 / RATE
-    glide = 0.004
-    lfo_k = 2.0 * _cos_turns(5.4 / RATE)
-    lfo0, lfo1 = 0.0, _sin_turns(5.4 / RATE)
-    phase = 0.0
-    freq = 0.0
-    state = seed
-    mean = 1.0 / 6.0
-    for i in range(at):
-        lfo2 = lfo_k * lfo1 - lfo0
-        lfo0 = lfo1
-        lfo1 = lfo2
-        t = target[i]
-        freq = t if freq == 0.0 else freq + (t - freq) * glide
-        phase += freq * (1.0 + vibrato * lfo1) * inv_rate
-        if phase >= 1.0:
-            phase -= 1.0
-        state = (state * 1103515245 + 12345) & 0x7FFFFFFF
-        x = phase * (1.0 - phase) - mean + breath * ((state >> 8) / 4194304.0 - 1.0) * 0.25
-        a = x * g1 + a11 * y11 + a12 * y12
-        y12 = y11
-        y11 = a
-        b = x * g2 + a21 * y21 + a22 * y22
-        y22 = y21
-        y21 = b
-        c = x * g3 + a31 * y31 + a32 * y32
-        y32 = y31
-        y31 = c
-        out[i] = (a + b + c) * env[i]
-    return [out]
+    """One voice over the whole piece: karaoke_synth.render_voice at this song's length."""
+    return _render_voice(syllables, TOTAL, vowel, vibrato, breath, seed)
 
 
 def render_vocal(harmony):
@@ -421,45 +250,10 @@ def render_parts():
         "vocal1": render_vocal(harmony=False),
         "vocal2": render_vocal(harmony=True),
     }
-    scaled = {}
-    for name, channels in parts.items():
-        peak = max(abs(s) for channel in channels for s in channel)
-        gain = PEAKS[name] / peak
-        scaled[name] = [array.array("h", (_to_int16(s * gain) for s in c)) for c in channels]
-    return scaled
-
-
-def _to_int16(x):
-    v = int(x * 32767.0 + 0.5) if x >= 0.0 else int(x * 32767.0 - 0.5)
-    return max(-32767, min(32767, v))
-
-
-def wav_bytes(channels):
-    count = len(channels)
-    frames = len(channels[0])
-    interleaved = array.array("h", bytes(2 * count * frames))
-    for c, samples in enumerate(channels):
-        interleaved[c::count] = samples
-    if sys.byteorder == "big":
-        interleaved.byteswap()
-    data = interleaved.tobytes()
-    block = 2 * count
-    fmt = struct.pack("<HHIIHH", 1, count, RATE, RATE * block, block, 16)
-    return (
-        b"RIFF" + struct.pack("<I", 4 + 8 + len(fmt) + 8 + len(data)) + b"WAVE"
-        + b"fmt " + struct.pack("<I", len(fmt)) + fmt
-        + b"data" + struct.pack("<I", len(data)) + data
-    )
+    return _scaled(parts, PEAKS)
 
 
 # --- the words and the project ------------------------------------------------------------------
-
-
-def _stamp(centiseconds, tag):
-    minutes, rest = divmod(centiseconds, 6000)
-    seconds, hundredths = divmod(rest, 100)
-    text = f"{minutes:02d}:{seconds:02d}.{hundredths:02d}"
-    return f"<{text}>" if tag == "word" else f"[{text}]"
 
 
 def lrc(words):
