@@ -22,6 +22,7 @@
 #include "ac4_sync_word.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "channel_geometry.hpp"
+#include "stream_playback.hpp"
 
 using splayer_detail::RawResult;
 
@@ -235,10 +236,31 @@ DecodeOutcome decode_stream_to_memory(const QString& path,
     auto result = std::make_shared<RawResult>();
 
     if (*bsid > 8) {
-        const auto units = iclforge::ac3::split_access_units(stream);
-        if (!units || units->empty()) {
+        // §E2.3.1.2: one programme plays, never a splice of several. A stream
+        // with a second independent substream (a second language, an audio
+        // description) comes back from an unfiltered split_access_units with
+        // its programmes interleaved, one frame period of each in turn - so
+        // the main, then the description, then the main again, and every
+        // append_planar below sized from the first unit's 5.1 would read the
+        // mono unit's channels that are not there. forge's decode, monitor and
+        // play make the same choice: the first programme the stream carries.
+        const auto selected = iclforge::apps::select_programme(stream, std::nullopt);
+        if (!selected) {
             outcome.error = QStringLiteral("%1 is not a valid E-AC-3 stream.").arg(path);
             return outcome;
+        }
+        const auto& units = selected->units;
+        if (selected->ids.size() > 1) {
+            // A multi-programme stream is never played without saying which
+            // programme it was: the line forge's own commands print.
+            QStringList ids;
+            for (const int id : selected->ids) {
+                ids << QString::number(id);
+            }
+            result->programme_note = QStringLiteral("programme %1 of %2 (%3)")
+                                         .arg(selected->programme)
+                                         .arg(selected->ids.size())
+                                         .arg(ids.join(QStringLiteral(", ")));
         }
         result->codec_label = QStringLiteral("E-AC-3");
         iclforge::ac3::Eac3Decoder decoder;
@@ -287,7 +309,7 @@ DecodeOutcome decode_stream_to_memory(const QString& path,
             }
         };
 
-        for (const auto& unit : *units) {
+        for (const auto& unit : units) {
             const auto decoded = decoder.decode_access_unit(unit);
             if (!decoded) {
                 outcome.error = QStringLiteral("Decode failed (code %1).")
@@ -397,11 +419,15 @@ QString StreamPlayerController::summaryLine() const {
     if (!result_) {
         return QString();
     }
-    return QStringLiteral("%1 · %2 · %3 Hz · %4 frame(s) · %5 s")
-        .arg(result_->codec_label, result_->layout_label)
-        .arg(result_->sample_rate_hz)
-        .arg(result_->unit_count)
-        .arg(result_->duration_seconds, 0, 'f', 2);
+    auto line = QStringLiteral("%1 · %2 · %3 Hz · %4 frame(s) · %5 s")
+                    .arg(result_->codec_label, result_->layout_label)
+                    .arg(result_->sample_rate_hz)
+                    .arg(result_->unit_count)
+                    .arg(result_->duration_seconds, 0, 'f', 2);
+    if (!result_->programme_note.isEmpty()) {
+        line += QStringLiteral(" · ") + result_->programme_note;
+    }
+    return line;
 }
 
 double StreamPlayerController::positionSeconds() const {
