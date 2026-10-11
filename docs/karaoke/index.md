@@ -86,7 +86,8 @@ choice does not apply:
 
 Hearth shows the words of the stream playing from a **`.lrc` file with the same name** in the same
 folder: `Auld Lang Syne.ac3` is read with `Auld Lang Syne.lrc` (the extension in any case). Where
-there is no `.lrc`, a **SubRip `.srt`** of that name is read the same way (see [below](#subrip)).
+there is no `.lrc`, a **SubRip `.srt`** of that name is read the same way (see [below](#subrip)),
+and failing that an **Advanced SubStation Alpha `.ass`** (see [below](#advanced-substation-alpha)).
 
 ### The file
 
@@ -132,6 +133,25 @@ override blocks are dropped, and a position after the end time is ignored. The n
 is not needed, a `.` is read for a `,` in a time, and cues out of order are put in order. There are
 no words in a SubRip file, so there is no word fill: the whole line is emphasised as it is sung.
 The encodings are the LRC reader's: UTF-8 with or without a byte-order mark, or UTF-16 with one.
+
+### Advanced SubStation Alpha
+
+A `.ass` script is read as lyrics too, which is what subtitle-karaoke tools write, and its
+karaoke tags are **word times**:
+
+```text
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:12.00,0:00:15.50,Default,,0,0,0,,{\k50}Should {\k30}auld {\k80}acquaint{\k20}ance
+```
+
+Each `Dialogue:` event is a line from its start to its end. Each `{\k50}` (and `\kf`, `\K`, `\ko`:
+the same duration, drawn differently) begins a **syllable** that lasts that many hundredths of a
+second after the one before; a syllable is a word of the line, so the fill moves by syllable, as
+the script's own sweep does. Everything else is dropped: the other override tags (`{\an8}`,
+`{\pos(...)}`), the styles, and any event that draws (`{\p1}`) or is a `Comment:`. `\N` is a
+space. The columns are the script's own `Format:` line, with the v4+ order where it has none, and
+an event with no karaoke tags is a line with no words.
 
 ### What is shown
 

@@ -393,6 +393,185 @@ TEST_CASE("subrip: the file beside an item is its .lrc, and its .srt where there
     CHECK(both->filename().string() == "song.lrc");
 }
 
+// ---- Advanced SubStation Alpha (planning/karaoke-phase2.md, W13d) -------------------------------
+
+namespace {
+
+// A script with the usual sections and one karaoke event and one plain one.
+const std::string kAssHeader =
+    "[Script Info]\nTitle: Song\nScriptType: v4.00+\n\n"
+    "[V4+ Styles]\nFormat: Name, Fontname\nStyle: Default,Arial\n\n"
+    "[Events]\n"
+    "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";
+
+}  // namespace
+
+TEST_CASE("ass: karaoke tags give each syllable its start and end", "[lyrics][ass]") {
+    const std::string text = kAssHeader +
+        "Dialogue: 0,0:00:12.00,0:00:15.50,Default,,0,0,0,,{\\k50}Should {\\k30}auld {\\k80}acquaint{\\k20}ance\n"
+        "Dialogue: 0,0:00:20.00,0:00:22.00,Default,,0,0,0,,And never brought to mind\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    CHECK(lyrics->timed);
+    REQUIRE(lyrics->lines.size() == 2);
+
+    const auto& first = lyrics->lines[0];
+    CHECK(first.start_ms == 12000);
+    CHECK(first.end_ms == 15500);
+    CHECK(first.text == "Should auld acquaintance");
+    REQUIRE(first.words.size() == 4);
+    CHECK(first.words[0].text == "Should ");
+    CHECK(first.words[0].start_ms == 12000);
+    CHECK(first.words[0].end_ms == 12500);
+    CHECK(first.words[1].text == "auld ");
+    CHECK(first.words[1].start_ms == 12500);
+    CHECK(first.words[1].end_ms == 12800);
+    // A word is a syllable: the fill moves by syllable.
+    CHECK(first.words[2].text == "acquaint");
+    CHECK(first.words[2].start_ms == 12800);
+    CHECK(first.words[2].end_ms == 13600);
+    CHECK(first.words[3].text == "ance");
+    CHECK(first.words[3].start_ms == 13600);
+    CHECK(first.words[3].end_ms == 13800);
+
+    // An event with no karaoke tags is a line, with its own end and no words.
+    CHECK(lyrics->lines[1].text == "And never brought to mind");
+    CHECK_FALSE(lyrics->lines[1].word_timed());
+    CHECK(lyrics->lines[1].end_ms == 22000);
+
+    // The cursor is the word's: a quarter of the way through "auld" at 12575 ms.
+    const auto at = iclforge::lyrics::lyric_position(*lyrics, 12575);
+    REQUIRE(at.line.has_value());
+    CHECK(*at.line == 0);
+    REQUIRE(at.word.has_value());
+    CHECK(*at.word == 1);
+    CHECK(at.fraction == Catch::Approx(0.25));
+}
+
+TEST_CASE("ass: the other karaoke tags are the same duration, and text before the first is a word of no length",
+          "[lyrics][ass]") {
+    const std::string text = kAssHeader +
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,{\\kf40}A {\\K30}B {\\ko20}C\n"
+        "Dialogue: 0,0:00:05.00,0:00:07.00,Default,,0,0,0,,Hi {\\k50}there {\\k0}{\\k25}friend\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 2);
+    const auto& tags = lyrics->lines[0];
+    REQUIRE(tags.words.size() == 3);
+    CHECK(tags.words[0].start_ms == 1000);
+    CHECK(tags.words[0].end_ms == 1400);
+    CHECK(tags.words[1].start_ms == 1400);
+    CHECK(tags.words[1].end_ms == 1700);
+    CHECK(tags.words[2].start_ms == 1700);
+    CHECK(tags.words[2].end_ms == 1900);
+
+    const auto& lead = lyrics->lines[1];
+    REQUIRE(lead.words.size() == 3);
+    CHECK(lead.text == "Hi there friend");
+    // "Hi " has no tag of its own: it starts with the line and runs to the next word.
+    CHECK(lead.words[0].text == "Hi ");
+    CHECK(lead.words[0].start_ms == 5000);
+    CHECK(lead.words[0].end_ms == 5000);
+    CHECK(lead.words[1].text == "there ");
+    CHECK(lead.words[1].start_ms == 5000);
+    CHECK(lead.words[1].end_ms == 5500);
+    // A {\\k0} between two words has no length and no text.
+    CHECK(lead.words[2].text == "friend");
+    CHECK(lead.words[2].start_ms == 5500);
+    CHECK(lead.words[2].end_ms == 5750);
+
+    // A last word of no length runs to the end of its line, so that it can be filled.
+    const auto closing = iclforge::lyrics::parse_ass(
+        "[Events]\nDialogue: 0,0:00:01.00,0:00:04.00,Default,,0,0,0,,{\\k50}One {\\k0}two\n");
+    REQUIRE(closing.has_value());
+    REQUIRE(closing->lines[0].words.size() == 2);
+    CHECK(closing->lines[0].words[1].start_ms == 1500);
+    CHECK(closing->lines[0].words[1].end_ms == 4000);
+}
+
+TEST_CASE("ass: override blocks, line breaks, drawings and comments", "[lyrics][ass]") {
+    const std::string text = kAssHeader +
+        "Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,{\\an8}{\\pos(10,20)}Hello, there\\Nfriend\n"
+        "Dialogue: 0,0:00:03.00,0:00:04.00,Default,,0,0,0,,{\\p1}m 0 0 l 10 10 l 0 10{\\p0}\n"
+        "Comment: 0,0:00:05.00,0:00:06.00,Default,,0,0,0,,not a lyric\n"
+        "Dialogue: 0,0:00:07.00,0:00:08.00,Default,,0,0,0,,Two\\hspaces\\nhere\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 2);
+    // The commas of the text are the text's: it is the rest of the line.
+    CHECK(lyrics->lines[0].text == "Hello, there friend");
+    CHECK(lyrics->lines[1].text == "Two spaces here");
+}
+
+TEST_CASE("ass: the columns are the file's own Format line", "[lyrics][ass]") {
+    const std::string text =
+        "[Events]\nFormat: Start, End, Text\n"
+        "Dialogue: 0:00:09.50,0:00:10.00,Late, but there\n"
+        "Dialogue: 1:02:03.45,1:02:04.00,An hour in\n"
+        "Dialogue: 0:00:01.5,0:00:02.00,Early\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 3);
+    // In order of start, with the hour and the fractions as the format writes them.
+    CHECK(lyrics->lines[0].text == "Early");
+    CHECK(lyrics->lines[0].start_ms == 1500);
+    CHECK(lyrics->lines[1].text == "Late, but there");
+    CHECK(lyrics->lines[1].start_ms == 9500);
+    CHECK(lyrics->lines[2].start_ms == 3723450);
+
+    // No Format line at all: the v4+ order.
+    const auto bare = iclforge::lyrics::parse_ass(
+        "[Events]\nDialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,No format line\n");
+    REQUIRE(bare.has_value());
+    CHECK(bare->lines[0].text == "No format line");
+}
+
+TEST_CASE("ass: what is not a script says so, and a file is read as one by what it holds",
+          "[lyrics][ass]") {
+    CHECK(iclforge::lyrics::parse_ass("[Script Info]\nTitle: Nothing\n").error() ==
+          "The subtitle file has no dialogue in it.");
+    CHECK(iclforge::lyrics::parse_ass("").error() == "The lyrics file is empty.");
+
+    // UTF-16 with a mark, as an editor that saves "Unicode" writes it.
+    const std::string ascii = kAssHeader + "Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,{\\k100}Hello\n";
+    std::string utf16 = std::string{"\xFF\xFE"};
+    for (const char c : ascii) {
+        utf16.push_back(c);
+        utf16.push_back('\0');
+    }
+    const auto wide = iclforge::lyrics::parse_ass(utf16);
+    REQUIRE(wide.has_value());
+    CHECK(wide->lines[0].text == "Hello");
+    const auto detected = iclforge::lyrics::parse_timed_text(
+        kAssHeader + "Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,{\\k100}Hello\n");
+    REQUIRE(detected.has_value());
+    REQUIRE(detected->lines.size() == 1);
+    CHECK(detected->lines[0].word_timed());
+    // An LRC lyric that says "Dialogue:" in its words is not a script.
+    const auto lrc = iclforge::lyrics::parse_timed_text("[00:01.00]Dialogue: a play in three acts\n");
+    REQUIRE(lrc.has_value());
+    CHECK(lrc->lines[0].text == "Dialogue: a play in three acts");
+}
+
+TEST_CASE("ass: the file beside an item is its .lrc, then its .srt, then its .ass", "[lyrics][ass]") {
+    Folder folder;
+    folder.write("song.mp3", "x");
+    folder.write("song.ass", kAssHeader +
+        "Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,{\\k100}From the script\n");
+    const std::string item = (folder.path() / "song.mp3").string();
+    const auto script = iclforge::lyrics::find_lyrics_file(item);
+    REQUIRE(script.has_value());
+    CHECK(script->extension().string() == ".ass");
+    const auto read = iclforge::lyrics::read_lyrics(*script);
+    REQUIRE(read.has_value());
+    CHECK(read->lines[0].text == "From the script");
+    CHECK(read->lines[0].word_timed());
+    folder.write("song.srt", "1\n00:00:01,000 --> 00:00:02,000\nFrom the subtitles\n");
+    CHECK(iclforge::lyrics::find_lyrics_file(item)->extension().string() == ".srt");
+    folder.write("song.lrc", "[00:01.00]From the lrc\n");
+    CHECK(iclforge::lyrics::find_lyrics_file(item)->extension().string() == ".lrc");
+}
+
 TEST_CASE("lyrics: the cursor finds the line, the word and how far through it",
           "[lyrics]") {
     const Lyrics lyrics = parsed(kWordTimed);

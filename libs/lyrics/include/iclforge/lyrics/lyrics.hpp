@@ -111,9 +111,25 @@ struct Lyrics {
 [[nodiscard]] std::expected<Lyrics, std::string> parse_subrip(
     std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
 
-// Either of the above, by what the file is: SubRip where it has a cue's `-->` line between two
-// times, LRC otherwise. What a program that is handed a timed-text file by a person, whose
-// extension may be anything, calls.
+// An Advanced SubStation Alpha (`.ass`) file read as lyrics (planning/karaoke-phase2.md, W13d). Its
+// `Dialogue:` events are lines, with the start and the end the event has (so, as in SubRip, a gap
+// between events is nothing being sung), and the karaoke override tags are word times:
+//
+//   Dialogue: 0,0:00:12.00,0:00:15.50,Default,,0,0,0,,{\k50}Should {\k30}auld {\k80}acquaint{\k20}ance
+//
+// Each `{\k<cs>}` (and `\kf`, `\K`, `\ko`, the same duration drawn differently) begins a
+// syllable that lasts that many hundredths of a second after the one before, from the event's start;
+// a syllable is a word of the line, with its own start and end, so the fill moves by syllable. The
+// text before the first tag is a word of no length. Everything else in an override block is
+// dropped, `{\N}` is a space, an event that draws (`{\p1}`) and a `Comment:` are not lyrics, and
+// the column order is the file's own `Format:` line (the v4+ order where it has none). An event
+// with no karaoke tags is a line without words. Encodings and errors are parse_lyrics's.
+[[nodiscard]] std::expected<Lyrics, std::string> parse_ass(
+    std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
+
+// Any of the above, by what the file is: ASS where it has a `Dialogue:` event, SubRip where it
+// has a cue's `-->` line between two times, LRC otherwise. What a program that is handed a
+// timed-text file by a person, whose extension may be anything, calls.
 [[nodiscard]] std::expected<Lyrics, std::string> parse_timed_text(
     std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
 
@@ -123,8 +139,8 @@ struct Lyrics {
     const std::filesystem::path& file, std::optional<std::int64_t> duration_ms = std::nullopt);
 
 // The lyrics file of a media item (L1): `name.lrc` in the item's folder, the
-// extension in any case, and where there is none `name.srt`. `item_path` is the item's path as the
-// queue holds it.
+// extension in any case, and where there is none `name.srt`, then `name.ass`. `item_path` is the
+// item's path as the queue holds it.
 [[nodiscard]] std::optional<std::filesystem::path> find_lyrics_file(const std::string& item_path);
 
 enum class WordState : std::uint8_t { kSung, kBeingSung, kNotYetSung };

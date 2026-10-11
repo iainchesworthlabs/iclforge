@@ -159,6 +159,12 @@ The sections below contain the complete change list and fixes.
   its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
   firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
   reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **Advanced SubStation Alpha scripts are lyrics, with word times.** The lyric reader takes a
+  `.ass` script's `Dialogue:` events as lines (each from its start to its end) and its karaoke tags
+  (`\k`, `\kf`, `\K`, `\ko`) as syllable times, so the fill moves by syllable; other override
+  blocks, drawings and comments are dropped and the columns are the script's own `Format:` line.
+  A file is recognised by what it holds, and Hearth finds `name.ass` beside an item when there is
+  no `.lrc` or `.srt` (planning/karaoke-phase2.md, W13d).
 - **SubRip files are lyrics.** The lyric reader takes a `.srt` as lines that end where their cue
   does (so the gap between cues is nothing being sung), with the cue's text lines joined, its styling
   and `{...}` override blocks dropped, and no word times invented. A file is read as SubRip or as LRC

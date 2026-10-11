@@ -461,6 +461,168 @@ void build_words(const std::vector<Segment>& segments, std::int64_t first, LineP
     return folded;
 }
 
+// ---- Advanced SubStation Alpha ---------------------------------------------------------------
+
+// "h:mm:ss.cc" (hours of one or two digits, hundredths of one to three), in milliseconds.
+[[nodiscard]] std::optional<std::int64_t> parse_ass_time(std::string_view s) {
+    s = trim(s);
+    std::int64_t parts[3] = {0, 0, 0};
+    std::size_t at = 0;
+    for (int part = 0; part < 3; ++part) {
+        std::size_t digits = 0;
+        std::int64_t value = 0;
+        while (at < s.size() && is_digit(s[at])) {
+            if (++digits > 4) {
+                return std::nullopt;
+            }
+            value = (value * 10) + (s[at] - '0');
+            ++at;
+        }
+        if (digits == 0) {
+            return std::nullopt;
+        }
+        parts[part] = value;
+        if (part < 2) {
+            if (at >= s.size() || s[at] != ':') {
+                return std::nullopt;
+            }
+            ++at;
+        }
+    }
+    std::int64_t millis = 0;
+    if (at < s.size()) {
+        if (s[at] != '.') {
+            return std::nullopt;
+        }
+        ++at;
+        std::size_t digits = 0;
+        std::int64_t fraction = 0;
+        while (at < s.size() && is_digit(s[at])) {
+            if (++digits > 3) {
+                return std::nullopt;
+            }
+            fraction = (fraction * 10) + (s[at] - '0');
+            ++at;
+        }
+        if (digits == 0 || at != s.size()) {
+            return std::nullopt;
+        }
+        millis = digits == 1 ? fraction * 100 : (digits == 2 ? fraction * 10 : fraction);
+    } else if (at != s.size()) {
+        return std::nullopt;
+    }
+    if (parts[1] > 59 || parts[2] > 59) {
+        return std::nullopt;
+    }
+    return (((parts[0] * 60) + parts[1]) * 60 + parts[2]) * 1000 + millis;
+}
+
+[[nodiscard]] bool starts_with_nocase(std::string_view s, std::string_view prefix) {
+    if (s.size() < prefix.size()) {
+        return false;
+    }
+    for (std::size_t i = 0; i < prefix.size(); ++i) {
+        if (std::tolower(static_cast<unsigned char>(s[i])) != std::tolower(static_cast<unsigned char>(prefix[i]))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// One syllable of an event's text: how long it lasts after the one before (hundredths), and what it
+// says, with the spacing written after it.
+struct AssSyllable {
+    std::int64_t centis = 0;
+    std::string text;
+};
+
+// An event's text split at its karaoke tags. `karaoke` is whether any was there; `drawing` is
+// whether an override block turned drawing mode on, which makes the event not lyrics.
+struct AssText {
+    std::vector<AssSyllable> syllables;
+    bool karaoke = false;
+    bool drawing = false;
+};
+
+[[nodiscard]] AssText split_ass_text(std::string_view text) {
+    AssText out;
+    AssSyllable current;
+    const auto flush = [&] {
+        if (!current.text.empty() || current.centis > 0) {
+            out.syllables.push_back(std::move(current));
+        }
+        current = AssSyllable{};
+    };
+    for (std::size_t i = 0; i < text.size();) {
+        if (text[i] == '{') {
+            const std::size_t close = text.find('}', i);
+            if (close == std::string_view::npos) {
+                current.text.push_back(text[i]);
+                ++i;
+                continue;
+            }
+            const std::string_view block = text.substr(i + 1, close - i - 1);
+            // The tags of the block, each from its backslash to the next.
+            std::size_t at = 0;
+            while ((at = block.find('\\', at)) != std::string_view::npos) {
+                ++at;
+                std::size_t end = block.find('\\', at);
+                if (end == std::string_view::npos) {
+                    end = block.size();
+                }
+                const std::string_view tag = block.substr(at, end - at);
+                // \k, \kf, \K, \ko and then the duration in hundredths of a second.
+                std::size_t name = 0;
+                if (!tag.empty() && (tag[0] == 'k' || tag[0] == 'K')) {
+                    name = 1;
+                    if (tag.size() > 1 && (tag[1] == 'f' || tag[1] == 'o')) {
+                        name = 2;
+                    }
+                    std::size_t digits = 0;
+                    std::int64_t value = 0;
+                    while (name + digits < tag.size() && is_digit(tag[name + digits]) && digits < 6) {
+                        value = (value * 10) + (tag[name + digits] - '0');
+                        ++digits;
+                    }
+                    if (digits > 0) {
+                        // A tag ends the syllable before it and begins the next.
+                        flush();
+                        current.centis = value;
+                        out.karaoke = true;
+                    }
+                } else if (tag.size() >= 2 && tag[0] == 'p' && is_digit(tag[1]) && tag[1] != '0') {
+                    out.drawing = true;
+                }
+            }
+            i = close + 1;
+            continue;
+        }
+        if (text[i] == '\\' && i + 1 < text.size() &&
+            (text[i + 1] == 'N' || text[i + 1] == 'n' || text[i + 1] == 'h')) {
+            current.text.push_back(' ');
+            i += 2;
+            continue;
+        }
+        current.text.push_back(is_space(text[i]) ? ' ' : text[i]);
+        ++i;
+    }
+    flush();
+    return out;
+}
+
+[[nodiscard]] bool looks_like_ass(std::string_view text) {
+    std::size_t begin = 0;
+    for (std::size_t i = 0; i <= text.size(); ++i) {
+        if (i == text.size() || text[i] == '\n' || text[i] == '\r') {
+            if (starts_with_nocase(trim(text.substr(begin, i - begin)), "Dialogue:")) {
+                return true;
+            }
+            begin = i + 1;
+        }
+    }
+    return false;
+}
+
 // Whether the decoded text has a SubRip cue line: two times either side of an arrow.
 [[nodiscard]] bool looks_like_subrip(std::string_view text) {
     std::size_t begin = 0;
@@ -711,11 +873,166 @@ std::expected<Lyrics, std::string> parse_subrip(std::string_view text,
     return lyrics;
 }
 
+std::expected<Lyrics, std::string> parse_ass(std::string_view text,
+                                             std::optional<std::int64_t> duration_ms) {
+    const auto decoded = decode_text(text);
+    if (!decoded) {
+        return std::unexpected(decoded.error());
+    }
+    // The column of Start, End and Text, from the events' Format line; the v4+ order without one.
+    std::size_t start_column = 1;
+    std::size_t end_column = 2;
+    std::size_t text_column = 9;
+    std::size_t columns = 10;
+    bool in_events = false;
+    struct Event {
+        std::int64_t start = 0;
+        std::int64_t end = 0;
+        AssText text;
+    };
+    std::vector<Event> events;
+    std::size_t begin = 0;
+    const std::string_view all = *decoded;
+    for (std::size_t i = 0; i <= all.size(); ++i) {
+        const bool end = i == all.size();
+        if (!end && all[i] != '\n' && all[i] != '\r') {
+            continue;
+        }
+        const std::string_view line = trim(all.substr(begin, i - begin));
+        begin = i + 1;
+        if (line.empty()) {
+            continue;
+        }
+        if (line.front() == '[') {
+            in_events = starts_with_nocase(line, "[events]");
+            continue;
+        }
+        if (!in_events) {
+            continue;
+        }
+        if (starts_with_nocase(line, "Format:")) {
+            std::size_t found = 0;
+            std::size_t column = 0;
+            std::string_view rest = line.substr(7);
+            std::size_t from = 0;
+            while (from <= rest.size()) {
+                std::size_t comma = rest.find(',', from);
+                if (comma == std::string_view::npos) {
+                    comma = rest.size();
+                }
+                const std::string name = lowercase(trim(rest.substr(from, comma - from)));
+                if (name == "start") {
+                    start_column = column;
+                    ++found;
+                } else if (name == "end") {
+                    end_column = column;
+                    ++found;
+                } else if (name == "text") {
+                    text_column = column;
+                    ++found;
+                }
+                ++column;
+                from = comma + 1;
+            }
+            columns = column;
+            static_cast<void>(found);
+            continue;
+        }
+        if (!starts_with_nocase(line, "Dialogue:")) {
+            continue;
+        }
+        // The fields to the Text column; the text is the rest of the line, commas and all.
+        std::string_view rest = line.substr(9);
+        std::vector<std::string_view> fields;
+        std::size_t from = 0;
+        while (fields.size() + 1 < columns) {
+            const std::size_t comma = rest.find(',', from);
+            if (comma == std::string_view::npos) {
+                break;
+            }
+            fields.push_back(rest.substr(from, comma - from));
+            from = comma + 1;
+        }
+        fields.push_back(rest.substr(from));
+        if (text_column >= fields.size() || start_column >= fields.size() || end_column >= fields.size()) {
+            continue;
+        }
+        const auto start = parse_ass_time(fields[start_column]);
+        const auto stop = parse_ass_time(fields[end_column]);
+        if (!start || !stop) {
+            continue;
+        }
+        AssText parsed = split_ass_text(fields[text_column]);
+        if (parsed.drawing) {
+            continue;
+        }
+        events.push_back(Event{.start = *start, .end = std::max(*stop, *start), .text = std::move(parsed)});
+    }
+    if (events.empty()) {
+        return std::unexpected(std::string{"The subtitle file has no dialogue in it."});
+    }
+    std::stable_sort(events.begin(), events.end(),
+                     [](const Event& a, const Event& b) { return a.start < b.start; });
+
+    Lyrics lyrics;
+    lyrics.timed = true;
+    lyrics.lines.reserve(events.size());
+    for (Event& event : events) {
+        LyricLine line;
+        line.start_ms = event.start;
+        line.end_ms = event.end;
+        std::int64_t at = event.start;
+        std::string joined;
+        for (AssSyllable& syllable : event.text.syllables) {
+            if (!syllable.text.empty()) {
+                LyricWord word;
+                word.start_ms = std::min(at, event.end);
+                word.text = syllable.text;
+                // The word is as long as its tag says; a word with no length runs to the next.
+                word.end_ms = std::min(at + (syllable.centis * 10), event.end);
+                if (event.text.karaoke) {
+                    line.words.push_back(std::move(word));
+                }
+                joined += syllable.text;
+            }
+            at += syllable.centis * 10;
+        }
+        // A line shows without the spacing at its ends, and so does its first and last word.
+        std::string_view shown = trim(joined);
+        line.text = std::string{shown};
+        if (!line.words.empty()) {
+            std::string& first = line.words.front().text;
+            std::size_t lead = 0;
+            while (lead < first.size() && is_space(first[lead])) {
+                ++lead;
+            }
+            first.erase(0, lead);
+            std::string& last = line.words.back().text;
+            while (!last.empty() && is_space(last.back())) {
+                last.pop_back();
+            }
+            // Words that came to nothing once trimmed are not words.
+            std::erase_if(line.words, [](const LyricWord& word) { return word.text.empty(); });
+        }
+        // A word of no length ends where the next begins, which is where it began; the last word of
+        // no length runs to the line's end, so that the fill has somewhere to go.
+        if (!line.words.empty() && line.words.back().end_ms <= line.words.back().start_ms) {
+            line.words.back().end_ms = std::max(line.words.back().start_ms, line.end_ms);
+        }
+        lyrics.lines.push_back(std::move(line));
+    }
+    static_cast<void>(duration_ms);
+    return lyrics;
+}
+
 std::expected<Lyrics, std::string> parse_timed_text(std::string_view text,
                                                     std::optional<std::int64_t> duration_ms) {
     const auto decoded = decode_text(text);
     if (!decoded) {
         return std::unexpected(decoded.error());
+    }
+    if (looks_like_ass(*decoded)) {
+        return parse_ass(*decoded, duration_ms);
     }
     if (looks_like_subrip(*decoded)) {
         return parse_subrip(*decoded, duration_ms);
@@ -754,7 +1071,8 @@ std::optional<std::filesystem::path> find_lyrics_file(const std::string& item_pa
     std::error_code error;
     // `.lrc` first and `.srt` where there is none: the usual spelling of each, which is also
     // the only one on a case-insensitive file system, then any case.
-    for (const std::string_view extension : {std::string_view{".lrc"}, std::string_view{".srt"}}) {
+    for (const std::string_view extension :
+         {std::string_view{".lrc"}, std::string_view{".srt"}, std::string_view{".ass"}}) {
         const std::filesystem::path usual = folder / (stem + std::string{extension});
         if (std::filesystem::is_regular_file(usual, error) && !error) {
             return usual;
