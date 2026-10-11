@@ -198,6 +198,46 @@ ColumnLayout {
         }
     }
 
+    // ---- projects ----------------------------------------------------------------
+    // What a project (ProjectFile; Main.qml's captureProject and applyProject) keeps of this
+    // flow. The paths are the sources', kept by the window; the flow adds which of them is
+    // which part, and how the stream is heard.
+
+    // The part each loaded source is, in sourceModel order, so that the same files are the
+    // same parts when the project is opened.
+    function loadedPartNames() {
+        const names = [];
+        for (const item of flow.loadedParts) {
+            names.push(item.part);
+        }
+        return names;
+    }
+
+    function projectState() {
+        return { input: flow.inputKind, listening: flow.listening, vocals: flow.vocalsChoice };
+    }
+
+    // Opening a project: the parts it names are loaded as if each had been chosen, and how the
+    // stream is heard is put back. `parts` maps a part name (or "file") to a file URL; a part
+    // it does not name is left empty. A listening or vocals the flow does not know is left
+    // as it is, which is the same thing a newer project's extra value should do.
+    function applyProject(parts, input, listening, vocals) {
+        flow.inputKind = input === "file" || parts.file !== undefined ? "file" : "parts";
+        flow.backingUrl = parts.backing || "";
+        flow.melodyUrl = parts.melody || "";
+        flow.vocal1Url = parts.vocal1 || "";
+        flow.vocal2Url = parts.vocal2 || "";
+        flow.singleUrl = parts.file || "";
+        flow.currentStepKey = "parts";
+        flow.rebuild();
+        if (["asCoded", "aware", "capable"].indexOf(listening) >= 0) {
+            flow.chooseListening(listening);
+        }
+        if (["none", "v1", "v2", "both"].indexOf(vocals) >= 0) {
+            flow.chooseVocals(vocals);
+        }
+    }
+
     // ---- sentences ---------------------------------------------------------
     function partName(part) {
         switch (part) {

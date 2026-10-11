@@ -931,6 +931,429 @@
         </message>
     </context>
     <context>
+        <name>KaraokeFlow</name>
+        <message>
+            <source>Parts</source>
+            <translation>[Pàrts ~~]</translation>
+        </message>
+        <message>
+            <source>Start with what you recorded. Everything after this follows from it.</source>
+            <translation>[Stàrt wîth whàt yõû récõrdéd. Évérythîng àftér thîs fõllõws frõm ît. ~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Next: levels</source>
+            <translation>[Néxt: lévéls ~~~~~]</translation>
+        </message>
+        <message>
+            <source>Levels</source>
+            <translation>[Lévéls ~~]</translation>
+        </message>
+        <message>
+            <source>How loud the melody guide and the vocals sit when a player mixes them for you.</source>
+            <translation>[Hõw lõûd thé mélõdy gûîdé ànd thé võcàls sît whén à plàyér mîxés thém fõr yõû. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Next: hear it</source>
+            <translation>[Néxt: héàr ît ~~~~~]</translation>
+        </message>
+        <message>
+            <source>Hear</source>
+            <translation>[Héàr ~~]</translation>
+        </message>
+        <message>
+            <source>If a part sounds wrong, go back to Levels: the centre and surround levels set how the aware decoder mixes them.</source>
+            <translation>[Îf à pàrt sõûnds wrõng, gõ bàck tõ Lévéls: thé céntré ànd sûrrõûnd lévéls sét hõw thé àwàré décõdér mîxés thém. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Next: save</source>
+            <translation>[Néxt: sàvé ~~~~]</translation>
+        </message>
+        <message>
+            <source>Save</source>
+            <translation>[Sàvé ~~]</translation>
+        </message>
+        <message>
+            <source>Nothing is written until you press the button.</source>
+            <translation>[Nõthîng îs wrîttén ûntîl yõû préss thé bûttõn. ~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Encode now</source>
+            <translation>[Éncõdé nõw ~~~~]</translation>
+        </message>
+        <message>
+            <source>Backing</source>
+            <translation>[Bàckîng ~~~]</translation>
+        </message>
+        <message>
+            <source>Melody guide</source>
+            <translation>[Mélõdy gûîdé ~~~~~]</translation>
+        </message>
+        <message>
+            <source>Vocal 1</source>
+            <translation>[Võcàl 1 ~~~]</translation>
+        </message>
+        <message>
+            <source>Vocal 2</source>
+            <translation>[Võcàl 2 ~~~]</translation>
+        </message>
+        <message>
+            <source>File</source>
+            <translation>[Fîlé ~~]</translation>
+        </message>
+        <message>
+            <source>A karaoke stream needs a backing: the music on the left and the right.</source>
+            <translation>[À kàràõké stréàm nééds à bàckîng: thé mûsîc õn thé léft ànd thé rîght. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 has %2 channel(s); the backing is the left and the right, so it needs two.</source>
+            <translation>[%1 hàs %2 chànnél(s); thé bàckîng îs thé léft ànd thé rîght, sõ ît nééds twõ. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 has %2 channels, already a surround bed. Give the backing as a stereo file, or use it as the one multichannel file whose speakers name the parts.</source>
+            <translation>[%1 hàs %2 chànnéls, àlréàdy à sûrrõûnd béd. Gîvé thé bàckîng às à stéréõ fîlé, õr ûsé ît às thé õné mûltîchànnél fîlé whõsé spéàkérs nàmé thé pàrts. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 has %2 channels; each melody and vocal is one channel.</source>
+            <translation>[%1 hàs %2 chànnéls; éàch mélõdy ànd võcàl îs õné chànnél. ~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 is Vocal 2, and a stream has no mode that carries Vocal 2 without Vocal 1. Use it as Vocal 1.</source>
+            <translation>[%1 îs Võcàl 2, ànd à stréàm hàs nõ mõdé thàt càrrîés Võcàl 2 wîthõût Võcàl 1. Ûsé ît às Võcàl 1. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>A backing alone is stereo, with nothing to sing along to. Add a melody guide or a vocal.</source>
+            <translation>[À bàckîng àlõné îs stéréõ, wîth nõthîng tõ sîng àlõng tõ. Àdd à mélõdy gûîdé õr à võcàl. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 is %2 and the backing is %3: the shorter part is padded with silence.</source>
+            <translation>[%1 îs %2 ànd thé bàckîng îs %3: thé shõrtér pàrt îs pàddéd wîth sîléncé. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 is %2 kHz and the backing is %3 kHz: it is resampled to the backing's rate.</source>
+            <translation>[%1 îs %2 kHz ànd thé bàckîng îs %3 kHz: ît îs résàmpléd tõ thé bàckîng's ràté. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>All parts are %1 at %2 kHz.</source>
+            <translation>[Àll pàrts àré %1 àt %2 kHz. ~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Each part is one place in the stream.</source>
+            <translation>[Éàch pàrt îs õné plàcé în thé stréàm. ~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Choose a file.</source>
+            <translation>[Chõõsé à fîlé. ~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 has %2 channels and does not say which speakers they are, so the parts cannot be told apart. Use separate parts, or a file whose speakers are named.</source>
+            <translation>[%1 hàs %2 chànnéls ànd dõés nõt sày whîch spéàkérs théy àré, sõ thé pàrts cànnõt bé tõld àpàrt. Ûsé sépàràté pàrts, õr à fîlé whõsé spéàkérs àré nàméd. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The speakers (%1) are not one of Annex C's five layouts: L C R, L R S, L C R S, L R Ls Rs or L C R Ls Rs.</source>
+            <translation>[Thé spéàkérs (%1) àré nõt õné õf Ànnéx C's fîvé làyõûts: L C R, L R S, L C R S, L R Ls Rs õr L C R Ls Rs. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 has an LFE channel. Karaoke streams made here carry none: use a file without it.</source>
+            <translation>[%1 hàs àn LFÉ chànnél. Kàràõké stréàms màdé héré càrry nõné: ûsé à fîlé wîthõût ît. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Chosen from what you supplied: a backing and a melody guide.</source>
+            <translation>[Chõsén frõm whàt yõû sûpplîéd: à bàckîng ànd à mélõdy gûîdé. ~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Chosen from what you supplied: a backing and one vocal.</source>
+            <translation>[Chõsén frõm whàt yõû sûpplîéd: à bàckîng ànd õné võcàl. ~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Chosen from what you supplied: a melody guide and one vocal.</source>
+            <translation>[Chõsén frõm whàt yõû sûpplîéd: à mélõdy gûîdé ànd õné võcàl. ~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Chosen from what you supplied: a backing and two vocals.</source>
+            <translation>[Chõsén frõm whàt yõû sûpplîéd: à bàckîng ànd twõ võcàls. ~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Chosen from what you supplied: a melody guide and two vocals.</source>
+            <translation>[Chõsén frõm whàt yõû sûpplîéd: à mélõdy gûîdé ànd twõ võcàls. ~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>silent</source>
+            <translation>[sîlént ~~]</translation>
+        </message>
+        <message>
+            <source>As a plain surround player plays it: the vocals come from the rear speakers.</source>
+            <translation>[Às à plàîn sûrrõûnd plàyér plàys ît: thé võcàls cõmé frõm thé réàr spéàkérs. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>As a karaoke-aware decoder plays it: the vocals at the surround level you chose (Table C.2.2).</source>
+            <translation>[Às à kàràõké-àwàré décõdér plàys ît: thé võcàls àt thé sûrrõûnd lévél yõû chõsé (Tàblé C.2.2). ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>This stream has no vocals to choose between.</source>
+            <translation>[Thîs stréàm hàs nõ võcàls tõ chõõsé bétwéén. ~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>No vocals: the backing and the melody guide, for singing along.</source>
+            <translation>[Nõ võcàls: thé bàckîng ànd thé mélõdy gûîdé, fõr sîngîng àlõng. ~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Vocal 1 alone: a single vocal sits in the centre with the melody (Table C.2.3).</source>
+            <translation>[Võcàl 1 àlõné: à sînglé võcàl sîts în thé céntré wîth thé mélõdy (Tàblé C.2.3). ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Vocal 2 alone: a single vocal sits in the centre with the melody (Table C.2.3).</source>
+            <translation>[Võcàl 2 àlõné: à sînglé võcàl sîts în thé céntré wîth thé mélõdy (Tàblé C.2.3). ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>This stream has no Vocal 2, so nothing is played.</source>
+            <translation>[Thîs stréàm hàs nõ Võcàl 2, sõ nõthîng îs plàyéd. ~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Both vocals: Vocal 1 on the left and Vocal 2 on the right.</source>
+            <translation>[Bõth võcàls: Võcàl 1 õn thé léft ànd Võcàl 2 õn thé rîght. ~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Which recordings make the song?</source>
+            <translation>[Whîch récõrdîngs màké thé sõng? ~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Give each part its own file. The stream is built from what you supply: a melody guide and one or two vocals go in the places a centre and surrounds would be, and the backing stays left and right.</source>
+            <translation>[Gîvé éàch pàrt îts õwn fîlé. Thé stréàm îs bûîlt frõm whàt yõû sûpply: à mélõdy gûîdé ànd õné õr twõ võcàls gõ în thé plàcés à céntré ànd sûrrõûnds wõûld bé, ànd thé bàckîng stàys léft ànd rîght. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Where the parts come from</source>
+            <translation>[Whéré thé pàrts cõmé frõm ~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Separate files</source>
+            <translation>[Sépàràté fîlés ~~~~~~]</translation>
+        </message>
+        <message>
+            <source>One multichannel file</source>
+            <translation>[Õné mûltîchànnél fîlé ~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>stereo · L R</source>
+            <translation>[stéréõ · L R ~~~~~]</translation>
+        </message>
+        <message>
+            <source>mono · M</source>
+            <translation>[mõnõ · M ~~~]</translation>
+        </message>
+        <message>
+            <source>mono · V1</source>
+            <translation>[mõnõ · V1 ~~~~]</translation>
+        </message>
+        <message>
+            <source>mono · V2</source>
+            <translation>[mõnõ · V2 ~~~~]</translation>
+        </message>
+        <message>
+            <source>(optional) %1</source>
+            <translation>[(õptîõnàl) %1 ~~~~~]</translation>
+        </message>
+        <message>
+            <source>not chosen</source>
+            <translation>[nõt chõsén ~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 kHz · %2 · %3 channel(s)</source>
+            <translation>[%1 kHz · %2 · %3 chànnél(s) ~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Change</source>
+            <translation>[Chàngé ~~]</translation>
+        </message>
+        <message>
+            <source>Choose…</source>
+            <translation>[Chõõsé… ~~~]</translation>
+        </message>
+        <message>
+            <source>Remove</source>
+            <translation>[Rémõvé ~~]</translation>
+        </message>
+        <message>
+            <source>A WAV whose speakers are already named L C R Ls Rs (or L R S, L C R S, L R Ls Rs).</source>
+            <translation>[À WÀV whõsé spéàkérs àré àlréàdy nàméd L C R Ls Rs (õr L R S, L C R S, L R Ls Rs). ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>CODING MODE</source>
+            <translation>[CÕDÎNG MÕDÉ ~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 · %2</source>
+            <translation>[%1 · %2 ~~~]</translation>
+        </message>
+        <message>
+            <source>not yet</source>
+            <translation>[nõt yét ~~~]</translation>
+        </message>
+        <message>
+            <source>CHECKS</source>
+            <translation>[CHÉCKS ~~]</translation>
+        </message>
+        <message>
+            <source>No LFE: karaoke streams made here carry none.</source>
+            <translation>[Nõ LFÉ: kàràõké stréàms màdé héré càrry nõné. ~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>How loud do the melody and the vocals sit?</source>
+            <translation>[Hõw lõûd dõ thé mélõdy ànd thé võcàls sît? ~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>These are the two levels Annex C reads from the stream. A karaoke-aware decoder mixes the melody guide and the vocals with them; a karaoke-capable one lets the singer choose the vocals but still folds with them.</source>
+            <translation>[Thésé àré thé twõ lévéls Ànnéx C réàds frõm thé stréàm. À kàràõké-àwàré décõdér mîxés thé mélõdy gûîdé ànd thé võcàls wîth thém; à kàràõké-càpàblé õné léts thé sîngér chõõsé thé võcàls bût stîll fõlds wîth thém. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Centre level (melody)</source>
+            <translation>[Céntré lévél (mélõdy) ~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Centre level</source>
+            <translation>[Céntré lévél ~~~~~]</translation>
+        </message>
+        <message>
+            <source>cmixlev: how loud the melody guide M is in a stereo fold. The aware decoder applies it to M at 2/0 (Table C.2.2).</source>
+            <translation>[cmîxlév: hõw lõûd thé mélõdy gûîdé M îs în à stéréõ fõld. Thé àwàré décõdér àpplîés ît tõ M àt 2/0 (Tàblé C.2.2). ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>This stream has no melody guide, so there is no centre level.</source>
+            <translation>[Thîs stréàm hàs nõ mélõdy gûîdé, sõ théré îs nõ céntré lévél. ~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Surround level (vocals)</source>
+            <translation>[Sûrrõûnd lévél (võcàls) ~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Surround level</source>
+            <translation>[Sûrrõûnd lévél ~~~~~~]</translation>
+        </message>
+        <message>
+            <source>surmixlev: how loud the vocals V1 and V2 are in the aware decoder's reproduction and in a stereo fold (Table C.2.2).</source>
+            <translation>[sûrmîxlév: hõw lõûd thé võcàls V1 ànd V2 àré în thé àwàré décõdér's réprõdûctîõn ànd în à stéréõ fõld (Tàblé C.2.2). ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>This stream has no vocals, so there is no surround level.</source>
+            <translation>[Thîs stréàm hàs nõ võcàls, sõ théré îs nõ sûrrõûnd lévél. ~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Hear it the way a singer will</source>
+            <translation>[Héàr ît thé wày à sîngér wîll ~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>This plays the stream you just built, decoded the way a karaoke player decodes it: not your source files. Try each choice a singer has.</source>
+            <translation>[Thîs plàys thé stréàm yõû jûst bûîlt, décõdéd thé wày à kàràõké plàyér décõdés ît: nõt yõûr sõûrcé fîlés. Try éàch chõîcé à sîngér hàs. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Building the stream…</source>
+            <translation>[Bûîldîng thé stréàm… ~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Could not build the stream: %1</source>
+            <translation>[Cõûld nõt bûîld thé stréàm: %1 ~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The stream is built when you reach this step.</source>
+            <translation>[Thé stréàm îs bûîlt whén yõû réàch thîs stép. ~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Player</source>
+            <translation>[Plàyér ~~]</translation>
+        </message>
+        <message>
+            <source>As coded</source>
+            <translation>[Às cõdéd ~~~]</translation>
+        </message>
+        <message>
+            <source>Aware</source>
+            <translation>[Àwàré ~~]</translation>
+        </message>
+        <message>
+            <source>Capable</source>
+            <translation>[Càpàblé ~~~]</translation>
+        </message>
+        <message>
+            <source>Vocals</source>
+            <translation>[Võcàls ~~]</translation>
+        </message>
+        <message>
+            <source>None</source>
+            <translation>[Nõné ~~]</translation>
+        </message>
+        <message>
+            <source>V1</source>
+            <translation>[V1 ~]</translation>
+        </message>
+        <message>
+            <source>V2</source>
+            <translation>[V2 ~]</translation>
+        </message>
+        <message>
+            <source>Both</source>
+            <translation>[Bõth ~~]</translation>
+        </message>
+        <message>
+            <source>Pause</source>
+            <translation>[Pàûsé ~~]</translation>
+        </message>
+        <message>
+            <source>Play</source>
+            <translation>[Plày ~~]</translation>
+        </message>
+        <message>
+            <source>%1 / %2</source>
+            <translation>[%1 / %2 ~~~]</translation>
+        </message>
+        <message>
+            <source>WHAT PLAYS</source>
+            <translation>[WHÀT PLÀYS ~~~~]</translation>
+        </message>
+        <message>
+            <source>Save the stream</source>
+            <translation>[Sàvé thé stréàm ~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 · karaoke %2 · %3 kbps</source>
+            <translation>[%1 · kàràõké %2 · %3 kbps ~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>AC-3</source>
+            <translation>[ÀC-3 ~~]</translation>
+        </message>
+        <message>
+            <source>File type</source>
+            <translation>[Fîlé typé ~~~~]</translation>
+        </message>
+        <message>
+            <source>Bit rate</source>
+            <translation>[Bît ràté ~~~]</translation>
+        </message>
+        <message>
+            <source>kbps</source>
+            <translation>[kbps ~~]</translation>
+        </message>
+        <message>
+            <source>THE SAME FROM THE COMMAND LINE</source>
+            <translation>[THÉ SÀMÉ FRÕM THÉ CÕMMÀND LÎNÉ ~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Back</source>
+            <translation>[Bàck ~~]</translation>
+        </message>
+        <message>
+            <source>Choose %1</source>
+            <translation>[Chõõsé %1 ~~~~]</translation>
+        </message>
+        <message>
+            <source>WAV audio (*.wav)</source>
+            <translation>[WÀV àûdîõ (*.wàv) ~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>All files (*)</source>
+            <translation>[Àll fîlés (*) ~~~~~]</translation>
+        </message>
+    </context>
+    <context>
         <name>LoudnessGroup</name>
         <message>
             <source>DRC profile</source>
@@ -1304,8 +1727,108 @@
             <translation>[ÀC-4 ~~]</translation>
         </message>
         <message>
+            <source>Open a project</source>
+            <translation>[Õpén à prõjéct ~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Forge projects (*.%1)</source>
+            <translation>[Fõrgé prõjécts (*.%1) ~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Save the project</source>
+            <translation>[Sàvé thé prõjéct ~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 could not be opened.</source>
+            <translation>[%1 cõûld nõt bé õpénéd. ~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 is not a Forge project: it is not a JSON document.</source>
+            <translation>[%1 îs nõt à Fõrgé prõjéct: ît îs nõt à JSÕN dõcûmént. ~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 is not a Forge project: it does not say it is one.</source>
+            <translation>[%1 îs nõt à Fõrgé prõjéct: ît dõés nõt sày ît îs õné. ~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 does not say which version of the project format it is.</source>
+            <translation>[%1 dõés nõt sày whîch vérsîõn õf thé prõjéct fõrmàt ît îs. ~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 was saved by a newer Forge (project version %2). This one reads up to version %3.</source>
+            <translation>[%1 wàs sàvéd by à néwér Fõrgé (prõjéct vérsîõn %2). Thîs õné réàds ûp tõ vérsîõn %3. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 could not be written.</source>
+            <translation>[%1 cõûld nõt bé wrîttén. ~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Source %1 has no path and was left out.</source>
+            <translation>[Sõûrcé %1 hàs nõ pàth ànd wàs léft õût. ~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 was not found, so it was not loaded.</source>
+            <translation>[%1 wàs nõt fõûnd, sõ ît wàs nõt lõàdéd. ~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 could not be loaded: %2</source>
+            <translation>[%1 cõûld nõt bé lõàdéd: %2 ~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 "%2" is not one this Forge knows. It was left as it was.</source>
+            <translation>[%1 "%2" îs nõt õné thîs Fõrgé knõws. Ît wàs léft às ît wàs. ~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 %2 is out of range. It was left as it was.</source>
+            <translation>[%1 %2 îs õût õf ràngé. Ît wàs léft às ît wàs. ~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 kbps is not a rate this codec offers. It was left as it was.</source>
+            <translation>[%1 kbps îs nõt à ràté thîs cõdéc õfférs. Ît wàs léft às ît wàs. ~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 could not be set.</source>
+            <translation>[%1 cõûld nõt bé sét. ~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The channel layout "%1" is not one this Forge knows. It was left as it was.</source>
+            <translation>[Thé chànnél làyõût "%1" îs nõt õné thîs Fõrgé knõws. Ît wàs léft às ît wàs. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>An encode is running. Open the project when it has finished.</source>
+            <translation>[Àn éncõdé îs rûnnîng. Õpén thé prõjéct whén ît hàs fînîshéd. ~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The project was not opened</source>
+            <translation>[Thé prõjéct wàs nõt õpénéd ~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The project was opened with notes</source>
+            <translation>[Thé prõjéct wàs õpénéd wîth nõtés ~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The project was not saved</source>
+            <translation>[Thé prõjéct wàs nõt sàvéd ~~~~~~~~~~]</translation>
+        </message>
+        <message>
             <source>Controls</source>
             <translation>[Cõntrõls ~~~]</translation>
+        </message>
+        <message>
+            <source>Karaoke</source>
+            <translation>[Kàràõké ~~~]</translation>
+        </message>
+        <message>
+            <source>Project…</source>
+            <translation>[Prõjéct… ~~~]</translation>
+        </message>
+        <message>
+            <source>Open project…</source>
+            <translation>[Õpén prõjéct… ~~~~~]</translation>
+        </message>
+        <message>
+            <source>Save project…</source>
+            <translation>[Sàvé prõjéct… ~~~~~]</translation>
         </message>
         <message>
             <source>Where the sound comes from</source>
