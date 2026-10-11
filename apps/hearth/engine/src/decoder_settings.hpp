@@ -87,12 +87,6 @@ struct Ac4Settings {
 inline constexpr double kAc4MinOutputLevelDbfs = -31.0;
 inline constexpr double kAc4MaxOutputLevelDbfs = 0.0;
 
-// What the Karaoke page's level controls span, in dB against Table C.2.3. A level
-// at the bottom is off (a singer who pulls the melody all the way down wants it
-// gone, not 24 dB quieter), and one above the top is held to it.
-inline constexpr double kKaraokeMinLevelDb = -24.0;
-inline constexpr double kKaraokeMaxLevelDb = 12.0;
-
 // Which of dual mono's (acmod 1+1) two unrelated programmes is heard.
 enum class DualMonoChoice : std::uint8_t {
     // Channel 1 on the left and channel 2 on the right.
@@ -146,8 +140,9 @@ struct DecoderSettings {
     // kCapable only: the level of each part against the table, in dB (Annex C.2.3's
     // "additional flexibility"; OutputConfig::karaoke_*_gain, which these become
     // in linear terms). 0 dB is Table C.2.3 as it stands. Held to
-    // kKaraokeMinLevelDb..kKaraokeMaxLevelDb, with the bottom of the range off,
-    // and a value that is not a number is 0 dB. A part raised far enough lowers
+    // ac3::kKaraokeMinLevelDb..kKaraokeMaxLevelDb (iclforge/ac3/decoder/output.hpp),
+    // with the bottom of the range off, and a value that is not a number is 0 dB.
+    // A part raised far enough lowers
     // the others: the output stage holds each output's coefficients to a sum of 1.
     double karaoke_melody_db = 0.0;
     double karaoke_vocal1_db = 0.0;

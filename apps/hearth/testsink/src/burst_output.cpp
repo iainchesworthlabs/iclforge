@@ -259,7 +259,8 @@ bool BurstOutput::start(const ac::StreamStart& stream) {
     return true;
 }
 
-void BurstOutput::set_karaoke(ac::Karaoke reproduction, ac::KaraokeVocals vocals) {
+void BurstOutput::set_karaoke(ac::Karaoke reproduction, ac::KaraokeVocals vocals,
+                              const std::array<double, 3>& levels_db) {
     config_.output.karaoke = reproduction == ac::Karaoke::kCapable ? ac3::KaraokeReproduction::kCapable
                              : reproduction == ac::Karaoke::kAware ? ac3::KaraokeReproduction::kAware
                                                                    : ac3::KaraokeReproduction::kOff;
@@ -267,6 +268,9 @@ void BurstOutput::set_karaoke(ac::Karaoke reproduction, ac::KaraokeVocals vocals
                                     : vocals == ac::KaraokeVocals::kV1 ? ac3::KaraokeVocals::kV1
                                     : vocals == ac::KaraokeVocals::kV2 ? ac3::KaraokeVocals::kV2
                                                                        : ac3::KaraokeVocals::kBoth;
+    config_.output.karaoke_melody_gain = ac3::karaoke_gain_from_db(levels_db[0]);
+    config_.output.karaoke_vocal1_gain = ac3::karaoke_gain_from_db(levels_db[1]);
+    config_.output.karaoke_vocal2_gain = ac3::karaoke_gain_from_db(levels_db[2]);
     // The decoders were made with the old ones.
     reset_decoding();
 }

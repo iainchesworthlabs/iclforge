@@ -451,6 +451,7 @@ ignored, per [E14](#encryption); a known key with an invalid value refuses the w
 | `concealment` | `"none"`, `"repeat_fade"`, `"mute"` | `DecoderConfig::concealment` |
 | `karaoke` | `"off"`, `"aware"`, `"capable"` | `OutputConfig::karaoke` (`KaraokeReproduction::kOff`, `kAware`, `kCapable`): Annex C's reproduction of an AC-3 stream flagged bsmod 7. A reproduced frame is L, C, R and the LFE, not the coded layout, so a sink lays its speakers out from `ac3::output_mode()` and not from the coded `acmod` |
 | `karaoke_vocals` | `"none"`, `"v1"`, `"v2"`, `"both"` | `OutputConfig::karaoke_vocals`: which vocals the `"capable"` reproduction plays; read and ignored by the other two |
+| `karaoke_melody_db`, `karaoke_vocal1_db`, `karaoke_vocal2_db` | -24.0 to 12.0 (dB) | `OutputConfig::karaoke_melody_gain`, `karaoke_vocal1_gain` and `karaoke_vocal2_gain`, through `ac3::karaoke_gain_from_db`: the level of the melody and of each vocal against Annex C's Table C.2.3 (Annex C.2.3's "additional flexibility"). Read by the `"capable"` reproduction alone. -24.0 is off, and 0 or the key left out is the table. A server sends a level only when it is not 0 dB and the sink lists the key; a sink that does not list it is sent PCM decoded by the server |
 
 ### Identify
 

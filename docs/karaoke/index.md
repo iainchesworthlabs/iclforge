@@ -84,8 +84,10 @@ choice does not apply:
 - The output is a **bitstream** to a receiver. The receiver decodes it, so the choice is not
   applied; unless it is karaoke-capable, V1 and V2 play from its surround speakers. The page has a
   button to choose another output.
-- The output is a **network group**: a sink that is sent PCM plays the reproduction, and one that
-  is sent coded AC-3 decodes and plays it as coded.
+- The output is a **network group**: a sink that lists the karaoke settings is sent the stream as
+  it is and told your choice, and decodes it itself; one that does not is sent PCM that Hearth has
+  decoded with the choice applied. Every member plays one reproduction, at the same levels (see
+  [the Hearth page](../hearth/index.md#karaoke)).
 - The stereo fold is **Lt/Rt**, for which Annex C defines no reproduction. The page has a button to
   use Lo/Ro, which does.
 

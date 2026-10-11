@@ -71,6 +71,14 @@ things. Where such a sink takes no PCM either, the stream plays as coded on it a
 page says so. The Karaoke page's choice reaches a sink as settings, which replace that sink's
 settings whole: what the sink's own page set is not kept.
 
+The levels of the melody and the vocals (Capable only) travel the same way, as `karaoke_melody_db`,
+`karaoke_vocal1_db` and `karaoke_vocal2_db`, and only the ones that change what is heard: a level
+of 0 dB is left out, and so is the level of a vocal the Vocals choice leaves out. A sink that has
+the reproduction but does not list a level's key (a board on firmware from before them) is sent PCM
+as soon as that level is moved, so no member plays the table while another plays the level. A level
+changed while an item plays reaches the sinks that are decoding for themselves; a sink that was
+started on the item without its key keeps the table until the item is played again.
+
 #### Lyrics
 
 Beside a stream, `name.lrc` (the extension in any case) is its lyrics. The Karaoke page shows the

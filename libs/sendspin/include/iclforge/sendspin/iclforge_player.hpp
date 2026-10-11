@@ -67,7 +67,7 @@ struct Management {
 };
 
 // The decoder keys of a settings command, as a sink lists them in decoder_settings.
-inline constexpr std::array<std::string_view, 13> kDecoderSettingNames{
+inline constexpr std::array<std::string_view, 16> kDecoderSettingNames{
     "mode",
     "drc_cut",
     "drc_boost",
@@ -81,7 +81,17 @@ inline constexpr std::array<std::string_view, 13> kDecoderSettingNames{
     "concealment",
     "karaoke",
     "karaoke_vocals",
+    "karaoke_melody_db",
+    "karaoke_vocal1_db",
+    "karaoke_vocal2_db",
 };
+
+// The span of karaoke_melody_db, karaoke_vocal1_db and karaoke_vocal2_db, in dB against Annex C's
+// Table C.2.3: the bottom is off. These are ac3::kKaraokeMinLevelDb and kKaraokeMaxLevelDb
+// (libs/ac3's output.hpp), which this library does not include; the host's sink form holds the
+// two equal with a static_assert.
+inline constexpr double kKaraokeLevelMinDb = -24.0;
+inline constexpr double kKaraokeLevelMaxDb = 12.0;
 
 struct Support {
     std::vector<DataType> data_types;
@@ -234,6 +244,11 @@ struct DecoderSettings {
     std::optional<Concealment> concealment;
     std::optional<Karaoke> karaoke;
     std::optional<KaraokeVocals> karaoke_vocals;
+    // The capable reproduction's level of the melody and of each vocal, in dB against the table
+    // (0 or absent is the table; kKaraokeLevelMinDb is off). Read by "capable" alone.
+    std::optional<double> karaoke_melody_db;
+    std::optional<double> karaoke_vocal1_db;
+    std::optional<double> karaoke_vocal2_db;
 };
 
 // A settings command's object, which replaces the sink's settings whole.

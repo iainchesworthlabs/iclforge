@@ -30,19 +30,6 @@ namespace {
 // impaired, which audio description is.
 constexpr int kVisuallyImpaired = 0b010;
 
-// A karaoke part's level in dB as the linear gain OutputConfig takes: held to
-// the range the page spans, off at its bottom, and the table's (1.0) for a value
-// that is not a number.
-[[nodiscard]] double karaoke_gain(double db) {
-    if (std::isnan(db)) {
-        return 1.0;
-    }
-    if (db <= kKaraokeMinLevelDb) {
-        return 0.0;
-    }
-    return std::pow(10.0, std::min(db, kKaraokeMaxLevelDb) / 20.0);
-}
-
 // The levels that are not the table's, as words: "melody -6 dB, vocal 1 off".
 [[nodiscard]] std::string karaoke_levels_words(const DecoderSettings& settings) {
     struct Level {
@@ -54,13 +41,13 @@ constexpr int kVisuallyImpaired = 0b010;
                             {"vocal 2", settings.karaoke_vocal2_db}};
     std::vector<std::string> parts;
     for (const Level& level : levels) {
-        if (std::isnan(level.db) || level.db == 0.0) {
+        const double held = ac3::karaoke_level_db(level.db);
+        if (held == 0.0) {
             continue;
         }
-        parts.push_back(level.db <= kKaraokeMinLevelDb
+        parts.push_back(held <= ac3::kKaraokeMinLevelDb
                             ? fmt::format("{} off", level.name)
-                            : fmt::format("{} {:+.0f} dB", level.name,
-                                          std::min(level.db, kKaraokeMaxLevelDb)));
+                            : fmt::format("{} {:+.0f} dB", level.name, held));
     }
     return joined(parts);
 }
@@ -224,9 +211,9 @@ DecoderSetup decoder_setup(const DecoderSettings& settings, const render::Output
     config.output.mix_override = settings.mix_levels;
     config.output.karaoke = settings.karaoke;
     config.output.karaoke_vocals = settings.karaoke_vocals;
-    config.output.karaoke_melody_gain = karaoke_gain(settings.karaoke_melody_db);
-    config.output.karaoke_vocal1_gain = karaoke_gain(settings.karaoke_vocal1_db);
-    config.output.karaoke_vocal2_gain = karaoke_gain(settings.karaoke_vocal2_db);
+    config.output.karaoke_melody_gain = ac3::karaoke_gain_from_db(settings.karaoke_melody_db);
+    config.output.karaoke_vocal1_gain = ac3::karaoke_gain_from_db(settings.karaoke_vocal1_db);
+    config.output.karaoke_vocal2_gain = ac3::karaoke_gain_from_db(settings.karaoke_vocal2_db);
     config.joc_domain = settings.joc_domain;
     // Not settings.programme: which programme plays is which units a session
     // feeds (Session::open), and a decoder told to skip every other

@@ -71,6 +71,9 @@ constexpr std::size_t kInitialPendingBlocks = 32;
             choice.vocals = sp::KaraokeVocals::kBoth;
             break;
     }
+    choice.melody_db = settings.karaoke_melody_db;
+    choice.vocal1_db = settings.karaoke_vocal1_db;
+    choice.vocal2_db = settings.karaoke_vocal2_db;
     return choice;
 }
 
@@ -620,9 +623,10 @@ void Player::set_decoder_settings(const DecoderSettings& settings) {
     const DecoderSettings previous = std::exchange(settings_, settings);
     // A choice made while a karaoke item plays to a group: the members that decode it themselves
     // are told, and the ones sent PCM have it applied by the decode below. Going back to "as
-    // coded" is a choice too, and is told as "off".
+    // coded" is a choice too, and is told as "off". So is a level (W10): the choice carries the
+    // melody's and each vocal's, which a sink that lists their keys applies.
     if (mode_ == OutputMode::kNetworkGroup && session_ && session_->facts().karaoke &&
-        (previous.karaoke != settings.karaoke || previous.karaoke_vocals != settings.karaoke_vocals)) {
+        karaoke_words(previous) != karaoke_words(settings)) {
         group_->set_karaoke(karaoke_words(settings));
     }
     if (!session_ || !decoder_) {

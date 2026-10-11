@@ -83,6 +83,16 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **A sink that decodes a karaoke stream itself applies the part levels.** The Sendspin
+  extension's decoder settings take three more keys, `karaoke_melody_db`, `karaoke_vocal1_db` and
+  `karaoke_vocal2_db` (-24.0, which is off, to 12.0 dB against Table C.2.3), which a sink lists
+  when it has them. Hearth tells a sink that lists them the levels that change what is heard,
+  with the choice, before the stream starts and when they change while the item plays; a sink
+  that has the reproduction and not a level's key is sent PCM decoded in Hearth as soon as that
+  level is moved, so a group plays one set of levels. The ESP32 sink firmware applies them. The
+  dB span and its conversion to the library's linear gains are one pair of functions in
+  `iclforge/ac3/decoder/output.hpp` (`karaoke_gain_from_db()`), used by Hearth, the wire and the
+  firmware (planning/karaoke-phase2.md, W10).
 - **Hearth's Karaoke page sets the level of the melody and of each vocal.** Under the capable
   reproduction, three sliders move M, V1 and V2 from 24 dB below Table C.2.3 (off) to 12 dB above
   it, with **Reset levels**; a part that is off is listed as muted and a vocal the stream lacks or

@@ -312,16 +312,16 @@ TEST_CASE("decoder settings: the karaoke part levels become the output stage's l
     // The span of the controls: the top holds, the bottom is off, and so is anything below it.
     DecoderSettings extreme;
     extreme.karaoke_melody_db = 40.0;
-    extreme.karaoke_vocal1_db = iclforge::hearth::kKaraokeMinLevelDb;
+    extreme.karaoke_vocal1_db = iclforge::ac3::kKaraokeMinLevelDb;
     extreme.karaoke_vocal2_db = -90.0;
     const auto held = decoder_setup(extreme, layout("5.1"));
     CHECK(held.config.output.karaoke_melody_gain ==
-          Approx(std::pow(10.0, iclforge::hearth::kKaraokeMaxLevelDb / 20.0)));
+          Approx(std::pow(10.0, iclforge::ac3::kKaraokeMaxLevelDb / 20.0)));
     CHECK(held.config.output.karaoke_vocal1_gain == 0.0);
     CHECK(held.config.output.karaoke_vocal2_gain == 0.0);
     // One step above the bottom is a level, not off.
     DecoderSettings quiet;
-    quiet.karaoke_melody_db = iclforge::hearth::kKaraokeMinLevelDb + 1.0;
+    quiet.karaoke_melody_db = iclforge::ac3::kKaraokeMinLevelDb + 1.0;
     CHECK(decoder_setup(quiet, layout("5.1")).config.output.karaoke_melody_gain > 0.0);
 
     // A value that is not a number is the table's, not a mute (the library mutes a gain it is
@@ -333,7 +333,7 @@ TEST_CASE("decoder settings: the karaoke part levels become the output stage's l
     const auto not_numbers = decoder_setup(broken, layout("5.1"));
     CHECK(not_numbers.config.output.karaoke_melody_gain == 1.0);
     CHECK(not_numbers.config.output.karaoke_vocal1_gain ==
-          Approx(std::pow(10.0, iclforge::hearth::kKaraokeMaxLevelDb / 20.0)));
+          Approx(std::pow(10.0, iclforge::ac3::kKaraokeMaxLevelDb / 20.0)));
     CHECK(not_numbers.config.output.karaoke_vocal2_gain == 0.0);
 
     // The diagnostics name only the levels that are not the table's, and only for the

@@ -39,8 +39,8 @@ ScrollView {
     readonly property string reproduction: root.settings.karaoke ?? "aware"
     readonly property string vocals: root.settings.karaokeVocals ?? "both"
     // The level of each part against Table C.2.3, in dB (capable only), and the
-    // span of the controls: the bottom is off (DecoderSettings'
-    // kKaraokeMinLevelDb and kKaraokeMaxLevelDb).
+    // span of the controls: the bottom is off (ac3::kKaraokeMinLevelDb and
+    // kKaraokeMaxLevelDb, iclforge/ac3/decoder/output.hpp).
     readonly property real minLevelDb: -24
     readonly property real maxLevelDb: 12
     readonly property real melodyDb: root.settings.karaokeMelodyDb ?? 0
