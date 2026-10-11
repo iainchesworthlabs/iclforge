@@ -13,10 +13,32 @@
 
 // RFC 8259 JSON for Sendspin's messages, read and written in-tree.
 //
-// The tree's other JSON reader is private to iclforge::oba (scene_json.cpp) and
-// allocates a node per value. This one is shaped by where Sendspin's player half
-// runs: on an ESP32 inside an HTTP server task with a 6,144-byte stack and a
-// regioned heap. So the reader
+// The rest of the tree reads JSON with nlohmann/json (cmake/NlohmannJson.cmake). This
+// is the place that does not, and that is a measured choice, not a leftover. It is
+// shaped by where Sendspin's player half runs: on an ESP32 inside an HTTP server
+// task with a 6,144-byte stack and a regioned heap, with the network's bytes
+// arriving at it first. nlohmann/json 3.12 was built -Os with exceptions off, as the
+// firmware is, and run on a C6 (160 MHz, no FPU) and an S3 (240 MHz) against the
+// player's own messages, read the way the player reads them:
+//
+//   flash   this reader and writer 8.8-10.0 KB; nlohmann parse and dump 59.8-62.1 KB
+//   time    parsing and reading a message takes 2.9-4.6x as long (C6, server/time:
+//           90 us against 409; client/hello: 339 against 1,517); writing 3.7-4.3x
+//   stack   about 1.0 KB against about 2.3 KB, in a task that has 6,144
+//   heap    1-3 allocations a message against 22-74 (148 for the 1.5 KB firmware
+//           status): small blocks, in the internal heap that sits at a few hundred
+//           bytes free while a stream plays. For an ordinary message nlohmann's
+//           PEAK is about half this reader's (0.5-2.4 KB against 0.9-4.4 KB),
+//           because Document::parse's vector overload reserves a 16-byte Token for
+//           every two bytes of text; that is the one figure this reader loses
+//   input   a 4 KB message of "[[[[..." (what a board accepts: max_message_bytes
+//           is a chunk plus 64) is refused here at the depth limit in 0.2-0.5 ms
+//           having reserved 32 KB; nlohmann builds all 2,000 levels - 4,032
+//           allocations, 70.7 KB, 51-61 ms - and nothing but the message's size
+//           bounds that, with a failed allocation an abort() under -fno-exceptions
+//
+// So a swap would cost about 50 KB of flash and several times the CPU, to make the
+// worst case a message can reach unbounded rather than capped. The reader
 //
 //   - parses into caller-owned token storage (one 16-byte Token per value, key
 //     or container) and allocates nothing itself; a Document that needs more

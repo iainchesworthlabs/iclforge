@@ -2606,6 +2606,25 @@ The sections below contain the complete change list and fixes.
 
 ### Changed
 
+**JSON**
+
+- **An object scene file is read with nlohmann/json, not a hand-written tokenizer.** `iclforge::objects`
+  compiles the header-only library in privately - through `$<BUILD_INTERFACE:...>`, as it does {fmt}, so
+  no package, export or consumer names it - and checks the schema in its own code, as before:
+  an unknown member is still an error, a malformed file still comes back as a `SceneError` and
+  never throws, and an error still names its line. What a file may contain follows RFC 8259 more
+  closely now, in four ways: a key an object names twice is an error (a parsed document would keep one
+  and say nothing), a surrogate pair in a `\u` escape reads as the one character it names, and a lone
+  surrogate, a raw control character in a name, or bytes that are not UTF-8 are refused where they were
+  let through. The messages for a malformed file are the tokenizer's own. nlohmann/json is now a
+  dependency of every build of `iclforge::objects` (the vcpkg port and the Conan recipe name it),
+  at 3.12.0 or newer, and its notice is in Hearth's and Crucible's, as it was in Forge's.
+- **Two JSON implementations remain, and each now says why in its header.** Sendspin's reader and
+  writer (`libs/sendspin`) run inside the ESP32 firmware, where they were measured against nlohmann/json
+  on a C6 and an S3: 6x the flash, 3-4.6x the time, over twice the stack, and no bound on what a
+  4 KB hostile message costs (70 KB and 51-61 ms, against a refusal at the depth limit). The forge
+  command line's `probe` writer streams a document of any length, which nlohmann/json has no way to.
+
 **AC-4 decoder**
 
 - **The AC-4 decoder claims `md_compat` level 7 by default, where it claimed 3.** Part 2 Table 55 calls `md_compat` 7 "unrestricted", above every level its tables define, so a decoder that claimed 3 did not select a presentation of more than eleven tracks, and the encoder's 9.0.4 and 9.1.4 streams (thirteen and fourteen tracks) needed `md-compat=7` to decode and were refused when Hearth opened them. The decoder takes every presentation the tables define, 9.X.4's tracks and 22.2's included, and refuses by name a frame it cannot decode, so it now claims what it does. `DecoderConfig::level` (and the C API's, Python's, Rust's and JavaScript's `level`, and `md-compat=` in `forge decode`) set it lower, `3` choosing as a receiver at the floor DVB and ATSC set would. No committed stream carries `md_compat` 7, so none of them changes (`libs/ac4/ERRATA.md`, "Which presentations can be selected").

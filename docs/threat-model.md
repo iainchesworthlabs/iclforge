@@ -65,11 +65,15 @@ this project does not read — or write, such as a bare Ogg or ADTS wrapper — 
 
 ## Memory-safety posture
 
-The codec core is first-party C++23. Its one third-party library is {fmt}, which builds text the
-library writes out: version and diagnostic strings, timecodes, and the scene and census JSON. None
-of the entry points in the table above is defined in a file that includes it. C++ is not a
-memory-safe language, so the posture is a set of specific properties rather than a language
-guarantee:
+The codec core is first-party C++23. It takes in two third-party libraries. {fmt} builds text the
+library writes out: version and diagnostic strings, timecodes, and the scene and census JSON.
+nlohmann/json tokenises the one file the library reads as JSON, an object scene
+(`libs/objects/src/scene_json.cpp`, the only file that includes it): it is header-only and
+compiled in privately, the library calls only its non-throwing parse so a malformed file is a
+`SceneError` and never an exception, and which members may appear, and how often, is checked by
+first-party code. Neither is included by a file that defines an entry point in the table above (a
+scene is a file the user names, not a stream). C++ is not a memory-safe language, so the posture
+is a set of specific properties rather than a language guarantee:
 
 - **Bit reading cannot run off the end.** The AC-3, E-AC-3 and object-layer parsers share
   `iclforge::BitReader`, and the AC-4 inspector and decoder each have a reader of their own with the

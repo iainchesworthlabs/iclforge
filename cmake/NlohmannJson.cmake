@@ -2,9 +2,17 @@
 # NlohmannJson.cmake
 #
 # Defines an INTERFACE target `iclforge::json` wrapping nlohmann/json
-# (`nlohmann_json::nlohmann_json`), the JSON library the project file's reader and writer
-# (apps/shared/project/src) use in both Forge programs. It reads and writes `.forgeproj`
-# documents and nothing else: no codec, no library under libs/ links it.
+# (`nlohmann_json::nlohmann_json`), the JSON library of this tree: the project file's reader and
+# writer (apps/shared/project/src, both Forge programs) and the scene file's reader
+# (libs/objects/src/scene_json.cpp). iclforge::objects takes it PRIVATE through
+# $<BUILD_INTERFACE:...>, the way it takes iclforge::fmt_private, so it is compiled into the library
+# and no export graph, package or consumer sees it.
+#
+# Two JSON implementations remain, on purpose, and neither uses this: iclforge::sendspin's
+# (libs/sendspin/include/iclforge/sendspin/json.hpp), because it runs inside the ESP32 firmware's
+# HTTP task and a message from the network must not be able to allocate without bound or abort, and
+# the forge command line's streaming writer (apps/forge/cli/src/json.hpp), because `probe` dumps
+# a stream of any length and nlohmann/json has no streaming writer. Their headers say why.
 #
 # Resolved the way cmake/Fmt.cmake resolves {fmt}, and for the same reasons: a desktop build gets
 # it from vcpkg (vcpkg.json's base "dependencies"); a build with no vcpkg toolchain - the Homebrew
@@ -21,9 +29,10 @@
 # against the same code. nlohmann's git tags carry a "v" prefix.
 set(ICLFORGE_NLOHMANN_JSON_VERSION 3.12.0)
 
-# The oldest a local copy may be. ordered_json (3.9) and the parse call this tree makes are older
-# than this; 3.11.0 is a round floor, not a version a build was bisected to.
-set(ICLFORGE_NLOHMANN_JSON_MINIMUM_VERSION 3.11.0)
+# The oldest a local copy may be. JSON_DIAGNOSTIC_POSITIONS, which libs/objects' scene reader
+# uses to name the line of an error, arrived in 3.12.0; an older copy is not used and the pinned
+# version above is fetched instead.
+set(ICLFORGE_NLOHMANN_JSON_MINIMUM_VERSION 3.12.0)
 
 option(ICLFORGE_FETCH_NLOHMANN_JSON
        "Fetch nlohmann/json from source via FetchContent when no local copy is found" ON)

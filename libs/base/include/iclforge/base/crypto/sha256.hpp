@@ -3,9 +3,9 @@
 // SHA-256 (FIPS 180-4), self-contained: the hash under hmac_sha256.hpp, which the EMDF Atmos
 // signer (iclforge::ac3::signing) computes its tag with. A caller wants the MAC or the signer
 // above it, not the raw hash. No third-party dependency by design:
-// the codec's only third-party library is {fmt}, for formatting (see the top
-// of vcpkg.json), so this is a from-the-standard implementation rather than a
-// pull of OpenSSL/mbedTLS for one primitive.
+// the codec's third-party libraries are {fmt}, for formatting, and nlohmann/json,
+// for one file reader (see the top of vcpkg.json), so this is a from-the-standard
+// implementation rather than a pull of OpenSSL/mbedTLS for one primitive.
 
 #include <array>
 #include <cstddef>

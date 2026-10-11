@@ -25,4 +25,7 @@ iclforge_add_library(objects
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
     LINK_PRIVATE
         "$<BUILD_INTERFACE:iclforge::tracy>"
-        "$<BUILD_INTERFACE:iclforge::fmt_private>")
+        "$<BUILD_INTERFACE:iclforge::fmt_private>"
+        # scene_json.cpp's tokenizer. Header-only and used inside that one file, so the export graph
+        # and the archive's consumers see nothing of it.
+        "$<BUILD_INTERFACE:iclforge::json>")

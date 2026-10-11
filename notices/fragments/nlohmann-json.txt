@@ -2,6 +2,6 @@ nlohmann/json {{JSON_VERSION}}
 ------------------------------
 
 The nlohmann/json library, version {{JSON_VERSION}}, is compiled into {{JSON_USERS}}: it is
-what reads and writes a Forge project file.
+what reads an object scene file and, in the Forge programs, reads and writes a project file.
 
 {{FILE:JSON_MIT}}
