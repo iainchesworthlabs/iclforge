@@ -39,6 +39,10 @@ qt_add_executable(forge_gui_qmltests
     src/ac4_encode_settings.hpp
     src/ac4_presentations.cpp
     src/ac4_presentations.hpp
+    src/karaoke_authoring.cpp
+    src/karaoke_authoring.hpp
+    src/karaoke_authoring_controller.cpp
+    src/karaoke_authoring_controller.hpp
     ../../shared/media/src/ac4_sync_word.hpp
     ../../shared/media/src/fmp4_folder_writer.cpp
     ../../shared/media/src/fmp4_folder_writer.hpp

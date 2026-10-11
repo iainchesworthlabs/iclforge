@@ -68,6 +68,13 @@ struct RawResult {
     bool ac4 = false;
     QStringList presentations;
     std::size_t presentation = 0;
+    // AC-3 karaoke (Annex C): the stream is bsmod 7 with a mode above 1/0,
+    // whether the decode applied the karaoke reproduction (so `acmod` above
+    // is the layout it came out in, not the coded one), and the layout as
+    // coded for the page to say beside it.
+    bool karaoke = false;
+    bool karaoke_reproduced = false;
+    QString coded_layout_label;
 };
 
 }  // namespace splayer_detail
@@ -145,6 +152,24 @@ class StreamPlayerController : public QObject {
                    presentationChanged)
     Q_PROPERTY(int decodedPresentation READ decodedPresentation NOTIFY resultChanged)
 
+    // Annex C's karaoke (ETSI TS 102 366): how an AC-3 karaoke stream is
+    // reproduced - "asCoded" (the channels as the stream codes them, the
+    // default and what this player has always done), "aware" (L, C and R with
+    // the vocals at the stream's own level, Table C.2.2) or "capable" (the
+    // listener's choice of vocals, Table C.2.3) - and which vocals "capable"
+    // plays: "none", "v1", "v2" or "both". Setting either decodes the open
+    // file again, when it is a karaoke stream: nothing else is changed by
+    // them. The Karaoke flow's Hear step is what sets them.
+    Q_PROPERTY(QString karaokeReproduction READ karaokeReproduction WRITE setKaraokeReproduction NOTIFY
+                   karaokeChanged)
+    Q_PROPERTY(QString karaokeVocals READ karaokeVocals WRITE setKaraokeVocals NOTIFY karaokeChanged)
+    // The open file is an AC-3 karaoke stream; the decode applied a
+    // reproduction (so its channels are L, C, R and not the coded ones); and
+    // the layout the stream codes.
+    Q_PROPERTY(bool isKaraoke READ isKaraoke NOTIFY resultChanged)
+    Q_PROPERTY(bool karaokeReproduced READ karaokeReproduced NOTIFY resultChanged)
+    Q_PROPERTY(QString codedLayoutLabel READ codedLayoutLabel NOTIFY resultChanged)
+
    public:
     explicit StreamPlayerController(QObject* parent = nullptr);
     ~StreamPlayerController() override;
@@ -178,6 +203,16 @@ class StreamPlayerController : public QObject {
     void setPresentationIndex(int index);
     [[nodiscard]] int decodedPresentation() const {
         return result_ && result_->ac4 ? static_cast<int>(result_->presentation) : -1;
+    }
+
+    [[nodiscard]] QString karaokeReproduction() const { return karaoke_reproduction_; }
+    void setKaraokeReproduction(const QString& name);
+    [[nodiscard]] QString karaokeVocals() const { return karaoke_vocals_; }
+    void setKaraokeVocals(const QString& name);
+    [[nodiscard]] bool isKaraoke() const { return result_ && result_->karaoke; }
+    [[nodiscard]] bool karaokeReproduced() const { return result_ && result_->karaoke_reproduced; }
+    [[nodiscard]] QString codedLayoutLabel() const {
+        return result_ ? result_->coded_layout_label : QString();
     }
 
     // Reads and decodes `url` off the GUI thread (QtConcurrent, mirroring
@@ -219,10 +254,19 @@ class StreamPlayerController : public QObject {
     void exportingChanged();
     void exportFinished();
     void presentationChanged();
+    void karaokeChanged();
 
    private:
     void decodePath(const QString& path);
+    // Decodes the open file again when the karaoke choice changed what it
+    // decodes to: only a karaoke AC-3 stream is.
+    void redecodeForKaraoke();
     int presentation_index_ = -1;
+    QString karaoke_reproduction_ = QStringLiteral("asCoded");
+    QString karaoke_vocals_ = QStringLiteral("both");
+    // A choice made while a decode was running: decoded again, with the latest
+    // choice, when that one lands.
+    bool karaoke_redecode_pending_ = false;
 
     // `source` is always the worker's own captured shared_ptr, never read
     // from result_ directly - see stream_player_controller.cpp's own

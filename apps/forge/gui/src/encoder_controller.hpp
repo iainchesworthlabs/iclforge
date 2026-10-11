@@ -69,6 +69,9 @@ class EncoderController : public QObject {
     // anything - see routingForSources(). offsetSeconds is that source's
     // start offset (see setSourceOffset) - the Objects tab's derived
     // timeline length is max(offsetSeconds + seconds) over every row.
+    // speakers is the file's own speaker names in channel order ("L", "R",
+    // "C", ...) when its WAVE_FORMAT_EXTENSIBLE mask states them, empty when
+    // only the channel count is known.
     // resampleLabel is "44.1→48 k" when addSourceFile had to resample this
     // source to the primary's rate (empty otherwise, including for the
     // primary itself, which is never resampled) - see addSourceFile's own
