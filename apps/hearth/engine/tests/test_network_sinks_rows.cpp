@@ -2,7 +2,11 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
+#include <vector>
 
+#include "iclforge/audio/passthrough.hpp"
+#include "iclforge/render/layout.hpp"
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sendspin/messages.hpp"
 #include "network_sinks.hpp"
@@ -340,4 +344,90 @@ TEST_CASE("network sinks rows: a group is looked up by its id, and an unknown id
     REQUIRE(group != nullptr);
     CHECK(group->id() == id);
     CHECK(rig.sinks->group("no-such-group") == nullptr);
+}
+
+// What a group is sent, decided by what each connected member takes (NetworkSinks::plan_group,
+// which the engine's group sink calls as a group opens): a stereo player is planned a 2.0 render
+// of a 5.1 stream, a Hearth board that decodes it keeps the coded stream, and a C6 that decodes
+// 2.0 only is held back, its reason in the log.
+TEST_CASE("network sinks rows: a group is planned by what each member takes",
+          "[hearth][network-sinks][plan]") {
+    Rig rig;
+    const auto stereo_service = service_named("stereo-player", 1);
+    rig.sinks->on_found(stereo_service);
+    auto stereo = connected(stereo_service, "client-stereo");
+    stereo.name = "Stereo player";
+    ss::messages::PlayerSupport stereo_support;
+    stereo_support.supported_formats = {
+        {.codec = ss::messages::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16}};
+    stereo.player_support = stereo_support;
+    rig.sinks->on_client(stereo);
+
+    const auto board_service = service_named("hearth-board", 2);
+    rig.sinks->on_found(board_service);
+    auto board = connected(board_service, "client-board");
+    board.name = "Board";
+    board.psk = ss::handshake::PskCategory::kLongTerm;
+    ss::player::Support board_support;
+    board_support.data_types = {ss::player::DataType::kAc3};
+    board_support.sample_rates = {48000};
+    board.iclforge_support = board_support;
+    rig.sinks->on_client(board);
+
+    const auto c6_service = service_named("hearth-c6", 3);
+    rig.sinks->on_found(c6_service);
+    auto c6 = connected(c6_service, "client-c6");
+    c6.name = "C6";
+    c6.psk = ss::handshake::PskCategory::kLongTerm;
+    c6.device_info.product_name = "ESP32-C6";
+    ss::player::Support c6_support = board_support;
+    c6_support.max_coded_channels[static_cast<std::size_t>(ss::player::DataType::kAc3)] = 2;
+    c6.iclforge_support = c6_support;
+    ss::messages::PlayerSupport c6_pcm;
+    c6_pcm.supported_formats = stereo_support.supported_formats;
+    c6.player_support = c6_pcm;
+    rig.sinks->on_client(c6);
+
+    const std::string group = rig.sinks->create_group("Downstairs");
+    REQUIRE_FALSE(group.empty());
+    for (const char* id : {"stereo-player", "hearth-board", "hearth-c6"}) {
+        rig.sinks->add_group_member(group, id);
+    }
+    const auto master = iclforge::render::OutputLayout::parse("5.1");
+    REQUIRE(master.has_value());
+    (void)rig.sinks->take_log();
+
+    const std::vector<iclforge::render::OutputLayout> variants =
+        rig.sinks->plan_group({.group_name = group,
+                               .stream = iclforge::audio::BitstreamFormat::kAc3,
+                               .sample_rate = 48000,
+                               .coded_channels = 6,
+                               .layout = *master});
+    // One render beyond the player's: the stereo player's 2.0.
+    REQUIRE(variants.size() == 1);
+    CHECK(variants.front().slots() == 2);
+
+    const std::vector<std::string> log = rig.sinks->take_log();
+    const auto line_for = [&](std::string_view name) -> std::string {
+        for (const std::string& line : log) {
+            if (line.find("\"Downstairs\": " + std::string(name) + ": ") != std::string::npos) {
+                return line;
+            }
+        }
+        return {};
+    };
+    // It has said no layout of its own and lists stereo only: the player's 5.1 folded to 2.0.
+    CHECK(line_for("Stereo player").find("folded to 2.0") != std::string::npos);
+    CHECK(line_for("Board").find("as it is") != std::string::npos);
+    CHECK(line_for("C6").find("up to 2 channels") != std::string::npos);
+    CHECK(line_for("C6").find("switched off") != std::string::npos);
+
+    // A group this class does not know decides nothing.
+    CHECK(rig.sinks
+              ->plan_group({.group_name = "no-such-group",
+                            .stream = iclforge::audio::BitstreamFormat::kAc3,
+                            .sample_rate = 48000,
+                            .coded_channels = 6,
+                            .layout = *master})
+              .empty());
 }
