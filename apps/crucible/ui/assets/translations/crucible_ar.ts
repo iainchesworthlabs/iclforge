@@ -335,8 +335,8 @@
     </message>
     <message>
         <location filename="../qml/LyricStrip.qml" line="103"/>
-        <source>Lyrics (*.lrc *.txt)</source>
-        <translation>كلمات الأغاني (*.lrc *.txt)</translation>
+        <source>Lyrics (*.lrc *.srt *.ass *.kar *.txt)</source>
+        <translation>كلمات الأغاني (*.lrc *.srt *.ass *.kar *.txt)</translation>
     </message>
     <message>
         <location filename="../qml/LyricStrip.qml" line="103"/>

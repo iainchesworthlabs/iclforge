@@ -263,6 +263,11 @@ right rail then shows the line being sung with the lines around it. The format i
 for a word-timed file, in which a word is **sung**, **being sung** (underlined and filled left to
 right) or **not yet sung**.
 
+A **SubRip** `.srt`, an **Advanced SubStation Alpha** `.ass` script and a **MIDI karaoke** `.kar`
+file are imported the same way, and told apart by what is in them and not by their name, as Hearth
+does: a `.kar` carries no word of its encoding, so its words must be UTF-8. A **CD+G** `.cdg` is a
+picture with no text and is not imported here.
+
 **Where the position comes from.** Crucible taps what an application plays and knows nothing of
 its track, so it has no way to read where a song is. The position is **start-and-nudge**:
 

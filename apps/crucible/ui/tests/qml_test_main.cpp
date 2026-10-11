@@ -9,6 +9,7 @@
 #include <QQuickStyle>
 #include <QSettings>
 #include <QString>
+#include <QVariantList>
 #include <QStringList>
 #include <QTemporaryDir>
 #include <QVariant>
@@ -268,6 +269,25 @@ public:
         }
         file.write(text.toUtf8());
         return path;
+    }
+
+    // `bytes` (a list of numbers 0 to 255) as a file of this process's own: for a lyrics file that
+    // is not text (a MIDI karaoke file). Its path, or empty when it could not be written. A list and
+    // not a string, since a script string does not carry a byte above 0x7F through Qt.btoa().
+    Q_INVOKABLE QString writeBinaryFile(const QString& name, const QVariantList& bytes) const {
+        const QString folder = QDir(QDir::tempPath()).filePath(QStringLiteral("crucible_qmltests_files"));
+        QDir().mkpath(folder);
+        const QString path = QDir(folder).filePath(name);
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            return {};
+        }
+        QByteArray data;
+        data.reserve(bytes.size());
+        for (const QVariant& value : bytes) {
+            data.append(static_cast<char>(value.toInt() & 0xFF));
+        }
+        return file.write(data) == data.size() ? path : QString{};
     }
 
     // The machine back. Every scripted suite calls this in cleanup(),

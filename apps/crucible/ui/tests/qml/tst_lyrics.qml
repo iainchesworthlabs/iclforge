@@ -168,6 +168,77 @@ TestCase {
         compare(CrucibleLyrics.status(8), "timed");
     }
 
+    // --- the other formats, told apart by what is in the file ------------------------
+
+    function test_aSubRipFileIsImportedAsTimedLines() {
+        const srt = ["1", "00:00:01,000 --> 00:00:03,000", "Should auld acquaintance", "",
+                     "2", "00:00:05,000 --> 00:00:07,500", "And never brought to mind?", ""].join("\n");
+        verify(CrucibleLyrics.importText(7, "song.srt", srt, 12000));
+        compare(CrucibleLyrics.status(7), "timed");
+        const lines = CrucibleLyrics.lines(7);
+        compare(lines.length, 2);
+        compare(lines[0].text, "Should auld acquaintance");
+        compare(lines[0].startMs, 1000);
+        compare(lines[0].wordTimed, false);
+        compare(lines[1].startMs, 5000);
+    }
+
+    function test_anAssScriptIsImportedWithItsSyllableTimes() {
+        // {\k50} is half a second (the tag counts hundredths) for the syllable after it.
+        const ass = ["[Script Info]", "ScriptType: v4.00+", "", "[Events]",
+                     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+                     "Dialogue: 0,0:00:01.00,0:00:04.00,Default,,0,0,0,,{\\k50}Should {\\k50}auld {\\k100}acquaintance",
+                     ""].join("\n");
+        verify(CrucibleLyrics.importText(7, "song.ass", ass, 12000));
+        compare(CrucibleLyrics.status(7), "timed");
+        const lines = CrucibleLyrics.lines(7);
+        compare(lines.length, 1);
+        compare(lines[0].wordTimed, true);
+        compare(lines[0].words.length, 3);
+        compare(lines[0].words[0].startMs, 1000);
+        compare(lines[0].words[1].startMs, 1500);
+        compare(lines[0].words[2].startMs, 2000);
+    }
+
+    // A Standard MIDI File of one track at 480 ticks to the quarter note and 120 beats a minute (a
+    // second is 960 ticks), with three Lyric events: "Hel" at 0, "lo " at half a second and, as a
+    // new line, "/world" at one second.
+    function midiKaraokeBytes() {
+        const bytes = [];
+        const push = function(list) { for (let i = 0; i < list.length; ++i) { bytes.push(list[i]); } };
+        const text = function(s) { return Array.from(s).map(function(c) { return c.charCodeAt(0); }); };
+        const track = [0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20];
+        const lyric = function(delta, s) {
+            for (const d of delta) { track.push(d); }
+            track.push(0xFF, 0x05, s.length);
+            for (const c of text(s)) { track.push(c); }
+        };
+        lyric([0x00], "Hel");
+        lyric([0x83, 0x60], "lo ");
+        lyric([0x83, 0x60], "/world");
+        track.push(0x00, 0xFF, 0x2F, 0x00);
+        push([0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, 0x01, 0xE0]);
+        push([0x4D, 0x54, 0x72, 0x6B, 0, 0, (track.length >> 8) & 0xFF, track.length & 0xFF]);
+        push(track);
+        return bytes;
+    }
+
+    function test_aMidiKaraokeFileIsImportedFromItsBytes() {
+        const path = TestServices.writeBinaryFile("song.kar", midiKaraokeBytes());
+        verify(path.length > 0, "the MIDI file could not be written");
+        const taken = CrucibleLyrics.importFile(7, path, 12000);
+        verify(taken, CrucibleLyrics.errorText(7));
+        compare(CrucibleLyrics.status(7), "timed");
+        compare(CrucibleLyrics.fileName(7), "song.kar");
+        const lines = CrucibleLyrics.lines(7);
+        compare(lines.length, 2);
+        compare(lines[0].text.trim(), "Hello");
+        compare(lines[0].startMs, 0);
+        compare(lines[0].words[1].startMs, 500);
+        compare(lines[1].text.trim(), "world");
+        compare(lines[1].startMs, 1000);
+    }
+
     // --- the strip -----------------------------------------------------------------
 
     function newStrip(app) {

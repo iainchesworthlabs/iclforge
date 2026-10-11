@@ -82,14 +82,16 @@ struct Entry {
     int nudge_ms = 0;
 };
 
-// An application's lyrics from the bytes of a file, as the reader takes them (UTF-8, or UTF-16 with
-// a byte-order mark): an entry with the lines, or one in the "error" state with the reader's reason.
+// An application's lyrics from the bytes of a file, as the reader takes them: an LRC file (UTF-8, or
+// UTF-16 with a byte-order mark), a SubRip file, an Advanced SubStation Alpha script or a MIDI karaoke
+// file, told apart by what is in them and not by their name (parse_timed_text). An entry with the
+// lines, or one in the "error" state with the reader's reason.
 [[nodiscard]] Entry make_entry(const QString& name, std::string_view bytes, qlonglong duration_ms) {
     Entry entry;
     entry.file_name = name;
     const std::optional<std::int64_t> duration =
         duration_ms > 0 ? std::optional<std::int64_t>{duration_ms} : std::nullopt;
-    auto parsed = iclforge::lyrics::parse_lyrics(bytes, duration);
+    auto parsed = iclforge::lyrics::parse_timed_text(bytes, duration);
     if (!parsed) {
         entry.status = QStringLiteral("error");
         entry.error_text = from_utf8(parsed.error());

@@ -100,7 +100,7 @@ ColumnLayout {
         id: lyricsDialog
         objectName: "lyricsDialog"
         title: qsTr("Choose the lyrics")
-        nameFilters: [qsTr("Lyrics (*.lrc *.txt)"), qsTr("All files (*)")]
+        nameFilters: [qsTr("Lyrics (*.lrc *.srt *.ass *.kar *.txt)"), qsTr("All files (*)")]
         onAccepted: CrucibleLyrics.importFile(root.appId, selectedFile.toString())
     }
 

@@ -159,6 +159,10 @@ The sections below contain the complete change list and fixes.
   its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
   firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
   reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **Crucible imports SubRip, ASS and MIDI karaoke lyrics too.** The strip's import takes a `.srt`,
+  an `.ass` or a `.kar` as well as an `.lrc`, told apart by what is in the file (the same
+  `parse_timed_text` Hearth reads with); the file dialog lists them, and the catalogues are filled
+  (planning/karaoke-phase2.md, W13b).
 - **Crucible shows the lyrics of an application.** The Room page has a sixth block, **06 LYRICS**:
   import an `.lrc` (UTF-8 or UTF-16) against the selected application, press **Start** as the song
   begins and the strip shows the line being sung with the lines around it, a word at a time where the
