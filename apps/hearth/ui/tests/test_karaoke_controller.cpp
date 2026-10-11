@@ -10,8 +10,11 @@
 #include <QSettings>
 #include <QString>
 #include <QTemporaryDir>
+#include <QUrl>
 #include <QVariantList>
 #include <QVariantMap>
+
+#include <string>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -232,4 +235,254 @@ TEST_CASE("KaraokeController: the same item and length again is not read again",
     controller.load(room.path("song.ac3"), 20000);
     CHECK(changes == 2);
     CHECK(line_at(controller, 2).value("endMs").toLongLong() == 20000);
+}
+
+// ---- timing the lyrics (planning/karaoke-phase2.md, W6) -------------------------------------
+//
+// The editing functions are tested where they live (libs/lyrics/tests/test_timing.cpp); what is
+// held here is the session around them: what a press is taken for, what a line and a word look
+// like to QML, the reaction time and that it is kept, and what a save does to the files.
+
+namespace {
+
+const QByteArray kPlain = "Should auld acquaintance\nBe forgot\nAnd never brought to mind\n";
+
+QVariantMap timing_line(const KaraokeController& controller, int index) {
+    return controller.timingLines().at(index).toMap();
+}
+
+QByteArray read_all(const QString& path) {
+    QFile file(path);
+    REQUIRE(file.open(QIODevice::ReadOnly));
+    return file.readAll();
+}
+
+}  // namespace
+
+TEST_CASE("KaraokeController timing: a plain file opens with no line stamped and the first next",
+          "[hearth][hearth-controller][karaoke][timing]") {
+    Room room;
+    room.write("song.lrc", kPlain);
+    KaraokeController controller;
+    controller.load(room.path("song.ac3"), 20000);
+    REQUIRE(controller.status().toStdString() == "plain");
+    CHECK_FALSE(controller.timing());
+
+    REQUIRE(controller.beginTiming());
+    CHECK(controller.timing());
+    CHECK(controller.nextLine() == 0);
+    CHECK(controller.stampedLines() == 0);
+    REQUIRE(controller.timingLines().size() == 3);
+    CHECK_FALSE(timing_line(controller, 0).value("stamped").toBool());
+    CHECK(timing_line(controller, 1).value("text").toString().toStdString() == "Be forgot");
+    // The lyrics the view shows are untouched by a session.
+    CHECK(controller.status().toStdString() == "plain");
+}
+
+TEST_CASE("KaraokeController timing: a press stamps the next line, less the reaction time",
+          "[hearth][hearth-controller][karaoke][timing]") {
+    Room room;
+    room.write("song.lrc", kPlain);
+    KaraokeController controller;
+    controller.setReactionMs(100);
+    controller.load(room.path("song.ac3"), 20000);
+    REQUIRE(controller.beginTiming());
+
+    CHECK(controller.tapLine(2100));
+    CHECK(timing_line(controller, 0).value("startMs").toLongLong() == 2000);
+    CHECK(timing_line(controller, 0).value("stamped").toBool());
+    CHECK(controller.nextLine() == 1);
+    CHECK(controller.stampedLines() == 1);
+    CHECK(controller.timingDirty());
+
+    CHECK(controller.tapLine(6100));
+    CHECK(controller.tapLine(9100));
+    CHECK(controller.nextLine() == -1);
+    CHECK(controller.stampedLines() == 3);
+    // Nothing left to stamp: a press is refused and nothing moves.
+    CHECK_FALSE(controller.tapLine(12000));
+    CHECK(timing_line(controller, 2).value("startMs").toLongLong() == 9000);
+    // The last line runs to the item's length, the others to the next line.
+    CHECK(timing_line(controller, 0).value("endMs").toLongLong() == 6000);
+    CHECK(timing_line(controller, 2).value("endMs").toLongLong() == 20000);
+}
+
+TEST_CASE("KaraokeController timing: a line can be stamped again and nudged",
+          "[hearth][hearth-controller][karaoke][timing]") {
+    Room room;
+    room.write("song.lrc", kPlain);
+    KaraokeController controller;
+    controller.setReactionMs(0);
+    controller.load(room.path("song.ac3"), 20000);
+    REQUIRE(controller.beginTiming());
+    REQUIRE(controller.tapLine(1000));
+    REQUIRE(controller.tapLine(5000));
+
+    CHECK(controller.restampLine(1, 5500));
+    CHECK(timing_line(controller, 1).value("startMs").toLongLong() == 5500);
+    CHECK(controller.nudge(1, -1, -300));
+    CHECK(timing_line(controller, 1).value("startMs").toLongLong() == 5200);
+    // A nudge below the line before is held there.
+    CHECK(controller.nudge(1, -1, -9000));
+    CHECK(timing_line(controller, 1).value("startMs").toLongLong() == 1000);
+
+    CHECK_FALSE(controller.restampLine(7, 1000));
+    CHECK_FALSE(controller.nudge(7, -1, 10));
+}
+
+TEST_CASE("KaraokeController timing: the word pass starts from an estimate and a press replaces it",
+          "[hearth][hearth-controller][karaoke][timing]") {
+    Room room;
+    room.write("song.lrc", kPlain);
+    KaraokeController controller;
+    controller.setReactionMs(0);
+    controller.load(room.path("song.ac3"), 20000);
+    REQUIRE(controller.beginTiming());
+    // Nothing is stamped yet, so there is nothing to estimate.
+    CHECK(controller.estimateWords() == 0);
+
+    REQUIRE(controller.tapLine(1000));
+    REQUIRE(controller.tapLine(5000));
+    CHECK(controller.estimateWords() == 2);
+    const QVariantList words = timing_line(controller, 0).value("words").toList();
+    REQUIRE(words.size() == 3);
+    // An estimate is not a tap, and is told apart as one.
+    CHECK_FALSE(words[1].toMap().value("tapped").toBool());
+    CHECK(words[0].toMap().value("text").toString().toStdString() == "Should");
+    CHECK(words[0].toMap().value("gap").toBool());
+
+    CHECK(controller.tapWord(0, 1, 2500));
+    const QVariantMap tapped = timing_line(controller, 0).value("words").toList()[1].toMap();
+    CHECK(tapped.value("startMs").toLongLong() == 2500);
+    CHECK(tapped.value("tapped").toBool());
+    // The estimate is not made again over what a person set.
+    CHECK(controller.estimateWords() == 0);
+    // A press for a word that is not there is refused.
+    CHECK_FALSE(controller.tapWord(0, 9, 1));
+    CHECK_FALSE(controller.tapWord(8, 0, 1));
+}
+
+TEST_CASE("KaraokeController timing: a file that is timed opens as given, and text can come from elsewhere",
+          "[hearth][hearth-controller][karaoke][timing]") {
+    Room room;
+    room.write("song.lrc", kEnhanced);
+    room.write("words.txt", "A line\nAnd another\n");
+    KaraokeController controller;
+    controller.load(room.path("song.ac3"), 10000);
+
+    REQUIRE(controller.beginTiming());
+    CHECK(controller.stampedLines() == 3);
+    CHECK(controller.nextLine() == -1);
+    CHECK(timing_line(controller, 0).value("words").toList()[0].toMap().value("tapped").toBool());
+    controller.endTiming();
+    CHECK_FALSE(controller.timing());
+    CHECK(controller.timingLines().isEmpty());
+
+    // The words of another file (a path, or a file URL) replace the file's own for the session.
+    REQUIRE(controller.beginTiming(room.path("words.txt")));
+    REQUIRE(controller.timingLines().size() == 2);
+    CHECK(controller.stampedLines() == 0);
+    CHECK(controller.nextLine() == 0);
+    controller.endTiming();
+    REQUIRE(controller.beginTiming(QUrl::fromLocalFile(room.path("words.txt")).toString()));
+    CHECK(controller.timingLines().size() == 2);
+}
+
+TEST_CASE("KaraokeController timing: a session that cannot open says why",
+          "[hearth][hearth-controller][karaoke][timing]") {
+    Room room;
+    KaraokeController controller;
+    // Nothing is playing.
+    CHECK_FALSE(controller.beginTiming());
+    CHECK_FALSE(controller.timingError().isEmpty());
+
+    // An item with no words beside it and no file given.
+    controller.load(room.path("song.ac3"), 10000);
+    CHECK_FALSE(controller.beginTiming());
+    CHECK(controller.timingError().toStdString().find("no words") != std::string::npos);
+
+    // A file that is not text the reader takes.
+    room.write("bad.txt", QByteArray("caf\xE9\n"));
+    CHECK_FALSE(controller.beginTiming(room.path("bad.txt")));
+    CHECK(controller.timingError().toStdString().find("UTF-8") != std::string::npos);
+    CHECK_FALSE(controller.timing());
+}
+
+TEST_CASE("KaraokeController timing: the reaction time is kept and held to its range",
+          "[hearth][hearth-controller][karaoke][timing]") {
+    Room room;
+    {
+        KaraokeController controller;
+        CHECK(controller.reactionMs() == KaraokeController::kDefaultReactionMs);
+        int changes = 0;
+        QObject::connect(&controller, &KaraokeController::reactionChanged, [&changes] { ++changes; });
+        controller.setReactionMs(180);
+        CHECK(changes == 1);
+        controller.setReactionMs(180);
+        CHECK(changes == 1);
+        controller.setReactionMs(9000);
+        CHECK(controller.reactionMs() == KaraokeController::kMaxReactionMs);
+        controller.setReactionMs(-5);
+        CHECK(controller.reactionMs() == 0);
+        controller.setReactionMs(180);
+    }
+    KaraokeController again;
+    CHECK(again.reactionMs() == 180);
+}
+
+TEST_CASE("KaraokeController timing: a save writes the item's file, keeps the first one, and loads it",
+          "[hearth][hearth-controller][karaoke][timing]") {
+    Room room;
+    room.write("song.lrc", kPlain);
+    KaraokeController controller;
+    controller.setReactionMs(0);
+    controller.load(room.path("song.ac3"), 20000);
+    REQUIRE(controller.beginTiming());
+    REQUIRE(controller.tapLine(1000));
+    REQUIRE(controller.tapLine(5000));
+    REQUIRE(controller.tapLine(9000));
+    REQUIRE(controller.estimateWords() == 3);
+    REQUIRE(controller.tapWord(0, 1, 2400));
+
+    int loads = 0;
+    QObject::connect(&controller, &KaraokeController::lyricsChanged, [&loads] { ++loads; });
+    CHECK(controller.saveTiming().isEmpty());
+    CHECK(loads >= 1);
+    CHECK_FALSE(controller.timingDirty());
+
+    // The original is kept, once, and the file is what was timed.
+    CHECK(read_all(room.path("song.lrc.bak")) == kPlain);
+    const QByteArray written = read_all(room.path("song.lrc"));
+    CHECK(written.startsWith("[00:01.00]<00:01.00>Should <00:02.40>auld <"));
+    CHECK(controller.status().toStdString() == "timed");
+    CHECK(controller.wordTimed());
+
+    // A second save does not replace the first backup with the file the first save wrote.
+    REQUIRE(controller.tapWord(1, 0, 5500));
+    CHECK(controller.saveTiming().isEmpty());
+    CHECK(read_all(room.path("song.lrc.bak")) == kPlain);
+
+    // A fresh controller reads the file as lines and words.
+    KaraokeController fresh;
+    fresh.load(room.path("song.ac3"), 20000);
+    REQUIRE(fresh.status().toStdString() == "timed");
+    CHECK(fresh.wordTimed());
+    CHECK(line_at(fresh, 0).value("words").toList().size() == 3);
+}
+
+TEST_CASE("KaraokeController timing: ending a session discards what was not saved",
+          "[hearth][hearth-controller][karaoke][timing]") {
+    Room room;
+    room.write("song.lrc", kPlain);
+    KaraokeController controller;
+    controller.setReactionMs(0);
+    controller.load(room.path("song.ac3"), 20000);
+    REQUIRE(controller.beginTiming());
+    REQUIRE(controller.tapLine(1000));
+    controller.endTiming();
+    CHECK(read_all(room.path("song.lrc")) == kPlain);
+    CHECK(controller.status().toStdString() == "plain");
+    // A save with no session is refused and writes nothing.
+    CHECK_FALSE(controller.saveTiming().isEmpty());
+    CHECK(read_all(room.path("song.lrc")) == kPlain);
 }
