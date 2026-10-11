@@ -379,17 +379,40 @@ What follows from it:
    1, 9 and 35 against 17, 18 and 23 alternated on one image. That is also why the 24-bit-first listing did better in the earlier runs: at the same 4,000
    bytes it sends 666 frames a chunk, not 1,000. **The listing is not the cause and the chunk
    duration is**, so #1251's 16-bit-first order is right (it sends fewer bytes) and the fix is to
-   size a PCM chunk by duration, about 10 ms, where `use_pcm(client, true, 0, width)` takes the
-   board's whole 4,096-byte limit. That is a change in `NetworkSinks::plan_group`, not in the
-   firmware, and it is not made yet.
+   size a PCM unit by duration: the library now sends 10 ms units to a sink whose buffer holds
+   under a second of the stream (#1275), where `use_pcm(client, true, 0, width)` took the board's
+   whole 4,096-byte limit. No firmware change.
 
-So the C6 is a board that plays PCM on a clean link and drops out on a busy one, and a 10 ms chunk
-moves the line without a byte of firmware. What is the owner's to decide: stay coded-only (a
-stream the board cannot decode is refused with its reason, as #1259's `form_policy` does); or
-offer the fallback with 10 ms chunks and a stated caveat that it can drop out on a busy WiFi,
-which is "playback everywhere" at the cost of drop-outs on some networks; or, later, a lossy leg
-(Opus is in `player@v1`'s codec list, at a twelfth of the bytes and a decode the C6 would have
-to be measured for).
+So the C6 is a board that plays PCM on a clean link and drops out on a busy one, and a 10 ms unit
+moves the line without a byte of firmware.
+
+**The owner's decision (2026-10-11): the C6 is offered the PCM fallback, with a caveat in its
+reason (#1275), and a lossy Opus leg is added beside it.** The caveat is shown in the group
+editor and the log: "This board holds under a fifth of a second of PCM, so on a busy WiFi the
+stream can drop out."
+
+### Opus on the C6, measured (2026-10-11)
+
+libopus 1.6.1, fixed point (`FIXED_POINT`, no float API), `-O2`, in the Hearth sink image with
+WiFi up and nothing playing, 48 kHz stereo, 20 ms packets of a music clip at CBR, 200 packets a
+set, three sets (the range across them is given):
+
+| What | 128 kbit/s (CELT fullband) | 64 kbit/s |
+|---|---|---|
+| Decode time per 20 ms packet, mean | 7.5 to 7.8 ms (**37 to 38% of the core**) | 6.4 to 7.2 ms (32 to 36%) |
+| Worst packet | 11 ms (one of 600 at 51 ms, under WiFi) | 9.4 to 11.5 ms |
+| Decoder state | 27,060 bytes of internal heap | the same |
+| Stack | about 16.4 KB (a 16 KB task overflowed) | the same |
+| Bytes a second | 16,000, a twelfth of 16-bit PCM | 8,000 |
+| What the 48 KB ring holds | about 2.3 s (1.7 s at the three quarters a server fills) | twice that |
+
+So the part decodes it with room, and the ring holds as much of it as AC-3, which the link's
+gaps do not reach. What it costs is 27 KB of heap for the decoder while an Opus stream plays, and
+a stack of 17 KB, which the 24 KB decode task already has (a PCM stream does not use it), against
+about 120 KB free in the idle image (79 KB with the benchmark's own 40 KB stack, which is what the
+figures above were taken under); and the quality: Opus is lossy, so a stream decoded here and sent
+as Opus is decoded, encoded and decoded again. It is a choice a person makes for a board on a busy
+link, not what a board is sent by default.
 
 ## What this means for the status rows
 

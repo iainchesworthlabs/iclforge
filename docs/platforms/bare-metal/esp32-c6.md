@@ -246,9 +246,27 @@ KB of the heap the coded paths need, so they are not raised. The rest is the lin
 heap, above); 1.65 s of PCM would take 317 KB.
 
 What costs nothing is a shorter chunk. The stalls fall with the chunk's duration (and a board that
-lists 24-bit first is sent shorter ones at the same byte limit, which is why it did better), so a
-server sending this board PCM should cap a chunk at about 10 ms, 2,000 bytes of 16-bit stereo,
-where Hearth's default fills the board's 4,096-byte limit.
+lists 24-bit first is sent shorter ones at the same byte limit, which is why it did better), so
+Hearth sends a sink whose buffer holds under a second of the stream PCM in units of at most
+10 ms, 2,000 bytes of 16-bit stereo, where it used to fill the board's 4,096-byte limit.
+
+### Opus from a server
+
+libopus 1.6.1 in fixed point (`FIXED_POINT`, no float API, `-O2`), decoding 48 kHz stereo 20 ms
+packets of a music clip in the Hearth sink's image with WiFi up and nothing playing, 200 packets a
+set, three sets:
+
+| What | 128 kbit/s | 64 kbit/s |
+|---|---|---|
+| Decode time per 20 ms packet, mean | 7.5 to 7.8 ms, 37 to 38% of the core | 6.4 to 7.2 ms, 32 to 36% |
+| Worst packet | 11 ms (one of 600 at 51 ms, under WiFi) | 9.4 to 11.5 ms |
+| Decoder state | 27,060 bytes of internal heap | the same |
+| Stack | about 16.4 KB (a 16 KB task overflowed) | the same |
+
+At 16,000 bytes a second the ring holds a twelfth of PCM's rate: about 2.3 s, as much as AC-3.
+The price is 27 KB of heap for the decoder while an Opus stream plays, and a 17 KB stack, which the
+24 KB decode task already has, against about 120 KB free in the idle image (79 KB with the
+benchmark's own 40 KB stack, under which these were taken); and that Opus is lossy.
 
 ### WiFi's code kept in flash
 
