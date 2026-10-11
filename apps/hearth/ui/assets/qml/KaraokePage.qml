@@ -114,22 +114,25 @@ ScrollView {
         // A fold takes the stream's own levels whatever is asked, which is
         // the aware 2/0 column: Annex C says any Lo/Ro downmix is it.
         const aware = root.reproduction !== "capable";
-        const wantV1 = aware ? v1 : (v1 && (root.vocals === "v1" || root.vocals === "both"));
-        const wantV2 = aware ? v2 : (v2 && (root.vocals === "v2" || root.vocals === "both"));
+        // Table C.2.3's choice, as the decoder applies it to what the stream
+        // has: "both" is the V1+V2 column - V1 left and V2 right, so a stream
+        // with a single vocal puts it on the left alone - and one vocal alone
+        // is a phantom centre.
+        const both = !aware && root.vocals === "both";
+        const onlyV1 = !aware && root.vocals === "v1" && v1;
+        const onlyV2 = !aware && root.vocals === "v2" && v2;
         if (!root.folded) {
             if (melody) { out.C.push("M"); }
             if (aware) {
                 // A single vocal joins the melody; a pair goes to the sides.
                 if (root.vocalCount === 1 && v1) { out.C.push("V1"); }
                 if (root.vocalCount === 2) { out.L.push("V1"); out.R.push("V2"); }
-            } else if (wantV1 && wantV2) {
-                // V1+V2: left and right at unity (a stream with one vocal puts
-                // it in the left alone, Table C.2.3's own reading).
-                out.L.push("V1");
+            } else if (both) {
+                if (v1) { out.L.push("V1"); }
                 if (v2) { out.R.push("V2"); }
-            } else if (wantV1) {
+            } else if (onlyV1) {
                 out.C.push("V1");
-            } else if (wantV2) {
+            } else if (onlyV2) {
                 out.C.push("V2");
             }
             return out;
@@ -137,15 +140,16 @@ ScrollView {
         // 2/0: the melody in both at the centre level, a single vocal in both
         // at 0.7, a pair on their own sides.
         if (melody) { out.L.push("M"); out.R.push("M"); }
-        if (wantV1 && wantV2) {
-            out.L.push("V1");
+        if (aware) {
+            if (root.vocalCount === 1 && v1) { out.L.push("V1"); out.R.push("V1"); }
+            if (root.vocalCount === 2) { out.L.push("V1"); out.R.push("V2"); }
+        } else if (both) {
+            if (v1) { out.L.push("V1"); }
             if (v2) { out.R.push("V2"); }
-        } else if (wantV1) {
+        } else if (onlyV1) {
             out.L.push("V1"); out.R.push("V1");
-        } else if (wantV2) {
+        } else if (onlyV2) {
             out.L.push("V2"); out.R.push("V2");
-        } else if (aware && root.vocalCount === 1 && v1) {
-            out.L.push("V1"); out.R.push("V1");
         }
         return out;
     }
