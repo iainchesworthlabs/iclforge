@@ -190,6 +190,20 @@ SurroundProgramme surround_programme(int count,
     return out;
 }
 
+// A test sink finalizes its WAV when the stream ends, which is a message after the last chunk it
+// counts in totals().frames: a read made first finds a header with no frames in it. This reads the
+// file again until it holds `frames`, or gives up and returns the last read.
+auto read_wav_holding(const std::string& path, std::size_t frames) {
+    auto wav = iclforge::ac3::io::read_wav(path);
+    const auto deadline = std::chrono::steady_clock::now() + 15s;
+    while ((!wav.has_value() || wav->frame_count() < frames) &&
+           std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(20ms);
+        wav = iclforge::ac3::io::read_wav(path);
+    }
+    return wav;
+}
+
 // Polls until `done` holds, or gives up after a generous while - test_engine.cpp's own.
 bool eventually(const std::function<bool()>& done) {
     const auto deadline = std::chrono::steady_clock::now() + 60s;
@@ -657,8 +671,8 @@ TEST_CASE("engine: a group's members are each sent the layout their player takes
             REQUIRE(reference.decode(unit, deliver).has_value());
         }
         reference.finish(deliver);
-        const auto wav = iclforge::ac3::io::read_wav(
-            only_file(scratch / name / "out", "stream-", ".wav").string());
+        const auto wav = read_wav_holding(
+            only_file(scratch / name / "out", "stream-", ".wav").string(), want[0].size());
         REQUIRE(wav.has_value());
         REQUIRE(wav->channels.size() == layout.slots());
         REQUIRE(wav->frame_count() == want[0].size());
@@ -813,8 +827,8 @@ TEST_CASE("engine: NetworkSinks plans a group of paired sinks and each is sent w
         REQUIRE(reference.decode(unit, deliver).has_value());
     }
     reference.finish(deliver);
-    const auto wav = iclforge::ac3::io::read_wav(
-        only_file(scratch / "limited" / "out", "stream-", ".wav").string());
+    const auto wav = read_wav_holding(
+        only_file(scratch / "limited" / "out", "stream-", ".wav").string(), want[0].size());
     REQUIRE(wav.has_value());
     REQUIRE(wav->channels.size() == 2);
     REQUIRE(wav->frame_count() == want[0].size());
@@ -969,8 +983,8 @@ TEST_CASE(
         REQUIRE(reference.decode(unit, deliver).has_value());
     }
     reference.finish(deliver);
-    const auto wav = iclforge::ac3::io::read_wav(
-        only_file(scratch / "places" / "out", "stream-", ".wav").string());
+    const auto wav = read_wav_holding(
+        only_file(scratch / "places" / "out", "stream-", ".wav").string(), want[0].size());
     REQUIRE(wav.has_value());
     REQUIRE(wav->channels.size() == immersive->slots());
     REQUIRE(wav->frame_count() == want[0].size());
@@ -1127,8 +1141,8 @@ TEST_CASE("engine: a sink set to Opus is sent the decoded programme as Opus",
     CHECK_FALSE(log.saw("stream PCM"));
     CHECK(sink->totals().bursts == 0);
     // And it is the programme: Opus-coded audio of the render, not silence.
-    const auto wav = iclforge::ac3::io::read_wav(
-        only_file(scratch / "out", "stream-", ".wav").string());
+    const auto wav = read_wav_holding(only_file(scratch / "out", "stream-", ".wav").string(),
+                                      expected_frames - 4800);
     REQUIRE(wav.has_value());
     REQUIRE(wav->channels.size() == 2);
     double energy = 0.0;
