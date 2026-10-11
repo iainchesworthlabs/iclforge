@@ -1122,161 +1122,161 @@
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="353"/>
-        <source>This is going to a network group. A sink that is sent PCM plays the reproduction; one that is sent coded AC-3 decodes it itself and plays it as coded.</source>
+        <source>This is going to a network group. A sink that takes the karaoke settings decodes the stream itself and reproduces it as chosen here; one that does not is sent PCM with the reproduction applied, so the group plays one reproduction. The Network page says which each sink was sent.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="368"/>
+        <location filename="../qml/KaraokePage.qml" line="370"/>
         <source>The stereo fold is Lt/Rt. Annex C defines no Lt/Rt reproduction, so the stream plays as its Lt/Rt fold and the choice above has no effect. The Lo/Ro fold reproduces karaoke.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="377"/>
+        <location filename="../qml/KaraokePage.qml" line="379"/>
         <source>Use Lo/Ro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="386"/>
+        <location filename="../qml/KaraokePage.qml" line="388"/>
         <source>Lyrics</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="388"/>
+        <location filename="../qml/KaraokePage.qml" line="390"/>
         <source>%1 · line %2 of %3</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="408"/>
+        <location filename="../qml/KaraokePage.qml" line="410"/>
         <source>, word-timed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="409"/>
+        <location filename="../qml/KaraokePage.qml" line="411"/>
         <source>, line-timed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="418"/>
+        <location filename="../qml/KaraokePage.qml" line="420"/>
         <source>Full screen · F11</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="436"/>
+        <location filename="../qml/KaraokePage.qml" line="438"/>
         <source>These lyrics have no times, so they are shown whole and not followed.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="438"/>
+        <location filename="../qml/KaraokePage.qml" line="440"/>
         <source>This file times lines, not words: a whole line is emphasised as it is sung.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="457"/>
+        <location filename="../qml/KaraokePage.qml" line="459"/>
         <source>The stream</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="462"/>
+        <location filename="../qml/KaraokePage.qml" line="464"/>
         <source>Backing left</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="463"/>
+        <location filename="../qml/KaraokePage.qml" line="465"/>
         <source>Backing right</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="464"/>
+        <location filename="../qml/KaraokePage.qml" line="466"/>
         <source>Melody guide</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="465"/>
+        <location filename="../qml/KaraokePage.qml" line="467"/>
         <source>Vocal 1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="466"/>
+        <location filename="../qml/KaraokePage.qml" line="468"/>
         <source>Vocal 2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="483"/>
+        <location filename="../qml/KaraokePage.qml" line="485"/>
         <source>not in this stream</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="484"/>
+        <location filename="../qml/KaraokePage.qml" line="486"/>
         <source>heard</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="484"/>
+        <location filename="../qml/KaraokePage.qml" line="486"/>
         <source>muted</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="494"/>
+        <location filename="../qml/KaraokePage.qml" line="496"/>
         <source>What plays</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="532"/>
+        <location filename="../qml/KaraokePage.qml" line="534"/>
         <source>Nothing karaoke is playing.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="540"/>
+        <location filename="../qml/KaraokePage.qml" line="542"/>
         <source>Signal path</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="548"/>
+        <location filename="../qml/KaraokePage.qml" line="550"/>
         <source>Decoded as the stream says.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="551"/>
+        <location filename="../qml/KaraokePage.qml" line="553"/>
         <source>as coded</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="552"/>
+        <location filename="../qml/KaraokePage.qml" line="554"/>
         <source>aware</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="553"/>
+        <location filename="../qml/KaraokePage.qml" line="555"/>
         <source>capable, vocals: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="554"/>
+        <location filename="../qml/KaraokePage.qml" line="556"/>
         <source>none</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="555"/>
+        <location filename="../qml/KaraokePage.qml" line="557"/>
         <source>both</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="558"/>
+        <location filename="../qml/KaraokePage.qml" line="560"/>
         <source>AC-3 karaoke, %1: not reproduced (see the notice).</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="559"/>
+        <location filename="../qml/KaraokePage.qml" line="561"/>
         <source>AC-3 karaoke, %1.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="571"/>
+        <location filename="../qml/KaraokePage.qml" line="573"/>
         <source>Nothing is playing.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="573"/>
+        <location filename="../qml/KaraokePage.qml" line="575"/>
         <source>%1 · %2 ch at %3 Hz</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4794,12 +4794,12 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2350"/>
+        <location filename="../../src/hearth_controller.cpp" line="2353"/>
         <source>saved to %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2353"/>
+        <location filename="../../src/hearth_controller.cpp" line="2356"/>
         <source>could not write %1: %2</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4807,12 +4807,12 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>iclforge::hearth::ui::NetworkController</name>
     <message>
-        <location filename="../../src/network_controller.cpp" line="908"/>
+        <location filename="../../src/network_controller.cpp" line="914"/>
         <source>it could not be read: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="911"/>
+        <location filename="../../src/network_controller.cpp" line="917"/>
         <source>it is %1 bytes, more than any sink&apos;s app slot holds</source>
         <translation type="unfinished"></translation>
     </message>

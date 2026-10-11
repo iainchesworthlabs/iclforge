@@ -292,12 +292,29 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
                 log("output delay " + std::to_string(command.output_delay_ms) + " ms");
                 break;
             case ac::Command::kSettings:
-                // Listed only with accept_settings; nothing here renders, so
-                // "applied" is the revision reported back, which is all a
-                // server can read.
+                // Listed only with accept_settings or karaoke. Settings replace the last whole,
+                // so a key left out is the sink's own default again. Nothing else renders from
+                // them: "applied" is the revision reported back, which is all a server can read.
                 iclforge_state_.settings_revision = command.settings.revision;
                 iclforge_state_.settings_error.reset();
-                log("settings " + std::to_string(command.settings.revision) + " applied");
+                if (sink_->options_.karaoke) {
+                    const ac::DecoderSettings& decoder = command.settings.decoder;
+                    const ac::Karaoke karaoke = decoder.karaoke.value_or(ac::Karaoke::kOff);
+                    const ac::KaraokeVocals vocals = decoder.karaoke_vocals.value_or(ac::KaraokeVocals::kBoth);
+                    bursts_.set_karaoke(karaoke, vocals);
+                    log("settings " + std::to_string(command.settings.revision) + " applied (karaoke " +
+                        std::string(karaoke == ac::Karaoke::kOff       ? "off"
+                                    : karaoke == ac::Karaoke::kAware   ? "aware"
+                                                                       : "capable") +
+                        ", vocals " +
+                        std::string(vocals == ac::KaraokeVocals::kNone   ? "none"
+                                    : vocals == ac::KaraokeVocals::kV1   ? "v1"
+                                    : vocals == ac::KaraokeVocals::kV2   ? "v2"
+                                                                         : "both") +
+                        ")");
+                } else {
+                    log("settings " + std::to_string(command.settings.revision) + " applied");
+                }
                 break;
             case ac::Command::kIdentify:
                 // Not listed, so not sent.
@@ -563,6 +580,10 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
         support.outputs.bit_depths = {32};
         support.layout_grammar = 1;
         // Nothing the server can manage: no routing, trims, delays, settings or identify tone.
+        // Except the karaoke choice, when the sink is asked to take it.
+        if (options_.karaoke) {
+            support.decoder_settings = {"karaoke", "karaoke_vocals"};
+        }
         support.management.crossover_hz = {render::LayoutRenderer::kMinCrossoverHz,
                                            render::LayoutRenderer::kMaxCrossoverHz};
         support.buffer_capacity = options_.buffer_capacity;
@@ -581,7 +602,7 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
         config.iclforge_state.required_lead_time_ms = 500;
         config.iclforge_state.min_buffer_ms = 200;
         config.iclforge_state.supported_commands = {ac::Command::kVolume, ac::Command::kMute};
-        if (options_.accept_settings) {
+        if (options_.accept_settings || options_.karaoke) {
             config.iclforge_state.supported_commands.push_back(ac::Command::kSettings);
         }
     }

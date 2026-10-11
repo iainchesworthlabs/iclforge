@@ -574,3 +574,106 @@ TEST_CASE("sink form: a sink that lists no PCM and cannot take the stream is sen
     CHECK(mentions(choice.reason, "does not decode AC-4"));
     CHECK(mentions(choice.reason, "no PCM"));
 }
+
+// ---- karaoke (planning/karaoke-phase2.md, W7) ---------------------------------------------------
+//
+// A karaoke AC-3 stream whose reproduction is wanted goes as it is only to a sink that is told how
+// to reproduce it: a sink whose decoder is not played the coded channels, and a group would hear
+// two things. That sink is sent PCM decoded here, where the reproduction is applied.
+
+namespace {
+
+// A paired sink that takes the karaoke keys (`keys`), and the settings command, as a board of
+// today does.
+SinkFacts karaoke_sink(std::vector<std::string> keys, std::vector<std::uint16_t> pcm = {2}) {
+    SinkFacts sink = hearth_sink({sp::DataType::kAc3, sp::DataType::kEac3}, std::move(pcm));
+    sink.iclforge_support->decoder_settings = std::move(keys);
+    sp::State state;
+    state.supported_commands = {sp::Command::kVolume, sp::Command::kMute, sp::Command::kSettings};
+    sink.iclforge_state = state;
+    return sink;
+}
+
+StreamNeeds karaoke_stream(sp::Karaoke reproduction, sp::KaraokeVocals vocals = sp::KaraokeVocals::kBoth) {
+    StreamNeeds needs = ac3(6);
+    needs.karaoke = iclforge::hearth::KaraokeChoice{.reproduction = reproduction, .vocals = vocals};
+    return needs;
+}
+
+}  // namespace
+
+TEST_CASE("sink form: a karaoke stream goes as it is to a sink that takes the karaoke keys",
+          "[hearth][sink_form][karaoke]") {
+    const SinkFacts sink = karaoke_sink({"karaoke", "karaoke_vocals"});
+    for (const sp::Karaoke reproduction : {sp::Karaoke::kAware, sp::Karaoke::kCapable}) {
+        const auto choice = choose_sink_form(karaoke_stream(reproduction), sink);
+        REQUIRE(choice.form == SinkForm::kCoded);
+        CHECK(mentions(choice.reason, "reproduces the karaoke"));
+    }
+    // A stream that is not karaoke, or is played as coded, is told nothing and is not asked for it.
+    CHECK_FALSE(mentions(choose_sink_form(ac3(6), sink).reason, "karaoke"));
+}
+
+TEST_CASE("sink form: a sink that does not take the keys is sent a karaoke stream as PCM",
+          "[hearth][sink_form][karaoke]") {
+    // A board from before the keys: the other decoder settings and not karaoke.
+    const SinkFacts old_board = karaoke_sink({"mode", "downmix", "objects"}, {2, 6});
+    const auto choice = choose_sink_form(karaoke_stream(sp::Karaoke::kAware), old_board);
+    REQUIRE(choice.form == SinkForm::kPcm);
+    CHECK(mentions(choice.reason, "does not reproduce karaoke"));
+    CHECK(mentions(choice.reason, "decoded here"));
+    // And the same board is sent the stream as it is when the singer wants none of it.
+    CHECK(choose_sink_form(ac3(6), old_board).form == SinkForm::kCoded);
+}
+
+TEST_CASE("sink form: the capable reproduction needs the vocals key too",
+          "[hearth][sink_form][karaoke]") {
+    const SinkFacts aware_only = karaoke_sink({"karaoke"}, {2, 6});
+    CHECK(choose_sink_form(karaoke_stream(sp::Karaoke::kAware), aware_only).form == SinkForm::kCoded);
+    const auto capable = choose_sink_form(karaoke_stream(sp::Karaoke::kCapable), aware_only);
+    REQUIRE(capable.form == SinkForm::kPcm);
+    CHECK(mentions(capable.reason, "karaoke_vocals"));
+}
+
+TEST_CASE("sink form: a sink that takes no settings cannot be told, so it is sent PCM",
+          "[hearth][sink_form][karaoke]") {
+    SinkFacts sink = karaoke_sink({"karaoke", "karaoke_vocals"}, {2, 6});
+    sink.iclforge_state->supported_commands = {sp::Command::kVolume, sp::Command::kMute};
+    const auto choice = choose_sink_form(karaoke_stream(sp::Karaoke::kAware), sink);
+    REQUIRE(choice.form == SinkForm::kPcm);
+    CHECK(mentions(choice.reason, "takes no settings"));
+
+    // One that has not said what it supports yet is the same: nothing says it can be told.
+    sink.iclforge_state.reset();
+    CHECK(choose_sink_form(karaoke_stream(sp::Karaoke::kAware), sink).form == SinkForm::kPcm);
+}
+
+TEST_CASE("sink form: where no PCM can be sent, the stream plays as coded and the reason says so",
+          "[hearth][sink_form][karaoke]") {
+    const SinkFacts old_board = karaoke_sink({"mode"}, {});
+    const auto choice = choose_sink_form(karaoke_stream(sp::Karaoke::kAware), old_board);
+    // Not "nothing": a person who asked for karaoke still hears the stream.
+    REQUIRE(choice.form == SinkForm::kCoded);
+    CHECK(mentions(choice.reason, "played as coded"));
+
+    // Nor with the fallback off, which is the person's own "never decode in Hearth".
+    const SinkFacts with_pcm = karaoke_sink({"mode"}, {2});
+    const auto off = choose_sink_form(karaoke_stream(sp::Karaoke::kAware), with_pcm, {.pcm_fallback = false});
+    CHECK(off.form == SinkForm::kCoded);
+    CHECK(mentions(off.reason, "played as coded"));
+}
+
+TEST_CASE("sink form: a group of a board that takes karaoke and one that does not plays one reproduction",
+          "[hearth][sink_form][karaoke]") {
+    SinkFacts takes = karaoke_sink({"karaoke", "karaoke_vocals"}, {2});
+    takes.id = "takes";
+    SinkFacts old_board = karaoke_sink({"mode"}, {2});
+    old_board.id = "old";
+    const std::vector<SinkFacts> sinks{takes, old_board};
+    const auto master = iclforge::render::OutputLayout::stereo();
+    const auto plan = plan_group_forms(karaoke_stream(sp::Karaoke::kAware), master, sinks);
+    REQUIRE(plan.members.size() == 2);
+    // The board that takes it decodes for itself; the other is sent PCM that has it applied.
+    CHECK(plan.members[0].action == MemberAction::kCoded);
+    CHECK(plan.members[1].action == MemberAction::kPcm);
+}
