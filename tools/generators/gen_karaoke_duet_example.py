@@ -15,7 +15,8 @@ Annex C's two vocal channels are for, and what "vocals: V1 only, V2 only or both
   parts/melody-guide.wav          mono     a hollow, clarinet-like tone on the whole tune
   parts/vocal-1-shantyman.wav     mono     a sung "ah", the solo lines (1 and 3), an octave down
   parts/vocal-2-crew.wav          mono     a darker "oo", the crew's lines (2 and 4), an octave down
-  leave-her-johnny.lrc            the words, timed to the syllable (Hearth's enhanced LRC)
+  leave-her-johnny.lrc            the words, timed to the syllable (Hearth's enhanced LRC), each
+                                  line marked with its singer, V1: or V2:, and the two named
   leave-her-johnny-lines-only.lrc the same words timed by the line only
   leave-her-johnny.forgeproj      the Forge GUI project: the four parts and nothing of how they
                                   are laid out, which the Karaoke flow and `forge project` do
@@ -261,19 +262,29 @@ def render_parts():
 # --- the words and the project ------------------------------------------------------------------
 
 
+# What the two singers are called, and the marker a line of each is written with: right after the
+# line's time tag, before any word tag (`[00:05.40]V2: <00:05.40>Leave ...`). The lyric reader
+# (libs/lyrics) reads the marker as the line's singer and the names as the two singers' names.
+SINGER_NAMES = {SOLO: "Shantyman", CREW: "Crew"}
+SINGER_MARKERS = {SOLO: "V1:", CREW: "V2:"}
+
+
 def lrc(words):
-    """The lyrics file: one line per sung line; `words` times every syllable, else only lines.
-    A time is a whole number of hundredths, since an eighth note is 30 of them."""
+    """The lyrics file: one line per sung line, each marked with its singer; `words` times every
+    syllable, else only lines. A time is a whole number of hundredths, since an eighth note is
+    30 of them."""
     rows = [
         "[ti:Leave Her, Johnny]",
         "[ar:Traditional]",
         "[al:iclforge karaoke example]",
+        f"[v1:{SINGER_NAMES[SOLO]}]",
+        f"[v2:{SINGER_NAMES[CREW]}]",
         "[by:tools/generators/gen_karaoke_duet_example.py]",
         f"[length:{TOTAL // RATE // 60:02d}:{TOTAL // RATE % 60:02d}]",
     ]
     eighths = 0
-    for _, line in LINES:
-        row = stamp(eighths * EIGHTH * 100 // RATE, "line")
+    for singer, line in LINES:
+        row = stamp(eighths * EIGHTH * 100 // RATE, "line") + SINGER_MARKERS[singer] + " "
         for text, space, notes in line:
             if words:
                 row += stamp(eighths * EIGHTH * 100 // RATE, "word")

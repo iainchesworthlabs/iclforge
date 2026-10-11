@@ -225,7 +225,8 @@ The sections below contain the complete change list and fixes.
   which the shantyman (vocal 1) and the crew (vocal 2) sing different lines and each is silent while
   the other sings, so "V1 only", "V2 only" and "both" each leave a different part to sing. Its
   `.forgeproj` names the four parts and nothing of how they are laid out, which the Karaoke flow
-  and `forge project` work out. Generated like the first example, by
+  and `forge project` work out, and its lyrics mark each line with its singer (`V1:` and `V2:`)
+  and name the two (`[v1:Shantyman]`, `[v2:Crew]`). Generated like the first example, by
   `tools/generators/gen_karaoke_duet_example.py` over the voices both now share
   (`karaoke_synth.py`; the first example's files are unchanged byte for byte), and held by a
   generator test (the committed files, the pitches the page prints, and the two vocals silent in

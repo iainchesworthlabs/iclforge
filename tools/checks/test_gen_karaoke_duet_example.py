@@ -115,7 +115,7 @@ class KaraokeDuetExample(unittest.TestCase):
                 last = -1
                 timed = 0
                 for row in text.splitlines():
-                    if re.match(r"\[[a-z]+:", row):
+                    if re.match(r"\[[a-z][a-z0-9]*:", row):
                         continue
                     for stamp in timestamps(row):
                         self.assertGreaterEqual(stamp, last, row)
@@ -131,7 +131,7 @@ class KaraokeDuetExample(unittest.TestCase):
         tags = [
             stamp
             for row in text.splitlines()
-            if not re.match(r"\[[a-z]+:", row)
+            if not re.match(r"\[[a-z][a-z0-9]*:", row)
             for stamp in re.findall(r"<(\d\d):(\d\d)\.(\d\d)>", row)
         ]
         in_file = [(int(m) * 60 + int(s)) * 100 + int(cs) for m, s, cs in tags]
@@ -172,6 +172,26 @@ class KaraokeDuetExample(unittest.TestCase):
             singers,
             [self.generator.SOLO, self.generator.CREW, self.generator.SOLO, self.generator.CREW],
         )
+
+    def test_each_line_says_which_singer_has_it_and_the_names_are_id_tags(self):
+        # The marker is the first thing after a line's time tag, before any word tag: `V1:` for
+        # the shantyman (vocal 1) and `V2:` for the crew (vocal 2). The names are id tags.
+        markers = {self.generator.SOLO: "V1:", self.generator.CREW: "V2:"}
+        for name in (f"{STEM}.lrc", f"{STEM}-lines-only.lrc"):
+            with self.subTest(name):
+                text = (EXAMPLE / name).read_text(encoding="utf-8")
+                self.assertIn("[v1:Shantyman]\n", text)
+                self.assertIn("[v2:Crew]\n", text)
+                sung = [
+                    row for row in text.splitlines() if re.match(r"\[\d\d:\d\d\.\d\d\]\S", row)
+                ]
+                self.assertEqual(len(sung), len(self.generator.LINES))
+                for row, (singer, _) in zip(sung, self.generator.LINES, strict=True):
+                    self.assertTrue(
+                        re.match(r"\[\d\d:\d\d\.\d\d\]" + markers[singer] + " ", row), row
+                    )
+                # The row that ends the last line has no singer.
+                self.assertRegex(text.splitlines()[-1], r"^\[\d\d:\d\d\.\d\d\]$")
 
     def test_each_vocal_is_silent_while_the_other_sings(self):
         parts = {}

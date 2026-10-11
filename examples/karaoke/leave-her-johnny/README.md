@@ -21,8 +21,11 @@ makes every sample from arithmetic, so the script is the record of what is in th
 | 3 | The shantyman, solo | Vocal 1 | "You can go ashore and draw your pay," |
 | 4 | The crew | Vocal 2 | "It's time for us to leave her!" |
 
-The words, line by line and timed to the syllable, are in `leave-her-johnny.lrc`. The `.lrc` format
-has no marker for which singer has a line, so the file does not say; this table does.
+The words, line by line and timed to the syllable, are in `leave-her-johnny.lrc`, and the file says
+who sings each line: it begins with a marker, `V1:` for the shantyman and `V2:` for the crew,
+right after the line's time tag, and `[v1:Shantyman]` and `[v2:Crew]` among the id tags at the top
+give the two singers' names. (`V1+V2:` marks a line both sing together; this verse has none.) A
+player that does not read the markers shows them as part of the line.
 
 ## What is here
 

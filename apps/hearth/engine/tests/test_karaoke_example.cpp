@@ -135,4 +135,30 @@ TEST_CASE("lyrics: the duet example's words are read and every word is inside it
     // two bars, 18 eighths of 0.3 s. The last sung line ends with the music and the stream.
     CHECK(lyrics->lines[1].start_ms == 5400);
     CHECK(lyrics->lines[3].end_ms == duration_ms);
+
+    // A duet: each line says which singer has it, in its marker, and the two singers have the
+    // names the id tags give. The marker is not part of what is shown.
+    using iclforge::lyrics::Singer;
+    CHECK(iclforge::lyrics::has_singers(*lyrics));
+    CHECK(lyrics->first_singer_name == "Shantyman");
+    CHECK(lyrics->second_singer_name == "Crew");
+    CHECK(lyrics->lines[0].singer == Singer::kFirst);
+    CHECK(lyrics->lines[1].singer == Singer::kSecond);
+    CHECK(lyrics->lines[2].singer == Singer::kFirst);
+    CHECK(lyrics->lines[3].singer == Singer::kSecond);
+    CHECK(lyrics->lines[0].text == "I thought I heard the Old Man say,");
+    CHECK(lyrics->lines[1].text == "Leave her, Johnny, leave her!");
+    // The row that ends the last line has no singer.
+    CHECK(lyrics->lines[4].singer == Singer::kUnmarked);
+
+    // The lines-only file says the same of each line.
+    const auto lines_only = iclforge::lyrics::read_lyrics(
+        fs::path{ICLFORGE_KARAOKE_DUET_EXAMPLE_DIR} / "leave-her-johnny-lines-only.lrc",
+        duration_ms);
+    REQUIRE(lines_only.has_value());
+    CHECK(lines_only->lines[0].singer == Singer::kFirst);
+    CHECK(lines_only->lines[1].singer == Singer::kSecond);
+    CHECK(lines_only->lines[2].singer == Singer::kFirst);
+    CHECK(lines_only->lines[3].singer == Singer::kSecond);
+    CHECK_FALSE(lines_only->lines[0].word_timed());
 }
