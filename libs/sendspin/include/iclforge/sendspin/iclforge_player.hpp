@@ -93,6 +93,12 @@ inline constexpr std::array<std::string_view, 16> kDecoderSettingNames{
 inline constexpr double kKaraokeLevelMinDb = -24.0;
 inline constexpr double kKaraokeLevelMaxDb = 12.0;
 
+// The longest lyric document, in bytes of text, the role carries in one message: a Noise transport
+// message holds 65,518 bytes of plaintext (planning/hearth-sendspin-extension.md, Encryption), and
+// a document's quotes, backslashes and line ends take a second byte each in JSON. A sink states
+// its own, smaller limit in the support object.
+inline constexpr std::uint32_t kMaxLyricsBytes = 60'000;
+
 struct Support {
     std::vector<DataType> data_types;
     std::vector<std::int32_t> sample_rates;
@@ -125,6 +131,10 @@ struct Support {
     [[nodiscard]] std::optional<std::uint8_t> max_objects_of(DataType type) const {
         return max_objects[static_cast<std::size_t>(type)];
     }
+    // The most bytes of lyric document (an LRC text, UTF-8) the sink holds for the item playing,
+    // 1 to kMaxLyricsBytes; 0 when it does not say, which is a sink that takes no lyrics. A sink
+    // that states one lists the `lyrics` and `lyrics_position` commands too.
+    std::uint32_t lyrics_max_bytes = 0;
 };
 
 void write_support(json::Writer& w, const Support& support);
@@ -140,6 +150,9 @@ enum class Command : std::uint8_t {
     kSetOutputDelay,
     kSettings,
     kIdentify,
+    // The item's lyric document, and where in the item the sound is (W7d, planning/karaoke-phase2.md).
+    kLyrics,
+    kLyricsPosition,
 };
 
 struct DecoderReport {
@@ -180,6 +193,15 @@ struct SettingsError {
     std::string why;
 };
 
+// What the sink holds of an item's lyrics: the item's number as the server gave it, and the line the
+// sink's own clock has the sound in (-1 before the first line, and for a file with no times).
+struct LyricsReport {
+    std::int64_t item = 0;
+    std::int32_t line = -1;
+
+    friend bool operator==(const LyricsReport&, const LyricsReport&) = default;
+};
+
 struct State {
     std::optional<std::int32_t> volume;
     std::optional<bool> muted;
@@ -197,6 +219,9 @@ struct State {
     // or the last settings command made it; absent when the sink does not say. A server that
     // renders for a sink reads it here instead of keeping what it last sent.
     std::optional<std::string> layout;
+    // The lyrics the sink holds, absent while it holds none. Reported when the item's document is
+    // taken and whenever the line changes, which is a few times a minute and not each word.
+    std::optional<LyricsReport> lyrics;
 };
 
 void write_state(json::Writer& w, const State& state);
@@ -267,6 +292,25 @@ struct Identify {
     double level_db = -30.0;
 };
 
+// kLyrics: the document of item `item`, an LRC text in UTF-8 (the library's write_lrc), which
+// replaces the sink's. An empty text takes the item's lyrics away.
+struct LyricsDocument {
+    std::int64_t item = 0;
+    std::string text;
+};
+
+// kLyricsPosition: where in the item the sound is, as of a time on the server's clock. The sink
+// plays `position_ms` at `at_us` (the server clock, which its time filter maps to its own), and from
+// there the position moves at `speed` times real time: 1 while the item plays, 0 held (paused, or
+// ended). Applied when the server clock reaches `at_us`, so that a hold sent for the end of what is
+// buffered does not stop the words before then.
+struct LyricsAnchor {
+    std::int64_t item = 0;
+    std::int64_t position_ms = 0;
+    std::int64_t at_us = 0;
+    double speed = 1.0;
+};
+
 struct CommandMessage {
     Command command = Command::kVolume;
     std::int32_t volume = 0;
@@ -275,6 +319,8 @@ struct CommandMessage {
     Settings settings;
     // kIdentify: the tone to play, or nothing to stop it.
     std::optional<Identify> identify;
+    LyricsDocument lyrics;
+    LyricsAnchor lyrics_position;
 };
 
 void write_command(json::Writer& w, const CommandMessage& command);

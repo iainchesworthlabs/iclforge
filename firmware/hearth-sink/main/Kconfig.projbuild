@@ -637,6 +637,24 @@ config ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES
         Sendspin stream's bursts: the decoder's frames are most of it. The
         page's Sendspin section says what a run left spare.
 
+config ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM
+    int "Put the Sendspin decode task's stack in PSRAM when present (1) or internal SRAM (0)"
+    default 1 if IDF_TARGET_ESP32S3 && SPIRAM
+    default 0
+    range 0 1
+    help
+        As ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM, for the task that decodes a
+        Sendspin stream's bursts. On an ESP32-S3 with Wi-Fi up no internal block
+        is over 31,744 bytes by the time the player starts, which is less than
+        the stack's default 32,768, so a stack in internal RAM fits only while
+        what was allocated before it leaves a block that size: an image that
+        started its player fitted by a few bytes, and did not after a few more
+        (the lyrics' document and anchors, planning/karaoke-phase2.md, W7d).
+        In PSRAM it does not depend on that, and the internal RAM is free for
+        the rest. Needs CONFIG_SPIRAM and
+        CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM; without PSRAM present the
+        stack is internal as before.
+
 config ICLFORGE_EXAMPLE_SENDSPIN_SERVER_STACK_BYTES
     int "Stack for the Sendspin WebSocket server's task, bytes"
     default 8192
@@ -672,6 +690,20 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS
         ring, 2.0 played every fixture measured; the AC-3 and E-AC-3 5.1
         fixtures each aborted within about 10 to 12 seconds, so
         sdkconfig.sendspin-c6 sets this to 2.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES
+    int "Largest lyric document held for the item playing, bytes (0 = none)"
+    default 16384
+    range 0 60000
+    help
+        A server that plays karaoke sends the item's lyrics to a board that
+        lists the `lyrics` command, as an LRC text, and then where in the item
+        the sound is; the board follows them on its own playout clock and
+        reports the line it has the sound in. The document is parsed into
+        lines and words, which take about three times its size in heap, and a
+        server keeps its message within the largest chunk taken above, so the
+        smaller of the two is what it sends. 0 lists neither command and
+        holds nothing, for a part with no heap to spare.
 
 config ICLFORGE_EXAMPLE_SENDSPIN_LEAD_MS
     int "Lead a stream's first chunk needs, milliseconds (required_lead_time_ms)"

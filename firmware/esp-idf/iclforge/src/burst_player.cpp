@@ -24,6 +24,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/idf_additions.h"
 #include "freertos/message_buffer.h"
 #include "freertos/task.h"
 
@@ -175,6 +176,9 @@ struct BurstPlayer::Impl {
     std::atomic<std::uint32_t> generation{1};
 
     TaskHandle_t task = nullptr;
+    // Whether the stack was made with caps (BurstPlayerConfig::stack_in_psram): freed only by
+    // vTaskDeleteWithCaps(), from another task.
+    bool task_with_caps = false;
     EventGroupHandle_t events = nullptr;
     std::atomic<bool> stopping{false};
     std::atomic<bool> held{false};
@@ -1338,6 +1342,9 @@ struct BurstPlayer::Impl {
         decoder_config.executor = nullptr;
         lane.reset();
         xEventGroupSetBits(events, kExited);
+        if (task_with_caps) {
+            vTaskSuspend(nullptr);
+        }
         vTaskDelete(nullptr);
     }
 
@@ -1426,8 +1433,24 @@ bool BurstPlayer::start() {
                 static_cast<unsigned>(im.outputs_open), static_cast<unsigned>(im.max_delay_samples));
 
     im.stopping.store(false);
-    if (xTaskCreatePinnedToCore(&Impl::entry, "sendspin-play", im.config.stack_bytes, &im, im.config.priority,
-                                &im.task, im.config.core) != pdPASS) {
+    // The stack in PSRAM is asked for and checked for presence as the ring is, not learned from a
+    // failed allocation.
+    BaseType_t created = pdFAIL;
+    if (im.config.stack_in_psram && heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0) {
+        created = xTaskCreatePinnedToCoreWithCaps(&Impl::entry, "sendspin-play", im.config.stack_bytes, &im,
+                                                  im.config.priority, &im.task, im.config.core,
+                                                  MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        im.task_with_caps = created == pdPASS;
+        if (im.task_with_caps) {
+            std::printf("burst player: decode stack %u bytes in PSRAM\n",
+                        static_cast<unsigned>(im.config.stack_bytes));
+        }
+    }
+    if (created != pdPASS) {
+        created = xTaskCreatePinnedToCore(&Impl::entry, "sendspin-play", im.config.stack_bytes, &im,
+                                          im.config.priority, &im.task, im.config.core);
+    }
+    if (created != pdPASS) {
         std::printf("burst player: could not start its task\n");
         im.task = nullptr;
         im.release();
@@ -1447,6 +1470,10 @@ void BurstPlayer::stop() {
         std::printf("burst player: its task did not stop; leaving it\n");
         return;
     }
+    if (im.task_with_caps && im.task != nullptr) {
+        vTaskDeleteWithCaps(im.task);
+    }
+    im.task_with_caps = false;
     im.task = nullptr;
     im.release();
 }

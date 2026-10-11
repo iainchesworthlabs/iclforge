@@ -309,3 +309,121 @@ TEST_CASE("network group sink: PCM and a burst reach real sinks through the wrap
     }
     CHECK(different == 0);
 }
+
+// --- the lyrics a group's members hold (W7d, planning/karaoke-phase2.md) ------------------------
+
+TEST_CASE("LyricsAnchors: a first sample is an anchor, and playing on is not one until it is stale",
+          "[hearth][group][lyrics]") {
+    using iclforge::hearth::LyricsAnchors;
+    constexpr std::int64_t kMs = 1000;
+    LyricsAnchors anchors;
+
+    // The first look at an item: the members hold nothing, and the sound is taken to be playing.
+    const auto first = anchors.sample(0, 100 * kMs);
+    REQUIRE(first.has_value());
+    CHECK(first->position_ms == 0);
+    CHECK(first->at_us == 100 * kMs);
+    CHECK(first->speed == 1.0);
+
+    // Playing on at the pace of the clock, sampled every 20 ms: nothing to say for the next 5 s.
+    std::int64_t now = 100 * kMs;
+    std::int64_t position = 0;
+    int sent = 0;
+    while (now < 100 * kMs + 4'900 * kMs) {
+        now += 20 * kMs;
+        position += 20;
+        if (anchors.sample(position, now)) {
+            ++sent;
+        }
+    }
+    CHECK(sent == 0);
+
+    // And a refresh once the anchor is five seconds old, with the position as it is.
+    now += 200 * kMs;
+    position += 200;
+    const auto refresh = anchors.sample(position, now);
+    REQUIRE(refresh.has_value());
+    CHECK(refresh->position_ms == position);
+    CHECK(refresh->speed == 1.0);
+}
+
+TEST_CASE("LyricsAnchors: a stop is a hold once the position has stood still, and a restart moves it again",
+          "[hearth][group][lyrics]") {
+    using iclforge::hearth::LyricsAnchors;
+    constexpr std::int64_t kMs = 1000;
+    LyricsAnchors anchors;
+    REQUIRE(anchors.sample(1000, 0).has_value());
+
+    // The sound goes on, then the buffer runs out and the position stands at 1,500.
+    std::int64_t now = 0;
+    std::int64_t position = 1000;
+    for (int turn = 0; turn < 25; ++turn) {
+        now += 20 * kMs;
+        position = std::min<std::int64_t>(position + 20, 1500);
+        (void)anchors.sample(position, now);
+    }
+    // 25 turns of 20 ms: the position stopped at 1,500 after 25 turns of 20 ms = 500 ms, which is the
+    // end of the buffer. The last turn that saw it move was the last that agreed with the anchor.
+    std::optional<iclforge::hearth::LyricsUpdate::Anchor> hold;
+    for (int turn = 0; turn < 10 && !hold; ++turn) {
+        now += 20 * kMs;
+        hold = anchors.sample(1500, now);
+    }
+    REQUIRE(hold.has_value());
+    CHECK(hold->speed == 0.0);
+    CHECK(hold->position_ms == 1500);
+
+    // Held, and sampled on: nothing more until it moves.
+    int sent = 0;
+    for (int turn = 0; turn < 100; ++turn) {
+        now += 20 * kMs;
+        if (anchors.sample(1500, now)) {
+            ++sent;
+        }
+    }
+    CHECK(sent == 0);
+
+    // It plays again: the position moves 20 ms a turn, and the first anchor that says so is a speed of 1
+    // at a position that is where the sound is.
+    std::optional<iclforge::hearth::LyricsUpdate::Anchor> restart;
+    std::int64_t at = 1500;
+    for (int turn = 0; turn < 10 && !restart; ++turn) {
+        now += 20 * kMs;
+        at += 20;
+        restart = anchors.sample(at, now);
+    }
+    REQUIRE(restart.has_value());
+    CHECK(restart->speed == 1.0);
+    CHECK(restart->position_ms == at);
+}
+
+TEST_CASE("LyricsAnchors: a seek is an anchor at once, and a new item forgets the last",
+          "[hearth][group][lyrics]") {
+    using iclforge::hearth::LyricsAnchors;
+    constexpr std::int64_t kMs = 1000;
+    LyricsAnchors anchors;
+    REQUIRE(anchors.sample(0, 0).has_value());
+    CHECK_FALSE(anchors.sample(20, 20 * kMs).has_value());
+
+    // 60 seconds on in 40 ms: far off what the anchor predicts, and the speed is still 1.
+    const auto jumped = anchors.sample(60'000, 60 * kMs);
+    REQUIRE(jumped.has_value());
+    CHECK(jumped->position_ms == 60'000);
+    CHECK(jumped->speed == 1.0);
+
+    // Back 10 seconds is as far off as forward is.
+    const auto back = anchors.sample(50'000, 100 * kMs);
+    REQUIRE(back.has_value());
+    CHECK(back->position_ms == 50'000);
+    // A jump is not a stop: the sound goes on at its speed from the new place.
+    CHECK(back->speed == 1.0);
+
+    // A drift under the threshold is left to the refresh.
+    CHECK_FALSE(anchors.sample(50'040 + 100, 140 * kMs).has_value());
+
+    // A new item starts again: the first sample is an anchor.
+    anchors.reset();
+    const auto fresh = anchors.sample(0, 200 * kMs);
+    REQUIRE(fresh.has_value());
+    CHECK(fresh->position_ms == 0);
+}

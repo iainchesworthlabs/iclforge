@@ -117,6 +117,20 @@ public:
         }
     }
 
+    // What tells a group's members that hold lyrics what the item playing says and where the sound
+    // is (NetworkSinks::apply_lyrics()), handed across as the others are: set once the NetworkSinks
+    // exists and cleared before it goes.
+    void set_lyrics_applier(iclforge::hearth::LyricsApplier applier) {
+        const std::lock_guard lock(mutex_);
+        lyrics_applier_ = std::move(applier);
+    }
+    void apply_lyrics(const std::string& group_id, const iclforge::hearth::LyricsUpdate& update) const {
+        const std::lock_guard lock(mutex_);
+        if (lyrics_applier_) {
+            lyrics_applier_(group_id, update);
+        }
+    }
+
 private:
     NetworkOutputStatus() = default;
 
@@ -124,6 +138,7 @@ private:
     std::map<std::string, Entry> groups_;
     iclforge::hearth::MemberPlanner planner_;
     iclforge::hearth::KaraokeApplier karaoke_applier_;
+    iclforge::hearth::LyricsApplier lyrics_applier_;
 };
 
 }  // namespace iclforge::hearth::ui

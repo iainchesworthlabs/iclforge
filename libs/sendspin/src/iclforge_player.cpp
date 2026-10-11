@@ -51,12 +51,14 @@ constexpr std::array<Named<DataType>, 3> kDataTypes{{
     {DataType::kAc4, "ac4"},
 }};
 
-constexpr std::array<Named<Command>, 5> kCommands{{
+constexpr std::array<Named<Command>, 7> kCommands{{
     {Command::kVolume, "volume"},
     {Command::kMute, "mute"},
     {Command::kSetOutputDelay, "set_output_delay"},
     {Command::kSettings, "settings"},
     {Command::kIdentify, "identify"},
+    {Command::kLyrics, "lyrics"},
+    {Command::kLyricsPosition, "lyrics_position"},
 }};
 
 constexpr std::array<Named<DecoderMode>, 3> kModes{{
@@ -112,6 +114,10 @@ constexpr std::int64_t kMaxOutputs = 1024;
 constexpr std::int64_t kMaxInt32 = 2'147'483'647;
 constexpr double kIdentifyMinimumDb = -60.0;
 constexpr double kIdentifyMaximumDb = -12.0;
+// Where in an item a lyrics_position may put the sound, and how fast it moves: 49 days is past any
+// item, and four times real time past any speed a player runs at (it is 1, or 0 held).
+constexpr std::int64_t kMaxLyricsPositionMs = 4'233'600'000;
+constexpr double kMaxLyricsSpeed = 4.0;
 
 [[nodiscard]] double level_on_wire(double db) {
     return std::isfinite(db) ? std::max(db, kSilenceDb) : kSilenceDb;
@@ -265,6 +271,9 @@ void write_support(json::Writer& w, const Support& support) {
         }
         w.end_object();
     }
+    if (support.lyrics_max_bytes != 0) {
+        w.key("lyrics").begin_object().key("max_bytes").unsigned_integer(support.lyrics_max_bytes).end_object();
+    }
     const bool any_object_limit = std::ranges::any_of(
         support.max_objects,
         [](const std::optional<std::uint8_t>& limit) { return limit.has_value(); });
@@ -406,6 +415,18 @@ std::optional<Support> read_support(json::Value value) {
                 static_cast<std::uint8_t>(*objects);
         }
     }
+    // The lyric document a sink holds: an object with the size, absent for a sink that takes none.
+    if (const json::Value lyrics = value["lyrics"]; lyrics.exists()) {
+        if (!lyrics.is_object()) {
+            return std::nullopt;
+        }
+        const std::optional<std::int32_t> bytes =
+            read_int32(lyrics["max_bytes"], 1, static_cast<std::int64_t>(kMaxLyricsBytes));
+        if (!bytes) {
+            return std::nullopt;
+        }
+        support.lyrics_max_bytes = static_cast<std::uint32_t>(*bytes);
+    }
     return support;
 }
 
@@ -470,6 +491,13 @@ void write_state(json::Writer& w, const State& state) {
     }
     if (state.layout) {
         w.member("layout", std::string_view{*state.layout});
+    }
+    if (state.lyrics) {
+        w.key("lyrics")
+            .begin_object()
+            .member("item", state.lyrics->item)
+            .member("line", state.lyrics->line)
+            .end_object();
     }
     w.end_object();
 }
@@ -573,6 +601,14 @@ std::optional<State> read_state(json::Value value) {
         if (!state.layout || state.layout->size() > kMaxLayoutText) {
             return std::nullopt;
         }
+    }
+    if (const json::Value lyrics = value["lyrics"]; lyrics.exists()) {
+        const std::optional<std::int64_t> item = lyrics["item"].as_int();
+        const std::optional<std::int32_t> line = read_int32(lyrics["line"], -1, kMaxInt32);
+        if (!item || *item < 0 || !line) {
+            return std::nullopt;
+        }
+        state.lyrics = LyricsReport{.item = *item, .line = *line};
     }
     return state;
 }
@@ -688,6 +724,21 @@ void write_command(json::Writer& w, const CommandMessage& command) {
             } else {
                 w.key("identify").null();
             }
+            break;
+        case Command::kLyrics:
+            w.key("lyrics")
+                .begin_object()
+                .member("item", command.lyrics.item)
+                .member("text", std::string_view{command.lyrics.text})
+                .end_object();
+            break;
+        case Command::kLyricsPosition:
+            w.key("lyrics_position")
+                .begin_object()
+                .member("item", command.lyrics_position.item)
+                .member("position_ms", command.lyrics_position.position_ms)
+                .member("at_us", command.lyrics_position.at_us);
+            w.key("speed").number(command.lyrics_position.speed, 3).end_object();
             break;
     }
     w.end_object();
@@ -879,6 +930,31 @@ std::expected<CommandMessage, CommandFailure> read_command(json::Value value) {
                 }
                 command.identify = Identify{.output = *output, .level_db = *level};
             }
+            break;
+        }
+        case Command::kLyrics: {
+            const json::Value lyrics = value["lyrics"];
+            const std::optional<std::int64_t> item = lyrics["item"].as_int();
+            std::optional<std::string> text = lyrics["text"].as_string();
+            if (!lyrics.is_object() || !item || *item < 0 || !text || text->size() > kMaxLyricsBytes) {
+                return malformed();
+            }
+            command.lyrics = LyricsDocument{.item = *item, .text = std::move(*text)};
+            break;
+        }
+        case Command::kLyricsPosition: {
+            const json::Value anchor = value["lyrics_position"];
+            const std::optional<std::int64_t> item = anchor["item"].as_int();
+            const std::optional<std::int64_t> position = anchor["position_ms"].as_int();
+            const std::optional<std::int64_t> at = anchor["at_us"].as_int();
+            const std::optional<double> speed = read_number(anchor["speed"]);
+            if (!anchor.is_object() || !item || *item < 0 || !position || *position < 0 ||
+                *position > kMaxLyricsPositionMs || !at || *at < 0 || !speed || *speed < 0.0 ||
+                *speed > kMaxLyricsSpeed) {
+                return malformed();
+            }
+            command.lyrics_position =
+                LyricsAnchor{.item = *item, .position_ms = *position, .at_us = *at, .speed = *speed};
             break;
         }
     }

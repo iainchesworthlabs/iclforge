@@ -5,10 +5,16 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 #include <iterator>
+#include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <utility>
+
+#include "iclforge/lyrics/lyrics.hpp"
+#include "iclforge/lyrics/timing.hpp"
 
 // See player.hpp. The transport decides and this carries it out; every
 // judgement about WHAT should happen is transport.cpp's, and this file is
@@ -1067,6 +1073,40 @@ PlayPosition Player::position() const {
     out.duration = std::chrono::milliseconds{
         static_cast<std::int64_t>(played.expected_frames * 1000 / decoder_rate_)};
     return out;
+}
+
+namespace {
+
+// The lyrics beside an item as a sink is sent them: the library's own LRC text, whichever format
+// the file was, so that a board reads one. Empty when the item has none, or its file is not readable.
+[[nodiscard]] std::string lyric_document(const std::string& path, std::chrono::milliseconds duration) {
+    const std::optional<std::filesystem::path> file = lyrics::find_lyrics_file(path);
+    if (!file) {
+        return {};
+    }
+    const std::optional<std::int64_t> length =
+        duration.count() > 0 ? std::optional<std::int64_t>{duration.count()} : std::nullopt;
+    const auto read = lyrics::read_lyrics(*file, length);
+    return read ? lyrics::write_lrc(*read) : std::string{};
+}
+
+}  // namespace
+
+void Player::follow_lyrics() {
+    if (mode_ != OutputMode::kNetworkGroup || !group_ || !group_->is_open()) {
+        return;
+    }
+    const PlayPosition at = position();
+    if (at.item == Queue::kNone || at.item >= queue_.size()) {
+        return;
+    }
+    if (lyrics_serial_ == 0 || at.item != lyrics_queue_item_ || opens_ != lyrics_opens_) {
+        lyrics_queue_item_ = at.item;
+        lyrics_opens_ = opens_;
+        ++lyrics_serial_;
+        group_->set_lyrics(lyrics_serial_, lyric_document(queue_.items()[at.item].path, at.duration));
+    }
+    group_->follow_lyrics(lyrics_serial_, at.heard.count());
 }
 
 TransportOutcome Player::play() {

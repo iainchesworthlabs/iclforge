@@ -40,8 +40,11 @@ constexpr std::int32_t kBitDepth = 32;
 
 class GroupSink final : public NetworkGroupSink {
 public:
- GroupSink(GroupResolver resolve, MemberPlanner plan, KaraokeApplier karaoke)
-     : resolve_(std::move(resolve)), plan_(std::move(plan)), karaoke_(std::move(karaoke)) {}
+ GroupSink(GroupResolver resolve, MemberPlanner plan, KaraokeApplier karaoke, LyricsApplier lyrics)
+     : resolve_(std::move(resolve)),
+       plan_(std::move(plan)),
+       karaoke_(std::move(karaoke)),
+       lyrics_(std::move(lyrics)) {}
 
  ~GroupSink() override { close(); }
 
@@ -107,6 +110,7 @@ public:
      sample_rate_ = format.sample_rate;
      taken_ = 0;
      flushed_ = 0;
+     lyrics_item_.reset();
      return OpenOutputFormat{.sample_rate = format.sample_rate,
                              .channels = static_cast<std::uint16_t>(channels),
                              .mode = OutputMode::kNetworkGroup,
@@ -122,6 +126,7 @@ public:
         channels_ = 0;
         taken_ = 0;
         flushed_ = 0;
+        lyrics_item_.reset();
     }
 
     [[nodiscard]] bool is_open() const override { return group_ != nullptr; }
@@ -129,6 +134,26 @@ public:
     void set_karaoke(const KaraokeChoice& choice) override {
         if (group_ && karaoke_) {
             karaoke_(open_group_name_, choice);
+        }
+    }
+
+    void set_lyrics(std::int64_t item, const std::string& document) override {
+        if (!group_ || !lyrics_) {
+            return;
+        }
+        // A new item: nothing is known of where its sound is until the next sample.
+        lyrics_item_ = item;
+        anchors_.reset();
+        lyrics_(open_group_name_, LyricsUpdate{.item = item, .document = document, .anchor = std::nullopt});
+    }
+
+    void follow_lyrics(std::int64_t item, std::int64_t heard_ms) override {
+        if (!group_ || !lyrics_ || !lyrics_item_ || *lyrics_item_ != item) {
+            return;
+        }
+        // On the group's own clock, which is the server's: a member's time filter maps it to its own.
+        if (const std::optional<LyricsUpdate::Anchor> anchor = anchors_.sample(heard_ms, clock_.now_us())) {
+            lyrics_(open_group_name_, LyricsUpdate{.item = item, .document = std::nullopt, .anchor = *anchor});
         }
     }
 
@@ -241,8 +266,12 @@ private:
     GroupResolver resolve_;
     MemberPlanner plan_;
     KaraokeApplier karaoke_;
+    LyricsApplier lyrics_;
     // The id the open group was resolved from, for a choice made while it plays.
     std::string open_group_name_;
+    // The lyrics the members were last told of: the item, and when its anchors are due.
+    std::optional<std::int64_t> lyrics_item_;
+    LyricsAnchors anchors_;
     std::shared_ptr<sendspin::Group> group_;
     // The layouts beyond the player's the open group carries, and the
     // interleaved block of each, reused across calls.
@@ -264,8 +293,9 @@ private:
 }  // namespace
 
 std::unique_ptr<NetworkGroupSink> make_group_sink(GroupResolver resolve, MemberPlanner plan,
-                                                  KaraokeApplier karaoke) {
-    return std::make_unique<GroupSink>(std::move(resolve), std::move(plan), std::move(karaoke));
+                                                  KaraokeApplier karaoke, LyricsApplier lyrics) {
+    return std::make_unique<GroupSink>(std::move(resolve), std::move(plan), std::move(karaoke),
+                                       std::move(lyrics));
 }
 
 }  // namespace iclforge::hearth

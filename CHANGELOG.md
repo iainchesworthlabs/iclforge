@@ -259,6 +259,17 @@ The sections below contain the complete change list and fixes.
   to it draw, so a seek back replays from the start. The words of a disc are pixels, so nothing is
   read as text, and the page says so; a lyrics file beside the stream is shown in its place
   (planning/karaoke-phase2.md, W13f).
+- **A sink that decodes for itself is sent the lyrics, and where the sound is in them.** Two commands
+  on `_iclforge_player@v1`, `lyrics` (the item's document, as the library's LRC text, converted
+  from SubRip, ASS or MIDI karaoke where that is what the file is) and `lyrics_position` (the
+  position at a time on the server's clock, with a speed of 1 playing or 0 held), a `lyrics`
+  object in the support object (the size the board holds) and one in the state (the item and the
+  line the board's own clock has the sound in). Hearth reads the lyrics beside each item as the
+  clock reaches it, sends them to the members that hold them (not to one that is sent PCM, which is
+  on a role with none) and keeps them in step through pauses, seeks and drift; the ESP32 firmware
+  follows them on its playout clock and logs and reports the line, with `iclforge::lyrics::Follower`
+  and `Playhead` in the library. A panel to draw them waits for a board with a screen
+  (planning/karaoke-phase2.md, W7d).
 - **The Forge GUI opens and saves projects, and `forge project` runs them.** A `.forgeproj` is a
   JSON file holding the sources (with their paths relative to it and, in the Karaoke flow, which
   part each is), the channel plan, the assignments, the objects' placements and motion, the
