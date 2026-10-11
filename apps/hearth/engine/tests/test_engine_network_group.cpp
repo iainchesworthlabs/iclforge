@@ -933,9 +933,10 @@ TEST_CASE(
                            << " / error: " << finished.error);
     REQUIRE(finished.history.size() == 1);
 
-    // What the stream declares reached the planner, from the stream's own addbsi.
+    // What the stream declares reached the planner: its addbsi says twelve and no object metadata
+    // shows in its first units, so the count is the index less the LFE.
     REQUIRE(asked.has_value());
-    CHECK(asked->objects == 12);
+    CHECK(asked->objects == 11);
 
     const std::uint64_t expected_frames = static_cast<std::uint64_t>(kFrameCount) * 1536;
     REQUIRE(eventually([&] {

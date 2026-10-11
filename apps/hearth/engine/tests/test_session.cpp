@@ -1,10 +1,14 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <fstream>
+#include <iterator>
 #include <numbers>
 #include <optional>
 #include <span>
@@ -13,6 +17,10 @@
 
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
+#include "iclforge/ac3/io/elementary.hpp"
+#include "iclforge/ac3/oba/joc.hpp"
+#include "iclforge/base/bitreader.hpp"
+#include "iclforge/objects/emdf.hpp"
 #include "iclforge/render/layout.hpp"
 #include "session.hpp"
 #include "stream_decoder.hpp"
@@ -123,9 +131,10 @@ TEST_CASE("session: a handover releases the unit the old decoder was holding, an
     CHECK(session->position_samples() == session->total_samples());
 }
 
-// The objects a programme declares are what a sink's stated limit is compared with, and are read
-// from the stream's own addbsi (TS 103 420's complexity index) when the item is opened.
-TEST_CASE("session: an E-AC-3 stream's declared object count is in the item's facts",
+// The objects a programme places are what a sink's stated limit is compared with, and are read when
+// the item is opened. A stream that declares objects (TS 103 420's complexity index in its addbsi)
+// and carries no object metadata in its first units is counted as the index less its LFE.
+TEST_CASE("session: a stream that declares objects and shows none is counted as its index less one",
           "[hearth][session]") {
     const auto objects_of = [](std::optional<int> index) {
         iclforge::ac3::eac3::FrameConfig config;
@@ -158,8 +167,82 @@ TEST_CASE("session: an E-AC-3 stream's declared object count is in the item's fa
         return session->facts().objects;
     };
     CHECK(objects_of(std::nullopt) == 0);
-    CHECK(objects_of(12) == 12);
-    CHECK(objects_of(16) == 16);
+    CHECK(objects_of(12) == 11);
+    CHECK(objects_of(16) == 15);
+}
+
+namespace {
+
+// The JOC payload's own joc_num_objects, found the way a decoder does: the EMDF container in the
+// access unit, and the payload with id 14 in it.
+std::optional<int> joc_num_objects(std::span<const std::byte> unit) {
+    const std::size_t total = unit.size() * 8;
+    for (std::size_t bit = 0; bit + 16 <= total; ++bit) {
+        iclforge::BitReader probe{unit};
+        probe.skip(bit);
+        if (probe.read(16) != iclforge::objects::emdf::kSyncWord) {
+            continue;
+        }
+        const auto length = probe.read(16);
+        std::vector<std::byte> container_bytes(4 + length);
+        iclforge::BitReader raw{unit};
+        raw.skip(bit);
+        for (auto& byte : container_bytes) {
+            byte = static_cast<std::byte>(raw.read(8));
+        }
+        const auto container = iclforge::objects::emdf::parse_container(container_bytes);
+        if (!container.has_value() || !container->has_value()) {
+            continue;
+        }
+        for (const auto& payload : **container) {
+            if (payload.id == iclforge::objects::emdf::kPayloadIdJoc) {
+                if (const auto params = iclforge::ac3::oba::joc::parse_payload(payload.bytes)) {
+                    return params->objects;
+                }
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+}  // namespace
+
+// Real JOC streams: the count is the one the first unit's JOC payload carries, which is what a
+// decoder reconstructs. On Dolby's streams the complexity index in the addbsi is one more (the LFE
+// is not a JOC object), so the two agree here; the index is the fallback for a stream whose first
+// units show no object metadata, and the case above is the one that tells the two routes apart.
+TEST_CASE("session: a JOC stream's object count is the one its payload carries",
+          "[hearth][session]") {
+    const std::array<const char*, 4> fixtures{
+        ICLFORGE_GOLDEN_OBJECT_DIR "/dee_joc_514.ec3",
+        ICLFORGE_GOLDEN_OBJECT_DIR "/../../firmware/hearth-sink/stream/height.ec3",
+        ICLFORGE_GOLDEN_OBJECT_DIR "/../../apps/forge/gui/tests/fixtures/atmos-objects.ec3",
+        ICLFORGE_GOLDEN_OBJECT_DIR "/../../apps/demos/wasm/assets/demo.ec3"};
+    for (const char* path : fixtures) {
+        INFO(path);
+        std::ifstream in(path, std::ios::binary);
+        REQUIRE(in.good());
+        const std::string text{std::istreambuf_iterator<char>{in},
+                               std::istreambuf_iterator<char>{}};
+        std::vector<std::byte> bytes(text.size());
+        std::transform(text.begin(), text.end(), bytes.begin(),
+                       [](char c) { return static_cast<std::byte>(c); });
+
+        const auto scanned = iclforge::ac3::io::scan(bytes);
+        REQUIRE(scanned.has_value());
+        REQUIRE(scanned->oba_complexity_index.has_value());
+        const std::optional<int> expected = joc_num_objects(scanned->access_units.front());
+        REQUIRE(expected.has_value());
+        REQUIRE(*expected > 0);
+
+        const ItemLoader loader =
+            [&bytes](const std::string&) -> std::expected<LoadedItem, std::string> {
+            return LoadedItem{.bytes = bytes};
+        };
+        auto session = Session::open("joc", loader);
+        REQUIRE(session.has_value());
+        CHECK(session->facts().objects == *expected);
+    }
 }
 
 TEST_CASE("session: each unit the item plays is reported with its frames, and no other",
