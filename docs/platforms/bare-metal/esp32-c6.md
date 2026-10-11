@@ -216,6 +216,29 @@ of `apps/demos/wasm/assets/demo.ec3`. During the decode the part received 1,500 
 the longest gap between two reads was 81 to 114 ms. The access point negotiated 802.11n on
 channel 1 at -61 dBm, so the part's WiFi 6 was not exercised.
 
+### PCM from a server
+
+A server that sends the board PCM (Hearth does, as `player@v1`, for a stream the board cannot
+decode) fills the player's ring to three quarters of its 48 KB: 36,864 bytes, **192 ms** of 16-bit
+stereo at 48 kHz (128 ms of 24-bit), where the same ring holds 1.65 s of 192 kbit/s AC-3. The
+board plays it, and drops out whenever the link has a gap longer than that.
+
+Measured on a board at -60 dBm, `hearth-testserver --pcm --tone` sending a 15 s tone in
+4,000-byte chunks (1,000 frames, 20.8 ms), with temporary traces in the firmware:
+
+| What | Measured |
+|---|---|
+| The player's time per chunk | 1.8 to 2.0 ms (9% of the core); 5.4 ms (27%) before the 16- and 24-bit unpack and the level meter ran on integers (`iclforge/pcm_unpack.hpp`) |
+| Underruns in 15 s, one image, one afternoon | 1 to 4 in quiet minutes, 17 to 79 in bad ones; each is about 200 ms of the stream skipped |
+| The CPU through a 320 ms stall | idle for 70 to 90 ms of every 100 |
+| A message's payload, after its header | 30 to 60 ms in a bad minute, 200 to 320 ms about twice a second |
+| Ping from a wired PC to the ESP32 boards on that SSID, idle | 2 ms least, 8 to 18 ms mean, 35 to 90 ms most; the wired router, 0 to 1 ms |
+
+So the part is not CPU-bound on PCM: the server's task is blocked in a read while the bytes have not
+arrived, and a ring that holds 192 ms is shorter than the link's gaps. The ring cannot be deepened
+on this part (a 64 KB ring failed on the heap, above); 1.65 s of PCM would take 317 KB. A C6 on a
+quiet link plays it, with, in the quiet minutes measured, one underrun at the stream's start.
+
 ### WiFi's code kept in flash
 
 ESP-IDF's defaults put parts of the WiFi and PHY code in RAM (`CONFIG_ESP_WIFI_IRAM_OPT`,

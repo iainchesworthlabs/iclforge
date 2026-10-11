@@ -2514,6 +2514,21 @@ The sections below contain the complete change list and fixes.
 - **A minimum-footprint build resolves the SIMD arch seam** instead of naming `generic/`
   literally, fixing a minimum-footprint decoder built for aarch64 that had been missing
   NEON.
+- **A Sendspin player's PCM chunk is unpacked and metered as integers**
+  (`libs/device/include/iclforge/pcm_unpack.hpp`, `burst_player.cpp`'s `play_pcm()`): 16- and
+  24-bit samples go to the float the playout takes without the soft-float conversions beside them,
+  and the level meter reads the integers while the gain is unity. On an ESP32-C6, which has no FPU,
+  a 1,000-frame 16-bit stereo chunk takes 1.8 to 2.0 ms of the player's time, where it took
+  5.4 ms (9% of the core, down from 27%), with the same samples out
+  (`test_pcm_unpack.cpp`: every 8-, 12-, 16- and 24-bit value, odd chunk sizes, levels against the
+  float meter). It does not make a C6 sustain PCM on a busy WiFi link: its ring holds 192 ms of 16-bit
+  stereo, shorter than the link's gaps (`docs/platforms/bare-metal/esp32-c6.md`, "PCM from a
+  server").
+- **`hearth-testserver` plays a tone as PCM** (`--pcm`, `--tone`, `--tone-bits`,
+  `--max-chunk-bytes`), pairs by a code the board shows (`--code-log`, `dial_to_pair()`), and
+  reports a board's PCM counters and its own end-of-stream totals; `test_playout.cpp` has the
+  playout recovering a PCM stream from a clock step, a late chunk and late interrupts on a model of
+  the I2S ring.
 
 **Library internals**
 
