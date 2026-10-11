@@ -29,6 +29,15 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth opens MP4, Matroska and MPEG-TS files**
+
+- **The desktop player plays AC-3, E-AC-3 and AC-4 from a container.** `hearth`'s file loader read
+  only raw `.ac3`, `.ec3` and `.ac4` streams and listed `.mp4`, `.mkv` and `.ts` files as not
+  playable. It now demuxes the first AC-3, E-AC-3 or AC-4 track through the same container input
+  `forge` uses, tells a container by its first bytes and not its name, applies an MP4 edit list's
+  priming and padding as `LoadedItem::skip_samples` and `play_samples`, and hands the container's
+  facts to the Media page. A file with no such track is unplayable with the demuxer's reason.
+
 **Atmos object signing: several keys, and the licensed gate**
 
 - **`verify-objects` takes a keyring.** `signing-key=` repeats, and a frame is valid when any of the
