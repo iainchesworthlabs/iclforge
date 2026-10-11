@@ -20,6 +20,7 @@ export function frame({
   channels = [],
   channelLabels = channels.map((_, i) => `C${i}`),
   fold = [],
+  karaoke = false,
   objects = [],
   objectLabels = objects.map((_, i) => `obj${i}`),
   positions = objects.map(() => null),
@@ -34,6 +35,7 @@ export function frame({
       channelCount: channels.length,
       channelLabels,
       foldChannelCount: fold.length,
+      karaoke,
       objectCount: objects.length,
       objectLabels,
     },
@@ -58,8 +60,8 @@ export function makeFakeModule({ script = [], flushEntries = [], flushed = [], s
 
   class FakeNativePushDecoder {
     #step = 0;
-    constructor(foldTarget, applyDialnorm, mixLfe) {
-      log.constructed.push({ foldTarget, applyDialnorm, mixLfe });
+    constructor(foldTarget, applyDialnorm, mixLfe, karaoke, karaokeVocals) {
+      log.constructed.push({ foldTarget, applyDialnorm, mixLfe, karaoke, karaokeVocals });
     }
     pushAccessUnit(bytes) {
       log.pushed.push(Array.from(bytes));
