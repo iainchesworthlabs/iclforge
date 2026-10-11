@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <expected>
 #include <optional>
 #include <span>
 #include <vector>
@@ -8,16 +9,61 @@
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
 
-// Two things a player that decodes a whole elementary stream has to get right
-// besides calling the decoders: which decoder reads the stream, and what
-// becomes of the audio the E-AC-3 one is still holding when the stream ends.
-// forge's 'monitor' and 'spatial' use both. Compiled straight into forge
+// Three things a player that decodes a whole elementary stream has to get right
+// besides calling the decoders: which decoder reads the stream, which
+// programme of it plays, and what becomes of the audio the E-AC-3 decoder is
+// still holding when the stream ends. forge's 'monitor' and 'spatial' use all
+// three, and 'play' the second. Compiled straight into forge
 // and iclforge-app-media-tests, the way container_input.cpp beside it is (see
 // recording_sink.hpp for why apps/shared/media/src has no library target), and kept
-// out of apps/forge/cli/src so a test can hold both without a render device - neither
-// command gets past opening one on a headless CI leg.
+// out of apps/forge/cli/src so a test can hold them without a render device - none
+// of those commands gets past opening one on a headless CI leg.
 
 namespace iclforge::apps {
+
+// One programme of an E-AC-3 stream, picked out for a player: the independent
+// substream's id (§E2.3.1.2's substreamid), every id the stream carries, and
+// the programme's own access units in order. Consecutive units here ARE
+// consecutive frame periods, which iclforge::ac3::split_access_units without a
+// programme is not: a stream with a second independent substream comes back
+// from that interleaved, one frame period of each programme in turn, and a
+// decoder fed it in that order plays them one after the other - a 5.1 main
+// and then, at the next unit, a mono audio description.
+struct ProgrammeUnits {
+    int programme = 0;
+    std::vector<int> ids;
+    std::vector<std::span<const std::byte>> units;
+};
+
+// Why select_programme chose nothing.
+struct ProgrammeError {
+    // False: the stream does not frame, or holds no programme at all. True:
+    // `wanted` named a programme the stream does not carry, and `carried`
+    // lists the ids it does.
+    bool not_carried = false;
+    std::vector<int> carried;
+};
+
+// The programme a player plays and its units. §E2.3.1.2's independent
+// substreams are alternatives - a second language, an audio description - not
+// layers, so exactly one of them is played, never a fold of several.
+// `wanted` is the listener's choice; omitted takes the first programme the
+// stream carries rather than a hard-coded 0, as forge's decode, qc and levels
+// do (a stream someone has cut a programme out of need not still start at
+// zero). The span points into `stream`.
+[[nodiscard]] std::expected<ProgrammeUnits, ProgrammeError> select_programme(
+    std::span<const std::byte> stream, std::optional<int> wanted);
+
+// One programme of `stream` as a stream of its own, for a receiver rather than
+// a decoder: the independent substream `programme` with the dependents behind
+// it, every frame period, renumbered as independent substream 0 with its CRC
+// re-stamped (iclforge::ac3::io::extract_programme). A receiver takes
+// substream 0 and ignores the rest, so another programme's frames left as
+// they stand would be a stream with nothing it will play. std::nullopt when
+// the stream does not scan or has no such programme.
+[[nodiscard]] std::optional<std::vector<std::byte>> cut_programme(
+    std::span<const std::byte> stream, int programme);
+
 
 // True when `stream` is read an access unit at a time (split_access_units and
 // Eac3Decoder); false when FrameDecoder reads it a frame at a time, which is

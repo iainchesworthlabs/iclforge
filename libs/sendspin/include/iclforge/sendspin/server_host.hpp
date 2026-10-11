@@ -261,6 +261,12 @@ class Group {
     // A client joins; it starts receiving at the next audio pushed once it can play.
     void add(const std::string& client_id);
     void remove(const std::string& client_id);
+    // Holds a client back (or, with `held` false, lets it go): while held it is sent none of the
+    // group's programme, neither the coded stream nor PCM, whichever role it is on. For a member
+    // the host has found takes the programme in neither form. It takes effect at the group's next
+    // start, as ServerHost::use_pcm() does; a programme under way keeps sending to it. Kept
+    // across start() and stop(), and forgotten when the client is removed.
+    void hold(const std::string& client_id, bool held);
 
     // What the group volume and mute see for one of its members right now:
     // its own reported volume and mute, and whether its active playback role

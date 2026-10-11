@@ -100,6 +100,39 @@ private:
     std::size_t head_ = 0;
 };
 
+// The same pair in single precision: the engine, the prototype and the half-sample turn
+// are the double bank's, held and computed in float. A part whose FPU is single precision
+// (the ESP32-S3 and -P4) runs the double bank in software, some hundred times slower, and
+// a JOC reconstruction is twenty-odd banks a frame; this is the bank that reconstruction
+// takes there (oba::joc::ReconstructionState::qmf_single_precision). The reconstruction
+// is perfect to float precision (about 140 dB against the double bank on programme
+// material: libs/ac3/tests/oba/test_joc_single.cpp); the double bank stays the reference.
+class ICLFORGE_DSP_EXPORT QmfAnalysisF {
+public:
+    void reset();
+
+    // As QmfAnalysis::push, in float.
+    void push(std::span<const float, kQmfHop> block, std::span<float, kQmfSubbands> real,
+              std::span<float, kQmfSubbands> imag);
+
+private:
+    std::array<float, kQmfTaps> history_{};
+    std::size_t head_ = 0;
+};
+
+class ICLFORGE_DSP_EXPORT QmfSynthesisF {
+public:
+    void reset();
+
+    // As QmfSynthesis::pull, in float.
+    void pull(std::span<const float, kQmfSubbands> real, std::span<const float, kQmfSubbands> imag,
+              std::span<float, kQmfHop> out);
+
+private:
+    std::array<float, 2 * kQmfTaps> overlap_{};
+    std::size_t head_ = 0;
+};
+
 // The designed prototype, for tests that check the perfect-reconstruction
 // conditions on the coefficients directly rather than only through a
 // round trip.

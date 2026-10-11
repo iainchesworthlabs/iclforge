@@ -1723,6 +1723,119 @@ TEST_CASE("group: a sink held for PCM is not started on bursts while its role mo
     host->reset();
 }
 
+// A member the host has found takes the programme in neither form is held back: sent nothing, on
+// whichever role it is on, while the rest of the group plays.
+TEST_CASE("group: a held member is sent nothing and plays once it is let go",
+          "[hearth][group][websocket][iclforge]") {
+    namespace ss = iclforge::sendspin;
+    const fs::path scratch =
+        fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_group_hold_" + scratch_pid_suffix());
+    fs::remove_all(scratch);
+    QuietLog log;
+    // One on the extension role (paired) and one a plain player: a hold stops both.
+    const std::unique_ptr<testsink::Sink> paired =
+        start_sink(scratch / "paired", "Paired", m::Codec::kPcm, log, false);
+    const std::unique_ptr<testsink::Sink> plain =
+        start_sink(scratch / "plain", "Plain", m::Codec::kPcm, log, true);
+    const std::unique_ptr<testsink::Sink> other =
+        start_sink(scratch / "other", "Other", m::Codec::kPcm, log, true);
+
+    std::optional<ss::noise::KeyPair> identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    ss::MemoryServerStore store;
+    HostEvents events;
+    auto host = ss::ServerHost::start({.identity = *identity,
+                                       .name = "Test host",
+                                       .languages = {"en"},
+                                       .address = "127.0.0.1",
+                                       .port = std::nullopt,
+                                       .advertise = false,
+                                       .browse = false,
+                                       .mdns_interfaces = {}},
+                                      store, events);
+    REQUIRE(host.has_value());
+    REQUIRE((*host)->enter_pairing_token(paired->pairing_token()));
+    for (const testsink::Sink* sink : {paired.get(), plain.get(), other.get()}) {
+        (*host)->dial("ws://127.0.0.1:" + std::to_string(sink->port()) + "/sendspin");
+    }
+    REQUIRE(events.wait([](const auto& clients) { return clients.size() == 3; }, 15s));
+    REQUIRE((*host)->approve(plain->client_id(), true));
+    REQUIRE((*host)->approve(other->client_id(), true));
+    REQUIRE(events.wait(
+        [](const auto& clients) {
+            return clients.size() == 3 &&
+                   std::all_of(clients.begin(), clients.end(), [](const auto& entry) {
+                       return entry.second.playing && entry.second.available;
+                   });
+        },
+        30s));
+    // The paired sink offers both roles and is on the extension role; the programme is PCM, so it
+    // is asked for PCM: held, it is sent that nowhere.
+    REQUIRE((*host)->use_pcm(paired->client_id(), true));
+
+    std::shared_ptr<ss::Group> group = (*host)->make_group("Held");
+    for (const testsink::Sink* sink : {paired.get(), plain.get(), other.get()}) {
+        group->add(sink->client_id());
+    }
+    group->hold(paired->client_id(), true);
+    group->hold(plain->client_id(), true);
+
+    constexpr std::size_t kFrames = 24000;
+    const std::vector<std::int32_t> programme(kFrames * 2, 3000);
+    const m::AudioFormat format{
+        .codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16};
+    const auto play = [&] {
+        REQUIRE(group->start({.pcm = format, .bursts = std::nullopt, .buffered = true}));
+        std::size_t offset = 0;
+        const auto deadline = std::chrono::steady_clock::now() + 30s;
+        while (offset < programme.size() && std::chrono::steady_clock::now() < deadline) {
+            const std::size_t taken = group->push(std::span<const std::int32_t>(programme).subspan(
+                offset, std::min<std::size_t>(4800 * 2, programme.size() - offset)));
+            if (taken > 0) {
+                offset += taken * 2;
+            } else {
+                std::this_thread::sleep_for(5ms);
+            }
+        }
+        REQUIRE(offset == programme.size());
+    };
+    play();
+    CHECK(group->members_playing() == 1);
+    group->stop();
+    const auto until = std::chrono::steady_clock::now() + 15s;
+    while (other->totals().frames < kFrames && std::chrono::steady_clock::now() < until) {
+        std::this_thread::sleep_for(20ms);
+    }
+    CHECK(other->totals().frames == kFrames);
+    CHECK(paired->totals().frames == 0);
+    CHECK(paired->totals().bursts == 0);
+    CHECK(plain->totals().frames == 0);
+
+    // Let go, the next programme goes to everyone.
+    group->hold(paired->client_id(), false);
+    group->hold(plain->client_id(), false);
+    // Pace off the sink's own role move: the paired sink is on player@v1 once use_pcm took.
+    REQUIRE(events.wait(
+        [&](const auto& clients) {
+            const auto found = clients.find(paired->client_id());
+            return found != clients.end() && found->second.playing && !found->second.bursts &&
+                   found->second.available;
+        },
+        30s));
+    play();
+    CHECK(group->members_playing() == 3);
+    group->stop();
+    const auto again = std::chrono::steady_clock::now() + 15s;
+    while ((paired->totals().frames < kFrames || plain->totals().frames < kFrames) &&
+           std::chrono::steady_clock::now() < again) {
+        std::this_thread::sleep_for(20ms);
+    }
+    CHECK(paired->totals().frames == kFrames);
+    CHECK(plain->totals().frames == kFrames);
+    group.reset();
+    host->reset();
+}
+
 TEST_CASE("group: two paired test sinks play E-AC-3 JOC in step over the extension role",
           "[hearth][group][websocket][iclforge]") {
     play_joc_programme(fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_group_joc_" + scratch_pid_suffix()), "7.1.4", 2);

@@ -269,10 +269,11 @@ struct FrameDecoder::Impl {
     // decode_frame_by_block's own frame of PCM. AC-3 writes its overlap-add
     // straight into whatever spans it is given, so the block form - which
     // promises the caller never needs more than a block - points the core at
-    // this and hands it out in blocks once the output stage has run. Six
-    // channels, the widest AC-3 layout; sized once at first use, so a decoder
-    // that never takes the form never allocates it.
-    std::vector<float> block_scratch_;
+    // this and hands it out in blocks once the output stage has run. One
+    // buffer a channel, up to six, the widest AC-3 layout; each made when a
+    // frame first needs it, so a decoder that never takes the form never
+    // allocates one and a stereo stream makes two.
+    std::array<std::vector<float>, 6> block_scratch_;
 
     // --- per-frame scratch --------------------------------------------------
     // Everything decode_frame_core used to declare as a local before its block
@@ -358,6 +359,18 @@ FrameDecoder::~FrameDecoder() = default;
 FrameDecoder::FrameDecoder(FrameDecoder&&) noexcept = default;
 FrameDecoder& FrameDecoder::operator=(FrameDecoder&&) noexcept = default;
 
+void FrameDecoder::reset() {
+    // Every member that carries a stream from one frame to the next, and nothing else: the
+    // per-frame scratch is re-established at the top of every frame and keeps only its capacity,
+    // which is what a reset is meant to leave alone.
+    auto& im = *impl_;
+    im.delay_ = {};
+    im.delay_norm_ = internal::fresh_delay_norms<6>();
+    im.dither_ = DitherGenerator{};
+    im.output_.reset();
+    im.retained_.reset();
+}
+
 int FrameDecoder::output_latency_samples() const { return impl_->output_.latency_samples(); }
 
 FrameDecoder::FrameDecoder(const DecoderConfig& config) : impl_(std::make_unique<Impl>()) {
@@ -428,24 +441,75 @@ std::expected<DecodedFrame, DecodeError> FrameDecoder::decode_frame_into(
     return decoded;
 }
 
+namespace {
+
+// How many channel buffers decode_frame_by_block must hand the core for `frame`: the
+// channels it codes or the slots the output stage leaves, whichever is more, from
+// the syncinfo and the first of the bsi (acmod and lfeon, §5.4.2.4 - §5.4.2.8), and the
+// widest layout's six when the header cannot say or when concealment may reach for the
+// channels of the last good frame instead. The core refuses what is not a frame.
+std::size_t scratch_channels(std::span<const std::byte> frame, const DecoderConfig& config) {
+    constexpr std::size_t kWidest = 6;
+    // syncinfo is five bytes, then bsid(5) bsmod(3), then acmod(3) and what follows it.
+    constexpr std::size_t kBsiAcmod = 6;
+    if (config.concealment != ConcealmentPolicy::kNone || frame.size() < kBsiAcmod + 2) {
+        return kWidest;
+    }
+    const unsigned bsid = std::to_integer<unsigned>(frame[kBsiAcmod - 1]) >> 3U;
+    if (bsid > 8U) {
+        return kWidest;
+    }
+    const unsigned window = (std::to_integer<unsigned>(frame[kBsiAcmod]) << 8U) |
+                            std::to_integer<unsigned>(frame[kBsiAcmod + 1]);
+    unsigned at = 0;
+    const auto take = [&](unsigned bits) {
+        const unsigned value = (window >> (16U - at - bits)) & ((1U << bits) - 1U);
+        at += bits;
+        return value;
+    };
+    const unsigned acmod_value = take(3);
+    if ((acmod_value & 1U) != 0 && acmod_value != 1U) {
+        take(2);  // cmixlev
+    }
+    if ((acmod_value & 4U) != 0) {
+        take(2);  // surmixlev
+    }
+    if (acmod_value == 2U) {
+        take(2);  // dsurmod
+    }
+    const bool lfe = take(1) != 0;
+    const auto acmod = static_cast<Acmod>(acmod_value);
+    const auto coded = static_cast<std::size_t>(fullbw_channel_count(acmod)) + (lfe ? 1U : 0U);
+    const std::size_t output = output_channel_count(config.output, acmod, lfe);
+    return std::clamp(std::max(coded, output), std::size_t{1}, kWidest);
+}
+
+}  // namespace
+
 std::expected<DecodedFrame, DecodeError> FrameDecoder::decode_frame_by_block(
     std::span<const std::byte> frame, BlockSink sink) {
     // The core and conceal() write through spans; here those spans are the
     // decoder's own frame (see Impl::block_scratch_), which the sink then
-    // reads a block at a time. Sized once, for the widest AC-3 layout.
+    // reads a block at a time. One 6 KB buffer for each channel the frame
+    // needs, made when a frame first needs it: not the 36,864 bytes of the
+    // widest AC-3 layout in one block, which a heap that Wi-Fi has cut up on a
+    // part with no PSRAM cannot always find (an ESP32-C6 with 68,860 bytes
+    // free and a largest block of 29,184 aborted on it), and which a stereo
+    // stream then did not need three quarters of.
     constexpr std::size_t kChannels = 6;
+    const std::size_t needed = scratch_channels(frame, impl_->config_);
     auto& scratch = impl_->block_scratch_;
-    if (scratch.empty()) {
-        scratch.assign(kChannels * static_cast<std::size_t>(kSamplesPerFrame), 0.0F);
-    }
     std::array<std::span<float>, kChannels> spans{};
-    for (std::size_t ch = 0; ch < kChannels; ++ch) {
-        spans[ch] = std::span<float>(scratch).subspan(ch * static_cast<std::size_t>(kSamplesPerFrame),
-                                                      static_cast<std::size_t>(kSamplesPerFrame));
+    for (std::size_t ch = 0; ch < needed; ++ch) {
+        if (scratch[ch].size() != static_cast<std::size_t>(kSamplesPerFrame)) {
+            scratch[ch].assign(static_cast<std::size_t>(kSamplesPerFrame), 0.0F);
+        }
+        spans[ch] = scratch[ch];
     }
-    auto decoded = decode_frame_core(frame, spans);
+    const std::span<const std::span<float>> targets = std::span<const std::span<float>>(spans).first(needed);
+    auto decoded = decode_frame_core(frame, targets);
     if (!decoded.has_value()) {
-        auto concealed = conceal(decoded.error(), spans);
+        auto concealed = conceal(decoded.error(), targets);
         if (!concealed) {
             return decoded;
         }

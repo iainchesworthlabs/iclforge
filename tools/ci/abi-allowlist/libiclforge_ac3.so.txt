@@ -23,6 +23,7 @@ iclforge::ac3::Eac3Decoder::flush()
 iclforge::ac3::Eac3Decoder::latency_samples() const
 iclforge::ac3::Eac3Decoder::operator=(iclforge::ac3::Eac3Decoder&&)
 iclforge::ac3::Eac3Decoder::output_latency_samples() const
+iclforge::ac3::Eac3Decoder::reset()
 iclforge::ac3::Eac3Decoder::~Eac3Decoder()
 iclforge::ac3::FrameDecoder::FrameDecoder()
 iclforge::ac3::FrameDecoder::FrameDecoder(iclforge::ac3::DecoderConfig const&)
@@ -34,6 +35,7 @@ iclforge::ac3::FrameDecoder::decode_frame_core(std::span<std::byte const, 184467
 iclforge::ac3::FrameDecoder::decode_frame_into(std::span<std::byte const, 18446744073709551615ul>, std::span<std::span<float, 18446744073709551615ul> const, 18446744073709551615ul>)
 iclforge::ac3::FrameDecoder::operator=(iclforge::ac3::FrameDecoder&&)
 iclforge::ac3::FrameDecoder::output_latency_samples() const
+iclforge::ac3::FrameDecoder::reset()
 iclforge::ac3::FrameDecoder::~FrameDecoder()
 iclforge::ac3::FrameEncoder::FrameEncoder(iclforge::ac3::EncoderConfig const&)
 iclforge::ac3::FrameEncoder::FrameEncoder(iclforge::ac3::FrameEncoder&&)
