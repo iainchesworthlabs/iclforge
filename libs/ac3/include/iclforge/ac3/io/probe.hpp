@@ -110,6 +110,9 @@ struct ProbeSubstream {
     bool lfe = false;
     int numblkscod = 3;
     std::optional<std::uint16_t> chanmap = std::nullopt;
+    // §E2.3.1.65: a type 2 substream's frmsizecod, the first one it sent - see
+    // FrameHeader::converted_frmsizecod. std::nullopt for any other type.
+    std::optional<int> converted_frmsizecod = std::nullopt;
     std::uint64_t syncframes = 0;
 };
 

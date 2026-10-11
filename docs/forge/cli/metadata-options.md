@@ -920,6 +920,32 @@ The decode-side half of `programme2=` above. All three commands work on exactly 
 never a fold of several, since two programmes are alternatives rather than layers and mixing them
 would give a WAV that splices unrelated audio, or a loudness figure neither programme has.
 
+`decode` alone can also mix one programme into another when the second is an **associated service**
+(§E3.10): a description, a commentary, a voice-over, carried beside the main with the gains and pan
+the stream gives it.
+
+```text
+  associated=<0..7>|<service>  mix this programme into the one being decoded: a substream id, or a
+                    service name (visually-impaired, audio-description, hearing-impaired,
+                    commentary, emergency-information, spoken-subtitles) that the stream's own
+                    bsmod labels
+  associated-gain=<dB>  the listener's level for it, 0 dB or less, on top of the stream's own
+```
+
+```bash
+forge decode broadcast.ec3 mixed.wav associated=visually-impaired
+forge decode broadcast.ec3 mixed.wav programme=0 associated=1 associated-gain=-3
+```
+
+The main is `programme=` as above, and the status output names what was mixed and the range of
+each gain. What is applied is the associated programme's `pgmscl` to itself, its `extpgmscl` and
+per-channel scales to the main (or `dmixscl`, when `channels=2` or `1` folded the main), the main's
+own `pgmscl`, and for a mono service its `paninfo` by Tables E3.15 to E3.17 — see
+[Mixing an associated service](../../library/decoding.md#mixing-an-associated-service-iclforgeac3associatedservicemixer)
+for the rules and for what Annex E gives no processing. A stream with no such programme, or
+whose main is 1+1 dual mono, is refused rather than decoded without it. `monitor` and `play` do not
+mix a second programme yet.
+
 ```bash
 forge decode out.ec3 main.wav                # programme 0
 forge decode out.ec3 commentary.wav programme=1

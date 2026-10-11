@@ -620,9 +620,17 @@ struct Options {
     // substream. Unset takes the first programme the stream carries, which is
     // the only one there is for effectively all content; the commands say so
     // when a stream turns out to carry more than one. Never a fold of several
-    // programmes: they are alternatives (a second language, an audio
-    // description), not layers, so mixing them is never what a caller wants.
+    // programmes unless associated= asks for it: they are alternatives (a
+    // second language, an audio description), not layers, and the only
+    // combination §E3.10 defines is a main with an associated service.
     std::optional<int> programme;
+    // 'decode' of E-AC-3: the independent substream (§E2.3.1.2's substreamid,
+    // 0..7) of an associated service to mix into `programme`, by associated=
+    // given a number. associated= given a service name selects by bsmod
+    // instead, through ac4_associated's classifier, which is the same code
+    // (Table 5.7 and TS 103 190-1 Table 91 number the services alike).
+    // associated-gain= is the listener's trim on it (ac4_associated_gain).
+    std::optional<int> eac3_associated_programme;
     // 'eac3-encode': further programmes to author into the same stream, each
     // its own independent substream (§E2.3.1.2's I1-I7) - up to
     // iclforge::ac3::eac3::kMaxProgrammes - 1 of them, so index 0 is I1 (the CLI's

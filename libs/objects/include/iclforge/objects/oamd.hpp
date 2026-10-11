@@ -328,6 +328,14 @@ struct ObjectUpdate {
     // The dynamic objects' state as of this update, program.dynamic_objects
     // long, same order every overload takes.
     std::span<const DynamicObject> objects;
+    // §5.5.15 / Tables 44-46: send each active object's position to a fifth
+    // of the standard step as well, as ext_prec_pos_block in the extended
+    // element - the standard 1/62 (x, y) and 1/15 (z) code plus a refinement
+    // of up to two fifths of a step either way, which narrows the position's
+    // quantization error from half a step to a fifth of one. Off by default:
+    // it costs the extended element and a decoder that ignores it (every one
+    // that existed before 2018's V1.2.1) reads the standard code unchanged.
+    bool extended_position_precision = false;
 };
 
 // One object_audio_metadata_payload (§5.5.2), padded to whole bytes because
@@ -481,12 +489,19 @@ struct DecodedProgram {
 // of it - it is anchored to a speaker, so its position comes from its label
 // (bed_label_position) and its extent is a point by definition. `label` is
 // empty for a dynamic object, which has an index and no name.
+//
+// `zone` and `enable_elevation` are the §5.6.1.6 rendering constraints; a bed
+// channel has neither (it IS a speaker), so they hold their defaults - no
+// constraint, elevation allowed. They sit ahead of `label`, in the padding
+// `active` leaves, so the struct is no larger than it was.
 struct DisplayObject {
     Position position{};
     ObjectSize size{};
     double gain_db = 0.0;
     bool snap = false;
     bool active = true;
+    ZoneConstraint zone = ZoneConstraint::kNone;
+    bool enable_elevation = true;
     std::string_view label{};
 };
 
