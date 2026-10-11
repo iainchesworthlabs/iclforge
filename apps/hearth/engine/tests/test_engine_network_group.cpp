@@ -1905,6 +1905,17 @@ TEST_CASE("engine: the lyrics beside an item reach the boards that hold them, an
         }
     }
     CHECK(group.legacy->roles().lyric_commands.empty());
+
+    // An anchor of an item the group was never given a document for is sent to no one.
+    iclforge::hearth::LyricsUpdate stray;
+    stray.item = 987654;
+    stray.anchor = iclforge::hearth::LyricsUpdate::Anchor{.position_ms = 1000, .at_us = 1, .speed = 1.0};
+    group.sinks->apply_lyrics(group.group_id, stray);
+    std::this_thread::sleep_for(300ms);
+    for (const auto& message : group.decodes->roles().lyric_commands) {
+        CHECK(message.lyrics.item != 987654);
+        CHECK(message.lyrics_position.item != 987654);
+    }
 }
 
 TEST_CASE("engine: an item with no lyrics tells the boards it has none, and a board that takes none is not sent any",
@@ -1930,6 +1941,28 @@ TEST_CASE("engine: a board that lists lyrics is told an item has none, so it dro
     REQUIRE(eventually([&] { return !group.decodes->roles().lyric_commands.empty(); }));
     const auto all = group.decodes->roles().lyric_commands;
     const auto documents = of_kind(all, Command::kLyrics);
+    REQUIRE_FALSE(documents.empty());
+    CHECK(documents.front().lyrics.text.empty());
+}
+
+TEST_CASE("engine: a document too big for a board is sent as none, so that it drops the last item's",
+          "[hearth][group][websocket][iclforge][lyrics]") {
+    constexpr int kFrameCount = 30;
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
+    // The board holds 64 bytes of document, and the item's lyrics are more.
+    KaraokeGroup group("lyrics_big_group", kFrameCount, wanted, true, 64);
+    fs::create_directories(fs::path(group.item_path).parent_path());
+    {
+        std::ofstream lrc(fs::path(group.item_path).replace_extension(".lrc"), std::ios::binary);
+        lrc << "[00:00.50]Should auld acquaintance be forgot and never brought to mind"
+            << '\n'
+            << "[00:01.00]Should auld acquaintance be forgot and days of auld lang syne"
+            << '\n';
+    }
+    group.play_through();
+    REQUIRE(eventually([&] { return !group.decodes->roles().lyric_commands.empty(); }));
+    const auto documents = of_kind(group.decodes->roles().lyric_commands, Command::kLyrics);
     REQUIRE_FALSE(documents.empty());
     CHECK(documents.front().lyrics.text.empty());
 }
