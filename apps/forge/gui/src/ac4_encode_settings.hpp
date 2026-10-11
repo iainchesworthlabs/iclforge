@@ -135,6 +135,26 @@ struct Ac4EncodeSettings {
 // settings, the output an MP4 file where `mp4`.
 [[nodiscard]] std::vector<std::string> ac4_cli_tokens(const Ac4EncodeSettings& settings, bool mp4);
 
+// What one `key=value` of the line does to these settings: the inverse of ac4_cli_tokens and of
+// ac4_object_cli_tokens, which is how a project file's AC-4 options reach the page. `key` is the
+// command's own word and `value` its text, as forge's parser reads them.
+//
+//   kApplied   the setting holds the value.
+//   kNotHeld   the command takes this key, or this value of it, and the page has no control for it
+//              (lfemix=, programme2-*, experimental=; codec-mode=scpl): the settings are unchanged.
+//   kBadValue  a key the page holds, with a value the command would refuse: unchanged.
+//
+// A key the command does not know is kNotHeld too: the caller keeps it, as a project does for a
+// newer version's.
+enum class Ac4OptionResult : std::uint8_t { kApplied, kNotHeld, kBadValue };
+
+[[nodiscard]] Ac4OptionResult ac4_apply_option(Ac4EncodeSettings& settings, std::string_view key,
+                                               std::string_view value);
+
+// The keys ac4_apply_option holds, in the order ac4_cli_tokens writes them (coding, which is
+// object mode's, last).
+[[nodiscard]] const std::vector<std::string_view>& ac4_option_keys();
+
 // Why ac4-encode refuses these settings for a source of `channels` channels at
 // `sample_rate_hz` before it reads the audio, in its words; nothing where it
 // does not. The encoder's own refusals (iclforge::ac4::Encoder::refusal_reason) come

@@ -45,6 +45,8 @@ qt_add_executable(forge_gui_qmltests
     src/karaoke_authoring_controller.hpp
     src/project_file.cpp
     src/project_file.hpp
+    ../../shared/project/src/karaoke_parts.cpp
+    ../../shared/project/src/karaoke_parts.hpp
     ../../shared/project/src/project_document.cpp
     ../../shared/project/src/project_document.hpp
     ../../shared/media/src/ac4_sync_word.hpp

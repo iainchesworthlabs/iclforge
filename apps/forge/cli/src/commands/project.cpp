@@ -4,8 +4,11 @@
 #include <cstdio>
 #include <filesystem>
 #include <fmt/base.h>
+#include <fmt/format.h>
 #include <fstream>
+#include <ios>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -67,9 +70,29 @@ std::string sentence(const project::Message& m) {
     }
     if (m.code == "no-assignments") {
         return fmt::format(
-            "the project has {} sources and says nothing of where their channels go: "
-            "save it from the Forge GUI, or give it a 'bed' and 'assignments'",
+            "the project has {} sources and says nothing of where their channels go: give it "
+            "'assignments' (and a 'bed'), name each source's 'part' (backing, melody, vocal1, "
+            "vocal2) for a karaoke stream, or save it from the Forge GUI",
             arg(0));
+    }
+    if (m.code == "karaoke-unknown-part") {
+        return fmt::format("a source's part '{}' is not one of backing, melody, vocal1, vocal2",
+                           arg(0));
+    }
+    if (m.code == "karaoke-duplicate-part") {
+        return fmt::format("two sources are the part '{}': a part is one place in the stream",
+                           arg(0));
+    }
+    if (m.code == "karaoke-no-backing") {
+        return "a karaoke stream needs a backing: name one source's part 'backing' (the music on "
+               "the left and the right)";
+    }
+    if (m.code == "karaoke-vocal2-needs-vocal1") {
+        return "a stream has no mode that carries vocal2 without vocal1: name it 'vocal1'";
+    }
+    if (m.code == "karaoke-nothing-to-sing") {
+        return "a backing alone is stereo, with nothing to sing along to: add a melody guide or "
+               "a vocal";
     }
     if (m.code == "unsupported") {
         return fmt::format("{} cannot be run from a project yet", arg(0));

@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <ios>
 #include <optional>
 #include <ostream>
 #include <span>

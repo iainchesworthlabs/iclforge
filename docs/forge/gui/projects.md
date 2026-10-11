@@ -35,7 +35,7 @@ the stream they make and its words.
 | `format`, `version` | `"iclforge-project"` and the format's revision, 1. |
 | `title` | A name for the project. Kept, never required. |
 | `flow` | The surface the project was made in: `guided`, `advanced`, `expert` or `karaoke`. |
-| `sources` | The source files, in order. Each has a `path`, and optionally a `part` (the Karaoke flow's `backing`, `melody`, `vocal1`, `vocal2` or `file`) and an `offsetSeconds`. |
+| `sources` | The source files, in order. Each has a `path`, and optionally a `part` (the Karaoke flow's `backing`, `melody`, `vocal1`, `vocal2`, `lfe` or `file`) and an `offsetSeconds`. |
 | `bed`, `lfe`, `extras`, `atmos` | The channel plan: the layout (`"3/2"`), whether it has an LFE, the extra channels (`"wide"`, `"rear"`, `"topf"`, `"topr"`, `"lfe2"`) and whether it is an object (Atmos) session. |
 | `assignments` | Where each source channel goes: `source`, `channel` and `to` (`"L"`, `"C"`, `"Ls"`, `"obj"`, `"none"`, with `@-3.5` for a trim). Every channel, when there is one: it is the command line's `map=`. |
 | `objects` | An object session's placements and motion: `count` and `scene`, the scene file `forge atmos-encode` reads. |
@@ -64,7 +64,7 @@ own defaults, so that a project of a plain encode has none. A flag is `true`.
 | `drc`, `heavy`, `ceiling`, `dialogue` | A profile name, `true`, and the two levels in dB |
 | `dialnorm2`, `drc2`, `heavy2`, `ceiling2`, `dialogue2` | The same for dual mono's second programme |
 | `cmixlev`, `surmixlev` | The centre and surround mix levels: `-3`, `-4.5`, `-6`, and `"off"` for the surround |
-| `lfemix`, `dmixmod`, `mixmeta` | The LFE level (0 to 31 or `"off"`), `"loro"`/`"ltrt"`/`"none"`, and the mixing metadata flag |
+| `lfemix`, `dmixmod`, `mixmeta` | The LFE level (0 to 31 or `"off"`), `"loro"`/`"ltrt"`/`"none"`, and the mixing metadata flag. Each is written only where the stream carries it: E-AC-3's mixing metadata for both, AC-3's Annex D for `dmixmod`. Naming either asks for its group, as it does on the command line. |
 | `bsmod` | `"cm"`, `"me"`, `"vi"`, `"hi"`, `"dialogue"`, `"commentary"`, `"emergency"`, `"voiceover"`: A/52 Table 5.7's service; `"voiceover"` at a layout above 1/0 is the karaoke main service |
 | `dsurmod`, `dheadphonmod`, `dsurexmod` | `"none"`, `"off"`, `"on"` (and `"ex"`, `"pliiz"` for the last) |
 | `mixlevel`, `roomtyp` | The mixing level, 80 to 111 dB SPL, and `"none"`, `"large"`, `"small"` |
@@ -73,6 +73,27 @@ own defaults, so that a project of a plain encode has none. A flag is `true`.
 Everything the command line takes in that group is a legal key. A key the window has no control for
 (`lorocmixlev=`, say) is kept in the file and used by `forge`; opening the project says it is there
 and that the window's own encode does not use it.
+
+### AC-4's `options`
+
+For `"codec": "ac4"` the keys are `ac4-encode`'s own, which the AC-4 tab holds; and again only what
+differs from its defaults. In an AC-4 object session (`"atmos": true`) the tab holds the three that
+`atmos-encode ... codec=ac4` takes.
+
+| Key | Value |
+|---|---|
+| `frame-rate` | `23.976`, `24`, `25`, `29.97`, `30`, `47.95`, `48`, `50`, `59.94`, `60`, `100`, `119.88`, `120`, or `"native"` (the default) |
+| `rate-mode`, `codec-mode` | `"constant"`, `"average"`, `"variable"`; `"auto"`, `"simple"`, `"aspx"`, `"aspx-acpl-1"`, `"aspx-acpl-2"`, `"aspx-acpl-3"` |
+| `dialnorm`, `loudness` | `"auto"` or 0 to 31.75 dB in steps of 0.25 (whole dB, 1 to 31, for objects); the practice the programme is measured to (`"ebu-r128"`, `"atsc-a85"`, ...) |
+| `drc` | `"film-standard"`, `"film-light"`, `"music-standard"`, `"music-light"`, `"speech"` |
+| `cmixlev`, `surmixlev`, `dmixmod` | The stereo downmix's centre (`"+3"` to `-6` or `"off"`) and surround levels, and `"loro"`, `"ltrt"`, `"pl2"`, `"none"` |
+| `dialogue-channels`, `dialogue-method`, `dialogue-max-gain` | The channels (`"l,c"`), `"independent"` or `"mid"`, and 3, 6, 9 or 12 dB |
+| `iframe-interval`, `crc` | A number of frames, and `"off"` for a raw stream with no Annex G CRC |
+| `coding` | Objects only: `"ajoc"` (the default) or `"direct"` |
+
+What `ac4-encode` takes beyond that (`lfemix=`, `programme2-*`, `substreamN-*`, `experimental=`) is
+kept and used by `forge project`, and opening the project says so, as for any key the window has no
+control for.
 
 A saved project is written with `format` and `version` first and everything else in reading order:
 
@@ -143,13 +164,39 @@ whose value this window does not know, an option it has no control for, a source
 be loaded. Opening a file that is not a project at all, or is a newer one, shows a note and
 changes nothing.
 
+## Parts that name themselves
+
+A karaoke project does not have to say where its channels go. When every source names its `part`
+(`backing`, `melody`, `vocal1`, `vocal2`) and the project has no `bed` and no `assignments`, the
+parts are laid out where Annex C's Table C.2.1 puts them, by the Karaoke flow when the window opens
+it and by `forge project` when it runs it, and the stream's service is set to `bsmod` 7 unless
+`options` names one:
+
+```json
+{
+  "format": "iclforge-project", "version": 1, "flow": "karaoke",
+  "sources": [
+    { "path": "backing.wav", "part": "backing" },
+    { "path": "lead.wav", "part": "vocal1" }
+  ],
+  "encode": { "codec": "ac3", "bitrateKbps": 192 }
+}
+```
+
+is a 2/1 stream, the backing on the left and the right and the vocal in the one surround. The
+same four parts of the example, with nothing else, are the stream it ships, byte for byte. A
+project that does say where the channels go is not laid out again. Two sources for one part, a
+second vocal with no first, and no backing are named and refused.
+
 ## What it does not do
 
-- **`forge project` does not work out the channel plan.** The Karaoke flow derives it from the
-  parts (a stereo backing, a melody guide, one or two vocals), and the window writes it into the
-  file when it saves; a project written by hand, or by the example's generator, has to say it as
-  `bed` and `assignments`. Several sources with no assignment are refused with that said.
+- **Several sources with nothing said of where their channels go are refused**, as the window shows
+  them: "unassigned". A channel nobody placed is a mistake and not a default, so a project needs
+  `assignments` (and a `bed`), or parts that name themselves above.
 - **No file type is claimed with the desktop**, as for the other files the window opens: a
   `.forgeproj` is opened from the window, dropped on it or named on its command line.
-- **Not yet in a project:** the AC-4 tab's settings, the AC-4 objects' scene, a live session and the
-  object-motion preview. An AC-4 object session cannot be run by `forge project` yet.
+- **Not in a project:** a live session and the object-motion preview. An AC-4 object session's
+  scene and its tab's settings are in one, and `forge project` runs them.
+- **What `forge` takes and the window has no control for is not in the window's encode.** The key
+  stays in the file and `forge project` uses it; the window says it is there when it opens the
+  project, and its own **Encode** does not use it.

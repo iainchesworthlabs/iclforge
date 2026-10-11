@@ -2,6 +2,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QLocale>
 #include <QMetaObject>
 #include <QMetaType>
 #include <QTemporaryFile>
@@ -17,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "ac4_encode_settings.hpp"
 #include "iclforge/objects/scene.hpp"
 #include "project_document.hpp"
 
@@ -232,17 +234,23 @@ Json capture_options(const Draft& d) {
             out["surmixlev"] = kSurmixDb[static_cast<std::size_t>(i)];
         }
     }
-    if (codec == 1 && d.get_bool("mixmeta")) {
+    // The LFE mix level and the preferred downmix are written only where the stream carries them:
+    // in E-AC-3's mixing metadata, and for the downmix in AC-3's Annex D. `forge` reads either word
+    // as asking for its group, so a value held under a group that is off would make the project
+    // a different stream than the window's own encode (EncoderController::metaTokens says the same).
+    const bool mixing = codec == 1 && d.get_bool("mixmeta");
+    if (mixing) {
         out["mixmeta"] = true;
     }
-    if (const int v = d.get_int("lfeMix"); v != kLfeMixDefault) {
+    if (const int v = d.get_int("lfeMix"); mixing && v != kLfeMixDefault) {
         if (v < 0) {
             out["lfemix"] = "off";
         } else {
             out["lfemix"] = v;
         }
     }
-    if (const int i = d.get_int("dmixIndex"); i != kDmixDefault && i >= 0 && i < 3) {
+    const bool downmix = mixing || (codec == 0 && d.get_bool("annexD"));
+    if (const int i = d.get_int("dmixIndex"); downmix && i != kDmixDefault && i >= 0 && i < 3) {
         static constexpr std::array<const char*, 3> kTokens{"none", "ltrt", "loro"};
         out["dmixmod"] = kTokens[static_cast<std::size_t>(i)];
     }
@@ -290,6 +298,53 @@ Json capture_options(const Draft& d) {
         out["annexd"] = true;
     }
     return out;
+}
+
+// ---- AC-4's options --------------------------------------------------------------------------
+// The AC-4 tab holds `ac4-encode`'s own words the same way: the line the window echoes for it
+// (EncoderController::ac4Tokens, which ac4_cli_tokens writes and ac4_apply_option reads back) is
+// the project's `options`, so that the tab and the file cannot differ about a spelling. A number is
+// written as one where the word is one ("dialnorm": 27.5, "frame-rate": 24) and as text where it
+// is not ("cmixlev": "+3", "frame-rate": "native").
+
+// `text` as a JSON number where it is a plain decimal one (digits, a fraction, a leading minus), and
+// as a string otherwise: "+3" is a word, and "-3" a number that reads back as the same word.
+Json word_value(const std::string& text) {
+    // JSON's own grammar says what a plain decimal is ("+3", "007", "1e3" and "native" are not one,
+    // or do not read back as the same text), and the number is only taken where it dumps as the
+    // text it came from.
+    const Json parsed = Json::parse(text, nullptr, /*allow_exceptions=*/false);
+    if (parsed.is_number() && parsed.dump() == text) {
+        return parsed;
+    }
+    return Json(text);
+}
+
+Json capture_ac4_options(const Draft& d) {
+    Json out = Json::object();
+    const QString line = d.get("ac4Tokens").toString();
+    for (const QString& token : line.split(QLatin1Char(' '), Qt::SkipEmptyParts)) {
+        const qsizetype equals = token.indexOf(QLatin1Char('='));
+        if (equals <= 0) {
+            continue;
+        }
+        out[token.left(equals).toStdString()] = word_value(token.mid(equals + 1).toStdString());
+    }
+    return out;
+}
+
+// A project value as the word the command line's parser would be handed: a number in its shortest
+// spelling ("29.97", not "29.969999").
+QString word_of(const QVariant& value) {
+    switch (value.typeId()) {
+        case QMetaType::Double:
+        case QMetaType::Float:
+            return QString::number(value.toDouble(), 'g', QLocale::FloatingPointShortest);
+        case QMetaType::Bool:
+            return value.toBool() ? QStringLiteral("on") : QStringLiteral("off");
+        default:
+            return value.toString();
+    }
 }
 
 // What one option does to the draft: 0 for it done, 1 for a value it cannot take.
@@ -406,18 +461,33 @@ constexpr std::array<OptionRow, 25> kOptionOrder{{
      [](const Draft& d, const QVariant& v) {
          if (token_index(v, {"off"}) == 0) {
              d.set("lfeMix", -1);
-             return 0;
+         } else {
+             const auto n = as_whole(v);
+             if (!n || *n < 0 || *n > 31) {
+                 return 1;
+             }
+             d.set("lfeMix", *n);
          }
-         const auto n = as_whole(v);
-         if (!n || *n < 0 || *n > 31) {
-             return 1;
+         // `forge` reads lfemix= as asking for E-AC-3's mixing metadata, so a project that names
+         // it has asked for the group without a mixmeta of its own.
+         if (d.get_int("codecIndex") == 1) {
+             d.set("mixmeta", true);
          }
-         d.set("lfeMix", *n);
          return 0;
      }},
     {"dmixmod",
      [](const Draft& d, const QVariant& v) {
-         return apply_token(d, v, "dmixIndex", {"none", "ltrt", "loro"});
+         if (apply_token(d, v, "dmixIndex", {"none", "ltrt", "loro"}) != 0) {
+             return 1;
+         }
+         // The preferred downmix rides E-AC-3's mixing metadata and AC-3's Annex D, and `forge`
+         // turns on whichever the codec has when it reads dmixmod=.
+         if (const int codec = d.get_int("codecIndex"); codec == 1) {
+             d.set("mixmeta", true);
+         } else if (codec == 0) {
+             d.set("annexD", true);
+         }
+         return 0;
      }},
     {"bsmod",
      [](const Draft& d, const QVariant& v) {
@@ -562,16 +632,17 @@ QString ProjectFile::captureEncode(QObject* controller) const {
         encode["container"] = kContainerIds[static_cast<std::size_t>(i)];
     }
     encode["bitrateKbps"] = d.get_int("bitrateKbps");
+    const bool ac4 = d.get_int("codecIndex") == 2;
     // The coding tools, as the `+`-joined token the command line takes: "none" is what a plan
-    // that says nothing has, and is not written.
+    // that says nothing has, and is not written. AC-4 has neither tools nor VBR of this kind.
     if (const QString tools = d.get("toolsToken").toString();
-        !tools.isEmpty() && tools != QLatin1String("none")) {
+        !ac4 && !tools.isEmpty() && tools != QLatin1String("none")) {
         encode["tools"] = tools.toStdString();
     }
-    if (d.get_bool("vbrAvailable") && d.get_bool("vbrEnabled")) {
+    if (!ac4 && d.get_bool("vbrAvailable") && d.get_bool("vbrEnabled")) {
         encode["vbr"] = d.get("vbrToken").toString().toStdString();
     }
-    encode["options"] = capture_options(d);
+    encode["options"] = ac4 ? capture_ac4_options(d) : capture_options(d);
     return dump(encode);
 }
 
@@ -579,6 +650,14 @@ QStringList ProjectFile::optionKeys() const {
     QStringList keys;
     for (const auto& row : kOptionOrder) {
         keys.append(QString::fromLatin1(row.key));
+    }
+    return keys;
+}
+
+QStringList ProjectFile::ac4OptionKeys() const {
+    QStringList keys;
+    for (const std::string_view key : forge_gui::ac4_option_keys()) {
+        keys.append(q(std::string{key}));
     }
     return keys;
 }
@@ -657,6 +736,22 @@ QVariantList ProjectFile::applyEncode(QObject* controller, const QVariantMap& en
         }
     }
     const QVariantMap options = encode.value(QStringLiteral("options")).toMap();
+    if (d.get_int("codecIndex") == 2) {
+        // AC-4's own words, which the AC-4 tab holds (setAc4Option answers 0 for set, 1 for a
+        // value the command would refuse, 2 for a key the tab has no control for).
+        for (auto it = options.constBegin(); it != options.constEnd(); ++it) {
+            int result = 2;
+            QMetaObject::invokeMethod(controller, "setAc4Option", Q_RETURN_ARG(int, result),
+                                      Q_ARG(QString, it.key()), Q_ARG(QString, word_of(it.value())));
+            if (result == 1) {
+                problems.append(message(QStringLiteral("setting-out-of-range"),
+                                        {it.key(), word_of(it.value())}));
+            } else if (result == 2) {
+                problems.append(message(QStringLiteral("setting-not-held"), {it.key()}));
+            }
+        }
+        return problems;
+    }
     QStringList handled;
     for (const auto& row : kOptionOrder) {
         const QString key = QString::fromLatin1(row.key);

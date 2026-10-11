@@ -29,6 +29,7 @@ QVariantMap plan_to_map(const forge_gui::KaraokePlan& plan) {
     out.insert(QStringLiteral("mode"), to_q(plan.mode));
     out.insert(QStringLiteral("melody"), plan.melody);
     out.insert(QStringLiteral("vocals"), plan.vocals);
+    out.insert(QStringLiteral("lfe"), plan.lfe);
     out.insert(QStringLiteral("hasProblem"), plan.has_problem());
     QVariantList channels;
     for (const auto& channel : plan.channels) {
@@ -73,6 +74,8 @@ QVariantMap KaraokeAuthoring::planParts(const QVariantList& files) const {
             file.part = forge_gui::KaraokePart::kVocal1;
         } else if (kind == QLatin1String("vocal2")) {
             file.part = forge_gui::KaraokePart::kVocal2;
+        } else if (kind == QLatin1String("lfe")) {
+            file.part = forge_gui::KaraokePart::kLfe;
         } else {
             file.part = forge_gui::KaraokePart::kBacking;
         }
@@ -98,7 +101,7 @@ QVariantMap KaraokeAuthoring::planSpeakers(const QVariantMap& file) const {
 }
 
 QVariantMap KaraokeAuthoring::outputs(bool melody, int vocals, const QString& listening,
-                                      const QString& choice, bool folded) const {
+                                      const QString& choice, bool folded, bool lfe) const {
     forge_gui::KaraokeListening how = forge_gui::KaraokeListening::kAsCoded;
     if (listening == QLatin1String("aware")) {
         how = forge_gui::KaraokeListening::kAware;
@@ -113,7 +116,8 @@ QVariantMap KaraokeAuthoring::outputs(bool melody, int vocals, const QString& li
     } else if (choice == QLatin1String("v2")) {
         vocal = forge_gui::KaraokeVocalsChoice::kV2;
     }
-    const forge_gui::KaraokeOutputs out = forge_gui::karaoke_outputs(melody, vocals, how, vocal, folded);
+    const forge_gui::KaraokeOutputs out =
+        forge_gui::karaoke_outputs(melody, vocals, how, vocal, folded, lfe);
     const auto names = [](const std::vector<std::string>& parts) {
         QStringList list;
         for (const std::string& part : parts) {
@@ -127,6 +131,7 @@ QVariantMap KaraokeAuthoring::outputs(bool melody, int vocals, const QString& li
     map.insert(QStringLiteral("r"), names(out.r));
     map.insert(QStringLiteral("ls"), names(out.ls));
     map.insert(QStringLiteral("rs"), names(out.rs));
+    map.insert(QStringLiteral("lfe"), names(out.lfe));
     return map;
 }
 

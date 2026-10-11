@@ -211,6 +211,11 @@ void Resampler<Real>::process(std::span<const Real> in, std::vector<Real>& out) 
         const auto phase = filter_->phase(p);
         const auto count = static_cast<std::size_t>(taps);
         Real sum{};
+        // phase() answers null for a p out of range, which the phases of the outputs this
+        // makes are not: the zero is the filter's own for such a p (coefficient()).
+        if (phase.coefficients == nullptr) {
+            return sum;
+        }
         if constexpr (std::is_same_v<Real, iclforge::internal::Fixed32>) {
             // Each product below 2^61, the history's values being audio, below 2^25; unsigned,
             // so that a stream that is not audio wraps rather than overflowing.

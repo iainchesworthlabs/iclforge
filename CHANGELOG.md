@@ -83,6 +83,14 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **The karaoke-capable decoder can re-level the melody and the vocals.** `OutputConfig` gains
+  `karaoke_melody_gain`, `karaoke_vocal1_gain` and `karaoke_vocal2_gain`, linear and 1.0 by
+  default, which multiply the Table C.2.3 coefficients of M, V1 and V2 (Annex C.2.3's "additional
+  flexibility") at the 3/0 and the 2/0 reproductions, before the scale-down that holds an output's
+  sum to 1. They are read under `KaraokeReproduction::kCapable` alone: the aware column ignores
+  them, and at 1.0 every output is the table's, bit for bit. A gain that is not a finite number of
+  0 or more is a mute (planning/karaoke-phase2.md, W10).
+
 - **`forge decode ... karaoke` reproduces a karaoke stream as a karaoke-aware decoder with three
   outputs does.** A stream with `bsmod` 7 and an `acmod` above 1/0 carries L and R, a guide melody
   M and one or two vocals V1 and V2 (Table C.2.1). The output is L, C, R and then the LFE: M at
@@ -208,6 +216,23 @@ The sections below contain the complete change list and fixes.
   nlohmann/json (a new vcpkg dependency of the two programs, and a new section of their notices),
   by `apps/shared/project`, which both compile in. [Projects](docs/forge/gui/projects.md) has the
   format.
+- **The Karaoke flow takes an LFE part.** An optional mono file, the stream's low-frequency
+  channel: it chooses no mode, is coded after the full-bandwidth channels (a 3/2 stream with one is
+  a 5.1 bed), is band-limited by the window as any channel assigned to the LFE is, and comes out of
+  a karaoke reproduction as L, C, R and the LFE. A multichannel file's own LFE is the stream's, where
+  it was a named problem. A project keeps the part as `lfe` (planning/karaoke-phase2.md, W9).
+- **A project holds the AC-4 tab and AC-4 objects, and a karaoke project's parts lay themselves
+  out.** `encode.options` of an AC-4 project is `ac4-encode`'s own words (`frame-rate`, `codec-mode`,
+  `dialnorm`, `drc`, `cmixlev`, `dialogue-channels`, ... and `coding` for objects), and
+  `forge project` runs an AC-4 object session as `atmos-encode ... codec=ac4` with its scene, its
+  `src=`, `map=` and offsets, and AC-4 into an MP4 file as the one command that writes it. Sources
+  that each name a `part` (backing, melody, vocal1, vocal2) and a project with no `bed` and no
+  `assignments` are laid out where Annex C's Table C.2.1 puts them, by the Karaoke flow and by
+  `forge project` from one table, so the example's four parts alone are its stream byte for byte.
+  Fixed: the window's LFE mix and preferred downmix were written to the command line (and so to a
+  project) when E-AC-3's mixing metadata, or AC-3's Annex D, was off and the stream had neither, so
+  the line and the project were a different stream than the window encoded; they are now written
+  with their group, and a project that names either asks for it, as `forge` reads it.
 - **The browser decode demo reproduces karaoke streams.** `PushDecoder` and the npm package's
   `FoldOptions` take `karaoke` (as coded, aware, capable) and `karaokeVocals` (none, V1, V2, both),
   and every push says whether the unit is Annex C karaoke type. The demo page shows a control for
