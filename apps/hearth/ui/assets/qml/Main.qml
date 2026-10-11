@@ -109,6 +109,22 @@ ApplicationWindow {
         });
     }
 
+    // The window's state before the singer view took it full screen, put back
+    // when that closes.
+    property int visibilityBeforeLyrics: Window.Windowed
+    function openLyricScreen() {
+        if (!lyricScreen.visible) {
+            lyricScreen.open();
+        }
+    }
+    function toggleLyricScreen() {
+        if (lyricScreen.visible) {
+            lyricScreen.close();
+        } else {
+            lyricScreen.open();
+        }
+    }
+
     // The one place that opens the output picker: the header's own summary
     // below, main.cpp's `--open-output-picker` debug flag (there is no
     // other way to drive a mouse click headlessly for a screenshot), and -
@@ -138,8 +154,20 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+7"; onActivated: window.page = "karaoke" }
     // The Speakers page's IDENTIFY card says this stops it. A harmless no-op
     // when nothing is sounding the tone, so this needs no guard on which
-    // page is showing.
-    Shortcut { sequence: "Escape"; onActivated: HearthController.stopIdentify() }
+    // page is showing. It also leaves the singer view, whose own popup takes
+    // no Escape so that this is the only shortcut on the key.
+    Shortcut {
+        sequence: "Escape"
+        onActivated: {
+            if (lyricScreen.visible) {
+                lyricScreen.close();
+            }
+            HearthController.stopIdentify();
+        }
+    }
+    // The singer view (LyricScreen.qml): the lyrics full screen. F11 from any
+    // page; the Karaoke page's lyrics card has a button for it too.
+    Shortcut { sequence: "F11"; onActivated: window.toggleLyricScreen() }
     Shortcut { sequence: StandardKey.HelpContents; onActivated: shortcuts.open() }
 
     header: Rectangle {
@@ -288,7 +316,10 @@ ApplicationWindow {
         DecoderPage { format: window.decoderFormat; onKaraokePageRequested: window.page = "karaoke" }
         Network { }
         Settings { }
-        KaraokePage { onOutputPickerRequested: window.openOutputPicker() }
+        KaraokePage {
+            onOutputPickerRequested: window.openOutputPicker()
+            onLyricsFullScreenRequested: window.openLyricScreen()
+        }
     }
 
     footer: TransportBar { }
@@ -297,6 +328,21 @@ ApplicationWindow {
         id: outputPicker
         objectName: "outputPicker"
         onNetworkPageRequested: window.page = "network"
+    }
+
+    LyricScreen {
+        id: lyricScreen
+        onAboutToShow: {
+            window.visibilityBeforeLyrics = window.visibility;
+            window.showFullScreen();
+        }
+        onClosed: {
+            if (window.visibilityBeforeLyrics === Window.Maximized) {
+                window.showMaximized();
+            } else if (window.visibilityBeforeLyrics !== Window.FullScreen) {
+                window.showNormal();
+            }
+        }
     }
 
     FirstRunDialog { id: firstRun; objectName: "firstRunDialog"; onOpenSpeakers: window.page = "speakers" }
