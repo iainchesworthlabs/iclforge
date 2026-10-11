@@ -778,6 +778,138 @@ TEST_CASE("decode_frame_by_block hands over the identical samples a block at a t
     }
 }
 
+TEST_CASE("decode_frame_by_block follows the channel count of each frame it is given",
+          "[decoder]") {
+    // The block form keeps one buffer a channel and makes each when a frame first needs it, so a
+    // stream that is stereo for a while and then 5.1 meets a decoder that has only two. Both
+    // decoders below see the same frames in the same order, through layouts that grow and shrink,
+    // plain and folded to stereo; what the sink is given must be what the value form returns.
+    using iclforge::ac3::Acmod;
+    struct Layout {
+        Acmod acmod;
+        bool lfe;
+    };
+    const std::vector<Layout> layouts = {
+        {Acmod::k2_0, false}, {Acmod::k3_2, true},  {Acmod::k1_0, false}, {Acmod::k3_0, false},
+        {Acmod::k2_2, true},  {Acmod::k2_0, false}, {Acmod::k3_2, true},  {Acmod::k2_1, false},
+    };
+    for (const bool fold : {false, true}) {
+        CAPTURE(fold);
+        iclforge::ac3::DecoderConfig config;
+        if (fold) {
+            config.output.target = iclforge::ac3::DownmixTarget::kLoRo;
+        }
+        iclforge::ac3::FrameDecoder by_value{config};
+        iclforge::ac3::FrameDecoder by_block{config};
+        std::uint64_t n0 = 0;
+        for (const auto& layout : layouts) {
+            iclforge::ac3::FrameEncoder encoder{
+                {.bitrate_kbps = 384, .acmod = layout.acmod, .lfe = layout.lfe}};
+            const auto nchans = static_cast<std::size_t>(encoder.channel_count());
+            std::vector<std::vector<float>> block(
+                nchans, std::vector<float>(iclforge::ac3::kSamplesPerFrame));
+            std::vector<std::span<const float>> views(nchans);
+            for (int f = 0; f < 3; ++f) {
+                for (std::size_t ch = 0; ch < nchans; ++ch) {
+                    for (int i = 0; i < iclforge::ac3::kSamplesPerFrame; ++i) {
+                        const auto n = static_cast<double>(n0 + static_cast<std::uint64_t>(i));
+                        block[ch][static_cast<std::size_t>(i)] = static_cast<float>(
+                            0.3 * std::sin(2.0 * std::numbers::pi *
+                                           (200.0 + 90.0 * static_cast<double>(ch)) * n / 48000.0));
+                    }
+                    views[ch] = block[ch];
+                }
+                n0 += iclforge::ac3::kSamplesPerFrame;
+                const auto frame = encoder.encode_frame(views);
+                REQUIRE(frame.has_value());
+
+                const auto value_result = by_value.decode_frame(*frame);
+                REQUIRE(value_result.has_value());
+                std::vector<std::vector<float>> delivered;
+                const auto sink = [&](const iclforge::ac3::PcmBlock& pcm) {
+                    delivered.resize(pcm.channels.size());
+                    for (std::size_t ch = 0; ch < pcm.channels.size(); ++ch) {
+                        delivered[ch].insert(delivered[ch].end(), pcm.channels[ch].begin(),
+                                             pcm.channels[ch].end());
+                    }
+                };
+                const auto block_result = by_block.decode_frame_by_block(*frame, sink);
+                REQUIRE(block_result.has_value());
+                REQUIRE(delivered.size() == value_result->channels.size());
+                for (std::size_t ch = 0; ch < delivered.size(); ++ch) {
+                    CAPTURE(ch, f);
+                    // A mono stream folded to two outputs comes back from the value form
+                    // with its second channel empty, where the block form delivers it;
+                    // that was so before the block form kept a buffer a channel.
+                    if (value_result->channels[ch].empty()) {
+                        continue;
+                    }
+                    CHECK(delivered[ch] == value_result->channels[ch]);
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("A reset FrameDecoder gives every frame the bits a new one does", "[decoder]") {
+    // What a player calls at the start of a stream instead of making another decoder: nothing of
+    // the stream before may be left - the first frame is compared too, which carries the overlap-add
+    // history, and the encoder codes dither on, which is a sequence the reset has to restart.
+    using iclforge::ac3::Acmod;
+    struct Layout {
+        Acmod acmod;
+        bool lfe;
+    };
+    const std::vector<Layout> layouts = {
+        {Acmod::k3_2, true}, {Acmod::k2_0, false}, {Acmod::k1_0, false}, {Acmod::k2_2, true}};
+    std::vector<std::vector<std::vector<std::byte>>> frames;
+    std::vector<std::vector<std::vector<std::vector<float>>>> fresh;
+    std::uint64_t n0 = 0;
+    for (const auto& layout : layouts) {
+        iclforge::ac3::FrameEncoder encoder{
+            {.bitrate_kbps = 384, .acmod = layout.acmod, .lfe = layout.lfe}};
+        const auto nchans = static_cast<std::size_t>(encoder.channel_count());
+        std::vector<std::vector<float>> block(nchans,
+                                              std::vector<float>(iclforge::ac3::kSamplesPerFrame));
+        std::vector<std::span<const float>> views(nchans);
+        frames.emplace_back();
+        fresh.emplace_back();
+        iclforge::ac3::FrameDecoder decoder;
+        for (int f = 0; f < 4; ++f) {
+            for (std::size_t ch = 0; ch < nchans; ++ch) {
+                for (int i = 0; i < iclforge::ac3::kSamplesPerFrame; ++i) {
+                    const auto n = static_cast<double>(n0 + static_cast<std::uint64_t>(i));
+                    block[ch][static_cast<std::size_t>(i)] = static_cast<float>(
+                        0.3 * std::sin(2.0 * std::numbers::pi *
+                                       (150.0 + 70.0 * static_cast<double>(ch)) * n / 48000.0) +
+                        0.02 * std::sin(n * 0.7331 + static_cast<double>(ch)));
+                }
+                views[ch] = block[ch];
+            }
+            n0 += iclforge::ac3::kSamplesPerFrame;
+            const auto frame = encoder.encode_frame(views);
+            REQUIRE(frame.has_value());
+            frames.back().emplace_back(frame->begin(), frame->end());
+            const auto decoded = decoder.decode_frame(frames.back().back());
+            REQUIRE(decoded.has_value());
+            fresh.back().push_back(decoded->channels);
+        }
+    }
+    iclforge::ac3::FrameDecoder shared;
+    for (int round = 0; round < 2; ++round) {
+        for (std::size_t i = 0; i < layouts.size(); ++i) {
+            const std::size_t which = round == 0 ? i : layouts.size() - 1 - i;
+            shared.reset();
+            for (std::size_t f = 0; f < frames[which].size(); ++f) {
+                CAPTURE(round, which, f);
+                const auto decoded = shared.decode_frame(frames[which][f]);
+                REQUIRE(decoded.has_value());
+                CHECK(decoded->channels == fresh[which][f]);
+            }
+        }
+    }
+}
+
 TEST_CASE("decode_frame_into writes the identical samples the value form allocates",
           "[decoder]") {
     // The span form exists to remove the per-call PCM allocation, never to

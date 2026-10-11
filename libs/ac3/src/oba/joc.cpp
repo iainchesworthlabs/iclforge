@@ -1,4 +1,5 @@
 #include "iclforge/ac3/oba/joc.hpp"
+#include "../decoder/lanes.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1297,6 +1298,290 @@ constexpr std::size_t kMaxParameterBands = static_cast<std::size_t>(kNumBands.ba
     return out;
 }
 
+// reconstruct_qmf's twenty-four-slot frame in single precision - the same §6.6.5 ramp, the
+// same §6.6.6 sum over the five bed channels in the same order, over dsp::QmfAnalysisF and
+// QmfSynthesisF - for the parts whose FPU is single precision, where reconstruct_qmf's double
+// arithmetic is a software routine per operation (planning/ac4.md D14i's measurements, and
+// 381 ms of a 397 ms ESP32-S3 frame for four objects). It differs from the double result by
+// float rounding, about 140 dB below the signal (libs/ac3/tests/oba/test_joc_single.cpp).
+//
+// Two things are done once that the double form does a slot at a time: the frame's matrix is
+// narrowed once (state.matrix_scratch), and each slot's coefficient is worked out per band and
+// not per subband - it is a function of the object, channel and band only, and a band is
+// several subbands.
+[[nodiscard]] std::vector<std::vector<float>> reconstruct_qmf_single(
+    std::span<const std::span<const float>> bed, const FrameParameters& params,
+    ReconstructionState& state) {
+    static_assert(dsp::kQmfSlotsPerFrame * dsp::kQmfHop == kSamplesPerFrame,
+                  "the QMF hop has to divide the frame exactly");
+
+    if (const int slots = static_cast<int>(bed[0].size()) / dsp::kQmfHop;
+        slots != dsp::kQmfSlotsPerFrame) {
+        return reconstruct_qmf_short(bed, params, state, slots);
+    }
+
+    const int objects = params.objects;
+    if (!state.qmf_single) {
+        state.qmf_single = std::make_unique<ReconstructionState::QmfStateSingle>();
+    }
+    auto& qmf = *state.qmf_single;
+    if (static_cast<int>(qmf.objects.size()) != objects) {
+        qmf.objects.assign(static_cast<std::size_t>(objects), dsp::QmfSynthesisF{});
+        qmf.silent_slots.assign(static_cast<std::size_t>(objects), std::uint8_t{10});
+    }
+
+    const std::size_t previous_size = static_cast<std::size_t>(objects) *
+                                      static_cast<std::size_t>(kNumChannels5X) *
+                                      static_cast<std::size_t>(kQmfSubbands);
+    const bool has_previous = params.seq_count != 0 && state.previous_objects == objects &&
+                              state.previous_channels == kNumChannels5X &&
+                              state.previous_matrix.size() == previous_size;
+    const bool has_older = has_previous && state.older_matrix.size() == previous_size;
+    if (state.previous_matrix.size() != previous_size) {
+        state.previous_matrix.assign(previous_size, 0.0F);
+    }
+
+    // The matrix narrowed once, and each object's slice of it found once.
+    auto& matrix = state.matrix_scratch;
+    matrix.resize(params.matrix.size());
+    for (std::size_t i = 0; i < matrix.size(); ++i) {
+        matrix[i] = static_cast<float>(params.matrix[i]);
+    }
+    std::array<const float*, kMaxObjects> object_base{};
+    std::array<int, kMaxObjects> object_bands{};
+    for (int object = 0; object < objects && object < kMaxObjects; ++object) {
+        object_base[static_cast<std::size_t>(object)] =
+            matrix.data() + params.object_offset(object);
+        object_bands[static_cast<std::size_t>(object)] = params.shape(object).bands();
+    }
+
+    std::vector<std::vector<float>> out(
+        static_cast<std::size_t>(objects),
+        std::vector<float>(static_cast<std::size_t>(kSamplesPerFrame)));
+
+    constexpr int kHalfWindow = kQmfTimeslots / 2;
+    // Bank by bank, not slot by slot: a bank's state (2.5 KB analysis, 5 KB synthesis) and the
+    // window it reads (2.5 KB) are what a slot touches, and going round fifteen banks a slot
+    // keeps none of them in a 32 KB data cache. So every bed channel's twenty-four slots are
+    // analysed first, into one array of subband values laid out [slot][channel][real, imag],
+    // and then each object runs its twenty-four slots from it. The arithmetic of every value is
+    // the same operations in the same order as the slot-major form's.
+    constexpr std::size_t kSlotStride = static_cast<std::size_t>(kNumChannels5X) * 2U * dsp::kQmfSubbands;
+    auto& spectra = qmf.spectra;
+    spectra.resize(static_cast<std::size_t>(dsp::kQmfSlotsPerFrame) * kSlotStride);
+    // The bed's five channels, one task each: a channel's bank and its slots of `spectra` are its
+    // own.
+    internal::run_lanes(
+        state.executor, static_cast<std::size_t>(kNumChannels5X),
+        [&](std::size_t channel, std::size_t /*lane*/) {
+            auto& analysis = qmf.bed[channel];
+            for (int slot = 0; slot < dsp::kQmfSlotsPerFrame; ++slot) {
+                const std::span<const float, dsp::kQmfHop> hop{
+                    bed[channel].data() + slot * dsp::kQmfHop,
+                    static_cast<std::size_t>(dsp::kQmfHop)};
+                float* const at = spectra.data() + static_cast<std::size_t>(slot) * kSlotStride +
+                                  channel * 2U * dsp::kQmfSubbands;
+                analysis.push(hop, std::span<float, dsp::kQmfSubbands>{at, dsp::kQmfSubbands},
+                              std::span<float, dsp::kQmfSubbands>{at + dsp::kQmfSubbands,
+                                                                  dsp::kQmfSubbands});
+            }
+        });
+
+    // The objects, one task each: an object's bank, its previous_matrix rows (read) and its
+    // `out` vector are its own, and what it mixes in is the lane's.
+    const auto object_task = [&](std::size_t object_index, std::size_t lane) {
+        const int object = static_cast<int>(object_index);
+        auto& scratch = qmf.lanes[lane];
+        auto& band_mix = scratch.band_mix;
+        const auto shape = params.shape(object);
+        auto& synth = qmf.objects[static_cast<std::size_t>(object)];
+        float* const out_object = out[static_cast<std::size_t>(object)].data();
+        const float* const base = object_base[static_cast<std::size_t>(object)];
+        const int bands = object_bands[static_cast<std::size_t>(object)];
+        const auto dq = [&](int data_point, int ch, int band) {
+            return base[((static_cast<std::size_t>(data_point) *
+                              static_cast<std::size_t>(kNumChannels5X) +
+                          static_cast<std::size_t>(ch)) *
+                         static_cast<std::size_t>(bands)) +
+                        static_cast<std::size_t>(band)];
+        };
+        const auto& mapping = kSubbandToBand[static_cast<std::size_t>(shape.num_bands_idx)];
+        const auto object_row = (static_cast<std::size_t>(object) *
+                                 static_cast<std::size_t>(kNumChannels5X)) *
+                                static_cast<std::size_t>(kQmfSubbands);
+        // The coefficient previous_matrix/older_matrix keep is per subband; a band's subbands
+        // share one value (it was made from one), so the band's first subband stands for it.
+        std::array<int, 32> first_subband{};
+        for (int k = dsp::kQmfSubbands - 1; k >= 0; --k) {
+            first_subband[static_cast<std::size_t>(mapping[static_cast<std::size_t>(k)])] = k;
+        }
+
+        for (int slot = 0; slot < dsp::kQmfSlotsPerFrame; ++slot) {
+            const std::span<float, dsp::kQmfHop> emitted{
+                out_object + slot * dsp::kQmfHop, static_cast<std::size_t>(dsp::kQmfHop)};
+            if (!shape.present) {
+                // Nothing coded: the filter still runs on silence, so its state drains
+                // through its own zero-input response as reconstruct_qmf has it - for the ten
+                // slots it takes to empty. After that its state is zero and so is its output,
+                // which `out` already holds.
+                std::uint8_t& silent = qmf.silent_slots[object_index];
+                if (silent >= 10) {
+                    continue;
+                }
+                ++silent;
+                scratch.object_real.fill(0.0F);
+                scratch.object_imag.fill(0.0F);
+                synth.pull(scratch.object_real, scratch.object_imag, emitted);
+                continue;
+            }
+            qmf.silent_slots[object_index] = 0;
+            // The slot's place in the ramp, as reconstruct_qmf spells it out: the first
+            // kQmfDelaySlots slots this call emits finish the previous frame's own ramp as a
+            // plain blend of the two snapshots; the rest belong to the frame just parsed.
+            const bool previous_frame = slot < dsp::kQmfDelaySlots;
+            const float tail_frac =
+                static_cast<float>(dsp::kQmfSlotsPerFrame - dsp::kQmfDelaySlots + slot + 1) /
+                static_cast<float>(dsp::kQmfSlotsPerFrame);
+            const int ts = slot - dsp::kQmfDelaySlots;
+            const float frac_whole = static_cast<float>(ts + 1) / static_cast<float>(kQmfTimeslots);
+            const float frac_first = static_cast<float>(ts + 1) / static_cast<float>(kHalfWindow);
+            const float frac_second = static_cast<float>(ts - kHalfWindow + 1) /
+                                      static_cast<float>(kQmfTimeslots - kHalfWindow);
+
+            // pass 1: this slot's coefficient for each channel and band. Which rule applies
+            // depends on the object's shape and the slot only.
+            enum class Rule : std::uint8_t {
+                kTailBlend, kFlat, kSmoothWhole, kSmoothFirst, kSmoothSecond,
+                kSteepPrevious, kSteepFirst, kSteepSecond,
+            };
+            const Rule rule = [&] {
+                if (previous_frame) {
+                    return Rule::kTailBlend;
+                }
+                if (!has_previous) {
+                    return Rule::kFlat;
+                }
+                if (!shape.steep) {
+                    if (shape.data_points == 1) {
+                        return Rule::kSmoothWhole;
+                    }
+                    return ts < kHalfWindow ? Rule::kSmoothFirst : Rule::kSmoothSecond;
+                }
+                if (ts < shape.offset_ts[0]) {
+                    return Rule::kSteepPrevious;
+                }
+                if (shape.data_points == 1 || ts < shape.offset_ts[1]) {
+                    return Rule::kSteepFirst;
+                }
+                return Rule::kSteepSecond;
+            }();
+            for (int ch = 0; ch < kNumChannels5X; ++ch) {
+                const std::size_t row = object_row + (static_cast<std::size_t>(ch) *
+                                                      static_cast<std::size_t>(kQmfSubbands));
+                auto& bm = band_mix[static_cast<std::size_t>(ch)];
+                for (int band = 0; band < bands; ++band) {
+                    const std::size_t index =
+                        row + static_cast<std::size_t>(first_subband[static_cast<std::size_t>(band)]);
+                    const float dq0 = dq(0, ch, band);
+                    float m = 0.0F;
+                    switch (rule) {
+                        case Rule::kTailBlend: {
+                            const float previous_val = has_previous ? state.previous_matrix[index] : dq0;
+                            const float older_val =
+                                has_older ? state.older_matrix[index] : previous_val;
+                            m = older_val + tail_frac * (previous_val - older_val);
+                            break;
+                        }
+                        case Rule::kFlat:
+                            m = shape.data_points > 1 ? dq(1, ch, band) : dq0;
+                            break;
+                        case Rule::kSmoothWhole: {
+                            const float previous_val = state.previous_matrix[index];
+                            m = previous_val + frac_whole * (dq0 - previous_val);
+                            break;
+                        }
+                        case Rule::kSmoothFirst: {
+                            const float previous_val = state.previous_matrix[index];
+                            m = previous_val + frac_first * (dq0 - previous_val);
+                            break;
+                        }
+                        case Rule::kSmoothSecond:
+                            m = dq0 + frac_second * (dq(1, ch, band) - dq0);
+                            break;
+                        case Rule::kSteepPrevious:
+                            m = state.previous_matrix[index];
+                            break;
+                        case Rule::kSteepFirst:
+                            m = dq0;
+                            break;
+                        case Rule::kSteepSecond:
+                            m = dq(1, ch, band);
+                            break;
+                    }
+                    bm[static_cast<std::size_t>(band)] = m;
+                }
+                auto& mix_ch = scratch.mix[static_cast<std::size_t>(ch)];
+                for (int k = 0; k < dsp::kQmfSubbands; ++k) {
+                    mix_ch[static_cast<std::size_t>(k)] =
+                        bm[static_cast<std::size_t>(mapping[static_cast<std::size_t>(k)])];
+                }
+            }
+
+            // pass 2: §6.6.6's sum, subband by subband, over the five bed channels in order.
+            const float* const slot_spectra =
+                spectra.data() + static_cast<std::size_t>(slot) * kSlotStride;
+            for (int k = 0; k < dsp::kQmfSubbands; ++k) {
+                const auto j = static_cast<std::size_t>(k);
+                float real = 0.0F;
+                float imag = 0.0F;
+                for (int ch = 0; ch < kNumChannels5X; ++ch) {
+                    const auto c = static_cast<std::size_t>(ch);
+                    const float m = scratch.mix[c][j];
+                    const float* const channel = slot_spectra + c * 2U * dsp::kQmfSubbands;
+                    real += m * channel[j];
+                    imag += m * channel[dsp::kQmfSubbands + j];
+                }
+                scratch.object_real[j] = real;
+                scratch.object_imag[j] = imag;
+            }
+            synth.pull(scratch.object_real, scratch.object_imag, emitted);
+        }
+    };
+    internal::run_lanes(state.executor, static_cast<std::size_t>(objects), object_task);
+
+    // The matrix to ramp from next frame: this frame's last data point at subband resolution.
+    state.older_matrix = std::move(state.previous_matrix);
+    state.previous_matrix.assign(previous_size, 0.0F);
+    for (int object = 0; object < objects; ++object) {
+        const auto shape = params.shape(object);
+        if (!shape.present) {
+            continue;
+        }
+        const auto& mapping = kSubbandToBand[static_cast<std::size_t>(shape.num_bands_idx)];
+        const float* const base = object_base[static_cast<std::size_t>(object)];
+        const int bands = object_bands[static_cast<std::size_t>(object)];
+        for (int ch = 0; ch < kNumChannels5X; ++ch) {
+            for (int subband = 0; subband < kQmfSubbands; ++subband) {
+                const std::size_t index =
+                    (static_cast<std::size_t>(object) * static_cast<std::size_t>(kNumChannels5X) +
+                     static_cast<std::size_t>(ch)) *
+                        static_cast<std::size_t>(kQmfSubbands) +
+                    static_cast<std::size_t>(subband);
+                state.previous_matrix[index] =
+                    base[((static_cast<std::size_t>(shape.data_points - 1) *
+                               static_cast<std::size_t>(kNumChannels5X) +
+                           static_cast<std::size_t>(ch)) *
+                          static_cast<std::size_t>(bands)) +
+                         static_cast<std::size_t>(mapping[static_cast<std::size_t>(subband)])];
+            }
+        }
+    }
+    state.previous_objects = objects;
+    state.previous_channels = kNumChannels5X;
+
+    return out;
+}
+
 }  // namespace
 
 std::vector<std::vector<float>> reconstruct(std::span<const std::span<const float>> bed,
@@ -1317,7 +1602,8 @@ std::vector<std::vector<float>> reconstruct(std::span<const std::span<const floa
     // cannot be copied verbatim between calls once band counts and data
     // points are allowed to vary per object.
     auto objects = domain == iclforge::objects::oba::joc::Domain::kQmf
-                       ? reconstruct_qmf(bed, params, state)
+                       ? (state.qmf_single_precision ? reconstruct_qmf_single(bed, params, state)
+                                                     : reconstruct_qmf(bed, params, state))
                        : reconstruct_mdct_band(bed, params, state, fast_mdct, fast_imdct);
 
     // §6.3.3.2: a flat per-frame post-multiply on the final object PCM only,
