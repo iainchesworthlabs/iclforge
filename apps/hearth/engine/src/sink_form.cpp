@@ -108,6 +108,103 @@ struct Folded {
 // name by their channel counts. Every one is a name OutputLayout knows.
 constexpr std::array<Folded, 3> kFoldTargets{{{"7.1", 8}, {"5.1", 6}, {"2.0", 2}}};
 
+// Why a sink that would place this stream's objects is not to be sent it as it is: it states
+// fewer objects than the stream has, and would place them. Nothing for a stream with none, for a
+// sink that states no limit for the type, and for one whose settings or layout leave the objects
+// out (it plays the bed, which is what the stream is to it).
+[[nodiscard]] std::optional<std::string> object_refusal(const StreamNeeds& stream,
+                                                        const SinkFacts& sink) {
+    if (!stream.stream || stream.objects == 0 || !sink.iclforge_support) {
+        return std::nullopt;
+    }
+    const sp::DataType type = data_type_of(*stream.stream);
+    const std::optional<std::uint8_t> limit = sink.iclforge_support->max_objects_of(type);
+    if (!limit || stream.objects <= *limit) {
+        return std::nullopt;
+    }
+    bool places = false;
+    const std::optional<sp::ObjectsPolicy> policy =
+        sink.intended_settings ? sink.intended_settings->decoder.objects : std::nullopt;
+    if (policy == sp::ObjectsPolicy::kAlways) {
+        places = true;
+    } else if (policy != sp::ObjectsPolicy::kNever) {
+        places = configured_layout(sink, stream).has_height();
+    }
+    if (!places) {
+        return std::nullopt;
+    }
+    if (*limit == 0) {
+        return fmt::format("This sink does not place objects, and this stream has {}",
+                           stream.objects);
+    }
+    return fmt::format("This sink places up to {} objects, and this stream has {}", *limit,
+                       stream.objects);
+}
+
+// PCM for a sink that is not to be sent the stream as it is, for `refusal`'s reason: at the rate
+// the stream has, at the sink's layout and folded where its formats do not take that; or nothing,
+// and why.
+[[nodiscard]] SinkChoice pcm_choice(const std::string& refusal, const StreamNeeds& stream,
+                                    const SinkFacts& sink, const SinkFormPolicy& policy) {
+    // PCM, at the rate the stream has: this app does not resample, so a sink
+    // that lists PCM at another rate only is a sink it has no PCM for.
+    std::vector<std::size_t> channels;
+    std::vector<std::int32_t> rates;
+    for (const PcmFormat& format : sink.pcm_formats) {
+        rates.push_back(static_cast<std::int32_t>(format.sample_rate));
+        if (stream.sample_rate == 0 || format.sample_rate == stream.sample_rate) {
+            channels.push_back(format.channels);
+        }
+    }
+    const auto lists = [&](std::size_t count) {
+        return std::ranges::find(channels, count) != channels.end();
+    };
+
+    if (sink.pcm_formats.empty()) {
+        return {.form = SinkForm::kNone,
+                .reason = fmt::format("{}, and it lists no PCM to be sent instead.", refusal)};
+    }
+    if (!policy.pcm_fallback) {
+        return {
+            .form = SinkForm::kNone,
+            .reason = fmt::format("{}, and sending it PCM decoded here is switched off.", refusal)};
+    }
+    if (channels.empty()) {
+        std::ranges::sort(rates);
+        rates.erase(std::unique(rates.begin(), rates.end()), rates.end());
+        return {.form = SinkForm::kNone,
+                .reason = fmt::format("{}, and its PCM is {} only, not {} Hz.", refusal,
+                                      rates_text(rates), stream.sample_rate)};
+    }
+
+    // A source with no coded form is PCM already, and is not decoded here.
+    const std::string_view decoded = stream.stream ? "decoded here and " : "";
+    const render::OutputLayout wanted = configured_layout(sink, stream);
+    if (lists(wanted.slots())) {
+        return {.form = SinkForm::kPcm,
+                .layout = wanted,
+                .reason = fmt::format("{}, so it is {}sent as PCM at {}.", refusal, decoded,
+                                      wanted.text())};
+    }
+    for (const Folded& target : kFoldTargets) {
+        if (target.channels < wanted.slots() && lists(target.channels)) {
+            const std::optional<render::OutputLayout> folded =
+                render::OutputLayout::named(target.name);
+            if (folded) {
+                return {.form = SinkForm::kPcm,
+                        .layout = folded,
+                        .reason = fmt::format(
+                            "{}, so it is {}folded to {} PCM, the widest its PCM formats take.",
+                            refusal, decoded, target.name)};
+            }
+        }
+    }
+    return {
+        .form = SinkForm::kNone,
+        .reason = fmt::format("{}, and none of its PCM formats takes the {} layout it is set to.",
+                              refusal, wanted.text())};
+}
+
 }  // namespace
 
 sp::DataType data_type_of(audio::BitstreamFormat format) {
@@ -126,72 +223,26 @@ sp::DataType data_type_of(audio::BitstreamFormat format) {
 
 SinkChoice choose_sink_form(const StreamNeeds& stream, const SinkFacts& sink,
                             const SinkFormPolicy& policy) {
-    const std::optional<std::string> refusal = coded_refusal(stream, sink);
-    if (!refusal) {
-        return {
-            .form = SinkForm::kCoded,
+    if (const std::optional<std::string> refusal = coded_refusal(stream, sink)) {
+        return pcm_choice(*refusal, stream, sink, policy);
+    }
+    const std::string coded =
+        fmt::format("Sending {} as it is", audio::format_name(*stream.stream));
+    const std::optional<std::string> objects = object_refusal(stream, sink);
+    if (!objects) {
+        return {.form = SinkForm::kCoded,
+                .layout = std::nullopt,
+                .reason = coded + ": the sink decodes it for its own speakers."};
+    }
+    // The sink decodes the stream but would play its bed alone, past the objects it places.
+    // Decoded here, the objects are placed; where that is not possible it plays the bed.
+    SinkChoice pcm = pcm_choice(*objects, stream, sink, policy);
+    if (pcm.form == SinkForm::kPcm) {
+        return pcm;
+    }
+    return {.form = SinkForm::kCoded,
             .layout = std::nullopt,
-            .reason = fmt::format("Sending {} as it is: the sink decodes it for its own speakers.",
-                                  audio::format_name(*stream.stream))};
-    }
-
-    // PCM, at the rate the stream has: this app does not resample, so a sink
-    // that lists PCM at another rate only is a sink it has no PCM for.
-    std::vector<std::size_t> channels;
-    std::vector<std::int32_t> rates;
-    for (const PcmFormat& format : sink.pcm_formats) {
-        rates.push_back(static_cast<std::int32_t>(format.sample_rate));
-        if (stream.sample_rate == 0 || format.sample_rate == stream.sample_rate) {
-            channels.push_back(format.channels);
-        }
-    }
-    const auto lists = [&](std::size_t count) {
-        return std::ranges::find(channels, count) != channels.end();
-    };
-
-    if (sink.pcm_formats.empty()) {
-        return {.form = SinkForm::kNone,
-                .reason = fmt::format("{}, and it lists no PCM to be sent instead.", *refusal)};
-    }
-    if (!policy.pcm_fallback) {
-        return {.form = SinkForm::kNone,
-                .reason =
-                    fmt::format("{}, and sending it PCM decoded here is switched off.", *refusal)};
-    }
-    if (channels.empty()) {
-        std::ranges::sort(rates);
-        rates.erase(std::unique(rates.begin(), rates.end()), rates.end());
-        return {.form = SinkForm::kNone,
-                .reason = fmt::format("{}, and its PCM is {} only, not {} Hz.", *refusal,
-                                      rates_text(rates), stream.sample_rate)};
-    }
-
-    // A source with no coded form is PCM already, and is not decoded here.
-    const std::string_view decoded = stream.stream ? "decoded here and " : "";
-    const render::OutputLayout wanted = configured_layout(sink, stream);
-    if (lists(wanted.slots())) {
-        return {.form = SinkForm::kPcm,
-                .layout = wanted,
-                .reason = fmt::format("{}, so it is {}sent as PCM at {}.", *refusal, decoded,
-                                      wanted.text())};
-    }
-    for (const Folded& target : kFoldTargets) {
-        if (target.channels < wanted.slots() && lists(target.channels)) {
-            const std::optional<render::OutputLayout> folded =
-                render::OutputLayout::named(target.name);
-            if (folded) {
-                return {.form = SinkForm::kPcm,
-                        .layout = folded,
-                        .reason = fmt::format(
-                            "{}, so it is {}folded to {} PCM, the widest its PCM formats take.",
-                            *refusal, decoded, target.name)};
-            }
-        }
-    }
-    return {
-        .form = SinkForm::kNone,
-        .reason = fmt::format("{}, and none of its PCM formats takes the {} layout it is set to.",
-                              *refusal, wanted.text())};
+            .reason = fmt::format("{}. {}, so it plays the bed without them.", coded, *objects)};
 }
 
 SinkFormPolicy form_policy(const SinkFacts& sink) {

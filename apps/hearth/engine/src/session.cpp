@@ -192,6 +192,8 @@ std::expected<Session, std::string> Session::open(
             session.programme_ = chosen->substreamid;
             session.first_programme_ = false;
             session.facts_.channels = static_cast<std::uint16_t>(std::max(chosen->channels, 0));
+            session.facts_.objects =
+                static_cast<std::uint16_t>(std::max(chosen->oba_complexity_index.value_or(0), 0));
             lengths.reserve(session.units_.size());
             for (const auto unit : session.units_) {
                 lengths.push_back(unit_samples(unit));
@@ -203,6 +205,8 @@ std::expected<Session, std::string> Session::open(
                                      : session.scanned_.programmes.front().substreamid;
             session.facts_.channels =
                 static_cast<std::uint16_t>(std::max(session.scanned_.channels, 0));
+            session.facts_.objects = static_cast<std::uint16_t>(
+                std::max(session.scanned_.oba_complexity_index.value_or(0), 0));
             lengths = session.scanned_.access_unit_samples;
         }
         session.facts_.stream = format_of(session.scanned_.kind);

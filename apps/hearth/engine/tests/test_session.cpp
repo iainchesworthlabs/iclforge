@@ -123,6 +123,45 @@ TEST_CASE("session: a handover releases the unit the old decoder was holding, an
     CHECK(session->position_samples() == session->total_samples());
 }
 
+// The objects a programme declares are what a sink's stated limit is compared with, and are read
+// from the stream's own addbsi (TS 103 420's complexity index) when the item is opened.
+TEST_CASE("session: an E-AC-3 stream's declared object count is in the item's facts",
+          "[hearth][session]") {
+    const auto objects_of = [](std::optional<int> index) {
+        iclforge::ac3::eac3::FrameConfig config;
+        config.bitrate_kbps = 384;
+        config.acmod = iclforge::ac3::Acmod::k3_2;
+        config.lfe = true;
+        config.oba_complexity_index = index;
+        iclforge::ac3::eac3::FrameEncoder encoder{config};
+        std::vector<std::byte> stream;
+        for (int f = 0; f < 3; ++f) {
+            std::vector<float> samples(iclforge::ac3::kSamplesPerFrame);
+            for (std::size_t n = 0; n < samples.size(); ++n) {
+                samples[n] = static_cast<float>(
+                    0.3 * std::sin(2.0 * std::numbers::pi * 440.0 *
+                                   static_cast<double>(n + (static_cast<std::size_t>(f) * 1536)) /
+                                   48000.0));
+            }
+            const std::vector<std::span<const float>> views(
+                static_cast<std::size_t>(encoder.channel_count()), samples);
+            const auto frame = encoder.encode_frame(views);
+            REQUIRE(frame.has_value());
+            stream.insert(stream.end(), frame->begin(), frame->end());
+        }
+        const ItemLoader loader =
+            [&stream](const std::string&) -> std::expected<LoadedItem, std::string> {
+            return LoadedItem{.bytes = stream};
+        };
+        auto session = Session::open("objects", loader);
+        REQUIRE(session.has_value());
+        return session->facts().objects;
+    };
+    CHECK(objects_of(std::nullopt) == 0);
+    CHECK(objects_of(12) == 12);
+    CHECK(objects_of(16) == 16);
+}
+
 TEST_CASE("session: each unit the item plays is reported with its frames, and no other",
           "[hearth][session]") {
     // The same stream a frame behind, with the start and the end trimmed off.

@@ -95,6 +95,9 @@ struct SinkOptions {
     // The most channels the extension role's support object states it decodes, for every data
     // type it lists; 0 states none, as a sink from before the key does.
     std::uint8_t max_coded_channels = 0;
+    // The most objects the extension role's support object states it places, for every data type
+    // it lists; unset states none. 0 is a statement: bed only.
+    std::optional<std::uint8_t> max_objects;
 };
 
 // What a sink reports, one line at a time, from any of its threads.

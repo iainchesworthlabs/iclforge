@@ -103,6 +103,16 @@ struct Support {
     [[nodiscard]] std::uint8_t max_coded_channels_of(DataType type) const {
         return max_coded_channels[static_cast<std::size_t>(type)];
     }
+    // Per data type, the most objects the sink reconstructs and places of a stream of that type in
+    // real time, indexed by DataType. Unset when the sink states none for the type; 0 is a
+    // statement, not an absence: the sink decodes the bed and does not reconstruct objects. A
+    // stream with more objects than a sink states is decoded as its bed by the sink itself, so a
+    // server that wants them placed sends it PCM rendered on its own side.
+    std::array<std::optional<std::uint8_t>, 3> max_objects{};
+
+    [[nodiscard]] std::optional<std::uint8_t> max_objects_of(DataType type) const {
+        return max_objects[static_cast<std::size_t>(type)];
+    }
 };
 
 void write_support(json::Writer& w, const Support& support);
