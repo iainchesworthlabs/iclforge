@@ -41,11 +41,13 @@
 //      cannot take is folded rather than refused.
 //   3. Else nothing, and the reason says which of the sink's own limits it was.
 //
-// What this does not decide: whether the sink can SUSTAIN a PCM stream (an
-// ESP32-C6 cannot, at the figures measured) is a fact about the board that
-// the sink does not state yet. The caller passes it as `pcm_fallback`, so the
-// one place that turns the fallback off for a board, or for a person who asked
-// for "never decode in Hearth", is that argument.
+// What this does not decide: whether the sink can SUSTAIN a PCM stream. An
+// ESP32-C6 does on a quiet link and drops out on a busy one, its buffer being
+// a fifth of a second (planning/esp32-sink-compatibility-matrix.md), a fact
+// about the board that the sink does not state yet. The caller passes it as
+// `pcm_fallback` and `pcm_caveat`: the one place that turns the fallback off
+// for a board, or for a person who asked for "never decode in Hearth", is
+// the first, and what a board is offered with a warning, the second.
 
 namespace iclforge::hearth {
 
@@ -79,6 +81,9 @@ struct StreamNeeds {
 struct SinkFormPolicy {
     // Whether a sink that cannot take the stream as coded may be sent PCM.
     bool pcm_fallback = true;
+    // A sentence added to the reason of a sink that is sent PCM: what may go wrong with it on
+    // this board. Empty for a sink with nothing to add.
+    std::string pcm_caveat{};
 };
 
 struct SinkChoice {
@@ -122,10 +127,11 @@ struct GroupFormPlan {
 };
 
 // The policy for one sink: whether it may be sent PCM decoded here when it cannot take the
-// stream as it is. Off for an ESP32-C6, whose player cannot sustain a PCM stream at the figures
-// measured (planning/esp32-sink-compatibility-matrix.md): the sink does not state that, so it is
-// read from the hardware it names, until the board can say it. This is the place a person's own
-// "never decode in Hearth" setting will be read as well.
+// stream as it is, and what to say about it. An ESP32-C6 is sent PCM with a caveat, its buffer
+// being short enough that a busy WiFi drops the stream out (planning/esp32-sink-compatibility-
+// matrix.md): the sink does not state that, so it is read from the hardware it names, until the
+// board can say it. This is the place a person's own "never decode in Hearth" setting will be
+// read as well.
 [[nodiscard]] SinkFormPolicy form_policy(const SinkFacts& sink);
 
 // Each sink's form for one stream, and the layouts the group needs rendered beyond `master`,

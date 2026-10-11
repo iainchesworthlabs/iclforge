@@ -60,6 +60,13 @@ constexpr std::int64_t kNetworkLead = 100'000;
 // A unit's longest play time, which a group counts each queued unit of a codec other than PCM
 // as lasting. A PCM unit is counted as lasting what its bytes make.
 constexpr std::int64_t kLongestUnit = 150'000;
+// A PCM sink whose buffer (player_support.buffer_capacity) holds less than kShallowBuffer of the
+// stream is sent units of at most kShortUnit. On a board with such a buffer, a unit's bytes
+// arriving late stalls the whole unit, and the longer the unit the more often and the longer the
+// stall: an ESP32-C6, 48 KB, dropped out a median 2 times in 15 s on 10 ms units and 22 on 21 ms
+// ones, the same stream over the same link (planning/esp32-sink-compatibility-matrix.md).
+constexpr std::int64_t kShallowBuffer = 1'000'000;
+constexpr std::int64_t kShortUnit = 10'000;
 constexpr std::chrono::seconds kRedialAfter{10};
 
 [[nodiscard]] bool contains(const std::vector<std::string>& roles, std::string_view role) {
@@ -1420,7 +1427,8 @@ struct Group::State {
                 return;
             }
             // A client the host was asked to play small chunks to (use_pcm()) gets PCM units of as
-            // many whole frames as fit its limit, where the default is 20 ms.
+            // many whole frames as fit its limit, where the default is 20 ms; and a sink with a
+            // shallow buffer gets units of at most 10 ms.
             codec::EncoderOptions options;
             if (chosen->codec == m::Codec::kPcm) {
                 std::size_t limit = request.max_chunk_bytes;
@@ -1437,6 +1445,19 @@ struct Group::State {
                 if (limit != 0 && frame_bytes != 0) {
                     options.frames =
                         static_cast<std::int32_t>(std::max<std::size_t>(1, limit / frame_bytes));
+                }
+                // And short ones where its buffer is shallow, whatever limit it states.
+                const std::uint64_t capacity = client.player_support->buffer_capacity;
+                if (capacity != 0 && frame_bytes != 0 && chosen->sample_rate > 0) {
+                    const auto held_us = static_cast<std::int64_t>(capacity / frame_bytes) *
+                                         1'000'000 / chosen->sample_rate;
+                    if (held_us < kShallowBuffer) {
+                        const auto short_frames = static_cast<std::int32_t>(std::max<std::int64_t>(
+                            1, chosen->sample_rate * kShortUnit / 1'000'000));
+                        options.frames = options.frames == 0
+                                             ? short_frames
+                                             : std::min(options.frames, short_frames);
+                    }
                 }
             }
             std::unique_ptr<codec::Encoder> encoder = codec::make_encoder(*chosen, options);

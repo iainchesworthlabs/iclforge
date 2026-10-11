@@ -213,8 +213,10 @@ class ServerHost {
     // takes small chunks (a board's message limit is a few KB). It counts the samples only: a
     // chunk's header and its encryption tag come on top. 0 leaves it to what the sink states in its
     // support object (max_chunk_bytes there, header included), and to 20 ms a chunk where it
-    // states none. A figure given here wins over the sink's. False when the client is not
-    // connected.
+    // states none. A figure given here wins over the sink's. Whatever the limit, a sink whose
+    // buffer (player_support.buffer_capacity) holds under a second of the stream is sent units of
+    // at most 10 ms: a long unit stalls a shallow buffer more often than a short one. False when
+    // the client is not connected.
     //
     // `channels` is the width of PCM to play it, when a group's programme carries more than one
     // (Group::Programme::more_pcm): the first format its player lists with that many channels,
