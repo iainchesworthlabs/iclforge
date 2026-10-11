@@ -375,10 +375,11 @@ TEST_CASE("subrip: the file beside an item is its .lrc, and its .srt where there
     Folder folder;
     folder.write("song.mp3", "x");
     CHECK_FALSE(iclforge::lyrics::find_lyrics_file((folder.path() / "song.mp3").string()).has_value());
-    folder.write("SONG.SRT", "1\n00:00:01,000 --> 00:00:02,000\nHello\n");
+    folder.write("song.SRT", "1\n00:00:01,000 --> 00:00:02,000\nHello\n");
     const auto subtitles = iclforge::lyrics::find_lyrics_file((folder.path() / "song.mp3").string());
     REQUIRE(subtitles.has_value());
-    // (On a case-insensitive file system the usual spelling is what comes back.)
+    // The extension in any case, as for the .lrc; on a case-insensitive file system the usual
+    // spelling is what comes back, so the name is compared in lower case.
     std::string name = subtitles->filename().string();
     std::transform(name.begin(), name.end(), name.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
