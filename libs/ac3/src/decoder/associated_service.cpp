@@ -3,12 +3,22 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
 #include <limits>
 #include <numbers>
+#include <optional>
+#include <span>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 #include "iclforge/ac3/core/types.hpp"
+#include "iclforge/ac3/decoder/decoder.hpp"
+#include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
+#include "iclforge/base/layout.hpp"
 
 namespace iclforge::ac3 {
 
