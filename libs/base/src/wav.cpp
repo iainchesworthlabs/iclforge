@@ -66,6 +66,7 @@ std::expected<WavData, WavError> parse_wav(const std::vector<char>& raw) {
 
     WavData result;
     result.sample_rate = format->sample_rate;
+    result.channel_mask = format->channel_mask;
     const std::size_t frames = payload / format->stride;
     const std::size_t width = detail::sample_bytes(format->format);
     result.channels.assign(format->channels, std::vector<float>(frames));
@@ -114,6 +115,21 @@ std::expected<void, WavError> write_wav_f32(const std::string& path,
                                             std::span<const std::vector<float>> channels,
                                             std::uint32_t sample_rate,
                                             std::span<const std::size_t> channel_order) {
+    return write_wav_f32(path, channels, sample_rate, channel_order, 0);
+}
+
+std::expected<void, WavError> write_wav_f32(std::ostream& out,
+                                            std::span<const std::vector<float>> channels,
+                                            std::uint32_t sample_rate,
+                                            std::span<const std::size_t> channel_order) {
+    return write_wav_f32(out, channels, sample_rate, channel_order, 0);
+}
+
+std::expected<void, WavError> write_wav_f32(const std::string& path,
+                                            std::span<const std::vector<float>> channels,
+                                            std::uint32_t sample_rate,
+                                            std::span<const std::size_t> channel_order,
+                                            std::uint32_t channel_mask) {
     // Checked here too, rather than left solely to the std::ostream& overload
     // below: an empty `channels` must not touch the filesystem at all (no
     // truncated file left behind at `path`), so this has to fail before
@@ -126,13 +142,14 @@ std::expected<void, WavError> write_wav_f32(const std::string& path,
     if (!out) {
         return std::unexpected(WavError::kCannotOpen);
     }
-    return write_wav_f32(out, channels, sample_rate, channel_order);
+    return write_wav_f32(out, channels, sample_rate, channel_order, channel_mask);
 }
 
 std::expected<void, WavError> write_wav_f32(std::ostream& out,
                                             std::span<const std::vector<float>> channels,
                                             std::uint32_t sample_rate,
-                                            std::span<const std::size_t> channel_order) {
+                                            std::span<const std::size_t> channel_order,
+                                            std::uint32_t channel_mask) {
     if (channels.empty()) {
         return std::unexpected(WavError::kTruncated);
     }
@@ -159,19 +176,7 @@ std::expected<void, WavError> write_wav_f32(std::ostream& out,
     // needs to seek back and patch the header once the truth is known. That
     // makes it exactly as safe on an unseekable stream (a pipe to `-`) as it
     // is on a plain file - see docs/forge/cli/commands.md's "-" convention.
-    out.write("RIFF", 4);
-    put_u32(out, 36 + data_bytes);
-    out.write("WAVE", 4);
-    out.write("fmt ", 4);
-    put_u32(out, 16);
-    put_u16(out, 3);  // IEEE float
-    put_u16(out, count);
-    put_u32(out, sample_rate);
-    put_u32(out, sample_rate * count * 4);
-    put_u16(out, static_cast<std::uint16_t>(count * 4));
-    put_u16(out, 32);
-    out.write("data", 4);
-    put_u32(out, data_bytes);
+    detail::write_f32_header(out, count, sample_rate, data_bytes, channel_mask);
     for (std::uint32_t frame = 0; frame < frames; ++frame) {
         for (const auto source : order) {
             const float value = channels[source][frame];

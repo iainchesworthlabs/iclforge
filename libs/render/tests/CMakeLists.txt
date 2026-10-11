@@ -1,6 +1,7 @@
 # iclforge-render-tests - the renderer's Catch2 tests (cmake/IclforgeTests.cmake).
 iclforge_add_test_binary(iclforge-render-tests PROJECT render SOURCES
     test_layout.cpp
+    test_object_constraints.cpp
     test_object_lfe_timing.cpp
     test_identify.cpp
     test_routing.cpp

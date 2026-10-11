@@ -54,6 +54,14 @@ In rough order of strength:
    `cplfsnroffst` ahead of the per-channel lists when the block couples, and the decoder skipped
    both, which no stream this project produces could have exposed.
 
+   Two more, `dee_joc_714.ec3` and `dee_joc_916.ec3`, are 7.1.4 and 9.1.6 beds that play one input
+   channel at a time, a tenth of a second each. They exist for what ten channels cannot show: that
+   the bed's channel order holds at twelve and sixteen, where Table 12's order and a production
+   tool's input order are different permutations (9.1.6 puts the wides last in the bed and right
+   after the rears at the input). The slice an object comes back loud in names the input channel
+   it carries, whatever the solver did with the others, and every object does — the DEE-checked
+   claim `docs/library/spatial-and-atmos.md` makes of CBI beds.
+
    What that fixture asserts is not just "it parses". Each of the ten channels of the source bed
    carries a different tone, so identifying each reconstructed JOC object by which tone dominates
    it is an independent check on both the reconstruction and the *order* the bed's channels
@@ -489,7 +497,7 @@ Two tiers, both gated in CI:
   commercially mastered programme material, encoded years ago by whatever encoder the mastering
   house used, and they exercise choices neither this project's encoder nor FFmpeg's makes:
   spectral extension at 128 and 256 kbit/s, 1536 kbit/s, a director's-commentary track, dither
-  in use, the 3/1 acmod nothing in this tree can encode, and an A/52 Annex E §E2.3.1.2
+  in use, a 3/1 acmod that this encoder reaches only through a Table E2.5 list, and an A/52 Annex E §E2.3.1.2
   legacy-core delivery (below). Fetched at run time and never committed — they are film
   excerpts, and pinning by hash is what keeps an upstream change from quietly moving the
   numbers. Runs nightly in the `Interop` workflow, and on a pull request that changes the decode
@@ -578,6 +586,13 @@ One more divergence was found and fixed rather than recorded:
   exercises 3/1 (`millers_crossing_4.0.ac3`) went from decode-and-parse-only to a compared sample
   once the two decoders' channel orders agreed: channel 0 (L) at 48.93 dB, and a near-silent
   surround channel gated on absolute difference at a −46.0 dBFS floor (measured −55.31 dBFS).
+
+The four modes with no preset were measured the same way against FFmpeg's decode of this
+encoder's own streams (a tone per channel, 192 kbit/s): 3/0 at 98.7 to 101.1 dB, 2/1 at 98.7 to
+101.1, 3/1 at 86.6 to 94.8, 2/2 at 86.6 to 94.8 and 3/0 with an LFE at 97.5 to 140.4, per
+channel, at zero lag. FFmpeg's channel masks for them (`0x7`, `0x103`, `0x107`, `0x603`, `0xF`)
+are the ones `decode` writes, except 2/2, which `decode` states with the back pair (`0x33`) and
+FFmpeg with the sides; both read back as L R Ls Rs.
 
 Two divergences are recorded rather than resolved:
 

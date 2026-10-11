@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 103> kOptionTokens{{
+constexpr std::array<OptionToken, 104> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -49,6 +49,7 @@ constexpr std::array<OptionToken, 103> kOptionTokens{{
     {"keep-partial", "keep a failed run's already-encoded frames as <name>.partial.<ext>"},
     {"sign-objects", "write a keyed EMDF object signature (needs signing-key=)"},
     {"verify-objects", "check each frame's EMDF object signature instead of just decoding"},
+    {"gate-objects", "play objects only where the EMDF signature verifies, the bed elsewhere"},
     {"mix-lfe", "decode/monitor: fold the LFE into the §7.8 output-stage downmix too"},
     {"mix-lfe=", "decode/monitor: on, or off to keep the LFE out of a downmix, as AC-4's is not by default"},
     {"fast-mdct", "names the default forward MDCT (the fast §7.9.4 path)"},
@@ -363,6 +364,12 @@ void print_layout_topic() {
     fmt::println("        Locations: L C R Ls Rs Lc Rc Lrs Rrs Cs Ts Lsd Rsd Lw Rw Vhl Vhr");
     fmt::println("        Vhc Lts Rts LFE2 LFE - a paired location (Lc/Rc, Lrs/Rrs, Lsd/Rsd,");
     fmt::println("        Lw/Rw, Vhl/Vhr, Lts/Rts) must be given both halves.");
+    fmt::println("");
+    fmt::println("        With no [layout], 'encode' and 'eac3-encode' follow the source: a WAV");
+    fmt::println("        that states which speakers its channels are (a WAVE_FORMAT_EXTENSIBLE");
+    fmt::println("        channel mask, which 'decode' writes from three channels up) is encoded");
+    fmt::println("        as exactly those - FL FR BC is 2/1, FL FR FC BC is 3/1 - and one that");
+    fmt::println("        states none is read by its channel count.");
 }
 
 void print_tools_topic() {
@@ -694,11 +701,13 @@ void print_stream_tools_topic() {
 
 void print_objects_topic() {
     fmt::println("");
-    fmt::println("sign-objects/verify-objects carry a keyed signature over the EMDF object");
-    fmt::println("       container: the encode side writes one, a decode or monitor checks it");
-    fmt::println("       and refuses the whole command on a mismatch. Both need a key -");
-    fmt::println("       signing-key=<path>, or ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY");
-    fmt::println("       - which this tool never stores. See docs/concepts/object-signing.md.");
+    fmt::println("sign-objects/verify-objects/gate-objects carry a keyed signature over the EMDF");
+    fmt::println("       object container: the encode side writes one, a decode or monitor checks");
+    fmt::println("       it - verify-objects refuses the whole command on a mismatch, gate-objects");
+    fmt::println("       plays the bed for the frames that do not verify and the objects for the");
+    fmt::println("       rest. All need a key - signing-key=<path> (repeat it for a keyring when");
+    fmt::println("       checking), or ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY - which");
+    fmt::println("       this tool never stores. See docs/concepts/object-signing.md.");
 }
 
 // The per-topic sections, in the order both the full listing and a single
@@ -847,8 +856,15 @@ void print_option_blocks(std::uint32_t mask) {
                      "against signing-key= instead of just playing it - a mismatch refuses the "
                      "command; omitted (the default) decodes signed and unsigned streams alike, "
                      "unchecked");
-        fmt::println("  signing-key=<path>      the key file sign-objects/verify-objects use "
-                     "(or ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY)");
+        fmt::println("  gate-objects      decode/monitor/spatial: the licensed policy - frames whose "
+                     "object signature verifies against signing-key= play as objects, any other "
+                     "(unsigned, another key's, altered) plays as its 5.1 bed and the decode "
+                     "carries on; where verify-objects would refuse. Not combinable with "
+                     "verify-objects");
+        fmt::println("  signing-key=<path>      the key file sign-objects/verify-objects/gate-objects "
+                     "use (or ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY). Repeat it to give "
+                     "verify-objects and gate-objects several keys - a frame is good under any of "
+                     "them; sign-objects takes one");
     }
     if ((mask & topic::kMulti) != 0) {
         fmt::println("");

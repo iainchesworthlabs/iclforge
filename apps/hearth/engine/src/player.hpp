@@ -391,6 +391,10 @@ private:
     // One rendered block, or one burst, waiting for room in the sink.
     struct Pending {
         std::vector<float> samples{};  // planar: slot 0's frames, then slot 1's, ...
+        // A network group's further layouts (group_variants_) of the same
+        // frames, planar like `samples`, one per layout; empty for a block
+        // whose layouts did not come, which the group is sent silence for.
+        std::vector<std::vector<float>> variants{};
         // For a bitstream output, the burst instead, of `frames` content
         // frames: what the units packed into it code, and whose they are - a
         // burst at a join holds units of both items.
@@ -541,6 +545,9 @@ private:
     // Builds the decoder for `rate` from the current settings, or a
     // transcode's from its own.
     void build_decoder(std::uint32_t rate, bool transcode);
+    // Gives the decoder the layouts a network group's members are to be sent
+    // beyond layout_ (group_variants_), or takes them away.
+    void attach_variants();
     // Whether the decoder there is is the one build_decoder() would build.
     [[nodiscard]] bool decoder_fits(std::uint32_t rate, bool transcode) const;
     // Decodes into the pending blocks until they hold at least `frames`.
@@ -631,6 +638,18 @@ private:
     // comment on why bursts are not pending_'s own entries).
     std::deque<PendingGroupBurst> pending_group_bursts_;
     std::size_t group_pcm_offset_ = 0;
+    // The layouts, beyond layout_, the open group's members take PCM at
+    // (NetworkGroupSink::variants()), each rendered by a decoder of its own
+    // (StreamDecoder::set_variants()). variant_stash_ holds each one's block
+    // of the samples take_block() is about to queue, which the decoder
+    // delivers just ahead of them; group_zeros_ is what a block that did not
+    // come is sent in its place.
+    std::vector<render::OutputLayout> group_variants_;
+    std::vector<std::vector<float>> variant_stash_;
+    std::vector<float> group_zeros_;
+    std::vector<std::array<std::span<const float>, render::OutputLayout::kMaxSlots>>
+        group_variant_views_;
+    std::vector<std::span<const std::span<const float>>> group_variant_spans_;
     // A transcoding output's encoder, and why it failed, if it did.
     std::optional<Ac3Transcoder> transcoder_;
     std::optional<std::string> transcode_error_;

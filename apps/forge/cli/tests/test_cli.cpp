@@ -1404,6 +1404,137 @@ TEST_CASE("verify-objects checks a decode against the signer's own tag",
     }
 }
 
+// The keyring and the licensed gate are the two halves verify-objects left
+// open: several keys (a facility signs per show or per year, and a delivery
+// QC has to accept any of them), and the AVR's policy - objects where the tag
+// is good, the bed where it is not, no refusal. The gate's contract is
+// checked at its own layer in libs/ac3/tests/signing/test_signing.cpp; what
+// is checked here is that the command line reaches it, and says what it did.
+TEST_CASE("verify-objects takes a keyring and gate-objects plays the bed where a tag does not "
+          "verify",
+          "[cli][atmos][signing][gate]") {
+    const auto dir = scratch_dir();
+    const auto key_a = dir / "gate_objects_a.key";
+    const auto key_b = dir / "gate_objects_b.key";
+    const auto key_c = dir / "gate_objects_c.key";
+    const auto write_key = [](const fs::path& path, std::string_view bytes) {
+        std::ofstream key{path, std::ios::binary};
+        REQUIRE(key.is_open());
+        key << bytes;
+    };
+    write_key(key_a, "gate-objects-test-key-A-material");
+    write_key(key_b, "gate-objects-test-key-B-material");
+    write_key(key_c, "gate-objects-test-key-C-material");
+
+    const auto signed_ec3 = dir / "gate_objects_signed.ec3";
+    const auto signed_log = dir / "gate_objects_signed.log";
+    REQUIRE(run_cli("atmos \"" + signed_ec3.string() +
+                        "\" 1 448 2 4 objects sign-objects signing-key=\"" + key_b.string() + "\"",
+                    signed_log) == 0);
+    REQUIRE(fs::exists(signed_ec3));
+
+    const auto decode_with = [&](const std::string& tail, const fs::path& wav,
+                                 const fs::path& log) {
+        return run_cli("decode \"" + signed_ec3.string() + "\" \"" + wav.string() + "\" " + tail,
+                       log);
+    };
+    const auto key_arg = [](const fs::path& path) {
+        return "signing-key=\"" + path.string() + "\"";
+    };
+
+    SECTION("verify-objects accepts the stream when any key of the set is the signer's") {
+        const auto wav = dir / "gate_objects_ring_ok.wav";
+        const auto log = dir / "gate_objects_ring_ok.log";
+        const auto rc = decode_with("verify-objects " + key_arg(key_a) + " " + key_arg(key_b) + " " +
+                                        key_arg(key_c),
+                                    wav, log);
+        const auto text = read_log(log);
+        INFO(text);
+        CHECK(rc == 0);
+        CHECK(text.find("0 mismatched") != std::string::npos);
+        // Which of the keys it was is part of the report: the second.
+        CHECK(text.find("key 2") != std::string::npos);
+    }
+
+    SECTION("verify-objects refuses when no key of the set is the signer's") {
+        const auto wav = dir / "gate_objects_ring_bad.wav";
+        const auto log = dir / "gate_objects_ring_bad.log";
+        const auto rc = decode_with("verify-objects " + key_arg(key_a) + " " + key_arg(key_c), wav, log);
+        const auto text = read_log(log);
+        INFO(text);
+        CHECK(rc != 0);
+        CHECK(text.find("any of the supplied keys") != std::string::npos);
+    }
+
+    SECTION("gate-objects with the signer's key plays the objects, and says so") {
+        const auto wav = dir / "gate_objects_pass.wav";
+        const auto log = dir / "gate_objects_pass.log";
+        const auto rc = decode_with("gate-objects " + key_arg(key_a) + " " + key_arg(key_b), wav, log);
+        const auto text = read_log(log);
+        INFO(text);
+        CHECK(rc == 0);
+        // Every frame was signed under key B, so every one kept its objects
+        // and none was reduced to the bed - credited to the second key.
+        CHECK(text.find("frame(s) kept their objects") != std::string::npos);
+        CHECK(text.find("object gate: 0 frame(s)") == std::string::npos);
+        CHECK(text.find("0 played as the bed") != std::string::npos);
+        CHECK(text.find("key 2") != std::string::npos);
+        CHECK(text.find("OAMD present") != std::string::npos);
+    }
+
+    SECTION("gate-objects with another key plays the bed - no refusal, no objects") {
+        const auto wav = dir / "gate_objects_bed.wav";
+        const auto log = dir / "gate_objects_bed.log";
+        const auto rc = decode_with("gate-objects " + key_arg(key_a), wav, log);
+        const auto text = read_log(log);
+        INFO(text);
+        CHECK(rc == 0);
+        CHECK(fs::exists(wav));
+        CHECK(text.find("object gate: 0 frame(s) kept their objects") != std::string::npos);
+        CHECK(text.find(" 0 played as the bed") == std::string::npos);
+        // The object layer never reached the decoder.
+        CHECK(text.find("OAMD present") == std::string::npos);
+
+        // And the bed it played is the bed the stream carries: the same
+        // samples an ungated decode of the same stream writes.
+        const auto plain_wav = dir / "gate_objects_bed_plain.wav";
+        REQUIRE(decode_with("", plain_wav, dir / "gate_objects_bed_plain.log") == 0);
+        const bool same_bed = read_log(wav) == read_log(plain_wav);
+        CHECK(same_bed);
+    }
+
+    SECTION("gate-objects with no key anywhere is the same hard error as verify-objects") {
+        const auto log = dir / "gate_objects_no_key.log";
+        const auto rc = decode_with("gate-objects", dir / "gate_objects_no_key.wav", log);
+        const auto text = read_log(log);
+        INFO(text);
+        CHECK(rc != 0);
+        CHECK(text.find("needs a key") != std::string::npos);
+    }
+
+    SECTION("verify-objects and gate-objects together is a usage error, not a guess") {
+        const auto log = dir / "gate_objects_both.log";
+        const auto rc = decode_with("verify-objects gate-objects " + key_arg(key_b),
+                                    dir / "gate_objects_both.wav", log);
+        const auto text = read_log(log);
+        INFO(text);
+        CHECK(rc != 0);
+        CHECK(text.find("give one, not both") != std::string::npos);
+    }
+
+    SECTION("sign-objects signs with one key and refuses a second") {
+        const auto log = dir / "gate_objects_two_signers.log";
+        const auto rc = run_cli("atmos \"" + (dir / "gate_objects_two_signers.ec3").string() +
+                                    "\" 1 448 2 4 objects sign-objects " + key_arg(key_a) + " " +
+                                    key_arg(key_b),
+                                log);
+        const auto text = read_log(log);
+        INFO(text);
+        CHECK(rc != 0);
+        CHECK(text.find("signs with one key") != std::string::npos);
+    }
+}
+
 // keep-partial (item 34): a bare trailing token, same style as heavy/
 // mixmeta/sign-objects, that keeps whatever frames a failed encode already
 // produced at <name>.partial.<ext> instead of discarding them - see
@@ -3589,8 +3720,8 @@ TEST_CASE("man and completions are generated from the command table", "[cli][man
         REQUIRE(run_cli("completions fish", log) == 0);
         const auto script = read_log(log);
         for (const auto* token : {"couple", "heavy", "heavy2", "mixmeta", "keep-partial",
-                                  "sign-objects", "verify-objects", "fast-mdct", "fast-imdct",
-                                  "quiet", "verbose"}) {
+                                  "sign-objects", "verify-objects", "gate-objects", "fast-mdct",
+                                  "fast-imdct", "quiet", "verbose"}) {
             INFO(token);
             CHECK(script.find(std::string{"-a '"} + token + "'") != std::string::npos);
             CHECK(run_cli(std::string{"silence \""} + (dir / "man_opt.ac3").string() + "\" 1 192 " +

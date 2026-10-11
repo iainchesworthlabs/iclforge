@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <numbers>
 #include <span>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -139,6 +140,221 @@ Played play(StreamDecoder& decoder, const std::vector<std::vector<std::byte>>& u
 }
 
 }  // namespace
+
+// A network group takes the same programme at several layouts. A stereo room is the decoder's own
+// fold, with the stream's mix levels, so each further layout is a decoder of its own and one unit
+// is decoded for each.
+namespace {
+
+// What one decoder delivers of `units` and the end of the stream, planar a block at a time.
+struct Rendered {
+    std::vector<std::vector<float>> blocks;
+    std::vector<std::size_t> frames;
+};
+
+Rendered render_alone(StreamDecoder& decoder, const std::vector<std::vector<std::byte>>& units) {
+    Rendered out;
+    const auto deliver = [&out](std::span<const std::span<const float>> slots, std::size_t frames) {
+        std::vector<float> planar;
+        for (const auto slot : slots) {
+            planar.insert(planar.end(), slot.begin(),
+                          slot.begin() + static_cast<std::ptrdiff_t>(frames));
+        }
+        out.blocks.push_back(std::move(planar));
+        out.frames.push_back(frames);
+    };
+    for (const auto& unit : units) {
+        REQUIRE(decoder.decode(unit, deliver).has_value());
+    }
+    decoder.finish(deliver);
+    return out;
+}
+
+// A decoder with `layouts` as variants, and what it and they delivered, with the order they came
+// in: 'V' for a variant's block and 'P' for the decoder's own.
+struct WithVariants {
+    Rendered primary;
+    std::vector<Rendered> variants;
+    std::string order;
+};
+
+WithVariants render_with_variants(StreamDecoder& decoder,
+                                  const std::vector<iclforge::render::OutputLayout>& layouts,
+                                  const std::vector<std::vector<std::byte>>& units) {
+    WithVariants out;
+    out.variants.resize(layouts.size());
+    decoder.set_variants(layouts,
+                         [&out](std::size_t index, std::span<const std::span<const float>> slots,
+                                std::size_t frames) {
+                             std::vector<float> planar;
+                             for (const auto slot : slots) {
+                                 REQUIRE(slot.size() == frames);
+                                 planar.insert(planar.end(), slot.begin(), slot.end());
+                             }
+                             out.variants[index].blocks.push_back(std::move(planar));
+                             out.variants[index].frames.push_back(frames);
+                             out.order.push_back('V');
+                         });
+    const auto deliver = [&out](std::span<const std::span<const float>> slots, std::size_t frames) {
+        std::vector<float> planar;
+        for (const auto slot : slots) {
+            planar.insert(planar.end(), slot.begin(),
+                          slot.begin() + static_cast<std::ptrdiff_t>(frames));
+        }
+        out.primary.blocks.push_back(std::move(planar));
+        out.primary.frames.push_back(frames);
+        out.order.push_back('P');
+    };
+    for (const auto& unit : units) {
+        REQUIRE(decoder.decode(unit, deliver).has_value());
+    }
+    decoder.finish(deliver);
+    return out;
+}
+
+bool same_blocks(const Rendered& a, const Rendered& b) {
+    return a.frames == b.frames && a.blocks == b.blocks;
+}
+
+}  // namespace
+
+TEST_CASE(
+    "stream decoder: a further layout is the same stream rendered as a decoder of its own would",
+    "[hearth][stream-decoder][variants]") {
+    const auto master = iclforge::render::OutputLayout::parse("5.1");
+    const auto stereo = iclforge::render::OutputLayout::parse("2.0");
+    const auto surround = iclforge::render::OutputLayout::parse("7.1");
+    REQUIRE(master.has_value());
+    REQUIRE(stereo.has_value());
+    REQUIRE(surround.has_value());
+    const auto units = eac3_frames(iclforge::ac3::Acmod::k3_2, /*lfe=*/true, 12);
+
+    StreamDecoder reference_master{*master, 48000};
+    StreamDecoder reference_stereo{*stereo, 48000};
+    StreamDecoder reference_surround{*surround, 48000};
+    const Rendered want_master = render_alone(reference_master, units);
+    const Rendered want_stereo = render_alone(reference_stereo, units);
+    const Rendered want_surround = render_alone(reference_surround, units);
+
+    StreamDecoder decoder{*master, 48000};
+    const WithVariants got = render_with_variants(decoder, {*stereo, *surround}, units);
+    REQUIRE(got.variants.size() == 2);
+    CHECK(decoder.variant_count() == 2);
+    // The decoder's own blocks are what it would have delivered alone, and each layout's are what a
+    // decoder of that layout delivers: the same samples, block for block.
+    CHECK(same_blocks(got.primary, want_master));
+    CHECK(same_blocks(got.variants[0], want_stereo));
+    CHECK(same_blocks(got.variants[1], want_surround));
+    // Each block of the decoder's own comes with a block of every layout, ahead of it.
+    REQUIRE_FALSE(got.primary.frames.empty());
+    std::string expected;
+    for (std::size_t block = 0; block < got.primary.frames.size(); ++block) {
+        expected += "VVP";
+    }
+    CHECK(got.order == expected);
+    // The stereo room's blocks are the fold's: two slots, and something audible.
+    REQUIRE_FALSE(got.variants[0].blocks.empty());
+    CHECK(got.variants[0].blocks.front().size() == 2 * got.variants[0].frames.front());
+    double energy = 0.0;
+    for (const auto& block : got.variants[0].blocks) {
+        for (const float sample : block) {
+            energy += static_cast<double>(sample) * static_cast<double>(sample);
+        }
+    }
+    CHECK(energy > 1.0);
+}
+
+TEST_CASE(
+    "stream decoder: a further layout stays in step through a held-back frame, a reset and the end",
+    "[hearth][stream-decoder][variants]") {
+    const auto master = iclforge::render::OutputLayout::parse("2.0");
+    const auto mono = iclforge::render::OutputLayout::parse("1.0");
+    REQUIRE(master.has_value());
+    REQUIRE(mono.has_value());
+    // A transient engages transient pre-noise processing, which holds a frame back until the end of
+    // the stream releases it: the decoder's own blocks and the layout's must still come together.
+    const auto units =
+        eac3_frames(iclforge::ac3::Acmod::k2_0, /*lfe=*/false, 8, /*transient_at_end=*/true);
+
+    StreamDecoder reference_mono{*mono, 48000};
+    const Rendered want_mono = render_alone(reference_mono, units);
+
+    StreamDecoder decoder{*master, 48000};
+    const WithVariants first = render_with_variants(decoder, {*mono}, units);
+    REQUIRE(first.variants.size() == 1);
+    CHECK(same_blocks(first.variants[0], want_mono));
+    CHECK(first.variants[0].frames.size() == first.primary.frames.size());
+    std::size_t total = 0;
+    for (const std::size_t frames : first.primary.frames) {
+        total += frames;
+    }
+    CHECK(total == 8 * iclforge::ac3::kSamplesPerFrame);
+
+    // The stream ended and finish() reset the decoder: the layout carries on into the next stream,
+    // clean, as a new decoder of its own would.
+    StreamDecoder reference_again{*mono, 48000};
+    const Rendered want_again = render_alone(reference_again, units);
+    Rendered got_again;
+    const std::array<iclforge::render::OutputLayout, 1> mono_only{*mono};
+    decoder.set_variants(mono_only,
+                         [&got_again](std::size_t, std::span<const std::span<const float>> slots,
+                                      std::size_t frames) {
+                             std::vector<float> planar;
+                             for (const auto slot : slots) {
+                                 planar.insert(planar.end(), slot.begin(), slot.end());
+                             }
+                             got_again.blocks.push_back(std::move(planar));
+                             got_again.frames.push_back(frames);
+                         });
+    const auto ignore = [](std::span<const std::span<const float>>, std::size_t) {};
+    for (const auto& unit : units) {
+        REQUIRE(decoder.decode(unit, ignore).has_value());
+    }
+    decoder.finish(ignore);
+    CHECK(same_blocks(got_again, want_again));
+
+    // A reset in the middle (a seek) starts both from nothing. A tone, not the silence the units
+    // above are until their transient: a decoder that carried its overlap across would show.
+    const auto tone_units = eac3_frames(iclforge::ac3::Acmod::k2_0, /*lfe=*/false, 8);
+    StreamDecoder reference_tone{*mono, 48000};
+    const Rendered want_tone = render_alone(reference_tone, tone_units);
+    got_again = {};
+    for (std::size_t i = 0; i < 3; ++i) {
+        REQUIRE(decoder.decode(tone_units[i], ignore).has_value());
+    }
+    decoder.reset();
+    got_again = {};
+    for (const auto& unit : tone_units) {
+        REQUIRE(decoder.decode(unit, ignore).has_value());
+    }
+    decoder.finish(ignore);
+    CHECK(same_blocks(got_again, want_tone));
+}
+
+TEST_CASE(
+    "stream decoder: AC-3 units are rendered to a further layout too, and none after it is dropped",
+    "[hearth][stream-decoder][variants]") {
+    const auto master = iclforge::render::OutputLayout::parse("5.1");
+    const auto stereo = iclforge::render::OutputLayout::parse("2.0");
+    REQUIRE(master.has_value());
+    REQUIRE(stereo.has_value());
+    const auto units = ac3_frames(iclforge::ac3::Acmod::k3_2, /*lfe=*/true, 10);
+
+    StreamDecoder reference{*stereo, 48000};
+    const Rendered want = render_alone(reference, units);
+
+    StreamDecoder decoder{*master, 48000};
+    const WithVariants got = render_with_variants(decoder, {*stereo}, units);
+    CHECK(same_blocks(got.variants.at(0), want));
+
+    // With the layouts taken away the decoder is the plain one again: no layout's blocks, and the
+    // same blocks of its own.
+    decoder.set_variants({}, {});
+    CHECK(decoder.variant_count() == 0);
+    StreamDecoder plain{*master, 48000};
+    const Rendered want_plain = render_alone(plain, units);
+    CHECK(same_blocks(render_alone(decoder, units), want_plain));
+}
 
 TEST_CASE("stream decoder: every E-AC-3 sample arrives, a block at a time, at the layout's width",
           "[hearth][stream-decoder]") {

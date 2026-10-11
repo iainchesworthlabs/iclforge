@@ -301,7 +301,10 @@ of objects takes them from `decode()`.
 plays E-AC-3's objects with (`iclforge::render::LayoutRenderer`, by way of
 `apps/shared/media/src/ac4_object_render.hpp`): each object panned from its position at its gain, moving to
 each update over its ramp, to the layout `speakers=`, `channels=` or `downmix=` names, 7.1.4
-without them. Width, divergence, zones and the screen factor are not rendered.
+without them. Width, divergence, zones and the screen factor are not rendered: the layout renderer
+applies E-AC-3's channel lock, zones and extent (see [Spatial & Atmos
+objects](spatial-and-atmos.md)), and this path does not hand them over from AC-4's object
+properties.
 
 ## Encoding a stream
 

@@ -29,6 +29,22 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Atmos object signing: several keys, and the licensed gate**
+
+- **`verify-objects` takes a keyring.** `signing-key=` repeats, and a frame is valid when any of the
+  keys reproduces its tag; the summary says which key accepted how many frames. The library gains
+  `signing::verify_atmos_frame_any` and `verify_atmos_stream_any` (a `KeyringVerdict` and a
+  `KeyringSummary` with `per_key` counts) and Python `signing.verify_atmos_stream_any`. An empty
+  set accepts nothing; with paths given the environment key is not consulted. `sign-objects` stays
+  single-key and refuses a second `signing-key=`.
+- **`gate-objects` is the AVR-like policy.** `decode`, `monitor` and `spatial` play the objects of
+  every frame whose tag verifies and the 5.1 bed of every other (unsigned, another key's, altered),
+  and carry on, where `verify-objects` refuses. `signing::gate_atmos_stream` (Python
+  `signing.gate_atmos_stream`) removes the object layer from the frames that do not verify with the
+  same lossless rewrite `strip_objects` does, so the bed is bit-identical and the result plays in
+  any decoder. It fails closed on an object layer it can neither verify nor remove. It cannot be
+  combined with `verify-objects`, and is a usage error on AC-4.
+
 **E-AC-3: an associated service mixed into the main**
 
 - **`iclforge::ac3::AssociatedServiceMixer` and `forge decode associated=`.** A description or a
@@ -128,6 +144,33 @@ The sections below contain the complete change list and fixes.
 - **The expanded loudspeaker layouts read.** `expanded_layout_info()` lists the 20
   `expanded_loudspeaker_layout` values (9.1.6ch, 10.2.9.3ch, 7.1.5.4ch and their subsets) with the
   substream order of 3.6.2.3, and `decode_pcm()` decodes a single-layer element in any of them.
+
+**Atmos objects: channel lock, zones and extent in the renderer, and DEE-checked 7.1.4 and 9.1.6 beds**
+
+- **`LayoutRenderer` applies an object's channel lock, zone constraints and extent.** The renderer
+  Hearth, the ESP32 player and `forge decode`'s AC-4 object rendering play objects through took an
+  object's position and gain and nothing else. It now follows what TS 103 420 §5.2 says each
+  property means: `b_object_snap` puts the object on the one nearest speaker; the
+  zone constraints of Tables 20 and 21 take the excluded zones' speakers (Table A.7) out of the set
+  it is panned over, with a surround pair the back zone in a 5.X layout and the side zone in a
+  larger one, and `b_enable_elevation` false keeping it off the height speakers; and an extent is
+  rendered as the cuboid it describes, sampled and power-averaged, so a large object spreads over
+  more speakers at the same level. `DisplayObject` gains `zone` and `enable_elevation`. An object
+  that says none of this renders exactly as before. Object divergence and the screen and depth
+  factors are still not applied: the standard gives no geometry for the first, and the output
+  layouts describe no screen for the others.
+- **Extended precision positions are applied.** §5.5.15's `ext_prec_pos_block` was read and thrown
+  away. A position now gets the refinement it carries (x and y by up to two fifths of the 1/62
+  step, z of the 1/15 one), per update block and without feeding the next block's differential
+  coding, as §5.6.1.1.8-.14 say. It is decoded from the text alone, no outside stream carries one.
+  Reading it also fixed a bit count: an object that is not active sends no `b_ext_prec_pos`, and the
+  reader took one for it. `ObjectUpdate::extended_position_precision` lets the writer send it.
+- **7.1.4 and 9.1.6 channel-based-immersive beds are checked against DEE.** Two committed Dolby
+  Encoding Engine streams, `dee_joc_714.ec3` and `dee_joc_916.ec3`, play one input channel at a
+  time, and every reconstructed object comes back as the channel its bed label names. That settles
+  what the 5.1.4 fixture could not: the bed's order holds at twelve and sixteen channels, where
+  Table 12's order and the input order differ (9.1.6 has the wides last in the bed and after the
+  rears at the input).
 
 **IAB (SMPTE ST 2098-2): lossless audio, a writer, and spread and zones in the bridge**
 
@@ -2733,6 +2776,16 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**Object signing**
+
+- **A signed frame could carry unauthenticated object data and still verify.** The tag hashes the
+  container and the audio, and every skip field is excised from the message, so a second payload in
+  another block's skip field, or bytes trailing the container in its own, were outside it.
+  `verify_atmos_frame` now reports such a frame as a mismatch, and likewise a container that
+  declares no primary protection field (`protection_length_primary` `00`, reserved), for which
+  comparing zero bits used to read as a match. `sign_atmos_frame` no longer reports having signed
+  one. The docs' claim that the tag does not cover the audio was wrong and is corrected.
+
 **E-AC-3: a type 2 substream, read and written as the standard has it**
 
 - **`strmtyp` 2 (§E2.3.1.1, "previously coded in AC-3") is a whole stream type now, not a
@@ -2746,6 +2799,30 @@ The sections below contain the complete change list and fixes.
   (held to AC-3's tools, no dependents, a Table 5.18 code) and `DecodedSubstream`,
   `FrameHeader` and `forge probe` report the code it was converted from. The conversion to and
   from AC-3 itself is not built: the standard gives the signalling and no process.
+
+**AC-3 coding modes 3/0, 2/1, 3/1 and 2/2**
+
+- **A WAV's speakers were never read, so a 2/1 or 3/1 file was encoded as a different mode.** The
+  encoder took a source's width as its layout: three channels were L R C and four were L R Ls Rs
+  whatever the file said, so `forge decode`'s own output for a 2/1 stream encoded back with its
+  lone surround in the centre channel, a 3/1 stream's centre in a surround, and a 3/0 + LFE
+  stream's centre and LFE in the surrounds, all on a 5.1 with silent channels besides. `WavData::channel_mask`
+  (and `WavStreamReader::channel_mask()`) now carry a `WAVE_FORMAT_EXTENSIBLE` header's
+  `dwChannelMask`, and `encode`, `eac3-encode`, `programmeN=` and Forge GUI follow it for an unnamed
+  layout: FL FR BC is 2/1, FL FR FC BC is 3/1, FL FR BL BR or FL FR SL SR is 2/2, each with or
+  without the LFE. The same file named onto a narrower layout folds by that mode's §7.8
+  coefficients (a lone surround at 0.707 × `surmixlev`, where the width's guess used the centre
+  level), `dialnorm=auto` weights its channels by the speakers they are, and `transcode` keeps a
+  stream that is exactly one coding mode in that mode instead of widening it to 5.1.
+- **`forge decode` states its speakers.** An AC-3 or E-AC-3 decode of three channels or more is
+  written as `WAVE_FORMAT_EXTENSIBLE` with its channel mask (`write_wav_f32` and
+  `WavStreamWriter::open` take one; a mask that does not name exactly the channels written leaves
+  the plain header). Mono and stereo output, and any decode that cannot name its speakers, keep
+  the 44-byte header they always had. A WAV that states no speakers is read by its width exactly
+  as before: every checked-in fixture encodes to the same bytes.
+- **New in `iclforge::ac3::plan`:** `wav_mask_locations`, `wav_channel_mask`, `source_layout`,
+  `channel_mask_of`, `layout_for_locations`, and a `route()` overload that takes the source's own
+  locations. The two front ends share them, as they share every other layout rule there.
 
 **ADM / BW64**
 

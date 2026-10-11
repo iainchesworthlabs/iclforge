@@ -51,6 +51,39 @@ what the AC-4 encoder takes from a plan: the named layouts mono, stereo and 5.1,
 does not go through a plan: it takes the immersive layouts, and the experimental 7.X and 3.0 ones,
 from the WAV file's own channels.
 
+## One source that states its speakers
+
+A width is not a layout: three channels are 3/0 as FL FR FC and 2/1 as FL FR BC, and four are 2/2
+as FL FR BL BR and 3/1 as FL FR FC BC. `route(target, channels, ...)` has only the count, so it
+reads three as L R C and four as L R Ls Rs, which is right for the files that are those and wrong
+for the rest. A `WAVE_FORMAT_EXTENSIBLE` header's `dwChannelMask` says which, and four functions
+carry it from the file to an encoder the way `forge` and Forge GUI both do:
+
+```cpp
+using namespace iclforge::ac3;
+const auto read = io::read_wav(path);                       // WavData::channel_mask
+const auto stated = plan::wav_mask_locations(read->channel_mask, read->channels.size());
+if (stated) {                                               // nullopt: states none, or none usable
+    if (const auto chosen = plan::source_layout(plan::Codec::kAc3, *stated)) {
+        if (chosen->layout) { p.layout = *chosen->layout; }
+        else { p.custom_locations = chosen->custom_locations; }
+    }
+    const auto routing = plan::route(plan::resolve(p), *stated, clev, slev);
+}
+```
+
+`wav_mask_locations` returns one Table E2.5 location per channel in file order, and nothing for a
+mask that is 0, names a different number of speakers than the file has channels, or names one
+Table E2.5 has no location for (`SPEAKER_TOP_BACK_CENTER`); `SPEAKER_BACK_LEFT/RIGHT` are the
+surrounds on their own and the rear surrounds beside the sides, as `iclforge::audio::locations_of`
+reads them (a test holds the two to each other). `source_layout` answers with the named layout that
+renders exactly those locations, or else a custom selection, and nothing for a set the codec cannot
+carry (AC-3 has no dependent substream). The located `route()` takes the source as it states itself:
+a 2/1 source folds to stereo by 2/1's §7.8 coefficients, a 5.1.2 file sent to 7.1 is panned to it
+rather than read as 7.1 because it is as wide, and a location named twice is refused.
+`plan::wav_channel_mask(locations)` is the inverse for a file about to be written, which is how
+`forge decode` states the speakers of what it writes.
+
 ## Multiple sources: `iclforge::ac3::plan::Assignment`
 
 `iclforge/ac3/encoder/assignment.hpp`. `plan::route()`'s other overload places *one* source by
