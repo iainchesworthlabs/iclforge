@@ -180,6 +180,27 @@ public:
         return path;
     }
 
+    // Writes `text` into this process's scratch folder as `name` - UTF-8, or one
+    // byte a character (Latin-1) when `latin1`, which is how a file that is not
+    // UTF-8 is made - and returns its path, or empty if it could not be written.
+    // For a lyrics file beside a stream the suite wrote under the same stem.
+    Q_INVOKABLE QString writeTextFile(const QString& name, const QString& text, bool latin1 = false) {
+        if (!scratch_.isValid()) {
+            return {};
+        }
+        const QString path = QDir(scratch_.path()).filePath(name);
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            qWarning("writeTextFile: cannot open %s", qPrintable(path));
+            return {};
+        }
+        const QByteArray bytes = latin1 ? text.toLatin1() : text.toUtf8();
+        if (file.write(bytes) != bytes.size()) {
+            return {};
+        }
+        return path;
+    }
+
     // Copies `source` (a path, or a file: URL) into this process's scratch
     // folder as `name`, so a suite can queue several distinctly named items
     // from the repository's small golden streams, and returns the copy's

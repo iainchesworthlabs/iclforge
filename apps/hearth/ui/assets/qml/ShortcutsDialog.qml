@@ -100,6 +100,8 @@ Dialog {
             rowSpacing: Theme.space1
             Key { text: "F1" }
             Action { text: qsTr("Open this reference") }
+            Key { text: "F11" }
+            Action { text: qsTr("Lyrics in full screen; Esc leaves it") }
         }
 
         RowLayout {
