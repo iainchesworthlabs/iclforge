@@ -2784,6 +2784,18 @@ The sections below contain the complete change list and fixes.
   `play` and `forge transcode` now take `programme=` too (they always transcoded the first).
   `iclforge::apps::select_programme()` and `cut_programme()` in `apps/shared/media` do the
   choosing without any printing, for a player that is not the CLI.
+- **`forge spdif` and the GUI stream player made the same mistake with a second independent
+  substream.** `spdif` wrapped every access unit of an E-AC-3 stream carrying two programmes, so
+  the carrier held both programmes' bursts one after the other (64 for a main of 32 frame periods),
+  which a receiver locks onto as the main at half speed with the description between its frames.
+  It now wraps one programme as `play` sends it: `programme=<0..7>`, or the first the stream
+  carries, said as `programme 0 of 2 (0, 1)`, cut out and renumbered as substream 0 when it is not
+  0, and refused by name when the stream lacks it. The Forge GUI's stream player fed the same
+  interleaved units to one decoder, sized from the first unit's 5.1, so the mono description's unit
+  read channels that were not there (on a two-programme file the decode never finished and the
+  player stayed busy); it now plays the first programme and says so in its summary line
+  (`… · programme 0 of 2 (0, 1)`). `play` and `spdif` share one choose-and-cut helper
+  (`select_receiver_units`).
 - **`ac3cli monitor` refused a §E2.3.1.2 legacy-core stream and dropped every stream's last
   unit.** It picked its decode path from the first frame's bsid alone, so a stream whose 5.1
   bed is a plain AC-3 syncframe with Annex E dependents extending it went to `FrameDecoder`,
