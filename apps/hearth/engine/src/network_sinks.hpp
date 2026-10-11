@@ -16,6 +16,7 @@
 #include "iclforge/sendspin/noise.hpp"
 #include "iclforge/sendspin/pairing_messages.hpp"
 #include "iclforge/sendspin/server_host.hpp"
+#include "network_group_sink.hpp"
 #include "network_view.hpp"
 #include "pairing_store.hpp"
 
@@ -242,6 +243,16 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
     // way iclforge::sendspin::Group::id() (unique per host) does.
     [[nodiscard]] std::shared_ptr<sendspin::Group> group(const std::string& group_id) const;
 
+    // Decides what each connected member of the group `request.group_name` (a group id) is sent
+    // the programme `request` describes, and tells the host: choose_sink_form() for each sink
+    // (sink_form.hpp), then ServerHost::use_pcm() to move it to PCM at the width chosen or back to
+    // the coded stream, and Group::hold() for a sink that takes neither. Answers the layouts the
+    // members chosen for PCM take beyond `request.layout`, which is what a MemberPlanner
+    // (network_group_sink.hpp) is. Called by the engine as a group opens, so on its thread;
+    // the line each member's reason makes is in take_log(). An id this class does not know
+    // answers nothing and decides nothing, and the group plays as it would with no planner.
+    [[nodiscard]] std::vector<render::OutputLayout> plan_group(const GroupPlanRequest& request);
+
     // The host's own trail (ServerHostEvents::on_log()) since the last call,
     // oldest first: what was dialled, what each sink was given, and why a
     // connection ended. At most kLogLines are kept between calls; older ones
@@ -327,6 +338,14 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
         // own header comment on why membership is kept here rather than
         // read back from Group, and in sink-id rather than client_id terms.
         std::vector<std::string> member_sink_ids{};
+        // What plan_group() last decided for each member, by sink id: the form's key
+        // (GroupMemberFacts::form), its label and the reason.
+        struct Planned {
+            std::string form{};
+            std::string label{};
+            std::string reason{};
+        };
+        std::map<std::string, Planned> planned{};
     };
 
     // A dial to make once mutex_ is released: to pair, or not.

@@ -56,6 +56,16 @@ Every vs_* key is ours-minus-theirs, including the LSD one where lower is
 better - the arithmetic stays uniform and the presentation layer decides
 which direction is good.
 
+A (leg, variant) already recorded for this commit is not recorded again. The
+nightly run scores a tip that has not moved to the same numbers it scored the
+night before, and this file carried a copy of every row for each of those runs:
+five of them on 5c21b117a, so the home page's listening card counted 335
+measurements where there were 67, and its "on 6 legs" was a count of legs
+recorded once each. Every row is still judged, against its history from BEFORE
+this commit, so a repeated run says again what the first said and a hard
+regression keeps failing the job it is in rather than going quiet once its own
+numbers were in the window.
+
 stdlib-only (json/argparse/pathlib), matching every other append-*.py
 script's no-new-CI-provisioning reasoning. Takes commit and commit-date as
 arguments rather than reading the clock itself - see this project's general
@@ -130,8 +140,10 @@ def load_baseline_scores(manifest_json: Path):
 TRACKED_METRICS = ("snr_db", "mos_lqo")
 
 
-def load_history(history_path: Path):
-    """(leg, variant) -> {metric: [values, oldest first]} for TRACKED_METRICS.
+def load_history(history_path: Path, exclude_commit=None):
+    """(leg, variant) -> {metric: [values, oldest first]} for TRACKED_METRICS,
+    without the records of `exclude_commit`: a run is judged against what came
+    before its commit, not against a copy of its own numbers.
 
     One pass over the file, not one per (row, metric) lookup. This history
     grows by one record per (leg, variant) on every main push - eight
@@ -155,12 +167,28 @@ def load_history(history_path: Path):
         if not line.strip():
             continue
         rec = json.loads(line)
+        if exclude_commit is not None and rec.get("commit") == exclude_commit:
+            continue
         key = (rec.get("leg"), rec.get("variant"))
         for metric in TRACKED_METRICS:
             value = rec.get(metric)
             if value is not None:
                 history.setdefault(key, {}).setdefault(metric, []).append(value)
     return history
+
+
+def recorded_keys(history_path: Path, commit: str):
+    """The (leg, variant) of every record the file already holds for `commit`."""
+    if not history_path.exists():
+        return set()
+    keys = set()
+    for line in history_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        rec = json.loads(line)
+        if rec.get("commit") == commit:
+            keys.add((rec.get("leg"), rec.get("variant")))
+    return keys
 
 
 def trailing_mean(history, leg: str, variant: str, window: int, metric: str = "snr_db"):
@@ -201,7 +229,8 @@ def main() -> int:
         print(f"::warning::no rows found in {args.trend_json}; nothing to append")
         return 0
     baselines = load_baseline_scores(args.manifest_json)
-    history = load_history(history_path)
+    history = load_history(history_path, exclude_commit=args.commit)
+    recorded = recorded_keys(history_path, args.commit)
 
     lines = []
     hard_regression = False
@@ -237,7 +266,8 @@ def main() -> int:
                             entry[f"vs_{tool}_lsd_db"] = entry["lsd_db"] - score["lsd_db"]
                         if entry["mos_lqo"] is not None and score.get("mos_lqo") is not None:
                             entry[f"vs_{tool}_mos_lqo"] = entry["mos_lqo"] - score["mos_lqo"]
-        lines.append(json.dumps(entry, sort_keys=True))
+        if (leg, variant) not in recorded:
+            lines.append(json.dumps(entry, sort_keys=True))
 
         mos_baseline = trailing_mean(history, leg, variant,
                                       REGRESSION_TRAILING_WINDOW, metric="mos_lqo")
@@ -269,7 +299,9 @@ def main() -> int:
         for line in lines:
             f.write(line + "\n")
 
-    print(f"Appended {len(lines)} record(s) to {history_path}")
+    skipped = len(rows) - len(lines)
+    print(f"Appended {len(lines)} record(s) to {history_path}"
+          + (f" ({skipped} already recorded for {args.commit[:8]})" if skipped else ""))
     write_recent_window(history_path)
     emit_github_output("hard_regression", "true" if hard_regression else "false")
     return 0

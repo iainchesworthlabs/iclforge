@@ -33,6 +33,7 @@
 #include "iclforge/objects/emdf.hpp"
 #include "iclforge/ac3/detail/decode_scalar.hpp"
 #include "iclforge/ac3/detail/profile.hpp"
+#include "lanes.hpp"
 #include "eac3_tools_fixed.hpp"
 #include "iclforge/base/arithmetic/fixed32.hpp"
 #include "iclforge/objects/joc_domain.hpp"
@@ -989,13 +990,16 @@ struct Eac3Decoder::Impl {
     // overwritten before being read, so nothing needs to persist beyond one
     // decode_substream call - unlike delay_ above, these don't need to be
     // keyed by substream identity.
-    std::array<internal::decode_scalar_t, 512> imdct_scratch_{};
+    // One per lane (lanes.hpp): the channels of a block's transform are the unit a second lane takes.
+    std::array<std::array<internal::decode_scalar_t, 512>, internal::kMaxLanes> imdct_scratch_{};
     // Enhanced coupling's spectrum, in the store's own type: eac3_tools
     // carries the §3.5.5 routines in both scalars (the double forms are the
     // encoder's), so nothing round-trips through double on the way to
     // `coeffs` - the coefficients are written into the store directly.
-    std::array<internal::decode_scalar_t, 256> ecpl_spectrum_real_{};
-    std::array<internal::decode_scalar_t, 256> ecpl_spectrum_imag_{};
+    // Two of each: with a second lane the next block's spectrum is made while this block's
+    // channels are reconstructed from the other (decode_substream_core's second pass).
+    std::array<std::array<internal::decode_scalar_t, 256>, 2> ecpl_spectrum_real_{};
+    std::array<std::array<internal::decode_scalar_t, 256>, 2> ecpl_spectrum_imag_{};
     // §3.5.5.2/.3's per-bin amplitude and angle, for one channel of one block.
     //
     // Members rather than locals in the reconstruction loop, which is where
@@ -1281,6 +1285,37 @@ void ecpl_spectrum_into(const std::array<Scalar, 256>& prev, const std::array<Sc
     }
 }
 
+// One block's enhanced coupling spectrum, as a task for the decoder's second lane
+// (DecoderConfig::executor's run_async): the three neighbouring blocks' coupling channels in,
+// the spectrum out. Only the floating tiers have the form (ecpl_spectrum_into).
+template <typename Scalar>
+struct EcplSpectrumJob {
+    const std::array<Scalar, 256>* prev = nullptr;
+    const std::array<Scalar, 256>* curr = nullptr;
+    const std::array<Scalar, 256>* next = nullptr;
+    std::array<Scalar, 256>* real = nullptr;
+    std::array<Scalar, 256>* imag = nullptr;
+    bool fast = false;
+};
+
+template <typename Scalar>
+void ecpl_spectrum_task(void* context, std::size_t /*index*/, std::size_t /*lane*/) {
+    const auto& job = *static_cast<const EcplSpectrumJob<Scalar>*>(context);
+    ecpl_spectrum_into(*job.prev, *job.curr, *job.next, *job.real, *job.imag, job.fast);
+}
+
+// The task, or none for the fixed tier, which has no such form: a template, so that the task is
+// not instantiated for a scalar that has no ecpl_spectrum_into (a plain function's `if constexpr`
+// discards nothing).
+template <typename Scalar>
+[[nodiscard]] iclforge::base::Executor::Task ecpl_spectrum_task_for() {
+    if constexpr (internal::kNormalisedStore<Scalar>) {
+        return nullptr;
+    } else {
+        return &ecpl_spectrum_task<Scalar>;
+    }
+}
+
 // A spectral extension band's RMS in the store's scalar (§E3.6.4.2.4). The
 // floating tiers accumulate in their own type, as this always did - a band
 // is at most a few dozen bins. The fixed tier sums squared raw units in 64
@@ -1341,10 +1376,12 @@ void ecpl_reconstruct_block(const Tail& tail, const std::array<Scalar, 256>& pre
                             eac3::EcplNoise& ecpl_noise, std::array<Scalar, 256>& zr,
                             std::array<Scalar, 256>& zi, std::vector<Scalar>& amp_scratch,
                             std::vector<Scalar>& angle_scratch, bool fast,
-                            std::vector<std::array<Scalar, 256>>& coeffs) {
+                            std::vector<std::array<Scalar, 256>>& coeffs,
+                            bool spectrum_ready = false) {
     const auto ubins = static_cast<std::size_t>(tail.cplendmant - tail.cplstrtmant);
     if constexpr (std::is_same_v<Scalar, iclforge::internal::Fixed32>) {
         (void)fast;
+        (void)spectrum_ready;
         // The tier's own stages (eac3_tools_fixed.hpp). The spectrum spans
         // three blocks stored under three exponents and reports the one its
         // bins share; each channel's reconstruction is handed the difference
@@ -1382,7 +1419,10 @@ void ecpl_reconstruct_block(const Tail& tail, const std::array<Scalar, 256>& pre
     } else {
         (void)prev_norm;
         (void)next_norm;
-        ecpl_spectrum_into(prev, curr, next, zr, zi, fast);
+        // `spectrum_ready`: another lane has made it already, into zr and zi.
+        if (!spectrum_ready) {
+            ecpl_spectrum_into(prev, curr, next, zr, zi, fast);
+        }
         for (int ch = 0; ch < nfchans; ++ch) {
             if (!tail.chincpl[static_cast<std::size_t>(ch)]) {
                 continue;
@@ -1434,6 +1474,33 @@ Eac3Decoder::Eac3Decoder() : impl_(std::make_unique<Impl>()) {}
 Eac3Decoder::~Eac3Decoder() = default;
 Eac3Decoder::Eac3Decoder(Eac3Decoder&&) noexcept = default;
 Eac3Decoder& Eac3Decoder::operator=(Eac3Decoder&&) noexcept = default;
+
+void Eac3Decoder::reset() {
+    // Every member that carries a stream from one call to the next: the per-identity slots'
+    // history and states, the dither sequence, the output stage, the AC-3 core's own state and
+    // whatever is waiting to be assembled. The per-frame scratch is re-established at the top of
+    // every frame and keeps only its capacity, which is what a reset is meant to leave alone.
+    auto& im = *impl_;
+    im.output_.reset();
+    im.program_compr_.reset();
+    if (im.core_) {
+        im.core_->reset();
+    }
+    for (std::size_t slot = 0; slot < Impl::kSubstreamSlots; ++slot) {
+        if (im.delay_[slot]) {
+            *im.delay_[slot] = {};
+        }
+        im.joc_state_[slot].reset();
+        im.transient_[slot].reset();
+        im.pending_au_parts_[slot].clear();
+        im.retained_[slot].reset();
+    }
+    im.delay_norm_ = internal::fresh_delay_norm_slots<Impl::kSubstreamSlots, 6>();
+    im.au_substreams_.clear();
+    im.conceal_scratch_.clear();
+    im.last_identity_ = -1;
+    im.dither_ = DitherGenerator{};
+}
 
 int Eac3Decoder::output_latency_samples() const {
     return impl_->output_.latency_samples();
@@ -1845,10 +1912,14 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
     // nothing ever writes these - see that option's own comment.
     if (!impl_->config_.skip_reconstruction) {
         // Into the identity's pooled set when it has one (pcm_pool_; the key
-        // is delay_index's, below), zero-filled exactly as a fresh set was:
-        // every sample the block loop does not write must read silence. The
-        // identity's entry is made here and never in the return, so the
-        // return - which runs in a destructor - never allocates.
+        // is delay_index's, below). A fresh set is zero, a pooled one holds the
+        // identity's last frame, and neither is cleared again here: the block
+        // loop writes every sample of every channel of every block (the
+        // overlap-add of its second pass), so nothing reads what was there.
+        // Clearing the 6 KB a channel was 2.9 ms of a 7.1.4 frame on an
+        // ESP32-S3, where these sit in PSRAM. The identity's entry is made here
+        // and never in the return, so the return - which runs in a destructor -
+        // never allocates.
         const int identity = static_cast<int>(bsi->strmtyp) * 8 + bsi->substreamid;
         auto& pool = impl_->pcm_pool_;
         auto entry = std::find_if(pool.begin(), pool.end(),
@@ -1859,7 +1930,7 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
         out.channels = std::exchange(entry->second, {});
         out.channels.resize(static_cast<std::size_t>(nchans));
         for (auto& channel : out.channels) {
-            channel.assign(static_cast<std::size_t>(nblks * kSamplesPerBlock), 0.0f);
+            channel.resize(static_cast<std::size_t>(nblks * kSamplesPerBlock));
         }
     }
 
@@ -2084,15 +2155,18 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
     // guard they are written under.
     auto& tails = impl_->tails_;
     tails.resize(static_cast<std::size_t>(nblks));
-    // Every block's spectra zeroed here, once for the frame, rather than
-    // each block's at the top of its own parse: an AHT stream (§3.4) sends
-    // all six blocks' mantissas in block 0, and decode_aht_stream writes them
-    // straight into the six tails, so tails 1-5 have to be clear before
-    // block 0 reaches them. Otherwise a block's parse still writes only its
-    // own tail, and every bin nothing writes reads zero, as a fresh store
-    // did.
+    // Every block's spectra are sized here, once for the frame, and NOT cleared: the
+    // store keeps what the last frame left in it, and what a block's parse and
+    // decoupling do not write is cleared at the end of that block's parse
+    // (clear_unwritten below), a few bins a channel rather than the whole of
+    // seven streams times six blocks. Clearing them all up front was 4.1 ms of a
+    // 37 ms 7.1.4 frame on an ESP32-S3, where the store is in PSRAM and a write
+    // to it fetches the line first. An AHT stream (§3.4) sends all six blocks'
+    // mantissas in block 0, and decode_aht_stream writes them straight into the
+    // six tails: those writes are the bins [begin, endmant) of the stream, which
+    // the clearing of any block leaves alone.
     for (auto& tail : tails) {
-        tail.coeffs.assign(static_cast<std::size_t>(kMaxSubstreamStreams), {});
+        tail.coeffs.resize(static_cast<std::size_t>(kMaxSubstreamStreams));
     }
 
     // Captured alongside out.object_metadata below, from whichever block's
@@ -3554,6 +3628,40 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
             }
         }
 
+        // clear_unwritten: what neither the parse nor the decoupling above wrote
+        // reads zero, as a freshly cleared store's did (see where the tails are
+        // sized): each stream's bins past its own bandwidth, a coupled channel's
+        // past the coupling band (the band itself the decoupling has just written;
+        // under enhanced coupling the second pass writes it, so the channel is
+        // cleared from where its own mantissas end), and the coupling channel
+        // outside [cplstrtmant, cplendmant) - all of it in a block with no
+        // coupling, except where an AHT stream put its whole frame there in block 0.
+        {
+            using Scalar = internal::decode_scalar_t;
+            const auto clear_from = [&](int stream, int from, int to) {
+                if (from < to) {
+                    auto& spectrum = coeffs[static_cast<std::size_t>(stream)];
+                    std::fill(spectrum.begin() + from, spectrum.begin() + to, Scalar{});
+                }
+            };
+            const int end = static_cast<int>(coeffs[0].size());
+            const bool coupled_block = frm->cplinu[static_cast<std::size_t>(blk)];
+            const bool decoupled_here = coupled_block && !ecplinu_now;
+            for (int ch = 0; ch < nfchans; ++ch) {
+                const auto uch = static_cast<std::size_t>(ch);
+                clear_from(ch, (decoupled_here && chincpl[uch]) ? cplendmant : endmant[uch], end);
+            }
+            if (bsi->lfe) {
+                clear_from(nfchans, endmant[static_cast<std::size_t>(nfchans)], end);
+            }
+            if (coupled_block) {
+                clear_from(kCplStream, 0, cplstrtmant);
+                clear_from(kCplStream, cplendmant, end);
+            } else if (!frm->ahtinu[static_cast<std::size_t>(kCplStream)]) {
+                clear_from(kCplStream, 0, end);
+            }
+        }
+
         // A block that used enhanced coupling says so, and the second pass
         // reads its raw enhanced coupling channel, as this block's and as a
         // neighbor's, from this tail: nothing after this point writes the
@@ -3642,6 +3750,21 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
     // AHT channels already carry their final coefficients from pass one
     // above; only enhanced coupling's own reconstruction happens here, right
     // before the spx/rematrix/IMDCT tail every block goes through.
+    //
+    // Enhanced coupling's spectrum of a block (three inverse transforms and a DFT, the larger
+    // half of §3.5.5's cost) reads the coupling stream of the block and of its two neighbours,
+    // which this pass never writes, and nothing else of the pass's state. Given a second lane
+    // the next enhanced coupling block's is made there while this block's channels are
+    // reconstructed here, into the other of the two buffers; the floating tiers only, the fixed
+    // tier's has its exponents to carry. The bits are the same whichever lane makes them.
+    iclforge::base::Executor* const spectrum_lane =
+        (!internal::kNormalisedStore<internal::decode_scalar_t> &&
+         impl_->config_.executor != nullptr && impl_->config_.executor->lanes() >= 2)
+            ? impl_->config_.executor
+            : nullptr;
+    EcplSpectrumJob<internal::decode_scalar_t> spectrum_job{};
+    int spectrum_pending = -1;        // the block whose spectrum the other lane is making
+    std::size_t spectrum_side = 0;    // the buffer it is making it in
     for (int blk = 0; blk < nblks; ++blk) {
         ICLFORGE_ZONE_SCOPED_N("eac3_reconstruct_block");
         auto& tail = tails[static_cast<std::size_t>(blk)];
@@ -3688,10 +3811,47 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
                     }
                 }
             }
+            std::size_t spectrum_used = 0;
+            bool spectrum_ready = false;
+            if constexpr (!internal::kNormalisedStore<internal::decode_scalar_t>) {
+                if (spectrum_lane != nullptr) {
+                    if (spectrum_pending == blk) {
+                        spectrum_lane->wait_async();
+                        spectrum_used = spectrum_side;
+                        spectrum_ready = true;
+                        spectrum_pending = -1;
+                    }
+                    // The next enhanced coupling block's spectrum goes to the other lane, into
+                    // the buffer this block is not reading.
+                    int later = blk + 1;
+                    while (later < nblks &&
+                           !(tails[static_cast<std::size_t>(later)].cplinu &&
+                             tails[static_cast<std::size_t>(later)].ecplinu_now)) {
+                        ++later;
+                    }
+                    if (later < nblks) {
+                        const auto ul = static_cast<std::size_t>(later);
+                        spectrum_job.prev =
+                            ecpl_active[ul - 1] ? &tails[ul - 1].coeffs[ucpl] : &kZero;
+                        spectrum_job.curr = &tails[ul].coeffs[ucpl];
+                        spectrum_job.next = (later + 1 < nblks && ecpl_active[ul + 1])
+                                                ? &tails[ul + 1].coeffs[ucpl]
+                                                : &kZero;
+                        spectrum_side = 1 - spectrum_used;
+                        spectrum_job.real = &impl_->ecpl_spectrum_real_[spectrum_side];
+                        spectrum_job.imag = &impl_->ecpl_spectrum_imag_[spectrum_side];
+                        spectrum_job.fast = impl_->config_.fast_imdct;
+                        spectrum_lane->run_async(
+                            ecpl_spectrum_task_for<internal::decode_scalar_t>(), &spectrum_job);
+                        spectrum_pending = later;
+                    }
+                }
+            }
             ecpl_reconstruct_block(tail, prev, coeffs[ucpl], next, prev_norm, next_norm, nfchans,
-                                   ecpl_noise, impl_->ecpl_spectrum_real_,
-                                   impl_->ecpl_spectrum_imag_, impl_->ecpl_amp_scratch_,
-                                   impl_->ecpl_angle_scratch_, impl_->config_.fast_imdct, coeffs);
+                                   ecpl_noise, impl_->ecpl_spectrum_real_[spectrum_used],
+                                   impl_->ecpl_spectrum_imag_[spectrum_used],
+                                   impl_->ecpl_amp_scratch_, impl_->ecpl_angle_scratch_,
+                                   impl_->config_.fast_imdct, coeffs, spectrum_ready);
         }
 
         // §3.6.4 spectral extension synthesis: translate the low band up,
@@ -3911,23 +4071,32 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
         }
         ICLFORGE_ZONE_END(drc_zone);
 
-        // The transform pair plus the overlap-add that reconstructs PCM from it -
-        // where a decode frame spends most of its time, and the stage
-        // DecoderConfig::fast_imdct's default switched under in 0.9.0.
-        {
-            ICLFORGE_ZONE_SCOPED_N("eac3_imdct_overlap");
-            for (int ch = 0; ch < nchans; ++ch) {
-                const auto index = static_cast<std::size_t>(ch);
-                auto& x = impl_->imdct_scratch_;
+    }
+
+    // The transform pair plus the overlap-add that reconstructs PCM from it - where a decode frame
+    // spends most of its time, and the stage DecoderConfig::fast_imdct's default switched under in
+    // 0.9.0. Channel by channel, each channel's blocks one after another, now that every block's
+    // coefficients are final: a channel's overlap-add history runs through its blocks in order and
+    // reads nothing of another channel's, so the channels are the unit of work a second lane takes
+    // (DecoderConfig::executor), and the transform's tables and a channel's history stay in the
+    // data cache across its six blocks. The same operations on the same values in the same order
+    // as the block-by-block loop this replaced, for every channel.
+    {
+        ICLFORGE_ZONE_SCOPED_N("eac3_imdct_overlap");
+        const auto transform_channel = [&](std::size_t index, std::size_t lane) {
+            auto& x = impl_->imdct_scratch_[lane];
+            auto& history = delay[index];
+            auto& pcm = out.channels[index];
+            for (int blk = 0; blk < nblks; ++blk) {
+                const auto& tail = tails[static_cast<std::size_t>(blk)];
                 // One call site for all three scalars (scalar_inverse.hpp). The float32
                 // inverse has no direct form of its own, so inverse_transform_into widens
                 // for fast_imdct=false; a build without the direct form has already
                 // refused it with kNoReferenceTransform long before reaching here.
-                const bool short_block = ch < nfchans && tail.blksw[static_cast<std::size_t>(ch)];
-                internal::inverse_transform_into(coeffs[index], x, short_block,
-                                       impl_->config_.fast_imdct);
-                auto& history = delay[index];
-                auto& pcm = out.channels[index];
+                const bool short_block =
+                    index < static_cast<std::size_t>(nfchans) && tail.blksw[index];
+                internal::inverse_transform_into(tail.coeffs[index], x, short_block,
+                                                 impl_->config_.fast_imdct);
                 if constexpr (internal::kNormalisedStore<internal::decode_scalar_t>) {
                     // The two halves under their own exponents, aligned and
                     // scaled once (block_norm.hpp).
@@ -3960,9 +4129,10 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
                                    });
                 }
             }
-        }
+        };
+        internal::run_lanes(impl_->config_.executor, static_cast<std::size_t>(nchans),
+                            transform_channel);
     }
-
     // The substream identity: which JOC state, §7.10 history and §3.7
     // hold-back below are this frame's.
     const int key = static_cast<int>(bsi->strmtyp) * 8 + bsi->substreamid;
@@ -4012,6 +4182,14 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
                         auto& joc_slot = impl_->joc_state_[static_cast<std::size_t>(key)];
                         if (!joc_slot) {
                             joc_slot = std::make_unique<oba::joc::ReconstructionState>();
+                            // A float decoder runs on parts whose FPU is single precision, where
+                            // the reference double QMF reconstruction is a software routine per
+                            // operation (381 ms of a 397 ms ESP32-S3 frame for four objects): it
+                            // reconstructs in single precision. The double decoder keeps the
+                            // reference arithmetic, and the fixed-point tier its pinned hashes.
+                            joc_slot->qmf_single_precision =
+                                std::is_same_v<internal::decode_scalar_t, float>;
+                            joc_slot->executor = impl_->config_.executor;
                         }
                         out.object_audio = oba::joc::reconstruct(
                             bed_joc_order, *params, *joc_slot, impl_->config_.fast_mdct,

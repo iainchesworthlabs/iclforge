@@ -216,6 +216,58 @@ of `apps/demos/wasm/assets/demo.ec3`. During the decode the part received 1,500 
 the longest gap between two reads was 81 to 114 ms. The access point negotiated 802.11n on
 channel 1 at -61 dBm, so the part's WiFi 6 was not exercised.
 
+### PCM from a server
+
+A server that sends the board PCM (Hearth does, as `player@v1`, for a stream the board cannot
+decode) fills the player's ring to three quarters of its 48 KB: 36,864 bytes, **192 ms** of 16-bit
+stereo at 48 kHz (128 ms of 24-bit), where the same ring holds 1.65 s of 192 kbit/s AC-3. The
+board plays it, and drops out whenever the stream stalls for longer than that.
+
+Measured on a board at -60 dBm, `hearth-testserver --pcm --tone` sending a 15 s tone, with
+temporary traces in the firmware (one afternoon; the link's quality moved from minute to minute, so
+each row is a count of runs and not a figure):
+
+| What | Measured |
+|---|---|
+| The player's time per 1,000-frame chunk | 1.8 to 2.0 ms (9% of the core); 5.4 ms (27%) before the unpack and the level meter ran on integers (`iclforge/pcm_unpack.hpp`) |
+| Underruns in 15 s, 16-bit, 4,000-byte (1,000-frame) chunks, 15 runs on six images | 10 to 65, median 22; each is about 200 ms of the stream skipped |
+| The same with 2,000-byte (500-frame) chunks, 6 runs | 1, 1, 2, 2, 9, 35 |
+| The same with the 24-bit format listed first (666-frame chunks in 4,000 bytes), 5 runs | 1, 1, 1, 4, 4 |
+| 4,000-byte chunks, TCP window 5,760 -> 11,520 bytes and receive mailbox 6 -> 16, 3 runs | 5, 7, 7; the heap's least 96 KB -> 75 KB |
+| The CPU through a 320 ms stall | idle for 70 to 90 ms of every 100 |
+| A message's payload, after its header | 30 to 60 ms in a bad minute, 200 to 320 ms about twice a second |
+| Ping from a wired PC to the ESP32 boards on that SSID, idle | 2 ms least, 8 to 18 ms mean, 35 to 90 ms most; the wired router, 0 to 1 ms |
+
+So the part is not CPU-bound on PCM. The server's task is blocked in the read of a message's
+payload while the bytes are not there: a segment held up or lost and retransmitted, in the middle
+of a message, with the CPU idle. The window and the mailbox are about two thirds of it and cost 22
+KB of the heap the coded paths need, so they are not raised. The rest is the link, and a ring of
+192 ms has no slack for it. The ring cannot be deepened on this part (a 64 KB ring failed on the
+heap, above); 1.65 s of PCM would take 317 KB.
+
+What costs nothing is a shorter chunk. The stalls fall with the chunk's duration (and a board that
+lists 24-bit first is sent shorter ones at the same byte limit, which is why it did better), so
+Hearth sends a sink whose buffer holds under a second of the stream PCM in units of at most
+10 ms, 2,000 bytes of 16-bit stereo, where it used to fill the board's 4,096-byte limit.
+
+### Opus from a server
+
+libopus 1.6.1 in fixed point (`FIXED_POINT`, no float API, `-O2`), decoding 48 kHz stereo 20 ms
+packets of a music clip in the Hearth sink's image with WiFi up and nothing playing, 200 packets a
+set, three sets:
+
+| What | 128 kbit/s | 64 kbit/s |
+|---|---|---|
+| Decode time per 20 ms packet, mean | 7.5 to 7.8 ms, 37 to 38% of the core | 6.4 to 7.2 ms, 32 to 36% |
+| Worst packet | 11 ms (one of 600 at 51 ms, under WiFi) | 9.4 to 11.5 ms |
+| Decoder state | 27,060 bytes of internal heap | the same |
+| Stack | about 16.4 KB (a 16 KB task overflowed) | the same |
+
+At 16,000 bytes a second the ring holds a twelfth of PCM's rate: about 2.3 s, as much as AC-3.
+The price is 27 KB of heap for the decoder while an Opus stream plays, and a 17 KB stack, which the
+24 KB decode task already has, against about 120 KB free in the idle image (79 KB with the
+benchmark's own 40 KB stack, under which these were taken); and that Opus is lossy.
+
 ### WiFi's code kept in flash
 
 ESP-IDF's defaults put parts of the WiFi and PHY code in RAM (`CONFIG_ESP_WIFI_IRAM_OPT`,

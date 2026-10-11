@@ -1215,9 +1215,13 @@ void HearthController::start() {
         .pcm = test_outputs_ ? test_outputs_->make_pcm()
                              : iclforge::hearth::make_device_sink(std::string()),
         .bitstream = {},
-        .group = iclforge::hearth::make_group_sink([](const std::string& group_id) {
-            return iclforge::hearth::ui::NetworkOutputStatus::instance().group(group_id);
-        }),
+        .group = iclforge::hearth::make_group_sink(
+            [](const std::string& group_id) {
+                return iclforge::hearth::ui::NetworkOutputStatus::instance().group(group_id);
+            },
+            [](const iclforge::hearth::GroupPlanRequest& request) {
+                return iclforge::hearth::ui::NetworkOutputStatus::instance().plan(request);
+            }),
         .endpoints =
             test_outputs_ ? test_outputs_->endpoints : iclforge::hearth::device_endpoints()};
     const iclforge::hearth::EngineSettings loaded = current_settings(*store_);

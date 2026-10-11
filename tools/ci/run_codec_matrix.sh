@@ -617,18 +617,35 @@ cmp eac3enc_2pgm_p0.wav eac3enc_2pgm_default.wav
 # tolerated, the same way 7.1.4 is.
 #
 # Muxing IS checked against FFmpeg, and is the one place an oracle reaches
-# this feature at all. A container track carries one programme, so `mkv`/`mp4`
-# write the first programme's access units alone (with a warning) - which
-# means FFmpeg reads the result perfectly even though it refuses the raw
-# stream the units came out of. That makes this row a direct regression guard
-# on the access-unit BOUNDARIES: a programme's unit has to end at the next
-# independent substream of any programme, not at its own next frame, or each
-# span swallows the other programme's frame and FFmpeg refuses the container
-# too.
+# this feature at all, but only for a container that holds ONE programme.
+# A Matroska track carries one, so `mkv` writes the first programme's access
+# units alone (with a warning), and `programme=N` on `mp4` does the same for
+# programme N, renumbered as substream 0 - which means FFmpeg reads the result
+# perfectly even though it refuses the raw stream the units came out of. That
+# makes these rows a direct regression guard on the access-unit BOUNDARIES: a
+# programme's unit has to end at the next independent substream of any
+# programme, not at its own next frame, or each span swallows the other
+# programme's frame and FFmpeg refuses the container too.
 run mkv eac3enc_2pgm.ec3 eac3enc_2pgm.mkv
 run_ffmpeg_check eac3enc_2pgm.mkv
+for programme in 0 1; do
+    run mp4 eac3enc_2pgm.ec3 "eac3enc_2pgm_p${programme}.mp4" "programme=${programme}"
+    run_ffmpeg_check "eac3enc_2pgm_p${programme}.mp4"
+done
+# `mp4` without programme= carries EVERY programme: a sample is the syncframes
+# of every independent substream present (ETSI TS 102 366 F.2). FFmpeg refuses
+# that file for the reason it refuses the raw stream above (ff_ac3_parse_header
+# rejects substreamid != 0 on an independent substream), so there is no FFmpeg
+# check on it; measured against ffmpeg 8.0.1, error -84085770 on the first
+# packet. What can be asserted without an oracle is that the container is a
+# lossless wrapper, which is how demux is checked below: the stream that went
+# in comes back out byte for byte, both programmes' units included.
 run mp4 eac3enc_2pgm.ec3 eac3enc_2pgm.mp4
-run_ffmpeg_check eac3enc_2pgm.mp4
+run demux eac3enc_2pgm.mp4 eac3enc_2pgm_demux.ec3
+cmp -s eac3enc_2pgm.ec3 eac3enc_2pgm_demux.ec3 || {
+    echo "demux eac3enc_2pgm.mp4 did not reproduce eac3enc_2pgm.ec3 byte for byte" >&2
+    exit 1
+}
 
 # --- Four independent substreams: the range past two, each its own service -
 # §E2.3.1.2 allows eight (I0-I7); the pair above proves the mechanism, this

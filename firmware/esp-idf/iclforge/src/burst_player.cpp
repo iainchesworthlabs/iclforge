@@ -1,6 +1,7 @@
 // The Sendspin player's audio. See ../include/iclforge/burst_player.hpp.
 
 #include "iclforge/burst_player.hpp"
+#include "lane_executor.hpp"
 
 #include <algorithm>
 #include <array>
@@ -37,6 +38,7 @@
 #include "iclforge/sendspin/chunks.hpp"
 
 #include "iclforge/access_units.hpp"
+#include "iclforge/pcm_unpack.hpp"
 
 namespace iclforge {
 namespace {
@@ -191,6 +193,8 @@ struct BurstPlayer::Impl {
     ac::DataType data_type = ac::DataType::kEac3;
     m::AudioFormat pcm_format;
     std::optional<iclforge::ac3::FrameDecoder> ac3_decoder;
+    // The decode lane (BurstPlayerConfig::decode_lane): started by the task, given back by it.
+    std::optional<lanes::TaskExecutor> lane;
     std::optional<iclforge::ac3::Eac3Decoder> eac3_decoder;
     std::optional<int> programme;
     std::array<iclforge::ac3::eac3::chanmap::Layout, kMaxPendingBeds> beds{};
@@ -227,6 +231,16 @@ struct BurstPlayer::Impl {
     std::array<Mark, kMaxMarks> marks{};
     std::size_t mark_head = 0;
     std::size_t mark_count = 0;
+
+    // Whether every output's trim is 0 dB and its delay none: the levels the meter reads are then
+    // the source's own.
+    bool trim_neutral = true;
+    // The levels of the PCM block being emitted, measured in integers while it was unpacked
+    // (play_pcm()), for the meter to use in place of measuring the floats again. Null for anything
+    // else: a burst's blocks have no source of this kind.
+    const PcmLevel* source_levels = nullptr;
+    std::size_t source_channels = 0;
+    unsigned source_bits = 16;
 
     // The meter.
     std::array<float, Playout::kMaxOutputs> window_peak{};
@@ -327,6 +341,7 @@ struct BurstPlayer::Impl {
         serving = iclforge::ac3::render::serve(layout, fold, objects);
         decoder_config = decoder;
         iclforge::ac3::render::configure_decoder(serving, decoder_config);
+        decoder_config.executor = lane.has_value() ? &*lane : nullptr;
         renderer = LayoutRenderer{layout, config.sample_rate, crossover_hz};
         renderer_bed.reset();
         if (new_routing) {
@@ -339,7 +354,14 @@ struct BurstPlayer::Impl {
         std::copy_n(trims.begin(), std::min(trims.size(), trims_db.size()), trims_db.begin());
         std::copy_n(delays.begin(), std::min(delays.size(), delays_ms.size()), delays_ms.begin());
         open_outputs(false);
+        drop_decoders();  // made with the settings these are
         reset_decoding();
+    }
+
+    // The decoders given back, for a change of the configuration they were made with.
+    void drop_decoders() {
+        ac3_decoder.reset();
+        eac3_decoder.reset();
     }
 
     // The sink opened for as many outputs as the routing and the identify
@@ -363,9 +385,11 @@ struct BurstPlayer::Impl {
             }
         }
         (void)trim_delay.configure(delay_storage, outputs_open, max_delay_samples);
+        trim_neutral = true;
         for (std::size_t o = 0; o < outputs_open; ++o) {
             (void)trim_delay.set_trim_db(o, trims_db[o]);
             (void)trim_delay.set_delay(o, TrimDelay::samples_for_ms(delays_ms[o], config.sample_rate));
+            trim_neutral = trim_neutral && trims_db[o] == 0.0 && delays_ms[o] == 0.0;
         }
     }
 
@@ -469,9 +493,19 @@ struct BurstPlayer::Impl {
 
     // --- decoding ---------------------------------------------------------------
 
+    // The decoders start the next stream where a new one would, and keep what they
+    // have allocated: made again, they ask a heap that Wi-Fi has cut up for the
+    // scratch they just gave back, and on a part with no PSRAM it is not there
+    // (an ESP32-C6 aborted on a 36 KB and then a 7 KB request, on a track change
+    // and on a late chunk). Only a change of what they are made for - the
+    // settings, or the other codec - drops them (drop_decoders).
     void reset_decoding() {
-        ac3_decoder.reset();
-        eac3_decoder.reset();
+        if (ac3_decoder) {
+            ac3_decoder->reset();
+        }
+        if (eac3_decoder) {
+            eac3_decoder->reset();
+        }
         programme.reset();
         bed_head = 0;
         bed_count = 0;
@@ -683,8 +717,10 @@ struct BurstPlayer::Impl {
                                                                 : outputs_open;
             tone.fill(out, output, carries_lfe(output) ? IdentifyTone::Band::kLow : IdentifyTone::Band::kFull);
         }
-        apply_gain(out, n);
-        meter(out, n);
+        const bool scaled = apply_gain(out, n);
+        if (scaled || !meter_from_source(n)) {
+            meter(out, n);
+        }
 
         const std::uint64_t first = decoded_frame;
         decoded_frame += n;
@@ -704,10 +740,11 @@ struct BurstPlayer::Impl {
         return layout.slot(static_cast<std::size_t>(channel)).kind == iclforge::render::Speaker::Kind::kLfe;
     }
 
-    void apply_gain(std::span<const std::span<float>> out, std::size_t n) {
+    // True when the block was scaled: a block at unity is left as it is, and costs nothing.
+    bool apply_gain(std::span<const std::span<float>> out, std::size_t n) {
         const float target = target_gain.load();
         if (target == 1.0F && gain == 1.0F) {
-            return;
+            return false;
         }
         const float start = gain;
         const float step = (target - start) / static_cast<float>(n);
@@ -719,6 +756,7 @@ struct BurstPlayer::Impl {
             }
         }
         gain = target;
+        return true;
     }
 
     void meter(std::span<const std::span<float>> out, std::size_t n) {
@@ -748,11 +786,43 @@ struct BurstPlayer::Impl {
             window_sum[o] += sum;
             stream_sum[o] += sum;
         }
+        meter_commit(n);
+    }
+
+    // `n` frames more in the window and the stream, and the window published once it is full.
+    void meter_commit(std::size_t n) {
         window_frames += static_cast<std::uint32_t>(n);
         stream_frames += n;
         if (window_frames >= kLevelWindow) {
             publish_levels();
         }
+    }
+
+    // The block's levels from the integers its PCM source was unpacked from (play_pcm()), where the
+    // outputs carry that source and nothing else: unity gain, every source channel on the output of
+    // its own number, no trim or delay, no identify tone (and, which the caller checks, no gain
+    // applied to the block). The same peak and mean square the floats would give, without a
+    // soft-float operation a sample. False when any of that does not hold, and the caller measures
+    // the floats.
+    [[nodiscard]] bool meter_from_source(std::size_t n) {
+        if (source_levels == nullptr || identifying || !trim_neutral ||
+            source_channels > outputs_open) {
+            return false;
+        }
+        for (std::size_t c = 0; c < source_channels; ++c) {
+            if (routing.output_of(c) != static_cast<int>(c)) {
+                return false;
+            }
+        }
+        for (std::size_t c = 0; c < source_channels; ++c) {
+            window_peak[c] =
+                std::max(window_peak[c], pcm_level_peak(source_levels[c], source_bits));
+            const double sum = pcm_level_square_sum(source_levels[c], source_bits);
+            window_sum[c] += sum;
+            stream_sum[c] += sum;
+        }
+        meter_commit(n);
+        return true;
     }
 
     void publish_levels() {
@@ -806,6 +876,8 @@ struct BurstPlayer::Impl {
         const auto deliver_block = [this](const iclforge::ac3::PcmBlock& block) { deliver(block); };
         if (header->kind == iclforge::ac3::io::StreamKind::kAc3 && header->bytes == unit.size()) {
             if (!ac3_decoder) {
+                // One codec's scratch at a time: an E-AC-3 decoder's is the larger.
+                eac3_decoder.reset();
                 ac3_decoder.emplace(decoder_config);
             }
             const auto decoded = ac3_decoder->decode_frame_by_block(unit, deliver_block);
@@ -826,6 +898,7 @@ struct BurstPlayer::Impl {
             return;
         }
         if (!eac3_decoder) {
+            ac3_decoder.reset();
             eac3_decoder.emplace(decoder_config);
         }
         const auto decoded = eac3_decoder->decode_access_unit_by_block(unit, deliver_block);
@@ -961,23 +1034,17 @@ struct BurstPlayer::Impl {
         std::size_t done = 0;
         while (done < frames) {
             const std::size_t n = std::min(kBlock, frames - done);
-            const std::uint8_t* bytes = payload.data() + (done * frame_bytes);
-            for (std::size_t k = 0; k < n; ++k) {
-                for (std::size_t c = 0; c < channels; ++c) {
-                    const std::uint8_t* at = bytes + (k * frame_bytes) + (c * width);
-                    float value = 0.0F;
-                    if (width == 2) {
-                        const auto sample = static_cast<std::int16_t>(static_cast<std::uint16_t>(at[0] | (at[1] << 8U)));
-                        value = static_cast<float>(sample) / 32768.0F;
-                    } else {
-                        std::int32_t sample = static_cast<std::int32_t>(at[0] | (at[1] << 8U) | (at[2] << 16U));
-                        if ((sample & 0x800000) != 0) {
-                            sample -= 0x1000000;
-                        }
-                        value = static_cast<float>(sample) / 8388608.0F;
-                    }
-                    pcm_channels[c][k] = value;
-                }
+            const std::span<const std::uint8_t> bytes =
+                payload.subspan(done * frame_bytes, n * frame_bytes);
+            // Integer operations only: a chunk's conversion to float and its meter were the whole
+            // of the time it took to render on a part without a floating-point unit.
+            std::array<PcmLevel, 2> levels{};
+            const std::array<std::span<float>, 2> planar{pcm_channels[0].first(n),
+                                                         pcm_channels[1].first(n)};
+            if (width == 2) {
+                unpack_pcm16(bytes, channels, n, planar, levels);
+            } else {
+                unpack_pcm24(bytes, channels, n, planar, levels);
             }
             std::size_t used = channels;
             if (serving.fold && channels == 2 && layout.speaker_count() == 1) {
@@ -1006,7 +1073,15 @@ struct BurstPlayer::Impl {
             } else {
                 renderer.render(block, false, 1.0F, out);
             }
+            // The levels stand for the outputs only while the channels are the source's own: not
+            // for a two-channel stream folded to one speaker, or a mono one given to two.
+            if (used == channels) {
+                source_levels = levels.data();
+                source_channels = channels;
+                source_bits = width == 2 ? 16U : 24U;
+            }
             emit(n);
+            source_levels = nullptr;
             done += n;
         }
         count_time(started);
@@ -1079,6 +1154,20 @@ struct BurstPlayer::Impl {
     }
 
     void run() {
+#if SOC_CPU_CORES_NUM > 1
+        if (config.decode_lane && (config.core == 0 || config.core == 1)) {
+            lane.emplace();
+            const bool in_psram = heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
+            if (lane->start(1 - config.core, config.priority, in_psram ? 16384 : 12288, in_psram)) {
+                decoder_config.executor = &*lane;
+                std::printf("burst player: decode stages on cores %d and %d\n", static_cast<int>(config.core),
+                            static_cast<int>(1 - config.core));
+            } else {
+                std::printf("burst player: no second lane for the decode, one core\n");
+                lane.reset();
+            }
+        }
+#endif
         std::int64_t last_status = 0;
         while (!stopping.load()) {
             if (held.load()) {
@@ -1162,6 +1251,10 @@ struct BurstPlayer::Impl {
                     break;
             }
         }
+        // The decoders hold a pointer to the lane: they go before it does.
+        drop_decoders();
+        decoder_config.executor = nullptr;
+        lane.reset();
         xEventGroupSetBits(events, kExited);
         vTaskDelete(nullptr);
     }
