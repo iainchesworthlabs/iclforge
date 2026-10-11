@@ -672,16 +672,26 @@ class SiteScriptsRenderTest(unittest.TestCase):
         self.assertIn("is not classified", cards["Live growth"]["note"])
         self.assertEqual(self.figures(cards["Speed"])["AC-3"], "8x")
 
-    def test_a_record_repeated_on_the_newest_commit_is_counted_once(self):
-        """The nightly on a tip that has not moved appended every record again, and the history
-        still holds the copies: the tile counted 335 measurements where there were 67."""
+    def test_a_measurement_repeated_on_the_newest_commit_is_counted_once(self):
+        """The nightly on a tip that has not moved recorded every row again, and the history
+        still holds the copies: the tile counted 335 measurements where there were 67. The
+        copies differ in the last digits of the MOS, so it is (leg, variant) that makes them one."""
         self.fixture()
-        rows = [{"codec": "ac4", "leg": "ac4-10-speech-24", "mos_lqo": 4.27},
-                {"codec": "ac4", "leg": "ac4-20-music-192", "mos_lqo": 4.71}]
-        self.write("ac4-encode-quality-main", rows * 5)
-        self.write("ac4-quality-main", [
-            {"leg": "ac4-20-music-192", "min_snr_db": 34.9, "mos_lqo": 4.72},
-            {"leg": "ac4-20-music-192", "min_snr_db": 34.9, "mos_lqo": 4.72}])
+
+        def copies(rows, times):
+            return [{**r, "mos_lqo": r["mos_lqo"] + 4e-14 * n}
+                    for n in range(times) for r in rows]
+
+        self.write("ac4-encode-quality-main", copies(
+            [{"codec": "ac4", "leg": "ac4-10-speech-24", "mos_lqo": 4.27},
+             {"codec": "ac4", "leg": "ac4-20-music-192", "mos_lqo": 4.71}], 5))
+        self.write("external-comparison-main", copies(
+            [{"codec": "eac3", "leg": "eac3-51-256", "variant": "spx", "mos_lqo": 2.38},
+             {"codec": "eac3", "leg": "eac3-51-256", "variant": "none", "mos_lqo": 4.1},
+             {"codec": "ac3", "leg": "ac3-music-stereo-192", "variant": "landscape",
+              "mos_lqo": 4.71}], 5))
+        self.write("ac4-quality-main", copies(
+            [{"leg": "ac4-20-music-192", "min_snr_db": 34.9, "mos_lqo": 4.72}], 2))
         for flags, title in (((), "Listening quality"),
                              (("--page",), "Predicted listening quality")):
             with self.subTest(surface="page" if flags else "strip"):
@@ -690,6 +700,10 @@ class SiteScriptsRenderTest(unittest.TestCase):
                 # The strip says "2 measurements", the page "2 encoder measurements".
                 self.assertRegex(listening["AC-4"]["what"],
                                  r"\b2 (encoder )?measurements on 2 legs")
+                self.assertRegex(listening["E-AC-3"]["what"],
+                                 r"\b2 (encoder )?measurements on 1 legs")
+                self.assertRegex(listening["AC-3"]["what"],
+                                 r"\b1 (encoder )?measurements on 1 legs")
                 accuracy = {line["codec"]: line["what"]
                             for line in cards["Decode accuracy"]["lines"]}
                 self.assertRegex(accuracy["AC-4"], r"of 1 Dolby streams")
@@ -725,13 +739,13 @@ class HistoryAndMainTest(unittest.TestCase):
             {"commit": "a", "v": 1}, {"commit": "b", "v": 2}, {"commit": "b", "v": 3}]) + "\n")
         self.assertEqual([r["v"] for r in badges.newest_commit_rows(path)], [2, 3])
 
-    def test_newest_commit_rows_counts_a_record_once(self):
-        path = self.dir / "h.jsonl"
-        same = {"commit": "b", "leg": "x", "mos_lqo": 4.5}
-        path.write_text("\n".join(json.dumps(r) for r in [
-            {"commit": "a", "leg": "x"}, same, dict(reversed(list(same.items()))),
-            {"commit": "b", "leg": "y"}, same]) + "\n")
-        self.assertEqual([r["leg"] for r in badges.newest_commit_rows(path)], ["x", "y"])
+    def test_a_stream_is_counted_once_however_often_its_run_was_repeated(self):
+        """The copies a repeated run leaves differ in the last digits of the MOS, so it is the
+        leg that makes them one stream."""
+        rows = [{"leg": "ac4-20-music-192", "min_snr_db": 34.9, "mos_lqo": 4.72},
+                {"leg": "ac4-20-music-192", "min_snr_db": 34.9, "mos_lqo": 4.72 + 4e-14},
+                {"leg": "ac4-20-speech-128", "min_snr_db": 38.1, "mos_lqo": 4.39}]
+        self.assertEqual(badges.ac4_quality(rows)["streams"], 2)
 
     def test_main_writes_four_badges(self):
         (self.dir / "performance-dev.jsonl").write_text(json.dumps(

@@ -944,9 +944,15 @@ are what fail a run, and they fail it before the numbers are published.
         const resp = await fetch(rawUrl(file));
         if (!resp.ok) continue;
         const text = await resp.text();
-        // A line is a record once: a run repeated on one commit appended its records again, and
-        // the history still holds those copies.
-        return [...new Set(text.split("\n").filter((l) => l.trim()))].map((l) => JSON.parse(l));
+        // A leg is one row per commit: a run repeated on one commit recorded it again, to the
+        // last digits of the MOS, and the history still holds those copies.
+        const seen = new Set();
+        return text.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l)).filter((r) => {
+          const identity = `${r.commit}\u0000${r.leg}`;
+          if (seen.has(identity)) return false;
+          seen.add(identity);
+          return true;
+        });
       } catch (e) {
         // Try the next candidate.
       }

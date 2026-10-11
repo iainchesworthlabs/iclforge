@@ -186,7 +186,10 @@
   // AC-4's decode quality: its lowest SNR and lowest MOS-LQO, one row per Dolby stream scored
   // against the source it was encoded from. Only CI's pinned floors exist, none recorded per
   // row, so nothing here can be coloured, and the figures are shown without a verdict.
-  function ac4Quality(rows) {
+  function ac4Quality(copies) {
+    // One row per stream: a run repeated on one commit recorded each stream again.
+    const once = new Set();
+    const rows = copies.filter((r) => !once.has(r.leg) && once.add(r.leg));
     const snr = rows.filter((r) => isNumber(r.min_snr_db));
     const mos = rows.filter((r) => isNumber(r.mos_lqo));
     if (snr.length === 0 && mos.length === 0) return null;
@@ -225,9 +228,16 @@
   // MOS-LQO for each codec and the rows at both ends of it.
   function listeningPerCodec(rows) {
     const picked = {};
+    const seen = new Set();
     for (const row of rows) {
       if (!isNumber(row.mos_lqo)) continue;
       const codec = listeningCodec(row);
+      // A (leg, variant) is one measurement. A run repeated on one commit (the nightly, on a tip
+      // that has not moved) recorded it again, to the last digits of the MOS, and the history on
+      // the branch still holds those copies.
+      const identity = [codec, row.leg, row.variant].join("\u0000");
+      if (seen.has(identity)) continue;
+      seen.add(identity);
       const p = picked[codec] || (picked[codec] = { count: 0, low: null, high: null, legs: new Set() });
       p.count += 1;
       p.legs.add(row.leg);
@@ -277,17 +287,7 @@
   function newestCommitRows(records) {
     if (records.length === 0) return { rows: [], commit: null, date: null };
     const commit = records[records.length - 1].commit;
-    // A run repeated on one commit (the nightly, on a tip that has not moved) appended the same
-    // records again, and the history on the branch still holds those copies. A copy is not a
-    // measurement: a record is counted once.
-    const seen = new Set();
-    const rows = records.filter((r) => {
-      if (r.commit !== commit) return false;
-      const key = JSON.stringify(r);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    const rows = records.filter((r) => r.commit === commit);
     return { rows: rows, commit: commit, date: rows[0] ? rows[0].commit_date : null };
   }
 

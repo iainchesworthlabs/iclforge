@@ -131,11 +131,6 @@ def newest_commit_rows(path: Path):
     The last SHA to appear, not the newest commit_date: these files are
     appended to in merge order, and two records written by the same run share
     a timestamp to the second, so a date sort has ties that this does not.
-
-    A record is counted once. A run repeated on one commit (the nightly, on a
-    tip that has not moved) appended the same records again before the
-    appenders learned to skip them, and the history on the branch still holds
-    those copies; the site's scripts count them once as well.
     """
     if not path.exists():
         return []
@@ -151,15 +146,7 @@ def newest_commit_rows(path: Path):
     if not records:
         return []
     newest = records[-1].get("commit")
-    rows, seen = [], set()
-    for r in records:
-        if r.get("commit") != newest:
-            continue
-        key = json.dumps(r, sort_keys=True)
-        if key not in seen:
-            seen.add(key)
-            rows.append(r)
-    return rows
+    return [r for r in records if r.get("commit") == newest]
 
 
 def badge(label, message, color):
@@ -346,6 +333,13 @@ def ac4_quality(rows):
     per-channel floors are recorded, only CI's pinned ones, so nothing here can
     be coloured, and the figures are shown without a verdict.
     """
+    # One row per stream: a run repeated on one commit (the nightly, on a tip
+    # that has not moved) recorded each stream again, and the history on the
+    # branch still holds those copies.
+    once = {}
+    for r in rows:
+        once.setdefault(r.get("leg"), r)
+    rows = list(once.values())
     snr = [r for r in rows if _number(r.get("min_snr_db"))]
     mos = [r for r in rows if _number(r.get("mos_lqo"))]
     if not snr and not mos:
