@@ -476,7 +476,8 @@ TEST_CASE("a change of gain ramps over the first block and holds after",
     auto second = stereo(0.0F, 0.0F);
     service.mixing->pgmscl = 39;  // -12 dB
     REQUIRE(mixer.mix(second, service).has_value());
-    const float target = static_cast<float>(steady * std::pow(10.0, -12.0 / 20.0));
+    const float target =
+        static_cast<float>(static_cast<double>(steady) * std::pow(10.0, -12.0 / 20.0));
     const auto& out = second.channels[0];
     // Monotone down across the block, never past the target, then constant.
     for (std::size_t n = 1; n < 256; ++n) {
