@@ -20,15 +20,35 @@
 
 namespace {
 
+using iclforge::sendspin::json::count_tokens;
 using iclforge::sendspin::json::Document;
 using iclforge::sendspin::json::Error;
 using iclforge::sendspin::json::Limits;
 using iclforge::sendspin::json::Member;
 using iclforge::sendspin::json::ParseResult;
 using iclforge::sendspin::json::Token;
+using iclforge::sendspin::json::TokenStorage;
 using iclforge::sendspin::json::Type;
 using iclforge::sendspin::json::Value;
 using iclforge::sendspin::json::Writer;
+
+// "[1,1,...]" of `values` elements: values + 1 tokens.
+std::string array_of(std::size_t values) {
+    std::string text = "[";
+    for (std::size_t i = 0; i < values; ++i) {
+        text += i == 0 ? "1" : ",1";
+    }
+    return text + "]";
+}
+
+// {"k0":1,"k1":1,...} of `members` members: 2 * members + 1 tokens.
+std::string object_of(std::size_t members) {
+    std::string text = "{";
+    for (std::size_t i = 0; i < members; ++i) {
+        text += (i == 0 ? "\"k" : ",\"k") + std::to_string(i) + "\":1";
+    }
+    return text + "}";
+}
 
 // A document with its own storage, for tests that only need the result.
 struct Parsed {
@@ -307,6 +327,133 @@ TEST_CASE("json: token storage is never exceeded", "[sendspin][json]") {
     CHECK(doc.parse("[1,2,3,4,5,6,7,8]", grown, 5).error == Error::kTooManyTokens);
     CHECK(doc.parse("[1,2,3,4,5,6,7,8]", grown, 100).error == Error::kNone);
     CHECK(grown.size() <= 9);
+}
+
+TEST_CASE("json: count_tokens finds the tokens parse stores", "[sendspin][json]") {
+    for (const std::string_view text :
+         {"0", "\"s\"", "[]", "{}", "[[],{}]", "[[[[]]]]", R"({"a":{"b":{"c":[1,[2,[3]]]}}})",
+          R"({"type":"server/time","payload":{"x":1,"y":2.5,"z":[true,false,null]}})",
+          "  [ 1 , 2 ]  "}) {
+        INFO(text);
+        const Parsed parsed(text);
+        REQUIRE(parsed.result);
+        const auto counted = count_tokens(text, 100000);
+        CHECK(counted.result);
+        CHECK(counted.tokens == parsed.doc.token_count());
+    }
+    for (const std::size_t n : {0U, 1U, 63U, 64U, 65U, 500U}) {
+        CHECK(count_tokens(array_of(n), 100000).tokens == n + 1);
+        CHECK(count_tokens(object_of(n), 100000).tokens == (2 * n) + 1);
+    }
+}
+
+TEST_CASE("json: count_tokens refuses what parse refuses, in the same place", "[sendspin][json]") {
+    for (const std::string_view text :
+         {"", "   ", "[", "[1,", "[1 2]", "[1,]", "{\"a\"}", "{\"a\":}", "{1:2}", "01", "1.",
+          "\"\\q\"", "tru", "[1] 2", "[\"\x01\"]", "\"\xff\""}) {
+        INFO(text);
+        const Parsed parsed(text);
+        const auto counted = count_tokens(text, 100000);
+        REQUIRE_FALSE(parsed.result);
+        CHECK(counted.result.error == parsed.result.error);
+        CHECK(counted.result.offset == parsed.result.offset);
+        CHECK(counted.tokens == 0);
+    }
+    const Limits shallow{.max_depth = 4, .max_members = 1024};
+    CHECK(count_tokens("[[[[[]]]]]", 100, shallow).result.error == Error::kDepth);
+    const Limits narrow{.max_depth = 32, .max_members = 2};
+    CHECK(count_tokens(R"({"a":1,"b":2,"c":3})", 100, narrow).result.error ==
+          Error::kTooManyMembers);
+    // The cap is the tokens it counts, however long the text is.
+    CHECK(count_tokens("[1,2,3,4]", 5).tokens == 5);
+    CHECK(count_tokens("[1,2,3,4,5]", 5).result.error == Error::kTooManyTokens);
+    CHECK(count_tokens(array_of(100000), 100).result.error == Error::kTooManyTokens);
+    // Duplicate keys are the one refusal it leaves to parse(): they need the tokens.
+    CHECK(count_tokens(R"({"a":1,"a":2})", 100).tokens == 5);
+    CHECK(error_of(R"({"a":1,"a":2})") == Error::kDuplicateKey);
+}
+
+TEST_CASE("json: token storage keeps an ordinary message in the object", "[sendspin][json]") {
+    TokenStorage storage;
+    Document doc;
+    const std::string fits = array_of(TokenStorage::kInlineTokens - 1);
+    REQUIRE(doc.parse(fits, storage, 4096));
+    CHECK(doc.token_count() == TokenStorage::kInlineTokens);
+    CHECK(storage.heap_tokens() == 0);
+    CHECK(doc.root().size() == TokenStorage::kInlineTokens - 1);
+
+    // One more value needs a block, of exactly the tokens the text holds.
+    const std::string spills = array_of(TokenStorage::kInlineTokens);
+    REQUIRE(doc.parse(spills, storage, 4096));
+    CHECK(doc.token_count() == TokenStorage::kInlineTokens + 1);
+    CHECK(storage.heap_tokens() == TokenStorage::kInlineTokens + 1);
+    CHECK(doc.root().at(TokenStorage::kInlineTokens - 1).as_int() == 1);
+
+    // Reusing the storage for a small message hands the block back.
+    REQUIRE(doc.parse("[1]", storage, 4096));
+    CHECK(storage.heap_tokens() == 0);
+    CHECK(doc.root().at(0).as_int() == 1);
+}
+
+TEST_CASE("json: token storage is sized by the values, not the text", "[sendspin][json]") {
+    // 70 values spread over 8 KB: the vector overload would reserve 4,097 tokens.
+    std::string text = "[1";
+    for (int i = 0; i < 69; ++i) {
+        text += std::string(120, ' ') + ",1";
+    }
+    text += "]";
+    REQUIRE(text.size() > 8000);
+    TokenStorage storage;
+    Document doc;
+    REQUIRE(doc.parse(text, storage, 4096));
+    CHECK(doc.token_count() == 71);
+    CHECK(storage.heap_tokens() == 71);
+    CHECK(doc.root().size() == 70);
+}
+
+TEST_CASE("json: token storage refuses before it allocates", "[sendspin][json]") {
+    TokenStorage storage;
+    Document doc;
+    // A run of openers is refused at the depth limit, inside the object.
+    CHECK(doc.parse(std::string(4000, '['), storage, 4096).error == Error::kDepth);
+    CHECK(storage.heap_tokens() == 0);
+    // More values than the cap: counted, refused, no block.
+    CHECK(doc.parse(array_of(500), storage, 100).error == Error::kTooManyTokens);
+    CHECK(storage.heap_tokens() == 0);
+    // Malformed after the object's tokens run out: no block.
+    CHECK(doc.parse(array_of(100) + "]", storage, 4096).error == Error::kTrailing);
+    CHECK(storage.heap_tokens() == 0);
+    std::string trailing_comma = array_of(100);
+    trailing_comma.insert(trailing_comma.size() - 1, ",");
+    CHECK(doc.parse(trailing_comma, storage, 4096).error == Error::kSyntax);
+    CHECK(storage.heap_tokens() == 0);
+    CHECK(doc.empty());
+    // A cap below what the object holds is the cap.
+    CHECK(doc.parse("[1,2,3,4]", storage, 3).error == Error::kTooManyTokens);
+    CHECK(doc.parse("[1,2]", storage, 3).error == Error::kNone);
+    // What only the tokens show: a repeated key past the object's capacity.
+    std::string repeated = object_of(40);
+    repeated.back() = ',';
+    repeated += "\"k0\":2}";
+    CHECK(doc.parse(repeated, storage, 4096).error == Error::kDuplicateKey);
+    CHECK(doc.empty());
+}
+
+TEST_CASE("json: token storage and a vector read the same document", "[sendspin][json]") {
+    for (std::size_t n = 0; n < 140; n += 7) {
+        for (const std::string& text : {array_of(n), object_of(n)}) {
+            INFO(text);
+            const Parsed expected(text);
+            TokenStorage storage;
+            Document doc;
+            const ParseResult got = doc.parse(text, storage, 100000);
+            CHECK(got.error == expected.result.error);
+            CHECK(got.offset == expected.result.offset);
+            CHECK(doc.token_count() == expected.doc.token_count());
+            CHECK(doc.root().source() == expected.doc.root().source());
+            CHECK(doc.root().size() == expected.doc.root().size());
+        }
+    }
 }
 
 TEST_CASE("json: the storage bound n/2 + 1 holds for dense texts", "[sendspin][json]") {

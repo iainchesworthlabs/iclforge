@@ -304,7 +304,20 @@ bool PlayerSession::on_artwork(std::span<const std::uint8_t> message) {
 }
 
 SessionOutput PlayerSession::on_json(std::string_view text, std::int64_t arrival) {
-    std::vector<json::Token> tokens;
+    // The message's tokens are read in on_json_message(), whose frame holds a kilobyte of
+    // them. A re-handshake runs X25519 and SHA-256 on this same task, which has a few KB of
+    // stack to spare, so it is entered once that frame is gone.
+    bool rehandshake = false;
+    SessionOutput out = on_json_message(text, arrival, rehandshake);
+    if (rehandshake) {
+        return on_rehandshake(text);
+    }
+    return out;
+}
+
+SessionOutput PlayerSession::on_json_message(std::string_view text, std::int64_t arrival,
+                                             bool& rehandshake) {
+    json::TokenStorage tokens;
     json::Document document;
     if (!document.parse(text, tokens, kMaxTokens)) {
         return {};
@@ -318,7 +331,8 @@ SessionOutput PlayerSession::on_json(std::string_view text, std::int64_t arrival
     SessionOutput out;
 
     if (type == "noise/handshake") {
-        return on_rehandshake(text);
+        rehandshake = true;
+        return {};
     }
     if (phase_ == Phase::kHello) {
         if (type != "server/hello") {

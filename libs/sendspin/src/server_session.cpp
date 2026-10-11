@@ -74,7 +74,7 @@ constexpr std::int32_t kMinimumCodeDigits = 6;
 // The _iclforge_player settings a server/command's text carries, read back as a client reads
 // them; nothing when the reader refuses them.
 [[nodiscard]] std::optional<player::Settings> settings_read_back(std::string_view text, Dialect dialect) {
-    std::vector<json::Token> tokens;
+    json::TokenStorage tokens;
     json::Document document;
     if (!document.parse(text, tokens, kMaxTokens)) {
         return std::nullopt;
@@ -247,7 +247,7 @@ SessionOutput ServerSession::established(handshake::Initiator& initiator) {
 }
 
 SessionOutput ServerSession::on_json(std::string_view text, std::int64_t arrival) {
-    std::vector<json::Token> tokens;
+    json::TokenStorage tokens;
     json::Document document;
     if (!document.parse(text, tokens, kMaxTokens)) {
         return {};
