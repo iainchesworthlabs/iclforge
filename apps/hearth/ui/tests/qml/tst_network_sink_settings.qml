@@ -58,6 +58,7 @@ TestCase {
         NetworkController.setSinkDecoderSettings({ "mode": "rf" });
         NetworkController.startSinkIdentify(0);
         NetworkController.stopSinkIdentify();
+        NetworkController.setSinkOpusFallback(true);
         wait(150);
         compare(NetworkController.selectedSinkSettable, false);
     }

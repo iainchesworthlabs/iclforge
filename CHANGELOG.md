@@ -2692,6 +2692,12 @@ The sections below contain the complete change list and fixes.
   time (59% of the core), the decoder 27 KB of heap and 16.7 KB of the decode task's stack; 30 s
   of tone played with no underrun in three runs, on a link where the same board's PCM stream
   dropped out 14 and 17 times in 15 s. Opus is a twelfth of PCM's bytes and lossy.
+- **A Hearth sink that lists Opus can be set to be sent it in place of PCM**
+  (`NetworkSinks::set_sink_opus_fallback`, the Decoder tab's "Audio decoded here" choice, and
+  `choose_sink_form`'s `PcmCodec`): for a board on a link too poor for PCM, audio Hearth decodes
+  for it goes as Opus at 2.0, which the group's plan asks the host for by codec. The choice is per
+  sink, applies at the group's next play, and is kept for the run. The group editor says which a
+  member is sent.
 
 **Library internals**
 

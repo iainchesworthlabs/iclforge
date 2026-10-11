@@ -335,6 +335,49 @@ TEST_CASE("network sinks rows: settings and identify for a Hearth sink with no l
     CHECK_FALSE(row.identify_slot.has_value());
 }
 
+// Opus in place of PCM is a choice kept per sink, and refused for a sink that lists none.
+TEST_CASE("network sinks rows: a sink can be set to Opus only where it lists Opus",
+          "[hearth][network-sinks]") {
+    Rig rig;
+    const auto plain_service = service_named("plain-player", 1);
+    rig.sinks->on_found(plain_service);
+    auto plain = connected(plain_service, "client-plain");
+    ss::messages::PlayerSupport plain_support;
+    plain_support.supported_formats = {
+        {.codec = ss::messages::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16}};
+    plain.player_support = plain_support;
+    rig.sinks->on_client(plain);
+
+    const auto opus_service = service_named("opus-player", 2);
+    rig.sinks->on_found(opus_service);
+    auto with_opus = connected(opus_service, "client-opus");
+    ss::messages::PlayerSupport opus_support;
+    opus_support.supported_formats = {
+        {.codec = ss::messages::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16},
+        {.codec = ss::messages::Codec::kOpus,
+         .channels = 2,
+         .sample_rate = 48000,
+         .bit_depth = 16}};
+    with_opus.player_support = opus_support;
+    rig.sinks->on_client(with_opus);
+
+    const auto fallback_of = [&](const std::string& id) {
+        for (const auto& sink : rig.sinks->status().sinks) {
+            if (sink.id == id) {
+                return sink.opus_fallback;
+            }
+        }
+        return false;
+    };
+    CHECK_FALSE(rig.sinks->set_sink_opus_fallback("plain-player", true));
+    CHECK_FALSE(fallback_of("plain-player"));
+    CHECK_FALSE(rig.sinks->set_sink_opus_fallback("no-such-sink", true));
+    CHECK(rig.sinks->set_sink_opus_fallback("opus-player", true));
+    CHECK(fallback_of("opus-player"));
+    CHECK(rig.sinks->set_sink_opus_fallback("opus-player", false));
+    CHECK_FALSE(fallback_of("opus-player"));
+}
+
 TEST_CASE("network sinks rows: a group is looked up by its id, and an unknown id finds none",
           "[hearth][network-sinks]") {
     Rig rig;

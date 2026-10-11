@@ -455,6 +455,8 @@ struct LayoutFields {
     map[QStringLiteral("canPair")] = detail.can_pair;
     map[QStringLiteral("canConnect")] = detail.can_connect;
     map[QStringLiteral("inGroup")] = in_group;
+    map[QStringLiteral("opusAvailable")] = detail.opus_available;
+    map[QStringLiteral("opusFallback")] = detail.opus_fallback;
     return map;
 }
 
@@ -1154,6 +1156,17 @@ void NetworkController::note_push(bool sent, const std::string& sink_id) {
     // push to any sink - poll() puts it in that sink's report.
     refused_push_sink_ = sent ? QString() : QString::fromStdString(sink_id);
     poll();
+}
+
+void NetworkController::setSinkOpusFallback(bool opus) {
+    if (!sinks_engine_) {
+        return;
+    }
+    const std::optional<iclforge::hearth::SinkFacts> facts = selected_sink_facts(*sinks_engine_);
+    if (!facts) {
+        return;
+    }
+    (void)sinks_engine_->set_sink_opus_fallback(facts->id, opus);
 }
 
 void NetworkController::startSinkIdentify(int slot) {

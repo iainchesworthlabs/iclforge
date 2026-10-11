@@ -146,6 +146,22 @@ constexpr std::array<Folded, 3> kFoldTargets{{{"7.1", 8}, {"5.1", 6}, {"2.0", 2}
 // and why.
 [[nodiscard]] SinkChoice pcm_choice(const std::string& refusal, const StreamNeeds& stream,
                                     const SinkFacts& sink, const SinkFormPolicy& policy) {
+    // Opus where the person set the sink to it and it lists it: stereo at 48 kHz, which is all
+    // Opus is listed at, so a stream of another rate goes the PCM way below.
+    constexpr std::uint32_t kOpusRate = 48000;
+    if (policy.pcm_fallback && policy.opus && sink_lists_opus(sink) &&
+        (stream.sample_rate == 0 || stream.sample_rate == kOpusRate)) {
+        if (const std::optional<render::OutputLayout> stereo = render::OutputLayout::named("2.0")) {
+            return {.form = SinkForm::kPcm,
+                    .layout = *stereo,
+                    .codec = PcmCodec::kOpus,
+                    .reason = fmt::format(
+                        "{}, so it is {}sent as Opus at 2.0, as this sink is set to: lossy, and a "
+                        "twelfth of PCM's bytes.",
+                        refusal, stream.stream ? "decoded here and " : "")};
+        }
+    }
+
     // PCM, at the rate the stream has: this app does not resample, so a sink
     // that lists PCM at another rate only is a sink it has no PCM for.
     std::vector<std::size_t> channels;
@@ -208,6 +224,10 @@ constexpr std::array<Folded, 3> kFoldTargets{{{"7.1", 8}, {"5.1", 6}, {"2.0", 2}
 
 }  // namespace
 
+bool sink_lists_opus(const SinkFacts& sink) {
+    return std::ranges::find(sink.codecs, "opus") != sink.codecs.end();
+}
+
 sp::DataType data_type_of(audio::BitstreamFormat format) {
     switch (format) {
         case audio::BitstreamFormat::kAc3:
@@ -251,6 +271,7 @@ SinkFormPolicy form_policy(const SinkFacts& sink) {
     std::string hardware = sink.hardware;
     std::ranges::transform(hardware, hardware.begin(),
                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    policy.opus = sink.opus_fallback && sink_lists_opus(sink);
     if (hardware.find("esp32-c6") != std::string::npos) {
         policy.pcm_caveat =
             "This board holds under a fifth of a second of PCM, so on a busy WiFi the stream can "
@@ -282,6 +303,7 @@ GroupFormPlan plan_group_forms(const StreamNeeds& stream, const render::OutputLa
             case SinkForm::kPcm: {
                 const render::OutputLayout layout = *member.choice.layout;
                 member.channels = static_cast<std::int32_t>(layout.slots());
+                member.codec = member.choice.codec;
                 const auto same =
                     std::ranges::find_if(taken, [&](const render::OutputLayout& other) {
                         return other.slots() == layout.slots();
@@ -313,7 +335,8 @@ GroupFormPlan plan_group_forms(const StreamNeeds& stream, const render::OutputLa
                                                          : std::string_view{"The stream"});
                 break;
             case MemberAction::kPcm:
-                member.label = fmt::format("PCM · {}", member.choice.layout->text());
+                member.label = fmt::format("{} · {}", member.codec == PcmCodec::kOpus ? "Opus" : "PCM",
+                                           member.choice.layout->text());
                 break;
             case MemberAction::kHold:
                 member.label = "Nothing · held back";

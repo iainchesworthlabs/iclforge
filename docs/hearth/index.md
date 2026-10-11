@@ -100,6 +100,15 @@ types (no ESP32 build does yet); otherwise that member gets nothing for the item
 nothing when the presentation chosen on the AC-4 tab is one a sink would not choose with no
 preferences: Hearth decodes that presentation here, and only the PCM members hear it.
 
+An extension-role member that cannot take a stream as it is (more channels than it decodes, say)
+is sent it decoded here as PCM, at the layout it takes, and the group editor shows what each
+member is sent and why. An ESP32-C6's buffer holds under a fifth of a second of PCM, so its
+reason carries a note that the stream can drop out on a busy WiFi network, and it is sent PCM in
+units of 10 ms. For a board on such a network, the Decoder tab of its page has an "Audio decoded
+here" choice, PCM or Opus: Opus is lossy and a twelfth of PCM's bytes, so it rides out gaps in the
+link, and it applies the next time the group plays. A board lists Opus only where its firmware
+decodes it, which the C6's does.
+
 ### Diagnostics
 
 Settings > Diagnostics has three buttons that produce the same text report of what Hearth has

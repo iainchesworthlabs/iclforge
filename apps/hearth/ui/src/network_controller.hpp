@@ -227,6 +227,11 @@ public:
     // HearthController::setDecoderSettings()'s own comment states.
     Q_INVOKABLE void setSinkDecoderSettings(const QVariantMap& settings);
 
+    // Whether the selected sink is sent Opus (lossy, a twelfth of PCM's bytes) rather than PCM
+    // when Hearth decodes for it: a choice for a sink on a link too poor for PCM, which takes
+    // effect at its group's next play. No-op for a sink that lists no Opus.
+    Q_INVOKABLE void setSinkOpusFallback(bool opus);
+
     // The identify tone on the sink itself (Command::kIdentify), not this
     // computer's own render::IdentifyTone - HearthController's identify
     // methods are a separate, unrelated pair. No-op for slot < 0 or a sink
