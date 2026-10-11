@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -13,10 +14,40 @@
 
 // RFC 8259 JSON for Sendspin's messages, read and written in-tree.
 //
-// The tree's other JSON reader is private to iclforge::oba (scene_json.cpp) and
-// allocates a node per value. This one is shaped by where Sendspin's player half
-// runs: on an ESP32 inside an HTTP server task with a 6,144-byte stack and a
-// regioned heap. So the reader
+// The rest of the tree reads JSON with nlohmann/json (cmake/NlohmannJson.cmake). This
+// is the place that does not, and that is a measured choice, not a leftover. It is
+// shaped by where Sendspin's player half runs: on an ESP32 inside an HTTP server
+// task with a 6,144-byte stack and a regioned heap, with the network's bytes
+// arriving at it first. nlohmann/json 3.12 was built -Os with exceptions off, as the
+// firmware is, and run on a C6 (160 MHz, no FPU) and an S3 (240 MHz) against the
+// player's own messages, read the way the player reads them:
+//
+//   flash   this reader and writer 9.2-10.4 KB; nlohmann parse and dump 59.8-62.1 KB
+//   time    parsing and reading a message takes 3.2-6.0x as long for up to 64
+//           values (Sendspin's own run 11 to 59) and 1.9-2.3x as long above that
+//           (C6, server/time: 80 us against 389; client/hello: 321 against 1,491);
+//           writing 3.7-4.3x
+//   stack   about 2.0 KB, 1 KB of it the 64 inline tokens, against about 2.3 KB,
+//           in a task that has 6,144 (a re-handshake is entered without them)
+//   heap    no allocation at all for a message of up to 64 values, against 22-74
+//           blocks and 0.5-2.3 KB at the peak, in the internal heap that sits at
+//           a few hundred bytes free while a stream plays. Above 64 values the
+//           tokens are counted first and taken as one block of exactly that size:
+//           the 1.5 KB firmware status, about 150 values, is 3 allocations and
+//           2.5 KB against 148 and 6.4 KB. Before TokenStorage the peak was 0.9-4.4
+//           KB, a block of 8 bytes for every byte of text whatever it held: 34 KB
+//           for a 4 KB message of ten values, which is now 3.7 KB, its string
+//   input   a 4 KB message of "[[[[..." (what a board accepts: max_message_bytes
+//           is a chunk plus 64) is refused here at the depth limit in 25-30 us
+//           with no heap, where it used to reserve 32 KB first; nlohmann builds
+//           all 2,000 levels - 4,032 allocations, 70.7 KB, 51-61 ms - and nothing
+//           but the message's size bounds that, with a failed allocation an
+//           abort() under -fno-exceptions. What the token cap (4,096 in the
+//           sessions) bounds is a valid 4 KB text of 2,000 one-digit values:
+//           32 KB of tokens in one block here, 65 KB in 19 for nlohmann
+//
+// So a swap would cost about 50 KB of flash and several times the CPU, to make the
+// worst case a message can reach unbounded rather than capped. The reader
 //
 //   - parses into caller-owned token storage (one 16-byte Token per value, key
 //     or container) and allocates nothing itself; a Document that needs more
@@ -105,6 +136,19 @@ struct ParseResult {
     std::size_t offset = 0;
     [[nodiscard]] explicit operator bool() const { return error == Error::kNone; }
 };
+
+struct TokenCount {
+    ParseResult result;
+    // The tokens Document::parse would store; 0 unless `result` is ok.
+    std::size_t tokens = 0;
+};
+
+// How many tokens `text` needs, found by reading it as Document::parse does but
+// storing nothing: no token storage, no heap. Grammar, depth and member limits are
+// all checked, and the count stops with kTooManyTokens at `max_tokens`. The one
+// check left to parse() is duplicate keys, which reads the tokens back.
+[[nodiscard]] TokenCount count_tokens(std::string_view text, std::size_t max_tokens,
+                                      const Limits& limits = {});
 
 class Document;
 class Value;
@@ -233,6 +277,36 @@ struct Member {
     Value value;
 };
 
+// Token storage for one message, sized by the values the message holds, not the
+// bytes it spans. A message of up to kInlineTokens values is read into the object
+// itself: a kilobyte of the caller's stack and no heap. A larger one is counted
+// first (count_tokens: nothing stored) and read into one heap block of exactly that
+// many tokens, so the biggest block ever asked for is max_tokens * sizeof(Token),
+// and text that is malformed, nests too deeply or holds more than max_tokens values
+// is refused before any block is.
+//
+// A Document parsed into it points at it: the object cannot be copied or moved, must
+// outlive every Value taken from that Document, and holds one Document at a time.
+class TokenStorage {
+   public:
+    // The tokens handshake.cpp reads its messages into; ordinary Sendspin messages
+    // run from 11 to 60.
+    static constexpr std::size_t kInlineTokens = 64;
+
+    TokenStorage() = default;
+    TokenStorage(const TokenStorage&) = delete;
+    TokenStorage& operator=(const TokenStorage&) = delete;
+
+    // Tokens in the heap block the last parse needed; 0 when it fitted in the object.
+    [[nodiscard]] std::size_t heap_tokens() const { return heap_.size(); }
+
+   private:
+    friend class Document;
+
+    std::array<Token, kInlineTokens> inline_;
+    std::vector<Token> heap_;
+};
+
 class Document {
    public:
     Document() = default;
@@ -242,8 +316,17 @@ class Document {
     ParseResult parse(std::string_view text, std::span<Token> tokens, const Limits& limits = {});
 
     // Sizes `storage` for `text` (a JSON text of n bytes holds at most n/2 + 1
-    // values), capped at `max_tokens`, then parses into it.
+    // values), capped at `max_tokens`, then parses into it. That is 8 bytes of heap
+    // for every byte of text whatever it holds, one contiguous block: for a host. A
+    // session on a board reads into a TokenStorage.
     ParseResult parse(std::string_view text, std::vector<Token>& storage, std::size_t max_tokens,
+                      const Limits& limits = {});
+
+    // Parses `text` into `storage`: in place when it holds at most
+    // TokenStorage::kInlineTokens tokens, otherwise into a heap block of exactly the
+    // tokens it holds. Nothing is reserved by the text's length; kTooManyTokens when
+    // it holds more than `max_tokens`.
+    ParseResult parse(std::string_view text, TokenStorage& storage, std::size_t max_tokens,
                       const Limits& limits = {});
 
     [[nodiscard]] bool empty() const { return count_ == 0; }

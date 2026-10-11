@@ -279,6 +279,11 @@ class PlayerSession {
     [[nodiscard]] SessionOutput on_handshake_text(std::string_view text);
     [[nodiscard]] SessionOutput on_message(std::span<const std::uint8_t> message, std::int64_t arrival);
     [[nodiscard]] SessionOutput on_json(std::string_view text, std::int64_t arrival);
+    // One JSON message, read into token storage that lives only for this call. Sets
+    // `rehandshake` and returns nothing for a noise/handshake message, which on_json() then
+    // hands to on_rehandshake() with that storage already released.
+    [[nodiscard]] SessionOutput on_json_message(std::string_view text, std::int64_t arrival,
+                                                bool& rehandshake);
     [[nodiscard]] SessionOutput on_activate(const messages::Activate& activate);
     [[nodiscard]] SessionOutput on_rehandshake(std::string_view text);
     [[nodiscard]] SessionOutput pairing_step(pairing_flow::Step step);

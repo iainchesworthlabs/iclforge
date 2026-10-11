@@ -2960,6 +2960,22 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**Sendspin: a sink's heap per message**
+
+- **A Sendspin session reserved eight bytes of heap for every byte of a message.**
+  `Document::parse` sized one contiguous block of 16-byte tokens by the text's length, whatever
+  the text held: 1.2 KB for a 145-byte `server/time`, 34 KB for a 4 KB message of ten values, a
+  block that may not exist on a C6 with Wi-Fi up and whose failure is an `abort()` with
+  exceptions off. Player and server sessions now read a message into `json::TokenStorage`: up to
+  64 values in the object itself (a kilobyte of the task's stack, no heap), more counted first
+  with `json::count_tokens` (which stores nothing) and read into one block of exactly that size.
+  Text that is malformed, nested too deeply or over the token cap is refused before any block
+  is taken. Measured on a C6 and an S3, `server/time` reads in 80 and 57 us with no allocation,
+  against 95 and 81 us and 1,168 B, and a 4 KB message of `[[[[...` is refused in 25-30 us with
+  no heap, against 32 KB reserved first. A text of 2,000 one-digit values still needs 32 KB of
+  tokens, which only the token cap bounds. A re-handshake is entered after the message's tokens
+  are released, so its X25519 does not sit on top of them.
+
 **Object signing**
 
 - **A signed frame could carry unauthenticated object data and still verify.** The tag hashes the
