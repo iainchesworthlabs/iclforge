@@ -2009,6 +2009,13 @@ The sections below contain the complete change list and fixes.
   ThreadSanitizer.
   [ESP32-P4](docs/platforms/bare-metal/esp32-p4.md#the-firmware-in-psram-and-the-second-core) and
   [ESP32-S3](docs/platforms/bare-metal/esp32-s3.md#playback-speed) have the figures.
+- **The AC-4 decoder reads the next frame's syntax on a second core while it reconstructs this frame (phase D14i).**
+  `Decoder::decode(frame, next)` and `decode_by_block(frame, next, sink)` take the frame the following call will be given and, with an
+  executor of two lanes, read its syntax on the second while this frame is reconstructed (`Executor::run_async()`, `wait_async()`); the
+  signal, `presentations()`, `metadata()` and the refusals are what a call without `next` gives, bit for bit. Nothing is read ahead for
+  object audio, a change of source or the efficient high frame rate mode; a `set_presentation()` takes effect one frame later. The
+  ESP32 player decodes a frame when the one after it has arrived. The ESP32-P4's 5.1.4 frame takes 0.94 of its duration in S-CPL
+  from 1.01 and 1.15 and 1.15 with A-SPX from 1.19 and 1.21; the ESP32-S3's 5.1 in SIMPLE mode 0.94 from 0.98.
 - **A-CPL's interpolation runs in single precision at the AC-4 decoder's float tier (phase D14h).** Pseudocode 109's interpolation of
   A-CPL's parameters, 46,000 `double` operations a 5.1 A-CPL mode 3 frame and calls into software on the ESP32s, is evaluated in
   single precision there (`acpl::BasicInterpolator<float>`), operation for operation from values narrowed once; the `double` and

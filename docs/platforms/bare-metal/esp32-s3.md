@@ -1567,6 +1567,38 @@ nineteen plays move by 3% or less: mode 2 by 1% (1.39 from 1.40, 1.30 from 1.31 
 table above, which are the images without the two files, with QIO and the lines and with `sdkconfig.s3-fast`, were measured before D14h
 and have those rows about as much above what the same images give now.
 
+#### The next frame's syntax on the second core
+
+D14i (2026-10-11): `Decoder::decode(frame, next)` reads the next frame's syntax on the second core while this frame is reconstructed, which the
+player gives it ([the P4 page](esp32-p4.md#the-next-frames-syntax-on-the-second-core) has the change). With `sdkconfig.s3-fast` and
+`sdkconfig.s3-dcache` the frame takes 0 to 8% less (the hash of every one of the forty plays is D14h's, the second core off and on):
+
+| Stream | Codec mode | To | D14h, both cores | One core | Both cores | us/frame | Worst frame ms |
+|---|---|---|---:|---:|---:|---:|---:|
+| `20-music-192` | SIMPLE | 2.0 | 0.40 | 0.51 | 0.40 | 16,909 | 39 |
+| `20-music-96` | A-SPX | 2.0 | 0.51 | 0.61 | 0.50 | 21,378 | 40 |
+| `51-music-384` | SIMPLE | 2.0 | 0.98 | 1.29 | 0.94 | 39,938 | 68 |
+| `51-music-384` | SIMPLE | 5.1 | 0.98 | 1.30 | 0.94 | 40,201 | 73 |
+| `51-music-192` | A-SPX | 2.0 | 1.17 | 1.45 | 1.14 | 48,708 | 70 |
+| `51-music-192` | A-SPX | 5.1 | 1.26 | 1.60 | 1.23 | 52,362 | 74 |
+| `51-music-128` | A-SPX, A-CPL 2 | 2.0 | 1.30 | 1.58 | 1.25 | 53,416 | 66 |
+| `51-music-128` | A-SPX, A-CPL 2 | 5.1 | 1.39 | 1.73 | 1.33 | 56,818 | 73 |
+| `51-music-96` | A-SPX, A-CPL 3 | 2.0 | 1.35 | 1.73 | 1.33 | 56,608 | 73 |
+| `51-music-96` | A-SPX, A-CPL 3 | 5.1 | 1.44 | 1.90 | 1.41 | 60,100 | 79 |
+| `514-music-256` | A-SPX, A-CPL 2 | 2.0 | 2.37 | 2.89 | 2.29 | 97,511 | 118 |
+| `514-music-256` | A-SPX, A-CPL 2 | 5.1.4 | 2.69 | 3.36 | 2.61 | 111,540 | 136 |
+| `514-music-512` | A-SPX, S-CPL | 2.0 | 2.37 | 2.84 | 2.24 | 95,780 | 125 |
+| `514-music-512` | A-SPX, S-CPL | 5.1.4 | 2.68 | 3.31 | 2.56 | 109,086 | 150 |
+| `514-music-768` | S-CPL | 2.0 | 1.95 | 2.48 | 1.80 | 76,963 | 129 |
+| `514-music-768` | S-CPL | 5.1.4 | 2.26 | 2.94 | 2.13 | 90,939 | 156 |
+| `ims-music-64-23976` | A-SPX, 23.976 fps | 2.0 | 0.87 | 1.09 | 0.87 | 36,135 | 502 |
+| `ims-music-64-24` | A-SPX, 24 fps | 2.0 | 0.70 | 0.92 | 0.69 | 28,710 | 490 |
+| `ims-music-64-25` | A-SPX, 25 fps | 2.0 | 0.67 | 0.92 | 0.67 | 26,884 | 46 |
+| `ims-music-64-2997` | A-SPX, 29.97 fps | 2.0 | 0.89 | 1.12 | 0.86 | 28,690 | 405 |
+
+5.1 in SIMPLE mode is 0.94 (0.94 folded to 2.0), A-SPX 1.23, A-CPL mode 2 1.33, mode 3 1.41; 5.1.4 2.13 (S-CPL), 2.61 and
+2.56; 2.0 0.40 and 0.50, and the converter 0.87, 0.69, 0.67, 0.86 at 23.976, 24, 25 and 29.97 fps.
+
 ### Running it
 
 ```bash

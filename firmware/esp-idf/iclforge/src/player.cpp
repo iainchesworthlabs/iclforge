@@ -760,12 +760,12 @@ struct Player::Impl {
     // True when the frame produced audio, false when it gave nothing (a frame
     // that waits for an I-frame the stream has not sent yet).
     std::expected<bool, iclforge::ac4::DecodeError> decode_ac4_frame(
-        std::span<const std::byte> frame) {
+        std::span<const std::byte> frame, std::span<const std::byte> ahead) {
         int index = 0;
         const auto deliver_block = [&](const iclforge::ac4::PcmBlock& block) {
             ac4_deliver(block, index++);
         };
-        const auto decoded = ac4_decoder->decode_by_block(frame, deliver_block);
+        const auto decoded = ac4_decoder->decode_by_block(frame, ahead, deliver_block);
         if (!decoded) {
             return std::unexpected(decoded.error());
         }
@@ -838,12 +838,14 @@ struct Player::Impl {
         // hands it a frame's per-channel stages (iclforge/ac4/decoder/executor.hpp).
         if (config.ac4.parallel && (config.decode_core == 0 || config.decode_core == 1)) {
             ac4_executor.emplace();
-            // 12 KB where the stack goes to PSRAM and 8 KB where it takes internal RAM: the
-            // lane's stages never used more than 5.7 KB of it on the boards (A-SPX's units).
+            // 32 KB where the stack goes to PSRAM and 24 KB where it takes internal RAM: the
+            // lane's stages never used more than 5.7 KB of it on the boards (A-SPX's units), and
+            // the syntax of the next frame, which it also reads, used 11.4 KB at 5.1 and 13.2 KB at
+            // 5.1.4 on the ESP32-P4.
             const bool in_psram =
                 config.decode_stack_in_psram && heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
             if (ac4_executor->start(1 - config.decode_core, config.decode_priority,
-                                    in_psram ? 12288 : 8192, in_psram)) {
+                                    in_psram ? 32768 : 24576, in_psram)) {
                 decoder_config.executor = &*ac4_executor;
                 std::printf("player: AC-4 stages on cores %d and %d\n",
                             static_cast<int>(config.decode_core),
@@ -865,6 +867,48 @@ struct Player::Impl {
         iclforge::ac4::SyncFrameSplitter splitter{std::span<std::byte>(framing)};
         std::uint64_t resync_before = 0;
         std::span<const std::byte> pending = lead;
+
+        // One frame decoded: false where the play is over. `ahead` is the frame after it, which a
+        // decoder with a second lane reads while it reconstructs this one (Decoder::decode()).
+        const auto decode_one = [&](std::span<const std::byte> bytes,
+                                    std::span<const std::byte> ahead) -> bool {
+            const std::int64_t started = esp_timer_get_time();
+            const auto decoded = decode_ac4_frame(bytes, ahead);
+            const auto elapsed = static_cast<std::uint64_t>(esp_timer_get_time() - started);
+            if (ac4_refused_rate_hz != 0) {
+                finish("sample rate", true, static_cast<int>(ac4_refused_rate_hz));
+                return false;
+            }
+            if (ac4_refused_layout) {
+                finish("channel layout", true, 0);
+                return false;
+            }
+            if (!decoded) {
+                const std::string_view why = ac4_decoder->refusal_reason();
+                std::printf(
+                    "player: AC-4 frame %llu: %.*s\n",
+                    static_cast<unsigned long long>(frames_played.load() + frames_held.load()),
+                    static_cast<int>(why.size()), why.data());
+                finish("decode", true, static_cast<int>(decoded.error()));
+                return false;
+            }
+            decode_us.fetch_add(elapsed);
+            std::uint64_t worst = worst_frame_us.load();
+            while (elapsed > worst && !worst_frame_us.compare_exchange_weak(worst, elapsed)) {
+            }
+            if (!*decoded) {
+                frames_held.fetch_add(1);
+                return true;
+            }
+            frames_played.fetch_add(1);
+            resync_bytes.store(resync_before + splitter.resynchronised_bytes());
+            return true;
+        };
+        // With a second lane a frame is decoded when the one after it has arrived, a frame of the
+        // stream held back in a buffer of its own (the splitter's moves under the next call).
+        const bool look_ahead = ac4_executor.has_value();
+        std::vector<std::byte> held;
+        bool have_held = false;
 
         while (!stopping()) {
             const auto next = splitter.next();
@@ -906,6 +950,12 @@ struct Player::Impl {
             if (next.status == Status::kEndOfStream) {
                 // What the decoder holds back is this pass's to hand over: a
                 // block short of 256 samples, at the end.
+                if (have_held) {
+                    have_held = false;
+                    if (!decode_one(held, {})) {
+                        break;
+                    }
+                }
                 int index = 0;
                 (void)ac4_decoder->flush([&](const iclforge::ac4::PcmBlock& block) { ac4_deliver(block, index++); });
                 resync_bytes.store(resync_before + splitter.resynchronised_bytes());
@@ -946,35 +996,22 @@ struct Player::Impl {
                 break;
             }
 
-            const std::int64_t started = esp_timer_get_time();
-            const auto decoded = decode_ac4_frame(next.frame.raw_ac4_frame);
-            const auto elapsed = static_cast<std::uint64_t>(esp_timer_get_time() - started);
-            if (ac4_refused_rate_hz != 0) {
-                finish("sample rate", true, static_cast<int>(ac4_refused_rate_hz));
-                break;
-            }
-            if (ac4_refused_layout) {
-                finish("channel layout", true, 0);
-                break;
-            }
-            if (!decoded) {
-                const std::string_view why = ac4_decoder->refusal_reason();
-                std::printf("player: AC-4 frame %llu: %.*s\n",
-                            static_cast<unsigned long long>(frames_played.load() + frames_held.load()),
-                            static_cast<int>(why.size()), why.data());
-                finish("decode", true, static_cast<int>(decoded.error()));
-                break;
-            }
-            decode_us.fetch_add(elapsed);
-            std::uint64_t worst = worst_frame_us.load();
-            while (elapsed > worst && !worst_frame_us.compare_exchange_weak(worst, elapsed)) {
-            }
-            if (!*decoded) {
-                frames_held.fetch_add(1);
+            if (!look_ahead) {
+                if (!decode_one(next.frame.raw_ac4_frame, {})) {
+                    break;
+                }
                 continue;
             }
-            frames_played.fetch_add(1);
-            resync_bytes.store(resync_before + splitter.resynchronised_bytes());
+            if (!have_held) {
+                held.assign(next.frame.raw_ac4_frame.begin(), next.frame.raw_ac4_frame.end());
+                have_held = true;
+                continue;
+            }
+            const bool more = decode_one(held, next.frame.raw_ac4_frame);
+            held.assign(next.frame.raw_ac4_frame.begin(), next.frame.raw_ac4_frame.end());
+            if (!more) {
+                break;
+            }
         }
     }
 #endif  // CONFIG_ICLFORGE_AC4

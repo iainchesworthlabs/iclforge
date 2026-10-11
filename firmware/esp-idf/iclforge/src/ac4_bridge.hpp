@@ -179,6 +179,11 @@ struct PcmHash {
 // is lane 0 and the worker lane 1; where the worker does not start, lanes() is 1 and run() does
 // the work in order on the caller, as a decoder without an executor does.
 //
+// The worker also takes the decoder's one background task a frame (run_async(): the next frame's
+// syntax, read while this frame is reconstructed), and runs it to its end before it looks at the
+// cursor again: a run() that starts meanwhile is done by the decode task alone, which is the
+// worker's share of it that was not going to be in time.
+//
 // The cursor holds the run's generation, its task count and the next index in one word, so that
 // a worker woken late for a run that has finished meets the next run's cursor and takes its
 // tasks (it was woken for that one too) and never one of the run it was woken for, whose tasks
@@ -265,6 +270,28 @@ class TaskExecutor final : public iclforge::ac4::Executor {
         }
     }
 
+    void run_async(Task task, void* context) override {
+        if (worker_ == nullptr) {
+            task(context, 0, 0);
+            return;
+        }
+        async_task_ = task;
+        async_context_ = context;
+        async_over_.store(false, std::memory_order_relaxed);
+        async_pending_.store(true, std::memory_order_release);
+        xTaskNotifyGive(worker_);
+    }
+
+    void wait_async() override {
+        if (worker_ == nullptr) {
+            return;
+        }
+        while (async_pending_.load(std::memory_order_acquire) ||
+               !async_over_.load(std::memory_order_acquire)) {
+            taskYIELD();
+        }
+    }
+
    private:
     void drain(std::size_t lane) {
         for (;;) {
@@ -292,6 +319,10 @@ class TaskExecutor final : public iclforge::ac4::Executor {
             if (executor->quit_.load()) {
                 break;
             }
+            if (executor->async_pending_.exchange(false, std::memory_order_acq_rel)) {
+                executor->async_task_(executor->async_context_, 0, 1);
+                executor->async_over_.store(true, std::memory_order_release);
+            }
             executor->drain(1);
         }
         executor->exited_.store(true);
@@ -309,6 +340,10 @@ class TaskExecutor final : public iclforge::ac4::Executor {
     std::uint16_t generation_ = 0;
     std::atomic<std::uint32_t> cursor_{0};
     std::atomic<std::size_t> done_{0};
+    Task async_task_ = nullptr;
+    void* async_context_ = nullptr;
+    std::atomic<bool> async_pending_{false};
+    std::atomic<bool> async_over_{true};
     std::atomic<bool> quit_{false};
     std::atomic<bool> exited_{false};
 };

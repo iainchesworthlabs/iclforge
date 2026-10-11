@@ -6,11 +6,13 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <map>
 #include <memory>
 #include <numeric>
 #include <optional>
+#include <ranges>
 #include <set>
 #include <span>
 #include <string_view>
@@ -1178,6 +1180,24 @@ struct Decoder::Impl {
     // so that a frame allocates none of them once the first has sized them.
     std::vector<detail::PresentationPlan> plans;
     Capture frame_capture;
+    // The frame read ahead (planning/ac4.md, D14i): decode()'s `next`, read on the executor's
+    // other lane while the frame before it is reconstructed, into a capture, plans and scratch of
+    // its own, so that nothing the reconstruction reads is written. Its reports are made when
+    // the following decode() takes it (take_ahead()), which is when a decode() without `next`
+    // would have read it.
+    struct ReadAhead {
+        bool launched = false;  // a task is outstanding: wait_async() has not returned
+        bool ready = false;     // a frame is read, for the next call
+        std::vector<std::byte> bytes;
+        std::expected<iclforge::ac4::RawFrame, iclforge::ac4::Error> frame;
+        std::optional<std::expected<FrameReport, DecodeError>> report;
+        Capture capture;
+        std::vector<detail::PresentationPlan> plans;
+        std::vector<std::uint8_t> reported;
+        std::optional<int> previous;  // previous_sequence_counter, as reading it leaves it
+        int level = 7;                // DecoderConfig::level when it was read
+    };
+    ReadAhead ahead;
     std::vector<detail::MixSource> sources;
     std::vector<std::vector<float>> scratch_channels;  // what a QMF-only decode puts out: nothing
     std::vector<Speaker> scratch_speakers;
@@ -1337,6 +1357,34 @@ struct Decoder::Impl {
         std::span<const std::byte> raw_ac4_frame,
         std::expected<iclforge::ac4::RawFrame, iclforge::ac4::Error> frame, bool assembled = false);
 
+    // read() without what it reports (presentations() and metadata()), into `capture`, with the
+    // plans of the frame's presentations in `plans_out`, and `reported` for scratch; `frame` keeps
+    // the table of contents it has after apply_observed_stereo_rule(). It reads and writes what
+    // a stream carries from frame to frame, and the members `capture`, `plans_out` and
+    // `reported_scratch` stand for, and nothing else of the decoder's, so that it runs on the
+    // executor's other lane while a frame is reconstructed from frame_capture and plans. With
+    // `ahead_counter` it notes the frame's sequence_counter there, which the caller has checked
+    // continues the stream, and not in previous_sequence_counter, which a failed
+    // reconstruction's concealment reads.
+    [[nodiscard]] ICLFORGE_AC4_NO_EXPORT std::expected<FrameReport, DecodeError> parse_frame(
+        std::span<const std::byte> raw_ac4_frame,
+        std::expected<iclforge::ac4::RawFrame, iclforge::ac4::Error>& frame, bool assembled,
+        Capture& capture, std::vector<detail::PresentationPlan>& plans_out,
+        std::vector<std::uint8_t>& reported_scratch, std::optional<int>* ahead_counter = nullptr);
+
+    // Starts reading `next` on the executor's other lane, where the frame now being reconstructed
+    // has no objects and `next` is an ordinary frame that continues the stream (what
+    // parse_frame() may be given while the reconstruction runs): true once it is outstanding,
+    // which finish_ahead() must follow before decode() returns.
+    [[nodiscard]] ICLFORGE_AC4_NO_EXPORT bool start_ahead(std::span<const std::byte> next);
+    ICLFORGE_AC4_NO_EXPORT void finish_ahead();
+
+    // The frame read ahead, if `raw_ac4_frame` is it: its capture and plans become the frame's, and
+    // what presentations() and metadata() report is made. A different frame than the one
+    // announced is a change of source. Returns the report of a frame taken.
+    [[nodiscard]] ICLFORGE_AC4_NO_EXPORT std::optional<std::expected<FrameReport, DecodeError>>
+    take_ahead(std::span<const std::byte> raw_ac4_frame);
+
     // Part 2 clause 5.1.3: what a transmission frame turns into. A frame of no presentation in
     // the efficient high frame rate mode is read as it stands (kFrame); the first f - 1 frames of
     // a unit are held (kPending) and the last gives the assembled unit (kFrame, `assembled`); a
@@ -1370,11 +1418,12 @@ struct Decoder::Impl {
     // decode()'s work, into `frame`, whose storage it reuses: true for a frame
     // of output, false for a frame that has none.
     [[nodiscard]] ICLFORGE_AC4_NO_EXPORT std::expected<bool, DecodeError> decode_into(
-        std::span<const std::byte> raw_ac4_frame, DecodedFrame& frame);
+        std::span<const std::byte> raw_ac4_frame, DecodedFrame& frame,
+        std::span<const std::byte> next = {});
 
     // The presentations of `toc` as presentations() reports them, from the
     // plans select() left.
-    ICLFORGE_AC4_NO_EXPORT void report_presentations(const Toc& toc);
+    ICLFORGE_AC4_NO_EXPORT void report_presentations(const Toc& toc, int level);
     // The selected presentation's metadata, from the frame just read.
     ICLFORGE_AC4_NO_EXPORT void report_metadata();
 
@@ -1763,6 +1812,8 @@ void Decoder::reset() {
     impl_->last_presentation = 0;
     impl_->last_presentation_id.reset();
     impl_->infos.clear();
+    impl_->ahead.ready = false;
+    impl_->ahead.report.reset();
     impl_->blocks.count = 0;
     impl_->blocks.concealed = false;
     impl_->blocks.position = 0;
@@ -1771,6 +1822,9 @@ void Decoder::reset() {
 }
 
 std::expected<FrameReport, DecodeError> Decoder::parse(std::span<const std::byte> raw_ac4_frame) {
+    if (auto taken = impl_->take_ahead(raw_ac4_frame)) {
+        return std::move(*taken);
+    }
     Impl::Collected collected = impl_->collect(raw_ac4_frame);
     if (collected.kind != Impl::Collected::Kind::kFrame) {
         // A fragment of a unit not yet whole, or of one that was lost: nothing to read yet.
@@ -1814,8 +1868,13 @@ int Decoder::latency_samples() const noexcept {
 
 std::expected<std::optional<DecodedFrame>, DecodeError> Decoder::decode(
     std::span<const std::byte> raw_ac4_frame) {
+    return decode(raw_ac4_frame, std::span<const std::byte>{});
+}
+
+std::expected<std::optional<DecodedFrame>, DecodeError> Decoder::decode(
+    std::span<const std::byte> raw_ac4_frame, std::span<const std::byte> next) {
     DecodedFrame frame;
-    const auto decoded = impl_->decode_into(raw_ac4_frame, frame);
+    const auto decoded = impl_->decode_into(raw_ac4_frame, frame, next);
     if (!decoded) {
         return std::unexpected(decoded.error());
     }
@@ -1827,9 +1886,14 @@ std::expected<std::optional<DecodedFrame>, DecodeError> Decoder::decode(
 
 std::expected<std::optional<FrameInfo>, DecodeError> Decoder::decode_by_block(
     std::span<const std::byte> raw_ac4_frame, BlockSink sink) {
+    return decode_by_block(raw_ac4_frame, std::span<const std::byte>{}, std::move(sink));
+}
+
+std::expected<std::optional<FrameInfo>, DecodeError> Decoder::decode_by_block(
+    std::span<const std::byte> raw_ac4_frame, std::span<const std::byte> next, BlockSink sink) {
     Impl& d = *impl_;
     DecodedFrame& frame = d.block_frame;
-    const auto decoded = d.decode_into(raw_ac4_frame, frame);
+    const auto decoded = d.decode_into(raw_ac4_frame, frame, next);
     if (!decoded) {
         return std::unexpected(decoded.error());
     }
@@ -1968,7 +2032,7 @@ detail::MixValues Decoder::Impl::mix_values(const detail::PresentationPlan& plan
     return mix;
 }
 
-void Decoder::Impl::report_presentations(const Toc& toc) {
+void Decoder::Impl::report_presentations(const Toc& toc, int level) {
     // select() planned every presentation of the frame, each at its index.
     const std::size_t count =
         toc.bitstream_version >= 2 ? toc.presentations_v1.size() : toc.presentations_v0.size();
@@ -2017,7 +2081,7 @@ void Decoder::Impl::report_presentations(const Toc& toc) {
         info.sample_rate_hz =
             anchor ? toc.sample_rate_hz * plan.members[*anchor].rate_multiplier : 0;
         info.decodable = plan.decodable;
-        info.selectable = detail::selectable(plan, config.level);
+        info.selectable = detail::selectable(plan, level);
     }
 }
 
@@ -2267,22 +2331,111 @@ Decoder::Impl::Collected Decoder::Impl::collect(std::span<const std::byte> raw_a
     return out;
 }
 
+bool Decoder::Impl::start_ahead(std::span<const std::byte> next) {
+    Executor* const executor = config.executor;
+    if (next.empty() || executor == nullptr || executor->lanes() < 2 ||
+        static_cast<bool>(config.syntax)) {
+        return false;
+    }
+    // An ordinary frame, which continues the stream: a change of source or a unit of the
+    // efficient high frame rate mode (whose fragments collect() holds and whose plans it makes)
+    // is read where it is taken.
+    auto raw = iclforge::ac4::parse_raw_frame(next);
+    if (!raw) {
+        return false;
+    }
+    const Toc& toc = raw->toc;
+    if (std::ranges::any_of(toc.presentations_v1, [](const PresentationInfoV1& info) {
+            return info.frame_rate_fraction != 1;
+        })) {
+        return false;
+    }
+    if (previous_sequence_counter) {
+        const int previous = *previous_sequence_counter;
+        const int counter = toc.sequence_counter;
+        if (!(counter == previous + 1 || (counter == 1 && previous == 1020) ||
+              (counter != 0 && previous == 0))) {
+            return false;
+        }
+    }
+    ahead.ready = false;
+    ahead.report.reset();
+    ahead.bytes.assign(next.begin(), next.end());
+    ahead.frame = std::move(raw);
+    ahead.previous = previous_sequence_counter;
+    ahead.level = config.level;
+    ahead.launched = true;
+    executor->run_async(
+        [](void* context, std::size_t, std::size_t) {
+            Impl& d = *static_cast<Impl*>(context);
+            ReadAhead& a = d.ahead;
+            a.report =
+                d.parse_frame(a.bytes, a.frame, false, a.capture, a.plans, a.reported, &a.previous);
+        },
+        this);
+    return true;
+}
+
+void Decoder::Impl::finish_ahead() {
+    if (!ahead.launched) {
+        return;
+    }
+    config.executor->wait_async();
+    ahead.launched = false;
+    ahead.ready = true;
+}
+
+std::optional<std::expected<FrameReport, DecodeError>> Decoder::Impl::take_ahead(
+    std::span<const std::byte> raw_ac4_frame) {
+    if (!ahead.ready) {
+        return std::nullopt;
+    }
+    ahead.ready = false;
+    if (!ahead.report || ahead.bytes.size() != raw_ac4_frame.size() ||
+        (!raw_ac4_frame.empty() &&
+         std::memcmp(ahead.bytes.data(), raw_ac4_frame.data(), raw_ac4_frame.size()) != 0)) {
+        // Not the frame announced: reading it moved on what the stream carries, so the stream
+        // is taken to have changed source and the frame given is read as the first of the new.
+        ahead.report.reset();
+        forget_stream();
+        return std::nullopt;
+    }
+    // What collect() does for an ordinary frame, and read()'s own note of its counter.
+    fragments_used = 0;
+    fragments_missing = 0;
+    previous_sequence_counter = ahead.previous;
+    std::swap(frame_capture, ahead.capture);
+    std::swap(plans, ahead.plans);
+    std::expected<FrameReport, DecodeError> report = std::move(*ahead.report);
+    ahead.report.reset();
+    if (report) {
+        report_presentations(ahead.frame->toc, ahead.level);
+        report_metadata();
+    }
+    return report;
+}
+
 std::expected<bool, DecodeError> Decoder::Impl::decode_into(
-    std::span<const std::byte> raw_ac4_frame, DecodedFrame& frame) {
+    std::span<const std::byte> raw_ac4_frame, DecodedFrame& frame,
+    std::span<const std::byte> next) {
     Impl& d = *this;
     d.refusal = {};
-    Collected collected = d.collect(raw_ac4_frame);
-    if (collected.kind == Collected::Kind::kPending) {
-        return false;  // a fragment: the unit is not whole yet
-    }
-    if (collected.kind == Collected::Kind::kLost) {
-        d.refusal = "a unit of the efficient high frame rate mode that did not arrive whole";
-        if (d.converter_phase) {
-            d.converter_phase = (*d.converter_phase + 1) % 5;
+    std::optional<std::expected<FrameReport, DecodeError>> taken = d.take_ahead(raw_ac4_frame);
+    if (!taken) {
+        Collected collected = d.collect(raw_ac4_frame);
+        if (collected.kind == Collected::Kind::kPending) {
+            return false;  // a fragment: the unit is not whole yet
         }
-        return d.conceal_or(DecodeError::kInvalidStream, frame);
+        if (collected.kind == Collected::Kind::kLost) {
+            d.refusal = "a unit of the efficient high frame rate mode that did not arrive whole";
+            if (d.converter_phase) {
+                d.converter_phase = (*d.converter_phase + 1) % 5;
+            }
+            return d.conceal_or(DecodeError::kInvalidStream, frame);
+        }
+        taken = d.read(collected.bytes, std::move(collected.frame), collected.assembled);
     }
-    auto report = d.read(collected.bytes, std::move(collected.frame), collected.assembled);
+    auto report = std::move(*taken);
     if (!report) {
         d.refusal = describe(report.error());
         // read() took the frame to be the one the stream expected; its phase
@@ -2425,6 +2578,23 @@ std::expected<bool, DecodeError> Decoder::Impl::decode_into(
         detail::downmix_values(capture.presentation_read ? &capture.presentation : nullptr, main.content.metadata);
     inputs.downmix.device = d.config.output.target_device;
     inputs.mix = d.mix_values(plan, anchor, dialnorm);
+    // The next frame's syntax, read on the executor's other lane while this frame is
+    // reconstructed (D14i): where this frame has no object audio, whose reconstruction reads
+    // what a later frame's syntax writes. Everything this frame takes from what the stream
+    // carries is in `inputs`, `capture`, `plan` and the substreams' own state by now.
+    struct AheadJoin {
+        Impl& d;
+        bool active = false;
+        ~AheadJoin() {
+            if (active) {
+                d.finish_ahead();
+            }
+        }
+    } join{d};
+    if (!next.empty() && capture.oamd.empty() &&
+        std::ranges::none_of(std::views::iota(std::size_t{0}, capture.audio.size()), is_object)) {
+        join.active = d.start_ahead(next);
+    }
     // The presentation's other substreams, each as far as the QMF domain,
     // after its own dialogue enhancement; the dialogue enhancement substream
     // is the waveform of the main substream's hybrid method.
@@ -2499,8 +2669,21 @@ std::expected<bool, DecodeError> Decoder::Impl::decode_into(
 std::expected<FrameReport, DecodeError> Decoder::Impl::read(
     std::span<const std::byte> raw_ac4_frame,
     std::expected<iclforge::ac4::RawFrame, iclforge::ac4::Error> frame, bool assembled) {
+    auto report = parse_frame(raw_ac4_frame, frame, assembled, frame_capture, plans, reported);
+    if (report) {
+        report_presentations(frame->toc, config.level);
+        report_metadata();
+    }
+    return report;
+}
+
+std::expected<FrameReport, DecodeError> Decoder::Impl::parse_frame(
+    std::span<const std::byte> raw_ac4_frame,
+    std::expected<iclforge::ac4::RawFrame, iclforge::ac4::Error>& frame, bool assembled,
+    Capture& capture_out, std::vector<detail::PresentationPlan>& plans_out,
+    std::vector<std::uint8_t>& reported_scratch, std::optional<int>* ahead_counter) {
     ICLFORGE_ZONE_SCOPED_N("ac4_parse");
-    Capture* const capture = &frame_capture;
+    Capture* const capture = &capture_out;
     if (!frame) {
         // The frame is taken to be the one the stream expected next, so that
         // one damaged frame is not a change of source. After a splice mark
@@ -2518,15 +2701,19 @@ std::expected<FrameReport, DecodeError> Decoder::Impl::read(
     capture->oamd.clear();
     capture->presentation_read = false;
     if (const std::optional<std::size_t> selected =
-            detail::select(toc, config.presentation, config.level, plans)) {
-        capture->plan = &plans[*selected];
+            detail::select(toc, config.presentation, config.level, plans_out)) {
+        capture->plan = &plans_out[*selected];
         for (const detail::Member& member : capture->plan->members) {
             capture->audio.emplace_back().index = member.substream;
         }
     }
 
     if (!assembled) {
-        note_sequence_counter(toc.sequence_counter);
+        if (ahead_counter != nullptr) {
+            *ahead_counter = toc.sequence_counter;
+        } else {
+            note_sequence_counter(toc.sequence_counter);
+        }
     }
 
     FrameReport report;
@@ -2834,14 +3021,15 @@ std::expected<FrameReport, DecodeError> Decoder::Impl::read(
     // ac4_hsf_ext_substream_info() points at, or one only a skipped
     // presentation_config_ext_info() names - is reported too, unread: without
     // a name the syntax to read it with is unknown.
-    reported.assign(frame->substreams.size(), 0);
+    reported_scratch.assign(frame->substreams.size(), 0);
     for (const SubstreamReport& substream : report.substreams) {
-        if (substream.index >= 0 && static_cast<std::size_t>(substream.index) < reported.size()) {
-            reported[static_cast<std::size_t>(substream.index)] = 1;
+        if (substream.index >= 0 &&
+            static_cast<std::size_t>(substream.index) < reported_scratch.size()) {
+            reported_scratch[static_cast<std::size_t>(substream.index)] = 1;
         }
     }
     for (std::size_t index = 0; index < frame->substreams.size(); ++index) {
-        if (reported[index] != 0) {
+        if (reported_scratch[index] != 0) {
             continue;
         }
         SubstreamReport substream;
@@ -2864,8 +3052,6 @@ std::expected<FrameReport, DecodeError> Decoder::Impl::read(
         in_order.push_back(std::move(report.substreams[i]));
     }
     report.substreams = std::move(in_order);
-    report_presentations(toc);
-    report_metadata();
     return report;
 }
 

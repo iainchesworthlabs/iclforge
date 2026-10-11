@@ -175,6 +175,14 @@ that decodes calls it. The ESP32 player's is a task pinned to the core the decod
 (`libs/ac4/tests/decoder/test_executor.cpp`), which decodes every committed stream through it and
 compares the bits.
 
+`decode(frame, next)` and `decode_by_block(frame, next, sink)` take, as well, the frame the following call will be given, and read its syntax
+on the executor's second lane while this frame is reconstructed (`Executor::run_async()` and `wait_async()`, which an executor with no
+second lane runs in place). The signal, `presentations()`, `metadata()`, `refusal_reason()` and `latency_samples()` after each call are
+what a call without `next` gives. Nothing is read ahead for a frame with object audio, one that does not continue the stream (a change of
+source), one of the efficient high frame rate mode, or with a syntax trace set; the frame the following call is given must be `next`, and any
+other is taken as a change of source; and a `set_presentation()` between the calls takes effect one frame later, since the frame was read
+with the choice that stood. The ESP32 player holds one frame back to give it the next.
+
 `forge decode` spells each control as an option (`output-level=`, `drcmode=`, `headphones`,
 `dialogue-enhancement=`, `channels=`, `downmix=`, `speakers=`, `mix-lfe=`, `dialogue-gain=`,
 `associated-gain=`, `md-compat=`, `decoding=`, `conceal=`); see
