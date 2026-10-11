@@ -416,6 +416,10 @@ class EncoderController : public QObject {
     // lets the picker reach it - LFE2 alone has no full-bandwidth channel to
     // share its dependent substream with.
     Q_PROPERTY(QString channelShapeName READ channelShapeName NOTIFY planChanged)
+    // What the plan is called where it is named for what it makes: channelShapeName(), or
+    // "Karaoke 3/2" for an Annex C karaoke stream (bsmod 7 at a mode above 1/0), whose five
+    // channels are a backing and parts, not a 5.0 room.
+    Q_PROPERTY(QString planLabel READ effectiveLabel NOTIFY planChanged)
     Q_PROPERTY(int channelBudgetUsed READ channelBudgetUsed NOTIFY planChanged)
     Q_PROPERTY(int channelBudgetMax READ channelBudgetMax CONSTANT)
     // plan::format_channels() of the current bed+LFE+extras mask - the
@@ -852,6 +856,9 @@ public:
         return atmos_enabled_ || isDualMono();
     }
     [[nodiscard]] QString channelShapeName() const;
+    // "AC-4 objects", "5.1 bed" for object mode, "Karaoke 3/2" for a karaoke stream, else the
+    // derived shape name (channelShapeName()).
+    [[nodiscard]] QString effectiveLabel() const;
     [[nodiscard]] int channelBudgetUsed() const;
     [[nodiscard]] int channelBudgetMax() const { return 16; }
     [[nodiscard]] QString channelLocationsText() const;
@@ -1257,6 +1264,10 @@ public:
     // answers 1.
     Q_INVOKABLE int setAc4Option(const QString& key, const QString& value);
     Q_INVOKABLE void encodeTo(const QUrl& url);
+    // The same encode, for a file the person did not ask for: the Karaoke flow's Hear step builds
+    // the stream to play it. It opens no run, so the run strip lists what was saved and not the
+    // preview; encodeFinished() and the status line report it as any encode.
+    Q_INVOKABLE void encodePreviewTo(const QUrl& url);
     Q_INVOKABLE void cancel();
     Q_INVOKABLE [[nodiscard]] QString suggestedOutputName() const;
     // The extension the current format and container imply, for the save
@@ -1481,9 +1492,6 @@ private:
     // routing computation below should read. Assumes currentPlan() validates,
     // the way forge's own resolve() does.
     [[nodiscard]] iclforge::ac3::plan::ChannelPlan effectiveChannelPlan() const;
-    // What the routing summary calls this plan: "5.1 bed" for object mode,
-    // else the derived shape name (channelShapeName()).
-    [[nodiscard]] QString effectiveLabel() const;
     // bed_acmod_ == kDualMono - checked often enough (currentPlan(),
     // channelShapeName(), extrasLocked()...) to name once. 1+1 is a bed, not
     // a location mask (see kBeds' own comment and acmod_map's "not a
@@ -1979,6 +1987,8 @@ private:
     // wrote a live-appropriate placeholder into the same run's rateText;
     // this is what replaces it once the real per-frame sizes are known.
     QString pending_rate_text_;
+    // Set by encodePreviewTo() for the one encodeTo() it makes: that encode opens no run.
+    bool next_encode_unrecorded_ = false;
 
     bool playing_ = false;
     // What outputPath holds - see the outputIsEac3 property. Snapshotted by
