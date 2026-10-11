@@ -30,6 +30,7 @@
 #include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/ac3/verify/eac3_selfcheck.hpp"
 #include "../multi_source.hpp"
+#include "source_frame.hpp"
 
 namespace forge_cli::commands {
 
@@ -122,11 +123,8 @@ class ProgrammeSource {
         const std::size_t frames = frame_count();
         if (!streaming_) {
             for (std::size_t c = 0; c < dest.size(); ++c) {
-                const float hold = frames > 0 ? whole_.channels[c][frames - 1] : 0.0f;
-                for (std::size_t i = 0; i < frame_len; ++i) {
-                    const std::size_t at = start + i;
-                    dest[c][i] = at < frames ? whole_.channels[c][at] : hold;
-                }
+                iclforge::apps::fill_source_frame(whole_.channels[c], 0, start,
+                                                  std::span<float>{dest[c]}.first(frame_len));
             }
             return true;
         }
@@ -956,16 +954,8 @@ int run_eac3_encode(std::string_view in_path, std::string_view out_path,
             }
         } else {
             for (std::size_t c = 0; c < source.size(); ++c) {
-                const float hold = frame_count > 0 ? wav->channels[c][frame_count - 1] : 0.0f;
-                for (std::size_t i = 0; i < samples_per_frame; ++i) {
-                    const std::size_t at = start + i;
-                    if (at < offset) {
-                        source[c][i] = 0.0f;
-                        continue;
-                    }
-                    const std::size_t shifted = at - offset;
-                    source[c][i] = shifted < frame_count ? wav->channels[c][shifted] : hold;
-                }
+                iclforge::apps::fill_source_frame(wav->channels[c], offset, start,
+                                                  std::span<float>{source[c]}.first(samples_per_frame));
                 in[c] = source[c];
             }
         }
@@ -1465,17 +1455,7 @@ int run_encode(std::string_view in_path, std::string_view out_path, std::uint32_
             }
         } else {
             for (std::size_t c = 0; c < source.size(); ++c) {
-                const float hold = frame_count > 0 ? wav->channels[c][frame_count - 1] : 0.0f;
-                for (int i = 0; i < iclforge::ac3::kSamplesPerFrame; ++i) {
-                    const std::size_t at = start + static_cast<std::size_t>(i);
-                    if (at < offset) {
-                        source[c][static_cast<std::size_t>(i)] = 0.0f;
-                        continue;
-                    }
-                    const std::size_t shifted = at - offset;
-                    source[c][static_cast<std::size_t>(i)] =
-                        shifted < frame_count ? wav->channels[c][shifted] : hold;
-                }
+                iclforge::apps::fill_source_frame(wav->channels[c], offset, start, source[c]);
                 in[c] = source[c];
             }
         }
