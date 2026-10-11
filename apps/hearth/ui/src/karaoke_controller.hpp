@@ -11,7 +11,7 @@
 // The lyrics of the item playing (planning/karaoke-design.md, K5): a third QML
 // singleton beside HearthController and NetworkController, so that
 // hearth_controller.cpp does not grow. What it wraps is apps/hearth/engine/src/
-// lyrics.hpp, the Qt-free reader and cursor; this class turns a file into
+// iclforge/lyrics/lyrics.hpp, the Qt-free reader and cursor; this class turns a file into
 // what a view binds to and answers "where is the singer" for a position.
 //
 // Nothing here is polled and nothing here owns a clock: the view that shows the

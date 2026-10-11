@@ -12,7 +12,6 @@ add_library(hearth_engine STATIC
     src/diagnostic_log.cpp
     src/diagnostics_report.cpp
     src/engine_thread.cpp
-    src/lyrics.cpp
     src/media_info.cpp
     src/media_inspector.cpp
     src/network_view.cpp
@@ -88,7 +87,8 @@ target_include_directories(hearth_engine PUBLIC "${PROJECT_SOURCE_DIR}/apps/shar
 # themselves (src/network_sinks.hpp), and Group, the burst/PCM streaming path a
 # network output plays through (src/network_group_sink.hpp). iclforge::ac3 asks
 # whether frames carry an authenticity tag.
-target_link_libraries(hearth_engine PUBLIC iclforge::audio iclforge::ac3 iclforge::ac4 iclforge::sendspin)
+target_link_libraries(hearth_engine PUBLIC iclforge::audio iclforge::ac3 iclforge::ac4 iclforge::sendspin
+                                          iclforge::lyrics)
 # iclforge::coverage (coverage floors, tools/checks/coverage_report.sh's "apps/hearth" row) instruments
 # this target's OWN sources - apps/forge/cli/src's own comment on its matching link explains why the
 # instrumented EXECUTABLE that eventually links this library is not enough on its own: --coverage
