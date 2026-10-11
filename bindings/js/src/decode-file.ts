@@ -31,6 +31,8 @@ export interface DecodedProgram {
   /** 0, 1 or 2 channels depending on whether `fold` was requested - the real iclforge::ac3::OutputStage fold, never a hand-rolled one. */
   fold: Float32Array[];
   durationSeconds: number;
+  /** Whether the stream is Annex C karaoke type (an AC-3 stream flagged bsmod 7 above 1/0), whatever reproduction was asked for. */
+  karaoke: boolean;
   objectCount: number;
   objectLabels: string[];
   /** Per object: [x, y, z, gain_db, width, depth, height] repeated once per object-carrying frame. */
@@ -75,6 +77,7 @@ function accumulate(
   const foldChunks: Float32Array[][] = [];
   let channelLabels: string[] = [];
   let sampleRate = streamSampleRate;
+  let karaoke = false;
 
   let objectCount = 0;
   let objectLabels: string[] = [];
@@ -95,6 +98,7 @@ function accumulate(
     }
 
     sampleRate = result.sampleRate;
+    karaoke = karaoke || result.karaoke;
     if (channelLabels.length === 0) channelLabels = result.channelLabels;
     appendChannels(channelChunks, result.channelCount, result.frameSamples, (ch) => decoder.channel(ch));
     if (result.foldChannelCount > 0) {
@@ -164,6 +168,7 @@ function accumulate(
     energyBlockSize: ENERGY_BLOCK_SAMPLES,
     fold,
     durationSeconds,
+    karaoke,
     objectCount,
     objectLabels,
     objectPositions: objectPositions.map((values) => Float32Array.from(values)),

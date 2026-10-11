@@ -75,6 +75,36 @@ const program = decodeFile(module, bytes, {
 // present if the stream carries Atmos objects
 ```
 
+### Karaoke streams
+
+An AC-3 stream flagged `bsmod` 7 with a layout wider than mono is an Annex C karaoke stream (ETSI
+TS 102 366): L and R, a guide melody where a centre would be, and one or two vocals where the
+surrounds would be. `FoldOptions` takes the reproduction a karaoke-aware or karaoke-capable
+decoder gives it, and `program.karaoke` (and each push's `outcome.karaoke`) says whether the stream
+is one:
+
+```ts
+import { decodeFile, DownmixTarget, KaraokeReproduction, KaraokeVocals } from "iclforge-wasm-decoder";
+
+// L, C and R (and the LFE): the melody in the centre, the vocals at the stream's own level.
+const three = decodeFile(module, bytes, {
+  fold: { target: DownmixTarget.AsCoded, karaoke: KaraokeReproduction.Aware },
+});
+// Stereo with only the first vocal heard: a stereo fold is Annex C's own 2/0 reproduction.
+const lead = decodeFile(module, bytes, {
+  fold: {
+    target: DownmixTarget.LoRo,
+    karaoke: KaraokeReproduction.Capable,
+    karaokeVocals: KaraokeVocals.V1,
+  },
+});
+```
+
+The reproduction is applied to the fold, so `program.fold` is where it comes out: three channels
+(four with an LFE) at `AsCoded`, two at `LoRo`. It changes nothing for a stream that is not
+karaoke (E-AC-3 and AC-4 never are). These are the library's own output stage: the same samples
+`forge decode karaoke` and `channels=2 karaoke=v1` write.
+
 ## Push-frame decode
 
 For a live/streaming source (your own transport, a container demuxer, the hls.js bridge below):
@@ -213,6 +243,12 @@ hls.attachMedia(videoElement); // video still decodes natively; only audio is di
   same kind of stand-in for the AC-4 Embind module (`ac4.test.js`), and `package-exports.test.js`
   checks the `exports` map, `./ac4` included. No browser test loads the compiled
   `iclforge_ac4.wasm` yet.
+- The karaoke reproduction (`FoldOptions.karaoke`, `karaokeVocals`): the options reach the Embind
+  constructor in the library's own numbering and the `karaoke` flag reaches the outcome, in Node
+  against the stand-in. The decoding itself was held against `forge decode` of the karaoke example
+  with a build of the module run in Node: all eight cases (the three-channel reproduction with the
+  stream's own, none, V1 and both vocals, and the same at the stereo fold) matched sample for
+  sample.
 - `npm test` fails under 95% line, 90% branch or 95% function coverage of `dist/`.
 
 **Not yet verified**: a live hls.js instance against an HLS manifest and segment server carrying
