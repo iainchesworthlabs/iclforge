@@ -38,6 +38,50 @@ ScrollView {
         width: root.availableWidth
         spacing: Theme.gap * 2
 
+        // What Hearth sends this sink when it decodes a stream for it: not one of the sink's own
+        // decoder settings (the sink decodes none of what is sent here), but a choice about
+        // the sink, and only for a sink that lists Opus. PCM is lossless and takes twelve times
+        // the bytes; Opus is lossy and fills a board's buffer for seconds, which a board on a
+        // busy WiFi link needs.
+        Card {
+            objectName: "networkSinkOpusCard"
+            rule: false
+            visible: (NetworkController.selectedSink.opusAvailable ?? false) === true
+            title: qsTr("Audio decoded here")
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.gap
+                Text {
+                    text: qsTr("Sent as")
+                    color: Theme.textMuted
+                    Layout.preferredWidth: root.labelWidth
+                    elide: Text.ElideRight
+                }
+                SegmentedControl {
+                    objectName: "networkSinkOpusChoice"
+                    accessibleName: qsTr("PCM or Opus")
+                    currentValue: (NetworkController.selectedSink.opusFallback ?? false) ? "opus" : "pcm"
+                    model: [
+                        { value: "pcm", label: qsTr("PCM") },
+                        { value: "opus", label: qsTr("Opus") }
+                    ]
+                    onSelected: function(value) { NetworkController.setSinkOpusFallback(value === "opus"); }
+                }
+            }
+            Text {
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                text: qsTr("When this sink cannot take a stream as it is, Hearth decodes it and sends "
+                          + "PCM, which is lossless and needs a good link. Opus is lossy and a twelfth "
+                          + "of the bytes, for a sink on a busy WiFi network. It applies the next time "
+                          + "the group plays.")
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSmall
+                wrapMode: Text.WordWrap
+            }
+        }
+
         // No ordinal on these three: network-sink-decoder.png numbers the
         // page's COLUMNS (01 ON THIS NETWORK, 02 ... SETTINGS, 03 WHAT THE
         // SINK REPORTS), not the cards inside the middle one, which carry a

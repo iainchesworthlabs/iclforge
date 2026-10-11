@@ -29,6 +29,7 @@ using iclforge::hearth::choose_sink_form;
 using iclforge::hearth::data_type_of;
 using iclforge::hearth::MemberAction;
 using iclforge::hearth::PairState;
+using iclforge::hearth::PcmCodec;
 using iclforge::hearth::PcmFormat;
 using iclforge::hearth::plan_group_forms;
 using iclforge::hearth::SinkFacts;
@@ -264,7 +265,7 @@ TEST_CASE("sink form: a group's plan sends each member its own form and one rend
 
     SinkFacts decodes = hearth_sink({sp::DataType::kAc3, sp::DataType::kEac3});
     decodes.name = "Decodes";
-    // A C6 build: it decodes 2.0 of AC-3 and cannot sustain PCM, which is read from its hardware.
+    // A C6 build: it decodes 2.0 of AC-3 and is sent PCM with a caveat, read from its hardware.
     SinkFacts c6 = hearth_sink({sp::DataType::kAc3, sp::DataType::kEac3});
     c6.name = "C6";
     c6.hardware = "ESP32-C6";
@@ -285,13 +286,14 @@ TEST_CASE("sink form: a group's plan sends each member its own form and one rend
 
     CHECK(plan.members[0].action == MemberAction::kCoded);
     CHECK(plan.members[0].label == "AC-3 as it is");
+    CHECK(plan.members[1].label == "PCM · 2.0");
     CHECK(plan.members[2].label == "PCM · 2.0");
     CHECK(plan.members[3].label == "PCM · 5.1");
-    CHECK(plan.members[1].label == "Nothing · held back");
-    // Past what it decodes, and not to be sent PCM: held back, and the reason says both.
-    CHECK(plan.members[1].action == MemberAction::kHold);
+    // Past what it decodes: sent PCM at 2.0, the stereo player's render, with the caveat.
+    CHECK(plan.members[1].action == MemberAction::kPcm);
+    CHECK(plan.members[1].channels == 2);
     CHECK(mentions(plan.members[1].choice.reason, "up to 2 channels"));
-    CHECK(mentions(plan.members[1].choice.reason, "switched off"));
+    CHECK(mentions(plan.members[1].choice.reason, "drop out"));
     // A stereo player: the 2.0 fold, a render of its own.
     CHECK(plan.members[2].action == MemberAction::kPcm);
     CHECK(plan.members[2].channels == 2);
@@ -337,17 +339,184 @@ TEST_CASE("sink form: a layout of a width another has is held back and not sent 
     CHECK(shared.variants.size() == 1);
 }
 
-TEST_CASE("sink form: only an ESP32-C6 is not offered PCM decoded here", "[hearth][sink_form]") {
+TEST_CASE("sink form: only an ESP32-C6 is offered PCM decoded here with a caveat",
+          "[hearth][sink_form]") {
     SinkFacts sink;
     CHECK(iclforge::hearth::form_policy(sink).pcm_fallback);
+    CHECK(iclforge::hearth::form_policy(sink).pcm_caveat.empty());
     sink.hardware = "ESP32-S3";
     CHECK(iclforge::hearth::form_policy(sink).pcm_fallback);
+    CHECK(iclforge::hearth::form_policy(sink).pcm_caveat.empty());
     sink.hardware = "ESP32-P4";
     CHECK(iclforge::hearth::form_policy(sink).pcm_fallback);
+    CHECK(iclforge::hearth::form_policy(sink).pcm_caveat.empty());
     sink.hardware = "esp32-c6";
-    CHECK_FALSE(iclforge::hearth::form_policy(sink).pcm_fallback);
+    CHECK(iclforge::hearth::form_policy(sink).pcm_fallback);
+    CHECK_FALSE(iclforge::hearth::form_policy(sink).pcm_caveat.empty());
     sink.hardware = "ESP32-C6-DevKitC";
-    CHECK_FALSE(iclforge::hearth::form_policy(sink).pcm_fallback);
+    CHECK(iclforge::hearth::form_policy(sink).pcm_fallback);
+    CHECK_FALSE(iclforge::hearth::form_policy(sink).pcm_caveat.empty());
+}
+
+TEST_CASE("sink form: a caveat is added to the reason of a sink sent PCM, and to no other",
+          "[hearth][sink_form]") {
+    SinkFacts c6 = hearth_sink({sp::DataType::kAc3});
+    c6.hardware = "ESP32-C6";
+    limit(c6, sp::DataType::kAc3, 2);
+    c6.pcm_formats.push_back({.channels = 2, .sample_rate = k48k, .bit_depth = 16});
+    const auto policy = iclforge::hearth::form_policy(c6);
+    const auto sent = choose_sink_form(ac3(6), c6, policy);
+    REQUIRE(sent.form == SinkForm::kPcm);
+    CHECK(mentions(sent.reason, "up to 2 channels"));
+    CHECK(mentions(sent.reason, "drop out"));
+    // A stream it takes as it is carries no caveat: nothing about it is at risk.
+    const auto coded = choose_sink_form(ac3(2), c6, policy);
+    REQUIRE(coded.form == SinkForm::kCoded);
+    CHECK_FALSE(mentions(coded.reason, "drop out"));
+}
+
+TEST_CASE(
+    "sink form: a sink that places fewer objects than the stream has is sent PCM decoded here",
+    "[hearth][sink_form][objects]") {
+    // An E-AC-3 stream with sixteen objects, to a Hearth sink set to 7.1.4, which has heights.
+    const StreamNeeds joc{
+        .stream = BitstreamFormat::kEac3, .sample_rate = k48k, .coded_channels = 6, .objects = 16};
+    SinkFacts sink = hearth_sink({sp::DataType::kEac3}, {2, 12});
+    configured(sink, "7.1.4");
+
+    SECTION("a sink that states no limit is sent the stream as it is") {
+        CHECK(choose_sink_form(joc, sink).form == SinkForm::kCoded);
+    }
+    SECTION("a limit the stream is within leaves it coded") {
+        sink.iclforge_support->max_objects[static_cast<std::size_t>(sp::DataType::kEac3)] = 16;
+        CHECK(choose_sink_form(joc, sink).form == SinkForm::kCoded);
+    }
+    SECTION("past the limit it is decoded here, with the objects placed, and the reason says so") {
+        sink.iclforge_support->max_objects[static_cast<std::size_t>(sp::DataType::kEac3)] = 4;
+        const auto choice = choose_sink_form(joc, sink);
+        REQUIRE(choice.form == SinkForm::kPcm);
+        REQUIRE(choice.layout.has_value());
+        CHECK(choice.layout->slots() == 12);
+        CHECK(mentions(choice.reason, "up to 4 objects"));
+        CHECK(mentions(choice.reason, "has 16"));
+    }
+    SECTION("0 is a limit: a sink that places none is sent PCM too") {
+        sink.iclforge_support->max_objects[static_cast<std::size_t>(sp::DataType::kEac3)] = 0;
+        const auto choice = choose_sink_form(joc, sink);
+        CHECK(choice.form == SinkForm::kPcm);
+        CHECK(mentions(choice.reason, "does not place objects"));
+    }
+    SECTION("a limit for another data type is not this one's") {
+        sink.iclforge_support->data_types = {sp::DataType::kEac3, sp::DataType::kAc4};
+        sink.iclforge_support->max_objects[static_cast<std::size_t>(sp::DataType::kAc4)] = 0;
+        CHECK(choose_sink_form(joc, sink).form == SinkForm::kCoded);
+    }
+    SECTION("a layout with no heights leaves the objects out, so the stream is as it is") {
+        configured(sink, "5.1");
+        sink.iclforge_support->max_objects[static_cast<std::size_t>(sp::DataType::kEac3)] = 0;
+        CHECK(choose_sink_form(joc, sink).form == SinkForm::kCoded);
+    }
+    SECTION("the listener's own objects setting decides over the layout") {
+        sink.iclforge_support->max_objects[static_cast<std::size_t>(sp::DataType::kEac3)] = 0;
+        sp::Settings settings;
+        settings.decoder.objects = sp::ObjectsPolicy::kNever;
+        sink.intended_settings = settings;
+        CHECK(choose_sink_form(joc, sink).form == SinkForm::kCoded);
+        configured(sink, "5.1");
+        settings.decoder.objects = sp::ObjectsPolicy::kAlways;
+        sink.intended_settings = settings;
+        CHECK(choose_sink_form(joc, sink).form == SinkForm::kPcm);
+    }
+    SECTION("a stream with no objects is not held to the limit") {
+        sink.iclforge_support->max_objects[static_cast<std::size_t>(sp::DataType::kEac3)] = 0;
+        StreamNeeds bed = joc;
+        bed.objects = 0;
+        CHECK(choose_sink_form(bed, sink).form == SinkForm::kCoded);
+    }
+    SECTION(
+        "where PCM decoded here is not possible the stream goes as it is, to be played as its "
+        "bed") {
+        sink.iclforge_support->max_objects[static_cast<std::size_t>(sp::DataType::kEac3)] = 0;
+        const auto choice = choose_sink_form(joc, sink, {.pcm_fallback = false});
+        CHECK(choice.form == SinkForm::kCoded);
+        CHECK(mentions(choice.reason, "plays the bed without them"));
+        // And a sink with no PCM to be sent says the same.
+        SinkFacts no_pcm = hearth_sink({sp::DataType::kEac3}, {});
+        configured(no_pcm, "7.1.4");
+        no_pcm.iclforge_support->max_objects[static_cast<std::size_t>(sp::DataType::kEac3)] = 0;
+        CHECK(choose_sink_form(joc, no_pcm).form == SinkForm::kCoded);
+    }
+}
+
+// A sink the person has set to Opus, on a link too poor for PCM: sent decoded audio as Opus, at 2.0,
+// where it lists Opus and the stream is at 48 kHz; PCM as before where it is not set, does not list
+// it, or the stream is at another rate.
+TEST_CASE("sink form: a sink set to Opus is sent it where it lists it", "[hearth][sink_form]") {
+    SinkFacts c6 = hearth_sink({sp::DataType::kAc3});
+    c6.hardware = "ESP32-C6";
+    limit(c6, sp::DataType::kAc3, 2);
+    c6.codecs = {"pcm", "opus"};
+    c6.opus_fallback = true;
+
+    SECTION("it is sent Opus at 2.0, and the reason says so and carries no PCM caveat") {
+        const auto policy = iclforge::hearth::form_policy(c6);
+        CHECK(policy.opus);
+        const auto sent = choose_sink_form(ac3(6), c6, policy);
+        REQUIRE(sent.form == SinkForm::kPcm);
+        CHECK(sent.codec == PcmCodec::kOpus);
+        REQUIRE(sent.layout.has_value());
+        CHECK(sent.layout->slots() == 2);
+        CHECK(mentions(sent.reason, "up to 2 channels"));
+        CHECK(mentions(sent.reason, "Opus"));
+        CHECK_FALSE(mentions(sent.reason, "drop out"));
+    }
+    SECTION("not set, it is sent PCM with the caveat") {
+        c6.opus_fallback = false;
+        const auto sent = choose_sink_form(ac3(6), c6, iclforge::hearth::form_policy(c6));
+        REQUIRE(sent.form == SinkForm::kPcm);
+        CHECK(sent.codec == PcmCodec::kPcm);
+        CHECK(mentions(sent.reason, "drop out"));
+    }
+    SECTION("a sink that does not list Opus is sent PCM whatever was set") {
+        c6.codecs = {"pcm"};
+        const auto policy = iclforge::hearth::form_policy(c6);
+        CHECK_FALSE(policy.opus);
+        const auto sent = choose_sink_form(ac3(6), c6, policy);
+        REQUIRE(sent.form == SinkForm::kPcm);
+        CHECK(sent.codec == PcmCodec::kPcm);
+    }
+    SECTION("a stream it takes as it is is sent as it is") {
+        const auto sent = choose_sink_form(ac3(2), c6, iclforge::hearth::form_policy(c6));
+        CHECK(sent.form == SinkForm::kCoded);
+        CHECK(sent.codec == PcmCodec::kPcm);
+    }
+    SECTION("a stream at another rate is not sent Opus, which is listed at 48 kHz only") {
+        c6.pcm_formats.push_back({.channels = 2, .sample_rate = 44100, .bit_depth = 16});
+        const StreamNeeds at_44k{
+            .stream = BitstreamFormat::kAc3, .sample_rate = 44100, .coded_channels = 6};
+        c6.iclforge_support->sample_rates = {44100};
+        const auto sent = choose_sink_form(at_44k, c6, iclforge::hearth::form_policy(c6));
+        CHECK(sent.codec == PcmCodec::kPcm);
+    }
+    SECTION("in a group it shares the 2.0 render the stereo player has") {
+        SinkFacts stereo;
+        stereo.name = "Stereo";
+        stereo.kind = SinkKind::kStandardPlayer;
+        stereo.pcm_formats.push_back({.channels = 2, .sample_rate = k48k, .bit_depth = 16});
+        const auto master = iclforge::render::OutputLayout::parse("5.1");
+        REQUIRE(master.has_value());
+        const std::vector<SinkFacts> sinks{c6, stereo};
+        const auto plan = plan_group_forms(ac3(6), *master, sinks);
+        REQUIRE(plan.members.size() == 2);
+        CHECK(plan.members[0].action == MemberAction::kPcm);
+        CHECK(plan.members[0].codec == PcmCodec::kOpus);
+        CHECK(plan.members[0].channels == 2);
+        CHECK(plan.members[0].label == "Opus · 2.0");
+        CHECK(plan.members[1].action == MemberAction::kPcm);
+        CHECK(plan.members[1].codec == PcmCodec::kPcm);
+        CHECK(plan.members[1].label == "PCM · 2.0");
+        CHECK(plan.variants.size() == 1);
+    }
 }
 
 TEST_CASE("sink form: a layout the sink's PCM cannot carry is folded to the widest it can",

@@ -39,6 +39,11 @@
   // The `codec` field of a gold-reference record (main.jsonl) and of a tool-comparison one.
   const QUALITY_CODECS = { "ac3": "AC-3", "eac3": "E-AC-3" };
 
+  // The `codec` field of a listening-quality row: a tool-comparison one (external-comparison-main.jsonl)
+  // or one of the AC-4 encoder's own series (ac4-encode-quality-main.jsonl). Not QUALITY_CODECS: that
+  // is the gold-reference gate's, which has no AC-4 check and must refuse a record that says it has.
+  const LISTENING_CODECS = { "ac3": "AC-3", "eac3": "E-AC-3", "ac4": "AC-4" };
+
   // config -> [codec, what the workload is]. The names in performance-main.jsonl and
   // memory-main.jsonl, which record no codec of their own. A config missing here fails
   // loudly (UnknownWorkload) rather than being filed under a guessed codec.
@@ -96,6 +101,12 @@
     if (has(QUALITY_CODECS, rec.codec)) return QUALITY_CODECS[rec.codec];
     throw new UnknownWorkload(`The codec "${rec.codec}" is not classified. Add it to QUALITY_CODECS in ` +
       "tools/ci/write_measurement_badges.py, docs/javascripts/hero-stats.js and docs/performance-quality.md.");
+  }
+
+  function listeningCodec(rec) {
+    if (has(LISTENING_CODECS, rec.codec)) return LISTENING_CODECS[rec.codec];
+    throw new UnknownWorkload(`The codec "${rec.codec}" is not classified. Add it to LISTENING_CODECS in ` +
+      "docs/javascripts/hero-stats.js and docs/performance-quality.md.");
   }
 
   // The slowest timed workload of each codec, by how many times real time it runs: the
@@ -175,7 +186,10 @@
   // AC-4's decode quality: its lowest SNR and lowest MOS-LQO, one row per Dolby stream scored
   // against the source it was encoded from. Only CI's pinned floors exist, none recorded per
   // row, so nothing here can be coloured, and the figures are shown without a verdict.
-  function ac4Quality(rows) {
+  function ac4Quality(copies) {
+    // One row per stream: a run repeated on one commit recorded each stream again.
+    const once = new Set();
+    const rows = copies.filter((r) => !once.has(r.leg) && once.add(r.leg));
     const snr = rows.filter((r) => isNumber(r.min_snr_db));
     const mos = rows.filter((r) => isNumber(r.mos_lqo));
     if (snr.length === 0 && mos.length === 0) return null;
@@ -214,9 +228,16 @@
   // MOS-LQO for each codec and the rows at both ends of it.
   function listeningPerCodec(rows) {
     const picked = {};
+    const seen = new Set();
     for (const row of rows) {
       if (!isNumber(row.mos_lqo)) continue;
-      const codec = qualityCodec(row);
+      const codec = listeningCodec(row);
+      // A (leg, variant) is one measurement. A run repeated on one commit (the nightly, on a tip
+      // that has not moved) recorded it again, to the last digits of the MOS, and the history on
+      // the branch still holds those copies.
+      const identity = [codec, row.leg, row.variant].join("\u0000");
+      if (seen.has(identity)) continue;
+      seen.add(identity);
       const p = picked[codec] || (picked[codec] = { count: 0, low: null, high: null, legs: new Set() });
       p.count += 1;
       p.legs.add(row.leg);
@@ -226,13 +247,18 @@
     return picked;
   }
 
+  // The layouts a leg name spells in digits: A/52's "51", and the AC-4 encoder's, whose first
+  // digits count the front and surround channels and whose last the LFE ("20" stereo, "514" 5.1.4).
+  const LEG_LAYOUTS = { "10": "mono", "20": "stereo", "50": "5.0", "51": "5.1", "514": "5.1.4" };
+
   // "5.1, 256 kbps" from a leg named "eac3-51-256"; "music stereo, 96 kbps" from
-  // "eac3-music-stereo-96". A name in another shape comes back as it is.
+  // "eac3-music-stereo-96"; "stereo music, 48 kbps" from "ac4-20-music-48". A name in another
+  // shape comes back as it is.
   function legWords(leg) {
     const parts = String(leg).split("-");
-    if (parts[0] === "ac3" || parts[0] === "eac3") parts.shift();
+    if (parts[0] === "ac3" || parts[0] === "eac3" || parts[0] === "ac4") parts.shift();
     const rate = parts.length > 1 && /^\d+$/.test(parts[parts.length - 1]) ? `${parts.pop()} kbps` : null;
-    return [parts.map((p) => (p === "51" ? "5.1" : p)).join(" "), rate].filter(Boolean).join(", ");
+    return [parts.map((p) => (has(LEG_LAYOUTS, p) ? LEG_LAYOUTS[p] : p)).join(" "), rate].filter(Boolean).join(", ");
   }
   // <<< measurement summary
 
@@ -340,7 +366,7 @@
     if (Object.keys(picked).length === 0) return emptyTile("Listening quality");
     const lines = CODECS.map((codec) => {
       const p = picked[codec];
-      if (!p) return noLine(codec, codec === "AC-4" ? "No series yet. Its decoder's MOS-LQO is under Decode accuracy." : null);
+      if (!p) return noLine(codec);
       const range = p.low.mos_lqo === p.high.mos_lqo ? twoDecimals(p.low.mos_lqo)
         : twoDecimals(p.low.mos_lqo) + "&ndash;" + twoDecimals(p.high.mos_lqo);
       return line(codec, range, "MOS-LQO", p.count + " measurements on " + p.legs.size + " legs. Lowest: " +
@@ -397,31 +423,35 @@
   }
 
   (async function render() {
-    let perf, quality, ac4, external, memory;
+    let perf, quality, ac4, external, ac4Encode, memory;
     try {
-      [perf, quality, ac4, external, memory] = await Promise.all([
+      [perf, quality, ac4, external, ac4Encode, memory] = await Promise.all([
         fetchHistory("performance-main"),
         fetchHistory("main"),
         fetchHistory("ac4-quality-main"),
         fetchHistory("external-comparison-main"),
+        fetchHistory("ac4-encode-quality-main"),
         fetchHistory("memory-main"),
       ]);
     } catch (e) {
-      perf = quality = ac4 = external = memory = [];
+      perf = quality = ac4 = external = ac4Encode = memory = [];
     }
 
-    if (perf.length === 0 && quality.length === 0 && ac4.length === 0 && external.length === 0 && memory.length === 0) {
+    if (perf.length === 0 && quality.length === 0 && ac4.length === 0 && external.length === 0 &&
+        ac4Encode.length === 0 && memory.length === 0) {
       mount.innerHTML = '<p class="ac3f-stat-status">Could not reach the measurement history just now — ' +
         '<a href="performance-quality/">the full page</a> fetches the same way, so this is a network or availability problem, not a missing measurement.</p>';
       return;
     }
 
     const p = newestCommitRows(perf), q = newestCommitRows(quality), a = newestCommitRows(ac4);
-    const e = newestCommitRows(external), m = newestCommitRows(memory);
+    const e = newestCommitRows(external), n = newestCommitRows(ac4Encode), m = newestCommitRows(memory);
     mount.innerHTML = [
       guarded("Speed", () => speedTile(p.rows)),
       guarded("Decode accuracy", () => qualityTile(q.rows, a.rows)),
-      guarded("Listening quality", () => listeningTile(e.rows)),
+      // Two series, each its own newest commit: the AC-3 and E-AC-3 tool comparison, and the
+      // AC-4 encoder's own. A row says its codec, so the tile files each under its own line.
+      guarded("Listening quality", () => listeningTile(e.rows.concat(n.rows))),
       guarded("Allocation per frame", () => allocationTile(m.rows)),
       guarded("Live growth", () => growthTile(m.rows)),
     ].join("");

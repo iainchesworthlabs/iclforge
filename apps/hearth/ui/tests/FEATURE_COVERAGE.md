@@ -131,6 +131,7 @@ Status:
 | 105 | Decoder | AC-4 Immersive and objects card: Layout (As coded, 5.1, 5.1.2, 5.1.4, 7.1, 7.1.2, 7.1.4) and Core decoding | none | none | No QML case drives the card. The settings reach the decoder in `[hearth][decoder-settings]` (`apps/hearth/engine/tests/test_decoder_settings.cpp`) and the layout fold in `[hearth][ac4]` (`apps/hearth/engine/tests/test_ac4_engine.cpp`), and neither goes through the page. `HearthController`'s map round-trip case does not carry these two keys, and its name mapping has none for the 5.1 segment |
 | 106 | Settings | Diagnostics "View live…" dialog (the report, refreshed every 500 ms while open) | none | none | Not opened by any case. The report it shows is the one the Copy case reads back |
 | 107 | Settings | Diagnostics HTTP endpoint (`ICLFORGE_HEARTH_DIAGNOSTICS_PORT`) | none | none | Not a window feature, so no QML case. `DiagnosticsHttpServer` is tested over a real loopback socket by `apps/hearth/engine/tests/test_diagnostics_server.cpp` (`[hearth][diagnostics]`, in `iclforge_tests_diagnostics_server`); the controller reading the variable is not tested |
+| 108 | Network | Sink Decoder tab: choose Opus in place of PCM for audio Hearth decodes for the sink (offered only where the sink lists Opus) | logic | UI | NetworkPairing::test_pairedSinkDecoderTabOffersOpusForADecodedStream (the choice reaches `NetworkSinks`; that the group is then sent Opus is the engine case `a sink set to Opus is sent the decoded programme as Opus`) |
 
 ### Totals
 

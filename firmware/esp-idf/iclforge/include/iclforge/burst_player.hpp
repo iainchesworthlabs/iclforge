@@ -218,6 +218,9 @@ class BurstPlayer {
     [[nodiscard]] BurstPlayerStatus status() const;
     // Whether a stream is running.
     [[nodiscard]] bool active() const;
+    // Whether this build decodes Opus (CONFIG_ICLFORGE_SENDSPIN_OPUS): a firmware lists the format
+    // in its player@v1 support only where it does.
+    [[nodiscard]] static bool decodes_opus();
 
     struct Impl;
 

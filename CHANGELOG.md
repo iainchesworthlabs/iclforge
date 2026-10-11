@@ -1307,6 +1307,14 @@ The sections below contain the complete change list and fixes.
     when it was due on each board (its own `worst_error_us`). A hidden `ac3tests` case,
     `[hearth-network-live]`, repeats that against the sinks named in `AC3HEARTH_LIVE_SINKS`, and
     withdraws its pairings afterwards.
+- **A network group is planned by what each of its members takes** (`NetworkSinks::plan_group`,
+  `sink_form.cpp`): a member that decodes the stream keeps it coded; one that cannot is sent PCM
+  decoded here at the layout it takes, one render for each width the group needs; one that can be
+  sent neither is held back, and its reason is in the log and the group editor. A sink whose
+  buffer holds under a second of the stream is sent PCM in units of at most 10 ms (a long unit
+  stalls a shallow buffer more often: on an ESP32-C6, a median of 2 drop-outs in 15 s against
+  22 at 21 ms), and an ESP32-C6 is offered the PCM fallback with a caveat in its reason, since
+  its 48 KB buffer holds under a fifth of a second and a busy WiFi drops the stream out.
 
 **Audio outputs**
 
@@ -2294,8 +2302,10 @@ The sections below contain the complete change list and fixes.
   speed card rank a workload against its own. AC-4 decode quality, from
   `score_ac4_decode.py --json-out`, is appended to `ac4-quality-main.jsonl` on `quality-history`
   with its own `ac4_hard_regression` output and failing step, and charted at the end of the
-  Quality trend page. The encode side has floors in CI and a local race against DEE, and no
-  history.
+  Quality trend page. The encoder's programme legs have a series of their own:
+  `score_ac4_encode.py --json-out` is appended to `ac4-encode-quality-main.jsonl`, which is
+  AC-4's line on the Listening quality card and the Quality trend page's AC-4 encode section.
+  The race against DEE is local and keeps no history.
 - **Golden masters from Dolby's encoders for AC-3, E-AC-3, E-AC-3 JOC and TrueHD.** DEE's licence
   ends on 2026-11-06 and is not renewed, so `tools/generators/gen_dee_gold.py` makes, and keeps
   on a local disk, every stream a later piece of work could want from it: 1,111 legs (1,086
@@ -2664,6 +2674,36 @@ The sections below contain the complete change list and fixes.
 - **A minimum-footprint build resolves the SIMD arch seam** instead of naming `generic/`
   literally, fixing a minimum-footprint decoder built for aarch64 that had been missing
   NEON.
+- **A Sendspin player's PCM chunk is unpacked and metered as integers**
+  (`libs/device/include/iclforge/pcm_unpack.hpp`, `burst_player.cpp`'s `play_pcm()`): 16- and
+  24-bit samples go to the float the playout takes without the soft-float conversions beside them,
+  and the level meter reads the integers while the gain is unity. On an ESP32-C6, which has no FPU,
+  a 1,000-frame 16-bit stereo chunk takes 1.8 to 2.0 ms of the player's time, where it took
+  5.4 ms (9% of the core, down from 27%), with the same samples out
+  (`test_pcm_unpack.cpp`: every 8-, 12-, 16- and 24-bit value, odd chunk sizes, levels against the
+  float meter). It does not make a C6 sustain PCM on a busy WiFi link: its ring holds 192 ms of 16-bit
+  stereo, shorter than the link's gaps (`docs/platforms/bare-metal/esp32-c6.md`, "PCM from a
+  server").
+- **`hearth-testserver` plays a tone as PCM** (`--pcm`, `--tone`, `--tone-bits`,
+  `--max-chunk-bytes`), pairs by a code the board shows (`--code-log`, `dial_to_pair()`), and
+  reports a board's PCM counters and its own end-of-stream totals; `test_playout.cpp` has the
+  playout recovering a PCM stream from a clock step, a late chunk and late interrupts on a model of
+  the I2S ring.
+- **The Sendspin player decodes Opus** (`CONFIG_ICLFORGE_SENDSPIN_OPUS`,
+  `firmware/esp-idf/iclforge/src/opus_stream.*`, `opus.cmake`): libopus 1.6.1's decoder in fixed
+  point, built from the release tarball (checked against its SHA-256) or a tree at
+  `ICLFORGE_OPUS_SOURCE_DIR`, behind a `player@v1` stream of 20 ms packets. A board that has it
+  lists Opus after its PCM formats, and `ServerHost::use_pcm()` takes the `codec` to play a sink
+  in (`hearth-testserver --pcm --opus`). On an ESP32-C6 a packet takes 11.8 ms of the player's
+  time (59% of the core), the decoder 27 KB of heap and 16.7 KB of the decode task's stack; 30 s
+  of tone played with no underrun in three runs, on a link where the same board's PCM stream
+  dropped out 14 and 17 times in 15 s. Opus is a twelfth of PCM's bytes and lossy.
+- **A Hearth sink that lists Opus can be set to be sent it in place of PCM**
+  (`NetworkSinks::set_sink_opus_fallback`, the Decoder tab's "Audio decoded here" choice, and
+  `choose_sink_form`'s `PcmCodec`): for a board on a link too poor for PCM, audio Hearth decodes
+  for it goes as Opus at 2.0, which the group's plan asks the host for by codec. The choice is per
+  sink, applies at the group's next play, and is kept for the run. The group editor says which a
+  member is sent.
 
 **Library internals**
 
@@ -2953,6 +2993,18 @@ The sections below contain the complete change list and fixes.
   `play` and `forge transcode` now take `programme=` too (they always transcoded the first).
   `iclforge::apps::select_programme()` and `cut_programme()` in `apps/shared/media` do the
   choosing without any printing, for a player that is not the CLI.
+- **`forge spdif` and the GUI stream player made the same mistake with a second independent
+  substream.** `spdif` wrapped every access unit of an E-AC-3 stream carrying two programmes, so
+  the carrier held both programmes' bursts one after the other (64 for a main of 32 frame periods),
+  which a receiver locks onto as the main at half speed with the description between its frames.
+  It now wraps one programme as `play` sends it: `programme=<0..7>`, or the first the stream
+  carries, said as `programme 0 of 2 (0, 1)`, cut out and renumbered as substream 0 when it is not
+  0, and refused by name when the stream lacks it. The Forge GUI's stream player fed the same
+  interleaved units to one decoder, sized from the first unit's 5.1, so the mono description's unit
+  read channels that were not there (on a two-programme file the decode never finished and the
+  player stayed busy); it now plays the first programme and says so in its summary line
+  (`… · programme 0 of 2 (0, 1)`). `play` and `spdif` share one choose-and-cut helper
+  (`select_receiver_units`).
 - **`ac3cli monitor` refused a §E2.3.1.2 legacy-core stream and dropped every stream's last
   unit.** It picked its decode path from the first frame's bsid alone, so a stream whose 5.1
   bed is a plain AC-3 syncframe with Annex E dependents extending it went to `FrameDecoder`,

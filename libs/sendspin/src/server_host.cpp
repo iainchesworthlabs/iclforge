@@ -60,6 +60,13 @@ constexpr std::int64_t kNetworkLead = 100'000;
 // A unit's longest play time, which a group counts each queued unit of a codec other than PCM
 // as lasting. A PCM unit is counted as lasting what its bytes make.
 constexpr std::int64_t kLongestUnit = 150'000;
+// A PCM sink whose buffer (player_support.buffer_capacity) holds less than kShallowBuffer of the
+// stream is sent units of at most kShortUnit. On a board with such a buffer, a unit's bytes
+// arriving late stalls the whole unit, and the longer the unit the more often and the longer the
+// stall: an ESP32-C6, 48 KB, dropped out a median 2 times in 15 s on 10 ms units and 22 on 21 ms
+// ones, the same stream over the same link (planning/esp32-sink-compatibility-matrix.md).
+constexpr std::int64_t kShallowBuffer = 1'000'000;
+constexpr std::int64_t kShortUnit = 10'000;
 constexpr std::chrono::seconds kRedialAfter{10};
 
 [[nodiscard]] bool contains(const std::vector<std::string>& roles, std::string_view role) {
@@ -115,10 +122,12 @@ struct ServerHost::State {
     std::set<Key32> sources;
     // The clients the host plays on player@v1's PCM although they offer the extension role
     // (use_pcm()), each with the most audio a chunk to it may carry (0: no limit) and the channel
-    // count of the PCM it is to get (0: the first its player lists that the programme can make).
+    // count of the PCM it is to get (0: the first its player lists that the programme can make),
+    // and the codec it is to get it in (unset: the first its player lists).
     struct PcmRequest {
         std::size_t max_chunk_bytes = 0;
         std::int32_t channels = 0;
+        std::optional<m::Codec> codec{};
     };
     std::map<Key32, PcmRequest> pcm_clients;
     std::vector<std::weak_ptr<Group::State>> groups;
@@ -929,7 +938,7 @@ bool ServerHost::allow_source(const std::string& client_id, bool allowed) {
 }
 
 bool ServerHost::use_pcm(const std::string& client_id, bool use, std::size_t max_chunk_bytes,
-                         std::int32_t channels) {
+                         std::int32_t channels, std::optional<m::Codec> codec) {
     const std::shared_ptr<HostConnection> connection = state_->find(client_id);
     if (!connection) {
         return false;
@@ -938,7 +947,8 @@ bool ServerHost::use_pcm(const std::string& client_id, bool use, std::size_t max
         const std::lock_guard lock(state_->mutex);
         const Key32 key = connection->view().client_key;
         if (use) {
-            state_->pcm_clients[key] = {.max_chunk_bytes = max_chunk_bytes, .channels = channels};
+            state_->pcm_clients[key] = {
+                .max_chunk_bytes = max_chunk_bytes, .channels = channels, .codec = codec};
         } else {
             state_->pcm_clients.erase(key);
         }
@@ -1398,12 +1408,16 @@ struct Group::State {
                     request = found->second;
                 }
             }
-            // The first of its listed formats the programme can make, at the width asked for when
-            // one was, from whichever of the programme's variants has that width.
+            // The first of its listed formats the programme can make, at the width and in the
+            // codec asked for when one was, from whichever of the programme's variants has that
+            // width.
             const m::AudioFormat* chosen = nullptr;
             std::size_t chosen_variant = 0;
             for (const m::AudioFormat& format : client.player_support->supported_formats) {
                 if (request.channels != 0 && format.channels != request.channels) {
+                    continue;
+                }
+                if (request.codec && format.codec != *request.codec) {
                     continue;
                 }
                 for (std::size_t index = 0; index < variant_count() && chosen == nullptr; ++index) {
@@ -1420,7 +1434,8 @@ struct Group::State {
                 return;
             }
             // A client the host was asked to play small chunks to (use_pcm()) gets PCM units of as
-            // many whole frames as fit its limit, where the default is 20 ms.
+            // many whole frames as fit its limit, where the default is 20 ms; and a sink with a
+            // shallow buffer gets units of at most 10 ms.
             codec::EncoderOptions options;
             if (chosen->codec == m::Codec::kPcm) {
                 std::size_t limit = request.max_chunk_bytes;
@@ -1437,6 +1452,19 @@ struct Group::State {
                 if (limit != 0 && frame_bytes != 0) {
                     options.frames =
                         static_cast<std::int32_t>(std::max<std::size_t>(1, limit / frame_bytes));
+                }
+                // And short ones where its buffer is shallow, whatever limit it states.
+                const std::uint64_t capacity = client.player_support->buffer_capacity;
+                if (capacity != 0 && frame_bytes != 0 && chosen->sample_rate > 0) {
+                    const auto held_us = static_cast<std::int64_t>(capacity / frame_bytes) *
+                                         1'000'000 / chosen->sample_rate;
+                    if (held_us < kShallowBuffer) {
+                        const auto short_frames = static_cast<std::int32_t>(std::max<std::int64_t>(
+                            1, chosen->sample_rate * kShortUnit / 1'000'000));
+                        options.frames = options.frames == 0
+                                             ? short_frames
+                                             : std::min(options.frames, short_frames);
+                    }
                 }
             }
             std::unique_ptr<codec::Encoder> encoder = codec::make_encoder(*chosen, options);

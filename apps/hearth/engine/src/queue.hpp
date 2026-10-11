@@ -38,6 +38,11 @@ struct ItemFacts {
     std::uint32_t sample_rate = 0;
     std::uint16_t channels = 0;
     bool has_objects = false;
+    // The most dynamic objects the programme places, as an E-AC-3 stream declares in its
+    // addbsi (TS 103 420's complexity index, which is an object count); 0 for a stream that
+    // declares none and where it is not known (an AC-4 presentation's are not read here).
+    // What a sink's stated limit is compared with (sink_form.hpp).
+    std::uint16_t objects = 0;
     // Measured over the whole programme, the same definition
     // io::ProbeReport::bitrate_kbps uses: its bytes * 8, over its duration.
     // Unset until the item has been probed, the same as the fields above.

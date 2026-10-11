@@ -213,16 +213,23 @@ class ServerHost {
     // takes small chunks (a board's message limit is a few KB). It counts the samples only: a
     // chunk's header and its encryption tag come on top. 0 leaves it to what the sink states in its
     // support object (max_chunk_bytes there, header included), and to 20 ms a chunk where it
-    // states none. A figure given here wins over the sink's. False when the client is not
-    // connected.
+    // states none. A figure given here wins over the sink's. Whatever the limit, a sink whose
+    // buffer (player_support.buffer_capacity) holds under a second of the stream is sent units of
+    // at most 10 ms: a long unit stalls a shallow buffer more often than a short one. False when
+    // the client is not connected.
     //
     // `channels` is the width of PCM to play it, when a group's programme carries more than one
     // (Group::Programme::more_pcm): the first format its player lists with that many channels,
     // where 0 takes the first it lists that the programme can produce. A client held for PCM
     // is not started on a burst stream while its role is still moving, so a group that has
     // been told what each sink gets never sends one the other form.
+    //
+    // `codec` is the codec to play it in, where its player lists more than one that the programme
+    // can make: PCM, or Opus for a sink on a link that cannot carry PCM (a twelfth of the bytes,
+    // and lossy). Unset takes the first format it lists, which a player lists its preference
+    // first in. A sink that lists none of that codec is not started.
     bool use_pcm(const std::string& client_id, bool use, std::size_t max_chunk_bytes = 0,
-                 std::int32_t channels = 0);
+                 std::int32_t channels = 0, std::optional<messages::Codec> codec = std::nullopt);
     // Approves a client for unpaired access, or withdraws the approval.
     bool approve(const std::string& client_id, bool approved);
     bool unpair(const std::string& client_id);

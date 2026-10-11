@@ -217,9 +217,10 @@ bool g_board_changed = false;
         config.supported_roles.emplace_back("player@v1");
     }
     const std::uint64_t capacity = player.buffer_capacity();
-    // PCM only: FLAC and Opus would need their decoders on the board, which
-    // the player has not measured room for (planning/hearth-reference-player.md,
-    // B3). Stereo at 48 kHz, which is the only rate the board plays.
+    // PCM, and Opus where the build decodes it (CONFIG_ICLFORGE_SENDSPIN_OPUS): FLAC would need its
+    // decoder on the board, which the player has not measured room for
+    // (planning/hearth-reference-player.md, B3). Stereo at 48 kHz, which is the only rate the
+    // board plays. Opus is listed last, so that a server that is not asked for it sends PCM.
     // The depth of the sink's own slots first: a server sends the first format it can, and 24-bit
     // PCM to a 16-bit slot is half as much again in the air, in the ring and through the player
     // for the same audio (planning/esp32-sink-compatibility-matrix.md, the C6 PCM runs).
@@ -227,11 +228,17 @@ bool g_board_changed = false;
         .codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 24};
     const m::AudioFormat pcm16{
         .codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16};
-    config.player_support = m::PlayerSupport{
-        .supported_formats = sink_slot_bits() <= 16 ? std::vector<m::AudioFormat>{pcm16, pcm24}
-                                                    : std::vector<m::AudioFormat>{pcm24, pcm16},
-        .buffer_capacity = capacity,
-        .commands = {m::PlayerCommand::kVolume, m::PlayerCommand::kMute}};
+    std::vector<m::AudioFormat> formats = sink_slot_bits() <= 16
+                                              ? std::vector<m::AudioFormat>{pcm16, pcm24}
+                                              : std::vector<m::AudioFormat>{pcm24, pcm16};
+    if (iclforge::BurstPlayer::decodes_opus()) {
+        formats.push_back(
+            {.codec = m::Codec::kOpus, .channels = 2, .sample_rate = 48000, .bit_depth = 16});
+    }
+    config.player_support =
+        m::PlayerSupport{.supported_formats = std::move(formats),
+                         .buffer_capacity = capacity,
+                         .commands = {m::PlayerCommand::kVolume, m::PlayerCommand::kMute}};
     config.iclforge_support = support(player);
     config.pair_methods = {
         {.method = m::PairMethod::kPairingPsk,

@@ -1,13 +1,14 @@
 # Quality trend
 
-This page has two series. The first, from here to "Where the data lives", is the
+This page has three series. The first, from here to "Where the data lives", is the
 [gold-reference
 gate](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/checks/verify_gold_reference.sh)'s
 (encode the checked-in golden 5.1 WAV, strict-decode with FFmpeg and with
 `forge`'s own decoder, delay-compensated SNR between the two), which covers
 AC-3 and E-AC-3, and its measure is Decode accuracy: how closely this decoder agrees with
 FFmpeg's. [AC-4 decode quality](#ac-4-decode-quality) is the second, scored
-against the source instead.
+against the source instead, and [AC-4 encode quality](#ac-4-encode-quality) the third: the
+encoder's own streams, decoded here and scored against the sources they were encoded from.
 
 Each run on `main` that gets through the gold-reference gate, the run after a merge
 and the nightly run, has its per-channel numbers appended to history
@@ -54,7 +55,7 @@ that question — see [Landscape](landscape.md) and
 </div>
 
 <style>
-#quality-trend-app, #ac4-quality-trend-app { margin: 1.5em 0; }
+#quality-trend-app, #ac4-quality-trend-app, #ac4-encode-quality-trend-app { margin: 1.5em 0; }
 .quality-trend-status { color: var(--md-default-fg-color--light); font-style: italic; }
 .quality-trend-controls { display: flex; gap: 1.25em; align-items: center; margin-bottom: 0.75em; flex-wrap: wrap; }
 .quality-trend-controls label { font-size: 0.85em; color: var(--md-default-fg-color--light); display: inline-flex; align-items: center; gap: 0.35em; white-space: nowrap; }
@@ -69,8 +70,8 @@ that question — see [Landscape](landscape.md) and
 .quality-trend-legend span { display: inline-flex; align-items: center; gap: 0.4em; }
 .quality-trend-legend i { width: 0.9em; height: 0.9em; border-radius: 50%; display: inline-block; }
 .quality-trend-table-wrap { overflow-x: auto; }
-#quality-trend-app table, #ac4-quality-trend-app table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
-#quality-trend-app th, #quality-trend-app td, #ac4-quality-trend-app th, #ac4-quality-trend-app td { padding: 0.35em 0.6em; text-align: left; border-bottom: 1px solid var(--md-default-fg-color--lightest); white-space: nowrap; }
+#quality-trend-app table, #ac4-quality-trend-app table, #ac4-encode-quality-trend-app table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+#quality-trend-app th, #quality-trend-app td, #ac4-quality-trend-app th, #ac4-quality-trend-app td, #ac4-encode-quality-trend-app th, #ac4-encode-quality-trend-app td { padding: 0.35em 0.6em; text-align: left; border-bottom: 1px solid var(--md-default-fg-color--lightest); white-space: nowrap; }
 .quality-trend-regression { color: var(--md-typeset-mark-color, #c62828); font-weight: 600; }
 .quality-trend-secondary-check { color: var(--md-default-fg-color--light); cursor: help; }
 .quality-trend-release-row { background: color-mix(in srgb, var(--md-accent-fg-color, #7c4dff) 8%, transparent); }
@@ -818,16 +819,68 @@ decodes the Dolby Encoding Engine's AC-4 streams and scores each against the sou
 from ([Validation](verification.md#ac-4) describes how). Its measure is Decode accuracy against
 that source, not against another decoder. It runs in FFmpeg Validate, a nightly job, on the
 `linux-llvm` build, and its pinned floors fail that run. The same run writes the scores as a JSON
-artifact, and the `Publish quality trend` job appends one row per stream to
-`ac4-quality-main.jsonl` on the same `quality-history` branch, by
+artifact, and the `Publish external-encoder landscape trend` job, which follows it,
+appends one row per stream to `ac4-quality-main.jsonl` on the same `quality-history` branch, by
 [`tools/ci/append_ac4_quality_history.py`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/ci/append_ac4_quality_history.py):
-one set of rows per nightly run. It covers 10 of the 15 committed legs, described below the
-chart. The AC-4 encoder's own scores (`score_ac4_encode.py`) are held to pinned floors only, and
-its race against the Dolby encoder runs locally, so neither has a series; nor do AC-4's objects.
+one set of rows per commit, however many nightly runs score it. It covers 10 of the 15 committed legs, described below the
+chart. The AC-4 encoder's own scores are the [next series](#ac-4-encode-quality); its race against
+the Dolby encoder runs locally and has none, and nor do AC-4's objects.
 
 <div id="ac4-quality-trend-app">
   <p class="quality-trend-status">Loading AC-4 decode quality…</p>
 </div>
+
+Each row is one DEE stream on one commit: the streams scored channel by channel against their
+source, 10 of the 15 committed legs (SIMPLE and A-SPX at 2.0 and 5.1, and immersive stereo). The
+A-CPL streams, scored through their downmixes, and the 5.1.4 streams, scored with their routing,
+are held to their floors in FFmpeg Validate but have no series. **Minimum SNR** is the
+stream's lowest full-band channel SNR against its source; the LFE is left out, since its SNR
+against the full-band source is about −2.3 dB on every 5.1 stream and its own floor holds it.
+**LSD** is the log-spectral distance and **MOS-LQO** ViSQOL's predicted listening score, all
+from the same scoring pass. The chart plots the worst stream for each commit
+on the chosen measure. A row is flagged when its SNR falls, or its LSD rises, 0.5 dB past that
+stream's own trailing ten-run mean. A hard regression (3 dB of SNR, or 2 dB of LSD) fails the
+job that publishes it after the numbers are pushed, as the AC-3 series does.
+
+## AC-4 encode quality
+
+The encoder's counterpart of the series above, with this project's encoder's streams where that one
+has Dolby's. [`tools/checks/score_ac4_encode.py`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/checks/score_ac4_encode.py)
+encodes the committed programme fixtures with `forge ac4-encode`, decodes each stream with this
+project's decoder and scores it against the source it was encoded from, as the decode series
+scores Dolby's ([Validation](verification.md#ac-4) describes the checks). It runs in FFmpeg
+Validate, a nightly job, on the `linux-llvm` build, and its pinned floors fail that run. The same
+run writes the scores of the legs below as a JSON artifact, and the `Publish external-encoder
+landscape trend` job, which follows it, appends one row per leg to `ac4-encode-quality-main.jsonl`
+on the same `quality-history` branch, by
+[`tools/ci/append_ac4_encode_quality_history.py`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/ci/append_ac4_encode_quality_history.py).
+This is the series behind AC-4's line of the Listening quality card on the
+[home page](index.md) and on [Performance & quality](performance-quality.md).
+
+<div id="ac4-encode-quality-trend-app">
+  <p class="quality-trend-status">Loading AC-4 encode quality…</p>
+</div>
+
+Each row is one leg on one commit: 24 of the 72 legs `score_ac4_encode.py` scores. They are the
+programme legs, music, speech and film, at the options a rate alone gives: stereo and mono from 24
+to 256 kbps, 5.0 and 5.1 from 96 to 384 kbps, where the encoder itself picks SIMPLE, A-SPX or the
+A-CPL modes, and 5.1.4 from 192 to 768 kbps, scored in full decoding. The rest are held to their
+floors in FFmpeg Validate and have no series. The synthetic signals (tones, sweeps, noise,
+castanets, a panned source) are left out because a ViSQOL score of a sine or of white noise
+predicts no listener's answer: white noise at 192 kbps scores about 3.8 with nothing wrong. The legs
+that name an option (the experimental coding configurations, A-CPL and A-JCC modes by name) and
+the frame-rate legs, which are held to the index-13 stream of the same source, are left out as
+well.
+
+**MOS-LQO** is ViSQOL's predicted listening score, 1 to 5, of the decoded stream against its
+source. A lower rate scores lower by design, so a figure is read against its own leg's past and
+not against another leg's. **Minimum SNR** is the stream's lowest full-band channel SNR against
+its source, below the crossover where A-SPX carries the channel, with the LFE left out as in the
+decode series; an A-CPL leg has none, its SNRs being those of the downmixes its waveform codes.
+**LSD** is the log-spectral distance. The chart plots the worst leg for each commit on the chosen
+measure. A row is flagged when its MOS falls 0.1 under that leg's own trailing ten-run mean, the
+margin the scorer's floors sit under their first measurement. That tier only warns: the floors
+are what fail a run, and they fail it before the numbers are published.
 
 <script>
 (function () {
@@ -838,23 +891,46 @@ its race against the Dolby encoder runs locally, so neither has a series; nor do
     ? location.hostname.split(".")[0] + "/" + location.pathname.split("/")[1]
     : "iainchesworthlabs/iclforge";
   const HISTORY_BRANCH = "quality-history";
-  const HISTORY_FILE = "ac4-quality-main";
-  // Mirrors tools/ci/append_ac4_quality_history.py's thresholds - a display
-  // echo of that script's judgment, not a second source of truth for it.
   const REGRESSION_WINDOW = 10;
-  const SNR_DROP_DB = 0.5;
-  const LSD_RISE_DB = 0.5;
   const TABLE_ROWS = 40;
   const COLOR = "#fb8c00";
-  // Which way is worse, per measure: the chart plots each commit's worst
-  // stream, so a drop in any one stream shows.
+  // Which way is worse, per measure: each chart plots a commit's worst row, so a drop in any one
+  // stream or leg shows.
   const METRICS = {
     min_snr_db: { label: "Minimum SNR (dB)", worse: (a, b) => a < b },
     lsd_db: { label: "LSD (dB)", worse: (a, b) => a > b },
     mos_lqo: { label: "MOS-LQO", worse: (a, b) => a < b },
   };
-  const root = document.getElementById("ac4-quality-trend-app");
-  const state = { metric: "min_snr_db" };
+
+  // The two AC-4 series on this page, drawn by the same code. `flags` mirror each appender's soft
+  // tier - a display echo of that script's judgment, not a second source of truth for it:
+  // tools/ci/append_ac4_quality_history.py's SNR_DROP_DB and LSD_RISE_DB for the decode series,
+  // tools/ci/append_ac4_encode_quality_history.py's MOS_REGRESSION_DROP for the encode series.
+  const SERIES = [
+    {
+      root: "ac4-quality-trend-app",
+      select: "ac4-quality-metric",
+      file: "ac4-quality-main",
+      title: "AC-4 decode quality",
+      noun: "stream",
+      metric: "min_snr_db",
+      flags: [
+        { key: "min_snr_db", label: "SNR", unit: " dB", threshold: 0.5, rising: false },
+        { key: "lsd_db", label: "LSD", unit: " dB", threshold: 0.5, rising: true },
+      ],
+    },
+    {
+      root: "ac4-encode-quality-trend-app",
+      select: "ac4-encode-quality-metric",
+      file: "ac4-encode-quality-main",
+      title: "AC-4 encode quality",
+      noun: "leg",
+      metric: "mos_lqo",
+      flags: [
+        { key: "mos_lqo", label: "MOS-LQO", unit: "", threshold: 0.1, rising: false },
+      ],
+    },
+  ];
 
   function rawUrl(file) {
     return `https://raw.githubusercontent.com/${REPO}/${HISTORY_BRANCH}/${file}`;
@@ -862,13 +938,21 @@ its race against the Dolby encoder runs locally, so neither has a series; nor do
 
   // The generated window first, the full file if there is none - the same
   // fallback the AC-3 series above uses.
-  async function fetchHistory() {
-    for (const file of [`${HISTORY_FILE}.recent.jsonl`, `${HISTORY_FILE}.jsonl`]) {
+  async function fetchHistory(series) {
+    for (const file of [`${series}.recent.jsonl`, `${series}.jsonl`]) {
       try {
         const resp = await fetch(rawUrl(file));
         if (!resp.ok) continue;
         const text = await resp.text();
-        return text.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+        // A leg is one row per commit: a run repeated on one commit recorded it again, to the
+        // last digits of the MOS, and the history still holds those copies.
+        const seen = new Set();
+        return text.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l)).filter((r) => {
+          const identity = `${r.commit}\u0000${r.leg}`;
+          if (seen.has(identity)) return false;
+          seen.add(identity);
+          return true;
+        });
       } catch (e) {
         // Try the next candidate.
       }
@@ -891,9 +975,9 @@ its race against the Dolby encoder runs locally, so neither has a series; nor do
     return Array.from(byCommit.values()).sort((a, b) => a.commit_date.localeCompare(b.commit_date));
   }
 
-  function baseline(records, stream, key, beforeDate) {
+  function baseline(records, leg, key, beforeDate) {
     const trail = records
-      .filter((r) => r.leg === stream && r.commit_date < beforeDate && value(r, key) !== null)
+      .filter((r) => r.leg === leg && r.commit_date < beforeDate && value(r, key) !== null)
       .sort((a, b) => a.commit_date.localeCompare(b.commit_date))
       .slice(-REGRESSION_WINDOW);
     if (!trail.length) return null;
@@ -901,24 +985,23 @@ its race against the Dolby encoder runs locally, so neither has a series; nor do
   }
 
   // Only the soft tier is shown: a hard regression fails its own CI run.
-  function flag(r, records) {
+  function flag(cfg, r, records) {
     const notes = [];
-    const snr = value(r, "min_snr_db");
-    const snrBase = baseline(records, r.leg, "min_snr_db", r.commit_date);
-    if (snr !== null && snrBase !== null && snrBase - snr >= SNR_DROP_DB) {
-      notes.push(`SNR ${(snrBase - snr).toFixed(2)} dB below the trailing mean`);
-    }
-    const lsd = value(r, "lsd_db");
-    const lsdBase = baseline(records, r.leg, "lsd_db", r.commit_date);
-    if (lsd !== null && lsdBase !== null && lsd - lsdBase >= LSD_RISE_DB) {
-      notes.push(`LSD ${(lsd - lsdBase).toFixed(2)} dB above the trailing mean`);
+    for (const f of cfg.flags) {
+      const v = value(r, f.key);
+      const base = baseline(records, r.leg, f.key, r.commit_date);
+      if (v === null || base === null) continue;
+      const worse = f.rising ? v - base : base - v;
+      if (worse >= f.threshold) {
+        notes.push(`${f.label} ${worse.toFixed(2)}${f.unit} ${f.rising ? "above" : "below"} the trailing mean`);
+      }
     }
     return notes.length
       ? `<span class="quality-trend-regression" title="${notes.join("; ")}">▼ regression</span>`
       : "";
   }
 
-  function buildChart(points, key) {
+  function buildChart(cfg, points, key) {
     if (!points.length) {
       return `<p class="quality-trend-status">No ${METRICS[key].label} history yet.</p>`;
     }
@@ -933,7 +1016,7 @@ its race against the Dolby encoder runs locally, so neither has a series; nor do
     const x = (t) => pad.left + (maxT === minT ? (width - pad.left - pad.right) / 2
       : ((t - minT) / (maxT - minT)) * (width - pad.left - pad.right));
     const y = (v) => height - pad.bottom - ((v - lo) / (hi - lo)) * (height - pad.top - pad.bottom);
-    let svg = `<svg class="quality-trend-chart" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="AC-4 ${METRICS[key].label}, worst stream per commit">`;
+    let svg = `<svg class="quality-trend-chart" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${cfg.title}, ${METRICS[key].label}, worst ${cfg.noun} per commit">`;
     for (let i = 0; i <= 4; i++) {
       const v = lo + ((hi - lo) * i) / 4;
       svg += `<line x1="${pad.left}" y1="${y(v)}" x2="${width - pad.right}" y2="${y(v)}" stroke="var(--md-default-fg-color--lightest)" stroke-width="1"/>`;
@@ -954,7 +1037,7 @@ its race against the Dolby encoder runs locally, so neither has a series; nor do
     return v === null ? "—" : v.toFixed(2);
   }
 
-  function buildTable(records) {
+  function buildTable(cfg, records) {
     const rows = records.slice()
       .sort((a, b) => b.commit_date.localeCompare(a.commit_date) || a.leg.localeCompare(b.leg))
       .slice(0, TABLE_ROWS)
@@ -965,49 +1048,42 @@ its race against the Dolby encoder runs locally, so neither has a series; nor do
         <td>${cell(value(r, "min_snr_db"))}</td>
         <td>${cell(value(r, "lsd_db"))}</td>
         <td>${cell(value(r, "mos_lqo"))}</td>
-        <td>${flag(r, records)}</td>
+        <td>${flag(cfg, r, records)}</td>
       </tr>`).join("");
+    const heading = cfg.noun.charAt(0).toUpperCase() + cfg.noun.slice(1);
     return `<div class="quality-trend-table-wrap"><table>
-      <thead><tr><th>Date</th><th>Commit</th><th>Stream</th><th>Minimum SNR</th><th>LSD</th><th>MOS-LQO</th><th></th></tr></thead>
+      <thead><tr><th>Date</th><th>Commit</th><th>${heading}</th><th>Minimum SNR</th><th>LSD</th><th>MOS-LQO</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
   }
 
-  function render(records) {
+  function render(cfg, root, records, state) {
     const options = Object.entries(METRICS).map(([key, m]) =>
       `<option value="${key}" ${state.metric === key ? "selected" : ""}>${m.label}</option>`).join("");
     root.innerHTML = `
       <div class="quality-trend-controls">
-        <label for="ac4-quality-metric">Measure <select id="ac4-quality-metric">${options}</select></label>
+        <label for="${cfg.select}">Measure <select id="${cfg.select}">${options}</select></label>
       </div>
-      <div class="quality-trend-chart-wrap">${buildChart(worstPerCommit(records, state.metric), state.metric)}</div>
-      <div class="quality-trend-legend"><span><i style="background:${COLOR}"></i>worst stream per commit</span></div>
-      ${buildTable(records)}
+      <div class="quality-trend-chart-wrap">${buildChart(cfg, worstPerCommit(records, state.metric), state.metric)}</div>
+      <div class="quality-trend-legend"><span><i style="background:${COLOR}"></i>worst ${cfg.noun} per commit</span></div>
+      ${buildTable(cfg, records)}
     `;
-    document.getElementById("ac4-quality-metric").addEventListener("change", (e) => {
+    document.getElementById(cfg.select).addEventListener("change", (e) => {
       state.metric = e.target.value;
-      render(records);
+      render(cfg, root, records, state);
     });
   }
 
-  fetchHistory().then((records) => {
-    if (!records.length) {
-      root.innerHTML = '<p class="quality-trend-status">No AC-4 decode quality history yet - the nightly run writes it.</p>';
-      return;
-    }
-    render(records);
-  });
+  for (const cfg of SERIES) {
+    const root = document.getElementById(cfg.root);
+    if (!root) continue;
+    fetchHistory(cfg.file).then((records) => {
+      if (!records.length) {
+        root.innerHTML = `<p class="quality-trend-status">No ${cfg.title} history yet - the nightly run writes it.</p>`;
+        return;
+      }
+      render(cfg, root, records, { metric: cfg.metric });
+    });
+  }
 })();
 </script>
-
-Each row is one DEE stream on one commit: the streams scored channel by channel against their
-source, 10 of the 15 committed legs (SIMPLE and A-SPX at 2.0 and 5.1, and immersive stereo). The
-A-CPL streams, scored through their downmixes, and the 5.1.4 streams, scored with their routing,
-are held to their floors in FFmpeg Validate but have no series. **Minimum SNR** is the
-stream's lowest full-band channel SNR against its source; the LFE is left out, since its SNR
-against the full-band source is about −2.3 dB on every 5.1 stream and its own floor holds it.
-**LSD** is the log-spectral distance and **MOS-LQO** ViSQOL's predicted listening score, all
-from the same scoring pass. The chart plots the worst stream for each commit
-on the chosen measure. A row is flagged when its SNR falls, or its LSD rises, 0.5 dB past that
-stream's own trailing ten-run mean. A hard regression (3 dB of SNR, or 2 dB of LSD) fails the
-`Publish quality trend` job after the numbers are pushed, as the AC-3 series does.

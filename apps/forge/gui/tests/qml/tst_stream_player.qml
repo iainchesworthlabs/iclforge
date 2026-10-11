@@ -31,6 +31,13 @@ TestCase {
         Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
     readonly property url outputUrl:
         Qt.resolvedUrl("_test_output/tst_stream_player.ec3")
+    // A 5.1 main and a mono description as two independent substreams of one
+    // E-AC-3 stream (§E2.3.1.2's I0 and I1), eight access units of each:
+    //   forge eac3-encode main51.wav two-programmes.ec3 448 none 51 off \
+    //       programme2=ad.wav programme2-layout=mono programme2-bitrate=96
+    // from 12288 frames (0.256 s) of a tone per channel.
+    readonly property url twoProgrammeStreamUrl:
+        Qt.resolvedUrl("../fixtures/two-programmes.ec3")
 
     function init() {
         StreamPlayerController.pause();
@@ -99,6 +106,46 @@ TestCase {
 
         StreamPlayerController.seek(StreamPlayerController.durationSeconds + 5);
         compare(StreamPlayerController.positionSeconds, StreamPlayerController.durationSeconds);
+    }
+
+    // A stream with a second independent substream comes back from an
+    // unfiltered split_access_units with its programmes interleaved, one frame
+    // period of each in turn: the 5.1 main, then the mono description, then
+    // the main again. The player decoded every unit with its channel order
+    // sized from the first (5.1), so the mono unit read channels that were not
+    // there - the access violation `forge monitor` died with - and, where it
+    // survived, played the programmes one after the other. It plays ONE, the
+    // first the stream carries as forge's own commands do, and says which.
+    function test_aStreamWithTwoProgrammesPlaysTheFirstAndSaysSo() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+
+        StreamPlayerController.openFile(twoProgrammeStreamUrl);
+        tryCompare(StreamPlayerController, "busy", false, 15000);
+
+        compare(StreamPlayerController.error, "");
+        compare(StreamPlayerController.hasResult, true);
+        // The main's own 5.1 bed: not the description's one channel, and not
+        // a splice of the two.
+        compare(StreamPlayerController.channelMeta.length, 6);
+        // Eight access units of the main (8 x 1536 / 48000 s), not sixteen
+        // units of both.
+        fuzzyCompare(StreamPlayerController.durationSeconds, 0.256, 0.001);
+        verify(StreamPlayerController.summaryLine.indexOf("8 frame(s)") > 0);
+        verify(StreamPlayerController.summaryLine.indexOf("programme 0 of 2 (0, 1)") > 0);
+    }
+
+    // The other half: a stream with one programme is not annotated, so the
+    // line the dialog has always shown is unchanged for it.
+    function test_aStreamWithOneProgrammeCarriesNoProgrammeNote() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+
+        StreamPlayerController.openFile(atmosStreamUrl);
+        tryCompare(StreamPlayerController, "busy", false, 15000);
+
+        compare(StreamPlayerController.hasResult, true);
+        verify(StreamPlayerController.summaryLine.indexOf("programme") < 0);
     }
 
     // A finished run's own "More…" menu (Main.qml's runMoreMenu) is the run-
