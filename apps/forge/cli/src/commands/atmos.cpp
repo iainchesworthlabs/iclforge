@@ -63,7 +63,16 @@ std::optional<int> apply_object_signing(std::vector<std::vector<std::byte>>& uni
     if (!meta.sign_objects) {
         return 0;
     }
-    const auto key = iclforge::base::crypto::load_signing_key(meta.signing_key.value_or(""));
+    // Verifying takes a keyring; signing is one key, and naming two would
+    // leave it unsaid which of them wrote the tag.
+    if (meta.signing_keys.size() > 1) {
+        fmt::println(stderr,
+                     "error: sign-objects signs with one key, and signing-key= was given {} times",
+                     meta.signing_keys.size());
+        return std::nullopt;
+    }
+    const auto key = iclforge::base::crypto::load_signing_key(
+        meta.signing_keys.empty() ? std::string_view{} : std::string_view{meta.signing_keys.front()});
     if (!key.has_value()) {
         if (key.error().kind == iclforge::base::crypto::KeyErrorKind::kAbsent) {
             fmt::println(stderr,

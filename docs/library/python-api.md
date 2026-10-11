@@ -340,6 +340,7 @@ result types are read-only.
 | `eac3.LayoutId`, `eac3.FrameMetadata` | [Encoding E-AC-3](#encoding-e-ac-3). `eac3.FrameEncoder.encode_frame(channels, metadata=None, aux=b"")` takes the §7.7 words as an `eac3.FrameMetadata` (`dynrng`, `compr`, `dynrng2`, `compr2`) and an EMDF `aux` payload |
 | `meta.QcPresetId`, `QcLoudnessLimit`, `QcPreset`, `QcVerdict` | `meta.qc_preset(id)` returns a `QcPreset` (`target_lkfs`, `tolerance_lu`, `max_true_peak_dbtp`, `loudness_limit` of `kBand` or `kCeiling`, `source`); `meta.evaluate_qc_gate` returns a `QcVerdict` (`loudness_delta_lu`, `loudness_pass`, `true_peak_margin_dbtp`, `true_peak_pass`, `passed`) |
 | `signing.VerifySummary` | `signing.verify_atmos_stream`'s counts: `valid`, `mismatch`, `no_container` and `all_valid` |
+| `signing.KeyringSummary`, `signing.GateSummary` | `signing.verify_atmos_stream_any`'s result (`totals`, a `VerifySummary` whose `valid` means "under some key", and `per_key`, the frames each key accepted) and `signing.gate_atmos_stream`'s counts (`passed`, `gated`, `no_objects`, `per_key`) |
 | `containers.TsCodec`, `TsProfile` | `TsTrack.codec` (`kAc3`, `kEac3`, `kAc4`) and `mux_mpegts`'s `profile` (`kDvb`, `kAtsc`) |
 | `ac4.Speaker`, `ObjectKind`, `DownmixTarget`, `DrcMode`, `AssociatedType`, `ConcealmentPolicy`, `ConcealmentAction`, `DecodingMode`, `CodecMode`, `RateMode`, `BedChannel`, `ObjectCoding`, `AjocDownmix`, `AdditionalPair`, `DecodeError`, `EncodeError` | The enums of `iclforge::ac4` behind the [AC-4](ac4.md) controls, under their C++ enumerator names |
 | `ac4.OutputConfig`, `PresentationChoice`, `DecoderConfig`, `Concealment`, `PresentationInfo`, `LoudnessInfo`, `EncodedFrame` | `OutputConfig` has `output_level_dbfs`, `drc`, `headphones`, `dialogue_enhancement_db`, `downmix`, `mix_lfe`, `dialogue_gain_db` and `associated_gain_db`; `PresentationChoice` `presentation_id`, `index`, `language`, `associated`, `associated_type` and `headphones`; `DecoderConfig` `output`, `concealment`, `presentation`, `level` and `decoding`; `Concealment` the `error` and `action` of a frame the decoder made in place of one that did not decode; `PresentationInfo` `index`, `presentation_id`, `md_compat`, `enabled`, `alternative`, `pre_virtualized`, `name`, `language`, `decodable`, `selectable` and `speakers`; `LoudnessInfo` `dialnorm_dbfs`, `integrated_lkfs`, `true_peak_dbtp` and `loudness_range_lu`, each `None` until the stream sends it; `EncodedFrame` `data`, `samples` and `iframe`. A `DecodedFrame` also has `sample_rate_hz`, `sequence_counter`, `presentation_index`, `presentation_id` and `concealed` |
@@ -367,7 +368,10 @@ wraps, and a context manager:
   own machinery, callable from a notebook.
 - **`iclforge.signing`** — `SigningKey` (base64 or raw, the single decode every front end
   shares), `sign_atmos_stream` (returns a signed copy — Python bytes are immutable),
-  `has_authenticity_tag` and `verify_atmos_stream`.
+  `has_authenticity_tag` and `verify_atmos_stream`; and, for more than one key,
+  `verify_atmos_stream_any` (a frame is valid under any key of a list) and `gate_atmos_stream`
+  (the licensed policy: returns the stream with every frame that did not verify reduced to its
+  bed, and a `GateSummary`).
 - **`Eac3Decoder` is a context manager** — `with iclforge.Eac3Decoder() as d:` drains the §3.7
   hold-back on scope exit (discarding it; call `flush()` yourself to keep it).
 

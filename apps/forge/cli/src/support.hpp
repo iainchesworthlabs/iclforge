@@ -336,10 +336,13 @@ struct Options {
     // parse_options itself cannot do (it only sees command-line text, not
     // opened files).
     std::optional<std::string> map_spec;
-    // signing-key=<path>, read by sign-objects/verify-objects below - kept
-    // apart from those two so their own comments stay about what they DO
-    // rather than where the key comes from.
-    std::optional<std::string> signing_key;
+    // signing-key=<path>, read by sign-objects/verify-objects/gate-objects
+    // below - kept apart from those so their own comments stay about what they
+    // DO rather than where the key comes from. Repeatable: verify-objects and
+    // gate-objects try each in the order given (a keyring), while sign-objects
+    // signs with exactly one and refuses a second. Empty means "no path given",
+    // which still lets ICLFORGE_SIGNING_KEY[_FILE] supply the one key.
+    std::vector<std::string> signing_keys;
     // 'probe' only: how much per-frame detail the report carries - unset for
     // the stream summary alone, "frames" for one entry per access unit,
     // "blocks" to also dump every block's coding tools and exponent
@@ -367,6 +370,14 @@ struct Options {
     // an unsigned one unless the operator opts in here - see
     // docs/concepts/object-signing.md.
     bool verify_objects = false;
+    // 'decode'/'monitor'/'spatial' only: the licensed policy, the permissive
+    // half of verify-objects. A frame whose object layer verifies against
+    // signing-key= is played as objects; one that does not - another key's,
+    // unsigned, altered - is played as its 5.1 bed and the decode carries on,
+    // where verify-objects would refuse the command. Off by default, like
+    // verify-objects; the two cannot be combined (one says "refuse", the other
+    // "play the bed"). See ac3::signing::gate_atmos_stream.
+    bool gate_objects = false;
     // 'fmp4' only: also write the object-stripped 5.1 companion rendition
     // into the same #EXT-X-MEDIA group, which is what Apple's HLS Authoring
     // Specification asks for alongside a CHANNELS="<N>/JOC" Atmos rendition.
@@ -1307,6 +1318,26 @@ using iclforge::apps::is_ac4_stream;
 // `status`, the caller's status stream: nowhere under quiet, and stderr when
 // a "-" output owns stdout (see status_stream above).
 std::optional<iclforge::ac3::signing::VerifySummary> apply_object_verification(
+    std::span<const std::byte> stream, const Options& meta, FILE* status);
+
+// The keys verify-objects and gate-objects try: each signing-key=<path> in the
+// order given, or - with none - the one key ICLFORGE_SIGNING_KEY_FILE /
+// ICLFORGE_SIGNING_KEY names. `option` is the word the error uses. nullopt
+// means a key could not be loaded or none was offered (both already printed).
+[[nodiscard]] std::optional<std::vector<iclforge::base::crypto::SigningKey>> load_object_keyring(
+    const Options& meta, std::string_view option);
+
+// gate-objects: the licensed policy (see Options::gate_objects). Returns the
+// stream to decode instead of `stream` - every frame whose object layer
+// verifies against the keyring byte for byte, every other one reduced to its
+// bed by taking the object layer out (iclforge::ac3::signing::gate_atmos_stream)
+// - or nullopt, with the reason printed, when a key could not be loaded or a
+// frame carries an object layer that can be neither verified nor removed (the
+// gate fails closed rather than play objects nothing vouched for). Call it
+// only when meta.gate_objects; the caller keeps its own `stream` otherwise,
+// so an ordinary decode never copies the stream. The summary line goes to
+// `status`, as apply_object_verification's does.
+[[nodiscard]] std::optional<std::vector<std::byte>> apply_object_gate(
     std::span<const std::byte> stream, const Options& meta, FILE* status);
 
 // The object layer (TS 103 420's OAMD) an E-AC-3 decode found, reported the
