@@ -981,6 +981,26 @@
             <translation>[Éncõdé nõw ~~~~]</translation>
         </message>
         <message>
+            <source>The lyrics are beside the stream, as the same name with .lrc.</source>
+            <translation>[Thé lyrîcs àré bésîdé thé stréàm, às thé sàmé nàmé wîth .lrc. ~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The lyrics are already beside the stream.</source>
+            <translation>[Thé lyrîcs àré àlréàdy bésîdé thé stréàm. ~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>A lyrics file of that name was already beside the stream, and was left as it is.</source>
+            <translation>[À lyrîcs fîlé õf thàt nàmé wàs àlréàdy bésîdé thé stréàm, ànd wàs léft às ît îs. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The lyrics file could not be read, so none was put beside the stream.</source>
+            <translation>[Thé lyrîcs fîlé cõûld nõt bé réàd, sõ nõné wàs pût bésîdé thé stréàm. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The lyrics could not be written beside the stream.</source>
+            <translation>[Thé lyrîcs cõûld nõt bé wrîttén bésîdé thé stréàm. ~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
             <source>Backing</source>
             <translation>[Bàckîng ~~~]</translation>
         </message>
@@ -1177,6 +1197,18 @@
             <translation>[À WÀV whõsé spéàkérs àré àlréàdy nàméd L C R Ls Rs (õr L R S, L C R S, L R Ls Rs). ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
         <message>
+            <source>Lyrics</source>
+            <translation>[Lyrîcs ~~]</translation>
+        </message>
+        <message>
+            <source>none</source>
+            <translation>[nõné ~~]</translation>
+        </message>
+        <message>
+            <source>An .lrc file is put beside the stream under the stream's name, where Hearth finds it. One of the backing's name beside it is offered.</source>
+            <translation>[Àn .lrc fîlé îs pût bésîdé thé stréàm ûndér thé stréàm's nàmé, whéré Héàrth fînds ît. Õné õf thé bàckîng's nàmé bésîdé ît îs õfféréd. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
             <source>CODING MODE</source>
             <translation>[CÕDÎNG MÕDÉ ~~~~]</translation>
         </message>
@@ -1187,10 +1219,6 @@
         <message>
             <source>not yet</source>
             <translation>[nõt yét ~~~]</translation>
-        </message>
-        <message>
-            <source>CHECKS</source>
-            <translation>[CHÉCKS ~~]</translation>
         </message>
         <message>
             <source>No LFE: karaoke streams made here carry none.</source>
@@ -1339,6 +1367,14 @@
         <message>
             <source>Back</source>
             <translation>[Bàck ~~]</translation>
+        </message>
+        <message>
+            <source>Choose the lyrics</source>
+            <translation>[Chõõsé thé lyrîcs ~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Lyrics (*.lrc)</source>
+            <translation>[Lyrîcs (*.lrc) ~~~~~~]</translation>
         </message>
         <message>
             <source>Choose %1</source>

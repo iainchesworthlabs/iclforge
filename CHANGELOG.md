@@ -120,6 +120,14 @@ The sections below contain the complete change list and fixes.
   gains `karaokeReproduction` and `karaokeVocals` (as coded by default, as it has always played),
   a karaoke stream's summary line says so, and `sourceModel` rows carry the file's stated
   `speakers`.
+- **The Karaoke flow is named, sized and kept for what it is.** The header, the rail and the run
+  chip say "Karaoke 3/2" where they said "5.0" (`EncoderController::planLabel`); a stream starts at
+  384 kbps for 3/2 and 256 or 320 below it where it started at the encoder's 192, until the
+  author picks a rate; the coding mode sits under the step, not below the fold at 900 px; the
+  Hear step's stream is built with `encodePreviewTo()` and is not a run in the run strip; a start
+  offset and a channel trim set on a part survive another part being added, replaced or removed;
+  and a `.lrc` of the backing's name beside it (or one the author chooses) is put beside the saved
+  stream under the stream's name, where Hearth finds it, never over a file already there.
 - **Hearth reproduces a karaoke stream.** `DecoderSettings` gains `karaoke` (aware by default,
   or capable, or off) and `karaoke_vocals`, which `decoder_setup()` hands to the output stage, and
   the stream decoder lays an AC-3 unit out from `output_mode()`: a karaoke stream played to a 5.1

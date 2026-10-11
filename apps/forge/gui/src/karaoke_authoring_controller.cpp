@@ -1,6 +1,7 @@
 #include "karaoke_authoring_controller.hpp"
 
 #include <QStringList>
+#include <QUrl>
 
 #include <string>
 #include <vector>
@@ -131,4 +132,34 @@ QVariantMap KaraokeAuthoring::outputs(bool melody, int vocals, const QString& li
 
 QString KaraokeAuthoring::durationText(double seconds) const {
     return to_q(forge_gui::karaoke_duration_text(seconds));
+}
+
+namespace {
+
+// A file URL or a plain path, as the path a file system call takes.
+std::string local_path(const QString& url_or_path) {
+    const QUrl url(url_or_path);
+    return (url.isLocalFile() ? url.toLocalFile() : url_or_path).toStdString();
+}
+
+}  // namespace
+
+int KaraokeAuthoring::defaultBitrateKbps(const QString& mode) const {
+    return forge_gui::karaoke_default_bitrate_kbps(mode.toStdString());
+}
+
+QString KaraokeAuthoring::lyricsBeside(const QString& url) const {
+    const std::string found = forge_gui::karaoke_lyrics_beside(local_path(url));
+    return found.empty() ? QString() : QUrl::fromLocalFile(to_q(found)).toString();
+}
+
+QString KaraokeAuthoring::copyLyrics(const QString& lyricsUrl, const QString& streamPath) const {
+    switch (forge_gui::karaoke_copy_lyrics(local_path(lyricsUrl), local_path(streamPath))) {
+        case forge_gui::KaraokeLyricsCopy::kCopied: return QStringLiteral("copied");
+        case forge_gui::KaraokeLyricsCopy::kAlreadyThere: return QStringLiteral("already-there");
+        case forge_gui::KaraokeLyricsCopy::kExists: return QStringLiteral("exists");
+        case forge_gui::KaraokeLyricsCopy::kUnreadable: return QStringLiteral("unreadable");
+        case forge_gui::KaraokeLyricsCopy::kFailed: break;
+    }
+    return QStringLiteral("failed");
 }
