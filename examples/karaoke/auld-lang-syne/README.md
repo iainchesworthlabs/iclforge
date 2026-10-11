@@ -37,10 +37,10 @@ or open `forge-gui` and choose **Project…**, **Open project…**, or drop the 
 **Controls** moves to **Karaoke** and the **Parts** step lists the four files, with the coding mode
 they make, 3/2 (`L M R V1 V2`), and a check for each thing that could be wrong.
 
-The project is only a list of which file is which part and what to encode them with
-([the format](../../../docs/forge/gui/projects.md)). The same state can be reached by hand, which
-is the way to see what the project saves you: choose **Controls**, **Karaoke**, then **Choose…**
-beside each part in **Parts**:
+The project is a list of which file is which part, where each channel goes and what to encode
+them with ([the format](../../../docs/forge/gui/projects.md)). The same state can be reached by
+hand, which is the way to see what the project saves you: choose **Controls**, **Karaoke**, then
+**Choose…** beside each part in **Parts**:
 
 | Part | File |
 |---|---|
@@ -91,6 +91,16 @@ and 3, and `map=` sends source 0's two channels to L and R, the melody guide to 
 Ls and Rs. `bsmod=voiceover` is `bsmod` 7, which at a layout above 1/0 is the karaoke main
 service. This writes the same bytes as the committed `auld-lang-syne.ac3`, and as **Save** in the
 Forge GUI does for the project.
+
+`forge` reads the project too, and runs that line from it:
+
+```text
+forge project auld-lang-syne.forgeproj out.ac3
+forge project auld-lang-syne.forgeproj print
+```
+
+The first writes `out.ac3` (the committed stream again); the second prints the line above and
+runs nothing.
 
 ```text
 $ forge probe auld-lang-syne.ac3
@@ -147,7 +157,7 @@ python tools/generators/gen_karaoke_example.py --forge build/bin/forge
   C library, so every platform writes the same files. The stream is the encoder's, which is
   bit-exact across the toolchains and architectures it is built for.
 - **Checked.** `tools/checks/test_gen_karaoke_example.py` runs the generator and holds each file
-  to the committed one; `iclforge-forge-cli-tests` probes the stream and encodes the parts again;
-  `iclforge-hearth-tests` reads the words with Hearth's reader; and the Forge GUI's Qt Quick suite
-  opens the project and encodes it. A change to the encoder that moves the bytes of this stream
+  to the committed one; `iclforge-forge-cli-tests` probes the stream and encodes the parts again,
+  with the README's line and with `forge project`; `iclforge-hearth-tests` reads the words with
+  Hearth's reader; and the Forge GUI's Qt Quick suite opens the project and encodes it. A change to the encoder that moves the bytes of this stream
   fails the second of those until the stream is made again with the command above.

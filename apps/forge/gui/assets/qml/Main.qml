@@ -1203,6 +1203,12 @@ ApplicationWindow {
             return qsTr("%1 kbps is not a rate this codec offers. It was left as it was.").arg(a[0]);
         case "setting-failed":
             return qsTr("%1 could not be set.").arg(a[0]);
+        case "setting-not-held":
+            return qsTr("%1 is in the project and `forge` uses it, but this window has no control for it, so its own encode does not.").arg(a[0]);
+        case "objects-more":
+            return qsTr("The project has %1 objects and the window has %2: the rest were left out.").arg(a[0]).arg(a[1]);
+        case "objects-failed":
+            return qsTr("The objects' placements and motion in the project could not be read.");
         case "bed-unknown":
             return qsTr("The channel layout \"%1\" is not one this Forge knows. It was left as it was.").arg(a[0]);
         case "busy":
@@ -1271,20 +1277,49 @@ ApplicationWindow {
                 project.extras = on;
             }
         }
-        const assignments = [];
-        const table = EncoderController.assignmentRows;
-        for (let i = 0; i < table.length; i++) {
-            if (table[i].touched === true || table[i].destToken !== "none") {
+        // Where each channel goes, when it has been said: every row, "none" included, which is
+        // what the command line's map= is - once given it names every channel. Without an explicit
+        // assignment the routing follows the layout, and a project says nothing of it.
+        if (EncoderController.mapToken.length > 0) {
+            const assignments = [];
+            const table = EncoderController.assignmentRows;
+            for (let i = 0; i < table.length; i++) {
                 assignments.push({ source: table[i].source, channel: table[i].channel,
                                    to: table[i].destToken });
             }
-        }
-        if (assignments.length > 0) {
             project.assignments = assignments;
         }
 
-        project.encode = Object.assign({}, project.encode || {},
-                                       ProjectFile.captureEncode(EncoderController));
+        // The window's settings, then what the file had that this window does not hold: a key
+        // of another version's, which goes back as it came.
+        const base = project.encode || {};
+        const held = JSON.parse(ProjectFile.captureEncode(EncoderController));
+        const encode = {};
+        const known = ["codec", "container", "bitrateKbps", "tools", "vbr", "options"];
+        for (const key of Object.keys(base)) {
+            if (known.indexOf(key) < 0) {
+                encode[key] = base[key];
+            }
+        }
+        for (const key of Object.keys(held)) {
+            encode[key] = held[key];
+        }
+        const options = held.options || {};
+        const heldKeys = ProjectFile.optionKeys();
+        const baseOptions = base.options || {};
+        for (const key of Object.keys(baseOptions)) {
+            if (heldKeys.indexOf(key) < 0) {
+                options[key] = baseOptions[key];
+            }
+        }
+        encode.options = options;
+        project.encode = encode;
+
+        delete project.objects;
+        const objects = ProjectFile.captureObjects(EncoderController);
+        if (objects.length > 0) {
+            project.objects = JSON.parse(objects);
+        }
         if (window.tier === "karaoke") {
             project.karaoke = Object.assign({}, project.karaoke || {}, karaokeFlow.projectState());
         }
@@ -1376,6 +1411,11 @@ ApplicationWindow {
                                                 assignments[i].to);
             }
         }
+        // The objects' placements and motion, once there are objects to put them on.
+        if (project.atmos === true && project.objects !== undefined) {
+            notes.push.apply(notes, ProjectFile.applyObjects(EncoderController,
+                                                             JSON.stringify(project.objects)));
+        }
         notes.push.apply(notes, ProjectFile.applyEncode(EncoderController, encode, 1));
         return notes;
     }
@@ -1390,10 +1430,11 @@ ApplicationWindow {
             window.showProjectNotice(qsTr("The project was not opened"), [result.error]);
             return false;
         }
+        const project = JSON.parse(result.text);
         const notes = result.warnings.slice();
-        notes.push.apply(notes, window.applyProject(result.project));
+        notes.push.apply(notes, window.applyProject(project));
         window.projectUrl = url.toString();
-        window.projectBase = result.project;
+        window.projectBase = project;
         if (notes.length > 0) {
             window.showProjectNotice(qsTr("The project was opened with notes"), notes);
         }
@@ -1402,7 +1443,7 @@ ApplicationWindow {
 
     function saveProjectFile(url) {
         const project = window.captureProject();
-        const result = ProjectFile.write(url, project);
+        const result = ProjectFile.write(url, JSON.stringify(project));
         if (!result.ok) {
             window.showProjectNotice(qsTr("The project was not saved"), [result.error]);
             return false;

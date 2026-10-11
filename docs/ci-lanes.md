@@ -180,7 +180,7 @@ as they did when no lane named their tree.
 
 A program's tests are beside it (`apps/<product>/<program>/tests/`), and the Catch2 binaries among
 them are `core`'s, as the `tests/` they were in is: `apps/forge/cli/tests/`,
-`apps/shared/{media,preferences}/tests/`, `apps/hearth/engine/tests/`,
+`apps/shared/{media,preferences,project}/tests/`, `apps/hearth/engine/tests/`,
 `apps/crucible/engine/tests/`, and the files named `test_*` in a window's `tests/` directory
 (`apps/forge/gui/tests/`, `apps/hearth/ui/tests/`, `apps/crucible/ui/tests/`). The Qt Quick suites
 beside them stay with the program. The PR gate's planner (`tools/ci/plan_gate.py`) draws the same

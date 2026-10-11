@@ -1,6 +1,6 @@
 # Commands
 
-The command list from the usage text, reproduced rather than paraphrased — 44 commands, as
+The command list from the usage text, reproduced rather than paraphrased — 45 commands, as
 a Windows build without `-DICLFORGE_BUILD_ADM=ON` prints them. The two ADM commands read
 `UNAVAILABLE HERE` because that flag is off; `spatial` does not, because Windows is the one
 platform with a spatial backend. Nothing in the build compares this block against the binary, so
@@ -41,6 +41,7 @@ Usage:
   forge qc            <in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> [preset=<name>|all] [layout=bed|rendered] [objects=<71|512|514|714>] (bitstream-aware loudness QC: measured loudness vs. embedded dialnorm/compr, optional preset gate, optional BS.1770-5 Annex 4 object re-render; an AC-4 presentation as coded, against its dialnorm and the loudness it states)
   forge spdif         <in.ac3|in.ec3|in.ac4> <out.wav>       (IEC 61937 wrap as playable PCM16 WAV, one programme of a multi-programme E-AC-3 stream (programme=); AC-4 in IEC 61937-14's bursts)
   forge unspdif       <in.wav|in.raw|-> <out.ac3|out.ec3|out.ac4|-> (the inverse: recover the elementary stream from IEC 61937 bursts, as captured from an S/PDIF or HDMI input or written by 'spdif'. '-' pipes either end)
+  forge project       <project.forgeproj> [out] [print]      (encode what a Forge project file says, by running the commands it stands for: the line the Forge GUI's command bar shows for the same settings; out is where the result goes (beside the project, named for it, by default); print shows the commands and runs none of them)
   forge mkv           <in.ac3|in.ec3> <out.mkv>              (wrap as a playable Matroska file; AC-4 is refused, Matroska registering no codec ID for it)
   forge mp4           <in.ac3|in.ec3|in.ac4> <out.mp4>       (wrap as playable MP4 with dac3/dec3 for AC-3/E-AC-3 or dac4 for AC-4)
   forge fmp4          <in.ac3|in.ec3|in.ac4|in.mkv|in.mp4|in.ts> <out_dir> [frames_per_fragment] (fragmented MP4/CMAF + HLS/DASH manifests, ready for a packager; fallback-51 also writes an object-stripped 5.1 companion rendition. AC-4 as TS 103 190-2 Annex H has it: each fragment starting at an I-frame, the timescale Table E.1 gives, the ca4m and ca4s brands and the DASH descriptors of Annex G)
@@ -1344,6 +1345,30 @@ has no bits to overwrite, and inserting them would re-frame the syncframe, which
 by another name. Such a request is refused with a reason rather than half-applied. This
 project's own E-AC-3 encoder never sets `infomdate`, so `bsmod`/`dsurmod` are AC-3-only in
 practice; `dsurmod` additionally exists only for coding mode 2/0 (§5.4.2.7).
+
+### Projects — a Forge project file, run
+
+| Command | What it does |
+|---|---|
+| `project` | Encodes what a Forge project file (`.forgeproj`, [the format](../gui/projects.md)) says: the sources, the channel plan, the assignments and the encode settings, by running the commands they stand for. `forge project song.forgeproj` writes the stream (or the container's file) beside the project, named for it; `forge project song.forgeproj out.ac3` says where, and `print` shows the commands it would run and runs none of them |
+
+```bash
+forge project examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj out.ac3
+forge project examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj print
+```
+
+It is the line the [Forge GUI](../gui/index.md)'s command bar shows for the same settings, so the
+commands are the ones that already exist and nothing is done differently: the same parsing, the
+same refusals, the same bytes. The project's `encode` settings are the command line's own words
+(`dialnorm=`, `drc=`, `bsmod=`, ...), its `tools` and `vbr` are the tokens `eac3-encode` takes,
+and a key `forge` knows that the window has no control for is passed through as it was written.
+A project says what to encode, not where: its paths are relative to its own folder.
+
+What it needs of the file that the window works out for itself is the channel plan: with more
+than one source, the project has to say where each channel goes (`bed` and `assignments`, which
+the window writes when it saves), because the commands refuse a channel nobody placed. A file
+that is not a project, or is a newer version than this `forge` reads, is refused with its reason
+and exit code 2; a project with nothing to encode, or something `forge` cannot run, exits 1.
 
 ### Containers
 
