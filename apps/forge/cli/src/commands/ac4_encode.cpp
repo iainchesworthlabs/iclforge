@@ -31,8 +31,9 @@
 // of sync frames with the CRC of TS 103 190-2 Annex G (without it where
 // crc=off), or in an MP4 file with Annex E's 'ac-4' sample entry when the
 // output is named .mp4, .m4a or .mov. What the encoder writes: mono, stereo,
-// 5.0 and 5.1, and with experimental=7x-... 7.0 and 7.1 and with
-// experimental=three-zero 3.0, at 48 kHz at every frame rate of Part 1 Table
+// 5.0 and 5.1, and with experimental=7x-... 7.0 and 7.1, with
+// experimental=three-zero 3.0 and with experimental=twenty-two-two 22.2 (24
+// channels), at 48 kHz at every frame rate of Part 1 Table
 // 83 or at 44.1 kHz in 2 048-sample frames, the SIMPLE, ASPX or A-CPL codec
 // modes, at a constant, average or variable rate, with the loudness, DRC,
 // downmix and dialogue enhancement metadata the options configure; and, with
@@ -147,7 +148,8 @@ struct Input {
 [[nodiscard]] std::optional<Input> read_input(std::string_view path, std::size_t number,
                                               const Options::Ac4Encode::Dialogue& dialogue,
                                               iclforge::ac4::AdditionalPair pair, bool three_zero,
-                                              bool back_pair, bool nine_x_4) {
+                                              bool back_pair, bool nine_x_4,
+                                              bool twenty_two_two) {
     auto wav = read_wav_arg(path);
     if (!wav.has_value()) {
         fmt::println(stderr, "error: {}: {}", path, iclforge::ac3::io::describe(wav.error()));
@@ -155,13 +157,14 @@ struct Input {
     }
     Input input;
     input.speakers = iclforge::apps::ac4_input_speakers(wav->channels.size(), pair, three_zero,
-                                                        back_pair, nine_x_4);
+                                                        back_pair, nine_x_4, twenty_two_two);
     if (input.speakers.empty()) {
         fmt::println(stderr,
                      "error: {}: AC-4 encoding takes mono, stereo, 5.0, 5.1, 5.0.4 and 5.1.4, 7.0 "
                      "and 7.1 with experimental=7x-back, 7x-wide or 7x-top-front, 7.0.4 and 7.1.4 "
                      "with experimental=back-pair, 9.0.4 and 9.1.4 with experimental=nine-x-4, "
-                     "and 3.0 with experimental=three-zero; "
+                     "3.0 with experimental=three-zero, and 22.2, 24 channels, with "
+                     "experimental=twenty-two-two; "
                      "substream {} has {} channels",
                      path, number, wav->channels.size());
         return std::nullopt;
@@ -372,7 +375,8 @@ int run_ac4_encode(std::string_view in_path, std::string_view out_path, std::uin
         if (n == 0 || !substreams[n].path.empty()) {
             inputs[n] = read_input(n == 0 ? in_path : std::string_view{substreams[n].path}, n + 1,
                                    substreams[n].dialogue, pair, meta.ac4_experimental_three_zero,
-                                   meta.ac4_experimental_back_pair, meta.ac4_experimental_nine_x_4);
+                                   meta.ac4_experimental_back_pair, meta.ac4_experimental_nine_x_4,
+                                   meta.ac4_experimental_twenty_two_two);
             if (!inputs[n]) {
                 return kExitInput;
             }
@@ -398,8 +402,11 @@ int run_ac4_encode(std::string_view in_path, std::string_view out_path, std::uin
             in_path);
         return kExitUsage;
     }
-    const bool multichannel = speakers.size() >= 5;
-    const bool immersive = speakers.size() >= 9;
+    // 22.2 (24 channels) has no stereo downmix or height downmix: no table of
+    // Part 2 clause 5.10.2 takes it as an input.
+    const bool twenty_two = speakers.size() == 24;
+    const bool multichannel = speakers.size() >= 5 && !twenty_two;
+    const bool immersive = speakers.size() >= 9 && !twenty_two;
     const bool has_lfe =
         std::ranges::find(speakers, iclforge::ac4::Speaker::kLfe) != speakers.end();
     const bool downmix_named = opts.loro_centre_db || opts.loro_surround_db ||
@@ -472,6 +479,7 @@ int run_ac4_encode(std::string_view in_path, std::string_view out_path, std::uin
     config.experimental.nine_x_4 = meta.ac4_experimental_nine_x_4;
     config.experimental.noise_fill = meta.ac4_experimental_noise_fill;
     config.experimental.frame_rate_fraction = meta.ac4_experimental_frame_rate_fraction;
+    config.experimental.twenty_two_two = meta.ac4_experimental_twenty_two_two;
 
     if (drc_named) {
         // Table 161's four modes on drc='s profile, and a mode named on a

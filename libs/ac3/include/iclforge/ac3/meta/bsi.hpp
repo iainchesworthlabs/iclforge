@@ -221,6 +221,16 @@ struct AlternateBsi {
 // question asked as a bool, for a caller deciding rather than displaying.
 [[nodiscard]] ICLFORGE_AC3_EXPORT bool is_associated_service(BitstreamMode value, Acmod acmod);
 
+// Annex C.2.1: "AC-3 bit streams are indicated as karaoke type when bsmod = '111'
+// and acmod >= 0x2" - a main service that carries L and R, a guide melody M
+// and one or two vocal channels V1 and V2 (Table C.2.1), where code 7 at
+// 1/0 is a voice-over and at 1+1 is nothing Annex C names. Header-only: it is
+// the same condition is_associated_service() reads, asked the other way.
+[[nodiscard]] constexpr bool is_karaoke(BitstreamMode value, Acmod acmod) {
+    return value == BitstreamMode::kVoiceOverOrKaraoke &&
+           static_cast<std::uint8_t>(acmod) >= static_cast<std::uint8_t>(Acmod::k2_0);
+}
+
 // Names for a front end to show, in the same order as each enum's values.
 [[nodiscard]] ICLFORGE_AC3_EXPORT std::string_view describe(BitstreamMode value, Acmod acmod);
 [[nodiscard]] ICLFORGE_AC3_EXPORT std::string_view describe(SurroundMode value);

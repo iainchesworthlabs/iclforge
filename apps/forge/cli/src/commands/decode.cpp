@@ -47,6 +47,7 @@
 #include "ac4_channels.hpp"
 #include "ac4_object_render.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
+#include "associated_mix.hpp"
 #include "stream_playback.hpp"
 
 namespace forge_cli::commands {
@@ -105,6 +106,31 @@ std::vector<float> delay_pcm(std::span<const float> pcm, std::size_t delay_sampl
 bool folding(const forge_cli::Options& meta, iclforge::ac3::Acmod acmod) {
     return meta.output.target != iclforge::ac3::DownmixTarget::kAsCoded &&
            acmod != iclforge::ac3::Acmod::kDualMono;
+}
+
+// Whether the output stage is going to leave this frame as Annex C's karaoke
+// 3/0 reproduction - L, C, R and the LFE, in place of the coded layout - which
+// is what the sink is then opened for, as it is for a fold. The stage is the
+// one that decides (a frame that is not karaoke, an acmod with nothing to
+// reproduce, and a stereo or mono target all leave the layout alone), so this
+// asks it by its own channel count rather than restating its rules.
+bool karaoke_reproduced(const forge_cli::Options& meta, const iclforge::ac3::DecodedFrame& frame) {
+    const bool karaoke = iclforge::ac3::meta::is_karaoke(
+        static_cast<iclforge::ac3::meta::BitstreamMode>(frame.bsmod), frame.acmod);
+    return meta.output.karaoke != iclforge::ac3::KaraokeReproduction::kOff &&
+           iclforge::ac3::output_channel_count(meta.output, frame.acmod, frame.lfe, karaoke) !=
+               iclforge::ac3::output_channel_count(meta.output, frame.acmod, frame.lfe, false);
+}
+
+// What the listener's choice of vocals is called in the report.
+std::string_view vocals_name(iclforge::ac3::KaraokeVocals vocals) {
+    switch (vocals) {
+        case iclforge::ac3::KaraokeVocals::kNone: return "no vocals";
+        case iclforge::ac3::KaraokeVocals::kV1: return "V1";
+        case iclforge::ac3::KaraokeVocals::kV2: return "V2";
+        case iclforge::ac3::KaraokeVocals::kBoth: return "V1 and V2";
+    }
+    return "no vocals";
 }
 
 // The one-line name for whatever the fold produced, for the status report.
@@ -515,16 +541,22 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
     }
     // Options AC-3's and E-AC-3's decode reads: said, not silently dropped.
     // The two that promise a result AC-4 cannot give are refused.
-    if (!meta.bap_census_path.empty() || meta.verify_objects) {
+    if (!meta.bap_census_path.empty() || meta.verify_objects || meta.gate_objects) {
         fmt::println(stderr, "error: {} is AC-4: {} AC-3's and E-AC-3's", in_path,
-                     meta.verify_objects ? "verify-objects checks the EMDF object signatures of"
-                                         : "bap-census= counts the bit allocation of");
+                     meta.verify_objects
+                         ? "verify-objects checks the EMDF object signatures of"
+                         : meta.gate_objects ? "gate-objects plays the signed EMDF object layer of"
+                                             : "bap-census= counts the bit allocation of");
         return kExitUsage;
     }
     if (!meta.eac3_decode_tokens.empty()) {
         fmt::println(stderr, "warning: {} is AC-4: {} {} AC-3's and E-AC-3's, and ignored", in_path,
                      joined(meta.eac3_decode_tokens),
                      meta.eac3_decode_tokens.size() == 1 ? "is" : "are");
+    }
+    if (meta.output.karaoke != iclforge::ac3::KaraokeReproduction::kOff) {
+        fmt::println(stderr, "warning: {} is AC-4: karaoke is AC-3's (Annex C), and ignored",
+                     in_path);
     }
     const iclforge::ac4::ScanResult scan = iclforge::ac4::scan(stream);
     if (scan.frames.empty()) {
@@ -812,7 +844,9 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     // §E2.3.1.2: one programme is decoded, never a fold of several. A stream
     // carrying a second independent substream carries an ALTERNATIVE - a
     // second language, an audio description - so writing both into one WAV
-    // would splice two unrelated pieces of audio together.
+    // would splice two unrelated pieces of audio together. The one
+    // combination Annex E defines is a main with an associated service
+    // (§E3.10), and associated= asks for exactly that.
     const auto ids = iclforge::ac3::programme_ids(stream);
     if (!ids.has_value()) {
         fmt::println(stderr, "error: stream framing failed: {}",
@@ -827,6 +861,18 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     if (!programme.has_value()) {
         return 1;
     }
+    // §E3.10: associated= names a second programme to mix into the first.
+    // Chosen here, before anything decodes, so that a stream that cannot give
+    // one is refused rather than decoded without it.
+    std::optional<iclforge::apps::AssociatedChoice> associated;
+    if (wants_associated(meta)) {
+        associated = choose_associated_programme(stream, *ids, *programme, meta);
+        if (!associated.has_value()) {
+            return kExitInput;
+        }
+    } else if (meta.ac4_associated_gain != 0.0) {
+        warn_associated_gain_unused();
+    }
     // Access units, not syncframes: a dependent substream is only meaningful
     // alongside the independent one it extends, and the two are rendered
     // together into one set of speaker feeds.
@@ -840,21 +886,46 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         status_println(status_stream(out_path), "  programme {} of {} ({})", *programme,
                        ids->size(), format_programme_ids(*ids));
     }
+    if (meta.output.karaoke != iclforge::ac3::KaraokeReproduction::kOff) {
+        // Annex C is AC-3's: the E-AC-3 decoder takes no karaoke flag from
+        // bsi, and its dependent-substream programmes have no karaoke layout.
+        fmt::println(stderr, "warning: the stream is E-AC-3: karaoke is AC-3's (Annex C), and ignored");
+    }
+    std::vector<std::span<const std::byte>> associated_units;
+    if (associated.has_value()) {
+        const auto own = iclforge::ac3::split_access_units(stream, associated->id);
+        if (!own.has_value()) {
+            fmt::println(stderr, "error: stream framing failed: {}",
+                         iclforge::ac3::describe(own.error()));
+            return kExitInput;
+        }
+        associated_units = *own;
+    }
     // Same convention as the AC-3 path below: null unless bap-census= asked
     // for it, so an ordinary decode pays nothing.
     const bool census_wanted = !meta.bap_census_path.empty();
     iclforge::ac3::verify::Eac3AccessUnitTrace census_trace;
     iclforge::ac3::verify::BapCensus census;
-    iclforge::ac3::Eac3Decoder decoder{{.drc_scale = meta.drc_scale,
-                             .fast_imdct = meta.fast_imdct,
-                             .heavy_compression = meta.p.heavy.has_value(),
-                             .output = meta.output,
-                             .concealment = meta.concealment,
-                             .fast_mdct = meta.fast_mdct,
-                             .joc_domain = meta.joc_domain,
-                             .eac3_trace = census_wanted ? &census_trace : nullptr,
-                             .programme = programme,
-                             .skip_object_reconstruction = meta.bed_only}};
+    const iclforge::ac3::DecoderConfig main_config{.drc_scale = meta.drc_scale,
+                                         .fast_imdct = meta.fast_imdct,
+                                         .heavy_compression = meta.p.heavy.has_value(),
+                                         .output = meta.output,
+                                         .concealment = meta.concealment,
+                                         .fast_mdct = meta.fast_mdct,
+                                         .joc_domain = meta.joc_domain,
+                                         .eac3_trace = census_wanted ? &census_trace : nullptr,
+                                         .programme = programme,
+                                         .skip_object_reconstruction = meta.bed_only};
+    iclforge::ac3::Eac3Decoder decoder{main_config};
+    // §E3.10: the associated service's own decoder, run in step with the main's
+    // and its units paired and mixed with it. It renders as coded whatever
+    // fold the main was asked for (iclforge::apps::AssociatedMix's header says
+    // why), and its objects are never wanted.
+    std::optional<iclforge::apps::AssociatedMix> mix;
+    if (associated.has_value()) {
+        mix.emplace(main_config, *programme, *associated, std::move(associated_units),
+                    meta.ac4_associated_gain);
+    }
     // The decoded programme goes out through the sink as units decode - the
     // sink's per-slot carry absorbs the one place slots advance unevenly
     // (the transient-pre-noise flush below).
@@ -868,14 +939,24 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         // fell back to. Everyone else gets the WAV speaker order the encode
         // side reads a file in.
         std::vector<std::size_t> order;
+        // Which speaker each WAV position is, for a file of three channels or
+        // more: the header then says so, and a re-encode reads a 2/1 file as
+        // 2/1 rather than as the 3/0 its width alone would suggest.
+        std::uint32_t mask = 0;
         // A fold has already put its own channels in their own order, so like
         // dual mono it takes the identity permutation rather than the
         // rendered layout's.
         if (unit.acmod != iclforge::ac3::Acmod::kDualMono && !folding(meta, unit.acmod)) {
-            order = plan::wav_order(std::span{unit.layout.items}.first(
-                static_cast<std::size_t>(unit.layout.count)));
+            const auto placed = std::span{unit.layout.items}.first(
+                static_cast<std::size_t>(unit.layout.count));
+            order = plan::wav_order(placed);
+            std::vector<iclforge::ac3::eac3::chanmap::Location> in_wav_order;
+            for (const auto slot : order) {
+                in_wav_order.push_back(placed[slot]);
+            }
+            mask = plan::wav_channel_mask(in_wav_order);
         }
-        if (!sink.open(out_path, sample_rate_hz(unit.sample_rate), slots, order)) {
+        if (!sink.open(out_path, sample_rate_hz(unit.sample_rate), slots, order, mask)) {
             fmt::println(stderr, "error: cannot open {} for writing", out_path);
             return false;
         }
@@ -1121,12 +1202,65 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
                 ++compr_frames;
             }
         };
+    // Everything a rendered unit goes through - decoded, flushed or mixed: the
+    // sink opens on the first, the report's figures are tracked, the channels
+    // and whatever objects it carries are written. Returns 0, or the exit
+    // code to leave with.
+    const auto consume = [&](const iclforge::ac3::DecodedAccessUnit& out) -> int {
+        if (!sink.is_open()) {
+            first = out;
+            programme_layout = out.layout;
+            if (!open_sink(first, out.channels.size())) {
+                return kExitOutput;
+            }
+        }
+        if (out.concealed.has_value()) {
+            ++concealed_units;
+        }
+        track_metadata(out.dynrng, out.numblkscod, out.compr);
+        for (std::size_t ch = 0; ch < out.channels.size() && ch < sink_slots; ++ch) {
+            if (!sink.append(ch, out.channels[ch])) {
+                fmt::println(stderr, "error: cannot write to {}", out_path);
+                abort_all();
+                return kExitOutput;
+            }
+        }
+        if (!append_objects(out.object_audio, sample_rate_hz(out.sample_rate))) {
+            abort_all();
+            return kExitOutput;
+        }
+        accumulate_adm(out.object_audio, out.object_indices, out.object_metadata, out.channels,
+                       out.layout, sample_rate_hz(out.sample_rate));
+        return 0;
+    };
+
+    // §E3.10's mix: what comes out of `mix` is the main with the service in it
+    // (see iclforge::apps::AssociatedMix for why the two sides' units wait for
+    // each other), and goes where a decoded unit always goes.
+    const auto drain = [&]() -> int {
+        while (true) {
+            auto mixed = mix->next();
+            if (!mixed.has_value()) {
+                report_mix_error(mixed.error());
+                abort_all();
+                return kExitInput;
+            }
+            if (!mixed->has_value()) {
+                return 0;
+            }
+            if (const int code = consume(**mixed); code != 0) {
+                return code;
+            }
+        }
+    };
+
     Progress progress;
     progress.start("decoding", units->size());
     std::uint64_t units_done = 0;
     for (const auto& unit : *units) {
         progress.tick(++units_done);
-        const auto decoded = decoder.decode_access_unit(unit);
+        // Not const: a released unit is moved on to the mix, not copied.
+        auto decoded = decoder.decode_access_unit(unit);
         if (!decoded.has_value()) {
             // describe(), not the raw enumerator: this is the line a CI
             // log shows when a third-party stream will not decode, and
@@ -1140,37 +1274,34 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         if (census_wanted) {
             census.observe(census_trace);
         }
+        if (mix.has_value()) {
+            // The service's next unit, whether or not this one released audio:
+            // the two decoders hold frames back independently.
+            if (const auto stepped = mix->advance(); !stepped.has_value()) {
+                report_mix_error(stepped.error());
+                abort_all();
+                return kExitInput;
+            }
+        }
         if (!decoded->has_value()) {
             // §3.7: this access unit's frame(s) are being held back pending
             // transient pre-noise processing (Eac3Decoder::decode_access_unit's
             // own doc comment) - nothing new to append yet, not an error.
             continue;
         }
-        const auto& out = **decoded;
-        if (!sink.is_open()) {
-            first = out;
-            programme_layout = out.layout;
-            if (!open_sink(first, out.channels.size())) {
-                return kExitOutput;
+        if (mix.has_value()) {
+            if (!programme_layout.has_value()) {
+                programme_layout = (*decoded)->layout;
             }
-        }
-        if (out.concealed.has_value()) {
-            ++concealed_units;
-        }
-        track_metadata(out.dynrng, out.numblkscod, out.compr);
-        for (std::size_t ch = 0; ch < out.channels.size(); ++ch) {
-            if (!sink.append(ch, out.channels[ch])) {
-                fmt::println(stderr, "error: cannot write to {}", out_path);
-                abort_all();
-                return kExitOutput;
+            mix->push_main(std::move(**decoded));
+            if (const int code = drain(); code != 0) {
+                return code;
             }
+            continue;
         }
-        if (!append_objects(out.object_audio, sample_rate_hz(first.sample_rate))) {
-            abort_all();
-            return kExitOutput;
+        if (const int code = consume(**decoded); code != 0) {
+            return code;
         }
-        accumulate_adm(out.object_audio, out.object_indices, out.object_metadata, out.channels,
-                       out.layout, sample_rate_hz(first.sample_rate));
     }
     // Whatever transient pre-noise processing was still holding back at
     // end-of-stream (§3.7). held_back_unit assembles the flushed substreams
@@ -1178,9 +1309,12 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     // `programme_layout` (or, when nothing ever decoded, a layout it synthesizes
     // itself by unioning the flushed substreams' own locations) - see its
     // own doc comment for the placement rules this used to duplicate here.
+    if (mix.has_value()) {
+        mix->end();
+    }
     const auto flushed = decoder.flush();
     if (!flushed.empty()) {
-        const auto held = iclforge::apps::held_back_unit(
+        auto held = iclforge::apps::held_back_unit(
             flushed, programme_layout,
             meta.output.target != iclforge::ac3::DownmixTarget::kAsCoded);
         if (held.has_value()) {
@@ -1189,26 +1323,16 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
             // numblkscod already come from the lead substream alone, the
             // same convention DecodedAccessUnit's own fields follow for a
             // live unit.
-            track_metadata(held->dynrng, held->numblkscod, held->compr);
-            if (!sink.is_open()) {
-                first = *held;
-                if (!open_sink(first, held->channels.size())) {
-                    return kExitOutput;
-                }
+            if (mix.has_value()) {
+                mix->push_main(std::move(*held));
+            } else if (const int code = consume(*held); code != 0) {
+                return code;
             }
-            for (std::size_t ch = 0; ch < held->channels.size() && ch < sink_slots; ++ch) {
-                if (!sink.append(ch, held->channels[ch])) {
-                    fmt::println(stderr, "error: cannot write to {}", out_path);
-                    abort_all();
-                    return kExitOutput;
-                }
-            }
-            if (!append_objects(held->object_audio, sample_rate_hz(held->sample_rate))) {
-                abort_all();
-                return kExitOutput;
-            }
-            accumulate_adm(held->object_audio, held->object_indices, held->object_metadata,
-                           held->channels, held->layout, sample_rate_hz(held->sample_rate));
+        }
+    }
+    if (mix.has_value()) {
+        if (const int code = drain(); code != 0) {
+            return code;
         }
     }
     progress.finish();
@@ -1281,6 +1405,9 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         if (first.mixing.has_value()) {
             print_mix_summary(status, *first.mixing);
         }
+        if (associated.has_value()) {
+            print_mix_report(status, *associated, *programme, mix->report());
+        }
         print_concealment_summary(status, concealed_units, units->size(), "access units");
         return report_decoded_objects(status, first.object_metadata, have_object_audio,
                                       objects_written, objects_dir);
@@ -1315,6 +1442,9 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     }
     if (first.mixing.has_value()) {
         print_mix_summary(status, *first.mixing);
+    }
+    if (associated.has_value()) {
+        print_mix_report(status, *associated, *programme, mix->report());
     }
     print_concealment_summary(status, concealed_units, units->size(), "access units");
     return report_decoded_objects(status, first.object_metadata, have_object_audio,
@@ -1351,6 +1481,15 @@ int run_decode(std::string_view in_path, std::string_view out_path,
                      joined(requested.ac4_decode_tokens),
                      requested.ac4_decode_tokens.size() == 1 ? "is" : "are");
     }
+    if (requested.output.karaoke != iclforge::ac3::KaraokeReproduction::kOff &&
+        requested.output.target == iclforge::ac3::DownmixTarget::kLtRt) {
+        // Annex C defines a 2/0 reproduction as Lo/Ro and a 3/0 one; there is
+        // no Lt/Rt karaoke. Said rather than quietly taking the one or the other.
+        fmt::println(stderr,
+                     "error: karaoke reproduces through the 3/0 or the Lo/Ro downmix (Annex C); "
+                     "it defines no Lt/Rt - drop karaoke or use downmix=loro");
+        return kExitUsage;
+    }
     // downmix=auto becomes a concrete fold here, once, from what the stream
     // itself prefers; everything below sees only the fold it settled on.
     auto meta = requested;
@@ -1358,10 +1497,23 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     if (!apply_object_verification(stream, meta, status_stream(out_path))) {
         return kExitInput;
     }
+    // gate-objects decodes a copy in which every frame that did not verify is
+    // already its bed; nothing below can tell it from a stream that never had
+    // the objects. Without it, `playable` is the stream as read - no copy.
+    std::vector<std::byte> gated;
+    if (meta.gate_objects) {
+        auto result = apply_object_gate(stream, meta, status_stream(out_path));
+        if (!result) {
+            return kExitInput;
+        }
+        gated = std::move(*result);
+    }
+    const std::span<const std::byte> playable =
+        meta.gate_objects ? std::span<const std::byte>{gated} : std::span<const std::byte>{stream};
     // bsid at bit 40 says which syntax this is, before either is assumed.
     // spdif and play branch on it the same way now that both packers handle
     // E-AC-3 (Eac3BurstPacker alongside AC-3's wrap_frame).
-    const auto bsid = iclforge::ac3::stream_bsid(stream);
+    const auto bsid = iclforge::ac3::stream_bsid(playable);
     if (!bsid.has_value()) {
         fmt::println(stderr, "error: {} is too short to hold a syncframe", in_path);
         return kExitInput;
@@ -1369,18 +1521,24 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     // ...except for §E2.3.1.2's legacy core, where the first frame is AC-3 and
     // the stream is not: an AC-3 bed with Annex E dependents extending it goes
     // down the access-unit path too, which reads the core natively.
-    if (*bsid > 8 || iclforge::ac3::has_eac3_extension_substreams(stream)) {
-        return run_decode_eac3(stream, out_path, meta, objects_dir, adm_out);
+    if (*bsid > 8 || iclforge::ac3::has_eac3_extension_substreams(playable)) {
+        return run_decode_eac3(playable, out_path, meta, objects_dir, adm_out);
     }
     if (!objects_dir.empty()) {
         fmt::println(stderr,
                      "warning: objects_dir given but {} is plain AC-3 - it has no object layer",
                      in_path);
     }
+    if (meta.eac3_associated_programme.has_value() || meta.ac4_associated.has_value()) {
+        fmt::println(stderr,
+                     "warning: associated= mixes a second programme and {} is plain AC-3, which "
+                     "carries one; ignored",
+                     in_path);
+    }
     if (!adm_out.empty()) {
         fmt::println(stderr, "warning: {} given but {} is plain AC-3 - it has no object layer", adm_out, in_path);
     }
-    const auto frames = iclforge::ac3::split_frames(stream);
+    const auto frames = iclforge::ac3::split_frames(playable);
     if (!frames.has_value()) {
         fmt::println(stderr, "error: {}: {}", in_path, iclforge::ac3::describe(frames.error()));
         return kExitInput;
@@ -1457,10 +1615,28 @@ int run_decode(std::string_view in_path, std::string_view out_path,
             // L then R, or the one mono channel - so it takes the identity
             // permutation rather than the coded layout's.
             const bool folded = folding(meta, decoded->acmod);
+            // Annex C's karaoke 3/0 reproduction replaces the coded layout
+            // with L, C, R (and the LFE): written channels that are a 3/0
+            // layout, named and ordered as one whatever the stream coded.
+            const bool reproduced = !folded && karaoke_reproduced(meta, *decoded);
+            const auto written = reproduced ? iclforge::ac3::Acmod::k3_0 : decoded->acmod;
+            // Which speaker each WAV position is, for three channels or more
+            // (see the E-AC-3 path's note); dual mono has no speakers to name.
+            std::uint32_t mask = 0;
+            if (!folded && decoded->acmod != iclforge::ac3::Acmod::kDualMono) {
+                const auto coded = iclforge::ac3::eac3::chanmap::expand(
+                    iclforge::ac3::eac3::chanmap::acmod_map(written, decoded->lfe));
+                std::vector<iclforge::ac3::eac3::chanmap::Location> in_wav_order;
+                for (const auto slot : iclforge::ac3::io::wav_channel_order(written, decoded->lfe)) {
+                    in_wav_order.push_back(coded[static_cast<int>(slot)]);
+                }
+                mask = plan::wav_channel_mask(in_wav_order);
+            }
             if (!sink.open(
                     out_path, sample_rate_hz(decoded->sample_rate), decoded->channels.size(),
                     folded ? std::vector<std::size_t>{}
-                           : iclforge::ac3::io::wav_channel_order(decoded->acmod, decoded->lfe))) {
+                           : iclforge::ac3::io::wav_channel_order(written, decoded->lfe),
+                    mask)) {
                 fmt::println(stderr, "error: cannot open {} for writing", out_path);
                 return kExitOutput;
             }
@@ -1468,10 +1644,20 @@ int run_decode(std::string_view in_path, std::string_view out_path,
             // fold rather than the coded layout it no longer carries.
             meter.emplace(folded ? (decoded->channels.size() == 1 ? iclforge::ac3::Acmod::k1_0
                                                                  : iclforge::ac3::Acmod::k2_0)
-                                 : decoded->acmod,
+                                 : written,
                           folded ? false : decoded->lfe,
                           sample_rate_hz(decoded->sample_rate));
             have_first = true;
+        }
+        // The sink was opened for the first frame's width. A stream whose
+        // layout changes after it (an acmod change, or bsmod switching a
+        // karaoke reproduction on or off) cannot be written into it.
+        if (decoded->channels.size() != first.channels.size()) {
+            fmt::println(stderr,
+                         "error: {}: the channel layout changes mid-stream ({} channels, then {})",
+                         in_path, first.channels.size(), decoded->channels.size());
+            sink.abort();
+            return kExitInput;
         }
         std::vector<std::span<const float>> views;
         views.reserve(decoded->channels.size());
@@ -1507,13 +1693,59 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     // and this report must not land in the middle of them.
     const auto status = status_stream(out_path);
     const bool folded = folding(meta, first.acmod);
+    const bool reproduced = !folded && karaoke_reproduced(meta, first);
     status_println(
         status, "decoded {} frames -> {} ({}, {} Hz)", frames->size(), out_path,
         folded
             ? fmt::format("{} -> {}", iclforge::ac3::analysis::layout_name(first.acmod, first.lfe),
                           fold_name(meta.output.target))
-            : std::string{iclforge::ac3::analysis::layout_name(first.acmod, first.lfe)},
+            : reproduced
+                  ? fmt::format("{} -> karaoke {}",
+                                iclforge::ac3::analysis::layout_name(first.acmod, first.lfe),
+                                iclforge::ac3::analysis::layout_name(iclforge::ac3::Acmod::k3_0,
+                                                                     first.lfe))
+                  : std::string{iclforge::ac3::analysis::layout_name(first.acmod, first.lfe)},
         sample_rate_hz(first.sample_rate));
+    if (meta.output.karaoke != iclforge::ac3::KaraokeReproduction::kOff) {
+        const bool karaoke_stream = iclforge::ac3::meta::is_karaoke(
+            static_cast<iclforge::ac3::meta::BitstreamMode>(first.bsmod), first.acmod);
+        const bool capable =
+            meta.output.karaoke == iclforge::ac3::KaraokeReproduction::kCapable;
+        if (reproduced && capable) {
+            status_println(status,
+                           "  karaoke (Annex C.2.3.2, Table C.2.3): melody M to the centre, "
+                           "listener's vocals: {}",
+                           vocals_name(meta.output.karaoke_vocals));
+        } else if (reproduced) {
+            const auto levels = iclforge::ac3::mix_levels(first.acmod, first.cmixlev,
+                                                          first.surmixlev, first.alternate_bsi);
+            status_println(status,
+                           "  karaoke (Annex C.2.3.1): melody M to the centre, the vocals at the "
+                           "stream's surround level ({:.1f} dB)",
+                           iclforge::ac3::meta::to_db(meta.output.mix_override.loro_slev.value_or(
+                               levels.loro_slev)));
+        } else if (!karaoke_stream) {
+            status_println(status,
+                           "note: karaoke applies to a stream with bsmod 7 above 1/0 (Annex C.2.1); "
+                           "this one is bsmod {} at {}, and was decoded as coded",
+                           first.bsmod,
+                           iclforge::ac3::analysis::layout_name(first.acmod, first.lfe));
+        } else if (folded && capable && first.acmod != iclforge::ac3::Acmod::k2_0) {
+            status_println(status,
+                           "  karaoke (Annex C.2.3.2, Table C.2.3): 2/0 reproduction, melody M at "
+                           "clev, listener's vocals: {}",
+                           vocals_name(meta.output.karaoke_vocals));
+        } else if (folded) {
+            status_println(status,
+                           "note: karaoke at a stereo or mono target is Annex C's 2/0 "
+                           "reproduction, which is this Lo/Ro downmix");
+        } else {
+            status_println(status,
+                           "note: a karaoke stream at {} is already what Annex C's reproduction "
+                           "gives; decoded as coded",
+                           iclforge::ac3::analysis::layout_name(first.acmod, first.lfe));
+        }
+    }
     status_println(status, "metadata: dialnorm {} (dialogue at -{} dBFS){}", first.dialnorm,
                    first.dialnorm, dialnorm_note(meta, first.dialnorm));
     if (first.dialnorm2.has_value()) {

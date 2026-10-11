@@ -37,6 +37,10 @@
 //              (the "faststart" layout mux() and fragment() both write); a
 //              moov-last file is kMoovAfterMdat, because locating a sample
 //              means seeking backwards and a stream cannot.
+//   demux_seekable() - the same bounded memory for a source that CAN be read
+//              at an offset: the boxes first (mdat jumped over), then each
+//              sample where the table says. Reads a moov-last file a stream
+//              refuses.
 //
 // UNTRUSTED INPUT. Every box length, chunk offset and sample size in an MP4
 // is self-declared, and the sample table is an INDEX - a hostile stsc can
@@ -230,5 +234,35 @@ class ICLFORGE_CONTAINERS_EXPORT Reader {
    private:
     std::unique_ptr<detail::ReaderState> state_;
 };
+
+// A source that can be read at an offset - a file, a memory map - for the
+// layouts a stream cannot do. Copies up to out.size() bytes starting at
+// `offset` into `out` and returns how many it copied: fewer than asked at the
+// end of the input, and 0 at or past it.
+using ReadAtFn = std::function<std::size_t(std::uint64_t offset, std::span<std::byte> out)>;
+
+// Called once, with the track as the container declares it, after the boxes
+// are read and before the first sample is delivered.
+using TrackFn = std::function<void(const ReadTrack&)>;
+
+// Reads an MP4 from a source of `size` bytes that can be read at an offset,
+// delivering each sample of the audio track through `on_sample` (valid for that
+// call only), and returns the track.
+//
+// This is the incremental Reader's answer to a moov that follows its mdat: a
+// stream cannot go back for the sample table, a seekable source can. The boxes
+// are walked by the same parser, jumping over mdat by its own declared length so
+// the audio is never read to find the table; the samples are then read one at a
+// time at the offsets the table gives. Memory is the largest box the table
+// needs (ReadOptions::max_box_bytes bounds it) plus one sample, whatever the
+// file's size and whichever side of mdat the moov is on - fragmented files
+// included.
+//
+// Handles what demux() does, with the same bounds; a sample whose declared
+// range runs past `size` ends delivery there rather than being fabricated, as
+// demux() does for a truncated download.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<ReadTrack, DemuxError> demux_seekable(
+    const ReadAtFn& read_at, std::uint64_t size, const TrackFn& on_track,
+    const Reader::SampleFn& on_sample, const ReadOptions& options = {});
 
 }  // namespace iclforge::containers::mp4

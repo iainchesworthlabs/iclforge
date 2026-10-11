@@ -1652,6 +1652,36 @@ does what the readings say, not that they are what an encoder meant.
   at the sides; the top, bottom and centre-back channels are not in the ring.
 - **Evidence:** Text; as for 7.X, no stream mixes into a 22.2 substream.
 
+#### The encoder's 22.2 input order and LFE tracks
+
+- **Where:** Part 2 5.2.4 and Table 21, p. 62; Table A.27, p. 214; 6.2.4.3, p. 130.
+- **Reading:** the encoder (`EncoderConfig::experimental.twenty_two_two`) takes its 24 input channels in
+  Table A.27's order by speaker index, the order the decoder writes them in ("The 22.2 element's
+  output"), so that a tone on input channel k decodes on output channel k. Table 21's tracks 0 and 1 are
+  the LFE (index 11) and LFE2 (index 17), each a `mono_data(1)` coded as the 5.1 LFE is: `sf_info_lfe()`
+  and the bands under 120 Hz, one long block. The eleven pairs follow in the table's order, [L, R] first
+  and [Lw, Rw] last, each a `two_channel_data()` with `b_enable_mdct_stereo_proc` 1, its own `sf_info()`
+  and `chparam_info()`, and in ASPX its own `aspx_data_2ch()`; `aspx_config()` is sent once, in an
+  I-frame, before the LFEs, and serves the eleven.
+- **Evidence:** Text; each channel's tone comes back on its own channel in both codec modes, and the
+  decoder's trace is the encoder's record for record (`libs/ac4/tests/encoder/test_twenty_two_two.cpp`).
+
+#### md_compat and the indicator of a 22.2 presentation
+
+- **Where:** Part 2 Table 55 and 6.3.2.2.3, p. 157: the levels hold at most 11 tracks, "with the
+  exception of LFE channels that have the b_lfe flag set in mono_data()", and a system "shall not
+  decode (i.e. select) presentations with md_compat > n"; 6.3.3.1.17a, p. 168:
+  `immersive_audio_indicator` says "whether this presentation contains immersive audio"; 6.2.1.8, p. 118
+  sends `b_4_back_channels_present`, `b_centre_present` and `top_channels_present` for 7.X.4 and 9.X.4
+  alone.
+- **Reading:** 22.2 has 22 tracks, the two LFEs not counted, which no level up to 3 holds (11 tracks, 7.1.4
+  at most) and 4 to 6 are reserved, so the least `md_compat` of a 22.2 presentation is 7, unrestricted. A
+  decoder claiming a lower level, 3 by default, does not select it (`DecoderConfig::level`, `forge decode
+  md-compat=7`). The presentation sends `immersive_audio_indicator` 1, 22.2 having top and bottom channels,
+  and derives no core, back pair or top pairs, its `channel_mode` naming none: `pres_ch_mode` 15, its
+  `b_pres_has_lfe` 1.
+- **Evidence:** Text.
+
 ### The 9.X.4 element
 
 Part 2's immersive_channel_element (6.2.4.1) with `b_5fronts` 1, which codes the channel modes 13 and 14,
@@ -2202,8 +2232,11 @@ it, whose substreams carry a tone each (`libs/ac4/tests/decoder/test_presentatio
   presentation_config 0 to 5), and the decoder decodes all of it: every substream channel-coded, in a
   channel mode it renders, at 48 or 44.1 kHz, and none a fragment of the efficient high frame rate mode that
   was not assembled (a presentation of another fraction than the selected one's).
-  md_compat 7 is above every level Table 55 defines, so it is selected only by a decoder told its level
-  is 7. The default level is 3.
+  md_compat 7 is above every level Table 55 defines, so it is selected only by a decoder whose level is
+  7. The default level is 7: the decoder takes every presentation Table 55 and Table 86 define, 9.X.4's
+  thirteen tracks and 22.2's twenty-four included, and refuses by name a frame it cannot decode. A
+  system that wants the choice of a level 3 receiver, the floor DVB and ATSC set, lowers it
+  (`DecoderConfig::level`, `md-compat=`). It was 3 until 2026-10-10.
 - **Evidence:** Text; the selection table's cases, which both transcriptions take.
 
 #### The order of the preferences
@@ -3147,9 +3180,9 @@ project has the element, so each entry below rests on the text and on the decode
 
 - **Where:** Part 2 Table 55, p. 157, and 6.3.2.2.3.
 - **Reading:** a 9.0.4 or 9.1.4 presentation has thirteen tracks (the LFE not counted), more than the 11 of
-  md_compat 3, so the least level its tracks allow is 7, "unrestricted". A decoder is told to select it by
-  its level (`DecoderConfig::level`, whose default is 3; see "Which presentations can be selected"), so a
-  decoder at the default does not select a 9.X.4 stream, and the encoder's tests decode at level 7.
+  md_compat 3, so the least level its tracks allow is 7, "unrestricted". A decoder selects it by its
+  level (`DecoderConfig::level`, whose default is 7; see "Which presentations can be selected"), so a
+  decoder at the default selects a 9.X.4 stream and one told level 3 does not.
 - **Evidence:** Text; the encoder's table of contents carries 7 in every 9.X.4 presentation.
 
 #### What the 9.X.4 element does not write

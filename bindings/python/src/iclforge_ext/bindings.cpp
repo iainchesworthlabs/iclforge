@@ -1777,8 +1777,9 @@ PYBIND11_MODULE(_iclforge, m) {
         py::arg("stream"),
         "The dac3/dec3 sample-entry box payload for this elementary stream (ETSI TS 102 366 "
         "Annex F, plus TS 103 420's Atmos extension when the stream carries objects) - what "
-        "containers.Mp4Track.codec_config wants. Empty for the legacy-core arrangement no "
-        "box can describe.");
+        "containers.Mp4Track.codec_config wants. It describes the lead programme, as "
+        "ScannedStream.access_units holds it. A legacy AC-3 core with E-AC-3 dependents gets "
+        "the dec3 box (use the 'ec-3' codec id for it).");
 
     // The three optional submodules - see optional_modules.hpp. Each is its own
     // translation unit, picked by bindings/python/CMakeLists.txt from a {present,absent}

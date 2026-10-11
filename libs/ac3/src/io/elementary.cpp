@@ -16,6 +16,7 @@
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/io/metadata_edit.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
 
 namespace iclforge::ac3::io {
@@ -224,7 +225,9 @@ void skip_mixing_metadata(BitReader& r, FrameHeader& s, int nblks) {
     if (s.lfe && r.read(1) != 0) {
         r.skip(5);  // lfemixlevcod
     }
-    if (s.strmtyp != eac3::StreamType::kDependent) {
+    // Table E1.2's gate is `strmtyp == 0x0`: a type 2 substream, which AC-3's
+    // bsi could not have carried this for, sends none of it either.
+    if (s.strmtyp == eac3::StreamType::kIndependent) {
         // pgmscle, extpgmscle, mixdef > 0 and paninfoe are exactly the four
         // conditions A/52 Annex G §3.5 lists for mixinfoexists (and ETSI
         // EN 300 468 D.5 words as "contains metadata ... to control mixing
@@ -369,7 +372,8 @@ std::expected<FrameHeader, ScanError> read_eac3_header(std::span<const std::byte
     if (s.strmtyp == eac3::StreamType::kConvertible) {
         const bool blkid = s.numblkscod == 0x3 || r.read(1) != 0;
         if (blkid) {
-            r.skip(6);  // frmsizecod, describing the AC-3 frame this came from
+            // frmsizecod, describing the AC-3 frame this came from
+            s.converted_frmsizecod = static_cast<int>(r.read(6));
         }
     }
     if (r.read(1)) {  // addbsie
@@ -479,8 +483,10 @@ std::expected<ScannedStream, ScanError> scan_eac3(std::span<const std::byte> str
         // PROGRAMME; dependents join the one in progress. Which programme
         // that is comes from substreamid (§E2.3.1.2) - not from position in
         // the stream, which is what made a two-programme stream look like one
-        // programme running at twice the frame rate.
-        if (sub->strmtyp == eac3::StreamType::kIndependent) {
+        // programme running at twice the frame rate. A type 2 substream
+        // (§E2.3.1.1, previously coded in AC-3) is an independent one that may
+        // have no dependents, and begins a unit exactly as a type 0 does.
+        if (sub->strmtyp != eac3::StreamType::kDependent) {
             // Close whichever programme's unit was open, not this one's: a
             // programme's access unit ends at the next INDEPENDENT substream
             // of ANY programme, because that is where its own dependents stop
@@ -592,6 +598,7 @@ std::expected<ScannedStream, ScanError> scan_eac3(std::span<const std::byte> str
     for (std::size_t i = 0; i < programmes.size(); ++i) {
         auto& p = programmes[i];
         p.summary.channels = eac3::chanmap::channel_count(p.locations);
+        p.summary.channel_map = p.locations;
         if (i == 0) {
             lead_locations = p.locations;
         }
@@ -755,6 +762,7 @@ std::expected<ScannedStream, ScanError> scan_ac3_led(std::span<const std::byte> 
                               .acmod = out.acmod,
                               .lfe = out.lfe,
                               .channels = out.channels,
+                              .channel_map = out.channel_map,
                               .bsid = out.bsid,
                               .bsmod = out.bsmod,
                               .substreams_per_unit = out.substreams_per_unit,
@@ -827,6 +835,78 @@ std::expected<ScannedStream, ScanError> scan(std::span<const std::byte> stream) 
         return scan_eac3(stream);
     }
     return std::unexpected(ScanError::kUnsupportedBsid);
+}
+
+std::optional<std::vector<std::span<const std::byte>>> all_programme_access_units(
+    const ScannedStream& stream) {
+    if (stream.programmes.size() <= 1) {
+        return stream.access_units;
+    }
+    const auto& lead = stream.programmes.front().access_units;
+    for (const auto& programme : stream.programmes) {
+        if (programme.access_units.size() != lead.size()) {
+            return std::nullopt;
+        }
+    }
+    std::vector<std::span<const std::byte>> merged;
+    merged.reserve(lead.size());
+    for (std::size_t n = 0; n < lead.size(); ++n) {
+        // Every programme's n-th unit is a slice of the one buffer scan() was
+        // handed, so the frame period they make together is the smallest span
+        // that covers them - and it is only a frame period if they fill it
+        // exactly, with no gap another substream (or junk) sits in.
+        const std::byte* first = lead[n].data();
+        const std::byte* last = lead[n].data() + lead[n].size();
+        std::size_t total = 0;
+        for (const auto& programme : stream.programmes) {
+            const auto unit = programme.access_units[n];
+            first = std::min(first, unit.data(), std::less<const std::byte*>{});
+            last = std::max(last, unit.data() + unit.size(), std::less<const std::byte*>{});
+            total += unit.size();
+        }
+        if (static_cast<std::size_t>(last - first) != total) {
+            return std::nullopt;
+        }
+        merged.emplace_back(first, total);
+    }
+    return merged;
+}
+
+std::optional<std::vector<std::byte>> extract_programme(const ScannedStream& stream,
+                                                        int substreamid) {
+    const auto found = std::ranges::find(stream.programmes, substreamid,
+                                         &ScannedProgramme::substreamid);
+    if (found == stream.programmes.end()) {
+        return std::nullopt;
+    }
+    std::vector<std::byte> out;
+    for (const auto unit : found->access_units) {
+        out.insert(out.end(), unit.begin(), unit.end());
+    }
+    if (substreamid == 0) {
+        return out;
+    }
+    // Renumber the programme's independent substream frames. E-AC-3's frame
+    // opens syncword(16), strmtyp(2), substreamid(3), frmsiz(11): the three
+    // bits are 0x38 of byte 2, and crc2 covers them, so the frame is
+    // re-stamped. A dependent keeps the id it has - those number within their
+    // parent's space (§E2.3.1.2), and the parent is the one that moved.
+    std::size_t offset = 0;
+    while (offset < out.size()) {
+        const auto header = read_frame_header(std::span<const std::byte>{out}.subspan(offset));
+        if (!header.has_value() || offset + header->bytes > out.size()) {
+            return std::nullopt;
+        }
+        if (header->strmtyp != eac3::StreamType::kDependent && header->bsid >= 11) {
+            auto frame = std::span<std::byte>{out}.subspan(offset, header->bytes);
+            frame[2] = static_cast<std::byte>(std::to_integer<unsigned>(frame[2]) & ~0x38U);
+            if (!restamp_crc(frame).has_value()) {
+                return std::nullopt;
+            }
+        }
+        offset += header->bytes;
+    }
+    return out;
 }
 
 // --- timing ------------------------------------------------------------------

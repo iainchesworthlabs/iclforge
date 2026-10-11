@@ -432,9 +432,10 @@ ICLFORGE_C_EXPORT void iclforge_decoded_frame_destroy(iclforge_decoded_frame_t* 
  * --------------------------------------------------------------------- */
 
 /* Mirrors iclforge::ac3::eac3::StreamType (Table E1.2, §E2.3.1.2). This encoder only
- * ever emits kIndependent/kDependent; kConvertible/kReserved are accepted
- * here for a faithful mirror but never produced by anything below, the same
- * way iclforge::ac3::eac3::FrameEncoder's own validate() refuses them. */
+ * ever emits kIndependent/kDependent. kConvertible (a type 2 substream, §E2.3.1.1)
+ * needs the AC-3 frame size code the C++ FrameConfig carries and this struct does
+ * not, so the C++ encoder's validate() refuses it from here; kReserved it refuses
+ * outright. Decoded substreams report either. */
 typedef enum iclforge_stream_type {
     ICLFORGE_STREAM_TYPE_INDEPENDENT = 0,
     ICLFORGE_STREAM_TYPE_DEPENDENT = 1,
@@ -1605,7 +1606,7 @@ typedef struct iclforge_ac4_decoder_config {
     iclforge_ac4_output_config_t output;
     iclforge_ac4_concealment_policy_t concealment;
     iclforge_ac4_presentation_choice_t presentation;
-    int level; /* md_compat ceiling, Part 2 Table 55; default 3 */
+    int level; /* md_compat ceiling, Part 2 Table 55; default 7, unrestricted */
     iclforge_ac4_decoding_mode_t decoding;
 } iclforge_ac4_decoder_config_t;
 
@@ -2026,7 +2027,8 @@ ICLFORGE_C_EXPORT void iclforge_ac4_objects_config_init(iclforge_ac4_objects_con
  * have read from this encoder, off unless asked for (planning/ac4.md, "What
  * the encoder writes by default"). Not mirrored: drc_gains and three_zero,
  * which need the DRC modes and the substream list this struct does not
- * carry, noise_fill, frame_rate_fraction, and nine_x_4 (9.0.4 and 9.1.4: 13 or 14 input channels). */
+ * carry, noise_fill, frame_rate_fraction, nine_x_4 (9.0.4 and 9.1.4: 13 or 14 input channels), and
+ * twenty_two_two (the 22.2 element, 24 input channels). */
 typedef struct iclforge_ac4_experimental {
     int aspx_balance;    /* the ASPX mode's pairs as sum and balance where that is fewer bits */
     int aspx_varvar;     /* the ASPX mode's VARVAR framing */

@@ -127,6 +127,9 @@ struct FrameInputs {
     // frame: decode() frees them once the reconstruction and the stereo and multichannel steps
     // have read them, before the QMF stages (about 23 KB a channel pair at 2048 samples).
     std::vector<Track>* release_tracks = nullptr;
+    // Where the substream may run a frame's per-channel stages on another thread
+    // (DecoderConfig::executor); null runs them on the caller's.
+    Executor* executor = nullptr;
 };
 
 class SubstreamPcm {
@@ -271,7 +274,12 @@ class SubstreamPcm {
                                          std::vector<Speaker>& speakers);
     // Channel c's blocks through the inverse transform into `samples`, and the clause 5.6 delay
     // of the result into `aligned`.
-    void transform_channel(std::size_t c, std::span<Real> samples);
+    // Channel c's inverse transform to `samples`, in `scratch` where it is not the set's own
+    // (a lane other than the first: render()).
+    void transform_channel(std::size_t c, std::span<Real> samples,
+                           dsp::tiered::TransformScratch<Real>* scratch = nullptr);
+    // Makes the working space of `lane_count` lanes for frames of `frame` samples.
+    void prepare_lanes(std::size_t lane_count, std::size_t frame);
     void align_channel(std::size_t c, std::span<const Real> samples, std::span<Real> aligned);
 
     // From the frame's spectra (spectra_ and lengths_) to its output: the
@@ -433,6 +441,23 @@ class SubstreamPcm {
     std::vector<std::vector<QmfValue>> side_;
     std::vector<QmfMatrix> side_matrices_;
     bool side_kept_ = false;  // whether the last frame's side chain is side_ rather than the matrices
+
+    // One thread's working space for render()'s per-channel stages when an executor runs them on
+    // more than one: the first lane uses the members below, a lane after it has one of these
+    // (lanes_[lane - 1]).
+    struct Lane {
+        std::vector<Real> time;       // one channel's inverse transform
+        std::vector<Real> aligned;    // and its alignment
+        std::vector<Real> pcm;        // an output's synthesis
+        std::vector<Real> converted;  // and its converter's output
+        dsp::tiered::QmfScratch<Real> qmf{};
+        dsp::tiered::TransformScratch<Real> transform;
+        std::unique_ptr<AspxScratch> aspx;  // made by the first A-SPX frame a lane takes a unit of
+    };
+    std::vector<Lane> lanes_;
+    // The executor of the frame being rendered (FrameInputs::executor), for the stages apply()
+    // runs, which reach it from the control and not from the frame's inputs.
+    Executor* executor_ = nullptr;
 
     // Scratch, kept to save an allocation per frame.
     // The QMF banks' working space, which they use one after another: the banks

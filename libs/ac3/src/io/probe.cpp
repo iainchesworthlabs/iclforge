@@ -194,6 +194,9 @@ struct Prober::Impl {
         if (header.chanmap.has_value() && !sub.chanmap.has_value()) {
             sub.chanmap = header.chanmap;
         }
+        if (header.converted_frmsizecod.has_value() && !sub.converted_frmsizecod.has_value()) {
+            sub.converted_frmsizecod = header.converted_frmsizecod;
+        }
         // A dependent's own dialnorm is part of the same program's metadata
         // and is reported with it; its compr bit means something else
         // entirely (§E3.8.5) and read_frame_header already declines to

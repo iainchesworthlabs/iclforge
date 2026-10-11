@@ -54,6 +54,14 @@ In rough order of strength:
    `cplfsnroffst` ahead of the per-channel lists when the block couples, and the decoder skipped
    both, which no stream this project produces could have exposed.
 
+   Two more, `dee_joc_714.ec3` and `dee_joc_916.ec3`, are 7.1.4 and 9.1.6 beds that play one input
+   channel at a time, a tenth of a second each. They exist for what ten channels cannot show: that
+   the bed's channel order holds at twelve and sixteen, where Table 12's order and a production
+   tool's input order are different permutations (9.1.6 puts the wides last in the bed and right
+   after the rears at the input). The slice an object comes back loud in names the input channel
+   it carries, whatever the solver did with the others, and every object does — the DEE-checked
+   claim `docs/library/spatial-and-atmos.md` makes of CBI beds.
+
    What that fixture asserts is not just "it parses". Each of the ten channels of the source bed
    carries a different tone, so identifying each reconstructed JOC object by which tone dominates
    it is an independent check on both the reconstruction and the *order* the bed's channels
@@ -489,7 +497,7 @@ Two tiers, both gated in CI:
   commercially mastered programme material, encoded years ago by whatever encoder the mastering
   house used, and they exercise choices neither this project's encoder nor FFmpeg's makes:
   spectral extension at 128 and 256 kbit/s, 1536 kbit/s, a director's-commentary track, dither
-  in use, the 3/1 acmod nothing in this tree can encode, and an A/52 Annex E §E2.3.1.2
+  in use, a 3/1 acmod that this encoder reaches only through a Table E2.5 list, and an A/52 Annex E §E2.3.1.2
   legacy-core delivery (below). Fetched at run time and never committed — they are film
   excerpts, and pinning by hash is what keeps an upstream change from quietly moving the
   numbers. Runs nightly in the `Interop` workflow, and on a pull request that changes the decode
@@ -550,10 +558,21 @@ an AC-3 frame through a private `iclforge::ac3::FrameDecoder` and presents the r
 (independent, 0), and `decode_access_unit_core`'s existing §E3.8.2 combining - unchanged - lays
 the dependent's channels over it exactly as it would a normal Annex E bed. Measured against
 FFmpeg's own decode of the real FATE sample: 41.69 dB on the worst of the eight rendered
-channels, in the same range as every other spectral-extension-free sample in this corpus. No
-codec-config box is defined for the arrangement (`build_codec_config_box` returns nothing for
-it), so container muxing refuses it explicitly rather than emit a `dac3`/`dec3` box that
-contradicts its own `mdat`; `forge decode` remains the way to read one.
+channels, in the same range as every other spectral-extension-free sample in this corpus.
+
+Carrying one in a container was refused at first, on the reading that no box could describe it: a
+`dac3` has no field for the dependents and a `dec3` would have to call the core Annex E syntax.
+ETSI TS 102 366 Annex F says otherwise on both counts. F.1 asks for an EC3SampleEntry for every
+E-AC-3 bit stream, F.6.2.5 sets the box's `bsid` to "the same value as the bsid field in the
+independent substream" without limiting it to 16, and §E2.3.1.2 makes the core that independent
+substream. So `build_codec_config_box` writes the ordinary `dec3` with the core's `bsid`, and `forge
+mp4`, `fmp4` and `ts` carry the arrangement. FFmpeg 8.0.1 opens the MP4 as `ec-3`, 7.1, 672
+kbit/s and the transport streams as E-AC-3 7.1 in both profiles; `forge demux` returns the
+stream's bytes unchanged from each. What FFmpeg does not do is read the box's `chan_loc` (the
+layout comes out the same with the field zeroed), so that field is held to Table F.6.1's text and the unit test alone. Matroska stays
+refused: its registry has `A_AC3` for `bsid` 10 and below and `A_EAC3` for 11 to 16 (checked
+2026-10-10 against the codec registry on the specification's main branch), and no ID for a stream
+that is both.
 
 One more divergence was found and fixed rather than recorded:
 
@@ -567,6 +586,25 @@ One more divergence was found and fixed rather than recorded:
   exercises 3/1 (`millers_crossing_4.0.ac3`) went from decode-and-parse-only to a compared sample
   once the two decoders' channel orders agreed: channel 0 (L) at 48.93 dB, and a near-silent
   surround channel gated on absolute difference at a −46.0 dBFS floor (measured −55.31 dBFS).
+
+Annex C's karaoke reproduction has no outside oracle at all: it is informative, no decoder this
+project can run implements it, and there is no karaoke stream from anyone else. It is held to
+the annex's own tables instead - Table C.2.2's 3/0 columns coefficient by coefficient off an
+impulse in every karaoke `acmod` (and its 2/0 column against the Lo/Ro fold), then a coded 3/2
+stream flagged `bsmod` 7 decoded as coded and as Lk, Ck, Rk, sample for sample, and a 3/2 stream
+flagged as a main service shown to ignore the request. The karaoke-capable decoder's Table C.2.3
+is held the same way: its four listener choices, in both the 3/0 and the 2/0 reproduction (and the
+mono sum), are transcribed from the specification's page 105-106 into the tests and compared
+coefficient by coefficient, with a level pair (clev 0.5, slev 0.25) no cell could be mistaken for,
+and again over a coded stream through the decoder and through `forge decode`. That checks the code
+against the reading of the table, not the reading against anyone's decoder.
+
+The four modes with no preset were measured the same way against FFmpeg's decode of this
+encoder's own streams (a tone per channel, 192 kbit/s): 3/0 at 98.7 to 101.1 dB, 2/1 at 98.7 to
+101.1, 3/1 at 86.6 to 94.8, 2/2 at 86.6 to 94.8 and 3/0 with an LFE at 97.5 to 140.4, per
+channel, at zero lag. FFmpeg's channel masks for them (`0x7`, `0x103`, `0x107`, `0x603`, `0xF`)
+are the ones `decode` writes, except 2/2, which `decode` states with the back pair (`0x33`) and
+FFmpeg with the sides; both read back as L R Ls Rs.
 
 Two divergences are recorded rather than resolved:
 
@@ -612,11 +650,22 @@ only the in-repo decoder can read is checked against itself, not against anythin
 | E-AC-3 with enhanced coupling (`ecpl`) | no | yes |
 | E-AC-3 with transient pre-noise processing (`tpn`) | yes, without applying the correction | yes |
 | E-AC-3 `fscod2` half rates (24/22.05/16 kHz) | header only | yes |
+| E-AC-3 type 2 substream (`strmtyp` 2, "previously coded in AC-3") | yes | yes |
 | E-AC-3 with a second *independent* substream (two programmes) | no — and it poisons the first programme too | yes |
 | E-AC-3 with JOC objects (Atmos) | 5.1 bed only | yes, including the objects |
 
 AC-4 is not in this table because FFmpeg has no AC-4 decoder: every AC-4 stream is a "no" for its
 audio, and FFmpeg's demuxers are the only outside reader of its framing ([AC-4](#ac-4)).
+
+A **type 2 substream** (§E2.3.1.1) is a "yes" in both columns, and was a bug in one of them before
+it was checked: it swaps `convsync` for `blkid` and `frmsizecod` and, per Table E1.2 and E1.3's
+`strmtyp == 0x0` gates, sends neither the programme-mixing group nor the converter exponent and SNR
+elements, and this decoder read it with a type 0's gates. An encoder-written type 2 stream decodes
+in ffmpeg 8.0.1 to the samples of the same coding as type 0 (every sample within 2e-6, which is
+the mantissas the rate loop spends the saved bsi bits on) and `tools/references/eac3_parse.py`
+walks it consistently; the in-repo decoder, scan, accumulator and metadata editor now agree with
+both on where it begins and what it carries. The conversion to and from AC-3 that gives the type
+its name is not built, so there is nothing of it to check.
 
 Every "no" in that column is a cell where a generated stream has to be checked some other way,
 which is what [`tools/ci/fuzz_eac3_encoder_space.py`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/ci/fuzz_eac3_encoder_space.py)
@@ -767,16 +816,28 @@ confirmed on a session written segment-by-segment by the streaming writer, not o
 form. The `ceao` compatibility brand is present in the `ftyp` and every `styp` of an
 object-audio track and does not disturb that decode.
 
-What has **not** been checked against anything external is the *meaning* of the DASH signalling.
+The manifests' *structure* is held to ISO/IEC 23009-1's own schema. `tools/checks/verify_dash_schema.py`
+fetches MPEG's `DASHSchema` at a pinned commit (with the two W3C schemas it imports, all
+SHA-256-pinned, never committed), writes the manifests `forge fmp4` produces - an AC-3 5.1, an
+E-AC-3 stereo, a Dolby Atmos JOC stream with and without the 5.1 fallback, and an AC-4 from the
+committed baseline - and validates each, with a deliberately corrupted copy that the same validator
+must reject (a validator that cannot fail proves nothing). Checked 2026-10-10 against commit
+`cc941bd` with .NET's XSD 1.0 validator on Windows, and in `interop.yml` with `xmllint` (libxml2)
+the same day: all five valid and the control rejected under each. That covers element order and nesting, attribute types, required
+attributes and the URI and duration patterns - the parts FFmpeg's demuxer, which takes what it
+needs and ignores the rest, never tests.
+
+What has **not** been checked against anything external is the *meaning* of the DASH signalling,
+which the schema cannot see: it leaves a descriptor's `schemeIdUri` and `value` as free strings.
 `EC3_ExtensionType`/`EC3_ExtensionComplexityIndex` and the Dolby
 `audio_channel_configuration:2011` `@value` are transcribed from ETSI TS 103 420 clause D.2 and
 TS 102 366 clause I.1.2.1 (via DASH-IF IOP Part 8 v5.0.0 §5.3.2–5.3.3) and asserted against those
 clause texts in `libs/ac3/tests/test_fmp4.cpp`, including the element order ISO/IEC 23009-1's
 `RepresentationBaseType` sequence requires — but FFmpeg's DASH demuxer ignores supplemental
 descriptors entirely, so it confirms only that the manifest still parses and plays, not that a
-JOC-aware player would read the right complexity index from it. No MPD schema validator and no
-real DASH player has been run against these manifests. The same gap applies to the HLS
-`CHANNELS="<N>/JOC"` attribute, which predates this work.
+JOC-aware player would read the right complexity index from it. No real DASH player has been run
+against these manifests. The same gap applies to the HLS `CHANNELS="<N>/JOC"` attribute, which
+predates this work.
 
 The incremental writers are held to a stronger in-repo standard instead: `iclforge::containers::mp4::FragmentWriter`'s
 media segments are asserted byte-identical to `iclforge::containers::mp4::fragment`'s over the same frames, and its
@@ -1167,7 +1228,10 @@ measures its levels against full scale 1.0. Those and the other readings reconst
 `libs/ac4/ERRATA.md`, under "Reconstruction" and "The QMF domain". None of the streams here, from DEE
 or anyone else, sets `b_snf_data_exists`, so the noise fill is decoded from the text alone. A unit
 test (`libs/ac4/tests/decoder/test_noise_fill.cpp`) holds its levels, escape and draw order to
-Pseudocodes 22 and 23 on a hand-built track.
+Pseudocodes 22 and 23 on a hand-built track. The encoder's `experimental.noise_fill` writes it
+since, and the decoder brings back a band the rate quantised to zero to within 2 dB of the
+source's level and leaves a coded tone at unity gain (`libs/ac4/tests/encoder/test_encoder.cpp`),
+which checks the decoder against a writer built from the same reading, not an outside one.
 
 **Locally, over the census.** With `AC4_GOLDEN_DIR` and `AC4_STREAM_DIR` set, the same test
 compares the decoder with the Python parser's digests of any other set of streams. Over the 107 DEE
@@ -1604,11 +1668,12 @@ ASPX_ACPL_1 and A-CPL in stereo, and 7.0.4 and 7.1.4 with the back pair, 9.0.4 a
 screen pair (`b_5fronts`, in every immersive mode but A-JCC), ASPX_ACPL_1 and A-JCC in the immersive
 element are experimental options. Objects, as an A-JOC substream or direct-coded, are
 an experimental option too (phase E9), as is spectral noise fill, which gives each band that
-quantises to zero a level of its own (`experimental.noise_fill`), and the efficient high frame rate
+quantises to zero a level of its own (`experimental.noise_fill`), the efficient high frame rate
 mode, which sends each codec frame as two or four transmission frames
 (`experimental.frame_rate_fraction`; a constant rate; the decoder reassembles each unit into the
-frame the codec coded, and a test holds its output to the plain stream's at the audio frame rate).
-It shares
+frame the codec coded, and a test holds its output to the plain stream's at the audio frame rate),
+and 22.2 (`experimental.twenty_two_two`), the 22_2_channel_element of Part 2 clause 6.2.4.3 in
+SIMPLE and ASPX. It shares
 `libs/ac4/src/core`'s transforms, windows, codebooks, QMF banks and A-SPX tables and high frequency
 generator with the decoder, and writes the syntax through a transcription of the tables of its own.
 `forge ac4-encode` writes it raw or in MP4, with an option for each setting. Ten checks stand
@@ -1625,7 +1690,8 @@ paragraph on the objects follows them:
   5.1 and the 7.X layouts, the codec mode the rate picks, SIMPLE or ASPX forced or an A-CPL mode
   forced, the experimental tools, every frame rate, the rate modes, the I-frame options and each
   metadata option, in a case in eight the immersive layouts in each of their codec modes, and in a
-  case in ten one to twelve objects, and its `--check-envelope` holds each A-CPL mode's least rate. A refusal of a rate
+  case in twenty 22.2, and in a case in ten one to twelve objects, and its `--check-envelope` holds each
+  A-CPL mode's least rate. A refusal of a rate
   as too low for the frame rate and metadata counts only for frames under 400 bytes, and only if the
   same case at 400 bytes a frame encodes.
   The fuzz target reaches every A-CPL mode too, and phase E6's substreams and presentations: each
@@ -1649,7 +1715,13 @@ paragraph on the objects follows them:
 - **One tone per channel.** Encoded and decoded, each channel's tone comes back at unity gain on its
   own channel, 60 dB or more over every other tone there, the LFE's 47 Hz included: 5.0 and 5.1 in
   SIMPLE and ASPX, and 7.0 and 7.1 in each of the three 7.X layouts (`test_encoder.cpp`, and
-  through `forge` in the WAV order `decode` writes). Noise above the crossover in one channel comes
+  through `forge` in the WAV order `decode` writes); and 22.2, 24 tones that are primes, none on
+  another's harmonic, in SIMPLE and ASPX at native, 25 and 50 fps and at 44.1 kHz, each at unity
+  gain within 0.2 dB and 60 dB over the 23 others (`test_twenty_two_two.cpp`), and through `forge
+  ac4-encode` and `decode` at `md-compat=7` in the WAV order. Music-like noise (a falling spectrum, each
+  pair sharing 0 to 100 % of its power) decodes in 22.2 with an SNR floor per pair of Table 21 of 11 to 12
+  dB in SIMPLE at 70 kbps a channel and 6 to 8 dB in ASPX at 40, and 32 and 25 dB for the LFEs, which
+  is where the 5.1 path lands on the same noise (11.8 to 12.9 dB at 70 kbps a channel). Noise above the crossover in one channel comes
   back in that channel alone, so each `aspx_data` element carries the channels Part 1 Table 213 gives
   it. In the A-CPL modes, whose parameters rebuild the channels band by band, a tone at the centre of
   each channel's own parameter band comes back within 0.5 dB, 40 dB over every other tone, in

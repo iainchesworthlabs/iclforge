@@ -123,40 +123,41 @@ void SessionDriver::read_loop() {
 }
 
 void SessionDriver::write_loop() {
-    std::unique_lock lock(*mutex_);
-    Steady::time_point due = after(session_.next_tick_us());
-    while (!ended_) {
-        if (!queue_.empty()) {
-            transport::Frame frame = std::move(queue_.front());
-            queue_.pop_front();
-            queued_bytes_ -= frame.bytes.size();
-            lock.unlock();
-            const bool sent = frame.kind == transport::FrameKind::kText ? connection_->send_text(frame.text())
-                                                                         : connection_->send_binary(frame.bytes);
-            lock.lock();
-            if (!sent) {
-                end_locked();
+    {
+        std::unique_lock lock(*mutex_);
+        Steady::time_point due = after(session_.next_tick_us());
+        while (!ended_) {
+            if (!queue_.empty()) {
+                transport::Frame frame = std::move(queue_.front());
+                queue_.pop_front();
+                queued_bytes_ -= frame.bytes.size();
+                lock.unlock();
+                const bool sent = frame.kind == transport::FrameKind::kText ? connection_->send_text(frame.text())
+                                                                             : connection_->send_binary(frame.bytes);
+                lock.lock();
+                if (!sent) {
+                    end_locked();
+                }
+                continue;
             }
-            continue;
+            if (closing_) {
+                break;
+            }
+            if (changed_) {
+                // A session call can bring the next tick forward, and never pushes it back.
+                changed_ = false;
+                due = std::min(due, after(session_.next_tick_us()));
+            }
+            if (Steady::now() >= due) {
+                deliver(session_.tick(), lock);
+                due = after(session_.next_tick_us());
+                continue;
+            }
+            wake_.wait_until(lock, due, [this] { return ended_ || changed_ || !queue_.empty(); });
         }
-        if (closing_) {
-            break;
-        }
-        if (changed_) {
-            // A session call can bring the next tick forward, and never pushes it back.
-            changed_ = false;
-            due = std::min(due, after(session_.next_tick_us()));
-        }
-        if (Steady::now() >= due) {
-            deliver(session_.tick(), lock);
-            due = after(session_.next_tick_us());
-            continue;
-        }
-        wake_.wait_until(lock, due, [this] { return ended_ || changed_ || !queue_.empty(); });
+        end_locked();
     }
-    end_locked();
-    lock.unlock();
-    // Ends the reader's receive().
+    // Ends the reader's receive(), with the lock released.
     connection_->close();
 }
 

@@ -1,6 +1,6 @@
 # Programme mixing metadata (mixmdate, Table E1.2)
 
-!!! note "Status as of 2026-09-30: Phases 1 and 2 built, Phases 3 to 5 not"
+!!! note "Status as of 2026-10-11: Phases 1, 2, 5 and 6 built; Phases 3 and 4 not"
     Written 2026-09-22 after a full review of the current implementation. The headline finding:
     the wire format itself is **already correct and complete**, on both the encoder and the
     decoder, including every `mixdef` variant, pan and per-block mixing configuration. Nothing in
@@ -16,12 +16,17 @@
     syntax has one per block of the syncframe, so its streams were also undecodable at
     `numblkscod` 1 and 2. The loop now runs once per block of the syncframe.
 
+    **Built 2026-10-11.** Phase 5, `iclforge::ac3::AssociatedServiceMixer`
+    (`decoder/associated_service.hpp`, with `meta::pgm_scale_gain()` and
+    `meta::external_scale_gain()`), and Phase 6's first half, `forge decode associated=`. Reading
+    the spec text this plan was written without changed its design in three ways, recorded under
+    Phase 5. The decoder itself still does not use the group's values: a single-programme decode
+    ignores `pgmscl`, as FFmpeg does, and mixing is a separate step over two decodes.
+
     **Not built.** Phase 3 (the C API and Python bindings: the C header and the Python bindings
     still say the group is not mirrored), Phase 4 (a decode-side summary in `ac3gui`, which has no
-    reference to the group's fields beyond the encoder page's three controls) and Phase 5
-    (`AssociatedServiceMixer`: there is no `associated_service.hpp`, no
-    `pgm_scale_gain()` and no `tests/decoder/test_associated_service_mixer.cpp`). Phase 6, the CLI
-    wiring, has not started, and nothing in the decoder uses the group's values. `ac3cli probe`
+    reference to the group's fields beyond the encoder page's three controls) and the live half of
+    Phase 6: `monitor`, `play` and Hearth do not mix a second programme in. `ac3cli probe`
     stays lightweight, as Decision 2 recommended.
 
     What is missing is everything built *on top of* that correct core: CLI/JSON reporting stops
@@ -191,9 +196,29 @@ encode-side widgets.
 
 ### Phase 5 — Decode-time associated-service mixing
 
-**Status: not built.** `libs/ac3/include/iclforge/ac3/decoder/associated_service.hpp`, its source, the two gain helpers in
-`mixing.hpp` and the mixer's tests do not exist. The two readings under "Before writing the pan-law/premix-scale code"
-are unchecked, and Decision 3 is open.
+**Status: built (2026-10-11).** `libs/ac3/include/iclforge/ac3/decoder/associated_service.hpp`,
+`libs/ac3/src/decoder/associated_service.cpp`, the two gain helpers in `mixing.hpp`, and
+`libs/ac3/tests/decoder/test_associated_service.cpp` and `test_associated_service_stream.cpp`.
+What the design below got wrong, found by reading A/52:2018 §E3.10 and Tables E3.15 to E3.17,
+which this plan was written without:
+
+- **The gains are symmetric, not the associated programme's alone.** §E3.10.1 says `pgmscl` scales
+  the programme "carried in the same substream", and §E3.10.2 that `extpgmscl` scales the one "in
+  a different bitstream or substream", with the worked example of a description's `extpgmscl`
+  ducking the main. So each programme's `pgmscl` scales itself, each one's `extpgmscl` and
+  per-channel scales scale the other, and they add in dB (§E3.10.6). The "one programme's metadata
+  only" decision below is withdrawn.
+- **The pan law is the spec's, not invented.** Tables E3.15 (stereo), E3.16 and E3.17 (5.1) give
+  the scale factors at every `panmean`; the constant-power law over BS.775 azimuths below is
+  replaced by them, and only a main those tables do not cover (3.0, quad, 7.1) uses an extension.
+  `panmean` runs clockwise (the right speaker at index 20, 30 degrees), which settles that open
+  reading.
+- **There is no premix compression to apply.** §E2.3.1.21 says decoders "are not required to use"
+  `premixcmpsel`, `drcsrc` and `premixcmpscl`, and §E3.10.3 that the model they were written for
+  "is not supported by the E-AC-3 mixing model". Table E2.7 lists codes 0 to 5 and 7 (100%) and
+  has no code 6, so the clamp question below does not arise either.
+
+The text below is the plan as first written.
 
 The one new feature. Full design (produced via a dedicated design pass, included in
 full below the phase list) recommends a small, stateful, **post-decode, PCM-domain** component:
@@ -248,7 +273,7 @@ New files: `libs/ac3/include/iclforge/ac3/decoder/associated_service.hpp`,
 gain helpers), `CMakeLists.txt`/`tests/CMakeLists.txt` (registration), `docs/library/decoding.md`
 (new subsection), `docs/library/capabilities.md` (Metadata table + Decoding section).
 
-**Before writing the pan-law/premix-scale code**: locate the licensed spec text
+**Before writing the pan-law/premix-scale code** (done: see the status above): locate the licensed spec text
 (`docs/spec/A52-2018.txt`, gitignored — not present in this worktree; a prior session found a copy
 in a sibling worktree, so check there first rather than re-sourcing) and confirm two specific
 readings the design had to assume without it:
@@ -271,7 +296,11 @@ block-boundary click-avoidance check.
 
 ### Phase 6 (not this plan) — CLI wiring for the mixer
 
-**Status: not started**, and it waits on Phase 5.
+**Status: the `decode` half is built (2026-10-11); the live half is not.** `forge decode associated=<0..7>|<service>`
+and `associated-gain=<dB>` mix a second programme into the one being decoded, and a service name is
+resolved against each programme's `bsmod` (A/52 Table 5.7 and TS 103 190-1 Table 91 number the
+services alike, so AC-4's `associated=` names work for E-AC-3 too). `monitor` and `play` do not
+mix, and neither selects a programme at all yet.
 
 Once Phase 5 lands, a natural follow-on is `ac3cli decode associated=<id> ...` to actually invoke
 it end to end. Deliberately not built here, per Phase 5's own scope boundary — keeps that PR
@@ -283,7 +312,7 @@ reviewable as one self-contained unit.
 |---|---|---|---|
 | 1 | GUI: read-only decode summary only (Phase 4), or full nested authoring UI for `mixdef==kExtended`'s sub-fields and `blkmixcfginfo`? | Read-only summary now; defer authoring UI | Full UI is a large, largely-unused surface (this is the deepest, least-common corner of the metadata space) for an audience CLI already serves |
 | 2 | Extend `ac3cli probe`'s `ProbeReport`/`FrameHeader` structs to carry the full field set, or leave probe lightweight? | Leave it lightweight; `ac3cli decode` (post-Phase-1) and Hearth's JSON (also post-Phase-1) already cover deep inspection, including machine-parseable JSON for automation | Extending probe duplicates that reporting path in a third place for marginal benefit |
-| 3 | Table E2.7 code 7 and `panmean` handedness (Phase 5) | Confirm against `docs/spec/A52-2018.txt` before writing the affected code, per the note above | Shipping the assumed reading risks a silent, hard-to-notice mirroring/clamping bug |
+| 3 | Table E2.7 code 7 and `panmean` handedness (Phase 5) | **Settled 2026-10-11 from the text:** Table E2.7 has no code 6 and lists 7 as 100%; `panmean` runs clockwise from the centre, 1.5 degrees an index (§E2.3.1.54, §E3.10.8). Premix compression is not applied at all | Shipping the assumed reading risks a silent, hard-to-notice mirroring/clamping bug |
 
 ## What cannot be verified and why
 

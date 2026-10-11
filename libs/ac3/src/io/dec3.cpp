@@ -1,12 +1,14 @@
 #include "iclforge/ac3/io/dec3.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <fmt/format.h>
 #include <string>
 #include <vector>
 
+#include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/types.hpp"
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
@@ -30,23 +32,43 @@ namespace {
     return static_cast<std::uint32_t>(fscod_family(sr));
 }
 
+// Table F.6.1's chan_loc: nine locations "beyond the standard 5.1 channels",
+// bit 0 in the least significant position and LFE2 in the most. The names are
+// Table E2.5's own, so this renames bit positions rather than translating -
+// A/52's chanmap word counts from the other end (Left is its most significant
+// bit) and has one location, the Lts/Rts pair, that Annex F's table has no bit
+// for. A location the table cannot name is left out, as F.6.2.13 leaves out a
+// replacement channel: the field says which extra locations the dependents
+// add, and a player opens the track with the channel count the sample entry
+// carries either way.
+[[nodiscard]] std::uint32_t chan_loc_from(std::uint16_t channel_map) {
+    using namespace eac3::chanmap;
+    constexpr std::array<std::uint16_t, 9> kLocations = {
+        kLcRcBit, kLrsRrsBit, kCsBit, kTsBit, kLsdRsdBit, kLwRwBit, kVhlVhrBit, kVhcBit, kLfe2Bit};
+    std::uint32_t loc = 0;
+    for (std::size_t bit = 0; bit < kLocations.size(); ++bit) {
+        if ((channel_map & kLocations[bit]) != 0) {
+            loc |= 1U << bit;
+        }
+    }
+    return loc;
+}
+
 }  // namespace
 
-std::vector<std::byte> build_codec_config_box(const ScannedStream& stream) {
+std::vector<std::byte> build_codec_config_box(const ScannedStream& stream,
+                                              BoxProgrammes programmes) {
     BitWriter w;
 
-    // §E2.3.1.2's legacy core has no codec-config box defined for it. An
-    // AC3SpecificBox describes one AC-3 syncframe and has no field that can
-    // mention the Annex E dependents at all; an EC3SpecificBox's bsid field
-    // would have to claim the independent substream is Annex E syntax when it
-    // is an AC-3 frame. Neither is a description of what is in mdat, and
-    // guessing one produces a file whose header contradicts its payload -
-    // so this returns nothing and leaves the muxer to refuse the stream
-    // (apps/forge/cli/src/commands/containers.cpp does, before ever reaching here).
-    if (stream.kind == StreamKind::kAc3CoreEac3Extension) {
-        return {};
-    }
-
+    // §E2.3.1.2's legacy core - an AC-3 syncframe with Annex E dependents
+    // behind it - takes the EC3SpecificBox below. An AC3SpecificBox describes
+    // one AC-3 syncframe and has no field for the dependents, but the E-AC-3
+    // box does not need the independent substream to be Annex E syntax:
+    // §E2.3.1.2 makes the AC-3 frame "an independent substream assigned
+    // substream ID 0" of the E-AC-3 stream, and ETSI TS 102 366 F.6.2.5 sets
+    // bsid to "the same value as the bsid field in the independent substream",
+    // which for the core is its own 6 or 8. The stream's scalar fields already
+    // describe the core (ScannedStream's own comment), so it falls through.
     if (stream.kind == StreamKind::kAc3) {
         // ETSI TS 102 366 Annex F §F.4 AC3SpecificBox: fscod(2) + bsid(5) +
         // bsmod(3) + acmod(3) + lfeon(1) + bit_rate_code(5) + reserved(5) =
@@ -74,80 +96,104 @@ std::vector<std::byte> build_codec_config_box(const ScannedStream& stream) {
     // what iclforge::ac3::eac3::frame_words() fixes per bitrate for this project's CBR
     // encoder, so the first access unit's own size is the exact rate, not an
     // estimate: kbps = bytes * 8 * sample_rate / samples_per_frame / 1000.
-    const auto first_unit_bytes =
-        stream.access_units.empty() ? std::size_t{0} : stream.access_units.front().size();
+    //
+    // F.6.2.2 calls it the rate "of the entire bitstream ... the sum of the
+    // data rates of all the substreams", so for a track holding every
+    // programme (kAll) each one's first unit counts and not the lead's alone.
+    // A ScannedStream without a programme list (one built by hand) is the lead
+    // programme and nothing else.
+    const bool all = programmes == BoxProgrammes::kAll;
+    std::size_t first_unit_bytes = 0;
+    if (all && stream.programmes.size() > 1) {
+        for (const auto& programme : stream.programmes) {
+            if (!programme.access_units.empty()) {
+                first_unit_bytes += programme.access_units.front().size();
+            }
+        }
+    } else if (!stream.access_units.empty()) {
+        first_unit_bytes = stream.access_units.front().size();
+    }
     const std::uint64_t data_rate_bps = static_cast<std::uint64_t>(first_unit_bytes) * 8 *
                                         sample_rate_hz(stream.sample_rate);
     constexpr std::uint64_t kDenominator = static_cast<std::uint64_t>(kSamplesPerFrame) * 1000;
     const std::uint64_t data_rate_kbps =
         first_unit_bytes == 0 ? 0 : (data_rate_bps + kDenominator / 2) / kDenominator;
-    // §F.6's data_rate is 13 bits (max 8191); E-AC-3's own ceiling (§E1.3.1.5,
-    // 6144 kbps) never reaches it, so clamping here is a defensive backstop,
-    // not a real-world case.
+    // §F.6's data_rate is 13 bits (max 8191); one programme at E-AC-3's own
+    // ceiling (§E1.3.1.5, 6144 kbps) fits, eight of them would not, so this
+    // clamp is a backstop rather than a case anyone meets.
     constexpr std::uint32_t kMaxDataRate = (1U << 13) - 1;
     w.put(static_cast<std::uint32_t>(std::min<std::uint64_t>(data_rate_kbps, kMaxDataRate)), 13);
-    // num_ind_sub: ONE, encoded as 0 (the field counts "one less than" the
-    // substream count, mirroring frmsiz's own "value plus one" convention
-    // elsewhere in this syntax).
-    //
-    // §F.6 does repeat the per-substream block for each independent substream,
-    // and a stream may carry up to eight (§E2.3.1.2) - but this box describes
-    // whatever went into the track, and what goes into the track is
-    // ScannedStream::access_units, which is the FIRST programme's units alone
-    // (see its own comment: two programmes are alternatives, not layers, and
-    // splicing their units into one track is not something a player can
-    // undo). Carrying every programme in one track, with num_ind_sub > 1 and
-    // a per-substream block each, is the MPEG-TS broadcast profiles' job together with the
-    // service granularity the Annex D fields supply - the two have to arrive together,
-    // since a box declaring programmes the track does not contain is worse
-    // than one describing what it does.
-    w.put(0, 3);  // num_ind_sub
 
-    // The programme those access units belong to - the same one every scalar
-    // field on ScannedStream describes.
-    const ScannedProgramme absent{};
-    const ScannedProgramme& programme =
-        stream.programmes.empty() ? absent : stream.programmes.front();
-    w.put(box_fscod(stream.sample_rate), 2);            // fscod
-    w.put(static_cast<std::uint32_t>(stream.bsid), 5);  // bsid
-    w.put(0, 1);                                        // reserved
-    // asvc: the associated-service flag. A/52 §5.4.2.2 puts the service type
-    // in bsmod - CM/ME are main services, VI/HI/D/C/E are associated, and
-    // code 7 is voice-over (associated) at acmod 1/0 but karaoke (a MAIN
-    // service) everywhere else, Table 5.7's one acmod-dependent split. So
-    // this is exactly "is this programme's own bsmod an associated one, per
-    // Table 5.7", read off the bitstream rather than assumed - which for the
-    // ordinary main-service stream still comes out 0, as it always did.
-    w.put(meta::is_associated_service(static_cast<meta::BitstreamMode>(programme.bsmod),
-                                      programme.acmod)
-              ? 1U
-              : 0U,
-          1);  // asvc
-    w.put(static_cast<std::uint32_t>(stream.bsmod), 3);  // bsmod
-    w.put(static_cast<std::uint32_t>(stream.acmod), 3);  // acmod
-    w.put(stream.lfe ? 1U : 0U, 1);                      // lfeon
-    w.put(0, 3);                                         // reserved
-    // substreams_per_unit counts every substream of the first access unit,
-    // independent one included (ScannedStream's own comment) - so the
-    // dependent count is one less, floored at 0 for a stream scan() rejected
-    // before ever reaching here (it never returns with substreams_per_unit
-    // == 0 on success, but this keeps the subtraction defined regardless).
-    const auto num_dep_sub =
-        stream.substreams_per_unit > 0 ? stream.substreams_per_unit - 1 : std::size_t{0};
-    w.put(static_cast<std::uint32_t>(num_dep_sub), 4);  // num_dep_sub
-    if (num_dep_sub > 0) {
-        // chan_loc: Annex F's own per-location channel bitmap - a DIFFERENT
-        // vocabulary from this project's internal Table E2.5 chanmap
-        // locations (eac3::chanmap), and deliberately not translated into it
-        // in this first cut (see this file's own PR description). No audio
-        // is misdescribed by leaving it 0: the sample entry's channelcount
-        // (iclforge::containers::mp4::AudioTrack::channels, Table E2.5-derived and exact) is what a
-        // player actually opens the file with, and the elementary stream in
-        // mdat is unaffected either way - only this one informational field
-        // undercounts which extra positions the dependent(s) add.
-        w.put(0, 9);  // chan_loc
-    } else {
-        w.put(0, 1);  // reserved
+    // One block per independent substream (§F.6.1's loop over num_ind_sub + 1).
+    // The lead programme's block comes from the stream's own scalar summary, as
+    // it always did, and each further programme's from its ScannedProgramme.
+    // Programmes are listed in ascending substreamid order and §E2.3.1.2
+    // numbers them sequentially, which makes the count of blocks the same
+    // number F.6.2.3 calls "the substreamID value of the last independent
+    // substream". A box declaring programmes the track does not hold would be
+    // worse than one describing what it does, so kLead - the pairing with
+    // ScannedStream::access_units - declares one, and kAll is for a track
+    // built from all_programme_access_units().
+    const std::size_t independent =
+        all ? std::clamp<std::size_t>(stream.programmes.size(), std::size_t{1}, std::size_t{8})
+            : std::size_t{1};
+    w.put(static_cast<std::uint32_t>(independent - 1), 3);  // num_ind_sub
+
+    for (std::size_t i = 0; i < independent; ++i) {
+        const ScannedProgramme absent{};
+        const ScannedProgramme& programme =
+            i < stream.programmes.size() ? stream.programmes[i] : absent;
+        const bool lead = i == 0;
+        const auto bsid = static_cast<std::uint32_t>(lead ? stream.bsid : programme.bsid);
+        const auto bsmod = static_cast<std::uint32_t>(lead ? stream.bsmod : programme.bsmod);
+        const auto acmod = static_cast<std::uint32_t>(lead ? stream.acmod : programme.acmod);
+        const bool lfe = lead ? stream.lfe : programme.lfe;
+        const std::size_t units = lead ? stream.substreams_per_unit : programme.substreams_per_unit;
+        const std::uint16_t map = lead ? stream.channel_map : programme.channel_map;
+
+        w.put(box_fscod(stream.sample_rate), 2);  // fscod
+        // F.6.2.5: "the same value as the bsid field in the independent
+        // substream" - whatever that substream is, which for a legacy core
+        // is the AC-3 frame's own 6 or 8. Nothing in F.6 limits the field to
+        // 16, and F.1 asks for an EC3SampleEntry for every E-AC-3 bit stream.
+        w.put(bsid, 5);  // bsid
+        w.put(0, 1);     // reserved
+        // asvc: the associated-service flag. A/52 §5.4.2.2 puts the service type
+        // in bsmod - CM/ME are main services, VI/HI/D/C/E are associated, and
+        // code 7 is voice-over (associated) at acmod 1/0 but karaoke (a MAIN
+        // service) everywhere else, Table 5.7's one acmod-dependent split. So
+        // this is exactly "is this programme's own bsmod an associated one, per
+        // Table 5.7", read off the bitstream rather than assumed - which for the
+        // ordinary main-service stream still comes out 0, as it always did.
+        w.put(meta::is_associated_service(static_cast<meta::BitstreamMode>(bsmod),
+                                          static_cast<Acmod>(acmod))
+                  ? 1U
+                  : 0U,
+              1);               // asvc
+        w.put(bsmod, 3);        // bsmod (F.6.2.8: 0 when the substream sends none)
+        w.put(acmod, 3);        // acmod
+        w.put(lfe ? 1U : 0U, 1);  // lfeon
+        w.put(0, 3);            // reserved
+        // substreams_per_unit counts every substream of the first access unit,
+        // independent one included (ScannedStream's own comment) - so the
+        // dependent count is one less, floored at 0 for a stream scan() rejected
+        // before ever reaching here (it never returns with substreams_per_unit
+        // == 0 on success, but this keeps the subtraction defined regardless).
+        const std::size_t num_dep_sub =
+            units > 0 ? std::min<std::size_t>(units - 1, std::size_t{15}) : std::size_t{0};
+        w.put(static_cast<std::uint32_t>(num_dep_sub), 4);  // num_dep_sub
+        if (num_dep_sub > 0) {
+            // chan_loc (F.6.2.13): the locations the dependents add beyond
+            // 5.1. Every location Table F.6.1 has a bit for is one a 5.1 bed
+            // cannot hold, so the programme's whole location word gives the
+            // answer without having to subtract the bed. Left at zero this
+            // was no harmless omission: F.5.2 has a player IGNORE the sample
+            // entry's ChannelCount, which makes this field - with acmod and
+            // lfeon - the only description of the layout the box carries.
+            w.put(chan_loc_from(map), 9);  // chan_loc
+        } else {
+            w.put(0, 1);  // reserved
+        }
     }
 
     if (stream.oba_complexity_index.has_value()) {

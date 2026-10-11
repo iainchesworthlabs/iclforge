@@ -34,6 +34,11 @@
 // runs on the family's one FFT, whose float rounding differs from the radix-4/2 kernel's, and
 // these six streams quantise differently. The double build's streams did not move.
 //
+// Re-pinned 2026-10-10 (eac3_stereo only): choose_delta_segments breaks a tie between equal
+// corrections in band order instead of leaving it to std::nth_element, so the frame in which
+// more than eight runs qualify keeps the same eight on every standard library. The other five
+// streams did not move. The host build, arm-none-eabi and the ESP32-S3 all print the new value.
+//
 // What a hash match establishes and what it does not: it says the target's
 // encoder produced the same bitstream the host's did from the same input. It
 // does NOT say either is correct - testdata/bitstream-hashes.json and the
@@ -95,7 +100,7 @@ inline constexpr std::uint64_t kAc3StereoHash = 17450847519567711795ULL;
 // two together say what the tool costs - in peak bytes and, under --icount,
 // in instructions - at the same input. 768 bytes an access unit, 4,608 for six.
 inline constexpr std::size_t kEac3StereoBytes = 4608;
-inline constexpr std::uint64_t kEac3StereoHash = 8189348635516293543ULL;
+inline constexpr std::uint64_t kEac3StereoHash = 9819896355108524771ULL;
 
 // E-AC-3 2/0 at 192 kbit/s with standard coupling, spectral extension and the
 // adaptive hybrid transform all in use - the tools the 5.1 row above never

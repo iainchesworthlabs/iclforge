@@ -535,6 +535,44 @@ TEST_CASE("scan reads an AC-3 core with E-AC-3 extension substreams", "[elementa
     CHECK(scanned->bsid == 8);
 }
 
+// ETSI TS 102 366 Annex F: an E-AC-3 bit stream is identified by an
+// EC3SampleEntry (F.1), and its EC3SpecificBox's bsid, acmod and lfeon are "the
+// same value as" the independent substream's own (F.6.2.5, F.6.2.9, F.6.2.10).
+// §E2.3.1.2 makes the legacy core's AC-3 frame that independent substream, so
+// the box is the ordinary dec3 with the core's bsid in it, not an empty one.
+TEST_CASE("dec3 describes an AC-3 core with E-AC-3 extension substreams", "[elementary][dec3]") {
+    const auto stream = legacy_core_stream(2);
+    const auto scanned = iclforge::ac3::io::scan(stream);
+    REQUIRE(scanned.has_value());
+    REQUIRE(scanned->kind == iclforge::ac3::io::StreamKind::kAc3CoreEac3Extension);
+
+    const auto box = iclforge::ac3::io::build_codec_config_box(*scanned);
+    // data_rate(13) num_ind_sub(3), one 32-bit block (a dependent follows, so
+    // chan_loc rather than a reserved bit), then the Atmos-extension byte.
+    REQUIRE(box.size() == 2 + 4 + 1);
+    const auto bits = [&box](std::size_t at, std::size_t count) {
+        std::uint32_t value = 0;
+        for (std::size_t i = 0; i < count; ++i) {
+            const std::size_t pos = at + i;
+            const auto byte = std::to_integer<std::uint32_t>(box[pos / 8]);
+            value = (value << 1) | ((byte >> (7 - pos % 8)) & 1U);
+        }
+        return value;
+    };
+    // F.6.2.2: the rate of the whole unit, core and dependent together.
+    const std::uint64_t unit_bytes = scanned->access_units.front().size();
+    CHECK(bits(0, 13) == (unit_bytes * 8 * 48000 + 768000) / (1536 * 1000));
+    CHECK(bits(13, 3) == 0);  // one independent substream
+    CHECK(bits(16, 2) == 0);  // fscod 48 kHz
+    CHECK(bits(18, 5) == 8);  // bsid: the AC-3 core's own, not the dependent's 16
+    CHECK(bits(28, 3) == static_cast<std::uint32_t>(iclforge::ac3::Acmod::k3_2));
+    CHECK(bits(31, 1) == 1);  // lfeon
+    CHECK(bits(35, 4) == 1);  // num_dep_sub: the 7.1 dependent
+    // Table F.6.1: the dependent adds the Lrs/Rrs pair, bit 1, and nothing
+    // else (its Ls/Rs replace the core's, which F.6.2.13 leaves out).
+    CHECK(bits(39, 9) == 0b000000010);
+}
+
 TEST_CASE("scan refuses substream arrangements it does not model", "[elementary]") {
     using iclforge::ac3::io::ScanError;
 

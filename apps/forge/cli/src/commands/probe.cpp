@@ -22,6 +22,7 @@
 #include "../support.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
+#include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/decoder/syntax_trace.hpp"
@@ -85,6 +86,20 @@ void print_range(std::string_view label, const io::MinMax& range, std::string_vi
     fmt::println("{:<16}{}{} .. {}{}", label, range.min, unit, range.max, unit);
 }
 
+// §E2.3.1.65: what a type 2 substream says about the AC-3 syncframe it was
+// converted from - Table 5.18's frame size code, and the rate it names.
+std::string converted_from(const std::optional<int>& frmsizecod) {
+    if (!frmsizecod.has_value()) {
+        return {};
+    }
+    const auto index = static_cast<std::size_t>(*frmsizecod >> 1);
+    if (index >= iclforge::ac3::kBitratesKbps.size()) {
+        return fmt::format(", from AC-3 frmsizecod {} (reserved)", *frmsizecod);
+    }
+    return fmt::format(", from AC-3 frmsizecod {} ({} kbit/s)", *frmsizecod,
+                       iclforge::ac3::kBitratesKbps[index]);
+}
+
 void print_container(const iclforge::apps::ContainerFacts& facts);
 
 void print_table(std::string_view path, const io::ProbeReport& report,
@@ -122,9 +137,9 @@ void print_table(std::string_view path, const io::ProbeReport& report,
         if (sub.chanmap.has_value()) {
             chanmap = fmt::format("chanmap 0x{:04x}", *sub.chanmap);
         }
-        fmt::println("  {:<14}{} id {}, {}, {} syncframe(s), {}", "", strmtyp_token(sub.strmtyp),
+        fmt::println("  {:<14}{} id {}, {}, {} syncframe(s), {}{}", "", strmtyp_token(sub.strmtyp),
                      sub.substreamid, iclforge::ac3::analysis::layout_name(sub.acmod, sub.lfe),
-                     sub.syncframes, chanmap);
+                     sub.syncframes, chanmap, converted_from(sub.converted_frmsizecod));
     }
 
     fmt::println("{:<16}{} ({} syncframe(s)), {} bytes", "access units", report.access_units,
@@ -252,7 +267,7 @@ void print_access_unit(const io::ProbeAccessUnit& unit, Detail detail) {
     fmt::println("access unit {} @ {} ({} bytes, t={:.4f}s)", unit.index, unit.byte_offset,
                  unit.bytes, unit.start_seconds);
     for (const auto& frame : unit.syncframes) {
-        fmt::println("  {} id {} @ {}: {} bytes, {}, {}, dialnorm {} dB{}{}",
+        fmt::println("  {} id {} @ {}: {} bytes, {}, {}, dialnorm {} dB{}{}{}",
                      strmtyp_token(frame.header.strmtyp), frame.header.substreamid,
                      frame.byte_offset, frame.header.bytes,
                      iclforge::ac3::analysis::layout_name(frame.header.acmod, frame.header.lfe),
@@ -260,6 +275,7 @@ void print_access_unit(const io::ProbeAccessUnit& unit, Detail detail) {
                      dialnorm_db(frame.header.dialnorm),
                      frame.header.compr ? fmt::format(", compr {}", *frame.header.compr)
                                         : std::string{},
+                     converted_from(frame.header.converted_frmsizecod),
                      frame.authenticity_tag ? ", signed" : "");
         if (frame.parse_error.has_value()) {
             fmt::println("    parse error: {}", iclforge::ac3::describe(*frame.parse_error));

@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 102> kOptionTokens{{
+constexpr std::array<OptionToken, 106> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -49,8 +49,11 @@ constexpr std::array<OptionToken, 102> kOptionTokens{{
     {"keep-partial", "keep a failed run's already-encoded frames as <name>.partial.<ext>"},
     {"sign-objects", "write a keyed EMDF object signature (needs signing-key=)"},
     {"verify-objects", "check each frame's EMDF object signature instead of just decoding"},
+    {"gate-objects", "play objects only where the EMDF signature verifies, the bed elsewhere"},
     {"mix-lfe", "decode/monitor: fold the LFE into the §7.8 output-stage downmix too"},
     {"mix-lfe=", "decode/monitor: on, or off to keep the LFE out of a downmix, as AC-4's is not by default"},
+    {"karaoke", "decode: an AC-3 karaoke stream (Annex C) as a karaoke-aware decoder plays it - L, C, R"},
+    {"karaoke=", "decode: on or aware; none, v1, v2 or v1+v2 for the karaoke-capable decoder's vocals; off (the default)"},
     {"fast-mdct", "names the default forward MDCT (the fast §7.9.4 path)"},
     {"fast-imdct", "names the default inverse MDCT (the fast §7.9.4 step 3)"},
     {"quiet", "no status output at all - errors and the payload only"},
@@ -85,11 +88,15 @@ constexpr std::array<OptionToken, 102> kOptionTokens{{
     {"presentation=", "decode of AC-4: the presentation at this position of the table of contents"},
     {"presentation-id=", "decode of AC-4: the presentation with this presentation_id"},
     {"language=", "decode of AC-4: prefer the presentation in this language, a BCP 47 tag"},
-    {"associated=", "decode of AC-4: prefer the presentation with this associated audio service"},
+    {"associated=", "decode of AC-4: prefer the presentation with this associated audio service; "
+                    "decode and monitor of E-AC-3: mix that programme (a substream id 0..7, or a "
+                    "service name its bsmod labels) into the one being decoded or played, §E3.10"},
     {"dialogue-gain=", "decode of AC-4: g_dialog, the dialogue against music and effects, dB"},
-    {"associated-gain=", "decode of AC-4: g_assoc, the associated audio's level, 0 dB or less"},
+    {"associated-gain=", "decode of AC-4: g_assoc, the associated audio's level, 0 dB or less; "
+                         "decode and monitor of E-AC-3: the same trim on the programme "
+                         "associated= mixes in"},
     {"headphones", "decode of AC-4: a listener on headphones - their DRC mode, pre-virtualized presentations"},
-    {"md-compat=", "decode of AC-4: the md_compat level the decoder claims, 0 to 7 (default 3)"},
+    {"md-compat=", "decode of AC-4: the md_compat level the decoder claims, 0 to 7 (default 7)"},
     {"syntax-trace=", "ac4-encode, and decode of AC-4: write every syntax element written or read"},
     {"codec-mode=", "ac4-encode: simple, aspx, aspx-acpl-1 to 3, and for 5.1.4 scpl, aspx-scpl or aspx-ajcc"},
     {"experimental=", "ac4-encode: tools and layouts no outside reader has checked yet"},
@@ -151,11 +158,16 @@ constexpr std::array<OptionToken, 102> kOptionTokens{{
     {"json=", "probe: emit the JSON document instead of the human table"},
     {"detail=", "probe: frames or blocks - add per-access-unit/per-block detail"},
     {"fallback-51", "fmp4: also write the object-stripped 5.1 companion rendition"},
+    {"insert", "metadata: add a field the stream does not carry (compr=, compr2=, bsmod=, "
+               "dsurmod=) instead of refusing it - E-AC-3 independent substreams only, and "
+               "every syncframe that gains one grows by a word or two"},
     {"mainid=", "ts: this service's A/52 Annex A main-service number"},
     {"asvc=", "ts: the main service(s) this one is associated with (A/52 Annex A) - a raw "
              "0-255/0x00-0xFF mask, or a comma list of main-service numbers, e.g. asvc=0,2"},
-    {"programme=", "decode/qc/levels: which independent substream (0..7) of a multi-programme "
-                   "stream"},
+    {"programme=", "decode/qc/levels/monitor/spatial/play/transcode: which independent substream "
+                   "(0..7) of a multi-programme stream, the first when omitted; mkv/mp4/fmp4/ts: "
+                   "carry that programme alone, renumbered as substream 0 (without it mp4, fmp4 "
+                   "and ts keep every programme and mkv the first)"},
     {"programme2=", "eac3-encode: another input file, encoded as its own independent substream "
                    "(§E2.3.1.2's I1); programme3= up to programme8= work the same way, for I2-I7"},
     {"programme2-layout=", "eac3-encode: that programme's own layout (default stereo; not 1+1) - "
@@ -355,6 +367,12 @@ void print_layout_topic() {
     fmt::println("        Locations: L C R Ls Rs Lc Rc Lrs Rrs Cs Ts Lsd Rsd Lw Rw Vhl Vhr");
     fmt::println("        Vhc Lts Rts LFE2 LFE - a paired location (Lc/Rc, Lrs/Rrs, Lsd/Rsd,");
     fmt::println("        Lw/Rw, Vhl/Vhr, Lts/Rts) must be given both halves.");
+    fmt::println("");
+    fmt::println("        With no [layout], 'encode' and 'eac3-encode' follow the source: a WAV");
+    fmt::println("        that states which speakers its channels are (a WAVE_FORMAT_EXTENSIBLE");
+    fmt::println("        channel mask, which 'decode' writes from three channels up) is encoded");
+    fmt::println("        as exactly those - FL FR BC is 2/1, FL FR FC BC is 3/1 - and one that");
+    fmt::println("        states none is read by its channel count.");
 }
 
 void print_tools_topic() {
@@ -433,6 +451,21 @@ void print_decode_topic() {
     fmt::println("       not decode from the previous block's overlap instead of failing the");
     fmt::println("       command; monitor also folds on its own initiative when the output");
     fmt::println("       endpoint renders fewer channels than the programme.");
+    fmt::println("");
+    fmt::println("decode alone takes karaoke (or karaoke=on) for an AC-3 karaoke stream,");
+    fmt::println("       bsmod 7 with an acmod above 1/0 (Annex C): it writes what a");
+    fmt::println("       karaoke-aware multi-channel decoder reproduces - L, C, R (and the LFE) -");
+    fmt::println("       with the guide melody M in the centre and the vocals V1, V2 mixed at");
+    fmt::println("       the stream's own surround level: a single V1 into the centre, a pair");
+    fmt::println("       into the left and the right (Table C.2.2). With channels=2 or 1 it is");
+    fmt::println("       the Lo/Ro downmix, which is Annex C's 2/0 reproduction. downmix=ltrt");
+    fmt::println("       is refused: Annex C defines no Lt/Rt. A stream that is not karaoke");
+    fmt::println("       is decoded as coded, and the report says so. karaoke=none, v1, v2");
+    fmt::println("       or v1+v2 is the karaoke-capable decoder's listener choice of vocals");
+    fmt::println("       (C.2.3.2, Table C.2.3): at the default layout the same L, C, R with");
+    fmt::println("       only the chosen vocals in it (V1 or V2 alone in the centre, a pair");
+    fmt::println("       left and right at unity), and at channels=2 or 1 the 2/0 form with");
+    fmt::println("       the melody at clev and a single vocal at 0.7 in both channels.");
 }
 
 void print_ac4_decode_topic() {
@@ -447,7 +480,7 @@ void print_ac4_decode_topic() {
     fmt::println("       substreams are mixed (TS 103 190-1 6.2.16): dialogue-gain=<dB> sets the");
     fmt::println("       dialogue against the music and effects, up to the stream's maximum,");
     fmt::println("       and associated-gain=<dB>, 0 or less, the associated audio.");
-    fmt::println("       md-compat=<0..7> is the md_compat level the decoder claims (3 by default;");
+    fmt::println("       md-compat=<0..7> is the md_compat level the decoder claims (7 by default;");
     fmt::println("       a presentation above it is not selected). headphones says the listener");
     fmt::println("       is on headphones: the portable headphones DRC mode where the output");
     fmt::println("       level falls in the portable range, and a presentation rendered for");
@@ -510,6 +543,9 @@ void print_ac4_encode_topic() {
     fmt::println("       decoder fills with noise, ETSI TS 103 190-1 5.1.4), hfr-2 and hfr-4");
     fmt::println("       (the efficient high frame rate mode, TS 103 190-2 5.1.3: with");
     fmt::println("       frame-rate=47.95 to 120 each audio frame goes out as 2 or 4 frames),");
+    fmt::println("       twenty-two-two for 22.2 (24 channels, TS 103 190-2 6.2.4.3, in");
+    fmt::println("       codec-mode=simple|aspx, ASPX below 76.8 kbps a full-band channel by");
+    fmt::println("       default; the channels in the order decode writes them),");
     fmt::println("       drc-gains-0 to drc-gains-3 (the DRC modes send gains, ETSI TS 103");
     fmt::println("       190-1 Table 163), and objects for objects=<scene file>: the WAV's");
     fmt::println("       channels as objects, a raw stream of one object substream. The");
@@ -669,17 +705,27 @@ void print_stream_tools_topic() {
     fmt::println("across rather than resetting them, and folds a layout AC-3 cannot code down");
     fmt::println("to 5.1 per §7.8. The other four never touch a coded coefficient:");
     fmt::println("metadata/normalize rewrite bsi fields in place and re-stamp the CRCs, cut/cat");
-    fmt::println("move whole access units. Convertible substreams (strmtyp 2) are out of scope");
-    fmt::println("for all five, the same way 'validate' already refuses them.");
+    fmt::println("move whole access units. A convertible substream (strmtyp 2, §E2.3.1.1:");
+    fmt::println("previously coded in AC-3) is an independent one and goes through all five;");
+    fmt::println("transcode reads it as the E-AC-3 it is.");
+    fmt::println("");
+    fmt::println("metadata can only overwrite a field the stream already transmits. A field it");
+    fmt::println("does not (compr behind a clear compre, bsmod and dsurmod behind a clear");
+    fmt::println("infomdate) is refused - unless the stream is E-AC-3 and 'insert' is given,");
+    fmt::println("which adds it to every independent substream and lengthens that syncframe by");
+    fmt::println("the field and the padding to a whole word. A frame that carries block start");
+    fmt::println("information or auxiliary data cannot be lengthened and is refused by name.");
 }
 
 void print_objects_topic() {
     fmt::println("");
-    fmt::println("sign-objects/verify-objects carry a keyed signature over the EMDF object");
-    fmt::println("       container: the encode side writes one, a decode or monitor checks it");
-    fmt::println("       and refuses the whole command on a mismatch. Both need a key -");
-    fmt::println("       signing-key=<path>, or ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY");
-    fmt::println("       - which this tool never stores. See docs/concepts/object-signing.md.");
+    fmt::println("sign-objects/verify-objects/gate-objects carry a keyed signature over the EMDF");
+    fmt::println("       object container: the encode side writes one, a decode or monitor checks");
+    fmt::println("       it - verify-objects refuses the whole command on a mismatch, gate-objects");
+    fmt::println("       plays the bed for the frames that do not verify and the objects for the");
+    fmt::println("       rest. All need a key - signing-key=<path> (repeat it for a keyring when");
+    fmt::println("       checking), or ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY - which");
+    fmt::println("       this tool never stores. See docs/concepts/object-signing.md.");
 }
 
 // The per-topic sections, in the order both the full listing and a single
@@ -828,8 +874,15 @@ void print_option_blocks(std::uint32_t mask) {
                      "against signing-key= instead of just playing it - a mismatch refuses the "
                      "command; omitted (the default) decodes signed and unsigned streams alike, "
                      "unchecked");
-        fmt::println("  signing-key=<path>      the key file sign-objects/verify-objects use "
-                     "(or ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY)");
+        fmt::println("  gate-objects      decode/monitor/spatial: the licensed policy - frames whose "
+                     "object signature verifies against signing-key= play as objects, any other "
+                     "(unsigned, another key's, altered) plays as its 5.1 bed and the decode "
+                     "carries on; where verify-objects would refuse. Not combinable with "
+                     "verify-objects");
+        fmt::println("  signing-key=<path>      the key file sign-objects/verify-objects/gate-objects "
+                     "use (or ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY). Repeat it to give "
+                     "verify-objects and gate-objects several keys - a frame is good under any of "
+                     "them; sign-objects takes one");
     }
     if ((mask & topic::kMulti) != 0) {
         fmt::println("");

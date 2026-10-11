@@ -263,8 +263,8 @@ test('a 320 px screen, with nothing wider than it', async ({ page, stub }) => {
     stub.device.sendspin = {
         ...playingSendspin(),
         pairing_code: '482913',
-        peak_db: Array(16).fill(-100.5),
-        rms_db: Array(16).fill(-110.5),
+        peak_db: new Array(16).fill(-100.5),
+        rms_db: new Array(16).fill(-110.5),
     };
     // And a paired server with a long name, which wraps rather than widen its row.
     stub.device.pairings = [

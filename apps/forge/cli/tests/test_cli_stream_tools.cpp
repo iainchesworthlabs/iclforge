@@ -13,6 +13,7 @@
 #include <numbers>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "platform/process.hpp"
@@ -275,6 +276,62 @@ TEST_CASE("metadata refuses a field the stream does not carry", "[cli][metadata]
     INFO(text);
     CHECK(text.find("does not transmit that field") != std::string::npos);
     // Refused before writing: no half-rewritten output left behind.
+    CHECK_FALSE(fs::exists(out));
+}
+
+TEST_CASE("metadata insert adds a field an E-AC-3 stream lacks, and the audio does not move",
+          "[cli][metadata]") {
+    const auto dir = scratch_dir();
+    // No `heavy`: compre is clear, so there are no compr bits to overwrite.
+    const auto source = make_stream("meta_insert.ec3", "eac3-encode", "none 51 off");
+    const auto in_place = dir / "meta_insert_refused.ec3";
+    const auto grown = dir / "meta_insert_out.ec3";
+    const auto log = dir / "meta_insert.log";
+    fs::remove(in_place);
+    fs::remove(grown);
+
+    // Without `insert` it is the same refusal an AC-3 stream gets, now with
+    // the way out named.
+    REQUIRE(run_cli("metadata " + quoted(source) + " " + quoted(in_place) + " compr=-6 bsmod=vi",
+                    log) == 1);
+    const auto refusal = read_log(log);
+    CHECK(refusal.find("does not transmit that field") != std::string::npos);
+    CHECK(refusal.find("insert") != std::string::npos);
+    CHECK_FALSE(fs::exists(in_place));
+
+    REQUIRE(run_cli("metadata " + quoted(source) + " " + quoted(grown) +
+                        " compr=-6 bsmod=vi insert",
+                    log) == 0);
+    const auto text = read_log(log);
+    INFO(text);
+    CHECK(text.find("gained a field") != std::string::npos);
+    CHECK(fs::file_size(grown) > fs::file_size(source));
+
+    const auto before = iclforge::ac3::io::read_frame_metadata(read_bytes(source));
+    const auto after = iclforge::ac3::io::read_frame_metadata(read_bytes(grown));
+    REQUIRE(before.has_value());
+    REQUIRE(after.has_value());
+    CHECK_FALSE(before->compr.has_value());
+    REQUIRE(after->compr.has_value());
+    CHECK(iclforge::ac3::meta::to_db(iclforge::ac3::meta::compr_gain(*after->compr)) <= -6.0 + 1e-9);
+    REQUIRE(after->bsmod.has_value());
+    CHECK(*after->bsmod == 2);  // Table 5.7: visually impaired
+
+    // And the whole stream still frames and decodes to the same samples.
+    const auto scanned = iclforge::ac3::io::scan(read_bytes(grown));
+    REQUIRE(scanned.has_value());
+    require_same_audio(source, grown, "meta_insert_audio");
+}
+
+TEST_CASE("metadata insert cannot grow an AC-3 frame", "[cli][metadata]") {
+    const auto dir = scratch_dir();
+    const auto source = make_stream("meta_insert_ac3.ac3", "encode", "51");
+    const auto out = dir / "meta_insert_ac3_out.ac3";
+    const auto log = dir / "meta_insert_ac3.log";
+    fs::remove(out);
+    REQUIRE(run_cli("metadata " + quoted(source) + " " + quoted(out) + " compr=-6 insert", log) ==
+            1);
+    CHECK(read_log(log).find("does not transmit that field") != std::string::npos);
     CHECK_FALSE(fs::exists(out));
 }
 
@@ -572,6 +629,69 @@ TEST_CASE("transcode also goes the other way, DD into DD+", "[cli][transcode]") 
     REQUIRE(after.has_value());
     CHECK(after->kind == iclforge::ac3::io::StreamKind::kEac3);
     CHECK(after->dialnorm == 27);
+}
+
+// 'play' sends a receiver that takes AC-3 and not E-AC-3 this command's output,
+// so a stream that carries a second language reaches here from there: programme=
+// has to get to it, and without it what comes out is the first programme - the
+// main - not a splice of the two.
+TEST_CASE("transcode takes a multi-programme stream's first programme, or the one programme= names",
+          "[cli][transcode][programme]") {
+    const auto dir = scratch_dir();
+    const auto main_wav = dir / "tx_programme_main.wav";
+    const auto second_wav = dir / "tx_programme_second.wav";
+    REQUIRE(iclforge::ac3::io::write_wav_f32(main_wav.string(), tone_channels(6, 68000, 48000),
+                                             48000)
+                .has_value());
+    REQUIRE(iclforge::ac3::io::write_wav_f32(second_wav.string(), tone_channels(1, 68000, 48000),
+                                             48000)
+                .has_value());
+    const auto source = dir / "tx_programme_source.ec3";
+    const auto make_log = dir / "tx_programme_source.log";
+    REQUIRE(run_cli("eac3-encode " + quoted(main_wav) + " " + quoted(source) +
+                        " 448 none 51 off programme2=" + quoted(second_wav) +
+                        " programme2-layout=mono programme2-bitrate=96",
+                    make_log) == 0);
+
+    const auto transcode = [&](const std::string& name, const std::string& extra) {
+        const auto out = dir / name;
+        const auto log = dir / (name + ".log");
+        const int rc =
+            run_cli("transcode " + quoted(source) + " " + quoted(out) + " 192 " + extra, log);
+        return std::pair{rc, out};
+    };
+
+    SECTION("without programme= the first programme comes out") {
+        const auto [rc, out] = transcode("tx_programme_default.ac3", "");
+        REQUIRE(rc == 0);
+        const auto bytes = read_bytes(out);
+        const auto scanned = iclforge::ac3::io::scan(bytes);
+        REQUIRE(scanned.has_value());
+        CHECK(scanned->kind == iclforge::ac3::io::StreamKind::kAc3);
+        CHECK(scanned->acmod == iclforge::ac3::Acmod::k3_2);
+        CHECK(scanned->lfe);
+    }
+
+    SECTION("programme=1 transcodes the second programme, as the mono it is") {
+        const auto [rc, out] = transcode("tx_programme_second.ac3", "programme=1");
+        REQUIRE(rc == 0);
+        const auto bytes = read_bytes(out);
+        const auto scanned = iclforge::ac3::io::scan(bytes);
+        REQUIRE(scanned.has_value());
+        CHECK(scanned->kind == iclforge::ac3::io::StreamKind::kAc3);
+        CHECK(scanned->acmod == iclforge::ac3::Acmod::k1_0);
+        CHECK_FALSE(scanned->lfe);
+    }
+
+    SECTION("a programme the stream does not carry is refused by name") {
+        const auto log = dir / "tx_programme_missing.log";
+        const auto out = dir / "tx_programme_missing.ac3";
+        CHECK(run_cli("transcode " + quoted(source) + " " + quoted(out) + " 192 programme=6",
+                      log) == 2);
+        CHECK(read_log(log).find("no programme 6 in this stream (it carries 0, 1)") !=
+              std::string::npos);
+        CHECK_FALSE(fs::exists(out));
+    }
 }
 
 // The bug this guards: decode_and_render's eac3_source check tested

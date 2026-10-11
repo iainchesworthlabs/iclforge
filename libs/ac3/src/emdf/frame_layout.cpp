@@ -155,13 +155,11 @@ FrameLayout walk_frame(std::span<const std::byte> frame) {
                 (void)r.read(5);
             }
         }
-        // Table E1.2 writes this gate as `strmtyp == 0x0`, but strmtyp 0x2 is
-        // also an independent substream (§E1.3.1 - one convertible back to
-        // AC-3), and it carries the same program-scaling and
-        // mixing-configuration block a dependent does not. This follows
-        // eac3_decoder.cpp's own reading of that gate rather than the table's
-        // literal wording, so the two walks agree on where the bits are.
-        if (strmtyp != 1) {
+        // Table E1.2's gate, as written: `strmtyp == 0x0`. A type 2 substream
+        // (previously coded in AC-3, which has no such block) carries none of
+        // it, any more than a dependent does; eac3_decoder.cpp reads it the
+        // same way, so the two walks agree on where the bits are.
+        if (strmtyp == 0) {
             if (r.read(1)) {
                 (void)r.read(6);
             }
@@ -382,9 +380,9 @@ FrameLayout walk_frame(std::span<const std::byte> frame) {
             lfeexpstr[static_cast<std::size_t>(b)] = static_cast<int>(r.read(1));
         }
     }
-    // Same gate, same reading as the mixing-metadata block above: only a
-    // dependent substream sends none of the converter-exponent element.
-    if (strmtyp != 1) {
+    // Same gate, same reading as the mixing-metadata block above: the
+    // converter-exponent element is a type 0 substream's alone.
+    if (strmtyp == 0) {
         const int convexpstre = (numblkscod == 3) ? 1 : static_cast<int>(r.read(1));
         if (convexpstre) {
             for (int ch = 0; ch < nfchans; ++ch) {
@@ -619,10 +617,8 @@ FrameLayout walk_frame(std::span<const std::byte> frame) {
         const int csnroffst = frmcsnroffst;
         const int fsnroffst = frmfsnroffst;
         // Same gate again (eac3_decoder.cpp reads convsnroffste the same
-        // way); inert here, since the shape check above already pinned
-        // strmtyp to 0, but spelled consistently with the two gates that are
-        // not.
-        if (strmtyp != 1) {
+        // way).
+        if (strmtyp == 0) {
             if (r.read(1)) {
                 (void)r.read(10);  // convsnroffste
             }

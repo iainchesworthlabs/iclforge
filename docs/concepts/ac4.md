@@ -46,7 +46,7 @@ by its place in the table of contents, or else by preferences: the listener's la
 of associated audio wanted (audio description, say) and whether the presentation was rendered for
 headphones. It mixes the presentation's substreams, with a gain for the dialogue against the music
 and effects and one for the associated audio. Each presentation states the least decoder level
-(`md_compat`) it needs, and this decoder claims level 3.
+(`md_compat`) it needs, and this decoder claims level 7, "unrestricted", unless it is told a lower one.
 
 A **substream** is one coded piece of a presentation:
 

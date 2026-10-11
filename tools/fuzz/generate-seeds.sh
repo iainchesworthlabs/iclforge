@@ -27,7 +27,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ICLFORGE_CLI="${ICLFORGE_CLI_BIN:-}"
 OUT_ROOT="${1:-}"
 
-if [ -z "$ICLFORGE_CLI" ] || [ ! -f "$ICLFORGE_CLI" ]; then
+if [[ -z "$ICLFORGE_CLI" ]] || [[ ! -f "$ICLFORGE_CLI" ]]; then
     echo "error: set ICLFORGE_CLI_BIN to a built forge (see this script's header)" >&2
     exit 1
 fi
@@ -154,7 +154,7 @@ for leg in ac3-51-448 eac3-51-256 eac3-stereo-192; do
     esac
     for tool in dee ffmpeg; do
         src="$EXTERNAL_BASELINE/$leg/$tool.$ext"
-        if [ ! -f "$src" ]; then
+        if [[ ! -f "$src" ]]; then
             echo "error: external-baseline fixture missing: $src" >&2
             exit 1
         fi
@@ -255,7 +255,7 @@ python3 "$SCRIPT_DIR/metadata-seeds.py" ac4-carrier "$OUT" \
 echo "==> done:"
 for d in "$OUT"/fuzz_*; do
     harness="$(basename "$d")"
-    if [ -n "$OUT_ROOT" ]; then
+    if [[ -n "$OUT_ROOT" ]]; then
         dest="$OUT_ROOT/$harness"
     else
         dest="$(fuzz_dir_of "$harness")/seeds/$harness"
