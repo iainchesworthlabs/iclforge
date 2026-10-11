@@ -900,26 +900,37 @@ One thing worth knowing before shipping such a stream: **FFmpeg refuses it outri
 only the second programme — see
 [Validation → Where the oracles don't reach](../../verification.md#where-the-oracles-dont-reach).
 
-## Programme options (`decode`, `qc`, `levels`): `programme=`
+## Programme options (`decode`, `qc`, `levels`, `monitor`, `spatial`, `play`, `transcode`): `programme=`
 
 ```text
-programme options (decode, qc, levels, mkv, mp4, fmp4, ts; any order, after the positional
-arguments):
+programme options (decode, qc, levels, monitor, spatial, play, transcode, mkv, mp4, fmp4, ts; any
+order, after the positional arguments):
   programme=<0..7>  which programme of a multi-programme stream to work on, by the §E2.3.1.2
                     substreamid of its independent substream; omitted takes the first the
                     stream carries (mp4, fmp4 and ts omit it to carry every programme)
 ```
 
-The decode-side half of `programme2=` above. All three commands work on exactly one programme —
-never a fold of several, since two programmes are alternatives rather than layers and mixing them
-would give a WAV that splices unrelated audio, or a loudness figure neither programme has.
+The decode-side half of `programme2=` above. Every one of these commands works on exactly one
+programme — never a fold of several, since two programmes are alternatives rather than layers and
+mixing them would give a WAV that splices unrelated audio, a loudness figure neither programme has,
+or, from `monitor`, a main and then its audio description one frame period at a time.
 
 ```bash
 forge decode out.ec3 main.wav                # programme 0
 forge decode out.ec3 commentary.wav programme=1
 forge levels out.ec3 programme=1
 forge qc out.ec3 programme=1 preset=atsc-a85
+forge monitor out.ec3 -1 programme=1         # hear the commentary
+forge transcode out.ec3 commentary.ac3 192 programme=1
 ```
+
+`monitor` and `spatial` play the programme they chose and say so before they touch a device; a
+programme the stream does not carry is refused by name (exit `1`) on a machine with no output at
+all. `play` sends a receiver that programme alone: a receiver takes independent substream 0 and
+ignores the rest, so a programme other than 0 is cut out and renumbered as substream 0 first, as the
+containers do. Where `play` has to fall back, the PCM leg is `monitor` and the AC-3 leg is
+`transcode`, and both honour `programme=` the same way. `transcode` without it takes the first
+programme, as it always has.
 
 On `mkv`, `mp4`, `fmp4` and `ts` the chosen programme is written alone, renumbered as independent
 substream 0 with its CRC re-stamped (a player takes substream 0 and ignores the rest, so another
@@ -931,7 +942,8 @@ command says which it picked and what else was there (`programme 0 of 2 (0, 1)`)
 multi-programme stream is never handled silently. Asking for a programme the stream does not
 carry is an error that lists the ones it does. Ignored for AC-3, which has no substream layer.
 AC-4 has no programmes: it chooses a presentation instead (below), and `decode` given `programme=`
-with an AC-4 stream names it in a warning and ignores it.
+with an AC-4 stream names it in a warning and ignores it; `monitor` and `play` ignore it for AC-4
+without saying so.
 
 ## AC-4 options
 

@@ -21,6 +21,7 @@
 #include "iclforge/objects/emdf.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
+#include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/objects/oamd.hpp"
 
 // The device-facing half of forge: devices/outputs/record/live/monitor.
@@ -215,6 +216,26 @@ void patch_bits(std::vector<std::byte>& frame, std::size_t offset, int count,
         iclforge::ac3::crc16(std::span<const std::byte>{frame}.subspan(2, bytes - 4));
     frame[bytes - 2] = static_cast<std::byte>(crc2 >> 8);
     frame[bytes - 1] = static_cast<std::byte>(crc2 & 0xFF);
+}
+
+// A second of a 5.1 main and a second of a mono description as two independent
+// substreams of one E-AC-3 stream (§E2.3.1.2's I0 and I1), written the way the
+// documentation writes one: eac3-encode with programme2=. Silent, because on a
+// machine with speakers 'monitor' plays what it is given.
+fs::path write_two_programme_stream(const std::string& name) {
+    const auto dir = scratch_dir();
+    const auto main_wav = dir / (name + "_main.wav");
+    const auto description_wav = dir / (name + "_description.wav");
+    const std::vector<std::vector<float>> bed(6, std::vector<float>(48000, 0.0F));
+    const std::vector<std::vector<float>> voice(1, std::vector<float>(48000, 0.0F));
+    REQUIRE(iclforge::ac3::io::write_wav_f32(main_wav.string(), bed, 48000).has_value());
+    REQUIRE(iclforge::ac3::io::write_wav_f32(description_wav.string(), voice, 48000).has_value());
+    const auto stream = dir / (name + ".ec3");
+    REQUIRE(run_cli("eac3-encode \"" + main_wav.string() + "\" \"" + stream.string() +
+                        "\" 448 none 51 off programme2=\"" + description_wav.string() +
+                        "\" programme2-layout=mono programme2-bitrate=96",
+                    dir / (name + "_make.log")) == 0);
+    return stream;
 }
 
 }  // namespace
@@ -752,4 +773,90 @@ TEST_CASE("monitor reports a decode failure by name, distinct from a device refu
     if (out.find("is unavailable on this platform") == std::string::npos) {
         CHECK(out.find("error: decode failed:") != std::string::npos);
     }
+}
+
+// A stream with a second independent substream (§E2.3.1.2: a second language,
+// an audio description) carries an ALTERNATIVE, and its units arrive
+// interleaved with the main's, one frame period of each in turn. monitor,
+// spatial and play gave their decoder every one of them and no `programme`,
+// so on a 5.1 main with a mono description the second unit read channels the
+// first unit's width said were there: monitor died with an access violation.
+// decode has always chosen one programme; these hold the three live commands
+// to the same choice.
+
+TEST_CASE("monitor, spatial and play refuse a programme the stream does not carry, by name",
+          "[cli][audio-io][programme]") {
+    // The choice is made before any device is looked at, so this holds on a
+    // machine with no output at all - which is what lets CI check it.
+    const auto stream = write_two_programme_stream("programme_refused");
+    for (const std::string command : {"monitor", "spatial", "play"}) {
+        CAPTURE(command);
+        const auto log = scratch_dir() / ("programme_refused_" + command + ".log");
+        const auto rc = run_cli(command + " \"" + stream.string() + "\" -1 programme=5", log);
+        const auto out = read_log(log);
+        INFO(out);
+        CHECK(rc != 0);
+        // A build without the command's backend refuses at main.cpp's gate,
+        // one level above - the same caveat 'play's refusal tests above give.
+        if (out.find("is unavailable on this platform") == std::string::npos) {
+            CHECK(rc == 1);
+            CHECK(out.find("error: no programme 5 in this stream (it carries 0, 1)") !=
+                  std::string::npos);
+        }
+    }
+}
+
+TEST_CASE("monitor plays one programme of a stream that carries two, and says which",
+          "[cli][audio-io][programme][concurrency]") {
+    const auto dir = scratch_dir();
+    const auto stream = write_two_programme_stream("programme_monitor");
+
+    SECTION("the first, by default") {
+        const auto log = dir / "programme_monitor_default.log";
+        const auto rc = run_cli("monitor \"" + stream.string() + "\"", log);
+        const auto out = read_log(log);
+        INFO(out);
+        if (out.find("is unavailable on this platform") != std::string::npos) {
+            return;
+        }
+        // Said before a device is touched, so on every machine.
+        CHECK(out.find("  programme 0 of 2 (0, 1)") != std::string::npos);
+        check_spoke_either_way(rc, out);
+        if (rc == 0) {
+            // One programme's second of audio, not two programmes' units
+            // one after the other (64).
+            CHECK(out.find("played 32 access units") != std::string::npos);
+        }
+    }
+    SECTION("the one programme= names") {
+        const auto log = dir / "programme_monitor_second.log";
+        const auto rc = run_cli("monitor \"" + stream.string() + "\" -1 programme=1", log);
+        const auto out = read_log(log);
+        INFO(out);
+        if (out.find("is unavailable on this platform") != std::string::npos) {
+            return;
+        }
+        CHECK(out.find("  programme 1 of 2 (0, 1)") != std::string::npos);
+        check_spoke_either_way(rc, out);
+        if (rc == 0) {
+            CHECK(out.find("(1 channels, ") != std::string::npos);
+            CHECK(out.find("played 32 access units") != std::string::npos);
+        }
+    }
+}
+
+TEST_CASE("spatial names the programme it renders from a stream that carries two",
+          "[cli][audio-io][atmos][programme][concurrency]") {
+    const auto stream = write_two_programme_stream("programme_spatial");
+    const auto log = scratch_dir() / "programme_spatial.log";
+    const auto rc = run_cli("spatial \"" + stream.string() + "\" -1 programme=1", log);
+    const auto out = read_log(log);
+    INFO(out);
+    if (out.find("is unavailable on this platform") != std::string::npos) {
+        return;
+    }
+    // Chosen before the spatial endpoint is probed, so this is there whether
+    // the machine can render objects or refuses by name.
+    CHECK(out.find("  programme 1 of 2 (0, 1)") != std::string::npos);
+    check_spoke_either_way(rc, out);
 }

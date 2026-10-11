@@ -43,6 +43,7 @@
 #include "live_audio.hpp"
 #include "recording_sink.hpp"
 #include "sink_wait.hpp"
+#include "stream_playback.hpp"
 #include "stream_tools.hpp"
 
 namespace forge_cli::commands {
@@ -1007,13 +1008,47 @@ int run_play(std::string_view in_path, int device_index, const Options& meta) {
     const bool eac3 = *bsid > 8;
 
     std::vector<std::span<const std::byte>> units;
+    // Owns the bytes `units` points into when a programme had to be cut out of
+    // the stream below; empty otherwise, and kept alive to the end of play.
+    std::vector<std::byte> programme_stream;
+    // Which programme `units` is, said once the native path is taken: the
+    // fallbacks below hand the file to monitor and transcode, and monitor says
+    // it for itself.
+    std::optional<iclforge::apps::ProgrammeUnits> played_programme;
     std::uint32_t content_rate = 0;
     if (eac3) {
-        const auto split = iclforge::ac3::split_access_units(stream);
-        if (!split.has_value() || split->empty()) {
-            fmt::println(stderr, "error: {} is not a valid E-AC-3 stream", in_path);
-            return kExitInput;        }
-        units = *split;
+        // One programme goes to the receiver, never the stream's programmes
+        // one burst each: the unfiltered split hands them back interleaved, a
+        // frame period of the main and then a frame period of the second
+        // language, and an E-AC-3 burst is one frame period - so the receiver
+        // would be given half the main's audio at half speed. programme= or
+        // else the first the stream carries, as decode and monitor choose.
+        auto selected = select_programme_units(stream, meta.programme, in_path);
+        if (!selected.has_value()) {
+            return selected.error();
+        }
+        played_programme = std::move(*selected);
+        auto& chosen = *played_programme;
+        if (chosen.programme == 0) {
+            units = chosen.units;
+        } else {
+            // A receiver takes independent substream 0 and ignores the rest,
+            // so another programme's frames as they stand would be a stream
+            // with nothing it will play: cut it out and renumber it as
+            // substream 0, as the container writers do for programme=.
+            auto cut = iclforge::apps::cut_programme(stream, chosen.programme);
+            if (!cut.has_value()) {
+                fmt::println(stderr, "error: {} is not a valid E-AC-3 stream", in_path);
+                return kExitInput;
+            }
+            programme_stream = std::move(*cut);
+            const auto split = iclforge::ac3::split_access_units(programme_stream);
+            if (!split.has_value() || split->empty()) {
+                fmt::println(stderr, "error: {} is not a valid E-AC-3 stream", in_path);
+                return kExitInput;
+            }
+            units = *split;
+        }
         content_rate =
             sample_rate_hz(static_cast<iclforge::ac3::SampleRate>(
                 std::to_integer<std::uint32_t>(units[0][4]) >> 6));
@@ -1115,6 +1150,9 @@ int run_play(std::string_view in_path, int device_index, const Options& meta) {
     if (!started.has_value()) {
         fmt::println(stderr, "error: {}", iclforge::audio::describe(started.error()));
         return kExitUnavailable;
+    }
+    if (played_programme.has_value()) {
+        report_programme(status_stream(), *played_programme);
     }
     status_println(status_stream(), "streaming {} {} to \"{}\" ({} Hz{})…", units.size(),
                  eac3 ? "access units" : "frames", device_name, content_rate,

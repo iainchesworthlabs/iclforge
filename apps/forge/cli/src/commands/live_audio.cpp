@@ -258,6 +258,25 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
     // Eac3Decoder has folded a core correctly since #690.
     const bool access_units = iclforge::apps::reads_as_access_units(stream);
 
+    // §E2.3.1.2: one programme is played, never a splice of several. A stream
+    // with a second independent substream carries an ALTERNATIVE - a second
+    // language, an audio description - and its units arrive interleaved, one
+    // frame period of each in turn, so feeding them straight to the decoder
+    // would play the two programmes one after the other (and a 5.1 main
+    // followed by a mono description is not even the same width). decode makes
+    // the same choice, programme= or else the first the stream carries. Made
+    // before a device is touched, so a programme the stream lacks is refused
+    // the same way on a machine with no output at all.
+    std::optional<iclforge::apps::ProgrammeUnits> selected;
+    if (access_units) {
+        auto chosen = select_programme_units(stream, meta.programme, in_path);
+        if (!chosen.has_value()) {
+            return chosen.error();
+        }
+        report_programme(status_stream(), *chosen);
+        selected = std::move(*chosen);
+    }
+
     const auto target = monitor_target(device_index);
     if (!target.has_value()) {
         return target.error();
@@ -281,12 +300,23 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
     iclforge::ac3::OutputConfig output = resolve_output(meta, stream, status_stream());
     if (output.target == iclforge::ac3::DownmixTarget::kAsCoded && device_channels > 0) {
         const auto scanned = iclforge::ac3::io::scan(stream);
-        if (scanned && scanned->channels > static_cast<int>(device_channels)) {
+        // The width of what will be played: the chosen programme's own, which
+        // is not the stream's first programme's when programme= names a
+        // mono description beside a 5.1 main.
+        int played_channels = scanned ? scanned->channels : 0;
+        if (scanned && selected.has_value()) {
+            if (const auto found = std::ranges::find(scanned->programmes, selected->programme,
+                                                     &iclforge::ac3::io::ScannedProgramme::substreamid);
+                found != scanned->programmes.end()) {
+                played_channels = found->channels;
+            }
+        }
+        if (scanned && played_channels > static_cast<int>(device_channels)) {
             output.target = device_channels == 1 ? iclforge::ac3::DownmixTarget::kMono
                                                  : iclforge::ac3::DownmixTarget::kLoRo;
             status_println(
                 status_stream(), "  {} channels on a {}-channel output: folding to {} (§7.8)",
-                scanned->channels, device_channels,
+                played_channels, device_channels,
                 output.target == iclforge::ac3::DownmixTarget::kMono ? "mono" : "Lo/Ro stereo");
         }
     }
@@ -305,12 +335,12 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
         return false;
     };
 
-    if (access_units) {
-        const auto units = iclforge::ac3::split_access_units(stream);
-        if (!units || units->empty()) {
-            fmt::println(stderr, "error: {} is not a valid E-AC-3 stream", in_path);
-            return kExitInput;
-        }
+    if (selected.has_value()) {
+        // `programme` is also given to the decoder: the units are already
+        // this programme's alone, and it skips any that are not, so a unit
+        // from another one cannot reach the sink whichever of the two a
+        // later change loosens.
+        //
         // Heap-allocated (PREfast's C6262, alert #9): Eac3Decoder grew
         // several KB of per-block scratch members (alert #63's fix), which
         // pushed this one-shot stack declaration over the threshold - same
@@ -321,7 +351,8 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
                                .heavy_compression = meta.p.heavy.has_value(),
                                .output = output,
                                .concealment = meta.concealment,
-                               .fast_mdct = meta.fast_mdct});
+                               .fast_mdct = meta.fast_mdct,
+                               .programme = selected->programme});
         const bool folded = output.target != iclforge::ac3::DownmixTarget::kAsCoded;
         std::vector<std::size_t> order;
         // The programme's layout, from the first unit played. The held-back
@@ -379,7 +410,7 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
             ++units_played;
             return kExitOk;
         };
-        for (const auto& unit : *units) {
+        for (const auto& unit : selected->units) {
             const auto decoded = decoder->decode_access_unit(unit);
             if (!decoded.has_value()) {
                 fmt::println(stderr, "error: decode failed: {}",
@@ -547,6 +578,17 @@ int run_spatial(std::string_view in_path, int device_index, const Options& meta)
                      "carries - 'forge monitor' plays a plain AC-3 bed");
         return kExitInput;
     }
+    // One programme, as run_monitor chooses it and for the same reason: a
+    // second independent substream is an alternative, and its units arrive
+    // interleaved with the first's, so the unfiltered split would hand the
+    // renderer one programme's objects and then the other's. Before any
+    // device is touched, so a programme the stream lacks is refused the same
+    // way wherever this runs.
+    const auto selected = select_programme_units(stream, meta.programme, in_path);
+    if (!selected.has_value()) {
+        return selected.error();
+    }
+    report_programme(status_stream(), *selected);
 
     std::string device_id;
     std::string device_name = "default endpoint";
@@ -580,11 +622,7 @@ int run_spatial(std::string_view in_path, int device_index, const Options& meta)
         return kExitUnavailable;
     }
 
-    const auto units = iclforge::ac3::split_access_units(stream);
-    if (!units || units->empty()) {
-        fmt::println(stderr, "error: {} is not a valid E-AC-3 stream", in_path);
-        return kExitInput;
-    }
+    const auto& units = selected->units;
     // Named rather than a temporary passed straight to the decoder: lfe_delay
     // below reads .joc_domain back off it, so the two can never disagree on
     // which domain the reconstruction this session actually decodes with.
@@ -592,7 +630,8 @@ int run_spatial(std::string_view in_path, int device_index, const Options& meta)
                                             .fast_imdct = meta.fast_imdct,
                                             .heavy_compression = meta.p.heavy.has_value(),
                                             .output = meta.output,
-                                            .concealment = meta.concealment};
+                                            .concealment = meta.concealment,
+                                            .programme = selected->programme};
     auto decoder = std::make_unique<iclforge::ac3::Eac3Decoder>(decoder_config);
 
     iclforge::audio::SpatialObjectSink sink;
@@ -676,7 +715,7 @@ int run_spatial(std::string_view in_path, int device_index, const Options& meta)
         return kExitOk;
     };
 
-    for (const auto& unit : *units) {
+    for (const auto& unit : units) {
         const auto decoded = decoder->decode_access_unit(unit);
         if (!decoded.has_value()) {
             fmt::println(stderr, "error: decode failed: {}",
