@@ -659,7 +659,9 @@ The sections below contain the complete change list and fixes.
       enhanced coupling block's spectrum to the caller's second lane. The PCM and the object audio
       are the same bit for bit with no executor, one that runs the tasks backwards and one that
       runs them on two threads. `hearth_sink` and the Sendspin burst player make the lane on a
-      part with two cores (`CONFIG_ICLFORGE_EXAMPLE_DECODE_LANE`, on by default there).
+      part with two cores and PSRAM (`CONFIG_ICLFORGE_EXAMPLE_DECODE_LANE`, on by default there;
+      without PSRAM its stack would come out of the internal RAM the decoder shares, so it is off
+      by default).
     - **The decoders stopped zeroing what they were about to overwrite, and stopped being made
       again.** An E-AC-3 substream no longer clears six 7 KB coefficient stores and its PCM at the
       start of every frame (3.2 ms of 37 on the S3), and the AC-3 decoder's per-block scratch is
