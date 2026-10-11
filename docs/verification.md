@@ -489,7 +489,7 @@ Two tiers, both gated in CI:
   commercially mastered programme material, encoded years ago by whatever encoder the mastering
   house used, and they exercise choices neither this project's encoder nor FFmpeg's makes:
   spectral extension at 128 and 256 kbit/s, 1536 kbit/s, a director's-commentary track, dither
-  in use, the 3/1 acmod nothing in this tree can encode, and an A/52 Annex E §E2.3.1.2
+  in use, a 3/1 acmod that this encoder reaches only through a Table E2.5 list, and an A/52 Annex E §E2.3.1.2
   legacy-core delivery (below). Fetched at run time and never committed — they are film
   excerpts, and pinning by hash is what keeps an upstream change from quietly moving the
   numbers. Runs nightly in the `Interop` workflow, and on a pull request that changes the decode
@@ -578,6 +578,13 @@ One more divergence was found and fixed rather than recorded:
   exercises 3/1 (`millers_crossing_4.0.ac3`) went from decode-and-parse-only to a compared sample
   once the two decoders' channel orders agreed: channel 0 (L) at 48.93 dB, and a near-silent
   surround channel gated on absolute difference at a −46.0 dBFS floor (measured −55.31 dBFS).
+
+The four modes with no preset were measured the same way against FFmpeg's decode of this
+encoder's own streams (a tone per channel, 192 kbit/s): 3/0 at 98.7 to 101.1 dB, 2/1 at 98.7 to
+101.1, 3/1 at 86.6 to 94.8, 2/2 at 86.6 to 94.8 and 3/0 with an LFE at 97.5 to 140.4, per
+channel, at zero lag. FFmpeg's channel masks for them (`0x7`, `0x103`, `0x107`, `0x603`, `0xF`)
+are the ones `decode` writes, except 2/2, which `decode` states with the back pair (`0x33`) and
+FFmpeg with the sides; both read back as L R Ls Rs.
 
 Two divergences are recorded rather than resolved:
 

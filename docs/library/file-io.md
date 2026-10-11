@@ -77,6 +77,19 @@ which goes out in the codec's own order. The two are exact inverses for the coun
 except that a 2/1 or 3/1 file comes back as 3/0 or 2/2, since a channel count alone cannot tell
 them apart.
 
+What can tell them apart is the speaker mask. `WavData::channel_mask` (and
+`WavStreamReader::channel_mask()`) hand over a `WAVE_FORMAT_EXTENSIBLE` header's `dwChannelMask`, 0
+when the file states none, and `write_wav_f32` and `WavStreamWriter::open` take one to state: a
+mask that sets exactly as many bits as there are channels makes the header extensible, anything
+else leaves the 44-byte plain one, so a writer that passes no mask writes the bytes it always did.
+`iclforge::ac3::plan::wav_mask_locations(mask, channels)` turns a mask into Table E2.5 locations in
+interleave order (the back pair is the surrounds of a 5.1 ring, and the rear surrounds only beside
+the sides), `plan::wav_channel_mask(locations)` is the inverse for a file about to be written, and
+`plan::source_layout(codec, locations)` and the located `plan::route()` overload carry them into a
+layout and a routing - forge and Forge GUI use the same four, so they cannot read a file two ways.
+`forge decode` states the mask for three channels or more, which is why its output encodes back into
+the mode it came from.
+
 `WavData::channels` is one `std::vector<float>` per channel, normalized to `[-1, 1)`, in
 whatever order the file itself interleaves — `read_wav` does not reorder for you. `WavError`
 covers open/parse failure the same way every other module here reports errors:

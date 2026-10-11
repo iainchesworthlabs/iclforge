@@ -29,7 +29,7 @@ carry a note about an oracle gap, an intentional `auto` exclusion, or an interop
 those details live in [Capabilities](capabilities.md) and [Validation](../verification.md).
 
 The tables below were cross-checked against the cited standards (A/52 / TS 102 366 including
-Annexes D–H and F, TS 103 420, TS 103 190-1/-2, ST 2098-2, BS.2076 / BS.2088, IAMF v2.0.0, and
+Annexes C–H, TS 103 420, TS 103 190-1/-2, ST 2098-2, BS.2076 / BS.2088, IAMF v2.0.0, and
 the carriage specs wired in-tree). Open gaps against those texts are collected again under
 [Standards cross-check](#standards-cross-check).
 
@@ -41,7 +41,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 |---|---|---|---|---|---|
 | **Encoder** | Syncframe / BSI / audio blocks (bsid ≤ 8) | 🟢 | High | Essential | Shared tables and bit allocation with the decoder |
 | | Coding modes 1+1, 1/0, 2/0, 3/2 ± LFE | 🟢 | High | Essential | Named layouts and CLI coverage |
-| | Coding modes 3/0, 2/1, 3/1, 2/2 | 🟡 | Low | Optional | Decode and `FrameConfig::acmod` accept them; no named-layout / CLI encode path for every acmod |
+| | Coding modes 3/0, 2/1, 3/1, 2/2 | 🟡🔵 | Low | Optional | Encoded and decoded, each with or without LFE, and this decoder agrees with FFmpeg's on all four to 87–101 dB. `layout=` takes them as a Table E2.5 list (`L,C,R`, `L,R,Cs`, `L,C,R,Cs`, `L,R,Ls,Rs`); a WAV that states its speakers (a `WAVE_FORMAT_EXTENSIBLE` mask, which `decode` writes from three channels up) is encoded in the mode they are and folds by that mode's §7.8 coefficients, in `forge` and in Forge GUI; a transcode keeps the stream's own mode. Accepted remainder: no preset token names them (5.0 has none either, so the list is the spelling), and a file with no mask is read by its width (3: L R C, 4: L R Ls Rs) as it always was. Decision: [file I/O](file-io.md#round-tripping-channel-order) |
 | | Sample rates 48 / 44.1 / 32 kHz | 🟢 | High | Essential | 44.1 kHz uses Bresenham frame-size alternation |
 | | CBR bit rates (Table 5.18, 32–640 kbps) | 🟢 | High | Essential | AC-3 has no VBR |
 | | Block switching (§8.2.2) | 🟢 | High | Essential | Per-channel transient detector |
@@ -59,11 +59,13 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | Service / production BSI (`bsmod`, `langcod`, timecode, `copyrightb`, `origbs`, `dsurmod`, …) | 🟢 | Medium | Important | Encode, decode, probe |
 | | Annex D Surround EX / Headphone / A/D (`dsurexmod`, `dheadphonmod`, `adconvtyp`) | 🟢 | Medium | Optional | Via `xbsi2` when bsid 6; E-AC-3 `infomdat` otherwise |
 | | Annex D alternate syntax (bsid 6, `xbsi1` / `xbsi2`) | 🟢 | Medium | Optional | Both ways; §D3.2 legacy-reader promise holds |
+| | Additional BSI and aux data (`addbsi` §5.4.2.31, `auxdata` §5.4.4) | 🔴🔵 | Low | Optional | The decoder reads past both and the encoder writes both clear (`addbsie` and `auxdatae` 0), so a stream that carries them decodes, and an in-place `metadata` edit leaves them. E-AC-3's `addbsi` object marker is Annex E and is covered under Atmos. Not done and not planned: the bytes are user data that no standard or receiver this project knows of reads from an AC-3 stream, so there is nothing to interoperate with and no stream to check an implementation against |
 | **Decoder** | Full AC-3 reconstruction | 🟢 | High | Essential | Shared core with encoder; FFmpeg oracle |
 | | CRC1 / CRC2 validation | 🟢 | High | Essential | Leading CRC1 solved on encode |
 | | §7.8 / dialnorm output stage | 🟢 | High | Essential | Opt-in; Lo/Ro, Lt/Rt, mono, RF |
 | | §7.10 error concealment | 🟢 | Medium | Important | Opt-in repeat / mute |
 | | Consumer diagnostics sink | 🟢 | Low | Optional | CRC fail and unknown EMDF id |
+| | Karaoke mode (Annex C, informative) | 🟡🔵 | Low | Optional | `bsmod` 7 with `acmod` above 1/0 is read and reported as a karaoke main service by `probe`. A karaoke-aware 2/0 reproduction is §7.8's Lo/Ro downmix, which Annex C says any decoder gives, and the output stage does give it. Not done: the 3/0 reproduction (Table C.2.2's third column) and a karaoke-capable decoder's listener controls over V1 and V2 (Table C.2.3). Accepted: the annex is informative, nothing in this project writes or reads a karaoke stream to check an implementation against, and the controls are a player's interface rather than a decoder's |
 
 ---
 
@@ -321,7 +323,9 @@ this register is the checklist that those bounds appear here too.
 
 | Clause / annex | Open item | Status |
 |---|---|---|
-| Table 5.8 acmods 3/0, 2/1, 3/1, 2/2 | Named-layout / CLI encode coverage | 🟡 |
+| Table 5.8 acmods 3/0, 2/1, 3/1, 2/2 | No preset token names them (a Table E2.5 list or a stated-speaker WAV does); a WAV with no mask is read by its width | 🟡🔵 |
+| §5.4.2.31 `addbsi`, §5.4.4 `auxdata` | Read past and written clear; no user-data surface | 🔴🔵 |
+| Annex C karaoke | 3/0 reproduction and V1/V2 listener controls | 🟡🔵 |
 | Annex E §E2.3.1.1 `strmtyp` 2 | Convertible substreams | 🔴 |
 | Annex E §E2.3.1.2 I0–I7 | Associated-service labelling; receiver mixer | 🟡 / 🔴 |
 | Annex E §E3.5 / §3.7 | In `auto`; external oracle; TPN EOF hold-back | 🟢 tools / 🟡 policy |
