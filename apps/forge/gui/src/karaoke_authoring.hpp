@@ -34,6 +34,36 @@
 
 namespace forge_gui {
 
+// The bit rate a karaoke stream of `mode` ("3/0", "2/1", "3/1", "2/2" or "3/2") starts at, in
+// kbps: 384 for the five channels of 3/2, as the design sheet showed, and the same rate a
+// channel (about 77 kbps) for the modes below it, rounded up to a rate Table 5.18 has. The
+// encoder's own default is 192, which is stereo's. 192 for a mode this does not name.
+[[nodiscard]] int karaoke_default_bitrate_kbps(const std::string& mode);
+
+// The lyrics file beside `media_path`: the same name in the same folder with the extension `.lrc`,
+// matched without regard to case, which is where Hearth looks for it (planning/karaoke.md, L1).
+// Empty when there is none.
+[[nodiscard]] std::string karaoke_lyrics_beside(const std::string& media_path);
+
+// What became of a lyrics file offered beside a saved stream.
+enum class KaraokeLyricsCopy : std::uint8_t {
+    // Written beside the stream, under the stream's name with `.lrc`.
+    kCopied,
+    // It was already there: the file offered is that file.
+    kAlreadyThere,
+    // A lyrics file of that name was already beside the stream, and was left as it was.
+    kExists,
+    // The file offered could not be read.
+    kUnreadable,
+    // The copy was refused (a read-only folder, a full disk).
+    kFailed,
+};
+
+// Puts `lyrics_path` beside `stream_path` as the stream's own lyrics file, so that the player finds
+// it by name. An existing lyrics file there is never overwritten.
+[[nodiscard]] KaraokeLyricsCopy karaoke_copy_lyrics(const std::string& lyrics_path,
+                                                    const std::string& stream_path);
+
 enum class KaraokePart : std::uint8_t { kBacking, kMelody, kVocal1, kVocal2 };
 
 // One file the author supplied, for one part.
