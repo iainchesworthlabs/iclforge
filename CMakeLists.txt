@@ -474,8 +474,12 @@ add_subdirectory(libs/render)
 # component, Hearth's engine and their tests share (libs/device/CMakeLists.txt).
 add_subdirectory(libs/device)
 # Timed lyrics (an LRC file read, and the cursor over it): standard library only, for Hearth,
-# Crucible and the sink firmware alike (libs/lyrics/CMakeLists.txt).
-add_subdirectory(libs/lyrics)
+# Crucible and the sink firmware alike (libs/lyrics/CMakeLists.txt). The minimum-footprint profile
+# carries none, and the ESP-IDF component's archive does not stage the directory, so it is not
+# reached there (tools/packaging/pack_esp_component.py).
+if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
+    add_subdirectory(libs/lyrics)
+endif()
 add_subdirectory(libs/ac3)
 
 # The containers, codec-blind and one library: IEC 61937 burst packing, always, and the Matroska,
