@@ -268,6 +268,7 @@ if(ICLFORGE_MINIMAL_HOT_O2)
         src/core/eac3_tools.cpp
         src/core/mdct.cpp
         "${PROJECT_SOURCE_DIR}/libs/dsp/src/fft.cpp"
+        "${PROJECT_SOURCE_DIR}/libs/dsp/src/qmf.cpp"  # JOC's bank: -Os left its passes as calls
         src/decoder/decoder.cpp
         src/decoder/eac3_decoder.cpp
         src/decoder/output.cpp
