@@ -1,0 +1,31 @@
+# The decode lane, on two cores with PSRAM, under QEMU: the one shape CI runs that
+# has a second thread working on a decode.
+#
+#   SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-http714;sdkconfig.ci-lane"
+#
+# The lane (CONFIG_ICLFORGE_EXAMPLE_DECODE_LANE, iclforge/src/lane_executor.hpp) is a worker
+# task on the core the decode task is not on. It takes a substream's channels' inverse
+# transforms, a JOC reconstruction's bed analyses and objects, and enhanced coupling's next
+# spectrum, and the PCM is the same bit for bit. Its stack is internal RAM without PSRAM, and
+# every other shape CI runs has none to give it (the object render has 10 KB left at its worst
+# moment, the 7.1.4 stream set 24 KB against its 20,480 byte floor), so the option defaults off
+# there: this shape is where it runs. The streams it plays are in the CI step that names it
+# (.github/workflows/_build.yml): the ones that use the lane's second thread, every
+# psram-marked stream of the set among them (planning/esp32-stream-set.md).
+#
+# QUAD PSRAM, not the board's octal: the step starts QEMU with the command line the other
+# steps do, and QEMU emulates quad PSRAM from it (planning/esp32-stream-set.md's 2026-09-16
+# measurement) - with `-m 8M`, the board's size. At the other steps' `-m 32M` the PSRAM takes
+# the S3's whole external virtual address window and the partition table's flash mapping
+# finds none: "esp_mmu_map_virt: no such vaddr range" at app_main's first NVS call. An
+# allocation of 16 KB or more tries PSRAM first, as on the board (sdkconfig.psram), so the
+# decoder's small, hot state stays in internal RAM and its large scratch - the lane's
+# enhanced coupling scratch is 23 KB - does not.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384
+CONFIG_SPIRAM_MEMTEST=n
+# Asked for, not left to the default: a shape that means to run the lane says so, and
+# a change of the default cannot quietly stop it.
+CONFIG_ICLFORGE_EXAMPLE_DECODE_LANE=1

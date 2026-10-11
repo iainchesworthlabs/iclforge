@@ -13,7 +13,9 @@
 // itself takes as a parameter rather than embedding a compiled binary of its
 // own - see bindings/js/README.md's "Loading the WASM module" section.
 
-import { decodeFile, DownmixTarget, IclForgeDecoderNode, scanStream } from './package/index.js';
+import {
+    decodeFile, DownmixTarget, IclForgeDecoderNode, KaraokeReproduction, KaraokeVocals, scanStream,
+} from './package/index.js';
 
 // Ear-level ring: iclforge::spatial's kSpeakerAzimuthDeg
 // (libs/render/include/iclforge/render/spatial.hpp), ITU-R BS.775, degrees CCW from
@@ -40,6 +42,10 @@ let playStartOffset = 0;
 let playing = false;
 
 let decoded = null; // DecodedProgram, see bindings/js/src/decode-file.ts
+// What the current decode was made from, so that a change of the karaoke reproduction can decode it
+// again (a push decoder is made with its settings).
+let decodedBytes = null;
+let decodedLabel = '';
 
 const el = (id) => document.getElementById(id);
 
@@ -416,7 +422,35 @@ function buildSoloControls(objectCount, labels) {
     }
 }
 
-async function handleDecoded(bytes, label) {
+// The fold's own options, with the karaoke reproduction the page asks for. It only changes a
+// stream that is karaoke (an AC-3 stream flagged bsmod 7): any other decodes as it did. At the
+// stereo fold the stream's own mix is already Annex C's 2/0 reproduction, so the choices are the
+// capable decoder's: which vocals are heard.
+const KARAOKE_CHOICES = {
+    stream: { karaoke: KaraokeReproduction.AsCoded, karaokeVocals: KaraokeVocals.Both },
+    both: { karaoke: KaraokeReproduction.Capable, karaokeVocals: KaraokeVocals.Both },
+    v1: { karaoke: KaraokeReproduction.Capable, karaokeVocals: KaraokeVocals.V1 },
+    v2: { karaoke: KaraokeReproduction.Capable, karaokeVocals: KaraokeVocals.V2 },
+    none: { karaoke: KaraokeReproduction.Capable, karaokeVocals: KaraokeVocals.None },
+};
+
+function foldOptions() {
+    return {
+        target: DownmixTarget.LoRo,
+        applyDialnorm: true,
+        ...KARAOKE_CHOICES[el('karaokeChoice').value],
+    };
+}
+
+// What a change of the karaoke choice does: the stream is decoded again, from where it was.
+function onKaraokeChange() {
+    if (decodedBytes === null) return;
+    const wasPlaying = playing;
+    const at = decoded ? currentPlaybackSeconds() : 0;
+    handleDecoded(decodedBytes, decodedLabel, { resumeAt: at, play: wasPlaying });
+}
+
+async function handleDecoded(bytes, label, options = {}) {
     setStatus(`Decoding ${label}...`, false);
     try {
         const moduleInstance = await loadModule();
@@ -425,11 +459,12 @@ async function handleDecoded(bytes, label) {
         // whole-file decode did, now produced by the package's decodeFile()
         // built on the same push-frame primitive the realtime section below
         // uses.
-        const result = decodeFile(moduleInstance, bytes, {
-            fold: { target: DownmixTarget.LoRo, applyDialnorm: true },
-        });
+        const result = decodeFile(moduleInstance, bytes, { fold: foldOptions() });
         decoded = result;
-        playStartOffset = 0;
+        decodedBytes = bytes;
+        decodedLabel = label;
+        el('karaokePanel').style.display = result.karaoke ? '' : 'none';
+        playStartOffset = options.resumeAt ?? 0;
         soloObject = -1;
         stop();
         const objectNote = result.objectCount > 0 ? `, ${result.objectCount} Atmos object(s)` : '';
@@ -438,10 +473,11 @@ async function handleDecoded(bytes, label) {
             `(${result.channelLabels.join(', ')})${objectNote}, ${result.durationSeconds.toFixed(1)}s`;
         el('playPause').disabled = false;
         el('seek').disabled = false;
-        el('seek').value = '0';
-        el('scrubTime').textContent = `0.0s / ${result.durationSeconds.toFixed(1)}s`;
+        el('seek').value = String(Math.round((playStartOffset / result.durationSeconds) * 1000) || 0);
+        el('scrubTime').textContent = `${playStartOffset.toFixed(1)}s / ${result.durationSeconds.toFixed(1)}s`;
         buildSoloControls(result.objectCount, result.objectLabels);
         setStatus(`Decoded ${label}.`, false);
+        if (options.play) play();
     } catch (err) {
         decoded = null;
         el('playPause').disabled = true;
@@ -591,6 +627,7 @@ window.addEventListener('DOMContentLoaded', () => {
     el('playPause').addEventListener('click', () => {
         if (playing) pause(); else play();
     });
+    el('karaokeChoice').addEventListener('change', onKaraokeChange);
     const seek = el('seek');
     seek.addEventListener('pointerdown', () => { seekDragging = true; });
     seek.addEventListener('input', () => {

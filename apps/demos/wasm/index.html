@@ -66,6 +66,14 @@
   #status.error { color: #f87171; }
   #streamInfo { font-size: 0.9rem; color: var(--muted); margin-top: 8px; }
   #scrubTime { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.9rem; }
+  #karaokePanel label { color: var(--muted); font-size: 0.9rem; }
+  #karaokePanel select {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+  }
   canvas { display: block; margin: 0 auto; background: #0d1526; border-radius: 8px; }
   .hint { color: var(--muted); font-size: 0.82rem; text-align: center; margin: 10px 0 0; line-height: 1.5; }
   .hint a { color: var(--accent); }
@@ -106,6 +114,26 @@
     </div>
     <div id="status"></div>
     <div id="streamInfo"></div>
+  </div>
+
+  <div id="karaokePanel" class="panel" style="display:none;">
+    <div class="controls">
+      <label for="karaokeChoice">Karaoke vocals</label>
+      <select id="karaokeChoice">
+        <option value="stream" selected>As the stream mixes them</option>
+        <option value="both">Both</option>
+        <option value="v1">V1 only</option>
+        <option value="v2">V2 only</option>
+        <option value="none">None (backing only)</option>
+      </select>
+    </div>
+    <p class="hint">
+      This is a karaoke AC-3 stream (Annex C of ETSI TS 102 366): L and R, a guide melody where a
+      centre would be, and one or two vocals where the surrounds would be. A stereo fold is already
+      Annex C's 2/0 reproduction, with the vocals at the level the programme set. A karaoke-capable
+      decoder lets the listener choose which vocals are heard; choosing one decodes the stream again
+      with it. The reproduction is the library's, the one <code>forge decode karaoke=v1</code> writes.
+    </p>
   </div>
 
   <div id="objectsPanel" class="panel" style="display:none;">
