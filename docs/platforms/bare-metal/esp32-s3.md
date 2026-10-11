@@ -1303,8 +1303,12 @@ What changed, in the order it was found:
   (`libs/ac3/tests/decoder/test_lanes.cpp`; on the P4 the per-channel RMS of six streams is
   identical with and without it). The lane's task is 12 KB of internal RAM (16 KB with the
   decode stack in PSRAM) of which 5 to 6 KB were ever used, and 23 KB of PSRAM for its enhanced
-  coupling scratch; `CONFIG_ICLFORGE_EXAMPLE_DECODE_LANE` switches it off, and a part with one core
-  (the C6) never makes it.
+  coupling scratch. `CONFIG_ICLFORGE_EXAMPLE_DECODE_LANE` is on by default only where there is
+  PSRAM: without it the task's stack comes out of the internal RAM the player and the decoder
+  share, and the 7.1.4 shapes CI runs under QEMU, which has none, do not have 12 KB to give (the
+  object render's lowest free internal RAM is 10 KB, and the stream set is held to 20,480 bytes
+  with 28 KB measured). It can be set to 1 on a part with no PSRAM that has the room, and a part
+  with one core (the C6) never makes it.
 
 **What is still over 1.0.** The three object streams above 1.0 and enhanced coupling at 7.1.4.
 The second core takes a fifth off the JOC reconstruction on this part (22.4 to 17.9 ms of
