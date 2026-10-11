@@ -113,8 +113,9 @@ checked. The table is of `main` at `5ef9eeafc`.
 | I6 | the ESP32 sinks | | not built |
 | N1 | the program names and the layout of `src/` | study #1122; S2 #1160; S3 #1161; S4 #1162; N1A #1164; S5; S6 | built in the repository, 2026-09-30 and 2026-10-01; the owner's renames and U1 are left (see N1); the PyPI project and the Homebrew names are decided (40, 41) and the open vcpkg pull request is not |
 
-Not built, beside those: a quality series for the encoder (the decoder's has one, `ac4-quality-main.jsonl`;
-the encoder's scores and the race against DEE are held to pinned floors and keep no history), Pro
+Not built, beside those: a history for the race against DEE (the encoder's own scores have a
+series since 2026-10-11, `ac4-encode-quality-main.jsonl`, 24 of the 72 legs of `score_ac4_encode.py`: the
+programme content at default options; the race is local and held to pinned floors), Pro
 Logic II from Hearth's Decoder page, an AC-4 live session in the Forge GUI, and AC-4 in Matroska,
 which registers no codec ID for it. AC-4's speed and memory are measured and gated: `ac3perf` holds
 AC-4's stereo and 5.1 encode and decode to real time in the gate's build legs, the speed, kernel and
@@ -1274,8 +1275,10 @@ that proves most to the one that proves least:
    holds the encoder's scores to pinned floors in FFmpeg Validate, which runs nightly, and its
    `--gold` race against DEE runs locally, with DEE's streams and ViSQOL; `quality_race.py` has no
    AC-4 legs. The decoder's scores have a trend series of 10 legs, which the nightly run writes
-   ([Quality trend](../docs/quality-trend.md#ac-4-decode-quality)); the encoder's scores, a
-   comparison with other tools and AC-4's objects have none. AC-4 does have speed, allocation and
+   ([Quality trend](../docs/quality-trend.md#ac-4-decode-quality)), and the encoder's 24 programme
+   legs one of their own, which the nightly run writes
+   ([Quality trend](../docs/quality-trend.md#ac-4-encode-quality)); a comparison with other tools
+   and AC-4's objects have none. AC-4 does have speed, allocation and
    kernel series ([Performance trend](../docs/performance-trend.md)).
 6. **Metadata gains match their formulas.** Through the decoder's output processing (D6), the
    encoder's streams give the dialogue enhancement, output level, downmix and mixing gains their
@@ -4178,8 +4181,8 @@ stand. Each lists its options, the recommendation, what each costs, and what was
 
     **Taken: (a)**, as recommended; the user raised no objection. As built, each phase's pull
     request recorded the gap to DEE, `score_ac4_encode.py` pins the scores as floors that fail
-    FFmpeg Validate's nightly run, the race against DEE runs locally, and the encoder's scores have
-    no trend series.
+    FFmpeg Validate's nightly run, and the race against DEE runs locally. The encoder's programme
+    legs have had a trend series since 2026-10-11, and the race has none.
 
 20. **The applications, and their order.**
     - (a) **`ac3cli` with each library phase; once the channel-based library is complete, the rest

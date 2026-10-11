@@ -790,7 +790,8 @@ std::vector<render::OutputLayout> NetworkSinks::plan_group(const GroupPlanReques
     }
     const StreamNeeds needs{.stream = request.stream,
                             .sample_rate = request.sample_rate,
-                            .coded_channels = request.coded_channels};
+                            .coded_channels = request.coded_channels,
+                            .objects = request.objects};
     const GroupFormPlan plan = plan_group_forms(needs, request.layout, facts);
 
     for (std::size_t index = 0; index < members.size(); ++index) {

@@ -1370,7 +1370,8 @@ Player::OpenFailure Player::open_chosen(std::size_t item, PumpReport* report) {
                               NetworkGroupSink::Format{.sample_rate = rate,
                                                        .layout = layout_,
                                                        .stream = sent_stream(*session_),
-                                                       .coded_channels = facts.channels});
+                                                       .coded_channels = facts.channels,
+                                                       .objects = facts.objects});
     } else {
         opened = sink_->open(
             PcmSink::Format{.sample_rate = rate, .layout = layout_, .endpoint_id = choice_.endpoint_id});
