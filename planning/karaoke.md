@@ -6,7 +6,8 @@
     ([Specification decisions](#specification-decisions)). The build is K0 to K6 of
     [the design's work breakdown](karaoke-design.md#work-breakdown), and [As built](#as-built)
     records what each PR did and where the build departed from this page. A requirement the build
-    changed carries an *As built* note. The live status board is [ROADMAP.md](../ROADMAP.md).
+    changed carries an *As built* note. What phase 1 left is planned in
+    [karaoke-phase2.md](karaoke-phase2.md). The live status board is [ROADMAP.md](../ROADMAP.md).
 
     | Phase | What | State |
     |---|---|---|
@@ -387,7 +388,8 @@ Recorded so a later phase starts from the owner's words and the open questions, 
 
 ### Found while building
 
-Not in v1, and not on the lists above; each is a place a later phase can start.
+Not in v1, and not on the lists above; each is a place a later phase can start, and
+[phase 2](karaoke-phase2.md) is where they were taken up.
 
 **Hearth**
 

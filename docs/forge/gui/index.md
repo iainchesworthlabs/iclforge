@@ -18,7 +18,8 @@ on the spot) and a one-sentence tour of the window:
 
 Any of those, plus dragging a file onto the window or launching `forge-gui path/to/file` from a
 shell, works from the first-run screen or the workbench alike — a WAV becomes a source, an
-already-encoded `.ac3`/`.ec3` opens in the [stream player](open-stream.md) instead. An `.ac4` file
+already-encoded `.ac3`/`.ec3` opens in the [stream player](open-stream.md) instead, and a
+`.forgeproj` opens as a [project](projects.md). An `.ac4` file
 is not recognised there: dropped or named on the command line it is read as a source and refused,
 so open one with **Open stream…**, whose file picker has an AC-4 filter. `forge-gui` claims no file
 type with the desktop, so a double-click in the file manager does not reach it:
@@ -46,7 +47,9 @@ Minimum size 1280×900. Two panes, divided by a vertical rule:
   counterpart for Dolby Atmos object metadata/audio — see [Inspect objects](inspect-objects.md)),
   an **Open stream…** button (plays an already-encoded file and exports its decode — see
   [Open stream](open-stream.md)), a **Preferences** button, and an **About** button (the version
-  and the licence).
+  and the licence). The title strip above the header ends in a **Project…** menu (**Open
+  project…** and **Save project…**, which keep what is set up in a file — see
+  [Projects](projects.md)).
 - **Left rail — "the signal"** (always visible, never scrolled away, and never affected by which
   tier is selected): three numbered blocks — **01 Input** (one input, with a **File / Live
   capture** selector, the loaded source list and its totals), **02 Levels** (the channel meters),
@@ -236,9 +239,11 @@ The rest of the guide, in reading order:
    actually recovers from an already-encoded file, from the header's own dialog
 10. [Open stream](open-stream.md) — play an already-encoded file and export its decode, from the
     header's own dialog or a finished run's own **More…** menu
-11. [Localisation](localisation.md) — what's translated today, the pseudo-locale QA fixture, and
+11. [Projects](projects.md) — save what is set up to a file and open it again, and the format's
+    rules for being added to
+12. [Localisation](localisation.md) — what's translated today, the pseudo-locale QA fixture, and
     how to update or add a language
-12. [Keyboard & text size](accessibility.md) — what can be done without a mouse, what a screen
+13. [Keyboard & text size](accessibility.md) — what can be done without a mouse, what a screen
     reader is told, the text-size setting, the diagnostics file, and what is still mouse-only
 
 Or start with [Concepts](../../concepts/index.md) if terms like "dependent substream" or "JOC" are

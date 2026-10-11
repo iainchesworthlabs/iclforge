@@ -162,6 +162,7 @@ All of these are run from the repo root.
 | `gen_baremetal_ac4_fixture.py` | `firmware/baremetal/ac4_fixture.hpp`, the committed AC-4 streams the bare-metal AC-4 probe decodes and their per-channel levels | needs a built `forge` (`--forge`) |
 | `gen_device_streams.py` | `firmware/hearth-sink/www/`: the ESP32 player's stream set and its `streams.json` | needs a built `forge` (`--forge`) and numpy; `tools/checks/check_stream_set.py` checks the committed set |
 | `gen_conformance_vectors.py` | the conformance vector bundle under `--out`, and with `--archive` its `.tar.gz` | needs a built `forge` (`--cli`); the one script CI runs, see above |
+| `gen_karaoke_example.py` | `examples/karaoke/auld-lang-syne/`: the karaoke example's four parts, its two lyrics files and its Forge GUI project, and with `--forge` its stream | stdlib only; `--check` compares the committed files; `tools/checks/test_gen_karaoke_example.py` runs it in CI; the sample path uses no C library function, so the files are the same on every platform |
 | `gen_pseudo_locale.py` | `apps/forge/gui/assets/translations/forge_gui_xx.ts`, the GUI's pseudo-locale, made from `forge_gui_fr.ts` | stdlib only |
 
 Regenerating a programme fixture:

@@ -50,3 +50,10 @@ cmake/vcpkg/ports/** text eol=lf
 # tools/checks/check_corpus.py): a Windows checkout with core.autocrlf would write CRLF and fail the
 # fixture check for a file nobody changed.
 testdata/audio/*.paths text eol=lf
+
+# The karaoke example's words and project (examples/karaoke/auld-lang-syne/) are text that
+# tools/checks/test_gen_karaoke_example.py holds, byte for byte, to what the generator writes, and
+# Hearth reads the words from the file on disk: LF in every checkout, whatever core.autocrlf says.
+# The parts are WAV and the stream is .ac3 (above), which git already leaves alone.
+examples/karaoke/**/*.lrc text eol=lf
+examples/karaoke/**/*.forgeproj text eol=lf

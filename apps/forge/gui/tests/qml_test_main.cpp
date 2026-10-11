@@ -161,17 +161,22 @@ public:
         return QUrl::fromLocalFile(path);
     }
 
-    // A text file called `name` beside the tones, UTF-8: a lyrics file for the part it is named
-    // after. The file's URL, or an empty one where it could not be written.
+    // A text file of the test's own beside the generated audio: a project that another
+    // version wrote, say. The file's URL, or an empty one where it could not be written.
     [[nodiscard]] Q_INVOKABLE QUrl writeText(const QString& name, const QString& text) const {
         const QString path = QDir(folder_).filePath(name);
         QFile file(path);
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        const QByteArray bytes = text.toUtf8();
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
+            file.write(bytes) != bytes.size()) {
             return {};
         }
-        const QByteArray bytes = text.toUtf8();
-        return file.write(bytes) == bytes.size() ? QUrl::fromLocalFile(path) : QUrl();
+        return QUrl::fromLocalFile(path);
     }
+
+    // The folder the generated files go in, as a URL: a project written there refers to the
+    // parts beside it by their names.
+    [[nodiscard]] Q_INVOKABLE QUrl folder() const { return QUrl::fromLocalFile(folder_); }
 
     // Whether `file` is gone: a run's output removed before it is made again, so that a file
     // left by an earlier run is not mistaken for this one's.

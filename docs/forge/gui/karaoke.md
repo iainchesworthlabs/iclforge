@@ -72,6 +72,14 @@ already there is left as it is.
 
 The start offsets and trims you set on the parts stay when you add, replace or remove a part.
 
+## A project of the parts
+
+**Project…**, **Save project…** keeps which file is which part, the levels, the bit rate and how
+the stream is heard in a `.forgeproj`, and **Open project…** (or dropping it on the window)
+puts the flow back as it was; see [Projects](projects.md). The
+[Auld Lang Syne example](https://github.com/iainchesworthlabs/iclforge/tree/main/examples/karaoke/auld-lang-syne)
+is four generated parts, a project that opens them here, the stream they make and its words.
+
 ## The same from the command line
 
 The command the last step shows is the whole of it, for example a 3/1 stream (backing, melody,
