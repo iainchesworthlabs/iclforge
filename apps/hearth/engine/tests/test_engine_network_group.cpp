@@ -21,9 +21,14 @@
 
 #include "platform/process.hpp"
 
+#include "burst_output.hpp"
+#include "engine_thread.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/ac3/io/wav.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/audio/passthrough.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/render.hpp"
 #include "iclforge/sendspin/messages.hpp"
@@ -31,12 +36,9 @@
 #include "iclforge/sendspin/pairing_messages.hpp"
 #include "iclforge/sendspin/server_host.hpp"
 #include "iclforge/sendspin/server_store.hpp"
-#include "iclforge/ac4/io/elementary.hpp"
-#include "iclforge/ac4/decoder/decoder.hpp"
-#include "burst_output.hpp"
-#include "engine_thread.hpp"
 #include "network_group_sink.hpp"
 #include "sink.hpp"
+#include "stream_decoder.hpp"
 
 // Issue #874's own exit (planning/hearth-reference-player.md, A6): "from the
 // app, a group of two test sinks... plays one programme." Unlike
@@ -394,6 +396,214 @@ TEST_CASE("engine: from the app, a group of two test sinks plays one programme",
     // exit makes for the library alone.
     CHECK(pcm_sink->totals().connections == 1);
     CHECK(burst_sink->totals().connections == 1);
+}
+
+// A group is one programme and each member takes it in the form and layout that suits it. The
+// player renders to 5.1; the group's planner (what NetworkSinks does by choose_sink_form) says one
+// member is to be sent PCM at 2.0, which is the decoder's own fold and not the 5.1 mixed down.
+// Three sinks play it together: one decodes the coded stream itself, one takes the player's 5.1 as
+// PCM, and one a board that lists stereo, moved to PCM at 2.0.
+TEST_CASE("engine: a group's members are each sent the layout their player takes",
+          "[hearth][group][websocket][iclforge]") {
+    namespace ss = iclforge::sendspin;
+    constexpr int kFrameCount = 20;
+    const fs::path scratch = fs::path{ICLFORGE_TEST_SCRATCH_DIR} /
+                             ("hearth_engine_group_variants_" + scratch_pid_suffix());
+    fs::remove_all(scratch);
+    QuietLog log;
+
+    // The programme: 5.1 E-AC-3, kept as units for the reference decodes.
+    iclforge::ac3::eac3::FrameConfig config;
+    config.bitrate_kbps = 384;
+    config.acmod = iclforge::ac3::Acmod::k3_2;
+    config.lfe = true;
+    iclforge::ac3::eac3::FrameEncoder encoder{config};
+    std::vector<std::vector<std::byte>> units;
+    std::vector<std::byte> programme;
+    for (int f = 0; f < kFrameCount; ++f) {
+        std::vector<float> samples(iclforge::ac3::kSamplesPerFrame);
+        for (std::size_t n = 0; n < samples.size(); ++n) {
+            samples[n] = static_cast<float>(
+                0.3 *
+                std::sin(2.0 * std::numbers::pi * 440.0 *
+                         static_cast<double>(n + (static_cast<std::size_t>(f) * 1536)) / 48000.0));
+        }
+        std::vector<std::vector<float>> by_channel;
+        for (int channel = 0; channel < encoder.channel_count(); ++channel) {
+            // Each channel at its own level, so a fold has something to sum.
+            std::vector<float> scaled = samples;
+            for (float& sample : scaled) {
+                sample *= 0.4F + (0.1F * static_cast<float>(channel));
+            }
+            by_channel.push_back(std::move(scaled));
+        }
+        const std::vector<std::span<const float>> views(by_channel.begin(), by_channel.end());
+        const auto frame = encoder.encode_frame(views);
+        REQUIRE(frame.has_value());
+        units.push_back(*frame);
+        programme.insert(programme.end(), frame->begin(), frame->end());
+    }
+
+    const auto make_sink = [&](const std::string& name, bool extension_role, bool unpaired_access,
+                               std::vector<std::int32_t> widths) {
+        testsink::SinkOptions options;
+        options.name = name;
+        options.address = "127.0.0.1";
+        options.port = 0;
+        options.state_directory = scratch / name / "state";
+        options.output_directory = scratch / name / "out";
+        options.advertise = false;
+        options.unpaired_access = unpaired_access;
+        options.codecs = {m::Codec::kPcm};
+        options.extension_role = extension_role;
+        options.layout = "5.1";
+        options.pcm_channels = std::move(widths);
+        auto started = testsink::Sink::start(options, log);
+        REQUIRE(started.has_value());
+        return std::move(*started);
+    };
+    const std::unique_ptr<testsink::Sink> decodes = make_sink("decodes", true, false, {2});
+    const std::unique_ptr<testsink::Sink> stereo = make_sink("stereo", true, false, {2});
+    const std::unique_ptr<testsink::Sink> wide = make_sink("wide", false, true, {6});
+
+    std::optional<ss::noise::KeyPair> identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    ss::MemoryServerStore store;
+    HostEvents events;
+    auto host = ss::ServerHost::start({.identity = *identity,
+                                       .name = "Test host",
+                                       .languages = {"en"},
+                                       .address = "127.0.0.1",
+                                       .port = std::nullopt,
+                                       .advertise = false,
+                                       .browse = false,
+                                       .mdns_interfaces = {}},
+                                      store, events);
+    REQUIRE(host.has_value());
+    REQUIRE((*host)->enter_pairing_token(decodes->pairing_token()));
+    REQUIRE((*host)->enter_pairing_token(stereo->pairing_token()));
+    for (const testsink::Sink* sink : {decodes.get(), stereo.get(), wide.get()}) {
+        (*host)->dial("ws://127.0.0.1:" + std::to_string(sink->port()) + "/sendspin");
+    }
+    REQUIRE(events.wait([](const auto& clients) { return clients.size() == 3; }, 15s));
+    REQUIRE((*host)->approve(wide->client_id(), true));
+    REQUIRE(events.wait(
+        [](const auto& clients) {
+            return clients.size() == 3 &&
+                   std::all_of(clients.begin(), clients.end(), [](const auto& entry) {
+                       return entry.second.playing && entry.second.available;
+                   });
+        },
+        30s));
+
+    std::shared_ptr<ss::Group> group = (*host)->make_group("Variants");
+    for (const ss::ClientView& client : (*host)->clients()) {
+        group->add(client.client_id);
+    }
+
+    const ItemLoader loader =
+        [&programme](const std::string& path) -> std::expected<LoadedItem, std::string> {
+        if (path != "programme") {
+            return std::unexpected("no such file: " + path);
+        }
+        return LoadedItem{.bytes = programme};
+    };
+    const auto master = iclforge::render::OutputLayout::parse("5.1");
+    const auto fold = iclforge::render::OutputLayout::parse("2.0");
+    REQUIRE(master.has_value());
+    REQUIRE(fold.has_value());
+
+    // What the planner was asked, and what it did: the board that lists stereo is to be sent PCM at
+    // 2.0, and the one that decodes keeps the coded stream.
+    std::optional<iclforge::hearth::GroupPlanRequest> asked;
+    const iclforge::hearth::MemberPlanner planner =
+        [&](const iclforge::hearth::GroupPlanRequest& request)
+        -> std::vector<iclforge::render::OutputLayout> {
+        asked = request;
+        (*host)->use_pcm(stereo->client_id(), true, 0, 2);
+        return {*fold};
+    };
+    EngineOutputs outputs{.group = iclforge::hearth::make_group_sink(
+                              [&group](const std::string&) { return group; }, planner)};
+    Engine engine(std::move(outputs), loader, *master, iclforge::hearth::DecoderSettings{},
+                  EngineTiming{.period = 5ms, .budget = 4800});
+    engine.set_output_preferences(OutputPreferences{.pinned = OutputMode::kNetworkGroup,
+                                                    .follow_sink = true,
+                                                    .group_name = group->id(),
+                                                    .group_ready = true});
+    engine.add({QueueItem{.path = "programme", .title = "Test programme"}});
+    engine.play();
+    REQUIRE(eventually([&] {
+        const EngineStatus status = engine.status();
+        return status.state == TransportState::kStopped && !status.history.empty();
+    }));
+    const EngineStatus finished = engine.status();
+    INFO("output_reason: " << finished.output_reason << " / note: " << finished.note
+                           << " / error: " << finished.error);
+    REQUIRE(finished.history.size() == 1);
+    CHECK(finished.history.front().frames == finished.history.front().expected_frames);
+
+    // The player said what the item is, so the planner could judge each member by it.
+    REQUIRE(asked.has_value());
+    CHECK(asked->stream == iclforge::audio::BitstreamFormat::kEac3);
+    CHECK(asked->sample_rate == 48000);
+    CHECK(asked->coded_channels == 6);
+    CHECK(asked->layout.slots() == 6);
+
+    const std::uint64_t expected_frames = static_cast<std::uint64_t>(kFrameCount) * 1536;
+    REQUIRE(eventually([&] {
+        return stereo->totals().frames >= expected_frames &&
+               wide->totals().frames >= expected_frames &&
+               decodes->totals().bursts >= static_cast<std::uint64_t>(kFrameCount);
+    }));
+    // The sink that decodes got the coded stream, and no PCM.
+    CHECK(decodes->totals().bursts == static_cast<std::uint64_t>(kFrameCount));
+    CHECK(decodes->totals().frames == 0);
+    // The board moved to PCM got it, and no bursts; so did the plain player.
+    CHECK(stereo->totals().frames == expected_frames);
+    CHECK(stereo->totals().bursts == 0);
+    CHECK(wide->totals().frames == expected_frames);
+    group.reset();
+    host->reset();
+
+    // Each wrote the layout it was sent, and that layout's own render of the programme: the board's
+    // stereo is what a stereo decoder of the stream makes (its fold), and the player's 5.1 what a
+    // 5.1 decoder makes. 16-bit samples, so within a sample's step of the float reference.
+    const auto matches = [&](const char* name, const iclforge::render::OutputLayout& layout) {
+        iclforge::hearth::StreamDecoder reference{layout, 48000};
+        std::vector<std::vector<float>> want(layout.slots());
+        const auto deliver = [&want](std::span<const std::span<const float>> slots,
+                                     std::size_t frames) {
+            for (std::size_t slot = 0; slot < slots.size(); ++slot) {
+                want[slot].insert(want[slot].end(), slots[slot].begin(),
+                                  slots[slot].begin() + static_cast<std::ptrdiff_t>(frames));
+            }
+        };
+        for (const auto& unit : units) {
+            REQUIRE(reference.decode(unit, deliver).has_value());
+        }
+        reference.finish(deliver);
+        const auto wav = iclforge::ac3::io::read_wav(
+            only_file(scratch / name / "out", "stream-", ".wav").string());
+        REQUIRE(wav.has_value());
+        REQUIRE(wav->channels.size() == layout.slots());
+        REQUIRE(wav->frame_count() == want[0].size());
+        double worst = 0.0;
+        double energy = 0.0;
+        for (std::size_t slot = 0; slot < layout.slots(); ++slot) {
+            for (std::size_t frame = 0; frame < want[slot].size(); ++frame) {
+                worst = std::max(worst, std::abs(static_cast<double>(wav->channels[slot][frame]) -
+                                                 static_cast<double>(want[slot][frame])));
+                energy +=
+                    static_cast<double>(want[slot][frame]) * static_cast<double>(want[slot][frame]);
+            }
+        }
+        CHECK(worst < 2.0 / 32768.0);
+        // Something was played, not two silences that agree.
+        CHECK(energy > 1.0);
+    };
+    matches("stereo", *fold);
+    matches("wide", *master);
 }
 
 // planning/ac4.md, I2: "AC-4 decodes to PCM for every output, and is sent as a

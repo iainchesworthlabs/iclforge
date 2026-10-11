@@ -1854,6 +1854,183 @@ TEST_CASE("OAMD sends no divergence for an inactive object", "[oba][oamd][diverg
     CHECK(decoded->objects[1].divergence == nearest_in_table_42(0.5));
 }
 
+// §5.6.6.4 / §5.6.1.1.8-.14: a position is the standard 1/62 (x, y) or 1/15 (z) code plus
+// ext_prec_pos / (62 x 5) or / (15 x 5), the refinement coming from Tables 44-46's
+// {+1, +2, -1, -2}. The values below are chosen ON that grid, so a decoder that applies the
+// refinement returns them exactly and one that walks past it returns the standard code.
+namespace {
+
+iclforge::objects::oba::DynamicObject at_position(double x, double y, double z) {
+    iclforge::objects::oba::DynamicObject object;
+    object.position = {.x = x, .y = y, .z = z};
+    return object;
+}
+
+}  // namespace
+
+TEST_CASE("OAMD reads extended precision positions and sends them when asked",
+          "[oba][oamd][extprec]") {
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 3};
+    constexpr double kXy = 1.0 / 310.0;  // a fifth of 1/62
+    constexpr double kZ = 1.0 / 75.0;    // a fifth of 1/15
+    const std::array<iclforge::objects::oba::DynamicObject, 3> objects{{
+        at_position(19.0 / 62.0 + 1 * kXy, 10.0 / 62.0 - 2 * kXy, 5.0 / 15.0 + 2 * kZ),
+        at_position(40.0 / 62.0 - 1 * kXy, 30.0 / 62.0 + 2 * kXy, -4.0 / 15.0 - 1 * kZ),
+        at_position(0.5, 0.25, 0.0),  // 0.25 is between codes 15 and 16 of 62: refined too
+    }};
+    // The standard code of each, which is what the same objects decode to without the option.
+    const std::array<iclforge::objects::oba::DynamicObject, 3> standard{{
+        at_position(19.0 / 62.0, 10.0 / 62.0, 5.0 / 15.0),
+        at_position(40.0 / 62.0, 30.0 / 62.0, -4.0 / 15.0),
+        at_position(31.0 / 62.0, 16.0 / 62.0, 0.0),
+    }};
+
+    const auto decode = [&](bool extended) {
+        const std::array<iclforge::objects::oba::ObjectUpdate, 1> updates{
+            {{.objects = objects, .extended_position_precision = extended}}};
+        const auto decoded = iclforge::objects::oba::parse_payload(
+            iclforge::objects::oba::build_payload_updates(program, updates));
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->objects.size() == 3);
+        return *decoded;
+    };
+
+    SECTION("without the option the standard code is all that is sent") {
+        const auto decoded = decode(false);
+        for (std::size_t i = 0; i < 3; ++i) {
+            CAPTURE(i);
+            CHECK(decoded.objects[i].position.x ==
+                  Catch::Approx(standard[i].position.x).margin(1e-12));
+            CHECK(decoded.objects[i].position.y ==
+                  Catch::Approx(standard[i].position.y).margin(1e-12));
+            CHECK(decoded.objects[i].position.z ==
+                  Catch::Approx(standard[i].position.z).margin(1e-12));
+        }
+    }
+
+    SECTION("with it the first two objects come back exactly as they were given") {
+        const auto decoded = decode(true);
+        for (std::size_t i = 0; i < 2; ++i) {
+            CAPTURE(i);
+            CHECK(decoded.objects[i].position.x ==
+                  Catch::Approx(objects[i].position.x).margin(1e-9));
+            CHECK(decoded.objects[i].position.y ==
+                  Catch::Approx(objects[i].position.y).margin(1e-9));
+            CHECK(decoded.objects[i].position.z ==
+                  Catch::Approx(objects[i].position.z).margin(1e-9));
+        }
+    }
+
+    SECTION("an arbitrary position lands within half a fifth-step instead of half a step") {
+        const std::array<iclforge::objects::oba::DynamicObject, 3> any{{
+            at_position(0.3, 0.7, 0.45), at_position(0.123, 0.987, -0.61), at_position(0.5, 0.5, 0.1)}};
+        const std::array<iclforge::objects::oba::ObjectUpdate, 1> updates{
+            {{.objects = any, .extended_position_precision = true}}};
+        const auto decoded = iclforge::objects::oba::parse_payload(
+            iclforge::objects::oba::build_payload_updates(program, updates));
+        REQUIRE(decoded.has_value());
+        for (std::size_t i = 0; i < 3; ++i) {
+            CAPTURE(i);
+            CHECK(std::abs(decoded->objects[i].position.x - any[i].position.x) <= 0.5 * kXy + 1e-9);
+            CHECK(std::abs(decoded->objects[i].position.y - any[i].position.y) <= 0.5 * kXy + 1e-9);
+            CHECK(std::abs(decoded->objects[i].position.z - any[i].position.z) <= 0.5 * kZ + 1e-9);
+        }
+    }
+
+    SECTION("an inactive object sends no refinement and the active ones after it still read") {
+        // §5.5.15: b_obj_not_active sends nothing, so a reader that took a
+        // b_ext_prec_pos for it would be a bit out for everything behind.
+        auto with_silent = objects;
+        with_silent[0].active = false;
+        const std::array<iclforge::objects::oba::ObjectUpdate, 1> updates{
+            {{.objects = with_silent, .extended_position_precision = true}}};
+        const auto decoded = iclforge::objects::oba::parse_payload(
+            iclforge::objects::oba::build_payload_updates(program, updates));
+        REQUIRE(decoded.has_value());
+        CHECK_FALSE(decoded->objects[0].active);
+        CHECK(decoded->objects[1].position.x == Catch::Approx(objects[1].position.x).margin(1e-9));
+        CHECK(decoded->objects[1].position.z == Catch::Approx(objects[1].position.z).margin(1e-9));
+    }
+
+    SECTION("each block carries its own refinement") {
+        const std::array<iclforge::objects::oba::DynamicObject, 1> first{
+            {at_position(19.0 / 62.0 + 1 * kXy, 0.5, 0.0)}};
+        const std::array<iclforge::objects::oba::DynamicObject, 1> second{
+            {at_position(19.0 / 62.0 - 2 * kXy, 0.5, 0.0)}};
+        const iclforge::objects::oba::Program one{
+            .dynamic_only = true, .lfe = false, .dynamic_objects = 1};
+        const std::array<iclforge::objects::oba::ObjectUpdate, 2> updates{
+            {{.block_offset_factor = 0, .objects = first, .extended_position_precision = true},
+             {.block_offset_factor = 8, .objects = second, .extended_position_precision = true}}};
+        const auto decoded = iclforge::objects::oba::parse_payload(
+            iclforge::objects::oba::build_payload_updates(one, updates));
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->blocks.size() == 2);
+        CHECK(decoded->blocks[0].objects[0].position.x ==
+              Catch::Approx(19.0 / 62.0 + 1 * kXy).margin(1e-9));
+        CHECK(decoded->blocks[1].objects[0].position.x ==
+              Catch::Approx(19.0 / 62.0 - 2 * kXy).margin(1e-9));
+    }
+}
+
+TEST_CASE("OAMD codes extended precision as Tables 43 to 46 say", "[oba][oamd][extprec]") {
+    const iclforge::objects::oba::Program program{
+        .dynamic_only = true, .lfe = false, .dynamic_objects = 1};
+    constexpr double kXy = 1.0 / 310.0;
+    constexpr double kZ = 1.0 / 75.0;
+    // The extended element's bits, read back by hand: skip the object_element
+    // by its size, then walk §5.5.13 and §5.5.15 field by field.
+    const auto bits_of = [&](const iclforge::objects::oba::DynamicObject& object,
+                             std::size_t extended_bits) {
+        const std::array<iclforge::objects::oba::DynamicObject, 1> objects{object};
+        const std::array<iclforge::objects::oba::ObjectUpdate, 1> updates{
+            {{.objects = objects, .extended_position_precision = true}}};
+        const auto payload = iclforge::objects::oba::build_payload_updates(program, updates);
+        iclforge::BitReader r(payload);
+        r.skip(2 + 5 + 2 + 1);
+        REQUIRE(r.read(4) == 2);  // oa_element_count_bits: object_element, extended_object_element
+        REQUIRE(r.read(4) == 1);
+        const auto object_bytes = static_cast<std::size_t>(read_variable_bits_max(r, 4, 4)) + 1;
+        r.skip(object_bytes * 8);
+        REQUIRE(r.read(4) == 5);  // oa_element_id_idx: extended_object_element
+        const auto extended_bytes = static_cast<std::size_t>(read_variable_bits_max(r, 4, 4)) + 1;
+        REQUIRE(extended_bytes * 8 >= extended_bits + 1);
+        r.skip(1);  // b_discard_unknown_element
+        std::vector<int> bits;
+        for (std::size_t i = 0; i < extended_bits; ++i) {
+            bits.push_back(static_cast<int>(r.read_bit()));
+        }
+        return bits;
+    };
+
+    SECTION("x +1 and z -2: Z leads the presence array, the codes follow X, Y, Z") {
+        // b_obj_div_block 0; b_ext_prec_pos_block 1; b_ext_prec_pos 1;
+        // presence[0], [1], [2] = Z, Y, X = 1 0 1; ext_prec_pos3D_X 00 (Table 44: +1);
+        // ext_prec_pos3D_Z 11 (Table 46: -2).
+        const auto bits = bits_of(at_position(31.0 / 62.0 + 1 * kXy, 31.0 / 62.0, -2 * kZ), 10);
+        CHECK(bits == std::vector<int>{0, 1, 1, 1, 0, 1, 0, 0, 1, 1});
+    }
+
+    SECTION("x +2 and y -1 take codes 01 and 10") {
+        // presence Z Y X = 0 1 1; X 01 (+2), Y 10 (-1).
+        const auto bits =
+            bits_of(at_position(31.0 / 62.0 + 2 * kXy, 31.0 / 62.0 - 1 * kXy, 0.0), 10);
+        CHECK(bits == std::vector<int>{0, 1, 1, 0, 1, 1, 0, 1, 1, 0});
+    }
+
+    SECTION("a position already on the grid sends no extended element at all") {
+        const std::array<iclforge::objects::oba::DynamicObject, 1> objects{
+            {at_position(31.0 / 62.0, 31.0 / 62.0, 0.0)}};
+        const std::array<iclforge::objects::oba::ObjectUpdate, 1> updates{
+            {{.objects = objects, .extended_position_precision = true}}};
+        const auto payload = iclforge::objects::oba::build_payload_updates(program, updates);
+        iclforge::BitReader r(payload);
+        r.skip(2 + 5 + 2 + 1);
+        CHECK(r.read(4) == 1);  // the object_element alone
+    }
+}
+
 TEST_CASE("OAMD round-trips the screen reference and its two factors", "[oba][oamd][screen]") {
     const iclforge::objects::oba::Program program{
         .dynamic_only = true, .lfe = false, .dynamic_objects = 4};

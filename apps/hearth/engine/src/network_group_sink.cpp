@@ -40,50 +40,82 @@ constexpr std::int32_t kBitDepth = 32;
 
 class GroupSink final : public NetworkGroupSink {
 public:
-    explicit GroupSink(GroupResolver resolve) : resolve_(std::move(resolve)) {}
+ GroupSink(GroupResolver resolve, MemberPlanner plan)
+     : resolve_(std::move(resolve)), plan_(std::move(plan)) {}
 
-    ~GroupSink() override { close(); }
+ ~GroupSink() override { close(); }
 
-    GroupSink(const GroupSink&) = delete;
-    GroupSink& operator=(const GroupSink&) = delete;
+ GroupSink(const GroupSink&) = delete;
+ GroupSink& operator=(const GroupSink&) = delete;
 
-    std::expected<OpenOutputFormat, std::string> open(const std::string& group_name,
-                                                       const Format& format) override {
-        close();
-        std::shared_ptr<sendspin::Group> group = resolve_ ? resolve_(group_name) : nullptr;
-        if (!group) {
-            return std::unexpected(fmt::format("The group \"{}\" is not available.", group_name));
-        }
-        const auto channels = static_cast<std::int32_t>(format.layout.slots());
-        const m::AudioFormat pcm{.codec = m::Codec::kPcm,
-                                 .channels = channels,
+ std::expected<OpenOutputFormat, std::string> open(const std::string& group_name,
+                                                   const Format& format) override {
+     close();
+     std::shared_ptr<sendspin::Group> group = resolve_ ? resolve_(group_name) : nullptr;
+     if (!group) {
+         return std::unexpected(fmt::format("The group \"{}\" is not available.", group_name));
+     }
+     const auto channels = static_cast<std::int32_t>(format.layout.slots());
+     const m::AudioFormat pcm{.codec = m::Codec::kPcm,
+                              .channels = channels,
+                              .sample_rate = static_cast<std::int32_t>(format.sample_rate),
+                              .bit_depth = kBitDepth};
+     std::optional<sendspin::player::StreamStart> bursts;
+     if (format.stream) {
+         bursts = sendspin::player::StreamStart{
+             .data_type = data_type_of(*format.stream),
+             .sample_rate = static_cast<std::int32_t>(format.sample_rate)};
+     }
+     // The members' forms are decided now, with the item's facts, and what
+     // they are to be sent PCM at, beyond the player's layout, comes back.
+     std::vector<render::OutputLayout> variants;
+     std::vector<m::AudioFormat> more_pcm;
+     if (plan_) {
+         const std::vector<render::OutputLayout> planned =
+             plan_({.group_name = group_name,
+                    .stream = format.stream,
+                    .sample_rate = format.sample_rate,
+                    .coded_channels = format.coded_channels,
+                    .layout = format.layout});
+         for (const render::OutputLayout& layout : planned) {
+             // One variant per width: a player lists a width, not a layout,
+             // and the group refuses two of one.
+             const auto width = static_cast<std::int32_t>(layout.slots());
+             const bool taken = width == channels || std::any_of(more_pcm.begin(), more_pcm.end(),
+                                                                 [&](const m::AudioFormat& other) {
+                                                                     return other.channels == width;
+                                                                 });
+             if (taken || width < 1) {
+                 continue;
+             }
+             variants.push_back(layout);
+             more_pcm.push_back({.codec = m::Codec::kPcm,
+                                 .channels = width,
                                  .sample_rate = static_cast<std::int32_t>(format.sample_rate),
-                                 .bit_depth = kBitDepth};
-        std::optional<sendspin::player::StreamStart> bursts;
-        if (format.stream) {
-            bursts = sendspin::player::StreamStart{
-                .data_type = data_type_of(*format.stream),
-                .sample_rate = static_cast<std::int32_t>(format.sample_rate)};
-        }
-        if (!group->start({.pcm = pcm, .bursts = bursts, .buffered = true})) {
-            return std::unexpected(fmt::format("The group \"{}\" would not start.", group_name));
-        }
-        group_ = std::move(group);
-        channels_ = static_cast<std::size_t>(channels);
-        sample_rate_ = format.sample_rate;
-        taken_ = 0;
-        flushed_ = 0;
-        return OpenOutputFormat{.sample_rate = format.sample_rate,
-                                .channels = static_cast<std::uint16_t>(channels),
-                                .mode = OutputMode::kNetworkGroup,
-                                .stream = format.stream};
-    }
+                                 .bit_depth = kBitDepth});
+         }
+     }
+     if (!group->start({.pcm = pcm, .more_pcm = more_pcm, .bursts = bursts, .buffered = true})) {
+         return std::unexpected(fmt::format("The group \"{}\" would not start.", group_name));
+     }
+     group_ = std::move(group);
+     variants_ = std::move(variants);
+     channels_ = static_cast<std::size_t>(channels);
+     sample_rate_ = format.sample_rate;
+     taken_ = 0;
+     flushed_ = 0;
+     return OpenOutputFormat{.sample_rate = format.sample_rate,
+                             .channels = static_cast<std::uint16_t>(channels),
+                             .mode = OutputMode::kNetworkGroup,
+                             .stream = format.stream};
+ }
 
     void close() override {
         if (group_) {
             group_->stop();
         }
         group_.reset();
+        variants_.clear();
         channels_ = 0;
         taken_ = 0;
         flushed_ = 0;
@@ -91,18 +123,49 @@ public:
 
     [[nodiscard]] bool is_open() const override { return group_ != nullptr; }
 
+    [[nodiscard]] std::vector<render::OutputLayout> variants() const override { return variants_; }
+
     std::size_t submit_pcm(std::span<const std::span<const float>> slots, std::size_t frames) override {
         if (!group_) {
             return 0;
         }
-        interleaved_.resize(frames * channels_);
-        for (std::size_t frame = 0; frame < frames; ++frame) {
-            for (std::size_t channel = 0; channel < channels_; ++channel) {
-                const float sample = channel < slots.size() ? slots[channel][frame] : 0.0F;
-                interleaved_[(frame * channels_) + channel] = to_sample(sample);
-            }
+        if (!variants_.empty()) {
+            // A group that carries variants takes a block of each; a caller
+            // that has none for them sends them silence, which keeps the
+            // layouts in step rather than leaving the group to take nothing.
+            return submit_pcm_variants(slots, {}, frames);
         }
+        interleave(slots, frames, channels_, interleaved_);
         const std::size_t taken = group_->push(interleaved_);
+        taken_ += taken;
+        return taken;
+    }
+
+    std::size_t submit_pcm_variants(
+        std::span<const std::span<const float>> slots,
+        std::span<const std::span<const std::span<const float>>> variants,
+        std::size_t frames) override {
+        if (!group_) {
+            return 0;
+        }
+        if (variants_.empty()) {
+            return submit_pcm(slots, frames);
+        }
+        interleave(slots, frames, channels_, interleaved_);
+        variant_buffers_.resize(variants_.size());
+        for (std::size_t index = 0; index < variants_.size(); ++index) {
+            const std::span<const std::span<const float>> block =
+                index < variants.size() ? variants[index]
+                                        : std::span<const std::span<const float>>{};
+            interleave(block, frames, variants_[index].slots(), variant_buffers_[index]);
+        }
+        std::vector<std::span<const std::int32_t>> blocks;
+        blocks.reserve(1 + variants_.size());
+        blocks.emplace_back(interleaved_);
+        for (const std::vector<std::int32_t>& buffer : variant_buffers_) {
+            blocks.emplace_back(buffer);
+        }
+        const std::size_t taken = group_->push_variants(blocks);
         taken_ += taken;
         return taken;
     }
@@ -153,8 +216,26 @@ public:
     bool resume() override { return true; }
 
 private:
+ // `slots` as interleaved 32-bit samples at `channels`, a slot the block
+ // does not have as silence.
+ static void interleave(std::span<const std::span<const float>> slots, std::size_t frames,
+                        std::size_t channels, std::vector<std::int32_t>& out) {
+     out.resize(frames * channels);
+     for (std::size_t frame = 0; frame < frames; ++frame) {
+         for (std::size_t channel = 0; channel < channels; ++channel) {
+             const float sample = channel < slots.size() ? slots[channel][frame] : 0.0F;
+             out[(frame * channels) + channel] = to_sample(sample);
+         }
+     }
+ }
+
     GroupResolver resolve_;
+    MemberPlanner plan_;
     std::shared_ptr<sendspin::Group> group_;
+    // The layouts beyond the player's the open group carries, and the
+    // interleaved block of each, reused across calls.
+    std::vector<render::OutputLayout> variants_;
+    std::vector<std::vector<std::int32_t>> variant_buffers_;
     std::size_t channels_ = 0;
     std::uint32_t sample_rate_ = 0;
     std::uint64_t taken_ = 0;
@@ -170,8 +251,8 @@ private:
 
 }  // namespace
 
-std::unique_ptr<NetworkGroupSink> make_group_sink(GroupResolver resolve) {
-    return std::make_unique<GroupSink>(std::move(resolve));
+std::unique_ptr<NetworkGroupSink> make_group_sink(GroupResolver resolve, MemberPlanner plan) {
+    return std::make_unique<GroupSink>(std::move(resolve), std::move(plan));
 }
 
 }  // namespace iclforge::hearth

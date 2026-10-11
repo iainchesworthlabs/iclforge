@@ -49,6 +49,21 @@ The sections below contain the complete change list and fixes.
   `OutputConfig::karaoke_vocals` (`KaraokeVocals`). The table's cells were read from the
   specification's own pages and are transcribed into the tests.
 
+**E-AC-3: an associated service mixed into the main**
+
+- **`iclforge::ac3::AssociatedServiceMixer` and `forge decode associated=`.** A description or a
+  commentary carried beside the main programme (§E2.3.1.2's second independent substream, labelled
+  by `bsmod`) is mixed into it with what Annex E §E3.10 gives the stream control of: `pgmscl` on
+  its own programme, `extpgmscl` and the per-channel `extpgm*scl` on the other (or `dmixscl`, when
+  the main was folded to two channels), and `panmean` for a mono service by Tables E3.15 to E3.17,
+  at stereo and at 5.1 as printed and by an extension for other layouts. Gain changes ramp over a
+  block. `premixcmp*`, the speech enhancement words and `blkmixcfginfo` are not applied, because
+  Annex E gives them no processing (§E2.3.1.21: "decoders are not required to use them").
+  `associated=1` or `associated=visually-impaired`, with `associated-gain=<dB>` as the listener's
+  own trim; `monitor`, `play` and Hearth do not mix yet. `meta::pgm_scale_gain()` and
+  `meta::external_scale_gain()` return the linear gain of a code, mute included: Table E2.8's code
+  15 is -infinity, which `kExternalScaleDb` can only hold as 0.0 dB.
+
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 
 - **An AC-3 core with E-AC-3 dependents is carried in MP4, fMP4 and MPEG-TS.** ETSI TS 102 366
@@ -133,6 +148,33 @@ The sections below contain the complete change list and fixes.
 - **The expanded loudspeaker layouts read.** `expanded_layout_info()` lists the 20
   `expanded_loudspeaker_layout` values (9.1.6ch, 10.2.9.3ch, 7.1.5.4ch and their subsets) with the
   substream order of 3.6.2.3, and `decode_pcm()` decodes a single-layer element in any of them.
+
+**Atmos objects: channel lock, zones and extent in the renderer, and DEE-checked 7.1.4 and 9.1.6 beds**
+
+- **`LayoutRenderer` applies an object's channel lock, zone constraints and extent.** The renderer
+  Hearth, the ESP32 player and `forge decode`'s AC-4 object rendering play objects through took an
+  object's position and gain and nothing else. It now follows what TS 103 420 §5.2 says each
+  property means: `b_object_snap` puts the object on the one nearest speaker; the
+  zone constraints of Tables 20 and 21 take the excluded zones' speakers (Table A.7) out of the set
+  it is panned over, with a surround pair the back zone in a 5.X layout and the side zone in a
+  larger one, and `b_enable_elevation` false keeping it off the height speakers; and an extent is
+  rendered as the cuboid it describes, sampled and power-averaged, so a large object spreads over
+  more speakers at the same level. `DisplayObject` gains `zone` and `enable_elevation`. An object
+  that says none of this renders exactly as before. Object divergence and the screen and depth
+  factors are still not applied: the standard gives no geometry for the first, and the output
+  layouts describe no screen for the others.
+- **Extended precision positions are applied.** §5.5.15's `ext_prec_pos_block` was read and thrown
+  away. A position now gets the refinement it carries (x and y by up to two fifths of the 1/62
+  step, z of the 1/15 one), per update block and without feeding the next block's differential
+  coding, as §5.6.1.1.8-.14 say. It is decoded from the text alone, no outside stream carries one.
+  Reading it also fixed a bit count: an object that is not active sends no `b_ext_prec_pos`, and the
+  reader took one for it. `ObjectUpdate::extended_position_precision` lets the writer send it.
+- **7.1.4 and 9.1.6 channel-based-immersive beds are checked against DEE.** Two committed Dolby
+  Encoding Engine streams, `dee_joc_714.ec3` and `dee_joc_916.ec3`, play one input channel at a
+  time, and every reconstructed object comes back as the channel its bed label names. That settles
+  what the 5.1.4 fixture could not: the bed's order holds at twelve and sixteen channels, where
+  Table 12's order and the input order differ (9.1.6 has the wides last in the bed and after the
+  rears at the input).
 
 **IAB (SMPTE ST 2098-2): lossless audio, a writer, and spread and zones in the bridge**
 
@@ -2761,6 +2803,20 @@ The sections below contain the complete change list and fixes.
 - **New in `iclforge::ac3::plan`:** `wav_mask_locations`, `wav_channel_mask`, `source_layout`,
   `channel_mask_of`, `layout_for_locations`, and a `route()` overload that takes the source's own
   locations. The two front ends share them, as they share every other layout rule there.
+
+**E-AC-3: a type 2 substream, read and written as the standard has it**
+
+- **`strmtyp` 2 (§E2.3.1.1, "previously coded in AC-3") is a whole stream type now, not a
+  half-parsed one.** Table E1.2 and E1.3 gate the programme-mixing group, the converter exponent
+  strategies and the converter SNR offset on `strmtyp == 0x0`; the decoder, the EMDF walker, the
+  scanner and the metadata editor read them for any substream that was not dependent, so a real
+  type 2 stream would have been decoded from the wrong bit offset (FFmpeg and the Python reference
+  parser read it as the table says). The encoder refused it, `scan` and the access unit
+  accumulator did not start an access unit at one, and `forge metadata` refused it by name. All
+  now treat it as the independent substream it is. `FrameConfig::ac3_frmsizecod` writes one
+  (held to AC-3's tools, no dependents, a Table 5.18 code) and `DecodedSubstream`,
+  `FrameHeader` and `forge probe` report the code it was converted from. The conversion to and
+  from AC-3 itself is not built: the standard gives the signalling and no process.
 
 **ADM / BW64**
 

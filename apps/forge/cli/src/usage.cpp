@@ -87,9 +87,12 @@ constexpr std::array<OptionToken, 105> kOptionTokens{{
     {"presentation=", "decode of AC-4: the presentation at this position of the table of contents"},
     {"presentation-id=", "decode of AC-4: the presentation with this presentation_id"},
     {"language=", "decode of AC-4: prefer the presentation in this language, a BCP 47 tag"},
-    {"associated=", "decode of AC-4: prefer the presentation with this associated audio service"},
+    {"associated=", "decode of AC-4: prefer the presentation with this associated audio service; of "
+                    "E-AC-3: mix that programme (a substream id 0..7, or a service name its bsmod "
+                    "labels) into the one being decoded, §E3.10"},
     {"dialogue-gain=", "decode of AC-4: g_dialog, the dialogue against music and effects, dB"},
-    {"associated-gain=", "decode of AC-4: g_assoc, the associated audio's level, 0 dB or less"},
+    {"associated-gain=", "decode of AC-4: g_assoc, the associated audio's level, 0 dB or less; of "
+                         "E-AC-3: the same trim on the programme associated= mixes in"},
     {"headphones", "decode of AC-4: a listener on headphones - their DRC mode, pre-virtualized presentations"},
     {"md-compat=", "decode of AC-4: the md_compat level the decoder claims, 0 to 7 (default 7)"},
     {"syntax-trace=", "ac4-encode, and decode of AC-4: write every syntax element written or read"},
@@ -700,8 +703,9 @@ void print_stream_tools_topic() {
     fmt::println("across rather than resetting them, and folds a layout AC-3 cannot code down");
     fmt::println("to 5.1 per §7.8. The other four never touch a coded coefficient:");
     fmt::println("metadata/normalize rewrite bsi fields in place and re-stamp the CRCs, cut/cat");
-    fmt::println("move whole access units. Convertible substreams (strmtyp 2) are out of scope");
-    fmt::println("for all five, the same way 'validate' already refuses them.");
+    fmt::println("move whole access units. A convertible substream (strmtyp 2, §E2.3.1.1:");
+    fmt::println("previously coded in AC-3) is an independent one and goes through all five;");
+    fmt::println("transcode reads it as the E-AC-3 it is.");
     fmt::println("");
     fmt::println("metadata can only overwrite a field the stream already transmits. A field it");
     fmt::println("does not (compr behind a clear compre, bsmod and dsurmod behind a clear");

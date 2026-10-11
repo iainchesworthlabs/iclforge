@@ -24,12 +24,13 @@ constexpr std::size_t kMinimumHeaderBytes = 6;
 
 // §E3.8.2's grouping rule, the same one split_access_units applies: an access
 // unit begins at every AC-3 syncframe and at every Annex E INDEPENDENT
-// substream. A dependent joins the unit ahead of it rather than starting one -
-// which is the whole reason this class exists, since a decoder handed a
-// dependent on its own has nothing to extend.
+// substream - a type 2 substream, previously coded in AC-3, included, since it
+// is independent and may have no dependents. A dependent joins the unit ahead
+// of it rather than starting one - which is the whole reason this class
+// exists, since a decoder handed a dependent on its own has nothing to extend.
 [[nodiscard]] bool begins_access_unit(const FrameHeader& header) {
     return header.kind == StreamKind::kAc3 ||
-           header.strmtyp == eac3::StreamType::kIndependent;
+           header.strmtyp != eac3::StreamType::kDependent;
 }
 
 }  // namespace

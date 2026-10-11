@@ -8,6 +8,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <vector>
 
 #include "iclforge/audio/monitor.hpp"
 #include "iclforge/audio/passthrough.hpp"
@@ -62,7 +63,17 @@ public:
         // can wrap - submit_burst() is then never called, and the group
         // plays to player@v1 members only.
         std::optional<audio::BitstreamFormat> stream{};
+        // The channels the item codes (ItemFacts::channels), which a member's
+        // stated limit is compared with; 0 when not known.
+        std::uint16_t coded_channels = 0;
     };
+
+    // The layouts the open group's members are to be sent PCM at, beyond
+    // Format::layout, which a MemberPlanner chose when the group opened: each
+    // is the programme rendered to a layout of its own, delivered by
+    // submit_pcm_variants() in this order. Empty for a group that plays one
+    // layout, or before open().
+    [[nodiscard]] virtual std::vector<render::OutputLayout> variants() const { return {}; }
 
     // Opens `group_name` - resolved against whatever this sink was built
     // with (make_group_sink()'s `resolve`), not a fixed group chosen once at
@@ -81,6 +92,16 @@ public:
     // retries what was not taken.
     [[nodiscard]] virtual std::size_t submit_pcm(std::span<const std::span<const float>> slots,
                                                  std::size_t frames) = 0;
+    // The same `frames` of the programme rendered to Format::layout (`slots`)
+    // and to each of variants(), in order: `variants[i]` is the planar block
+    // of variants()[i]'s slots. All of them or none are taken, so the layouts
+    // stay in step. Without variants() it is submit_pcm().
+    [[nodiscard]] virtual std::size_t submit_pcm_variants(
+        std::span<const std::span<const float>> slots,
+        std::span<const std::span<const std::span<const float>>> variants, std::size_t frames) {
+        static_cast<void>(variants);
+        return submit_pcm(slots, frames);
+    }
     // One burst: `pc`/`pd` as iclforge::containers::iec61937 writes them, `payload` the
     // elementary-stream bytes they describe (not the IEC 61937 carrier
     // bytes - a group's members are not S/PDIF, so there is nothing to
@@ -127,6 +148,27 @@ public:
 // planning/hearth-reference-player.md#a6-network-outputs-in-the-application),
 // not this sink's.
 using GroupResolver = std::function<std::shared_ptr<sendspin::Group>(const std::string& group_name)>;
-[[nodiscard]] std::unique_ptr<NetworkGroupSink> make_group_sink(GroupResolver resolve);
+
+// What a group is about to play, as far as its members' forms are concerned.
+struct GroupPlanRequest {
+    std::string group_name{};
+    // The coded form the item has, as NetworkGroupSink::Format::stream.
+    std::optional<audio::BitstreamFormat> stream{};
+    std::uint32_t sample_rate = 0;
+    std::uint16_t coded_channels = 0;
+    // The layout the player renders to, which a member that wants it is sent.
+    render::OutputLayout layout{};
+};
+
+// Decides, for each member of a group, the form it is sent the programme in
+// (choose_sink_form()), tells the host (ServerHost::use_pcm()), and answers
+// the layouts, beyond the request's, that the members chosen for PCM are to
+// get. Called when a group opens, on the engine's thread. With none, the
+// group plays PCM at the player's layout to whichever members take it.
+using MemberPlanner =
+    std::function<std::vector<render::OutputLayout>(const GroupPlanRequest& request)>;
+
+[[nodiscard]] std::unique_ptr<NetworkGroupSink> make_group_sink(GroupResolver resolve,
+                                                                MemberPlanner plan = {});
 
 }  // namespace iclforge::hearth

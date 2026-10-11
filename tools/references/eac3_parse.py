@@ -248,10 +248,11 @@ def parse_frame(data, verbose=True):
             info['sourcefscod'] = r.bits(1)
     if strmtyp == 0 and numblkscod != 3:
         r.bits(1)                    # convsync
+    converted_frmsizecod = None
     if strmtyp == 2:
         blkid = 1 if numblkscod == 3 else r.bits(1)
         if blkid:
-            r.bits(6)                # frmsizecod
+            converted_frmsizecod = r.bits(6)  # frmsizecod of the AC-3 frame
     # TS 103 420 §8.3: an object-audio stream puts its only decoder-visible
     # marker here. addbsil counts bytes minus one.
     oba = None
@@ -740,6 +741,7 @@ def parse_frame(data, verbose=True):
                                'dialnorm': dialnorm, 'compr': compr,
                                'mixmdate': mix or None, 'infomdat': info or None,
                                'dynrng': dynrng_blocks,
+                               'converted_frmsizecod': converted_frmsizecod,
                                'oba': oba, 'emdf': emdf, 'aux_start': aux_start}
 
 
@@ -922,7 +924,8 @@ def chanmap_channels(m):
 def split_access_units(data, programme=None):
     """Group syncframes into access units, optionally for one programme only.
 
-    A new access unit starts at each strmtyp 0. Which PROGRAMME it belongs to
+    A new access unit starts at each strmtyp 0 or 2: a type 2 substream is an
+    independent one, previously coded in AC-3. Which PROGRAMME it belongs to
     is that independent substream's own substreamid (E2.3.1.2): a stream
     carrying I0 and I1 puts one access unit of each into every frame period,
     so successive units are successive programmes, not successive frames.
@@ -937,7 +940,7 @@ def split_access_units(data, programme=None):
         substreamid = (data[offset + 2] >> 3) & 0x07
         frmsiz = ((data[offset + 2] & 0x07) << 8) | data[offset + 3]
         size = (frmsiz + 1) * 2
-        if strmtyp == 0 or not units:
+        if strmtyp != 1 or not units:
             units.append([])
         units[-1].append((offset, size, strmtyp, substreamid))
         offset += size
@@ -1000,7 +1003,7 @@ def main():
         # Cross-substream invariants. A dependent that disagrees with its
         # parent about the sample rate or the block count silently desynchronises
         # the program rather than failing to parse.
-        if strmtyp == 0:
+        if strmtyp != 1:
             parent = info
         elif parent is not None:
             for field in ('fscod', 'fscod_family', 'numblkscod'):

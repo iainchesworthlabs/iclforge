@@ -17,6 +17,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "platform/process.hpp"
@@ -4717,6 +4718,125 @@ TEST_CASE("programmeN= generalizes past two, each with its own metadata",
         const auto dialnorm = value_after(qc_text, "dialnorm");
         REQUIRE(dialnorm.has_value());
         CHECK(*dialnorm == want.dialnorm);
+    }
+}
+
+TEST_CASE("decode associated= mixes a description into the main as the stream says",
+          "[cli][decode][programme2][associated]") {
+    // §E3.10: the description (I1, labelled visually impaired) ducks the main
+    // by 10 dB with its extpgmscl and sits hard right with its paninfo - panmean
+    // 20, thirty degrees clockwise, the right speaker alone in Table E3.16.
+    const auto dir = scratch_dir();
+    const auto primary = dir / "associated_main.wav";
+    const auto description = dir / "associated_ad.wav";
+    constexpr std::size_t kFrames = 24000;
+    REQUIRE(iclforge::ac3::io::write_wav_f32(primary.string(),
+                                             make_tone_channels(6, kFrames, 48000), 48000)
+                .has_value());
+    REQUIRE(write_wav(description, {make_tone(0.5, 300.0, kFrames, 48000)}, 48000));
+    const auto stream = dir / "associated.ec3";
+    REQUIRE(run_cli("eac3-encode \"" + primary.string() + "\" \"" + stream.string() +
+                        "\" 448 none 51 off programme2=\"" + description.string() +
+                        "\" programme2-layout=mono programme2-bitrate=96 programme2-bsmod=vi"
+                        " programme2-extpgmscl=-10 programme2-paninfo=20",
+                    dir / "associated_encode.log") == 0);
+
+    // The channel levels of the main alone and of the mix, in WAV order
+    // (L R C LFE Ls Rs), over a window clear of the codec's start-up.
+    const auto level = [&](const std::string& name, const std::string& options) {
+        const auto wav = dir / (name + ".wav");
+        const auto log = dir / (name + ".log");
+        const auto rc = run_cli("decode \"" + stream.string() + "\" \"" + wav.string() + "\" " +
+                                    options,
+                                log);
+        INFO(read_log(log));
+        REQUIRE(rc == 0);
+        const auto decoded = iclforge::ac3::io::read_wav(wav.string());
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->channels.size() == 6);
+        std::vector<double> out;
+        for (const auto& channel : decoded->channels) {
+            out.push_back(rms(channel, 4000, 12000));
+        }
+        return out;
+    };
+    const auto plain = level("associated_plain", "programme=0");
+    const auto mixed = level("associated_mixed", "associated=1");
+
+    const double duck = std::pow(10.0, -10.0 / 20.0);
+    for (const std::size_t channel : {0U, 2U, 3U, 4U, 5U}) {
+        CAPTURE(channel);
+        CHECK(mixed[channel] == Catch::Approx(plain[channel] * duck).epsilon(0.05));
+    }
+    // R carries the main 10 dB down and the description at the level it was
+    // authored at: 0.5 amplitude, 0.354 RMS.
+    const double description_rms = 0.5 / std::numbers::sqrt2;
+    CHECK(mixed[1] == Catch::Approx(std::hypot(plain[1] * duck, description_rms)).epsilon(0.05));
+
+    // By service name, and with the listener's own trim on the description.
+    const auto by_name = level("associated_named",
+                               "associated=visually-impaired associated-gain=-6");
+    CHECK(by_name[1] ==
+          Catch::Approx(std::hypot(plain[1] * duck, description_rms * std::pow(10.0, -6.0 / 20.0)))
+              .epsilon(0.05));
+
+    // The status report says what was done.
+    const auto log = dir / "associated_report.log";
+    REQUIRE(run_cli("decode \"" + stream.string() + "\" \"" +
+                        (dir / "associated_report.wav").string() + "\" associated=1",
+                    log) == 0);
+    const auto text = read_log(log);
+    INFO(text);
+    CHECK(text.find("mixed programme 1 (associated service: visually impaired") !=
+          std::string::npos);
+    CHECK(text.find("main -10.0 dB, associated +0.0 dB") != std::string::npos);
+    CHECK(text.find("placed at pan 20 (30.0 degrees clockwise from the centre)") !=
+          std::string::npos);
+}
+
+TEST_CASE("decode associated= refuses what the stream cannot give",
+          "[cli][decode][programme2][associated]") {
+    const auto dir = scratch_dir();
+    const auto primary = dir / "associated_refuse_main.wav";
+    const auto description = dir / "associated_refuse_ad.wav";
+    REQUIRE(iclforge::ac3::io::write_wav_f32(primary.string(), make_tone_channels(6, 4800, 48000),
+                                             48000)
+                .has_value());
+    REQUIRE(write_wav(description, {make_tone(0.5, 300.0, 4800, 48000)}, 48000));
+    const auto stream = dir / "associated_refuse.ec3";
+    REQUIRE(run_cli("eac3-encode \"" + primary.string() + "\" \"" + stream.string() +
+                        "\" 448 none 51 off programme2=\"" + description.string() +
+                        "\" programme2-layout=mono programme2-bitrate=96 programme2-bsmod=vi",
+                    dir / "associated_refuse_encode.log") == 0);
+    const auto wav = dir / "associated_refuse_out.wav";
+    const auto decode = [&](const std::string& options) {
+        const auto log = dir / "associated_refuse_decode.log";
+        const auto rc = run_cli("decode \"" + stream.string() + "\" \"" + wav.string() + "\" " +
+                                    options,
+                                log);
+        return std::pair{rc, read_log(log)};
+    };
+
+    SECTION("a service no programme of the stream is") {
+        const auto [rc, text] = decode("associated=commentary");
+        CHECK(rc != 0);
+        CHECK(text.find("no programme of this stream is that associated service") !=
+              std::string::npos);
+    }
+    SECTION("the programme being decoded") {
+        const auto [rc, text] = decode("associated=0");
+        CHECK(rc != 0);
+        CHECK(text.find("is the programme being decoded") != std::string::npos);
+    }
+    SECTION("a substream the stream does not carry") {
+        const auto [rc, text] = decode("associated=5");
+        CHECK(rc != 0);
+        CHECK(text.find("no programme 5 in this stream") != std::string::npos);
+    }
+    SECTION("a gain with nothing to scale is named and ignored") {
+        const auto [rc, text] = decode("associated-gain=-6");
+        CHECK(rc == 0);
+        CHECK(text.find("associated-gain= scales an associated service") != std::string::npos);
     }
 }
 

@@ -28,7 +28,7 @@ This table is AC-3 and E-AC-3. The AC-4 encoder is the `iclforge::ac4`, the enco
 | | AC-3 (bsid 8) | E-AC-3 (bsid 16) |
 |---|---|---|
 | Coding modes | 1+1 dual mono, 1/0, 2/0, 3/0, 2/1, 3/1, 2/2, 3/2, each with or without LFE (1+1 never carries one) | the same, plus 7.1, 5.1.2, 5.1.4 and 7.1.4 through dependent substreams |
-| Programmes per stream | one | up to eight independent substreams can be **authored** (§E2.3.1.2's I0–I7) — each with its own layout, dialnorm and full `mixmdate`/`bsmod` metadata via `programmeN=` (sample rate and block count are shared across every programme in a stream — §E2.3.1.2 requires it). Receiver-side use of that metadata (actually combining an associated service with the main programme during mixdown) is not implemented yet |
+| Programmes per stream | one | up to eight independent substreams can be **authored** (§E2.3.1.2's I0–I7) — each with its own layout, dialnorm and full `mixmdate`/`bsmod` metadata via `programmeN=` (sample rate and block count are shared across every programme in a stream — §E2.3.1.2 requires it). Receiver-side use of that metadata - combining an associated service with the main programme - is `AssociatedServiceMixer` (§E3.10; see [Decoding](#decoding)) |
 | Sample rates | 48, 44.1, 32 kHz | 48, 44.1, 32 kHz, plus the `fscod2` half rates 24, 22.05, 16 kHz (Annex E only) |
 | Bit rates | CBR only — the 19 nominal rates of Table 5.18, 32–640 kbps | CBR (the same 19, per substream) or VBR — a quality target with optional min/max kbps bounds, per substream |
 | Transform | long (512-point) or short (2x256-point) blocks, KBD window, chosen per block per channel by a §8.2.2 transient detector | same |
@@ -106,7 +106,7 @@ presentation metadata is under [AC-4](ac4.md#what-the-decoder-reports) and, for 
 | `compr` | §7.7.2 | Heavy compression as a limiter guaranteeing a peak ceiling in the §7.8 mono downmix. Rounds down, because nearest-code rounding can overshoot a ceiling by half a step. Its peak detector includes the previous frame's MDCT overlap. |
 | `dialnorm` | §5.4.2.8 | Measured with ITU-R BS.1770-4 gated loudness and negated, or set directly. A/52 predates BS.1770 and leaves the measurement open. |
 | Downmix levels | Tables 5.9/5.10, E1.2, D2.2–D2.6 | `cmixlev`/`surmixlev` in AC-3's own bsi; separate Lt/Rt and Lo/Ro levels plus a preferred-downmix indication in E-AC-3's `mixmdate` and in AC-3's Annex D `xbsi1`. |
-| Programme mixing | Table E1.2, §E2.3.1.12–61 | The rest of `mixmdate`, written by the independent substream: programme and external-programme scale factors, the `mixdef` mixing-parameter block (premix compression, per-channel external scales, speech enhancement data), pan position for a mono or 1+1 programme, and per-block mixing configuration. This is what a receiver mixes an audio-description or commentary service against the main programme with. |
+| Programme mixing | Table E1.2, §E2.3.1.12–61 | The rest of `mixmdate`, written by the independent substream: programme and external-programme scale factors, the `mixdef` mixing-parameter block (premix compression, per-channel external scales, speech enhancement data), pan position for a mono or 1+1 programme, and per-block mixing configuration. This is what a receiver mixes an audio-description or commentary service against the main programme with, and `AssociatedServiceMixer` does (see [Decoding](#decoding)). |
 | Service and production | §5.4.2.2–28, Table E1.2 | `bsmod` (complete main through commentary and emergency — what ATSC A/53 and DVB key associated-service handling off), `dsurmod`, `dsurexmod`, `dheadphonmod`, `adconvtyp`, `audprodie`'s mixing level and room type, `copyrightb`, `origbs`, `langcod`, the 28-bit time code, and E-AC-3's `sourcefscod`. AC-3 carries them in bsi (the Surround EX, Headphone and A/D flags only under Annex D); E-AC-3 gathers the same set into `infomdat`. |
 | Annex D alternate syntax | Annex D, `bsid` 6 | AC-3's two 14-bit `timecod` fields "have never been applied for their originally anticipated purpose" (§D1), so a `bsid`-6 stream spends them on `xbsi1`/`xbsi2` instead. Encode and decode both sides; §D3.2's promise holds, in that a legacy reader takes those bits for a time code it already ignores. |
 
@@ -119,7 +119,7 @@ The in-repo decoder shares its tables, bit-allocation engine, exponent decoding 
 the encoder. It reads AC-3 (bsid ≤ 8) and E-AC-3 (bsid 11–16), including dependent substreams,
 `chanmap`, and the §E3.8.2 render that lays a dependent's channels over the bed. A stream
 carrying more than one programme is decoded one programme at a time — `DecoderConfig::programme`
-picks which — since independent substreams are alternatives rather than layers. Every Annex E
+picks which — since independent substreams are alternatives rather than layers; an associated service (a description, a commentary) is mixed into the main afterwards by `AssociatedServiceMixer`, with the gains, per-channel trims and pan §E3.10 gives it. Every Annex E
 coding tool decodes too — standard coupling (§E3.3), enhanced coupling (§E3.5, a full FFT-based
 phase-restoring reconstruction over 22 sub-bands), spectral extension (§E3.6, including the
 pseudo-random noise blend the standard requires but leaves the exact generator unspecified), the

@@ -192,6 +192,13 @@ void write_stream(JsonSink& json, const ac3::io::ProbeReport& report) {
         } else {
             json.member_null("chanmap");
         }
+        // §E2.3.1.65: the AC-3 frame size code a type 2 substream was
+        // converted from, null for every other type.
+        if (sub.converted_frmsizecod.has_value()) {
+            json.member("converted_frmsizecod", static_cast<std::int64_t>(*sub.converted_frmsizecod));
+        } else {
+            json.member_null("converted_frmsizecod");
+        }
         json.member("syncframes", static_cast<std::uint64_t>(sub.syncframes));
         json.end_object();
     }
