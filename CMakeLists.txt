@@ -477,8 +477,12 @@ add_subdirectory(libs/device)
 # Crucible and the sink firmware alike (libs/lyrics/CMakeLists.txt). The minimum-footprint profile
 # carries none, and the ESP-IDF component's archive does not stage the directory, so it is not
 # reached there (tools/packaging/pack_esp_component.py).
+#
+# EXCLUDE_FROM_ALL: it is built when a program links it (Hearth, the tests) and not otherwise. It
+# reads files through std::filesystem, which the Python wheel's Intel macOS target (10.9) does not
+# have, and the wheel links nothing of it (bindings/python/pyproject.toml).
 if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
-    add_subdirectory(libs/lyrics)
+    add_subdirectory(libs/lyrics EXCLUDE_FROM_ALL)
 endif()
 add_subdirectory(libs/ac3)
 
