@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # forge - the command-line front end over iclforge::ac3.
 # ---------------------------------------------------------------------------
-add_executable(forge src/main.cpp src/support.cpp src/usage.cpp src/json.cpp src/multi_source.cpp ../../shared/media/src/fmp4_folder_writer.cpp ../../shared/media/src/recording_sink.cpp ../../shared/media/src/container_input.cpp ../../shared/media/src/stream_playback.cpp ../../shared/media/src/ac4_object_render.cpp ../../shared/media/src/ac4_encode_core.cpp ../../shared/media/src/ac4_objects_core.cpp src/commands/containers.cpp src/commands/audio_io.cpp src/commands/live_audio.cpp src/commands/synth.cpp src/commands/atmos.cpp src/commands/encode.cpp src/commands/ac4_encode.cpp src/commands/ac4_encode_objects.cpp src/commands/decode.cpp src/commands/analysis.cpp src/commands/probe.cpp src/commands/stream_tools.cpp)
+add_executable(forge src/main.cpp src/support.cpp src/usage.cpp src/json.cpp src/multi_source.cpp ../../shared/media/src/fmp4_folder_writer.cpp ../../shared/media/src/recording_sink.cpp ../../shared/media/src/container_input.cpp ../../shared/media/src/stream_playback.cpp ../../shared/media/src/associated_mix.cpp ../../shared/media/src/ac4_object_render.cpp ../../shared/media/src/ac4_encode_core.cpp ../../shared/media/src/ac4_objects_core.cpp src/commands/containers.cpp src/commands/audio_io.cpp src/commands/live_audio.cpp src/commands/synth.cpp src/commands/atmos.cpp src/commands/encode.cpp src/commands/ac4_encode.cpp src/commands/ac4_encode_objects.cpp src/commands/decode.cpp src/commands/analysis.cpp src/commands/probe.cpp src/commands/stream_tools.cpp)
 
 # ../../shared/media/src/recording_sink.cpp + fmp4_folder_writer.cpp: the take writer
 # 'record' and 'live' stream their output through (wide-layout record/live paths), shared
@@ -12,7 +12,9 @@ add_executable(forge src/main.cpp src/support.cpp src/usage.cpp src/json.cpp src
 # iclforge-forge-cli-tests. ../../shared/media/src/container_input.cpp (container readers (mkv/mp4/ts)) is the same shape,
 # for turning a container file into an elementary stream instead, and so is
 # ../../shared/media/src/stream_playback.cpp, the decoder choice and end-of-stream flush
-# 'monitor' and 'spatial' play a stream with, ../../shared/media/src/ac4_encode_core.cpp,
+# 'monitor' and 'spatial' play a stream with, ../../shared/media/src/associated_mix.cpp,
+# the choice of an associated service and the pairing of its units with the main's that
+# 'decode' and 'monitor' mix a second programme with, ../../shared/media/src/ac4_encode_core.cpp,
 # the steps of 'ac4-encode' forge-gui's AC-4 encode takes too, and
 # ../../shared/media/src/ac4_objects_core.cpp, the object slots and the AC-4 objects' steps
 # 'atmos-encode', 'atmos-adm' and 'atmos-iab' take, which forge-gui's AC-4 objects take too.

@@ -427,3 +427,207 @@ TEST_CASE("a dual mono held-back unit stays in coded order", "[decoder][eac3][mo
     CHECK(played.back().layout.count == 0);
     CHECK(played.back().channels.size() == 2);
 }
+
+// ---------------------------------------------------------------------------
+// Which programme plays. A stream with a second independent substream hands
+// split_access_units its programmes interleaved, one frame period of each in
+// turn, and 'monitor' and 'spatial' used to feed that straight to a decoder
+// that was given no `programme`: the decoder played the main, then the audio
+// description, then the main again - and sized the output for the first unit's
+// 5.1, so the mono unit after it read channels that were not there.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+constexpr int kProgrammeUnits = 6;
+
+// A 5.1 main and a mono audio description as two independent substreams of one
+// stream, a frame period of each in turn: the way a broadcast DD+ stream with
+// an associated service arrives, and the way 'forge eac3-encode ...
+// programme2=' writes one. The frames are kept apart as well, so a test can
+// say which frame each unit is.
+struct TwoProgrammes {
+    std::vector<std::byte> stream;
+    std::vector<std::vector<std::byte>> main;
+    std::vector<std::vector<std::byte>> description;
+};
+
+TwoProgrammes two_programmes() {
+    iclforge::ac3::eac3::FrameEncoder main_encoder{
+        {.bitrate_kbps = 448, .acmod = Acmod::k3_2, .lfe = true}};
+    iclforge::ac3::eac3::FrameEncoder description_encoder{
+        {.bitrate_kbps = 96, .acmod = Acmod::k1_0, .substreamid = 1}};
+    TwoProgrammes out;
+    for (int unit = 0; unit < kProgrammeUnits; ++unit) {
+        const auto bed = unit_pcm(kBedTones, unit, 0);
+        auto main_frame = main_encoder.encode_frame(views(bed));
+        REQUIRE(main_frame.has_value());
+        const auto voice = unit_pcm(std::array{700.0}, unit, 0);
+        auto description_frame = description_encoder.encode_frame(views(voice));
+        REQUIRE(description_frame.has_value());
+        out.stream.insert(out.stream.end(), main_frame->begin(), main_frame->end());
+        out.stream.insert(out.stream.end(), description_frame->begin(), description_frame->end());
+        out.main.push_back(std::move(*main_frame));
+        out.description.push_back(std::move(*description_frame));
+    }
+    return out;
+}
+
+bool same_bytes(std::span<const std::byte> a, std::span<const std::byte> b) {
+    return std::ranges::equal(a, b);
+}
+
+// Every unit of `selected` is, byte for byte, the frame `expected` has at its
+// position - so the units are one programme's, and in frame-period order.
+void check_units_are(const iclforge::apps::ProgrammeUnits& selected,
+                     const std::vector<std::vector<std::byte>>& expected) {
+    REQUIRE(selected.units.size() == expected.size());
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+        CAPTURE(i);
+        CHECK(same_bytes(selected.units[i], expected[i]));
+    }
+}
+
+}  // namespace
+
+TEST_CASE("select_programme takes a stream's first programme and only its units",
+          "[decoder][eac3][monitor][programme]") {
+    const auto two = two_programmes();
+
+    // The premise: the unfiltered split really does interleave them.
+    const auto all = iclforge::ac3::split_access_units(two.stream);
+    REQUIRE(all.has_value());
+    REQUIRE(all->size() == 2 * static_cast<std::size_t>(kProgrammeUnits));
+
+    const auto selected = iclforge::apps::select_programme(two.stream, std::nullopt);
+    REQUIRE(selected.has_value());
+    CHECK(selected->programme == 0);
+    CHECK(selected->ids == std::vector<int>{0, 1});
+    check_units_are(*selected, two.main);
+}
+
+TEST_CASE("select_programme takes the programme asked for, in frame-period order",
+          "[decoder][eac3][monitor][programme]") {
+    const auto two = two_programmes();
+
+    const auto first = iclforge::apps::select_programme(two.stream, 0);
+    REQUIRE(first.has_value());
+    CHECK(first->programme == 0);
+    check_units_are(*first, two.main);
+
+    const auto second = iclforge::apps::select_programme(two.stream, 1);
+    REQUIRE(second.has_value());
+    CHECK(second->programme == 1);
+    CHECK(second->ids == std::vector<int>{0, 1});
+    check_units_are(*second, two.description);
+}
+
+TEST_CASE("select_programme says which programmes there are when the one asked for is not",
+          "[decoder][eac3][monitor][programme]") {
+    const auto two = two_programmes();
+    const auto missing = iclforge::apps::select_programme(two.stream, 5);
+    REQUIRE_FALSE(missing.has_value());
+    CHECK(missing.error().not_carried);
+    CHECK(missing.error().carried == std::vector<int>{0, 1});
+
+    // Not framing at all is a different answer: nothing to list.
+    const std::vector<std::byte> junk(64, std::byte{0x55});
+    const auto garbage = iclforge::apps::select_programme(junk, std::nullopt);
+    REQUIRE_FALSE(garbage.has_value());
+    CHECK_FALSE(garbage.error().not_carried);
+    CHECK(garbage.error().carried.empty());
+    CHECK_FALSE(iclforge::apps::select_programme({}, 0).has_value());
+}
+
+TEST_CASE("a decoder given one programme's units plays only that programme, at its own width",
+          "[decoder][eac3][monitor][programme]") {
+    const auto two = two_programmes();
+
+    // What 'monitor' did: the unfiltered units to a decoder with no
+    // `programme`. The mono description follows the 5.1 main, unit for unit.
+    {
+        const auto all = iclforge::ac3::split_access_units(two.stream);
+        REQUIRE(all.has_value());
+        iclforge::ac3::Eac3Decoder decoder;
+        std::vector<std::size_t> widths;
+        for (const auto& unit : *all) {
+            const auto decoded = decoder.decode_access_unit(unit);
+            REQUIRE(decoded.has_value());
+            REQUIRE(decoded->has_value());
+            widths.push_back((*decoded)->channels.size());
+        }
+        REQUIRE(widths.size() >= 2);
+        CHECK(widths[0] == 6);
+        CHECK(widths[1] == 1);
+    }
+
+    // What it does now, for each programme.
+    for (const int wanted : {0, 1}) {
+        CAPTURE(wanted);
+        const auto selected = iclforge::apps::select_programme(two.stream, wanted);
+        REQUIRE(selected.has_value());
+        iclforge::ac3::Eac3Decoder decoder{{.programme = selected->programme}};
+        std::size_t played = 0;
+        for (const auto& unit : selected->units) {
+            const auto decoded = decoder.decode_access_unit(unit);
+            REQUIRE(decoded.has_value());
+            REQUIRE(decoded->has_value());
+            CHECK((*decoded)->programme == wanted);
+            CHECK((*decoded)->channels.size() == (wanted == 0 ? 6U : 1U));
+            ++played;
+        }
+        CHECK(played == static_cast<std::size_t>(kProgrammeUnits));
+    }
+}
+
+TEST_CASE("select_programme leaves a single-programme stream, legacy core included, whole",
+          "[decoder][eac3][monitor][programme]") {
+    const auto single = single_substream_streams(Acmod::k3_2, true, kBedTones).held;
+    const auto legacy = legacy_core_streams(3, 1).held;
+    for (const auto* stream : {&single, &legacy}) {
+        const auto all = iclforge::ac3::split_access_units(*stream);
+        REQUIRE(all.has_value());
+        const auto selected = iclforge::apps::select_programme(*stream, std::nullopt);
+        REQUIRE(selected.has_value());
+        CHECK(selected->programme == 0);
+        CHECK(selected->ids == std::vector<int>{0});
+        REQUIRE(selected->units.size() == all->size());
+        for (std::size_t i = 0; i < all->size(); ++i) {
+            CHECK(same_bytes(selected->units[i], (*all)[i]));
+        }
+    }
+}
+
+TEST_CASE("cut_programme makes a programme a stream a receiver will play",
+          "[decoder][eac3][programme]") {
+    const auto two = two_programmes();
+
+    // The description, which a receiver would ignore as it stands (it takes
+    // independent substream 0): cut out, it is substream 0 of a stream of its
+    // own and decodes as the mono it is.
+    const auto cut = iclforge::apps::cut_programme(two.stream, 1);
+    REQUIRE(cut.has_value());
+    const auto ids = iclforge::ac3::programme_ids(*cut);
+    REQUIRE(ids.has_value());
+    CHECK(*ids == std::vector<int>{0});
+    const auto units = iclforge::ac3::split_access_units(*cut);
+    REQUIRE(units.has_value());
+    REQUIRE(units->size() == static_cast<std::size_t>(kProgrammeUnits));
+    iclforge::ac3::Eac3Decoder decoder;
+    const auto decoded = decoder.decode_access_unit(units->front());
+    REQUIRE(decoded.has_value());
+    REQUIRE(decoded->has_value());
+    CHECK((*decoded)->channels.size() == 1);
+
+    // Programme 0 is substream 0 already: its frames come back as they were.
+    const auto main = iclforge::apps::cut_programme(two.stream, 0);
+    REQUIRE(main.has_value());
+    std::vector<std::byte> expected;
+    for (const auto& frame : two.main) {
+        expected.insert(expected.end(), frame.begin(), frame.end());
+    }
+    CHECK(same_bytes(*main, expected));
+
+    CHECK_FALSE(iclforge::apps::cut_programme(two.stream, 5).has_value());
+    CHECK_FALSE(iclforge::apps::cut_programme({}, 0).has_value());
+}
