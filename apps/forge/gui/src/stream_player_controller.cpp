@@ -728,8 +728,14 @@ void StreamPlayerController::exportDecodedWav(const QUrl& url) {
     emit exportingChanged();
 
     jobs_.run([this, path, result = result_] {
-        const auto written = iclforge::ac3::io::write_wav_f32(path.toStdString(), result->channels,
-                                                     result->sample_rate_hz);
+        // An AC-3 or E-AC-3 decode of three channels or more states its
+        // speakers, as `forge decode` writes them: the file then loads back as
+        // the coding mode it came from instead of the one its width suggests.
+        // `locations` is parallel to `channels`, which are in WAV order.
+        const std::uint32_t mask =
+            result->ac4 ? 0 : iclforge::ac3::plan::wav_channel_mask(result->locations);
+        const auto written = iclforge::ac3::io::write_wav_f32(
+            path.toStdString(), result->channels, result->sample_rate_hz, {}, mask);
         QString error;
         if (!written) {
             error = QStringLiteral("Could not write %1: %2")

@@ -1,10 +1,12 @@
 #include "wav_format.hpp"
 
+#include <array>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <optional>
+#include <ostream>
 #include <span>
 #include <string_view>
 
@@ -88,6 +90,7 @@ std::expected<WavFormat, WavError> parse_format(std::span<const char> data, cons
         return std::unexpected(WavError::kNotRiffWave);
     }
     auto tag = read_u16(data, fmt.payload_at);
+    std::uint32_t channel_mask = 0;
     const auto channels = read_u16(data, fmt.payload_at + 2);
     const auto sample_rate = read_u32(data, fmt.payload_at + 4);
     const auto bits = read_u16(data, fmt.payload_at + 14);
@@ -101,6 +104,8 @@ std::expected<WavFormat, WavError> parse_format(std::span<const char> data, cons
             return std::unexpected(WavError::kUnsupportedFormat);
         }
         tag = read_u16(data, fmt.payload_at + 24);
+        // dwChannelMask follows cbSize (+16) and wValidBitsPerSample (+18).
+        channel_mask = read_u32(data, fmt.payload_at + 20);
     }
     if (channels == 0) {
         return std::unexpected(WavError::kUnsupportedFormat);
@@ -131,6 +136,7 @@ std::expected<WavFormat, WavError> parse_format(std::span<const char> data, cons
     out.channels = channels;
     out.format = *format;
     out.stride = static_cast<std::size_t>(channels) * sample_bytes(*format);
+    out.channel_mask = channel_mask;
     return out;
 }
 
@@ -188,6 +194,50 @@ float convert_sample(std::span<const char> raw, std::size_t at, SampleFormat for
         }
     }
     return 0.0f;
+}
+
+bool states_mask(std::uint16_t channels, std::uint32_t channel_mask) {
+    return channel_mask != 0 &&
+           static_cast<std::size_t>(std::popcount(channel_mask)) == channels;
+}
+
+void write_f32_header(std::ostream& out, std::uint16_t channels, std::uint32_t sample_rate,
+                      std::uint32_t data_bytes, std::uint32_t channel_mask) {
+    const auto put_u16 = [&out](std::uint16_t value) {
+        out.write(reinterpret_cast<const char*>(&value), 2);
+    };
+    const auto put_u32 = [&out](std::uint32_t value) {
+        out.write(reinterpret_cast<const char*>(&value), 4);
+    };
+    const bool extensible = states_mask(channels, channel_mask);
+    // RIFF's size field counts everything after itself: the header less its
+    // first 8 bytes, plus the samples.
+    out.write("RIFF", 4);
+    put_u32(static_cast<std::uint32_t>(f32_header_bytes(extensible) - 8) + data_bytes);
+    out.write("WAVE", 4);
+    out.write("fmt ", 4);
+    put_u32(extensible ? 40 : 16);
+    put_u16(extensible ? kFormatExtensible : kFormatIeeeFloat);
+    put_u16(channels);
+    put_u32(sample_rate);
+    put_u32(sample_rate * channels * 4);
+    put_u16(static_cast<std::uint16_t>(channels * 4));
+    put_u16(32);
+    if (extensible) {
+        put_u16(22);  // cbSize: the extension that follows
+        put_u16(32);  // wValidBitsPerSample: the whole container carries signal
+        put_u32(channel_mask);
+        // SubFormat KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, {00000003-0000-0010-8000-00AA00389B71}:
+        // the format tag in the first two bytes, then the fixed Microsoft base GUID.
+        put_u16(kFormatIeeeFloat);
+        put_u16(0);
+        constexpr std::array<std::uint8_t, 12> kBaseGuid = {0x00, 0x00, 0x10, 0x00, 0x80, 0x00,
+                                                            0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71};
+        out.write(reinterpret_cast<const char*>(kBaseGuid.data()),
+                  static_cast<std::streamsize>(kBaseGuid.size()));
+    }
+    out.write("data", 4);
+    put_u32(data_bytes);
 }
 
 }  // namespace iclforge::base::detail

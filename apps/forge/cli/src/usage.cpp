@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 104> kOptionTokens{{
+constexpr std::array<OptionToken, 106> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -52,6 +52,8 @@ constexpr std::array<OptionToken, 104> kOptionTokens{{
     {"gate-objects", "play objects only where the EMDF signature verifies, the bed elsewhere"},
     {"mix-lfe", "decode/monitor: fold the LFE into the §7.8 output-stage downmix too"},
     {"mix-lfe=", "decode/monitor: on, or off to keep the LFE out of a downmix, as AC-4's is not by default"},
+    {"karaoke", "decode: an AC-3 karaoke stream (Annex C) as a karaoke-aware decoder plays it - L, C, R"},
+    {"karaoke=", "decode: on or aware; none, v1, v2 or v1+v2 for the karaoke-capable decoder's vocals; off (the default)"},
     {"fast-mdct", "names the default forward MDCT (the fast §7.9.4 path)"},
     {"fast-imdct", "names the default inverse MDCT (the fast §7.9.4 step 3)"},
     {"quiet", "no status output at all - errors and the payload only"},
@@ -364,6 +366,12 @@ void print_layout_topic() {
     fmt::println("        Locations: L C R Ls Rs Lc Rc Lrs Rrs Cs Ts Lsd Rsd Lw Rw Vhl Vhr");
     fmt::println("        Vhc Lts Rts LFE2 LFE - a paired location (Lc/Rc, Lrs/Rrs, Lsd/Rsd,");
     fmt::println("        Lw/Rw, Vhl/Vhr, Lts/Rts) must be given both halves.");
+    fmt::println("");
+    fmt::println("        With no [layout], 'encode' and 'eac3-encode' follow the source: a WAV");
+    fmt::println("        that states which speakers its channels are (a WAVE_FORMAT_EXTENSIBLE");
+    fmt::println("        channel mask, which 'decode' writes from three channels up) is encoded");
+    fmt::println("        as exactly those - FL FR BC is 2/1, FL FR FC BC is 3/1 - and one that");
+    fmt::println("        states none is read by its channel count.");
 }
 
 void print_tools_topic() {
@@ -442,6 +450,21 @@ void print_decode_topic() {
     fmt::println("       not decode from the previous block's overlap instead of failing the");
     fmt::println("       command; monitor also folds on its own initiative when the output");
     fmt::println("       endpoint renders fewer channels than the programme.");
+    fmt::println("");
+    fmt::println("decode alone takes karaoke (or karaoke=on) for an AC-3 karaoke stream,");
+    fmt::println("       bsmod 7 with an acmod above 1/0 (Annex C): it writes what a");
+    fmt::println("       karaoke-aware multi-channel decoder reproduces - L, C, R (and the LFE) -");
+    fmt::println("       with the guide melody M in the centre and the vocals V1, V2 mixed at");
+    fmt::println("       the stream's own surround level: a single V1 into the centre, a pair");
+    fmt::println("       into the left and the right (Table C.2.2). With channels=2 or 1 it is");
+    fmt::println("       the Lo/Ro downmix, which is Annex C's 2/0 reproduction. downmix=ltrt");
+    fmt::println("       is refused: Annex C defines no Lt/Rt. A stream that is not karaoke");
+    fmt::println("       is decoded as coded, and the report says so. karaoke=none, v1, v2");
+    fmt::println("       or v1+v2 is the karaoke-capable decoder's listener choice of vocals");
+    fmt::println("       (C.2.3.2, Table C.2.3): at the default layout the same L, C, R with");
+    fmt::println("       only the chosen vocals in it (V1 or V2 alone in the centre, a pair");
+    fmt::println("       left and right at unity), and at channels=2 or 1 the 2/0 form with");
+    fmt::println("       the melody at clev and a single vocal at 0.7 in both channels.");
 }
 
 void print_ac4_decode_topic() {

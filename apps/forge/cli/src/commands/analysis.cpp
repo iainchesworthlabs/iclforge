@@ -1475,7 +1475,7 @@ int run_levels(std::string_view in_path, const Options& meta) {
         fmt::println(stderr, "error: {}: {}", in_path, iclforge::ac3::io::describe(wav.error()));
         return kExitInput;
     }
-    const auto layout = iclforge::ac3::io::ac3_layout_for(wav->channels.size());
+    const auto layout = wav_source_layout(*wav);
     if (!layout) {
         fmt::println(stderr, "error: levels handles 1 to 6 channels ({} given)",
                      wav->channels.size());
@@ -1582,7 +1582,7 @@ int run_loudness(std::string_view in_path, const Options& meta) {
     // The BS.1770 channel weighting depends on which coded positions are
     // surrounds, so the layout has to be inferred from the channel count
     // (Table 5.8) rather than assumed.
-    const auto layout = iclforge::ac3::io::ac3_layout_for(wav->channels.size());
+    const auto layout = wav_source_layout(*wav);
     if (!layout) {
         fmt::println(stderr, "error: {} channels is not an AC-3 layout",
                      wav->channels.size());

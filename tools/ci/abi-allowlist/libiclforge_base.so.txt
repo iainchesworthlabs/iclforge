@@ -40,6 +40,7 @@ iclforge::base::WavPcm16StreamWriter::write(std::span<std::byte const, 184467440
 iclforge::base::WavPcm16StreamWriter::~WavPcm16StreamWriter()
 iclforge::base::WavStreamReader::WavStreamReader()
 iclforge::base::WavStreamReader::WavStreamReader(iclforge::base::WavStreamReader&&)
+iclforge::base::WavStreamReader::channel_mask() const
 iclforge::base::WavStreamReader::channels() const
 iclforge::base::WavStreamReader::close()
 iclforge::base::WavStreamReader::frame_count() const
@@ -57,6 +58,7 @@ iclforge::base::WavStreamWriter::flush_header()
 iclforge::base::WavStreamWriter::frames_written() const
 iclforge::base::WavStreamWriter::is_open() const
 iclforge::base::WavStreamWriter::open(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, unsigned int, unsigned short)
+iclforge::base::WavStreamWriter::open(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, unsigned int, unsigned short, unsigned int)
 iclforge::base::WavStreamWriter::operator=(iclforge::base::WavStreamWriter&&)
 iclforge::base::WavStreamWriter::write(std::span<float const, 18446744073709551615ul>)
 iclforge::base::WavStreamWriter::~WavStreamWriter()
@@ -74,6 +76,8 @@ iclforge::base::read_wav(std::basic_istream<char, std::char_traits<char> >&)
 iclforge::base::to_dbfs(double)
 iclforge::base::version_details[abi:cxx11]()
 iclforge::base::write_wav_f32(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::span<std::vector<float, std::allocator<float> > const, 18446744073709551615ul>, unsigned int, std::span<unsigned long const, 18446744073709551615ul>)
+iclforge::base::write_wav_f32(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::span<std::vector<float, std::allocator<float> > const, 18446744073709551615ul>, unsigned int, std::span<unsigned long const, 18446744073709551615ul>, unsigned int)
 iclforge::base::write_wav_f32(std::basic_ostream<char, std::char_traits<char> >&, std::span<std::vector<float, std::allocator<float> > const, 18446744073709551615ul>, unsigned int, std::span<unsigned long const, 18446744073709551615ul>)
+iclforge::base::write_wav_f32(std::basic_ostream<char, std::char_traits<char> >&, std::span<std::vector<float, std::allocator<float> > const, 18446744073709551615ul>, unsigned int, std::span<unsigned long const, 18446744073709551615ul>, unsigned int)
 iclforge::base::write_wav_pcm16_raw(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::span<std::byte const, 18446744073709551615ul>, unsigned int, unsigned short)
 iclforge::internal::cpu::has_avx2()
